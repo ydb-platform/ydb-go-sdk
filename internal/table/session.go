@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
@@ -21,9 +23,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -43,17 +46,20 @@ type session struct {
 	tableService Ydb_Table_V1.TableServiceClient
 	config       config.Config
 
-	closedMtx xsync.RWMutex
-	closed    bool
+	status options.SessionStatus
+	nodeID uint32
 
-	statusMtx xsync.RWMutex
-	status    options.SessionStatus
-
-	onCloseMtx xsync.RWMutex
-	onClose    []func(ctx context.Context)
+	onClose   []func(s *session)
+	closeOnce sync.Once
 }
 
 func (s *session) NodeID() uint32 {
+	if s == nil {
+		return 0
+	}
+	if nodeID := atomic.LoadUint32(&s.nodeID); nodeID != 0 {
+		return nodeID
+	}
 	u, err := url.Parse(s.id)
 	if err != nil {
 		panic(err)
@@ -62,34 +68,32 @@ func (s *session) NodeID() uint32 {
 	if err != nil {
 		return 0
 	}
+	atomic.StoreUint32(&s.nodeID, uint32(nodeID))
 	return uint32(nodeID)
 }
 
 func (s *session) Status() string {
-	s.statusMtx.RLock()
-	defer s.statusMtx.RUnlock()
-	return s.status.String()
+	if s == nil {
+		return ""
+	}
+	return options.SessionStatus(atomic.LoadUint32((*uint32)(&s.status))).String()
 }
 
 func (s *session) SetStatus(status options.SessionStatus) {
-	s.statusMtx.WithLock(func() {
-		s.status = status
-	})
+	atomic.StoreUint32((*uint32)(&s.status), uint32(status))
 }
 
 func (s *session) isClosed() bool {
-	s.closedMtx.RLock()
-	defer s.closedMtx.RUnlock()
-	return s.closed
+	return options.SessionStatus(atomic.LoadUint32((*uint32)(&s.status))) == options.SessionClosed
 }
 
 func (s *session) isClosing() bool {
-	s.statusMtx.RLock()
-	defer s.statusMtx.RUnlock()
-	return s.status == options.SessionClosing
+	return options.SessionStatus(atomic.LoadUint32((*uint32)(&s.status))) == options.SessionClosing
 }
 
-func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) (s Session, err error) {
+func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.Config, opts ...sessionBuilderOption) (
+	s *session, err error,
+) {
 	onDone := trace.TableOnSessionNew(config.Trace(), &ctx)
 	defer func() {
 		onDone(s, err)
@@ -120,11 +124,18 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	return &session{
+
+	s = &session{
 		id:           result.GetSessionId(),
 		tableService: c,
 		config:       config,
-	}, nil
+	}
+
+	for _, o := range opts {
+		o(s)
+	}
+
+	return s, nil
 }
 
 func (s *session) trailer() *trailer {
@@ -141,60 +152,42 @@ func (s *session) ID() string {
 	return s.id
 }
 
-func (s *session) OnClose(cb func(ctx context.Context)) {
-	if s.isClosed() {
-		return
-	}
-
-	s.onCloseMtx.Lock()
-	defer s.onCloseMtx.Unlock()
-
-	s.onClose = append(s.onClose, cb)
-}
-
 func (s *session) Close(ctx context.Context) (err error) {
-	var fastReturn bool
-	s.closedMtx.WithLock(func() {
-		if s.closed {
-			fastReturn = true
-		} else {
-			s.closed = true
-		}
-	})
-	if fastReturn {
-		return nil
+	if s.isClosed() {
+		return xerrors.WithStackTrace(errSessionClosed)
 	}
 
-	onDone := trace.TableOnSessionDelete(
-		s.config.Trace(),
-		&ctx,
-		s,
-	)
-	defer func() {
-		onDone(err)
-	}()
+	s.closeOnce.Do(func() {
+		defer func() {
+			s.SetStatus(options.SessionClosed)
+		}()
 
-	// call all close listeners before doing request
-	// firstly this need to clear Client from this session
-	s.onCloseMtx.WithRLock(func() {
-		for _, cb := range s.onClose {
-			cb(ctx)
+		onDone := trace.TableOnSessionDelete(s.config.Trace(), &ctx, s)
+
+		_, err = s.tableService.DeleteSession(
+			balancer.WithEndpoint(ctx, s),
+			&Ydb_Table.DeleteSessionRequest{
+				SessionId: s.id,
+				OperationParams: operation.Params(ctx,
+					s.config.OperationTimeout(),
+					s.config.OperationCancelAfter(),
+					operation.ModeSync,
+				),
+			},
+		)
+
+		for _, onClose := range s.onClose {
+			onClose(s)
 		}
+
+		onDone(err)
 	})
 
-	_, err = s.tableService.DeleteSession(
-		balancer.WithEndpoint(ctx, s),
-		&Ydb_Table.DeleteSessionRequest{
-			SessionId: s.id,
-			OperationParams: operation.Params(
-				ctx,
-				s.config.OperationTimeout(),
-				s.config.OperationCancelAfter(),
-				operation.ModeSync,
-			),
-		},
-	)
-	return xerrors.WithStackTrace(err)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
 }
 
 // KeepAlive keeps idle session alive.
@@ -251,18 +244,22 @@ func (s *session) CreateTable(
 	path string,
 	opts ...options.CreateTableOption,
 ) (err error) {
-	request := Ydb_Table.CreateTableRequest{
-		SessionId: s.id,
-		Path:      path,
-		OperationParams: operation.Params(
-			ctx,
-			s.config.OperationTimeout(),
-			s.config.OperationCancelAfter(),
-			operation.ModeSync,
-		),
-	}
+	var (
+		request = Ydb_Table.CreateTableRequest{
+			SessionId: s.id,
+			Path:      path,
+			OperationParams: operation.Params(
+				ctx,
+				s.config.OperationTimeout(),
+				s.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
+		}
+		a = allocator.New()
+	)
+	defer a.Free()
 	for _, opt := range opts {
-		opt((*options.CreateTableDesc)(&request))
+		opt((*options.CreateTableDesc)(&request), a)
 	}
 	t := s.trailer()
 	defer t.processHints()
@@ -444,24 +441,37 @@ func (s *session) DropTable(
 	return xerrors.WithStackTrace(err)
 }
 
+func (s *session) checkError(err error) {
+	if err == nil {
+		return
+	}
+	if m := retry.Check(err); m.MustDeleteSession() {
+		s.SetStatus(options.SessionClosing)
+	}
+}
+
 // AlterTable modifies schema of table at given path with given options.
 func (s *session) AlterTable(
 	ctx context.Context,
 	path string,
 	opts ...options.AlterTableOption,
 ) (err error) {
-	request := Ydb_Table.AlterTableRequest{
-		SessionId: s.id,
-		Path:      path,
-		OperationParams: operation.Params(
-			ctx,
-			s.config.OperationTimeout(),
-			s.config.OperationCancelAfter(),
-			operation.ModeSync,
-		),
-	}
+	var (
+		request = Ydb_Table.AlterTableRequest{
+			SessionId: s.id,
+			Path:      path,
+			OperationParams: operation.Params(
+				ctx,
+				s.config.OperationTimeout(),
+				s.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
+		}
+		a = allocator.New()
+	)
+	defer a.Free()
 	for _, opt := range opts {
-		opt((*options.AlterTableDesc)(&request))
+		opt((*options.AlterTableDesc)(&request), a)
 	}
 	t := s.trailer()
 	defer t.processHints()
@@ -636,9 +646,21 @@ func (s *session) Execute(
 		params = table.NewQueryParameters()
 	}
 
-	onDone := trace.TableOnSessionQueryExecute(s.config.Trace(), &ctx, s, q, params)
+	var optsResult options.ExecuteDataQueryDesc
+	for _, f := range opts {
+		f(&optsResult)
+	}
+
+	onDone := trace.TableOnSessionQueryExecute(
+		s.config.Trace(),
+		&ctx,
+		s,
+		q,
+		params,
+		optsResult.QueryCachePolicy.GetKeepInCache(),
+	)
 	defer func() {
-		onDone(txr, true, r, err)
+		onDone(txr, false, r, err)
 	}()
 
 	request, result, err := s.executeDataQuery(ctx, tx, q, params, opts...)
@@ -672,6 +694,7 @@ func (s *session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (
 	r := scanner.NewUnary(
 		res.GetResultSets(),
 		res.GetQueryStats(),
+		scanner.WithIgnoreTruncated(s.config.IgnoreTruncated()),
 	)
 	return t, r, nil
 }
@@ -682,26 +705,31 @@ func (s *session) executeDataQuery(
 	query *dataQuery, params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
-	request *Ydb_Table.ExecuteDataQueryRequest,
-	result *Ydb_Table.ExecuteQueryResult,
+	_ *Ydb_Table.ExecuteDataQueryRequest,
+	_ *Ydb_Table.ExecuteQueryResult,
 	err error,
 ) {
-	result = &Ydb_Table.ExecuteQueryResult{}
-	request = &Ydb_Table.ExecuteDataQueryRequest{
-		SessionId:  s.id,
-		TxControl:  tx.Desc(),
-		Parameters: params.Params(),
-		Query:      &query.query,
-		QueryCachePolicy: &Ydb_Table.QueryCachePolicy{
-			KeepInCache: len(params.Params()) > 0,
-		},
-		OperationParams: operation.Params(
-			ctx,
-			s.config.OperationTimeout(),
-			s.config.OperationCancelAfter(),
-			operation.ModeSync,
-		),
-	}
+	var (
+		a       = allocator.New()
+		result  = &Ydb_Table.ExecuteQueryResult{}
+		request = &Ydb_Table.ExecuteDataQueryRequest{
+			SessionId:  s.id,
+			TxControl:  tx.Desc(),
+			Parameters: params.Params().ToYDB(a),
+			Query:      &query.query,
+			QueryCachePolicy: &Ydb_Table.QueryCachePolicy{
+				KeepInCache: len(params.Params()) > 0,
+			},
+			OperationParams: operation.Params(
+				ctx,
+				s.config.OperationTimeout(),
+				s.config.OperationCancelAfter(),
+				operation.ModeSync,
+			),
+		}
+	)
+	defer a.Free()
+
 	for _, opt := range opts {
 		opt((*options.ExecuteDataQueryDesc)(request))
 	}
@@ -910,15 +938,17 @@ func (s *session) StreamReadTable(
 			Path:      path,
 		}
 		stream Ydb_Table_V1.TableService_StreamReadTableClient
+		a      = allocator.New()
 	)
 	defer func() {
+		a.Free()
 		if err != nil {
 			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 		}
 	}()
 
 	for _, opt := range opts {
-		opt((*options.ReadTableDesc)(&request))
+		opt((*options.ReadTableDesc)(&request), a)
 	}
 
 	ctx, cancel := xcontext.WithErrCancel(ctx)
@@ -964,6 +994,7 @@ func (s *session) StreamReadTable(
 			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 			return err
 		},
+		scanner.WithIgnoreTruncated(true), // stream read table always returns truncated flag on last result set
 	), nil
 }
 
@@ -988,14 +1019,16 @@ func (s *session) StreamExecuteScanQuery(
 			q,
 			params,
 		)
+		a       = allocator.New()
 		request = Ydb_Table.ExecuteScanQueryRequest{
 			Query:      &q.query,
-			Parameters: params.Params(),
+			Parameters: params.Params().ToYDB(a),
 			Mode:       Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC, // set default
 		}
 		stream Ydb_Table_V1.TableService_StreamExecuteScanQueryClient
 	)
 	defer func() {
+		a.Free()
 		if err != nil {
 			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 		}
@@ -1044,18 +1077,25 @@ func (s *session) StreamExecuteScanQuery(
 			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 			return err
 		},
+		scanner.WithIgnoreTruncated(s.config.IgnoreTruncated()),
 	), nil
 }
 
 // BulkUpsert uploads given list of ydb struct values to the table.
 func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value) (err error) {
-	t := s.trailer()
-	defer t.processHints()
+	var (
+		t = s.trailer()
+		a = allocator.New()
+	)
+	defer func() {
+		a.Free()
+		t.processHints()
+	}()
 	_, err = s.tableService.BulkUpsert(
 		balancer.WithEndpoint(ctx, s),
 		&Ydb_Table.BulkUpsertRequest{
 			Table: table,
-			Rows:  value.ToYDB(rows),
+			Rows:  value.ToYDB(rows, a),
 			OperationParams: operation.Params(
 				ctx,
 				s.config.OperationTimeout(),

@@ -22,8 +22,8 @@ type clientConn struct {
 func (c *clientConn) UpdateState(state resolver.State) (err error) {
 	onDone := trace.DriverOnResolve(
 		c.trace,
-		// nolint:staticcheck
-		// nolint:nolintlint
+		//nolint:staticcheck
+		//nolint:nolintlint
 		c.target.Endpoint,
 		func() (addrs []string) {
 			for _, a := range state.Addresses {

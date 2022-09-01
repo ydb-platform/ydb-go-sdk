@@ -10,6 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -28,6 +29,7 @@ type TxOperation func(ctx context.Context, tx TransactionActor) error
 
 type ClosableSession interface {
 	closer.Closer
+
 	Session
 }
 
@@ -35,8 +37,10 @@ type Client interface {
 	closer.Closer
 
 	// CreateSession returns session or error for manually control of session lifecycle
-	// CreateSession do not provide retry loop for failed create session requests.
-	// Best effort policy may be implements with outer retry loop includes CreateSession call
+	//
+	// CreateSession implements internal busy loop until one of the following conditions is met:
+	// - context was canceled or deadlined
+	// - session was created
 	CreateSession(ctx context.Context, opts ...Option) (s ClosableSession, err error)
 
 	// Do provide the best effort for execute operation.
@@ -360,15 +364,48 @@ func DefaultTxControl() *TransactionControl {
 	)
 }
 
+// SerializableReadWriteTxControl returns transaction control with serializable read-write isolation mode
+func SerializableReadWriteTxControl(opts ...TxControlOption) *TransactionControl {
+	return TxControl(
+		append([]TxControlOption{
+			BeginTx(WithSerializableReadWrite()),
+		}, opts...)...,
+	)
+}
+
+// OnlineReadOnlyTxControl returns online read-only transaction control
+func OnlineReadOnlyTxControl(opts ...TxOnlineReadOnlyOption) *TransactionControl {
+	return TxControl(
+		BeginTx(WithOnlineReadOnly(opts...)),
+		CommitTx(), // open transactions not supported for OnlineReadOnly
+	)
+}
+
+// StaleReadOnlyTxControl returns stale read-only transaction control
+func StaleReadOnlyTxControl() *TransactionControl {
+	return TxControl(
+		BeginTx(WithStaleReadOnly()),
+		CommitTx(), // open transactions not supported for StaleReadOnly
+	)
+}
+
 // QueryParameters
 
 type (
-	queryParams     map[string]*Ydb.TypedValue
+	queryParams     map[string]types.Value
 	ParameterOption func(queryParams)
 	QueryParameters struct {
 		m queryParams
 	}
 )
+
+func (qp queryParams) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
+	params := make(map[string]*Ydb.TypedValue, len(qp))
+	for k, v := range qp {
+		params[k] = value.ToYDB(v, a)
+	}
+	return params
+}
 
 func (q *QueryParameters) Params() queryParams {
 	if q == nil {
@@ -382,10 +419,7 @@ func (q *QueryParameters) Each(it func(name string, v types.Value)) {
 		return
 	}
 	for key, v := range q.m {
-		it(key, value.FromYDB(
-			v.Type,
-			v.Value,
-		))
+		it(key, v)
 	}
 }
 
@@ -397,7 +431,7 @@ func (q *QueryParameters) String() string {
 		buf.WriteString(name)
 		buf.WriteByte(')')
 		buf.WriteByte('(')
-		value.WriteValueStringTo(&buf, v)
+		buf.WriteString(v.String())
 		buf.WriteString("))")
 	})
 	buf.WriteByte(')')
@@ -428,7 +462,7 @@ func ValueParam(name string, v types.Value) ParameterOption {
 		}
 	}
 	return func(q queryParams) {
-		q[name] = value.ToYDB(v)
+		q[name] = v
 	}
 }
 

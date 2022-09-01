@@ -20,7 +20,7 @@ type logger struct {
 	external  log.Logger
 	namespace string
 	minLevel  level.Level
-	noColor   bool
+	coloring  bool
 	out       io.Writer
 	err       io.Writer
 }
@@ -28,7 +28,7 @@ type logger struct {
 func New(opts ...Option) *logger {
 	l := &logger{
 		minLevel: level.INFO,
-		noColor:  false,
+		coloring: false,
 		out:      os.Stdout,
 		err:      os.Stderr,
 	}
@@ -39,25 +39,25 @@ func New(opts ...Option) *logger {
 }
 
 func (l *logger) format(format string, logLevel level.Level) string {
-	if l.noColor {
+	if l.coloring {
 		return fmt.Sprintf(
-			"%-5s %23s %26s %s\n",
+			"%s%-5s %23s %26s%s %s%s%s\n",
+			logLevel.BoldColor(),
 			logLevel.String(),
 			time.Now().Format(dateLayout),
 			"["+l.namespace+"]",
+			colorReset,
+			logLevel.Color(),
 			format,
+			colorReset,
 		)
 	}
 	return fmt.Sprintf(
-		"%s%-5s %23s %26s%s %s%s%s\n",
-		logLevel.BoldColor(),
+		"%-5s %23s %26s %s\n",
 		logLevel.String(),
 		time.Now().Format(dateLayout),
 		"["+l.namespace+"]",
-		colorReset,
-		logLevel.Color(),
 		format,
-		colorReset,
 	)
 }
 
@@ -144,6 +144,6 @@ func (l *logger) WithName(name string) log.Logger {
 		err:       l.err,
 		namespace: join(l.namespace, name),
 		minLevel:  l.minLevel,
-		noColor:   l.noColor,
+		coloring:  l.coloring,
 	}
 }

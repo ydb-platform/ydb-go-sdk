@@ -8,10 +8,11 @@ import (
 )
 
 // Scripting returns trace.Scripting with logging events from details
-func Scripting(l Logger, details trace.Details) (t trace.Scripting) {
+func Scripting(l Logger, details trace.Details, opts ...option) (t trace.Scripting) {
 	if details&trace.ScriptingEvents == 0 {
 		return
 	}
+	options := parseOptions(opts...)
 	l = l.WithName(`scripting`)
 	t.OnExecute = func(info trace.ScriptingExecuteStartInfo) func(trace.ScriptingExecuteDoneInfo) {
 		l.Debugf(`execute start`)
@@ -59,10 +60,14 @@ func Scripting(l Logger, details trace.Details) (t trace.Scripting) {
 	) {
 		query := info.Query
 		params := info.Parameters
-		l.Tracef(`stream execute start {query:"%s",params:"%s"}`,
-			query,
-			params,
-		)
+		if options.logQuery {
+			l.Tracef(`stream execute start {query:"%s",params:"%s"}`,
+				query,
+				params,
+			)
+		} else {
+			l.Tracef(`stream execute start`)
+		}
 		start := time.Now()
 		return func(
 			info trace.ScriptingStreamExecuteIntermediateInfo,
@@ -85,13 +90,21 @@ func Scripting(l Logger, details trace.Details) (t trace.Scripting) {
 						params,
 					)
 				} else {
-					l.Errorf(`stream execute failed {latency:"%v",query:"%s",params:"%s",error:"%v",version:"%s"}`,
-						time.Since(start),
-						query,
-						params,
-						info.Error,
-						meta.Version,
-					)
+					if options.logQuery {
+						l.Errorf(`stream execute failed {latency:"%v",query:"%s",params:"%s",error:"%v",version:"%s"}`,
+							time.Since(start),
+							query,
+							params,
+							info.Error,
+							meta.Version,
+						)
+					} else {
+						l.Errorf(`stream execute failed {latency:"%v",error:"%v",version:"%s"}`,
+							time.Since(start),
+							info.Error,
+							meta.Version,
+						)
+					}
 				}
 			}
 		}

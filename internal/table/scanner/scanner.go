@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -12,24 +13,26 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
+var errTruncated = xerrors.Wrap(errors.New("truncated result"))
+
 type scanner struct {
-	set       *Ydb.ResultSet
-	row       *Ydb.Value
-	converter *rawConverter
-	stack     scanStack
-	nextRow   int
-	nextItem  int
+	set             *Ydb.ResultSet
+	row             *Ydb.Value
+	converter       *rawConverter
+	stack           scanStack
+	nextRow         int
+	nextItem        int
+	ignoreTruncated bool
 
 	columnIndexes []int
 
@@ -207,11 +210,25 @@ func (s *scanner) Truncated() bool {
 	return s.set.Truncated
 }
 
+// Truncated returns true if current result set has been truncated by server
+func (s *scanner) truncated() bool {
+	if s.set == nil {
+		return false
+	}
+	return s.set.Truncated
+}
+
 // Err returns error caused Scanner to be broken.
 func (s *scanner) Err() error {
 	s.errMtx.RLock()
 	defer s.errMtx.RUnlock()
-	return s.err
+	if s.err != nil {
+		return s.err
+	}
+	if !s.ignoreTruncated && s.truncated() {
+		return xerrors.WithStackTrace(errTruncated)
+	}
+	return nil
 }
 
 // Must not be exported.
@@ -308,22 +325,22 @@ func (s *scanner) setColumnIndexes(columns []string) {
 // Any returns any primitive or optional value.
 // Currently, it may return one of these types:
 //
-//   bool
-//   int8
-//   uint8
-//   int16
-//   uint16
-//   int32
-//   uint32
-//   int64
-//   uint64
-//   float32
-//   float64
-//   []byte
-//   string
-//   [16]byte
+//	bool
+//	int8
+//	uint8
+//	int16
+//	uint16
+//	int32
+//	uint32
+//	int64
+//	uint64
+//	float32
+//	float64
+//	[]byte
+//	string
+//	[16]byte
 //
-// nolint:gocyclo
+//nolint:gocyclo
 func (s *scanner) any() interface{} {
 	x := s.stack.current()
 	if s.Err() != nil || x.isEmpty() {
@@ -427,7 +444,7 @@ func (s *scanner) isNull() bool {
 	return yes
 }
 
-// unwrap current item under scan interpreting it as Optional<T> types.
+// unwrap current item under scan interpreting it as Optional<Type> types.
 // ignores if type is not optional
 func (s *scanner) unwrap() {
 	if s.Err() != nil {
@@ -719,7 +736,7 @@ func (s *scanner) trySetByteArray(v interface{}, optional bool, def bool) bool {
 	return true
 }
 
-// nolint: gocyclo
+//nolint:gocyclo
 func (s *scanner) scanRequired(value interface{}) {
 	switch v := value.(type) {
 	case *bool:
@@ -795,7 +812,7 @@ func (s *scanner) scanRequired(value interface{}) {
 	}
 }
 
-// nolint:gocyclo
+//nolint:gocyclo
 func (s *scanner) scanOptional(value interface{}, defaultValueForOptional bool) {
 	if defaultValueForOptional {
 		if s.isNull() {

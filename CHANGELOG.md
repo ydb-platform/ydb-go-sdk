@@ -1,7 +1,142 @@
+## v3.37.4
+* Revert the marking of context errors as required to delete session
+
+## v3.37.3
+* Fixed alter topic request - stop send empty setSupportedCodecs if customer not set them 
+* Marked the context errors as required to delete session
+* Added log topic api reader for internal logger
+
+## v3.37.2
+* Fixed nil pointer exception in topic reader if reconnect failed
+
+## v3.37.1
+* Refactored the `xsql.badconn.Error`
+
+## v3.37.0
+* Supported read-only `sql.LevelSnapshot` isolation with fake transaction and `OnlineReadOnly` transaction control (transient, while YDB clusters are not updated with true snapshot isolation mode)
+* Supported the `*sql.Conn` as input type `ydb.Unwrap` helper for go's 1.18
+
+## v3.36.2
+* Changed output of `sugar.GenerateDeclareSection` (added error as second result)
+* Specified `sugar.GenerateDeclareSection` for `go1.18` (supports input types `*table.QueryParameters` `[]table.ParameterOption` or `[]sql.NamedArg`)
+* Supports different go's primitive value types as arg of `sql.Named("name", value)`
+* Added `database/sql` example and docs
+
+## v3.36.1
+* Fixed `xsql.Rows` error checking
+
+## v3.36.0
+* Changed behavior on `result.Err()` on truncated result (returns non-retryable error now, exclude `StreamExecuteScanQuery`)
+* Added `ydb.WithIgnoreTruncated` option for disabling errors on truncated flag
+* Added simple transaction control constructors `table.OnlineReadOnlyTxControl()` and `table.StaleReadOnlyTxControl()`
+* Added transaction control specifier with context `ydb.WithTxControl`
+* Added value constructors `types.BytesValue`, `types.BytesValueFromString`, `types.TextValue`
+* Removed auto-prepending declare section on `xsql` queries
+* Supports `time.Time` as type destination in `xsql` queries
+* Defined default dial timeout (5 seconds)
+
+## v3.35.1
+* Removed the deprecation warning for `ydb.WithSessionPoolIdleThreshold` option
+
+## v3.35.0
+* Replaced internal table client background worker to plain wait group for control spawned goroutines
+* Replaced internal table client background session keeper to internal background session garbage collector for idle sessions
+* Extended the `DescribeTopicResult` struct
+
+## v3.34.2
+* Added some description to error message from table pool get
+* Moved implementation `sugar.GenerateDeclareSection` to `internal/table`
+* Added transaction trace callbacks and internal logging with them
+* Stored context from `BeginTx` to `internal/xsql` transaction
+* Added automatically generated declare section to query text in `database/sql` usage 
+* Removed supports `sql.LevelSerializable`
+* Added `retry.Do` helper for retry custom lambda with `database/sql` without transactions
+* Removed `retry.WithTxOptions` option (only default isolation supports)
+
+## v3.34.1
+* Changed `database/sql` driver `prepare` behaviour to `nop` with proxing call to conn exec/query with keep-in-cache flag
+* Added metadata to `trace.Driver.OnInvoke` and `trace.Driver.OnNewStream` done events
+
+## v3.34.0
+* Improved the `xsql` errors mapping to `driver.ErrBadConn` 
+* Extended `retry.DoTx` test for to achieve equivalence with `retry.Retry` behaviour
+* Added `database/sql` events for tracing `database/sql` driver events
+* Added internal logging for `database/sql` events
+* Supports `YDB_LOG_DETAILS` environment variable for specify scope of log messages
+* Removed support of `YDB_LOG_NO_COLOR` environment variable
+* Changed default behaviour of internal logger to without coloring
+* Fixed coloring (to true) with environment variable `YDB_LOG_SEVERITY_LEVEL`
+* Added `ydb.WithStaticCredentials(user, password)` option for make static credentials 
+* Supports static credentials as part of connection string (dsn - data source name)
+* Changed minimal supported version of go from 1.14 to 1.16 (required for jwt library)
+
+
+## v3.33.0
+* Added `retry.DoTx` helper for retrying `database/sql` transactions 
+* Implemented `database/sql` driver over `ydb-go-sdk`
+* Marked as deprecated `trace.Table.OnPoolSessionNew` and `trace.Table.OnPoolSessionClose` events
+* Added `trace.Table.OnPoolSessionAdd` and `trace.Table.OnPoolSessionRemove` events
+* Refactored session lifecycle in session pool for fix flaked `TestTable`
+* Fixed deadlock in topicreader batcher, while add and read raw server messages
+* Fixed bug in `db.Topic()` with send response to stop partition message
+
+## v3.32.1
+* Fixed flaky TestTable
+* Renamed topic events in `trace.Details` enum
+
+## v3.32.0
+* Refactored `trace.Topic` (experimental) handlers
+* Fixed signature and names of helpers in `topic/topicsugar` package 
+* Allowed parallel reading and committing topic messages
+
+## v3.31.0
+* Extended the `ydb.Connection` interface with experimental `db.Topic()` client (control plane and reader API)
+* Removed `ydb.RegisterParser()` function (was needed for `database/sql` driver outside `ydb-go-sdk` repository, necessity of `ydb.RegisterParser()` disappeared with implementation `database/sql` driver in same repository)
+* Refactored `db.Table().CreateSession(ctx)` (maked retryable with internal create session timeout)
+* Refactored `internal/table/client.createSession(ctx)` (got rid of unnecessary goroutine)
+* Supported many user-agent records
+
+## v3.30.0
+* Added `ydb.RegisterParser(name string, parser func(value string) []ydb.Option)` function for register parser of specified param name (supporting additional params in connection string)
+* Fixed writing `KeepInCacheFlag` in table traces
+
+## v3.29.5
+* Fixed regression of `table/types.WriteTypeStringTo`
+
+## v3.29.4
+* Added touching of last updated timestamp in existing conns on stage of applying new endpoint list
+
+## v3.29.3
+* Reverted `xerrors.IsTransportError(err)` behaviour for raw grpc errors to false 
+
+## v3.29.2
+* Enabled server-side session balancing for sessions created from internal session pool 
+* Removed unused public `meta.Meta` methods
+* Renamed `meta.Meta.Meta(ctx)` public method to `meta.Meta.Context(ctx)`
+* Reverted default balancer to `balancers.RandomChoice()`
+
+## v3.29.1
+* Changed default balancer to `balancers.PreferLocalDC(balancers.RandomChoice())`
+
+## v3.29.0
+* Refactored `internal/value` package for decrease CPU and memory workload with GC
+* Added `table/types.Equal(lhs, rhs)` helper for check equal for two types
+
+## v3.28.3
+* Fixed false-positive node pessimization on receiving from stream io.EOF
+
+## v3.28.2
+* Upgraded dependencies (grpc, protobuf, testify)
+
+## v3.28.1
+* Marked dial errors as retryable
+* Supported node pessimization on dialing errors  
+* Marked error from `Invoke` and `NewStream` as retryable if request not sended to server
+
 ## v3.28.0
 * Added `sugar.GenerateDeclareSection()` helper for make declare section in `YQL`
 * Added check when parameter name not started from `$` and automatically prepends it to name 
-* Refactor connection closing
+* Refactored connection closing
 
 ## v3.27.0
 * Added internal experimental packages `internal/value/exp` and `internal/value/exp/allocator` with alternative value implementations with zero-allocation model

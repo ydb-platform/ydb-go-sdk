@@ -42,7 +42,7 @@ func New(opts ...option) Rand {
 		o(r)
 	}
 
-	// nolint:gosec
+	//nolint:gosec
 	r.r = rand.New(rand.NewSource(r.source))
 	return r
 }

@@ -7,9 +7,8 @@ import (
 	"testing"
 	"time"
 
-	grpcCodes "google.golang.org/grpc/codes"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -78,12 +77,18 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 func TestRetryerBadSession(t *testing.T) {
 	closed := make(map[table.Session]bool)
 	p := SessionProviderFunc{
-		OnGet: func(ctx context.Context) (Session, error) {
+		OnGet: func(ctx context.Context) (*session, error) {
 			s := simpleSession(t)
-			s.OnClose(func(context.Context) {
+			s.onClose = append(s.onClose, func(s *session) {
 				closed[s] = true
 			})
 			return s, nil
+		},
+		OnPut: func(ctx context.Context, s *session) error {
+			if s.isClosing() {
+				return s.Close(ctx)
+			}
+			return nil
 		},
 	}
 	var (
@@ -127,12 +132,18 @@ func TestRetryerBadSession(t *testing.T) {
 func TestRetryerSessionClosing(t *testing.T) {
 	closed := make(map[table.Session]bool)
 	p := SessionProviderFunc{
-		OnGet: func(ctx context.Context) (Session, error) {
+		OnGet: func(ctx context.Context) (*session, error) {
 			s := simpleSession(t)
-			s.OnClose(func(context.Context) {
+			s.onClose = append(s.onClose, func(s *session) {
 				closed[s] = true
 			})
 			return s, nil
+		},
+		OnPut: func(ctx context.Context, s *session) error {
+			if s.isClosing() {
+				return s.Close(ctx)
+			}
+			return nil
 		},
 	}
 	var sessions []table.Session
@@ -308,10 +319,10 @@ func TestRetryContextDeadline(t *testing.T) {
 		xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_SESSION_BUSY)),
 	}
 	client := &Client{
-		cc: testutil.NewRouter(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
+		cc: testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{})),
 	}
 	p := SessionProviderFunc{
-		OnGet: client.createSession,
+		OnGet: client.internalPoolCreateSession,
 	}
 	r := xrand.New(xrand.WithLock())
 	for i := range timeouts {
@@ -357,7 +368,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 		limit = 10
 		ctx   = context.Background()
 		p     = SessionProviderFunc{
-			OnGet: func(ctx context.Context) (Session, error) {
+			OnGet: func(ctx context.Context) (*session, error) {
 				return simpleSession(t), nil
 			},
 		}
@@ -436,7 +447,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 				},
 				table.Options{},
 			)
-			// nolint:nestif
+			//nolint:nestif
 			if test.retriable {
 				if i != limit {
 					t.Fatalf("unexpected i: %d, err: %v", i, err)
@@ -462,3 +473,60 @@ func TestRetryWithCustomErrors(t *testing.T) {
 		})
 	}
 }
+
+type SessionProviderFunc struct {
+	OnGet func(context.Context) (*session, error)
+	OnPut func(context.Context, *session) error
+}
+
+var _ SessionProvider = SessionProviderFunc{}
+
+func (f SessionProviderFunc) Get(ctx context.Context) (*session, error) {
+	if f.OnGet == nil {
+		return nil, xerrors.WithStackTrace(errNoSession)
+	}
+	return f.OnGet(ctx)
+}
+
+func (f SessionProviderFunc) Put(ctx context.Context, s *session) error {
+	if f.OnPut == nil {
+		return xerrors.WithStackTrace(testutil.ErrNotImplemented)
+	}
+	return f.OnPut(ctx, s)
+}
+
+// SingleSession returns SessionProvider that uses only given session during
+// retries.
+func SingleSession(s *session) SessionProvider {
+	return &singleSession{s: s}
+}
+
+type singleSession struct {
+	s     *session
+	empty bool
+}
+
+func (s *singleSession) Get(context.Context) (*session, error) {
+	if s.empty {
+		return nil, xerrors.WithStackTrace(errNoSession)
+	}
+	s.empty = true
+	return s.s, nil
+}
+
+func (s *singleSession) Put(_ context.Context, x *session) error {
+	if x != s.s {
+		return xerrors.WithStackTrace(errUnexpectedSession)
+	}
+	if !s.empty {
+		return xerrors.WithStackTrace(errSessionOverflow)
+	}
+	s.empty = false
+	return nil
+}
+
+var (
+	errNoSession         = xerrors.Wrap(fmt.Errorf("no session"))
+	errUnexpectedSession = xerrors.Wrap(fmt.Errorf("unexpected session"))
+	errSessionOverflow   = xerrors.Wrap(fmt.Errorf("session overflow"))
+)

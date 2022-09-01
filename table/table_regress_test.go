@@ -29,6 +29,7 @@ func TestIssue229UnexpectedNullWhileParseNilJsonDocumentValue(t *testing.T) {
 	defer cancel()
 
 	db := connect(t)
+	defer db.Close(ctx)
 	err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 		res, err := tx.Execute(ctx, `SELECT Nothing(JsonDocument?) AS r`, nil)
 		require.NoError(t, err)
@@ -42,7 +43,7 @@ func TestIssue229UnexpectedNullWhileParseNilJsonDocumentValue(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func connect(t *testing.T) ydb.Connection {
+func connect(t testing.TB) ydb.Connection {
 	db, err := ydb.Open(
 		context.Background(),
 		os.Getenv("YDB_CONNECTION_STRING"),
@@ -57,6 +58,7 @@ func TestIssue259IntervalFromDuration(t *testing.T) {
 	defer cancel()
 
 	db := connect(t)
+	defer db.Close(ctx)
 	err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 		// Check about interval work with microseconds
 		res, err := tx.Execute(ctx, `DECLARE $ts as Interval;

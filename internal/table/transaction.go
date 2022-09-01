@@ -4,12 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
-
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -19,8 +17,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// nolint:gofumpt
-// nolint:nolintlint
+//nolint:gofumpt
+//nolint:nolintlint
 var (
 	// errAlreadyCommited returns if transaction Commit called twice
 	errAlreadyCommited = xerrors.Wrap(fmt.Errorf("already committed"))
@@ -48,6 +46,28 @@ func (tx *transaction) Execute(
 	query string, params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
+	q := new(dataQuery)
+	q.initFromText(query)
+
+	if params == nil {
+		params = table.NewQueryParameters()
+	}
+	var optsResult options.ExecuteDataQueryDesc
+	for _, f := range opts {
+		f(&optsResult)
+	}
+	onDone := trace.TableOnSessionTransactionExecute(
+		tx.s.config.Trace(),
+		&ctx,
+		tx.s,
+		tx,
+		q,
+		params,
+		optsResult.QueryCachePolicy.GetKeepInCache(),
+	)
+	defer func() {
+		onDone(r, err)
+	}()
 	_, r, err = tx.s.Execute(ctx, tx.txc(), query, params, opts...)
 	return
 }
@@ -58,6 +78,23 @@ func (tx *transaction) ExecuteStatement(
 	stmt table.Statement, params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
+	if params == nil {
+		params = table.NewQueryParameters()
+	}
+	var optsResult options.ExecuteDataQueryDesc
+	for _, f := range opts {
+		f(&optsResult)
+	}
+	onDone := trace.TableOnSessionTransactionExecuteStatement(
+		tx.s.config.Trace(),
+		&ctx,
+		tx.s,
+		tx,
+		params,
+	)
+	defer func() {
+		onDone(r, err)
+	}()
 	_, r, err = stmt.Execute(ctx, tx.txc(), params, opts...)
 	return
 }
@@ -124,6 +161,7 @@ func (tx *transaction) CommitTx(
 	return scanner.NewUnary(
 		nil,
 		result.GetQueryStats(),
+		scanner.WithIgnoreTruncated(tx.s.config.IgnoreTruncated()),
 	), nil
 }
 

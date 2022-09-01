@@ -10,10 +10,15 @@ import (
 
 // NewWithIssues returns error which contains child issues
 func NewWithIssues(text string, issues ...error) error {
-	return &errorWithIssues{
+	err := &errorWithIssues{
 		reason: text,
-		issues: issues,
 	}
+	for i := range issues {
+		if issues[i] != nil {
+			err.issues = append(err.issues, issues[i])
+		}
+	}
+	return err
 }
 
 type errorWithIssues struct {

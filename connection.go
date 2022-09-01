@@ -8,8 +8,6 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
@@ -17,7 +15,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	internalCoordination "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	internalRatelimiter "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
 	internalScheme "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
@@ -26,12 +27,17 @@ import (
 	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
 	internalTable "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicclientinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -71,12 +77,17 @@ type Connection interface {
 	// Scripting returns scripting client
 	Scripting() scripting.Client
 
+	// Topic returns topic client
+	Topic() topic.Client
+
 	// With makes child connection with the same options and another options
 	With(ctx context.Context, opts ...Option) (Connection, error)
 }
 
-// nolint: maligned
+//nolint:maligned
 type connection struct {
+	userInfo *dsn.UserInfo
+
 	opts []Option
 
 	config  config.Config
@@ -104,10 +115,16 @@ type connection struct {
 	ratelimiter        *internalRatelimiter.Client
 	ratelimiterOptions []ratelimiterConfig.Option
 
+	topicOnce    initOnce
+	topic        *topicclientinternal.Client
+	topicOptions []topicoptions.TopicOption
+
+	databaseSQLOptions []xsql.ConnectorOption
+
 	pool *conn.Pool
 
 	mtx      sync.Mutex
-	balancer balancer.Connection
+	balancer *balancer.Balancer
 
 	children    map[uint64]Connection
 	childrenMtx xsync.Mutex
@@ -141,6 +158,7 @@ func (c *connection) Close(ctx context.Context) error {
 		c.schemeOnce.Close,
 		c.scriptingOnce.Close,
 		c.tableOnce.Close,
+		c.topicOnce.Close,
 		c.balancer.Close,
 		c.pool.Release,
 	)
@@ -305,11 +323,24 @@ func (c *connection) Scripting() scripting.Client {
 	return c.scripting
 }
 
+// Topic return topic client
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func (c *connection) Topic() topic.Client {
+	c.topicOnce.Init(func() closeFunc {
+		c.topic = topicclientinternal.New(c.balancer, c.topicOptions...)
+		return c.topic.Close
+	})
+	return c.topic
+}
+
 // Open connects to database by DSN and return driver runtime holder
 //
 // DSN accept connection string like
 //
-//   "grpc[s]://{endpoint}/?database={database}[&param=value]"
+//	"grpc[s]://{endpoint}/{database}[?param=value]"
 //
 // See sugar.DSN helper for make dsn from endpoint and database
 func Open(ctx context.Context, dsn string, opts ...Option) (_ Connection, err error) {
@@ -344,10 +375,13 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 			opts = append(
 				opts,
 				WithLogger(
-					trace.DetailsAll,
+					trace.MatchDetails(
+						os.Getenv("YDB_LOG_DETAILS"),
+						trace.WithDefaultDetails(trace.DetailsAll),
+					),
 					WithNamespace("ydb"),
 					WithMinLevel(log.FromString(logLevel)),
-					WithNoColor(os.Getenv("YDB_LOG_NO_COLOR") != ""),
+					WithColoring(),
 				),
 			)
 		}
@@ -379,16 +413,20 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	}()
 
 	if c.pool == nil {
-		c.pool = conn.NewPool(
-			ctx,
-			c.config,
-		)
+		c.pool = conn.NewPool(ctx, c.config)
 	}
 
-	c.balancer, err = balancer.New(
-		ctx,
-		c.config,
-		c.pool,
+	if c.userInfo != nil {
+		c.config = c.config.With(config.WithCredentials(
+			credentials.NewStaticCredentials(
+				c.userInfo.User, c.userInfo.Password,
+				c.pool.Get(endpoint.New(c.config.Endpoint())),
+			),
+		))
+	}
+
+	c.balancer, err = balancer.New(ctx,
+		c.config, c.pool,
 		append(
 			// prepend common params from root config
 			[]discoveryConfig.Option{

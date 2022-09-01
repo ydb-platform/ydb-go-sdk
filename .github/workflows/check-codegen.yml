@@ -1,0 +1,40 @@
+name: check-codegen
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest ]
+        go: [1.18.x, 1.19.x]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Setup Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ matrix.go }}
+
+    - name: Go Env
+      run: |
+        go env
+
+    - name: Build
+      run: |
+        go install ./internal/cmd/gtrace
+        go install github.com/golang/mock/mockgen@v1.6.0        
+
+    - name: Clean and re-generate *_gtrace.go files
+      run: |
+        rm -f ./trace/*_gtrace.go
+        go generate ./trace
+        go generate ./...
+
+    - name: Check repository diff
+      run: bash ./.github/scripts/check-work-copy-equals-to-committed.sh "code-generation not equal with committed"

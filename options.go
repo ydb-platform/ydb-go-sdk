@@ -24,12 +24,24 @@ import (
 	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 // Option contains configuration values for Connection
 type Option func(ctx context.Context, c *connection) error
+
+func WithStaticCredentials(user, password string) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.userInfo = &dsn.UserInfo{
+			User:     user,
+			Password: password,
+		}
+		return nil
+	}
+}
 
 func WithAccessTokenCredentials(accessToken string) Option {
 	return WithCredentials(
@@ -58,7 +70,8 @@ func WithRequestsType(requestsType string) Option {
 }
 
 // WithConnectionString accept connection string like
-//  grpc[s]://{endpoint}/?database={database}
+//
+//	grpc[s]://{endpoint}/{database}[?param=value]
 //
 // Warning: WithConnectionString will be removed at next major release
 // (connection string will be required string param of ydb.Open)
@@ -67,20 +80,24 @@ func WithConnectionString(connectionString string) Option {
 		if connectionString == "" {
 			return nil
 		}
-		options, err := dsn.Parse(connectionString)
+		info, err := dsn.Parse(connectionString)
 		if err != nil {
 			return xerrors.WithStackTrace(
 				fmt.Errorf("parse connection string '%s' failed: %w", connectionString, err),
 			)
 		}
-		c.options = append(c.options, options...)
+		c.options = append(c.options,
+			config.WithEndpoint(info.Endpoint),
+			config.WithDatabase(info.Database),
+			config.WithSecure(info.Secure),
+		)
+		c.options = append(c.options, info.Options...)
+		c.userInfo = info.UserInfo
 		return nil
 	}
 }
 
 // WithConnectionTTL defines duration for parking idle connections
-//
-// Warning: if defined WithSessionPoolIdleThreshold - idleThreshold must be less than connectionTTL
 func WithConnectionTTL(ttl time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithConnectionTTL(ttl))
@@ -162,6 +179,8 @@ func WithLogger(details trace.Details, opts ...LoggerOption) Option {
 		WithTraceCoordination(log.Coordination(l, details)),
 		WithTraceRatelimiter(log.Ratelimiter(l, details)),
 		WithTraceDiscovery(log.Discovery(l, details)),
+		WithTraceTopic(log.Topic(l, details)),
+		WithTraceDatabaseSQL(log.DatabaseSQL(l, details)),
 	)
 }
 
@@ -332,15 +351,13 @@ func WithSessionPoolSizeLimit(sizeLimit int) Option {
 }
 
 // WithSessionPoolKeepAliveMinSize set minimum sessions should be keeped alive in table.Client
+//
+// Deprecated: table client do not supports background session keep-aliving now
 func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
-	return func(ctx context.Context, c *connection) error {
-		c.tableOptions = append(c.tableOptions, tableConfig.WithKeepAliveMinSize(keepAliveMinSize))
-		return nil
-	}
+	return func(ctx context.Context, c *connection) error { return nil }
 }
 
 // WithSessionPoolIdleThreshold defines keep-alive interval for idle sessions
-// Warning: if defined WithConnectionTTL - idleThreshold must be less than connectionTTL
 func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithIdleThreshold(idleThreshold))
@@ -350,10 +367,7 @@ func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 
 // WithSessionPoolKeepAliveTimeout set timeout of keep alive requests for session in table.Client
 func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
-	return func(ctx context.Context, c *connection) error {
-		c.tableOptions = append(c.tableOptions, tableConfig.WithKeepAliveTimeout(keepAliveTimeout))
-		return nil
-	}
+	return func(ctx context.Context, c *connection) error { return nil }
 }
 
 // WithSessionPoolCreateSessionTimeout set timeout for new session creation process in table.Client
@@ -368,6 +382,14 @@ func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Opt
 func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithDeleteTimeout(deleteTimeout))
+		return nil
+	}
+}
+
+// WithIgnoreTruncated disables errors on truncated flag
+func WithIgnoreTruncated() Option {
+	return func(ctx context.Context, c *connection) error {
+		c.tableOptions = append(c.tableOptions, tableConfig.WithIgnoreTruncated())
 		return nil
 	}
 }
@@ -497,6 +519,44 @@ func WithTraceDiscovery(t trace.Discovery, opts ...trace.DiscoveryComposeOption)
 				append(
 					[]trace.DiscoveryComposeOption{
 						trace.WithDiscoveryPanicCallback(c.panicCallback),
+					},
+					opts...,
+				)...,
+			),
+		)
+		return nil
+	}
+}
+
+// WithTraceTopic adds configured discovery tracer to Connection
+func WithTraceTopic(t trace.Topic, opts ...trace.TopicComposeOption) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.topicOptions = append(
+			c.topicOptions,
+			topicoptions.WithTrace(
+				t,
+				append(
+					[]trace.TopicComposeOption{
+						trace.WithTopicPanicCallback(c.panicCallback),
+					},
+					opts...,
+				)...,
+			),
+		)
+		return nil
+	}
+}
+
+// WithTraceDatabaseSQL adds configured discovery tracer to Connection
+func WithTraceDatabaseSQL(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) Option {
+	return func(ctx context.Context, c *connection) error {
+		c.databaseSQLOptions = append(
+			c.databaseSQLOptions,
+			xsql.WithTrace(
+				t,
+				append(
+					[]trace.DatabaseSQLComposeOption{
+						trace.WithDatabaseSQLPanicCallback(c.panicCallback),
 					},
 					opts...,
 				)...,

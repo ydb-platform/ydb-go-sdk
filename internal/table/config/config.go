@@ -8,13 +8,19 @@ import (
 )
 
 const (
-	DefaultSessionPoolKeepAliveTimeout     = 500 * time.Millisecond
 	DefaultSessionPoolDeleteTimeout        = 500 * time.Millisecond
 	DefaultSessionPoolCreateSessionTimeout = 5 * time.Second
-	DefaultSessionPoolIdleThreshold        = 5 * time.Minute
 	DefaultSessionPoolSizeLimit            = 50
-	DefaultKeepAliveMinSize                = 10
-	DefaultIdleKeepAliveThreshold          = 2
+	DefaultSessionPoolIdleThreshold        = 5 * time.Minute
+
+	// Deprecated: table client do not supports background session keep-aliving now
+	DefaultKeepAliveMinSize = 10
+
+	// Deprecated: table client do not supports background session keep-aliving now
+	DefaultIdleKeepAliveThreshold = 2
+
+	// Deprecated: table client do not supports background session keep-aliving now
+	DefaultSessionPoolKeepAliveTimeout = 500 * time.Millisecond
 )
 
 func New(opts ...Option) Config {
@@ -49,13 +55,10 @@ func WithSizeLimit(sizeLimit int) Option {
 // the excess idle ones will be closed and removed after IdleKeepAliveThreshold is reached for each of them.
 // If keepAliveMinSize is less than zero, then no sessions will be preserved
 // If keepAliveMinSize is zero, the DefaultKeepAliveMinSize is used
+//
+// Deprecated: table client do not supports background session keep-aliving now
 func WithKeepAliveMinSize(keepAliveMinSize int) Option {
-	return func(c *Config) {
-		if keepAliveMinSize < 0 {
-			keepAliveMinSize = 0
-		}
-		c.keepAliveMinSize = keepAliveMinSize
-	}
+	return func(c *Config) {}
 }
 
 // WithIdleKeepAliveThreshold defines number of keepAlive messages to call before the
@@ -64,12 +67,10 @@ func WithKeepAliveMinSize(keepAliveMinSize int) Option {
 // If IdleKeepAliveThreshold is less than zero then it will be treated as infinite and no sessions will
 // be removed ever.
 // If IdleKeepAliveThreshold is equal to zero, it will be set to DefaultIdleKeepAliveThreshold
+//
+// Deprecated: table client do not supports background session keep-aliving now
 func WithIdleKeepAliveThreshold(idleKeepAliveThreshold int) Option {
-	return func(c *Config) {
-		if idleKeepAliveThreshold > 0 {
-			c.idleKeepAliveThreshold = idleKeepAliveThreshold
-		}
-	}
+	return func(c *Config) {}
 }
 
 // WithIdleThreshold sets maximum duration between any activity within session.
@@ -77,8 +78,7 @@ func WithIdleKeepAliveThreshold(idleKeepAliveThreshold int) Option {
 // session.
 //
 // If idleThreshold is less than zero then there is no idle limit.
-// If idleThreshold is zero, then the DefaultSessionPoolIdleThreshold value
-// is used.
+// If idleThreshold is zero, then the DefaultSessionPoolIdleThreshold value is used.
 func WithIdleThreshold(idleThreshold time.Duration) Option {
 	return func(c *Config) {
 		if idleThreshold < 0 {
@@ -90,12 +90,10 @@ func WithIdleThreshold(idleThreshold time.Duration) Option {
 
 // WithKeepAliveTimeout limits maximum time spent on KeepAlive request
 // If keepAliveTimeout is less than or equal to zero then the DefaultSessionPoolKeepAliveTimeout is used.
+//
+// Deprecated: table client do not supports background session keep-aliving now
 func WithKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
-	return func(c *Config) {
-		if keepAliveTimeout > 0 {
-			c.keepAliveTimeout = keepAliveTimeout
-		}
-	}
+	return func(c *Config) {}
 }
 
 // WithCreateSessionTimeout limits maximum time spent on Create session request
@@ -126,17 +124,24 @@ func WithTrace(trace trace.Table, opts ...trace.TableComposeOption) Option {
 	}
 }
 
+// WithIgnoreTruncated disables errors on truncated flag
+func WithIgnoreTruncated() Option {
+	return func(c *Config) {
+		c.ignoreTruncated = true
+	}
+}
+
 // Config is a configuration of table client
 type Config struct {
 	config.Common
 
-	sizeLimit              int
-	keepAliveMinSize       int
-	idleKeepAliveThreshold int
-	idleThreshold          time.Duration
-	keepAliveTimeout       time.Duration
-	createSessionTimeout   time.Duration
-	deleteTimeout          time.Duration
+	sizeLimit int
+
+	createSessionTimeout time.Duration
+	deleteTimeout        time.Duration
+	idleThreshold        time.Duration
+
+	ignoreTruncated bool
 
 	trace trace.Table
 }
@@ -157,8 +162,15 @@ func (c Config) SizeLimit() int {
 // the excess idle ones will be closed and removed after IdleKeepAliveThreshold is reached for each of them.
 // If KeepAliveMinSize is less than zero, then no sessions will be preserved
 // If KeepAliveMinSize is zero, the DefaultKeepAliveMinSize is used
+//
+// Deprecated: table client do not supports background session keep-aliving now
 func (c Config) KeepAliveMinSize() int {
-	return c.keepAliveMinSize
+	return DefaultKeepAliveMinSize
+}
+
+// IgnoreTruncated specifies behavior on truncated flag
+func (c Config) IgnoreTruncated() bool {
+	return c.ignoreTruncated
 }
 
 // IdleKeepAliveThreshold is a number of keepAlive messages to call before the
@@ -167,50 +179,48 @@ func (c Config) KeepAliveMinSize() int {
 // If IdleKeepAliveThreshold is less than zero then it will be treated as infinite and no sessions will
 // be removed ever.
 // If IdleKeepAliveThreshold is equal to zero, it will be set to DefaultIdleKeepAliveThreshold
+//
+// Deprecated: table client do not supports background session keep-aliving now
 func (c Config) IdleKeepAliveThreshold() int {
-	return c.idleKeepAliveThreshold
+	return DefaultIdleKeepAliveThreshold
 }
 
 // IdleThreshold is a maximum duration between any activity within session.
-// If this threshold reached, KeepAlive() method will be called on idle
-// session.
+// If this threshold reached, idle session will be closed
 //
 // If IdleThreshold is less than zero then there is no idle limit.
-// If IdleThreshold is zero, then the DefaultSessionPoolIdleThreshold value
-// is used.
+// If IdleThreshold is zero, then the DefaultSessionPoolIdleThreshold value is used.
 func (c Config) IdleThreshold() time.Duration {
 	return c.idleThreshold
 }
 
 // KeepAliveTimeout limits maximum time spent on KeepAlive request
-// If KeepAliveTimeout is less than or equal to zero then the
-// DefaultSessionPoolKeepAliveTimeout is used.
+// If KeepAliveTimeout is less than or equal to zero then the DefaultSessionPoolKeepAliveTimeout is used.
+//
+// Deprecated: table client do not supports background session keep-aliving now
 func (c Config) KeepAliveTimeout() time.Duration {
-	return c.keepAliveTimeout
+	return DefaultSessionPoolKeepAliveTimeout
 }
 
 // CreateSessionTimeout limits maximum time spent on Create session request
-// If CreateSessionTimeout is less than or equal to zero then the
-// DefaultSessionPoolCreateSessionTimeout is used.
+//
+// If CreateSessionTimeout is less than or equal to zero then the DefaultSessionPoolCreateSessionTimeout is used.
 func (c Config) CreateSessionTimeout() time.Duration {
 	return c.createSessionTimeout
 }
 
 // DeleteTimeout limits maximum time spent on Delete request
-// If DeleteTimeout is less than or equal to zero then the
-// DefaultSessionPoolDeleteTimeout is used.
+//
+// If DeleteTimeout is less than or equal to zero then the DefaultSessionPoolDeleteTimeout is used.
 func (c Config) DeleteTimeout() time.Duration {
 	return c.deleteTimeout
 }
 
 func defaults() Config {
 	return Config{
-		sizeLimit:              DefaultSessionPoolSizeLimit,
-		keepAliveMinSize:       DefaultKeepAliveMinSize,
-		idleKeepAliveThreshold: DefaultIdleKeepAliveThreshold,
-		idleThreshold:          DefaultSessionPoolIdleThreshold,
-		keepAliveTimeout:       DefaultSessionPoolKeepAliveTimeout,
-		createSessionTimeout:   DefaultSessionPoolCreateSessionTimeout,
-		deleteTimeout:          DefaultSessionPoolDeleteTimeout,
+		sizeLimit:            DefaultSessionPoolSizeLimit,
+		createSessionTimeout: DefaultSessionPoolCreateSessionTimeout,
+		deleteTimeout:        DefaultSessionPoolDeleteTimeout,
+		idleThreshold:        DefaultSessionPoolIdleThreshold,
 	}
 }

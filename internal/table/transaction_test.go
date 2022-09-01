@@ -4,12 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
@@ -23,7 +22,7 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		cc: testutil.NewRouter(
+		cc: testutil.NewBalancer(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableBeginTransaction: func(request interface{}) (proto.Message, error) {

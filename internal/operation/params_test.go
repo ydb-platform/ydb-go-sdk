@@ -6,9 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/protobuf/types/known/durationpb"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 func TestParams(t *testing.T) {
@@ -216,7 +215,7 @@ func TestParams(t *testing.T) {
 		},
 		{
 			ctx: func() context.Context {
-				// nolint: govet
+				//nolint:govet
 				ctx, _ := context.WithTimeout(WithCancelAfter(
 					WithTimeout(
 						context.Background(),
@@ -237,7 +236,7 @@ func TestParams(t *testing.T) {
 		},
 		{
 			ctx: func() context.Context {
-				// nolint: govet
+				//nolint:govet
 				ctx, _ := context.WithTimeout(WithCancelAfter(
 					WithTimeout(
 						context.Background(),
@@ -258,7 +257,7 @@ func TestParams(t *testing.T) {
 		},
 		{
 			ctx: func() context.Context {
-				// nolint: govet
+				//nolint:govet
 				ctx, _ := context.WithTimeout(WithCancelAfter(
 					WithTimeout(
 						context.Background(),
@@ -280,7 +279,7 @@ func TestParams(t *testing.T) {
 		},
 		{
 			ctx: func() context.Context {
-				// nolint: govet
+				//nolint:govet
 				ctx, _ := context.WithTimeout(context.Background(), time.Second*1)
 				return ctx
 			}(),

@@ -7,8 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/protobuf/proto"
@@ -16,6 +18,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -32,7 +35,7 @@ func TestSessionKeepAlive(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		cc: testutil.NewRouter(
+		cc: testutil.NewBalancer(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableKeepAlive: func(interface{}) (proto.Message, error) {
@@ -86,7 +89,7 @@ func TestSessionDescribeTable(t *testing.T) {
 	)
 	b := StubBuilder{
 		T: t,
-		cc: testutil.NewRouter(
+		cc: testutil.NewBalancer(
 			testutil.WithInvokeHandlers(
 				testutil.InvokeHandlers{
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
@@ -158,6 +161,8 @@ func TestSessionDescribeTable(t *testing.T) {
 			},
 			Indexes: []options.IndexDescription{},
 		}
+		a := allocator.New()
+		defer a.Free()
 		result = &Ydb_Table.DescribeTableResult{
 			Self: &Ydb_Scheme.Entry{
 				Name:                 expect.Name,
@@ -169,13 +174,13 @@ func TestSessionDescribeTable(t *testing.T) {
 			Columns: []*Ydb_Table.ColumnMeta{
 				{
 					Name:   expect.Columns[0].Name,
-					Type:   value.TypeToYDB(expect.Columns[0].Type),
+					Type:   value.TypeToYDB(expect.Columns[0].Type, a),
 					Family: "testFamily",
 				},
 			},
 			PrimaryKey: expect.PrimaryKey,
 			ShardKeyBounds: []*Ydb.TypedValue{
-				value.ToYDB(expect.KeyRanges[0].To),
+				value.ToYDB(expect.KeyRanges[0].To, a),
 			},
 			Indexes:    nil,
 			TableStats: nil,
@@ -231,7 +236,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					config:       config.New(),
 				}
 				_, _, err := s.Execute(ctx, table.TxControl(), "", table.NewQueryParameters())
-				testutil.NoError(t, err)
+				require.NoError(t, err)
 			},
 		},
 		{
@@ -242,7 +247,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					config:       config.New(),
 				}
 				_, err := s.Explain(ctx, "")
-				testutil.NoError(t, err)
+				require.NoError(t, err)
 			},
 		},
 		{
@@ -253,14 +258,14 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					config:       config.New(),
 				}
 				_, err := s.Prepare(ctx, "")
-				testutil.NoError(t, err)
+				require.NoError(t, err)
 			},
 		},
 		{
 			method: testutil.TableCreateSession,
 			do: func(t *testing.T, ctx context.Context, c *Client) {
-				_, err := c.createSession(ctx)
-				testutil.NoError(t, err)
+				_, err := c.internalPoolCreateSession(ctx)
+				require.NoError(t, err)
 			},
 		},
 		{
@@ -270,7 +275,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 					config:       config.New(),
 				}
-				testutil.NoError(t, s.Close(ctx))
+				require.NoError(t, s.Close(ctx))
 			},
 		},
 		{
@@ -281,7 +286,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					config:       config.New(),
 				}
 				_, err := s.BeginTransaction(ctx, table.TxSettings())
-				testutil.NoError(t, err)
+				require.NoError(t, err)
 			},
 		},
 		{
@@ -294,7 +299,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					},
 				}
 				_, err := tx.CommitTx(ctx)
-				testutil.NoError(t, err)
+				require.NoError(t, err)
 			},
 		},
 		{
@@ -307,7 +312,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					},
 				}
 				err := tx.Rollback(ctx)
-				testutil.NoError(t, err)
+				require.NoError(t, err)
 			},
 		},
 		{
@@ -317,7 +322,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
 					config:       config.New(),
 				}
-				testutil.NoError(t, s.KeepAlive(ctx))
+				require.NoError(t, s.KeepAlive(ctx))
 			},
 		},
 	} {
@@ -327,7 +332,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				for _, srcDst := range fromTo {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
 						client := New(
-							testutil.NewRouter(
+							testutil.NewBalancer(
 								testutil.WithInvokeHandlers(
 									testutil.InvokeHandlers{
 										testutil.TableExecuteDataQuery: func(interface{}) (proto.Message, error) {
@@ -382,5 +387,236 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 				}
 			},
 		)
+	}
+}
+
+func TestCreateTableRegression(t *testing.T) {
+	client := New(
+		testutil.NewBalancer(
+			testutil.WithInvokeHandlers(
+				testutil.InvokeHandlers{
+					testutil.TableCreateSession: func(request interface{}) (proto.Message, error) {
+						return &Ydb_Table.CreateSessionResult{
+							SessionId: "",
+						}, nil
+					},
+					testutil.TableCreateTable: func(act interface{}) (proto.Message, error) {
+						exp := &Ydb_Table.CreateTableRequest{
+							SessionId: "",
+							Path:      "episodes",
+							Columns: []*Ydb_Table.ColumnMeta{
+								{
+									Name: "series_id",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UINT64,
+										}}},
+									}},
+								},
+								{
+									Name: "season_id",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UINT64,
+										}}},
+									}},
+								},
+								{
+									Name: "episode_id",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UINT64,
+										}}},
+									}},
+								},
+								{
+									Name: "title",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UTF8,
+										}}},
+									}},
+								},
+								{
+									Name: "air_date",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UINT64,
+										}}},
+									}},
+								},
+							},
+							PrimaryKey: []string{
+								"series_id",
+								"season_id",
+								"episode_id",
+							},
+							OperationParams: &Ydb_Operations.OperationParams{
+								OperationMode: Ydb_Operations.OperationParams_SYNC,
+							},
+							Attributes: map[string]string{
+								"attr": "attr_value",
+							},
+						}
+						if !proto.Equal(exp, act.(proto.Message)) {
+							//nolint:revive
+							return nil, fmt.Errorf("proto's not equal: \n\nact: %v\n\nexp: %s\n\n", act, exp)
+						}
+						return &Ydb_Table.CreateTableResponse{}, nil
+					},
+				},
+			),
+		),
+		config.New(),
+	)
+
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		time.Second,
+	)
+	defer cancel()
+
+	err := client.Do(ctx, func(ctx context.Context, s table.Session) error {
+		return s.CreateTable(ctx, "episodes",
+			options.WithColumn("series_id", types.Optional(types.TypeUint64)),
+			options.WithColumn("season_id", types.Optional(types.TypeUint64)),
+			options.WithColumn("episode_id", types.Optional(types.TypeUint64)),
+			options.WithColumn("title", types.Optional(types.TypeUTF8)),
+			options.WithColumn("air_date", types.Optional(types.TypeUint64)),
+			options.WithPrimaryKeyColumn("series_id", "season_id", "episode_id"),
+			options.WithAttribute("attr", "attr_value"),
+		)
+	})
+
+	require.NoError(t, err, "")
+}
+
+func TestDescribeTableRegression(t *testing.T) {
+	client := New(
+		testutil.NewBalancer(
+			testutil.WithInvokeHandlers(
+				testutil.InvokeHandlers{
+					testutil.TableCreateSession: func(request interface{}) (proto.Message, error) {
+						return &Ydb_Table.CreateSessionResult{
+							SessionId: "",
+						}, nil
+					},
+					testutil.TableDescribeTable: func(act interface{}) (proto.Message, error) {
+						return &Ydb_Table.DescribeTableResult{
+							Self: &Ydb_Scheme.Entry{
+								Name: "episodes",
+							},
+							Columns: []*Ydb_Table.ColumnMeta{
+								{
+									Name: "series_id",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UINT64,
+										}}},
+									}},
+								},
+								{
+									Name: "season_id",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UINT64,
+										}}},
+									}},
+								},
+								{
+									Name: "episode_id",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UINT64,
+										}}},
+									}},
+								},
+								{
+									Name: "title",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UTF8,
+										}}},
+									}},
+								},
+								{
+									Name: "air_date",
+									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+											TypeId: Ydb.Type_UINT64,
+										}}},
+									}},
+								},
+							},
+							PrimaryKey: []string{
+								"series_id",
+								"season_id",
+								"episode_id",
+							},
+							Attributes: map[string]string{
+								"attr": "attr_value",
+							},
+						}, nil
+					},
+				},
+			),
+		),
+		config.New(),
+	)
+
+	ctx, cancel := context.WithTimeout(
+		context.Background(),
+		time.Second,
+	)
+	defer cancel()
+
+	var act options.Description
+
+	err := client.Do(ctx, func(ctx context.Context, s table.Session) (err error) {
+		act, err = s.DescribeTable(ctx, "episodes")
+		return err
+	})
+
+	require.NoError(t, err, "")
+
+	exp := options.Description{
+		Name: "episodes",
+		Columns: []options.Column{
+			{
+				Name: "series_id",
+				Type: types.Optional(types.TypeUint64),
+			},
+			{
+				Name: "season_id",
+				Type: types.Optional(types.TypeUint64),
+			},
+			{
+				Name: "episode_id",
+				Type: types.Optional(types.TypeUint64),
+			},
+			{
+				Name: "title",
+				Type: types.Optional(types.TypeUTF8),
+			},
+			{
+				Name: "air_date",
+				Type: types.Optional(types.TypeUint64),
+			},
+		},
+		KeyRanges: []options.KeyRange{
+			{},
+		},
+		PrimaryKey: []string{
+			"series_id",
+			"season_id",
+			"episode_id",
+		},
+		Attributes: map[string]string{
+			"attr": "attr_value",
+		},
+	}
+
+	if fmt.Sprintf("%+v", act) != fmt.Sprintf("%+v", exp) {
+		t.Fatalf("description's not equal: \n\nact: %+v\n\nexp: %+v\n\n", act, exp)
 	}
 }

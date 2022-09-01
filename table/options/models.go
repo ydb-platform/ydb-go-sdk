@@ -8,16 +8,18 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-type SessionStatus byte
+type SessionStatus uint32
 
 const (
 	SessionStatusUnknown SessionStatus = iota
 	SessionReady
 	SessionBusy
 	SessionClosing
+	SessionClosed
 
 	statusUnknown = "unknown"
 )
@@ -30,6 +32,8 @@ func (s SessionStatus) String() string {
 		return "busy"
 	case SessionClosing:
 		return "closing"
+	case SessionClosed:
+		return "closed"
 	default:
 		return statusUnknown
 	}
@@ -41,10 +45,10 @@ type Column struct {
 	Family string
 }
 
-func (c Column) toYDB() *Ydb_Table.ColumnMeta {
+func (c Column) toYDB(a *allocator.Allocator) *Ydb_Table.ColumnMeta {
 	return &Ydb_Table.ColumnMeta{
 		Name:   c.Name,
-		Type:   value.TypeToYDB(c.Type),
+		Type:   value.TypeToYDB(c.Type, a),
 		Family: c.Family,
 	}
 }
@@ -63,7 +67,7 @@ type IndexDescription struct {
 	Status       Ydb_Table.TableIndexDescription_Status
 }
 
-// nolint:unused
+//nolint:unused
 func (i IndexDescription) toYDB() *Ydb_Table.TableIndexDescription {
 	return &Ydb_Table.TableIndexDescription{
 		Name:         i.Name,

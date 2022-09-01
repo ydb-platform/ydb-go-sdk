@@ -5,9 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -70,7 +69,7 @@ func TestQueryCachePolicyKeepInCache(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			b := StubBuilder{
 				T: t,
-				cc: testutil.NewRouter(
+				cc: testutil.NewBalancer(
 					testutil.WithInvokeHandlers(
 						testutil.InvokeHandlers{
 							testutil.TableExecuteDataQuery: func(request interface{}) (proto.Message, error) {

@@ -2,103 +2,83 @@ package value
 
 import (
 	"bytes"
-	"strconv"
+	"fmt"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 )
 
-type T interface {
-	String() string
-	toYDB() *Ydb.Type
+type Type interface {
+	toYDB(a *allocator.Allocator) *Ydb.Type
+	equalsTo(rhs Type) bool
 	toString(*bytes.Buffer)
-	equal(T) bool
+
+	String() string
 }
 
-func TypeToYDB(t T) *Ydb.Type {
-	return t.toYDB()
+func WriteTypeStringTo(buf *bytes.Buffer, t Type) {
+	buf.WriteString(t.String())
 }
 
-func WriteTypeStringTo(buf *bytes.Buffer, t T) {
-	t.toString(buf)
+func TypeToYDB(t Type, a *allocator.Allocator) *Ydb.Type {
+	return t.toYDB(a)
 }
 
-func TypesEqual(a, b T) bool {
-	return a.equal(b)
-}
-
-func TypeFromYDB(x *Ydb.Type) T {
+func TypeFromYDB(x *Ydb.Type) Type {
 	switch v := x.Type.(type) {
 	case *Ydb.Type_TypeId:
 		return primitiveTypeFromYDB(v.TypeId)
 
 	case *Ydb.Type_OptionalType:
-		return OptionalType{TypeFromYDB(v.OptionalType.Item)}
+		return Optional(TypeFromYDB(v.OptionalType.Item))
 
 	case *Ydb.Type_ListType:
-		return ListType{TypeFromYDB(v.ListType.Item)}
+		return List(TypeFromYDB(v.ListType.Item))
 
 	case *Ydb.Type_DecimalType:
 		d := v.DecimalType
-		return DecimalType{d.Precision, d.Scale}
+		return Decimal(d.Precision, d.Scale)
 
 	case *Ydb.Type_TupleType:
 		t := v.TupleType
-		return TupleType{TypesFromYDB(t.Elements)}
+		return Tuple(TypesFromYDB(t.Elements)...)
 
 	case *Ydb.Type_StructType:
 		s := v.StructType
-		return StructType{StructFields(s.Members)}
+		return Struct(StructFields(s.Members)...)
 
 	case *Ydb.Type_DictType:
 		d := v.DictType
-		return DictType{
-			Key:     TypeFromYDB(d.Key),
-			Payload: TypeFromYDB(d.Payload),
-		}
+		return Dict(
+			TypeFromYDB(d.Key),
+			TypeFromYDB(d.Payload),
+		)
 
 	case *Ydb.Type_VariantType:
 		t := v.VariantType
 		switch x := t.Type.(type) {
 		case *Ydb.VariantType_TupleItems:
-			return VariantType{
-				T: TupleType{TypesFromYDB(x.TupleItems.Elements)},
-			}
+			return Variant(
+				Tuple(TypesFromYDB(x.TupleItems.Elements)...),
+			)
 		case *Ydb.VariantType_StructItems:
-			return VariantType{
-				S: StructType{StructFields(x.StructItems.Members)},
-			}
+			return Variant(
+				Struct(StructFields(x.StructItems.Members)...),
+			)
 		default:
 			panic("ydb: unknown variant type")
 		}
 
 	case *Ydb.Type_VoidType:
-		return VoidType{}
+		return Void()
 
 	default:
 		panic("ydb: unknown type")
 	}
 }
 
-func StructFields(ms []*Ydb.StructMember) []StructField {
-	fs := make([]StructField, len(ms))
-	for i, m := range ms {
-		fs[i] = StructField{
-			Name: m.Name,
-			Type: TypeFromYDB(m.Type),
-		}
-	}
-	return fs
-}
-
-func TypesFromYDB(es []*Ydb.Type) []T {
-	ts := make([]T, len(es))
-	for i, el := range es {
-		ts[i] = TypeFromYDB(el)
-	}
-	return ts
-}
-
-func primitiveTypeFromYDB(t Ydb.Type_PrimitiveTypeId) T {
+func primitiveTypeFromYDB(t Ydb.Type_PrimitiveTypeId) Type {
 	switch t {
 	case Ydb.Type_BOOL:
 		return TypeBool
@@ -155,354 +135,16 @@ func primitiveTypeFromYDB(t Ydb.Type_PrimitiveTypeId) T {
 	}
 }
 
-// ListType wraps proto message List
-// TODO prepare toYDB() calls in constructors as an optimization.
-// nolint:godox
-type ListType struct {
-	T T
-}
-
-func (l ListType) String() string {
-	var buf bytes.Buffer
-	l.toString(&buf)
-	return buf.String()
-}
-
-func (l ListType) equal(t T) bool {
-	x, ok := t.(ListType)
-	if !ok {
-		return false
+func TypesFromYDB(es []*Ydb.Type) []Type {
+	ts := make([]Type, len(es))
+	for i, el := range es {
+		ts[i] = TypeFromYDB(el)
 	}
-	return l.T.equal(x.T)
+	return ts
 }
 
-func (l ListType) toString(buf *bytes.Buffer) {
-	buf.WriteString("List<")
-	l.T.toString(buf)
-	buf.WriteString(">")
-}
-
-func (l ListType) toYDB() *Ydb.Type {
-	if x, ok := l.T.(PrimitiveType); ok {
-		return listPrimitive[x]
-	}
-	return &Ydb.Type{
-		Type: &Ydb.Type_ListType{
-			ListType: &Ydb.ListType{
-				Item: l.T.toYDB(),
-			},
-		},
-	}
-}
-
-type TupleType struct {
-	Elems []T
-}
-
-func (t TupleType) Empty() bool {
-	return len(t.Elems) == 0
-}
-
-func (t TupleType) String() string {
-	var buf bytes.Buffer
-	t.toString(&buf)
-	return buf.String()
-}
-
-func (t TupleType) equal(x T) bool {
-	v, ok := x.(TupleType)
-	if !ok {
-		return false
-	}
-	if len(t.Elems) != len(v.Elems) {
-		return false
-	}
-	for i, elem := range t.Elems {
-		if !elem.equal(v.Elems[i]) {
-			return false
-		}
-	}
-	return true
-}
-
-func (t TupleType) toString(buf *bytes.Buffer) {
-	buf.WriteString("Tuple<")
-	for i, t := range t.Elems {
-		if i > 0 {
-			buf.WriteByte(',')
-		}
-		t.toString(buf)
-	}
-	buf.WriteByte('>')
-}
-
-func (t TupleType) toYDB() *Ydb.Type {
-	return &Ydb.Type{
-		Type: &Ydb.Type_TupleType{
-			TupleType: &Ydb.TupleType{
-				Elements: t.Elements(),
-			},
-		},
-	}
-}
-
-func (t TupleType) Elements() []*Ydb.Type {
-	es := make([]*Ydb.Type, len(t.Elems))
-	for i, t := range t.Elems {
-		es[i] = t.toYDB()
-	}
-	return es
-}
-
-type StructField struct {
-	Name string
-	Type T
-}
-
-type StructType struct {
-	Fields []StructField
-}
-
-func (s StructType) Empty() bool {
-	return len(s.Fields) == 0
-}
-
-func (s StructType) String() string {
-	var buf bytes.Buffer
-	s.toString(&buf)
-	return buf.String()
-}
-
-func (s StructType) equal(t T) bool {
-	v, ok := t.(StructType)
-	if !ok {
-		return false
-	}
-	if len(s.Fields) != len(v.Fields) {
-		return false
-	}
-	for i, sf := range s.Fields {
-		vf := v.Fields[i]
-		if sf.Name != vf.Name {
-			return false
-		}
-		if !sf.Type.equal(vf.Type) {
-			return false
-		}
-	}
-	return true
-}
-
-func (s StructType) toString(buf *bytes.Buffer) {
-	buf.WriteString("Struct<")
-	for i, f := range s.Fields {
-		if i > 0 {
-			buf.WriteByte(',')
-		}
-		buf.WriteString(f.Name)
-		buf.WriteByte(':')
-		f.Type.toString(buf)
-	}
-	buf.WriteByte('>')
-}
-
-func (s StructType) toYDB() *Ydb.Type {
-	return &Ydb.Type{
-		Type: &Ydb.Type_StructType{
-			StructType: &Ydb.StructType{
-				Members: s.Members(),
-			},
-		},
-	}
-}
-
-func (s StructType) Members() []*Ydb.StructMember {
-	ms := make([]*Ydb.StructMember, len(s.Fields))
-	for i, f := range s.Fields {
-		ms[i] = &Ydb.StructMember{
-			Name: f.Name,
-			Type: f.Type.toYDB(),
-		}
-	}
-	return ms
-}
-
-type DictType struct {
-	Key     T
-	Payload T
-}
-
-func Dict(key, payload T) T {
-	return DictType{
-		Key:     key,
-		Payload: payload,
-	}
-}
-
-func (d DictType) String() string {
-	var buf bytes.Buffer
-	d.toString(&buf)
-	return buf.String()
-}
-
-func (d DictType) equal(t T) bool {
-	v, ok := t.(DictType)
-	if !ok {
-		return false
-	}
-	if !d.Key.equal(v.Key) {
-		return false
-	}
-	if !d.Payload.equal(v.Payload) {
-		return false
-	}
-	return true
-}
-
-func (d DictType) toString(buf *bytes.Buffer) {
-	buf.WriteString("Dict<")
-	d.Key.toString(buf)
-	buf.WriteByte(',')
-	d.Payload.toString(buf)
-	buf.WriteByte('>')
-}
-
-func (d DictType) toYDB() *Ydb.Type {
-	return &Ydb.Type{
-		Type: &Ydb.Type_DictType{
-			DictType: &Ydb.DictType{
-				Key:     d.Key.toYDB(),
-				Payload: d.Payload.toYDB(),
-			},
-		},
-	}
-}
-
-type VariantType struct {
-	S StructType
-	T TupleType
-}
-
-func (v VariantType) String() string {
-	var buf bytes.Buffer
-	v.toString(&buf)
-	return buf.String()
-}
-
-func (v VariantType) at(i int) (T, bool) {
-	if v.S.Empty() {
-		if len(v.T.Elems) <= i {
-			return nil, false
-		}
-		return v.T.Elems[i], true
-	}
-	if len(v.S.Fields) <= i {
-		return nil, false
-	}
-	return v.S.Fields[i].Type, true
-}
-
-func (v VariantType) equal(t T) bool {
-	x, ok := t.(VariantType)
-	if !ok {
-		return false
-	}
-	if v.S.Empty() {
-		return v.T.equal(x.T)
-	}
-	return v.S.equal(x.S)
-}
-
-func (v VariantType) toString(buf *bytes.Buffer) {
-	buf.WriteString("Variant<")
-	if v.S.Empty() {
-		v.T.toString(buf)
-	} else {
-		v.S.toString(buf)
-	}
-	buf.WriteString(">")
-}
-
-func (v VariantType) toYDB() *Ydb.Type {
-	vt := new(Ydb.VariantType)
-	if v.S.Empty() { // StructItems.
-		vt.Type = &Ydb.VariantType_TupleItems{
-			TupleItems: &Ydb.TupleType{
-				Elements: v.T.Elements(),
-			},
-		}
-	} else { // TupleItems.
-		vt.Type = &Ydb.VariantType_StructItems{
-			StructItems: &Ydb.StructType{
-				Members: v.S.Members(),
-			},
-		}
-	}
-	return &Ydb.Type{
-		Type: &Ydb.Type_VariantType{
-			VariantType: vt,
-		},
-	}
-}
-
-type VoidType struct{}
-
-func (v VoidType) toYDB() *Ydb.Type {
-	return void
-}
-
-func (v VoidType) String() string {
-	return "Void"
-}
-
-func (v VoidType) equal(t T) bool {
-	_, ok := t.(VoidType)
-	return ok
-}
-
-func (v VoidType) toString(buf *bytes.Buffer) {
-	buf.WriteString(v.String())
-}
-
-var void = &Ydb.Type{
-	Type: &Ydb.Type_VoidType{},
-}
-
-type OptionalType struct {
-	T T
-}
-
-func (opt OptionalType) String() string {
-	var buf bytes.Buffer
-	opt.toString(&buf)
-	return buf.String()
-}
-
-func (opt OptionalType) equal(t T) bool {
-	v, ok := t.(OptionalType)
-	if !ok {
-		return false
-	}
-	return opt.T.equal(v.T)
-}
-
-func (opt OptionalType) toString(buf *bytes.Buffer) {
-	buf.WriteString("Optional<")
-	opt.T.toString(buf)
-	buf.WriteString(">")
-}
-
-func (opt OptionalType) toYDB() *Ydb.Type {
-	if x, ok := opt.T.(PrimitiveType); ok {
-		return optionalPrimitive[x]
-	}
-	return &Ydb.Type{
-		Type: &Ydb.Type_OptionalType{
-			OptionalType: &Ydb.OptionalType{
-				Item: opt.T.toYDB(),
-			},
-		},
-	}
+func TypesEqual(a, b Type) bool {
+	return a.equalsTo(b)
 }
 
 type DecimalType struct {
@@ -510,66 +152,234 @@ type DecimalType struct {
 	Scale     uint32
 }
 
-func (d DecimalType) String() string {
-	var buf bytes.Buffer
-	d.toString(&buf)
+func (v *DecimalType) toString(buffer *bytes.Buffer) {
+	buffer.WriteString(fmt.Sprintf("Decimal(%d,%d)", v.Precision, v.Scale))
+}
+
+func (v *DecimalType) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
 	return buf.String()
 }
 
-func (d DecimalType) equal(t T) bool {
-	v, ok := t.(DecimalType)
+func (v *DecimalType) equalsTo(rhs Type) bool {
+	vv, ok := rhs.(*DecimalType)
+	return ok && *v == *vv
+}
+
+func (v *DecimalType) toYDB(a *allocator.Allocator) *Ydb.Type {
+	decimal := a.Decimal()
+
+	decimal.Scale = v.Scale
+	decimal.Precision = v.Precision
+
+	typeDecimal := a.TypeDecimal()
+	typeDecimal.DecimalType = decimal
+
+	t := a.Type()
+	t.Type = typeDecimal
+
+	return t
+}
+
+func Decimal(precision, scale uint32) *DecimalType {
+	return &DecimalType{
+		Precision: precision,
+		Scale:     scale,
+	}
+}
+
+type dictType struct {
+	keyType   Type
+	valueType Type
+}
+
+func (v *dictType) toString(buffer *bytes.Buffer) {
+	buffer.WriteString("Dict<")
+	v.keyType.toString(buffer)
+	buffer.WriteByte(',')
+	v.valueType.toString(buffer)
+	buffer.WriteByte('>')
+}
+
+func (v *dictType) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (v *dictType) equalsTo(rhs Type) bool {
+	vv, ok := rhs.(*dictType)
 	if !ok {
 		return false
 	}
-	return d == v
+	if !v.keyType.equalsTo(vv.keyType) {
+		return false
+	}
+	if !v.valueType.equalsTo(vv.valueType) {
+		return false
+	}
+	return true
 }
 
-func (d DecimalType) toString(buf *bytes.Buffer) {
-	buf.WriteString("Decimal(")
-	buf.WriteString(strconv.FormatUint(uint64(d.Precision), 10))
-	buf.WriteByte(',')
-	buf.WriteString(strconv.FormatUint(uint64(d.Scale), 10))
-	buf.WriteString(")")
+func (v *dictType) toYDB(a *allocator.Allocator) *Ydb.Type {
+	t := a.Type()
+
+	typeDict := a.TypeDict()
+
+	typeDict.DictType = a.Dict()
+
+	typeDict.DictType.Key = v.keyType.toYDB(a)
+	typeDict.DictType.Payload = v.valueType.toYDB(a)
+
+	t.Type = typeDict
+
+	return t
 }
 
-func (d DecimalType) toYDB() *Ydb.Type {
-	return &Ydb.Type{
-		Type: &Ydb.Type_DecimalType{
-			DecimalType: &Ydb.DecimalType{
-				Precision: d.Precision,
-				Scale:     d.Scale,
-			},
-		},
+func Dict(key, value Type) (v *dictType) {
+	return &dictType{
+		keyType:   key,
+		valueType: value,
 	}
 }
 
-type PrimitiveType int
+type emptyListType struct{}
 
-func (t PrimitiveType) String() string {
-	if int(t) < len(primitiveString) {
-		return primitiveString[t]
+func (v emptyListType) toString(buffer *bytes.Buffer) {
+	buffer.WriteString("List<>")
+}
+
+func (v emptyListType) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (emptyListType) equalsTo(rhs Type) bool {
+	_, ok := rhs.(emptyListType)
+	return ok
+}
+
+func (emptyListType) toYDB(a *allocator.Allocator) *Ydb.Type {
+	t := a.Type()
+
+	t.Type = a.TypeEmptyList()
+
+	return t
+}
+
+func EmptyList() emptyListType {
+	return emptyListType{}
+}
+
+type listType struct {
+	itemType Type
+}
+
+func (v *listType) toString(buffer *bytes.Buffer) {
+	buffer.WriteString("List<")
+	v.itemType.toString(buffer)
+	buffer.WriteString(">")
+}
+
+func (v *listType) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (v *listType) equalsTo(rhs Type) bool {
+	vv, ok := rhs.(*listType)
+	if !ok {
+		return false
 	}
-	return "Unknown"
+	return v.itemType.equalsTo(vv.itemType)
 }
 
-func (t PrimitiveType) equal(x T) bool {
-	v, ok := x.(PrimitiveType)
-	return ok && v == t
+func (v *listType) toYDB(a *allocator.Allocator) *Ydb.Type {
+	t := a.Type()
+
+	list := a.List()
+
+	list.Item = v.itemType.toYDB(a)
+
+	typeList := a.TypeList()
+	typeList.ListType = list
+
+	t.Type = typeList
+
+	return t
 }
 
-func (t PrimitiveType) toYDB() *Ydb.Type {
-	i := int(t)
-	if 0 < i && i < len(primitive) {
-		return primitive[i]
+func List(t Type) *listType {
+	return &listType{
+		itemType: t,
 	}
-	panic("ydb: unexpected primitive type")
 }
 
-func (t PrimitiveType) toString(buf *bytes.Buffer) {
-	buf.WriteString(t.String())
+type optionalType struct {
+	innerType Type
 }
 
-// Primitive TypesFromYDB known by YDB.
+func (v *optionalType) toString(buffer *bytes.Buffer) {
+	buffer.WriteString("Optional<")
+	v.innerType.toString(buffer)
+	buffer.WriteString(">")
+}
+
+func (v *optionalType) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (v *optionalType) equalsTo(rhs Type) bool {
+	vv, ok := rhs.(*optionalType)
+	if !ok {
+		return false
+	}
+	return v.innerType.equalsTo(vv.innerType)
+}
+
+func (v *optionalType) toYDB(a *allocator.Allocator) *Ydb.Type {
+	t := a.Type()
+
+	typeOptional := a.TypeOptional()
+
+	typeOptional.OptionalType = a.Optional()
+
+	typeOptional.OptionalType.Item = v.innerType.toYDB(a)
+
+	t.Type = typeOptional
+
+	return t
+}
+
+func Optional(t Type) *optionalType {
+	return &optionalType{
+		innerType: t,
+	}
+}
+
+type PrimitiveType uint
+
+func (v PrimitiveType) toString(buffer *bytes.Buffer) {
+	buffer.WriteString(primitiveString[v])
+}
+
+func (v PrimitiveType) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
 const (
 	TypeUnknown PrimitiveType = iota
 	TypeBool
@@ -598,6 +408,34 @@ const (
 	TypeJSONDocument
 	TypeDyNumber
 )
+
+var primitive = [...]*Ydb.Type{
+	TypeBool:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL}},
+	TypeInt8:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT8}},
+	TypeUint8:        {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT8}},
+	TypeInt16:        {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT16}},
+	TypeUint16:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT16}},
+	TypeInt32:        {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32}},
+	TypeUint32:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT32}},
+	TypeInt64:        {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT64}},
+	TypeUint64:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}},
+	TypeFloat:        {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_FLOAT}},
+	TypeDouble:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DOUBLE}},
+	TypeDate:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATE}},
+	TypeDatetime:     {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATETIME}},
+	TypeTimestamp:    {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TIMESTAMP}},
+	TypeInterval:     {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INTERVAL}},
+	TypeTzDate:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATE}},
+	TypeTzDatetime:   {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATETIME}},
+	TypeTzTimestamp:  {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_TIMESTAMP}},
+	TypeString:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_STRING}},
+	TypeUTF8:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}},
+	TypeYSON:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_YSON}},
+	TypeJSON:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON}},
+	TypeUUID:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UUID}},
+	TypeJSONDocument: {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON_DOCUMENT}},
+	TypeDyNumber:     {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DYNUMBER}},
+}
 
 var primitiveString = [...]string{
 	TypeUnknown:      "<unknown>",
@@ -628,86 +466,288 @@ var primitiveString = [...]string{
 	TypeDyNumber:     "DyNumber",
 }
 
-var primitive = [...]*Ydb.Type{
-	TypeBool:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL}},
-	TypeInt8:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT8}},
-	TypeUint8:        {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT8}},
-	TypeInt16:        {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT16}},
-	TypeUint16:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT16}},
-	TypeInt32:        {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32}},
-	TypeUint32:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT32}},
-	TypeInt64:        {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT64}},
-	TypeUint64:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64}},
-	TypeFloat:        {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_FLOAT}},
-	TypeDouble:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DOUBLE}},
-	TypeDate:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATE}},
-	TypeDatetime:     {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATETIME}},
-	TypeTimestamp:    {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TIMESTAMP}},
-	TypeInterval:     {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INTERVAL}},
-	TypeTzDate:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATE}},
-	TypeTzDatetime:   {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATETIME}},
-	TypeTzTimestamp:  {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_TIMESTAMP}},
-	TypeString:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_STRING}},
-	TypeUTF8:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}},
-	TypeYSON:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_YSON}},
-	TypeJSON:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON}},
-	TypeUUID:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UUID}},
-	TypeJSONDocument: {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON_DOCUMENT}},
-	TypeDyNumber:     {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DYNUMBER}},
+func (v PrimitiveType) equalsTo(rhs Type) bool {
+	vv, ok := rhs.(PrimitiveType)
+	if !ok {
+		return false
+	}
+	return v == vv
 }
 
-var optionalPrimitive = [...]*Ydb.Type{
-	TypeBool:         {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeBool]}}},
-	TypeInt8:         {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeInt8]}}},
-	TypeUint8:        {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeUint8]}}},
-	TypeInt16:        {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeInt16]}}},
-	TypeUint16:       {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeUint16]}}},
-	TypeInt32:        {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeInt32]}}},
-	TypeUint32:       {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeUint32]}}},
-	TypeInt64:        {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeInt64]}}},
-	TypeUint64:       {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeUint64]}}},
-	TypeFloat:        {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeFloat]}}},
-	TypeDouble:       {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeDouble]}}},
-	TypeDate:         {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeDate]}}},
-	TypeDatetime:     {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeDatetime]}}},
-	TypeTimestamp:    {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeTimestamp]}}},
-	TypeInterval:     {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeInterval]}}},
-	TypeTzDate:       {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeTzDate]}}},
-	TypeTzDatetime:   {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeTzDatetime]}}},
-	TypeTzTimestamp:  {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeTzTimestamp]}}},
-	TypeString:       {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeString]}}},
-	TypeUTF8:         {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeUTF8]}}},
-	TypeYSON:         {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeYSON]}}},
-	TypeJSON:         {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeJSON]}}},
-	TypeUUID:         {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeUUID]}}},
-	TypeJSONDocument: {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeJSONDocument]}}},
-	TypeDyNumber:     {Type: &Ydb.Type_OptionalType{OptionalType: &Ydb.OptionalType{Item: primitive[TypeDyNumber]}}},
+func (v PrimitiveType) toYDB(*allocator.Allocator) *Ydb.Type {
+	return primitive[v]
 }
 
-var listPrimitive = [...]*Ydb.Type{
-	TypeBool:         {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeBool]}}},
-	TypeInt8:         {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeInt8]}}},
-	TypeUint8:        {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeUint8]}}},
-	TypeInt16:        {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeInt16]}}},
-	TypeUint16:       {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeUint16]}}},
-	TypeInt32:        {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeInt32]}}},
-	TypeUint32:       {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeUint32]}}},
-	TypeInt64:        {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeInt64]}}},
-	TypeUint64:       {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeUint64]}}},
-	TypeFloat:        {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeFloat]}}},
-	TypeDouble:       {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeDouble]}}},
-	TypeDate:         {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeDate]}}},
-	TypeDatetime:     {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeDatetime]}}},
-	TypeTimestamp:    {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeTimestamp]}}},
-	TypeInterval:     {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeInterval]}}},
-	TypeTzDate:       {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeTzDate]}}},
-	TypeTzDatetime:   {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeTzDatetime]}}},
-	TypeTzTimestamp:  {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeTzTimestamp]}}},
-	TypeString:       {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeString]}}},
-	TypeUTF8:         {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeUTF8]}}},
-	TypeYSON:         {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeYSON]}}},
-	TypeJSON:         {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeJSON]}}},
-	TypeUUID:         {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeUUID]}}},
-	TypeJSONDocument: {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeJSONDocument]}}},
-	TypeDyNumber:     {Type: &Ydb.Type_ListType{ListType: &Ydb.ListType{Item: primitive[TypeDyNumber]}}},
+func Primitive(t PrimitiveType) PrimitiveType {
+	return t
+}
+
+type (
+	StructField struct {
+		Name string
+		T    Type
+	}
+	StructType struct {
+		fields []StructField
+	}
+)
+
+func (v *StructType) toString(buffer *bytes.Buffer) {
+	buffer.WriteString("Struct<")
+	for i, f := range v.fields {
+		if i > 0 {
+			buffer.WriteByte(',')
+		}
+		buffer.WriteString(f.Name)
+		buffer.WriteByte(':')
+		f.T.toString(buffer)
+	}
+	buffer.WriteByte('>')
+}
+
+func (v *StructType) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (v *StructType) equalsTo(rhs Type) bool {
+	vv, ok := rhs.(*StructType)
+	if !ok {
+		return false
+	}
+	if len(v.fields) != len(vv.fields) {
+		return false
+	}
+	for i := range v.fields {
+		if v.fields[i].Name != vv.fields[i].Name {
+			return false
+		}
+		if !v.fields[i].T.equalsTo(vv.fields[i].T) {
+			return false
+		}
+	}
+	return true
+}
+
+func (v *StructType) toYDB(a *allocator.Allocator) *Ydb.Type {
+	t := a.Type()
+
+	typeStruct := a.TypeStruct()
+
+	typeStruct.StructType = a.Struct()
+
+	for _, filed := range v.fields {
+		structMember := a.StructMember()
+		structMember.Name = filed.Name
+		structMember.Type = filed.T.toYDB(a)
+		typeStruct.StructType.Members = append(
+			typeStruct.StructType.Members,
+			structMember,
+		)
+	}
+
+	t.Type = typeStruct
+
+	return t
+}
+
+func Struct(fields ...StructField) (v *StructType) {
+	return &StructType{
+		fields: fields,
+	}
+}
+
+func StructFields(ms []*Ydb.StructMember) []StructField {
+	fs := make([]StructField, len(ms))
+	for i, m := range ms {
+		fs[i] = StructField{
+			Name: m.Name,
+			T:    TypeFromYDB(m.Type),
+		}
+	}
+	return fs
+}
+
+type TupleType struct {
+	items []Type
+}
+
+func (v *TupleType) toString(buffer *bytes.Buffer) {
+	buffer.WriteString("Tuple<")
+	for i, t := range v.items {
+		if i > 0 {
+			buffer.WriteByte(',')
+		}
+		t.toString(buffer)
+	}
+	buffer.WriteByte('>')
+}
+
+func (v *TupleType) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (v *TupleType) equalsTo(rhs Type) bool {
+	vv, ok := rhs.(*TupleType)
+	if !ok {
+		return false
+	}
+	if len(v.items) != len(vv.items) {
+		return false
+	}
+	for i := range v.items {
+		if !v.items[i].equalsTo(vv.items[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func (v *TupleType) toYDB(a *allocator.Allocator) *Ydb.Type {
+	var items []Type
+	if v != nil {
+		items = v.items
+	}
+	t := a.Type()
+
+	typeTuple := a.TypeTuple()
+
+	typeTuple.TupleType = a.Tuple()
+
+	for _, vv := range items {
+		typeTuple.TupleType.Elements = append(typeTuple.TupleType.Elements, vv.toYDB(a))
+	}
+
+	t.Type = typeTuple
+
+	return t
+}
+
+func Tuple(items ...Type) (v *TupleType) {
+	return &TupleType{
+		items: items,
+	}
+}
+
+type internalVariantType uint8
+
+const (
+	variantTypeTuple internalVariantType = iota + 1
+	variantTypeStruct
+)
+
+type variantType struct {
+	innerType   Type
+	variantType internalVariantType
+}
+
+func (v *variantType) toString(buffer *bytes.Buffer) {
+	buffer.WriteString("Variant<")
+	v.innerType.toString(buffer)
+	buffer.WriteString(">")
+}
+
+func (v *variantType) String() string {
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	v.toString(buf)
+	return buf.String()
+}
+
+func (v *variantType) equalsTo(rhs Type) bool {
+	vv, ok := rhs.(*variantType)
+	if !ok {
+		return false
+	}
+	return v.innerType.equalsTo(vv.innerType)
+}
+
+func (v *variantType) toYDB(a *allocator.Allocator) *Ydb.Type {
+	t := a.Type()
+
+	typeVariant := a.TypeVariant()
+
+	typeVariant.VariantType = a.Variant()
+
+	tt := v.innerType.toYDB(a).Type
+
+	switch v.variantType {
+	case variantTypeTuple:
+		tupleType, ok := tt.(*Ydb.Type_TupleType)
+		if !ok {
+			panic(fmt.Sprintf("type %T cannot casts to *Ydb.Type_TupleType", tt))
+		}
+
+		tupleItems := a.VariantTupleItems()
+		tupleItems.TupleItems = tupleType.TupleType
+
+		typeVariant.VariantType.Type = tupleItems
+	case variantTypeStruct:
+		structType, ok := tt.(*Ydb.Type_StructType)
+		if !ok {
+			panic(fmt.Sprintf("type %T cannot casts to *Ydb.Type_TupleType", tt))
+		}
+
+		structItems := a.VariantStructItems()
+		structItems.StructItems = structType.StructType
+
+		typeVariant.VariantType.Type = structItems
+	default:
+		panic(fmt.Sprintf("unsupported variant type: %v", v.variantType))
+	}
+
+	t.Type = typeVariant
+
+	return t
+}
+
+func Variant(t Type) *variantType {
+	if tt, ok := t.(*variantType); ok {
+		t = tt.innerType
+	}
+	var tt internalVariantType
+	switch t.(type) {
+	case *StructType:
+		tt = variantTypeStruct
+	case *TupleType:
+		tt = variantTypeTuple
+	default:
+		panic(fmt.Sprintf("unsupported variant type: %v", t))
+	}
+	return &variantType{
+		innerType:   t,
+		variantType: tt,
+	}
+}
+
+type voidType struct{}
+
+func (v voidType) toString(buffer *bytes.Buffer) {
+	buffer.WriteString(v.String())
+}
+
+func (v voidType) String() string {
+	return "Void"
+}
+
+var _voidType = &Ydb.Type{
+	Type: &Ydb.Type_VoidType{},
+}
+
+func (v voidType) equalsTo(rhs Type) bool {
+	_, ok := rhs.(voidType)
+	return ok
+}
+
+func (voidType) toYDB(*allocator.Allocator) *Ydb.Type {
+	return _voidType
+}
+
+func Void() voidType {
+	return voidType{}
 }

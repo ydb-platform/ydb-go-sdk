@@ -7,11 +7,10 @@ import (
 
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -38,7 +37,12 @@ func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 		return cc
 	}
 
-	cc = newConn(endpoint, p.config, withOnClose(p.remove))
+	cc = newConn(
+		endpoint,
+		p.config,
+		withOnClose(p.remove),
+		withOnTransportError(p.Ban),
+	)
 
 	p.conns[address] = cc
 
@@ -51,7 +55,20 @@ func (p *Pool) remove(c *conn) {
 	delete(p.conns, c.Endpoint().Address())
 }
 
+func (p *Pool) isClosed() bool {
+	select {
+	case <-p.done:
+		return true
+	default:
+		return false
+	}
+}
+
 func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
+	if p.isClosed() {
+		return
+	}
+
 	e := cc.Endpoint().Copy()
 
 	p.mtx.RLock()
@@ -72,6 +89,10 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 }
 
 func (p *Pool) Allow(ctx context.Context, cc Conn) {
+	if p.isClosed() {
+		return
+	}
+
 	e := cc.Endpoint().Copy()
 
 	p.mtx.RLock()

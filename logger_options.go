@@ -18,8 +18,15 @@ func WithMinLevel(minLevel log.Level) LoggerOption {
 	return LoggerOption(logger.WithMinLevel(level.Level(minLevel)))
 }
 
+// WithNoColor specified coloring of log messages
+//
+// Deprecated: has no effect now, use WithColoring instead
 func WithNoColor(b bool) LoggerOption {
-	return LoggerOption(logger.WithNoColor(b))
+	return LoggerOption(logger.Nop())
+}
+
+func WithColoring() LoggerOption {
+	return LoggerOption(logger.WithColoring())
 }
 
 func WithExternalLogger(external log.Logger) LoggerOption {

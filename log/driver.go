@@ -14,7 +14,7 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 	}
 	l = l.WithName(`driver`)
 	if details&trace.DriverResolverEvents != 0 {
-		// nolint:govet
+		//nolint:govet
 		l := l.WithName(`resolver`)
 		t.OnResolve = func(
 			info trace.DriverResolveStartInfo,
@@ -44,9 +44,9 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 			}
 		}
 	}
-	// nolint:nestif
+	//nolint:nestif
 	if details&trace.DriverNetEvents != 0 {
-		// nolint:govet
+		//nolint:govet
 		l := l.WithName(`net`)
 		t.OnNetRead = func(info trace.DriverNetReadStartInfo) func(trace.DriverNetReadDoneInfo) {
 			address := info.Address
@@ -194,9 +194,9 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 			}
 		}
 	}
-	// nolint:nestif
+	//nolint:nestif
 	if details&trace.DriverConnEvents != 0 {
-		// nolint:govet
+		//nolint:govet
 		l := l.WithName(`conn`)
 		t.OnConnTake = func(info trace.DriverConnTakeStartInfo) func(trace.DriverConnTakeDoneInfo) {
 			endpoint := info.Endpoint.String()
@@ -289,17 +289,19 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 			start := time.Now()
 			return func(info trace.DriverConnInvokeDoneInfo) {
 				if info.Error == nil {
-					l.Tracef(`invoke done {endpoint:%v,method:"%s",latency:"%v"}`,
+					l.Tracef(`invoke done {endpoint:%v,method:"%s",latency:"%v",,metadata:%v}`,
 						endpoint,
 						method,
 						time.Since(start),
+						info.Metadata,
 					)
 				} else {
-					l.Warnf(`invoke failed {endpoint:%v,method:"%s",latency:"%v",error:"%s",version:"%s"}`,
+					l.Warnf(`invoke failed {endpoint:%v,method:"%s",latency:"%v",error:"%s",,metadata:%v,version:"%s"}`,
 						endpoint,
 						method,
 						time.Since(start),
 						info.Error,
+						info.Metadata,
 						meta.Version,
 					)
 				}
@@ -337,17 +339,19 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 				}
 				return func(info trace.DriverConnNewStreamDoneInfo) {
 					if info.Error == nil {
-						l.Tracef(`streaming done {endpoint:%v,method:"%s",latency:"%v"}`,
+						l.Tracef(`streaming done {endpoint:%v,method:"%s",latency:"%v",metadata:%v}`,
 							endpoint,
 							method,
 							time.Since(start),
+							info.Metadata,
 						)
 					} else {
-						l.Warnf(`streaming done {endpoint:%v,method:"%s",latency:"%v",error:"%s",version:"%s"}`,
+						l.Warnf(`streaming done {endpoint:%v,method:"%s",latency:"%v",error:"%s",,metadata:%v,version:"%s"}`,
 							endpoint,
 							method,
 							time.Since(start),
 							info.Error,
+							info.Metadata,
 							meta.Version,
 						)
 					}
@@ -390,7 +394,7 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 		}
 	}
 	if details&trace.DriverRepeaterEvents != 0 {
-		// nolint:govet
+		//nolint:govet
 		l := l.WithName(`repeater`)
 		t.OnRepeaterWakeUp = func(info trace.DriverRepeaterWakeUpStartInfo) func(trace.DriverRepeaterWakeUpDoneInfo) {
 			name := info.Name
@@ -419,10 +423,10 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 			}
 		}
 	}
-	// nolint:nestif
+	//nolint:nestif
 	if details&trace.DriverBalancerEvents != 0 {
-		// nolint:govet
-		l := l.WithName(`cluster`)
+		//nolint:govet
+		l := l.WithName(`balancer`)
 		t.OnBalancerInit = func(info trace.DriverBalancerInitStartInfo) func(trace.DriverBalancerInitDoneInfo) {
 			l.Tracef(`init start`)
 			start := time.Now()
@@ -500,7 +504,7 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 		}
 	}
 	if details&trace.DriverCredentialsEvents != 0 {
-		// nolint:govet
+		//nolint:govet
 		l := l.WithName(`credentials`)
 		t.OnGetCredentials = func(info trace.DriverGetCredentialsStartInfo) func(trace.DriverGetCredentialsDoneInfo) {
 			l.Tracef(`get start`)

@@ -48,6 +48,10 @@ func (s *connectionsState) PreferredCount() int {
 }
 
 func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, failedCount int) {
+	if err := ctx.Err(); err != nil {
+		return nil, 0
+	}
+
 	if c := s.preferConnection(ctx); c != nil {
 		return c, 0
 	}
@@ -67,6 +71,7 @@ func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, fail
 	}
 
 	c, _ := s.selectRandomConnection(s.all, true)
+
 	return c, failedCount
 }
 

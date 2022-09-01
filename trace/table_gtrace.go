@@ -598,6 +598,76 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 		}
 	}
 	{
+		h1 := t.OnSessionTransactionExecute
+		h2 := x.OnSessionTransactionExecute
+		ret.OnSessionTransactionExecute = func(t TableTransactionExecuteStartInfo) func(TableTransactionExecuteDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TableTransactionExecuteDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableTransactionExecuteDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnSessionTransactionExecuteStatement
+		h2 := x.OnSessionTransactionExecuteStatement
+		ret.OnSessionTransactionExecuteStatement = func(t TableTransactionExecuteStatementStartInfo) func(TableTransactionExecuteStatementDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TableTransactionExecuteStatementDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableTransactionExecuteStatementDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnSessionTransactionCommit
 		h2 := x.OnSessionTransactionCommit
 		ret.OnSessionTransactionCommit = func(t TableSessionTransactionCommitStartInfo) func(TableSessionTransactionCommitDoneInfo) {
@@ -683,6 +753,44 @@ func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 			}
 			if h2 != nil {
 				h2(t)
+			}
+		}
+	}
+	{
+		h1 := t.OnPoolSessionAdd
+		h2 := x.OnPoolSessionAdd
+		ret.OnPoolSessionAdd = func(info TablePoolSessionAddInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(info)
+			}
+			if h2 != nil {
+				h2(info)
+			}
+		}
+	}
+	{
+		h1 := t.OnPoolSessionRemove
+		h2 := x.OnPoolSessionRemove
+		ret.OnPoolSessionRemove = func(info TablePoolSessionRemoveInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(info)
+			}
+			if h2 != nil {
+				h2(info)
 			}
 		}
 	}
@@ -1133,6 +1241,36 @@ func (t Table) onSessionTransactionBegin(t1 TableSessionTransactionBeginStartInf
 	}
 	return res
 }
+func (t Table) onSessionTransactionExecute(t1 TableTransactionExecuteStartInfo) func(TableTransactionExecuteDoneInfo) {
+	fn := t.OnSessionTransactionExecute
+	if fn == nil {
+		return func(TableTransactionExecuteDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TableTransactionExecuteDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Table) onSessionTransactionExecuteStatement(t1 TableTransactionExecuteStatementStartInfo) func(TableTransactionExecuteStatementDoneInfo) {
+	fn := t.OnSessionTransactionExecuteStatement
+	if fn == nil {
+		return func(TableTransactionExecuteStatementDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TableTransactionExecuteStatementDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t Table) onSessionTransactionCommit(t1 TableSessionTransactionCommitStartInfo) func(TableSessionTransactionCommitDoneInfo) {
 	fn := t.OnSessionTransactionCommit
 	if fn == nil {
@@ -1169,6 +1307,20 @@ func (t Table) onPoolStateChange(t1 TablePoolStateChangeInfo) {
 		return
 	}
 	fn(t1)
+}
+func (t Table) onPoolSessionAdd(info TablePoolSessionAddInfo) {
+	fn := t.OnPoolSessionAdd
+	if fn == nil {
+		return
+	}
+	fn(info)
+}
+func (t Table) onPoolSessionRemove(info TablePoolSessionRemoveInfo) {
+	fn := t.OnPoolSessionRemove
+	if fn == nil {
+		return
+	}
+	fn(info)
 }
 func (t Table) onPoolSessionNew(t1 TablePoolSessionNewStartInfo) func(TablePoolSessionNewDoneInfo) {
 	fn := t.OnPoolSessionNew
@@ -1245,14 +1397,13 @@ func (t Table) onPoolWait(t1 TablePoolWaitStartInfo) func(TablePoolWaitDoneInfo)
 	}
 	return res
 }
-func TableOnInit(t Table, c *context.Context) func(limit int, keepAliveMinSize int) {
+func TableOnInit(t Table, c *context.Context) func(limit int) {
 	var p TableInitStartInfo
 	p.Context = c
 	res := t.onInit(p)
-	return func(limit int, keepAliveMinSize int) {
+	return func(limit int) {
 		var p TableInitDoneInfo
 		p.Limit = limit
-		p.KeepAliveMinSize = keepAliveMinSize
 		res(p)
 	}
 }
@@ -1363,12 +1514,13 @@ func TableOnSessionQueryPrepare(t Table, c *context.Context, session tableSessio
 		res(p)
 	}
 }
-func TableOnSessionQueryExecute(t Table, c *context.Context, session tableSessionInfo, query tableDataQuery, parameters tableQueryParameters) func(tx tableTransactionInfo, prepared bool, result tableResult, _ error) {
+func TableOnSessionQueryExecute(t Table, c *context.Context, session tableSessionInfo, query tableDataQuery, parameters tableQueryParameters, keepInCache bool) func(tx tableTransactionInfo, prepared bool, result tableResult, _ error) {
 	var p TableExecuteDataQueryStartInfo
 	p.Context = c
 	p.Session = session
 	p.Query = query
 	p.Parameters = parameters
+	p.KeepInCache = keepInCache
 	res := t.onSessionQueryExecute(p)
 	return func(tx tableTransactionInfo, prepared bool, result tableResult, e error) {
 		var p TableExecuteDataQueryDoneInfo
@@ -1439,6 +1591,36 @@ func TableOnSessionTransactionBegin(t Table, c *context.Context, session tableSe
 		res(p)
 	}
 }
+func TableOnSessionTransactionExecute(t Table, c *context.Context, session tableSessionInfo, tx tableTransactionInfo, query tableDataQuery, parameters tableQueryParameters, keepInCache bool) func(result tableResult, _ error) {
+	var p TableTransactionExecuteStartInfo
+	p.Context = c
+	p.Session = session
+	p.Tx = tx
+	p.Query = query
+	p.Parameters = parameters
+	p.KeepInCache = keepInCache
+	res := t.onSessionTransactionExecute(p)
+	return func(result tableResult, e error) {
+		var p TableTransactionExecuteDoneInfo
+		p.Result = result
+		p.Error = e
+		res(p)
+	}
+}
+func TableOnSessionTransactionExecuteStatement(t Table, c *context.Context, session tableSessionInfo, tx tableTransactionInfo, parameters tableQueryParameters) func(result tableResult, _ error) {
+	var p TableTransactionExecuteStatementStartInfo
+	p.Context = c
+	p.Session = session
+	p.Tx = tx
+	p.Parameters = parameters
+	res := t.onSessionTransactionExecuteStatement(p)
+	return func(result tableResult, e error) {
+		var p TableTransactionExecuteStatementDoneInfo
+		p.Result = result
+		p.Error = e
+		res(p)
+	}
+}
 func TableOnSessionTransactionCommit(t Table, c *context.Context, session tableSessionInfo, tx tableTransactionInfo) func(error) {
 	var p TableSessionTransactionCommitStartInfo
 	p.Context = c
@@ -1468,6 +1650,16 @@ func TableOnPoolStateChange(t Table, size int, event string) {
 	p.Size = size
 	p.Event = event
 	t.onPoolStateChange(p)
+}
+func TableOnPoolSessionAdd(t Table, session tableSessionInfo) {
+	var p TablePoolSessionAddInfo
+	p.Session = session
+	t.onPoolSessionAdd(p)
+}
+func TableOnPoolSessionRemove(t Table, session tableSessionInfo) {
+	var p TablePoolSessionRemoveInfo
+	p.Session = session
+	t.onPoolSessionRemove(p)
 }
 func TableOnPoolSessionNew(t Table, c *context.Context) func(session tableSessionInfo, _ error) {
 	var p TablePoolSessionNewStartInfo

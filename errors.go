@@ -1,9 +1,8 @@
 package ydb
 
 import (
-	grpcCodes "google.golang.org/grpc/codes"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	grpcCodes "google.golang.org/grpc/codes"
 
 	ratelimiterErrors "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"

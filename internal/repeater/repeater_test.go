@@ -83,7 +83,7 @@ func TestRepeaterForceLogBackoff(t *testing.T) {
 		}
 		lastWakeUp = fakeClock.Now()
 		wakeUps++
-		return fmt.Errorf("spatial error for force with log backoff")
+		return fmt.Errorf("special error for force with log backoff")
 	}, WithClock(fakeClock))
 	defer r.Stop()
 

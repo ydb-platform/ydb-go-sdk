@@ -26,55 +26,55 @@ type retryOptions struct {
 	panicCallback func(e interface{})
 }
 
-type retryOption func(h *retryOptions)
+type retryOption func(o *retryOptions)
 
 // WithID applies id for identification call Retry in trace.Retry.OnRetry
 func WithID(id string) retryOption {
-	return func(h *retryOptions) {
-		h.id = id
+	return func(o *retryOptions) {
+		o.id = id
 	}
 }
 
 // WithStackTrace wraps errors with stacktrace from Retry call
 func WithStackTrace() retryOption {
-	return func(h *retryOptions) {
-		h.stackTrace = true
+	return func(o *retryOptions) {
+		o.stackTrace = true
 	}
 }
 
 // WithTrace returns trace option
 func WithTrace(trace trace.Retry) retryOption {
-	return func(h *retryOptions) {
-		h.trace = trace
+	return func(o *retryOptions) {
+		o.trace = trace
 	}
 }
 
 // WithIdempotent applies idempotent flag to retry operation
 func WithIdempotent(idempotent bool) retryOption {
-	return func(h *retryOptions) {
-		h.idempotent = idempotent
+	return func(o *retryOptions) {
+		o.idempotent = idempotent
 	}
 }
 
 // WithFastBackoff replaces default fast backoff
 func WithFastBackoff(b backoff.Backoff) retryOption {
-	return func(h *retryOptions) {
-		h.fastBackoff = b
+	return func(o *retryOptions) {
+		o.fastBackoff = b
 	}
 }
 
 // WithSlowBackoff replaces default slow backoff
 func WithSlowBackoff(b backoff.Backoff) retryOption {
-	return func(h *retryOptions) {
-		h.slowBackoff = b
+	return func(o *retryOptions) {
+		o.slowBackoff = b
 	}
 }
 
 // WithPanicCallback returns panic callback option
 // If not defined - panic would not intercept with driver
 func WithPanicCallback(panicCallback func(e interface{})) retryOption {
-	return func(h *retryOptions) {
-		h.panicCallback = panicCallback
+	return func(o *retryOptions) {
+		o.panicCallback = panicCallback
 	}
 }
 
@@ -97,6 +97,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 	for _, o := range opts {
 		o(options)
 	}
+	ctx = retry.WithIdempotent(ctx, options.idempotent)
 	defer func() {
 		if err != nil && options.stackTrace {
 			err = xerrors.WithStackTrace(
@@ -159,7 +160,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 	}
 }
 
-// Check returns retry mode for err.
+// Check returns retry mode for queryErr.
 func Check(err error) (m retry.Mode) {
 	statusCode, operationStatus, backoff, deleteSession := retry.Check(err)
 	return retry.NewMode(

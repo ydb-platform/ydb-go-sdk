@@ -2,18 +2,21 @@ package ydb_test
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"io/ioutil"
 	"log"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 )
 
 func Example_table() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/?database=/local")
+	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -52,9 +55,83 @@ func Example_table() {
 	}
 }
 
+func Example_databaseSQL() {
+	db, err := sql.Open("ydb", "grpcs://localhost:2135/local")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() { _ = db.Close() }() // cleanup resources
+
+	var (
+		query = `SELECT 42 as id, "my string" as myStr`
+		id    int32  // required value
+		myStr string // optional value
+	)
+	err = retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) error {
+		row := tx.QueryRowContext(ctx, query)
+		if err = row.Scan(&id, &myStr); err != nil {
+			return err
+		}
+		log.Printf("id=%v, myStr='%s'\n", id, myStr)
+		return nil
+	}, retry.WithDoTxRetryOptions(retry.WithIdempotent(true)))
+	if err != nil {
+		log.Printf("query failed: %v", err)
+	}
+}
+
+func Example_databaseSql() {
+	db, err := sql.Open("ydb", "grpcs://localhost:2135/local")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close() // cleanup resources
+	var (
+		id    int32
+		myStr string
+	)
+	row := db.QueryRowContext(context.TODO(), `SELECT 42 as id, "my string" as myStr`)
+	if err = row.Scan(&id, &myStr); err != nil {
+		log.Printf("select failed: %v", err)
+		return
+	}
+	log.Printf("id = %d, myStr = \"%s\"", id, myStr)
+}
+
+func Example_topic() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
+	if err != nil {
+		fmt.Printf("failed connect: %v", err)
+		return
+	}
+	defer db.Close(ctx) // cleanup resources
+
+	reader, err := db.Topic().StartReader("consumer", topicoptions.ReadTopic("/topic/path"))
+	if err != nil {
+		fmt.Printf("failed start reader: %v", err)
+		return
+	}
+
+	for {
+		mess, err := reader.ReadMessage(ctx)
+		if err != nil {
+			fmt.Printf("failed start reader: %v", err)
+			return
+		}
+
+		content, err := ioutil.ReadAll(mess)
+		if err != nil {
+			fmt.Printf("failed start reader: %v", err)
+			return
+		}
+		fmt.Println(string(content))
+	}
+}
+
 func Example_scripting() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/?database=/local")
+	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 		return
@@ -97,7 +174,7 @@ func Example_scripting() {
 
 func Example_discovery() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/?database=/local")
+	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 		return

@@ -6,14 +6,12 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -238,11 +236,13 @@ func WithInvokeHandlers(invokeHandlers InvokeHandlers) balancerOption {
 			opts ...grpc.CallOption,
 		) (err error) {
 			if handler, ok := invokeHandlers[Method(method).Code()]; ok {
-				result, err := handler(args)
+				var result proto.Message
+				result, err = handler(args)
 				if err != nil {
 					return xerrors.WithStackTrace(err)
 				}
-				anyResult, err := anypb.New(result)
+				var anyResult *anypb.Any
+				anyResult, err = anypb.New(result)
 				if err != nil {
 					return xerrors.WithStackTrace(err)
 				}
@@ -282,7 +282,7 @@ func WithClose(onClose func(ctx context.Context) error) balancerOption {
 	}
 }
 
-func NewRouter(opts ...balancerOption) balancer.Router {
+func NewBalancer(opts ...balancerOption) grpc.ClientConnInterface {
 	c := &balancerStub{}
 	for _, opt := range opts {
 		opt(c)

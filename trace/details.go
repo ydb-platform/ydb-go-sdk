@@ -7,32 +7,44 @@ import (
 type Details uint64
 
 const (
-	DriverNetEvents         Details = 1 << iota // 1
-	DriverConnEvents                            // 2
-	DriverBalancerEvents                        // 4
-	DriverResolverEvents                        // 8
-	DriverRepeaterEvents                        // 16
-	DriverCredentialsEvents                     // 32
+	DriverNetEvents Details = 1 << iota // for bitmask: 1, 2, 4, 8, 16, 32, ...
+	DriverConnEvents
+	DriverBalancerEvents
+	DriverResolverEvents
+	DriverRepeaterEvents
+	DriverCredentialsEvents
 
-	TableSessionLifeCycleEvents     // 64
-	TableSessionQueryInvokeEvents   // 128
-	TableSessionQueryStreamEvents   // 256
-	TableSessionTransactionEvents   // 512
-	TablePoolLifeCycleEvents        // 1024
-	TablePoolSessionLifeCycleEvents // 2048
-	TablePoolAPIEvents              // 4096
+	TableSessionLifeCycleEvents
+	TableSessionQueryInvokeEvents
+	TableSessionQueryStreamEvents
+	TableSessionTransactionEvents
+	TablePoolLifeCycleEvents
+	TablePoolSessionLifeCycleEvents
+	TablePoolAPIEvents
 
-	RetryEvents // 8192
+	TopicControlPlaneEvents
 
-	DiscoveryEvents // 16384
+	TopicReaderStreamLifeCycleEvents
+	TopicReaderStreamEvents
+	TopicReaderMessageEvents
+	TopicReaderPartitionEvents
 
-	SchemeEvents // 32768
+	DatabaseSQLConnectorEvents
+	DatabaseSQLConnEvents
+	DatabaseSQLTxEvents
+	DatabaseSQLStmtEvents
 
-	ScriptingEvents // 65536
+	RetryEvents
 
-	RatelimiterEvents // 131072
+	DiscoveryEvents
 
-	CoordinationEvents // 262144
+	SchemeEvents
+
+	ScriptingEvents
+
+	RatelimiterEvents
+
+	CoordinationEvents
 
 	// Deprecated: has no effect now
 	DriverClusterEvents
@@ -42,7 +54,7 @@ const (
 		DriverBalancerEvents |
 		DriverResolverEvents |
 		DriverRepeaterEvents |
-		DriverCredentialsEvents // 63
+		DriverCredentialsEvents
 
 	TableEvents = TableSessionLifeCycleEvents |
 		TableSessionQueryInvokeEvents |
@@ -50,19 +62,30 @@ const (
 		TableSessionTransactionEvents |
 		TablePoolLifeCycleEvents |
 		TablePoolSessionLifeCycleEvents |
-		TablePoolAPIEvents // 16320
+		TablePoolAPIEvents
 
 	TablePoolEvents = TablePoolLifeCycleEvents |
 		TablePoolSessionLifeCycleEvents |
-		TablePoolAPIEvents // 15360
+		TablePoolAPIEvents
 
 	TableSessionQueryEvents = TableSessionQueryInvokeEvents |
-		TableSessionQueryStreamEvents // 384
+		TableSessionQueryStreamEvents
 	TableSessionEvents = TableSessionLifeCycleEvents |
 		TableSessionQueryEvents |
-		TableSessionTransactionEvents // 960
+		TableSessionTransactionEvents
 
-	DetailsAll = ^Details(0) // 18446744073709551615
+	TopicReaderEvents = TopicReaderStreamEvents | TopicReaderMessageEvents |
+		TopicReaderPartitionEvents |
+		TopicReaderStreamLifeCycleEvents
+
+	TopicEvents = TopicControlPlaneEvents | TopicReaderEvents
+
+	DatabaseSQLEvents = DatabaseSQLConnectorEvents |
+		DatabaseSQLConnEvents |
+		DatabaseSQLTxEvents |
+		DatabaseSQLStmtEvents
+
+	DetailsAll = ^Details(0) // All bits enabled
 )
 
 var (
@@ -95,6 +118,20 @@ var (
 		TablePoolLifeCycleEvents:        "ydb.table.pool",
 		TablePoolSessionLifeCycleEvents: "ydb.table.pool.session",
 		TablePoolAPIEvents:              "ydb.table.pool.api",
+
+		DatabaseSQLEvents:          "ydb.database.sql",
+		DatabaseSQLConnectorEvents: "ydb.database.sql.connector",
+		DatabaseSQLConnEvents:      "ydb.database.sql.conn",
+		DatabaseSQLTxEvents:        "ydb.database.sql.tx",
+		DatabaseSQLStmtEvents:      "ydb.database.sql.stmt",
+
+		TopicEvents:                      "ydb.topic",
+		TopicControlPlaneEvents:          "ydb.topic.controlplane",
+		TopicReaderEvents:                "ydb.topic.reader",
+		TopicReaderStreamEvents:          "ydb.topic.reader.stream",
+		TopicReaderMessageEvents:         "ydb.topic.reader.message",
+		TopicReaderPartitionEvents:       "ydb.topic.reader.partition",
+		TopicReaderStreamLifeCycleEvents: "ydb.topic.reader.lifecycle",
 	}
 	defaultDetails = DetailsAll
 )

@@ -236,10 +236,11 @@ type (
 		Method   Method
 	}
 	DriverConnInvokeDoneInfo struct {
-		Error  error
-		Issues []Issue
-		OpID   string
-		State  ConnState
+		Error    error
+		Issues   []Issue
+		OpID     string
+		State    ConnState
+		Metadata map[string][]string
 	}
 	DriverConnNewStreamStartInfo struct {
 		// Context make available context in trace callback function.
@@ -254,8 +255,9 @@ type (
 		Error error
 	}
 	DriverConnNewStreamDoneInfo struct {
-		State ConnState
-		Error error
+		Error    error
+		State    ConnState
+		Metadata map[string][]string
 	}
 	DriverBalancerInitStartInfo struct {
 		// Context make available context in trace callback function.

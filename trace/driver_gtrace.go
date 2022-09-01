@@ -1197,35 +1197,37 @@ func DriverOnConnStateChange(t Driver, endpoint EndpointInfo, state ConnState) f
 		res(p)
 	}
 }
-func DriverOnConnInvoke(t Driver, c *context.Context, endpoint EndpointInfo, m Method) func(_ error, issues []Issue, opID string, state ConnState) {
+func DriverOnConnInvoke(t Driver, c *context.Context, endpoint EndpointInfo, m Method) func(_ error, issues []Issue, opID string, state ConnState, metadata map[string][]string) {
 	var p DriverConnInvokeStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	p.Method = m
 	res := t.onConnInvoke(p)
-	return func(e error, issues []Issue, opID string, state ConnState) {
+	return func(e error, issues []Issue, opID string, state ConnState, metadata map[string][]string) {
 		var p DriverConnInvokeDoneInfo
 		p.Error = e
 		p.Issues = issues
 		p.OpID = opID
 		p.State = state
+		p.Metadata = metadata
 		res(p)
 	}
 }
-func DriverOnConnNewStream(t Driver, c *context.Context, endpoint EndpointInfo, m Method) func(error) func(state ConnState, _ error) {
+func DriverOnConnNewStream(t Driver, c *context.Context, endpoint EndpointInfo, m Method) func(error) func(_ error, state ConnState, metadata map[string][]string) {
 	var p DriverConnNewStreamStartInfo
 	p.Context = c
 	p.Endpoint = endpoint
 	p.Method = m
 	res := t.onConnNewStream(p)
-	return func(e error) func(ConnState, error) {
+	return func(e error) func(error, ConnState, map[string][]string) {
 		var p DriverConnNewStreamRecvInfo
 		p.Error = e
 		res := res(p)
-		return func(state ConnState, e error) {
+		return func(e error, state ConnState, metadata map[string][]string) {
 			var p DriverConnNewStreamDoneInfo
-			p.State = state
 			p.Error = e
+			p.State = state
+			p.Metadata = metadata
 			res(p)
 		}
 	}

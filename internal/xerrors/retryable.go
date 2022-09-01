@@ -41,6 +41,10 @@ func (e *retryableError) Error() string {
 	return e.err.Error()
 }
 
+func (e *retryableError) Unwrap() error {
+	return e.err
+}
+
 type RetryableErrorOption func(e *retryableError)
 
 func WithBackoff(t backoff.Type) RetryableErrorOption {
@@ -71,6 +75,7 @@ func Retryable(err error, opts ...RetryableErrorOption) error {
 	return re
 }
 
+// RetryableError return Error if err is retriable error, else nil
 func RetryableError(err error) Error {
 	var e *retryableError
 	if errors.As(err, &e) {

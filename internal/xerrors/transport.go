@@ -7,10 +7,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
-
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
@@ -128,8 +127,7 @@ func (e *transportError) BackoffType() backoff.Type {
 		grpcCodes.Canceled,
 		grpcCodes.Unavailable:
 		return backoff.TypeFast
-	case
-		grpcCodes.ResourceExhausted:
+	case grpcCodes.ResourceExhausted:
 		return backoff.TypeSlow
 	default:
 		return backoff.TypeNoBackoff
@@ -153,18 +151,20 @@ func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 		return false
 	}
 	var t *transportError
-	if !errors.As(err, &t) {
-		return false
-	}
-	if len(codes) == 0 {
-		return true
-	}
-	for _, code := range codes {
-		if t.code == code {
+	switch {
+	case errors.As(err, &t):
+		if len(codes) == 0 {
 			return true
 		}
+		for _, code := range codes {
+			if t.code == code {
+				return true
+			}
+		}
+		return false
+	default:
+		return false
 	}
-	return false
 }
 
 func FromGRPCError(err error, opts ...teOpt) error {

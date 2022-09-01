@@ -4,11 +4,10 @@ import (
 	"context"
 	"errors"
 
-	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scheme_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
@@ -17,8 +16,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
-// nolint: gofumpt
-// nolint: nolintlint
+//nolint:gofumpt
+//nolint:nolintlint
 var (
 	errNilClient = xerrors.Wrap(errors.New("scheme client is not initialized"))
 )
@@ -154,14 +153,20 @@ func (c *Client) DescribePath(ctx context.Context, path string) (e scheme.Entry,
 	}
 	call := func(ctx context.Context) error {
 		e, err = c.describePath(ctx, path)
-		return xerrors.WithStackTrace(err)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+		return nil
 	}
 	if !c.config.AutoRetry() {
 		err = call(ctx)
 		return
 	}
 	err = retry.Retry(ctx, call, retry.WithIdempotent(true), retry.WithStackTrace())
-	return
+	if err != nil {
+		return e, xerrors.WithStackTrace(err)
+	}
+	return e, nil
 }
 
 func (c *Client) describePath(ctx context.Context, path string) (e scheme.Entry, err error) {
@@ -224,7 +229,10 @@ func (c *Client) modifyPermissions(ctx context.Context, path string, opts ...sch
 			),
 		},
 	)
-	return xerrors.WithStackTrace(err)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+	return nil
 }
 
 func putEntry(dst []scheme.Entry, src []*Ydb_Scheme.Entry) {

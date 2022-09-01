@@ -11,11 +11,6 @@ import (
 	"testing"
 	"time"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/durationpb"
-
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Export_V1"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scripting_V1"
@@ -24,9 +19,12 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Export"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scripting"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
@@ -34,7 +32,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// nolint:gocyclo
+//nolint:gocyclo
 func TestConnection(t *testing.T) {
 	var (
 		userAgent     = "connection user agent"
@@ -73,7 +71,6 @@ func TestConnection(t *testing.T) {
 			config.WithOperationTimeout(time.Second*2),
 			config.WithOperationCancelAfter(time.Second*2),
 		),
-		ydb.WithBalancer(balancers.SingleConn()),
 		ydb.WithConnectionTTL(time.Millisecond*10000),
 		ydb.WithMinTLSVersion(tls.VersionTLS10),
 		ydb.WithLogger(
@@ -118,7 +115,7 @@ func TestConnection(t *testing.T) {
 	defer func() {
 		// cleanup connection
 		if e := db.Close(ctx); e != nil {
-			t.Fatalf("balancer close failed: %+v", e)
+			t.Fatalf("close failed: %+v", e)
 		}
 	}()
 	t.Run("discovery.WhoAmI", func(t *testing.T) {
@@ -168,7 +165,7 @@ func TestConnection(t *testing.T) {
 					len(result.GetResultSets()[0].GetColumns()),
 				)
 			}
-			// nolint:goconst
+			//nolint:goconst
 			if result.GetResultSets()[0].GetColumns()[0].GetName() != "sum" {
 				return fmt.Errorf(
 					"unexpected colum name: %s",

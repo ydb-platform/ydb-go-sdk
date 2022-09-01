@@ -201,6 +201,7 @@ func TestString(t *testing.T) {
 func TestNull(t *testing.T) {
 	l := NullValue(TypeUTF8)
 	r := UTF8Value("abc")
+
 	c, err := Compare(l, r)
 	requireNoError(t, err)
 	requireEqualValues(t, -1, c)
@@ -367,12 +368,14 @@ func TestListInList(t *testing.T) {
 }
 
 func requireNoError(t *testing.T, err error) {
+	t.Helper()
 	if err != nil {
 		t.Errorf("Unexpected error %v", err)
 	}
 }
 
 func requireEqualValues(t *testing.T, expected int, actual int) {
+	t.Helper()
 	if expected != actual {
 		t.Errorf("Values not equal: expected %v, actual %v", expected, actual)
 	}

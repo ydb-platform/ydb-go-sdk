@@ -6,10 +6,9 @@ import (
 	"strconv"
 	"time"
 
-	"google.golang.org/protobuf/proto"
-
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -62,7 +61,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 		onDone(location, nodes, err)
 	}()
 
-	ctx, err = c.config.Meta().Meta(ctx)
+	ctx, err = c.config.Meta().Context(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -110,7 +109,7 @@ func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 		}
 	}()
 
-	ctx, err = c.config.Meta().Meta(ctx)
+	ctx, err = c.config.Meta().Context(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

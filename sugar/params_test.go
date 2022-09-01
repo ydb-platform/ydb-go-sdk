@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -55,10 +57,7 @@ func TestGenerateDeclareSection(t *testing.T) {
 		},
 		{
 			params: table.NewQueryParameters(
-				table.ValueParam(
-					"$ts",
-					types.TimestampValueFromTime(time.Now()),
-				),
+				table.ValueParam("$ts", types.TimestampValueFromTime(time.Now())),
 			),
 			declare: `
 				DECLARE $ts AS Timestamp;
@@ -66,18 +65,9 @@ func TestGenerateDeclareSection(t *testing.T) {
 		},
 		{
 			params: table.NewQueryParameters(
-				table.ValueParam(
-					"$a",
-					types.BoolValue(true),
-				),
-				table.ValueParam(
-					"$b",
-					types.Int64Value(123),
-				),
-				table.ValueParam(
-					"$c",
-					types.OptionalValue(types.UTF8Value("test")),
-				),
+				table.ValueParam("$a", types.BoolValue(true)),
+				table.ValueParam("$b", types.Int64Value(123)),
+				table.ValueParam("$c", types.OptionalValue(types.UTF8Value("test"))),
 			),
 			declare: `
 				DECLARE $a AS Bool;
@@ -87,18 +77,9 @@ func TestGenerateDeclareSection(t *testing.T) {
 		},
 		{
 			params: table.NewQueryParameters(
-				table.ValueParam(
-					"$a",
-					types.BoolValue(true),
-				),
-				table.ValueParam(
-					"b",
-					types.Int64Value(123),
-				),
-				table.ValueParam(
-					"c",
-					types.OptionalValue(types.UTF8Value("test")),
-				),
+				table.ValueParam("$a", types.BoolValue(true)),
+				table.ValueParam("b", types.Int64Value(123)),
+				table.ValueParam("c", types.OptionalValue(types.UTF8Value("test"))),
 			),
 			declare: `
 				DECLARE $a AS Bool;
@@ -108,7 +89,9 @@ func TestGenerateDeclareSection(t *testing.T) {
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			got := splitDeclares(GenerateDeclareSection(tt.params))
+			declares, err := GenerateDeclareSection(tt.params)
+			require.NoError(t, err)
+			got := splitDeclares(declares)
 			want := splitDeclares(tt.declare)
 			if len(got) != len(want) {
 				t.Errorf("len(got) = %v, len(want) = %v", len(got), len(want))

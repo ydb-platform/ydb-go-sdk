@@ -19,6 +19,12 @@ func Until(t time.Time) time.Duration {
 	return t.Sub(Now())
 }
 
+// Since returns the time elapsed since t.
+// It is shorthand for time.Now().Sub(t).
+func Since(t time.Time) time.Duration {
+	return Now().Sub(t)
+}
+
 // Timer is the interface used by node watcher to be periodically triggered to
 // prepare some action.
 type Timer interface {

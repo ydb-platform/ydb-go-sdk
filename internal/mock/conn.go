@@ -116,5 +116,4 @@ func (e *Endpoint) Copy() endpoint.Endpoint {
 }
 
 func (e *Endpoint) Touch(opts ...endpoint.Option) {
-	panic("not implemented in mock")
 }

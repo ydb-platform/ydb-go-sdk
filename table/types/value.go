@@ -11,7 +11,7 @@ import (
 )
 
 type Value interface {
-	value.V
+	value.Value
 }
 
 func BoolValue(v bool) Value { return value.BoolValue(v) }
@@ -113,6 +113,10 @@ func TzTimestampValueFromTime(v time.Time) Value {
 
 func StringValue(v []byte) Value { return value.StringValue(v) }
 
+func BytesValue(v []byte) Value { return value.StringValue(v) }
+
+func BytesValueFromString(v string) Value { return value.StringValue([]byte(v)) }
+
 // StringValueFromString makes String value from string
 //
 // Warning: all *From* helpers will be removed at next major release
@@ -120,6 +124,8 @@ func StringValue(v []byte) Value { return value.StringValue(v) }
 func StringValueFromString(v string) Value { return value.StringValue([]byte(v)) }
 
 func UTF8Value(v string) Value { return value.UTF8Value(v) }
+
+func TextValue(v string) Value { return value.UTF8Value(v) }
 
 func YSONValue(v string) Value { return value.YSONValue(v) }
 
@@ -149,7 +155,7 @@ func JSONDocumentValueFromBytes(v []byte) Value { return value.JSONDocumentValue
 
 func DyNumberValue(v string) Value { return value.DyNumberValue(v) }
 
-func VoidValue() Value { return value.VoidValue }
+func VoidValue() Value { return value.VoidValue() }
 
 func NullValue(t Type) Value { return value.NullValue(t) }
 
@@ -176,60 +182,70 @@ func (d *Decimal) BigInt() *big.Int {
 // DecimalValue creates decimal value of given types t and value v.
 // Note that Decimal.Bytes interpreted as big-endian int128.
 func DecimalValue(v *Decimal) Value {
-	t := DecimalTypeFromDecimal(v)
-	return value.DecimalValue(t, v.Bytes)
+	return value.DecimalValue(v.Bytes, v.Precision, v.Scale)
 }
 
 func DecimalValueFromBigInt(v *big.Int, precision, scale uint32) Value {
 	b := decimal.BigIntToByte(v, precision, scale)
-	t := DecimalType(precision, scale)
-	return value.DecimalValue(t, b)
+	return value.DecimalValue(b, precision, scale)
 }
 
 func TupleValue(vs ...Value) Value {
-	return value.TupleValue(len(vs), func(i int) value.V {
-		return vs[i]
-	})
+	return value.TupleValue(func() (vv []value.Value) {
+		for _, v := range vs {
+			vv = append(vv, v)
+		}
+		return vv
+	}()...)
 }
 
 func ListValue(vs ...Value) Value {
-	return value.ListValue(len(vs), func(i int) value.V {
-		return vs[i]
-	})
+	return value.ListValue(func() (vv []value.Value) {
+		for _, v := range vs {
+			vv = append(vv, v)
+		}
+		return vv
+	}()...)
 }
 
-type tStructValueProto value.StructValueProto
-
-type StructValueOption interface {
-	apply(*tStructValueProto)
+type structValueFields struct {
+	fields []value.StructValueField
 }
 
-type structField struct {
-	name  string
-	value Value
-}
-
-func (f structField) apply(p *tStructValueProto) {
-	(*value.StructValueProto)(p).Add(f.name, f.value)
-}
+type StructValueOption func(*structValueFields)
 
 func StructFieldValue(name string, v Value) StructValueOption {
-	return structField{name: name, value: v}
+	return func(t *structValueFields) {
+		t.fields = append(t.fields, value.StructValueField{Name: name, V: v})
+	}
 }
 
 func StructValue(opts ...StructValueOption) Value {
-	var p tStructValueProto
-	(*value.StructValueProto)(&p).Grow(len(opts))
+	var p structValueFields
 	for _, opt := range opts {
-		opt.apply(&p)
+		opt(&p)
 	}
-	return value.StructValue((*value.StructValueProto)(&p))
+	return value.StructValue(p.fields...)
 }
 
-func DictValue(pairs ...Value) Value {
-	return value.DictValue(len(pairs), func(i int) value.V {
-		return pairs[i]
-	})
+type dictValueFields struct {
+	fields []value.DictValueField
+}
+
+type DictValueOption func(*dictValueFields)
+
+func DictFieldValue(k, v Value) DictValueOption {
+	return func(t *dictValueFields) {
+		t.fields = append(t.fields, value.DictValueField{K: k, V: v})
+	}
+}
+
+func DictValue(opts ...DictValueOption) Value {
+	var p dictValueFields
+	for _, opt := range opts {
+		opt(&p)
+	}
+	return value.DictValue(p.fields...)
 }
 
 func VariantValue(v Value, i uint32, variantT Type) Value {
@@ -421,11 +437,21 @@ func NullableIntervalValueFromDuration(v *time.Duration) Value {
 	return OptionalValue(IntervalValueFromDuration(*v))
 }
 
+// NullableStringValue
+//
+// Deprecated: use NullableBytesValue instead
 func NullableStringValue(v *[]byte) Value {
 	if v == nil {
 		return NullValue(TypeString)
 	}
 	return OptionalValue(StringValue(*v))
+}
+
+func NullableBytesValue(v *[]byte) Value {
+	if v == nil {
+		return NullValue(TypeBytes)
+	}
+	return OptionalValue(BytesValue(*v))
 }
 
 func NullableStringValueFromString(v *string) Value {
@@ -435,11 +461,25 @@ func NullableStringValueFromString(v *string) Value {
 	return OptionalValue(StringValueFromString(*v))
 }
 
+func NullableBytesValueFromString(v *string) Value {
+	if v == nil {
+		return NullValue(TypeBytes)
+	}
+	return OptionalValue(BytesValueFromString(*v))
+}
+
 func NullableUTF8Value(v *string) Value {
 	if v == nil {
 		return NullValue(TypeUTF8)
 	}
 	return OptionalValue(UTF8Value(*v))
+}
+
+func NullableTextValue(v *string) Value {
+	if v == nil {
+		return NullValue(TypeText)
+	}
+	return OptionalValue(TextValue(*v))
 }
 
 func NullableYSONValue(v *string) Value {
@@ -500,7 +540,8 @@ func NullableDyNumberValue(v *string) Value {
 
 // Nullable makes optional value from nullable type
 // Warning: type interface will be replaced in the future with typed parameters pattern from go1.18
-// nolint:gocyclo
+//
+//nolint:gocyclo
 func Nullable(t Type, v interface{}) Value {
 	switch t {
 	case TypeBool:
@@ -532,7 +573,7 @@ func Nullable(t Type, v interface{}) Value {
 		case *time.Time:
 			return NullableDateValueFromTime(tt)
 		default:
-			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeDate", tt))
 		}
 	case TypeDatetime:
 		switch tt := v.(type) {
@@ -541,7 +582,7 @@ func Nullable(t Type, v interface{}) Value {
 		case *time.Time:
 			return NullableDatetimeValueFromTime(tt)
 		default:
-			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeDatetime", tt))
 		}
 	case TypeTimestamp:
 		switch tt := v.(type) {
@@ -550,7 +591,7 @@ func Nullable(t Type, v interface{}) Value {
 		case *time.Time:
 			return NullableTimestampValueFromTime(tt)
 		default:
-			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeTimestamp", tt))
 		}
 	case TypeInterval:
 		switch tt := v.(type) {
@@ -559,7 +600,7 @@ func Nullable(t Type, v interface{}) Value {
 		case *time.Duration:
 			return NullableIntervalValueFromDuration(tt)
 		default:
-			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeInterval", tt))
 		}
 	case TypeTzDate:
 		switch tt := v.(type) {
@@ -568,7 +609,7 @@ func Nullable(t Type, v interface{}) Value {
 		case *time.Time:
 			return NullableTzDateValueFromTime(tt)
 		default:
-			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeTzDate", tt))
 		}
 	case TypeTzDatetime:
 		switch tt := v.(type) {
@@ -577,7 +618,7 @@ func Nullable(t Type, v interface{}) Value {
 		case *time.Time:
 			return NullableTzDatetimeValueFromTime(tt)
 		default:
-			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeTzDatetime", tt))
 		}
 	case TypeTzTimestamp:
 		switch tt := v.(type) {
@@ -586,23 +627,23 @@ func Nullable(t Type, v interface{}) Value {
 		case *time.Time:
 			return NullableTzTimestampValueFromTime(tt)
 		default:
-			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeTzTimestamp", tt))
 		}
-	case TypeString:
+	case TypeBytes:
 		switch tt := v.(type) {
 		case *[]byte:
-			return NullableStringValue(tt)
+			return NullableBytesValue(tt)
 		case *string:
 			return NullableStringValueFromString(tt)
 		default:
-			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeString", tt))
 		}
 	case TypeUTF8:
 		switch tt := v.(type) {
 		case *string:
 			return NullableUTF8Value(tt)
 		default:
-			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeUTF8", tt))
 		}
 	case TypeYSON:
 		switch tt := v.(type) {
@@ -611,7 +652,7 @@ func Nullable(t Type, v interface{}) Value {
 		case *[]byte:
 			return NullableYSONValueFromBytes(tt)
 		default:
-			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeYSON", tt))
 		}
 	case TypeJSON:
 		switch tt := v.(type) {
@@ -620,14 +661,14 @@ func Nullable(t Type, v interface{}) Value {
 		case *[]byte:
 			return NullableJSONValueFromBytes(tt)
 		default:
-			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeJSON", tt))
 		}
 	case TypeUUID:
 		switch tt := v.(type) {
 		case *[16]byte:
 			return NullableUUIDValue(tt)
 		default:
-			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeUUID", tt))
 		}
 	case TypeJSONDocument:
 		switch tt := v.(type) {
@@ -636,16 +677,16 @@ func Nullable(t Type, v interface{}) Value {
 		case *[]byte:
 			return NullableJSONDocumentValueFromBytes(tt)
 		default:
-			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeJSONDocument", tt))
 		}
 	case TypeDyNumber:
 		switch tt := v.(type) {
 		case *string:
 			return NullableDyNumberValue(tt)
 		default:
-			panic(fmt.Sprintf("unsupported %s argument type: %T", t.String(), tt))
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeDyNumber", tt))
 		}
 	default:
-		panic(fmt.Sprintf("unsupported type: %s", t.String()))
+		panic(fmt.Sprintf("unsupported type: %T", t))
 	}
 }
