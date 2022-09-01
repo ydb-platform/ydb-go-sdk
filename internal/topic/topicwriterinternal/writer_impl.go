@@ -65,15 +65,23 @@ func newWriterImplStopped(cfg writerImplConfig) writerImpl {
 }
 
 func (w *writerImpl) Write(ctx context.Context, messages *messageWithDataContentSlice) (rawtopicwriter.WriteResult, error) {
+	if err := w.background.CloseReason(); err != nil {
+		return rawtopicwriter.WriteResult{}, xerrors.WithStackTrace(fmt.Errorf("ydb: writer is closed: %w", err))
+	}
+
 	if err := w.send(ctx, messages); err != nil {
-		return rawtopicwriter.WriteResult{}, nil
+		return rawtopicwriter.WriteResult{}, err
 	}
 
 	return rawtopicwriter.WriteResult{}, nil
 }
 
 func (w *writerImpl) Close(ctx context.Context) error {
-	return w.background.Close(ctx, xerrors.WithStackTrace(errStopWriterImpl))
+	return w.close(ctx, xerrors.WithStackTrace(errStopWriterImpl))
+}
+
+func (w *writerImpl) close(ctx context.Context, reason error) error {
+	return w.background.Close(ctx, reason)
 }
 
 func (w *writerImpl) send(ctx context.Context, messages *messageWithDataContentSlice) error {
@@ -208,7 +216,12 @@ func (w *writerImpl) receiveMessages(ctx context.Context, stream RawTopicWriterS
 
 		switch m := mess.(type) {
 		case *rawtopicwriter.WriteResult:
-			w.queue.AcksReceived(m.Acks)
+			if err = w.queue.AcksReceived(m.Acks); err != nil {
+				reason := xerrors.WithStackTrace(err)
+				_ = w.close(ctx, reason)
+				cancel(reason)
+				return
+			}
 		}
 	}
 }

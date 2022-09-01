@@ -18,6 +18,7 @@ var (
 	errCloseClosedMessageQueue   = xerrors.Wrap(errors.New("ydb: close closed message queue"))
 	errGetMessageFromClosedQueue = xerrors.Wrap(errors.New("ydb: get message from closed message queue"))
 	errAddUnorderedMessages      = xerrors.Wrap(errors.New("ydb: add unordered messages"))
+	errAckUnexpectedMessage      = xerrors.Wrap(errors.New("ydb: ack unexpected message"))
 )
 
 const (
@@ -60,7 +61,7 @@ func (q *messageQueue) AddMessages(messages *messageWithDataContentSlice) error 
 	defer q.m.Unlock()
 
 	if q.closed {
-		return xerrors.WithStackTrace(errAddMessageToClosedQueue)
+		return xerrors.WithStackTrace(fmt.Errorf("ydb: add message to closed message queue: %w", q.closedErr))
 	}
 
 	if err := q.checkNewMessagesBeforeAddNeedLock(messages); err != nil {
@@ -115,23 +116,27 @@ func (q *messageQueue) addMessageNeedLock(mess messageWithDataContent) {
 	q.seqNoToOrderId[mess.SeqNo] = q.lastWrittenIndex
 }
 
-func (q *messageQueue) AcksReceived(acks []rawtopicwriter.WriteAck) {
+func (q *messageQueue) AcksReceived(acks []rawtopicwriter.WriteAck) error {
 	q.m.Lock()
 	defer q.m.Unlock()
 
 	for i := range acks {
-		q.ackReceived(acks[i].SeqNo)
+		if err := q.ackReceived(acks[i].SeqNo); err != nil {
+			return err
+		}
 	}
+	return nil
 }
 
-func (q *messageQueue) ackReceived(seqNo int64) {
+func (q *messageQueue) ackReceived(seqNo int64) error {
 	orderID, ok := q.seqNoToOrderId[seqNo]
 	if !ok {
-		return
+		return xerrors.WithStackTrace(errAckUnexpectedMessage)
 	}
-	delete(q.seqNoToOrderId, seqNo)
 
+	delete(q.seqNoToOrderId, seqNo)
 	delete(q.messagesByOrder, orderID)
+	return nil
 }
 
 func (q *messageQueue) Close(err error) error {

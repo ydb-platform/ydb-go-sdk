@@ -141,7 +141,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 				{SeqNo: 1},
 			},
 			Codec: rawtopiccommon.CodecRaw,
-		}).Return(xerrors.Retryable(errors.New("retriable on strm3")))
+		}).Return(xerrors.Retryable(errors.New("retriable on strm2")))
 
 		strm3 := newStream(nil)
 		strm3.EXPECT().Send(&rawtopicwriter.WriteRequest{
