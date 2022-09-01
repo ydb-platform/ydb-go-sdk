@@ -12,6 +12,7 @@ import (
 
 type Session struct {
 	sessionID uint64
+	path      string
 	client    *Client
 }
 
@@ -121,16 +122,16 @@ func (s *Session) DescribeSemaphore(
 	name, path string,
 	id uint64,
 ) (
-	*Ydb_Coordination.SessionResponse_DescribeSemaphoreResult,
+	coordination.SemaphoreData,
 	error,
 ) {
 	if s.client == nil {
-		return nil, xerrors.WithStackTrace(errNilClient)
+		return coordination.SemaphoreData{}, xerrors.WithStackTrace(errNilClient)
 	}
 
 	result, err := s.describeSemaphore(ctx, name, path, id)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return coordination.SemaphoreData{}, xerrors.WithStackTrace(err)
 	}
 
 	return result, nil
@@ -141,12 +142,12 @@ func (s *Session) describeSemaphore(
 	name, path string,
 	id uint64,
 ) (
-	*Ydb_Coordination.SessionResponse_DescribeSemaphoreResult,
+	coordination.SemaphoreData,
 	error,
 ) {
 	serviceClient, err := s.client.service.Session(ctx)
 	if err != nil {
-		return nil, err
+		return coordination.SemaphoreData{}, err
 	}
 	defer serviceClient.CloseSend()
 
@@ -154,17 +155,43 @@ func (s *Session) describeSemaphore(
 		config.WithSessionID(s.sessionID),
 	)
 	if err != nil {
-		return nil, err
+		return coordination.SemaphoreData{}, err
 	}
 
 	return s.client.loadData(serviceClient, id, name)
 }
 
-func (s *Session) CreateLocker(name, path string) coordination.Locker {
+func (s *Session) CreateLocker(name string) coordination.Locker {
 	return &Locker{
 		name:      name,
-		path:      path,
+		path:      s.path,
 		sessionID: s.sessionID,
 		client:    s.client,
 	}
+}
+
+func (s *Session) KeepAlive(ctx context.Context) error {
+	return nil
+}
+
+func (s *Session) KeepAliveOnce(ctx context.Context) error {
+	if s.client == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
+
+	return xerrors.WithStackTrace(s.keepAliveOnce(ctx))
+}
+
+func (s *Session) keepAliveOnce(ctx context.Context) error {
+	serviceClient, err := s.client.service.Session(ctx)
+	if err != nil {
+		return err
+	}
+	defer serviceClient.CloseSend()
+
+	_, err = s.client.sessionStart(serviceClient, s.path,
+		config.WithSessionID(s.sessionID),
+	)
+
+	return err
 }

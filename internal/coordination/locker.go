@@ -3,7 +3,6 @@ package coordination
 import (
 	"context"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Coordination"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
@@ -77,7 +76,7 @@ func (l *Locker) Unlock(ctx context.Context) error {
 		return xerrors.WithStackTrace(errNilClient)
 	}
 
-	err := l.client.unlock(ctx, l.name, l.path, l.sessionID)
+	err := l.unlock(ctx)
 	if err != nil {
 		return err
 	}
@@ -86,19 +85,73 @@ func (l *Locker) Unlock(ctx context.Context) error {
 	return nil
 }
 
+func (l *Locker) unlock(
+	ctx context.Context,
+) error {
+	serviceClient, err := l.client.service.Session(ctx)
+	if err != nil {
+		return err
+	}
+	defer serviceClient.CloseSend()
+
+	_, err = l.client.sessionStart(serviceClient, l.path, config.WithSessionID(l.sessionID))
+	if err != nil {
+		return err
+	}
+
+	err = serviceClient.Send(&Ydb_Coordination.SessionRequest{
+		Request: &Ydb_Coordination.SessionRequest_ReleaseSemaphore_{
+			ReleaseSemaphore: &Ydb_Coordination.SessionRequest_ReleaseSemaphore{
+				ReqId: l.sessionID,
+				Name:  l.name,
+			},
+		},
+	})
+
+	if err != nil {
+		return err
+	}
+
+	var (
+		response *Ydb_Coordination.SessionResponse
+		result   *Ydb_Coordination.SessionResponse_ReleaseSemaphoreResult
+	)
+	for result.GetReqId() != l.sessionID {
+		response, err = serviceClient.Recv()
+		if err != nil {
+			return err
+		}
+
+		result = response.GetReleaseSemaphoreResult()
+	}
+
+	return nil
+}
+
 func (l *Locker) StoreData(ctx context.Context, date []byte) error {
 	return nil
 }
 
-//func (l *Locker) LoadData(ctx context.Context) ([]byte, error) {
-//	if l.client == nil {
-//		return nil, xerrors.WithStackTrace(errNilClient)
-//	}
-//
-//	res, err := l.client.describeSemaphore(ctx, l.name, l.path, l.sessionID)
-//	if err != nil {
-//		return nil, xerrors.WithStackTrace(err)
-//	}
-//
-//	return res.GetSemaphoreDescription().GetData(), nil
-//}
+func (l *Locker) LoadData(ctx context.Context) ([]byte, error) {
+	if l.client == nil {
+		return nil, xerrors.WithStackTrace(errNilClient)
+	}
+
+	serviceClient, err := l.client.service.Session(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer serviceClient.CloseSend()
+
+	_, err = l.client.sessionStart(serviceClient, l.path, config.WithSessionID(l.sessionID))
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := l.client.loadData(serviceClient, l.sessionID, l.name)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return res.GetSemaphoreDescription().GetData(), nil
+}

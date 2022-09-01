@@ -5,15 +5,14 @@ import (
 	"errors"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Coordination_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Coordination"
-	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
+	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 )
 
 // nolint: gofumpt
@@ -253,6 +252,7 @@ func (c *Client) SessionStart(
 	id, err := c.sessionStart(serviceClient, path, opts...)
 	return &Session{
 		sessionID: id,
+		path:      path,
 		client:    c,
 	}, xerrors.WithStackTrace(err)
 }
@@ -287,7 +287,7 @@ func (c *Client) sessionStart(
 	return response.GetSessionStarted().GetSessionId(), nil
 }
 
-// TODO: убрать
+// Not used yet
 func (c *Client) sessionStop(
 	serviceClient Ydb_Coordination_V1.CoordinationService_SessionClient,
 ) error {
@@ -303,7 +303,7 @@ func (c *Client) loadData(
 	id uint64,
 	name string,
 ) (
-	*Ydb_Coordination.SessionResponse_DescribeSemaphoreResult,
+	coordination.SemaphoreData,
 	error,
 ) {
 	err := serviceClient.Send(&Ydb_Coordination.SessionRequest{
@@ -315,7 +315,7 @@ func (c *Client) loadData(
 		},
 	})
 	if err != nil {
-		return nil, err
+		return coordination.SemaphoreData{}, err
 	}
 
 	var (
@@ -325,78 +325,13 @@ func (c *Client) loadData(
 	for result.GetReqId() != id {
 		response, err = serviceClient.Recv()
 		if err != nil {
-			return nil, err
+			return coordination.SemaphoreData{}, err
 		}
 
 		result = response.GetDescribeSemaphoreResult()
 	}
 
-	return result, nil
-}
-
-//func (c *Client) keepAlive(
-//	ctx context.Context,
-//	serviceClient Ydb_Coordination_V1.CoordinationService_SessionClient,
-//	path string,
-//	id uint64,
-//	updateDuration time.Duration) {
-//
-//	ticker := time.NewTicker(updateDuration)
-//
-//	for {
-//		select {
-//		case <-ticker.C:
-//			// TODO: сделать нормальную обработку ошибки
-//			// TODO: сделать нормальную передачу duration
-//			_, err := c.sessionStart(
-//				serviceClient, path,
-//				config.WithSessionID(id), config.WithSessionTimeoutMillis(uint64(updateDuration.Milliseconds())),
-//			)
-//			if err != nil {
-//				return
-//			}
-//		case <-ctx.Done():
-//			return
-//		}
-//	}
-//}
-
-func (c *Client) unlock(
-	ctx context.Context,
-	name, path string,
-	id uint64,
-) error {
-	serviceClient, err := c.service.Session(ctx)
-	if err != nil {
-		return err
-	}
-	defer serviceClient.CloseSend()
-
-	err = serviceClient.Send(&Ydb_Coordination.SessionRequest{
-		Request: &Ydb_Coordination.SessionRequest_ReleaseSemaphore_{
-			ReleaseSemaphore: &Ydb_Coordination.SessionRequest_ReleaseSemaphore{
-				ReqId: id,
-				Name:  name,
-			},
-		},
-	})
-
-	if err != nil {
-		return err
-	}
-
-	var (
-		response *Ydb_Coordination.SessionResponse
-		result   *Ydb_Coordination.SessionResponse_ReleaseSemaphoreResult
-	)
-	for result.GetReqId() != id {
-		response, err = serviceClient.Recv()
-		if err != nil {
-			return err
-		}
-
-		result = response.GetReleaseSemaphoreResult()
-	}
-
-	return nil
+	return coordination.SemaphoreData{
+		SessionResponse_DescribeSemaphoreResult: result,
+	}, nil
 }
