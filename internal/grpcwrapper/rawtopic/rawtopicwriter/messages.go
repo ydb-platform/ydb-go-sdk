@@ -1,10 +1,14 @@
-//nolint
+// nolint
 package rawtopicwriter
 
 import (
+	"fmt"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 type InitRequest struct {
@@ -19,6 +23,22 @@ type InitRequest struct {
 	GetLastSeqNo bool
 }
 
+func (r *InitRequest) toProto() (*Ydb_Topic.StreamWriteMessage_InitRequest, error) {
+	res := &Ydb_Topic.StreamWriteMessage_InitRequest{
+		Path:             r.Path,
+		ProducerId:       r.ProducerID,
+		WriteSessionMeta: r.WriteSessionMeta,
+		GetLastSeqNo:     r.GetLastSeqNo,
+	}
+
+	err := r.Partitioning.setToProto(res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 // Partitioning is struct because it included in per-message structure and
 // places on hot-path for write messages
 // structure will work and compile-optimization better then interface
@@ -26,6 +46,39 @@ type Partitioning struct {
 	Type           PartitioningType
 	MessageGroupID string
 	PartitionID    int64
+}
+
+func NewPartitioningMessageGroup(messageGroupID string) Partitioning {
+	return Partitioning{
+		Type:           PartitioningMessageGroupID,
+		MessageGroupID: messageGroupID,
+	}
+}
+
+func NewPartitioningPartitionID(partitionID int64) Partitioning {
+	return Partitioning{
+		Type:        PartitioningPartitionID,
+		PartitionID: partitionID,
+	}
+}
+
+func (p Partitioning) setToProto(r *Ydb_Topic.StreamWriteMessage_InitRequest) error {
+	switch p.Type {
+	case PartitioningUndefined:
+		r.Partitioning = nil
+	case PartitioningMessageGroupID:
+		r.Partitioning = &Ydb_Topic.StreamWriteMessage_InitRequest_MessageGroupId{
+			MessageGroupId: p.MessageGroupID,
+		}
+	case PartitioningPartitionID:
+		r.Partitioning = &Ydb_Topic.StreamWriteMessage_InitRequest_PartitionId{
+			PartitionId: p.PartitionID,
+		}
+	default:
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: ")))
+	}
+
+	return nil
 }
 
 type PartitioningType int

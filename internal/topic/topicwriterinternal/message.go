@@ -55,7 +55,7 @@ func newMessageDataWithContent(mess Message) (res messageWithDataContent, err er
 }
 
 // messageWithDataContentSlice with buffer use for prevent allocation while send messsages from
-// Writer to writerImpl, because it is hot way and slice need for every call
+// Writer to WriterImpl, because it is hot way and slice need for every call
 // if messages sended one by one without additional buffer - it need for every message
 type messageWithDataContentSlice struct {
 	m []messageWithDataContent

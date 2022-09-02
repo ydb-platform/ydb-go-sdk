@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -66,8 +67,22 @@ func (c *Client) StreamRead(ctxStreamLifeTime context.Context) (rawtopicreader.S
 	protoResp, err := c.service.StreamRead(ctxStreamLifeTime)
 	if err != nil {
 		return rawtopicreader.StreamReader{}, xerrors.WithStackTrace(
-			fmt.Errorf("ydb: failed start grpc topic stream read: %w", err),
+			xerrors.Wrap(
+				fmt.Errorf("ydb: failed start grpc topic stream read: %w", err),
+			),
 		)
 	}
 	return rawtopicreader.StreamReader{Stream: protoResp}, nil
+}
+
+func (c *Client) StreamWrite(ctxStreamLifeTime context.Context) (rawtopicwriter.StreamWriter, error) {
+	protoResp, err := c.service.StreamWrite(ctxStreamLifeTime)
+	if err != nil {
+		return rawtopicwriter.StreamWriter{}, xerrors.WithStackTrace(
+			xerrors.Wrap(
+				fmt.Errorf("ydb: failed start grpc topic stream write: %w", err),
+			),
+		)
+	}
+	return rawtopicwriter.StreamWriter{Stream: protoResp}, nil
 }

@@ -1,16 +1,16 @@
-//nolint
+// nolint
 package rawtopicwriter
 
 import (
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_PersQueue_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 )
 
 type GrpcStream interface {
-	Send(messageNew *Ydb_PersQueue_V1.StreamingWriteClientMessage) error
-	Recv() (*Ydb_PersQueue_V1.StreamingWriteServerMessage, error)
+	Send(messageNew *Ydb_Topic.StreamWriteMessage_FromClient) error
+	Recv() (*Ydb_Topic.StreamWriteMessage_FromServer, error)
 	CloseSend() error
 }
 
@@ -18,12 +18,16 @@ type StreamWriter struct {
 	Stream GrpcStream
 }
 
-func (w *StreamWriter) Recv() (ServerMessage, error) {
+func (w StreamWriter) Recv() (ServerMessage, error) {
 	panic("not implemented")
 }
 
-func (w *StreamWriter) Send(msg ClientMessage) error {
+func (w StreamWriter) Send(msg ClientMessage) error {
 	panic("not implemented")
+}
+
+func (w StreamWriter) CloseSend() error {
+	return w.Stream.CloseSend()
 }
 
 type ClientMessage interface {

@@ -291,8 +291,8 @@ func newTestMessages(numbers ...int) *messageWithDataContentSlice {
 	return messages
 }
 
-func newTestWriter() writerImpl {
-	cfg := newWriterImplConfig(
+func newTestWriter() WriterImpl {
+	cfg := NewWriterImplConfig(
 		nil,
 		"test-producer-id",
 		"test-topic",

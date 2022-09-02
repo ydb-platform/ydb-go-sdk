@@ -26,7 +26,25 @@ var (
 	errBadCodec                  = xerrors.Wrap(errors.New("ydb: internal error - bad codec for message"))
 )
 
-type writerImpl struct {
+type writerImplConfig struct {
+	connect             ConnectFunc
+	producerID          string
+	topic               string
+	writerMeta          map[string]string
+	defaultPartitioning rawtopicwriter.Partitioning
+}
+
+func NewWriterImplConfig(connect ConnectFunc, producerID, topic string, meta map[string]string, partitioning rawtopicwriter.Partitioning) writerImplConfig {
+	return writerImplConfig{
+		connect:             connect,
+		producerID:          producerID,
+		topic:               topic,
+		writerMeta:          meta,
+		defaultPartitioning: partitioning,
+	}
+}
+
+type WriterImpl struct {
 	cfg writerImplConfig
 
 	queue      messageQueue
@@ -38,33 +56,25 @@ type writerImpl struct {
 	sessionID        string
 }
 
-type writerImplConfig struct {
-	connect             connectFunc
-	producerID          string
-	topic               string
-	writerMeta          map[string]string
-	defaultPartitioning rawtopicwriter.Partitioning
+func NewWriterImpl(cfg writerImplConfig) *WriterImpl {
+	res := newWriterImplStopped(cfg)
+	res.start()
+	return &res
 }
 
-func newWriterImplConfig(connect connectFunc, producerID, topic string, meta map[string]string, partitioning rawtopicwriter.Partitioning) writerImplConfig {
-	return writerImplConfig{
-		connect:             connect,
-		producerID:          producerID,
-		topic:               topic,
-		writerMeta:          meta,
-		defaultPartitioning: partitioning,
-	}
-}
-
-func newWriterImplStopped(cfg writerImplConfig) writerImpl {
-	return writerImpl{
+func newWriterImplStopped(cfg writerImplConfig) WriterImpl {
+	return WriterImpl{
 		cfg:   cfg,
 		queue: newMessageQueue(),
 		clock: clockwork.NewRealClock(),
 	}
 }
 
-func (w *writerImpl) Write(ctx context.Context, messages *messageWithDataContentSlice) (rawtopicwriter.WriteResult, error) {
+func (w *WriterImpl) start() {
+	panic("not implemented")
+}
+
+func (w *WriterImpl) Write(ctx context.Context, messages *messageWithDataContentSlice) (rawtopicwriter.WriteResult, error) {
 	if err := w.background.CloseReason(); err != nil {
 		return rawtopicwriter.WriteResult{}, xerrors.WithStackTrace(fmt.Errorf("ydb: writer is closed: %w", err))
 	}
@@ -76,19 +86,19 @@ func (w *writerImpl) Write(ctx context.Context, messages *messageWithDataContent
 	return rawtopicwriter.WriteResult{}, nil
 }
 
-func (w *writerImpl) Close(ctx context.Context) error {
+func (w *WriterImpl) Close(ctx context.Context) error {
 	return w.close(ctx, xerrors.WithStackTrace(errStopWriterImpl))
 }
 
-func (w *writerImpl) close(ctx context.Context, reason error) error {
+func (w *WriterImpl) close(ctx context.Context, reason error) error {
 	return w.background.Close(ctx, reason)
 }
 
-func (w *writerImpl) send(ctx context.Context, messages *messageWithDataContentSlice) error {
+func (w *WriterImpl) send(ctx context.Context, messages *messageWithDataContentSlice) error {
 	return w.queue.AddMessages(messages)
 }
 
-func (w *writerImpl) sendLoop(ctx context.Context) {
+func (w *WriterImpl) sendLoop(ctx context.Context) {
 	doneCtx := ctx.Done()
 	attempt := 0
 
@@ -143,12 +153,12 @@ func (w *writerImpl) sendLoop(ctx context.Context) {
 	}
 }
 
-func (w *writerImpl) connectWithTimeout(streamLifetimeContext context.Context) (RawTopicWriterStream, error) {
+func (w *WriterImpl) connectWithTimeout(streamLifetimeContext context.Context) (RawTopicWriterStream, error) {
 	// TODO: impl
 	return w.cfg.connect(streamLifetimeContext)
 }
 
-func (w *writerImpl) communicateWithServerThroughExistedStream(ctx context.Context, stream RawTopicWriterStream) error {
+func (w *WriterImpl) communicateWithServerThroughExistedStream(ctx context.Context, stream RawTopicWriterStream) error {
 	ctx, cancel := xcontext.WithErrCancel(ctx)
 	defer func() {
 		_ = stream.CloseSend()
@@ -166,7 +176,7 @@ func (w *writerImpl) communicateWithServerThroughExistedStream(ctx context.Conte
 	return w.sendMessagesFromQueueToStream(ctx, stream)
 }
 
-func (w *writerImpl) initStream(stream RawTopicWriterStream) error {
+func (w *WriterImpl) initStream(stream RawTopicWriterStream) error {
 	req := w.createInitRequest()
 	if err := stream.Send(&req); err != nil {
 		return err
@@ -190,7 +200,7 @@ func (w *writerImpl) initStream(stream RawTopicWriterStream) error {
 	return nil
 }
 
-func (w *writerImpl) createInitRequest() rawtopicwriter.InitRequest {
+func (w *WriterImpl) createInitRequest() rawtopicwriter.InitRequest {
 	return rawtopicwriter.InitRequest{
 		Path:             w.cfg.topic,
 		ProducerID:       w.cfg.producerID,
@@ -199,7 +209,7 @@ func (w *writerImpl) createInitRequest() rawtopicwriter.InitRequest {
 	}
 }
 
-func (w *writerImpl) receiveMessages(ctx context.Context, stream RawTopicWriterStream, cancel xcontext.CancelErrFunc) {
+func (w *WriterImpl) receiveMessages(ctx context.Context, stream RawTopicWriterStream, cancel xcontext.CancelErrFunc) {
 	for {
 		if ctx.Err() != nil {
 			return
@@ -223,7 +233,7 @@ func (w *writerImpl) receiveMessages(ctx context.Context, stream RawTopicWriterS
 	}
 }
 
-func (w *writerImpl) sendMessagesFromQueueToStream(ctx context.Context, stream RawTopicWriterStream) error {
+func (w *WriterImpl) sendMessagesFromQueueToStream(ctx context.Context, stream RawTopicWriterStream) error {
 	w.queue.ResetSentProgress()
 	for {
 		messages, err := w.queue.GetMessagesForSend(ctx)
@@ -340,4 +350,4 @@ func createRawMessageData(
 	return res, nil
 }
 
-type connectFunc func(ctx context.Context) (RawTopicWriterStream, error)
+type ConnectFunc func(ctx context.Context) (RawTopicWriterStream, error)

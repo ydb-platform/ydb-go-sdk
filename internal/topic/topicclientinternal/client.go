@@ -8,12 +8,15 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
 type Client struct {
@@ -165,4 +168,24 @@ func (c *Client) StartReader(
 
 	internalReader := topicreaderinternal.NewReader(connector, consumer, readSelectors, opts...)
 	return topicreader.NewReader(internalReader), nil
+}
+
+// StartWriter create new topic writer wrapper
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func (c *Client) StartWriter(producerID, path string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error) {
+	// TODO: Implement handle arguments
+
+	var connector topicwriterinternal.ConnectFunc = func(ctx context.Context) (topicwriterinternal.RawTopicWriterStream, error) {
+		return c.rawClient.StreamWrite(ctx)
+	}
+
+	partitioning := rawtopicwriter.NewPartitioningMessageGroup(producerID)
+
+	cfg := topicwriterinternal.NewWriterImplConfig(connector, producerID, path, nil, partitioning)
+	writerImpl := topicwriterinternal.NewWriterImpl(cfg)
+	writer := topicwriterinternal.NewWriter(writerImpl)
+	return topicwriter.NewWriter(writer), nil
 }

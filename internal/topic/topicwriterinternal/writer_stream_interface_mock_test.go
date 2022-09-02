@@ -11,31 +11,31 @@ import (
 	rawtopicwriter "github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 )
 
-// MockstreamWriter is a mock of streamWriter interface.
-type MockstreamWriter struct {
+// MockStreamWriter is a mock of StreamWriter interface.
+type MockStreamWriter struct {
 	ctrl     *gomock.Controller
-	recorder *MockstreamWriterMockRecorder
+	recorder *MockStreamWriterMockRecorder
 }
 
-// MockstreamWriterMockRecorder is the mock recorder for MockstreamWriter.
-type MockstreamWriterMockRecorder struct {
-	mock *MockstreamWriter
+// MockStreamWriterMockRecorder is the mock recorder for MockStreamWriter.
+type MockStreamWriterMockRecorder struct {
+	mock *MockStreamWriter
 }
 
-// NewMockstreamWriter creates a new mock instance.
-func NewMockstreamWriter(ctrl *gomock.Controller) *MockstreamWriter {
-	mock := &MockstreamWriter{ctrl: ctrl}
-	mock.recorder = &MockstreamWriterMockRecorder{mock}
+// NewMockStreamWriter creates a new mock instance.
+func NewMockStreamWriter(ctrl *gomock.Controller) *MockStreamWriter {
+	mock := &MockStreamWriter{ctrl: ctrl}
+	mock.recorder = &MockStreamWriterMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockstreamWriter) EXPECT() *MockstreamWriterMockRecorder {
+func (m *MockStreamWriter) EXPECT() *MockStreamWriterMockRecorder {
 	return m.recorder
 }
 
 // Close mocks base method.
-func (m *MockstreamWriter) Close(ctx context.Context) error {
+func (m *MockStreamWriter) Close(ctx context.Context) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Close", ctx)
 	ret0, _ := ret[0].(error)
@@ -43,13 +43,13 @@ func (m *MockstreamWriter) Close(ctx context.Context) error {
 }
 
 // Close indicates an expected call of Close.
-func (mr *MockstreamWriterMockRecorder) Close(ctx interface{}) *gomock.Call {
+func (mr *MockStreamWriterMockRecorder) Close(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockstreamWriter)(nil).Close), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockStreamWriter)(nil).Close), ctx)
 }
 
 // Write mocks base method.
-func (m *MockstreamWriter) Write(ctx context.Context, messages *messageWithDataContentSlice) (rawtopicwriter.WriteResult, error) {
+func (m *MockStreamWriter) Write(ctx context.Context, messages *messageWithDataContentSlice) (rawtopicwriter.WriteResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Write", ctx, messages)
 	ret0, _ := ret[0].(rawtopicwriter.WriteResult)
@@ -58,7 +58,7 @@ func (m *MockstreamWriter) Write(ctx context.Context, messages *messageWithDataC
 }
 
 // Write indicates an expected call of Write.
-func (mr *MockstreamWriterMockRecorder) Write(ctx, messages interface{}) *gomock.Call {
+func (mr *MockStreamWriterMockRecorder) Write(ctx, messages interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Write", reflect.TypeOf((*MockstreamWriter)(nil).Write), ctx, messages)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Write", reflect.TypeOf((*MockStreamWriter)(nil).Write), ctx, messages)
 }

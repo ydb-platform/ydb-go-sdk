@@ -18,8 +18,15 @@ type RawTopicWriterStream interface {
 }
 
 type Writer struct {
-	streamWriter streamWriter
-	clockwork.Clock
+	streamWriter StreamWriter
+	clock        clockwork.Clock
+}
+
+func NewWriter(streamWriter StreamWriter) *Writer {
+	return &Writer{
+		streamWriter: streamWriter,
+		clock:        clockwork.NewRealClock(),
+	}
 }
 
 func (w *Writer) Write(ctx context.Context, messages ...Message) error {

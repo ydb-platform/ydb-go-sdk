@@ -1,6 +1,5 @@
 package topicwriterinternal
 
-type WriterOption func(cfg *writerConfig)
+type PublicWriterOption func(cfg *writerConfig)
 
-type writerConfig struct {
-}
+type writerConfig struct{}
