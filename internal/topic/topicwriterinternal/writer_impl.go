@@ -34,7 +34,7 @@ type writerImplConfig struct {
 	defaultPartitioning rawtopicwriter.Partitioning
 }
 
-func NewWriterImplConfig(connect ConnectFunc, producerID, topic string, meta map[string]string, partitioning rawtopicwriter.Partitioning) writerImplConfig {
+func newWriterImplConfig(connect ConnectFunc, producerID, topic string, meta map[string]string, partitioning rawtopicwriter.Partitioning) writerImplConfig {
 	return writerImplConfig{
 		connect:             connect,
 		producerID:          producerID,
@@ -56,7 +56,7 @@ type WriterImpl struct {
 	sessionID        string
 }
 
-func NewWriterImpl(cfg writerImplConfig) *WriterImpl {
+func newWriterImpl(cfg writerImplConfig) *WriterImpl {
 	res := newWriterImplStopped(cfg)
 	res.start()
 	return &res
@@ -71,7 +71,8 @@ func newWriterImplStopped(cfg writerImplConfig) WriterImpl {
 }
 
 func (w *WriterImpl) start() {
-	panic("not implemented")
+	name := fmt.Sprintf("writer %q", w.cfg.topic)
+	w.background.Start(name+", sendloop", w.sendLoop)
 }
 
 func (w *WriterImpl) Write(ctx context.Context, messages *messageWithDataContentSlice) (rawtopicwriter.WriteResult, error) {

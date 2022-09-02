@@ -184,8 +184,6 @@ func (c *Client) StartWriter(producerID, path string, opts ...topicoptions.Write
 
 	partitioning := rawtopicwriter.NewPartitioningMessageGroup(producerID)
 
-	cfg := topicwriterinternal.NewWriterImplConfig(connector, producerID, path, nil, partitioning)
-	writerImpl := topicwriterinternal.NewWriterImpl(cfg)
-	writer := topicwriterinternal.NewWriter(writerImpl)
+	writer := topicwriterinternal.NewWriter(connector, producerID, path, nil, partitioning)
 	return topicwriter.NewWriter(writer), nil
 }

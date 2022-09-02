@@ -292,7 +292,7 @@ func newTestMessages(numbers ...int) *messageWithDataContentSlice {
 }
 
 func newTestWriter() WriterImpl {
-	cfg := NewWriterImplConfig(
+	cfg := newWriterImplConfig(
 		nil,
 		"test-producer-id",
 		"test-topic",

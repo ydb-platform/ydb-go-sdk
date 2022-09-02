@@ -30,9 +30,9 @@ func NewWriter(writer *topicwriterinternal.Writer) *Writer {
 }
 
 func (w *Writer) Write(ctx context.Context, messages ...Message) error {
-	panic("not implemented")
+	return w.inner.Write(ctx, messages...)
 }
 
 func (w *Writer) Close(ctx context.Context) error {
-	panic("not implemented")
+	return w.inner.Close(ctx)
 }
