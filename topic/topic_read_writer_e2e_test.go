@@ -49,5 +49,6 @@ func createTopic(ctx context.Context, t *testing.T, db ydb.Connection) (topicPat
 	_ = db.Topic().Drop(ctx, topicPath)
 	err := db.Topic().Create(ctx, topicPath, []topictypes.Codec{topictypes.CodecRaw}, topicoptions.CreateWithConsumer(topictypes.Consumer{Name: consumerName}))
 	require.NoError(t, err)
+
 	return topicPath
 }

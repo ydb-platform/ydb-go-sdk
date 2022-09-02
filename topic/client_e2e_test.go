@@ -51,7 +51,7 @@ func connect(t testing.TB) ydb.Connection {
 		ydb.WithDialTimeout(time.Second),
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 		ydb.With(config.WithGrpcOptions(grpc.WithChainUnaryInterceptor(xtest.NewGrpcLogger(t).UnaryClientInterceptor))),
-		ydb.With(config.WithGrpcOptions(grpc.WithChainStreamInterceptor(xtest.NewGrpcLogger(t).StreamClientInterceptor))),
+		// ydb.With(config.WithGrpcOptions(grpc.WithChainStreamInterceptor(xtest.NewGrpcLogger(t).StreamClientInterceptor))),
 	}
 
 	db, err := ydb.Open(context.Background(), connectionString, opts...)
