@@ -163,7 +163,7 @@ func TestDatabaseSql(t *testing.T) {
 			return nil
 		}, retry.WithDoTxRetryOptions(retry.WithIdempotent(true)))
 		if err != nil {
-			t.Fatalf("begin tx failed: %v\n", err)
+			t.Fatalf("do tx failed: %v\n", err)
 		}
 		err = retry.DoTx(ctx, db,
 			func(ctx context.Context, tx *sql.Tx) error {
@@ -198,7 +198,7 @@ func TestDatabaseSql(t *testing.T) {
 			}),
 		)
 		if err != nil {
-			t.Fatalf("begin tx failed: %v\n", err)
+			t.Fatalf("do tx failed: %v\n", err)
 		}
 	})
 }
