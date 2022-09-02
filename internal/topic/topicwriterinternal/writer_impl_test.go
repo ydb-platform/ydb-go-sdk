@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
 func TestWriterImpl_Write(t *testing.T) {
@@ -121,14 +122,25 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		newStream := func(onSendInitCallback func()) *MockRawTopicWriterStream {
 			strm := NewMockRawTopicWriterStream(mc)
 			initReq := w.createInitRequest()
+
+			streamClosed := make(empty.Chan)
+			strm.EXPECT().CloseSend().Do(func() {
+				close(streamClosed)
+			})
+
 			strm.EXPECT().Send(&initReq).Do(func(_ interface{}) {
 				if onSendInitCallback != nil {
 					onSendInitCallback()
 				}
 			})
+
 			strm.EXPECT().Recv().Return(&rawtopicwriter.InitResult{
 				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
 			}, nil)
+
+			strm.EXPECT().Recv().Do(func() {
+				xtest.WaitChannelClosed(t, streamClosed)
+			}).Return(nil, errors.New("test stream closed")).MaxTimes(1)
 			return strm
 		}
 
@@ -150,9 +162,6 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			},
 			Codec: rawtopiccommon.CodecRaw,
 		}).Return(errors.New("strm3"))
-
-		// CloseSend on last stream
-		strm3.EXPECT().CloseSend()
 
 		connectsResult := []connectionAttemptContext{
 			{

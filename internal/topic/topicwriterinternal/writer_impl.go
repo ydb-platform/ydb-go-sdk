@@ -92,7 +92,6 @@ func (w *writerImpl) sendLoop(ctx context.Context) {
 	doneCtx := ctx.Done()
 	attempt := 0
 
-	var stream RawTopicWriterStream
 	createStreamContext := func() (context.Context, xcontext.CancelErrFunc) {
 		// need suppress parent context cancelation for flush buffer while close writer
 		return xcontext.WithErrCancel(xcontext.WithoutDeadline(ctx))
@@ -102,9 +101,6 @@ func (w *writerImpl) sendLoop(ctx context.Context) {
 	streamCtx, streamCtxCancel := createStreamContext()
 
 	defer func() {
-		if stream != nil {
-			_ = stream.CloseSend()
-		}
 		streamCtxCancel(xerrors.WithStackTrace(errCloseWriterImplStreamLoop))
 	}()
 
@@ -127,9 +123,7 @@ func (w *writerImpl) sendLoop(ctx context.Context) {
 			}
 		}
 
-		var err error
-		stream, err = w.connectWithTimeout(streamCtx)
-
+		stream, err := w.connectWithTimeout(streamCtx)
 		// TODO: trace
 		if err != nil {
 			if !topic.IsRetryableError(err) {
@@ -140,7 +134,7 @@ func (w *writerImpl) sendLoop(ctx context.Context) {
 		}
 		attempt = 0
 
-		err = w.initStreamAndStartSendMessages(ctx, stream)
+		err = w.communicateWithServerThroughExistedStream(ctx, stream)
 		if !topic.IsRetryableError(err) {
 			_ = w.background.Close(ctx, err)
 			return
@@ -154,9 +148,12 @@ func (w *writerImpl) connectWithTimeout(streamLifetimeContext context.Context) (
 	return w.cfg.connect(streamLifetimeContext)
 }
 
-func (w *writerImpl) initStreamAndStartSendMessages(ctx context.Context, stream RawTopicWriterStream) error {
+func (w *writerImpl) communicateWithServerThroughExistedStream(ctx context.Context, stream RawTopicWriterStream) error {
 	ctx, cancel := xcontext.WithErrCancel(ctx)
-	defer cancel(xerrors.WithStackTrace(errCloseWriterImplStopWork))
+	defer func() {
+		_ = stream.CloseSend()
+		cancel(xerrors.WithStackTrace(errCloseWriterImplStopWork))
+	}()
 
 	if err := w.initStream(stream); err != nil {
 		return err
