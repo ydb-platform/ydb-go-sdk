@@ -57,12 +57,9 @@ func (tx *tx) Rollback() (err error) {
 	if tx.conn.isClosed() {
 		return errClosedConn
 	}
-	if tx.conn.currentTx == nil {
-		return nil
-	}
 	err = tx.tx.Rollback(tx.ctx)
 	if err != nil {
-		return tx.conn.checkClosed(err)
+		return tx.conn.checkClosed(xerrors.WithStackTrace(err))
 	}
 	return err
 }
