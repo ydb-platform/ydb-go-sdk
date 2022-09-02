@@ -33,12 +33,12 @@ func (tx *tx) Commit() (err error) {
 	defer func() {
 		onDone(err)
 	}()
-	if tx.conn.isClosed() {
-		return errClosedConn
-	}
 	defer func() {
 		tx.conn.currentTx = nil
 	}()
+	if tx.conn.isClosed() {
+		return errClosedConn
+	}
 	_, err = tx.tx.CommitTx(tx.ctx)
 	if err != nil {
 		return tx.conn.checkClosed(xerrors.WithStackTrace(err))
@@ -51,12 +51,12 @@ func (tx *tx) Rollback() (err error) {
 	defer func() {
 		onDone(err)
 	}()
-	if tx.conn.isClosed() {
-		return errClosedConn
-	}
 	defer func() {
 		tx.conn.currentTx = nil
 	}()
+	if tx.conn.isClosed() {
+		return errClosedConn
+	}
 	if tx.conn.currentTx == nil {
 		return nil
 	}
