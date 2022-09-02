@@ -29,7 +29,7 @@ func TestSendAsyncMessages(t *testing.T) {
 	writer, err := db.Topic().(*topicclientinternal.Client).StartWriter("test", topicPath)
 	require.NoError(t, err)
 	require.NotEmpty(t, writer)
-	require.NoError(t, writer.Write(ctx, topicwriter.Message{SeqNo: 1, Data: strings.NewReader(content)}))
+	require.NoError(t, writer.Write(ctx, topicwriter.Message{SeqNo: 1, CreatedAt: time.Now(), Data: strings.NewReader(content)}))
 
 	reader, err := db.Topic().StartReader(consumerName, topicoptions.ReadTopic(topicPath))
 	require.NoError(t, err)

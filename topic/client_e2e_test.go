@@ -10,8 +10,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
@@ -44,10 +47,14 @@ func connect(t testing.TB) ydb.Connection {
 	if cs := os.Getenv("YDB_CONNECTION_STRING"); cs != "" {
 		connectionString = cs
 	}
-	db, err := ydb.Open(context.Background(), connectionString,
+	opts := []ydb.Option{
 		ydb.WithDialTimeout(time.Second),
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
-	)
+		ydb.With(config.WithGrpcOptions(grpc.WithChainUnaryInterceptor(xtest.NewGrpcLogger(t).UnaryClientInterceptor))),
+		ydb.With(config.WithGrpcOptions(grpc.WithChainStreamInterceptor(xtest.NewGrpcLogger(t).StreamClientInterceptor))),
+	}
+
+	db, err := ydb.Open(context.Background(), connectionString, opts...)
 	require.NoError(t, err)
 	return db
 }
