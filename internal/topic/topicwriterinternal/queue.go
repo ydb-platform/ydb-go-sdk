@@ -114,6 +114,7 @@ func (q *messageQueue) addMessageNeedLock(mess messageWithDataContent) {
 
 	q.messagesByOrder[q.lastWrittenIndex] = mess
 	q.seqNoToOrderId[mess.SeqNo] = q.lastWrittenIndex
+	q.lastSeqNo = mess.SeqNo
 }
 
 func (q *messageQueue) AcksReceived(acks []rawtopicwriter.WriteAck) error {

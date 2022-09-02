@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -31,7 +32,7 @@ func (r *InitRequest) toProto() (*Ydb_Topic.StreamWriteMessage_InitRequest, erro
 		GetLastSeqNo:     r.GetLastSeqNo,
 	}
 
-	err := r.Partitioning.setToProto(res)
+	err := r.Partitioning.setToProtoInitRequest(res)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +63,7 @@ func NewPartitioningPartitionID(partitionID int64) Partitioning {
 	}
 }
 
-func (p Partitioning) setToProto(r *Ydb_Topic.StreamWriteMessage_InitRequest) error {
+func (p *Partitioning) setToProtoInitRequest(r *Ydb_Topic.StreamWriteMessage_InitRequest) error {
 	switch p.Type {
 	case PartitioningUndefined:
 		r.Partitioning = nil
@@ -75,7 +76,26 @@ func (p Partitioning) setToProto(r *Ydb_Topic.StreamWriteMessage_InitRequest) er
 			PartitionId: p.PartitionID,
 		}
 	default:
-		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: ")))
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected partition type while set to init request: %v", p.Type)))
+	}
+
+	return nil
+}
+
+func (p *Partitioning) setToProtoMessage(m *Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData) error {
+	switch p.Type {
+	case PartitioningUndefined:
+		m.Partitioning = nil
+	case PartitioningMessageGroupID:
+		m.Partitioning = &Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData_MessageGroupId{
+			MessageGroupId: p.MessageGroupID,
+		}
+	case PartitioningPartitionID:
+		m.Partitioning = &Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData_PartitionId{
+			PartitionId: p.PartitionID,
+		}
+	default:
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected partition type while set to message proto: %v", p.Type)))
 	}
 
 	return nil
@@ -99,11 +119,37 @@ type InitResult struct {
 	SupportedCodecs rawtopiccommon.SupportedCodecs
 }
 
+func (r *InitResult) mustFromProto(response *Ydb_Topic.StreamWriteMessage_InitResponse) {
+	r.SessionID = response.SessionId
+	r.PartitionID = response.PartitionId
+	r.LastSeqNo = response.LastSeqNo
+	r.SupportedCodecs.MustFromProto(response.SupportedCodecs)
+}
+
 type WriteRequest struct {
 	clientMessageImpl
 
 	Messages []MessageData
 	Codec    rawtopiccommon.Codec
+}
+
+func (r *WriteRequest) toProto() (p *Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest, err error) {
+	messages := make([]*Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData, len(r.Messages))
+
+	for i := range r.Messages {
+		messages[i], err = r.Messages[i].ToProto()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	res := &Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest{
+		WriteRequest: &Ydb_Topic.StreamWriteMessage_WriteRequest{
+			Messages: messages,
+			Codec:    int32(r.Codec.ToProto()),
+		},
+	}
+	return res, nil
 }
 
 type MessageData struct {
@@ -112,6 +158,20 @@ type MessageData struct {
 	UncompressedSize int64
 	Partitioning     Partitioning
 	Data             []byte
+}
+
+func (d *MessageData) ToProto() (*Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData, error) {
+	res := &Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData{
+		SeqNo:            d.SeqNo,
+		CreatedAt:        timestamppb.New(d.CreatedAt),
+		Data:             d.Data,
+		UncompressedSize: d.UncompressedSize,
+	}
+	err := d.Partitioning.setToProtoMessage(res)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 type WriteResult struct {

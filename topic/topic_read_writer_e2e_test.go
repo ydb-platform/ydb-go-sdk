@@ -33,7 +33,7 @@ func TestSendAsyncMessages(t *testing.T) {
 
 	reader, err := db.Topic().StartReader(consumerName, topicoptions.ReadTopic(topicPath))
 	require.NoError(t, err)
-	readCtx, cancel := context.WithTimeout(ctx, time.Second)
+	readCtx, cancel := context.WithTimeout(ctx, time.Hour)
 	defer cancel()
 
 	mess, err := reader.ReadMessage(readCtx)
