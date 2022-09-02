@@ -27,12 +27,12 @@ func (tx *fakeTx) Commit() (err error) {
 	defer func() {
 		onDone(err)
 	}()
-	if tx.conn.isClosed() {
-		return errClosedConn
-	}
 	defer func() {
 		tx.conn.currentTx = nil
 	}()
+	if tx.conn.isClosed() {
+		return errClosedConn
+	}
 	return nil
 }
 
@@ -41,12 +41,12 @@ func (tx *fakeTx) Rollback() (err error) {
 	defer func() {
 		onDone(err)
 	}()
-	if tx.conn.isClosed() {
-		return errClosedConn
-	}
 	defer func() {
 		tx.conn.currentTx = nil
 	}()
+	if tx.conn.isClosed() {
+		return errClosedConn
+	}
 	return nil
 }
 

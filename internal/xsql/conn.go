@@ -80,6 +80,7 @@ var (
 	_ driver.QueryerContext     = &conn{}
 	_ driver.Pinger             = &conn{}
 	_ driver.NamedValueChecker  = &conn{}
+	_ driver.SessionResetter    = &conn{}
 )
 
 func newConn(c *Connector, s table.ClosableSession, opts ...connOption) *conn {
@@ -342,4 +343,14 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 		tx:   transaction,
 	}
 	return c.currentTx, nil
+}
+
+func (c *conn) ResetSession(ctx context.Context) error {
+	if c.currentTx != nil {
+		_ = c.currentTx.Rollback()
+	}
+	if c.isClosed() {
+		return errClosedConn
+	}
+	return nil
 }
