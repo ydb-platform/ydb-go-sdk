@@ -95,12 +95,6 @@ func newConn(c *Connector, s table.ClosableSession, opts ...connOption) *conn {
 }
 
 func (c *conn) checkClosed(err error) error {
-	if c.isClosed() {
-		return errClosedConn
-	}
-	if err == nil {
-		return nil
-	}
 	if err = badconn.Map(err); xerrors.Is(err, driver.ErrBadConn) {
 		c.setClosed()
 	}
