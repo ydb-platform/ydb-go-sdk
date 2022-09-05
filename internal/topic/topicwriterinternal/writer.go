@@ -22,8 +22,8 @@ type Writer struct {
 	clock        clockwork.Clock
 }
 
-func NewWriter(connect ConnectFunc, producerID, topic string, meta map[string]string, partitioning rawtopicwriter.Partitioning) *Writer {
-	cfg := newWriterImplConfig(connect, producerID, topic, meta, partitioning)
+func NewWriter(options []PublicWriterOption) *Writer {
+	cfg := newWriterImplConfig(options...)
 	writerImpl := newWriterImpl(cfg)
 
 	return &Writer{
@@ -47,15 +47,14 @@ func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 		messagesWithContent.m = append(messagesWithContent.m, contentMessage)
 	}
 
-	_, err := w.streamWriter.Write(ctx, messagesWithContent)
-	return err
+	return w.streamWriter.Write(ctx, messagesWithContent)
 }
 
 func (w *Writer) Close(ctx context.Context) error {
 	return w.streamWriter.Close(ctx)
 }
 
-type WriteOptions struct {
+type WriteOption struct {
 	Codec     Codec
 	Autocodec bool
 }

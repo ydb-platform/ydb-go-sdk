@@ -5,16 +5,20 @@ package topic_test
 
 import (
 	"context"
+	"errors"
 	"io"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicclientinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
@@ -44,7 +48,64 @@ func TestSendAsyncMessages(t *testing.T) {
 	require.Equal(t, content, string(readBytes))
 }
 
-func createTopic(ctx context.Context, t *testing.T, db ydb.Connection) (topicPath string) {
+func TestSendSyncMessages(t *testing.T) {
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		ctx := testCtx(t)
+
+		grpcStopper := xtest.NewGrpcStopper(errors.New("stop grpc for test"))
+
+		db := connect(t,
+			grpc.WithChainUnaryInterceptor(grpcStopper.UnaryClientInterceptor),
+			grpc.WithChainStreamInterceptor(grpcStopper.StreamClientInterceptor),
+		)
+		topicPath := createTopic(ctx, t, db)
+
+		producerID := "test-producer"
+		writer, err := db.Topic().(*topicclientinternal.Client).StartWriter(producerID, topicPath, topicoptions.WithWriterPartitioning(
+			topicwriter.NewPartitioningWithMessageGroupID(producerID),
+		),
+			topicoptions.WithSyncWrite(true),
+		)
+		require.NoError(t, err)
+		msg := topicwriter.Message{SeqNo: 1, CreatedAt: time.Now(), Data: strings.NewReader("1")}
+		err = writer.Write(ctx, msg)
+		require.NoError(t, err)
+
+		grpcStopper.Stop() // stop any activity through connections
+
+		// check about connection broken
+		msg = topicwriter.Message{SeqNo: 2, CreatedAt: time.Now(), Data: strings.NewReader("nosent")}
+		err = writer.Write(ctx, msg)
+		require.Error(t, err)
+
+		db = connect(t)
+		writer, err = db.Topic().(*topicclientinternal.Client).StartWriter(producerID, topicPath,
+			topicoptions.WithWriterPartitioning(
+				topicwriter.NewPartitioningWithMessageGroupID(producerID),
+			),
+			topicoptions.WithSyncWrite(true),
+		)
+		require.NoError(t, err)
+		msg = topicwriter.Message{SeqNo: 2, CreatedAt: time.Now(), Data: strings.NewReader("2")}
+		err = writer.Write(ctx, msg)
+		require.NoError(t, err)
+
+		reader, err := db.Topic().StartReader(consumerName, topicoptions.ReadTopic(topicPath))
+		mess, err := reader.ReadMessage(ctx)
+		require.NoError(t, err)
+		require.NoError(t, topicsugar.ReadMessageDataWithCallback(mess, func(data []byte) error {
+			require.Equal(t, "1", string(data))
+			return nil
+		}))
+		mess, err = reader.ReadMessage(ctx)
+		require.NoError(t, topicsugar.ReadMessageDataWithCallback(mess, func(data []byte) error {
+			require.Equal(t, "2", string(data))
+			return nil
+		}))
+	})
+}
+
+func createTopic(ctx context.Context, t testing.TB, db ydb.Connection) (topicPath string) {
 	topicPath = db.Name() + "/" + t.Name() + "--test-topic"
 	_ = db.Topic().Drop(ctx, topicPath)
 	err := db.Topic().Create(ctx, topicPath, []topictypes.Codec{topictypes.CodecRaw}, topicoptions.CreateWithConsumer(topictypes.Consumer{Name: consumerName}))

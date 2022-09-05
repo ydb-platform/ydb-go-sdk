@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -20,6 +21,13 @@ type PublicPartitioning struct {
 	messageGroupID string
 	partitionID    int64
 	hasPartitionID bool
+}
+
+func (p PublicPartitioning) ToRaw() rawtopicwriter.Partitioning {
+	if p.hasPartitionID {
+		return rawtopicwriter.NewPartitioningPartitionID(p.partitionID)
+	}
+	return rawtopicwriter.NewPartitioningMessageGroup(p.messageGroupID)
 }
 
 func NewPartitioningWithMessageGroupID(id string) PublicPartitioning {

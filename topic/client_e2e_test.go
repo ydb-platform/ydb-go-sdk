@@ -14,7 +14,6 @@ import (
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
@@ -42,16 +41,21 @@ func TestClient_CreateDropTopic(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func connect(t testing.TB) ydb.Connection {
+func connect(t testing.TB, grpcOptions ...grpc.DialOption) ydb.Connection {
 	connectionString := "grpc://localhost:2136/local"
 	if cs := os.Getenv("YDB_CONNECTION_STRING"); cs != "" {
 		connectionString = cs
 	}
+
+	//grpcOptions = append(grpcOptions,
+	//	grpc.WithChainUnaryInterceptor(xtest.NewGrpcLogger(t).UnaryClientInterceptor),
+	//	grpc.WithChainStreamInterceptor(xtest.NewGrpcLogger(t).StreamClientInterceptor),
+	//)
+
 	opts := []ydb.Option{
 		ydb.WithDialTimeout(time.Second),
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
-		ydb.With(config.WithGrpcOptions(grpc.WithChainUnaryInterceptor(xtest.NewGrpcLogger(t).UnaryClientInterceptor))),
-		// ydb.With(config.WithGrpcOptions(grpc.WithChainStreamInterceptor(xtest.NewGrpcLogger(t).StreamClientInterceptor))),
+		ydb.With(config.WithGrpcOptions(grpcOptions...)),
 	}
 
 	db, err := ydb.Open(context.Background(), connectionString, opts...)

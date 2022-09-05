@@ -42,6 +42,14 @@ func (w StreamWriter) Recv() (ServerMessage, error) {
 		res.ServerMessageMetadata = meta
 		res.mustFromProto(v.InitResponse)
 		return &res, nil
+	case *Ydb_Topic.StreamWriteMessage_FromServer_WriteResponse:
+		var res WriteResult
+		res.ServerMessageMetadata = meta
+		err = res.fromProto(v.WriteResponse)
+		if err != nil {
+			return nil, err
+		}
+		return &res, nil
 	default:
 		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected message type received from raw writer stream: '%v'", reflect.TypeOf(grpcMsg))))
 	}

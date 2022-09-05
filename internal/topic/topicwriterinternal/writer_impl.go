@@ -32,16 +32,15 @@ type writerImplConfig struct {
 	topic               string
 	writerMeta          map[string]string
 	defaultPartitioning rawtopicwriter.Partitioning
+	waitServerAck       bool
 }
 
-func newWriterImplConfig(connect ConnectFunc, producerID, topic string, meta map[string]string, partitioning rawtopicwriter.Partitioning) writerImplConfig {
-	return writerImplConfig{
-		connect:             connect,
-		producerID:          producerID,
-		topic:               topic,
-		writerMeta:          meta,
-		defaultPartitioning: partitioning,
+func newWriterImplConfig(options ...PublicWriterOption) writerImplConfig {
+	cfg := writerImplConfig{}
+	for _, f := range options {
+		f(&cfg)
 	}
+	return cfg
 }
 
 type WriterImpl struct {
@@ -75,16 +74,21 @@ func (w *WriterImpl) start() {
 	w.background.Start(name+", sendloop", w.sendLoop)
 }
 
-func (w *WriterImpl) Write(ctx context.Context, messages *messageWithDataContentSlice) (rawtopicwriter.WriteResult, error) {
+func (w *WriterImpl) Write(ctx context.Context, messages *messageWithDataContentSlice) error {
 	if err := w.background.CloseReason(); err != nil {
-		return rawtopicwriter.WriteResult{}, xerrors.WithStackTrace(fmt.Errorf("ydb: writer is closed: %w", err))
+		return xerrors.WithStackTrace(fmt.Errorf("ydb: writer is closed: %w", err))
 	}
 
-	if err := w.send(ctx, messages); err != nil {
-		return rawtopicwriter.WriteResult{}, err
+	if !w.cfg.waitServerAck {
+		return w.queue.AddMessages(messages)
 	}
 
-	return rawtopicwriter.WriteResult{}, nil
+	waiter, err := w.queue.AddMessagesWithWaiter(messages)
+	if err != nil {
+		return err
+	}
+
+	return w.queue.Wait(ctx, waiter)
 }
 
 func (w *WriterImpl) Close(ctx context.Context) error {
@@ -92,11 +96,12 @@ func (w *WriterImpl) Close(ctx context.Context) error {
 }
 
 func (w *WriterImpl) close(ctx context.Context, reason error) error {
-	return w.background.Close(ctx, reason)
-}
-
-func (w *WriterImpl) send(ctx context.Context, messages *messageWithDataContentSlice) error {
-	return w.queue.AddMessages(messages)
+	resErr := w.queue.Close(reason)
+	bgErr := w.background.Close(ctx, reason)
+	if resErr == nil {
+		resErr = bgErr
+	}
+	return resErr
 }
 
 func (w *WriterImpl) sendLoop(ctx context.Context) {
@@ -147,7 +152,9 @@ func (w *WriterImpl) sendLoop(ctx context.Context) {
 
 		err = w.communicateWithServerThroughExistedStream(ctx, stream)
 		if !topic.IsRetryableError(err) {
-			_ = w.background.Close(ctx, err)
+			closeCtx, cancel := context.WithCancel(ctx)
+			cancel()
+			_ = w.close(closeCtx, err)
 			return
 		}
 		// next iteration
@@ -226,7 +233,9 @@ func (w *WriterImpl) receiveMessages(ctx context.Context, stream RawTopicWriterS
 		case *rawtopicwriter.WriteResult:
 			if err = w.queue.AcksReceived(m.Acks); err != nil {
 				reason := xerrors.WithStackTrace(err)
-				_ = w.close(ctx, reason)
+				closeCtx, closeCtxCancel := context.WithCancel(ctx)
+				closeCtxCancel()
+				_ = w.close(closeCtx, reason)
 				cancel(reason)
 				return
 			}

@@ -2,7 +2,9 @@
 package rawtopicwriter
 
 import (
+	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
@@ -10,6 +12,12 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+)
+
+var (
+	errWriteResultProtoIsNil             = xerrors.Wrap(errors.New("ydb: write result proto is nil"))
+	errWriteResultResponseWriteAckIsNil  = xerrors.Wrap(errors.New("ydb: write result response write ack is nil"))
+	errWriteResultResponseStatisticIsNil = xerrors.Wrap(errors.New("ydb: write result response statistic is nil"))
 )
 
 type InitRequest struct {
@@ -187,9 +195,31 @@ type WriteResult struct {
 	WriteStatistics WriteStatistics
 }
 
+func (r *WriteResult) fromProto(response *Ydb_Topic.StreamWriteMessage_WriteResponse) error {
+	if response == nil {
+		return xerrors.WithStackTrace(errWriteResultProtoIsNil)
+	}
+	r.Acks = make([]WriteAck, len(response.Acks))
+	for i := range response.Acks {
+		if err := r.Acks[i].fromProto(response.Acks[i]); err != nil {
+			return err
+		}
+	}
+	r.PartitionID = response.PartitionId
+	return r.WriteStatistics.fromProto(response.WriteStatistics)
+}
+
 type WriteAck struct {
 	SeqNo              int64
 	MessageWriteStatus MessageWriteStatus
+}
+
+func (wa *WriteAck) fromProto(pb *Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck) error {
+	if pb == nil {
+		return xerrors.WithStackTrace(errWriteResultResponseWriteAckIsNil)
+	}
+	wa.SeqNo = pb.SeqNo
+	return wa.MessageWriteStatus.fromProto(pb.MessageWriteStatus)
 }
 
 // MessageWriteStatus is struct because it included in per-message structure and
@@ -199,6 +229,21 @@ type MessageWriteStatus struct {
 	Type          WriteStatusType
 	WrittenOffset int64
 	SkippedReason WriteStatusSkipReason
+}
+
+func (s *MessageWriteStatus) fromProto(status interface{}) error {
+	switch v := status.(type) {
+	case *Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Written_:
+		s.Type = WriteStatusTypeWritten
+		s.WrittenOffset = v.Written.Offset
+		return nil
+	case *Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Skipped_:
+		s.Type = WriteStatusTypeSkipped
+		s.SkippedReason = WriteStatusSkipReason(v.Skipped.Reason)
+		return nil
+	default:
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected write status type: %v", reflect.TypeOf(v))))
+	}
 }
 
 type WriteStatusType int
@@ -212,8 +257,8 @@ const (
 type WriteStatusSkipReason int
 
 const (
-	WriteStatusSkipReasonUnspecified    WriteStatusSkipReason = 0
-	WriteStatusSkipReasonAlreadyWritten WriteStatusSkipReason = 1
+	WriteStatusSkipReasonUnspecified    = WriteStatusSkipReason(Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Skipped_REASON_UNSPECIFIED)
+	WriteStatusSkipReasonAlreadyWritten = WriteStatusSkipReason(Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Skipped_REASON_ALREADY_WRITTEN)
 )
 
 type WriteStatistics struct {
@@ -221,4 +266,16 @@ type WriteStatistics struct {
 	MinQueueWaitTime   time.Duration
 	MaxQueueWaitTime   time.Duration
 	TopicQuotaWaitTime time.Duration
+}
+
+func (s *WriteStatistics) fromProto(statistics *Ydb_Topic.StreamWriteMessage_WriteResponse_WriteStatistics) error {
+	if statistics == nil {
+		return xerrors.WithStackTrace(errWriteResultResponseStatisticIsNil)
+	}
+
+	s.PersistingTime = statistics.PersistingTime.AsDuration()
+	s.MinQueueWaitTime = statistics.MinQueueWaitTime.AsDuration()
+	s.MaxQueueWaitTime = statistics.MaxQueueWaitTime.AsDuration()
+	s.TopicQuotaWaitTime = statistics.TopicQuotaWaitTime.AsDuration()
+	return nil
 }

@@ -8,7 +8,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
@@ -182,8 +181,14 @@ func (c *Client) StartWriter(producerID, path string, opts ...topicoptions.Write
 		return c.rawClient.StreamWrite(ctx)
 	}
 
-	partitioning := rawtopicwriter.NewPartitioningMessageGroup(producerID)
+	options := []topicoptions.WriterOption{
+		topicwriterinternal.WithConnectFunc(connector),
+		topicwriterinternal.WithTopic(path),
+		topicwriterinternal.WithProducerID(producerID),
+	}
 
-	writer := topicwriterinternal.NewWriter(connector, producerID, path, nil, partitioning)
+	options = append(options, opts...)
+
+	writer := topicwriterinternal.NewWriter(options)
 	return topicwriter.NewWriter(writer), nil
 }

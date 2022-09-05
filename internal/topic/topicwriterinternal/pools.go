@@ -8,6 +8,7 @@ import (
 var (
 	globalBufferPool                   = &sync.Pool{}
 	globalMessageWithContentSlicesPool = &sync.Pool{}
+	globalMessageQueueWaiterPool       = &sync.Pool{}
 )
 
 func newBuffer() *bytes.Buffer {
@@ -36,4 +37,19 @@ func putContentMessagesSlice(obj *messageWithDataContentSlice) {
 	}
 	obj.m = obj.m[:0]
 	globalMessageWithContentSlicesPool.Put(obj)
+}
+
+func newMessageQueueAckWaiter() *MessageQueueAckWaiter {
+	if stored := globalMessageQueueWaiterPool.Get(); stored != nil {
+		return stored.(*MessageQueueAckWaiter)
+	}
+
+	res := &MessageQueueAckWaiter{}
+	res.init()
+	return res
+}
+
+func putMessageQueueAckWaiter(obj *MessageQueueAckWaiter) {
+	obj.reset()
+	globalMessageQueueWaiterPool.Put(obj)
 }

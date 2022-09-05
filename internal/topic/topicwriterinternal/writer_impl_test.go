@@ -21,7 +21,7 @@ import (
 func TestWriterImpl_Write(t *testing.T) {
 	ctx := context.Background()
 	w := newTestWriter()
-	_, err := w.Write(ctx, newTestMessages(1, 3, 5))
+	err := w.Write(ctx, newTestMessages(1, 3, 5))
 	require.NoError(t, err)
 
 	expectedMap := map[int]messageWithDataContent{
@@ -145,7 +145,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		}
 
 		strm2 := newStream(func() {
-			_, err := w.Write(ctx, newTestMessages(1))
+			err := w.Write(ctx, newTestMessages(1))
 			require.NoError(t, err)
 		})
 		strm2.EXPECT().Send(&rawtopicwriter.WriteRequest{
@@ -293,15 +293,10 @@ func newTestMessages(numbers ...int) *messageWithDataContentSlice {
 
 func newTestWriter() WriterImpl {
 	cfg := newWriterImplConfig(
-		nil,
-		"test-producer-id",
-		"test-topic",
-		map[string]string{"test-key": "test-val"},
-		rawtopicwriter.Partitioning{
-			Type:           rawtopicwriter.PartitioningMessageGroupID,
-			MessageGroupID: "test-message-group-id",
-			PartitionID:    0,
-		},
+		WithProducerID("test-producer-id"),
+		WithTopic("test-topic"),
+		WithSessionMeta(map[string]string{"test-key": "test-val"}),
+		WithPartitioning(NewPartitioningWithMessageGroupID("test-message-group-id")),
 	)
 	return newWriterImplStopped(cfg)
 }

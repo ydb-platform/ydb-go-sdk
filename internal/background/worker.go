@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -92,9 +93,19 @@ func (b *Worker) Close(ctx context.Context, err error) error {
 
 	b.stop(err)
 
-	b.workers.Wait()
+	bgCompleted := make(empty.Chan)
 
-	return ctx.Err()
+	go func() {
+		b.workers.Wait()
+		close(bgCompleted)
+	}()
+
+	select {
+	case <-bgCompleted:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 func (b *Worker) CloseReason() error {

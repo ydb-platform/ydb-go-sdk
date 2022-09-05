@@ -30,10 +30,11 @@ const (
 )
 
 type messageQueue struct {
-	hasNewMessages empty.Chan
-	closedErr      error
+	hasNewMessages    empty.Chan
+	closedErr         error
+	acksReceivedEvent xsync.EventBroadcast
 
-	m                xsync.Mutex
+	m                xsync.RWMutex
 	closed           bool
 	closedChan       empty.Chan
 	lastWrittenIndex int
@@ -55,26 +56,42 @@ func newMessageQueue() messageQueue {
 }
 
 func (q *messageQueue) AddMessages(messages *messageWithDataContentSlice) error {
+	_, err := q.addMessages(messages, false)
+	return err
+}
+
+func (q *messageQueue) AddMessagesWithWaiter(messages *messageWithDataContentSlice) (waiter *MessageQueueAckWaiter, err error) {
+	return q.addMessages(messages, true)
+}
+
+func (q *messageQueue) addMessages(messages *messageWithDataContentSlice, needWaiter bool) (waiter *MessageQueueAckWaiter, err error) {
 	defer putContentMessagesSlice(messages)
 
 	q.m.Lock()
 	defer q.m.Unlock()
 
 	if q.closed {
-		return xerrors.WithStackTrace(fmt.Errorf("ydb: add message to closed message queue: %w", q.closedErr))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: add message to closed message queue: %w", q.closedErr))
+	}
+
+	if needWaiter {
+		waiter = newMessageQueueAckWaiter()
 	}
 
 	if err := q.checkNewMessagesBeforeAddNeedLock(messages); err != nil {
-		return err
+		return nil, err
 	}
 
 	for i := range messages.m {
-		q.addMessageNeedLock(messages.m[i])
+		messageIndex := q.addMessageNeedLock(messages.m[i])
+		if needWaiter {
+			waiter.AddWaitIndex(messageIndex)
+		}
 	}
 
 	q.notifyNewMessages()
 
-	return nil
+	return waiter, nil
 }
 
 func (q *messageQueue) notifyNewMessages() {
@@ -101,20 +118,22 @@ func (q *messageQueue) checkNewMessagesBeforeAddNeedLock(messages *messageWithDa
 	return nil
 }
 
-func (q *messageQueue) addMessageNeedLock(mess messageWithDataContent) {
+func (q *messageQueue) addMessageNeedLock(mess messageWithDataContent) (messageIndex int) {
 	q.lastWrittenIndex++
+	messageIndex = q.lastWrittenIndex
 
-	if q.lastWrittenIndex == minInt {
+	if messageIndex == minInt {
 		q.ensureNoSmallIntIndexes()
 	}
 
-	if _, ok := q.messagesByOrder[q.lastWrittenIndex]; ok {
-		panic(fmt.Errorf("ydb: bad internal state os message queue - already exists with index: %v", q.lastWrittenIndex))
+	if _, ok := q.messagesByOrder[messageIndex]; ok {
+		panic(fmt.Errorf("ydb: bad internal state os message queue - already exists with index: %v", messageIndex))
 	}
 
-	q.messagesByOrder[q.lastWrittenIndex] = mess
-	q.seqNoToOrderId[mess.SeqNo] = q.lastWrittenIndex
+	q.messagesByOrder[messageIndex] = mess
+	q.seqNoToOrderId[mess.SeqNo] = messageIndex
 	q.lastSeqNo = mess.SeqNo
+	return messageIndex
 }
 
 func (q *messageQueue) AcksReceived(acks []rawtopicwriter.WriteAck) error {
@@ -122,14 +141,16 @@ func (q *messageQueue) AcksReceived(acks []rawtopicwriter.WriteAck) error {
 	defer q.m.Unlock()
 
 	for i := range acks {
-		if err := q.ackReceived(acks[i].SeqNo); err != nil {
+		if err := q.ackReceivedNeedLock(acks[i].SeqNo); err != nil {
 			return err
 		}
 	}
+
+	q.acksReceivedEvent.Broadcast()
 	return nil
 }
 
-func (q *messageQueue) ackReceived(seqNo int64) error {
+func (q *messageQueue) ackReceivedNeedLock(seqNo int64) error {
 	orderID, ok := q.seqNoToOrderId[seqNo]
 	if !ok {
 		return xerrors.WithStackTrace(errAckUnexpectedMessage)
@@ -233,6 +254,55 @@ func (q *messageQueue) getMessagesForSendWithLock() *messageWithDataContentSlice
 		res = nil
 	}
 	return res
+}
+
+func (q *messageQueue) Wait(ctx context.Context, waiter *MessageQueueAckWaiter) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	ctxDone := ctx.Done()
+	for {
+		ackReceived := q.acksReceivedEvent.Subscribe()
+
+		hasWaited := false
+		q.m.WithRLock(func() {
+			for _, k := range waiter.sequenseNumbers {
+				if _, ok := q.messagesByOrder[k]; ok {
+					hasWaited = true
+					return
+				}
+			}
+		})
+
+		if !hasWaited {
+			return nil
+		}
+
+		select {
+		case <-ctxDone:
+			return ctx.Err()
+		case <-q.closedChan:
+			return q.closedErr
+		case <-ackReceived:
+			// pass next iteration
+		}
+	}
+}
+
+type MessageQueueAckWaiter struct {
+	sequenseNumbers []int
+}
+
+func (m *MessageQueueAckWaiter) init() {
+}
+
+func (m *MessageQueueAckWaiter) AddWaitIndex(index int) {
+	m.sequenseNumbers = append(m.sequenseNumbers, index)
+}
+
+func (m *MessageQueueAckWaiter) reset() {
+	m.sequenseNumbers = m.sequenseNumbers[:0]
 }
 
 // sortMessageQueueIndexes deprecated
