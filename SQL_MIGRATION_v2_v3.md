@@ -8,7 +8,7 @@
 
 Package `database/sql` provides two ways for making driver:
 - from connection string (see [sql.Open(driverName, connectionString)](https://pkg.go.dev/database/sql#Open))
-- from custom connector (see [sql.OpnDB(connector)](https://pkg.go.dev/database/sql#OpenDB))
+- from custom connector (see [sql.OpenDB(connector)](https://pkg.go.dev/database/sql#OpenDB))
 
 Second way (making driver from connector) are different in `v2` and `v3`:
 - in `v2`:
