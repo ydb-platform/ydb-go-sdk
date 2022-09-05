@@ -30,11 +30,13 @@ Second way (making driver from connector) are different in `v2` and `v3`:
   if err != nil {
     // fallback on error
   }
+  defer nativeDriver.Close(context.TODO())
   connector, err := ydb.Connector(nativeDriver)
   if err != nil {
     // fallback on error
   }
   db := sql.OpenDB(connector)
+  defer db.Close()
   ```
 
 ## Read-only isolation levels
