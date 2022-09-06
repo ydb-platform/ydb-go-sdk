@@ -185,7 +185,7 @@ func TestTopicReaderReconnectorCommit(t *testing.T) {
 
 func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 	t.Run("Reconnect", func(t *testing.T) {
-		ctx := testContext(t)
+		ctx := xtest.Context(t)
 		mc := gomock.NewController(t)
 		defer mc.Finish()
 

@@ -19,7 +19,7 @@ import (
 
 func TestCommitterCommit(t *testing.T) {
 	t.Run("CommitWithCancelledContext", func(t *testing.T) {
-		ctx := testContext(t)
+		ctx := xtest.Context(t)
 		c := newTestCommitter(ctx, t)
 		c.send = func(msg rawtopicreader.ClientMessage) error {
 			t.Fatalf("must not call")
@@ -36,7 +36,7 @@ func TestCommitterCommit(t *testing.T) {
 }
 
 func TestCommitterCommitDisabled(t *testing.T) {
-	ctx := testContext(t)
+	ctx := xtest.Context(t)
 	c := &committer{mode: CommitModeNone}
 	err := c.Commit(ctx, commitRange{})
 	require.ErrorIs(t, err, ErrCommitDisabled)
@@ -44,7 +44,7 @@ func TestCommitterCommitDisabled(t *testing.T) {
 
 func TestCommitterCommitAsync(t *testing.T) {
 	t.Run("SendCommit", func(t *testing.T) {
-		ctx := testContext(t)
+		ctx := xtest.Context(t)
 		session := &partitionSession{
 			ctx:                context.Background(),
 			partitionSessionID: 1,
@@ -75,7 +75,7 @@ func TestCommitterCommitAsync(t *testing.T) {
 
 func TestCommitterCommitSync(t *testing.T) {
 	t.Run("SendCommit", func(t *testing.T) {
-		ctx := testContext(t)
+		ctx := xtest.Context(t)
 		session := &partitionSession{
 			ctx:                context.Background(),
 			partitionSessionID: 1,
@@ -105,7 +105,7 @@ func TestCommitterCommitSync(t *testing.T) {
 	})
 
 	xtest.TestManyTimesWithName(t, "SuccessCommitWithNotifyAfterCommit", func(t testing.TB) {
-		ctx := testContext(t)
+		ctx := xtest.Context(t)
 		session := &partitionSession{
 			ctx:                context.Background(),
 			partitionSessionID: 1,
@@ -143,7 +143,7 @@ func TestCommitterCommitSync(t *testing.T) {
 	})
 
 	t.Run("SuccessCommitPreviousCommitted", func(t *testing.T) {
-		ctx := testContext(t)
+		ctx := xtest.Context(t)
 		session := &partitionSession{
 			ctx:                ctx,
 			partitionSessionID: 1,
@@ -163,7 +163,7 @@ func TestCommitterCommitSync(t *testing.T) {
 
 func TestCommitterBuffer(t *testing.T) {
 	t.Run("SendZeroLag", func(t *testing.T) {
-		ctx := testContext(t)
+		ctx := xtest.Context(t)
 		c := newTestCommitter(ctx, t)
 
 		sendCalled := make(empty.Chan)
@@ -179,7 +179,7 @@ func TestCommitterBuffer(t *testing.T) {
 		<-sendCalled
 	})
 	t.Run("TimeLagTrigger", func(t *testing.T) {
-		ctx := testContext(t)
+		ctx := xtest.Context(t)
 		c := newTestCommitter(ctx, t)
 
 		sendCalled := make(empty.Chan)
@@ -218,7 +218,7 @@ func TestCommitterBuffer(t *testing.T) {
 		<-sendCalled
 	})
 	t.Run("CountAndTimeFireCountMoreThenNeed", func(t *testing.T) {
-		ctx := testContext(t)
+		ctx := xtest.Context(t)
 		c := newTestCommitter(ctx, t)
 
 		sendCalled := make(empty.Chan)
@@ -244,7 +244,7 @@ func TestCommitterBuffer(t *testing.T) {
 		<-sendCalled
 	})
 	t.Run("CountAndTimeFireCountOnAdd", func(t *testing.T) {
-		ctx := testContext(t)
+		ctx := xtest.Context(t)
 		c := newTestCommitter(ctx, t)
 
 		sendCalled := make(empty.Chan)
@@ -290,7 +290,7 @@ func TestCommitterBuffer(t *testing.T) {
 		<-sendCalled
 	})
 	t.Run("CountAndTimeFireTime", func(t *testing.T) {
-		ctx := testContext(t)
+		ctx := xtest.Context(t)
 		clock := clockwork.NewFakeClock()
 		c := newTestCommitter(ctx, t)
 		c.clock = clock
@@ -310,7 +310,7 @@ func TestCommitterBuffer(t *testing.T) {
 		<-sendCalled
 	})
 	t.Run("FireWithEmptyBuffer", func(t *testing.T) {
-		ctx := testContext(t)
+		ctx := xtest.Context(t)
 		c := newTestCommitter(ctx, t)
 		c.send = func(msg rawtopicreader.ClientMessage) error {
 			t.Fatal()
@@ -321,7 +321,7 @@ func TestCommitterBuffer(t *testing.T) {
 		c.commitLoopSignal <- empty.Struct{} // if send - second message consumed and first processed
 	})
 	t.Run("FlushOnClose", func(t *testing.T) {
-		ctx := testContext(t)
+		ctx := xtest.Context(t)
 		c := newTestCommitter(ctx, t)
 
 		sendCalled := false
