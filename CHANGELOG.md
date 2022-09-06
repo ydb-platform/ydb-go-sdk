@@ -1,3 +1,5 @@
+* Refactoring of `xsql` errors checking
+
 ## v3.37.4
 * Revert the marking of context errors as required to delete session
 

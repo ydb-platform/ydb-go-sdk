@@ -54,7 +54,7 @@ func TestDatabaseSql(t *testing.T) {
 		}
 	})
 
-	t.Run("sql.OpnDB", func(t *testing.T) {
+	t.Run("sql.OpenDB", func(t *testing.T) {
 		cc, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"))
 		if err != nil {
 			t.Fatal(err)
