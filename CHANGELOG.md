@@ -1,3 +1,4 @@
+## v3.37.5
 * Refactoring of `xsql` errors checking
 
 ## v3.37.4
