@@ -79,10 +79,7 @@ func (s *connectionsState) preferConnection(ctx context.Context) conn.Conn {
 	if e, hasPreferEndpoint := ContextEndpoint(ctx); hasPreferEndpoint {
 		c := s.connByNodeID[e.NodeID()]
 		if c != nil && isOkConnection(c, true) {
-			e.Choose(true)
 			return c
-		} else {
-			e.Choose(false)
 		}
 	}
 

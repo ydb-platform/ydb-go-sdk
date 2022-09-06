@@ -4,12 +4,14 @@ import (
 	"container/list"
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -27,14 +29,20 @@ type sessionBuilderOption func(s *session)
 // sessionBuilder is the interface that holds logic of creating sessions.
 type sessionBuilder func(ctx context.Context, opts ...sessionBuilderOption) (*session, error)
 
-func New(cc grpc.ClientConnInterface, config config.Config) *Client {
-	return newClient(cc, func(ctx context.Context, opts ...sessionBuilderOption) (s *session, err error) {
-		return newSession(ctx, cc, config, opts...)
+type balancerNotifier interface {
+	grpc.ClientConnInterface
+
+	OnDiscovery(onDiscovery func(ctx context.Context, endpoints []endpoint.Info))
+}
+
+func New(balancer balancerNotifier, config config.Config) *Client {
+	return newClient(balancer, func(ctx context.Context, opts ...sessionBuilderOption) (s *session, err error) {
+		return newSession(ctx, balancer, config, opts...)
 	}, config)
 }
 
 func newClient(
-	cc grpc.ClientConnInterface,
+	balancer balancerNotifier,
 	builder sessionBuilder,
 	config config.Config,
 ) *Client {
@@ -44,7 +52,7 @@ func newClient(
 	)
 	c := &Client{
 		config: config,
-		cc:     cc,
+		cc:     balancer,
 		build:  builder,
 		index:  make(map[*session]sessionInfo),
 		idle:   list.New(),
@@ -58,6 +66,7 @@ func newClient(
 		},
 		done: make(chan struct{}),
 	}
+	balancer.OnDiscovery(c.onDiscovery)
 	if idleThreshold := config.IdleThreshold(); idleThreshold > 0 {
 		c.spawnedGoroutines.Add(1)
 		go c.internalPoolGC(ctx, idleThreshold)
@@ -105,6 +114,40 @@ func withCreateSessionOnClose(onClose func(s *session)) createSessionOption {
 	return func(o *createSessionOptions) {
 		o.onClose = append(o.onClose, onClose)
 	}
+}
+
+func (c *Client) onDiscovery(ctx context.Context, endpoints []endpoint.Info) {
+	nodeIDs := make([]uint32, len(endpoints))
+	for i, e := range endpoints {
+		nodeIDs[i] = e.NodeID()
+	}
+	sort.Slice(nodeIDs, func(i, j int) bool {
+		return nodeIDs[i] < nodeIDs[j]
+	})
+	c.mu.WithLock(func() {
+		touched := make(map[*session]struct{}, len(c.index))
+		for e := c.idle.Front(); e != nil; e = e.Next() {
+			s := e.Value.(*session)
+			nodeID := s.NodeID()
+			if sort.Search(len(nodeIDs), func(i int) bool {
+				return nodeIDs[i] >= nodeID
+			}) == len(nodeIDs) {
+				c.internalPoolAsyncCloseSession(ctx, s)
+			}
+			touched[s] = struct{}{}
+		}
+		for s := range c.index {
+			if _, has := touched[s]; has {
+				continue
+			}
+			nodeID := s.NodeID()
+			if sort.Search(len(nodeIDs), func(i int) bool {
+				return nodeIDs[i] >= nodeID
+			}) == len(nodeIDs) {
+				s.SetStatus(options.SessionClosing)
+			}
+		}
+	})
 }
 
 func (c *Client) createSession(ctx context.Context, opts ...createSessionOption) (s *session, err error) {

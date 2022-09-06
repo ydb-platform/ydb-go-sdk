@@ -3,7 +3,6 @@ package scripting
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 )
@@ -19,8 +18,6 @@ const (
 )
 
 type Client interface {
-	closer.Closer
-
 	Execute(
 		ctx context.Context,
 		query string,

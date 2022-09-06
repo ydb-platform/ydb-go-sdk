@@ -880,16 +880,16 @@ type StubBuilder struct {
 
 func newClientWithStubBuilder(
 	t testing.TB,
-	cc grpc.ClientConnInterface,
+	balancer balancerNotifier,
 	stubLimit int,
 	options ...config.Option,
 ) *Client {
 	return newClient(
-		cc,
+		balancer,
 		(&StubBuilder{
 			T:     t,
 			Limit: stubLimit,
-			cc:    cc,
+			cc:    balancer,
 		}).createSession,
 		config.New(options...),
 	)

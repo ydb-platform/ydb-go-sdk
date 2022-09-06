@@ -8,9 +8,6 @@ type (
 
 type Endpoint interface {
 	NodeID() uint32
-
-	// Choose calls from balancer if this endpoint to request chosen or not
-	Choose(chosen bool)
 }
 
 func WithEndpoint(ctx context.Context, endpoint Endpoint) context.Context {

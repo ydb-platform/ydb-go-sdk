@@ -14,14 +14,6 @@ import (
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type Client interface {
-	// Close stop client
-	//
-	// Experimental
-	//
-	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
-	// later release.
-	Close(context.Context) error
-
 	// Alter change topic options
 	//
 	// Experimental
