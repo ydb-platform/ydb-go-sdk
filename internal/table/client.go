@@ -66,7 +66,9 @@ func newClient(
 		},
 		done: make(chan struct{}),
 	}
-	balancer.OnDiscovery(c.onDiscovery)
+	if balancer != nil {
+		balancer.OnDiscovery(c.onDiscovery)
+	}
 	if idleThreshold := config.IdleThreshold(); idleThreshold > 0 {
 		c.spawnedGoroutines.Add(1)
 		go c.internalPoolGC(ctx, idleThreshold)
