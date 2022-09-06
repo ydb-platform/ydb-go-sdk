@@ -6,8 +6,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 )
 
 func BenchmarkWriteMessageAllocations(b *testing.B) {
@@ -28,7 +26,7 @@ func TestWriterWrite(t *testing.T) {
 		t.Run("OK", func(t *testing.T) {
 			mc := gomock.NewController(t)
 
-			strm := NewMockstreamWriter(mc)
+			strm := NewMockStreamWriter(mc)
 			strm.EXPECT().Write(ctx, newTestMessages(1))
 			w := Writer{
 				streamWriter: strm,
@@ -43,7 +41,7 @@ func TestWriterWriteMessage(t *testing.T) {
 	t.Run("OK", func(t *testing.T) {
 		mc := gomock.NewController(t)
 
-		strm := NewMockstreamWriter(mc)
+		strm := NewMockStreamWriter(mc)
 		strm.EXPECT().Write(ctx, newTestMessages(1, 3))
 		w := Writer{
 			streamWriter: strm,
@@ -54,12 +52,12 @@ func TestWriterWriteMessage(t *testing.T) {
 
 type writerReturnToPool struct{}
 
-func (w writerReturnToPool) Write(ctx context.Context, messages *messageWithDataContentSlice) (rawtopicwriter.WriteResult, error) {
+func (w writerReturnToPool) Write(ctx context.Context, messages *messageWithDataContentSlice) error {
 	for i := 0; i < len(messages.m); i++ {
 		putBuffer(messages.m[i].buf)
 	}
 	putContentMessagesSlice(messages)
-	return rawtopicwriter.WriteResult{}, nil
+	return nil
 }
 
 func (w writerReturnToPool) Close(ctx context.Context) error {

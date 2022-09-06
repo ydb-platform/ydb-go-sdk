@@ -8,7 +8,6 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	rawtopicwriter "github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 )
 
 // MockStreamWriter is a mock of StreamWriter interface.
@@ -49,12 +48,11 @@ func (mr *MockStreamWriterMockRecorder) Close(ctx interface{}) *gomock.Call {
 }
 
 // Write mocks base method.
-func (m *MockStreamWriter) Write(ctx context.Context, messages *messageWithDataContentSlice) (rawtopicwriter.WriteResult, error) {
+func (m *MockStreamWriter) Write(ctx context.Context, messages *messageWithDataContentSlice) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Write", ctx, messages)
-	ret0, _ := ret[0].(rawtopicwriter.WriteResult)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // Write indicates an expected call of Write.

@@ -10,9 +10,11 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -24,6 +26,7 @@ var (
 	errCloseWriterImplReconnect  = xerrors.Wrap(errors.New("ydb: stream writer reconnect"))
 	errCloseWriterImplStopWork   = xerrors.Wrap(errors.New("ydb: stop work with writer stream"))
 	errBadCodec                  = xerrors.Wrap(errors.New("ydb: internal error - bad codec for message"))
+	errNonZeroSeqNo              = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))
 )
 
 type writerImplConfig struct {
@@ -33,10 +36,13 @@ type writerImplConfig struct {
 	writerMeta          map[string]string
 	defaultPartitioning rawtopicwriter.Partitioning
 	waitServerAck       bool
+	autoSetSeqNo        bool
 }
 
 func newWriterImplConfig(options ...PublicWriterOption) writerImplConfig {
-	cfg := writerImplConfig{}
+	cfg := writerImplConfig{
+		autoSetSeqNo: true,
+	}
 	for _, f := range options {
 		f(&cfg)
 	}
@@ -46,13 +52,16 @@ func newWriterImplConfig(options ...PublicWriterOption) writerImplConfig {
 type WriterImpl struct {
 	cfg writerImplConfig
 
-	queue      messageQueue
-	background background.Worker
-	clock      clockwork.Clock
+	queue                      messageQueue
+	background                 background.Worker
+	clock                      clockwork.Clock
+	firstInitResponseProcessed xatomic.Bool
 
-	m                xsync.RWMutex
-	allowedCodecsVal rawtopiccommon.SupportedCodecs
-	sessionID        string
+	m                              xsync.RWMutex
+	allowedCodecsVal               rawtopiccommon.SupportedCodecs
+	sessionID                      string
+	lastSeqNo                      int64
+	firstInitResponseProcessedChan empty.Chan
 }
 
 func newWriterImpl(cfg writerImplConfig) *WriterImpl {
@@ -63,10 +72,24 @@ func newWriterImpl(cfg writerImplConfig) *WriterImpl {
 
 func newWriterImplStopped(cfg writerImplConfig) WriterImpl {
 	return WriterImpl{
-		cfg:   cfg,
-		queue: newMessageQueue(),
-		clock: clockwork.NewRealClock(),
+		cfg:                            cfg,
+		queue:                          newMessageQueue(),
+		clock:                          clockwork.NewRealClock(),
+		lastSeqNo:                      -1,
+		firstInitResponseProcessedChan: make(empty.Chan),
 	}
+}
+
+func (w *WriterImpl) setSeqNumbers(messages *messageWithDataContentSlice) error {
+	for i := range messages.m {
+		msg := &messages.m[i]
+		if msg.SeqNo != 0 {
+			return xerrors.WithStackTrace(errNonZeroSeqNo)
+		}
+		w.lastSeqNo++
+		msg.SeqNo = w.lastSeqNo
+	}
+	return nil
 }
 
 func (w *WriterImpl) start() {
@@ -79,13 +102,33 @@ func (w *WriterImpl) Write(ctx context.Context, messages *messageWithDataContent
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: writer is closed: %w", err))
 	}
 
-	if !w.cfg.waitServerAck {
-		return w.queue.AddMessages(messages)
+	if err := w.waitFirstInitResponse(ctx); err != nil {
+		return err
 	}
 
-	waiter, err := w.queue.AddMessagesWithWaiter(messages)
+	var err error
+	var waiter *MessageQueueAckWaiter
+	w.m.WithLock(func() {
+		// need set numbers and add to queue atomically
+		if w.cfg.autoSetSeqNo {
+			err = w.setSeqNumbers(messages)
+			if err != nil {
+				return
+			}
+		}
+
+		if w.cfg.waitServerAck {
+			waiter, err = w.queue.AddMessagesWithWaiter(messages)
+		} else {
+			err = w.queue.AddMessages(messages)
+		}
+	})
 	if err != nil {
 		return err
+	}
+
+	if !w.cfg.waitServerAck {
+		return nil
 	}
 
 	return w.queue.Wait(ctx, waiter)
@@ -205,15 +248,24 @@ func (w *WriterImpl) initStream(stream RawTopicWriterStream) error {
 
 	w.allowedCodecsVal = result.SupportedCodecs
 	w.sessionID = result.SessionID
+	if req.GetLastSeqNo {
+		w.lastSeqNo = result.LastSeqNo
+	}
+	if w.firstInitResponseProcessed.CompareAndSwap(false, true) {
+		close(w.firstInitResponseProcessedChan)
+	}
 	return nil
 }
 
 func (w *WriterImpl) createInitRequest() rawtopicwriter.InitRequest {
+	getLastSeqNo := w.lastSeqNo < 0 && w.cfg.autoSetSeqNo
+
 	return rawtopicwriter.InitRequest{
 		Path:             w.cfg.topic,
 		ProducerID:       w.cfg.producerID,
 		WriteSessionMeta: w.cfg.writerMeta,
 		Partitioning:     w.cfg.defaultPartitioning,
+		GetLastSeqNo:     getLastSeqNo,
 	}
 }
 
@@ -255,6 +307,23 @@ func (w *WriterImpl) sendMessagesFromQueueToStream(ctx context.Context, stream R
 		if err != nil {
 			return xerrors.WithStackTrace(fmt.Errorf("ydb: error send message to topic stream: %w", err))
 		}
+	}
+}
+
+func (w *WriterImpl) waitFirstInitResponse(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	if w.firstInitResponseProcessed.Load() {
+		return nil
+	}
+
+	select {
+	case <-w.firstInitResponseProcessedChan:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 

@@ -74,12 +74,12 @@ func (q *messageQueue) addMessages(messages *messageWithDataContentSlice, needWa
 		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: add message to closed message queue: %w", q.closedErr))
 	}
 
-	if needWaiter {
-		waiter = newMessageQueueAckWaiter()
-	}
-
 	if err := q.checkNewMessagesBeforeAddNeedLock(messages); err != nil {
 		return nil, err
+	}
+
+	if needWaiter {
+		waiter = newMessageQueueAckWaiter()
 	}
 
 	for i := range messages.m {
@@ -107,12 +107,12 @@ func (q *messageQueue) checkNewMessagesBeforeAddNeedLock(messages *messageWithDa
 		return nil
 	}
 
-	lastSeqNo := q.lastSeqNo
+	checkedSeqNo := q.lastSeqNo
 	for _, m := range messages.m {
-		if m.SeqNo <= lastSeqNo {
+		if m.SeqNo <= checkedSeqNo {
 			return xerrors.WithStackTrace(errAddUnorderedMessages)
 		}
-		lastSeqNo = m.SeqNo
+		checkedSeqNo = m.SeqNo
 	}
 
 	return nil

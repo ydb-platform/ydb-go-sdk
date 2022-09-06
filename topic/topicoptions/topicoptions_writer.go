@@ -97,7 +97,7 @@ func WithCodecAutoSelect(autoSelect bool, codecs ...topictypes.Codec) WriterOpti
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithWriterSetAutoSeqNo(val bool) WriterOption {
-	panic("not implemented")
+	return topicwriterinternal.WithAutoSetSeqNo(val)
 }
 
 // WithWriterSetAutoCreatedAt

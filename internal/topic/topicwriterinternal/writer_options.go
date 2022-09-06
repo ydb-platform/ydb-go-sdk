@@ -2,6 +2,12 @@ package topicwriterinternal
 
 type PublicWriterOption func(cfg *writerImplConfig)
 
+func WithAutoSetSeqNo(val bool) PublicWriterOption {
+	return func(cfg *writerImplConfig) {
+		cfg.autoSetSeqNo = val
+	}
+}
+
 func WithConnectFunc(connect ConnectFunc) PublicWriterOption {
 	return func(cfg *writerImplConfig) {
 		cfg.connect = connect

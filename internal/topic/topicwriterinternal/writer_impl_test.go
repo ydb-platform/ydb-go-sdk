@@ -18,9 +18,54 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
+func TestWriterImpl_AutoSeq(t *testing.T) {
+	t.Run("OK", func(t *testing.T) {
+	})
+}
+
+func TestWriterImpl_CreateInitMessage(t *testing.T) {
+	t.Run("Empty", func(t *testing.T) {
+		cfg := writerImplConfig{
+			producerID:          "producer",
+			topic:               "topic",
+			writerMeta:          map[string]string{"key": "val"},
+			defaultPartitioning: rawtopicwriter.NewPartitioningPartitionID(5),
+			autoSetSeqNo:        false,
+		}
+		w := newWriterImplStopped(cfg)
+		expected := rawtopicwriter.InitRequest{
+			Path:             w.cfg.topic,
+			ProducerID:       w.cfg.producerID,
+			WriteSessionMeta: w.cfg.writerMeta,
+			Partitioning:     w.cfg.defaultPartitioning,
+			GetLastSeqNo:     w.cfg.autoSetSeqNo,
+		}
+		require.Equal(t, expected, w.createInitRequest())
+	})
+
+	t.Run("WithAutoSeq", func(t *testing.T) {
+		t.Run("InitState", func(t *testing.T) {
+			w := newWriterImplStopped(writerImplConfig{
+				autoSetSeqNo: true,
+			})
+			require.True(t, w.createInitRequest().GetLastSeqNo)
+		})
+		t.Run("WithInternalSeqNo", func(t *testing.T) {
+			w := newWriterImplStopped(writerImplConfig{
+				autoSetSeqNo: true,
+			})
+			w.lastSeqNo = 1
+			require.False(t, w.createInitRequest().GetLastSeqNo)
+		})
+	})
+}
+
 func TestWriterImpl_Write(t *testing.T) {
 	ctx := context.Background()
 	w := newTestWriter()
+
+	w.firstInitResponseProcessed.Store(true)
+
 	err := w.Write(ctx, newTestMessages(1, 3, 5))
 	require.NoError(t, err)
 
@@ -34,7 +79,7 @@ func TestWriterImpl_Write(t *testing.T) {
 }
 
 func TestWriterImpl_InitSession(t *testing.T) {
-	w := newTestWriter()
+	w := newTestWriter(WithAutoSetSeqNo(true))
 	mc := gomock.NewController(t)
 	strm := NewMockRawTopicWriterStream(mc)
 	strm.EXPECT().Send(&rawtopicwriter.InitRequest{
@@ -45,16 +90,20 @@ func TestWriterImpl_InitSession(t *testing.T) {
 			Type:           rawtopicwriter.PartitioningMessageGroupID,
 			MessageGroupID: "test-message-group-id",
 		},
-		GetLastSeqNo: false,
+		GetLastSeqNo: true,
 	})
+	lastSeqNo := int64(123)
 	strm.EXPECT().Recv().Return(&rawtopicwriter.InitResult{
 		SessionID:       "test-session-id",
 		SupportedCodecs: rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip},
+		LastSeqNo:       lastSeqNo,
 	}, nil)
 	err := w.initStream(strm)
 	require.NoError(t, err)
 	require.Equal(t, "test-session-id", w.sessionID)
 	require.Equal(t, rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip}, w.allowedCodecsVal)
+	require.Equal(t, lastSeqNo, w.lastSeqNo)
+	require.True(t, isClosed(w.firstInitResponseProcessedChan))
 }
 
 func TestWriterImpl_Reconnect(t *testing.T) {
@@ -64,7 +113,8 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 
 		w := newTestWriter()
 
-		ctx, cancel := xcontext.WithErrCancel(context.Background())
+		ctx := xtest.Context(t)
+		ctx, cancel := xcontext.WithErrCancel(ctx)
 		testErr := errors.New("test")
 
 		connectCalled := false
@@ -107,7 +157,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 	})
 
 	t.Run("ReconnectOnErrors", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := xtest.Context(t)
 
 		w := newTestWriter()
 
@@ -144,9 +194,14 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			return strm
 		}
 
-		strm2 := newStream(func() {
+		strm2InitSent := make(empty.Chan)
+		go func() {
 			err := w.Write(ctx, newTestMessages(1))
 			require.NoError(t, err)
+		}()
+
+		strm2 := newStream(func() {
+			close(strm2InitSent)
 		})
 		strm2.EXPECT().Send(&rawtopicwriter.WriteRequest{
 			Messages: []rawtopicwriter.MessageData{
@@ -291,12 +346,27 @@ func newTestMessages(numbers ...int) *messageWithDataContentSlice {
 	return messages
 }
 
-func newTestWriter() WriterImpl {
-	cfg := newWriterImplConfig(
+func newTestWriter(opts ...PublicWriterOption) WriterImpl {
+	cfgOptions := []PublicWriterOption{
 		WithProducerID("test-producer-id"),
 		WithTopic("test-topic"),
 		WithSessionMeta(map[string]string{"test-key": "test-val"}),
 		WithPartitioning(NewPartitioningWithMessageGroupID("test-message-group-id")),
-	)
+		WithAutoSetSeqNo(false),
+	}
+	cfgOptions = append(cfgOptions, opts...)
+	cfg := newWriterImplConfig(cfgOptions...)
 	return newWriterImplStopped(cfg)
+}
+
+func isClosed(ch <-chan struct{}) bool {
+	select {
+	case _, existVal := <-ch:
+		if existVal {
+			panic("value, when not expected")
+		}
+		return true
+	default:
+		return false
+	}
 }
