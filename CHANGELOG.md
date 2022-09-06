@@ -1,3 +1,5 @@
+* Added listening node status from session and close session early if node not found in balancer
+
 ## v3.37.5
 * Refactoring of `xsql` errors checking
 
