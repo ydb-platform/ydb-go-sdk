@@ -158,9 +158,6 @@ func (r *WriteRequest) toProto() (p *Ydb_Topic.StreamWriteMessage_FromClient_Wri
 		},
 	}
 
-	// TODO: remove after fix https://st.yandex-team.ru/LOGBROKER-7740
-	res.WriteRequest.Codec = 0
-
 	return res, nil
 }
 
