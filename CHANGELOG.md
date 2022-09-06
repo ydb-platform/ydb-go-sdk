@@ -1,3 +1,6 @@
+* Added to balancer notifying mechanism for listening in table client event about removing some nodes and closing sessions on them 
+* Removed from public client interfaces `closer.Closer` (for exclude undefined behaviour on client-side)
+
 ## v3.37.5
 * Refactoring of `xsql` errors checking
 

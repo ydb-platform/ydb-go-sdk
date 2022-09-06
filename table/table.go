@@ -34,8 +34,6 @@ type ClosableSession interface {
 }
 
 type Client interface {
-	closer.Closer
-
 	// CreateSession returns session or error for manually control of session lifecycle
 	//
 	// CreateSession implements internal busy loop until one of the following conditions is met:

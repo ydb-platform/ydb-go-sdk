@@ -165,7 +165,7 @@ func (s *session) Close(ctx context.Context) (err error) {
 		onDone := trace.TableOnSessionDelete(s.config.Trace(), &ctx, s)
 
 		_, err = s.tableService.DeleteSession(
-			balancer.WithEndpoint(ctx, s),
+			ctx,
 			&Ydb_Table.DeleteSessionRequest{
 				SessionId: s.id,
 				OperationParams: operation.Params(ctx,

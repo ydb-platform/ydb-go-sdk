@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	discoveryBuilder "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
@@ -21,16 +22,29 @@ import (
 
 var ErrNoEndpoints = xerrors.Wrap(fmt.Errorf("no endpoints"))
 
+type discoveryClient interface {
+	closer.Closer
+	discovery.Client
+}
+
 type Balancer struct {
 	driverConfig      config.Config
 	balancerConfig    balancerConfig.Config
 	pool              *conn.Pool
-	discovery         discovery.Client
+	discovery         discoveryClient
 	discoveryRepeater repeater.Repeater
 	localDCDetector   func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
 	mu               xsync.RWMutex
 	connectionsState *connectionsState
+
+	onDiscovery []func(ctx context.Context, endpoints []endpoint.Info)
+}
+
+func (b *Balancer) OnDiscovery(onDiscovery func(ctx context.Context, endpoints []endpoint.Info)) {
+	b.mu.WithLock(func() {
+		b.onDiscovery = append(b.onDiscovery, onDiscovery)
+	})
 }
 
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
@@ -83,8 +97,16 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	info := balancerConfig.Info{SelfLocation: localDC}
 	state := newConnectionsState(connections, b.balancerConfig.IsPreferConn, info, b.balancerConfig.AllowFalback)
 
+	endpointsInfo := make([]endpoint.Info, len(endpoints))
+	for i, e := range endpoints {
+		endpointsInfo[i] = e
+	}
+
 	b.mu.WithLock(func() {
 		b.connectionsState = state
+		for _, onDiscovery := range b.onDiscovery {
+			onDiscovery(ctx, endpointsInfo)
+		}
 	})
 }
 
