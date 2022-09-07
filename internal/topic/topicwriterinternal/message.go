@@ -48,28 +48,25 @@ type messageWithDataContent struct {
 	Message
 
 	encoders            EncoderMap
-	rawBuf              *bytes.Buffer
+	hasRawContent       bool
+	rawBuf              bytes.Buffer
+	hasEncodedContent   bool
 	bufCodec            rawtopiccommon.Codec
-	bufEncoded          *bytes.Buffer
+	bufEncoded          bytes.Buffer
 	bufUncompressedSize int64
 }
 
 func (m *messageWithDataContent) GetEncodedBytes(codec rawtopiccommon.Codec) ([]byte, error) {
-	if codec == rawtopiccommon.CodecRaw && m.rawBuf != nil {
+	if codec == rawtopiccommon.CodecRaw && m.hasRawContent {
 		return m.rawBuf.Bytes(), nil
 	}
 
 	if codec == m.bufCodec {
 		return m.bufEncoded.Bytes(), nil
 	}
+	m.bufEncoded.Reset()
 
-	if m.bufEncoded == nil {
-		m.bufEncoded = newBuffer()
-	} else {
-		m.bufEncoded.Reset()
-	}
-
-	writer, err := m.encoders.CreateLazyEncodeWriter(codec, m.bufEncoded)
+	writer, err := m.encoders.CreateLazyEncodeWriter(codec, &m.bufEncoded)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed create encoder for message, codec '%v': %w", codec, err)))
 	}
@@ -84,9 +81,10 @@ func (m *messageWithDataContent) GetEncodedBytes(codec rawtopiccommon.Codec) ([]
 }
 
 func (m *messageWithDataContent) readDataToRawBuf() error {
-	m.rawBuf = newBuffer()
+	m.rawBuf.Reset()
+	m.hasRawContent = true
 	if m.Data != nil {
-		writtenBytes, err := io.Copy(m.rawBuf, m.Data)
+		writtenBytes, err := io.Copy(&m.rawBuf, m.Data)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -97,10 +95,11 @@ func (m *messageWithDataContent) readDataToRawBuf() error {
 }
 
 func (m *messageWithDataContent) readDataToTargetCodec(codec rawtopiccommon.Codec) error {
+	m.hasEncodedContent = true
 	m.bufCodec = codec
-	m.bufEncoded = newBuffer()
+	m.bufEncoded.Reset()
 
-	encoder, err := m.encoders.CreateLazyEncodeWriter(codec, m.bufEncoded)
+	encoder, err := m.encoders.CreateLazyEncodeWriter(codec, &m.bufEncoded)
 	if err != nil {
 		return err
 	}
@@ -131,11 +130,4 @@ func newMessageDataWithContent(mess Message, encoders EncoderMap, targetCodec ra
 	}
 
 	return res, xerrors.WithStackTrace(err)
-}
-
-// messageWithDataContentSlice with buffer use for prevent allocation while send messsages from
-// Writer to WriterImpl, because it is hot way and slice need for every call
-// if messages sended one by one without additional buffer - it need for every message
-type messageWithDataContentSlice struct {
-	m []messageWithDataContent
 }

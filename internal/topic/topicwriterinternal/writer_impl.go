@@ -98,11 +98,11 @@ func newWriterImplStopped(cfg writerImplConfig) *WriterImpl {
 	return res
 }
 
-func (w *WriterImpl) fillFields(messages *messageWithDataContentSlice) error {
+func (w *WriterImpl) fillFields(messages []messageWithDataContent) error {
 	var now time.Time
 
-	for i := range messages.m {
-		msg := &messages.m[i]
+	for i := range messages {
+		msg := &messages[i]
 
 		// SetSeqNo
 		if w.cfg.autoSetSeqNo {
@@ -143,7 +143,7 @@ func (w *WriterImpl) Write(ctx context.Context, messages []Message) error {
 		return err
 	}
 
-	var waiter *MessageQueueAckWaiter
+	var waiter MessageQueueAckWaiter
 	w.m.WithLock(func() {
 		// need set numbers and add to queue atomically
 		err = w.fillFields(messagesSlice)
@@ -168,14 +168,14 @@ func (w *WriterImpl) Write(ctx context.Context, messages []Message) error {
 	return w.queue.Wait(ctx, waiter)
 }
 
-func (w *WriterImpl) createMessagesWithContent(messages []Message) (*messageWithDataContentSlice, error) {
-	res := newContentMessagesSlice()
+func (w *WriterImpl) createMessagesWithContent(messages []Message) ([]messageWithDataContent, error) {
+	res := make([]messageWithDataContent, 0, len(messages))
 	for i := range messages {
 		mess, err := newMessageDataWithContent(messages[i], w.encoders, w.cfg.forceCodec)
 		if err != nil {
 			return nil, err
 		}
-		res.m = append(res.m, mess)
+		res = append(res, mess)
 	}
 	return res, nil
 }
@@ -390,7 +390,6 @@ func (w *WriterImpl) sendMessagesFromQueueToStream(ctx context.Context, stream R
 		if err != nil {
 			return xerrors.WithStackTrace(fmt.Errorf("ydb: error send message to topic stream: %w", err))
 		}
-		putContentMessagesSlice(messages)
 	}
 }
 
@@ -413,7 +412,7 @@ func (w *WriterImpl) waitFirstInitResponse(ctx context.Context) error {
 	}
 }
 
-func (w *WriterImpl) selectCodecForMessages(messages *messageWithDataContentSlice) (rawtopiccommon.Codec, error) {
+func (w *WriterImpl) selectCodecForMessages(messages []messageWithDataContent) (rawtopiccommon.Codec, error) {
 	if w.cfg.forceCodec != rawtopiccommon.CodecUNSPECIFIED {
 		return w.cfg.forceCodec, nil
 	}
@@ -421,7 +420,7 @@ func (w *WriterImpl) selectCodecForMessages(messages *messageWithDataContentSlic
 	return w.selectCodecForMessagesSlowPath(messages)
 }
 
-func (w *WriterImpl) selectCodecForMessagesSlowPath(messages *messageWithDataContentSlice) (rawtopiccommon.Codec, error) {
+func (w *WriterImpl) selectCodecForMessagesSlowPath(messages []messageWithDataContent) (rawtopiccommon.Codec, error) {
 	var allowedCodecs rawtopiccommon.SupportedCodecs
 	w.m.WithRLock(func() {
 		allowedCodecs = w.allowedCodecsVal
@@ -444,8 +443,8 @@ func (w *WriterImpl) selectCodecForMessagesSlowPath(messages *messageWithDataCon
 	return allowedCodecs[index], nil
 }
 
-func sendMessagesToStream(stream RawTopicWriterStream, targetCodec rawtopiccommon.Codec, messages *messageWithDataContentSlice) error {
-	if len(messages.m) == 0 {
+func sendMessagesToStream(stream RawTopicWriterStream, targetCodec rawtopiccommon.Codec, messages []messageWithDataContent) error {
+	if len(messages) == 0 {
 		return nil
 	}
 
@@ -493,11 +492,11 @@ func splitMessagesByBufCodec(messages []messageWithDataContent) (res [][]message
 	return res
 }
 
-func createWriteRequest(messages *messageWithDataContentSlice, targetCodec rawtopiccommon.Codec) (res rawtopicwriter.WriteRequest, err error) {
+func createWriteRequest(messages []messageWithDataContent, targetCodec rawtopiccommon.Codec) (res rawtopicwriter.WriteRequest, err error) {
 	res.Codec = targetCodec
-	res.Messages = make([]rawtopicwriter.MessageData, len(messages.m))
-	for i := range messages.m {
-		res.Messages[i], err = createRawMessageData(res.Codec, &messages.m[i])
+	res.Messages = make([]rawtopicwriter.MessageData, len(messages))
+	for i := range messages {
+		res.Messages[i], err = createRawMessageData(res.Codec, &messages[i])
 		if err != nil {
 			return res, err
 		}

@@ -451,17 +451,17 @@ func TestAllMessagesHasSameBufCodec(t *testing.T) {
 	})
 
 	t.Run("One", func(t *testing.T) {
-		require.True(t, allMessagesHasSameBufCodec(newTestMessagesWithContent(1).m))
+		require.True(t, allMessagesHasSameBufCodec(newTestMessagesWithContent(1)))
 	})
 
 	t.Run("SameCodecs", func(t *testing.T) {
-		require.True(t, allMessagesHasSameBufCodec(newTestMessagesWithContent(1, 2, 3).m))
+		require.True(t, allMessagesHasSameBufCodec(newTestMessagesWithContent(1, 2, 3)))
 	})
 	t.Run("DifferCodecs", func(t *testing.T) {
 		for i := 0; i < 3; i++ {
 			messages := newTestMessagesWithContent(1, 2, 3)
-			messages.m[i].bufCodec = rawtopiccommon.CodecGzip
-			require.False(t, allMessagesHasSameBufCodec(messages.m))
+			messages[i].bufCodec = rawtopiccommon.CodecGzip
+			require.False(t, allMessagesHasSameBufCodec(messages))
 		}
 	})
 }
@@ -599,7 +599,6 @@ func TestWriterImpl_CalculateAllowedCodecs(t *testing.T) {
 func newTestMessageWithDataContent(num int) messageWithDataContent {
 	return messageWithDataContent{
 		Message:  Message{SeqNo: int64(num)},
-		rawBuf:   newBuffer(),
 		bufCodec: rawtopiccommon.CodecRaw,
 		encoders: NewEncoderMap(),
 	}
@@ -613,10 +612,10 @@ func newTestMessages(numbers ...int) []Message {
 	return messages
 }
 
-func newTestMessagesWithContent(numbers ...int) *messageWithDataContentSlice {
-	messages := newContentMessagesSlice()
+func newTestMessagesWithContent(numbers ...int) []messageWithDataContent {
+	messages := make([]messageWithDataContent, 0, len(numbers))
 	for _, num := range numbers {
-		messages.m = append(messages.m, newTestMessageWithDataContent(num))
+		messages = append(messages, newTestMessageWithDataContent(num))
 	}
 	return messages
 }

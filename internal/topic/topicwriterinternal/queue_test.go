@@ -101,7 +101,7 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 		q := newMessageQueue()
 
 		var err error
-		var messages *messageWithDataContentSlice
+		var messages []messageWithDataContent
 		gotMessages := make(empty.Chan)
 		go func() {
 			messages, err = q.GetMessagesForSend(ctx)
@@ -128,10 +128,10 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 			sendRand := rand.New(rand.NewSource(0))
 			for i := 0; i < iterations; i++ {
 				count := sendRand.Intn(10) + 1
-				m := newContentMessagesSlice()
+				var m []messageWithDataContent
 				for k := 0; k < count; k++ {
 					number := int(atomic.AddInt64(&lastSentSeqNo, 1))
-					m.m = append(m.m, newTestMessageWithDataContent(number))
+					m = append(m, newTestMessageWithDataContent(number))
 				}
 				require.NoError(t, q.AddMessages(m))
 			}
@@ -153,7 +153,7 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 					break
 				}
 
-				for _, mess := range messages.m {
+				for _, mess := range messages {
 					if atomic.LoadInt64(&lastReadSeqNo)+1 != mess.SeqNo {
 						fatalChan <- string(debug.Stack())
 						return
@@ -446,10 +446,10 @@ func waitGetMessageStarted(q *messageQueue) {
 	}
 }
 
-func getSeqNumbers(messages *messageWithDataContentSlice) []int64 {
-	res := make([]int64, 0, len(messages.m))
-	for i := range messages.m {
-		res = append(res, messages.m[i].SeqNo)
+func getSeqNumbers(messages []messageWithDataContent) []int64 {
+	res := make([]int64, 0, len(messages))
+	for i := range messages {
+		res = append(res, messages[i].SeqNo)
 	}
 	return res
 }

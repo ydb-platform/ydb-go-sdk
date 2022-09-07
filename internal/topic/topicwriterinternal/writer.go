@@ -43,8 +43,3 @@ func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 func (w *Writer) Close(ctx context.Context) error {
 	return w.streamWriter.Close(ctx)
 }
-
-type WriteOption struct {
-	Codec     Codec
-	Autocodec bool
-}
