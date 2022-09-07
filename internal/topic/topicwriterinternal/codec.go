@@ -24,7 +24,7 @@ func selectCodec(messages []messageWithDataContent, allowCodecs []Codec) rawtopi
 		if messages[i].bufCodec != rawtopiccommon.CodecRaw {
 			panic("ydb: non raw codec for select codec message, must be never")
 		}
-		if messages[i].buf.Len() > gzipHeaderSize {
+		if messages[i].rawBuf.Len() > gzipHeaderSize {
 			return rawtopiccommon.CodecGzip
 		}
 	}

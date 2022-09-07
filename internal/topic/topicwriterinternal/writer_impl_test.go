@@ -2,9 +2,11 @@ package topicwriterinternal
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -115,7 +117,6 @@ func TestWriterImpl_Write(t *testing.T) {
 
 		require.Equal(t, expectedMap, w.queue.messagesByOrder)
 	})
-
 	t.Run("WriteWithSyncMode", func(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
 			e := newTestEnv(t, &testEnvOptions{
@@ -181,6 +182,87 @@ func TestWriterImpl_Write(t *testing.T) {
 
 			xtest.WaitChannelClosed(t, writeCompleted)
 		})
+	})
+}
+
+func TestWriterImpl_WriteCodecs(t *testing.T) {
+	t.Run("ForceRaw", func(t *testing.T) {
+		var err error
+		e := newTestEnv(t, &testEnvOptions{writerOptions: []PublicWriterOption{WithCodec(rawtopiccommon.CodecRaw)}})
+
+		messContent := []byte("123")
+		createdTime := time.Date(2022, 9, 2, 13, 44, 1, 0, time.UTC)
+
+		const seqNo = 1
+		messReceived := make(empty.Chan)
+		e.stream.EXPECT().Send(&rawtopicwriter.WriteRequest{
+			Messages: []rawtopicwriter.MessageData{
+				{
+					SeqNo:            seqNo,
+					CreatedAt:        createdTime,
+					UncompressedSize: int64(len(messContent)),
+					Data:             messContent,
+				},
+			},
+			Codec: rawtopiccommon.CodecRaw,
+		}).Do(func(_ interface{}) {
+			close(messReceived)
+		})
+
+		msgs := newTestMessages(seqNo)
+		msgs.m[0], err = newMessageDataWithContent(Message{
+			SeqNo:     seqNo,
+			CreatedAt: createdTime,
+			Data:      bytes.NewReader(messContent),
+		})
+		require.NoError(t, err)
+		require.NoError(t, e.writer.Write(e.ctx, msgs))
+
+		xtest.WaitChannelClosed(t, messReceived)
+	})
+	t.Run("ForceGzip", func(t *testing.T) {
+		var err error
+		e := newTestEnv(t, &testEnvOptions{
+			writerOptions: []PublicWriterOption{WithCodec(rawtopiccommon.CodecGzip)},
+			topicCodecs:   rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecGzip},
+		})
+
+		messContent := []byte("123")
+
+		gzipped := &bytes.Buffer{}
+		writer := gzip.NewWriter(gzipped)
+		_, err = writer.Write(messContent)
+		require.NoError(t, err)
+		require.NoError(t, writer.Close())
+
+		createdTime := time.Date(2022, 9, 2, 13, 44, 1, 0, time.UTC)
+
+		const seqNo = 1
+		messReceived := make(empty.Chan)
+		e.stream.EXPECT().Send(&rawtopicwriter.WriteRequest{
+			Messages: []rawtopicwriter.MessageData{
+				{
+					SeqNo:            seqNo,
+					CreatedAt:        createdTime,
+					UncompressedSize: int64(len(messContent)),
+					Data:             gzipped.Bytes(),
+				},
+			},
+			Codec: rawtopiccommon.CodecGzip,
+		}).Do(func(_ interface{}) {
+			close(messReceived)
+		})
+
+		msgs := newTestMessages(seqNo)
+		msgs.m[0], err = newMessageDataWithContent(Message{
+			SeqNo:     seqNo,
+			CreatedAt: createdTime,
+			Data:      bytes.NewReader(messContent),
+		})
+		require.NoError(t, err)
+		require.NoError(t, e.writer.Write(e.ctx, msgs))
+
+		xtest.WaitChannelClosed(t, messReceived)
 	})
 }
 
@@ -381,7 +463,7 @@ func TestAllMessagesHasSameBufCodec(t *testing.T) {
 
 func TestCreateRawMessageData(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
-		req, err := createWriteRequest(nil)
+		req, err := createWriteRequest(nil, rawtopiccommon.CodecRaw)
 		require.NoError(t, err)
 		require.Equal(t,
 			rawtopicwriter.WriteRequest{
@@ -392,10 +474,7 @@ func TestCreateRawMessageData(t *testing.T) {
 		)
 	})
 
-	t.Run("OK", func(t *testing.T) {
-		messages := newTestMessages(2, 4, 10)
-		messages.m[0].bufCodec = rawtopiccommon.CodecGzip
-	})
+	// TODO: additional tests
 }
 
 func TestSplitMessagesByBufCodec(t *testing.T) {
@@ -443,10 +522,79 @@ func TestSplitMessagesByBufCodec(t *testing.T) {
 	}
 }
 
+func TestWriterImpl_CalculateAllowedCodecs(t *testing.T) {
+	customCodecSupported := rawtopiccommon.Codec(rawtopiccommon.CodecCustomerFirst)
+	customCodecUnsupported := rawtopiccommon.Codec(rawtopiccommon.CodecCustomerFirst + 1)
+	encoders := NewEncoderMap()
+	encoders.AddEncoder(customCodecSupported, func(writer io.Writer) (io.WriteCloser, error) {
+		return nil, errors.New("test")
+	})
+
+	table := []struct {
+		name           string
+		force          rawtopiccommon.Codec
+		serverCodecs   rawtopiccommon.SupportedCodecs
+		expectedResult rawtopiccommon.SupportedCodecs
+	}{
+		{
+			name:           "ForceRawWithEmptyServer",
+			force:          rawtopiccommon.CodecRaw,
+			serverCodecs:   nil,
+			expectedResult: rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},
+		},
+		{
+			name:           "ForceRawWithAllowedByServer",
+			force:          rawtopiccommon.CodecRaw,
+			serverCodecs:   rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip},
+			expectedResult: rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},
+		},
+		{
+			name:           "ForceCustomWithAllowedByServer",
+			force:          customCodecSupported,
+			serverCodecs:   rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip, customCodecSupported},
+			expectedResult: rawtopiccommon.SupportedCodecs{customCodecSupported},
+		},
+		{
+			name:           "ForceRawWithDeniedByServer",
+			force:          rawtopiccommon.CodecRaw,
+			serverCodecs:   rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecGzip},
+			expectedResult: nil,
+		},
+		{
+			name:           "NotForcedWithEmptyServerList",
+			force:          rawtopiccommon.CodecUNSPECIFIED,
+			serverCodecs:   nil,
+			expectedResult: rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip},
+		},
+		{
+			name:           "NotForcedWithServerGzipOnly",
+			force:          rawtopiccommon.CodecUNSPECIFIED,
+			serverCodecs:   rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecGzip},
+			expectedResult: rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecGzip},
+		},
+		{
+			name:           "NotForcedCustomCodecSupportedAndAllowedByServer",
+			force:          rawtopiccommon.CodecUNSPECIFIED,
+			serverCodecs:   rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecGzip, customCodecSupported, customCodecUnsupported},
+			expectedResult: rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecGzip, customCodecSupported},
+		},
+	}
+
+	for _, test := range table {
+		t.Run(test.name, func(t *testing.T) {
+			w := newWriterImplStopped(newWriterImplConfig())
+			w.cfg.forceCodec = test.force
+			w.encoders = encoders
+			res := w.calculateAllowedCodecs(test.serverCodecs)
+			require.Equal(t, test.expectedResult, res)
+		})
+	}
+}
+
 func newTestMessage(num int) messageWithDataContent {
 	return messageWithDataContent{
 		Message:  Message{SeqNo: int64(num)},
-		buf:      newBuffer(),
+		rawBuf:   newBuffer(),
 		bufCodec: rawtopiccommon.CodecRaw,
 	}
 }
@@ -473,6 +621,7 @@ func defaultTestWriterOptions() []PublicWriterOption {
 		WithPartitioning(NewPartitioningWithMessageGroupID("test-message-group-id")),
 		WithAutoSetSeqNo(false),
 		WithWaitAckOnWrite(false),
+		WithCodec(rawtopiccommon.CodecRaw),
 	}
 }
 
@@ -501,6 +650,7 @@ type testEnv struct {
 type testEnvOptions struct {
 	writerOptions []PublicWriterOption
 	lastSeqNo     int64
+	topicCodecs   rawtopiccommon.SupportedCodecs
 }
 
 func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
@@ -531,12 +681,16 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 
 	req := res.writer.createInitRequest()
 	res.stream.EXPECT().Send(&req).Do(func(_ interface{}) {
+		supportedCodecs := rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw}
+		if options.topicCodecs != nil {
+			supportedCodecs = options.topicCodecs
+		}
 		res.sendFromServer(&rawtopicwriter.InitResult{
 			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{},
 			LastSeqNo:             options.lastSeqNo,
 			SessionID:             "session-" + t.Name(),
 			PartitionID:           res.partitionID,
-			SupportedCodecs:       rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},
+			SupportedCodecs:       supportedCodecs,
 		})
 	}).Return(nil)
 
@@ -575,46 +729,4 @@ func (e *testEnv) receiveMessageHandler() (rawtopicwriter.ServerMessage, error) 
 type sendFromServerResponse struct {
 	msg rawtopicwriter.ServerMessage
 	err error
-}
-
-func connectToMock(t testing.TB, w *WriterImpl) (stream *MockRawTopicWriterStream) {
-	counter := int64(0)
-	if w.cfg.connect != nil {
-		t.Fatalf("test: connect func already set in")
-	}
-	w.cfg.connect = func(ctx context.Context) (RawTopicWriterStream, error) {
-		startCount := atomic.AddInt64(&counter, 1)
-		if startCount > 1 {
-			return nil, errors.New("test unexpected reconnect")
-		}
-
-		return stream, nil
-	}
-
-	stream = NewMockRawTopicWriterStream(gomock.NewController(t))
-
-	initRequest := w.createInitRequest()
-	initRequestReceived := make(empty.Chan)
-	stream.EXPECT().Send(&initRequest).Return(nil).Do(func(_ interface{}) {
-		close(initRequestReceived)
-	})
-
-	stream.EXPECT().Recv().DoAndReturn(func() (rawtopicwriter.ServerMessage, error) {
-		if !isClosed(initRequestReceived) {
-			t.Fatalf("test: init request not received")
-		}
-		return &rawtopicwriter.InitResult{
-			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
-				Status: rawydb.StatusSuccess,
-			},
-			LastSeqNo:       0,
-			SessionID:       "test-session",
-			PartitionID:     0,
-			SupportedCodecs: []rawtopiccommon.Codec{rawtopiccommon.CodecRaw},
-		}, nil
-	})
-
-	stream.EXPECT().CloseSend().Return(nil)
-
-	return stream
 }

@@ -54,7 +54,7 @@ type writerReturnToPool struct{}
 
 func (w writerReturnToPool) Write(ctx context.Context, messages *messageWithDataContentSlice) error {
 	for i := 0; i < len(messages.m); i++ {
-		putBuffer(messages.m[i].buf)
+		putBuffer(messages.m[i].rawBuf)
 	}
 	putContentMessagesSlice(messages)
 	return nil

@@ -35,12 +35,27 @@ func (c Codec) ToProto() Ydb_Topic.Codec {
 
 type SupportedCodecs []Codec
 
-func (c SupportedCodecs) ToProto() *Ydb_Topic.SupportedCodecs {
-	proto := &Ydb_Topic.SupportedCodecs{
-		Codecs: make([]int32, len(c)),
+func (c *SupportedCodecs) AllowedByCodecsList(need Codec) bool {
+	// empty list allow any codec
+	if len(*c) == 0 {
+		return true
 	}
-	for i := range c {
-		proto.Codecs[i] = int32(c[i].ToProto().Number())
+
+	for _, v := range *c {
+		if v == need {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *SupportedCodecs) ToProto() *Ydb_Topic.SupportedCodecs {
+	codecs := *c
+	proto := &Ydb_Topic.SupportedCodecs{
+		Codecs: make([]int32, len(codecs)),
+	}
+	for i := range codecs {
+		proto.Codecs[i] = int32(codecs[i].ToProto().Number())
 	}
 	return proto
 }

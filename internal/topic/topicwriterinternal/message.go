@@ -2,6 +2,7 @@ package topicwriterinternal
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"time"
 
@@ -46,20 +47,55 @@ func NewPartitioningWithPartitionID(id int64) PublicPartitioning {
 type messageWithDataContent struct {
 	Message
 
-	buf                 *bytes.Buffer
+	encoders            EncoderMap
+	rawBuf              *bytes.Buffer
 	bufCodec            rawtopiccommon.Codec
+	bufEncoded          *bytes.Buffer
 	bufUncompressedSize int64
+}
+
+func (m *messageWithDataContent) SetEncoders(encoders EncoderMap) {
+	m.encoders = encoders
+}
+
+func (m *messageWithDataContent) GetEncodedBytes(codec rawtopiccommon.Codec) ([]byte, error) {
+	if codec == rawtopiccommon.CodecRaw && m.rawBuf != nil {
+		return m.rawBuf.Bytes(), nil
+	}
+
+	if codec == m.bufCodec {
+		return m.bufEncoded.Bytes(), nil
+	}
+
+	if m.bufEncoded == nil {
+		m.bufEncoded = newBuffer()
+	} else {
+		m.bufEncoded.Reset()
+	}
+
+	writer, err := m.encoders.CreateLazyEncodeWriter(codec, m.bufEncoded)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed create encoder for message, codec '%v': %w", codec, err)))
+	}
+	_, err = writer.Write(m.rawBuf.Bytes())
+	if err == nil {
+		err = writer.Close()
+	}
+	if err != nil {
+		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed to compress message, codec '%v': %w", codec, err)))
+	}
+	return m.bufEncoded.Bytes(), nil
 }
 
 func newMessageDataWithContent(mess Message) (res messageWithDataContent, err error) {
 	res.Message = mess
 	res.Data = nil
 
-	res.buf = newBuffer()
-	res.bufCodec = rawtopiccommon.CodecRaw
+	res.rawBuf = newBuffer()
+	res.bufCodec = rawtopiccommon.CodecUNSPECIFIED
 
 	if mess.Data != nil {
-		writtenBytes, err := io.Copy(res.buf, mess.Data)
+		writtenBytes, err := io.Copy(res.rawBuf, mess.Data)
 		if err != nil {
 			return messageWithDataContent{}, xerrors.WithStackTrace(err)
 		}

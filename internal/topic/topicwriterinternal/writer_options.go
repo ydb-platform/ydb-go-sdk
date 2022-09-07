@@ -1,10 +1,18 @@
 package topicwriterinternal
 
+import "github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+
 type PublicWriterOption func(cfg *writerImplConfig)
 
 func WithAutoSetSeqNo(val bool) PublicWriterOption {
 	return func(cfg *writerImplConfig) {
 		cfg.autoSetSeqNo = val
+	}
+}
+
+func WithCodec(codec rawtopiccommon.Codec) PublicWriterOption {
+	return func(cfg *writerImplConfig) {
+		cfg.forceCodec = codec
 	}
 }
 

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync/atomic"
+	"time"
 
 	"github.com/jonboulle/clockwork"
 
@@ -27,6 +29,7 @@ var (
 	errCloseWriterImplStopWork   = xerrors.Wrap(errors.New("ydb: stop work with writer stream"))
 	errBadCodec                  = xerrors.Wrap(errors.New("ydb: internal error - bad codec for message"))
 	errNonZeroSeqNo              = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))
+	errNoAllowedCodecs           = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
 )
 
 type writerImplConfig struct {
@@ -37,6 +40,8 @@ type writerImplConfig struct {
 	defaultPartitioning rawtopicwriter.Partitioning
 	waitServerAck       bool
 	autoSetSeqNo        bool
+	additionalEncoders  map[rawtopiccommon.Codec]PublicCreateEncoderFunc
+	forceCodec          rawtopiccommon.Codec
 }
 
 func newWriterImplConfig(options ...PublicWriterOption) writerImplConfig {
@@ -56,12 +61,14 @@ type WriterImpl struct {
 	background                 background.Worker
 	clock                      clockwork.Clock
 	firstInitResponseProcessed xatomic.Bool
+	autoCodecIndex             int64
 
 	m                              xsync.RWMutex
 	allowedCodecsVal               rawtopiccommon.SupportedCodecs
 	sessionID                      string
 	lastSeqNo                      int64
 	firstInitResponseProcessedChan empty.Chan
+	encoders                       EncoderMap
 }
 
 func newWriterImpl(cfg writerImplConfig) *WriterImpl {
@@ -71,23 +78,46 @@ func newWriterImpl(cfg writerImplConfig) *WriterImpl {
 }
 
 func newWriterImplStopped(cfg writerImplConfig) *WriterImpl {
-	return &WriterImpl{
+	res := &WriterImpl{
 		cfg:                            cfg,
 		queue:                          newMessageQueue(),
 		clock:                          clockwork.NewRealClock(),
 		lastSeqNo:                      -1,
 		firstInitResponseProcessedChan: make(empty.Chan),
+		encoders:                       NewEncoderMap(),
 	}
+
+	for codec, creator := range cfg.additionalEncoders {
+		res.encoders.AddEncoder(codec, creator)
+	}
+
+	res.allowedCodecsVal = res.calculateAllowedCodecs(nil)
+
+	return res
 }
 
-func (w *WriterImpl) setSeqNumbers(messages *messageWithDataContentSlice) error {
+func (w *WriterImpl) fillFields(messages *messageWithDataContentSlice) error {
+	var now time.Time
+
 	for i := range messages.m {
 		msg := &messages.m[i]
-		if msg.SeqNo != 0 {
-			return xerrors.WithStackTrace(errNonZeroSeqNo)
+
+		// SetSeqNo
+		if w.cfg.autoSetSeqNo {
+			if msg.SeqNo != 0 {
+				return xerrors.WithStackTrace(errNonZeroSeqNo)
+			}
+			w.lastSeqNo++
+			msg.SeqNo = w.lastSeqNo
 		}
-		w.lastSeqNo++
-		msg.SeqNo = w.lastSeqNo
+
+		// Set created time
+		if msg.CreatedAt.IsZero() {
+			if now.IsZero() {
+				now = time.Now()
+			}
+			msg.CreatedAt = now
+		}
 	}
 	return nil
 }
@@ -102,6 +132,8 @@ func (w *WriterImpl) Write(ctx context.Context, messages *messageWithDataContent
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: writer is closed: %w", err))
 	}
 
+	w.initMessagesWithContent(messages)
+
 	if err := w.waitFirstInitResponse(ctx); err != nil {
 		return err
 	}
@@ -110,11 +142,9 @@ func (w *WriterImpl) Write(ctx context.Context, messages *messageWithDataContent
 	var waiter *MessageQueueAckWaiter
 	w.m.WithLock(func() {
 		// need set numbers and add to queue atomically
-		if w.cfg.autoSetSeqNo {
-			err = w.setSeqNumbers(messages)
-			if err != nil {
-				return
-			}
+		err = w.fillFields(messages)
+		if err != nil {
+			return
 		}
 
 		if w.cfg.waitServerAck {
@@ -132,6 +162,13 @@ func (w *WriterImpl) Write(ctx context.Context, messages *messageWithDataContent
 	}
 
 	return w.queue.Wait(ctx, waiter)
+}
+
+func (w *WriterImpl) initMessagesWithContent(messages *messageWithDataContentSlice) {
+	for i := range messages.m {
+		msg := &messages.m[i]
+		msg.SetEncoders(w.encoders)
+	}
 }
 
 func (w *WriterImpl) Close(ctx context.Context) error {
@@ -246,7 +283,12 @@ func (w *WriterImpl) initStream(stream RawTopicWriterStream) error {
 	w.m.Lock()
 	defer w.m.Unlock()
 
-	w.allowedCodecsVal = result.SupportedCodecs
+	allowedCodecs := w.calculateAllowedCodecs(result.SupportedCodecs)
+	if len(allowedCodecs) == 0 {
+		return xerrors.WithStackTrace(errNoAllowedCodecs)
+	}
+
+	w.allowedCodecsVal = allowedCodecs
 	w.sessionID = result.SessionID
 	if req.GetLastSeqNo {
 		w.lastSeqNo = result.LastSeqNo
@@ -267,6 +309,32 @@ func (w *WriterImpl) createInitRequest() rawtopicwriter.InitRequest {
 		Partitioning:     w.cfg.defaultPartitioning,
 		GetLastSeqNo:     getLastSeqNo,
 	}
+}
+
+func (w *WriterImpl) calculateAllowedCodecs(serverCodecs rawtopiccommon.SupportedCodecs) rawtopiccommon.SupportedCodecs {
+	if w.cfg.forceCodec != rawtopiccommon.CodecUNSPECIFIED {
+		if serverCodecs.AllowedByCodecsList(w.cfg.forceCodec) && w.encoders.IsSupported(w.cfg.forceCodec) {
+			return rawtopiccommon.SupportedCodecs{w.cfg.forceCodec}
+		}
+		return nil
+	}
+
+	if len(serverCodecs) == 0 {
+		// fixed list for autoselect codec if empty server list for prevent unexpectedly add messages with new codec
+		// with sdk update
+		serverCodecs = rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip}
+	}
+
+	res := make(rawtopiccommon.SupportedCodecs, 0, len(serverCodecs))
+	for _, codec := range serverCodecs {
+		if w.encoders.IsSupported(codec) {
+			res = append(res, codec)
+		}
+	}
+	if len(res) == 0 {
+		res = nil
+	}
+	return res
 }
 
 func (w *WriterImpl) receiveMessages(ctx context.Context, stream RawTopicWriterStream, cancel xcontext.CancelErrFunc) {
@@ -297,16 +365,23 @@ func (w *WriterImpl) receiveMessages(ctx context.Context, stream RawTopicWriterS
 
 func (w *WriterImpl) sendMessagesFromQueueToStream(ctx context.Context, stream RawTopicWriterStream) error {
 	w.queue.ResetSentProgress()
+
 	for {
 		messages, err := w.queue.GetMessagesForSend(ctx)
 		if err != nil {
 			return err
 		}
 
-		err = sendMessagesToStream(stream, messages.m)
+		targetCodec, err := w.selectCodecForMessages(messages)
+		if err != nil {
+			return err
+		}
+
+		err = sendMessagesToStream(stream, targetCodec, messages)
 		if err != nil {
 			return xerrors.WithStackTrace(fmt.Errorf("ydb: error send message to topic stream: %w", err))
 		}
+		putContentMessagesSlice(messages)
 	}
 }
 
@@ -320,6 +395,8 @@ func (w *WriterImpl) waitFirstInitResponse(ctx context.Context) error {
 	}
 
 	select {
+	case <-w.background.Done():
+		return w.background.CloseReason()
 	case <-w.firstInitResponseProcessedChan:
 		return nil
 	case <-ctx.Done():
@@ -327,26 +404,49 @@ func (w *WriterImpl) waitFirstInitResponse(ctx context.Context) error {
 	}
 }
 
-func sendMessagesToStream(stream RawTopicWriterStream, messages []messageWithDataContent) error {
-	if len(messages) == 0 {
+func (w *WriterImpl) selectCodecForMessages(messages *messageWithDataContentSlice) (rawtopiccommon.Codec, error) {
+	if w.cfg.forceCodec != rawtopiccommon.CodecUNSPECIFIED {
+		return w.cfg.forceCodec, nil
+	}
+
+	return w.selectCodecForMessagesSlowPath(messages)
+}
+
+func (w *WriterImpl) selectCodecForMessagesSlowPath(messages *messageWithDataContentSlice) (rawtopiccommon.Codec, error) {
+	var allowedCodecs rawtopiccommon.SupportedCodecs
+	w.m.WithRLock(func() {
+		allowedCodecs = w.allowedCodecsVal
+	})
+
+	if len(allowedCodecs) == 1 {
+		return allowedCodecs[0], nil
+	}
+
+	// TODO: add smart codec select
+	index64 := atomic.AddInt64(&w.autoCodecIndex, 1)
+	index := int(index64)
+	if index < 0 {
+		atomic.CompareAndSwapInt64(&w.autoCodecIndex, index64, 0)
+		index = 0
+	}
+
+	index = index % len(allowedCodecs)
+
+	return allowedCodecs[index], nil
+}
+
+func sendMessagesToStream(stream RawTopicWriterStream, targetCodec rawtopiccommon.Codec, messages *messageWithDataContentSlice) error {
+	if len(messages.m) == 0 {
 		return nil
 	}
 
-	// optimization for avoid allocation in common way - when all messages has same codec
-	messageGroups := [][]messageWithDataContent{messages}
-	if !allMessagesHasSameBufCodec(messages) {
-		messageGroups = splitMessagesByBufCodec(messages)
+	request, err := createWriteRequest(messages, targetCodec)
+	if err != nil {
+		return err
 	}
-
-	for _, messageGroup := range messageGroups {
-		request, err := createWriteRequest(messageGroup)
-		if err != nil {
-			return err
-		}
-		err = stream.Send(&request)
-		if err != nil {
-			return xerrors.WithStackTrace(fmt.Errorf("ydb: failed send write request: %w", err))
-		}
+	err = stream.Send(&request)
+	if err != nil {
+		return xerrors.WithStackTrace(fmt.Errorf("ydb: failed send write request: %w", err))
 	}
 	return nil
 }
@@ -384,16 +484,11 @@ func splitMessagesByBufCodec(messages []messageWithDataContent) (res [][]message
 	return res
 }
 
-func createWriteRequest(messages []messageWithDataContent) (res rawtopicwriter.WriteRequest, err error) {
-	res.Codec = rawtopiccommon.CodecRaw
-	if len(messages) == 0 {
-		return res, nil
-	}
-
-	res.Codec = messages[0].bufCodec
-	res.Messages = make([]rawtopicwriter.MessageData, len(messages))
-	for i := range messages {
-		res.Messages[i], err = createRawMessageData(res.Codec, &messages[i])
+func createWriteRequest(messages *messageWithDataContentSlice, targetCodec rawtopiccommon.Codec) (res rawtopicwriter.WriteRequest, err error) {
+	res.Codec = targetCodec
+	res.Messages = make([]rawtopicwriter.MessageData, len(messages.m))
+	for i := range messages.m {
+		res.Messages[i], err = createRawMessageData(res.Codec, &messages.m[i])
 		if err != nil {
 			return res, err
 		}
@@ -406,10 +501,6 @@ func createRawMessageData(
 	codec rawtopiccommon.Codec,
 	mess *messageWithDataContent,
 ) (res rawtopicwriter.MessageData, err error) {
-	if mess.bufCodec != codec {
-		return res, xerrors.WithStackTrace(errBadCodec)
-	}
-
 	res.CreatedAt = mess.CreatedAt
 	res.SeqNo = mess.SeqNo
 
@@ -425,8 +516,8 @@ func createRawMessageData(
 	}
 
 	res.UncompressedSize = mess.bufUncompressedSize
-	res.Data = mess.buf.Bytes()
-	return res, nil
+	res.Data, err = mess.GetEncodedBytes(codec)
+	return res, err
 }
 
 type ConnectFunc func(ctx context.Context) (RawTopicWriterStream, error)
