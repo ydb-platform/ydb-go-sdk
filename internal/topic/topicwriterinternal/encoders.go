@@ -9,6 +9,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
+const (
+	codecMeasureIntervalBatches = 100
+	codecUnknown                = rawtopiccommon.CodecUNSPECIFIED
+)
+
 type EncoderMap struct {
 	m map[rawtopiccommon.Codec]PublicCreateEncoderFunc
 }
@@ -64,9 +69,9 @@ func (nopWriteCloser) Close() error {
 type EncoderSelector struct {
 	m *EncoderMap
 
-	allowedCodecs rawtopiccommon.SupportedCodecs
-	forceCodec    rawtopiccommon.Codec
-	batchCounter  int
+	allowedCodecs     rawtopiccommon.SupportedCodecs
+	lastSelectedCodec rawtopiccommon.Codec
+	batchCounter      int
 }
 
 func NewEncoderSelector(m *EncoderMap, allowedCodecs rawtopiccommon.SupportedCodecs) EncoderSelector {
@@ -92,11 +97,7 @@ func (s *EncoderSelector) ResetAllowedCodecs(allowedCodecs rawtopiccommon.Suppor
 	}
 
 	s.allowedCodecs = allowedCodecs.Clone()
-	if len(s.allowedCodecs) == 1 {
-		s.forceCodec = s.allowedCodecs[0]
-	} else {
-		s.forceCodec = rawtopiccommon.CodecUNSPECIFIED
-	}
+	s.lastSelectedCodec = codecUnknown
 	s.batchCounter = 0
 }
 
@@ -114,12 +115,11 @@ func (s *EncoderSelector) compressMessages(messages []messageWithDataContent, co
 }
 
 func (s *EncoderSelector) selectCodec(messages []messageWithDataContent) (rawtopiccommon.Codec, error) {
-	if s.forceCodec != rawtopiccommon.CodecUNSPECIFIED {
-		return s.forceCodec, nil
-	}
-
 	if len(s.allowedCodecs) == 0 {
-		return rawtopiccommon.CodecUNSPECIFIED, errNoAllowedCodecs
+		return codecUnknown, errNoAllowedCodecs
+	}
+	if len(s.allowedCodecs) == 1 {
+		return s.allowedCodecs[0], nil
 	}
 
 	s.batchCounter++
@@ -127,7 +127,50 @@ func (s *EncoderSelector) selectCodec(messages []messageWithDataContent) (rawtop
 		s.batchCounter = 0
 	}
 
-	index := s.batchCounter % len(s.allowedCodecs)
+	// Try every codec at start - for fast reader fail if unexpected include codec, incompatible with readers
+	if s.batchCounter < len(s.allowedCodecs) {
+		return s.allowedCodecs[s.batchCounter], nil
+	}
 
-	return s.allowedCodecs[index], nil
+	if s.lastSelectedCodec == codecUnknown || s.batchCounter%codecMeasureIntervalBatches == 0 {
+		if codec, err := s.measureCodecs(messages); err == nil {
+			s.lastSelectedCodec = codec
+		} else {
+			return codecUnknown, err
+		}
+	}
+
+	return s.lastSelectedCodec, nil
+}
+
+func (s *EncoderSelector) measureCodecs(messages []messageWithDataContent) (rawtopiccommon.Codec, error) {
+	if len(s.allowedCodecs) == 0 {
+		return codecUnknown, errNoAllowedCodecs
+	}
+	sizes := make([]int, len(s.allowedCodecs))
+
+	for codecIndex, codec := range s.allowedCodecs {
+		if err := s.compressMessages(messages, codec); err != nil {
+			return codecUnknown, err
+		}
+
+		size := 0
+		for messIndex := range messages {
+			content, err := messages[messIndex].GetEncodedBytes(codec)
+			if err != nil {
+				return codecUnknown, err
+			}
+			size += len(content)
+		}
+		sizes[codecIndex] = size
+	}
+
+	minSizeIndex := 0
+	for i := range sizes {
+		if sizes[i] < sizes[minSizeIndex] {
+			minSizeIndex = i
+		}
+	}
+
+	return s.allowedCodecs[minSizeIndex], nil
 }
