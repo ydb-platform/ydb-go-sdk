@@ -1,3 +1,5 @@
+* Marked sessions which creates from `database/sql` driver as supported server-side session balancing
+
 ## v3.37.7
 * Changed type of truncated result error from `StreamExecuteScanQuery` to retryable error
 * Added closing sessions if node removed from discovery results
