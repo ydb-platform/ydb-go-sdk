@@ -129,6 +129,7 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.
 		id:           result.GetSessionId(),
 		tableService: c,
 		config:       config,
+		status:       options.SessionReady,
 	}
 
 	for _, o := range opts {

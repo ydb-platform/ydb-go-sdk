@@ -32,7 +32,7 @@ type sessionBuilder func(ctx context.Context, opts ...sessionBuilderOption) (*se
 type balancerNotifier interface {
 	grpc.ClientConnInterface
 
-	OnDiscovery(onDiscovery func(ctx context.Context, endpoints []endpoint.Info))
+	OnUpdate(onDiscovery func(ctx context.Context, endpoints []endpoint.Info))
 }
 
 func New(balancer balancerNotifier, config config.Config) *Client {
@@ -55,6 +55,7 @@ func newClient(
 		cc:     balancer,
 		build:  builder,
 		index:  make(map[*session]sessionInfo),
+		nodes:  make(map[uint32]map[*session]struct{}),
 		idle:   list.New(),
 		waitq:  list.New(),
 		limit:  config.SizeLimit(),
@@ -67,7 +68,7 @@ func newClient(
 		done: make(chan struct{}),
 	}
 	if balancer != nil {
-		balancer.OnDiscovery(c.onDiscovery)
+		balancer.OnUpdate(c.updateNodes)
 	}
 	if idleThreshold := config.IdleThreshold(); idleThreshold > 0 {
 		c.spawnedGoroutines.Add(1)
@@ -88,6 +89,7 @@ type Client struct {
 	// read-write fields
 	mu                xsync.Mutex
 	index             map[*session]sessionInfo
+	nodes             map[uint32]map[*session]struct{}
 	createInProgress  int        // KIKIMR-9163: in-create-process counter
 	limit             int        // Upper bound for Client size.
 	idle              *list.List // list<*session>
@@ -118,7 +120,7 @@ func withCreateSessionOnClose(onClose func(s *session)) createSessionOption {
 	}
 }
 
-func (c *Client) onDiscovery(ctx context.Context, endpoints []endpoint.Info) {
+func (c *Client) updateNodes(ctx context.Context, endpoints []endpoint.Info) {
 	nodeIDs := make([]uint32, len(endpoints))
 	for i, e := range endpoints {
 		nodeIDs[i] = e.NodeID()
@@ -127,26 +129,17 @@ func (c *Client) onDiscovery(ctx context.Context, endpoints []endpoint.Info) {
 		return nodeIDs[i] < nodeIDs[j]
 	})
 	c.mu.WithLock(func() {
-		touched := make(map[*session]struct{}, len(c.index))
-		for e := c.idle.Front(); e != nil; e = e.Next() {
-			s := e.Value.(*session)
-			nodeID := s.NodeID()
+		for nodeID := range c.nodes {
 			if sort.Search(len(nodeIDs), func(i int) bool {
 				return nodeIDs[i] >= nodeID
 			}) == len(nodeIDs) {
-				c.internalPoolAsyncCloseSession(ctx, s)
-			}
-			touched[s] = struct{}{}
-		}
-		for s := range c.index {
-			if _, has := touched[s]; has {
-				continue
-			}
-			nodeID := s.NodeID()
-			if sort.Search(len(nodeIDs), func(i int) bool {
-				return nodeIDs[i] >= nodeID
-			}) == len(nodeIDs) {
-				s.SetStatus(options.SessionClosing)
+				for s := range c.nodes[nodeID] {
+					if c.index[s].idle != nil {
+						c.internalPoolAsyncCloseSession(ctx, s)
+					} else {
+						s.SetStatus(options.SessionClosing)
+					}
+				}
 			}
 		}
 	})
@@ -256,13 +249,51 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 	}
 }
 
+func (c *Client) appendSessionToNodes(s *session) {
+	c.mu.WithLock(func() {
+		nodeID := s.NodeID()
+		sessions, has := c.nodes[nodeID]
+		if !has {
+			sessions = make(map[*session]struct{})
+		}
+		sessions[s] = struct{}{}
+		c.nodes[nodeID] = sessions
+	})
+}
+
+func (c *Client) removeSessionFromNodes(s *session) {
+	c.mu.WithLock(func() {
+		nodeID := s.NodeID()
+		sessions, has := c.nodes[nodeID]
+		if !has {
+			sessions = make(map[*session]struct{})
+		}
+		delete(sessions, s)
+		if len(sessions) == 0 {
+			delete(c.nodes, nodeID)
+		} else {
+			c.nodes[nodeID] = sessions
+		}
+	})
+}
+
 func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ table.ClosableSession, err error) {
 	if c == nil {
 		return nil, xerrors.WithStackTrace(errNilClient)
 	}
 	var s *session
+	createSession := func(ctx context.Context) (*session, error) {
+		s, err = c.createSession(ctx,
+			withCreateSessionOnCreate(c.appendSessionToNodes),
+			withCreateSessionOnClose(c.removeSessionFromNodes),
+		)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+		return s, nil
+	}
 	if !c.config.AutoRetry() {
-		s, err = c.createSession(ctx)
+		s, err = createSession(ctx)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -272,7 +303,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 	err = retry.Retry(
 		ctx,
 		func(ctx context.Context) (err error) {
-			s, err = c.createSession(ctx)
+			s, err = createSession(ctx)
 			if err != nil {
 				return xerrors.WithStackTrace(err)
 			}
@@ -328,40 +359,45 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 		})
 	}()
 
-	s, err = c.createSession(meta.WithAllowFeatures(ctx,
-		meta.HintSessionBalancer,
-	), withCreateSessionOnCreate(func(s *session) {
-		c.mu.WithLock(func() {
-			c.index[s] = sessionInfo{
-				touched: timeutil.Now(),
-			}
-			trace.TableOnPoolSessionAdd(c.config.Trace(), s)
-			trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "append")
-		})
-	}), withCreateSessionOnClose(func(s *session) {
-		c.mu.WithLock(func() {
-			info, has := c.index[s]
-			if !has {
-				panic("session not found in pool")
-			}
+	s, err = c.createSession(
+		meta.WithAllowFeatures(ctx,
+			meta.HintSessionBalancer,
+		),
+		withCreateSessionOnCreate(c.appendSessionToNodes),
+		withCreateSessionOnClose(c.removeSessionFromNodes),
+		withCreateSessionOnCreate(func(s *session) {
+			c.mu.WithLock(func() {
+				c.index[s] = sessionInfo{
+					touched: timeutil.Now(),
+				}
+				trace.TableOnPoolSessionAdd(c.config.Trace(), s)
+				trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "append")
+			})
+		}), withCreateSessionOnClose(func(s *session) {
+			c.mu.WithLock(func() {
+				info, has := c.index[s]
+				if !has {
+					panic("session not found in pool")
+				}
 
-			delete(c.index, s)
+				delete(c.index, s)
 
-			trace.TableOnPoolSessionRemove(c.config.Trace(), s)
-			trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "remove")
+				trace.TableOnPoolSessionRemove(c.config.Trace(), s)
+				trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "remove")
 
-			if !c.isClosed() {
-				c.internalPoolNotify(nil)
-			}
+				if !c.isClosed() {
+					c.internalPoolNotify(nil)
+				}
 
-			if info.idle != nil {
-				c.idle.Remove(info.idle)
-			}
-		})
-	}))
+				if info.idle != nil {
+					c.idle.Remove(info.idle)
+				}
+			})
+		}))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	return s, nil
 }
 

@@ -41,7 +41,7 @@ type Balancer struct {
 	onDiscovery []func(ctx context.Context, endpoints []endpoint.Info)
 }
 
-func (b *Balancer) OnDiscovery(onDiscovery func(ctx context.Context, endpoints []endpoint.Info)) {
+func (b *Balancer) OnUpdate(onDiscovery func(ctx context.Context, endpoints []endpoint.Info)) {
 	b.mu.WithLock(func() {
 		b.onDiscovery = append(b.onDiscovery, onDiscovery)
 	})

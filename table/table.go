@@ -67,6 +67,7 @@ type Client interface {
 
 type SessionInfo interface {
 	ID() string
+	Status() string
 }
 
 type Session interface {

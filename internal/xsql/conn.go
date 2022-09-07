@@ -102,7 +102,14 @@ func (c *conn) checkClosed(err error) error {
 }
 
 func (c *conn) isClosed() bool {
-	return atomic.LoadUint32(&c.closed) == 1
+	if atomic.LoadUint32(&c.closed) == 1 {
+		return true
+	}
+	if c.session.Status() != options.SessionReady.String() {
+		c.setClosed()
+		return true
+	}
+	return false
 }
 
 func (c *conn) setClosed() {
