@@ -111,6 +111,9 @@ func TzTimestampValueFromTime(v time.Time) Value {
 	return value.TzTimestampValue(timeutil.MarshalTzTimestamp(v))
 }
 
+// StringValue returns bytes value
+//
+// Deprecated: use BytesValue instead
 func StringValue(v []byte) Value { return value.StringValue(v) }
 
 func BytesValue(v []byte) Value { return value.StringValue(v) }

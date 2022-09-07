@@ -65,8 +65,8 @@ func TestSessionKeepAlive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Status() != options.SessionReady.String() {
-		t.Fatalf("Result %v differ from, expectd %v", s.Status(), options.SessionReady.String())
+	if s.Status() != table.SessionReady {
+		t.Fatalf("Result %v differ from, expectd %v", s.Status(), table.SessionReady)
 	}
 
 	status, e = Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY, nil
@@ -74,8 +74,8 @@ func TestSessionKeepAlive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if s.Status() != options.SessionBusy.String() {
-		t.Fatalf("Result %v differ from, expectd %v", s.Status(), options.SessionBusy.String())
+	if s.Status() != table.SessionBusy {
+		t.Fatalf("Result %v differ from, expectd %v", s.Status(), table.SessionBusy)
 	}
 }
 

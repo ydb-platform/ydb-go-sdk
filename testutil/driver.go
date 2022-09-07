@@ -291,7 +291,7 @@ func NewBalancer(opts ...balancerOption) *balancerStub {
 	return c
 }
 
-func (b *balancerStub) OnDiscovery(func(context.Context, []endpoint.Info)) {
+func (b *balancerStub) OnUpdate(func(context.Context, []endpoint.Info)) {
 }
 
 type clientConn struct {

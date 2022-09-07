@@ -23,7 +23,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-var errTruncated = xerrors.Wrap(errors.New("truncated result"))
+var errTruncated = xerrors.Retryable(errors.New("truncated result"))
 
 type scanner struct {
 	set             *Ydb.ResultSet
