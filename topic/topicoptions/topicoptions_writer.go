@@ -25,7 +25,16 @@ func WithWriteSessionMeta(meta map[string]string) WriterOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithMessageGroupID(groupID string) WriterOption {
-	panic("not implemented")
+	return topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithMessageGroupID(groupID))
+}
+
+// WithPartitionID
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func WithPartitionID(partitionID int64) WriterOption {
+	return topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithPartitionID(partitionID))
 }
 
 // WithSyncWrite
@@ -35,15 +44,6 @@ func WithMessageGroupID(groupID string) WriterOption {
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithSyncWrite(sync bool) WriterOption {
 	return topicwriterinternal.WithWaitAckOnWrite(sync)
-}
-
-// WithPartitionID
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func WithPartitionID(partitionID string) WriterOption {
-	panic("not implemented")
 }
 
 // WithGetLastSeqNo

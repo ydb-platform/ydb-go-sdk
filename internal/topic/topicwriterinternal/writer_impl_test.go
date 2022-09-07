@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -23,6 +24,39 @@ import (
 
 func TestWriterImpl_AutoSeq(t *testing.T) {
 	t.Run("OK", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		w := newWriterImplStopped(writerImplConfig{autoSetSeqNo: true})
+		w.firstInitResponseProcessed.Store(true)
+
+		lastSeqNo := int64(16)
+		w.lastSeqNo = lastSeqNo
+
+		var wg sync.WaitGroup
+		fWrite := func(num int) {
+			defer wg.Done()
+
+			msgs := newTestMessages(0)
+			msgs.m[0].Message.CreatedAt = time.Unix(int64(num), 0)
+			require.NoError(t, w.Write(ctx, msgs))
+		}
+
+		const messCount = 1000
+		wg.Add(messCount)
+		for i := 0; i < messCount; i++ {
+			go fWrite(i)
+		}
+		wg.Wait()
+
+		require.Len(t, w.queue.messagesByOrder, messCount)
+		require.Equal(t, lastSeqNo+messCount, w.queue.lastSeqNo)
+	})
+
+	t.Run("PredefinedSeqNo", func(t *testing.T) {
+		ctx := xtest.Context(t)
+
+		w := newWriterImplStopped(writerImplConfig{autoSetSeqNo: true})
+		w.firstInitResponseProcessed.Store(true)
+		require.Error(t, w.Write(ctx, newTestMessages(1)))
 	})
 }
 
@@ -466,6 +500,7 @@ type testEnv struct {
 
 type testEnvOptions struct {
 	writerOptions []PublicWriterOption
+	lastSeqNo     int64
 }
 
 func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
@@ -498,7 +533,7 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 	res.stream.EXPECT().Send(&req).Do(func(_ interface{}) {
 		res.sendFromServer(&rawtopicwriter.InitResult{
 			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{},
-			LastSeqNo:             0,
+			LastSeqNo:             options.lastSeqNo,
 			SessionID:             "session-" + t.Name(),
 			PartitionID:           res.partitionID,
 			SupportedCodecs:       rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},

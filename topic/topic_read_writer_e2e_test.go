@@ -17,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicclientinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -30,16 +31,19 @@ func TestSendAsyncMessages(t *testing.T) {
 
 	content := "hello"
 
-	writer, err := db.Topic().(*topicclientinternal.Client).StartWriter("test", topicPath)
+	producerID := "test-producer-ang-message-group"
+	writer, err := db.Topic().(*topicclientinternal.Client).StartWriter(producerID, topicPath,
+		topicoptions.WithMessageGroupID(producerID),
+	)
 	require.NoError(t, err)
 	require.NotEmpty(t, writer)
-	require.NoError(t, writer.Write(ctx, topicwriter.Message{SeqNo: 1, CreatedAt: time.Now(), Data: strings.NewReader(content)}))
+	require.NoError(t, writer.Write(ctx, topicwriter.Message{Data: strings.NewReader(content)}))
 
 	reader, err := db.Topic().StartReader(consumerName, topicoptions.ReadTopic(topicPath))
 	require.NoError(t, err)
-	readCtx, cancel := context.WithTimeout(ctx, time.Hour)
-	defer cancel()
 
+	readCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
 	mess, err := reader.ReadMessage(readCtx)
 	require.NoError(t, err)
 
@@ -52,7 +56,7 @@ func TestSendSyncMessages(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx := testCtx(t)
 
-		grpcStopper := xtest.NewGrpcStopper(errors.New("stop grpc for test"))
+		grpcStopper := topic.NewGrpcStopper(errors.New("stop grpc for test"))
 
 		db := connect(t,
 			grpc.WithChainUnaryInterceptor(grpcStopper.UnaryClientInterceptor),
