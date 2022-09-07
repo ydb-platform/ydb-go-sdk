@@ -19,7 +19,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -134,10 +133,10 @@ func (c *Client) updateNodes(ctx context.Context, endpoints []endpoint.Info) {
 				return nodeIDs[i] >= nodeID
 			}) == len(nodeIDs) {
 				for s := range c.nodes[nodeID] {
-					if c.index[s].idle != nil {
+					if info, has := c.index[s]; has && info.idle != nil {
 						c.internalPoolAsyncCloseSession(ctx, s)
 					} else {
-						s.SetStatus(options.SessionClosing)
+						s.SetStatus(table.SessionClosing)
 					}
 				}
 			}
@@ -632,7 +631,7 @@ func (c *Client) Close(ctx context.Context) (err error) {
 			for e := c.idle.Front(); e != nil; e = e.Next() {
 				wg.Add(1)
 				s := e.Value.(*session)
-				s.SetStatus(options.SessionClosing)
+				s.SetStatus(table.SessionClosing)
 				go func() {
 					defer wg.Done()
 					c.internalPoolSyncCloseSession(ctx, s)
@@ -806,7 +805,7 @@ func (c *Client) internalPoolNotify(s *session) (notified bool) {
 }
 
 func (c *Client) internalPoolAsyncCloseSession(ctx context.Context, s *session) {
-	s.SetStatus(options.SessionClosing)
+	s.SetStatus(table.SessionClosing)
 	c.spawnedGoroutines.Add(1)
 	go func() {
 		defer c.spawnedGoroutines.Done()

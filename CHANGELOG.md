@@ -1,5 +1,7 @@
 * Marked the truncated result as retryable error
 * Added closing sessions if node removed from discovery results
+* Moved session status type from `table/options` package to `table`
+* Changed session status source type from `uint32` to `string` alias 
 
 ## v3.37.6
 * Added to balancer notifying mechanism for listening in table client event about removing some nodes and closing sessions on them 

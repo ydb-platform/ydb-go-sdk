@@ -15,7 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
@@ -154,7 +153,7 @@ func TestRetryerSessionClosing(t *testing.T) {
 			config.New(),
 			func(ctx context.Context, s table.Session) error {
 				sessions = append(sessions, s)
-				s.(*session).SetStatus(options.SessionClosing)
+				s.(*session).SetStatus(table.SessionClosing)
 				return nil
 			},
 			table.Options{},

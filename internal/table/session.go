@@ -46,8 +46,9 @@ type session struct {
 	tableService Ydb_Table_V1.TableServiceClient
 	config       config.Config
 
-	status options.SessionStatus
-	nodeID uint32
+	status    table.SessionStatus
+	statusMtx sync.RWMutex
+	nodeID    uint32
 
 	onClose   []func(s *session)
 	closeOnce sync.Once
@@ -72,23 +73,27 @@ func (s *session) NodeID() uint32 {
 	return uint32(nodeID)
 }
 
-func (s *session) Status() string {
+func (s *session) Status() table.SessionStatus {
 	if s == nil {
-		return ""
+		return table.SessionStatusUnknown
 	}
-	return options.SessionStatus(atomic.LoadUint32((*uint32)(&s.status))).String()
+	s.statusMtx.RLock()
+	defer s.statusMtx.RUnlock()
+	return s.status
 }
 
-func (s *session) SetStatus(status options.SessionStatus) {
-	atomic.StoreUint32((*uint32)(&s.status), uint32(status))
+func (s *session) SetStatus(status table.SessionStatus) {
+	s.statusMtx.Lock()
+	defer s.statusMtx.Unlock()
+	s.status = status
 }
 
 func (s *session) isClosed() bool {
-	return options.SessionStatus(atomic.LoadUint32((*uint32)(&s.status))) == options.SessionClosed
+	return s.Status() == table.SessionClosed
 }
 
 func (s *session) isClosing() bool {
-	return options.SessionStatus(atomic.LoadUint32((*uint32)(&s.status))) == options.SessionClosing
+	return s.Status() == table.SessionClosing
 }
 
 func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.Config, opts ...sessionBuilderOption) (
@@ -129,7 +134,7 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.
 		id:           result.GetSessionId(),
 		tableService: c,
 		config:       config,
-		status:       options.SessionReady,
+		status:       table.SessionReady,
 	}
 
 	for _, o := range opts {
@@ -160,7 +165,7 @@ func (s *session) Close(ctx context.Context) (err error) {
 
 	s.closeOnce.Do(func() {
 		defer func() {
-			s.SetStatus(options.SessionClosed)
+			s.SetStatus(table.SessionClosed)
 		}()
 
 		onDone := trace.TableOnSessionDelete(s.config.Trace(), &ctx, s)
@@ -232,9 +237,9 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 	}
 	switch result.SessionStatus {
 	case Ydb_Table.KeepAliveResult_SESSION_STATUS_READY:
-		s.SetStatus(options.SessionReady)
+		s.SetStatus(table.SessionReady)
 	case Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY:
-		s.SetStatus(options.SessionBusy)
+		s.SetStatus(table.SessionBusy)
 	}
 	return nil
 }
@@ -447,7 +452,7 @@ func (s *session) checkError(err error) {
 		return
 	}
 	if m := retry.Check(err); m.MustDeleteSession() {
-		s.SetStatus(options.SessionClosing)
+		s.SetStatus(table.SessionClosing)
 	}
 }
 
