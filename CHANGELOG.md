@@ -1,4 +1,4 @@
-* Marked the truncated result as retryable error
+* Changed type of truncated result error from `StreamExecuteScanQuery` to retryable error
 * Added closing sessions if node removed from discovery results
 * Moved session status type from `table/options` package to `table`
 * Changed session status source type from `uint32` to `string` alias 

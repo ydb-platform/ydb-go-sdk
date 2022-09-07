@@ -146,8 +146,8 @@
 
 ## About truncated result <a name="truncated"></a>
 
-Call of `session.Execute` may returns a result with a flag `Truncated` because `YDB` have a default limit of rows is a 1000.
-In this case query must be changed for supporting pagination. Trucated flag in result must be checks explicitly.
+Call of `session.Execute` may return a result with a flag `Truncated` because `YDB` have a default limit of rows is a 1000.
+In this case query must be changed for supporting pagination. Truncated flag in result must be checks explicitly.
 - in `v2`:
   ```go
   var res *table.Result
@@ -178,7 +178,7 @@ In this case query must be changed for supporting pagination. Trucated flag in r
   }
   ```
 - in `v3`:
-  By default, truncated result wraps as non-retryable error
+  By default, truncated result wraps as non-retryable error for `session.Execute` and retryable error for `session.StreamExecuteScanQuery`
   ```go
   import (
     "github.com/ydb-platform/ydb-go-sdk/v3/table/result"  

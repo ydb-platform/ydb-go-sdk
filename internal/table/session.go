@@ -1084,6 +1084,7 @@ func (s *session) StreamExecuteScanQuery(
 			return err
 		},
 		scanner.WithIgnoreTruncated(s.config.IgnoreTruncated()),
+		scanner.WithMarkTruncatedAsRetryable(),
 	), nil
 }
 

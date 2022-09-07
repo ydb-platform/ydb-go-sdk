@@ -78,6 +78,12 @@ func WithIgnoreTruncated(ignoreTruncated bool) option {
 	}
 }
 
+func WithMarkTruncatedAsRetryable() option {
+	return func(r *baseResult) {
+		r.scanner.markTruncatedAsRetryable = true
+	}
+}
+
 func NewStream(
 	recv func(ctx context.Context) (*Ydb.ResultSet, *Ydb_TableStats.QueryStats, error),
 	onClose func(error) error,
