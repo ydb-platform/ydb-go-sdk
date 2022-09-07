@@ -302,7 +302,6 @@ func TestWriterImpl_InitSession(t *testing.T) {
 	err := w.initStream(strm)
 	require.NoError(t, err)
 	require.Equal(t, "test-session-id", w.sessionID)
-	require.Equal(t, rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw}, w.allowedCodecsVal)
 	require.Equal(t, lastSeqNo, w.lastSeqNo)
 	require.True(t, isClosed(w.firstInitResponseProcessedChan))
 }
@@ -590,7 +589,7 @@ func TestWriterImpl_CalculateAllowedCodecs(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			w := newWriterImplStopped(newWriterImplConfig())
 			w.cfg.forceCodec = test.force
-			w.encoders = encoders
+			w.encodersMap = encoders
 			res := w.calculateAllowedCodecs(test.serverCodecs)
 			require.Equal(t, test.expectedResult, res)
 		})
@@ -627,7 +626,7 @@ func newTestWriterStopped(opts ...PublicWriterOption) *WriterImpl {
 	res := newWriterImplStopped(cfg)
 
 	if cfg.additionalEncoders == nil {
-		res.encoders = testCommonEncoders
+		res.encodersMap = testCommonEncoders
 	}
 
 	return res

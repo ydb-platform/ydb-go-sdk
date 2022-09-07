@@ -1,7 +1,6 @@
 package rawtopiccommon
 
 import (
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_PersQueue_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 )
 
@@ -10,10 +9,10 @@ type Codec int
 
 const (
 	CodecUNSPECIFIED Codec = iota
-	CodecRaw               = Codec(Ydb_PersQueue_V1.Codec_CODEC_RAW)
-	CodecGzip              = Codec(Ydb_PersQueue_V1.Codec_CODEC_GZIP)
-	CodecLzop              = Codec(Ydb_PersQueue_V1.Codec_CODEC_LZOP)
-	CodecZstd              = Codec(Ydb_PersQueue_V1.Codec_CODEC_ZSTD)
+	CodecRaw               = Codec(Ydb_Topic.Codec_CODEC_RAW)
+	CodecGzip              = Codec(Ydb_Topic.Codec_CODEC_GZIP)
+	CodecLzop              = Codec(Ydb_Topic.Codec_CODEC_LZOP)
+	CodecZstd              = Codec(Ydb_Topic.Codec_CODEC_ZSTD)
 )
 
 const (
@@ -41,12 +40,54 @@ func (c *SupportedCodecs) AllowedByCodecsList(need Codec) bool {
 		return true
 	}
 
+	return c.Contains(need)
+}
+
+func (c *SupportedCodecs) Contains(need Codec) bool {
 	for _, v := range *c {
 		if v == need {
 			return true
 		}
 	}
 	return false
+}
+
+func (c *SupportedCodecs) Clone() SupportedCodecs {
+	res := make(SupportedCodecs, len(*c))
+	copy(res, *c)
+	return res
+}
+
+func (c *SupportedCodecs) IsEqualsTo(other SupportedCodecs) bool {
+	if len(*c) != len(other) {
+		return false
+	}
+
+	maxLen := len(*c)
+	if otherLen := len(other); otherLen > maxLen {
+		maxLen = otherLen
+	}
+
+	codecs := make(map[Codec]struct{})
+	for _, v := range *c {
+		codecs[v] = struct{}{}
+	}
+
+	for _, v := range other {
+		if _, ok := codecs[v]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func (c *SupportedCodecs) containsAllIn(other SupportedCodecs) bool {
+	for _, v := range *c {
+		if !other.Contains(v) {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *SupportedCodecs) ToProto() *Ydb_Topic.SupportedCodecs {

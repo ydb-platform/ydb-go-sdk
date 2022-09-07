@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"sync/atomic"
 	"time"
 
 	"github.com/jonboulle/clockwork"
@@ -63,14 +62,13 @@ type WriterImpl struct {
 	background                 background.Worker
 	clock                      clockwork.Clock
 	firstInitResponseProcessed xatomic.Bool
-	autoCodecIndex             int64
+	encoder                    EncoderSelector
 
 	m                              xsync.RWMutex
-	allowedCodecsVal               rawtopiccommon.SupportedCodecs
 	sessionID                      string
 	lastSeqNo                      int64
 	firstInitResponseProcessedChan empty.Chan
-	encoders                       *EncoderMap
+	encodersMap                    *EncoderMap
 }
 
 func newWriterImpl(cfg writerImplConfig) *WriterImpl {
@@ -86,14 +84,14 @@ func newWriterImplStopped(cfg writerImplConfig) *WriterImpl {
 		clock:                          clockwork.NewRealClock(),
 		lastSeqNo:                      -1,
 		firstInitResponseProcessedChan: make(empty.Chan),
-		encoders:                       NewEncoderMap(),
+		encodersMap:                    NewEncoderMap(),
 	}
 
 	for codec, creator := range cfg.additionalEncoders {
-		res.encoders.AddEncoder(codec, creator)
+		res.encodersMap.AddEncoder(codec, creator)
 	}
 
-	res.allowedCodecsVal = res.calculateAllowedCodecs(nil)
+	res.encoder = NewEncoderSelector(res.encodersMap, res.calculateAllowedCodecs(nil))
 
 	return res
 }
@@ -171,7 +169,7 @@ func (w *WriterImpl) Write(ctx context.Context, messages []Message) error {
 func (w *WriterImpl) createMessagesWithContent(messages []Message) ([]messageWithDataContent, error) {
 	res := make([]messageWithDataContent, 0, len(messages))
 	for i := range messages {
-		mess, err := newMessageDataWithContent(messages[i], w.encoders, w.cfg.forceCodec)
+		mess, err := newMessageDataWithContent(messages[i], w.encodersMap, w.cfg.forceCodec)
 		if err != nil {
 			return nil, err
 		}
@@ -297,7 +295,7 @@ func (w *WriterImpl) initStream(stream RawTopicWriterStream) error {
 		return xerrors.WithStackTrace(errNoAllowedCodecs)
 	}
 
-	w.allowedCodecsVal = allowedCodecs
+	w.encoder.ResetAllowedCodecs(allowedCodecs)
 	w.sessionID = result.SessionID
 	if req.GetLastSeqNo {
 		w.lastSeqNo = result.LastSeqNo
@@ -322,7 +320,7 @@ func (w *WriterImpl) createInitRequest() rawtopicwriter.InitRequest {
 
 func (w *WriterImpl) calculateAllowedCodecs(serverCodecs rawtopiccommon.SupportedCodecs) rawtopiccommon.SupportedCodecs {
 	if w.cfg.forceCodec != rawtopiccommon.CodecUNSPECIFIED {
-		if serverCodecs.AllowedByCodecsList(w.cfg.forceCodec) && w.encoders.IsSupported(w.cfg.forceCodec) {
+		if serverCodecs.AllowedByCodecsList(w.cfg.forceCodec) && w.encodersMap.IsSupported(w.cfg.forceCodec) {
 			return rawtopiccommon.SupportedCodecs{w.cfg.forceCodec}
 		}
 		return nil
@@ -336,7 +334,7 @@ func (w *WriterImpl) calculateAllowedCodecs(serverCodecs rawtopiccommon.Supporte
 
 	res := make(rawtopiccommon.SupportedCodecs, 0, len(serverCodecs))
 	for _, codec := range serverCodecs {
-		if w.encoders.IsSupported(codec) {
+		if w.encodersMap.IsSupported(codec) {
 			res = append(res, codec)
 		}
 	}
@@ -381,7 +379,7 @@ func (w *WriterImpl) sendMessagesFromQueueToStream(ctx context.Context, stream R
 			return err
 		}
 
-		targetCodec, err := w.selectCodecForMessages(messages)
+		targetCodec, err := w.encoder.CompressMessages(messages)
 		if err != nil {
 			return err
 		}
@@ -410,37 +408,6 @@ func (w *WriterImpl) waitFirstInitResponse(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
-}
-
-func (w *WriterImpl) selectCodecForMessages(messages []messageWithDataContent) (rawtopiccommon.Codec, error) {
-	if w.cfg.forceCodec != rawtopiccommon.CodecUNSPECIFIED {
-		return w.cfg.forceCodec, nil
-	}
-
-	return w.selectCodecForMessagesSlowPath(messages)
-}
-
-func (w *WriterImpl) selectCodecForMessagesSlowPath(messages []messageWithDataContent) (rawtopiccommon.Codec, error) {
-	var allowedCodecs rawtopiccommon.SupportedCodecs
-	w.m.WithRLock(func() {
-		allowedCodecs = w.allowedCodecsVal
-	})
-
-	if len(allowedCodecs) == 1 {
-		return allowedCodecs[0], nil
-	}
-
-	// TODO: add smart codec select
-	index64 := atomic.AddInt64(&w.autoCodecIndex, 1)
-	index := int(index64)
-	if index < 0 {
-		atomic.CompareAndSwapInt64(&w.autoCodecIndex, index64, 0)
-		index = 0
-	}
-
-	index = index % len(allowedCodecs)
-
-	return allowedCodecs[index], nil
 }
 
 func sendMessagesToStream(stream RawTopicWriterStream, targetCodec rawtopiccommon.Codec, messages []messageWithDataContent) error {
