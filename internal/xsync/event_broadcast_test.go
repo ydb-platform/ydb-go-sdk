@@ -14,9 +14,9 @@ import (
 func TestEventBroadcast(t *testing.T) {
 	t.Run("Simple", func(t *testing.T) {
 		b := &EventBroadcast{}
-		ch := b.Subscribe()
+		waiter := b.Waiter()
 		b.Broadcast()
-		xtest.WaitChannelClosed(t, ch)
+		xtest.WaitChannelClosed(t, waiter.Done())
 	})
 
 	xtest.TestManyTimesWithName(t, "SubscribeAndEventsInRace", func(t testing.TB) {
@@ -37,9 +37,9 @@ func TestEventBroadcast(t *testing.T) {
 			defer close(subscribeStopped)
 			for {
 				atomic.AddInt64(&backgroundCounter, 1)
-				subscriber := b.Subscribe()
+				waiter := b.Waiter()
 				go func() {
-					<-subscriber
+					<-waiter.Done()
 					atomic.AddInt64(&backgroundCounter, -1)
 				}()
 				if atomic.LoadInt64(&stopRace) != 0 {

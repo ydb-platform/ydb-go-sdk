@@ -53,12 +53,18 @@ type messageWithDataContent struct {
 
 func newMessageDataWithContent(mess Message) (res messageWithDataContent, err error) {
 	res.Message = mess
+	res.Data = nil
+
 	res.buf = newBuffer()
 	res.bufCodec = rawtopiccommon.CodecRaw
+
 	if mess.Data != nil {
-		_, err = io.Copy(res.buf, res.Data)
+		writtenBytes, err := io.Copy(res.buf, mess.Data)
+		if err != nil {
+			return messageWithDataContent{}, xerrors.WithStackTrace(err)
+		}
+		res.bufUncompressedSize = writtenBytes
 	}
-	res.Data = nil
 	return res, xerrors.WithStackTrace(err)
 }
 

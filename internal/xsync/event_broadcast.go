@@ -20,19 +20,16 @@ func (b *EventBroadcast) initNeedLock() {
 	}
 }
 
-// Subscribe return channel, that will close when next event will be broadcast.
+// Waiter return channel, that will close when next event will be broadcast.
 // For prevent race between subscribe and event client code must subscribe at first, then check condition
 // if false - wait closing channed and check condition again
-//
-// Example:
-// b := NewEventBroadcast()
-func (b *EventBroadcast) Subscribe() empty.Chan {
+func (b *EventBroadcast) Waiter() OneTimeWaiter {
 	b.m.Lock()
 	defer b.m.Unlock()
 
 	b.initNeedLock()
 
-	return b.nextEventChannel
+	return OneTimeWaiter{b.nextEventChannel}
 }
 
 func (b *EventBroadcast) Broadcast() {
@@ -43,4 +40,12 @@ func (b *EventBroadcast) Broadcast() {
 
 	close(b.nextEventChannel)
 	b.nextEventChannel = make(empty.Chan)
+}
+
+type OneTimeWaiter struct {
+	ch empty.Chan
+}
+
+func (w *OneTimeWaiter) Done() <-chan struct{} {
+	return w.ch
 }

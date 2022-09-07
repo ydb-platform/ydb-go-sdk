@@ -34,7 +34,7 @@ func WithMessageGroupID(groupID string) WriterOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithSyncWrite(sync bool) WriterOption {
-	return topicwriterinternal.WithSyncWrite(sync)
+	return topicwriterinternal.WithWaitAckOnWrite(sync)
 }
 
 // WithPartitionID

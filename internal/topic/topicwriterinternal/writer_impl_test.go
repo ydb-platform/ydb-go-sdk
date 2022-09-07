@@ -1,10 +1,13 @@
 package topicwriterinternal
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
@@ -61,25 +64,101 @@ func TestWriterImpl_CreateInitMessage(t *testing.T) {
 }
 
 func TestWriterImpl_Write(t *testing.T) {
-	ctx := context.Background()
-	w := newTestWriter()
+	t.Run("PushToQueue", func(t *testing.T) {
+		ctx := context.Background()
+		w := newTestWriterStopped()
 
-	w.firstInitResponseProcessed.Store(true)
+		w.firstInitResponseProcessed.Store(true)
 
-	err := w.Write(ctx, newTestMessages(1, 3, 5))
-	require.NoError(t, err)
+		err := w.Write(ctx, newTestMessages(1, 3, 5))
+		require.NoError(t, err)
 
-	expectedMap := map[int]messageWithDataContent{
-		1: newTestMessage(1),
-		2: newTestMessage(3),
-		3: newTestMessage(5),
-	}
+		expectedMap := map[int]messageWithDataContent{
+			1: newTestMessage(1),
+			2: newTestMessage(3),
+			3: newTestMessage(5),
+		}
 
-	require.Equal(t, expectedMap, w.queue.messagesByOrder)
+		require.Equal(t, expectedMap, w.queue.messagesByOrder)
+	})
+
+	t.Run("WriteWithSyncMode", func(t *testing.T) {
+		xtest.TestManyTimes(t, func(t testing.TB) {
+			e := newTestEnv(t, &testEnvOptions{
+				writerOptions: []PublicWriterOption{
+					WithWaitAckOnWrite(true),
+				},
+			})
+
+			messageTime := time.Date(2022, 9, 7, 11, 34, 0, 0, time.UTC)
+			messageData := []byte("123")
+
+			const seqNo = 31
+
+			writeMessageReceived := make(empty.Chan)
+			e.stream.EXPECT().Send(&rawtopicwriter.WriteRequest{
+				Messages: []rawtopicwriter.MessageData{
+					{
+						SeqNo:            seqNo,
+						CreatedAt:        messageTime,
+						UncompressedSize: int64(len(messageData)),
+						Partitioning:     rawtopicwriter.Partitioning{},
+						Data:             messageData,
+					},
+				},
+				Codec: rawtopiccommon.CodecRaw,
+			}).Do(func(_ interface{}) {
+				close(writeMessageReceived)
+			}).Return(nil)
+
+			msgs := newTestMessages(1)
+			var err error
+			msgs.m[0], err = newMessageDataWithContent(Message{SeqNo: seqNo, CreatedAt: messageTime, Data: bytes.NewReader(messageData)})
+			require.NoError(t, err)
+
+			writeCompleted := make(empty.Chan)
+			go func() {
+				err = e.writer.Write(e.ctx, msgs)
+				require.NoError(t, err)
+				close(writeCompleted)
+			}()
+
+			<-writeMessageReceived
+
+			select {
+			case <-writeCompleted:
+				t.Fatal("sync write must complete after receive ack only")
+			default:
+				// pass
+			}
+
+			e.sendFromServer(&rawtopicwriter.WriteResult{
+				Acks: []rawtopicwriter.WriteAck{
+					{
+						SeqNo: seqNo,
+						MessageWriteStatus: rawtopicwriter.MessageWriteStatus{
+							Type:          rawtopicwriter.WriteStatusTypeWritten,
+							WrittenOffset: 4,
+						},
+					},
+				},
+				PartitionID: e.partitionID,
+			})
+
+			xtest.WaitChannelClosed(t, writeCompleted)
+		})
+	})
+}
+
+func TestEnv(t *testing.T) {
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		env := newTestEnv(t, nil)
+		xtest.WaitChannelClosed(t, env.writer.firstInitResponseProcessedChan)
+	})
 }
 
 func TestWriterImpl_InitSession(t *testing.T) {
-	w := newTestWriter(WithAutoSetSeqNo(true))
+	w := newTestWriterStopped(WithAutoSetSeqNo(true))
 	mc := gomock.NewController(t)
 	strm := NewMockRawTopicWriterStream(mc)
 	strm.EXPECT().Send(&rawtopicwriter.InitRequest{
@@ -111,7 +190,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		mc := gomock.NewController(t)
 		strm := NewMockRawTopicWriterStream(mc)
 
-		w := newTestWriter()
+		w := newTestWriterStopped()
 
 		ctx := xtest.Context(t)
 		ctx, cancel := xcontext.WithErrCancel(ctx)
@@ -159,7 +238,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 	t.Run("ReconnectOnErrors", func(t *testing.T) {
 		ctx := xtest.Context(t)
 
-		w := newTestWriter()
+		w := newTestWriterStopped()
 
 		mc := gomock.NewController(t)
 
@@ -346,17 +425,21 @@ func newTestMessages(numbers ...int) *messageWithDataContentSlice {
 	return messages
 }
 
-func newTestWriter(opts ...PublicWriterOption) WriterImpl {
-	cfgOptions := []PublicWriterOption{
+func newTestWriterStopped(opts ...PublicWriterOption) *WriterImpl {
+	cfgOptions := append(defaultTestWriterOptions(), opts...)
+	cfg := newWriterImplConfig(cfgOptions...)
+	return newWriterImplStopped(cfg)
+}
+
+func defaultTestWriterOptions() []PublicWriterOption {
+	return []PublicWriterOption{
 		WithProducerID("test-producer-id"),
 		WithTopic("test-topic"),
 		WithSessionMeta(map[string]string{"test-key": "test-val"}),
 		WithPartitioning(NewPartitioningWithMessageGroupID("test-message-group-id")),
 		WithAutoSetSeqNo(false),
+		WithWaitAckOnWrite(false),
 	}
-	cfgOptions = append(cfgOptions, opts...)
-	cfg := newWriterImplConfig(cfgOptions...)
-	return newWriterImplStopped(cfg)
 }
 
 func isClosed(ch <-chan struct{}) bool {
@@ -369,4 +452,134 @@ func isClosed(ch <-chan struct{}) bool {
 	default:
 		return false
 	}
+}
+
+type testEnv struct {
+	ctx                   context.Context
+	stream                *MockRawTopicWriterStream
+	writer                *WriterImpl
+	sendFromServerChannel chan sendFromServerResponse
+	stopReadEvents        empty.Chan
+	partitionID           int64
+	connectCount          int64
+}
+
+type testEnvOptions struct {
+	writerOptions []PublicWriterOption
+}
+
+func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
+	if options == nil {
+		options = &testEnvOptions{}
+	}
+
+	res := &testEnv{
+		ctx:                   xtest.Context(t),
+		stream:                NewMockRawTopicWriterStream(gomock.NewController(t)),
+		sendFromServerChannel: make(chan sendFromServerResponse, 1),
+		stopReadEvents:        make(empty.Chan),
+		partitionID:           14,
+	}
+
+	writerOptions := append(defaultTestWriterOptions(), WithConnectFunc(func(ctx context.Context) (RawTopicWriterStream, error) {
+		connectNum := atomic.AddInt64(&res.connectCount, 1)
+		if connectNum > 1 {
+			t.Fatalf("test: default env support most one connection")
+		}
+		return res.stream, nil
+	}))
+	writerOptions = append(writerOptions, options.writerOptions...)
+
+	res.writer = newWriterImplStopped(newWriterImplConfig(writerOptions...))
+
+	res.stream.EXPECT().Recv().DoAndReturn(res.receiveMessageHandler).AnyTimes()
+
+	req := res.writer.createInitRequest()
+	res.stream.EXPECT().Send(&req).Do(func(_ interface{}) {
+		res.sendFromServer(&rawtopicwriter.InitResult{
+			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{},
+			LastSeqNo:             0,
+			SessionID:             "session-" + t.Name(),
+			PartitionID:           res.partitionID,
+			SupportedCodecs:       rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},
+		})
+	}).Return(nil)
+
+	streamClosed := make(empty.Chan)
+	res.stream.EXPECT().CloseSend().Do(func() {
+		close(streamClosed)
+	})
+
+	res.writer.start()
+	require.NoError(t, res.writer.waitFirstInitResponse(res.ctx))
+
+	t.Cleanup(func() {
+		close(res.stopReadEvents)
+		<-streamClosed
+	})
+	return res
+}
+
+func (e *testEnv) sendFromServer(msg rawtopicwriter.ServerMessage) {
+	if msg.StatusData().Status == 0 {
+		msg.SetStatus(rawydb.StatusSuccess)
+	}
+
+	e.sendFromServerChannel <- sendFromServerResponse{msg: msg}
+}
+
+func (e *testEnv) receiveMessageHandler() (rawtopicwriter.ServerMessage, error) {
+	select {
+	case <-e.stopReadEvents:
+		return nil, fmt.Errorf("test: stop test environment")
+	case res := <-e.sendFromServerChannel:
+		return res.msg, res.err
+	}
+}
+
+type sendFromServerResponse struct {
+	msg rawtopicwriter.ServerMessage
+	err error
+}
+
+func connectToMock(t testing.TB, w *WriterImpl) (stream *MockRawTopicWriterStream) {
+	counter := int64(0)
+	if w.cfg.connect != nil {
+		t.Fatalf("test: connect func already set in")
+	}
+	w.cfg.connect = func(ctx context.Context) (RawTopicWriterStream, error) {
+		startCount := atomic.AddInt64(&counter, 1)
+		if startCount > 1 {
+			return nil, errors.New("test unexpected reconnect")
+		}
+
+		return stream, nil
+	}
+
+	stream = NewMockRawTopicWriterStream(gomock.NewController(t))
+
+	initRequest := w.createInitRequest()
+	initRequestReceived := make(empty.Chan)
+	stream.EXPECT().Send(&initRequest).Return(nil).Do(func(_ interface{}) {
+		close(initRequestReceived)
+	})
+
+	stream.EXPECT().Recv().DoAndReturn(func() (rawtopicwriter.ServerMessage, error) {
+		if !isClosed(initRequestReceived) {
+			t.Fatalf("test: init request not received")
+		}
+		return &rawtopicwriter.InitResult{
+			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
+				Status: rawydb.StatusSuccess,
+			},
+			LastSeqNo:       0,
+			SessionID:       "test-session",
+			PartitionID:     0,
+			SupportedCodecs: []rawtopiccommon.Codec{rawtopiccommon.CodecRaw},
+		}, nil
+	})
+
+	stream.EXPECT().CloseSend().Return(nil)
+
+	return stream
 }

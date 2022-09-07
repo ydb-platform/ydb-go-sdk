@@ -263,7 +263,7 @@ func (q *messageQueue) Wait(ctx context.Context, waiter *MessageQueueAckWaiter) 
 
 	ctxDone := ctx.Done()
 	for {
-		ackReceived := q.acksReceivedEvent.Subscribe()
+		ackReceived := q.acksReceivedEvent.Waiter()
 
 		hasWaited := false
 		q.m.WithRLock(func() {
@@ -284,7 +284,7 @@ func (q *messageQueue) Wait(ctx context.Context, waiter *MessageQueueAckWaiter) 
 			return ctx.Err()
 		case <-q.closedChan:
 			return q.closedErr
-		case <-ackReceived:
+		case <-ackReceived.Done():
 			// pass next iteration
 		}
 	}

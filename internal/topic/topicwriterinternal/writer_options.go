@@ -39,7 +39,7 @@ func WithSessionMeta(meta map[string]string) PublicWriterOption {
 	}
 }
 
-func WithSyncWrite(val bool) PublicWriterOption {
+func WithWaitAckOnWrite(val bool) PublicWriterOption {
 	return func(cfg *writerImplConfig) {
 		cfg.waitServerAck = val
 	}

@@ -67,11 +67,11 @@ type WriterImpl struct {
 func newWriterImpl(cfg writerImplConfig) *WriterImpl {
 	res := newWriterImplStopped(cfg)
 	res.start()
-	return &res
+	return res
 }
 
-func newWriterImplStopped(cfg writerImplConfig) WriterImpl {
-	return WriterImpl{
+func newWriterImplStopped(cfg writerImplConfig) *WriterImpl {
+	return &WriterImpl{
 		cfg:                            cfg,
 		queue:                          newMessageQueue(),
 		clock:                          clockwork.NewRealClock(),
