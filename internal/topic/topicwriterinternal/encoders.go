@@ -4,9 +4,11 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
 const (
@@ -69,14 +71,22 @@ func (nopWriteCloser) Close() error {
 type EncoderSelector struct {
 	m *EncoderMap
 
-	allowedCodecs     rawtopiccommon.SupportedCodecs
-	lastSelectedCodec rawtopiccommon.Codec
-	batchCounter      int
+	allowedCodecs          rawtopiccommon.SupportedCodecs
+	lastSelectedCodec      rawtopiccommon.Codec
+	parallelCompressors    int
+	batchCounter           int
+	measureIntervalBatches int
 }
 
-func NewEncoderSelector(m *EncoderMap, allowedCodecs rawtopiccommon.SupportedCodecs) EncoderSelector {
+func NewEncoderSelector(m *EncoderMap, allowedCodecs rawtopiccommon.SupportedCodecs, parallelCompressors int) EncoderSelector {
+	if parallelCompressors <= 0 {
+		panic("ydb: need leas one allowed compressor")
+	}
+
 	res := EncoderSelector{
-		m: m,
+		m:                      m,
+		parallelCompressors:    parallelCompressors,
+		measureIntervalBatches: codecMeasureIntervalBatches,
 	}
 	res.ResetAllowedCodecs(allowedCodecs)
 
@@ -86,7 +96,7 @@ func NewEncoderSelector(m *EncoderMap, allowedCodecs rawtopiccommon.SupportedCod
 func (s *EncoderSelector) CompressMessages(messages []messageWithDataContent) (rawtopiccommon.Codec, error) {
 	codec, err := s.selectCodec(messages)
 	if err == nil {
-		err = s.compressMessages(messages, codec)
+		err = compressMessages(messages, codec, s.parallelCompressors)
 	}
 	return codec, err
 }
@@ -99,19 +109,6 @@ func (s *EncoderSelector) ResetAllowedCodecs(allowedCodecs rawtopiccommon.Suppor
 	s.allowedCodecs = allowedCodecs.Clone()
 	s.lastSelectedCodec = codecUnknown
 	s.batchCounter = 0
-}
-
-func (s *EncoderSelector) compressMessages(messages []messageWithDataContent, codec rawtopiccommon.Codec) error {
-	for i := range messages {
-		// force call GetEncodedBytes for cache result
-		// it call here for future do it in parallel for
-		_, err := messages[i].GetEncodedBytes(codec)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
 }
 
 func (s *EncoderSelector) selectCodec(messages []messageWithDataContent) (rawtopiccommon.Codec, error) {
@@ -132,7 +129,7 @@ func (s *EncoderSelector) selectCodec(messages []messageWithDataContent) (rawtop
 		return s.allowedCodecs[s.batchCounter], nil
 	}
 
-	if s.lastSelectedCodec == codecUnknown || s.batchCounter%codecMeasureIntervalBatches == 0 {
+	if s.lastSelectedCodec == codecUnknown || s.batchCounter%s.measureIntervalBatches == 0 {
 		if codec, err := s.measureCodecs(messages); err == nil {
 			s.lastSelectedCodec = codec
 		} else {
@@ -150,7 +147,7 @@ func (s *EncoderSelector) measureCodecs(messages []messageWithDataContent) (rawt
 	sizes := make([]int, len(s.allowedCodecs))
 
 	for codecIndex, codec := range s.allowedCodecs {
-		if err := s.compressMessages(messages, codec); err != nil {
+		if err := compressMessages(messages, codec, s.parallelCompressors); err != nil {
 			return codecUnknown, err
 		}
 
@@ -173,4 +170,62 @@ func (s *EncoderSelector) measureCodecs(messages []messageWithDataContent) (rawt
 	}
 
 	return s.allowedCodecs[minSizeIndex], nil
+}
+
+func compressMessages(messages []messageWithDataContent, codec rawtopiccommon.Codec, parallel int) error {
+	workerCount := parallel
+	if len(messages) < workerCount {
+		workerCount = len(messages)
+	}
+
+	// no need goroutines and syncronization for raw codec (no encode work) or zero-one worker
+	if codec == rawtopiccommon.CodecRaw || workerCount < 2 {
+		for i := range messages {
+			if _, err := messages[i].GetEncodedBytes(codec); err != nil {
+				return err
+			}
+		}
+	}
+
+	tasks := make(chan *messageWithDataContent, len(messages))
+
+	for i := range messages {
+		tasks <- &messages[i]
+	}
+	close(tasks)
+
+	var resErrMutex xsync.Mutex
+	var resErr error
+
+	var wg sync.WaitGroup
+	worker := func() {
+		defer wg.Done()
+
+		for task := range tasks {
+			var localErr error
+			resErrMutex.WithLock(func() {
+				localErr = resErr
+			})
+
+			if localErr != nil {
+				return
+			}
+			_, localErr = task.GetEncodedBytes(codec)
+			if localErr != nil {
+				resErrMutex.WithLock(func() {
+					resErr = localErr
+				})
+				return
+			}
+		}
+	}
+
+	wg.Add(workerCount)
+	for i := 0; i < workerCount; i++ {
+		go worker()
+	}
+
+	wg.Wait()
+
+	return resErr
 }

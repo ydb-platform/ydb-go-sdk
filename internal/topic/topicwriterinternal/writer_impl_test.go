@@ -29,7 +29,7 @@ var testCommonEncoders = NewEncoderMap()
 func TestWriterImpl_AutoSeq(t *testing.T) {
 	t.Run("OK", func(t *testing.T) {
 		ctx := xtest.Context(t)
-		w := newWriterImplStopped(writerImplConfig{autoSetSeqNo: true})
+		w := newWriterImplStopped(newWriterImplConfig(WithAutoSetSeqNo(true)))
 		w.firstInitResponseProcessed.Store(true)
 
 		lastSeqNo := int64(16)
@@ -58,7 +58,7 @@ func TestWriterImpl_AutoSeq(t *testing.T) {
 	t.Run("PredefinedSeqNo", func(t *testing.T) {
 		ctx := xtest.Context(t)
 
-		w := newWriterImplStopped(writerImplConfig{autoSetSeqNo: true})
+		w := newWriterImplStopped(newWriterImplConfig(WithAutoSetSeqNo(true)))
 		w.firstInitResponseProcessed.Store(true)
 		require.Error(t, w.Write(ctx, newTestMessages(1)))
 	})
@@ -72,6 +72,7 @@ func TestWriterImpl_CreateInitMessage(t *testing.T) {
 			writerMeta:          map[string]string{"key": "val"},
 			defaultPartitioning: rawtopicwriter.NewPartitioningPartitionID(5),
 			autoSetSeqNo:        false,
+			compressorCount:     1,
 		}
 		w := newWriterImplStopped(cfg)
 		expected := rawtopicwriter.InitRequest{
@@ -86,15 +87,11 @@ func TestWriterImpl_CreateInitMessage(t *testing.T) {
 
 	t.Run("WithAutoSeq", func(t *testing.T) {
 		t.Run("InitState", func(t *testing.T) {
-			w := newWriterImplStopped(writerImplConfig{
-				autoSetSeqNo: true,
-			})
+			w := newWriterImplStopped(newWriterImplConfig(WithAutoSetSeqNo(true)))
 			require.True(t, w.createInitRequest().GetLastSeqNo)
 		})
 		t.Run("WithInternalSeqNo", func(t *testing.T) {
-			w := newWriterImplStopped(writerImplConfig{
-				autoSetSeqNo: true,
-			})
+			w := newWriterImplStopped(newWriterImplConfig(WithAutoSetSeqNo(true)))
 			w.lastSeqNo = 1
 			require.False(t, w.createInitRequest().GetLastSeqNo)
 		})
@@ -231,7 +228,6 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 		require.Equal(t, rawtopiccommon.CodecGzip, <-messReceived)
 	})
 	t.Run("Auto", func(t *testing.T) {
-		var err error
 		e := newTestEnv(t, &testEnvOptions{
 			writerOptions: []PublicWriterOption{
 				WithAutoSetSeqNo(true),
@@ -247,25 +243,27 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 		e.stream.EXPECT().Send(gomock.Any()).Do(func(message rawtopicwriter.ClientMessage) {
 			writeReq := message.(*rawtopicwriter.WriteRequest)
 			messReceived <- writeReq.Codec
-		}).Times(2)
+		}).Times(codecMeasureIntervalBatches * 2)
 
 		codecs := make(map[rawtopiccommon.Codec]empty.Struct)
 
-		require.NoError(t, err)
-		require.NoError(t, e.writer.Write(e.ctx, []Message{{
-			Data: bytes.NewReader(messContentShort),
-		}}))
-		// wait send
-		codec := <-messReceived
-		codecs[codec] = empty.Struct{}
+		for i := 0; i < codecMeasureIntervalBatches; i++ {
+			require.NoError(t, e.writer.Write(e.ctx, []Message{{
+				Data: bytes.NewReader(messContentShort),
+			}}))
+			// wait send
+			codec := <-messReceived
+			codecs[codec] = empty.Struct{}
+		}
 
-		require.NoError(t, err)
-		require.NoError(t, e.writer.Write(e.ctx, []Message{{
-			Data: bytes.NewReader(messContentLong),
-		}}))
-		// wait send
-		codec = <-messReceived
-		codecs[codec] = empty.Struct{}
+		for i := 0; i < codecMeasureIntervalBatches; i++ {
+			require.NoError(t, e.writer.Write(e.ctx, []Message{{
+				Data: bytes.NewReader(messContentLong),
+			}}))
+			// wait send
+			codec := <-messReceived
+			codecs[codec] = empty.Struct{}
+		}
 
 		// used two different codecs
 		require.Len(t, codecs, 2)

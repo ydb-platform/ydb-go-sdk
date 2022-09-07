@@ -3,6 +3,7 @@ package topicwriterinternal
 import (
 	"bytes"
 	"math/rand"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,12 +13,12 @@ import (
 
 func TestEncoderSelector_CodecMeasure(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
-		s := NewEncoderSelector(testCommonEncoders, nil)
+		s := NewEncoderSelector(testCommonEncoders, nil, 1)
 		_, err := s.measureCodecs(nil)
 		require.Error(t, err)
 	})
 	t.Run("One", func(t *testing.T) {
-		s := NewEncoderSelector(NewEncoderMap(), rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw})
+		s := NewEncoderSelector(NewEncoderMap(), rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw}, 1)
 		codec, err := s.measureCodecs(nil)
 		require.NoError(t, err)
 		require.Equal(t, rawtopiccommon.CodecRaw, codec)
@@ -32,7 +33,7 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 		)
 
 		testSelectCodec := func(t testing.TB, targetCodec rawtopiccommon.Codec, smallCount, largeCount int) {
-			s := NewEncoderSelector(testCommonEncoders, rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip})
+			s := NewEncoderSelector(testCommonEncoders, rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip}, 4)
 
 			var messages []messageWithDataContent
 			for i := 0; i < smallCount; i++ {
@@ -135,5 +136,64 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 				testSelectCodec(t, test.targetCodec, test.smallCount, test.largeCount)
 			})
 		}
+	})
+}
+
+func TestCompressMessages(t *testing.T) {
+	t.Run("NoMessages", func(t *testing.T) {
+		require.NoError(t, compressMessages(nil, rawtopiccommon.CodecRaw, 1))
+	})
+
+	t.Run("RawOk", func(t *testing.T) {
+		messages := newTestMessagesWithContent(1)
+		require.NoError(t, compressMessages(messages, rawtopiccommon.CodecRaw, 1))
+	})
+	t.Run("RawError", func(t *testing.T) {
+		mess, err := newMessageDataWithContent(Message{}, testCommonEncoders, rawtopiccommon.CodecGzip)
+		require.NoError(t, err)
+		messages := []messageWithDataContent{mess}
+		require.Error(t, compressMessages(messages, rawtopiccommon.CodecRaw, 1))
+	})
+
+	const messageCount = 10
+	t.Run("GzipOneThread", func(t *testing.T) {
+		var messages []messageWithDataContent
+		for i := 0; i < messageCount; i++ {
+			mess, err := newMessageDataWithContent(Message{Data: strings.NewReader("asdf")}, testCommonEncoders, codecUnknown)
+			require.NoError(t, err)
+			messages = append(messages, mess)
+		}
+
+		require.NoError(t, compressMessages(messages, rawtopiccommon.CodecGzip, 1))
+		for i := 0; i < messageCount; i++ {
+			require.Equal(t, rawtopiccommon.CodecGzip, messages[i].bufCodec)
+		}
+	})
+
+	const parallelCount = 10
+	t.Run("GzipOk", func(t *testing.T) {
+		var messages []messageWithDataContent
+		for i := 0; i < messageCount; i++ {
+			mess, err := newMessageDataWithContent(Message{Data: strings.NewReader("asdf")}, testCommonEncoders, codecUnknown)
+			require.NoError(t, err)
+			messages = append(messages, mess)
+		}
+
+		require.NoError(t, compressMessages(messages, rawtopiccommon.CodecGzip, parallelCount))
+		for i := 0; i < messageCount; i++ {
+			require.Equal(t, rawtopiccommon.CodecGzip, messages[i].bufCodec)
+		}
+	})
+
+	t.Run("GzipErr", func(t *testing.T) {
+		var messages []messageWithDataContent
+		for i := 0; i < messageCount; i++ {
+			mess, err := newMessageDataWithContent(Message{Data: strings.NewReader("asdf")}, testCommonEncoders, codecUnknown)
+			require.NoError(t, err)
+			messages = append(messages, mess)
+		}
+		messages[0].hasRawContent = false
+
+		require.Error(t, compressMessages(messages, rawtopiccommon.CodecGzip, parallelCount))
 	})
 }

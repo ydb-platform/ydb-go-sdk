@@ -2,6 +2,7 @@ package topicwriterinternal
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -10,6 +11,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
+
+var errNoRawContentForRecodeMessage = xerrors.Wrap(errors.New("ydb: internal state error - no raw message content for recode message"))
 
 type Message struct {
 	SeqNo        int64
@@ -64,6 +67,10 @@ func (m *messageWithDataContent) GetEncodedBytes(codec rawtopiccommon.Codec) ([]
 	if codec == m.bufCodec {
 		return m.bufEncoded.Bytes(), nil
 	}
+	if !m.hasRawContent {
+		return nil, xerrors.WithStackTrace(errNoRawContentForRecodeMessage)
+	}
+
 	m.bufEncoded.Reset()
 
 	writer, err := m.encoders.CreateLazyEncodeWriter(codec, &m.bufEncoded)
@@ -77,6 +84,8 @@ func (m *messageWithDataContent) GetEncodedBytes(codec rawtopiccommon.Codec) ([]
 	if err != nil {
 		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed to compress message, codec '%v': %w", codec, err)))
 	}
+
+	m.bufCodec = codec
 	return m.bufEncoded.Bytes(), nil
 }
 
@@ -91,6 +100,7 @@ func (m *messageWithDataContent) readDataToRawBuf() error {
 		m.Data = nil
 		m.bufUncompressedSize = writtenBytes
 	}
+
 	return nil
 }
 

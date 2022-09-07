@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"runtime"
 	"time"
 
 	"github.com/jonboulle/clockwork"
@@ -42,13 +43,19 @@ type writerImplConfig struct {
 	additionalEncoders   map[rawtopiccommon.Codec]PublicCreateEncoderFunc
 	forceCodec           rawtopiccommon.Codec
 	fillEmptyCreatedTime bool
+	compressorCount      int
 }
 
 func newWriterImplConfig(options ...PublicWriterOption) writerImplConfig {
 	cfg := writerImplConfig{
 		autoSetSeqNo:         true,
 		fillEmptyCreatedTime: true,
+		compressorCount:      runtime.NumCPU(),
 	}
+	if cfg.compressorCount == 0 {
+		cfg.compressorCount = 1
+	}
+
 	for _, f := range options {
 		f(&cfg)
 	}
@@ -91,7 +98,7 @@ func newWriterImplStopped(cfg writerImplConfig) *WriterImpl {
 		res.encodersMap.AddEncoder(codec, creator)
 	}
 
-	res.encoder = NewEncoderSelector(res.encodersMap, res.calculateAllowedCodecs(nil))
+	res.encoder = NewEncoderSelector(res.encodersMap, res.calculateAllowedCodecs(nil), cfg.compressorCount)
 
 	return res
 }
@@ -174,6 +181,9 @@ func (w *WriterImpl) createMessagesWithContent(messages []Message) ([]messageWit
 			return nil, err
 		}
 		res = append(res, mess)
+	}
+	if err := compressMessages(res, w.cfg.forceCodec, w.cfg.compressorCount); err != nil {
+		return nil, err
 	}
 	return res, nil
 }

@@ -22,6 +22,19 @@ func WithWriterAddEncoder(codec topictypes.Codec, f CreateEncoderFunc) WriterOpt
 	return topicwriterinternal.WithAddEncoder(rawtopiccommon.Codec(codec), f)
 }
 
+// WithWriterCompressorCount
+// max count of goroutine for compress messages
+// must be more zero
+//
+// panic if num <= 0
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func WithWriterCompressorCount(num int) WriterOption {
+	return topicwriterinternal.WithCompressorCount(num)
+}
+
 // WithWriteSessionMeta
 //
 // # Experimental

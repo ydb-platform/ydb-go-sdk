@@ -27,6 +27,16 @@ func WithAutoCodec() PublicWriterOption {
 	}
 }
 
+func WithCompressorCount(num int) PublicWriterOption {
+	if num <= 0 {
+		panic("ydb: compressor count must be > 0")
+	}
+
+	return func(cfg *writerImplConfig) {
+		cfg.compressorCount = num
+	}
+}
+
 func WithCodec(codec rawtopiccommon.Codec) PublicWriterOption {
 	return func(cfg *writerImplConfig) {
 		cfg.forceCodec = codec
