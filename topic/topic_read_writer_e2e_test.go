@@ -71,14 +71,14 @@ func TestSendSyncMessages(t *testing.T) {
 			topicoptions.WithSyncWrite(true),
 		)
 		require.NoError(t, err)
-		msg := topicwriter.Message{SeqNo: 1, CreatedAt: time.Now(), Data: strings.NewReader("1")}
+		msg := topicwriter.Message{CreatedAt: time.Now(), Data: strings.NewReader("1")}
 		err = writer.Write(ctx, msg)
 		require.NoError(t, err)
 
 		grpcStopper.Stop() // stop any activity through connections
 
 		// check about connection broken
-		msg = topicwriter.Message{SeqNo: 2, CreatedAt: time.Now(), Data: strings.NewReader("nosent")}
+		msg = topicwriter.Message{CreatedAt: time.Now(), Data: strings.NewReader("nosent")}
 		err = writer.Write(ctx, msg)
 		require.Error(t, err)
 
@@ -90,7 +90,7 @@ func TestSendSyncMessages(t *testing.T) {
 			topicoptions.WithSyncWrite(true),
 		)
 		require.NoError(t, err)
-		msg = topicwriter.Message{SeqNo: 2, CreatedAt: time.Now(), Data: strings.NewReader("2")}
+		msg = topicwriter.Message{CreatedAt: time.Now(), Data: strings.NewReader("2")}
 		err = writer.Write(ctx, msg)
 		require.NoError(t, err)
 

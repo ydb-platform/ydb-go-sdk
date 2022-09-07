@@ -19,14 +19,16 @@ import (
 func TestMessageQueue_AddMessages(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		q := newMessageQueue()
-		require.NoError(t, q.AddMessages(newTestMessages(1, 3, 5)))
+		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 3, 5)))
 
 		require.Equal(t, 3, q.lastWrittenIndex)
 
-		require.Len(t, q.messagesByOrder, 3)
-		require.Equal(t, newTestMessage(1), q.messagesByOrder[1])
-		require.Equal(t, newTestMessage(3), q.messagesByOrder[2])
-		require.Equal(t, newTestMessage(5), q.messagesByOrder[3])
+		expected := map[int]messageWithDataContent{
+			1: newTestMessageWithDataContent(1),
+			2: newTestMessageWithDataContent(3),
+			3: newTestMessageWithDataContent(5),
+		}
+		testMessageMapEquals(t, expected, q.messagesByOrder)
 
 		require.Len(t, q.seqNoToOrderId, 3)
 		require.Equal(t, 1, q.seqNoToOrderId[1])
@@ -36,40 +38,40 @@ func TestMessageQueue_AddMessages(t *testing.T) {
 	t.Run("Closed", func(t *testing.T) {
 		q := newMessageQueue()
 		_ = q.Close(errors.New("err"))
-		require.Error(t, q.AddMessages(newTestMessages(1, 3, 5)))
+		require.Error(t, q.AddMessages(newTestMessagesWithContent(1, 3, 5)))
 	})
 	t.Run("OverflowIndex", func(t *testing.T) {
 		q := newMessageQueue()
 		q.lastWrittenIndex = maxInt - 1
-		require.NoError(t, q.AddMessages(newTestMessages(1, 3, 5)))
+		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 3, 5)))
 		require.Len(t, q.messagesByOrder, 3)
-		q.messagesByOrder[maxInt] = newTestMessage(1)
-		q.messagesByOrder[minInt] = newTestMessage(3)
-		q.messagesByOrder[minInt+1] = newTestMessage(5)
+		q.messagesByOrder[maxInt] = newTestMessageWithDataContent(1)
+		q.messagesByOrder[minInt] = newTestMessageWithDataContent(3)
+		q.messagesByOrder[minInt+1] = newTestMessageWithDataContent(5)
 		require.Equal(t, minInt+1, q.lastWrittenIndex)
 	})
 	t.Run("BadOrder", func(t *testing.T) {
 		q := newMessageQueue()
-		require.Error(t, q.AddMessages(newTestMessages(2, 1)))
+		require.Error(t, q.AddMessages(newTestMessagesWithContent(2, 1)))
 	})
 }
 
 func TestMessageQueue_CheckMessages(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		q := newMessageQueue()
-		require.NoError(t, q.checkNewMessagesBeforeAddNeedLock(newTestMessages()))
+		require.NoError(t, q.checkNewMessagesBeforeAddNeedLock(newTestMessagesWithContent()))
 	})
 	t.Run("Unordered", func(t *testing.T) {
 		q := newMessageQueue()
-		require.Error(t, q.checkNewMessagesBeforeAddNeedLock(newTestMessages(2, 2)))
-		require.Error(t, q.checkNewMessagesBeforeAddNeedLock(newTestMessages(2, 1)))
+		require.Error(t, q.checkNewMessagesBeforeAddNeedLock(newTestMessagesWithContent(2, 2)))
+		require.Error(t, q.checkNewMessagesBeforeAddNeedLock(newTestMessagesWithContent(2, 1)))
 	})
 	t.Run("NoGreaterThenLastSent", func(t *testing.T) {
 		q := newMessageQueue()
 		q.lastSeqNo = 10
-		require.Error(t, q.checkNewMessagesBeforeAddNeedLock(newTestMessages(int(q.lastSeqNo-1))))
-		require.Error(t, q.checkNewMessagesBeforeAddNeedLock(newTestMessages(int(q.lastSeqNo))))
-		require.NoError(t, q.checkNewMessagesBeforeAddNeedLock(newTestMessages(int(q.lastSeqNo+1))))
+		require.Error(t, q.checkNewMessagesBeforeAddNeedLock(newTestMessagesWithContent(int(q.lastSeqNo-1))))
+		require.Error(t, q.checkNewMessagesBeforeAddNeedLock(newTestMessagesWithContent(int(q.lastSeqNo))))
+		require.NoError(t, q.checkNewMessagesBeforeAddNeedLock(newTestMessagesWithContent(int(q.lastSeqNo+1))))
 	})
 }
 
@@ -87,12 +89,12 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 	ctx := context.Background()
 	t.Run("Simple", func(t *testing.T) {
 		q := newMessageQueue()
-		require.NoError(t, q.AddMessages(newTestMessages(1, 2)))
-		require.NoError(t, q.AddMessages(newTestMessages(3, 4)))
+		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 2)))
+		require.NoError(t, q.AddMessages(newTestMessagesWithContent(3, 4)))
 
 		messages, err := q.GetMessagesForSend(ctx)
 		require.NoError(t, err)
-		require.Equal(t, newTestMessages(1, 2, 3, 4), messages)
+		require.Equal(t, []int64{1, 2, 3, 4}, getSeqNumbers(messages))
 	})
 
 	t.Run("SendMessagesAfterStartWait", func(t *testing.T) {
@@ -107,11 +109,11 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 		}()
 
 		waitGetMessageStarted(&q)
-		require.NoError(t, q.AddMessages(newTestMessages(1, 2, 3)))
+		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 2, 3)))
 
 		<-gotMessages
 		require.NoError(t, err)
-		require.Equal(t, newTestMessages(1, 2, 3), messages)
+		require.Equal(t, []int64{1, 2, 3}, getSeqNumbers(messages))
 	})
 
 	t.Run("Stress", func(t *testing.T) {
@@ -129,7 +131,7 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 				m := newContentMessagesSlice()
 				for k := 0; k < count; k++ {
 					number := int(atomic.AddInt64(&lastSentSeqNo, 1))
-					m.m = append(m.m, newTestMessage(number))
+					m.m = append(m.m, newTestMessageWithDataContent(number))
 				}
 				require.NoError(t, q.AddMessages(m))
 			}
@@ -194,7 +196,7 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 		cancel()
 
 		q := newMessageQueue()
-		require.NoError(t, q.AddMessages(newTestMessages(1, 2)))
+		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 2)))
 
 		_, err := q.GetMessagesForSend(closedCtx)
 		require.ErrorIs(t, err, context.Canceled)
@@ -233,7 +235,7 @@ func TestMessageQueue_ResetSentProgress(t *testing.T) {
 
 	t.Run("Simple", func(t *testing.T) {
 		q := newMessageQueue()
-		require.NoError(t, q.AddMessages(newTestMessages(1, 2, 3)))
+		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 2, 3)))
 		res1, err := q.GetMessagesForSend(ctx)
 		require.NoError(t, err)
 
@@ -250,7 +252,7 @@ func TestMessageQueue_ResetSentProgress(t *testing.T) {
 		q.lastWrittenIndex = maxInt - 1
 		q.lastSentIndex = q.lastWrittenIndex
 
-		require.NoError(t, q.AddMessages(newTestMessages(1, 2, 3)))
+		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 2, 3)))
 		res1, err := q.GetMessagesForSend(ctx)
 		require.NoError(t, err)
 
@@ -405,33 +407,35 @@ func TestQueuePanicOnOverflow(t *testing.T) {
 func TestQueue_Ack(t *testing.T) {
 	t.Run("First", func(t *testing.T) {
 		q := newMessageQueue()
-		require.NoError(t, q.AddMessages(newTestMessages(1, 2, 5)))
+		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 2, 5)))
 
-		q.AcksReceived([]rawtopicwriter.WriteAck{
+		require.NoError(t, q.AcksReceived([]rawtopicwriter.WriteAck{
 			{
 				SeqNo: 2,
 			},
-		})
+		}))
 		expectedMap := map[int]messageWithDataContent{
-			1: newTestMessage(1),
-			3: newTestMessage(5),
+			1: newTestMessageWithDataContent(1),
+			3: newTestMessageWithDataContent(5),
 		}
-		require.Equal(t, expectedMap, q.messagesByOrder)
+		testMessageMapEquals(t, expectedMap, q.messagesByOrder)
 	})
 	t.Run("Unexisted", func(t *testing.T) {
 		q := newMessageQueue()
-		require.NoError(t, q.AddMessages(newTestMessages(1)))
+		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1)))
 
 		// remove first with the seqno
-		q.AcksReceived([]rawtopicwriter.WriteAck{
+		require.Error(t, q.AcksReceived([]rawtopicwriter.WriteAck{
 			{
 				SeqNo: 5,
 			},
-		})
+		}))
+
 		expectedMap := map[int]messageWithDataContent{
-			1: newTestMessage(1),
+			1: newTestMessageWithDataContent(1),
 		}
-		require.Equal(t, expectedMap, q.messagesByOrder)
+
+		testMessageMapEquals(t, expectedMap, q.messagesByOrder)
 	})
 }
 
@@ -439,5 +443,27 @@ func waitGetMessageStarted(q *messageQueue) {
 	q.notifyNewMessages()
 	for len(q.hasNewMessages) != 0 {
 		runtime.Gosched()
+	}
+}
+
+func getSeqNumbers(messages *messageWithDataContentSlice) []int64 {
+	res := make([]int64, 0, len(messages.m))
+	for i := range messages.m {
+		res = append(res, messages.m[i].SeqNo)
+	}
+	return res
+}
+
+// testMessageMapEquals needs because require.Equals can't compare map with functions (encoders)
+func testMessageMapEquals(t testing.TB, expected, object map[int]messageWithDataContent) {
+	t.Helper()
+	if len(expected) != len(object) {
+		t.Fatal()
+	}
+
+	for k, v := range expected {
+		if object[k].SeqNo != v.SeqNo {
+			t.Fatal()
+		}
 	}
 }

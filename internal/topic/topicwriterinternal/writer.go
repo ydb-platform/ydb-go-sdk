@@ -37,17 +37,7 @@ func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 		return err
 	}
 
-	messagesWithContent := newContentMessagesSlice()
-
-	for i := range messages {
-		contentMessage, err := newMessageDataWithContent(messages[i])
-		if err != nil {
-			return err
-		}
-		messagesWithContent.m = append(messagesWithContent.m, contentMessage)
-	}
-
-	return w.streamWriter.Write(ctx, messagesWithContent)
+	return w.streamWriter.Write(ctx, messages)
 }
 
 func (w *Writer) Close(ctx context.Context) error {

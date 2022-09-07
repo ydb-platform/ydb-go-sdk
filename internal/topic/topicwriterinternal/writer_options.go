@@ -22,6 +22,12 @@ func WithConnectFunc(connect ConnectFunc) PublicWriterOption {
 	}
 }
 
+func WithAutosetCreatedTime(enable bool) PublicWriterOption {
+	return func(cfg *writerImplConfig) {
+		cfg.fillEmptyCreatedTime = enable
+	}
+}
+
 func WithPartitioning(partitioning PublicPartitioning) PublicWriterOption {
 	return func(cfg *writerImplConfig) {
 		cfg.defaultPartitioning = partitioning.ToRaw()

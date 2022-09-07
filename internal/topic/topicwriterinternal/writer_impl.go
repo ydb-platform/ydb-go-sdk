@@ -33,20 +33,22 @@ var (
 )
 
 type writerImplConfig struct {
-	connect             ConnectFunc
-	producerID          string
-	topic               string
-	writerMeta          map[string]string
-	defaultPartitioning rawtopicwriter.Partitioning
-	waitServerAck       bool
-	autoSetSeqNo        bool
-	additionalEncoders  map[rawtopiccommon.Codec]PublicCreateEncoderFunc
-	forceCodec          rawtopiccommon.Codec
+	connect              ConnectFunc
+	producerID           string
+	topic                string
+	writerMeta           map[string]string
+	defaultPartitioning  rawtopicwriter.Partitioning
+	waitServerAck        bool
+	autoSetSeqNo         bool
+	additionalEncoders   map[rawtopiccommon.Codec]PublicCreateEncoderFunc
+	forceCodec           rawtopiccommon.Codec
+	fillEmptyCreatedTime bool
 }
 
 func newWriterImplConfig(options ...PublicWriterOption) writerImplConfig {
 	cfg := writerImplConfig{
-		autoSetSeqNo: true,
+		autoSetSeqNo:         true,
+		fillEmptyCreatedTime: true,
 	}
 	for _, f := range options {
 		f(&cfg)
@@ -112,7 +114,7 @@ func (w *WriterImpl) fillFields(messages *messageWithDataContentSlice) error {
 		}
 
 		// Set created time
-		if msg.CreatedAt.IsZero() {
+		if w.cfg.fillEmptyCreatedTime && msg.CreatedAt.IsZero() {
 			if now.IsZero() {
 				now = time.Now()
 			}
@@ -127,30 +129,32 @@ func (w *WriterImpl) start() {
 	w.background.Start(name+", sendloop", w.sendLoop)
 }
 
-func (w *WriterImpl) Write(ctx context.Context, messages *messageWithDataContentSlice) error {
+func (w *WriterImpl) Write(ctx context.Context, messages []Message) error {
 	if err := w.background.CloseReason(); err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: writer is closed: %w", err))
 	}
 
-	w.initMessagesWithContent(messages)
+	messagesSlice, err := w.createMessagesWithContent(messages)
+	if err != nil {
+		return err
+	}
 
 	if err := w.waitFirstInitResponse(ctx); err != nil {
 		return err
 	}
 
-	var err error
 	var waiter *MessageQueueAckWaiter
 	w.m.WithLock(func() {
 		// need set numbers and add to queue atomically
-		err = w.fillFields(messages)
+		err = w.fillFields(messagesSlice)
 		if err != nil {
 			return
 		}
 
 		if w.cfg.waitServerAck {
-			waiter, err = w.queue.AddMessagesWithWaiter(messages)
+			waiter, err = w.queue.AddMessagesWithWaiter(messagesSlice)
 		} else {
-			err = w.queue.AddMessages(messages)
+			err = w.queue.AddMessages(messagesSlice)
 		}
 	})
 	if err != nil {
@@ -164,11 +168,16 @@ func (w *WriterImpl) Write(ctx context.Context, messages *messageWithDataContent
 	return w.queue.Wait(ctx, waiter)
 }
 
-func (w *WriterImpl) initMessagesWithContent(messages *messageWithDataContentSlice) {
-	for i := range messages.m {
-		msg := &messages.m[i]
-		msg.SetEncoders(w.encoders)
+func (w *WriterImpl) createMessagesWithContent(messages []Message) (*messageWithDataContentSlice, error) {
+	res := newContentMessagesSlice()
+	for i := range messages {
+		mess, err := newMessageDataWithContent(messages[i], w.encoders, w.cfg.forceCodec)
+		if err != nil {
+			return nil, err
+		}
+		res.m = append(res.m, mess)
 	}
+	return res, nil
 }
 
 func (w *WriterImpl) Close(ctx context.Context) error {

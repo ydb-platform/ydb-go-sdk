@@ -48,7 +48,7 @@ func (mr *MockStreamWriterMockRecorder) Close(ctx interface{}) *gomock.Call {
 }
 
 // Write mocks base method.
-func (m *MockStreamWriter) Write(ctx context.Context, messages *messageWithDataContentSlice) error {
+func (m *MockStreamWriter) Write(ctx context.Context, messages []Message) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Write", ctx, messages)
 	ret0, _ := ret[0].(error)

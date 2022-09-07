@@ -38,7 +38,7 @@ func TestWriterImpl_AutoSeq(t *testing.T) {
 			defer wg.Done()
 
 			msgs := newTestMessages(0)
-			msgs.m[0].Message.CreatedAt = time.Unix(int64(num), 0)
+			msgs[0].CreatedAt = time.Unix(int64(num), 0)
 			require.NoError(t, w.Write(ctx, msgs))
 		}
 
@@ -103,6 +103,7 @@ func TestWriterImpl_Write(t *testing.T) {
 	t.Run("PushToQueue", func(t *testing.T) {
 		ctx := context.Background()
 		w := newTestWriterStopped()
+		w.cfg.fillEmptyCreatedTime = false
 
 		w.firstInitResponseProcessed.Store(true)
 
@@ -110,12 +111,12 @@ func TestWriterImpl_Write(t *testing.T) {
 		require.NoError(t, err)
 
 		expectedMap := map[int]messageWithDataContent{
-			1: newTestMessage(1),
-			2: newTestMessage(3),
-			3: newTestMessage(5),
+			1: newTestMessageWithDataContent(1),
+			2: newTestMessageWithDataContent(3),
+			3: newTestMessageWithDataContent(5),
 		}
 
-		require.Equal(t, expectedMap, w.queue.messagesByOrder)
+		testMessageMapEquals(t, expectedMap, w.queue.messagesByOrder)
 	})
 	t.Run("WriteWithSyncMode", func(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
@@ -146,14 +147,9 @@ func TestWriterImpl_Write(t *testing.T) {
 				close(writeMessageReceived)
 			}).Return(nil)
 
-			msgs := newTestMessages(1)
-			var err error
-			msgs.m[0], err = newMessageDataWithContent(Message{SeqNo: seqNo, CreatedAt: messageTime, Data: bytes.NewReader(messageData)})
-			require.NoError(t, err)
-
 			writeCompleted := make(empty.Chan)
 			go func() {
-				err = e.writer.Write(e.ctx, msgs)
+				err := e.writer.Write(e.ctx, []Message{{SeqNo: seqNo, CreatedAt: messageTime, Data: bytes.NewReader(messageData)}})
 				require.NoError(t, err)
 				close(writeCompleted)
 			}()
@@ -209,14 +205,12 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 			close(messReceived)
 		})
 
-		msgs := newTestMessages(seqNo)
-		msgs.m[0], err = newMessageDataWithContent(Message{
+		require.NoError(t, err)
+		require.NoError(t, e.writer.Write(e.ctx, []Message{{
 			SeqNo:     seqNo,
 			CreatedAt: createdTime,
 			Data:      bytes.NewReader(messContent),
-		})
-		require.NoError(t, err)
-		require.NoError(t, e.writer.Write(e.ctx, msgs))
+		}}))
 
 		xtest.WaitChannelClosed(t, messReceived)
 	})
@@ -253,14 +247,12 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 			close(messReceived)
 		})
 
-		msgs := newTestMessages(seqNo)
-		msgs.m[0], err = newMessageDataWithContent(Message{
+		require.NoError(t, err)
+		require.NoError(t, e.writer.Write(e.ctx, []Message{{
 			SeqNo:     seqNo,
 			CreatedAt: createdTime,
 			Data:      bytes.NewReader(messContent),
-		})
-		require.NoError(t, err)
-		require.NoError(t, e.writer.Write(e.ctx, msgs))
+		}}))
 
 		xtest.WaitChannelClosed(t, messReceived)
 	})
@@ -296,7 +288,7 @@ func TestWriterImpl_InitSession(t *testing.T) {
 	err := w.initStream(strm)
 	require.NoError(t, err)
 	require.Equal(t, "test-session-id", w.sessionID)
-	require.Equal(t, rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip}, w.allowedCodecsVal)
+	require.Equal(t, rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw}, w.allowedCodecsVal)
 	require.Equal(t, lastSeqNo, w.lastSeqNo)
 	require.True(t, isClosed(w.firstInitResponseProcessedChan))
 }
@@ -446,15 +438,15 @@ func TestAllMessagesHasSameBufCodec(t *testing.T) {
 	})
 
 	t.Run("One", func(t *testing.T) {
-		require.True(t, allMessagesHasSameBufCodec(newTestMessages(1).m))
+		require.True(t, allMessagesHasSameBufCodec(newTestMessagesWithContent(1).m))
 	})
 
 	t.Run("SameCodecs", func(t *testing.T) {
-		require.True(t, allMessagesHasSameBufCodec(newTestMessages(1, 2, 3).m))
+		require.True(t, allMessagesHasSameBufCodec(newTestMessagesWithContent(1, 2, 3).m))
 	})
 	t.Run("DifferCodecs", func(t *testing.T) {
 		for i := 0; i < 3; i++ {
-			messages := newTestMessages(1, 2, 3)
+			messages := newTestMessagesWithContent(1, 2, 3)
 			messages.m[i].bufCodec = rawtopiccommon.CodecGzip
 			require.False(t, allMessagesHasSameBufCodec(messages.m))
 		}
@@ -463,11 +455,11 @@ func TestAllMessagesHasSameBufCodec(t *testing.T) {
 
 func TestCreateRawMessageData(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
-		req, err := createWriteRequest(nil, rawtopiccommon.CodecRaw)
+		req, err := createWriteRequest(newTestMessagesWithContent(), rawtopiccommon.CodecRaw)
 		require.NoError(t, err)
 		require.Equal(t,
 			rawtopicwriter.WriteRequest{
-				Messages: nil,
+				Messages: []rawtopicwriter.MessageData{},
 				Codec:    rawtopiccommon.CodecRaw,
 			},
 			req,
@@ -499,7 +491,7 @@ func TestSplitMessagesByBufCodec(t *testing.T) {
 		t.Run(fmt.Sprint(test), func(t *testing.T) {
 			var messages []messageWithDataContent
 			for index, codec := range test {
-				mess := newTestMessage(index)
+				mess := newTestMessageWithDataContent(index)
 				mess.bufCodec = codec
 				messages = append(messages, mess)
 			}
@@ -591,18 +583,27 @@ func TestWriterImpl_CalculateAllowedCodecs(t *testing.T) {
 	}
 }
 
-func newTestMessage(num int) messageWithDataContent {
+func newTestMessageWithDataContent(num int) messageWithDataContent {
 	return messageWithDataContent{
 		Message:  Message{SeqNo: int64(num)},
 		rawBuf:   newBuffer(),
 		bufCodec: rawtopiccommon.CodecRaw,
+		encoders: NewEncoderMap(),
 	}
 }
 
-func newTestMessages(numbers ...int) *messageWithDataContentSlice {
+func newTestMessages(numbers ...int) []Message {
+	messages := make([]Message, 0, len(numbers))
+	for _, num := range numbers {
+		messages = append(messages, Message{SeqNo: int64(num)})
+	}
+	return messages
+}
+
+func newTestMessagesWithContent(numbers ...int) *messageWithDataContentSlice {
 	messages := newContentMessagesSlice()
 	for _, num := range numbers {
-		messages.m = append(messages.m, newTestMessage(num))
+		messages.m = append(messages.m, newTestMessageWithDataContent(num))
 	}
 	return messages
 }
@@ -622,6 +623,7 @@ func defaultTestWriterOptions() []PublicWriterOption {
 		WithAutoSetSeqNo(false),
 		WithWaitAckOnWrite(false),
 		WithCodec(rawtopiccommon.CodecRaw),
+		WithAutosetCreatedTime(false),
 	}
 }
 

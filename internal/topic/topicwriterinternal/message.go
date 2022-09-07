@@ -54,10 +54,6 @@ type messageWithDataContent struct {
 	bufUncompressedSize int64
 }
 
-func (m *messageWithDataContent) SetEncoders(encoders EncoderMap) {
-	m.encoders = encoders
-}
-
 func (m *messageWithDataContent) GetEncodedBytes(codec rawtopiccommon.Codec) ([]byte, error) {
 	if codec == rawtopiccommon.CodecRaw && m.rawBuf != nil {
 		return m.rawBuf.Bytes(), nil
@@ -87,20 +83,53 @@ func (m *messageWithDataContent) GetEncodedBytes(codec rawtopiccommon.Codec) ([]
 	return m.bufEncoded.Bytes(), nil
 }
 
-func newMessageDataWithContent(mess Message) (res messageWithDataContent, err error) {
-	res.Message = mess
-	res.Data = nil
-
-	res.rawBuf = newBuffer()
-	res.bufCodec = rawtopiccommon.CodecUNSPECIFIED
-
-	if mess.Data != nil {
-		writtenBytes, err := io.Copy(res.rawBuf, mess.Data)
+func (m *messageWithDataContent) readDataToRawBuf() error {
+	m.rawBuf = newBuffer()
+	if m.Data != nil {
+		writtenBytes, err := io.Copy(m.rawBuf, m.Data)
 		if err != nil {
-			return messageWithDataContent{}, xerrors.WithStackTrace(err)
+			return xerrors.WithStackTrace(err)
 		}
-		res.bufUncompressedSize = writtenBytes
+		m.Data = nil
+		m.bufUncompressedSize = writtenBytes
 	}
+	return nil
+}
+
+func (m *messageWithDataContent) readDataToTargetCodec(codec rawtopiccommon.Codec) error {
+	m.bufCodec = codec
+	m.bufEncoded = newBuffer()
+
+	encoder, err := m.encoders.CreateLazyEncodeWriter(codec, m.bufEncoded)
+	if err != nil {
+		return err
+	}
+
+	reader := m.Data
+	if reader == nil {
+		reader = &bytes.Reader{}
+	}
+	bytesCount, err := io.Copy(encoder, reader)
+	if err == nil {
+		err = encoder.Close()
+	}
+	if err != nil {
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed compress message with codec '%v': %w", codec, err)))
+	}
+	m.bufUncompressedSize = bytesCount
+	return nil
+}
+
+func newMessageDataWithContent(mess Message, encoders EncoderMap, targetCodec rawtopiccommon.Codec) (res messageWithDataContent, err error) {
+	res.encoders = encoders
+	res.Message = mess
+
+	if targetCodec == rawtopiccommon.CodecUNSPECIFIED {
+		err = res.readDataToRawBuf()
+	} else {
+		err = res.readDataToTargetCodec(targetCodec)
+	}
+
 	return res, xerrors.WithStackTrace(err)
 }
 

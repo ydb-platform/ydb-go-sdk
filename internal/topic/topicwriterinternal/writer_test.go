@@ -8,18 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func BenchmarkWriteMessageAllocations(b *testing.B) {
-	b.ReportAllocs()
-	w := &Writer{
-		streamWriter: writerReturnToPool{},
-	}
-	ctx := context.Background()
-
-	for i := 0; i < b.N; i++ {
-		_ = w.Write(ctx, Message{SeqNo: int64(i)})
-	}
-}
-
 func TestWriterWrite(t *testing.T) {
 	t.Run("Ok", func(t *testing.T) {
 		ctx := context.Background()
@@ -48,18 +36,4 @@ func TestWriterWriteMessage(t *testing.T) {
 		}
 		require.NoError(t, w.Write(ctx, Message{SeqNo: 1}, Message{SeqNo: 3}))
 	})
-}
-
-type writerReturnToPool struct{}
-
-func (w writerReturnToPool) Write(ctx context.Context, messages *messageWithDataContentSlice) error {
-	for i := 0; i < len(messages.m); i++ {
-		putBuffer(messages.m[i].rawBuf)
-	}
-	putContentMessagesSlice(messages)
-	return nil
-}
-
-func (w writerReturnToPool) Close(ctx context.Context) error {
-	return nil
 }
