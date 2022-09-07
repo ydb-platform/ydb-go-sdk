@@ -256,6 +256,46 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 
 		xtest.WaitChannelClosed(t, messReceived)
 	})
+	t.Run("Auto", func(t *testing.T) {
+		var err error
+		e := newTestEnv(t, &testEnvOptions{
+			writerOptions: []PublicWriterOption{
+				WithAutoSetSeqNo(true),
+				WithAutoCodec(),
+			},
+			topicCodecs: rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip},
+		})
+
+		messContentShort := []byte("1")
+		messContentLong := make([]byte, 100000)
+
+		messReceived := make(chan rawtopiccommon.Codec, 2)
+		e.stream.EXPECT().Send(gomock.Any()).Do(func(message rawtopicwriter.ClientMessage) {
+			writeReq := message.(*rawtopicwriter.WriteRequest)
+			messReceived <- writeReq.Codec
+		}).Times(2)
+
+		codecs := make(map[rawtopiccommon.Codec]empty.Struct)
+
+		require.NoError(t, err)
+		require.NoError(t, e.writer.Write(e.ctx, []Message{{
+			Data: bytes.NewReader(messContentShort),
+		}}))
+		// wait send
+		codec := <-messReceived
+		codecs[codec] = empty.Struct{}
+
+		require.NoError(t, err)
+		require.NoError(t, e.writer.Write(e.ctx, []Message{{
+			Data: bytes.NewReader(messContentLong),
+		}}))
+		// wait send
+		codec = <-messReceived
+		codecs[codec] = empty.Struct{}
+
+		// used two different codecs
+		require.Len(t, codecs, 2)
+	})
 }
 
 func TestEnv(t *testing.T) {

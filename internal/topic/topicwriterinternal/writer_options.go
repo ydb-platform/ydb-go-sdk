@@ -10,6 +10,12 @@ func WithAutoSetSeqNo(val bool) PublicWriterOption {
 	}
 }
 
+func WithAutoCodec() PublicWriterOption {
+	return func(cfg *writerImplConfig) {
+		cfg.forceCodec = rawtopiccommon.CodecUNSPECIFIED
+	}
+}
+
 func WithCodec(codec rawtopiccommon.Codec) PublicWriterOption {
 	return func(cfg *writerImplConfig) {
 		cfg.forceCodec = codec
