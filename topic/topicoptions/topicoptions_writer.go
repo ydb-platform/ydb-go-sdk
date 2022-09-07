@@ -1,6 +1,7 @@
 package topicoptions
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
@@ -9,6 +10,17 @@ import (
 type WriterOption = topicwriterinternal.PublicWriterOption
 
 type WriteSessionMetadata map[string]string
+
+type CreateEncoderFunc = topicwriterinternal.PublicCreateEncoderFunc
+
+// WithWriterAddEncoder
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func WithWriterAddEncoder(codec topictypes.Codec, f CreateEncoderFunc) WriterOption {
+	return topicwriterinternal.WithAddEncoder(rawtopiccommon.Codec(codec), f)
+}
 
 // WithWriteSessionMeta
 //

@@ -187,32 +187,19 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 		e := newTestEnv(t, &testEnvOptions{writerOptions: []PublicWriterOption{WithCodec(rawtopiccommon.CodecRaw)}})
 
 		messContent := []byte("123")
-		createdTime := time.Date(2022, 9, 2, 13, 44, 1, 0, time.UTC)
 
-		const seqNo = 1
-		messReceived := make(empty.Chan)
-		e.stream.EXPECT().Send(&rawtopicwriter.WriteRequest{
-			Messages: []rawtopicwriter.MessageData{
-				{
-					SeqNo:            seqNo,
-					CreatedAt:        createdTime,
-					UncompressedSize: int64(len(messContent)),
-					Data:             messContent,
-				},
-			},
-			Codec: rawtopiccommon.CodecRaw,
-		}).Do(func(_ interface{}) {
-			close(messReceived)
+		messReceived := make(chan rawtopiccommon.Codec, 2)
+		e.stream.EXPECT().Send(gomock.Any()).Do(func(message rawtopicwriter.ClientMessage) {
+			writeReq := message.(*rawtopicwriter.WriteRequest)
+			messReceived <- writeReq.Codec
 		})
 
 		require.NoError(t, err)
 		require.NoError(t, e.writer.Write(e.ctx, []Message{{
-			SeqNo:     seqNo,
-			CreatedAt: createdTime,
-			Data:      bytes.NewReader(messContent),
+			Data: bytes.NewReader(messContent),
 		}}))
 
-		xtest.WaitChannelClosed(t, messReceived)
+		require.Equal(t, rawtopiccommon.CodecRaw, <-messReceived)
 	})
 	t.Run("ForceGzip", func(t *testing.T) {
 		var err error
@@ -229,32 +216,18 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, writer.Close())
 
-		createdTime := time.Date(2022, 9, 2, 13, 44, 1, 0, time.UTC)
-
-		const seqNo = 1
-		messReceived := make(empty.Chan)
-		e.stream.EXPECT().Send(&rawtopicwriter.WriteRequest{
-			Messages: []rawtopicwriter.MessageData{
-				{
-					SeqNo:            seqNo,
-					CreatedAt:        createdTime,
-					UncompressedSize: int64(len(messContent)),
-					Data:             gzipped.Bytes(),
-				},
-			},
-			Codec: rawtopiccommon.CodecGzip,
-		}).Do(func(_ interface{}) {
-			close(messReceived)
+		messReceived := make(chan rawtopiccommon.Codec, 2)
+		e.stream.EXPECT().Send(gomock.Any()).Do(func(message rawtopicwriter.ClientMessage) {
+			writeReq := message.(*rawtopicwriter.WriteRequest)
+			messReceived <- writeReq.Codec
 		})
 
 		require.NoError(t, err)
 		require.NoError(t, e.writer.Write(e.ctx, []Message{{
-			SeqNo:     seqNo,
-			CreatedAt: createdTime,
-			Data:      bytes.NewReader(messContent),
+			Data: bytes.NewReader(messContent),
 		}}))
 
-		xtest.WaitChannelClosed(t, messReceived)
+		require.Equal(t, rawtopiccommon.CodecGzip, <-messReceived)
 	})
 	t.Run("Auto", func(t *testing.T) {
 		var err error
