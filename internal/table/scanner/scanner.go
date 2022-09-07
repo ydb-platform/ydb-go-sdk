@@ -23,16 +23,17 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-var errTruncated = xerrors.Retryable(errors.New("truncated result"))
+var errTruncated = xerrors.Wrap(errors.New("truncated result"))
 
 type scanner struct {
-	set             *Ydb.ResultSet
-	row             *Ydb.Value
-	converter       *rawConverter
-	stack           scanStack
-	nextRow         int
-	nextItem        int
-	ignoreTruncated bool
+	set                      *Ydb.ResultSet
+	row                      *Ydb.Value
+	converter                *rawConverter
+	stack                    scanStack
+	nextRow                  int
+	nextItem                 int
+	ignoreTruncated          bool
+	markTruncatedAsRetryable bool
 
 	columnIndexes []int
 
@@ -226,6 +227,9 @@ func (s *scanner) Err() error {
 		return s.err
 	}
 	if !s.ignoreTruncated && s.truncated() {
+		if s.markTruncatedAsRetryable {
+			return xerrors.WithStackTrace(xerrors.Retryable(errTruncated))
+		}
 		return xerrors.WithStackTrace(errTruncated)
 	}
 	return nil
