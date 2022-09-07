@@ -28,7 +28,7 @@ func TestMessageQueue_AddMessages(t *testing.T) {
 			2: newTestMessageWithDataContent(3),
 			3: newTestMessageWithDataContent(5),
 		}
-		testMessageMapEquals(t, expected, q.messagesByOrder)
+		require.Equal(t, expected, q.messagesByOrder)
 
 		require.Len(t, q.seqNoToOrderId, 3)
 		require.Equal(t, 1, q.seqNoToOrderId[1])
@@ -418,7 +418,7 @@ func TestQueue_Ack(t *testing.T) {
 			1: newTestMessageWithDataContent(1),
 			3: newTestMessageWithDataContent(5),
 		}
-		testMessageMapEquals(t, expectedMap, q.messagesByOrder)
+		require.Equal(t, expectedMap, q.messagesByOrder)
 	})
 	t.Run("Unexisted", func(t *testing.T) {
 		q := newMessageQueue()
@@ -435,7 +435,7 @@ func TestQueue_Ack(t *testing.T) {
 			1: newTestMessageWithDataContent(1),
 		}
 
-		testMessageMapEquals(t, expectedMap, q.messagesByOrder)
+		require.Equal(t, expectedMap, q.messagesByOrder)
 	})
 }
 
@@ -452,18 +452,4 @@ func getSeqNumbers(messages []messageWithDataContent) []int64 {
 		res = append(res, messages[i].SeqNo)
 	}
 	return res
-}
-
-// testMessageMapEquals needs because require.Equals can't compare map with functions (encoders)
-func testMessageMapEquals(t testing.TB, expected, object map[int]messageWithDataContent) {
-	t.Helper()
-	if len(expected) != len(object) {
-		t.Fatal()
-	}
-
-	for k, v := range expected {
-		if object[k].SeqNo != v.SeqNo {
-			t.Fatal()
-		}
-	}
 }

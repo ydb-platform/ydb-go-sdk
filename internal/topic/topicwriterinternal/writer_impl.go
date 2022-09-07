@@ -70,7 +70,7 @@ type WriterImpl struct {
 	sessionID                      string
 	lastSeqNo                      int64
 	firstInitResponseProcessedChan empty.Chan
-	encoders                       EncoderMap
+	encoders                       *EncoderMap
 }
 
 func newWriterImpl(cfg writerImplConfig) *WriterImpl {

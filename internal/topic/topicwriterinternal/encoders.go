@@ -13,8 +13,8 @@ type EncoderMap struct {
 	m map[rawtopiccommon.Codec]PublicCreateEncoderFunc
 }
 
-func NewEncoderMap() EncoderMap {
-	return EncoderMap{
+func NewEncoderMap() *EncoderMap {
+	return &EncoderMap{
 		m: map[rawtopiccommon.Codec]PublicCreateEncoderFunc{
 			rawtopiccommon.CodecRaw: func(writer io.Writer) (io.WriteCloser, error) {
 				return nopWriteCloser{writer}, nil

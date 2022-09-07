@@ -24,6 +24,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
+var testCommonEncoders = NewEncoderMap()
+
 func TestWriterImpl_AutoSeq(t *testing.T) {
 	t.Run("OK", func(t *testing.T) {
 		ctx := xtest.Context(t)
@@ -104,7 +106,6 @@ func TestWriterImpl_Write(t *testing.T) {
 		ctx := context.Background()
 		w := newTestWriterStopped()
 		w.cfg.fillEmptyCreatedTime = false
-
 		w.firstInitResponseProcessed.Store(true)
 
 		err := w.Write(ctx, newTestMessages(1, 3, 5))
@@ -116,7 +117,7 @@ func TestWriterImpl_Write(t *testing.T) {
 			3: newTestMessageWithDataContent(5),
 		}
 
-		testMessageMapEquals(t, expectedMap, w.queue.messagesByOrder)
+		require.Equal(t, expectedMap, w.queue.messagesByOrder)
 	})
 	t.Run("WriteWithSyncMode", func(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
@@ -340,7 +341,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			SessionID:       "test-session",
 			PartitionID:     10,
 			SupportedCodecs: rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip},
-		}, nil)
+		}, nil).MaxTimes(2)
 		strm.EXPECT().CloseSend().Do(func() {
 			require.NoError(t, streamContext.Err())
 			require.ErrorIs(t, ctx.Err(), testErr)
@@ -597,11 +598,11 @@ func TestWriterImpl_CalculateAllowedCodecs(t *testing.T) {
 }
 
 func newTestMessageWithDataContent(num int) messageWithDataContent {
-	return messageWithDataContent{
-		Message:  Message{SeqNo: int64(num)},
-		bufCodec: rawtopiccommon.CodecRaw,
-		encoders: NewEncoderMap(),
+	res, err := newMessageDataWithContent(Message{SeqNo: int64(num)}, testCommonEncoders, rawtopiccommon.CodecRaw)
+	if err != nil {
+		panic(err)
 	}
+	return res
 }
 
 func newTestMessages(numbers ...int) []Message {
@@ -623,7 +624,13 @@ func newTestMessagesWithContent(numbers ...int) []messageWithDataContent {
 func newTestWriterStopped(opts ...PublicWriterOption) *WriterImpl {
 	cfgOptions := append(defaultTestWriterOptions(), opts...)
 	cfg := newWriterImplConfig(cfgOptions...)
-	return newWriterImplStopped(cfg)
+	res := newWriterImplStopped(cfg)
+
+	if cfg.additionalEncoders == nil {
+		res.encoders = testCommonEncoders
+	}
+
+	return res
 }
 
 func defaultTestWriterOptions() []PublicWriterOption {

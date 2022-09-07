@@ -47,7 +47,7 @@ func NewPartitioningWithPartitionID(id int64) PublicPartitioning {
 type messageWithDataContent struct {
 	Message
 
-	encoders            EncoderMap
+	encoders            *EncoderMap
 	hasRawContent       bool
 	rawBuf              bytes.Buffer
 	hasEncodedContent   bool
@@ -119,11 +119,11 @@ func (m *messageWithDataContent) readDataToTargetCodec(codec rawtopiccommon.Code
 	return nil
 }
 
-func newMessageDataWithContent(mess Message, encoders EncoderMap, targetCodec rawtopiccommon.Codec) (res messageWithDataContent, err error) {
+func newMessageDataWithContent(mess Message, encoders *EncoderMap, targetCodec rawtopiccommon.Codec) (res messageWithDataContent, err error) {
 	res.encoders = encoders
 	res.Message = mess
 
-	if targetCodec == rawtopiccommon.CodecUNSPECIFIED {
+	if targetCodec == rawtopiccommon.CodecUNSPECIFIED || targetCodec == rawtopiccommon.CodecRaw {
 		err = res.readDataToRawBuf()
 	} else {
 		err = res.readDataToTargetCodec(targetCodec)
