@@ -63,11 +63,6 @@ func (c *SupportedCodecs) IsEqualsTo(other SupportedCodecs) bool {
 		return false
 	}
 
-	maxLen := len(*c)
-	if otherLen := len(other); otherLen > maxLen {
-		maxLen = otherLen
-	}
-
 	codecs := make(map[Codec]struct{})
 	for _, v := range *c {
 		codecs[v] = struct{}{}
@@ -75,15 +70,6 @@ func (c *SupportedCodecs) IsEqualsTo(other SupportedCodecs) bool {
 
 	for _, v := range other {
 		if _, ok := codecs[v]; !ok {
-			return false
-		}
-	}
-	return true
-}
-
-func (c *SupportedCodecs) containsAllIn(other SupportedCodecs) bool {
-	for _, v := range *c {
-		if !other.Contains(v) {
 			return false
 		}
 	}

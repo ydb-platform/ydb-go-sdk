@@ -30,10 +30,10 @@ func TestMessageQueue_AddMessages(t *testing.T) {
 		}
 		require.Equal(t, expected, q.messagesByOrder)
 
-		require.Len(t, q.seqNoToOrderId, 3)
-		require.Equal(t, 1, q.seqNoToOrderId[1])
-		require.Equal(t, 2, q.seqNoToOrderId[3])
-		require.Equal(t, 3, q.seqNoToOrderId[5])
+		require.Len(t, q.seqNoToOrderID, 3)
+		require.Equal(t, 1, q.seqNoToOrderID[1])
+		require.Equal(t, 2, q.seqNoToOrderID[3])
+		require.Equal(t, 3, q.seqNoToOrderID[5])
 	})
 	t.Run("Closed", func(t *testing.T) {
 		q := newMessageQueue()
@@ -125,6 +125,7 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 		fatalChan := make(chan string)
 
 		go func() {
+			//nolint:gosec
 			sendRand := rand.New(rand.NewSource(0))
 			for i := 0; i < iterations; i++ {
 				count := sendRand.Intn(10) + 1

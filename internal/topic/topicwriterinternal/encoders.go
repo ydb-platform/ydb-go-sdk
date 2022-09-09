@@ -182,7 +182,7 @@ func compressMessages(messages []messageWithDataContent, codec rawtopiccommon.Co
 		workerCount = len(messages)
 	}
 
-	// no need goroutines and syncronization for raw codec (no encode work) or zero-one worker
+	// no need goroutines and synchronization for raw codec (no encode work) or zero-one worker
 	if codec == rawtopiccommon.CodecRaw || workerCount < 2 {
 		for i := range messages {
 			if _, err := messages[i].GetEncodedBytes(codec); err != nil {

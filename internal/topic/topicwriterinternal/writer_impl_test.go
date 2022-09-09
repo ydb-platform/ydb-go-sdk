@@ -540,46 +540,75 @@ func TestWriterImpl_CalculateAllowedCodecs(t *testing.T) {
 		expectedResult rawtopiccommon.SupportedCodecs
 	}{
 		{
-			name:           "ForceRawWithEmptyServer",
-			force:          rawtopiccommon.CodecRaw,
-			serverCodecs:   nil,
-			expectedResult: rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},
+			name:         "ForceRawWithEmptyServer",
+			force:        rawtopiccommon.CodecRaw,
+			serverCodecs: nil,
+			expectedResult: rawtopiccommon.SupportedCodecs{
+				rawtopiccommon.CodecRaw,
+			},
 		},
 		{
-			name:           "ForceRawWithAllowedByServer",
-			force:          rawtopiccommon.CodecRaw,
-			serverCodecs:   rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip},
-			expectedResult: rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},
+			name:  "ForceRawWithAllowedByServer",
+			force: rawtopiccommon.CodecRaw,
+			serverCodecs: rawtopiccommon.SupportedCodecs{
+				rawtopiccommon.CodecRaw,
+				rawtopiccommon.CodecGzip,
+			},
+			expectedResult: rawtopiccommon.SupportedCodecs{
+				rawtopiccommon.CodecRaw,
+			},
 		},
 		{
-			name:           "ForceCustomWithAllowedByServer",
-			force:          customCodecSupported,
-			serverCodecs:   rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip, customCodecSupported},
-			expectedResult: rawtopiccommon.SupportedCodecs{customCodecSupported},
+			name:  "ForceCustomWithAllowedByServer",
+			force: customCodecSupported,
+			serverCodecs: rawtopiccommon.SupportedCodecs{
+				rawtopiccommon.CodecRaw,
+				rawtopiccommon.CodecGzip,
+				customCodecSupported,
+			},
+			expectedResult: rawtopiccommon.SupportedCodecs{
+				customCodecSupported,
+			},
 		},
 		{
-			name:           "ForceRawWithDeniedByServer",
-			force:          rawtopiccommon.CodecRaw,
-			serverCodecs:   rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecGzip},
+			name:  "ForceRawWithDeniedByServer",
+			force: rawtopiccommon.CodecRaw,
+			serverCodecs: rawtopiccommon.SupportedCodecs{
+				rawtopiccommon.CodecGzip,
+			},
 			expectedResult: nil,
 		},
 		{
-			name:           "NotForcedWithEmptyServerList",
-			force:          rawtopiccommon.CodecUNSPECIFIED,
-			serverCodecs:   nil,
-			expectedResult: rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip},
+			name:         "NotForcedWithEmptyServerList",
+			force:        rawtopiccommon.CodecUNSPECIFIED,
+			serverCodecs: nil,
+			expectedResult: rawtopiccommon.SupportedCodecs{
+				rawtopiccommon.CodecRaw,
+				rawtopiccommon.CodecGzip,
+			},
 		},
 		{
-			name:           "NotForcedWithServerGzipOnly",
-			force:          rawtopiccommon.CodecUNSPECIFIED,
-			serverCodecs:   rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecGzip},
-			expectedResult: rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecGzip},
+			name:  "NotForcedWithServerGzipOnly",
+			force: rawtopiccommon.CodecUNSPECIFIED,
+			serverCodecs: rawtopiccommon.SupportedCodecs{
+				rawtopiccommon.CodecGzip,
+			},
+			expectedResult: rawtopiccommon.SupportedCodecs{
+				rawtopiccommon.CodecGzip,
+			},
 		},
 		{
-			name:           "NotForcedCustomCodecSupportedAndAllowedByServer",
-			force:          rawtopiccommon.CodecUNSPECIFIED,
-			serverCodecs:   rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecGzip, customCodecSupported, customCodecUnsupported},
-			expectedResult: rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecGzip, customCodecSupported},
+			name:  "NotForcedCustomCodecSupportedAndAllowedByServer",
+			force: rawtopiccommon.CodecUNSPECIFIED,
+			serverCodecs: rawtopiccommon.SupportedCodecs{
+				rawtopiccommon.CodecGzip,
+				customCodecSupported,
+				customCodecUnsupported,
+			},
+			expectedResult: rawtopiccommon.SupportedCodecs{
+				rawtopiccommon.CodecGzip,
+				customCodecSupported,
+			},
 		},
 	}
 
@@ -684,7 +713,10 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 		partitionID:           14,
 	}
 
-	writerOptions := append(defaultTestWriterOptions(), WithConnectFunc(func(ctx context.Context) (RawTopicWriterStream, error) {
+	writerOptions := append(defaultTestWriterOptions(), WithConnectFunc(func(ctx context.Context) (
+		RawTopicWriterStream,
+		error,
+	) {
 		connectNum := atomic.AddInt64(&res.connectCount, 1)
 		if connectNum > 1 {
 			t.Fatalf("test: default env support most one connection")

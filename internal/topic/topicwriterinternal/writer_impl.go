@@ -2,8 +2,11 @@ package topicwriterinternal
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
+	"math"
+	"math/big"
 	"reflect"
 	"runtime"
 	"time"
@@ -28,7 +31,6 @@ var (
 	errCloseWriterImplStreamLoop = xerrors.Wrap(errors.New("ydb: close writer impl stream loop"))
 	errCloseWriterImplReconnect  = xerrors.Wrap(errors.New("ydb: stream writer reconnect"))
 	errCloseWriterImplStopWork   = xerrors.Wrap(errors.New("ydb: stop work with writer stream"))
-	errBadCodec                  = xerrors.Wrap(errors.New("ydb: internal error - bad codec for message"))
 	errNonZeroSeqNo              = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))
 	errNoAllowedCodecs           = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
 )
@@ -65,8 +67,7 @@ func newWriterImplConfig(options ...PublicWriterOption) writerImplConfig {
 }
 
 type WriterImpl struct {
-	cfg        writerImplConfig
-	instanceID string
+	cfg writerImplConfig
 
 	queue                      messageQueue
 	background                 background.Worker
@@ -102,6 +103,8 @@ func newWriterImplStopped(cfg writerImplConfig) *WriterImpl {
 	}
 
 	res.encoder = NewEncoderSelector(res.encodersMap, res.calculateAllowedCodecs(nil), cfg.compressorCount)
+	id, _ := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
+	res.sessionID = "not-connected-" + id.String()
 
 	return res
 }
@@ -147,7 +150,7 @@ func (w *WriterImpl) Write(ctx context.Context, messages []Message) error {
 		return err
 	}
 
-	if err := w.waitFirstInitResponse(ctx); err != nil {
+	if err = w.waitFirstInitResponse(ctx); err != nil {
 		return err
 	}
 
@@ -241,7 +244,7 @@ func (w *WriterImpl) sendLoop(ctx context.Context) {
 			}
 		}
 
-		traceOnDone := trace.TopicOnWriterReconnect(w.cfg.tracer, w.cfg.topic, w.cfg.producerID, attempt)
+		traceOnDone := trace.TopicOnWriterReconnect(w.cfg.tracer, w.cfg.topic, w.cfg.producerID, w.sessionID, attempt)
 
 		stream, err := w.connectWithTimeout(streamCtx)
 
@@ -280,7 +283,7 @@ func (w *WriterImpl) communicateWithServerThroughExistedStream(ctx context.Conte
 		cancel(xerrors.WithStackTrace(errCloseWriterImplStopWork))
 	}()
 
-	traceOnDone := trace.TopicOnWriterInitStream(w.cfg.tracer, w.cfg.topic, w.cfg.producerID)
+	traceOnDone := trace.TopicOnWriterInitStream(w.cfg.tracer, w.cfg.topic, w.cfg.producerID, w.sessionID)
 	err := w.initStream(stream)
 	traceOnDone(err)
 	if err != nil {
@@ -341,7 +344,9 @@ func (w *WriterImpl) createInitRequest() rawtopicwriter.InitRequest {
 	}
 }
 
-func (w *WriterImpl) calculateAllowedCodecs(serverCodecs rawtopiccommon.SupportedCodecs) rawtopiccommon.SupportedCodecs {
+func (w *WriterImpl) calculateAllowedCodecs(
+	serverCodecs rawtopiccommon.SupportedCodecs,
+) rawtopiccommon.SupportedCodecs {
 	if w.cfg.forceCodec != rawtopiccommon.CodecUNSPECIFIED {
 		if serverCodecs.AllowedByCodecsList(w.cfg.forceCodec) && w.encodersMap.IsSupported(w.cfg.forceCodec) {
 			return rawtopiccommon.SupportedCodecs{w.cfg.forceCodec}
@@ -433,7 +438,11 @@ func (w *WriterImpl) waitFirstInitResponse(ctx context.Context) error {
 	}
 }
 
-func sendMessagesToStream(stream RawTopicWriterStream, targetCodec rawtopiccommon.Codec, messages []messageWithDataContent) error {
+func sendMessagesToStream(
+	stream RawTopicWriterStream,
+	targetCodec rawtopiccommon.Codec,
+	messages []messageWithDataContent,
+) error {
 	if len(messages) == 0 {
 		return nil
 	}
@@ -482,7 +491,10 @@ func splitMessagesByBufCodec(messages []messageWithDataContent) (res [][]message
 	return res
 }
 
-func createWriteRequest(messages []messageWithDataContent, targetCodec rawtopiccommon.Codec) (res rawtopicwriter.WriteRequest, err error) {
+func createWriteRequest(messages []messageWithDataContent, targetCodec rawtopiccommon.Codec) (
+	res rawtopicwriter.WriteRequest,
+	err error,
+) {
 	res.Codec = targetCodec
 	res.Messages = make([]rawtopicwriter.MessageData, len(messages))
 	for i := range messages {

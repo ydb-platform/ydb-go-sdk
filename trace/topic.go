@@ -378,7 +378,8 @@ type (
 	TopicWriterReconnectStartInfo struct {
 		Topic      string
 		ProducerID string
-		Attemps    int
+		SessionID  string
+		Attempts   int
 	}
 
 	TopicWriterReconnectDoneInfo struct {
@@ -388,6 +389,7 @@ type (
 	TopicWriterInitStreamStartInfo struct {
 		Topic      string
 		ProducerID string
+		SessionID  string
 	}
 
 	TopicWriterInitStreamDoneInfo struct {

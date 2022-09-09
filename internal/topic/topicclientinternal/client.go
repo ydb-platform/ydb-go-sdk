@@ -177,7 +177,10 @@ func (c *Client) StartReader(
 func (c *Client) StartWriter(producerID, path string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error) {
 	// TODO: Implement handle arguments
 
-	var connector topicwriterinternal.ConnectFunc = func(ctx context.Context) (topicwriterinternal.RawTopicWriterStream, error) {
+	var connector topicwriterinternal.ConnectFunc = func(ctx context.Context) (
+		topicwriterinternal.RawTopicWriterStream,
+		error,
+	) {
 		return c.rawClient.StreamWrite(ctx)
 	}
 

@@ -75,14 +75,22 @@ func (m *messageWithDataContent) GetEncodedBytes(codec rawtopiccommon.Codec) ([]
 
 	writer, err := m.encoders.CreateLazyEncodeWriter(codec, &m.bufEncoded)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed create encoder for message, codec '%v': %w", codec, err)))
+		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
+			"ydb: failed create encoder for message, codec '%v': %w",
+			codec,
+			err,
+		)))
 	}
 	_, err = writer.Write(m.rawBuf.Bytes())
 	if err == nil {
 		err = writer.Close()
 	}
 	if err != nil {
-		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed to compress message, codec '%v': %w", codec, err)))
+		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
+			"ydb: failed to compress message, codec '%v': %w",
+			codec,
+			err,
+		)))
 	}
 
 	m.bufCodec = codec
@@ -123,13 +131,20 @@ func (m *messageWithDataContent) readDataToTargetCodec(codec rawtopiccommon.Code
 		err = encoder.Close()
 	}
 	if err != nil {
-		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed compress message with codec '%v': %w", codec, err)))
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
+			"ydb: failed compress message with codec '%v': %w",
+			codec,
+			err,
+		)))
 	}
 	m.bufUncompressedSize = bytesCount
 	return nil
 }
 
-func newMessageDataWithContent(mess Message, encoders *EncoderMap, targetCodec rawtopiccommon.Codec) (res messageWithDataContent, err error) {
+func newMessageDataWithContent(mess Message, encoders *EncoderMap, targetCodec rawtopiccommon.Codec) (
+	res messageWithDataContent,
+	err error,
+) {
 	res.encoders = encoders
 	res.Message = mess
 

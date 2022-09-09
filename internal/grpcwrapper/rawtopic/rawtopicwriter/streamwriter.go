@@ -1,4 +1,3 @@
-// nolint
 package rawtopicwriter
 
 import (
@@ -25,7 +24,10 @@ type StreamWriter struct {
 func (w StreamWriter) Recv() (ServerMessage, error) {
 	grpcMsg, err := w.Stream.Recv()
 	if err != nil {
-		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed to read grpc message from writer stream: %w", err)))
+		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
+			"ydb: failed to read grpc message from writer stream: %w",
+			err,
+		)))
 	}
 
 	var meta rawtopiccommon.ServerMessageMetadata
@@ -51,7 +53,10 @@ func (w StreamWriter) Recv() (ServerMessage, error) {
 		}
 		return &res, nil
 	default:
-		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected message type received from raw writer stream: '%v'", reflect.TypeOf(grpcMsg))))
+		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
+			"ydb: unexpected message type received from raw writer stream: '%v'",
+			reflect.TypeOf(grpcMsg),
+		)))
 	}
 }
 
@@ -73,7 +78,10 @@ func (w StreamWriter) Send(rawMsg ClientMessage) error {
 		}
 		protoMsg.ClientMessage = writeReqProto
 	default:
-		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected message type for send to raw writer stream: '%v'", reflect.TypeOf(rawMsg))))
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
+			"ydb: unexpected message type for send to raw writer stream: '%v'",
+			reflect.TypeOf(rawMsg),
+		)))
 	}
 
 	err := w.Stream.Send(&protoMsg)

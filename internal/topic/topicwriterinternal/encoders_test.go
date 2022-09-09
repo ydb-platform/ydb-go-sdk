@@ -33,7 +33,10 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 		)
 
 		testSelectCodec := func(t testing.TB, targetCodec rawtopiccommon.Codec, smallCount, largeCount int) {
-			s := NewEncoderSelector(testCommonEncoders, rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip}, 4)
+			s := NewEncoderSelector(testCommonEncoders, rawtopiccommon.SupportedCodecs{
+				rawtopiccommon.CodecRaw,
+				rawtopiccommon.CodecGzip,
+			}, 4)
 
 			var messages []messageWithDataContent
 			for i := 0; i < smallCount; i++ {

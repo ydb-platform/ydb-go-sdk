@@ -1,4 +1,3 @@
-// nolint
 package rawtopicwriter
 
 import (
@@ -84,7 +83,10 @@ func (p *Partitioning) setToProtoInitRequest(r *Ydb_Topic.StreamWriteMessage_Ini
 			PartitionId: p.PartitionID,
 		}
 	default:
-		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected partition type while set to init request: %v", p.Type)))
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
+			"ydb: unexpected partition type while set to init request: %v",
+			p.Type,
+		)))
 	}
 
 	return nil
@@ -103,7 +105,10 @@ func (p *Partitioning) setToProtoMessage(m *Ydb_Topic.StreamWriteMessage_WriteRe
 			PartitionId: p.PartitionID,
 		}
 	default:
-		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected partition type while set to message proto: %v", p.Type)))
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
+			"ydb: unexpected partition type while set to message proto: %v",
+			p.Type,
+		)))
 	}
 
 	return nil
@@ -254,8 +259,8 @@ const (
 type WriteStatusSkipReason int
 
 const (
-	WriteStatusSkipReasonUnspecified    = WriteStatusSkipReason(Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Skipped_REASON_UNSPECIFIED)
-	WriteStatusSkipReasonAlreadyWritten = WriteStatusSkipReason(Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Skipped_REASON_ALREADY_WRITTEN)
+	WriteStatusSkipReasonUnspecified    = WriteStatusSkipReason(Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Skipped_REASON_UNSPECIFIED)     //nolint:lll
+	WriteStatusSkipReasonAlreadyWritten = WriteStatusSkipReason(Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Skipped_REASON_ALREADY_WRITTEN) //nolint:lll
 )
 
 type WriteStatistics struct {

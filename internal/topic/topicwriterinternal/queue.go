@@ -1,4 +1,3 @@
-// nolint
 package topicwriterinternal
 
 import (
@@ -14,7 +13,6 @@ import (
 )
 
 var (
-	errAddMessageToClosedQueue   = xerrors.Wrap(errors.New("ydb: add message to closed message queue"))
 	errCloseClosedMessageQueue   = xerrors.Wrap(errors.New("ydb: close closed message queue"))
 	errGetMessageFromClosedQueue = xerrors.Wrap(errors.New("ydb: get message from closed message queue"))
 	errAddUnorderedMessages      = xerrors.Wrap(errors.New("ydb: add unordered messages"))
@@ -42,13 +40,13 @@ type messageQueue struct {
 	lastSeqNo        int64
 
 	messagesByOrder map[int]messageWithDataContent
-	seqNoToOrderId  map[int64]int
+	seqNoToOrderID  map[int64]int
 }
 
 func newMessageQueue() messageQueue {
 	return messageQueue{
 		messagesByOrder: make(map[int]messageWithDataContent),
-		seqNoToOrderId:  make(map[int64]int),
+		seqNoToOrderID:  make(map[int64]int),
 		hasNewMessages:  make(empty.Chan, 1),
 		closedChan:      make(empty.Chan),
 		lastSeqNo:       -1,
@@ -60,11 +58,17 @@ func (q *messageQueue) AddMessages(messages []messageWithDataContent) error {
 	return err
 }
 
-func (q *messageQueue) AddMessagesWithWaiter(messages []messageWithDataContent) (waiter MessageQueueAckWaiter, err error) {
+func (q *messageQueue) AddMessagesWithWaiter(messages []messageWithDataContent) (
+	waiter MessageQueueAckWaiter,
+	err error,
+) {
 	return q.addMessages(messages, true)
 }
 
-func (q *messageQueue) addMessages(messages []messageWithDataContent, needWaiter bool) (waiter MessageQueueAckWaiter, err error) {
+func (q *messageQueue) addMessages(messages []messageWithDataContent, needWaiter bool) (
+	waiter MessageQueueAckWaiter,
+	err error,
+) {
 	q.m.Lock()
 	defer q.m.Unlock()
 
@@ -126,7 +130,7 @@ func (q *messageQueue) addMessageNeedLock(mess messageWithDataContent) (messageI
 	}
 
 	q.messagesByOrder[messageIndex] = mess
-	q.seqNoToOrderId[mess.SeqNo] = messageIndex
+	q.seqNoToOrderID[mess.SeqNo] = messageIndex
 	q.lastSeqNo = mess.SeqNo
 	return messageIndex
 }
@@ -146,12 +150,12 @@ func (q *messageQueue) AcksReceived(acks []rawtopicwriter.WriteAck) error {
 }
 
 func (q *messageQueue) ackReceivedNeedLock(seqNo int64) error {
-	orderID, ok := q.seqNoToOrderId[seqNo]
+	orderID, ok := q.seqNoToOrderID[seqNo]
 	if !ok {
 		return xerrors.WithStackTrace(errAckUnexpectedMessage)
 	}
 
-	delete(q.seqNoToOrderId, seqNo)
+	delete(q.seqNoToOrderID, seqNo)
 	delete(q.messagesByOrder, orderID)
 	return nil
 }
@@ -230,18 +234,15 @@ func (q *messageQueue) getMessagesForSendWithLock() []messageWithDataContent {
 	}
 
 	var res []messageWithDataContent
-	for {
-		// use  "!=" instead of  "<" - for work with negative indexes after overflow
-		if q.lastWrittenIndex == q.lastSentIndex {
-			break
-		}
+
+	// use  "!=" stop instead of  "<" - for work with negative indexes after overflow
+	for q.lastWrittenIndex != q.lastSentIndex {
 		q.lastSentIndex++
 
+		// msg may be unexisted if it already has ack from server
+		// pass
 		if msg, ok := q.messagesByOrder[q.lastSentIndex]; ok {
 			res = append(res, msg)
-		} else {
-			// msg may be unexisted if it already has ack from server
-			// pass
 		}
 	}
 	return res
@@ -289,10 +290,6 @@ type MessageQueueAckWaiter struct {
 
 func (m *MessageQueueAckWaiter) AddWaitIndex(index int) {
 	m.sequenseNumbers = append(m.sequenseNumbers, index)
-}
-
-func (m *MessageQueueAckWaiter) reset() {
-	m.sequenseNumbers = m.sequenseNumbers[:0]
 }
 
 // sortMessageQueueIndexes deprecated

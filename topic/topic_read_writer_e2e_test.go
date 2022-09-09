@@ -65,9 +65,12 @@ func TestSendSyncMessages(t *testing.T) {
 		topicPath := createTopic(ctx, t, db)
 
 		producerID := "test-producer"
-		writer, err := db.Topic().(*topicclientinternal.Client).StartWriter(producerID, topicPath, topicoptions.WithWriterPartitioning(
-			topicwriter.NewPartitioningWithMessageGroupID(producerID),
-		),
+		writer, err := db.Topic().(*topicclientinternal.Client).StartWriter(
+			producerID,
+			topicPath,
+			topicoptions.WithWriterPartitioning(
+				topicwriter.NewPartitioningWithMessageGroupID(producerID),
+			),
 			topicoptions.WithSyncWrite(true),
 		)
 		require.NoError(t, err)
@@ -95,6 +98,7 @@ func TestSendSyncMessages(t *testing.T) {
 		require.NoError(t, err)
 
 		reader, err := db.Topic().StartReader(consumerName, topicoptions.ReadTopic(topicPath))
+		require.NoError(t, err)
 		mess, err := reader.ReadMessage(ctx)
 		require.NoError(t, err)
 		require.NoError(t, topicsugar.ReadMessageDataWithCallback(mess, func(data []byte) error {
@@ -102,6 +106,7 @@ func TestSendSyncMessages(t *testing.T) {
 			return nil
 		}))
 		mess, err = reader.ReadMessage(ctx)
+		require.NoError(t, err)
 		require.NoError(t, topicsugar.ReadMessageDataWithCallback(mess, func(data []byte) error {
 			require.Equal(t, "2", string(data))
 			return nil
@@ -112,7 +117,12 @@ func TestSendSyncMessages(t *testing.T) {
 func createTopic(ctx context.Context, t testing.TB, db ydb.Connection) (topicPath string) {
 	topicPath = db.Name() + "/" + t.Name() + "--test-topic"
 	_ = db.Topic().Drop(ctx, topicPath)
-	err := db.Topic().Create(ctx, topicPath, []topictypes.Codec{topictypes.CodecRaw}, topicoptions.CreateWithConsumer(topictypes.Consumer{Name: consumerName}))
+	err := db.Topic().Create(
+		ctx,
+		topicPath,
+		[]topictypes.Codec{topictypes.CodecRaw},
+		topicoptions.CreateWithConsumer(topictypes.Consumer{Name: consumerName}),
+	)
 	require.NoError(t, err)
 
 	return topicPath

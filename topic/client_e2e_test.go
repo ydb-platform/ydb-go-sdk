@@ -14,6 +14,7 @@ import (
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
@@ -47,10 +48,13 @@ func connect(t testing.TB, grpcOptions ...grpc.DialOption) ydb.Connection {
 		connectionString = cs
 	}
 
-	//grpcOptions = append(grpcOptions,
-	//	grpc.WithChainUnaryInterceptor(xtest.NewGrpcLogger(t).UnaryClientInterceptor),
-	//	grpc.WithChainStreamInterceptor(xtest.NewGrpcLogger(t).StreamClientInterceptor),
-	//)
+	const needLogGRPCMessages = false
+	if needLogGRPCMessages {
+		grpcOptions = append(grpcOptions,
+			grpc.WithChainUnaryInterceptor(xtest.NewGrpcLogger(t).UnaryClientInterceptor),
+			grpc.WithChainStreamInterceptor(xtest.NewGrpcLogger(t).StreamClientInterceptor),
+		)
+	}
 
 	opts := []ydb.Option{
 		ydb.WithDialTimeout(time.Second),
