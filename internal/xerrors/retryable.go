@@ -19,10 +19,7 @@ func (e *retryableError) Code() int32 {
 }
 
 func (e *retryableError) Name() string {
-	if e.name != "" {
-		return e.name
-	}
-	return "CUSTOM"
+	return "retryable/" + e.name
 }
 
 func (e *retryableError) OperationStatus() operation.Status {
@@ -67,7 +64,8 @@ func WithDeleteSession() RetryableErrorOption {
 
 func Retryable(err error, opts ...RetryableErrorOption) error {
 	re := &retryableError{
-		err: err,
+		err:  err,
+		name: "CUSTOM",
 	}
 	for _, o := range opts {
 		o(re)

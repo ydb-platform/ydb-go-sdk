@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"io"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -115,7 +116,11 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 	defer func() {
 		onDone(err)
 	}()
-	s, err := c.connection.Table().CreateSession(ctx)
+	s, err := c.connection.Table().CreateSession(
+		meta.WithAllowFeatures(ctx,
+			meta.HintSessionBalancer,
+		),
+	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
