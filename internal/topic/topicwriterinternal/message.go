@@ -12,7 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var errNoRawContentForRecodeMessage = xerrors.Wrap(errors.New("ydb: internal state error - no raw message content for recode message"))
+var errNoRawContentForRecodeMessage = xerrors.Wrap(errors.New("ydb: internal state error - no raw message content for recode message")) //nolint:lll
 
 type Message struct {
 	SeqNo        int64

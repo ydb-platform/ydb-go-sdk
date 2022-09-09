@@ -20,6 +20,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var (
@@ -33,6 +34,7 @@ var (
 )
 
 type writerImplConfig struct {
+	tracer               trace.Topic
 	connect              ConnectFunc
 	producerID           string
 	topic                string
@@ -63,7 +65,8 @@ func newWriterImplConfig(options ...PublicWriterOption) writerImplConfig {
 }
 
 type WriterImpl struct {
-	cfg writerImplConfig
+	cfg        writerImplConfig
+	instanceID string
 
 	queue                      messageQueue
 	background                 background.Worker
@@ -221,10 +224,12 @@ func (w *WriterImpl) sendLoop(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
+
 		streamCtxCancel(xerrors.WithStackTrace(errCloseWriterImplReconnect))
 		streamCtx, streamCtxCancel = createStreamContext()
 
 		attempt++
+
 		// delay if reconnect
 		if attempt > 1 {
 			delay := backoff.Fast.Delay(attempt - 2)
@@ -236,7 +241,12 @@ func (w *WriterImpl) sendLoop(ctx context.Context) {
 			}
 		}
 
+		traceOnDone := trace.TopicOnWriterReconnect(w.cfg.tracer, w.cfg.topic, w.cfg.producerID, attempt)
+
 		stream, err := w.connectWithTimeout(streamCtx)
+
+		traceOnDone(err)
+
 		// TODO: trace
 		if err != nil {
 			if !topic.IsRetryableError(err) {
@@ -270,7 +280,10 @@ func (w *WriterImpl) communicateWithServerThroughExistedStream(ctx context.Conte
 		cancel(xerrors.WithStackTrace(errCloseWriterImplStopWork))
 	}()
 
-	if err := w.initStream(stream); err != nil {
+	traceOnDone := trace.TopicOnWriterInitStream(w.cfg.tracer, w.cfg.topic, w.cfg.producerID)
+	err := w.initStream(stream)
+	traceOnDone(err)
+	if err != nil {
 		return err
 	}
 

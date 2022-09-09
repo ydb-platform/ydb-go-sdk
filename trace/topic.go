@@ -39,6 +39,10 @@ type (
 		OnReaderReceiveDataResponse func(startInfo TopicReaderReceiveDataResponseStartInfo) func(doneInfo TopicReaderReceiveDataResponseDoneInfo)
 		OnReaderReadMessages        func(startInfo TopicReaderReadMessagesStartInfo) func(doneInfo TopicReaderReadMessagesDoneInfo)
 		OnReaderUnknownGrpcMessage  func(info OnReadUnknownGrpcMessageInfo)
+
+		// TopicWriterStreamLifeCycleEvents
+		OnWriterReconnect  func(startInfo TopicWriterReconnectStartInfo) func(doneInfo TopicWriterReconnectDoneInfo)
+		OnWriterInitStream func(startInfo TopicWriterInitStreamStartInfo) func(doneInfo TopicWriterInitStreamDoneInfo)
 	}
 
 	// TopicReaderPartitionReadStartResponseStartInfo
@@ -364,6 +368,29 @@ type (
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
 	OnReadStreamUpdateTokenDoneInfo struct {
+		Error error
+	}
+
+	////////////
+	//////////// TopicWriter
+	////////////
+
+	TopicWriterReconnectStartInfo struct {
+		Topic      string
+		ProducerID string
+		Attemps    int
+	}
+
+	TopicWriterReconnectDoneInfo struct {
+		Error error
+	}
+
+	TopicWriterInitStreamStartInfo struct {
+		Topic      string
+		ProducerID string
+	}
+
+	TopicWriterInitStreamDoneInfo struct {
 		Error error
 	}
 )

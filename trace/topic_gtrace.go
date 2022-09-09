@@ -488,6 +488,76 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 			}
 		}
 	}
+	{
+		h1 := t.OnWriterReconnect
+		h2 := x.OnWriterReconnect
+		ret.OnWriterReconnect = func(startInfo TopicWriterReconnectStartInfo) func(TopicWriterReconnectDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TopicWriterReconnectDoneInfo)
+			if h1 != nil {
+				r = h1(startInfo)
+			}
+			if h2 != nil {
+				r1 = h2(startInfo)
+			}
+			return func(doneInfo TopicWriterReconnectDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(doneInfo)
+				}
+				if r1 != nil {
+					r1(doneInfo)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnWriterInitStream
+		h2 := x.OnWriterInitStream
+		ret.OnWriterInitStream = func(startInfo TopicWriterInitStreamStartInfo) func(TopicWriterInitStreamDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TopicWriterInitStreamDoneInfo)
+			if h1 != nil {
+				r = h1(startInfo)
+			}
+			if h2 != nil {
+				r1 = h2(startInfo)
+			}
+			return func(doneInfo TopicWriterInitStreamDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(doneInfo)
+				}
+				if r1 != nil {
+					r1(doneInfo)
+				}
+			}
+		}
+	}
 	return ret
 }
 func (t Topic) onReaderReconnect(startInfo TopicReaderReconnectStartInfo) func(doneInfo TopicReaderReconnectDoneInfo) {
@@ -687,6 +757,36 @@ func (t Topic) onReaderUnknownGrpcMessage(info OnReadUnknownGrpcMessageInfo) {
 	}
 	fn(info)
 }
+func (t Topic) onWriterReconnect(startInfo TopicWriterReconnectStartInfo) func(doneInfo TopicWriterReconnectDoneInfo) {
+	fn := t.OnWriterReconnect
+	if fn == nil {
+		return func(TopicWriterReconnectDoneInfo) {
+			return
+		}
+	}
+	res := fn(startInfo)
+	if res == nil {
+		return func(TopicWriterReconnectDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Topic) onWriterInitStream(startInfo TopicWriterInitStreamStartInfo) func(doneInfo TopicWriterInitStreamDoneInfo) {
+	fn := t.OnWriterInitStream
+	if fn == nil {
+		return func(TopicWriterInitStreamDoneInfo) {
+			return
+		}
+	}
+	res := fn(startInfo)
+	if res == nil {
+		return func(TopicWriterInitStreamDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func TopicOnReaderReconnect(t Topic) func(error) {
 	var p TopicReaderReconnectStartInfo
 	res := t.onReaderReconnect(p)
@@ -857,4 +957,27 @@ func TopicOnReaderUnknownGrpcMessage(t Topic, readerConnectionID string, e error
 	p.ReaderConnectionID = readerConnectionID
 	p.Error = e
 	t.onReaderUnknownGrpcMessage(p)
+}
+func TopicOnWriterReconnect(t Topic, topic string, producerID string, attemps int) func(error) {
+	var p TopicWriterReconnectStartInfo
+	p.Topic = topic
+	p.ProducerID = producerID
+	p.Attemps = attemps
+	res := t.onWriterReconnect(p)
+	return func(e error) {
+		var p TopicWriterReconnectDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func TopicOnWriterInitStream(t Topic, topic string, producerID string) func(error) {
+	var p TopicWriterInitStreamStartInfo
+	p.Topic = topic
+	p.ProducerID = producerID
+	res := t.onWriterInitStream(p)
+	return func(e error) {
+		var p TopicWriterInitStreamDoneInfo
+		p.Error = e
+		res(p)
+	}
 }

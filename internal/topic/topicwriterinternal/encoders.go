@@ -78,7 +78,11 @@ type EncoderSelector struct {
 	measureIntervalBatches int
 }
 
-func NewEncoderSelector(m *EncoderMap, allowedCodecs rawtopiccommon.SupportedCodecs, parallelCompressors int) EncoderSelector {
+func NewEncoderSelector(
+	m *EncoderMap,
+	allowedCodecs rawtopiccommon.SupportedCodecs,
+	parallelCompressors int,
+) EncoderSelector {
 	if parallelCompressors <= 0 {
 		panic("ydb: need leas one allowed compressor")
 	}
