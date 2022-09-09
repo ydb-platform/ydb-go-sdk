@@ -6,6 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
@@ -18,11 +19,12 @@ import (
 
 type Client struct {
 	cfg                    topic.Config
+	cred                   credentials.Credentials
 	defaultOperationParams rawydb.OperationParams
 	rawClient              rawtopic.Client
 }
 
-func New(conn grpc.ClientConnInterface, opts ...topicoptions.TopicOption) *Client {
+func New(conn grpc.ClientConnInterface, cred credentials.Credentials, opts ...topicoptions.TopicOption) *Client {
 	rawClient := rawtopic.NewClient(Ydb_Topic_V1.NewTopicServiceClient(conn))
 
 	cfg := newTopicConfig(opts...)
@@ -32,6 +34,7 @@ func New(conn grpc.ClientConnInterface, opts ...topicoptions.TopicOption) *Clien
 
 	return &Client{
 		cfg:                    cfg,
+		cred:                   cred,
 		defaultOperationParams: defaultOperationParams,
 		rawClient:              rawClient,
 	}
@@ -160,7 +163,10 @@ func (c *Client) StartReader(
 		return c.rawClient.StreamRead(ctx)
 	}
 
-	defaultOpts := []topicoptions.ReaderOption{topicoptions.WithCommonConfig(c.cfg.Common)}
+	defaultOpts := []topicoptions.ReaderOption{
+		topicoptions.WithCommonConfig(c.cfg.Common),
+		topicreaderinternal.WithCredentials(c.cred),
+	}
 	opts = append(defaultOpts, opts...)
 
 	internalReader := topicreaderinternal.NewReader(connector, consumer, readSelectors, opts...)
