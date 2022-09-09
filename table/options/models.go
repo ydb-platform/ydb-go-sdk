@@ -2,6 +2,7 @@ package options
 
 import (
 	"bytes"
+	"fmt"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
@@ -11,33 +12,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
-
-type SessionStatus uint32
-
-const (
-	SessionStatusUnknown SessionStatus = iota
-	SessionReady
-	SessionBusy
-	SessionClosing
-	SessionClosed
-
-	statusUnknown = "unknown"
-)
-
-func (s SessionStatus) String() string {
-	switch s {
-	case SessionReady:
-		return "ready"
-	case SessionBusy:
-		return "busy"
-	case SessionClosing:
-		return "closing"
-	case SessionClosed:
-		return "closed"
-	default:
-		return statusUnknown
-	}
-}
 
 type Column struct {
 	Name   string
@@ -165,7 +139,7 @@ func (c ColumnFamilyCompression) String() string {
 	case ColumnFamilyCompressionLZ4:
 		return "lz4"
 	default:
-		return statusUnknown
+		return fmt.Sprintf("unknown_column_family_compression_%d", c)
 	}
 }
 

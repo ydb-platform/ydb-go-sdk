@@ -34,8 +34,6 @@ type ClosableSession interface {
 }
 
 type Client interface {
-	closer.Closer
-
 	// CreateSession returns session or error for manually control of session lifecycle
 	//
 	// CreateSession implements internal busy loop until one of the following conditions is met:
@@ -67,8 +65,19 @@ type Client interface {
 	DoTx(ctx context.Context, op TxOperation, opts ...Option) error
 }
 
+type SessionStatus = string
+
+const (
+	SessionStatusUnknown = SessionStatus("unknown")
+	SessionReady         = SessionStatus("ready")
+	SessionBusy          = SessionStatus("busy")
+	SessionClosing       = SessionStatus("closing")
+	SessionClosed        = SessionStatus("closed")
+)
+
 type SessionInfo interface {
 	ID() string
+	Status() SessionStatus
 }
 
 type Session interface {

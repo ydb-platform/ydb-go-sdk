@@ -30,7 +30,7 @@ func (e *transportError) Code() int32 {
 }
 
 func (e *transportError) Name() string {
-	return e.code.String()
+	return "transport/" + e.code.String()
 }
 
 type teOpt func(te *transportError)

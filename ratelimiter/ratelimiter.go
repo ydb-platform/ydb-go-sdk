@@ -4,13 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/options"
 )
 
 type Client interface {
-	closer.Closer
-
 	CreateResource(
 		ctx context.Context,
 		coordinationNodePath string,

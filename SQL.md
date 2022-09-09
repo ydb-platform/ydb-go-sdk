@@ -45,6 +45,7 @@ func main() {
     if err != nil {
         // fallback on error
     }
+    defer nativeDriver.Close(context.TODO())
     connector, err := ydb.Connector(nativeDriver,
         // See ydb.ConnectorOption's for configure connector https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#ConnectorOption
     )
@@ -52,6 +53,7 @@ func main() {
         // fallback on error
     }
     db := sql.OpenDB(connector)
+    defer db.Close()
 }
 ```
 
@@ -65,6 +67,7 @@ import (
 
 func main() {
     db, err := sql.Open("ydb", "grpcs://localhost:2135/local")
+    defer db.Close()
 }
 ```
 Data source name parameters:

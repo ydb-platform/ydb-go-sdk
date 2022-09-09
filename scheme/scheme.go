@@ -4,13 +4,9 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 )
 
 type Client interface {
-	closer.Closer
-
 	DescribePath(ctx context.Context, path string) (e Entry, err error)
 	MakeDirectory(ctx context.Context, path string) (err error)
 	ListDirectory(ctx context.Context, path string) (d Directory, err error)

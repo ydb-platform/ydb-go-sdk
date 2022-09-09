@@ -5,7 +5,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 type trailer struct {
@@ -29,7 +29,7 @@ func checkHintSessionClose(md metadata.MD) bool {
 func (t *trailer) processHints() {
 	switch {
 	case checkHintSessionClose(t.md):
-		t.s.SetStatus(options.SessionClosing)
+		t.s.SetStatus(table.SessionClosing)
 	default:
 		// pass
 	}

@@ -330,7 +330,7 @@ func (c *connection) Scripting() scripting.Client {
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (c *connection) Topic() topic.Client {
 	c.topicOnce.Init(func() closeFunc {
-		c.topic = topicclientinternal.New(c.balancer, c.topicOptions...)
+		c.topic = topicclientinternal.New(c.balancer, c.config.Credentials(), c.topicOptions...)
 		return c.topic.Close
 	})
 	return c.topic

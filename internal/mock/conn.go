@@ -82,6 +82,9 @@ type Endpoint struct {
 	LocalDCField  bool
 }
 
+func (e *Endpoint) Choose(bool) {
+}
+
 func (e *Endpoint) NodeID() uint32 {
 	return e.NodeIDField
 }

@@ -35,6 +35,10 @@ type Config struct {
 	excludeGRPCCodesForPessimization []grpcCodes.Code
 }
 
+func (c Config) Credentials() credentials.Credentials {
+	return c.credentials
+}
+
 // ExcludeGRPCCodesForPessimization defines grpc codes for exclude its from pessimization trigger
 func (c Config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
 	return c.excludeGRPCCodesForPessimization

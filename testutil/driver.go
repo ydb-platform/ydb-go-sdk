@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -282,12 +283,15 @@ func WithClose(onClose func(ctx context.Context) error) balancerOption {
 	}
 }
 
-func NewBalancer(opts ...balancerOption) grpc.ClientConnInterface {
+func NewBalancer(opts ...balancerOption) *balancerStub {
 	c := &balancerStub{}
 	for _, opt := range opts {
 		opt(c)
 	}
 	return c
+}
+
+func (b *balancerStub) OnUpdate(func(context.Context, []endpoint.Info)) {
 }
 
 type clientConn struct {

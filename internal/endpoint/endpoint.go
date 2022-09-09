@@ -150,7 +150,7 @@ func withLastUpdated(ts time.Time) Option {
 	}
 }
 
-func New(address string, opts ...Option) Endpoint {
+func New(address string, opts ...Option) *endpoint {
 	e := &endpoint{
 		address:     address,
 		lastUpdated: time.Now(),

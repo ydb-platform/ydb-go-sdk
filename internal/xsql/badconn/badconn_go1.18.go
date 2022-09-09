@@ -41,6 +41,8 @@ func (e Error) As(target interface{}) bool {
 
 func Map(err error) error {
 	switch {
+	case err == nil:
+		return nil
 	case xerrors.Is(err, driver.ErrBadConn):
 		return err
 	case retry.MustDeleteSession(err):

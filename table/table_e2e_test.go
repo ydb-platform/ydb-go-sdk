@@ -245,7 +245,7 @@ func testTable(t testing.TB) {
 					if atomic.LoadUint32(&shutdowned) == 0 {
 						return
 					}
-					if info.Session.Status() != options.SessionClosing.String() {
+					if info.Session.Status() != table.SessionClosing {
 						return
 					}
 					sessionsMtx.Lock()
