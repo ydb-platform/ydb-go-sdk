@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
@@ -191,6 +192,15 @@ type ReaderConfig struct {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicReaderOption func(cfg *ReaderConfig)
+
+func WithCredentials(cred credentials.Credentials) PublicReaderOption {
+	return func(cfg *ReaderConfig) {
+		if cred == nil {
+			cred = credentials.NewAnonymousCredentials()
+		}
+		cfg.Cred = cred
+	}
+}
 
 func convertNewParamsToStreamConfig(
 	consumer string,
