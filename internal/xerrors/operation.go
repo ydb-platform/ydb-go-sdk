@@ -24,7 +24,7 @@ func (e *operationError) Code() int32 {
 }
 
 func (e *operationError) Name() string {
-	return e.code.String()
+	return "operation/" + e.code.String()
 }
 
 type operationStatus interface {
