@@ -1,4 +1,4 @@
-# `ydb-go-sdk` - native Go's driver for [YDB](https://github.com/ydb-platform/ydb)
+# `ydb-go-sdk` - native and `database/sql` Go's driver for [YDB](https://github.com/ydb-platform/ydb)
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/ydb-platform/ydb/blob/main/LICENSE)
 [![Release](https://img.shields.io/github/v/release/ydb-platform/ydb-go-sdk.svg?style=flat-square)](https://github.com/ydb-platform/ydb-go-sdk/releases)
