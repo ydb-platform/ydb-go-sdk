@@ -16,7 +16,6 @@ type WritersCommonConfig struct {
 	topic               string
 	writerMeta          map[string]string
 	defaultPartitioning rawtopicwriter.Partitioning
-	writerInstanceID    string
 	compressorCount     int
 
 	tracer             trace.Topic

@@ -181,6 +181,8 @@ func (q *messageQueue) ensureNoSmallIntIndexes() {
 	}
 }
 
+// GetMessagesForSend one or more messages for send
+// it blocked until context cancelled of have least one message for send
 func (q *messageQueue) GetMessagesForSend(ctx context.Context) ([]messageWithDataContent, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err

@@ -74,6 +74,7 @@ type WriterReconnector struct {
 	firstConnectionHandled         xatomic.Bool
 	firstInitResponseProcessedChan empty.Chan
 	encoder                        EncoderSelector
+	writerInstanceID               string
 
 	m           xsync.RWMutex
 	sessionID   string
@@ -88,6 +89,7 @@ func newWriterReconnector(cfg writerReconnectorConfig) *WriterReconnector {
 }
 
 func newWriterReconnectorStopped(cfg writerReconnectorConfig) *WriterReconnector {
+	writerInstanceID, _ := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
 	res := &WriterReconnector{
 		cfg:                            cfg,
 		queue:                          newMessageQueue(),
@@ -95,6 +97,7 @@ func newWriterReconnectorStopped(cfg writerReconnectorConfig) *WriterReconnector
 		lastSeqNo:                      -1,
 		firstInitResponseProcessedChan: make(empty.Chan),
 		encodersMap:                    NewEncoderMap(),
+		writerInstanceID:               writerInstanceID.String(),
 	}
 
 	for codec, creator := range cfg.additionalEncoders {
@@ -103,8 +106,7 @@ func newWriterReconnectorStopped(cfg writerReconnectorConfig) *WriterReconnector
 
 	allowedCodecs := calculateAllowedCodecs(cfg.forceCodec, res.encodersMap, nil)
 	res.encoder = NewEncoderSelector(res.encodersMap, allowedCodecs, cfg.compressorCount)
-	id, _ := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
-	res.sessionID = "not-connected-" + id.String()
+	res.sessionID = "not-connected-" + writerInstanceID.String()
 
 	return res
 }
@@ -182,13 +184,31 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []Message) error
 func (w *WriterReconnector) createMessagesWithContent(messages []Message) ([]messageWithDataContent, error) {
 	res := make([]messageWithDataContent, 0, len(messages))
 	for i := range messages {
-		mess, err := newMessageDataWithContent(messages[i], w.encodersMap, w.cfg.forceCodec)
-		if err != nil {
-			return nil, err
-		}
+		mess := newMessageDataWithContent(messages[i], w.encodersMap)
 		res = append(res, mess)
 	}
-	if err := compressMessages(res, w.cfg.forceCodec, w.cfg.compressorCount); err != nil {
+
+	var sessionID string
+	w.m.WithRLock(func() {
+		sessionID = w.sessionID
+	})
+	onCompressDone := trace.TopicOnWriterCompressMessages(
+		w.cfg.tracer,
+		w.writerInstanceID,
+		sessionID,
+		w.cfg.forceCodec.ToInt32(),
+		messages[0].SeqNo,
+		len(messages),
+		trace.TopicWriterCompressMessagesReasonCompressDataOnWriteReadData,
+	)
+
+	targetCodec := w.cfg.forceCodec
+	if targetCodec == rawtopiccommon.CodecUNSPECIFIED {
+		targetCodec = rawtopiccommon.CodecRaw
+	}
+	err := readInParallelWithCodec(res, targetCodec, w.cfg.compressorCount)
+	onCompressDone(err)
+	if err != nil {
 		return nil, err
 	}
 	return res, nil
@@ -198,8 +218,13 @@ func (w *WriterReconnector) Close(ctx context.Context) error {
 	return w.close(ctx, xerrors.WithStackTrace(errStopWriterReconnector))
 }
 
-func (w *WriterReconnector) close(ctx context.Context, reason error) error {
-	resErr := w.queue.Close(reason)
+func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr error) {
+	onDone := trace.TopicOnWriterClose(w.cfg.tracer, w.writerInstanceID, reason)
+	defer func() {
+		onDone(resErr)
+	}()
+
+	resErr = w.queue.Close(reason)
 	bgErr := w.background.Close(ctx, reason)
 	if resErr == nil {
 		resErr = bgErr
@@ -244,7 +269,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 			}
 		}
 
-		traceOnDone := trace.TopicOnWriterReconnect(w.cfg.tracer, w.cfg.topic, w.cfg.producerID, w.sessionID, attempt)
+		traceOnDone := trace.TopicOnWriterReconnect(w.cfg.tracer, w.writerInstanceID, w.cfg.topic, w.cfg.producerID, w.sessionID, attempt)
 
 		stream, trackedErr := w.connectWithTimeout(streamCtx)
 		traceOnDone(trackedErr)
@@ -322,7 +347,14 @@ func (w *WriterReconnector) waitFirstInitResponse(ctx context.Context) error {
 }
 
 func (w *WriterReconnector) createWriterStreamConfig(stream RawTopicWriterStream) SingleStreamWriterConfig {
-	cfg := newSingleStreamWriterConfig(w.cfg.WritersCommonConfig, stream, &w.queue, w.encodersMap, w.needReceiveLastSeqNo())
+	cfg := newSingleStreamWriterConfig(
+		w.cfg.WritersCommonConfig,
+		stream,
+		&w.queue,
+		w.encodersMap,
+		w.needReceiveLastSeqNo(),
+		w.writerInstanceID,
+	)
 	return cfg
 }
 

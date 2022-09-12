@@ -30,6 +30,7 @@ const (
 	TopicReaderPartitionEvents
 
 	TopicWriterStreamLifeCycleEvents
+	TopicWriterStreamEvents
 
 	DatabaseSQLConnectorEvents
 	DatabaseSQLConnEvents

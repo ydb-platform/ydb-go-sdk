@@ -43,6 +43,12 @@ type (
 		// TopicWriterStreamLifeCycleEvents
 		OnWriterReconnect  func(startInfo TopicWriterReconnectStartInfo) func(doneInfo TopicWriterReconnectDoneInfo)
 		OnWriterInitStream func(startInfo TopicWriterInitStreamStartInfo) func(doneInfo TopicWriterInitStreamDoneInfo)
+		OnWriterClose      func(startInfo TopicWriterCloseStartInfo) func(doneInfo TopicWriterCloseDoneInfo)
+
+		// TopicWriterStreamEvents
+		OnWriterCompressMessages       func(startInfo TopicWriterCompressMessagesStartInfo) func(doneInfo TopicWriterCompressMessagesDoneInfo)
+		OnWriterSendMessages           func(startInfo TopicWriterSendMessagesStartInfo) func(doneInfo TopicWriterSendMessagesDoneInfo)
+		OnWriterReadUnknownGrpcMessage func(info TopicOnWriterReadUnknownGrpcMessageInfo)
 	}
 
 	// TopicReaderPartitionReadStartResponseStartInfo
@@ -376,10 +382,11 @@ type (
 	////////////
 
 	TopicWriterReconnectStartInfo struct {
-		Topic      string
-		ProducerID string
-		SessionID  string
-		Attempts   int
+		WriterInstanceID string
+		Topic            string
+		ProducerID       string
+		SessionID        string
+		Attempt          int
 	}
 
 	TopicWriterReconnectDoneInfo struct {
@@ -387,13 +394,61 @@ type (
 	}
 
 	TopicWriterInitStreamStartInfo struct {
+		WriterInstanceID string
 		Topic            string
 		ProducerID       string
-		WriterInstanceID string
 	}
 
 	TopicWriterInitStreamDoneInfo struct {
 		SessionID string
 		Error     error
 	}
+
+	TopicWriterCloseStartInfo struct {
+		WriterInstanceID string
+		Reason           error
+	}
+
+	TopicWriterCloseDoneInfo struct {
+		Error error
+	}
+
+	TopicWriterCompressMessagesReason int
+
+	TopicWriterCompressMessagesStartInfo struct {
+		WriterInstanceID string
+		SessionID        string
+		Codec            int32
+		FirstSeqNo       int64
+		MessagesCount    int
+		Reason           TopicWriterCompressMessagesReason
+	}
+
+	TopicWriterCompressMessagesDoneInfo struct {
+		Error error
+	}
+
+	TopicWriterSendMessagesStartInfo struct {
+		WriterInstanceID string
+		SessionID        string
+		Codec            int32
+		FirstSeqNo       int64
+		MessagesCount    int
+	}
+
+	TopicWriterSendMessagesDoneInfo struct {
+		Error error
+	}
+
+	TopicOnWriterReadUnknownGrpcMessageInfo struct {
+		WriterInstanceID string
+		SessionID        string
+		Error            error
+	}
+)
+
+const (
+	TopicWriterCompressMessagesReasonCompressData TopicWriterCompressMessagesReason = iota
+	TopicWriterCompressMessagesReasonCompressDataOnWriteReadData
+	TopicWriterCompressMessagesReasonCodecsMeasure
 )

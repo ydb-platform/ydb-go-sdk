@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 const (
@@ -71,6 +72,10 @@ func (nopWriteCloser) Close() error {
 type EncoderSelector struct {
 	m *EncoderMap
 
+	tracer              trace.Topic
+	writerReconnectorID string
+	sessionID           string
+
 	allowedCodecs          rawtopiccommon.SupportedCodecs
 	lastSelectedCodec      rawtopiccommon.Codec
 	parallelCompressors    int
@@ -100,7 +105,17 @@ func NewEncoderSelector(
 func (s *EncoderSelector) CompressMessages(messages []messageWithDataContent) (rawtopiccommon.Codec, error) {
 	codec, err := s.selectCodec(messages)
 	if err == nil {
-		err = compressMessages(messages, codec, s.parallelCompressors)
+		onCompressDone := trace.TopicOnWriterCompressMessages(
+			s.tracer,
+			s.writerReconnectorID,
+			s.sessionID,
+			codec.ToInt32(),
+			messages[0].SeqNo,
+			len(messages),
+			trace.TopicWriterCompressMessagesReasonCompressData,
+		)
+		err = readInParallelWithCodec(messages, codec, s.parallelCompressors)
+		onCompressDone(err)
 	}
 	return codec, err
 }
@@ -148,10 +163,26 @@ func (s *EncoderSelector) measureCodecs(messages []messageWithDataContent) (rawt
 	if len(s.allowedCodecs) == 0 {
 		return codecUnknown, errNoAllowedCodecs
 	}
+
 	sizes := make([]int, len(s.allowedCodecs))
 
 	for codecIndex, codec := range s.allowedCodecs {
-		if err := compressMessages(messages, codec, s.parallelCompressors); err != nil {
+		firstSeqNo := int64(-1)
+		if len(messages) > 0 {
+			firstSeqNo = messages[0].SeqNo
+		}
+		onCompressDone := trace.TopicOnWriterCompressMessages(
+			s.tracer,
+			s.writerReconnectorID,
+			s.sessionID,
+			codec.ToInt32(),
+			firstSeqNo,
+			len(messages),
+			trace.TopicWriterCompressMessagesReasonCodecsMeasure,
+		)
+		err := readInParallelWithCodec(messages, codec, s.parallelCompressors)
+		onCompressDone(err)
+		if err != nil {
 			return codecUnknown, err
 		}
 
@@ -176,14 +207,14 @@ func (s *EncoderSelector) measureCodecs(messages []messageWithDataContent) (rawt
 	return s.allowedCodecs[minSizeIndex], nil
 }
 
-func compressMessages(messages []messageWithDataContent, codec rawtopiccommon.Codec, parallel int) error {
+func readInParallelWithCodec(messages []messageWithDataContent, codec rawtopiccommon.Codec, parallel int) error {
 	workerCount := parallel
 	if len(messages) < workerCount {
 		workerCount = len(messages)
 	}
 
-	// no need goroutines and synchronization for raw codec (no encode work) or zero-one worker
-	if codec == rawtopiccommon.CodecRaw || workerCount < 2 {
+	// no need goroutines and synchronization for zero or one worker
+	if workerCount < 2 {
 		for i := range messages {
 			if _, err := messages[i].GetEncodedBytes(codec); err != nil {
 				return err

@@ -12,7 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var errNoRawContentForRecodeMessage = xerrors.Wrap(errors.New("ydb: internal state error - no raw message content for recode message")) //nolint:lll
+var errNoRawContent = xerrors.Wrap(errors.New("ydb: internal state error - no raw message content")) //nolint:lll
 
 type Message struct {
 	SeqNo        int64
@@ -50,6 +50,7 @@ func NewPartitioningWithPartitionID(id int64) PublicPartitioning {
 type messageWithDataContent struct {
 	Message
 
+	dataWasRead         bool
 	encoders            *EncoderMap
 	hasRawContent       bool
 	rawBuf              bytes.Buffer
@@ -60,15 +61,16 @@ type messageWithDataContent struct {
 }
 
 func (m *messageWithDataContent) GetEncodedBytes(codec rawtopiccommon.Codec) ([]byte, error) {
-	if codec == rawtopiccommon.CodecRaw && m.hasRawContent {
-		return m.rawBuf.Bytes(), nil
+	if codec == rawtopiccommon.CodecRaw {
+		return m.getRawBytes()
 	}
 
-	if codec == m.bufCodec {
-		return m.bufEncoded.Bytes(), nil
-	}
+	return m.getEncodedBytes(codec)
+}
+
+func (m *messageWithDataContent) encodeRawContent(codec rawtopiccommon.Codec) ([]byte, error) {
 	if !m.hasRawContent {
-		return nil, xerrors.WithStackTrace(errNoRawContentForRecodeMessage)
+		return nil, xerrors.WithStackTrace(errNoRawContent)
 	}
 
 	m.bufEncoded.Reset()
@@ -105,14 +107,14 @@ func (m *messageWithDataContent) readDataToRawBuf() error {
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
-		m.Data = nil
 		m.bufUncompressedSize = writtenBytes
+		m.Data = nil
 	}
-
 	return nil
 }
 
 func (m *messageWithDataContent) readDataToTargetCodec(codec rawtopiccommon.Codec) error {
+	m.dataWasRead = true
 	m.hasEncodedContent = true
 	m.bufCodec = codec
 	m.bufEncoded.Reset()
@@ -138,21 +140,47 @@ func (m *messageWithDataContent) readDataToTargetCodec(codec rawtopiccommon.Code
 		)))
 	}
 	m.bufUncompressedSize = bytesCount
+	m.Data = nil
 	return nil
 }
 
-func newMessageDataWithContent(mess Message, encoders *EncoderMap, targetCodec rawtopiccommon.Codec) (
+func (m *messageWithDataContent) getRawBytes() ([]byte, error) {
+	if m.hasRawContent {
+		return m.rawBuf.Bytes(), nil
+	}
+	if m.dataWasRead {
+		return nil, xerrors.WithStackTrace(errNoRawContent)
+	}
+
+	err := m.readDataToRawBuf()
+	if err != nil {
+		return nil, err
+	}
+	return m.rawBuf.Bytes(), nil
+}
+
+func (m *messageWithDataContent) getEncodedBytes(codec rawtopiccommon.Codec) ([]byte, error) {
+	switch {
+	case m.hasEncodedContent && m.bufCodec == codec:
+		return m.bufEncoded.Bytes(), nil
+	case m.hasRawContent:
+		return m.encodeRawContent(codec)
+	case m.dataWasRead:
+		return nil, errNoRawContent
+	default:
+		err := m.readDataToTargetCodec(codec)
+		if err != nil {
+			return nil, err
+		}
+		return m.bufEncoded.Bytes(), nil
+	}
+}
+
+func newMessageDataWithContent(mess Message, encoders *EncoderMap) (
 	res messageWithDataContent,
-	err error,
 ) {
 	res.encoders = encoders
 	res.Message = mess
 
-	if targetCodec == rawtopiccommon.CodecUNSPECIFIED || targetCodec == rawtopiccommon.CodecRaw {
-		err = res.readDataToRawBuf()
-	} else {
-		err = res.readDataToTargetCodec(targetCodec)
-	}
-
-	return res, xerrors.WithStackTrace(err)
+	return res
 }

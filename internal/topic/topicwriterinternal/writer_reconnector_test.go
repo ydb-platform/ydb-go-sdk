@@ -79,6 +79,13 @@ func TestWriterImpl_Write(t *testing.T) {
 			3: newTestMessageWithDataContent(5),
 		}
 
+		for k := range expectedMap {
+			mess := expectedMap[k]
+			_, err = mess.GetEncodedBytes(rawtopiccommon.CodecRaw)
+			require.NoError(t, err)
+			expectedMap[k] = mess
+		}
+
 		require.Equal(t, expectedMap, w.queue.messagesByOrder)
 	})
 	t.Run("WriteWithSyncMode", func(t *testing.T) {
@@ -556,10 +563,7 @@ func TestCalculateAllowedCodecs(t *testing.T) {
 }
 
 func newTestMessageWithDataContent(num int) messageWithDataContent {
-	res, err := newMessageDataWithContent(Message{SeqNo: int64(num)}, testCommonEncoders, rawtopiccommon.CodecRaw)
-	if err != nil {
-		panic(err)
-	}
+	res := newMessageDataWithContent(Message{SeqNo: int64(num)}, testCommonEncoders)
 	return res
 }
 

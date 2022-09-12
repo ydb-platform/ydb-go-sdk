@@ -32,6 +32,10 @@ func (c Codec) ToProto() Ydb_Topic.Codec {
 	return Ydb_Topic.Codec(c)
 }
 
+func (c Codec) ToInt32() int32 {
+	return int32(c)
+}
+
 type SupportedCodecs []Codec
 
 func (c *SupportedCodecs) AllowedByCodecsList(need Codec) bool {

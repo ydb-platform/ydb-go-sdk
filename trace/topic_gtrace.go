@@ -558,6 +558,130 @@ func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 			}
 		}
 	}
+	{
+		h1 := t.OnWriterClose
+		h2 := x.OnWriterClose
+		ret.OnWriterClose = func(startInfo TopicWriterCloseStartInfo) func(TopicWriterCloseDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TopicWriterCloseDoneInfo)
+			if h1 != nil {
+				r = h1(startInfo)
+			}
+			if h2 != nil {
+				r1 = h2(startInfo)
+			}
+			return func(doneInfo TopicWriterCloseDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(doneInfo)
+				}
+				if r1 != nil {
+					r1(doneInfo)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnWriterCompressMessages
+		h2 := x.OnWriterCompressMessages
+		ret.OnWriterCompressMessages = func(startInfo TopicWriterCompressMessagesStartInfo) func(TopicWriterCompressMessagesDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TopicWriterCompressMessagesDoneInfo)
+			if h1 != nil {
+				r = h1(startInfo)
+			}
+			if h2 != nil {
+				r1 = h2(startInfo)
+			}
+			return func(doneInfo TopicWriterCompressMessagesDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(doneInfo)
+				}
+				if r1 != nil {
+					r1(doneInfo)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnWriterSendMessages
+		h2 := x.OnWriterSendMessages
+		ret.OnWriterSendMessages = func(startInfo TopicWriterSendMessagesStartInfo) func(TopicWriterSendMessagesDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TopicWriterSendMessagesDoneInfo)
+			if h1 != nil {
+				r = h1(startInfo)
+			}
+			if h2 != nil {
+				r1 = h2(startInfo)
+			}
+			return func(doneInfo TopicWriterSendMessagesDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(doneInfo)
+				}
+				if r1 != nil {
+					r1(doneInfo)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnWriterReadUnknownGrpcMessage
+		h2 := x.OnWriterReadUnknownGrpcMessage
+		ret.OnWriterReadUnknownGrpcMessage = func(info TopicOnWriterReadUnknownGrpcMessageInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(info)
+			}
+			if h2 != nil {
+				h2(info)
+			}
+		}
+	}
 	return ret
 }
 func (t Topic) onReaderReconnect(startInfo TopicReaderReconnectStartInfo) func(doneInfo TopicReaderReconnectDoneInfo) {
@@ -787,6 +911,58 @@ func (t Topic) onWriterInitStream(startInfo TopicWriterInitStreamStartInfo) func
 	}
 	return res
 }
+func (t Topic) onWriterClose(startInfo TopicWriterCloseStartInfo) func(doneInfo TopicWriterCloseDoneInfo) {
+	fn := t.OnWriterClose
+	if fn == nil {
+		return func(TopicWriterCloseDoneInfo) {
+			return
+		}
+	}
+	res := fn(startInfo)
+	if res == nil {
+		return func(TopicWriterCloseDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Topic) onWriterCompressMessages(startInfo TopicWriterCompressMessagesStartInfo) func(doneInfo TopicWriterCompressMessagesDoneInfo) {
+	fn := t.OnWriterCompressMessages
+	if fn == nil {
+		return func(TopicWriterCompressMessagesDoneInfo) {
+			return
+		}
+	}
+	res := fn(startInfo)
+	if res == nil {
+		return func(TopicWriterCompressMessagesDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Topic) onWriterSendMessages(startInfo TopicWriterSendMessagesStartInfo) func(doneInfo TopicWriterSendMessagesDoneInfo) {
+	fn := t.OnWriterSendMessages
+	if fn == nil {
+		return func(TopicWriterSendMessagesDoneInfo) {
+			return
+		}
+	}
+	res := fn(startInfo)
+	if res == nil {
+		return func(TopicWriterSendMessagesDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Topic) onWriterReadUnknownGrpcMessage(info TopicOnWriterReadUnknownGrpcMessageInfo) {
+	fn := t.OnWriterReadUnknownGrpcMessage
+	if fn == nil {
+		return
+	}
+	fn(info)
+}
 func TopicOnReaderReconnect(t Topic) func(error) {
 	var p TopicReaderReconnectStartInfo
 	res := t.onReaderReconnect(p)
@@ -958,12 +1134,13 @@ func TopicOnReaderUnknownGrpcMessage(t Topic, readerConnectionID string, e error
 	p.Error = e
 	t.onReaderUnknownGrpcMessage(p)
 }
-func TopicOnWriterReconnect(t Topic, topic string, producerID string, sessionID string, attempts int) func(error) {
+func TopicOnWriterReconnect(t Topic, writerInstanceID string, topic string, producerID string, sessionID string, attempt int) func(error) {
 	var p TopicWriterReconnectStartInfo
+	p.WriterInstanceID = writerInstanceID
 	p.Topic = topic
 	p.ProducerID = producerID
 	p.SessionID = sessionID
-	p.Attempts = attempts
+	p.Attempt = attempt
 	res := t.onWriterReconnect(p)
 	return func(e error) {
 		var p TopicWriterReconnectDoneInfo
@@ -971,11 +1148,11 @@ func TopicOnWriterReconnect(t Topic, topic string, producerID string, sessionID 
 		res(p)
 	}
 }
-func TopicOnWriterInitStream(t Topic, topic string, producerID string, writerInstanceID string) func(sessionID string, _ error) {
+func TopicOnWriterInitStream(t Topic, writerInstanceID string, topic string, producerID string) func(sessionID string, _ error) {
 	var p TopicWriterInitStreamStartInfo
+	p.WriterInstanceID = writerInstanceID
 	p.Topic = topic
 	p.ProducerID = producerID
-	p.WriterInstanceID = writerInstanceID
 	res := t.onWriterInitStream(p)
 	return func(sessionID string, e error) {
 		var p TopicWriterInitStreamDoneInfo
@@ -983,4 +1160,51 @@ func TopicOnWriterInitStream(t Topic, topic string, producerID string, writerIns
 		p.Error = e
 		res(p)
 	}
+}
+func TopicOnWriterClose(t Topic, writerInstanceID string, reason error) func(error) {
+	var p TopicWriterCloseStartInfo
+	p.WriterInstanceID = writerInstanceID
+	p.Reason = reason
+	res := t.onWriterClose(p)
+	return func(e error) {
+		var p TopicWriterCloseDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func TopicOnWriterCompressMessages(t Topic, writerInstanceID string, sessionID string, codec int32, firstSeqNo int64, messagesCount int, reason TopicWriterCompressMessagesReason) func(error) {
+	var p TopicWriterCompressMessagesStartInfo
+	p.WriterInstanceID = writerInstanceID
+	p.SessionID = sessionID
+	p.Codec = codec
+	p.FirstSeqNo = firstSeqNo
+	p.MessagesCount = messagesCount
+	p.Reason = reason
+	res := t.onWriterCompressMessages(p)
+	return func(e error) {
+		var p TopicWriterCompressMessagesDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func TopicOnWriterSendMessages(t Topic, writerInstanceID string, sessionID string, codec int32, firstSeqNo int64, messagesCount int) func(error) {
+	var p TopicWriterSendMessagesStartInfo
+	p.WriterInstanceID = writerInstanceID
+	p.SessionID = sessionID
+	p.Codec = codec
+	p.FirstSeqNo = firstSeqNo
+	p.MessagesCount = messagesCount
+	res := t.onWriterSendMessages(p)
+	return func(e error) {
+		var p TopicWriterSendMessagesDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func TopicOnWriterReadUnknownGrpcMessage(t Topic, writerInstanceID string, sessionID string, e error) {
+	var p TopicOnWriterReadUnknownGrpcMessageInfo
+	p.WriterInstanceID = writerInstanceID
+	p.SessionID = sessionID
+	p.Error = e
+	t.onWriterReadUnknownGrpcMessage(p)
 }
