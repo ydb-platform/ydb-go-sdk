@@ -387,12 +387,13 @@ type (
 	}
 
 	TopicWriterInitStreamStartInfo struct {
-		Topic      string
-		ProducerID string
-		SessionID  string
+		Topic            string
+		ProducerID       string
+		WriterInstanceID string
 	}
 
 	TopicWriterInitStreamDoneInfo struct {
-		Error error
+		SessionID string
+		Error     error
 	}
 )

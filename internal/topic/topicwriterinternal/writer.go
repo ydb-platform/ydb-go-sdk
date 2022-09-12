@@ -28,8 +28,8 @@ func NewWriter(cred credentials.Credentials, options []PublicWriterOption) *Writ
 		options,
 		WithCredentials(cred),
 	)
-	cfg := newWriterImplConfig(options...)
-	writerImpl := newWriterImpl(cfg)
+	cfg := newWriterReconnectorConfig(options...)
+	writerImpl := newWriterReconnector(cfg)
 
 	return &Writer{
 		streamWriter: writerImpl,

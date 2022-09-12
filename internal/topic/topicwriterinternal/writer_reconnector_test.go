@@ -19,7 +19,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
@@ -29,8 +28,8 @@ var testCommonEncoders = NewEncoderMap()
 func TestWriterImpl_AutoSeq(t *testing.T) {
 	t.Run("OK", func(t *testing.T) {
 		ctx := xtest.Context(t)
-		w := newWriterImplStopped(newWriterImplConfig(WithAutoSetSeqNo(true)))
-		w.firstInitResponseProcessed.Store(true)
+		w := newWriterReconnectorStopped(newWriterReconnectorConfig(WithAutoSetSeqNo(true)))
+		w.firstConnectionHandled.Store(true)
 
 		lastSeqNo := int64(16)
 		w.lastSeqNo = lastSeqNo
@@ -58,43 +57,9 @@ func TestWriterImpl_AutoSeq(t *testing.T) {
 	t.Run("PredefinedSeqNo", func(t *testing.T) {
 		ctx := xtest.Context(t)
 
-		w := newWriterImplStopped(newWriterImplConfig(WithAutoSetSeqNo(true)))
-		w.firstInitResponseProcessed.Store(true)
+		w := newWriterReconnectorStopped(newWriterReconnectorConfig(WithAutoSetSeqNo(true)))
+		w.firstConnectionHandled.Store(true)
 		require.Error(t, w.Write(ctx, newTestMessages(1)))
-	})
-}
-
-func TestWriterImpl_CreateInitMessage(t *testing.T) {
-	t.Run("Empty", func(t *testing.T) {
-		cfg := writerImplConfig{
-			producerID:          "producer",
-			topic:               "topic",
-			writerMeta:          map[string]string{"key": "val"},
-			defaultPartitioning: rawtopicwriter.NewPartitioningPartitionID(5),
-			autoSetSeqNo:        false,
-			compressorCount:     1,
-		}
-		w := newWriterImplStopped(cfg)
-		expected := rawtopicwriter.InitRequest{
-			Path:             w.cfg.topic,
-			ProducerID:       w.cfg.producerID,
-			WriteSessionMeta: w.cfg.writerMeta,
-			Partitioning:     w.cfg.defaultPartitioning,
-			GetLastSeqNo:     w.cfg.autoSetSeqNo,
-		}
-		require.Equal(t, expected, w.createInitRequest())
-	})
-
-	t.Run("WithAutoSeq", func(t *testing.T) {
-		t.Run("InitState", func(t *testing.T) {
-			w := newWriterImplStopped(newWriterImplConfig(WithAutoSetSeqNo(true)))
-			require.True(t, w.createInitRequest().GetLastSeqNo)
-		})
-		t.Run("WithInternalSeqNo", func(t *testing.T) {
-			w := newWriterImplStopped(newWriterImplConfig(WithAutoSetSeqNo(true)))
-			w.lastSeqNo = 1
-			require.False(t, w.createInitRequest().GetLastSeqNo)
-		})
 	})
 }
 
@@ -103,7 +68,7 @@ func TestWriterImpl_Write(t *testing.T) {
 		ctx := context.Background()
 		w := newTestWriterStopped()
 		w.cfg.fillEmptyCreatedTime = false
-		w.firstInitResponseProcessed.Store(true)
+		w.firstConnectionHandled.Store(true)
 
 		err := w.Write(ctx, newTestMessages(1, 3, 5))
 		require.NoError(t, err)
@@ -279,80 +244,48 @@ func TestEnv(t *testing.T) {
 
 func TestWriterImpl_InitSession(t *testing.T) {
 	w := newTestWriterStopped(WithAutoSetSeqNo(true))
-	mc := gomock.NewController(t)
-	strm := NewMockRawTopicWriterStream(mc)
-	strm.EXPECT().Send(&rawtopicwriter.InitRequest{
-		Path:             "test-topic",
-		ProducerID:       "test-producer-id",
-		WriteSessionMeta: map[string]string{"test-key": "test-val"},
-		Partitioning: rawtopicwriter.Partitioning{
-			Type:           rawtopicwriter.PartitioningMessageGroupID,
-			MessageGroupID: "test-message-group-id",
-		},
-		GetLastSeqNo: true,
-	})
 	lastSeqNo := int64(123)
-	strm.EXPECT().Recv().Return(&rawtopicwriter.InitResult{
-		SessionID:       "test-session-id",
-		SupportedCodecs: rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip},
-		LastSeqNo:       lastSeqNo,
-	}, nil)
-	w.streamVal = strm
-	err := w.initStream()
-	require.NoError(t, err)
-	require.Equal(t, "test-session-id", w.sessionID)
+	sessionID := "test-session-id"
+
+	w.onWriterChange(&SingleStreamWriter{
+		ReceivedLastSeqNum: lastSeqNo,
+		SessionID:          sessionID,
+	})
+
+	require.Equal(t, sessionID, w.sessionID)
 	require.Equal(t, lastSeqNo, w.lastSeqNo)
 	require.True(t, isClosed(w.firstInitResponseProcessedChan))
 }
 
 func TestWriterImpl_Reconnect(t *testing.T) {
-	t.Run("StartStopLoop", func(t *testing.T) {
+	t.Run("StopReconnectOnUnretryableError", func(t *testing.T) {
 		mc := gomock.NewController(t)
 		strm := NewMockRawTopicWriterStream(mc)
 
 		w := newTestWriterStopped()
 
 		ctx := xtest.Context(t)
-		ctx, cancel := xcontext.WithErrCancel(ctx)
 		testErr := errors.New("test")
 
 		connectCalled := false
 		connectCalledChan := make(empty.Chan)
-		var streamContext context.Context
 
 		w.cfg.connect = func(streamCtxArg context.Context) (RawTopicWriterStream, error) {
 			close(connectCalledChan)
 			connectCalled = true
-			streamContext = ctx
 			require.NotEqual(t, ctx, streamCtxArg)
-			streamContext = streamCtxArg
 			return strm, nil
 		}
 
-		initRequest := w.createInitRequest()
+		initRequest := testCreateInitRequest(w)
 		strm.EXPECT().Send(&initRequest)
-		strm.EXPECT().Recv().Return(&rawtopicwriter.InitResult{
-			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{
-				Status: rawydb.StatusSuccess,
-			},
-			LastSeqNo:       10,
-			SessionID:       "test-session",
-			PartitionID:     10,
-			SupportedCodecs: rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip},
-		}, nil).MaxTimes(2)
-		strm.EXPECT().CloseSend().Do(func() {
-			require.NoError(t, streamContext.Err())
-			require.ErrorIs(t, ctx.Err(), testErr)
-		})
+		strm.EXPECT().Recv().Return(nil, testErr)
+		strm.EXPECT().CloseSend()
 
-		go func() {
-			<-connectCalledChan
-			cancel(testErr)
-		}()
+		w.connectionLoop(ctx)
 
-		w.sendLoop(ctx)
 		require.True(t, connectCalled)
-		require.Error(t, streamContext.Err())
+		require.ErrorIs(t, w.background.CloseReason(), testErr)
 	})
 
 	t.Run("ReconnectOnErrors", func(t *testing.T) {
@@ -368,9 +301,9 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			connectionError error
 		}
 
-		newStream := func(onSendInitCallback func()) *MockRawTopicWriterStream {
+		newStream := func(name string, onSendInitCallback func()) *MockRawTopicWriterStream {
 			strm := NewMockRawTopicWriterStream(mc)
-			initReq := w.createInitRequest()
+			initReq := testCreateInitRequest(w)
 
 			streamClosed := make(empty.Chan)
 			strm.EXPECT().CloseSend().Do(func() {
@@ -385,6 +318,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 
 			strm.EXPECT().Recv().Return(&rawtopicwriter.InitResult{
 				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
+				SessionID:             name,
 			}, nil)
 
 			strm.EXPECT().Recv().Do(func() {
@@ -399,7 +333,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			require.NoError(t, err)
 		}()
 
-		strm2 := newStream(func() {
+		strm2 := newStream("strm2", func() {
 			close(strm2InitSent)
 		})
 		strm2.EXPECT().Send(&rawtopicwriter.WriteRequest{
@@ -409,7 +343,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			Codec: rawtopiccommon.CodecRaw,
 		}).Return(xerrors.Retryable(errors.New("retriable on strm2")))
 
-		strm3 := newStream(nil)
+		strm3 := newStream("strm3", nil)
 		strm3.EXPECT().Send(&rawtopicwriter.WriteRequest{
 			Messages: []rawtopicwriter.MessageData{
 				{SeqNo: 1},
@@ -440,7 +374,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			return res.stream, res.connectionError
 		}
 
-		w.sendLoop(ctx)
+		w.connectionLoop(ctx)
 	})
 }
 
@@ -526,7 +460,7 @@ func TestSplitMessagesByBufCodec(t *testing.T) {
 	}
 }
 
-func TestWriterImpl_CalculateAllowedCodecs(t *testing.T) {
+func TestCalculateAllowedCodecs(t *testing.T) {
 	customCodecSupported := rawtopiccommon.Codec(rawtopiccommon.CodecCustomerFirst)
 	customCodecUnsupported := rawtopiccommon.Codec(rawtopiccommon.CodecCustomerFirst + 1)
 	encoders := NewEncoderMap()
@@ -615,10 +549,7 @@ func TestWriterImpl_CalculateAllowedCodecs(t *testing.T) {
 
 	for _, test := range table {
 		t.Run(test.name, func(t *testing.T) {
-			w := newWriterImplStopped(newWriterImplConfig())
-			w.cfg.forceCodec = test.force
-			w.encodersMap = encoders
-			res := w.calculateAllowedCodecs(test.serverCodecs)
+			res := calculateAllowedCodecs(test.force, encoders, test.serverCodecs)
 			require.Equal(t, test.expectedResult, res)
 		})
 	}
@@ -648,10 +579,10 @@ func newTestMessagesWithContent(numbers ...int) []messageWithDataContent {
 	return messages
 }
 
-func newTestWriterStopped(opts ...PublicWriterOption) *WriterImpl {
+func newTestWriterStopped(opts ...PublicWriterOption) *WriterReconnector {
 	cfgOptions := append(defaultTestWriterOptions(), opts...)
-	cfg := newWriterImplConfig(cfgOptions...)
-	res := newWriterImplStopped(cfg)
+	cfg := newWriterReconnectorConfig(cfgOptions...)
+	res := newWriterReconnectorStopped(cfg)
 
 	if cfg.additionalEncoders == nil {
 		res.encodersMap = testCommonEncoders
@@ -688,7 +619,7 @@ func isClosed(ch <-chan struct{}) bool {
 type testEnv struct {
 	ctx                   context.Context
 	stream                *MockRawTopicWriterStream
-	writer                *WriterImpl
+	writer                *WriterReconnector
 	sendFromServerChannel chan sendFromServerResponse
 	stopReadEvents        empty.Chan
 	partitionID           int64
@@ -726,11 +657,12 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 	}))
 	writerOptions = append(writerOptions, options.writerOptions...)
 
-	res.writer = newWriterImplStopped(newWriterImplConfig(writerOptions...))
+	res.writer = newWriterReconnectorStopped(newWriterReconnectorConfig(writerOptions...))
 
 	res.stream.EXPECT().Recv().DoAndReturn(res.receiveMessageHandler).AnyTimes()
 
-	req := res.writer.createInitRequest()
+	req := testCreateInitRequest(res.writer)
+
 	res.stream.EXPECT().Send(&req).Do(func(_ interface{}) {
 		supportedCodecs := rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw}
 		if options.topicCodecs != nil {
@@ -780,4 +712,9 @@ func (e *testEnv) receiveMessageHandler() (rawtopicwriter.ServerMessage, error) 
 type sendFromServerResponse struct {
 	msg rawtopicwriter.ServerMessage
 	err error
+}
+
+func testCreateInitRequest(w *WriterReconnector) rawtopicwriter.InitRequest {
+	req := newSingleStreamWriterStopped(context.Background(), w.createWriterStreamConfig(nil)).createInitRequest()
+	return req
 }
