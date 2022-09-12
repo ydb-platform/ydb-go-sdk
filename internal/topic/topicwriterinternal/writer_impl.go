@@ -13,6 +13,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
@@ -38,6 +39,8 @@ var (
 type writerImplConfig struct {
 	tracer               trace.Topic
 	connect              ConnectFunc
+	cred                 credentials.Credentials
+	credUpdateInterval   time.Duration
 	producerID           string
 	topic                string
 	writerMeta           map[string]string
@@ -48,13 +51,17 @@ type writerImplConfig struct {
 	forceCodec           rawtopiccommon.Codec
 	fillEmptyCreatedTime bool
 	compressorCount      int
+	clock                clockwork.Clock
 }
 
 func newWriterImplConfig(options ...PublicWriterOption) writerImplConfig {
 	cfg := writerImplConfig{
 		autoSetSeqNo:         true,
 		fillEmptyCreatedTime: true,
+		cred:                 credentials.NewAnonymousCredentials(),
+		credUpdateInterval:   time.Hour,
 		compressorCount:      runtime.NumCPU(),
+		clock:                clockwork.NewRealClock(),
 	}
 	if cfg.compressorCount == 0 {
 		cfg.compressorCount = 1
@@ -80,6 +87,7 @@ type WriterImpl struct {
 	lastSeqNo                      int64
 	firstInitResponseProcessedChan empty.Chan
 	encodersMap                    *EncoderMap
+	streamVal                      RawTopicWriterStream
 }
 
 func newWriterImpl(cfg writerImplConfig) *WriterImpl {
@@ -127,12 +135,19 @@ func (w *WriterImpl) fillFields(messages []messageWithDataContent) error {
 		// Set created time
 		if w.cfg.fillEmptyCreatedTime && msg.CreatedAt.IsZero() {
 			if now.IsZero() {
-				now = time.Now()
+				now = w.clock.Now()
 			}
 			msg.CreatedAt = now
 		}
 	}
 	return nil
+}
+
+func (w *WriterImpl) stream() RawTopicWriterStream {
+	w.m.RLock()
+	defer w.m.RUnlock()
+
+	return w.streamVal
 }
 
 func (w *WriterImpl) start() {
@@ -246,21 +261,20 @@ func (w *WriterImpl) sendLoop(ctx context.Context) {
 
 		traceOnDone := trace.TopicOnWriterReconnect(w.cfg.tracer, w.cfg.topic, w.cfg.producerID, w.sessionID, attempt)
 
-		stream, err := w.connectWithTimeout(streamCtx)
-
+		err := w.connectWithTimeout(streamCtx)
 		traceOnDone(err)
 
 		// TODO: trace
 		if err != nil {
-			if !topic.IsRetryableError(err) {
-				_ = w.background.Close(ctx, err)
-				return
+			if topic.IsRetryableError(err) {
+				continue
 			}
-			continue
+			_ = w.background.Close(ctx, err)
+			return
 		}
 		attempt = 0
 
-		err = w.communicateWithServerThroughExistedStream(ctx, stream)
+		err = w.communicateWithServerThroughExistedStream(ctx)
 		if !topic.IsRetryableError(err) {
 			closeCtx, cancel := context.WithCancel(ctx)
 			cancel()
@@ -271,34 +285,68 @@ func (w *WriterImpl) sendLoop(ctx context.Context) {
 	}
 }
 
-func (w *WriterImpl) connectWithTimeout(streamLifetimeContext context.Context) (RawTopicWriterStream, error) {
+func (w *WriterImpl) connectWithTimeout(streamLifetimeContext context.Context) error {
 	// TODO: impl
-	return w.cfg.connect(streamLifetimeContext)
+	strm, err := w.cfg.connect(streamLifetimeContext)
+	if err == nil {
+		w.m.WithLock(func() {
+			w.streamVal = strm
+		})
+	}
+
+	return err
 }
 
-func (w *WriterImpl) communicateWithServerThroughExistedStream(ctx context.Context, stream RawTopicWriterStream) error {
-	ctx, cancel := xcontext.WithErrCancel(ctx)
-	defer func() {
-		_ = stream.CloseSend()
-		cancel(xerrors.WithStackTrace(errCloseWriterImplStopWork))
-	}()
-
+func (w *WriterImpl) communicateWithServerThroughExistedStream(ctx context.Context) error {
 	traceOnDone := trace.TopicOnWriterInitStream(w.cfg.tracer, w.cfg.topic, w.cfg.producerID, w.sessionID)
-	err := w.initStream(stream)
+	err := w.initStream()
 	traceOnDone(err)
 	if err != nil {
 		return err
 	}
 
+	readStreamStopped := make(empty.Chan)
+	tokenUpdaterStreamStopped := make(empty.Chan)
+	defer func() {
+		// wait reader
+		select {
+		case <-w.background.Done():
+			// if background stopped - no new reader can be started
+		case <-readStreamStopped:
+			// wait reader stop for prevent reads in parallel
+		}
+
+		// wait token updater
+		select {
+		case <-w.background.Done():
+			// if background stopped - no new reader can be started
+		case <-tokenUpdaterStreamStopped:
+			// wait reader stop for prevent reads in parallel
+		}
+	}()
+
+	ctx, cancel := xcontext.WithErrCancel(ctx)
+	defer func() {
+		_ = w.stream().CloseSend()
+		cancel(xerrors.WithStackTrace(errCloseWriterImplStopWork))
+	}()
+
 	w.background.Start("topic writer receive messages", func(_ context.Context) {
-		w.receiveMessages(ctx, stream, cancel)
+		defer close(readStreamStopped)
+		w.receiveMessages(ctx, cancel)
 	})
 
-	return w.sendMessagesFromQueueToStream(ctx, stream)
+	w.background.Start("topic writer token updater", func(_ context.Context) {
+		defer close(tokenUpdaterStreamStopped)
+		w.updateTokenLoop(ctx)
+	})
+
+	return w.sendMessagesFromQueueToStream(ctx)
 }
 
-func (w *WriterImpl) initStream(stream RawTopicWriterStream) error {
+func (w *WriterImpl) initStream() error {
 	req := w.createInitRequest()
+	stream := w.stream()
 	if err := stream.Send(&req); err != nil {
 		return err
 	}
@@ -372,13 +420,13 @@ func (w *WriterImpl) calculateAllowedCodecs(
 	return res
 }
 
-func (w *WriterImpl) receiveMessages(ctx context.Context, stream RawTopicWriterStream, cancel xcontext.CancelErrFunc) {
+func (w *WriterImpl) receiveMessages(ctx context.Context, cancel xcontext.CancelErrFunc) {
 	for {
 		if ctx.Err() != nil {
 			return
 		}
 
-		mess, err := stream.Recv()
+		mess, err := w.stream().Recv()
 		if err != nil {
 			cancel(xerrors.WithStackTrace(fmt.Errorf("ydb: failed to receive message from write stream: %w", err)))
 			return
@@ -394,11 +442,15 @@ func (w *WriterImpl) receiveMessages(ctx context.Context, stream RawTopicWriterS
 				cancel(reason)
 				return
 			}
+		case *rawtopicwriter.UpdateTokenResponse:
+			// pass
+		default:
+			// TODO: trace
 		}
 	}
 }
 
-func (w *WriterImpl) sendMessagesFromQueueToStream(ctx context.Context, stream RawTopicWriterStream) error {
+func (w *WriterImpl) sendMessagesFromQueueToStream(ctx context.Context) error {
 	w.queue.ResetSentProgress()
 
 	for {
@@ -412,7 +464,7 @@ func (w *WriterImpl) sendMessagesFromQueueToStream(ctx context.Context, stream R
 			return err
 		}
 
-		err = sendMessagesToStream(stream, targetCodec, messages)
+		err = sendMessagesToStream(w.stream(), targetCodec, messages)
 		if err != nil {
 			return xerrors.WithStackTrace(fmt.Errorf("ydb: error send message to topic stream: %w", err))
 		}
@@ -436,6 +488,43 @@ func (w *WriterImpl) waitFirstInitResponse(ctx context.Context) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+func (w *WriterImpl) updateTokenLoop(ctx context.Context) {
+	if ctx.Err() != nil {
+		return
+	}
+
+	ticker := w.cfg.clock.NewTicker(w.cfg.credUpdateInterval)
+	defer ticker.Stop()
+
+	ctxDone := ctx.Done()
+	tickerChan := ticker.Chan()
+	for {
+		select {
+		case <-ctxDone:
+			return
+		case <-tickerChan:
+			_ = w.sendUpdateToken(ctx)
+		}
+	}
+}
+
+func (w *WriterImpl) sendUpdateToken(ctx context.Context) (err error) {
+	token, err := w.cfg.cred.Token(ctx)
+	if err != nil {
+		return err
+	}
+
+	stream := w.stream()
+	if stream == nil {
+		// not connected yet
+		return nil
+	}
+
+	req := &rawtopicwriter.UpdateTokenRequest{}
+	req.Token = token
+	return stream.Send(req)
 }
 
 func sendMessagesToStream(

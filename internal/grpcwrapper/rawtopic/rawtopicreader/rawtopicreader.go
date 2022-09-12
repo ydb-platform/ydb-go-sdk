@@ -86,6 +86,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 	case *Ydb_Topic.StreamReadMessage_FromServer_UpdateTokenResponse:
 		resp := &UpdateTokenResponse{}
 		resp.ServerMessageMetadata = meta
+		resp.MustFromProto(m.UpdateTokenResponse)
 		return resp, nil
 	default:
 		return nil, xerrors.WithStackTrace(fmt.Errorf(
@@ -139,7 +140,7 @@ func (s StreamReader) Send(msg ClientMessage) error {
 	case *UpdateTokenRequest:
 		grpcMess := &Ydb_Topic.StreamReadMessage_FromClient{
 			ClientMessage: &Ydb_Topic.StreamReadMessage_FromClient_UpdateTokenRequest{
-				UpdateTokenRequest: m.toProto(),
+				UpdateTokenRequest: m.ToProto(),
 			},
 		}
 		return s.Stream.Send(grpcMess)

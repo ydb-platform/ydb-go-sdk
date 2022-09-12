@@ -297,7 +297,8 @@ func TestWriterImpl_InitSession(t *testing.T) {
 		SupportedCodecs: rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw, rawtopiccommon.CodecGzip},
 		LastSeqNo:       lastSeqNo,
 	}, nil)
-	err := w.initStream(strm)
+	w.streamVal = strm
+	err := w.initStream()
 	require.NoError(t, err)
 	require.Equal(t, "test-session-id", w.sessionID)
 	require.Equal(t, lastSeqNo, w.lastSeqNo)

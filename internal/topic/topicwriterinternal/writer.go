@@ -5,6 +5,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 )
 
@@ -22,7 +23,11 @@ type Writer struct {
 	clock        clockwork.Clock
 }
 
-func NewWriter(options []PublicWriterOption) *Writer {
+func NewWriter(cred credentials.Credentials, options []PublicWriterOption) *Writer {
+	options = append(
+		options,
+		WithCredentials(cred),
+	)
 	cfg := newWriterImplConfig(options...)
 	writerImpl := newWriterImpl(cfg)
 

@@ -281,3 +281,17 @@ func (s *WriteStatistics) fromProto(statistics *Ydb_Topic.StreamWriteMessage_Wri
 	s.TopicQuotaWaitTime = statistics.TopicQuotaWaitTime.AsDuration()
 	return nil
 }
+
+type UpdateTokenRequest struct {
+	clientMessageImpl
+
+	rawtopiccommon.UpdateTokenRequest
+}
+
+type UpdateTokenResponse struct {
+	serverMessageImpl
+
+	rawtopiccommon.ServerMessageMetadata
+
+	rawtopiccommon.UpdateTokenResponse
+}

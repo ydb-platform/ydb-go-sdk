@@ -75,14 +75,14 @@ func (c *Client) StreamRead(ctxStreamLifeTime context.Context) (rawtopicreader.S
 	return rawtopicreader.StreamReader{Stream: protoResp}, nil
 }
 
-func (c *Client) StreamWrite(ctxStreamLifeTime context.Context) (rawtopicwriter.StreamWriter, error) {
+func (c *Client) StreamWrite(ctxStreamLifeTime context.Context) (*rawtopicwriter.StreamWriter, error) {
 	protoResp, err := c.service.StreamWrite(ctxStreamLifeTime)
 	if err != nil {
-		return rawtopicwriter.StreamWriter{}, xerrors.WithStackTrace(
+		return nil, xerrors.WithStackTrace(
 			xerrors.Wrap(
 				fmt.Errorf("ydb: failed start grpc topic stream write: %w", err),
 			),
 		)
 	}
-	return rawtopicwriter.StreamWriter{Stream: protoResp}, nil
+	return &rawtopicwriter.StreamWriter{Stream: protoResp}, nil
 }

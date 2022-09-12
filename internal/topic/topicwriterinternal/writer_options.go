@@ -1,6 +1,7 @@
 package topicwriterinternal
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 )
 
@@ -34,6 +35,17 @@ func WithCompressorCount(num int) PublicWriterOption {
 
 	return func(cfg *writerImplConfig) {
 		cfg.compressorCount = num
+	}
+}
+
+// WithCredentials for internal usage only
+// no proxy to public interface
+func WithCredentials(cred credentials.Credentials) PublicWriterOption {
+	return func(cfg *writerImplConfig) {
+		if cred == nil {
+			cred = credentials.NewAnonymousCredentials()
+		}
+		cfg.cred = cred
 	}
 }
 

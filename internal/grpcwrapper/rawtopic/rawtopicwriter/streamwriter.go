@@ -1,8 +1,11 @@
 package rawtopicwriter
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
+	"sync"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 
@@ -11,6 +14,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
+var errConcurencyReadDenied = xerrors.Wrap(errors.New("ydb: read from rawtopicwriter in parallel"))
+
 type GrpcStream interface {
 	Send(messageNew *Ydb_Topic.StreamWriteMessage_FromClient) error
 	Recv() (*Ydb_Topic.StreamWriteMessage_FromServer, error)
@@ -18,10 +23,20 @@ type GrpcStream interface {
 }
 
 type StreamWriter struct {
-	Stream GrpcStream
+	readCounter int32
+
+	sendCloseMtx sync.Mutex
+	Stream       GrpcStream
 }
 
-func (w StreamWriter) Recv() (ServerMessage, error) {
+func (w *StreamWriter) Recv() (ServerMessage, error) {
+	readCnt := atomic.AddInt32(&w.readCounter, 1)
+	defer atomic.AddInt32(&w.readCounter, -1)
+
+	if readCnt != 1 {
+		return nil, xerrors.WithStackTrace(errConcurencyReadDenied)
+	}
+
 	grpcMsg, err := w.Stream.Recv()
 	if err != nil {
 		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
@@ -52,6 +67,10 @@ func (w StreamWriter) Recv() (ServerMessage, error) {
 			return nil, err
 		}
 		return &res, nil
+	case *Ydb_Topic.StreamWriteMessage_FromServer_UpdateTokenResponse:
+		var res UpdateTokenResponse
+		res.MustFromProto(v.UpdateTokenResponse)
+		return &res, nil
 	default:
 		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: unexpected message type received from raw writer stream: '%v'",
@@ -60,7 +79,10 @@ func (w StreamWriter) Recv() (ServerMessage, error) {
 	}
 }
 
-func (w StreamWriter) Send(rawMsg ClientMessage) error {
+func (w *StreamWriter) Send(rawMsg ClientMessage) error {
+	w.sendCloseMtx.Lock()
+	defer w.sendCloseMtx.Unlock()
+
 	var protoMsg Ydb_Topic.StreamWriteMessage_FromClient
 	switch v := rawMsg.(type) {
 	case *InitRequest:
@@ -77,6 +99,10 @@ func (w StreamWriter) Send(rawMsg ClientMessage) error {
 			return err
 		}
 		protoMsg.ClientMessage = writeReqProto
+	case *UpdateTokenRequest:
+		protoMsg.ClientMessage = &Ydb_Topic.StreamWriteMessage_FromClient_UpdateTokenRequest{
+			UpdateTokenRequest: v.ToProto(),
+		}
 	default:
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: unexpected message type for send to raw writer stream: '%v'",
@@ -91,7 +117,10 @@ func (w StreamWriter) Send(rawMsg ClientMessage) error {
 	return nil
 }
 
-func (w StreamWriter) CloseSend() error {
+func (w *StreamWriter) CloseSend() error {
+	w.sendCloseMtx.Lock()
+	defer w.sendCloseMtx.Unlock()
+
 	return w.Stream.CloseSend()
 }
 
