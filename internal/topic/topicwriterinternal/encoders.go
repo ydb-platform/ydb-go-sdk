@@ -87,6 +87,8 @@ func NewEncoderSelector(
 	m *EncoderMap,
 	allowedCodecs rawtopiccommon.SupportedCodecs,
 	parallelCompressors int,
+	tracer trace.Topic,
+	writerReconnectorID, sessionID string,
 ) EncoderSelector {
 	if parallelCompressors <= 0 {
 		panic("ydb: need leas one allowed compressor")
@@ -96,6 +98,9 @@ func NewEncoderSelector(
 		m:                      m,
 		parallelCompressors:    parallelCompressors,
 		measureIntervalBatches: codecMeasureIntervalBatches,
+		tracer:                 tracer,
+		writerReconnectorID:    writerReconnectorID,
+		sessionID:              sessionID,
 	}
 	res.ResetAllowedCodecs(allowedCodecs)
 

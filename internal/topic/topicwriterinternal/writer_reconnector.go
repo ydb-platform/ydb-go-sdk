@@ -73,7 +73,6 @@ type WriterReconnector struct {
 	clock                          clockwork.Clock
 	firstConnectionHandled         xatomic.Bool
 	firstInitResponseProcessedChan empty.Chan
-	encoder                        EncoderSelector
 	writerInstanceID               string
 
 	m           xsync.RWMutex
@@ -104,8 +103,6 @@ func newWriterReconnectorStopped(cfg writerReconnectorConfig) *WriterReconnector
 		res.encodersMap.AddEncoder(codec, creator)
 	}
 
-	allowedCodecs := calculateAllowedCodecs(cfg.forceCodec, res.encodersMap, nil)
-	res.encoder = NewEncoderSelector(res.encodersMap, allowedCodecs, cfg.compressorCount)
 	res.sessionID = "not-connected-" + writerInstanceID.String()
 
 	return res

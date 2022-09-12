@@ -9,16 +9,17 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestEncoderSelector_CodecMeasure(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
-		s := NewEncoderSelector(testCommonEncoders, nil, 1)
+		s := NewEncoderSelector(testCommonEncoders, nil, 1, trace.Topic{}, "", "")
 		_, err := s.measureCodecs(nil)
 		require.Error(t, err)
 	})
 	t.Run("One", func(t *testing.T) {
-		s := NewEncoderSelector(NewEncoderMap(), rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw}, 1)
+		s := NewEncoderSelector(NewEncoderMap(), rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw}, 1, trace.Topic{}, "", "")
 		codec, err := s.measureCodecs(nil)
 		require.NoError(t, err)
 		require.Equal(t, rawtopiccommon.CodecRaw, codec)
@@ -36,7 +37,9 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 			s := NewEncoderSelector(testCommonEncoders, rawtopiccommon.SupportedCodecs{
 				rawtopiccommon.CodecRaw,
 				rawtopiccommon.CodecGzip,
-			}, 4)
+			}, 4,
+				trace.Topic{}, "", "",
+			)
 
 			var messages []messageWithDataContent
 			for i := 0; i < smallCount; i++ {

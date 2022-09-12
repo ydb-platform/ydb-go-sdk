@@ -135,7 +135,14 @@ func (w *SingleStreamWriter) initStream() (err error) {
 		return xerrors.WithStackTrace(errNoAllowedCodecs)
 	}
 
-	w.Encoder = NewEncoderSelector(w.cfg.encodersMap, w.AllowedCodecs, w.cfg.compressorCount)
+	w.Encoder = NewEncoderSelector(
+		w.cfg.encodersMap,
+		w.AllowedCodecs,
+		w.cfg.compressorCount,
+		w.cfg.tracer,
+		w.cfg.reconnectorInstanceID,
+		w.SessionID,
+	)
 
 	w.SessionID = result.SessionID
 	w.ReceivedLastSeqNum = result.LastSeqNo
