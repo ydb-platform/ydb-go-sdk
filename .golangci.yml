@@ -231,6 +231,9 @@ issues:
   # Show only new issues created in git patch with set file path.
   # new-from-patch: path/to/patch/file
   exclude-rules:
+    - path: internal/xatomic/type.go
+      linters:
+        - predeclared
     - path: _test\.go
       linters:
         - unused
