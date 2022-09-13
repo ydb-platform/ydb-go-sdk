@@ -67,7 +67,7 @@ func TestWriterImpl_Write(t *testing.T) {
 	t.Run("PushToQueue", func(t *testing.T) {
 		ctx := context.Background()
 		w := newTestWriterStopped()
-		w.cfg.fillEmptyCreatedTime = false
+		w.cfg.FillEmptyCreatedTime = false
 		w.firstConnectionHandled.Store(true)
 
 		err := w.Write(ctx, newTestMessages(1, 3, 5))
@@ -277,7 +277,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		connectCalled := false
 		connectCalledChan := make(empty.Chan)
 
-		w.cfg.connect = func(streamCtxArg context.Context) (RawTopicWriterStream, error) {
+		w.cfg.Connect = func(streamCtxArg context.Context) (RawTopicWriterStream, error) {
 			close(connectCalledChan)
 			connectCalled = true
 			require.NotEqual(t, ctx, streamCtxArg)
@@ -375,7 +375,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		}
 
 		connectionAttempt := 0
-		w.cfg.connect = func(ctx context.Context) (RawTopicWriterStream, error) {
+		w.cfg.Connect = func(ctx context.Context) (RawTopicWriterStream, error) {
 			res := connectsResult[connectionAttempt]
 			connectionAttempt++
 			return res.stream, res.connectionError
@@ -418,8 +418,27 @@ func TestCreateRawMessageData(t *testing.T) {
 			req,
 		)
 	})
-
-	// TODO: additional tests
+	t.Run("WithSeqno", func(t *testing.T) {
+		req, err := createWriteRequest(newTestMessagesWithContent(1, 2, 3), rawtopiccommon.CodecRaw)
+		require.NoError(t, err)
+		require.Equal(t,
+			rawtopicwriter.WriteRequest{
+				Messages: []rawtopicwriter.MessageData{
+					{
+						SeqNo: 1,
+					},
+					{
+						SeqNo: 2,
+					},
+					{
+						SeqNo: 3,
+					},
+				},
+				Codec: rawtopiccommon.CodecRaw,
+			},
+			req,
+		)
+	})
 }
 
 func TestSplitMessagesByBufCodec(t *testing.T) {
@@ -588,7 +607,7 @@ func newTestWriterStopped(opts ...PublicWriterOption) *WriterReconnector {
 	cfg := newWriterReconnectorConfig(cfgOptions...)
 	res := newWriterReconnectorStopped(cfg)
 
-	if cfg.additionalEncoders == nil {
+	if cfg.AdditionalEncoders == nil {
 		res.encodersMap = testCommonEncoders
 	}
 

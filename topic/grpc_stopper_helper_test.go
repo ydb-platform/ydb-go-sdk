@@ -1,4 +1,7 @@
-package topic
+//go:build !fast
+// +build !fast
+
+package topic_test
 
 import (
 	"context"

@@ -15,9 +15,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -27,6 +29,7 @@ import (
 )
 
 var (
+	errConnTimeout                          = xerrors.Wrap(errors.New("ydb: connection timeout"))
 	errStopWriterReconnector                = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
 	errCloseWriterReconnectorConnectionLoop = xerrors.Wrap(errors.New("ydb: close writer reconnector connection loop"))
 	errCloseWriterReconnectorReconnect      = xerrors.Wrap(errors.New("ydb: stream writer reconnect"))
@@ -34,26 +37,29 @@ var (
 	errNoAllowedCodecs                      = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
 )
 
-type writerReconnectorConfig struct {
+type WriterReconnectorConfig struct {
 	WritersCommonConfig
 
-	additionalEncoders   map[rawtopiccommon.Codec]PublicCreateEncoderFunc
-	connect              ConnectFunc
-	waitServerAck        bool
-	autoSetSeqNo         bool
-	fillEmptyCreatedTime bool
+	Common               config.Common
+	AdditionalEncoders   map[rawtopiccommon.Codec]PublicCreateEncoderFunc
+	Connect              ConnectFunc
+	WaitServerAck        bool
+	AutoSetSeqNo         bool
+	FillEmptyCreatedTime bool
+
+	connectTimeout time.Duration
 }
 
-func newWriterReconnectorConfig(options ...PublicWriterOption) writerReconnectorConfig {
-	cfg := writerReconnectorConfig{
+func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnectorConfig {
+	cfg := WriterReconnectorConfig{
 		WritersCommonConfig: WritersCommonConfig{
 			cred:               credentials.NewAnonymousCredentials(),
 			credUpdateInterval: time.Hour,
 			clock:              clockwork.NewRealClock(),
 			compressorCount:    runtime.NumCPU(),
 		},
-		autoSetSeqNo:         true,
-		fillEmptyCreatedTime: true,
+		AutoSetSeqNo:         true,
+		FillEmptyCreatedTime: true,
 	}
 	if cfg.compressorCount == 0 {
 		cfg.compressorCount = 1
@@ -62,11 +68,19 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) writerReconnector
 	for _, f := range options {
 		f(&cfg)
 	}
+
+	if cfg.connectTimeout == 0 {
+		cfg.connectTimeout = cfg.Common.OperationTimeout()
+	}
+	if cfg.connectTimeout == 0 {
+		cfg.connectTimeout = timeutil.InfiniteDuration
+	}
+
 	return cfg
 }
 
 type WriterReconnector struct {
-	cfg writerReconnectorConfig
+	cfg WriterReconnectorConfig
 
 	queue                          messageQueue
 	background                     background.Worker
@@ -81,13 +95,13 @@ type WriterReconnector struct {
 	encodersMap *EncoderMap
 }
 
-func newWriterReconnector(cfg writerReconnectorConfig) *WriterReconnector {
+func newWriterReconnector(cfg WriterReconnectorConfig) *WriterReconnector {
 	res := newWriterReconnectorStopped(cfg)
 	res.start()
 	return res
 }
 
-func newWriterReconnectorStopped(cfg writerReconnectorConfig) *WriterReconnector {
+func newWriterReconnectorStopped(cfg WriterReconnectorConfig) *WriterReconnector {
 	writerInstanceID, _ := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
 	res := &WriterReconnector{
 		cfg:                            cfg,
@@ -99,7 +113,7 @@ func newWriterReconnectorStopped(cfg writerReconnectorConfig) *WriterReconnector
 		writerInstanceID:               writerInstanceID.String(),
 	}
 
-	for codec, creator := range cfg.additionalEncoders {
+	for codec, creator := range cfg.AdditionalEncoders {
 		res.encodersMap.AddEncoder(codec, creator)
 	}
 
@@ -115,7 +129,7 @@ func (w *WriterReconnector) fillFields(messages []messageWithDataContent) error 
 		msg := &messages[i]
 
 		// SetSeqNo
-		if w.cfg.autoSetSeqNo {
+		if w.cfg.AutoSetSeqNo {
 			if msg.SeqNo != 0 {
 				return xerrors.WithStackTrace(errNonZeroSeqNo)
 			}
@@ -124,7 +138,7 @@ func (w *WriterReconnector) fillFields(messages []messageWithDataContent) error 
 		}
 
 		// Set created time
-		if w.cfg.fillEmptyCreatedTime && msg.CreatedAt.IsZero() {
+		if w.cfg.FillEmptyCreatedTime && msg.CreatedAt.IsZero() {
 			if now.IsZero() {
 				now = w.clock.Now()
 			}
@@ -161,7 +175,7 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []Message) error
 			return
 		}
 
-		if w.cfg.waitServerAck {
+		if w.cfg.WaitServerAck {
 			waiter, err = w.queue.AddMessagesWithWaiter(messagesSlice)
 		} else {
 			err = w.queue.AddMessages(messagesSlice)
@@ -171,7 +185,7 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []Message) error
 		return err
 	}
 
-	if !w.cfg.waitServerAck {
+	if !w.cfg.WaitServerAck {
 		return nil
 	}
 
@@ -301,13 +315,47 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 }
 
 func (w *WriterReconnector) needReceiveLastSeqNo() bool {
-	res := w.cfg.autoSetSeqNo && !w.firstConnectionHandled.Load()
+	res := w.cfg.AutoSetSeqNo && !w.firstConnectionHandled.Load()
 	return res
 }
 
 func (w *WriterReconnector) connectWithTimeout(streamLifetimeContext context.Context) (RawTopicWriterStream, error) {
-	// TODO: impl timeout
-	return w.cfg.connect(streamLifetimeContext)
+	connectCtx, connectCancel := context.WithCancel(streamLifetimeContext)
+
+	type resT struct {
+		stream RawTopicWriterStream
+		err    error
+	}
+	resCh := make(chan resT, 1)
+
+	go func() {
+		defer func() {
+			p := recover()
+			if p != nil {
+				resCh <- resT{
+					stream: nil,
+					err:    xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: panic while connect to topic writer: %+v", p))),
+				}
+			}
+		}()
+
+		stream, err := w.cfg.Connect(connectCtx)
+		resCh <- resT{stream: stream, err: err}
+	}()
+
+	timer := time.NewTimer(w.cfg.connectTimeout)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		connectCancel()
+		return nil, xerrors.WithStackTrace(errConnTimeout)
+	case res := <-resCh:
+		// force no cancel connect context - because it will break stream
+		// context will cancel by cancel streamLifetimeContext while reconnect or stop connection
+		_ = connectCancel
+		return res.stream, res.err
+	}
 }
 
 func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
@@ -325,7 +373,7 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 	}
 	defer close(w.firstInitResponseProcessedChan)
 
-	if w.cfg.autoSetSeqNo {
+	if w.cfg.AutoSetSeqNo {
 		w.lastSeqNo = writerStream.ReceivedLastSeqNum
 	}
 }

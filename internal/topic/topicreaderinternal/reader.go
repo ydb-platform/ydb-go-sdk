@@ -3,7 +3,6 @@ package topicreaderinternal
 import (
 	"context"
 	"errors"
-	"math"
 	"sync"
 	"time"
 
@@ -19,8 +18,6 @@ var (
 	errUnconnected  = xerrors.Retryable(xerrors.Wrap(errors.New("ydb: first connection attempt not finished")))
 	ErrReaderClosed = xerrors.Wrap(errors.New("ydb: reader closed"))
 )
-
-const infiniteTimeout = time.Duration(math.MaxInt64)
 
 //nolint:lll
 //go:generate mockgen -destination raw_topic_reader_stream_mock_test.go -package topicreaderinternal -write_package_comment=false . RawTopicReaderStream

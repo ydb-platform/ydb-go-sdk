@@ -21,7 +21,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -64,7 +63,7 @@ func TestSendSyncMessages(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx := testCtx(t)
 
-		grpcStopper := topic.NewGrpcStopper(errors.New("stop grpc for test"))
+		grpcStopper := NewGrpcStopper(errors.New("stop grpc for test"))
 
 		db := connect(t,
 			grpc.WithChainUnaryInterceptor(grpcStopper.UnaryClientInterceptor),
