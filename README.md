@@ -1,4 +1,4 @@
-# `ydb-go-sdk` - native Go's driver for [YDB](https://github.com/ydb-platform/ydb)
+# `ydb-go-sdk` - pure Go native and `database/sql` driver for [YDB](https://github.com/ydb-platform/ydb)
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/ydb-platform/ydb/blob/main/LICENSE)
 [![Release](https://img.shields.io/github/v/release/ydb-platform/ydb-go-sdk.svg?style=flat-square)](https://github.com/ydb-platform/ydb-go-sdk/releases)
@@ -12,7 +12,7 @@
 [![Telegram](https://img.shields.io/badge/chat-on%20Telegram-2ba2d9.svg)](https://t.me/YDBPlatform)
 [![WebSite](https://img.shields.io/badge/website-ydb.tech-blue.svg)](https://ydb.tech)
 
-Supports `table`, `discovery`, `coordination`, `ratelimiter`, `scheme`, `scripting` and `topic` clients for [YDB](ydb.tech).
+Supports `table`, `discovery`, `coordination`, `ratelimiter`, `scheme`, `scripting` and `topic` clients for [YDB](https://ydb.tech).
 `YDB` is an open-source Distributed SQL Database that combines high availability and scalability with strict consistency and [ACID](https://en.wikipedia.org/wiki/ACID) transactions.
 `YDB` was created primarily for [OLTP](https://en.wikipedia.org/wiki/Online_transaction_processing) workloads and supports some [OLAP](https://en.wikipedia.org/wiki/Online_analytical_processing) scenarious.
 
