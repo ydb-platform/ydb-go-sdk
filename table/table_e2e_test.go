@@ -172,9 +172,7 @@ func (s *stats) removeFromInFlight(t testing.TB, id string) {
 }
 
 func TestTableMultiple(t *testing.T) {
-	if _, ok := os.LookupEnv("LOCAL_TESTING"); !ok {
-		t.Skip("only for local testing")
-	}
+	xtest.AllowByFlag(t, "HUGE_TEST")
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		testTable(t)
 	}, xtest.StopAfter(time.Hour))
