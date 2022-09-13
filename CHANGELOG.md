@@ -1,4 +1,6 @@
 * Added topic writer experimental api
+* Refactored the internal closing behaviour of table client
+* Implemented the `sql.driver.Validator` interface
 * Fixed update token for topic reader
 * Marked sessions which creates from `database/sql` driver as supported server-side session balancing
 

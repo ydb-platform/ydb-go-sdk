@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sort"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"google.golang.org/grpc"
@@ -70,7 +69,7 @@ func newClient(
 		balancer.OnUpdate(c.updateNodes)
 	}
 	if idleThreshold := config.IdleThreshold(); idleThreshold > 0 {
-		c.spawnedGoroutines.Add(1)
+		c.wg.Add(1)
 		go c.internalPoolGC(ctx, idleThreshold)
 	}
 	onDone(c.limit)
@@ -95,8 +94,7 @@ type Client struct {
 	waitq             *list.List // list<*chan *session>
 	waitChPool        sync.Pool
 	testHookGetWaitCh func() // nil except some tests.
-	spawnedGoroutines sync.WaitGroup
-	closed            uint32
+	wg                sync.WaitGroup
 	done              chan struct{}
 }
 
@@ -128,6 +126,9 @@ func (c *Client) updateNodes(ctx context.Context, endpoints []endpoint.Info) {
 		return nodeIDs[i] < nodeIDs[j]
 	})
 	c.mu.WithLock(func() {
+		if c.isClosed() {
+			return
+		}
 		for nodeID := range c.nodes {
 			if sort.Search(len(nodeIDs), func(i int) bool {
 				return nodeIDs[i] >= nodeID
@@ -145,10 +146,6 @@ func (c *Client) updateNodes(ctx context.Context, endpoints []endpoint.Info) {
 }
 
 func (c *Client) createSession(ctx context.Context, opts ...createSessionOption) (s *session, err error) {
-	if c.isClosed() {
-		return nil, errClosedClient
-	}
-
 	options := createSessionOptions{}
 	for _, o := range opts {
 		o(&options)
@@ -171,10 +168,6 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 
 	ch := make(chan result)
 
-	if c.isClosed() {
-		return nil, xerrors.WithStackTrace(errClosedClient)
-	}
-
 	select {
 	case <-c.done:
 		return nil, xerrors.WithStackTrace(errClosedClient)
@@ -183,54 +176,59 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 		return nil, xerrors.WithStackTrace(ctx.Err())
 
 	default:
-		c.spawnedGoroutines.Add(1)
-		go func() {
-			defer c.spawnedGoroutines.Done()
-
-			var (
-				s   *session
-				err error
-			)
-
-			createSessionCtx := xcontext.WithoutDeadline(ctx)
-
-			if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
-				var cancel context.CancelFunc
-				createSessionCtx, cancel = context.WithTimeout(createSessionCtx, timeout)
-				defer cancel()
+		c.mu.WithLock(func() {
+			if c.isClosed() {
+				return
 			}
+			c.wg.Add(1)
+			go func() {
+				defer c.wg.Done()
 
-			s, err = c.build(createSessionCtx)
+				var (
+					s   *session
+					err error
+				)
 
-			closeSession := func(s *session) {
-				if s == nil {
-					return
-				}
+				createSessionCtx := xcontext.WithoutDeadline(ctx)
 
-				closeSessionCtx := xcontext.WithoutDeadline(ctx)
-
-				if timeout := c.config.DeleteTimeout(); timeout > 0 {
+				if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
 					var cancel context.CancelFunc
-					createSessionCtx, cancel = context.WithTimeout(closeSessionCtx, timeout)
+					createSessionCtx, cancel = context.WithTimeout(createSessionCtx, timeout)
 					defer cancel()
 				}
 
-				_ = s.Close(ctx)
-			}
+				s, err = c.build(createSessionCtx)
 
-			select {
-			case ch <- result{
-				s:   s,
-				err: err,
-			}: // nop
+				closeSession := func(s *session) {
+					if s == nil {
+						return
+					}
 
-			case <-c.done:
-				closeSession(s)
+					closeSessionCtx := xcontext.WithoutDeadline(ctx)
 
-			case <-ctx.Done():
-				closeSession(s)
-			}
-		}()
+					if timeout := c.config.DeleteTimeout(); timeout > 0 {
+						var cancel context.CancelFunc
+						createSessionCtx, cancel = context.WithTimeout(closeSessionCtx, timeout)
+						defer cancel()
+					}
+
+					_ = s.Close(ctx)
+				}
+
+				select {
+				case ch <- result{
+					s:   s,
+					err: err,
+				}: // nop
+
+				case <-c.done:
+					closeSession(s)
+
+				case <-ctx.Done():
+					closeSession(s)
+				}
+			}()
+		})
 	}
 
 	select {
@@ -279,6 +277,9 @@ func (c *Client) removeSessionFromNodes(s *session) {
 func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ table.ClosableSession, err error) {
 	if c == nil {
 		return nil, xerrors.WithStackTrace(errNilClient)
+	}
+	if c.isClosed() {
+		return nil, xerrors.WithStackTrace(errClosedClient)
 	}
 	var s *session
 	createSession := func(ctx context.Context) (*session, error) {
@@ -331,7 +332,12 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 }
 
 func (c *Client) isClosed() bool {
-	return atomic.LoadUint32(&c.closed) != 0
+	select {
+	case <-c.done:
+		return true
+	default:
+		return false
+	}
 }
 
 // c.mu must NOT be held.
@@ -611,16 +617,19 @@ func (c *Client) Close(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(errNilClient)
 	}
 
-	onDone := trace.TableOnClose(c.config.Trace(), &ctx)
-	defer func() {
-		onDone(err)
-	}()
+	c.mu.WithLock(func() {
+		select {
+		case <-c.done:
+			return
 
-	if atomic.CompareAndSwapUint32(&c.closed, 0, 1) {
-		close(c.done)
+		default:
+			close(c.done)
 
-		wg := sync.WaitGroup{}
-		c.mu.WithLock(func() {
+			onDone := trace.TableOnClose(c.config.Trace(), &ctx)
+			defer func() {
+				onDone(err)
+			}()
+
 			c.limit = 0
 
 			for el := c.waitq.Front(); el != nil; el = el.Next() {
@@ -629,19 +638,18 @@ func (c *Client) Close(ctx context.Context) (err error) {
 			}
 
 			for e := c.idle.Front(); e != nil; e = e.Next() {
-				wg.Add(1)
 				s := e.Value.(*session)
 				s.SetStatus(table.SessionClosing)
+				c.wg.Add(1)
 				go func() {
-					defer wg.Done()
+					defer c.wg.Done()
 					c.internalPoolSyncCloseSession(ctx, s)
 				}()
 			}
-		})
-		wg.Wait()
+		}
+	})
 
-		c.spawnedGoroutines.Wait()
-	}
+	c.wg.Wait()
 
 	return nil
 }
@@ -689,7 +697,7 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 }
 
 func (c *Client) internalPoolGC(ctx context.Context, idleThreshold time.Duration) {
-	defer c.spawnedGoroutines.Done()
+	defer c.wg.Done()
 	timer := timeutil.NewTimer(idleThreshold)
 
 	for {
@@ -699,6 +707,9 @@ func (c *Client) internalPoolGC(ctx context.Context, idleThreshold time.Duration
 
 		case <-timer.C():
 			c.mu.WithLock(func() {
+				if c.isClosed() {
+					return
+				}
 				for e := c.idle.Front(); e != nil; e = e.Next() {
 					s := e.Value.(*session)
 					info, has := c.index[s]
@@ -712,8 +723,8 @@ func (c *Client) internalPoolGC(ctx context.Context, idleThreshold time.Duration
 						c.internalPoolAsyncCloseSession(ctx, s)
 					}
 				}
+				timer.Reset(idleThreshold / 2)
 			})
-			timer.Reset(idleThreshold / 2)
 		}
 	}
 }
@@ -806,11 +817,16 @@ func (c *Client) internalPoolNotify(s *session) (notified bool) {
 
 func (c *Client) internalPoolAsyncCloseSession(ctx context.Context, s *session) {
 	s.SetStatus(table.SessionClosing)
-	c.spawnedGoroutines.Add(1)
-	go func() {
-		defer c.spawnedGoroutines.Done()
-		c.internalPoolSyncCloseSession(ctx, s)
-	}()
+	c.mu.WithLock(func() {
+		if c.isClosed() {
+			return
+		}
+		c.wg.Add(1)
+		go func() {
+			defer c.wg.Done()
+			c.internalPoolSyncCloseSession(ctx, s)
+		}()
+	})
 }
 
 func (c *Client) internalPoolSyncCloseSession(ctx context.Context, s *session) {

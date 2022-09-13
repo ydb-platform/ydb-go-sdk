@@ -256,15 +256,17 @@ func TestRaceWgClosed(t *testing.T) {
 		}
 	}()
 
-	limit := 100
-
-	var counter int
+	var (
+		limit   = 100
+		start   = time.Now()
+		counter int
+	)
 
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		counter++
 		defer func() {
-			if counter%100 == 0 {
-				t.Logf("%d times test passed", counter)
+			if counter%1000 == 0 {
+				t.Logf("%0.1fs: %d times test passed", time.Since(start).Seconds(), counter)
 			}
 		}()
 		ctx, cancel := context.WithTimeout(context.Background(),
@@ -274,8 +276,7 @@ func TestRaceWgClosed(t *testing.T) {
 		defer cancel()
 
 		wg := sync.WaitGroup{}
-		p := newClientWithStubBuilder(
-			t,
+		p := newClientWithStubBuilder(t,
 			testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 					return &Ydb_Table.CreateSessionResult{
