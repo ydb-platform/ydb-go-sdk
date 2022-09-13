@@ -19,7 +19,14 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 		require.Error(t, err)
 	})
 	t.Run("One", func(t *testing.T) {
-		s := NewEncoderSelector(NewEncoderMap(), rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw}, 1, trace.Topic{}, "", "")
+		s := NewEncoderSelector(
+			NewEncoderMap(),
+			rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},
+			1,
+			trace.Topic{},
+			"",
+			"",
+		)
 		codec, err := s.measureCodecs(nil)
 		require.NoError(t, err)
 		require.Equal(t, rawtopiccommon.CodecRaw, codec)

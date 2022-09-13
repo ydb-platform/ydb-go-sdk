@@ -1,5 +1,3 @@
-//nolint
-
 package xatomic
 
 // the file contains types, copied from go 1.19 atomic/type for use in older go

@@ -20,7 +20,6 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicclientinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
@@ -39,7 +38,7 @@ func TestSendAsyncMessages(t *testing.T) {
 	content := "hello"
 
 	producerID := "test-producer-ang-message-group"
-	writer, err := db.Topic().(*topicclientinternal.Client).StartWriter(producerID, topicPath,
+	writer, err := db.Topic().StartWriter(producerID, topicPath,
 		topicoptions.WithMessageGroupID(producerID),
 	)
 	require.NoError(t, err)
@@ -74,7 +73,7 @@ func TestSendSyncMessages(t *testing.T) {
 		topicPath := createTopic(ctx, t, db)
 
 		producerID := "test-producer"
-		writer, err := db.Topic().(*topicclientinternal.Client).StartWriter(
+		writer, err := db.Topic().StartWriter(
 			producerID,
 			topicPath,
 			topicoptions.WithWriterPartitioning(
@@ -95,7 +94,7 @@ func TestSendSyncMessages(t *testing.T) {
 		require.Error(t, err)
 
 		db = connect(t)
-		writer, err = db.Topic().(*topicclientinternal.Client).StartWriter(producerID, topicPath,
+		writer, err = db.Topic().StartWriter(producerID, topicPath,
 			topicoptions.WithWriterPartitioning(
 				topicwriter.NewPartitioningWithMessageGroupID(producerID),
 			),
@@ -149,16 +148,16 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 	// senders
 	writer := func(producerID string) {
 		pprof.Do(ctx, pprof.Labels("writer", producerID), func(ctx context.Context) {
-			w, err := db.Topic().(*topicclientinternal.Client).StartWriter(producerID, topicName, topicoptions.WithMessageGroupID(producerID))
-			require.NoError(t, err)
+			w, errWriter := db.Topic().StartWriter(producerID, topicName, topicoptions.WithMessageGroupID(producerID))
+			require.NoError(t, errWriter)
 
 			for i := 0; i < sendMessageCount; i++ {
 				buf := &bytes.Buffer{}
-				err = binary.Write(buf, binary.BigEndian, int64(i))
-				require.NoError(t, err)
+				errWriter = binary.Write(buf, binary.BigEndian, int64(i))
+				require.NoError(t, errWriter)
 				mess := topicwriter.Message{Data: buf}
-				err = w.Write(ctx, mess)
-				require.NoError(t, err)
+				errWriter = w.Write(ctx, mess)
+				require.NoError(t, errWriter)
 			}
 		})
 	}
@@ -177,30 +176,30 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 
 	reader := func(consumerID string) {
 		pprof.Do(ctx, pprof.Labels("reader", consumerID), func(ctx context.Context) {
-			r, err := db.Topic().StartReader(
+			r, errReader := db.Topic().StartReader(
 				consumerID,
 				topicoptions.ReadTopic(topicName),
 				topicoptions.WithCommitTimeLagTrigger(0),
 			)
-			require.NoError(t, err)
+			require.NoError(t, errReader)
 
 			for {
-				mess, err := r.ReadMessage(readerCtx)
+				mess, errReader := r.ReadMessage(readerCtx)
 				if readerCtx.Err() != nil {
 					return
 				}
-				require.NoError(t, err)
+				require.NoError(t, errReader)
 
 				var val int64
-				err = binary.Read(mess, binary.BigEndian, &val)
-				require.NoError(t, err)
+				errReader = binary.Read(mess, binary.BigEndian, &val)
+				require.NoError(t, errReader)
 				receivedMessage <- receivedMessT{
 					ctx:     mess.Context(),
 					writer:  mess.ProducerID,
 					content: val,
 				}
-				err = r.Commit(ctx, mess)
-				require.NoError(t, err)
+				errReader = r.Commit(ctx, mess)
+				require.NoError(t, errReader)
 			}
 		})
 	}

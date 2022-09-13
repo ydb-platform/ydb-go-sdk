@@ -266,7 +266,14 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 			}
 		}
 
-		traceOnDone := trace.TopicOnWriterReconnect(w.cfg.tracer, w.writerInstanceID, w.cfg.topic, w.cfg.producerID, w.sessionID, attempt)
+		traceOnDone := trace.TopicOnWriterReconnect(
+			w.cfg.tracer,
+			w.writerInstanceID,
+			w.cfg.topic,
+			w.cfg.producerID,
+			w.sessionID,
+			attempt,
+		)
 
 		stream, trackedErr := w.connectWithTimeout(streamCtx)
 		traceOnDone(trackedErr)
@@ -310,9 +317,8 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 	if writerStream == nil {
 		w.sessionID = ""
 		return
-	} else {
-		w.sessionID = writerStream.SessionID
 	}
+	w.sessionID = writerStream.SessionID
 
 	if !w.firstConnectionHandled.CompareAndSwap(false, true) {
 		return

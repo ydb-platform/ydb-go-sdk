@@ -52,15 +52,17 @@ type SingleStreamWriter struct {
 	AllowedCodecs      rawtopiccommon.SupportedCodecs
 	Encoder            EncoderSelector
 
-	cfg                   SingleStreamWriterConfig
-	ctxForPProfLabelsOnly context.Context
-	background            background.Worker
-	closed                xatomic.Bool
-	closeReason           error
-	closeCompleted        empty.Chan
+	cfg            SingleStreamWriterConfig
+	background     background.Worker
+	closed         xatomic.Bool
+	closeReason    error
+	closeCompleted empty.Chan
 }
 
-func NewSingleStreamWriter(ctxForPProfLabelsOnly context.Context, cfg SingleStreamWriterConfig) (*SingleStreamWriter, error) {
+func NewSingleStreamWriter(
+	ctxForPProfLabelsOnly context.Context,
+	cfg SingleStreamWriterConfig,
+) (*SingleStreamWriter, error) {
 	res := newSingleStreamWriterStopped(ctxForPProfLabelsOnly, cfg)
 	err := res.initStream()
 	if err != nil {
@@ -71,7 +73,10 @@ func NewSingleStreamWriter(ctxForPProfLabelsOnly context.Context, cfg SingleStre
 	return res, nil
 }
 
-func newSingleStreamWriterStopped(ctxForPProfLabelsOnly context.Context, cfg SingleStreamWriterConfig) *SingleStreamWriter {
+func newSingleStreamWriterStopped(
+	ctxForPProfLabelsOnly context.Context,
+	cfg SingleStreamWriterConfig,
+) *SingleStreamWriter {
 	return &SingleStreamWriter{
 		cfg:            cfg,
 		background:     *background.NewWorker(xcontext.WithoutDeadline(ctxForPProfLabelsOnly)),
@@ -116,7 +121,7 @@ func (w *SingleStreamWriter) initStream() (err error) {
 	defer traceOnDone(w.SessionID, err)
 
 	req := w.createInitRequest()
-	if err := w.cfg.stream.Send(&req); err != nil {
+	if err = w.cfg.stream.Send(&req); err != nil {
 		return err
 	}
 	recvMessage, err := w.cfg.stream.Recv()
@@ -193,7 +198,6 @@ func (w *SingleStreamWriter) receiveMessagesLoop(ctx context.Context) {
 					reflect.TypeOf(m),
 				))),
 			)
-
 		}
 	}
 }
