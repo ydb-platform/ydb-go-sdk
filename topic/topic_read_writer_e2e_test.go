@@ -4,10 +4,15 @@
 package topic_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"io"
+	"runtime/pprof"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -25,6 +30,8 @@ import (
 )
 
 func TestSendAsyncMessages(t *testing.T) {
+	xtest.AllowByFlag(t, "TEST_TOPIC_WRITER")
+
 	ctx := context.Background()
 	db := connect(t)
 	topicPath := createTopic(ctx, t, db)
@@ -53,6 +60,8 @@ func TestSendAsyncMessages(t *testing.T) {
 }
 
 func TestSendSyncMessages(t *testing.T) {
+	xtest.AllowByFlag(t, "TEST_TOPIC_WRITER")
+
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx := testCtx(t)
 
@@ -112,6 +121,138 @@ func TestSendSyncMessages(t *testing.T) {
 			return nil
 		}))
 	})
+}
+
+func TestManyConcurentReadersWriters(t *testing.T) {
+	xtest.AllowByFlag(t, "TEST_TOPIC_WRITER")
+
+	const partitionCount = 3
+	const writersCount = 5
+	const readersCount = 10
+	const sendMessageCount = 100
+	const totalMessageCount = sendMessageCount * writersCount
+
+	ctx := xtest.Context(t)
+	db := connect(t)
+
+	// create topic
+	topicName := t.Name()
+	_ = db.Topic().Drop(ctx, topicName)
+	err := db.Topic().Create(
+		ctx,
+		topicName,
+		[]topictypes.Codec{topictypes.CodecRaw},
+		topicoptions.CreateWithMinActivePartitions(partitionCount),
+	)
+	require.NoError(t, err)
+
+	// senders
+	writer := func(producerID string) {
+		pprof.Do(ctx, pprof.Labels("writer", producerID), func(ctx context.Context) {
+			w, err := db.Topic().(*topicclientinternal.Client).StartWriter(producerID, topicName, topicoptions.WithMessageGroupID(producerID))
+			require.NoError(t, err)
+
+			for i := 0; i < sendMessageCount; i++ {
+				buf := &bytes.Buffer{}
+				err = binary.Write(buf, binary.BigEndian, int64(i))
+				require.NoError(t, err)
+				mess := topicwriter.Message{Data: buf}
+				err = w.Write(ctx, mess)
+				require.NoError(t, err)
+			}
+		})
+	}
+	for i := 0; i < writersCount; i++ {
+		go writer(strconv.Itoa(i))
+	}
+
+	// readers
+	type receivedMessT struct {
+		ctx     context.Context
+		writer  string
+		content int64
+	}
+	readerCtx, readerCancel := context.WithCancel(ctx)
+	receivedMessage := make(chan receivedMessT, totalMessageCount)
+
+	reader := func(consumerID string) {
+		pprof.Do(ctx, pprof.Labels("reader", consumerID), func(ctx context.Context) {
+			r, err := db.Topic().StartReader(
+				consumerID,
+				topicoptions.ReadTopic(topicName),
+				topicoptions.WithCommitTimeLagTrigger(0),
+			)
+			require.NoError(t, err)
+
+			for {
+				mess, err := r.ReadMessage(readerCtx)
+				if readerCtx.Err() != nil {
+					return
+				}
+				require.NoError(t, err)
+
+				var val int64
+				err = binary.Read(mess, binary.BigEndian, &val)
+				require.NoError(t, err)
+				receivedMessage <- receivedMessT{
+					ctx:     mess.Context(),
+					writer:  mess.ProducerID,
+					content: val,
+				}
+				err = r.Commit(ctx, mess)
+				require.NoError(t, err)
+			}
+		})
+	}
+
+	consumerID := "consumer"
+	err = db.Topic().Alter(ctx, topicName, topicoptions.AlterWithAddConsumers(
+		topictypes.Consumer{
+			Name: consumerID,
+		},
+	))
+	require.NoError(t, err)
+
+	var wg sync.WaitGroup
+	wg.Add(readersCount)
+	for i := 0; i < readersCount; i++ {
+		go func(id int) {
+			defer wg.Done()
+
+			reader(consumerID)
+		}(i)
+	}
+
+	received := map[string]int64{}
+	for i := 0; i < writersCount; i++ {
+		received[strconv.Itoa(i)] = -1
+	}
+
+	cnt := 0
+	doubles := 0
+	for cnt < totalMessageCount {
+		mess := <-receivedMessage
+		stored := received[mess.writer]
+		if mess.content <= stored {
+			// double
+			doubles++
+			continue
+		}
+		cnt++
+		require.Equal(t, stored+1, mess.content)
+		received[mess.writer] = mess.content
+	}
+
+	// check about no more messages
+	select {
+	case mess := <-receivedMessage:
+		t.Fatal(mess)
+	default:
+	}
+
+	readerCancel()
+	wg.Wait()
+	t.Log(doubles)
 }
 
 func createTopic(ctx context.Context, t testing.TB, db ydb.Connection) (topicPath string) {
