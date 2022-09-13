@@ -63,7 +63,9 @@ func TestEventBroadcast(t *testing.T) {
 
 		<-time.After(testDuration)
 
-		require.True(t, atomic.LoadInt64(&backgroundCounter) > 0)
+		xtest.SpinWaitCondition(t, nil, func() bool {
+			return atomic.LoadInt64(&backgroundCounter) > 0
+		})
 
 		atomic.AddInt64(&stopRace, 1)
 		<-subscribeStopped
