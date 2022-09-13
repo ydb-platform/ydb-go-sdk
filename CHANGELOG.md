@@ -1,3 +1,4 @@
+* Added topic writer experimental api
 * Fixed update token for topic reader
 * Marked sessions which creates from `database/sql` driver as supported server-side session balancing
 
