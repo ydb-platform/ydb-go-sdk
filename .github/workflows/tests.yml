@@ -91,7 +91,7 @@ jobs:
           flags: scripting,e2e,${{ matrix.os }},${{ matrix.go-version }}
           name: scripting
       - name: Test Topic client
-        run: go test -race -coverpkg=./... -coverprofile topic.txt -covermode atomic ./topic/cdc_reader_e2e_test.go ./topic/client_e2e_test.go ./topic/topic_read_writer_e2e_test.go
+        run: go test -race -coverpkg=./... -coverprofile topic.txt -covermode atomic ./topic/cdc_reader_e2e_test.go ./topic/client_e2e_test.go ./topic/topic_read_writer_e2e_test.go ./topic/grpc_stopper_helper_test.go
       - name: Upload Topic coverage report to Codecov
         uses: codecov/codecov-action@v2
         with:
