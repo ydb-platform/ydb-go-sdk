@@ -65,6 +65,10 @@ type conn struct {
 	currentTx currentTx
 }
 
+func (c *conn) IsValid() bool {
+	return !c.isClosed()
+}
+
 type currentTx interface {
 	driver.Tx
 	driver.ExecerContext
@@ -81,6 +85,7 @@ var (
 	_ driver.Pinger             = &conn{}
 	_ driver.NamedValueChecker  = &conn{}
 	_ driver.SessionResetter    = &conn{}
+	_ driver.Validator          = &conn{}
 )
 
 func newConn(c *Connector, s table.ClosableSession, opts ...connOption) *conn {
