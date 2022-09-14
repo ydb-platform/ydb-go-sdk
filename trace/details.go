@@ -135,6 +135,8 @@ var (
 		TopicReaderMessageEvents:         "ydb.topic.reader.message",
 		TopicReaderPartitionEvents:       "ydb.topic.reader.partition",
 		TopicReaderStreamLifeCycleEvents: "ydb.topic.reader.lifecycle",
+		TopicWriterStreamLifeCycleEvents: "ydb.topic.writer.lifecycle",
+		TopicWriterStreamEvents:          "ydb.topic.writer.stream",
 	}
 	defaultDetails = DetailsAll
 )

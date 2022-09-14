@@ -1,4 +1,4 @@
-* Added topic writer experimental api
+* Added topic writer experimental api with internal logger
 
 ## v3.37.8
 * Refactored the internal closing behaviour of table client

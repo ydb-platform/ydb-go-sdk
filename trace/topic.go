@@ -385,7 +385,6 @@ type (
 		WriterInstanceID string
 		Topic            string
 		ProducerID       string
-		SessionID        string
 		Attempt          int
 	}
 
@@ -412,8 +411,6 @@ type (
 	TopicWriterCloseDoneInfo struct {
 		Error error
 	}
-
-	TopicWriterCompressMessagesReason int
 
 	TopicWriterCompressMessagesStartInfo struct {
 		WriterInstanceID string
@@ -447,8 +444,14 @@ type (
 	}
 )
 
+type TopicWriterCompressMessagesReason string
+
 const (
-	TopicWriterCompressMessagesReasonCompressData TopicWriterCompressMessagesReason = iota
-	TopicWriterCompressMessagesReasonCompressDataOnWriteReadData
-	TopicWriterCompressMessagesReasonCodecsMeasure
+	TopicWriterCompressMessagesReasonCompressData                = TopicWriterCompressMessagesReason("compress-on-send")
+	TopicWriterCompressMessagesReasonCompressDataOnWriteReadData = TopicWriterCompressMessagesReason("compress-on-call-write")
+	TopicWriterCompressMessagesReasonCodecsMeasure               = TopicWriterCompressMessagesReason("compress-on-codecs-measure")
 )
+
+func (r TopicWriterCompressMessagesReason) String() string {
+	return string(r)
+}
