@@ -11,14 +11,8 @@ type (
 	Partitioning = topicwriterinternal.PublicPartitioning
 )
 
-func NewPartitioningWithMessageGroupID(id string) Partitioning {
-	return topicwriterinternal.NewPartitioningWithMessageGroupID(id)
-}
-
-func NewPartitioningWithPartitionID(id int64) Partitioning {
-	return topicwriterinternal.NewPartitioningWithPartitionID(id)
-}
-
+// Writer represent write session to topic
+// It handles connection problems, reconnect to server when need and resend buffered messages
 type Writer struct {
 	inner *topicwriterinternal.Writer
 }
@@ -29,10 +23,14 @@ func NewWriter(writer *topicwriterinternal.Writer) *Writer {
 	}
 }
 
-// Write
-// Will fast in async mode (return after write message to internal buffer) and wait ack from server in sync mode.
-// The method will wait first initial connection even for async mode, that mean first write may be slow.
+// Write send messages to topic
+// return fast in async mode (default) and wait ack from server in sync mode.
+// see topicoptions.WithSyncWrite
+//
+// The method will wait first initial connection even for async mode, that mean first write may be slower.
 // especially when connection has problems.
+//
+// ctx cancelation mean cancel of wait ack only, it will not cancel of send messages
 //
 // # Experimental
 //

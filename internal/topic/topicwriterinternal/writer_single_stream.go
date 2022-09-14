@@ -49,10 +49,12 @@ func newSingleStreamWriterConfig(
 type SingleStreamWriter struct {
 	ReceivedLastSeqNum int64
 	SessionID          string
-	AllowedCodecs      rawtopiccommon.SupportedCodecs
+	PartitionID        int64
+	CodecsFromServer   rawtopiccommon.SupportedCodecs
 	Encoder            EncoderSelector
 
 	cfg            SingleStreamWriterConfig
+	allowedCodecs  rawtopiccommon.SupportedCodecs
 	background     background.Worker
 	closed         xatomic.Bool
 	closeReason    error
@@ -135,14 +137,14 @@ func (w *SingleStreamWriter) initStream() (err error) {
 		)
 	}
 
-	w.AllowedCodecs = calculateAllowedCodecs(w.cfg.forceCodec, w.cfg.encodersMap, result.SupportedCodecs)
-	if len(w.AllowedCodecs) == 0 {
+	w.allowedCodecs = calculateAllowedCodecs(w.cfg.forceCodec, w.cfg.encodersMap, result.SupportedCodecs)
+	if len(w.allowedCodecs) == 0 {
 		return xerrors.WithStackTrace(errNoAllowedCodecs)
 	}
 
 	w.Encoder = NewEncoderSelector(
 		w.cfg.encodersMap,
-		w.AllowedCodecs,
+		w.allowedCodecs,
 		w.cfg.compressorCount,
 		w.cfg.tracer,
 		w.cfg.reconnectorInstanceID,
@@ -151,6 +153,8 @@ func (w *SingleStreamWriter) initStream() (err error) {
 
 	w.SessionID = result.SessionID
 	w.ReceivedLastSeqNum = result.LastSeqNo
+	w.PartitionID = result.PartitionID
+	w.CodecsFromServer = result.SupportedCodecs
 	return nil
 }
 

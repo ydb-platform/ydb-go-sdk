@@ -83,7 +83,7 @@ func WithConnectTimeout(timeout time.Duration) PublicWriterOption {
 
 func WithAutosetCreatedTime(enable bool) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
-		cfg.FillEmptyCreatedTime = enable
+		cfg.AutoSetCreatedTime = enable
 	}
 }
 

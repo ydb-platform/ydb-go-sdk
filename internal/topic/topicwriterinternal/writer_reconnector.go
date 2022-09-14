@@ -25,6 +25,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -34,18 +35,20 @@ var (
 	errCloseWriterReconnectorConnectionLoop = xerrors.Wrap(errors.New("ydb: close writer reconnector connection loop"))
 	errCloseWriterReconnectorReconnect      = xerrors.Wrap(errors.New("ydb: stream writer reconnect"))
 	errNonZeroSeqNo                         = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))
+	errNonZeroCreatedAt                     = xerrors.Wrap(errors.New("ydb: non zero Message.CreatedAt and set auto fill created at option")) //nolint:lll
 	errNoAllowedCodecs                      = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
 )
 
 type WriterReconnectorConfig struct {
 	WritersCommonConfig
 
-	Common               config.Common
-	AdditionalEncoders   map[rawtopiccommon.Codec]PublicCreateEncoderFunc
-	Connect              ConnectFunc
-	WaitServerAck        bool
-	AutoSetSeqNo         bool
-	FillEmptyCreatedTime bool
+	Common                       config.Common
+	AdditionalEncoders           map[rawtopiccommon.Codec]PublicCreateEncoderFunc
+	Connect                      ConnectFunc
+	WaitServerAck                bool
+	AutoSetSeqNo                 bool
+	AutoSetCreatedTime           bool
+	OnWriterInitResponseCallback PublicOnWriterInitResponseCallback
 
 	connectTimeout time.Duration
 }
@@ -58,8 +61,8 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 			clock:              clockwork.NewRealClock(),
 			compressorCount:    runtime.NumCPU(),
 		},
-		AutoSetSeqNo:         true,
-		FillEmptyCreatedTime: true,
+		AutoSetSeqNo:       true,
+		AutoSetCreatedTime: true,
 	}
 	if cfg.compressorCount == 0 {
 		cfg.compressorCount = 1
@@ -138,13 +141,18 @@ func (w *WriterReconnector) fillFields(messages []messageWithDataContent) error 
 		}
 
 		// Set created time
-		if w.cfg.FillEmptyCreatedTime && msg.CreatedAt.IsZero() {
-			if now.IsZero() {
-				now = w.clock.Now()
+		if w.cfg.AutoSetCreatedTime {
+			if msg.CreatedAt.IsZero() {
+				if now.IsZero() {
+					now = w.clock.Now()
+				}
+				msg.CreatedAt = now
+			} else {
+				return xerrors.WithStackTrace(errNonZeroCreatedAt)
 			}
-			msg.CreatedAt = now
 		}
 	}
+
 	return nil
 }
 
@@ -359,22 +367,42 @@ func (w *WriterReconnector) connectWithTimeout(streamLifetimeContext context.Con
 }
 
 func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
-	w.m.Lock()
-	defer w.m.Unlock()
+	isFirstInit := false
+	w.m.WithLock(func() {
+		if writerStream == nil {
+			w.sessionID = ""
+			return
+		}
+		w.sessionID = writerStream.SessionID
 
-	if writerStream == nil {
-		w.sessionID = ""
-		return
+		if !w.firstConnectionHandled.CompareAndSwap(false, true) {
+			return
+		}
+		defer close(w.firstInitResponseProcessedChan)
+		isFirstInit = true
+
+		if w.cfg.AutoSetSeqNo {
+			w.lastSeqNo = writerStream.ReceivedLastSeqNum
+		}
+	})
+
+	if isFirstInit {
+		w.onWriterInitCallbackHandler(writerStream)
 	}
-	w.sessionID = writerStream.SessionID
+}
 
-	if !w.firstConnectionHandled.CompareAndSwap(false, true) {
-		return
-	}
-	defer close(w.firstInitResponseProcessedChan)
+func (w *WriterReconnector) onWriterInitCallbackHandler(writerStream *SingleStreamWriter) {
+	if w.cfg.OnWriterInitResponseCallback != nil {
+		info := PublicWithOnWriterConnectedInfo{
+			LastSeqNo:        w.lastSeqNo,
+			SessionID:        w.sessionID,
+			PartitionID:      writerStream.PartitionID,
+			CodecsFromServer: createPublicCodecsFromRaw(writerStream.CodecsFromServer),
+		}
 
-	if w.cfg.AutoSetSeqNo {
-		w.lastSeqNo = writerStream.ReceivedLastSeqNum
+		if err := w.cfg.OnWriterInitResponseCallback(info); err != nil {
+			_ = w.close(context.Background(), fmt.Errorf("OnWriterInitResponseCallback return error: %w", err))
+		}
 	}
 }
 
@@ -530,3 +558,11 @@ func calculateAllowedCodecs(forceCodec rawtopiccommon.Codec, encoderMap *Encoder
 }
 
 type ConnectFunc func(ctx context.Context) (RawTopicWriterStream, error)
+
+func createPublicCodecsFromRaw(codecs rawtopiccommon.SupportedCodecs) []topictypes.Codec {
+	res := make([]topictypes.Codec, len(codecs))
+	for i, v := range codecs {
+		res[i] = topictypes.Codec(v)
+	}
+	return res
+}

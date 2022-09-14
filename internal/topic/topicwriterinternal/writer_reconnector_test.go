@@ -28,7 +28,10 @@ var testCommonEncoders = NewEncoderMap()
 func TestWriterImpl_AutoSeq(t *testing.T) {
 	t.Run("OK", func(t *testing.T) {
 		ctx := xtest.Context(t)
-		w := newWriterReconnectorStopped(newWriterReconnectorConfig(WithAutoSetSeqNo(true)))
+		w := newWriterReconnectorStopped(newWriterReconnectorConfig(
+			WithAutoSetSeqNo(true),
+			WithAutosetCreatedTime(false),
+		))
 		w.firstConnectionHandled.Store(true)
 
 		lastSeqNo := int64(16)
@@ -67,7 +70,7 @@ func TestWriterImpl_Write(t *testing.T) {
 	t.Run("PushToQueue", func(t *testing.T) {
 		ctx := context.Background()
 		w := newTestWriterStopped()
-		w.cfg.FillEmptyCreatedTime = false
+		w.cfg.AutoSetCreatedTime = false
 		w.firstConnectionHandled.Store(true)
 
 		err := w.Write(ctx, newTestMessages(1, 3, 5))

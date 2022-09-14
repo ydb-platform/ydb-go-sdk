@@ -75,9 +75,7 @@ func TestSendSyncMessages(t *testing.T) {
 		writer, err := db.Topic().StartWriter(
 			producerID,
 			topicPath,
-			topicoptions.WithWriterPartitioning(
-				topicwriter.NewPartitioningWithMessageGroupID(producerID),
-			),
+			topicoptions.WithMessageGroupID(producerID),
 			topicoptions.WithSyncWrite(true),
 		)
 		require.NoError(t, err)
@@ -94,9 +92,7 @@ func TestSendSyncMessages(t *testing.T) {
 
 		db = connect(t)
 		writer, err = db.Topic().StartWriter(producerID, topicPath,
-			topicoptions.WithWriterPartitioning(
-				topicwriter.NewPartitioningWithMessageGroupID(producerID),
-			),
+			topicoptions.WithMessageGroupID(producerID),
 			topicoptions.WithSyncWrite(true),
 		)
 		require.NoError(t, err)
