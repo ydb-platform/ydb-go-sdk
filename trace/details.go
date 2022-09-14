@@ -29,6 +29,9 @@ const (
 	TopicReaderMessageEvents
 	TopicReaderPartitionEvents
 
+	TopicWriterStreamLifeCycleEvents
+	TopicWriterStreamEvents
+
 	DatabaseSQLConnectorEvents
 	DatabaseSQLConnEvents
 	DatabaseSQLTxEvents

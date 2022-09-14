@@ -7,12 +7,16 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
-var ErrAlreadyClosed = errors.New("background worker already closed")
+var (
+	ErrAlreadyClosed       = xerrors.Wrap(errors.New("ydb: background worker already closed"))
+	errClosedWithNilReason = xerrors.Wrap(errors.New("ydb: background worker closed with nil reason"))
+)
 
 // A Worker must not be copied after first use
 type Worker struct {
@@ -22,8 +26,9 @@ type Worker struct {
 
 	m xsync.Mutex
 
-	closed uint32
-	stop   xcontext.CancelErrFunc
+	closed      uint32
+	stop        xcontext.CancelErrFunc
+	closeReason error
 }
 
 func NewWorker(parent context.Context) *Worker {
@@ -78,14 +83,36 @@ func (b *Worker) Close(ctx context.Context, err error) error {
 
 	b.init()
 
-	b.stop(err)
-
 	b.m.Lock()
 	defer b.m.Unlock()
 
-	b.workers.Wait()
+	b.closeReason = err
+	if b.closeReason == nil {
+		b.closeReason = errClosedWithNilReason
+	}
 
-	return ctx.Err()
+	b.stop(err)
+
+	bgCompleted := make(empty.Chan)
+
+	go func() {
+		b.workers.Wait()
+		close(bgCompleted)
+	}()
+
+	select {
+	case <-bgCompleted:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (b *Worker) CloseReason() error {
+	b.m.Lock()
+	defer b.m.Unlock()
+
+	return b.closeReason
 }
 
 func (b *Worker) init() {

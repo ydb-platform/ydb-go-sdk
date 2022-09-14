@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -64,7 +65,7 @@ func newReaderReconnector(
 		baseContext:    baseContext,
 	}
 	if res.connectTimeout == 0 {
-		res.connectTimeout = infiniteTimeout
+		res.connectTimeout = timeutil.InfiniteDuration
 	}
 
 	res.initChannelsAndClock()

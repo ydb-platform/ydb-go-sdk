@@ -1,6 +1,11 @@
 package timeutil
 
-import "time"
+import (
+	"math"
+	"time"
+)
+
+const InfiniteDuration = time.Duration(math.MaxInt64)
 
 const (
 	secondsPerMinute int64 = 60

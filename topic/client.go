@@ -6,6 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
 // Client is interface for topic client
@@ -58,4 +59,13 @@ type Client interface {
 		readSelectors topicoptions.ReadSelectors,
 		opts ...topicoptions.ReaderOption,
 	) (*topicreader.Reader, error)
+
+	// StartWriter start write session to topic
+	// it is fast non block call, connection starts in background
+	//
+	// Experimental
+	//
+	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
+	// later release.
+	StartWriter(producerID, path string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error)
 }

@@ -1,0 +1,125 @@
+package topicwriterinternal
+
+import (
+	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+)
+
+type PublicWriterOption func(cfg *WriterReconnectorConfig)
+
+func WithAddEncoder(codec rawtopiccommon.Codec, encoderFunc PublicCreateEncoderFunc) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		if cfg.AdditionalEncoders == nil {
+			cfg.AdditionalEncoders = map[rawtopiccommon.Codec]PublicCreateEncoderFunc{}
+		}
+		cfg.AdditionalEncoders[codec] = encoderFunc
+	}
+}
+
+func WithAutoSetSeqNo(val bool) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.AutoSetSeqNo = val
+	}
+}
+
+func WithAutoCodec() PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.forceCodec = rawtopiccommon.CodecUNSPECIFIED
+	}
+}
+
+func WithCompressorCount(num int) PublicWriterOption {
+	if num <= 0 {
+		panic("ydb: compressor count must be > 0")
+	}
+
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.compressorCount = num
+	}
+}
+
+// WithCommonConfig
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func WithCommonConfig(common config.Common) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.Common = common
+	}
+}
+
+// WithCredentials for internal usage only
+// no proxy to public interface
+func WithCredentials(cred credentials.Credentials) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		if cred == nil {
+			cred = credentials.NewAnonymousCredentials()
+		}
+		cfg.cred = cred
+	}
+}
+
+func WithCodec(codec rawtopiccommon.Codec) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.forceCodec = codec
+	}
+}
+
+func WithConnectFunc(connect ConnectFunc) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.Connect = connect
+	}
+}
+
+func WithConnectTimeout(timeout time.Duration) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.connectTimeout = timeout
+	}
+}
+
+func WithAutosetCreatedTime(enable bool) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.FillEmptyCreatedTime = enable
+	}
+}
+
+func WithPartitioning(partitioning PublicPartitioning) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.defaultPartitioning = partitioning.ToRaw()
+	}
+}
+
+func WithProducerID(producerID string) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.producerID = producerID
+	}
+}
+
+func WithSessionMeta(meta map[string]string) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		if len(meta) == 0 {
+			cfg.writerMeta = nil
+		} else {
+			cfg.writerMeta = make(map[string]string, len(meta))
+			for k, v := range meta {
+				cfg.writerMeta[k] = v
+			}
+		}
+	}
+}
+
+func WithWaitAckOnWrite(val bool) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.WaitServerAck = val
+	}
+}
+
+func WithTopic(topic string) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.topic = topic
+	}
+}

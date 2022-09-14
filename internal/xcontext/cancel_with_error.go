@@ -9,7 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var errCancelWithNilError = cancelError{err: errors.New("cancel context with nil error")}
+var errCancelWithNilError = cancelError{err: xerrors.Wrap(errors.New("cancel context with nil error"))}
 
 // CancelErrFunc use for cancel with wrap with specific error
 // if err == nil CancelErrFunc will panic for prevent

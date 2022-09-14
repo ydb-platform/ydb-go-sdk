@@ -5,11 +5,9 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 )
 
-func WaitChannelClosed(t testing.TB, ch empty.Chan) {
+func WaitChannelClosed(t testing.TB, ch <-chan struct{}) {
 	t.Helper()
 
 	const condWaitTimeout = time.Second

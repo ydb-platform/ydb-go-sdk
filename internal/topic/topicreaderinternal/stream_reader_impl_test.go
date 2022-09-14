@@ -5,9 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
-	"fmt"
 	"io/ioutil"
-	"runtime/pprof"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -623,7 +621,7 @@ type testStreamResult struct {
 }
 
 func newTopicReaderTestEnv(t testing.TB) streamEnv {
-	ctx := testContext(t)
+	ctx := xtest.Context(t)
 
 	mc := gomock.NewController(t)
 
@@ -754,16 +752,4 @@ readMessages:
 			return res.msg, res.err
 		}
 	}
-}
-
-func testContext(t testing.TB) context.Context {
-	ctx, cancel := xcontext.WithErrCancel(context.Background())
-	ctx = pprof.WithLabels(ctx, pprof.Labels("test", t.Name()))
-	pprof.SetGoroutineLabels(ctx)
-
-	t.Cleanup(func() {
-		pprof.SetGoroutineLabels(ctx)
-		cancel(fmt.Errorf("test context finished: %v", t.Name()))
-	})
-	return ctx
 }

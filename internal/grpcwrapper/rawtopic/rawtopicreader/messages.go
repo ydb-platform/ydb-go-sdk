@@ -87,12 +87,6 @@ type UpdateTokenRequest struct {
 	rawtopiccommon.UpdateTokenRequest
 }
 
-func (r *UpdateTokenRequest) toProto() *Ydb_Topic.UpdateTokenRequest {
-	return &Ydb_Topic.UpdateTokenRequest{
-		Token: r.Token,
-	}
-}
-
 type UpdateTokenResponse struct {
 	serverMessageImpl
 
