@@ -1,4 +1,6 @@
 * Added topic writer experimental api
+
+## v3.37.8
 * Refactored the internal closing behaviour of table client
 * Implemented the `sql.driver.Validator` interface
 * Fixed update token for topic reader
