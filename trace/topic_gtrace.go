@@ -1134,12 +1134,11 @@ func TopicOnReaderUnknownGrpcMessage(t Topic, readerConnectionID string, e error
 	p.Error = e
 	t.onReaderUnknownGrpcMessage(p)
 }
-func TopicOnWriterReconnect(t Topic, writerInstanceID string, topic string, producerID string, sessionID string, attempt int) func(error) {
+func TopicOnWriterReconnect(t Topic, writerInstanceID string, topic string, producerID string, attempt int) func(error) {
 	var p TopicWriterReconnectStartInfo
 	p.WriterInstanceID = writerInstanceID
 	p.Topic = topic
 	p.ProducerID = producerID
-	p.SessionID = sessionID
 	p.Attempt = attempt
 	res := t.onWriterReconnect(p)
 	return func(e error) {

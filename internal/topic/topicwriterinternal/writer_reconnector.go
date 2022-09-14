@@ -285,7 +285,6 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 			w.writerInstanceID,
 			w.cfg.topic,
 			w.cfg.producerID,
-			w.sessionID,
 			attempt,
 		)
 
