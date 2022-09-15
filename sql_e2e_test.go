@@ -390,44 +390,18 @@ var (
 			title: Optional<Utf8>,
 			air_date: Optional<Date>>>;
 		
-		REPLACE INTO series
-		SELECT
-			series_id,
-			title,
-			series_info,
-			release_date,
-			comment
-		FROM AS_TABLE($seriesData);
+		REPLACE INTO series SELECT * FROM AS_TABLE($seriesData);
 		
-		REPLACE INTO seasons
-		SELECT
-			series_id,
-			season_id,
-			title,
-			first_aired,
-			last_aired
-		FROM AS_TABLE($seasonsData);
+		REPLACE INTO seasons SELECT * FROM AS_TABLE($seasonsData);
 		
-		REPLACE INTO episodes
-		SELECT
-			series_id,
-			season_id,
-			episode_id,
-			title,
-			air_date
-		FROM AS_TABLE($episodesData);
+		REPLACE INTO episodes SELECT * FROM AS_TABLE($episodesData);
 	`))
 	querySelect = template.Must(template.New("").Parse(`
 		PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
 		DECLARE $seriesID AS Uint64;
 		DECLARE $seasonID AS Uint64;
 		DECLARE $episodeID AS Uint64;
-		SELECT
-			views
-		FROM
-			episodes
-		WHERE
-			series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID;
+		SELECT views FROM episodes WHERE series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID;
 	`))
 	queryUpsert = template.Must(template.New("").Parse(`
 		PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
