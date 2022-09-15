@@ -28,8 +28,6 @@ import (
 )
 
 func TestSendAsyncMessages(t *testing.T) {
-	xtest.AllowByFlag(t, "TEST_TOPIC_WRITER")
-
 	ctx := context.Background()
 	db := connect(t)
 	topicPath := createTopic(ctx, t, db)
@@ -58,8 +56,6 @@ func TestSendAsyncMessages(t *testing.T) {
 }
 
 func TestSendSyncMessages(t *testing.T) {
-	xtest.AllowByFlag(t, "TEST_TOPIC_WRITER")
-
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx := testCtx(t)
 
@@ -118,8 +114,6 @@ func TestSendSyncMessages(t *testing.T) {
 }
 
 func TestManyConcurentReadersWriters(t *testing.T) {
-	xtest.AllowByFlag(t, "TEST_TOPIC_WRITER")
-
 	const partitionCount = 3
 	const writersCount = 5
 	const readersCount = 10
