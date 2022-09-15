@@ -306,7 +306,7 @@ func (c *connection) Discovery() discovery.Client {
 func (c *connection) Scripting() scripting.Client {
 	c.scriptingOnce.Init(func() closeFunc {
 		c.scripting = internalScripting.New(
-			c,
+			c.balancer,
 			scriptingConfig.New(
 				append(
 					// prepend common params from root config

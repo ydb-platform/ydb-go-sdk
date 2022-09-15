@@ -402,11 +402,26 @@ func StaleReadOnlyTxControl() *TransactionControl {
 
 type (
 	queryParams     map[string]types.Value
-	ParameterOption func(queryParams)
+	ParameterOption interface {
+		Name() string
+		Value() types.Value
+	}
+	parameterOption struct {
+		name  string
+		value types.Value
+	}
 	QueryParameters struct {
 		m queryParams
 	}
 )
+
+func (p parameterOption) Name() string {
+	return p.name
+}
+
+func (p parameterOption) Value() types.Value {
+	return p.value
+}
 
 func (qp queryParams) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
 	params := make(map[string]*Ydb.TypedValue, len(qp))
@@ -455,9 +470,9 @@ func NewQueryParameters(opts ...ParameterOption) *QueryParameters {
 	return q
 }
 
-func (q *QueryParameters) Add(opts ...ParameterOption) {
-	for _, opt := range opts {
-		opt(q.m)
+func (q *QueryParameters) Add(params ...ParameterOption) {
+	for _, param := range params {
+		q.m[param.Name()] = param.Value()
 	}
 }
 
@@ -470,8 +485,9 @@ func ValueParam(name string, v types.Value) ParameterOption {
 			name = "$" + name
 		}
 	}
-	return func(q queryParams) {
-		q[name] = v
+	return &parameterOption{
+		name:  name,
+		value: v,
 	}
 }
 

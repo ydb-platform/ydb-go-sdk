@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"io"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
@@ -160,6 +161,12 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		if err != nil {
 			return nil, c.checkClosed(xerrors.WithStackTrace(err))
 		}
+		defer func() {
+			_ = res.Close()
+		}()
+		if err = res.NextResultSetErr(ctx); err != nil && !xerrors.Is(err, io.EOF) {
+			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+		}
 		if err = res.Err(); err != nil {
 			return nil, c.checkClosed(xerrors.WithStackTrace(err))
 		}
@@ -171,8 +178,18 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		}
 		return driver.ResultNoRows, nil
 	case ScriptingQueryMode:
-		_, err = c.connector.connection.Scripting().StreamExecute(ctx, query, toQueryParams(args))
+		var res result.StreamResult
+		res, err = c.connector.connection.Scripting().StreamExecute(ctx, query, toQueryParams(args))
 		if err != nil {
+			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+		}
+		defer func() {
+			_ = res.Close()
+		}()
+		if err = res.NextResultSetErr(ctx); err != nil && !xerrors.Is(err, io.EOF) {
+			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+		}
+		if err = res.Err(); err != nil {
 			return nil, c.checkClosed(xerrors.WithStackTrace(err))
 		}
 		return driver.ResultNoRows, nil

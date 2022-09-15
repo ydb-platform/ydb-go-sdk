@@ -36,7 +36,7 @@ func toQueryParams(values []driver.NamedValue) *table.QueryParameters {
 }
 
 //nolint:gocyclo
-func primitiveToValue(v interface{}) (value types.Value, err error) {
+func convertToValue(v interface{}) (value types.Value, err error) {
 	if valuer, ok := v.(driver.Valuer); ok {
 		v, err = valuer.Value()
 		if err != nil {
@@ -99,6 +99,18 @@ func primitiveToValue(v interface{}) (value types.Value, err error) {
 		return types.TextValue(x), nil
 	case *string:
 		return types.NullableTextValue(x), nil
+	case []string:
+		items := make([]types.Value, len(x))
+		for i := range x {
+			items[i] = types.TextValue(x[i])
+		}
+		return types.ListValue(items...), nil
+	case *[]string:
+		items := make([]types.Value, len(*x))
+		for i := range *x {
+			items[i] = types.TextValue((*x)[i])
+		}
+		return types.ListValue(items...), nil
 	case [16]byte:
 		return types.UUIDValue(x), nil
 	case *[16]byte:
@@ -128,7 +140,7 @@ func checkNamedValue(v *driver.NamedValue) (err error) {
 		}
 	}
 
-	value, err := primitiveToValue(v.Value)
+	value, err := convertToValue(v.Value)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -147,11 +159,22 @@ func GenerateDeclareSection(args []sql.NamedArg) (string, error) {
 		if arg.Name == "" {
 			return "", xerrors.WithStackTrace(internal.ErrNameRequired)
 		}
-		value, err := primitiveToValue(arg.Value)
+		value, err := convertToValue(arg.Value)
 		if err != nil {
 			return "", xerrors.WithStackTrace(err)
 		}
 		values[i] = table.ValueParam(arg.Name, value)
 	}
 	return internal.GenerateDeclareSection(table.NewQueryParameters(values...))
+}
+
+func ToYdbParam(param sql.NamedArg) (table.ParameterOption, error) {
+	if param.Name == "" {
+		return nil, xerrors.WithStackTrace(internal.ErrNameRequired)
+	}
+	value, err := convertToValue(param.Value)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	return table.ValueParam(param.Name, value), nil
 }
