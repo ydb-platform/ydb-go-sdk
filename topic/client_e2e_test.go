@@ -42,12 +42,13 @@ func TestClient_CreateDropTopic(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func connect(t testing.TB, grpcOptions ...grpc.DialOption) ydb.Connection {
+func connect(t testing.TB, opts ...ydb.Option) ydb.Connection {
 	connectionString := "grpc://localhost:2136/local"
 	if cs := os.Getenv("YDB_CONNECTION_STRING"); cs != "" {
 		connectionString = cs
 	}
 
+	var grpcOptions []grpc.DialOption
 	const needLogGRPCMessages = false
 	if needLogGRPCMessages {
 		grpcOptions = append(grpcOptions,
@@ -56,13 +57,18 @@ func connect(t testing.TB, grpcOptions ...grpc.DialOption) ydb.Connection {
 		)
 	}
 
-	opts := []ydb.Option{
+	ydbOpts := []ydb.Option{
 		ydb.WithDialTimeout(time.Second),
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 		ydb.With(config.WithGrpcOptions(grpcOptions...)),
 	}
+	ydbOpts = append(ydbOpts, opts...)
 
-	db, err := ydb.Open(context.Background(), connectionString, opts...)
+	db, err := ydb.Open(context.Background(), connectionString, ydbOpts...)
 	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		_ = db.Close(context.Background())
+	})
 	return db
 }

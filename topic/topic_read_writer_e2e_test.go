@@ -20,11 +20,14 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestSendAsyncMessages(t *testing.T) {
@@ -62,8 +65,10 @@ func TestSendSyncMessages(t *testing.T) {
 		grpcStopper := NewGrpcStopper(errors.New("stop grpc for test"))
 
 		db := connect(t,
-			grpc.WithChainUnaryInterceptor(grpcStopper.UnaryClientInterceptor),
-			grpc.WithChainStreamInterceptor(grpcStopper.StreamClientInterceptor),
+			ydb.With(config.WithGrpcOptions(
+				grpc.WithChainUnaryInterceptor(grpcStopper.UnaryClientInterceptor),
+				grpc.WithChainStreamInterceptor(grpcStopper.StreamClientInterceptor),
+			)),
 		)
 		topicPath := createTopic(ctx, t, db)
 
@@ -120,11 +125,16 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 	const sendMessageCount = 100
 	const totalMessageCount = sendMessageCount * writersCount
 
-	ctx := xtest.Context(t)
-	db := connect(t)
+	tb := xtest.MakeSyncedTest(t)
+	ctx := xtest.Context(tb)
+	tw := &xtest.TestWriter{Test: tb}
+	db := connect(tb, ydb.WithLogger(trace.DetailsAll,
+		ydb.WithMinLevel(log.TRACE),
+		ydb.WithOutWriter(tw), ydb.WithErrWriter(tw),
+	))
 
 	// create topic
-	topicName := t.Name()
+	topicName := tb.Name()
 	_ = db.Topic().Drop(ctx, topicName)
 	err := db.Topic().Create(
 		ctx,
@@ -132,21 +142,21 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 		[]topictypes.Codec{topictypes.CodecRaw},
 		topicoptions.CreateWithMinActivePartitions(partitionCount),
 	)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	// senders
 	writer := func(producerID string) {
 		pprof.Do(ctx, pprof.Labels("writer", producerID), func(ctx context.Context) {
 			w, errWriter := db.Topic().StartWriter(producerID, topicName, topicoptions.WithMessageGroupID(producerID))
-			require.NoError(t, errWriter)
+			require.NoError(tb, errWriter)
 
 			for i := 0; i < sendMessageCount; i++ {
 				buf := &bytes.Buffer{}
 				errWriter = binary.Write(buf, binary.BigEndian, int64(i))
-				require.NoError(t, errWriter)
+				require.NoError(tb, errWriter)
 				mess := topicwriter.Message{Data: buf}
 				errWriter = w.Write(ctx, mess)
-				require.NoError(t, errWriter)
+				require.NoError(tb, errWriter)
 			}
 		})
 	}
@@ -170,25 +180,25 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 				topicoptions.ReadTopic(topicName),
 				topicoptions.WithCommitTimeLagTrigger(0),
 			)
-			require.NoError(t, errReader)
+			require.NoError(tb, errReader)
 
 			for {
 				mess, errReader := r.ReadMessage(readerCtx)
 				if readerCtx.Err() != nil {
 					return
 				}
-				require.NoError(t, errReader)
+				require.NoError(tb, errReader)
 
 				var val int64
 				errReader = binary.Read(mess, binary.BigEndian, &val)
-				require.NoError(t, errReader)
+				require.NoError(tb, errReader)
 				receivedMessage <- receivedMessT{
 					ctx:     mess.Context(),
 					writer:  mess.ProducerID,
 					content: val,
 				}
 				errReader = r.Commit(ctx, mess)
-				require.NoError(t, errReader)
+				require.NoError(tb, errReader)
 			}
 		})
 	}
@@ -199,7 +209,7 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 			Name: consumerID,
 		},
 	))
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	var wg sync.WaitGroup
 	wg.Add(readersCount)
@@ -227,20 +237,20 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 			continue
 		}
 		cnt++
-		require.Equal(t, stored+1, mess.content)
+		require.Equal(tb, stored+1, mess.content)
 		received[mess.writer] = mess.content
 	}
 
 	// check about no more messages
 	select {
 	case mess := <-receivedMessage:
-		t.Fatal(mess)
+		tb.Fatal(mess)
 	default:
 	}
 
 	readerCancel()
 	wg.Wait()
-	t.Log(doubles)
+	tb.Log(doubles)
 }
 
 func createTopic(ctx context.Context, t testing.TB, db ydb.Connection) (topicPath string) {

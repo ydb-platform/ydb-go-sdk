@@ -168,6 +168,7 @@ func (c *Client) StartReader(
 	defaultOpts := []topicoptions.ReaderOption{
 		topicoptions.WithCommonConfig(c.cfg.Common),
 		topicreaderinternal.WithCredentials(c.cred),
+		topicreaderinternal.WithTrace(c.cfg.Trace),
 	}
 	opts = append(defaultOpts, opts...)
 
@@ -193,6 +194,7 @@ func (c *Client) StartWriter(producerID, path string, opts ...topicoptions.Write
 		topicwriterinternal.WithTopic(path),
 		topicwriterinternal.WithProducerID(producerID),
 		topicwriterinternal.WithCommonConfig(c.cfg.Common),
+		topicwriterinternal.WithTrace(c.cfg.Trace),
 	}
 
 	options = append(options, opts...)
