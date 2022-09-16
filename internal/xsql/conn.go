@@ -164,7 +164,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		defer func() {
 			_ = res.Close()
 		}()
-		if err = res.NextResultSetErr(ctx); err != nil && !xerrors.Is(err, io.EOF) {
+		if err = res.NextResultSetErr(ctx); !xerrors.Is(err, nil, io.EOF) {
 			return nil, c.checkClosed(xerrors.WithStackTrace(err))
 		}
 		if err = res.Err(); err != nil {
@@ -186,7 +186,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		defer func() {
 			_ = res.Close()
 		}()
-		if err = res.NextResultSetErr(ctx); err != nil && !xerrors.Is(err, io.EOF) {
+		if err = res.NextResultSetErr(ctx); !xerrors.Is(err, nil, io.EOF) {
 			return nil, c.checkClosed(xerrors.WithStackTrace(err))
 		}
 		if err = res.Err(); err != nil {

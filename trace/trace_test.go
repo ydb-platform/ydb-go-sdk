@@ -6,20 +6,43 @@ import (
 	"testing"
 )
 
-func TestTraceTable(t *testing.T) {
+func TestTable(t *testing.T) {
 	testSingleTrace(t, Table{}, "Table")
 }
 
-func TestTraceDriver(t *testing.T) {
+func TestDriver(t *testing.T) {
 	testSingleTrace(t, Driver{}, "Driver")
 }
 
 func TestRetry(t *testing.T) {
-	testSingleTrace(t, Retry{}, "Driver")
+	testSingleTrace(t, Retry{}, "Retry")
+}
+
+func TestCoordination(t *testing.T) {
+	testSingleTrace(t, Table{}, "Coordination")
+}
+
+func TestRatelimiter(t *testing.T) {
+	testSingleTrace(t, Ratelimiter{}, "Ratelimiter")
+}
+
+func TestTopic(t *testing.T) {
+	testSingleTrace(t, Topic{}, "Topic")
+}
+
+func TestDiscovery(t *testing.T) {
+	testSingleTrace(t, Discovery{}, "Discovery")
+}
+
+func TestDatabaseSQL(t *testing.T) {
+	testSingleTrace(t, DatabaseSQL{}, "DatabaseSQL")
 }
 
 func testSingleTrace(t *testing.T, x interface{}, traceName string) {
 	t.Helper()
+	reflect.ValueOf(x).MethodByName("Compose").Call(
+		[]reflect.Value{reflect.New(reflect.ValueOf(x).Type()).Elem()},
+	)
 	a := reflect.New(reflect.TypeOf(x))
 	defer assertCalled(t, traceName, stubEachFunc(a))
 	callEachFunc(a.Elem())
@@ -47,6 +70,29 @@ func stubEachFunc(x reflect.Value) map[string]bool {
 	return fs
 }
 
+func callFunc(f reflect.Value, ft reflect.Type) {
+	if ft.Kind() != reflect.Func {
+		return
+	}
+	if f.IsNil() {
+		return
+	}
+	args := make([]reflect.Value, ft.NumIn())
+	for j := range args {
+		args[j] = reflect.New(ft.In(j)).Elem()
+	}
+	for _, xx := range f.Call(args) {
+		switch xx.Type().Kind() {
+		case reflect.Struct:
+			callEachFunc(xx)
+		case reflect.Func:
+			callFunc(xx, xx.Type())
+		default:
+			_ = xx
+		}
+	}
+}
+
 func callEachFunc(x reflect.Value) {
 	t := x.Type()
 	for i := 0; i < t.NumField(); i++ {
@@ -54,16 +100,6 @@ func callEachFunc(x reflect.Value) {
 			f  = x.Field(i)
 			ft = f.Type()
 		)
-		if ft.Kind() != reflect.Func {
-			continue
-		}
-		if f.IsNil() {
-			continue
-		}
-		args := make([]reflect.Value, ft.NumIn())
-		for j := range args {
-			args[j] = reflect.New(ft.In(j)).Elem()
-		}
-		f.Call(args)
+		callFunc(f, ft)
 	}
 }
