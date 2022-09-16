@@ -322,11 +322,11 @@ func (r *topicStreamReaderImpl) onPartitionSessionStatusResponseFromBuffer(
 }
 
 func (r *topicStreamReaderImpl) Commit(ctx context.Context, commitRange commitRange) (err error) {
-	session := partitionSession{}
-	if commitRange.partitionSession != nil {
-		session = *commitRange.partitionSession
+	if commitRange.partitionSession == nil {
+		return xerrors.WithStackTrace(errCommitWithNilPartitionSession)
 	}
 
+	session := commitRange.partitionSession
 	onDone := trace.TopicOnReaderCommit(
 		r.cfg.Tracer,
 		ctx,
