@@ -101,7 +101,7 @@ func (c *partitionSessionStorage) Get(id partitionSessionID) (*partitionSession,
 
 	partition := c.sessions[id]
 	if partition == nil {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: read undefined partition with id: %v", id))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: read undefined partition session with id: %v", id))
 	}
 
 	return partition, nil

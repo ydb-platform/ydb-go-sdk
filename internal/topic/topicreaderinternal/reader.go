@@ -199,6 +199,12 @@ func WithCredentials(cred credentials.Credentials) PublicReaderOption {
 	}
 }
 
+func WithTrace(tracer trace.Topic) PublicReaderOption {
+	return func(cfg *ReaderConfig) {
+		cfg.Tracer = cfg.Tracer.Compose(tracer)
+	}
+}
+
 func convertNewParamsToStreamConfig(
 	consumer string,
 	readSelectors []PublicReadSelector,

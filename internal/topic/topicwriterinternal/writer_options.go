@@ -6,6 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type PublicWriterOption func(cfg *WriterReconnectorConfig)
@@ -115,6 +116,12 @@ func WithSessionMeta(meta map[string]string) PublicWriterOption {
 func WithWaitAckOnWrite(val bool) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.WaitServerAck = val
+	}
+}
+
+func WithTrace(tracer trace.Topic) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.tracer = cfg.tracer.Compose(tracer)
 	}
 }
 
