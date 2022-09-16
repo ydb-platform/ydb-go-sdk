@@ -119,6 +119,8 @@ func TestSendSyncMessages(t *testing.T) {
 }
 
 func TestManyConcurentReadersWriters(t *testing.T) {
+	xtest.AllowByFlag(t, "ISSUE-389")
+
 	const partitionCount = 3
 	const writersCount = 5
 	const readersCount = 10
