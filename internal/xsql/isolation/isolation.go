@@ -18,6 +18,9 @@ func ToYDB(opts driver.TxOptions) (txcControl table.TxOption, err error) {
 	if !opts.ReadOnly && level == sql.LevelDefault {
 		return table.WithSerializableReadWrite(), nil
 	}
+	if opts.ReadOnly && level == sql.LevelSnapshot {
+		return table.WithSnapshotReadOnly(), nil
+	}
 	return nil, xerrors.WithStackTrace(fmt.Errorf(
 		"ydb: unsupported transaction options: %+v", opts,
 	))

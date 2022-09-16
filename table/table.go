@@ -263,6 +263,9 @@ var (
 	staleReadOnly = &Ydb_Table.TransactionSettings_StaleReadOnly{
 		StaleReadOnly: &Ydb_Table.StaleModeSettings{},
 	}
+	snapshotReadOnly = &Ydb_Table.TransactionSettings_SnapshotReadOnly{
+		SnapshotReadOnly: &Ydb_Table.SnapshotModeSettings{},
+	}
 )
 
 // Transaction control options
@@ -308,6 +311,12 @@ func CommitTx() TxControlOption {
 func WithSerializableReadWrite() TxOption {
 	return func(d *txDesc) {
 		d.TxMode = serializableReadWrite
+	}
+}
+
+func WithSnapshotReadOnly() TxOption {
+	return func(d *txDesc) {
+		d.TxMode = snapshotReadOnly
 	}
 }
 

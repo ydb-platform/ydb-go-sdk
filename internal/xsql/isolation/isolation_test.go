@@ -118,7 +118,8 @@ func TestToYDB(t *testing.T) {
 				Isolation: driver.IsolationLevel(sql.LevelSnapshot),
 				ReadOnly:  true,
 			},
-			err: true,
+			txControl: table.WithSnapshotReadOnly(),
+			err:       false,
 		},
 		{
 			txOptions: driver.TxOptions{
