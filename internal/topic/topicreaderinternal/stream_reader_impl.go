@@ -665,7 +665,7 @@ func (r *topicStreamReaderImpl) onCommitResponse(msg *rawtopicreader.CommitOffse
 		commit := &msg.PartitionsCommittedOffsets[i]
 		partition, err := r.sessionController.Get(commit.PartitionSessionID)
 		if err != nil {
-			return err
+			return fmt.Errorf("ydb: can't found session on commit response: %w", err)
 		}
 		partition.setCommittedOffset(commit.CommittedOffset)
 

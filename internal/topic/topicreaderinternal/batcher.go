@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"strings"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
@@ -41,6 +43,11 @@ func (b *batcher) Close(err error) error {
 
 	if b.closed {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: batch closed already: %w", err))
+	}
+
+	errText := err.Error()
+	if strings.Contains(errText, "read undefined partition session with id") {
+		io.Discard.Write([]byte(errText))
 	}
 
 	b.closed = true

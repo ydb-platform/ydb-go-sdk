@@ -21,8 +21,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
-	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -127,136 +127,194 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 	const sendMessageCount = 100
 	const totalMessageCount = sendMessageCount * writersCount
 
-	tb := xtest.MakeSyncedTest(t)
-	ctx := xtest.Context(tb)
-	tw := &xtest.TestWriter{Test: tb}
-	db := connect(tb, ydb.WithLogger(trace.DetailsAll,
-		ydb.WithMinLevel(log.TRACE),
-		ydb.WithOutWriter(tw), ydb.WithErrWriter(tw),
-	))
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		tb := xtest.MakeSyncedTest(t)
+		ctx := xtest.Context(tb)
+		//tw := &xtest.TestWriter{Test: tb}
+		db := connect(tb)
+		//ydb.WithLogger(trace.DetailsAll,
+		//	ydb.WithMinLevel(log.TRACE),
+		//	ydb.WithOutWriter(tw), ydb.WithErrWriter(tw),
+		//))
 
-	// create topic
-	topicName := tb.Name()
-	_ = db.Topic().Drop(ctx, topicName)
-	err := db.Topic().Create(
-		ctx,
-		topicName,
-		[]topictypes.Codec{topictypes.CodecRaw},
-		topicoptions.CreateWithMinActivePartitions(partitionCount),
-	)
-	require.NoError(tb, err)
+		// create topic
+		topicName := tb.Name()
+		_ = db.Topic().Drop(ctx, topicName)
+		err := db.Topic().Create(
+			ctx,
+			topicName,
+			[]topictypes.Codec{topictypes.CodecRaw},
+			topicoptions.CreateWithMinActivePartitions(partitionCount),
+		)
+		require.NoError(tb, err)
 
-	// senders
-	writer := func(producerID string) {
-		pprof.Do(ctx, pprof.Labels("writer", producerID), func(ctx context.Context) {
-			w, errWriter := db.Topic().StartWriter(producerID, topicName, topicoptions.WithMessageGroupID(producerID))
-			require.NoError(tb, errWriter)
-
-			for i := 0; i < sendMessageCount; i++ {
-				buf := &bytes.Buffer{}
-				errWriter = binary.Write(buf, binary.BigEndian, int64(i))
+		// senders
+		writer := func(producerID string) {
+			pprof.Do(ctx, pprof.Labels("writer", producerID), func(ctx context.Context) {
+				w, errWriter := db.Topic().StartWriter(producerID, topicName, topicoptions.WithMessageGroupID(producerID))
 				require.NoError(tb, errWriter)
-				mess := topicwriter.Message{Data: buf}
-				errWriter = w.Write(ctx, mess)
-				require.NoError(tb, errWriter)
-			}
-		})
-	}
-	for i := 0; i < writersCount; i++ {
-		go writer(strconv.Itoa(i))
-	}
 
-	// readers
-	type receivedMessT struct {
-		ctx     context.Context
-		writer  string
-		content int64
-	}
-	readerCtx, readerCancel := context.WithCancel(ctx)
-	receivedMessage := make(chan receivedMessT, totalMessageCount)
-
-	reader := func(consumerID string) {
-		pprof.Do(ctx, pprof.Labels("reader", consumerID), func(ctx context.Context) {
-			r, errReader := db.Topic().StartReader(
-				consumerID,
-				topicoptions.ReadTopic(topicName),
-				topicoptions.WithCommitTimeLagTrigger(0),
-			)
-			require.NoError(tb, errReader)
-
-			for {
-				mess, errReader := r.ReadMessage(readerCtx)
-				if readerCtx.Err() != nil {
-					return
+				for i := 0; i < sendMessageCount; i++ {
+					buf := &bytes.Buffer{}
+					errWriter = binary.Write(buf, binary.BigEndian, int64(i))
+					require.NoError(tb, errWriter)
+					mess := topicwriter.Message{Data: buf}
+					errWriter = w.Write(ctx, mess)
+					require.NoError(tb, errWriter)
 				}
-				require.NoError(tb, errReader)
-
-				var val int64
-				errReader = binary.Read(mess, binary.BigEndian, &val)
-				require.NoError(tb, errReader)
-				receivedMessage <- receivedMessT{
-					ctx:     mess.Context(),
-					writer:  mess.ProducerID,
-					content: val,
-				}
-				errReader = r.Commit(ctx, mess)
-				require.NoError(tb, errReader)
-			}
-		})
-	}
-
-	consumerID := "consumer"
-	err = db.Topic().Alter(ctx, topicName, topicoptions.AlterWithAddConsumers(
-		topictypes.Consumer{
-			Name: consumerID,
-		},
-	))
-	require.NoError(tb, err)
-
-	var wg sync.WaitGroup
-	wg.Add(readersCount)
-	for i := 0; i < readersCount; i++ {
-		go func(id int) {
-			defer wg.Done()
-
-			reader(consumerID)
-		}(i)
-	}
-
-	received := map[string]int64{}
-	for i := 0; i < writersCount; i++ {
-		received[strconv.Itoa(i)] = -1
-	}
-
-	cnt := 0
-	doubles := 0
-	for cnt < totalMessageCount {
-		mess := <-receivedMessage
-		stored := received[mess.writer]
-		if mess.content <= stored {
-			// double
-			doubles++
-			continue
+			})
 		}
-		cnt++
-		require.Equal(tb, stored+1, mess.content)
-		received[mess.writer] = mess.content
-	}
+		for i := 0; i < writersCount; i++ {
+			go writer(strconv.Itoa(i))
+		}
 
-	// check about no more messages
-	select {
-	case mess := <-receivedMessage:
-		tb.Fatal(mess)
-	default:
-	}
+		// readers
+		type receivedMessT struct {
+			ctx     context.Context
+			writer  string
+			content int64
+		}
+		readerCtx, readerCancel := context.WithCancel(ctx)
+		receivedMessage := make(chan receivedMessT, totalMessageCount)
 
-	readerCancel()
-	wg.Wait()
-	tb.Log(doubles)
+		reader := func(consumerID string) {
+			pprof.Do(ctx, pprof.Labels("reader", consumerID), func(ctx context.Context) {
+				r, errReader := db.Topic().StartReader(
+					consumerID,
+					topicoptions.ReadTopic(topicName),
+					topicoptions.WithCommitTimeLagTrigger(0),
+				)
+				require.NoError(tb, errReader)
+
+				for {
+					mess, errReader := r.ReadMessage(readerCtx)
+					if readerCtx.Err() != nil {
+						return
+					}
+					require.NoError(tb, errReader)
+
+					var val int64
+					errReader = binary.Read(mess, binary.BigEndian, &val)
+					require.NoError(tb, errReader)
+					receivedMessage <- receivedMessT{
+						ctx:     mess.Context(),
+						writer:  mess.ProducerID,
+						content: val,
+					}
+					errReader = r.Commit(ctx, mess)
+					require.NoError(tb, errReader)
+				}
+			})
+		}
+
+		consumerID := "consumer"
+		err = db.Topic().Alter(ctx, topicName, topicoptions.AlterWithAddConsumers(
+			topictypes.Consumer{
+				Name: consumerID,
+			},
+		))
+		require.NoError(tb, err)
+
+		var wg sync.WaitGroup
+		wg.Add(readersCount)
+		for i := 0; i < readersCount; i++ {
+			go func(id int) {
+				defer wg.Done()
+
+				reader(consumerID)
+			}(i)
+		}
+
+		received := map[string]int64{}
+		for i := 0; i < writersCount; i++ {
+			received[strconv.Itoa(i)] = -1
+		}
+
+		cnt := 0
+		doubles := 0
+		for cnt < totalMessageCount {
+			mess := <-receivedMessage
+			stored := received[mess.writer]
+			if mess.content <= stored {
+				// double
+				doubles++
+				continue
+			}
+			cnt++
+			require.Equal(tb, stored+1, mess.content)
+			received[mess.writer] = mess.content
+		}
+
+		// check about no more messages
+		select {
+		case mess := <-receivedMessage:
+			tb.Fatal(mess)
+		default:
+		}
+
+		readerCancel()
+		wg.Wait()
+		tb.Log(doubles)
+
+	}, xtest.StopAfter(time.Hour))
+
 }
 
+func TestCommitUnexpectedRange(t *testing.T) {
+	sleepTime := time.Second
+	ctx := xtest.Context(t)
+	db := connect(t)
+
+	topicName1 := createTopic(ctx, t, db)
+	topicName2 := createTopic(ctx, t, db)
+	consumer := "test"
+	err := addConsumer(ctx, db, topicName1, consumer)
+	require.NoError(t, err)
+	err = addConsumer(ctx, db, topicName2, consumer)
+	require.NoError(t, err)
+
+	// get range from other reader
+	producerID := "producer"
+	writer, err := db.Topic().StartWriter(producerID, topicName1, topicoptions.WithMessageGroupID(producerID))
+	require.NoError(t, err)
+
+	err = writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("123")})
+
+	reader1, err := db.Topic().StartReader(consumer, topicoptions.ReadTopic(topicName1))
+	require.NoError(t, err)
+	mess1, err := reader1.ReadMessage(ctx)
+	require.NoError(t, err)
+
+	connected := make(empty.Chan)
+
+	tracer := trace.Topic{
+		OnReaderInit: func(startInfo trace.TopicReaderInitStartInfo) func(doneInfo trace.TopicReaderInitDoneInfo) {
+			return func(doneInfo trace.TopicReaderInitDoneInfo) {
+				close(connected)
+			}
+		},
+	}
+
+	reader, err := db.Topic().StartReader(consumer, topicoptions.ReadTopic(topicName2), topicoptions.WithReaderTrace(tracer))
+	require.NoError(t, err)
+
+	<-connected
+
+	err = reader.Commit(ctx, mess1)
+	require.Error(t, err)
+
+	readCtx, cancel := context.WithTimeout(ctx, sleepTime)
+	defer cancel()
+	_, err = reader.ReadMessage(readCtx)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+
+}
+
+var topicCounter int
+
 func createTopic(ctx context.Context, t testing.TB, db ydb.Connection) (topicPath string) {
-	topicPath = db.Name() + "/" + t.Name() + "--test-topic"
+	topicCounter += 1
+	topicPath = db.Name() + "/" + t.Name() + "--test-topic-" + strconv.Itoa(topicCounter)
 	_ = db.Topic().Drop(ctx, topicPath)
 	err := db.Topic().Create(
 		ctx,
@@ -267,4 +325,9 @@ func createTopic(ctx context.Context, t testing.TB, db ydb.Connection) (topicPat
 	require.NoError(t, err)
 
 	return topicPath
+}
+
+func addConsumer(ctx context.Context, db ydb.Connection, topicName, consumerName string) error {
+	consumer := topictypes.Consumer{Name: consumerName}
+	return db.Topic().Alter(ctx, topicName, topicoptions.AlterWithAddConsumers(consumer))
 }

@@ -597,6 +597,24 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 	})
 }
 
+func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
+	sleep := func() {
+		time.Sleep(time.Second / 10)
+	}
+	e := newTopicReaderTestEnv(t)
+	e.Start()
+
+	cr := commitRange{
+		partitionSession: newPartitionSession(context.Background(), "asd", 123, 222, 213),
+	}
+	err := e.reader.Commit(e.ctx, cr)
+	require.Error(t, err)
+
+	sleep()
+
+	require.False(t, e.reader.closed)
+}
+
 type streamEnv struct {
 	ctx                    context.Context
 	t                      testing.TB
