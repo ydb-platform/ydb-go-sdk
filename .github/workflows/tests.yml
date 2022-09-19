@@ -122,3 +122,11 @@ jobs:
           file: ./database_sql.txt
           flags: database_sql,e2e,integration,${{ matrix.os }},${{ matrix.go-version }}
           name: database/sql
+      - name: Static credentials
+        run: go test -race -coverpkg=./... -coverprofile static_credentials.txt -covermode atomic ./static_credentials_test.go
+      - name: Upload static credentials coverage report to Codecov
+        uses: codecov/codecov-action@v2
+        with:
+          file: ./database_sql.txt
+          flags: static_credentials,e2e,integration,${{ matrix.os }},${{ matrix.go-version }}
+          name: database/sql
