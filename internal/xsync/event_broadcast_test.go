@@ -1,6 +1,7 @@
 package xsync
 
 import (
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
@@ -27,10 +29,10 @@ func TestEventBroadcast(t *testing.T) {
 
 		backgroundCounter := int64(0)
 
-		stopRace := int64(0)
+		stopSubscribe := xatomic.Bool{}
 
 		subscribeStopped := make(empty.Chan)
-		fireStopped := make(empty.Chan)
+		broadcastStopped := make(empty.Chan)
 
 		// Add subscribers
 		go func() {
@@ -42,20 +44,22 @@ func TestEventBroadcast(t *testing.T) {
 					<-waiter.Done()
 					atomic.AddInt64(&backgroundCounter, -1)
 				}()
-				if atomic.LoadInt64(&stopRace) != 0 {
+				if stopSubscribe.Load() {
 					return
 				}
 			}
 		}()
 
+		stopBroadcast := xatomic.Bool{}
 		go func() {
-			defer close(fireStopped)
+			defer close(broadcastStopped)
 
 			// Fire events
 			for {
 				atomic.AddInt64(&events, 1)
 				b.Broadcast()
-				if atomic.LoadInt64(&stopRace) != 0 {
+				runtime.Gosched()
+				if stopBroadcast.Load() {
 					return
 				}
 			}
@@ -67,13 +71,13 @@ func TestEventBroadcast(t *testing.T) {
 			return atomic.LoadInt64(&backgroundCounter) > 0
 		})
 
-		atomic.AddInt64(&stopRace, 1)
+		stopSubscribe.Store(true)
 		<-subscribeStopped
-		<-fireStopped
-		b.Broadcast()
 		xtest.SpinWaitCondition(t, nil, func() bool {
 			return atomic.LoadInt64(&backgroundCounter) == 0
 		})
+		stopBroadcast.Store(true)
+		<-broadcastStopped
 
 		require.True(t, atomic.LoadInt64(&events) > 0)
 	})
