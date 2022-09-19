@@ -1,3 +1,4 @@
+## v3.38.0
 * Fixed commit errors for experimental topic reader
 * Updated `ydb-go-genproto` dependency
 * Added `table.WithSnapshotReadOnly()` `TxOption` for supporting `SnapshotReadOnly` transaction control
