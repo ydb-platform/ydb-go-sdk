@@ -104,6 +104,78 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		require.NoError(t, e.reader.Commit(e.ctx, batch.getCommitRange().priv))
 		<-commitReceived
 	})
+
+	t.Run("CommitAfterGracefulStopPartition", func(t *testing.T) {
+		e := newTopicReaderTestEnv(t)
+
+		committed := e.partitionSession.committedOffset()
+		e.stream.EXPECT().Send(&rawtopicreader.CommitOffsetRequest{CommitOffsets: []rawtopicreader.PartitionCommitOffset{
+			{
+				PartitionSessionID: e.partitionSessionID,
+				Offsets: []rawtopicreader.OffsetRange{
+					{
+						Start: committed,
+						End:   committed + 1,
+					},
+				},
+			},
+		}}).Return(nil)
+
+		stopPartitionResponseSent := make(empty.Chan)
+		e.stream.EXPECT().Send(&rawtopicreader.StopPartitionSessionResponse{PartitionSessionID: e.partitionSessionID}).
+			Do(func(_ interface{}) {
+				close(stopPartitionResponseSent)
+			}).Return(nil)
+
+		e.Start()
+
+		// send from server message, then partition graceful stop request
+		go func() {
+			e.SendFromServer(&rawtopicreader.ReadResponse{
+				PartitionData: []rawtopicreader.PartitionData{
+					{
+						PartitionSessionID: e.partitionSessionID,
+						Batches: []rawtopicreader.Batch{
+							{
+								Codec: rawtopiccommon.CodecRaw,
+								MessageData: []rawtopicreader.MessageData{
+									{
+										Offset: committed,
+										SeqNo:  1,
+									},
+								},
+							},
+						},
+					},
+				},
+			})
+			e.SendFromServer(&rawtopicreader.StopPartitionSessionRequest{
+				PartitionSessionID: e.partitionSessionID,
+				Graceful:           true,
+			})
+		}()
+
+		readCtx, readCtxCancel := xcontext.WithErrCancel(e.ctx)
+		readerStopErr := errors.New("stop partition response sent")
+		go func() {
+			<-stopPartitionResponseSent
+			readCtxCancel(readerStopErr)
+		}()
+
+		batch, err := e.reader.ReadMessageBatch(readCtx, newReadMessageBatchOptions())
+		require.NoError(t, err)
+		err = e.reader.Commit(e.ctx, batch.commitRange)
+		require.NoError(t, err)
+		_, err = e.reader.ReadMessageBatch(readCtx, newReadMessageBatchOptions())
+		require.ErrorIs(t, err, readerStopErr)
+
+		select {
+		case <-e.partitionSession.Context().Done():
+			// pass
+		case <-time.After(time.Second):
+			t.Fatal("partition session not closed")
+		}
+	})
 }
 
 func TestTopicStreamReaderImpl_Create(t *testing.T) {
@@ -595,6 +667,24 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 		<-nextDataRequested
 		require.Equal(t, e.initialBufferSizeBytes, atomic.LoadInt64(&e.reader.atomicRestBufferSizeBytes))
 	})
+}
+
+func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
+	sleep := func() {
+		time.Sleep(time.Second / 10)
+	}
+	e := newTopicReaderTestEnv(t)
+	e.Start()
+
+	cr := commitRange{
+		partitionSession: newPartitionSession(context.Background(), "asd", 123, 222, 213),
+	}
+	err := e.reader.Commit(e.ctx, cr)
+	require.Error(t, err)
+
+	sleep()
+
+	require.False(t, e.reader.closed)
 }
 
 type streamEnv struct {

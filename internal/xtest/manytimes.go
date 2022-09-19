@@ -70,6 +70,7 @@ type testWrapper struct {
 	testing.TB
 
 	m       sync.Mutex
+	logs    []logRecord
 	cleanup []func()
 }
 
@@ -82,6 +83,83 @@ func (tw *testWrapper) Cleanup(f func()) {
 	tw.cleanup = append(tw.cleanup, f)
 }
 
+func (tw *testWrapper) Error(args ...interface{}) {
+	tw.TB.Helper()
+
+	tw.flushLogs()
+	tw.TB.Error(args...)
+}
+
+func (tw *testWrapper) Errorf(format string, args ...interface{}) {
+	tw.TB.Helper()
+
+	tw.flushLogs()
+	tw.TB.Errorf(format, args...)
+}
+
+func (tw *testWrapper) Fatal(args ...interface{}) {
+	tw.TB.Helper()
+
+	tw.flushLogs()
+	tw.TB.Fatal(args...)
+}
+
+func (tw *testWrapper) Fatalf(format string, args ...interface{}) {
+	tw.TB.Helper()
+
+	tw.flushLogs()
+	tw.TB.Fatalf(format, args...)
+}
+
+func (tw *testWrapper) Log(args ...interface{}) {
+	tw.TB.Helper()
+
+	tw.m.Lock()
+	defer tw.m.Unlock()
+
+	if tw.TB.Failed() {
+		tw.TB.Log(args...)
+	} else {
+		tw.logs = append(tw.logs, logRecord{
+			format: "",
+			args:   args,
+		})
+	}
+}
+
+func (tw *testWrapper) Logf(format string, args ...interface{}) {
+	tw.TB.Helper()
+
+	tw.m.Lock()
+	defer tw.m.Unlock()
+
+	if tw.TB.Failed() {
+		tw.TB.Logf(format, args...)
+	} else {
+		tw.logs = append(tw.logs, logRecord{
+			format: format,
+			args:   args,
+		})
+	}
+}
+
+func (tw *testWrapper) flushLogs() {
+	tw.TB.Helper()
+
+	tw.m.Lock()
+	defer tw.m.Unlock()
+
+	for _, rec := range tw.logs {
+		if rec.format == "" {
+			tw.TB.Log(rec.args...)
+		} else {
+			tw.TB.Logf(rec.format, rec.args...)
+		}
+	}
+
+	tw.logs = nil
+}
+
 func (tw *testWrapper) doCleanup() {
 	tw.Helper()
 
@@ -91,4 +169,9 @@ func (tw *testWrapper) doCleanup() {
 
 		last()
 	}
+}
+
+type logRecord struct {
+	format string
+	args   []interface{}
 }

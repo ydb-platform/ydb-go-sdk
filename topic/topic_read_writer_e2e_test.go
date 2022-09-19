@@ -21,6 +21,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
@@ -255,8 +256,65 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 	tb.Log(doubles)
 }
 
+func TestCommitUnexpectedRange(t *testing.T) {
+	sleepTime := time.Second
+	ctx := xtest.Context(t)
+	db := connect(t)
+
+	topicName1 := createTopic(ctx, t, db)
+	topicName2 := createTopic(ctx, t, db)
+	consumer := "test"
+	err := addConsumer(ctx, db, topicName1, consumer)
+	require.NoError(t, err)
+	err = addConsumer(ctx, db, topicName2, consumer)
+	require.NoError(t, err)
+
+	// get range from other reader
+	producerID := "producer"
+	writer, err := db.Topic().StartWriter(producerID, topicName1, topicoptions.WithMessageGroupID(producerID))
+	require.NoError(t, err)
+
+	err = writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("123")})
+	require.NoError(t, err)
+
+	reader1, err := db.Topic().StartReader(consumer, topicoptions.ReadTopic(topicName1))
+	require.NoError(t, err)
+	mess1, err := reader1.ReadMessage(ctx)
+	require.NoError(t, err)
+
+	connected := make(empty.Chan)
+
+	tracer := trace.Topic{
+		OnReaderInit: func(startInfo trace.TopicReaderInitStartInfo) func(doneInfo trace.TopicReaderInitDoneInfo) {
+			return func(doneInfo trace.TopicReaderInitDoneInfo) {
+				close(connected)
+			}
+		},
+	}
+
+	reader, err := db.Topic().StartReader(
+		consumer,
+		topicoptions.ReadTopic(topicName2),
+		topicoptions.WithReaderTrace(tracer),
+	)
+	require.NoError(t, err)
+
+	<-connected
+
+	err = reader.Commit(ctx, mess1)
+	require.Error(t, err)
+
+	readCtx, cancel := context.WithTimeout(ctx, sleepTime)
+	defer cancel()
+	_, err = reader.ReadMessage(readCtx)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+var topicCounter int
+
 func createTopic(ctx context.Context, t testing.TB, db ydb.Connection) (topicPath string) {
-	topicPath = db.Name() + "/" + t.Name() + "--test-topic"
+	topicCounter++
+	topicPath = db.Name() + "/" + t.Name() + "--test-topic-" + strconv.Itoa(topicCounter)
 	_ = db.Topic().Drop(ctx, topicPath)
 	err := db.Topic().Create(
 		ctx,
@@ -267,4 +325,9 @@ func createTopic(ctx context.Context, t testing.TB, db ydb.Connection) (topicPat
 	require.NoError(t, err)
 
 	return topicPath
+}
+
+func addConsumer(ctx context.Context, db ydb.Connection, topicName, consumerName string) error {
+	consumer := topictypes.Consumer{Name: consumerName}
+	return db.Topic().Alter(ctx, topicName, topicoptions.AlterWithAddConsumers(consumer))
 }

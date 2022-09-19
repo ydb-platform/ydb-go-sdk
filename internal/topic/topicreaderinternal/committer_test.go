@@ -159,6 +159,38 @@ func TestCommitterCommitSync(t *testing.T) {
 		c := newTestCommitter(ctx, t)
 		require.NoError(t, c.Commit(ctx, cRange))
 	})
+
+	xtest.TestManyTimesWithName(t, "SessionClosed", func(t testing.TB) {
+		ctx := xtest.Context(t)
+
+		sessionCtx, sessionCancel := xcontext.WithErrCancel(ctx)
+
+		session := &partitionSession{
+			ctx:                sessionCtx,
+			partitionSessionID: 1,
+			committedOffsetVal: 1,
+		}
+		cRange := commitRange{
+			commitOffsetStart: 1,
+			commitOffsetEnd:   2,
+			partitionSession:  session,
+		}
+
+		c := newTestCommitter(ctx, t)
+		c.mode = CommitModeSync
+
+		waitErr := make(chan error)
+		go func() {
+			commitErr := c.Commit(ctx, cRange)
+			waitErr <- commitErr
+		}()
+
+		testErr := errors.New("test")
+		sessionCancel(testErr)
+
+		commitErr := <-waitErr
+		require.ErrorIs(t, commitErr, testErr)
+	})
 }
 
 func TestCommitterBuffer(t *testing.T) {
