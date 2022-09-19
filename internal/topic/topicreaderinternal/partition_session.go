@@ -53,7 +53,7 @@ func (s *partitionSession) Context() context.Context {
 	return s.ctx
 }
 
-func (s *partitionSession) close(err error) {
+func (s *partitionSession) Close(err error) {
 	s.ctxCancel(err)
 }
 

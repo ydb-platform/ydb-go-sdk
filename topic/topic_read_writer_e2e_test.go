@@ -167,14 +167,14 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 		go writer(strconv.Itoa(i))
 	}
 
-		// readers
-		type receivedMessT struct {
-			ctx     context.Context
-			writer  string
-			content int64
-		}
-		readerCtx, readerCancel := context.WithCancel(ctx)
-		receivedMessage := make(chan receivedMessT, totalMessageCount)
+	// readers
+	type receivedMessT struct {
+		ctx     context.Context
+		writer  string
+		content int64
+	}
+	readerCtx, readerCancel := context.WithCancel(ctx)
+	receivedMessage := make(chan receivedMessT, totalMessageCount)
 
 	reader := func(consumerID string) {
 		pprof.Do(ctx, pprof.Labels("reader", consumerID), func(ctx context.Context) {
@@ -214,20 +214,20 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 	))
 	require.NoError(tb, err)
 
-		var wg sync.WaitGroup
-		wg.Add(readersCount)
-		for i := 0; i < readersCount; i++ {
-			go func(id int) {
-				defer wg.Done()
+	var wg sync.WaitGroup
+	wg.Add(readersCount)
+	for i := 0; i < readersCount; i++ {
+		go func(id int) {
+			defer wg.Done()
 
-				reader(consumerID)
-			}(i)
-		}
+			reader(consumerID)
+		}(i)
+	}
 
-		received := map[string]int64{}
-		for i := 0; i < writersCount; i++ {
-			received[strconv.Itoa(i)] = -1
-		}
+	received := map[string]int64{}
+	for i := 0; i < writersCount; i++ {
+		received[strconv.Itoa(i)] = -1
+	}
 
 	cnt := 0
 	doubles := 0

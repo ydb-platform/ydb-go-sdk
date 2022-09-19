@@ -23,9 +23,10 @@ import (
 )
 
 var (
-	errPartitionStopped              = xerrors.Wrap(errors.New("ydb: pq partition stopped"))
-	errCommitSessionFromOtherReader  = xerrors.Wrap(errors.New("ydb: commit with session from other reader"))
-	errCommitWithNilPartitionSession = xerrors.Wrap(errors.New("ydb: commit with nil partition session"))
+	errPartitionSessionStoppedByServer = xerrors.Wrap(errors.New("ydb: topic partition session stopped by server"))
+	errPartitionSessionStoppedBySDK    = xerrors.Wrap(errors.New("ydb: topic partition session stopped by sdk"))
+	errCommitSessionFromOtherReader    = xerrors.Wrap(errors.New("ydb: commit with session from other reader"))
+	errCommitWithNilPartitionSession   = xerrors.Wrap(errors.New("ydb: commit with nil partition session"))
 )
 
 type partitionSessionID = rawtopicreader.PartitionSessionID
@@ -292,6 +293,7 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequestFromBuffer(
 	}()
 
 	if msg.Graceful {
+		session.Close(errPartitionSessionStoppedBySDK)
 		resp := &rawtopicreader.StopPartitionSessionResponse{
 			PartitionSessionID: session.partitionSessionID,
 		}
@@ -354,7 +356,7 @@ func (r *topicStreamReaderImpl) checkCommitRange(commitRange commitRange) error 
 	}
 
 	if session.Context().Err() != nil {
-		return xerrors.WithStackTrace(fmt.Errorf("ydb: commit error: %w", errPartitionStopped))
+		return xerrors.WithStackTrace(fmt.Errorf("ydb: commit error: %w", errPartitionSessionStoppedByServer))
 	}
 
 	ownSession, err := r.sessionController.Get(session.partitionSessionID)
@@ -772,7 +774,7 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequest(m *rawtopicreader.
 	}
 
 	if !m.Graceful {
-		session.close(xerrors.WithStackTrace(errPartitionStopped))
+		session.Close(xerrors.WithStackTrace(errPartitionSessionStoppedByServer))
 	}
 
 	return r.batcher.PushRawMessage(session, m)
