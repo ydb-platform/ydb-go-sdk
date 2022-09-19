@@ -49,7 +49,7 @@ func connect(t testing.TB, opts ...ydb.Option) ydb.Connection {
 	}
 
 	var grpcOptions []grpc.DialOption
-	const needLogGRPCMessages = false
+	const needLogGRPCMessages = true
 	if needLogGRPCMessages {
 		grpcOptions = append(grpcOptions,
 			grpc.WithChainUnaryInterceptor(xtest.NewGrpcLogger(t).UnaryClientInterceptor),

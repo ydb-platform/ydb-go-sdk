@@ -119,8 +119,6 @@ func TestSendSyncMessages(t *testing.T) {
 }
 
 func TestManyConcurentReadersWriters(t *testing.T) {
-	xtest.AllowByFlag(t, "ISSUE-389")
-
 	const partitionCount = 3
 	const writersCount = 5
 	const readersCount = 10
@@ -130,7 +128,7 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		tb := xtest.MakeSyncedTest(t)
 		ctx := xtest.Context(tb)
-		//tw := &xtest.TestWriter{Test: tb}
+		// tw := &xtest.TestWriter{Test: tb}
 		db := connect(tb)
 		//ydb.WithLogger(trace.DetailsAll,
 		//	ydb.WithMinLevel(log.TRACE),
@@ -255,9 +253,7 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 		readerCancel()
 		wg.Wait()
 		tb.Log(doubles)
-
 	}, xtest.StopAfter(time.Hour))
-
 }
 
 func TestCommitUnexpectedRange(t *testing.T) {
@@ -307,7 +303,6 @@ func TestCommitUnexpectedRange(t *testing.T) {
 	defer cancel()
 	_, err = reader.ReadMessage(readCtx)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
-
 }
 
 var topicCounter int

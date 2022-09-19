@@ -5,10 +5,16 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+)
+
+const (
+	compactionIntervalTime    = time.Hour
+	compactionIntervalRemoves = 10000
 )
 
 type partitionSession struct {
@@ -76,12 +82,18 @@ func (s *partitionSession) setLastReceivedMessageOffset(v rawtopicreader.Offset)
 }
 
 type partitionSessionStorage struct {
-	m        sync.RWMutex
-	sessions map[partitionSessionID]*partitionSession
+	m sync.RWMutex
+
+	sessions map[partitionSessionID]sessionInfo
+
+	removeIndex              int
+	lastCompactedTime        time.Time
+	lastCompactedRemoveIndex int
 }
 
 func (c *partitionSessionStorage) init() {
-	c.sessions = make(map[partitionSessionID]*partitionSession)
+	c.sessions = make(map[partitionSessionID]sessionInfo)
+	c.lastCompactedTime = time.Now()
 }
 
 func (c *partitionSessionStorage) Add(session *partitionSession) error {
@@ -91,7 +103,7 @@ func (c *partitionSessionStorage) Add(session *partitionSession) error {
 	if _, ok := c.sessions[session.partitionSessionID]; ok {
 		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.partitionSessionID))
 	}
-	c.sessions[session.partitionSessionID] = session
+	c.sessions[session.partitionSessionID] = sessionInfo{Session: session}
 	return nil
 }
 
@@ -99,22 +111,59 @@ func (c *partitionSessionStorage) Get(id partitionSessionID) (*partitionSession,
 	c.m.RLock()
 	defer c.m.RUnlock()
 
-	partition := c.sessions[id]
-	if partition == nil {
+	partitionInfo := c.sessions[id]
+	if partitionInfo.Session == nil {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: read undefined partition session with id: %v", id))
 	}
 
-	return partition, nil
+	return partitionInfo.Session, nil
 }
 
 func (c *partitionSessionStorage) Remove(id partitionSessionID) (*partitionSession, error) {
+	now := time.Now()
 	c.m.Lock()
 	defer c.m.Unlock()
 
-	if data, ok := c.sessions[id]; ok {
-		delete(c.sessions, id)
-		return data, nil
+	c.removeIndex++
+	if partitionInfo, ok := c.sessions[id]; ok {
+		partitionInfo.RemoveTime = now
+		return partitionInfo.Session, nil
 	}
 
+	c.compactionNeedLock(now)
+
 	return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: delete undefined partition session with id: %v", id))
+}
+
+func (c *partitionSessionStorage) compactionNeedLock(now time.Time) {
+	if !c.isNeedCompactionNeedLock(now) {
+		return
+	}
+	c.doCompactionNeedLock(now)
+}
+
+func (c *partitionSessionStorage) isNeedCompactionNeedLock(now time.Time) bool {
+	return c.removeIndex-c.lastCompactedRemoveIndex < compactionIntervalRemoves && now.Sub(c.lastCompactedTime) < compactionIntervalTime
+}
+
+func (c *partitionSessionStorage) doCompactionNeedLock(now time.Time) {
+	newSessions := make(map[partitionSessionID]sessionInfo, len(c.sessions))
+
+	for sessionID, info := range c.sessions {
+		if info.IsGarbage(c.removeIndex, now) {
+			continue
+		}
+		newSessions[sessionID] = info
+	}
+	c.sessions = newSessions
+}
+
+type sessionInfo struct {
+	RemoveTime   time.Time
+	RemovedIndex int
+	Session      *partitionSession
+}
+
+func (si *sessionInfo) IsGarbage(removeIndexNow int, timeNow time.Time) bool {
+	return removeIndexNow-si.RemovedIndex >= compactionIntervalRemoves || timeNow.Sub(si.RemoveTime) >= compactionIntervalTime
 }
