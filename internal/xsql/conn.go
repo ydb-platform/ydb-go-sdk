@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"io"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
@@ -160,6 +161,12 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		if err != nil {
 			return nil, c.checkClosed(xerrors.WithStackTrace(err))
 		}
+		defer func() {
+			_ = res.Close()
+		}()
+		if err = res.NextResultSetErr(ctx); !xerrors.Is(err, nil, io.EOF) {
+			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+		}
 		if err = res.Err(); err != nil {
 			return nil, c.checkClosed(xerrors.WithStackTrace(err))
 		}
@@ -171,8 +178,18 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		}
 		return driver.ResultNoRows, nil
 	case ScriptingQueryMode:
-		_, err = c.connector.connection.Scripting().StreamExecute(ctx, query, toQueryParams(args))
+		var res result.StreamResult
+		res, err = c.connector.connection.Scripting().StreamExecute(ctx, query, toQueryParams(args))
 		if err != nil {
+			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+		}
+		defer func() {
+			_ = res.Close()
+		}()
+		if err = res.NextResultSetErr(ctx); !xerrors.Is(err, nil, io.EOF) {
+			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+		}
+		if err = res.Err(); err != nil {
 			return nil, c.checkClosed(xerrors.WithStackTrace(err))
 		}
 		return driver.ResultNoRows, nil
@@ -320,19 +337,6 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 		return nil, xerrors.WithStackTrace(
 			fmt.Errorf("conn already have an opened currentTx: %s", c.currentTx.ID()),
 		)
-	}
-	// TODO: replace with true transaction with snapshot read-only isolation after implementing it on server-side
-	//nolint:godox
-	if txOptions.ReadOnly && txOptions.Isolation == driver.IsolationLevel(sql.LevelSnapshot) {
-		c.currentTx = &fakeTx{
-			conn: c,
-			txControl: table.TxControl(
-				table.BeginTx(table.WithSerializableReadWrite()),
-				table.CommitTx(),
-			),
-			ctx: ctx,
-		}
-		return c.currentTx, nil
 	}
 	var txc table.TxOption
 	txc, err = isolation.ToYDB(txOptions)

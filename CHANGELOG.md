@@ -1,3 +1,8 @@
+* Update `ydb-go-genproto` dependency
+* Added `table.WithSnapshotReadOnly()` `TxOption` for supporting `SnapshotReadOnly` transaction control
+* Fixed bug in `db.Scripting()` queries (not checked operation results)
+* Added `sugar.ToYdbParam(sql.NamedArg)` helper for converting `sql.NamedArg` to `table.ParameterOption`
+* Changed type `table.ParameterOption` for getting name and value from `table.ParameterOption` instance
 * Added topic writer experimental api with internal logger
 
 ## v3.37.8

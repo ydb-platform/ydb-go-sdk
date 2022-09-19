@@ -30,3 +30,10 @@ func GenerateDeclareSection[T *table.QueryParameters | []table.ParameterOption |
 		return "", xerrors.WithStackTrace(fmt.Errorf("unsupported type: %T", v))
 	}
 }
+
+// ToYdbParam converts
+//
+// Warning: This is an experimental feature and could change at any time
+func ToYdbParam(param sql.NamedArg) (table.ParameterOption, error) {
+	return xsql.ToYdbParam(param)
+}

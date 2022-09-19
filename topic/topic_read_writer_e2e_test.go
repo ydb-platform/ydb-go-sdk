@@ -23,6 +23,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -119,52 +120,52 @@ func TestSendSyncMessages(t *testing.T) {
 }
 
 func TestManyConcurentReadersWriters(t *testing.T) {
+	xtest.AllowByFlag(t, "ISSUE-389")
+
 	const partitionCount = 3
 	const writersCount = 5
 	const readersCount = 10
 	const sendMessageCount = 100
 	const totalMessageCount = sendMessageCount * writersCount
 
-	xtest.TestManyTimes(t, func(t testing.TB) {
-		tb := xtest.MakeSyncedTest(t)
-		ctx := xtest.Context(tb)
-		// tw := &xtest.TestWriter{Test: tb}
-		db := connect(tb)
-		//ydb.WithLogger(trace.DetailsAll,
-		//	ydb.WithMinLevel(log.TRACE),
-		//	ydb.WithOutWriter(tw), ydb.WithErrWriter(tw),
-		//))
+	tb := xtest.MakeSyncedTest(t)
+	ctx := xtest.Context(tb)
+	tw := &xtest.TestWriter{Test: tb}
+	db := connect(tb, ydb.WithLogger(trace.DetailsAll,
+		ydb.WithMinLevel(log.TRACE),
+		ydb.WithOutWriter(tw), ydb.WithErrWriter(tw),
+	))
 
-		// create topic
-		topicName := tb.Name()
-		_ = db.Topic().Drop(ctx, topicName)
-		err := db.Topic().Create(
-			ctx,
-			topicName,
-			[]topictypes.Codec{topictypes.CodecRaw},
-			topicoptions.CreateWithMinActivePartitions(partitionCount),
-		)
-		require.NoError(tb, err)
+	// create topic
+	topicName := tb.Name()
+	_ = db.Topic().Drop(ctx, topicName)
+	err := db.Topic().Create(
+		ctx,
+		topicName,
+		[]topictypes.Codec{topictypes.CodecRaw},
+		topicoptions.CreateWithMinActivePartitions(partitionCount),
+	)
+	require.NoError(tb, err)
 
-		// senders
-		writer := func(producerID string) {
-			pprof.Do(ctx, pprof.Labels("writer", producerID), func(ctx context.Context) {
-				w, errWriter := db.Topic().StartWriter(producerID, topicName, topicoptions.WithMessageGroupID(producerID))
+	// senders
+	writer := func(producerID string) {
+		pprof.Do(ctx, pprof.Labels("writer", producerID), func(ctx context.Context) {
+			w, errWriter := db.Topic().StartWriter(producerID, topicName, topicoptions.WithMessageGroupID(producerID))
+			require.NoError(tb, errWriter)
+
+			for i := 0; i < sendMessageCount; i++ {
+				buf := &bytes.Buffer{}
+				errWriter = binary.Write(buf, binary.BigEndian, int64(i))
 				require.NoError(tb, errWriter)
-
-				for i := 0; i < sendMessageCount; i++ {
-					buf := &bytes.Buffer{}
-					errWriter = binary.Write(buf, binary.BigEndian, int64(i))
-					require.NoError(tb, errWriter)
-					mess := topicwriter.Message{Data: buf}
-					errWriter = w.Write(ctx, mess)
-					require.NoError(tb, errWriter)
-				}
-			})
-		}
-		for i := 0; i < writersCount; i++ {
-			go writer(strconv.Itoa(i))
-		}
+				mess := topicwriter.Message{Data: buf}
+				errWriter = w.Write(ctx, mess)
+				require.NoError(tb, errWriter)
+			}
+		})
+	}
+	for i := 0; i < writersCount; i++ {
+		go writer(strconv.Itoa(i))
+	}
 
 		// readers
 		type receivedMessT struct {
@@ -175,43 +176,43 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 		readerCtx, readerCancel := context.WithCancel(ctx)
 		receivedMessage := make(chan receivedMessT, totalMessageCount)
 
-		reader := func(consumerID string) {
-			pprof.Do(ctx, pprof.Labels("reader", consumerID), func(ctx context.Context) {
-				r, errReader := db.Topic().StartReader(
-					consumerID,
-					topicoptions.ReadTopic(topicName),
-					topicoptions.WithCommitTimeLagTrigger(0),
-				)
+	reader := func(consumerID string) {
+		pprof.Do(ctx, pprof.Labels("reader", consumerID), func(ctx context.Context) {
+			r, errReader := db.Topic().StartReader(
+				consumerID,
+				topicoptions.ReadTopic(topicName),
+				topicoptions.WithCommitTimeLagTrigger(0),
+			)
+			require.NoError(tb, errReader)
+
+			for {
+				mess, errReader := r.ReadMessage(readerCtx)
+				if readerCtx.Err() != nil {
+					return
+				}
 				require.NoError(tb, errReader)
 
-				for {
-					mess, errReader := r.ReadMessage(readerCtx)
-					if readerCtx.Err() != nil {
-						return
-					}
-					require.NoError(tb, errReader)
-
-					var val int64
-					errReader = binary.Read(mess, binary.BigEndian, &val)
-					require.NoError(tb, errReader)
-					receivedMessage <- receivedMessT{
-						ctx:     mess.Context(),
-						writer:  mess.ProducerID,
-						content: val,
-					}
-					errReader = r.Commit(ctx, mess)
-					require.NoError(tb, errReader)
+				var val int64
+				errReader = binary.Read(mess, binary.BigEndian, &val)
+				require.NoError(tb, errReader)
+				receivedMessage <- receivedMessT{
+					ctx:     mess.Context(),
+					writer:  mess.ProducerID,
+					content: val,
 				}
-			})
-		}
+				errReader = r.Commit(ctx, mess)
+				require.NoError(tb, errReader)
+			}
+		})
+	}
 
-		consumerID := "consumer"
-		err = db.Topic().Alter(ctx, topicName, topicoptions.AlterWithAddConsumers(
-			topictypes.Consumer{
-				Name: consumerID,
-			},
-		))
-		require.NoError(tb, err)
+	consumerID := "consumer"
+	err = db.Topic().Alter(ctx, topicName, topicoptions.AlterWithAddConsumers(
+		topictypes.Consumer{
+			Name: consumerID,
+		},
+	))
+	require.NoError(tb, err)
 
 		var wg sync.WaitGroup
 		wg.Add(readersCount)
@@ -228,32 +229,31 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 			received[strconv.Itoa(i)] = -1
 		}
 
-		cnt := 0
-		doubles := 0
-		for cnt < totalMessageCount {
-			mess := <-receivedMessage
-			stored := received[mess.writer]
-			if mess.content <= stored {
-				// double
-				doubles++
-				continue
-			}
-			cnt++
-			require.Equal(tb, stored+1, mess.content)
-			received[mess.writer] = mess.content
+	cnt := 0
+	doubles := 0
+	for cnt < totalMessageCount {
+		mess := <-receivedMessage
+		stored := received[mess.writer]
+		if mess.content <= stored {
+			// double
+			doubles++
+			continue
 		}
+		cnt++
+		require.Equal(tb, stored+1, mess.content)
+		received[mess.writer] = mess.content
+	}
 
-		// check about no more messages
-		select {
-		case mess := <-receivedMessage:
-			tb.Fatal(mess)
-		default:
-		}
+	// check about no more messages
+	select {
+	case mess := <-receivedMessage:
+		tb.Fatal(mess)
+	default:
+	}
 
-		readerCancel()
-		wg.Wait()
-		tb.Log(doubles)
-	}, xtest.StopAfter(time.Hour))
+	readerCancel()
+	wg.Wait()
+	tb.Log(doubles)
 }
 
 func TestCommitUnexpectedRange(t *testing.T) {
