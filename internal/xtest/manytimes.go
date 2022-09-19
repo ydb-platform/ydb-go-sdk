@@ -83,35 +83,35 @@ func (tw *testWrapper) Cleanup(f func()) {
 	tw.cleanup = append(tw.cleanup, f)
 }
 
-func (tw *testWrapper) Error(args ...any) {
+func (tw *testWrapper) Error(args ...interface{}) {
 	tw.TB.Helper()
 
 	tw.flushLogs()
 	tw.TB.Error(args...)
 }
 
-func (tw *testWrapper) Errorf(format string, args ...any) {
+func (tw *testWrapper) Errorf(format string, args ...interface{}) {
 	tw.TB.Helper()
 
 	tw.flushLogs()
 	tw.TB.Errorf(format, args...)
 }
 
-func (tw *testWrapper) Fatal(args ...any) {
+func (tw *testWrapper) Fatal(args ...interface{}) {
 	tw.TB.Helper()
 
 	tw.flushLogs()
 	tw.TB.Fatal(args...)
 }
 
-func (tw *testWrapper) Fatalf(format string, args ...any) {
+func (tw *testWrapper) Fatalf(format string, args ...interface{}) {
 	tw.TB.Helper()
 
 	tw.flushLogs()
 	tw.TB.Fatalf(format, args...)
 }
 
-func (tw *testWrapper) Log(args ...any) {
+func (tw *testWrapper) Log(args ...interface{}) {
 	tw.TB.Helper()
 
 	tw.m.Lock()
@@ -127,7 +127,7 @@ func (tw *testWrapper) Log(args ...any) {
 	}
 }
 
-func (tw *testWrapper) Logf(format string, args ...any) {
+func (tw *testWrapper) Logf(format string, args ...interface{}) {
 	tw.TB.Helper()
 
 	tw.m.Lock()
