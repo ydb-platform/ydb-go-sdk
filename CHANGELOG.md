@@ -1,3 +1,5 @@
+* Added `table.types.CastTo(from, to)` helper for cast `types.Value` to golang native type value destination
+
 ## v3.38.2
 * Added missing `RetentionPeriod` parameter for topic description
 * Fixed reconnect problem for topic client
