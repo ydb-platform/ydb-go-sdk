@@ -122,9 +122,10 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		}}).Return(nil)
 
 		stopPartitionResponseSent := make(empty.Chan)
-		e.stream.EXPECT().Send(&rawtopicreader.StopPartitionSessionResponse{PartitionSessionID: e.partitionSessionID}).Do(func(_ interface{}) {
-			close(stopPartitionResponseSent)
-		}).Return(nil)
+		e.stream.EXPECT().Send(&rawtopicreader.StopPartitionSessionResponse{PartitionSessionID: e.partitionSessionID}).
+			Do(func(_ interface{}) {
+				close(stopPartitionResponseSent)
+			}).Return(nil)
 
 		e.Start()
 

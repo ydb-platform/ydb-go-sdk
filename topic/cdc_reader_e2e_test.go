@@ -131,7 +131,7 @@ func TestPartitionsBalanced(t *testing.T) {
 		require.True(t, ydb.IsOperationErrorSchemeError(err))
 	}
 
-	consumer := "test"
+	consumer := "test-consumer-" + t.Name()
 	err = db.Topic().Create(ctx, topicPath, []topictypes.Codec{topictypes.CodecRaw},
 		topicoptions.CreateWithMinActivePartitions(2),
 		topicoptions.CreateWithPartitionCountLimit(2),

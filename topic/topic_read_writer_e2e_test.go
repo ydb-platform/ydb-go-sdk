@@ -275,6 +275,7 @@ func TestCommitUnexpectedRange(t *testing.T) {
 	require.NoError(t, err)
 
 	err = writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("123")})
+	require.NoError(t, err)
 
 	reader1, err := db.Topic().StartReader(consumer, topicoptions.ReadTopic(topicName1))
 	require.NoError(t, err)
@@ -291,7 +292,11 @@ func TestCommitUnexpectedRange(t *testing.T) {
 		},
 	}
 
-	reader, err := db.Topic().StartReader(consumer, topicoptions.ReadTopic(topicName2), topicoptions.WithReaderTrace(tracer))
+	reader, err := db.Topic().StartReader(
+		consumer,
+		topicoptions.ReadTopic(topicName2),
+		topicoptions.WithReaderTrace(tracer),
+	)
 	require.NoError(t, err)
 
 	<-connected
@@ -308,7 +313,7 @@ func TestCommitUnexpectedRange(t *testing.T) {
 var topicCounter int
 
 func createTopic(ctx context.Context, t testing.TB, db ydb.Connection) (topicPath string) {
-	topicCounter += 1
+	topicCounter++
 	topicPath = db.Name() + "/" + t.Name() + "--test-topic-" + strconv.Itoa(topicCounter)
 	_ = db.Topic().Drop(ctx, topicPath)
 	err := db.Topic().Create(

@@ -143,7 +143,8 @@ func (c *partitionSessionStorage) compactionNeedLock(now time.Time) {
 }
 
 func (c *partitionSessionStorage) isNeedCompactionNeedLock(now time.Time) bool {
-	return c.removeIndex-c.lastCompactedRemoveIndex < compactionIntervalRemoves && now.Sub(c.lastCompactedTime) < compactionIntervalTime
+	return c.removeIndex-c.lastCompactedRemoveIndex < compactionIntervalRemoves &&
+		now.Sub(c.lastCompactedTime) < compactionIntervalTime
 }
 
 func (c *partitionSessionStorage) doCompactionNeedLock(now time.Time) {
@@ -165,5 +166,6 @@ type sessionInfo struct {
 }
 
 func (si *sessionInfo) IsGarbage(removeIndexNow int, timeNow time.Time) bool {
-	return removeIndexNow-si.RemovedIndex >= compactionIntervalRemoves || timeNow.Sub(si.RemoveTime) >= compactionIntervalTime
+	return removeIndexNow-si.RemovedIndex >= compactionIntervalRemoves ||
+		timeNow.Sub(si.RemoveTime) >= compactionIntervalTime
 }
