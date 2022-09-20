@@ -22,6 +22,7 @@ type CreateTopicRequest struct {
 	PartitionWriteBurstBytes          int64
 	Attributes                        map[string]string
 	Consumers                         []Consumer
+	MeteringMode                      MeteringMode
 }
 
 func (req *CreateTopicRequest) ToProto() *Ydb_Topic.CreateTopicRequest {
@@ -43,6 +44,8 @@ func (req *CreateTopicRequest) ToProto() *Ydb_Topic.CreateTopicRequest {
 	for i := range proto.Consumers {
 		proto.Consumers[i] = req.Consumers[i].ToProto()
 	}
+
+	proto.MeteringMode = Ydb_Topic.MeteringMode(req.MeteringMode)
 
 	return proto
 }

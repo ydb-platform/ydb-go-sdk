@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
@@ -13,6 +14,17 @@ import (
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type CreateOption func(request *rawtopic.CreateTopicRequest)
+
+// CreateWithMeteringMode
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func CreateWithMeteringMode(mode topictypes.MeteringMode) CreateOption {
+	return func(request *rawtopic.CreateTopicRequest) {
+		mode.ToRaw(&request.MeteringMode)
+	}
+}
 
 // CreateWithMinActivePartitions
 //
@@ -55,6 +67,20 @@ func CreateWithRetentionPeriod(retentionPeriod time.Duration) CreateOption {
 func CreateWithRetentionStorageMB(retentionStorageMB int64) CreateOption {
 	return func(request *rawtopic.CreateTopicRequest) {
 		request.RetentionStorageMB = retentionStorageMB
+	}
+}
+
+// CreateWithSupportedCodecs
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func CreateWithSupportedCodecs(codecs ...topictypes.Codec) CreateOption {
+	return func(request *rawtopic.CreateTopicRequest) {
+		request.SupportedCodecs = make(rawtopiccommon.SupportedCodecs, len(codecs))
+		for i, c := range codecs {
+			c.ToRaw(&request.SupportedCodecs[i])
+		}
 	}
 }
 

@@ -159,7 +159,8 @@ func TestSessionDescribeTable(t *testing.T) {
 				External:           options.StoragePool{Media: "m3"},
 				StoreExternalBlobs: options.FeatureEnabled,
 			},
-			Indexes: []options.IndexDescription{},
+			Indexes:     []options.IndexDescription{},
+			Changefeeds: make([]options.ChangefeedDescription, 0),
 		}
 		a := allocator.New()
 		defer a.Free()

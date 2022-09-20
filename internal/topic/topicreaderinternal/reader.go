@@ -8,6 +8,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clone"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -246,9 +247,7 @@ type PublicReadSelector struct {
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (s PublicReadSelector) Clone() PublicReadSelector {
 	dst := s
-
-	dst.Partitions = make([]int64, len(s.Partitions))
-	copy(dst.Partitions, s.Partitions)
+	dst.Partitions = clone.Int64Slice(s.Partitions)
 
 	return dst
 }

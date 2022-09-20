@@ -61,6 +61,7 @@ const (
 	EntryTypeCoordinationNode = EntryType(Ydb_Scheme.Entry_COORDINATION_NODE)
 	EntryTypeSequence         = EntryType(Ydb_Scheme.Entry_SEQUENCE)
 	EntryTypeReplication      = EntryType(Ydb_Scheme.Entry_REPLICATION)
+	EntryTypeTopic            = EntryType(Ydb_Scheme.Entry_TOPIC)
 )
 
 type Permissions struct {

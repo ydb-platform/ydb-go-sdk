@@ -6,6 +6,7 @@ package topic_test
 import (
 	"context"
 	"fmt"
+	"path"
 	"runtime/pprof"
 	"sync"
 	"sync/atomic"
@@ -117,7 +118,7 @@ func TestTopicPath(t *testing.T) {
 	topicPath := db.Name() + "/" + t.Name()
 	_ = db.Topic().Drop(ctx, topicPath)
 
-	err := db.Topic().Create(ctx, topicPath, []topictypes.Codec{topictypes.CodecRaw})
+	err := db.Topic().Create(ctx, topicPath)
 	require.NoError(t, err)
 }
 
@@ -132,7 +133,7 @@ func TestPartitionsBalanced(t *testing.T) {
 	}
 
 	consumer := "test-consumer-" + t.Name()
-	err = db.Topic().Create(ctx, topicPath, []topictypes.Codec{topictypes.CodecRaw},
+	err = db.Topic().Create(ctx, topicPath,
 		topicoptions.CreateWithMinActivePartitions(2),
 		topicoptions.CreateWithPartitionCountLimit(2),
 		topicoptions.CreateWithConsumer(topictypes.Consumer{Name: consumer}),
@@ -209,7 +210,31 @@ func TestPartitionsBalanced(t *testing.T) {
 	require.NoError(t, firstReader.Close(ctx))
 }
 
-func createCDCFeed(ctx context.Context, t *testing.T, db ydb.Connection) {
+func TestCDCInTableDescribe(t *testing.T) {
+	ctx := testCtx(t)
+	db := connect(t)
+	topicPath := createCDCFeed(ctx, t, db)
+
+	t.Run("SchemeDescribePath", func(t *testing.T) {
+		desc, err := db.Scheme().DescribePath(ctx, topicPath)
+		require.NoError(t, err)
+		require.True(t, desc.IsTopic())
+	})
+
+	t.Run("DescribeTable", func(t *testing.T) {
+		err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
+			tablePath := path.Dir(topicPath)
+			topicName := path.Base(topicPath)
+			desc, err := s.DescribeTable(ctx, tablePath)
+			require.NoError(t, err)
+			require.Equal(t, topicName, desc.Changefeeds[0].Name)
+			return nil
+		})
+		require.NoError(t, err)
+	})
+}
+
+func createCDCFeed(ctx context.Context, t *testing.T, db ydb.Connection) string {
 	err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
 		_ = s.ExecuteSchemeQuery(ctx, "DROP TABLE test")
 		err := s.ExecuteSchemeQuery(ctx, `
@@ -253,6 +278,7 @@ func createCDCFeed(ctx context.Context, t *testing.T, db ydb.Connection) {
 		topicoptions.AlterWithAddConsumers(topictypes.Consumer{Name: consumerName}),
 	)
 	require.NoError(t, err)
+	return topicPath
 }
 
 func createFeedReader(t *testing.T, db ydb.Connection, opts ...topicoptions.ReaderOption) *topicreader.Reader {

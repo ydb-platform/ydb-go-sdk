@@ -29,7 +29,7 @@ type Client interface {
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	Create(ctx context.Context, path string, codecs []topictypes.Codec, opts ...topicoptions.CreateOption) error
+	Create(ctx context.Context, path string, opts ...topicoptions.CreateOption) error
 
 	// Describe describe topic
 	//

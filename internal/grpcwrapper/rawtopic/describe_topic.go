@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clone"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawscheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
@@ -30,12 +31,15 @@ type DescribeTopicResult struct {
 
 	Self                              rawscheme.Entry
 	PartitioningSettings              PartitioningSettings
-	Consumers                         []Consumer
-	SupportedCodecs                   rawtopiccommon.SupportedCodecs
+	Partitions                        []PartitionInfo
 	RetentionPeriod                   time.Duration
-	PartitionWriteBurstBytes          int64
+	RetentionStorageMB                int64
+	SupportedCodecs                   rawtopiccommon.SupportedCodecs
 	PartitionWriteSpeedBytesPerSecond int64
+	PartitionWriteBurstBytes          int64
 	Attributes                        map[string]string
+	Consumers                         []Consumer
+	MeteringMode                      MeteringMode
 }
 
 func (res *DescribeTopicResult) FromProto(protoResponse *Ydb_Topic.DescribeTopicResponse) error {
@@ -56,28 +60,45 @@ func (res *DescribeTopicResult) FromProto(protoResponse *Ydb_Topic.DescribeTopic
 		return err
 	}
 
-	res.PartitionWriteBurstBytes = protoResult.PartitionWriteBurstBytes
+	protoPartitions := protoResult.GetPartitions()
+	res.Partitions = make([]PartitionInfo, len(protoPartitions))
+	for i, protoPartition := range protoPartitions {
+		res.Partitions[i].mustFromProto(protoPartition)
+	}
+
+	res.RetentionPeriod = protoResult.GetRetentionPeriod().AsDuration()
+	res.RetentionStorageMB = protoResult.GetRetentionStorageMb()
+
+	for _, v := range protoResult.GetSupportedCodecs().GetCodecs() {
+		res.SupportedCodecs = append(res.SupportedCodecs, rawtopiccommon.Codec(v))
+	}
+
 	res.PartitionWriteSpeedBytesPerSecond = protoResult.PartitionWriteSpeedBytesPerSecond
+	res.PartitionWriteBurstBytes = protoResult.PartitionWriteBurstBytes
 
-	if protoResult.RetentionPeriod != nil {
-		res.RetentionPeriod = protoResult.RetentionPeriod.AsDuration()
-	}
-
-	if protoResult.SupportedCodecs != nil {
-		for _, v := range protoResult.SupportedCodecs.Codecs {
-			res.SupportedCodecs = append(res.SupportedCodecs, rawtopiccommon.Codec(v))
-		}
-	}
-
-	res.Attributes = make(map[string]string)
-	for k, v := range protoResult.Attributes {
-		res.Attributes[k] = v
-	}
+	res.Attributes = protoResult.Attributes
 
 	res.Consumers = make([]Consumer, len(protoResult.Consumers))
 	for i := range res.Consumers {
 		res.Consumers[i].MustFromProto(protoResult.Consumers[i])
 	}
 
+	res.MeteringMode = MeteringMode(protoResult.MeteringMode)
+
 	return nil
+}
+
+type PartitionInfo struct {
+	PartitionID        int64
+	Active             bool
+	ChildPartitionIDs  []int64
+	ParentPartitionIDs []int64
+}
+
+func (pi *PartitionInfo) mustFromProto(proto *Ydb_Topic.DescribeTopicResult_PartitionInfo) {
+	pi.PartitionID = proto.GetPartitionId()
+	pi.Active = proto.GetActive()
+
+	pi.ChildPartitionIDs = clone.Int64Slice(proto.GetChildPartitionIds())
+	pi.ParentPartitionIDs = clone.Int64Slice(proto.GetParentPartitionIds())
 }

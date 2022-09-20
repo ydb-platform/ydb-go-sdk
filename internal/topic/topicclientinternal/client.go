@@ -8,11 +8,11 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -71,8 +71,16 @@ func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.Al
 	for _, f := range opts {
 		f(&req)
 	}
-	_, err := c.rawClient.AlterTopic(ctx, req)
-	return err
+
+	call := func(ctx context.Context) error {
+		_, alterErr := c.rawClient.AlterTopic(ctx, req)
+		return alterErr
+	}
+
+	if c.cfg.AutoRetry() {
+		return retry.Retry(ctx, call, retry.WithIdempotent(true))
+	}
+	return call(ctx)
 }
 
 // Create new topic
@@ -83,24 +91,25 @@ func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.Al
 func (c *Client) Create(
 	ctx context.Context,
 	path string,
-	codecs []topictypes.Codec,
 	opts ...topicoptions.CreateOption,
 ) error {
 	req := rawtopic.CreateTopicRequest{}
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
 
-	req.SupportedCodecs = make(rawtopiccommon.SupportedCodecs, len(codecs))
-	for i, codec := range codecs {
-		req.SupportedCodecs[i] = rawtopiccommon.Codec(codec)
-	}
-
 	for _, f := range opts {
 		f(&req)
 	}
 
-	_, err := c.rawClient.CreateTopic(ctx, req)
-	return err
+	call := func(ctx context.Context) error {
+		_, createErr := c.rawClient.CreateTopic(ctx, req)
+		return createErr
+	}
+
+	if c.cfg.AutoRetry() {
+		return retry.Retry(ctx, call, retry.WithIdempotent(true))
+	}
+	return call(ctx)
 }
 
 // Describe topic
@@ -122,7 +131,21 @@ func (c *Client) Describe(
 		opt(&req)
 	}
 
-	rawRes, err := c.rawClient.DescribeTopic(ctx, req)
+	var rawRes rawtopic.DescribeTopicResult
+
+	call := func(ctx context.Context) (describeErr error) {
+		rawRes, describeErr = c.rawClient.DescribeTopic(ctx, req)
+		return describeErr
+	}
+
+	var err error
+
+	if c.cfg.AutoRetry() {
+		err = retry.Retry(ctx, call, retry.WithIdempotent(true))
+	} else {
+		err = call(ctx)
+	}
+
 	if err != nil {
 		return res, err
 	}
@@ -144,8 +167,17 @@ func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.Dro
 	for _, f := range opts {
 		f(&req)
 	}
-	_, err := c.rawClient.DropTopic(ctx, req)
-	return err
+
+	call := func(ctx context.Context) error {
+		_, removeErr := c.rawClient.DropTopic(ctx, req)
+		return removeErr
+	}
+
+	if c.cfg.AutoRetry() {
+		return retry.Retry(ctx, call, retry.WithIdempotent(true))
+	}
+
+	return call(ctx)
 }
 
 // StartReader create new topic reader and start pull messages from server

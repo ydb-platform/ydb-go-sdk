@@ -142,7 +142,7 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 	err := db.Topic().Create(
 		ctx,
 		topicName,
-		[]topictypes.Codec{topictypes.CodecRaw},
+		topicoptions.CreateWithSupportedCodecs(topictypes.CodecRaw),
 		topicoptions.CreateWithMinActivePartitions(partitionCount),
 	)
 	require.NoError(tb, err)
@@ -319,7 +319,7 @@ func createTopic(ctx context.Context, t testing.TB, db ydb.Connection) (topicPat
 	err := db.Topic().Create(
 		ctx,
 		topicPath,
-		[]topictypes.Codec{topictypes.CodecRaw},
+		topicoptions.CreateWithSupportedCodecs(topictypes.CodecRaw),
 		topicoptions.CreateWithConsumer(topictypes.Consumer{Name: consumerName}),
 	)
 	require.NoError(t, err)
