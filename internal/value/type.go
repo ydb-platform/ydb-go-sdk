@@ -73,6 +73,9 @@ func TypeFromYDB(x *Ydb.Type) Type {
 	case *Ydb.Type_VoidType:
 		return Void()
 
+	case *Ydb.Type_NullType:
+		return Null()
+
 	default:
 		panic("ydb: unknown type")
 	}
@@ -750,4 +753,31 @@ func (voidType) toYDB(*allocator.Allocator) *Ydb.Type {
 
 func Void() voidType {
 	return voidType{}
+}
+
+type nullType struct{}
+
+func (v nullType) toString(buffer *bytes.Buffer) {
+	buffer.WriteString(v.String())
+}
+
+func (v nullType) String() string {
+	return "Null"
+}
+
+var _nullType = &Ydb.Type{
+	Type: &Ydb.Type_NullType{},
+}
+
+func (v nullType) equalsTo(rhs Type) bool {
+	_, ok := rhs.(nullType)
+	return ok
+}
+
+func (nullType) toYDB(*allocator.Allocator) *Ydb.Type {
+	return _nullType
+}
+
+func Null() nullType {
+	return nullType{}
 }
