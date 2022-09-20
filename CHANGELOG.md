@@ -1,3 +1,5 @@
+* Fixed deadlock with implicit usage of `internal.table.Client.internalPoolAsyncCloseSession` 
+
 ## v3.38.0
 * Fixed commit errors for experimental topic reader
 * Updated `ydb-go-genproto` dependency

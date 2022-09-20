@@ -670,8 +670,7 @@ func TestSessionPoolCloseIdleSessions(t *testing.T) {
 
 		var (
 			idleThreshold = 4 * time.Second
-
-			closedCount uint32
+			closedCount   uint32
 		)
 		p := newClientWithStubBuilder(
 			t,
