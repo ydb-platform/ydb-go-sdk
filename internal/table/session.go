@@ -54,23 +54,31 @@ type session struct {
 	closeOnce sync.Once
 }
 
+func nodeID(sessionID string) (uint32, error) {
+	u, err := url.Parse(sessionID)
+	if err != nil {
+		return 0, err
+	}
+	id, err := strconv.ParseUint(u.Query().Get("node_id"), 10, 32)
+	if err != nil {
+		return 0, err
+	}
+	return uint32(id), err
+}
+
 func (s *session) NodeID() uint32 {
 	if s == nil {
 		return 0
 	}
-	if nodeID := atomic.LoadUint32(&s.nodeID); nodeID != 0 {
-		return nodeID
+	if id := atomic.LoadUint32(&s.nodeID); id != 0 {
+		return id
 	}
-	u, err := url.Parse(s.id)
-	if err != nil {
-		panic(err)
-	}
-	nodeID, err := strconv.ParseUint(u.Query().Get("node_id"), 10, 32)
+	id, err := nodeID(s.id)
 	if err != nil {
 		return 0
 	}
-	atomic.StoreUint32(&s.nodeID, uint32(nodeID))
-	return uint32(nodeID)
+	atomic.StoreUint32(&s.nodeID, id)
+	return id
 }
 
 func (s *session) Status() table.SessionStatus {

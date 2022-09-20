@@ -134,11 +134,18 @@ func (c *Client) updateNodes(ctx context.Context, endpoints []endpoint.Info) {
 				return nodeIDs[i] >= nodeID
 			}) == len(nodeIDs) {
 				for s := range c.nodes[nodeID] {
-					if info, has := c.index[s]; has && info.idle != nil {
-						c.internalPoolAsyncCloseSession(ctx, s)
-					} else {
-						s.SetStatus(table.SessionClosing)
-					}
+					func(s *session) {
+						if info, has := c.index[s]; has && info.idle != nil {
+							s.SetStatus(table.SessionClosing)
+							c.wg.Add(1)
+							go func() {
+								defer c.wg.Done()
+								c.internalPoolSyncCloseSession(ctx, s)
+							}()
+						} else {
+							s.SetStatus(table.SessionClosing)
+						}
+					}(s)
 				}
 			}
 		}
@@ -696,35 +703,49 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 	return nil
 }
 
+func (c *Client) internalPoolGCTick(ctx context.Context, idleThreshold time.Duration) {
+	c.mu.WithLock(func() {
+		if c.isClosed() {
+			return
+		}
+		for e := c.idle.Front(); e != nil; e = e.Next() {
+			s := e.Value.(*session)
+			info, has := c.index[s]
+			if !has {
+				panic("session not found in pool")
+			}
+			if info.idle == nil {
+				panic("inconsistent session info")
+			}
+			if since := timeutil.Until(info.touched); since > idleThreshold {
+				s.SetStatus(table.SessionClosing)
+				c.wg.Add(1)
+				go func() {
+					defer c.wg.Done()
+					c.internalPoolSyncCloseSession(ctx, s)
+				}()
+			}
+		}
+	})
+}
+
 func (c *Client) internalPoolGC(ctx context.Context, idleThreshold time.Duration) {
 	defer c.wg.Done()
+
 	timer := timeutil.NewTimer(idleThreshold)
+	defer timer.Stop()
 
 	for {
 		select {
 		case <-c.done:
 			return
 
+		case <-ctx.Done():
+			return
+
 		case <-timer.C():
-			c.mu.WithLock(func() {
-				if c.isClosed() {
-					return
-				}
-				for e := c.idle.Front(); e != nil; e = e.Next() {
-					s := e.Value.(*session)
-					info, has := c.index[s]
-					if !has {
-						panic("session not found in pool")
-					}
-					if info.idle == nil {
-						panic("inconsistent session info")
-					}
-					if since := timeutil.Until(info.touched); since > idleThreshold {
-						c.internalPoolAsyncCloseSession(ctx, s)
-					}
-				}
-				timer.Reset(idleThreshold / 2)
-			})
+			c.internalPoolGCTick(ctx, idleThreshold)
+			timer.Reset(idleThreshold / 2)
 		}
 	}
 }
@@ -813,20 +834,6 @@ func (c *Client) internalPoolNotify(s *session) (notified bool) {
 		}
 	}
 	return false
-}
-
-func (c *Client) internalPoolAsyncCloseSession(ctx context.Context, s *session) {
-	s.SetStatus(table.SessionClosing)
-	c.mu.WithLock(func() {
-		if c.isClosed() {
-			return
-		}
-		c.wg.Add(1)
-		go func() {
-			defer c.wg.Done()
-			c.internalPoolSyncCloseSession(ctx, s)
-		}()
-	})
 }
 
 func (c *Client) internalPoolSyncCloseSession(ctx context.Context, s *session) {
