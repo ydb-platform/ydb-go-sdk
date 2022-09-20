@@ -134,16 +134,18 @@ func (c *Client) updateNodes(ctx context.Context, endpoints []endpoint.Info) {
 				return nodeIDs[i] >= nodeID
 			}) == len(nodeIDs) {
 				for s := range c.nodes[nodeID] {
-					if info, has := c.index[s]; has && info.idle != nil {
-						s.SetStatus(table.SessionClosing)
-						c.wg.Add(1)
-						go func() {
-							defer c.wg.Done()
-							c.internalPoolSyncCloseSession(ctx, s)
-						}()
-					} else {
-						s.SetStatus(table.SessionClosing)
-					}
+					func(s *session) {
+						if info, has := c.index[s]; has && info.idle != nil {
+							s.SetStatus(table.SessionClosing)
+							c.wg.Add(1)
+							go func() {
+								defer c.wg.Done()
+								c.internalPoolSyncCloseSession(ctx, s)
+							}()
+						} else {
+							s.SetStatus(table.SessionClosing)
+						}
+					}(s)
 				}
 			}
 		}
