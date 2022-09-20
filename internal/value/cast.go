@@ -2,14 +2,18 @@ package value
 
 import "fmt"
 
+// CastTo casts Value to destination type as possible
 func CastTo(v Value, dst interface{}) error {
+	if o, has := v.(*optionalValue); has {
+		return CastTo(o.value, dst)
+	}
 	switch vv := dst.(type) {
 	case *string:
 		return castToString(v, vv)
 	case *[]byte:
 		return castToBytes(v, vv)
 	case *uint64:
-		return catToUint64(v, vv)
+		return castToUint64(v, vv)
 	case *int64:
 		return castToInt64(v, vv)
 	case *uint32:
@@ -57,9 +61,18 @@ func castToBytes(v Value, dst *[]byte) error {
 	return fmt.Errorf("cannot cast YDB type '%s' to '[]byte' destination", v.Type().String())
 }
 
-func catToUint64(v Value, dst *uint64) error {
+func castToUint64(v Value, dst *uint64) error {
 	switch vv := v.(type) {
 	case uint64Value:
+		*dst = uint64(vv)
+		return nil
+	case uint32Value:
+		*dst = uint64(vv)
+		return nil
+	case uint16Value:
+		*dst = uint64(vv)
+		return nil
+	case uint8Value:
 		*dst = uint64(vv)
 		return nil
 	default:
@@ -72,6 +85,24 @@ func castToInt64(v Value, dst *int64) error {
 	case int64Value:
 		*dst = int64(vv)
 		return nil
+	case uint32Value:
+		*dst = int64(vv)
+		return nil
+	case int32Value:
+		*dst = int64(vv)
+		return nil
+	case uint16Value:
+		*dst = int64(vv)
+		return nil
+	case int16Value:
+		*dst = int64(vv)
+		return nil
+	case uint8Value:
+		*dst = int64(vv)
+		return nil
+	case int8Value:
+		*dst = int64(vv)
+		return nil
 	default:
 		return fmt.Errorf("cannot cast YDB type '%s' to 'int64' destination", v.Type().String())
 	}
@@ -80,6 +111,12 @@ func castToInt64(v Value, dst *int64) error {
 func castToUint32(v Value, dst *uint32) error {
 	switch vv := v.(type) {
 	case uint32Value:
+		*dst = uint32(vv)
+		return nil
+	case uint16Value:
+		*dst = uint32(vv)
+		return nil
+	case uint8Value:
 		*dst = uint32(vv)
 		return nil
 	default:
@@ -92,6 +129,18 @@ func castToInt32(v Value, dst *int32) error {
 	case int32Value:
 		*dst = int32(vv)
 		return nil
+	case uint16Value:
+		*dst = int32(vv)
+		return nil
+	case int16Value:
+		*dst = int32(vv)
+		return nil
+	case uint8Value:
+		*dst = int32(vv)
+		return nil
+	case int8Value:
+		*dst = int32(vv)
+		return nil
 	default:
 		return fmt.Errorf("cannot cast YDB type '%s' to 'int32' destination", v.Type().String())
 	}
@@ -102,6 +151,9 @@ func castToUint16(v Value, dst *uint16) error {
 	case uint16Value:
 		*dst = uint16(vv)
 		return nil
+	case uint8Value:
+		*dst = uint16(vv)
+		return nil
 	default:
 		return fmt.Errorf("cannot cast YDB type '%s' to 'uint16' destination", v.Type().String())
 	}
@@ -110,6 +162,12 @@ func castToUint16(v Value, dst *uint16) error {
 func castToInt16(v Value, dst *int16) error {
 	switch vv := v.(type) {
 	case int16Value:
+		*dst = int16(vv)
+		return nil
+	case uint8Value:
+		*dst = int16(vv)
+		return nil
+	case int8Value:
 		*dst = int16(vv)
 		return nil
 	default:
@@ -138,9 +196,12 @@ func castToInt8(v Value, dst *int8) error {
 }
 
 func castToFloat64(v Value, dst *float64) error {
-	switch vvv := v.(type) {
+	switch vv := v.(type) {
+	case *floatValue:
+		*dst = float64(vv.value)
+		return nil
 	case *doubleValue:
-		*dst = vvv.value
+		*dst = vv.value
 		return nil
 	default:
 		return fmt.Errorf("cannot cast YDB type '%s' to 'float64' destination", v.Type().String())
