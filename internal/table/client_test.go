@@ -763,6 +763,9 @@ func TestSessionPoolDoublePut(t *testing.T) {
 
 func mustResetTimer(t testing.TB, ch <-chan time.Duration, exp time.Duration) {
 	t.Helper()
+
+	runtime.Gosched()
+
 	select {
 	case act := <-ch:
 		if act != exp {
@@ -771,7 +774,7 @@ func mustResetTimer(t testing.TB, ch <-chan time.Duration, exp time.Duration) {
 				act, exp,
 			)
 		}
-	case <-time.After(100 * time.Millisecond):
+	case <-time.After(200 * time.Millisecond):
 		t.Fatalf("%s: no timer reset", caller())
 	}
 }
