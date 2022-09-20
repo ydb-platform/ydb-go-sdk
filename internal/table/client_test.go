@@ -11,11 +11,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
@@ -938,4 +940,78 @@ func whenWantWaitCh(p *Client) <-chan struct{} {
 		close(ch)
 	}
 	return ch
+}
+
+func TestDeadlockOnUpdateNodes(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	nodes := make([]uint32, 0, 3)
+	balancer := testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+		testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
+			sessionID := testutil.SessionID()
+			nodeID, err := nodeID(sessionID)
+			if err != nil {
+				return nil, err
+			}
+			nodes = append(nodes, nodeID)
+			return &Ydb_Table.CreateSessionResult{
+				SessionId: sessionID,
+			}, nil
+		},
+	}))
+	c := newClientWithStubBuilder(t, balancer, 3)
+	defer func() {
+		_ = c.Close(ctx)
+	}()
+	s1, err := c.Get(ctx)
+	require.NoError(t, err)
+	s2, err := c.Get(ctx)
+	require.NoError(t, err)
+	s3, err := c.Get(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(nodes))
+	err = c.Put(ctx, s1)
+	require.NoError(t, err)
+	err = c.Put(ctx, s2)
+	require.NoError(t, err)
+	err = c.Put(ctx, s3)
+	require.NoError(t, err)
+	c.updateNodes(ctx, []endpoint.Info{})
+}
+
+func TestDeadlockOnInternalPoolGCTick(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	nodes := make([]uint32, 0, 3)
+	balancer := testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
+		testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
+			sessionID := testutil.SessionID()
+			nodeID, err := nodeID(sessionID)
+			if err != nil {
+				return nil, err
+			}
+			nodes = append(nodes, nodeID)
+			return &Ydb_Table.CreateSessionResult{
+				SessionId: sessionID,
+			}, nil
+		},
+	}))
+	c := newClientWithStubBuilder(t, balancer, 3)
+	defer func() {
+		_ = c.Close(ctx)
+	}()
+	s1, err := c.Get(ctx)
+	require.NoError(t, err)
+	s2, err := c.Get(ctx)
+	require.NoError(t, err)
+	s3, err := c.Get(ctx)
+	require.NoError(t, err)
+	require.Equal(t, 3, len(nodes))
+	err = c.Put(ctx, s1)
+	require.NoError(t, err)
+	err = c.Put(ctx, s2)
+	require.NoError(t, err)
+	err = c.Put(ctx, s3)
+	require.NoError(t, err)
+	c.internalPoolGCTick(ctx, 0)
 }
