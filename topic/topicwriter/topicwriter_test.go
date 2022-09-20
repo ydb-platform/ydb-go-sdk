@@ -19,8 +19,9 @@ func ExampleWriter_Write() {
 		log.Fatalf("failed ydb connection: %v", err)
 	}
 
-	writer, err := db.Topic().StartWriter("producer-id", "topicName",
-		topicoptions.WithWriterCompressorCount(1),
+	producerAndGroupID := "group-id"
+	writer, err := db.Topic().StartWriter(producerAndGroupID, "topicName",
+		topicoptions.WithMessageGroupID(producerAndGroupID),
 	)
 	if err != nil {
 		log.Fatalf("failed to create topic writer: %v", err)
