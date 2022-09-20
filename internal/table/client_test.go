@@ -944,7 +944,7 @@ func whenWantWaitCh(p *Client) <-chan struct{} {
 
 func TestDeadlockOnUpdateNodes(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 		nodes := make([]uint32, 0, 3)
 		balancer := testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
@@ -983,7 +983,7 @@ func TestDeadlockOnUpdateNodes(t *testing.T) {
 
 func TestDeadlockOnInternalPoolGCTick(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 		nodes := make([]uint32, 0, 3)
 		balancer := testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
