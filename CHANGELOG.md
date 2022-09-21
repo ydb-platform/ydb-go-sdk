@@ -1,3 +1,4 @@
+## v3.38.1
 * Fixed deadlock with implicit usage of `internal.table.Client.internalPoolAsyncCloseSession` 
 
 ## v3.38.0
