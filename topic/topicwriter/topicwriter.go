@@ -32,7 +32,8 @@ func NewWriter(writer *topicwriterinternal.Writer) *Writer {
 // The method will wait first initial connection even for async mode, that mean first write may be slower.
 // especially when connection has problems.
 //
-// It returns ErrQueueLimitExceed (must be checked by errors.Is) if ctx cancelled before messages put to internal buffer.
+// It returns ErrQueueLimitExceed (must be checked by errors.Is)
+// if ctx cancelled before messages put to internal buffer or try to add more messages, that can be put to queue
 //
 // # Experimental
 //

@@ -184,6 +184,14 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []Message) error
 	}
 
 	semaphoreWeight := int64(len(messages))
+	if semaphoreWeight > int64(w.cfg.MaxQueueLen) {
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"ydb: add more messages, then max queue limit. max queue: %v, try to add: %v: %w",
+			w.cfg.MaxQueueLen,
+			semaphoreWeight,
+			PublicErrQueueIsFull,
+		))
+	}
 	if err := w.semaphore.Acquire(ctx, semaphoreWeight); err != nil {
 		return xerrors.WithStackTrace(
 			fmt.Errorf("ydb: add new messages exceed max queue size limit. Add count: %v, max size: %v: %w",
