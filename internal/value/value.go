@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
@@ -15,6 +16,7 @@ import (
 type Value interface {
 	Type() Type
 	String() string
+	CastTo(dst interface{}) error
 
 	toYDB(a *allocator.Allocator) *Ydb.Value
 	toString(*bytes.Buffer)
@@ -62,7 +64,7 @@ func valueToString(buf *bytes.Buffer, t Type, v *Ydb.Value) {
 	}
 	if x, ok := primitiveGoTypeFromYDB(v); ok {
 		if x != nil {
-			fmt.Fprintf(buf, "%v", x)
+			_, _ = fmt.Fprintf(buf, "%v", x)
 		} else {
 			buf.WriteString("NULL")
 		}
@@ -351,6 +353,19 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 
 type boolValue bool
 
+func (v boolValue) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *bool:
+		*vv = bool(v)
+		return nil
+	case *string:
+		*vv = strconv.FormatBool(bool(v))
+		return nil
+	default:
+		return fmt.Errorf("cannot cast '%s' to '%T'", v.Type().String(), vv)
+	}
+}
+
 func (v boolValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
@@ -386,6 +401,31 @@ func BoolValue(v bool) boolValue {
 
 type dateValue uint32
 
+func (v dateValue) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = time.Unix(int64(v)*int64(time.Hour/time.Second)*24, 0).Format("2006-01-02")
+		return nil
+	case *[]byte:
+		*vv = []byte(time.Unix(int64(v)*int64(time.Hour/time.Second)*24, 0).Format("2006-01-02"))
+		return nil
+	case *time.Time:
+		*vv = time.Unix(int64(v)*int64(time.Hour)*24, 0)
+		return nil
+	case *uint64:
+		*vv = uint64(v)
+		return nil
+	case *int64:
+		*vv = int64(v)
+		return nil
+	case *int32:
+		*vv = int32(v)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
+}
+
 func (v dateValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
@@ -415,11 +455,37 @@ func (v dateValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
+// DateValue returns ydb date value by given days since Epoch
 func DateValue(v uint32) dateValue {
 	return dateValue(v)
 }
 
 type datetimeValue uint32
+
+func (v datetimeValue) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = time.Unix(int64(v), 0).Format("2006-01-02 15:04:05 -0700 MST")
+		return nil
+	case *[]byte:
+		*vv = []byte(time.Unix(int64(v), 0).Format("2006-01-02 15:04:05 -0700 MST"))
+		return nil
+	case *time.Time:
+		*vv = time.Unix(int64(v)*int64(time.Hour)*24, 0)
+		return nil
+	case *uint64:
+		*vv = uint64(v)
+		return nil
+	case *int64:
+		*vv = int64(v)
+		return nil
+	case *uint32:
+		*vv = uint32(v)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
+}
 
 func (v datetimeValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
@@ -449,6 +515,7 @@ func (v datetimeValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
+// DatetimeValue makes ydb datetime value from seconds since Epoch
 func DatetimeValue(v uint32) datetimeValue {
 	return datetimeValue(v)
 }
@@ -456,6 +523,10 @@ func DatetimeValue(v uint32) datetimeValue {
 type decimalValue struct {
 	value     [16]byte
 	innerType *DecimalType
+}
+
+func (v decimalValue) CastTo(dst interface{}) error {
+	return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), dst)
 }
 
 func (v decimalValue) toString(buffer *bytes.Buffer) {
@@ -512,6 +583,10 @@ type (
 	}
 )
 
+func (v *dictValue) CastTo(dst interface{}) error {
+	return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), dst)
+}
+
 func (v *dictValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
@@ -560,6 +635,22 @@ type doubleValue struct {
 	value float64
 }
 
+func (v *doubleValue) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = strconv.FormatFloat(v.value, 'f', -1, 64)
+		return nil
+	case *[]byte:
+		*vv = []byte(strconv.FormatFloat(v.value, 'f', -1, 64))
+		return nil
+	case *float64:
+		*vv = v.value
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
+}
+
 func (v *doubleValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
@@ -596,6 +687,19 @@ func DoubleValue(v float64) *doubleValue {
 
 type dyNumberValue struct {
 	value string
+}
+
+func (v dyNumberValue) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = v.value
+		return nil
+	case *[]byte:
+		*vv = []byte(v.value)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
 }
 
 func (v dyNumberValue) toString(buffer *bytes.Buffer) {
@@ -636,6 +740,25 @@ type floatValue struct {
 	value float32
 }
 
+func (v *floatValue) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = strconv.FormatFloat(float64(v.value), 'f', -1, 32)
+		return nil
+	case *[]byte:
+		*vv = []byte(strconv.FormatFloat(float64(v.value), 'f', -1, 32))
+		return nil
+	case *float64:
+		*vv = float64(v.value)
+		return nil
+	case *float32:
+		*vv = v.value
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
+}
+
 func (v *floatValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
@@ -672,6 +795,46 @@ func FloatValue(v float32) *floatValue {
 
 type int8Value int8
 
+func (v int8Value) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = strconv.FormatInt(int64(v), 10)
+		return nil
+	case *[]byte:
+		*vv = []byte(strconv.FormatInt(int64(v), 10))
+		return nil
+	case *uint64:
+		*vv = uint64(v)
+		return nil
+	case *int64:
+		*vv = int64(v)
+		return nil
+	case *uint32:
+		*vv = uint32(v)
+		return nil
+	case *int32:
+		*vv = int32(v)
+		return nil
+	case *uint16:
+		*vv = uint16(v)
+		return nil
+	case *int16:
+		*vv = int16(v)
+		return nil
+	case *int8:
+		*vv = int8(v)
+		return nil
+	case *float64:
+		*vv = float64(v)
+		return nil
+	case *float32:
+		*vv = float32(v)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
+}
+
 func (v int8Value) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
@@ -705,6 +868,40 @@ func Int8Value(v int8) int8Value {
 }
 
 type int16Value int16
+
+func (v int16Value) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = strconv.FormatInt(int64(v), 10)
+		return nil
+	case *[]byte:
+		*vv = []byte(strconv.FormatInt(int64(v), 10))
+		return nil
+	case *uint64:
+		*vv = uint64(v)
+		return nil
+	case *int64:
+		*vv = int64(v)
+		return nil
+	case *uint32:
+		*vv = uint32(v)
+		return nil
+	case *int32:
+		*vv = int32(v)
+		return nil
+	case *int16:
+		*vv = int16(v)
+		return nil
+	case *float64:
+		*vv = float64(v)
+		return nil
+	case *float32:
+		*vv = float32(v)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
+}
 
 func (v int16Value) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
@@ -740,6 +937,34 @@ func Int16Value(v int16) int16Value {
 
 type int32Value int32
 
+func (v int32Value) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = strconv.FormatInt(int64(v), 10)
+		return nil
+	case *[]byte:
+		*vv = []byte(strconv.FormatInt(int64(v), 10))
+		return nil
+	case *uint64:
+		*vv = uint64(v)
+		return nil
+	case *int64:
+		*vv = int64(v)
+		return nil
+	case *int32:
+		*vv = int32(v)
+		return nil
+	case *float64:
+		*vv = float64(v)
+		return nil
+	case *float32:
+		*vv = float32(v)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
+}
+
 func (v int32Value) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
@@ -774,6 +999,28 @@ func Int32Value(v int32) int32Value {
 
 type int64Value int64
 
+func (v int64Value) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = strconv.FormatInt(int64(v), 10)
+		return nil
+	case *[]byte:
+		*vv = []byte(strconv.FormatInt(int64(v), 10))
+		return nil
+	case *int64:
+		*vv = int64(v)
+		return nil
+	case *float64:
+		*vv = float64(v)
+		return nil
+	case *float32:
+		*vv = float32(v)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
+}
+
 func (v int64Value) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
@@ -807,6 +1054,25 @@ func Int64Value(v int64) int64Value {
 }
 
 type intervalValue int64
+
+func (v intervalValue) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = (time.Duration(v) * time.Microsecond).String()
+		return nil
+	case *[]byte:
+		*vv = []byte((time.Duration(v) * time.Microsecond).String())
+		return nil
+	case *time.Duration:
+		*vv = time.Duration(v) * time.Microsecond
+		return nil
+	case *int64:
+		*vv = int64(v)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
+}
 
 func (v intervalValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
@@ -843,6 +1109,19 @@ func IntervalValue(v int64) intervalValue {
 
 type jsonValue struct {
 	value string
+}
+
+func (v *jsonValue) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = v.value
+		return nil
+	case *[]byte:
+		*vv = []byte(v.value)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
 }
 
 func (v *jsonValue) toString(buffer *bytes.Buffer) {
@@ -883,6 +1162,19 @@ type jsonDocumentValue struct {
 	value string
 }
 
+func (v *jsonDocumentValue) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = v.value
+		return nil
+	case *[]byte:
+		*vv = []byte(v.value)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
+}
+
 func (v *jsonDocumentValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
@@ -920,6 +1212,10 @@ func JSONDocumentValue(v string) *jsonDocumentValue {
 type listValue struct {
 	t     Type
 	items []Value
+}
+
+func (v *listValue) CastTo(dst interface{}) error {
+	return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), dst)
 }
 
 func (v *listValue) toString(buffer *bytes.Buffer) {
@@ -978,6 +1274,10 @@ type nullValue struct {
 	t *optionalType
 }
 
+func (v *nullValue) CastTo(dst interface{}) error {
+	return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), dst)
+}
+
 func (v *nullValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
@@ -1025,6 +1325,10 @@ func NullValue(t Type) *nullValue {
 type optionalValue struct {
 	innerType Type
 	value     Value
+}
+
+func (v *optionalValue) CastTo(dst interface{}) error {
+	return v.value.CastTo(dst)
 }
 
 func (v *optionalValue) toString(buffer *bytes.Buffer) {
@@ -1077,6 +1381,10 @@ type (
 	}
 )
 
+func (v *structValue) CastTo(dst interface{}) error {
+	return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), dst)
+}
+
 func (v *structValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
@@ -1122,6 +1430,34 @@ func StructValue(fields ...StructValueField) *structValue {
 
 type timestampValue uint64
 
+func (v timestampValue) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = time.Unix(
+			int64(v)/int64(time.Microsecond),
+			int64(v)%int64(time.Microsecond*time.Nanosecond),
+		).Format("2006-01-02 15:04:05.999999 -0700 MST")
+		return nil
+	case *[]byte:
+		*vv = []byte(time.Unix(
+			int64(v)/int64(time.Microsecond),
+			int64(v)/int64(time.Microsecond*time.Nanosecond),
+		).Format("2006-01-02 15:04:05.999999 -0700 MST"))
+		return nil
+	case *time.Time:
+		*vv = time.Unix(
+			int64(v)/int64(time.Microsecond),
+			int64(v)%int64(time.Microsecond*time.Nanosecond),
+		)
+		return nil
+	case *uint64:
+		*vv = uint64(v)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
+}
+
 func (v timestampValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
@@ -1150,6 +1486,7 @@ func (v timestampValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
+// TimestampValue makes ydb timestamp value by given microseconds since Epoch
 func TimestampValue(v uint64) timestampValue {
 	return timestampValue(v)
 }
@@ -1157,6 +1494,10 @@ func TimestampValue(v uint64) timestampValue {
 type tupleValue struct {
 	t     Type
 	items []Value
+}
+
+func (v *tupleValue) CastTo(dst interface{}) error {
+	return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), dst)
 }
 
 func (v *tupleValue) toString(buffer *bytes.Buffer) {
@@ -1206,6 +1547,19 @@ type tzDateValue struct {
 	value string
 }
 
+func (v *tzDateValue) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = v.value
+		return nil
+	case *[]byte:
+		*vv = []byte(v.value)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
+}
+
 func (v *tzDateValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
@@ -1242,6 +1596,19 @@ func TzDateValue(v string) *tzDateValue {
 
 type tzDatetimeValue struct {
 	value string
+}
+
+func (v *tzDatetimeValue) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = v.value
+		return nil
+	case *[]byte:
+		*vv = []byte(v.value)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
 }
 
 func (v *tzDatetimeValue) toString(buffer *bytes.Buffer) {
@@ -1282,6 +1649,19 @@ type tzTimestampValue struct {
 	value string
 }
 
+func (v *tzTimestampValue) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = v.value
+		return nil
+	case *[]byte:
+		*vv = []byte(v.value)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
+}
+
 func (v *tzTimestampValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
@@ -1318,6 +1698,46 @@ func TzTimestampValue(v string) *tzTimestampValue {
 
 type uint8Value uint8
 
+func (v uint8Value) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = strconv.FormatInt(int64(v), 10)
+		return nil
+	case *[]byte:
+		*vv = []byte(strconv.FormatInt(int64(v), 10))
+		return nil
+	case *uint64:
+		*vv = uint64(v)
+		return nil
+	case *int64:
+		*vv = int64(v)
+		return nil
+	case *uint32:
+		*vv = uint32(v)
+		return nil
+	case *int32:
+		*vv = int32(v)
+		return nil
+	case *uint16:
+		*vv = uint16(v)
+		return nil
+	case *int16:
+		*vv = int16(v)
+		return nil
+	case *uint8:
+		*vv = uint8(v)
+		return nil
+	case *float64:
+		*vv = float64(v)
+		return nil
+	case *float32:
+		*vv = float32(v)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
+}
+
 func (v uint8Value) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
@@ -1351,6 +1771,34 @@ func Uint8Value(v uint8) uint8Value {
 }
 
 type uint16Value uint16
+
+func (v uint16Value) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = strconv.FormatInt(int64(v), 10)
+		return nil
+	case *[]byte:
+		*vv = []byte(strconv.FormatInt(int64(v), 10))
+		return nil
+	case *uint64:
+		*vv = uint64(v)
+		return nil
+	case *int64:
+		*vv = int64(v)
+		return nil
+	case *uint32:
+		*vv = uint32(v)
+		return nil
+	case *int32:
+		*vv = int32(v)
+		return nil
+	case *uint16:
+		*vv = uint16(v)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
+}
 
 func (v uint16Value) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
@@ -1386,6 +1834,34 @@ func Uint16Value(v uint16) uint16Value {
 
 type uint32Value uint32
 
+func (v uint32Value) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = strconv.FormatInt(int64(v), 10)
+		return nil
+	case *[]byte:
+		*vv = []byte(strconv.FormatInt(int64(v), 10))
+		return nil
+	case *uint64:
+		*vv = uint64(v)
+		return nil
+	case *int64:
+		*vv = int64(v)
+		return nil
+	case *uint32:
+		*vv = uint32(v)
+		return nil
+	case *float64:
+		*vv = float64(v)
+		return nil
+	case *float32:
+		*vv = float32(v)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
+}
+
 func (v uint32Value) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
@@ -1419,6 +1895,25 @@ func Uint32Value(v uint32) uint32Value {
 }
 
 type uint64Value uint64
+
+func (v uint64Value) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = strconv.FormatInt(int64(v), 10)
+		return nil
+	case *[]byte:
+		*vv = []byte(strconv.FormatInt(int64(v), 10))
+		return nil
+	case *uint64:
+		*vv = uint64(v)
+		return nil
+	case *float64:
+		*vv = float64(v)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
+}
 
 func (v uint64Value) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
@@ -1454,6 +1949,19 @@ func Uint64Value(v uint64) uint64Value {
 
 type utf8Value struct {
 	value string
+}
+
+func (v *utf8Value) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = v.value
+		return nil
+	case *[]byte:
+		*vv = []byte(v.value)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
 }
 
 func (v *utf8Value) toString(buffer *bytes.Buffer) {
@@ -1492,6 +2000,22 @@ func UTF8Value(v string) *utf8Value {
 
 type uuidValue struct {
 	value [16]byte
+}
+
+func (v *uuidValue) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = string(v.value[:])
+		return nil
+	case *[]byte:
+		*vv = v.value[:]
+		return nil
+	case *[16]byte:
+		*vv = v.value
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
 }
 
 func (v *uuidValue) toString(buffer *bytes.Buffer) {
@@ -1535,6 +2059,10 @@ type variantValue struct {
 	innerType Type
 	value     Value
 	idx       uint32
+}
+
+func (v *variantValue) CastTo(dst interface{}) error {
+	return v.value.CastTo(dst)
 }
 
 func (v *variantValue) toString(buffer *bytes.Buffer) {
@@ -1605,6 +2133,10 @@ func VariantValueTuple(v Value, idx uint32) *variantValue {
 
 type voidValue struct{}
 
+func (v voidValue) CastTo(dst interface{}) error {
+	return fmt.Errorf("cannot cast '%s' to '%T'", v.Type().String(), dst)
+}
+
 func (v voidValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()
 	defer a.Free()
@@ -1640,6 +2172,19 @@ func VoidValue() voidValue {
 
 type ysonValue struct {
 	value string
+}
+
+func (v *ysonValue) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = v.value
+		return nil
+	case *[]byte:
+		*vv = []byte(v.value)
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
 }
 
 func (v *ysonValue) toString(buffer *bytes.Buffer) {
@@ -1678,6 +2223,10 @@ func YSONValue(v string) *ysonValue {
 
 type zeroValue struct {
 	t Type
+}
+
+func (v *zeroValue) CastTo(dst interface{}) error {
+	return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), dst)
 }
 
 func (v *zeroValue) toString(buffer *bytes.Buffer) {
@@ -1771,6 +2320,19 @@ func ZeroValue(t Type) *zeroValue {
 }
 
 type stringValue []byte
+
+func (v stringValue) CastTo(dst interface{}) error {
+	switch vv := dst.(type) {
+	case *string:
+		*vv = string(v)
+		return nil
+	case *[]byte:
+		*vv = v
+		return nil
+	default:
+		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
+	}
+}
 
 func (v stringValue) toString(buffer *bytes.Buffer) {
 	a := allocator.New()

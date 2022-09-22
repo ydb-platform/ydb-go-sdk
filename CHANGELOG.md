@@ -1,5 +1,5 @@
 * Supported `NullValue` type as received type from `YDB`
-* Added `table.types.CastTo(from, to)` helper for cast `types.Value` to golang native type value destination
+* Added `table.types.Value.CastTo(destination)` public method for cast `types.Value` to golang native type value destination
 
 ## v3.38.3
 * Added retries to initial discovering
