@@ -66,6 +66,23 @@ func TestWriterImpl_AutoSeq(t *testing.T) {
 	})
 }
 
+func TestWriterImpl_CheckMessages(t *testing.T) {
+	t.Run("MessageSize", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		w := newWriterReconnectorStopped(newWriterReconnectorConfig())
+		w.firstConnectionHandled.Store(true)
+
+		maxSize := 5
+		w.cfg.MaxMessageSize = maxSize
+
+		err := w.Write(ctx, []Message{{Data: bytes.NewReader(make([]byte, maxSize))}})
+		require.NoError(t, err)
+
+		err = w.Write(ctx, []Message{{Data: bytes.NewReader(make([]byte, maxSize+1))}})
+		require.Error(t, err)
+	})
+}
+
 func TestWriterImpl_Write(t *testing.T) {
 	t.Run("PushToQueue", func(t *testing.T) {
 		ctx := context.Background()

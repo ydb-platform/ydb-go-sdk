@@ -37,11 +37,13 @@ var (
 	errNonZeroSeqNo                         = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))
 	errNonZeroCreatedAt                     = xerrors.Wrap(errors.New("ydb: non zero Message.CreatedAt and set auto fill created at option")) //nolint:lll
 	errNoAllowedCodecs                      = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
+	errLargeMessage                         = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))
 )
 
 type WriterReconnectorConfig struct {
 	WritersCommonConfig
 
+	MaxMessageSize               int
 	Common                       config.Common
 	AdditionalEncoders           map[rawtopiccommon.Codec]PublicCreateEncoderFunc
 	Connect                      ConnectFunc
@@ -63,6 +65,7 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		},
 		AutoSetSeqNo:       true,
 		AutoSetCreatedTime: true,
+		MaxMessageSize:     50 * 1024 * 1024,
 	}
 	if cfg.compressorCount == 0 {
 		cfg.compressorCount = 1
@@ -177,6 +180,10 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []Message) error
 		return err
 	}
 
+	if err = w.checkMessages(messagesSlice); err != nil {
+		return err
+	}
+
 	if err = w.waitFirstInitResponse(ctx); err != nil {
 		return err
 	}
@@ -204,6 +211,16 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []Message) error
 	}
 
 	return w.queue.Wait(ctx, waiter)
+}
+
+func (w *WriterReconnector) checkMessages(messages []messageWithDataContent) error {
+	for i := range messages {
+		size := messages[i].BufUncompressedSize
+		if size > w.cfg.MaxMessageSize {
+			return xerrors.WithStackTrace(fmt.Errorf("message size bytes %v: %w", size, errLargeMessage))
+		}
+	}
+	return nil
 }
 
 func (w *WriterReconnector) createMessagesWithContent(messages []Message) ([]messageWithDataContent, error) {
@@ -529,7 +546,7 @@ func createRawMessageData(
 		// pass
 	}
 
-	res.UncompressedSize = mess.bufUncompressedSize
+	res.UncompressedSize = int64(mess.BufUncompressedSize)
 	res.Data, err = mess.GetEncodedBytes(codec)
 	return res, err
 }
