@@ -30,6 +30,7 @@ const (
 	EntryRtmrVolume
 	EntryBlockStoreVolume
 	EntryCoordinationNode
+	EntryTopic
 )
 
 func (t EntryType) String() string {
@@ -50,6 +51,8 @@ func (t EntryType) String() string {
 		return "BlockStoreVolume"
 	case EntryCoordinationNode:
 		return "CoordinationNode"
+	case EntryTopic:
+		return "Topic"
 	}
 }
 
@@ -89,6 +92,10 @@ func (e *Entry) IsCoordinationNode() bool {
 	return e.Type == EntryCoordinationNode
 }
 
+func (e *Entry) IsTopic() bool {
+	return e.Type == EntryTopic
+}
+
 func (e *Entry) From(y *Ydb_Scheme.Entry) {
 	*e = Entry{
 		Name:                 y.Name,
@@ -115,6 +122,8 @@ func entryType(t Ydb_Scheme.Entry_Type) EntryType {
 		return EntryBlockStoreVolume
 	case Ydb_Scheme.Entry_COORDINATION_NODE:
 		return EntryCoordinationNode
+	case Ydb_Scheme.Entry_TOPIC:
+		return EntryTopic
 	default:
 		return EntryTypeUnknown
 	}

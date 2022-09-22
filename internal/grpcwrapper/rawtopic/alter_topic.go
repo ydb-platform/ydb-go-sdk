@@ -24,6 +24,7 @@ type AlterTopicRequest struct {
 	AddConsumers                         []Consumer
 	DropConsumers                        []string
 	AlterConsumers                       []AlterConsumer
+	SetMeteringMode                      MeteringMode
 }
 
 func (req *AlterTopicRequest) ToProto() *Ydb_Topic.AlterTopicRequest {
@@ -36,6 +37,7 @@ func (req *AlterTopicRequest) ToProto() *Ydb_Topic.AlterTopicRequest {
 		SetPartitionWriteSpeedBytesPerSecond: req.SetPartitionWriteSpeedBytesPerSecond.ToProto(),
 		SetPartitionWriteBurstBytes:          req.SetPartitionWriteBurstBytes.ToProto(),
 		AlterAttributes:                      req.AlterAttributes,
+		SetMeteringMode:                      Ydb_Topic.MeteringMode(req.SetMeteringMode),
 	}
 
 	if req.SetSupportedCodecs {

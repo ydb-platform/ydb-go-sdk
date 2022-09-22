@@ -64,6 +64,7 @@ type Description struct {
 	PartitioningSettings PartitioningSettings
 	Indexes              []IndexDescription
 	TimeToLiveSettings   *TimeToLiveSettings
+	Changefeeds          []ChangefeedDescription
 }
 
 type TableStats struct {
@@ -539,3 +540,45 @@ func timeToLiveUnit(unit Ydb_Table.ValueSinceUnixEpochModeSettings_Unit) *TimeTo
 	}
 	return &res
 }
+
+type ChangefeedDescription struct {
+	Name   string
+	Mode   ChangefeedMode
+	Format ChangefeedFormat
+	State  ChangefeedState
+}
+
+func NewChangefeedDescription(proto *Ydb_Table.ChangefeedDescription) ChangefeedDescription {
+	return ChangefeedDescription{
+		Name:   proto.GetName(),
+		Mode:   ChangefeedMode(proto.GetMode()),
+		Format: ChangefeedFormat(proto.GetFormat()),
+		State:  ChangefeedState(proto.GetState()),
+	}
+}
+
+type ChangefeedState int
+
+const (
+	ChangefeedStateUnspecified = ChangefeedState(Ydb_Table.ChangefeedDescription_STATE_UNSPECIFIED)
+	ChangefeedStateEnabled     = ChangefeedState(Ydb_Table.ChangefeedDescription_STATE_ENABLED)
+	ChangefeedStateDisabled    = ChangefeedState(Ydb_Table.ChangefeedDescription_STATE_DISABLED)
+)
+
+type ChangefeedMode int
+
+const (
+	ChangefeedModeUnspecified     = ChangefeedMode(Ydb_Table.ChangefeedMode_MODE_UNSPECIFIED)
+	ChangefeedModeKeysOnly        = ChangefeedMode(Ydb_Table.ChangefeedMode_MODE_KEYS_ONLY)
+	ChangefeedModeUpdates         = ChangefeedMode(Ydb_Table.ChangefeedMode_MODE_UPDATES)
+	ChangefeedModeNewImage        = ChangefeedMode(Ydb_Table.ChangefeedMode_MODE_NEW_IMAGE)
+	ChangefeedModeOldImage        = ChangefeedMode(Ydb_Table.ChangefeedMode_MODE_OLD_IMAGE)
+	ChangefeedModeNewAndOldImages = ChangefeedMode(Ydb_Table.ChangefeedMode_MODE_NEW_AND_OLD_IMAGES)
+)
+
+type ChangefeedFormat int
+
+const (
+	ChangefeedFormatUnspecified = ChangefeedFormat(Ydb_Table.ChangefeedFormat_FORMAT_UNSPECIFIED)
+	ChangefeedFormatJSON        = ChangefeedFormat(Ydb_Table.ChangefeedFormat_FORMAT_JSON)
+)

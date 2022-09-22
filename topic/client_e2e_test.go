@@ -6,6 +6,7 @@ package topic_test
 import (
 	"context"
 	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -20,13 +21,12 @@ import (
 )
 
 func TestClient_CreateDropTopic(t *testing.T) {
-	ctx := context.Background()
+	ctx := xtest.Context(t)
 	db := connect(t)
 	topicPath := db.Name() + "/testtopic"
 
 	_ = db.Topic().Drop(ctx, topicPath)
 	err := db.Topic().Create(ctx, topicPath,
-		[]topictypes.Codec{topictypes.CodecRaw},
 		topicoptions.CreateWithConsumer(
 			topictypes.Consumer{
 				Name: "test",
@@ -40,6 +40,115 @@ func TestClient_CreateDropTopic(t *testing.T) {
 
 	err = db.Topic().Drop(ctx, topicPath)
 	require.NoError(t, err)
+}
+
+func TestClient_Describe(t *testing.T) {
+	ctx := xtest.Context(t)
+	db := connect(t)
+	topicName := "test-topic-" + t.Name()
+
+	var (
+		supportedCodecs     = []topictypes.Codec{topictypes.CodecRaw, topictypes.CodecGzip}
+		minActivePartitions = int64(2)
+		// partitionCountLimit = int64(5) LOGBROKER-7800
+		retentionPeriod = time.Hour
+		writeSpeed      = int64(1023)
+		burstBytes      = int64(222)
+		consumers       = []topictypes.Consumer{
+			{
+				Name:            "c1",
+				Important:       false,
+				SupportedCodecs: []topictypes.Codec{topictypes.CodecRaw, topictypes.CodecGzip},
+				ReadFrom:        time.Date(2022, 9, 11, 10, 1, 2, 0, time.UTC),
+			},
+			{
+				Name:            "c2",
+				SupportedCodecs: []topictypes.Codec{},
+				ReadFrom:        time.Date(2021, 1, 2, 3, 4, 5, 0, time.UTC),
+			},
+		}
+	)
+
+	_ = db.Topic().Drop(ctx, topicName)
+	err := db.Topic().Create(ctx, topicName,
+		topicoptions.CreateWithSupportedCodecs(supportedCodecs...),
+		topicoptions.CreateWithMinActivePartitions(minActivePartitions),
+		// topicoptions.CreateWithPartitionCountLimit(partitionCountLimit), LOGBROKER-7800
+		topicoptions.CreateWithRetentionPeriod(retentionPeriod),
+		// topicoptions.CreateWithRetentionStorageMB(...) - incompatible with retention period
+		topicoptions.CreateWithPartitionWriteSpeedBytesPerSecond(writeSpeed),
+		topicoptions.CreateWithPartitionWriteBurstBytes(burstBytes),
+		topicoptions.CreateWithConsumer(consumers...),
+		// topicoptions.CreateWithMeteringMode(topictypes.MeteringModeRequestUnits), - work with serverless only
+	)
+	require.NoError(t, err)
+
+	res, err := db.Topic().Describe(ctx, topicName)
+	require.NoError(t, err)
+
+	expected := topictypes.TopicDescription{
+		Path: topicName,
+		PartitionSettings: topictypes.PartitionSettings{
+			MinActivePartitions: minActivePartitions,
+			// PartitionCountLimit: partitionCountLimit, LOGBROKER-7800
+		},
+		Partitions: []topictypes.PartitionInfo{
+			{
+				PartitionID: 0,
+				Active:      true,
+			},
+			{
+				PartitionID: 1,
+				Active:      true,
+			},
+		},
+		RetentionPeriod:                   retentionPeriod,
+		RetentionStorageMB:                0,
+		SupportedCodecs:                   supportedCodecs,
+		PartitionWriteBurstBytes:          burstBytes,
+		PartitionWriteSpeedBytesPerSecond: writeSpeed,
+		Attributes:                        nil,
+		Consumers:                         consumers,
+		MeteringMode:                      topictypes.MeteringModeUnspecified,
+	}
+
+	requireAndCleanSubset := func(checked *map[string]string, subset *map[string]string) {
+		t.Helper()
+		for k, subValue := range *subset {
+			checkedValue, ok := (*checked)[k]
+			require.True(t, ok, k)
+			require.Equal(t, subValue, checkedValue)
+		}
+		*checked = nil
+		*subset = nil
+	}
+
+	requireAndCleanSubset(&res.Attributes, &expected.Attributes)
+
+	for i := range expected.Consumers {
+		requireAndCleanSubset(&res.Consumers[i].Attributes, &expected.Consumers[i].Attributes)
+	}
+
+	require.Equal(t, expected, res)
+}
+
+func TestSchemeList(t *testing.T) {
+	ctx := xtest.Context(t)
+	db := connect(t)
+
+	topicPath := createTopic(ctx, t, db)
+	list, err := db.Scheme().ListDirectory(ctx, db.Name())
+	require.NoError(t, err)
+
+	topicName := path.Base(topicPath)
+
+	hasTopic := false
+	for _, e := range list.Children {
+		if e.IsTopic() && topicName == e.Name {
+			hasTopic = true
+		}
+	}
+	require.True(t, hasTopic)
 }
 
 func connect(t testing.TB, opts ...ydb.Option) ydb.Connection {

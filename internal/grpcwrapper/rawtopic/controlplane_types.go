@@ -38,6 +38,14 @@ func (c *Consumer) ToProto() *Ydb_Topic.Consumer {
 	}
 }
 
+type MeteringMode int
+
+const (
+	MeteringModeUnspecified      = MeteringMode(Ydb_Topic.MeteringMode_METERING_MODE_UNSPECIFIED)
+	MeteringModeReservedCapacity = MeteringMode(Ydb_Topic.MeteringMode_METERING_MODE_RESERVED_CAPACITY)
+	MeteringModeRequestUnits     = MeteringMode(Ydb_Topic.MeteringMode_METERING_MODE_REQUEST_UNITS)
+)
+
 type PartitioningSettings struct {
 	MinActivePartitions int64
 	PartitionCountLimit int64

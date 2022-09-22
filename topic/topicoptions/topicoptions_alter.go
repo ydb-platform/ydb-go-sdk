@@ -15,6 +15,17 @@ import (
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type AlterOption func(req *rawtopic.AlterTopicRequest)
 
+// AlterWithMeteringMode
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func AlterWithMeteringMode(m topictypes.MeteringMode) AlterOption {
+	return func(req *rawtopic.AlterTopicRequest) {
+		m.ToRaw(&req.SetMeteringMode)
+	}
+}
+
 // AlterWithMinActivePartitions
 //
 // # Experimental

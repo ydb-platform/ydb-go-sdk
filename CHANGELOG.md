@@ -1,4 +1,5 @@
-* Allowed write zero messages to topic writer
+* Improved control plane for topic services: Allow list topic in schema, read cdc feeds in table, retry on contol plane operations in topic client, full info in topic describe result
+* Allowed to write zero messages to topic writer
 
 ## v3.38.1
 * Fixed deadlock with implicit usage of `internal.table.Client.internalPoolAsyncCloseSession` 
