@@ -11,6 +11,8 @@ type (
 	Partitioning = topicwriterinternal.PublicPartitioning
 )
 
+var ErrQueueLimitExceed = topicwriterinternal.PublicErrQueueIsFull
+
 // Writer represent write session to topic
 // It handles connection problems, reconnect to server when need and resend buffered messages
 type Writer struct {
@@ -24,13 +26,13 @@ func NewWriter(writer *topicwriterinternal.Writer) *Writer {
 }
 
 // Write send messages to topic
-// return fast in async mode (default) and wait ack from server in sync mode.
+// return after save messages into buffer in async mode (default) and after ack from server in sync mode.
 // see topicoptions.WithSyncWrite
 //
 // The method will wait first initial connection even for async mode, that mean first write may be slower.
 // especially when connection has problems.
 //
-// ctx cancelation mean cancel of wait ack only, it will not cancel of send messages
+// It returns ErrQueueLimitExceed (must be checked by errors.Is) if ctx cancelled before messages put to internal buffer.
 //
 // # Experimental
 //

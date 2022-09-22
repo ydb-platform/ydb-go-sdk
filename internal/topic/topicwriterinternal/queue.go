@@ -28,6 +28,8 @@ const (
 )
 
 type messageQueue struct {
+	OnAckReceived func(count int)
+
 	hasNewMessages    empty.Chan
 	closedErr         error
 	acksReceivedEvent xsync.EventBroadcast
@@ -136,13 +138,21 @@ func (q *messageQueue) addMessageNeedLock(mess messageWithDataContent) (messageI
 }
 
 func (q *messageQueue) AcksReceived(acks []rawtopicwriter.WriteAck) error {
+	ackReceivedCounter := 0
 	q.m.Lock()
-	defer q.m.Unlock()
+	defer func() {
+		q.m.Unlock()
+
+		if q.OnAckReceived != nil {
+			q.OnAckReceived(ackReceivedCounter)
+		}
+	}()
 
 	for i := range acks {
 		if err := q.ackReceivedNeedLock(acks[i].SeqNo); err != nil {
 			return err
 		}
+		ackReceivedCounter++
 	}
 
 	q.acksReceivedEvent.Broadcast()

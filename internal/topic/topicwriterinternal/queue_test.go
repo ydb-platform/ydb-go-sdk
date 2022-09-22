@@ -438,6 +438,43 @@ func TestQueue_Ack(t *testing.T) {
 
 		require.Equal(t, expectedMap, q.messagesByOrder)
 	})
+
+	t.Run("OnAckReceived", func(t *testing.T) {
+		receivedCount := 0
+
+		q := newMessageQueue()
+		q.OnAckReceived = func(count int) {
+			receivedCount = count
+		}
+
+		err := q.AddMessages(newTestMessagesWithContent(1, 2, 3))
+		require.NoError(t, err)
+
+		err = q.AcksReceived([]rawtopicwriter.WriteAck{
+			{
+				SeqNo: 1,
+			},
+			{
+				SeqNo: 3,
+			},
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, 2, receivedCount)
+
+		// Double ack
+		err = q.AcksReceived([]rawtopicwriter.WriteAck{
+			{
+				SeqNo: 1,
+			},
+			{
+				SeqNo: 3,
+			},
+		})
+
+		require.Error(t, err)
+		require.Equal(t, 0, receivedCount)
+	})
 }
 
 func waitGetMessageStarted(q *messageQueue) {

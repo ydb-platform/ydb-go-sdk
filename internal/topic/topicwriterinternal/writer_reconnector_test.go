@@ -262,6 +262,50 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 	})
 }
 
+func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
+	ctx := xtest.Context(t)
+	w := newWriterReconnectorStopped(newWriterReconnectorConfig(
+		WithAutoSetSeqNo(false),
+		WithMaxQueueLen(2),
+	))
+	w.firstConnectionHandled.Store(true)
+
+	waitStartQueueWait := func() {
+		xtest.SpinWaitCondition(t, nil, func() bool {
+			if w.semaphore.TryAcquire(1) {
+				w.semaphore.Release(1)
+				return false
+			}
+			return true
+		})
+	}
+
+	err := w.Write(ctx, newTestMessages(1, 2))
+	require.NoError(t, err)
+
+	ctxNoQueueSpace, ctxNoQueueSpaceCancel := context.WithCancel(ctx)
+
+	go func() {
+		waitStartQueueWait()
+		ctxNoQueueSpaceCancel()
+	}()
+	err = w.Write(ctxNoQueueSpace, newTestMessages(3))
+	require.ErrorIs(t, err, PublicErrQueueIsFull)
+
+	go func() {
+		waitStartQueueWait()
+		ackErr := w.queue.AcksReceived([]rawtopicwriter.WriteAck{
+			{
+				SeqNo: 1,
+			},
+		})
+		require.NoError(t, ackErr)
+	}()
+
+	err = w.Write(ctx, newTestMessages(3))
+	require.NoError(t, err)
+}
+
 func TestEnv(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		env := newTestEnv(t, nil)
