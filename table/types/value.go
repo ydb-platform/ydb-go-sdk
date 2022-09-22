@@ -18,9 +18,7 @@ const (
 	tzLayoutTimestamp = "2006-01-02T15:04:05.000000,MST"
 )
 
-type Value interface {
-	value.Value
-}
+type Value = value.Value
 
 func BoolValue(v bool) Value { return value.BoolValue(v) }
 
