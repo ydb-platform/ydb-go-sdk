@@ -1,3 +1,5 @@
+* Allowed write zero messages to topic writer
+
 ## v3.38.1
 * Fixed deadlock with implicit usage of `internal.table.Client.internalPoolAsyncCloseSession` 
 

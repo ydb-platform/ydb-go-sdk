@@ -165,6 +165,12 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []Message) error
 	if err := w.background.CloseReason(); err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: writer is closed: %w", err))
 	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if len(messages) == 0 {
+		return nil
+	}
 
 	messagesSlice, err := w.createMessagesWithContent(messages)
 	if err != nil {
