@@ -143,7 +143,10 @@ func (s *EncoderSelector) selectCodec(messages []messageWithDataContent) (rawtop
 		return s.allowedCodecs[0], nil
 	}
 
-	s.batchCounter++
+	defer func() {
+		s.batchCounter++
+	}()
+
 	if s.batchCounter < 0 {
 		s.batchCounter = 0
 	}
