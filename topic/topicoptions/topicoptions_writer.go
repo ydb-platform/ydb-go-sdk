@@ -34,6 +34,26 @@ func WithWriterCompressorCount(num int) WriterOption {
 	return topicwriterinternal.WithCompressorCount(num)
 }
 
+// WithWriterMaxQueueLen set max len of queue for wait ack
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func WithWriterMaxQueueLen(num int) WriterOption {
+	return topicwriterinternal.WithMaxQueueLen(num)
+}
+
+// WithWriterMessageMaxBytesSize set max body size of one message in bytes
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func WithWriterMessageMaxBytesSize(size int) WriterOption {
+	return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
+		cfg.MaxMessageSize = size
+	}
+}
+
 // WithWriteSessionMeta set session metadata
 //
 // # Experimental

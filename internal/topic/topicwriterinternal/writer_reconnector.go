@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
@@ -37,11 +38,15 @@ var (
 	errNonZeroSeqNo                         = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))
 	errNonZeroCreatedAt                     = xerrors.Wrap(errors.New("ydb: non zero Message.CreatedAt and set auto fill created at option")) //nolint:lll
 	errNoAllowedCodecs                      = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
+	errLargeMessage                         = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))
+	PublicErrQueueIsFull                    = xerrors.Wrap(errors.New("ydb: queue is full"))
 )
 
 type WriterReconnectorConfig struct {
 	WritersCommonConfig
 
+	MaxMessageSize               int
+	MaxQueueLen                  int
 	Common                       config.Common
 	AdditionalEncoders           map[rawtopiccommon.Codec]PublicCreateEncoderFunc
 	Connect                      ConnectFunc
@@ -63,6 +68,8 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		},
 		AutoSetSeqNo:       true,
 		AutoSetCreatedTime: true,
+		MaxMessageSize:     50 * 1024 * 1024,
+		MaxQueueLen:        1000,
 	}
 	if cfg.compressorCount == 0 {
 		cfg.compressorCount = 1
@@ -85,6 +92,7 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 type WriterReconnector struct {
 	cfg WriterReconnectorConfig
 
+	semaphore                      *semaphore.Weighted
 	queue                          messageQueue
 	background                     background.Worker
 	clock                          clockwork.Clock
@@ -108,6 +116,7 @@ func newWriterReconnectorStopped(cfg WriterReconnectorConfig) *WriterReconnector
 	writerInstanceID, _ := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
 	res := &WriterReconnector{
 		cfg:                            cfg,
+		semaphore:                      semaphore.NewWeighted(int64(cfg.MaxQueueLen)),
 		queue:                          newMessageQueue(),
 		clock:                          clockwork.NewRealClock(),
 		lastSeqNo:                      -1,
@@ -115,6 +124,8 @@ func newWriterReconnectorStopped(cfg WriterReconnectorConfig) *WriterReconnector
 		encodersMap:                    NewEncoderMap(),
 		writerInstanceID:               writerInstanceID.String(),
 	}
+
+	res.queue.OnAckReceived = res.onAckReceived
 
 	for codec, creator := range cfg.AdditionalEncoders {
 		res.encodersMap.AddEncoder(codec, creator)
@@ -172,8 +183,33 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []Message) error
 		return nil
 	}
 
+	semaphoreWeight := int64(len(messages))
+	if semaphoreWeight > int64(w.cfg.MaxQueueLen) {
+		return xerrors.WithStackTrace(fmt.Errorf(
+			"ydb: add more messages, then max queue limit. max queue: %v, try to add: %v: %w",
+			w.cfg.MaxQueueLen,
+			semaphoreWeight,
+			PublicErrQueueIsFull,
+		))
+	}
+	if err := w.semaphore.Acquire(ctx, semaphoreWeight); err != nil {
+		return xerrors.WithStackTrace(
+			fmt.Errorf("ydb: add new messages exceed max queue size limit. Add count: %v, max size: %v: %w",
+				semaphoreWeight,
+				w.cfg.MaxQueueLen,
+				PublicErrQueueIsFull,
+			))
+	}
+	defer func() {
+		w.semaphore.Release(semaphoreWeight)
+	}()
+
 	messagesSlice, err := w.createMessagesWithContent(messages)
 	if err != nil {
+		return err
+	}
+
+	if err = w.checkMessages(messagesSlice); err != nil {
 		return err
 	}
 
@@ -194,6 +230,10 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []Message) error
 		} else {
 			err = w.queue.AddMessages(messagesSlice)
 		}
+		if err == nil {
+			// move semaphore weight to queue
+			semaphoreWeight = 0
+		}
 	})
 	if err != nil {
 		return err
@@ -204,6 +244,16 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []Message) error
 	}
 
 	return w.queue.Wait(ctx, waiter)
+}
+
+func (w *WriterReconnector) checkMessages(messages []messageWithDataContent) error {
+	for i := range messages {
+		size := messages[i].BufUncompressedSize
+		if size > w.cfg.MaxMessageSize {
+			return xerrors.WithStackTrace(fmt.Errorf("message size bytes %v: %w", size, errLargeMessage))
+		}
+	}
+	return nil
 }
 
 func (w *WriterReconnector) createMessagesWithContent(messages []Message) ([]messageWithDataContent, error) {
@@ -371,6 +421,10 @@ func (w *WriterReconnector) connectWithTimeout(streamLifetimeContext context.Con
 	}
 }
 
+func (w *WriterReconnector) onAckReceived(count int) {
+	w.semaphore.Release(int64(count))
+}
+
 func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 	isFirstInit := false
 	w.m.WithLock(func() {
@@ -529,7 +583,7 @@ func createRawMessageData(
 		// pass
 	}
 
-	res.UncompressedSize = mess.bufUncompressedSize
+	res.UncompressedSize = int64(mess.BufUncompressedSize)
 	res.Data, err = mess.GetEncodedBytes(codec)
 	return res, err
 }

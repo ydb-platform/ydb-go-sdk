@@ -88,6 +88,12 @@ func WithAutosetCreatedTime(enable bool) PublicWriterOption {
 	}
 }
 
+func WithMaxQueueLen(num int) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.MaxQueueLen = num
+	}
+}
+
 func WithPartitioning(partitioning PublicPartitioning) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.defaultPartitioning = partitioning.ToRaw()

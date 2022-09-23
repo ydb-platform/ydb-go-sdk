@@ -66,6 +66,23 @@ func TestWriterImpl_AutoSeq(t *testing.T) {
 	})
 }
 
+func TestWriterImpl_CheckMessages(t *testing.T) {
+	t.Run("MessageSize", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		w := newWriterReconnectorStopped(newWriterReconnectorConfig())
+		w.firstConnectionHandled.Store(true)
+
+		maxSize := 5
+		w.cfg.MaxMessageSize = maxSize
+
+		err := w.Write(ctx, []Message{{Data: bytes.NewReader(make([]byte, maxSize))}})
+		require.NoError(t, err)
+
+		err = w.Write(ctx, []Message{{Data: bytes.NewReader(make([]byte, maxSize+1))}})
+		require.Error(t, err)
+	})
+}
+
 func TestWriterImpl_Write(t *testing.T) {
 	t.Run("PushToQueue", func(t *testing.T) {
 		ctx := context.Background()
@@ -243,6 +260,50 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 		// used two different codecs
 		require.Len(t, codecs, 2)
 	})
+}
+
+func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
+	ctx := xtest.Context(t)
+	w := newWriterReconnectorStopped(newWriterReconnectorConfig(
+		WithAutoSetSeqNo(false),
+		WithMaxQueueLen(2),
+	))
+	w.firstConnectionHandled.Store(true)
+
+	waitStartQueueWait := func() {
+		xtest.SpinWaitCondition(t, nil, func() bool {
+			if w.semaphore.TryAcquire(1) {
+				w.semaphore.Release(1)
+				return false
+			}
+			return true
+		})
+	}
+
+	err := w.Write(ctx, newTestMessages(1, 2))
+	require.NoError(t, err)
+
+	ctxNoQueueSpace, ctxNoQueueSpaceCancel := context.WithCancel(ctx)
+
+	go func() {
+		waitStartQueueWait()
+		ctxNoQueueSpaceCancel()
+	}()
+	err = w.Write(ctxNoQueueSpace, newTestMessages(3))
+	require.ErrorIs(t, err, PublicErrQueueIsFull)
+
+	go func() {
+		waitStartQueueWait()
+		ackErr := w.queue.AcksReceived([]rawtopicwriter.WriteAck{
+			{
+				SeqNo: 1,
+			},
+		})
+		require.NoError(t, ackErr)
+	}()
+
+	err = w.Write(ctx, newTestMessages(3))
+	require.NoError(t, err)
 }
 
 func TestEnv(t *testing.T) {

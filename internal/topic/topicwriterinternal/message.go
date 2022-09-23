@@ -57,7 +57,7 @@ type messageWithDataContent struct {
 	hasEncodedContent   bool
 	bufCodec            rawtopiccommon.Codec
 	bufEncoded          bytes.Buffer
-	bufUncompressedSize int64
+	BufUncompressedSize int
 }
 
 func (m *messageWithDataContent) GetEncodedBytes(codec rawtopiccommon.Codec) ([]byte, error) {
@@ -107,7 +107,7 @@ func (m *messageWithDataContent) readDataToRawBuf() error {
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
-		m.bufUncompressedSize = writtenBytes
+		m.BufUncompressedSize = int(writtenBytes)
 		m.Data = nil
 	}
 	return nil
@@ -139,7 +139,7 @@ func (m *messageWithDataContent) readDataToTargetCodec(codec rawtopiccommon.Code
 			err,
 		)))
 	}
-	m.bufUncompressedSize = bytesCount
+	m.BufUncompressedSize = int(bytesCount)
 	m.Data = nil
 	return nil
 }

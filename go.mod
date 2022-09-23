@@ -8,6 +8,7 @@ require (
 	github.com/jonboulle/clockwork v0.2.2
 	github.com/stretchr/testify v1.7.1
 	github.com/ydb-platform/ydb-go-genproto v0.0.0-20220922065549-66df47a830ba
+	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
 	google.golang.org/grpc v1.47.0
 	google.golang.org/protobuf v1.28.0
 )
