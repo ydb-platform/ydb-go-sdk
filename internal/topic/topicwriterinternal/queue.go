@@ -172,14 +172,23 @@ func (q *messageQueue) ackReceivedNeedLock(seqNo int64) error {
 
 func (q *messageQueue) Close(err error) error {
 	q.m.Lock()
-	defer q.m.Unlock()
+	defer func() {
+		q.m.Unlock()
+
+		// release all
+		if q.OnAckReceived != nil {
+			q.OnAckReceived(len(q.seqNoToOrderID))
+		}
+	}()
 
 	if q.closed {
 		return xerrors.WithStackTrace(errCloseClosedMessageQueue)
 	}
+
 	q.closed = true
 	q.closedErr = err
 	close(q.closedChan)
+
 	return nil
 }
 
