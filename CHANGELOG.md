@@ -1,3 +1,4 @@
+* Fixes reconnect problem for topic client
 * Added queue limit for sent messages and split large grpc messages while send to topic service
 * Improved control plane for topic services: Allow list topic in schema, read cdc feeds in table, retry on contol plane operations in topic client, full info in topic describe result
 * Allowed to write zero messages to topic writer
