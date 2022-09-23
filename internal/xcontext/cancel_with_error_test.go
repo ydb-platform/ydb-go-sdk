@@ -43,4 +43,16 @@ func TestCancelWithError(t *testing.T) {
 		require.ErrorIs(t, ctx.Err(), errCancelWithNilError)
 		require.ErrorIs(t, ctx.Err(), context.Canceled)
 	})
+
+	t.Run("ParentReason", func(t *testing.T) {
+		ctxParent, ctxParentCancel := WithErrCancel(context.Background())
+		ctxChild, ctxChildCancel := WithErrCancel(ctxParent)
+		defer ctxChildCancel(nil)
+
+		testErr := errors.New("test")
+		ctxParentCancel(testErr)
+
+		childErr := ctxChild.Err()
+		require.ErrorIs(t, childErr, testErr)
+	})
 }
