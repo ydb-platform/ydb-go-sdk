@@ -171,12 +171,13 @@ func (q *messageQueue) ackReceivedNeedLock(seqNo int64) error {
 }
 
 func (q *messageQueue) Close(err error) error {
+	isFirstTimeClosed := false
 	q.m.Lock()
 	defer func() {
 		q.m.Unlock()
 
 		// release all
-		if q.OnAckReceived != nil {
+		if isFirstTimeClosed && q.OnAckReceived != nil {
 			q.OnAckReceived(len(q.seqNoToOrderID))
 		}
 	}()
@@ -184,6 +185,7 @@ func (q *messageQueue) Close(err error) error {
 	if q.closed {
 		return xerrors.WithStackTrace(errCloseClosedMessageQueue)
 	}
+	isFirstTimeClosed = true
 
 	q.closed = true
 	q.closedErr = err
