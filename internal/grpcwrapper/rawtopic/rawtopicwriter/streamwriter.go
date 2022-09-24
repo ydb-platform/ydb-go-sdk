@@ -92,17 +92,17 @@ func (w *StreamWriter) Send(rawMsg ClientMessage) (err error) {
 	var protoMsg Ydb_Topic.StreamWriteMessage_FromClient
 	switch v := rawMsg.(type) {
 	case *InitRequest:
-		initReqProto, err := v.toProto()
-		if err != nil {
-			return err
+		initReqProto, initErr := v.toProto()
+		if initErr != nil {
+			return initErr
 		}
 		protoMsg.ClientMessage = &Ydb_Topic.StreamWriteMessage_FromClient_InitRequest{
 			InitRequest: initReqProto,
 		}
 	case *WriteRequest:
-		writeReqProto, err := v.toProto()
-		if err != nil {
-			return err
+		writeReqProto, writeErr := v.toProto()
+		if writeErr != nil {
+			return writeErr
 		}
 		return sendWriteRequest(w.Stream.Send, writeReqProto)
 	case *UpdateTokenRequest:
