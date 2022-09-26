@@ -1,8 +1,8 @@
 * Added missing `RetentionPeriod` parameter for topic description
-* Fixes reconnect problem for topic client
+* Fixed reconnect problem for topic client
 * Added queue limit for sent messages and split large grpc messages while send to topic service
-* Improved control plane for topic services: Allow list topic in schema, read cdc feeds in table, retry on contol plane operations in topic client, full info in topic describe result
-* Allowed to write zero messages to topic writer
+* Improved control plane for topic services: allow list topic in schema, read cdc feeds in table, retry on contol plane operations in topic client, full info in topic describe result
+* Allowed writing zero messages to topic writer
 
 ## v3.38.1
 * Fixed deadlock with implicit usage of `internal.table.Client.internalPoolAsyncCloseSession` 
