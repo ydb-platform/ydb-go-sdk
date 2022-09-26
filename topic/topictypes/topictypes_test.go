@@ -12,7 +12,7 @@ import (
 )
 
 func TestTopicDescriptionFromRaw(t *testing.T) {
-	var testData = []struct {
+	testData := []struct {
 		testName            string
 		expectedDescription TopicDescription
 		rawTopicDescription *rawtopic.DescribeTopicResult
