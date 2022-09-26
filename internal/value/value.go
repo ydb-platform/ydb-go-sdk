@@ -303,7 +303,7 @@ type dateValue uint32
 func (v dateValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *time.Time:
-		*vv = time.Unix(int64(v)*int64(time.Hour)*24, 0)
+		*vv = time.Unix(int64(v)*int64(time.Hour)*24, 0).UTC()
 		return nil
 	case *uint64:
 		*vv = uint64(v)
@@ -325,7 +325,7 @@ func (v dateValue) String() string {
 	buffer.WriteString(v.Type().String())
 	buffer.WriteString("(\"")
 	buffer.WriteString(
-		time.Unix(int64(v)*int64(time.Hour/time.Second)*24, 0).Format("2006-01-02"),
+		time.Unix(int64(v)*int64(time.Hour/time.Second)*24, 0).UTC().Format("2006-01-02"),
 	)
 	buffer.WriteString("\")")
 	return buffer.String()
@@ -356,7 +356,7 @@ type datetimeValue uint32
 func (v datetimeValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *time.Time:
-		*vv = time.Unix(int64(v)*int64(time.Hour)*24, 0)
+		*vv = time.Unix(int64(v)*int64(time.Hour)*24, 0).UTC()
 		return nil
 	case *uint64:
 		*vv = uint64(v)
@@ -377,7 +377,7 @@ func (v datetimeValue) String() string {
 	defer allocator.Buffers.Put(buffer)
 	buffer.WriteString(v.Type().String())
 	buffer.WriteString("(\"")
-	buffer.WriteString(time.Unix(int64(v), 0).Format("2006-01-02 15:04:05 -0700 MST"))
+	buffer.WriteString(time.Unix(int64(v), 0).UTC().Format("2006-01-02 15:04:05 -0700 MST"))
 	buffer.WriteString("\")")
 	return buffer.String()
 }
@@ -1252,9 +1252,9 @@ func (v timestampValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *time.Time:
 		*vv = time.Unix(
-			int64(v)/int64(time.Microsecond),
-			int64(v)%int64(time.Microsecond*time.Nanosecond),
-		)
+			int64(v)*int64(time.Microsecond)/int64(time.Second),
+			int64(v)*int64(time.Microsecond)%int64(time.Nanosecond),
+		).UTC()
 		return nil
 	case *uint64:
 		*vv = uint64(v)
@@ -1270,9 +1270,9 @@ func (v timestampValue) String() string {
 	buffer.WriteString(v.Type().String())
 	buffer.WriteString("(\"")
 	buffer.WriteString(time.Unix(
-		int64(v)/int64(time.Microsecond),
-		int64(v)/int64(time.Microsecond*time.Nanosecond),
-	).Format("2006-01-02 15:04:05.999999"))
+		int64(v)*int64(time.Microsecond)/int64(time.Second),
+		int64(v)*int64(time.Microsecond)%int64(time.Nanosecond),
+	).UTC().Format("2006-01-02 15:04:05.999999"))
 	buffer.WriteString("\")")
 	return buffer.String()
 }

@@ -686,12 +686,16 @@ func TestValueToString(t *testing.T) {
 			exp: "Date(\"2022-06-17\")",
 		},
 		{
-			value: IntervalValue(42),
-			exp:   "Interval(\"42µs\")",
+			value: IntervalValueFromDuration(time.Duration(42) * time.Millisecond),
+			exp:   "Interval(\"42ms\")",
 		},
 		{
-			value: TimestampValue(42),
-			exp:   "Timestamp(\"1970-01-01 03:00:00\")",
+			value: TimestampValueFromTime(func() time.Time {
+				tt, err := time.Parse("2006-01-02 15:04:05 MST", "1997-12-14 03:09:42 +00")
+				require.NoError(t, err)
+				return tt
+			}()),
+			exp: "Timestamp(\"1997-12-14 03:09:42\")",
 		},
 		{
 			value: NullValue(TypeInt32),
