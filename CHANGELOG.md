@@ -1,3 +1,4 @@
+## v3.38.2
 * Added missing `RetentionPeriod` parameter for topic description
 * Fixed reconnect problem for topic client
 * Added queue limit for sent messages and split large grpc messages while send to topic service
