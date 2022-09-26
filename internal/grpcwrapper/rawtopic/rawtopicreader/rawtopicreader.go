@@ -31,6 +31,7 @@ func (s StreamReader) CloseSend() error {
 func (s StreamReader) Recv() (ServerMessage, error) {
 	grpcMess, err := s.Stream.Recv()
 	if err != nil {
+		err = xerrors.FromGRPCError(err)
 		return nil, err
 	}
 
@@ -97,7 +98,10 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 	}
 }
 
-func (s StreamReader) Send(msg ClientMessage) error {
+func (s StreamReader) Send(msg ClientMessage) (err error) {
+	defer func() {
+		err = xerrors.FromGRPCError(err)
+	}()
 	switch m := msg.(type) {
 	case *InitRequest:
 		grpcMess := &Ydb_Topic.StreamReadMessage_FromClient{

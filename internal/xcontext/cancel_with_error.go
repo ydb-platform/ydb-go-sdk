@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -16,15 +17,23 @@ var errCancelWithNilError = cancelError{err: xerrors.Wrap(errors.New("cancel con
 // call cancel, then ctx.Err() == nil
 type CancelErrFunc func(err error)
 
+var withErrCounter int64
+
 func WithErrCancel(ctx context.Context) (resCtx context.Context, cancel CancelErrFunc) {
-	res := &ctxError{}
+	index := atomic.AddInt64(&withErrCounter, 1)
+	res := &ctxError{
+		index:     index,
+		parentCtx: ctx,
+	}
 	res.ctx, res.ctxCancel = context.WithCancel(ctx)
 	return res, res.cancel
 }
 
 type ctxError struct {
+	parentCtx context.Context
 	ctx       context.Context
 	ctxCancel context.CancelFunc
+	index     int64 // for debug purposes
 
 	m   sync.Mutex
 	err error
@@ -47,7 +56,7 @@ func (c *ctxError) Err() error {
 
 func (c *ctxError) errUnderLock() error {
 	if c.err == nil {
-		c.err = c.ctx.Err()
+		c.err = c.parentCtx.Err()
 	}
 
 	return c.err
