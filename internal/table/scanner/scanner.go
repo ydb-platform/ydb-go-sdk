@@ -383,7 +383,7 @@ func (s *scanner) any() interface{} {
 		return s.float()
 	case value.TypeDouble:
 		return s.double()
-	case value.TypeString:
+	case value.TypeBytes:
 		return s.bytes()
 	case value.TypeUUID:
 		return s.uint128()
@@ -419,7 +419,7 @@ func (s *scanner) any() interface{} {
 			_ = s.errorf(0, "scanner.any(): %w", err)
 		}
 		return src
-	case value.TypeUTF8, value.TypeDyNumber:
+	case value.TypeText, value.TypeDyNumber:
 		return s.text()
 	case
 		value.TypeYSON,

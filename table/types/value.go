@@ -133,29 +133,29 @@ func TzTimestampValueFromTime(t time.Time) Value {
 // StringValue returns bytes value
 //
 // Deprecated: use BytesValue instead
-func StringValue(v []byte) Value { return value.StringValue(v) }
+func StringValue(v []byte) Value { return value.BytesValue(v) }
 
-func BytesValue(v []byte) Value { return value.StringValue(v) }
+func BytesValue(v []byte) Value { return value.BytesValue(v) }
 
-func BytesValueFromString(v string) Value { return value.StringValue([]byte(v)) }
+func BytesValueFromString(v string) Value { return value.BytesValue([]byte(v)) }
 
 // StringValueFromString makes String value from string
 //
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
-func StringValueFromString(v string) Value { return value.StringValue([]byte(v)) }
+func StringValueFromString(v string) Value { return value.BytesValue([]byte(v)) }
 
-func UTF8Value(v string) Value { return value.UTF8Value(v) }
+func UTF8Value(v string) Value { return value.TextValue(v) }
 
-func TextValue(v string) Value { return value.UTF8Value(v) }
+func TextValue(v string) Value { return value.TextValue(v) }
 
-func YSONValue(v string) Value { return value.YSONValue(v) }
+func YSONValue(v string) Value { return value.YSONValue([]byte(v)) }
 
 // YSONValueFromBytes makes YSON value from bytes
 //
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
-func YSONValueFromBytes(v []byte) Value { return value.YSONValue(string(v)) }
+func YSONValueFromBytes(v []byte) Value { return value.YSONValue(v) }
 
 func JSONValue(v string) Value { return value.JSONValue(v) }
 
@@ -214,19 +214,13 @@ func DecimalValueFromBigInt(v *big.Int, precision, scale uint32) Value {
 
 func TupleValue(vs ...Value) Value {
 	return value.TupleValue(func() (vv []value.Value) {
-		for _, v := range vs {
-			vv = append(vv, v)
-		}
-		return vv
+		return append(vv, vs...)
 	}()...)
 }
 
 func ListValue(vs ...Value) Value {
 	return value.ListValue(func() (vv []value.Value) {
-		for _, v := range vs {
-			vv = append(vv, v)
-		}
-		return vv
+		return append(vv, vs...)
 	}()...)
 }
 
@@ -658,14 +652,14 @@ func Nullable(t Type, v interface{}) Value {
 		case *string:
 			return NullableStringValueFromString(tt)
 		default:
-			panic(fmt.Sprintf("unsupported type conversion from %T to TypeString", tt))
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeBytes", tt))
 		}
 	case TypeUTF8:
 		switch tt := v.(type) {
 		case *string:
 			return NullableUTF8Value(tt)
 		default:
-			panic(fmt.Sprintf("unsupported type conversion from %T to TypeUTF8", tt))
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeText", tt))
 		}
 	case TypeYSON:
 		switch tt := v.(type) {

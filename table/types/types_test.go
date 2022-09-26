@@ -2,6 +2,7 @@ package types
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 )
 
@@ -201,20 +202,20 @@ func TestWriteTypeStringTo(t *testing.T) {
 			s: "Optional<TzTimestamp>",
 		},
 		{
-			t: TypeString,
-			s: "String",
+			t: TypeBytes,
+			s: "Bytes",
 		},
 		{
 			t: Optional(TypeString),
-			s: "Optional<String>",
+			s: "Optional<Bytes>",
 		},
 		{
-			t: TypeUTF8,
-			s: "Utf8",
+			t: TypeText,
+			s: "Text",
 		},
 		{
-			t: Optional(TypeUTF8),
-			s: "Optional<Utf8>",
+			t: Optional(TypeText),
+			s: "Optional<Text>",
 		},
 		{
 			t: TypeYSON,
@@ -267,19 +268,19 @@ func TestWriteTypeStringTo(t *testing.T) {
 				StructField("air_date", TypeDate),
 				StructField("remove_date", Optional(TypeTzDatetime)),
 			),
-			s: "Struct<series_id:Uint64,title:Utf8,air_date:Date,remove_date:Optional<TzDatetime>>",
+			s: "Struct<series_id:Uint64,title:Text,air_date:Date,remove_date:Optional<TzDatetime>>",
 		},
 		{
 			t: Dict(TypeUTF8, Optional(TypeTzDatetime)),
-			s: "Dict<Utf8,Optional<TzDatetime>>",
+			s: "Dict<Text,Optional<TzDatetime>>",
 		},
 		{
 			t: Tuple(TypeUTF8, List(TypeInt64), Optional(TypeTzDatetime)),
-			s: "Tuple<Utf8,List<Int64>,Optional<TzDatetime>>",
+			s: "Tuple<Text,List<Int64>,Optional<TzDatetime>>",
 		},
 		{
 			t: Variant(Tuple(TypeUTF8, List(TypeInt64), Optional(TypeTzDatetime))),
-			s: "Variant<Tuple<Utf8,List<Int64>,Optional<TzDatetime>>>",
+			s: "Variant<Tuple<Text,List<Int64>,Optional<TzDatetime>>>",
 		},
 		{
 			t: Variant(Struct(
@@ -288,14 +289,14 @@ func TestWriteTypeStringTo(t *testing.T) {
 				StructField("air_date", TypeDate),
 				StructField("remove_date", Optional(TypeTzDatetime)),
 			)),
-			s: "Variant<Struct<series_id:Uint64,title:Utf8,air_date:Date,remove_date:Optional<TzDatetime>>>",
+			s: "Variant<Struct<series_id:Uint64,title:Text,air_date:Date,remove_date:Optional<TzDatetime>>>",
 		},
 	} {
-		t.Run("", func(t *testing.T) {
+		t.Run(fmt.Sprintf("%+v", tt.t), func(t *testing.T) {
 			var buf bytes.Buffer
 			WriteTypeStringTo(&buf, tt.t)
 			if buf.String() != tt.s {
-				t.Fatalf("unexpected string representation of %+v: %s, exp: %s", tt.t, buf.String(), tt.s)
+				t.Fatalf("unexpected string representation of %+v.\n\ngot: %s\n\nexp: %s", tt.t, buf.String(), tt.s)
 			}
 		})
 	}
