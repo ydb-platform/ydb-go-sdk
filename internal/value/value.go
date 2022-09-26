@@ -1,14 +1,16 @@
 package value
 
 import (
-	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
@@ -16,10 +18,9 @@ import (
 type Value interface {
 	Type() Type
 	String() string
-	CastTo(dst interface{}) error
 
+	castTo(dst interface{}) error
 	toYDB(a *allocator.Allocator) *Ydb.Value
-	toString(*bytes.Buffer)
 }
 
 func ToYDB(v Value, a *allocator.Allocator) *Ydb.TypedValue {
@@ -29,108 +30,6 @@ func ToYDB(v Value, a *allocator.Allocator) *Ydb.TypedValue {
 	tv.Value = v.toYDB(a)
 
 	return tv
-}
-
-func valueToString(buf *bytes.Buffer, t Type, v *Ydb.Value) {
-	buf.WriteByte('(')
-	defer buf.WriteByte(')')
-	if x, ok := v.Value.(*Ydb.Value_NestedValue); ok {
-		switch x := t.(type) {
-		case *variantType:
-			var (
-				i = int(v.VariantIndex)
-				s string
-			)
-			switch x.variantType {
-			case variantTypeTuple:
-				t = x.innerType.(*TupleType).items[i]
-				s = strconv.Itoa(i)
-			case variantTypeStruct:
-				f := x.innerType.(*StructType).fields[i]
-				t = f.T
-				s = f.Name
-			}
-			buf.WriteString(s)
-			buf.WriteByte('=')
-
-		case *optionalType:
-			t = x.innerType
-
-		default:
-			panic("ydb: unknown nested types")
-		}
-		valueToString(buf, t, x.NestedValue)
-		return
-	}
-	if x, ok := primitiveGoTypeFromYDB(v); ok {
-		if x != nil {
-			_, _ = fmt.Fprintf(buf, "%v", x)
-		} else {
-			buf.WriteString("NULL")
-		}
-		return
-	}
-	if n := len(v.Items); n > 0 {
-		types := make([]Type, n)
-		switch x := t.(type) {
-		case *StructType:
-			for i, f := range x.fields {
-				types[i] = f.T
-			}
-		case *listType:
-			for i := range types {
-				types[i] = x.itemType
-			}
-		case *TupleType:
-			copy(types, x.items)
-		default:
-			panic(fmt.Sprintf("ydb: unknown iterable types: %v", x))
-		}
-		for i, item := range v.Items {
-			valueToString(buf, types[i], item)
-		}
-		return
-	}
-	if len(v.Pairs) > 0 {
-		dict := t.(*dictType)
-		for _, pair := range v.Pairs {
-			buf.WriteByte('(')
-			valueToString(buf, dict.keyType, pair.Key)
-			valueToString(buf, dict.valueType, pair.Payload)
-			buf.WriteByte(')')
-		}
-	}
-}
-
-func primitiveGoTypeFromYDB(x *Ydb.Value) (v interface{}, primitive bool) {
-	switch v := x.Value.(type) {
-	case *Ydb.Value_BoolValue:
-		return v.BoolValue, true
-	case *Ydb.Value_Int32Value:
-		return v.Int32Value, true
-	case *Ydb.Value_Uint32Value:
-		return v.Uint32Value, true
-	case *Ydb.Value_Int64Value:
-		return v.Int64Value, true
-	case *Ydb.Value_Uint64Value:
-		return v.Uint64Value, true
-	case *Ydb.Value_FloatValue:
-		return v.FloatValue, true
-	case *Ydb.Value_DoubleValue:
-		return v.DoubleValue, true
-	case *Ydb.Value_BytesValue:
-		return v.BytesValue, true
-	case *Ydb.Value_TextValue:
-		return v.TextValue, true
-	case *Ydb.Value_Low_128:
-		return BigEndianUint128(x.High_128, v.Low_128), true
-	case *Ydb.Value_NestedValue:
-		return primitiveGoTypeFromYDB(v.NestedValue)
-	case *Ydb.Value_NullFlagValue:
-		return nil, true
-	default:
-		return nil, false
-	}
 }
 
 // BigEndianUint128 builds a big-endian uint128 value.
@@ -215,11 +114,18 @@ func primitiveValueFromYDB(t PrimitiveType, v *Ydb.Value) (Value, error) {
 	case TypeDouble:
 		return DoubleValue(v.GetDoubleValue()), nil
 
-	case TypeUTF8:
-		return UTF8Value(v.GetTextValue()), nil
+	case TypeText:
+		return TextValue(v.GetTextValue()), nil
 
 	case TypeYSON:
-		return YSONValue(v.GetTextValue()), nil
+		switch vv := v.GetValue().(type) {
+		case *Ydb.Value_TextValue:
+			return YSONValue([]byte(vv.TextValue)), nil
+		case *Ydb.Value_BytesValue:
+			return YSONValue(vv.BytesValue), nil
+		default:
+			return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered YSON internal type: %T", vv))
+		}
 
 	case TypeJSON:
 		return JSONValue(v.GetTextValue()), nil
@@ -239,8 +145,8 @@ func primitiveValueFromYDB(t PrimitiveType, v *Ydb.Value) (Value, error) {
 	case TypeTzTimestamp:
 		return TzTimestampValue(v.GetTextValue()), nil
 
-	case TypeString:
-		return StringValue(v.GetBytesValue()), nil
+	case TypeBytes:
+		return BytesValue(v.GetBytesValue()), nil
 
 	case TypeUUID:
 		return UUIDValue(BigEndianUint128(v.High_128, v.GetLow_128())), nil
@@ -353,7 +259,7 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 
 type boolValue bool
 
-func (v boolValue) CastTo(dst interface{}) error {
+func (v boolValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *bool:
 		*vv = bool(v)
@@ -364,13 +270,6 @@ func (v boolValue) CastTo(dst interface{}) error {
 	default:
 		return fmt.Errorf("cannot cast '%s' to '%T'", v.Type().String(), vv)
 	}
-}
-
-func (v boolValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
 }
 
 func (v boolValue) String() string {
@@ -401,14 +300,8 @@ func BoolValue(v bool) boolValue {
 
 type dateValue uint32
 
-func (v dateValue) CastTo(dst interface{}) error {
+func (v dateValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
-	case *string:
-		*vv = time.Unix(int64(v)*int64(time.Hour/time.Second)*24, 0).Format("2006-01-02")
-		return nil
-	case *[]byte:
-		*vv = []byte(time.Unix(int64(v)*int64(time.Hour/time.Second)*24, 0).Format("2006-01-02"))
-		return nil
 	case *time.Time:
 		*vv = time.Unix(int64(v)*int64(time.Hour)*24, 0)
 		return nil
@@ -426,18 +319,16 @@ func (v dateValue) CastTo(dst interface{}) error {
 	}
 }
 
-func (v dateValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v dateValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteString("(\"")
+	buffer.WriteString(
+		time.Unix(int64(v)*int64(time.Hour/time.Second)*24, 0).Format("2006-01-02"),
+	)
+	buffer.WriteString("\")")
+	return buffer.String()
 }
 
 func (dateValue) Type() Type {
@@ -462,14 +353,8 @@ func DateValue(v uint32) dateValue {
 
 type datetimeValue uint32
 
-func (v datetimeValue) CastTo(dst interface{}) error {
+func (v datetimeValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
-	case *string:
-		*vv = time.Unix(int64(v), 0).Format("2006-01-02 15:04:05 -0700 MST")
-		return nil
-	case *[]byte:
-		*vv = []byte(time.Unix(int64(v), 0).Format("2006-01-02 15:04:05 -0700 MST"))
-		return nil
 	case *time.Time:
 		*vv = time.Unix(int64(v)*int64(time.Hour)*24, 0)
 		return nil
@@ -487,18 +372,14 @@ func (v datetimeValue) CastTo(dst interface{}) error {
 	}
 }
 
-func (v datetimeValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v datetimeValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteString("(\"")
+	buffer.WriteString(time.Unix(int64(v), 0).Format("2006-01-02 15:04:05 -0700 MST"))
+	buffer.WriteString("\")")
+	return buffer.String()
 }
 
 func (datetimeValue) Type() Type {
@@ -525,22 +406,18 @@ type decimalValue struct {
 	innerType *DecimalType
 }
 
-func (v decimalValue) CastTo(dst interface{}) error {
+func (v decimalValue) castTo(dst interface{}) error {
 	return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), dst)
 }
 
-func (v decimalValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v decimalValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteByte('(')
+	buffer.WriteString(decimal.FromBytes(v.value[:], v.innerType.Precision, v.innerType.Scale).String())
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (v decimalValue) Type() Type {
@@ -583,22 +460,29 @@ type (
 	}
 )
 
-func (v *dictValue) CastTo(dst interface{}) error {
+func (v *dictValue) castTo(dst interface{}) error {
 	return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), dst)
 }
 
-func (v *dictValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v *dictValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	if len(v.values) > 0 {
+		buffer.WriteString("Dict(")
+		for i, value := range v.values {
+			if i != 0 {
+				buffer.WriteByte(',')
+			}
+			buffer.WriteString(value.K.String())
+			buffer.WriteByte(':')
+			buffer.WriteString(value.V.String())
+		}
+		buffer.WriteByte(')')
+	} else {
+		buffer.WriteString(v.t.String())
+		buffer.WriteString("()")
+	}
+	return buffer.String()
 }
 
 func (v *dictValue) Type() Type {
@@ -635,7 +519,7 @@ type doubleValue struct {
 	value float64
 }
 
-func (v *doubleValue) CastTo(dst interface{}) error {
+func (v *doubleValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = strconv.FormatFloat(v.value, 'f', -1, 64)
@@ -651,18 +535,14 @@ func (v *doubleValue) CastTo(dst interface{}) error {
 	}
 }
 
-func (v *doubleValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v *doubleValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteByte('(')
+	buffer.WriteString(fmt.Sprintf("%v", v.value))
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (*doubleValue) Type() Type {
@@ -689,7 +569,7 @@ type dyNumberValue struct {
 	value string
 }
 
-func (v dyNumberValue) CastTo(dst interface{}) error {
+func (v dyNumberValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = v.value
@@ -702,18 +582,14 @@ func (v dyNumberValue) CastTo(dst interface{}) error {
 	}
 }
 
-func (v dyNumberValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v dyNumberValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteString("(\"")
+	buffer.WriteString(v.value)
+	buffer.WriteString("\")")
+	return buffer.String()
 }
 
 func (dyNumberValue) Type() Type {
@@ -740,7 +616,7 @@ type floatValue struct {
 	value float32
 }
 
-func (v *floatValue) CastTo(dst interface{}) error {
+func (v *floatValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = strconv.FormatFloat(float64(v.value), 'f', -1, 32)
@@ -759,18 +635,14 @@ func (v *floatValue) CastTo(dst interface{}) error {
 	}
 }
 
-func (v *floatValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v *floatValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteByte('(')
+	buffer.WriteString(fmt.Sprintf("%v", v.value))
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (*floatValue) Type() Type {
@@ -795,7 +667,7 @@ func FloatValue(v float32) *floatValue {
 
 type int8Value int8
 
-func (v int8Value) CastTo(dst interface{}) error {
+func (v int8Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = strconv.FormatInt(int64(v), 10)
@@ -803,20 +675,11 @@ func (v int8Value) CastTo(dst interface{}) error {
 	case *[]byte:
 		*vv = []byte(strconv.FormatInt(int64(v), 10))
 		return nil
-	case *uint64:
-		*vv = uint64(v)
-		return nil
 	case *int64:
 		*vv = int64(v)
 		return nil
-	case *uint32:
-		*vv = uint32(v)
-		return nil
 	case *int32:
 		*vv = int32(v)
-		return nil
-	case *uint16:
-		*vv = uint16(v)
 		return nil
 	case *int16:
 		*vv = int16(v)
@@ -835,18 +698,14 @@ func (v int8Value) CastTo(dst interface{}) error {
 	}
 }
 
-func (v int8Value) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v int8Value) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteByte('(')
+	buffer.WriteString(strconv.FormatInt(int64(v), 10))
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (int8Value) Type() Type {
@@ -869,7 +728,7 @@ func Int8Value(v int8) int8Value {
 
 type int16Value int16
 
-func (v int16Value) CastTo(dst interface{}) error {
+func (v int16Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = strconv.FormatInt(int64(v), 10)
@@ -877,14 +736,8 @@ func (v int16Value) CastTo(dst interface{}) error {
 	case *[]byte:
 		*vv = []byte(strconv.FormatInt(int64(v), 10))
 		return nil
-	case *uint64:
-		*vv = uint64(v)
-		return nil
 	case *int64:
 		*vv = int64(v)
-		return nil
-	case *uint32:
-		*vv = uint32(v)
 		return nil
 	case *int32:
 		*vv = int32(v)
@@ -903,18 +756,14 @@ func (v int16Value) CastTo(dst interface{}) error {
 	}
 }
 
-func (v int16Value) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v int16Value) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteByte('(')
+	buffer.WriteString(strconv.FormatInt(int64(v), 10))
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (int16Value) Type() Type {
@@ -937,16 +786,13 @@ func Int16Value(v int16) int16Value {
 
 type int32Value int32
 
-func (v int32Value) CastTo(dst interface{}) error {
+func (v int32Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = strconv.FormatInt(int64(v), 10)
 		return nil
 	case *[]byte:
 		*vv = []byte(strconv.FormatInt(int64(v), 10))
-		return nil
-	case *uint64:
-		*vv = uint64(v)
 		return nil
 	case *int64:
 		*vv = int64(v)
@@ -965,18 +811,14 @@ func (v int32Value) CastTo(dst interface{}) error {
 	}
 }
 
-func (v int32Value) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v int32Value) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteByte('(')
+	buffer.WriteString(strconv.FormatInt(int64(v), 10))
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (int32Value) Type() Type {
@@ -999,7 +841,7 @@ func Int32Value(v int32) int32Value {
 
 type int64Value int64
 
-func (v int64Value) CastTo(dst interface{}) error {
+func (v int64Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = strconv.FormatInt(int64(v), 10)
@@ -1013,26 +855,19 @@ func (v int64Value) CastTo(dst interface{}) error {
 	case *float64:
 		*vv = float64(v)
 		return nil
-	case *float32:
-		*vv = float32(v)
-		return nil
 	default:
 		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
 	}
 }
 
-func (v int64Value) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v int64Value) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteByte('(')
+	buffer.WriteString(strconv.FormatInt(int64(v), 10))
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (int64Value) Type() Type {
@@ -1055,14 +890,8 @@ func Int64Value(v int64) int64Value {
 
 type intervalValue int64
 
-func (v intervalValue) CastTo(dst interface{}) error {
+func (v intervalValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
-	case *string:
-		*vv = (time.Duration(v) * time.Microsecond).String()
-		return nil
-	case *[]byte:
-		*vv = []byte((time.Duration(v) * time.Microsecond).String())
-		return nil
 	case *time.Duration:
 		*vv = time.Duration(v) * time.Microsecond
 		return nil
@@ -1074,18 +903,14 @@ func (v intervalValue) CastTo(dst interface{}) error {
 	}
 }
 
-func (v intervalValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v intervalValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteString("(\"")
+	buffer.WriteString((time.Duration(v) * time.Microsecond).String())
+	buffer.WriteString("\")")
+	return buffer.String()
 }
 
 func (intervalValue) Type() Type {
@@ -1111,7 +936,7 @@ type jsonValue struct {
 	value string
 }
 
-func (v *jsonValue) CastTo(dst interface{}) error {
+func (v *jsonValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = v.value
@@ -1124,18 +949,14 @@ func (v *jsonValue) CastTo(dst interface{}) error {
 	}
 }
 
-func (v *jsonValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v *jsonValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteByte('(')
+	buffer.WriteString(v.value)
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (*jsonValue) Type() Type {
@@ -1162,7 +983,7 @@ type jsonDocumentValue struct {
 	value string
 }
 
-func (v *jsonDocumentValue) CastTo(dst interface{}) error {
+func (v *jsonDocumentValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = v.value
@@ -1175,18 +996,14 @@ func (v *jsonDocumentValue) CastTo(dst interface{}) error {
 	}
 }
 
-func (v *jsonDocumentValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v *jsonDocumentValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteByte('(')
+	buffer.WriteString(v.value)
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (*jsonDocumentValue) Type() Type {
@@ -1214,22 +1031,27 @@ type listValue struct {
 	items []Value
 }
 
-func (v *listValue) CastTo(dst interface{}) error {
+func (v *listValue) castTo(dst interface{}) error {
 	return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), dst)
 }
 
-func (v *listValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v *listValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	if len(v.items) > 0 {
+		buffer.WriteString("List(")
+		for i, item := range v.items {
+			if i != 0 {
+				buffer.WriteByte(',')
+			}
+			buffer.WriteString(item.String())
+		}
+		buffer.WriteByte(')')
+	} else {
+		buffer.WriteString(v.t.String())
+		buffer.WriteString("()")
+	}
+	return buffer.String()
 }
 
 func (v *listValue) Type() Type {
@@ -1274,22 +1096,16 @@ type nullValue struct {
 	t *optionalType
 }
 
-func (v *nullValue) CastTo(dst interface{}) error {
+func (v *nullValue) castTo(dst interface{}) error {
 	return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), dst)
 }
 
-func (v *nullValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v *nullValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteString("(NULL)")
+	return buffer.String()
 }
 
 func (v *nullValue) Type() Type {
@@ -1327,22 +1143,17 @@ type optionalValue struct {
 	value     Value
 }
 
-func (v *optionalValue) CastTo(dst interface{}) error {
-	return v.value.CastTo(dst)
-}
-
-func (v *optionalValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
+func (v *optionalValue) castTo(dst interface{}) error {
+	return v.value.castTo(dst)
 }
 
 func (v *optionalValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString("Optional<")
+	buffer.WriteString(v.value.String())
+	buffer.WriteByte('>')
+	return buffer.String()
 }
 
 func (v *optionalValue) Type() Type {
@@ -1377,26 +1188,37 @@ type (
 	}
 	structValue struct {
 		t      Type
-		values []Value
+		fields []StructValueField
 	}
 )
 
-func (v *structValue) CastTo(dst interface{}) error {
+func (v *structValue) castTo(dst interface{}) error {
 	return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), dst)
 }
 
-func (v *structValue) toString(buffer *bytes.Buffer) {
+func (v *structValue) String() string {
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
 	a := allocator.New()
 	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
-func (v *structValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	if len(v.fields) > 0 {
+		buffer.WriteString("Struct{")
+		for i, field := range v.fields {
+			if i != 0 {
+				buffer.WriteByte(',')
+			}
+			buffer.WriteByte('"')
+			buffer.WriteString(field.Name)
+			buffer.WriteByte('"')
+			buffer.WriteByte(':')
+			buffer.WriteString(field.V.String())
+		}
+		buffer.WriteByte('}')
+	} else {
+		buffer.WriteString(v.t.String())
+		buffer.WriteString("()")
+	}
+	return buffer.String()
 }
 
 func (v *structValue) Type() Type {
@@ -1406,44 +1228,28 @@ func (v *structValue) Type() Type {
 func (v structValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vvv := a.Value()
 
-	for _, vv := range v.values {
-		vvv.Items = append(vvv.Items, vv.toYDB(a))
+	for _, field := range v.fields {
+		vvv.Items = append(vvv.Items, field.V.toYDB(a))
 	}
 
 	return vvv
 }
 
 func StructValue(fields ...StructValueField) *structValue {
-	var (
-		structFields = make([]StructField, 0, len(fields))
-		values       = make([]Value, 0, len(fields))
-	)
+	structFields := make([]StructField, 0, len(fields))
 	for _, field := range fields {
 		structFields = append(structFields, StructField{field.Name, field.V.Type()})
-		values = append(values, field.V)
 	}
 	return &structValue{
 		t:      Struct(structFields...),
-		values: values,
+		fields: fields,
 	}
 }
 
 type timestampValue uint64
 
-func (v timestampValue) CastTo(dst interface{}) error {
+func (v timestampValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
-	case *string:
-		*vv = time.Unix(
-			int64(v)/int64(time.Microsecond),
-			int64(v)%int64(time.Microsecond*time.Nanosecond),
-		).Format("2006-01-02 15:04:05.999999 -0700 MST")
-		return nil
-	case *[]byte:
-		*vv = []byte(time.Unix(
-			int64(v)/int64(time.Microsecond),
-			int64(v)/int64(time.Microsecond*time.Nanosecond),
-		).Format("2006-01-02 15:04:05.999999 -0700 MST"))
-		return nil
 	case *time.Time:
 		*vv = time.Unix(
 			int64(v)/int64(time.Microsecond),
@@ -1458,18 +1264,17 @@ func (v timestampValue) CastTo(dst interface{}) error {
 	}
 }
 
-func (v timestampValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v timestampValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteString("(\"")
+	buffer.WriteString(time.Unix(
+		int64(v)/int64(time.Microsecond),
+		int64(v)/int64(time.Microsecond*time.Nanosecond),
+	).Format("2006-01-02 15:04:05.999999"))
+	buffer.WriteString("\")")
+	return buffer.String()
 }
 
 func (timestampValue) Type() Type {
@@ -1496,22 +1301,27 @@ type tupleValue struct {
 	items []Value
 }
 
-func (v *tupleValue) CastTo(dst interface{}) error {
+func (v *tupleValue) castTo(dst interface{}) error {
 	return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), dst)
 }
 
-func (v *tupleValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v *tupleValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	if len(v.items) > 0 {
+		buffer.WriteString("Tuple(")
+		for i, item := range v.items {
+			if i != 0 {
+				buffer.WriteByte(',')
+			}
+			buffer.WriteString(item.String())
+		}
+		buffer.WriteByte(')')
+	} else {
+		buffer.WriteString(v.t.String())
+		buffer.WriteString("()")
+	}
+	return buffer.String()
 }
 
 func (v *tupleValue) Type() Type {
@@ -1547,7 +1357,7 @@ type tzDateValue struct {
 	value string
 }
 
-func (v *tzDateValue) CastTo(dst interface{}) error {
+func (v *tzDateValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = v.value
@@ -1560,18 +1370,14 @@ func (v *tzDateValue) CastTo(dst interface{}) error {
 	}
 }
 
-func (v *tzDateValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v *tzDateValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteByte('(')
+	buffer.WriteString(v.value)
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (*tzDateValue) Type() Type {
@@ -1598,7 +1404,7 @@ type tzDatetimeValue struct {
 	value string
 }
 
-func (v *tzDatetimeValue) CastTo(dst interface{}) error {
+func (v *tzDatetimeValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = v.value
@@ -1611,18 +1417,14 @@ func (v *tzDatetimeValue) CastTo(dst interface{}) error {
 	}
 }
 
-func (v *tzDatetimeValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v *tzDatetimeValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteByte('(')
+	buffer.WriteString(v.value)
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (*tzDatetimeValue) Type() Type {
@@ -1649,7 +1451,7 @@ type tzTimestampValue struct {
 	value string
 }
 
-func (v *tzTimestampValue) CastTo(dst interface{}) error {
+func (v *tzTimestampValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = v.value
@@ -1662,18 +1464,14 @@ func (v *tzTimestampValue) CastTo(dst interface{}) error {
 	}
 }
 
-func (v *tzTimestampValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v *tzTimestampValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteByte('(')
+	buffer.WriteString(v.value)
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (*tzTimestampValue) Type() Type {
@@ -1698,7 +1496,7 @@ func TzTimestampValue(v string) *tzTimestampValue {
 
 type uint8Value uint8
 
-func (v uint8Value) CastTo(dst interface{}) error {
+func (v uint8Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = strconv.FormatInt(int64(v), 10)
@@ -1738,18 +1536,14 @@ func (v uint8Value) CastTo(dst interface{}) error {
 	}
 }
 
-func (v uint8Value) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v uint8Value) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteByte('(')
+	buffer.WriteString(strconv.FormatUint(uint64(v), 10))
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (uint8Value) Type() Type {
@@ -1772,7 +1566,7 @@ func Uint8Value(v uint8) uint8Value {
 
 type uint16Value uint16
 
-func (v uint16Value) CastTo(dst interface{}) error {
+func (v uint16Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = strconv.FormatInt(int64(v), 10)
@@ -1795,23 +1589,25 @@ func (v uint16Value) CastTo(dst interface{}) error {
 	case *uint16:
 		*vv = uint16(v)
 		return nil
+	case *float32:
+		*vv = float32(v)
+		return nil
+	case *float64:
+		*vv = float64(v)
+		return nil
 	default:
 		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
 	}
 }
 
-func (v uint16Value) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v uint16Value) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteByte('(')
+	buffer.WriteString(strconv.FormatUint(uint64(v), 10))
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (uint16Value) Type() Type {
@@ -1834,7 +1630,7 @@ func Uint16Value(v uint16) uint16Value {
 
 type uint32Value uint32
 
-func (v uint32Value) CastTo(dst interface{}) error {
+func (v uint32Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = strconv.FormatInt(int64(v), 10)
@@ -1854,26 +1650,19 @@ func (v uint32Value) CastTo(dst interface{}) error {
 	case *float64:
 		*vv = float64(v)
 		return nil
-	case *float32:
-		*vv = float32(v)
-		return nil
 	default:
 		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
 	}
 }
 
-func (v uint32Value) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v uint32Value) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteByte('(')
+	buffer.WriteString(strconv.FormatUint(uint64(v), 10))
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (uint32Value) Type() Type {
@@ -1896,7 +1685,7 @@ func Uint32Value(v uint32) uint32Value {
 
 type uint64Value uint64
 
-func (v uint64Value) CastTo(dst interface{}) error {
+func (v uint64Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = strconv.FormatInt(int64(v), 10)
@@ -1907,26 +1696,19 @@ func (v uint64Value) CastTo(dst interface{}) error {
 	case *uint64:
 		*vv = uint64(v)
 		return nil
-	case *float64:
-		*vv = float64(v)
-		return nil
 	default:
 		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
 	}
 }
 
-func (v uint64Value) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v uint64Value) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteByte('(')
+	buffer.WriteString(strconv.FormatUint(uint64(v), 10))
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (uint64Value) Type() Type {
@@ -1947,11 +1729,11 @@ func Uint64Value(v uint64) uint64Value {
 	return uint64Value(v)
 }
 
-type utf8Value struct {
+type textValue struct {
 	value string
 }
 
-func (v *utf8Value) CastTo(dst interface{}) error {
+func (v *textValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = v.value
@@ -1964,25 +1746,21 @@ func (v *utf8Value) CastTo(dst interface{}) error {
 	}
 }
 
-func (v *utf8Value) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
+func (v *textValue) String() string {
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteString("(\"")
+	buffer.WriteString(v.value)
+	buffer.WriteString("\")")
+	return buffer.String()
 }
 
-func (v *utf8Value) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+func (*textValue) Type() Type {
+	return TypeText
 }
 
-func (*utf8Value) Type() Type {
-	return TypeUTF8
-}
-
-func (v *utf8Value) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v *textValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Text()
 	if v != nil {
 		vv.TextValue = v.value
@@ -1994,15 +1772,15 @@ func (v *utf8Value) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func UTF8Value(v string) *utf8Value {
-	return &utf8Value{value: v}
+func TextValue(v string) *textValue {
+	return &textValue{value: v}
 }
 
 type uuidValue struct {
 	value [16]byte
 }
 
-func (v *uuidValue) CastTo(dst interface{}) error {
+func (v *uuidValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = string(v.value[:])
@@ -2018,18 +1796,14 @@ func (v *uuidValue) CastTo(dst interface{}) error {
 	}
 }
 
-func (v *uuidValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v *uuidValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteString("(\"")
+	buffer.WriteString(hex.EncodeToString(v.value[:]))
+	buffer.WriteString("\")")
+	return buffer.String()
 }
 
 func (*uuidValue) Type() Type {
@@ -2061,22 +1835,20 @@ type variantValue struct {
 	idx       uint32
 }
 
-func (v *variantValue) CastTo(dst interface{}) error {
-	return v.value.CastTo(dst)
-}
-
-func (v *variantValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
+func (v *variantValue) castTo(dst interface{}) error {
+	return v.value.castTo(dst)
 }
 
 func (v *variantValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteByte('(')
+	buffer.WriteString(strconv.FormatUint(uint64(v.idx), 10))
+	buffer.WriteByte(':')
+	buffer.WriteString(v.value.String())
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (v *variantValue) Type() Type {
@@ -2133,22 +1905,15 @@ func VariantValueTuple(v Value, idx uint32) *variantValue {
 
 type voidValue struct{}
 
-func (v voidValue) CastTo(dst interface{}) error {
+func (v voidValue) castTo(dst interface{}) error {
 	return fmt.Errorf("cannot cast '%s' to '%T'", v.Type().String(), dst)
 }
 
-func (v voidValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v voidValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	return buffer.String()
 }
 
 var (
@@ -2171,34 +1936,30 @@ func VoidValue() voidValue {
 }
 
 type ysonValue struct {
-	value string
+	value []byte
 }
 
-func (v *ysonValue) CastTo(dst interface{}) error {
+func (v *ysonValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
-		*vv = v.value
+		*vv = string(v.value)
 		return nil
 	case *[]byte:
-		*vv = []byte(v.value)
+		*vv = v.value
 		return nil
 	default:
 		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
 	}
 }
 
-func (v *ysonValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
-
 func (v *ysonValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteByte('(')
+	buffer.Write(v.value)
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (*ysonValue) Type() Type {
@@ -2206,9 +1967,9 @@ func (*ysonValue) Type() Type {
 }
 
 func (v *ysonValue) toYDB(a *allocator.Allocator) *Ydb.Value {
-	vv := a.Text()
+	vv := a.Bytes()
 	if v != nil {
-		vv.TextValue = v.value
+		vv.BytesValue = v.value
 	}
 
 	vvv := a.Value()
@@ -2217,111 +1978,134 @@ func (v *ysonValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func YSONValue(v string) *ysonValue {
+func YSONValue(v []byte) *ysonValue {
 	return &ysonValue{value: v}
 }
 
-type zeroValue struct {
-	t Type
-}
+func zeroPrimitiveValue(t PrimitiveType) Value {
+	switch t {
+	case TypeBool:
+		return BoolValue(false)
 
-func (v *zeroValue) CastTo(dst interface{}) error {
-	return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), dst)
-}
+	case TypeInt8:
+		return Int8Value(0)
 
-func (v *zeroValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
-}
+	case TypeUint8:
+		return Uint8Value(0)
 
-func (v *zeroValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
-}
+	case TypeInt16:
+		return Int16Value(0)
 
-func (v *zeroValue) Type() Type {
-	return v.t
-}
+	case TypeUint16:
+		return Uint16Value(0)
 
-func (v *zeroValue) toYDB(a *allocator.Allocator) *Ydb.Value {
-	vv := a.Value()
-	switch t := v.t.(type) {
-	case PrimitiveType:
-		switch t {
-		case TypeBool:
-			vv.Value = a.Bool()
+	case TypeInt32:
+		return Int32Value(0)
 
-		case TypeInt8, TypeInt16, TypeInt32:
-			vv.Value = a.Int32()
+	case TypeUint32:
+		return Uint32Value(0)
 
-		case
-			TypeUint8, TypeUint16, TypeUint32,
-			TypeDate, TypeDatetime:
+	case TypeInt64:
+		return Int64Value(0)
 
-			vv.Value = a.Uint32()
+	case TypeUint64:
+		return Uint64Value(0)
 
-		case TypeInt64, TypeInterval:
+	case TypeFloat:
+		return FloatValue(0)
 
-			vv.Value = a.Int64()
+	case TypeDouble:
+		return DoubleValue(0)
 
-		case TypeUint64, TypeTimestamp:
+	case TypeDate:
+		return DateValue(0)
 
-			vv.Value = a.Uint64()
+	case TypeDatetime:
+		return DatetimeValue(0)
 
-		case TypeFloat:
-			vv.Value = a.Float()
+	case TypeTimestamp:
+		return TimestampValue(0)
 
-		case TypeDouble:
-			vv.Value = a.Double()
+	case TypeInterval:
+		return IntervalValue(0)
 
-		case
-			TypeUTF8, TypeYSON, TypeJSON, TypeJSONDocument, TypeDyNumber,
-			TypeTzDate, TypeTzDatetime, TypeTzTimestamp:
+	case TypeText:
+		return TextValue("")
 
-			vv.Value = a.Text()
+	case TypeYSON:
+		return YSONValue([]byte(""))
 
-		case TypeString:
-			vv.Value = a.Bytes()
+	case TypeJSON:
+		return JSONValue("")
 
-		case TypeUUID:
-			vv.Value = a.Low128()
+	case TypeJSONDocument:
+		return JSONDocumentValue("")
 
-		default:
-			panic("uncovered primitive types")
-		}
+	case TypeDyNumber:
+		return DyNumberValue("")
 
-	case *optionalType, *voidType:
-		vv.Value = a.NullFlag()
+	case TypeTzDate:
+		return TzDateValue("")
 
-	case *listType, *TupleType, *StructType, *dictType:
-		// Nothing to do.
+	case TypeTzDatetime:
+		return TzDatetimeValue("")
 
-	case *DecimalType:
-		vv.Value = a.Low128()
+	case TypeTzTimestamp:
+		return TzTimestampValue("")
 
-	case *variantType:
-		panic("do not know what to do with variant types for zero value")
+	case TypeBytes:
+		return BytesValue([]byte{})
+
+	case TypeUUID:
+		return UUIDValue([16]byte{})
 
 	default:
-		panic("uncovered types")
-	}
-
-	return vv
-}
-
-func ZeroValue(t Type) *zeroValue {
-	return &zeroValue{
-		t: t,
+		panic(fmt.Sprintf("uncovered primitive type '%T'", t))
 	}
 }
 
-type stringValue []byte
+func ZeroValue(t Type) Value {
+	switch t := t.(type) {
+	case PrimitiveType:
+		return zeroPrimitiveValue(t)
 
-func (v stringValue) CastTo(dst interface{}) error {
+	case *optionalType:
+		return NullValue(t.innerType)
+
+	case *voidType:
+		return VoidValue()
+
+	case *listType:
+		return &listValue{
+			t: t,
+		}
+	case *TupleType:
+		return &tupleValue{
+			t: t,
+		}
+	case *StructType:
+		return &structValue{
+			t: t,
+		}
+	case *dictType:
+		return &dictValue{
+			t: t,
+		}
+
+	case *DecimalType:
+		return DecimalValue([16]byte{}, 22, 9)
+
+	case *variantType:
+		return VariantValue(ZeroValue(t.innerType), 0, t.innerType)
+
+	default:
+		panic(fmt.Sprintf("uncovered type '%T'", t))
+	}
+}
+
+type bytesValue []byte
+
+func (v bytesValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
 		*vv = string(v)
@@ -2334,25 +2118,27 @@ func (v stringValue) CastTo(dst interface{}) error {
 	}
 }
 
-func (v stringValue) toString(buffer *bytes.Buffer) {
-	a := allocator.New()
-	defer a.Free()
-	v.Type().toString(buffer)
-	valueToString(buffer, v.Type(), v.toYDB(a))
+func (v bytesValue) String() string {
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(v.Type().String())
+	buffer.WriteByte('(')
+	for i, b := range []byte(v) {
+		if i != 0 {
+			buffer.WriteByte(',')
+		}
+		buffer.WriteString("0x")
+		buffer.WriteString(strings.ToUpper(strconv.FormatUint(uint64(b), 16)))
+	}
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
-func (v stringValue) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+func (bytesValue) Type() Type {
+	return TypeBytes
 }
 
-func (stringValue) Type() Type {
-	return TypeString
-}
-
-func (v stringValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v bytesValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Bytes()
 
 	vv.BytesValue = v
@@ -2363,6 +2149,6 @@ func (v stringValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func StringValue(v []byte) stringValue {
-	return stringValue(v)
+func BytesValue(v []byte) bytesValue {
+	return v
 }

@@ -13,7 +13,7 @@ import (
 func TestUnwrapOptionalValue(t *testing.T) {
 	a := allocator.New()
 	defer a.Free()
-	v := value.OptionalValue(value.OptionalValue(value.UTF8Value("a")))
+	v := value.OptionalValue(value.OptionalValue(value.TextValue("a")))
 	val := unwrapTypedValue(value.ToYDB(v, a))
 	typeID := val.Type.GetTypeId()
 	if typeID != Ydb.Type_UTF8 {
@@ -29,7 +29,7 @@ func TestUnwrapOptionalValue(t *testing.T) {
 func TestUnwrapPrimitiveValue(t *testing.T) {
 	a := allocator.New()
 	defer a.Free()
-	v := value.UTF8Value("a")
+	v := value.TextValue("a")
 	val := unwrapTypedValue(value.ToYDB(v, a))
 	typeID := val.Type.GetTypeId()
 	if typeID != Ydb.Type_UTF8 {
@@ -45,7 +45,7 @@ func TestUnwrapPrimitiveValue(t *testing.T) {
 func TestUnwrapNullValue(t *testing.T) {
 	a := allocator.New()
 	defer a.Free()
-	v := value.NullValue(value.TypeUTF8)
+	v := value.NullValue(value.TypeText)
 	val := unwrapTypedValue(value.ToYDB(v, a))
 	typeID := val.Type.GetTypeId()
 	if typeID != Ydb.Type_UTF8 {
