@@ -67,7 +67,7 @@ func TestGenerateDeclareSection(t *testing.T) {
 			params: table.NewQueryParameters(
 				table.ValueParam("$a", types.BoolValue(true)),
 				table.ValueParam("$b", types.Int64Value(123)),
-				table.ValueParam("$c", types.OptionalValue(types.UTF8Value("test"))),
+				table.ValueParam("$c", types.OptionalValue(types.TextValue("test"))),
 			),
 			declare: `
 				DECLARE $a AS Bool;
@@ -79,7 +79,7 @@ func TestGenerateDeclareSection(t *testing.T) {
 			params: table.NewQueryParameters(
 				table.ValueParam("$a", types.BoolValue(true)),
 				table.ValueParam("b", types.Int64Value(123)),
-				table.ValueParam("c", types.OptionalValue(types.UTF8Value("test"))),
+				table.ValueParam("c", types.OptionalValue(types.TextValue("test"))),
 			),
 			declare: `
 				DECLARE $a AS Bool;
