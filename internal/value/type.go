@@ -3,6 +3,7 @@ package value
 import (
 	"bytes"
 	"fmt"
+
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
@@ -692,10 +693,6 @@ func Variant(t Type) *variantType {
 
 type voidType struct{}
 
-func (v voidType) toString(buffer *bytes.Buffer) {
-	buffer.WriteString(v.String())
-}
-
 func (v voidType) String() string {
 	return "Void"
 }
@@ -718,10 +715,6 @@ func Void() voidType {
 }
 
 type nullType struct{}
-
-func (v nullType) toString(buffer *bytes.Buffer) {
-	buffer.WriteString(v.String())
-}
 
 func (v nullType) String() string {
 	return "Null"
