@@ -88,7 +88,7 @@ func TestGenerateDeclareSection_ParameterOption(t *testing.T) {
 			declare: `
 				DECLARE $a AS Bool;
 				DECLARE $b AS Int64; 
-				DECLARE $c AS Optional<Utf8>;
+				DECLARE $c AS Optional<Text>;
 			`,
 		},
 		{
@@ -109,7 +109,7 @@ func TestGenerateDeclareSection_ParameterOption(t *testing.T) {
 			declare: `
 				DECLARE $a AS Bool;
 				DECLARE $b AS Int64; 
-				DECLARE $c AS Optional<Utf8>;
+				DECLARE $c AS Optional<Text>;
 			`,
 		},
 	} {
@@ -207,7 +207,7 @@ func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 			declare: `
 				DECLARE $a AS Bool;
 				DECLARE $b AS Int64; 
-				DECLARE $c AS Optional<Utf8>;
+				DECLARE $c AS Optional<Text>;
 			`,
 		},
 		{
@@ -228,7 +228,7 @@ func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 			declare: `
 				DECLARE $a AS Bool;
 				DECLARE $b AS Int64; 
-				DECLARE $c AS Optional<Utf8>;
+				DECLARE $c AS Optional<Text>;
 			`,
 		},
 
@@ -257,7 +257,7 @@ func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 			declare: `
 				DECLARE $a AS Bool;
 				DECLARE $b AS Int64; 
-				DECLARE $c AS Optional<Utf8>;
+				DECLARE $c AS Optional<Text>;
 			`,
 		},
 		{
@@ -269,7 +269,7 @@ func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 			declare: `
 				DECLARE $a AS Optional<Bool>;
 				DECLARE $b AS Optional<Int64>; 
-				DECLARE $c AS Optional<Utf8>;
+				DECLARE $c AS Optional<Text>;
 			`,
 		},
 	} {
