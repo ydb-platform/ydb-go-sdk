@@ -7,7 +7,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -538,7 +537,7 @@ func PrepareScannerPerformanceTest(count int) *scanner {
 				},
 			}, {
 				Value: &Ydb.Value_Uint32Value{
-					Uint32Value: timeutil.MarshalDatetime(time.Now()) + uint32(i),
+					Uint32Value: uint32(i),
 				},
 			}},
 		})

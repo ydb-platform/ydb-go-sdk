@@ -1119,15 +1119,15 @@ var (
 		
 		DECLARE $seriesData AS List<Struct<
 			series_id: Uint64,
-			title: Utf8,
-			series_info: Utf8,
+			title: Text,
+			series_info: Text,
 			release_date: Date,
-			comment: Optional<Utf8>>>;
+			comment: Optional<Text>>>;
 		
 		DECLARE $seasonsData AS List<Struct<
 			series_id: Uint64,
 			season_id: Uint64,
-			title: Utf8,
+			title: Text,
 			first_aired: Date,
 			last_aired: Date>>;
 		
@@ -1135,7 +1135,7 @@ var (
 			series_id: Uint64,
 			season_id: Uint64,
 			episode_id: Uint64,
-			title: Utf8,
+			title: Text,
 			air_date: Date>>;
 		
 		REPLACE INTO series

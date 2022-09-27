@@ -303,7 +303,7 @@ type dateValue uint32
 func (v dateValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *time.Time:
-		*vv = time.Unix(int64(v)*int64(time.Hour)*24, 0).UTC()
+		*vv = DateToTime(uint32(v))
 		return nil
 	case *uint64:
 		*vv = uint64(v)
@@ -324,9 +324,7 @@ func (v dateValue) String() string {
 	defer allocator.Buffers.Put(buffer)
 	buffer.WriteString(v.Type().String())
 	buffer.WriteString("(\"")
-	buffer.WriteString(
-		time.Unix(int64(v)*int64(time.Hour/time.Second)*24, 0).UTC().Format("2006-01-02"),
-	)
+	buffer.WriteString(DateToTime(uint32(v)).Format(LayoutDate))
 	buffer.WriteString("\")")
 	return buffer.String()
 }
@@ -351,12 +349,16 @@ func DateValue(v uint32) dateValue {
 	return dateValue(v)
 }
 
+func DateValueFromTime(t time.Time) dateValue {
+	return dateValue(uint64(t.Sub(unix)/time.Second) / secondsPerDay)
+}
+
 type datetimeValue uint32
 
 func (v datetimeValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *time.Time:
-		*vv = time.Unix(int64(v)*int64(time.Hour)*24, 0).UTC()
+		*vv = DatetimeToTime(uint32(v))
 		return nil
 	case *uint64:
 		*vv = uint64(v)
@@ -377,7 +379,7 @@ func (v datetimeValue) String() string {
 	defer allocator.Buffers.Put(buffer)
 	buffer.WriteString(v.Type().String())
 	buffer.WriteString("(\"")
-	buffer.WriteString(time.Unix(int64(v), 0).UTC().Format("2006-01-02 15:04:05 -0700 MST"))
+	buffer.WriteString(DatetimeToTime(uint32(v)).Format(LayoutDatetime))
 	buffer.WriteString("\")")
 	return buffer.String()
 }
@@ -399,6 +401,10 @@ func (v datetimeValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 // DatetimeValue makes ydb datetime value from seconds since Epoch
 func DatetimeValue(v uint32) datetimeValue {
 	return datetimeValue(v)
+}
+
+func DatetimeValueFromTime(t time.Time) Value {
+	return datetimeValue(uint64(t.Sub(unix) / time.Second))
 }
 
 type decimalValue struct {
@@ -893,7 +899,7 @@ type intervalValue int64
 func (v intervalValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *time.Duration:
-		*vv = time.Duration(v) * time.Microsecond
+		*vv = IntervalToDuration(int64(v))
 		return nil
 	case *int64:
 		*vv = int64(v)
@@ -908,7 +914,7 @@ func (v intervalValue) String() string {
 	defer allocator.Buffers.Put(buffer)
 	buffer.WriteString(v.Type().String())
 	buffer.WriteString("(\"")
-	buffer.WriteString((time.Duration(v) * time.Microsecond).String())
+	buffer.WriteString(IntervalToDuration(int64(v)).String())
 	buffer.WriteString("\")")
 	return buffer.String()
 }
@@ -930,6 +936,10 @@ func (v intervalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 // IntervalValue makes Value from given microseconds value
 func IntervalValue(v int64) intervalValue {
 	return intervalValue(v)
+}
+
+func IntervalValueFromDuration(v time.Duration) Value {
+	return intervalValue(durationToMicroseconds(v))
 }
 
 type jsonValue struct {
@@ -1251,10 +1261,7 @@ type timestampValue uint64
 func (v timestampValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *time.Time:
-		*vv = time.Unix(
-			int64(v)*int64(time.Microsecond)/int64(time.Second),
-			int64(v)*int64(time.Microsecond)%int64(time.Nanosecond),
-		).UTC()
+		*vv = TimestampToTime(uint64(v))
 		return nil
 	case *uint64:
 		*vv = uint64(v)
@@ -1269,10 +1276,7 @@ func (v timestampValue) String() string {
 	defer allocator.Buffers.Put(buffer)
 	buffer.WriteString(v.Type().String())
 	buffer.WriteString("(\"")
-	buffer.WriteString(time.Unix(
-		int64(v)*int64(time.Microsecond)/int64(time.Second),
-		int64(v)*int64(time.Microsecond)%int64(time.Nanosecond),
-	).UTC().Format("2006-01-02 15:04:05.999999"))
+	buffer.WriteString(TimestampToTime(uint64(v)).Format(LayoutTimestamp))
 	buffer.WriteString("\")")
 	return buffer.String()
 }
@@ -1294,6 +1298,10 @@ func (v timestampValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 // TimestampValue makes ydb timestamp value by given microseconds since Epoch
 func TimestampValue(v uint64) timestampValue {
 	return timestampValue(v)
+}
+
+func TimestampValueFromTime(t time.Time) Value {
+	return timestampValue(t.Sub(unix) / time.Microsecond)
 }
 
 type tupleValue struct {
@@ -1400,6 +1408,10 @@ func TzDateValue(v string) *tzDateValue {
 	return &tzDateValue{value: v}
 }
 
+func TzDateValueFromTime(t time.Time) Value {
+	return &tzDateValue{value: t.Format(LayoutTzDate)}
+}
+
 type tzDatetimeValue struct {
 	value string
 }
@@ -1447,6 +1459,10 @@ func TzDatetimeValue(v string) *tzDatetimeValue {
 	return &tzDatetimeValue{value: v}
 }
 
+func TzDatetimeValueFromTime(t time.Time) *tzDatetimeValue {
+	return &tzDatetimeValue{value: t.Format(LayoutTzDatetime)}
+}
+
 type tzTimestampValue struct {
 	value string
 }
@@ -1492,6 +1508,10 @@ func (v *tzTimestampValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 
 func TzTimestampValue(v string) *tzTimestampValue {
 	return &tzTimestampValue{value: v}
+}
+
+func TzTimestampValueFromTime(t time.Time) *tzTimestampValue {
+	return &tzTimestampValue{value: t.Format(LayoutTzTimestamp)}
 }
 
 type uint8Value uint8
