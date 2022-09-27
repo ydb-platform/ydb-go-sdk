@@ -6,16 +6,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-)
-
-var unix = time.Unix(0, 0)
-
-const (
-	tzLayoutDate      = "2006-01-02,MST"
-	tzLayoutDatetime  = "2006-01-02T15:04:05,MST"
-	tzLayoutTimestamp = "2006-01-02T15:04:05.000000,MST"
 )
 
 type Value = value.Value
@@ -73,9 +64,7 @@ func TzTimestampValue(v string) Value { return value.TzTimestampValue(v) }
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
 func DateValueFromTime(t time.Time) Value {
-	d := t.Sub(unix)
-	d /= (time.Hour * 24)
-	return value.DateValue(uint32(d))
+	return value.DateValueFromTime(t)
 }
 
 // DatetimeValueFromTime makes Datetime value from time.Time
@@ -83,9 +72,7 @@ func DateValueFromTime(t time.Time) Value {
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
 func DatetimeValueFromTime(t time.Time) Value {
-	d := t.Sub(unix)
-	d /= time.Second
-	return value.DatetimeValue(uint32(d))
+	return value.DatetimeValueFromTime(t)
 }
 
 // TimestampValueFromTime makes Timestamp value from time.Time
@@ -93,9 +80,7 @@ func DatetimeValueFromTime(t time.Time) Value {
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
 func TimestampValueFromTime(t time.Time) Value {
-	d := t.Sub(unix)
-	d /= time.Microsecond
-	return value.TimestampValue(uint64(d))
+	return value.TimestampValueFromTime(t)
 }
 
 // IntervalValueFromDuration makes Interval value from time.Duration
@@ -103,7 +88,7 @@ func TimestampValueFromTime(t time.Time) Value {
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
 func IntervalValueFromDuration(v time.Duration) Value {
-	return value.IntervalValue(timeutil.DurationToMicroseconds(v))
+	return value.IntervalValueFromDuration(v)
 }
 
 // TzDateValueFromTime makes TzDate value from time.Time
@@ -111,7 +96,7 @@ func IntervalValueFromDuration(v time.Duration) Value {
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
 func TzDateValueFromTime(t time.Time) Value {
-	return value.TzDateValue(t.Format(tzLayoutDate))
+	return value.TzDateValueFromTime(t)
 }
 
 // TzDatetimeValueFromTime makes TzDatetime value from time.Time
@@ -119,7 +104,7 @@ func TzDateValueFromTime(t time.Time) Value {
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
 func TzDatetimeValueFromTime(t time.Time) Value {
-	return value.TzDatetimeValue(t.Format(tzLayoutDatetime))
+	return value.TzDatetimeValueFromTime(t)
 }
 
 // TzTimestampValueFromTime makes TzTimestamp value from time.Time
@@ -127,7 +112,7 @@ func TzDatetimeValueFromTime(t time.Time) Value {
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
 func TzTimestampValueFromTime(t time.Time) Value {
-	return value.TzTimestampValue(t.Format(tzLayoutTimestamp))
+	return value.TzTimestampValueFromTime(t)
 }
 
 // StringValue returns bytes value

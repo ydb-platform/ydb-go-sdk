@@ -13,7 +13,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -390,31 +389,31 @@ func (s *scanner) any() interface{} {
 	case value.TypeUint32:
 		return s.uint32()
 	case value.TypeDate:
-		return timeutil.UnmarshalDate(s.uint32())
+		return value.DateToTime(s.uint32())
 	case value.TypeDatetime:
-		return timeutil.UnmarshalDatetime(s.uint32())
+		return value.DatetimeToTime(s.uint32())
 	case value.TypeUint64:
 		return s.uint64()
 	case value.TypeTimestamp:
-		return timeutil.UnmarshalTimestamp(s.uint64())
+		return value.TimestampToTime(s.uint64())
 	case value.TypeInt64:
 		return s.int64()
 	case value.TypeInterval:
-		return timeutil.MicrosecondsToDuration(s.int64())
+		return value.IntervalToDuration(s.int64())
 	case value.TypeTzDate:
-		src, err := timeutil.UnmarshalTzDate(s.text())
+		src, err := value.TzDateToTime(s.text())
 		if err != nil {
 			_ = s.errorf(0, "scanner.any(): %w", err)
 		}
 		return src
 	case value.TypeTzDatetime:
-		src, err := timeutil.UnmarshalTzDatetime(s.text())
+		src, err := value.TzDatetimeToTime(s.text())
 		if err != nil {
 			_ = s.errorf(0, "scanner.any(): %w", err)
 		}
 		return src
 	case value.TypeTzTimestamp:
-		src, err := timeutil.UnmarshalTzTimestamp(s.text())
+		src, err := value.TzTimestampToTime(s.text())
 		if err != nil {
 			_ = s.errorf(0, "scanner.any(): %w", err)
 		}
@@ -646,25 +645,25 @@ func (s *scanner) null() {
 func (s *scanner) setTime(dst *time.Time) {
 	switch t := s.stack.current().t.GetTypeId(); t {
 	case Ydb.Type_DATE:
-		*dst = timeutil.UnmarshalDate(s.uint32())
+		*dst = value.DateToTime(s.uint32())
 	case Ydb.Type_DATETIME:
-		*dst = timeutil.UnmarshalDatetime(s.uint32())
+		*dst = value.DatetimeToTime(s.uint32())
 	case Ydb.Type_TIMESTAMP:
-		*dst = timeutil.UnmarshalTimestamp(s.uint64())
+		*dst = value.TimestampToTime(s.uint64())
 	case Ydb.Type_TZ_DATE:
-		src, err := timeutil.UnmarshalTzDate(s.text())
+		src, err := value.TzDateToTime(s.text())
 		if err != nil {
 			_ = s.errorf(0, "scanner.setTime(): %w", err)
 		}
 		*dst = src
 	case Ydb.Type_TZ_DATETIME:
-		src, err := timeutil.UnmarshalTzDatetime(s.text())
+		src, err := value.TzDatetimeToTime(s.text())
 		if err != nil {
 			_ = s.errorf(0, "scanner.setTime(): %w", err)
 		}
 		*dst = src
 	case Ydb.Type_TZ_TIMESTAMP:
-		src, err := timeutil.UnmarshalTzTimestamp(s.text())
+		src, err := value.TzTimestampToTime(s.text())
 		if err != nil {
 			_ = s.errorf(0, "scanner.setTime(): %w", err)
 		}
@@ -741,8 +740,8 @@ func (s *scanner) trySetByteArray(v interface{}, optional bool, def bool) bool {
 }
 
 //nolint:gocyclo
-func (s *scanner) scanRequired(value interface{}) {
-	switch v := value.(type) {
+func (s *scanner) scanRequired(v interface{}) {
+	switch v := v.(type) {
 	case *bool:
 		*v = s.bool()
 	case *int8:
@@ -772,7 +771,7 @@ func (s *scanner) scanRequired(value interface{}) {
 	case *time.Time:
 		s.setTime(v)
 	case *time.Duration:
-		*v = timeutil.MicrosecondsToDuration(s.int64())
+		*v = value.IntervalToDuration(s.int64())
 	case *string:
 		s.setString(v)
 	case *[]byte:
@@ -817,17 +816,17 @@ func (s *scanner) scanRequired(value interface{}) {
 }
 
 //nolint:gocyclo
-func (s *scanner) scanOptional(value interface{}, defaultValueForOptional bool) {
+func (s *scanner) scanOptional(v interface{}, defaultValueForOptional bool) {
 	if defaultValueForOptional {
 		if s.isNull() {
-			s.setDefaultValue(value)
+			s.setDefaultValue(v)
 		} else {
 			s.unwrap()
-			s.scanRequired(value)
+			s.scanRequired(v)
 		}
 		return
 	}
-	switch v := value.(type) {
+	switch v := v.(type) {
 	case **bool:
 		if s.isNull() {
 			*v = nil
@@ -932,7 +931,7 @@ func (s *scanner) scanOptional(value interface{}, defaultValueForOptional bool) 
 		if s.isNull() {
 			*v = nil
 		} else {
-			src := timeutil.MicrosecondsToDuration(s.int64())
+			src := value.IntervalToDuration(s.int64())
 			*v = &src
 		}
 	case **string:

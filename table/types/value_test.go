@@ -691,11 +691,11 @@ func TestValueToString(t *testing.T) {
 		},
 		{
 			value: TimestampValueFromTime(func() time.Time {
-				tt, err := time.Parse("2006-01-02 15:04:05 MST", "1997-12-14 03:09:42 +00")
+				tt, err := time.Parse(value.LayoutTimestamp, "1997-12-14 03:09:42.123456")
 				require.NoError(t, err)
 				return tt
 			}()),
-			exp: "Timestamp(\"1997-12-14 03:09:42\")",
+			exp: "Timestamp(\"1997-12-14 03:09:42.123456\")",
 		},
 		{
 			value: NullValue(TypeInt32),

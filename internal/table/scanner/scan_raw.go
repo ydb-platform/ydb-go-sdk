@@ -10,7 +10,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -158,22 +157,22 @@ func (s *rawConverter) Double() (v float64) {
 
 func (s *rawConverter) Date() (v time.Time) {
 	s.unwrap()
-	return timeutil.UnmarshalDate(s.uint32())
+	return value.DateToTime(s.uint32())
 }
 
 func (s *rawConverter) Datetime() (v time.Time) {
 	s.unwrap()
-	return timeutil.UnmarshalDatetime(s.uint32())
+	return value.DatetimeToTime(s.uint32())
 }
 
 func (s *rawConverter) Timestamp() (v time.Time) {
 	s.unwrap()
-	return timeutil.UnmarshalTimestamp(s.uint64())
+	return value.TimestampToTime(s.uint64())
 }
 
 func (s *rawConverter) Interval() (v time.Duration) {
 	s.unwrap()
-	return timeutil.MicrosecondsToDuration(s.int64())
+	return value.IntervalToDuration(s.int64())
 }
 
 func (s *rawConverter) TzDate() (v time.Time) {
@@ -181,7 +180,7 @@ func (s *rawConverter) TzDate() (v time.Time) {
 	if s.isNull() {
 		return
 	}
-	src, err := timeutil.UnmarshalTzDate(s.text())
+	src, err := value.TzDateToTime(s.text())
 	if err != nil {
 		_ = s.errorf(0, "rawConverter.TzDate(): %w", err)
 	}
@@ -193,7 +192,7 @@ func (s *rawConverter) TzDatetime() (v time.Time) {
 	if s.isNull() {
 		return
 	}
-	src, err := timeutil.UnmarshalTzDatetime(s.text())
+	src, err := value.TzDatetimeToTime(s.text())
 	if err != nil {
 		_ = s.errorf(0, "rawConverter.TzDatetime(): %w", err)
 	}
@@ -205,7 +204,7 @@ func (s *rawConverter) TzTimestamp() (v time.Time) {
 	if s.isNull() {
 		return
 	}
-	src, err := timeutil.UnmarshalTzTimestamp(s.text())
+	src, err := value.TzTimestampToTime(s.text())
 	if err != nil {
 		_ = s.errorf(0, "rawConverter.TzTimestamp(): %w", err)
 	}

@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
@@ -195,7 +195,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 				Uint32Value: v,
 			},
 		}
-		src := timeutil.UnmarshalDate(v)
+		src := value.DateToTime(v)
 		if c.scanner {
 			s := dateScanner(src)
 			return ydbval, &s
@@ -212,7 +212,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 				Uint32Value: v,
 			},
 		}
-		src := timeutil.UnmarshalDatetime(v)
+		src := value.DatetimeToTime(v)
 		if c.optional && !c.testDefault {
 			vp := &src
 			return ydbval, &vp
@@ -225,7 +225,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 				Uint64Value: v,
 			},
 		}
-		src := timeutil.UnmarshalTimestamp(v)
+		src := value.TimestampToTime(v)
 		if c.optional && !c.testDefault {
 			vp := &src
 			return ydbval, &vp
@@ -250,21 +250,20 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 				Int64Value: v,
 			},
 		}
-		src := timeutil.MicrosecondsToDuration(v)
+		src := value.IntervalToDuration(v)
 		if c.optional && !c.testDefault {
 			vp := &src
 			return ydbval, &vp
 		}
 		return ydbval, &src
 	case Ydb.Type_TZ_DATE:
-		rv %= (time.Now().Unix() / 24 / 60 / 60)
-		v := timeutil.MarshalTzDate(timeutil.UnmarshalDate(uint32(rv)))
+		v := time.Now().Format(value.LayoutTzDate)
 		ydbval := &Ydb.Value{
 			Value: &Ydb.Value_TextValue{
 				TextValue: v,
 			},
 		}
-		src, _ := timeutil.UnmarshalTzDate(v)
+		src, _ := value.TzDateToTime(v)
 		if c.optional && !c.testDefault {
 			vp := &src
 			return ydbval, &vp
@@ -283,13 +282,13 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 			return ydbval, &dv
 		}
 		rv %= time.Now().Unix()
-		v := timeutil.MarshalTzDatetime(timeutil.UnmarshalDatetime(uint32(rv)))
+		v := value.DatetimeToTime(uint32(rv)).Format(value.LayoutTzDatetime)
 		ydbval := &Ydb.Value{
 			Value: &Ydb.Value_TextValue{
 				TextValue: v,
 			},
 		}
-		src, _ := timeutil.UnmarshalTzDatetime(v)
+		src, _ := value.TzDatetimeToTime(v)
 		if c.optional && !c.testDefault {
 			vp := &src
 			return ydbval, &vp
@@ -297,13 +296,13 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 		return ydbval, &src
 	case Ydb.Type_TZ_TIMESTAMP:
 		rv %= time.Now().Unix()
-		v := timeutil.MarshalTzTimestamp(timeutil.UnmarshalTimestamp(uint64(rv)))
+		v := value.TimestampToTime(uint64(rv)).Format(value.LayoutTzTimestamp)
 		ydbval := &Ydb.Value{
 			Value: &Ydb.Value_TextValue{
 				TextValue: v,
 			},
 		}
-		src, _ := timeutil.UnmarshalTzTimestamp(v)
+		src, _ := value.TzTimestampToTime(v)
 		if c.optional && !c.testDefault {
 			vp := &src
 			return ydbval, &vp

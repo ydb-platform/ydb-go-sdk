@@ -20,8 +20,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -83,7 +83,7 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		cfg.connectTimeout = cfg.Common.OperationTimeout()
 	}
 	if cfg.connectTimeout == 0 {
-		cfg.connectTimeout = timeutil.InfiniteDuration
+		cfg.connectTimeout = value.InfiniteDuration
 	}
 
 	return cfg
