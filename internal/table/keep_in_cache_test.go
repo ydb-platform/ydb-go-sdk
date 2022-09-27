@@ -29,7 +29,7 @@ func TestQueryCachePolicyKeepInCache(t *testing.T) {
 		},
 		{
 			name:                    "not empty params, no options",
-			params:                  table.NewQueryParameters(table.ValueParam("a", types.UTF8Value("b"))),
+			params:                  table.NewQueryParameters(table.ValueParam("a", types.TextValue("b"))),
 			executeDataQueryOptions: nil,
 			keepInCache:             true,
 		},
@@ -43,7 +43,7 @@ func TestQueryCachePolicyKeepInCache(t *testing.T) {
 		},
 		{
 			name:   "not empty params, with server cache",
-			params: table.NewQueryParameters(table.ValueParam("a", types.UTF8Value("b"))),
+			params: table.NewQueryParameters(table.ValueParam("a", types.TextValue("b"))),
 			executeDataQueryOptions: []options.ExecuteDataQueryOption{
 				options.WithKeepInCache(true),
 			},
@@ -59,7 +59,7 @@ func TestQueryCachePolicyKeepInCache(t *testing.T) {
 		},
 		{
 			name:   "not empty params, no server cache",
-			params: table.NewQueryParameters(table.ValueParam("a", types.UTF8Value("b"))),
+			params: table.NewQueryParameters(table.ValueParam("a", types.TextValue("b"))),
 			executeDataQueryOptions: []options.ExecuteDataQueryOption{
 				options.WithKeepInCache(false),
 			},

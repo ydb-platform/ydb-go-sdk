@@ -151,8 +151,8 @@ func TestFloat(t *testing.T) {
 }
 
 func TestUTF8(t *testing.T) {
-	l := UTF8Value("abc")
-	r := UTF8Value("abx")
+	l := TextValue("abc")
+	r := TextValue("abx")
 	c, err := Compare(l, r)
 	requireNoError(t, err)
 	requireEqualValues(t, -1, c)
@@ -167,8 +167,8 @@ func TestUTF8(t *testing.T) {
 }
 
 func TestOptionalUTF8(t *testing.T) {
-	l := OptionalValue(OptionalValue(UTF8Value("abc")))
-	r := UTF8Value("abx")
+	l := OptionalValue(OptionalValue(TextValue("abc")))
+	r := TextValue("abx")
 	c, err := Compare(l, r)
 	requireNoError(t, err)
 	requireEqualValues(t, -1, c)
@@ -199,8 +199,8 @@ func TestString(t *testing.T) {
 }
 
 func TestNull(t *testing.T) {
-	l := NullValue(TypeUTF8)
-	r := UTF8Value("abc")
+	l := NullValue(TypeText)
+	r := TextValue("abc")
 
 	c, err := Compare(l, r)
 	requireNoError(t, err)
@@ -216,10 +216,10 @@ func TestNull(t *testing.T) {
 }
 
 func TestTuple(t *testing.T) {
-	withNull := TupleValue(Uint64Value(1), NullValue(TypeUTF8))
-	least := TupleValue(Uint64Value(1), UTF8Value("abc"))
-	medium := TupleValue(Uint64Value(1), UTF8Value("def"))
-	largest := TupleValue(Uint64Value(2), UTF8Value("abc"))
+	withNull := TupleValue(Uint64Value(1), NullValue(TypeText))
+	least := TupleValue(Uint64Value(1), TextValue("abc"))
+	medium := TupleValue(Uint64Value(1), TextValue("def"))
+	largest := TupleValue(Uint64Value(2), TextValue("abc"))
 
 	c, err := Compare(least, medium)
 	requireNoError(t, err)
@@ -310,7 +310,7 @@ func TestIncompatiblePrimitives(t *testing.T) {
 }
 
 func TestIncompatibleTuples(t *testing.T) {
-	l := TupleValue(Uint64Value(1), UTF8Value("abc"))
+	l := TupleValue(Uint64Value(1), TextValue("abc"))
 	r := TupleValue(Uint64Value(1), StringValue([]byte("abc")))
 	_, err := Compare(l, r)
 	if err == nil {
@@ -321,8 +321,8 @@ func TestIncompatibleTuples(t *testing.T) {
 }
 
 func TestTupleOfDifferentLength(t *testing.T) {
-	l := TupleValue(Uint64Value(1), UTF8Value("abc"))
-	r := TupleValue(Uint64Value(1), UTF8Value("abc"), UTF8Value("def"))
+	l := TupleValue(Uint64Value(1), TextValue("abc"))
+	r := TupleValue(Uint64Value(1), TextValue("abc"), TextValue("def"))
 
 	cmp, err := Compare(l, r)
 	requireNoError(t, err)
@@ -334,8 +334,8 @@ func TestTupleOfDifferentLength(t *testing.T) {
 }
 
 func TestTupleInTuple(t *testing.T) {
-	l := TupleValue(Uint64Value(1), TupleValue(UTF8Value("abc"), StringValue([]byte("xyz"))))
-	r := TupleValue(Uint64Value(1), TupleValue(UTF8Value("def"), StringValue([]byte("xyz"))))
+	l := TupleValue(Uint64Value(1), TupleValue(TextValue("abc"), StringValue([]byte("xyz"))))
+	r := TupleValue(Uint64Value(1), TupleValue(TextValue("def"), StringValue([]byte("xyz"))))
 
 	cmp, err := Compare(l, r)
 	requireNoError(t, err)
@@ -351,8 +351,8 @@ func TestTupleInTuple(t *testing.T) {
 }
 
 func TestListInList(t *testing.T) {
-	l := ListValue(ListValue(UTF8Value("abc"), UTF8Value("def")), ListValue(UTF8Value("uvw"), UTF8Value("xyz")))
-	r := ListValue(ListValue(UTF8Value("abc"), UTF8Value("deg")), ListValue(UTF8Value("uvw"), UTF8Value("xyz")))
+	l := ListValue(ListValue(TextValue("abc"), TextValue("def")), ListValue(TextValue("uvw"), TextValue("xyz")))
+	r := ListValue(ListValue(TextValue("abc"), TextValue("deg")), ListValue(TextValue("uvw"), TextValue("xyz")))
 
 	cmp, err := Compare(l, r)
 	requireNoError(t, err)

@@ -1,7 +1,6 @@
 package types
 
 import (
-	"bytes"
 	"fmt"
 	"testing"
 )
@@ -19,12 +18,12 @@ func TestEqual(t *testing.T) {
 		},
 		{
 			TypeBool,
-			TypeUTF8,
+			TypeText,
 			false,
 		},
 		{
-			TypeUTF8,
-			TypeUTF8,
+			TypeText,
+			TypeText,
 			true,
 		},
 		{
@@ -34,12 +33,12 @@ func TestEqual(t *testing.T) {
 		},
 		{
 			Optional(TypeBool),
-			Optional(TypeUTF8),
+			Optional(TypeText),
 			false,
 		},
 		{
-			Optional(TypeUTF8),
-			Optional(TypeUTF8),
+			Optional(TypeText),
+			Optional(TypeText),
 			true,
 		},
 	}
@@ -52,7 +51,7 @@ func TestEqual(t *testing.T) {
 	}
 }
 
-func TestWriteTypeStringTo(t *testing.T) {
+func TestWriteTypeBytesTo(t *testing.T) {
 	for _, tt := range []struct {
 		t Type
 		s string
@@ -206,7 +205,7 @@ func TestWriteTypeStringTo(t *testing.T) {
 			s: "Bytes",
 		},
 		{
-			t: Optional(TypeString),
+			t: Optional(TypeBytes),
 			s: "Optional<Bytes>",
 		},
 		{
@@ -264,28 +263,28 @@ func TestWriteTypeStringTo(t *testing.T) {
 		{
 			t: Struct(
 				StructField("series_id", TypeUint64),
-				StructField("title", TypeUTF8),
+				StructField("title", TypeText),
 				StructField("air_date", TypeDate),
 				StructField("remove_date", Optional(TypeTzDatetime)),
 			),
 			s: "Struct<series_id:Uint64,title:Text,air_date:Date,remove_date:Optional<TzDatetime>>",
 		},
 		{
-			t: Dict(TypeUTF8, Optional(TypeTzDatetime)),
+			t: Dict(TypeText, Optional(TypeTzDatetime)),
 			s: "Dict<Text,Optional<TzDatetime>>",
 		},
 		{
-			t: Tuple(TypeUTF8, List(TypeInt64), Optional(TypeTzDatetime)),
+			t: Tuple(TypeText, List(TypeInt64), Optional(TypeTzDatetime)),
 			s: "Tuple<Text,List<Int64>,Optional<TzDatetime>>",
 		},
 		{
-			t: Variant(Tuple(TypeUTF8, List(TypeInt64), Optional(TypeTzDatetime))),
+			t: Variant(Tuple(TypeText, List(TypeInt64), Optional(TypeTzDatetime))),
 			s: "Variant<Tuple<Text,List<Int64>,Optional<TzDatetime>>>",
 		},
 		{
 			t: Variant(Struct(
 				StructField("series_id", TypeUint64),
-				StructField("title", TypeUTF8),
+				StructField("title", TypeText),
 				StructField("air_date", TypeDate),
 				StructField("remove_date", Optional(TypeTzDatetime)),
 			)),
@@ -293,10 +292,8 @@ func TestWriteTypeStringTo(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%+v", tt.t), func(t *testing.T) {
-			var buf bytes.Buffer
-			WriteTypeStringTo(&buf, tt.t)
-			if buf.String() != tt.s {
-				t.Fatalf("unexpected string representation of %+v.\n\ngot: %s\n\nexp: %s", tt.t, buf.String(), tt.s)
+			if tt.t.String() != tt.s {
+				t.Fatalf("unexpected string representation of %+v.\n\ngot: %s\n\nexp: %s", tt.t, tt.t.String(), tt.s)
 			}
 		})
 	}

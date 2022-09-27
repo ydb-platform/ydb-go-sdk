@@ -1,7 +1,6 @@
 package types
 
 import (
-	"bytes"
 	"io"
 	"time"
 
@@ -110,10 +109,6 @@ const (
 	TypeJSONDocument = value.TypeJSONDocument
 	TypeDyNumber     = value.TypeDyNumber
 )
-
-func WriteTypeStringTo(buf *bytes.Buffer, t Type) {
-	value.WriteTypeStringTo(buf, t)
-}
 
 // RawValue scanning non-primitive yql types or for own implementation scanner native API
 type RawValue interface {

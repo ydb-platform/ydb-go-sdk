@@ -1,7 +1,6 @@
 package value
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -14,10 +13,6 @@ type Type interface {
 
 	toYDB(a *allocator.Allocator) *Ydb.Type
 	equalsTo(rhs Type) bool
-}
-
-func WriteTypeStringTo(buf *bytes.Buffer, t Type) {
-	buf.WriteString(t.String())
 }
 
 func TypeToYDB(t Type, a *allocator.Allocator) *Ydb.Type {

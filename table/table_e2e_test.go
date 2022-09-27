@@ -960,15 +960,15 @@ func executeScanQuery(ctx context.Context, t testing.TB, c table.Client, folderA
 func seriesData(id uint64, released time.Time, title, info, comment string) types.Value {
 	var commentv types.Value
 	if comment == "" {
-		commentv = types.NullValue(types.TypeUTF8)
+		commentv = types.NullValue(types.TypeText)
 	} else {
-		commentv = types.OptionalValue(types.UTF8Value(comment))
+		commentv = types.OptionalValue(types.TextValue(comment))
 	}
 	return types.StructValue(
 		types.StructFieldValue("series_id", types.Uint64Value(id)),
 		types.StructFieldValue("release_date", types.DateValueFromTime(released)),
-		types.StructFieldValue("title", types.UTF8Value(title)),
-		types.StructFieldValue("series_info", types.UTF8Value(info)),
+		types.StructFieldValue("title", types.TextValue(title)),
+		types.StructFieldValue("series_info", types.TextValue(info)),
 		types.StructFieldValue("comment", commentv),
 	)
 }
@@ -977,7 +977,7 @@ func seasonData(seriesID, seasonID uint64, title string, first, last time.Time) 
 	return types.StructValue(
 		types.StructFieldValue("series_id", types.Uint64Value(seriesID)),
 		types.StructFieldValue("season_id", types.Uint64Value(seasonID)),
-		types.StructFieldValue("title", types.UTF8Value(title)),
+		types.StructFieldValue("title", types.TextValue(title)),
 		types.StructFieldValue("first_aired", types.DateValueFromTime(first)),
 		types.StructFieldValue("last_aired", types.DateValueFromTime(last)),
 	)
@@ -988,7 +988,7 @@ func episodeData(seriesID, seasonID, episodeID uint64, title string, date time.T
 		types.StructFieldValue("series_id", types.Uint64Value(seriesID)),
 		types.StructFieldValue("season_id", types.Uint64Value(seasonID)),
 		types.StructFieldValue("episode_id", types.Uint64Value(episodeID)),
-		types.StructFieldValue("title", types.UTF8Value(title)),
+		types.StructFieldValue("title", types.TextValue(title)),
 		types.StructFieldValue("air_date", types.DateValueFromTime(date)),
 	)
 }
@@ -1268,10 +1268,10 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 			}
 			return s.CreateTable(ctx, path.Join(folder, "series"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
-				options.WithColumn("title", types.Optional(types.TypeUTF8)),
-				options.WithColumn("series_info", types.Optional(types.TypeUTF8)),
+				options.WithColumn("title", types.Optional(types.TypeText)),
+				options.WithColumn("series_info", types.Optional(types.TypeText)),
 				options.WithColumn("release_date", types.Optional(types.TypeDate)),
-				options.WithColumn("comment", types.Optional(types.TypeUTF8)),
+				options.WithColumn("comment", types.Optional(types.TypeText)),
 				options.WithPrimaryKeyColumn("series_id"),
 			)
 		},
@@ -1290,7 +1290,7 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 			return s.CreateTable(ctx, path.Join(folder, "seasons"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("season_id", types.Optional(types.TypeUint64)),
-				options.WithColumn("title", types.Optional(types.TypeUTF8)),
+				options.WithColumn("title", types.Optional(types.TypeText)),
 				options.WithColumn("first_aired", types.Optional(types.TypeDate)),
 				options.WithColumn("last_aired", types.Optional(types.TypeDate)),
 				options.WithPrimaryKeyColumn("series_id", "season_id"),
@@ -1311,7 +1311,7 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("season_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("episode_id", types.Optional(types.TypeUint64)),
-				options.WithColumn("title", types.Optional(types.TypeUTF8)),
+				options.WithColumn("title", types.Optional(types.TypeText)),
 				options.WithColumn("air_date", types.Optional(types.TypeDate)),
 				options.WithColumn("views", types.Optional(types.TypeUint64)),
 				options.WithPrimaryKeyColumn("series_id", "season_id", "episode_id"),
