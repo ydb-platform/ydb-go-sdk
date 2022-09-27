@@ -482,7 +482,7 @@ func TestCreateTableRegression(t *testing.T) {
 			options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 			options.WithColumn("season_id", types.Optional(types.TypeUint64)),
 			options.WithColumn("episode_id", types.Optional(types.TypeUint64)),
-			options.WithColumn("title", types.Optional(types.TypeUTF8)),
+			options.WithColumn("title", types.Optional(types.TypeText)),
 			options.WithColumn("air_date", types.Optional(types.TypeUint64)),
 			options.WithPrimaryKeyColumn("series_id", "season_id", "episode_id"),
 			options.WithAttribute("attr", "attr_value"),
@@ -597,7 +597,7 @@ func TestDescribeTableRegression(t *testing.T) {
 			},
 			{
 				Name: "title",
-				Type: types.Optional(types.TypeUTF8),
+				Type: types.Optional(types.TypeText),
 			},
 			{
 				Name: "air_date",

@@ -82,7 +82,7 @@ func TestGenerateDeclareSection_ParameterOption(t *testing.T) {
 				),
 				table.ValueParam(
 					"$c",
-					types.OptionalValue(types.UTF8Value("test")),
+					types.OptionalValue(types.TextValue("test")),
 				),
 			},
 			declare: `
@@ -103,7 +103,7 @@ func TestGenerateDeclareSection_ParameterOption(t *testing.T) {
 				),
 				table.ValueParam(
 					"c",
-					types.OptionalValue(types.UTF8Value("test")),
+					types.OptionalValue(types.TextValue("test")),
 				),
 			},
 			declare: `
@@ -201,7 +201,7 @@ func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 				),
 				sql.Named(
 					"c",
-					types.OptionalValue(types.UTF8Value("test")),
+					types.OptionalValue(types.TextValue("test")),
 				),
 			},
 			declare: `
@@ -222,7 +222,7 @@ func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 				),
 				sql.Named(
 					"c",
-					types.OptionalValue(types.UTF8Value("test")),
+					types.OptionalValue(types.TextValue("test")),
 				),
 			},
 			declare: `

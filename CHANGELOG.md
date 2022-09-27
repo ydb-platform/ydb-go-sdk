@@ -142,7 +142,7 @@
 * Fixed writing `KeepInCacheFlag` in table traces
 
 ## v3.29.5
-* Fixed regression of `table/types.WriteTypeStringTo`
+* Fixed regression of `table/types.WriteTypeBytesTo`
 
 ## v3.29.4
 * Added touching of last updated timestamp in existing conns on stage of applying new endpoint list
