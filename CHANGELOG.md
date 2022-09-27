@@ -1,5 +1,6 @@
 * Supported `NullValue` type as received type from `YDB`
 * Added `types.CastTo(types.Value, destination)` public method for cast `types.Value` to golang native type value destination
+* Refactored string representation of `types.Value`
 
 ## v3.38.2
 * Added missing `RetentionPeriod` parameter for topic description
