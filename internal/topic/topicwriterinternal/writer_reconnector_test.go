@@ -271,9 +271,11 @@ func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
 		))
 		w.firstConnectionHandled.Store(true)
 
-		waitStartQueueWait := func() {
-			// TODO: fix with reflection and unsafe for count internal waiters
-			time.Sleep(time.Second / 10)
+		waitStartQueueWait := func(targetWaiters int) {
+			xtest.SpinWaitCondition(t, nil, func() bool {
+				res := getWaitersCount(w.semaphore) == targetWaiters
+				return res
+			})
 		}
 
 		err := w.Write(ctx, newTestMessages(1, 2))
@@ -282,7 +284,7 @@ func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
 		ctxNoQueueSpace, ctxNoQueueSpaceCancel := context.WithCancel(ctx)
 
 		go func() {
-			waitStartQueueWait()
+			waitStartQueueWait(1)
 			ctxNoQueueSpaceCancel()
 		}()
 		err = w.Write(ctxNoQueueSpace, newTestMessages(3))
@@ -291,7 +293,7 @@ func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
 		}
 
 		go func() {
-			waitStartQueueWait()
+			waitStartQueueWait(1)
 			ackErr := w.queue.AcksReceived([]rawtopicwriter.WriteAck{
 				{
 					SeqNo: 1,
