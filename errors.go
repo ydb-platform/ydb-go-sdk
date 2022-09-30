@@ -77,6 +77,11 @@ func IsOperationErrorNotFoundError(err error) bool {
 	return IsOperationError(err, Ydb.StatusIds_NOT_FOUND)
 }
 
+// IsOperationErrorPreconditionFailed checks whether given err is an operation error with code PreconditionFailed
+func IsOperationErrorPreconditionFailed(err error) bool {
+	return IsOperationError(err, Ydb.StatusIds_PRECONDITION_FAILED)
+}
+
 // IsOperationErrorSchemeError checks whether given err is an operation error with code SchemeError
 func IsOperationErrorSchemeError(err error) bool {
 	return IsOperationError(err, Ydb.StatusIds_SCHEME_ERROR)
