@@ -1,3 +1,4 @@
+//nolint:goconst
 package topic_test
 
 import (
@@ -20,7 +21,7 @@ func Example_createTopic() {
 	}
 	db, err := ydb.Open(ctx, connectionString)
 	if err != nil {
-		log.Fatalf("failed connect: %v", err)
+		log.Printf("failed connect: %v", err)
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
@@ -34,7 +35,7 @@ func Example_createTopic() {
 		topicoptions.CreateWithMinActivePartitions(3),
 	)
 	if err != nil {
-		log.Fatalf("failed create topic: %v", err)
+		log.Printf("failed create topic: %v", err)
 		return
 	}
 }
@@ -47,7 +48,7 @@ func Example_alterTopic() {
 	}
 	db, err := ydb.Open(ctx, connectionString)
 	if err != nil {
-		log.Fatalf("failed connect: %v", err)
+		log.Printf("failed connect: %v", err)
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
@@ -59,7 +60,7 @@ func Example_alterTopic() {
 		}),
 	)
 	if err != nil {
-		log.Fatalf("failed alter topic: %v", err)
+		log.Printf("failed alter topic: %v", err)
 		return
 	}
 }
@@ -72,14 +73,14 @@ func Example_describeTopic() {
 	}
 	db, err := ydb.Open(ctx, connectionString)
 	if err != nil {
-		log.Fatalf("failed connect: %v", err)
+		log.Printf("failed connect: %v", err)
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
 
 	descResult, err := db.Topic().Describe(ctx, "topic-path")
 	if err != nil {
-		log.Fatalf("failed drop topic: %v", err)
+		log.Printf("failed drop topic: %v", err)
 		return
 	}
 	fmt.Printf("describe: %#v\n", descResult)
@@ -93,14 +94,14 @@ func Example_dropTopic() {
 	}
 	db, err := ydb.Open(ctx, connectionString)
 	if err != nil {
-		log.Fatalf("failed connect: %v", err)
+		log.Printf("failed connect: %v", err)
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
 
 	err = db.Topic().Drop(ctx, "topic-path")
 	if err != nil {
-		log.Fatalf("failed drop topic: %v", err)
+		log.Printf("failed drop topic: %v", err)
 		return
 	}
 }
@@ -113,7 +114,7 @@ func Example_readMessage() {
 	}
 	db, err := ydb.Open(ctx, connectionString)
 	if err != nil {
-		log.Fatalf("failed connect: %v", err)
+		log.Printf("failed connect: %v", err)
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
