@@ -20,6 +20,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
+const defaultConnectionString = "grpc://localhost:2136/local"
+
 func TestClient_CreateDropTopic(t *testing.T) {
 	ctx := xtest.Context(t)
 	db := connect(t)
@@ -152,7 +154,7 @@ func TestSchemeList(t *testing.T) {
 }
 
 func connect(t testing.TB, opts ...ydb.Option) ydb.Connection {
-	connectionString := "grpc://localhost:2136/local"
+	connectionString := defaultConnectionString
 	if cs := os.Getenv("YDB_CONNECTION_STRING"); cs != "" {
 		connectionString = cs
 	}
