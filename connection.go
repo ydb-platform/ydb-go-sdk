@@ -413,7 +413,7 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	}()
 
 	if c.pool == nil {
-		c.pool = conn.NewPool(ctx, c.config)
+		c.pool = conn.NewPool(c.config)
 	}
 
 	if c.userInfo != nil {
@@ -423,6 +423,12 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 				c.pool.Get(endpoint.New(c.config.Endpoint())),
 			),
 		))
+	}
+
+	if t := c.config.DialTimeout(); t > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, t)
+		defer cancel()
 	}
 
 	c.balancer, err = balancer.New(ctx,

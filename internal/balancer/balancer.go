@@ -17,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -146,6 +147,12 @@ func New(
 	pool *conn.Pool,
 	opts ...discoveryConfig.Option,
 ) (b *Balancer, err error) {
+	if t := c.DialTimeout(); t > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, t)
+		defer cancel()
+	}
+
 	onDone := trace.DriverOnBalancerInit(
 		c.Trace(),
 		&ctx,
@@ -181,9 +188,17 @@ func New(
 			endpointsToConnections(pool, []endpoint.Endpoint{discoveryEndpoint}),
 			nil, balancerConfig.Info{}, false)
 	} else {
-		if err = b.clusterDiscovery(ctx); err != nil {
+		// initialization of balancer state
+		if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+			if err = b.clusterDiscovery(ctx); err != nil {
+				return xerrors.WithStackTrace(err)
+			}
+			return nil
+		}, retry.WithIdempotent(true)); err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
+
+		// run background discovering
 		if d := discoveryConfig.Interval(); d > 0 {
 			b.discoveryRepeater = repeater.New(d, func(ctx context.Context) (err error) {
 				ctx, cancel := context.WithTimeout(ctx, d)
@@ -196,14 +211,6 @@ func New(
 			)
 		}
 	}
-
-	var cancel context.CancelFunc
-	if t := c.DialTimeout(); t > 0 {
-		ctx, cancel = context.WithTimeout(ctx, c.DialTimeout())
-	} else {
-		ctx, cancel = context.WithCancel(ctx)
-	}
-	defer cancel()
 
 	return b, nil
 }

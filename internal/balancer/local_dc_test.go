@@ -144,7 +144,7 @@ func TestLocalDCDiscovery(t *testing.T) {
 	r := &Balancer{
 		driverConfig:   cfg,
 		balancerConfig: *cfg.Balancer(),
-		pool:           conn.NewPool(ctx, cfg),
+		pool:           conn.NewPool(cfg),
 		discovery: discoveryMock{endpoints: []endpoint.Endpoint{
 			&mock.Endpoint{AddrField: "a:123", LocationField: "a"},
 			&mock.Endpoint{AddrField: "b:234", LocationField: "b"},
