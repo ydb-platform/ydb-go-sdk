@@ -144,7 +144,7 @@ func (p *Pool) Release(ctx context.Context) error {
 	return nil
 }
 
-func (p *Pool) connParker(ctx context.Context, ttl, interval time.Duration) {
+func (p *Pool) connParker(ttl, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	for {
@@ -156,7 +156,7 @@ func (p *Pool) connParker(ctx context.Context, ttl, interval time.Duration) {
 				if time.Since(c.LastUsage()) > ttl {
 					switch c.GetState() {
 					case Online, Banned:
-						_ = c.park(ctx)
+						_ = c.park(context.Background())
 					default:
 						// nop
 					}
@@ -176,10 +176,7 @@ func (p *Pool) collectConns() []*conn {
 	return conns
 }
 
-func NewPool(
-	ctx context.Context,
-	config Config,
-) *Pool {
+func NewPool(config Config) *Pool {
 	p := &Pool{
 		usages: 1,
 		config: config,
@@ -188,7 +185,7 @@ func NewPool(
 		done:   make(chan struct{}),
 	}
 	if ttl := config.ConnectionTTL(); ttl > 0 {
-		go p.connParker(ctx, ttl, ttl/2)
+		go p.connParker(ttl, ttl/2)
 	}
 	return p
 }

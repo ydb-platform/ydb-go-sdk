@@ -1,3 +1,5 @@
+* Added retries to initial discovering
+
 ## v3.38.2
 * Added missing `RetentionPeriod` parameter for topic description
 * Fixed reconnect problem for topic client
