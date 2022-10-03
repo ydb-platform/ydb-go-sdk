@@ -1,3 +1,4 @@
+## v3.38.3
 * Added retries to initial discovering
 
 ## v3.38.2
