@@ -5,17 +5,12 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
-	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 )
 
 var ErrNotComparable = xerrors.Wrap(fmt.Errorf("not comparable"))
@@ -297,97 +292,5 @@ func compareUUID(l, r *Ydb.Value) int {
 		return 1
 	default:
 		return 0
-	}
-}
-
-// CompareCreateTableOptions compares table options used for creating YDB table.
-//
-// This function should be used only for testing purpose.
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func CompareCreateTableOptions(expected, actual []options.CreateTableOption) func(*testing.T) {
-	expectedReq := &options.CreateTableDesc{}
-	all := &allocator.Allocator{}
-	for _, v := range expected {
-		v(expectedReq, all)
-	}
-
-	actualReq := &options.CreateTableDesc{}
-	for _, v := range actual {
-		v(actualReq, all)
-	}
-
-	return func(t *testing.T) {
-		assert.Equal(t, expectedReq, actualReq)
-	}
-}
-
-// CompareAlterTableOptions compares table options used for altering YDB table.
-//
-// This function should be used only for testing purpose.
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func CompareAlterTableOptions(expected, actual []options.AlterTableOption) func(*testing.T) {
-	expectedReq := &options.AlterTableDesc{}
-	all := &allocator.Allocator{}
-	for _, v := range expected {
-		v(expectedReq, all)
-	}
-
-	actualReq := &options.AlterTableDesc{}
-	for _, v := range actual {
-		v(actualReq, all)
-	}
-
-	return nil
-}
-
-// CompareCreateTopicOptions compares table options used for creating YDB topic.
-//
-// This function should be used only for testing purpose.
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func CompareCreateTopicOptions(expected, actual []topicoptions.CreateOption) func(*testing.T) {
-	expectedReq := &rawtopic.CreateTopicRequest{}
-	for _, v := range expected {
-		v(expectedReq)
-	}
-
-	actualReq := &rawtopic.CreateTopicRequest{}
-	for _, v := range actual {
-		v(actualReq)
-	}
-
-	return func(t *testing.T) {
-		assert.Equal(t, expectedReq, actualReq)
-	}
-}
-
-// CompareAlterTopicOptions compares table options used for altering YDB topic.
-//
-// This function should be used only for testing purpose.
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func CompareAlterTopicOptions(expected, actual []topicoptions.AlterOption) func(*testing.T) {
-	expectedReq := &rawtopic.AlterTopicRequest{}
-	for _, v := range expected {
-		v(expectedReq)
-	}
-
-	actualReq := &rawtopic.AlterTopicRequest{}
-	for _, v := range actual {
-		v(actualReq)
-	}
-
-	return func(t *testing.T) {
-		assert.Equal(t, expectedReq, actualReq)
 	}
 }
