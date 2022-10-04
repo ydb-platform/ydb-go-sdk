@@ -303,6 +303,10 @@ func compareUUID(l, r *Ydb.Value) int {
 // CompareCreateTableOptions compares table options used for creating YDB table.
 //
 // This function should be used only for testing purpose.
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func CompareCreateTableOptions(expected, actual []options.CreateTableOption) func(*testing.T) {
 	expectedReq := &options.CreateTableDesc{}
 	all := &allocator.Allocator{}
@@ -323,6 +327,10 @@ func CompareCreateTableOptions(expected, actual []options.CreateTableOption) fun
 // CompareAlterTableOptions compares table options used for altering YDB table.
 //
 // This function should be used only for testing purpose.
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func CompareAlterTableOptions(expected, actual []options.AlterTableOption) func(*testing.T) {
 	expectedReq := &options.AlterTableDesc{}
 	all := &allocator.Allocator{}
@@ -341,6 +349,10 @@ func CompareAlterTableOptions(expected, actual []options.AlterTableOption) func(
 // CompareCreateTopicOptions compares table options used for creating YDB topic.
 //
 // This function should be used only for testing purpose.
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func CompareCreateTopicOptions(expected, actual []topicoptions.CreateOption) func(*testing.T) {
 	expectedReq := &rawtopic.CreateTopicRequest{}
 	for _, v := range expected {
@@ -360,6 +372,10 @@ func CompareCreateTopicOptions(expected, actual []topicoptions.CreateOption) fun
 // CompareAlterTopicOptions compares table options used for altering YDB topic.
 //
 // This function should be used only for testing purpose.
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func CompareAlterTopicOptions(expected, actual []topicoptions.AlterOption) func(*testing.T) {
 	expectedReq := &rawtopic.AlterTopicRequest{}
 	for _, v := range expected {

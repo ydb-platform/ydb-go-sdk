@@ -1,3 +1,6 @@
+## Unreleased
+* Added `CompareTable`/`CompareTopic` in `testutil` package
+
 ## v3.38.3
 * Added retries to initial discovering
 
