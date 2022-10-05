@@ -228,8 +228,7 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 			},
 		}...)
 
-		reconnector.background.Start("test-reconnectionLoop", reconnector.reconnectionLoop)
-		reconnector.reconnectFromBadStream <- nil
+		reconnector.start()
 
 		<-stream1Ready
 
