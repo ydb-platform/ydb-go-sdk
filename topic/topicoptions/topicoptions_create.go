@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
@@ -13,7 +12,9 @@ import (
 // # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-type CreateOption func(request *rawtopic.CreateTopicRequest)
+type CreateOption interface {
+	Create(request *rawtopic.CreateTopicRequest)
+}
 
 // CreateWithMeteringMode
 //
@@ -21,9 +22,7 @@ type CreateOption func(request *rawtopic.CreateTopicRequest)
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func CreateWithMeteringMode(mode topictypes.MeteringMode) CreateOption {
-	return func(request *rawtopic.CreateTopicRequest) {
-		mode.ToRaw(&request.MeteringMode)
-	}
+	return withMeteringMode(mode)
 }
 
 // CreateWithMinActivePartitions
@@ -32,9 +31,7 @@ func CreateWithMeteringMode(mode topictypes.MeteringMode) CreateOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func CreateWithMinActivePartitions(count int64) CreateOption {
-	return func(request *rawtopic.CreateTopicRequest) {
-		request.PartitionSettings.MinActivePartitions = count
-	}
+	return withMinActivePartitions(count)
 }
 
 // CreateWithPartitionCountLimit
@@ -43,9 +40,7 @@ func CreateWithMinActivePartitions(count int64) CreateOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func CreateWithPartitionCountLimit(count int64) CreateOption {
-	return func(request *rawtopic.CreateTopicRequest) {
-		request.PartitionSettings.PartitionCountLimit = count
-	}
+	return withPartitionCountLimit(count)
 }
 
 // CreateWithRetentionPeriod
@@ -54,9 +49,7 @@ func CreateWithPartitionCountLimit(count int64) CreateOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func CreateWithRetentionPeriod(retentionPeriod time.Duration) CreateOption {
-	return func(request *rawtopic.CreateTopicRequest) {
-		request.RetentionPeriod = retentionPeriod
-	}
+	return withRetentionPeriod(retentionPeriod)
 }
 
 // CreateWithRetentionStorageMB
@@ -65,9 +58,7 @@ func CreateWithRetentionPeriod(retentionPeriod time.Duration) CreateOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func CreateWithRetentionStorageMB(retentionStorageMB int64) CreateOption {
-	return func(request *rawtopic.CreateTopicRequest) {
-		request.RetentionStorageMB = retentionStorageMB
-	}
+	return withRetentionStorageMB(retentionStorageMB)
 }
 
 // CreateWithSupportedCodecs
@@ -76,12 +67,7 @@ func CreateWithRetentionStorageMB(retentionStorageMB int64) CreateOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func CreateWithSupportedCodecs(codecs ...topictypes.Codec) CreateOption {
-	return func(request *rawtopic.CreateTopicRequest) {
-		request.SupportedCodecs = make(rawtopiccommon.SupportedCodecs, len(codecs))
-		for i, c := range codecs {
-			c.ToRaw(&request.SupportedCodecs[i])
-		}
-	}
+	return withSupportedCodecs(codecs)
 }
 
 // CreateWithPartitionWriteSpeedBytesPerSecond
@@ -90,9 +76,7 @@ func CreateWithSupportedCodecs(codecs ...topictypes.Codec) CreateOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func CreateWithPartitionWriteSpeedBytesPerSecond(partitionWriteSpeedBytesPerSecond int64) CreateOption {
-	return func(request *rawtopic.CreateTopicRequest) {
-		request.PartitionWriteSpeedBytesPerSecond = partitionWriteSpeedBytesPerSecond
-	}
+	return withPartitionWriteSpeedBytesPerSecond(partitionWriteSpeedBytesPerSecond)
 }
 
 // CreateWithPartitionWriteBurstBytes
@@ -101,9 +85,7 @@ func CreateWithPartitionWriteSpeedBytesPerSecond(partitionWriteSpeedBytesPerSeco
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func CreateWithPartitionWriteBurstBytes(partitionWriteBurstBytes int64) CreateOption {
-	return func(request *rawtopic.CreateTopicRequest) {
-		request.PartitionWriteBurstBytes = partitionWriteBurstBytes
-	}
+	return withPartitionWriteBurstBytes(partitionWriteBurstBytes)
 }
 
 // CreateWithAttributes
@@ -112,9 +94,7 @@ func CreateWithPartitionWriteBurstBytes(partitionWriteBurstBytes int64) CreateOp
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func CreateWithAttributes(attributes map[string]string) CreateOption {
-	return func(request *rawtopic.CreateTopicRequest) {
-		request.Attributes = attributes
-	}
+	return withAttributes(attributes)
 }
 
 // CreateWithConsumer
@@ -123,10 +103,5 @@ func CreateWithAttributes(attributes map[string]string) CreateOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func CreateWithConsumer(consumers ...topictypes.Consumer) CreateOption {
-	return func(request *rawtopic.CreateTopicRequest) {
-		request.Consumers = make([]rawtopic.Consumer, len(consumers))
-		for i := range consumers {
-			consumers[i].ToRaw(&request.Consumers[i])
-		}
-	}
+	return withAddConsumers(consumers)
 }

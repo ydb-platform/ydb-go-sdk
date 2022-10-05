@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
@@ -13,7 +12,9 @@ import (
 // # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-type AlterOption func(req *rawtopic.AlterTopicRequest)
+type AlterOption interface {
+	Alter(req *rawtopic.AlterTopicRequest)
+}
 
 // AlterWithMeteringMode
 //
@@ -21,9 +22,7 @@ type AlterOption func(req *rawtopic.AlterTopicRequest)
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithMeteringMode(m topictypes.MeteringMode) AlterOption {
-	return func(req *rawtopic.AlterTopicRequest) {
-		m.ToRaw(&req.SetMeteringMode)
-	}
+	return withMeteringMode(m)
 }
 
 // AlterWithMinActivePartitions
@@ -32,10 +31,7 @@ func AlterWithMeteringMode(m topictypes.MeteringMode) AlterOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithMinActivePartitions(minActivePartitions int64) AlterOption {
-	return func(req *rawtopic.AlterTopicRequest) {
-		req.AlterPartitionSettings.SetMinActivePartitions.HasValue = true
-		req.AlterPartitionSettings.SetMinActivePartitions.Value = minActivePartitions
-	}
+	return withMinActivePartitions(minActivePartitions)
 }
 
 // AlterWithPartitionCountLimit
@@ -44,10 +40,7 @@ func AlterWithMinActivePartitions(minActivePartitions int64) AlterOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithPartitionCountLimit(partitionCountLimit int64) AlterOption {
-	return func(req *rawtopic.AlterTopicRequest) {
-		req.AlterPartitionSettings.SetPartitionCountLimit.HasValue = true
-		req.AlterPartitionSettings.SetPartitionCountLimit.Value = partitionCountLimit
-	}
+	return withPartitionCountLimit(partitionCountLimit)
 }
 
 // AlterWithRetentionPeriod
@@ -56,10 +49,7 @@ func AlterWithPartitionCountLimit(partitionCountLimit int64) AlterOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithRetentionPeriod(retentionPeriod time.Duration) AlterOption {
-	return func(req *rawtopic.AlterTopicRequest) {
-		req.SetRetentionPeriod.HasValue = true
-		req.SetRetentionPeriod.Value = retentionPeriod
-	}
+	return withRetentionPeriod(retentionPeriod)
 }
 
 // AlterWithRetentionStorageMB
@@ -68,10 +58,7 @@ func AlterWithRetentionPeriod(retentionPeriod time.Duration) AlterOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithRetentionStorageMB(retentionStorageMB int64) AlterOption {
-	return func(req *rawtopic.AlterTopicRequest) {
-		req.SetRetentionStorageMB.HasValue = true
-		req.SetRetentionStorageMB.Value = retentionStorageMB
-	}
+	return withRetentionStorageMB(retentionStorageMB)
 }
 
 // AlterWithSupportedCodecs
@@ -80,13 +67,7 @@ func AlterWithRetentionStorageMB(retentionStorageMB int64) AlterOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithSupportedCodecs(codecs ...topictypes.Codec) AlterOption {
-	return func(req *rawtopic.AlterTopicRequest) {
-		req.SetSupportedCodecs = true
-		req.SetSupportedCodecsValue = make(rawtopiccommon.SupportedCodecs, len(codecs))
-		for i, codec := range codecs {
-			req.SetSupportedCodecsValue[i] = rawtopiccommon.Codec(codec)
-		}
-	}
+	return withSupportedCodecs(codecs)
 }
 
 // AlterWithPartitionWriteSpeedBytesPerSecond
@@ -95,10 +76,7 @@ func AlterWithSupportedCodecs(codecs ...topictypes.Codec) AlterOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithPartitionWriteSpeedBytesPerSecond(bytesPerSecond int64) AlterOption {
-	return func(req *rawtopic.AlterTopicRequest) {
-		req.SetPartitionWriteSpeedBytesPerSecond.HasValue = true
-		req.SetPartitionWriteSpeedBytesPerSecond.Value = bytesPerSecond
-	}
+	return withPartitionWriteSpeedBytesPerSecond(bytesPerSecond)
 }
 
 // AlterWithPartitionWriteBurstBytes
@@ -107,10 +85,7 @@ func AlterWithPartitionWriteSpeedBytesPerSecond(bytesPerSecond int64) AlterOptio
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithPartitionWriteBurstBytes(burstBytes int64) AlterOption {
-	return func(req *rawtopic.AlterTopicRequest) {
-		req.SetPartitionWriteBurstBytes.HasValue = true
-		req.SetPartitionWriteBurstBytes.Value = burstBytes
-	}
+	return withPartitionWriteBurstBytes(burstBytes)
 }
 
 // AlterWithAttributes
@@ -119,9 +94,7 @@ func AlterWithPartitionWriteBurstBytes(burstBytes int64) AlterOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithAttributes(attributes map[string]string) AlterOption {
-	return func(req *rawtopic.AlterTopicRequest) {
-		req.AlterAttributes = attributes
-	}
+	return withAttributes(attributes)
 }
 
 // AlterWithAddConsumers
@@ -130,12 +103,7 @@ func AlterWithAttributes(attributes map[string]string) AlterOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithAddConsumers(consumers ...topictypes.Consumer) AlterOption {
-	return func(req *rawtopic.AlterTopicRequest) {
-		req.AddConsumers = make([]rawtopic.Consumer, len(consumers))
-		for i := range consumers {
-			consumers[i].ToRaw(&req.AddConsumers[i])
-		}
-	}
+	return withAddConsumers(consumers)
 }
 
 // AlterWithDropConsumers
@@ -144,9 +112,7 @@ func AlterWithAddConsumers(consumers ...topictypes.Consumer) AlterOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithDropConsumers(consumersName ...string) AlterOption {
-	return func(req *rawtopic.AlterTopicRequest) {
-		req.DropConsumers = consumersName
-	}
+	return withDropConsumers(consumersName)
 }
 
 // AlterConsumerWithImportant
@@ -155,11 +121,9 @@ func AlterWithDropConsumers(consumersName ...string) AlterOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterConsumerWithImportant(name string, important bool) AlterOption {
-	return func(req *rawtopic.AlterTopicRequest) {
-		var index int
-		req.AlterConsumers, index = ensureAlterConsumer(req.AlterConsumers, name)
-		req.AlterConsumers[index].SetImportant.HasValue = true
-		req.AlterConsumers[index].SetImportant.Value = important
+	return withConsumerWithImportant{
+		name:      name,
+		important: important,
 	}
 }
 
@@ -169,11 +133,9 @@ func AlterConsumerWithImportant(name string, important bool) AlterOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterConsumerWithReadFrom(name string, readFrom time.Time) AlterOption {
-	return func(req *rawtopic.AlterTopicRequest) {
-		var index int
-		req.AlterConsumers, index = ensureAlterConsumer(req.AlterConsumers, name)
-		req.AlterConsumers[index].SetReadFrom.HasValue = true
-		req.AlterConsumers[index].SetReadFrom.Value = readFrom
+	return withConsumerWithReadFrom{
+		name:     name,
+		readFrom: readFrom,
 	}
 }
 
@@ -183,15 +145,9 @@ func AlterConsumerWithReadFrom(name string, readFrom time.Time) AlterOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterConsumerWithSupportedCodecs(name string, codecs []topictypes.Codec) AlterOption {
-	return func(req *rawtopic.AlterTopicRequest) {
-		var index int
-		req.AlterConsumers, index = ensureAlterConsumer(req.AlterConsumers, name)
-
-		consumer := &req.AlterConsumers[index]
-		consumer.SetSupportedCodecs = make(rawtopiccommon.SupportedCodecs, len(codecs))
-		for i, codec := range codecs {
-			consumer.SetSupportedCodecs[i] = rawtopiccommon.Codec(codec)
-		}
+	return withConsumerWithSupportedCodecs{
+		name:   name,
+		codecs: codecs,
 	}
 }
 
@@ -201,10 +157,9 @@ func AlterConsumerWithSupportedCodecs(name string, codecs []topictypes.Codec) Al
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterConsumerWithAttributes(name string, attributes map[string]string) AlterOption {
-	return func(req *rawtopic.AlterTopicRequest) {
-		var index int
-		req.AlterConsumers, index = ensureAlterConsumer(req.AlterConsumers, name)
-		req.AlterConsumers[index].AlterAttributes = attributes
+	return withConsumerWithAttributes{
+		name:       name,
+		attributes: attributes,
 	}
 }
 

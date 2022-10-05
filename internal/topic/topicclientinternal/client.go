@@ -68,8 +68,8 @@ func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.Al
 	req := rawtopic.AlterTopicRequest{}
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
-	for _, f := range opts {
-		f(&req)
+	for _, o := range opts {
+		o.Alter(&req)
 	}
 
 	call := func(ctx context.Context) error {
@@ -97,8 +97,8 @@ func (c *Client) Create(
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
 
-	for _, f := range opts {
-		f(&req)
+	for _, o := range opts {
+		o.Create(&req)
 	}
 
 	call := func(ctx context.Context) error {

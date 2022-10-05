@@ -1,3 +1,7 @@
+* Changed type of `topic/topicoptions.AlterOption` from func to interface
+* Changed type of `topic/topicoptions.CreateOption` from func to interface
+* Added implementations of `topic/topicoptions.AlterOption` and `topic/topicoptions.CreateOption`
+
 ## v3.38.3
 * Added retries to initial discovering
 
