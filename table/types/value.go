@@ -193,8 +193,7 @@ func DecimalValue(v *Decimal) Value {
 }
 
 func DecimalValueFromBigInt(v *big.Int, precision, scale uint32) Value {
-	b := decimal.BigIntToByte(v, precision, scale)
-	return value.DecimalValue(b, precision, scale)
+	return value.DecimalValueFromBigInt(v, precision, scale)
 }
 
 func TupleValue(vs ...Value) Value {
