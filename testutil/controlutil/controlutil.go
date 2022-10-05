@@ -32,7 +32,9 @@ type CreateTableOptionsDesc struct {
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func ToCreateTableOptionsDesc(opts ...options.CreateTableOption) *CreateTableOptionsDesc {
 	req := &options.CreateTableDesc{}
-	all := &allocator.Allocator{}
+	all := allocator.New()
+	defer all.Free()
+
 	for _, v := range opts {
 		v(req, all)
 	}
@@ -62,7 +64,9 @@ type AlterTableOptionsDesc struct {
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func ToAlterTableOptionsDesc(opts ...options.AlterTableOption) *AlterTableOptionsDesc {
 	req := &options.AlterTableDesc{}
-	all := &allocator.Allocator{}
+	all := allocator.New()
+	defer all.Free()
+
 	for _, v := range opts {
 		v(req, all)
 	}
