@@ -95,44 +95,95 @@ func TestWorkerClose(t *testing.T) {
 }
 
 func TestWorkerConcurrentStartAndClose(t *testing.T) {
-	targetClose := int64(10000)
-	parallel := 10
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		targetClose := int64(10000)
+		parallel := 10
 
-	var counter int64
+		var counter int64
 
-	ctx := xtest.Context(t)
-	w := NewWorker(ctx)
+		ctx := xtest.Context(t)
+		w := NewWorker(ctx)
 
-	closeIndex := int64(0)
-	closed := make(empty.Chan)
-	go func() {
-		xtest.SpinWaitCondition(t, nil, func() bool {
-			return atomic.LoadInt64(&counter) > targetClose
-		})
-		require.NoError(t, w.Close(ctx, nil))
-		closeIndex = atomic.LoadInt64(&counter)
-		close(closed)
-	}()
-
-	stopNewStarts := xatomic.Bool{}
-	for i := 0; i < parallel; i++ {
+		closeIndex := int64(0)
+		closed := make(empty.Chan)
 		go func() {
-			for {
-				if stopNewStarts.Load() {
-					return
-				}
+			xtest.SpinWaitCondition(t, nil, func() bool {
+				return atomic.LoadInt64(&counter) > targetClose
+			})
+			require.NoError(t, w.Close(ctx, nil))
+			closeIndex = atomic.LoadInt64(&counter)
+			close(closed)
+		}()
 
-				go func() {
-					w.Start("test", func(ctx context.Context) {
-						atomic.AddInt64(&counter, 1)
-					})
-				}()
+		stopNewStarts := xatomic.Bool{}
+		for i := 0; i < parallel; i++ {
+			go func() {
+				for {
+					if stopNewStarts.Load() {
+						return
+					}
+
+					go func() {
+						w.Start("test", func(ctx context.Context) {
+							atomic.AddInt64(&counter, 1)
+						})
+					}()
+				}
+			}()
+		}
+
+		xtest.WaitChannelClosed(t, closed)
+		runtime.Gosched()
+		require.Equal(t, closeIndex, atomic.LoadInt64(&counter))
+		stopNewStarts.Store(true)
+	})
+}
+
+func TestWorkerStartCompletedWhileLongWait(t *testing.T) {
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		ctx := xtest.Context(t)
+		w := NewWorker(ctx)
+
+		allowStop := make(empty.Chan)
+		closeStarted := make(empty.Chan)
+		w.Start("test", func(ctx context.Context) {
+			<-ctx.Done()
+			close(closeStarted)
+
+			<-allowStop
+		})
+
+		closed := make(empty.Chan)
+
+		callStartFinished := make(empty.Chan)
+		go func() {
+			defer close(callStartFinished)
+			start := time.Now()
+
+			for time.Since(start) < time.Millisecond {
+				w.Start("test2", func(ctx context.Context) {
+					// pass
+				})
 			}
 		}()
-	}
 
-	xtest.WaitChannelClosed(t, closed)
-	runtime.Gosched()
-	require.Equal(t, closeIndex, atomic.LoadInt64(&counter))
-	stopNewStarts.Store(true)
+		go func() {
+			defer close(closed)
+
+			_ = w.Close(ctx, nil)
+		}()
+
+		xtest.WaitChannelClosed(t, callStartFinished)
+		runtime.Gosched()
+
+		select {
+		case <-closed:
+			t.Fatal()
+		default:
+			// pass
+		}
+
+		close(allowStop)
+		xtest.WaitChannelClosed(t, closed)
+	})
 }
