@@ -222,14 +222,13 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 			},
 			{
 				callback: func(ctx context.Context) (batchedStreamReader, error) {
-					t.Error()
+					t.Fatal()
 					return nil, errors.New("unexpected call")
 				},
 			},
 		}...)
 
-		reconnector.background.Start("test-reconnectionLoop", reconnector.reconnectionLoop)
-		reconnector.reconnectFromBadStream <- nil
+		reconnector.start()
 
 		<-stream1Ready
 

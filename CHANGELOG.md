@@ -1,3 +1,5 @@
+* Fix internal race-condition bugs in internal background worker
+
 ## v3.38.3
 * Added retries to initial discovering
 
