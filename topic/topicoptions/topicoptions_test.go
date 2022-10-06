@@ -60,9 +60,11 @@ func TestOptionsCompare(t *testing.T) {
 				AlterConsumerWithReadFrom("name", time.Unix(0, 0)),
 				AlterWithDropConsumers("a", "b"),
 			},
-			false,
+			true,
 		},
 	} {
-		require.Equal(t, tt.equal, reflect.DeepEqual(tt.lhs, tt.rhs))
+		t.Run("", func(t *testing.T) {
+			require.Equal(t, tt.equal, reflect.DeepEqual(tt.lhs, tt.rhs))
+		})
 	}
 }

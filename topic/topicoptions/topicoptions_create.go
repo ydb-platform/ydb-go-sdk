@@ -1,6 +1,7 @@
 package topicoptions
 
 import (
+	"sort"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
@@ -67,6 +68,9 @@ func CreateWithRetentionStorageMB(retentionStorageMB int64) CreateOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func CreateWithSupportedCodecs(codecs ...topictypes.Codec) CreateOption {
+	sort.Slice(codecs, func(i, j int) bool {
+		return codecs[i] < codecs[j]
+	})
 	return withSupportedCodecs(codecs)
 }
 
@@ -103,5 +107,8 @@ func CreateWithAttributes(attributes map[string]string) CreateOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func CreateWithConsumer(consumers ...topictypes.Consumer) CreateOption {
+	sort.Slice(consumers, func(i, j int) bool {
+		return consumers[i].Name < consumers[j].Name
+	})
 	return withAddConsumers(consumers)
 }

@@ -1,6 +1,7 @@
 package topicoptions
 
 import (
+	"sort"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
@@ -67,6 +68,9 @@ func AlterWithRetentionStorageMB(retentionStorageMB int64) AlterOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithSupportedCodecs(codecs ...topictypes.Codec) AlterOption {
+	sort.Slice(codecs, func(i, j int) bool {
+		return codecs[i] < codecs[j]
+	})
 	return withSupportedCodecs(codecs)
 }
 
@@ -103,6 +107,9 @@ func AlterWithAttributes(attributes map[string]string) AlterOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithAddConsumers(consumers ...topictypes.Consumer) AlterOption {
+	sort.Slice(consumers, func(i, j int) bool {
+		return consumers[i].Name < consumers[j].Name
+	})
 	return withAddConsumers(consumers)
 }
 
@@ -112,6 +119,7 @@ func AlterWithAddConsumers(consumers ...topictypes.Consumer) AlterOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterWithDropConsumers(consumersName ...string) AlterOption {
+	sort.Strings(consumersName)
 	return withDropConsumers(consumersName)
 }
 
@@ -145,6 +153,9 @@ func AlterConsumerWithReadFrom(name string, readFrom time.Time) AlterOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func AlterConsumerWithSupportedCodecs(name string, codecs []topictypes.Codec) AlterOption {
+	sort.Slice(codecs, func(i, j int) bool {
+		return codecs[i] < codecs[j]
+	})
 	return withConsumerWithSupportedCodecs{
 		name:   name,
 		codecs: codecs,
