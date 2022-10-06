@@ -23,9 +23,10 @@ func TestWorkerContext(t *testing.T) {
 	})
 
 	t.Run("Dedicated", func(t *testing.T) {
-		ctx := context.WithValue(context.Background(), "1", "2")
+		type ctxkey struct{}
+		ctx := context.WithValue(context.Background(), ctxkey{}, "2")
 		w := NewWorker(ctx)
-		require.Equal(t, "2", w.Context().Value("1"))
+		require.Equal(t, "2", w.Context().Value(ctxkey{}))
 	})
 
 	t.Run("Stop", func(t *testing.T) {
@@ -96,7 +97,7 @@ func TestWorkerClose(t *testing.T) {
 
 func TestWorkerConcurrentStartAndClose(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
-		targetClose := int64(10000)
+		targetClose := int64(100)
 		parallel := 10
 
 		var counter int64
@@ -106,13 +107,16 @@ func TestWorkerConcurrentStartAndClose(t *testing.T) {
 
 		closeIndex := int64(0)
 		closed := make(empty.Chan)
+
 		go func() {
+			defer close(closed)
+
 			xtest.SpinWaitCondition(t, nil, func() bool {
 				return atomic.LoadInt64(&counter) > targetClose
 			})
+
 			require.NoError(t, w.Close(ctx, nil))
 			closeIndex = atomic.LoadInt64(&counter)
-			close(closed)
 		}()
 
 		stopNewStarts := xatomic.Bool{}
@@ -123,11 +127,9 @@ func TestWorkerConcurrentStartAndClose(t *testing.T) {
 						return
 					}
 
-					go func() {
-						w.Start("test", func(ctx context.Context) {
-							atomic.AddInt64(&counter, 1)
-						})
-					}()
+					w.Start("test", func(ctx context.Context) {
+						atomic.AddInt64(&counter, 1)
+					})
 				}
 			}()
 		}

@@ -135,11 +135,11 @@ func (b *Worker) starterLoop() {
 	for bgTask := range b.tasks {
 		b.workers.Add(1)
 
-		go func() {
+		go func(task backgroundTask) {
 			defer b.workers.Done()
 
-			pprof.Do(b.ctx, pprof.Labels("background", bgTask.name), bgTask.callback)
-		}()
+			pprof.Do(b.ctx, pprof.Labels("background", task.name), task.callback)
+		}(bgTask)
 	}
 }
 
