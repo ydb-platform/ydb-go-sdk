@@ -5,9 +5,9 @@ import (
 	"errors"
 	"runtime/pprof"
 	"sync"
-	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -26,10 +26,12 @@ type Worker struct {
 
 	m xsync.Mutex
 
-	closed      uint32
+	closed      xatomic.Bool
 	stop        xcontext.CancelErrFunc
 	closeReason error
 }
+
+type CallbackFunc func(ctx context.Context)
 
 func NewWorker(parent context.Context) *Worker {
 	w := Worker{}
@@ -44,58 +46,59 @@ func (b *Worker) Context() context.Context {
 	return b.ctx
 }
 
-func (b *Worker) Start(name string, f func(ctx context.Context)) {
-	if atomic.LoadUint32(&b.closed) != 0 {
-		f(b.ctx)
+func (b *Worker) Start(name string, f CallbackFunc) {
+	if b.closed.Load() {
 		return
 	}
 
 	b.init()
-
-	b.m.Lock()
-	defer b.m.Unlock()
 
 	if b.ctx.Err() != nil {
 		return
 	}
 
-	b.workers.Add(1)
-	go func() {
-		defer b.workers.Done()
+	b.m.WithLock(func() {
+		if b.closed.Load() {
+			return
+		}
+		b.workers.Add(1)
 
-		pprof.Do(b.ctx, pprof.Labels("background", name), f)
-	}()
+		go func() {
+			defer b.workers.Done()
+
+			pprof.Do(b.ctx, pprof.Labels("background", name), f)
+		}()
+	})
 }
 
 func (b *Worker) Done() <-chan struct{} {
 	b.init()
 
-	b.m.Lock()
-	defer b.m.Unlock()
-
 	return b.ctx.Done()
 }
 
 func (b *Worker) Close(ctx context.Context, err error) error {
-	if !atomic.CompareAndSwapUint32(&b.closed, 0, 1) {
+	if b.closed.Swap(true) {
 		return xerrors.WithStackTrace(ErrAlreadyClosed)
 	}
 
 	b.init()
 
-	b.m.Lock()
-	defer b.m.Unlock()
+	b.m.WithLock(func() {
+		b.closeReason = err
+		if b.closeReason == nil {
+			b.closeReason = errClosedWithNilReason
+		}
 
-	b.closeReason = err
-	if b.closeReason == nil {
-		b.closeReason = errClosedWithNilReason
-	}
-
-	b.stop(err)
+		b.stop(err)
+	})
 
 	bgCompleted := make(empty.Chan)
 
 	go func() {
+		b.m.Lock()
+		defer b.m.Unlock()
+
 		b.workers.Wait()
 		close(bgCompleted)
 	}()
