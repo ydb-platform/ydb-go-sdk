@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -24,9 +23,13 @@ type Worker struct {
 	workers  sync.WaitGroup
 	onceInit sync.Once
 
+	tasksCompleted empty.Chan
+
 	m xsync.Mutex
 
-	closed      xatomic.Bool
+	tasks chan backgroundTask
+
+	closed      bool
 	stop        xcontext.CancelErrFunc
 	closeReason error
 }
@@ -47,27 +50,17 @@ func (b *Worker) Context() context.Context {
 }
 
 func (b *Worker) Start(name string, f CallbackFunc) {
-	if b.closed.Load() {
-		return
-	}
-
 	b.init()
 
-	if b.ctx.Err() != nil {
-		return
-	}
-
 	b.m.WithLock(func() {
-		if b.closed.Load() {
+		if b.closed {
 			return
 		}
-		b.workers.Add(1)
 
-		go func() {
-			defer b.workers.Done()
-
-			pprof.Do(b.ctx, pprof.Labels("background", name), f)
-		}()
+		b.tasks <- backgroundTask{
+			callback: f,
+			name:     name,
+		}
 	})
 }
 
@@ -78,13 +71,18 @@ func (b *Worker) Done() <-chan struct{} {
 }
 
 func (b *Worker) Close(ctx context.Context, err error) error {
-	if b.closed.Swap(true) {
-		return xerrors.WithStackTrace(ErrAlreadyClosed)
-	}
-
 	b.init()
 
+	var resErr error
 	b.m.WithLock(func() {
+		if b.closed {
+			resErr = xerrors.WithStackTrace(ErrAlreadyClosed)
+			return
+		}
+
+		b.closed = true
+
+		close(b.tasks)
 		b.closeReason = err
 		if b.closeReason == nil {
 			b.closeReason = errClosedWithNilReason
@@ -92,13 +90,15 @@ func (b *Worker) Close(ctx context.Context, err error) error {
 
 		b.stop(err)
 	})
+	if resErr != nil {
+		return resErr
+	}
+
+	<-b.tasksCompleted
 
 	bgCompleted := make(empty.Chan)
 
 	go func() {
-		b.m.Lock()
-		defer b.m.Unlock()
-
 		b.workers.Wait()
 		close(bgCompleted)
 	}()
@@ -123,5 +123,27 @@ func (b *Worker) init() {
 		if b.ctx == nil {
 			b.ctx, b.stop = xcontext.WithErrCancel(context.Background())
 		}
+		b.tasks = make(chan backgroundTask)
+		b.tasksCompleted = make(empty.Chan)
+		go b.starterLoop()
 	})
+}
+
+func (b *Worker) starterLoop() {
+	defer close(b.tasksCompleted)
+
+	for bgTask := range b.tasks {
+		b.workers.Add(1)
+
+		go func() {
+			defer b.workers.Done()
+
+			pprof.Do(b.ctx, pprof.Labels("background", bgTask.name), bgTask.callback)
+		}()
+	}
+}
+
+type backgroundTask struct {
+	callback CallbackFunc
+	name     string
 }
