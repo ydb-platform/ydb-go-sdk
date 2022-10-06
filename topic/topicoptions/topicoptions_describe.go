@@ -8,5 +8,5 @@ import "github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type DescribeOption interface {
-	Describe(req *rawtopic.DescribeTopicRequest)
+	ApplyDescribeOption(req *rawtopic.DescribeTopicRequest)
 }

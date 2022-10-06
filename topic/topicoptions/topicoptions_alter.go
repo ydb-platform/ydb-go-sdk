@@ -14,7 +14,7 @@ import (
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type AlterOption interface {
-	Alter(req *rawtopic.AlterTopicRequest)
+	ApplyAlterOption(req *rawtopic.AlterTopicRequest)
 }
 
 // AlterWithMeteringMode

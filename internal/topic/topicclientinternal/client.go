@@ -69,7 +69,7 @@ func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.Al
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
 	for _, o := range opts {
-		o.Alter(&req)
+		o.ApplyAlterOption(&req)
 	}
 
 	call := func(ctx context.Context) error {
@@ -98,7 +98,7 @@ func (c *Client) Create(
 	req.Path = path
 
 	for _, o := range opts {
-		o.Create(&req)
+		o.ApplyCreateOption(&req)
 	}
 
 	call := func(ctx context.Context) error {
@@ -128,7 +128,7 @@ func (c *Client) Describe(
 	}
 
 	for _, o := range opts {
-		o.Describe(&req)
+		o.ApplyDescribeOption(&req)
 	}
 
 	var rawRes rawtopic.DescribeTopicResult
@@ -165,7 +165,7 @@ func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.Dro
 	req.Path = path
 
 	for _, o := range opts {
-		o.Drop(&req)
+		o.ApplyDropOption(&req)
 	}
 
 	call := func(ctx context.Context) error {

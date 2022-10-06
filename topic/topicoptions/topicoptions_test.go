@@ -1,18 +1,16 @@
 package topicoptions
 
 import (
-	"reflect"
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestOptionsCompare(t *testing.T) {
+func TestEqualAlterOptions(t *testing.T) {
 	for _, tt := range []struct {
-		lhs   []AlterOption
-		rhs   []AlterOption
-		equal bool
+		lhs []AlterOption
+		rhs []AlterOption
 	}{
 		{
 			[]AlterOption{
@@ -23,7 +21,6 @@ func TestOptionsCompare(t *testing.T) {
 				AlterConsumerWithImportant("name", true),
 				AlterConsumerWithReadFrom("name", time.Unix(0, 0)),
 			},
-			true,
 		},
 		{
 			[]AlterOption{
@@ -34,7 +31,18 @@ func TestOptionsCompare(t *testing.T) {
 				AlterConsumerWithReadFrom("name", time.Unix(0, 0)),
 				AlterConsumerWithImportant("name", true),
 			},
-			false,
+		},
+		{
+			[]AlterOption{
+				AlterConsumerWithImportant("name", true),
+				AlterWithMinActivePartitions(15),
+				AlterConsumerWithReadFrom("name", time.Unix(0, 0)),
+			},
+			[]AlterOption{
+				AlterConsumerWithReadFrom("name", time.Unix(0, 0)),
+				AlterConsumerWithImportant("name", true),
+				AlterWithMinActivePartitions(15),
+			},
 		},
 		{
 			[]AlterOption{
@@ -47,7 +55,6 @@ func TestOptionsCompare(t *testing.T) {
 				AlterConsumerWithReadFrom("name", time.Unix(0, 0)),
 				AlterWithDropConsumers("a", "b"),
 			},
-			true,
 		},
 		{
 			[]AlterOption{
@@ -60,11 +67,34 @@ func TestOptionsCompare(t *testing.T) {
 				AlterConsumerWithReadFrom("name", time.Unix(0, 0)),
 				AlterWithDropConsumers("a", "b"),
 			},
-			true,
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			require.Equal(t, tt.equal, reflect.DeepEqual(tt.lhs, tt.rhs))
+			assert.ElementsMatch(t, tt.lhs, tt.rhs) // compare slices with ignore ordering
+		})
+	}
+}
+
+func TestEqualCreateOptions(t *testing.T) {
+	for _, tt := range []struct {
+		lhs []CreateOption
+		rhs []CreateOption
+	}{
+		{
+			[]CreateOption{
+				CreateWithMeteringMode(1),
+				CreateWithPartitionCountLimit(100),
+				CreateWithRetentionPeriod(5),
+			},
+			[]CreateOption{
+				CreateWithRetentionPeriod(5),
+				CreateWithMeteringMode(1),
+				CreateWithPartitionCountLimit(100),
+			},
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			assert.ElementsMatch(t, tt.lhs, tt.rhs) // compare slices with ignore ordering
 		})
 	}
 }
