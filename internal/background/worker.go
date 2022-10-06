@@ -5,6 +5,7 @@ import (
 	"errors"
 	"runtime/pprof"
 	"sync"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -23,18 +24,12 @@ type Worker struct {
 	workers  sync.WaitGroup
 	onceInit sync.Once
 
-	tasksCompleted empty.Chan
-
 	m xsync.Mutex
 
-	tasks chan backgroundTask
-
-	closed      bool
+	closed      uint32
 	stop        xcontext.CancelErrFunc
 	closeReason error
 }
-
-type CallbackFunc func(ctx context.Context)
 
 func NewWorker(parent context.Context) *Worker {
 	w := Worker{}
@@ -49,52 +44,54 @@ func (b *Worker) Context() context.Context {
 	return b.ctx
 }
 
-func (b *Worker) Start(name string, f CallbackFunc) {
+func (b *Worker) Start(name string, f func(ctx context.Context)) {
+	if atomic.LoadUint32(&b.closed) != 0 {
+		f(b.ctx)
+		return
+	}
+
 	b.init()
 
-	b.m.WithLock(func() {
-		if b.closed {
-			return
-		}
+	b.m.Lock()
+	defer b.m.Unlock()
 
-		b.tasks <- backgroundTask{
-			callback: f,
-			name:     name,
-		}
-	})
+	if b.ctx.Err() != nil {
+		return
+	}
+
+	b.workers.Add(1)
+	go func() {
+		defer b.workers.Done()
+
+		pprof.Do(b.ctx, pprof.Labels("background", name), f)
+	}()
 }
 
 func (b *Worker) Done() <-chan struct{} {
 	b.init()
 
+	b.m.Lock()
+	defer b.m.Unlock()
+
 	return b.ctx.Done()
 }
 
 func (b *Worker) Close(ctx context.Context, err error) error {
-	b.init()
-
-	var resErr error
-	b.m.WithLock(func() {
-		if b.closed {
-			resErr = xerrors.WithStackTrace(ErrAlreadyClosed)
-			return
-		}
-
-		b.closed = true
-
-		close(b.tasks)
-		b.closeReason = err
-		if b.closeReason == nil {
-			b.closeReason = errClosedWithNilReason
-		}
-
-		b.stop(err)
-	})
-	if resErr != nil {
-		return resErr
+	if !atomic.CompareAndSwapUint32(&b.closed, 0, 1) {
+		return xerrors.WithStackTrace(ErrAlreadyClosed)
 	}
 
-	<-b.tasksCompleted
+	b.init()
+
+	b.m.Lock()
+	defer b.m.Unlock()
+
+	b.closeReason = err
+	if b.closeReason == nil {
+		b.closeReason = errClosedWithNilReason
+	}
+
+	b.stop(err)
 
 	bgCompleted := make(empty.Chan)
 
@@ -123,27 +120,5 @@ func (b *Worker) init() {
 		if b.ctx == nil {
 			b.ctx, b.stop = xcontext.WithErrCancel(context.Background())
 		}
-		b.tasks = make(chan backgroundTask)
-		b.tasksCompleted = make(empty.Chan)
-		go b.starterLoop()
 	})
-}
-
-func (b *Worker) starterLoop() {
-	defer close(b.tasksCompleted)
-
-	for bgTask := range b.tasks {
-		b.workers.Add(1)
-
-		go func(task backgroundTask) {
-			defer b.workers.Done()
-
-			pprof.Do(b.ctx, pprof.Labels("background", task.name), task.callback)
-		}(bgTask)
-	}
-}
-
-type backgroundTask struct {
-	callback CallbackFunc
-	name     string
 }

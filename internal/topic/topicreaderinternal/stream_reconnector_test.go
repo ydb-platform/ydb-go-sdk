@@ -222,7 +222,7 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 			},
 			{
 				callback: func(ctx context.Context) (batchedStreamReader, error) {
-					t.Fatal()
+					t.Error()
 					return nil, errors.New("unexpected call")
 				},
 			},
