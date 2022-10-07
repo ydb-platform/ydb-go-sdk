@@ -7,7 +7,7 @@ type Status uint8
 
 // Binary flags that used as Status
 const (
-	Finished  = Status(1 << iota >> 1)
+	Finished  = Status(iota)
 	Undefined // may be true or may be false
 	NotFinished
 )
