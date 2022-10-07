@@ -273,7 +273,7 @@ func (s *session) CreateTable(
 	)
 	defer a.Free()
 	for _, opt := range opts {
-		opt((*options.CreateTableDesc)(&request), a)
+		opt.ApplyCreateTableOption((*options.CreateTableDesc)(&request), a)
 	}
 	t := s.trailer()
 	defer t.processHints()
@@ -449,7 +449,7 @@ func (s *session) DropTable(
 		),
 	}
 	for _, opt := range opts {
-		opt((*options.DropTableDesc)(&request))
+		opt.ApplyDropTableOption((*options.DropTableDesc)(&request))
 	}
 	t := s.trailer()
 	defer t.processHints()
@@ -491,7 +491,7 @@ func (s *session) AlterTable(
 	)
 	defer a.Free()
 	for _, opt := range opts {
-		opt((*options.AlterTableDesc)(&request), a)
+		opt.ApplyAlterTableOption((*options.AlterTableDesc)(&request), a)
 	}
 	t := s.trailer()
 	defer t.processHints()

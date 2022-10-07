@@ -29,12 +29,16 @@ func WithPartitionStats() DescribeTableOption {
 
 type (
 	CreateTableDesc   Ydb_Table.CreateTableRequest
-	CreateTableOption func(d *CreateTableDesc, a *allocator.Allocator)
+	CreateTableOption interface {
+		ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator)
+	}
 )
 
 type (
 	profile       Ydb_Table.TableProfile
-	ProfileOption func(p *profile, a *allocator.Allocator)
+	ProfileOption interface {
+		ApplyProfileOption(p *profile, a *allocator.Allocator)
+	}
 )
 
 type (
@@ -46,179 +50,324 @@ type (
 	cachingPolicy      Ydb_Table.CachingPolicy
 )
 
+type column struct {
+	name string
+	typ  types.Type
+}
+
+func (c column) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) {
+	d.AddColumns = append(d.AddColumns, &Ydb_Table.ColumnMeta{
+		Name: c.name,
+		Type: value.TypeToYDB(c.typ, a),
+	})
+}
+
+func (c column) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
+	d.Columns = append(d.Columns, &Ydb_Table.ColumnMeta{
+		Name: c.name,
+		Type: value.TypeToYDB(c.typ, a),
+	})
+}
+
 func WithColumn(name string, typ types.Type) CreateTableOption {
-	return func(d *CreateTableDesc, a *allocator.Allocator) {
-		d.Columns = append(d.Columns, &Ydb_Table.ColumnMeta{
-			Name: name,
-			Type: value.TypeToYDB(typ, a),
-		})
+	return column{
+		name: name,
+		typ:  typ,
 	}
+}
+
+type columnMeta Column
+
+func (c columnMeta) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) {
+	d.AddColumns = append(d.AddColumns, Column(c).toYDB(a))
+}
+
+func (c columnMeta) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
+	d.Columns = append(d.Columns, Column(c).toYDB(a))
 }
 
 func WithColumnMeta(column Column) CreateTableOption {
-	return func(d *CreateTableDesc, a *allocator.Allocator) {
-		d.Columns = append(d.Columns, column.toYDB(a))
-	}
+	return columnMeta(column)
+}
+
+type primaryKeyColumn []string
+
+func (columns primaryKeyColumn) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
+	d.PrimaryKey = append(d.PrimaryKey, columns...)
 }
 
 func WithPrimaryKeyColumn(columns ...string) CreateTableOption {
-	return func(d *CreateTableDesc, a *allocator.Allocator) {
-		d.PrimaryKey = append(d.PrimaryKey, columns...)
+	return primaryKeyColumn(columns)
+}
+
+type timeToLiveSettings TimeToLiveSettings
+
+func (settings timeToLiveSettings) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) {
+	d.TtlAction = &Ydb_Table.AlterTableRequest_SetTtlSettings{
+		SetTtlSettings: (*TimeToLiveSettings)(&settings).ToYDB(),
 	}
+}
+
+func (settings timeToLiveSettings) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
+	d.TtlSettings = (*TimeToLiveSettings)(&settings).ToYDB()
 }
 
 func WithTimeToLiveSettings(settings TimeToLiveSettings) CreateTableOption {
-	return func(d *CreateTableDesc, a *allocator.Allocator) {
-		d.TtlSettings = settings.ToYDB()
+	return timeToLiveSettings(settings)
+}
+
+type attribute struct {
+	key   string
+	value string
+}
+
+func (a attribute) ApplyAlterTableOption(d *AlterTableDesc, _ *allocator.Allocator) {
+	if d.AlterAttributes == nil {
+		d.AlterAttributes = make(map[string]string)
 	}
+	d.AlterAttributes[a.key] = a.value
+}
+
+func (a attribute) ApplyCreateTableOption(d *CreateTableDesc, _ *allocator.Allocator) {
+	if d.Attributes == nil {
+		d.Attributes = make(map[string]string)
+	}
+	d.Attributes[a.key] = a.value
 }
 
 func WithAttribute(key, value string) CreateTableOption {
-	return func(d *CreateTableDesc, a *allocator.Allocator) {
-		if d.Attributes == nil {
-			d.Attributes = make(map[string]string)
-		}
-		d.Attributes[key] = value
+	return attribute{
+		key:   key,
+		value: value,
 	}
 }
 
 type (
 	indexDesc   Ydb_Table.TableIndex
-	IndexOption func(d *indexDesc)
+	IndexOption interface {
+		ApplyIndexOption(d *indexDesc)
+	}
 )
 
-func WithIndex(name string, opts ...IndexOption) CreateTableOption {
-	return func(d *CreateTableDesc, a *allocator.Allocator) {
-		x := &Ydb_Table.TableIndex{
-			Name: name,
-		}
-		for _, opt := range opts {
-			opt((*indexDesc)(x))
-		}
-		d.Indexes = append(d.Indexes, x)
+type index struct {
+	name string
+	opts []IndexOption
+}
+
+func (i index) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
+	x := &Ydb_Table.TableIndex{
+		Name: i.name,
 	}
+	for _, opt := range i.opts {
+		opt.ApplyIndexOption((*indexDesc)(x))
+	}
+	d.Indexes = append(d.Indexes, x)
+}
+
+func WithIndex(name string, opts ...IndexOption) CreateTableOption {
+	return index{
+		name: name,
+		opts: opts,
+	}
+}
+
+type indexColumns []string
+
+func (columns indexColumns) ApplyIndexOption(d *indexDesc) {
+	d.IndexColumns = append(d.IndexColumns, columns...)
 }
 
 func WithIndexColumns(columns ...string) IndexOption {
-	return func(d *indexDesc) {
-		d.IndexColumns = append(d.IndexColumns, columns...)
-	}
+	return indexColumns(columns)
+}
+
+type indexType struct {
+	t IndexType
+}
+
+func (i indexType) ApplyIndexOption(d *indexDesc) {
+	i.t.setup(d)
 }
 
 func WithIndexType(t IndexType) IndexOption {
-	return func(d *indexDesc) {
-		t.setup(d)
+	return indexType{t: t}
+}
+
+type columnFamilies []ColumnFamily
+
+func (cf columnFamilies) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) {
+	d.AddColumnFamilies = make([]*Ydb_Table.ColumnFamily, len(cf))
+	for i, c := range cf {
+		d.AddColumnFamilies[i] = c.toYDB()
+	}
+}
+
+func (cf columnFamilies) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
+	d.ColumnFamilies = make([]*Ydb_Table.ColumnFamily, len(cf))
+	for i, c := range cf {
+		d.ColumnFamilies[i] = c.toYDB()
 	}
 }
 
 func WithColumnFamilies(cf ...ColumnFamily) CreateTableOption {
-	return func(d *CreateTableDesc, a *allocator.Allocator) {
-		d.ColumnFamilies = make([]*Ydb_Table.ColumnFamily, len(cf))
-		for i, c := range cf {
-			d.ColumnFamilies[i] = c.toYDB()
-		}
-	}
+	return columnFamilies(cf)
+}
+
+type readReplicasSettings ReadReplicasSettings
+
+func (rr readReplicasSettings) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) {
+	d.SetReadReplicasSettings = ReadReplicasSettings(rr).ToYDB()
+}
+
+func (rr readReplicasSettings) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
+	d.ReadReplicasSettings = ReadReplicasSettings(rr).ToYDB()
 }
 
 func WithReadReplicasSettings(rr ReadReplicasSettings) CreateTableOption {
-	return func(d *CreateTableDesc, a *allocator.Allocator) {
-		d.ReadReplicasSettings = rr.ToYDB()
-	}
+	return readReplicasSettings(rr)
+}
+
+type storageSettings StorageSettings
+
+func (ss storageSettings) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) {
+	d.AlterStorageSettings = StorageSettings(ss).ToYDB()
+}
+
+func (ss storageSettings) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
+	d.StorageSettings = StorageSettings(ss).ToYDB()
 }
 
 func WithStorageSettings(ss StorageSettings) CreateTableOption {
-	return func(d *CreateTableDesc, a *allocator.Allocator) {
-		d.StorageSettings = ss.ToYDB()
-	}
+	return storageSettings(ss)
+}
+
+type keyBloomFilter FeatureFlag
+
+func (f keyBloomFilter) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) {
+	d.SetKeyBloomFilter = FeatureFlag(f).ToYDB()
+}
+
+func (f keyBloomFilter) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
+	d.KeyBloomFilter = FeatureFlag(f).ToYDB()
 }
 
 func WithKeyBloomFilter(f FeatureFlag) CreateTableOption {
-	return func(d *CreateTableDesc, a *allocator.Allocator) {
-		d.KeyBloomFilter = f.ToYDB()
+	return keyBloomFilter(f)
+}
+
+type profileOption []ProfileOption
+
+func (opts profileOption) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
+	if d.Profile == nil {
+		d.Profile = new(Ydb_Table.TableProfile)
+	}
+	for _, opt := range opts {
+		opt.ApplyProfileOption((*profile)(d.Profile), a)
 	}
 }
 
 func WithProfile(opts ...ProfileOption) CreateTableOption {
-	return func(d *CreateTableDesc, a *allocator.Allocator) {
-		if d.Profile == nil {
-			d.Profile = new(Ydb_Table.TableProfile)
-		}
-		for _, opt := range opts {
-			opt((*profile)(d.Profile), a)
-		}
-	}
+	return profileOption(opts)
+}
+
+type profilePresetProfileOption string
+
+func (preset profilePresetProfileOption) ApplyProfileOption(p *profile, a *allocator.Allocator) {
+	p.PresetName = string(preset)
 }
 
 func WithProfilePreset(name string) ProfileOption {
-	return func(p *profile, a *allocator.Allocator) {
-		p.PresetName = name
+	return profilePresetProfileOption(name)
+}
+
+type storagePolicyProfileOption []StoragePolicyOption
+
+func (opts storagePolicyProfileOption) ApplyProfileOption(p *profile, a *allocator.Allocator) {
+	if p.StoragePolicy == nil {
+		p.StoragePolicy = new(Ydb_Table.StoragePolicy)
+	}
+	for _, opt := range opts {
+		opt((*storagePolicy)(p.StoragePolicy))
 	}
 }
 
 func WithStoragePolicy(opts ...StoragePolicyOption) ProfileOption {
-	return func(p *profile, a *allocator.Allocator) {
-		if p.StoragePolicy == nil {
-			p.StoragePolicy = new(Ydb_Table.StoragePolicy)
-		}
-		for _, opt := range opts {
-			opt((*storagePolicy)(p.StoragePolicy))
-		}
+	return storagePolicyProfileOption(opts)
+}
+
+type compactionPolicyProfileOption []CompactionPolicyOption
+
+func (opts compactionPolicyProfileOption) ApplyProfileOption(p *profile, a *allocator.Allocator) {
+	if p.CompactionPolicy == nil {
+		p.CompactionPolicy = new(Ydb_Table.CompactionPolicy)
+	}
+	for _, opt := range opts {
+		opt((*compactionPolicy)(p.CompactionPolicy))
 	}
 }
 
 func WithCompactionPolicy(opts ...CompactionPolicyOption) ProfileOption {
-	return func(p *profile, a *allocator.Allocator) {
-		if p.CompactionPolicy == nil {
-			p.CompactionPolicy = new(Ydb_Table.CompactionPolicy)
-		}
-		for _, opt := range opts {
-			opt((*compactionPolicy)(p.CompactionPolicy))
-		}
+	return compactionPolicyProfileOption(opts)
+}
+
+type partitioningPolicyProfileOption []PartitioningPolicyOption
+
+func (opts partitioningPolicyProfileOption) ApplyProfileOption(p *profile, a *allocator.Allocator) {
+	if p.PartitioningPolicy == nil {
+		p.PartitioningPolicy = new(Ydb_Table.PartitioningPolicy)
+	}
+	for _, opt := range opts {
+		opt((*partitioningPolicy)(p.PartitioningPolicy), a)
 	}
 }
 
 func WithPartitioningPolicy(opts ...PartitioningPolicyOption) ProfileOption {
-	return func(p *profile, a *allocator.Allocator) {
-		if p.PartitioningPolicy == nil {
-			p.PartitioningPolicy = new(Ydb_Table.PartitioningPolicy)
-		}
-		for _, opt := range opts {
-			opt((*partitioningPolicy)(p.PartitioningPolicy), a)
-		}
+	return partitioningPolicyProfileOption(opts)
+}
+
+type executionPolicyProfileOption []ExecutionPolicyOption
+
+func (opts executionPolicyProfileOption) ApplyProfileOption(p *profile, a *allocator.Allocator) {
+	if p.ExecutionPolicy == nil {
+		p.ExecutionPolicy = new(Ydb_Table.ExecutionPolicy)
+	}
+	for _, opt := range opts {
+		opt((*executionPolicy)(p.ExecutionPolicy))
 	}
 }
 
 func WithExecutionPolicy(opts ...ExecutionPolicyOption) ProfileOption {
-	return func(p *profile, a *allocator.Allocator) {
-		if p.ExecutionPolicy == nil {
-			p.ExecutionPolicy = new(Ydb_Table.ExecutionPolicy)
-		}
-		for _, opt := range opts {
-			opt((*executionPolicy)(p.ExecutionPolicy))
-		}
+	return executionPolicyProfileOption(opts)
+}
+
+type replicationPolicyProfileOption []ReplicationPolicyOption
+
+func (opts replicationPolicyProfileOption) ApplyProfileOption(p *profile, a *allocator.Allocator) {
+	if p.ReplicationPolicy == nil {
+		p.ReplicationPolicy = new(Ydb_Table.ReplicationPolicy)
+	}
+	for _, opt := range opts {
+		opt((*replicationPolicy)(p.ReplicationPolicy))
 	}
 }
 
 func WithReplicationPolicy(opts ...ReplicationPolicyOption) ProfileOption {
-	return func(p *profile, a *allocator.Allocator) {
-		if p.ReplicationPolicy == nil {
-			p.ReplicationPolicy = new(Ydb_Table.ReplicationPolicy)
-		}
-		for _, opt := range opts {
-			opt((*replicationPolicy)(p.ReplicationPolicy))
-		}
+	return replicationPolicyProfileOption(opts)
+}
+
+type cachingPolicyProfileOption []CachingPolicyOption
+
+func (opts cachingPolicyProfileOption) ApplyProfileOption(p *profile, a *allocator.Allocator) {
+	if p.CachingPolicy == nil {
+		p.CachingPolicy = new(Ydb_Table.CachingPolicy)
+	}
+	for _, opt := range opts {
+		opt((*cachingPolicy)(p.CachingPolicy))
 	}
 }
 
 func WithCachingPolicy(opts ...CachingPolicyOption) ProfileOption {
-	return func(p *profile, a *allocator.Allocator) {
-		if p.CachingPolicy == nil {
-			p.CachingPolicy = new(Ydb_Table.CachingPolicy)
-		}
-		for _, opt := range opts {
-			opt((*cachingPolicy)(p.CachingPolicy))
-		}
-	}
+	return cachingPolicyProfileOption(opts)
 }
 
 type (
@@ -340,151 +489,179 @@ func WithCachingPolicyPreset(name string) CachingPolicyOption {
 	}
 }
 
+type partitioningSettingsObject PartitioningSettings
+
+func (ps partitioningSettingsObject) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) {
+	d.AlterPartitioningSettings = PartitioningSettings(ps).toYDB()
+}
+
+func (ps partitioningSettingsObject) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
+	d.PartitioningSettings = PartitioningSettings(ps).toYDB()
+}
+
 func WithPartitioningSettingsObject(ps PartitioningSettings) CreateTableOption {
-	return func(d *CreateTableDesc, a *allocator.Allocator) {
-		d.PartitioningSettings = ps.toYDB()
+	return partitioningSettingsObject(ps)
+}
+
+type partitioningSettings []PartitioningSettingsOption
+
+func (opts partitioningSettings) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
+	settings := &ydbPartitioningSettings{}
+	for _, opt := range opts {
+		opt.ApplyPartitioningSettingsOption(settings)
 	}
+	d.PartitioningSettings = (*Ydb_Table.PartitioningSettings)(settings)
 }
 
 func WithPartitioningSettings(opts ...PartitioningSettingsOption) CreateTableOption {
-	return func(d *CreateTableDesc, a *allocator.Allocator) {
-		settings := &ydbPartitioningSettings{}
-		for _, o := range opts {
-			o(settings)
-		}
-		d.PartitioningSettings = (*Ydb_Table.PartitioningSettings)(settings)
-	}
+	return partitioningSettings(opts)
 }
 
 type (
 	ydbPartitioningSettings    Ydb_Table.PartitioningSettings
-	PartitioningSettingsOption func(settings *ydbPartitioningSettings)
+	PartitioningSettingsOption interface {
+		ApplyPartitioningSettingsOption(settings *ydbPartitioningSettings)
+	}
 )
 
+type partitioningBySizePartitioningSettingsOption FeatureFlag
+
+func (flag partitioningBySizePartitioningSettingsOption) ApplyPartitioningSettingsOption(
+	settings *ydbPartitioningSettings,
+) {
+	settings.PartitioningBySize = FeatureFlag(flag).ToYDB()
+}
+
 func WithPartitioningBySize(flag FeatureFlag) PartitioningSettingsOption {
-	return func(settings *ydbPartitioningSettings) {
-		settings.PartitioningBySize = flag.ToYDB()
-	}
+	return partitioningBySizePartitioningSettingsOption(flag)
+}
+
+type partitionSizeMbPartitioningSettingsOption uint64
+
+func (partitionSizeMb partitionSizeMbPartitioningSettingsOption) ApplyPartitioningSettingsOption(
+	settings *ydbPartitioningSettings,
+) {
+	settings.PartitionSizeMb = uint64(partitionSizeMb)
 }
 
 func WithPartitionSizeMb(partitionSizeMb uint64) PartitioningSettingsOption {
-	return func(settings *ydbPartitioningSettings) {
-		settings.PartitionSizeMb = partitionSizeMb
-	}
+	return partitionSizeMbPartitioningSettingsOption(partitionSizeMb)
+}
+
+type partitioningByLoadPartitioningSettingsOption FeatureFlag
+
+func (flag partitioningByLoadPartitioningSettingsOption) ApplyPartitioningSettingsOption(
+	settings *ydbPartitioningSettings,
+) {
+	settings.PartitioningByLoad = FeatureFlag(flag).ToYDB()
 }
 
 func WithPartitioningByLoad(flag FeatureFlag) PartitioningSettingsOption {
-	return func(settings *ydbPartitioningSettings) {
-		settings.PartitioningByLoad = flag.ToYDB()
-	}
+	return partitioningByLoadPartitioningSettingsOption(flag)
+}
+
+type minPartitionsCountPartitioningSettingsOption uint64
+
+func (minPartitionsCount minPartitionsCountPartitioningSettingsOption) ApplyPartitioningSettingsOption(
+	settings *ydbPartitioningSettings,
+) {
+	settings.MinPartitionsCount = uint64(minPartitionsCount)
 }
 
 func WithMinPartitionsCount(minPartitionsCount uint64) PartitioningSettingsOption {
-	return func(settings *ydbPartitioningSettings) {
-		settings.MinPartitionsCount = minPartitionsCount
-	}
+	return minPartitionsCountPartitioningSettingsOption(minPartitionsCount)
+}
+
+type maxPartitionsCountPartitioningSettingsOption uint64
+
+func (maxPartitionsCount maxPartitionsCountPartitioningSettingsOption) ApplyPartitioningSettingsOption(
+	settings *ydbPartitioningSettings,
+) {
+	settings.MaxPartitionsCount = uint64(maxPartitionsCount)
 }
 
 func WithMaxPartitionsCount(maxPartitionsCount uint64) PartitioningSettingsOption {
-	return func(settings *ydbPartitioningSettings) {
-		settings.MaxPartitionsCount = maxPartitionsCount
-	}
+	return maxPartitionsCountPartitioningSettingsOption(maxPartitionsCount)
 }
 
 type (
 	DropTableDesc   Ydb_Table.DropTableRequest
-	DropTableOption func(*DropTableDesc)
+	DropTableOption interface {
+		ApplyDropTableOption(*DropTableDesc)
+	}
 )
 
 type (
 	AlterTableDesc   Ydb_Table.AlterTableRequest
-	AlterTableOption func(*AlterTableDesc, *allocator.Allocator)
+	AlterTableOption interface {
+		ApplyAlterTableOption(*AlterTableDesc, *allocator.Allocator)
+	}
 )
 
 func WithAddColumn(name string, typ types.Type) AlterTableOption {
-	return func(d *AlterTableDesc, a *allocator.Allocator) {
-		d.AddColumns = append(d.AddColumns, &Ydb_Table.ColumnMeta{
-			Name: name,
-			Type: value.TypeToYDB(typ, a),
-		})
+	return column{
+		name: name,
+		typ:  typ,
 	}
 }
 
 func WithAlterAttribute(key, value string) AlterTableOption {
-	return func(d *AlterTableDesc, a *allocator.Allocator) {
-		if d.AlterAttributes == nil {
-			d.AlterAttributes = make(map[string]string)
-		}
-		d.AlterAttributes[key] = value
+	return attribute{
+		key:   key,
+		value: value,
 	}
 }
 
 func WithAddColumnMeta(column Column) AlterTableOption {
-	return func(d *AlterTableDesc, a *allocator.Allocator) {
-		d.AddColumns = append(d.AddColumns, column.toYDB(a))
-	}
+	return columnMeta(column)
+}
+
+type dropColumn string
+
+func (name dropColumn) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) {
+	d.DropColumns = append(d.DropColumns, string(name))
 }
 
 func WithDropColumn(name string) AlterTableOption {
-	return func(d *AlterTableDesc, a *allocator.Allocator) {
-		d.DropColumns = append(d.DropColumns, name)
-	}
+	return dropColumn(name)
 }
 
 func WithAddColumnFamilies(cf ...ColumnFamily) AlterTableOption {
-	return func(d *AlterTableDesc, a *allocator.Allocator) {
-		d.AddColumnFamilies = make([]*Ydb_Table.ColumnFamily, len(cf))
-		for i, c := range cf {
-			d.AddColumnFamilies[i] = c.toYDB()
-		}
-	}
+	return columnFamilies(cf)
 }
 
 func WithAlterColumnFamilies(cf ...ColumnFamily) AlterTableOption {
-	return func(d *AlterTableDesc, a *allocator.Allocator) {
-		d.AddColumnFamilies = make([]*Ydb_Table.ColumnFamily, len(cf))
-		for i, c := range cf {
-			d.AddColumnFamilies[i] = c.toYDB()
-		}
-	}
+	return columnFamilies(cf)
 }
 
 func WithAlterReadReplicasSettings(rr ReadReplicasSettings) AlterTableOption {
-	return func(d *AlterTableDesc, a *allocator.Allocator) {
-		d.SetReadReplicasSettings = rr.ToYDB()
-	}
+	return readReplicasSettings(rr)
 }
 
 func WithAlterStorageSettings(ss StorageSettings) AlterTableOption {
-	return func(d *AlterTableDesc, a *allocator.Allocator) {
-		d.AlterStorageSettings = ss.ToYDB()
-	}
+	return storageSettings(ss)
 }
 
 func WithAlterKeyBloomFilter(f FeatureFlag) AlterTableOption {
-	return func(d *AlterTableDesc, a *allocator.Allocator) {
-		d.SetKeyBloomFilter = f.ToYDB()
-	}
+	return keyBloomFilter(f)
 }
 
 func WithAlterPartitionSettingsObject(ps PartitioningSettings) AlterTableOption {
-	return func(d *AlterTableDesc, a *allocator.Allocator) {
-		d.AlterPartitioningSettings = ps.toYDB()
-	}
+	return partitioningSettingsObject(ps)
 }
 
 func WithSetTimeToLiveSettings(settings TimeToLiveSettings) AlterTableOption {
-	return func(d *AlterTableDesc, a *allocator.Allocator) {
-		d.TtlAction = &Ydb_Table.AlterTableRequest_SetTtlSettings{
-			SetTtlSettings: settings.ToYDB(),
-		}
-	}
+	return timeToLiveSettings(settings)
+}
+
+type dropTimeToLive struct{}
+
+func (dropTimeToLive) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) {
+	d.TtlAction = &Ydb_Table.AlterTableRequest_DropTtlSettings{}
 }
 
 func WithDropTimeToLive() AlterTableOption {
-	return func(d *AlterTableDesc, a *allocator.Allocator) {
-		d.TtlAction = &Ydb_Table.AlterTableRequest_DropTtlSettings{}
-	}
+	return dropTimeToLive{}
 }
 
 type (
