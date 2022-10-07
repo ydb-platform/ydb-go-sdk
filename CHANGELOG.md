@@ -1,8 +1,6 @@
-* Changed type of `topic/topicoptions.AlterOption` from func to interface
-* Changed type of `topic/topicoptions.CreateOption` from func to interface
-* Changed type of `topic/topicoptions.DescribeOption` from func to interface
-* Changed type of `topic/topicoptions.DropOption` from func to interface
-* Added implementations of `topic/topicoptions.AlterOption` and `topic/topicoptions.CreateOption`
+* Changed type of `topic/topicoptions.{Create,Alter,Describe,Drop}Option` from func to interface
+* Added implementations of `topic/topicoptions.{Create,Alter}Option`
+* Fix internal race-condition bugs in internal background worker
 
 ## v3.38.3
 * Added retries to initial discovering
