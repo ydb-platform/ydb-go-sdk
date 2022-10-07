@@ -1,6 +1,6 @@
 * Changed type of `table/options.{Create,Alter,Drop}TableOption` from func to interface
 * Added implementations of `table/options.{Create,Alter,Drop}Option`
-* Changed type of `topic/topicoptions.{Create,Alter,Describe,Drop}Option` from func to interface
+* Changed type of `topic/topicoptions.{Create,Alter,Drop}Option` from func to interface
 * Added implementations of `topic/topicoptions.{Create,Alter}Option`
 * Fix internal race-condition bugs in internal background worker
 

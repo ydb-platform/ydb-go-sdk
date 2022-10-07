@@ -128,7 +128,7 @@ func (c *Client) Describe(
 	}
 
 	for _, o := range opts {
-		o.ApplyDescribeOption(&req)
+		o(&req)
 	}
 
 	var rawRes rawtopic.DescribeTopicResult
