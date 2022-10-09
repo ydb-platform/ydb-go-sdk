@@ -48,35 +48,36 @@ type verbFormatter struct {
 	format func()
 }
 
-func vF(rune rune, format func()) verbFormatter {
-	return verbFormatter{verb: rune, format: format}
+func vF(verb rune, format func()) verbFormatter {
+	return verbFormatter{verb: verb, format: format}
 }
 
 func formatValue(v Value, s fmt.State, verb rune, other ...verbFormatter) {
-	switch verb {
-	case 'v':
-		if s.Flag('+') {
-			_, _ = io.WriteString(s, v.Type().String()+"(")
-		}
-		_, _ = io.WriteString(s, v.String())
-		if s.Flag('+') {
-			_, _ = io.WriteString(s, ")")
-		}
-	case 's':
-		_, _ = io.WriteString(s, v.String())
-	case 'T':
-		_, _ = io.WriteString(s, v.Type().String())
-	default:
-		for _, rf := range other {
-			if rf.verb == verb {
-				rf.format()
-				return
+	for _, rf := range append(other,
+		vF('v', func() {
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, v.Type().String()+"(")
 			}
+			_, _ = io.WriteString(s, v.String())
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, ")")
+			}
+		}),
+		vF('s', func() {
+			_, _ = io.WriteString(s, v.String())
+		}),
+		vF('T', func() {
+			_, _ = io.WriteString(s, v.Type().String())
+		}),
+	) {
+		if rf.verb == verb {
+			rf.format()
+			return
 		}
-		_, _ = io.WriteString(s,
-			fmt.Sprintf("unknown formatter verb '%v' for value type '%s'", verb, v.Type().String()),
-		)
 	}
+	_, _ = io.WriteString(s,
+		fmt.Sprintf("unknown formatter verb '%v' for value type '%s'", verb, v.Type().String()),
+	)
 }
 
 func FromYDB(t *Ydb.Type, v *Ydb.Value) Value {
@@ -300,9 +301,7 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 type boolValue bool
 
 func (v boolValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb, vF('t', func() {
-		return
-	}))
+	formatValue(v, s, verb)
 }
 
 func (v boolValue) castTo(dst interface{}) error {
@@ -519,7 +518,7 @@ func (v *dictValue) castTo(dst interface{}) error {
 func (v *dictValue) String() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString("(")
+	buffer.WriteByte('{')
 	for i, value := range v.values {
 		if i != 0 {
 			buffer.WriteByte(',')
@@ -528,7 +527,7 @@ func (v *dictValue) String() string {
 		buffer.WriteByte(':')
 		buffer.WriteString(value.V.String())
 	}
-	buffer.WriteByte(')')
+	buffer.WriteByte('}')
 	return buffer.String()
 }
 
@@ -572,7 +571,7 @@ func (v *doubleValue) Format(s fmt.State, verb rune) {
 		if p, hasPrecision := s.Precision(); hasPrecision {
 			precision = p
 		}
-		_, _ = io.WriteString(s, strconv.FormatFloat(float64(v.value), 'f', precision, 64))
+		_, _ = io.WriteString(s, strconv.FormatFloat(v.value, 'f', precision, 64))
 	}))
 }
 
@@ -1093,14 +1092,14 @@ func (v *listValue) castTo(dst interface{}) error {
 func (v *listValue) String() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString("(")
+	buffer.WriteString("[")
 	for i, item := range v.items {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
 		buffer.WriteString(item.String())
 	}
-	buffer.WriteByte(')')
+	buffer.WriteByte(']')
 	return buffer.String()
 }
 
@@ -1346,7 +1345,14 @@ type tupleValue struct {
 }
 
 func (v *tupleValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
+	formatValue(v, s, verb,
+		vF('v', func() {
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, v.Type().String())
+			}
+			_, _ = io.WriteString(s, v.String())
+		}),
+	)
 }
 
 func (v *tupleValue) castTo(dst interface{}) error {
@@ -1881,7 +1887,14 @@ type variantValue struct {
 }
 
 func (v *variantValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
+	formatValue(v, s, verb,
+		vF('v', func() {
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, v.Type().String())
+			}
+			_, _ = io.WriteString(s, v.String())
+		}),
+	)
 }
 
 func (v *variantValue) castTo(dst interface{}) error {
@@ -1962,7 +1975,7 @@ func (v voidValue) castTo(dst interface{}) error {
 }
 
 func (v voidValue) String() string {
-	return ""
+	return "VOID"
 }
 
 var (
@@ -2127,18 +2140,30 @@ func ZeroValue(t Type) Value {
 			t: t,
 		}
 	case *TupleType:
-		return &tupleValue{
-			t: t,
+		v := &tupleValue{
+			t:     t,
+			items: make([]Value, len(t.items)),
 		}
+		for i, tt := range t.items {
+			v.items[i] = ZeroValue(tt)
+		}
+		return v
 	case *StructType:
-		return &structValue{
-			t: t,
+		v := &structValue{
+			t:      t,
+			fields: make([]StructValueField, len(t.fields)),
 		}
+		for i, tt := range t.fields {
+			v.fields[i] = StructValueField{
+				Name: tt.Name,
+				V:    ZeroValue(tt.T),
+			}
+		}
+		return v
 	case *dictType:
 		return &dictValue{
 			t: t,
 		}
-
 	case *DecimalType:
 		return DecimalValue([16]byte{}, 22, 9)
 
