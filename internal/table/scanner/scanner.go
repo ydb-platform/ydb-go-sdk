@@ -1,7 +1,6 @@
 package scanner
 
 import (
-	"bytes"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -14,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -172,9 +172,9 @@ func (s *scanner) Scan(values ...indexed.RequiredOrOptional) (err error) {
 	return s.Err()
 }
 
-func (s *scanner) ScanNamed(namedValues ...named.Value) (err error) {
-	if err = s.Err(); err != nil {
-		return
+func (s *scanner) ScanNamed(namedValues ...named.Value) error {
+	if err := s.Err(); err != nil {
+		return err
 	}
 	if s.ColumnCount() < len(namedValues) {
 		panic(fmt.Sprintf("scan row failed: count of columns less then values (%d < %d)", s.ColumnCount(), len(namedValues)))
@@ -183,8 +183,8 @@ func (s *scanner) ScanNamed(namedValues ...named.Value) (err error) {
 		panic("scan row failed: double scan per row")
 	}
 	for _, v := range namedValues {
-		if err = s.seekItemByName(v.Name); err != nil {
-			return
+		if err := s.seekItemByName(v.Name); err != nil {
+			return err
 		}
 		switch t := v.Type; t {
 		case named.TypeRequired:
@@ -249,8 +249,9 @@ func (s *scanner) reset(set *Ydb.ResultSet, columnNames ...string) {
 }
 
 func (s *scanner) path() string {
-	var buf bytes.Buffer
-	_, _ = s.writePathTo(&buf)
+	buf := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buf)
+	_, _ = s.writePathTo(buf)
 	return buf.String()
 }
 
@@ -279,7 +280,7 @@ func (s *scanner) hasItems() bool {
 
 func (s *scanner) seekItemByID(id int) error {
 	if !s.hasItems() || id >= len(s.set.Columns) {
-		return s.noValueError()
+		return s.notFoundColumnByIndex(id)
 	}
 	col := s.set.Columns[id]
 	s.stack.scanItem.name = col.Name
@@ -290,7 +291,7 @@ func (s *scanner) seekItemByID(id int) error {
 
 func (s *scanner) seekItemByName(name string) error {
 	if !s.hasItems() {
-		return s.noValueError()
+		return s.notFoundColumnName(name)
 	}
 	for i, c := range s.set.Columns {
 		if name == c.Name {
@@ -300,7 +301,7 @@ func (s *scanner) seekItemByName(name string) error {
 			return s.Err()
 		}
 	}
-	return s.noValueError()
+	return s.notFoundColumnName(name)
 }
 
 func (s *scanner) setColumnIndexes(columns []string) {
@@ -1122,11 +1123,19 @@ func (s *scanner) valueTypeError(act, exp interface{}) {
 	)
 }
 
-func (s *scanner) noValueError() error {
+func (s *scanner) notFoundColumnByIndex(idx int) error {
 	return s.errorf(
 		2,
-		"no value at %q",
-		s.path(),
+		"not found %d column",
+		idx,
+	)
+}
+
+func (s *scanner) notFoundColumnName(name string) error {
+	return s.errorf(
+		2,
+		"not found column '%s'",
+		name,
 	)
 }
 

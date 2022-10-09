@@ -2,6 +2,16 @@
 * Added `types.CastTo(types.Value, destination)` public method for cast `types.Value` to golang native type value destination
 * Refactored string representation of `types.Value`
 
+## v3.38.5
+* Fixed bug from scan unexpected column name
+
+## v3.38.4
+* Changed type of `table/options.{Create,Alter,Drop}TableOption` from func to interface
+* Added implementations of `table/options.{Create,Alter,Drop}Option`
+* Changed type of `topic/topicoptions.{Create,Alter,Drop}Option` from func to interface
+* Added implementations of `topic/topicoptions.{Create,Alter}Option`
+* Fix internal race-condition bugs in internal background worker
+
 ## v3.38.3
 * Added retries to initial discovering
 

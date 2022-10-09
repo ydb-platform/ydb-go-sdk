@@ -68,8 +68,8 @@ func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.Al
 	req := rawtopic.AlterTopicRequest{}
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
-	for _, f := range opts {
-		f(&req)
+	for _, o := range opts {
+		o.ApplyAlterOption(&req)
 	}
 
 	call := func(ctx context.Context) error {
@@ -97,8 +97,8 @@ func (c *Client) Create(
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
 
-	for _, f := range opts {
-		f(&req)
+	for _, o := range opts {
+		o.ApplyCreateOption(&req)
 	}
 
 	call := func(ctx context.Context) error {
@@ -127,8 +127,8 @@ func (c *Client) Describe(
 		Path:            path,
 	}
 
-	for _, opt := range opts {
-		opt(&req)
+	for _, o := range opts {
+		o(&req)
 	}
 
 	var rawRes rawtopic.DescribeTopicResult
@@ -164,8 +164,8 @@ func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.Dro
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
 
-	for _, f := range opts {
-		f(&req)
+	for _, o := range opts {
+		o.ApplyDropOption(&req)
 	}
 
 	call := func(ctx context.Context) error {
