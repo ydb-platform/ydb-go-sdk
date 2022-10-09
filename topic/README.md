@@ -11,7 +11,8 @@
 [![Telegram](https://img.shields.io/badge/chat-on%20Telegram-2ba2d9.svg)](https://t.me/YDBPlatform)
 [![WebSite](https://img.shields.io/badge/website-ydb.tech-blue.svg)](https://ydb.tech)
 
-Supports `topic` clients for [YDB](https://ydb.tech), see [ydb-go-sdk](https://github.com/ydb-platform/ydb-go-sdk) for describe driver all features
+See [ydb-go-sdk](https://github.com/ydb-platform/ydb-go-sdk) for describe all driver features.
+
 `YDB` is an open-source Distributed SQL Database that combines high availability and scalability with strict consistency and [ACID](https://en.wikipedia.org/wiki/ACID) transactions with [CDC](https://en.wikipedia.org/wiki/Change_data_capture) and Data stream features.
 
 ## Installation
