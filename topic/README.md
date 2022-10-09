@@ -1,4 +1,3 @@
-# `ydb-go-sdk` - pure Go native and `database/sql` driver for [YDB](https://github.com/ydb-platform/ydb)
 # `topic` - pure Go native client for [YDB Topic](https://ydb.tech/en/docs/concepts/topic)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/ydb-platform/ydb/blob/main/LICENSE)
 [![Release](https://img.shields.io/github/v/release/ydb-platform/ydb-go-sdk.svg?style=flat-square)](https://github.com/ydb-platform/ydb-go-sdk/releases)
