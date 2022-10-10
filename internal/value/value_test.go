@@ -353,16 +353,16 @@ func TestValueToString(t *testing.T) {
 		},
 		{
 			value: DatetimeValue(func() uint32 {
-				v, _ := time.Parse("2006-01-02 15:04:05", "2022-06-17 05:19:20")
+				v, _ := time.ParseInLocation("2006-01-02 15:04:05", "2022-06-17 05:19:20", time.Local)
 				return uint32(v.Sub(time.Unix(0, 0)).Seconds())
 			}()),
-			string: "2022-06-17 05:19:20",
+			string: "2022-06-17T05:19:20",
 			format: map[string]string{
-				"%v":  "2022-06-17 05:19:20",
-				"%+v": "Datetime(\"2022-06-17 05:19:20\")",
+				"%v":  "2022-06-17T05:19:20",
+				"%+v": "Datetime(\"2022-06-17T05:19:20\")",
 				"%T":  "value.datetimeValue",
-				"%s":  "2022-06-17 05:19:20",
-				"%q":  "\"2022-06-17 05:19:20\"",
+				"%s":  "2022-06-17T05:19:20",
+				"%q":  "\"2022-06-17T05:19:20\"",
 			},
 		},
 		{
@@ -400,17 +400,17 @@ func TestValueToString(t *testing.T) {
 		},
 		{
 			value: TimestampValueFromTime(func() time.Time {
-				tt, err := time.Parse(LayoutTimestamp, "1997-12-14 03:09:42.123456")
+				tt, err := time.ParseInLocation(LayoutTimestamp, "1997-12-14T03:09:42.123456", time.Local)
 				require.NoError(t, err)
-				return tt
+				return tt.Local()
 			}()),
-			string: "1997-12-14 03:09:42.123456",
+			string: "1997-12-14T03:09:42.123456",
 			format: map[string]string{
-				"%v":  "1997-12-14 03:09:42.123456",
-				"%+v": "Timestamp(\"1997-12-14 03:09:42.123456\")",
+				"%v":  "1997-12-14T03:09:42.123456",
+				"%+v": "Timestamp(\"1997-12-14T03:09:42.123456\")",
 				"%T":  "value.timestampValue",
-				"%s":  "1997-12-14 03:09:42.123456",
-				"%q":  "\"1997-12-14 03:09:42.123456\"",
+				"%s":  "1997-12-14T03:09:42.123456",
+				"%q":  "\"1997-12-14T03:09:42.123456\"",
 			},
 		},
 		{
