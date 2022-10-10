@@ -257,7 +257,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 		}
 		return ydbval, &src
 	case Ydb.Type_TZ_DATE:
-		v := time.Now().Format(value.LayoutTzDate)
+		v := time.Now().Format(value.LayoutDate)
 		ydbval := &Ydb.Value{
 			Value: &Ydb.Value_TextValue{
 				TextValue: v,
@@ -282,7 +282,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 			return ydbval, &dv
 		}
 		rv %= time.Now().Unix()
-		v := value.DatetimeToTime(uint32(rv)).Format(value.LayoutTzDatetime)
+		v := value.DatetimeToTime(uint32(rv)).Format(value.LayoutDatetime)
 		ydbval := &Ydb.Value{
 			Value: &Ydb.Value_TextValue{
 				TextValue: v,
@@ -296,7 +296,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 		return ydbval, &src
 	case Ydb.Type_TZ_TIMESTAMP:
 		rv %= time.Now().Unix()
-		v := value.TimestampToTime(uint64(rv)).Format(value.LayoutTzTimestamp)
+		v := value.TimestampToTime(uint64(rv)).Format(value.LayoutTimestamp)
 		ydbval := &Ydb.Value{
 			Value: &Ydb.Value_TextValue{
 				TextValue: v,

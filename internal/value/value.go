@@ -1501,7 +1501,7 @@ func TzDateValue(v string) tzDateValue {
 }
 
 func TzDateValueFromTime(t time.Time) tzDateValue {
-	return tzDateValue(t.Format(LayoutTzDate))
+	return tzDateValue(t.Format(LayoutDate))
 }
 
 type tzDatetimeValue string
@@ -1559,7 +1559,7 @@ func TzDatetimeValue(v string) tzDatetimeValue {
 }
 
 func TzDatetimeValueFromTime(t time.Time) tzDatetimeValue {
-	return tzDatetimeValue(t.Format(LayoutTzDatetime))
+	return tzDatetimeValue(t.Format(LayoutDatetime))
 }
 
 type tzTimestampValue string
@@ -1617,7 +1617,7 @@ func TzTimestampValue(v string) tzTimestampValue {
 }
 
 func TzTimestampValueFromTime(t time.Time) tzTimestampValue {
-	return tzTimestampValue(t.Format(LayoutTzTimestamp))
+	return tzTimestampValue(t.Format(LayoutTimestamp))
 }
 
 type uint8Value uint8
