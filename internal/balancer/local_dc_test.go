@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
 var localIP = net.IPv4(127, 0, 0, 1)
@@ -100,26 +101,22 @@ func TestCheckFastestAddress(t *testing.T) {
 
 func TestDetectLocalDC(t *testing.T) {
 	ctx := context.Background()
-	t.Run("Ok", func(t *testing.T) {
-		for i := 0; i < 100; i++ {
-			t.Run("", func(t *testing.T) {
-				listen1, err := net.ListenTCP("tcp", &net.TCPAddr{IP: localIP})
-				require.NoError(t, err)
-				defer func() { _ = listen1.Close() }()
+	xtest.TestManyTimesWithName(t, "Ok", func(t testing.TB) {
+		listen1, err := net.ListenTCP("tcp", &net.TCPAddr{IP: localIP})
+		require.NoError(t, err)
+		defer func() { _ = listen1.Close() }()
 
-				listen2, err := net.ListenTCP("tcp", &net.TCPAddr{IP: localIP})
-				require.NoError(t, err)
-				listen2Addr := listen2.Addr().String()
-				_ = listen2.Close() // force close, for not accept tcp connections
+		listen2, err := net.ListenTCP("tcp", &net.TCPAddr{IP: localIP})
+		require.NoError(t, err)
+		listen2Addr := listen2.Addr().String()
+		_ = listen2.Close() // force close, for not accept tcp connections
 
-				dc, err := detectLocalDC(ctx, []endpoint.Endpoint{
-					&mock.Endpoint{LocationField: "a", AddrField: "grpc://" + listen1.Addr().String()},
-					&mock.Endpoint{LocationField: "b", AddrField: "grpc://" + listen2Addr},
-				})
-				require.NoError(t, err)
-				require.Equal(t, "a", dc)
-			})
-		}
+		dc, err := detectLocalDC(ctx, []endpoint.Endpoint{
+			&mock.Endpoint{LocationField: "a", AddrField: "grpc://" + listen1.Addr().String()},
+			&mock.Endpoint{LocationField: "b", AddrField: "grpc://" + listen2Addr},
+		})
+		require.NoError(t, err)
+		require.Equal(t, "a", dc)
 	})
 	t.Run("Empty", func(t *testing.T) {
 		res, err := detectLocalDC(ctx, nil)
@@ -230,14 +227,12 @@ func TestGetRandomEndpoints(t *testing.T) {
 		res = getRandomEndpoints(source, 4)
 		require.Equal(t, source, res)
 	})
-	t.Run("SelectRandom", func(t *testing.T) {
-		for i := 0; i < 100; i++ {
-			res := getRandomEndpoints(source, 2)
-			require.Len(t, res, 2)
-			for _, ep := range res {
-				require.Contains(t, source, ep)
-			}
-			require.NotEqual(t, res[0], res[1])
+	xtest.TestManyTimesWithName(t, "SelectRandom", func(t testing.TB) {
+		res := getRandomEndpoints(source, 2)
+		require.Len(t, res, 2)
+		for _, ep := range res {
+			require.Contains(t, source, ep)
 		}
+		require.NotEqual(t, res[0], res[1])
 	})
 }
