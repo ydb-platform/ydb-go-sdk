@@ -409,7 +409,7 @@ func DateValue(v uint32) dateValue {
 }
 
 func DateValueFromTime(t time.Time) dateValue {
-	return dateValue(uint64(t.Sub(unix)/time.Second) / secondsPerDay)
+	return dateValue(uint64(t.Sub(epoch)/time.Second) / secondsPerDay)
 }
 
 type datetimeValue uint32
@@ -474,7 +474,7 @@ func DatetimeValue(v uint32) datetimeValue {
 }
 
 func DatetimeValueFromTime(t time.Time) datetimeValue {
-	return datetimeValue(uint64(t.Sub(unix) / time.Second))
+	return datetimeValue(t.Unix())
 }
 
 type decimalValue struct {
@@ -1382,7 +1382,7 @@ func TimestampValue(v uint64) timestampValue {
 }
 
 func TimestampValueFromTime(t time.Time) timestampValue {
-	return timestampValue(t.Sub(unix) / time.Microsecond)
+	return timestampValue(t.Sub(epoch) / time.Microsecond)
 }
 
 type tupleValue struct {

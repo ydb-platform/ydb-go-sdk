@@ -23,7 +23,7 @@ const (
 	LayoutTzTimestamp = "2006-01-02T15:04:05.000000,MST"
 )
 
-var unix = time.Unix(0, 0)
+var epoch = time.Unix(0, 0)
 
 // IntervalToDuration returns time.Duration from given microseconds
 func IntervalToDuration(n int64) time.Duration {
@@ -37,7 +37,7 @@ func durationToMicroseconds(d time.Duration) int64 {
 
 // DateToTime up to 11761191-01-20 00:00:00 +0000 UTC.
 func DateToTime(n uint32) time.Time {
-	return time.Unix(int64(n)*int64(secondsPerDay), 0).UTC()
+	return time.Unix(0, 0).Add(time.Hour * 24 * time.Duration(n))
 }
 
 // DatetimeToTime converts seconds to time.Time
