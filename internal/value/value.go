@@ -7,7 +7,6 @@ import (
 	"io"
 	"math/big"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -53,9 +52,6 @@ func vF(verb rune, format func()) verbFormatter {
 }
 
 func formatValue(v Value, s fmt.State, verb rune, other ...verbFormatter) {
-	if verb == 'q' {
-		fmt.Println()
-	}
 	for _, rf := range append(other,
 		vF('v', func() {
 			if s.Flag('+') {
@@ -2257,7 +2253,23 @@ func ZeroValue(t Type) Value {
 type bytesValue []byte
 
 func (v bytesValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
+	formatValue(v, s, verb,
+		vF('s', func() {
+			_, _ = io.WriteString(s, string(v))
+		}),
+		vF('q', func() {
+			_, _ = io.WriteString(s, fmt.Sprintf("%q", []byte(v)))
+		}),
+		vF('d', func() {
+			_, _ = io.WriteString(s, fmt.Sprintf("%d", []byte(v)))
+		}),
+		vF('x', func() {
+			_, _ = io.WriteString(s, fmt.Sprintf("%x", []byte(v)))
+		}),
+		vF('X', func() {
+			_, _ = io.WriteString(s, fmt.Sprintf("%X", []byte(v)))
+		}),
+	)
 }
 
 func (v bytesValue) castTo(dst interface{}) error {
@@ -2274,18 +2286,7 @@ func (v bytesValue) castTo(dst interface{}) error {
 }
 
 func (v bytesValue) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteByte('[')
-	for i, b := range []byte(v) {
-		if i != 0 {
-			buffer.WriteByte(',')
-		}
-		buffer.WriteString("0x")
-		buffer.WriteString(strings.ToUpper(strconv.FormatUint(uint64(b), 16)))
-	}
-	buffer.WriteByte(']')
-	return buffer.String()
+	return fmt.Sprintf("%v", []byte(v))
 }
 
 func (bytesValue) Type() Type {

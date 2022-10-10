@@ -205,12 +205,15 @@ func TestValueToString(t *testing.T) {
 		},
 		{
 			value:  BytesValue([]byte("foo")),
-			string: "[0x66,0x6F,0x6F]",
+			string: "[102 111 111]",
 			format: map[string]string{
-				"%v":  "[0x66,0x6F,0x6F]",
-				"%+v": "Bytes([0x66,0x6F,0x6F])",
+				"%v":  "[102 111 111]",
+				"%+v": "Bytes([102 111 111])",
 				"%T":  "value.bytesValue",
-				"%s":  "[0x66,0x6F,0x6F]",
+				"%s":  "foo",
+				"%q":  "\"foo\"",
+				"%x":  "666f6f",
+				"%X":  "666F6F",
 			},
 		},
 		{
