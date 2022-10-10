@@ -194,12 +194,13 @@ func TestValueToString(t *testing.T) {
 		},
 		{
 			value:  TextValue("foo"),
-			string: "\"foo\"",
+			string: "foo",
 			format: map[string]string{
-				"%v":  "\"foo\"",
+				"%v":  "foo",
 				"%+v": "Text(\"foo\")",
 				"%T":  "*value.textValue",
-				"%s":  "\"foo\"",
+				"%s":  "foo",
+				"%q":  "\"foo\"",
 			},
 		},
 		{
@@ -341,22 +342,60 @@ func TestValueToString(t *testing.T) {
 				v, _ := time.Parse("2006-01-02", "2022-06-17")
 				return uint32(v.Sub(time.Unix(0, 0)) / time.Hour / 24)
 			}()),
-			string: "\"2022-06-17\"",
+			string: "2022-06-17",
 			format: map[string]string{
-				"%v":  "\"2022-06-17\"",
+				"%v":  "2022-06-17",
 				"%+v": "Date(\"2022-06-17\")",
 				"%T":  "value.dateValue",
-				"%s":  "\"2022-06-17\"",
+				"%s":  "2022-06-17",
+				"%q":  "\"2022-06-17\"",
+			},
+		},
+		{
+			value: DatetimeValue(func() uint32 {
+				v, _ := time.Parse("2006-01-02 15:04:05", "2022-06-17 05:19:20")
+				return uint32(v.Sub(time.Unix(0, 0)).Seconds())
+			}()),
+			string: "2022-06-17 05:19:20",
+			format: map[string]string{
+				"%v":  "2022-06-17 05:19:20",
+				"%+v": "Datetime(\"2022-06-17 05:19:20\")",
+				"%T":  "value.datetimeValue",
+				"%s":  "2022-06-17 05:19:20",
+				"%q":  "\"2022-06-17 05:19:20\"",
+			},
+		},
+		{
+			value:  TzDateValue("2022-06-17"),
+			string: "2022-06-17",
+			format: map[string]string{
+				"%v":  "2022-06-17",
+				"%+v": "TzDate(\"2022-06-17\")",
+				"%T":  "value.tzDateValue",
+				"%s":  "2022-06-17",
+				"%q":  "\"2022-06-17\"",
+			},
+		},
+		{
+			value:  TzDatetimeValue("2022-06-17 05:19:20"),
+			string: "2022-06-17 05:19:20",
+			format: map[string]string{
+				"%v":  "2022-06-17 05:19:20",
+				"%+v": "TzDatetime(\"2022-06-17 05:19:20\")",
+				"%T":  "value.tzDatetimeValue",
+				"%s":  "2022-06-17 05:19:20",
+				"%q":  "\"2022-06-17 05:19:20\"",
 			},
 		},
 		{
 			value:  IntervalValueFromDuration(time.Duration(42) * time.Millisecond),
-			string: "\"42ms\"",
+			string: "42ms",
 			format: map[string]string{
-				"%v":  "\"42ms\"",
+				"%v":  "42ms",
 				"%+v": "Interval(\"42ms\")",
 				"%T":  "value.intervalValue",
-				"%s":  "\"42ms\"",
+				"%s":  "42ms",
+				"%q":  "\"42ms\"",
 			},
 		},
 		{
@@ -365,12 +404,24 @@ func TestValueToString(t *testing.T) {
 				require.NoError(t, err)
 				return tt
 			}()),
-			string: "\"1997-12-14 03:09:42.123456\"",
+			string: "1997-12-14 03:09:42.123456",
 			format: map[string]string{
-				"%v":  "\"1997-12-14 03:09:42.123456\"",
+				"%v":  "1997-12-14 03:09:42.123456",
 				"%+v": "Timestamp(\"1997-12-14 03:09:42.123456\")",
 				"%T":  "value.timestampValue",
-				"%s":  "\"1997-12-14 03:09:42.123456\"",
+				"%s":  "1997-12-14 03:09:42.123456",
+				"%q":  "\"1997-12-14 03:09:42.123456\"",
+			},
+		},
+		{
+			value:  TzTimestampValue("1997-12-14 03:09:42.123456"),
+			string: "1997-12-14 03:09:42.123456",
+			format: map[string]string{
+				"%v":  "1997-12-14 03:09:42.123456",
+				"%+v": "TzTimestamp(\"1997-12-14 03:09:42.123456\")",
+				"%T":  "value.tzTimestampValue",
+				"%s":  "1997-12-14 03:09:42.123456",
+				"%q":  "\"1997-12-14 03:09:42.123456\"",
 			},
 		},
 		{
@@ -448,12 +499,25 @@ func TestValueToString(t *testing.T) {
 				TypeBytes,
 				TypeInt32,
 			))),
-			string: "(1:42)",
+			string: "{1:42}",
 			format: map[string]string{
-				"%v":  "(1:42)",
-				"%+v": "Variant<Tuple<Bytes,Int32>>(1:42)",
+				"%v":  "{1:42}",
+				"%+v": "Variant<Tuple<Bytes,Int32>>({1:42})",
 				"%T":  "*value.variantValue",
-				"%s":  "(1:42)",
+				"%s":  "{1:42}",
+			},
+		},
+		{
+			value: VariantValue(TextValue("foo"), 1, Variant(Tuple(
+				TypeBytes,
+				TypeText,
+			))),
+			string: "{1:\"foo\"}",
+			format: map[string]string{
+				"%v":  "{1:\"foo\"}",
+				"%+v": "Variant<Tuple<Bytes,Text>>({1:\"foo\"})",
+				"%T":  "*value.variantValue",
+				"%s":  "{1:\"foo\"}",
 			},
 		},
 		{
@@ -461,12 +525,12 @@ func TestValueToString(t *testing.T) {
 				TypeBytes,
 				TypeInt32,
 			))),
-			string: "(0:true)",
+			string: "{0:true}",
 			format: map[string]string{
-				"%v":  "(0:true)",
-				"%+v": "Variant<Tuple<Bytes,Int32>>(0:true)",
+				"%v":  "{0:true}",
+				"%+v": "Variant<Tuple<Bytes,Int32>>({0:true})",
 				"%T":  "*value.variantValue",
-				"%s":  "(0:true)",
+				"%s":  "{0:true}",
 			},
 		},
 		{
@@ -474,12 +538,12 @@ func TestValueToString(t *testing.T) {
 				StructField{"foo", TypeBytes},
 				StructField{"bar", TypeInt32},
 			))),
-			string: "(1:42)",
+			string: "{1:42}",
 			format: map[string]string{
-				"%v":  "(1:42)",
-				"%+v": "Variant<Struct<\"foo\":Bytes,\"bar\":Int32>>(1:42)",
+				"%v":  "{1:42}",
+				"%+v": "Variant<Struct<\"foo\":Bytes,\"bar\":Int32>>({1:42})",
 				"%T":  "*value.variantValue",
-				"%s":  "(1:42)",
+				"%s":  "{1:42}",
 			},
 		},
 		{

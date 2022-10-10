@@ -53,6 +53,9 @@ func vF(verb rune, format func()) verbFormatter {
 }
 
 func formatValue(v Value, s fmt.State, verb rune, other ...verbFormatter) {
+	if verb == 'q' {
+		fmt.Println()
+	}
 	for _, rf := range append(other,
 		vF('v', func() {
 			if s.Flag('+') {
@@ -66,6 +69,9 @@ func formatValue(v Value, s fmt.State, verb rune, other ...verbFormatter) {
 		vF('s', func() {
 			_, _ = io.WriteString(s, v.String())
 		}),
+		vF('q', func() {
+			_, _ = io.WriteString(s, v.String())
+		}),
 		vF('T', func() {
 			_, _ = io.WriteString(s, v.Type().String())
 		}),
@@ -76,7 +82,7 @@ func formatValue(v Value, s fmt.State, verb rune, other ...verbFormatter) {
 		}
 	}
 	_, _ = io.WriteString(s,
-		fmt.Sprintf("unknown formatter verb '%v' for value type '%s'", verb, v.Type().String()),
+		fmt.Sprintf("unknown formatter verb '%s' for value type '%s'", string(verb), v.Type().String()),
 	)
 }
 
@@ -343,7 +349,20 @@ func BoolValue(v bool) boolValue {
 type dateValue uint32
 
 func (v dateValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
+	formatValue(v, s, verb,
+		vF('v', func() {
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, v.Type().String()+"(\"")
+			}
+			_, _ = io.WriteString(s, v.String())
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, "\")")
+			}
+		}),
+		vF('q', func() {
+			_, _ = io.WriteString(s, "\""+v.String()+"\"")
+		}),
+	)
 }
 
 func (v dateValue) castTo(dst interface{}) error {
@@ -366,7 +385,7 @@ func (v dateValue) castTo(dst interface{}) error {
 }
 
 func (v dateValue) String() string {
-	return "\"" + DateToTime(uint32(v)).Format(LayoutDate) + "\""
+	return DateToTime(uint32(v)).Format(LayoutDate)
 }
 
 func (dateValue) Type() Type {
@@ -396,7 +415,20 @@ func DateValueFromTime(t time.Time) dateValue {
 type datetimeValue uint32
 
 func (v datetimeValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
+	formatValue(v, s, verb,
+		vF('v', func() {
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, v.Type().String()+"(\"")
+			}
+			_, _ = io.WriteString(s, v.String())
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, "\")")
+			}
+		}),
+		vF('q', func() {
+			_, _ = io.WriteString(s, "\""+v.String()+"\"")
+		}),
+	)
 }
 
 func (v datetimeValue) castTo(dst interface{}) error {
@@ -441,7 +473,7 @@ func DatetimeValue(v uint32) datetimeValue {
 	return datetimeValue(v)
 }
 
-func DatetimeValueFromTime(t time.Time) Value {
+func DatetimeValueFromTime(t time.Time) datetimeValue {
 	return datetimeValue(uint64(t.Sub(unix) / time.Second))
 }
 
@@ -481,7 +513,7 @@ func (v *decimalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func DecimalValueFromBigInt(v *big.Int, precision, scale uint32) Value {
+func DecimalValueFromBigInt(v *big.Int, precision, scale uint32) *decimalValue {
 	b := decimal.BigIntToByte(v, precision, scale)
 	return DecimalValue(b, precision, scale)
 }
@@ -523,9 +555,9 @@ func (v *dictValue) String() string {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
-		buffer.WriteString(value.K.String())
+		buffer.WriteString(fmt.Sprintf("%q", value.K))
 		buffer.WriteByte(':')
-		buffer.WriteString(value.V.String())
+		buffer.WriteString(fmt.Sprintf("%q", value.V))
 	}
 	buffer.WriteByte('}')
 	return buffer.String()
@@ -943,7 +975,20 @@ func Int64Value(v int64) int64Value {
 type intervalValue int64
 
 func (v intervalValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
+	formatValue(v, s, verb,
+		vF('v', func() {
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, v.Type().String()+"(\"")
+			}
+			_, _ = io.WriteString(s, v.String())
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, "\")")
+			}
+		}),
+		vF('q', func() {
+			_, _ = io.WriteString(s, "\""+v.String()+"\"")
+		}),
+	)
 }
 
 func (v intervalValue) castTo(dst interface{}) error {
@@ -960,7 +1005,7 @@ func (v intervalValue) castTo(dst interface{}) error {
 }
 
 func (v intervalValue) String() string {
-	return "\"" + IntervalToDuration(int64(v)).String() + "\""
+	return IntervalToDuration(int64(v)).String()
 }
 
 func (intervalValue) Type() Type {
@@ -982,7 +1027,7 @@ func IntervalValue(v int64) intervalValue {
 	return intervalValue(v)
 }
 
-func IntervalValueFromDuration(v time.Duration) Value {
+func IntervalValueFromDuration(v time.Duration) intervalValue {
 	return intervalValue(durationToMicroseconds(v))
 }
 
@@ -1097,7 +1142,7 @@ func (v *listValue) String() string {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
-		buffer.WriteString(item.String())
+		buffer.WriteString(fmt.Sprintf("%q", item))
 	}
 	buffer.WriteByte(']')
 	return buffer.String()
@@ -1262,7 +1307,7 @@ func (v *structValue) String() string {
 		buffer.WriteString(field.Name)
 		buffer.WriteByte('"')
 		buffer.WriteByte(':')
-		buffer.WriteString(field.V.String())
+		buffer.WriteString(fmt.Sprintf("%q", field.V))
 	}
 	buffer.WriteByte('}')
 	return buffer.String()
@@ -1296,7 +1341,20 @@ func StructValue(fields ...StructValueField) *structValue {
 type timestampValue uint64
 
 func (v timestampValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
+	formatValue(v, s, verb,
+		vF('q', func() {
+			_, _ = io.WriteString(s, "\""+v.String()+"\"")
+		}),
+		vF('v', func() {
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, v.Type().String()+"(\"")
+			}
+			_, _ = io.WriteString(s, v.String())
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, "\")")
+			}
+		}),
+	)
 }
 
 func (v timestampValue) castTo(dst interface{}) error {
@@ -1313,7 +1371,7 @@ func (v timestampValue) castTo(dst interface{}) error {
 }
 
 func (v timestampValue) String() string {
-	return "\"" + TimestampToTime(uint64(v)).Format(LayoutTimestamp) + "\""
+	return TimestampToTime(uint64(v)).Format(LayoutTimestamp)
 }
 
 func (timestampValue) Type() Type {
@@ -1335,7 +1393,7 @@ func TimestampValue(v uint64) timestampValue {
 	return timestampValue(v)
 }
 
-func TimestampValueFromTime(t time.Time) Value {
+func TimestampValueFromTime(t time.Time) timestampValue {
 	return timestampValue(t.Sub(unix) / time.Microsecond)
 }
 
@@ -1345,14 +1403,12 @@ type tupleValue struct {
 }
 
 func (v *tupleValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb,
-		vF('v', func() {
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, v.Type().String())
-			}
-			_, _ = io.WriteString(s, v.String())
-		}),
-	)
+	formatValue(v, s, verb, vF('v', func() {
+		if s.Flag('+') {
+			_, _ = io.WriteString(s, v.Type().String())
+		}
+		_, _ = io.WriteString(s, v.String())
+	}))
 }
 
 func (v *tupleValue) castTo(dst interface{}) error {
@@ -1367,7 +1423,7 @@ func (v *tupleValue) String() string {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
-		buffer.WriteString(item.String())
+		buffer.WriteString(fmt.Sprintf("%q", item))
 	}
 	buffer.WriteByte(')')
 	return buffer.String()
@@ -1402,40 +1458,49 @@ func TupleValue(values ...Value) *tupleValue {
 	}
 }
 
-type tzDateValue struct {
-	value string
+type tzDateValue string
+
+func (v tzDateValue) Format(s fmt.State, verb rune) {
+	formatValue(v, s, verb,
+		vF('v', func() {
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, v.Type().String()+"(\"")
+			}
+			_, _ = io.WriteString(s, v.String())
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, "\")")
+			}
+		}),
+		vF('q', func() {
+			_, _ = io.WriteString(s, "\""+v.String()+"\"")
+		}),
+	)
 }
 
-func (v *tzDateValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
-}
-
-func (v *tzDateValue) castTo(dst interface{}) error {
+func (v tzDateValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
-		*vv = v.value
+		*vv = string(v)
 		return nil
 	case *[]byte:
-		*vv = []byte(v.value)
+		*vv = []byte(v)
 		return nil
 	default:
 		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
 	}
 }
 
-func (v *tzDateValue) String() string {
-	return v.value
+func (v tzDateValue) String() string {
+	return string(v)
 }
 
-func (*tzDateValue) Type() Type {
+func (tzDateValue) Type() Type {
 	return TypeTzDate
 }
 
-func (v *tzDateValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v tzDateValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Text()
-	if v != nil {
-		vv.TextValue = v.value
-	}
+	vv.TextValue = string(v)
 
 	vvv := a.Value()
 	vvv.Value = vv
@@ -1443,48 +1508,57 @@ func (v *tzDateValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func TzDateValue(v string) *tzDateValue {
-	return &tzDateValue{value: v}
+func TzDateValue(v string) tzDateValue {
+	return tzDateValue(v)
 }
 
-func TzDateValueFromTime(t time.Time) Value {
-	return &tzDateValue{value: t.Format(LayoutTzDate)}
+func TzDateValueFromTime(t time.Time) tzDateValue {
+	return tzDateValue(t.Format(LayoutTzDate))
 }
 
-type tzDatetimeValue struct {
-	value string
+type tzDatetimeValue string
+
+func (v tzDatetimeValue) Format(s fmt.State, verb rune) {
+	formatValue(v, s, verb,
+		vF('v', func() {
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, v.Type().String()+"(\"")
+			}
+			_, _ = io.WriteString(s, v.String())
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, "\")")
+			}
+		}),
+		vF('q', func() {
+			_, _ = io.WriteString(s, "\""+v.String()+"\"")
+		}),
+	)
 }
 
-func (v *tzDatetimeValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
-}
-
-func (v *tzDatetimeValue) castTo(dst interface{}) error {
+func (v tzDatetimeValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
-		*vv = v.value
+		*vv = string(v)
 		return nil
 	case *[]byte:
-		*vv = []byte(v.value)
+		*vv = []byte(v)
 		return nil
 	default:
 		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
 	}
 }
 
-func (v *tzDatetimeValue) String() string {
-	return v.value
+func (v tzDatetimeValue) String() string {
+	return string(v)
 }
 
-func (*tzDatetimeValue) Type() Type {
+func (tzDatetimeValue) Type() Type {
 	return TypeTzDatetime
 }
 
-func (v *tzDatetimeValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v tzDatetimeValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Text()
-	if v != nil {
-		vv.TextValue = v.value
-	}
+	vv.TextValue = string(v)
 
 	vvv := a.Value()
 	vvv.Value = vv
@@ -1492,48 +1566,57 @@ func (v *tzDatetimeValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func TzDatetimeValue(v string) *tzDatetimeValue {
-	return &tzDatetimeValue{value: v}
+func TzDatetimeValue(v string) tzDatetimeValue {
+	return tzDatetimeValue(v)
 }
 
-func TzDatetimeValueFromTime(t time.Time) *tzDatetimeValue {
-	return &tzDatetimeValue{value: t.Format(LayoutTzDatetime)}
+func TzDatetimeValueFromTime(t time.Time) tzDatetimeValue {
+	return tzDatetimeValue(t.Format(LayoutTzDatetime))
 }
 
-type tzTimestampValue struct {
-	value string
+type tzTimestampValue string
+
+func (v tzTimestampValue) Format(s fmt.State, verb rune) {
+	formatValue(v, s, verb,
+		vF('v', func() {
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, v.Type().String()+"(\"")
+			}
+			_, _ = io.WriteString(s, v.String())
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, "\")")
+			}
+		}),
+		vF('q', func() {
+			_, _ = io.WriteString(s, "\""+v.String()+"\"")
+		}),
+	)
 }
 
-func (v *tzTimestampValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
-}
-
-func (v *tzTimestampValue) castTo(dst interface{}) error {
+func (v tzTimestampValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
-		*vv = v.value
+		*vv = string(v)
 		return nil
 	case *[]byte:
-		*vv = []byte(v.value)
+		*vv = []byte(v)
 		return nil
 	default:
 		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
 	}
 }
 
-func (v *tzTimestampValue) String() string {
-	return v.value
+func (v tzTimestampValue) String() string {
+	return string(v)
 }
 
-func (*tzTimestampValue) Type() Type {
+func (tzTimestampValue) Type() Type {
 	return TypeTzTimestamp
 }
 
-func (v *tzTimestampValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v tzTimestampValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Text()
-	if v != nil {
-		vv.TextValue = v.value
-	}
+	vv.TextValue = string(v)
 
 	vvv := a.Value()
 	vvv.Value = vv
@@ -1541,12 +1624,12 @@ func (v *tzTimestampValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func TzTimestampValue(v string) *tzTimestampValue {
-	return &tzTimestampValue{value: v}
+func TzTimestampValue(v string) tzTimestampValue {
+	return tzTimestampValue(v)
 }
 
-func TzTimestampValueFromTime(t time.Time) *tzTimestampValue {
-	return &tzTimestampValue{value: t.Format(LayoutTzTimestamp)}
+func TzTimestampValueFromTime(t time.Time) tzTimestampValue {
+	return tzTimestampValue(t.Format(LayoutTzTimestamp))
 }
 
 type uint8Value uint8
@@ -1789,7 +1872,20 @@ type textValue struct {
 }
 
 func (v *textValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
+	formatValue(v, s, verb,
+		vF('q', func() {
+			_, _ = io.WriteString(s, "\""+v.value+"\"")
+		}),
+		vF('v', func() {
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, v.Type().String()+"(\"")
+			}
+			_, _ = io.WriteString(s, v.String())
+			if s.Flag('+') {
+				_, _ = io.WriteString(s, "\")")
+			}
+		}),
+	)
 }
 
 func (v *textValue) castTo(dst interface{}) error {
@@ -1806,7 +1902,7 @@ func (v *textValue) castTo(dst interface{}) error {
 }
 
 func (v *textValue) String() string {
-	return "\"" + v.value + "\""
+	return v.value
 }
 
 func (*textValue) Type() Type {
@@ -1887,14 +1983,19 @@ type variantValue struct {
 }
 
 func (v *variantValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb,
-		vF('v', func() {
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, v.Type().String())
-			}
-			_, _ = io.WriteString(s, v.String())
-		}),
-	)
+	formatValue(v, s, verb, vF('v', func() {
+		if s.Flag('+') {
+			_, _ = io.WriteString(s, v.Type().String()+"(")
+		}
+		_, _ = io.WriteString(s, "{")
+		_, _ = io.WriteString(s, strconv.FormatUint(uint64(v.idx), 10))
+		_, _ = io.WriteString(s, ":")
+		_, _ = io.WriteString(s, fmt.Sprintf("%q", v.value))
+		_, _ = io.WriteString(s, "}")
+		if s.Flag('+') {
+			_, _ = io.WriteString(s, ")")
+		}
+	}))
 }
 
 func (v *variantValue) castTo(dst interface{}) error {
@@ -1904,11 +2005,11 @@ func (v *variantValue) castTo(dst interface{}) error {
 func (v *variantValue) String() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
-	buffer.WriteByte('(')
+	buffer.WriteString("{")
 	buffer.WriteString(strconv.FormatUint(uint64(v.idx), 10))
 	buffer.WriteByte(':')
-	buffer.WriteString(v.value.String())
-	buffer.WriteByte(')')
+	buffer.WriteString(fmt.Sprintf("%q", v.value))
+	buffer.WriteString("}")
 	return buffer.String()
 }
 
