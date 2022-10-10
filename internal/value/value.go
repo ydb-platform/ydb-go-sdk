@@ -1857,15 +1857,14 @@ type textValue string
 func (v textValue) Format(s fmt.State, verb rune) {
 	formatValue(v, s, verb,
 		vF('q', func() {
-			_, _ = io.WriteString(s, "\""+string(v)+"\"")
+			_, _ = io.WriteString(s, fmt.Sprintf("%q", string(v)))
 		}),
 		vF('v', func() {
 			if s.Flag('+') {
-				_, _ = io.WriteString(s, v.Type().String()+"(\"")
-			}
-			_, _ = io.WriteString(s, v.String())
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, "\")")
+				_, _ = io.WriteString(s, v.Type().String())
+				_, _ = io.WriteString(s, fmt.Sprintf("(%q)", string(v)))
+			} else {
+				_, _ = io.WriteString(s, string(v))
 			}
 		}),
 	)

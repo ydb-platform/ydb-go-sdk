@@ -193,14 +193,14 @@ func TestValueToString(t *testing.T) {
 			},
 		},
 		{
-			value:  TextValue("foo"),
-			string: "foo",
+			value:  TextValue("some\"text\"with brackets"),
+			string: "some\"text\"with brackets",
 			format: map[string]string{
-				"%v":  "foo",
-				"%+v": "Text(\"foo\")",
+				"%v":  "some\"text\"with brackets",
+				"%+v": "Text(\"some\\\"text\\\"with brackets\")",
 				"%T":  "value.textValue",
-				"%s":  "foo",
-				"%q":  "\"foo\"",
+				"%s":  "some\"text\"with brackets",
+				"%q":  "\"some\\\"text\\\"with brackets\"",
 			},
 		},
 		{
