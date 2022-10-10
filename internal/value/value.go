@@ -647,40 +647,36 @@ func DoubleValue(v float64) *doubleValue {
 	return &doubleValue{value: v}
 }
 
-type dyNumberValue struct {
-	value string
-}
+type dyNumberValue string
 
-func (v *dyNumberValue) Format(s fmt.State, verb rune) {
+func (v dyNumberValue) Format(s fmt.State, verb rune) {
 	formatValue(v, s, verb)
 }
 
-func (v *dyNumberValue) castTo(dst interface{}) error {
+func (v dyNumberValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
-		*vv = v.value
+		*vv = string(v)
 		return nil
 	case *[]byte:
-		*vv = []byte(v.value)
+		*vv = []byte(v)
 		return nil
 	default:
 		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
 	}
 }
 
-func (v *dyNumberValue) String() string {
-	return v.value
+func (v dyNumberValue) String() string {
+	return string(v)
 }
 
-func (*dyNumberValue) Type() Type {
+func (dyNumberValue) Type() Type {
 	return TypeDyNumber
 }
 
-func (v *dyNumberValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v dyNumberValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Text()
-	if v != nil {
-		vv.TextValue = v.value
-	}
+	vv.TextValue = string(v)
 
 	vvv := a.Value()
 	vvv.Value = vv
@@ -688,8 +684,8 @@ func (v *dyNumberValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func DyNumberValue(v string) *dyNumberValue {
-	return &dyNumberValue{value: v}
+func DyNumberValue(v string) dyNumberValue {
+	return dyNumberValue(v)
 }
 
 type floatValue struct {
@@ -1031,40 +1027,36 @@ func IntervalValueFromDuration(v time.Duration) intervalValue {
 	return intervalValue(durationToMicroseconds(v))
 }
 
-type jsonValue struct {
-	value string
-}
+type jsonValue string
 
-func (v *jsonValue) Format(s fmt.State, verb rune) {
+func (v jsonValue) Format(s fmt.State, verb rune) {
 	formatValue(v, s, verb)
 }
 
-func (v *jsonValue) castTo(dst interface{}) error {
+func (v jsonValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
-		*vv = v.value
+		*vv = string(v)
 		return nil
 	case *[]byte:
-		*vv = []byte(v.value)
+		*vv = []byte(v)
 		return nil
 	default:
 		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
 	}
 }
 
-func (v *jsonValue) String() string {
-	return v.value
+func (v jsonValue) String() string {
+	return string(v)
 }
 
-func (*jsonValue) Type() Type {
+func (jsonValue) Type() Type {
 	return TypeJSON
 }
 
-func (v *jsonValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v jsonValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Text()
-	if v != nil {
-		vv.TextValue = v.value
-	}
+	vv.TextValue = string(v)
 
 	vvv := a.Value()
 	vvv.Value = vv
@@ -1072,44 +1064,40 @@ func (v *jsonValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func JSONValue(v string) *jsonValue {
-	return &jsonValue{value: v}
+func JSONValue(v string) jsonValue {
+	return jsonValue(v)
 }
 
-type jsonDocumentValue struct {
-	value string
-}
+type jsonDocumentValue string
 
-func (v *jsonDocumentValue) Format(s fmt.State, verb rune) {
+func (v jsonDocumentValue) Format(s fmt.State, verb rune) {
 	formatValue(v, s, verb)
 }
 
-func (v *jsonDocumentValue) castTo(dst interface{}) error {
+func (v jsonDocumentValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
-		*vv = v.value
+		*vv = string(v)
 		return nil
 	case *[]byte:
-		*vv = []byte(v.value)
+		*vv = []byte(v)
 		return nil
 	default:
 		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
 	}
 }
 
-func (v *jsonDocumentValue) String() string {
-	return v.value
+func (v jsonDocumentValue) String() string {
+	return string(v)
 }
 
-func (*jsonDocumentValue) Type() Type {
+func (jsonDocumentValue) Type() Type {
 	return TypeJSONDocument
 }
 
-func (v *jsonDocumentValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v jsonDocumentValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Text()
-	if v != nil {
-		vv.TextValue = v.value
-	}
+	vv.TextValue = string(v)
 
 	vvv := a.Value()
 	vvv.Value = vv
@@ -1117,8 +1105,8 @@ func (v *jsonDocumentValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func JSONDocumentValue(v string) *jsonDocumentValue {
-	return &jsonDocumentValue{value: v}
+func JSONDocumentValue(v string) jsonDocumentValue {
+	return jsonDocumentValue(v)
 }
 
 type listValue struct {
@@ -1867,14 +1855,12 @@ func Uint64Value(v uint64) uint64Value {
 	return uint64Value(v)
 }
 
-type textValue struct {
-	value string
-}
+type textValue string
 
-func (v *textValue) Format(s fmt.State, verb rune) {
+func (v textValue) Format(s fmt.State, verb rune) {
 	formatValue(v, s, verb,
 		vF('q', func() {
-			_, _ = io.WriteString(s, "\""+v.value+"\"")
+			_, _ = io.WriteString(s, "\""+string(v)+"\"")
 		}),
 		vF('v', func() {
 			if s.Flag('+') {
@@ -1888,32 +1874,30 @@ func (v *textValue) Format(s fmt.State, verb rune) {
 	)
 }
 
-func (v *textValue) castTo(dst interface{}) error {
+func (v textValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
-		*vv = v.value
+		*vv = string(v)
 		return nil
 	case *[]byte:
-		*vv = []byte(v.value)
+		*vv = []byte(v)
 		return nil
 	default:
 		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
 	}
 }
 
-func (v *textValue) String() string {
-	return v.value
+func (v textValue) String() string {
+	return string(v)
 }
 
-func (*textValue) Type() Type {
+func (textValue) Type() Type {
 	return TypeText
 }
 
-func (v *textValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v textValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Text()
-	if v != nil {
-		vv.TextValue = v.value
-	}
+	vv.TextValue = string(v)
 
 	vvv := a.Value()
 	vvv.Value = vv
@@ -1921,8 +1905,8 @@ func (v *textValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func TextValue(v string) *textValue {
-	return &textValue{value: v}
+func TextValue(v string) textValue {
+	return textValue(v)
 }
 
 type uuidValue struct {
@@ -2098,39 +2082,37 @@ func VoidValue() voidValue {
 	return voidValue{}
 }
 
-type ysonValue struct {
-	value []byte
-}
+type ysonValue []byte
 
-func (v *ysonValue) Format(s fmt.State, verb rune) {
+func (v ysonValue) Format(s fmt.State, verb rune) {
 	formatValue(v, s, verb)
 }
 
-func (v *ysonValue) castTo(dst interface{}) error {
+func (v ysonValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
-		*vv = string(v.value)
+		*vv = string(v)
 		return nil
 	case *[]byte:
-		*vv = v.value
+		*vv = v
 		return nil
 	default:
 		return fmt.Errorf("cannot cast YDB type '%s' to '%T'", v.Type().String(), vv)
 	}
 }
 
-func (v *ysonValue) String() string {
-	return string(v.value)
+func (v ysonValue) String() string {
+	return string(v)
 }
 
-func (*ysonValue) Type() Type {
+func (ysonValue) Type() Type {
 	return TypeYSON
 }
 
-func (v *ysonValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v ysonValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Bytes()
 	if v != nil {
-		vv.BytesValue = v.value
+		vv.BytesValue = v
 	}
 
 	vvv := a.Value()
@@ -2139,8 +2121,8 @@ func (v *ysonValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func YSONValue(v []byte) *ysonValue {
-	return &ysonValue{value: v}
+func YSONValue(v []byte) ysonValue {
+	return v
 }
 
 func zeroPrimitiveValue(t PrimitiveType) Value {

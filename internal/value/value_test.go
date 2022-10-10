@@ -198,7 +198,7 @@ func TestValueToString(t *testing.T) {
 			format: map[string]string{
 				"%v":  "foo",
 				"%+v": "Text(\"foo\")",
-				"%T":  "*value.textValue",
+				"%T":  "value.textValue",
 				"%s":  "foo",
 				"%q":  "\"foo\"",
 			},
@@ -658,6 +658,46 @@ func TestValueToString(t *testing.T) {
 				"%+v": "Decimal(22,9)(-1234567890123456)",
 				"%T":  "*value.decimalValue",
 				"%s":  "-1234567890123456",
+			},
+		},
+		{
+			value:  DyNumberValue("-1234567890123456"),
+			string: "-1234567890123456",
+			format: map[string]string{
+				"%v":  "-1234567890123456",
+				"%+v": "DyNumber(-1234567890123456)",
+				"%T":  "value.dyNumberValue",
+				"%s":  "-1234567890123456",
+			},
+		},
+		{
+			value:  JSONValue("{\"a\":-1234567890123456}"),
+			string: "{\"a\":-1234567890123456}",
+			format: map[string]string{
+				"%v":  "{\"a\":-1234567890123456}",
+				"%+v": "Json({\"a\":-1234567890123456})",
+				"%T":  "value.jsonValue",
+				"%s":  "{\"a\":-1234567890123456}",
+			},
+		},
+		{
+			value:  JSONDocumentValue("{\"a\":-1234567890123456}"),
+			string: "{\"a\":-1234567890123456}",
+			format: map[string]string{
+				"%v":  "{\"a\":-1234567890123456}",
+				"%+v": "JsonDocument({\"a\":-1234567890123456})",
+				"%T":  "value.jsonDocumentValue",
+				"%s":  "{\"a\":-1234567890123456}",
+			},
+		},
+		{
+			value:  YSONValue([]byte("{\"a\":-1234567890123456}")),
+			string: "{\"a\":-1234567890123456}",
+			format: map[string]string{
+				"%v":  "{\"a\":-1234567890123456}",
+				"%+v": "Yson({\"a\":-1234567890123456})",
+				"%T":  "value.ysonValue",
+				"%s":  "{\"a\":-1234567890123456}",
 			},
 		},
 	} {
