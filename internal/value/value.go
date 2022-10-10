@@ -72,9 +72,6 @@ func formatValue(v Value, s fmt.State, verb rune, other ...verbFormatter) {
 		vF('q', func() {
 			_, _ = io.WriteString(s, v.String())
 		}),
-		vF('T', func() {
-			_, _ = io.WriteString(s, v.Type().String())
-		}),
 	) {
 		if rf.verb == verb {
 			rf.format()
