@@ -1,6 +1,7 @@
 * Supported `NullValue` type as received type from `YDB`
 * Added `types.CastTo(types.Value, destination)` public method for cast `types.Value` to golang native type value destination
 * Refactored string representation of `types.Value`
+* Added supporting of `printf` formatter for `types.Value`
 
 ## v3.38.5
 * Fixed bug from scan unexpected column name
