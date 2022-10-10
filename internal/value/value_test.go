@@ -588,6 +588,16 @@ func TestValueToString(t *testing.T) {
 			},
 		},
 		{
+			value:  ZeroValue(TypeBool),
+			string: "false",
+			format: map[string]string{
+				"%v":  "false",
+				"%+v": "Bool(false)",
+				"%T":  "value.boolValue",
+				"%s":  "false",
+			},
+		},
+		{
 			value:  ZeroValue(Optional(TypeBool)),
 			string: "NULL",
 			format: map[string]string{
