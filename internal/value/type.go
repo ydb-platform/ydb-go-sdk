@@ -1,7 +1,6 @@
 package value
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -10,15 +9,10 @@ import (
 )
 
 type Type interface {
+	String() string
+
 	toYDB(a *allocator.Allocator) *Ydb.Type
 	equalsTo(rhs Type) bool
-	toString(*bytes.Buffer)
-
-	String() string
-}
-
-func WriteTypeStringTo(buf *bytes.Buffer, t Type) {
-	buf.WriteString(t.String())
 }
 
 func TypeToYDB(t Type, a *allocator.Allocator) *Ydb.Type {
@@ -73,6 +67,9 @@ func TypeFromYDB(x *Ydb.Type) Type {
 	case *Ydb.Type_VoidType:
 		return Void()
 
+	case *Ydb.Type_NullType:
+		return Null()
+
 	default:
 		panic("ydb: unknown type")
 	}
@@ -117,9 +114,9 @@ func primitiveTypeFromYDB(t Ydb.Type_PrimitiveTypeId) Type {
 	case Ydb.Type_TZ_TIMESTAMP:
 		return TypeTzTimestamp
 	case Ydb.Type_STRING:
-		return TypeString
+		return TypeBytes
 	case Ydb.Type_UTF8:
-		return TypeUTF8
+		return TypeText
 	case Ydb.Type_YSON:
 		return TypeYSON
 	case Ydb.Type_JSON:
@@ -152,15 +149,11 @@ type DecimalType struct {
 	Scale     uint32
 }
 
-func (v *DecimalType) toString(buffer *bytes.Buffer) {
-	buffer.WriteString(fmt.Sprintf("Decimal(%d,%d)", v.Precision, v.Scale))
-}
-
 func (v *DecimalType) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(fmt.Sprintf("Decimal(%d,%d)", v.Precision, v.Scale))
+	return buffer.String()
 }
 
 func (v *DecimalType) equalsTo(rhs Type) bool {
@@ -195,19 +188,15 @@ type dictType struct {
 	valueType Type
 }
 
-func (v *dictType) toString(buffer *bytes.Buffer) {
-	buffer.WriteString("Dict<")
-	v.keyType.toString(buffer)
-	buffer.WriteByte(',')
-	v.valueType.toString(buffer)
-	buffer.WriteByte('>')
-}
-
 func (v *dictType) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString("Dict<")
+	buffer.WriteString(v.keyType.String())
+	buffer.WriteByte(',')
+	buffer.WriteString(v.valueType.String())
+	buffer.WriteByte('>')
+	return buffer.String()
 }
 
 func (v *dictType) equalsTo(rhs Type) bool {
@@ -248,15 +237,11 @@ func Dict(key, value Type) (v *dictType) {
 
 type emptyListType struct{}
 
-func (v emptyListType) toString(buffer *bytes.Buffer) {
-	buffer.WriteString("List<>")
-}
-
 func (v emptyListType) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString("List<>")
+	return buffer.String()
 }
 
 func (emptyListType) equalsTo(rhs Type) bool {
@@ -280,17 +265,13 @@ type listType struct {
 	itemType Type
 }
 
-func (v *listType) toString(buffer *bytes.Buffer) {
-	buffer.WriteString("List<")
-	v.itemType.toString(buffer)
-	buffer.WriteString(">")
-}
-
 func (v *listType) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString("List<")
+	buffer.WriteString(v.itemType.String())
+	buffer.WriteString(">")
+	return buffer.String()
 }
 
 func (v *listType) equalsTo(rhs Type) bool {
@@ -326,17 +307,13 @@ type optionalType struct {
 	innerType Type
 }
 
-func (v *optionalType) toString(buffer *bytes.Buffer) {
-	buffer.WriteString("Optional<")
-	v.innerType.toString(buffer)
-	buffer.WriteString(">")
-}
-
 func (v *optionalType) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString("Optional<")
+	buffer.WriteString(v.innerType.String())
+	buffer.WriteString(">")
+	return buffer.String()
 }
 
 func (v *optionalType) equalsTo(rhs Type) bool {
@@ -369,15 +346,11 @@ func Optional(t Type) *optionalType {
 
 type PrimitiveType uint
 
-func (v PrimitiveType) toString(buffer *bytes.Buffer) {
-	buffer.WriteString(primitiveString[v])
-}
-
 func (v PrimitiveType) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(primitiveString[v])
+	return buffer.String()
 }
 
 const (
@@ -400,8 +373,8 @@ const (
 	TypeTzDate
 	TypeTzDatetime
 	TypeTzTimestamp
-	TypeString
-	TypeUTF8
+	TypeBytes
+	TypeText
 	TypeYSON
 	TypeJSON
 	TypeUUID
@@ -428,8 +401,8 @@ var primitive = [...]*Ydb.Type{
 	TypeTzDate:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATE}},
 	TypeTzDatetime:   {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATETIME}},
 	TypeTzTimestamp:  {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_TIMESTAMP}},
-	TypeString:       {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_STRING}},
-	TypeUTF8:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}},
+	TypeBytes:        {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_STRING}},
+	TypeText:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8}},
 	TypeYSON:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_YSON}},
 	TypeJSON:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON}},
 	TypeUUID:         {Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UUID}},
@@ -457,8 +430,8 @@ var primitiveString = [...]string{
 	TypeTzDate:       "TzDate",
 	TypeTzDatetime:   "TzDatetime",
 	TypeTzTimestamp:  "TzTimestamp",
-	TypeString:       "String",
-	TypeUTF8:         "Utf8",
+	TypeBytes:        "Bytes",
+	TypeText:         "Text",
 	TypeYSON:         "Yson",
 	TypeJSON:         "Json",
 	TypeUUID:         "Uuid",
@@ -492,24 +465,20 @@ type (
 	}
 )
 
-func (v *StructType) toString(buffer *bytes.Buffer) {
+func (v *StructType) String() string {
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
 	buffer.WriteString("Struct<")
 	for i, f := range v.fields {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
-		buffer.WriteString(f.Name)
+		buffer.WriteString("\"" + f.Name + "\"")
 		buffer.WriteByte(':')
-		f.T.toString(buffer)
+		buffer.WriteString(f.T.String())
 	}
 	buffer.WriteByte('>')
-}
-
-func (v *StructType) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	return buffer.String()
 }
 
 func (v *StructType) equalsTo(rhs Type) bool {
@@ -574,22 +543,18 @@ type TupleType struct {
 	items []Type
 }
 
-func (v *TupleType) toString(buffer *bytes.Buffer) {
+func (v *TupleType) String() string {
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
 	buffer.WriteString("Tuple<")
 	for i, t := range v.items {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
-		t.toString(buffer)
+		buffer.WriteString(t.String())
 	}
 	buffer.WriteByte('>')
-}
-
-func (v *TupleType) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	return buffer.String()
 }
 
 func (v *TupleType) equalsTo(rhs Type) bool {
@@ -646,17 +611,13 @@ type variantType struct {
 	variantType internalVariantType
 }
 
-func (v *variantType) toString(buffer *bytes.Buffer) {
-	buffer.WriteString("Variant<")
-	v.innerType.toString(buffer)
-	buffer.WriteString(">")
-}
-
 func (v *variantType) String() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
-	v.toString(buf)
-	return buf.String()
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString("Variant<")
+	buffer.WriteString(v.innerType.String())
+	buffer.WriteString(">")
+	return buffer.String()
 }
 
 func (v *variantType) equalsTo(rhs Type) bool {
@@ -727,10 +688,6 @@ func Variant(t Type) *variantType {
 
 type voidType struct{}
 
-func (v voidType) toString(buffer *bytes.Buffer) {
-	buffer.WriteString(v.String())
-}
-
 func (v voidType) String() string {
 	return "Void"
 }
@@ -750,4 +707,27 @@ func (voidType) toYDB(*allocator.Allocator) *Ydb.Type {
 
 func Void() voidType {
 	return voidType{}
+}
+
+type nullType struct{}
+
+func (v nullType) String() string {
+	return "Null"
+}
+
+var _nullType = &Ydb.Type{
+	Type: &Ydb.Type_NullType{},
+}
+
+func (v nullType) equalsTo(rhs Type) bool {
+	_, ok := rhs.(nullType)
+	return ok
+}
+
+func (nullType) toYDB(*allocator.Allocator) *Ydb.Type {
+	return _nullType
+}
+
+func Null() nullType {
+	return nullType{}
 }

@@ -6,6 +6,8 @@ package table_test
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"math"
 	"net/http"
@@ -960,15 +962,15 @@ func executeScanQuery(ctx context.Context, t testing.TB, c table.Client, folderA
 func seriesData(id uint64, released time.Time, title, info, comment string) types.Value {
 	var commentv types.Value
 	if comment == "" {
-		commentv = types.NullValue(types.TypeUTF8)
+		commentv = types.NullValue(types.TypeText)
 	} else {
-		commentv = types.OptionalValue(types.UTF8Value(comment))
+		commentv = types.OptionalValue(types.TextValue(comment))
 	}
 	return types.StructValue(
 		types.StructFieldValue("series_id", types.Uint64Value(id)),
 		types.StructFieldValue("release_date", types.DateValueFromTime(released)),
-		types.StructFieldValue("title", types.UTF8Value(title)),
-		types.StructFieldValue("series_info", types.UTF8Value(info)),
+		types.StructFieldValue("title", types.TextValue(title)),
+		types.StructFieldValue("series_info", types.TextValue(info)),
 		types.StructFieldValue("comment", commentv),
 	)
 }
@@ -977,7 +979,7 @@ func seasonData(seriesID, seasonID uint64, title string, first, last time.Time) 
 	return types.StructValue(
 		types.StructFieldValue("series_id", types.Uint64Value(seriesID)),
 		types.StructFieldValue("season_id", types.Uint64Value(seasonID)),
-		types.StructFieldValue("title", types.UTF8Value(title)),
+		types.StructFieldValue("title", types.TextValue(title)),
 		types.StructFieldValue("first_aired", types.DateValueFromTime(first)),
 		types.StructFieldValue("last_aired", types.DateValueFromTime(last)),
 	)
@@ -988,7 +990,7 @@ func episodeData(seriesID, seasonID, episodeID uint64, title string, date time.T
 		types.StructFieldValue("series_id", types.Uint64Value(seriesID)),
 		types.StructFieldValue("season_id", types.Uint64Value(seasonID)),
 		types.StructFieldValue("episode_id", types.Uint64Value(episodeID)),
-		types.StructFieldValue("title", types.UTF8Value(title)),
+		types.StructFieldValue("title", types.TextValue(title)),
 		types.StructFieldValue("air_date", types.DateValueFromTime(date)),
 	)
 }
@@ -1119,15 +1121,15 @@ var (
 		
 		DECLARE $seriesData AS List<Struct<
 			series_id: Uint64,
-			title: Utf8,
-			series_info: Utf8,
+			title: Text,
+			series_info: Text,
 			release_date: Date,
-			comment: Optional<Utf8>>>;
+			comment: Optional<Text>>>;
 		
 		DECLARE $seasonsData AS List<Struct<
 			series_id: Uint64,
 			season_id: Uint64,
-			title: Utf8,
+			title: Text,
 			first_aired: Date,
 			last_aired: Date>>;
 		
@@ -1135,7 +1137,7 @@ var (
 			series_id: Uint64,
 			season_id: Uint64,
 			episode_id: Uint64,
-			title: Utf8,
+			title: Text,
 			air_date: Date>>;
 		
 		REPLACE INTO series
@@ -1268,10 +1270,10 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 			}
 			return s.CreateTable(ctx, path.Join(folder, "series"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
-				options.WithColumn("title", types.Optional(types.TypeUTF8)),
-				options.WithColumn("series_info", types.Optional(types.TypeUTF8)),
+				options.WithColumn("title", types.Optional(types.TypeText)),
+				options.WithColumn("series_info", types.Optional(types.TypeText)),
 				options.WithColumn("release_date", types.Optional(types.TypeDate)),
-				options.WithColumn("comment", types.Optional(types.TypeUTF8)),
+				options.WithColumn("comment", types.Optional(types.TypeText)),
 				options.WithPrimaryKeyColumn("series_id"),
 			)
 		},
@@ -1290,7 +1292,7 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 			return s.CreateTable(ctx, path.Join(folder, "seasons"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("season_id", types.Optional(types.TypeUint64)),
-				options.WithColumn("title", types.Optional(types.TypeUTF8)),
+				options.WithColumn("title", types.Optional(types.TypeText)),
 				options.WithColumn("first_aired", types.Optional(types.TypeDate)),
 				options.WithColumn("last_aired", types.Optional(types.TypeDate)),
 				options.WithPrimaryKeyColumn("series_id", "season_id"),
@@ -1311,7 +1313,7 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("season_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("episode_id", types.Optional(types.TypeUint64)),
-				options.WithColumn("title", types.Optional(types.TypeUTF8)),
+				options.WithColumn("title", types.Optional(types.TypeText)),
 				options.WithColumn("air_date", types.Optional(types.TypeDate)),
 				options.WithColumn("views", types.Optional(types.TypeUint64)),
 				options.WithPrimaryKeyColumn("series_id", "season_id", "episode_id"),
@@ -1386,9 +1388,6 @@ func TestLongStream(t *testing.T) {
 			ctx,
 			func(ctx context.Context, s table.Session) (err error) {
 				_, err = s.DescribeTable(ctx, path.Join(db.Name(), tableName))
-				if !ydb.IsOperationErrorSchemeError(err) {
-					return err
-				}
 				if err == nil {
 					if err = s.DropTable(ctx, path.Join(db.Name(), tableName)); err != nil {
 						return err
@@ -1441,7 +1440,7 @@ func TestLongStream(t *testing.T) {
 								DECLARE $values AS List<Struct<
 									val: Int32,
 								>>;
-								UPSERT INTO long_stream_query
+								UPSERT INTO `+"`"+path.Join(db.Name(), tableName)+"`"+`
 								SELECT
 									val 
 								FROM
@@ -1491,7 +1490,7 @@ func TestLongStream(t *testing.T) {
 					start     = time.Now()
 					rowsCount = 0
 				)
-				res, err := s.StreamExecuteScanQuery(ctx, "SELECT val FROM long_stream_query", table.NewQueryParameters())
+				res, err := s.StreamExecuteScanQuery(ctx, "SELECT val FROM "+tableName, table.NewQueryParameters())
 				if err != nil {
 					return err
 				}
@@ -1532,7 +1531,7 @@ func TestLongStream(t *testing.T) {
 					start     = time.Now()
 					rowsCount = 0
 				)
-				res, err := s.StreamReadTable(ctx, path.Join(db.Name(), "long_stream_query"), options.ReadColumn("val"))
+				res, err := s.StreamReadTable(ctx, path.Join(db.Name(), tableName), options.ReadColumn("val"))
 				if err != nil {
 					return err
 				}
@@ -1562,6 +1561,218 @@ func TestLongStream(t *testing.T) {
 			},
 		); err != nil {
 			t.Fatalf("stream query failed: %v\n", err)
+		}
+	})
+}
+
+func TestSplitRangesAndRead(t *testing.T) {
+	var (
+		tableName       = `ranges_table`
+		db              ydb.Connection
+		err             error
+		upsertRowsCount = 100000
+		batchSize       = 10000
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	db, err = ydb.Open(
+		ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithAccessTokenCredentials(
+			os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
+		),
+		ydb.WithDiscoveryInterval(0), // disable re-discovery on upsert time
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func(db ydb.Connection) {
+		// cleanup
+		_ = db.Close(ctx)
+	}(db)
+
+	t.Run("creating table", func(t *testing.T) {
+		if err = db.Table().Do(
+			ctx,
+			func(ctx context.Context, s table.Session) (err error) {
+				_, err = s.DescribeTable(ctx, path.Join(db.Name(), tableName))
+				if err == nil {
+					if err = s.DropTable(ctx, path.Join(db.Name(), tableName)); err != nil {
+						return err
+					}
+				}
+				return s.ExecuteSchemeQuery(
+					ctx,
+					`CREATE TABLE `+tableName+` (
+						id Uint64,
+						PRIMARY KEY (id)
+					)
+					WITH (
+						UNIFORM_PARTITIONS = 8
+					)`,
+				)
+			},
+		); err != nil {
+			t.Fatalf("create table failed: %v\n", err)
+		}
+	})
+
+	t.Run("check batch size", func(t *testing.T) {
+		if upsertRowsCount%batchSize != 0 {
+			t.Fatalf("wrong batch size: (%d mod %d = %d) != 0", upsertRowsCount, batchSize, upsertRowsCount%batchSize)
+		}
+	})
+
+	t.Run("upserting rows", func(t *testing.T) {
+		var upserted uint32
+		for i := 0; i < (upsertRowsCount / batchSize); i++ {
+			from, to := uint32(i*batchSize), uint32((i+1)*batchSize)
+			t.Run(fmt.Sprintf("upserting %v...%v", from, to-1), func(t *testing.T) {
+				values := make([]types.Value, 0, batchSize)
+				for j := from; j < to; j++ {
+					b := make([]byte, 4)
+					binary.BigEndian.PutUint32(b, j)
+					s := sha256.Sum224(b)
+					values = append(
+						values,
+						types.StructValue(
+							types.StructFieldValue("id", types.Uint64Value(binary.BigEndian.Uint64(s[:]))),
+						),
+					)
+				}
+				if err = db.Table().Do(
+					ctx,
+					func(ctx context.Context, s table.Session) (err error) {
+						_, _, err = s.Execute(
+							ctx,
+							table.TxControl(
+								table.BeginTx(
+									table.WithSerializableReadWrite(),
+								),
+								table.CommitTx(),
+							), `
+								DECLARE $values AS List<Struct<
+									id: Uint64,
+								>>;
+								UPSERT INTO `+"`"+path.Join(db.Name(), tableName)+"`"+`
+								SELECT
+									id 
+								FROM
+									AS_TABLE($values);            
+							`, table.NewQueryParameters(
+								table.ValueParam(
+									"$values",
+									types.ListValue(values...),
+								),
+							),
+						)
+						return err
+					},
+				); err != nil {
+					t.Fatalf("upsert failed: %v\n", err)
+				} else {
+					upserted += to - from
+					fmt.Printf("upserted %d rows, total upserted rows: %d\n", to-from, upserted)
+				}
+			})
+		}
+		t.Run("check upserted rows", func(t *testing.T) {
+			fmt.Printf("total upserted rows: %d, expected: %d\n", upserted, upsertRowsCount)
+			if upserted != uint32(upsertRowsCount) {
+				t.Fatalf("wrong rows count: %v, expected: %d", upserted, upsertRowsCount)
+			}
+		})
+	})
+
+	var ranges []options.KeyRange
+
+	t.Run("make ranges", func(t *testing.T) {
+		if err = db.Table().Do(ctx,
+			func(ctx context.Context, s table.Session) (err error) {
+				d, err := s.DescribeTable(ctx,
+					path.Join(db.Name(), tableName),
+					options.WithShardKeyBounds(),
+				)
+				if err != nil {
+					return err
+				}
+				for _, r := range d.KeyRanges {
+					if r.From == nil || r.To == nil {
+						ranges = append(ranges, r)
+					} else {
+						var from, to uint64
+						if err := types.CastTo(r.From, &from); err != nil {
+							return err
+						}
+						if err := types.CastTo(r.To, &to); err != nil {
+							return err
+						}
+						ranges = append(ranges,
+							options.KeyRange{
+								From: r.From,
+								To: types.TupleValue(
+									types.OptionalValue(types.Uint64Value(from + (to-from)/2)),
+								),
+							},
+							options.KeyRange{
+								From: types.TupleValue(
+									types.OptionalValue(types.Uint64Value(from + (to-from)/2)),
+								),
+								To: r.To,
+							},
+						)
+					}
+					fmt.Printf("- range [%+v, %+v]\n", r.From, r.To)
+				}
+				return nil
+			},
+		); err != nil {
+			t.Fatalf("stream query failed: %v\n", err)
+		}
+	})
+
+	t.Run("read ranges", func(t *testing.T) {
+		var (
+			start     = time.Now()
+			rowsCount = 0
+		)
+		for _, r := range ranges {
+			if err = db.Table().Do(
+				ctx,
+				func(ctx context.Context, s table.Session) (err error) {
+					res, err := s.StreamReadTable(ctx, path.Join(db.Name(), tableName), options.ReadKeyRange(r))
+					if err != nil {
+						return err
+					}
+					defer func() {
+						_ = res.Close()
+					}()
+					for res.NextResultSet(ctx) {
+						count := 0
+						for res.NextRow() {
+							count++
+						}
+						rowsCount += count
+						fmt.Printf("received set with %d rows. total received: %d\n", count, rowsCount)
+					}
+					if err = res.Err(); err != nil {
+						return fmt.Errorf("received error (duration: %v): %w", time.Since(start), err)
+					}
+					return nil
+				},
+			); err != nil {
+				t.Fatalf("stream query failed: %v\n", err)
+			}
+		}
+		if rowsCount != upsertRowsCount {
+			t.Errorf("wrong rows count: %v, expected: %d (duration: %v, ranges: %v)",
+				rowsCount,
+				upsertRowsCount,
+				time.Since(start),
+				ranges,
+			)
 		}
 	})
 }

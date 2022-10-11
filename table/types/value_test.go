@@ -1,9 +1,12 @@
 package types
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
@@ -277,33 +280,33 @@ func TestNullable(t *testing.T) {
 		},
 		{
 			name: "string",
-			t:    TypeString,
+			t:    TypeBytes,
 			v:    func(v string) *string { return &v }("test"),
-			exp:  OptionalValue(StringValueFromString("test")),
+			exp:  OptionalValue(BytesValueFromString("test")),
 		},
 		{
 			name: "string",
-			t:    TypeString,
+			t:    TypeBytes,
 			v:    func(v []byte) *[]byte { return &v }([]byte("test")),
-			exp:  OptionalValue(StringValueFromString("test")),
+			exp:  OptionalValue(BytesValueFromString("test")),
 		},
 		{
 			name: "nil string",
-			t:    TypeString,
+			t:    TypeBytes,
 			v:    func() *string { return nil }(),
-			exp:  NullValue(TypeString),
+			exp:  NullValue(TypeBytes),
 		},
 		{
 			name: "utf8",
-			t:    TypeUTF8,
+			t:    TypeText,
 			v:    func(v string) *string { return &v }("test"),
-			exp:  OptionalValue(UTF8Value("test")),
+			exp:  OptionalValue(TextValue("test")),
 		},
 		{
 			name: "nil utf8",
-			t:    TypeUTF8,
+			t:    TypeText,
 			v:    func() *string { return nil }(),
-			exp:  NullValue(TypeUTF8),
+			exp:  NullValue(TypeText),
 		},
 		{
 			name: "yson",
@@ -386,5 +389,229 @@ func TestNullable(t *testing.T) {
 				t.Fatalf("unexpected value: %v, exp: %v", v, test.exp)
 			}
 		})
+	}
+}
+
+func TestCastNumbers(t *testing.T) {
+	numberValues := []struct {
+		value  Value
+		signed bool
+		len    int
+	}{
+		{
+			value:  Uint64Value(1),
+			signed: false,
+			len:    8,
+		},
+		{
+			value:  Int64Value(2),
+			signed: true,
+			len:    8,
+		},
+		{
+			value:  Uint32Value(3),
+			signed: false,
+			len:    4,
+		},
+		{
+			value:  Int32Value(4),
+			signed: true,
+			len:    4,
+		},
+		{
+			value:  Uint16Value(5),
+			signed: false,
+			len:    2,
+		},
+		{
+			value:  Int16Value(6),
+			signed: true,
+			len:    2,
+		},
+		{
+			value:  Uint8Value(7),
+			signed: false,
+			len:    1,
+		},
+		{
+			value:  Int8Value(8),
+			signed: true,
+			len:    1,
+		},
+	}
+	numberDestinations := []struct {
+		destination interface{}
+		signed      bool
+		len         int
+	}{
+		{
+			destination: func(v uint64) *uint64 { return &v }(1),
+			signed:      false,
+			len:         8,
+		},
+		{
+			destination: func(v int64) *int64 { return &v }(2),
+			signed:      true,
+			len:         8,
+		},
+		{
+			destination: func(v uint32) *uint32 { return &v }(3),
+			signed:      false,
+			len:         4,
+		},
+		{
+			destination: func(v int32) *int32 { return &v }(4),
+			signed:      true,
+			len:         4,
+		},
+		{
+			destination: func(v uint16) *uint16 { return &v }(5),
+			signed:      false,
+			len:         2,
+		},
+		{
+			destination: func(v int16) *int16 { return &v }(6),
+			signed:      true,
+			len:         2,
+		},
+		{
+			destination: func(v uint8) *uint8 { return &v }(7),
+			signed:      false,
+			len:         1,
+		},
+		{
+			destination: func(v int8) *int8 { return &v }(8),
+			signed:      true,
+			len:         1,
+		},
+		{
+			destination: func(v float32) *float32 { return &v }(7),
+			signed:      true,
+			len:         4,
+		},
+		{
+			destination: func(v float64) *float64 { return &v }(8),
+			signed:      true,
+			len:         8,
+		},
+	}
+	for _, dst := range numberDestinations {
+		t.Run(reflect.ValueOf(dst.destination).Type().Elem().String(), func(t *testing.T) {
+			for _, src := range numberValues {
+				t.Run(src.value.String(), func(t *testing.T) {
+					mustErr := false
+					switch {
+					case src.len == dst.len && src.signed != dst.signed,
+						src.len > dst.len,
+						src.signed && !dst.signed:
+						mustErr = true
+					}
+					err := CastTo(src.value, dst.destination)
+					if mustErr {
+						require.Error(t, err)
+					} else {
+						require.NoError(t, err)
+					}
+				})
+				t.Run(OptionalValue(src.value).String(), func(t *testing.T) {
+					mustErr := false
+					switch {
+					case src.len == dst.len && src.signed != dst.signed,
+						src.len > dst.len,
+						src.signed && !dst.signed:
+						mustErr = true
+					}
+					err := CastTo(OptionalValue(src.value), dst.destination)
+					if mustErr {
+						require.Error(t, err)
+					} else {
+						require.NoError(t, err)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestCastOtherTypes(t *testing.T) {
+	for _, tt := range []struct {
+		v      Value
+		dst    interface{}
+		result interface{}
+		error  bool
+	}{
+		{
+			v:      BytesValue([]byte("test")),
+			dst:    func(v []byte) *[]byte { return &v }(make([]byte, 0, 10)),
+			result: func(v []byte) *[]byte { return &v }([]byte("test")),
+			error:  false,
+		},
+		{
+			v:      TextValue("test"),
+			dst:    func(v []byte) *[]byte { return &v }(make([]byte, 0, 10)),
+			result: func(v []byte) *[]byte { return &v }([]byte("test")),
+			error:  false,
+		},
+		{
+			v:      BytesValue([]byte("test")),
+			dst:    func(v string) *string { return &v }(""),
+			result: func(v string) *string { return &v }("test"),
+			error:  false,
+		},
+		{
+			v:      DoubleValue(123),
+			dst:    func(v float64) *float64 { return &v }(9),
+			result: func(v float64) *float64 { return &v }(123),
+			error:  false,
+		},
+		{
+			v:      DoubleValue(123),
+			dst:    func(v float32) *float32 { return &v }(9),
+			result: func(v float32) *float32 { return &v }(9),
+			error:  true,
+		},
+		{
+			v:      FloatValue(123),
+			dst:    func(v float64) *float64 { return &v }(9),
+			result: func(v float64) *float64 { return &v }(123),
+			error:  false,
+		},
+		{
+			v:      FloatValue(123),
+			dst:    func(v float32) *float32 { return &v }(9),
+			result: func(v float32) *float32 { return &v }(123),
+			error:  false,
+		},
+		{
+			v:      Uint64Value(123),
+			dst:    func(v float32) *float32 { return &v }(9),
+			result: func(v float32) *float32 { return &v }(9),
+			error:  true,
+		},
+		{
+			v:      Uint64Value(123),
+			dst:    func(v float64) *float64 { return &v }(9),
+			result: func(v float64) *float64 { return &v }(9),
+			error:  true,
+		},
+		{
+			v:      OptionalValue(DoubleValue(123)),
+			dst:    func(v float64) *float64 { return &v }(9),
+			result: func(v float64) *float64 { return &v }(123),
+			error:  false,
+		},
+	} {
+		t.Run(fmt.Sprintf("cast %s to %v", tt.v.Type().String(), reflect.ValueOf(tt.dst).Type().Elem()),
+			func(t *testing.T) {
+				if err := CastTo(tt.v, tt.dst); (err != nil) != tt.error {
+					t.Errorf("castTo() error = %v, want %v", err, tt.error)
+				} else if !reflect.DeepEqual(tt.dst, tt.result) {
+					t.Errorf("castTo() result = %+v, want %+v",
+						reflect.ValueOf(tt.dst).Elem(),
+						reflect.ValueOf(tt.result).Elem(),
+					)
+				}
+			},
+		)
 	}
 }

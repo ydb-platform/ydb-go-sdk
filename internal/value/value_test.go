@@ -1,8 +1,12 @@
 package value
 
 import (
+	"fmt"
+	"math/big"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
@@ -27,7 +31,7 @@ func BenchmarkMemory(b *testing.B) {
 		VoidValue(),
 		FloatValue(1),
 		DoubleValue(1),
-		StringValue([]byte("test")),
+		BytesValue([]byte("test")),
 		DecimalValue([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, 22, 9),
 		DyNumberValue("123"),
 		JSONValue("{}"),
@@ -35,9 +39,9 @@ func BenchmarkMemory(b *testing.B) {
 		TzDateValue("1"),
 		TzDatetimeValue("1"),
 		TzTimestampValue("1"),
-		UTF8Value("1"),
+		TextValue("1"),
 		UUIDValue([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}),
-		YSONValue("{}"),
+		YSONValue([]byte("{}")),
 		ListValue(
 			Int64Value(1),
 			Int64Value(2),
@@ -47,32 +51,32 @@ func BenchmarkMemory(b *testing.B) {
 		OptionalValue(OptionalValue(IntervalValue(1))),
 		StructValue(
 			StructValueField{"series_id", Uint64Value(1)},
-			StructValueField{"title", UTF8Value("test")},
+			StructValueField{"title", TextValue("test")},
 			StructValueField{"air_date", DateValue(1)},
 			StructValueField{"remove_date", OptionalValue(TzDatetimeValue("1234"))},
 		),
 		DictValue(
-			DictValueField{UTF8Value("series_id"), Uint64Value(1)},
-			DictValueField{UTF8Value("title"), Uint64Value(2)},
-			DictValueField{UTF8Value("air_date"), Uint64Value(3)},
-			DictValueField{UTF8Value("remove_date"), Uint64Value(4)},
+			DictValueField{TextValue("series_id"), Uint64Value(1)},
+			DictValueField{TextValue("title"), Uint64Value(2)},
+			DictValueField{TextValue("air_date"), Uint64Value(3)},
+			DictValueField{TextValue("remove_date"), Uint64Value(4)},
 		),
 		NullValue(Optional(Optional(Optional(Primitive(TypeBool))))),
 		VariantValue(Int32Value(42), 1, Tuple(
-			TypeString,
+			TypeBytes,
 			TypeInt32,
 		)),
 		VariantValue(Int32Value(42), 1, Struct(
 			StructField{
 				Name: "foo",
-				T:    TypeString,
+				T:    TypeBytes,
 			},
 			StructField{
 				Name: "bar",
 				T:    TypeInt32,
 			},
 		)),
-		ZeroValue(TypeUTF8),
+		ZeroValue(TypeText),
 		ZeroValue(Struct()),
 		ZeroValue(Tuple()),
 	)
@@ -80,164 +84,6 @@ func BenchmarkMemory(b *testing.B) {
 		a := allocator.New()
 		_ = ToYDB(v, a)
 		a.Free()
-	}
-}
-
-func TestValueToString(t *testing.T) {
-	for _, tt := range []struct {
-		value Value
-		exp   string
-	}{
-		{
-			value: VoidValue(),
-			exp:   "Void(NULL)",
-		},
-		{
-			value: UTF8Value("foo"),
-			exp:   "Utf8(foo)",
-		},
-		{
-			value: StringValue([]byte("foo")),
-			exp:   "String([102 111 111])",
-		},
-		{
-			value: BoolValue(true),
-			exp:   "Bool(true)",
-		},
-		{
-			value: Int8Value(42),
-			exp:   "Int8(42)",
-		},
-		{
-			value: Uint8Value(42),
-			exp:   "Uint8(42)",
-		},
-		{
-			value: Int16Value(42),
-			exp:   "Int16(42)",
-		},
-		{
-			value: Uint16Value(42),
-			exp:   "Uint16(42)",
-		},
-		{
-			value: Int32Value(42),
-			exp:   "Int32(42)",
-		},
-		{
-			value: Uint32Value(42),
-			exp:   "Uint32(42)",
-		},
-		{
-			value: Int64Value(42),
-			exp:   "Int64(42)",
-		},
-		{
-			value: Uint64Value(42),
-			exp:   "Uint64(42)",
-		},
-		{
-			value: FloatValue(42),
-			exp:   "Float(42)",
-		},
-		{
-			value: DoubleValue(42),
-			exp:   "Double(42)",
-		},
-		{
-			value: IntervalValue(42),
-			exp:   "Interval(42)",
-		},
-		{
-			value: TimestampValue(42),
-			exp:   "Timestamp(42)",
-		},
-		{
-			value: NullValue(TypeInt32),
-			exp:   "Optional<Int32>(NULL)",
-		},
-		{
-			value: NullValue(Optional(TypeBool)),
-			exp:   "Optional<Optional<Bool>>((NULL))",
-		},
-		{
-			value: OptionalValue(OptionalValue(Int32Value(42))),
-			exp:   "Optional<Optional<Int32>>((42))",
-		},
-		{
-			value: OptionalValue(OptionalValue(OptionalValue(Int32Value(42)))),
-			exp:   "Optional<Optional<Optional<Int32>>>(((42)))",
-		},
-		{
-			value: ListValue(
-				Int32Value(0),
-				Int32Value(1),
-				Int32Value(2),
-				Int32Value(3),
-			),
-			exp: "List<Int32>((0)(1)(2)(3))",
-		},
-		{
-			value: TupleValue(
-				Int32Value(0),
-				Int32Value(1),
-				Int32Value(2),
-				Int32Value(3),
-			),
-			exp: "Tuple<Int32,Int32,Int32,Int32>((0)(1)(2)(3))",
-		},
-		{
-			value: VariantValue(Int32Value(42), 1, Variant(Tuple(
-				TypeString,
-				TypeInt32,
-			))),
-			exp: "Variant<Tuple<String,Int32>>(1=(42))",
-		},
-		{
-			value: VariantValue(Int32Value(42), 1, Variant(Struct(
-				StructField{
-					Name: "foo",
-					T:    TypeString,
-				},
-				StructField{
-					Name: "bar",
-					T:    TypeInt32,
-				},
-			))),
-			exp: "Variant<Struct<foo:String,bar:Int32>>(bar=(42))",
-		},
-		{
-			value: DictValue(
-				DictValueField{UTF8Value("foo"), Int32Value(42)},
-				DictValueField{UTF8Value("bar"), Int32Value(43)},
-			),
-			exp: "Dict<Utf8,Int32>(((foo)(42))((bar)(43)))",
-		},
-		{
-			value: DictValue(
-				DictValueField{UTF8Value("foo"), VoidValue()},
-				DictValueField{UTF8Value("bar"), VoidValue()},
-			),
-			exp: "Dict<Utf8,Void>(((foo)(NULL))((bar)(NULL)))",
-		},
-		{
-			value: ZeroValue(Optional(TypeBool)),
-			exp:   "Optional<Bool>(NULL)",
-		},
-		{
-			value: ZeroValue(List(TypeBool)),
-			exp:   "List<Bool>()",
-		},
-		{
-			value: ZeroValue(TypeUUID),
-			exp:   "Uuid([0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0])",
-		},
-	} {
-		t.Run(tt.exp, func(t *testing.T) {
-			if got := tt.value.String(); got != tt.exp {
-				t.Errorf("string representations not equals:\n\n -  got: %s\n\n - want: %s", got, tt.exp)
-			}
-		})
 	}
 }
 
@@ -259,7 +105,7 @@ func TestToYDBFromYDB(t *testing.T) {
 		VoidValue(),
 		FloatValue(1),
 		DoubleValue(1),
-		StringValue([]byte("test")),
+		BytesValue([]byte("test")),
 		DecimalValue([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, 22, 9),
 		DyNumberValue("123"),
 		JSONValue("{}"),
@@ -267,9 +113,9 @@ func TestToYDBFromYDB(t *testing.T) {
 		TzDateValue("1"),
 		TzDatetimeValue("1"),
 		TzTimestampValue("1"),
-		UTF8Value("1"),
+		TextValue("1"),
 		UUIDValue([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}),
-		YSONValue("{}"),
+		YSONValue([]byte("{}")),
 		TupleValue(
 			Int64Value(1),
 			Int32Value(2),
@@ -285,33 +131,33 @@ func TestToYDBFromYDB(t *testing.T) {
 		OptionalValue(OptionalValue(IntervalValue(1))),
 		StructValue(
 			StructValueField{"series_id", Uint64Value(1)},
-			StructValueField{"title", UTF8Value("test")},
+			StructValueField{"title", TextValue("test")},
 			StructValueField{"air_date", DateValue(1)},
 			StructValueField{"remove_date", OptionalValue(TzDatetimeValue("1234"))},
 		),
 		DictValue(
-			DictValueField{UTF8Value("series_id"), Uint64Value(1)},
-			DictValueField{UTF8Value("title"), Uint64Value(2)},
-			DictValueField{UTF8Value("air_date"), Uint64Value(3)},
-			DictValueField{UTF8Value("remove_date"), Uint64Value(4)},
+			DictValueField{TextValue("series_id"), Uint64Value(1)},
+			DictValueField{TextValue("title"), Uint64Value(2)},
+			DictValueField{TextValue("air_date"), Uint64Value(3)},
+			DictValueField{TextValue("remove_date"), Uint64Value(4)},
 		),
 		NullValue(Primitive(TypeBool)),
 		NullValue(Optional(Primitive(TypeBool))),
 		VariantValue(Int32Value(42), 1, Tuple(
-			TypeString,
+			TypeBytes,
 			TypeInt32,
 		)),
 		VariantValue(Int32Value(42), 1, Struct(
 			StructField{
 				Name: "foo",
-				T:    TypeString,
+				T:    TypeBytes,
 			},
 			StructField{
 				Name: "bar",
 				T:    TypeInt32,
 			},
 		)),
-		ZeroValue(TypeUTF8),
+		ZeroValue(TypeText),
 		ZeroValue(Struct()),
 		ZeroValue(Tuple()),
 	}
@@ -325,6 +171,561 @@ func TestToYDBFromYDB(t *testing.T) {
 				t.Errorf("dual conversion error: %v", err)
 			} else if !proto.Equal(value, ToYDB(dualConversedValue, a)) {
 				t.Errorf("dual conversion failed:\n\n - got:  %v\n\n - want: %v", ToYDB(dualConversedValue, a), value)
+			}
+		})
+	}
+}
+
+func TestValueToString(t *testing.T) {
+	for _, tt := range []struct {
+		value  Value
+		string string
+		format map[string]string
+	}{
+		{
+			value:  VoidValue(),
+			string: "VOID",
+			format: map[string]string{
+				"%v":  "VOID",
+				"%+v": "Void(VOID)",
+				"%T":  "value.voidValue",
+				"%s":  "VOID",
+			},
+		},
+		{
+			value:  TextValue("some\"text\"with brackets"),
+			string: "some\"text\"with brackets",
+			format: map[string]string{
+				"%v":  "some\"text\"with brackets",
+				"%+v": "Text(\"some\\\"text\\\"with brackets\")",
+				"%T":  "value.textValue",
+				"%s":  "some\"text\"with brackets",
+				"%q":  "\"some\\\"text\\\"with brackets\"",
+			},
+		},
+		{
+			value:  BytesValue([]byte("foo")),
+			string: "[102 111 111]",
+			format: map[string]string{
+				"%v":  "[102 111 111]",
+				"%+v": "Bytes([102 111 111])",
+				"%T":  "value.bytesValue",
+				"%s":  "foo",
+				"%q":  "\"foo\"",
+				"%x":  "666f6f",
+				"%X":  "666F6F",
+			},
+		},
+		{
+			value:  BoolValue(true),
+			string: "true",
+			format: map[string]string{
+				"%v":  "true",
+				"%+v": "Bool(true)",
+				"%T":  "value.boolValue",
+				"%s":  "true",
+			},
+		},
+		{
+			value:  Int8Value(42),
+			string: "42",
+			format: map[string]string{
+				"%v":  "42",
+				"%+v": "Int8(42)",
+				"%T":  "value.int8Value",
+				"%s":  "42",
+				"%d":  "42",
+			},
+		},
+		{
+			value:  Uint8Value(42),
+			string: "42",
+			format: map[string]string{
+				"%v":  "42",
+				"%+v": "Uint8(42)",
+				"%T":  "value.uint8Value",
+				"%s":  "42",
+				"%d":  "42",
+			},
+		},
+		{
+			value:  Int16Value(42),
+			string: "42",
+			format: map[string]string{
+				"%v":  "42",
+				"%+v": "Int16(42)",
+				"%T":  "value.int16Value",
+				"%s":  "42",
+				"%d":  "42",
+			},
+		},
+		{
+			value:  Uint16Value(42),
+			string: "42",
+			format: map[string]string{
+				"%v":  "42",
+				"%+v": "Uint16(42)",
+				"%T":  "value.uint16Value",
+				"%s":  "42",
+				"%d":  "42",
+			},
+		},
+		{
+			value:  Int32Value(42),
+			string: "42",
+			format: map[string]string{
+				"%v":  "42",
+				"%+v": "Int32(42)",
+				"%T":  "value.int32Value",
+				"%s":  "42",
+				"%d":  "42",
+			},
+		},
+		{
+			value:  Uint32Value(42),
+			string: "42",
+			format: map[string]string{
+				"%v":  "42",
+				"%+v": "Uint32(42)",
+				"%T":  "value.uint32Value",
+				"%s":  "42",
+				"%d":  "42",
+			},
+		},
+		{
+			value:  Int64Value(42),
+			string: "42",
+			format: map[string]string{
+				"%v":  "42",
+				"%+v": "Int64(42)",
+				"%T":  "value.int64Value",
+				"%s":  "42",
+				"%d":  "42",
+			},
+		},
+		{
+			value:  Uint64Value(42),
+			string: "42",
+			format: map[string]string{
+				"%v":  "42",
+				"%+v": "Uint64(42)",
+				"%T":  "value.uint64Value",
+				"%s":  "42",
+				"%d":  "42",
+			},
+		},
+		{
+			value:  FloatValue(42.2121236),
+			string: "42.212124",
+			format: map[string]string{
+				"%v":    "42.212124",
+				"%+v":   "Float(42.212124)",
+				"%T":    "*value.floatValue",
+				"%s":    "42.212124",
+				"%f":    "42.212124",
+				"%0.2f": "42.21",
+				"%3.5f": "42.21212",
+			},
+		},
+		{
+			value:  DoubleValue(42.2121236192),
+			string: "42.2121236192",
+			format: map[string]string{
+				"%v":    "42.2121236192",
+				"%+v":   "Double(42.2121236192)",
+				"%T":    "*value.doubleValue",
+				"%s":    "42.2121236192",
+				"%f":    "42.2121236192",
+				"%0.2f": "42.21",
+				"%3.5f": "42.21212",
+			},
+		},
+		{
+			value: DateValue(func() uint32 {
+				v, _ := time.Parse("2006-01-02", "2022-06-17")
+				return uint32(v.Sub(time.Unix(0, 0)) / time.Hour / 24)
+			}()),
+			string: "2022-06-17",
+			format: map[string]string{
+				"%v":  "2022-06-17",
+				"%+v": "Date(\"2022-06-17\")",
+				"%T":  "value.dateValue",
+				"%s":  "2022-06-17",
+				"%q":  "\"2022-06-17\"",
+			},
+		},
+		{
+			value: DatetimeValue(func() uint32 {
+				v, _ := time.ParseInLocation("2006-01-02 15:04:05", "2022-06-17 05:19:20", time.Local)
+				return uint32(v.Sub(time.Unix(0, 0)).Seconds())
+			}()),
+			string: "2022-06-17T05:19:20",
+			format: map[string]string{
+				"%v":  "2022-06-17T05:19:20",
+				"%+v": "Datetime(\"2022-06-17T05:19:20\")",
+				"%T":  "value.datetimeValue",
+				"%s":  "2022-06-17T05:19:20",
+				"%q":  "\"2022-06-17T05:19:20\"",
+			},
+		},
+		{
+			value:  TzDateValue("2022-06-17,Europe/Berlin"),
+			string: "2022-06-17,Europe/Berlin",
+			format: map[string]string{
+				"%v":  "2022-06-17,Europe/Berlin",
+				"%+v": "TzDate(\"2022-06-17,Europe/Berlin\")",
+				"%T":  "value.tzDateValue",
+				"%s":  "2022-06-17,Europe/Berlin",
+				"%q":  "\"2022-06-17,Europe/Berlin\"",
+			},
+		},
+		{
+			value:  TzDatetimeValue("2022-06-17T05:19:20,Europe/Berlin"),
+			string: "2022-06-17T05:19:20,Europe/Berlin",
+			format: map[string]string{
+				"%v":  "2022-06-17T05:19:20,Europe/Berlin",
+				"%+v": "TzDatetime(\"2022-06-17T05:19:20,Europe/Berlin\")",
+				"%T":  "value.tzDatetimeValue",
+				"%s":  "2022-06-17T05:19:20,Europe/Berlin",
+				"%q":  "\"2022-06-17T05:19:20,Europe/Berlin\"",
+			},
+		},
+		{
+			value:  IntervalValueFromDuration(time.Duration(42) * time.Millisecond),
+			string: "42ms",
+			format: map[string]string{
+				"%v":  "42ms",
+				"%+v": "Interval(\"42ms\")",
+				"%T":  "value.intervalValue",
+				"%s":  "42ms",
+				"%q":  "\"42ms\"",
+			},
+		},
+		{
+			value: TimestampValueFromTime(func() time.Time {
+				tt, err := time.ParseInLocation(LayoutTimestamp, "1997-12-14T03:09:42.123456", time.Local)
+				require.NoError(t, err)
+				return tt.Local()
+			}()),
+			string: "1997-12-14T03:09:42.123456",
+			format: map[string]string{
+				"%v":  "1997-12-14T03:09:42.123456",
+				"%+v": "Timestamp(\"1997-12-14T03:09:42.123456\")",
+				"%T":  "value.timestampValue",
+				"%s":  "1997-12-14T03:09:42.123456",
+				"%q":  "\"1997-12-14T03:09:42.123456\"",
+			},
+		},
+		{
+			value:  TzTimestampValue("1997-12-14T03:09:42.123456,Europe/Berlin"),
+			string: "1997-12-14T03:09:42.123456,Europe/Berlin",
+			format: map[string]string{
+				"%v":  "1997-12-14T03:09:42.123456,Europe/Berlin",
+				"%+v": "TzTimestamp(\"1997-12-14T03:09:42.123456,Europe/Berlin\")",
+				"%T":  "value.tzTimestampValue",
+				"%s":  "1997-12-14T03:09:42.123456,Europe/Berlin",
+				"%q":  "\"1997-12-14T03:09:42.123456,Europe/Berlin\"",
+			},
+		},
+		{
+			value:  NullValue(TypeInt32),
+			string: "NULL",
+			format: map[string]string{
+				"%v":  "NULL",
+				"%+v": "Optional<Int32>(NULL)",
+				"%T":  "*value.optionalValue",
+				"%s":  "NULL",
+			},
+		},
+		{
+			value:  NullValue(Optional(TypeBool)),
+			string: "NULL",
+			format: map[string]string{
+				"%v":  "NULL",
+				"%+v": "Optional<Optional<Bool>>(NULL)",
+				"%T":  "*value.optionalValue",
+				"%s":  "NULL",
+			},
+		},
+		{
+			value:  OptionalValue(OptionalValue(Int32Value(42))),
+			string: "42",
+			format: map[string]string{
+				"%v":  "42",
+				"%+v": "Optional<Optional<Int32>>(42)",
+				"%T":  "*value.optionalValue",
+				"%s":  "42",
+			},
+		},
+		{
+			value:  OptionalValue(OptionalValue(OptionalValue(Int32Value(42)))),
+			string: "42",
+			format: map[string]string{
+				"%v":  "42",
+				"%+v": "Optional<Optional<Optional<Int32>>>(42)",
+				"%T":  "*value.optionalValue",
+				"%s":  "42",
+			},
+		},
+		{
+			value: ListValue(
+				Int32Value(0),
+				Int32Value(1),
+				Int32Value(2),
+				Int32Value(3),
+			),
+			string: "[0,1,2,3]",
+			format: map[string]string{
+				"%v":  "[0,1,2,3]",
+				"%+v": "List<Int32>([0,1,2,3])",
+				"%T":  "*value.listValue",
+				"%s":  "[0,1,2,3]",
+			},
+		},
+		{
+			value: TupleValue(
+				Int32Value(0),
+				Int64Value(1),
+				FloatValue(2),
+				TextValue("3"),
+			),
+			string: "(0,1,2,\"3\")",
+			format: map[string]string{
+				"%v":  "(0,1,2,\"3\")",
+				"%+v": "Tuple<Int32,Int64,Float,Text>(0,1,2,\"3\")",
+				"%T":  "*value.tupleValue",
+				"%s":  "(0,1,2,\"3\")",
+			},
+		},
+		{
+			value: VariantValue(Int32Value(42), 1, Variant(Tuple(
+				TypeBytes,
+				TypeInt32,
+			))),
+			string: "{1:42}",
+			format: map[string]string{
+				"%v":  "{1:42}",
+				"%+v": "Variant<Tuple<Bytes,Int32>>({1:42})",
+				"%T":  "*value.variantValue",
+				"%s":  "{1:42}",
+			},
+		},
+		{
+			value: VariantValue(TextValue("foo"), 1, Variant(Tuple(
+				TypeBytes,
+				TypeText,
+			))),
+			string: "{1:\"foo\"}",
+			format: map[string]string{
+				"%v":  "{1:\"foo\"}",
+				"%+v": "Variant<Tuple<Bytes,Text>>({1:\"foo\"})",
+				"%T":  "*value.variantValue",
+				"%s":  "{1:\"foo\"}",
+			},
+		},
+		{
+			value: VariantValue(BoolValue(true), 0, Variant(Tuple(
+				TypeBytes,
+				TypeInt32,
+			))),
+			string: "{0:true}",
+			format: map[string]string{
+				"%v":  "{0:true}",
+				"%+v": "Variant<Tuple<Bytes,Int32>>({0:true})",
+				"%T":  "*value.variantValue",
+				"%s":  "{0:true}",
+			},
+		},
+		{
+			value: VariantValue(Int32Value(42), 1, Variant(Struct(
+				StructField{"foo", TypeBytes},
+				StructField{"bar", TypeInt32},
+			))),
+			string: "{1:42}",
+			format: map[string]string{
+				"%v":  "{1:42}",
+				"%+v": "Variant<Struct<\"foo\":Bytes,\"bar\":Int32>>({1:42})",
+				"%T":  "*value.variantValue",
+				"%s":  "{1:42}",
+			},
+		},
+		{
+			value: StructValue(
+				StructValueField{"series_id", Uint64Value(1)},
+				StructValueField{"title", TextValue("test")},
+				StructValueField{"air_date", DateValue(1)},
+			),
+			string: "{\"series_id\":1,\"title\":\"test\",\"air_date\":\"1970-01-02\"}",
+			format: map[string]string{
+				"%v": "{\"series_id\":1,\"title\":\"test\",\"air_date\":\"1970-01-02\"}",
+				//nolint:lll
+				"%+v": "Struct<\"series_id\":Uint64,\"title\":Text,\"air_date\":Date>({\"series_id\":1,\"title\":\"test\",\"air_date\":\"1970-01-02\"})",
+				"%T":  "*value.structValue",
+				"%s":  "{\"series_id\":1,\"title\":\"test\",\"air_date\":\"1970-01-02\"}",
+			},
+		},
+		{
+			value: DictValue(
+				DictValueField{TextValue("foo"), Int32Value(42)},
+				DictValueField{TextValue("bar"), Int32Value(43)},
+			),
+			string: "{\"foo\":42,\"bar\":43}",
+			format: map[string]string{
+				"%v":  "{\"foo\":42,\"bar\":43}",
+				"%+v": "Dict<Text,Int32>({\"foo\":42,\"bar\":43})",
+				"%T":  "*value.dictValue",
+				"%s":  "{\"foo\":42,\"bar\":43}",
+			},
+		},
+		{
+			value: DictValue(
+				DictValueField{TextValue("foo"), VoidValue()},
+				DictValueField{TextValue("bar"), VoidValue()},
+			),
+			string: "{\"foo\":VOID,\"bar\":VOID}",
+			format: map[string]string{
+				"%v":  "{\"foo\":VOID,\"bar\":VOID}",
+				"%+v": "Dict<Text,Void>({\"foo\":VOID,\"bar\":VOID})",
+				"%T":  "*value.dictValue",
+				"%s":  "{\"foo\":VOID,\"bar\":VOID}",
+			},
+		},
+		{
+			value:  ZeroValue(TypeBool),
+			string: "false",
+			format: map[string]string{
+				"%v":  "false",
+				"%+v": "Bool(false)",
+				"%T":  "value.boolValue",
+				"%s":  "false",
+			},
+		},
+		{
+			value:  ZeroValue(Optional(TypeBool)),
+			string: "NULL",
+			format: map[string]string{
+				"%v":  "NULL",
+				"%+v": "Optional<Bool>(NULL)",
+				"%T":  "*value.optionalValue",
+				"%s":  "NULL",
+			},
+		},
+		{
+			value:  ZeroValue(List(TypeBool)),
+			string: "[]",
+			format: map[string]string{
+				"%v":  "[]",
+				"%+v": "List<Bool>([])",
+				"%T":  "*value.listValue",
+				"%s":  "[]",
+			},
+		},
+		{
+			value:  ZeroValue(Tuple(TypeBool, TypeDouble)),
+			string: "(false,0)",
+			format: map[string]string{
+				"%v":  "(false,0)",
+				"%+v": "Tuple<Bool,Double>(false,0)",
+				"%T":  "*value.tupleValue",
+				"%s":  "(false,0)",
+			},
+		},
+		{
+			value: ZeroValue(Struct(
+				StructField{"foo", TypeBool},
+				StructField{"bar", TypeText},
+			)),
+			string: "{\"foo\":false,\"bar\":\"\"}",
+			format: map[string]string{
+				"%v":  "{\"foo\":false,\"bar\":\"\"}",
+				"%+v": "Struct<\"foo\":Bool,\"bar\":Text>({\"foo\":false,\"bar\":\"\"})",
+				"%T":  "*value.structValue",
+				"%s":  "{\"foo\":false,\"bar\":\"\"}",
+			},
+		},
+		{
+			value:  ZeroValue(Dict(TypeText, TypeTimestamp)),
+			string: "{}",
+			format: map[string]string{
+				"%v":  "{}",
+				"%+v": "Dict<Text,Timestamp>({})",
+				"%T":  "*value.dictValue",
+				"%s":  "{}",
+			},
+		},
+		{
+			value:  ZeroValue(TypeUUID),
+			string: "\"00000000000000000000000000000000\"",
+			format: map[string]string{
+				"%v":  "\"00000000000000000000000000000000\"",
+				"%+v": "Uuid(\"00000000000000000000000000000000\")",
+				"%T":  "*value.uuidValue",
+				"%s":  "\"00000000000000000000000000000000\"",
+			},
+		},
+		{
+			value:  DecimalValueFromBigInt(big.NewInt(-1234567890123456), 22, 9),
+			string: "-1234567890123456",
+			format: map[string]string{
+				"%v":  "-1234567890123456",
+				"%+v": "Decimal(22,9)(-1234567890123456)",
+				"%T":  "*value.decimalValue",
+				"%s":  "-1234567890123456",
+			},
+		},
+		{
+			value:  DyNumberValue("-1234567890123456"),
+			string: "-1234567890123456",
+			format: map[string]string{
+				"%v":  "-1234567890123456",
+				"%+v": "DyNumber(-1234567890123456)",
+				"%T":  "value.dyNumberValue",
+				"%s":  "-1234567890123456",
+			},
+		},
+		{
+			value:  JSONValue("{\"a\":-1234567890123456}"),
+			string: "{\"a\":-1234567890123456}",
+			format: map[string]string{
+				"%v":  "{\"a\":-1234567890123456}",
+				"%+v": "Json({\"a\":-1234567890123456})",
+				"%T":  "value.jsonValue",
+				"%s":  "{\"a\":-1234567890123456}",
+			},
+		},
+		{
+			value:  JSONDocumentValue("{\"a\":-1234567890123456}"),
+			string: "{\"a\":-1234567890123456}",
+			format: map[string]string{
+				"%v":  "{\"a\":-1234567890123456}",
+				"%+v": "JsonDocument({\"a\":-1234567890123456})",
+				"%T":  "value.jsonDocumentValue",
+				"%s":  "{\"a\":-1234567890123456}",
+			},
+		},
+		{
+			value:  YSONValue([]byte("{\"a\":-1234567890123456}")),
+			string: "{\"a\":-1234567890123456}",
+			format: map[string]string{
+				"%v":  "{\"a\":-1234567890123456}",
+				"%+v": "Yson({\"a\":-1234567890123456})",
+				"%T":  "value.ysonValue",
+				"%s":  "{\"a\":-1234567890123456}",
+			},
+		},
+	} {
+		t.Run(fmt.Sprintf("%+v", tt.value), func(t *testing.T) {
+			t.Run("String()", func(t *testing.T) {
+				if got := tt.value.String(); got != tt.string {
+					t.Errorf("string representations not equals:\n\n -  got: %s\n\n - want: %s", got, tt.string)
+				}
+			})
+			for f := range tt.format {
+				t.Run(fmt.Sprintf("Sprintf(\"%s\")", f), func(t *testing.T) {
+					if got := fmt.Sprintf(f, tt.value); got != tt.format[f] {
+						t.Errorf("string representations not equals:\n\n -  got: %s\n\n - want: %s", got, tt.format[f])
+					}
+				})
 			}
 		})
 	}

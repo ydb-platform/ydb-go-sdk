@@ -68,10 +68,10 @@ func Example_createTable() {
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(db.Name(), "series"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
-				options.WithColumn("title", types.Optional(types.TypeUTF8)),
-				options.WithColumn("series_info", types.Optional(types.TypeUTF8)),
+				options.WithColumn("title", types.Optional(types.TypeText)),
+				options.WithColumn("series_info", types.Optional(types.TypeText)),
 				options.WithColumn("release_date", types.Optional(types.TypeDate)),
-				options.WithColumn("comment", types.Optional(types.TypeUTF8)),
+				options.WithColumn("comment", types.Optional(types.TypeText)),
 				options.WithPrimaryKeyColumn("series_id"),
 			)
 		},
@@ -120,11 +120,11 @@ func Example_bulkUpsert() {
 			rows := make([]types.Value, 0, len(logs))
 			for _, msg := range logs {
 				rows = append(rows, types.StructValue(
-					types.StructFieldValue("App", types.UTF8Value(msg.App)),
-					types.StructFieldValue("Host", types.UTF8Value(msg.Host)),
+					types.StructFieldValue("App", types.TextValue(msg.App)),
+					types.StructFieldValue("Host", types.TextValue(msg.Host)),
 					types.StructFieldValue("Timestamp", types.TimestampValueFromTime(msg.Timestamp)),
 					types.StructFieldValue("HTTPCode", types.Uint32Value(msg.HTTPCode)),
-					types.StructFieldValue("Message", types.UTF8Value(msg.Message)),
+					types.StructFieldValue("Message", types.TextValue(msg.Message)),
 				))
 			}
 			return s.BulkUpsert(ctx, "/local/bulk_upsert_example", types.ListValue(rows...))

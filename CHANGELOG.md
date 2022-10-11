@@ -1,3 +1,8 @@
+* Supported `NullValue` type as received type from `YDB`
+* Added `types.CastTo(types.Value, destination)` public method for cast `types.Value` to golang native type value destination
+* Added `types.TupleItem(types.Value)`, `types.StructFields(types.Value)` and `types.DictValues(types.Value)` funcs (extractors of internal fields of tuple, struct and dict values)
+* Refactored string representation of `types.Value`
+* Added supporting of `printf` formatter for `types.Value`
 * Added `table/options.WithDataColumns` for supporting covering indexes
 
 ## v3.38.5

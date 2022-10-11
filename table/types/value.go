@@ -6,13 +6,10 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
-type Value interface {
-	value.Value
-}
+type Value = value.Value
 
 func BoolValue(v bool) Value { return value.BoolValue(v) }
 
@@ -36,10 +33,13 @@ func FloatValue(v float32) Value { return value.FloatValue(v) }
 
 func DoubleValue(v float64) Value { return value.DoubleValue(v) }
 
+// DateValue returns ydb date value by given days since Epoch
 func DateValue(v uint32) Value { return value.DateValue(v) }
 
+// DatetimeValue makes ydb datetime value from seconds since Epoch
 func DatetimeValue(v uint32) Value { return value.DatetimeValue(v) }
 
+// TimestampValue makes ydb timestamp value from microseconds since Epoch
 func TimestampValue(v uint64) Value { return value.TimestampValue(v) }
 
 // IntervalValueFromMicroseconds makes Value from given microseconds value
@@ -63,22 +63,24 @@ func TzTimestampValue(v string) Value { return value.TzTimestampValue(v) }
 //
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
-func DateValueFromTime(v time.Time) Value { return value.DateValue(timeutil.MarshalDate(v)) }
+func DateValueFromTime(t time.Time) Value {
+	return value.DateValueFromTime(t)
+}
 
 // DatetimeValueFromTime makes Datetime value from time.Time
 //
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
-func DatetimeValueFromTime(v time.Time) Value {
-	return value.DatetimeValue(timeutil.MarshalDatetime(v))
+func DatetimeValueFromTime(t time.Time) Value {
+	return value.DatetimeValueFromTime(t)
 }
 
 // TimestampValueFromTime makes Timestamp value from time.Time
 //
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
-func TimestampValueFromTime(v time.Time) Value {
-	return value.TimestampValue(timeutil.MarshalTimestamp(v))
+func TimestampValueFromTime(t time.Time) Value {
+	return value.TimestampValueFromTime(t)
 }
 
 // IntervalValueFromDuration makes Interval value from time.Duration
@@ -86,57 +88,59 @@ func TimestampValueFromTime(v time.Time) Value {
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
 func IntervalValueFromDuration(v time.Duration) Value {
-	return value.IntervalValue(timeutil.DurationToMicroseconds(v))
+	return value.IntervalValueFromDuration(v)
 }
 
 // TzDateValueFromTime makes TzDate value from time.Time
 //
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
-func TzDateValueFromTime(v time.Time) Value { return value.TzDateValue(timeutil.MarshalTzDate(v)) }
+func TzDateValueFromTime(t time.Time) Value {
+	return value.TzDateValueFromTime(t)
+}
 
 // TzDatetimeValueFromTime makes TzDatetime value from time.Time
 //
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
-func TzDatetimeValueFromTime(v time.Time) Value {
-	return value.TzDatetimeValue(timeutil.MarshalTzDatetime(v))
+func TzDatetimeValueFromTime(t time.Time) Value {
+	return value.TzDatetimeValueFromTime(t)
 }
 
 // TzTimestampValueFromTime makes TzTimestamp value from time.Time
 //
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
-func TzTimestampValueFromTime(v time.Time) Value {
-	return value.TzTimestampValue(timeutil.MarshalTzTimestamp(v))
+func TzTimestampValueFromTime(t time.Time) Value {
+	return value.TzTimestampValueFromTime(t)
 }
 
 // StringValue returns bytes value
 //
 // Deprecated: use BytesValue instead
-func StringValue(v []byte) Value { return value.StringValue(v) }
+func StringValue(v []byte) Value { return value.BytesValue(v) }
 
-func BytesValue(v []byte) Value { return value.StringValue(v) }
+func BytesValue(v []byte) Value { return value.BytesValue(v) }
 
-func BytesValueFromString(v string) Value { return value.StringValue([]byte(v)) }
+func BytesValueFromString(v string) Value { return value.BytesValue([]byte(v)) }
 
 // StringValueFromString makes String value from string
 //
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
-func StringValueFromString(v string) Value { return value.StringValue([]byte(v)) }
+func StringValueFromString(v string) Value { return value.BytesValue([]byte(v)) }
 
-func UTF8Value(v string) Value { return value.UTF8Value(v) }
+func UTF8Value(v string) Value { return value.TextValue(v) }
 
-func TextValue(v string) Value { return value.UTF8Value(v) }
+func TextValue(v string) Value { return value.TextValue(v) }
 
-func YSONValue(v string) Value { return value.YSONValue(v) }
+func YSONValue(v string) Value { return value.YSONValue([]byte(v)) }
 
 // YSONValueFromBytes makes YSON value from bytes
 //
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
-func YSONValueFromBytes(v []byte) Value { return value.YSONValue(string(v)) }
+func YSONValueFromBytes(v []byte) Value { return value.YSONValue(v) }
 
 func JSONValue(v string) Value { return value.JSONValue(v) }
 
@@ -189,25 +193,18 @@ func DecimalValue(v *Decimal) Value {
 }
 
 func DecimalValueFromBigInt(v *big.Int, precision, scale uint32) Value {
-	b := decimal.BigIntToByte(v, precision, scale)
-	return value.DecimalValue(b, precision, scale)
+	return value.DecimalValueFromBigInt(v, precision, scale)
 }
 
 func TupleValue(vs ...Value) Value {
 	return value.TupleValue(func() (vv []value.Value) {
-		for _, v := range vs {
-			vv = append(vv, v)
-		}
-		return vv
+		return append(vv, vs...)
 	}()...)
 }
 
 func ListValue(vs ...Value) Value {
 	return value.ListValue(func() (vv []value.Value) {
-		for _, v := range vs {
-			vv = append(vv, v)
-		}
-		return vv
+		return append(vv, vs...)
 	}()...)
 }
 
@@ -445,7 +442,7 @@ func NullableIntervalValueFromDuration(v *time.Duration) Value {
 // Deprecated: use NullableBytesValue instead
 func NullableStringValue(v *[]byte) Value {
 	if v == nil {
-		return NullValue(TypeString)
+		return NullValue(TypeBytes)
 	}
 	return OptionalValue(StringValue(*v))
 }
@@ -459,9 +456,9 @@ func NullableBytesValue(v *[]byte) Value {
 
 func NullableStringValueFromString(v *string) Value {
 	if v == nil {
-		return NullValue(TypeString)
+		return NullValue(TypeBytes)
 	}
-	return OptionalValue(StringValueFromString(*v))
+	return OptionalValue(BytesValueFromString(*v))
 }
 
 func NullableBytesValueFromString(v *string) Value {
@@ -473,9 +470,9 @@ func NullableBytesValueFromString(v *string) Value {
 
 func NullableUTF8Value(v *string) Value {
 	if v == nil {
-		return NullValue(TypeUTF8)
+		return NullValue(TypeText)
 	}
-	return OptionalValue(UTF8Value(*v))
+	return OptionalValue(TextValue(*v))
 }
 
 func NullableTextValue(v *string) Value {
@@ -639,14 +636,14 @@ func Nullable(t Type, v interface{}) Value {
 		case *string:
 			return NullableStringValueFromString(tt)
 		default:
-			panic(fmt.Sprintf("unsupported type conversion from %T to TypeString", tt))
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeBytes", tt))
 		}
-	case TypeUTF8:
+	case TypeText:
 		switch tt := v.(type) {
 		case *string:
-			return NullableUTF8Value(tt)
+			return NullableTextValue(tt)
 		default:
-			panic(fmt.Sprintf("unsupported type conversion from %T to TypeUTF8", tt))
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeText", tt))
 		}
 	case TypeYSON:
 		switch tt := v.(type) {
