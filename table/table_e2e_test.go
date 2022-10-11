@@ -1703,14 +1703,10 @@ func TestSplitRangesAndRead(t *testing.T) {
 						ranges = append(ranges, r)
 					} else {
 						var from, to uint64
-						if vv, err := types.TupleItems(r.From); err != nil {
-							return err
-						} else if err := types.CastTo(vv[0], &from); err != nil {
+						if err := types.CastTo(r.From, &from); err != nil {
 							return err
 						}
-						if vv, err := types.TupleItems(r.To); err != nil {
-							return err
-						} else if err := types.CastTo(vv[0], &to); err != nil {
+						if err := types.CastTo(r.To, &to); err != nil {
 							return err
 						}
 						ranges = append(ranges,

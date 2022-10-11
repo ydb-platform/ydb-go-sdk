@@ -1385,22 +1385,10 @@ func (v *tupleValue) Format(s fmt.State, verb rune) {
 }
 
 func (v *tupleValue) castTo(dst interface{}) error {
-	switch t := dst.(type) {
-	case []interface{}:
-		if len(t) != len(v.items) {
-			return xerrors.WithStackTrace(
-				fmt.Errorf("len of tuple '%s' not equals to destinnation slice len '%T'", v.Type().String(), dst),
-			)
-		}
-		for i, vv := range v.items {
-			if err := vv.castTo(t[i]); err != nil {
-				return xerrors.WithStackTrace(err)
-			}
-		}
-		return nil
-	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, dst))
+	if len(v.items) == 1 {
+		return v.items[0].castTo(dst)
 	}
+	return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, dst))
 }
 
 func (v *tupleValue) String() string {
