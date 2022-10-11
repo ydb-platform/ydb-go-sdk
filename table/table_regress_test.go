@@ -165,3 +165,38 @@ func TestIssue415ScanError(t *testing.T) {
 	}(err)
 	require.Equal(t, "not found column 'ghi'", err.Error())
 }
+
+func TestNullType(t *testing.T) {
+	// https://github.com/ydb-platform/ydb-go-sdk/issues/415
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	db := connect(t)
+	defer db.Close(ctx)
+	err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+		res, err := tx.Execute(ctx, `SELECT NULL AS reschedule_due;`, nil)
+		if err != nil {
+			return err
+		}
+		err = res.NextResultSetErr(ctx)
+		if err != nil {
+			return err
+		}
+		if !res.NextRow() {
+			if err = res.Err(); err != nil {
+				return err
+			}
+			return fmt.Errorf("unexpected empty result set")
+		}
+		var rescheduleDue *time.Time
+		err = res.ScanNamed(
+			named.Optional("reschedule_due", &rescheduleDue),
+		)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%+v\n", rescheduleDue)
+		return res.Err()
+	}, table.WithTxSettings(table.TxSettings(table.WithSnapshotReadOnly())))
+	require.NoError(t, err)
+}
