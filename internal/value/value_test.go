@@ -433,7 +433,7 @@ func TestValueToString(t *testing.T) {
 			format: map[string]string{
 				"%v":  "NULL",
 				"%+v": "Optional<Int32>(NULL)",
-				"%T":  "*value.nullValue",
+				"%T":  "*value.optionalValue",
 				"%s":  "NULL",
 			},
 		},
@@ -443,7 +443,7 @@ func TestValueToString(t *testing.T) {
 			format: map[string]string{
 				"%v":  "NULL",
 				"%+v": "Optional<Optional<Bool>>(NULL)",
-				"%T":  "*value.nullValue",
+				"%T":  "*value.optionalValue",
 				"%s":  "NULL",
 			},
 		},
@@ -606,7 +606,7 @@ func TestValueToString(t *testing.T) {
 			format: map[string]string{
 				"%v":  "NULL",
 				"%+v": "Optional<Bool>(NULL)",
-				"%T":  "*value.nullValue",
+				"%T":  "*value.optionalValue",
 				"%s":  "NULL",
 			},
 		},
