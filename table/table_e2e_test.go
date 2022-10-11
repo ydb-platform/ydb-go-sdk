@@ -1702,7 +1702,7 @@ func TestSplitRangesAndRead(t *testing.T) {
 					if r.From == nil || r.To == nil {
 						ranges = append(ranges, r)
 					} else {
-						var from, to *uint64
+						var from, to uint64
 						if vv, err := types.TupleItems(r.From); err != nil {
 							return err
 						} else if err := types.CastTo(vv[0], &from); err != nil {
@@ -1717,12 +1717,12 @@ func TestSplitRangesAndRead(t *testing.T) {
 							options.KeyRange{
 								From: r.From,
 								To: types.TupleValue(
-									types.OptionalValue(types.Uint64Value(*from + (*to-*from)/2)),
+									types.OptionalValue(types.Uint64Value(from + (to-from)/2)),
 								),
 							},
 							options.KeyRange{
 								From: types.TupleValue(
-									types.OptionalValue(types.Uint64Value(*from + (*to-*from)/2)),
+									types.OptionalValue(types.Uint64Value(from + (to-from)/2)),
 								),
 								To: r.To,
 							},
