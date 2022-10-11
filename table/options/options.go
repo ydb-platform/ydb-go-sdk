@@ -181,6 +181,16 @@ func WithIndexColumns(columns ...string) IndexOption {
 	return indexColumns(columns)
 }
 
+type dataColumns []string
+
+func (columns dataColumns) ApplyIndexOption(d *indexDesc) {
+	d.DataColumns = append(d.DataColumns, columns...)
+}
+
+func WithDataColumns(columns ...string) IndexOption {
+	return dataColumns(columns)
+}
+
 type indexType struct {
 	t IndexType
 }

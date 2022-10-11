@@ -3,6 +3,7 @@
 * Added `types.TupleItem(types.Value)`, `types.StructFields(types.Value)` and `types.DictValues(types.Value)` funcs (extractors of internal fields of tuple, struct and dict values)
 * Refactored string representation of `types.Value`
 * Added supporting of `printf` formatter for `types.Value`
+* Added `table/options.WithDataColumns` for supporting covering indexes
 
 ## v3.38.5
 * Fixed bug from scan unexpected column name
