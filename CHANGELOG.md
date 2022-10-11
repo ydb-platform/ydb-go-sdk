@@ -1,3 +1,5 @@
+* Added `table/options.WithDataColumns` for supporting covering indexes
+
 ## v3.38.5
 * Fixed bug from scan unexpected column name
 
