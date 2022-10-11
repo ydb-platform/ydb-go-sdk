@@ -1213,33 +1213,19 @@ func (v *optionalValue) Type() Type {
 }
 
 func (v *optionalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
-	vvv := a.Value()
-	switch v.value {
-	case nil:
-		vvv.Value = a.NullFlag()
-
-		x := v.innerType
-		for {
-			opt, ok := x.(*optionalType)
-			if !ok {
-				break
-			}
-			x = opt.innerType
-			nestedValue := a.Nested()
-			nestedValue.NestedValue = vvv
-			vvv = a.Value()
-			vvv.Value = nestedValue
-		}
-	default:
-		if _, opt := v.value.(*optionalValue); opt {
-			vv := a.Nested()
-			vv.NestedValue = v.value.toYDB(a)
-			vvv.Value = vv
+	vv := a.Value()
+	if _, opt := v.value.(*optionalValue); opt {
+		vvv := a.Nested()
+		vvv.NestedValue = v.value.toYDB(a)
+		vv.Value = vvv
+	} else {
+		if v.value != nil {
+			vv.Value = v.value.toYDB(a).Value
 		} else {
-			vvv.Value = v.value.toYDB(a).Value
+			vv.Value = a.NullFlag()
 		}
 	}
-	return vvv
+	return vv
 }
 
 func OptionalValue(v Value) *optionalValue {
