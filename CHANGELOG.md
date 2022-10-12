@@ -5,6 +5,7 @@
 * Changed `Utf8Value` type string representation from `Utf8` to `Text` for exclude user confuses
 * Changed `StringValue` type string representation from `String` to `Bytes` for exclude user confuses
 * Added supporting of `printf` formatter for `types.Value`
+* Marked `table/types.WriteTypeStringTo` as deprecated 
 * Added `table/options.WithDataColumns` for supporting covering indexes
 
 ## v3.38.5
