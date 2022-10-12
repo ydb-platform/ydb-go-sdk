@@ -21,6 +21,11 @@ func StopAfter(stopAfter time.Duration) TestManyTimesOption {
 func TestManyTimes(t testing.TB, test TestFunc, opts ...TestManyTimesOption) {
 	t.Helper()
 
+	testCounter := 0
+	defer func() {
+		t.Log("test run counter:", testCounter)
+	}()
+
 	options := testManyTimesOptions{
 		stopAfter: time.Second,
 	}
@@ -30,14 +35,12 @@ func TestManyTimes(t testing.TB, test TestFunc, opts ...TestManyTimesOption) {
 	}
 
 	start := time.Now()
-	testCounter := 0
 	for {
 		testCounter++
 		// run test, then check stopAfter for guarantee run test least once
 		runTest(t, test)
 
 		if time.Since(start) > options.stopAfter || t.Failed() {
-			t.Log("test run counter:", testCounter)
 			return
 		}
 	}
@@ -109,6 +112,20 @@ func (tw *testWrapper) Fatalf(format string, args ...interface{}) {
 
 	tw.flushLogs()
 	tw.TB.Fatalf(format, args...)
+}
+
+func (tw *testWrapper) Fail() {
+	tw.TB.Helper()
+
+	tw.flushLogs()
+	tw.TB.Fail()
+}
+
+func (tw *testWrapper) FailNow() {
+	tw.TB.Helper()
+
+	tw.flushLogs()
+	tw.TB.FailNow()
 }
 
 func (tw *testWrapper) Log(args ...interface{}) {
