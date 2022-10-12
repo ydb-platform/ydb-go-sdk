@@ -33,7 +33,10 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		const dataSize = 4
 
 		// request new data portion
-		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: dataSize * 2})
+		readRequestReceived := make(empty.Chan)
+		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: dataSize * 2}).Do(func(_ interface{}) {
+			close(readRequestReceived)
+		})
 
 		commitReceived := make(empty.Chan)
 		// Expect commit message with stole
@@ -103,6 +106,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, e.reader.Commit(e.ctx, batch.getCommitRange().priv))
 		xtest.WaitChannelClosed(t, commitReceived)
+		xtest.WaitChannelClosed(t, readRequestReceived)
 	})
 
 	xtest.TestManyTimesWithName(t, "CommitAfterGracefulStopPartition", func(t testing.TB) {
