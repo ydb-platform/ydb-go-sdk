@@ -23,6 +23,7 @@ func TestManyTimes(t testing.TB, test TestFunc, opts ...TestManyTimesOption) {
 
 	testCounter := 0
 	defer func() {
+		t.Helper()
 		t.Log("test run counter:", testCounter)
 	}()
 

@@ -7,6 +7,9 @@ env:
 
 jobs:
   gorelease:
+    concurrency:
+      group: breaking-${{ github.ref }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     steps:
       - name: Install Go
