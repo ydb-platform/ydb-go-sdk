@@ -473,7 +473,7 @@ func (v *StructType) String() string {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
-		buffer.WriteString(f.Name)
+		buffer.WriteString("`" + f.Name + "`")
 		buffer.WriteByte(':')
 		buffer.WriteString(f.T.String())
 	}

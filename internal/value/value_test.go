@@ -544,7 +544,7 @@ func TestValueToString(t *testing.T) {
 			string: "{1:42}",
 			format: map[string]string{
 				"%v":  "{1:42}",
-				"%+v": "Variant<Struct<foo:Bytes,bar:Int32>>({1:42})",
+				"%+v": "Variant<Struct<`foo`:Bytes,`bar`:Int32>>({1:42})",
 				"%T":  "*value.variantValue",
 				"%s":  "{1:42}",
 			},
@@ -559,7 +559,7 @@ func TestValueToString(t *testing.T) {
 			format: map[string]string{
 				"%v": "{\"series_id\":1,\"title\":\"test\",\"air_date\":\"1970-01-02\"}",
 				//nolint:lll
-				"%+v": "Struct<series_id:Uint64,title:Text,air_date:Date>({\"series_id\":1,\"title\":\"test\",\"air_date\":\"1970-01-02\"})",
+				"%+v": "Struct<`series_id`:Uint64,`title`:Text,`air_date`:Date>({\"series_id\":1,\"title\":\"test\",\"air_date\":\"1970-01-02\"})",
 				"%T":  "*value.structValue",
 				"%s":  "{\"series_id\":1,\"title\":\"test\",\"air_date\":\"1970-01-02\"}",
 			},
@@ -638,7 +638,7 @@ func TestValueToString(t *testing.T) {
 			string: "{\"foo\":false,\"bar\":\"\"}",
 			format: map[string]string{
 				"%v":  "{\"foo\":false,\"bar\":\"\"}",
-				"%+v": "Struct<foo:Bool,bar:Text>({\"foo\":false,\"bar\":\"\"})",
+				"%+v": "Struct<`foo`:Bool,`bar`:Text>({\"foo\":false,\"bar\":\"\"})",
 				"%T":  "*value.structValue",
 				"%s":  "{\"foo\":false,\"bar\":\"\"}",
 			},
