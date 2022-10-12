@@ -28,6 +28,7 @@ func TestEventBroadcast(t *testing.T) {
 		events := int64(0)
 
 		backgroundCounter := int64(0)
+		firstWaiterStarted := xatomic.Bool{}
 
 		stopSubscribe := xatomic.Bool{}
 
@@ -40,6 +41,7 @@ func TestEventBroadcast(t *testing.T) {
 			for {
 				atomic.AddInt64(&backgroundCounter, 1)
 				waiter := b.Waiter()
+				firstWaiterStarted.Store(true)
 				go func() {
 					<-waiter.Done()
 					atomic.AddInt64(&backgroundCounter, -1)
@@ -65,17 +67,24 @@ func TestEventBroadcast(t *testing.T) {
 			}
 		}()
 
-		<-time.After(testDuration)
+		xtest.SpinWaitCondition(t, nil, firstWaiterStarted.Load)
 
-		xtest.SpinWaitCondition(t, nil, func() bool {
-			return atomic.LoadInt64(&backgroundCounter) > 0
-		})
+		<-time.After(testDuration)
 
 		stopSubscribe.Store(true)
 		<-subscribeStopped
-		xtest.SpinWaitCondition(t, nil, func() bool {
-			return atomic.LoadInt64(&backgroundCounter) == 0
-		})
+
+		for {
+			oldCounter := atomic.LoadInt64(&backgroundCounter)
+			if oldCounter == 0 {
+				break
+			}
+
+			t.Log("background counter", oldCounter)
+			xtest.SpinWaitCondition(t, nil, func() bool {
+				return atomic.LoadInt64(&backgroundCounter) < oldCounter
+			})
+		}
 		stopBroadcast.Store(true)
 		<-broadcastStopped
 
