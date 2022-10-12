@@ -7,6 +7,9 @@ on:
   workflow_dispatch:
 jobs:
   test:
+    concurrency:
+      group: codegen-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
+      cancel-in-progress: true
     strategy:
       matrix:
         os: [ ubuntu-latest ]
