@@ -25,7 +25,7 @@ import (
 )
 
 func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
-	xtest.TestManyTimes(t, func(t testing.TB) {
+	xtest.TestManyTimesWithName(t, "SimpleCommit", func(t testing.TB) {
 		e := newTopicReaderTestEnv(t)
 		e.Start()
 
@@ -102,13 +102,14 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		batch, err := e.reader.ReadMessageBatch(e.ctx, opts)
 		require.NoError(t, err)
 		require.NoError(t, e.reader.Commit(e.ctx, batch.getCommitRange().priv))
-		<-commitReceived
+		xtest.WaitChannelClosed(t, commitReceived)
 	})
 
-	t.Run("CommitAfterGracefulStopPartition", func(t *testing.T) {
+	xtest.TestManyTimesWithName(t, "CommitAfterGracefulStopPartition", func(t testing.TB) {
 		e := newTopicReaderTestEnv(t)
 
 		committed := e.partitionSession.committedOffset()
+		commitReceived := make(empty.Chan)
 		e.stream.EXPECT().Send(&rawtopicreader.CommitOffsetRequest{CommitOffsets: []rawtopicreader.PartitionCommitOffset{
 			{
 				PartitionSessionID: e.partitionSessionID,
@@ -119,7 +120,9 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 					},
 				},
 			},
-		}}).Return(nil)
+		}}).Do(func(_ interface{}) {
+			close(commitReceived)
+		}).Return(nil)
 
 		stopPartitionResponseSent := make(empty.Chan)
 		e.stream.EXPECT().Send(&rawtopicreader.StopPartitionSessionResponse{PartitionSessionID: e.partitionSessionID}).
@@ -175,6 +178,8 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		case <-time.After(time.Second):
 			t.Fatal("partition session not closed")
 		}
+
+		xtest.WaitChannelClosed(t, commitReceived)
 	})
 }
 
@@ -722,6 +727,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	cfg := newTopicStreamReaderConfig()
 	cfg.BaseContext = ctx
 	cfg.BufferSizeProtoBytes = initialBufferSizeBytes
+	cfg.CommitterBatchTimeLag = 0
 
 	reader := newTopicStreamReaderStopped(stream, cfg)
 	// reader.initSession() - skip stream level initialization
