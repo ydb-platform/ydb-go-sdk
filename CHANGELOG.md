@@ -2,6 +2,8 @@
 * Added `types.CastTo(types.Value, destination)` public method for cast `types.Value` to golang native type value destination
 * Added `types.TupleItem(types.Value)`, `types.StructFields(types.Value)` and `types.DictValues(types.Value)` funcs (extractors of internal fields of tuple, struct and dict values)
 * Refactored string representation of `types.Value`
+* Changed `Utf8Value` type string representation from `Utf8` to `Text` for exclude user confuses
+* Changed `StringValue` type string representation from `String` to `Bytes` for exclude user confuses
 * Added supporting of `printf` formatter for `types.Value`
 * Added `table/options.WithDataColumns` for supporting covering indexes
 
