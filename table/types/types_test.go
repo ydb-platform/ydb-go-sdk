@@ -267,7 +267,7 @@ func TestWriteTypeBytesTo(t *testing.T) {
 				StructField("air_date", TypeDate),
 				StructField("remove_date", Optional(TypeTzDatetime)),
 			),
-			s: "Struct<\"series_id\":Uint64,\"title\":Text,\"air_date\":Date,\"remove_date\":Optional<TzDatetime>>",
+			s: "Struct<`series_id`:Uint64,`title`:Text,`air_date`:Date,`remove_date`:Optional<TzDatetime>>",
 		},
 		{
 			t: Dict(TypeText, Optional(TypeTzDatetime)),
@@ -288,7 +288,7 @@ func TestWriteTypeBytesTo(t *testing.T) {
 				StructField("air_date", TypeDate),
 				StructField("remove_date", Optional(TypeTzDatetime)),
 			)),
-			s: "Variant<Struct<\"series_id\":Uint64,\"title\":Text,\"air_date\":Date,\"remove_date\":Optional<TzDatetime>>>",
+			s: "Variant<Struct<`series_id`:Uint64,`title`:Text,`air_date`:Date,`remove_date`:Optional<TzDatetime>>>",
 		},
 	} {
 		t.Run(fmt.Sprintf("%+v", tt.t), func(t *testing.T) {
