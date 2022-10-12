@@ -4,6 +4,9 @@ on:
 jobs:
   changelog:
     name: changelog
+    concurrency:
+      group: changelog-${{ github.ref }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
