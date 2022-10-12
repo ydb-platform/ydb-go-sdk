@@ -1,6 +1,7 @@
 package types
 
 import (
+	"bytes"
 	"io"
 	"time"
 
@@ -109,6 +110,13 @@ const (
 	TypeJSONDocument = value.TypeJSONDocument
 	TypeDyNumber     = value.TypeDyNumber
 )
+
+// WriteTypeStringTo writes ydb type string representation into buffer
+//
+// Deprecated: use types.Type.String() instead
+func WriteTypeStringTo(buf *bytes.Buffer, t Type) {
+	buf.WriteString(t.String())
+}
 
 // RawValue scanning non-primitive yql types or for own implementation scanner native API
 type RawValue interface {
