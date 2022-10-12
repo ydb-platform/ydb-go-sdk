@@ -221,19 +221,25 @@ func TestBatcher_Pop(t *testing.T) {
 	})
 
 	xtest.TestManyTimesWithName(t, "CloseBatcherWhilePopWait", func(t testing.TB) {
-		ctx := context.Background()
+		ctx := xtest.Context(t)
 		testErr := errors.New("test")
 
 		b := newBatcher()
 		b.notifyAboutNewMessages()
 
-		var err error
+		require.Len(t, b.hasNewMessages, 1)
 
 		popFinished := make(empty.Chan)
+		popGoroutineStarted := make(empty.Chan)
 		go func() {
-			_, err = b.Pop(ctx, batcherGetOptions{MinCount: 1})
+			close(popGoroutineStarted)
+
+			_, popErr := b.Pop(ctx, batcherGetOptions{MinCount: 1})
+			require.ErrorIs(t, popErr, testErr)
 			close(popFinished)
 		}()
+
+		xtest.WaitChannelClosed(t, popGoroutineStarted)
 
 		// loop for wait Pop start wait message
 		xtest.SpinWaitCondition(t, &b.m, func() bool {
@@ -243,8 +249,7 @@ func TestBatcher_Pop(t *testing.T) {
 		require.NoError(t, b.Close(testErr))
 		require.Error(t, b.Close(errors.New("second close")))
 
-		<-popFinished
-		require.ErrorIs(t, err, testErr)
+		xtest.WaitChannelClosed(t, popFinished)
 	})
 }
 

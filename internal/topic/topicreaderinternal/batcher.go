@@ -179,7 +179,7 @@ func (b *batcher) Pop(ctx context.Context, opts batcherGetOptions) (_ batcherMes
 		})
 		if closed {
 			return batcherMessageOrderItem{},
-				xerrors.WithStackTrace(fmt.Errorf("ydb: try pop messages from closed batcher: %w", b.closeErr))
+				xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: try pop messages from closed batcher: %w", b.closeErr)))
 		}
 		if findRes.Ok {
 			return findRes.Result, nil
