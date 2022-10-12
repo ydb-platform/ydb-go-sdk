@@ -25,7 +25,7 @@ import (
 )
 
 func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
-	xtest.TestManyTimes(t, func(t testing.TB) {
+	xtest.TestManyTimesWithName(t, "SimpleCommit", func(t testing.TB) {
 		e := newTopicReaderTestEnv(t)
 		e.Start()
 
@@ -102,7 +102,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		batch, err := e.reader.ReadMessageBatch(e.ctx, opts)
 		require.NoError(t, err)
 		require.NoError(t, e.reader.Commit(e.ctx, batch.getCommitRange().priv))
-		<-commitReceived
+		xtest.WaitChannelClosed(t, commitReceived)
 	})
 
 	xtest.TestManyTimesWithName(t, "CommitAfterGracefulStopPartition", func(t testing.TB) {
@@ -727,6 +727,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	cfg := newTopicStreamReaderConfig()
 	cfg.BaseContext = ctx
 	cfg.BufferSizeProtoBytes = initialBufferSizeBytes
+	cfg.CommitterBatchTimeLag = 0
 
 	reader := newTopicStreamReaderStopped(stream, cfg)
 	// reader.initSession() - skip stream level initialization
