@@ -7,10 +7,13 @@ on:
   workflow_dispatch:
 jobs:
   test:
+    concurrency:
+      group: codegen-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
+      cancel-in-progress: true
     strategy:
       matrix:
         os: [ ubuntu-latest ]
-        go: [1.18.x, 1.19.x]
+        go-version: [1.18.x, 1.19.x]
     runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout
@@ -19,7 +22,7 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v3
       with:
-        go-version: ${{ matrix.go }}
+        go-version: ${{ matrix.go-version }}
 
     - name: Go Env
       run: |

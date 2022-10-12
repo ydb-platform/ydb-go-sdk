@@ -7,6 +7,9 @@ on:
   workflow_dispatch:
 jobs:
   unit:
+    concurrency:
+      group: unit-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
+      cancel-in-progress: true
     strategy:
       matrix:
         go-version: [1.16.x, 1.18.x, 1.19.x]
@@ -31,6 +34,9 @@ jobs:
           flags: unit,${{ matrix.os }},${{ matrix.go-version }}
           name: unit
   e2e:
+    concurrency:
+      group: e2e-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
+      cancel-in-progress: true
     strategy:
       matrix:
         go-version: [1.16.x, 1.18.x, 1.19.x]
