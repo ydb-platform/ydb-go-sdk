@@ -221,7 +221,7 @@ func TestValueToString(t *testing.T) {
 			string: "[102 111 111]",
 			format: map[string]string{
 				"%v":  "[102 111 111]",
-				"%+v": "Optional<Bytes>([102 111 111])",
+				"%+v": "Bytes?([102 111 111])",
 				"%T":  "*value.optionalValue",
 				"%s":  "foo",
 				"%q":  "\"foo\"",
@@ -445,7 +445,7 @@ func TestValueToString(t *testing.T) {
 			string: "NULL",
 			format: map[string]string{
 				"%v":  "NULL",
-				"%+v": "Optional<Int32>(NULL)",
+				"%+v": "Int32?(NULL)",
 				"%T":  "*value.optionalValue",
 				"%s":  "NULL",
 			},
@@ -455,7 +455,7 @@ func TestValueToString(t *testing.T) {
 			string: "NULL",
 			format: map[string]string{
 				"%v":  "NULL",
-				"%+v": "Optional<Optional<Bool>>(NULL)",
+				"%+v": "Bool??(NULL)",
 				"%T":  "*value.optionalValue",
 				"%s":  "NULL",
 			},
@@ -465,7 +465,7 @@ func TestValueToString(t *testing.T) {
 			string: "42",
 			format: map[string]string{
 				"%v":  "42",
-				"%+v": "Optional<Optional<Int32>>(42)",
+				"%+v": "Int32??(42)",
 				"%T":  "*value.optionalValue",
 				"%s":  "42",
 			},
@@ -475,7 +475,7 @@ func TestValueToString(t *testing.T) {
 			string: "42",
 			format: map[string]string{
 				"%v":  "42",
-				"%+v": "Optional<Optional<Optional<Int32>>>(42)",
+				"%+v": "Int32???(42)",
 				"%T":  "*value.optionalValue",
 				"%s":  "42",
 			},
@@ -618,7 +618,7 @@ func TestValueToString(t *testing.T) {
 			string: "NULL",
 			format: map[string]string{
 				"%v":  "NULL",
-				"%+v": "Optional<Bool>(NULL)",
+				"%+v": "Bool?(NULL)",
 				"%T":  "*value.optionalValue",
 				"%s":  "NULL",
 			},

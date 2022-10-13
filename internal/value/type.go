@@ -310,9 +310,8 @@ type optionalType struct {
 func (v *optionalType) String() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString("Optional<")
 	buffer.WriteString(v.innerType.String())
-	buffer.WriteString(">")
+	buffer.WriteString("?")
 	return buffer.String()
 }
 
