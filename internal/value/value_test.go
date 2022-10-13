@@ -217,6 +217,19 @@ func TestValueToString(t *testing.T) {
 			},
 		},
 		{
+			value:  OptionalValue(BytesValue([]byte("foo"))),
+			string: "[102 111 111]",
+			format: map[string]string{
+				"%v":  "[102 111 111]",
+				"%+v": "Optional<Bytes>([102 111 111])",
+				"%T":  "*value.optionalValue",
+				"%s":  "foo",
+				"%q":  "\"foo\"",
+				"%x":  "666f6f",
+				"%X":  "666F6F",
+			},
+		},
+		{
 			value:  BoolValue(true),
 			string: "true",
 			format: map[string]string{

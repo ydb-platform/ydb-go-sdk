@@ -1189,7 +1189,26 @@ type optionalValue struct {
 }
 
 func (v *optionalValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
+	switch verb {
+	case 'v':
+		if s.Flag('+') {
+			_, _ = io.WriteString(s, v.Type().String()+"(")
+		}
+		if v.value == nil {
+			_, _ = io.WriteString(s, "NULL")
+		} else {
+			_, _ = io.WriteString(s, fmt.Sprintf("%v", v.value))
+		}
+		if s.Flag('+') {
+			_, _ = io.WriteString(s, ")")
+		}
+	default:
+		if v.value == nil {
+			_, _ = io.WriteString(s, "NULL")
+		} else {
+			v.value.Format(s, verb)
+		}
+	}
 }
 
 var errOptionalNilValue = errors.New("optional contains nil value")
