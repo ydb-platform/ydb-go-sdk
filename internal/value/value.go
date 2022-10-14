@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"io"
 	"math/big"
 	"strconv"
 	"time"
@@ -18,8 +17,6 @@ import (
 )
 
 type Value interface {
-	fmt.Formatter
-
 	Type() Type
 	String() string
 
@@ -41,43 +38,6 @@ func BigEndianUint128(hi, lo uint64) (v [16]byte) {
 	binary.BigEndian.PutUint64(v[0:8], hi)
 	binary.BigEndian.PutUint64(v[8:16], lo)
 	return v
-}
-
-type verbFormatter struct {
-	verb   rune
-	format func()
-}
-
-func vF(verb rune, format func()) verbFormatter {
-	return verbFormatter{verb: verb, format: format}
-}
-
-func formatValue(v Value, s fmt.State, verb rune, other ...verbFormatter) {
-	for _, rf := range append(other,
-		vF('v', func() {
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, v.Type().String()+"(")
-			}
-			_, _ = io.WriteString(s, v.String())
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, ")")
-			}
-		}),
-		vF('s', func() {
-			_, _ = io.WriteString(s, v.String())
-		}),
-		vF('q', func() {
-			_, _ = io.WriteString(s, v.String())
-		}),
-	) {
-		if rf.verb == verb {
-			rf.format()
-			return
-		}
-	}
-	_, _ = io.WriteString(s,
-		fmt.Sprintf("unknown formatter verb '%s' for value type '%s'", string(verb), v.Type().String()),
-	)
 }
 
 func FromYDB(t *Ydb.Type, v *Ydb.Value) Value {
@@ -300,10 +260,6 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 
 type boolValue bool
 
-func (v boolValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
-}
-
 func (v boolValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *bool:
@@ -341,23 +297,6 @@ func BoolValue(v bool) boolValue {
 }
 
 type dateValue uint32
-
-func (v dateValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb,
-		vF('v', func() {
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, v.Type().String()+"(\"")
-			}
-			_, _ = io.WriteString(s, v.String())
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, "\")")
-			}
-		}),
-		vF('q', func() {
-			_, _ = io.WriteString(s, "\""+v.String()+"\"")
-		}),
-	)
-}
 
 func (v dateValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
@@ -408,23 +347,6 @@ func DateValueFromTime(t time.Time) dateValue {
 
 type datetimeValue uint32
 
-func (v datetimeValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb,
-		vF('v', func() {
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, v.Type().String()+"(\"")
-			}
-			_, _ = io.WriteString(s, v.String())
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, "\")")
-			}
-		}),
-		vF('q', func() {
-			_, _ = io.WriteString(s, "\""+v.String()+"\"")
-		}),
-	)
-}
-
 func (v datetimeValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *time.Time:
@@ -474,10 +396,6 @@ func DatetimeValueFromTime(t time.Time) datetimeValue {
 type decimalValue struct {
 	value     [16]byte
 	innerType *DecimalType
-}
-
-func (v *decimalValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
 }
 
 func (v *decimalValue) castTo(dst interface{}) error {
@@ -541,10 +459,6 @@ func (v *dictValue) Values() map[Value]Value {
 	return values
 }
 
-func (v *dictValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
-}
-
 func (v *dictValue) castTo(dst interface{}) error {
 	return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, dst))
 }
@@ -599,16 +513,6 @@ type doubleValue struct {
 	value float64
 }
 
-func (v *doubleValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb, vF('f', func() {
-		precision := -1
-		if p, hasPrecision := s.Precision(); hasPrecision {
-			precision = p
-		}
-		_, _ = io.WriteString(s, strconv.FormatFloat(v.value, 'f', precision, 64))
-	}))
-}
-
 func (v *doubleValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -651,10 +555,6 @@ func DoubleValue(v float64) *doubleValue {
 
 type dyNumberValue string
 
-func (v dyNumberValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
-}
-
 func (v dyNumberValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -692,16 +592,6 @@ func DyNumberValue(v string) dyNumberValue {
 
 type floatValue struct {
 	value float32
-}
-
-func (v *floatValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb, vF('f', func() {
-		precision := -1
-		if p, hasPrecision := s.Precision(); hasPrecision {
-			precision = p
-		}
-		_, _ = io.WriteString(s, strconv.FormatFloat(float64(v.value), 'f', precision, 32))
-	}))
 }
 
 func (v *floatValue) castTo(dst interface{}) error {
@@ -748,12 +638,6 @@ func FloatValue(v float32) *floatValue {
 }
 
 type int8Value int8
-
-func (v int8Value) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb, vF('d', func() {
-		_, _ = io.WriteString(s, v.String())
-	}))
-}
 
 func (v int8Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
@@ -810,12 +694,6 @@ func Int8Value(v int8) int8Value {
 
 type int16Value int16
 
-func (v int16Value) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb, vF('d', func() {
-		_, _ = io.WriteString(s, v.String())
-	}))
-}
-
 func (v int16Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -868,12 +746,6 @@ func Int16Value(v int16) int16Value {
 
 type int32Value int32
 
-func (v int32Value) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb, vF('d', func() {
-		_, _ = io.WriteString(s, v.String())
-	}))
-}
-
 func (v int32Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -923,12 +795,6 @@ func Int32Value(v int32) int32Value {
 
 type int64Value int64
 
-func (v int64Value) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb, vF('d', func() {
-		_, _ = io.WriteString(s, v.String())
-	}))
-}
-
 func (v int64Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -972,23 +838,6 @@ func Int64Value(v int64) int64Value {
 
 type intervalValue int64
 
-func (v intervalValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb,
-		vF('v', func() {
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, v.Type().String()+"(\"")
-			}
-			_, _ = io.WriteString(s, v.String())
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, "\")")
-			}
-		}),
-		vF('q', func() {
-			_, _ = io.WriteString(s, "\""+v.String()+"\"")
-		}),
-	)
-}
-
 func (v intervalValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *time.Duration:
@@ -1031,10 +880,6 @@ func IntervalValueFromDuration(v time.Duration) intervalValue {
 
 type jsonValue string
 
-func (v jsonValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
-}
-
 func (v jsonValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -1071,10 +916,6 @@ func JSONValue(v string) jsonValue {
 }
 
 type jsonDocumentValue string
-
-func (v jsonDocumentValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
-}
 
 func (v jsonDocumentValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
@@ -1114,10 +955,6 @@ func JSONDocumentValue(v string) jsonDocumentValue {
 type listValue struct {
 	t     Type
 	items []Value
-}
-
-func (v *listValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
 }
 
 func (v *listValue) castTo(dst interface{}) error {
@@ -1188,29 +1025,6 @@ type optionalValue struct {
 	value     Value
 }
 
-func (v *optionalValue) Format(s fmt.State, verb rune) {
-	switch verb {
-	case 'v':
-		if s.Flag('+') {
-			_, _ = io.WriteString(s, v.Type().String()+"(")
-		}
-		if v.value == nil {
-			_, _ = io.WriteString(s, "NULL")
-		} else {
-			_, _ = io.WriteString(s, fmt.Sprintf("%v", v.value))
-		}
-		if s.Flag('+') {
-			_, _ = io.WriteString(s, ")")
-		}
-	default:
-		if v.value == nil {
-			_, _ = io.WriteString(s, "NULL")
-		} else {
-			v.value.Format(s, verb)
-		}
-	}
-}
-
 var errOptionalNilValue = errors.New("optional contains nil value")
 
 func (v *optionalValue) castTo(dst interface{}) error {
@@ -1273,10 +1087,6 @@ func (v *structValue) Fields() map[string]Value {
 	return fields
 }
 
-func (v *structValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
-}
-
 func (v *structValue) castTo(dst interface{}) error {
 	return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, dst))
 }
@@ -1328,23 +1138,6 @@ func StructValue(fields ...StructValueField) *structValue {
 
 type timestampValue uint64
 
-func (v timestampValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb,
-		vF('q', func() {
-			_, _ = io.WriteString(s, "\""+v.String()+"\"")
-		}),
-		vF('v', func() {
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, v.Type().String()+"(\"")
-			}
-			_, _ = io.WriteString(s, v.String())
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, "\")")
-			}
-		}),
-	)
-}
-
 func (v timestampValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *time.Time:
@@ -1392,15 +1185,6 @@ type tupleValue struct {
 
 func (v *tupleValue) Items() []Value {
 	return v.items
-}
-
-func (v *tupleValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb, vF('v', func() {
-		if s.Flag('+') {
-			_, _ = io.WriteString(s, v.Type().String())
-		}
-		_, _ = io.WriteString(s, v.String())
-	}))
 }
 
 func (v *tupleValue) castTo(dst interface{}) error {
@@ -1455,23 +1239,6 @@ func TupleValue(values ...Value) *tupleValue {
 
 type tzDateValue string
 
-func (v tzDateValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb,
-		vF('v', func() {
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, v.Type().String()+"(\"")
-			}
-			_, _ = io.WriteString(s, v.String())
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, "\")")
-			}
-		}),
-		vF('q', func() {
-			_, _ = io.WriteString(s, "\""+v.String()+"\"")
-		}),
-	)
-}
-
 func (v tzDateValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -1512,23 +1279,6 @@ func TzDateValueFromTime(t time.Time) tzDateValue {
 }
 
 type tzDatetimeValue string
-
-func (v tzDatetimeValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb,
-		vF('v', func() {
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, v.Type().String()+"(\"")
-			}
-			_, _ = io.WriteString(s, v.String())
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, "\")")
-			}
-		}),
-		vF('q', func() {
-			_, _ = io.WriteString(s, "\""+v.String()+"\"")
-		}),
-	)
-}
 
 func (v tzDatetimeValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
@@ -1571,23 +1321,6 @@ func TzDatetimeValueFromTime(t time.Time) tzDatetimeValue {
 
 type tzTimestampValue string
 
-func (v tzTimestampValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb,
-		vF('v', func() {
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, v.Type().String()+"(\"")
-			}
-			_, _ = io.WriteString(s, v.String())
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, "\")")
-			}
-		}),
-		vF('q', func() {
-			_, _ = io.WriteString(s, "\""+v.String()+"\"")
-		}),
-	)
-}
-
 func (v tzTimestampValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -1628,12 +1361,6 @@ func TzTimestampValueFromTime(t time.Time) tzTimestampValue {
 }
 
 type uint8Value uint8
-
-func (v uint8Value) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb, vF('d', func() {
-		_, _ = io.WriteString(s, v.String())
-	}))
-}
 
 func (v uint8Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
@@ -1699,12 +1426,6 @@ func Uint8Value(v uint8) uint8Value {
 
 type uint16Value uint16
 
-func (v uint16Value) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb, vF('d', func() {
-		_, _ = io.WriteString(s, v.String())
-	}))
-}
-
 func (v uint16Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -1763,12 +1484,6 @@ func Uint16Value(v uint16) uint16Value {
 
 type uint32Value uint32
 
-func (v uint32Value) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb, vF('d', func() {
-		_, _ = io.WriteString(s, v.String())
-	}))
-}
-
 func (v uint32Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -1818,12 +1533,6 @@ func Uint32Value(v uint32) uint32Value {
 
 type uint64Value uint64
 
-func (v uint64Value) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb, vF('d', func() {
-		_, _ = io.WriteString(s, v.String())
-	}))
-}
-
 func (v uint64Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -1864,22 +1573,6 @@ func Uint64Value(v uint64) uint64Value {
 
 type textValue string
 
-func (v textValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb,
-		vF('q', func() {
-			_, _ = io.WriteString(s, fmt.Sprintf("%q", string(v)))
-		}),
-		vF('v', func() {
-			if s.Flag('+') {
-				_, _ = io.WriteString(s, v.Type().String())
-				_, _ = io.WriteString(s, fmt.Sprintf("(%q)", string(v)))
-			} else {
-				_, _ = io.WriteString(s, string(v))
-			}
-		}),
-	)
-}
-
 func (v textValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -1917,10 +1610,6 @@ func TextValue(v string) textValue {
 
 type uuidValue struct {
 	value [16]byte
-}
-
-func (v *uuidValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
 }
 
 func (v *uuidValue) castTo(dst interface{}) error {
@@ -1970,22 +1659,6 @@ type variantValue struct {
 	innerType Type
 	value     Value
 	idx       uint32
-}
-
-func (v *variantValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb, vF('v', func() {
-		if s.Flag('+') {
-			_, _ = io.WriteString(s, v.Type().String()+"(")
-		}
-		_, _ = io.WriteString(s, "{")
-		_, _ = io.WriteString(s, strconv.FormatUint(uint64(v.idx), 10))
-		_, _ = io.WriteString(s, ":")
-		_, _ = io.WriteString(s, fmt.Sprintf("%q", v.value))
-		_, _ = io.WriteString(s, "}")
-		if s.Flag('+') {
-			_, _ = io.WriteString(s, ")")
-		}
-	}))
 }
 
 func (v *variantValue) castTo(dst interface{}) error {
@@ -2057,10 +1730,6 @@ func VariantValueTuple(v Value, idx uint32) *variantValue {
 
 type voidValue struct{}
 
-func (v voidValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
-}
-
 func (v voidValue) castTo(dst interface{}) error {
 	return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%s' to '%T' destination", v.Type().String(), dst))
 }
@@ -2089,10 +1758,6 @@ func VoidValue() voidValue {
 }
 
 type ysonValue []byte
-
-func (v ysonValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb)
-}
 
 func (v ysonValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
@@ -2265,26 +1930,6 @@ func ZeroValue(t Type) Value {
 }
 
 type bytesValue []byte
-
-func (v bytesValue) Format(s fmt.State, verb rune) {
-	formatValue(v, s, verb,
-		vF('s', func() {
-			_, _ = io.WriteString(s, string(v))
-		}),
-		vF('q', func() {
-			_, _ = io.WriteString(s, fmt.Sprintf("%q", []byte(v)))
-		}),
-		vF('d', func() {
-			_, _ = io.WriteString(s, fmt.Sprintf("%d", []byte(v)))
-		}),
-		vF('x', func() {
-			_, _ = io.WriteString(s, fmt.Sprintf("%x", []byte(v)))
-		}),
-		vF('X', func() {
-			_, _ = io.WriteString(s, fmt.Sprintf("%X", []byte(v)))
-		}),
-	)
-}
 
 func (v bytesValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {

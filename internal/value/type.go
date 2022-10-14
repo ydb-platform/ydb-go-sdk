@@ -150,10 +150,7 @@ type DecimalType struct {
 }
 
 func (v *DecimalType) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString(fmt.Sprintf("Decimal(%d,%d)", v.Precision, v.Scale))
-	return buffer.String()
+	return fmt.Sprintf("Decimal(%d,%d)", v.Precision, v.Scale)
 }
 
 func (v *DecimalType) equalsTo(rhs Type) bool {
@@ -238,10 +235,7 @@ func Dict(key, value Type) (v *dictType) {
 type emptyListType struct{}
 
 func (v emptyListType) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString("List<>")
-	return buffer.String()
+	return "EmptyList"
 }
 
 func (emptyListType) equalsTo(rhs Type) bool {
@@ -266,12 +260,7 @@ type listType struct {
 }
 
 func (v *listType) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString("List<")
-	buffer.WriteString(v.itemType.String())
-	buffer.WriteString(">")
-	return buffer.String()
+	return "List<" + v.itemType.String() + ">"
 }
 
 func (v *listType) equalsTo(rhs Type) bool {
@@ -308,11 +297,7 @@ type optionalType struct {
 }
 
 func (v *optionalType) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString(v.innerType.String())
-	buffer.WriteString("?")
-	return buffer.String()
+	return "Optional<" + v.innerType.String() + ">"
 }
 
 func (v *optionalType) equalsTo(rhs Type) bool {
@@ -346,10 +331,7 @@ func Optional(t Type) *optionalType {
 type PrimitiveType uint
 
 func (v PrimitiveType) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString(primitiveString[v])
-	return buffer.String()
+	return primitiveString[v]
 }
 
 const (
@@ -429,8 +411,8 @@ var primitiveString = [...]string{
 	TypeTzDate:       "TzDate",
 	TypeTzDatetime:   "TzDatetime",
 	TypeTzTimestamp:  "TzTimestamp",
-	TypeBytes:        "Bytes",
-	TypeText:         "Text",
+	TypeBytes:        "String",
+	TypeText:         "Utf8",
 	TypeYSON:         "Yson",
 	TypeJSON:         "Json",
 	TypeUUID:         "Uuid",
@@ -448,10 +430,6 @@ func (v PrimitiveType) equalsTo(rhs Type) bool {
 
 func (v PrimitiveType) toYDB(*allocator.Allocator) *Ydb.Type {
 	return primitive[v]
-}
-
-func Primitive(t PrimitiveType) PrimitiveType {
-	return t
 }
 
 type (
@@ -472,7 +450,7 @@ func (v *StructType) String() string {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
-		buffer.WriteString("`" + f.Name + "`")
+		buffer.WriteString("'" + f.Name + "'")
 		buffer.WriteByte(':')
 		buffer.WriteString(f.T.String())
 	}
@@ -611,12 +589,7 @@ type variantType struct {
 }
 
 func (v *variantType) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString("Variant<")
-	buffer.WriteString(v.innerType.String())
-	buffer.WriteString(">")
-	return buffer.String()
+	return "Variant<" + v.innerType.String() + ">"
 }
 
 func (v *variantType) equalsTo(rhs Type) bool {

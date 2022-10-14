@@ -7,8 +7,11 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/binary"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"math"
 	"net/http"
 	"os"
@@ -1775,4 +1778,100 @@ func TestSplitRangesAndRead(t *testing.T) {
 			)
 		}
 	})
+}
+
+func TestTypeToString(t *testing.T) {
+	db, err := sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, tt := range []value.Type{
+		value.Void(),
+		value.Null(),
+		value.TypeBool,
+		value.TypeInt8,
+		value.TypeUint8,
+		value.TypeInt16,
+		value.TypeUint16,
+		value.TypeInt32,
+		value.TypeUint32,
+		value.TypeInt64,
+		value.TypeUint64,
+		value.TypeFloat,
+		value.TypeDouble,
+		value.TypeDate,
+		value.TypeDatetime,
+		value.TypeTimestamp,
+		value.TypeInterval,
+		value.TypeTzDate,
+		value.TypeTzDatetime,
+		value.TypeTzTimestamp,
+		value.TypeBytes,
+		value.TypeText,
+		value.TypeYSON,
+		value.TypeJSON,
+		value.TypeUUID,
+		value.TypeJSONDocument,
+		value.TypeDyNumber,
+		value.Optional(value.TypeBool),
+		value.Optional(value.TypeInt8),
+		value.Optional(value.TypeUint8),
+		value.Optional(value.TypeInt16),
+		value.Optional(value.TypeUint16),
+		value.Optional(value.TypeInt32),
+		value.Optional(value.TypeUint32),
+		value.Optional(value.TypeInt64),
+		value.Optional(value.TypeUint64),
+		value.Optional(value.TypeFloat),
+		value.Optional(value.TypeDouble),
+		value.Optional(value.TypeDate),
+		value.Optional(value.TypeDatetime),
+		value.Optional(value.TypeTimestamp),
+		value.Optional(value.TypeInterval),
+		value.Optional(value.TypeTzDate),
+		value.Optional(value.TypeTzDatetime),
+		value.Optional(value.TypeTzTimestamp),
+		value.Optional(value.TypeBytes),
+		value.Optional(value.TypeText),
+		value.Optional(value.TypeYSON),
+		value.Optional(value.TypeJSON),
+		value.Optional(value.TypeUUID),
+		value.Optional(value.TypeJSONDocument),
+		value.Optional(value.TypeDyNumber),
+		value.Decimal(22, 9),
+		value.Dict(value.TypeText, value.TypeTimestamp),
+		value.EmptyList(),
+		value.List(value.TypeUint32),
+		value.Variant(value.Struct(
+			value.StructField{
+				Name: "a",
+				T:    value.TypeBool,
+			},
+			value.StructField{
+				Name: "b",
+				T:    value.TypeFloat,
+			},
+		)),
+		value.Variant(value.Tuple(
+			value.TypeBool,
+			value.TypeFloat,
+		)),
+	} {
+		t.Run(tt.String(), func(t *testing.T) {
+			var got string
+			retry.Do(context.Background(), db, func(ctx context.Context, cc *sql.Conn) error {
+				row := cc.QueryRowContext(ydb.WithQueryMode(ctx, ydb.ScriptingQueryMode),
+					fmt.Sprintf("SELECT FormatType(ParseType(\"%s\"))", tt.String()),
+				)
+				if err := row.Scan(&got); err != nil {
+					return err
+				}
+				return row.Err()
+			})
+			if got != tt.String() {
+				t.Errorf("s representations not equals:\n\n -  got: %s\n\n - want: %s", got, tt.String())
+			}
+		})
+	}
 }
