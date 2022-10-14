@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -316,7 +317,7 @@ func TestConnection(t *testing.T) {
 	})
 }
 
-func BenchmarkWithCertificates(b *testing.B) {
+func BenchmarkWithCertificateCache(b *testing.B) {
 	b.ReportAllocs()
 
 	bytes, err := os.ReadFile(os.Getenv("YDB_SSL_ROOT_CERTIFICATES_FILE"))
@@ -324,8 +325,7 @@ func BenchmarkWithCertificates(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
+	ctx := context.TODO()
 	db, err := ydb.Open(
 		ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
@@ -341,10 +341,18 @@ func BenchmarkWithCertificates(b *testing.B) {
 		}
 	}()
 
-	for _, disableCache := range []bool{true, false} {
-		b.Run(fmt.Sprintf("disableCache=%t", disableCache), func(b *testing.B) {
-			ydb.DisablePemCertificatesCache = disableCache
+	tcs := []struct {
+		name         string
+		disableCache bool
+	}{
+		{"no cache", true},
+		{"cached", false},
+	}
+	for _, tc := range tcs {
+		b.Run(tc.name, func(b *testing.B) {
+			ydb.DisableCertificateCache = tc.disableCache
 			for i := 0; i < b.N; i++ {
+				// child conns are closed on db.Close()
 				_, err := db.With(
 					ctx,
 					ydb.WithAnonymousCredentials(),
@@ -361,4 +369,104 @@ func BenchmarkWithCertificates(b *testing.B) {
 			}
 		})
 	}
+}
+
+func BenchmarkWithFileCache(b *testing.B) {
+	b.ReportAllocs()
+
+	ctx := context.TODO()
+	db, err := ydb.Open(
+		ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithCertificatesFromFile(os.Getenv("YDB_SSL_ROOT_CERTIFICATES_FILE")),
+	)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		// cleanup connection
+		if e := db.Close(ctx); e != nil {
+			b.Fatalf("close failed: %+v", e)
+		}
+	}()
+
+	tcs := []struct {
+		name                    string
+		disableCertificateCache bool
+		disableFileCache        bool
+	}{
+		{"no cache", true, true},
+		{"cert cache", false, true},
+		{"file cache", false, false},
+	}
+	for _, tc := range tcs {
+		b.Run(tc.name, func(b *testing.B) {
+			ydb.DisableCertificateCache = tc.disableCertificateCache
+			ydb.DisableFileCache = tc.disableFileCache
+			for i := 0; i < b.N; i++ {
+				// child conns are closed on db.Close()
+				_, err := db.With(
+					ctx,
+					ydb.WithAnonymousCredentials(),
+					ydb.WithBalancer(
+						balancers.PreferLocationsWithFallback(
+							balancers.RandomChoice(), "a", "b",
+						),
+					),
+					ydb.WithSessionPoolSizeLimit(100),
+				)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+func TestWithCacheConcurrent(t *testing.T) {
+	const nRoutines = 10
+
+	bytes, err := os.ReadFile(os.Getenv("YDB_SSL_ROOT_CERTIFICATES_FILE"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.TODO()
+	db, err := ydb.Open(
+		ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithCertificatesFromPem(bytes),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		// cleanup connection
+		if e := db.Close(ctx); e != nil {
+			t.Fatalf("close failed: %+v", e)
+		}
+	}()
+
+	wg := &sync.WaitGroup{}
+	for i := 0; i < nRoutines; i++ {
+		wg.Add(1)
+		go func() {
+			// child conns are closed on db.Close()
+			_, err := db.With(
+				ctx,
+				ydb.WithAnonymousCredentials(),
+				ydb.WithBalancer(
+					balancers.PreferLocationsWithFallback(
+						balancers.RandomChoice(), "a", "b",
+					),
+				),
+				ydb.WithSessionPoolSizeLimit(100),
+			)
+			if err != nil {
+				t.Error(err)
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
 }
