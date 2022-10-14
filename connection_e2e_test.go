@@ -24,7 +24,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
+	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
@@ -313,4 +314,51 @@ func TestConnection(t *testing.T) {
 			t.Fatalf("check export failed: %v", err)
 		}
 	})
+}
+
+func BenchmarkWithCertificates(b *testing.B) {
+	b.ReportAllocs()
+
+	bytes, err := os.ReadFile(os.Getenv("YDB_SSL_ROOT_CERTIFICATES_FILE"))
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	db, err := ydb.Open(
+		ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithCertificatesFromPem(bytes),
+	)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer func() {
+		// cleanup connection
+		if e := db.Close(ctx); e != nil {
+			b.Fatalf("close failed: %+v", e)
+		}
+	}()
+
+	for _, disableCache := range []bool{true, false} {
+		b.Run(fmt.Sprintf("disableCache=%t", disableCache), func(b *testing.B) {
+			ydb.DisablePemCertificatesCache = disableCache
+			for i := 0; i < b.N; i++ {
+				_, err := db.With(
+					ctx,
+					ydb.WithAnonymousCredentials(),
+					ydb.WithBalancer(
+						balancers.PreferLocationsWithFallback(
+							balancers.RandomChoice(), "a", "b",
+						),
+					),
+					ydb.WithSessionPoolSizeLimit(100),
+				)
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
 }

@@ -303,33 +303,14 @@ func WithTLSConfig(tlsConfig *tls.Config) Option {
 	}
 }
 
-// WithCertificatesFromPem appends certificates by filepath to TLS config root certificates
+// WithCertificatesFromPem appends certificates from pem-encoded data to TLS config root certificates
 func WithCertificatesFromPem(bytes []byte) Option {
 	return func(ctx context.Context, c *connection) error {
-		if ok, err := func(bytes []byte) (ok bool, err error) {
-			var cert *x509.Certificate
-			for len(bytes) > 0 {
-				var block *pem.Block
-				block, bytes = pem.Decode(bytes)
-				if block == nil {
-					break
-				}
-				if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
-					continue
-				}
-				certBytes := block.Bytes
-				cert, err = x509.ParseCertificate(certBytes)
-				if err != nil {
-					continue
-				}
-				_ = WithCertificate(cert)(ctx, c)
-				ok = true
-			}
-			return
-		}(bytes); !ok {
-			return xerrors.WithStackTrace(err)
+		certs, err := loadCertificatesFromPem(bytes)
+		for _, cert := range certs {
+			_ = WithCertificate(cert)(ctx, c)
 		}
-		return nil
+		return xerrors.WithStackTrace(err)
 	}
 }
 
