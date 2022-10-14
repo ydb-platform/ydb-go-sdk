@@ -82,7 +82,7 @@ func CreateFromConfig(s string) (*balancerConfig.Config, error) {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	b, err = createByType(balancerType(s))
+	b, err = createByType(c.Type)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
