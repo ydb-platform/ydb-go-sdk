@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"encoding/binary"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"math"
@@ -1860,7 +1861,7 @@ func TestTypeToString(t *testing.T) {
 	} {
 		t.Run(tt.String(), func(t *testing.T) {
 			var got string
-			retry.Do(context.Background(), db, func(ctx context.Context, cc *sql.Conn) error {
+			err := retry.Do(context.Background(), db, func(ctx context.Context, cc *sql.Conn) error {
 				row := cc.QueryRowContext(ydb.WithQueryMode(ctx, ydb.ScriptingQueryMode),
 					fmt.Sprintf("SELECT FormatType(ParseType(\"%s\"))", tt.String()),
 				)
@@ -1869,6 +1870,7 @@ func TestTypeToString(t *testing.T) {
 				}
 				return row.Err()
 			})
+			require.NoError(t, err)
 			if got != tt.String() {
 				t.Errorf("s representations not equals:\n\n -  got: %s\n\n - want: %s", got, tt.String())
 			}
