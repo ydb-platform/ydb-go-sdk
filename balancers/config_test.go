@@ -10,7 +10,7 @@ import (
 )
 
 func TestFromConfig(t *testing.T) {
-	for _, test := range []struct {
+	for _, tt := range []struct {
 		name   string
 		config string
 		res    balancerConfig.Config
@@ -23,21 +23,41 @@ func TestFromConfig(t *testing.T) {
 			fail:   true,
 		},
 		{
-			name: "single",
+			name:   "disable",
+			config: `disable`,
+			res:    balancerConfig.Config{SingleConn: true},
+		},
+		{
+			name:   "single",
+			config: `single`,
+			res:    balancerConfig.Config{SingleConn: true},
+		},
+		{
+			name: "single/JSON",
 			config: `{
 				"type": "single"
 			}`,
 			res: balancerConfig.Config{SingleConn: true},
 		},
 		{
-			name: "round_robin",
+			name:   "round_robin",
+			config: `round_robin`,
+			res:    balancerConfig.Config{},
+		},
+		{
+			name: "round_robin/JSON",
 			config: `{
 				"type": "round_robin"
 			}`,
 			res: balancerConfig.Config{},
 		},
 		{
-			name: "random_choice",
+			name:   "random_choice",
+			config: `random_choice`,
+			res:    balancerConfig.Config{},
+		},
+		{
+			name: "random_choice/JSON",
 			config: `{
 				"type": "random_choice"
 			}`,
@@ -112,36 +132,36 @@ func TestFromConfig(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(test.name, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			var (
 				actErr   error
 				fallback = &balancerConfig.Config{}
 			)
 			b := FromConfig(
-				test.config,
+				tt.config,
 				WithParseErrorFallbackBalancer(fallback),
 				WithParseErrorHandler(func(err error) {
 					actErr = err
 				}),
 			)
-			if test.fail && actErr == nil {
+			if tt.fail && actErr == nil {
 				t.Fatalf("expected error, but it not hanled")
 			}
-			if !test.fail && actErr != nil {
+			if !tt.fail && actErr != nil {
 				t.Fatalf("unexpected error: %v", actErr)
 			}
-			if test.fail && b != fallback {
+			if tt.fail && b != fallback {
 				t.Fatalf("unexpected balancer: %v", b)
 			}
 
 			// function pointers can check equal to nil only
-			if test.res.IsPreferConn != nil {
+			if tt.res.IsPreferConn != nil {
 				require.NotNil(t, b.IsPreferConn)
 				b.IsPreferConn = nil
-				test.res.IsPreferConn = nil
+				tt.res.IsPreferConn = nil
 			}
 
-			require.Equal(t, &test.res, b)
+			require.Equal(t, &tt.res, b)
 		})
 	}
 }

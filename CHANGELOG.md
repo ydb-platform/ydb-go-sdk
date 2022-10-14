@@ -7,6 +7,7 @@
 * Added supporting of `printf` formatter for `types.Value`
 * Marked `table/types.WriteTypeStringTo` as deprecated 
 * Added `table/options.WithDataColumns` for supporting covering indexes
+* Supported `balancer` query string parameter in DSN
 
 ## v3.38.5
 * Fixed bug from scan unexpected column name
