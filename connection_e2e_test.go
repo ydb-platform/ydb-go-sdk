@@ -397,7 +397,7 @@ func BenchmarkWithFileCache(b *testing.B) {
 	}{
 		{"no cache", true, true},
 		{"cert cache", false, true},
-		{"file cache", false, false},
+		{"both caches", false, false},
 	}
 	for _, tc := range tcs {
 		b.Run(tc.name, func(b *testing.B) {
