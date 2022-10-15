@@ -26,8 +26,8 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cached"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -324,6 +324,7 @@ func BenchmarkWithCertificateCache(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
+	os.Unsetenv("YDB_SSL_ROOT_CERTIFICATES_FILE")
 
 	ctx := context.TODO()
 	db, err := ydb.Open(
@@ -342,15 +343,15 @@ func BenchmarkWithCertificateCache(b *testing.B) {
 	}()
 
 	tcs := []struct {
-		name         string
-		disableCache bool
+		name    string
+		enabled bool
 	}{
-		{"no cache", true},
-		{"cached", false},
+		{"no cache", false},
+		{"cached", true},
 	}
 	for _, tc := range tcs {
 		b.Run(tc.name, func(b *testing.B) {
-			ydb.DisableCertificateCache = tc.disableCache
+			cached.CertificateCache().Enable(tc.enabled)
 			for i := 0; i < b.N; i++ {
 				// child conns are closed on db.Close()
 				_, err := db.With(
@@ -372,7 +373,6 @@ func BenchmarkWithFileCache(b *testing.B) {
 	db, err := ydb.Open(
 		ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
-		ydb.WithCertificatesFromFile(os.Getenv("YDB_SSL_ROOT_CERTIFICATES_FILE")),
 	)
 	if err != nil {
 		b.Fatal(err)
@@ -385,28 +385,28 @@ func BenchmarkWithFileCache(b *testing.B) {
 	}()
 
 	tcs := []struct {
-		name                    string
-		disableCertificateCache bool
-		disableFileCache        bool
+		name        string
+		certEnabled bool
+		fileEnabled bool
 	}{
-		{"no cache", true, true},
-		{"cert cache", false, true},
-		{"both caches", false, false},
+		{"no cache", false, false},
+		{"cert cache", true, false},
+		{"both caches", true, true},
 	}
 	for _, tc := range tcs {
 		b.Run(tc.name, func(b *testing.B) {
-			ydb.DisableCertificateCache = tc.disableCertificateCache
-			ydb.DisableFileCache = tc.disableFileCache
+			cached.FileCache().Enable(tc.fileEnabled)
+			cached.FileCache().Reset()
+
+			cached.CertificateCache().Enable(tc.certEnabled)
+			cached.CertificateCache().Reset()
+
+			b.ResetTimer()
+
 			for i := 0; i < b.N; i++ {
 				// child conns are closed on db.Close()
 				_, err := db.With(
 					ctx,
-					ydb.WithAnonymousCredentials(),
-					ydb.WithBalancer(
-						balancers.PreferLocationsWithFallback(
-							balancers.RandomChoice(), "a", "b",
-						),
-					),
 					ydb.WithSessionPoolSizeLimit(100),
 				)
 				if err != nil {
@@ -420,16 +420,10 @@ func BenchmarkWithFileCache(b *testing.B) {
 func TestWithCacheConcurrent(t *testing.T) {
 	const nRoutines = 10
 
-	bytes, err := os.ReadFile(os.Getenv("YDB_SSL_ROOT_CERTIFICATES_FILE"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	ctx := context.TODO()
 	db, err := ydb.Open(
 		ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
-		ydb.WithCertificatesFromPem(bytes),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -442,18 +436,13 @@ func TestWithCacheConcurrent(t *testing.T) {
 	}()
 
 	wg := &sync.WaitGroup{}
+
 	for i := 0; i < nRoutines; i++ {
 		wg.Add(1)
 		go func() {
 			// child conns are closed on db.Close()
 			_, err := db.With(
 				ctx,
-				ydb.WithAnonymousCredentials(),
-				ydb.WithBalancer(
-					balancers.PreferLocationsWithFallback(
-						balancers.RandomChoice(), "a", "b",
-					),
-				),
 				ydb.WithSessionPoolSizeLimit(100),
 			)
 			if err != nil {
@@ -463,4 +452,9 @@ func TestWithCacheConcurrent(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+
+	want, got := nRoutines, cached.FileCache().Hits()
+	if want != got {
+		t.Errorf("cache hits: want %d, got %d", want, got)
+	}
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cached"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
@@ -280,7 +281,7 @@ func WithCertificatesFromFile(caFile string) Option {
 			}
 			caFile = filepath.Join(home, caFile[1:])
 		}
-		bytes, err := readFileCached(filepath.Clean(caFile))
+		bytes, err := cached.ReadFileCached(filepath.Clean(caFile))
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -317,7 +318,7 @@ func WithCertificatesFromPem(bytes []byte) Option {
 					continue
 				}
 				certBytes := block.Bytes
-				cert, err = parseCertificateCached(certBytes)
+				cert, err = cached.ParseCertificateCached(certBytes)
 				if err != nil {
 					continue
 				}
