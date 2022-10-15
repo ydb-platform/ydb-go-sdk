@@ -1,4 +1,4 @@
-package cached
+package cache
 
 import (
 	"crypto/sha256"
@@ -15,9 +15,9 @@ func FileCache() Cache {
 	return fileCache
 }
 
-// ReadFileCached is a cached version of os.ReadFile. Cache key is
+// ReadFile is a cached version of os.ReadFile. Cache key is
 //  filepath.Clean(file)
-func ReadFileCached(file string) ([]byte, error) {
+func ReadFile(file string) ([]byte, error) {
 	file = filepath.Clean(file)
 
 	value, err := fileCache.loadOrStore(nopLazyValue(file), func() (interface{}, error) {
@@ -40,9 +40,9 @@ func CertificateCache() Cache {
 	return certificateCache
 }
 
-// ParseCertificateCached is a cached version of x509.ParseCertificate. Cache key is
+// ParseCertificate is a cached version of x509.ParseCertificate. Cache key is
 //  sha256.Sum224(der)
-func ParseCertificateCached(der []byte) (*x509.Certificate, error) {
+func ParseCertificate(der []byte) (*x509.Certificate, error) {
 	// using Sum224 for cert data similarly to tls package
 	var sum [sha256.Size224]byte
 	lKey := func() (interface{}, error) {

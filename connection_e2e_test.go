@@ -27,7 +27,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cached"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cache"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -326,6 +326,7 @@ func BenchmarkWithCertificateCache(b *testing.B) {
 	}
 	os.Unsetenv("YDB_SSL_ROOT_CERTIFICATES_FILE")
 
+	cache.CertificateCache().Reset()
 	ctx := context.TODO()
 	db, err := ydb.Open(
 		ctx,
@@ -351,7 +352,8 @@ func BenchmarkWithCertificateCache(b *testing.B) {
 	}
 	for _, tc := range tcs {
 		b.Run(tc.name, func(b *testing.B) {
-			cached.CertificateCache().Enable(tc.enabled)
+			cache.CertificateCache().Enable(tc.enabled)
+			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				// child conns are closed on db.Close()
 				_, err := db.With(
@@ -369,6 +371,8 @@ func BenchmarkWithCertificateCache(b *testing.B) {
 func BenchmarkWithFileCache(b *testing.B) {
 	b.ReportAllocs()
 
+	cache.FileCache().Reset()
+	cache.CertificateCache().Reset()
 	ctx := context.TODO()
 	db, err := ydb.Open(
 		ctx,
@@ -395,12 +399,8 @@ func BenchmarkWithFileCache(b *testing.B) {
 	}
 	for _, tc := range tcs {
 		b.Run(tc.name, func(b *testing.B) {
-			cached.FileCache().Enable(tc.fileEnabled)
-			cached.FileCache().Reset()
-
-			cached.CertificateCache().Enable(tc.certEnabled)
-			cached.CertificateCache().Reset()
-
+			cache.FileCache().Enable(tc.fileEnabled)
+			cache.CertificateCache().Enable(tc.certEnabled)
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
@@ -452,9 +452,41 @@ func TestWithCacheConcurrent(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+}
 
-	want, got := nRoutines, cached.FileCache().Hits()
-	if want != got {
-		t.Errorf("cache hits: want %d, got %d", want, got)
+func TestWithCacheHits(t *testing.T) {
+	const nChildren = 10
+
+	cache.FileCache().Reset()
+	ctx := context.TODO()
+	db, err := ydb.Open(
+		ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		// cleanup connection
+		if e := db.Close(ctx); e != nil {
+			t.Fatalf("close failed: %+v", e)
+		}
+	}()
+
+	lastHits := cache.FileCache().Hits()
+	for i := 0; i < nChildren; i++ {
+		// child conns are closed on db.Close()
+		_, err := db.With(
+			ctx,
+			ydb.WithSessionPoolSizeLimit(100),
+		)
+		if err != nil {
+			t.Error(err)
+		}
+		hits := cache.FileCache().Hits()
+		if delta := hits - lastHits; delta < 1 {
+			t.Errorf("child conn #%d: cache miss", i)
+		}
+		lastHits = hits
 	}
 }
