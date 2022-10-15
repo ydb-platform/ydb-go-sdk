@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/golang-jwt/jwt/v4 v4.4.1
 	github.com/golang/mock v1.6.0
+	github.com/google/uuid v1.3.0
 	github.com/jonboulle/clockwork v0.2.2
 	github.com/stretchr/testify v1.7.1
 	github.com/ydb-platform/ydb-go-genproto v0.0.0-20220922065549-66df47a830ba

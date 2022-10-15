@@ -20,8 +20,8 @@ const (
 // Date format layouts described in time.Format and time.ANSIC docs.
 const (
 	LayoutDate      = "2006-01-02"
-	LayoutDatetime  = "2006-01-02T15:04:05"
-	LayoutTimestamp = "2006-01-02T15:04:05.000000"
+	LayoutDatetime  = "2006-01-02T15:04:05Z"
+	LayoutTimestamp = "2006-01-02T15:04:05.000000Z"
 )
 
 var epoch = time.Unix(0, 0)

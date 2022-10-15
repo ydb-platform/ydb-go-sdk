@@ -3,6 +3,7 @@ package scanner
 import (
 	"context"
 	"errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"io"
 	"sync/atomic"
 
@@ -15,7 +16,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
-var errAlreadyClosed = xerrors.Wrap(errors.New("result closed early"))
+var (
+	errAlreadyClosed     = xerrors.Wrap(errors.New("result closed early"))
+	errMissingCurrentRow = xerrors.Wrap(errors.New("missing current row"))
+)
 
 type baseResult struct {
 	scanner
@@ -54,6 +58,17 @@ func (r *unaryResult) ResultSetCount() int {
 
 func (r *baseResult) isClosed() bool {
 	return atomic.LoadUint32(&r.closed) != 0
+}
+
+func (r *baseResult) RowValues() (_ []value.Value, err error) {
+	if r.row == nil {
+		return nil, xerrors.WithStackTrace(errMissingCurrentRow)
+	}
+	values := make([]value.Value, len(r.row.GetItems()))
+	for i, item := range r.row.GetItems() {
+		values[i] = value.FromYDB(r.set.GetColumns()[i].GetType(), item)
+	}
+	return values, nil
 }
 
 type resultWithError interface {

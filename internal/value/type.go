@@ -149,8 +149,12 @@ type DecimalType struct {
 	Scale     uint32
 }
 
+func (v *DecimalType) Name() string {
+	return "Decimal"
+}
+
 func (v *DecimalType) String() string {
-	return fmt.Sprintf("Decimal(%d,%d)", v.Precision, v.Scale)
+	return fmt.Sprintf("%s(%d,%d)", v.Name(), v.Precision, v.Scale)
 }
 
 func (v *DecimalType) equalsTo(rhs Type) bool {

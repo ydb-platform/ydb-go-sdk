@@ -2,13 +2,14 @@ package value
 
 import (
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
+	"sort"
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
@@ -20,6 +21,7 @@ type Value interface {
 	Type() Type
 	String() string
 
+	toString() string
 	castTo(dst interface{}) error
 	toYDB(a *allocator.Allocator) *Ydb.Value
 }
@@ -171,6 +173,9 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 	case voidType:
 		return VoidValue(), nil
 
+	case nullType:
+		return NullValue(tt), nil
+
 	case *DecimalType:
 		return DecimalValue(BigEndianUint128(v.High_128, v.GetLow_128()), ttt.Precision, ttt.Scale), nil
 
@@ -232,22 +237,20 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		defer a.Free()
 		switch ttt.variantType {
 		case variantTypeTuple:
-			return VariantValue(
+			return VariantValueTuple(
 				FromYDB(
-					ttt.innerType.(*TupleType).items[v.VariantIndex].toYDB(a),
+					ttt.innerType.(*TupleType).toYDB(a),
 					v.Value.(*Ydb.Value_NestedValue).NestedValue,
 				),
 				v.VariantIndex,
-				ttt.innerType,
 			), nil
 		case variantTypeStruct:
-			return VariantValue(
+			return VariantValueStruct(
 				FromYDB(
-					ttt.innerType.(*StructType).fields[v.VariantIndex].T.toYDB(a),
+					ttt.innerType.(*StructType).toYDB(a),
 					v.Value.(*Ydb.Value_NestedValue).NestedValue,
 				),
 				v.VariantIndex,
-				ttt.innerType,
 			), nil
 		default:
 			return nil, fmt.Errorf("unknown variant type: %v", ttt.variantType)
@@ -259,6 +262,10 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 }
 
 type boolValue bool
+
+func (v boolValue) toString() string {
+	return strconv.FormatBool(bool(v))
+}
 
 func (v boolValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
@@ -274,7 +281,7 @@ func (v boolValue) castTo(dst interface{}) error {
 }
 
 func (v boolValue) String() string {
-	return strconv.FormatBool(bool(v))
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (boolValue) Type() Type {
@@ -298,10 +305,14 @@ func BoolValue(v bool) boolValue {
 
 type dateValue uint32
 
+func (v dateValue) toString() string {
+	return DateToTime(uint32(v)).Format(LayoutDate)
+}
+
 func (v dateValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *time.Time:
-		*vv = DateToTime(uint32(v))
+		*vv = DateToTime(uint32(v)).UTC()
 		return nil
 	case *uint64:
 		*vv = uint64(v)
@@ -318,7 +329,7 @@ func (v dateValue) castTo(dst interface{}) error {
 }
 
 func (v dateValue) String() string {
-	return DateToTime(uint32(v)).Format(LayoutDate)
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (dateValue) Type() Type {
@@ -347,10 +358,14 @@ func DateValueFromTime(t time.Time) dateValue {
 
 type datetimeValue uint32
 
+func (v datetimeValue) toString() string {
+	return DatetimeToTime(uint32(v)).UTC().Format(LayoutDatetime)
+}
+
 func (v datetimeValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *time.Time:
-		*vv = DatetimeToTime(uint32(v))
+		*vv = DatetimeToTime(uint32(v)).UTC()
 		return nil
 	case *uint64:
 		*vv = uint64(v)
@@ -367,7 +382,7 @@ func (v datetimeValue) castTo(dst interface{}) error {
 }
 
 func (v datetimeValue) String() string {
-	return DatetimeToTime(uint32(v)).Format(LayoutDatetime)
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (datetimeValue) Type() Type {
@@ -398,12 +413,19 @@ type decimalValue struct {
 	innerType *DecimalType
 }
 
+func (v *decimalValue) toString() string {
+	s := decimal.FromBytes(v.value[:], v.innerType.Precision, v.innerType.Scale).String()
+	return s[:len(s)-int(v.innerType.Scale)] + "." + s[len(s)-int(v.innerType.Scale):]
+}
+
 func (v *decimalValue) castTo(dst interface{}) error {
 	return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, dst))
 }
 
 func (v *decimalValue) String() string {
-	return decimal.FromBytes(v.value[:], v.innerType.Precision, v.innerType.Scale).String()
+	return fmt.Sprintf("%s(%q,%d,%d)", v.innerType.Name(),
+		v.toString(), v.innerType.Precision, v.innerType.Scale,
+	)
 }
 
 func (v *decimalValue) Type() Type {
@@ -451,6 +473,22 @@ type (
 	}
 )
 
+func (v *dictValue) toString() string {
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	for i, value := range v.values {
+		if i != 0 {
+			buffer.WriteByte(',')
+		}
+		buffer.WriteString("AsTuple(")
+		buffer.WriteString(value.K.String())
+		buffer.WriteByte(',')
+		buffer.WriteString(value.V.String())
+		buffer.WriteByte(')')
+	}
+	return buffer.String()
+}
+
 func (v *dictValue) Values() map[Value]Value {
 	values := make(map[Value]Value, len(v.values))
 	for _, vv := range v.values {
@@ -464,19 +502,7 @@ func (v *dictValue) castTo(dst interface{}) error {
 }
 
 func (v *dictValue) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteByte('{')
-	for i, value := range v.values {
-		if i != 0 {
-			buffer.WriteByte(',')
-		}
-		buffer.WriteString(fmt.Sprintf("%q", value.K))
-		buffer.WriteByte(':')
-		buffer.WriteString(fmt.Sprintf("%q", value.V))
-	}
-	buffer.WriteByte('}')
-	return buffer.String()
+	return fmt.Sprintf("AsDict(%s)", v.toString())
 }
 
 func (v *dictValue) Type() Type {
@@ -503,6 +529,9 @@ func (v *dictValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 }
 
 func DictValue(values ...DictValueField) *dictValue {
+	sort.Slice(values, func(i, j int) bool {
+		return values[i].K.toString() < values[j].K.toString()
+	})
 	return &dictValue{
 		t:      Dict(values[0].K.Type(), values[0].V.Type()),
 		values: values,
@@ -511,6 +540,10 @@ func DictValue(values ...DictValueField) *dictValue {
 
 type doubleValue struct {
 	value float64
+}
+
+func (v *doubleValue) toString() string {
+	return fmt.Sprintf("%v", v.value)
 }
 
 func (v *doubleValue) castTo(dst interface{}) error {
@@ -530,7 +563,7 @@ func (v *doubleValue) castTo(dst interface{}) error {
 }
 
 func (v *doubleValue) String() string {
-	return fmt.Sprintf("%v", v.value)
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (*doubleValue) Type() Type {
@@ -555,6 +588,10 @@ func DoubleValue(v float64) *doubleValue {
 
 type dyNumberValue string
 
+func (v dyNumberValue) toString() string {
+	return string(v)
+}
+
 func (v dyNumberValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -569,7 +606,7 @@ func (v dyNumberValue) castTo(dst interface{}) error {
 }
 
 func (v dyNumberValue) String() string {
-	return string(v)
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (dyNumberValue) Type() Type {
@@ -594,6 +631,10 @@ type floatValue struct {
 	value float32
 }
 
+func (v *floatValue) toString() string {
+	return fmt.Sprintf("%v", v.value)
+}
+
 func (v *floatValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -614,7 +655,7 @@ func (v *floatValue) castTo(dst interface{}) error {
 }
 
 func (v *floatValue) String() string {
-	return fmt.Sprintf("%v", v.value)
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (*floatValue) Type() Type {
@@ -638,6 +679,10 @@ func FloatValue(v float32) *floatValue {
 }
 
 type int8Value int8
+
+func (v int8Value) toString() string {
+	return strconv.FormatInt(int64(v), 10)
+}
 
 func (v int8Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
@@ -671,7 +716,7 @@ func (v int8Value) castTo(dst interface{}) error {
 }
 
 func (v int8Value) String() string {
-	return strconv.FormatInt(int64(v), 10)
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (int8Value) Type() Type {
@@ -693,6 +738,10 @@ func Int8Value(v int8) int8Value {
 }
 
 type int16Value int16
+
+func (v int16Value) toString() string {
+	return strconv.FormatInt(int64(v), 10)
+}
 
 func (v int16Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
@@ -723,7 +772,7 @@ func (v int16Value) castTo(dst interface{}) error {
 }
 
 func (v int16Value) String() string {
-	return strconv.FormatInt(int64(v), 10)
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (int16Value) Type() Type {
@@ -745,6 +794,10 @@ func Int16Value(v int16) int16Value {
 }
 
 type int32Value int32
+
+func (v int32Value) toString() string {
+	return strconv.FormatInt(int64(v), 10)
+}
 
 func (v int32Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
@@ -772,7 +825,7 @@ func (v int32Value) castTo(dst interface{}) error {
 }
 
 func (v int32Value) String() string {
-	return strconv.FormatInt(int64(v), 10)
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (int32Value) Type() Type {
@@ -795,6 +848,10 @@ func Int32Value(v int32) int32Value {
 
 type int64Value int64
 
+func (v int64Value) toString() string {
+	return strconv.FormatInt(int64(v), 10)
+}
+
 func (v int64Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -815,7 +872,7 @@ func (v int64Value) castTo(dst interface{}) error {
 }
 
 func (v int64Value) String() string {
-	return strconv.FormatInt(int64(v), 10)
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (int64Value) Type() Type {
@@ -838,6 +895,41 @@ func Int64Value(v int64) int64Value {
 
 type intervalValue int64
 
+func (v intervalValue) toString() string {
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	d := IntervalToDuration(int64(v))
+	if d < 0 {
+		buffer.WriteByte('-')
+		d = -d
+	}
+	buffer.WriteByte('P')
+	if days := d / time.Hour / 24; days > 0 {
+		d -= days * time.Hour * 24
+		buffer.WriteString(strconv.FormatInt(int64(days), 10))
+		buffer.WriteByte('D')
+	}
+	if d > 0 {
+		buffer.WriteByte('T')
+	}
+	if hours := d / time.Hour; hours > 0 {
+		d -= hours * time.Hour
+		buffer.WriteString(strconv.FormatInt(int64(hours), 10))
+		buffer.WriteByte('H')
+	}
+	if minutes := d / time.Minute; minutes > 0 {
+		d -= minutes * time.Minute
+		buffer.WriteString(strconv.FormatInt(int64(minutes), 10))
+		buffer.WriteByte('M')
+	}
+	if d > 0 {
+		seconds := float64(d) / float64(time.Second)
+		buffer.WriteString(fmt.Sprintf("%0.6f", seconds))
+		buffer.WriteByte('S')
+	}
+	return buffer.String()
+}
+
 func (v intervalValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *time.Duration:
@@ -852,7 +944,7 @@ func (v intervalValue) castTo(dst interface{}) error {
 }
 
 func (v intervalValue) String() string {
-	return IntervalToDuration(int64(v)).String()
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (intervalValue) Type() Type {
@@ -880,6 +972,10 @@ func IntervalValueFromDuration(v time.Duration) intervalValue {
 
 type jsonValue string
 
+func (v jsonValue) toString() string {
+	return string(v)
+}
+
 func (v jsonValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -894,7 +990,7 @@ func (v jsonValue) castTo(dst interface{}) error {
 }
 
 func (v jsonValue) String() string {
-	return string(v)
+	return fmt.Sprintf("%s(@@%s@@)", v.Type().String(), v.toString())
 }
 
 func (jsonValue) Type() Type {
@@ -917,6 +1013,10 @@ func JSONValue(v string) jsonValue {
 
 type jsonDocumentValue string
 
+func (v jsonDocumentValue) toString() string {
+	return string(v)
+}
+
 func (v jsonDocumentValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -931,7 +1031,7 @@ func (v jsonDocumentValue) castTo(dst interface{}) error {
 }
 
 func (v jsonDocumentValue) String() string {
-	return string(v)
+	return fmt.Sprintf("%s(@@%s@@)", v.Type().String(), v.toString())
 }
 
 func (jsonDocumentValue) Type() Type {
@@ -957,22 +1057,24 @@ type listValue struct {
 	items []Value
 }
 
+func (v *listValue) toString() string {
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	for i, item := range v.items {
+		if i != 0 {
+			buffer.WriteByte(',')
+		}
+		buffer.WriteString(item.toString())
+	}
+	return buffer.String()
+}
+
 func (v *listValue) castTo(dst interface{}) error {
 	return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, dst))
 }
 
 func (v *listValue) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString("[")
-	for i, item := range v.items {
-		if i != 0 {
-			buffer.WriteByte(',')
-		}
-		buffer.WriteString(fmt.Sprintf("%q", item))
-	}
-	buffer.WriteByte(']')
-	return buffer.String()
+	return fmt.Sprintf("AsList(%s)", v.toString())
 }
 
 func (v *listValue) Type() Type {
@@ -1025,6 +1127,14 @@ type optionalValue struct {
 	value     Value
 }
 
+func (v *optionalValue) toString() string {
+	if v.value == nil {
+		return "NULL"
+	} else {
+		return v.value.toString()
+	}
+}
+
 var errOptionalNilValue = errors.New("optional contains nil value")
 
 func (v *optionalValue) castTo(dst interface{}) error {
@@ -1035,10 +1145,7 @@ func (v *optionalValue) castTo(dst interface{}) error {
 }
 
 func (v *optionalValue) String() string {
-	if v.value == nil {
-		return "NULL"
-	}
-	return v.value.String()
+	return fmt.Sprintf("CAST(%q AS %s)", v.toString(), v.Type().String())
 }
 
 func (v *optionalValue) Type() Type {
@@ -1079,6 +1186,23 @@ type (
 	}
 )
 
+func (v *structValue) toString() string {
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	a := allocator.New()
+	defer a.Free()
+	for i, field := range v.fields {
+		if i != 0 {
+			buffer.WriteByte(',')
+		}
+		buffer.WriteString(field.V.String())
+		buffer.WriteString(" AS `")
+		buffer.WriteString(field.Name)
+		buffer.WriteByte('`')
+	}
+	return buffer.String()
+}
+
 func (v *structValue) Fields() map[string]Value {
 	fields := make(map[string]Value, len(v.fields))
 	for _, f := range v.fields {
@@ -1092,23 +1216,7 @@ func (v *structValue) castTo(dst interface{}) error {
 }
 
 func (v *structValue) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	a := allocator.New()
-	defer a.Free()
-	buffer.WriteString("{")
-	for i, field := range v.fields {
-		if i != 0 {
-			buffer.WriteByte(',')
-		}
-		buffer.WriteByte('"')
-		buffer.WriteString(field.Name)
-		buffer.WriteByte('"')
-		buffer.WriteByte(':')
-		buffer.WriteString(fmt.Sprintf("%q", field.V))
-	}
-	buffer.WriteByte('}')
-	return buffer.String()
+	return fmt.Sprintf("AsStruct(%s)", v.toString())
 }
 
 func (v *structValue) Type() Type {
@@ -1126,6 +1234,9 @@ func (v structValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 }
 
 func StructValue(fields ...StructValueField) *structValue {
+	sort.Slice(fields, func(i, j int) bool {
+		return fields[i].Name < fields[j].Name
+	})
 	structFields := make([]StructField, 0, len(fields))
 	for _, field := range fields {
 		structFields = append(structFields, StructField{field.Name, field.V.Type()})
@@ -1138,10 +1249,14 @@ func StructValue(fields ...StructValueField) *structValue {
 
 type timestampValue uint64
 
+func (v timestampValue) toString() string {
+	return TimestampToTime(uint64(v)).UTC().Format(LayoutTimestamp)
+}
+
 func (v timestampValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *time.Time:
-		*vv = TimestampToTime(uint64(v))
+		*vv = TimestampToTime(uint64(v)).UTC()
 		return nil
 	case *uint64:
 		*vv = uint64(v)
@@ -1152,7 +1267,7 @@ func (v timestampValue) castTo(dst interface{}) error {
 }
 
 func (v timestampValue) String() string {
-	return TimestampToTime(uint64(v)).Format(LayoutTimestamp)
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (timestampValue) Type() Type {
@@ -1183,6 +1298,18 @@ type tupleValue struct {
 	items []Value
 }
 
+func (v *tupleValue) toString() string {
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	for i, item := range v.items {
+		if i != 0 {
+			buffer.WriteByte(',')
+		}
+		buffer.WriteString(item.String())
+	}
+	return buffer.String()
+}
+
 func (v *tupleValue) Items() []Value {
 	return v.items
 }
@@ -1195,17 +1322,7 @@ func (v *tupleValue) castTo(dst interface{}) error {
 }
 
 func (v *tupleValue) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString("(")
-	for i, item := range v.items {
-		if i != 0 {
-			buffer.WriteByte(',')
-		}
-		buffer.WriteString(fmt.Sprintf("%q", item))
-	}
-	buffer.WriteByte(')')
-	return buffer.String()
+	return fmt.Sprintf("AsTuple(%s)", v.toString())
 }
 
 func (v *tupleValue) Type() Type {
@@ -1239,6 +1356,10 @@ func TupleValue(values ...Value) *tupleValue {
 
 type tzDateValue string
 
+func (v tzDateValue) toString() string {
+	return string(v)
+}
+
 func (v tzDateValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -1253,7 +1374,7 @@ func (v tzDateValue) castTo(dst interface{}) error {
 }
 
 func (v tzDateValue) String() string {
-	return string(v)
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (tzDateValue) Type() Type {
@@ -1280,6 +1401,10 @@ func TzDateValueFromTime(t time.Time) tzDateValue {
 
 type tzDatetimeValue string
 
+func (v tzDatetimeValue) toString() string {
+	return string(v)
+}
+
 func (v tzDatetimeValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -1294,7 +1419,7 @@ func (v tzDatetimeValue) castTo(dst interface{}) error {
 }
 
 func (v tzDatetimeValue) String() string {
-	return string(v)
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (tzDatetimeValue) Type() Type {
@@ -1321,6 +1446,10 @@ func TzDatetimeValueFromTime(t time.Time) tzDatetimeValue {
 
 type tzTimestampValue string
 
+func (v tzTimestampValue) toString() string {
+	return string(v)
+}
+
 func (v tzTimestampValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -1335,7 +1464,7 @@ func (v tzTimestampValue) castTo(dst interface{}) error {
 }
 
 func (v tzTimestampValue) String() string {
-	return string(v)
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (tzTimestampValue) Type() Type {
@@ -1361,6 +1490,10 @@ func TzTimestampValueFromTime(t time.Time) tzTimestampValue {
 }
 
 type uint8Value uint8
+
+func (v uint8Value) toString() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
 
 func (v uint8Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
@@ -1403,7 +1536,7 @@ func (v uint8Value) castTo(dst interface{}) error {
 }
 
 func (v uint8Value) String() string {
-	return strconv.FormatUint(uint64(v), 10)
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (uint8Value) Type() Type {
@@ -1425,6 +1558,10 @@ func Uint8Value(v uint8) uint8Value {
 }
 
 type uint16Value uint16
+
+func (v uint16Value) toString() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
 
 func (v uint16Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
@@ -1461,7 +1598,7 @@ func (v uint16Value) castTo(dst interface{}) error {
 }
 
 func (v uint16Value) String() string {
-	return strconv.FormatUint(uint64(v), 10)
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (uint16Value) Type() Type {
@@ -1483,6 +1620,10 @@ func Uint16Value(v uint16) uint16Value {
 }
 
 type uint32Value uint32
+
+func (v uint32Value) toString() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
 
 func (v uint32Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
@@ -1510,7 +1651,7 @@ func (v uint32Value) castTo(dst interface{}) error {
 }
 
 func (v uint32Value) String() string {
-	return strconv.FormatUint(uint64(v), 10)
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (uint32Value) Type() Type {
@@ -1533,6 +1674,10 @@ func Uint32Value(v uint32) uint32Value {
 
 type uint64Value uint64
 
+func (v uint64Value) toString() string {
+	return strconv.FormatUint(uint64(v), 10)
+}
+
 func (v uint64Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -1550,7 +1695,7 @@ func (v uint64Value) castTo(dst interface{}) error {
 }
 
 func (v uint64Value) String() string {
-	return strconv.FormatUint(uint64(v), 10)
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (uint64Value) Type() Type {
@@ -1573,6 +1718,10 @@ func Uint64Value(v uint64) uint64Value {
 
 type textValue string
 
+func (v textValue) toString() string {
+	return string(v)
+}
+
 func (v textValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -1587,7 +1736,7 @@ func (v textValue) castTo(dst interface{}) error {
 }
 
 func (v textValue) String() string {
-	return string(v)
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (textValue) Type() Type {
@@ -1612,6 +1761,10 @@ type uuidValue struct {
 	value [16]byte
 }
 
+func (v *uuidValue) toString() string {
+	return uuid.UUID(v.value).String()
+}
+
 func (v *uuidValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -1629,7 +1782,7 @@ func (v *uuidValue) castTo(dst interface{}) error {
 }
 
 func (v *uuidValue) String() string {
-	return "\"" + hex.EncodeToString(v.value[:]) + "\""
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (*uuidValue) Type() Type {
@@ -1661,19 +1814,21 @@ type variantValue struct {
 	idx       uint32
 }
 
+func (v *variantValue) toString() string {
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString(fmt.Sprintf("%q", v.value.toString()))
+	buffer.WriteByte(',')
+	buffer.WriteString(strconv.FormatUint(uint64(v.idx), 10))
+	return buffer.String()
+}
+
 func (v *variantValue) castTo(dst interface{}) error {
 	return v.value.castTo(dst)
 }
 
 func (v *variantValue) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString("{")
-	buffer.WriteString(strconv.FormatUint(uint64(v.idx), 10))
-	buffer.WriteByte(':')
-	buffer.WriteString(fmt.Sprintf("%q", v.value))
-	buffer.WriteString("}")
-	return buffer.String()
+	return fmt.Sprintf("AsVariant(%s)", v.toString())
 }
 
 func (v *variantValue) Type() Type {
@@ -1730,12 +1885,16 @@ func VariantValueTuple(v Value, idx uint32) *variantValue {
 
 type voidValue struct{}
 
+func (v voidValue) toString() string {
+	return "VOID"
+}
+
 func (v voidValue) castTo(dst interface{}) error {
 	return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%s' to '%T' destination", v.Type().String(), dst))
 }
 
 func (v voidValue) String() string {
-	return "VOID"
+	return v.toString()
 }
 
 var (
@@ -1759,6 +1918,10 @@ func VoidValue() voidValue {
 
 type ysonValue []byte
 
+func (v ysonValue) toString() string {
+	return string(v)
+}
+
 func (v ysonValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -1773,7 +1936,7 @@ func (v ysonValue) castTo(dst interface{}) error {
 }
 
 func (v ysonValue) String() string {
-	return string(v)
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (ysonValue) Type() Type {
@@ -1903,17 +2066,14 @@ func ZeroValue(t Type) Value {
 		}
 		return v
 	case *StructType:
-		v := &structValue{
-			t:      t,
-			fields: make([]StructValueField, len(t.fields)),
-		}
+		fields := make([]StructValueField, len(t.fields))
 		for i, tt := range t.fields {
-			v.fields[i] = StructValueField{
+			fields[i] = StructValueField{
 				Name: tt.Name,
 				V:    ZeroValue(tt.T),
 			}
 		}
-		return v
+		return StructValue(fields...)
 	case *dictType:
 		return &dictValue{
 			t: t,
@@ -1931,6 +2091,10 @@ func ZeroValue(t Type) Value {
 
 type bytesValue []byte
 
+func (v bytesValue) toString() string {
+	return string(v)
+}
+
 func (v bytesValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -1945,7 +2109,7 @@ func (v bytesValue) castTo(dst interface{}) error {
 }
 
 func (v bytesValue) String() string {
-	return fmt.Sprintf("%v", []byte(v))
+	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
 func (bytesValue) Type() Type {
