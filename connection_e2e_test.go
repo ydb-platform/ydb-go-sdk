@@ -355,12 +355,6 @@ func BenchmarkWithCertificateCache(b *testing.B) {
 				// child conns are closed on db.Close()
 				_, err := db.With(
 					ctx,
-					ydb.WithAnonymousCredentials(),
-					ydb.WithBalancer(
-						balancers.PreferLocationsWithFallback(
-							balancers.RandomChoice(), "a", "b",
-						),
-					),
 					ydb.WithSessionPoolSizeLimit(100),
 				)
 				if err != nil {
