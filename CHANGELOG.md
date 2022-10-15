@@ -7,6 +7,7 @@
 * Added supporting of `printf` formatter for `types.Value`
 * Marked `table/types.WriteTypeStringTo` as deprecated 
 * Added `table/options.WithDataColumns` for supporting covering indexes
+* Added certificate caching in `WithCertificatesFromFile` and `WithCertificatesFromPem`
 
 ## v3.38.5
 * Fixed bug from scan unexpected column name
