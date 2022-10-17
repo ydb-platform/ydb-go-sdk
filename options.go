@@ -281,12 +281,14 @@ func WithCertificatesFromFile(caFile string) Option {
 			}
 			caFile = filepath.Join(home, caFile[1:])
 		}
-		bytes, err := cache.ReadFile(filepath.Clean(caFile))
+		certs, err := cache.ParseCertificatesFromFile(caFile)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
-		if err = WithCertificatesFromPem(bytes)(ctx, c); err != nil {
-			return xerrors.WithStackTrace(err)
+		for _, cert := range certs {
+			if err := WithCertificate(cert)(ctx, c); err != nil {
+				return xerrors.WithStackTrace(err)
+			}
 		}
 		return nil
 	}

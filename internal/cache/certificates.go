@@ -3,6 +3,7 @@ package cache
 import (
 	"crypto/sha256"
 	"crypto/x509"
+	"encoding/pem"
 	"os"
 	"path/filepath"
 
@@ -15,23 +16,58 @@ func FileCache() Cache {
 	return fileCache
 }
 
-// ReadFile is a cached version of os.ReadFile. Cache key is
-//  filepath.Clean(file)
-func ReadFile(file string) ([]byte, error) {
-	file = filepath.Clean(file)
+// ParseCertificatesFromFile reads and parses pem-encoded certificate(s) from file.
+// The cache key is clean, absolute filepath with all symlinks evaluated.
+func ParseCertificatesFromFile(file string) ([]*x509.Certificate, error) {
+	var err error
+	file, err = filepath.Abs(file)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	file, err = filepath.EvalSymlinks(file)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
 
 	value, err := fileCache.loadOrStore(nopLazyValue(file), func() (interface{}, error) {
-		return os.ReadFile(file)
+		var bytes []byte
+		bytes, err = os.ReadFile(file)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+		var (
+			block *pem.Block
+			certs []*x509.Certificate
+		)
+		for len(bytes) > 0 {
+			block, bytes = pem.Decode(bytes)
+			if block == nil {
+				break
+			}
+			if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
+				continue
+			}
+			var cert *x509.Certificate
+			cert, err = ParseCertificate(block.Bytes)
+			if err != nil {
+				continue
+			}
+			certs = append(certs, cert)
+		}
+		if len(certs) > 0 {
+			return certs, nil
+		}
+		return nil, xerrors.WithStackTrace(err)
 	})
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	bytes, ok := value.([]byte)
+	certs, ok := value.([]*x509.Certificate)
 	if !ok {
 		panic("unknown file cache type")
 	}
-	return bytes, nil
+	return certs, nil
 }
 
 var certificateCache = newCache()
