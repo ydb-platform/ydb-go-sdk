@@ -31,7 +31,7 @@ func BenchmarkWithCertificateCache(b *testing.B) {
 	}
 	for _, tc := range tcs {
 		b.Run(tc.name, func(b *testing.B) {
-			certificates.DerCacheEnabled = tc.enabled
+			certificates.PemCacheEnabled = tc.enabled
 
 			ctx := context.TODO()
 			db, err := applyOptions(
@@ -78,7 +78,7 @@ func BenchmarkWithFileCache(b *testing.B) {
 	for _, tc := range tcs {
 		b.Run(tc.name, func(b *testing.B) {
 			certificates.FileCacheEnabled = tc.fileEnabled
-			certificates.DerCacheEnabled = tc.certEnabled
+			certificates.PemCacheEnabled = tc.certEnabled
 
 			ctx := context.TODO()
 			db, err := applyOptions(
@@ -94,7 +94,6 @@ func BenchmarkWithFileCache(b *testing.B) {
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
-				// child conns are closed on db.Close()
 				_, _, err := db.with(
 					ctx,
 					WithSessionPoolSizeLimit(100),

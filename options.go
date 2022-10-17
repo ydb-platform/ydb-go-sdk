@@ -272,14 +272,18 @@ func WithCertificate(cert *x509.Certificate) Option {
 
 // WithCertificatesFromFile appends certificates by filepath to TLS config root certificates
 func WithCertificatesFromFile(caFile string) Option {
-	return func(ctx context.Context, c *connection) error {
-		if len(caFile) > 0 && caFile[0] == '~' {
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return xerrors.WithStackTrace(err)
-			}
+	if len(caFile) > 0 && caFile[0] == '~' {
+		if home, err := os.UserHomeDir(); err == nil {
 			caFile = filepath.Join(home, caFile[1:])
 		}
+	}
+	if file, err := filepath.Abs(caFile); err == nil {
+		caFile = file
+	}
+	if file, err := filepath.EvalSymlinks(caFile); err == nil {
+		caFile = file
+	}
+	return func(ctx context.Context, c *connection) error {
 		certs, err := certificates.ParseCertificatesFromFile(caFile)
 		if err != nil {
 			return xerrors.WithStackTrace(err)

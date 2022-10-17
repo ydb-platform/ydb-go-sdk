@@ -4,7 +4,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"os"
-	"path/filepath"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -24,20 +23,10 @@ var (
 )
 
 // ParseCertificatesFromFile reads and parses pem-encoded certificate(s) from file.
-// The cache key is clean, absolute filepath with all symlinks evaluated.
 func ParseCertificatesFromFile(file string) ([]*x509.Certificate, error) {
 	if !FileCacheEnabled {
 		certs, err := parseCertificatesFromFile(file)
 		return certs, xerrors.WithStackTrace(err)
-	}
-	var err error
-	file, err = filepath.Abs(file)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-	file, err = filepath.EvalSymlinks(file)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
 	}
 
 	value, exists := fileCache.Load(file)
@@ -71,30 +60,30 @@ func parseCertificatesFromFile(file string) ([]*x509.Certificate, error) {
 }
 
 var (
-	// derCache
+	// pemCache
 	//  map[string]*x509.Certificate
-	derCache sync.Map
-	// DerCacheEnabled turns caching in ParseCertificate on or off.
+	pemCache sync.Map
+	// PemCacheEnabled turns caching in ParseCertificate on or off.
 	// This varbialbe MUST not be set concurrently with calls to ParseCertificate.
-	DerCacheEnabled = true
-	// DerCacheHook (if not nil) is called on every call to ParseCertificate
+	PemCacheEnabled = true
+	// PemCacheHook (if not nil) is called on every call to ParseCertificate
 	// if DerCacheEnabled = true. Its argument tells whether there was a cache hit.
 	// This varbialbe MUST not be set concurrently with calls to ParseCertificate.
-	DerCacheHook func(isHit bool)
+	PemCacheHook func(isHit bool)
 )
 
 // ParseCertificate is a cached version of x509.ParseCertificate. Cache key is
 //  string(der)
 func ParseCertificate(der []byte) (*x509.Certificate, error) {
-	if !DerCacheEnabled {
+	if !PemCacheEnabled {
 		cert, err := x509.ParseCertificate(der)
 		return cert, xerrors.WithStackTrace(err)
 	}
 	key := string(der)
 
-	value, exists := derCache.Load(key)
-	if DerCacheHook != nil {
-		DerCacheHook(exists)
+	value, exists := pemCache.Load(key)
+	if PemCacheHook != nil {
+		PemCacheHook(exists)
 	}
 	if exists {
 		cert, ok := value.(*x509.Certificate)
@@ -105,7 +94,7 @@ func ParseCertificate(der []byte) (*x509.Certificate, error) {
 	}
 	cert, err := x509.ParseCertificate(der)
 	if err == nil {
-		derCache.Store(key, cert)
+		pemCache.Store(key, cert)
 	}
 	return cert, xerrors.WithStackTrace(err)
 }
