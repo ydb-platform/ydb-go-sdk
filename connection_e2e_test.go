@@ -27,7 +27,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cache"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/certificates"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -326,23 +326,6 @@ func BenchmarkWithCertificateCache(b *testing.B) {
 	}
 	os.Unsetenv("YDB_SSL_ROOT_CERTIFICATES_FILE")
 
-	cache.CertificateCache().Reset()
-	ctx := context.TODO()
-	db, err := ydb.Open(
-		ctx,
-		os.Getenv("YDB_CONNECTION_STRING"),
-		ydb.WithCertificatesFromPem(bytes),
-	)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		// cleanup connection
-		if e := db.Close(ctx); e != nil {
-			b.Fatalf("close failed: %+v", e)
-		}
-	}()
-
 	tcs := []struct {
 		name    string
 		enabled bool
@@ -352,7 +335,24 @@ func BenchmarkWithCertificateCache(b *testing.B) {
 	}
 	for _, tc := range tcs {
 		b.Run(tc.name, func(b *testing.B) {
-			cache.CertificateCache().Enable(tc.enabled)
+			certificates.DerCacheEnabled = tc.enabled
+
+			ctx := context.TODO()
+			db, err := ydb.Open(
+				ctx,
+				os.Getenv("YDB_CONNECTION_STRING"),
+				ydb.WithCertificatesFromPem(bytes),
+			)
+			if err != nil {
+				b.Fatal(err)
+			}
+			defer func() {
+				// cleanup connection
+				if e := db.Close(ctx); e != nil {
+					b.Fatalf("close failed: %+v", e)
+				}
+			}()
+
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
 				// child conns are closed on db.Close()
@@ -371,23 +371,6 @@ func BenchmarkWithCertificateCache(b *testing.B) {
 func BenchmarkWithFileCache(b *testing.B) {
 	b.ReportAllocs()
 
-	cache.FileCache().Reset()
-	cache.CertificateCache().Reset()
-	ctx := context.TODO()
-	db, err := ydb.Open(
-		ctx,
-		os.Getenv("YDB_CONNECTION_STRING"),
-	)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer func() {
-		// cleanup connection
-		if e := db.Close(ctx); e != nil {
-			b.Fatalf("close failed: %+v", e)
-		}
-	}()
-
 	tcs := []struct {
 		name        string
 		certEnabled bool
@@ -399,8 +382,24 @@ func BenchmarkWithFileCache(b *testing.B) {
 	}
 	for _, tc := range tcs {
 		b.Run(tc.name, func(b *testing.B) {
-			cache.FileCache().Enable(tc.fileEnabled)
-			cache.CertificateCache().Enable(tc.certEnabled)
+			certificates.FileCacheEnabled = tc.fileEnabled
+			certificates.DerCacheEnabled = tc.certEnabled
+
+			ctx := context.TODO()
+			db, err := ydb.Open(
+				ctx,
+				os.Getenv("YDB_CONNECTION_STRING"),
+			)
+			if err != nil {
+				b.Fatal(err)
+			}
+			defer func() {
+				// cleanup connection
+				if e := db.Close(ctx); e != nil {
+					b.Fatalf("close failed: %+v", e)
+				}
+			}()
+
 			b.ResetTimer()
 
 			for i := 0; i < b.N; i++ {
@@ -457,7 +456,6 @@ func TestWithCacheConcurrent(t *testing.T) {
 func TestWithCacheHits(t *testing.T) {
 	const nChildren = 10
 
-	cache.FileCache().Reset()
 	ctx := context.TODO()
 	db, err := ydb.Open(
 		ctx,
@@ -473,7 +471,14 @@ func TestWithCacheHits(t *testing.T) {
 		}
 	}()
 
-	lastHits := cache.FileCache().Hits()
+	hits := 0
+	certificates.FileCacheHook = func(isHit bool) {
+		if isHit {
+			hits++
+		}
+	}
+
+	lastHits := hits
 	for i := 0; i < nChildren; i++ {
 		// child conns are closed on db.Close()
 		_, err := db.With(
@@ -483,7 +488,6 @@ func TestWithCacheHits(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		hits := cache.FileCache().Hits()
 		if delta := hits - lastHits; delta < 1 {
 			t.Errorf("child conn #%d: cache miss", i)
 		}

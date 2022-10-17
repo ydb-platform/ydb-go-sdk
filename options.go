@@ -12,7 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cache"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/certificates"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
@@ -280,7 +280,7 @@ func WithCertificatesFromFile(caFile string) Option {
 			}
 			caFile = filepath.Join(home, caFile[1:])
 		}
-		certs, err := cache.ParseCertificatesFromFile(caFile)
+		certs, err := certificates.ParseCertificatesFromFile(caFile)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -307,7 +307,7 @@ func WithTLSConfig(tlsConfig *tls.Config) Option {
 // WithCertificatesFromPem appends certificates from pem-encoded data to TLS config root certificates
 func WithCertificatesFromPem(bytes []byte) Option {
 	return func(ctx context.Context, c *connection) error {
-		certs, err := cache.ParseCertificatesFromPem(bytes)
+		certs, err := certificates.ParseCertificatesFromPem(bytes)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
