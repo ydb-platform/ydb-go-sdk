@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
 	"os"
@@ -30,34 +29,11 @@ func ParseCertificatesFromFile(file string) ([]*x509.Certificate, error) {
 	}
 
 	value, err := fileCache.loadOrStore(nopLazyValue(file), func() (interface{}, error) {
-		var bytes []byte
-		bytes, err = os.ReadFile(file)
-		if err != nil {
+		bytes, err2 := os.ReadFile(file)
+		if err2 != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
-		var (
-			block *pem.Block
-			certs []*x509.Certificate
-		)
-		for len(bytes) > 0 {
-			block, bytes = pem.Decode(bytes)
-			if block == nil {
-				break
-			}
-			if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
-				continue
-			}
-			var cert *x509.Certificate
-			cert, err = ParseCertificate(block.Bytes)
-			if err != nil {
-				continue
-			}
-			certs = append(certs, cert)
-		}
-		if len(certs) > 0 {
-			return certs, nil
-		}
-		return nil, xerrors.WithStackTrace(err)
+		return ParseCertificatesFromPem(bytes)
 	})
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -77,16 +53,11 @@ func CertificateCache() Cache {
 }
 
 // ParseCertificate is a cached version of x509.ParseCertificate. Cache key is
-//  sha256.Sum224(der)
+//  string(der)
 func ParseCertificate(der []byte) (*x509.Certificate, error) {
-	// using Sum224 for cert data similarly to tls package
-	var sum [sha256.Size224]byte
-	lKey := func() (interface{}, error) {
-		sum = sha256.Sum224(der)
-		return sum, nil
-	}
+	key := string(der)
 
-	value, err := certificateCache.loadOrStore(lKey, func() (interface{}, error) {
+	value, err := certificateCache.loadOrStore(nopLazyValue(key), func() (interface{}, error) {
 		return x509.ParseCertificate(der)
 	})
 	if err != nil {
@@ -98,4 +69,30 @@ func ParseCertificate(der []byte) (*x509.Certificate, error) {
 		panic("unknown file cache type")
 	}
 	return cert, nil
+}
+
+// ParseCertificatesFromPem parses one or more certificate from pem blocks in bytes.
+// It returns nil error if at least one certificate was successfully parsed.
+// This function uses chached ParseCertificate.
+func ParseCertificatesFromPem(bytes []byte) (certs []*x509.Certificate, err error) {
+	var block *pem.Block
+	for len(bytes) > 0 {
+		block, bytes = pem.Decode(bytes)
+		if block == nil {
+			break
+		}
+		if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
+			continue
+		}
+		var cert *x509.Certificate
+		cert, err = ParseCertificate(block.Bytes)
+		if err != nil {
+			continue
+		}
+		certs = append(certs, cert)
+	}
+	if len(certs) > 0 {
+		return certs, nil
+	}
+	return nil, xerrors.WithStackTrace(err)
 }
