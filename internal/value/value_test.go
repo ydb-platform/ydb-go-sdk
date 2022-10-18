@@ -183,19 +183,19 @@ func TestValueToString(t *testing.T) {
 	}{
 		{
 			value:  VoidValue(),
-			string: "FIXME",
+			string: "Void()",
 		},
 		{
 			value:  TextValue("some\"text\"with brackets"),
-			string: "CAST(\"some\\\"text\\\"with brackets\" AS Text)",
+			string: "Utf8(\"some\\\"text\\\"with brackets\")",
 		},
 		{
 			value:  BytesValue([]byte("foo")),
-			string: "CAST(\"foo\" AS Bytes)",
+			string: "String(\"foo\")",
 		},
 		{
 			value:  OptionalValue(BytesValue([]byte("foo"))),
-			string: "CAST(\"foo\" AS Optional<Bytes>)",
+			string: "Optional<String>(\"foo\")",
 		},
 		{
 			value:  BoolValue(true),
@@ -269,7 +269,7 @@ func TestValueToString(t *testing.T) {
 		},
 		{
 			value: TimestampValueFromTime(func() time.Time {
-				tt, err := time.ParseInLocation(LayoutTimestamp, "1997-12-14T03:09:42.123456", time.Local)
+				tt, err := time.ParseInLocation(LayoutTimestamp, "1997-12-14T03:09:42.123456Z", time.Local)
 				require.NoError(t, err)
 				return tt.Local()
 			}()),
@@ -416,11 +416,9 @@ func TestValueToString(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%+v", tt.value), func(t *testing.T) {
-			t.Run("String()", func(t *testing.T) {
-				if got := tt.value.String(); got != tt.string {
-					t.Errorf("string representations not equals:\n\n -  got: %s\n\n - want: %s", got, tt.string)
-				}
-			})
+			if got := tt.value.String(); got != tt.string {
+				t.Errorf("string representations not equals:\n\n -  got: %s\n\n - want: %s", got, tt.string)
+			}
 		})
 	}
 }

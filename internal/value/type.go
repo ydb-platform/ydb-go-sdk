@@ -2,9 +2,7 @@ package value
 
 import (
 	"fmt"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 )
 
@@ -53,13 +51,9 @@ func TypeFromYDB(x *Ydb.Type) Type {
 		t := v.VariantType
 		switch x := t.Type.(type) {
 		case *Ydb.VariantType_TupleItems:
-			return Variant(
-				Tuple(TypesFromYDB(x.TupleItems.Elements)...),
-			)
+			return VariantTuple(TypesFromYDB(x.TupleItems.Elements)...)
 		case *Ydb.VariantType_StructItems:
-			return Variant(
-				Struct(StructFields(x.StructItems.Members)...),
-			)
+			return VariantStruct(StructFields(x.StructItems.Members)...)
 		default:
 			panic("ydb: unknown variant type")
 		}
@@ -580,85 +574,109 @@ func Tuple(items ...Type) (v *TupleType) {
 	}
 }
 
-type internalVariantType uint8
-
-const (
-	variantTypeTuple internalVariantType = iota + 1
-	variantTypeStruct
-)
-
-type variantType struct {
-	innerType   Type
-	variantType internalVariantType
+type variantStructType struct {
+	*StructType
 }
 
-func (v *variantType) String() string {
-	return "Variant<" + v.innerType.String() + ">"
+func (v *variantStructType) String() string {
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString("Variant<")
+	for i, f := range v.fields {
+		if i > 0 {
+			buffer.WriteByte(',')
+		}
+		buffer.WriteString("'" + f.Name + "'")
+		buffer.WriteByte(':')
+		buffer.WriteString(f.T.String())
+	}
+	buffer.WriteByte('>')
+	return buffer.String()
 }
 
-func (v *variantType) equalsTo(rhs Type) bool {
-	vv, ok := rhs.(*variantType)
-	if !ok {
+func (v *variantStructType) equalsTo(rhs Type) bool {
+	switch t := rhs.(type) {
+	case *variantStructType:
+		return v.StructType.equalsTo(t.StructType)
+	case *StructType:
+		return v.StructType.equalsTo(t)
+	default:
 		return false
 	}
-	return v.innerType.equalsTo(vv.innerType)
 }
 
-func (v *variantType) toYDB(a *allocator.Allocator) *Ydb.Type {
+func (v *variantStructType) toYDB(a *allocator.Allocator) *Ydb.Type {
 	t := a.Type()
 
 	typeVariant := a.TypeVariant()
 
 	typeVariant.VariantType = a.Variant()
 
-	tt := v.innerType.toYDB(a).Type
+	structItems := a.VariantStructItems()
+	structItems.StructItems = v.StructType.toYDB(a).Type.(*Ydb.Type_StructType).StructType
 
-	switch v.variantType {
-	case variantTypeTuple:
-		tupleType, ok := tt.(*Ydb.Type_TupleType)
-		if !ok {
-			panic(fmt.Sprintf("type %T cannot casts to *Ydb.Type_TupleType", tt))
-		}
-
-		tupleItems := a.VariantTupleItems()
-		tupleItems.TupleItems = tupleType.TupleType
-
-		typeVariant.VariantType.Type = tupleItems
-	case variantTypeStruct:
-		structType, ok := tt.(*Ydb.Type_StructType)
-		if !ok {
-			panic(fmt.Sprintf("type %T cannot casts to *Ydb.Type_TupleType", tt))
-		}
-
-		structItems := a.VariantStructItems()
-		structItems.StructItems = structType.StructType
-
-		typeVariant.VariantType.Type = structItems
-	default:
-		panic(fmt.Sprintf("unsupported variant type: %v", v.variantType))
-	}
+	typeVariant.VariantType.Type = structItems
 
 	t.Type = typeVariant
 
 	return t
 }
 
-func Variant(t Type) *variantType {
-	if tt, ok := t.(*variantType); ok {
-		t = tt.innerType
+func VariantStruct(fields ...StructField) *variantStructType {
+	return &variantStructType{
+		StructType: Struct(fields...),
 	}
-	var tt internalVariantType
-	switch t.(type) {
-	case *StructType:
-		tt = variantTypeStruct
+}
+
+type variantTupleType struct {
+	*TupleType
+}
+
+func (v *variantTupleType) String() string {
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString("Variant<")
+	for i, t := range v.items {
+		if i > 0 {
+			buffer.WriteByte(',')
+		}
+		buffer.WriteString(t.String())
+	}
+	buffer.WriteByte('>')
+	return buffer.String()
+}
+
+func (v *variantTupleType) equalsTo(rhs Type) bool {
+	switch t := rhs.(type) {
+	case *variantTupleType:
+		return v.TupleType.equalsTo(t.TupleType)
 	case *TupleType:
-		tt = variantTypeTuple
+		return v.TupleType.equalsTo(t)
 	default:
-		panic(fmt.Sprintf("unsupported variant type: %v", t))
+		return false
 	}
-	return &variantType{
-		innerType:   t,
-		variantType: tt,
+}
+
+func (v *variantTupleType) toYDB(a *allocator.Allocator) *Ydb.Type {
+	t := a.Type()
+
+	typeVariant := a.TypeVariant()
+
+	typeVariant.VariantType = a.Variant()
+
+	tupleItems := a.VariantTupleItems()
+	tupleItems.TupleItems = v.TupleType.toYDB(a).Type.(*Ydb.Type_TupleType).TupleType
+
+	typeVariant.VariantType.Type = tupleItems
+
+	t.Type = typeVariant
+
+	return t
+}
+
+func VariantTuple(items ...Type) *variantTupleType {
+	return &variantTupleType{
+		TupleType: Tuple(items...),
 	}
 }
 

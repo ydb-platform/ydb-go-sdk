@@ -278,17 +278,17 @@ func TestWriteTypeBytesTo(t *testing.T) {
 			s: "Tuple<Text,List<Int64>,Optional<TzDatetime>>",
 		},
 		{
-			t: Variant(Tuple(TypeText, List(TypeInt64), Optional(TypeTzDatetime))),
-			s: "Variant<Tuple<Text,List<Int64>,Optional<TzDatetime>>>",
+			t: VariantTuple(TypeText, List(TypeInt64), Optional(TypeTzDatetime)),
+			s: "Variant<Text,List<Int64>,Optional<TzDatetime>>",
 		},
 		{
-			t: Variant(Struct(
+			t: VariantStruct(
 				StructField("series_id", TypeUint64),
 				StructField("title", TypeText),
 				StructField("air_date", TypeDate),
 				StructField("remove_date", Optional(TypeTzDatetime)),
-			)),
-			s: "Variant<Struct<`series_id`:Uint64,`title`:Text,`air_date`:Date,`remove_date`:Optional<TzDatetime>>>",
+			),
+			s: "Variant<`series_id`:Uint64,`title`:Text,`air_date`:Date,`remove_date`:Optional<TzDatetime>>",
 		},
 	} {
 		t.Run(fmt.Sprintf("%+v", tt.t), func(t *testing.T) {

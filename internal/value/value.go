@@ -187,74 +187,78 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		return OptionalValue(FromYDB(t, v)), nil
 
 	case *listType:
-		return ListValue(func() (vv []Value) {
+		return ListValue(func() []Value {
+			vv := make([]Value, len(v.Items))
 			a := allocator.New()
 			defer a.Free()
-			for _, vvv := range v.Items {
-				vv = append(vv, FromYDB(ttt.itemType.toYDB(a), vvv))
+			for i, vvv := range v.Items {
+				vv[i] = FromYDB(ttt.itemType.toYDB(a), vvv)
 			}
 			return vv
 		}()...), nil
 
 	case *TupleType:
-		return TupleValue(func() (vv []Value) {
+		return TupleValue(func() []Value {
+			vv := make([]Value, len(v.Items))
 			a := allocator.New()
 			defer a.Free()
 			for i, vvv := range v.Items {
-				vv = append(vv, FromYDB(ttt.items[i].toYDB(a), vvv))
+				vv[i] = FromYDB(ttt.items[i].toYDB(a), vvv)
 			}
 			return vv
 		}()...), nil
 
 	case *StructType:
-		return StructValue(func() (vv []StructValueField) {
+		return StructValue(func() []StructValueField {
+			vv := make([]StructValueField, len(v.Items))
 			a := allocator.New()
 			defer a.Free()
 			for i, vvv := range v.Items {
-				vv = append(vv, StructValueField{
+				vv[i] = StructValueField{
 					Name: ttt.fields[i].Name,
 					V:    FromYDB(ttt.fields[i].T.toYDB(a), vvv),
-				})
+				}
 			}
 			return vv
 		}()...), nil
 
 	case *dictType:
-		return DictValue(func() (vv []DictValueField) {
+		return DictValue(func() []DictValueField {
+			vv := make([]DictValueField, len(v.Pairs))
 			a := allocator.New()
 			defer a.Free()
-			for _, vvv := range v.Pairs {
-				vv = append(vv, DictValueField{
+			for i, vvv := range v.Pairs {
+				vv[i] = DictValueField{
 					K: FromYDB(ttt.keyType.toYDB(a), vvv.Key),
 					V: FromYDB(ttt.valueType.toYDB(a), vvv.Payload),
-				})
+				}
 			}
 			return vv
 		}()...), nil
 
-	case *variantType:
+	case *variantStructType:
 		a := allocator.New()
 		defer a.Free()
-		switch ttt.variantType {
-		case variantTypeTuple:
-			return VariantValueTuple(
-				FromYDB(
-					ttt.innerType.(*TupleType).toYDB(a),
-					v.Value.(*Ydb.Value_NestedValue).NestedValue,
-				),
-				v.VariantIndex,
-			), nil
-		case variantTypeStruct:
-			return VariantValueStruct(
-				FromYDB(
-					ttt.innerType.(*StructType).toYDB(a),
-					v.Value.(*Ydb.Value_NestedValue).NestedValue,
-				),
-				v.VariantIndex,
-			), nil
-		default:
-			return nil, fmt.Errorf("unknown variant type: %v", ttt.variantType)
-		}
+		return VariantValueStruct(
+			FromYDB(
+				ttt.StructType.fields[v.VariantIndex].T.toYDB(a),
+				v.Value.(*Ydb.Value_NestedValue).NestedValue,
+			),
+			ttt.StructType.fields[v.VariantIndex].Name,
+			ttt.StructType,
+		), nil
+
+	case *variantTupleType:
+		a := allocator.New()
+		defer a.Free()
+		return VariantValueTuple(
+			FromYDB(
+				ttt.TupleType.items[v.VariantIndex].toYDB(a),
+				v.Value.(*Ydb.Value_NestedValue).NestedValue,
+			),
+			v.VariantIndex,
+			ttt.TupleType,
+		), nil
 
 	default:
 		return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered type: %T", ttt))
@@ -530,7 +534,7 @@ func (v *dictValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 
 func DictValue(values ...DictValueField) *dictValue {
 	sort.Slice(values, func(i, j int) bool {
-		return values[i].K.toString() < values[j].K.toString()
+		return values[i].K.String() < values[j].K.String()
 	})
 	return &dictValue{
 		t:      Dict(values[0].K.Type(), values[0].V.Type()),
@@ -1145,7 +1149,10 @@ func (v *optionalValue) castTo(dst interface{}) error {
 }
 
 func (v *optionalValue) String() string {
-	return fmt.Sprintf("CAST(%q AS %s)", v.toString(), v.Type().String())
+	if v.value == nil {
+		return fmt.Sprintf("Nothing(%s)", v.innerType.String())
+	}
+	return fmt.Sprintf("Just(%s)", v.value.String())
 }
 
 func (v *optionalValue) Type() Type {
@@ -1719,7 +1726,7 @@ func Uint64Value(v uint64) uint64Value {
 type textValue string
 
 func (v textValue) toString() string {
-	return string(v)
+	return fmt.Sprintf("%q", string(v))
 }
 
 func (v textValue) castTo(dst interface{}) error {
@@ -1736,7 +1743,7 @@ func (v textValue) castTo(dst interface{}) error {
 }
 
 func (v textValue) String() string {
-	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
+	return v.Type().String() + "(" + v.toString() + ")"
 }
 
 func (textValue) Type() Type {
@@ -1817,9 +1824,16 @@ type variantValue struct {
 func (v *variantValue) toString() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString(fmt.Sprintf("%q", v.value.toString()))
+	buffer.WriteString(v.value.toString())
 	buffer.WriteByte(',')
-	buffer.WriteString(strconv.FormatUint(uint64(v.idx), 10))
+	switch t := v.innerType.(type) {
+	case *variantStructType:
+		buffer.WriteString(fmt.Sprintf("%q", t.fields[v.idx].Name))
+	case *variantTupleType:
+		buffer.WriteString("\"" + strconv.FormatUint(uint64(v.idx), 10) + "\"")
+	}
+	a := allocator.New()
+	defer a.Free()
 	return buffer.String()
 }
 
@@ -1828,7 +1842,7 @@ func (v *variantValue) castTo(dst interface{}) error {
 }
 
 func (v *variantValue) String() string {
-	return fmt.Sprintf("AsVariant(%s)", v.toString())
+	return fmt.Sprintf("Variant(%s,%s)", v.toString(), v.Type().String())
 }
 
 func (v *variantValue) Type() Type {
@@ -1847,46 +1861,48 @@ func (v *variantValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func VariantValue(v Value, idx uint32, t Type) *variantValue {
+func VariantValueTuple(v Value, idx uint32, t Type) *variantValue {
+	switch tt := t.(type) {
+	case *TupleType:
+		t = VariantTuple(tt.items...)
+	}
 	return &variantValue{
-		innerType: Variant(t),
+		innerType: t,
 		value:     v,
 		idx:       idx,
 	}
 }
 
-func VariantValueStruct(v Value, idx uint32) *variantValue {
-	if _, ok := v.(*structValue); !ok {
-		panic("value must be a struct type")
+func VariantValueStruct(v Value, name string, t Type) *variantValue {
+	var idx int
+	switch tt := t.(type) {
+	case *StructType:
+		sort.Slice(tt.fields, func(i, j int) bool {
+			return tt.fields[i].Name < tt.fields[j].Name
+		})
+		idx = sort.Search(len(tt.fields), func(i int) bool {
+			return tt.fields[i].Name >= name
+		})
+		t = VariantStruct(tt.fields...)
+	case *variantStructType:
+		sort.Slice(tt.fields, func(i, j int) bool {
+			return tt.fields[i].Name < tt.fields[j].Name
+		})
+		idx = sort.Search(len(tt.fields), func(i int) bool {
+			return tt.fields[i].Name >= name
+		})
 	}
 	return &variantValue{
-		innerType: &variantType{
-			innerType:   v.Type(),
-			variantType: variantTypeStruct,
-		},
-		value: v,
-		idx:   idx,
-	}
-}
-
-func VariantValueTuple(v Value, idx uint32) *variantValue {
-	if _, ok := v.(*tupleValue); !ok {
-		panic("value must be a tuple type")
-	}
-	return &variantValue{
-		innerType: &variantType{
-			innerType:   v.Type(),
-			variantType: variantTypeTuple,
-		},
-		value: v,
-		idx:   idx,
+		innerType: t,
+		value:     v,
+		idx:       uint32(idx),
 	}
 }
 
 type voidValue struct{}
 
 func (v voidValue) toString() string {
-	return "VOID"
+	return ""
 }
 
 func (v voidValue) castTo(dst interface{}) error {
@@ -1894,7 +1910,7 @@ func (v voidValue) castTo(dst interface{}) error {
 }
 
 func (v voidValue) String() string {
-	return v.toString()
+	return fmt.Sprintf("%s()", v.Type().String())
 }
 
 var (
@@ -2080,9 +2096,6 @@ func ZeroValue(t Type) Value {
 		}
 	case *DecimalType:
 		return DecimalValue([16]byte{}, 22, 9)
-
-	case *variantType:
-		return VariantValue(ZeroValue(t.innerType), 0, t.innerType)
 
 	default:
 		panic(fmt.Sprintf("uncovered type '%T'", t))

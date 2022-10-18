@@ -8,10 +8,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
-	"google.golang.org/protobuf/proto"
 	"os"
 	"testing"
 	"time"
@@ -83,14 +80,14 @@ func TestTypeToString(t *testing.T) {
 		types.Optional(types.TypeDyNumber),
 		types.Dict(types.TypeText, types.TypeTimestamp),
 		types.List(types.TypeUint32),
-		types.Variant(types.Struct(
+		types.VariantStruct(
 			types.StructField("a", types.TypeBool),
 			types.StructField("b", types.TypeFloat),
-		)),
-		types.Variant(types.Tuple(
+		),
+		types.VariantTuple(
 			types.TypeBool,
 			types.TypeFloat,
-		)),
+		),
 	} {
 		t.Run(tt.String(), func(t *testing.T) {
 			var got string
@@ -121,6 +118,7 @@ func TestValueToString(t *testing.T) {
 		_ = db.Close(ctx)
 	}()
 	for _, tt := range []types.Value{
+		types.VoidValue(),
 		types.TextValue("some\"text\"with brackets"),
 		types.BytesValue([]byte("foo")),
 		types.OptionalValue(types.BytesValue([]byte("foo"))),
@@ -172,22 +170,26 @@ func TestValueToString(t *testing.T) {
 			types.FloatValue(2),
 			types.TextValue("3"),
 		),
-		types.VariantValue(types.Int32Value(42), 1, types.Variant(types.Tuple(
+		types.VariantValueTuple(types.Int32Value(42), 1, types.VariantTuple(
 			types.TypeBytes,
 			types.TypeInt32,
-		))),
-		types.VariantValue(types.TextValue("foo"), 1, types.Variant(types.Tuple(
+		)),
+		types.VariantValueTuple(types.TextValue("foo"), 1, types.VariantTuple(
 			types.TypeBytes,
 			types.TypeText,
-		))),
-		types.VariantValue(types.BoolValue(true), 0, types.Variant(types.Tuple(
-			types.TypeBytes,
+		)),
+		types.VariantValueTuple(types.BoolValue(true), 0, types.VariantTuple(
+			types.TypeBool,
 			types.TypeInt32,
-		))),
-		types.VariantValue(types.Int32Value(42), 1, types.Variant(types.Struct(
+		)),
+		types.VariantValueStruct(types.Int32Value(42), "bar", types.VariantStruct(
 			types.StructField("foo", types.TypeBytes),
 			types.StructField("bar", types.TypeInt32),
-		))),
+		)),
+		types.VariantValueStruct(types.Int32Value(6), "foo", types.VariantStruct(
+			types.StructField("foo", types.TypeInt32),
+			types.StructField("bar", types.TypeBool),
+		)),
 		types.StructValue(
 			types.StructFieldValue("series_id", types.Uint64Value(1)),
 			types.StructFieldValue("title", types.TextValue("test")),
@@ -226,18 +228,13 @@ func TestValueToString(t *testing.T) {
 				fmt.Sprintf("SELECT %s;", tt.String()),
 				nil,
 			)
-			require.NoError(t, err)
+			require.NoError(t, err, tt.String())
 			require.NoError(t, res.NextResultSetErr(ctx))
 			require.True(t, res.NextRow())
 			values, err := res.RowValues()
 			require.NoError(t, err)
 			require.Equal(t, 1, len(values))
-			v := values[0]
-			a := allocator.New()
-			lhs, rhs := value.ToYDB(v, a), value.ToYDB(tt, a)
-			if !proto.Equal(lhs, rhs) {
-				t.Errorf("%s != %s (%v != %v)", v.String(), tt.String(), lhs, rhs)
-			}
+			require.Equal(t, tt.String(), values[0].String())
 		})
 	}
 }
