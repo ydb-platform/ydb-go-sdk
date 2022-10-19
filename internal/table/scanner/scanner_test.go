@@ -282,7 +282,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 			return ydbval, &dv
 		}
 		rv %= time.Now().Unix()
-		v := value.DatetimeToTime(uint32(rv)).Format(value.LayoutDatetime) + ",Europe/Berlin"
+		v := value.DatetimeToTime(uint32(rv)).Format(value.LayoutTzDatetime) + ",Europe/Berlin"
 		ydbval := &Ydb.Value{
 			Value: &Ydb.Value_TextValue{
 				TextValue: v,
@@ -296,7 +296,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 		return ydbval, &src
 	case Ydb.Type_TZ_TIMESTAMP:
 		rv %= time.Now().Unix()
-		v := value.TimestampToTime(uint64(rv)).Format(value.LayoutTimestamp) + ",Europe/Berlin"
+		v := value.TimestampToTime(uint64(rv)).Format(value.LayoutTzTimestamp) + ",Europe/Berlin"
 		ydbval := &Ydb.Value{
 			Value: &Ydb.Value_TextValue{
 				TextValue: v,

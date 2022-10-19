@@ -22,8 +22,8 @@ const (
 	LayoutDate        = "2006-01-02"
 	LayoutDatetime    = "2006-01-02T15:04:05Z"
 	LayoutTimestamp   = "2006-01-02T15:04:05.000000Z"
-	tzLayoutDatetime  = "2006-01-02T15:04:05"
-	tzLayoutTimestamp = "2006-01-02T15:04:05.000000"
+	LayoutTzDatetime  = "2006-01-02T15:04:05"
+	LayoutTzTimestamp = "2006-01-02T15:04:05.000000"
 )
 
 var epoch = time.Unix(0, 0)
@@ -82,7 +82,7 @@ func TzDatetimeToTime(s string) (t time.Time, err error) {
 	if err != nil {
 		return t, xerrors.WithStackTrace(err)
 	}
-	t, err = time.ParseInLocation(tzLayoutDatetime, ss[0], location)
+	t, err = time.ParseInLocation(LayoutTzDatetime, ss[0], location)
 	if err != nil {
 		return t, xerrors.WithStackTrace(fmt.Errorf("parse '%s' failed: %w", s, err))
 	}
@@ -98,7 +98,7 @@ func TzTimestampToTime(s string) (t time.Time, err error) {
 	if err != nil {
 		return t, xerrors.WithStackTrace(err)
 	}
-	t, err = time.ParseInLocation(tzLayoutTimestamp, ss[0], location)
+	t, err = time.ParseInLocation(LayoutTzTimestamp, ss[0], location)
 	if err != nil {
 		return t, xerrors.WithStackTrace(fmt.Errorf("parse '%s' failed: %w", s, err))
 	}
