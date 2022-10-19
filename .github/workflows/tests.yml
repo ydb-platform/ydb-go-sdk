@@ -72,13 +72,13 @@ jobs:
       - name: Wait database available
         run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Test YQL Types
-        run: go test -race -coverpkg=./... -coverprofile yql.txt -covermode atomic ./internal/value/yql_test.go
+        run: go test -race -coverpkg=./... -coverprofile types.txt -covermode atomic ./table/types_e2e_test.go
       - name: Upload Table coverage report to Codecov
         uses: codecov/codecov-action@v2
         with:
-          file: ./yql.txt
+          file: ./types.txt
           flags: table,types,e2e,${{ matrix.os }},${{ matrix.go-version }}
-          name: yql
+          name: types
       - name: Test Table
         run: go test -race -coverpkg=./... -coverprofile table.txt -covermode atomic ./table/table_e2e_test.go
       - name: Upload Table coverage report to Codecov
