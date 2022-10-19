@@ -186,7 +186,7 @@ func TestValueToString(t *testing.T) {
 		},
 		{
 			value:   TextValue("some\"text\"with brackets"),
-			literal: `"some\"text\"with brackets"`,
+			literal: `Utf8("some\"text\"with brackets")`,
 		},
 		{
 			value:   BytesValue([]byte("foo")),
@@ -249,7 +249,7 @@ func TestValueToString(t *testing.T) {
 		},
 		{
 			value: DatetimeValue(func() uint32 {
-				v, _ := time.ParseInLocation("2006-01-02 15:04:05", "2022-06-17 05:19:20", time.Local)
+				v, _ := time.Parse("2006-01-02 15:04:05", "2022-06-17 05:19:20")
 				return uint32(v.UTC().Sub(time.Unix(0, 0)).Seconds())
 			}()),
 			literal: `Datetime("2022-06-17T05:19:20Z")`,
@@ -268,9 +268,9 @@ func TestValueToString(t *testing.T) {
 		},
 		{
 			value: TimestampValueFromTime(func() time.Time {
-				tt, err := time.ParseInLocation(LayoutTimestamp, "1997-12-14T03:09:42.123456Z", time.Local)
+				tt, err := time.Parse(LayoutTimestamp, "1997-12-14T03:09:42.123456Z")
 				require.NoError(t, err)
-				return tt.Local()
+				return tt.UTC()
 			}()),
 			literal: `Timestamp("1997-12-14T03:09:42.123456Z")`,
 		},
@@ -328,7 +328,7 @@ func TestValueToString(t *testing.T) {
 				FloatValue(2),
 				TextValue("3"),
 			),
-			literal: `AsTuple(0,Int64("1"),Float("2"),"3")`,
+			literal: `AsTuple(0,Int64("1"),Float("2"),Utf8("3"))`,
 		},
 		{
 			value: VariantValueTuple(Int32Value(42), 1, Tuple(
@@ -342,7 +342,7 @@ func TestValueToString(t *testing.T) {
 				TypeBytes,
 				TypeText,
 			)),
-			literal: `Variant("foo","1",Variant<String,Utf8>)`,
+			literal: `Variant(Utf8("foo"),"1",Variant<String,Utf8>)`,
 		},
 		{
 			value: VariantValueTuple(BoolValue(true), 0, Tuple(
@@ -364,21 +364,21 @@ func TestValueToString(t *testing.T) {
 				StructValueField{"title", TextValue("test")},
 				StructValueField{"air_date", DateValue(1)},
 			),
-			literal: `AsStruct(Date("1970-01-02") AS ` + "`" + `air_date` + "`" + `,Uint64("1") AS ` + "`" + `series_id` + "`" + `,"test" AS ` + "`" + `title` + "`" + `)`,
+			literal: `AsStruct(Date("1970-01-02") AS ` + "`" + `air_date` + "`" + `,Uint64("1") AS ` + "`" + `series_id` + "`" + `,Utf8("test") AS ` + "`" + `title` + "`" + `)`,
 		},
 		{
 			value: DictValue(
 				DictValueField{TextValue("foo"), Int32Value(42)},
 				DictValueField{TextValue("bar"), Int32Value(43)},
 			),
-			literal: `AsDict(AsTuple("bar",43),AsTuple("foo",42))`,
+			literal: `AsDict(AsTuple(Utf8("bar"),43),AsTuple(Utf8("foo"),42))`,
 		},
 		{
 			value: DictValue(
 				DictValueField{TextValue("foo"), VoidValue()},
 				DictValueField{TextValue("bar"), VoidValue()},
 			),
-			literal: `AsDict(AsTuple("bar",Void()),AsTuple("foo",Void()))`,
+			literal: `AsDict(AsTuple(Utf8("bar"),Void()),AsTuple(Utf8("foo"),Void()))`,
 		},
 		{
 			value:   ZeroValue(TypeBool),
@@ -397,7 +397,7 @@ func TestValueToString(t *testing.T) {
 				StructField{"foo", TypeBool},
 				StructField{"bar", TypeText},
 			)),
-			literal: `AsStruct("" AS ` + "`" + `bar` + "`" + `,false AS ` + "`" + `foo` + "`" + `)`,
+			literal: `AsStruct(Utf8("") AS ` + "`" + `bar` + "`" + `,false AS ` + "`" + `foo` + "`" + `)`,
 		},
 		{
 			value:   ZeroValue(TypeUUID),
