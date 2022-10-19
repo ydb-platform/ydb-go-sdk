@@ -88,7 +88,7 @@ func ParseCertificate(der []byte) (*x509.Certificate, error) {
 	if exists {
 		cert, ok := value.(*x509.Certificate)
 		if !ok {
-			panic("ydb: unknown file cache type")
+			panic("ydb: unknown pem cache type")
 		}
 		return cert, nil
 	}
