@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"os"
 	"strconv"
 	"testing"
@@ -94,7 +95,7 @@ func TestTypeToString(t *testing.T) {
 		t.Run(tt.String(), func(t *testing.T) {
 			var got string
 			err := retry.Do(context.Background(), db, func(ctx context.Context, cc *sql.Conn) error {
-				row := cc.QueryRowContext(ydb.WithQueryMode(ctx, ydb.ScriptingQueryMode),
+				row := cc.QueryRowContext(ctx,
 					fmt.Sprintf("SELECT FormatType(ParseType(\"%s\"))", tt.String()),
 				)
 				if err := row.Scan(&got); err != nil {
@@ -229,19 +230,22 @@ func TestValueToString(t *testing.T) {
 		types.YSONValue("<a=1>[3;%false]"),
 	} {
 		t.Run(strconv.Itoa(i)+"."+tt.ToYqlLiteral(), func(t *testing.T) {
-			res, err := db.Scripting().Execute(ctx,
-				fmt.Sprintf("SELECT %s;", tt.ToYqlLiteral()),
-				nil,
-			)
-			require.NoError(t, err, tt.ToYqlLiteral())
-			require.NoError(t, res.NextResultSetErr(ctx))
-			require.True(t, res.NextRow())
-			values, err := res.(interface {
-				RowValues() ([]types.Value, error)
-			}).RowValues()
+			err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+				res, err := tx.Execute(ctx, fmt.Sprintf("SELECT %s;", tt.ToYqlLiteral()), nil)
+				if err != nil {
+					return err
+				}
+				require.NoError(t, res.NextResultSetErr(ctx))
+				require.True(t, res.NextRow())
+				values, err := res.(interface {
+					RowValues() ([]types.Value, error)
+				}).RowValues()
+				require.NoError(t, err)
+				require.Equal(t, 1, len(values))
+				require.Equal(t, tt.ToYqlLiteral(), values[0].ToYqlLiteral(), fmt.Sprintf("%T vs %T", tt, values[0]))
+				return nil
+			})
 			require.NoError(t, err)
-			require.Equal(t, 1, len(values))
-			require.Equal(t, tt.ToYqlLiteral(), values[0].ToYqlLiteral(), fmt.Sprintf("%T vs %T", tt, values[0]))
 		})
 	}
 }
