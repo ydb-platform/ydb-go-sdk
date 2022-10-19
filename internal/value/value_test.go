@@ -364,11 +364,7 @@ func TestValueToYqlLiteral(t *testing.T) {
 				StructValueField{"title", TextValue("test")},
 				StructValueField{"air_date", DateValue(1)},
 			),
-			literal: `AsStruct(` +
-				`Date("1970-01-02") AS ` + "`" + `air_date` + "`" + `,` +
-				`Uint64("1") AS ` + "`" + `series_id` + "`" + `,` +
-				`Utf8("test") AS ` + "`" + `title` + "`" +
-				`)`,
+			literal: "AsStruct(Date(\"1970-01-02\") AS `air_date`,Uint64(\"1\") AS `series_id`,Utf8(\"test\") AS `title`)",
 		},
 		{
 			value: DictValue(
@@ -401,7 +397,7 @@ func TestValueToYqlLiteral(t *testing.T) {
 				StructField{"foo", TypeBool},
 				StructField{"bar", TypeText},
 			)),
-			literal: `AsStruct(Utf8("") AS ` + "`" + `bar` + "`" + `,false AS ` + "`" + `foo` + "`" + `)`,
+			literal: "AsStruct(Utf8(\"\") AS `bar`,false AS `foo`)",
 		},
 		{
 			value:   ZeroValue(TypeUUID),
