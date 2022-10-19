@@ -19,9 +19,11 @@ const (
 
 // Date format layouts described in time.Format and time.ANSIC docs.
 const (
-	LayoutDate      = "2006-01-02"
-	LayoutDatetime  = "2006-01-02T15:04:05Z"
-	LayoutTimestamp = "2006-01-02T15:04:05.000000Z"
+	LayoutDate        = "2006-01-02"
+	LayoutDatetime    = "2006-01-02T15:04:05Z"
+	LayoutTimestamp   = "2006-01-02T15:04:05.000000Z"
+	tzLayoutDatetime  = "2006-01-02T15:04:05"
+	tzLayoutTimestamp = "2006-01-02T15:04:05.000000"
 )
 
 var epoch = time.Unix(0, 0)
@@ -66,7 +68,7 @@ func TzDateToTime(s string) (t time.Time, err error) {
 	}
 	t, err = time.ParseInLocation(LayoutDate, ss[0], location)
 	if err != nil {
-		return t, xerrors.WithStackTrace(err)
+		return t, xerrors.WithStackTrace(fmt.Errorf("parse '%s' failed: %w", s, err))
 	}
 	return t, nil
 }
@@ -80,9 +82,9 @@ func TzDatetimeToTime(s string) (t time.Time, err error) {
 	if err != nil {
 		return t, xerrors.WithStackTrace(err)
 	}
-	t, err = time.ParseInLocation(LayoutDatetime, ss[0], location)
+	t, err = time.ParseInLocation(tzLayoutDatetime, ss[0], location)
 	if err != nil {
-		return t, xerrors.WithStackTrace(fmt.Errorf("not found timezone location in '%s'", s))
+		return t, xerrors.WithStackTrace(fmt.Errorf("parse '%s' failed: %w", s, err))
 	}
 	return t, nil
 }
@@ -96,9 +98,9 @@ func TzTimestampToTime(s string) (t time.Time, err error) {
 	if err != nil {
 		return t, xerrors.WithStackTrace(err)
 	}
-	t, err = time.ParseInLocation(LayoutTimestamp, ss[0], location)
+	t, err = time.ParseInLocation(tzLayoutTimestamp, ss[0], location)
 	if err != nil {
-		return t, xerrors.WithStackTrace(fmt.Errorf("not found timezone location in '%s'", s))
+		return t, xerrors.WithStackTrace(fmt.Errorf("parse '%s' failed: %w", s, err))
 	}
 	return t, nil
 }

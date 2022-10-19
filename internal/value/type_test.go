@@ -234,7 +234,7 @@ func TestTypeToString(t *testing.T) {
 			s: "List<Uint32>",
 		},
 		{
-			t: Variant(Struct(
+			t: VariantStruct(
 				StructField{
 					Name: "a",
 					T:    TypeBool,
@@ -243,15 +243,15 @@ func TestTypeToString(t *testing.T) {
 					Name: "b",
 					T:    TypeFloat,
 				},
-			)),
-			s: "Variant<Struct<'a':Bool,'b':Float>>",
+			),
+			s: "Variant<'a':Bool,'b':Float>",
 		},
 		{
-			t: Variant(Tuple(
+			t: VariantTuple(
 				TypeBool,
 				TypeFloat,
-			)),
-			s: "Variant<Tuple<Bool,Float>>",
+			),
+			s: "Variant<Bool,Float>",
 		},
 	} {
 		t.Run(tt.s, func(t *testing.T) {

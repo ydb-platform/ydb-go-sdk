@@ -62,11 +62,11 @@ func BenchmarkMemory(b *testing.B) {
 			DictValueField{TextValue("remove_date"), Uint64Value(4)},
 		),
 		NullValue(Optional(Optional(Optional(TypeBool)))),
-		VariantValue(Int32Value(42), 1, Tuple(
+		VariantValueTuple(Int32Value(42), 1, Tuple(
 			TypeBytes,
 			TypeInt32,
 		)),
-		VariantValue(Int32Value(42), 1, Struct(
+		VariantValueStruct(Int32Value(42), "bar", Struct(
 			StructField{
 				Name: "foo",
 				T:    TypeBytes,
@@ -143,11 +143,11 @@ func TestToYDBFromYDB(t *testing.T) {
 		),
 		NullValue(TypeBool),
 		NullValue(Optional(TypeBool)),
-		VariantValue(Int32Value(42), 1, Tuple(
+		VariantValueTuple(Int32Value(42), 1, Tuple(
 			TypeBytes,
 			TypeInt32,
 		)),
-		VariantValue(Int32Value(42), 1, Struct(
+		VariantValueStruct(Int32Value(42), "bar", Struct(
 			StructField{
 				Name: "foo",
 				T:    TypeBytes,
@@ -167,9 +167,8 @@ func TestToYDBFromYDB(t *testing.T) {
 			defer a.Free()
 			value := ToYDB(v, a)
 			dualConversedValue, err := fromYDB(value.Type, value.Value)
-			if err != nil {
-				t.Errorf("dual conversion error: %v", err)
-			} else if !proto.Equal(value, ToYDB(dualConversedValue, a)) {
+			require.NoError(t, err)
+			if !proto.Equal(value, ToYDB(dualConversedValue, a)) {
 				t.Errorf("dual conversion failed:\n\n - got:  %v\n\n - want: %v", ToYDB(dualConversedValue, a), value)
 			}
 		})
@@ -183,89 +182,89 @@ func TestValueToString(t *testing.T) {
 	}{
 		{
 			value:  VoidValue(),
-			string: "Void()",
+			string: `Void()`,
 		},
 		{
 			value:  TextValue("some\"text\"with brackets"),
-			string: "Utf8(\"some\\\"text\\\"with brackets\")",
+			string: `Utf8("some\"text\"with brackets")`,
 		},
 		{
 			value:  BytesValue([]byte("foo")),
-			string: "String(\"foo\")",
+			string: `String("foo")`,
 		},
 		{
 			value:  OptionalValue(BytesValue([]byte("foo"))),
-			string: "Optional<String>(\"foo\")",
+			string: `Just(String("foo"))`,
 		},
 		{
 			value:  BoolValue(true),
-			string: "CAST(true AS Bool)",
+			string: `Bool("true")`,
 		},
 		{
 			value:  Int8Value(42),
-			string: "CAST(42 AS Int8)",
+			string: `Int8("42")`,
 		},
 		{
 			value:  Uint8Value(42),
-			string: "CAST(42 AS Uint8)",
+			string: `Uint8("42")`,
 		},
 		{
 			value:  Int16Value(42),
-			string: "CAST(42 AS Int16)",
+			string: `Int16("42")`,
 		},
 		{
 			value:  Uint16Value(42),
-			string: "CAST(42 AS Uint16)",
+			string: `Uint16("42")`,
 		},
 		{
 			value:  Int32Value(42),
-			string: "CAST(42 AS Int32)",
+			string: `Int32("42")`,
 		},
 		{
 			value:  Uint32Value(42),
-			string: "CAST(42 AS Uint32)",
+			string: `Uint32("42")`,
 		},
 		{
 			value:  Int64Value(42),
-			string: "CAST(42 AS Int64)",
+			string: `Int64("42")`,
 		},
 		{
 			value:  Uint64Value(42),
-			string: "CAST(42 AS Uint64)",
+			string: `Uint64("42")`,
 		},
 		{
 			value:  FloatValue(42.2121236),
-			string: "CAST(42.2121236 AS Float)",
+			string: `Float("42.212124")`,
 		},
 		{
 			value:  DoubleValue(42.2121236192),
-			string: "CAST(42.2121236192 AS Double)",
+			string: `Double("42.2121236192")`,
 		},
 		{
 			value: DateValue(func() uint32 {
 				v, _ := time.Parse("2006-01-02", "2022-06-17")
 				return uint32(v.Sub(time.Unix(0, 0)) / time.Hour / 24)
 			}()),
-			string: "CAST(\"2022-06-17\" AS Date)",
+			string: `Date("2022-06-17")`,
 		},
 		{
 			value: DatetimeValue(func() uint32 {
 				v, _ := time.ParseInLocation("2006-01-02 15:04:05", "2022-06-17 05:19:20", time.Local)
-				return uint32(v.Sub(time.Unix(0, 0)).Seconds())
+				return uint32(v.UTC().Sub(time.Unix(0, 0)).Seconds())
 			}()),
-			string: "2022-06-17T05:19:20",
+			string: `Datetime("2022-06-17T05:19:20Z")`,
 		},
 		{
 			value:  TzDateValue("2022-06-17,Europe/Berlin"),
-			string: "2022-06-17,Europe/Berlin",
+			string: `TzDate("2022-06-17,Europe/Berlin")`,
 		},
 		{
 			value:  TzDatetimeValue("2022-06-17T05:19:20,Europe/Berlin"),
-			string: "2022-06-17T05:19:20,Europe/Berlin",
+			string: `TzDatetime("2022-06-17T05:19:20,Europe/Berlin")`,
 		},
 		{
 			value:  IntervalValueFromDuration(time.Duration(42) * time.Millisecond),
-			string: "42ms",
+			string: `Interval("PT0.042000S")`,
 		},
 		{
 			value: TimestampValueFromTime(func() time.Time {
@@ -273,27 +272,35 @@ func TestValueToString(t *testing.T) {
 				require.NoError(t, err)
 				return tt.Local()
 			}()),
-			string: "1997-12-14T03:09:42.123456",
+			string: `Timestamp("1997-12-14T03:09:42.123456Z")`,
 		},
 		{
 			value:  TzTimestampValue("1997-12-14T03:09:42.123456,Europe/Berlin"),
-			string: "1997-12-14T03:09:42.123456,Europe/Berlin",
+			string: `TzTimestamp("1997-12-14T03:09:42.123456,Europe/Berlin")`,
 		},
 		{
 			value:  NullValue(TypeInt32),
-			string: "NULL",
+			string: `Nothing(Int32?)`,
 		},
 		{
 			value:  NullValue(Optional(TypeBool)),
-			string: "NULL",
+			string: `Nothing(Optional<Bool>?)`,
+		},
+		{
+			value:  Int32Value(42),
+			string: `Int32("42")`,
+		},
+		{
+			value:  OptionalValue(Int32Value(42)),
+			string: `Just(Int32("42"))`,
 		},
 		{
 			value:  OptionalValue(OptionalValue(Int32Value(42))),
-			string: "42",
+			string: `Just(Just(Int32("42")))`,
 		},
 		{
 			value:  OptionalValue(OptionalValue(OptionalValue(Int32Value(42)))),
-			string: "42",
+			string: `Just(Just(Just(Int32("42"))))`,
 		},
 		{
 			value: ListValue(
@@ -302,7 +309,7 @@ func TestValueToString(t *testing.T) {
 				Int32Value(2),
 				Int32Value(3),
 			),
-			string: "[0,1,2,3]",
+			string: `AsList(Int32("0"),Int32("1"),Int32("2"),Int32("3"))`,
 		},
 		{
 			value: TupleValue(
@@ -311,35 +318,35 @@ func TestValueToString(t *testing.T) {
 				FloatValue(2),
 				TextValue("3"),
 			),
-			string: "(0,1,2,\"3\")",
+			string: `AsTuple(Int32("0"),Int64("1"),Float("2"),Utf8("3"))`,
 		},
 		{
-			value: VariantValue(Int32Value(42), 1, Variant(Tuple(
+			value: VariantValueTuple(Int32Value(42), 1, Tuple(
 				TypeBytes,
 				TypeInt32,
-			))),
-			string: "{1:42}",
+			)),
+			string: `Variant(42,"1",Variant<String,Int32>)`,
 		},
 		{
-			value: VariantValue(TextValue("foo"), 1, Variant(Tuple(
+			value: VariantValueTuple(TextValue("foo"), 1, Tuple(
 				TypeBytes,
 				TypeText,
-			))),
-			string: "{1:\"foo\"}",
+			)),
+			string: `Variant("foo","1",Variant<String,Utf8>)`,
 		},
 		{
-			value: VariantValue(BoolValue(true), 0, Variant(Tuple(
+			value: VariantValueTuple(BoolValue(true), 0, Tuple(
 				TypeBytes,
 				TypeInt32,
-			))),
-			string: "{0:true}",
+			)),
+			string: `Variant(true,"0",Variant<String,Int32>)`,
 		},
 		{
-			value: VariantValue(Int32Value(42), 1, Variant(Struct(
+			value: VariantValueStruct(Int32Value(42), "bar", Struct(
 				StructField{"foo", TypeBytes},
 				StructField{"bar", TypeInt32},
-			))),
-			string: "{1:42}",
+			)),
+			string: `Variant(42,"bar",Variant<'bar':Int32,'foo':String>)`,
 		},
 		{
 			value: StructValue(
@@ -347,78 +354,68 @@ func TestValueToString(t *testing.T) {
 				StructValueField{"title", TextValue("test")},
 				StructValueField{"air_date", DateValue(1)},
 			),
-			string: "{\"series_id\":1,\"title\":\"test\",\"air_date\":\"1970-01-02\"}",
+			string: `AsStruct(Date("1970-01-02") AS ` + "`" + `air_date` + "`" + `,Uint64("1") AS ` + "`" + `series_id` + "`" + `,Utf8("test") AS ` + "`" + `title` + "`" + `)`,
 		},
 		{
 			value: DictValue(
 				DictValueField{TextValue("foo"), Int32Value(42)},
 				DictValueField{TextValue("bar"), Int32Value(43)},
 			),
-			string: "{\"foo\":42,\"bar\":43}",
+			string: `AsDict(AsTuple(Utf8("bar"),Int32("43")),AsTuple(Utf8("foo"),Int32("42")))`,
 		},
 		{
 			value: DictValue(
 				DictValueField{TextValue("foo"), VoidValue()},
 				DictValueField{TextValue("bar"), VoidValue()},
 			),
-			string: "{\"foo\":VOID,\"bar\":VOID}",
+			string: `AsDict(AsTuple(Utf8("bar"),Void()),AsTuple(Utf8("foo"),Void()))`,
 		},
 		{
 			value:  ZeroValue(TypeBool),
-			string: "false",
+			string: `Bool("false")`,
 		},
 		{
 			value:  ZeroValue(Optional(TypeBool)),
-			string: "NULL",
-		},
-		{
-			value:  ZeroValue(List(TypeBool)),
-			string: "[]",
+			string: `Nothing(Bool?)`,
 		},
 		{
 			value:  ZeroValue(Tuple(TypeBool, TypeDouble)),
-			string: "(false,0)",
+			string: `AsTuple(Bool("false"),Double("0"))`,
 		},
 		{
 			value: ZeroValue(Struct(
 				StructField{"foo", TypeBool},
 				StructField{"bar", TypeText},
 			)),
-			string: "{\"foo\":false,\"bar\":\"\"}",
-		},
-		{
-			value:  ZeroValue(Dict(TypeText, TypeTimestamp)),
-			string: "{}",
+			string: `AsStruct(Utf8("") AS ` + "`" + `bar` + "`" + `,Bool("false") AS ` + "`" + `foo` + "`" + `)`,
 		},
 		{
 			value:  ZeroValue(TypeUUID),
-			string: "\"00000000000000000000000000000000\"",
+			string: `Uuid("00000000-0000-0000-0000-000000000000")`,
 		},
 		{
 			value:  DecimalValueFromBigInt(big.NewInt(-1234567890123456), 22, 9),
-			string: "-1234567890123456",
+			string: `Decimal("-1234567.890123456",22,9)`,
 		},
 		{
 			value:  DyNumberValue("-1234567890123456"),
-			string: "-1234567890123456",
+			string: `DyNumber("-1234567890123456")`,
 		},
 		{
 			value:  JSONValue("{\"a\":-1234567890123456}"),
-			string: "{\"a\":-1234567890123456}",
+			string: `Json(@@{"a":-1234567890123456}@@)`,
 		},
 		{
 			value:  JSONDocumentValue("{\"a\":-1234567890123456}"),
-			string: "{\"a\":-1234567890123456}",
+			string: `JsonDocument(@@{"a":-1234567890123456}@@)`,
 		},
 		{
-			value:  YSONValue([]byte("{\"a\":-1234567890123456}")),
-			string: "{\"a\":-1234567890123456}",
+			value:  YSONValue([]byte("<a=1>[3;%false]")),
+			string: `Yson("<a=1>[3;%false]")`,
 		},
 	} {
 		t.Run(fmt.Sprintf("%+v", tt.value), func(t *testing.T) {
-			if got := tt.value.String(); got != tt.string {
-				t.Errorf("string representations not equals:\n\n -  got: %s\n\n - want: %s", got, tt.string)
-			}
+			require.Equal(t, tt.string, tt.value.String())
 		})
 	}
 }

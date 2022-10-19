@@ -316,7 +316,7 @@ func (v dateValue) toString() string {
 func (v dateValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *time.Time:
-		*vv = DateToTime(uint32(v)).UTC()
+		*vv = DateToTime(uint32(v))
 		return nil
 	case *uint64:
 		*vv = uint64(v)
@@ -363,13 +363,13 @@ func DateValueFromTime(t time.Time) dateValue {
 type datetimeValue uint32
 
 func (v datetimeValue) toString() string {
-	return DatetimeToTime(uint32(v)).UTC().Format(LayoutDatetime)
+	return DatetimeToTime(uint32(v)).Format(LayoutDatetime)
 }
 
 func (v datetimeValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *time.Time:
-		*vv = DatetimeToTime(uint32(v)).UTC()
+		*vv = DatetimeToTime(uint32(v))
 		return nil
 	case *uint64:
 		*vv = uint64(v)
@@ -1068,7 +1068,7 @@ func (v *listValue) toString() string {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
-		buffer.WriteString(item.toString())
+		buffer.WriteString(item.String())
 	}
 	return buffer.String()
 }
@@ -1150,7 +1150,7 @@ func (v *optionalValue) castTo(dst interface{}) error {
 
 func (v *optionalValue) String() string {
 	if v.value == nil {
-		return fmt.Sprintf("Nothing(%s)", v.innerType.String())
+		return fmt.Sprintf("Nothing(%s)", v.Type().String())
 	}
 	return fmt.Sprintf("Just(%s)", v.value.String())
 }
@@ -1257,13 +1257,13 @@ func StructValue(fields ...StructValueField) *structValue {
 type timestampValue uint64
 
 func (v timestampValue) toString() string {
-	return TimestampToTime(uint64(v)).UTC().Format(LayoutTimestamp)
+	return TimestampToTime(uint64(v)).Format(LayoutTimestamp)
 }
 
 func (v timestampValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *time.Time:
-		*vv = TimestampToTime(uint64(v)).UTC()
+		*vv = TimestampToTime(uint64(v))
 		return nil
 	case *uint64:
 		*vv = uint64(v)
@@ -2068,10 +2068,6 @@ func ZeroValue(t Type) Value {
 	case *voidType:
 		return VoidValue()
 
-	case *listType:
-		return &listValue{
-			t: t,
-		}
 	case *TupleType:
 		v := &tupleValue{
 			t:     t,
@@ -2090,15 +2086,11 @@ func ZeroValue(t Type) Value {
 			}
 		}
 		return StructValue(fields...)
-	case *dictType:
-		return &dictValue{
-			t: t,
-		}
 	case *DecimalType:
 		return DecimalValue([16]byte{}, 22, 9)
 
 	default:
-		panic(fmt.Sprintf("uncovered type '%T'", t))
+		panic(fmt.Sprintf("type '%T' have not a zero value", t))
 	}
 }
 
