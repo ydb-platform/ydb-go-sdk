@@ -14,6 +14,7 @@ const (
 	typeRoundRobin   = balancerType("round_robin")
 	typeRandomChoice = balancerType("random_choice")
 	typeSingle       = balancerType("single")
+	typeDisable      = balancerType("disable")
 )
 
 type preferType string
@@ -49,26 +50,41 @@ func WithParseErrorHandler(errorHandler func(error)) fromConfigOption {
 	}
 }
 
-func CreateFromConfig(config string) (*balancerConfig.Config, error) {
+func createByType(t balancerType) (*balancerConfig.Config, error) {
+	switch t {
+	case typeDisable:
+		return SingleConn(), nil
+	case typeSingle:
+		return SingleConn(), nil
+	case typeRandomChoice:
+		return RandomChoice(), nil
+	case typeRoundRobin:
+		return RoundRobin(), nil
+	default:
+		return nil, xerrors.WithStackTrace(fmt.Errorf("unknown type of balancer: %s", t))
+	}
+}
+
+func CreateFromConfig(s string) (*balancerConfig.Config, error) {
+	// try to parse s as identifier of balancer
+	if c, err := createByType(balancerType(s)); err == nil {
+		return c, nil
+	}
+
 	var (
 		b   *balancerConfig.Config
 		err error
 		c   balancersConfig
 	)
 
-	if err = json.Unmarshal([]byte(config), &c); err != nil {
+	// try to parse s as json
+	if err = json.Unmarshal([]byte(s), &c); err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	switch c.Type {
-	case typeSingle:
-		b = SingleConn()
-	case typeRandomChoice:
-		b = RandomChoice()
-	case typeRoundRobin:
-		b = RoundRobin()
-	default:
-		return nil, xerrors.WithStackTrace(fmt.Errorf("unknown type of balancer: %s", c.Type))
+	b, err = createByType(c.Type)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	switch c.Prefer {
