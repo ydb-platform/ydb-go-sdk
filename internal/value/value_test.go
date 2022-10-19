@@ -186,15 +186,19 @@ func TestValueToYqlLiteral(t *testing.T) {
 		},
 		{
 			value:   TextValue("some\"text\"with brackets"),
-			literal: `Utf8("some\"text\"with brackets")`,
+			literal: `"some\"text\"with brackets"u`,
+		},
+		{
+			value:   TextValue(`some text with slashes \ \\ \\\`),
+			literal: `"some text with slashes \\ \\\\ \\\\\\"u`,
 		},
 		{
 			value:   BytesValue([]byte("foo")),
-			literal: `String("foo")`,
+			literal: `"foo"`,
 		},
 		{
 			value:   OptionalValue(BytesValue([]byte("foo"))),
-			literal: `Just(String("foo"))`,
+			literal: `Just("foo")`,
 		},
 		{
 			value:   BoolValue(true),
@@ -202,19 +206,19 @@ func TestValueToYqlLiteral(t *testing.T) {
 		},
 		{
 			value:   Int8Value(42),
-			literal: `Int8("42")`,
+			literal: `42t`,
 		},
 		{
 			value:   Uint8Value(42),
-			literal: `Uint8("42")`,
+			literal: `42ut`,
 		},
 		{
 			value:   Int16Value(42),
-			literal: `Int16("42")`,
+			literal: `42s`,
 		},
 		{
 			value:   Uint16Value(42),
-			literal: `Uint16("42")`,
+			literal: `42us`,
 		},
 		{
 			value:   Int32Value(42),
@@ -222,15 +226,15 @@ func TestValueToYqlLiteral(t *testing.T) {
 		},
 		{
 			value:   Uint32Value(42),
-			literal: `Uint32("42")`,
+			literal: `42u`,
 		},
 		{
 			value:   Int64Value(42),
-			literal: `Int64("42")`,
+			literal: `42l`,
 		},
 		{
 			value:   Uint64Value(42),
-			literal: `Uint64("42")`,
+			literal: `42ul`,
 		},
 		{
 			value:   FloatValue(42.2121236),
@@ -310,7 +314,7 @@ func TestValueToYqlLiteral(t *testing.T) {
 				Int32Value(2),
 				Int32Value(3),
 			),
-			literal: `AsList(-1,0,1,2,3)`,
+			literal: `[-1,0,1,2,3]`,
 		},
 		{
 			value: ListValue(
@@ -319,7 +323,7 @@ func TestValueToYqlLiteral(t *testing.T) {
 				Int64Value(2),
 				Int64Value(3),
 			),
-			literal: `AsList(Int64("0"),Int64("1"),Int64("2"),Int64("3"))`,
+			literal: `[0l,1l,2l,3l]`,
 		},
 		{
 			value: TupleValue(
@@ -328,7 +332,7 @@ func TestValueToYqlLiteral(t *testing.T) {
 				FloatValue(2),
 				TextValue("3"),
 			),
-			literal: `AsTuple(0,Int64("1"),Float("2"),Utf8("3"))`,
+			literal: `(0,1l,Float("2"),"3"u)`,
 		},
 		{
 			value: VariantValueTuple(Int32Value(42), 1, Tuple(
@@ -342,7 +346,7 @@ func TestValueToYqlLiteral(t *testing.T) {
 				TypeBytes,
 				TypeText,
 			)),
-			literal: `Variant(Utf8("foo"),"1",Variant<String,Utf8>)`,
+			literal: `Variant("foo"u,"1",Variant<String,Utf8>)`,
 		},
 		{
 			value: VariantValueTuple(BoolValue(true), 0, Tuple(
@@ -364,21 +368,21 @@ func TestValueToYqlLiteral(t *testing.T) {
 				StructValueField{"title", TextValue("test")},
 				StructValueField{"air_date", DateValue(1)},
 			),
-			literal: "AsStruct(Date(\"1970-01-02\") AS `air_date`,Uint64(\"1\") AS `series_id`,Utf8(\"test\") AS `title`)",
+			literal: "<|`air_date`:Date(\"1970-01-02\"),`series_id`:1ul,`title`:\"test\"u|>",
 		},
 		{
 			value: DictValue(
 				DictValueField{TextValue("foo"), Int32Value(42)},
 				DictValueField{TextValue("bar"), Int32Value(43)},
 			),
-			literal: `AsDict(AsTuple(Utf8("bar"),43),AsTuple(Utf8("foo"),42))`,
+			literal: `{"bar"u:43,"foo"u:42}`,
 		},
 		{
 			value: DictValue(
 				DictValueField{TextValue("foo"), VoidValue()},
 				DictValueField{TextValue("bar"), VoidValue()},
 			),
-			literal: `AsDict(AsTuple(Utf8("bar"),Void()),AsTuple(Utf8("foo"),Void()))`,
+			literal: `{"bar"u:Void(),"foo"u:Void()}`,
 		},
 		{
 			value:   ZeroValue(TypeBool),
@@ -390,14 +394,14 @@ func TestValueToYqlLiteral(t *testing.T) {
 		},
 		{
 			value:   ZeroValue(Tuple(TypeBool, TypeDouble)),
-			literal: `AsTuple(false,Double("0"))`,
+			literal: `(false,Double("0"))`,
 		},
 		{
 			value: ZeroValue(Struct(
 				StructField{"foo", TypeBool},
 				StructField{"bar", TypeText},
 			)),
-			literal: "AsStruct(Utf8(\"\") AS `bar`,false AS `foo`)",
+			literal: "<|`bar`:\"\"u,`foo`:false|>",
 		},
 		{
 			value:   ZeroValue(TypeUUID),

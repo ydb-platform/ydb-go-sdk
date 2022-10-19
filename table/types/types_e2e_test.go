@@ -122,6 +122,7 @@ func TestValueToString(t *testing.T) {
 	for i, tt := range []types.Value{
 		types.VoidValue(),
 		types.TextValue("some\"text\"with brackets"),
+		types.TextValue(`some text with slashes \ \\ \\\`),
 		types.BytesValue([]byte("foo")),
 		types.OptionalValue(types.BytesValue([]byte("foo"))),
 		types.BoolValue(true),

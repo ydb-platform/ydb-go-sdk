@@ -485,18 +485,16 @@ func (v *dictValue) castTo(dst interface{}) error {
 func (v *dictValue) ToYqlLiteral() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString("AsDict(")
+	buffer.WriteByte('{')
 	for i, value := range v.values {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
-		buffer.WriteString("AsTuple(")
 		buffer.WriteString(value.K.ToYqlLiteral())
-		buffer.WriteByte(',')
+		buffer.WriteByte(':')
 		buffer.WriteString(value.V.ToYqlLiteral())
-		buffer.WriteByte(')')
 	}
-	buffer.WriteByte(')')
+	buffer.WriteByte('}')
 	return buffer.String()
 }
 
@@ -695,7 +693,7 @@ func (v int8Value) castTo(dst interface{}) error {
 }
 
 func (v int8Value) ToYqlLiteral() string {
-	return fmt.Sprintf("%s(\"%d\")", v.Type().String(), v)
+	return strconv.FormatUint(uint64(v), 10) + "t"
 }
 
 func (int8Value) Type() Type {
@@ -747,7 +745,7 @@ func (v int16Value) castTo(dst interface{}) error {
 }
 
 func (v int16Value) ToYqlLiteral() string {
-	return fmt.Sprintf("%s(\"%d\")", v.Type().String(), v)
+	return strconv.FormatUint(uint64(v), 10) + "s"
 }
 
 func (int16Value) Type() Type {
@@ -839,7 +837,7 @@ func (v int64Value) castTo(dst interface{}) error {
 }
 
 func (v int64Value) ToYqlLiteral() string {
-	return fmt.Sprintf("%s(\"%d\")", v.Type().String(), v)
+	return strconv.FormatUint(uint64(v), 10) + "l"
 }
 
 func (int64Value) Type() Type {
@@ -1024,14 +1022,14 @@ func (v *listValue) castTo(dst interface{}) error {
 func (v *listValue) ToYqlLiteral() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString("AsList(")
+	buffer.WriteByte('[')
 	for i, item := range v.items {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
 		buffer.WriteString(item.ToYqlLiteral())
 	}
-	buffer.WriteByte(')')
+	buffer.WriteByte(']')
 	return buffer.String()
 }
 
@@ -1154,17 +1152,15 @@ func (v *structValue) castTo(dst interface{}) error {
 func (v *structValue) ToYqlLiteral() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString("AsStruct(")
+	buffer.WriteString("<|")
 	for i, field := range v.fields {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
+		buffer.WriteString("`" + field.Name + "`:")
 		buffer.WriteString(field.V.ToYqlLiteral())
-		buffer.WriteString(" AS `")
-		buffer.WriteString(field.Name)
-		buffer.WriteByte('`')
 	}
-	buffer.WriteByte(')')
+	buffer.WriteString("|>")
 	return buffer.String()
 }
 
@@ -1257,7 +1253,7 @@ func (v *tupleValue) castTo(dst interface{}) error {
 func (v *tupleValue) ToYqlLiteral() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString("AsTuple(")
+	buffer.WriteByte('(')
 	for i, item := range v.items {
 		if i != 0 {
 			buffer.WriteByte(',')
@@ -1463,15 +1459,7 @@ func (v uint8Value) castTo(dst interface{}) error {
 }
 
 func (v uint8Value) ToYqlLiteral() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString(v.Type().String())
-	buffer.WriteByte('(')
-	buffer.WriteByte('"')
-	buffer.WriteString(strconv.FormatUint(uint64(v), 10))
-	buffer.WriteByte('"')
-	buffer.WriteByte(')')
-	return buffer.String()
+	return strconv.FormatUint(uint64(v), 10) + "ut"
 }
 
 func (uint8Value) Type() Type {
@@ -1529,15 +1517,7 @@ func (v uint16Value) castTo(dst interface{}) error {
 }
 
 func (v uint16Value) ToYqlLiteral() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString(v.Type().String())
-	buffer.WriteByte('(')
-	buffer.WriteByte('"')
-	buffer.WriteString(strconv.FormatUint(uint64(v), 10))
-	buffer.WriteByte('"')
-	buffer.WriteByte(')')
-	return buffer.String()
+	return strconv.FormatUint(uint64(v), 10) + "us"
 }
 
 func (uint16Value) Type() Type {
@@ -1586,15 +1566,7 @@ func (v uint32Value) castTo(dst interface{}) error {
 }
 
 func (v uint32Value) ToYqlLiteral() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString(v.Type().String())
-	buffer.WriteByte('(')
-	buffer.WriteByte('"')
-	buffer.WriteString(strconv.FormatUint(uint64(v), 10))
-	buffer.WriteByte('"')
-	buffer.WriteByte(')')
-	return buffer.String()
+	return strconv.FormatUint(uint64(v), 10) + "u"
 }
 
 func (uint32Value) Type() Type {
@@ -1634,15 +1606,7 @@ func (v uint64Value) castTo(dst interface{}) error {
 }
 
 func (v uint64Value) ToYqlLiteral() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString(v.Type().String())
-	buffer.WriteByte('(')
-	buffer.WriteByte('"')
-	buffer.WriteString(strconv.FormatUint(uint64(v), 10))
-	buffer.WriteByte('"')
-	buffer.WriteByte(')')
-	return buffer.String()
+	return strconv.FormatUint(uint64(v), 10) + "ul"
 }
 
 func (uint64Value) Type() Type {
@@ -1679,7 +1643,7 @@ func (v textValue) castTo(dst interface{}) error {
 }
 
 func (v textValue) ToYqlLiteral() string {
-	return fmt.Sprintf("%s(%q)", v.Type().String(), string(v))
+	return fmt.Sprintf("%qu", string(v))
 }
 
 func (textValue) Type() Type {
@@ -2039,7 +2003,7 @@ func (v bytesValue) castTo(dst interface{}) error {
 }
 
 func (v bytesValue) ToYqlLiteral() string {
-	return fmt.Sprintf("%s(%q)", v.Type().String(), string(v))
+	return fmt.Sprintf("%q", string(v))
 }
 
 func (bytesValue) Type() Type {
