@@ -498,7 +498,7 @@ func TestCastNumbers(t *testing.T) {
 	for _, dst := range numberDestinations {
 		t.Run(reflect.ValueOf(dst.destination).Type().Elem().String(), func(t *testing.T) {
 			for _, src := range numberValues {
-				t.Run(src.value.String(), func(t *testing.T) {
+				t.Run(src.value.ToYqlLiteral(), func(t *testing.T) {
 					mustErr := false
 					switch {
 					case src.len == dst.len && src.signed != dst.signed,
@@ -513,7 +513,7 @@ func TestCastNumbers(t *testing.T) {
 						require.NoError(t, err)
 					}
 				})
-				t.Run(OptionalValue(src.value).String(), func(t *testing.T) {
+				t.Run(OptionalValue(src.value).ToYqlLiteral(), func(t *testing.T) {
 					mustErr := false
 					switch {
 					case src.len == dst.len && src.signed != dst.signed,

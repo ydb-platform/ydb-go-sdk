@@ -464,7 +464,7 @@ func (q *QueryParameters) String() string {
 		buf.WriteString(name)
 		buf.WriteByte(')')
 		buf.WriteByte('(')
-		buf.WriteString(v.String())
+		buf.WriteString(v.ToYqlLiteral())
 		buf.WriteString("))")
 	})
 	buf.WriteByte(')')

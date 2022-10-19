@@ -19,9 +19,8 @@ import (
 
 type Value interface {
 	Type() Type
-	String() string
+	ToYqlLiteral() string
 
-	toString() string
 	castTo(dst interface{}) error
 	toYDB(a *allocator.Allocator) *Ydb.Value
 }
@@ -267,10 +266,6 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 
 type boolValue bool
 
-func (v boolValue) toString() string {
-	return strconv.FormatBool(bool(v))
-}
-
 func (v boolValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *bool:
@@ -284,8 +279,8 @@ func (v boolValue) castTo(dst interface{}) error {
 	}
 }
 
-func (v boolValue) String() string {
-	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
+func (v boolValue) ToYqlLiteral() string {
+	return strconv.FormatBool(bool(v))
 }
 
 func (boolValue) Type() Type {
@@ -332,7 +327,7 @@ func (v dateValue) castTo(dst interface{}) error {
 	}
 }
 
-func (v dateValue) String() string {
+func (v dateValue) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
@@ -385,7 +380,7 @@ func (v datetimeValue) castTo(dst interface{}) error {
 	}
 }
 
-func (v datetimeValue) String() string {
+func (v datetimeValue) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
@@ -426,7 +421,7 @@ func (v *decimalValue) castTo(dst interface{}) error {
 	return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, dst))
 }
 
-func (v *decimalValue) String() string {
+func (v *decimalValue) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q,%d,%d)", v.innerType.Name(),
 		v.toString(), v.innerType.Precision, v.innerType.Scale,
 	)
@@ -485,9 +480,9 @@ func (v *dictValue) toString() string {
 			buffer.WriteByte(',')
 		}
 		buffer.WriteString("AsTuple(")
-		buffer.WriteString(value.K.String())
+		buffer.WriteString(value.K.ToYqlLiteral())
 		buffer.WriteByte(',')
-		buffer.WriteString(value.V.String())
+		buffer.WriteString(value.V.ToYqlLiteral())
 		buffer.WriteByte(')')
 	}
 	return buffer.String()
@@ -505,7 +500,7 @@ func (v *dictValue) castTo(dst interface{}) error {
 	return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, dst))
 }
 
-func (v *dictValue) String() string {
+func (v *dictValue) ToYqlLiteral() string {
 	return fmt.Sprintf("AsDict(%s)", v.toString())
 }
 
@@ -534,7 +529,7 @@ func (v *dictValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 
 func DictValue(values ...DictValueField) *dictValue {
 	sort.Slice(values, func(i, j int) bool {
-		return values[i].K.String() < values[j].K.String()
+		return values[i].K.ToYqlLiteral() < values[j].K.ToYqlLiteral()
 	})
 	return &dictValue{
 		t:      Dict(values[0].K.Type(), values[0].V.Type()),
@@ -566,7 +561,7 @@ func (v *doubleValue) castTo(dst interface{}) error {
 	}
 }
 
-func (v *doubleValue) String() string {
+func (v *doubleValue) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
@@ -609,7 +604,7 @@ func (v dyNumberValue) castTo(dst interface{}) error {
 	}
 }
 
-func (v dyNumberValue) String() string {
+func (v dyNumberValue) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
@@ -658,7 +653,7 @@ func (v *floatValue) castTo(dst interface{}) error {
 	}
 }
 
-func (v *floatValue) String() string {
+func (v *floatValue) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
@@ -719,7 +714,7 @@ func (v int8Value) castTo(dst interface{}) error {
 	}
 }
 
-func (v int8Value) String() string {
+func (v int8Value) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
@@ -775,7 +770,7 @@ func (v int16Value) castTo(dst interface{}) error {
 	}
 }
 
-func (v int16Value) String() string {
+func (v int16Value) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
@@ -798,10 +793,6 @@ func Int16Value(v int16) int16Value {
 }
 
 type int32Value int32
-
-func (v int32Value) toString() string {
-	return strconv.FormatInt(int64(v), 10)
-}
 
 func (v int32Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
@@ -828,8 +819,8 @@ func (v int32Value) castTo(dst interface{}) error {
 	}
 }
 
-func (v int32Value) String() string {
-	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
+func (v int32Value) ToYqlLiteral() string {
+	return strconv.FormatInt(int64(v), 10)
 }
 
 func (int32Value) Type() Type {
@@ -875,7 +866,7 @@ func (v int64Value) castTo(dst interface{}) error {
 	}
 }
 
-func (v int64Value) String() string {
+func (v int64Value) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
@@ -947,7 +938,7 @@ func (v intervalValue) castTo(dst interface{}) error {
 	}
 }
 
-func (v intervalValue) String() string {
+func (v intervalValue) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
@@ -993,7 +984,7 @@ func (v jsonValue) castTo(dst interface{}) error {
 	}
 }
 
-func (v jsonValue) String() string {
+func (v jsonValue) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(@@%s@@)", v.Type().String(), v.toString())
 }
 
@@ -1034,7 +1025,7 @@ func (v jsonDocumentValue) castTo(dst interface{}) error {
 	}
 }
 
-func (v jsonDocumentValue) String() string {
+func (v jsonDocumentValue) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(@@%s@@)", v.Type().String(), v.toString())
 }
 
@@ -1068,7 +1059,7 @@ func (v *listValue) toString() string {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
-		buffer.WriteString(item.String())
+		buffer.WriteString(item.ToYqlLiteral())
 	}
 	return buffer.String()
 }
@@ -1077,7 +1068,7 @@ func (v *listValue) castTo(dst interface{}) error {
 	return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, dst))
 }
 
-func (v *listValue) String() string {
+func (v *listValue) ToYqlLiteral() string {
 	return fmt.Sprintf("AsList(%s)", v.toString())
 }
 
@@ -1131,14 +1122,6 @@ type optionalValue struct {
 	value     Value
 }
 
-func (v *optionalValue) toString() string {
-	if v.value == nil {
-		return "NULL"
-	} else {
-		return v.value.toString()
-	}
-}
-
 var errOptionalNilValue = errors.New("optional contains nil value")
 
 func (v *optionalValue) castTo(dst interface{}) error {
@@ -1148,11 +1131,11 @@ func (v *optionalValue) castTo(dst interface{}) error {
 	return v.value.castTo(dst)
 }
 
-func (v *optionalValue) String() string {
+func (v *optionalValue) ToYqlLiteral() string {
 	if v.value == nil {
 		return fmt.Sprintf("Nothing(%s)", v.Type().String())
 	}
-	return fmt.Sprintf("Just(%s)", v.value.String())
+	return fmt.Sprintf("Just(%s)", v.value.ToYqlLiteral())
 }
 
 func (v *optionalValue) Type() Type {
@@ -1193,23 +1176,6 @@ type (
 	}
 )
 
-func (v *structValue) toString() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	a := allocator.New()
-	defer a.Free()
-	for i, field := range v.fields {
-		if i != 0 {
-			buffer.WriteByte(',')
-		}
-		buffer.WriteString(field.V.String())
-		buffer.WriteString(" AS `")
-		buffer.WriteString(field.Name)
-		buffer.WriteByte('`')
-	}
-	return buffer.String()
-}
-
 func (v *structValue) Fields() map[string]Value {
 	fields := make(map[string]Value, len(v.fields))
 	for _, f := range v.fields {
@@ -1222,8 +1188,23 @@ func (v *structValue) castTo(dst interface{}) error {
 	return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, dst))
 }
 
-func (v *structValue) String() string {
-	return fmt.Sprintf("AsStruct(%s)", v.toString())
+func (v *structValue) ToYqlLiteral() string {
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	a := allocator.New()
+	defer a.Free()
+	buffer.WriteString("AsStruct(")
+	for i, field := range v.fields {
+		if i != 0 {
+			buffer.WriteByte(',')
+		}
+		buffer.WriteString(field.V.ToYqlLiteral())
+		buffer.WriteString(" AS `")
+		buffer.WriteString(field.Name)
+		buffer.WriteByte('`')
+	}
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (v *structValue) Type() Type {
@@ -1256,10 +1237,6 @@ func StructValue(fields ...StructValueField) *structValue {
 
 type timestampValue uint64
 
-func (v timestampValue) toString() string {
-	return TimestampToTime(uint64(v)).Format(LayoutTimestamp)
-}
-
 func (v timestampValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *time.Time:
@@ -1273,8 +1250,8 @@ func (v timestampValue) castTo(dst interface{}) error {
 	}
 }
 
-func (v timestampValue) String() string {
-	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
+func (v timestampValue) ToYqlLiteral() string {
+	return fmt.Sprintf("%s(%q)", v.Type().String(), TimestampToTime(uint64(v)).Format(LayoutTimestamp))
 }
 
 func (timestampValue) Type() Type {
@@ -1305,18 +1282,6 @@ type tupleValue struct {
 	items []Value
 }
 
-func (v *tupleValue) toString() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	for i, item := range v.items {
-		if i != 0 {
-			buffer.WriteByte(',')
-		}
-		buffer.WriteString(item.String())
-	}
-	return buffer.String()
-}
-
 func (v *tupleValue) Items() []Value {
 	return v.items
 }
@@ -1328,8 +1293,18 @@ func (v *tupleValue) castTo(dst interface{}) error {
 	return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, dst))
 }
 
-func (v *tupleValue) String() string {
-	return fmt.Sprintf("AsTuple(%s)", v.toString())
+func (v *tupleValue) ToYqlLiteral() string {
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString("AsTuple(")
+	for i, item := range v.items {
+		if i != 0 {
+			buffer.WriteByte(',')
+		}
+		buffer.WriteString(item.ToYqlLiteral())
+	}
+	buffer.WriteByte(')')
+	return buffer.String()
 }
 
 func (v *tupleValue) Type() Type {
@@ -1380,7 +1355,7 @@ func (v tzDateValue) castTo(dst interface{}) error {
 	}
 }
 
-func (v tzDateValue) String() string {
+func (v tzDateValue) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
@@ -1425,7 +1400,7 @@ func (v tzDatetimeValue) castTo(dst interface{}) error {
 	}
 }
 
-func (v tzDatetimeValue) String() string {
+func (v tzDatetimeValue) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
@@ -1470,7 +1445,7 @@ func (v tzTimestampValue) castTo(dst interface{}) error {
 	}
 }
 
-func (v tzTimestampValue) String() string {
+func (v tzTimestampValue) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
@@ -1542,7 +1517,7 @@ func (v uint8Value) castTo(dst interface{}) error {
 	}
 }
 
-func (v uint8Value) String() string {
+func (v uint8Value) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
@@ -1604,7 +1579,7 @@ func (v uint16Value) castTo(dst interface{}) error {
 	}
 }
 
-func (v uint16Value) String() string {
+func (v uint16Value) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
@@ -1657,7 +1632,7 @@ func (v uint32Value) castTo(dst interface{}) error {
 	}
 }
 
-func (v uint32Value) String() string {
+func (v uint32Value) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
@@ -1701,7 +1676,7 @@ func (v uint64Value) castTo(dst interface{}) error {
 	}
 }
 
-func (v uint64Value) String() string {
+func (v uint64Value) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
@@ -1725,10 +1700,6 @@ func Uint64Value(v uint64) uint64Value {
 
 type textValue string
 
-func (v textValue) toString() string {
-	return fmt.Sprintf("%q", string(v))
-}
-
 func (v textValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -1742,8 +1713,8 @@ func (v textValue) castTo(dst interface{}) error {
 	}
 }
 
-func (v textValue) String() string {
-	return v.Type().String() + "(" + v.toString() + ")"
+func (v textValue) ToYqlLiteral() string {
+	return fmt.Sprintf("%q", string(v))
 }
 
 func (textValue) Type() Type {
@@ -1788,7 +1759,7 @@ func (v *uuidValue) castTo(dst interface{}) error {
 	}
 }
 
-func (v *uuidValue) String() string {
+func (v *uuidValue) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
@@ -1824,7 +1795,7 @@ type variantValue struct {
 func (v *variantValue) toString() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString(v.value.toString())
+	buffer.WriteString(v.value.ToYqlLiteral())
 	buffer.WriteByte(',')
 	switch t := v.innerType.(type) {
 	case *variantStructType:
@@ -1841,7 +1812,7 @@ func (v *variantValue) castTo(dst interface{}) error {
 	return v.value.castTo(dst)
 }
 
-func (v *variantValue) String() string {
+func (v *variantValue) ToYqlLiteral() string {
 	return fmt.Sprintf("Variant(%s,%s)", v.toString(), v.Type().String())
 }
 
@@ -1909,7 +1880,7 @@ func (v voidValue) castTo(dst interface{}) error {
 	return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%s' to '%T' destination", v.Type().String(), dst))
 }
 
-func (v voidValue) String() string {
+func (v voidValue) ToYqlLiteral() string {
 	return fmt.Sprintf("%s()", v.Type().String())
 }
 
@@ -1951,7 +1922,7 @@ func (v ysonValue) castTo(dst interface{}) error {
 	}
 }
 
-func (v ysonValue) String() string {
+func (v ysonValue) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 
@@ -2113,7 +2084,7 @@ func (v bytesValue) castTo(dst interface{}) error {
 	}
 }
 
-func (v bytesValue) String() string {
+func (v bytesValue) ToYqlLiteral() string {
 	return fmt.Sprintf("%s(%q)", v.Type().String(), v.toString())
 }
 

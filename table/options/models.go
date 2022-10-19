@@ -403,13 +403,13 @@ func (kr KeyRange) String() string {
 	if kr.From == nil {
 		buf.WriteString("NULL")
 	} else {
-		buf.WriteString(kr.From.String())
+		buf.WriteString(kr.From.ToYqlLiteral())
 	}
 	buf.WriteString(",")
 	if kr.To == nil {
 		buf.WriteString("NULL")
 	} else {
-		buf.WriteString(kr.To.String())
+		buf.WriteString(kr.To.ToYqlLiteral())
 	}
 	buf.WriteString("]")
 	return buf.String()

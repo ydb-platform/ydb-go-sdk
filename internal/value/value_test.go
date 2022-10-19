@@ -1,8 +1,8 @@
 package value
 
 import (
-	"fmt"
 	"math/big"
+	"strconv"
 	"testing"
 	"time"
 
@@ -162,7 +162,7 @@ func TestToYDBFromYDB(t *testing.T) {
 		ZeroValue(Tuple()),
 	}
 	for _, v := range vv {
-		t.Run(v.String(), func(t *testing.T) {
+		t.Run(v.ToYqlLiteral(), func(t *testing.T) {
 			a := allocator.New()
 			defer a.Free()
 			value := ToYDB(v, a)
@@ -176,95 +176,95 @@ func TestToYDBFromYDB(t *testing.T) {
 }
 
 func TestValueToString(t *testing.T) {
-	for _, tt := range []struct {
-		value  Value
-		string string
+	for i, tt := range []struct {
+		value   Value
+		literal string
 	}{
 		{
-			value:  VoidValue(),
-			string: `Void()`,
+			value:   VoidValue(),
+			literal: `Void()`,
 		},
 		{
-			value:  TextValue("some\"text\"with brackets"),
-			string: `Utf8("some\"text\"with brackets")`,
+			value:   TextValue("some\"text\"with brackets"),
+			literal: `"some\"text\"with brackets"`,
 		},
 		{
-			value:  BytesValue([]byte("foo")),
-			string: `String("foo")`,
+			value:   BytesValue([]byte("foo")),
+			literal: `String("foo")`,
 		},
 		{
-			value:  OptionalValue(BytesValue([]byte("foo"))),
-			string: `Just(String("foo"))`,
+			value:   OptionalValue(BytesValue([]byte("foo"))),
+			literal: `Just(String("foo"))`,
 		},
 		{
-			value:  BoolValue(true),
-			string: `Bool("true")`,
+			value:   BoolValue(true),
+			literal: `true`,
 		},
 		{
-			value:  Int8Value(42),
-			string: `Int8("42")`,
+			value:   Int8Value(42),
+			literal: `Int8("42")`,
 		},
 		{
-			value:  Uint8Value(42),
-			string: `Uint8("42")`,
+			value:   Uint8Value(42),
+			literal: `Uint8("42")`,
 		},
 		{
-			value:  Int16Value(42),
-			string: `Int16("42")`,
+			value:   Int16Value(42),
+			literal: `Int16("42")`,
 		},
 		{
-			value:  Uint16Value(42),
-			string: `Uint16("42")`,
+			value:   Uint16Value(42),
+			literal: `Uint16("42")`,
 		},
 		{
-			value:  Int32Value(42),
-			string: `Int32("42")`,
+			value:   Int32Value(42),
+			literal: `42`,
 		},
 		{
-			value:  Uint32Value(42),
-			string: `Uint32("42")`,
+			value:   Uint32Value(42),
+			literal: `Uint32("42")`,
 		},
 		{
-			value:  Int64Value(42),
-			string: `Int64("42")`,
+			value:   Int64Value(42),
+			literal: `Int64("42")`,
 		},
 		{
-			value:  Uint64Value(42),
-			string: `Uint64("42")`,
+			value:   Uint64Value(42),
+			literal: `Uint64("42")`,
 		},
 		{
-			value:  FloatValue(42.2121236),
-			string: `Float("42.212124")`,
+			value:   FloatValue(42.2121236),
+			literal: `Float("42.212124")`,
 		},
 		{
-			value:  DoubleValue(42.2121236192),
-			string: `Double("42.2121236192")`,
+			value:   DoubleValue(42.2121236192),
+			literal: `Double("42.2121236192")`,
 		},
 		{
 			value: DateValue(func() uint32 {
 				v, _ := time.Parse("2006-01-02", "2022-06-17")
 				return uint32(v.Sub(time.Unix(0, 0)) / time.Hour / 24)
 			}()),
-			string: `Date("2022-06-17")`,
+			literal: `Date("2022-06-17")`,
 		},
 		{
 			value: DatetimeValue(func() uint32 {
 				v, _ := time.ParseInLocation("2006-01-02 15:04:05", "2022-06-17 05:19:20", time.Local)
 				return uint32(v.UTC().Sub(time.Unix(0, 0)).Seconds())
 			}()),
-			string: `Datetime("2022-06-17T05:19:20Z")`,
+			literal: `Datetime("2022-06-17T05:19:20Z")`,
 		},
 		{
-			value:  TzDateValue("2022-06-17,Europe/Berlin"),
-			string: `TzDate("2022-06-17,Europe/Berlin")`,
+			value:   TzDateValue("2022-06-17,Europe/Berlin"),
+			literal: `TzDate("2022-06-17,Europe/Berlin")`,
 		},
 		{
-			value:  TzDatetimeValue("2022-06-17T05:19:20,Europe/Berlin"),
-			string: `TzDatetime("2022-06-17T05:19:20,Europe/Berlin")`,
+			value:   TzDatetimeValue("2022-06-17T05:19:20,Europe/Berlin"),
+			literal: `TzDatetime("2022-06-17T05:19:20,Europe/Berlin")`,
 		},
 		{
-			value:  IntervalValueFromDuration(time.Duration(42) * time.Millisecond),
-			string: `Interval("PT0.042000S")`,
+			value:   IntervalValueFromDuration(time.Duration(42) * time.Millisecond),
+			literal: `Interval("PT0.042000S")`,
 		},
 		{
 			value: TimestampValueFromTime(func() time.Time {
@@ -272,44 +272,54 @@ func TestValueToString(t *testing.T) {
 				require.NoError(t, err)
 				return tt.Local()
 			}()),
-			string: `Timestamp("1997-12-14T03:09:42.123456Z")`,
+			literal: `Timestamp("1997-12-14T03:09:42.123456Z")`,
 		},
 		{
-			value:  TzTimestampValue("1997-12-14T03:09:42.123456,Europe/Berlin"),
-			string: `TzTimestamp("1997-12-14T03:09:42.123456,Europe/Berlin")`,
+			value:   TzTimestampValue("1997-12-14T03:09:42.123456,Europe/Berlin"),
+			literal: `TzTimestamp("1997-12-14T03:09:42.123456,Europe/Berlin")`,
 		},
 		{
-			value:  NullValue(TypeInt32),
-			string: `Nothing(Int32?)`,
+			value:   NullValue(TypeInt32),
+			literal: `Nothing(Optional<Int32>)`,
 		},
 		{
-			value:  NullValue(Optional(TypeBool)),
-			string: `Nothing(Optional<Bool>?)`,
+			value:   NullValue(Optional(TypeBool)),
+			literal: `Nothing(Optional<Optional<Bool>>)`,
 		},
 		{
-			value:  Int32Value(42),
-			string: `Int32("42")`,
+			value:   Int32Value(42),
+			literal: `42`,
 		},
 		{
-			value:  OptionalValue(Int32Value(42)),
-			string: `Just(Int32("42"))`,
+			value:   OptionalValue(Int32Value(42)),
+			literal: `Just(42)`,
 		},
 		{
-			value:  OptionalValue(OptionalValue(Int32Value(42))),
-			string: `Just(Just(Int32("42")))`,
+			value:   OptionalValue(OptionalValue(Int32Value(42))),
+			literal: `Just(Just(42))`,
 		},
 		{
-			value:  OptionalValue(OptionalValue(OptionalValue(Int32Value(42)))),
-			string: `Just(Just(Just(Int32("42"))))`,
+			value:   OptionalValue(OptionalValue(OptionalValue(Int32Value(42)))),
+			literal: `Just(Just(Just(42)))`,
 		},
 		{
 			value: ListValue(
+				Int32Value(-1),
 				Int32Value(0),
 				Int32Value(1),
 				Int32Value(2),
 				Int32Value(3),
 			),
-			string: `AsList(Int32("0"),Int32("1"),Int32("2"),Int32("3"))`,
+			literal: `AsList(-1,0,1,2,3)`,
+		},
+		{
+			value: ListValue(
+				Int64Value(0),
+				Int64Value(1),
+				Int64Value(2),
+				Int64Value(3),
+			),
+			literal: `AsList(Int64("0"),Int64("1"),Int64("2"),Int64("3"))`,
 		},
 		{
 			value: TupleValue(
@@ -318,35 +328,35 @@ func TestValueToString(t *testing.T) {
 				FloatValue(2),
 				TextValue("3"),
 			),
-			string: `AsTuple(Int32("0"),Int64("1"),Float("2"),Utf8("3"))`,
+			literal: `AsTuple(0,Int64("1"),Float("2"),"3")`,
 		},
 		{
 			value: VariantValueTuple(Int32Value(42), 1, Tuple(
 				TypeBytes,
 				TypeInt32,
 			)),
-			string: `Variant(42,"1",Variant<String,Int32>)`,
+			literal: `Variant(42,"1",Variant<String,Int32>)`,
 		},
 		{
 			value: VariantValueTuple(TextValue("foo"), 1, Tuple(
 				TypeBytes,
 				TypeText,
 			)),
-			string: `Variant("foo","1",Variant<String,Utf8>)`,
+			literal: `Variant("foo","1",Variant<String,Utf8>)`,
 		},
 		{
 			value: VariantValueTuple(BoolValue(true), 0, Tuple(
 				TypeBytes,
 				TypeInt32,
 			)),
-			string: `Variant(true,"0",Variant<String,Int32>)`,
+			literal: `Variant(true,"0",Variant<String,Int32>)`,
 		},
 		{
 			value: VariantValueStruct(Int32Value(42), "bar", Struct(
 				StructField{"foo", TypeBytes},
 				StructField{"bar", TypeInt32},
 			)),
-			string: `Variant(42,"bar",Variant<'bar':Int32,'foo':String>)`,
+			literal: `Variant(42,"bar",Variant<'bar':Int32,'foo':String>)`,
 		},
 		{
 			value: StructValue(
@@ -354,68 +364,68 @@ func TestValueToString(t *testing.T) {
 				StructValueField{"title", TextValue("test")},
 				StructValueField{"air_date", DateValue(1)},
 			),
-			string: `AsStruct(Date("1970-01-02") AS ` + "`" + `air_date` + "`" + `,Uint64("1") AS ` + "`" + `series_id` + "`" + `,Utf8("test") AS ` + "`" + `title` + "`" + `)`,
+			literal: `AsStruct(Date("1970-01-02") AS ` + "`" + `air_date` + "`" + `,Uint64("1") AS ` + "`" + `series_id` + "`" + `,"test" AS ` + "`" + `title` + "`" + `)`,
 		},
 		{
 			value: DictValue(
 				DictValueField{TextValue("foo"), Int32Value(42)},
 				DictValueField{TextValue("bar"), Int32Value(43)},
 			),
-			string: `AsDict(AsTuple(Utf8("bar"),Int32("43")),AsTuple(Utf8("foo"),Int32("42")))`,
+			literal: `AsDict(AsTuple("bar",43),AsTuple("foo",42))`,
 		},
 		{
 			value: DictValue(
 				DictValueField{TextValue("foo"), VoidValue()},
 				DictValueField{TextValue("bar"), VoidValue()},
 			),
-			string: `AsDict(AsTuple(Utf8("bar"),Void()),AsTuple(Utf8("foo"),Void()))`,
+			literal: `AsDict(AsTuple("bar",Void()),AsTuple("foo",Void()))`,
 		},
 		{
-			value:  ZeroValue(TypeBool),
-			string: `Bool("false")`,
+			value:   ZeroValue(TypeBool),
+			literal: `false`,
 		},
 		{
-			value:  ZeroValue(Optional(TypeBool)),
-			string: `Nothing(Bool?)`,
+			value:   ZeroValue(Optional(TypeBool)),
+			literal: `Nothing(Optional<Bool>)`,
 		},
 		{
-			value:  ZeroValue(Tuple(TypeBool, TypeDouble)),
-			string: `AsTuple(Bool("false"),Double("0"))`,
+			value:   ZeroValue(Tuple(TypeBool, TypeDouble)),
+			literal: `AsTuple(false,Double("0"))`,
 		},
 		{
 			value: ZeroValue(Struct(
 				StructField{"foo", TypeBool},
 				StructField{"bar", TypeText},
 			)),
-			string: `AsStruct(Utf8("") AS ` + "`" + `bar` + "`" + `,Bool("false") AS ` + "`" + `foo` + "`" + `)`,
+			literal: `AsStruct("" AS ` + "`" + `bar` + "`" + `,false AS ` + "`" + `foo` + "`" + `)`,
 		},
 		{
-			value:  ZeroValue(TypeUUID),
-			string: `Uuid("00000000-0000-0000-0000-000000000000")`,
+			value:   ZeroValue(TypeUUID),
+			literal: `Uuid("00000000-0000-0000-0000-000000000000")`,
 		},
 		{
-			value:  DecimalValueFromBigInt(big.NewInt(-1234567890123456), 22, 9),
-			string: `Decimal("-1234567.890123456",22,9)`,
+			value:   DecimalValueFromBigInt(big.NewInt(-1234567890123456), 22, 9),
+			literal: `Decimal("-1234567.890123456",22,9)`,
 		},
 		{
-			value:  DyNumberValue("-1234567890123456"),
-			string: `DyNumber("-1234567890123456")`,
+			value:   DyNumberValue("-1234567890123456"),
+			literal: `DyNumber("-1234567890123456")`,
 		},
 		{
-			value:  JSONValue("{\"a\":-1234567890123456}"),
-			string: `Json(@@{"a":-1234567890123456}@@)`,
+			value:   JSONValue("{\"a\":-1234567890123456}"),
+			literal: `Json(@@{"a":-1234567890123456}@@)`,
 		},
 		{
-			value:  JSONDocumentValue("{\"a\":-1234567890123456}"),
-			string: `JsonDocument(@@{"a":-1234567890123456}@@)`,
+			value:   JSONDocumentValue("{\"a\":-1234567890123456}"),
+			literal: `JsonDocument(@@{"a":-1234567890123456}@@)`,
 		},
 		{
-			value:  YSONValue([]byte("<a=1>[3;%false]")),
-			string: `Yson("<a=1>[3;%false]")`,
+			value:   YSONValue([]byte("<a=1>[3;%false]")),
+			literal: `Yson("<a=1>[3;%false]")`,
 		},
 	} {
-		t.Run(fmt.Sprintf("%+v", tt.value), func(t *testing.T) {
-			require.Equal(t, tt.string, tt.value.String())
+		t.Run(strconv.Itoa(i)+"."+tt.literal, func(t *testing.T) {
+			require.Equal(t, tt.literal, tt.value.ToYqlLiteral())
 		})
 	}
 }
