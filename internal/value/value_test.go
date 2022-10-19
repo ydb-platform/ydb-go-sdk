@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 )
 
 func BenchmarkMemory(b *testing.B) {
