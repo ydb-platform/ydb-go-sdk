@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"testing"
@@ -135,8 +136,15 @@ func TestValueToYqlLiteral(t *testing.T) {
 		types.Uint32Value(42),
 		types.Int64Value(42),
 		types.Uint64Value(42),
+		types.Uint64Value(200000000000),
 		types.FloatValue(42.2121236),
+		types.FloatValue(float32(math.Inf(+1))),
+		types.FloatValue(float32(math.Inf(-1))),
+		types.FloatValue(float32(math.NaN())),
 		types.DoubleValue(42.2121236192),
+		types.DoubleValue(math.Inf(+1)),
+		types.DoubleValue(math.Inf(-1)),
+		types.DoubleValue(math.NaN()),
 		types.DateValue(func() uint32 {
 			v, _ := time.Parse("2006-01-02", "2022-06-17")
 			return uint32(v.Sub(time.Unix(0, 0)) / time.Hour / 24)

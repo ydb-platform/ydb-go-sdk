@@ -1,6 +1,7 @@
 package value
 
 import (
+	"math"
 	"math/big"
 	"strconv"
 	"testing"
@@ -246,12 +247,40 @@ func TestValueToYqlLiteral(t *testing.T) {
 			literal: `42ul`,
 		},
 		{
+			value:   Uint64Value(200000000000),
+			literal: `200000000000ul`,
+		},
+		{
 			value:   FloatValue(42.2121236),
 			literal: `Float("42.212124")`,
 		},
 		{
+			value:   FloatValue(float32(math.Inf(+1))),
+			literal: `Float("+Inf")`,
+		},
+		{
+			value:   FloatValue(float32(math.Inf(-1))),
+			literal: `Float("-Inf")`,
+		},
+		{
+			value:   FloatValue(float32(math.NaN())),
+			literal: `Float("NaN")`,
+		},
+		{
 			value:   DoubleValue(42.2121236192),
 			literal: `Double("42.2121236192")`,
+		},
+		{
+			value:   DoubleValue(math.Inf(+1)),
+			literal: `Double("+Inf")`,
+		},
+		{
+			value:   DoubleValue(math.Inf(-1)),
+			literal: `Double("-Inf")`,
+		},
+		{
+			value:   DoubleValue(math.NaN()),
+			literal: `Double("NaN")`,
 		},
 		{
 			value: DateValue(func() uint32 {
