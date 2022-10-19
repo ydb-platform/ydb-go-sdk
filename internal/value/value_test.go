@@ -175,7 +175,7 @@ func TestToYDBFromYDB(t *testing.T) {
 	}
 }
 
-func TestValueToString(t *testing.T) {
+func TestValueToYqlLiteral(t *testing.T) {
 	for i, tt := range []struct {
 		value   Value
 		literal string
