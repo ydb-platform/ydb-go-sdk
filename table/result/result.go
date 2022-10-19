@@ -6,7 +6,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 // BaseResult is a result of a query.
@@ -105,9 +104,6 @@ type BaseResult interface {
 
 	// ScanNamed scans row with column names defined in namedValues
 	ScanNamed(namedValues ...named.Value) error
-
-	// RowValues returns all values from current row
-	RowValues() ([]types.Value, error)
 
 	// Stats returns query execution QueryStats.
 	//

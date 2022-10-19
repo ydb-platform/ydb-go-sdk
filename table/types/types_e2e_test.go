@@ -235,7 +235,9 @@ func TestValueToString(t *testing.T) {
 			require.NoError(t, err, tt.ToYqlLiteral())
 			require.NoError(t, res.NextResultSetErr(ctx))
 			require.True(t, res.NextRow())
-			values, err := res.RowValues()
+			values, err := res.(interface {
+				RowValues() ([]types.Value, error)
+			}).RowValues()
 			require.NoError(t, err)
 			require.Equal(t, 1, len(values))
 			require.Equal(t, tt.ToYqlLiteral(), values[0].ToYqlLiteral(), fmt.Sprintf("%T vs %T", tt, values[0]))
