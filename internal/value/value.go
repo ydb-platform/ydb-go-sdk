@@ -187,10 +187,10 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 
 	case *listType:
 		return ListValue(func() []Value {
-			vv := make([]Value, len(v.Items))
+			vv := make([]Value, len(v.GetItems()))
 			a := allocator.New()
 			defer a.Free()
-			for i, vvv := range v.Items {
+			for i, vvv := range v.GetItems() {
 				vv[i] = FromYDB(ttt.itemType.toYDB(a), vvv)
 			}
 			return vv
@@ -198,10 +198,10 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 
 	case *TupleType:
 		return TupleValue(func() []Value {
-			vv := make([]Value, len(v.Items))
+			vv := make([]Value, len(v.GetItems()))
 			a := allocator.New()
 			defer a.Free()
-			for i, vvv := range v.Items {
+			for i, vvv := range v.GetItems() {
 				vv[i] = FromYDB(ttt.items[i].toYDB(a), vvv)
 			}
 			return vv
@@ -209,10 +209,10 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 
 	case *StructType:
 		return StructValue(func() []StructValueField {
-			vv := make([]StructValueField, len(v.Items))
+			vv := make([]StructValueField, len(v.GetItems()))
 			a := allocator.New()
 			defer a.Free()
-			for i, vvv := range v.Items {
+			for i, vvv := range v.GetItems() {
 				vv[i] = StructValueField{
 					Name: ttt.fields[i].Name,
 					V:    FromYDB(ttt.fields[i].T.toYDB(a), vvv),
@@ -223,14 +223,25 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 
 	case *dictType:
 		return DictValue(func() []DictValueField {
-			vv := make([]DictValueField, len(v.Pairs))
+			vv := make([]DictValueField, len(v.GetPairs()))
 			a := allocator.New()
 			defer a.Free()
-			for i, vvv := range v.Pairs {
+			for i, vvv := range v.GetPairs() {
 				vv[i] = DictValueField{
 					K: FromYDB(ttt.keyType.toYDB(a), vvv.Key),
 					V: FromYDB(ttt.valueType.toYDB(a), vvv.Payload),
 				}
+			}
+			return vv
+		}()...), nil
+
+	case *setType:
+		return SetValue(func() []Value {
+			vv := make([]Value, len(v.GetPairs()))
+			a := allocator.New()
+			defer a.Free()
+			for i, vvv := range v.GetPairs() {
+				vv[i] = FromYDB(ttt.itemType.toYDB(a), vvv.Key)
 			}
 			return vv
 		}()...), nil
@@ -525,8 +536,15 @@ func DictValue(values ...DictValueField) *dictValue {
 	sort.Slice(values, func(i, j int) bool {
 		return values[i].K.ToYqlLiteral() < values[j].K.ToYqlLiteral()
 	})
+	var t Type
+	switch {
+	case len(values) > 0:
+		t = Dict(values[0].K.Type(), values[0].V.Type())
+	default:
+		t = EmptyDict()
+	}
 	return &dictValue{
-		t:      Dict(values[0].K.Type(), values[0].V.Type()),
+		t:      t,
 		values: values,
 	}
 }
@@ -1059,13 +1077,68 @@ func ListValue(items ...Value) *listValue {
 	default:
 		t = EmptyList()
 	}
-
-	for _, v := range items {
-		if !v.Type().equalsTo(v.Type()) {
-			panic(fmt.Sprintf("different types of items: %v", items))
-		}
-	}
 	return &listValue{
+		t:     t,
+		items: items,
+	}
+}
+
+type setValue struct {
+	t     Type
+	items []Value
+}
+
+func (v *setValue) castTo(dst interface{}) error {
+	return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, dst))
+}
+
+func (v *setValue) ToYqlLiteral() string {
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteByte('{')
+	for i, item := range v.items {
+		if i != 0 {
+			buffer.WriteByte(',')
+		}
+		buffer.WriteString(item.ToYqlLiteral())
+	}
+	buffer.WriteByte('}')
+	return buffer.String()
+}
+
+func (v *setValue) Type() Type {
+	return v.t
+}
+
+func (v *setValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vvv := a.Value()
+
+	for _, vv := range v.items {
+		pair := a.Pair()
+
+		pair.Key = vv.toYDB(a)
+		pair.Payload = _voidValue
+
+		vvv.Pairs = append(vvv.Pairs, pair)
+	}
+
+	return vvv
+}
+
+func SetValue(items ...Value) *setValue {
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].ToYqlLiteral() < items[j].ToYqlLiteral()
+	})
+
+	var t Type
+	switch {
+	case len(items) > 0:
+		t = Set(items[0].Type())
+	default:
+		t = EmptySet()
+	}
+
+	return &setValue{
 		t:     t,
 		items: items,
 	}

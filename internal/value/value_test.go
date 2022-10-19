@@ -47,6 +47,11 @@ func BenchmarkMemory(b *testing.B) {
 			Int64Value(2),
 			Int64Value(3),
 		),
+		SetValue(
+			Int64Value(1),
+			Int64Value(2),
+			Int64Value(3),
+		),
 		OptionalValue(IntervalValue(1)),
 		OptionalValue(OptionalValue(IntervalValue(1))),
 		StructValue(
@@ -88,7 +93,7 @@ func BenchmarkMemory(b *testing.B) {
 }
 
 func TestToYDBFromYDB(t *testing.T) {
-	vv := []Value{
+	for i, v := range []Value{
 		BoolValue(true),
 		Int8Value(1),
 		Int16Value(1),
@@ -127,6 +132,11 @@ func TestToYDBFromYDB(t *testing.T) {
 			Int64Value(2),
 			Int64Value(3),
 		),
+		SetValue(
+			Int64Value(1),
+			Int64Value(2),
+			Int64Value(3),
+		),
 		OptionalValue(IntervalValue(1)),
 		OptionalValue(OptionalValue(IntervalValue(1))),
 		StructValue(
@@ -160,9 +170,8 @@ func TestToYDBFromYDB(t *testing.T) {
 		ZeroValue(TypeText),
 		ZeroValue(Struct()),
 		ZeroValue(Tuple()),
-	}
-	for _, v := range vv {
-		t.Run(v.ToYqlLiteral(), func(t *testing.T) {
+	} {
+		t.Run(strconv.Itoa(i)+"."+v.ToYqlLiteral(), func(t *testing.T) {
 			a := allocator.New()
 			defer a.Free()
 			value := ToYDB(v, a)
@@ -324,6 +333,15 @@ func TestValueToYqlLiteral(t *testing.T) {
 				Int64Value(3),
 			),
 			literal: `[0l,1l,2l,3l]`,
+		},
+		{
+			value: SetValue(
+				Int64Value(0),
+				Int64Value(1),
+				Int64Value(2),
+				Int64Value(3),
+			),
+			literal: `{0l,1l,2l,3l}`,
 		},
 		{
 			value: TupleValue(

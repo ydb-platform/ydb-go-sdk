@@ -19,6 +19,7 @@ type (
 		typeDecimalAllocator
 		typeListAllocator
 		typeEmptyListAllocator
+		typeEmptyDictAllocator
 		typeTupleAllocator
 		typeStructAllocator
 		typeDictAllocator
@@ -61,6 +62,7 @@ func (a *Allocator) Free() {
 	a.typeDecimalAllocator.free()
 	a.typeListAllocator.free()
 	a.typeEmptyListAllocator.free()
+	a.typeEmptyDictAllocator.free()
 	a.typeTupleAllocator.free()
 	a.typeStructAllocator.free()
 	a.typeDictAllocator.free()
@@ -483,6 +485,24 @@ func (a *typeEmptyListAllocator) free() {
 	a.allocations = a.allocations[:0]
 }
 
+type typeEmptyDictAllocator struct {
+	allocations []*Ydb.Type_EmptyDictType
+}
+
+func (a *typeEmptyDictAllocator) TypeEmptyDict() (v *Ydb.Type_EmptyDictType) {
+	v = typeEmptyDictPool.Get()
+	a.allocations = append(a.allocations, v)
+	return v
+}
+
+func (a *typeEmptyDictAllocator) free() {
+	for _, v := range a.allocations {
+		*v = Ydb.Type_EmptyDictType{}
+		typeEmptyDictPool.Put(v)
+	}
+	a.allocations = a.allocations[:0]
+}
+
 type typeAllocator struct {
 	allocations []*Ydb.Type
 }
@@ -756,6 +776,7 @@ var (
 	typeDecimalPool        Pool[Ydb.Type_DecimalType]
 	typeListPool           Pool[Ydb.Type_ListType]
 	typeEmptyListPool      Pool[Ydb.Type_EmptyListType]
+	typeEmptyDictPool      Pool[Ydb.Type_EmptyDictType]
 	typeTuplePool          Pool[Ydb.Type_TupleType]
 	typeStructPool         Pool[Ydb.Type_StructType]
 	typeDictPool           Pool[Ydb.Type_DictType]

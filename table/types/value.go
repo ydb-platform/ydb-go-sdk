@@ -208,6 +208,12 @@ func ListValue(vs ...Value) Value {
 	}()...)
 }
 
+func SetValue(vs ...Value) Value {
+	return value.SetValue(func() (vv []value.Value) {
+		return append(vv, vs...)
+	}()...)
+}
+
 type structValueFields struct {
 	fields []value.StructValueField
 }

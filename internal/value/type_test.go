@@ -234,6 +234,18 @@ func TestTypeToString(t *testing.T) {
 			s: "List<Uint32>",
 		},
 		{
+			t: Set(TypeUint32),
+			s: "Set<Uint32>",
+		},
+		{
+			t: EmptySet(),
+			s: "EmptyDict",
+		},
+		{
+			t: EmptyDict(),
+			s: "EmptyDict",
+		},
+		{
 			t: VariantStruct(
 				StructField{
 					Name: "a",

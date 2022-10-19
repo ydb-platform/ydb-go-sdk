@@ -1,4 +1,5 @@
 * Supported `NullValue` type as received type from `YDB`
+* Supported `types.SetValue` type
 * Added `types.CastTo(types.Value, destination)` public method for cast `types.Value` to golang native type value destination
 * Added `types.TupleItem(types.Value)`, `types.StructFields(types.Value)` and `types.DictValues(types.Value)` funcs (extractors of internal fields of tuple, struct and dict values)
 * Added `types.Value.ToYqlLiteral()` func for getting values string representation as `YQL` literal

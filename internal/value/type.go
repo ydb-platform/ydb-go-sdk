@@ -43,11 +43,11 @@ func TypeFromYDB(x *Ydb.Type) Type {
 		return Struct(StructFields(s.Members)...)
 
 	case *Ydb.Type_DictType:
-		d := v.DictType
-		return Dict(
-			TypeFromYDB(d.Key),
-			TypeFromYDB(d.Payload),
-		)
+		keyType, valueType := TypeFromYDB(v.DictType.Key), TypeFromYDB(v.DictType.Payload)
+		if valueType.equalsTo(Void()) {
+			return Set(keyType)
+		}
+		return Dict(keyType, valueType)
 
 	case *Ydb.Type_VariantType:
 		t := v.VariantType
@@ -255,6 +255,33 @@ func EmptyList() emptyListType {
 	return emptyListType{}
 }
 
+type emptyDictType struct{}
+
+func (v emptyDictType) String() string {
+	return "EmptyDict"
+}
+
+func (emptyDictType) equalsTo(rhs Type) bool {
+	_, ok := rhs.(emptyDictType)
+	return ok
+}
+
+func (emptyDictType) toYDB(a *allocator.Allocator) *Ydb.Type {
+	t := a.Type()
+
+	t.Type = a.TypeEmptyDict()
+
+	return t
+}
+
+func EmptySet() emptyDictType {
+	return emptyDictType{}
+}
+
+func EmptyDict() emptyDictType {
+	return emptyDictType{}
+}
+
 type listType struct {
 	itemType Type
 }
@@ -288,6 +315,43 @@ func (v *listType) toYDB(a *allocator.Allocator) *Ydb.Type {
 
 func List(t Type) *listType {
 	return &listType{
+		itemType: t,
+	}
+}
+
+type setType struct {
+	itemType Type
+}
+
+func (v *setType) String() string {
+	return "Set<" + v.itemType.String() + ">"
+}
+
+func (v *setType) equalsTo(rhs Type) bool {
+	vv, ok := rhs.(*setType)
+	if !ok {
+		return false
+	}
+	return v.itemType.equalsTo(vv.itemType)
+}
+
+func (v *setType) toYDB(a *allocator.Allocator) *Ydb.Type {
+	t := a.Type()
+
+	typeDict := a.TypeDict()
+
+	typeDict.DictType = a.Dict()
+
+	typeDict.DictType.Key = v.itemType.toYDB(a)
+	typeDict.DictType.Payload = _voidType
+
+	t.Type = typeDict
+
+	return t
+}
+
+func Set(t Type) *setType {
+	return &setType{
 		itemType: t,
 	}
 }

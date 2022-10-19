@@ -7,7 +7,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"os"
 	"strconv"
 	"testing"
@@ -18,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -111,7 +111,7 @@ func TestTypeToString(t *testing.T) {
 	}
 }
 
-func TestValueToString(t *testing.T) {
+func TestValueToYqlLiteral(t *testing.T) {
 	ctx := context.Background()
 	db, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"))
 	if err != nil {
@@ -165,6 +165,12 @@ func TestValueToString(t *testing.T) {
 		types.OptionalValue(types.OptionalValue(types.Int32Value(42))),
 		types.OptionalValue(types.OptionalValue(types.OptionalValue(types.Int32Value(42)))),
 		types.ListValue(
+			types.Int32Value(0),
+			types.Int32Value(1),
+			types.Int32Value(2),
+			types.Int32Value(3),
+		),
+		types.SetValue(
 			types.Int32Value(0),
 			types.Int32Value(1),
 			types.Int32Value(2),
@@ -231,6 +237,9 @@ func TestValueToString(t *testing.T) {
 	} {
 		t.Run(strconv.Itoa(i)+"."+tt.ToYqlLiteral(), func(t *testing.T) {
 			err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+				if i == 28 {
+					i = 28
+				}
 				res, err := tx.Execute(ctx, fmt.Sprintf("SELECT %s;", tt.ToYqlLiteral()), nil)
 				if err != nil {
 					return err
