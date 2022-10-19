@@ -207,8 +207,12 @@ func TestValueToYqlLiteral(t *testing.T) {
 			literal: `"foo"`,
 		},
 		{
-			value:   OptionalValue(BytesValue([]byte("foo"))),
-			literal: `Just("foo")`,
+			value:   BytesValue([]byte("\xFE\xFF")),
+			literal: `"\xfe\xff"`,
+		},
+		{
+			value:   OptionalValue(BytesValue([]byte{0, 1, 2, 3, 4, 5, 6})),
+			literal: `Just("\x00\x01\x02\x03\x04\x05\x06")`,
 		},
 		{
 			value:   BoolValue(true),
