@@ -1800,8 +1800,7 @@ func (v *variantValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 }
 
 func VariantValueTuple(v Value, idx uint32, t Type) *variantValue {
-	switch tt := t.(type) {
-	case *TupleType:
+	if tt, has := t.(*TupleType); has {
 		t = VariantTuple(tt.items...)
 	}
 	return &variantValue{

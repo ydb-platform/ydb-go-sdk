@@ -7,16 +7,17 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"os"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 func TestTypeToString(t *testing.T) {
@@ -144,7 +145,9 @@ func TestValueToString(t *testing.T) {
 		}()),
 		types.TzDateValue("2022-06-17,Europe/Berlin"),
 		types.TzDatetimeValue("2022-06-17T05:19:20,Europe/Berlin"),
-		types.IntervalValueFromDuration(-(123329*time.Hour + 893745*time.Second + 42*time.Millisecond + time.Microsecond*666)),
+		types.IntervalValueFromDuration(
+			-(123329*time.Hour + 893745*time.Second + 42*time.Millisecond + time.Microsecond*666),
+		),
 		types.TimestampValueFromTime(func() time.Time {
 			tt, err := time.ParseInLocation(
 				"2006-01-02T15:04:05.000000",

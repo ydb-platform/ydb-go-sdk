@@ -3,13 +3,13 @@ package scanner
 import (
 	"context"
 	"errors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"io"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"

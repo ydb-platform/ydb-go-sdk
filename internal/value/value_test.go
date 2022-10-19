@@ -364,7 +364,11 @@ func TestValueToString(t *testing.T) {
 				StructValueField{"title", TextValue("test")},
 				StructValueField{"air_date", DateValue(1)},
 			),
-			literal: `AsStruct(Date("1970-01-02") AS ` + "`" + `air_date` + "`" + `,Uint64("1") AS ` + "`" + `series_id` + "`" + `,Utf8("test") AS ` + "`" + `title` + "`" + `)`,
+			literal: `AsStruct(` +
+				`Date("1970-01-02") AS ` + "`" + `air_date` + "`" + `,` +
+				`Uint64("1") AS ` + "`" + `series_id` + "`" + `,` +
+				`Utf8("test") AS ` + "`" + `title` + "`" +
+				`)`,
 		},
 		{
 			value: DictValue(

@@ -9,8 +9,6 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
-	"github.com/stretchr/testify/require"
-	"golang.org/x/xerrors"
 	"math"
 	"net/http"
 	"os"
@@ -24,6 +22,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/stretchr/testify/require"
+	"golang.org/x/xerrors"
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 
