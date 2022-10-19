@@ -8,6 +8,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/certificates"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
 func BenchmarkWithCertificateCache(b *testing.B) {
@@ -107,40 +108,42 @@ func BenchmarkWithFileCache(b *testing.B) {
 }
 
 func TestWithCacheConcurrent(t *testing.T) {
-	const nRoutines = 10
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		const nRoutines = 10
 
-	ctx := context.TODO()
-	db, err := Open(
-		ctx,
-		os.Getenv("YDB_CONNECTION_STRING"),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		// cleanup connection
-		if e := db.Close(ctx); e != nil {
-			t.Fatalf("close failed: %+v", e)
+		ctx := context.TODO()
+		db, err := Open(
+			ctx,
+			os.Getenv("YDB_CONNECTION_STRING"),
+		)
+		if err != nil {
+			t.Fatal(err)
 		}
-	}()
-
-	wg := &sync.WaitGroup{}
-
-	for i := 0; i < nRoutines; i++ {
-		wg.Add(1)
-		go func() {
-			// child conns are closed on db.Close()
-			_, err := db.With(
-				ctx,
-				WithSessionPoolSizeLimit(100),
-			)
-			if err != nil {
-				t.Error(err)
+		defer func() {
+			// cleanup connection
+			if e := db.Close(ctx); e != nil {
+				t.Fatalf("close failed: %+v", e)
 			}
-			wg.Done()
 		}()
-	}
-	wg.Wait()
+
+		wg := &sync.WaitGroup{}
+
+		for i := 0; i < nRoutines; i++ {
+			wg.Add(1)
+			go func() {
+				// child conns are closed on db.Close()
+				_, err := db.With(
+					ctx,
+					WithSessionPoolSizeLimit(100),
+				)
+				if err != nil {
+					t.Error(err)
+				}
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+	})
 }
 
 func TestWithCacheHits(t *testing.T) {
