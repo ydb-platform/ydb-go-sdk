@@ -365,7 +365,7 @@ func (v optionalType) Yql() string {
 }
 
 func (v optionalType) equalsTo(rhs Type) bool {
-	vv, ok := rhs.(*optionalType)
+	vv, ok := rhs.(optionalType)
 	if !ok {
 		return false
 	}

@@ -56,7 +56,7 @@ func nullValueFromYDB(x *Ydb.Value, t Type) (_ Value, ok bool) {
 			x = xx.NestedValue
 		case *Ydb.Value_NullFlagValue:
 			switch tt := t.(type) {
-			case *optionalType:
+			case optionalType:
 				return NullValue(tt.innerType), true
 			case voidType:
 				return VoidValue(), true
@@ -178,7 +178,7 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 	case *DecimalType:
 		return DecimalValue(BigEndianUint128(v.High_128, v.GetLow_128()), ttt.Precision, ttt.Scale), nil
 
-	case *optionalType:
+	case optionalType:
 		t = t.Type.(*Ydb.Type_OptionalType).OptionalType.Item
 		if nestedValue, ok := v.Value.(*Ydb.Value_NestedValue); ok {
 			return OptionalValue(FromYDB(t, nestedValue.NestedValue)), nil
@@ -2028,7 +2028,7 @@ func ZeroValue(t Type) Value {
 	case PrimitiveType:
 		return zeroPrimitiveValue(t)
 
-	case *optionalType:
+	case optionalType:
 		return NullValue(t.innerType)
 
 	case *voidType:
