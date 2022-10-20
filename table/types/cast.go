@@ -24,7 +24,7 @@ func TupleItems(v Value) ([]Value, error) {
 	}); has {
 		return vv.Items(), nil
 	}
-	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get tuple items from '%s'", v.Type().String()))
+	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get tuple items from '%s'", v.Type().Yql()))
 }
 
 func StructFields(v Value) (map[string]Value, error) {
@@ -33,7 +33,7 @@ func StructFields(v Value) (map[string]Value, error) {
 	}); has {
 		return vv.Fields(), nil
 	}
-	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get struct fields from '%s'", v.Type().String()))
+	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get struct fields from '%s'", v.Type().Yql()))
 }
 
 func DictFields(v Value) (map[Value]Value, error) {
@@ -42,5 +42,5 @@ func DictFields(v Value) (map[Value]Value, error) {
 	}); has {
 		return vv.Values(), nil
 	}
-	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get dict values from '%s'", v.Type().String()))
+	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get dict values from '%s'", v.Type().Yql()))
 }

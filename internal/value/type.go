@@ -9,7 +9,7 @@ import (
 )
 
 type Type interface {
-	String() string
+	Yql() string
 
 	toYDB(a *allocator.Allocator) *Ydb.Type
 	equalsTo(rhs Type) bool
@@ -149,7 +149,7 @@ func (v *DecimalType) Name() string {
 	return "Decimal"
 }
 
-func (v *DecimalType) String() string {
+func (v *DecimalType) Yql() string {
 	return fmt.Sprintf("%s(%d,%d)", v.Name(), v.Precision, v.Scale)
 }
 
@@ -185,13 +185,13 @@ type dictType struct {
 	valueType Type
 }
 
-func (v *dictType) String() string {
+func (v *dictType) Yql() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
 	buffer.WriteString("Dict<")
-	buffer.WriteString(v.keyType.String())
+	buffer.WriteString(v.keyType.Yql())
 	buffer.WriteByte(',')
-	buffer.WriteString(v.valueType.String())
+	buffer.WriteString(v.valueType.Yql())
 	buffer.WriteByte('>')
 	return buffer.String()
 }
@@ -234,7 +234,7 @@ func Dict(key, value Type) (v *dictType) {
 
 type emptyListType struct{}
 
-func (v emptyListType) String() string {
+func (v emptyListType) Yql() string {
 	return "EmptyList"
 }
 
@@ -257,7 +257,7 @@ func EmptyList() emptyListType {
 
 type emptyDictType struct{}
 
-func (v emptyDictType) String() string {
+func (v emptyDictType) Yql() string {
 	return "EmptyDict"
 }
 
@@ -286,8 +286,8 @@ type listType struct {
 	itemType Type
 }
 
-func (v *listType) String() string {
-	return "List<" + v.itemType.String() + ">"
+func (v *listType) Yql() string {
+	return "List<" + v.itemType.Yql() + ">"
 }
 
 func (v *listType) equalsTo(rhs Type) bool {
@@ -323,8 +323,8 @@ type setType struct {
 	itemType Type
 }
 
-func (v *setType) String() string {
-	return "Set<" + v.itemType.String() + ">"
+func (v *setType) Yql() string {
+	return "Set<" + v.itemType.Yql() + ">"
 }
 
 func (v *setType) equalsTo(rhs Type) bool {
@@ -360,8 +360,8 @@ type optionalType struct {
 	innerType Type
 }
 
-func (v *optionalType) String() string {
-	return "Optional<" + v.innerType.String() + ">"
+func (v *optionalType) Yql() string {
+	return "Optional<" + v.innerType.Yql() + ">"
 }
 
 func (v *optionalType) equalsTo(rhs Type) bool {
@@ -394,7 +394,7 @@ func Optional(t Type) *optionalType {
 
 type PrimitiveType uint
 
-func (v PrimitiveType) String() string {
+func (v PrimitiveType) Yql() string {
 	return primitiveString[v]
 }
 
@@ -506,7 +506,7 @@ type (
 	}
 )
 
-func (v *StructType) String() string {
+func (v *StructType) Yql() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
 	buffer.WriteString("Struct<")
@@ -516,7 +516,7 @@ func (v *StructType) String() string {
 		}
 		buffer.WriteString("'" + f.Name + "'")
 		buffer.WriteByte(':')
-		buffer.WriteString(f.T.String())
+		buffer.WriteString(f.T.Yql())
 	}
 	buffer.WriteByte('>')
 	return buffer.String()
@@ -584,7 +584,7 @@ type TupleType struct {
 	items []Type
 }
 
-func (v *TupleType) String() string {
+func (v *TupleType) Yql() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
 	buffer.WriteString("Tuple<")
@@ -592,7 +592,7 @@ func (v *TupleType) String() string {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
-		buffer.WriteString(t.String())
+		buffer.WriteString(t.Yql())
 	}
 	buffer.WriteByte('>')
 	return buffer.String()
@@ -644,7 +644,7 @@ type variantStructType struct {
 	*StructType
 }
 
-func (v *variantStructType) String() string {
+func (v *variantStructType) Yql() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
 	buffer.WriteString("Variant<")
@@ -654,7 +654,7 @@ func (v *variantStructType) String() string {
 		}
 		buffer.WriteString("'" + f.Name + "'")
 		buffer.WriteByte(':')
-		buffer.WriteString(f.T.String())
+		buffer.WriteString(f.T.Yql())
 	}
 	buffer.WriteByte('>')
 	return buffer.String()
@@ -698,7 +698,7 @@ type variantTupleType struct {
 	*TupleType
 }
 
-func (v *variantTupleType) String() string {
+func (v *variantTupleType) Yql() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
 	buffer.WriteString("Variant<")
@@ -706,7 +706,7 @@ func (v *variantTupleType) String() string {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
-		buffer.WriteString(t.String())
+		buffer.WriteString(t.Yql())
 	}
 	buffer.WriteByte('>')
 	return buffer.String()
@@ -748,7 +748,7 @@ func VariantTuple(items ...Type) *variantTupleType {
 
 type voidType struct{}
 
-func (v voidType) String() string {
+func (v voidType) Yql() string {
 	return "Void"
 }
 
@@ -771,7 +771,7 @@ func Void() voidType {
 
 type nullType struct{}
 
-func (v nullType) String() string {
+func (v nullType) Yql() string {
 	return "Null"
 }
 

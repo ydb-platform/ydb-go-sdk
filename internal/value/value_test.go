@@ -172,7 +172,7 @@ func TestToYDBFromYDB(t *testing.T) {
 		ZeroValue(Struct()),
 		ZeroValue(Tuple()),
 	} {
-		t.Run(strconv.Itoa(i)+"."+v.ToYqlLiteral(), func(t *testing.T) {
+		t.Run(strconv.Itoa(i)+"."+v.Yql(), func(t *testing.T) {
 			a := allocator.New()
 			defer a.Free()
 			value := ToYDB(v, a)
@@ -480,7 +480,7 @@ func TestValueToYqlLiteral(t *testing.T) {
 		},
 	} {
 		t.Run(strconv.Itoa(i)+"."+tt.literal, func(t *testing.T) {
-			require.Equal(t, tt.literal, tt.value.ToYqlLiteral())
+			require.Equal(t, tt.literal, tt.value.Yql())
 		})
 	}
 }

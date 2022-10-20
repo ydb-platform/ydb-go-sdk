@@ -127,7 +127,7 @@ const (
 //
 // Deprecated: use types.Type.String() instead
 func WriteTypeStringTo(buf *bytes.Buffer, t Type) {
-	buf.WriteString(t.String())
+	buf.WriteString(t.Yql())
 }
 
 // RawValue scanning non-primitive yql types or for own implementation scanner native API

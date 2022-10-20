@@ -93,11 +93,11 @@ func TestTypeToString(t *testing.T) {
 			types.TypeFloat,
 		),
 	} {
-		t.Run(tt.String(), func(t *testing.T) {
+		t.Run(tt.Yql(), func(t *testing.T) {
 			var got string
 			err := retry.Do(context.Background(), db, func(ctx context.Context, cc *sql.Conn) error {
 				row := cc.QueryRowContext(ctx,
-					fmt.Sprintf("SELECT FormatType(ParseType(\"%s\"))", tt.String()),
+					fmt.Sprintf("SELECT FormatType(ParseType(\"%s\"))", tt.Yql()),
 				)
 				if err := row.Scan(&got); err != nil {
 					return err
@@ -105,8 +105,8 @@ func TestTypeToString(t *testing.T) {
 				return row.Err()
 			})
 			require.NoError(t, err)
-			if got != tt.String() {
-				t.Errorf("s representations not equals:\n\n -  got: %s\n\n - want: %s", got, tt.String())
+			if got != tt.Yql() {
+				t.Errorf("s representations not equals:\n\n -  got: %s\n\n - want: %s", got, tt.Yql())
 			}
 		})
 	}
@@ -243,12 +243,12 @@ func TestValueToYqlLiteral(t *testing.T) {
 		types.JSONDocumentValue("{\"a\":1,\"b\":null}"),
 		types.YSONValue("<a=1>[3;%false]"),
 	} {
-		t.Run(strconv.Itoa(i)+"."+tt.ToYqlLiteral(), func(t *testing.T) {
+		t.Run(strconv.Itoa(i)+"."+tt.Yql(), func(t *testing.T) {
 			err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 				if i == 28 {
 					i = 28
 				}
-				res, err := tx.Execute(ctx, fmt.Sprintf("SELECT %s;", tt.ToYqlLiteral()), nil)
+				res, err := tx.Execute(ctx, fmt.Sprintf("SELECT %s;", tt.Yql()), nil)
 				if err != nil {
 					return err
 				}
@@ -259,7 +259,7 @@ func TestValueToYqlLiteral(t *testing.T) {
 				}).RowValues()
 				require.NoError(t, err)
 				require.Equal(t, 1, len(values))
-				require.Equal(t, tt.ToYqlLiteral(), values[0].ToYqlLiteral(), fmt.Sprintf("%T vs %T", tt, values[0]))
+				require.Equal(t, tt.Yql(), values[0].Yql(), fmt.Sprintf("%T vs %T", tt, values[0]))
 				return nil
 			})
 			require.NoError(t, err)

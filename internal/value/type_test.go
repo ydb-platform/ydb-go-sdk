@@ -267,7 +267,7 @@ func TestTypeToString(t *testing.T) {
 		},
 	} {
 		t.Run(tt.s, func(t *testing.T) {
-			if got := tt.t.String(); got != tt.s {
+			if got := tt.t.Yql(); got != tt.s {
 				t.Errorf("s representations not equals:\n\n -  got: %s\n\n - want: %s", got, tt.s)
 			}
 		})
