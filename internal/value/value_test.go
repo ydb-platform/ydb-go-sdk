@@ -16,6 +16,7 @@ import (
 func BenchmarkMemory(b *testing.B) {
 	b.ReportAllocs()
 	v := TupleValue(
+		VoidValue(),
 		BoolValue(true),
 		Int8Value(1),
 		Int16Value(1),

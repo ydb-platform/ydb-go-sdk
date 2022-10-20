@@ -3,6 +3,7 @@ package table
 import (
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"reflect"
 	"testing"
 	"time"
@@ -612,12 +613,13 @@ func TestDescribeTableRegression(t *testing.T) {
 			"season_id",
 			"episode_id",
 		},
+		ColumnFamilies: []options.ColumnFamily{},
 		Attributes: map[string]string{
 			"attr": "attr_value",
 		},
+		Indexes:     []options.IndexDescription{},
+		Changefeeds: []options.ChangefeedDescription{},
 	}
 
-	if fmt.Sprintf("%+v", act) != fmt.Sprintf("%+v", exp) {
-		t.Fatalf("description's not equal: \n\nact: %+v\n\nexp: %+v\n\n", act, exp)
-	}
+	assert.Equal(t, exp, act)
 }

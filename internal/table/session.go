@@ -409,9 +409,9 @@ func (s *session) DescribeTable(
 		}
 	}
 
-	changefeeds := make([]options.ChangefeedDescription, len(result.Changefeeds))
+	changeFeeds := make([]options.ChangefeedDescription, len(result.Changefeeds))
 	for i, proto := range result.GetChangefeeds() {
-		changefeeds[i] = options.NewChangefeedDescription(proto)
+		changeFeeds[i] = options.NewChangefeedDescription(proto)
 	}
 
 	return options.Description{
@@ -428,7 +428,7 @@ func (s *session) DescribeTable(
 		PartitioningSettings: options.NewPartitioningSettings(result.GetPartitioningSettings()),
 		Indexes:              indexes,
 		TimeToLiveSettings:   options.NewTimeToLiveSettings(result.GetTtlSettings()),
-		Changefeeds:          changefeeds,
+		Changefeeds:          changeFeeds,
 	}, nil
 }
 

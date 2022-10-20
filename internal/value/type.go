@@ -360,11 +360,11 @@ type optionalType struct {
 	innerType Type
 }
 
-func (v *optionalType) Yql() string {
+func (v optionalType) Yql() string {
 	return "Optional<" + v.innerType.Yql() + ">"
 }
 
-func (v *optionalType) equalsTo(rhs Type) bool {
+func (v optionalType) equalsTo(rhs Type) bool {
 	vv, ok := rhs.(*optionalType)
 	if !ok {
 		return false
@@ -372,7 +372,7 @@ func (v *optionalType) equalsTo(rhs Type) bool {
 	return v.innerType.equalsTo(vv.innerType)
 }
 
-func (v *optionalType) toYDB(a *allocator.Allocator) *Ydb.Type {
+func (v optionalType) toYDB(a *allocator.Allocator) *Ydb.Type {
 	t := a.Type()
 
 	typeOptional := a.TypeOptional()
@@ -386,8 +386,8 @@ func (v *optionalType) toYDB(a *allocator.Allocator) *Ydb.Type {
 	return t
 }
 
-func Optional(t Type) *optionalType {
-	return &optionalType{
+func Optional(t Type) optionalType {
+	return optionalType{
 		innerType: t,
 	}
 }
