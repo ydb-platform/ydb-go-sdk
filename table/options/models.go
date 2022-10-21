@@ -7,9 +7,9 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -403,13 +403,13 @@ func (kr KeyRange) String() string {
 	if kr.From == nil {
 		buf.WriteString("NULL")
 	} else {
-		buf.WriteString(kr.From.String())
+		buf.WriteString(kr.From.Yql())
 	}
 	buf.WriteString(",")
 	if kr.To == nil {
 		buf.WriteString("NULL")
 	} else {
-		buf.WriteString(kr.To.String())
+		buf.WriteString(kr.To.Yql())
 	}
 	buf.WriteString("]")
 	return buf.String()

@@ -26,7 +26,7 @@ func GenerateDeclareSection(params *table.QueryParameters) (string, error) {
 		declares[name] = fmt.Sprintf(
 			"DECLARE %s AS %s;\n",
 			name,
-			v.Type().String(),
+			v.Type().Yql(),
 		)
 	})
 	sort.Strings(names)

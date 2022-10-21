@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 )
 
 func TestNullable(t *testing.T) {
@@ -498,7 +498,7 @@ func TestCastNumbers(t *testing.T) {
 	for _, dst := range numberDestinations {
 		t.Run(reflect.ValueOf(dst.destination).Type().Elem().String(), func(t *testing.T) {
 			for _, src := range numberValues {
-				t.Run(src.value.String(), func(t *testing.T) {
+				t.Run(src.value.Yql(), func(t *testing.T) {
 					mustErr := false
 					switch {
 					case src.len == dst.len && src.signed != dst.signed,
@@ -513,7 +513,7 @@ func TestCastNumbers(t *testing.T) {
 						require.NoError(t, err)
 					}
 				})
-				t.Run(OptionalValue(src.value).String(), func(t *testing.T) {
+				t.Run(OptionalValue(src.value).Yql(), func(t *testing.T) {
 					mustErr := false
 					switch {
 					case src.len == dst.len && src.signed != dst.signed,
@@ -601,7 +601,7 @@ func TestCastOtherTypes(t *testing.T) {
 			error:  false,
 		},
 	} {
-		t.Run(fmt.Sprintf("cast %s to %v", tt.v.Type().String(), reflect.ValueOf(tt.dst).Type().Elem()),
+		t.Run(fmt.Sprintf("cast %s to %v", tt.v.Type().Yql(), reflect.ValueOf(tt.dst).Type().Elem()),
 			func(t *testing.T) {
 				if err := CastTo(tt.v, tt.dst); (err != nil) != tt.error {
 					t.Errorf("castTo() error = %v, want %v", err, tt.error)

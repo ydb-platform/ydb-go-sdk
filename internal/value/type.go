@@ -5,11 +5,11 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 )
 
 type Type interface {
-	String() string
+	Yql() string
 
 	toYDB(a *allocator.Allocator) *Ydb.Type
 	equalsTo(rhs Type) bool
@@ -43,23 +43,19 @@ func TypeFromYDB(x *Ydb.Type) Type {
 		return Struct(StructFields(s.Members)...)
 
 	case *Ydb.Type_DictType:
-		d := v.DictType
-		return Dict(
-			TypeFromYDB(d.Key),
-			TypeFromYDB(d.Payload),
-		)
+		keyType, valueType := TypeFromYDB(v.DictType.Key), TypeFromYDB(v.DictType.Payload)
+		if valueType.equalsTo(Void()) {
+			return Set(keyType)
+		}
+		return Dict(keyType, valueType)
 
 	case *Ydb.Type_VariantType:
 		t := v.VariantType
 		switch x := t.Type.(type) {
 		case *Ydb.VariantType_TupleItems:
-			return Variant(
-				Tuple(TypesFromYDB(x.TupleItems.Elements)...),
-			)
+			return VariantTuple(TypesFromYDB(x.TupleItems.Elements)...)
 		case *Ydb.VariantType_StructItems:
-			return Variant(
-				Struct(StructFields(x.StructItems.Members)...),
-			)
+			return VariantStruct(StructFields(x.StructItems.Members)...)
 		default:
 			panic("ydb: unknown variant type")
 		}
@@ -149,11 +145,12 @@ type DecimalType struct {
 	Scale     uint32
 }
 
-func (v *DecimalType) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString(fmt.Sprintf("Decimal(%d,%d)", v.Precision, v.Scale))
-	return buffer.String()
+func (v *DecimalType) Name() string {
+	return "Decimal"
+}
+
+func (v *DecimalType) Yql() string {
+	return fmt.Sprintf("%s(%d,%d)", v.Name(), v.Precision, v.Scale)
 }
 
 func (v *DecimalType) equalsTo(rhs Type) bool {
@@ -188,13 +185,13 @@ type dictType struct {
 	valueType Type
 }
 
-func (v *dictType) String() string {
+func (v *dictType) Yql() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
 	buffer.WriteString("Dict<")
-	buffer.WriteString(v.keyType.String())
+	buffer.WriteString(v.keyType.Yql())
 	buffer.WriteByte(',')
-	buffer.WriteString(v.valueType.String())
+	buffer.WriteString(v.valueType.Yql())
 	buffer.WriteByte('>')
 	return buffer.String()
 }
@@ -237,11 +234,8 @@ func Dict(key, value Type) (v *dictType) {
 
 type emptyListType struct{}
 
-func (v emptyListType) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString("List<>")
-	return buffer.String()
+func (v emptyListType) Yql() string {
+	return "EmptyList"
 }
 
 func (emptyListType) equalsTo(rhs Type) bool {
@@ -261,17 +255,39 @@ func EmptyList() emptyListType {
 	return emptyListType{}
 }
 
+type emptyDictType struct{}
+
+func (v emptyDictType) Yql() string {
+	return "EmptyDict"
+}
+
+func (emptyDictType) equalsTo(rhs Type) bool {
+	_, ok := rhs.(emptyDictType)
+	return ok
+}
+
+func (emptyDictType) toYDB(a *allocator.Allocator) *Ydb.Type {
+	t := a.Type()
+
+	t.Type = a.TypeEmptyDict()
+
+	return t
+}
+
+func EmptySet() emptyDictType {
+	return emptyDictType{}
+}
+
+func EmptyDict() emptyDictType {
+	return emptyDictType{}
+}
+
 type listType struct {
 	itemType Type
 }
 
-func (v *listType) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString("List<")
-	buffer.WriteString(v.itemType.String())
-	buffer.WriteString(">")
-	return buffer.String()
+func (v *listType) Yql() string {
+	return "List<" + v.itemType.Yql() + ">"
 }
 
 func (v *listType) equalsTo(rhs Type) bool {
@@ -303,28 +319,60 @@ func List(t Type) *listType {
 	}
 }
 
+type setType struct {
+	itemType Type
+}
+
+func (v *setType) Yql() string {
+	return "Set<" + v.itemType.Yql() + ">"
+}
+
+func (v *setType) equalsTo(rhs Type) bool {
+	vv, ok := rhs.(*setType)
+	if !ok {
+		return false
+	}
+	return v.itemType.equalsTo(vv.itemType)
+}
+
+func (v *setType) toYDB(a *allocator.Allocator) *Ydb.Type {
+	t := a.Type()
+
+	typeDict := a.TypeDict()
+
+	typeDict.DictType = a.Dict()
+
+	typeDict.DictType.Key = v.itemType.toYDB(a)
+	typeDict.DictType.Payload = _voidType
+
+	t.Type = typeDict
+
+	return t
+}
+
+func Set(t Type) *setType {
+	return &setType{
+		itemType: t,
+	}
+}
+
 type optionalType struct {
 	innerType Type
 }
 
-func (v *optionalType) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString("Optional<")
-	buffer.WriteString(v.innerType.String())
-	buffer.WriteString(">")
-	return buffer.String()
+func (v optionalType) Yql() string {
+	return "Optional<" + v.innerType.Yql() + ">"
 }
 
-func (v *optionalType) equalsTo(rhs Type) bool {
-	vv, ok := rhs.(*optionalType)
+func (v optionalType) equalsTo(rhs Type) bool {
+	vv, ok := rhs.(optionalType)
 	if !ok {
 		return false
 	}
 	return v.innerType.equalsTo(vv.innerType)
 }
 
-func (v *optionalType) toYDB(a *allocator.Allocator) *Ydb.Type {
+func (v optionalType) toYDB(a *allocator.Allocator) *Ydb.Type {
 	t := a.Type()
 
 	typeOptional := a.TypeOptional()
@@ -338,19 +386,16 @@ func (v *optionalType) toYDB(a *allocator.Allocator) *Ydb.Type {
 	return t
 }
 
-func Optional(t Type) *optionalType {
-	return &optionalType{
+func Optional(t Type) optionalType {
+	return optionalType{
 		innerType: t,
 	}
 }
 
 type PrimitiveType uint
 
-func (v PrimitiveType) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString(primitiveString[v])
-	return buffer.String()
+func (v PrimitiveType) Yql() string {
+	return primitiveString[v]
 }
 
 const (
@@ -430,8 +475,8 @@ var primitiveString = [...]string{
 	TypeTzDate:       "TzDate",
 	TypeTzDatetime:   "TzDatetime",
 	TypeTzTimestamp:  "TzTimestamp",
-	TypeBytes:        "Bytes",
-	TypeText:         "Text",
+	TypeBytes:        "String",
+	TypeText:         "Utf8",
 	TypeYSON:         "Yson",
 	TypeJSON:         "Json",
 	TypeUUID:         "Uuid",
@@ -451,10 +496,6 @@ func (v PrimitiveType) toYDB(*allocator.Allocator) *Ydb.Type {
 	return primitive[v]
 }
 
-func Primitive(t PrimitiveType) PrimitiveType {
-	return t
-}
-
 type (
 	StructField struct {
 		Name string
@@ -465,7 +506,7 @@ type (
 	}
 )
 
-func (v *StructType) String() string {
+func (v *StructType) Yql() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
 	buffer.WriteString("Struct<")
@@ -473,9 +514,9 @@ func (v *StructType) String() string {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
-		buffer.WriteString("`" + f.Name + "`")
+		buffer.WriteString("'" + f.Name + "'")
 		buffer.WriteByte(':')
-		buffer.WriteString(f.T.String())
+		buffer.WriteString(f.T.Yql())
 	}
 	buffer.WriteByte('>')
 	return buffer.String()
@@ -543,7 +584,7 @@ type TupleType struct {
 	items []Type
 }
 
-func (v *TupleType) String() string {
+func (v *TupleType) Yql() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
 	buffer.WriteString("Tuple<")
@@ -551,7 +592,7 @@ func (v *TupleType) String() string {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
-		buffer.WriteString(t.String())
+		buffer.WriteString(t.Yql())
 	}
 	buffer.WriteByte('>')
 	return buffer.String()
@@ -599,96 +640,115 @@ func Tuple(items ...Type) (v *TupleType) {
 	}
 }
 
-type internalVariantType uint8
-
-const (
-	variantTypeTuple internalVariantType = iota + 1
-	variantTypeStruct
-)
-
-type variantType struct {
-	innerType   Type
-	variantType internalVariantType
+type variantStructType struct {
+	*StructType
 }
 
-func (v *variantType) String() string {
+func (v *variantStructType) Yql() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
 	buffer.WriteString("Variant<")
-	buffer.WriteString(v.innerType.String())
-	buffer.WriteString(">")
+	for i, f := range v.fields {
+		if i > 0 {
+			buffer.WriteByte(',')
+		}
+		buffer.WriteString("'" + f.Name + "'")
+		buffer.WriteByte(':')
+		buffer.WriteString(f.T.Yql())
+	}
+	buffer.WriteByte('>')
 	return buffer.String()
 }
 
-func (v *variantType) equalsTo(rhs Type) bool {
-	vv, ok := rhs.(*variantType)
-	if !ok {
+func (v *variantStructType) equalsTo(rhs Type) bool {
+	switch t := rhs.(type) {
+	case *variantStructType:
+		return v.StructType.equalsTo(t.StructType)
+	case *StructType:
+		return v.StructType.equalsTo(t)
+	default:
 		return false
 	}
-	return v.innerType.equalsTo(vv.innerType)
 }
 
-func (v *variantType) toYDB(a *allocator.Allocator) *Ydb.Type {
+func (v *variantStructType) toYDB(a *allocator.Allocator) *Ydb.Type {
 	t := a.Type()
 
 	typeVariant := a.TypeVariant()
 
 	typeVariant.VariantType = a.Variant()
 
-	tt := v.innerType.toYDB(a).Type
+	structItems := a.VariantStructItems()
+	structItems.StructItems = v.StructType.toYDB(a).Type.(*Ydb.Type_StructType).StructType
 
-	switch v.variantType {
-	case variantTypeTuple:
-		tupleType, ok := tt.(*Ydb.Type_TupleType)
-		if !ok {
-			panic(fmt.Sprintf("type %T cannot casts to *Ydb.Type_TupleType", tt))
-		}
-
-		tupleItems := a.VariantTupleItems()
-		tupleItems.TupleItems = tupleType.TupleType
-
-		typeVariant.VariantType.Type = tupleItems
-	case variantTypeStruct:
-		structType, ok := tt.(*Ydb.Type_StructType)
-		if !ok {
-			panic(fmt.Sprintf("type %T cannot casts to *Ydb.Type_TupleType", tt))
-		}
-
-		structItems := a.VariantStructItems()
-		structItems.StructItems = structType.StructType
-
-		typeVariant.VariantType.Type = structItems
-	default:
-		panic(fmt.Sprintf("unsupported variant type: %v", v.variantType))
-	}
+	typeVariant.VariantType.Type = structItems
 
 	t.Type = typeVariant
 
 	return t
 }
 
-func Variant(t Type) *variantType {
-	if tt, ok := t.(*variantType); ok {
-		t = tt.innerType
+func VariantStruct(fields ...StructField) *variantStructType {
+	return &variantStructType{
+		StructType: Struct(fields...),
 	}
-	var tt internalVariantType
-	switch t.(type) {
-	case *StructType:
-		tt = variantTypeStruct
+}
+
+type variantTupleType struct {
+	*TupleType
+}
+
+func (v *variantTupleType) Yql() string {
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString("Variant<")
+	for i, t := range v.items {
+		if i > 0 {
+			buffer.WriteByte(',')
+		}
+		buffer.WriteString(t.Yql())
+	}
+	buffer.WriteByte('>')
+	return buffer.String()
+}
+
+func (v *variantTupleType) equalsTo(rhs Type) bool {
+	switch t := rhs.(type) {
+	case *variantTupleType:
+		return v.TupleType.equalsTo(t.TupleType)
 	case *TupleType:
-		tt = variantTypeTuple
+		return v.TupleType.equalsTo(t)
 	default:
-		panic(fmt.Sprintf("unsupported variant type: %v", t))
+		return false
 	}
-	return &variantType{
-		innerType:   t,
-		variantType: tt,
+}
+
+func (v *variantTupleType) toYDB(a *allocator.Allocator) *Ydb.Type {
+	t := a.Type()
+
+	typeVariant := a.TypeVariant()
+
+	typeVariant.VariantType = a.Variant()
+
+	tupleItems := a.VariantTupleItems()
+	tupleItems.TupleItems = v.TupleType.toYDB(a).Type.(*Ydb.Type_TupleType).TupleType
+
+	typeVariant.VariantType.Type = tupleItems
+
+	t.Type = typeVariant
+
+	return t
+}
+
+func VariantTuple(items ...Type) *variantTupleType {
+	return &variantTupleType{
+		TupleType: Tuple(items...),
 	}
 }
 
 type voidType struct{}
 
-func (v voidType) String() string {
+func (v voidType) Yql() string {
 	return "Void"
 }
 
@@ -711,7 +771,7 @@ func Void() voidType {
 
 type nullType struct{}
 
-func (v nullType) String() string {
+func (v nullType) Yql() string {
 	return "Null"
 }
 

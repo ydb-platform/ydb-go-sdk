@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -15,10 +16,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -612,12 +613,13 @@ func TestDescribeTableRegression(t *testing.T) {
 			"season_id",
 			"episode_id",
 		},
+		ColumnFamilies: []options.ColumnFamily{},
 		Attributes: map[string]string{
 			"attr": "attr_value",
 		},
+		Indexes:     []options.IndexDescription{},
+		Changefeeds: []options.ChangefeedDescription{},
 	}
 
-	if fmt.Sprintf("%+v", act) != fmt.Sprintf("%+v", exp) {
-		t.Fatalf("description's not equal: \n\nact: %+v\n\nexp: %+v\n\n", act, exp)
-	}
+	assert.Equal(t, exp, act)
 }

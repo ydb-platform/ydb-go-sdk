@@ -17,13 +17,13 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -409,9 +409,9 @@ func (s *session) DescribeTable(
 		}
 	}
 
-	changefeeds := make([]options.ChangefeedDescription, len(result.Changefeeds))
+	changeFeeds := make([]options.ChangefeedDescription, len(result.Changefeeds))
 	for i, proto := range result.GetChangefeeds() {
-		changefeeds[i] = options.NewChangefeedDescription(proto)
+		changeFeeds[i] = options.NewChangefeedDescription(proto)
 	}
 
 	return options.Description{
@@ -428,7 +428,7 @@ func (s *session) DescribeTable(
 		PartitioningSettings: options.NewPartitioningSettings(result.GetPartitioningSettings()),
 		Indexes:              indexes,
 		TimeToLiveSettings:   options.NewTimeToLiveSettings(result.GetTtlSettings()),
-		Changefeeds:          changefeeds,
+		Changefeeds:          changeFeeds,
 	}, nil
 }
 

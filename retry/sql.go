@@ -50,7 +50,7 @@ func Do(ctx context.Context, db *sql.DB, f func(ctx context.Context, cc *sql.Con
 	}, options.retryOptions...)
 	if err != nil {
 		return xerrors.WithStackTrace(
-			fmt.Errorf("opration failed with %d attempts: %w", attempts, err),
+			fmt.Errorf("operation failed with %d attempts: %w", attempts, err),
 		)
 	}
 	return nil
@@ -115,7 +115,7 @@ func DoTx(ctx context.Context, db *sql.DB, f func(context.Context, *sql.Tx) erro
 	}, options.retryOptions...)
 	if err != nil {
 		return xerrors.WithStackTrace(
-			fmt.Errorf("tx opration failed with %d attempts: %w", attempts, err),
+			fmt.Errorf("tx operation failed with %d attempts: %w", attempts, err),
 		)
 	}
 	return nil

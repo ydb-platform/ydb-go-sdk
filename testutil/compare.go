@@ -8,8 +8,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -56,19 +56,32 @@ func compare(l *Ydb.TypedValue, r *Ydb.TypedValue) (int, error) {
 		return compareTuplesOrLists(expandTuple(l), expandTuple(r))
 	case l.Type.GetListType() != nil && r.Type.GetListType() != nil:
 		return compareTuplesOrLists(expandList(l), expandList(r))
+	case l.Type.GetStructType() != nil && r.Type.GetStructType() != nil:
+		return compareStructs(expandStruct(l), expandStruct(r))
 	default:
 		return 0, notComparableError(l, r)
 	}
 }
 
-func expandList(v *Ydb.TypedValue) []*Ydb.TypedValue {
-	elementType := v.Type.GetListType().Item
-	size := len(v.Value.Items)
+func expandItems(v *Ydb.TypedValue, itemType func(i int) *Ydb.Type) []*Ydb.TypedValue {
+	size := len(v.GetValue().GetItems())
 	values := make([]*Ydb.TypedValue, 0, size)
-	for _, val := range v.Value.Items {
-		values = append(values, unwrapTypedValue(&Ydb.TypedValue{Type: elementType, Value: val}))
+	for i, val := range v.GetValue().GetItems() {
+		values = append(values, unwrapTypedValue(&Ydb.TypedValue{Type: itemType(i), Value: val}))
 	}
 	return values
+}
+
+func expandList(v *Ydb.TypedValue) []*Ydb.TypedValue {
+	return expandItems(v, func(i int) *Ydb.Type {
+		return v.GetType().GetListType().GetItem()
+	})
+}
+
+func expandStruct(v *Ydb.TypedValue) []*Ydb.TypedValue {
+	return expandItems(v, func(i int) *Ydb.Type {
+		return v.GetType().GetStructType().GetMembers()[i].GetType()
+	})
 }
 
 func expandTuple(v *Ydb.TypedValue) []*Ydb.TypedValue {
@@ -111,6 +124,28 @@ func comparePrimitives(t Ydb.Type_PrimitiveTypeId, l *Ydb.Value, r *Ydb.Value) (
 }
 
 func compareTuplesOrLists(l []*Ydb.TypedValue, r []*Ydb.TypedValue) (int, error) {
+	for i, lval := range l {
+		if i >= len(r) {
+			// l is longer than r, first len(r) elements equal
+			return 1, nil
+		}
+		rval := r[i]
+		cmp, err := compare(lval, rval)
+		if err != nil {
+			return 0, xerrors.WithStackTrace(err)
+		}
+		if cmp != 0 {
+			return cmp, nil
+		}
+	}
+	// len(l) elements equal
+	if len(r) > len(l) {
+		return -1, nil
+	}
+	return 0, nil
+}
+
+func compareStructs(l []*Ydb.TypedValue, r []*Ydb.TypedValue) (int, error) {
 	for i, lval := range l {
 		if i >= len(r) {
 			// l is longer than r, first len(r) elements equal

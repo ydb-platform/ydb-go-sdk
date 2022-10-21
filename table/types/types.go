@@ -57,8 +57,20 @@ func Dict(k, v Type) Type {
 	return value.Dict(k, v)
 }
 
-func Variant(x Type) Type {
-	return value.Variant(x)
+func VariantStruct(opts ...StructOption) Type {
+	var s tStructType
+	for _, opt := range opts {
+		opt(&s)
+	}
+	return value.VariantStruct(s.fields...)
+}
+
+func VariantTuple(elems ...Type) Type {
+	es := make([]value.Type, len(elems))
+	for i, el := range elems {
+		es[i] = el
+	}
+	return value.VariantTuple(es...)
 }
 
 func Void() Type {
@@ -113,9 +125,9 @@ const (
 
 // WriteTypeStringTo writes ydb type string representation into buffer
 //
-// Deprecated: use types.Type.String() instead
+// Deprecated: use types.Type.Yql() instead
 func WriteTypeStringTo(buf *bytes.Buffer, t Type) {
-	buf.WriteString(t.String())
+	buf.WriteString(t.Yql())
 }
 
 // RawValue scanning non-primitive yql types or for own implementation scanner native API

@@ -208,6 +208,12 @@ func ListValue(vs ...Value) Value {
 	}()...)
 }
 
+func SetValue(vs ...Value) Value {
+	return value.SetValue(func() (vv []value.Value) {
+		return append(vv, vs...)
+	}()...)
+}
+
 type structValueFields struct {
 	fields []value.StructValueField
 }
@@ -248,8 +254,12 @@ func DictValue(opts ...DictValueOption) Value {
 	return value.DictValue(p.fields...)
 }
 
-func VariantValue(v Value, i uint32, variantT Type) Value {
-	return value.VariantValue(v, i, variantT)
+func VariantValueStruct(v Value, name string, variantT Type) Value {
+	return value.VariantValueStruct(v, name, variantT)
+}
+
+func VariantValueTuple(v Value, i uint32, variantT Type) Value {
+	return value.VariantValueTuple(v, i, variantT)
 }
 
 func NullableBoolValue(v *bool) Value {

@@ -64,6 +64,10 @@ func (a *Allocator) TypeEmptyList() (v *Ydb.Type_EmptyListType) {
 	return new(Ydb.Type_EmptyListType)
 }
 
+func (a *Allocator) TypeEmptyDict() (v *Ydb.Type_EmptyDictType) {
+	return new(Ydb.Type_EmptyDictType)
+}
+
 func (a *Allocator) TypeOptional() (v *Ydb.Type_OptionalType) {
 	return new(Ydb.Type_OptionalType)
 }

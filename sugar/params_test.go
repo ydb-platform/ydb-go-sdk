@@ -72,7 +72,7 @@ func TestGenerateDeclareSection(t *testing.T) {
 			declare: `
 				DECLARE $a AS Bool;
 				DECLARE $b AS Int64; 
-				DECLARE $c AS Optional<Text>;
+				DECLARE $c AS Optional<Utf8>;
 			`,
 		},
 		{
@@ -84,7 +84,7 @@ func TestGenerateDeclareSection(t *testing.T) {
 			declare: `
 				DECLARE $a AS Bool;
 				DECLARE $b AS Int64; 
-				DECLARE $c AS Optional<Text>;
+				DECLARE $c AS Optional<Utf8>;
 			`,
 		},
 	} {
