@@ -271,7 +271,7 @@ func WithCertificate(cert *x509.Certificate) Option {
 }
 
 // WithCertificatesFromFile appends certificates by filepath to TLS config root certificates
-func WithCertificatesFromFile(caFile string) Option {
+func WithCertificatesFromFile(caFile string, opts ...certificates.FromFileOption) Option {
 	if len(caFile) > 0 && caFile[0] == '~' {
 		if home, err := os.UserHomeDir(); err == nil {
 			caFile = filepath.Join(home, caFile[1:])
@@ -284,7 +284,7 @@ func WithCertificatesFromFile(caFile string) Option {
 		caFile = file
 	}
 	return func(ctx context.Context, c *connection) error {
-		certs, err := certificates.ParseCertificatesFromFile(caFile)
+		certs, err := certificates.FromFile(caFile, opts...)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -309,9 +309,9 @@ func WithTLSConfig(tlsConfig *tls.Config) Option {
 }
 
 // WithCertificatesFromPem appends certificates from pem-encoded data to TLS config root certificates
-func WithCertificatesFromPem(bytes []byte) Option {
+func WithCertificatesFromPem(bytes []byte, opts ...certificates.FromPemOption) Option {
 	return func(ctx context.Context, c *connection) error {
-		certs, err := certificates.ParseCertificatesFromPem(bytes)
+		certs, err := certificates.FromPem(bytes, opts...)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}

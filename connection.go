@@ -362,7 +362,7 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	return open(ctx, opts...)
 }
 
-func applyOptions(ctx context.Context, opts ...Option) (_ *connection, err error) {
+func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *connection, err error) {
 	c := &connection{
 		opts:     opts,
 		children: make(map[uint64]Connection),
@@ -461,7 +461,7 @@ func connect(ctx context.Context, c *connection) error {
 }
 
 func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
-	c, err := applyOptions(ctx, opts...)
+	c, err := newConnectionFromOptions(ctx, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

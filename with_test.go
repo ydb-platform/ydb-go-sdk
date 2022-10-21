@@ -1,191 +1,154 @@
 package ydb
 
 import (
+	"bytes"
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
+	"math/big"
 	"os"
-	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/certificates"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
-	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
-func BenchmarkWithCertificateCache(b *testing.B) {
-	b.ReportAllocs()
-
-	bytes, err := os.ReadFile(os.Getenv("YDB_SSL_ROOT_CERTIFICATES_FILE"))
-	if err != nil {
-		b.Fatal(err)
+func TestWithCertificatesCached(t *testing.T) {
+	ca := &x509.Certificate{
+		SerialNumber: big.NewInt(2019),
+		Subject: pkix.Name{
+			Organization:  []string{"Company, INC."},
+			Country:       []string{"US"},
+			Province:      []string{""},
+			Locality:      []string{"San Francisco"},
+			StreetAddress: []string{"Golden Gate Bridge"},
+			PostalCode:    []string{"94016"},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().AddDate(10, 0, 0),
+		IsCA:                  true,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
 	}
-
-	// these vars make applyOptions() do unnecessary things
-	testutil.Unsetenv(b, "YDB_SSL_ROOT_CERTIFICATES_FILE")
-	testutil.Unsetenv(b, "YDB_LOG_SEVERITY_LEVEL")
-
-	tcs := []struct {
-		name    string
-		enabled bool
-	}{
-		{"no cache", false},
-		{"cached", true},
-	}
-	for _, tc := range tcs {
-		b.Run(tc.name, func(b *testing.B) {
-			certificates.PemCacheEnabled = tc.enabled
-
-			ctx := context.TODO()
-			db, err := applyOptions(
-				ctx,
-				WithCertificatesFromPem(bytes),
-			)
-			if err != nil {
-				b.Fatal(err)
-			}
-			// pool is needed in db.with()
-			db.pool = conn.NewPool(db.config)
-
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				_, _, err := db.with(
-					ctx,
-					WithSessionPoolSizeLimit(100),
-				)
-				if err != nil {
-					b.Fatal(err)
-				}
-			}
-		})
-	}
-}
-
-func BenchmarkWithFileCache(b *testing.B) {
-	b.ReportAllocs()
-
-	caFile := os.Getenv("YDB_SSL_ROOT_CERTIFICATES_FILE")
-
-	// these vars make applyOptions() do unnecessary things
-	testutil.Unsetenv(b, "YDB_SSL_ROOT_CERTIFICATES_FILE")
-	testutil.Unsetenv(b, "YDB_LOG_SEVERITY_LEVEL")
-
-	tcs := []struct {
-		name        string
-		certEnabled bool
-		fileEnabled bool
-	}{
-		{"no cache", false, false},
-		{"cert cache", true, false},
-		{"both caches", true, true},
-	}
-	for _, tc := range tcs {
-		b.Run(tc.name, func(b *testing.B) {
-			certificates.FileCacheEnabled = tc.fileEnabled
-			certificates.PemCacheEnabled = tc.certEnabled
-
-			ctx := context.TODO()
-			db, err := applyOptions(
-				ctx,
-				WithCertificatesFromFile(caFile),
-			)
-			if err != nil {
-				b.Fatal(err)
-			}
-			// pool is needed in db.with()
-			db.pool = conn.NewPool(db.config)
-
-			b.ResetTimer()
-
-			for i := 0; i < b.N; i++ {
-				_, _, err := db.with(
-					ctx,
-					WithSessionPoolSizeLimit(100),
-				)
-				if err != nil {
-					b.Fatal(err)
-				}
-			}
-		})
-	}
-}
-
-func TestWithCacheConcurrent(t *testing.T) {
-	xtest.TestManyTimes(t, func(t testing.TB) {
-		const nRoutines = 10
-
-		ctx := context.TODO()
-		db, err := Open(
-			ctx,
-			os.Getenv("YDB_CONNECTION_STRING"),
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			// cleanup connection
-			if e := db.Close(ctx); e != nil {
-				t.Fatalf("close failed: %+v", e)
-			}
-		}()
-
-		wg := &sync.WaitGroup{}
-
-		for i := 0; i < nRoutines; i++ {
-			wg.Add(1)
-			go func() {
-				// child conns are closed on db.Close()
-				_, err := db.With(
-					ctx,
-					WithSessionPoolSizeLimit(100),
-				)
-				if err != nil {
-					t.Error(err)
-				}
-				wg.Done()
-			}()
-		}
-		wg.Wait()
+	caPrivKey, err := rsa.GenerateKey(rand.Reader, 4096)
+	require.NoError(t, err)
+	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, &caPrivKey.PublicKey, caPrivKey)
+	require.NoError(t, err)
+	caPEM := new(bytes.Buffer)
+	err = pem.Encode(caPEM, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: caBytes,
 	})
-}
+	require.NoError(t, err)
+	f, err := os.CreateTemp(os.TempDir(), "ca.pem")
+	require.NoError(t, err)
+	_, err = f.Write(caPEM.Bytes())
+	require.NoError(t, err)
+	defer os.Remove(f.Name())
 
-func TestWithCacheHits(t *testing.T) {
-	const nChildren = 10
-
-	ctx := context.TODO()
-	db, err := Open(
-		ctx,
-		os.Getenv("YDB_CONNECTION_STRING"),
+	var (
+		n           = 100
+		hitCounter  uint64
+		missCounter uint64
+		ctx         = context.TODO()
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		// cleanup connection
-		if e := db.Close(ctx); e != nil {
-			t.Fatalf("close failed: %+v", e)
-		}
-	}()
 
-	hits := 0
-	certificates.FileCacheHook = func(isHit bool) {
-		if isHit {
-			hits++
-		}
-	}
+	for _, test := range []struct {
+		name    string
+		options []Option
+		expMiss uint64
+		expHit  uint64
+	}{
+		{
+			"no cache",
+			[]Option{},
+			0,
+			0,
+		},
+		{
+			"file cache",
+			[]Option{
+				WithCertificatesFromFile(f.Name(),
+					certificates.FromFileOnHit(func() {
+						atomic.AddUint64(&hitCounter, 1)
+					}),
+					certificates.FromFileOnMiss(func() {
+						atomic.AddUint64(&missCounter, 1)
+					}),
+				),
+			},
+			0,
+			uint64(n),
+		},
+		{
+			"pem cache",
+			[]Option{
+				WithCertificatesFromPem(caPEM.Bytes(),
+					certificates.FromPemOnHit(func() {
+						atomic.AddUint64(&hitCounter, 1)
+					}),
+					certificates.FromPemMiss(func() {
+						atomic.AddUint64(&missCounter, 1)
+					}),
+				),
+			},
+			0,
+			uint64(n),
+		},
+		{
+			"pem&file cache",
+			[]Option{
+				WithCertificatesFromFile(f.Name(),
+					certificates.FromFileOnHit(func() {
+						atomic.AddUint64(&hitCounter, 1)
+					}),
+					certificates.FromFileOnMiss(func() {
+						atomic.AddUint64(&missCounter, 1)
+					}),
+				),
+				WithCertificatesFromPem(caPEM.Bytes(),
+					certificates.FromPemOnHit(func() {
+						atomic.AddUint64(&hitCounter, 1)
+					}),
+					certificates.FromPemMiss(func() {
+						atomic.AddUint64(&missCounter, 1)
+					}),
+				),
+			},
+			0,
+			uint64(n * 2),
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			db, err := newConnectionFromOptions(ctx,
+				append(
+					test.options,
+					withConnPool(conn.NewPool(config.New())),
+				)...,
+			)
+			require.NoError(t, err)
 
-	lastHits := hits
-	for i := 0; i < nChildren; i++ {
-		// child conns are closed on db.Close()
-		_, err := db.With(
-			ctx,
-			WithSessionPoolSizeLimit(100),
-		)
-		if err != nil {
-			t.Error(err)
-		}
-		if delta := hits - lastHits; delta < 1 {
-			t.Errorf("child conn #%d: cache miss", i)
-		}
-		lastHits = hits
+			hitCounter, missCounter = 0, 0
+
+			for i := 0; i < n; i++ {
+				_, _, err := db.with(ctx,
+					func(ctx context.Context, c *connection) error {
+						return nil // nothing to do
+					},
+				)
+				require.NoError(t, err)
+			}
+			require.Equal(t, test.expHit, hitCounter)
+			require.Equal(t, test.expMiss, missCounter)
+		})
 	}
 }
