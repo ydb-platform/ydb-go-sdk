@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/certificates"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
 func BenchmarkWithCertificateCache(b *testing.B) {
@@ -20,8 +21,8 @@ func BenchmarkWithCertificateCache(b *testing.B) {
 	}
 
 	// these vars make applyOptions() do unnecessary things
-	os.Unsetenv("YDB_SSL_ROOT_CERTIFICATES_FILE")
-	os.Unsetenv("YDB_LOG_SEVERITY_LEVEL")
+	testutil.Unsetenv(b, "YDB_SSL_ROOT_CERTIFICATES_FILE")
+	testutil.Unsetenv(b, "YDB_LOG_SEVERITY_LEVEL")
 
 	tcs := []struct {
 		name    string
@@ -63,9 +64,10 @@ func BenchmarkWithFileCache(b *testing.B) {
 	b.ReportAllocs()
 
 	caFile := os.Getenv("YDB_SSL_ROOT_CERTIFICATES_FILE")
+
 	// these vars make applyOptions() do unnecessary things
-	os.Unsetenv("YDB_SSL_ROOT_CERTIFICATES_FILE")
-	os.Unsetenv("YDB_LOG_SEVERITY_LEVEL")
+	testutil.Unsetenv(b, "YDB_SSL_ROOT_CERTIFICATES_FILE")
+	testutil.Unsetenv(b, "YDB_LOG_SEVERITY_LEVEL")
 
 	tcs := []struct {
 		name        string
