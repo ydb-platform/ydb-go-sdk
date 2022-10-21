@@ -72,8 +72,7 @@ var (
 	PemCacheHook func(isHit bool)
 )
 
-// ParseCertificate is a cached version of x509.ParseCertificate. Cache key is
-//  string(der)
+// ParseCertificate is a cached version of x509.ParseCertificate. Cache key is string(der)
 func ParseCertificate(der []byte) (*x509.Certificate, error) {
 	if !PemCacheEnabled {
 		cert, err := x509.ParseCertificate(der)
@@ -88,7 +87,7 @@ func ParseCertificate(der []byte) (*x509.Certificate, error) {
 	if exists {
 		cert, ok := value.(*x509.Certificate)
 		if !ok {
-			panic("ydb: unknown pem cache type")
+			panic("ydb: unknown der cache type")
 		}
 		return cert, nil
 	}
