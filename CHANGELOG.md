@@ -6,6 +6,7 @@
 * Marked `table/types.WriteTypeStringTo` as deprecated 
 * Added `table/options.WithDataColumns` for supporting covering indexes
 * Supported `balancer` query string parameter in DSN
+* Added certificate caching in `WithCertificatesFromFile` and `WithCertificatesFromPem`
 
 ## v3.38.5
 * Fixed bug from scan unexpected column name

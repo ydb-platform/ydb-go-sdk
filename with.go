@@ -9,10 +9,10 @@ import (
 
 var nextID = uint64(0)
 
-func (c *connection) With(ctx context.Context, opts ...Option) (Connection, error) {
+func (c *connection) with(ctx context.Context, opts ...Option) (*connection, uint64, error) {
 	id := atomic.AddUint64(&nextID, 1)
 
-	child, err := open(
+	child, err := applyOptions(
 		ctx,
 		append(
 			append(
@@ -31,6 +31,19 @@ func (c *connection) With(ctx context.Context, opts ...Option) (Connection, erro
 			opts...,
 		)...,
 	)
+	if err != nil {
+		return nil, 0, xerrors.WithStackTrace(err)
+	}
+	return child, id, nil
+}
+
+func (c *connection) With(ctx context.Context, opts ...Option) (Connection, error) {
+	child, id, err := c.with(ctx, opts...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	err = connect(ctx, child)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

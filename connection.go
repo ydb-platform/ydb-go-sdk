@@ -362,7 +362,7 @@ func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	return open(ctx, opts...)
 }
 
-func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
+func applyOptions(ctx context.Context, opts ...Option) (_ *connection, err error) {
 	c := &connection{
 		opts:     opts,
 		children: make(map[uint64]Connection),
@@ -396,12 +396,17 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		}
 	}
 	c.config = config.New(c.options...)
+	return c, nil
+}
+
+func connect(ctx context.Context, c *connection) error {
+	var err error
 
 	if c.config.Endpoint() == "" {
-		return nil, xerrors.WithStackTrace(errors.New("configuration: empty dial address"))
+		return xerrors.WithStackTrace(errors.New("configuration: empty dial address"))
 	}
 	if c.config.Database() == "" {
-		return nil, xerrors.WithStackTrace(errors.New("configuration: empty database"))
+		return xerrors.WithStackTrace(errors.New("configuration: empty database"))
 	}
 
 	onDone := trace.DriverOnInit(
@@ -449,9 +454,21 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 		)...,
 	)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 
+	return nil
+}
+
+func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
+	c, err := applyOptions(ctx, opts...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	err = connect(ctx, c)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
 	return c, nil
 }
 

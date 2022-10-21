@@ -4,9 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"time"
@@ -14,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/certificates"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
@@ -273,20 +272,26 @@ func WithCertificate(cert *x509.Certificate) Option {
 
 // WithCertificatesFromFile appends certificates by filepath to TLS config root certificates
 func WithCertificatesFromFile(caFile string) Option {
-	return func(ctx context.Context, c *connection) error {
-		if len(caFile) > 0 && caFile[0] == '~' {
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return xerrors.WithStackTrace(err)
-			}
+	if len(caFile) > 0 && caFile[0] == '~' {
+		if home, err := os.UserHomeDir(); err == nil {
 			caFile = filepath.Join(home, caFile[1:])
 		}
-		bytes, err := ioutil.ReadFile(filepath.Clean(caFile))
+	}
+	if file, err := filepath.Abs(caFile); err == nil {
+		caFile = file
+	}
+	if file, err := filepath.EvalSymlinks(caFile); err == nil {
+		caFile = file
+	}
+	return func(ctx context.Context, c *connection) error {
+		certs, err := certificates.ParseCertificatesFromFile(caFile)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
-		if err = WithCertificatesFromPem(bytes)(ctx, c); err != nil {
-			return xerrors.WithStackTrace(err)
+		for _, cert := range certs {
+			if err := WithCertificate(cert)(ctx, c); err != nil {
+				return xerrors.WithStackTrace(err)
+			}
 		}
 		return nil
 	}
@@ -303,31 +308,15 @@ func WithTLSConfig(tlsConfig *tls.Config) Option {
 	}
 }
 
-// WithCertificatesFromPem appends certificates by filepath to TLS config root certificates
+// WithCertificatesFromPem appends certificates from pem-encoded data to TLS config root certificates
 func WithCertificatesFromPem(bytes []byte) Option {
 	return func(ctx context.Context, c *connection) error {
-		if ok, err := func(bytes []byte) (ok bool, err error) {
-			var cert *x509.Certificate
-			for len(bytes) > 0 {
-				var block *pem.Block
-				block, bytes = pem.Decode(bytes)
-				if block == nil {
-					break
-				}
-				if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
-					continue
-				}
-				certBytes := block.Bytes
-				cert, err = x509.ParseCertificate(certBytes)
-				if err != nil {
-					continue
-				}
-				_ = WithCertificate(cert)(ctx, c)
-				ok = true
-			}
-			return
-		}(bytes); !ok {
+		certs, err := certificates.ParseCertificatesFromPem(bytes)
+		if err != nil {
 			return xerrors.WithStackTrace(err)
+		}
+		for _, cert := range certs {
+			_ = WithCertificate(cert)(ctx, c)
 		}
 		return nil
 	}
