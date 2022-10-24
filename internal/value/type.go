@@ -10,6 +10,7 @@ import (
 
 type Type interface {
 	Yql() string
+	String() string
 
 	toYDB(a *allocator.Allocator) *Ydb.Type
 	equalsTo(rhs Type) bool
@@ -145,6 +146,10 @@ type DecimalType struct {
 	Scale     uint32
 }
 
+func (v *DecimalType) String() string {
+	return v.Yql()
+}
+
 func (v *DecimalType) Name() string {
 	return "Decimal"
 }
@@ -183,6 +188,10 @@ func Decimal(precision, scale uint32) *DecimalType {
 type dictType struct {
 	keyType   Type
 	valueType Type
+}
+
+func (v *dictType) String() string {
+	return v.Yql()
 }
 
 func (v *dictType) Yql() string {
@@ -238,6 +247,10 @@ func (v emptyListType) Yql() string {
 	return "EmptyList"
 }
 
+func (v emptyListType) String() string {
+	return v.Yql()
+}
+
 func (emptyListType) equalsTo(rhs Type) bool {
 	_, ok := rhs.(emptyListType)
 	return ok
@@ -256,6 +269,10 @@ func EmptyList() emptyListType {
 }
 
 type emptyDictType struct{}
+
+func (v emptyDictType) String() string {
+	return v.Yql()
+}
 
 func (v emptyDictType) Yql() string {
 	return "EmptyDict"
@@ -284,6 +301,10 @@ func EmptyDict() emptyDictType {
 
 type listType struct {
 	itemType Type
+}
+
+func (v *listType) String() string {
+	return v.Yql()
 }
 
 func (v *listType) Yql() string {
@@ -323,6 +344,10 @@ type setType struct {
 	itemType Type
 }
 
+func (v *setType) String() string {
+	return v.Yql()
+}
+
 func (v *setType) Yql() string {
 	return "Set<" + v.itemType.Yql() + ">"
 }
@@ -360,6 +385,10 @@ type optionalType struct {
 	innerType Type
 }
 
+func (v optionalType) String() string {
+	return v.Yql()
+}
+
 func (v optionalType) Yql() string {
 	return "Optional<" + v.innerType.Yql() + ">"
 }
@@ -393,6 +422,10 @@ func Optional(t Type) optionalType {
 }
 
 type PrimitiveType uint
+
+func (v PrimitiveType) String() string {
+	return v.Yql()
+}
 
 func (v PrimitiveType) Yql() string {
 	return primitiveString[v]
@@ -506,6 +539,10 @@ type (
 	}
 )
 
+func (v *StructType) String() string {
+	return v.Yql()
+}
+
 func (v *StructType) Yql() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
@@ -582,6 +619,10 @@ func StructFields(ms []*Ydb.StructMember) []StructField {
 
 type TupleType struct {
 	items []Type
+}
+
+func (v *TupleType) String() string {
+	return v.Yql()
 }
 
 func (v *TupleType) Yql() string {
@@ -748,6 +789,10 @@ func VariantTuple(items ...Type) *variantTupleType {
 
 type voidType struct{}
 
+func (v voidType) String() string {
+	return v.Yql()
+}
+
 func (v voidType) Yql() string {
 	return "Void"
 }
@@ -770,6 +815,10 @@ func Void() voidType {
 }
 
 type nullType struct{}
+
+func (v nullType) String() string {
+	return v.Yql()
+}
 
 func (v nullType) Yql() string {
 	return "Null"
