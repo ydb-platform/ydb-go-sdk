@@ -5,7 +5,8 @@
 * Added `types.Value.Yql()` func for getting values string representation as `YQL` literal
 * Marked `table/types.WriteTypeStringTo` as deprecated 
 * Added `table/options.WithDataColumns` for supporting covering indexes
-* Supported `balancer` query string parameter in DSN
+* Supported `balancer` query string parameter in `DSN`
+* Fixed bug with scanning `YSON` value from result set
 * Added certificate caching in `WithCertificatesFromFile` and `WithCertificatesFromPem`
 
 ## v3.38.5
