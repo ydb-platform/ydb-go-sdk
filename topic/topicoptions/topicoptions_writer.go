@@ -4,7 +4,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
 type WriterOption = topicwriterinternal.PublicWriterOption
@@ -89,15 +88,6 @@ func WithPartitionID(partitionID int64) WriterOption {
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithSyncWrite(sync bool) WriterOption {
 	return topicwriterinternal.WithWaitAckOnWrite(sync)
-}
-
-// WithWriterPartitioning explicit set partitioning for write session
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func WithWriterPartitioning(partitioning topicwriter.Partitioning) WriterOption {
-	return topicwriterinternal.WithPartitioning(partitioning)
 }
 
 type (

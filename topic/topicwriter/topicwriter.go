@@ -7,8 +7,7 @@ import (
 )
 
 type (
-	Message      = topicwriterinternal.Message
-	Partitioning = topicwriterinternal.PublicPartitioning
+	Message = topicwriterinternal.Message
 )
 
 var ErrQueueLimitExceed = topicwriterinternal.PublicErrQueueIsFull
