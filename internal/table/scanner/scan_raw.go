@@ -221,7 +221,7 @@ func (s *rawConverter) UTF8() (v string) {
 
 func (s *rawConverter) YSON() (v []byte) {
 	s.unwrap()
-	return []byte(s.text())
+	return s.bytes()
 }
 
 func (s *rawConverter) JSON() (v []byte) {
