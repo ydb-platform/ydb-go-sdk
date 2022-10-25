@@ -1,3 +1,4 @@
+* Added sugar helper for read messages with auto-commit
 * Removed message level partitioning from experimental topic API. It is unavailable on server side yet.
 * Supported `NullValue` type as received type from `YDB`
 * Supported `types.SetValue` type
