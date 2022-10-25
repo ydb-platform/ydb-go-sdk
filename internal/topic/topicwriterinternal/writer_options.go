@@ -94,7 +94,7 @@ func WithMaxQueueLen(num int) PublicWriterOption {
 	}
 }
 
-func WithPartitioning(partitioning PublicPartitioning) PublicWriterOption {
+func WithPartitioning(partitioning PublicFuturePartitioning) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.defaultPartitioning = partitioning.ToRaw()
 	}

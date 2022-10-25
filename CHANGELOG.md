@@ -1,3 +1,4 @@
+* Removed message level partitioning from experimental topic API. It is unavailable on server side yet.
 * Supported `NullValue` type as received type from `YDB`
 * Supported `types.SetValue` type
 * Added `types.CastTo(types.Value, destination)` public method for cast `types.Value` to golang native type value destination
