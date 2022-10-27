@@ -1,22 +1,22 @@
 package log
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger/level"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log/structural"
 )
 
-type Level level.Level
+type Level structural.Level
 
 const (
-	TRACE = Level(level.TRACE)
-	DEBUG = Level(level.DEBUG)
-	INFO  = Level(level.INFO)
-	WARN  = Level(level.WARN)
-	ERROR = Level(level.ERROR)
-	FATAL = Level(level.FATAL)
+	TRACE = Level(structural.TRACE)
+	DEBUG = Level(structural.DEBUG)
+	INFO  = Level(structural.INFO)
+	WARN  = Level(structural.WARN)
+	ERROR = Level(structural.ERROR)
+	FATAL = Level(structural.FATAL)
 
-	QUIET = Level(level.QUIET)
+	QUIET = Level(structural.QUIET)
 )
 
 func FromString(l string) Level {
-	return Level(level.FromString(l))
+	return Level(structural.FromString(l))
 }
