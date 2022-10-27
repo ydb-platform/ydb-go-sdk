@@ -1,3 +1,6 @@
+//go:build !tagForFixDEVTOOLSSUPPORT_14817
+// +build !tagForFixDEVTOOLSSUPPORT_14817
+
 package ydb
 
 import (
