@@ -702,7 +702,7 @@ func testTable(t testing.TB) {
 	}
 	fmt.Printf("> values selected\n")
 	// shutdown existing sessions
-	urls := os.Getenv("YDB_SHUTDOWN_URLS")
+	urls := os.Getenv("YDB_SESSIONS_SHUTDOWN_URLS")
 	if len(urls) > 0 {
 		fmt.Printf("> shutdowning existing sessions...\n")
 		for _, url := range strings.Split(urls, ",") {
