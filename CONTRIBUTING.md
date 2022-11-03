@@ -1,35 +1,55 @@
-# Notice to external contributors
+# How to contribute
 
+ydb-go-sdk (and YDB also) is an open project, and you can contribute to it in many ways. You can help with ideas, code, or documentation. We appreciate any efforts that help us to make the project better.
 
-## General info
+Thank you!
 
-Hello! In order for us (YANDEX LLC) to accept patches and other contributions from you, you will have to adopt our Yandex Contributor License Agreement (the “**CLA**”). The current version of the CLA you may find here:
-1) https://yandex.ru/legal/cla/?lang=en (in English) and 
+## Legal Info
+
+In order for us (YANDEX LLC) to accept patches and other contributions from you, you will have to adopt our Yandex Contributor License Agreement (the “**CLA**”). The current version of the CLA you may find here:
+1) https://yandex.ru/legal/cla/?lang=en (in English) and
 2) https://yandex.ru/legal/cla/?lang=ru (in Russian).
 
-By adopting the CLA, you state the following:
+## Technical Info
 
-* You obviously wish and are willingly licensing your contributions to us for our open source projects under the terms of the CLA,
-* You has read the terms and conditions of the CLA and agree with them in full,
-* You are legally able to provide and license your contributions as stated,
-* We may use your contributions for our open source projects and for any other our project too,
-* We rely on your assurances concerning the rights of third parties in relation to your contributes.
+#. Check for open issues or open a fresh issue to start a discussion around a feature idea or a bug.
+#. Fork `the repository <https://github.com/ydb-platform/ydb-go-sdk>`_ on GitHub to start making your changes to the **master** branch (or branch off of it).
+#. Write a test which shows that the bug was fixed or that the feature works as expected.
+#. Send a pull request and bug the maintainer until it gets merged and published.
 
-If you agree with these principles, please read and adopt our CLA. By providing us your contributions, you hereby declare that you has already read and adopt our CLA, and we may freely merge your contributions with our corresponding open source project and use it in further in accordance with terms and conditions of the CLA.
+## Instructions for checks code changes locally
 
-## Provide contributions 
+### Prerequisites
 
-If you have already adopted terms and conditions of the CLA, you are able to provide your contributes. When you submit your pull request, please add the following information into it:
+- Docker. See [official documentations](https://docs.docker.com/engine/install/) for install `docker` to your operating system
+- go >= 1.18. See [official instructions](https://go.dev/doc/install) for install `golang` to your operating system
+- golangci-lint >= 1.48.0. See [official instructions](https://golangci-lint.run/usage/install/) for install `golangci-lint` to your operating system
 
+### Run linter checks
+
+All commands must be called from project directory.
+
+```sh
+$ golangci-lint run ...
 ```
-I hereby agree to the terms of the CLA available at: [link].
+
+### Run tests
+
+All commands must be called from project directory.
+
+#### Only unit tests
+
+```sh
+$ go test -race -tags fast ./... 
 ```
 
-Replace the bracketed text as follows:
-* [link] is the link at the current version of the CLA (you may add here a link https://yandex.ru/legal/cla/?lang=en (in English) or a link https://yandex.ru/legal/cla/?lang=ru (in Russian).
+#### All tests (include integration tests)
 
-It is enough to provide us such notification at once. 
-
-## Other questions
-
-If you have any questions, please mail us at opensource@yandex-team.ru.
+```sh
+$ docker run -itd --name ydb -dp 2135:2135 -dp 2136:2136 -dp 8765:8765 -v `pwd`/ydb_certs:/ydb_certs -e YDB_LOCAL_SURVIVE_RESTART=true -e YDB_USE_IN_MEMORY_PDISKS=true -h localhost cr.yandex/yc/yandex-docker-local-ydb:latest
+$ export YDB_CONNECTION_STRING="grpcs://localhost:2135/local"
+$ export YDB_SSL_ROOT_CERTIFICATES_FILE="`pwd`/ydb_certs/ca.pem"
+$ export YDB_SESSIONS_SHUTDOWN_URLS="http://localhost:8765/actors/kqp_proxy?force_shutdown=all"
+$ go test -race ./... 
+$ docker stop ydb
+```
