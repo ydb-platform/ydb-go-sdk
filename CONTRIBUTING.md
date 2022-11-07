@@ -1,5 +1,9 @@
 # How to contribute
 
+ydb-go-sdk (and YDB also) is an open project, and you can contribute to it in many ways. You can help with ideas, code, or documentation. We appreciate any efforts that help us to make the project better.
+
+Thank you!
+
 ## Table of contents
   * [Legal Info](#legal-info)
   * [Technical Info](#technical-info)
@@ -9,11 +13,6 @@
     + [Run tests](#run-tests)
       - [Only unit tests](#only-unit-tests)
       - [All tests (include integration tests)](#all-tests)
-
-
-ydb-go-sdk (and YDB also) is an open project, and you can contribute to it in many ways. You can help with ideas, code, or documentation. We appreciate any efforts that help us to make the project better.
-
-Thank you!
 
 ## Legal Info
 
