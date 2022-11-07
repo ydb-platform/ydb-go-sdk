@@ -7,12 +7,12 @@ Thank you!
 ## Table of contents
   * [Legal Info](#legal-info)
   * [Technical Info](#technical-info)
-  * [Instructions for checks code changes locally](#instructions-for-checks-code-changes-locally)
-    + [Prerequisites](#prerequisites)
-    + [Run linter checks](#run-linter-checks)
-    + [Run tests](#run-tests)
-      - [Only unit tests](#only-unit-tests)
-      - [All tests (include integration tests)](#all-tests)
+    * [Instructions for checks code changes locally](#instructions-for-checks-code-changes-locally)
+      + [Prerequisites](#prerequisites)
+      + [Run linter checks](#run-linter-checks)
+      + [Run tests](#run-tests)
+        - [Only unit tests](#only-unit-tests)
+        - [All tests (include integration tests)](#all-tests)
 
 ## Legal Info
 
@@ -27,15 +27,15 @@ In order for us (YANDEX LLC) to accept patches and other contributions from you,
 3. Write a test which shows that the bug was fixed or that the feature works as expected.
 4. Send a pull request and bug the maintainer until it gets merged and published.
 
-## Instructions for checks code changes locally
+### Instructions for checks code changes locally
 
-### Prerequisites
+#### Prerequisites
 
 - Docker. See [official documentations](https://docs.docker.com/engine/install/) for install `docker` to your operating system
 - go >= 1.18. See [official instructions](https://go.dev/doc/install) for install `golang` to your operating system
 - golangci-lint >= 1.48.0. See [official instructions](https://golangci-lint.run/usage/install/) for install `golangci-lint` to your operating system
 
-### Run linter checks
+#### Run linter checks
 
 All commands must be called from project directory.
 
@@ -43,17 +43,17 @@ All commands must be called from project directory.
 golangci-lint run ./...
 ```
 
-### Run tests
+#### Run tests
 
 All commands must be called from project directory.
 
-#### Only unit tests
+##### Only unit tests
 
 ```sh
 go test -race -tags fast ./... 
 ```
 
-#### All tests
+##### All tests
 
 ```sh
 docker run -itd --name ydb -dp 2135:2135 -dp 2136:2136 -dp 8765:8765 -v `pwd`/ydb_certs:/ydb_certs -e YDB_LOCAL_SURVIVE_RESTART=true -e YDB_USE_IN_MEMORY_PDISKS=true -h localhost cr.yandex/yc/yandex-docker-local-ydb:latest
