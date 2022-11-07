@@ -1,5 +1,16 @@
 # How to contribute
 
+## Table of contents
+  * [Legal Info](#legal-info)
+  * [Technical Info](#technical-info)
+  * [Instructions for checks code changes locally](#instructions-for-checks-code-changes-locally)
+    + [Prerequisites](#prerequisites)
+    + [Run linter checks](#run-linter-checks)
+    + [Run tests](#run-tests)
+      - [Only unit tests](#only-unit-tests)
+      - [All tests (include integration tests)](#all-tests)
+
+
 ydb-go-sdk (and YDB also) is an open project, and you can contribute to it in many ways. You can help with ideas, code, or documentation. We appreciate any efforts that help us to make the project better.
 
 Thank you!
@@ -30,7 +41,7 @@ In order for us (YANDEX LLC) to accept patches and other contributions from you,
 All commands must be called from project directory.
 
 ```sh
-$ golangci-lint run ...
+golangci-lint run ...
 ```
 
 ### Run tests
@@ -40,16 +51,16 @@ All commands must be called from project directory.
 #### Only unit tests
 
 ```sh
-$ go test -race -tags fast ./... 
+go test -race -tags fast ./... 
 ```
 
-#### All tests (include integration tests)
+#### All tests
 
 ```sh
-$ docker run -itd --name ydb -dp 2135:2135 -dp 2136:2136 -dp 8765:8765 -v `pwd`/ydb_certs:/ydb_certs -e YDB_LOCAL_SURVIVE_RESTART=true -e YDB_USE_IN_MEMORY_PDISKS=true -h localhost cr.yandex/yc/yandex-docker-local-ydb:latest
-$ export YDB_CONNECTION_STRING="grpcs://localhost:2135/local"
-$ export YDB_SSL_ROOT_CERTIFICATES_FILE="`pwd`/ydb_certs/ca.pem"
-$ export YDB_SESSIONS_SHUTDOWN_URLS="http://localhost:8765/actors/kqp_proxy?force_shutdown=all"
-$ go test -race ./... 
-$ docker stop ydb
+docker run -itd --name ydb -dp 2135:2135 -dp 2136:2136 -dp 8765:8765 -v `pwd`/ydb_certs:/ydb_certs -e YDB_LOCAL_SURVIVE_RESTART=true -e YDB_USE_IN_MEMORY_PDISKS=true -h localhost cr.yandex/yc/yandex-docker-local-ydb:latest
+export YDB_CONNECTION_STRING="grpcs://localhost:2135/local"
+export YDB_SSL_ROOT_CERTIFICATES_FILE="`pwd`/ydb_certs/ca.pem"
+export YDB_SESSIONS_SHUTDOWN_URLS="http://localhost:8765/actors/kqp_proxy?force_shutdown=all"
+go test -race ./... 
+docker stop ydb
 ```
