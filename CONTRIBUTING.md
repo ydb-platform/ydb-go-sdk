@@ -40,7 +40,7 @@ In order for us (YANDEX LLC) to accept patches and other contributions from you,
 All commands must be called from project directory.
 
 ```sh
-golangci-lint run ...
+golangci-lint run ./...
 ```
 
 ### Run tests
