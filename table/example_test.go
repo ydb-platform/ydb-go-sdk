@@ -133,3 +133,27 @@ func Example_bulkUpsert() {
 		fmt.Printf("unexpected error: %v", err)
 	}
 }
+
+func Example_alterTable() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
+	if err != nil {
+		fmt.Printf("failed connect: %v", err)
+		return
+	}
+	defer db.Close(ctx) // cleanup resources
+	err = db.Table().Do(ctx,
+		func(ctx context.Context, s table.Session) (err error) {
+			return s.AlterTable(ctx, path.Join(db.Name(), "series"),
+				options.WithAddColumn("series_id", types.Optional(types.TypeUint64)),
+				options.WithAddColumn("title", types.Optional(types.TypeText)),
+				options.WithAlterAttribute("hello", "world"),
+				options.WithAddAttribute("foo", "bar"),
+				options.WithDropAttribute("baz"),
+			)
+		},
+	)
+	if err != nil {
+		fmt.Printf("unexpected error: %v", err)
+	}
+}
