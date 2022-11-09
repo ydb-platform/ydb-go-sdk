@@ -428,8 +428,7 @@ func testTable(t testing.TB) {
 	}
 
 	// upsert with transaction
-	if err = db.Table().DoTx(
-		ctx,
+	if err = db.Table().DoTx(ctx,
 		func(ctx context.Context, tx table.TransactionActor) (err error) {
 			var (
 				res   result.Result
@@ -499,8 +498,7 @@ func testTable(t testing.TB) {
 		t.Fatalf("tx failed: %v\n", err)
 	}
 	// select upserted data
-	if err = db.Table().Do(
-		ctx,
+	if err = db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			var (
 				res   result.Result
@@ -558,8 +556,7 @@ func testTable(t testing.TB) {
 	// multiple result sets
 	// - create table
 	t.Logf("> creating table stream_query...\n")
-	if err = db.Table().Do(
-		ctx,
+	if err = db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			_ = s.ExecuteSchemeQuery(
 				ctx,
@@ -604,8 +601,7 @@ func testTable(t testing.TB) {
 	fmt.Printf("> values to upsert prepared\n")
 
 	fmt.Printf("> upserting prepared values...\n")
-	if err = db.Table().Do(
-		ctx,
+	if err = db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			_, _, err = s.Execute(
 				ctx,
@@ -640,8 +636,7 @@ func testTable(t testing.TB) {
 
 	// - scan select
 	fmt.Printf("> scan-selecting values...\n")
-	if err = db.Table().Do(
-		ctx,
+	if err = db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			res, err := s.StreamExecuteScanQuery(
 				ctx, `SELECT val FROM stream_query;`, table.NewQueryParameters(),
@@ -764,8 +759,7 @@ func testTable(t testing.TB) {
 }
 
 func streamReadTable(ctx context.Context, t testing.TB, c table.Client, tableAbsPath string) {
-	err := c.Do(
-		ctx,
+	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			var (
 				res   result.StreamResult
@@ -857,8 +851,7 @@ func executeDataQuery(ctx context.Context, t testing.TB, c table.Client, folderA
 			table.CommitTx(),
 		)
 	)
-	err := c.Do(
-		ctx,
+	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			var (
 				res   result.Result
@@ -919,8 +912,7 @@ func executeScanQuery(ctx context.Context, t testing.TB, c table.Client, folderA
 			TablePathPrefix: folderAbsPath,
 		},
 	)
-	err := c.Do(
-		ctx,
+	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			var (
 				res      result.StreamResult
@@ -1197,8 +1189,7 @@ var (
 
 func describeTableOptions(ctx context.Context, c table.Client) error {
 	var desc options.TableOptionsDescription
-	err := c.Do(
-		ctx,
+	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			desc, err = s.DescribeTableOptions(ctx)
 			return
@@ -1247,8 +1238,7 @@ func fill(ctx context.Context, db ydb.Connection, folder string) error {
 		),
 		table.CommitTx(),
 	)
-	return db.Table().Do(
-		ctx,
+	return db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			stmt, err := s.Prepare(ctx, render(fillQuery, templateConfig{
 				TablePathPrefix: path.Join(db.Name(), folder),
@@ -1267,8 +1257,7 @@ func fill(ctx context.Context, db ydb.Connection, folder string) error {
 }
 
 func createTables(ctx context.Context, c table.Client, folder string) error {
-	err := c.Do(
-		ctx,
+	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			if _, err = s.DescribeTable(ctx, path.Join(folder, "series")); err == nil {
 				_ = s.DropTable(ctx, path.Join(folder, "series"))
@@ -1288,8 +1277,7 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 		return err
 	}
 
-	err = c.Do(
-		ctx,
+	err = c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			if _, err = s.DescribeTable(ctx, path.Join(folder, "seasons")); err == nil {
 				_ = s.DropTable(ctx, path.Join(folder, "seasons"))
@@ -1308,8 +1296,7 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 		return err
 	}
 
-	err = c.Do(
-		ctx,
+	err = c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			if _, err = s.DescribeTable(ctx, path.Join(folder, "episodes")); err == nil {
 				_ = s.DropTable(ctx, path.Join(folder, "episodes"))
@@ -1329,8 +1316,7 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 }
 
 func describeTable(ctx context.Context, c table.Client, path string) (err error) {
-	err = c.Do(
-		ctx,
+	err = c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			desc, err := s.DescribeTable(ctx, path)
 			if err != nil {
@@ -1389,8 +1375,7 @@ func TestLongStream(t *testing.T) {
 	}(db)
 
 	t.Run("creating stream table", func(t *testing.T) {
-		if err = db.Table().Do(
-			ctx,
+		if err = db.Table().Do(ctx,
 			func(ctx context.Context, s table.Session) (err error) {
 				_, err = s.DescribeTable(ctx, path.Join(db.Name(), tableName))
 				if err == nil {
@@ -1431,8 +1416,7 @@ func TestLongStream(t *testing.T) {
 						),
 					)
 				}
-				if err = db.Table().Do(
-					ctx,
+				if err = db.Table().Do(ctx,
 					func(ctx context.Context, s table.Session) (err error) {
 						_, _, err = s.Execute(
 							ctx,
@@ -1488,8 +1472,7 @@ func TestLongStream(t *testing.T) {
 	}(db)
 
 	t.Run("execute stream query", func(t *testing.T) {
-		if err = db.Table().Do(
-			ctx,
+		if err = db.Table().Do(ctx,
 			func(ctx context.Context, s table.Session) (err error) {
 				var (
 					start     = time.Now()
@@ -1529,8 +1512,7 @@ func TestLongStream(t *testing.T) {
 	})
 
 	t.Run("stream read table", func(t *testing.T) {
-		if err = db.Table().Do(
-			ctx,
+		if err = db.Table().Do(ctx,
 			func(ctx context.Context, s table.Session) (err error) {
 				var (
 					start     = time.Now()
@@ -1599,8 +1581,7 @@ func TestSplitRangesAndRead(t *testing.T) {
 	}(db)
 
 	t.Run("creating table", func(t *testing.T) {
-		if err = db.Table().Do(
-			ctx,
+		if err = db.Table().Do(ctx,
 			func(ctx context.Context, s table.Session) (err error) {
 				_, err = s.DescribeTable(ctx, path.Join(db.Name(), tableName))
 				if err == nil {
@@ -1647,8 +1628,7 @@ func TestSplitRangesAndRead(t *testing.T) {
 						),
 					)
 				}
-				if err = db.Table().Do(
-					ctx,
+				if err = db.Table().Do(ctx,
 					func(ctx context.Context, s table.Session) (err error) {
 						_, _, err = s.Execute(
 							ctx,
@@ -1744,8 +1724,7 @@ func TestSplitRangesAndRead(t *testing.T) {
 			rowsCount = 0
 		)
 		for _, r := range ranges {
-			if err = db.Table().Do(
-				ctx,
+			if err = db.Table().Do(ctx,
 				func(ctx context.Context, s table.Session) (err error) {
 					res, err := s.StreamReadTable(ctx, path.Join(db.Name(), tableName), options.ReadKeyRange(r))
 					if err != nil {

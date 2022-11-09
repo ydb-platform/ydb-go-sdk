@@ -622,6 +622,19 @@ func WithAlterAttribute(key, value string) AlterTableOption {
 	}
 }
 
+func WithAddAttribute(key, value string) AlterTableOption {
+	return attribute{
+		key:   key,
+		value: value,
+	}
+}
+
+func WithDropAttribute(key string) AlterTableOption {
+	return attribute{
+		key: key,
+	}
+}
+
 func WithAddColumnMeta(column Column) AlterTableOption {
 	return columnMeta(column)
 }

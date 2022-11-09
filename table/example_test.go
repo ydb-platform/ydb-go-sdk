@@ -63,8 +63,7 @@ func Example_createTable() {
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
-	err = db.Table().Do(
-		ctx,
+	err = db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(db.Name(), "series"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),

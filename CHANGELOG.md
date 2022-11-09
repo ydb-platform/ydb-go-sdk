@@ -1,3 +1,5 @@
+* Added `options.WithAddAttribute` and `options.WithDropAttribute` options for `session.AlterTable` request
+
 ## v3.39.0
 * Removed message level partitioning from experimental topic API. It is unavailable on server side yet.
 * Supported `NullValue` type as received type from `YDB`
