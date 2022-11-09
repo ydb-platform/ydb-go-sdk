@@ -12,34 +12,58 @@ type logger struct {
 }
 
 func Structural(l Logger) structural.Logger {
-	return logger{l}
+	return &logger{l: l}
 }
 
-func (r logger) Record() structural.Record {
-	rec := &record{l: r.l}
-	rec.Reset()
-	return rec
+func (l *logger) Trace() structural.Record {
+	return &record{
+		send: l.l.Tracef,
+	}
 }
 
-func (r logger) WithName(name string) structural.Logger {
-	return Structural(r.l.WithName(name))
+func (l *logger) Debug() structural.Record {
+	return &record{
+		send: l.l.Debugf,
+	}
+}
+
+func (l *logger) Info() structural.Record {
+	return &record{
+		send: l.l.Infof,
+	}
+}
+
+func (l *logger) Warn() structural.Record {
+	return &record{
+		send: l.l.Warnf,
+	}
+}
+
+func (l *logger) Error() structural.Record {
+	return &record{
+		send: l.l.Errorf,
+	}
+}
+
+func (l *logger) Fatal() structural.Record {
+	return &record{
+		send: l.l.Fatalf,
+	}
+}
+
+func (l *logger) WithName(name string) structural.Logger {
+	return Structural(l.l.WithName(name))
 }
 
 type record struct {
-	lvl     Level
 	formats []string
 	values  []interface{}
-	l       Logger
+	send    func(format string, a ...interface{})
 }
 
 func (r *record) addField(key string, format string, value interface{}) *record {
 	r.formats = append(r.formats, key+":"+format)
 	r.values = append(r.values, value)
-	return r
-}
-
-func (r *record) Level(lvl structural.Level) structural.Record {
-	r.lvl = Level(lvl)
 	return r
 }
 
@@ -59,17 +83,7 @@ func (r *record) Error(value error) structural.Record {
 	return r.addField("error", `"%v"`, value)
 }
 
-func (r *record) Reset() {
-	r.lvl = QUIET
-	r.formats = r.formats[:0]
-	r.values = r.values[:0]
-}
-
 func (r *record) Message(msg string) {
-	var format string
-	if msg != "" {
-		format = msg + " "
-	}
-	format += "{" + strings.Join(r.formats, ",") + "}"
-	logLevel(r.l, nil, r.lvl, QUIET, format, r.values...)
+	format := msg + "{" + strings.Join(r.formats, ",") + "}"
+	r.send(format, r.values...)
 }

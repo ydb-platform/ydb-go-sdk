@@ -14,8 +14,7 @@ func Discovery(l Logger, details trace.Details) (t trace.Discovery) {
 	}
 	l = l.WithName(`discovery`)
 	t.OnDiscover = func(info trace.DiscoveryDiscoverStartInfo) func(trace.DiscoveryDiscoverDoneInfo) {
-		l.Record().
-			Level(INFO).
+		l.Info().
 			String("address", info.Address).
 			String("database", info.Database).
 			Message("discover start")
@@ -27,14 +26,12 @@ func Discovery(l Logger, details trace.Details) (t trace.Discovery) {
 				for _, e := range info.Endpoints {
 					endpoints = append(endpoints, e.String())
 				}
-				l.Record().
-					Level(DEBUG).
+				l.Debug().
 					Duration("latency", time.Since(start)).
 					Strings("endpoints", endpoints).
 					Message("discover done")
 			} else {
-				l.Record().
-					Level(ERROR).
+				l.Error().
 					Duration("latency", time.Since(start)).
 					Error(info.Error).
 					String("version", meta.Version).
@@ -43,21 +40,17 @@ func Discovery(l Logger, details trace.Details) (t trace.Discovery) {
 		}
 	}
 	t.OnWhoAmI = func(info trace.DiscoveryWhoAmIStartInfo) func(doneInfo trace.DiscoveryWhoAmIDoneInfo) {
-		l.Record().
-			Level(DEBUG).
-			Message(`whoAmI start`)
+		l.Debug().Message(`whoAmI start`)
 		start := time.Now()
 		return func(info trace.DiscoveryWhoAmIDoneInfo) {
 			if info.Error == nil {
-				l.Record().
-					Level(DEBUG).
+				l.Debug().
 					Duration("latency", time.Since(start)).
 					String("user", info.User).
 					Strings("groups", info.Groups).
 					Message("whoAmI done")
 			} else {
-				l.Record().
-					Level(ERROR).
+				l.Error().
 					Duration("latency", time.Since(start)).
 					Error(info.Error).
 					String("version", meta.Version).
