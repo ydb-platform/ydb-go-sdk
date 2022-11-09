@@ -83,6 +83,26 @@ func (r *record) Error(value error) structural.Record {
 	return r.addField("error", `"%v"`, value)
 }
 
+func (r *record) NamedError(key string, value error) structural.Record {
+	return r.addField(key, `"%v"`, value)
+}
+
+func (r *record) Int(key string, value int) structural.Record {
+	return r.addField(key, `%d`, value)
+}
+
+func (r *record) Int64(key string, value int64) structural.Record {
+	return r.addField(key, `%d`, value)
+}
+
+func (r *record) Bool(key string, value bool) structural.Record {
+	return r.addField(key, `%t`, value)
+}
+
+func (r *record) Any(key string, value interface{}) structural.Record {
+	return r.addField(key, `%v`, value)
+}
+
 func (r *record) Message(msg string) {
 	format := msg + "{" + strings.Join(r.formats, ",") + "}"
 	r.send(format, r.values...)
