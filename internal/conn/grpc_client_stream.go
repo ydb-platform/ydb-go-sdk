@@ -8,6 +8,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wrap"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -20,7 +21,7 @@ type grpcClientStream struct {
 	c        *conn
 	wrapping bool
 	sentMark *modificationMark
-	onDone   func(ctx context.Context)
+	onDone   func(ctx context.Context, md metadata.MD)
 	recv     func(error) func(error, trace.ConnState, map[string][]string)
 }
 
@@ -75,10 +76,11 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	defer cancel(xerrors.WithStackTrace(errors.New("receive msg finished")))
 
 	defer func() {
-		onDone := s.recv(xerrors.HideEOF(err))
+		var onDone = s.recv(xerrors.HideEOF(err))
 		if err != nil {
-			onDone(xerrors.HideEOF(err), s.c.GetState(), s.ClientStream.Trailer())
-			s.onDone(s.ClientStream.Context())
+			md := s.ClientStream.Trailer()
+			onDone(xerrors.HideEOF(err), s.c.GetState(), md)
+			s.onDone(s.ClientStream.Context(), md)
 		}
 	}()
 

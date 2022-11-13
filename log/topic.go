@@ -2,9 +2,9 @@
 package log
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 

@@ -3,32 +3,13 @@ package meta
 import (
 	"context"
 	"fmt"
+	meta2 "github.com/ydb-platform/ydb-go-sdk/v3/meta"
 
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-)
-
-const (
-	// outgoing headers
-	HeaderDatabase           = "x-ydb-database"
-	HeaderTicket             = "x-ydb-auth-ticket"
-	HeaderVersion            = "x-ydb-sdk-build-info"
-	HeaderRequestType        = "x-ydb-request-type"
-	HeaderTraceID            = "x-ydb-trace-id"
-	HeaderUserAgent          = "x-ydb-user-agent"
-	HeaderClientCapabilities = "x-ydb-client-capabilities"
-
-	// outgoing hints
-	HintSessionBalancer = "session-balancer"
-
-	// incomming headers
-	HeaderServerHints = "x-ydb-server-hints"
-
-	// incoming hints
-	HintSessionClose = "session-close"
 )
 
 type Meta interface {
@@ -100,26 +81,26 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		md = metadata.MD{}
 	}
 
-	if len(md.Get(HeaderDatabase)) == 0 {
-		md.Set(HeaderDatabase, m.database)
+	if len(md.Get(meta2.HeaderDatabase)) == 0 {
+		md.Set(meta2.HeaderDatabase, m.database)
 	}
 
-	if len(md.Get(HeaderVersion)) == 0 {
-		md.Set(HeaderVersion, "ydb-go-sdk/"+Version)
+	if len(md.Get(meta2.HeaderVersion)) == 0 {
+		md.Set(meta2.HeaderVersion, "ydb-go-sdk/"+meta2.Version)
 	}
 
 	if m.requestsType != "" {
-		if len(md.Get(HeaderRequestType)) == 0 {
-			md.Set(HeaderRequestType, m.requestsType)
+		if len(md.Get(meta2.HeaderRequestType)) == 0 {
+			md.Set(meta2.HeaderRequestType, m.requestsType)
 		}
 	}
 
 	if len(m.userAgents) != 0 {
-		md.Append(HeaderUserAgent, m.userAgents...)
+		md.Append(meta2.HeaderUserAgent, m.userAgents...)
 	}
 
 	if len(m.capabilities) > 0 {
-		md.Append(HeaderClientCapabilities, m.capabilities...)
+		md.Append(meta2.HeaderClientCapabilities, m.capabilities...)
 	}
 
 	if m.credentials == nil {
@@ -141,7 +122,7 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	md.Set(HeaderTicket, token)
+	md.Set(meta2.HeaderTicket, token)
 
 	return md, nil
 }

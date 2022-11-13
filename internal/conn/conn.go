@@ -3,6 +3,7 @@ package conn
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/incoming"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -313,6 +314,10 @@ func (c *conn) Invoke(
 		onDone(err, issues, opID, c.GetState(), md)
 	}()
 
+	defer func() {
+		incoming.Notify(ctx, md)
+	}()
+
 	cc, err = c.take(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -433,8 +438,9 @@ func (c *conn) NewStream(
 		c:            c,
 		wrapping:     wrapping,
 		sentMark:     sentMark,
-		onDone: func(ctx context.Context) {
+		onDone: func(ctx context.Context, md metadata.MD) {
 			cancel()
+			incoming.Notify(ctx, md)
 		},
 		recv: streamRecv,
 	}, nil

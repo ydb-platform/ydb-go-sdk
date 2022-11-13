@@ -2,8 +2,7 @@ package ydb
 
 import (
 	"context"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 )
 
 // WithTraceID returns a copy of parent context with traceID

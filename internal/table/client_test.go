@@ -294,8 +294,7 @@ func TestRaceWgClosed(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				for {
-					err := p.Do(
-						ctx,
+					err := p.Do(ctx,
 						func(ctx context.Context, s table.Session) error {
 							return nil
 						},

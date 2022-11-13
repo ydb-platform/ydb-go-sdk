@@ -3,6 +3,7 @@ package table
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/incoming"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/protobuf/proto"
@@ -140,13 +141,9 @@ func (tx *transaction) CommitTx(
 		opt((*options.CommitTransactionDesc)(request))
 	}
 
-	t := tx.s.trailer()
-	defer t.processHints()
-
 	response, err = tx.s.tableService.CommitTransaction(
-		balancer.WithEndpoint(ctx, tx.s),
+		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, tx.s.checkCloseHint), tx.s),
 		request,
-		t.Trailer(),
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -180,11 +177,8 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 		onDone(err)
 	}()
 
-	t := tx.s.trailer()
-	defer t.processHints()
-
 	_, err = tx.s.tableService.RollbackTransaction(
-		balancer.WithEndpoint(ctx, tx.s),
+		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, tx.s.checkCloseHint), tx.s),
 		&Ydb_Table.RollbackTransactionRequest{
 			SessionId: tx.s.id,
 			TxId:      tx.id,
@@ -195,7 +189,6 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 				operation.ModeSync,
 			),
 		},
-		t.Trailer(),
 	)
 	return xerrors.WithStackTrace(err)
 }

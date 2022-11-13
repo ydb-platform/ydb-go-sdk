@@ -6,6 +6,7 @@ package discovery_test
 import (
 	"context"
 	"crypto/tls"
+	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"os"
 	"testing"
 	"time"
@@ -16,7 +17,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )

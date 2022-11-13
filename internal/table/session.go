@@ -14,11 +14,11 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/incoming"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
@@ -26,6 +26,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -152,13 +153,6 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.
 	return s, nil
 }
 
-func (s *session) trailer() *trailer {
-	return &trailer{
-		s:  s,
-		md: metadata.MD{},
-	}
-}
-
 func (s *session) ID() string {
 	if s == nil {
 		return ""
@@ -204,6 +198,17 @@ func (s *session) Close(ctx context.Context) (err error) {
 	return nil
 }
 
+func (s *session) checkCloseHint(header string, values []string) {
+	if header != meta.HeaderServerHints {
+		return
+	}
+	for _, hint := range values {
+		if hint == meta.HintSessionClose {
+			s.SetStatus(table.SessionClosing)
+		}
+	}
+}
+
 // KeepAlive keeps idle session alive.
 func (s *session) KeepAlive(ctx context.Context) (err error) {
 	var (
@@ -218,10 +223,8 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 		onDone(err)
 	}()
 
-	t := s.trailer()
-	defer t.processHints()
 	resp, err := s.tableService.KeepAlive(
-		balancer.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&Ydb_Table.KeepAliveRequest{
 			SessionId: s.id,
 			OperationParams: operation.Params(
@@ -231,7 +234,6 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 				operation.ModeSync,
 			),
 		},
-		t.Trailer(),
 	)
 	if err != nil {
 		return
@@ -275,12 +277,9 @@ func (s *session) CreateTable(
 	for _, opt := range opts {
 		opt.ApplyCreateTableOption((*options.CreateTableDesc)(&request), a)
 	}
-	t := s.trailer()
-	defer t.processHints()
 	_, err = s.tableService.CreateTable(
-		balancer.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&request,
-		t.Trailer(),
 	)
 	return xerrors.WithStackTrace(err)
 }
@@ -451,12 +450,9 @@ func (s *session) DropTable(
 	for _, opt := range opts {
 		opt.ApplyDropTableOption((*options.DropTableDesc)(&request))
 	}
-	t := s.trailer()
-	defer t.processHints()
 	_, err = s.tableService.DropTable(
-		balancer.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&request,
-		t.Trailer(),
 	)
 	return xerrors.WithStackTrace(err)
 }
@@ -493,12 +489,9 @@ func (s *session) AlterTable(
 	for _, opt := range opts {
 		opt.ApplyAlterTableOption((*options.AlterTableDesc)(&request), a)
 	}
-	t := s.trailer()
-	defer t.processHints()
 	_, err = s.tableService.AlterTable(
-		balancer.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&request,
-		t.Trailer(),
 	)
 	return xerrors.WithStackTrace(err)
 }
@@ -523,12 +516,9 @@ func (s *session) CopyTable(
 	for _, opt := range opts {
 		opt((*options.CopyTableDesc)(&request))
 	}
-	t := s.trailer()
-	defer t.processHints()
 	_, err = s.tableService.CopyTable(
-		balancer.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&request,
-		t.Trailer(),
 	)
 	return xerrors.WithStackTrace(err)
 }
@@ -560,10 +550,8 @@ func (s *session) Explain(
 		}
 	}()
 
-	t := s.trailer()
-	defer t.processHints()
 	response, err = s.tableService.ExplainDataQuery(
-		balancer.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&Ydb_Table.ExplainDataQueryRequest{
 			SessionId: s.id,
 			YqlText:   query,
@@ -574,7 +562,6 @@ func (s *session) Explain(
 				operation.ModeSync,
 			),
 		},
-		t.Trailer(),
 	)
 	if err != nil {
 		return
@@ -611,10 +598,8 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 		onDone(q, err)
 	}()
 
-	t := s.trailer()
-	defer t.processHints()
 	response, err = s.tableService.PrepareDataQuery(
-		balancer.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&Ydb_Table.PrepareDataQueryRequest{
 			SessionId: s.id,
 			YqlText:   query,
@@ -625,7 +610,6 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 				operation.ModeSync,
 			),
 		},
-		t.Trailer(),
 	)
 	if err != nil {
 		return
@@ -754,14 +738,10 @@ func (s *session) executeDataQuery(
 		opt((*options.ExecuteDataQueryDesc)(request))
 	}
 
-	t := s.trailer()
-	defer t.processHints()
-
 	var response *Ydb_Table.ExecuteDataQueryResponse
 	response, err = s.tableService.ExecuteDataQuery(
-		balancer.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		request,
-		t.Trailer(),
 	)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
@@ -792,12 +772,9 @@ func (s *session) ExecuteSchemeQuery(
 	for _, opt := range opts {
 		opt((*options.ExecuteSchemeQueryDesc)(&request))
 	}
-	t := s.trailer()
-	defer t.processHints()
 	_, err = s.tableService.ExecuteSchemeQuery(
-		balancer.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&request,
-		t.Trailer(),
 	)
 	return xerrors.WithStackTrace(err)
 }
@@ -819,12 +796,9 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 			operation.ModeSync,
 		),
 	}
-	t := s.trailer()
-	defer t.processHints()
 	response, err = s.tableService.DescribeTableOptions(
-		balancer.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&request,
-		t.Trailer(),
 	)
 	if err != nil {
 		return
@@ -974,7 +948,7 @@ func (s *session) StreamReadTable(
 	ctx, cancel := xcontext.WithErrCancel(ctx)
 
 	stream, err = s.tableService.StreamReadTable(
-		balancer.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&request,
 	)
 
@@ -1061,7 +1035,7 @@ func (s *session) StreamExecuteScanQuery(
 	ctx, cancel := context.WithCancel(ctx)
 
 	stream, err = s.tableService.StreamExecuteScanQuery(
-		balancer.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&request,
 	)
 
@@ -1104,16 +1078,10 @@ func (s *session) StreamExecuteScanQuery(
 
 // BulkUpsert uploads given list of ydb struct values to the table.
 func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value) (err error) {
-	var (
-		t = s.trailer()
-		a = allocator.New()
-	)
-	defer func() {
-		a.Free()
-		t.processHints()
-	}()
+	a := allocator.New()
+	defer a.Free()
 	_, err = s.tableService.BulkUpsert(
-		balancer.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&Ydb_Table.BulkUpsertRequest{
 			Table: table,
 			Rows:  value.ToYDB(rows, a),
@@ -1124,7 +1092,6 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 				operation.ModeSync,
 			),
 		},
-		t.Trailer(),
 	)
 	return xerrors.WithStackTrace(err)
 }
@@ -1148,10 +1115,8 @@ func (s *session) BeginTransaction(
 		onDone(x, err)
 	}()
 
-	t := s.trailer()
-	defer t.processHints()
 	response, err = s.tableService.BeginTransaction(
-		balancer.WithEndpoint(ctx, s),
+		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&Ydb_Table.BeginTransactionRequest{
 			SessionId:  s.id,
 			TxSettings: tx.Settings(),
@@ -1162,7 +1127,6 @@ func (s *session) BeginTransaction(
 				operation.ModeSync,
 			),
 		},
-		t.Trailer(),
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
