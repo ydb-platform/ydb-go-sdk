@@ -290,7 +290,7 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 						String("endpoint", endpoint).
 						String("method", method).
 						Duration("latency", time.Since(start)).
-						Any("metadata", info.Metadata).
+						Object("metadata", Metadata(info.Metadata, l.Object())).
 						Message("invoke done")
 				} else {
 					l.Warn().
@@ -298,7 +298,7 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 						String("method", method).
 						Duration("latency", time.Since(start)).
 						Error(info.Error).
-						Any("metadata", info.Metadata).
+						Object("metadata", Metadata(info.Metadata, l.Object())).
 						String("version", meta.Version).
 						Message("invoke failed")
 				}
@@ -340,7 +340,7 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 							String("endpoint", endpoint).
 							String("method", method).
 							Duration("latency", time.Since(start)).
-							Any("metadata", info.Metadata).
+							Object("metadata", Metadata(info.Metadata, l.Object())).
 							Message("streaming done")
 					} else {
 						l.Warn().
@@ -348,7 +348,7 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 							String("method", method).
 							Duration("latency", time.Since(start)).
 							Error(info.Error).
-							Any("metadata", info.Metadata).
+							Object("metadata", Metadata(info.Metadata, l.Object())).
 							String("version", meta.Version).
 							Message("streaming done")
 					}
@@ -485,7 +485,7 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 				if info.Error == nil {
 					l.Info().
 						Duration("latency", time.Since(start)).
-						Any("endpoints", info.Endpoints).
+						Array("endpoints", EndpointInfoSlice(info.Endpoints, l.Array())).
 						String("detectedLocalDC", info.LocalDC).
 						Message("balancer discovery done")
 				} else {

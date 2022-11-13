@@ -83,13 +83,19 @@ func Scripting(l Logger, details trace.Details, opts ...option) (t trace.Scripti
 					Message("stream execute intermediate failed")
 			}
 			return func(info trace.ScriptingStreamExecuteDoneInfo) {
+				//nolint:nestif
 				if info.Error == nil {
-					// TODO: logQuery?
-					l.Debug().
-						Duration("latency", time.Since(start)).
-						String("query", query).
-						String("params", params.String()).
-						Message("stream execute done")
+					if options.logQuery {
+						l.Debug().
+							Duration("latency", time.Since(start)).
+							String("query", query).
+							String("params", params.String()).
+							Message("stream execute done")
+					} else {
+						l.Debug().
+							Duration("latency", time.Since(start)).
+							Message("stream execute done")
+					}
 				} else {
 					if options.logQuery {
 						l.Error().
