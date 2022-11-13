@@ -4,15 +4,17 @@ type logOptions struct {
 	logQuery bool
 }
 
-type option func(o *logOptions)
+// Option is exported only for compatibility reasons and MUST NOT be initialized directly.
+// Instead, only options providing functions (e.g. WithLogQuery()) must be used.
+type Option func(o *logOptions)
 
-func WithLogQuery() option {
+func WithLogQuery() Option {
 	return func(o *logOptions) {
 		o.logQuery = true
 	}
 }
 
-func parseOptions(opts ...option) logOptions {
+func parseOptions(opts ...Option) logOptions {
 	options := logOptions{}
 	for _, o := range opts {
 		o(&options)

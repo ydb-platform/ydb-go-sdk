@@ -9,7 +9,7 @@ import (
 )
 
 // DatabaseSQL makes trace.DatabaseSQL with logging events from details
-func DatabaseSQL(l Logger, details trace.Details, opts ...option) (t trace.DatabaseSQL) {
+func DatabaseSQL(l Logger, details trace.Details, opts ...Option) (t trace.DatabaseSQL) {
 	if details&trace.DatabaseSQLEvents == 0 {
 		return
 	}

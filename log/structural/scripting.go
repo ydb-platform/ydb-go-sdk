@@ -8,7 +8,7 @@ import (
 )
 
 // Scripting returns trace.Scripting with logging events from details
-func Scripting(l Logger, details trace.Details, opts ...option) (t trace.Scripting) {
+func Scripting(l Logger, details trace.Details, opts ...Option) (t trace.Scripting) {
 	if details&trace.ScriptingEvents == 0 {
 		return
 	}

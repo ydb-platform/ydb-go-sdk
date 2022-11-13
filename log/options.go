@@ -1,21 +1,7 @@
 package log
 
-type logOptions struct {
-	logQuery bool
-}
+import "github.com/ydb-platform/ydb-go-sdk/v3/log/structural"
 
-type option func(o *logOptions)
-
-func WithLogQuery() option {
-	return func(o *logOptions) {
-		o.logQuery = true
-	}
-}
-
-func parseOptions(opts ...option) logOptions {
-	options := logOptions{}
-	for _, o := range opts {
-		o(&options)
-	}
-	return options
+func WithLogQuery() structural.Option {
+	return structural.WithLogQuery()
 }
