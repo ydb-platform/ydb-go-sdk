@@ -1,4 +1,5 @@
 * Added `options.WithAddAttribute` and `options.WithDropAttribute` options for `session.AlterTable` request
+* Added package `meta` with methods to subscribe to incoming metadata 
 
 ## v3.39.0
 * Removed message level partitioning from experimental topic API. It is unavailable on server side yet.
