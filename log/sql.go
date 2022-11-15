@@ -1,9 +1,9 @@
 package log
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )

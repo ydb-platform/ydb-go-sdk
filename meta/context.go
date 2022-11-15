@@ -32,6 +32,9 @@ func WithAllowFeatures(ctx context.Context, features ...string) context.Context 
 	return metadata.AppendToOutgoingContext(ctx, kv...)
 }
 
-func WithIncomingMetadataCallback(ctx context.Context, callback func(header string, values []string)) context.Context {
+func WithIncomingMetadataCallback(
+	ctx context.Context,
+	callback func(header string, values []string),
+) context.Context {
 	return incoming.WithMetadataCallback(ctx, callback)
 }

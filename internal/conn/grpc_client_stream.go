@@ -76,7 +76,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	defer cancel(xerrors.WithStackTrace(errors.New("receive msg finished")))
 
 	defer func() {
-		var onDone = s.recv(xerrors.HideEOF(err))
+		onDone := s.recv(xerrors.HideEOF(err))
 		if err != nil {
 			md := s.ClientStream.Trailer()
 			onDone(xerrors.HideEOF(err), s.c.GetState(), md)

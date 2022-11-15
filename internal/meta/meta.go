@@ -3,12 +3,12 @@ package meta
 import (
 	"context"
 	"fmt"
-	meta2 "github.com/ydb-platform/ydb-go-sdk/v3/meta"
 
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -22,7 +22,7 @@ func New(
 	trace trace.Driver,
 	opts ...Option,
 ) Meta {
-	m := &meta{
+	m := &metaObject{
 		trace:       trace,
 		credentials: credentials,
 		database:    database,
@@ -33,28 +33,28 @@ func New(
 	return m
 }
 
-type Option func(m *meta)
+type Option func(m *metaObject)
 
 func WithUserAgentOption(userAgent string) Option {
-	return func(m *meta) {
+	return func(m *metaObject) {
 		m.userAgents = append(m.userAgents, userAgent)
 	}
 }
 
 func WithRequestTypeOption(requestType string) Option {
-	return func(m *meta) {
+	return func(m *metaObject) {
 		m.requestsType = requestType
 	}
 }
 
 func AllowOption(feature string) Option {
-	return func(m *meta) {
+	return func(m *metaObject) {
 		m.capabilities = append(m.capabilities, feature)
 	}
 }
 
 func ForbidOption(feature string) Option {
-	return func(m *meta) {
+	return func(m *metaObject) {
 		n := 0
 		for _, capability := range m.capabilities {
 			if capability != feature {
@@ -66,7 +66,7 @@ func ForbidOption(feature string) Option {
 	}
 }
 
-type meta struct {
+type metaObject struct {
 	trace        trace.Driver
 	credentials  credentials.Credentials
 	database     string
@@ -75,32 +75,32 @@ type meta struct {
 	capabilities []string
 }
 
-func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
+func (m *metaObject) meta(ctx context.Context) (_ metadata.MD, err error) {
 	md, has := metadata.FromOutgoingContext(ctx)
 	if !has {
 		md = metadata.MD{}
 	}
 
-	if len(md.Get(meta2.HeaderDatabase)) == 0 {
-		md.Set(meta2.HeaderDatabase, m.database)
+	if len(md.Get(meta.HeaderDatabase)) == 0 {
+		md.Set(meta.HeaderDatabase, m.database)
 	}
 
-	if len(md.Get(meta2.HeaderVersion)) == 0 {
-		md.Set(meta2.HeaderVersion, "ydb-go-sdk/"+meta2.Version)
+	if len(md.Get(meta.HeaderVersion)) == 0 {
+		md.Set(meta.HeaderVersion, "ydb-go-sdk/"+meta.Version)
 	}
 
 	if m.requestsType != "" {
-		if len(md.Get(meta2.HeaderRequestType)) == 0 {
-			md.Set(meta2.HeaderRequestType, m.requestsType)
+		if len(md.Get(meta.HeaderRequestType)) == 0 {
+			md.Set(meta.HeaderRequestType, m.requestsType)
 		}
 	}
 
 	if len(m.userAgents) != 0 {
-		md.Append(meta2.HeaderUserAgent, m.userAgents...)
+		md.Append(meta.HeaderUserAgent, m.userAgents...)
 	}
 
 	if len(m.capabilities) > 0 {
-		md.Append(meta2.HeaderClientCapabilities, m.capabilities...)
+		md.Append(meta.HeaderClientCapabilities, m.capabilities...)
 	}
 
 	if m.credentials == nil {
@@ -122,12 +122,12 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	md.Set(meta2.HeaderTicket, token)
+	md.Set(meta.HeaderTicket, token)
 
 	return md, nil
 }
 
-func (m *meta) Context(ctx context.Context) (_ context.Context, err error) {
+func (m *metaObject) Context(ctx context.Context) (_ context.Context, err error) {
 	md, err := m.meta(ctx)
 	if err != nil {
 		return ctx, xerrors.WithStackTrace(err)

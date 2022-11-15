@@ -4,7 +4,6 @@ import (
 	"container/list"
 	"context"
 	"fmt"
-	meta2 "github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"sort"
 	"sync"
 	"time"
@@ -16,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
@@ -372,8 +372,8 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 	}()
 
 	s, err = c.createSession(
-		meta2.WithAllowFeatures(ctx,
-			meta2.HintSessionBalancer,
+		meta.WithAllowFeatures(ctx,
+			meta.HintSessionBalancer,
 		),
 		withCreateSessionOnCreate(c.appendSessionToNodes),
 		withCreateSessionOnClose(c.removeSessionFromNodes),

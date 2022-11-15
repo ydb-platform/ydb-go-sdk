@@ -3,10 +3,10 @@ package xsql
 import (
 	"context"
 	"database/sql/driver"
-	meta2 "github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"io"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -117,8 +117,8 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 		onDone(err)
 	}()
 	s, err := c.connection.Table().CreateSession(
-		meta2.WithAllowFeatures(ctx,
-			meta2.HintSessionBalancer,
+		meta.WithAllowFeatures(ctx,
+			meta.HintSessionBalancer,
 		),
 	)
 	if err != nil {
