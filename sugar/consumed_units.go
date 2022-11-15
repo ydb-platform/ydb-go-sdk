@@ -2,12 +2,14 @@ package sugar
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"strconv"
+	"sync/atomic"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 )
 
 type consumedUnitsCounter struct {
-	consumedUnits float64
+	consumedUnits uint64
 }
 
 func ConsumedUnitsCounter(ctx context.Context) *consumedUnitsCounter {
@@ -20,16 +22,18 @@ func (c *consumedUnitsCounter) Observe(ctx context.Context) context.Context {
 			return
 		}
 		for _, v := range values {
-			consumedUnits, err := strconv.ParseFloat(v, 64)
-			if err != nil {
-				panic(err)
+			consumedUnits, err := strconv.ParseUint(v, 10, 64)
+			if err == nil {
+				atomic.AddUint64(&c.consumedUnits, consumedUnits)
 			}
-			atomic.Ad
-			c.consumedUnits += consumedUnits
 		}
 	})
 }
 
-func (c *consumedUnitsCounter) Sum() float64 {
-	return c.consumedUnits
+func (c *consumedUnitsCounter) Sum() uint64 {
+	return atomic.LoadUint64(&c.consumedUnits)
+}
+
+func (c *consumedUnitsCounter) Clear() {
+	atomic.StoreUint64(&c.consumedUnits, 0)
 }
