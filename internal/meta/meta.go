@@ -12,49 +12,45 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type Meta interface {
-	Context(ctx context.Context) (context.Context, error)
-}
-
 func New(
 	database string,
 	credentials credentials.Credentials,
 	trace trace.Driver,
 	opts ...Option,
 ) Meta {
-	m := &metaObject{
+	m := Meta{
 		trace:       trace,
 		credentials: credentials,
 		database:    database,
 	}
 	for _, o := range opts {
-		o(m)
+		o(&m)
 	}
 	return m
 }
 
-type Option func(m *metaObject)
+type Option func(m *Meta)
 
 func WithUserAgentOption(userAgent string) Option {
-	return func(m *metaObject) {
+	return func(m *Meta) {
 		m.userAgents = append(m.userAgents, userAgent)
 	}
 }
 
 func WithRequestTypeOption(requestType string) Option {
-	return func(m *metaObject) {
+	return func(m *Meta) {
 		m.requestsType = requestType
 	}
 }
 
 func AllowOption(feature string) Option {
-	return func(m *metaObject) {
+	return func(m *Meta) {
 		m.capabilities = append(m.capabilities, feature)
 	}
 }
 
 func ForbidOption(feature string) Option {
-	return func(m *metaObject) {
+	return func(m *Meta) {
 		n := 0
 		for _, capability := range m.capabilities {
 			if capability != feature {
@@ -66,7 +62,7 @@ func ForbidOption(feature string) Option {
 	}
 }
 
-type metaObject struct {
+type Meta struct {
 	trace        trace.Driver
 	credentials  credentials.Credentials
 	database     string
@@ -75,7 +71,7 @@ type metaObject struct {
 	capabilities []string
 }
 
-func (m *metaObject) meta(ctx context.Context) (_ metadata.MD, err error) {
+func (m Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	md, has := metadata.FromOutgoingContext(ctx)
 	if !has {
 		md = metadata.MD{}
@@ -127,7 +123,7 @@ func (m *metaObject) meta(ctx context.Context) (_ metadata.MD, err error) {
 	return md, nil
 }
 
-func (m *metaObject) Context(ctx context.Context) (_ context.Context, err error) {
+func (m Meta) Context(ctx context.Context) (_ context.Context, err error) {
 	md, err := m.meta(ctx)
 	if err != nil {
 		return ctx, xerrors.WithStackTrace(err)
