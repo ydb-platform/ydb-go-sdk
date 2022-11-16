@@ -8,7 +8,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -77,26 +76,26 @@ func (m Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		md = metadata.MD{}
 	}
 
-	if len(md.Get(meta.HeaderDatabase)) == 0 {
-		md.Set(meta.HeaderDatabase, m.database)
+	if len(md.Get(HeaderDatabase)) == 0 {
+		md.Set(HeaderDatabase, m.database)
 	}
 
-	if len(md.Get(meta.HeaderVersion)) == 0 {
-		md.Set(meta.HeaderVersion, "ydb-go-sdk/"+meta.Version)
+	if len(md.Get(HeaderVersion)) == 0 {
+		md.Set(HeaderVersion, "ydb-go-sdk/"+Version)
 	}
 
 	if m.requestsType != "" {
-		if len(md.Get(meta.HeaderRequestType)) == 0 {
-			md.Set(meta.HeaderRequestType, m.requestsType)
+		if len(md.Get(HeaderRequestType)) == 0 {
+			md.Set(HeaderRequestType, m.requestsType)
 		}
 	}
 
 	if len(m.userAgents) != 0 {
-		md.Append(meta.HeaderUserAgent, m.userAgents...)
+		md.Append(HeaderUserAgent, m.userAgents...)
 	}
 
 	if len(m.capabilities) > 0 {
-		md.Append(meta.HeaderClientCapabilities, m.capabilities...)
+		md.Append(HeaderClientCapabilities, m.capabilities...)
 	}
 
 	if m.credentials == nil {
@@ -118,7 +117,7 @@ func (m Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	md.Set(meta.HeaderTicket, token)
+	md.Set(HeaderTicket, token)
 
 	return md, nil
 }

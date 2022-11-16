@@ -14,8 +14,8 @@ import (
 	"google.golang.org/grpc/stats"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/incoming"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -315,7 +315,7 @@ func (c *conn) Invoke(
 	}()
 
 	defer func() {
-		incoming.Notify(ctx, md)
+		meta.Notify(ctx, md)
 	}()
 
 	cc, err = c.take(ctx)
@@ -440,7 +440,7 @@ func (c *conn) NewStream(
 		sentMark:     sentMark,
 		onDone: func(ctx context.Context, md metadata.MD) {
 			cancel()
-			incoming.Notify(ctx, md)
+			meta.Notify(ctx, md)
 		},
 		recv: streamRecv,
 	}, nil

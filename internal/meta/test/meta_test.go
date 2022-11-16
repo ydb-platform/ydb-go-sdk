@@ -39,13 +39,13 @@ func TestMetaRequiredHeaders(t *testing.T) {
 		t.Fatal("no outgoing metadata")
 	}
 
-	require.Equal(t, []string{"database"}, md.Get(meta.HeaderDatabase))
-	require.Equal(t, []string{"requestType"}, md.Get(meta.HeaderRequestType))
-	require.Equal(t, []string{"token"}, md.Get(meta.HeaderTicket))
-	require.Equal(t, []string{"userAgent", "user-agent"}, md.Get(meta.HeaderUserAgent))
-	require.Equal(t, []string{"traceID"}, md.Get(meta.HeaderTraceID))
+	require.Equal(t, []string{"database"}, md.Get(internal.HeaderDatabase))
+	require.Equal(t, []string{"requestType"}, md.Get(internal.HeaderRequestType))
+	require.Equal(t, []string{"token"}, md.Get(internal.HeaderTicket))
+	require.Equal(t, []string{"userAgent", "user-agent"}, md.Get(internal.HeaderUserAgent))
+	require.Equal(t, []string{"traceID"}, md.Get(internal.HeaderTraceID))
 	require.Equal(t, []string{
-		"ydb-go-sdk/" + meta.VersionMajor + "." + meta.VersionMinor + "." + meta.VersionPatch,
-	}, md.Get(meta.HeaderVersion))
+		"ydb-go-sdk/" + internal.VersionMajor + "." + internal.VersionMinor + "." + internal.VersionPatch,
+	}, md.Get(internal.HeaderVersion))
 	require.Equal(t, []string{"some-user-value"}, md.Get("some-user-header"))
 }

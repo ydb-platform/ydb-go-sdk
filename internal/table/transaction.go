@@ -8,7 +8,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/incoming"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -142,7 +142,7 @@ func (tx *transaction) CommitTx(
 	}
 
 	response, err = tx.s.tableService.CommitTransaction(
-		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, tx.s.checkCloseHint), tx.s),
+		balancer.WithEndpoint(meta.WithMetadataCallback(ctx, tx.s.checkCloseHint), tx.s),
 		request,
 	)
 	if err != nil {
@@ -178,7 +178,7 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 	}()
 
 	_, err = tx.s.tableService.RollbackTransaction(
-		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, tx.s.checkCloseHint), tx.s),
+		balancer.WithEndpoint(meta.WithMetadataCallback(ctx, tx.s.checkCloseHint), tx.s),
 		&Ydb_Table.RollbackTransactionRequest{
 			SessionId: tx.s.id,
 			TxId:      tx.id,

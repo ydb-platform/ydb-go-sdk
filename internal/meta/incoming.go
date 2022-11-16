@@ -1,4 +1,4 @@
-package incoming
+package meta
 
 import (
 	"context"
@@ -7,16 +7,16 @@ import (
 )
 
 type (
-	MetadataCallback    func(header string, values []string)
+	MetadataCallback    func(md metadata.MD)
 	metadataCallbackKey struct{}
 )
 
 func WithMetadataCallback(ctx context.Context, callback MetadataCallback) context.Context {
 	if existingCallback, has := ctx.Value(metadataCallbackKey{}).(MetadataCallback); has {
 		return context.WithValue(ctx, metadataCallbackKey{}, MetadataCallback(
-			func(header string, values []string) {
-				existingCallback(header, values)
-				callback(header, values)
+			func(md metadata.MD) {
+				existingCallback(md)
+				callback(md)
 			},
 		))
 	}
@@ -31,7 +31,5 @@ func Notify(ctx context.Context, md metadata.MD) {
 	if !has {
 		return
 	}
-	for k, v := range md {
-		callback(k, v)
-	}
+	callback(md)
 }

@@ -14,19 +14,19 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn/incoming"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -198,13 +198,15 @@ func (s *session) Close(ctx context.Context) (err error) {
 	return nil
 }
 
-func (s *session) checkCloseHint(header string, values []string) {
-	if header != meta.HeaderServerHints {
-		return
-	}
-	for _, hint := range values {
-		if hint == meta.HintSessionClose {
-			s.SetStatus(table.SessionClosing)
+func (s *session) checkCloseHint(md metadata.MD) {
+	for header, values := range md {
+		if header != meta.HeaderServerHints {
+			continue
+		}
+		for _, hint := range values {
+			if hint == meta.HintSessionClose {
+				s.SetStatus(table.SessionClosing)
+			}
 		}
 	}
 }
@@ -224,7 +226,7 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 	}()
 
 	resp, err := s.tableService.KeepAlive(
-		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
+		balancer.WithEndpoint(meta.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&Ydb_Table.KeepAliveRequest{
 			SessionId: s.id,
 			OperationParams: operation.Params(
@@ -278,7 +280,7 @@ func (s *session) CreateTable(
 		opt.ApplyCreateTableOption((*options.CreateTableDesc)(&request), a)
 	}
 	_, err = s.tableService.CreateTable(
-		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
+		balancer.WithEndpoint(meta.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&request,
 	)
 	return xerrors.WithStackTrace(err)
@@ -451,7 +453,7 @@ func (s *session) DropTable(
 		opt.ApplyDropTableOption((*options.DropTableDesc)(&request))
 	}
 	_, err = s.tableService.DropTable(
-		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
+		balancer.WithEndpoint(meta.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&request,
 	)
 	return xerrors.WithStackTrace(err)
@@ -490,7 +492,7 @@ func (s *session) AlterTable(
 		opt.ApplyAlterTableOption((*options.AlterTableDesc)(&request), a)
 	}
 	_, err = s.tableService.AlterTable(
-		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
+		balancer.WithEndpoint(meta.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&request,
 	)
 	return xerrors.WithStackTrace(err)
@@ -517,7 +519,7 @@ func (s *session) CopyTable(
 		opt((*options.CopyTableDesc)(&request))
 	}
 	_, err = s.tableService.CopyTable(
-		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
+		balancer.WithEndpoint(meta.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&request,
 	)
 	return xerrors.WithStackTrace(err)
@@ -551,7 +553,7 @@ func (s *session) Explain(
 	}()
 
 	response, err = s.tableService.ExplainDataQuery(
-		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
+		balancer.WithEndpoint(meta.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&Ydb_Table.ExplainDataQueryRequest{
 			SessionId: s.id,
 			YqlText:   query,
@@ -599,7 +601,7 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 	}()
 
 	response, err = s.tableService.PrepareDataQuery(
-		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
+		balancer.WithEndpoint(meta.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&Ydb_Table.PrepareDataQueryRequest{
 			SessionId: s.id,
 			YqlText:   query,
@@ -740,7 +742,7 @@ func (s *session) executeDataQuery(
 
 	var response *Ydb_Table.ExecuteDataQueryResponse
 	response, err = s.tableService.ExecuteDataQuery(
-		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
+		balancer.WithEndpoint(meta.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		request,
 	)
 	if err != nil {
@@ -773,7 +775,7 @@ func (s *session) ExecuteSchemeQuery(
 		opt((*options.ExecuteSchemeQueryDesc)(&request))
 	}
 	_, err = s.tableService.ExecuteSchemeQuery(
-		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
+		balancer.WithEndpoint(meta.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&request,
 	)
 	return xerrors.WithStackTrace(err)
@@ -797,7 +799,7 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 		),
 	}
 	response, err = s.tableService.DescribeTableOptions(
-		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
+		balancer.WithEndpoint(meta.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&request,
 	)
 	if err != nil {
@@ -948,7 +950,7 @@ func (s *session) StreamReadTable(
 	ctx, cancel := xcontext.WithErrCancel(ctx)
 
 	stream, err = s.tableService.StreamReadTable(
-		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
+		balancer.WithEndpoint(meta.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&request,
 	)
 
@@ -1035,7 +1037,7 @@ func (s *session) StreamExecuteScanQuery(
 	ctx, cancel := context.WithCancel(ctx)
 
 	stream, err = s.tableService.StreamExecuteScanQuery(
-		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
+		balancer.WithEndpoint(meta.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&request,
 	)
 
@@ -1081,7 +1083,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 	a := allocator.New()
 	defer a.Free()
 	_, err = s.tableService.BulkUpsert(
-		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
+		balancer.WithEndpoint(meta.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&Ydb_Table.BulkUpsertRequest{
 			Table: table,
 			Rows:  value.ToYDB(rows, a),
@@ -1116,7 +1118,7 @@ func (s *session) BeginTransaction(
 	}()
 
 	response, err = s.tableService.BeginTransaction(
-		balancer.WithEndpoint(incoming.WithMetadataCallback(ctx, s.checkCloseHint), s),
+		balancer.WithEndpoint(meta.WithMetadataCallback(ctx, s.checkCloseHint), s),
 		&Ydb_Table.BeginTransactionRequest{
 			SessionId:  s.id,
 			TxSettings: tx.Settings(),

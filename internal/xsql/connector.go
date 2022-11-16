@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"io"
 
+	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
@@ -118,7 +119,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 	}()
 	s, err := c.connection.Table().CreateSession(
 		meta.WithAllowFeatures(ctx,
-			meta.HintSessionBalancer,
+			metaHeaders.HintSessionBalancer,
 		),
 	)
 	if err != nil {

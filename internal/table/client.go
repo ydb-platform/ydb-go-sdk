@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -373,7 +374,7 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 
 	s, err = c.createSession(
 		meta.WithAllowFeatures(ctx,
-			meta.HintSessionBalancer,
+			metaHeaders.HintSessionBalancer,
 		),
 		withCreateSessionOnCreate(c.appendSessionToNodes),
 		withCreateSessionOnClose(c.removeSessionFromNodes),
