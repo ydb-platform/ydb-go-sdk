@@ -154,6 +154,16 @@ type index struct {
 	opts []IndexOption
 }
 
+func (i index) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) {
+	x := &Ydb_Table.TableIndex{
+		Name: i.name,
+	}
+	for _, opt := range i.opts {
+		opt.ApplyIndexOption((*indexDesc)(x))
+	}
+	d.AddIndexes = append(d.AddIndexes, x)
+}
+
 func (i index) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
 	x := &Ydb_Table.TableIndex{
 		Name: i.name,
@@ -169,6 +179,23 @@ func WithIndex(name string, opts ...IndexOption) CreateTableOption {
 		name: name,
 		opts: opts,
 	}
+}
+
+func WithAddIndex(name string, opts ...IndexOption) AlterTableOption {
+	return index{
+		name: name,
+		opts: opts,
+	}
+}
+
+type dropIndex string
+
+func (i dropIndex) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) {
+	d.DropIndexes = append(d.DropIndexes, string(i))
+}
+
+func WithDropIndex(name string) AlterTableOption {
+	return dropIndex(name)
 }
 
 type indexColumns []string

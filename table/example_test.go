@@ -148,6 +148,10 @@ func Example_alterTable() {
 				options.WithAddColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithAddColumn("title", types.Optional(types.TypeText)),
 				options.WithAlterAttribute("hello", "world"),
+				options.WithAddIndex("idx_series_series_id",
+					options.WithIndexType(options.GlobalAsyncIndex()),
+				),
+				options.WithDropIndex("idx_series_title"),
 				options.WithAddAttribute("foo", "bar"),
 				options.WithDropAttribute("baz"),
 			)
