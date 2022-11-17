@@ -37,5 +37,5 @@ func ListenIncomingMetadata(
 	ctx context.Context,
 	callback func(md metadata.MD),
 ) context.Context {
-	return meta.WithMetadataCallback(ctx, callback)
+	return meta.WithIncomingCallback(ctx, callback)
 }

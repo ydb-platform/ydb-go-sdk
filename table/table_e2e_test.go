@@ -27,6 +27,7 @@ import (
 	"golang.org/x/xerrors"
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
@@ -35,6 +36,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -203,6 +205,15 @@ func testTable(t testing.TB) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), testDuration)
 	defer cancel()
+
+	var totalConsumedUnits uint64
+	defer func() {
+		t.Logf("total consumed units: %d", atomic.LoadUint64(&totalConsumedUnits))
+	}()
+
+	ctx = meta.ListenIncomingMetadata(ctx, func(md metadata.MD) {
+		atomic.AddUint64(&totalConsumedUnits, meta.ConsumedUnits(md))
+	})
 
 	s := &stats{
 		limit:            math.MaxInt32,

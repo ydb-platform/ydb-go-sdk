@@ -142,7 +142,7 @@ func (tx *transaction) CommitTx(
 	}
 
 	response, err = tx.s.tableService.CommitTransaction(
-		balancer.WithEndpoint(meta.WithMetadataCallback(ctx, tx.s.checkCloseHint), tx.s),
+		balancer.WithEndpoint(meta.WithIncomingCallback(ctx, tx.s.checkCloseHint), tx.s),
 		request,
 	)
 	if err != nil {
@@ -178,7 +178,7 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 	}()
 
 	_, err = tx.s.tableService.RollbackTransaction(
-		balancer.WithEndpoint(meta.WithMetadataCallback(ctx, tx.s.checkCloseHint), tx.s),
+		balancer.WithEndpoint(meta.WithIncomingCallback(ctx, tx.s.checkCloseHint), tx.s),
 		&Ydb_Table.RollbackTransactionRequest{
 			SessionId: tx.s.id,
 			TxId:      tx.id,

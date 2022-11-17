@@ -12,15 +12,18 @@ import (
 	"math/rand"
 	"os"
 	"path"
+	"sync/atomic"
 	"testing"
 	"text/template"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -33,6 +36,15 @@ const (
 func TestDatabaseSql(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
 	defer cancel()
+
+	var totalConsumedUnits uint64
+	defer func() {
+		t.Logf("total consumed units: %d", atomic.LoadUint64(&totalConsumedUnits))
+	}()
+
+	ctx = meta.ListenIncomingMetadata(ctx, func(md metadata.MD) {
+		atomic.AddUint64(&totalConsumedUnits, meta.ConsumedUnits(md))
+	})
 
 	t.Run("sql.Open", func(t *testing.T) {
 		db, err := sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
