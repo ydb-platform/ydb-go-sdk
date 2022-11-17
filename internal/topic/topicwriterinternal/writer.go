@@ -23,18 +23,22 @@ type Writer struct {
 	clock        clockwork.Clock
 }
 
-func NewWriter(cred credentials.Credentials, options []PublicWriterOption) *Writer {
+func NewWriter(cred credentials.Credentials, options []PublicWriterOption) (*Writer, error) {
 	options = append(
 		options,
 		WithCredentials(cred),
 	)
 	cfg := newWriterReconnectorConfig(options...)
+	if err := cfg.validate(); err != nil {
+		return nil, err
+	}
+
 	writerImpl := newWriterReconnector(cfg)
 
 	return &Writer{
 		streamWriter: writerImpl,
 		clock:        clockwork.NewRealClock(),
-	}
+	}, nil
 }
 
 func (w *Writer) Write(ctx context.Context, messages ...Message) error {

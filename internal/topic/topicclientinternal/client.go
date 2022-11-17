@@ -231,6 +231,9 @@ func (c *Client) StartWriter(producerID, path string, opts ...topicoptions.Write
 
 	options = append(options, opts...)
 
-	writer := topicwriterinternal.NewWriter(c.cred, options)
+	writer, err := topicwriterinternal.NewWriter(c.cred, options)
+	if err != nil {
+		return nil, err
+	}
 	return topicwriter.NewWriter(writer), nil
 }

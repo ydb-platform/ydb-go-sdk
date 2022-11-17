@@ -72,6 +72,10 @@ func Example_createTable() {
 				options.WithColumn("release_date", types.Optional(types.TypeDate)),
 				options.WithColumn("comment", types.Optional(types.TypeText)),
 				options.WithPrimaryKeyColumn("series_id"),
+				options.WithIndex("idx_series_title",
+					options.WithIndexColumns("title"),
+					options.WithIndexType(options.GlobalAsyncIndex()),
+				),
 			)
 		},
 	)
@@ -148,6 +152,12 @@ func Example_alterTable() {
 				options.WithAddColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithAddColumn("title", types.Optional(types.TypeText)),
 				options.WithAlterAttribute("hello", "world"),
+				options.WithAddIndex("idx_series_series_id",
+					options.WithIndexColumns("series_id"),
+					options.WithDataColumns("title"),
+					options.WithIndexType(options.GlobalAsyncIndex()),
+				),
+				options.WithDropIndex("idx_series_title"),
 				options.WithAddAttribute("foo", "bar"),
 				options.WithDropAttribute("baz"),
 			)
