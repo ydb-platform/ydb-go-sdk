@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
@@ -14,6 +15,8 @@ import (
 )
 
 var d = &sqlDriver{connectors: make(map[*xsql.Connector]struct{})}
+
+const sqlUserAgent = "database/sql"
 
 func init() {
 	sql.Register("ydb", d)
@@ -58,7 +61,11 @@ func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, erro
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	db, err := Open(context.Background(), dataSourceName, With(opts...))
+	db, err := Open(context.Background(), dataSourceName,
+		With(
+			append(opts, config.WithUserAgent(sqlUserAgent))...,
+		),
+	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -117,9 +124,17 @@ func WithDatabaseSQLTrace(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeO
 	return xsql.WithTrace(t, opts...)
 }
 
-func Connector(db Connection, opts ...ConnectorOption) (*xsql.Connector, error) {
+func Connector(db Connection, opts ...ConnectorOption) (_ *xsql.Connector, err error) {
 	if c, ok := db.(*connection); ok {
 		opts = append(opts, c.databaseSQLOptions...)
+		db, err = c.With(context.Background(),
+			With(
+				append(c.options, config.WithUserAgent(sqlUserAgent))...,
+			),
+		)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
 	}
 	c, err := xsql.Open(d, db, opts...)
 	if err != nil {

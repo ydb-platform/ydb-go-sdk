@@ -56,7 +56,16 @@ type Option func(m *meta)
 
 func WithUserAgentOption(userAgent string) Option {
 	return func(m *meta) {
-		m.userAgents = append(m.userAgents, userAgent)
+		if func() (nonExists bool) {
+			for _, ua := range m.userAgents {
+				if userAgent == ua {
+					return false
+				}
+			}
+			return true
+		}() {
+			m.userAgents = append(m.userAgents, userAgent)
+		}
 	}
 }
 
