@@ -1,5 +1,7 @@
 * Added `options.WithAddAttribute` and `options.WithDropAttribute` options for `session.AlterTable` request
-* Added package `meta` with methods to subscribe to incoming metadata 
+* Added package `meta` with methods about `YDB` metadata
+* Added `meta.ListenIncomingMetadata()` context modifier for attaching callback function which will be called on incoming metadata
+* Added `meta.ConsumedUnits(metadata.MD)` method for getting consumed units from metadata
 
 ## v3.39.0
 * Removed message level partitioning from experimental topic API. It is unavailable on server side yet.

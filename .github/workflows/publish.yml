@@ -24,7 +24,7 @@ jobs:
     env:
       VERSION_CHANGE: ${{ github.event.inputs.version-change }}
       RELEASE_CANDIDATE: ${{ github.event.inputs.release-candidate }}
-      VERSION_FILE: meta/version.go
+      VERSION_FILE: internal/meta/version.go
       CHANGELOG_FILE: CHANGELOG.md
       GITHUB_TOKEN: ${{ secrets.YDB_PLATFORM_BOT_TOKEN_REPO }}
     steps:
