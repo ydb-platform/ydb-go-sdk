@@ -40,6 +40,13 @@ var (
 	errNoAllowedCodecs                      = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
 	errLargeMessage                         = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))
 	PublicErrQueueIsFull                    = xerrors.Wrap(errors.New("ydb: queue is full"))
+
+	// errProducerIDNotEqualMessageGroupID is temporary
+	// WithMessageGroupID is optional parameter because it allowed to be skipped by protocol.
+	// But right not YDB server doesn't implement it.
+	// It is fast check for return error at writer create context instead of stream initialization
+	// The error will remove in the future, when skip message group id will be allowed by server.
+	errProducerIDNotEqualMessageGroupID = xerrors.Wrap(errors.New("ydb: producer id not equal to message group id, use option WithMessageGroupID(producerID) for create writer")) //nolint:lll
 )
 
 type WriterReconnectorConfig struct {
@@ -56,6 +63,13 @@ type WriterReconnectorConfig struct {
 	OnWriterInitResponseCallback PublicOnWriterInitResponseCallback
 
 	connectTimeout time.Duration
+}
+
+func (cfg *WriterReconnectorConfig) validate() error {
+	if cfg.producerID != cfg.defaultPartitioning.MessageGroupID {
+		return xerrors.WithStackTrace(errProducerIDNotEqualMessageGroupID)
+	}
+	return nil
 }
 
 func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnectorConfig {
