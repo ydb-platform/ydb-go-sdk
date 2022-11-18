@@ -9,17 +9,13 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
-var (
-	errAlreadyClosed     = xerrors.Wrap(errors.New("result closed early"))
-	errMissingCurrentRow = xerrors.Wrap(errors.New("missing current row"))
-)
+var errAlreadyClosed = xerrors.Wrap(errors.New("result closed early"))
 
 type baseResult struct {
 	scanner
@@ -58,17 +54,6 @@ func (r *unaryResult) ResultSetCount() int {
 
 func (r *baseResult) isClosed() bool {
 	return atomic.LoadUint32(&r.closed) != 0
-}
-
-func (r *baseResult) RowValues() (_ []value.Value, err error) {
-	if r.row == nil {
-		return nil, xerrors.WithStackTrace(errMissingCurrentRow)
-	}
-	values := make([]value.Value, len(r.row.GetItems()))
-	for i, item := range r.row.GetItems() {
-		values[i] = value.FromYDB(r.set.GetColumns()[i].GetType(), item)
-	}
-	return values, nil
 }
 
 type resultWithError interface {
