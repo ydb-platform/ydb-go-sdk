@@ -78,6 +78,21 @@ func WithPanicCallback(panicCallback func(e interface{})) retryOption {
 	}
 }
 
+type (
+	markRetryCallKey struct{}
+)
+
+func markRetryCall(ctx context.Context) context.Context {
+	return context.WithValue(ctx, markRetryCallKey{}, true)
+}
+
+func isRetryCalledAbove(ctx context.Context) bool {
+	if _, has := ctx.Value(markRetryCallKey{}).(bool); has {
+		return true
+	}
+	return false
+}
+
 // Retry provide the best effort fo retrying operation
 //
 // Retry implements internal busy loop until one of the following conditions is met:
@@ -111,7 +126,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 		attempts int
 
 		code           = int64(0)
-		onIntermediate = trace.RetryOnRetry(options.trace, &ctx, options.id, options.idempotent)
+		onIntermediate = trace.RetryOnRetry(options.trace, &ctx, options.id, options.idempotent, isRetryCalledAbove(ctx))
 	)
 	defer func() {
 		onIntermediate(err)(attempts, err)
@@ -132,7 +147,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 						}
 					}()
 				}
-				return op(ctx)
+				return op(markRetryCall(ctx))
 			}()
 
 			if err == nil {

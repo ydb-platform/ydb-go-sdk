@@ -377,6 +377,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
 		Idempotent bool
+		NestedCall bool // flag when Retry called inside head Retry
 	}
 	TableDoIntermediateInfo struct {
 		Error error
@@ -392,6 +393,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
 		Idempotent bool
+		NestedCall bool // flag when Retry called inside head Retry
 	}
 	TableDoTxIntermediateInfo struct {
 		Error error
