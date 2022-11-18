@@ -42,7 +42,7 @@ func TestDatabaseSql(t *testing.T) {
 		t.Logf("total consumed units: %d", atomic.LoadUint64(&totalConsumedUnits))
 	}()
 
-	ctx = meta.ListenIncomingMetadata(ctx, func(md metadata.MD) {
+	ctx = meta.WithTrailerCallback(ctx, func(md metadata.MD) {
 		atomic.AddUint64(&totalConsumedUnits, meta.ConsumedUnits(md))
 	})
 

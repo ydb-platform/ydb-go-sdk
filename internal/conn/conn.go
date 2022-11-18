@@ -315,7 +315,7 @@ func (c *conn) Invoke(
 	}()
 
 	defer func() {
-		meta.CallIncomingCallback(ctx, md)
+		meta.CallTrailerCallback(ctx, md)
 	}()
 
 	cc, err = c.take(ctx)
@@ -440,7 +440,7 @@ func (c *conn) NewStream(
 		sentMark:     sentMark,
 		onDone: func(ctx context.Context, md metadata.MD) {
 			cancel()
-			meta.CallIncomingCallback(ctx, md)
+			meta.CallTrailerCallback(ctx, md)
 		},
 		recv: streamRecv,
 	}, nil

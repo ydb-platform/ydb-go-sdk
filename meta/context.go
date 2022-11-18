@@ -32,10 +32,10 @@ func WithAllowFeatures(ctx context.Context, features ...string) context.Context 
 	return metadata.AppendToOutgoingContext(ctx, kv...)
 }
 
-// ListenIncomingMetadata attaches callback to context for listening incoming metadata
-func ListenIncomingMetadata(
+// WithTrailerCallback attaches callback to context for listening incoming metadata
+func WithTrailerCallback(
 	ctx context.Context,
 	callback func(md metadata.MD),
 ) context.Context {
-	return meta.WithIncomingCallback(ctx, callback)
+	return meta.WithTrailerCallback(ctx, callback)
 }

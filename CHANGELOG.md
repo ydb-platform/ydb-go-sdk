@@ -2,7 +2,7 @@
 * Added `options.WithAddIndex` and `options.WithDropIndex` options for `session.AlterTable` request
 * Added return error while create topic writer with not equal producer id and message group id.
 * Added package `meta` with methods about `YDB` metadata
-* Added `meta.ListenIncomingMetadata(ctx, callback)` context modifier for attaching callback function which will be called on incoming metadata
+* Added `meta.WithTrailerCallback(ctx, callback)` context modifier for attaching callback function which will be called on incoming metadata
 * Added `meta.ConsumedUnits(metadata.MD)` method for getting consumed units from metadata
 
 ## v3.39.0

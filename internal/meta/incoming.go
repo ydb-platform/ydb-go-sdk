@@ -11,7 +11,7 @@ type (
 	metadataCallbackKey struct{}
 )
 
-func WithIncomingCallback(ctx context.Context, callback MetadataCallback) context.Context {
+func WithTrailerCallback(ctx context.Context, callback MetadataCallback) context.Context {
 	if existingCallback, has := ctx.Value(metadataCallbackKey{}).(MetadataCallback); has {
 		return context.WithValue(ctx, metadataCallbackKey{}, MetadataCallback(
 			func(md metadata.MD) {
@@ -23,7 +23,7 @@ func WithIncomingCallback(ctx context.Context, callback MetadataCallback) contex
 	return context.WithValue(ctx, metadataCallbackKey{}, callback)
 }
 
-func CallIncomingCallback(ctx context.Context, md metadata.MD) {
+func CallTrailerCallback(ctx context.Context, md metadata.MD) {
 	if len(md) == 0 {
 		return
 	}

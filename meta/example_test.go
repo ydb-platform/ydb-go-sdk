@@ -26,7 +26,7 @@ func Example_consumedUnitsCount() {
 		totalConsumedUnits uint64
 	)
 	err = db.Table().Do( // Do retry operation on errors with best effort
-		meta.ListenIncomingMetadata(ctx, func(md metadata.MD) {
+		meta.WithTrailerCallback(ctx, func(md metadata.MD) {
 			totalConsumedUnits += meta.ConsumedUnits(md)
 		}),
 		func(ctx context.Context, s table.Session) (err error) { // retry operation
