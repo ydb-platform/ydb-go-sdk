@@ -614,8 +614,7 @@ func testTable(t testing.TB) {
 	fmt.Printf("> upserting prepared values...\n")
 	if err = db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
-			_, _, err = s.Execute(
-				ctx,
+			_, _, err = s.Execute(ctx,
 				table.TxControl(
 					table.BeginTx(
 						table.WithSerializableReadWrite(),
@@ -827,7 +826,7 @@ func streamReadTable(ctx context.Context, t testing.TB, c table.Client, tableAbs
 				}
 			}
 
-			return nil
+			return res.Err()
 		},
 		table.WithIdempotent(),
 	)
@@ -1203,7 +1202,7 @@ func describeTableOptions(ctx context.Context, c table.Client) error {
 	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			desc, err = s.DescribeTableOptions(ctx)
-			return
+			return err
 		},
 		table.WithIdempotent(),
 	)
@@ -1343,7 +1342,7 @@ func describeTable(ctx context.Context, c table.Client, path string) (err error)
 			for i, keyRange := range desc.KeyRanges {
 				fmt.Printf("  > key range %d: %s\n", i, keyRange.String())
 			}
-			return
+			return err
 		},
 		table.WithIdempotent(),
 	)
@@ -1520,7 +1519,7 @@ func TestLongStream(t *testing.T) {
 						time.Since(start),
 					)
 				}
-				return nil
+				return res.Err()
 			},
 			table.WithIdempotent(),
 		); err != nil {
@@ -1561,7 +1560,7 @@ func TestLongStream(t *testing.T) {
 						time.Since(start),
 					)
 				}
-				return nil
+				return res.Err()
 			},
 			table.WithIdempotent(),
 		); err != nil {
@@ -1797,6 +1796,7 @@ func TestIssue229UnexpectedNullWhileParseNilJsonDocumentValue(t *testing.T) {
 
 	db := connect(t)
 	defer db.Close(ctx)
+	var val issue229Struct
 	err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 		res, err := tx.Execute(ctx, `SELECT Nothing(JsonDocument?) AS r`, nil)
 		if err != nil {
@@ -1805,10 +1805,12 @@ func TestIssue229UnexpectedNullWhileParseNilJsonDocumentValue(t *testing.T) {
 		if err = res.NextResultSetErr(ctx); err != nil {
 			return err
 		}
-		require.True(t, res.NextRow())
-
-		var val issue229Struct
-		require.NoError(t, res.Scan(&val))
+		if !res.NextRow() {
+			return fmt.Errorf("unexpected no rows in result set (err = %w)", res.Err())
+		}
+		if err = res.Scan(&val); err != nil {
+			return err
+		}
 		return res.Err()
 	}, table.WithIdempotent())
 	require.NoError(t, err)
@@ -1830,65 +1832,105 @@ func TestIssue259IntervalFromDuration(t *testing.T) {
 
 	db := connect(t)
 	defer db.Close(ctx)
-	err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
-		// Check about interval work with microseconds
-		res, err := tx.Execute(ctx, `DECLARE $ts as Interval;
+
+	t.Run("Check about interval work with microseconds", func(t *testing.T) {
+		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+			//
+			res, err := tx.Execute(ctx, `DECLARE $ts as Interval;
 			$ten_micro = CAST(10 as Interval);
 			SELECT $ts == $ten_micro, $ten_micro;`, table.NewQueryParameters(
-			table.ValueParam(`$ts`, types.IntervalValueFromDuration(10*time.Microsecond)),
-		))
-		if err != nil {
-			return err
-		}
-		if err = res.NextResultSetErr(ctx); err != nil {
-			return err
-		}
-		require.True(t, res.NextRow())
+				table.ValueParam(`$ts`, types.IntervalValueFromDuration(10*time.Microsecond)),
+			))
+			if err != nil {
+				return err
+			}
+			if err = res.NextResultSetErr(ctx); err != nil {
+				return err
+			}
+			if !res.NextRow() {
+				return fmt.Errorf("unexpected no rows in result set (err = %w)", res.Err())
+			}
+			var (
+				valuesEqual bool
+				tenMicro    time.Duration
+			)
+			if err = res.Scan(&valuesEqual, &tenMicro); err != nil {
+				return err
+			}
+			if !valuesEqual {
+				return fmt.Errorf("unexpected values equal (err = %w)", res.Err())
+			}
+			if tenMicro != 10*time.Microsecond {
+				return fmt.Errorf("unexpected ten micro equal: %v (err = %w)", tenMicro, res.Err())
+			}
+			return res.Err()
+		}, table.WithIdempotent())
+		require.NoError(t, err)
+	})
 
-		var (
-			valuesEqual bool
-			tenMicro    time.Duration
-		)
-		require.NoError(t, res.Scan(&valuesEqual, &tenMicro))
-		require.True(t, valuesEqual)
-		require.Equal(t, 10*time.Microsecond, tenMicro)
-
-		// Check about parse interval represent date interval
-		query := `
+	t.Run("Check about parse interval represent date interval", func(t *testing.T) {
+		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+			//
+			query := `
 		SELECT 
 			DateTime::MakeTimestamp(DateTime::ParseIso8601("2009-02-14T02:31:30+0000")) - 
 			DateTime::MakeTimestamp(DateTime::ParseIso8601("2009-02-14T01:31:30+0000")) 
 		`
-		res, err = tx.Execute(ctx, query, nil)
+			res, err := tx.Execute(ctx, query, nil)
+			if err != nil {
+				return err
+			}
+			if err = res.NextResultSetErr(ctx); err != nil {
+				return err
+			}
+			if !res.NextRow() {
+				return fmt.Errorf("unexpected no rows in result set (err = %w)", res.Err())
+			}
+			var delta time.Duration
+			if err = res.ScanWithDefaults(&delta); err != nil {
+				return err
+			}
+			if delta != time.Hour {
+				return fmt.Errorf("unexpected ten micro equal: %v (err = %w)", delta, res.Err())
+			}
+			return res.Err()
+		}, table.WithIdempotent())
 		require.NoError(t, err)
-		require.NoError(t, res.NextResultSetErr(ctx))
-		require.True(t, res.NextRow())
+	})
 
-		var delta time.Duration
-		require.NoError(t, res.ScanWithDefaults(&delta))
-		require.Equal(t, time.Hour, delta)
-
-		// check about send interval work find with dates
-		query = `
+	t.Run("check about send interval work find with dates", func(t *testing.T) {
+		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+			//
+			query := `
 		DECLARE $delta AS Interval;
 	
 		SELECT 
 			DateTime::MakeTimestamp(DateTime::ParseIso8601("2009-02-14T01:31:30+0000")) + $delta ==
 			DateTime::MakeTimestamp(DateTime::ParseIso8601("2009-02-14T02:31:30+0000"))
 		`
-		res, err = tx.Execute(ctx, query, table.NewQueryParameters(
-			table.ValueParam("$delta", types.IntervalValueFromDuration(time.Hour))),
-		)
+			res, err := tx.Execute(ctx, query, table.NewQueryParameters(
+				table.ValueParam("$delta", types.IntervalValueFromDuration(time.Hour))),
+			)
+			if err != nil {
+				return err
+			}
+			if err = res.NextResultSetErr(ctx); err != nil {
+				return err
+			}
+			if !res.NextRow() {
+				return fmt.Errorf("unexpected no rows in result set (err = %w)", res.Err())
+			}
+			var valuesEqual bool
+			if err = res.ScanWithDefaults(&valuesEqual); err != nil {
+				return err
+			}
+			if !valuesEqual {
+				return fmt.Errorf("unexpected values equal (err = %w)", res.Err())
+			}
+			return res.Err()
+		}, table.WithIdempotent())
 		require.NoError(t, err)
-		require.NoError(t, res.NextResultSetErr(ctx))
-		require.True(t, res.NextRow())
-
-		require.NoError(t, res.ScanWithDefaults(&valuesEqual))
-		require.True(t, valuesEqual)
-
-		return nil
 	})
-	require.NoError(t, err)
 }
 
 func TestIssue415ScanError(t *testing.T) {
@@ -2203,15 +2245,20 @@ func TestValueToYqlLiteral(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				require.NoError(t, res.NextResultSetErr(ctx))
-				require.True(t, res.NextRow())
-				values, err := res.(interface {
-					RowValues() ([]types.Value, error)
-				}).RowValues()
-				require.NoError(t, err)
-				require.Equal(t, 1, len(values))
-				require.Equal(t, tt.Yql(), values[0].Yql(), fmt.Sprintf("%T vs %T", tt, values[0]))
-				return nil
+				if err = res.NextResultSetErr(ctx); err != nil {
+					return err
+				}
+				if !res.NextRow() {
+					return fmt.Errorf("unexpected no rows in result set (err = %w)", res.Err())
+				}
+				var v types.Value
+				if err = res.Scan(&v); err != nil {
+					return err
+				}
+				if tt.Yql() != v.Yql() {
+					return fmt.Errorf("unexpected YQL: %T (%s) vs %T (%s) (err = %w)", tt, tt.Yql(), v, v.Yql(), res.Err())
+				}
+				return res.Err()
 			}, table.WithIdempotent())
 			require.NoError(t, err)
 		})

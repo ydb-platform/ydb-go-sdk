@@ -501,8 +501,8 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 		})
 		return s, xerrors.WithStackTrace(
 			fmt.Errorf("failed to get session from pool ("+
-				"attempts: %d, latency: %v, stats: {index: %d, idle: %d, create_in_progress: %d}"+
-				"): %w", i, time.Since(start), index, idle, createInProgress, err,
+				"attempts: %d, latency: %v, pool have %d sessions (%d busy, %d idle, %d create_in_progress): %w",
+				i, time.Since(start), index, index-idle, idle, createInProgress, err,
 			),
 		)
 	}

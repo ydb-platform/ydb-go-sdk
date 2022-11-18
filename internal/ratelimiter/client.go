@@ -58,7 +58,7 @@ func (c *Client) CreateResource(
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace())
+	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
 }
 
 func (c *Client) createResource(
@@ -101,7 +101,7 @@ func (c *Client) AlterResource(
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace())
+	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
 }
 
 func (c *Client) alterResource(
@@ -144,7 +144,7 @@ func (c *Client) DropResource(
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace())
+	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
 }
 
 func (c *Client) dropResource(

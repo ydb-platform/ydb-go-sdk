@@ -45,7 +45,7 @@ func (c *Client) CreateNode(ctx context.Context, path string, config coordinatio
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace())
+	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
 }
 
 func (c *Client) createNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
@@ -82,7 +82,7 @@ func (c *Client) AlterNode(ctx context.Context, path string, config coordination
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace())
+	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
 }
 
 func (c *Client) alterNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
@@ -119,7 +119,7 @@ func (c *Client) DropNode(ctx context.Context, path string) (err error) {
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace())
+	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
 }
 
 func (c *Client) dropNode(ctx context.Context, path string) (err error) {
@@ -158,7 +158,7 @@ func (c *Client) DescribeNode(
 		err = call(ctx)
 		return
 	}
-	err = retry.Retry(ctx, call, retry.WithStackTrace())
+	err = retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
 	return
 }
 
