@@ -112,6 +112,7 @@ func (settings timeToLiveSettings) ApplyCreateTableOption(d *CreateTableDesc, a 
 	d.TtlSettings = (*TimeToLiveSettings)(&settings).ToYDB()
 }
 
+// WithTimeToLiveSettings defines TTL settings in CreateTable request
 func WithTimeToLiveSettings(settings TimeToLiveSettings) CreateTableOption {
 	return timeToLiveSettings(settings)
 }
@@ -635,6 +636,7 @@ type (
 	}
 )
 
+// WithAddColumn adds column in AlterTable request
 func WithAddColumn(name string, typ types.Type) AlterTableOption {
 	return column{
 		name: name,
@@ -642,6 +644,7 @@ func WithAddColumn(name string, typ types.Type) AlterTableOption {
 	}
 }
 
+// WithAlterAttribute changes attribute in AlterTable request
 func WithAlterAttribute(key, value string) AlterTableOption {
 	return attribute{
 		key:   key,
@@ -649,6 +652,7 @@ func WithAlterAttribute(key, value string) AlterTableOption {
 	}
 }
 
+// WithAddAttribute adds attribute to table in AlterTable request
 func WithAddAttribute(key, value string) AlterTableOption {
 	return attribute{
 		key:   key,
@@ -656,6 +660,7 @@ func WithAddAttribute(key, value string) AlterTableOption {
 	}
 }
 
+// WithDropAttribute drops attribute from table in AlterTable request
 func WithDropAttribute(key string) AlterTableOption {
 	return attribute{
 		key: key,
@@ -700,6 +705,7 @@ func WithAlterPartitionSettingsObject(ps PartitioningSettings) AlterTableOption 
 	return partitioningSettingsObject(ps)
 }
 
+// WithSetTimeToLiveSettings appends TTL settings in AlterTable request
 func WithSetTimeToLiveSettings(settings TimeToLiveSettings) AlterTableOption {
 	return timeToLiveSettings(settings)
 }
@@ -710,6 +716,7 @@ func (dropTimeToLive) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allo
 	d.TtlAction = &Ydb_Table.AlterTableRequest_DropTtlSettings{}
 }
 
+// WithDropTimeToLive drops TTL settings in AlterTable request
 func WithDropTimeToLive() AlterTableOption {
 	return dropTimeToLive{}
 }
