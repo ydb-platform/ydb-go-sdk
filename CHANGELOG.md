@@ -7,6 +7,7 @@
 * Added `NestedCall` field to retry trace start infos for alarm on nested calls
 * Added `topicoptions.WithWriterTrace` option for attach tracer into separated writer
 * Added `sugar.IsTableExists()` helper for check existence of table
+* Added `types.AlterTable` options FIXME
 
 ## v3.39.0
 * Removed message level partitioning from experimental topic API. It is unavailable on server side yet.
