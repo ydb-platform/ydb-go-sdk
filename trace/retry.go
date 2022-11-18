@@ -22,6 +22,7 @@ type (
 		Context    *context.Context
 		ID         string
 		Idempotent bool
+		NestedCall bool // flag when Retry called inside head Retry
 	}
 	RetryLoopIntermediateInfo struct {
 		Error error

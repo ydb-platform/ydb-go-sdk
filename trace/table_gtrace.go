@@ -1417,10 +1417,11 @@ func TableOnClose(t Table, c *context.Context) func(error) {
 		res(p)
 	}
 }
-func TableOnDo(t Table, c *context.Context, idempotent bool) func(error) func(attempts int, _ error) {
+func TableOnDo(t Table, c *context.Context, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
 	var p TableDoStartInfo
 	p.Context = c
 	p.Idempotent = idempotent
+	p.NestedCall = nestedCall
 	res := t.onDo(p)
 	return func(e error) func(int, error) {
 		var p TableDoIntermediateInfo
@@ -1434,10 +1435,11 @@ func TableOnDo(t Table, c *context.Context, idempotent bool) func(error) func(at
 		}
 	}
 }
-func TableOnDoTx(t Table, c *context.Context, idempotent bool) func(error) func(attempts int, _ error) {
+func TableOnDoTx(t Table, c *context.Context, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
 	var p TableDoTxStartInfo
 	p.Context = c
 	p.Idempotent = idempotent
+	p.NestedCall = nestedCall
 	res := t.onDoTx(p)
 	return func(e error) func(int, error) {
 		var p TableDoTxIntermediateInfo

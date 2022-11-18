@@ -4,6 +4,7 @@
 * Added package `meta` with methods about `YDB` metadata
 * Added `meta.WithTrailerCallback(ctx, callback)` context modifier for attaching callback function which will be called on incoming metadata
 * Added `meta.ConsumedUnits(metadata.MD)` method for getting consumed units from metadata
+* Added `NestedCall` field to retry trace start infos for alarm on nested calls
 
 ## v3.39.0
 * Removed message level partitioning from experimental topic API. It is unavailable on server side yet.
