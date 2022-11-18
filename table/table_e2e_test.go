@@ -1264,6 +1264,7 @@ func fill(ctx context.Context, db ydb.Connection, folder string) error {
 			))
 			return
 		},
+		table.WithIdempotent(),
 	)
 }
 
@@ -1302,6 +1303,7 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 				options.WithPrimaryKeyColumn("series_id", "season_id"),
 			)
 		},
+		table.WithIdempotent(),
 	)
 	if err != nil {
 		return err
@@ -1322,6 +1324,7 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 				options.WithPrimaryKeyColumn("series_id", "season_id", "episode_id"),
 			)
 		},
+		table.WithIdempotent(),
 	)
 	return err
 }
@@ -1399,6 +1402,7 @@ func TestLongStream(t *testing.T) {
 					`CREATE TABLE `+tableName+` (val Int64, PRIMARY KEY (val))`,
 				)
 			},
+			table.WithIdempotent(),
 		); err != nil {
 			t.Fatalf("create table failed: %v\n", err)
 		}
@@ -1454,6 +1458,7 @@ func TestLongStream(t *testing.T) {
 						)
 						return err
 					},
+					table.WithIdempotent(),
 				); err != nil {
 					t.Fatalf("upsert failed: %v\n", err)
 				} else {
@@ -1517,6 +1522,7 @@ func TestLongStream(t *testing.T) {
 				}
 				return nil
 			},
+			table.WithIdempotent(),
 		); err != nil {
 			t.Fatalf("stream query failed: %v\n", err)
 		}
@@ -1557,6 +1563,7 @@ func TestLongStream(t *testing.T) {
 				}
 				return nil
 			},
+			table.WithIdempotent(),
 		); err != nil {
 			t.Fatalf("stream query failed: %v\n", err)
 		}
@@ -1611,6 +1618,7 @@ func TestSplitRangesAndRead(t *testing.T) {
 					)`,
 				)
 			},
+			table.WithIdempotent(),
 		); err != nil {
 			t.Fatalf("create table failed: %v\n", err)
 		}
@@ -1666,6 +1674,7 @@ func TestSplitRangesAndRead(t *testing.T) {
 						)
 						return err
 					},
+					table.WithIdempotent(),
 				); err != nil {
 					t.Fatalf("upsert failed: %v\n", err)
 				} else {
@@ -1724,6 +1733,7 @@ func TestSplitRangesAndRead(t *testing.T) {
 				}
 				return nil
 			},
+			table.WithIdempotent(),
 		); err != nil {
 			t.Fatalf("stream query failed: %v\n", err)
 		}
@@ -1757,6 +1767,7 @@ func TestSplitRangesAndRead(t *testing.T) {
 					}
 					return nil
 				},
+				table.WithIdempotent(),
 			); err != nil {
 				t.Fatalf("stream query failed: %v\n", err)
 			}
@@ -1788,14 +1799,18 @@ func TestIssue229UnexpectedNullWhileParseNilJsonDocumentValue(t *testing.T) {
 	defer db.Close(ctx)
 	err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 		res, err := tx.Execute(ctx, `SELECT Nothing(JsonDocument?) AS r`, nil)
-		require.NoError(t, err)
-		require.NoError(t, res.NextResultSetErr(ctx))
+		if err != nil {
+			return err
+		}
+		if err = res.NextResultSetErr(ctx); err != nil {
+			return err
+		}
 		require.True(t, res.NextRow())
 
 		var val issue229Struct
 		require.NoError(t, res.Scan(&val))
-		return nil
-	})
+		return res.Err()
+	}, table.WithIdempotent())
 	require.NoError(t, err)
 }
 
@@ -1822,8 +1837,12 @@ func TestIssue259IntervalFromDuration(t *testing.T) {
 			SELECT $ts == $ten_micro, $ten_micro;`, table.NewQueryParameters(
 			table.ValueParam(`$ts`, types.IntervalValueFromDuration(10*time.Microsecond)),
 		))
-		require.NoError(t, err)
-		require.NoError(t, res.NextResultSetErr(ctx))
+		if err != nil {
+			return err
+		}
+		if err = res.NextResultSetErr(ctx); err != nil {
+			return err
+		}
 		require.True(t, res.NextRow())
 
 		var (
@@ -1950,7 +1969,7 @@ func TestNullType(t *testing.T) {
 		}
 		fmt.Printf("%+v\n", rescheduleDue)
 		return res.Err()
-	}, table.WithTxSettings(table.TxSettings(table.WithSnapshotReadOnly())))
+	}, table.WithTxSettings(table.TxSettings(table.WithSnapshotReadOnly())), table.WithIdempotent())
 	require.NoError(t, err)
 }
 
@@ -2193,7 +2212,7 @@ func TestValueToYqlLiteral(t *testing.T) {
 				require.Equal(t, 1, len(values))
 				require.Equal(t, tt.Yql(), values[0].Yql(), fmt.Sprintf("%T vs %T", tt, values[0]))
 				return nil
-			})
+			}, table.WithIdempotent())
 			require.NoError(t, err)
 		})
 	}

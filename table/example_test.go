@@ -49,6 +49,7 @@ func Example_select() {
 			}
 			return res.Err() // return finally result error for auto-retry with driver
 		},
+		table.WithIdempotent(),
 	)
 	if err != nil {
 		fmt.Printf("unexpected error: %v", err)
@@ -78,6 +79,7 @@ func Example_createTable() {
 				),
 			)
 		},
+		table.WithIdempotent(),
 	)
 	if err != nil {
 		fmt.Printf("unexpected error: %v", err)
@@ -132,6 +134,7 @@ func Example_bulkUpsert() {
 			}
 			return s.BulkUpsert(ctx, "/local/bulk_upsert_example", types.ListValue(rows...))
 		},
+		table.WithIdempotent(),
 	)
 	if err != nil {
 		fmt.Printf("unexpected error: %v", err)
@@ -162,6 +165,7 @@ func Example_alterTable() {
 				options.WithDropAttribute("baz"),
 			)
 		},
+		table.WithIdempotent(),
 	)
 	if err != nil {
 		fmt.Printf("unexpected error: %v", err)

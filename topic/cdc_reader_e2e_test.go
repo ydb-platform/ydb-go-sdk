@@ -226,10 +226,12 @@ func TestCDCInTableDescribe(t *testing.T) {
 			tablePath := path.Dir(topicPath)
 			topicName := path.Base(topicPath)
 			desc, err := s.DescribeTable(ctx, tablePath)
-			require.NoError(t, err)
+			if err != nil {
+				return err
+			}
 			require.Equal(t, topicName, desc.Changefeeds[0].Name)
 			return nil
-		})
+		}, table.WithIdempotent())
 		require.NoError(t, err)
 	})
 }
@@ -265,7 +267,7 @@ func createCDCFeed(ctx context.Context, t *testing.T, db ydb.Connection) string 
 		}
 
 		return nil
-	})
+	}, table.WithIdempotent())
 	require.NoError(t, err)
 
 	topicPath := testCDCFeedName(db)

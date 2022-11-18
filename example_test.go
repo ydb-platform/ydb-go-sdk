@@ -49,6 +49,7 @@ func Example_table() {
 			}
 			return res.Err() // return finally result error for auto-retry with driver
 		},
+		table.WithIdempotent(),
 	)
 	if err != nil {
 		log.Printf("unexpected error: %v", err)
