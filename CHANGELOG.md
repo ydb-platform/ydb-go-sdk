@@ -1,3 +1,4 @@
+## v3.40.0
 * Added `options.WithAddAttribute` and `options.WithDropAttribute` options for `session.AlterTable` request
 * Added `options.WithAddIndex` and `options.WithDropIndex` options for `session.AlterTable` request
 * Added return error while create topic writer with not equal producer id and message group id.
