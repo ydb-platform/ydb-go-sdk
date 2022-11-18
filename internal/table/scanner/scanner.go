@@ -1113,6 +1113,7 @@ func (s *scanner) typeError(act, exp interface{}) {
 }
 
 func (s *scanner) valueTypeError(act, exp interface{}) {
+	// unexpected value during scan at \"migration_status\" Int64: NullFlag; want Int64
 	_ = s.errorf(
 		2,
 		"unexpected value during scan at %q %s: %s; want %s",

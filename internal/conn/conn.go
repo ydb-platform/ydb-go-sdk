@@ -15,6 +15,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -313,6 +314,10 @@ func (c *conn) Invoke(
 		onDone(err, issues, opID, c.GetState(), md)
 	}()
 
+	defer func() {
+		meta.CallTrailerCallback(ctx, md)
+	}()
+
 	cc, err = c.take(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -433,8 +438,9 @@ func (c *conn) NewStream(
 		c:            c,
 		wrapping:     wrapping,
 		sentMark:     sentMark,
-		onDone: func(ctx context.Context) {
+		onDone: func(ctx context.Context, md metadata.MD) {
 			cancel()
+			meta.CallTrailerCallback(ctx, md)
 		},
 		recv: streamRecv,
 	}, nil

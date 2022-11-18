@@ -11,69 +11,45 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-const (
-	// outgoing headers
-	HeaderDatabase           = "x-ydb-database"
-	HeaderTicket             = "x-ydb-auth-ticket"
-	HeaderVersion            = "x-ydb-sdk-build-info"
-	HeaderRequestType        = "x-ydb-request-type"
-	HeaderTraceID            = "x-ydb-trace-id"
-	HeaderUserAgent          = "x-ydb-user-agent"
-	HeaderClientCapabilities = "x-ydb-client-capabilities"
-
-	// outgoing hints
-	HintSessionBalancer = "session-balancer"
-
-	// incomming headers
-	HeaderServerHints = "x-ydb-server-hints"
-
-	// incoming hints
-	HintSessionClose = "session-close"
-)
-
-type Meta interface {
-	Context(ctx context.Context) (context.Context, error)
-}
-
 func New(
 	database string,
 	credentials credentials.Credentials,
 	trace trace.Driver,
 	opts ...Option,
 ) Meta {
-	m := &meta{
+	m := Meta{
 		trace:       trace,
 		credentials: credentials,
 		database:    database,
 	}
 	for _, o := range opts {
-		o(m)
+		o(&m)
 	}
 	return m
 }
 
-type Option func(m *meta)
+type Option func(m *Meta)
 
 func WithUserAgentOption(userAgent string) Option {
-	return func(m *meta) {
+	return func(m *Meta) {
 		m.userAgents = append(m.userAgents, userAgent)
 	}
 }
 
 func WithRequestTypeOption(requestType string) Option {
-	return func(m *meta) {
+	return func(m *Meta) {
 		m.requestsType = requestType
 	}
 }
 
 func AllowOption(feature string) Option {
-	return func(m *meta) {
+	return func(m *Meta) {
 		m.capabilities = append(m.capabilities, feature)
 	}
 }
 
 func ForbidOption(feature string) Option {
-	return func(m *meta) {
+	return func(m *Meta) {
 		n := 0
 		for _, capability := range m.capabilities {
 			if capability != feature {
@@ -85,7 +61,7 @@ func ForbidOption(feature string) Option {
 	}
 }
 
-type meta struct {
+type Meta struct {
 	trace        trace.Driver
 	credentials  credentials.Credentials
 	database     string
@@ -94,7 +70,7 @@ type meta struct {
 	capabilities []string
 }
 
-func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
+func (m Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	md, has := metadata.FromOutgoingContext(ctx)
 	if !has {
 		md = metadata.MD{}
@@ -146,7 +122,7 @@ func (m *meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	return md, nil
 }
 
-func (m *meta) Context(ctx context.Context) (_ context.Context, err error) {
+func (m Meta) Context(ctx context.Context) (_ context.Context, err error) {
 	md, err := m.meta(ctx)
 	if err != nil {
 		return ctx, xerrors.WithStackTrace(err)
