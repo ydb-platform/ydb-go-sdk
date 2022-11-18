@@ -4,6 +4,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type WriterOption = topicwriterinternal.PublicWriterOption
@@ -158,4 +159,13 @@ func WithWriterSetAutoSeqNo(val bool) WriterOption {
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithWriterSetAutoCreatedAt(val bool) WriterOption {
 	return topicwriterinternal.WithAutosetCreatedTime(val)
+}
+
+// WithWriterTrace
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func WithWriterTrace(tracer trace.Topic) WriterOption {
+	return topicwriterinternal.WithTrace(tracer)
 }
