@@ -1,3 +1,5 @@
+* Added fluent modifiers for `options.TimeToLiveSettings`
+
 ## v3.40.0
 * Added `options.WithAddAttribute` and `options.WithDropAttribute` options for `session.AlterTable` request
 * Added `options.WithAddIndex` and `options.WithDropIndex` options for `session.AlterTable` request
@@ -8,7 +10,6 @@
 * Added `NestedCall` field to retry trace start infos for alarm on nested calls
 * Added `topicoptions.WithWriterTrace` option for attach tracer into separated writer
 * Added `sugar.IsTableExists()` helper for check existence of table
-* Added `types.AlterTable` options FIXME
 
 ## v3.39.0
 * Removed message level partitioning from experimental topic API. It is unavailable on server side yet.

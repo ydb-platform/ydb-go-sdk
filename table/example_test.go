@@ -162,7 +162,7 @@ func Example_alterTable() {
 				options.WithSetTimeToLiveSettings(options.TimeToLiveSettings{
 					ColumnName:         "expire_at",
 					ExpireAfterSeconds: uint32(time.Hour.Seconds()),
-				}),
+				}.WithMode(options.TimeToLiveModeValueSinceUnixEpoch).WithColumnUnit(options.TimeToLiveUnitSeconds)),
 				options.WithAddIndex("idx_series_series_id",
 					options.WithIndexColumns("series_id"),
 					options.WithDataColumns("title"),

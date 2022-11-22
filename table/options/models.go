@@ -442,6 +442,26 @@ const (
 	TimeToLiveModeValueSinceUnixEpoch
 )
 
+func (ttl TimeToLiveSettings) WithColumnName(columnName string) TimeToLiveSettings {
+	ttl.ColumnName = columnName
+	return ttl
+}
+
+func (ttl TimeToLiveSettings) WithExpireAfter(expireAfter time.Duration) TimeToLiveSettings {
+	ttl.ExpireAfterSeconds = uint32(expireAfter.Seconds())
+	return ttl
+}
+
+func (ttl TimeToLiveSettings) WithMode(mode TimeToLiveMode) TimeToLiveSettings {
+	ttl.Mode = mode
+	return ttl
+}
+
+func (ttl TimeToLiveSettings) WithColumnUnit(columnUnit TimeToLiveUnit) TimeToLiveSettings {
+	ttl.ColumnUnit = &columnUnit
+	return ttl
+}
+
 func (ttl *TimeToLiveSettings) ToYDB() *Ydb_Table.TtlSettings {
 	if ttl == nil {
 		return nil
