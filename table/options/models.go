@@ -447,7 +447,7 @@ func (ttl TimeToLiveSettings) WithColumnName(columnName string) TimeToLiveSettin
 	return ttl
 }
 
-func (ttl TimeToLiveSettings) WithExpireAfter(expireAfter time.Duration) TimeToLiveSettings {
+func (ttl TimeToLiveSettings) ExpireAfter(expireAfter time.Duration) TimeToLiveSettings {
 	ttl.ExpireAfterSeconds = uint32(expireAfter.Seconds())
 	return ttl
 }
@@ -457,7 +457,57 @@ func (ttl TimeToLiveSettings) WithMode(mode TimeToLiveMode) TimeToLiveSettings {
 	return ttl
 }
 
+func (ttl TimeToLiveSettings) ModeDate() TimeToLiveSettings {
+	ttl.Mode = TimeToLiveModeDateType
+	ttl.ColumnUnit = nil
+	return ttl
+}
+
+func (ttl TimeToLiveSettings) ModeSinceEpoch() TimeToLiveSettings {
+	ttl.Mode = TimeToLiveModeValueSinceUnixEpoch
+	if ttl.ColumnUnit == nil {
+		return ttl.ColumnUnitSeconds()
+	}
+	return ttl
+}
+
 func (ttl TimeToLiveSettings) WithColumnUnit(columnUnit TimeToLiveUnit) TimeToLiveSettings {
+	ttl.ColumnUnit = &columnUnit
+	return ttl
+}
+
+func (ttl TimeToLiveSettings) ColumnUnitSeconds() TimeToLiveSettings {
+	if ttl.Mode != TimeToLiveModeValueSinceUnixEpoch {
+		ttl.Mode = TimeToLiveModeValueSinceUnixEpoch
+	}
+	columnUnit := TimeToLiveUnitSeconds
+	ttl.ColumnUnit = &columnUnit
+	return ttl
+}
+
+func (ttl TimeToLiveSettings) ColumnUnitMilliseconds() TimeToLiveSettings {
+	if ttl.Mode != TimeToLiveModeValueSinceUnixEpoch {
+		ttl.Mode = TimeToLiveModeValueSinceUnixEpoch
+	}
+	columnUnit := TimeToLiveUnitMilliseconds
+	ttl.ColumnUnit = &columnUnit
+	return ttl
+}
+
+func (ttl TimeToLiveSettings) ColumnUnitMicroseconds() TimeToLiveSettings {
+	if ttl.Mode != TimeToLiveModeValueSinceUnixEpoch {
+		ttl.Mode = TimeToLiveModeValueSinceUnixEpoch
+	}
+	columnUnit := TimeToLiveUnitMicroseconds
+	ttl.ColumnUnit = &columnUnit
+	return ttl
+}
+
+func (ttl TimeToLiveSettings) ColumnUnitNanoseconds() TimeToLiveSettings {
+	if ttl.Mode != TimeToLiveModeValueSinceUnixEpoch {
+		ttl.Mode = TimeToLiveModeValueSinceUnixEpoch
+	}
+	columnUnit := TimeToLiveUnitNanoseconds
 	ttl.ColumnUnit = &columnUnit
 	return ttl
 }
