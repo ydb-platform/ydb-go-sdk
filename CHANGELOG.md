@@ -1,3 +1,4 @@
+## v3.40.1
 * Added constructor of `options.TimeToLiveSettings` and fluent modifiers
 
 ## v3.40.0
