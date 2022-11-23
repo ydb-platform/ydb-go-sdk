@@ -426,7 +426,7 @@ func (s *session) DescribeTable(
 		KeyBloomFilter:       feature.FromYDB(result.GetKeyBloomFilter()),
 		PartitioningSettings: options.NewPartitioningSettings(result.GetPartitioningSettings()),
 		Indexes:              indexes,
-		TimeToLiveSettings:   options.NewTimeToLiveSettings(result.GetTtlSettings()),
+		TimeToLiveSettings:   NewTimeToLiveSettings(result.GetTtlSettings()),
 		Changefeeds:          changeFeeds,
 	}, nil
 }

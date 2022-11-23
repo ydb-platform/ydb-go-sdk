@@ -159,10 +159,9 @@ func Example_alterTable() {
 			return s.AlterTable(ctx, path.Join(db.Name(), "series"),
 				options.WithAddColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithAddColumn("title", types.Optional(types.TypeText)),
-				options.WithSetTimeToLiveSettings(options.TimeToLiveSettings{
-					ColumnName:         "expire_at",
-					ExpireAfterSeconds: uint32(time.Hour.Seconds()),
-				}),
+				options.WithSetTimeToLiveSettings(
+					options.NewTTLSettings().ColumnDateType("expire_at").ExpireAfter(time.Hour),
+				),
 				options.WithAddIndex("idx_series_series_id",
 					options.WithIndexColumns("series_id"),
 					options.WithDataColumns("title"),
