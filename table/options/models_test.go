@@ -13,25 +13,8 @@ func TestTimeToLiveSettingsFluentModifiers(t *testing.T) {
 		expectedSettings TimeToLiveSettings
 	}{
 		{
-			fluentSettings: TimeToLiveSettings{}.
-				WithColumnName("a").
-				WithColumnUnit(TimeToLiveUnitSeconds).
-				WithMode(TimeToLiveModeValueSinceUnixEpoch).
-				ExpireAfter(time.Hour),
-			expectedSettings: TimeToLiveSettings{
-				ColumnName:         "a",
-				Mode:               TimeToLiveModeValueSinceUnixEpoch,
-				ExpireAfterSeconds: uint32(time.Hour.Seconds()),
-				ColumnUnit: func() *TimeToLiveUnit {
-					u := TimeToLiveUnitSeconds
-					return &u
-				}(),
-			},
-		},
-		{
-			fluentSettings: TimeToLiveSettings{}.
-				WithColumnName("a").
-				ModeDate().
+			fluentSettings: NewTTLSettings().
+				ColumnDateType("a").
 				ExpireAfter(time.Hour),
 			expectedSettings: TimeToLiveSettings{
 				ColumnName:         "a",
@@ -40,79 +23,47 @@ func TestTimeToLiveSettingsFluentModifiers(t *testing.T) {
 			},
 		},
 		{
-			fluentSettings: TimeToLiveSettings{}.
-				WithColumnName("a").
-				ModeSinceEpoch().
-				ColumnUnitSeconds().
+			fluentSettings: NewTTLSettings().
+				ColumnSeconds("a").
 				ExpireAfter(time.Hour),
 			expectedSettings: TimeToLiveSettings{
 				ColumnName:         "a",
 				Mode:               TimeToLiveModeValueSinceUnixEpoch,
 				ExpireAfterSeconds: uint32(time.Hour.Seconds()),
-				ColumnUnit: func() *TimeToLiveUnit {
-					u := TimeToLiveUnitSeconds
-					return &u
-				}(),
+				ColumnUnit:         unitToPointer(TimeToLiveUnitSeconds),
 			},
 		},
 		{
-			fluentSettings: TimeToLiveSettings{}.
-				WithColumnName("a").
-				ColumnUnitSeconds().
+			fluentSettings: NewTTLSettings().
+				ColumnMilliseconds("a").
 				ExpireAfter(time.Hour),
 			expectedSettings: TimeToLiveSettings{
 				ColumnName:         "a",
 				Mode:               TimeToLiveModeValueSinceUnixEpoch,
 				ExpireAfterSeconds: uint32(time.Hour.Seconds()),
-				ColumnUnit: func() *TimeToLiveUnit {
-					u := TimeToLiveUnitSeconds
-					return &u
-				}(),
+				ColumnUnit:         unitToPointer(TimeToLiveUnitMilliseconds),
 			},
 		},
 		{
-			fluentSettings: TimeToLiveSettings{}.
-				WithColumnName("a").
-				ColumnUnitMilliseconds().
+			fluentSettings: NewTTLSettings().
+				ColumnMicroseconds("a").
 				ExpireAfter(time.Hour),
 			expectedSettings: TimeToLiveSettings{
 				ColumnName:         "a",
 				Mode:               TimeToLiveModeValueSinceUnixEpoch,
 				ExpireAfterSeconds: uint32(time.Hour.Seconds()),
-				ColumnUnit: func() *TimeToLiveUnit {
-					u := TimeToLiveUnitMilliseconds
-					return &u
-				}(),
+				ColumnUnit:         unitToPointer(TimeToLiveUnitMicroseconds),
 			},
 		},
 		{
-			fluentSettings: TimeToLiveSettings{}.
-				WithColumnName("a").
-				ColumnUnitMicroseconds().
+			fluentSettings: NewTTLSettings().
+				ColumnNanoseconds("a").
 				ExpireAfter(time.Hour),
 			expectedSettings: TimeToLiveSettings{
 				ColumnName:         "a",
 				Mode:               TimeToLiveModeValueSinceUnixEpoch,
 				ExpireAfterSeconds: uint32(time.Hour.Seconds()),
-				ColumnUnit: func() *TimeToLiveUnit {
-					u := TimeToLiveUnitMicroseconds
-					return &u
-				}(),
-			},
-		},
-		{
-			fluentSettings: TimeToLiveSettings{}.
-				WithColumnName("a").
-				ColumnUnitNanoseconds().
-				ExpireAfter(time.Hour),
-			expectedSettings: TimeToLiveSettings{
-				ColumnName:         "a",
-				Mode:               TimeToLiveModeValueSinceUnixEpoch,
-				ExpireAfterSeconds: uint32(time.Hour.Seconds()),
-				ColumnUnit: func() *TimeToLiveUnit {
-					u := TimeToLiveUnitNanoseconds
-					return &u
-				}(),
+				ColumnUnit:         unitToPointer(TimeToLiveUnitNanoseconds),
 			},
 		},
 	} {

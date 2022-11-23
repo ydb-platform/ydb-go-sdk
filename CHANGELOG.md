@@ -1,4 +1,4 @@
-* Added fluent modifiers for `options.TimeToLiveSettings`
+* Added constructor of `options.TimeToLiveSettings` and fluent modifiers
 
 ## v3.40.0
 * Added `options.WithAddAttribute` and `options.WithDropAttribute` options for `session.AlterTable` request
