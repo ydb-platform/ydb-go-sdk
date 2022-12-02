@@ -49,6 +49,7 @@ func Example_select() {
 			}
 			return res.Err() // return finally result error for auto-retry with driver
 		},
+		table.WithIdempotent(),
 	)
 	if err != nil {
 		fmt.Printf("unexpected error: %v", err)
@@ -63,18 +64,27 @@ func Example_createTable() {
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
-	err = db.Table().Do(
-		ctx,
+	err = db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(db.Name(), "series"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("title", types.Optional(types.TypeText)),
 				options.WithColumn("series_info", types.Optional(types.TypeText)),
 				options.WithColumn("release_date", types.Optional(types.TypeDate)),
+				options.WithColumn("expire_at", types.Optional(types.TypeDate)),
 				options.WithColumn("comment", types.Optional(types.TypeText)),
 				options.WithPrimaryKeyColumn("series_id"),
+				options.WithTimeToLiveSettings(options.TimeToLiveSettings{
+					ColumnName:         "expire_at",
+					ExpireAfterSeconds: uint32(time.Hour.Seconds()),
+				}),
+				options.WithIndex("idx_series_title",
+					options.WithIndexColumns("title"),
+					options.WithIndexType(options.GlobalAsyncIndex()),
+				),
 			)
 		},
+		table.WithIdempotent(),
 	)
 	if err != nil {
 		fmt.Printf("unexpected error: %v", err)
@@ -129,6 +139,41 @@ func Example_bulkUpsert() {
 			}
 			return s.BulkUpsert(ctx, "/local/bulk_upsert_example", types.ListValue(rows...))
 		},
+		table.WithIdempotent(),
+	)
+	if err != nil {
+		fmt.Printf("unexpected error: %v", err)
+	}
+}
+
+func Example_alterTable() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
+	if err != nil {
+		fmt.Printf("failed connect: %v", err)
+		return
+	}
+	defer db.Close(ctx) // cleanup resources
+	err = db.Table().Do(ctx,
+		func(ctx context.Context, s table.Session) (err error) {
+			return s.AlterTable(ctx, path.Join(db.Name(), "series"),
+				options.WithAddColumn("series_id", types.Optional(types.TypeUint64)),
+				options.WithAddColumn("title", types.Optional(types.TypeText)),
+				options.WithSetTimeToLiveSettings(
+					options.NewTTLSettings().ColumnDateType("expire_at").ExpireAfter(time.Hour),
+				),
+				options.WithAddIndex("idx_series_series_id",
+					options.WithIndexColumns("series_id"),
+					options.WithDataColumns("title"),
+					options.WithIndexType(options.GlobalAsyncIndex()),
+				),
+				options.WithDropIndex("idx_series_title"),
+				options.WithAlterAttribute("hello", "world"),
+				options.WithAddAttribute("foo", "bar"),
+				options.WithDropAttribute("baz"),
+			)
+		},
+		table.WithIdempotent(),
 	)
 	if err != nil {
 		fmt.Printf("unexpected error: %v", err)

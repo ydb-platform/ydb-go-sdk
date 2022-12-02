@@ -73,6 +73,7 @@ func WithRequestsType(requestsType string) Option {
 //	grpc[s]://{endpoint}/{database}[?param=value]
 //
 // Warning: WithConnectionString will be removed at next major release
+//
 // (connection string will be required string param of ydb.Open)
 func WithConnectionString(connectionString string) Option {
 	return func(ctx context.Context, c *connection) error {
@@ -106,7 +107,9 @@ func WithConnectionTTL(ttl time.Duration) Option {
 
 // WithEndpoint defines endpoint option
 //
-// Warning: use WithConnectionString or dsn package instead
+// Warning: use ydb.Open with required connection string parameter instead
+//
+// For making connection string from endpoint+database+secure - use sugar.DSN()
 func WithEndpoint(endpoint string) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithEndpoint(endpoint))
@@ -116,7 +119,9 @@ func WithEndpoint(endpoint string) Option {
 
 // WithDatabase defines database option
 //
-// Warning: use WithConnectionString or dsn package instead
+// Warning: use ydb.Open with required connection string parameter instead
+//
+// For making connection string from endpoint+database+secure - use sugar.DSN()
 func WithDatabase(database string) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithDatabase(database))
@@ -126,7 +131,9 @@ func WithDatabase(database string) Option {
 
 // WithSecure defines secure option
 //
-// Warning: if secure is false - TLS config options has no effect.
+// Warning: use ydb.Open with required connection string parameter instead
+//
+// For making connection string from endpoint+database+secure - use sugar.DSN()
 func WithSecure(secure bool) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithSecure(secure))
@@ -218,6 +225,8 @@ func WithBalancer(balancer *balancerConfig.Config) Option {
 }
 
 // WithDialTimeout sets timeout for establishing new connection to cluster
+//
+// Default dial timeout is config.DefaultDialTimeout
 func WithDialTimeout(timeout time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.options = append(c.options, config.WithDialTimeout(timeout))
@@ -226,6 +235,7 @@ func WithDialTimeout(timeout time.Duration) Option {
 }
 
 // With collects additional configuration options.
+//
 // This option does not replace collected option, instead it will append provided options.
 func With(options ...config.Option) Option {
 	return func(ctx context.Context, c *connection) error {

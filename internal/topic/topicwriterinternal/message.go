@@ -15,33 +15,38 @@ import (
 var errNoRawContent = xerrors.Wrap(errors.New("ydb: internal state error - no raw message content"))
 
 type Message struct {
-	SeqNo        int64
-	CreatedAt    time.Time
-	Data         io.Reader
-	Partitioning PublicPartitioning
+	SeqNo     int64
+	CreatedAt time.Time
+	Data      io.Reader
+
+	// partitioning at level message available by protocol, but doesn't available by current server implementation
+	// the field hidden from public access for prevent runtime errors.
+	// it will be published after implementation on server side.
+	futurePartitioning PublicFuturePartitioning
 }
 
-type PublicPartitioning struct {
+// PublicFuturePartitioning will be published in feature, after server implementation completed.
+type PublicFuturePartitioning struct {
 	messageGroupID string
 	partitionID    int64
 	hasPartitionID bool
 }
 
-func (p PublicPartitioning) ToRaw() rawtopicwriter.Partitioning {
+func (p PublicFuturePartitioning) ToRaw() rawtopicwriter.Partitioning {
 	if p.hasPartitionID {
 		return rawtopicwriter.NewPartitioningPartitionID(p.partitionID)
 	}
 	return rawtopicwriter.NewPartitioningMessageGroup(p.messageGroupID)
 }
 
-func NewPartitioningWithMessageGroupID(id string) PublicPartitioning {
-	return PublicPartitioning{
+func NewPartitioningWithMessageGroupID(id string) PublicFuturePartitioning {
+	return PublicFuturePartitioning{
 		messageGroupID: id,
 	}
 }
 
-func NewPartitioningWithPartitionID(id int64) PublicPartitioning {
-	return PublicPartitioning{
+func NewPartitioningWithPartitionID(id int64) PublicFuturePartitioning {
+	return PublicFuturePartitioning{
 		partitionID:    id,
 		hasPartitionID: true,
 	}

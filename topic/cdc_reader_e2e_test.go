@@ -15,7 +15,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
@@ -226,10 +226,14 @@ func TestCDCInTableDescribe(t *testing.T) {
 			tablePath := path.Dir(topicPath)
 			topicName := path.Base(topicPath)
 			desc, err := s.DescribeTable(ctx, tablePath)
-			require.NoError(t, err)
-			require.Equal(t, topicName, desc.Changefeeds[0].Name)
+			if err != nil {
+				return err
+			}
+			if topicName != desc.Changefeeds[0].Name {
+				return fmt.Errorf("unexpected topic name: %s, epx: %s", desc.Changefeeds[0].Name, topicName)
+			}
 			return nil
-		})
+		}, table.WithIdempotent())
 		require.NoError(t, err)
 	})
 }
@@ -265,7 +269,7 @@ func createCDCFeed(ctx context.Context, t *testing.T, db ydb.Connection) string 
 		}
 
 		return nil
-	})
+	}, table.WithIdempotent())
 	require.NoError(t, err)
 
 	topicPath := testCDCFeedName(db)
@@ -308,12 +312,10 @@ var sendCDCCounter int64
 func sendCDCMessage(ctx context.Context, t *testing.T, db ydb.Connection) {
 	counter := atomic.AddInt64(&sendCDCCounter, 1)
 	err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
-		if _, err := tx.Execute(ctx,
+		_, err := tx.Execute(ctx,
 			"DECLARE $id AS Int64; INSERT INTO test (id, val) VALUES($id, 'asd')",
-			table.NewQueryParameters(table.ValueParam("$id", types.Int64Value(counter)))); err != nil {
-			return err
-		}
-		return nil
+			table.NewQueryParameters(table.ValueParam("$id", types.Int64Value(counter))))
+		return err
 	})
 	require.NoError(t, err)
 }

@@ -49,6 +49,7 @@ func Example_table() {
 			}
 			return res.Err() // return finally result error for auto-retry with driver
 		},
+		table.WithIdempotent(),
 	)
 	if err != nil {
 		log.Printf("unexpected error: %v", err)
@@ -78,24 +79,6 @@ func Example_databaseSQL() {
 	if err != nil {
 		log.Printf("query failed: %v", err)
 	}
-}
-
-func Example_databaseSql() {
-	db, err := sql.Open("ydb", "grpcs://localhost:2135/local")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close() // cleanup resources
-	var (
-		id    int32
-		myStr string
-	)
-	row := db.QueryRowContext(context.TODO(), `SELECT 42 as id, "my string" as myStr`)
-	if err = row.Scan(&id, &myStr); err != nil {
-		log.Printf("select failed: %v", err)
-		return
-	}
-	log.Printf("id = %d, myStr = \"%s\"", id, myStr)
 }
 
 func Example_topic() {

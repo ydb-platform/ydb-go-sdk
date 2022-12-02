@@ -9,7 +9,7 @@
 [![codecov](https://codecov.io/gh/ydb-platform/ydb-go-sdk/branch/master/graph/badge.svg?precision=2)](https://app.codecov.io/gh/ydb-platform/ydb-go-sdk)
 ![Code lines](https://sloc.xyz/github/ydb-platform/ydb-go-sdk/?category=code)
 [![View examples](https://img.shields.io/badge/learn-examples-brightgreen.svg)](https://github.com/ydb-platform/ydb-go-examples)
-[![Telegram](https://img.shields.io/badge/chat-on%20Telegram-2ba2d9.svg)](https://t.me/YDBPlatform)
+[![Telegram](https://img.shields.io/badge/chat-on%20Telegram-2ba2d9.svg)](https://t.me/ydb_en)
 [![WebSite](https://img.shields.io/badge/website-ydb.tech-blue.svg)](https://ydb.tech)
 
 Supports `table`, `discovery`, `coordination`, `ratelimiter`, `scheme`, `scripting` and `topic` clients for [YDB](https://ydb.tech).
@@ -119,7 +119,8 @@ Next packages provide debug tooling:
 | [ydb-go-sdk-zerolog](https://github.com/ydb-platform/ydb-go-sdk-zap)             | logging | logging ydb-go-sdk events with zerolog package                                                                            | [ydbZerolog.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-zerolog/blob/master/internal/cmd/bench/main.go#L47)         |
 | [ydb-go-sdk-metrics](https://github.com/ydb-platform/ydb-go-sdk-metrics)         | metrics | common metrics of ydb-go-sdk. Package declare interfaces such as `Registry`, `GaugeVec` and `Gauge` and use it for traces |                                                                                                                                |
 | [ydb-go-sdk-prometheus](https://github.com/ydb-platform/ydb-go-sdk-prometheus)   | metrics | prometheus wrapper over [ydb-go-sdk-metrics](https://github.com/ydb-platform/ydb-go-sdk-metrics)                          | [ydbPrometheus.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-prometheus/blob/master/internal/cmd/bench/main.go#L56)   |
-| [ydb-go-sdk-opentracing](https://github.com/ydb-platform/ydb-go-sdk-opentracing) | tracing | opentracing plugin for trace internal ydb-go-sdk calls                                                                    | [ydbOpentracing.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-opentracing/blob/master/internal/cmd/bench/main.go#L86) |
+| [ydb-go-sdk-opentracing](https://github.com/ydb-platform/ydb-go-sdk-opentracing) | tracing | OpenTracing plugin for trace internal ydb-go-sdk calls                                                                    | [ydbOpentracing.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-opentracing/blob/master/internal/cmd/bench/main.go#L86) |
+| [ydb-go-sdk-otel](https://github.com/ydb-platform/ydb-go-sdk-otel) | tracing | OpenTelemetry plugin for trace internal ydb-go-sdk calls                                                                    | [ydbOtel.WithTraces](https://github.com/ydb-platform/ydb-go-sdk-otel/blob/master/internal/cmd/bench/main.go#L98) |
 
 ## Environment variables <a name="environ"></a>
 

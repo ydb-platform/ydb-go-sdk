@@ -51,7 +51,7 @@ func (c *Client) MakeDirectory(ctx context.Context, path string) (err error) {
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace())
+	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
 }
 
 func (c *Client) makeDirectory(ctx context.Context, path string) (err error) {
@@ -80,7 +80,7 @@ func (c *Client) RemoveDirectory(ctx context.Context, path string) (err error) {
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace())
+	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
 }
 
 func (c *Client) removeDirectory(ctx context.Context, path string) (err error) {
@@ -207,7 +207,7 @@ func (c *Client) ModifyPermissions(ctx context.Context, path string, opts ...sch
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace())
+	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
 }
 
 func (c *Client) modifyPermissions(ctx context.Context, path string, opts ...scheme.PermissionsOption) (err error) {

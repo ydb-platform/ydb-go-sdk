@@ -22,6 +22,21 @@ type SessionProvider interface {
 	Put(context.Context, *session) (err error)
 }
 
+type (
+	markRetryCallKey struct{}
+)
+
+func markRetryCall(ctx context.Context) context.Context {
+	return context.WithValue(ctx, markRetryCallKey{}, true)
+}
+
+func isRetryCalledAbove(ctx context.Context) bool {
+	if _, has := ctx.Value(markRetryCallKey{}).(bool); has {
+		return true
+	}
+	return false
+}
+
 func doTx(
 	ctx context.Context,
 	c SessionProvider,
@@ -33,6 +48,7 @@ func doTx(
 		opts.Trace,
 		&ctx,
 		opts.Idempotent,
+		isRetryCalledAbove(ctx),
 	)
 	defer func() {
 		onIntermediate(err)(attempts, err)
@@ -101,6 +117,7 @@ func do(
 		opts.Trace,
 		&ctx,
 		opts.Idempotent,
+		isRetryCalledAbove(ctx),
 	)
 	defer func() {
 		onIntermediate(err)(attempts, err)
@@ -147,7 +164,7 @@ func retryBackoff(
 	op table.Operation,
 ) (err error) {
 	err = retry.Retry(
-		ctx,
+		markRetryCall(ctx),
 		func(ctx context.Context) (err error) {
 			var s *session
 

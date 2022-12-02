@@ -120,7 +120,7 @@ func (c *Client) Explain(
 		err = call(ctx)
 		return
 	}
-	err = retry.Retry(ctx, call, retry.WithStackTrace())
+	err = retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
 	return
 }
 

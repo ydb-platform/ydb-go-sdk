@@ -27,6 +27,7 @@ import (
 	"golang.org/x/xerrors"
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
@@ -35,6 +36,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -203,6 +205,15 @@ func testTable(t testing.TB) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), testDuration)
 	defer cancel()
+
+	var totalConsumedUnits uint64
+	defer func() {
+		t.Logf("total consumed units: %d", atomic.LoadUint64(&totalConsumedUnits))
+	}()
+
+	ctx = meta.WithTrailerCallback(ctx, func(md metadata.MD) {
+		atomic.AddUint64(&totalConsumedUnits, meta.ConsumedUnits(md))
+	})
 
 	s := &stats{
 		limit:            math.MaxInt32,
@@ -428,8 +439,7 @@ func testTable(t testing.TB) {
 	}
 
 	// upsert with transaction
-	if err = db.Table().DoTx(
-		ctx,
+	if err = db.Table().DoTx(ctx,
 		func(ctx context.Context, tx table.TransactionActor) (err error) {
 			var (
 				res   result.Result
@@ -499,8 +509,7 @@ func testTable(t testing.TB) {
 		t.Fatalf("tx failed: %v\n", err)
 	}
 	// select upserted data
-	if err = db.Table().Do(
-		ctx,
+	if err = db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			var (
 				res   result.Result
@@ -558,8 +567,7 @@ func testTable(t testing.TB) {
 	// multiple result sets
 	// - create table
 	t.Logf("> creating table stream_query...\n")
-	if err = db.Table().Do(
-		ctx,
+	if err = db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			_ = s.ExecuteSchemeQuery(
 				ctx,
@@ -604,11 +612,9 @@ func testTable(t testing.TB) {
 	fmt.Printf("> values to upsert prepared\n")
 
 	fmt.Printf("> upserting prepared values...\n")
-	if err = db.Table().Do(
-		ctx,
+	if err = db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
-			_, _, err = s.Execute(
-				ctx,
+			_, _, err = s.Execute(ctx,
 				table.TxControl(
 					table.BeginTx(
 						table.WithSerializableReadWrite(),
@@ -640,8 +646,7 @@ func testTable(t testing.TB) {
 
 	// - scan select
 	fmt.Printf("> scan-selecting values...\n")
-	if err = db.Table().Do(
-		ctx,
+	if err = db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			res, err := s.StreamExecuteScanQuery(
 				ctx, `SELECT val FROM stream_query;`, table.NewQueryParameters(),
@@ -702,7 +707,7 @@ func testTable(t testing.TB) {
 	}
 	fmt.Printf("> values selected\n")
 	// shutdown existing sessions
-	urls := os.Getenv("YDB_SHUTDOWN_URLS")
+	urls := os.Getenv("YDB_SESSIONS_SHUTDOWN_URLS")
 	if len(urls) > 0 {
 		fmt.Printf("> shutdowning existing sessions...\n")
 		for _, url := range strings.Split(urls, ",") {
@@ -764,8 +769,7 @@ func testTable(t testing.TB) {
 }
 
 func streamReadTable(ctx context.Context, t testing.TB, c table.Client, tableAbsPath string) {
-	err := c.Do(
-		ctx,
+	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			var (
 				res   result.StreamResult
@@ -822,7 +826,7 @@ func streamReadTable(ctx context.Context, t testing.TB, c table.Client, tableAbs
 				}
 			}
 
-			return nil
+			return res.Err()
 		},
 		table.WithIdempotent(),
 	)
@@ -857,8 +861,7 @@ func executeDataQuery(ctx context.Context, t testing.TB, c table.Client, folderA
 			table.CommitTx(),
 		)
 	)
-	err := c.Do(
-		ctx,
+	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			var (
 				res   result.Result
@@ -919,8 +922,7 @@ func executeScanQuery(ctx context.Context, t testing.TB, c table.Client, folderA
 			TablePathPrefix: folderAbsPath,
 		},
 	)
-	err := c.Do(
-		ctx,
+	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			var (
 				res      result.StreamResult
@@ -1197,11 +1199,10 @@ var (
 
 func describeTableOptions(ctx context.Context, c table.Client) error {
 	var desc options.TableOptionsDescription
-	err := c.Do(
-		ctx,
+	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			desc, err = s.DescribeTableOptions(ctx)
-			return
+			return err
 		},
 		table.WithIdempotent(),
 	)
@@ -1247,8 +1248,7 @@ func fill(ctx context.Context, db ydb.Connection, folder string) error {
 		),
 		table.CommitTx(),
 	)
-	return db.Table().Do(
-		ctx,
+	return db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			stmt, err := s.Prepare(ctx, render(fillQuery, templateConfig{
 				TablePathPrefix: path.Join(db.Name(), folder),
@@ -1263,12 +1263,12 @@ func fill(ctx context.Context, db ydb.Connection, folder string) error {
 			))
 			return
 		},
+		table.WithIdempotent(),
 	)
 }
 
 func createTables(ctx context.Context, c table.Client, folder string) error {
-	err := c.Do(
-		ctx,
+	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			if _, err = s.DescribeTable(ctx, path.Join(folder, "series")); err == nil {
 				_ = s.DropTable(ctx, path.Join(folder, "series"))
@@ -1288,8 +1288,7 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 		return err
 	}
 
-	err = c.Do(
-		ctx,
+	err = c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			if _, err = s.DescribeTable(ctx, path.Join(folder, "seasons")); err == nil {
 				_ = s.DropTable(ctx, path.Join(folder, "seasons"))
@@ -1303,13 +1302,13 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 				options.WithPrimaryKeyColumn("series_id", "season_id"),
 			)
 		},
+		table.WithIdempotent(),
 	)
 	if err != nil {
 		return err
 	}
 
-	err = c.Do(
-		ctx,
+	err = c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			if _, err = s.DescribeTable(ctx, path.Join(folder, "episodes")); err == nil {
 				_ = s.DropTable(ctx, path.Join(folder, "episodes"))
@@ -1324,13 +1323,13 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 				options.WithPrimaryKeyColumn("series_id", "season_id", "episode_id"),
 			)
 		},
+		table.WithIdempotent(),
 	)
 	return err
 }
 
 func describeTable(ctx context.Context, c table.Client, path string) (err error) {
-	err = c.Do(
-		ctx,
+	err = c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			desc, err := s.DescribeTable(ctx, path)
 			if err != nil {
@@ -1343,7 +1342,7 @@ func describeTable(ctx context.Context, c table.Client, path string) (err error)
 			for i, keyRange := range desc.KeyRanges {
 				fmt.Printf("  > key range %d: %s\n", i, keyRange.String())
 			}
-			return
+			return err
 		},
 		table.WithIdempotent(),
 	)
@@ -1389,8 +1388,7 @@ func TestLongStream(t *testing.T) {
 	}(db)
 
 	t.Run("creating stream table", func(t *testing.T) {
-		if err = db.Table().Do(
-			ctx,
+		if err = db.Table().Do(ctx,
 			func(ctx context.Context, s table.Session) (err error) {
 				_, err = s.DescribeTable(ctx, path.Join(db.Name(), tableName))
 				if err == nil {
@@ -1403,6 +1401,7 @@ func TestLongStream(t *testing.T) {
 					`CREATE TABLE `+tableName+` (val Int64, PRIMARY KEY (val))`,
 				)
 			},
+			table.WithIdempotent(),
 		); err != nil {
 			t.Fatalf("create table failed: %v\n", err)
 		}
@@ -1431,8 +1430,7 @@ func TestLongStream(t *testing.T) {
 						),
 					)
 				}
-				if err = db.Table().Do(
-					ctx,
+				if err = db.Table().Do(ctx,
 					func(ctx context.Context, s table.Session) (err error) {
 						_, _, err = s.Execute(
 							ctx,
@@ -1459,6 +1457,7 @@ func TestLongStream(t *testing.T) {
 						)
 						return err
 					},
+					table.WithIdempotent(),
 				); err != nil {
 					t.Fatalf("upsert failed: %v\n", err)
 				} else {
@@ -1488,8 +1487,7 @@ func TestLongStream(t *testing.T) {
 	}(db)
 
 	t.Run("execute stream query", func(t *testing.T) {
-		if err = db.Table().Do(
-			ctx,
+		if err = db.Table().Do(ctx,
 			func(ctx context.Context, s table.Session) (err error) {
 				var (
 					start     = time.Now()
@@ -1521,16 +1519,16 @@ func TestLongStream(t *testing.T) {
 						time.Since(start),
 					)
 				}
-				return nil
+				return res.Err()
 			},
+			table.WithIdempotent(),
 		); err != nil {
 			t.Fatalf("stream query failed: %v\n", err)
 		}
 	})
 
 	t.Run("stream read table", func(t *testing.T) {
-		if err = db.Table().Do(
-			ctx,
+		if err = db.Table().Do(ctx,
 			func(ctx context.Context, s table.Session) (err error) {
 				var (
 					start     = time.Now()
@@ -1562,8 +1560,9 @@ func TestLongStream(t *testing.T) {
 						time.Since(start),
 					)
 				}
-				return nil
+				return res.Err()
 			},
+			table.WithIdempotent(),
 		); err != nil {
 			t.Fatalf("stream query failed: %v\n", err)
 		}
@@ -1599,8 +1598,7 @@ func TestSplitRangesAndRead(t *testing.T) {
 	}(db)
 
 	t.Run("creating table", func(t *testing.T) {
-		if err = db.Table().Do(
-			ctx,
+		if err = db.Table().Do(ctx,
 			func(ctx context.Context, s table.Session) (err error) {
 				_, err = s.DescribeTable(ctx, path.Join(db.Name(), tableName))
 				if err == nil {
@@ -1619,6 +1617,7 @@ func TestSplitRangesAndRead(t *testing.T) {
 					)`,
 				)
 			},
+			table.WithIdempotent(),
 		); err != nil {
 			t.Fatalf("create table failed: %v\n", err)
 		}
@@ -1647,8 +1646,7 @@ func TestSplitRangesAndRead(t *testing.T) {
 						),
 					)
 				}
-				if err = db.Table().Do(
-					ctx,
+				if err = db.Table().Do(ctx,
 					func(ctx context.Context, s table.Session) (err error) {
 						_, _, err = s.Execute(
 							ctx,
@@ -1675,6 +1673,7 @@ func TestSplitRangesAndRead(t *testing.T) {
 						)
 						return err
 					},
+					table.WithIdempotent(),
 				); err != nil {
 					t.Fatalf("upsert failed: %v\n", err)
 				} else {
@@ -1733,6 +1732,7 @@ func TestSplitRangesAndRead(t *testing.T) {
 				}
 				return nil
 			},
+			table.WithIdempotent(),
 		); err != nil {
 			t.Fatalf("stream query failed: %v\n", err)
 		}
@@ -1744,8 +1744,7 @@ func TestSplitRangesAndRead(t *testing.T) {
 			rowsCount = 0
 		)
 		for _, r := range ranges {
-			if err = db.Table().Do(
-				ctx,
+			if err = db.Table().Do(ctx,
 				func(ctx context.Context, s table.Session) (err error) {
 					res, err := s.StreamReadTable(ctx, path.Join(db.Name(), tableName), options.ReadKeyRange(r))
 					if err != nil {
@@ -1767,6 +1766,7 @@ func TestSplitRangesAndRead(t *testing.T) {
 					}
 					return nil
 				},
+				table.WithIdempotent(),
 			); err != nil {
 				t.Fatalf("stream query failed: %v\n", err)
 			}
@@ -1796,16 +1796,23 @@ func TestIssue229UnexpectedNullWhileParseNilJsonDocumentValue(t *testing.T) {
 
 	db := connect(t)
 	defer db.Close(ctx)
+	var val issue229Struct
 	err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 		res, err := tx.Execute(ctx, `SELECT Nothing(JsonDocument?) AS r`, nil)
-		require.NoError(t, err)
-		require.NoError(t, res.NextResultSetErr(ctx))
-		require.True(t, res.NextRow())
-
-		var val issue229Struct
-		require.NoError(t, res.Scan(&val))
-		return nil
-	})
+		if err != nil {
+			return err
+		}
+		if err = res.NextResultSetErr(ctx); err != nil {
+			return err
+		}
+		if !res.NextRow() {
+			return fmt.Errorf("unexpected no rows in result set (err = %w)", res.Err())
+		}
+		if err = res.Scan(&val); err != nil {
+			return err
+		}
+		return res.Err()
+	}, table.WithIdempotent())
 	require.NoError(t, err)
 }
 
@@ -1825,61 +1832,105 @@ func TestIssue259IntervalFromDuration(t *testing.T) {
 
 	db := connect(t)
 	defer db.Close(ctx)
-	err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
-		// Check about interval work with microseconds
-		res, err := tx.Execute(ctx, `DECLARE $ts as Interval;
+
+	t.Run("Check about interval work with microseconds", func(t *testing.T) {
+		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+			//
+			res, err := tx.Execute(ctx, `DECLARE $ts as Interval;
 			$ten_micro = CAST(10 as Interval);
 			SELECT $ts == $ten_micro, $ten_micro;`, table.NewQueryParameters(
-			table.ValueParam(`$ts`, types.IntervalValueFromDuration(10*time.Microsecond)),
-		))
+				table.ValueParam(`$ts`, types.IntervalValueFromDuration(10*time.Microsecond)),
+			))
+			if err != nil {
+				return err
+			}
+			if err = res.NextResultSetErr(ctx); err != nil {
+				return err
+			}
+			if !res.NextRow() {
+				return fmt.Errorf("unexpected no rows in result set (err = %w)", res.Err())
+			}
+			var (
+				valuesEqual bool
+				tenMicro    time.Duration
+			)
+			if err = res.Scan(&valuesEqual, &tenMicro); err != nil {
+				return err
+			}
+			if !valuesEqual {
+				return fmt.Errorf("unexpected values equal (err = %w)", res.Err())
+			}
+			if tenMicro != 10*time.Microsecond {
+				return fmt.Errorf("unexpected ten micro equal: %v (err = %w)", tenMicro, res.Err())
+			}
+			return res.Err()
+		}, table.WithIdempotent())
 		require.NoError(t, err)
-		require.NoError(t, res.NextResultSetErr(ctx))
-		require.True(t, res.NextRow())
+	})
 
-		var (
-			valuesEqual bool
-			tenMicro    time.Duration
-		)
-		require.NoError(t, res.Scan(&valuesEqual, &tenMicro))
-		require.True(t, valuesEqual)
-		require.Equal(t, 10*time.Microsecond, tenMicro)
-
-		// Check about parse interval represent date interval
-		query := `
+	t.Run("Check about parse interval represent date interval", func(t *testing.T) {
+		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+			//
+			query := `
 		SELECT 
 			DateTime::MakeTimestamp(DateTime::ParseIso8601("2009-02-14T02:31:30+0000")) - 
 			DateTime::MakeTimestamp(DateTime::ParseIso8601("2009-02-14T01:31:30+0000")) 
 		`
-		res, err = tx.Execute(ctx, query, nil)
+			res, err := tx.Execute(ctx, query, nil)
+			if err != nil {
+				return err
+			}
+			if err = res.NextResultSetErr(ctx); err != nil {
+				return err
+			}
+			if !res.NextRow() {
+				return fmt.Errorf("unexpected no rows in result set (err = %w)", res.Err())
+			}
+			var delta time.Duration
+			if err = res.ScanWithDefaults(&delta); err != nil {
+				return err
+			}
+			if delta != time.Hour {
+				return fmt.Errorf("unexpected ten micro equal: %v (err = %w)", delta, res.Err())
+			}
+			return res.Err()
+		}, table.WithIdempotent())
 		require.NoError(t, err)
-		require.NoError(t, res.NextResultSetErr(ctx))
-		require.True(t, res.NextRow())
+	})
 
-		var delta time.Duration
-		require.NoError(t, res.ScanWithDefaults(&delta))
-		require.Equal(t, time.Hour, delta)
-
-		// check about send interval work find with dates
-		query = `
+	t.Run("check about send interval work find with dates", func(t *testing.T) {
+		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+			//
+			query := `
 		DECLARE $delta AS Interval;
 	
 		SELECT 
 			DateTime::MakeTimestamp(DateTime::ParseIso8601("2009-02-14T01:31:30+0000")) + $delta ==
 			DateTime::MakeTimestamp(DateTime::ParseIso8601("2009-02-14T02:31:30+0000"))
 		`
-		res, err = tx.Execute(ctx, query, table.NewQueryParameters(
-			table.ValueParam("$delta", types.IntervalValueFromDuration(time.Hour))),
-		)
+			res, err := tx.Execute(ctx, query, table.NewQueryParameters(
+				table.ValueParam("$delta", types.IntervalValueFromDuration(time.Hour))),
+			)
+			if err != nil {
+				return err
+			}
+			if err = res.NextResultSetErr(ctx); err != nil {
+				return err
+			}
+			if !res.NextRow() {
+				return fmt.Errorf("unexpected no rows in result set (err = %w)", res.Err())
+			}
+			var valuesEqual bool
+			if err = res.ScanWithDefaults(&valuesEqual); err != nil {
+				return err
+			}
+			if !valuesEqual {
+				return fmt.Errorf("unexpected values equal (err = %w)", res.Err())
+			}
+			return res.Err()
+		}, table.WithIdempotent())
 		require.NoError(t, err)
-		require.NoError(t, res.NextResultSetErr(ctx))
-		require.True(t, res.NextRow())
-
-		require.NoError(t, res.ScanWithDefaults(&valuesEqual))
-		require.True(t, valuesEqual)
-
-		return nil
 	})
-	require.NoError(t, err)
 }
 
 func TestIssue415ScanError(t *testing.T) {
@@ -1960,7 +2011,7 @@ func TestNullType(t *testing.T) {
 		}
 		fmt.Printf("%+v\n", rescheduleDue)
 		return res.Err()
-	}, table.WithTxSettings(table.TxSettings(table.WithSnapshotReadOnly())))
+	}, table.WithTxSettings(table.TxSettings(table.WithSnapshotReadOnly())), table.WithIdempotent())
 	require.NoError(t, err)
 }
 
@@ -2194,16 +2245,21 @@ func TestValueToYqlLiteral(t *testing.T) {
 				if err != nil {
 					return err
 				}
-				require.NoError(t, res.NextResultSetErr(ctx))
-				require.True(t, res.NextRow())
-				values, err := res.(interface {
-					RowValues() ([]types.Value, error)
-				}).RowValues()
-				require.NoError(t, err)
-				require.Equal(t, 1, len(values))
-				require.Equal(t, tt.Yql(), values[0].Yql(), fmt.Sprintf("%T vs %T", tt, values[0]))
-				return nil
-			})
+				if err = res.NextResultSetErr(ctx); err != nil {
+					return err
+				}
+				if !res.NextRow() {
+					return fmt.Errorf("unexpected no rows in result set (err = %w)", res.Err())
+				}
+				var v types.Value
+				if err = res.Scan(&v); err != nil {
+					return err
+				}
+				if tt.Yql() != v.Yql() {
+					return fmt.Errorf("unexpected YQL: %T (%s) vs %T (%s) (err = %w)", tt, tt.Yql(), v, v.Yql(), res.Err())
+				}
+				return res.Err()
+			}, table.WithIdempotent())
 			require.NoError(t, err)
 		})
 	}

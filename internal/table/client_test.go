@@ -2,6 +2,7 @@ package table
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"path"
@@ -294,8 +295,7 @@ func TestRaceWgClosed(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				for {
-					err := p.Do(
-						ctx,
+					err := p.Do(ctx,
 						func(ctx context.Context, s table.Session) error {
 							return nil
 						},
@@ -1007,17 +1007,35 @@ func TestDeadlockOnInternalPoolGCTick(t *testing.T) {
 			_ = c.Close(ctx)
 		}()
 		s1, err := c.Get(ctx)
+		if err != nil && errors.Is(err, context.DeadlineExceeded) {
+			return
+		}
 		require.NoError(t, err)
 		s2, err := c.Get(ctx)
+		if err != nil && errors.Is(err, context.DeadlineExceeded) {
+			return
+		}
 		require.NoError(t, err)
 		s3, err := c.Get(ctx)
+		if err != nil && errors.Is(err, context.DeadlineExceeded) {
+			return
+		}
 		require.NoError(t, err)
 		require.Equal(t, 3, len(nodes))
 		err = c.Put(ctx, s1)
+		if err != nil && errors.Is(err, context.DeadlineExceeded) {
+			return
+		}
 		require.NoError(t, err)
 		err = c.Put(ctx, s2)
+		if err != nil && errors.Is(err, context.DeadlineExceeded) {
+			return
+		}
 		require.NoError(t, err)
 		err = c.Put(ctx, s3)
+		if err != nil && errors.Is(err, context.DeadlineExceeded) {
+			return
+		}
 		require.NoError(t, err)
 		c.internalPoolGCTick(ctx, 0)
 	}, xtest.StopAfter(12*time.Second))

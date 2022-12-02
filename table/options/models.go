@@ -442,6 +442,55 @@ const (
 	TimeToLiveModeValueSinceUnixEpoch
 )
 
+func NewTTLSettings() TimeToLiveSettings {
+	return TimeToLiveSettings{
+		Mode: TimeToLiveModeDateType,
+	}
+}
+
+func (ttl TimeToLiveSettings) ColumnDateType(columnName string) TimeToLiveSettings {
+	ttl.Mode = TimeToLiveModeDateType
+	ttl.ColumnName = columnName
+	return ttl
+}
+
+func unitToPointer(unit TimeToLiveUnit) *TimeToLiveUnit {
+	return &unit
+}
+
+func (ttl TimeToLiveSettings) ColumnSeconds(columnName string) TimeToLiveSettings {
+	ttl.Mode = TimeToLiveModeValueSinceUnixEpoch
+	ttl.ColumnName = columnName
+	ttl.ColumnUnit = unitToPointer(TimeToLiveUnitSeconds)
+	return ttl
+}
+
+func (ttl TimeToLiveSettings) ColumnMilliseconds(columnName string) TimeToLiveSettings {
+	ttl.Mode = TimeToLiveModeValueSinceUnixEpoch
+	ttl.ColumnName = columnName
+	ttl.ColumnUnit = unitToPointer(TimeToLiveUnitMilliseconds)
+	return ttl
+}
+
+func (ttl TimeToLiveSettings) ColumnMicroseconds(columnName string) TimeToLiveSettings {
+	ttl.Mode = TimeToLiveModeValueSinceUnixEpoch
+	ttl.ColumnName = columnName
+	ttl.ColumnUnit = unitToPointer(TimeToLiveUnitMicroseconds)
+	return ttl
+}
+
+func (ttl TimeToLiveSettings) ColumnNanoseconds(columnName string) TimeToLiveSettings {
+	ttl.Mode = TimeToLiveModeValueSinceUnixEpoch
+	ttl.ColumnName = columnName
+	ttl.ColumnUnit = unitToPointer(TimeToLiveUnitNanoseconds)
+	return ttl
+}
+
+func (ttl TimeToLiveSettings) ExpireAfter(expireAfter time.Duration) TimeToLiveSettings {
+	ttl.ExpireAfterSeconds = uint32(expireAfter.Seconds())
+	return ttl
+}
+
 func (ttl *TimeToLiveSettings) ToYDB() *Ydb_Table.TtlSettings {
 	if ttl == nil {
 		return nil
@@ -467,29 +516,6 @@ func (ttl *TimeToLiveSettings) ToYDB() *Ydb_Table.TtlSettings {
 			},
 		}
 	}
-}
-
-func NewTimeToLiveSettings(settings *Ydb_Table.TtlSettings) *TimeToLiveSettings {
-	if settings == nil {
-		return nil
-	}
-	switch mode := settings.Mode.(type) {
-	case *Ydb_Table.TtlSettings_DateTypeColumn:
-		return &TimeToLiveSettings{
-			ColumnName:         mode.DateTypeColumn.ColumnName,
-			ExpireAfterSeconds: mode.DateTypeColumn.ExpireAfterSeconds,
-			Mode:               TimeToLiveModeDateType,
-		}
-
-	case *Ydb_Table.TtlSettings_ValueSinceUnixEpoch:
-		return &TimeToLiveSettings{
-			ColumnName:         mode.ValueSinceUnixEpoch.ColumnName,
-			ColumnUnit:         timeToLiveUnit(mode.ValueSinceUnixEpoch.ColumnUnit),
-			ExpireAfterSeconds: mode.ValueSinceUnixEpoch.ExpireAfterSeconds,
-			Mode:               TimeToLiveModeValueSinceUnixEpoch,
-		}
-	}
-	return nil
 }
 
 type TimeToLiveUnit int32
@@ -520,25 +546,6 @@ func (unit *TimeToLiveUnit) ToYDB() Ydb_Table.ValueSinceUnixEpochModeSettings_Un
 	default:
 		panic("ydb: unknown unit for value since epoch")
 	}
-}
-
-func timeToLiveUnit(unit Ydb_Table.ValueSinceUnixEpochModeSettings_Unit) *TimeToLiveUnit {
-	var res TimeToLiveUnit
-	switch unit {
-	case Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_SECONDS:
-		res = TimeToLiveUnitSeconds
-	case Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_MILLISECONDS:
-		res = TimeToLiveUnitMilliseconds
-	case Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_MICROSECONDS:
-		res = TimeToLiveUnitMicroseconds
-	case Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_NANOSECONDS:
-		res = TimeToLiveUnitNanoseconds
-	case Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_UNSPECIFIED:
-		res = TimeToLiveUnitUnspecified
-	default:
-		panic("ydb: unknown Ydb unit for value since epoch")
-	}
-	return &res
 }
 
 type ChangefeedDescription struct {

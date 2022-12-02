@@ -115,7 +115,7 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 			case scheme.EntryTable:
 				err = db.Table().Do(ctx, func(ctx context.Context, session table.Session) (err error) {
 					return session.DropTable(ctx, pt)
-				})
+				}, table.WithIdempotent())
 				if err != nil {
 					return xerrors.WithStackTrace(err)
 				}

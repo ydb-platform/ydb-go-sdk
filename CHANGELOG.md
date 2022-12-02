@@ -1,11 +1,29 @@
+## v3.40.1
+* Added constructor of `options.TimeToLiveSettings` and fluent modifiers
+
+## v3.40.0
+* Added `options.WithAddAttribute` and `options.WithDropAttribute` options for `session.AlterTable` request
+* Added `options.WithAddIndex` and `options.WithDropIndex` options for `session.AlterTable` request
+* Added return error while create topic writer with not equal producer id and message group id.
+* Added package `meta` with methods about `YDB` metadata
+* Added `meta.WithTrailerCallback(ctx, callback)` context modifier for attaching callback function which will be called on incoming metadata
+* Added `meta.ConsumedUnits(metadata.MD)` method for getting consumed units from metadata
+* Added `NestedCall` field to retry trace start infos for alarm on nested calls
+* Added `topicoptions.WithWriterTrace` option for attach tracer into separated writer
+* Added `sugar.IsTableExists()` helper for check existence of table
+
+## v3.39.0
+* Removed message level partitioning from experimental topic API. It is unavailable on server side yet.
 * Supported `NullValue` type as received type from `YDB`
 * Supported `types.SetValue` type
 * Added `types.CastTo(types.Value, destination)` public method for cast `types.Value` to golang native type value destination
 * Added `types.TupleItem(types.Value)`, `types.StructFields(types.Value)` and `types.DictValues(types.Value)` funcs (extractors of internal fields of tuple, struct and dict values)
 * Added `types.Value.Yql()` func for getting values string representation as `YQL` literal
+* Added `types.Type.Yql()` func for getting `YQL` representation of type
 * Marked `table/types.WriteTypeStringTo` as deprecated 
 * Added `table/options.WithDataColumns` for supporting covering indexes
-* Supported `balancer` query string parameter in DSN
+* Supported `balancer` query string parameter in `DSN`
+* Fixed bug with scanning `YSON` value from result set
 * Added certificate caching in `WithCertificatesFromFile` and `WithCertificatesFromPem`
 
 ## v3.38.5

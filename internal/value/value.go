@@ -2034,24 +2034,41 @@ func ZeroValue(t Type) Value {
 	case *voidType:
 		return VoidValue()
 
+	case *listType, *emptyListType:
+		return &listValue{
+			t: t,
+		}
+	case *setType:
+		return &setValue{
+			t: t,
+		}
+	case *dictType:
+		return &dictValue{
+			t: t.valueType,
+		}
+	case *emptyDictType:
+		return &dictValue{
+			t: t,
+		}
 	case *TupleType:
-		v := &tupleValue{
-			t:     t,
-			items: make([]Value, len(t.items)),
-		}
-		for i, tt := range t.items {
-			v.items[i] = ZeroValue(tt)
-		}
-		return v
-	case *StructType:
-		fields := make([]StructValueField, len(t.fields))
-		for i, tt := range t.fields {
-			fields[i] = StructValueField{
-				Name: tt.Name,
-				V:    ZeroValue(tt.T),
+		return TupleValue(func() []Value {
+			values := make([]Value, len(t.items))
+			for i, tt := range t.items {
+				values[i] = ZeroValue(tt)
 			}
-		}
-		return StructValue(fields...)
+			return values
+		}()...)
+	case *StructType:
+		return StructValue(func() []StructValueField {
+			fields := make([]StructValueField, len(t.fields))
+			for i, tt := range t.fields {
+				fields[i] = StructValueField{
+					Name: tt.Name,
+					V:    ZeroValue(tt.T),
+				}
+			}
+			return fields
+		}()...)
 	case *DecimalType:
 		return DecimalValue([16]byte{}, 22, 9)
 

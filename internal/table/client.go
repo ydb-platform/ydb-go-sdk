@@ -11,11 +11,12 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
@@ -373,7 +374,7 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 
 	s, err = c.createSession(
 		meta.WithAllowFeatures(ctx,
-			meta.HintSessionBalancer,
+			metaHeaders.HintSessionBalancer,
 		),
 		withCreateSessionOnCreate(c.appendSessionToNodes),
 		withCreateSessionOnClose(c.removeSessionFromNodes),
@@ -500,8 +501,8 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 		})
 		return s, xerrors.WithStackTrace(
 			fmt.Errorf("failed to get session from pool ("+
-				"attempts: %d, latency: %v, stats: {index: %d, idle: %d, create_in_progress: %d}"+
-				"): %w", i, time.Since(start), index, idle, createInProgress, err,
+				"attempts: %d, latency: %v, pool have %d sessions (%d busy, %d idle, %d create_in_progress): %w",
+				i, time.Since(start), index, index-idle, idle, createInProgress, err,
 			),
 		)
 	}
