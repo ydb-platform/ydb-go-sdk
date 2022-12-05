@@ -12,7 +12,7 @@ import (
 // Field's type based on Type and use the corresponding getter method to retrieve
 // the value:
 //
-//	switch f.Type {
+//	switch f.Type() {
 //	case logs.IntType:
 //	    var i int = f.Int()
 //	    // handle int value
@@ -22,137 +22,68 @@ import (
 //	//...
 //	}
 //
-// Getter methods must not be called on fields with wrong Type (e.g. calling String()
+// Getter methods must not be called on fields with wrong Type (e.g. calling String()logs.$1
 // on fields with Type != StringType).
+// Field must not be initialized directly as a struct literal.
 type Field struct {
-	Type FieldType
-	Key  string
+	ftype FieldType
+	key   string
 
 	vint int64
 	vstr string
 	vany interface{}
 }
 
-func String(key string, value string) Field {
-	return Field{
-		Type: StringType,
-		Key:  key,
-		vstr: value,
-	}
+func (f Field) Type() FieldType {
+	return f.ftype
 }
 
+func (f Field) Key() string {
+	return f.key
+}
+
+// String is a value getter for fields with StringType type
 func (f Field) String() string {
 	return f.vstr
 }
 
-func Int(key string, value int) Field {
-	return Field{
-		Type: IntType,
-		Key:  key,
-		vint: int64(value),
-	}
-}
-
+// Int is a value getter for fields with IntType type
 func (f Field) Int() int {
 	return int(f.vint)
 }
 
-func Bool(key string, value bool) Field {
-	var vint int64
-	if value {
-		vint = 1
-	} else {
-		vint = 0
-	}
-	return Field{
-		Type: BoolType,
-		Key:  key,
-		vint: vint,
-	}
-}
-
+// Bool is a value getter for fields with BoolType type
 func (f Field) Bool() bool {
 	return f.vint != 0
 }
 
-func Duration(key string, value time.Duration) Field {
-	return Field{
-		Type: DurationType,
-		Key:  key,
-		vint: value.Nanoseconds(),
-	}
-}
-
+// Duration is a value getter for fields with DurationType type
 func (f Field) Duration() time.Duration {
 	return time.Nanosecond * time.Duration(f.vint)
 }
 
-func Strings(key string, value []string) Field {
-	return Field{
-		Type: StringsType,
-		Key:  key,
-		vany: value,
-	}
-}
-
+// Strings is a value getter for fields with StringsType type
 func (f Field) Strings() []string {
+	if f.vany == nil {
+		return nil
+	}
 	return f.vany.([]string)
 }
 
-// NamedError adds error field. If value is nil, resulting Field will be
-// of NilType instead of ErrorType.
-func NamedError(key string, value error) Field {
-	if value == nil {
-		return nilField(key)
-	}
-	return Field{
-		Type: ErrorType,
-		Key:  key,
-		vany: value,
-	}
-}
-
-// Error is the same as NamedError("error", value)
-func Error(value error) Field {
-	return NamedError("error", value)
-}
-
+// Error is a value getter for fields with ErrorType type
 func (f Field) Error() error {
+	if f.vany == nil {
+		return nil
+	}
 	return f.vany.(error)
 }
 
-// Any adds untyped field. If value is nil, resulting Field will be
-// of NilType instead of AnyType.
-func Any(key string, value interface{}) Field {
-	if value == nil {
-		return nilField(key)
-	}
-	return Field{
-		Type: AnyType,
-		Key:  key,
-		vany: value,
-	}
-}
-
+// Any is a value getter for fields with AnyType type
 func (f Field) Any() interface{} {
 	return f.vany
 }
 
-func nilField(key string) Field {
-	return Field{
-		Type: NilType,
-		Key:  key,
-	}
-}
-
-func Endpoints(key string, value []trace.EndpointInfo) Field {
-	return Field{
-		Type: EndpointsType,
-		Key:  key,
-		vany: value,
-	}
-}
-
+// Endpoints is a value getter for fields with EndpointsType type
 func (f Field) Endpoints() []trace.EndpointInfo {
 	return f.vany.([]trace.EndpointInfo)
 }
@@ -160,7 +91,7 @@ func (f Field) Endpoints() []trace.EndpointInfo {
 // Fallback returns default string representation of Field value.
 // It should be used by adapters that don't support f.Type directly.
 func (f Field) Fallback() string {
-	switch f.Type {
+	switch f.ftype {
 	case IntType:
 		return strconv.FormatInt(f.vint, 10)
 	case StringType:
@@ -180,7 +111,105 @@ func (f Field) Fallback() string {
 	case EndpointsType:
 		return fmt.Sprintf("%v", f.Endpoints())
 	default:
-		panic(fmt.Sprintf("ydb: unknown FieldType %d", f.Type))
+		panic(fmt.Sprintf("ydb: unknown FieldType %d", f.ftype))
+	}
+}
+
+// String constructs Field with StringType
+func String(key string, value string) Field {
+	return Field{
+		ftype: StringType,
+		key:   key,
+		vstr:  value,
+	}
+}
+
+// Int constructs Field with IntType
+func Int(key string, value int) Field {
+	return Field{
+		ftype: IntType,
+		key:   key,
+		vint:  int64(value),
+	}
+}
+
+// Bool constructs Field with BoolType
+func Bool(key string, value bool) Field {
+	var vint int64
+	if value {
+		vint = 1
+	} else {
+		vint = 0
+	}
+	return Field{
+		ftype: BoolType,
+		key:   key,
+		vint:  vint,
+	}
+}
+
+// Duration constructs Field with DurationType
+func Duration(key string, value time.Duration) Field {
+	return Field{
+		ftype: DurationType,
+		key:   key,
+		vint:  value.Nanoseconds(),
+	}
+}
+
+// Strings constructs Field with StringsType
+func Strings(key string, value []string) Field {
+	return Field{
+		ftype: StringsType,
+		key:   key,
+		vany:  value,
+	}
+}
+
+// NamedError constructs Field with ErrorType. If value is nil,
+// resulting Field will be of NilType instead of ErrorType.
+func NamedError(key string, value error) Field {
+	if value == nil {
+		return nilField(key)
+	}
+	return Field{
+		ftype: ErrorType,
+		key:   key,
+		vany:  value,
+	}
+}
+
+// Error is the same as NamedError("error", value)
+func Error(value error) Field {
+	return NamedError("error", value)
+}
+
+// Any constructs untyped Field. If value is nil, resulting Field
+// will be of NilType instead of AnyType.
+func Any(key string, value interface{}) Field {
+	if value == nil {
+		return nilField(key)
+	}
+	return Field{
+		ftype: AnyType,
+		key:   key,
+		vany:  value,
+	}
+}
+
+func nilField(key string) Field {
+	return Field{
+		ftype: NilType,
+		key:   key,
+	}
+}
+
+// Endpoints constructs Field with EndpointsType
+func Endpoints(key string, value []trace.EndpointInfo) Field {
+	return Field{
+		ftype: EndpointsType,
+		key:   key,
+		vany:  value,
 	}
 }
 
@@ -189,6 +218,9 @@ func (f Field) Fallback() string {
 type FieldType int
 
 const (
+	// InvalidType indicates that Field was not initialized correctly. Adapters
+	// should either ignore such field or issue an error. No value getters should
+	// be called on field with such type.
 	InvalidType FieldType = iota
 
 	IntType
@@ -203,7 +235,8 @@ const (
 	// AnyType indicates that the Field is untyped. Adapters should use
 	// reflection-based approached to marshal this field.
 	AnyType
-	// NilType indicates that the Field value is nil.
+	// NilType indicates that the Field value is nil. No value getters should
+	// be called on field with such type.
 	NilType
 
 	// EndpointsType corresponds to []trace.EndpointInfo
