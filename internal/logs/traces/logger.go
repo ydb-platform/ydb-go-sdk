@@ -8,6 +8,20 @@ type logger struct {
 	scope []string
 }
 
+func newLogger(l logs.Logger, scope ...string) logger {
+	return logger{
+		l:     l,
+		scope: scope,
+	}
+}
+
+func (l logger) WithSubScope(scope ...string) logger {
+	return logger{
+		l:     l.l,
+		scope: append(l.scope, scope...),
+	}
+}
+
 func (l logger) Log(lvl logs.Level, msg string, fields ...logs.Field) {
 	l.l.Log(logs.Options{
 		Lvl:   lvl,
