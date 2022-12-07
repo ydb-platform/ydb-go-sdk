@@ -53,7 +53,7 @@ func (q preparedDataQuery) YQL() string {
 
 func (q preparedDataQuery) toYDB(a *allocator.Allocator) *Ydb_Table.Query {
 	query := a.TableQuery()
-	query.Query = a.TableQueryId(q.id)
+	query.Query = a.TableQueryID(q.id)
 	return query
 }
 

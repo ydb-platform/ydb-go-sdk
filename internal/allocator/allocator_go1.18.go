@@ -53,7 +53,7 @@ type (
 		tableQueryCachePolicyAllocator
 		tableQueryAllocator
 		tableQueryYqlTextAllocator
-		tableQueryIdAllocator
+		tableQueryIDAllocator
 	}
 )
 
@@ -102,7 +102,7 @@ func (a *Allocator) Free() {
 	a.tableQueryCachePolicyAllocator.free()
 	a.tableQueryAllocator.free()
 	a.tableQueryYqlTextAllocator.free()
-	a.tableQueryIdAllocator.free()
+	a.tableQueryIDAllocator.free()
 
 	allocatorPool.Put(a)
 }
@@ -847,20 +847,20 @@ func (a *tableQueryYqlTextAllocator) free() {
 	a.allocations = a.allocations[:0]
 }
 
-type tableQueryIdAllocator struct {
+type tableQueryIDAllocator struct {
 	allocations []*Ydb_Table.Query_Id
 }
 
-func (a *tableQueryIdAllocator) TableQueryId(id string) (v *Ydb_Table.Query_Id) {
-	v = tableQueryIdPool.Get()
+func (a *tableQueryIDAllocator) TableQueryID(id string) (v *Ydb_Table.Query_Id) {
+	v = tableQueryIDPool.Get()
 	v.Id = id
 	a.allocations = append(a.allocations, v)
 	return v
 }
 
-func (a *tableQueryIdAllocator) free() {
+func (a *tableQueryIDAllocator) free() {
 	for _, v := range a.allocations {
-		tableQueryIdPool.Put(v)
+		tableQueryIDPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
 }
@@ -932,5 +932,5 @@ var (
 	tableQueryCachePolicyPool        Pool[Ydb_Table.QueryCachePolicy]
 	tableQueryPool                   Pool[Ydb_Table.Query]
 	tableQueryYqlTextPool            Pool[Ydb_Table.Query_YqlText]
-	tableQueryIdPool                 Pool[Ydb_Table.Query_Id]
+	tableQueryIDPool                 Pool[Ydb_Table.Query_Id]
 )

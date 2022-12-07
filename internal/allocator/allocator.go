@@ -187,7 +187,7 @@ func (a *Allocator) TableQueryYqlText(s string) (v *Ydb_Table.Query_YqlText) {
 	}
 }
 
-func (a *Allocator) TableQueryId(id string) (v *Ydb_Table.Query_Id) {
+func (a *Allocator) TableQueryID(id string) (v *Ydb_Table.Query_Id) {
 	return &Ydb_Table.Query_Id{
 		Id: id,
 	}
