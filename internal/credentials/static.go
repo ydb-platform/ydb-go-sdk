@@ -11,10 +11,8 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Auth"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
-	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"google.golang.org/grpc"
 )
 
 func NewStaticCredentials(user, password string, cc grpc.ClientConnInterface) Credentials {
@@ -75,10 +73,7 @@ func (lp *staticCredentials) Token(ctx context.Context) (token string, err error
 		)
 	}
 	var result Ydb_Auth.LoginResult
-	if err = proto.Unmarshal(
-		response.GetOperation().GetResult().GetValue(),
-		&result,
-	); err != nil {
+	if err = response.GetOperation().GetResult().UnmarshalTo(&result); err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
 	expiresAt, err := parseExpiresAt(result.GetToken())

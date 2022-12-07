@@ -8,8 +8,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
@@ -71,7 +69,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -119,7 +117,7 @@ func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &whoAmIResultResult)
+	err = response.GetOperation().GetResult().UnmarshalTo(&whoAmIResultResult)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

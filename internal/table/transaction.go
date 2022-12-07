@@ -3,9 +3,10 @@ package table
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -72,7 +73,11 @@ func (tx *transaction) Execute(
 		onDone(r, err)
 	}()
 	_, r, err = tx.s.Execute(ctx, tx.txc(), query, params, opts...)
-	return
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return r, nil
 }
 
 // ExecuteStatement executes prepared statement stmt within transaction tx.
@@ -106,7 +111,11 @@ func (tx *transaction) ExecuteStatement(
 	}()
 
 	_, r, err = stmt.Execute(ctx, tx.txc(), params, opts...)
-	return
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return r, nil
 }
 
 // CommitTx commits specified active transaction.

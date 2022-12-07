@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clone"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawscheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
@@ -48,7 +46,7 @@ func (res *DescribeTopicResult) FromProto(protoResponse *Ydb_Topic.DescribeTopic
 	}
 
 	protoResult := &Ydb_Topic.DescribeTopicResult{}
-	if err := proto.Unmarshal(protoResponse.GetOperation().GetResult().GetValue(), protoResult); err != nil {
+	if err := protoResponse.GetOperation().GetResult().UnmarshalTo(protoResult); err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: describe topic result failed on unmarshal grpc result: %w", err))
 	}
 

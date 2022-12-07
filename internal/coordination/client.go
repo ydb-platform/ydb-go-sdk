@@ -6,15 +6,13 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Coordination_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Coordination"
-	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
+	"google.golang.org/grpc"
 )
 
 //nolint:gofumpt
@@ -190,7 +188,7 @@ func (c *Client) describeNode(
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
