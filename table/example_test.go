@@ -74,10 +74,9 @@ func Example_createTable() {
 				options.WithColumn("expire_at", types.Optional(types.TypeDate)),
 				options.WithColumn("comment", types.Optional(types.TypeText)),
 				options.WithPrimaryKeyColumn("series_id"),
-				options.WithTimeToLiveSettings(options.TimeToLiveSettings{
-					ColumnName:         "expire_at",
-					ExpireAfterSeconds: uint32(time.Hour.Seconds()),
-				}),
+				options.WithTimeToLiveSettings(
+					options.NewTTLSettings().ColumnDateType("expire_at").ExpireAfter(time.Hour),
+				),
 				options.WithIndex("idx_series_title",
 					options.WithIndexColumns("title"),
 					options.WithIndexType(options.GlobalAsyncIndex()),
@@ -162,6 +161,7 @@ func Example_alterTable() {
 				options.WithSetTimeToLiveSettings(
 					options.NewTTLSettings().ColumnDateType("expire_at").ExpireAfter(time.Hour),
 				),
+				options.WithDropTimeToLive(),
 				options.WithAddIndex("idx_series_series_id",
 					options.WithIndexColumns("series_id"),
 					options.WithDataColumns("title"),
