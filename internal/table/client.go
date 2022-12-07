@@ -598,7 +598,7 @@ func (c *Client) Put(ctx context.Context, s *session) (err error) {
 		return xerrors.WithStackTrace(errSessionUnderShutdown)
 
 	case s.isClosed():
-		return xerrors.WithStackTrace(errSessionClosed)
+		return xerrors.WithStackTrace(ErrSessionClosed)
 
 	default:
 		c.mu.Lock()

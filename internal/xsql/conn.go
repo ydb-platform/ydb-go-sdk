@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/isolation"
@@ -310,10 +311,12 @@ func (c *conn) Close() (err error) {
 		onDone(err)
 	}()
 	err = c.session.Close(context.Background())
-	if err != nil {
-		return c.checkClosed(xerrors.WithStackTrace(err))
+	switch {
+	case err == nil, xerrors.Is(err, internal.ErrSessionClosed):
+		return nil
+	default:
+		return err
 	}
-	return nil
 }
 
 func (c *conn) Prepare(string) (driver.Stmt, error) {

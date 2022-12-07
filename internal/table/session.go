@@ -167,7 +167,7 @@ func (s *session) ID() string {
 
 func (s *session) Close(ctx context.Context) (err error) {
 	if s.isClosed() {
-		return xerrors.WithStackTrace(errSessionClosed)
+		return xerrors.WithStackTrace(ErrSessionClosed)
 	}
 
 	s.closeOnce.Do(func() {
