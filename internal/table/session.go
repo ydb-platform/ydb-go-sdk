@@ -559,9 +559,9 @@ func (s *session) Explain(
 }
 
 // Prepare prepares data query within session s.
-func (s *session) Prepare(ctx context.Context, queryText string) (stmt table.Statement, err error) {
+func (s *session) Prepare(ctx context.Context, queryText string) (_ table.Statement, err error) {
 	var (
-		q        query
+		stmt     *statement
 		response *Ydb_Table.PrepareDataQueryResponse
 		result   Ydb_Table.PrepareQueryResult
 		onDone   = trace.TableOnSessionQueryPrepare(
@@ -572,7 +572,11 @@ func (s *session) Prepare(ctx context.Context, queryText string) (stmt table.Sta
 		)
 	)
 	defer func() {
-		onDone(q, err)
+		if err != nil {
+			onDone(nil, err)
+		} else {
+			onDone(stmt.query, nil)
+		}
 	}()
 
 	response, err = s.tableService.PrepareDataQuery(ctx,
@@ -598,7 +602,7 @@ func (s *session) Prepare(ctx context.Context, queryText string) (stmt table.Sta
 
 	stmt = &statement{
 		session: s,
-		query:   queryPrepared(result.QueryId, queryText),
+		query:   queryPrepared(result.GetQueryId(), queryText),
 		params:  result.ParametersTypes,
 	}
 
