@@ -9,7 +9,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scripting"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
@@ -86,7 +85,7 @@ func (c *Client) execute(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -151,7 +150,7 @@ func (c *Client) explain(
 	if err != nil {
 		return
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return
 	}

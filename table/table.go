@@ -433,6 +433,9 @@ func (p parameterOption) Value() types.Value {
 }
 
 func (qp queryParams) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
+	if qp == nil {
+		return nil
+	}
 	params := make(map[string]*Ydb.TypedValue, len(qp))
 	for k, v := range qp {
 		params[k] = value.ToYDB(v, a)

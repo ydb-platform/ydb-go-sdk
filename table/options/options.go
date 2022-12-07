@@ -733,7 +733,7 @@ type (
 
 type (
 	ExecuteDataQueryDesc   Ydb_Table.ExecuteDataQueryRequest
-	ExecuteDataQueryOption func(*ExecuteDataQueryDesc)
+	ExecuteDataQueryOption func(*ExecuteDataQueryDesc, *allocator.Allocator)
 )
 
 type (
@@ -743,7 +743,7 @@ type (
 
 type (
 	queryCachePolicy       Ydb_Table.QueryCachePolicy
-	QueryCachePolicyOption func(*queryCachePolicy)
+	QueryCachePolicyOption func(*queryCachePolicy, *allocator.Allocator)
 )
 
 // WithKeepInCache manages keep-in-cache flag in query cache policy
@@ -764,7 +764,7 @@ func WithQueryCachePolicyKeepInCache() QueryCachePolicyOption {
 }
 
 func withQueryCachePolicyKeepInCache(keepInCache bool) QueryCachePolicyOption {
-	return func(p *queryCachePolicy) {
+	return func(p *queryCachePolicy, a *allocator.Allocator) {
 		p.KeepInCache = keepInCache
 	}
 }
@@ -777,14 +777,13 @@ func WithQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption
 }
 
 func withQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption {
-	return func(d *ExecuteDataQueryDesc) {
+	return func(d *ExecuteDataQueryDesc, a *allocator.Allocator) {
 		if d.QueryCachePolicy == nil {
-			d.QueryCachePolicy = &Ydb_Table.QueryCachePolicy{
-				KeepInCache: true,
-			}
+			d.QueryCachePolicy = a.TableQueryCachePolicy()
+			d.QueryCachePolicy.KeepInCache = true
 		}
 		for _, opt := range opts {
-			opt((*queryCachePolicy)(d.QueryCachePolicy))
+			opt((*queryCachePolicy)(d.QueryCachePolicy), a)
 		}
 	}
 }
@@ -802,13 +801,13 @@ func WithCommitCollectStatsModeBasic() CommitTransactionOption {
 }
 
 func WithCollectStatsModeNone() ExecuteDataQueryOption {
-	return func(d *ExecuteDataQueryDesc) {
+	return func(d *ExecuteDataQueryDesc, a *allocator.Allocator) {
 		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE
 	}
 }
 
 func WithCollectStatsModeBasic() ExecuteDataQueryOption {
-	return func(d *ExecuteDataQueryDesc) {
+	return func(d *ExecuteDataQueryDesc, a *allocator.Allocator) {
 		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC
 	}
 }

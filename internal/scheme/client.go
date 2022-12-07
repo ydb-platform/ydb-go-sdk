@@ -7,7 +7,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scheme_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
@@ -137,7 +136,7 @@ func (c *Client) listDirectory(ctx context.Context, path string) (scheme.Directo
 	if err != nil {
 		return d, xerrors.WithStackTrace(err)
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return d, xerrors.WithStackTrace(err)
 	}
@@ -189,7 +188,7 @@ func (c *Client) describePath(ctx context.Context, path string) (e scheme.Entry,
 	if err != nil {
 		return e, xerrors.WithStackTrace(err)
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return e, xerrors.WithStackTrace(err)
 	}

@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 )
 
 type (
@@ -162,6 +163,34 @@ func (a *Allocator) Variant() (v *Ydb.VariantType) {
 
 func (a *Allocator) VariantTupleItems() (v *Ydb.VariantType_TupleItems) {
 	return new(Ydb.VariantType_TupleItems)
+}
+
+func (a *Allocator) TableExecuteQueryResult() (v *Ydb_Table.ExecuteQueryResult) {
+	return new(Ydb_Table.ExecuteQueryResult)
+}
+
+func (a *Allocator) TableExecuteDataQueryRequest() (v *Ydb_Table.ExecuteDataQueryRequest) {
+	return new(Ydb_Table.ExecuteDataQueryRequest)
+}
+
+func (a *Allocator) TableQueryCachePolicy() (v *Ydb_Table.QueryCachePolicy) {
+	return new(Ydb_Table.QueryCachePolicy)
+}
+
+func (a *Allocator) TableQuery() (v *Ydb_Table.Query) {
+	return new(Ydb_Table.Query)
+}
+
+func (a *Allocator) TableQueryYqlText(s string) (v *Ydb_Table.Query_YqlText) {
+	return &Ydb_Table.Query_YqlText{
+		YqlText: s,
+	}
+}
+
+func (a *Allocator) TableQueryID(id string) (v *Ydb_Table.Query_Id) {
+	return &Ydb_Table.Query_Id{
+		Id: id,
+	}
 }
 
 var Buffers = &buffersPoolType{}
