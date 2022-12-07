@@ -3,10 +3,9 @@ package table
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -45,16 +44,21 @@ func (tx *transaction) Execute(
 	query string, params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
-	q := new(dataQuery)
-	q.initFromText(query)
+	var (
+		a          = allocator.New()
+		q          = queryFromText(query)
+		optsResult options.ExecuteDataQueryDesc
+	)
+	defer a.Free()
 
 	if params == nil {
 		params = table.NewQueryParameters()
 	}
-	var optsResult options.ExecuteDataQueryDesc
+
 	for _, f := range opts {
-		f(&optsResult)
+		f(&optsResult, a)
 	}
+
 	onDone := trace.TableOnSessionTransactionExecute(
 		tx.s.config.Trace(),
 		&ctx,
@@ -80,10 +84,16 @@ func (tx *transaction) ExecuteStatement(
 	if params == nil {
 		params = table.NewQueryParameters()
 	}
-	var optsResult options.ExecuteDataQueryDesc
+	var (
+		a          = allocator.New()
+		optsResult options.ExecuteDataQueryDesc
+	)
+	defer a.Free()
+
 	for _, f := range opts {
-		f(&optsResult)
+		f(&optsResult, a)
 	}
+
 	onDone := trace.TableOnSessionTransactionExecuteStatement(
 		tx.s.config.Trace(),
 		&ctx,
@@ -94,6 +104,7 @@ func (tx *transaction) ExecuteStatement(
 	defer func() {
 		onDone(r, err)
 	}()
+
 	_, r, err = stmt.Execute(ctx, tx.txc(), params, opts...)
 	return
 }
@@ -143,10 +154,7 @@ func (tx *transaction) CommitTx(
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	err = proto.Unmarshal(
-		response.GetOperation().GetResult().GetValue(),
-		result,
-	)
+	err = response.GetOperation().GetResult().UnmarshalTo(result)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

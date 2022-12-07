@@ -2,6 +2,9 @@ package table
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
@@ -14,7 +17,7 @@ import (
 
 type statement struct {
 	session *session
-	query   *dataQuery
+	query   query
 	params  map[string]*Ydb.Type
 }
 
@@ -26,9 +29,26 @@ func (s *statement) Execute(
 ) (
 	txr table.Transaction, r result.Result, err error,
 ) {
-	var optsResult options.ExecuteDataQueryDesc
-	for _, f := range opts {
-		f(&optsResult)
+	var (
+		a       = allocator.New()
+		request = a.TableExecuteDataQueryRequest()
+	)
+	defer a.Free()
+
+	request.SessionId = s.session.id
+	request.TxControl = tx.Desc()
+	request.Parameters = params.Params().ToYDB(a)
+	request.Query = s.query.toYDB(a)
+	request.QueryCachePolicy = a.TableQueryCachePolicy()
+	request.QueryCachePolicy.KeepInCache = len(params.Params()) > 0
+	request.OperationParams = operation.Params(ctx,
+		s.session.config.OperationTimeout(),
+		s.session.config.OperationCancelAfter(),
+		operation.ModeSync,
+	)
+
+	for _, opt := range opts {
+		opt((*options.ExecuteDataQueryDesc)(request), a)
 	}
 
 	onDone := trace.TableOnSessionQueryExecute(
@@ -37,32 +57,26 @@ func (s *statement) Execute(
 		s.session,
 		s.query,
 		params,
-		optsResult.QueryCachePolicy.GetKeepInCache(),
+		request.QueryCachePolicy.GetKeepInCache(),
 	)
 	defer func() {
 		onDone(txr, true, r, err)
 	}()
-	return s.execute(ctx, tx, params, opts...)
+
+	return s.execute(ctx, a, request)
 }
 
 // execute executes prepared query without any tracing.
 func (s *statement) execute(
-	ctx context.Context, tx *table.TransactionControl,
-	params *table.QueryParameters,
-	opts ...options.ExecuteDataQueryOption,
+	ctx context.Context, a *allocator.Allocator, request *Ydb_Table.ExecuteDataQueryRequest,
 ) (
 	txr table.Transaction, r result.Result, err error,
 ) {
-	_, res, err := s.session.executeDataQuery(
-		ctx,
-		tx,
-		s.query,
-		params,
-		opts...,
-	)
+	res, err := s.session.executeDataQuery(ctx, a, request)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
+
 	return s.session.executeQueryResult(res)
 }
 

@@ -13,10 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
-	"google.golang.org/protobuf/proto"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -34,6 +30,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 // session represents a single table API session.
@@ -132,10 +130,7 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	err = proto.Unmarshal(
-		response.GetOperation().GetResult().GetValue(),
-		&result,
-	)
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -244,10 +239,7 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 	if err != nil {
 		return
 	}
-	err = proto.Unmarshal(
-		resp.GetOperation().GetResult().GetValue(),
-		&result,
-	)
+	err = resp.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return
 	}
@@ -314,10 +306,7 @@ func (s *session) DescribeTable(
 	if err != nil {
 		return desc, xerrors.WithStackTrace(err)
 	}
-	err = proto.Unmarshal(
-		response.GetOperation().GetResult().GetValue(),
-		&result,
-	)
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return desc, xerrors.WithStackTrace(err)
 	}
@@ -556,10 +545,7 @@ func (s *session) Explain(
 	if err != nil {
 		return
 	}
-	err = proto.Unmarshal(
-		response.GetOperation().GetResult().GetValue(),
-		&result,
-	)
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return
 	}
@@ -572,16 +558,16 @@ func (s *session) Explain(
 }
 
 // Prepare prepares data query within session s.
-func (s *session) Prepare(ctx context.Context, query string) (stmt table.Statement, err error) {
+func (s *session) Prepare(ctx context.Context, queryText string) (stmt table.Statement, err error) {
 	var (
-		q        *dataQuery
+		q        query
 		response *Ydb_Table.PrepareDataQueryResponse
 		result   Ydb_Table.PrepareQueryResult
 		onDone   = trace.TableOnSessionQueryPrepare(
 			s.config.Trace(),
 			&ctx,
 			s,
-			query,
+			queryText,
 		)
 	)
 	defer func() {
@@ -591,7 +577,7 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 	response, err = s.tableService.PrepareDataQuery(ctx,
 		&Ydb_Table.PrepareDataQueryRequest{
 			SessionId: s.id,
-			YqlText:   query,
+			YqlText:   queryText,
 			OperationParams: operation.Params(
 				ctx,
 				s.config.OperationTimeout(),
@@ -603,19 +589,15 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 	if err != nil {
 		return
 	}
-	err = proto.Unmarshal(
-		response.GetOperation().GetResult().GetValue(),
-		&result,
-	)
+
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return
 	}
 
-	q = new(dataQuery)
-	q.initPrepared(result.QueryId)
 	stmt = &statement{
 		session: s,
-		query:   q,
+		query:   queryPrepared(result.QueryId, queryText),
 		params:  result.ParametersTypes,
 	}
 
@@ -632,16 +614,27 @@ func (s *session) Execute(
 ) (
 	txr table.Transaction, r result.Result, err error,
 ) {
-	q := new(dataQuery)
-	q.initFromText(query)
+	var (
+		a       = allocator.New()
+		q       = queryFromText(query)
+		request = a.TableExecuteDataQueryRequest()
+	)
+	defer a.Free()
 
-	if params == nil {
-		params = table.NewQueryParameters()
-	}
+	request.SessionId = s.id
+	request.TxControl = tx.Desc()
+	request.Parameters = params.Params().ToYDB(a)
+	request.Query = q.toYDB(a)
+	request.QueryCachePolicy = a.TableQueryCachePolicy()
+	request.QueryCachePolicy.KeepInCache = len(params.Params()) > 0
+	request.OperationParams = operation.Params(ctx,
+		s.config.OperationTimeout(),
+		s.config.OperationCancelAfter(),
+		operation.ModeSync,
+	)
 
-	var optsResult options.ExecuteDataQueryDesc
-	for _, f := range opts {
-		f(&optsResult)
+	for _, opt := range opts {
+		opt((*options.ExecuteDataQueryDesc)(request), a)
 	}
 
 	onDone := trace.TableOnSessionQueryExecute(
@@ -650,24 +643,15 @@ func (s *session) Execute(
 		s,
 		q,
 		params,
-		optsResult.QueryCachePolicy.GetKeepInCache(),
+		request.QueryCachePolicy.GetKeepInCache(),
 	)
 	defer func() {
 		onDone(txr, false, r, err)
 	}()
 
-	request, result, err := s.executeDataQuery(ctx, tx, q, params, opts...)
+	result, err := s.executeDataQuery(ctx, a, request)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
-	}
-	if keepInCache(request) && result.QueryMeta != nil {
-		queryID := result.QueryMeta.Id
-		// Supplement q with ID for tracing.
-		q.initPreparedText(query, queryID)
-		// Create new dataQuery instead of q above to not store the whole query
-		// string within statement.
-		subq := new(dataQuery)
-		subq.initPrepared(queryID)
 	}
 
 	return s.executeQueryResult(result)
@@ -694,49 +678,27 @@ func (s *session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (
 
 // executeDataQuery executes data query.
 func (s *session) executeDataQuery(
-	ctx context.Context, tx *table.TransactionControl,
-	query *dataQuery, params *table.QueryParameters,
-	opts ...options.ExecuteDataQueryOption,
+	ctx context.Context, a *allocator.Allocator, request *Ydb_Table.ExecuteDataQueryRequest,
 ) (
-	_ *Ydb_Table.ExecuteDataQueryRequest,
 	_ *Ydb_Table.ExecuteQueryResult,
 	err error,
 ) {
 	var (
-		a       = allocator.New()
-		result  = &Ydb_Table.ExecuteQueryResult{}
-		request = &Ydb_Table.ExecuteDataQueryRequest{
-			SessionId:  s.id,
-			TxControl:  tx.Desc(),
-			Parameters: params.Params().ToYDB(a),
-			Query:      &query.query,
-			QueryCachePolicy: &Ydb_Table.QueryCachePolicy{
-				KeepInCache: len(params.Params()) > 0,
-			},
-			OperationParams: operation.Params(
-				ctx,
-				s.config.OperationTimeout(),
-				s.config.OperationCancelAfter(),
-				operation.ModeSync,
-			),
-		}
+		result   = a.TableExecuteQueryResult()
+		response *Ydb_Table.ExecuteDataQueryResponse
 	)
-	defer a.Free()
 
-	for _, opt := range opts {
-		opt((*options.ExecuteDataQueryDesc)(request))
-	}
-
-	var response *Ydb_Table.ExecuteDataQueryResponse
 	response, err = s.tableService.ExecuteDataQuery(ctx, request)
 	if err != nil {
-		return nil, nil, xerrors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
-	err = proto.Unmarshal(
-		response.GetOperation().GetResult().GetValue(),
-		result,
-	)
-	return request, result, xerrors.WithStackTrace(err)
+
+	err = response.GetOperation().GetResult().UnmarshalTo(result)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return result, nil
 }
 
 // ExecuteSchemeQuery executes scheme query.
@@ -783,13 +745,12 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 	if err != nil {
 		return
 	}
-	err = proto.Unmarshal(
-		response.GetOperation().GetResult().GetValue(),
-		&result,
-	)
+
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return
 	}
+
 	{
 		xs := make([]options.TableProfileDescription, len(result.GetTableProfilePresets()))
 		for i, p := range result.GetTableProfilePresets() {
@@ -980,9 +941,9 @@ func (s *session) StreamExecuteScanQuery(
 	params *table.QueryParameters,
 	opts ...options.ExecuteScanQueryOption,
 ) (_ result.StreamResult, err error) {
-	q := new(dataQuery)
-	q.initFromText(query)
 	var (
+		a              = allocator.New()
+		q              = queryFromText(query)
 		onIntermediate = trace.TableOnSessionQueryStreamExecute(
 			s.config.Trace(),
 			&ctx,
@@ -990,9 +951,8 @@ func (s *session) StreamExecuteScanQuery(
 			q,
 			params,
 		)
-		a       = allocator.New()
 		request = Ydb_Table.ExecuteScanQueryRequest{
-			Query:      &q.query,
+			Query:      q.toYDB(a),
 			Parameters: params.Params().ToYDB(a),
 			Mode:       Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC, // set default
 		}
@@ -1103,10 +1063,7 @@ func (s *session) BeginTransaction(
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	err = proto.Unmarshal(
-		response.GetOperation().GetResult().GetValue(),
-		&result,
-	)
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return
 	}
