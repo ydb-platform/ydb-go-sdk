@@ -674,7 +674,6 @@ func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 	if c.isClosed() {
 		return xerrors.WithStackTrace(errClosedClient)
 	}
-	opts = append(opts, table.WithTrace(c.config.Trace()))
 	return do(
 		ctx,
 		c,
