@@ -2,6 +2,7 @@
 * Fixed typo in `topic/README.md`
 * Upgraded `ydb-go-genproto` dependency
 * Fixed duplicating of traces in `table.Client.Do()` call
+* Added `ydb.IsPrimaryKeyConstraintViolation(err)` helper for check primary key constraint violation
 
 ## v3.40.1
 * Added constructor of `options.TimeToLiveSettings` and fluent modifiers

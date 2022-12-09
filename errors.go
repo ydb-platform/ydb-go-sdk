@@ -92,3 +92,8 @@ func IsRatelimiterAcquireError(err error) bool {
 func ToRatelimiterAcquireError(err error) ratelimiter.AcquireError {
 	return ratelimiterErrors.ToAcquireError(err)
 }
+
+// IsPrimaryKeyConstraintViolation returns true if error about primary key constraint violation
+func IsPrimaryKeyConstraintViolation(err error) bool {
+	return xerrors.IsPrimaryKeyConstraintViolation(err)
+}
