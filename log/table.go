@@ -706,7 +706,7 @@ func Table(l Logger, details trace.Details, opts ...option) (t trace.Table) {
 							session.Status(),
 						)
 					} else {
-						l.Errorf(`put failed {latency:"%v",id:"%s",status:"%s",error:"%v",version:"%s"}`,
+						l.Warnf(`put failed {latency:"%v",id:"%s",status:"%s",error:"%v",version:"%s"}`,
 							time.Since(start),
 							session.ID(),
 							session.Status(),
