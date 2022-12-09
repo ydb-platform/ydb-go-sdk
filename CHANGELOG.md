@@ -1,6 +1,7 @@
 * Supported internal allocator in `{session,statement}.Execute` for decrease memory usage
 * Fixed typo in `topic/README.md`
 * Upgraded `ydb-go-genproto` dependency
+* Fixed duplicating of traces in `table.Client.Do()` call
 
 ## v3.40.1
 * Added constructor of `options.TimeToLiveSettings` and fluent modifiers
