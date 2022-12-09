@@ -43,8 +43,8 @@ func grpcOptions(t trace.Driver, secure bool, tlsConfig *tls.Config) (opts []grp
 			DefaultGrpcConnectionPolicy,
 		),
 		grpc.WithDefaultServiceConfig(`{
-				"loadBalancingPolicy": "round_robin"
-			}`),
+			"loadBalancingPolicy": "round_robin"
+		}`),
 		grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(DefaultGRPCMsgSize),
 			grpc.MaxCallSendMsgSize(DefaultGRPCMsgSize),
