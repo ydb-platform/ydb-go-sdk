@@ -311,12 +311,10 @@ func (c *conn) Close() (err error) {
 		onDone(err)
 	}()
 	err = c.session.Close(context.Background())
-	switch {
-	case err == nil, xerrors.Is(err, internal.ErrSessionClosed):
-		return nil
-	default:
-		return err
+	if err != nil {
+		return xerrors.WithStackTrace(err)
 	}
+	return nil
 }
 
 func (c *conn) Prepare(string) (driver.Stmt, error) {
