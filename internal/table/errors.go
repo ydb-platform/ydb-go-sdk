@@ -24,9 +24,9 @@ var (
 	// requested session is under shutdown.
 	errSessionUnderShutdown = xerrors.Wrap(errors.New("session under shutdown"))
 
-	// ErrSessionClosed returned by a Client instance to indicate that
+	// errSessionClosed returned by a Client instance to indicate that
 	// requested session is closed early.
-	ErrSessionClosed = xerrors.Wrap(errors.New("session closed early"))
+	errSessionClosed = xerrors.Wrap(errors.New("session closed early"))
 
 	// errNoProgress returned by a Client instance to indicate that
 	// operation could not be completed.
