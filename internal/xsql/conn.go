@@ -311,7 +311,7 @@ func (c *conn) Close() (err error) {
 	}()
 	err = c.session.Close(context.Background())
 	if err != nil {
-		return xerrors.WithStackTrace(err)
+		return c.checkClosed(xerrors.WithStackTrace(err))
 	}
 	return nil
 }
