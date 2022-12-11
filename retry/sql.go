@@ -40,9 +40,6 @@ func Do(ctx context.Context, db *sql.DB, f func(ctx context.Context, cc *sql.Con
 		if err != nil {
 			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
-		defer func() {
-			_ = cc.Close()
-		}()
 		if err = f(ctx, cc); err != nil {
 			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
