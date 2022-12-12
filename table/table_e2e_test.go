@@ -432,6 +432,30 @@ func testTable(t testing.TB) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	err = db.Table().Do(ctx,
+		func(ctx context.Context, s table.Session) (err error) {
+			// lazy open transaction on first execute query
+			tx, res, err := s.Execute(ctx, table.DefaultTxControl(), "SELECT 1", nil)
+			if err != nil {
+				return err // for auto-retry with driver
+			}
+			defer res.Close() // cleanup resources
+			if err = res.Err(); err != nil {
+				return err
+			}
+			// close transaction on last execute query
+			res, err = tx.WithCommit().Execute(ctx, "SELECT 2", nil)
+			if err != nil {
+				return err
+			}
+			defer res.Close()
+			return res.Err()
+		},
+		table.WithIdempotent(),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// fill data
 	if err = fill(ctx, db, folder); err != nil {

@@ -243,6 +243,11 @@ type Transaction interface {
 	Rollback(
 		ctx context.Context,
 	) (err error)
+
+	// WithCommit modifies current transaction with add flag for auto-commit on next Execute[Statement] query
+	//
+	// Current transaction will set to committed state after next execute query
+	WithCommit() TransactionActor
 }
 
 type Statement interface {
@@ -293,10 +298,18 @@ func BeginTx(opts ...TxOption) TxControlOption {
 	}
 }
 
-func WithTx(t Transaction) TxControlOption {
+func WithTx(t TransactionIdentifier) TxControlOption {
 	return func(d *txControlDesc) {
 		d.TxSelector = &Ydb_Table.TransactionControl_TxId{
 			TxId: t.ID(),
+		}
+	}
+}
+
+func WithTxID(txID string) TxControlOption {
+	return func(d *txControlDesc) {
+		d.TxSelector = &Ydb_Table.TransactionControl_TxId{
+			TxId: txID,
 		}
 	}
 }
@@ -363,6 +376,14 @@ func (t *TransactionControl) Desc() *Ydb_Table.TransactionControl {
 		return nil
 	}
 	return &t.desc
+}
+
+// With modifies current TransactionControl with options
+func (t *TransactionControl) With(opts ...TxControlOption) *TransactionControl {
+	for _, opt := range opts {
+		opt((*txControlDesc)(&t.desc))
+	}
+	return t
 }
 
 // TxControl makes transaction control from given options
