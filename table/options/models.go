@@ -38,6 +38,7 @@ func NewTableColumn(name string, typ types.Type, family string) Column {
 type IndexDescription struct {
 	Name         string
 	IndexColumns []string
+	DataColumns  []string
 	Status       Ydb_Table.TableIndexDescription_Status
 }
 
