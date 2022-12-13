@@ -394,6 +394,7 @@ func (s *session) DescribeTable(
 		indexes[i] = options.IndexDescription{
 			Name:         idx.GetName(),
 			IndexColumns: idx.GetIndexColumns(),
+			DataColumns:  idx.GetDataColumns(),
 			Status:       idx.GetStatus(),
 		}
 	}

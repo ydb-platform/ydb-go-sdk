@@ -3,6 +3,7 @@
 * Upgraded `ydb-go-genproto` dependency
 * Fixed duplicating of traces in `table.Client.Do()` call
 * Supported `table.Transaction.WithCommit()` method for execute query and auto-commit after
+* Added DataColumns to IndexDescription
 
 ## v3.40.1
 * Added constructor of `options.TimeToLiveSettings` and fluent modifiers
