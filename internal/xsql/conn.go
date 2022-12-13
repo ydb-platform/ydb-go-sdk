@@ -102,7 +102,7 @@ func newConn(c *Connector, s table.ClosableSession, opts ...connOption) *conn {
 
 func (c *conn) checkClosed(err error) error {
 	if err = badconn.Map(err); xerrors.Is(err, driver.ErrBadConn) {
-		c.setClosed()
+		atomic.StoreUint32(&c.closed, 1)
 	}
 	return err
 }
@@ -112,16 +112,10 @@ func (c *conn) isClosed() bool {
 		return true
 	}
 	if c.session.Status() != table.SessionReady {
-		c.setClosed()
+		atomic.StoreUint32(&c.closed, 1)
 		return true
 	}
 	return false
-}
-
-func (c *conn) setClosed() {
-	if atomic.CompareAndSwapUint32(&c.closed, 0, 1) {
-		_ = c.Close()
-	}
 }
 
 func (conn) CheckNamedValue(v *driver.NamedValue) (err error) {
