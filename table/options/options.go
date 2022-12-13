@@ -598,6 +598,16 @@ func WithPartitioningByLoad(flag FeatureFlag) PartitioningSettingsOption {
 	return partitioningByLoadPartitioningSettingsOption(flag)
 }
 
+type partitioningByPartitioningSettingsOption []string
+
+func (columns partitioningByPartitioningSettingsOption) ApplyPartitioningSettingsOption(settings *ydbPartitioningSettings) {
+	settings.PartitionBy = columns
+}
+
+func WithPartitioningBy(columns []string) PartitioningSettingsOption {
+	return partitioningByPartitioningSettingsOption(columns)
+}
+
 type minPartitionsCountPartitioningSettingsOption uint64
 
 func (minPartitionsCount minPartitionsCountPartitioningSettingsOption) ApplyPartitioningSettingsOption(

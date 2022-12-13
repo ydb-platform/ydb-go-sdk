@@ -4,7 +4,8 @@
 * Fixed duplicating of traces in `table.Client.Do()` call
 * Supported `table.Transaction.WithCommit()` method for execute query and auto-commit after
 * Added `DataColumns` to `table.options.IndexDescription`
-* Added `scheme.EntryColumnStore` and `scheme.EntryColumnColumn` entry types 
+* Added `scheme.EntryColumnStore` and `scheme.EntryColumnColumn` entry types
+* Added `table.options.WithPartitioningBy(columns)` option
 
 ## v3.40.1
 * Added constructor of `options.TimeToLiveSettings` and fluent modifiers
