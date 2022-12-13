@@ -600,7 +600,9 @@ func WithPartitioningByLoad(flag FeatureFlag) PartitioningSettingsOption {
 
 type partitioningByPartitioningSettingsOption []string
 
-func (columns partitioningByPartitioningSettingsOption) ApplyPartitioningSettingsOption(settings *ydbPartitioningSettings) {
+func (columns partitioningByPartitioningSettingsOption) ApplyPartitioningSettingsOption(
+	settings *ydbPartitioningSettings,
+) {
 	settings.PartitionBy = columns
 }
 
