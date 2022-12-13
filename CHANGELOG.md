@@ -2,7 +2,6 @@
 * Fixed typo in `topic/README.md`
 * Upgraded `ydb-go-genproto` dependency
 * Fixed duplicating of traces in `table.Client.Do()` call
-* Fixed closing conn on `retry.Do()` call
 * Supported `table.Transaction.WithCommit()` method for execute query and auto-commit after
 
 ## v3.40.1
