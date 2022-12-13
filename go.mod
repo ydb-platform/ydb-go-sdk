@@ -8,7 +8,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/jonboulle/clockwork v0.2.2
 	github.com/stretchr/testify v1.7.1
-	github.com/ydb-platform/ydb-go-genproto v0.0.0-20221209083312-054a5201cc59
+	github.com/ydb-platform/ydb-go-genproto v0.0.0-20221213133644-c165754de0a7
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	google.golang.org/grpc v1.47.0
