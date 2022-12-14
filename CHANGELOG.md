@@ -1,3 +1,4 @@
+* Added option for set interval of auth token update in topic streams
 * Supported internal allocator in `{session,statement}.Execute` for decrease memory usage
 * Fixed typo in `topic/README.md`
 * Upgraded `ydb-go-genproto` dependency
