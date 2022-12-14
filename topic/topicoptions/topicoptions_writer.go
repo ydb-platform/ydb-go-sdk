@@ -1,6 +1,8 @@
 package topicoptions
 
 import (
+	"time"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -168,4 +170,13 @@ func WithWriterSetAutoCreatedAt(val bool) WriterOption {
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithWriterTrace(tracer trace.Topic) WriterOption {
 	return topicwriterinternal.WithTrace(tracer)
+}
+
+// WithWriterUpdateTokenInterval
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func WithWriterUpdateTokenInterval(interval time.Duration) WriterOption {
+	return topicwriterinternal.WithTokenUpdateInterval(interval)
 }

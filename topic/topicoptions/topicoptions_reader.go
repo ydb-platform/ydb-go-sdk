@@ -234,3 +234,14 @@ func WithReaderTrace(tracer trace.Topic) ReaderOption {
 		cfg.Tracer = cfg.Tracer.Compose(tracer)
 	}
 }
+
+// WithReaderUpdateTokenInterval
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func WithReaderUpdateTokenInterval(interval time.Duration) ReaderOption {
+	return func(cfg *topicreaderinternal.ReaderConfig) {
+		cfg.CredUpdateInterval = interval
+	}
+}
