@@ -39,6 +39,9 @@ type Client interface {
 	// CreateSession implements internal busy loop until one of the following conditions is met:
 	// - context was canceled or deadlined
 	// - session was created
+	//
+	// Deprecated: don't use CreateSession explicitly. This method only for ORM's compatibility.
+	// Use Do for queries with session
 	CreateSession(ctx context.Context, opts ...Option) (s ClosableSession, err error)
 
 	// Do provide the best effort for execute operation.
