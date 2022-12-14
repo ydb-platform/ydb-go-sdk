@@ -43,7 +43,7 @@ jobs:
         os: [ubuntu-latest]
     services:
       ydb:
-        image: cr.yandex/yc/yandex-docker-local-ydb:latest
+        image: amyasnikov/ydb:latest
         ports:
           - 2135:2135
           - 2136:2136
@@ -51,7 +51,7 @@ jobs:
         volumes:
           - /tmp/ydb_certs:/ydb_certs
         env:
-          YDB_LOCAL_SURVIVE_RESTART: true
+          YDB_DEFAULT_LOG_LEVEL: INFO
           YDB_USE_IN_MEMORY_PDISKS: true
         options: '-h localhost'
     env:
@@ -69,8 +69,6 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
         uses: actions/checkout@v2
-      - name: Wait database available
-        run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Test Table
         run: go test -race -coverpkg=./... -coverprofile table.txt -covermode atomic ./table/table_e2e_test.go
       - name: Upload Table coverage report to Codecov
