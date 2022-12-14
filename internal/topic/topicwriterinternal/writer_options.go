@@ -42,6 +42,12 @@ func WithCompressorCount(num int) PublicWriterOption {
 	}
 }
 
+func WithTokenUpdateInterval(interval time.Duration) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.credUpdateInterval = interval
+	}
+}
+
 // WithCommonConfig
 //
 // # Experimental
