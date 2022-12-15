@@ -312,6 +312,8 @@ func TestCommitUnexpectedRange(t *testing.T) {
 }
 
 func TestUpdateToken(t *testing.T) {
+	xtest.AllowByFlag(t, "LOGBROKER-7960")
+
 	ctx := context.Background()
 	db := connect(t)
 	dbLogging := connectWithGrpcLogging(t)
