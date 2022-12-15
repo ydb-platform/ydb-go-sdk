@@ -117,7 +117,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 	defer func() {
 		onDone(err)
 	}()
-	s, err := c.connection.Table().CreateSession(
+	s, err := c.connection.Table().CreateSession( //nolint:staticcheck // SA1019
 		meta.WithAllowFeatures(ctx,
 			metaHeaders.HintSessionBalancer,
 		),
