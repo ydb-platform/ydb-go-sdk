@@ -328,6 +328,9 @@ func (r *topicStreamReaderImpl) onPartitionSessionStatusResponseFromBuffer(
 	panic("not implemented")
 }
 
+func (r *topicStreamReaderImpl) onUpdateTokenResponse(m *rawtopicreader.UpdateTokenResponse) {
+}
+
 func (r *topicStreamReaderImpl) Commit(ctx context.Context, commitRange commitRange) (err error) {
 	defer func() {
 		if errors.Is(err, PublicErrCommitSessionToExpiredSession) && r.cfg.CommitMode == CommitModeAsync {
@@ -508,7 +511,7 @@ func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
 			}
 
 		case *rawtopicreader.UpdateTokenResponse:
-			// skip
+			r.onUpdateTokenResponse(m)
 		default:
 			trace.TopicOnReaderUnknownGrpcMessage(
 				r.cfg.Tracer,
