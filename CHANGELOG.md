@@ -1,3 +1,4 @@
+## v3.41.0
 * Added option for set interval of auth token update in topic streams
 * Supported internal allocator in `{session,statement}.Execute` for decrease memory usage
 * Fixed typo in `topic/README.md`
