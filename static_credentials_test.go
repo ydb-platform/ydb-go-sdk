@@ -37,7 +37,7 @@ func TestStaticCredentials(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		createUserQuery := fmt.Sprintf("CREATE USER '%s' PASSWORD '%s';", user, password)
+		createUserQuery := fmt.Sprintf("CREATE USER %s PASSWORD `%s`;", user, password)
 
 		_, err = db.ExecContext(ydb.WithQueryMode(ctx, ydb.ScriptingQueryMode), createUserQuery)
 		if err != nil {
