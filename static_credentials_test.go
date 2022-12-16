@@ -15,14 +15,14 @@ import (
 )
 
 var (
-	user     = "testUser"
-	password = "testPassword"
+	user     = "test"
+	password = "test"
 )
 
 func TestStaticCredentials(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("sql.Open", func(t *testing.T) {
+	t.Run("create user", func(t *testing.T) {
 		db, err := sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
 		if err != nil {
 			t.Fatal(err)
@@ -37,7 +37,7 @@ func TestStaticCredentials(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		createUserQuery := fmt.Sprintf("CREATE USER %s PASSWORD `%s`;", user, password)
+		createUserQuery := fmt.Sprintf("CREATE USER %s PASSWORD %q", user, password)
 
 		_, err = db.ExecContext(ydb.WithQueryMode(ctx, ydb.ScriptingQueryMode), createUserQuery)
 		if err != nil {
@@ -49,7 +49,7 @@ func TestStaticCredentials(t *testing.T) {
 		}
 	})
 
-	t.Run("sql.OpenDB", func(t *testing.T) {
+	t.Run("select under new user", func(t *testing.T) {
 		u, err := url.Parse(os.Getenv("YDB_CONNECTION_STRING"))
 		if err != nil {
 			t.Fatal(err)
@@ -65,15 +65,33 @@ func TestStaticCredentials(t *testing.T) {
 			_ = db.Close()
 		}()
 
-		if err = db.PingContext(ctx); err != nil {
+		if _, err = db.QueryContext(ctx, "SELECT 1"); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("drop user", func(t *testing.T) {
+		db, err := sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
+		if err != nil {
 			t.Fatal(err)
 		}
 
-		_, err = db.ExecContext(
-			ydb.WithQueryMode(ctx, ydb.ScriptingQueryMode),
-			fmt.Sprintf("DROP USER %s;", user),
-		)
+		if err = db.PingContext(ctx); err != nil {
+			t.Fatalf("driver not initialized: %+v", err)
+		}
+
+		_, err = ydb.Unwrap(db)
 		if err != nil {
+			t.Fatal(err)
+		}
+
+		dropUserQuery := fmt.Sprintf("DROP USER %s", user)
+
+		_, err = db.ExecContext(ydb.WithQueryMode(ctx, ydb.ScriptingQueryMode), dropUserQuery)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err = db.Close(); err != nil {
 			t.Fatal(err)
 		}
 	})
