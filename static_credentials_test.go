@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"net/url"
 	"os"
 	"testing"
@@ -65,9 +66,15 @@ func TestStaticCredentials(t *testing.T) {
 			_ = db.Close()
 		}()
 
-		if _, err = db.QueryContext(ctx, "SELECT 1"); err != nil {
+		row := db.QueryRowContext(ctx, "SELECT 1")
+		var result int
+		if err = row.Scan(&result); err != nil {
 			t.Fatal(err)
 		}
+		if err = row.Err(); err != nil {
+			t.Fatal(err)
+		}
+		require.Equal(t, 1, result)
 	})
 	t.Run("drop user", func(t *testing.T) {
 		db, err := sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
