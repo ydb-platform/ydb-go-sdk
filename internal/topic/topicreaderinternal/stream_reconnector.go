@@ -37,7 +37,7 @@ type readerReconnector struct {
 
 	readerConnect readerConnectFunc
 
-	reconnectFromBadStream chan batchedStreamReader
+	reconnectFromBadStream chan reconnectRequest
 	connectTimeout         time.Duration
 
 	closeOnce sync.Once
@@ -148,14 +148,14 @@ func (r *readerReconnector) start() {
 	r.background.Start("reconnector-loop", r.reconnectionLoop)
 
 	// start first connection
-	r.reconnectFromBadStream <- nil
+	r.reconnectFromBadStream <- newReconnectRequest(nil, nil)
 }
 
 func (r *readerReconnector) initChannelsAndClock() {
 	if r.clock == nil {
 		r.clock = clockwork.NewRealClock()
 	}
-	r.reconnectFromBadStream = make(chan batchedStreamReader, 1)
+	r.reconnectFromBadStream = make(chan reconnectRequest, 1)
 	r.streamConnectionInProgress = make(empty.Chan)
 	close(r.streamConnectionInProgress) // no progress at start
 }
@@ -192,8 +192,8 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 
-		case oldReader := <-r.reconnectFromBadStream:
-			_ = r.reconnect(ctx, oldReader)
+		case request := <-r.reconnectFromBadStream:
+			_ = r.reconnect(ctx, request.oldReader)
 		}
 	}
 }
@@ -235,11 +235,11 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 	newStream, err := r.connectWithTimeout()
 
 	if topic.IsRetryableError(err) {
-		go func() {
+		go func(reason error) {
 			// guarantee write reconnect signal to channel
-			r.reconnectFromBadStream <- oldReader
+			r.reconnectFromBadStream <- newReconnectRequest(oldReader, reason)
 			trace.TopicOnReaderReconnectRequest(r.tracer, err, true)
-		}()
+		}(err)
 	}
 
 	r.m.WithLock(func() {
@@ -295,7 +295,7 @@ func (r *readerReconnector) fireReconnectOnRetryableError(stream batchedStreamRe
 	}
 
 	select {
-	case r.reconnectFromBadStream <- stream:
+	case r.reconnectFromBadStream <- newReconnectRequest(stream, err):
 		// send signal
 		trace.TopicOnReaderReconnectRequest(r.tracer, err, true)
 	default:
@@ -343,5 +343,17 @@ func (r *readerReconnector) handlePanic() {
 
 	if p != nil {
 		_ = r.CloseWithError(context.Background(), xerrors.WithStackTrace(fmt.Errorf("handled panic: %v", p)))
+	}
+}
+
+type reconnectRequest struct {
+	oldReader batchedStreamReader
+	reason    error
+}
+
+func newReconnectRequest(oldReader batchedStreamReader, reason error) reconnectRequest {
+	return reconnectRequest{
+		oldReader: oldReader,
+		reason:    reason,
 	}
 }
