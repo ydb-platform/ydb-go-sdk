@@ -94,7 +94,7 @@ func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessa
 		attempt++
 		stream, err := r.stream(ctx)
 		switch {
-		case topic.IsRetryableError(err):
+		case r.isRetriableErr(err):
 			r.fireReconnectOnRetryableError(stream, err)
 			runtime.Gosched()
 			continue
@@ -105,7 +105,7 @@ func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessa
 		}
 
 		res, err := stream.ReadMessageBatch(ctx, opts)
-		if topic.IsRetryableError(err) {
+		if r.isRetriableErr(err) {
 			r.fireReconnectOnRetryableError(stream, err)
 			runtime.Gosched()
 			continue
@@ -234,7 +234,7 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 
 	newStream, err := r.connectWithTimeout()
 
-	if topic.IsRetryableError(err) {
+	if r.isRetriableErr(err) {
 		go func(reason error) {
 			// guarantee write reconnect signal to channel
 			r.reconnectFromBadStream <- newReconnectRequest(oldReader, reason)
@@ -249,6 +249,10 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 		}
 	})
 	return err
+}
+
+func (r *readerReconnector) isRetriableErr(err error) bool {
+	return topic.IsRetryableError(err)
 }
 
 func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err error) {
@@ -290,7 +294,7 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 }
 
 func (r *readerReconnector) fireReconnectOnRetryableError(stream batchedStreamReader, err error) {
-	if !topic.IsRetryableError(err) {
+	if !r.isRetriableErr(err) {
 		return
 	}
 

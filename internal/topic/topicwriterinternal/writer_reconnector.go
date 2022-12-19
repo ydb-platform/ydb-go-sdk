@@ -381,7 +381,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		}
 		w.onWriterChange(nil)
 
-		if !topic.IsRetryableError(trackedErr) {
+		if !w.isRetriableErr(trackedErr) {
 			closeCtx, cancel := context.WithCancel(ctx)
 			cancel()
 			_ = w.close(closeCtx, trackedErr)
@@ -389,6 +389,10 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		}
 		// next iteration
 	}
+}
+
+func (w *WriterReconnector) isRetriableErr(err error) bool {
+	return topic.IsRetryableError(err)
 }
 
 func (w *WriterReconnector) needReceiveLastSeqNo() bool {
