@@ -177,7 +177,16 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 			attempt++
 		}
 
-		if attempt > 0 {
+		var request reconnectRequest
+		select {
+		case <-ctx.Done():
+			return
+
+		case request = <-r.reconnectFromBadStream:
+			// pass
+		}
+
+		if request.reason != nil && r.isRetriableErr(request.reason) {
 			delay := backoff.Fast.Delay(attempt)
 
 			select {
@@ -188,13 +197,7 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 			}
 		}
 
-		select {
-		case <-ctx.Done():
-			return
-
-		case request := <-r.reconnectFromBadStream:
-			_ = r.reconnect(ctx, request.oldReader)
-		}
+		_ = r.reconnect(ctx, request.oldReader)
 	}
 }
 
