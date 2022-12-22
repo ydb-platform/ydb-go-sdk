@@ -18,6 +18,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -32,8 +33,9 @@ type readerReconnector struct {
 	clock      clockwork.Clock
 	background background.Worker
 
-	tracer      trace.Topic
-	baseContext context.Context
+	tracer        trace.Topic
+	baseContext   context.Context
+	retrySettings topic.RetrySettings
 
 	readerConnect readerConnectFunc
 
@@ -94,7 +96,7 @@ func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessa
 		attempt++
 		stream, err := r.stream(ctx)
 		switch {
-		case r.isRetriableErr(err):
+		case r.isRetriableError(err):
 			r.fireReconnectOnRetryableError(stream, err)
 			runtime.Gosched()
 			continue
@@ -105,7 +107,7 @@ func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessa
 		}
 
 		res, err := stream.ReadMessageBatch(ctx, opts)
-		if r.isRetriableErr(err) {
+		if r.isRetriableError(err) {
 			r.fireReconnectOnRetryableError(stream, err)
 			runtime.Gosched()
 			continue
@@ -186,8 +188,8 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 			// pass
 		}
 
-		if request.reason != nil && r.isRetriableErr(request.reason) {
-			delay := backoff.Fast.Delay(attempt)
+		if backoff, isRetriableErr := r.checkErrRetryMode(attempt, request.reason); request.reason != nil && isRetriableErr {
+			delay := backoff.Delay(attempt)
 
 			select {
 			case <-ctx.Done():
@@ -237,7 +239,7 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 
 	newStream, err := r.connectWithTimeout()
 
-	if r.isRetriableErr(err) {
+	if r.isRetriableError(err) {
 		go func(reason error) {
 			// guarantee write reconnect signal to channel
 			r.reconnectFromBadStream <- newReconnectRequest(oldReader, reason)
@@ -254,8 +256,47 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 	return err
 }
 
-func (r *readerReconnector) isRetriableErr(err error) bool {
-	return topic.IsRetryableError(err)
+func (r *readerReconnector) isRetriableError(err error) bool {
+	_, res := r.checkErrRetryModeLogic(true, 0, err)
+	return res
+}
+
+func (r *readerReconnector) checkErrRetryMode(attempts int, err error) (
+	backoffType backoff.Backoff,
+	isRetriableErr bool,
+) {
+	return r.checkErrRetryModeLogic(false, attempts, err)
+}
+
+func (r *readerReconnector) checkErrRetryModeLogic(preCheck bool, attempts int, err error) (
+	backoffType backoff.Backoff,
+	isRetriableErr bool,
+) {
+	isRetriableErr = true
+	if r.retrySettings.CheckError != nil {
+		switch decision := r.retrySettings.CheckError(topic.NewCheckRetryArgs(preCheck, attempts, err)); decision {
+		case topic.PublicRetryDecisionDefault:
+			isRetriableErr = topic.IsRetryableError(err)
+		case topic.PublicRetryDecisionRetry:
+			isRetriableErr = true
+		case topic.PublicRetryDecisionStop:
+			isRetriableErr = false
+		default:
+			panic(fmt.Errorf("unexpected retry decision: %v", decision))
+		}
+	}
+	if !isRetriableErr {
+		return nil, false
+	}
+	if preCheck {
+		return nil, true
+	}
+
+	if retry.Check(err).BackoffType() == backoff.TypeFast {
+		return backoff.Fast, true
+	}
+
+	return backoff.Slow, true
 }
 
 func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err error) {
@@ -297,7 +338,7 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 }
 
 func (r *readerReconnector) fireReconnectOnRetryableError(stream batchedStreamReader, err error) {
-	if !r.isRetriableErr(err) {
+	if !r.isRetriableError(err) {
 		return
 	}
 

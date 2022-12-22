@@ -10,8 +10,17 @@ type RetrySettings struct {
 type PublicCheckRetryFunc func(errInfo PublicCheckRetryArgs) PublicCheckRetryResult
 
 type PublicCheckRetryArgs struct {
-	Attempt int
-	Error   error
+	IsPreCheck bool
+	Attempt    int
+	Error      error
+}
+
+func NewCheckRetryArgs(preCheck bool, attempts int, err error) PublicCheckRetryArgs {
+	return PublicCheckRetryArgs{
+		IsPreCheck: preCheck,
+		Attempt:    attempts,
+		Error:      err,
+	}
 }
 
 type PublicCheckRetryResult int
