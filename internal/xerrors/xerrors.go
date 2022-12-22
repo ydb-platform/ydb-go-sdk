@@ -9,7 +9,6 @@ import (
 	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 )
 
 // Error is an interface of error which reports about error code and error name.
@@ -18,7 +17,7 @@ type Error interface {
 
 	Code() int32
 	Name() string
-	OperationStatus() operation.Status
+	Type() Type
 	BackoffType() backoff.Type
 	MustDeleteSession() bool
 }

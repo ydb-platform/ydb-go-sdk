@@ -1,4 +1,4 @@
-package retry
+package xerrors
 
 import "context"
 

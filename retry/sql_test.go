@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -99,7 +98,7 @@ func (m *mockConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.T
 
 func (m *mockConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	m.t.Log(xerrors.StackRecord(0))
-	if retry.MustDeleteSession(m.execErr) {
+	if xerrors.MustDeleteSession(m.execErr) {
 		m.closed = true
 	}
 	return nil, m.queryErr
@@ -107,7 +106,7 @@ func (m *mockConn) QueryContext(ctx context.Context, query string, args []driver
 
 func (m *mockConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	m.t.Log(xerrors.StackRecord(0))
-	if retry.MustDeleteSession(m.execErr) {
+	if xerrors.MustDeleteSession(m.execErr) {
 		m.closed = true
 	}
 	return nil, m.execErr

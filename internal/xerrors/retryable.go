@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 )
 
 type retryableError struct {
@@ -22,8 +21,8 @@ func (e *retryableError) Name() string {
 	return "retryable/" + e.name
 }
 
-func (e *retryableError) OperationStatus() operation.Status {
-	return operation.NotFinished
+func (e *retryableError) Type() Type {
+	return TypeRetryable
 }
 
 func (e *retryableError) BackoffType() backoff.Type {
