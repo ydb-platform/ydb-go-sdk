@@ -183,9 +183,7 @@ func WithWriterSetAutoCreatedAt(val bool) WriterOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithWriterStartTimeout(timeout time.Duration) WriterOption {
-	return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
-		cfg.RetrySettings.StartTimeout = timeout
-	}
+	return topicwriterinternal.WithStartTimeout(timeout)
 }
 
 // WithWriterTrace

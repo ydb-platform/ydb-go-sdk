@@ -85,7 +85,7 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		MaxMessageSize:     50 * 1024 * 1024,
 		MaxQueueLen:        1000,
 		RetrySettings: topic.RetrySettings{
-			StartTimeout: topic.DefaultConnectionTimeout,
+			StartTimeout: topic.DefaultStartTimeout,
 		},
 	}
 	if cfg.compressorCount == 0 {
@@ -141,6 +141,7 @@ func newWriterReconnectorStopped(cfg WriterReconnectorConfig) *WriterReconnector
 		firstInitResponseProcessedChan: make(empty.Chan),
 		encodersMap:                    NewEncoderMap(),
 		writerInstanceID:               writerInstanceID.String(),
+		retrySettings:                  cfg.RetrySettings,
 	}
 
 	res.queue.OnAckReceived = res.onAckReceived
@@ -356,7 +357,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		now := time.Now()
 		if topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
 			attempt = 0
-			startOfRetries = time.Now()
+			startOfRetries = w.clock.Now()
 		} else {
 			attempt++
 		}

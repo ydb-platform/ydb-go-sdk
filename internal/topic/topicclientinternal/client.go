@@ -201,7 +201,7 @@ func (c *Client) StartReader(
 		topicoptions.WithCommonConfig(c.cfg.Common),
 		topicreaderinternal.WithCredentials(c.cred),
 		topicreaderinternal.WithTrace(c.cfg.Trace),
-		topicoptions.WithReaderStartTimeout(topic.DefaultConnectionTimeout),
+		topicoptions.WithReaderStartTimeout(topic.DefaultStartTimeout),
 	}
 	opts = append(defaultOpts, opts...)
 

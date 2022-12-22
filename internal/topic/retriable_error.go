@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	DefaultConnectionTimeout = time.Minute
+	DefaultStartTimeout = time.Minute
 )
 
 type RetrySettings struct {
