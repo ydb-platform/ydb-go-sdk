@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wait"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -112,7 +112,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 	for _, o := range opts {
 		o(options)
 	}
-	ctx = retry.WithIdempotent(ctx, options.idempotent)
+	ctx = xcontext.WithIdempotent(ctx, options.idempotent)
 	defer func() {
 		if err != nil && options.stackTrace {
 			err = xerrors.WithStackTrace(
@@ -176,12 +176,12 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 }
 
 // Check returns retry mode for queryErr.
-func Check(err error) (m retry.Mode) {
-	statusCode, operationStatus, backoff, deleteSession := retry.Check(err)
-	return retry.NewMode(
-		statusCode,
-		operationStatus,
-		backoff,
-		deleteSession,
-	)
+func Check(err error) (m retryMode) {
+	code, errType, backoff, deleteSession := xerrors.Check(err)
+	return retryMode{
+		code:          code,
+		errType:       errType,
+		backoff:       backoff,
+		deleteSession: deleteSession,
+	}
 }

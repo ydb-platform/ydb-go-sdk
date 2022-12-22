@@ -8,7 +8,7 @@ import (
 	"io"
 	"sync/atomic"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/isolation"
@@ -139,7 +139,7 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt,
 
 func (c *conn) execContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, err error) {
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
-	onDone := trace.DatabaseSQLOnConnExec(c.trace, &ctx, query, m.String(), retry.IsIdempotent(ctx))
+	onDone := trace.DatabaseSQLOnConnExec(c.trace, &ctx, query, m.String(), xcontext.IsIdempotent(ctx))
 	defer func() {
 		onDone(err)
 	}()
@@ -214,7 +214,7 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 
 func (c *conn) queryContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, err error) {
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
-	onDone := trace.DatabaseSQLOnConnExec(c.trace, &ctx, query, m.String(), retry.IsIdempotent(ctx))
+	onDone := trace.DatabaseSQLOnConnExec(c.trace, &ctx, query, m.String(), xcontext.IsIdempotent(ctx))
 	defer func() {
 		onDone(err)
 	}()
