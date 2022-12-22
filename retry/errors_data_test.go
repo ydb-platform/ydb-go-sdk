@@ -98,10 +98,10 @@ var errsToCheck = []struct {
 		err: xerrors.Transport(
 			xerrors.WithCode(grpcCodes.Unknown),
 		),
-		backoff:       backoff.TypeNoBackoff,
+		backoff:       backoff.TypeFast,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
-			idempotent:    false,
+			idempotent:    true,
 			nonIdempotent: false,
 		},
 	},
@@ -269,10 +269,10 @@ var errsToCheck = []struct {
 		err: xerrors.Transport(
 			xerrors.WithCode(grpcCodes.DataLoss),
 		),
-		backoff:       backoff.TypeNoBackoff,
+		backoff:       backoff.TypeFast,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
-			idempotent:    false,
+			idempotent:    true,
 			nonIdempotent: false,
 		},
 	},
@@ -291,10 +291,10 @@ var errsToCheck = []struct {
 		err: xerrors.Operation(
 			xerrors.WithStatusCode(Ydb.StatusIds_STATUS_CODE_UNSPECIFIED),
 		),
-		backoff:       backoff.TypeNoBackoff,
+		backoff:       backoff.TypeFast,
 		deleteSession: false,
 		canRetry: map[idempotency]bool{
-			idempotent:    false,
+			idempotent:    true,
 			nonIdempotent: false,
 		},
 	},
@@ -324,10 +324,10 @@ var errsToCheck = []struct {
 		err: xerrors.Operation(
 			xerrors.WithStatusCode(Ydb.StatusIds_INTERNAL_ERROR),
 		),
-		backoff:       backoff.TypeNoBackoff,
+		backoff:       backoff.TypeFast,
 		deleteSession: false,
 		canRetry: map[idempotency]bool{
-			idempotent:    false,
+			idempotent:    true,
 			nonIdempotent: false,
 		},
 	},
@@ -379,10 +379,10 @@ var errsToCheck = []struct {
 		err: xerrors.Operation(
 			xerrors.WithStatusCode(Ydb.StatusIds_GENERIC_ERROR),
 		),
-		backoff:       backoff.TypeNoBackoff,
+		backoff:       backoff.TypeFast,
 		deleteSession: false,
 		canRetry: map[idempotency]bool{
-			idempotent:    false,
+			idempotent:    true,
 			nonIdempotent: false,
 		},
 	},
@@ -390,10 +390,10 @@ var errsToCheck = []struct {
 		err: xerrors.Operation(
 			xerrors.WithStatusCode(Ydb.StatusIds_TIMEOUT),
 		),
-		backoff:       backoff.TypeNoBackoff,
+		backoff:       backoff.TypeFast,
 		deleteSession: false,
 		canRetry: map[idempotency]bool{
-			idempotent:    false,
+			idempotent:    true,
 			nonIdempotent: false,
 		},
 	},
@@ -448,8 +448,8 @@ var errsToCheck = []struct {
 		backoff:       backoff.TypeNoBackoff,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
-			idempotent:    false,
-			nonIdempotent: false,
+			idempotent:    true,
+			nonIdempotent: true,
 		},
 	},
 	{
@@ -459,7 +459,7 @@ var errsToCheck = []struct {
 		backoff:       backoff.TypeFast,
 		deleteSession: false,
 		canRetry: map[idempotency]bool{
-			idempotent:    false,
+			idempotent:    true,
 			nonIdempotent: false,
 		},
 	},
