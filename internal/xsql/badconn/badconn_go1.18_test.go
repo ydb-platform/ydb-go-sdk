@@ -24,7 +24,9 @@ var errsToCheck = []error{
 	fmt.Errorf("unknown error"),
 	context.DeadlineExceeded,
 	context.Canceled,
-	xerrors.FromGRPCError(grpc.ErrClientConnClosing), //nolint:staticcheck // ignore SA1019
+	xerrors.FromGRPCError(
+		grpc.ErrClientConnClosing, //nolint:staticcheck // ignore SA1019
+	),
 	xerrors.Transport(),
 	xerrors.Transport(
 		xerrors.WithCode(grpcCodes.Canceled),
