@@ -774,6 +774,7 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 	require.NoError(t, res.writer.waitFirstInitResponse(res.ctx))
 
 	t.Cleanup(func() {
+		res.writer.close(context.Background(), errors.New("stop writer test environment"))
 		close(res.stopReadEvents)
 		<-streamClosed
 	})

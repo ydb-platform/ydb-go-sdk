@@ -18,7 +18,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -254,7 +253,7 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 }
 
 func (r *readerReconnector) isRetriableError(err error) bool {
-	_, res := r.checkErrRetryModeLogic(true, 0, err)
+	_, res := topic.CheckRetryMode(err, true, 0, r.retrySettings.CheckError)
 	return res
 }
 
@@ -262,38 +261,7 @@ func (r *readerReconnector) checkErrRetryMode(attempts int, err error) (
 	backoffType backoff.Backoff,
 	isRetriableErr bool,
 ) {
-	return r.checkErrRetryModeLogic(false, attempts, err)
-}
-
-func (r *readerReconnector) checkErrRetryModeLogic(preCheck bool, attempts int, err error) (
-	backoffType backoff.Backoff,
-	isRetriableErr bool,
-) {
-	isRetriableErr = true
-	if r.retrySettings.CheckError != nil {
-		switch decision := r.retrySettings.CheckError(topic.NewCheckRetryArgs(preCheck, attempts, err)); decision {
-		case topic.PublicRetryDecisionDefault:
-			isRetriableErr = topic.IsRetryableError(err)
-		case topic.PublicRetryDecisionRetry:
-			isRetriableErr = true
-		case topic.PublicRetryDecisionStop:
-			isRetriableErr = false
-		default:
-			panic(fmt.Errorf("unexpected retry decision: %v", decision))
-		}
-	}
-	if !isRetriableErr {
-		return nil, false
-	}
-	if preCheck {
-		return nil, true
-	}
-
-	if retry.Check(err).BackoffType() == backoff.TypeFast {
-		return backoff.Fast, true
-	}
-
-	return backoff.Slow, true
+	return topic.CheckRetryMode(err, false, attempts, r.retrySettings.CheckError)
 }
 
 func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err error) {

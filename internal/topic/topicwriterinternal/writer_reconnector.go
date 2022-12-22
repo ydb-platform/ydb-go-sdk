@@ -15,7 +15,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
@@ -104,7 +103,8 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 }
 
 type WriterReconnector struct {
-	cfg WriterReconnectorConfig
+	cfg           WriterReconnectorConfig
+	retrySettings topic.RetrySettings
 
 	semaphore                      *semaphore.Weighted
 	queue                          messageQueue
@@ -337,8 +337,8 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		streamCtxCancel(xerrors.WithStackTrace(errCloseWriterReconnectorConnectionLoop))
 	}()
 
-	var prevConnectionError error
-	var prevConnectionTime time.Time
+	var reconnectReason error
+	var prevAttemptTime time.Time
 
 	for {
 		if ctx.Err() != nil {
@@ -348,54 +348,61 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		streamCtxCancel(xerrors.WithStackTrace(errCloseWriterReconnectorReconnect))
 		streamCtx, streamCtxCancel = createStreamContext()
 
-		attempt++
+		now := time.Now()
+		if topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
+			attempt = 0
+		} else {
+			attempt++
+		}
+		prevAttemptTime = now
 
-		// delay if reconnect
-		if attempt > 1 {
-			delay := backoff.Fast.Delay(attempt - 2)
-			select {
-			case <-doneCtx:
+		if reconnectReason != nil {
+			if backoff, retry := topic.CheckRetryMode(reconnectReason, false, attempt, w.retrySettings.CheckError); retry {
+				delay := backoff.Delay(attempt)
+				select {
+				case <-doneCtx:
+					return
+				case <-w.clock.After(delay):
+					// pass
+				}
+			} else {
+				_ = w.close(ctx, reconnectReason)
 				return
-			case <-w.clock.After(delay):
-				// pass
 			}
 		}
 
-		traceOnDone := trace.TopicOnWriterReconnect(
-			w.cfg.tracer,
-			w.writerInstanceID,
-			w.cfg.topic,
-			w.cfg.producerID,
-			attempt,
-		)
-
-		stream, trackedErr := w.connectWithTimeout(streamCtx)
-		traceOnDone(trackedErr)
-
-		var writer *SingleStreamWriter
-		if trackedErr == nil {
-			attempt = 0
-			w.queue.ResetSentProgress()
-			writer, trackedErr = NewSingleStreamWriter(ctx, w.createWriterStreamConfig(stream))
+		writer, err := w.startWriteStream(ctx, streamCtx, attempt)
+		w.onWriterChange(writer)
+		if err == nil {
+			reconnectReason = writer.WaitClose(ctx)
+		} else {
+			reconnectReason = err
 		}
-		if trackedErr == nil {
-			w.onWriterChange(writer)
-			trackedErr = writer.CloseWait(ctx)
-		}
-		w.onWriterChange(nil)
-
-		if !w.isRetriableErr(trackedErr) {
-			closeCtx, cancel := context.WithCancel(ctx)
-			cancel()
-			_ = w.close(closeCtx, trackedErr)
-			return
-		}
-		// next iteration
 	}
 }
 
-func (w *WriterReconnector) isRetriableErr(err error) bool {
-	return topic.IsRetryableError(err)
+func (w *WriterReconnector) startWriteStream(ctx context.Context, streamCtx context.Context, attempt int) (
+	writer *SingleStreamWriter,
+	err error,
+) {
+	traceOnDone := trace.TopicOnWriterReconnect(
+		w.cfg.tracer,
+		w.writerInstanceID,
+		w.cfg.topic,
+		w.cfg.producerID,
+		attempt,
+	)
+	defer func() {
+		traceOnDone(err)
+	}()
+
+	stream, err := w.connectWithTimeout(streamCtx)
+	if err != nil {
+		return nil, err
+	}
+
+	w.queue.ResetSentProgress()
+	return NewSingleStreamWriter(ctx, w.createWriterStreamConfig(stream))
 }
 
 func (w *WriterReconnector) needReceiveLastSeqNo() bool {
