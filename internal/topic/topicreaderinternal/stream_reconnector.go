@@ -169,15 +169,12 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 	attempt := 0
 	for {
 		now := r.clock.Now()
-		sinceLastTime := now.Sub(lastTime)
-		lastTime = now
-
-		const resetAttemptEmpiricalCoefficient = 10
-		if sinceLastTime > r.connectTimeout*resetAttemptEmpiricalCoefficient {
+		if topic.CheckResetReconnectionCounters(lastTime, now, r.connectTimeout) {
 			attempt = 0
 		} else {
 			attempt++
 		}
+		lastTime = now
 
 		var request reconnectRequest
 		select {

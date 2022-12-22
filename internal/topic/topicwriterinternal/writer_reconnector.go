@@ -337,6 +337,9 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		streamCtxCancel(xerrors.WithStackTrace(errCloseWriterReconnectorConnectionLoop))
 	}()
 
+	var prevConnectionError error
+	var prevConnectionTime time.Time
+
 	for {
 		if ctx.Err() != nil {
 			return
