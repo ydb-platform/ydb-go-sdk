@@ -64,8 +64,8 @@ var errsToCheck = []struct {
 		},
 	},
 	{
-		//nolint:staticcheck
-		// ignore SA1019
+		//nolint:nolintlint
+		//nolint:staticcheck // ignore SA1019
 		err:           xerrors.FromGRPCError(grpc.ErrClientConnClosing),
 		backoff:       backoff.TypeFast,
 		deleteSession: true,
