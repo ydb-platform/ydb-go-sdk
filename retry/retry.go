@@ -5,6 +5,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wait"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -111,7 +112,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 	for _, o := range opts {
 		o(options)
 	}
-	ctx = xerrors.WithIdempotent(ctx, options.idempotent)
+	ctx = xcontext.WithIdempotent(ctx, options.idempotent)
 	defer func() {
 		if err != nil && options.stackTrace {
 			err = xerrors.WithStackTrace(

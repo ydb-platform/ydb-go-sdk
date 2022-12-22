@@ -112,7 +112,7 @@ func (e *operationError) Type() Type {
 	case Ydb.StatusIds_UNDETERMINED:
 		return TypeConditionallyRetryable
 	default:
-		return TypeNonRetryable
+		return TypeUndefined
 	}
 }
 

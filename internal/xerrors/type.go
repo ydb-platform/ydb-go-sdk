@@ -6,7 +6,8 @@ import "fmt"
 type Type uint8
 
 const (
-	TypeNoError = Type(iota)
+	TypeUndefined = Type(iota)
+	TypeNoError
 	TypeNonRetryable
 	TypeConditionallyRetryable
 	TypeRetryable
@@ -14,6 +15,8 @@ const (
 
 func (t Type) String() string {
 	switch t {
+	case TypeUndefined:
+		return "undefined"
 	case TypeNoError:
 		return "no error"
 	case TypeNonRetryable:

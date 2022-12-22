@@ -15,7 +15,10 @@ type retryMode struct {
 
 func (m retryMode) MustRetry(isOperationIdempotent bool) bool {
 	switch m.errType {
-	case xerrors.TypeNoError, xerrors.TypeNonRetryable:
+	case
+		xerrors.TypeUndefined,
+		xerrors.TypeNoError,
+		xerrors.TypeNonRetryable:
 		return false
 	case xerrors.TypeConditionallyRetryable:
 		return isOperationIdempotent

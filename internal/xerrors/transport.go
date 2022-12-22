@@ -115,7 +115,7 @@ func (e *transportError) Type() Type {
 		grpcCodes.Unavailable:
 		return TypeConditionallyRetryable
 	default:
-		return TypeNonRetryable
+		return TypeUndefined
 	}
 }
 
