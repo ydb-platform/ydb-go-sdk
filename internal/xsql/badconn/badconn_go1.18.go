@@ -23,6 +23,7 @@ func (e Error) Error() string {
 
 func (e Error) Is(err error) bool {
 	//nolint:errorlint
+	//nolint:nolilint
 	if err == driver.ErrBadConn {
 		return true
 	}
