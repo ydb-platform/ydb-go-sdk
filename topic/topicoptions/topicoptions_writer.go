@@ -24,6 +24,20 @@ func WithWriterAddEncoder(codec topictypes.Codec, f CreateEncoderFunc) WriterOpt
 	return topicwriterinternal.WithAddEncoder(rawtopiccommon.Codec(codec), f)
 }
 
+// WithWriterCheckRetryErrorFunction can override default error retry policy
+// use CheckErrorRetryDecisionDefault for use default behavior for the error
+// callback func must be fast and deterministic: always result same result for same error - it can be called
+// few times for every error
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func WithWriterCheckRetryErrorFunction(callback CheckErrorRetryFunction) WriterOption {
+	return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
+		cfg.RetrySettings.CheckError = callback
+	}
+}
+
 // WithWriterCompressorCount set max count of goroutine for compress messages
 // must be more zero
 //
@@ -161,6 +175,17 @@ func WithWriterSetAutoSeqNo(val bool) WriterOption {
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithWriterSetAutoCreatedAt(val bool) WriterOption {
 	return topicwriterinternal.WithAutosetCreatedTime(val)
+}
+
+// WithWriterStartTimeout mean timeout for connect to writer stream and work some time without errors
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func WithWriterStartTimeout(timeout time.Duration) WriterOption {
+	return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
+		cfg.RetrySettings.StartTimeout = timeout
+	}
 }
 
 // WithWriterTrace

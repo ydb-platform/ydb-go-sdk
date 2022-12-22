@@ -54,6 +54,7 @@ type readerReconnector struct {
 func newReaderReconnector(
 	connector readerConnectFunc,
 	connectTimeout time.Duration,
+	retrySettings topic.RetrySettings,
 	tracer trace.Topic,
 	baseContext context.Context,
 ) *readerReconnector {
@@ -64,6 +65,7 @@ func newReaderReconnector(
 		connectTimeout: connectTimeout,
 		tracer:         tracer,
 		baseContext:    baseContext,
+		retrySettings:  retrySettings,
 	}
 	if res.connectTimeout == 0 {
 		res.connectTimeout = value.InfiniteDuration
@@ -164,12 +166,14 @@ func (r *readerReconnector) initChannelsAndClock() {
 func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 	defer r.handlePanic()
 
+	var retriesStarted time.Time
 	lastTime := time.Time{}
 	attempt := 0
 	for {
 		now := r.clock.Now()
 		if topic.CheckResetReconnectionCounters(lastTime, now, r.connectTimeout) {
 			attempt = 0
+			retriesStarted = time.Now()
 		} else {
 			attempt++
 		}
@@ -181,17 +185,24 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 			return
 
 		case request = <-r.reconnectFromBadStream:
-			// pass
+			if retriesStarted.IsZero() {
+				retriesStarted = time.Now()
+			}
 		}
 
-		if backoff, isRetriableErr := r.checkErrRetryMode(attempt, request.reason); request.reason != nil && isRetriableErr {
-			delay := backoff.Delay(attempt)
+		if request.reason != nil {
+			if retryBackoff, isRetriableErr := r.checkErrRetryMode(
+				request.reason,
+				r.clock.Since(retriesStarted),
+			); isRetriableErr {
+				delay := retryBackoff.Delay(attempt)
 
-			select {
-			case <-ctx.Done():
-				return
-			case <-r.clock.After(delay):
-				// pass
+				select {
+				case <-ctx.Done():
+					return
+				case <-r.clock.After(delay):
+					// pass
+				}
 			}
 		}
 
@@ -253,15 +264,15 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 }
 
 func (r *readerReconnector) isRetriableError(err error) bool {
-	_, res := topic.CheckRetryMode(err, true, 0, r.retrySettings.CheckError)
+	_, res := topic.CheckRetryMode(err, r.retrySettings, 0)
 	return res
 }
 
-func (r *readerReconnector) checkErrRetryMode(attempts int, err error) (
+func (r *readerReconnector) checkErrRetryMode(err error, retriesDuration time.Duration) (
 	backoffType backoff.Backoff,
 	isRetriableErr bool,
 ) {
-	return topic.CheckRetryMode(err, false, attempts, r.retrySettings.CheckError)
+	return topic.CheckRetryMode(err, r.retrySettings, retriesDuration)
 }
 
 func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err error) {

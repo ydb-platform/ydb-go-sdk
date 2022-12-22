@@ -60,6 +60,7 @@ type WriterReconnectorConfig struct {
 	AutoSetSeqNo                 bool
 	AutoSetCreatedTime           bool
 	OnWriterInitResponseCallback PublicOnWriterInitResponseCallback
+	RetrySettings                topic.RetrySettings
 
 	connectTimeout time.Duration
 }
@@ -83,6 +84,9 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		AutoSetCreatedTime: true,
 		MaxMessageSize:     50 * 1024 * 1024,
 		MaxQueueLen:        1000,
+		RetrySettings: topic.RetrySettings{
+			StartTimeout: topic.DefaultConnectionTimeout,
+		},
 	}
 	if cfg.compressorCount == 0 {
 		cfg.compressorCount = 1
@@ -339,6 +343,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 
 	var reconnectReason error
 	var prevAttemptTime time.Time
+	var startOfRetries time.Time
 
 	for {
 		if ctx.Err() != nil {
@@ -351,13 +356,14 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		now := time.Now()
 		if topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
 			attempt = 0
+			startOfRetries = time.Now()
 		} else {
 			attempt++
 		}
 		prevAttemptTime = now
 
 		if reconnectReason != nil {
-			if backoff, retry := topic.CheckRetryMode(reconnectReason, false, attempt, w.retrySettings.CheckError); retry {
+			if backoff, retry := topic.CheckRetryMode(reconnectReason, w.retrySettings, w.clock.Since(startOfRetries)); retry {
 				delay := backoff.Delay(attempt)
 				select {
 				case <-doneCtx:
@@ -375,6 +381,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		w.onWriterChange(writer)
 		if err == nil {
 			reconnectReason = writer.WaitClose(ctx)
+			startOfRetries = time.Now()
 		} else {
 			reconnectReason = err
 		}

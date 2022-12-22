@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clone"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -88,7 +88,13 @@ func NewReader(
 	}
 
 	res := Reader{
-		reader:             newReaderReconnector(readerConnector, cfg.OperationTimeout(), cfg.Tracer, cfg.BaseContext),
+		reader: newReaderReconnector(
+			readerConnector,
+			cfg.OperationTimeout(),
+			cfg.RetrySettings,
+			cfg.Tracer,
+			cfg.BaseContext,
+		),
 		defaultBatchConfig: cfg.DefaultBatchConfig,
 		tracer:             cfg.Tracer,
 	}
@@ -178,10 +184,9 @@ func (r *Reader) CommitRanges(ctx context.Context, ranges []PublicCommitRange) e
 type ReaderConfig struct {
 	config.Common
 
+	RetrySettings      topic.RetrySettings
 	DefaultBatchConfig ReadMessageBatchOptions
 	topicStreamReaderConfig
-
-	reconnectionBackoff backoff.Backoff
 }
 
 // PublicReaderOption
@@ -213,7 +218,6 @@ func convertNewParamsToStreamConfig(
 ) (cfg ReaderConfig) {
 	cfg.topicStreamReaderConfig = newTopicStreamReaderConfig()
 	cfg.Consumer = consumer
-	cfg.reconnectionBackoff = backoff.Fast
 
 	// make own copy, for prevent changing internal states if readSelectors will change outside
 	cfg.ReadSelectors = make([]PublicReadSelector, len(readSelectors))

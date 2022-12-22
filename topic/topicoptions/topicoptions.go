@@ -5,7 +5,20 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
+)
+
+type (
+	CheckErrorRetryFunction = topic.PublicCheckErrorRetryFunction
+	CheckErrorRetryArgs     = topic.PublicCheckErrorRetryArgs
+	CheckErrorRetryResult   = topic.PublicCheckRetryResult
+)
+
+var (
+	CheckErrorRetryDecisionDefault = topic.PublicRetryDecisionDefault // Apply default behavior for the error
+	CheckErrorRetryDecisionRetry   = topic.PublicRetryDecisionRetry   // Do once more retry
+	CheckErrorRetryDecisionStop    = topic.PublicRetryDecisionStop    // Do not retry
 )
 
 type withMeteringMode topictypes.MeteringMode
