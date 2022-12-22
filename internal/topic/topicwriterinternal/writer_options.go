@@ -125,6 +125,12 @@ func WithSessionMeta(meta map[string]string) PublicWriterOption {
 	}
 }
 
+func WithStartTimeout(timeout time.Duration) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.RetrySettings.StartTimeout = timeout
+	}
+}
+
 func WithWaitAckOnWrite(val bool) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.WaitServerAck = val

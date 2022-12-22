@@ -360,7 +360,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		require.ErrorIs(t, w.background.CloseReason(), testErr)
 	})
 
-	t.Run("ReconnectOnErrors", func(t *testing.T) {
+	xtest.TestManyTimesWithName(t, "ReconnectOnErrors", func(t testing.TB) {
 		ctx := xtest.Context(t)
 
 		w := newTestWriterStopped()
@@ -400,10 +400,6 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		}
 
 		strm2InitSent := make(empty.Chan)
-		go func() {
-			err := w.Write(ctx, newTestMessages(1))
-			require.NoError(t, err)
-		}()
 
 		strm2 := newStream("strm2", func() {
 			close(strm2InitSent)
@@ -446,7 +442,16 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			return res.stream, res.connectionError
 		}
 
-		w.connectionLoop(ctx)
+		connectionLoopStopped := make(empty.Chan)
+		go func() {
+			defer close(connectionLoopStopped)
+			w.connectionLoop(ctx)
+		}()
+
+		err := w.Write(ctx, newTestMessages(1))
+		require.NoError(t, err)
+
+		xtest.WaitChannelClosed(t, connectionLoopStopped)
 	})
 }
 
@@ -774,6 +779,7 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 	require.NoError(t, res.writer.waitFirstInitResponse(res.ctx))
 
 	t.Cleanup(func() {
+		res.writer.close(context.Background(), errors.New("stop writer test environment"))
 		close(res.stopReadEvents)
 		<-streamClosed
 	})

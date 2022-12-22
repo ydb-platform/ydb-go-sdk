@@ -103,7 +103,7 @@ func (w *SingleStreamWriter) close(ctx context.Context, reason error) error {
 	return resErr
 }
 
-func (w *SingleStreamWriter) CloseWait(ctx context.Context) error {
+func (w *SingleStreamWriter) WaitClose(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
