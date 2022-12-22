@@ -12,8 +12,8 @@ jobs:
       cancel-in-progress: true
     strategy:
       matrix:
-        go-version: [1.16.x, 1.18.x, 1.19.x]
-        os: [ubuntu-latest, windows-latest, macOS-latest]
+        go-version: [1.16.x, 1.19.x]
+        os: [ubuntu-latest]
     env:
       OS: ${{ matrix.os }}
       GO: ${{ matrix.go-version }}
@@ -39,8 +39,8 @@ jobs:
       cancel-in-progress: true
     strategy:
       matrix:
-        go-version: [1.16.x, 1.18.x, 1.19.x]
-        os: [ubuntu-latest]
+        go-version: [1.16.x, 1.19.x]
+        os: [ubuntu-latest, windows-latest, macOS-latest]
     services:
       ydb:
         image: amyasnikov/ydb:latest
@@ -51,7 +51,7 @@ jobs:
         volumes:
           - /tmp/ydb_certs:/ydb_certs
         env:
-          YDB_DEFAULT_LOG_LEVEL: INFO
+          YDB_DEFAULT_LOG_LEVEL: 4
           YDB_USE_IN_MEMORY_PDISKS: true
         options: '-h localhost'
     env:
