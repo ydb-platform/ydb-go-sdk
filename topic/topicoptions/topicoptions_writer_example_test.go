@@ -2,7 +2,6 @@ package topicoptions_test
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 )
 
@@ -12,7 +11,7 @@ func ExampleWithWriterCheckRetryErrorFunction() {
 		"",
 		"",
 		topicoptions.WithWriterCheckRetryErrorFunction(
-			func(errInfo topic.PublicCheckErrorRetryArgs) topic.PublicCheckRetryResult {
+			func(errInfo topicoptions.CheckErrorRetryArgs) topicoptions.CheckErrorRetryResult {
 				// Retry for all transport errors
 				if ydb.IsTransportError(errInfo.Error) {
 					return topicoptions.CheckErrorRetryDecisionRetry
