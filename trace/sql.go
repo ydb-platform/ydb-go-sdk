@@ -2,7 +2,10 @@ package trace
 
 //go:generate gtrace
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type (
 	// DatabaseSQL specified trace of `database/sql` call activity.
@@ -84,6 +87,7 @@ type (
 		Query      string
 		Mode       string
 		Idempotent bool
+		IdleTime   time.Duration
 	}
 	DatabaseSQLConnQueryDoneInfo struct {
 		Error error
@@ -97,6 +101,7 @@ type (
 		Query      string
 		Mode       string
 		Idempotent bool
+		IdleTime   time.Duration
 	}
 	DatabaseSQLConnExecDoneInfo struct {
 		Error error
