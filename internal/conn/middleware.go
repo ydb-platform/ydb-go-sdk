@@ -9,8 +9,8 @@ import (
 var _ grpc.ClientConnInterface = (*middleware)(nil)
 
 type (
-	invoker  func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
-	streamer func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
+	invoker  func(context.Context, string, interface{}, interface{}, ...grpc.CallOption) error
+	streamer func(context.Context, *grpc.StreamDesc, string, ...grpc.CallOption) (grpc.ClientStream, error)
 )
 
 type middleware struct {
@@ -39,7 +39,9 @@ func WithContextModifier(
 			ctx = modifyCtx(ctx)
 			return cc.Invoke(ctx, method, args, reply, opts...)
 		},
-		newStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+		newStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (
+			grpc.ClientStream, error,
+		) {
 			ctx = modifyCtx(ctx)
 			return cc.NewStream(ctx, desc, method, opts...)
 		},
@@ -52,7 +54,9 @@ func WithAppendOptions(cc grpc.ClientConnInterface, appendOpts ...grpc.CallOptio
 			opts = append(opts, appendOpts...)
 			return cc.Invoke(ctx, method, args, reply, opts...)
 		},
-		newStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+		newStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (
+			grpc.ClientStream, error,
+		) {
 			opts = append(opts, appendOpts...)
 			return cc.NewStream(ctx, desc, method, opts...)
 		},
@@ -68,7 +72,9 @@ func WithBeforeFunc(
 			before()
 			return cc.Invoke(ctx, method, args, reply, opts...)
 		},
-		newStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+		newStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (
+			grpc.ClientStream, error,
+		) {
 			before()
 			return cc.NewStream(ctx, desc, method, opts...)
 		},
@@ -84,7 +90,9 @@ func WithAfterFunc(
 			defer after()
 			return cc.Invoke(ctx, method, args, reply, opts...)
 		},
-		newStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+		newStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (
+			grpc.ClientStream, error,
+		) {
 			defer after()
 			return cc.NewStream(ctx, desc, method, opts...)
 		},
