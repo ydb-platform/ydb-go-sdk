@@ -174,11 +174,12 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context     *context.Context
-		Session     tableSessionInfo
-		Tx          tableTransactionInfo
-		Query       tableDataQuery
-		Parameters  tableQueryParameters
+		Context    *context.Context
+		Session    tableSessionInfo
+		Tx         tableTransactionInfo
+		Query      tableDataQuery
+		Parameters tableQueryParameters
+		// Deprecated: has no effect (always false). See KeepInCache flag in underlying Execute query trace
 		KeepInCache bool
 	}
 	TableTransactionExecuteStatementStartInfo struct {
@@ -186,10 +187,11 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context    *context.Context
-		Session    tableSessionInfo
-		Tx         tableTransactionInfo
-		Parameters tableQueryParameters
+		Context        *context.Context
+		Session        tableSessionInfo
+		Tx             tableTransactionInfo
+		StatementQuery tableDataQuery
+		Parameters     tableQueryParameters
 	}
 	TableExplainQueryStartInfo struct {
 		// Context make available context in trace callback function.

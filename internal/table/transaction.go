@@ -18,16 +18,14 @@ import (
 )
 
 var (
-	errTxInvalidatedWithCommit = xerrors.Wrap(fmt.Errorf("transaction invalidated from WithCommit() call"))
-	errTxAlreadyCommitted      = xerrors.Wrap(fmt.Errorf("transaction already committed"))
-	errTxRollbackedEarly       = xerrors.Wrap(fmt.Errorf("transaction rollbacked early"))
+	errTxAlreadyCommitted = xerrors.Wrap(fmt.Errorf("transaction already committed"))
+	errTxRollbackedEarly  = xerrors.Wrap(fmt.Errorf("transaction rollbacked early"))
 )
 
 type txState int32
 
 const (
 	txStateInitialized = iota
-	txStateInvalidatedWithCommit
 	txStateCommitted
 	txStateRollbacked
 )
@@ -49,48 +47,30 @@ func (tx *transaction) Execute(
 	query string, params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
+	onDone := trace.TableOnSessionTransactionExecute(
+		tx.s.config.Trace(), &ctx, tx.s, tx, queryFromText(query), params, false,
+	)
+	defer func() {
+		onDone(r, err)
+	}()
+
 	switch txState(atomic.LoadInt32((*int32)(&tx.state))) {
-	case txStateInvalidatedWithCommit:
-		return nil, xerrors.WithStackTrace(errTxInvalidatedWithCommit)
 	case txStateCommitted:
 		return nil, xerrors.WithStackTrace(errTxAlreadyCommitted)
 	case txStateRollbacked:
 		return nil, xerrors.WithStackTrace(errTxRollbackedEarly)
 	default:
-	}
-	var (
-		a          = allocator.New()
-		q          = queryFromText(query)
-		optsResult options.ExecuteDataQueryDesc
-	)
-	defer a.Free()
+		_, r, err = tx.s.Execute(ctx, tx.control, query, params, opts...)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
 
-	if params == nil {
-		params = table.NewQueryParameters()
-	}
+		if tx.control.Desc().CommitTx {
+			atomic.StoreInt32((*int32)(&tx.state), txStateCommitted)
+		}
 
-	for _, f := range opts {
-		f(&optsResult, a)
+		return r, nil
 	}
-
-	onDone := trace.TableOnSessionTransactionExecute(
-		tx.s.config.Trace(),
-		&ctx,
-		tx.s,
-		tx,
-		q,
-		params,
-		optsResult.QueryCachePolicy.GetKeepInCache(),
-	)
-	defer func() {
-		onDone(r, err)
-	}()
-	_, r, err = tx.s.Execute(ctx, tx.control, query, params, opts...)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	return r, nil
 }
 
 // ExecuteStatement executes prepared statement stmt within transaction tx.
@@ -99,15 +79,6 @@ func (tx *transaction) ExecuteStatement(
 	stmt table.Statement, params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
-	switch txState(atomic.LoadInt32((*int32)(&tx.state))) {
-	case txStateInvalidatedWithCommit:
-		return nil, xerrors.WithStackTrace(errTxInvalidatedWithCommit)
-	case txStateCommitted:
-		return nil, xerrors.WithStackTrace(errTxAlreadyCommitted)
-	case txStateRollbacked:
-		return nil, xerrors.WithStackTrace(errTxRollbackedEarly)
-	default:
-	}
 	if params == nil {
 		params = table.NewQueryParameters()
 	}
@@ -126,29 +97,29 @@ func (tx *transaction) ExecuteStatement(
 		&ctx,
 		tx.s,
 		tx,
+		stmt.(*statement).query,
 		params,
 	)
 	defer func() {
 		onDone(r, err)
 	}()
 
-	_, r, err = stmt.Execute(ctx, tx.control, params, opts...)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
+	switch txState(atomic.LoadInt32((*int32)(&tx.state))) {
+	case txStateCommitted:
+		return nil, xerrors.WithStackTrace(errTxAlreadyCommitted)
+	case txStateRollbacked:
+		return nil, xerrors.WithStackTrace(errTxRollbackedEarly)
+	default:
+		_, r, err = stmt.Execute(ctx, tx.control, params, opts...)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
 
-	return r, nil
-}
+		if tx.control.Desc().CommitTx {
+			atomic.StoreInt32((*int32)(&tx.state), txStateCommitted)
+		}
 
-func (tx *transaction) WithCommit() table.TransactionActor {
-	defer func() {
-		atomic.StoreInt32((*int32)(&tx.state), txStateInvalidatedWithCommit)
-	}()
-	return &transaction{
-		id:      tx.id,
-		s:       tx.s,
-		control: table.TxControl(table.WithTxID(tx.id), table.CommitTx()),
-		state:   txState(atomic.LoadInt32((*int32)(&tx.state))),
+		return r, nil
 	}
 }
 
@@ -157,20 +128,6 @@ func (tx *transaction) CommitTx(
 	ctx context.Context,
 	opts ...options.CommitTransactionOption,
 ) (r result.Result, err error) {
-	switch txState(atomic.LoadInt32((*int32)(&tx.state))) {
-	case txStateInvalidatedWithCommit:
-		return nil, xerrors.WithStackTrace(errTxInvalidatedWithCommit)
-	case txStateCommitted:
-		return nil, xerrors.WithStackTrace(errTxAlreadyCommitted)
-	case txStateRollbacked:
-		return nil, xerrors.WithStackTrace(errTxRollbackedEarly)
-	default:
-		defer func() {
-			if err == nil {
-				atomic.StoreInt32((*int32)(&tx.state), txStateCommitted)
-			}
-		}()
-	}
 	onDone := trace.TableOnSessionTransactionCommit(
 		tx.s.config.Trace(),
 		&ctx,
@@ -180,56 +137,54 @@ func (tx *transaction) CommitTx(
 	defer func() {
 		onDone(err)
 	}()
-	var (
-		request = &Ydb_Table.CommitTransactionRequest{
-			SessionId: tx.s.id,
-			TxId:      tx.id,
-			OperationParams: operation.Params(
-				ctx,
-				tx.s.config.OperationTimeout(),
-				tx.s.config.OperationCancelAfter(),
-				operation.ModeSync,
-			),
+
+	switch txState(atomic.LoadInt32((*int32)(&tx.state))) {
+	case txStateCommitted:
+		return nil, xerrors.WithStackTrace(errTxAlreadyCommitted)
+	case txStateRollbacked:
+		return nil, xerrors.WithStackTrace(errTxRollbackedEarly)
+	default:
+		var (
+			request = &Ydb_Table.CommitTransactionRequest{
+				SessionId: tx.s.id,
+				TxId:      tx.id,
+				OperationParams: operation.Params(
+					ctx,
+					tx.s.config.OperationTimeout(),
+					tx.s.config.OperationCancelAfter(),
+					operation.ModeSync,
+				),
+			}
+			response *Ydb_Table.CommitTransactionResponse
+			result   = new(Ydb_Table.CommitTransactionResult)
+		)
+
+		for _, opt := range opts {
+			opt((*options.CommitTransactionDesc)(request))
 		}
-		response *Ydb_Table.CommitTransactionResponse
-		result   = new(Ydb_Table.CommitTransactionResult)
-	)
 
-	for _, opt := range opts {
-		opt((*options.CommitTransactionDesc)(request))
-	}
+		response, err = tx.s.tableService.CommitTransaction(ctx, request)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
 
-	response, err = tx.s.tableService.CommitTransaction(ctx, request)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		err = response.GetOperation().GetResult().UnmarshalTo(result)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		atomic.StoreInt32((*int32)(&tx.state), txStateCommitted)
+
+		return scanner.NewUnary(
+			nil,
+			result.GetQueryStats(),
+			scanner.WithIgnoreTruncated(tx.s.config.IgnoreTruncated()),
+		), nil
 	}
-	err = response.GetOperation().GetResult().UnmarshalTo(result)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-	return scanner.NewUnary(
-		nil,
-		result.GetQueryStats(),
-		scanner.WithIgnoreTruncated(tx.s.config.IgnoreTruncated()),
-	), nil
 }
 
 // Rollback performs a rollback of the specified active transaction.
 func (tx *transaction) Rollback(ctx context.Context) (err error) {
-	switch txState(atomic.LoadInt32((*int32)(&tx.state))) {
-	case txStateInvalidatedWithCommit:
-		return xerrors.WithStackTrace(errTxInvalidatedWithCommit)
-	case txStateCommitted:
-		return xerrors.WithStackTrace(errTxAlreadyCommitted)
-	case txStateRollbacked:
-		return xerrors.WithStackTrace(errTxRollbackedEarly)
-	default:
-		defer func() {
-			if err == nil {
-				atomic.StoreInt32((*int32)(&tx.state), txStateRollbacked)
-			}
-		}()
-	}
 	onDone := trace.TableOnSessionTransactionRollback(
 		tx.s.config.Trace(),
 		&ctx,
@@ -240,17 +195,30 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 		onDone(err)
 	}()
 
-	_, err = tx.s.tableService.RollbackTransaction(ctx,
-		&Ydb_Table.RollbackTransactionRequest{
-			SessionId: tx.s.id,
-			TxId:      tx.id,
-			OperationParams: operation.Params(
-				ctx,
-				tx.s.config.OperationTimeout(),
-				tx.s.config.OperationCancelAfter(),
-				operation.ModeSync,
-			),
-		},
-	)
-	return xerrors.WithStackTrace(err)
+	switch txState(atomic.LoadInt32((*int32)(&tx.state))) {
+	case txStateCommitted:
+		return nil // nop for committed tx
+	case txStateRollbacked:
+		return xerrors.WithStackTrace(errTxRollbackedEarly)
+	default:
+		_, err = tx.s.tableService.RollbackTransaction(ctx,
+			&Ydb_Table.RollbackTransactionRequest{
+				SessionId: tx.s.id,
+				TxId:      tx.id,
+				OperationParams: operation.Params(
+					ctx,
+					tx.s.config.OperationTimeout(),
+					tx.s.config.OperationCancelAfter(),
+					operation.ModeSync,
+				),
+			},
+		)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		atomic.StoreInt32((*int32)(&tx.state), txStateRollbacked)
+
+		return nil
+	}
 }

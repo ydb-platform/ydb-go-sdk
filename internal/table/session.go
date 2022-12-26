@@ -671,26 +671,31 @@ func (s *session) Execute(
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	return s.executeQueryResult(result, txControl)
+	return s.executeQueryResult(result, request.TxControl)
 }
 
 // executeQueryResult returns Transaction and result built from received
 // result.
-func (s *session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult, txControl *table.TransactionControl) (
+func (s *session) executeQueryResult(
+	res *Ydb_Table.ExecuteQueryResult, txControl *Ydb_Table.TransactionControl,
+) (
 	table.Transaction, result.Result, error,
 ) {
-	t := &transaction{
-		id:      res.GetTxMeta().GetId(),
-		state:   txStateInitialized,
-		s:       s,
-		control: txControl,
+	tx := &transaction{
+		id: res.GetTxMeta().GetId(),
+		s:  s,
 	}
-	r := scanner.NewUnary(
+	if txControl.CommitTx {
+		tx.state = txStateCommitted
+	} else {
+		tx.state = txStateInitialized
+		tx.control = table.TxControl(table.WithTxID(tx.id))
+	}
+	return tx, scanner.NewUnary(
 		res.GetResultSets(),
 		res.GetQueryStats(),
 		scanner.WithIgnoreTruncated(s.config.IgnoreTruncated()),
-	)
-	return t, r, nil
+	), nil
 }
 
 // executeDataQuery executes data query.

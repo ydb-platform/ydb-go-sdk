@@ -63,13 +63,13 @@ func (s *statement) Execute(
 		onDone(txr, true, r, err)
 	}()
 
-	return s.execute(ctx, a, request, txControl)
+	return s.execute(ctx, a, request, request.TxControl)
 }
 
 // execute executes prepared query without any tracing.
 func (s *statement) execute(
 	ctx context.Context, a *allocator.Allocator,
-	request *Ydb_Table.ExecuteDataQueryRequest, txControl *table.TransactionControl,
+	request *Ydb_Table.ExecuteDataQueryRequest, txControl *Ydb_Table.TransactionControl,
 ) (
 	txr table.Transaction, r result.Result, err error,
 ) {
@@ -77,7 +77,6 @@ func (s *statement) execute(
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
-
 	return s.session.executeQueryResult(res, txControl)
 }
 

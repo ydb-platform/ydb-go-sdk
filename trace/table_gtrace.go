@@ -1609,11 +1609,12 @@ func TableOnSessionTransactionExecute(t Table, c *context.Context, session table
 		res(p)
 	}
 }
-func TableOnSessionTransactionExecuteStatement(t Table, c *context.Context, session tableSessionInfo, tx tableTransactionInfo, parameters tableQueryParameters) func(result tableResult, _ error) {
+func TableOnSessionTransactionExecuteStatement(t Table, c *context.Context, session tableSessionInfo, tx tableTransactionInfo, statementQuery tableDataQuery, parameters tableQueryParameters) func(result tableResult, _ error) {
 	var p TableTransactionExecuteStatementStartInfo
 	p.Context = c
 	p.Session = session
 	p.Tx = tx
+	p.StatementQuery = statementQuery
 	p.Parameters = parameters
 	res := t.onSessionTransactionExecuteStatement(p)
 	return func(result tableResult, e error) {

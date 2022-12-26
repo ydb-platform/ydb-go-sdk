@@ -246,9 +246,6 @@ type Transaction interface {
 	Rollback(
 		ctx context.Context,
 	) (err error)
-
-	// WithCommit returns transaction actor which contains auto-commit flag in next Execute[Statement] query
-	WithCommit() TransactionActor
 }
 
 type Statement interface {

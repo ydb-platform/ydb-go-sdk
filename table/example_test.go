@@ -200,7 +200,7 @@ func Example_lazyTransaction() {
 				return err
 			}
 			// close transaction on last execute query
-			res, err = tx.WithCommit().Execute(ctx, "SELECT 2", nil)
+			res, err = tx.Execute(ctx, "SELECT 2", nil, options.WithCommit())
 			if err != nil {
 				return err
 			}
