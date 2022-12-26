@@ -219,10 +219,8 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 	switch txState(atomic.LoadInt32((*int32)(&tx.state))) {
 	case txStateInvalidatedWithCommit:
 		return xerrors.WithStackTrace(errTxInvalidatedWithCommit)
-	case txStateCommitted:
-		return xerrors.WithStackTrace(errTxAlreadyCommitted)
-	case txStateRollbacked:
-		return xerrors.WithStackTrace(errTxRollbackedEarly)
+	case txStateCommitted, txStateRollbacked:
+		return nil
 	default:
 		defer func() {
 			if err == nil {
