@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 // Field represents typed log field (a key-value pair). Adapters should determine
@@ -22,7 +20,7 @@ import (
 //	//...
 //	}
 //
-// Getter methods must not be called on fields with wrong Type (e.g. calling String()logs.$1
+// Getter methods must not be called on fields with wrong Type (e.g. calling String()
 // on fields with Type != StringType).
 // Field must not be initialized directly as a struct literal.
 type Field struct {
@@ -91,64 +89,40 @@ func (f Field) Stringer() fmt.Stringer {
 	return f.vany.(fmt.Stringer)
 }
 
-// Endpoints is a value getter for fields with EndpointsType type
-func (f Field) Endpoints() []trace.EndpointInfo {
-	if f.vany == nil {
-		return nil
-	}
-	return f.vany.([]trace.EndpointInfo)
-}
-
-// Metadata is a value getter for fields with MetadataType type
-func (f Field) Metadata() map[string][]string {
-	if f.vany == nil {
-		return nil
-	}
-	return f.vany.(map[string][]string)
-}
-
 // Fallback returns default string representation of Field value.
 // It should be used by adapters that don't support f.Type directly.
 // Non-nil error indicates some fatal marshaling error and is most
 // likely a sign of invalid Field initialization.
 func (f Field) Fallback() (repr string, err error) {
-	func() {
-		defer func() {
-			if p := recover(); p != nil {
-				if e, ok := p.(error); ok {
-					err = e
-				} else {
-					err = fmt.Errorf("%v", p)
-				}
+	defer func() {
+		if p := recover(); p != nil {
+			if e, ok := p.(error); ok {
+				err = e
+			} else {
+				err = fmt.Errorf("%v", p)
 			}
-		}()
-		switch f.ftype {
-		case IntType:
-			repr = strconv.FormatInt(f.vint, 10)
-		case StringType:
-			repr = f.vstr
-		case BoolType:
-			repr = strconv.FormatBool(f.Bool())
-		case DurationType:
-			repr = f.Duration().String()
-		case StringsType:
-			repr = fmt.Sprintf("%v", f.Strings())
-		case ErrorType:
-			repr = f.Error().Error()
-		case AnyType:
-			repr = fmt.Sprint(f.vany)
-		case NilType:
-			repr = "<nil>"
-		case StringerType:
-			repr = f.Stringer().String()
-		case EndpointsType:
-			repr = fmt.Sprintf("%v", f.Endpoints())
-		case MetadataType:
-			repr = fmt.Sprintf("%v", f.Metadata())
-		default:
-			err = fmt.Errorf("unknown FieldType %d", f.ftype)
 		}
 	}()
+	switch f.ftype {
+	case IntType:
+		repr = strconv.FormatInt(f.vint, 10)
+	case StringType:
+		repr = f.vstr
+	case BoolType:
+		repr = strconv.FormatBool(f.Bool())
+	case DurationType:
+		repr = f.Duration().String()
+	case StringsType:
+		repr = fmt.Sprintf("%v", f.Strings())
+	case ErrorType:
+		repr = f.Error().Error()
+	case AnyType:
+		repr = fmt.Sprint(f.vany)
+	case StringerType:
+		repr = f.Stringer().String()
+	default:
+		err = fmt.Errorf("unknown FieldType %d", f.ftype)
+	}
 	return repr, err
 }
 
@@ -204,10 +178,10 @@ func Strings(key string, value []string) Field {
 }
 
 // NamedError constructs Field with ErrorType. If value is nil,
-// resulting Field will be of NilType instead of ErrorType.
+// resulting Field will be of AnyType instead of ErrorType.
 func NamedError(key string, value error) Field {
 	if value == nil {
-		return nilField(key)
+		return Any(key, nil)
 	}
 	return Field{
 		ftype: ErrorType,
@@ -221,12 +195,8 @@ func Error(value error) Field {
 	return NamedError("error", value)
 }
 
-// Any constructs untyped Field. If value is nil, resulting Field
-// will be of NilType instead of AnyType.
+// Any constructs untyped Field.
 func Any(key string, value interface{}) Field {
-	if value == nil {
-		return nilField(key)
-	}
 	return Field{
 		ftype: AnyType,
 		key:   key,
@@ -234,39 +204,14 @@ func Any(key string, value interface{}) Field {
 	}
 }
 
-func nilField(key string) Field {
-	return Field{
-		ftype: NilType,
-		key:   key,
-	}
-}
-
 // Stringer constructs Field with StringerType. If value is nil,
-// resulting Field will be of NilType instead of StringerType.
+// resulting Field will be of AnyType instead of StringerType.
 func Stringer(key string, value fmt.Stringer) Field {
 	if value == nil {
-		return nilField(key)
+		return Any(key, nil)
 	}
 	return Field{
 		ftype: StringerType,
-		key:   key,
-		vany:  value,
-	}
-}
-
-// Endpoints constructs Field with EndpointsType
-func Endpoints(key string, value []trace.EndpointInfo) Field {
-	return Field{
-		ftype: EndpointsType,
-		key:   key,
-		vany:  value,
-	}
-}
-
-// Metadata constructs Field with MetadataType
-func Metadata(key string, value map[string][]string) Field {
-	return Field{
-		ftype: MetadataType,
 		key:   key,
 		vany:  value,
 	}
@@ -294,15 +239,7 @@ const (
 	// AnyType indicates that the Field is untyped. Adapters should use
 	// reflection-based approached to marshal this field.
 	AnyType
-	// NilType indicates that the Field value is nil. No value getters should
-	// be called on field with such type.
-	NilType
 
 	// StringerType corresponds to fmt.Stringer
 	StringerType
-
-	// EndpointsType corresponds to []trace.EndpointInfo
-	EndpointsType
-	// MetadataType corresponds to map[string][]string
-	MetadataType
 )

@@ -23,7 +23,7 @@ func Discovery(l logs.Logger, details trace.Details) (t trace.Discovery) {
 			if info.Error == nil {
 				ll.Debug("discover done",
 					latency(start),
-					logs.Endpoints("endpoints", info.Endpoints),
+					logs.Stringer("endpoints", endpoints(info.Endpoints)),
 				)
 			} else {
 				ll.Error("discover failed",
