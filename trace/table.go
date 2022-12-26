@@ -2,6 +2,7 @@ package trace
 
 import (
 	"context"
+	"time"
 )
 
 // tool gtrace used from ./internal/cmd/gtrace
@@ -99,6 +100,7 @@ type (
 	tableSessionInfo interface {
 		ID() string
 		Status() string
+		LastUsage() time.Time
 	}
 	tableTransactionInfo interface {
 		ID() string

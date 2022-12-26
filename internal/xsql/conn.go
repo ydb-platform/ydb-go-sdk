@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"sync/atomic"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -56,6 +57,7 @@ type conn struct {
 	session   table.ClosableSession // Immutable and r/o usage.
 
 	closed           uint32
+	lastUsage        int64
 	defaultQueryMode QueryMode
 
 	defaultTxControl *table.TransactionControl
@@ -139,8 +141,16 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt,
 
 func (c *conn) execContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, err error) {
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
-	onDone := trace.DatabaseSQLOnConnExec(c.trace, &ctx, query, m.String(), xcontext.IsIdempotent(ctx))
+	onDone := trace.DatabaseSQLOnConnExec(
+		c.trace,
+		&ctx,
+		query,
+		m.String(),
+		xcontext.IsIdempotent(ctx),
+		time.Since(time.Unix(atomic.LoadInt64(&c.lastUsage), 0)),
+	)
 	defer func() {
+		atomic.StoreInt64(&c.lastUsage, time.Now().Unix())
 		onDone(err)
 	}()
 	switch m {
@@ -214,8 +224,16 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 
 func (c *conn) queryContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, err error) {
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
-	onDone := trace.DatabaseSQLOnConnExec(c.trace, &ctx, query, m.String(), xcontext.IsIdempotent(ctx))
+	onDone := trace.DatabaseSQLOnConnQuery(
+		c.trace,
+		&ctx,
+		query,
+		m.String(),
+		xcontext.IsIdempotent(ctx),
+		time.Since(time.Unix(atomic.LoadInt64(&c.lastUsage), 0)),
+	)
 	defer func() {
+		atomic.StoreInt64(&c.lastUsage, time.Now().Unix())
 		onDone(err)
 	}()
 	switch m {
@@ -349,7 +367,7 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 	return c.currentTx, nil
 }
 
-func (c *conn) ResetSession(ctx context.Context) error {
+func (c *conn) ResetSession(_ context.Context) error {
 	if c.currentTx != nil {
 		_ = c.currentTx.Rollback()
 	}

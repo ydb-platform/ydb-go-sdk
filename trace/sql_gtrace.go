@@ -4,6 +4,7 @@ package trace
 
 import (
 	"context"
+	"time"
 )
 
 // databaseSQLComposeOptions is a holder of options
@@ -858,12 +859,13 @@ func DatabaseSQLOnConnBegin(t DatabaseSQL, c *context.Context) func(tx tableTran
 		res(p)
 	}
 }
-func DatabaseSQLOnConnQuery(t DatabaseSQL, c *context.Context, query string, mode string, idempotent bool) func(error) {
+func DatabaseSQLOnConnQuery(t DatabaseSQL, c *context.Context, query string, mode string, idempotent bool, idleTime time.Duration) func(error) {
 	var p DatabaseSQLConnQueryStartInfo
 	p.Context = c
 	p.Query = query
 	p.Mode = mode
 	p.Idempotent = idempotent
+	p.IdleTime = idleTime
 	res := t.onConnQuery(p)
 	return func(e error) {
 		var p DatabaseSQLConnQueryDoneInfo
@@ -871,12 +873,13 @@ func DatabaseSQLOnConnQuery(t DatabaseSQL, c *context.Context, query string, mod
 		res(p)
 	}
 }
-func DatabaseSQLOnConnExec(t DatabaseSQL, c *context.Context, query string, mode string, idempotent bool) func(error) {
+func DatabaseSQLOnConnExec(t DatabaseSQL, c *context.Context, query string, mode string, idempotent bool, idleTime time.Duration) func(error) {
 	var p DatabaseSQLConnExecStartInfo
 	p.Context = c
 	p.Query = query
 	p.Mode = mode
 	p.Idempotent = idempotent
+	p.IdleTime = idleTime
 	res := t.onConnExec(p)
 	return func(e error) {
 		var p DatabaseSQLConnExecDoneInfo
