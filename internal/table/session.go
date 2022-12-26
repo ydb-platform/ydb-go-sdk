@@ -680,9 +680,10 @@ func (s *session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult, txContro
 	table.Transaction, result.Result, error,
 ) {
 	t := &transaction{
-		id: res.GetTxMeta().GetId(),
-		s:  s,
-		c:  txControl,
+		id:      res.GetTxMeta().GetId(),
+		state:   txStateInitialized,
+		s:       s,
+		control: txControl,
 	}
 	r := scanner.NewUnary(
 		res.GetResultSets(),
@@ -1084,8 +1085,9 @@ func (s *session) BeginTransaction(
 		return
 	}
 	return &transaction{
-		id: result.GetTxMeta().GetId(),
-		s:  s,
-		c:  table.TxControl(table.WithTxID(result.GetTxMeta().GetId())),
+		id:      result.GetTxMeta().GetId(),
+		state:   txStateInitialized,
+		s:       s,
+		control: table.TxControl(table.WithTxID(result.GetTxMeta().GetId())),
 	}, nil
 }
