@@ -1,4 +1,6 @@
-* Added retry policy options for topics: WithReaderCheckRetryErrorFunction, WithReaderStartTimeout, WithWriterCheckRetryErrorFunction, WithWriterStartTimeout
+* Added retry policy options for topics: `topicoptions.With{ReaderCheckRetryErrorFunction,ReaderStartTimeout,WriterCheckRetryErrorFunction,WriterStartTimeout}`
+* Refactored `internal/conn` middlewares for `DRY`
+* Added `trace.tableSessionInfo.LastUsage()` method for get last usage timestamp
 
 ## v3.41.0
 * Added option for set interval of auth token update in topic streams

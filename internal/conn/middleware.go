@@ -6,53 +6,87 @@ import (
 	"google.golang.org/grpc"
 )
 
-type contextModifierMiddleware struct {
-	cc        grpc.ClientConnInterface
-	modifyCtx func(ctx context.Context) context.Context
+var _ grpc.ClientConnInterface = (*middleware)(nil)
+
+type (
+	invoker  func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error
+	streamer func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error)
+)
+
+type middleware struct {
+	invoke    invoker
+	newStream streamer
 }
 
-func (c *contextModifierMiddleware) Invoke(
+func (m *middleware) Invoke(
 	ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption,
 ) error {
-	return c.cc.Invoke(c.modifyCtx(ctx), method, args, reply, opts...)
+	return m.invoke(ctx, method, args, reply, opts...)
 }
 
-func (c *contextModifierMiddleware) NewStream(
+func (m *middleware) NewStream(
 	ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption,
 ) (grpc.ClientStream, error) {
-	return c.cc.NewStream(c.modifyCtx(ctx), desc, method, opts...)
+	return m.newStream(ctx, desc, method, opts...)
 }
 
 func WithContextModifier(
 	cc grpc.ClientConnInterface,
 	modifyCtx func(ctx context.Context) context.Context,
 ) grpc.ClientConnInterface {
-	return &contextModifierMiddleware{
-		cc:        cc,
-		modifyCtx: modifyCtx,
+	return &middleware{
+		invoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+			ctx = modifyCtx(ctx)
+			return cc.Invoke(ctx, method, args, reply, opts...)
+		},
+		newStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+			ctx = modifyCtx(ctx)
+			return cc.NewStream(ctx, desc, method, opts...)
+		},
 	}
 }
 
-type optionsAppenderMiddleware struct {
-	cc   grpc.ClientConnInterface
-	opts []grpc.CallOption
+func WithAppendOptions(cc grpc.ClientConnInterface, appendOpts ...grpc.CallOption) grpc.ClientConnInterface {
+	return &middleware{
+		invoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+			opts = append(opts, appendOpts...)
+			return cc.Invoke(ctx, method, args, reply, opts...)
+		},
+		newStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+			opts = append(opts, appendOpts...)
+			return cc.NewStream(ctx, desc, method, opts...)
+		},
+	}
 }
 
-func (c *optionsAppenderMiddleware) Invoke(
-	ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption,
-) error {
-	return c.cc.Invoke(ctx, method, args, reply, append(opts, c.opts...)...)
+func WithBeforeFunc(
+	cc grpc.ClientConnInterface,
+	before func(),
+) grpc.ClientConnInterface {
+	return &middleware{
+		invoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+			before()
+			return cc.Invoke(ctx, method, args, reply, opts...)
+		},
+		newStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+			before()
+			return cc.NewStream(ctx, desc, method, opts...)
+		},
+	}
 }
 
-func (c *optionsAppenderMiddleware) NewStream(
-	ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption,
-) (grpc.ClientStream, error) {
-	return c.cc.NewStream(ctx, desc, method, append(opts, c.opts...)...)
-}
-
-func WithAppendOptions(cc grpc.ClientConnInterface, opts ...grpc.CallOption) grpc.ClientConnInterface {
-	return &optionsAppenderMiddleware{
-		cc:   cc,
-		opts: opts,
+func WithAfterFunc(
+	cc grpc.ClientConnInterface,
+	after func(),
+) grpc.ClientConnInterface {
+	return &middleware{
+		invoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
+			defer after()
+			return cc.Invoke(ctx, method, args, reply, opts...)
+		},
+		newStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+			defer after()
+			return cc.NewStream(ctx, desc, method, opts...)
+		},
 	}
 }

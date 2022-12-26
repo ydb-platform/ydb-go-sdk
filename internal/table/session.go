@@ -50,9 +50,14 @@ type session struct {
 	status    table.SessionStatus
 	statusMtx sync.RWMutex
 	nodeID    uint32
+	lastUsage int64
 
 	onClose   []func(s *session)
 	closeOnce sync.Once
+}
+
+func (s *session) LastUsage() time.Time {
+	return time.Unix(atomic.LoadInt64(&s.lastUsage), 0)
 }
 
 func nodeID(sessionID string) (uint32, error) {
@@ -137,15 +142,21 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.
 	}
 
 	s = &session{
-		id: result.GetSessionId(),
-		tableService: Ydb_Table_V1.NewTableServiceClient(
-			conn.WithContextModifier(cc, func(ctx context.Context) context.Context {
-				return meta.WithTrailerCallback(balancer.WithEndpoint(ctx, s), s.checkCloseHint)
-			}),
-		),
+		id:     result.GetSessionId(),
 		config: config,
 		status: table.SessionReady,
 	}
+
+	s.tableService = Ydb_Table_V1.NewTableServiceClient(
+		conn.WithBeforeFunc(
+			conn.WithContextModifier(cc, func(ctx context.Context) context.Context {
+				return meta.WithTrailerCallback(balancer.WithEndpoint(ctx, s), s.checkCloseHint)
+			}),
+			func() {
+				atomic.StoreInt64(&s.lastUsage, time.Now().Unix())
+			},
+		),
+	)
 
 	for _, o := range opts {
 		o(s)
