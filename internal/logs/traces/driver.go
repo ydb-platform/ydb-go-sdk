@@ -291,7 +291,7 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 						logs.Stringer("endpoint", endpoint),
 						logs.String("method", method),
 						latency(start),
-						logs.Metadata("metadata", info.Metadata),
+						logs.Stringer("metadata", metadata(info.Metadata)),
 					)
 				} else {
 					ll.Warn("invoke failed",
@@ -299,7 +299,7 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 						logs.String("method", method),
 						latency(start),
 						logs.Error(info.Error),
-						logs.Metadata("metadata", info.Metadata),
+						logs.Stringer("metadata", metadata(info.Metadata)),
 						version(),
 					)
 				}
@@ -341,7 +341,7 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 							logs.Stringer("endpoint", endpoint),
 							logs.String("method", method),
 							latency(start),
-							logs.Metadata("metadata", info.Metadata),
+							logs.Stringer("metadata", metadata(info.Metadata)),
 						)
 					} else {
 						ll.Warn("streaming failed",
@@ -349,7 +349,7 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 							logs.String("method", method),
 							latency(start),
 							logs.Error(info.Error),
-							logs.Metadata("metadata", info.Metadata),
+							logs.Stringer("metadata", metadata(info.Metadata)),
 							version(),
 						)
 					}
@@ -486,7 +486,7 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 				if info.Error == nil {
 					ll.Info("balancer discovery done",
 						latency(start),
-						logs.Endpoints("endpoints", info.Endpoints),
+						logs.Stringer("endpoints", endpoints(info.Endpoints)),
 						logs.String("detectedLocalDC", info.LocalDC),
 					)
 				} else {
