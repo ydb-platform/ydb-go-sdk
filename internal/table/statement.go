@@ -23,7 +23,7 @@ type statement struct {
 
 // Execute executes prepared data query.
 func (s *statement) Execute(
-	ctx context.Context, txControl *table.TransactionControl,
+	ctx context.Context, tx *table.TransactionControl,
 	params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
@@ -36,7 +36,7 @@ func (s *statement) Execute(
 	defer a.Free()
 
 	request.SessionId = s.session.id
-	request.TxControl = txControl.Desc()
+	request.TxControl = tx.Desc()
 	request.Parameters = params.Params().ToYDB(a)
 	request.Query = s.query.toYDB(a)
 	request.QueryCachePolicy = a.TableQueryCachePolicy()
@@ -63,13 +63,12 @@ func (s *statement) Execute(
 		onDone(txr, true, r, err)
 	}()
 
-	return s.execute(ctx, a, request, txControl)
+	return s.execute(ctx, a, request)
 }
 
 // execute executes prepared query without any tracing.
 func (s *statement) execute(
-	ctx context.Context, a *allocator.Allocator,
-	request *Ydb_Table.ExecuteDataQueryRequest, txControl *table.TransactionControl,
+	ctx context.Context, a *allocator.Allocator, request *Ydb_Table.ExecuteDataQueryRequest,
 ) (
 	txr table.Transaction, r result.Result, err error,
 ) {
@@ -78,7 +77,7 @@ func (s *statement) execute(
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	return s.session.executeQueryResult(res, txControl)
+	return s.session.executeQueryResult(res)
 }
 
 func (s *statement) NumInput() int {

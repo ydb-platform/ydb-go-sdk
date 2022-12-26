@@ -118,11 +118,6 @@ func (tx *transaction) ExecuteStatement(
 	return r, nil
 }
 
-func (tx *transaction) WithCommit() table.TransactionActor {
-	tx.c = tx.c.With(table.CommitTx())
-	return tx
-}
-
 // CommitTx commits specified active transaction.
 func (tx *transaction) CommitTx(
 	ctx context.Context,

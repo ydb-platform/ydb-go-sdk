@@ -613,7 +613,7 @@ func (s *session) Prepare(ctx context.Context, queryText string) (_ table.Statem
 // Execute executes given data query represented by text.
 func (s *session) Execute(
 	ctx context.Context,
-	txControl *table.TransactionControl,
+	tx *table.TransactionControl,
 	query string,
 	params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
@@ -628,7 +628,7 @@ func (s *session) Execute(
 	defer a.Free()
 
 	request.SessionId = s.id
-	request.TxControl = txControl.Desc()
+	request.TxControl = tx.Desc()
 	request.Parameters = params.Params().ToYDB(a)
 	request.Query = q.toYDB(a)
 	request.QueryCachePolicy = a.TableQueryCachePolicy()
@@ -660,18 +660,19 @@ func (s *session) Execute(
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	return s.executeQueryResult(result, txControl)
+	return s.executeQueryResult(result)
 }
 
 // executeQueryResult returns Transaction and result built from received
 // result.
-func (s *session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult, txControl *table.TransactionControl) (
-	table.Transaction, result.Result, error,
+func (s *session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (
+	table.Transaction,
+	result.Result,
+	error,
 ) {
 	t := &transaction{
 		id: res.GetTxMeta().GetId(),
 		s:  s,
-		c:  txControl,
 	}
 	r := scanner.NewUnary(
 		res.GetResultSets(),
@@ -1038,7 +1039,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 // settings.
 func (s *session) BeginTransaction(
 	ctx context.Context,
-	txSettings *table.TransactionSettings,
+	tx *table.TransactionSettings,
 ) (x table.Transaction, err error) {
 	var (
 		result   Ydb_Table.BeginTransactionResult
@@ -1056,7 +1057,7 @@ func (s *session) BeginTransaction(
 	response, err = s.tableService.BeginTransaction(ctx,
 		&Ydb_Table.BeginTransactionRequest{
 			SessionId:  s.id,
-			TxSettings: txSettings.Settings(),
+			TxSettings: tx.Settings(),
 			OperationParams: operation.Params(
 				ctx,
 				s.config.OperationTimeout(),
@@ -1075,6 +1076,5 @@ func (s *session) BeginTransaction(
 	return &transaction{
 		id: result.GetTxMeta().GetId(),
 		s:  s,
-		c:  table.TxControl(table.WithTxID(result.GetTxMeta().GetId())),
 	}, nil
 }

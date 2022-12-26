@@ -6,7 +6,7 @@
 * Fixed typo in `topic/README.md`
 * Upgraded `ydb-go-genproto` dependency
 * Fixed duplicating of traces in `table.Client.Do()` call
-* Supported `table.Transaction.WithCommit()` method for execute query and auto-commit after
+* Fixed closing conn on `retry.Do()` call
 * Added `DataColumns` to `table.options.IndexDescription`
 * Added `scheme.EntryColumnStore` and `scheme.EntryColumnColumn` entry types
 * Added `table.options.WithPartitioningBy(columns)` option
