@@ -1,4 +1,4 @@
-* Added retry policy options for topics: WithReaderCheckRetryErrorFunction, WithReaderStartTimeout, WithWriterCheckRetryErrorFunction, WithWriterStartTimeout
+* Added retry policy options for topics: `topic/topicoptions.WithReaderCheckRetryErrorFunction`, `topic/topicoptions.WithReaderStartTimeout`, `topic/topicoptions.WithWriterCheckRetryErrorFunction`, `topic/topicoptions.WithWriterStartTimeout`
 
 ## v3.41.0
 * Added option for set interval of auth token update in topic streams
