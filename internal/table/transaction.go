@@ -47,9 +47,7 @@ func (tx *transaction) Execute(
 	query string, params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
-	onDone := trace.TableOnSessionTransactionExecute(
-		tx.s.config.Trace(), &ctx, tx.s, tx, queryFromText(query), params, false,
-	)
+	onDone := trace.TableOnSessionTransactionExecute(tx.s.config.Trace(), &ctx, tx.s, tx, queryFromText(query), params)
 	defer func() {
 		onDone(r, err)
 	}()

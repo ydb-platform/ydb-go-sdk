@@ -179,8 +179,6 @@ type (
 		Tx         tableTransactionInfo
 		Query      tableDataQuery
 		Parameters tableQueryParameters
-		// Deprecated: has no effect (always false). See KeepInCache flag in underlying Execute query trace
-		KeepInCache bool
 	}
 	TableTransactionExecuteStatementStartInfo struct {
 		// Context make available context in trace callback function.

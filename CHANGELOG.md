@@ -1,7 +1,9 @@
 * Added retry policy options for topics: `topic/topicoptions.WithReaderCheckRetryErrorFunction`, `topic/topicoptions.WithReaderStartTimeout`, `topic/topicoptions.WithWriterCheckRetryErrorFunction`, `topic/topicoptions.WithWriterStartTimeout`
-* Refactored `internal/conn` middlewares for `DRY`
+* Refactored `internal/conn` middlewares
 * Added `trace.tableSessionInfo.LastUsage()` method for get last usage timestamp
-* Fixed mutable behaviour of `tx.WithCommit()`
+* Reverted `tx.WithCommit()` changes for fix unstable behaviour of lazy transactions
+* Added `options.WithCommit()` option for execute query with auto-commit flag
+* Removed `trace.TableTransactionExecuteStartInfo.KeepInCache` field as redundant
 
 ## v3.41.0
 * Added option for set interval of auth token update in topic streams
