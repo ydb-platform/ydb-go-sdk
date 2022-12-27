@@ -127,7 +127,6 @@ linters:
   disable-all: true
   enable:
 #    - cyclop
-    - deadcode
     - depguard
     - dogsled
 #    - dupl
@@ -173,7 +172,6 @@ linters:
     - revive
     - staticcheck
     - stylecheck
-    - structcheck
 #    - tagliatelle
 #    - testpackage
 #    - thelper
@@ -183,7 +181,6 @@ linters:
     - unparam
     - unused
 #    - varnamelen
-    - varcheck
     - whitespace
 #    - wrapcheck
 #    - wsl

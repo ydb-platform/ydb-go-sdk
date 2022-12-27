@@ -1593,14 +1593,13 @@ func TableOnSessionTransactionBegin(t Table, c *context.Context, session tableSe
 		res(p)
 	}
 }
-func TableOnSessionTransactionExecute(t Table, c *context.Context, session tableSessionInfo, tx tableTransactionInfo, query tableDataQuery, parameters tableQueryParameters, keepInCache bool) func(result tableResult, _ error) {
+func TableOnSessionTransactionExecute(t Table, c *context.Context, session tableSessionInfo, tx tableTransactionInfo, query tableDataQuery, parameters tableQueryParameters) func(result tableResult, _ error) {
 	var p TableTransactionExecuteStartInfo
 	p.Context = c
 	p.Session = session
 	p.Tx = tx
 	p.Query = query
 	p.Parameters = parameters
-	p.KeepInCache = keepInCache
 	res := t.onSessionTransactionExecute(p)
 	return func(result tableResult, e error) {
 		var p TableTransactionExecuteDoneInfo
@@ -1609,11 +1608,12 @@ func TableOnSessionTransactionExecute(t Table, c *context.Context, session table
 		res(p)
 	}
 }
-func TableOnSessionTransactionExecuteStatement(t Table, c *context.Context, session tableSessionInfo, tx tableTransactionInfo, parameters tableQueryParameters) func(result tableResult, _ error) {
+func TableOnSessionTransactionExecuteStatement(t Table, c *context.Context, session tableSessionInfo, tx tableTransactionInfo, statementQuery tableDataQuery, parameters tableQueryParameters) func(result tableResult, _ error) {
 	var p TableTransactionExecuteStatementStartInfo
 	p.Context = c
 	p.Session = session
 	p.Tx = tx
+	p.StatementQuery = statementQuery
 	p.Parameters = parameters
 	res := t.onSessionTransactionExecuteStatement(p)
 	return func(result tableResult, e error) {

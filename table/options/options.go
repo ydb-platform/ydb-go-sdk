@@ -767,6 +767,13 @@ func WithKeepInCache(keepInCache bool) ExecuteDataQueryOption {
 	)
 }
 
+// WithCommit appends flag of commit transaction with executing query
+func WithCommit() ExecuteDataQueryOption {
+	return func(desc *ExecuteDataQueryDesc, a *allocator.Allocator) {
+		desc.TxControl.CommitTx = true
+	}
+}
+
 // WithQueryCachePolicyKeepInCache manages keep-in-cache policy
 //
 // Deprecated: data queries always executes with enabled keep-in-cache policy.

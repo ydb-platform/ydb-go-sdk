@@ -435,7 +435,7 @@ func testTable(t testing.TB) {
 	err = db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			// lazy open transaction on first execute query
-			tx, res, err := s.Execute(ctx, table.DefaultTxControl(), "SELECT 1", nil)
+			tx, res, err := s.Execute(ctx, table.SerializableReadWriteTxControl(), "SELECT 1", nil)
 			if err != nil {
 				return err // for auto-retry with driver
 			}
@@ -444,7 +444,7 @@ func testTable(t testing.TB) {
 				return err
 			}
 			// close transaction on last execute query
-			res, err = tx.WithCommit().Execute(ctx, "SELECT 2", nil)
+			res, err = tx.Execute(ctx, "SELECT 2", nil, options.WithCommit())
 			if err != nil {
 				return err
 			}

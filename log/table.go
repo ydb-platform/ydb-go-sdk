@@ -335,12 +335,14 @@ func Table(l Logger, details trace.Details, opts ...option) (t trace.Table) {
 					session := info.Session
 					query := info.Query
 					params := info.Parameters
+					keepInCache := info.KeepInCache
 					if options.logQuery {
-						l.Tracef(`execute start {id:"%s",status:"%s",query:"%s",params:"%s"}`,
+						l.Tracef(`execute start {id:"%s",status:"%s",query:"%s",params:"%s",keepInCache:%v}`,
 							session.ID(),
 							session.Status(),
 							query,
 							params,
+							keepInCache,
 						)
 					} else {
 						l.Tracef(`execute start {id:"%s",status:"%s"}`,
