@@ -189,23 +189,54 @@ func Example_lazyTransaction() {
 	}
 	defer db.Close(ctx)
 	err = db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			// lazy open transaction on first execute query
-			tx, res, err := s.Execute(ctx, table.DefaultTxControl(), "SELECT 1", nil)
+		func(ctx context.Context, session table.Session) (err error) {
+			// execute query with opening lazy transaction
+			tx, result, err := session.Execute(ctx,
+				table.SerializableReadWriteTxControl(),
+				"DECLARE $id AS Uint64; "+
+					"SELECT `title`, `description` FROM `path/to/mytable` WHERE id = $id",
+				table.NewQueryParameters(
+					table.ValueParam("$id", types.Uint64Value(1)),
+				),
+			)
 			if err != nil {
-				return err // for auto-retry with driver
+				panic(err)
 			}
-			defer res.Close() // cleanup resources
-			if err = res.Err(); err != nil {
-				return err
+			defer tx.Rollback(ctx)
+			defer result.Close()
+			if result.NextResultSet(ctx) {
+				if result.NextRow() {
+					var (
+						id          uint64
+						title       string
+						description string
+					)
+					if err = result.ScanNamed(
+						named.OptionalWithDefault("id", &id),
+						named.OptionalWithDefault("title", &title),
+						named.OptionalWithDefault("description", &description),
+					); err != nil {
+						panic(err)
+					}
+					fmt.Println(id, title, description)
+					_, err = tx.Execute(ctx,
+						"DECLARE $id AS Uint64; "+
+							"DECLARE $description AS Text; "+
+							"UPSERT INTO `path/to/mytable` "+
+							"(id, description) "+
+							"VALUES ($id, $description);",
+						table.NewQueryParameters(
+							table.ValueParam("$id", types.Uint64Value(1)),
+							table.ValueParam("$description", types.TextValue("changed description")),
+						),
+						options.WithCommit(),
+					)
+					if err != nil {
+						return err
+					}
+				}
 			}
-			// close transaction on last execute query
-			res, err = tx.Execute(ctx, "SELECT 2", nil, options.WithCommit())
-			if err != nil {
-				return err
-			}
-			defer res.Close()
-			return res.Err()
+			return result.Err()
 		},
 		table.WithIdempotent(),
 	)
