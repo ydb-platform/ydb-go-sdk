@@ -1,3 +1,4 @@
+## v3.42.1
 * Fixed lazy transaction example for `godoc`
 
 ## v3.42.0
