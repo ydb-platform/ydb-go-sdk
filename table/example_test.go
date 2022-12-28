@@ -3,11 +3,11 @@ package table_test
 import (
 	"context"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"path"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
@@ -203,8 +203,10 @@ func Example_lazyTransaction() {
 			if err != nil {
 				return err
 			}
-			defer tx.Rollback(ctx)
-			defer result.Close()
+			defer func() {
+				_ = tx.Rollback(ctx)
+				_ = result.Close()
+			}()
 			if !result.NextResultSet(ctx) {
 				return retry.RetryableError(fmt.Errorf("no result sets"))
 			}
