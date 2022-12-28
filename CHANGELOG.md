@@ -1,3 +1,5 @@
+* Fixed lazy transaction example for `godoc`
+
 ## v3.42.0
 * Added retry policy options for topics: `topic/topicoptions.WithReaderCheckRetryErrorFunction`, `topic/topicoptions.WithReaderStartTimeout`, `topic/topicoptions.WithWriterCheckRetryErrorFunction`, `topic/topicoptions.WithWriterStartTimeout`
 * Refactored `internal/conn` middlewares

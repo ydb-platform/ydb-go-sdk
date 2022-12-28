@@ -3,6 +3,7 @@ package table_test
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"path"
 	"time"
 
@@ -200,41 +201,44 @@ func Example_lazyTransaction() {
 				),
 			)
 			if err != nil {
-				panic(err)
+				return err
 			}
 			defer tx.Rollback(ctx)
 			defer result.Close()
-			if result.NextResultSet(ctx) {
-				if result.NextRow() {
-					var (
-						id          uint64
-						title       string
-						description string
-					)
-					if err = result.ScanNamed(
-						named.OptionalWithDefault("id", &id),
-						named.OptionalWithDefault("title", &title),
-						named.OptionalWithDefault("description", &description),
-					); err != nil {
-						panic(err)
-					}
-					fmt.Println(id, title, description)
-					_, err = tx.Execute(ctx,
-						"DECLARE $id AS Uint64; "+
-							"DECLARE $description AS Text; "+
-							"UPSERT INTO `path/to/mytable` "+
-							"(id, description) "+
-							"VALUES ($id, $description);",
-						table.NewQueryParameters(
-							table.ValueParam("$id", types.Uint64Value(1)),
-							table.ValueParam("$description", types.TextValue("changed description")),
-						),
-						options.WithCommit(),
-					)
-					if err != nil {
-						return err
-					}
-				}
+			if !result.NextResultSet(ctx) {
+				return retry.RetryableError(fmt.Errorf("no result sets"))
+			}
+			if !result.NextRow() {
+				return retry.RetryableError(fmt.Errorf("no rows"))
+			}
+			var (
+				id          uint64
+				title       string
+				description string
+			)
+			if err = result.ScanNamed(
+				named.OptionalWithDefault("id", &id),
+				named.OptionalWithDefault("title", &title),
+				named.OptionalWithDefault("description", &description),
+			); err != nil {
+				return err
+			}
+			fmt.Println(id, title, description)
+			// execute query with commit transaction
+			_, err = tx.Execute(ctx,
+				"DECLARE $id AS Uint64; "+
+					"DECLARE $description AS Text; "+
+					"UPSERT INTO `path/to/mytable` "+
+					"(id, description) "+
+					"VALUES ($id, $description);",
+				table.NewQueryParameters(
+					table.ValueParam("$id", types.Uint64Value(1)),
+					table.ValueParam("$description", types.TextValue("changed description")),
+				),
+				options.WithCommit(),
+			)
+			if err != nil {
+				return err
 			}
 			return result.Err()
 		},
