@@ -135,8 +135,6 @@ func (x *xorm) IsTableExist() (columnNames []string, res xormResult, err error) 
 	res.value = make([][]any, 0)
 
 	if exist {
-		var tableName string
-		_ = value.CastTo(x.params["TableName"].(value.Value), &tableName)
 		res.value = append(res.value, []any{tableName})
 	}
 	return
@@ -188,8 +186,6 @@ func (x *xorm) IsColumnExist() (columnNames []string, res xormResult, err error)
 	res.value = make([][]any, 0)
 
 	if exist {
-		var columnName string
-		_ = value.CastTo(x.params["ColumnName"].(value.Value), &columnName)
 		res.value = append(res.value, []any{columnName})
 	}
 	return columnNames, res, nil
@@ -327,8 +323,8 @@ func (x *xorm) GetIndexes() (columnNames []string, res xormResult, err error) {
 }
 
 type xormResult struct {
-	rentRow int
-	value   [][]any
+	currentRow int
+	value      [][]any
 }
 
 type xormRows struct {
@@ -345,12 +341,12 @@ func (xr *xormRows) Close() error {
 }
 
 func (xr *xormRows) Next(dst []driver.Value) error {
-	if xr.result.rentRow >= len(xr.result.value) {
+	if xr.result.currentRow >= len(xr.result.value) {
 		return io.EOF
 	}
-	for i, v := range xr.result.value[xr.result.rentRow] {
+	for i, v := range xr.result.value[xr.result.currentRow] {
 		dst[i] = v
 	}
-	xr.result.rentRow++
+	xr.result.currentRow++
 	return nil
 }
