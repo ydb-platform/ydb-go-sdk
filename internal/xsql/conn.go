@@ -219,6 +219,10 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	if c.currentTx != nil {
 		return c.currentTx.QueryContext(ctx, query, args)
 	}
+	if _, ok := ctx.Value(XormMetadataQuery).(string); ok {
+		xorm := newXorm(ctx, c, query, args)
+		return xorm.queryMetadata()
+	}
 	return c.queryContext(ctx, query, args)
 }
 
