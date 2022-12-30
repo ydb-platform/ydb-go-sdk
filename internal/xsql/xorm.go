@@ -61,7 +61,7 @@ var (
 type xorm struct {
 	ctx    context.Context
 	conn   *conn
-	params map[string]any
+	params map[string]value.Value
 	query  string
 	args   []driver.NamedValue
 }
@@ -70,12 +70,12 @@ func newXorm(ctx context.Context, c *conn, query string, args []driver.NamedValu
 	x := &xorm{
 		ctx:    ctx,
 		conn:   c,
-		params: make(map[string]any),
+		params: make(map[string]value.Value),
 		query:  query,
 		args:   args,
 	}
 	for _, arg := range args {
-		x.params[arg.Name] = arg.Value
+		x.params[arg.Name] = arg.Value.(value.Value)
 	}
 	return x
 }
@@ -86,6 +86,10 @@ func xormModeFromContext(ctx context.Context) XormQueryMode {
 		return r
 	}
 	return UnknownXormMetadataQueryMode
+}
+
+func (x *xorm) getConnector() *Connector {
+	return x.conn.connector
 }
 
 func (x *xorm) queryMetadata() (_ driver.Rows, err error) {
@@ -101,6 +105,7 @@ func (x *xorm) queryMetadata() (_ driver.Rows, err error) {
 	case XormIsColumnExistQueryMode:
 		colNames, res, err = x.IsColumnExist()
 	case XormGetColumnsQueryMode:
+		colNames, res, err = x.GetColumns()
 	case XormGetTablesQueryMode:
 		colNames, res, err = x.GetTables()
 	case XormGetIndexesQueryMode:
@@ -113,7 +118,7 @@ func (x *xorm) queryMetadata() (_ driver.Rows, err error) {
 	}
 	return &xormRows{
 		columnNames: colNames,
-		result:      res,
+		xormResult:  res,
 	}, nil
 }
 
@@ -122,8 +127,8 @@ func (x *xorm) IsTableExist() (columnNames []string, res xormResult, err error) 
 		return nil, xormResult{}, fmt.Errorf("table name not found")
 	}
 	var tableName string
-	if err = value.CastTo(x.params["TableName"].(value.Value), &tableName); err != nil {
-		return nil, xormResult{}, x.conn.checkClosed(xerrors.WithStackTrace(err))
+	if err = value.CastTo(x.params["TableName"], &tableName); err != nil {
+		return nil, xormResult{}, err
 	}
 
 	exist, err := x.isTableExist(tableName)
@@ -141,7 +146,7 @@ func (x *xorm) IsTableExist() (columnNames []string, res xormResult, err error) 
 }
 
 func (x *xorm) isTableExist(tableName string) (bool, error) {
-	schemeClient := x.conn.connector.Connection().Scheme()
+	schemeClient := x.getConnector().Connection().Scheme()
 
 	var e scheme.Entry
 	err := retry.Retry(x.ctx, func(ctx context.Context) (err error) {
@@ -168,13 +173,13 @@ func (x *xorm) IsColumnExist() (columnNames []string, res xormResult, err error)
 	}
 
 	var tableName string
-	if err = value.CastTo(x.params["TableName"].(value.Value), &tableName); err != nil {
-		return nil, xormResult{}, x.conn.checkClosed(xerrors.WithStackTrace(err))
+	if err = value.CastTo(x.params["TableName"], &tableName); err != nil {
+		return nil, xormResult{}, err
 	}
 
 	var columnName string
-	if err = value.CastTo(x.params["ColumnName"].(value.Value), &columnName); err != nil {
-		return nil, xormResult{}, x.conn.checkClosed(xerrors.WithStackTrace(err))
+	if err = value.CastTo(x.params["ColumnName"], &columnName); err != nil {
+		return nil, xormResult{}, err
 	}
 
 	exist, err := x.isColumnExist(columnName, tableName)
@@ -203,7 +208,7 @@ func (x *xorm) isColumnExist(columnName, tableName string) (bool, error) {
 	columnExist := false
 	_ = columnExist
 
-	tableClient := x.conn.connector.Connection().Table()
+	tableClient := x.getConnector().Connection().Table()
 	err = tableClient.Do(x.ctx, func(ctx context.Context, session table.Session) (err error) {
 		desc, err := session.DescribeTable(ctx, tableName)
 		if err != nil {
@@ -218,10 +223,60 @@ func (x *xorm) isColumnExist(columnName, tableName string) (bool, error) {
 		return
 	})
 	if err != nil {
-		return false, err
+		return false, x.conn.checkClosed(err)
 	}
 
 	return columnExist, nil
+}
+
+func (x *xorm) GetColumns() (columnNames []string, res xormResult, err error) {
+	if _, has := x.params["TableName"]; !has {
+		return nil, xormResult{}, fmt.Errorf("table name not found")
+	}
+
+	var tableName string
+	if err = value.CastTo(x.params["TableName"], &tableName); err != nil {
+		return nil, xormResult{}, err
+	}
+
+	tableExist, err := x.isTableExist(tableName)
+	if err != nil {
+		return nil, xormResult{}, err
+	}
+	if !tableExist {
+		return nil, xormResult{}, fmt.Errorf("table `%s` not exist", tableName)
+	}
+
+	columnNames = append(columnNames, "ColumnName", "TableName", "DataType", "IsPrimaryKey")
+	res.value = make([][]any, 0)
+
+	tableClient := x.getConnector().Connection().Table()
+	err = tableClient.Do(x.ctx, func(ctx context.Context, session table.Session) (err error) {
+		desc, err := session.DescribeTable(ctx, tableName)
+		if err != nil {
+			return err
+		}
+
+		isPk := make(map[string]bool)
+		for _, pk := range desc.PrimaryKey {
+			isPk[pk] = true
+		}
+
+		for _, col := range desc.Columns {
+			res.value = append(res.value, []any{
+				col.Name,
+				tableName,
+				col.Type.Yql(),
+				isPk[col.Name],
+			})
+		}
+		return
+	})
+	if err != nil {
+		return nil, xormResult{}, x.conn.checkClosed(err)
+	}
+
+	return columnNames, res, nil
 }
 
 func (x *xorm) GetTables() (columnNames []string, res xormResult, err error) {
@@ -229,8 +284,8 @@ func (x *xorm) GetTables() (columnNames []string, res xormResult, err error) {
 		return nil, xormResult{}, fmt.Errorf("database name not found")
 	}
 	var dbName string
-	if err := value.CastTo(x.params["DatabaseName"].(value.Value), &dbName); err != nil {
-		return nil, xormResult{}, x.conn.checkClosed(xerrors.WithStackTrace(err))
+	if err := value.CastTo(x.params["DatabaseName"], &dbName); err != nil {
+		return nil, xormResult{}, err
 	}
 
 	columnNames = append(columnNames, "TableName")
@@ -240,7 +295,7 @@ func (x *xorm) GetTables() (columnNames []string, res xormResult, err error) {
 		return dir != ".sys" && dir != ".sys_health"
 	}
 
-	schemeClient := x.conn.connector.Connection().Scheme()
+	schemeClient := x.getConnector().Connection().Scheme()
 
 	queue := make([]string, 0)
 	queue = append(queue, dbName)
@@ -254,7 +309,7 @@ func (x *xorm) GetTables() (columnNames []string, res xormResult, err error) {
 			e, err = schemeClient.DescribePath(ctx, curDir)
 			return
 		}, retry.WithIdempotent(true)); err != nil {
-			return nil, xormResult{}, err
+			return nil, xormResult{}, x.conn.checkClosed(err)
 		}
 		if e.IsTable() {
 			res.value = append(res.value, []any{curDir})
@@ -267,7 +322,7 @@ func (x *xorm) GetTables() (columnNames []string, res xormResult, err error) {
 			d, err = schemeClient.ListDirectory(ctx, curDir)
 			return
 		}, retry.WithIdempotent(true)); err != nil {
-			return nil, xormResult{}, err
+			return nil, xormResult{}, x.conn.checkClosed(err)
 		}
 
 		for _, child := range d.Children {
@@ -287,8 +342,8 @@ func (x *xorm) GetIndexes() (columnNames []string, res xormResult, err error) {
 		return nil, xormResult{}, fmt.Errorf("table name not found")
 	}
 	var tableName string
-	if err = value.CastTo(x.params["TableName"].(value.Value), &tableName); err != nil {
-		return nil, xormResult{}, x.conn.checkClosed(xerrors.WithStackTrace(err))
+	if err = value.CastTo(x.params["TableName"], &tableName); err != nil {
+		return nil, xormResult{}, err
 	}
 
 	tableExist, err := x.isTableExist(tableName)
@@ -302,7 +357,7 @@ func (x *xorm) GetIndexes() (columnNames []string, res xormResult, err error) {
 	columnNames = append(columnNames, "IndexName", "Columns")
 	res.value = make([][]any, 0)
 
-	tableClient := x.conn.connector.Connection().Table()
+	tableClient := x.getConnector().Connection().Table()
 	err = tableClient.Do(x.ctx, func(ctx context.Context, session table.Session) (err error) {
 		desc, err := session.DescribeTable(ctx, tableName)
 		if err != nil {
@@ -317,7 +372,7 @@ func (x *xorm) GetIndexes() (columnNames []string, res xormResult, err error) {
 		return
 	})
 	if err != nil {
-		return nil, xormResult{}, err
+		return nil, xormResult{}, x.conn.checkClosed(err)
 	}
 	return columnNames, res, nil
 }
@@ -328,9 +383,11 @@ type xormResult struct {
 }
 
 type xormRows struct {
+	xormResult
 	columnNames []string
-	result      xormResult
 }
+
+var _ driver.Rows = &xormRows{}
 
 func (xr *xormRows) Columns() []string {
 	return xr.columnNames
@@ -341,12 +398,12 @@ func (xr *xormRows) Close() error {
 }
 
 func (xr *xormRows) Next(dst []driver.Value) error {
-	if xr.result.currentRow >= len(xr.result.value) {
+	if xr.currentRow >= len(xr.value) {
 		return io.EOF
 	}
-	for i, v := range xr.result.value[xr.result.currentRow] {
+	for i, v := range xr.value[xr.currentRow] {
 		dst[i] = v
 	}
-	xr.result.currentRow++
+	xr.currentRow++
 	return nil
 }
