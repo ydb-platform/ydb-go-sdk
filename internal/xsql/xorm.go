@@ -221,9 +221,9 @@ func (x *xorm) isColumnExist(columnName, tableName string) (bool, error) {
 			}
 		}
 		return
-	})
+	}, table.WithIdempotent())
 	if err != nil {
-		return false, x.conn.checkClosed(err)
+		return false, x.conn.checkClosed(xerrors.WithStackTrace(err))
 	}
 
 	return columnExist, nil
@@ -271,9 +271,9 @@ func (x *xorm) GetColumns() (columnNames []string, res xormResult, err error) {
 			})
 		}
 		return
-	})
+	}, table.WithIdempotent())
 	if err != nil {
-		return nil, xormResult{}, x.conn.checkClosed(err)
+		return nil, xormResult{}, x.conn.checkClosed(xerrors.WithStackTrace(err))
 	}
 
 	return columnNames, res, nil
@@ -288,11 +288,28 @@ func (x *xorm) GetTables() (columnNames []string, res xormResult, err error) {
 		return nil, xormResult{}, err
 	}
 
+	ignoreDirs := map[string]bool{
+		".sys":        true,
+		".sys_health": true,
+	}
+
+	if _, has := x.params["IgnoreDirs"]; has {
+		li := make([]string, 0)
+		if err := value.CastTo(x.params["IgnoreDirs"], &li); err == nil {
+			for _, v := range li {
+				ignoreDirs[v] = true
+			}
+		}
+	}
+
 	columnNames = append(columnNames, "TableName")
 	res.value = make([][]any, 0)
 
 	canEnter := func(dir string) bool {
-		return dir != ".sys" && dir != ".sys_health"
+		if _, ignore := ignoreDirs[dir]; ignore {
+			return false
+		}
+		return true
 	}
 
 	schemeClient := x.getConnector().Connection().Scheme()
@@ -309,7 +326,7 @@ func (x *xorm) GetTables() (columnNames []string, res xormResult, err error) {
 			e, err = schemeClient.DescribePath(ctx, curDir)
 			return
 		}, retry.WithIdempotent(true)); err != nil {
-			return nil, xormResult{}, x.conn.checkClosed(err)
+			return nil, xormResult{}, x.conn.checkClosed(xerrors.WithStackTrace(err))
 		}
 		if e.IsTable() {
 			res.value = append(res.value, []any{curDir})
@@ -322,11 +339,11 @@ func (x *xorm) GetTables() (columnNames []string, res xormResult, err error) {
 			d, err = schemeClient.ListDirectory(ctx, curDir)
 			return
 		}, retry.WithIdempotent(true)); err != nil {
-			return nil, xormResult{}, x.conn.checkClosed(err)
+			return nil, xormResult{}, x.conn.checkClosed(xerrors.WithStackTrace(err))
 		}
 
 		for _, child := range d.Children {
-			if child.IsDirectory() || child.IsTable() {
+			if child.IsDirectory() || child.IsDatabase() || child.IsTable() {
 				if canEnter(child.Name) {
 					queue = append(queue, path.Join(curDir, child.Name))
 				}
@@ -370,9 +387,9 @@ func (x *xorm) GetIndexes() (columnNames []string, res xormResult, err error) {
 			})
 		}
 		return
-	})
+	}, table.WithIdempotent())
 	if err != nil {
-		return nil, xormResult{}, x.conn.checkClosed(err)
+		return nil, xormResult{}, x.conn.checkClosed(xerrors.WithStackTrace(err))
 	}
 	return columnNames, res, nil
 }
