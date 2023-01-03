@@ -216,12 +216,12 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	if c.isClosed() {
 		return nil, errClosedConn
 	}
-	if c.currentTx != nil {
-		return c.currentTx.QueryContext(ctx, query, args)
-	}
-	if _, ok := ctx.Value(XormMetadataQuery).(string); ok {
+	if checkXormQueryFromContext(ctx) {
 		xorm := newXorm(ctx, c, query, args)
 		return xorm.queryMetadata()
+	}
+	if c.currentTx != nil {
+		return c.currentTx.QueryContext(ctx, query, args)
 	}
 	return c.queryContext(ctx, query, args)
 }

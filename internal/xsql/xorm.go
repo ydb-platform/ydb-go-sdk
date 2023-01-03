@@ -16,45 +16,45 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
-type XormQueryMode int
+type xormQueryMode int
 
-func (t XormQueryMode) String() string {
+func (t xormQueryMode) String() string {
 	if s, ok := modeToString[t]; ok {
 		return s
 	}
 	return fmt.Sprintf("unknown_mode_%d", t)
 }
 
-const XormMetadataQuery string = "xorm-metadata-query"
+const xormMetadataQuery string = "xorm-metadata-query"
 
 const (
-	UnknownXormMetadataQueryMode = XormQueryMode(iota)
+	unknownXormMetadataQueryMode = xormQueryMode(iota)
 
-	XormVersionQueryMode
-	XormIsTableExistQueryMode
-	XormIsColumnExistQueryMode
-	XormGetColumnsQueryMode
-	XormGetTablesQueryMode
-	XormGetIndexesQueryMode
+	xormVersionQueryMode
+	xormIsTableExistQueryMode
+	xormIsColumnExistQueryMode
+	xormGetColumnsQueryMode
+	xormGetTablesQueryMode
+	xormGetIndexesQueryMode
 )
 
 var (
-	stringToMode = map[string]XormQueryMode{
-		"version":         XormVersionQueryMode,
-		"is-table-exist":  XormIsTableExistQueryMode,
-		"is-column-exist": XormIsColumnExistQueryMode,
-		"get-columns":     XormGetColumnsQueryMode,
-		"get-tables":      XormGetTablesQueryMode,
-		"get-indexes":     XormGetIndexesQueryMode,
+	stringToMode = map[string]xormQueryMode{
+		"version":         xormVersionQueryMode,
+		"is-table-exist":  xormIsTableExistQueryMode,
+		"is-column-exist": xormIsColumnExistQueryMode,
+		"get-columns":     xormGetColumnsQueryMode,
+		"get-tables":      xormGetTablesQueryMode,
+		"get-indexes":     xormGetIndexesQueryMode,
 	}
 
-	modeToString = map[XormQueryMode]string{
-		XormVersionQueryMode:       "version",
-		XormIsTableExistQueryMode:  "is-table-exist",
-		XormIsColumnExistQueryMode: "is-column-exist",
-		XormGetColumnsQueryMode:    "get-columns",
-		XormGetTablesQueryMode:     "get-tables",
-		XormGetIndexesQueryMode:    "get-indexes",
+	modeToString = map[xormQueryMode]string{
+		xormVersionQueryMode:       "version",
+		xormIsTableExistQueryMode:  "is-table-exist",
+		xormIsColumnExistQueryMode: "is-column-exist",
+		xormGetColumnsQueryMode:    "get-columns",
+		xormGetTablesQueryMode:     "get-tables",
+		xormGetIndexesQueryMode:    "get-indexes",
 	}
 )
 
@@ -80,12 +80,19 @@ func newXorm(ctx context.Context, c *conn, query string, args []driver.NamedValu
 	return x
 }
 
-func xormModeFromContext(ctx context.Context) XormQueryMode {
-	m := ctx.Value(XormMetadataQuery).(string)
+func checkXormQueryFromContext(ctx context.Context) bool {
+	if _, ok := ctx.Value(xormMetadataQuery).(string); ok {
+		return true
+	}
+	return false
+}
+
+func xormModeFromContext(ctx context.Context) xormQueryMode {
+	m := ctx.Value(xormMetadataQuery).(string)
 	if r, ok := stringToMode[m]; ok {
 		return r
 	}
-	return UnknownXormMetadataQueryMode
+	return unknownXormMetadataQueryMode
 }
 
 func (x *xorm) getConnector() *Connector {
@@ -99,17 +106,17 @@ func (x *xorm) queryMetadata() (_ driver.Rows, err error) {
 		res      xormResult
 	)
 	switch m {
-	case XormVersionQueryMode:
-	case XormIsTableExistQueryMode:
-		colNames, res, err = x.IsTableExist()
-	case XormIsColumnExistQueryMode:
-		colNames, res, err = x.IsColumnExist()
-	case XormGetColumnsQueryMode:
-		colNames, res, err = x.GetColumns()
-	case XormGetTablesQueryMode:
-		colNames, res, err = x.GetTables()
-	case XormGetIndexesQueryMode:
-		colNames, res, err = x.GetIndexes()
+	case xormVersionQueryMode:
+	case xormIsTableExistQueryMode:
+		colNames, res, err = x.isTableExist()
+	case xormIsColumnExistQueryMode:
+		colNames, res, err = x.isColumnExist()
+	case xormGetColumnsQueryMode:
+		colNames, res, err = x.getColumns()
+	case xormGetTablesQueryMode:
+		colNames, res, err = x.getTables()
+	case xormGetIndexesQueryMode:
+		colNames, res, err = x.getIndexes()
 	default:
 		return nil, fmt.Errorf("unsupported xorm metadata querymode '%s'", m)
 	}
@@ -122,7 +129,7 @@ func (x *xorm) queryMetadata() (_ driver.Rows, err error) {
 	}, nil
 }
 
-func (x *xorm) IsTableExist() (columnNames []string, res xormResult, err error) {
+func (x *xorm) isTableExist() (columnNames []string, res xormResult, err error) {
 	if _, has := x.params["TableName"]; !has {
 		return nil, xormResult{}, fmt.Errorf("table name not found")
 	}
@@ -131,21 +138,21 @@ func (x *xorm) IsTableExist() (columnNames []string, res xormResult, err error) 
 		return nil, xormResult{}, err
 	}
 
-	exist, err := x.isTableExist(tableName)
+	exist, err := x.checkTableExist(tableName)
 	if err != nil {
 		return nil, xormResult{}, err
 	}
 
 	columnNames = append(columnNames, "TableName")
-	res.value = make([][]any, 0)
+	res.values = make([][]any, 0)
 
 	if exist {
-		res.value = append(res.value, []any{tableName})
+		res.values = append(res.values, []any{tableName})
 	}
 	return
 }
 
-func (x *xorm) isTableExist(tableName string) (bool, error) {
+func (x *xorm) checkTableExist(tableName string) (bool, error) {
 	schemeClient := x.getConnector().Connection().Scheme()
 
 	var e scheme.Entry
@@ -164,7 +171,7 @@ func (x *xorm) isTableExist(tableName string) (bool, error) {
 	return e.IsTable(), nil
 }
 
-func (x *xorm) IsColumnExist() (columnNames []string, res xormResult, err error) {
+func (x *xorm) isColumnExist() (columnNames []string, res xormResult, err error) {
 	if _, has := x.params["TableName"]; !has {
 		return nil, xormResult{}, fmt.Errorf("table name not found")
 	}
@@ -182,22 +189,22 @@ func (x *xorm) IsColumnExist() (columnNames []string, res xormResult, err error)
 		return nil, xormResult{}, err
 	}
 
-	exist, err := x.isColumnExist(columnName, tableName)
+	exist, err := x.checkColumnExist(columnName, tableName)
 	if err != nil {
 		return nil, xormResult{}, err
 	}
 
 	columnNames = append(columnNames, "ColumnName")
-	res.value = make([][]any, 0)
+	res.values = make([][]any, 0)
 
 	if exist {
-		res.value = append(res.value, []any{columnName})
+		res.values = append(res.values, []any{columnName})
 	}
 	return columnNames, res, nil
 }
 
-func (x *xorm) isColumnExist(columnName, tableName string) (bool, error) {
-	tableExist, err := x.isTableExist(tableName)
+func (x *xorm) checkColumnExist(columnName, tableName string) (bool, error) {
+	tableExist, err := x.checkTableExist(tableName)
 	if err != nil {
 		return false, err
 	}
@@ -229,7 +236,7 @@ func (x *xorm) isColumnExist(columnName, tableName string) (bool, error) {
 	return columnExist, nil
 }
 
-func (x *xorm) GetColumns() (columnNames []string, res xormResult, err error) {
+func (x *xorm) getColumns() (columnNames []string, res xormResult, err error) {
 	if _, has := x.params["TableName"]; !has {
 		return nil, xormResult{}, fmt.Errorf("table name not found")
 	}
@@ -239,7 +246,7 @@ func (x *xorm) GetColumns() (columnNames []string, res xormResult, err error) {
 		return nil, xormResult{}, err
 	}
 
-	tableExist, err := x.isTableExist(tableName)
+	tableExist, err := x.checkTableExist(tableName)
 	if err != nil {
 		return nil, xormResult{}, err
 	}
@@ -248,7 +255,7 @@ func (x *xorm) GetColumns() (columnNames []string, res xormResult, err error) {
 	}
 
 	columnNames = append(columnNames, "ColumnName", "TableName", "DataType", "IsPrimaryKey")
-	res.value = make([][]any, 0)
+	res.values = make([][]any, 0)
 
 	tableClient := x.getConnector().Connection().Table()
 	err = tableClient.Do(x.ctx, func(ctx context.Context, session table.Session) (err error) {
@@ -263,7 +270,7 @@ func (x *xorm) GetColumns() (columnNames []string, res xormResult, err error) {
 		}
 
 		for _, col := range desc.Columns {
-			res.value = append(res.value, []any{
+			res.values = append(res.values, []any{
 				col.Name,
 				tableName,
 				col.Type.Yql(),
@@ -279,7 +286,7 @@ func (x *xorm) GetColumns() (columnNames []string, res xormResult, err error) {
 	return columnNames, res, nil
 }
 
-func (x *xorm) GetTables() (columnNames []string, res xormResult, err error) {
+func (x *xorm) getTables() (columnNames []string, res xormResult, err error) {
 	if _, has := x.params["DatabaseName"]; !has {
 		return nil, xormResult{}, fmt.Errorf("database name not found")
 	}
@@ -303,7 +310,7 @@ func (x *xorm) GetTables() (columnNames []string, res xormResult, err error) {
 	}
 
 	columnNames = append(columnNames, "TableName")
-	res.value = make([][]any, 0)
+	res.values = make([][]any, 0)
 
 	canEnter := func(dir string) bool {
 		if _, ignore := ignoreDirs[dir]; ignore {
@@ -329,7 +336,7 @@ func (x *xorm) GetTables() (columnNames []string, res xormResult, err error) {
 			return nil, xormResult{}, x.conn.checkClosed(xerrors.WithStackTrace(err))
 		}
 		if e.IsTable() {
-			res.value = append(res.value, []any{curDir})
+			res.values = append(res.values, []any{curDir})
 			continue
 		}
 
@@ -354,7 +361,7 @@ func (x *xorm) GetTables() (columnNames []string, res xormResult, err error) {
 	return columnNames, res, nil
 }
 
-func (x *xorm) GetIndexes() (columnNames []string, res xormResult, err error) {
+func (x *xorm) getIndexes() (columnNames []string, res xormResult, err error) {
 	if _, has := x.params["TableName"]; !has {
 		return nil, xormResult{}, fmt.Errorf("table name not found")
 	}
@@ -363,7 +370,7 @@ func (x *xorm) GetIndexes() (columnNames []string, res xormResult, err error) {
 		return nil, xormResult{}, err
 	}
 
-	tableExist, err := x.isTableExist(tableName)
+	tableExist, err := x.checkTableExist(tableName)
 	if err != nil {
 		return nil, xormResult{}, err
 	}
@@ -372,7 +379,7 @@ func (x *xorm) GetIndexes() (columnNames []string, res xormResult, err error) {
 	}
 
 	columnNames = append(columnNames, "IndexName", "Columns")
-	res.value = make([][]any, 0)
+	res.values = make([][]any, 0)
 
 	tableClient := x.getConnector().Connection().Table()
 	err = tableClient.Do(x.ctx, func(ctx context.Context, session table.Session) (err error) {
@@ -381,7 +388,7 @@ func (x *xorm) GetIndexes() (columnNames []string, res xormResult, err error) {
 			return err
 		}
 		for _, indexDesc := range desc.Indexes {
-			res.value = append(res.value, []any{
+			res.values = append(res.values, []any{
 				indexDesc.Name,
 				strings.Join(indexDesc.IndexColumns, ","),
 			})
@@ -396,7 +403,7 @@ func (x *xorm) GetIndexes() (columnNames []string, res xormResult, err error) {
 
 type xormResult struct {
 	currentRow int
-	value      [][]any
+	values     [][]any
 }
 
 type xormRows struct {
@@ -407,7 +414,9 @@ type xormRows struct {
 var _ driver.Rows = &xormRows{}
 
 func (xr *xormRows) Columns() []string {
-	return xr.columnNames
+	ret := make([]string, len(xr.columnNames))
+	copy(ret, xr.columnNames)
+	return ret
 }
 
 func (xr *xormRows) Close() error {
@@ -415,11 +424,15 @@ func (xr *xormRows) Close() error {
 }
 
 func (xr *xormRows) Next(dst []driver.Value) error {
-	if xr.currentRow >= len(xr.value) {
+	if xr.currentRow >= len(xr.values) {
 		return io.EOF
 	}
-	for i, v := range xr.value[xr.currentRow] {
-		dst[i] = v
+	var (
+		cur    = xr.currentRow
+		values = xr.values[cur]
+	)
+	for i := range values {
+		dst[i] = values[i]
 	}
 	xr.currentRow++
 	return nil
