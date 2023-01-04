@@ -213,7 +213,6 @@ func (x *xorm) checkColumnExist(columnName, tableName string) (bool, error) {
 	}
 
 	columnExist := false
-	_ = columnExist
 
 	tableClient := x.getConnector().Connection().Table()
 	err = tableClient.Do(x.ctx, func(ctx context.Context, session table.Session) (err error) {
@@ -291,7 +290,7 @@ func (x *xorm) getTables() (columnNames []string, res xormResult, err error) {
 		return nil, xormResult{}, fmt.Errorf("database name not found")
 	}
 	var dbName string
-	if err := value.CastTo(x.params["DatabaseName"], &dbName); err != nil {
+	if err = value.CastTo(x.params["DatabaseName"], &dbName); err != nil {
 		return nil, xormResult{}, err
 	}
 
@@ -302,7 +301,7 @@ func (x *xorm) getTables() (columnNames []string, res xormResult, err error) {
 
 	if _, has := x.params["IgnoreDirs"]; has {
 		li := make([]string, 0)
-		if err := value.CastTo(x.params["IgnoreDirs"], &li); err == nil {
+		if err = value.CastTo(x.params["IgnoreDirs"], &li); err == nil {
 			for _, v := range li {
 				ignoreDirs[v] = true
 			}
@@ -328,24 +327,27 @@ func (x *xorm) getTables() (columnNames []string, res xormResult, err error) {
 		curDir := queue[st]
 
 		var e scheme.Entry
-		_ = e
-		if err := retry.Retry(x.ctx, func(ctx context.Context) (err error) {
+		err = retry.Retry(x.ctx, func(ctx context.Context) (err error) {
 			e, err = schemeClient.DescribePath(ctx, curDir)
 			return
-		}, retry.WithIdempotent(true)); err != nil {
+		}, retry.WithIdempotent(true))
+
+		if err != nil {
 			return nil, xormResult{}, x.conn.checkClosed(xerrors.WithStackTrace(err))
 		}
+
 		if e.IsTable() {
 			res.values = append(res.values, []any{curDir})
 			continue
 		}
 
 		var d scheme.Directory
-		_ = d
-		if err := retry.Retry(x.ctx, func(ctx context.Context) (err error) {
+		err = retry.Retry(x.ctx, func(ctx context.Context) (err error) {
 			d, err = schemeClient.ListDirectory(ctx, curDir)
 			return
-		}, retry.WithIdempotent(true)); err != nil {
+		}, retry.WithIdempotent(true))
+
+		if err != nil {
 			return nil, xormResult{}, x.conn.checkClosed(xerrors.WithStackTrace(err))
 		}
 
