@@ -1,5 +1,6 @@
 ## v3.42.1
 * Fixed lazy transaction example for `godoc`
+* Added `trace.Details.Details()` method for use external detailer
 
 ## v3.42.0
 * Added retry policy options for topics: `topic/topicoptions.WithReaderCheckRetryErrorFunction`, `topic/topicoptions.WithReaderStartTimeout`, `topic/topicoptions.WithWriterCheckRetryErrorFunction`, `topic/topicoptions.WithWriterStartTimeout`
