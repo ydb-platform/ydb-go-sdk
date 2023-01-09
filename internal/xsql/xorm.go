@@ -107,6 +107,7 @@ func (x *xorm) queryMetadata() (_ driver.Rows, err error) {
 	)
 	switch m {
 	case xormVersionQueryMode:
+		colNames, res = x.getVersion()
 	case xormIsTableExistQueryMode:
 		colNames, res, err = x.isTableExist()
 	case xormIsColumnExistQueryMode:
@@ -127,6 +128,21 @@ func (x *xorm) queryMetadata() (_ driver.Rows, err error) {
 		columnNames: colNames,
 		xormResult:  res,
 	}, nil
+}
+
+const (
+	VersionMajor = "22"
+	VersionMinor = "4"
+	VersionPatch = "44"
+)
+
+const version = VersionMajor + "." + VersionMinor + "." + VersionPatch
+
+func (x *xorm) getVersion() (columnNames []string, res xormResult) {
+	columnNames = append(columnNames, "Version")
+	res.values = make([][]any, 0)
+	res.values = append(res.values, []any{"YDB Server " + "v" + version})
+	return
 }
 
 func (x *xorm) isTableExist() (columnNames []string, res xormResult, err error) {
@@ -285,6 +301,7 @@ func (x *xorm) getColumns() (columnNames []string, res xormResult, err error) {
 	return columnNames, res, nil
 }
 
+// Get all tables in database, using breadth-first search to traverse the directory tree.
 func (x *xorm) getTables() (columnNames []string, res xormResult, err error) {
 	if _, has := x.params["DatabaseName"]; !has {
 		return nil, xormResult{}, fmt.Errorf("database name not found")
@@ -352,7 +369,7 @@ func (x *xorm) getTables() (columnNames []string, res xormResult, err error) {
 		}
 
 		for _, child := range d.Children {
-			if child.IsDirectory() || child.IsDatabase() || child.IsTable() {
+			if child.IsDirectory() || child.IsTable() {
 				if canEnter(child.Name) {
 					queue = append(queue, path.Join(curDir, child.Name))
 				}

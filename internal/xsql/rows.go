@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -15,9 +16,10 @@ import (
 )
 
 var (
-	_ driver.Rows              = &rows{}
-	_ driver.RowsNextResultSet = &rows{}
-	_ driver.Rows              = &single{}
+	_ driver.Rows                           = &rows{}
+	_ driver.RowsNextResultSet              = &rows{}
+	_ driver.RowsColumnTypeDatabaseTypeName = &rows{}
+	_ driver.Rows                           = &single{}
 
 	_ types.Scanner = &valuer{}
 )
@@ -42,6 +44,33 @@ func (r *rows) Columns() []string {
 		i++
 	})
 	return cs
+}
+
+// Add `ColumnTypeDatabaseTypeName` to support `Xorm`
+// NOTE: Need to optimize somehow? This might take O(|r.Columns()|^2)
+// each time (*Rows).ColumnTypes be called
+// https://cs.opensource.google/go/go/+/refs/tags/go1.19.4:src/database/sql/sql.go;l=3101
+// https://cs.opensource.google/go/go/+/refs/tags/go1.19.4:src/database/sql/sql.go;drc=f721fa3be9bb52524f97b409606f9423437535e8;l=3141
+func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
+	r.nextSet.Do(func() {
+		r.result.NextResultSet(context.Background())
+	})
+
+	f := func(s string) string {
+		if strings.HasPrefix(s, "Optional") {
+			s = strings.TrimPrefix(s, "Optional<")
+			s = strings.TrimSuffix(s, ">")
+		}
+		return strings.ToUpper(s)
+	}
+
+	var i int
+	yqlTypes := make([]string, r.result.CurrentResultSet().ColumnCount())
+	r.result.CurrentResultSet().Columns(func(m options.Column) {
+		yqlTypes[i] = f(m.Type.Yql())
+		i++
+	})
+	return yqlTypes[index]
 }
 
 func (r *rows) NextResultSet() error {
