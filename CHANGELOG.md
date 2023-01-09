@@ -1,3 +1,4 @@
+## v3.42.2
 * Added `trace.Details.Details()` method for use external detailer
 
 ## v3.42.1
