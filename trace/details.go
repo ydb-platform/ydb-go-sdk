@@ -6,6 +6,10 @@ import (
 
 type Details uint64
 
+func (d Details) Details() Details {
+	return d
+}
+
 const (
 	DriverNetEvents Details = 1 << iota // for bitmask: 1, 2, 4, 8, 16, 32, ...
 	DriverConnEvents
@@ -92,7 +96,7 @@ const (
 )
 
 var (
-	details = map[Details]string{
+	detailsMap = map[Details]string{
 		DriverEvents:            "ydb.driver",
 		DriverBalancerEvents:    "ydb.driver.balancer",
 		DriverNetEvents:         "ydb.driver.net",
@@ -180,7 +184,7 @@ func MatchDetails(pattern string, opts ...matchDetailsOption) (d Details) {
 	if err != nil {
 		return h.defaultDetails
 	}
-	for k, v := range details {
+	for k, v := range detailsMap {
 		if re.MatchString(v) {
 			d |= k
 		}
