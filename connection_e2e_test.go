@@ -7,6 +7,8 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	grpcCredentials "google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 	"net/url"
 	"os"
 	"testing"
@@ -335,7 +337,17 @@ func TestStaticCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	staticCredentials := credentials.NewStaticCredentials("root", "", url.Host)
+	staticCredentials := credentials.NewStaticCredentials("root", "", url.Host, func() grpc.DialOption {
+		if url.Scheme == "grpcs" {
+			transportCredentials, err := grpcCredentials.NewClientTLSFromFile(os.Getenv("YDB_SSL_ROOT_CERTIFICATES_FILE"), "")
+			if err != nil {
+				t.Fatalf("cannot create transport credentials: %v", err)
+			}
+			return grpc.WithTransportCredentials(transportCredentials)
+		}
+		return grpc.WithTransportCredentials(insecure.NewCredentials())
+	}())
+
 	token, err := staticCredentials.Token(ctx)
 	if err != nil {
 		t.Fatalf("get token failed: %v", err)
