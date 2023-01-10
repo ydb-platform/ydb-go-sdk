@@ -9,12 +9,20 @@ import (
 	"strings"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
+
+type XormQueryerContext interface {
+	XormQueryContext(context.Context, string, ...driver.NamedValue) (driver.Rows, error)
+}
+
+func (c *conn) XormQueryContext(ctx context.Context, query string, args ...driver.NamedValue) (driver.Rows, error) {
+	xorm := newXorm(ctx, c, query, args)
+	return xorm.queryMetadata()
+}
 
 type xormQueryMode int
 
@@ -61,7 +69,7 @@ var (
 type xorm struct {
 	ctx    context.Context
 	conn   *conn
-	params map[string]value.Value
+	params map[string]driver.Value
 	query  string
 	args   []driver.NamedValue
 }
@@ -70,21 +78,14 @@ func newXorm(ctx context.Context, c *conn, query string, args []driver.NamedValu
 	x := &xorm{
 		ctx:    ctx,
 		conn:   c,
-		params: make(map[string]value.Value),
+		params: make(map[string]driver.Value),
 		query:  query,
 		args:   args,
 	}
 	for _, arg := range args {
-		x.params[arg.Name] = arg.Value.(value.Value)
+		x.params[arg.Name] = arg.Value
 	}
 	return x
-}
-
-func checkXormQueryFromContext(ctx context.Context) bool {
-	if _, ok := ctx.Value(xormMetadataQuery).(string); ok {
-		return true
-	}
-	return false
 }
 
 func xormModeFromContext(ctx context.Context) xormQueryMode {
@@ -149,9 +150,10 @@ func (x *xorm) isTableExist() (columnNames []string, res xormResult, err error) 
 	if _, has := x.params["TableName"]; !has {
 		return nil, xormResult{}, fmt.Errorf("table name not found")
 	}
-	var tableName string
-	if err = value.CastTo(x.params["TableName"], &tableName); err != nil {
-		return nil, xormResult{}, err
+
+	tableName, ok := x.params["TableName"].(string)
+	if !ok {
+		return nil, xormResult{}, fmt.Errorf("TableName should be string, not %T", x.params["TableName"])
 	}
 
 	exist, err := x.checkTableExist(tableName)
@@ -195,14 +197,14 @@ func (x *xorm) isColumnExist() (columnNames []string, res xormResult, err error)
 		return nil, xormResult{}, fmt.Errorf("column name not found")
 	}
 
-	var tableName string
-	if err = value.CastTo(x.params["TableName"], &tableName); err != nil {
-		return nil, xormResult{}, err
+	tableName, ok := x.params["TableName"].(string)
+	if !ok {
+		return nil, xormResult{}, fmt.Errorf("TableName should be string, not %T", x.params["TableName"])
 	}
 
-	var columnName string
-	if err = value.CastTo(x.params["ColumnName"], &columnName); err != nil {
-		return nil, xormResult{}, err
+	columnName, ok := x.params["ColumnName"].(string)
+	if !ok {
+		return nil, xormResult{}, fmt.Errorf("ColumnName should be string, not %T", x.params["ColumnName"])
 	}
 
 	exist, err := x.checkColumnExist(columnName, tableName)
@@ -256,9 +258,9 @@ func (x *xorm) getColumns() (columnNames []string, res xormResult, err error) {
 		return nil, xormResult{}, fmt.Errorf("table name not found")
 	}
 
-	var tableName string
-	if err = value.CastTo(x.params["TableName"], &tableName); err != nil {
-		return nil, xormResult{}, err
+	tableName, ok := x.params["TableName"].(string)
+	if !ok {
+		return nil, xormResult{}, fmt.Errorf("TableName should be string, not %T", x.params["TableName"])
 	}
 
 	tableExist, err := x.checkTableExist(tableName)
@@ -306,23 +308,15 @@ func (x *xorm) getTables() (columnNames []string, res xormResult, err error) {
 	if _, has := x.params["DatabaseName"]; !has {
 		return nil, xormResult{}, fmt.Errorf("database name not found")
 	}
-	var dbName string
-	if err = value.CastTo(x.params["DatabaseName"], &dbName); err != nil {
-		return nil, xormResult{}, err
+
+	dbName, ok := x.params["DatabaseName"].(string)
+	if !ok {
+		return nil, xormResult{}, fmt.Errorf("DatabaseName should be string, not %T", x.params["DatabaseName"])
 	}
 
 	ignoreDirs := map[string]bool{
 		".sys":        true,
 		".sys_health": true,
-	}
-
-	if _, has := x.params["IgnoreDirs"]; has {
-		li := make([]string, 0)
-		if err = value.CastTo(x.params["IgnoreDirs"], &li); err == nil {
-			for _, v := range li {
-				ignoreDirs[v] = true
-			}
-		}
 	}
 
 	columnNames = append(columnNames, "TableName")
@@ -384,9 +378,10 @@ func (x *xorm) getIndexes() (columnNames []string, res xormResult, err error) {
 	if _, has := x.params["TableName"]; !has {
 		return nil, xormResult{}, fmt.Errorf("table name not found")
 	}
-	var tableName string
-	if err = value.CastTo(x.params["TableName"], &tableName); err != nil {
-		return nil, xormResult{}, err
+
+	tableName, ok := x.params["TableName"].(string)
+	if !ok {
+		return nil, xormResult{}, fmt.Errorf("TableName should be string, not %T", x.params["TableName"])
 	}
 
 	tableExist, err := x.checkTableExist(tableName)

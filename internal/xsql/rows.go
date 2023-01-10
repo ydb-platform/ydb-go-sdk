@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"io"
-	"strings"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -56,18 +55,10 @@ func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 		r.result.NextResultSet(context.Background())
 	})
 
-	f := func(s string) string {
-		if strings.HasPrefix(s, "Optional") {
-			s = strings.TrimPrefix(s, "Optional<")
-			s = strings.TrimSuffix(s, ">")
-		}
-		return strings.ToUpper(s)
-	}
-
 	var i int
 	yqlTypes := make([]string, r.result.CurrentResultSet().ColumnCount())
 	r.result.CurrentResultSet().Columns(func(m options.Column) {
-		yqlTypes[i] = f(m.Type.Yql())
+		yqlTypes[i] = m.Type.Yql()
 		i++
 	})
 	return yqlTypes[index]
