@@ -43,7 +43,7 @@ jobs:
         os: [ubuntu-latest]
     services:
       ydb:
-        image: amyasnikov/ydb:latest
+        image: amyasnikov/ydb:slim
         ports:
           - 2135:2135
           - 2136:2136
