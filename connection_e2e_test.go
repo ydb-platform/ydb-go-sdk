@@ -7,16 +7,19 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net/url"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Export_V1"
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Monitoring_V1"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scripting_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Export"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Monitoring"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scripting"
 	"google.golang.org/grpc"
@@ -26,6 +29,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -311,6 +315,94 @@ func TestConnection(t *testing.T) {
 			return nil
 		}, retry.WithIdempotent(true)); err != nil {
 			t.Fatalf("check export failed: %v", err)
+		}
+	})
+}
+
+func TestStaticCredentials(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	var dsn string
+	if v, has := os.LookupEnv("YDB_CONNECTION_STRING"); !has {
+		t.Fatal("env YDB_CONNECTION_STRING required")
+	} else {
+		dsn = v
+	}
+
+	url, err := url.Parse(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	staticCredentials := credentials.NewStaticCredentials("root", "", url.Host)
+	token, err := staticCredentials.Token(ctx)
+	if err != nil {
+		t.Fatalf("get token failed: %v", err)
+	} else {
+		fmt.Printf("token: %s\n", token)
+	}
+
+	db, err := ydb.Open(
+		ctx,
+		"", // corner case for check replacement of endpoint+database+secure
+		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
+		ydb.WithCredentials(staticCredentials),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		// cleanup connection
+		if e := db.Close(ctx); e != nil {
+			t.Fatalf("close failed: %+v", e)
+		}
+	}()
+	_, err = db.Discovery().WhoAmI(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestMonitoring(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	db, err := ydb.Open(
+		ctx,
+		"", // corner case for check replacement of endpoint+database+secure
+		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		// cleanup connection
+		if e := db.Close(ctx); e != nil {
+			t.Fatalf("close failed: %+v", e)
+		}
+	}()
+	t.Run("monitoring.SelfCheck", func(t *testing.T) {
+		if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+			client := Ydb_Monitoring_V1.NewMonitoringServiceClient(ydb.GRPCConn(db))
+			response, err := client.SelfCheck(ctx, &Ydb_Monitoring.SelfCheckRequest{
+				OperationParams:     nil,
+				ReturnVerboseStatus: false,
+				MinimumStatus:       0,
+				MaximumLevel:        0,
+			})
+			if err != nil {
+				return err
+			}
+			var result Ydb_Monitoring.SelfCheckResult
+			err = response.Operation.Result.UnmarshalTo(&result)
+			if err != nil {
+				return err
+			}
+			fmt.Printf("%+v\n", &result)
+			return nil
+		}, retry.WithIdempotent(true)); err != nil {
+			t.Fatalf("Execute failed: %v", err)
 		}
 	})
 }

@@ -18,7 +18,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	internalRatelimiter "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
 	internalScheme "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
@@ -428,7 +427,8 @@ func connect(ctx context.Context, c *connection) error {
 		c.config = c.config.With(config.WithCredentials(
 			credentials.NewStaticCredentials(
 				c.userInfo.User, c.userInfo.Password,
-				c.pool.Get(endpoint.New(c.config.Endpoint())),
+				c.config.Endpoint(),
+				c.config.GrpcDialOptions()...,
 			),
 		))
 	}
