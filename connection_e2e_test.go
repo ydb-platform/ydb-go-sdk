@@ -7,8 +7,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	grpcCredentials "google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/credentials/insecure"
 	"net/url"
 	"os"
 	"testing"
@@ -25,6 +23,8 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scripting"
 	"google.golang.org/grpc"
+	grpcCredentials "google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -339,9 +339,11 @@ func TestStaticCredentials(t *testing.T) {
 
 	staticCredentials := credentials.NewStaticCredentials("root", "", url.Host, func() grpc.DialOption {
 		if url.Scheme == "grpcs" {
-			transportCredentials, err := grpcCredentials.NewClientTLSFromFile(os.Getenv("YDB_SSL_ROOT_CERTIFICATES_FILE"), "")
+			transportCredentials, transportCredentialsErr := grpcCredentials.NewClientTLSFromFile(
+				os.Getenv("YDB_SSL_ROOT_CERTIFICATES_FILE"), url.Hostname(),
+			)
 			if err != nil {
-				t.Fatalf("cannot create transport credentials: %v", err)
+				t.Fatalf("cannot create transport credentials: %v", transportCredentialsErr)
 			}
 			return grpc.WithTransportCredentials(transportCredentials)
 		}
