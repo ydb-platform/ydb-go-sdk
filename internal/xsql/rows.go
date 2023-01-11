@@ -23,8 +23,11 @@ var (
 )
 
 type rows struct {
-	conn    *conn
-	result  result.BaseResult
+	conn   *conn
+	result result.BaseResult
+
+	// nextSet once need for get first result set as default.
+	// Iterate over many result sets must be with rows.NextResultSet()
 	nextSet sync.Once
 }
 

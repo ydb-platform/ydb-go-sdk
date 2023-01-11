@@ -1,5 +1,6 @@
 * Added `credentials.NewStaticCredentials()` static credentials constructor
 * Changed `internal/credentials.NewStaticCredentials()` signature and behaviour for create grpc connection on each call to auth service 
+* Downgrade `google.golang.org/grpc` to `v1.49.0`
 
 ## v3.42.2
 * Added `trace.Details.Details()` method for use external detailer
