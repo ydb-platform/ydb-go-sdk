@@ -1,3 +1,5 @@
+* Added `ydb.WithDisableServerBalancer()` database/sql connector option
+
 ## v3.42.3
 * Added `credentials.NewStaticCredentials()` static credentials constructor
 * Changed `internal/credentials.NewStaticCredentials()` signature and behaviour for create grpc connection on each call to auth service 

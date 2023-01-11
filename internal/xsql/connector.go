@@ -51,6 +51,13 @@ func WithTrace(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) Conn
 	}
 }
 
+func WithDisableServerBalancer() ConnectorOption {
+	return func(c *Connector) error {
+		c.disableServerBalancer = true
+		return nil
+	}
+}
+
 func Open(d Driver, connection connection, opts ...ConnectorOption) (_ *Connector, err error) {
 	c := &Connector{
 		driver:           d,
@@ -90,10 +97,11 @@ type Connector struct {
 	driver     Driver
 	connection connection
 
-	defaultTxControl     *table.TransactionControl
-	defaultQueryMode     QueryMode
-	defaultDataQueryOpts []options.ExecuteDataQueryOption
-	defaultScanQueryOpts []options.ExecuteScanQueryOption
+	defaultTxControl      *table.TransactionControl
+	defaultQueryMode      QueryMode
+	defaultDataQueryOpts  []options.ExecuteDataQueryOption
+	defaultScanQueryOpts  []options.ExecuteScanQueryOption
+	disableServerBalancer bool
 
 	trace trace.DatabaseSQL
 }
@@ -117,11 +125,10 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 	defer func() {
 		onDone(err)
 	}()
-	s, err := c.connection.Table().CreateSession( //nolint:staticcheck // SA1019
-		meta.WithAllowFeatures(ctx,
-			metaHeaders.HintSessionBalancer,
-		),
-	)
+	if !c.disableServerBalancer {
+		ctx = meta.WithAllowFeatures(ctx, metaHeaders.HintSessionBalancer)
+	}
+	s, err := c.connection.Table().CreateSession(ctx) //nolint:staticcheck // SA1019
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

@@ -117,6 +117,10 @@ func WithDatabaseSQLTrace(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeO
 	return xsql.WithTrace(t, opts...)
 }
 
+func WithDisableServerBalancer() ConnectorOption {
+	return xsql.WithDisableServerBalancer()
+}
+
 func Connector(db Connection, opts ...ConnectorOption) (*xsql.Connector, error) {
 	if c, ok := db.(*connection); ok {
 		opts = append(opts, c.databaseSQLOptions...)
