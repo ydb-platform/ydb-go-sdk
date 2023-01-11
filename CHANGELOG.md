@@ -1,3 +1,4 @@
+## v3.42.4
 * Added `ydb.WithDisableServerBalancer()` database/sql connector option
 
 ## v3.42.3
