@@ -69,7 +69,7 @@ type conn struct {
 }
 
 func (c *conn) IsValid() bool {
-	return !c.isClosed()
+	return c.isReady()
 }
 
 type currentTx interface {
@@ -87,7 +87,6 @@ var (
 	_ driver.QueryerContext     = &conn{}
 	_ driver.Pinger             = &conn{}
 	_ driver.NamedValueChecker  = &conn{}
-	_ driver.SessionResetter    = &conn{}
 	_ driver.Validator          = &conn{}
 )
 
@@ -109,7 +108,7 @@ func (c *conn) checkClosed(err error) error {
 	return err
 }
 
-func (c *conn) isClosed() bool {
+func (c *conn) isReady() bool {
 	if atomic.LoadUint32(&c.closed) == 1 {
 		return true
 	}
@@ -129,8 +128,8 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt,
 	defer func() {
 		onDone(err)
 	}()
-	if c.isClosed() {
-		return nil, errClosedConn
+	if !c.isReady() {
+		return nil, errNotReadyConn
 	}
 	return &stmt{
 		conn:  c,
@@ -203,8 +202,8 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 }
 
 func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, err error) {
-	if c.isClosed() {
-		return nil, errClosedConn
+	if !c.isReady() {
+		return nil, errNotReadyConn
 	}
 	if c.currentTx != nil {
 		return c.currentTx.ExecContext(ctx, query, args)
@@ -213,8 +212,8 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 }
 
 func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, err error) {
-	if c.isClosed() {
-		return nil, errClosedConn
+	if !c.isReady() {
+		return nil, errNotReadyConn
 	}
 	if c.currentTx != nil {
 		return c.currentTx.QueryContext(ctx, query, args)
@@ -307,8 +306,8 @@ func (c *conn) Ping(ctx context.Context) (err error) {
 	defer func() {
 		onDone(err)
 	}()
-	if c.isClosed() {
-		return errClosedConn
+	if !c.isReady() {
+		return errNotReadyConn
 	}
 	if err = c.session.KeepAlive(ctx); err != nil {
 		return c.checkClosed(xerrors.WithStackTrace(err))
@@ -317,15 +316,18 @@ func (c *conn) Ping(ctx context.Context) (err error) {
 }
 
 func (c *conn) Close() (err error) {
-	onDone := trace.DatabaseSQLOnConnClose(c.trace)
-	defer func() {
-		onDone(err)
-	}()
-	err = c.session.Close(context.Background())
-	if err != nil {
-		return c.checkClosed(xerrors.WithStackTrace(err))
+	if atomic.CompareAndSwapUint32(&c.closed, 0, 1) {
+		onDone := trace.DatabaseSQLOnConnClose(c.trace)
+		defer func() {
+			onDone(err)
+		}()
+		err = c.session.Close(context.Background())
+		if err != nil {
+			return badconn.Map(xerrors.WithStackTrace(err))
+		}
+		return nil
 	}
-	return nil
+	return errClosedConn
 }
 
 func (c *conn) Prepare(string) (driver.Stmt, error) {
@@ -342,8 +344,8 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 	defer func() {
 		onDone(transaction, err)
 	}()
-	if c.isClosed() {
-		return nil, errClosedConn
+	if !c.isReady() {
+		return nil, errNotReadyConn
 	}
 	if c.currentTx != nil {
 		return nil, xerrors.WithStackTrace(
@@ -365,14 +367,4 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 		tx:   transaction,
 	}
 	return c.currentTx, nil
-}
-
-func (c *conn) ResetSession(_ context.Context) error {
-	if c.currentTx != nil {
-		_ = c.currentTx.Rollback()
-	}
-	if c.isClosed() {
-		return errClosedConn
-	}
-	return nil
 }

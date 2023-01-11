@@ -9,7 +9,8 @@ import (
 )
 
 var (
-	ErrUnsupported = driver.ErrSkip
-	errDeprecated  = driver.ErrSkip
-	errClosedConn  = badconn.Map(xerrors.Retryable(errors.New("conn closed early"), xerrors.WithDeleteSession()))
+	ErrUnsupported  = driver.ErrSkip
+	errDeprecated   = driver.ErrSkip
+	errClosedConn   = badconn.Map(xerrors.Retryable(errors.New("conn closed early"), xerrors.WithDeleteSession()))
+	errNotReadyConn = badconn.Map(xerrors.Retryable(errors.New("conn not ready"), xerrors.WithDeleteSession()))
 )

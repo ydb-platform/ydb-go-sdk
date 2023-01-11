@@ -26,8 +26,8 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ dr
 	defer func() {
 		onDone(err)
 	}()
-	if s.conn.isClosed() {
-		return nil, errClosedConn
+	if !s.conn.isReady() {
+		return nil, errNotReadyConn
 	}
 	switch m := queryModeFromContext(ctx, s.conn.defaultQueryMode); m {
 	case DataQueryMode:
@@ -42,8 +42,8 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ dri
 	defer func() {
 		onDone(err)
 	}()
-	if s.conn.isClosed() {
-		return nil, errClosedConn
+	if !s.conn.isReady() {
+		return nil, errNotReadyConn
 	}
 	switch m := queryModeFromContext(ctx, s.conn.defaultQueryMode); m {
 	case DataQueryMode:
