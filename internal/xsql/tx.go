@@ -6,6 +6,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -37,11 +38,11 @@ func (tx *tx) Commit() (err error) {
 		tx.conn.currentTx = nil
 	}()
 	if !tx.conn.isReady() {
-		return errNotReadyConn
+		return badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
 	_, err = tx.tx.CommitTx(tx.ctx)
 	if err != nil {
-		return tx.conn.checkClosed(xerrors.WithStackTrace(err))
+		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 	return nil
 }
@@ -55,11 +56,11 @@ func (tx *tx) Rollback() (err error) {
 		tx.conn.currentTx = nil
 	}()
 	if !tx.conn.isReady() {
-		return errNotReadyConn
+		return badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
 	err = tx.tx.Rollback(tx.ctx)
 	if err != nil {
-		return tx.conn.checkClosed(xerrors.WithStackTrace(err))
+		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 	return err
 }
@@ -76,10 +77,10 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 		dataQueryOptions(ctx)...,
 	)
 	if err != nil {
-		return nil, tx.conn.checkClosed(xerrors.WithStackTrace(err))
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
 	if err = res.Err(); err != nil {
-		return nil, tx.conn.checkClosed(xerrors.WithStackTrace(err))
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
 	return &rows{
 		conn:   tx.conn,
@@ -98,7 +99,7 @@ func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.Named
 		dataQueryOptions(ctx)...,
 	)
 	if err != nil {
-		return nil, tx.conn.checkClosed(xerrors.WithStackTrace(err))
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
 	return driver.ResultNoRows, nil
 }

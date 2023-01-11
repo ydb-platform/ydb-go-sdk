@@ -5,6 +5,8 @@ import (
 	"database/sql/driver"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -27,7 +29,7 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ dr
 		onDone(err)
 	}()
 	if !s.conn.isReady() {
-		return nil, errNotReadyConn
+		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
 	switch m := queryModeFromContext(ctx, s.conn.defaultQueryMode); m {
 	case DataQueryMode:
@@ -43,7 +45,7 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ dri
 		onDone(err)
 	}()
 	if !s.conn.isReady() {
-		return nil, errNotReadyConn
+		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
 	switch m := queryModeFromContext(ctx, s.conn.defaultQueryMode); m {
 	case DataQueryMode:

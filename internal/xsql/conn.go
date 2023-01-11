@@ -101,22 +101,8 @@ func newConn(c *Connector, s table.ClosableSession, opts ...connOption) *conn {
 	return cc
 }
 
-func (c *conn) checkClosed(err error) error {
-	if err = badconn.Map(err); xerrors.Is(err, driver.ErrBadConn) {
-		atomic.StoreUint32(&c.closed, 1)
-	}
-	return err
-}
-
 func (c *conn) isReady() bool {
-	if atomic.LoadUint32(&c.closed) == 1 {
-		return true
-	}
-	if c.session.Status() != table.SessionReady {
-		atomic.StoreUint32(&c.closed, 1)
-		return true
-	}
-	return false
+	return c.session.Status() == table.SessionReady
 }
 
 func (conn) CheckNamedValue(v *driver.NamedValue) (err error) {
@@ -129,7 +115,7 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt,
 		onDone(err)
 	}()
 	if !c.isReady() {
-		return nil, errNotReadyConn
+		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
 	return &stmt{
 		conn:  c,
@@ -162,38 +148,38 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 			dataQueryOptions(ctx)...,
 		)
 		if err != nil {
-			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
 		defer func() {
 			_ = res.Close()
 		}()
 		if err = res.NextResultSetErr(ctx); !xerrors.Is(err, nil, io.EOF) {
-			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
 		if err = res.Err(); err != nil {
-			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
 		return driver.ResultNoRows, nil
 	case SchemeQueryMode:
 		err = c.session.ExecuteSchemeQuery(ctx, query)
 		if err != nil {
-			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
 		return driver.ResultNoRows, nil
 	case ScriptingQueryMode:
 		var res result.StreamResult
 		res, err = c.connector.connection.Scripting().StreamExecute(ctx, query, toQueryParams(args))
 		if err != nil {
-			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
 		defer func() {
 			_ = res.Close()
 		}()
 		if err = res.NextResultSetErr(ctx); !xerrors.Is(err, nil, io.EOF) {
-			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
 		if err = res.Err(); err != nil {
-			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
 		return driver.ResultNoRows, nil
 	default:
@@ -203,7 +189,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 
 func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, err error) {
 	if !c.isReady() {
-		return nil, errNotReadyConn
+		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
 	if c.currentTx != nil {
 		return c.currentTx.ExecContext(ctx, query, args)
@@ -213,7 +199,7 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 
 func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, err error) {
 	if !c.isReady() {
-		return nil, errNotReadyConn
+		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
 	if c.currentTx != nil {
 		return c.currentTx.QueryContext(ctx, query, args)
@@ -245,10 +231,10 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 			dataQueryOptions(ctx)...,
 		)
 		if err != nil {
-			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
 		if err = res.Err(); err != nil {
-			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
 		return &rows{
 			conn:   c,
@@ -262,10 +248,10 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 			scanQueryOptions(ctx)...,
 		)
 		if err != nil {
-			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
 		if err = res.Err(); err != nil {
-			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
 		return &rows{
 			conn:   c,
@@ -275,7 +261,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		var exp table.DataQueryExplanation
 		exp, err = c.session.Explain(ctx, query)
 		if err != nil {
-			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
 		return &single{
 			values: []sql.NamedArg{
@@ -287,10 +273,10 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		var res result.StreamResult
 		res, err = c.connector.connection.Scripting().StreamExecute(ctx, query, toQueryParams(args))
 		if err != nil {
-			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
 		if err = res.Err(); err != nil {
-			return nil, c.checkClosed(xerrors.WithStackTrace(err))
+			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
 		return &rows{
 			conn:   c,
@@ -307,10 +293,10 @@ func (c *conn) Ping(ctx context.Context) (err error) {
 		onDone(err)
 	}()
 	if !c.isReady() {
-		return errNotReadyConn
+		return badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
 	if err = c.session.KeepAlive(ctx); err != nil {
-		return c.checkClosed(xerrors.WithStackTrace(err))
+		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 	return nil
 }
@@ -327,7 +313,7 @@ func (c *conn) Close() (err error) {
 		}
 		return nil
 	}
-	return errClosedConn
+	return badconn.Map(xerrors.WithStackTrace(errClosedConn))
 }
 
 func (c *conn) Prepare(string) (driver.Stmt, error) {
@@ -345,7 +331,7 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 		onDone(transaction, err)
 	}()
 	if !c.isReady() {
-		return nil, errNotReadyConn
+		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
 	if c.currentTx != nil {
 		return nil, xerrors.WithStackTrace(
@@ -359,7 +345,7 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 	}
 	transaction, err = c.session.BeginTransaction(ctx, table.TxSettings(txc))
 	if err != nil {
-		return nil, c.checkClosed(xerrors.WithStackTrace(err))
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
 	c.currentTx = &tx{
 		conn: c,
