@@ -1,3 +1,5 @@
+* Downgrade `google.golang.org/grpc` to `v1.49.0`
+
 ## v3.42.2
 * Added `trace.Details.Details()` method for use external detailer
 
