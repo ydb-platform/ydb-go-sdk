@@ -43,7 +43,7 @@ jobs:
         os: [ubuntu-latest]
     services:
       ydb:
-        image: amyasnikov/ydb:slim
+        image: cr.yandex/yc/yandex-docker-local-ydb:latest
         ports:
           - 2135:2135
           - 2136:2136
@@ -51,6 +51,7 @@ jobs:
         volumes:
           - /tmp/ydb_certs:/ydb_certs
         env:
+          YDB_LOCAL_SURVIVE_RESTART: true
           YDB_USE_IN_MEMORY_PDISKS: true
         options: '-h localhost'
     env:
