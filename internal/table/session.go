@@ -184,17 +184,19 @@ func (s *session) Close(ctx context.Context) (err error) {
 
 		onDone := trace.TableOnSessionDelete(s.config.Trace(), &ctx, s)
 
-		_, err = s.tableService.DeleteSession(
-			ctx,
-			&Ydb_Table.DeleteSessionRequest{
-				SessionId: s.id,
-				OperationParams: operation.Params(ctx,
-					s.config.OperationTimeout(),
-					s.config.OperationCancelAfter(),
-					operation.ModeSync,
-				),
-			},
-		)
+		if time.Since(s.LastUsage()) < s.config.IdleThreshold() {
+			_, err = s.tableService.DeleteSession(
+				ctx,
+				&Ydb_Table.DeleteSessionRequest{
+					SessionId: s.id,
+					OperationParams: operation.Params(ctx,
+						s.config.OperationTimeout(),
+						s.config.OperationCancelAfter(),
+						operation.ModeSync,
+					),
+				},
+			)
+		}
 
 		for _, onClose := range s.onClose {
 			onClose(s)
