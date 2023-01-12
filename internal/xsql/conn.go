@@ -98,6 +98,7 @@ func newConn(c *Connector, s table.ClosableSession, opts ...connOption) *conn {
 	for _, o := range opts {
 		o(cc)
 	}
+	c.attach(cc)
 	return cc
 }
 
@@ -124,6 +125,10 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt,
 	}, nil
 }
 
+func (c *conn) sinceLastUsage() time.Duration {
+	return time.Since(time.Unix(atomic.LoadInt64(&c.lastUsage), 0))
+}
+
 func (c *conn) execContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, err error) {
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
 	onDone := trace.DatabaseSQLOnConnExec(
@@ -132,7 +137,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		query,
 		m.String(),
 		xcontext.IsIdempotent(ctx),
-		time.Since(time.Unix(atomic.LoadInt64(&c.lastUsage), 0)),
+		c.sinceLastUsage(),
 	)
 	defer func() {
 		atomic.StoreInt64(&c.lastUsage, time.Now().Unix())
@@ -215,7 +220,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		query,
 		m.String(),
 		xcontext.IsIdempotent(ctx),
-		time.Since(time.Unix(atomic.LoadInt64(&c.lastUsage), 0)),
+		c.sinceLastUsage(),
 	)
 	defer func() {
 		atomic.StoreInt64(&c.lastUsage, time.Now().Unix())
@@ -303,6 +308,7 @@ func (c *conn) Ping(ctx context.Context) (err error) {
 
 func (c *conn) Close() (err error) {
 	if atomic.CompareAndSwapUint32(&c.closed, 0, 1) {
+		c.connector.detach(c)
 		onDone := trace.DatabaseSQLOnConnClose(c.trace)
 		defer func() {
 			onDone(err)
@@ -313,7 +319,7 @@ func (c *conn) Close() (err error) {
 		}
 		return nil
 	}
-	return badconn.Map(xerrors.WithStackTrace(errClosedConn))
+	return badconn.Map(xerrors.WithStackTrace(errConnClosedEarly))
 }
 
 func (c *conn) Prepare(string) (driver.Stmt, error) {

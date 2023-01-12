@@ -1,5 +1,6 @@
 * Fixed closing of `database/sql` connection (aka `YDB` session)
 * Made `session.Close()` as `nop` for idled session
+* Implemented goroutine for closing idle connection in `database/sql` driver
 
 ## v3.42.4
 * Added `ydb.WithDisableServerBalancer()` database/sql connector option
