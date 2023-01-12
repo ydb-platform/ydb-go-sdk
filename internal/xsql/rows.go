@@ -4,10 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
+	"fmt"
 	"io"
+	"path"
+	"strings"
 	"sync"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/helpers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
@@ -45,11 +51,9 @@ func (r *rows) Columns() []string {
 	return cs
 }
 
-// Add `ColumnTypeDatabaseTypeName` to support `Xorm`
 // NOTE: Need to optimize somehow? This might take O(|r.Columns()|^2)
 // each time (*Rows).ColumnTypes be called
 // https://cs.opensource.google/go/go/+/refs/tags/go1.19.4:src/database/sql/sql.go;l=3101
-// https://cs.opensource.google/go/go/+/refs/tags/go1.19.4:src/database/sql/sql.go;drc=f721fa3be9bb52524f97b409606f9423437535e8;l=3141
 func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 	r.nextSet.Do(func() {
 		r.result.NextResultSet(context.Background())
@@ -130,4 +134,304 @@ func (r *single) Next(dst []driver.Value) error {
 	}
 	r.values = nil
 	return nil
+}
+
+type multiRows struct {
+	rows
+	columns     []string
+	values      [][]sql.NamedArg
+	currentRow  int
+	initColumns bool
+}
+
+var _ driver.Rows = &multiRows{}
+
+func (mr *multiRows) Columns() (columns []string) {
+	if mr.currentRow >= len(mr.values) {
+		return
+	}
+	if !mr.initColumns {
+		if mr.columns == nil {
+			mr.columns = make([]string, len(mr.values[mr.currentRow]))
+		}
+		for i := range mr.values[mr.currentRow] {
+			mr.columns[i] = mr.values[mr.currentRow][i].Name
+		}
+		mr.initColumns = true
+	}
+	columns = append(columns, mr.columns...)
+	return columns
+}
+
+func (mr *multiRows) Close() error {
+	return nil
+}
+
+func (mr *multiRows) Next(dst []driver.Value) error {
+	if mr.currentRow >= len(mr.values) {
+		return io.EOF
+	}
+	if !mr.initColumns {
+		if mr.columns == nil {
+			mr.columns = make([]string, len(mr.values[mr.currentRow]))
+		}
+		for i := range mr.values[mr.currentRow] {
+			mr.columns[i] = mr.values[mr.currentRow][i].Name
+		}
+		mr.initColumns = true
+	}
+
+	for i := range mr.values[mr.currentRow] {
+		dst[i] = mr.values[mr.currentRow][i].Value
+	}
+
+	mr.currentRow++
+	return nil
+}
+
+func (mr *multiRows) isTableExist(ctx context.Context, _ string, args []driver.NamedValue) (err error) {
+	margs := make(map[string]driver.Value)
+	for _, arg := range args {
+		margs[arg.Name] = arg.Value
+	}
+	if _, has := margs["TableName"]; !has {
+		return fmt.Errorf("table name not found")
+	}
+
+	var (
+		tableName = margs["TableName"].(string)
+		cn        = mr.conn.connector.Connection()
+	)
+
+	exist, err := helpers.IsTableExists(ctx, cn.Scheme(), tableName)
+	if err != nil {
+		return err
+	}
+
+	mr.values = make([][]sql.NamedArg, 0)
+	if exist {
+		mr.values = append(mr.values, []sql.NamedArg{sql.Named("TableName", tableName)})
+	}
+	return
+}
+
+func (mr *multiRows) isColumnExist(ctx context.Context, _ string, args []driver.NamedValue) (err error) {
+	margs := make(map[string]driver.Value)
+	for _, arg := range args {
+		margs[arg.Name] = arg.Value
+	}
+
+	if _, has := margs["TableName"]; !has {
+		return fmt.Errorf("table name not found")
+	}
+	if _, has := margs["ColumnName"]; !has {
+		return fmt.Errorf("column name not found")
+	}
+
+	var (
+		tableName   = margs["TableName"].(string)
+		columnName  = margs["ColumnName"].(string)
+		columnExist = false
+		cn          = mr.conn.connector.Connection()
+	)
+
+	tableExist, err := helpers.IsTableExists(ctx, cn.Scheme(), tableName)
+	if err != nil {
+		return err
+	}
+	if !tableExist {
+		return fmt.Errorf("table '%s' not exist", tableName)
+	}
+
+	session := mr.conn.session
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		desc, err := session.DescribeTable(ctx, tableName)
+		if err != nil {
+			return
+		}
+		for _, col := range desc.Columns {
+			if col.Name == columnName {
+				columnExist = true
+				break
+			}
+		}
+		return
+	}, retry.WithIdempotent(true))
+	if err != nil {
+		return err
+	}
+
+	mr.values = make([][]sql.NamedArg, 0)
+	if columnExist {
+		mr.values = append(mr.values, []sql.NamedArg{sql.Named("ColumnName", columnName)})
+	}
+	return err
+}
+
+func (mr *multiRows) getColumns(ctx context.Context, _ string, args []driver.NamedValue) (err error) {
+	margs := make(map[string]driver.Value)
+	for _, arg := range args {
+		margs[arg.Name] = arg.Value
+	}
+	if _, has := margs["TableName"]; !has {
+		return fmt.Errorf("table name not found")
+	}
+
+	var (
+		tableName = margs["TableName"].(string)
+		cn        = mr.conn.connector.Connection()
+	)
+
+	mr.values = make([][]sql.NamedArg, 0)
+
+	tableExist, err := helpers.IsTableExists(ctx, cn.Scheme(), tableName)
+	if err != nil {
+		return err
+	}
+	if !tableExist {
+		return fmt.Errorf("table '%s' not exist", tableName)
+	}
+
+	session := mr.conn.session
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		desc, err := session.DescribeTable(ctx, tableName)
+		if err != nil {
+			return err
+		}
+
+		isPk := make(map[string]bool)
+		for _, pk := range desc.PrimaryKey {
+			isPk[pk] = true
+		}
+
+		for _, col := range desc.Columns {
+			mr.values = append(mr.values, []sql.NamedArg{
+				sql.Named("ColumnName", col.Name),
+				sql.Named("TableName", tableName),
+				sql.Named("DataType", col.Type.Yql()),
+				sql.Named("IsPrimaryKey", isPk[col.Name]),
+			})
+		}
+		return
+	}, retry.WithIdempotent(true))
+	if err != nil {
+		return err
+	}
+	return err
+}
+
+func (mr *multiRows) getTables(ctx context.Context, _ string, args []driver.NamedValue) (err error) {
+	margs := make(map[string]driver.Value)
+	for _, arg := range args {
+		margs[arg.Name] = arg.Value
+	}
+	if _, has := margs["DatabaseName"]; !has {
+		return fmt.Errorf("database name not found")
+	}
+
+	var (
+		databaseName = margs["DatabaseName"].(string)
+		cn           = mr.conn.connector.Connection()
+		schemeClient = cn.Scheme()
+	)
+
+	ignoreDirs := map[string]bool{
+		".sys":        true,
+		".sys_health": true,
+	}
+
+	mr.values = make([][]sql.NamedArg, 0)
+
+	canEnter := func(dir string) bool {
+		if _, ignore := ignoreDirs[dir]; ignore {
+			return false
+		}
+		return true
+	}
+
+	queue := make([]string, 0)
+	queue = append(queue, databaseName)
+
+	for st := 0; st < len(queue); st++ {
+		curDir := queue[st]
+
+		var e scheme.Entry
+		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+			e, err = schemeClient.DescribePath(ctx, curDir)
+			return
+		}, retry.WithIdempotent(true))
+
+		if err != nil {
+			return err
+		}
+
+		if e.IsTable() {
+			mr.values = append(mr.values, []sql.NamedArg{sql.Named("TableName", curDir)})
+			continue
+		}
+
+		var d scheme.Directory
+		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+			d, err = schemeClient.ListDirectory(ctx, curDir)
+			return
+		}, retry.WithIdempotent(true))
+
+		if err != nil {
+			return err
+		}
+
+		for _, child := range d.Children {
+			if child.IsDirectory() || child.IsTable() {
+				if canEnter(child.Name) {
+					queue = append(queue, path.Join(curDir, child.Name))
+				}
+			}
+		}
+	}
+	return err
+}
+
+func (mr *multiRows) getIndexes(ctx context.Context, _ string, args []driver.NamedValue) (err error) {
+	margs := make(map[string]driver.Value)
+	for _, arg := range args {
+		margs[arg.Name] = arg.Value
+	}
+	if _, has := margs["TableName"]; !has {
+		return fmt.Errorf("table name not found")
+	}
+
+	var (
+		tableName = margs["TableName"].(string)
+		cn        = mr.conn.connector.Connection()
+	)
+
+	tableExist, err := helpers.IsTableExists(ctx, cn.Scheme(), tableName)
+	if err != nil {
+		return err
+	}
+	if !tableExist {
+		return fmt.Errorf("table '%s' not exist", tableName)
+	}
+
+	mr.values = make([][]sql.NamedArg, 0)
+
+	session := mr.conn.session
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		desc, err := session.DescribeTable(ctx, tableName)
+		if err != nil {
+			return err
+		}
+		for _, indexDesc := range desc.Indexes {
+			mr.values = append(mr.values, []sql.NamedArg{
+				sql.Named("IndexName", indexDesc.Name),
+				sql.Named("Columns", strings.Join(indexDesc.IndexColumns, ",")),
+			})
+		}
+		return
+	}, retry.WithIdempotent(true))
+	if err != nil {
+		return err
+	}
+
+	return err
 }

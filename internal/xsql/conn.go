@@ -376,3 +376,59 @@ func (c *conn) ResetSession(_ context.Context) error {
 	}
 	return nil
 }
+
+func (c *conn) MetadataQuery(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, err error) {
+	const (
+		metadataQuery          = "metadata-query"
+		versionQueryMode       = "version"
+		isTableExistQueryMode  = "is-table-exist"
+		isColumnExistQueryMode = "is-column-exist"
+		getColumnsQueryMode    = "get-columns"
+		getTablesQueryMode     = "get-tables"
+		getIndexesQueryMode    = "get-indexes"
+	)
+
+	const (
+		versionMajor = "22"
+		versionMinor = "4"
+		versionPatch = "44"
+		version      = versionMajor + "." + versionMinor + "." + versionPatch
+	)
+
+	mt, ok := ctx.Value(metadataQuery).(string)
+	if !ok {
+		return nil, fmt.Errorf("context is not in metadata query mode")
+	}
+
+	mr := &multiRows{
+		rows: rows{
+			conn: c,
+		},
+	}
+
+	switch mt {
+	case versionQueryMode:
+		return &single{
+			values: []sql.NamedArg{
+				sql.Named("Version", "YDB Server "+"v"+version),
+			},
+		}, nil
+	case isTableExistQueryMode:
+		err = mr.isTableExist(ctx, query, args)
+	case isColumnExistQueryMode:
+		err = mr.isColumnExist(ctx, query, args)
+	case getColumnsQueryMode:
+		err = mr.getColumns(ctx, query, args)
+	case getTablesQueryMode:
+		err = mr.getTables(ctx, query, args)
+	case getIndexesQueryMode:
+		err = mr.getIndexes(ctx, query, args)
+	default:
+		return nil, fmt.Errorf("mode %s is not supported", mt)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	return mr, nil
+}
