@@ -142,9 +142,10 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.
 	}
 
 	s = &session{
-		id:     result.GetSessionId(),
-		config: config,
-		status: table.SessionReady,
+		id:        result.GetSessionId(),
+		config:    config,
+		status:    table.SessionReady,
+		lastUsage: time.Now().Unix(),
 	}
 
 	s.tableService = Ydb_Table_V1.NewTableServiceClient(
@@ -185,8 +186,7 @@ func (s *session) Close(ctx context.Context) (err error) {
 		onDone := trace.TableOnSessionDelete(s.config.Trace(), &ctx, s)
 
 		if time.Since(s.LastUsage()) < s.config.IdleThreshold() {
-			_, err = s.tableService.DeleteSession(
-				ctx,
+			_, err = s.tableService.DeleteSession(ctx,
 				&Ydb_Table.DeleteSessionRequest{
 					SessionId: s.id,
 					OperationParams: operation.Params(ctx,
