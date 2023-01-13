@@ -69,7 +69,11 @@ func TestReader_Close(t *testing.T) {
 		readerReadMessageBatchState := newCallState()
 
 		go func() {
-			readerCommitState.err = reader.Commit(context.Background(), &PublicMessage{})
+			readerCommitState.err = reader.Commit(context.Background(), &PublicMessage{
+				commitRange: commitRange{
+					partitionSession: &partitionSession{},
+				},
+			})
 			close(readerCommitState.callCompleted)
 		}()
 
