@@ -208,7 +208,7 @@ func (c *committer) waitCommitAck(ctx context.Context, waiter commitWaiter) erro
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-waiter.Session.Context().Done():
-		return waiter.Session.Context().Err()
+		return PublicErrCommitSessionToExpiredSession
 	case <-waiter.Committed:
 		return nil
 	}

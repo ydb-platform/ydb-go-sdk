@@ -197,7 +197,7 @@ func TestTopicStreamReaderImpl_Create(t *testing.T) {
 		}, nil)
 		stream.EXPECT().CloseSend().Return(nil)
 
-		reader, err := newTopicStreamReader(stream, newTopicStreamReaderConfig())
+		reader, err := newTopicStreamReader(nextReaderID(), stream, newTopicStreamReaderConfig())
 		require.Error(t, err)
 		require.Nil(t, reader)
 	})
@@ -679,21 +679,41 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 }
 
 func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
-	sleep := func() {
-		time.Sleep(time.Second / 10)
+	commitByMode := func(mode PublicCommitMode) error {
+		sleep := func() {
+			time.Sleep(time.Second / 10)
+		}
+		e := newTopicReaderTestEnv(t)
+		e.reader.cfg.CommitMode = mode
+		e.Start()
+
+		cr := commitRange{
+			partitionSession: newPartitionSession(
+				context.Background(),
+				"asd",
+				123,
+				nextReaderID(),
+				"bad-connection-id",
+				222,
+				213,
+			),
+		}
+		commitErr := e.reader.Commit(e.ctx, cr)
+
+		sleep()
+
+		require.False(t, e.reader.closed)
+		return commitErr
 	}
-	e := newTopicReaderTestEnv(t)
-	e.Start()
-
-	cr := commitRange{
-		partitionSession: newPartitionSession(context.Background(), "asd", 123, 222, 213),
-	}
-	err := e.reader.Commit(e.ctx, cr)
-	require.Error(t, err)
-
-	sleep()
-
-	require.False(t, e.reader.closed)
+	t.Run("CommitModeNone", func(t *testing.T) {
+		require.ErrorIs(t, commitByMode(CommitModeNone), ErrCommitDisabled)
+	})
+	t.Run("CommitModeSync", func(t *testing.T) {
+		require.ErrorIs(t, commitByMode(CommitModeSync), PublicErrCommitSessionToExpiredSession)
+	})
+	t.Run("CommitModeAsync", func(t *testing.T) {
+		require.NoError(t, commitByMode(CommitModeAsync))
+	})
 }
 
 type streamEnv struct {
@@ -733,14 +753,22 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	cfg.BufferSizeProtoBytes = initialBufferSizeBytes
 	cfg.CommitterBatchTimeLag = 0
 
-	reader := newTopicStreamReaderStopped(stream, cfg)
+	reader := newTopicStreamReaderStopped(nextReaderID(), stream, cfg)
 	// reader.initSession() - skip stream level initialization
 
 	const testPartitionID = 5
 	const testSessionID = 15
 	const testSessionComitted = 20
 
-	session := newPartitionSession(ctx, "/test", testPartitionID, testSessionID, testSessionComitted)
+	session := newPartitionSession(
+		ctx,
+		"/test",
+		testPartitionID,
+		reader.readerID,
+		reader.readConnectionID,
+		testSessionID,
+		testSessionComitted,
+	)
 	require.NoError(t, reader.sessionController.Add(session))
 
 	env := streamEnv{

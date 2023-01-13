@@ -297,10 +297,10 @@ func (c *conn) Invoke(
 	opts ...grpc.CallOption,
 ) (err error) {
 	var (
-		opID     string
-		issues   []trace.Issue
-		wrapping = needWrapping(ctx)
-		onDone   = trace.DriverOnConnInvoke(
+		opID        string
+		issues      []trace.Issue
+		useWrapping = UseWrapping(ctx)
+		onDone      = trace.DriverOnConnInvoke(
 			c.config.Trace(),
 			&ctx,
 			c.endpoint,
@@ -330,7 +330,7 @@ func (c *conn) Invoke(
 
 	err = cc.Invoke(ctx, method, req, res, append(opts, grpc.Trailer(&md))...)
 	if err != nil {
-		if wrapping {
+		if useWrapping {
 			err = xerrors.FromGRPCError(err,
 				xerrors.WithAddress(c.Address()),
 			)
@@ -353,7 +353,7 @@ func (c *conn) Invoke(
 		for _, issue := range o.GetOperation().GetIssues() {
 			issues = append(issues, issue)
 		}
-		if wrapping {
+		if useWrapping {
 			switch {
 			case !o.GetOperation().GetReady():
 				return xerrors.WithStackTrace(errOperationNotReady)
@@ -386,9 +386,9 @@ func (c *conn) NewStream(
 			c.endpoint.Copy(),
 			trace.Method(method),
 		)
-		wrapping = needWrapping(ctx)
-		cc       *grpc.ClientConn
-		s        grpc.ClientStream
+		useWrapping = UseWrapping(ctx)
+		cc          *grpc.ClientConn
+		s           grpc.ClientStream
 	)
 
 	defer func() {
@@ -418,7 +418,7 @@ func (c *conn) NewStream(
 
 	s, err = cc.NewStream(ctx, desc, method, opts...)
 	if err != nil {
-		if wrapping {
+		if useWrapping {
 			err = xerrors.Retryable(
 				xerrors.FromGRPCError(err,
 					xerrors.WithAddress(c.Address()),
@@ -436,7 +436,7 @@ func (c *conn) NewStream(
 	return &grpcClientStream{
 		ClientStream: s,
 		c:            c,
-		wrapping:     wrapping,
+		wrapping:     useWrapping,
 		sentMark:     sentMark,
 		onDone: func(ctx context.Context, md metadata.MD) {
 			cancel()
