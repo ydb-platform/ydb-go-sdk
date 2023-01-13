@@ -329,6 +329,12 @@ func (r *topicStreamReaderImpl) onPartitionSessionStatusResponseFromBuffer(
 }
 
 func (r *topicStreamReaderImpl) Commit(ctx context.Context, commitRange commitRange) (err error) {
+	defer func() {
+		if errors.Is(err, PublicErrCommitSessionToExpiredSession) && r.cfg.CommitMode == CommitModeAsync {
+			err = nil
+		}
+	}()
+
 	if commitRange.partitionSession == nil {
 		return xerrors.WithStackTrace(errCommitWithNilPartitionSession)
 	}
