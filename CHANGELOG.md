@@ -1,4 +1,5 @@
 * Separated errors of commit from other reader and to expired session
+* Fixed wrapping error in `internal/balancer/Balancer.wrapCall()`
 
 ## v3.42.4
 * Added `ydb.WithDisableServerBalancer()` database/sql connector option
