@@ -360,6 +360,9 @@ func (r *topicStreamReaderImpl) Commit(ctx context.Context, commitRange commitRa
 }
 
 func (r *topicStreamReaderImpl) checkCommitRange(commitRange commitRange) error {
+	if r.cfg.CommitMode == CommitModeNone {
+		return ErrCommitDisabled
+	}
 	session := commitRange.partitionSession
 
 	if session == nil {
