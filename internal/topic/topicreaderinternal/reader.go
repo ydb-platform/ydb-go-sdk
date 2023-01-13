@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
@@ -16,9 +17,18 @@ import (
 )
 
 var (
-	errUnconnected  = xerrors.Retryable(xerrors.Wrap(errors.New("ydb: first connection attempt not finished")))
-	ErrReaderClosed = xerrors.Wrap(errors.New("ydb: reader closed"))
+	errUnconnected = xerrors.Retryable(xerrors.Wrap(
+		errors.New("ydb: first connection attempt not finished"),
+	))
+	errReaderClosed                 = xerrors.Wrap(errors.New("ydb: reader closed"))
+	errCommitSessionFromOtherReader = xerrors.Wrap(errors.New("ydb: commit with session from other reader"))
 )
+
+var globalReaderCounter int64
+
+func nextReaderID() int64 {
+	return atomic.AddInt64(&globalReaderCounter, 1)
+}
 
 //nolint:lll
 //go:generate mockgen -destination raw_topic_reader_stream_mock_test.go -package topicreaderinternal -write_package_comment=false . RawTopicReaderStream
@@ -37,6 +47,7 @@ type Reader struct {
 	reader             batchedStreamReader
 	defaultBatchConfig ReadMessageBatchOptions
 	tracer             trace.Topic
+	readerID           int64
 }
 
 type ReadMessageBatchOptions struct {
@@ -78,17 +89,20 @@ func NewReader(
 	opts ...PublicReaderOption,
 ) Reader {
 	cfg := convertNewParamsToStreamConfig(consumer, readSelectors, opts...)
+	readerID := nextReaderID()
+
 	readerConnector := func(ctx context.Context) (batchedStreamReader, error) {
 		stream, err := connector(ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		return newTopicStreamReader(stream, cfg.topicStreamReaderConfig)
+		return newTopicStreamReader(readerID, stream, cfg.topicStreamReaderConfig)
 	}
 
 	res := Reader{
 		reader: newReaderReconnector(
+			readerID,
 			readerConnector,
 			cfg.OperationTimeout(),
 			cfg.RetrySettings,
@@ -97,13 +111,14 @@ func NewReader(
 		),
 		defaultBatchConfig: cfg.DefaultBatchConfig,
 		tracer:             cfg.Tracer,
+		readerID:           readerID,
 	}
 
 	return res
 }
 
 func (r *Reader) Close(ctx context.Context) error {
-	return r.reader.CloseWithError(ctx, xerrors.WithStackTrace(ErrReaderClosed))
+	return r.reader.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
 }
 
 type readExplicitMessagesCount int
@@ -148,10 +163,21 @@ forReadBatch:
 }
 
 func (r *Reader) Commit(ctx context.Context, offsets PublicCommitRangeGetter) (err error) {
-	return r.reader.Commit(ctx, offsets.getCommitRange().priv)
+	cr := offsets.getCommitRange().priv
+	if cr.partitionSession.readerID != r.readerID {
+		return errCommitSessionFromOtherReader
+	}
+
+	return r.reader.Commit(ctx, cr)
 }
 
 func (r *Reader) CommitRanges(ctx context.Context, ranges []PublicCommitRange) error {
+	for i := range ranges {
+		if ranges[i].priv.partitionSession.readerID != r.readerID {
+			return errCommitSessionFromOtherReader
+		}
+	}
+
 	commitRanges := NewCommitRangesFromPublicCommits(ranges)
 	commitRanges.optimize()
 

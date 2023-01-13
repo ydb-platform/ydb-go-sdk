@@ -42,6 +42,7 @@ type readerReconnector struct {
 	connectTimeout         time.Duration
 
 	closeOnce sync.Once
+	readerID  int64
 
 	m                          xsync.RWMutex
 	streamConnectionInProgress empty.Chan // opened if connection in progress, closed if connection established
@@ -52,6 +53,7 @@ type readerReconnector struct {
 
 //nolint:revive
 func newReaderReconnector(
+	readerID int64,
 	connector readerConnectFunc,
 	connectTimeout time.Duration,
 	retrySettings topic.RetrySettings,
@@ -59,6 +61,7 @@ func newReaderReconnector(
 	baseContext context.Context,
 ) *readerReconnector {
 	res := &readerReconnector{
+		readerID:       readerID,
 		clock:          clockwork.NewRealClock(),
 		readerConnect:  connector,
 		streamErr:      errUnconnected,
@@ -138,7 +141,7 @@ func (r *readerReconnector) CloseWithError(ctx context.Context, err error) error
 		closeErr = r.background.Close(ctx, err)
 
 		if r.streamVal != nil {
-			streamCloseErr := r.streamVal.CloseWithError(ctx, xerrors.WithStackTrace(ErrReaderClosed))
+			streamCloseErr := r.streamVal.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
 			if closeErr == nil {
 				closeErr = streamCloseErr
 			}

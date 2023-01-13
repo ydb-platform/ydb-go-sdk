@@ -23,9 +23,10 @@ import (
 )
 
 var (
+	PublicErrCommitSessionToExpiredSession = xerrors.Wrap(errors.New("ydb: commit to expired session"))
+
 	errPartitionSessionStoppedByServer = xerrors.Wrap(errors.New("ydb: topic partition session stopped by server"))
 	errPartitionSessionStoppedBySDK    = xerrors.Wrap(errors.New("ydb: topic partition session stopped by sdk"))
-	errCommitSessionFromOtherReader    = xerrors.Wrap(errors.New("ydb: commit with session from other reader"))
 	errCommitWithNilPartitionSession   = xerrors.Wrap(errors.New("ydb: commit with nil partition session"))
 )
 
@@ -48,6 +49,7 @@ type topicStreamReaderImpl struct {
 
 	stream           RawTopicReaderStream
 	readConnectionID string
+	readerID         int64
 
 	m       xsync.RWMutex
 	err     error
@@ -106,6 +108,7 @@ func (cfg *topicStreamReaderConfig) initMessage() *rawtopicreader.InitRequest {
 }
 
 func newTopicStreamReader(
+	readerID int64,
 	stream RawTopicReaderStream,
 	cfg topicStreamReaderConfig,
 ) (_ *topicStreamReaderImpl, err error) {
@@ -115,7 +118,7 @@ func newTopicStreamReader(
 		}
 	}()
 
-	reader := newTopicStreamReaderStopped(stream, cfg)
+	reader := newTopicStreamReaderStopped(readerID, stream, cfg)
 	if err = reader.initSession(); err != nil {
 		return nil, err
 	}
@@ -127,6 +130,7 @@ func newTopicStreamReader(
 }
 
 func newTopicStreamReaderStopped(
+	readerID int64,
 	stream RawTopicReaderStream,
 	cfg topicStreamReaderConfig,
 ) *topicStreamReaderImpl {
@@ -147,6 +151,7 @@ func newTopicStreamReaderStopped(
 		batcher:               newBatcher(),
 		backgroundWorkers:     *background.NewWorker(stopPump),
 		readConnectionID:      "preinitID-" + readerConnectionID.String(),
+		readerID:              readerID,
 		rawMessagesFromBuffer: make(chan rawtopicreader.ServerMessage, 1),
 	}
 
@@ -361,7 +366,7 @@ func (r *topicStreamReaderImpl) checkCommitRange(commitRange commitRange) error 
 
 	ownSession, err := r.sessionController.Get(session.partitionSessionID)
 	if err != nil || session != ownSession {
-		return xerrors.WithStackTrace(errCommitSessionFromOtherReader)
+		return xerrors.WithStackTrace(PublicErrCommitSessionToExpiredSession)
 	}
 
 	return nil
@@ -706,6 +711,8 @@ func (r *topicStreamReaderImpl) onStartPartitionSessionRequest(m *rawtopicreader
 		r.ctx,
 		m.PartitionSession.Path,
 		m.PartitionSession.PartitionID,
+		r.readerID,
+		r.readConnectionID,
 		m.PartitionSession.PartitionSessionID,
 		m.CommittedOffset,
 	)
