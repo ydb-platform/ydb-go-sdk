@@ -100,27 +100,51 @@ func TestReader_Close(t *testing.T) {
 }
 
 func TestReader_Commit(t *testing.T) {
-	mc := gomock.NewController(t)
-	defer mc.Finish()
+	t.Run("OK", func(t *testing.T) {
+		mc := gomock.NewController(t)
+		defer mc.Finish()
 
-	baseReader := NewMockbatchedStreamReader(mc)
-	reader := &Reader{reader: baseReader}
+		readerID := nextReaderID()
+		baseReader := NewMockbatchedStreamReader(mc)
+		reader := &Reader{
+			reader:   baseReader,
+			readerID: readerID,
+		}
 
-	expectedRangeOk := commitRange{
-		commitOffsetStart: 1,
-		commitOffsetEnd:   10,
-		partitionSession:  &partitionSession{partitionSessionID: 10},
-	}
-	baseReader.EXPECT().Commit(gomock.Any(), expectedRangeOk).Return(nil)
-	require.NoError(t, reader.Commit(context.Background(), &PublicMessage{commitRange: expectedRangeOk}))
+		expectedRangeOk := commitRange{
+			commitOffsetStart: 1,
+			commitOffsetEnd:   10,
+			partitionSession: &partitionSession{
+				readerID:           readerID,
+				partitionSessionID: 10,
+			},
+		}
+		baseReader.EXPECT().Commit(gomock.Any(), expectedRangeOk).Return(nil)
+		require.NoError(t, reader.Commit(context.Background(), &PublicMessage{commitRange: expectedRangeOk}))
 
-	expectedRangeErr := commitRange{
-		commitOffsetStart: 15,
-		commitOffsetEnd:   20,
-		partitionSession:  &partitionSession{partitionSessionID: 30},
-	}
+		expectedRangeErr := commitRange{
+			commitOffsetStart: 15,
+			commitOffsetEnd:   20,
+			partitionSession: &partitionSession{
+				readerID:           readerID,
+				partitionSessionID: 30,
+			},
+		}
 
-	testErr := errors.New("test err")
-	baseReader.EXPECT().Commit(gomock.Any(), expectedRangeErr).Return(testErr)
-	require.ErrorIs(t, reader.Commit(context.Background(), &PublicMessage{commitRange: expectedRangeErr}), testErr)
+		testErr := errors.New("test err")
+		baseReader.EXPECT().Commit(gomock.Any(), expectedRangeErr).Return(testErr)
+		require.ErrorIs(t, reader.Commit(context.Background(), &PublicMessage{commitRange: expectedRangeErr}), testErr)
+	})
+
+	t.Run("CommitFromOtherReader", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		reader := &Reader{readerID: 1}
+		forCommit := commitRange{
+			commitOffsetStart: 1,
+			commitOffsetEnd:   2,
+			partitionSession:  &partitionSession{readerID: 2},
+		}
+		err := reader.Commit(ctx, forCommit)
+		require.ErrorIs(t, err, errCommitSessionFromOtherReader)
+	})
 }

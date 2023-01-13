@@ -21,6 +21,9 @@ type partitionSession struct {
 	Topic       string
 	PartitionID int64
 
+	readerID     int64
+	connectionID string
+
 	ctx                context.Context
 	ctxCancel          xcontext.CancelErrFunc
 	partitionSessionID rawtopicreader.PartitionSessionID
@@ -33,6 +36,8 @@ func newPartitionSession(
 	partitionContext context.Context,
 	topic string,
 	partitionID int64,
+	readerID int64,
+	connectionID string,
 	partitionSessionID rawtopicreader.PartitionSessionID,
 	committedOffset rawtopicreader.Offset,
 ) *partitionSession {
@@ -41,6 +46,8 @@ func newPartitionSession(
 	return &partitionSession{
 		Topic:                    topic,
 		PartitionID:              partitionID,
+		readerID:                 readerID,
+		connectionID:             connectionID,
 		ctx:                      partitionContext,
 		ctxCancel:                cancel,
 		partitionSessionID:       partitionSessionID,

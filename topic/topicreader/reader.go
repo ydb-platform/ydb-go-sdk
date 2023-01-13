@@ -71,6 +71,11 @@ type MessageContentUnmarshaler = topicreaderinternal.PublicMessageContentUnmarsh
 // It can be fast (by default) or sync and waite response from server
 // see topicoptions.CommitMode for details
 //
+// for topicoptions.CommitModeSync mode sync the method can return ErrCommitToExpiredSession
+// it means about the message/batch was not committed because connection broken or partition routed to
+// other reader by server.
+// Client code should continue work normally
+//
 // # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.

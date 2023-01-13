@@ -244,7 +244,7 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 			return reconnector.streamVal == newStream2
 		})
 
-		require.NoError(t, reconnector.CloseWithError(ctx, ErrReaderClosed))
+		require.NoError(t, reconnector.CloseWithError(ctx, errReaderClosed))
 	})
 
 	t.Run("StartWithCancelledContext", func(t *testing.T) {
