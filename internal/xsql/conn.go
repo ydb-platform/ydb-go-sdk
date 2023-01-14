@@ -382,7 +382,7 @@ func (c *conn) ResetSession(_ context.Context) error {
 }
 
 func (c *conn) Version(ctx context.Context) (_ string, err error) {
-	const version = "dafault"
+	const version = "default"
 	return version, nil
 }
 
