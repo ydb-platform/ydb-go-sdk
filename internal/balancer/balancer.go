@@ -279,7 +279,10 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 	}
 
 	if err = f(ctx, cc); err != nil {
-		return xerrors.WithStackTrace(err)
+		if conn.UseWrapping(ctx) {
+			return xerrors.WithStackTrace(err)
+		}
+		return err
 	}
 
 	return nil

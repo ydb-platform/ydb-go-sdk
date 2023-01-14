@@ -16,11 +16,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-func NewStaticCredentials(user, password string, cc grpc.ClientConnInterface) Credentials {
+func NewStaticCredentials(user, password string, authEndpoint string, opts ...grpc.DialOption) Credentials {
 	return &staticCredentials{
 		user:     user,
 		password: password,
-		client:   Ydb_Auth_V1.NewAuthServiceClient(cc),
+		endpoint: authEndpoint,
+		opts:     opts,
 	}
 }
 
@@ -29,19 +30,32 @@ func NewStaticCredentials(user, password string, cc grpc.ClientConnInterface) Cr
 type staticCredentials struct {
 	user      string
 	password  string
-	client    Ydb_Auth_V1.AuthServiceClient
+	endpoint  string
+	opts      []grpc.DialOption
 	token     string
 	requestAt time.Time
 	mu        sync.Mutex
 }
 
-func (lp *staticCredentials) Token(ctx context.Context) (token string, err error) {
-	lp.mu.Lock()
-	defer lp.mu.Unlock()
-	if time.Until(lp.requestAt) > 0 {
-		return lp.token, nil
+func (c *staticCredentials) Token(ctx context.Context) (token string, err error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if time.Until(c.requestAt) > 0 {
+		return c.token, nil
 	}
-	response, err := lp.client.Login(ctx, &Ydb_Auth.LoginRequest{
+	cc, err := grpc.DialContext(ctx, c.endpoint, c.opts...)
+	if err != nil {
+		return "", xerrors.WithStackTrace(
+			fmt.Errorf("dial failed: %w", err),
+		)
+	}
+	defer func() {
+		_ = cc.Close()
+	}()
+
+	client := Ydb_Auth_V1.NewAuthServiceClient(cc)
+
+	response, err := client.Login(ctx, &Ydb_Auth.LoginRequest{
 		OperationParams: &Ydb_Operations.OperationParams{
 			OperationMode:    0,
 			OperationTimeout: nil,
@@ -49,12 +63,13 @@ func (lp *staticCredentials) Token(ctx context.Context) (token string, err error
 			Labels:           nil,
 			ReportCostInfo:   0,
 		},
-		User:     lp.user,
-		Password: lp.password,
+		User:     c.user,
+		Password: c.password,
 	})
 	if err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
+
 	switch {
 	case !response.GetOperation().GetReady():
 		return "", xerrors.WithStackTrace(
@@ -77,13 +92,16 @@ func (lp *staticCredentials) Token(ctx context.Context) (token string, err error
 	if err = response.GetOperation().GetResult().UnmarshalTo(&result); err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
+
 	expiresAt, err := parseExpiresAt(result.GetToken())
 	if err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
-	lp.requestAt = time.Now().Add(time.Until(expiresAt) / 2)
-	lp.token = result.GetToken()
-	return lp.token, nil
+
+	c.requestAt = time.Now().Add(time.Until(expiresAt) / 2)
+	c.token = result.GetToken()
+
+	return c.token, nil
 }
 
 func parseExpiresAt(raw string) (expiresAt time.Time, err error) {

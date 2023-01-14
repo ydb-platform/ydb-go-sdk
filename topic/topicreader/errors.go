@@ -16,8 +16,17 @@ import (
 var ErrUnexpectedCodec = topicreaderinternal.PublicErrUnexpectedCodec
 
 // ErrConcurrencyCall return if method on reader called in concurrency
+// client side must check error with errors.Is
 //
 // # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 var ErrConcurrencyCall = xerrors.Wrap(errors.New("ydb: concurrency call denied"))
+
+// ErrCommitToExpiredSession it is not fatal error and reader can continue work
+// client side must check error with errors.Is
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+var ErrCommitToExpiredSession = topicreaderinternal.PublicErrCommitSessionToExpiredSession

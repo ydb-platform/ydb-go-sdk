@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
@@ -24,8 +25,11 @@ var (
 )
 
 type rows struct {
-	conn    *conn
-	result  result.BaseResult
+	conn   *conn
+	result result.BaseResult
+
+	// nextSet once need for get first result set as default.
+	// Iterate over many result sets must be with rows.NextResultSet()
 	nextSet sync.Once
 }
 
@@ -76,10 +80,10 @@ func (r *rows) Next(dst []driver.Value) (err error) {
 		err = r.result.NextResultSetErr(context.Background())
 	})
 	if err != nil {
-		return r.conn.checkClosed(xerrors.WithStackTrace(err))
+		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 	if err = r.result.Err(); err != nil {
-		return r.conn.checkClosed(xerrors.WithStackTrace(err))
+		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 	if !r.result.NextRow() {
 		return io.EOF
@@ -89,13 +93,13 @@ func (r *rows) Next(dst []driver.Value) (err error) {
 		values[i] = &valuer{}
 	}
 	if err = r.result.Scan(values...); err != nil {
-		return r.conn.checkClosed(xerrors.WithStackTrace(err))
+		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 	for i := range values {
 		dst[i] = values[i].(*valuer).Value()
 	}
 	if err = r.result.Err(); err != nil {
-		return r.conn.checkClosed(xerrors.WithStackTrace(err))
+		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 	return nil
 }
