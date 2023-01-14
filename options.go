@@ -360,6 +360,10 @@ func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
 func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 	return func(ctx context.Context, c *connection) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithIdleThreshold(idleThreshold))
+		c.databaseSQLOptions = append(
+			c.databaseSQLOptions,
+			xsql.WithIdleThreshold(idleThreshold),
+		)
 		return nil
 	}
 }

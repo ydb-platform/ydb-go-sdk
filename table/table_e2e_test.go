@@ -2040,6 +2040,9 @@ func TestNullType(t *testing.T) {
 }
 
 func TestTypeToString(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	db, err := sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
 	if err != nil {
 		t.Fatal(err)
@@ -2112,7 +2115,7 @@ func TestTypeToString(t *testing.T) {
 	} {
 		t.Run(tt.Yql(), func(t *testing.T) {
 			var got string
-			err := retry.Do(context.Background(), db, func(ctx context.Context, cc *sql.Conn) error {
+			err := retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
 				row := cc.QueryRowContext(ctx,
 					fmt.Sprintf("SELECT FormatType(ParseType(\"%s\"))", tt.Yql()),
 				)
