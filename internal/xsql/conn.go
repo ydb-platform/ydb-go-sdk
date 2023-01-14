@@ -6,13 +6,17 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"io"
+	"path"
 	"sync/atomic"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/helpers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/isolation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -377,82 +381,310 @@ func (c *conn) ResetSession(_ context.Context) error {
 	return nil
 }
 
-func (c *conn) Version(ctx context.Context) (_ driver.Rows, err error) {
-	const (
-		versionMajor = "22"
-		versionMinor = "4"
-		versionPatch = "44"
-		version      = versionMajor + "." + versionMinor + "." + versionPatch
+func (c *conn) Version(ctx context.Context) (_ string, err error) {
+	const version = "dafault"
+	return version, nil
+}
+
+func (c *conn) IsTableExists(ctx context.Context, tableName string) (tableExists bool, err error) {
+	var cn = c.connector.Connection()
+	tableExists, err = helpers.IsTableExists(ctx, cn.Scheme(), tableName)
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string) (columnExists bool, err error) {
+	var (
+		cn      = c.connector.Connection()
+		session = c.session
 	)
 
-	return &single{
-		values: []sql.NamedArg{
-			sql.Named("Version", "YDB Server "+"v"+version),
-		},
-	}, nil
+	tableExist, err := helpers.IsTableExists(ctx, cn.Scheme(), tableName)
+	if err != nil {
+		return
+	}
+	if !tableExist {
+		return false, fmt.Errorf("table '%s' not exist", tableName)
+	}
+
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		desc, err := session.DescribeTable(ctx, tableName)
+		if err != nil {
+			return
+		}
+		for _, col := range desc.Columns {
+			if col.Name == columnName {
+				columnExists = true
+				break
+			}
+		}
+		return
+	}, retry.WithIdempotent(true))
+	if err != nil {
+		return
+	}
+	return columnExists, nil
 }
 
-func (c *conn) IsTableExists(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, err error) {
-	mr := &multiRows{
-		rows: rows{
-			conn: c,
-		},
-	}
-	err = mr.isTableExist(ctx, query, args)
+func (c *conn) GetColumns(ctx context.Context, tableName string) (columns []string, err error) {
+	var (
+		cn      = c.connector.Connection()
+		session = c.session
+	)
+
+	tableExist, err := helpers.IsTableExists(ctx, cn.Scheme(), tableName)
 	if err != nil {
-		return nil, err
+		return
 	}
-	return mr, nil
+	if !tableExist {
+		return nil, fmt.Errorf("table '%s' not exist", tableName)
+	}
+
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		desc, err := session.DescribeTable(ctx, tableName)
+		if err != nil {
+			return err
+		}
+		for _, col := range desc.Columns {
+			columns = append(columns, col.Name)
+		}
+		return
+	}, retry.WithIdempotent(true))
+	if err != nil {
+		return
+	}
+	return
 }
 
-func (c *conn) IsColumnExists(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, err error) {
-	mr := &multiRows{
-		rows: rows{
-			conn: c,
-		},
-	}
-	err = mr.isColumnExist(ctx, query, args)
+func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) (dataType string, err error) {
+	var (
+		cn      = c.connector.Connection()
+		session = c.session
+	)
+
+	tableExist, err := helpers.IsTableExists(ctx, cn.Scheme(), tableName)
 	if err != nil {
-		return nil, err
+		return
 	}
-	return mr, nil
+	if !tableExist {
+		return "", fmt.Errorf("table '%s' not exist", tableName)
+	}
+
+	columnExist, err := c.IsColumnExists(ctx, tableName, columnName)
+	if err != nil {
+		return
+	}
+	if !columnExist {
+		return "", fmt.Errorf("column '%s' not exist in table '%s'", columnName, tableName)
+	}
+
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		desc, err := session.DescribeTable(ctx, tableName)
+		if err != nil {
+			return err
+		}
+		for _, col := range desc.Columns {
+			if col.Name == columnName {
+				dataType = col.Type.Yql()
+				break
+			}
+		}
+		return
+	}, retry.WithIdempotent(true))
+	if err != nil {
+		return
+	}
+	return dataType, nil
 }
 
-func (c *conn) GetColumns(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, err error) {
-	mr := &multiRows{
-		rows: rows{
-			conn: c,
-		},
-	}
-	err = mr.getColumns(ctx, query, args)
+func (c *conn) GetPrimaryKeys(ctx context.Context, tableName string) (pkCols []string, err error) {
+	var (
+		cn      = c.connector.Connection()
+		session = c.session
+	)
+
+	tableExist, err := helpers.IsTableExists(ctx, cn.Scheme(), tableName)
 	if err != nil {
-		return nil, err
+		return
 	}
-	return mr, nil
+	if !tableExist {
+		return nil, fmt.Errorf("table '%s' not exist", tableName)
+	}
+
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		desc, err := session.DescribeTable(ctx, tableName)
+		if err != nil {
+			return err
+		}
+		pkCols = append(pkCols, desc.PrimaryKey...)
+		return
+	}, retry.WithIdempotent(true))
+	if err != nil {
+		return
+	}
+	return
 }
 
-func (c *conn) GetTables(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, err error) {
-	mr := &multiRows{
-		rows: rows{
-			conn: c,
-		},
-	}
-	err = mr.getTables(ctx, query, args)
+func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (ok bool, err error) {
+	var cn = c.connector.Connection()
+
+	tableExist, err := helpers.IsTableExists(ctx, cn.Scheme(), tableName)
 	if err != nil {
-		return nil, err
+		return
 	}
-	return mr, nil
+	if !tableExist {
+		return false, fmt.Errorf("table '%s' not exist", tableName)
+	}
+
+	columnExist, err := c.IsColumnExists(ctx, tableName, columnName)
+	if err != nil {
+		return
+	}
+	if !columnExist {
+		return false, fmt.Errorf("column '%s' not exist in table '%s'", columnName, tableName)
+	}
+
+	pkCols, err := c.GetPrimaryKeys(ctx, tableName)
+	if err != nil {
+		return
+	}
+	for _, pkCol := range pkCols {
+		if pkCol == columnName {
+			ok = true
+			break
+		}
+	}
+	return
 }
 
-func (c *conn) GetIndexes(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, err error) {
-	mr := &multiRows{
-		rows: rows{
-			conn: c,
-		},
+func (c *conn) GetTables(ctx context.Context, root string) (tables []string, err error) {
+	var (
+		cn           = c.connector.Connection()
+		schemeClient = cn.Scheme()
+	)
+
+	ignoreDirs := map[string]bool{
+		".sys":        true,
+		".sys_health": true,
 	}
-	err = mr.getIndexes(ctx, query, args)
+
+	canEnter := func(dir string) bool {
+		if _, ignore := ignoreDirs[dir]; ignore {
+			return false
+		}
+		return true
+	}
+
+	queue := make([]string, 0)
+	queue = append(queue, root)
+
+	for st := 0; st < len(queue); st++ {
+		curPath := queue[st]
+
+		var e scheme.Entry
+		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+			e, err = schemeClient.DescribePath(ctx, curPath)
+			return
+		}, retry.WithIdempotent(true))
+
+		if err != nil {
+			return
+		}
+
+		if e.IsTable() {
+			tables = append(tables, curPath)
+			continue
+		}
+
+		var d scheme.Directory
+		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+			d, err = schemeClient.ListDirectory(ctx, curPath)
+			return
+		}, retry.WithIdempotent(true))
+
+		if err != nil {
+			return
+		}
+
+		for _, child := range d.Children {
+			if child.IsDirectory() || child.IsTable() {
+				if canEnter(child.Name) {
+					queue = append(queue, path.Join(curPath, child.Name))
+				}
+			}
+		}
+	}
+	return tables, nil
+}
+
+func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []string, err error) {
+	var (
+		cn      = c.connector.Connection()
+		session = c.session
+	)
+
+	tableExist, err := helpers.IsTableExists(ctx, cn.Scheme(), tableName)
 	if err != nil {
-		return nil, err
+		return
 	}
-	return mr, nil
+	if !tableExist {
+		return nil, fmt.Errorf("table '%s' not exist", tableName)
+	}
+
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		desc, err := session.DescribeTable(ctx, tableName)
+		if err != nil {
+			return err
+		}
+		for _, indexDesc := range desc.Indexes {
+			indexes = append(indexes, indexDesc.Name)
+		}
+		return
+	}, retry.WithIdempotent(true))
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (c *conn) GetIndexColumns(ctx context.Context, tableName, indexName string) (columns []string, err error) {
+	var (
+		cn       = c.connector.Connection()
+		session  = c.session
+		hasIndex = false
+	)
+
+	tableExist, err := helpers.IsTableExists(ctx, cn.Scheme(), tableName)
+	if err != nil {
+		return
+	}
+	if !tableExist {
+		return nil, fmt.Errorf("table '%s' not exist", tableName)
+	}
+
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		desc, err := session.DescribeTable(ctx, tableName)
+		if err != nil {
+			return err
+		}
+		for _, indexDesc := range desc.Indexes {
+			if indexDesc.Name == indexName {
+				hasIndex = true
+				columns = append(columns, indexDesc.IndexColumns...)
+				break
+			}
+		}
+		return
+	}, retry.WithIdempotent(true))
+	if err != nil {
+		return
+	}
+	if !hasIndex {
+		return nil, fmt.Errorf("index '%s' not found in table '%s'", indexName, tableName)
+	}
+
+	return columns, nil
 }
