@@ -24,7 +24,53 @@ var (
 	_ types.Scanner = &valuer{}
 )
 
+type cacheMode int32
+
+const (
+	columnsCache cacheMode = cacheMode(iota)
+	typesCache
+)
+
+type cache struct {
+	data map[cacheMode][]string
+	done map[cacheMode]bool
+}
+
+func (c *cache) get(key cacheMode) []string {
+	return c.data[key]
+}
+
+func (c *cache) set(key cacheMode, val []string) {
+	c.data[key] = val
+	c.done[key] = true
+}
+
+func (c *cache) cached(key cacheMode) bool {
+	if _, has := c.done[key]; !has {
+		return false
+	}
+	return c.done[key]
+}
+
+func (c *cache) reset(key cacheMode) {
+	c.done[key] = false
+}
+
+func (c *cache) resetAll() {
+	for key := range c.done {
+		c.reset(key)
+	}
+}
+
+func newCache() *cache {
+	return &cache{
+		data: make(map[cacheMode][]string),
+		done: make(map[cacheMode]bool),
+	}
+}
+
 type rows struct {
+	*cache
 	conn   *conn
 	result result.BaseResult
 
@@ -39,23 +85,40 @@ func (r *rows) RowsAffected() (int64, error) { return 0, ErrUnsupported }
 func (r *rows) Columns() []string {
 	r.nextSet.Do(func() {
 		r.result.NextResultSet(context.Background())
+		if r.cache == nil {
+			r.cache = newCache()
+		}
 	})
+
+	if r.cache.cached(columnsCache) {
+		cs := make([]string, 0)
+		cs = append(cs, r.cache.get(columnsCache)...)
+		return cs
+	}
+
 	var i int
 	cs := make([]string, r.result.CurrentResultSet().ColumnCount())
 	r.result.CurrentResultSet().Columns(func(m options.Column) {
 		cs[i] = m.Name
 		i++
 	})
+
+	r.cache.set(columnsCache, cs)
 	return cs
 }
 
-// NOTE: Need to optimize somehow? This might take O(|r.Columns()|^2)
-// each time (*Rows).ColumnTypes be called
 // https://cs.opensource.google/go/go/+/refs/tags/go1.19.4:src/database/sql/sql.go;l=3101
 func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 	r.nextSet.Do(func() {
 		r.result.NextResultSet(context.Background())
+		if r.cache == nil {
+			r.cache = newCache()
+		}
 	})
+
+	if r.cache.cached(typesCache) {
+		return r.cache.get(typesCache)[index]
+	}
 
 	var i int
 	yqlTypes := make([]string, r.result.CurrentResultSet().ColumnCount())
@@ -63,11 +126,18 @@ func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 		yqlTypes[i] = m.Type.Yql()
 		i++
 	})
+
+	r.cache.set(typesCache, yqlTypes)
 	return yqlTypes[index]
 }
 
 func (r *rows) NextResultSet() error {
-	r.nextSet.Do(func() {})
+	r.nextSet.Do(func() {
+		if r.cache == nil {
+			r.cache = newCache()
+		}
+	})
+	r.cache.resetAll()
 	return r.result.NextResultSetErr(context.Background())
 }
 
@@ -78,6 +148,9 @@ func (r *rows) HasNextResultSet() bool {
 func (r *rows) Next(dst []driver.Value) (err error) {
 	r.nextSet.Do(func() {
 		err = r.result.NextResultSetErr(context.Background())
+		if r.cache == nil {
+			r.cache = newCache()
+		}
 	})
 	if err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))

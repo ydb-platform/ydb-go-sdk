@@ -4,42 +4,46 @@ import "context"
 
 var (
 	_ interface {
-		Version(context.Context) (string, error)
+		Version(ctx context.Context) (version string, err error)
 	} = (*conn)(nil)
 
 	_ interface {
-		IsTableExists(context.Context, string) (bool, error)
+		IsTableExists(ctx context.Context, tableName string) (tableExists bool, err error)
 	} = (*conn)(nil)
 
 	_ interface {
-		IsColumnExists(context.Context, string, string) (bool, error)
+		IsColumnExists(ctx context.Context, tableName string, columnName string) (columnExists bool, err error)
 	} = (*conn)(nil)
 
 	_ interface {
-		IsPrimaryKey(context.Context, string, string) (bool, error)
+		IsPrimaryKey(ctx context.Context, tableName string, columnName string) (ok bool, err error)
 	} = (*conn)(nil)
 
 	_ interface {
-		GetColumns(context.Context, string) ([]string, error)
+		GetColumns(ctx context.Context, tableName string) (columns []string, err error)
 	} = (*conn)(nil)
 
 	_ interface {
-		GetColumnType(context.Context, string, string) (string, error)
+		GetColumnType(ctx context.Context, tableName string, columnName string) (dataType string, err error)
 	} = (*conn)(nil)
 
 	_ interface {
-		GetPrimaryKeys(context.Context, string) ([]string, error)
+		GetPrimaryKeys(ctx context.Context, tableName string) (pkCols []string, err error)
 	} = (*conn)(nil)
 
 	_ interface {
-		GetTables(context.Context, string) ([]string, error)
+		GetTables(ctx context.Context, absPath string) (tables []string, err error)
 	} = (*conn)(nil)
 
 	_ interface {
-		GetIndexes(context.Context, string) ([]string, error)
+		GetAllTables(ctx context.Context, absPath string) (tables []string, err error)
 	} = (*conn)(nil)
 
 	_ interface {
-		GetIndexColumns(context.Context, string, string) ([]string, error)
+		GetIndexes(ctx context.Context, tableName string) (indexes []string, err error)
+	} = (*conn)(nil)
+
+	_ interface {
+		GetIndexColumns(ctx context.Context, tableName string, indexName string) (columns []string, err error)
 	} = (*conn)(nil)
 )
