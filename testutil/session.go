@@ -30,7 +30,9 @@ func SessionID(opts ...sessionIDOption) string {
 		hash:      strconv.FormatInt(xrand.New().Int64(math.MaxInt64), 16),
 	}
 	for _, o := range opts {
-		o(h)
+		if o != nil {
+			o(h)
+		}
 	}
 	return fmt.Sprintf("ydb://session/%d?node_id=%d&id=%s==", h.serviceID, h.nodeID, h.hash)
 }

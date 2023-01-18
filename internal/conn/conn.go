@@ -481,7 +481,9 @@ func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 		done:            make(chan struct{}),
 	}
 	for _, o := range opts {
-		o(c)
+		if o != nil {
+			o(c)
+		}
 	}
 
 	return c

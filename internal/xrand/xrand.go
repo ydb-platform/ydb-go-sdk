@@ -39,7 +39,9 @@ func New(opts ...option) Rand {
 		source: math.MaxInt64,
 	}
 	for _, o := range opts {
-		o(r)
+		if o != nil {
+			o(r)
+		}
 	}
 
 	//nolint:gosec

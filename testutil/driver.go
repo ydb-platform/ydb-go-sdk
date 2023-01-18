@@ -286,7 +286,9 @@ func WithClose(onClose func(ctx context.Context) error) balancerOption {
 func NewBalancer(opts ...balancerOption) *balancerStub {
 	c := &balancerStub{}
 	for _, opt := range opts {
-		opt(c)
+		if opt != nil {
+			opt(c)
+		}
 	}
 	return c
 }

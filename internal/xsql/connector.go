@@ -76,8 +76,10 @@ func Open(d Driver, connection connection, opts ...ConnectorOption) (_ *Connecto
 		defaultQueryMode: DefaultQueryMode,
 	}
 	for _, opt := range opts {
-		if err = opt(c); err != nil {
-			return nil, err
+		if opt != nil {
+			if err = opt(c); err != nil {
+				return nil, err
+			}
 		}
 	}
 	if c.idleThreshold > 0 {

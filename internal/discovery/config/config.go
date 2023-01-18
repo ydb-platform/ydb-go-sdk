@@ -29,7 +29,9 @@ func New(opts ...Option) Config {
 		interval: DefaultInterval,
 	}
 	for _, o := range opts {
-		o(&c)
+		if o != nil {
+			o(&c)
+		}
 	}
 	return c
 }

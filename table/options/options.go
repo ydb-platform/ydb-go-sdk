@@ -300,7 +300,9 @@ func (opts profileOption) ApplyCreateTableOption(d *CreateTableDesc, a *allocato
 		d.Profile = new(Ydb_Table.TableProfile)
 	}
 	for _, opt := range opts {
-		opt.ApplyProfileOption((*profile)(d.Profile), a)
+		if opt != nil {
+			opt.ApplyProfileOption((*profile)(d.Profile), a)
+		}
 	}
 }
 
@@ -325,7 +327,9 @@ func (opts storagePolicyProfileOption) ApplyProfileOption(p *profile, a *allocat
 		p.StoragePolicy = new(Ydb_Table.StoragePolicy)
 	}
 	for _, opt := range opts {
-		opt((*storagePolicy)(p.StoragePolicy))
+		if opt != nil {
+			opt((*storagePolicy)(p.StoragePolicy))
+		}
 	}
 }
 
@@ -340,7 +344,9 @@ func (opts compactionPolicyProfileOption) ApplyProfileOption(p *profile, a *allo
 		p.CompactionPolicy = new(Ydb_Table.CompactionPolicy)
 	}
 	for _, opt := range opts {
-		opt((*compactionPolicy)(p.CompactionPolicy))
+		if opt != nil {
+			opt((*compactionPolicy)(p.CompactionPolicy))
+		}
 	}
 }
 
@@ -355,7 +361,9 @@ func (opts partitioningPolicyProfileOption) ApplyProfileOption(p *profile, a *al
 		p.PartitioningPolicy = new(Ydb_Table.PartitioningPolicy)
 	}
 	for _, opt := range opts {
-		opt((*partitioningPolicy)(p.PartitioningPolicy), a)
+		if opt != nil {
+			opt((*partitioningPolicy)(p.PartitioningPolicy), a)
+		}
 	}
 }
 
@@ -370,7 +378,9 @@ func (opts executionPolicyProfileOption) ApplyProfileOption(p *profile, a *alloc
 		p.ExecutionPolicy = new(Ydb_Table.ExecutionPolicy)
 	}
 	for _, opt := range opts {
-		opt((*executionPolicy)(p.ExecutionPolicy))
+		if opt != nil {
+			opt((*executionPolicy)(p.ExecutionPolicy))
+		}
 	}
 }
 
@@ -385,7 +395,9 @@ func (opts replicationPolicyProfileOption) ApplyProfileOption(p *profile, a *all
 		p.ReplicationPolicy = new(Ydb_Table.ReplicationPolicy)
 	}
 	for _, opt := range opts {
-		opt((*replicationPolicy)(p.ReplicationPolicy))
+		if opt != nil {
+			opt((*replicationPolicy)(p.ReplicationPolicy))
+		}
 	}
 }
 
@@ -400,7 +412,9 @@ func (opts cachingPolicyProfileOption) ApplyProfileOption(p *profile, a *allocat
 		p.CachingPolicy = new(Ydb_Table.CachingPolicy)
 	}
 	for _, opt := range opts {
-		opt((*cachingPolicy)(p.CachingPolicy))
+		if opt != nil {
+			opt((*cachingPolicy)(p.CachingPolicy))
+		}
 	}
 }
 
@@ -546,7 +560,9 @@ type partitioningSettings []PartitioningSettingsOption
 func (opts partitioningSettings) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
 	settings := &ydbPartitioningSettings{}
 	for _, opt := range opts {
-		opt.ApplyPartitioningSettingsOption(settings)
+		if opt != nil {
+			opt.ApplyPartitioningSettingsOption(settings)
+		}
 	}
 	d.PartitioningSettings = (*Ydb_Table.PartitioningSettings)(settings)
 }
@@ -802,7 +818,9 @@ func withQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption
 			d.QueryCachePolicy.KeepInCache = true
 		}
 		for _, opt := range opts {
-			opt((*queryCachePolicy)(d.QueryCachePolicy), a)
+			if opt != nil {
+				opt((*queryCachePolicy)(d.QueryCachePolicy), a)
+			}
 		}
 	}
 }

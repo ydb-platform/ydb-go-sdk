@@ -25,7 +25,9 @@ func WithTopicPanicCallback(cb func(e interface{})) TopicComposeOption {
 func (t Topic) Compose(x Topic, opts ...TopicComposeOption) (ret Topic) {
 	options := topicComposeOptions{}
 	for _, opt := range opts {
-		opt(&options)
+		if opt != nil {
+			opt(&options)
+		}
 	}
 	{
 		h1 := t.OnReaderReconnect

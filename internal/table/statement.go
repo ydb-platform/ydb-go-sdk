@@ -48,7 +48,9 @@ func (s *statement) Execute(
 	)
 
 	for _, opt := range opts {
-		opt((*options.ExecuteDataQueryDesc)(request), a)
+		if opt != nil {
+			opt((*options.ExecuteDataQueryDesc)(request), a)
+		}
 	}
 
 	onDone := trace.TableOnSessionQueryExecute(

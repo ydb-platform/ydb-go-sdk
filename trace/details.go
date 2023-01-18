@@ -174,7 +174,9 @@ func MatchDetails(pattern string, opts ...matchDetailsOption) (d Details) {
 	)
 
 	for _, o := range opts {
-		o(h)
+		if o != nil {
+			o(h)
+		}
 	}
 	if h.posixMatch {
 		re, err = regexp.CompilePOSIX(pattern)

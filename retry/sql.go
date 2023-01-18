@@ -30,8 +30,10 @@ func Do(ctx context.Context, db *sql.DB, f func(ctx context.Context, cc *sql.Con
 		attempts = 0
 	)
 	for _, o := range opts {
-		if err := o(&options); err != nil {
-			return xerrors.WithStackTrace(err)
+		if o != nil {
+			if err := o(&options); err != nil {
+				return xerrors.WithStackTrace(err)
+			}
 		}
 	}
 	err := Retry(ctx, func(ctx context.Context) (err error) {
@@ -92,8 +94,10 @@ func DoTx(ctx context.Context, db *sql.DB, f func(context.Context, *sql.Tx) erro
 		attempts = 0
 	)
 	for _, o := range opts {
-		if err := o(&options); err != nil {
-			return xerrors.WithStackTrace(err)
+		if o != nil {
+			if err := o(&options); err != nil {
+				return xerrors.WithStackTrace(err)
+			}
 		}
 	}
 	err := Retry(ctx, func(ctx context.Context) (err error) {

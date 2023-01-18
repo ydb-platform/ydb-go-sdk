@@ -324,7 +324,11 @@ func (w *Writer) compose(trace *Trace) {
 				w.line(`options := `, unexported(trace.Name), `ComposeOptions{}`)
 				w.line(`for _, opt := range opts {`)
 				w.block(func() {
-					w.line(`opt(&options)`)
+					w.line(`if opt != nil {`)
+					w.block(func() {
+						w.line(`opt(&options)`)
+					})
+					w.line(`}`)
 				})
 				w.line(`}`)
 			}

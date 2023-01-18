@@ -54,7 +54,9 @@ func loadFromFileCache(key string) (_ []*x509.Certificate, exists bool) {
 func FromFile(file string, opts ...FromFileOption) ([]*x509.Certificate, error) {
 	options := fromFileOptions{}
 	for _, opt := range opts {
-		opt(&options)
+		if opt != nil {
+			opt(&options)
+		}
 	}
 
 	if !options.noCache {
@@ -105,7 +107,9 @@ func loadFromPemCache(key string) (_ *x509.Certificate, exists bool) {
 func parseCertificate(der []byte, opts ...FromPemOption) (*x509.Certificate, error) {
 	options := fromPemOptions{}
 	for _, opt := range opts {
-		opt(&options)
+		if opt != nil {
+			opt(&options)
+		}
 	}
 
 	key := string(der)

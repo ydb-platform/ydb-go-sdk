@@ -156,7 +156,9 @@ func New(address string, opts ...Option) *endpoint {
 		lastUpdated: time.Now(),
 	}
 	for _, o := range opts {
-		o(e)
+		if o != nil {
+			o(e)
+		}
 	}
 	return e
 }

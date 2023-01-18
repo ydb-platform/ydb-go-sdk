@@ -173,7 +173,9 @@ func WithTLSSInsecureSkipVerify() Option {
 func WithLogger(details trace.Details, opts ...LoggerOption) Option {
 	loggerOpts := make([]logger.Option, 0, len(opts))
 	for _, o := range opts {
-		loggerOpts = append(loggerOpts, logger.Option(o))
+		if o != nil {
+			loggerOpts = append(loggerOpts, logger.Option(o))
+		}
 	}
 
 	l := logger.New(loggerOpts...)
@@ -248,8 +250,10 @@ func With(options ...config.Option) Option {
 func MergeOptions(opts ...Option) Option {
 	return func(ctx context.Context, c *connection) error {
 		for _, o := range opts {
-			if err := o(ctx, c); err != nil {
-				return xerrors.WithStackTrace(err)
+			if o != nil {
+				if err := o(ctx, c); err != nil {
+					return xerrors.WithStackTrace(err)
+				}
 			}
 		}
 		return nil

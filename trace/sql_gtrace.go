@@ -26,7 +26,9 @@ func WithDatabaseSQLPanicCallback(cb func(e interface{})) DatabaseSQLComposeOpti
 func (t DatabaseSQL) Compose(x DatabaseSQL, opts ...DatabaseSQLComposeOption) (ret DatabaseSQL) {
 	options := databaseSQLComposeOptions{}
 	for _, opt := range opts {
-		opt(&options)
+		if opt != nil {
+			opt(&options)
+		}
 	}
 	{
 		h1 := t.OnConnectorConnect
