@@ -1,3 +1,5 @@
+* Added checks for nil option to all opts range loops
+
 ## v3.42.5
 * Fixed closing of `database/sql` connection (aka `YDB` session)
 * Made `session.Close()` as `nop` for idled session

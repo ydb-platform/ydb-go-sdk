@@ -89,7 +89,9 @@ func New(
 	}
 
 	for _, o := range opts {
-		o(r)
+		if o != nil {
+			o(r)
+		}
 	}
 
 	go r.worker(ctx, r.clock.NewTicker(interval))

@@ -23,7 +23,9 @@ func New(
 		database:    database,
 	}
 	for _, o := range opts {
-		o(&m)
+		if o != nil {
+			o(&m)
+		}
 	}
 	return m
 }

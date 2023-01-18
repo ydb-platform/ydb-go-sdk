@@ -110,7 +110,9 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 		slowBackoff: backoff.Slow,
 	}
 	for _, o := range opts {
-		o(options)
+		if o != nil {
+			o(options)
+		}
 	}
 	ctx = xcontext.WithIdempotent(ctx, options.idempotent)
 	defer func() {

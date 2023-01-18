@@ -32,7 +32,9 @@ func TestManyTimes(t testing.TB, test TestFunc, opts ...TestManyTimesOption) {
 	}
 
 	for _, o := range opts {
-		o(&options)
+		if o != nil {
+			o(&options)
+		}
 	}
 
 	start := time.Now()

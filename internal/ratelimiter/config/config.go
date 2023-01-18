@@ -38,7 +38,9 @@ func With(config config.Common) Option {
 func New(opts ...Option) Config {
 	c := Config{}
 	for _, o := range opts {
-		o(&c)
+		if o != nil {
+			o(&c)
+		}
 	}
 	return c
 }

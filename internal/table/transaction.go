@@ -87,7 +87,9 @@ func (tx *transaction) ExecuteStatement(
 	defer a.Free()
 
 	for _, f := range opts {
-		f(&optsResult, a)
+		if f != nil {
+			f(&optsResult, a)
+		}
 	}
 
 	onDone := trace.TableOnSessionTransactionExecuteStatement(
@@ -158,7 +160,9 @@ func (tx *transaction) CommitTx(
 		)
 
 		for _, opt := range opts {
-			opt((*options.CommitTransactionDesc)(request))
+			if opt != nil {
+				opt((*options.CommitTransactionDesc)(request))
+			}
 		}
 
 		response, err = tx.s.tableService.CommitTransaction(ctx, request)

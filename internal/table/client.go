@@ -156,7 +156,9 @@ func (c *Client) updateNodes(ctx context.Context, endpoints []endpoint.Info) {
 func (c *Client) createSession(ctx context.Context, opts ...createSessionOption) (s *session, err error) {
 	options := createSessionOptions{}
 	for _, o := range opts {
-		o(&options)
+		if o != nil {
+			o(&options)
+		}
 	}
 
 	defer func() {
@@ -437,7 +439,9 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 		o     = getOptions{t: c.config.Trace()}
 	)
 	for _, opt := range opts {
-		opt(&o)
+		if opt != nil {
+			opt(&o)
+		}
 	}
 
 	onDone := trace.TableOnPoolGet(o.t, &ctx)

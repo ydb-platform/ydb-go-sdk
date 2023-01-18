@@ -138,8 +138,10 @@ func (r *Reader) ReadMessage(ctx context.Context) (*PublicMessage, error) {
 func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOption) (batch *PublicBatch, err error) {
 	readOptions := r.defaultBatchConfig.clone()
 
-	for _, optFunc := range opts {
-		readOptions = optFunc.Apply(readOptions)
+	for _, opt := range opts {
+		if opt != nil {
+			readOptions = opt.Apply(readOptions)
+		}
 	}
 
 forReadBatch:
@@ -252,7 +254,9 @@ func convertNewParamsToStreamConfig(
 	}
 
 	for _, f := range opts {
-		f(&cfg)
+		if f != nil {
+			f(&cfg)
+		}
 	}
 
 	return cfg

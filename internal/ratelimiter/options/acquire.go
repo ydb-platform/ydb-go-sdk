@@ -75,7 +75,9 @@ func NewAcquire(opts ...AcquireOption) Acquire {
 		acquireType: AcquireTypeDefault,
 	}
 	for _, o := range opts {
-		o(h)
+		if o != nil {
+			o(h)
+		}
 	}
 	return h
 }

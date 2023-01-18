@@ -212,7 +212,9 @@ func (c *Client) ModifyPermissions(ctx context.Context, path string, opts ...sch
 func (c *Client) modifyPermissions(ctx context.Context, path string, opts ...scheme.PermissionsOption) (err error) {
 	var desc permissionsDesc
 	for _, o := range opts {
-		o(&desc)
+		if o != nil {
+			o(&desc)
+		}
 	}
 	_, err = c.service.ModifyPermissions(
 		ctx,

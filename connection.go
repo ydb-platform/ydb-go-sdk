@@ -386,12 +386,11 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *connectio
 		}
 	}
 	for _, opt := range opts {
-		if opt == nil {
-			continue
-		}
-		err = opt(ctx, c)
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
+		if opt != nil {
+			err = opt(ctx, c)
+			if err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
 		}
 	}
 	c.config = config.New(c.options...)

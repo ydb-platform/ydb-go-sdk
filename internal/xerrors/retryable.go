@@ -67,7 +67,9 @@ func Retryable(err error, opts ...RetryableErrorOption) error {
 		name: "CUSTOM",
 	}
 	for _, o := range opts {
-		o(re)
+		if o != nil {
+			o(re)
+		}
 	}
 	return re
 }

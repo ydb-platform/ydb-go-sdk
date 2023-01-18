@@ -25,7 +25,9 @@ func WithDriverPanicCallback(cb func(e interface{})) DriverComposeOption {
 func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 	options := driverComposeOptions{}
 	for _, opt := range opts {
-		opt(&options)
+		if opt != nil {
+			opt(&options)
+		}
 	}
 	{
 		h1 := t.OnInit

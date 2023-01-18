@@ -25,7 +25,9 @@ func WithTablePanicCallback(cb func(e interface{})) TableComposeOption {
 func (t Table) Compose(x Table, opts ...TableComposeOption) (ret Table) {
 	options := tableComposeOptions{}
 	for _, opt := range opts {
-		opt(&options)
+		if opt != nil {
+			opt(&options)
+		}
 	}
 	{
 		h1 := t.OnInit

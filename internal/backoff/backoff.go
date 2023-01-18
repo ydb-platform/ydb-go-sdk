@@ -97,7 +97,9 @@ func New(opts ...option) logBackoff {
 		clock: clockwork.NewRealClock(),
 	}
 	for _, o := range opts {
-		o(&b)
+		if o != nil {
+			o(&b)
+		}
 	}
 	return b
 }
