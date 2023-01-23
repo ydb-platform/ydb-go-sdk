@@ -25,7 +25,9 @@ func WithScriptingPanicCallback(cb func(e interface{})) ScriptingComposeOption {
 func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scripting) {
 	options := scriptingComposeOptions{}
 	for _, opt := range opts {
-		opt(&options)
+		if opt != nil {
+			opt(&options)
+		}
 	}
 	{
 		h1 := t.OnExecute

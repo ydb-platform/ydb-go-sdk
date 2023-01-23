@@ -26,7 +26,9 @@ const (
 func New(opts ...Option) Config {
 	c := defaults()
 	for _, o := range opts {
-		o(&c)
+		if o != nil {
+			o(&c)
+		}
 	}
 	return c
 }

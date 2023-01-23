@@ -160,7 +160,9 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.
 	)
 
 	for _, o := range opts {
-		o(s)
+		if o != nil {
+			o(s)
+		}
 	}
 
 	return s, nil
@@ -287,7 +289,9 @@ func (s *session) CreateTable(
 	)
 	defer a.Free()
 	for _, opt := range opts {
-		opt.ApplyCreateTableOption((*options.CreateTableDesc)(&request), a)
+		if opt != nil {
+			opt.ApplyCreateTableOption((*options.CreateTableDesc)(&request), a)
+		}
 	}
 	_, err = s.tableService.CreateTable(ctx, &request)
 	return xerrors.WithStackTrace(err)
@@ -314,7 +318,9 @@ func (s *session) DescribeTable(
 		),
 	}
 	for _, opt := range opts {
-		opt((*options.DescribeTableDesc)(&request))
+		if opt != nil {
+			opt((*options.DescribeTableDesc)(&request))
+		}
 	}
 	response, err = s.tableService.DescribeTable(ctx, &request)
 	if err != nil {
@@ -452,7 +458,9 @@ func (s *session) DropTable(
 		),
 	}
 	for _, opt := range opts {
-		opt.ApplyDropTableOption((*options.DropTableDesc)(&request))
+		if opt != nil {
+			opt.ApplyDropTableOption((*options.DropTableDesc)(&request))
+		}
 	}
 	_, err = s.tableService.DropTable(ctx, &request)
 	return xerrors.WithStackTrace(err)
@@ -488,7 +496,9 @@ func (s *session) AlterTable(
 	)
 	defer a.Free()
 	for _, opt := range opts {
-		opt.ApplyAlterTableOption((*options.AlterTableDesc)(&request), a)
+		if opt != nil {
+			opt.ApplyAlterTableOption((*options.AlterTableDesc)(&request), a)
+		}
 	}
 	_, err = s.tableService.AlterTable(ctx, &request)
 	return xerrors.WithStackTrace(err)
@@ -512,7 +522,9 @@ func (s *session) CopyTable(
 		),
 	}
 	for _, opt := range opts {
-		opt((*options.CopyTableDesc)(&request))
+		if opt != nil {
+			opt((*options.CopyTableDesc)(&request))
+		}
 	}
 	_, err = s.tableService.CopyTable(ctx, &request)
 	return xerrors.WithStackTrace(err)
@@ -653,7 +665,9 @@ func (s *session) Execute(
 	)
 
 	for _, opt := range opts {
-		opt((*options.ExecuteDataQueryDesc)(request), a)
+		if opt != nil {
+			opt((*options.ExecuteDataQueryDesc)(request), a)
+		}
 	}
 
 	onDone := trace.TableOnSessionQueryExecute(
@@ -742,7 +756,9 @@ func (s *session) ExecuteSchemeQuery(
 		),
 	}
 	for _, opt := range opts {
-		opt((*options.ExecuteSchemeQueryDesc)(&request))
+		if opt != nil {
+			opt((*options.ExecuteSchemeQueryDesc)(&request))
+		}
 	}
 	_, err = s.tableService.ExecuteSchemeQuery(ctx, &request)
 	return xerrors.WithStackTrace(err)
@@ -907,7 +923,9 @@ func (s *session) StreamReadTable(
 	}()
 
 	for _, opt := range opts {
-		opt((*options.ReadTableDesc)(&request), a)
+		if opt != nil {
+			opt((*options.ReadTableDesc)(&request), a)
+		}
 	}
 
 	ctx, cancel := xcontext.WithErrCancel(ctx)
@@ -990,7 +1008,9 @@ func (s *session) StreamExecuteScanQuery(
 	}()
 
 	for _, opt := range opts {
-		opt((*options.ExecuteScanQueryDesc)(&request))
+		if opt != nil {
+			opt((*options.ExecuteScanQueryDesc)(&request))
+		}
 	}
 
 	ctx, cancel := context.WithCancel(ctx)

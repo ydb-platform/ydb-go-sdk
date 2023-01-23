@@ -25,7 +25,9 @@ func WithDiscoveryPanicCallback(cb func(e interface{})) DiscoveryComposeOption {
 func (t Discovery) Compose(x Discovery, opts ...DiscoveryComposeOption) (ret Discovery) {
 	options := discoveryComposeOptions{}
 	for _, opt := range opts {
-		opt(&options)
+		if opt != nil {
+			opt(&options)
+		}
 	}
 	{
 		h1 := t.OnDiscover

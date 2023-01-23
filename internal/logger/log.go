@@ -33,7 +33,9 @@ func New(opts ...Option) *logger {
 		err:      os.Stderr,
 	}
 	for _, o := range opts {
-		o(l)
+		if o != nil {
+			o(l)
+		}
 	}
 	return l
 }

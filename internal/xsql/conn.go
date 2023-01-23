@@ -100,7 +100,9 @@ func newConn(c *Connector, s table.ClosableSession, opts ...connOption) *conn {
 		session:   s,
 	}
 	for _, o := range opts {
-		o(cc)
+		if o != nil {
+			o(cc)
+		}
 	}
 	c.attach(cc)
 	return cc

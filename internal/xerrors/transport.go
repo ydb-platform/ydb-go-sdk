@@ -50,7 +50,9 @@ func WithAddress(address string) teOpt {
 func Transport(opts ...teOpt) error {
 	te := &transportError{}
 	for _, f := range opts {
-		f(te)
+		if f != nil {
+			f(te)
+		}
 	}
 	return WithStackTrace(fmt.Errorf("%w", te), WithSkipDepth(1))
 }
@@ -182,7 +184,9 @@ func FromGRPCError(err error, opts ...teOpt) error {
 			details: s.Details(),
 		}
 		for _, o := range opts {
-			o(te)
+			if o != nil {
+				o(te)
+			}
 		}
 		return te
 	}

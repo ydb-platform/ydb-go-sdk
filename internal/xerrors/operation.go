@@ -63,7 +63,9 @@ func Operation(opts ...oeOpt) error {
 		code: Ydb.StatusIds_STATUS_CODE_UNSPECIFIED,
 	}
 	for _, f := range opts {
-		f(oe)
+		if f != nil {
+			f(oe)
+		}
 	}
 	return oe
 }

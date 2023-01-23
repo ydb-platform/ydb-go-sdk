@@ -48,7 +48,9 @@ func StructField(name string, t Type) StructOption {
 func Struct(opts ...StructOption) Type {
 	var s tStructType
 	for _, opt := range opts {
-		opt(&s)
+		if opt != nil {
+			opt(&s)
+		}
 	}
 	return value.Struct(s.fields...)
 }
@@ -60,7 +62,9 @@ func Dict(k, v Type) Type {
 func VariantStruct(opts ...StructOption) Type {
 	var s tStructType
 	for _, opt := range opts {
-		opt(&s)
+		if opt != nil {
+			opt(&s)
+		}
 	}
 	return value.VariantStruct(s.fields...)
 }

@@ -281,7 +281,9 @@ type (
 func TxSettings(opts ...TxOption) *TransactionSettings {
 	s := new(TransactionSettings)
 	for _, opt := range opts {
-		opt((*txDesc)(&s.settings))
+		if opt != nil {
+			opt((*txDesc)(&s.settings))
+		}
 	}
 	return s
 }
@@ -341,7 +343,9 @@ func WithOnlineReadOnly(opts ...TxOnlineReadOnlyOption) TxOption {
 	return func(d *txDesc) {
 		var ro txOnlineReadOnly
 		for _, opt := range opts {
-			opt(&ro)
+			if opt != nil {
+				opt(&ro)
+			}
 		}
 		d.TxMode = &Ydb_Table.TransactionSettings_OnlineReadOnly{
 			OnlineReadOnly: (*Ydb_Table.OnlineModeSettings)(&ro),
@@ -380,7 +384,9 @@ func (t *TransactionControl) Desc() *Ydb_Table.TransactionControl {
 func TxControl(opts ...TxControlOption) *TransactionControl {
 	c := new(TransactionControl)
 	for _, opt := range opts {
-		opt((*txControlDesc)(&c.desc))
+		if opt != nil {
+			opt((*txControlDesc)(&c.desc))
+		}
 	}
 	return c
 }
