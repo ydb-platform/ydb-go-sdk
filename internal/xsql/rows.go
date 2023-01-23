@@ -52,7 +52,8 @@ func (r *rows) Columns() []string {
 }
 
 // TODO: Need to store column types to internal rows cache.
-// https://cs.opensource.google/go/go/+/refs/tags/go1.19.4:src/database/sql/sql.go;l=3101
+//
+//nolint:godox
 func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 	r.nextSet.Do(func() {
 		r.result.NextResultSet(context.Background())
