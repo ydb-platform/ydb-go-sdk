@@ -8,9 +8,9 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
+	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -20,24 +20,31 @@ import (
 var DefaultDiscoveryInterval = time.Minute
 
 func New(
-	cc conn.Conn,
 	config config.Config,
+	grpcOptions ...grpc.DialOption,
 ) *Client {
-	c := &Client{
-		cc:      cc,
-		config:  config,
-		service: Ydb_Discovery_V1.NewDiscoveryServiceClient(cc),
+	return &Client{
+		config:      config,
+		grpcOptions: grpcOptions,
 	}
-
-	return c
 }
 
 var _ discovery.Client = &Client{}
 
 type Client struct {
-	config  config.Config
-	service Ydb_Discovery_V1.DiscoveryServiceClient
-	cc      conn.Conn
+	config      config.Config
+	grpcOptions []grpc.DialOption
+}
+
+func (c *Client) client(ctx context.Context) (Ydb_Discovery_V1.DiscoveryServiceClient, *grpc.ClientConn, error) {
+	cc, err := grpc.DialContext(ctx,
+		"dns:///"+c.config.Endpoint(),
+		c.grpcOptions...,
+	)
+	if err != nil {
+		return nil, nil, xerrors.WithStackTrace(err)
+	}
+	return Ydb_Discovery_V1.NewDiscoveryServiceClient(cc), cc, nil
 }
 
 // Discover cluster endpoints
@@ -65,7 +72,15 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	response, err = c.service.ListEndpoints(ctx, &request)
+	client, cc, err := c.client(ctx)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	defer func() {
+		_ = cc.Close()
+	}()
+
+	response, err = client.ListEndpoints(ctx, &request)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -113,7 +128,15 @@ func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	response, err = c.service.WhoAmI(ctx, &request)
+	client, cc, err := c.client(ctx)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	defer func() {
+		_ = cc.Close()
+	}()
+
+	response, err = client.WhoAmI(ctx, &request)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
