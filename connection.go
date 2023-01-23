@@ -16,8 +16,10 @@ import (
 	internalCoordination "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
+	internalDiscovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	internalRatelimiter "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
 	internalScheme "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
@@ -92,6 +94,10 @@ type connection struct {
 	config  config.Config
 	options []config.Option
 
+	discoveryOnce    initOnce
+	discovery        *internalDiscovery.Client
+	discoveryOptions []discoveryConfig.Option
+
 	tableOnce    initOnce
 	table        *internalTable.Client
 	tableOptions []tableConfig.Option
@@ -103,8 +109,6 @@ type connection struct {
 	schemeOnce    initOnce
 	scheme        *internalScheme.Client
 	schemeOptions []schemeConfig.Option
-
-	discoveryOptions []discoveryConfig.Option
 
 	coordinationOnce    initOnce
 	coordination        *internalCoordination.Client
@@ -299,7 +303,24 @@ func (c *connection) Ratelimiter() ratelimiter.Client {
 }
 
 func (c *connection) Discovery() discovery.Client {
-	return c.balancer.Discovery()
+	c.discoveryOnce.Init(func() closeFunc {
+		cfg := discoveryConfig.New(
+			append(
+				// prepend common params from root config
+				[]discoveryConfig.Option{
+					discoveryConfig.With(c.config.Common),
+				},
+				c.discoveryOptions...,
+			)...,
+		)
+		c.discovery = internalDiscovery.New(
+			c.pool.Get(endpoint.New(cfg.Endpoint())),
+			cfg,
+		)
+		return c.ratelimiter.Close
+	})
+	// may be nil if driver closed early
+	return c.discovery
 }
 
 func (c *connection) Scripting() scripting.Client {
