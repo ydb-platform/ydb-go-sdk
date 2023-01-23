@@ -141,6 +141,11 @@ func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 		return nil, xerrors.WithStackTrace(err)
 	}
 
+	result := response.GetOperation().GetResult()
+	if result == nil {
+		return &discovery.WhoAmI{}, nil
+	}
+
 	err = response.GetOperation().GetResult().UnmarshalTo(&whoAmIResultResult)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
