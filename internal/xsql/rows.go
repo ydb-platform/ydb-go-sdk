@@ -40,14 +40,12 @@ func (r *rows) Columns() []string {
 	r.nextSet.Do(func() {
 		r.result.NextResultSet(context.Background())
 	})
-
 	var i int
 	cs := make([]string, r.result.CurrentResultSet().ColumnCount())
 	r.result.CurrentResultSet().Columns(func(m options.Column) {
 		cs[i] = m.Name
 		i++
 	})
-
 	return cs
 }
 
@@ -70,8 +68,7 @@ func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 }
 
 func (r *rows) NextResultSet() error {
-	r.nextSet.Do(func() {
-	})
+	r.nextSet.Do(func() {})
 	return r.result.NextResultSetErr(context.Background())
 }
 
