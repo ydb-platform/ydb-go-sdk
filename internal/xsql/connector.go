@@ -10,6 +10,7 @@ import (
 	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -95,6 +96,9 @@ type connection interface {
 
 	// Scripting returns scripting client
 	Scripting() scripting.Client
+
+	// Scheme returns scheme client
+	Scheme() scheme.Client
 
 	// Close closes connection and clear resources
 	Close(ctx context.Context) error

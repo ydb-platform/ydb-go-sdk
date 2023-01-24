@@ -16,9 +16,10 @@ import (
 )
 
 var (
-	_ driver.Rows              = &rows{}
-	_ driver.RowsNextResultSet = &rows{}
-	_ driver.Rows              = &single{}
+	_ driver.Rows                           = &rows{}
+	_ driver.RowsNextResultSet              = &rows{}
+	_ driver.RowsColumnTypeDatabaseTypeName = &rows{}
+	_ driver.Rows                           = &single{}
 
 	_ types.Scanner = &valuer{}
 )
@@ -46,6 +47,24 @@ func (r *rows) Columns() []string {
 		i++
 	})
 	return cs
+}
+
+// TODO: Need to store column types to internal rows cache.
+//
+//nolint:godox
+func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
+	r.nextSet.Do(func() {
+		r.result.NextResultSet(context.Background())
+	})
+
+	var i int
+	yqlTypes := make([]string, r.result.CurrentResultSet().ColumnCount())
+	r.result.CurrentResultSet().Columns(func(m options.Column) {
+		yqlTypes[i] = m.Type.Yql()
+		i++
+	})
+
+	return yqlTypes[index]
 }
 
 func (r *rows) NextResultSet() error {

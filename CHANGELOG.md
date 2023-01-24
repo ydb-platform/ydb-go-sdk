@@ -1,3 +1,7 @@
+* Implemented `driver.RowsColumnTypeDatabaseTypeName` interface in `internal/xsql.rows` struct
+* Extended `internal/xsql.conn` struct with methods for getting `YDB` metadata
+* Added `scheme.Client` to `internal/xsql.connection` interface
+* Added `helpers` package with method for checking existence of table, refactored `sugar.IsTableExists()`
 * Added checks for nil option to all opts range loops
 * Moved content of package `internal/ctxlabels` into `internal/xcontext`
 * Implemented `GRPCStatus` method in `internal/xerrors/transportError`

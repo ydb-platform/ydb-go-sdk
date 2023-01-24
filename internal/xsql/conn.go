@@ -6,13 +6,17 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"io"
+	"path"
 	"sync/atomic"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/helpers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/isolation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -361,4 +365,355 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 		tx:   transaction,
 	}
 	return c.currentTx, nil
+}
+
+func (c *conn) Version(ctx context.Context) (_ string, err error) {
+	const version string = "default"
+	return version, nil
+}
+
+func (c *conn) IsTableExists(ctx context.Context, tableName string) (tableExists bool, err error) {
+	cc := c.connector.Connection()
+	tableExists, err = helpers.IsTableExists(ctx, cc.Scheme(), tableName)
+	if err != nil {
+		return false, xerrors.WithStackTrace(err)
+	}
+	return tableExists, nil
+}
+
+func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string) (columnExists bool, err error) {
+	var (
+		cc      = c.connector.Connection()
+		session = c.session
+	)
+
+	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
+	if err != nil {
+		return false, xerrors.WithStackTrace(err)
+	}
+	if !tableExist {
+		return false, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
+	}
+
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		desc, err := session.DescribeTable(ctx, tableName)
+		if err != nil {
+			return err
+		}
+		for _, col := range desc.Columns {
+			if col.Name == columnName {
+				columnExists = true
+				break
+			}
+		}
+		return nil
+	}, retry.WithIdempotent(true))
+	if err != nil {
+		return false, xerrors.WithStackTrace(err)
+	}
+	return columnExists, nil
+}
+
+func (c *conn) GetColumns(ctx context.Context, tableName string) (columns []string, err error) {
+	var (
+		cc      = c.connector.Connection()
+		session = c.session
+	)
+
+	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	if !tableExist {
+		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
+	}
+
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		desc, err := session.DescribeTable(ctx, tableName)
+		if err != nil {
+			return err
+		}
+		for _, col := range desc.Columns {
+			columns = append(columns, col.Name)
+		}
+		return nil
+	}, retry.WithIdempotent(true))
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	return columns, nil
+}
+
+func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) (dataType string, err error) {
+	var (
+		cc      = c.connector.Connection()
+		session = c.session
+	)
+
+	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
+	if err != nil {
+		return "", xerrors.WithStackTrace(err)
+	}
+	if !tableExist {
+		return "", xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
+	}
+
+	columnExist, err := c.IsColumnExists(ctx, tableName, columnName)
+	if err != nil {
+		return "", xerrors.WithStackTrace(err)
+	}
+	if !columnExist {
+		return "", xerrors.WithStackTrace(fmt.Errorf("column '%s' not exist in table '%s'", columnName, tableName))
+	}
+
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		desc, err := session.DescribeTable(ctx, tableName)
+		if err != nil {
+			return err
+		}
+		for _, col := range desc.Columns {
+			if col.Name == columnName {
+				dataType = col.Type.Yql()
+				break
+			}
+		}
+		return nil
+	}, retry.WithIdempotent(true))
+	if err != nil {
+		return "", xerrors.WithStackTrace(err)
+	}
+	return dataType, nil
+}
+
+func (c *conn) GetPrimaryKeys(ctx context.Context, tableName string) (pkCols []string, err error) {
+	var (
+		cc      = c.connector.Connection()
+		session = c.session
+	)
+
+	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	if !tableExist {
+		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
+	}
+
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		desc, err := session.DescribeTable(ctx, tableName)
+		if err != nil {
+			return err
+		}
+		pkCols = append(pkCols, desc.PrimaryKey...)
+		return nil
+	}, retry.WithIdempotent(true))
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	return pkCols, nil
+}
+
+func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (ok bool, err error) {
+	cc := c.connector.Connection()
+
+	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
+	if err != nil {
+		return false, xerrors.WithStackTrace(err)
+	}
+	if !tableExist {
+		return false, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
+	}
+
+	columnExist, err := c.IsColumnExists(ctx, tableName, columnName)
+	if err != nil {
+		return false, xerrors.WithStackTrace(err)
+	}
+	if !columnExist {
+		return false, xerrors.WithStackTrace(fmt.Errorf("column '%s' not exist in table '%s'", columnName, tableName))
+	}
+
+	pkCols, err := c.GetPrimaryKeys(ctx, tableName)
+	if err != nil {
+		return false, xerrors.WithStackTrace(err)
+	}
+	for _, pkCol := range pkCols {
+		if pkCol == columnName {
+			ok = true
+			break
+		}
+	}
+	return ok, nil
+}
+
+func (c *conn) GetTables(ctx context.Context, absPath string) (tables []string, err error) {
+	var (
+		cc           = c.connector.Connection()
+		schemeClient = cc.Scheme()
+	)
+
+	var e scheme.Entry
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		e, err = schemeClient.DescribePath(ctx, absPath)
+		return err
+	}, retry.WithIdempotent(true))
+
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	if !e.IsTable() && !e.IsDirectory() {
+		return nil, xerrors.WithStackTrace(fmt.Errorf("path '%s' should be a table or directory", absPath))
+	}
+
+	if e.IsTable() {
+		tables = append(tables, absPath)
+		return tables, nil
+	}
+
+	var d scheme.Directory
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		d, err = schemeClient.ListDirectory(ctx, absPath)
+		return err
+	}, retry.WithIdempotent(true))
+
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	for _, child := range d.Children {
+		if child.IsTable() {
+			tables = append(tables, path.Join(absPath, child.Name))
+		}
+	}
+	return tables, nil
+}
+
+func (c *conn) GetAllTables(ctx context.Context, absPath string) (tables []string, err error) {
+	var (
+		cc           = c.connector.Connection()
+		schemeClient = cc.Scheme()
+	)
+
+	ignoreDirs := map[string]bool{
+		".sys":        true,
+		".sys_health": true,
+	}
+
+	canEnter := func(dir string) bool {
+		if _, ignore := ignoreDirs[dir]; ignore {
+			return false
+		}
+		return true
+	}
+
+	queue := make([]string, 0)
+	queue = append(queue, absPath)
+
+	for st := 0; st < len(queue); st++ {
+		curPath := queue[st]
+
+		var e scheme.Entry
+		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+			e, err = schemeClient.DescribePath(ctx, curPath)
+			return err
+		}, retry.WithIdempotent(true))
+
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		if e.IsTable() {
+			tables = append(tables, curPath)
+			continue
+		}
+
+		var d scheme.Directory
+		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+			d, err = schemeClient.ListDirectory(ctx, curPath)
+			return err
+		}, retry.WithIdempotent(true))
+
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		for _, child := range d.Children {
+			if child.IsDirectory() || child.IsTable() {
+				if canEnter(child.Name) {
+					queue = append(queue, path.Join(curPath, child.Name))
+				}
+			}
+		}
+	}
+	return tables, nil
+}
+
+func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []string, err error) {
+	var (
+		cc      = c.connector.Connection()
+		session = c.session
+	)
+
+	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	if !tableExist {
+		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
+	}
+
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		desc, err := session.DescribeTable(ctx, tableName)
+		if err != nil {
+			return err
+		}
+		for _, indexDesc := range desc.Indexes {
+			indexes = append(indexes, indexDesc.Name)
+		}
+		return nil
+	}, retry.WithIdempotent(true))
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return indexes, nil
+}
+
+func (c *conn) GetIndexColumns(ctx context.Context, tableName, indexName string) (columns []string, err error) {
+	var (
+		cc       = c.connector.Connection()
+		session  = c.session
+		hasIndex = false
+	)
+
+	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	if !tableExist {
+		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
+	}
+
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		desc, err := session.DescribeTable(ctx, tableName)
+		if err != nil {
+			return err
+		}
+		for _, indexDesc := range desc.Indexes {
+			if indexDesc.Name == indexName {
+				hasIndex = true
+				columns = append(columns, indexDesc.IndexColumns...)
+				break
+			}
+		}
+		return nil
+	}, retry.WithIdempotent(true))
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	if !hasIndex {
+		return nil, xerrors.WithStackTrace(fmt.Errorf("index '%s' not found in table '%s'", indexName, tableName))
+	}
+	return columns, nil
 }
