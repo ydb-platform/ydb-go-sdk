@@ -7,13 +7,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
+	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 func TestCheckRetryMode(t *testing.T) {
-	fastError := xerrors.Transport(xerrors.WithCode(grpcCodes.Unavailable))
+	fastError := xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, ""))
 	slowError := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
 	unretriable := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED))
 

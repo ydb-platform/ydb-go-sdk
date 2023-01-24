@@ -31,7 +31,7 @@ func (s *grpcClientStream) CloseSend() (err error) {
 	if err != nil {
 		if s.wrapping {
 			return xerrors.WithStackTrace(
-				xerrors.FromGRPCError(
+				xerrors.Transport(
 					err,
 					xerrors.WithAddress(s.c.Address()),
 				),
@@ -51,7 +51,7 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 
 	if err != nil {
 		if s.wrapping {
-			err = xerrors.FromGRPCError(err,
+			err = xerrors.Transport(err,
 				xerrors.WithAddress(s.c.Address()),
 			)
 			if s.sentMark.canRetry() {
@@ -88,7 +88,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 
 	if err != nil {
 		if s.wrapping {
-			err = xerrors.FromGRPCError(err,
+			err = xerrors.Transport(err,
 				xerrors.WithAddress(s.c.Address()),
 			)
 			if s.sentMark.canRetry() {

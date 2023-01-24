@@ -331,7 +331,7 @@ func (c *conn) Invoke(
 	err = cc.Invoke(ctx, method, req, res, append(opts, grpc.Trailer(&md))...)
 	if err != nil {
 		if useWrapping {
-			err = xerrors.FromGRPCError(err,
+			err = xerrors.Transport(err,
 				xerrors.WithAddress(c.Address()),
 			)
 			if sentMark.canRetry() {
@@ -420,7 +420,7 @@ func (c *conn) NewStream(
 	if err != nil {
 		if useWrapping {
 			err = xerrors.Retryable(
-				xerrors.FromGRPCError(err,
+				xerrors.Transport(err,
 					xerrors.WithAddress(c.Address()),
 				),
 				xerrors.WithName("NewStream"),

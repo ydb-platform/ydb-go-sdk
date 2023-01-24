@@ -8,14 +8,14 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
+	grpcStatus "google.golang.org/grpc/status"
 )
 
 func TestIsTransportError(t *testing.T) {
 	code := grpcCodes.Canceled
 	for _, err := range []error{
-		&transportError{code: code},
-		&transportError{code: code, err: context.Canceled},
-		fmt.Errorf("wrapped: %w", &transportError{code: code}),
+		&transportError{status: grpcStatus.New(code, "")},
+		fmt.Errorf("wrapped: %w", &transportError{status: grpcStatus.New(code, "")}),
 	} {
 		t.Run("", func(t *testing.T) {
 			if !IsTransportError(err, code) {
@@ -28,9 +28,8 @@ func TestIsTransportError(t *testing.T) {
 func TestIsNonTransportError(t *testing.T) {
 	code := grpcCodes.Canceled
 	for _, err := range []error{
-		&transportError{code: grpcCodes.Aborted},
-		&transportError{code: grpcCodes.Aborted, err: context.Canceled},
-		fmt.Errorf("wrapped: %w", &transportError{code: grpcCodes.Aborted}),
+		&transportError{status: grpcStatus.New(grpcCodes.Aborted, "")},
+		fmt.Errorf("wrapped: %w", &transportError{status: grpcStatus.New(grpcCodes.Aborted, "")}),
 		&operationError{code: Ydb.StatusIds_BAD_REQUEST},
 	} {
 		t.Run("", func(t *testing.T) {
@@ -43,8 +42,7 @@ func TestIsNonTransportError(t *testing.T) {
 
 func TestTransportErrorWrapsContextError(t *testing.T) {
 	err := fmt.Errorf("wrapped: %w", &transportError{
-		code: grpcCodes.Canceled,
-		err:  context.Canceled,
+		status: grpcStatus.New(grpcCodes.Canceled, ""),
 	})
 	if !errors.Is(err, context.Canceled) {
 		t.Errorf("expected %v to wrap deadline.Canceled", err)
@@ -56,7 +54,7 @@ func TestIsNonOperationError(t *testing.T) {
 	for _, err := range []error{
 		&operationError{code: Ydb.StatusIds_TIMEOUT},
 		fmt.Errorf("wrapped: %w", &operationError{code: Ydb.StatusIds_TIMEOUT}),
-		&transportError{code: grpcCodes.Aborted},
+		&transportError{status: grpcStatus.New(grpcCodes.Aborted, "")},
 	} {
 		t.Run("", func(t *testing.T) {
 			if IsOperationError(err, code) {
@@ -72,71 +70,67 @@ func TestMustPessimizeEndpoint(t *testing.T) {
 		pessimize bool
 	}{
 		{
-			error:     Transport(),
+			error:     Transport(grpcStatus.Error(grpcCodes.Canceled, "")),
 			pessimize: true,
 		},
 		{
-			error:     Transport(WithCode(grpcCodes.Canceled)),
+			error:     Transport(grpcStatus.Error(grpcCodes.Unknown, "")),
 			pessimize: true,
 		},
 		{
-			error:     Transport(WithCode(grpcCodes.Unknown)),
+			error:     Transport(grpcStatus.Error(grpcCodes.InvalidArgument, "")),
 			pessimize: true,
 		},
 		{
-			error:     Transport(WithCode(grpcCodes.InvalidArgument)),
+			error:     Transport(grpcStatus.Error(grpcCodes.DeadlineExceeded, "")),
 			pessimize: true,
 		},
 		{
-			error:     Transport(WithCode(grpcCodes.DeadlineExceeded)),
+			error:     Transport(grpcStatus.Error(grpcCodes.NotFound, "")),
 			pessimize: true,
 		},
 		{
-			error:     Transport(WithCode(grpcCodes.NotFound)),
+			error:     Transport(grpcStatus.Error(grpcCodes.AlreadyExists, "")),
 			pessimize: true,
 		},
 		{
-			error:     Transport(WithCode(grpcCodes.AlreadyExists)),
+			error:     Transport(grpcStatus.Error(grpcCodes.PermissionDenied, "")),
 			pessimize: true,
 		},
 		{
-			error:     Transport(WithCode(grpcCodes.PermissionDenied)),
-			pessimize: true,
-		},
-		{
-			error:     Transport(WithCode(grpcCodes.ResourceExhausted)),
+			error:     Transport(grpcStatus.Error(grpcCodes.ResourceExhausted, "")),
 			pessimize: false,
 		},
 		{
-			error:     Transport(WithCode(grpcCodes.FailedPrecondition)),
+			error:     Transport(grpcStatus.Error(grpcCodes.FailedPrecondition, "")),
 			pessimize: true,
 		},
 		{
-			error:     Transport(WithCode(grpcCodes.Aborted)),
+			error:     Transport(grpcStatus.Error(grpcCodes.Aborted, "")),
 			pessimize: true,
 		},
 		{
-			error:     Transport(WithCode(grpcCodes.OutOfRange)),
+			error:     Transport(grpcStatus.Error(grpcCodes.OutOfRange, "")),
 			pessimize: false,
 		},
 		{
-			error:     Transport(WithCode(grpcCodes.Unimplemented)),
+			error:     Transport(grpcStatus.Error(grpcCodes.Unimplemented, "")),
 			pessimize: true,
 		},
 		{
-			error:     Transport(WithCode(grpcCodes.Internal)),
+			error:     Transport(grpcStatus.Error(grpcCodes.Internal, "")),
 			pessimize: true,
 		},
 		{
-			error:     Transport(WithCode(grpcCodes.Unavailable)),
+			error:     Transport(grpcStatus.Error(grpcCodes.Unavailable, "")),
 			pessimize: true,
 		},
 		{
-			error:     Transport(WithCode(grpcCodes.DataLoss)),
+			error:     Transport(grpcStatus.Error(grpcCodes.DataLoss, "")),
 			pessimize: true,
 		},
 		{
-			error:     Transport(WithCode(grpcCodes.Unauthenticated)),
+			error:     Transport(grpcStatus.Error(grpcCodes.Unauthenticated, "")),
 			pessimize: true,
 		},
 		{

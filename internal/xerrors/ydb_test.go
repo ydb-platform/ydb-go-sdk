@@ -7,6 +7,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
+	grpcStatus "google.golang.org/grpc/status"
 )
 
 func TestIsYdb(t *testing.T) {
@@ -23,7 +24,7 @@ func TestIsYdb(t *testing.T) {
 			isYdbError: true,
 		},
 		{
-			error:      Transport(WithCode(grpcCodes.DeadlineExceeded)),
+			error:      Transport(grpcStatus.Error(grpcCodes.DeadlineExceeded, "")),
 			isYdbError: true,
 		},
 		{
@@ -35,7 +36,7 @@ func TestIsYdb(t *testing.T) {
 			isYdbError: true,
 		},
 		{
-			error:      WithStackTrace(Transport(WithCode(grpcCodes.DeadlineExceeded))),
+			error:      WithStackTrace(Transport(grpcStatus.Error(grpcCodes.DeadlineExceeded, ""))),
 			isYdbError: true,
 		},
 		{
@@ -47,7 +48,7 @@ func TestIsYdb(t *testing.T) {
 			isYdbError: true,
 		},
 		{
-			error:      WithStackTrace(WithStackTrace(Transport(WithCode(grpcCodes.DeadlineExceeded)))),
+			error:      WithStackTrace(WithStackTrace(Transport(grpcStatus.Error(grpcCodes.DeadlineExceeded, "")))),
 			isYdbError: true,
 		},
 		{
