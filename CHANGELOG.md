@@ -1,7 +1,7 @@
-* `xsql.rows`: Implement `driver.RowsColumnTypeDatabaseTypeName` interface for getting columns type.
-* Extends `xsql.conn` with methods for getting `YDB` metadata.
-* Add `scheme.Client` to `xsql.connection`.
-* Add `helpers` package with method for checking existence of table, refactored `sugar.IsTableExists()`.
+* Implemented `driver.RowsColumnTypeDatabaseTypeName` interface in `internal/xsql.rows` struct
+* Extended `internal/xsql.conn` struct with methods for getting `YDB` metadata
+* Added `scheme.Client` to `internal/xsql.connection` interface
+* Added `helpers` package with method for checking existence of table, refactored `sugar.IsTableExists()`
 * Added checks for nil option to all opts range loops
 
 ## v3.42.5

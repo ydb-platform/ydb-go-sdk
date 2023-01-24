@@ -373,8 +373,8 @@ func (c *conn) Version(ctx context.Context) (_ string, err error) {
 }
 
 func (c *conn) IsTableExists(ctx context.Context, tableName string) (tableExists bool, err error) {
-	cn := c.connector.Connection()
-	tableExists, err = helpers.IsTableExists(ctx, cn.Scheme(), tableName)
+	cc := c.connector.Connection()
+	tableExists, err = helpers.IsTableExists(ctx, cc.Scheme(), tableName)
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
@@ -383,11 +383,11 @@ func (c *conn) IsTableExists(ctx context.Context, tableName string) (tableExists
 
 func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string) (columnExists bool, err error) {
 	var (
-		cn      = c.connector.Connection()
+		cc      = c.connector.Connection()
 		session = c.session
 	)
 
-	tableExist, err := helpers.IsTableExists(ctx, cn.Scheme(), tableName)
+	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
@@ -416,11 +416,11 @@ func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string)
 
 func (c *conn) GetColumns(ctx context.Context, tableName string) (columns []string, err error) {
 	var (
-		cn      = c.connector.Connection()
+		cc      = c.connector.Connection()
 		session = c.session
 	)
 
-	tableExist, err := helpers.IsTableExists(ctx, cn.Scheme(), tableName)
+	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -446,11 +446,11 @@ func (c *conn) GetColumns(ctx context.Context, tableName string) (columns []stri
 
 func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) (dataType string, err error) {
 	var (
-		cn      = c.connector.Connection()
+		cc      = c.connector.Connection()
 		session = c.session
 	)
 
-	tableExist, err := helpers.IsTableExists(ctx, cn.Scheme(), tableName)
+	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
 	if err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
@@ -487,11 +487,11 @@ func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) 
 
 func (c *conn) GetPrimaryKeys(ctx context.Context, tableName string) (pkCols []string, err error) {
 	var (
-		cn      = c.connector.Connection()
+		cc      = c.connector.Connection()
 		session = c.session
 	)
 
-	tableExist, err := helpers.IsTableExists(ctx, cn.Scheme(), tableName)
+	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -514,9 +514,9 @@ func (c *conn) GetPrimaryKeys(ctx context.Context, tableName string) (pkCols []s
 }
 
 func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (ok bool, err error) {
-	cn := c.connector.Connection()
+	cc := c.connector.Connection()
 
-	tableExist, err := helpers.IsTableExists(ctx, cn.Scheme(), tableName)
+	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
@@ -547,8 +547,8 @@ func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (
 
 func (c *conn) GetTables(ctx context.Context, absPath string) (tables []string, err error) {
 	var (
-		cn           = c.connector.Connection()
-		schemeClient = cn.Scheme()
+		cc           = c.connector.Connection()
+		schemeClient = cc.Scheme()
 	)
 
 	var e scheme.Entry
@@ -590,8 +590,8 @@ func (c *conn) GetTables(ctx context.Context, absPath string) (tables []string, 
 
 func (c *conn) GetAllTables(ctx context.Context, absPath string) (tables []string, err error) {
 	var (
-		cn           = c.connector.Connection()
-		schemeClient = cn.Scheme()
+		cc           = c.connector.Connection()
+		schemeClient = cc.Scheme()
 	)
 
 	ignoreDirs := map[string]bool{
@@ -650,11 +650,11 @@ func (c *conn) GetAllTables(ctx context.Context, absPath string) (tables []strin
 
 func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []string, err error) {
 	var (
-		cn      = c.connector.Connection()
+		cc      = c.connector.Connection()
 		session = c.session
 	)
 
-	tableExist, err := helpers.IsTableExists(ctx, cn.Scheme(), tableName)
+	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -681,12 +681,12 @@ func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []stri
 
 func (c *conn) GetIndexColumns(ctx context.Context, tableName, indexName string) (columns []string, err error) {
 	var (
-		cn       = c.connector.Connection()
+		cc       = c.connector.Connection()
 		session  = c.session
 		hasIndex = false
 	)
 
-	tableExist, err := helpers.IsTableExists(ctx, cn.Scheme(), tableName)
+	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
