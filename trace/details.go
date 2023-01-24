@@ -56,8 +56,7 @@ const (
 	// Deprecated: has no effect now
 	DriverClusterEvents
 
-	DriverEvents = DriverNetEvents |
-		DriverConnEvents |
+	DriverEvents = DriverConnEvents |
 		DriverBalancerEvents |
 		DriverResolverEvents |
 		DriverRepeaterEvents |
@@ -99,7 +98,6 @@ var (
 	detailsMap = map[Details]string{
 		DriverEvents:            "ydb.driver",
 		DriverBalancerEvents:    "ydb.driver.balancer",
-		DriverNetEvents:         "ydb.driver.net",
 		DriverResolverEvents:    "ydb.driver.resolver",
 		DriverRepeaterEvents:    "ydb.driver.repeater",
 		DriverConnEvents:        "ydb.driver.conn",

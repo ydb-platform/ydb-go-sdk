@@ -22,12 +22,8 @@ func TestDetailsMatch(t *testing.T) {
 			details: DriverResolverEvents,
 		},
 		{
-			pattern: `^ydb\.driver\.(resolver|net)$`,
-			details: DriverResolverEvents | DriverNetEvents,
-		},
-		{
-			pattern: `^ydb\.driver\.(conn|credentials|resolver|net)$`,
-			details: DriverConnEvents | DriverCredentialsEvents | DriverResolverEvents | DriverNetEvents,
+			pattern: `^ydb\.driver\.(conn|credentials|resolver)$`,
+			details: DriverConnEvents | DriverCredentialsEvents | DriverResolverEvents,
 		},
 		{
 			pattern: `^ydb\.scheme$`,

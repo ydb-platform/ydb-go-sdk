@@ -20,9 +20,13 @@ type (
 		OnClose func(DriverCloseStartInfo) func(DriverCloseDoneInfo)
 
 		// Network events
-		OnNetRead  func(DriverNetReadStartInfo) func(DriverNetReadDoneInfo)
+		// Deprecated: driver not support logging of net events
+		OnNetRead func(DriverNetReadStartInfo) func(DriverNetReadDoneInfo)
+		// Deprecated: driver not support logging of net events
 		OnNetWrite func(DriverNetWriteStartInfo) func(DriverNetWriteDoneInfo)
-		OnNetDial  func(DriverNetDialStartInfo) func(DriverNetDialDoneInfo)
+		// Deprecated: driver not support logging of net events
+		OnNetDial func(DriverNetDialStartInfo) func(DriverNetDialDoneInfo)
+		// Deprecated: driver not support logging of net events
 		OnNetClose func(DriverNetCloseStartInfo) func(DriverNetCloseDoneInfo)
 
 		// Resolver events
