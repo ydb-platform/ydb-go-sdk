@@ -1,4 +1,5 @@
 * Added checks for nil option to all opts range loops
+* Moved content of package `internal/ctxlabels` into `internal/xcontext`
 
 ## v3.42.5
 * Fixed closing of `database/sql` connection (aka `YDB` session)
