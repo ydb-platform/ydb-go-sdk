@@ -142,13 +142,11 @@ func TestLocalDCDiscovery(t *testing.T) {
 		driverConfig:   cfg,
 		balancerConfig: *cfg.Balancer(),
 		pool:           conn.NewPool(cfg),
-		discoveryClient: func() discovery.Client {
-			return discoveryMock{endpoints: []endpoint.Endpoint{
-				&mock.Endpoint{AddrField: "a:123", LocationField: "a"},
-				&mock.Endpoint{AddrField: "b:234", LocationField: "b"},
-				&mock.Endpoint{AddrField: "c:456", LocationField: "c"},
-			}}
-		},
+		discoveryClient: discoveryMock{endpoints: []endpoint.Endpoint{
+			&mock.Endpoint{AddrField: "a:123", LocationField: "a"},
+			&mock.Endpoint{AddrField: "b:234", LocationField: "b"},
+			&mock.Endpoint{AddrField: "c:456", LocationField: "c"},
+		}},
 		localDCDetector: func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error) {
 			return "b", nil
 		},

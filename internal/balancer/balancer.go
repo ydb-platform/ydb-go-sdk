@@ -25,7 +25,7 @@ var ErrNoEndpoints = xerrors.Wrap(fmt.Errorf("no endpoints"))
 type Balancer struct {
 	driverConfig      config.Config
 	balancerConfig    balancerConfig.Config
-	discoveryClient   func() discovery.Client
+	discoveryClient   discovery.Client
 	pool              *conn.Pool
 	discoveryRepeater repeater.Repeater
 	localDCDetector   func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
@@ -65,12 +65,7 @@ func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
 		)
 	}()
 
-	client := b.discoveryClient()
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
-	endpoints, err = client.Discover(ctx)
+	endpoints, err = b.discoveryClient.Discover(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -128,11 +123,11 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 
 func New(
 	ctx context.Context,
-	c config.Config,
+	driverConfig config.Config,
 	pool *conn.Pool,
 	opts ...discoveryConfig.Option,
 ) (b *Balancer, err error) {
-	if t := c.DialTimeout(); t > 0 {
+	if t := driverConfig.DialTimeout(); t > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, t)
 		defer cancel()
@@ -140,7 +135,7 @@ func New(
 
 	var (
 		onDone = trace.DriverOnBalancerInit(
-			c.Trace(),
+			driverConfig.Trace(),
 			&ctx,
 		)
 		discoveryConfig = discoveryConfig.New(opts...)
@@ -150,15 +145,13 @@ func New(
 	}()
 
 	b = &Balancer{
-		driverConfig:    c,
+		driverConfig:    driverConfig,
 		pool:            pool,
 		localDCDetector: detectLocalDC,
-		discoveryClient: func() discovery.Client {
-			return internalDiscovery.New(discoveryConfig, b.driverConfig.GrpcDialOptions()...)
-		},
+		discoveryClient: internalDiscovery.New(discoveryConfig, driverConfig.GrpcDialOptions()...),
 	}
 
-	if config := c.Balancer(); config == nil {
+	if config := driverConfig.Balancer(); config == nil {
 		b.balancerConfig = balancerConfig.Config{}
 	} else {
 		b.balancerConfig = *config
@@ -167,7 +160,7 @@ func New(
 	if b.balancerConfig.SingleConn {
 		b.connectionsState = newConnectionsState(
 			endpointsToConnections(pool, []endpoint.Endpoint{
-				endpoint.New(c.Endpoint()),
+				endpoint.New(driverConfig.Endpoint()),
 			}),
 			nil, balancerConfig.Info{}, false)
 	} else {
