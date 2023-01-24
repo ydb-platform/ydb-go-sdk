@@ -5,15 +5,41 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 )
+
+const commonWaitTimeout = time.Second
+
+func WaitGroup(tb testing.TB, wg *sync.WaitGroup) {
+	tb.Helper()
+
+	WaitGroupWithTimeout(tb, wg, commonWaitTimeout)
+}
+
+func WaitGroupWithTimeout(tb testing.TB, wg *sync.WaitGroup, timeout time.Duration) {
+	tb.Helper()
+
+	groupFinished := make(empty.Chan)
+	go func() {
+		wg.Wait()
+		close(groupFinished)
+	}()
+
+	WaitChannelClosedWithTimeout(tb, groupFinished, timeout)
+}
 
 func WaitChannelClosed(t testing.TB, ch <-chan struct{}) {
 	t.Helper()
 
-	const condWaitTimeout = time.Second
+	WaitChannelClosedWithTimeout(t, ch, commonWaitTimeout)
+}
+
+func WaitChannelClosedWithTimeout(t testing.TB, ch <-chan struct{}, timeout time.Duration) {
+	t.Helper()
 
 	select {
-	case <-time.After(condWaitTimeout):
+	case <-time.After(timeout):
 		t.Fatal()
 	case <-ch:
 		// pass
@@ -24,7 +50,8 @@ func WaitChannelClosed(t testing.TB, ch <-chan struct{}) {
 // l can be nil - then locker use for check conditions
 func SpinWaitCondition(tb testing.TB, l sync.Locker, cond func() bool) {
 	tb.Helper()
-	SpinWaitConditionWithTimeout(tb, l, time.Second, cond)
+
+	SpinWaitConditionWithTimeout(tb, l, commonWaitTimeout, cond)
 }
 
 // SpinWaitConditionWithTimeout wait while cond return true with check it in loop
