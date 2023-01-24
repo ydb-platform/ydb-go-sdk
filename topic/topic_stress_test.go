@@ -193,7 +193,7 @@ func stressTestInATopic(
 		}
 	}
 
-	xtest.SpinWaitCondition(t, nil, func() bool {
+	xtest.SpinWaitConditionWithTimeout(t, nil, time.Minute, func() bool {
 		return atomic.LoadInt64(&createdMessagesCount) == atomic.LoadInt64(&readedMessagesCount)
 	})
 
