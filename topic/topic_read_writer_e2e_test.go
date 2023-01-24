@@ -206,10 +206,9 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 		})
 	}
 
-	consumerID := "consumer"
 	err = db.Topic().Alter(ctx, topicName, topicoptions.AlterWithAddConsumers(
 		topictypes.Consumer{
-			Name: consumerID,
+			Name: commonConsumerName,
 		},
 	))
 	require.NoError(tb, err)
@@ -220,7 +219,7 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 
-			reader(consumerID)
+			reader(commonConsumerName)
 		}(i)
 	}
 

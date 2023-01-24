@@ -22,6 +22,8 @@ import (
 
 const defaultConnectionString = "grpc://localhost:2136/local"
 
+const commonConsumerName = "consumer"
+
 func TestClient_CreateDropTopic(t *testing.T) {
 	ctx := xtest.Context(t)
 	db := connect(t)

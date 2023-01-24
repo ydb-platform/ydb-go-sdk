@@ -1,3 +1,6 @@
+//go:build !fast
+// +build !fast
+
 package topic_test
 
 import (
@@ -25,11 +28,10 @@ import (
 
 func TestReadersWritersStress(t *testing.T) {
 	ctx := xtest.Context(t)
-	xtest.AllowByFlag(t, "SHORT_STRESS_TEST")
 	db := connect(t)
 
 	topicPrefix := db.Name() + "/stress-topic-"
-	consumerName := "consumer"
+	consumerName := commonConsumerName
 
 	writeTime := time.Second * 10
 	topicCount := 10
@@ -54,12 +56,29 @@ func TestReadersWritersStress(t *testing.T) {
 		t.Run(topicInner, func(t *testing.T) {
 			t.Parallel()
 
-			require.NoError(t, stressTestInATopic(ctx, t, db, writeTime, topicInner, consumerName, writersPerTopic, readersPerTopic))
+			require.NoError(t, stressTestInATopic(
+				ctx,
+				t,
+				db,
+				writeTime,
+				topicInner,
+				consumerName,
+				writersPerTopic,
+				readersPerTopic,
+			))
 		})
 	}
 }
 
-func stressTestInATopic(ctx context.Context, t testing.TB, db ydb.Connection, testTime time.Duration, topicPath string, consumerName string, topicWriters, topicReaders int) error {
+func stressTestInATopic(
+	ctx context.Context,
+	t testing.TB,
+	db ydb.Connection,
+	testTime time.Duration,
+	topicPath string,
+	consumerName string,
+	topicWriters, topicReaders int,
+) error {
 	maxMessagesInBatch := 5
 	createdMessagesCount := int64(0)
 	readedMessagesCount := int64(0)
@@ -88,7 +107,7 @@ func stressTestInATopic(ctx context.Context, t testing.TB, db ydb.Connection, te
 		}
 
 		for !stopWrite.Load() {
-			messageCount := rand.Intn(maxMessagesInBatch) + 1
+			messageCount := rand.Intn(maxMessagesInBatch) + 1 //nolint:gosec
 			var messages []topicwriter.Message
 			for i := 0; i < messageCount; i++ {
 				newMessageContent := atomic.AddInt64(&createdMessagesCount, 1)
@@ -153,6 +172,8 @@ func stressTestInATopic(ctx context.Context, t testing.TB, db ydb.Connection, te
 	var readersWG sync.WaitGroup
 	readersError := make(chan error, topicReaders)
 	readCtx, stopReader := context.WithCancel(ctx)
+	defer stopReader()
+
 	for i := 0; i < topicReaders; i++ {
 		readersWG.Add(1)
 		go func() {
@@ -186,6 +207,7 @@ func stressTestInATopic(ctx context.Context, t testing.TB, db ydb.Connection, te
 		}
 	}
 
+	//nolint:gocritic
 	//// check about all messages are committed
 	// https://github.com/ydb-platform/ydb-go-sdk/issues/531
 	//reader, err := db.Topic().StartReader(consumerName, topicoptions.ReadTopic(topicPath))
