@@ -18,6 +18,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
@@ -65,8 +66,18 @@ func stressTestInATopic(ctx context.Context, t testing.TB, db ydb.Connection, te
 
 	var stopWrite xatomic.Bool
 
-	writeToTopic := func(ctx context.Context, producerID string, wg *sync.WaitGroup) error {
-		defer wg.Done()
+	writeToTopic := func(ctx context.Context, producerID string, wg *sync.WaitGroup) (resErr error) {
+		var writer *topicwriter.Writer
+
+		defer func() {
+			closeErr := writer.Close(context.Background())
+
+			if resErr == nil && closeErr != nil {
+				resErr = closeErr
+			}
+
+			wg.Done()
+		}()
 
 		writer, err := db.Topic().StartWriter(producerID, topicPath,
 			topicoptions.WithMessageGroupID(producerID),
@@ -95,12 +106,19 @@ func stressTestInATopic(ctx context.Context, t testing.TB, db ydb.Connection, te
 	}
 
 	readFromTopic := func(ctx context.Context, wg *sync.WaitGroup) (resErr error) {
+		var reader *topicreader.Reader
 		defer func() {
-			wg.Done()
+			closeErr := reader.Close(context.Background())
+
+			if resErr == nil && closeErr != nil {
+				resErr = closeErr
+			}
 
 			if ctx.Err() != nil && errors.Is(resErr, context.Canceled) {
 				resErr = nil
 			}
+
+			wg.Done()
 		}()
 
 		reader, err := db.Topic().StartReader(consumerName, topicoptions.ReadTopic(topicPath))
@@ -154,7 +172,7 @@ func stressTestInATopic(ctx context.Context, t testing.TB, db ydb.Connection, te
 		}
 	}
 
-	xtest.SpinWaitConditionWithTimeout(t, nil, time.Minute, func() bool {
+	xtest.SpinWaitCondition(t, nil, func() bool {
 		return atomic.LoadInt64(&createdMessagesCount) == atomic.LoadInt64(&readedMessagesCount)
 	})
 
@@ -167,6 +185,18 @@ func stressTestInATopic(ctx context.Context, t testing.TB, db ydb.Connection, te
 			return err
 		}
 	}
+
+	//// check about all messages are committed
+	// https://github.com/ydb-platform/ydb-go-sdk/issues/531
+	//reader, err := db.Topic().StartReader(consumerName, topicoptions.ReadTopic(topicPath))
+	//if err != nil {
+	//	return err
+	//}
+	//readWithTimeout, readCancel := context.WithTimeout(ctx, time.Second/10)
+	//defer readCancel()
+	//_, err = reader.ReadMessage(readWithTimeout)
+	//t.Log("err: ", err)
+	//require.ErrorIs(t, err, context.DeadlineExceeded)
 
 	return nil
 }
