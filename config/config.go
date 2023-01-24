@@ -265,7 +265,7 @@ func New(opts ...Option) Config {
 		}
 	}
 
-	c.grpcOptions = append(c.grpcOptions, grpcOptions(c.trace, c.secure, c.tlsConfig)...)
+	c.grpcOptions = append(defaultGrpcOptions(c.trace, c.secure, c.tlsConfig), c.grpcOptions...)
 
 	c.meta = meta.New(c.database, c.credentials, c.trace, c.metaOptions...)
 

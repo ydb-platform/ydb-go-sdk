@@ -2,6 +2,9 @@
 * Moved content of package `internal/ctxlabels` into `internal/xcontext`
 * Implemented `GRPCStatus` method in `internal/xerrors/transportError`
 * Added different implementations of stacktrace error for grpc errors and other 
+* Dropped `internal/xnet` package as useless
+* Fixed default grpc dial options
+* Replaced single connection for discovery repeater into connection which creates each time for discovery request
 
 ## v3.42.5
 * Fixed closing of `database/sql` connection (aka `YDB` session)

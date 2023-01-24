@@ -2,42 +2,35 @@ package discovery
 
 import (
 	"context"
+	"io"
 	"net"
 	"strconv"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
+	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var DefaultDiscoveryInterval = time.Minute
-
-func New(
-	cc conn.Conn,
-	config config.Config,
-) *Client {
-	c := &Client{
-		cc:      cc,
-		config:  config,
-		service: Ydb_Discovery_V1.NewDiscoveryServiceClient(cc),
+func New(cc grpc.ClientConnInterface, config config.Config) *Client {
+	return &Client{
+		config: config,
+		cc:     cc,
+		client: Ydb_Discovery_V1.NewDiscoveryServiceClient(cc),
 	}
-
-	return c
 }
 
 var _ discovery.Client = &Client{}
 
 type Client struct {
-	config  config.Config
-	service Ydb_Discovery_V1.DiscoveryServiceClient
-	cc      conn.Conn
+	config config.Config
+	cc     grpc.ClientConnInterface
+	client Ydb_Discovery_V1.DiscoveryServiceClient
 }
 
 // Discover cluster endpoints
@@ -65,7 +58,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	response, err = c.service.ListEndpoints(ctx, &request)
+	response, err = c.client.ListEndpoints(ctx, &request)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -113,9 +106,14 @@ func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	response, err = c.service.WhoAmI(ctx, &request)
+	response, err = c.client.WhoAmI(ctx, &request)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
+	}
+
+	result := response.GetOperation().GetResult()
+	if result == nil {
+		return &discovery.WhoAmI{}, nil
 	}
 
 	err = response.GetOperation().GetResult().UnmarshalTo(&whoAmIResultResult)
@@ -129,6 +127,9 @@ func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 	}, nil
 }
 
-func (c *Client) Close(ctx context.Context) error {
+func (c *Client) Close(context.Context) error {
+	if cc, has := c.cc.(io.Closer); has {
+		return cc.Close()
+	}
 	return nil
 }
