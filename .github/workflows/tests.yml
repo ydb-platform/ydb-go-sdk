@@ -60,6 +60,7 @@ jobs:
       YDB_CONNECTION_STRING: grpcs://localhost:2135/local
       YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
       YDB_SESSIONS_SHUTDOWN_URLS: http://localhost:8765/actors/kqp_proxy?force_shutdown=all
+      SHORT_STRESS_TEST: 1
       HIDE_APPLICATION_OUTPUT: 1
     runs-on: ${{ matrix.os }}
     steps:
