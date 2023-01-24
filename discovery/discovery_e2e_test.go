@@ -46,6 +46,7 @@ func TestDiscovery(t *testing.T) {
 				t.Fatalf("unknown request type: %s", requestTypes[0])
 			}
 		}
+		parking = make(chan struct{})
 	)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -98,6 +99,13 @@ func TestDiscovery(t *testing.T) {
 				}),
 			),
 		),
+		ydb.WithTraceDriver(trace.Driver{
+			OnConnPark: func(info trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
+				return func(info trace.DriverConnParkDoneInfo) {
+					parking <- struct{}{}
+				}
+			},
+		}),
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -110,16 +118,21 @@ func TestDiscovery(t *testing.T) {
 	}()
 	t.Run("discovery.Discover", func(t *testing.T) {
 		if endpoints, err := db.Discovery().Discover(ctx); err != nil {
-			t.Fatalf("Execute failed: %v", err)
+			t.Fatal(err)
 		} else {
 			fmt.Println(endpoints)
 		}
-	})
-	t.Run("discovery.WhoAmI", func(t *testing.T) {
-		if whoAmI, err := db.Discovery().WhoAmI(ctx); err != nil {
-			t.Fatalf("Execute failed: %v", err)
-		} else {
-			fmt.Println(whoAmI)
-		}
+		t.Run("wait", func(t *testing.T) {
+			t.Run("parking", func(t *testing.T) {
+				<-parking // wait for parking conn
+				t.Run("re-discover", func(t *testing.T) {
+					if endpoints, err := db.Discovery().Discover(ctx); err != nil {
+						t.Fatal(err)
+					} else {
+						fmt.Println(endpoints)
+					}
+				})
+			})
+		})
 	})
 }

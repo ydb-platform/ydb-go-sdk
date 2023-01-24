@@ -19,6 +19,7 @@ import (
 	internalDiscovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	internalRatelimiter "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
 	internalScheme "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
@@ -303,19 +304,22 @@ func (c *connection) Ratelimiter() ratelimiter.Client {
 
 func (c *connection) Discovery() discovery.Client {
 	c.discoveryOnce.Init(func() closeFunc {
-		c.discovery = internalDiscovery.New(discoveryConfig.New(
-			append(
-				// prepend common params from root config
-				[]discoveryConfig.Option{
-					discoveryConfig.With(c.config.Common),
-					discoveryConfig.WithEndpoint(c.Endpoint()),
-					discoveryConfig.WithDatabase(c.Name()),
-					discoveryConfig.WithSecure(c.Secure()),
-					discoveryConfig.WithMeta(c.config.Meta()),
-				},
-				c.discoveryOptions...,
-			)...,
-		), c.config.GrpcDialOptions()...)
+		c.discovery = internalDiscovery.New(
+			c.pool.Get(endpoint.New(c.config.Endpoint())),
+			discoveryConfig.New(
+				append(
+					// prepend common params from root config
+					[]discoveryConfig.Option{
+						discoveryConfig.With(c.config.Common),
+						discoveryConfig.WithEndpoint(c.Endpoint()),
+						discoveryConfig.WithDatabase(c.Name()),
+						discoveryConfig.WithSecure(c.Secure()),
+						discoveryConfig.WithMeta(c.config.Meta()),
+					},
+					c.discoveryOptions...,
+				)...,
+			),
+		)
 		return c.discovery.Close
 	})
 	// may be nil if driver closed early

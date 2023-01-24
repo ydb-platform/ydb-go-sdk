@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	internalDiscovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
@@ -22,11 +23,16 @@ import (
 
 var ErrNoEndpoints = xerrors.Wrap(fmt.Errorf("no endpoints"))
 
+type discoveryClient interface {
+	discovery.Client
+	closer.Closer
+}
+
 type Balancer struct {
 	driverConfig      config.Config
 	balancerConfig    balancerConfig.Config
-	discoveryClient   discovery.Client
 	pool              *conn.Pool
+	discoveryClient   func() (discoveryClient, error)
 	discoveryRepeater repeater.Repeater
 	localDCDetector   func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
@@ -65,7 +71,15 @@ func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
 		)
 	}()
 
-	endpoints, err = b.discoveryClient.Discover(ctx)
+	client, err := b.discoveryClient()
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+	defer func() {
+		_ = client.Close(ctx)
+	}()
+
+	endpoints, err = client.Discover(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -148,7 +162,16 @@ func New(
 		driverConfig:    driverConfig,
 		pool:            pool,
 		localDCDetector: detectLocalDC,
-		discoveryClient: internalDiscovery.New(discoveryConfig, driverConfig.GrpcDialOptions()...),
+		discoveryClient: func() (_ discoveryClient, err error) {
+			cc, err := grpc.DialContext(ctx,
+				"dns:///"+b.driverConfig.Endpoint(),
+				b.driverConfig.GrpcDialOptions()...,
+			)
+			if err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
+			return internalDiscovery.New(cc, discoveryConfig), nil
+		},
 	}
 
 	if config := driverConfig.Balancer(); config == nil {
