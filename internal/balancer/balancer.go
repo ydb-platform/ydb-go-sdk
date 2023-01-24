@@ -11,7 +11,7 @@ import (
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
-	discoveryBuilder "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
+	internalDiscovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
@@ -24,15 +24,15 @@ import (
 var ErrNoEndpoints = xerrors.Wrap(fmt.Errorf("no endpoints"))
 
 type discoveryClient interface {
-	closer.Closer
 	discovery.Client
+	closer.Closer
 }
 
 type Balancer struct {
 	driverConfig      config.Config
 	balancerConfig    balancerConfig.Config
 	pool              *conn.Pool
-	discovery         discoveryClient
+	discoveryClient   func() (discoveryClient, error)
 	discoveryRepeater repeater.Repeater
 	localDCDetector   func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
@@ -71,7 +71,15 @@ func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
 		)
 	}()
 
-	endpoints, err = b.discovery.Discover(ctx)
+	client, err := b.discoveryClient()
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+	defer func() {
+		_ = client.Close(ctx)
+	}()
+
+	endpoints, err = client.Discover(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -111,10 +119,6 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	})
 }
 
-func (b *Balancer) Discovery() discovery.Client {
-	return b.discovery
-}
-
 func (b *Balancer) Close(ctx context.Context) (err error) {
 	onDone := trace.DriverOnBalancerClose(
 		b.driverConfig.Trace(),
@@ -124,18 +128,8 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		onDone(err)
 	}()
 
-	issues := make([]error, 0, 2)
-
 	if b.discoveryRepeater != nil {
 		b.discoveryRepeater.Stop()
-	}
-
-	if err = b.discovery.Close(ctx); err != nil {
-		issues = append(issues, err)
-	}
-
-	if len(issues) > 0 {
-		return xerrors.WithStackTrace(xerrors.NewWithIssues("Balancer close failed", issues...))
 	}
 
 	return nil
@@ -143,49 +137,54 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 
 func New(
 	ctx context.Context,
-	c config.Config,
+	driverConfig config.Config,
 	pool *conn.Pool,
 	opts ...discoveryConfig.Option,
 ) (b *Balancer, err error) {
-	if t := c.DialTimeout(); t > 0 {
+	if t := driverConfig.DialTimeout(); t > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, t)
 		defer cancel()
 	}
 
-	onDone := trace.DriverOnBalancerInit(
-		c.Trace(),
-		&ctx,
+	var (
+		onDone = trace.DriverOnBalancerInit(
+			driverConfig.Trace(),
+			&ctx,
+		)
+		discoveryConfig = discoveryConfig.New(opts...)
 	)
 	defer func() {
 		onDone(err)
 	}()
 
 	b = &Balancer{
-		driverConfig:    c,
+		driverConfig:    driverConfig,
 		pool:            pool,
 		localDCDetector: detectLocalDC,
+		discoveryClient: func() (_ discoveryClient, err error) {
+			cc, err := grpc.DialContext(ctx,
+				"dns:///"+b.driverConfig.Endpoint(),
+				b.driverConfig.GrpcDialOptions()...,
+			)
+			if err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
+			return internalDiscovery.New(cc, discoveryConfig), nil
+		},
 	}
 
-	if config := c.Balancer(); config == nil {
+	if config := driverConfig.Balancer(); config == nil {
 		b.balancerConfig = balancerConfig.Config{}
 	} else {
 		b.balancerConfig = *config
 	}
 
-	discoveryEndpoint := endpoint.New(c.Endpoint())
-	discoveryConnection := pool.Get(discoveryEndpoint)
-
-	discoveryConfig := discoveryConfig.New(opts...)
-
-	b.discovery = discoveryBuilder.New(
-		discoveryConnection,
-		discoveryConfig,
-	)
-
 	if b.balancerConfig.SingleConn {
 		b.connectionsState = newConnectionsState(
-			endpointsToConnections(pool, []endpoint.Endpoint{discoveryEndpoint}),
+			endpointsToConnections(pool, []endpoint.Endpoint{
+				endpoint.New(driverConfig.Endpoint()),
+			}),
 			nil, balancerConfig.Info{}, false)
 	} else {
 		// initialization of balancer state
@@ -213,18 +212,6 @@ func New(
 	}
 
 	return b, nil
-}
-
-func (b *Balancer) Endpoint() string {
-	return b.driverConfig.Endpoint()
-}
-
-func (b *Balancer) Name() string {
-	return b.driverConfig.Database()
-}
-
-func (b *Balancer) Secure() bool {
-	return b.driverConfig.Secure()
 }
 
 func (b *Balancer) Invoke(
