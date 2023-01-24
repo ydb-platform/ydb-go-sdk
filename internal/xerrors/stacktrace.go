@@ -4,6 +4,8 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+
+	grpcStatus "google.golang.org/grpc/status"
 )
 
 type withStackTraceOptions struct {
@@ -27,6 +29,15 @@ func WithStackTrace(err error, opts ...withStackTraceOption) error {
 	for _, o := range opts {
 		if o != nil {
 			o(&options)
+		}
+	}
+	if s, has := grpcStatus.FromError(err); has {
+		return &stackTransportError{
+			stackError: stackError{
+				stackRecord: StackRecord(options.skipDepth + 1),
+				err:         err,
+			},
+			status: s,
 		}
 	}
 	return &stackError{
@@ -60,4 +71,13 @@ func (e *stackError) Error() string {
 
 func (e *stackError) Unwrap() error {
 	return e.err
+}
+
+type stackTransportError struct {
+	stackError
+	status *grpcStatus.Status
+}
+
+func (e *stackTransportError) GRPCStatus() *grpcStatus.Status {
+	return e.status
 }

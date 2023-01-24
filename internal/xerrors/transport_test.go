@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -37,15 +38,6 @@ func TestIsNonTransportError(t *testing.T) {
 				t.Errorf("expected %v not to be transportError with code=%v", err, code)
 			}
 		})
-	}
-}
-
-func TestTransportErrorWrapsContextError(t *testing.T) {
-	err := fmt.Errorf("wrapped: %w", &transportError{
-		status: grpcStatus.New(grpcCodes.Canceled, ""),
-	})
-	if !errors.Is(err, context.Canceled) {
-		t.Errorf("expected %v to wrap deadline.Canceled", err)
 	}
 }
 
@@ -155,6 +147,24 @@ func TestMustPessimizeEndpoint(t *testing.T) {
 			if pessimize != test.pessimize {
 				t.Errorf("unexpected pessimization status for error `%v`: %t, exp: %t", test.error, pessimize, test.pessimize)
 			}
+		})
+	}
+}
+
+func TestGrpcError(t *testing.T) {
+	for _, err := range []error{
+		WithStackTrace(grpcStatus.Error(grpcCodes.Aborted, "")),
+		WithStackTrace(WithStackTrace(grpcStatus.Error(grpcCodes.Aborted, ""))),
+		WithStackTrace(WithStackTrace(WithStackTrace(grpcStatus.Error(grpcCodes.Aborted, "")))),
+		WithStackTrace(Transport(grpcStatus.Error(grpcCodes.Aborted, ""))),
+		WithStackTrace(Transport(WithStackTrace(grpcStatus.Error(grpcCodes.Aborted, "")))),
+		WithStackTrace(Transport(WithStackTrace(WithStackTrace(grpcStatus.Error(grpcCodes.Aborted, ""))))),
+	} {
+		t.Run(err.Error(), func(t *testing.T) {
+			require.True(t, IsTransportError(err))
+			s, has := grpcStatus.FromError(err)
+			require.True(t, has)
+			require.NotNil(t, s)
 		})
 	}
 }

@@ -16,6 +16,7 @@ import (
 
 type transportError struct {
 	status  *grpcStatus.Status
+	err     error
 	address string
 }
 
@@ -43,30 +44,17 @@ func WithAddress(address string) teOpt {
 
 func (e *transportError) Error() string {
 	var b bytes.Buffer
-	b.WriteString("transport error: ")
-	b.WriteString(e.status.Code().String())
-	if message := e.status.Message(); message != "" {
-		b.WriteString(", message: ")
-		b.WriteString(message)
-	}
+	b.WriteString(e.Name())
+	b.WriteString(fmt.Sprintf(" (%q", e.err.Error()))
 	if len(e.address) > 0 {
-		b.WriteString(", address: ")
-		b.WriteString(e.address)
+		b.WriteString(fmt.Sprintf(", address: %q", e.address))
 	}
-	if details := e.status.Details(); len(details) > 0 {
-		b.WriteString(", details: ")
-		if len(details) > 0 {
-			b.WriteString(", details:")
-			for _, detail := range details {
-				b.WriteString(fmt.Sprintf("\n- %v", detail))
-			}
-		}
-	}
+	b.WriteString(")")
 	return b.String()
 }
 
 func (e *transportError) Unwrap() error {
-	return e.status.Err()
+	return e.err
 }
 
 func dumpIssues(buf *bytes.Buffer, ms []*Ydb_Issue.IssueMessage) {
@@ -135,9 +123,7 @@ func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 	if err == nil {
 		return false
 	}
-	var t *transportError
-	switch {
-	case errors.As(err, &t):
+	if t := (*transportError)(nil); errors.As(err, &t) {
 		if len(codes) == 0 {
 			return true
 		}
@@ -147,9 +133,9 @@ func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 			}
 		}
 		return false
-	default:
-		return false
 	}
+	_, has := grpcStatus.FromError(err)
+	return has
 }
 
 // Transport returns a new transport error with given options
@@ -164,6 +150,7 @@ func Transport(err error, opts ...teOpt) error {
 	if s, ok := grpcStatus.FromError(err); ok {
 		te := &transportError{
 			status: s,
+			err:    err,
 		}
 		for _, o := range opts {
 			if o != nil {
