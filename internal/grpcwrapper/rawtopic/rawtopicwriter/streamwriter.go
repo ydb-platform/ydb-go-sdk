@@ -41,7 +41,7 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 
 	grpcMsg, err := w.Stream.Recv()
 	if err != nil {
-		err = xerrors.FromGRPCError(err)
+		err = xerrors.Transport(err)
 		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: failed to read grpc message from writer stream: %w",
 			err,
@@ -86,7 +86,7 @@ func (w *StreamWriter) Send(rawMsg ClientMessage) (err error) {
 	w.sendCloseMtx.Lock()
 	defer func() {
 		w.sendCloseMtx.Unlock()
-		err = xerrors.FromGRPCError(err)
+		err = xerrors.Transport(err)
 	}()
 
 	var protoMsg Ydb_Topic.StreamWriteMessage_FromClient

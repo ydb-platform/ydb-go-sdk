@@ -7,7 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -64,8 +64,11 @@ var errsToCheck = []struct {
 		},
 	},
 	{
-		err: xerrors.FromGRPCError(
-			grpc.ErrClientConnClosing, //nolint:staticcheck // ignore SA1019
+		err: xerrors.Transport(
+			//nolint:staticcheck
+			// ignore SA1019
+			//nolint:nolintlint
+			grpc.ErrClientConnClosing,
 		),
 		backoff:       backoff.TypeFast,
 		deleteSession: true,
@@ -75,18 +78,7 @@ var errsToCheck = []struct {
 		},
 	},
 	{
-		err:           xerrors.Transport(),
-		backoff:       backoff.TypeNoBackoff,
-		deleteSession: true,
-		canRetry: map[idempotency]bool{
-			idempotent:    false,
-			nonIdempotent: false,
-		},
-	},
-	{
-		err: xerrors.Transport(
-			xerrors.WithCode(grpcCodes.Canceled),
-		),
+		err:           xerrors.Transport(grpcStatus.Error(grpcCodes.Canceled, "")),
 		backoff:       backoff.TypeFast,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
@@ -95,9 +87,7 @@ var errsToCheck = []struct {
 		},
 	},
 	{
-		err: xerrors.Transport(
-			xerrors.WithCode(grpcCodes.Unknown),
-		),
+		err:           xerrors.Transport(grpcStatus.Error(grpcCodes.Unknown, "")),
 		backoff:       backoff.TypeNoBackoff,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
@@ -106,9 +96,7 @@ var errsToCheck = []struct {
 		},
 	},
 	{
-		err: xerrors.Transport(
-			xerrors.WithCode(grpcCodes.InvalidArgument),
-		),
+		err:           xerrors.Transport(grpcStatus.Error(grpcCodes.InvalidArgument, "")),
 		backoff:       backoff.TypeNoBackoff,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
@@ -117,9 +105,7 @@ var errsToCheck = []struct {
 		},
 	},
 	{
-		err: xerrors.Transport(
-			xerrors.WithCode(grpcCodes.DeadlineExceeded),
-		),
+		err:           xerrors.Transport(grpcStatus.Error(grpcCodes.DeadlineExceeded, "")),
 		backoff:       backoff.TypeNoBackoff,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
@@ -128,9 +114,7 @@ var errsToCheck = []struct {
 		},
 	},
 	{
-		err: xerrors.Transport(
-			xerrors.WithCode(grpcCodes.NotFound),
-		),
+		err:           xerrors.Transport(grpcStatus.Error(grpcCodes.NotFound, "")),
 		backoff:       backoff.TypeNoBackoff,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
@@ -139,9 +123,7 @@ var errsToCheck = []struct {
 		},
 	},
 	{
-		err: xerrors.Transport(
-			xerrors.WithCode(grpcCodes.AlreadyExists),
-		),
+		err:           xerrors.Transport(grpcStatus.Error(grpcCodes.AlreadyExists, "")),
 		backoff:       backoff.TypeNoBackoff,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
@@ -150,9 +132,7 @@ var errsToCheck = []struct {
 		},
 	},
 	{
-		err: xerrors.Transport(
-			xerrors.WithCode(grpcCodes.PermissionDenied),
-		),
+		err:           xerrors.Transport(grpcStatus.Error(grpcCodes.PermissionDenied, "")),
 		backoff:       backoff.TypeNoBackoff,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
@@ -161,9 +141,7 @@ var errsToCheck = []struct {
 		},
 	},
 	{
-		err: xerrors.Transport(
-			xerrors.WithCode(grpcCodes.ResourceExhausted),
-		),
+		err:           xerrors.Transport(grpcStatus.Error(grpcCodes.ResourceExhausted, "")),
 		backoff:       backoff.TypeSlow,
 		deleteSession: false,
 		canRetry: map[idempotency]bool{
@@ -172,9 +150,7 @@ var errsToCheck = []struct {
 		},
 	},
 	{
-		err: xerrors.Transport(
-			xerrors.WithCode(grpcCodes.FailedPrecondition),
-		),
+		err:           xerrors.Transport(grpcStatus.Error(grpcCodes.FailedPrecondition, "")),
 		backoff:       backoff.TypeNoBackoff,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
@@ -183,9 +159,7 @@ var errsToCheck = []struct {
 		},
 	},
 	{
-		err: xerrors.Transport(
-			xerrors.WithCode(grpcCodes.Aborted),
-		),
+		err:           xerrors.Transport(grpcStatus.Error(grpcCodes.Aborted, "")),
 		backoff:       backoff.TypeNoBackoff,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
@@ -194,9 +168,7 @@ var errsToCheck = []struct {
 		},
 	},
 	{
-		err: xerrors.Transport(
-			xerrors.WithCode(grpcCodes.OutOfRange),
-		),
+		err:           xerrors.Transport(grpcStatus.Error(grpcCodes.OutOfRange, "")),
 		backoff:       backoff.TypeNoBackoff,
 		deleteSession: false,
 		canRetry: map[idempotency]bool{
@@ -205,9 +177,7 @@ var errsToCheck = []struct {
 		},
 	},
 	{
-		err: xerrors.Transport(
-			xerrors.WithCode(grpcCodes.Unimplemented),
-		),
+		err:           xerrors.Transport(grpcStatus.Error(grpcCodes.Unimplemented, "")),
 		backoff:       backoff.TypeNoBackoff,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
@@ -216,9 +186,7 @@ var errsToCheck = []struct {
 		},
 	},
 	{
-		err: xerrors.Transport(
-			xerrors.WithCode(grpcCodes.Internal),
-		),
+		err:           xerrors.Transport(grpcStatus.Error(grpcCodes.Internal, "")),
 		backoff:       backoff.TypeFast,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
@@ -227,9 +195,7 @@ var errsToCheck = []struct {
 		},
 	},
 	{
-		err: xerrors.Transport(
-			xerrors.WithCode(grpcCodes.Unavailable),
-		),
+		err:           xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "")),
 		backoff:       backoff.TypeFast,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
@@ -239,9 +205,7 @@ var errsToCheck = []struct {
 	},
 	{
 		err: xerrors.Retryable(
-			xerrors.Transport(
-				xerrors.WithCode(grpcCodes.Unavailable),
-			),
+			xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "")),
 			xerrors.WithBackoff(backoff.TypeFast),
 			xerrors.WithDeleteSession(),
 		),
@@ -254,7 +218,7 @@ var errsToCheck = []struct {
 	},
 	{
 		err: xerrors.Retryable(
-			status.Error(grpcCodes.Unavailable, ""),
+			grpcStatus.Error(grpcCodes.Unavailable, ""),
 			xerrors.WithBackoff(backoff.TypeFast),
 			xerrors.WithDeleteSession(),
 		),
@@ -266,9 +230,7 @@ var errsToCheck = []struct {
 		},
 	},
 	{
-		err: xerrors.Transport(
-			xerrors.WithCode(grpcCodes.DataLoss),
-		),
+		err:           xerrors.Transport(grpcStatus.Error(grpcCodes.DataLoss, "")),
 		backoff:       backoff.TypeNoBackoff,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
@@ -277,9 +239,7 @@ var errsToCheck = []struct {
 		},
 	},
 	{
-		err: xerrors.Transport(
-			xerrors.WithCode(grpcCodes.Unauthenticated),
-		),
+		err:           xerrors.Transport(grpcStatus.Error(grpcCodes.Unauthenticated, "")),
 		backoff:       backoff.TypeNoBackoff,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
