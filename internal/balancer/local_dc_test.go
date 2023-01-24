@@ -142,7 +142,7 @@ func TestLocalDCDiscovery(t *testing.T) {
 		driverConfig:   cfg,
 		balancerConfig: *cfg.Balancer(),
 		pool:           conn.NewPool(cfg),
-		discoveryClient: func() (discoveryClient, error) {
+		discoveryClient: func(context.Context) (discoveryClient, error) {
 			return discoveryMock{endpoints: []endpoint.Endpoint{
 				&mock.Endpoint{AddrField: "a:123", LocationField: "a"},
 				&mock.Endpoint{AddrField: "b:234", LocationField: "b"},
@@ -154,7 +154,7 @@ func TestLocalDCDiscovery(t *testing.T) {
 		},
 	}
 
-	err := r.clusterDiscovery(ctx)
+	err := r.clusterDiscoveryAttempt(ctx)
 	require.NoError(t, err)
 
 	for i := 0; i < 100; i++ {
