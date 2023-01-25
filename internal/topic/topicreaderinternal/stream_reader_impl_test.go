@@ -787,7 +787,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	stream.EXPECT().Recv().AnyTimes().DoAndReturn(env.receiveMessageHandler)
 
 	// initial data request
-	stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: initialBufferSizeBytes})
+	stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: initialBufferSizeBytes}).MaxTimes(1)
 
 	// allow in test send data without explicit sizes
 	stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: 0}).AnyTimes()
