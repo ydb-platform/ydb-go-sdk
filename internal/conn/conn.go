@@ -200,11 +200,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	// three slashes in "ydb:///" is ok. It needs for good parse scheme in grpc resolver.
 	address := "ydb:///" + c.endpoint.Address()
 
-	cc, err = grpc.DialContext(
-		ctx,
-		address,
-		c.grpcDialOptions...,
-	)
+	cc, err = grpc.DialContext(ctx, address, c.grpcDialOptions...)
 	if err != nil {
 		err = xerrors.WithStackTrace(
 			xerrors.Retryable(
