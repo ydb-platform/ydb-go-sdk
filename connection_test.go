@@ -5,7 +5,13 @@ package ydb_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
@@ -39,4 +45,19 @@ func ExampleOpen_advanced() {
 	}
 	defer db.Close(ctx) // cleanup resources
 	fmt.Printf("connected to %s, database '%s'", db.Endpoint(), db.Name())
+}
+
+func TestZeroDialTimeout(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	db, err := ydb.Open(
+		ctx,
+		"grpc://non-existent.com:2135/some",
+		ydb.WithDialTimeout(0),
+	)
+
+	require.Error(t, err)
+	require.Nil(t, db)
+	require.True(t, errors.Is(err, context.DeadlineExceeded) || ydb.IsTransportError(err, grpcCodes.DeadlineExceeded))
 }
