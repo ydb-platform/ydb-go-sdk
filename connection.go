@@ -456,12 +456,6 @@ func connect(ctx context.Context, c *connection) error {
 		))
 	}
 
-	if t := c.config.DialTimeout(); t > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, t)
-		defer cancel()
-	}
-
 	c.balancer, err = balancer.New(ctx,
 		c.config, c.pool,
 		append(

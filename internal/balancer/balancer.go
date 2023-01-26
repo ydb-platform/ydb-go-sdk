@@ -90,7 +90,15 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 		)
 	}()
 
-	childCtx, cancel := context.WithTimeout(ctx, b.driverConfig.DialTimeout())
+	var (
+		childCtx context.Context
+		cancel   context.CancelFunc
+	)
+	if dialTimeout := b.driverConfig.DialTimeout(); dialTimeout > 0 {
+		childCtx, cancel = context.WithTimeout(ctx, dialTimeout)
+	} else {
+		childCtx, cancel = context.WithCancel(ctx)
+	}
 	defer cancel()
 
 	client, err := b.discoveryClient(childCtx)
@@ -163,12 +171,6 @@ func New(
 	pool *conn.Pool,
 	opts ...discoveryConfig.Option,
 ) (b *Balancer, err error) {
-	if t := driverConfig.DialTimeout(); t > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, t)
-		defer cancel()
-	}
-
 	var (
 		onDone = trace.DriverOnBalancerInit(
 			driverConfig.Trace(),

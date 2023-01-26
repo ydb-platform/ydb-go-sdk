@@ -10,6 +10,7 @@
 * Fixed default grpc dial options
 * Replaced single connection for discovery repeater into connection which creates each time for discovery request
 * Fixed retry of cluster discovery on initialization
+* Fixed dial timeout processing
 
 ## v3.42.5
 * Fixed closing of `database/sql` connection (aka `YDB` session)
