@@ -49,8 +49,12 @@ func (b *Balancer) OnUpdate(onDiscovery func(ctx context.Context, endpoints []en
 }
 
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
-	if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		if err = b.clusterDiscoveryAttempt(ctx); err != nil {
+	if err = retry.Retry(ctx, func(childCtx context.Context) (err error) {
+		if err = b.clusterDiscoveryAttempt(childCtx); err != nil {
+			// if got err but parent context is not done - mark error as retryable
+			if err != nil && ctx.Err() == nil && xerrors.IsTimeoutError(err) {
+				return xerrors.WithStackTrace(xerrors.Retryable(err))
+			}
 			return xerrors.WithStackTrace(err)
 		}
 		return nil
@@ -69,39 +73,25 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 		)
 		endpoints []endpoint.Endpoint
 		localDC   string
+		cancel    context.CancelFunc
 	)
 
 	defer func() {
-		// if got err but parent context is not done - mark error as retryable
-		if err != nil && ctx.Err() == nil && xerrors.Is(err,
-			context.DeadlineExceeded,
-			context.Canceled,
-		) {
-			err = xerrors.WithStackTrace(xerrors.Retryable(err))
-		}
 		nodes := make([]trace.EndpointInfo, 0, len(endpoints))
 		for _, e := range endpoints {
 			nodes = append(nodes, e.Copy())
 		}
-		onDone(
-			nodes,
-			localDC,
-			err,
-		)
+		onDone(nodes, localDC, err)
 	}()
 
-	var (
-		childCtx context.Context
-		cancel   context.CancelFunc
-	)
 	if dialTimeout := b.driverConfig.DialTimeout(); dialTimeout > 0 {
-		childCtx, cancel = context.WithTimeout(ctx, dialTimeout)
+		ctx, cancel = context.WithTimeout(ctx, dialTimeout)
 	} else {
-		childCtx, cancel = context.WithCancel(ctx)
+		ctx, cancel = context.WithCancel(ctx)
 	}
 	defer cancel()
 
-	client, err := b.discoveryClient(childCtx)
+	client, err := b.discoveryClient(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -109,19 +99,19 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 		_ = client.Close(ctx)
 	}()
 
-	endpoints, err = client.Discover(childCtx)
+	endpoints, err = client.Discover(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
 	if b.balancerConfig.DetectlocalDC {
-		localDC, err = b.localDCDetector(childCtx, endpoints)
+		localDC, err = b.localDCDetector(ctx, endpoints)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
 	}
 
-	b.applyDiscoveredEndpoints(childCtx, endpoints, localDC)
+	b.applyDiscoveredEndpoints(ctx, endpoints, localDC)
 
 	return nil
 }
