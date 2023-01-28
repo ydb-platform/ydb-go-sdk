@@ -1,3 +1,4 @@
+## v3.42.6
 * Implemented `driver.RowsColumnTypeDatabaseTypeName` interface in `internal/xsql.rows` struct
 * Extended `internal/xsql.conn` struct with methods for getting `YDB` metadata
 * Added `scheme.Client` to `internal/xsql.connection` interface
