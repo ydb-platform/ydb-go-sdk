@@ -410,11 +410,19 @@ func (s *session) DescribeTable(
 
 	indexes := make([]options.IndexDescription, len(result.Indexes))
 	for i, idx := range result.GetIndexes() {
+		var typ options.IndexType
+		switch idx.Type.(type) {
+		case *Ydb_Table.TableIndexDescription_GlobalAsyncIndex:
+			typ = options.GlobalAsyncIndex()
+		case *Ydb_Table.TableIndexDescription_GlobalIndex:
+			typ = options.GlobalIndex()
+		}
 		indexes[i] = options.IndexDescription{
 			Name:         idx.GetName(),
 			IndexColumns: idx.GetIndexColumns(),
 			DataColumns:  idx.GetDataColumns(),
 			Status:       idx.GetStatus(),
+			Type:         typ,
 		}
 	}
 
