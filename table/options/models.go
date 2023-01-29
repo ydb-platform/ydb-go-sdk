@@ -289,6 +289,14 @@ func (t IndexType) ApplyIndexOption(d *indexDesc) {
 	}
 }
 
+func GlobalIndex() IndexType {
+	return IndexTypeGlobal
+}
+
+func GlobalAsyncIndex() IndexType {
+	return IndexTypeGlobalAsync
+}
+
 type PartitioningMode byte
 
 const (

@@ -80,7 +80,7 @@ func Example_createTable() {
 				),
 				options.WithIndex("idx_series_title",
 					options.WithIndexColumns("title"),
-					options.WithIndexType(options.IndexTypeGlobalAsync),
+					options.WithIndexType(options.GlobalAsyncIndex()),
 				),
 			)
 		},
@@ -166,7 +166,7 @@ func Example_alterTable() {
 				options.WithAddIndex("idx_series_series_id",
 					options.WithIndexColumns("series_id"),
 					options.WithDataColumns("title"),
-					options.WithIndexType(options.IndexTypeGlobalAsync),
+					options.WithIndexType(options.GlobalIndex()),
 				),
 				options.WithDropIndex("idx_series_title"),
 				options.WithAlterAttribute("hello", "world"),
