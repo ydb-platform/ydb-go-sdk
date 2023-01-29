@@ -45,17 +45,11 @@ type IndexDescription struct {
 
 //nolint:unused
 func (i IndexDescription) toYDB() *Ydb_Table.TableIndexDescription {
-	res := &Ydb_Table.TableIndexDescription{
+	return &Ydb_Table.TableIndexDescription{
 		Name:         i.Name,
 		IndexColumns: i.IndexColumns,
 		Status:       i.Status,
 	}
-	if i.Type.Type() == IndexTypeGlobal {
-		res.Type = &Ydb_Table.TableIndexDescription_GlobalIndex{}
-	} else {
-		res.Type = &Ydb_Table.TableIndexDescription_GlobalAsyncIndex{}
-	}
-	return res
 }
 
 type Description struct {
@@ -277,48 +271,22 @@ func NewPartitioningSettings(ps *Ydb_Table.PartitioningSettings) PartitioningSet
 	}
 }
 
-type IndexTypeValue uint8
+type (
+	IndexType uint8
+)
 
 const (
-	IndexTypeGlobal IndexTypeValue = iota
+	IndexTypeGlobal = IndexType(iota)
 	IndexTypeGlobalAsync
 )
 
-type IndexType interface {
-	setup(*indexDesc)
-	Type() IndexTypeValue
-}
-
-type globalIndex struct{}
-
-func GlobalIndex() IndexType {
-	return globalIndex{}
-}
-
-func (globalIndex) setup(d *indexDesc) {
-	d.Type = &Ydb_Table.TableIndex_GlobalIndex{
-		GlobalIndex: new(Ydb_Table.GlobalIndex),
+func (t IndexType) ApplyIndexOption(d *indexDesc) {
+	switch t {
+	case IndexTypeGlobal:
+		d.Type = &Ydb_Table.TableIndex_GlobalIndex{}
+	case IndexTypeGlobalAsync:
+		d.Type = &Ydb_Table.TableIndex_GlobalAsyncIndex{}
 	}
-}
-
-func (globalIndex) Type() IndexTypeValue {
-	return IndexTypeGlobal
-}
-
-type globalAsyncIndex struct{}
-
-func GlobalAsyncIndex() IndexType {
-	return globalAsyncIndex{}
-}
-
-func (globalAsyncIndex) setup(d *indexDesc) {
-	d.Type = &Ydb_Table.TableIndex_GlobalAsyncIndex{
-		GlobalAsyncIndex: new(Ydb_Table.GlobalAsyncIndex),
-	}
-}
-
-func (globalAsyncIndex) Type() IndexTypeValue {
-	return IndexTypeGlobalAsync
 }
 
 type PartitioningMode byte

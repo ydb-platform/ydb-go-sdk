@@ -219,16 +219,8 @@ func WithDataColumns(columns ...string) IndexOption {
 	return dataColumns(columns)
 }
 
-type indexType struct {
-	t IndexType
-}
-
-func (i indexType) ApplyIndexOption(d *indexDesc) {
-	i.t.setup(d)
-}
-
 func WithIndexType(t IndexType) IndexOption {
-	return indexType{t: t}
+	return t
 }
 
 type columnFamilies []ColumnFamily

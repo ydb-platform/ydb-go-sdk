@@ -413,9 +413,9 @@ func (s *session) DescribeTable(
 		var typ options.IndexType
 		switch idx.Type.(type) {
 		case *Ydb_Table.TableIndexDescription_GlobalAsyncIndex:
-			typ = options.GlobalAsyncIndex()
+			typ = options.IndexTypeGlobalAsync
 		case *Ydb_Table.TableIndexDescription_GlobalIndex:
-			typ = options.GlobalIndex()
+			typ = options.IndexTypeGlobal
 		}
 		indexes[i] = options.IndexDescription{
 			Name:         idx.GetName(),
