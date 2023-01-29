@@ -283,9 +283,13 @@ const (
 func (t IndexType) ApplyIndexOption(d *indexDesc) {
 	switch t {
 	case IndexTypeGlobal:
-		d.Type = &Ydb_Table.TableIndex_GlobalIndex{}
+		d.Type = &Ydb_Table.TableIndex_GlobalIndex{
+			GlobalIndex: &Ydb_Table.GlobalIndex{},
+		}
 	case IndexTypeGlobalAsync:
-		d.Type = &Ydb_Table.TableIndex_GlobalAsyncIndex{}
+		d.Type = &Ydb_Table.TableIndex_GlobalAsyncIndex{
+			GlobalAsyncIndex: &Ydb_Table.GlobalAsyncIndex{},
+		}
 	}
 }
 

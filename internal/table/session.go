@@ -294,7 +294,10 @@ func (s *session) CreateTable(
 		}
 	}
 	_, err = s.tableService.CreateTable(ctx, &request)
-	return xerrors.WithStackTrace(err)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+	return nil
 }
 
 // DescribeTable describes table at given path.
