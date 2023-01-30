@@ -72,7 +72,7 @@ jobs:
       - name: Wait database available
         run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Test
-        run: go test -race -coverpkg=./tests/... -coverprofile integration.txt -covermode atomic ./tests
+        run: go test -race -coverpkg=./... -coverprofile integration.txt -covermode atomic ./tests
       - name: Upload Table coverage report to Codecov
         uses: codecov/codecov-action@v2
         with:
