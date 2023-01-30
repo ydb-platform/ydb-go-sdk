@@ -1,7 +1,7 @@
 //go:build !fast
 // +build !fast
 
-package ratelimiter_test
+package tests
 
 import (
 	"context"

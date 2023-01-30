@@ -33,7 +33,7 @@ jobs:
           file: ./unit.txt
           flags: unit,${{ matrix.os }},${{ matrix.go-version }}
           name: unit
-  e2e:
+  integration:
     concurrency:
       group: e2e-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
       cancel-in-progress: true
@@ -71,60 +71,11 @@ jobs:
         uses: actions/checkout@v2
       - name: Wait database available
         run: bash ./.github/scripts/wait-ydb-container.sh
-      - name: Test Table
-        run: go test -race -coverpkg=./... -coverprofile table.txt -covermode atomic ./table/table_e2e_test.go
+      - name: Test
+        run: go test -race -coverpkg=./tests/... -coverprofile integration.txt -covermode atomic ./table/table_e2e_test.go
       - name: Upload Table coverage report to Codecov
         uses: codecov/codecov-action@v2
         with:
-          file: ./table.txt
-          flags: table,e2e,${{ matrix.os }},${{ matrix.go-version }}
-          name: table
-      - name: Test Ratelimiter
-        run: go test -race -coverpkg=./... -coverprofile ratelimiter.txt -covermode atomic ./ratelimiter/ratelimiter_e2e_test.go
-        shell: bash
-      - name: Upload Ratelimiter coverage report to Codecov
-        uses: codecov/codecov-action@v2
-        with:
-          file: ./ratelimiter.txt
-          flags: ratelimiter,e2e,${{ matrix.os }},${{ matrix.go-version }}
-          name: ratelimiter
-      - name: Test Scripting
-        run: go test -race -coverpkg=./... -coverprofile scripting.txt -covermode atomic ./scripting/scripting_e2e_test.go
-      - name: Upload Scripting coverage report to Codecov
-        uses: codecov/codecov-action@v2
-        with:
-          file: ./scripting.txt
-          flags: scripting,e2e,${{ matrix.os }},${{ matrix.go-version }}
-          name: scripting
-      - name: Test Topic client
-        run: go test -race -coverpkg=./... -coverprofile topic.txt -covermode atomic ./topic/cdc_reader_e2e_test.go ./topic/client_e2e_test.go ./topic/topic_read_writer_e2e_test.go ./topic/grpc_stopper_helper_test.go ./topic/topic_stress_test.go
-      - name: Upload Topic coverage report to Codecov
-        uses: codecov/codecov-action@v2
-        with:
-          file: ./topic.txt
-          flags: topic,e2e,${{ matrix.os }},${{ matrix.go-version }}
-          name: topic
-      - name: Test Discovery
-        run: go test -race -coverpkg=./... -coverprofile discovery.txt -covermode atomic ./discovery/discovery_e2e_test.go
-      - name: Upload Discovery coverage report to Codecov
-        uses: codecov/codecov-action@v2
-        with:
-          file: ./discovery.txt
-          flags: discovery,e2e,${{ matrix.os }},${{ matrix.go-version }}
-          name: discovery
-      - name: Test Connection
-        run: go test -race -coverpkg=./... -coverprofile connection.txt -covermode atomic ./connection_e2e_test.go
-      - name: Upload Connection coverage report to Codecov
-        uses: codecov/codecov-action@v2
-        with:
-          file: ./connection.txt
-          flags: connection,e2e,${{ matrix.os }},${{ matrix.go-version }}
-          name: connection
-      - name: Test database/sql
-        run: go test -race -coverpkg=./... -coverprofile database_sql.txt -covermode atomic ./sql_e2e_test.go
-      - name: Upload database/sql coverage report to Codecov
-        uses: codecov/codecov-action@v2
-        with:
-          file: ./database_sql.txt
-          flags: database_sql,e2e,integration,${{ matrix.os }},${{ matrix.go-version }}
-          name: database/sql
+          file: ./integration.txt
+          flags: integration,${{ matrix.os }},${{ matrix.go-version }}
+          name: integration

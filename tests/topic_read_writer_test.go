@@ -1,7 +1,7 @@
 //go:build !fast
 // +build !fast
 
-package topic_test
+package tests
 
 import (
 	"bytes"
