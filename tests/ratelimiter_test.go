@@ -18,12 +18,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-const (
-	testCoordinationNodePath = "/local/ratelimiter_test"
-	testResource             = "test_resource"
-)
-
 func TestRatelimiter(t *testing.T) {
+	const (
+		testCoordinationNodePath = "/local/ratelimiter_test"
+		testResource             = "test_resource"
+	)
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*4)
 	defer cancel()
 	db, err := ydb.Open(
