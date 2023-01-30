@@ -19,11 +19,19 @@ import (
 //nolint:nolintlint
 var (
 	errNilClient = xerrors.Wrap(errors.New("scheme client is not initialized"))
+
+	_ interface {
+		Database() string
+	} = (*Client)(nil)
 )
 
 type Client struct {
 	config  config.Config
 	service Ydb_Scheme_V1.SchemeServiceClient
+}
+
+func (c *Client) Database() string {
+	return c.config.Database()
 }
 
 func (c *Client) Close(_ context.Context) error {
