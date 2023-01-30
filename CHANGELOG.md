@@ -1,6 +1,8 @@
 * Fixed `sugar.IsTableExists` with recursive check directory exists
 * Added `sugar.IsDirectoryExists`
-* Added missing `IndexType` for `TableDescription`
+* Changed type of `table/options.IndexType` for type checks
+* Added constants `table/options.IndexTypeGlobal` and `table/options.IndexTypeGlobalAsync`
+* Added `table/options.IndexDescription.Type` field with `table/options.IndexType` type
 
 ## v3.42.6
 * Implemented `driver.RowsColumnTypeDatabaseTypeName` interface in `internal/xsql.rows` struct
