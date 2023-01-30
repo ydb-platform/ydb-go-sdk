@@ -11,3 +11,8 @@ func IsTableExists(ctx context.Context, c scheme.Client, absTablePath string) (e
 	exists, err := helpers.IsTableExists(ctx, c, absTablePath)
 	return exists, err
 }
+
+func IsDirectoryExists(ctx context.Context, c scheme.Client, absTablePath string) (exists bool, _ error) {
+	exists, err := helpers.IsDirectoryExists(ctx, c, absTablePath)
+	return exists, err
+}

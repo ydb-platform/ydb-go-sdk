@@ -250,6 +250,7 @@ func (c *connection) Scheme() scheme.Client {
 				append(
 					// prepend common params from root config
 					[]schemeConfig.Option{
+						schemeConfig.WithDatabaseName(c.Name()),
 						schemeConfig.With(c.config.Common),
 					},
 					c.schemeOptions...,
