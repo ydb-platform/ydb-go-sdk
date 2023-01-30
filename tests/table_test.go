@@ -1837,10 +1837,17 @@ func TestIssue229UnexpectedNullWhileParseNilJsonDocumentValue(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	db := connect(t)
-	defer db.Close(ctx)
+	db, err := ydb.Open(ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+	)
+	require.NoError(t, err)
+	defer func(db ydb.Connection) {
+		// cleanup
+		_ = db.Close(ctx)
+	}(db)
 	var val issue229Struct
-	err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+	err = db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 		res, err := tx.Execute(ctx, `SELECT Nothing(JsonDocument?) AS r`, nil)
 		if err != nil {
 			return err
@@ -1859,22 +1866,16 @@ func TestIssue229UnexpectedNullWhileParseNilJsonDocumentValue(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func (scope *tableTestScope) connect(t testing.TB) ydb.Connection {
-	db, err := ydb.Open(
-		context.Background(),
-		os.Getenv("YDB_CONNECTION_STRING"),
-		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")))
-	require.NoError(t, err)
-	return db
-}
-
 func TestIssue259IntervalFromDuration(t *testing.T) {
 	// https://github.com/ydb-platform/ydb-go-sdk/issues/259
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	db := connect(t)
-	defer db.Close(ctx)
+	db, err := ydb.Open(ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+	)
+	require.NoError(t, err)
 
 	t.Run("Check about interval work with microseconds", func(t *testing.T) {
 		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
@@ -1981,9 +1982,12 @@ func TestIssue415ScanError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	db := connect(t)
-	defer db.Close(ctx)
-	err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+	db, err := ydb.Open(ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+	)
+	require.NoError(t, err)
+	err = db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 		res, err := tx.Execute(ctx, `SELECT 1 as abc, 2 as def;`, nil)
 		if err != nil {
 			return err
@@ -2028,9 +2032,12 @@ func TestNullType(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	db := connect(t)
-	defer db.Close(ctx)
-	err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+	db, err := ydb.Open(ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+	)
+	require.NoError(t, err)
+	err = db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 		res, err := tx.Execute(ctx, `SELECT NULL AS reschedule_due;`, nil)
 		if err != nil {
 			return err
