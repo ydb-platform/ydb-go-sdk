@@ -1,3 +1,6 @@
+//go:build !fast
+// +build !fast
+
 package tests
 
 import (
