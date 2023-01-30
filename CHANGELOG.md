@@ -1,3 +1,4 @@
+## v3.42.7
 * Fixed `sugar.IsTableExists` with recursive check directory exists
 * Added `sugar.IsDirectoryExists`
 * Changed type of `table/options.IndexType` for type checks
