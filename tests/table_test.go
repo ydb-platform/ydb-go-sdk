@@ -1847,7 +1847,7 @@ func TestIssue229UnexpectedNullWhileParseNilJsonDocumentValue(t *testing.T) {
 		_ = db.Close(ctx)
 	}(db)
 	var val issue229Struct
-	err = db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+	err = db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) (err error) {
 		res, err := tx.Execute(ctx, `SELECT Nothing(JsonDocument?) AS r`, nil)
 		if err != nil {
 			return err
@@ -1987,7 +1987,7 @@ func TestIssue415ScanError(t *testing.T) {
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 	)
 	require.NoError(t, err)
-	err = db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+	err = db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) (err error) {
 		res, err := tx.Execute(ctx, `SELECT 1 as abc, 2 as def;`, nil)
 		if err != nil {
 			return err
@@ -2037,7 +2037,7 @@ func TestNullType(t *testing.T) {
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 	)
 	require.NoError(t, err)
-	err = db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+	err = db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) (err error) {
 		res, err := tx.Execute(ctx, `SELECT NULL AS reschedule_due;`, nil)
 		if err != nil {
 			return err
