@@ -1,7 +1,7 @@
 //go:build !fast
 // +build !fast
 
-package table_test
+package tests
 
 import (
 	"bytes"
@@ -25,7 +25,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
-	"golang.org/x/xerrors"
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -48,9 +47,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-const (
-	folder = "table_test"
-)
+type tableTestScope struct {
+	folder string
+}
 
 type stats struct {
 	xsync.Mutex
@@ -194,6 +193,10 @@ func TestTable(t *testing.T) {
 
 //nolint:gocyclo
 func testTable(t testing.TB) {
+	scope := tableTestScope{
+		folder: "table_test",
+	}
+
 	testDuration := 55 * time.Second
 	if v, ok := os.LookupEnv("TEST_DURATION"); ok {
 		vv, err := time.ParseDuration(v)
@@ -405,31 +408,31 @@ func testTable(t testing.TB) {
 	}
 
 	// prepare scheme
-	err = sugar.RemoveRecursive(ctx, db, folder)
+	err = sugar.RemoveRecursive(ctx, db, scope.folder)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = sugar.MakeRecursive(ctx, db, folder)
+	err = sugar.MakeRecursive(ctx, db, scope.folder)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = describeTableOptions(ctx, db.Table())
+	err = scope.describeTableOptions(ctx, db.Table())
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = createTables(ctx, db.Table(), path.Join(db.Name(), folder))
+	err = scope.createTables(ctx, db.Table(), path.Join(db.Name(), scope.folder))
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = describeTable(ctx, db.Table(), path.Join(db.Name(), folder, "series"))
+	err = scope.describeTable(ctx, db.Table(), path.Join(db.Name(), scope.folder, "series"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = describeTable(ctx, db.Table(), path.Join(db.Name(), folder, "seasons"))
+	err = scope.describeTable(ctx, db.Table(), path.Join(db.Name(), scope.folder, "seasons"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = describeTable(ctx, db.Table(), path.Join(db.Name(), folder, "episodes"))
+	err = scope.describeTable(ctx, db.Table(), path.Join(db.Name(), scope.folder, "episodes"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -459,7 +462,7 @@ func testTable(t testing.TB) {
 	}
 
 	// fill data
-	if err = fill(ctx, db, folder); err != nil {
+	if err = scope.fill(ctx, db, scope.folder); err != nil {
 		t.Fatalf("fillQuery failed: %v\n", err)
 	}
 
@@ -473,10 +476,23 @@ func testTable(t testing.TB) {
 			// select current value of `views`
 			res, err = tx.Execute(
 				ctx,
-				render(
-					querySelect,
-					templateConfig{
-						TablePathPrefix: path.Join(db.Name(), folder),
+				scope.render(
+					template.Must(template.New("").Parse(`
+						PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
+						DECLARE $seriesID AS Uint64;
+						DECLARE $seasonID AS Uint64;
+						DECLARE $episodeID AS Uint64;
+						SELECT
+							views
+						FROM
+							episodes
+						WHERE
+							series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID;
+					`)),
+					struct {
+						TablePathPrefix string
+					}{
+						TablePathPrefix: path.Join(db.Name(), scope.folder),
 					},
 				),
 				table.NewQueryParameters(
@@ -508,10 +524,20 @@ func testTable(t testing.TB) {
 			// increment `views`
 			res, err = tx.Execute(
 				ctx,
-				render(
-					queryUpsert,
-					templateConfig{
-						TablePathPrefix: path.Join(db.Name(), folder),
+				scope.render(
+					template.Must(template.New("").Parse(`
+						PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
+						DECLARE $seriesID AS Uint64;
+						DECLARE $seasonID AS Uint64;
+						DECLARE $episodeID AS Uint64;
+						DECLARE $views AS Uint64;
+						UPSERT INTO episodes ( series_id, season_id, episode_id, views )
+						VALUES ( $seriesID, $seasonID, $episodeID, $views );
+					`)),
+					struct {
+						TablePathPrefix string
+					}{
+						TablePathPrefix: path.Join(db.Name(), scope.folder),
 					},
 				),
 				table.NewQueryParameters(
@@ -549,10 +575,23 @@ func testTable(t testing.TB) {
 					),
 					table.CommitTx(),
 				),
-				render(
-					querySelect,
-					templateConfig{
-						TablePathPrefix: path.Join(db.Name(), folder),
+				scope.render(
+					template.Must(template.New("").Parse(`
+						PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
+						DECLARE $seriesID AS Uint64;
+						DECLARE $seasonID AS Uint64;
+						DECLARE $episodeID AS Uint64;
+						SELECT
+							views
+						FROM
+							episodes
+						WHERE
+							series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID;
+					`)),
+					struct {
+						TablePathPrefix string
+					}{
+						TablePathPrefix: path.Join(db.Name(), scope.folder),
 					},
 				),
 				table.NewQueryParameters(
@@ -760,7 +799,7 @@ func testTable(t testing.TB) {
 				case <-ctx.Done():
 					return
 				default:
-					executeDataQuery(ctx, t, db.Table(), path.Join(db.Name(), folder))
+					scope.executeDataQuery(ctx, t, db.Table(), path.Join(db.Name(), scope.folder))
 				}
 			}
 		}()
@@ -772,7 +811,7 @@ func testTable(t testing.TB) {
 				case <-ctx.Done():
 					return
 				default:
-					executeScanQuery(ctx, t, db.Table(), path.Join(db.Name(), folder))
+					scope.executeScanQuery(ctx, t, db.Table(), path.Join(db.Name(), scope.folder))
 				}
 			}
 		}()
@@ -784,7 +823,7 @@ func testTable(t testing.TB) {
 				case <-ctx.Done():
 					return
 				default:
-					streamReadTable(ctx, t, db.Table(), path.Join(db.Name(), folder, "series"))
+					scope.streamReadTable(ctx, t, db.Table(), path.Join(db.Name(), scope.folder, "series"))
 				}
 			}
 		}()
@@ -793,7 +832,7 @@ func testTable(t testing.TB) {
 	fmt.Printf("> concurrent quering done\n")
 }
 
-func streamReadTable(ctx context.Context, t testing.TB, c table.Client, tableAbsPath string) {
+func (scope *tableTestScope) streamReadTable(ctx context.Context, t testing.TB, c table.Client, tableAbsPath string) {
 	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			var (
@@ -860,9 +899,9 @@ func streamReadTable(ctx context.Context, t testing.TB, c table.Client, tableAbs
 	}
 }
 
-func executeDataQuery(ctx context.Context, t testing.TB, c table.Client, folderAbsPath string) {
+func (scope *tableTestScope) executeDataQuery(ctx context.Context, t testing.TB, c table.Client, folderAbsPath string) {
 	var (
-		query = render(
+		query = scope.render(
 			template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
 			DECLARE $seriesID AS Uint64;
@@ -875,7 +914,9 @@ func executeDataQuery(ctx context.Context, t testing.TB, c table.Client, folderA
 			WHERE
 				series_id = $seriesID;
 		`)),
-			templateConfig{
+			struct {
+				TablePathPrefix string
+			}{
 				TablePathPrefix: folderAbsPath,
 			},
 		)
@@ -932,18 +973,20 @@ func executeDataQuery(ctx context.Context, t testing.TB, c table.Client, folderA
 	}
 }
 
-func executeScanQuery(ctx context.Context, t testing.TB, c table.Client, folderAbsPath string) {
-	query := render(
+func (scope *tableTestScope) executeScanQuery(ctx context.Context, t testing.TB, c table.Client, folderAbsPath string) {
+	query := scope.render(
 		template.Must(template.New("").Parse(`
-				PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
-	
-				DECLARE $series AS List<UInt64>;
-	
-				SELECT series_id, season_id, title, first_aired
-				FROM seasons
-				WHERE series_id IN $series
-			`)),
-		templateConfig{
+			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
+
+			DECLARE $series AS List<UInt64>;
+
+			SELECT series_id, season_id, title, first_aired
+			FROM seasons
+			WHERE series_id IN $series
+		`)),
+		struct {
+			TablePathPrefix string
+		}{
 			TablePathPrefix: folderAbsPath,
 		},
 	)
@@ -991,7 +1034,7 @@ func executeScanQuery(ctx context.Context, t testing.TB, c table.Client, folderA
 	}
 }
 
-func seriesData(id uint64, released time.Time, title, info, comment string) types.Value {
+func (scope *tableTestScope) seriesData(id uint64, released time.Time, title, info, comment string) types.Value {
 	var commentv types.Value
 	if comment == "" {
 		commentv = types.NullValue(types.TypeText)
@@ -1007,7 +1050,7 @@ func seriesData(id uint64, released time.Time, title, info, comment string) type
 	)
 }
 
-func seasonData(seriesID, seasonID uint64, title string, first, last time.Time) types.Value {
+func (scope *tableTestScope) seasonData(seriesID, seasonID uint64, title string, first, last time.Time) types.Value {
 	return types.StructValue(
 		types.StructFieldValue("series_id", types.Uint64Value(seriesID)),
 		types.StructFieldValue("season_id", types.Uint64Value(seasonID)),
@@ -1017,7 +1060,9 @@ func seasonData(seriesID, seasonID uint64, title string, first, last time.Time) 
 	)
 }
 
-func episodeData(seriesID, seasonID, episodeID uint64, title string, date time.Time) types.Value {
+func (scope *tableTestScope) episodeData(
+	seriesID, seasonID, episodeID uint64, title string, date time.Time,
+) types.Value {
 	return types.StructValue(
 		types.StructFieldValue("series_id", types.Uint64Value(seriesID)),
 		types.StructFieldValue("season_id", types.Uint64Value(seasonID)),
@@ -1027,16 +1072,16 @@ func episodeData(seriesID, seasonID, episodeID uint64, title string, date time.T
 	)
 }
 
-func getSeriesData() types.Value {
+func (scope *tableTestScope) getSeriesData() types.Value {
 	return types.ListValue(
-		seriesData(
-			1, days("2006-02-03"), "IT Crowd", ""+
+		scope.seriesData(
+			1, scope.days("2006-02-03"), "IT Crowd", ""+
 				"The IT Crowd is a British sitcom produced by Channel 4, written by Graham Linehan, produced by "+
 				"Ash Atalla and starring Chris O'Dowd, Richard Ayoade, Katherine Parkinson, and Matt Berry.",
 			"", // NULL comment.
 		),
-		seriesData(
-			2, days("2014-04-06"), "Silicon Valley", ""+
+		scope.seriesData(
+			2, scope.days("2014-04-06"), "Silicon Valley", ""+
 				"Silicon Valley is an American comedy television series openSessions by Mike Judge, John Altschuler and "+
 				"Dave Krinsky. The series focuses on five young men who founded a startup company in Silicon Valley.",
 			"Some comment here",
@@ -1044,98 +1089,97 @@ func getSeriesData() types.Value {
 	)
 }
 
-func getSeasonsData() types.Value {
+func (scope *tableTestScope) getSeasonsData() types.Value {
 	return types.ListValue(
-		seasonData(1, 1, "Season 1", days("2006-02-03"), days("2006-03-03")),
-		seasonData(1, 2, "Season 2", days("2007-08-24"), days("2007-09-28")),
-		seasonData(1, 3, "Season 3", days("2008-11-21"), days("2008-12-26")),
-		seasonData(1, 4, "Season 4", days("2010-06-25"), days("2010-07-30")),
-		seasonData(2, 1, "Season 1", days("2014-04-06"), days("2014-06-01")),
-		seasonData(2, 2, "Season 2", days("2015-04-12"), days("2015-06-14")),
-		seasonData(2, 3, "Season 3", days("2016-04-24"), days("2016-06-26")),
-		seasonData(2, 4, "Season 4", days("2017-04-23"), days("2017-06-25")),
-		seasonData(2, 5, "Season 5", days("2018-03-25"), days("2018-05-13")),
+		scope.seasonData(1, 1, "Season 1", scope.days("2006-02-03"), scope.days("2006-03-03")),
+		scope.seasonData(1, 2, "Season 2", scope.days("2007-08-24"), scope.days("2007-09-28")),
+		scope.seasonData(1, 3, "Season 3", scope.days("2008-11-21"), scope.days("2008-12-26")),
+		scope.seasonData(1, 4, "Season 4", scope.days("2010-06-25"), scope.days("2010-07-30")),
+		scope.seasonData(2, 1, "Season 1", scope.days("2014-04-06"), scope.days("2014-06-01")),
+		scope.seasonData(2, 2, "Season 2", scope.days("2015-04-12"), scope.days("2015-06-14")),
+		scope.seasonData(2, 3, "Season 3", scope.days("2016-04-24"), scope.days("2016-06-26")),
+		scope.seasonData(2, 4, "Season 4", scope.days("2017-04-23"), scope.days("2017-06-25")),
+		scope.seasonData(2, 5, "Season 5", scope.days("2018-03-25"), scope.days("2018-05-13")),
 	)
 }
 
-func getEpisodesData() types.Value {
+func (scope *tableTestScope) getEpisodesData() types.Value {
 	return types.ListValue(
-		episodeData(1, 1, 1, "Yesterday's Jam", days("2006-02-03")),
-		episodeData(1, 1, 2, "Calamity Jen", days("2006-02-03")),
-		episodeData(1, 1, 3, "Fifty-Fifty", days("2006-02-10")),
-		episodeData(1, 1, 4, "The Red Door", days("2006-02-17")),
-		episodeData(1, 1, 5, "The Haunting of Bill Crouse", days("2006-02-24")),
-		episodeData(1, 1, 6, "Aunt Irma Visits", days("2006-03-03")),
-		episodeData(1, 2, 1, "The Work Outing", days("2006-08-24")),
-		episodeData(1, 2, 2, "Return of the Golden Child", days("2007-08-31")),
-		episodeData(1, 2, 3, "Moss and the German", days("2007-09-07")),
-		episodeData(1, 2, 4, "The Dinner Party", days("2007-09-14")),
-		episodeData(1, 2, 5, "Smoke and Mirrors", days("2007-09-21")),
-		episodeData(1, 2, 6, "Men Without Women", days("2007-09-28")),
-		episodeData(1, 3, 1, "From Hell", days("2008-11-21")),
-		episodeData(1, 3, 2, "Are We Not Men?", days("2008-11-28")),
-		episodeData(1, 3, 3, "Tramps Like Us", days("2008-12-05")),
-		episodeData(1, 3, 4, "The Speech", days("2008-12-12")),
-		episodeData(1, 3, 5, "Friendface", days("2008-12-19")),
-		episodeData(1, 3, 6, "Calendar Geeks", days("2008-12-26")),
-		episodeData(1, 4, 1, "Jen The Fredo", days("2010-06-25")),
-		episodeData(1, 4, 2, "The Final Countdown", days("2010-07-02")),
-		episodeData(1, 4, 3, "Something Happened", days("2010-07-09")),
-		episodeData(1, 4, 4, "Italian For Beginners", days("2010-07-16")),
-		episodeData(1, 4, 5, "Bad Boys", days("2010-07-23")),
-		episodeData(1, 4, 6, "Reynholm vs Reynholm", days("2010-07-30")),
-		episodeData(2, 1, 1, "Minimum Viable Product", days("2014-04-06")),
-		episodeData(2, 1, 2, "The Cap Table", days("2014-04-13")),
-		episodeData(2, 1, 3, "Articles of Incorporation", days("2014-04-20")),
-		episodeData(2, 1, 4, "Fiduciary Duties", days("2014-04-27")),
-		episodeData(2, 1, 5, "Signaling Risk", days("2014-05-04")),
-		episodeData(2, 1, 6, "Third Party Insourcing", days("2014-05-11")),
-		episodeData(2, 1, 7, "Proof of Concept", days("2014-05-18")),
-		episodeData(2, 1, 8, "Optimal Tip-to-Tip Efficiency", days("2014-06-01")),
-		episodeData(2, 2, 1, "Sand Hill Shuffle", days("2015-04-12")),
-		episodeData(2, 2, 2, "Runaway Devaluation", days("2015-04-19")),
-		episodeData(2, 2, 3, "Bad Money", days("2015-04-26")),
-		episodeData(2, 2, 4, "The Lady", days("2015-05-03")),
-		episodeData(2, 2, 5, "Server Space", days("2015-05-10")),
-		episodeData(2, 2, 6, "Homicide", days("2015-05-17")),
-		episodeData(2, 2, 7, "Adult Content", days("2015-05-24")),
-		episodeData(2, 2, 8, "White Hat/Black Hat", days("2015-05-31")),
-		episodeData(2, 2, 9, "Binding Arbitration", days("2015-06-07")),
-		episodeData(2, 2, 10, "Two Days of the Condor", days("2015-06-14")),
-		episodeData(2, 3, 1, "Founder Friendly", days("2016-04-24")),
-		episodeData(2, 3, 2, "Two in the Box", days("2016-05-01")),
-		episodeData(2, 3, 3, "Meinertzhagen's Haversack", days("2016-05-08")),
-		episodeData(2, 3, 4, "Maleant Data Systems Solutions", days("2016-05-15")),
-		episodeData(2, 3, 5, "The Empty Chair", days("2016-05-22")),
-		episodeData(2, 3, 6, "Bachmanity Insanity", days("2016-05-29")),
-		episodeData(2, 3, 7, "To Build a Better Beta", days("2016-06-05")),
-		episodeData(2, 3, 8, "Bachman's Earnings Over-Ride", days("2016-06-12")),
-		episodeData(2, 3, 9, "Daily Active Users", days("2016-06-19")),
-		episodeData(2, 3, 10, "The Uptick", days("2016-06-26")),
-		episodeData(2, 4, 1, "Success Failure", days("2017-04-23")),
-		episodeData(2, 4, 2, "Terms of Service", days("2017-04-30")),
-		episodeData(2, 4, 3, "Intellectual Property", days("2017-05-07")),
-		episodeData(2, 4, 4, "Teambuilding Exercise", days("2017-05-14")),
-		episodeData(2, 4, 5, "The Blood Boy", days("2017-05-21")),
-		episodeData(2, 4, 6, "Customer Service", days("2017-05-28")),
-		episodeData(2, 4, 7, "The Patent Troll", days("2017-06-04")),
-		episodeData(2, 4, 8, "The Keenan Vortex", days("2017-06-11")),
-		episodeData(2, 4, 9, "Hooli-Con", days("2017-06-18")),
-		episodeData(2, 4, 10, "Server Error", days("2017-06-25")),
-		episodeData(2, 5, 1, "Grow Fast or Die Slow", days("2018-03-25")),
-		episodeData(2, 5, 2, "Reorientation", days("2018-04-01")),
-		episodeData(2, 5, 3, "Chief Operating Officer", days("2018-04-08")),
-		episodeData(2, 5, 4, "Tech Evangelist", days("2018-04-15")),
-		episodeData(2, 5, 5, "Facial Recognition", days("2018-04-22")),
-		episodeData(2, 5, 6, "Artificial Emotional Intelligence", days("2018-04-29")),
-		episodeData(2, 5, 7, "Initial Coin Offering", days("2018-05-06")),
-		episodeData(2, 5, 8, "Fifty-One Percent", days("2018-05-13")),
+		scope.episodeData(1, 1, 1, "Yesterday's Jam", scope.days("2006-02-03")),
+		scope.episodeData(1, 1, 2, "Calamity Jen", scope.days("2006-02-03")),
+		scope.episodeData(1, 1, 3, "Fifty-Fifty", scope.days("2006-02-10")),
+		scope.episodeData(1, 1, 4, "The Red Door", scope.days("2006-02-17")),
+		scope.episodeData(1, 1, 5, "The Haunting of Bill Crouse", scope.days("2006-02-24")),
+		scope.episodeData(1, 1, 6, "Aunt Irma Visits", scope.days("2006-03-03")),
+		scope.episodeData(1, 2, 1, "The Work Outing", scope.days("2006-08-24")),
+		scope.episodeData(1, 2, 2, "Return of the Golden Child", scope.days("2007-08-31")),
+		scope.episodeData(1, 2, 3, "Moss and the German", scope.days("2007-09-07")),
+		scope.episodeData(1, 2, 4, "The Dinner Party", scope.days("2007-09-14")),
+		scope.episodeData(1, 2, 5, "Smoke and Mirrors", scope.days("2007-09-21")),
+		scope.episodeData(1, 2, 6, "Men Without Women", scope.days("2007-09-28")),
+		scope.episodeData(1, 3, 1, "From Hell", scope.days("2008-11-21")),
+		scope.episodeData(1, 3, 2, "Are We Not Men?", scope.days("2008-11-28")),
+		scope.episodeData(1, 3, 3, "Tramps Like Us", scope.days("2008-12-05")),
+		scope.episodeData(1, 3, 4, "The Speech", scope.days("2008-12-12")),
+		scope.episodeData(1, 3, 5, "Friendface", scope.days("2008-12-19")),
+		scope.episodeData(1, 3, 6, "Calendar Geeks", scope.days("2008-12-26")),
+		scope.episodeData(1, 4, 1, "Jen The Fredo", scope.days("2010-06-25")),
+		scope.episodeData(1, 4, 2, "The Final Countdown", scope.days("2010-07-02")),
+		scope.episodeData(1, 4, 3, "Something Happened", scope.days("2010-07-09")),
+		scope.episodeData(1, 4, 4, "Italian For Beginners", scope.days("2010-07-16")),
+		scope.episodeData(1, 4, 5, "Bad Boys", scope.days("2010-07-23")),
+		scope.episodeData(1, 4, 6, "Reynholm vs Reynholm", scope.days("2010-07-30")),
+		scope.episodeData(2, 1, 1, "Minimum Viable Product", scope.days("2014-04-06")),
+		scope.episodeData(2, 1, 2, "The Cap Table", scope.days("2014-04-13")),
+		scope.episodeData(2, 1, 3, "Articles of Incorporation", scope.days("2014-04-20")),
+		scope.episodeData(2, 1, 4, "Fiduciary Duties", scope.days("2014-04-27")),
+		scope.episodeData(2, 1, 5, "Signaling Risk", scope.days("2014-05-04")),
+		scope.episodeData(2, 1, 6, "Third Party Insourcing", scope.days("2014-05-11")),
+		scope.episodeData(2, 1, 7, "Proof of Concept", scope.days("2014-05-18")),
+		scope.episodeData(2, 1, 8, "Optimal Tip-to-Tip Efficiency", scope.days("2014-06-01")),
+		scope.episodeData(2, 2, 1, "Sand Hill Shuffle", scope.days("2015-04-12")),
+		scope.episodeData(2, 2, 2, "Runaway Devaluation", scope.days("2015-04-19")),
+		scope.episodeData(2, 2, 3, "Bad Money", scope.days("2015-04-26")),
+		scope.episodeData(2, 2, 4, "The Lady", scope.days("2015-05-03")),
+		scope.episodeData(2, 2, 5, "Server Space", scope.days("2015-05-10")),
+		scope.episodeData(2, 2, 6, "Homicide", scope.days("2015-05-17")),
+		scope.episodeData(2, 2, 7, "Adult Content", scope.days("2015-05-24")),
+		scope.episodeData(2, 2, 8, "White Hat/Black Hat", scope.days("2015-05-31")),
+		scope.episodeData(2, 2, 9, "Binding Arbitration", scope.days("2015-06-07")),
+		scope.episodeData(2, 2, 10, "Two Days of the Condor", scope.days("2015-06-14")),
+		scope.episodeData(2, 3, 1, "Founder Friendly", scope.days("2016-04-24")),
+		scope.episodeData(2, 3, 2, "Two in the Box", scope.days("2016-05-01")),
+		scope.episodeData(2, 3, 3, "Meinertzhagen's Haversack", scope.days("2016-05-08")),
+		scope.episodeData(2, 3, 4, "Maleant Data Systems Solutions", scope.days("2016-05-15")),
+		scope.episodeData(2, 3, 5, "The Empty Chair", scope.days("2016-05-22")),
+		scope.episodeData(2, 3, 6, "Bachmanity Insanity", scope.days("2016-05-29")),
+		scope.episodeData(2, 3, 7, "To Build a Better Beta", scope.days("2016-06-05")),
+		scope.episodeData(2, 3, 8, "Bachman's Earnings Over-Ride", scope.days("2016-06-12")),
+		scope.episodeData(2, 3, 9, "Daily Active Users", scope.days("2016-06-19")),
+		scope.episodeData(2, 3, 10, "The Uptick", scope.days("2016-06-26")),
+		scope.episodeData(2, 4, 1, "Success Failure", scope.days("2017-04-23")),
+		scope.episodeData(2, 4, 2, "Terms of Service", scope.days("2017-04-30")),
+		scope.episodeData(2, 4, 3, "Intellectual Property", scope.days("2017-05-07")),
+		scope.episodeData(2, 4, 4, "Teambuilding Exercise", scope.days("2017-05-14")),
+		scope.episodeData(2, 4, 5, "The Blood Boy", scope.days("2017-05-21")),
+		scope.episodeData(2, 4, 6, "Customer Service", scope.days("2017-05-28")),
+		scope.episodeData(2, 4, 7, "The Patent Troll", scope.days("2017-06-04")),
+		scope.episodeData(2, 4, 8, "The Keenan Vortex", scope.days("2017-06-11")),
+		scope.episodeData(2, 4, 9, "Hooli-Con", scope.days("2017-06-18")),
+		scope.episodeData(2, 4, 10, "Server Error", scope.days("2017-06-25")),
+		scope.episodeData(2, 5, 1, "Grow Fast or Die Slow", scope.days("2018-03-25")),
+		scope.episodeData(2, 5, 2, "Reorientation", scope.days("2018-04-01")),
+		scope.episodeData(2, 5, 3, "Chief Operating Officer", scope.days("2018-04-08")),
+		scope.episodeData(2, 5, 4, "Tech Evangelist", scope.days("2018-04-15")),
+		scope.episodeData(2, 5, 5, "Facial Recognition", scope.days("2018-04-22")),
+		scope.episodeData(2, 5, 6, "Artificial Emotional Intelligence", scope.days("2018-04-29")),
+		scope.episodeData(2, 5, 7, "Initial Coin Offering", scope.days("2018-05-06")),
+		scope.episodeData(2, 5, 8, "Fifty-One Percent", scope.days("2018-05-13")),
 	)
 }
 
-const dateISO8601 = "2006-01-02"
-
-func days(date string) time.Time {
+func (scope *tableTestScope) days(date string) time.Time {
+	const dateISO8601 = "2006-01-02"
 	t, err := time.Parse(dateISO8601, date)
 	if err != nil {
 		panic(err)
@@ -1143,86 +1187,7 @@ func days(date string) time.Time {
 	return t
 }
 
-type templateConfig struct {
-	TablePathPrefix string
-}
-
-var (
-	fillQuery = template.Must(template.New("fillQuery database").Parse(`
-		PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
-		
-		DECLARE $seriesData AS List<Struct<
-			series_id: Uint64,
-			title: Text,
-			series_info: Text,
-			release_date: Date,
-			comment: Optional<Text>>>;
-		
-		DECLARE $seasonsData AS List<Struct<
-			series_id: Uint64,
-			season_id: Uint64,
-			title: Text,
-			first_aired: Date,
-			last_aired: Date>>;
-		
-		DECLARE $episodesData AS List<Struct<
-			series_id: Uint64,
-			season_id: Uint64,
-			episode_id: Uint64,
-			title: Text,
-			air_date: Date>>;
-		
-		REPLACE INTO series
-		SELECT
-			series_id,
-			title,
-			series_info,
-			release_date,
-			comment
-		FROM AS_TABLE($seriesData);
-		
-		REPLACE INTO seasons
-		SELECT
-			series_id,
-			season_id,
-			title,
-			first_aired,
-			last_aired
-		FROM AS_TABLE($seasonsData);
-		
-		REPLACE INTO episodes
-		SELECT
-			series_id,
-			season_id,
-			episode_id,
-			title,
-			air_date
-		FROM AS_TABLE($episodesData);
-	`))
-	querySelect = template.Must(template.New("").Parse(`
-		PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
-		DECLARE $seriesID AS Uint64;
-		DECLARE $seasonID AS Uint64;
-		DECLARE $episodeID AS Uint64;
-		SELECT
-			views
-		FROM
-			episodes
-		WHERE
-			series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID;
-	`))
-	queryUpsert = template.Must(template.New("").Parse(`
-		PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
-		DECLARE $seriesID AS Uint64;
-		DECLARE $seasonID AS Uint64;
-		DECLARE $episodeID AS Uint64;
-		DECLARE $views AS Uint64;
-		UPSERT INTO episodes ( series_id, season_id, episode_id, views )
-		VALUES ( $seriesID, $seasonID, $episodeID, $views );
-	`))
-)
-
-func describeTableOptions(ctx context.Context, c table.Client) error {
+func (scope *tableTestScope) describeTableOptions(ctx context.Context, c table.Client) error {
 	var desc options.TableOptionsDescription
 	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
@@ -1261,7 +1226,7 @@ func describeTableOptions(ctx context.Context, c table.Client) error {
 	return nil
 }
 
-func fill(ctx context.Context, db ydb.Connection, folder string) error {
+func (scope *tableTestScope) fill(ctx context.Context, db ydb.Connection, folder string) error {
 	fmt.Printf("> filling tables\n")
 	defer func() {
 		fmt.Printf("> filling tables done\n")
@@ -1275,16 +1240,68 @@ func fill(ctx context.Context, db ydb.Connection, folder string) error {
 	)
 	return db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
-			stmt, err := s.Prepare(ctx, render(fillQuery, templateConfig{
+			stmt, err := s.Prepare(ctx, scope.render(template.Must(template.New("fillQuery database").Parse(`
+				PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
+				
+				DECLARE $seriesData AS List<Struct<
+					series_id: Uint64,
+					title: Text,
+					series_info: Text,
+					release_date: Date,
+					comment: Optional<Text>>>;
+				
+				DECLARE $seasonsData AS List<Struct<
+					series_id: Uint64,
+					season_id: Uint64,
+					title: Text,
+					first_aired: Date,
+					last_aired: Date>>;
+				
+				DECLARE $episodesData AS List<Struct<
+					series_id: Uint64,
+					season_id: Uint64,
+					episode_id: Uint64,
+					title: Text,
+					air_date: Date>>;
+				
+				REPLACE INTO series
+				SELECT
+					series_id,
+					title,
+					series_info,
+					release_date,
+					comment
+				FROM AS_TABLE($seriesData);
+				
+				REPLACE INTO seasons
+				SELECT
+					series_id,
+					season_id,
+					title,
+					first_aired,
+					last_aired
+				FROM AS_TABLE($seasonsData);
+				
+				REPLACE INTO episodes
+				SELECT
+					series_id,
+					season_id,
+					episode_id,
+					title,
+					air_date
+				FROM AS_TABLE($episodesData);
+			`)), struct {
+				TablePathPrefix string
+			}{
 				TablePathPrefix: path.Join(db.Name(), folder),
 			}))
 			if err != nil {
 				return
 			}
 			_, _, err = stmt.Execute(ctx, writeTx, table.NewQueryParameters(
-				table.ValueParam("$seriesData", getSeriesData()),
-				table.ValueParam("$seasonsData", getSeasonsData()),
-				table.ValueParam("$episodesData", getEpisodesData()),
+				table.ValueParam("$seriesData", scope.getSeriesData()),
+				table.ValueParam("$seasonsData", scope.getSeasonsData()),
+				table.ValueParam("$episodesData", scope.getEpisodesData()),
 			))
 			return
 		},
@@ -1292,7 +1309,7 @@ func fill(ctx context.Context, db ydb.Connection, folder string) error {
 	)
 }
 
-func createTables(ctx context.Context, c table.Client, folder string) error {
+func (scope *tableTestScope) createTables(ctx context.Context, c table.Client, folder string) error {
 	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			if _, err = s.DescribeTable(ctx, path.Join(folder, "series")); err == nil {
@@ -1353,7 +1370,7 @@ func createTables(ctx context.Context, c table.Client, folder string) error {
 	return err
 }
 
-func describeTable(ctx context.Context, c table.Client, path string) (err error) {
+func (scope *tableTestScope) describeTable(ctx context.Context, c table.Client, path string) (err error) {
 	err = c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			desc, err := s.DescribeTable(ctx, path)
@@ -1374,7 +1391,7 @@ func describeTable(ctx context.Context, c table.Client, path string) (err error)
 	return err
 }
 
-func render(t *template.Template, data interface{}) string {
+func (scope *tableTestScope) render(t *template.Template, data interface{}) string {
 	var buf bytes.Buffer
 	err := t.Execute(&buf, data)
 	if err != nil {
@@ -1807,212 +1824,17 @@ func TestSplitRangesAndRead(t *testing.T) {
 	})
 }
 
-type issue229Struct struct{}
-
-// UnmarshalJSON implements json.Unmarshaler
-func (i *issue229Struct) UnmarshalJSON(_ []byte) error {
-	return nil
-}
-
-func TestIssue229UnexpectedNullWhileParseNilJsonDocumentValue(t *testing.T) {
-	// https://github.com/ydb-platform/ydb-go-sdk/issues/229
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	db := connect(t)
-	defer db.Close(ctx)
-	var val issue229Struct
-	err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
-		res, err := tx.Execute(ctx, `SELECT Nothing(JsonDocument?) AS r`, nil)
-		if err != nil {
-			return err
-		}
-		if err = res.NextResultSetErr(ctx); err != nil {
-			return err
-		}
-		if !res.NextRow() {
-			return fmt.Errorf("unexpected no rows in result set (err = %w)", res.Err())
-		}
-		if err = res.Scan(&val); err != nil {
-			return err
-		}
-		return res.Err()
-	}, table.WithIdempotent())
-	require.NoError(t, err)
-}
-
-func connect(t testing.TB) ydb.Connection {
-	db, err := ydb.Open(
-		context.Background(),
-		os.Getenv("YDB_CONNECTION_STRING"),
-		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")))
-	require.NoError(t, err)
-	return db
-}
-
-func TestIssue259IntervalFromDuration(t *testing.T) {
-	// https://github.com/ydb-platform/ydb-go-sdk/issues/259
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	db := connect(t)
-	defer db.Close(ctx)
-
-	t.Run("Check about interval work with microseconds", func(t *testing.T) {
-		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
-			//
-			res, err := tx.Execute(ctx, `DECLARE $ts as Interval;
-			$ten_micro = CAST(10 as Interval);
-			SELECT $ts == $ten_micro, $ten_micro;`, table.NewQueryParameters(
-				table.ValueParam(`$ts`, types.IntervalValueFromDuration(10*time.Microsecond)),
-			))
-			if err != nil {
-				return err
-			}
-			if err = res.NextResultSetErr(ctx); err != nil {
-				return err
-			}
-			if !res.NextRow() {
-				return fmt.Errorf("unexpected no rows in result set (err = %w)", res.Err())
-			}
-			var (
-				valuesEqual bool
-				tenMicro    time.Duration
-			)
-			if err = res.Scan(&valuesEqual, &tenMicro); err != nil {
-				return err
-			}
-			if !valuesEqual {
-				return fmt.Errorf("unexpected values equal (err = %w)", res.Err())
-			}
-			if tenMicro != 10*time.Microsecond {
-				return fmt.Errorf("unexpected ten micro equal: %v (err = %w)", tenMicro, res.Err())
-			}
-			return res.Err()
-		}, table.WithIdempotent())
-		require.NoError(t, err)
-	})
-
-	t.Run("Check about parse interval represent date interval", func(t *testing.T) {
-		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
-			//
-			query := `
-		SELECT 
-			DateTime::MakeTimestamp(DateTime::ParseIso8601("2009-02-14T02:31:30+0000")) - 
-			DateTime::MakeTimestamp(DateTime::ParseIso8601("2009-02-14T01:31:30+0000")) 
-		`
-			res, err := tx.Execute(ctx, query, nil)
-			if err != nil {
-				return err
-			}
-			if err = res.NextResultSetErr(ctx); err != nil {
-				return err
-			}
-			if !res.NextRow() {
-				return fmt.Errorf("unexpected no rows in result set (err = %w)", res.Err())
-			}
-			var delta time.Duration
-			if err = res.ScanWithDefaults(&delta); err != nil {
-				return err
-			}
-			if delta != time.Hour {
-				return fmt.Errorf("unexpected ten micro equal: %v (err = %w)", delta, res.Err())
-			}
-			return res.Err()
-		}, table.WithIdempotent())
-		require.NoError(t, err)
-	})
-
-	t.Run("check about send interval work find with dates", func(t *testing.T) {
-		err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
-			//
-			query := `
-		DECLARE $delta AS Interval;
-	
-		SELECT 
-			DateTime::MakeTimestamp(DateTime::ParseIso8601("2009-02-14T01:31:30+0000")) + $delta ==
-			DateTime::MakeTimestamp(DateTime::ParseIso8601("2009-02-14T02:31:30+0000"))
-		`
-			res, err := tx.Execute(ctx, query, table.NewQueryParameters(
-				table.ValueParam("$delta", types.IntervalValueFromDuration(time.Hour))),
-			)
-			if err != nil {
-				return err
-			}
-			if err = res.NextResultSetErr(ctx); err != nil {
-				return err
-			}
-			if !res.NextRow() {
-				return fmt.Errorf("unexpected no rows in result set (err = %w)", res.Err())
-			}
-			var valuesEqual bool
-			if err = res.ScanWithDefaults(&valuesEqual); err != nil {
-				return err
-			}
-			if !valuesEqual {
-				return fmt.Errorf("unexpected values equal (err = %w)", res.Err())
-			}
-			return res.Err()
-		}, table.WithIdempotent())
-		require.NoError(t, err)
-	})
-}
-
-func TestIssue415ScanError(t *testing.T) {
-	// https://github.com/ydb-platform/ydb-go-sdk/issues/415
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	db := connect(t)
-	defer db.Close(ctx)
-	err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
-		res, err := tx.Execute(ctx, `SELECT 1 as abc, 2 as def;`, nil)
-		if err != nil {
-			return err
-		}
-		err = res.NextResultSetErr(ctx)
-		if err != nil {
-			return err
-		}
-		if !res.NextRow() {
-			if err = res.Err(); err != nil {
-				return err
-			}
-			return fmt.Errorf("unexpected empty result set")
-		}
-		var abc, def int32
-		err = res.ScanNamed(
-			named.Required("abc", &abc),
-			named.Required("ghi", &def),
-		)
-		if err != nil {
-			return err
-		}
-		fmt.Println(abc, def)
-		return res.Err()
-	}, table.WithTxSettings(table.TxSettings(table.WithSnapshotReadOnly())))
-	require.Error(t, err)
-	err = func(err error) error {
-		for {
-			//nolint:errorlint
-			if unwrappedErr, has := err.(xerrors.Wrapper); has {
-				err = unwrappedErr.Unwrap()
-			} else {
-				return err
-			}
-		}
-	}(err)
-	require.Equal(t, "not found column 'ghi'", err.Error())
-}
-
 func TestNullType(t *testing.T) {
 	// https://github.com/ydb-platform/ydb-go-sdk/issues/415
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	db := connect(t)
-	defer db.Close(ctx)
-	err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
+	db, err := ydb.Open(ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+	)
+	require.NoError(t, err)
+	err = db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) (err error) {
 		res, err := tx.Execute(ctx, `SELECT NULL AS reschedule_due;`, nil)
 		if err != nil {
 			return err

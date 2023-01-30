@@ -1,7 +1,7 @@
 //go:build !fast
 // +build !fast
 
-package discovery_test
+package tests
 
 import (
 	"context"
