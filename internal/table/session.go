@@ -294,7 +294,10 @@ func (s *session) CreateTable(
 		}
 	}
 	_, err = s.tableService.CreateTable(ctx, &request)
-	return xerrors.WithStackTrace(err)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+	return nil
 }
 
 // DescribeTable describes table at given path.
@@ -410,11 +413,19 @@ func (s *session) DescribeTable(
 
 	indexes := make([]options.IndexDescription, len(result.Indexes))
 	for i, idx := range result.GetIndexes() {
+		var typ options.IndexType
+		switch idx.Type.(type) {
+		case *Ydb_Table.TableIndexDescription_GlobalAsyncIndex:
+			typ = options.IndexTypeGlobalAsync
+		case *Ydb_Table.TableIndexDescription_GlobalIndex:
+			typ = options.IndexTypeGlobal
+		}
 		indexes[i] = options.IndexDescription{
 			Name:         idx.GetName(),
 			IndexColumns: idx.GetIndexColumns(),
 			DataColumns:  idx.GetDataColumns(),
 			Status:       idx.GetStatus(),
+			Type:         typ,
 		}
 	}
 

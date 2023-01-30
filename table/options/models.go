@@ -40,6 +40,7 @@ type IndexDescription struct {
 	IndexColumns []string
 	DataColumns  []string
 	Status       Ydb_Table.TableIndexDescription_Status
+	Type         IndexType
 }
 
 //nolint:unused
@@ -270,32 +271,34 @@ func NewPartitioningSettings(ps *Ydb_Table.PartitioningSettings) PartitioningSet
 	}
 }
 
-type IndexType interface {
-	setup(*indexDesc)
-}
+type (
+	IndexType uint8
+)
 
-type globalIndex struct{}
+const (
+	IndexTypeGlobal = IndexType(iota)
+	IndexTypeGlobalAsync
+)
+
+func (t IndexType) ApplyIndexOption(d *indexDesc) {
+	switch t {
+	case IndexTypeGlobal:
+		d.Type = &Ydb_Table.TableIndex_GlobalIndex{
+			GlobalIndex: &Ydb_Table.GlobalIndex{},
+		}
+	case IndexTypeGlobalAsync:
+		d.Type = &Ydb_Table.TableIndex_GlobalAsyncIndex{
+			GlobalAsyncIndex: &Ydb_Table.GlobalAsyncIndex{},
+		}
+	}
+}
 
 func GlobalIndex() IndexType {
-	return globalIndex{}
+	return IndexTypeGlobal
 }
-
-func (globalIndex) setup(d *indexDesc) {
-	d.Type = &Ydb_Table.TableIndex_GlobalIndex{
-		GlobalIndex: new(Ydb_Table.GlobalIndex),
-	}
-}
-
-type globalAsyncIndex struct{}
 
 func GlobalAsyncIndex() IndexType {
-	return globalAsyncIndex{}
-}
-
-func (globalAsyncIndex) setup(d *indexDesc) {
-	d.Type = &Ydb_Table.TableIndex_GlobalAsyncIndex{
-		GlobalAsyncIndex: new(Ydb_Table.GlobalAsyncIndex),
-	}
+	return IndexTypeGlobalAsync
 }
 
 type PartitioningMode byte
