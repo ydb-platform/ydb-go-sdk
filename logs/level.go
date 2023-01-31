@@ -1,18 +1,22 @@
 package logs
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger/level"
 )
 
-type Level log.Level
+type Level level.Level
 
 const (
-	TRACE = Level(log.TRACE)
-	DEBUG = Level(log.DEBUG)
-	INFO  = Level(log.INFO)
-	WARN  = Level(log.WARN)
-	ERROR = Level(log.ERROR)
-	FATAL = Level(log.FATAL)
+	TRACE = Level(level.TRACE)
+	DEBUG = Level(level.DEBUG)
+	INFO  = Level(level.INFO)
+	WARN  = Level(level.WARN)
+	ERROR = Level(level.ERROR)
+	FATAL = Level(level.FATAL)
 
-	QUIET = Level(log.QUIET)
+	QUIET = Level(level.QUIET)
 )
+
+func FromString(l string) Level {
+	return Level(level.FromString(l))
+}

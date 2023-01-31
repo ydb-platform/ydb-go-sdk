@@ -4,12 +4,13 @@ package log
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logs/traces"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 // Topic returns trace.Topic with logging events from details
-func Topic(topicLogger Logger, details trace.Details, opts ...option) trace.Topic {
+func Topic(topicLogger Logger, details trace.Details, opts ...traces.Option) trace.Topic {
 	topicLogger = topicLogger.WithName("ydb").WithName("topic")
 	t := trace.Topic{}
 
