@@ -12,34 +12,29 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 )
 
 type transportError struct {
-	code    grpcCodes.Code
-	message string
+	status  *grpcStatus.Status
 	err     error
-	details []interface{}
 	address string
+}
+
+func (e *transportError) GRPCStatus() *grpcStatus.Status {
+	return e.status
 }
 
 func (e *transportError) isYdbError() {}
 
 func (e *transportError) Code() int32 {
-	return int32(e.code)
+	return int32(e.status.Code())
 }
 
 func (e *transportError) Name() string {
-	return "transport/" + e.code.String()
+	return "transport/" + e.status.Code().String()
 }
 
 type teOpt func(te *transportError)
-
-func WithCode(code grpcCodes.Code) teOpt {
-	return func(te *transportError) {
-		te.code = code
-	}
-}
 
 func WithAddress(address string) teOpt {
 	return func(te *transportError) {
@@ -47,36 +42,14 @@ func WithAddress(address string) teOpt {
 	}
 }
 
-// Transport returns a new transport error with given options
-func Transport(opts ...teOpt) error {
-	te := &transportError{}
-	for _, f := range opts {
-		f(te)
-	}
-	return WithStackTrace(fmt.Errorf("%w", te), WithSkipDepth(1))
-}
-
 func (e *transportError) Error() string {
 	var b bytes.Buffer
-	b.WriteString("transport error: ")
-	b.WriteString(e.code.String())
-	if e.message != "" {
-		b.WriteString(", message: ")
-		b.WriteString(e.message)
-	}
+	b.WriteString(e.Name())
+	b.WriteString(fmt.Sprintf(" (%q", e.err.Error()))
 	if len(e.address) > 0 {
-		b.WriteString(", address: ")
-		b.WriteString(e.address)
+		b.WriteString(fmt.Sprintf(", address: %q", e.address))
 	}
-	if len(e.details) > 0 {
-		b.WriteString(", details: ")
-		if len(e.details) > 0 {
-			b.WriteString(", details:")
-			for _, detail := range e.details {
-				b.WriteString(fmt.Sprintf("\n- %v", detail))
-			}
-		}
-	}
+	b.WriteString(")")
 	return b.String()
 }
 
@@ -104,24 +77,24 @@ func dumpIssues(buf *bytes.Buffer, ms []*Ydb_Issue.IssueMessage) {
 	}
 }
 
-func (e *transportError) OperationStatus() operation.Status {
-	switch e.code {
+func (e *transportError) Type() Type {
+	switch e.status.Code() {
 	case
 		grpcCodes.Aborted,
 		grpcCodes.ResourceExhausted:
-		return operation.NotFinished
+		return TypeRetryable
 	case
 		grpcCodes.Internal,
 		grpcCodes.Canceled,
 		grpcCodes.Unavailable:
-		return operation.Undefined
+		return TypeConditionallyRetryable
 	default:
-		return operation.Finished
+		return TypeUndefined
 	}
 }
 
 func (e *transportError) BackoffType() backoff.Type {
-	switch e.code {
+	switch e.status.Code() {
 	case
 		grpcCodes.Internal,
 		grpcCodes.Canceled,
@@ -135,7 +108,7 @@ func (e *transportError) BackoffType() backoff.Type {
 }
 
 func (e *transportError) MustDeleteSession() bool {
-	switch e.code {
+	switch e.status.Code() {
 	case
 		grpcCodes.ResourceExhausted,
 		grpcCodes.OutOfRange:
@@ -150,24 +123,23 @@ func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 	if err == nil {
 		return false
 	}
-	var t *transportError
-	switch {
-	case errors.As(err, &t):
+	if t := (*transportError)(nil); errors.As(err, &t) {
 		if len(codes) == 0 {
 			return true
 		}
 		for _, code := range codes {
-			if t.code == code {
+			if t.status.Code() == code {
 				return true
 			}
 		}
 		return false
-	default:
-		return false
 	}
+	_, has := grpcStatus.FromError(err)
+	return has
 }
 
-func FromGRPCError(err error, opts ...teOpt) error {
+// Transport returns a new transport error with given options
+func Transport(err error, opts ...teOpt) error {
 	if err == nil {
 		return nil
 	}
@@ -177,13 +149,13 @@ func FromGRPCError(err error, opts ...teOpt) error {
 	}
 	if s, ok := grpcStatus.FromError(err); ok {
 		te := &transportError{
-			code:    s.Code(),
-			message: s.Message(),
-			err:     s.Err(),
-			details: s.Details(),
+			status: s,
+			err:    err,
 		}
 		for _, o := range opts {
-			o(te)
+			if o != nil {
+				o(te)
+			}
 		}
 		return te
 	}

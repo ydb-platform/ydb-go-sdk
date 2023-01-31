@@ -3,6 +3,8 @@ package credentials
 import (
 	"context"
 
+	"google.golang.org/grpc"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 )
 
@@ -32,7 +34,9 @@ func NewAccessTokenCredentials(accessToken string, opts ...option) Credentials {
 		sourceInfo: "credentials.NewAccessTokenCredentials(token)",
 	}
 	for _, o := range opts {
-		o(h)
+		if o != nil {
+			o(h)
+		}
 	}
 	return credentials.NewAccessTokenCredentials(accessToken, h.sourceInfo)
 }
@@ -44,7 +48,14 @@ func NewAnonymousCredentials(opts ...option) Credentials {
 		sourceInfo: "credentials.NewAnonymousCredentials()",
 	}
 	for _, o := range opts {
-		o(h)
+		if o != nil {
+			o(h)
+		}
 	}
 	return credentials.NewAnonymousCredentials(h.sourceInfo)
+}
+
+// NewStaticCredentials makes static credentials object
+func NewStaticCredentials(user, password string, authEndpoint string, opts ...grpc.DialOption) Credentials {
+	return credentials.NewStaticCredentials(user, password, authEndpoint, opts...)
 }

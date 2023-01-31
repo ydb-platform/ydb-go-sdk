@@ -16,6 +16,7 @@ import (
 	internalCoordination "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination"
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
+	internalDiscovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -93,6 +94,10 @@ type connection struct {
 	config  config.Config
 	options []config.Option
 
+	discoveryOnce    initOnce
+	discovery        *internalDiscovery.Client
+	discoveryOptions []discoveryConfig.Option
+
 	tableOnce    initOnce
 	table        *internalTable.Client
 	tableOptions []tableConfig.Option
@@ -104,8 +109,6 @@ type connection struct {
 	schemeOnce    initOnce
 	scheme        *internalScheme.Client
 	schemeOptions []schemeConfig.Option
-
-	discoveryOptions []discoveryConfig.Option
 
 	coordinationOnce    initOnce
 	coordination        *internalCoordination.Client
@@ -247,6 +250,7 @@ func (c *connection) Scheme() scheme.Client {
 				append(
 					// prepend common params from root config
 					[]schemeConfig.Option{
+						schemeConfig.WithDatabaseName(c.Name()),
 						schemeConfig.With(c.config.Common),
 					},
 					c.schemeOptions...,
@@ -300,7 +304,27 @@ func (c *connection) Ratelimiter() ratelimiter.Client {
 }
 
 func (c *connection) Discovery() discovery.Client {
-	return c.balancer.Discovery()
+	c.discoveryOnce.Init(func() closeFunc {
+		c.discovery = internalDiscovery.New(
+			c.pool.Get(endpoint.New(c.config.Endpoint())),
+			discoveryConfig.New(
+				append(
+					// prepend common params from root config
+					[]discoveryConfig.Option{
+						discoveryConfig.With(c.config.Common),
+						discoveryConfig.WithEndpoint(c.Endpoint()),
+						discoveryConfig.WithDatabase(c.Name()),
+						discoveryConfig.WithSecure(c.Secure()),
+						discoveryConfig.WithMeta(c.config.Meta()),
+					},
+					c.discoveryOptions...,
+				)...,
+			),
+		)
+		return c.discovery.Close
+	})
+	// may be nil if driver closed early
+	return c.discovery
 }
 
 func (c *connection) Scripting() scripting.Client {
@@ -387,12 +411,11 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *connectio
 		}
 	}
 	for _, opt := range opts {
-		if opt == nil {
-			continue
-		}
-		err = opt(ctx, c)
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
+		if opt != nil {
+			err = opt(ctx, c)
+			if err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
 		}
 	}
 	c.config = config.New(c.options...)
@@ -428,15 +451,10 @@ func connect(ctx context.Context, c *connection) error {
 		c.config = c.config.With(config.WithCredentials(
 			credentials.NewStaticCredentials(
 				c.userInfo.User, c.userInfo.Password,
-				c.pool.Get(endpoint.New(c.config.Endpoint())),
+				c.config.Endpoint(),
+				c.config.GrpcDialOptions()...,
 			),
 		))
-	}
-
-	if t := c.config.DialTimeout(); t > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, t)
-		defer cancel()
 	}
 
 	c.balancer, err = balancer.New(ctx,

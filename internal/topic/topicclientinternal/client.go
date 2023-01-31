@@ -45,7 +45,9 @@ func New(conn grpc.ClientConnInterface, cred credentials.Credentials, opts ...to
 func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
 	c := topic.Config{}
 	for _, o := range opts {
-		o(&c)
+		if o != nil {
+			o(&c)
+		}
 	}
 	return c
 }
@@ -69,7 +71,9 @@ func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.Al
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
 	for _, o := range opts {
-		o.ApplyAlterOption(&req)
+		if o != nil {
+			o.ApplyAlterOption(&req)
+		}
 	}
 
 	call := func(ctx context.Context) error {
@@ -98,7 +102,9 @@ func (c *Client) Create(
 	req.Path = path
 
 	for _, o := range opts {
-		o.ApplyCreateOption(&req)
+		if o != nil {
+			o.ApplyCreateOption(&req)
+		}
 	}
 
 	call := func(ctx context.Context) error {
@@ -128,7 +134,9 @@ func (c *Client) Describe(
 	}
 
 	for _, o := range opts {
-		o(&req)
+		if o != nil {
+			o(&req)
+		}
 	}
 
 	var rawRes rawtopic.DescribeTopicResult
@@ -165,7 +173,9 @@ func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.Dro
 	req.Path = path
 
 	for _, o := range opts {
-		o.ApplyDropOption(&req)
+		if o != nil {
+			o.ApplyDropOption(&req)
+		}
 	}
 
 	call := func(ctx context.Context) error {
@@ -201,6 +211,7 @@ func (c *Client) StartReader(
 		topicoptions.WithCommonConfig(c.cfg.Common),
 		topicreaderinternal.WithCredentials(c.cred),
 		topicreaderinternal.WithTrace(c.cfg.Trace),
+		topicoptions.WithReaderStartTimeout(topic.DefaultStartTimeout),
 	}
 	opts = append(defaultOpts, opts...)
 

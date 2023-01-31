@@ -260,10 +260,12 @@ func New(opts ...Option) Config {
 	c := defaultConfig()
 
 	for _, o := range opts {
-		o(&c)
+		if o != nil {
+			o(&c)
+		}
 	}
 
-	c.grpcOptions = append(c.grpcOptions, grpcOptions(c.trace, c.secure, c.tlsConfig)...)
+	c.grpcOptions = append(defaultGrpcOptions(c.trace, c.secure, c.tlsConfig), c.grpcOptions...)
 
 	c.meta = meta.New(c.database, c.credentials, c.trace, c.metaOptions...)
 
@@ -273,7 +275,9 @@ func New(opts ...Option) Config {
 // With makes copy of current Config with specified options
 func (c Config) With(opts ...Option) Config {
 	for _, o := range opts {
-		o(&c)
+		if o != nil {
+			o(&c)
+		}
 	}
 	c.meta = meta.New(
 		c.database,

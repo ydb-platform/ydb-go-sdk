@@ -31,6 +31,8 @@ const (
 	EntryBlockStoreVolume
 	EntryCoordinationNode
 	EntryTopic
+	EntryColumnStore
+	EntryColumnTable
 )
 
 func (t EntryType) String() string {
@@ -53,6 +55,10 @@ func (t EntryType) String() string {
 		return "CoordinationNode"
 	case EntryTopic:
 		return "Topic"
+	case EntryColumnStore:
+		return "ColumnStore"
+	case EntryColumnTable:
+		return "ColumnTable"
 	}
 }
 
@@ -124,6 +130,10 @@ func entryType(t Ydb_Scheme.Entry_Type) EntryType {
 		return EntryCoordinationNode
 	case Ydb_Scheme.Entry_TOPIC:
 		return EntryTopic
+	case Ydb_Scheme.Entry_COLUMN_STORE:
+		return EntryColumnStore
+	case Ydb_Scheme.Entry_COLUMN_TABLE:
+		return EntryColumnTable
 	default:
 		return EntryTypeUnknown
 	}

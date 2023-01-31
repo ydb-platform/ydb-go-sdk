@@ -233,9 +233,9 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 		<-stream1Ready
 
 		// skip bad (old) stream
-		reconnector.reconnectFromBadStream <- NewMockbatchedStreamReader(mc)
+		reconnector.reconnectFromBadStream <- newReconnectRequest(NewMockbatchedStreamReader(mc), nil)
 
-		reconnector.reconnectFromBadStream <- newStream1
+		reconnector.reconnectFromBadStream <- newReconnectRequest(newStream1, nil)
 
 		<-stream2Ready
 
@@ -244,7 +244,7 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 			return reconnector.streamVal == newStream2
 		})
 
-		require.NoError(t, reconnector.CloseWithError(ctx, ErrReaderClosed))
+		require.NoError(t, reconnector.CloseWithError(ctx, errReaderClosed))
 	})
 
 	t.Run("StartWithCancelledContext", func(t *testing.T) {
@@ -311,9 +311,11 @@ func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {
 			// OK
 		}
 
-		reconnector.fireReconnectOnRetryableError(stream, xerrors.Retryable(errors.New("test")))
+		testErr := errors.New("test")
+		reconnector.fireReconnectOnRetryableError(stream, xerrors.Retryable(testErr))
 		res := <-reconnector.reconnectFromBadStream
-		require.Equal(t, stream, res)
+		require.Equal(t, stream, res.oldReader)
+		require.ErrorIs(t, res.reason, testErr)
 	})
 
 	t.Run("SkipWriteOnFullChannel", func(t *testing.T) {
@@ -327,7 +329,7 @@ func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {
 	fillChannel:
 		for {
 			select {
-			case reconnector.reconnectFromBadStream <- nil:
+			case reconnector.reconnectFromBadStream <- newReconnectRequest(nil, nil):
 				// repeat
 			default:
 				break fillChannel
@@ -337,7 +339,7 @@ func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {
 		// write skipped
 		reconnector.fireReconnectOnRetryableError(stream, xerrors.Retryable(errors.New("test")))
 		res := <-reconnector.reconnectFromBadStream
-		require.Nil(t, res)
+		require.Nil(t, res.oldReader)
 	})
 }
 

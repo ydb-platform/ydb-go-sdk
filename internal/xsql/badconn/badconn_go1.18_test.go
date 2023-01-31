@@ -14,7 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -24,69 +24,38 @@ var errsToCheck = []error{
 	fmt.Errorf("unknown error"),
 	context.DeadlineExceeded,
 	context.Canceled,
-	//nolint:staticcheck // ignore SA1019
-	xerrors.FromGRPCError(grpc.ErrClientConnClosing),
-	xerrors.Transport(),
 	xerrors.Transport(
-		xerrors.WithCode(grpcCodes.Canceled),
+		//nolint:staticcheck
+		// ignore SA1019
+		//nolint:nolintlint
+		grpc.ErrClientConnClosing,
 	),
-	xerrors.Transport(
-		xerrors.WithCode(grpcCodes.Unknown),
-	),
-	xerrors.Transport(
-		xerrors.WithCode(grpcCodes.InvalidArgument),
-	),
-	xerrors.Transport(
-		xerrors.WithCode(grpcCodes.DeadlineExceeded),
-	),
-	xerrors.Transport(
-		xerrors.WithCode(grpcCodes.NotFound),
-	),
-	xerrors.Transport(
-		xerrors.WithCode(grpcCodes.AlreadyExists),
-	),
-	xerrors.Transport(
-		xerrors.WithCode(grpcCodes.PermissionDenied),
-	),
-	xerrors.Transport(
-		xerrors.WithCode(grpcCodes.ResourceExhausted),
-	),
-	xerrors.Transport(
-		xerrors.WithCode(grpcCodes.FailedPrecondition),
-	),
-	xerrors.Transport(
-		xerrors.WithCode(grpcCodes.Aborted),
-	),
-	xerrors.Transport(
-		xerrors.WithCode(grpcCodes.OutOfRange),
-	),
-	xerrors.Transport(
-		xerrors.WithCode(grpcCodes.Unimplemented),
-	),
-	xerrors.Transport(
-		xerrors.WithCode(grpcCodes.Internal),
-	),
-	xerrors.Transport(
-		xerrors.WithCode(grpcCodes.Unavailable),
-	),
+	xerrors.Transport(grpcStatus.Error(grpcCodes.Canceled, "")),
+	xerrors.Transport(grpcStatus.Error(grpcCodes.Unknown, "")),
+	xerrors.Transport(grpcStatus.Error(grpcCodes.InvalidArgument, "")),
+	xerrors.Transport(grpcStatus.Error(grpcCodes.DeadlineExceeded, "")),
+	xerrors.Transport(grpcStatus.Error(grpcCodes.NotFound, "")),
+	xerrors.Transport(grpcStatus.Error(grpcCodes.AlreadyExists, "")),
+	xerrors.Transport(grpcStatus.Error(grpcCodes.PermissionDenied, "")),
+	xerrors.Transport(grpcStatus.Error(grpcCodes.ResourceExhausted, "")),
+	xerrors.Transport(grpcStatus.Error(grpcCodes.FailedPrecondition, "")),
+	xerrors.Transport(grpcStatus.Error(grpcCodes.Aborted, "")),
+	xerrors.Transport(grpcStatus.Error(grpcCodes.OutOfRange, "")),
+	xerrors.Transport(grpcStatus.Error(grpcCodes.Unimplemented, "")),
+	xerrors.Transport(grpcStatus.Error(grpcCodes.Internal, "")),
+	xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "")),
 	xerrors.Retryable(
-		xerrors.Transport(
-			xerrors.WithCode(grpcCodes.Unavailable),
-		),
+		xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "")),
 		xerrors.WithBackoff(backoff.TypeFast),
 		xerrors.WithDeleteSession(),
 	),
 	xerrors.Retryable(
-		status.Error(grpcCodes.Unavailable, ""),
+		grpcStatus.Error(grpcCodes.Unavailable, ""),
 		xerrors.WithBackoff(backoff.TypeFast),
 		xerrors.WithDeleteSession(),
 	),
-	xerrors.Transport(
-		xerrors.WithCode(grpcCodes.DataLoss),
-	),
-	xerrors.Transport(
-		xerrors.WithCode(grpcCodes.Unauthenticated),
-	),
+	xerrors.Transport(grpcStatus.Error(grpcCodes.DataLoss, "")),
+	xerrors.Transport(grpcStatus.Error(grpcCodes.Unauthenticated, "")),
 	xerrors.Operation(
 		xerrors.WithStatusCode(Ydb.StatusIds_STATUS_CODE_UNSPECIFIED),
 	),

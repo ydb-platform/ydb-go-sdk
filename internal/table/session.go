@@ -15,7 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
@@ -51,9 +50,14 @@ type session struct {
 	status    table.SessionStatus
 	statusMtx sync.RWMutex
 	nodeID    uint32
+	lastUsage int64
 
 	onClose   []func(s *session)
 	closeOnce sync.Once
+}
+
+func (s *session) LastUsage() time.Time {
+	return time.Unix(atomic.LoadInt64(&s.lastUsage), 0)
 }
 
 func nodeID(sessionID string) (uint32, error) {
@@ -132,27 +136,33 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	err = proto.Unmarshal(
-		response.GetOperation().GetResult().GetValue(),
-		&result,
-	)
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
 	s = &session{
-		id: result.GetSessionId(),
-		tableService: Ydb_Table_V1.NewTableServiceClient(
+		id:        result.GetSessionId(),
+		config:    config,
+		status:    table.SessionReady,
+		lastUsage: time.Now().Unix(),
+	}
+
+	s.tableService = Ydb_Table_V1.NewTableServiceClient(
+		conn.WithBeforeFunc(
 			conn.WithContextModifier(cc, func(ctx context.Context) context.Context {
 				return meta.WithTrailerCallback(balancer.WithEndpoint(ctx, s), s.checkCloseHint)
 			}),
+			func() {
+				atomic.StoreInt64(&s.lastUsage, time.Now().Unix())
+			},
 		),
-		config: config,
-		status: table.SessionReady,
-	}
+	)
 
 	for _, o := range opts {
-		o(s)
+		if o != nil {
+			o(s)
+		}
 	}
 
 	return s, nil
@@ -177,17 +187,18 @@ func (s *session) Close(ctx context.Context) (err error) {
 
 		onDone := trace.TableOnSessionDelete(s.config.Trace(), &ctx, s)
 
-		_, err = s.tableService.DeleteSession(
-			ctx,
-			&Ydb_Table.DeleteSessionRequest{
-				SessionId: s.id,
-				OperationParams: operation.Params(ctx,
-					s.config.OperationTimeout(),
-					s.config.OperationCancelAfter(),
-					operation.ModeSync,
-				),
-			},
-		)
+		if time.Since(s.LastUsage()) < s.config.IdleThreshold() {
+			_, err = s.tableService.DeleteSession(ctx,
+				&Ydb_Table.DeleteSessionRequest{
+					SessionId: s.id,
+					OperationParams: operation.Params(ctx,
+						s.config.OperationTimeout(),
+						s.config.OperationCancelAfter(),
+						operation.ModeSync,
+					),
+				},
+			)
+		}
 
 		for _, onClose := range s.onClose {
 			onClose(s)
@@ -244,10 +255,7 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 	if err != nil {
 		return
 	}
-	err = proto.Unmarshal(
-		resp.GetOperation().GetResult().GetValue(),
-		&result,
-	)
+	err = resp.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return
 	}
@@ -281,10 +289,15 @@ func (s *session) CreateTable(
 	)
 	defer a.Free()
 	for _, opt := range opts {
-		opt.ApplyCreateTableOption((*options.CreateTableDesc)(&request), a)
+		if opt != nil {
+			opt.ApplyCreateTableOption((*options.CreateTableDesc)(&request), a)
+		}
 	}
 	_, err = s.tableService.CreateTable(ctx, &request)
-	return xerrors.WithStackTrace(err)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+	return nil
 }
 
 // DescribeTable describes table at given path.
@@ -308,16 +321,15 @@ func (s *session) DescribeTable(
 		),
 	}
 	for _, opt := range opts {
-		opt((*options.DescribeTableDesc)(&request))
+		if opt != nil {
+			opt((*options.DescribeTableDesc)(&request))
+		}
 	}
 	response, err = s.tableService.DescribeTable(ctx, &request)
 	if err != nil {
 		return desc, xerrors.WithStackTrace(err)
 	}
-	err = proto.Unmarshal(
-		response.GetOperation().GetResult().GetValue(),
-		&result,
-	)
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return desc, xerrors.WithStackTrace(err)
 	}
@@ -401,10 +413,19 @@ func (s *session) DescribeTable(
 
 	indexes := make([]options.IndexDescription, len(result.Indexes))
 	for i, idx := range result.GetIndexes() {
+		var typ options.IndexType
+		switch idx.Type.(type) {
+		case *Ydb_Table.TableIndexDescription_GlobalAsyncIndex:
+			typ = options.IndexTypeGlobalAsync
+		case *Ydb_Table.TableIndexDescription_GlobalIndex:
+			typ = options.IndexTypeGlobal
+		}
 		indexes[i] = options.IndexDescription{
 			Name:         idx.GetName(),
 			IndexColumns: idx.GetIndexColumns(),
+			DataColumns:  idx.GetDataColumns(),
 			Status:       idx.GetStatus(),
+			Type:         typ,
 		}
 	}
 
@@ -448,7 +469,9 @@ func (s *session) DropTable(
 		),
 	}
 	for _, opt := range opts {
-		opt.ApplyDropTableOption((*options.DropTableDesc)(&request))
+		if opt != nil {
+			opt.ApplyDropTableOption((*options.DropTableDesc)(&request))
+		}
 	}
 	_, err = s.tableService.DropTable(ctx, &request)
 	return xerrors.WithStackTrace(err)
@@ -484,7 +507,9 @@ func (s *session) AlterTable(
 	)
 	defer a.Free()
 	for _, opt := range opts {
-		opt.ApplyAlterTableOption((*options.AlterTableDesc)(&request), a)
+		if opt != nil {
+			opt.ApplyAlterTableOption((*options.AlterTableDesc)(&request), a)
+		}
 	}
 	_, err = s.tableService.AlterTable(ctx, &request)
 	return xerrors.WithStackTrace(err)
@@ -508,7 +533,9 @@ func (s *session) CopyTable(
 		),
 	}
 	for _, opt := range opts {
-		opt((*options.CopyTableDesc)(&request))
+		if opt != nil {
+			opt((*options.CopyTableDesc)(&request))
+		}
 	}
 	_, err = s.tableService.CopyTable(ctx, &request)
 	return xerrors.WithStackTrace(err)
@@ -556,10 +583,7 @@ func (s *session) Explain(
 	if err != nil {
 		return
 	}
-	err = proto.Unmarshal(
-		response.GetOperation().GetResult().GetValue(),
-		&result,
-	)
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return
 	}
@@ -572,26 +596,30 @@ func (s *session) Explain(
 }
 
 // Prepare prepares data query within session s.
-func (s *session) Prepare(ctx context.Context, query string) (stmt table.Statement, err error) {
+func (s *session) Prepare(ctx context.Context, queryText string) (_ table.Statement, err error) {
 	var (
-		q        *dataQuery
+		stmt     *statement
 		response *Ydb_Table.PrepareDataQueryResponse
 		result   Ydb_Table.PrepareQueryResult
 		onDone   = trace.TableOnSessionQueryPrepare(
 			s.config.Trace(),
 			&ctx,
 			s,
-			query,
+			queryText,
 		)
 	)
 	defer func() {
-		onDone(q, err)
+		if err != nil {
+			onDone(nil, err)
+		} else {
+			onDone(stmt.query, nil)
+		}
 	}()
 
 	response, err = s.tableService.PrepareDataQuery(ctx,
 		&Ydb_Table.PrepareDataQueryRequest{
 			SessionId: s.id,
-			YqlText:   query,
+			YqlText:   queryText,
 			OperationParams: operation.Params(
 				ctx,
 				s.config.OperationTimeout(),
@@ -603,19 +631,15 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 	if err != nil {
 		return
 	}
-	err = proto.Unmarshal(
-		response.GetOperation().GetResult().GetValue(),
-		&result,
-	)
+
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return
 	}
 
-	q = new(dataQuery)
-	q.initPrepared(result.QueryId)
 	stmt = &statement{
 		session: s,
-		query:   q,
+		query:   queryPrepared(result.GetQueryId(), queryText),
 		params:  result.ParametersTypes,
 	}
 
@@ -625,23 +649,36 @@ func (s *session) Prepare(ctx context.Context, query string) (stmt table.Stateme
 // Execute executes given data query represented by text.
 func (s *session) Execute(
 	ctx context.Context,
-	tx *table.TransactionControl,
+	txControl *table.TransactionControl,
 	query string,
 	params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
 	txr table.Transaction, r result.Result, err error,
 ) {
-	q := new(dataQuery)
-	q.initFromText(query)
+	var (
+		a       = allocator.New()
+		q       = queryFromText(query)
+		request = a.TableExecuteDataQueryRequest()
+	)
+	defer a.Free()
 
-	if params == nil {
-		params = table.NewQueryParameters()
-	}
+	request.SessionId = s.id
+	request.TxControl = txControl.Desc()
+	request.Parameters = params.Params().ToYDB(a)
+	request.Query = q.toYDB(a)
+	request.QueryCachePolicy = a.TableQueryCachePolicy()
+	request.QueryCachePolicy.KeepInCache = len(params.Params()) > 0
+	request.OperationParams = operation.Params(ctx,
+		s.config.OperationTimeout(),
+		s.config.OperationCancelAfter(),
+		operation.ModeSync,
+	)
 
-	var optsResult options.ExecuteDataQueryDesc
-	for _, f := range opts {
-		f(&optsResult)
+	for _, opt := range opts {
+		if opt != nil {
+			opt((*options.ExecuteDataQueryDesc)(request), a)
+		}
 	}
 
 	onDone := trace.TableOnSessionQueryExecute(
@@ -650,93 +687,67 @@ func (s *session) Execute(
 		s,
 		q,
 		params,
-		optsResult.QueryCachePolicy.GetKeepInCache(),
+		request.QueryCachePolicy.GetKeepInCache(),
 	)
 	defer func() {
 		onDone(txr, false, r, err)
 	}()
 
-	request, result, err := s.executeDataQuery(ctx, tx, q, params, opts...)
+	result, err := s.executeDataQuery(ctx, a, request)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
-	if keepInCache(request) && result.QueryMeta != nil {
-		queryID := result.QueryMeta.Id
-		// Supplement q with ID for tracing.
-		q.initPreparedText(query, queryID)
-		// Create new dataQuery instead of q above to not store the whole query
-		// string within statement.
-		subq := new(dataQuery)
-		subq.initPrepared(queryID)
-	}
 
-	return s.executeQueryResult(result)
+	return s.executeQueryResult(result, request.TxControl)
 }
 
 // executeQueryResult returns Transaction and result built from received
 // result.
-func (s *session) executeQueryResult(res *Ydb_Table.ExecuteQueryResult) (
-	table.Transaction,
-	result.Result,
-	error,
+func (s *session) executeQueryResult(
+	res *Ydb_Table.ExecuteQueryResult, txControl *Ydb_Table.TransactionControl,
+) (
+	table.Transaction, result.Result, error,
 ) {
-	t := &transaction{
+	tx := &transaction{
 		id: res.GetTxMeta().GetId(),
 		s:  s,
 	}
-	r := scanner.NewUnary(
+	if txControl.CommitTx {
+		tx.state = txStateCommitted
+	} else {
+		tx.state = txStateInitialized
+		tx.control = table.TxControl(table.WithTxID(tx.id))
+	}
+	return tx, scanner.NewUnary(
 		res.GetResultSets(),
 		res.GetQueryStats(),
 		scanner.WithIgnoreTruncated(s.config.IgnoreTruncated()),
-	)
-	return t, r, nil
+	), nil
 }
 
 // executeDataQuery executes data query.
 func (s *session) executeDataQuery(
-	ctx context.Context, tx *table.TransactionControl,
-	query *dataQuery, params *table.QueryParameters,
-	opts ...options.ExecuteDataQueryOption,
+	ctx context.Context, a *allocator.Allocator, request *Ydb_Table.ExecuteDataQueryRequest,
 ) (
-	_ *Ydb_Table.ExecuteDataQueryRequest,
 	_ *Ydb_Table.ExecuteQueryResult,
 	err error,
 ) {
 	var (
-		a       = allocator.New()
-		result  = &Ydb_Table.ExecuteQueryResult{}
-		request = &Ydb_Table.ExecuteDataQueryRequest{
-			SessionId:  s.id,
-			TxControl:  tx.Desc(),
-			Parameters: params.Params().ToYDB(a),
-			Query:      &query.query,
-			QueryCachePolicy: &Ydb_Table.QueryCachePolicy{
-				KeepInCache: len(params.Params()) > 0,
-			},
-			OperationParams: operation.Params(
-				ctx,
-				s.config.OperationTimeout(),
-				s.config.OperationCancelAfter(),
-				operation.ModeSync,
-			),
-		}
+		result   = a.TableExecuteQueryResult()
+		response *Ydb_Table.ExecuteDataQueryResponse
 	)
-	defer a.Free()
 
-	for _, opt := range opts {
-		opt((*options.ExecuteDataQueryDesc)(request))
-	}
-
-	var response *Ydb_Table.ExecuteDataQueryResponse
 	response, err = s.tableService.ExecuteDataQuery(ctx, request)
 	if err != nil {
-		return nil, nil, xerrors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
-	err = proto.Unmarshal(
-		response.GetOperation().GetResult().GetValue(),
-		result,
-	)
-	return request, result, xerrors.WithStackTrace(err)
+
+	err = response.GetOperation().GetResult().UnmarshalTo(result)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return result, nil
 }
 
 // ExecuteSchemeQuery executes scheme query.
@@ -756,7 +767,9 @@ func (s *session) ExecuteSchemeQuery(
 		),
 	}
 	for _, opt := range opts {
-		opt((*options.ExecuteSchemeQueryDesc)(&request))
+		if opt != nil {
+			opt((*options.ExecuteSchemeQueryDesc)(&request))
+		}
 	}
 	_, err = s.tableService.ExecuteSchemeQuery(ctx, &request)
 	return xerrors.WithStackTrace(err)
@@ -783,13 +796,12 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 	if err != nil {
 		return
 	}
-	err = proto.Unmarshal(
-		response.GetOperation().GetResult().GetValue(),
-		&result,
-	)
+
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return
 	}
+
 	{
 		xs := make([]options.TableProfileDescription, len(result.GetTableProfilePresets()))
 		for i, p := range result.GetTableProfilePresets() {
@@ -922,7 +934,9 @@ func (s *session) StreamReadTable(
 	}()
 
 	for _, opt := range opts {
-		opt((*options.ReadTableDesc)(&request), a)
+		if opt != nil {
+			opt((*options.ReadTableDesc)(&request), a)
+		}
 	}
 
 	ctx, cancel := xcontext.WithErrCancel(ctx)
@@ -980,9 +994,9 @@ func (s *session) StreamExecuteScanQuery(
 	params *table.QueryParameters,
 	opts ...options.ExecuteScanQueryOption,
 ) (_ result.StreamResult, err error) {
-	q := new(dataQuery)
-	q.initFromText(query)
 	var (
+		a              = allocator.New()
+		q              = queryFromText(query)
 		onIntermediate = trace.TableOnSessionQueryStreamExecute(
 			s.config.Trace(),
 			&ctx,
@@ -990,9 +1004,8 @@ func (s *session) StreamExecuteScanQuery(
 			q,
 			params,
 		)
-		a       = allocator.New()
 		request = Ydb_Table.ExecuteScanQueryRequest{
-			Query:      &q.query,
+			Query:      q.toYDB(a),
 			Parameters: params.Params().ToYDB(a),
 			Mode:       Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC, // set default
 		}
@@ -1006,7 +1019,9 @@ func (s *session) StreamExecuteScanQuery(
 	}()
 
 	for _, opt := range opts {
-		opt((*options.ExecuteScanQueryDesc)(&request))
+		if opt != nil {
+			opt((*options.ExecuteScanQueryDesc)(&request))
+		}
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -1073,7 +1088,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 // settings.
 func (s *session) BeginTransaction(
 	ctx context.Context,
-	tx *table.TransactionSettings,
+	txSettings *table.TransactionSettings,
 ) (x table.Transaction, err error) {
 	var (
 		result   Ydb_Table.BeginTransactionResult
@@ -1091,7 +1106,7 @@ func (s *session) BeginTransaction(
 	response, err = s.tableService.BeginTransaction(ctx,
 		&Ydb_Table.BeginTransactionRequest{
 			SessionId:  s.id,
-			TxSettings: tx.Settings(),
+			TxSettings: txSettings.Settings(),
 			OperationParams: operation.Params(
 				ctx,
 				s.config.OperationTimeout(),
@@ -1103,15 +1118,14 @@ func (s *session) BeginTransaction(
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	err = proto.Unmarshal(
-		response.GetOperation().GetResult().GetValue(),
-		&result,
-	)
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return
 	}
 	return &transaction{
-		id: result.GetTxMeta().GetId(),
-		s:  s,
+		id:      result.GetTxMeta().GetId(),
+		state:   txStateInitialized,
+		s:       s,
+		control: table.TxControl(table.WithTxID(result.GetTxMeta().GetId())),
 	}, nil
 }

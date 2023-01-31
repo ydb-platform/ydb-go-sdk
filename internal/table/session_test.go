@@ -352,7 +352,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 											}, nil
 										},
 										testutil.TableExplainDataQuery: func(request interface{}) (result proto.Message, err error) {
-											return &Ydb_Table.ExecuteQueryResult{}, nil
+											return &Ydb_Table.ExplainQueryResult{}, nil
 										},
 										testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.PrepareQueryResult{}, nil
@@ -366,7 +366,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 											return &Ydb_Table.DeleteSessionResponse{}, nil
 										},
 										testutil.TableCommitTransaction: func(request interface{}) (result proto.Message, err error) {
-											return &Ydb_Table.CommitTransactionResponse{}, nil
+											return &Ydb_Table.CommitTransactionResult{}, nil
 										},
 										testutil.TableRollbackTransaction: func(request interface{}) (result proto.Message, err error) {
 											return &Ydb_Table.RollbackTransactionResponse{}, nil

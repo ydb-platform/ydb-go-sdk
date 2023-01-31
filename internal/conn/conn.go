@@ -200,11 +200,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	// three slashes in "ydb:///" is ok. It needs for good parse scheme in grpc resolver.
 	address := "ydb:///" + c.endpoint.Address()
 
-	cc, err = grpc.DialContext(
-		ctx,
-		address,
-		c.grpcDialOptions...,
-	)
+	cc, err = grpc.DialContext(ctx, address, c.grpcDialOptions...)
 	if err != nil {
 		err = xerrors.WithStackTrace(
 			xerrors.Retryable(
@@ -297,10 +293,10 @@ func (c *conn) Invoke(
 	opts ...grpc.CallOption,
 ) (err error) {
 	var (
-		opID     string
-		issues   []trace.Issue
-		wrapping = needWrapping(ctx)
-		onDone   = trace.DriverOnConnInvoke(
+		opID        string
+		issues      []trace.Issue
+		useWrapping = UseWrapping(ctx)
+		onDone      = trace.DriverOnConnInvoke(
 			c.config.Trace(),
 			&ctx,
 			c.endpoint,
@@ -330,8 +326,8 @@ func (c *conn) Invoke(
 
 	err = cc.Invoke(ctx, method, req, res, append(opts, grpc.Trailer(&md))...)
 	if err != nil {
-		if wrapping {
-			err = xerrors.FromGRPCError(err,
+		if useWrapping {
+			err = xerrors.Transport(err,
 				xerrors.WithAddress(c.Address()),
 			)
 			if sentMark.canRetry() {
@@ -353,7 +349,7 @@ func (c *conn) Invoke(
 		for _, issue := range o.GetOperation().GetIssues() {
 			issues = append(issues, issue)
 		}
-		if wrapping {
+		if useWrapping {
 			switch {
 			case !o.GetOperation().GetReady():
 				return xerrors.WithStackTrace(errOperationNotReady)
@@ -386,9 +382,9 @@ func (c *conn) NewStream(
 			c.endpoint.Copy(),
 			trace.Method(method),
 		)
-		wrapping = needWrapping(ctx)
-		cc       *grpc.ClientConn
-		s        grpc.ClientStream
+		useWrapping = UseWrapping(ctx)
+		cc          *grpc.ClientConn
+		s           grpc.ClientStream
 	)
 
 	defer func() {
@@ -418,9 +414,9 @@ func (c *conn) NewStream(
 
 	s, err = cc.NewStream(ctx, desc, method, opts...)
 	if err != nil {
-		if wrapping {
+		if useWrapping {
 			err = xerrors.Retryable(
-				xerrors.FromGRPCError(err,
+				xerrors.Transport(err,
 					xerrors.WithAddress(c.Address()),
 				),
 				xerrors.WithName("NewStream"),
@@ -436,7 +432,7 @@ func (c *conn) NewStream(
 	return &grpcClientStream{
 		ClientStream: s,
 		c:            c,
-		wrapping:     wrapping,
+		wrapping:     useWrapping,
 		sentMark:     sentMark,
 		onDone: func(ctx context.Context, md metadata.MD) {
 			cancel()
@@ -481,7 +477,9 @@ func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 		done:            make(chan struct{}),
 	}
 	for _, o := range opts {
-		o(c)
+		if o != nil {
+			o(c)
+		}
 	}
 
 	return c

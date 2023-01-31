@@ -15,7 +15,9 @@ func WithLogQuery() Option {
 func ParseOptions(opts ...Option) LogOptions {
 	options := LogOptions{}
 	for _, o := range opts {
-		o(&options)
+		if o != nil {
+			o(&options)
+		}
 	}
 	return options
 }

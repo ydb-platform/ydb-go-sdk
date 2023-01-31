@@ -46,7 +46,7 @@ data2 := []byte{4, 5, 6}
 mess1 := topicwriter.Message{Data: bytes.NewReader(data1)}
 mess2 := topicwriter.Message{Data: bytes.NewReader(data2)}
 
-err = w.Write(ctx, mess1, mess2)
+err = writer.Write(ctx, mess1, mess2)
 if err != nil {
 	log.Fatal(err)
 }

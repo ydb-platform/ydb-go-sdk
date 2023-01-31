@@ -30,7 +30,9 @@ func RetryableError(err error, opts ...retryableErrorOption) error {
 		err,
 		func() (retryableErrorOptions []xerrors.RetryableErrorOption) {
 			for _, o := range opts {
-				retryableErrorOptions = append(retryableErrorOptions, xerrors.RetryableErrorOption(o))
+				if o != nil {
+					retryableErrorOptions = append(retryableErrorOptions, xerrors.RetryableErrorOption(o))
+				}
 			}
 			return retryableErrorOptions
 		}()...,

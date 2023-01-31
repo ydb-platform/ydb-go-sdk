@@ -7,7 +7,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scheme_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
@@ -20,11 +19,19 @@ import (
 //nolint:nolintlint
 var (
 	errNilClient = xerrors.Wrap(errors.New("scheme client is not initialized"))
+
+	_ interface {
+		Database() string
+	} = (*Client)(nil)
 )
 
 type Client struct {
 	config  config.Config
 	service Ydb_Scheme_V1.SchemeServiceClient
+}
+
+func (c *Client) Database() string {
+	return c.config.Database()
 }
 
 func (c *Client) Close(_ context.Context) error {
@@ -137,7 +144,7 @@ func (c *Client) listDirectory(ctx context.Context, path string) (scheme.Directo
 	if err != nil {
 		return d, xerrors.WithStackTrace(err)
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return d, xerrors.WithStackTrace(err)
 	}
@@ -189,7 +196,7 @@ func (c *Client) describePath(ctx context.Context, path string) (e scheme.Entry,
 	if err != nil {
 		return e, xerrors.WithStackTrace(err)
 	}
-	err = proto.Unmarshal(response.GetOperation().GetResult().GetValue(), &result)
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return e, xerrors.WithStackTrace(err)
 	}
@@ -213,7 +220,9 @@ func (c *Client) ModifyPermissions(ctx context.Context, path string, opts ...sch
 func (c *Client) modifyPermissions(ctx context.Context, path string, opts ...scheme.PermissionsOption) (err error) {
 	var desc permissionsDesc
 	for _, o := range opts {
-		o(&desc)
+		if o != nil {
+			o(&desc)
+		}
 	}
 	_, err = c.service.ModifyPermissions(
 		ctx,

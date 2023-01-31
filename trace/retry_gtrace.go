@@ -25,7 +25,9 @@ func WithRetryPanicCallback(cb func(e interface{})) RetryComposeOption {
 func (t Retry) Compose(x Retry, opts ...RetryComposeOption) (ret Retry) {
 	options := retryComposeOptions{}
 	for _, opt := range opts {
-		opt(&options)
+		if opt != nil {
+			opt(&options)
+		}
 	}
 	{
 		h1 := t.OnRetry

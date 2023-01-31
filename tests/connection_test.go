@@ -1,7 +1,7 @@
 //go:build !fast
 // +build !fast
 
-package ydb_test
+package tests
 
 import (
 	"context"

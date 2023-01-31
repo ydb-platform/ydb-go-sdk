@@ -1,47 +1,69 @@
 package table
 
-import "github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+import (
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
-type dataQuery struct {
-	query    Ydb_Table.Query
-	queryID  Ydb_Table.Query_Id
-	queryYQL Ydb_Table.Query_YqlText
-}
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+)
 
-func (q *dataQuery) String() string {
-	var emptyID Ydb_Table.Query_Id
-	if q.queryID == emptyID {
-		return q.queryYQL.YqlText
+type (
+	query interface {
+		String() string
+		ID() string
+		YQL() string
+
+		toYDB(a *allocator.Allocator) *Ydb_Table.Query
 	}
-	return q.queryID.Id
+	textDataQuery     string
+	preparedDataQuery struct {
+		id    string
+		query string
+	}
+)
+
+func (q textDataQuery) String() string {
+	return string(q)
 }
 
-func (q *dataQuery) ID() string {
-	return q.queryID.Id
+func (q textDataQuery) ID() string {
+	return ""
 }
 
-func (q *dataQuery) YQL() string {
-	return q.queryYQL.YqlText
+func (q textDataQuery) YQL() string {
+	return string(q)
 }
 
-func (q *dataQuery) initFromText(s string) {
-	q.queryID = Ydb_Table.Query_Id{} // Reset id field.
-	q.queryYQL.YqlText = s
-	q.query.Query = &q.queryYQL
+func (q textDataQuery) toYDB(a *allocator.Allocator) *Ydb_Table.Query {
+	query := a.TableQuery()
+	query.Query = a.TableQueryYqlText(string(q))
+	return query
 }
 
-func (q *dataQuery) initPrepared(id string) {
-	q.queryYQL = Ydb_Table.Query_YqlText{} // Reset yql field.
-	q.queryID.Id = id
-	q.query.Query = &q.queryID
+func (q preparedDataQuery) String() string {
+	return q.query
 }
 
-func (q *dataQuery) initPreparedText(s, id string) {
-	q.queryYQL = Ydb_Table.Query_YqlText{} // Reset yql field.
-	q.queryYQL.YqlText = s
+func (q preparedDataQuery) ID() string {
+	return q.id
+}
 
-	q.queryID = Ydb_Table.Query_Id{} // Reset id field.
-	q.queryID.Id = id
+func (q preparedDataQuery) YQL() string {
+	return q.query
+}
 
-	q.query.Query = &q.queryID // Prefer preared query.
+func (q preparedDataQuery) toYDB(a *allocator.Allocator) *Ydb_Table.Query {
+	query := a.TableQuery()
+	query.Query = a.TableQueryID(q.id)
+	return query
+}
+
+func queryFromText(s string) query {
+	return textDataQuery(s)
+}
+
+func queryPrepared(id string, query string) query {
+	return preparedDataQuery{
+		id:    id,
+		query: query,
+	}
 }

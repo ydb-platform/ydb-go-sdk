@@ -229,7 +229,9 @@ func StructFieldValue(name string, v Value) StructValueOption {
 func StructValue(opts ...StructValueOption) Value {
 	var p structValueFields
 	for _, opt := range opts {
-		opt(&p)
+		if opt != nil {
+			opt(&p)
+		}
 	}
 	return value.StructValue(p.fields...)
 }
@@ -249,7 +251,9 @@ func DictFieldValue(k, v Value) DictValueOption {
 func DictValue(opts ...DictValueOption) Value {
 	var p dictValueFields
 	for _, opt := range opts {
-		opt(&p)
+		if opt != nil {
+			opt(&p)
+		}
 	}
 	return value.DictValue(p.fields...)
 }

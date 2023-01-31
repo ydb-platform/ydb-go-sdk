@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
@@ -74,10 +75,9 @@ func Example_createTable() {
 				options.WithColumn("expire_at", types.Optional(types.TypeDate)),
 				options.WithColumn("comment", types.Optional(types.TypeText)),
 				options.WithPrimaryKeyColumn("series_id"),
-				options.WithTimeToLiveSettings(options.TimeToLiveSettings{
-					ColumnName:         "expire_at",
-					ExpireAfterSeconds: uint32(time.Hour.Seconds()),
-				}),
+				options.WithTimeToLiveSettings(
+					options.NewTTLSettings().ColumnDateType("expire_at").ExpireAfter(time.Hour),
+				),
 				options.WithIndex("idx_series_title",
 					options.WithIndexColumns("title"),
 					options.WithIndexType(options.GlobalAsyncIndex()),
@@ -162,16 +162,87 @@ func Example_alterTable() {
 				options.WithSetTimeToLiveSettings(
 					options.NewTTLSettings().ColumnDateType("expire_at").ExpireAfter(time.Hour),
 				),
+				options.WithDropTimeToLive(),
 				options.WithAddIndex("idx_series_series_id",
 					options.WithIndexColumns("series_id"),
 					options.WithDataColumns("title"),
-					options.WithIndexType(options.GlobalAsyncIndex()),
+					options.WithIndexType(options.GlobalIndex()),
 				),
 				options.WithDropIndex("idx_series_title"),
 				options.WithAlterAttribute("hello", "world"),
 				options.WithAddAttribute("foo", "bar"),
 				options.WithDropAttribute("baz"),
 			)
+		},
+		table.WithIdempotent(),
+	)
+	if err != nil {
+		fmt.Printf("unexpected error: %v", err)
+	}
+}
+
+func Example_lazyTransaction() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
+	if err != nil {
+		fmt.Printf("failed connect: %v", err)
+		return
+	}
+	defer db.Close(ctx)
+	err = db.Table().Do(ctx,
+		func(ctx context.Context, session table.Session) (err error) {
+			// execute query with opening lazy transaction
+			tx, result, err := session.Execute(ctx,
+				table.SerializableReadWriteTxControl(),
+				"DECLARE $id AS Uint64; "+
+					"SELECT `title`, `description` FROM `path/to/mytable` WHERE id = $id",
+				table.NewQueryParameters(
+					table.ValueParam("$id", types.Uint64Value(1)),
+				),
+			)
+			if err != nil {
+				return err
+			}
+			defer func() {
+				_ = tx.Rollback(ctx)
+				_ = result.Close()
+			}()
+			if !result.NextResultSet(ctx) {
+				return retry.RetryableError(fmt.Errorf("no result sets"))
+			}
+			if !result.NextRow() {
+				return retry.RetryableError(fmt.Errorf("no rows"))
+			}
+			var (
+				id          uint64
+				title       string
+				description string
+			)
+			if err = result.ScanNamed(
+				named.OptionalWithDefault("id", &id),
+				named.OptionalWithDefault("title", &title),
+				named.OptionalWithDefault("description", &description),
+			); err != nil {
+				return err
+			}
+			fmt.Println(id, title, description)
+			// execute query with commit transaction
+			_, err = tx.Execute(ctx,
+				"DECLARE $id AS Uint64; "+
+					"DECLARE $description AS Text; "+
+					"UPSERT INTO `path/to/mytable` "+
+					"(id, description) "+
+					"VALUES ($id, $description);",
+				table.NewQueryParameters(
+					table.ValueParam("$id", types.Uint64Value(1)),
+					table.ValueParam("$description", types.TextValue("changed description")),
+				),
+				options.WithCommit(),
+			)
+			if err != nil {
+				return err
+			}
+			return result.Err()
 		},
 		table.WithIdempotent(),
 	)

@@ -39,6 +39,9 @@ type Client interface {
 	// CreateSession implements internal busy loop until one of the following conditions is met:
 	// - context was canceled or deadlined
 	// - session was created
+	//
+	// Deprecated: don't use CreateSession explicitly. This method only for ORM's compatibility.
+	// Use Do for queries with session
 	CreateSession(ctx context.Context, opts ...Option) (s ClosableSession, err error)
 
 	// Do provide the best effort for execute operation.
@@ -278,7 +281,9 @@ type (
 func TxSettings(opts ...TxOption) *TransactionSettings {
 	s := new(TransactionSettings)
 	for _, opt := range opts {
-		opt((*txDesc)(&s.settings))
+		if opt != nil {
+			opt((*txDesc)(&s.settings))
+		}
 	}
 	return s
 }
@@ -293,10 +298,18 @@ func BeginTx(opts ...TxOption) TxControlOption {
 	}
 }
 
-func WithTx(t Transaction) TxControlOption {
+func WithTx(t TransactionIdentifier) TxControlOption {
 	return func(d *txControlDesc) {
 		d.TxSelector = &Ydb_Table.TransactionControl_TxId{
 			TxId: t.ID(),
+		}
+	}
+}
+
+func WithTxID(txID string) TxControlOption {
+	return func(d *txControlDesc) {
+		d.TxSelector = &Ydb_Table.TransactionControl_TxId{
+			TxId: txID,
 		}
 	}
 }
@@ -330,7 +343,9 @@ func WithOnlineReadOnly(opts ...TxOnlineReadOnlyOption) TxOption {
 	return func(d *txDesc) {
 		var ro txOnlineReadOnly
 		for _, opt := range opts {
-			opt(&ro)
+			if opt != nil {
+				opt(&ro)
+			}
 		}
 		d.TxMode = &Ydb_Table.TransactionSettings_OnlineReadOnly{
 			OnlineReadOnly: (*Ydb_Table.OnlineModeSettings)(&ro),
@@ -369,7 +384,9 @@ func (t *TransactionControl) Desc() *Ydb_Table.TransactionControl {
 func TxControl(opts ...TxControlOption) *TransactionControl {
 	c := new(TransactionControl)
 	for _, opt := range opts {
-		opt((*txControlDesc)(&c.desc))
+		if opt != nil {
+			opt((*txControlDesc)(&c.desc))
+		}
 	}
 	return c
 }
@@ -433,6 +450,9 @@ func (p parameterOption) Value() types.Value {
 }
 
 func (qp queryParams) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
+	if qp == nil {
+		return nil
+	}
 	params := make(map[string]*Ydb.TypedValue, len(qp))
 	for k, v := range qp {
 		params[k] = value.ToYDB(v, a)

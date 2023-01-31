@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
@@ -15,16 +16,20 @@ import (
 )
 
 var (
-	_ driver.Rows              = &rows{}
-	_ driver.RowsNextResultSet = &rows{}
-	_ driver.Rows              = &single{}
+	_ driver.Rows                           = &rows{}
+	_ driver.RowsNextResultSet              = &rows{}
+	_ driver.RowsColumnTypeDatabaseTypeName = &rows{}
+	_ driver.Rows                           = &single{}
 
 	_ types.Scanner = &valuer{}
 )
 
 type rows struct {
-	conn    *conn
-	result  result.BaseResult
+	conn   *conn
+	result result.BaseResult
+
+	// nextSet once need for get first result set as default.
+	// Iterate over many result sets must be with rows.NextResultSet()
 	nextSet sync.Once
 }
 
@@ -44,6 +49,24 @@ func (r *rows) Columns() []string {
 	return cs
 }
 
+// TODO: Need to store column types to internal rows cache.
+//
+//nolint:godox
+func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
+	r.nextSet.Do(func() {
+		r.result.NextResultSet(context.Background())
+	})
+
+	var i int
+	yqlTypes := make([]string, r.result.CurrentResultSet().ColumnCount())
+	r.result.CurrentResultSet().Columns(func(m options.Column) {
+		yqlTypes[i] = m.Type.Yql()
+		i++
+	})
+
+	return yqlTypes[index]
+}
+
 func (r *rows) NextResultSet() error {
 	r.nextSet.Do(func() {})
 	return r.result.NextResultSetErr(context.Background())
@@ -58,10 +81,10 @@ func (r *rows) Next(dst []driver.Value) (err error) {
 		err = r.result.NextResultSetErr(context.Background())
 	})
 	if err != nil {
-		return r.conn.checkClosed(xerrors.WithStackTrace(err))
+		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 	if err = r.result.Err(); err != nil {
-		return r.conn.checkClosed(xerrors.WithStackTrace(err))
+		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 	if !r.result.NextRow() {
 		return io.EOF
@@ -71,13 +94,13 @@ func (r *rows) Next(dst []driver.Value) (err error) {
 		values[i] = &valuer{}
 	}
 	if err = r.result.Scan(values...); err != nil {
-		return r.conn.checkClosed(xerrors.WithStackTrace(err))
+		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 	for i := range values {
 		dst[i] = values[i].(*valuer).Value()
 	}
 	if err = r.result.Err(); err != nil {
-		return r.conn.checkClosed(xerrors.WithStackTrace(err))
+		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 	return nil
 }

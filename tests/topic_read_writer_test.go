@@ -1,7 +1,7 @@
 //go:build !fast
 // +build !fast
 
-package topic_test
+package tests
 
 import (
 	"bytes"
@@ -22,6 +22,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
@@ -206,10 +207,9 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 		})
 	}
 
-	consumerID := "consumer"
 	err = db.Topic().Alter(ctx, topicName, topicoptions.AlterWithAddConsumers(
 		topictypes.Consumer{
-			Name: consumerID,
+			Name: commonConsumerName,
 		},
 	))
 	require.NoError(tb, err)
@@ -220,7 +220,7 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 		go func(id int) {
 			defer wg.Done()
 
-			reader(consumerID)
+			reader(commonConsumerName)
 		}(i)
 	}
 
@@ -308,6 +308,84 @@ func TestCommitUnexpectedRange(t *testing.T) {
 	defer cancel()
 	_, err = reader.ReadMessage(readCtx)
 	require.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func TestUpdateToken(t *testing.T) {
+	xtest.AllowByFlag(t, "LOGBROKER-7960")
+
+	ctx := context.Background()
+	db := connect(t)
+	dbLogging := connectWithGrpcLogging(t)
+	topicPath := createTopic(ctx, t, db)
+
+	tokenInterval := time.Second
+	reader, err := dbLogging.Topic().StartReader(
+		consumerName,
+		topicoptions.ReadTopic(topicPath),
+		topicoptions.WithReaderUpdateTokenInterval(tokenInterval),
+	)
+	require.NoError(t, err)
+
+	writer, err := db.Topic().StartWriter(
+		"producer-id",
+		topicPath,
+		topicoptions.WithMessageGroupID("producer-id"),
+		topicoptions.WithWriterUpdateTokenInterval(tokenInterval),
+	)
+	require.NoError(t, err)
+
+	var wg sync.WaitGroup
+
+	wg.Add(1)
+	stopTopicActivity := xatomic.Bool{}
+	go func() {
+		defer wg.Done()
+
+		for i := 0; true; i++ {
+			if stopTopicActivity.Load() {
+				return
+			}
+
+			msgContent := []byte(strconv.Itoa(i))
+			err = writer.Write(ctx, topicwriter.Message{Data: bytes.NewReader(msgContent)})
+			require.NoError(t, err)
+		}
+	}()
+
+	hasMessages := xatomic.Bool{}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		for i := 0; true; i++ {
+			if stopTopicActivity.Load() {
+				return
+			}
+
+			msg, err := reader.ReadMessage(ctx)
+			require.NoError(t, err)
+			require.NoError(t, reader.Commit(ctx, msg))
+			hasMessages.Store(true)
+		}
+	}()
+
+	start := time.Now()
+	for i := 0; time.Since(start) < time.Second*10; i++ {
+		t.Log(i)
+		hasMessages.Store(false)
+		xtest.SpinWaitConditionWithTimeout(t, nil, time.Second*10, hasMessages.Load)
+		time.Sleep(tokenInterval)
+	}
+
+	stopTopicActivity.Store(true)
+
+	activityStopped := make(empty.Chan)
+	go func() {
+		wg.Wait()
+		close(activityStopped)
+	}()
+	xtest.WaitChannelClosed(t, activityStopped)
 }
 
 var topicCounter int

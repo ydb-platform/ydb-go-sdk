@@ -51,6 +51,31 @@ func WithReaderOperationTimeout(timeout time.Duration) ReaderOption {
 	}
 }
 
+// WithReaderStartTimeout mean timeout for connect to reader stream and work some time without errors
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func WithReaderStartTimeout(timeout time.Duration) ReaderOption {
+	return func(cfg *topicreaderinternal.ReaderConfig) {
+		cfg.RetrySettings.StartTimeout = timeout
+	}
+}
+
+// WithReaderCheckRetryErrorFunction can override default error retry policy
+// use CheckErrorRetryDecisionDefault for use default behavior for the error
+// callback func must be fast and deterministic: always result same result for same error - it can be called
+// few times for every error
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func WithReaderCheckRetryErrorFunction(callback CheckErrorRetryFunction) ReaderOption {
+	return func(cfg *topicreaderinternal.ReaderConfig) {
+		cfg.RetrySettings.CheckError = callback
+	}
+}
+
 // WithReaderOperationCancelAfter
 //
 // # Experimental
@@ -232,5 +257,16 @@ func WithGetPartitionStartOffset(f GetPartitionStartOffsetFunc) ReaderOption {
 func WithReaderTrace(tracer trace.Topic) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.Tracer = cfg.Tracer.Compose(tracer)
+	}
+}
+
+// WithReaderUpdateTokenInterval
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func WithReaderUpdateTokenInterval(interval time.Duration) ReaderOption {
+	return func(cfg *topicreaderinternal.ReaderConfig) {
+		cfg.CredUpdateInterval = interval
 	}
 }

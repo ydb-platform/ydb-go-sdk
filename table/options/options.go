@@ -219,16 +219,8 @@ func WithDataColumns(columns ...string) IndexOption {
 	return dataColumns(columns)
 }
 
-type indexType struct {
-	t IndexType
-}
-
-func (i indexType) ApplyIndexOption(d *indexDesc) {
-	i.t.setup(d)
-}
-
 func WithIndexType(t IndexType) IndexOption {
-	return indexType{t: t}
+	return t
 }
 
 type columnFamilies []ColumnFamily
@@ -300,7 +292,9 @@ func (opts profileOption) ApplyCreateTableOption(d *CreateTableDesc, a *allocato
 		d.Profile = new(Ydb_Table.TableProfile)
 	}
 	for _, opt := range opts {
-		opt.ApplyProfileOption((*profile)(d.Profile), a)
+		if opt != nil {
+			opt.ApplyProfileOption((*profile)(d.Profile), a)
+		}
 	}
 }
 
@@ -325,7 +319,9 @@ func (opts storagePolicyProfileOption) ApplyProfileOption(p *profile, a *allocat
 		p.StoragePolicy = new(Ydb_Table.StoragePolicy)
 	}
 	for _, opt := range opts {
-		opt((*storagePolicy)(p.StoragePolicy))
+		if opt != nil {
+			opt((*storagePolicy)(p.StoragePolicy))
+		}
 	}
 }
 
@@ -340,7 +336,9 @@ func (opts compactionPolicyProfileOption) ApplyProfileOption(p *profile, a *allo
 		p.CompactionPolicy = new(Ydb_Table.CompactionPolicy)
 	}
 	for _, opt := range opts {
-		opt((*compactionPolicy)(p.CompactionPolicy))
+		if opt != nil {
+			opt((*compactionPolicy)(p.CompactionPolicy))
+		}
 	}
 }
 
@@ -355,7 +353,9 @@ func (opts partitioningPolicyProfileOption) ApplyProfileOption(p *profile, a *al
 		p.PartitioningPolicy = new(Ydb_Table.PartitioningPolicy)
 	}
 	for _, opt := range opts {
-		opt((*partitioningPolicy)(p.PartitioningPolicy), a)
+		if opt != nil {
+			opt((*partitioningPolicy)(p.PartitioningPolicy), a)
+		}
 	}
 }
 
@@ -370,7 +370,9 @@ func (opts executionPolicyProfileOption) ApplyProfileOption(p *profile, a *alloc
 		p.ExecutionPolicy = new(Ydb_Table.ExecutionPolicy)
 	}
 	for _, opt := range opts {
-		opt((*executionPolicy)(p.ExecutionPolicy))
+		if opt != nil {
+			opt((*executionPolicy)(p.ExecutionPolicy))
+		}
 	}
 }
 
@@ -385,7 +387,9 @@ func (opts replicationPolicyProfileOption) ApplyProfileOption(p *profile, a *all
 		p.ReplicationPolicy = new(Ydb_Table.ReplicationPolicy)
 	}
 	for _, opt := range opts {
-		opt((*replicationPolicy)(p.ReplicationPolicy))
+		if opt != nil {
+			opt((*replicationPolicy)(p.ReplicationPolicy))
+		}
 	}
 }
 
@@ -400,7 +404,9 @@ func (opts cachingPolicyProfileOption) ApplyProfileOption(p *profile, a *allocat
 		p.CachingPolicy = new(Ydb_Table.CachingPolicy)
 	}
 	for _, opt := range opts {
-		opt((*cachingPolicy)(p.CachingPolicy))
+		if opt != nil {
+			opt((*cachingPolicy)(p.CachingPolicy))
+		}
 	}
 }
 
@@ -546,7 +552,9 @@ type partitioningSettings []PartitioningSettingsOption
 func (opts partitioningSettings) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
 	settings := &ydbPartitioningSettings{}
 	for _, opt := range opts {
-		opt.ApplyPartitioningSettingsOption(settings)
+		if opt != nil {
+			opt.ApplyPartitioningSettingsOption(settings)
+		}
 	}
 	d.PartitioningSettings = (*Ydb_Table.PartitioningSettings)(settings)
 }
@@ -596,6 +604,18 @@ func (flag partitioningByLoadPartitioningSettingsOption) ApplyPartitioningSettin
 
 func WithPartitioningByLoad(flag FeatureFlag) PartitioningSettingsOption {
 	return partitioningByLoadPartitioningSettingsOption(flag)
+}
+
+type partitioningByPartitioningSettingsOption []string
+
+func (columns partitioningByPartitioningSettingsOption) ApplyPartitioningSettingsOption(
+	settings *ydbPartitioningSettings,
+) {
+	settings.PartitionBy = columns
+}
+
+func WithPartitioningBy(columns []string) PartitioningSettingsOption {
+	return partitioningByPartitioningSettingsOption(columns)
 }
 
 type minPartitionsCountPartitioningSettingsOption uint64
@@ -733,7 +753,7 @@ type (
 
 type (
 	ExecuteDataQueryDesc   Ydb_Table.ExecuteDataQueryRequest
-	ExecuteDataQueryOption func(*ExecuteDataQueryDesc)
+	ExecuteDataQueryOption func(*ExecuteDataQueryDesc, *allocator.Allocator)
 )
 
 type (
@@ -743,7 +763,7 @@ type (
 
 type (
 	queryCachePolicy       Ydb_Table.QueryCachePolicy
-	QueryCachePolicyOption func(*queryCachePolicy)
+	QueryCachePolicyOption func(*queryCachePolicy, *allocator.Allocator)
 )
 
 // WithKeepInCache manages keep-in-cache flag in query cache policy
@@ -755,6 +775,13 @@ func WithKeepInCache(keepInCache bool) ExecuteDataQueryOption {
 	)
 }
 
+// WithCommit appends flag of commit transaction with executing query
+func WithCommit() ExecuteDataQueryOption {
+	return func(desc *ExecuteDataQueryDesc, a *allocator.Allocator) {
+		desc.TxControl.CommitTx = true
+	}
+}
+
 // WithQueryCachePolicyKeepInCache manages keep-in-cache policy
 //
 // Deprecated: data queries always executes with enabled keep-in-cache policy.
@@ -764,7 +791,7 @@ func WithQueryCachePolicyKeepInCache() QueryCachePolicyOption {
 }
 
 func withQueryCachePolicyKeepInCache(keepInCache bool) QueryCachePolicyOption {
-	return func(p *queryCachePolicy) {
+	return func(p *queryCachePolicy, a *allocator.Allocator) {
 		p.KeepInCache = keepInCache
 	}
 }
@@ -777,14 +804,15 @@ func WithQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption
 }
 
 func withQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption {
-	return func(d *ExecuteDataQueryDesc) {
+	return func(d *ExecuteDataQueryDesc, a *allocator.Allocator) {
 		if d.QueryCachePolicy == nil {
-			d.QueryCachePolicy = &Ydb_Table.QueryCachePolicy{
-				KeepInCache: true,
-			}
+			d.QueryCachePolicy = a.TableQueryCachePolicy()
+			d.QueryCachePolicy.KeepInCache = true
 		}
 		for _, opt := range opts {
-			opt((*queryCachePolicy)(d.QueryCachePolicy))
+			if opt != nil {
+				opt((*queryCachePolicy)(d.QueryCachePolicy), a)
+			}
 		}
 	}
 }
@@ -802,13 +830,13 @@ func WithCommitCollectStatsModeBasic() CommitTransactionOption {
 }
 
 func WithCollectStatsModeNone() ExecuteDataQueryOption {
-	return func(d *ExecuteDataQueryDesc) {
+	return func(d *ExecuteDataQueryDesc, a *allocator.Allocator) {
 		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE
 	}
 }
 
 func WithCollectStatsModeBasic() ExecuteDataQueryOption {
-	return func(d *ExecuteDataQueryDesc) {
+	return func(d *ExecuteDataQueryDesc, a *allocator.Allocator) {
 		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC
 	}
 }

@@ -8,7 +8,6 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 )
 
 // operationError reports about operationStatus fail.
@@ -64,7 +63,9 @@ func Operation(opts ...oeOpt) error {
 		code: Ydb.StatusIds_STATUS_CODE_UNSPECIFIED,
 	}
 	for _, f := range opts {
-		f(oe)
+		if f != nil {
+			f(oe)
+		}
 	}
 	return oe
 }
@@ -84,7 +85,7 @@ func (e *operationError) Error() string {
 	return buf.String()
 }
 
-// IsOperationError reports whether err is operationError with given status codes.
+// IsOperationError reports whether err is operationError with given errType codes.
 func IsOperationError(err error, codes ...Ydb.StatusIds_StatusCode) bool {
 	var op *operationError
 	if !errors.As(err, &op) {
@@ -101,7 +102,7 @@ func IsOperationError(err error, codes ...Ydb.StatusIds_StatusCode) bool {
 	return false
 }
 
-func (e *operationError) OperationStatus() operation.Status {
+func (e *operationError) Type() Type {
 	switch e.code {
 	case
 		Ydb.StatusIds_ABORTED,
@@ -109,11 +110,11 @@ func (e *operationError) OperationStatus() operation.Status {
 		Ydb.StatusIds_OVERLOADED,
 		Ydb.StatusIds_BAD_SESSION,
 		Ydb.StatusIds_SESSION_BUSY:
-		return operation.NotFinished
+		return TypeRetryable
 	case Ydb.StatusIds_UNDETERMINED:
-		return operation.Undefined
+		return TypeConditionallyRetryable
 	default:
-		return operation.Finished
+		return TypeUndefined
 	}
 }
 

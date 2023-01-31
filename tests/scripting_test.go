@@ -1,7 +1,7 @@
 //go:build !fast
 // +build !fast
 
-package scripting_test
+package tests
 
 import (
 	"context"

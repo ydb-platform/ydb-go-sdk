@@ -94,7 +94,9 @@ func NewStream(
 		close: onClose,
 	}
 	for _, o := range opts {
-		o(&r.baseResult)
+		if o != nil {
+			o(&r.baseResult)
+		}
 	}
 	return r
 }
@@ -107,7 +109,9 @@ func NewUnary(sets []*Ydb.ResultSet, stats *Ydb_TableStats.QueryStats, opts ...o
 		sets: sets,
 	}
 	for _, o := range opts {
-		o(&r.baseResult)
+		if o != nil {
+			o(&r.baseResult)
+		}
 	}
 	return r
 }

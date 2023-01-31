@@ -193,7 +193,9 @@ func WithValues(vs ...types.Value) ResultSetOption {
 func NewResultSet(a *allocator.Allocator, opts ...ResultSetOption) *Ydb.ResultSet {
 	var d resultSetDesc
 	for _, opt := range opts {
-		opt(&d, a)
+		if opt != nil {
+			opt(&d, a)
+		}
 	}
 	return (*Ydb.ResultSet)(&d)
 }

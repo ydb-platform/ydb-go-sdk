@@ -4,21 +4,31 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clone"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var (
-	errUnconnected  = xerrors.Retryable(xerrors.Wrap(errors.New("ydb: first connection attempt not finished")))
-	ErrReaderClosed = xerrors.Wrap(errors.New("ydb: reader closed"))
+	errUnconnected = xerrors.Retryable(xerrors.Wrap(
+		errors.New("ydb: first connection attempt not finished"),
+	))
+	errReaderClosed                 = xerrors.Wrap(errors.New("ydb: reader closed"))
+	errCommitSessionFromOtherReader = xerrors.Wrap(errors.New("ydb: commit with session from other reader"))
 )
+
+var globalReaderCounter int64
+
+func nextReaderID() int64 {
+	return atomic.AddInt64(&globalReaderCounter, 1)
+}
 
 //nolint:lll
 //go:generate mockgen -destination raw_topic_reader_stream_mock_test.go -package topicreaderinternal -write_package_comment=false . RawTopicReaderStream
@@ -37,6 +47,7 @@ type Reader struct {
 	reader             batchedStreamReader
 	defaultBatchConfig ReadMessageBatchOptions
 	tracer             trace.Topic
+	readerID           int64
 }
 
 type ReadMessageBatchOptions struct {
@@ -78,26 +89,36 @@ func NewReader(
 	opts ...PublicReaderOption,
 ) Reader {
 	cfg := convertNewParamsToStreamConfig(consumer, readSelectors, opts...)
+	readerID := nextReaderID()
+
 	readerConnector := func(ctx context.Context) (batchedStreamReader, error) {
 		stream, err := connector(ctx)
 		if err != nil {
 			return nil, err
 		}
 
-		return newTopicStreamReader(stream, cfg.topicStreamReaderConfig)
+		return newTopicStreamReader(readerID, stream, cfg.topicStreamReaderConfig)
 	}
 
 	res := Reader{
-		reader:             newReaderReconnector(readerConnector, cfg.OperationTimeout(), cfg.Tracer, cfg.BaseContext),
+		reader: newReaderReconnector(
+			readerID,
+			readerConnector,
+			cfg.OperationTimeout(),
+			cfg.RetrySettings,
+			cfg.Tracer,
+			cfg.BaseContext,
+		),
 		defaultBatchConfig: cfg.DefaultBatchConfig,
 		tracer:             cfg.Tracer,
+		readerID:           readerID,
 	}
 
 	return res
 }
 
 func (r *Reader) Close(ctx context.Context) error {
-	return r.reader.CloseWithError(ctx, xerrors.WithStackTrace(ErrReaderClosed))
+	return r.reader.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
 }
 
 type readExplicitMessagesCount int
@@ -117,8 +138,10 @@ func (r *Reader) ReadMessage(ctx context.Context) (*PublicMessage, error) {
 func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOption) (batch *PublicBatch, err error) {
 	readOptions := r.defaultBatchConfig.clone()
 
-	for _, optFunc := range opts {
-		readOptions = optFunc.Apply(readOptions)
+	for _, opt := range opts {
+		if opt != nil {
+			readOptions = opt.Apply(readOptions)
+		}
 	}
 
 forReadBatch:
@@ -142,10 +165,21 @@ forReadBatch:
 }
 
 func (r *Reader) Commit(ctx context.Context, offsets PublicCommitRangeGetter) (err error) {
-	return r.reader.Commit(ctx, offsets.getCommitRange().priv)
+	cr := offsets.getCommitRange().priv
+	if cr.partitionSession.readerID != r.readerID {
+		return errCommitSessionFromOtherReader
+	}
+
+	return r.reader.Commit(ctx, cr)
 }
 
 func (r *Reader) CommitRanges(ctx context.Context, ranges []PublicCommitRange) error {
+	for i := range ranges {
+		if ranges[i].priv.partitionSession.readerID != r.readerID {
+			return errCommitSessionFromOtherReader
+		}
+	}
+
 	commitRanges := NewCommitRangesFromPublicCommits(ranges)
 	commitRanges.optimize()
 
@@ -178,10 +212,9 @@ func (r *Reader) CommitRanges(ctx context.Context, ranges []PublicCommitRange) e
 type ReaderConfig struct {
 	config.Common
 
+	RetrySettings      topic.RetrySettings
 	DefaultBatchConfig ReadMessageBatchOptions
 	topicStreamReaderConfig
-
-	reconnectionBackoff backoff.Backoff
 }
 
 // PublicReaderOption
@@ -213,7 +246,6 @@ func convertNewParamsToStreamConfig(
 ) (cfg ReaderConfig) {
 	cfg.topicStreamReaderConfig = newTopicStreamReaderConfig()
 	cfg.Consumer = consumer
-	cfg.reconnectionBackoff = backoff.Fast
 
 	// make own copy, for prevent changing internal states if readSelectors will change outside
 	cfg.ReadSelectors = make([]PublicReadSelector, len(readSelectors))
@@ -222,7 +254,9 @@ func convertNewParamsToStreamConfig(
 	}
 
 	for _, f := range opts {
-		f(&cfg)
+		if f != nil {
+			f(&cfg)
+		}
 	}
 
 	return cfg

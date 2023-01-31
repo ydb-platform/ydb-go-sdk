@@ -1,7 +1,7 @@
 //go:build !fast
 // +build !fast
 
-package topic_test
+package tests
 
 import (
 	"context"
@@ -21,6 +21,8 @@ import (
 )
 
 const defaultConnectionString = "grpc://localhost:2136/local"
+
+const commonConsumerName = "consumer"
 
 func TestClient_CreateDropTopic(t *testing.T) {
 	ctx := xtest.Context(t)
@@ -154,14 +156,22 @@ func TestSchemeList(t *testing.T) {
 }
 
 func connect(t testing.TB, opts ...ydb.Option) ydb.Connection {
+	return connectWithLogOption(t, false, opts...)
+}
+
+func connectWithGrpcLogging(t testing.TB, opts ...ydb.Option) ydb.Connection {
+	return connectWithLogOption(t, true, opts...)
+}
+
+func connectWithLogOption(t testing.TB, logGRPC bool, opts ...ydb.Option) ydb.Connection {
 	connectionString := defaultConnectionString
 	if cs := os.Getenv("YDB_CONNECTION_STRING"); cs != "" {
 		connectionString = cs
 	}
 
 	var grpcOptions []grpc.DialOption
-	const needLogGRPCMessages = false
-	if needLogGRPCMessages {
+	const needLogGRPCMessages = true
+	if logGRPC {
 		grpcOptions = append(grpcOptions,
 			grpc.WithChainUnaryInterceptor(xtest.NewGrpcLogger(t).UnaryClientInterceptor),
 			grpc.WithChainStreamInterceptor(xtest.NewGrpcLogger(t).StreamClientInterceptor),

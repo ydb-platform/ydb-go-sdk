@@ -32,15 +32,17 @@ type readerReconnector struct {
 	clock      clockwork.Clock
 	background background.Worker
 
-	tracer      trace.Topic
-	baseContext context.Context
+	tracer        trace.Topic
+	baseContext   context.Context
+	retrySettings topic.RetrySettings
 
 	readerConnect readerConnectFunc
 
-	reconnectFromBadStream chan batchedStreamReader
+	reconnectFromBadStream chan reconnectRequest
 	connectTimeout         time.Duration
 
 	closeOnce sync.Once
+	readerID  int64
 
 	m                          xsync.RWMutex
 	streamConnectionInProgress empty.Chan // opened if connection in progress, closed if connection established
@@ -51,18 +53,22 @@ type readerReconnector struct {
 
 //nolint:revive
 func newReaderReconnector(
+	readerID int64,
 	connector readerConnectFunc,
 	connectTimeout time.Duration,
+	retrySettings topic.RetrySettings,
 	tracer trace.Topic,
 	baseContext context.Context,
 ) *readerReconnector {
 	res := &readerReconnector{
+		readerID:       readerID,
 		clock:          clockwork.NewRealClock(),
 		readerConnect:  connector,
 		streamErr:      errUnconnected,
 		connectTimeout: connectTimeout,
 		tracer:         tracer,
 		baseContext:    baseContext,
+		retrySettings:  retrySettings,
 	}
 	if res.connectTimeout == 0 {
 		res.connectTimeout = value.InfiniteDuration
@@ -94,7 +100,7 @@ func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessa
 		attempt++
 		stream, err := r.stream(ctx)
 		switch {
-		case topic.IsRetryableError(err):
+		case r.isRetriableError(err):
 			r.fireReconnectOnRetryableError(stream, err)
 			runtime.Gosched()
 			continue
@@ -105,7 +111,7 @@ func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessa
 		}
 
 		res, err := stream.ReadMessageBatch(ctx, opts)
-		if topic.IsRetryableError(err) {
+		if r.isRetriableError(err) {
 			r.fireReconnectOnRetryableError(stream, err)
 			runtime.Gosched()
 			continue
@@ -135,7 +141,7 @@ func (r *readerReconnector) CloseWithError(ctx context.Context, err error) error
 		closeErr = r.background.Close(ctx, err)
 
 		if r.streamVal != nil {
-			streamCloseErr := r.streamVal.CloseWithError(ctx, xerrors.WithStackTrace(ErrReaderClosed))
+			streamCloseErr := r.streamVal.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
 			if closeErr == nil {
 				closeErr = streamCloseErr
 			}
@@ -148,14 +154,14 @@ func (r *readerReconnector) start() {
 	r.background.Start("reconnector-loop", r.reconnectionLoop)
 
 	// start first connection
-	r.reconnectFromBadStream <- nil
+	r.reconnectFromBadStream <- newReconnectRequest(nil, nil)
 }
 
 func (r *readerReconnector) initChannelsAndClock() {
 	if r.clock == nil {
 		r.clock = clockwork.NewRealClock()
 	}
-	r.reconnectFromBadStream = make(chan batchedStreamReader, 1)
+	r.reconnectFromBadStream = make(chan reconnectRequest, 1)
 	r.streamConnectionInProgress = make(empty.Chan)
 	close(r.streamConnectionInProgress) // no progress at start
 }
@@ -163,38 +169,47 @@ func (r *readerReconnector) initChannelsAndClock() {
 func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 	defer r.handlePanic()
 
+	var retriesStarted time.Time
 	lastTime := time.Time{}
 	attempt := 0
 	for {
 		now := r.clock.Now()
-		sinceLastTime := now.Sub(lastTime)
-		lastTime = now
-
-		const resetAttemptEmpiricalCoefficient = 10
-		if sinceLastTime > r.connectTimeout*resetAttemptEmpiricalCoefficient {
+		if topic.CheckResetReconnectionCounters(lastTime, now, r.connectTimeout) {
 			attempt = 0
+			retriesStarted = time.Now()
 		} else {
 			attempt++
 		}
+		lastTime = now
 
-		if attempt > 0 {
-			delay := backoff.Fast.Delay(attempt)
-
-			select {
-			case <-ctx.Done():
-				return
-			case <-r.clock.After(delay):
-				// pass
-			}
-		}
-
+		var request reconnectRequest
 		select {
 		case <-ctx.Done():
 			return
 
-		case oldReader := <-r.reconnectFromBadStream:
-			_ = r.reconnect(ctx, oldReader)
+		case request = <-r.reconnectFromBadStream:
+			if retriesStarted.IsZero() {
+				retriesStarted = time.Now()
+			}
 		}
+
+		if request.reason != nil {
+			if retryBackoff, isRetriableErr := r.checkErrRetryMode(
+				request.reason,
+				r.clock.Since(retriesStarted),
+			); isRetriableErr {
+				delay := retryBackoff.Delay(attempt)
+
+				select {
+				case <-ctx.Done():
+					return
+				case <-r.clock.After(delay):
+					// pass
+				}
+			}
+		}
+
+		_ = r.reconnect(ctx, request.oldReader)
 	}
 }
 
@@ -234,12 +249,12 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 
 	newStream, err := r.connectWithTimeout()
 
-	if topic.IsRetryableError(err) {
-		go func() {
+	if r.isRetriableError(err) {
+		go func(reason error) {
 			// guarantee write reconnect signal to channel
-			r.reconnectFromBadStream <- oldReader
+			r.reconnectFromBadStream <- newReconnectRequest(oldReader, reason)
 			trace.TopicOnReaderReconnectRequest(r.tracer, err, true)
-		}()
+		}(err)
 	}
 
 	r.m.WithLock(func() {
@@ -249,6 +264,18 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 		}
 	})
 	return err
+}
+
+func (r *readerReconnector) isRetriableError(err error) bool {
+	_, res := topic.CheckRetryMode(err, r.retrySettings, 0)
+	return res
+}
+
+func (r *readerReconnector) checkErrRetryMode(err error, retriesDuration time.Duration) (
+	backoffType backoff.Backoff,
+	isRetriableErr bool,
+) {
+	return topic.CheckRetryMode(err, r.retrySettings, retriesDuration)
 }
 
 func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err error) {
@@ -290,12 +317,12 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 }
 
 func (r *readerReconnector) fireReconnectOnRetryableError(stream batchedStreamReader, err error) {
-	if !topic.IsRetryableError(err) {
+	if !r.isRetriableError(err) {
 		return
 	}
 
 	select {
-	case r.reconnectFromBadStream <- stream:
+	case r.reconnectFromBadStream <- newReconnectRequest(stream, err):
 		// send signal
 		trace.TopicOnReaderReconnectRequest(r.tracer, err, true)
 	default:
@@ -343,5 +370,17 @@ func (r *readerReconnector) handlePanic() {
 
 	if p != nil {
 		_ = r.CloseWithError(context.Background(), xerrors.WithStackTrace(fmt.Errorf("handled panic: %v", p)))
+	}
+}
+
+type reconnectRequest struct {
+	oldReader batchedStreamReader
+	reason    error
+}
+
+func newReconnectRequest(oldReader batchedStreamReader, reason error) reconnectRequest {
+	return reconnectRequest{
+		oldReader: oldReader,
+		reason:    reason,
 	}
 }

@@ -6,7 +6,6 @@ package badconn
 import (
 	"database/sql/driver"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -23,8 +22,8 @@ func (e Error) Error() string {
 }
 
 func (e Error) Is(err error) bool {
-	//nolint:errorlint
-	if err == driver.ErrBadConn {
+	//nolint:nolintlint
+	if err == driver.ErrBadConn { //nolint:errorlint
 		return true
 	}
 	return xerrors.Is(e.err, err)
@@ -45,7 +44,7 @@ func Map(err error) error {
 		return nil
 	case xerrors.Is(err, driver.ErrBadConn):
 		return err
-	case retry.MustDeleteSession(err):
+	case xerrors.MustDeleteSession(err):
 		return Error{err: err}
 	default:
 		return err

@@ -11,12 +11,18 @@ import (
 type Config struct {
 	config.Common
 
-	trace trace.Scheme
+	databaseName string
+	trace        trace.Scheme
 }
 
 // Trace returns trace over scheme client calls
 func (c Config) Trace() trace.Scheme {
 	return c.trace
+}
+
+// Database returns database name
+func (c Config) Database() string {
+	return c.databaseName
 }
 
 type Option func(c *Config)
@@ -25,6 +31,13 @@ type Option func(c *Config)
 func WithTrace(trace trace.Scheme, opts ...trace.SchemeComposeOption) Option {
 	return func(c *Config) {
 		c.trace = c.trace.Compose(trace, opts...)
+	}
+}
+
+// WithDatabaseName applies database name
+func WithDatabaseName(dbName string) Option {
+	return func(c *Config) {
+		c.databaseName = dbName
 	}
 }
 
@@ -38,7 +51,9 @@ func With(config config.Common) Option {
 func New(opts ...Option) Config {
 	c := Config{}
 	for _, o := range opts {
-		o(&c)
+		if o != nil {
+			o(&c)
+		}
 	}
 	return c
 }

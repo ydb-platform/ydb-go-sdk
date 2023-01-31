@@ -336,12 +336,14 @@ func Table(l logs.Logger, details trace.Details, opts ...Option) (t trace.Table)
 					session := info.Session
 					query := info.Query
 					params := info.Parameters
+					keepInCache := info.KeepInCache
 					if options.LogQuery {
 						ll.Trace(`execute start`,
 							logs.String("id", session.ID()),
 							logs.String("status", session.Status()),
 							logs.Stringer("query", query),
 							logs.Stringer("params", params),
+							logs.Bool("keepInCache", keepInCache),
 						)
 					} else {
 						ll.Trace(`execute start`,
@@ -704,7 +706,7 @@ func Table(l logs.Logger, details trace.Details, opts ...Option) (t trace.Table)
 							logs.String("status", session.Status()),
 						)
 					} else {
-						ll.Error(`put failed`,
+						ll.Warn(`put failed`,
 							logs.Duration("latency", time.Since(start)),
 							logs.String("id", session.ID()),
 							logs.String("status", session.Status()),

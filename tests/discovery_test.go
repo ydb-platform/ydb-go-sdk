@@ -1,11 +1,12 @@
 //go:build !fast
 // +build !fast
 
-package discovery_test
+package tests
 
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -115,15 +116,23 @@ func TestDiscovery(t *testing.T) {
 			t.Fatalf("db close failed: %+v", e)
 		}
 	}()
-	t.Run("immediate", func(t *testing.T) {
-		if _, err = db.Discovery().Discover(ctx); err != nil {
-			t.Fatalf("Execute failed: %v", err)
+	t.Run("discovery.Discover", func(t *testing.T) {
+		if endpoints, err := db.Discovery().Discover(ctx); err != nil {
+			t.Fatal(err)
+		} else {
+			fmt.Println(endpoints)
 		}
-	})
-	t.Run("after parking", func(t *testing.T) {
-		<-parking // wait for parking conn
-		if _, err = db.Discovery().Discover(ctx); err != nil {
-			t.Fatalf("Execute failed: %v", err)
-		}
+		t.Run("wait", func(t *testing.T) {
+			t.Run("parking", func(t *testing.T) {
+				<-parking // wait for parking conn
+				t.Run("re-discover", func(t *testing.T) {
+					if endpoints, err := db.Discovery().Discover(ctx); err != nil {
+						t.Fatal(err)
+					} else {
+						fmt.Println(endpoints)
+					}
+				})
+			})
+		})
 	})
 }

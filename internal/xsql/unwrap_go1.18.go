@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 )
 
 func Unwrap[T *sql.DB | *sql.Conn](v T) (connector *Connector, err error) {
@@ -26,7 +27,7 @@ func Unwrap[T *sql.DB | *sql.Conn](v T) (connector *Connector, err error) {
 			}
 			return xerrors.WithStackTrace(fmt.Errorf("%T is not a *conn", driverConn))
 		}); err != nil {
-			return nil, xerrors.WithStackTrace(err)
+			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
 		return connector, nil
 	default:

@@ -42,6 +42,12 @@ func WithCompressorCount(num int) PublicWriterOption {
 	}
 }
 
+func WithTokenUpdateInterval(interval time.Duration) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.credUpdateInterval = interval
+	}
+}
+
 // WithCommonConfig
 //
 // # Experimental
@@ -116,6 +122,12 @@ func WithSessionMeta(meta map[string]string) PublicWriterOption {
 				cfg.writerMeta[k] = v
 			}
 		}
+	}
+}
+
+func WithStartTimeout(timeout time.Duration) PublicWriterOption {
+	return func(cfg *WriterReconnectorConfig) {
+		cfg.RetrySettings.StartTimeout = timeout
 	}
 }
 

@@ -8,8 +8,8 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
@@ -30,22 +30,10 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 						if !ok {
 							t.Fatalf("cannot cast request '%T' to *Ydb_Table.BeginTransactionRequest", request)
 						}
-						result, err := anypb.New(
-							&Ydb_Table.BeginTransactionResult{
-								TxMeta: &Ydb_Table.TransactionMeta{
-									Id: "",
-								},
-							},
-						)
-						if err != nil {
-							return nil, err
-						}
 						begin++
-						return &Ydb_Table.BeginTransactionResponse{
-							Operation: &Ydb_Operations.Operation{
-								Ready:  true,
-								Status: Ydb.StatusIds_SUCCESS,
-								Result: result,
+						return &Ydb_Table.BeginTransactionResult{
+							TxMeta: &Ydb_Table.TransactionMeta{
+								Id: "",
 							},
 						}, nil
 					},
@@ -54,20 +42,8 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 						if !ok {
 							t.Fatalf("cannot cast request '%T' to *Ydb_Table.CommitTransactionRequest", request)
 						}
-						result, err := anypb.New(
-							&Ydb_Table.CommitTransactionResult{},
-						)
-						if err != nil {
-							return nil, err
-						}
 						commit++
-						return &Ydb_Table.CommitTransactionResponse{
-							Operation: &Ydb_Operations.Operation{
-								Ready:  true,
-								Status: Ydb.StatusIds_SUCCESS,
-								Result: result,
-							},
-						}, nil
+						return &Ydb_Table.CommitTransactionResult{}, nil
 					},
 					testutil.TableRollbackTransaction: func(request interface{}) (proto.Message, error) {
 						_, ok := request.(*Ydb_Table.RollbackTransactionRequest)
@@ -138,11 +114,11 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 			t.Fatalf("unexpected rollback: %d", begin)
 		}
 		_, err = x.CommitTx(context.Background())
-		if err != nil {
-			t.Fatal(err)
+		if !xerrors.Is(err, errTxRollbackedEarly) {
+			t.Fatal("must be errTxRollbackedEarly")
 		}
-		if commit != 2 {
-			t.Fatalf("unexpected commit: %d", begin)
+		if commit != 1 {
+			t.Fatalf("unexpected commit: %d", commit)
 		}
 	}
 }
