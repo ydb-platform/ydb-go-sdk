@@ -50,6 +50,10 @@ func (f Field) Int() int {
 	return int(f.vint)
 }
 
+func (f Field) Int64() int64 {
+	return f.vint
+}
+
 // Bool is a value getter for fields with BoolType type
 func (f Field) Bool() bool {
 	return f.vint != 0
@@ -105,6 +109,8 @@ func (f Field) Fallback() (repr string, err error) {
 	}()
 	switch f.ftype {
 	case IntType:
+		fallthrough
+	case Int64Type:
 		repr = strconv.FormatInt(f.vint, 10)
 	case StringType:
 		repr = f.vstr
@@ -141,6 +147,14 @@ func Int(key string, value int) Field {
 		ftype: IntType,
 		key:   key,
 		vint:  int64(value),
+	}
+}
+
+func Int64(key string, value int64) Field {
+	return Field{
+		ftype: Int64Type,
+		key:   key,
+		vint:  value,
 	}
 }
 
@@ -228,6 +242,7 @@ const (
 	InvalidType FieldType = iota
 
 	IntType
+	Int64Type
 	StringType
 	BoolType
 	DurationType

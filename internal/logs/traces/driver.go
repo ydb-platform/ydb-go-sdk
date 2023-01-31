@@ -3,7 +3,6 @@ package traces
 import (
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/logs"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -508,12 +507,12 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 				if info.Error == nil {
 					ll.Trace("get done",
 						latency(start),
-						logs.String("token", log.Secret(info.Token)),
+						logs.String("token", Secret(info.Token)),
 					)
 				} else {
 					ll.Error("get done",
 						latency(start),
-						logs.String("token", log.Secret(info.Token)),
+						logs.String("token", Secret(info.Token)),
 						logs.Error(info.Error),
 						version(),
 					)

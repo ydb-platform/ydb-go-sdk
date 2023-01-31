@@ -1,6 +1,8 @@
 package logs
 
 type Logger interface {
+	// Log logs the message with specified options and fields.
+	// Implementations must not in any way use slice of fields after Log returns.
 	Log(opts Options, msg string, fields ...Field)
 
 	// Enabled tells whether the loggin level is enabled by the logger.
