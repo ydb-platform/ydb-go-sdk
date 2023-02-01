@@ -1,3 +1,4 @@
+## v3.42.8
 * Fixed `internal/scheme/helpers/IsDirectoryExists(..)` recursive bug
 
 ## v3.42.7
