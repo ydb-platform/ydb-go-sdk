@@ -24,15 +24,24 @@ func databaseName(c schemeClient) string {
 }
 
 func IsDirectoryExists(ctx context.Context, c schemeClient, directory string) (exists bool, _ error) {
+	if !strings.HasPrefix(directory, databaseName(c)) {
+		return false, xerrors.WithStackTrace(fmt.Errorf(
+			"path '%s' must be inside database '%s'",
+			directory, databaseName(c),
+		))
+	}
+	if directory == databaseName(c) {
+		return true, nil
+	}
 	parentDirectory, childDirectory := path.Split(directory)
 	parentDirectory = strings.TrimRight(parentDirectory, "/")
-	if parentDirectory != databaseName(c) {
-		if exists, err := IsDirectoryExists(ctx, c, parentDirectory); err != nil {
-			return false, xerrors.WithStackTrace(err)
-		} else if !exists {
-			return false, nil
-		}
+
+	if exists, err := IsDirectoryExists(ctx, c, parentDirectory); err != nil {
+		return false, xerrors.WithStackTrace(err)
+	} else if !exists {
+		return false, nil
 	}
+
 	d, err := c.ListDirectory(ctx, parentDirectory)
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
@@ -43,7 +52,7 @@ func IsDirectoryExists(ctx context.Context, c schemeClient, directory string) (e
 		}
 		if e.Type != scheme.EntryDirectory {
 			return false, xerrors.WithStackTrace(fmt.Errorf(
-				"entry '%s' in path '%s' is not a direectory: %s",
+				"entry '%s' in path '%s' is not a directory: %s",
 				childDirectory, parentDirectory, e.Type.String(),
 			))
 		}
