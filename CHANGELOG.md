@@ -1,4 +1,5 @@
-* Fixed `internal/helpers/IsDirectoryExists(..)` recursive bug
+* Fixed `internal/scheme/helpers/IsDirectoryExists(..)` recursive bug
+
 ## v3.42.7
 * Fixed `sugar.IsTableExists` with recursive check directory exists
 * Added `sugar.IsDirectoryExists`
