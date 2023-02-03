@@ -88,10 +88,10 @@ func IsTableExists(ctx context.Context, c schemeClient, absTablePath string) (ex
 			continue
 		}
 		if e.Type != scheme.EntryTable {
-			return false, fmt.Errorf(
+			return false, xerrors.WithStackTrace(fmt.Errorf(
 				"entry '%s' in path '%s' is not a table: %s",
 				tableName, directory, e.Type.String(),
-			)
+			))
 		}
 		return true, nil
 	}
