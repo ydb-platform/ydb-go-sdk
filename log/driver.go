@@ -378,6 +378,48 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 				}
 			}
 		}
+		t.OnBalancerDialEntrypoint = func(
+			info trace.DriverBalancerDialEntrypointStartInfo,
+		) func(
+			trace.DriverBalancerDialEntrypointDoneInfo,
+		) {
+			l.Tracef(`trying to dial entrypoint {address:"%s"}`, info.Address)
+			start := time.Now()
+			return func(info trace.DriverBalancerDialEntrypointDoneInfo) {
+				if info.Error == nil {
+					l.Tracef(`dial entrypoint done {latency:"%v"}`,
+						time.Since(start),
+					)
+				} else {
+					l.Errorf(`dial entrypoint failed {latency:"%v",error:"%s",version:"%s"}`,
+						time.Since(start),
+						info.Error,
+						meta.Version,
+					)
+				}
+			}
+		}
+		t.OnBalancerClusterDiscoveryAttempt = func(
+			info trace.DriverBalancerClusterDiscoveryAttemptStartInfo,
+		) func(
+			trace.DriverBalancerClusterDiscoveryAttemptDoneInfo,
+		) {
+			l.Tracef(`trying to cluster discovery {address:"%s"}`, info.Address)
+			start := time.Now()
+			return func(info trace.DriverBalancerClusterDiscoveryAttemptDoneInfo) {
+				if info.Error == nil {
+					l.Tracef(`cluster discovery done {latency:"%v"}`,
+						time.Since(start),
+					)
+				} else {
+					l.Errorf(`cluster discovery failed {latency:"%v",error:"%s",version:"%s"}`,
+						time.Since(start),
+						info.Error,
+						meta.Version,
+					)
+				}
+			}
+		}
 		t.OnBalancerUpdate = func(
 			info trace.DriverBalancerUpdateStartInfo,
 		) func(

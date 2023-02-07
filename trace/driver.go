@@ -53,9 +53,23 @@ type (
 
 		// Balancer events
 		OnBalancerInit           func(DriverBalancerInitStartInfo) func(DriverBalancerInitDoneInfo)
+		OnBalancerDialEntrypoint func(
+			DriverBalancerDialEntrypointStartInfo,
+		) func(
+			DriverBalancerDialEntrypointDoneInfo,
+		)
 		OnBalancerClose          func(DriverBalancerCloseStartInfo) func(DriverBalancerCloseDoneInfo)
-		OnBalancerChooseEndpoint func(DriverBalancerChooseEndpointStartInfo) func(DriverBalancerChooseEndpointDoneInfo)
-		OnBalancerUpdate         func(DriverBalancerUpdateStartInfo) func(DriverBalancerUpdateDoneInfo)
+		OnBalancerChooseEndpoint func(
+			DriverBalancerChooseEndpointStartInfo,
+		) func(
+			DriverBalancerChooseEndpointDoneInfo,
+		)
+		OnBalancerClusterDiscoveryAttempt func(
+			DriverBalancerClusterDiscoveryAttemptStartInfo,
+		) func(
+			DriverBalancerClusterDiscoveryAttemptDoneInfo,
+		)
+		OnBalancerUpdate func(DriverBalancerUpdateStartInfo) func(DriverBalancerUpdateDoneInfo)
 
 		// Credentials events
 		OnGetCredentials func(DriverGetCredentialsStartInfo) func(DriverGetCredentialsDoneInfo)
@@ -138,6 +152,17 @@ type (
 		Endpoints []EndpointInfo
 		LocalDC   string
 		Error     error
+	}
+	DriverBalancerClusterDiscoveryAttemptStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Address string
+	}
+	DriverBalancerClusterDiscoveryAttemptDoneInfo struct {
+		Error error
 	}
 	DriverNetReadStartInfo struct {
 		Address string
@@ -271,6 +296,17 @@ type (
 		Context *context.Context
 	}
 	DriverBalancerInitDoneInfo struct {
+		Error error
+	}
+	DriverBalancerDialEntrypointStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Address string
+	}
+	DriverBalancerDialEntrypointDoneInfo struct {
 		Error error
 	}
 	DriverBalancerCloseStartInfo struct {
