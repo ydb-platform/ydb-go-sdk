@@ -641,6 +641,41 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		}
 	}
 	{
+		h1 := t.OnBalancerDialEntrypoint
+		h2 := x.OnBalancerDialEntrypoint
+		ret.OnBalancerDialEntrypoint = func(d DriverBalancerDialEntrypointStartInfo) func(DriverBalancerDialEntrypointDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverBalancerDialEntrypointDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverBalancerDialEntrypointDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
+					r1(d)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnBalancerClose
 		h2 := x.OnBalancerClose
 		ret.OnBalancerClose = func(d DriverBalancerCloseStartInfo) func(DriverBalancerCloseDoneInfo) {
@@ -694,6 +729,41 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 				r1 = h2(d)
 			}
 			return func(d DriverBalancerChooseEndpointDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
+					r1(d)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnBalancerClusterDiscoveryAttempt
+		h2 := x.OnBalancerClusterDiscoveryAttempt
+		ret.OnBalancerClusterDiscoveryAttempt = func(d DriverBalancerClusterDiscoveryAttemptStartInfo) func(DriverBalancerClusterDiscoveryAttemptDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverBalancerClusterDiscoveryAttemptDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverBalancerClusterDiscoveryAttemptDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -1049,6 +1119,21 @@ func (t Driver) onBalancerInit(d DriverBalancerInitStartInfo) func(DriverBalance
 	}
 	return res
 }
+func (t Driver) onBalancerDialEntrypoint(d DriverBalancerDialEntrypointStartInfo) func(DriverBalancerDialEntrypointDoneInfo) {
+	fn := t.OnBalancerDialEntrypoint
+	if fn == nil {
+		return func(DriverBalancerDialEntrypointDoneInfo) {
+			return
+		}
+	}
+	res := fn(d)
+	if res == nil {
+		return func(DriverBalancerDialEntrypointDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t Driver) onBalancerClose(d DriverBalancerCloseStartInfo) func(DriverBalancerCloseDoneInfo) {
 	fn := t.OnBalancerClose
 	if fn == nil {
@@ -1074,6 +1159,21 @@ func (t Driver) onBalancerChooseEndpoint(d DriverBalancerChooseEndpointStartInfo
 	res := fn(d)
 	if res == nil {
 		return func(DriverBalancerChooseEndpointDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t Driver) onBalancerClusterDiscoveryAttempt(d DriverBalancerClusterDiscoveryAttemptStartInfo) func(DriverBalancerClusterDiscoveryAttemptDoneInfo) {
+	fn := t.OnBalancerClusterDiscoveryAttempt
+	if fn == nil {
+		return func(DriverBalancerClusterDiscoveryAttemptDoneInfo) {
+			return
+		}
+	}
+	res := fn(d)
+	if res == nil {
+		return func(DriverBalancerClusterDiscoveryAttemptDoneInfo) {
 			return
 		}
 	}
@@ -1314,6 +1414,17 @@ func DriverOnBalancerInit(t Driver, c *context.Context) func(error) {
 		res(p)
 	}
 }
+func DriverOnBalancerDialEntrypoint(t Driver, c *context.Context, address string) func(error) {
+	var p DriverBalancerDialEntrypointStartInfo
+	p.Context = c
+	p.Address = address
+	res := t.onBalancerDialEntrypoint(p)
+	return func(e error) {
+		var p DriverBalancerDialEntrypointDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
 func DriverOnBalancerClose(t Driver, c *context.Context) func(error) {
 	var p DriverBalancerCloseStartInfo
 	p.Context = c
@@ -1331,6 +1442,17 @@ func DriverOnBalancerChooseEndpoint(t Driver, c *context.Context) func(endpoint 
 	return func(endpoint EndpointInfo, e error) {
 		var p DriverBalancerChooseEndpointDoneInfo
 		p.Endpoint = endpoint
+		p.Error = e
+		res(p)
+	}
+}
+func DriverOnBalancerClusterDiscoveryAttempt(t Driver, c *context.Context, address string) func(error) {
+	var p DriverBalancerClusterDiscoveryAttemptStartInfo
+	p.Context = c
+	p.Address = address
+	res := t.onBalancerClusterDiscoveryAttempt(p)
+	return func(e error) {
+		var p DriverBalancerClusterDiscoveryAttemptDoneInfo
 		p.Error = e
 		res(p)
 	}

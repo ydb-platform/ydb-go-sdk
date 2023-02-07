@@ -1,5 +1,6 @@
 * Added `internal/xerrors.Errorf` error for wrap multiple errors and check them with `errors.Is` of `errors.As`
 * Fixed corner cases of `internal/wait.Wait`
+* Added `trace.Driver.{OnBalancerDialEntrypoint,OnBalancerClusterDiscoveryAttempt}` trace events
 
 ## v3.42.8
 * Fixed `internal/scheme/helpers/IsDirectoryExists(..)` recursive bug
