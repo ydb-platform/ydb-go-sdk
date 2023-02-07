@@ -20,8 +20,6 @@ import (
 )
 
 func TestStaticCredentials(t *testing.T) {
-	t.Skip("wait for newest cr.yandex/yc/yandex-docker-local-ydb:latest was published")
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
