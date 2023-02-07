@@ -171,7 +171,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 
 			if e := wait.Wait(ctx, options.fastBackoff, options.slowBackoff, m.BackoffType(), i); e != nil {
 				return xerrors.WithStackTrace(
-					xerrors.MultiErrorf("wait exit with error '%w' (origin error '%w')", e, err),
+					xerrors.Errorf("wait exit with error '%w' (origin error '%w')", e, err),
 				)
 			}
 

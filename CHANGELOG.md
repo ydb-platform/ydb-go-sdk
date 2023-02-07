@@ -1,4 +1,4 @@
-* Added `internal/xerrors.multiErrorf` error for wrap multiple errors and check with `errors.Is` of `errors.As`
+* Added `internal/xerrors.Errorf` error for wrap multiple errors and check them with `errors.Is` of `errors.As`
 * Fixed corner cases of `internal/wait.Wait`
 
 ## v3.42.8

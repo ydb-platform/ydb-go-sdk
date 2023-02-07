@@ -8,27 +8,24 @@ import (
 var _ error = (*multiErrorf)(nil)
 
 type multiErrorf struct {
-	format string
-	errs   []error
-	args   []interface{}
+	msg  string
+	errs []error
 }
 
-func MultiErrorf(format string, args ...interface{}) *multiErrorf {
+func Errorf(format string, args ...interface{}) *multiErrorf {
 	e := &multiErrorf{
-		format: format,
-		args:   args,
+		msg: fmt.Sprintf(strings.ReplaceAll(format, "%w", "%v"), args...),
 	}
 	for _, arg := range args {
 		if err, has := arg.(error); has {
 			e.errs = append(e.errs, err)
 		}
 	}
-	e.format = strings.ReplaceAll(e.format, "%w", "%v")
 	return e
 }
 
 func (e *multiErrorf) Error() string {
-	return fmt.Sprintf(e.format, e.args...)
+	return e.msg
 }
 
 func (e *multiErrorf) As(target interface{}) bool {
