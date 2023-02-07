@@ -35,7 +35,7 @@ jobs:
           name: unit
   integration:
     concurrency:
-      group: e2e-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
+      group: integration-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
       cancel-in-progress: true
     strategy:
       matrix:
@@ -57,8 +57,6 @@ jobs:
     env:
       OS: ${{ matrix.os }}
       GO: ${{ matrix.go-version }}
-      YDB_CONNECTION_STRING: grpcs://localhost:2135/local
-      YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
       YDB_SESSIONS_SHUTDOWN_URLS: http://localhost:8765/actors/kqp_proxy?force_shutdown=all
       HIDE_APPLICATION_OUTPUT: 1
     runs-on: ${{ matrix.os }}
@@ -71,11 +69,24 @@ jobs:
         uses: actions/checkout@v2
       - name: Wait database available
         run: bash ./.github/scripts/wait-ydb-container.sh
-      - name: Test
-        run: go test -race -coverpkg=./... -coverprofile integration.txt -covermode atomic ./tests
-      - name: Upload Table coverage report to Codecov
+      - name: Test secure connection
+        env:
+          YDB_CONNECTION_STRING: grpcs://localhost:2135/local
+          YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
+        run: go test -race -coverpkg=./... -coverprofile integration-secure.txt -covermode atomic ./tests
+      - name: Upload Test secure connection coverage report to Codecov
         uses: codecov/codecov-action@v2
         with:
-          file: ./integration.txt
-          flags: integration,${{ matrix.os }},${{ matrix.go-version }}
-          name: integration
+          file: ./integration-secure.txt
+          flags: integration,secure,${{ matrix.os }},${{ matrix.go-version }}
+          name: integration-secure
+      - name: Test insecure connection
+        env:
+          YDB_CONNECTION_STRING: grpc://localhost:2136/local
+        run: go test -race -coverpkg=./... -coverprofile integration-insecure.txt -covermode atomic ./tests
+      - name: Upload Test insecure connection coverage report to Codecov
+        uses: codecov/codecov-action@v2
+        with:
+          file: ./integration-insecure.txt
+          flags: integration,insecure,${{ matrix.os }},${{ matrix.go-version }}
+          name: integration-insecure
