@@ -33,9 +33,9 @@ jobs:
           file: ./unit.txt
           flags: unit,${{ matrix.os }},${{ matrix.go-version }}
           name: unit
-  integration:
+  integration-secure-connection:
     concurrency:
-      group: e2e-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
+      group: integration-secure-connection-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
       cancel-in-progress: true
     strategy:
       matrix:
@@ -71,11 +71,56 @@ jobs:
         uses: actions/checkout@v2
       - name: Wait database available
         run: bash ./.github/scripts/wait-ydb-container.sh
-      - name: Test
-        run: go test -race -coverpkg=./... -coverprofile integration.txt -covermode atomic ./tests
-      - name: Upload Table coverage report to Codecov
+      - name: Integration test
+        run: go test -race -coverpkg=./... -coverprofile integration-secure.txt -covermode atomic ./tests
+      - name: Upload Test secure connection coverage report to Codecov
         uses: codecov/codecov-action@v2
         with:
-          file: ./integration.txt
-          flags: integration,${{ matrix.os }},${{ matrix.go-version }}
-          name: integration
+          file: ./integration-secure.txt
+          flags: integration,secure,${{ matrix.os }},${{ matrix.go-version }}
+          name: integration-secure
+  integration-insecure-connection:
+    concurrency:
+      group: integration-insecure-connection-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
+      cancel-in-progress: true
+    strategy:
+      matrix:
+        go-version: [1.16.x, 1.19.x, 1.20.x]
+        os: [ubuntu-latest]
+    services:
+      ydb:
+        image: cr.yandex/yc/yandex-docker-local-ydb:latest
+        ports:
+          - 2135:2135
+          - 2136:2136
+          - 8765:8765
+        volumes:
+          - /tmp/ydb_certs:/ydb_certs
+        env:
+          YDB_LOCAL_SURVIVE_RESTART: true
+          YDB_USE_IN_MEMORY_PDISKS: true
+        options: '-h localhost'
+    env:
+      OS: ${{ matrix.os }}
+      GO: ${{ matrix.go-version }}
+      YDB_CONNECTION_STRING: grpc://localhost:2136/local
+      YDB_SESSIONS_SHUTDOWN_URLS: http://localhost:8765/actors/kqp_proxy?force_shutdown=all
+      HIDE_APPLICATION_OUTPUT: 1
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Wait database available
+        run: bash ./.github/scripts/wait-ydb-container.sh
+      - name: Test insecure connection
+        run: go test -race -coverpkg=./... -coverprofile integration-insecure.txt -covermode atomic ./tests
+      - name: Upload Test insecure connection coverage report to Codecov
+        uses: codecov/codecov-action@v2
+        with:
+          file: ./integration-insecure.txt
+          flags: integration,insecure,${{ matrix.os }},${{ matrix.go-version }}
+          name: integration-insecure
