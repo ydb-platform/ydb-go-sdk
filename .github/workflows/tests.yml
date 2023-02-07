@@ -24,7 +24,7 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Test
         run: go test -race -tags fast -coverprofile unit.txt -covermode atomic ./...
       - name: Upload coverage report to Codecov
@@ -68,7 +68,7 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Wait database available
         run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Integration test
@@ -113,7 +113,7 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Wait database available
         run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Test insecure connection
