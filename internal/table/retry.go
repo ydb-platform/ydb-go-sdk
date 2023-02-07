@@ -113,21 +113,11 @@ func do(
 	op table.Operation,
 	opts table.Options,
 ) (err error) {
-	attempts, onIntermediate := 0, trace.TableOnDo(
-		opts.Trace,
-		&ctx,
-		opts.Idempotent,
-		isRetryCalledAbove(ctx),
-	)
+	attempts, onIntermediate := 0, trace.TableOnDo(opts.Trace, &ctx, opts.Idempotent, isRetryCalledAbove(ctx))
 	defer func() {
 		onIntermediate(err)(attempts, err)
 	}()
-	return retryBackoff(
-		ctx,
-		c,
-		opts.FastBackoff,
-		opts.SlowBackoff,
-		opts.Idempotent,
+	return retryBackoff(ctx, c, opts.FastBackoff, opts.SlowBackoff, opts.Idempotent,
 		func(ctx context.Context, s table.Session) (err error) {
 			attempts++
 
@@ -163,8 +153,7 @@ func retryBackoff(
 	isOperationIdempotent bool,
 	op table.Operation,
 ) (err error) {
-	err = retry.Retry(
-		markRetryCall(ctx),
+	err = retry.Retry(markRetryCall(ctx),
 		func(ctx context.Context) (err error) {
 			var s *session
 
