@@ -59,14 +59,18 @@ func WithIdempotent(idempotent bool) retryOption {
 // WithFastBackoff replaces default fast backoff
 func WithFastBackoff(b backoff.Backoff) retryOption {
 	return func(o *retryOptions) {
-		o.fastBackoff = b
+		if b != nil {
+			o.fastBackoff = b
+		}
 	}
 }
 
 // WithSlowBackoff replaces default slow backoff
 func WithSlowBackoff(b backoff.Backoff) retryOption {
 	return func(o *retryOptions) {
-		o.slowBackoff = b
+		if b != nil {
+			o.slowBackoff = b
+		}
 	}
 }
 
@@ -117,8 +121,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 	ctx = xcontext.WithIdempotent(ctx, options.idempotent)
 	defer func() {
 		if err != nil && options.stackTrace {
-			err = xerrors.WithStackTrace(
-				err,
+			err = xerrors.WithStackTrace(err,
 				xerrors.WithSkipDepth(2), // 1 - exit from defer, 1 - exit from Retry call
 			)
 		}
@@ -167,7 +170,9 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			}
 
 			if e := wait.Wait(ctx, options.fastBackoff, options.slowBackoff, m.BackoffType(), i); e != nil {
-				return xerrors.WithStackTrace(err)
+				return xerrors.WithStackTrace(
+					xerrors.MultiErrorf("wait exit with error '%w' (origin error '%w')", e, err),
+				)
 			}
 
 			code = m.StatusCode()

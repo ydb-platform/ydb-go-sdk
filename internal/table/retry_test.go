@@ -97,10 +97,7 @@ func TestRetryerBadSession(t *testing.T) {
 		sessions   []table.Session
 	)
 	ctx, cancel := context.WithCancel(context.Background())
-	err := do(
-		ctx,
-		p,
-		config.New(),
+	err := do(ctx, p, config.New(),
 		func(ctx context.Context, s table.Session) error {
 			sessions = append(sessions, s)
 			i++

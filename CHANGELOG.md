@@ -1,3 +1,6 @@
+* Added `internal/xerrors.multiErrorf` error for wrap multiple errors and check with `errors.Is` of `errors.As`
+* Fixed corner cases of `internal/wait.Wait`
+
 ## v3.42.8
 * Fixed `internal/scheme/helpers/IsDirectoryExists(..)` recursive bug
 

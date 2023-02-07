@@ -63,7 +63,10 @@ func HideEOF(err error) error {
 // This need to single import errors
 func As(err error, targets ...interface{}) bool {
 	if err == nil {
-		return false
+		panic("nil err")
+	}
+	if len(targets) == 0 {
+		panic("empty targets")
 	}
 	for _, t := range targets {
 		if errors.As(err, t) {
@@ -76,6 +79,9 @@ func As(err error, targets ...interface{}) bool {
 // Is is a improved proxy to errors.Is
 // This need to single import errors
 func Is(err error, targets ...error) bool {
+	if err == nil {
+		panic("nil err")
+	}
 	if len(targets) == 0 {
 		panic("empty targets")
 	}

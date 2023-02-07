@@ -26,10 +26,19 @@ func Wait(ctx context.Context, fastBackoff backoff.Backoff, slowBackoff backoff.
 	var b backoff.Backoff
 	switch t {
 	case backoff.TypeNoBackoff:
+		if err := ctx.Err(); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
 		return nil
 	case backoff.TypeFast:
+		if fastBackoff == nil {
+			fastBackoff = backoff.Fast
+		}
 		b = fastBackoff
 	case backoff.TypeSlow:
+		if slowBackoff == nil {
+			slowBackoff = backoff.Slow
+		}
 		b = slowBackoff
 	}
 	return waitBackoff(ctx, b, i)

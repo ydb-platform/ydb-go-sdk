@@ -300,7 +300,7 @@ func TestRaceWgClosed(t *testing.T) {
 							return nil
 						},
 					)
-					if xerrors.Is(err, errClosedClient) {
+					if err != nil && xerrors.Is(err, errClosedClient) {
 						return
 					}
 				}
