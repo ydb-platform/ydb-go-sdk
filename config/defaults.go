@@ -1,8 +1,10 @@
 package config
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"net"
 	"time"
 
 	"google.golang.org/grpc"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xnet"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -29,8 +32,13 @@ var (
 	}
 )
 
-func defaultGrpcOptions(t trace.Driver, secure bool, tlsConfig *tls.Config) (opts []grpc.DialOption) {
+func grpcOptions(t trace.Driver, secure bool, tlsConfig *tls.Config) (opts []grpc.DialOption) {
 	opts = append(opts,
+		grpc.WithContextDialer(
+			func(ctx context.Context, address string) (net.Conn, error) {
+				return xnet.New(ctx, address, t)
+			},
+		),
 		grpc.WithKeepaliveParams(
 			DefaultGrpcConnectionPolicy,
 		),
