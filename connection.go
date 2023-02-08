@@ -443,10 +443,6 @@ func connect(ctx context.Context, c *connection) error {
 		onDone(err)
 	}()
 
-	if c.pool == nil {
-		c.pool = conn.NewPool(c.config)
-	}
-
 	if c.userInfo != nil {
 		c.config = c.config.With(config.WithCredentials(
 			credentials.NewStaticCredentials(
@@ -455,6 +451,10 @@ func connect(ctx context.Context, c *connection) error {
 				c.config.GrpcDialOptions()...,
 			),
 		))
+	}
+
+	if c.pool == nil {
+		c.pool = conn.NewPool(c.config)
 	}
 
 	c.balancer, err = balancer.New(ctx,
