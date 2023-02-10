@@ -46,7 +46,10 @@ func (c Config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
 
 // GrpcDialOptions reports about used grpc dialing options
 func (c Config) GrpcDialOptions() []grpc.DialOption {
-	return c.grpcOptions
+	return append(
+		defaultGrpcOptions(c.trace, c.secure, c.tlsConfig),
+		c.grpcOptions...,
+	)
 }
 
 // Meta reports meta information about database connection
@@ -264,8 +267,6 @@ func New(opts ...Option) Config {
 			o(&c)
 		}
 	}
-
-	c.grpcOptions = append(defaultGrpcOptions(c.trace, c.secure, c.tlsConfig), c.grpcOptions...)
 
 	c.meta = meta.New(c.database, c.credentials, c.trace, c.metaOptions...)
 

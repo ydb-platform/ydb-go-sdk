@@ -50,6 +50,9 @@ func Parse(dsn string) (info parsedInfo, err error) {
 	if err != nil {
 		return info, xerrors.WithStackTrace(err)
 	}
+	if port := uri.Port(); port == "" {
+		return info, xerrors.WithStackTrace(fmt.Errorf("bad connection string '%s': port required", dsn))
+	}
 	info.Endpoint = uri.Host
 	info.Database = uri.Path
 	info.Secure = uri.Scheme != insecureSchema
