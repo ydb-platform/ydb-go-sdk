@@ -3,6 +3,7 @@
 * Added check of port in connection string and erro throw
 * Fixed bug with initialization of connection pool before apply static credentials
 * Refactored of applying grpc dial options with defaults
+* Added `trace.Driver.{OnBalancerDialEntrypoint,OnBalancerClusterDiscoveryAttempt}` trace events
 
 ## v3.42.8
 * Fixed `internal/scheme/helpers/IsDirectoryExists(..)` recursive bug

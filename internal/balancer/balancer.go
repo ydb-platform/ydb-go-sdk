@@ -32,19 +32,19 @@ type Balancer struct {
 	driverConfig      config.Config
 	balancerConfig    balancerConfig.Config
 	pool              *conn.Pool
-	discoveryClient   func(ctx context.Context) (discoveryClient, error)
+	discoveryClient   func(ctx context.Context, address string) (discoveryClient, error)
 	discoveryRepeater repeater.Repeater
 	localDCDetector   func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
 	mu               xsync.RWMutex
 	connectionsState *connectionsState
 
-	onDiscovery []func(ctx context.Context, endpoints []endpoint.Info)
+	onApplyDiscoveredEndpoints []func(ctx context.Context, endpoints []endpoint.Info)
 }
 
-func (b *Balancer) OnUpdate(onDiscovery func(ctx context.Context, endpoints []endpoint.Info)) {
+func (b *Balancer) OnUpdate(onApplyDiscoveredEndpoints func(ctx context.Context, endpoints []endpoint.Info)) {
 	b.mu.WithLock(func() {
-		b.onDiscovery = append(b.onDiscovery, onDiscovery)
+		b.onApplyDiscoveredEndpoints = append(b.onApplyDiscoveredEndpoints, onApplyDiscoveredEndpoints)
 	})
 }
 
@@ -66,22 +66,18 @@ func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
 
 func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 	var (
-		onDone = trace.DriverOnBalancerUpdate(
+		address = "ydb:///" + b.driverConfig.Endpoint()
+		onDone  = trace.DriverOnBalancerClusterDiscoveryAttempt(
 			b.driverConfig.Trace(),
 			&ctx,
-			b.balancerConfig.DetectlocalDC,
+			address,
 		)
 		endpoints []endpoint.Endpoint
 		localDC   string
 		cancel    context.CancelFunc
 	)
-
 	defer func() {
-		nodes := make([]trace.EndpointInfo, 0, len(endpoints))
-		for _, e := range endpoints {
-			nodes = append(nodes, e.Copy())
-		}
-		onDone(nodes, localDC, err)
+		onDone(err)
 	}()
 
 	if dialTimeout := b.driverConfig.DialTimeout(); dialTimeout > 0 {
@@ -91,7 +87,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 	}
 	defer cancel()
 
-	client, err := b.discoveryClient(ctx)
+	client, err := b.discoveryClient(ctx, address)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -117,6 +113,19 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 }
 
 func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
+	onDone := trace.DriverOnBalancerUpdate(
+		b.driverConfig.Trace(),
+		&ctx,
+		b.balancerConfig.DetectlocalDC,
+	)
+	defer func() {
+		nodes := make([]trace.EndpointInfo, 0, len(endpoints))
+		for _, e := range endpoints {
+			nodes = append(nodes, e.Copy())
+		}
+		onDone(nodes, localDC, nil)
+	}()
+
 	connections := endpointsToConnections(b.pool, endpoints)
 	for _, c := range connections {
 		b.pool.Allow(ctx, c)
@@ -133,8 +142,8 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 
 	b.mu.WithLock(func() {
 		b.connectionsState = state
-		for _, onDiscovery := range b.onDiscovery {
-			onDiscovery(ctx, endpointsInfo)
+		for _, onApplyDiscoveredEndpoints := range b.onApplyDiscoveredEndpoints {
+			onApplyDiscoveredEndpoints(ctx, endpointsInfo)
 		}
 	})
 }
@@ -166,7 +175,13 @@ func New(
 			driverConfig.Trace(),
 			&ctx,
 		)
-		discoveryConfig = discoveryConfig.New(opts...)
+		discoveryConfig = discoveryConfig.New(append(opts,
+			discoveryConfig.With(driverConfig.Common),
+			discoveryConfig.WithEndpoint(driverConfig.Endpoint()),
+			discoveryConfig.WithDatabase(driverConfig.Database()),
+			discoveryConfig.WithSecure(driverConfig.Secure()),
+			discoveryConfig.WithMeta(driverConfig.Meta()),
+		)...)
 	)
 	defer func() {
 		onDone(err)
@@ -176,11 +191,16 @@ func New(
 		driverConfig:    driverConfig,
 		pool:            pool,
 		localDCDetector: detectLocalDC,
-		discoveryClient: func(ctx context.Context) (_ discoveryClient, err error) {
-			cc, err := grpc.DialContext(ctx,
-				"dns:///"+b.driverConfig.Endpoint(),
-				b.driverConfig.GrpcDialOptions()...,
+		discoveryClient: func(ctx context.Context, address string) (_ discoveryClient, err error) {
+			onBalancerDialEntrypointDone := trace.DriverOnBalancerDialEntrypoint(
+				b.driverConfig.Trace(),
+				&ctx,
+				address,
 			)
+			defer func() {
+				onBalancerDialEntrypointDone(err)
+			}()
+			cc, err := grpc.DialContext(ctx, address, b.driverConfig.GrpcDialOptions()...)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
@@ -195,11 +215,9 @@ func New(
 	}
 
 	if b.balancerConfig.SingleConn {
-		b.connectionsState = newConnectionsState(
-			endpointsToConnections(pool, []endpoint.Endpoint{
-				endpoint.New(driverConfig.Endpoint()),
-			}),
-			nil, balancerConfig.Info{}, false)
+		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
+			endpoint.New(driverConfig.Endpoint()),
+		}, "")
 	} else {
 		// initialization of balancer state
 		if err = b.clusterDiscovery(ctx); err != nil {
