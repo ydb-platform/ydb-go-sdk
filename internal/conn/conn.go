@@ -53,7 +53,6 @@ func (c *conn) Address() string {
 type conn struct {
 	mtx               sync.RWMutex
 	config            Config // ro access
-	grpcDialOptions   []grpc.DialOption
 	cc                *grpc.ClientConn
 	done              chan struct{}
 	endpoint          endpoint.Endpoint // ro access
@@ -200,7 +199,11 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	// three slashes in "ydb:///" is ok. It needs for good parse scheme in grpc resolver.
 	address := "ydb:///" + c.endpoint.Address()
 
-	cc, err = grpc.DialContext(ctx, address, c.grpcDialOptions...)
+	cc, err = grpc.DialContext(ctx, address, append(
+		[]grpc.DialOption{
+			grpc.WithStatsHandler(statsHandler{}),
+		}, c.config.GrpcDialOptions()...,
+	)...)
 	if err != nil {
 		err = xerrors.WithStackTrace(
 			xerrors.Retryable(
@@ -461,20 +464,11 @@ func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, ca
 }
 
 func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
-	grpcDialOptions := config.GrpcDialOptions()
-	grpcDialOptions = append(
-		append(
-			make([]grpc.DialOption, 0, len(grpcDialOptions)+1),
-			statsHandlerOption,
-		),
-		grpcDialOptions...,
-	)
 	c := &conn{
-		grpcDialOptions: grpcDialOptions,
-		state:           uint32(Created),
-		endpoint:        e,
-		config:          config,
-		done:            make(chan struct{}),
+		state:    uint32(Created),
+		endpoint: e,
+		config:   config,
+		done:     make(chan struct{}),
 	}
 	for _, o := range opts {
 		if o != nil {
@@ -492,8 +486,6 @@ func New(e endpoint.Endpoint, config Config, opts ...option) Conn {
 var _ stats.Handler = statsHandler{}
 
 type statsHandler struct{}
-
-var statsHandlerOption = grpc.WithStatsHandler(statsHandler{})
 
 func (statsHandler) TagRPC(ctx context.Context, _ *stats.RPCTagInfo) context.Context {
 	return ctx
