@@ -43,7 +43,7 @@ jobs:
         os: [ubuntu-latest]
     services:
       ydb:
-        image: cr.yandex/yc/yandex-docker-local-ydb:latest
+        image: cr.yandex/yc/yandex-docker-local-ydb:stable-22-5-slim
         ports:
           - 2135:2135
           - 2136:2136
@@ -69,8 +69,6 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Wait database available
-        run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Integration test
         run: go test -race -coverpkg=./... -coverprofile integration-secure.txt -covermode atomic ./tests
       - name: Upload Test secure connection coverage report to Codecov
@@ -89,7 +87,7 @@ jobs:
         os: [ubuntu-latest]
     services:
       ydb:
-        image: cr.yandex/yc/yandex-docker-local-ydb:latest
+        image: cr.yandex/yc/yandex-docker-local-ydb:stable-22-5-slim
         ports:
           - 2135:2135
           - 2136:2136
@@ -114,8 +112,6 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Wait database available
-        run: bash ./.github/scripts/wait-ydb-container.sh
       - name: Test insecure connection
         run: go test -race -coverpkg=./... -coverprofile integration-insecure.txt -covermode atomic ./tests
       - name: Upload Test insecure connection coverage report to Codecov
