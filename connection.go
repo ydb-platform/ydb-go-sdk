@@ -457,7 +457,7 @@ func connect(ctx context.Context, c *connection) error {
 		c.pool = conn.NewPool(c.config)
 	}
 
-  c.balancer, err = balancer.New(ctx, c.config, c.pool, c.discoveryOptions...)
+	c.balancer, err = balancer.New(ctx, c.config, c.pool, c.discoveryOptions...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
