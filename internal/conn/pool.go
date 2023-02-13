@@ -74,6 +74,11 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 	p.mtx.RLock()
 	defer p.mtx.RUnlock()
 
+	// don't ban single connection
+	if len(p.conns) == 1 {
+		return
+	}
+
 	cc, ok := p.conns[e.Address()]
 	if !ok {
 		return

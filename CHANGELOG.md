@@ -9,6 +9,7 @@
 * Added wrapping of errors from unary and stream results
 * Added error throw on `database/sql.Conn.BeginTx()`, `*sql.Tx.ExecContext` and `*sql.Tx.QueryContext` if query mode is not `ydb.DataQueryMode`
 * Added test for `database/sql` scan-query
+* Skipped ban of single connection in connection pool
 
 ## v3.42.8
 * Fixed `internal/scheme/helpers/IsDirectoryExists(..)` recursive bug
