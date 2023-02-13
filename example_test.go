@@ -8,6 +8,7 @@ import (
 	"log"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
@@ -172,4 +173,34 @@ func Example_discovery() {
 	for i, e := range endpoints {
 		fmt.Printf("%d) %s\n", i, e.String())
 	}
+}
+
+func ExampleOpen() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2135/local")
+	if err != nil {
+		fmt.Printf("connection failed: %v", err)
+	}
+	defer db.Close(ctx) // cleanup resources
+	fmt.Printf("connected to %s, database '%s'", db.Endpoint(), db.Name())
+}
+
+func ExampleOpen_advanced() {
+	ctx := context.TODO()
+	db, err := ydb.Open(
+		ctx,
+		"grpc://localhost:2135/local",
+		ydb.WithAnonymousCredentials(),
+		ydb.WithBalancer(
+			balancers.PreferLocationsWithFallback(
+				balancers.RandomChoice(), "a", "b",
+			),
+		),
+		ydb.WithSessionPoolSizeLimit(100),
+	)
+	if err != nil {
+		fmt.Printf("connection failed: %v", err)
+	}
+	defer db.Close(ctx) // cleanup resources
+	fmt.Printf("connected to %s, database '%s'", db.Endpoint(), db.Name())
 }
