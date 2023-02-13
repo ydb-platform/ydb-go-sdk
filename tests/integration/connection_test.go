@@ -1,7 +1,7 @@
 //go:build !fast
 // +build !fast
 
-package tests
+package integration
 
 import (
 	"context"
