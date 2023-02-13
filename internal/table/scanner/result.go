@@ -33,11 +33,29 @@ type streamResult struct {
 	close func(error) error
 }
 
+// Err returns error caused Scanner to be broken.
+func (r *streamResult) Err() error {
+	err := r.scanner.Err()
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+	return nil
+}
+
 type unaryResult struct {
 	baseResult
 
 	sets    []*Ydb.ResultSet
 	nextSet int
+}
+
+// Err returns error caused Scanner to be broken.
+func (r *unaryResult) Err() error {
+	err := r.scanner.Err()
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+	return nil
 }
 
 // Close closes the result, preventing further iteration.

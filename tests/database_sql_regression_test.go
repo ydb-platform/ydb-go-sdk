@@ -7,16 +7,24 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"math/rand"
+	"net/url"
 	"os"
+	"strconv"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 func TestRegressionCloud109307(t *testing.T) {
@@ -70,4 +78,167 @@ func TestRegressionCloud109307(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestRegressionKikimr17104(t *testing.T) {
+	tablePath := "/database/sql/kikimr/17104/stream_query"
+	if dsn, has := os.LookupEnv("YDB_CONNECTION_STRING"); !has {
+		t.Errorf("expected YDB_CONNECTION_STRING environment variable")
+	} else {
+		u, err := url.Parse(dsn)
+		require.NoError(t, err)
+		tablePath = u.Path + tablePath
+	}
+
+	var (
+		upsertRowsCount = 100000
+		upsertChecksum  uint64
+	)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
+	defer cancel()
+
+	t.Run("data", func(t *testing.T) {
+		t.Run("prepare", func(t *testing.T) {
+			var db *sql.DB
+			defer func() {
+				if db != nil {
+					_ = db.Close()
+				}
+			}()
+			t.Run("connect", func(t *testing.T) {
+				var err error
+				db, err = sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
+				require.NoError(t, err)
+			})
+			t.Run("scheme", func(t *testing.T) {
+				var cc ydb.Connection
+				t.Run("unwrap", func(t *testing.T) {
+					var err error
+					cc, err = ydb.Unwrap(db)
+					require.NoError(t, err)
+				})
+				var tableExists bool
+				t.Run("check_exists", func(t *testing.T) {
+					var err error
+					tableExists, err = sugar.IsTableExists(ctx, cc.Scheme(), tablePath)
+					require.NoError(t, err)
+				})
+				if tableExists {
+					t.Run("drop", func(t *testing.T) {
+						err := retry.Do(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), db,
+							func(ctx context.Context, cc *sql.Conn) (err error) {
+								_, err = cc.ExecContext(ctx,
+									fmt.Sprintf("DROP TABLE `%s`", tablePath),
+								)
+								if err != nil {
+									return err
+								}
+								return nil
+							}, retry.WithDoRetryOptions(retry.WithIdempotent(true)),
+						)
+						require.NoError(t, err)
+					})
+				}
+				t.Run("create", func(t *testing.T) {
+					err := retry.Do(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), db,
+						func(ctx context.Context, cc *sql.Conn) (err error) {
+							_, err = cc.ExecContext(ctx,
+								fmt.Sprintf("CREATE TABLE `%s` (val Int32, PRIMARY KEY (val))", tablePath),
+							)
+							if err != nil {
+								return err
+							}
+							return nil
+						}, retry.WithDoRetryOptions(retry.WithIdempotent(true)),
+					)
+					require.NoError(t, err)
+				})
+			})
+			t.Run("upsert", func(t *testing.T) {
+				if v, ok := os.LookupEnv("UPSERT_ROWS_COUNT"); ok {
+					var vv int
+					vv, err := strconv.Atoi(v)
+					require.NoError(t, err)
+					upsertRowsCount = vv
+				}
+				// - upsert data
+				fmt.Printf("> preparing values to upsert...\n")
+				values := make([]types.Value, 0, upsertRowsCount)
+				for i := 0; i < upsertRowsCount; i++ {
+					upsertChecksum += uint64(i)
+					values = append(values,
+						types.StructValue(
+							types.StructFieldValue("val", types.Int32Value(int32(i))),
+						),
+					)
+				}
+				fmt.Printf("> upsert data\n")
+				err := retry.Do(ydb.WithQueryMode(ctx, ydb.DataQueryMode), db,
+					func(ctx context.Context, cc *sql.Conn) (err error) {
+						values := table.NewQueryParameters(table.ValueParam("$values", types.ListValue(values...)))
+						declares, err := sugar.GenerateDeclareSection(values)
+						require.NoError(t, err)
+						_, err = cc.ExecContext(ctx,
+							declares+fmt.Sprintf("UPSERT INTO `%s` SELECT val FROM AS_TABLE($values);", tablePath),
+							values,
+						)
+						if err != nil {
+							return err
+						}
+						return nil
+					}, retry.WithDoRetryOptions(retry.WithIdempotent(true)),
+				)
+				require.NoError(t, err)
+			})
+		})
+		t.Run("scan", func(t *testing.T) {
+			var db *sql.DB
+			defer func() {
+				if db != nil {
+					_ = db.Close()
+				}
+			}()
+			t.Run("connect", func(t *testing.T) {
+				var err error
+				cc, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"))
+				require.NoError(t, err)
+				connector, err := ydb.Connector(cc, ydb.WithDefaultQueryMode(ydb.ScanQueryMode))
+				require.NoError(t, err)
+				db = sql.OpenDB(connector)
+			})
+			t.Run("query", func(t *testing.T) {
+				var (
+					rowsCount int
+					checkSum  uint64
+				)
+				err := retry.Do(ydb.WithQueryMode(ctx, ydb.ScanQueryMode), db,
+					func(ctx context.Context, cc *sql.Conn) (err error) {
+						var rows *sql.Rows
+						rowsCount = 0
+						checkSum = 0
+						rows, err = cc.QueryContext(ctx, fmt.Sprintf("SELECT val FROM `%s`", tablePath))
+						if err != nil {
+							return err
+						}
+						for rows.NextResultSet() {
+							for rows.Next() {
+								rowsCount++
+								var val uint64
+								err = rows.Scan(&val)
+								if err != nil {
+									return err
+								}
+								checkSum += val
+							}
+						}
+						return rows.Err()
+					}, retry.WithDoRetryOptions(retry.WithIdempotent(true)),
+				)
+				require.NoError(t, err)
+				require.Equal(t, upsertRowsCount, rowsCount)
+				require.Equal(t, upsertChecksum, checkSum)
+			})
+		})
+	})
 }

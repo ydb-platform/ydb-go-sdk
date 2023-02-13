@@ -342,6 +342,10 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 	defer func() {
 		onDone(transaction, err)
 	}()
+	m := queryModeFromContext(ctx, c.defaultQueryMode)
+	if m != DataQueryMode {
+		return nil, badconn.Map(xerrors.WithStackTrace(fmt.Errorf("wrong query mode: %s", m.String())))
+	}
 	if !c.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}

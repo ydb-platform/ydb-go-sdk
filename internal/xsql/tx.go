@@ -3,6 +3,7 @@ package xsql
 import (
 	"context"
 	"database/sql/driver"
+	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -70,6 +71,10 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 	defer func() {
 		onDone(err)
 	}()
+	m := queryModeFromContext(ctx, tx.conn.defaultQueryMode)
+	if m != DataQueryMode {
+		return nil, badconn.Map(xerrors.WithStackTrace(fmt.Errorf("wrong query mode: %s", m.String())))
+	}
 	var res result.Result
 	res, err = tx.tx.Execute(ctx,
 		query,
@@ -93,6 +98,10 @@ func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.Named
 	defer func() {
 		onDone(err)
 	}()
+	m := queryModeFromContext(ctx, tx.conn.defaultQueryMode)
+	if m != DataQueryMode {
+		return nil, badconn.Map(xerrors.WithStackTrace(fmt.Errorf("wrong query mode: %s", m.String())))
+	}
 	_, err = tx.tx.Execute(ctx,
 		query,
 		toQueryParams(args),
