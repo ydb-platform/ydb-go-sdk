@@ -5,7 +5,9 @@
 * Refactored of applying grpc dial options with defaults
 * Added `trace.Driver.{OnBalancerDialEntrypoint,OnBalancerClusterDiscoveryAttempt}` trace events
 * Fixed compilation of package `internal/xresolver` with `google.golang.org/grpc@v1.53`
+* Fixed returning `io.EOF` on `rows.Next` and `rows.NextResultSet`
 * Added wrapping of errors from unary and stream results
+* Added error throw on `database/sql.Conn.BeginTx()`, `*sql.Tx.ExecContext` and `*sql.Tx.QueryContext` if query mode is not `ydb.DataQueryMode`
 * Added test for `database/sql` scan-query
 
 ## v3.42.8

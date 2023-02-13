@@ -5,7 +5,6 @@ package badconn
 
 import (
 	"database/sql/driver"
-	"io"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
@@ -43,8 +42,6 @@ func Map(err error) error {
 	switch {
 	case err == nil:
 		return nil
-	case xerrors.Is(err, io.EOF):
-		return io.EOF
 	case xerrors.Is(err, driver.ErrBadConn):
 		return err
 	case xerrors.MustDeleteSession(err):
