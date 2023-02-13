@@ -1,6 +1,8 @@
 package xresolver
 
 import (
+	"strings"
+
 	"google.golang.org/grpc/resolver"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -19,23 +21,29 @@ type clientConn struct {
 	trace  trace.Driver
 }
 
+func (c *clientConn) Endpoint() string {
+	endpoint := c.target.URL.Path
+	if endpoint == "" {
+		endpoint = c.target.URL.Opaque
+	}
+	return strings.TrimPrefix(endpoint, "/")
+}
+
 func (c *clientConn) UpdateState(state resolver.State) (err error) {
-	onDone := trace.DriverOnResolve(
-		c.trace,
-		//nolint:staticcheck
-		//nolint:nolintlint
-		c.target.Endpoint,
-		func() (addrs []string) {
-			for _, a := range state.Addresses {
-				addrs = append(addrs, a.Addr)
-			}
-			return
-		}(),
-	)
+	onDone := trace.DriverOnResolve(c.trace, c.Endpoint(), func() (addrs []string) {
+		for _, a := range state.Addresses {
+			addrs = append(addrs, a.Addr)
+		}
+		return
+	}())
 	defer func() {
 		onDone(err)
 	}()
-	return xerrors.WithStackTrace(c.ClientConn.UpdateState(state))
+	err = c.ClientConn.UpdateState(state)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+	return nil
 }
 
 func (d *dnsBuilder) Build(
@@ -43,15 +51,11 @@ func (d *dnsBuilder) Build(
 	cc resolver.ClientConn,
 	opts resolver.BuildOptions,
 ) (resolver.Resolver, error) {
-	return d.Builder.Build(
-		target,
-		&clientConn{
-			ClientConn: cc,
-			target:     target,
-			trace:      d.trace,
-		},
-		opts,
-	)
+	return d.Builder.Build(target, &clientConn{
+		ClientConn: cc,
+		target:     target,
+		trace:      d.trace,
+	}, opts)
 }
 
 func (d *dnsBuilder) Scheme() string {
