@@ -69,7 +69,11 @@ func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 
 func (r *rows) NextResultSet() error {
 	r.nextSet.Do(func() {})
-	return r.result.NextResultSetErr(context.Background())
+	err := r.result.NextResultSetErr(context.Background())
+	if err != nil {
+		return badconn.Map(xerrors.WithStackTrace(err))
+	}
+	return nil
 }
 
 func (r *rows) HasNextResultSet() bool {

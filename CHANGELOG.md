@@ -5,6 +5,8 @@
 * Refactored of applying grpc dial options with defaults
 * Added `trace.Driver.{OnBalancerDialEntrypoint,OnBalancerClusterDiscoveryAttempt}` trace events
 * Fixed compilation of package `internal/xresolver` with `google.golang.org/grpc@v1.53`
+* Added wrapping of errors from unary and stream results
+* Added test for `database/sql` scan-query
 
 ## v3.42.8
 * Fixed `internal/scheme/helpers/IsDirectoryExists(..)` recursive bug
