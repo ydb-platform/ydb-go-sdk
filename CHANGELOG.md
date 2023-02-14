@@ -1,3 +1,4 @@
+## v3.42.9
 * Added `internal/xerrors.Errorf` error for wrap multiple errors and check them with `errors.Is` of `errors.As`
 * Fixed corner cases of `internal/wait.Wait`
 * Added check of port in connection string and erro throw

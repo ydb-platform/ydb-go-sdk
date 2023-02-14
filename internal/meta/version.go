@@ -3,7 +3,7 @@ package meta
 const (
 	VersionMajor = "3"
 	VersionMinor = "42"
-	VersionPatch = "8"
+	VersionPatch = "9"
 )
 
 const Version = VersionMajor + "." + VersionMinor + "." + VersionPatch
