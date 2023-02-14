@@ -385,6 +385,12 @@ type optionalType struct {
 	innerType Type
 }
 
+func (v optionalType) IsOptional() {}
+
+func (v optionalType) InnerType() Type {
+	return v.innerType
+}
+
 func (v optionalType) String() string {
 	return v.Yql()
 }
