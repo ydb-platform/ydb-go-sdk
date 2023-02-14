@@ -1,3 +1,5 @@
+* Added exit from retryer if got grpc-error `Unauthenticated` on `discovery/ListEndpoints` call  
+
 ## v3.42.9
 * Added `internal/xerrors.Errorf` error for wrap multiple errors and check them with `errors.Is` of `errors.As`
 * Fixed corner cases of `internal/wait.Wait`
