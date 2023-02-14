@@ -9,8 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"net/url"
 	"os"
+	"path"
 	"strconv"
 	"testing"
 	"time"
@@ -81,14 +81,7 @@ func TestRegressionCloud109307(t *testing.T) {
 }
 
 func TestRegressionKikimr17104(t *testing.T) {
-	tablePath := "/database/sql/kikimr/17104/stream_query"
-	if dsn, has := os.LookupEnv("YDB_CONNECTION_STRING"); !has {
-		t.Errorf("expected YDB_CONNECTION_STRING environment variable")
-	} else {
-		u, err := url.Parse(dsn)
-		require.NoError(t, err)
-		tablePath = u.Path + tablePath
-	}
+	const tableRelativePath = "database/sql/kikimr/17104/big_table"
 
 	var (
 		upsertRowsCount = 100000
@@ -100,16 +93,22 @@ func TestRegressionKikimr17104(t *testing.T) {
 
 	t.Run("data", func(t *testing.T) {
 		t.Run("prepare", func(t *testing.T) {
-			var db *sql.DB
+			var (
+				db                *sql.DB
+				tableAbsolutePath string
+			)
 			defer func() {
 				if db != nil {
 					_ = db.Close()
 				}
 			}()
 			t.Run("connect", func(t *testing.T) {
-				var err error
-				db, err = sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
+				cc, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"))
 				require.NoError(t, err)
+				connector, err := ydb.Connector(cc)
+				require.NoError(t, err)
+				db = sql.OpenDB(connector)
+				tableAbsolutePath = path.Join(cc.Name(), tableRelativePath)
 			})
 			t.Run("scheme", func(t *testing.T) {
 				var cc ydb.Connection
@@ -121,7 +120,7 @@ func TestRegressionKikimr17104(t *testing.T) {
 				var tableExists bool
 				t.Run("check_exists", func(t *testing.T) {
 					var err error
-					tableExists, err = sugar.IsTableExists(ctx, cc.Scheme(), tablePath)
+					tableExists, err = sugar.IsTableExists(ctx, cc.Scheme(), tableAbsolutePath)
 					require.NoError(t, err)
 				})
 				if tableExists {
@@ -129,7 +128,7 @@ func TestRegressionKikimr17104(t *testing.T) {
 						err := retry.Do(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), db,
 							func(ctx context.Context, cc *sql.Conn) (err error) {
 								_, err = cc.ExecContext(ctx,
-									fmt.Sprintf("DROP TABLE `%s`", tablePath),
+									fmt.Sprintf("DROP TABLE `%s`", tableAbsolutePath),
 								)
 								if err != nil {
 									return err
@@ -144,7 +143,7 @@ func TestRegressionKikimr17104(t *testing.T) {
 					err := retry.Do(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), db,
 						func(ctx context.Context, cc *sql.Conn) (err error) {
 							_, err = cc.ExecContext(ctx,
-								fmt.Sprintf("CREATE TABLE `%s` (val Int32, PRIMARY KEY (val))", tablePath),
+								fmt.Sprintf("CREATE TABLE `%s` (val Int32, PRIMARY KEY (val))", tableAbsolutePath),
 							)
 							if err != nil {
 								return err
@@ -180,7 +179,7 @@ func TestRegressionKikimr17104(t *testing.T) {
 						declares, err := sugar.GenerateDeclareSection(values)
 						require.NoError(t, err)
 						_, err = cc.ExecContext(ctx,
-							declares+fmt.Sprintf("UPSERT INTO `%s` SELECT val FROM AS_TABLE($values);", tablePath),
+							declares+fmt.Sprintf("UPSERT INTO `%s` SELECT val FROM AS_TABLE($values);", tableAbsolutePath),
 							values,
 						)
 						if err != nil {
@@ -193,19 +192,22 @@ func TestRegressionKikimr17104(t *testing.T) {
 			})
 		})
 		t.Run("scan", func(t *testing.T) {
-			var db *sql.DB
+			var (
+				db                *sql.DB
+				tableAbsolutePath string
+			)
 			defer func() {
 				if db != nil {
 					_ = db.Close()
 				}
 			}()
 			t.Run("connect", func(t *testing.T) {
-				var err error
 				cc, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"))
 				require.NoError(t, err)
 				connector, err := ydb.Connector(cc, ydb.WithDefaultQueryMode(ydb.ScanQueryMode))
 				require.NoError(t, err)
 				db = sql.OpenDB(connector)
+				tableAbsolutePath = path.Join(cc.Name(), tableRelativePath)
 			})
 			t.Run("query", func(t *testing.T) {
 				var (
@@ -217,7 +219,7 @@ func TestRegressionKikimr17104(t *testing.T) {
 						var rows *sql.Rows
 						rowsCount = 0
 						checkSum = 0
-						rows, err = cc.QueryContext(ctx, fmt.Sprintf("SELECT val FROM `%s`", tablePath))
+						rows, err = cc.QueryContext(ctx, fmt.Sprintf("SELECT val FROM `%s`", tableAbsolutePath))
 						if err != nil {
 							return err
 						}
