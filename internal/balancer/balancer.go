@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"google.golang.org/grpc"
+	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
@@ -51,8 +52,11 @@ func (b *Balancer) OnUpdate(onApplyDiscoveredEndpoints func(ctx context.Context,
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
 	if err = retry.Retry(ctx, func(childCtx context.Context) (err error) {
 		if err = b.clusterDiscoveryAttempt(childCtx); err != nil {
+			if xerrors.IsTransportError(err, grpcCodes.Unauthenticated) {
+				return xerrors.WithStackTrace(err)
+			}
 			// if got err but parent context is not done - mark error as retryable
-			if err != nil && ctx.Err() == nil && xerrors.IsTimeoutError(err) {
+			if ctx.Err() == nil && xerrors.IsTimeoutError(err) {
 				return xerrors.WithStackTrace(xerrors.Retryable(err))
 			}
 			return xerrors.WithStackTrace(err)
