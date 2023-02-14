@@ -18,6 +18,21 @@ func Equal(lhs, rhs Type) bool {
 	return value.TypesEqual(lhs, rhs)
 }
 
+// IsOptional return true if type is optional
+func IsOptional(t Type) bool {
+	return value.IsOptional(t)
+}
+
+// IsNull return true if type is null
+func IsNull(t Type) bool {
+	return value.IsNull(t)
+}
+
+// IsVoid return true if type is void
+func IsVoid(t Type) bool {
+	return value.IsVoid(t)
+}
+
 func List(t Type) Type {
 	return value.List(t)
 }

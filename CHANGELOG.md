@@ -1,3 +1,5 @@
+* Added `table/types.Is{Optional,Null,Void}` type checkers
+
 ## v3.42.10
 * Added exit from retryer if got grpc-error `Unauthenticated` on `discovery/ListEndpoints` call  
 

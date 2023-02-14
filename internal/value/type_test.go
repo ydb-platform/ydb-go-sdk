@@ -2,6 +2,8 @@ package value
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestTypeToString(t *testing.T) {
@@ -267,9 +269,127 @@ func TestTypeToString(t *testing.T) {
 		},
 	} {
 		t.Run(tt.s, func(t *testing.T) {
-			if got := tt.t.Yql(); got != tt.s {
-				t.Errorf("s representations not equals:\n\n -  got: %s\n\n - want: %s", got, tt.s)
-			}
+			require.Equal(t, tt.s, tt.t.Yql())
+		})
+	}
+}
+
+func TestIsOptional(t *testing.T) {
+	for _, tt := range []struct {
+		t          Type
+		isOptional bool
+	}{
+		{
+			t:          nil,
+			isOptional: false,
+		},
+		{
+			t:          Optional(nil),
+			isOptional: true,
+		},
+		{
+			t:          Optional(Optional(nil)),
+			isOptional: true,
+		},
+		{
+			t:          Void(),
+			isOptional: false,
+		},
+		{
+			t:          Null(),
+			isOptional: false,
+		},
+		{
+			t:          TypeText,
+			isOptional: false,
+		},
+		{
+			t:          Struct(),
+			isOptional: false,
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			require.Equal(t, tt.isOptional, IsOptional(tt.t))
+		})
+	}
+}
+
+func TestIsNull(t *testing.T) {
+	for _, tt := range []struct {
+		t          Type
+		isOptional bool
+	}{
+		{
+			t:          nil,
+			isOptional: false,
+		},
+		{
+			t:          Optional(nil),
+			isOptional: false,
+		},
+		{
+			t:          Optional(Optional(nil)),
+			isOptional: false,
+		},
+		{
+			t:          Void(),
+			isOptional: false,
+		},
+		{
+			t:          Null(),
+			isOptional: true,
+		},
+		{
+			t:          TypeText,
+			isOptional: false,
+		},
+		{
+			t:          Struct(),
+			isOptional: false,
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			require.Equal(t, tt.isOptional, IsNull(tt.t))
+		})
+	}
+}
+
+func TestIsVoid(t *testing.T) {
+	for _, tt := range []struct {
+		t          Type
+		isOptional bool
+	}{
+		{
+			t:          nil,
+			isOptional: false,
+		},
+		{
+			t:          Optional(nil),
+			isOptional: false,
+		},
+		{
+			t:          Optional(Optional(nil)),
+			isOptional: false,
+		},
+		{
+			t:          Void(),
+			isOptional: true,
+		},
+		{
+			t:          Null(),
+			isOptional: false,
+		},
+		{
+			t:          TypeText,
+			isOptional: false,
+		},
+		{
+			t:          Struct(),
+			isOptional: false,
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			require.Equal(t, tt.isOptional, IsVoid(tt.t))
 		})
 	}
 }

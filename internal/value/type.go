@@ -141,6 +141,21 @@ func TypesEqual(a, b Type) bool {
 	return a.equalsTo(b)
 }
 
+func IsOptional(t Type) bool {
+	_, has := t.(optionalType)
+	return has
+}
+
+func IsNull(t Type) bool {
+	_, has := t.(nullType)
+	return has
+}
+
+func IsVoid(t Type) bool {
+	_, has := t.(voidType)
+	return has
+}
+
 type DecimalType struct {
 	Precision uint32
 	Scale     uint32
