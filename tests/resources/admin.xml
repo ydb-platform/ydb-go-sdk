@@ -1,0 +1,16 @@
+<clickhouse>
+    <!-- Profiles of settings. -->
+    <profiles>
+        <!-- Default settings. -->
+        <default>
+            <max_threads>1</max_threads>
+            <max_block_size>8000</max_block_size>
+        </default>
+    </profiles>
+    <users>
+        <default>
+            <password>ClickHouse</password>
+            <access_management>1</access_management>
+        </default>
+    </users>
+</clickhouse>
