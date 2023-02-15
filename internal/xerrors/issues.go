@@ -42,6 +42,24 @@ func (e *errorWithIssues) Error() string {
 	return b.String()
 }
 
+func (e *errorWithIssues) As(target interface{}) bool {
+	for _, err := range e.issues {
+		if As(err, target) {
+			return true
+		}
+	}
+	return false
+}
+
+func (e *errorWithIssues) Is(target error) bool {
+	for _, err := range e.issues {
+		if Is(err, target) {
+			return true
+		}
+	}
+	return false
+}
+
 // Issue struct
 type Issue struct {
 	Message  string

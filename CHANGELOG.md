@@ -1,3 +1,22 @@
+## v3.42.10
+* Added exit from retryer if got grpc-error `Unauthenticated` on `discovery/ListEndpoints` call  
+
+## v3.42.9
+* Added `internal/xerrors.Errorf` error for wrap multiple errors and check them with `errors.Is` of `errors.As`
+* Fixed corner cases of `internal/wait.Wait`
+* Added check of port in connection string and erro throw
+* Fixed bug with initialization of connection pool before apply static credentials
+* Refactored of applying grpc dial options with defaults
+* Added `trace.Driver.{OnBalancerDialEntrypoint,OnBalancerClusterDiscoveryAttempt}` trace events
+* Fixed compilation of package `internal/xresolver` with `google.golang.org/grpc@v1.53`
+* Fixed returning `io.EOF` on `rows.Next` and `rows.NextResultSet`
+* Added wrapping of errors from unary and stream results
+* Added error throw on `database/sql.Conn.BeginTx()`, `*sql.Tx.ExecContext` and `*sql.Tx.QueryContext` if query mode is not `ydb.DataQueryMode`
+* Added test for `database/sql` scan-query
+
+## v3.42.8
+* Fixed `internal/scheme/helpers/IsDirectoryExists(..)` recursive bug
+
 ## v3.42.7
 * Fixed `sugar.IsTableExists` with recursive check directory exists
 * Added `sugar.IsDirectoryExists`

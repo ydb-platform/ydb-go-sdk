@@ -443,10 +443,6 @@ func connect(ctx context.Context, c *connection) error {
 		onDone(err)
 	}()
 
-	if c.pool == nil {
-		c.pool = conn.NewPool(c.config)
-	}
-
 	if c.userInfo != nil {
 		c.config = c.config.With(config.WithCredentials(
 			credentials.NewStaticCredentials(
@@ -457,20 +453,11 @@ func connect(ctx context.Context, c *connection) error {
 		))
 	}
 
-	c.balancer, err = balancer.New(ctx,
-		c.config, c.pool,
-		append(
-			// prepend common params from root config
-			[]discoveryConfig.Option{
-				discoveryConfig.With(c.config.Common),
-				discoveryConfig.WithEndpoint(c.Endpoint()),
-				discoveryConfig.WithDatabase(c.Name()),
-				discoveryConfig.WithSecure(c.Secure()),
-				discoveryConfig.WithMeta(c.config.Meta()),
-			},
-			c.discoveryOptions...,
-		)...,
-	)
+	if c.pool == nil {
+		c.pool = conn.NewPool(c.config)
+	}
+
+	c.balancer, err = balancer.New(ctx, c.config, c.pool, c.discoveryOptions...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}

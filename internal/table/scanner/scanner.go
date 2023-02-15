@@ -3,7 +3,6 @@ package scanner
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -21,8 +20,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
-
-var errTruncated = xerrors.Wrap(errors.New("truncated result"))
 
 type scanner struct {
 	set                      *Ydb.ResultSet
@@ -226,10 +223,13 @@ func (s *scanner) Err() error {
 		return s.err
 	}
 	if !s.ignoreTruncated && s.truncated() {
+		err := xerrors.Wrap(
+			fmt.Errorf("truncated result (more than %d rows)", len(s.set.GetRows())),
+		)
 		if s.markTruncatedAsRetryable {
-			return xerrors.WithStackTrace(xerrors.Retryable(errTruncated))
+			err = xerrors.Retryable(err)
 		}
-		return xerrors.WithStackTrace(errTruncated)
+		return xerrors.WithStackTrace(err)
 	}
 	return nil
 }

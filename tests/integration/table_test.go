@@ -1,7 +1,7 @@
 //go:build !fast
 // +build !fast
 
-package tests
+package integration
 
 import (
 	"bytes"
@@ -646,7 +646,7 @@ func testTable(t testing.TB) {
 	); err != nil {
 		t.Fatalf("create table failed: %v\n", err)
 	}
-	fmt.Printf("> table stream_query openSessions\n")
+	fmt.Printf("> table stream_query upsert data\n")
 	var (
 		upsertRowsCount = 100000
 		sum             uint64

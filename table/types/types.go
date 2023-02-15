@@ -9,9 +9,7 @@ import (
 )
 
 // Type describes YDB data types.
-type Type interface {
-	value.Type
-}
+type Type = value.Type
 
 // Equal checks for type equivalence
 func Equal(lhs, rhs Type) bool {
@@ -23,11 +21,7 @@ func List(t Type) Type {
 }
 
 func Tuple(elems ...Type) Type {
-	es := make([]value.Type, len(elems))
-	for i, el := range elems {
-		es[i] = el
-	}
-	return value.Tuple(es...)
+	return value.Tuple(elems...)
 }
 
 type tStructType struct {
@@ -70,11 +64,7 @@ func VariantStruct(opts ...StructOption) Type {
 }
 
 func VariantTuple(elems ...Type) Type {
-	es := make([]value.Type, len(elems))
-	for i, el := range elems {
-		es[i] = el
-	}
-	return value.VariantTuple(es...)
+	return value.VariantTuple(elems...)
 }
 
 func Void() Type {

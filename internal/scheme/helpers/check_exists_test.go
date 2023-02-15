@@ -57,6 +57,30 @@ func TestIsDirectoryExists(t *testing.T) {
 		err       bool
 	}{
 		{
+			checkPath: "/c/d",
+			client:    isDirectoryExistsSchemeClient{"/a", "/a/b/"},
+			exists:    false,
+			err:       true,
+		},
+		{
+			checkPath: "/a",
+			client:    isDirectoryExistsSchemeClient{"/a", "/a/b/"},
+			exists:    true,
+			err:       false,
+		},
+		{
+			checkPath: "/a/b/c",
+			client:    isDirectoryExistsSchemeClient{"/a/b/c", "/a/b/c/d/"},
+			exists:    true,
+			err:       false,
+		},
+		{
+			checkPath: "/a/b",
+			client:    isDirectoryExistsSchemeClient{"/a", "/a/b/"},
+			exists:    true,
+			err:       false,
+		},
+		{
 			checkPath: "/a/b/c/d",
 			client:    isDirectoryExistsSchemeClient{"/a", "/a/"},
 			exists:    false,
