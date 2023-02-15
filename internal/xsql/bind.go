@@ -1,31 +1,20 @@
-// Licensed to ClickHouse, Inc. under one or more contributor
-// license agreements. See the NOTICE file distributed with
-// this work for additional information regarding copyright
-// ownership. ClickHouse, Inc. licenses this file to you under
-// the Apache License, Version 2.0 (the "License"); you may
-// not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
-
-package clickhouse
+package xsql
 
 import (
 	std_driver "database/sql/driver"
+	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"reflect"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+)
+
+var (
+	errBindMixedParamsFormats = errors.New("mixed named, numeric or positional parameters")
 )
 
 func Named(name string, value interface{}) driver.NamedValue {
@@ -73,7 +62,7 @@ func bind(tz *time.Location, query string, args ...interface{}) (string, error) 
 	haveNumeric = bindNumericRe.MatchString(query)
 	havePositional = bindPositionalRe.MatchString(query)
 	if haveNumeric && havePositional {
-		return "", ErrBindMixedParamsFormats
+		return "", xerrors.WithStackTrace(errBindMixedParamsFormats)
 	}
 	for _, v := range args {
 		switch v.(type) {
@@ -82,7 +71,7 @@ func bind(tz *time.Location, query string, args ...interface{}) (string, error) 
 		default:
 		}
 		if haveNamed && (haveNumeric || havePositional) {
-			return "", ErrBindMixedParamsFormats
+			return "", xerrors.WithStackTrace(errBindMixedParamsFormats)
 		}
 	}
 	if haveNamed {
