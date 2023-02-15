@@ -146,7 +146,8 @@ func TestBindPositional(t *testing.T) {
 		}
 
 		for _, asset := range assets {
-			if actual, err := bind(time.Local, asset.query, asset.params...); assert.NoError(t, err) {
+			var actual string
+			if actual, err = bind(time.Local, asset.query, asset.params...); assert.NoError(t, err) {
 				assert.Equal(t, asset.expected, actual)
 			}
 		}

@@ -1,19 +1,21 @@
 package xsql
 
 import (
-	std_driver "database/sql/driver"
+	"database/sql/driver"
 	"errors"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"reflect"
 	"regexp"
 	"strings"
 	"time"
 
-	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 var (
+	bindNumericRe    = regexp.MustCompile(`\$[0-9]+`)
+	bindPositionalRe = regexp.MustCompile(`[^\\][?]`)
+
 	errBindMixedParamsFormats = errors.New("mixed named, numeric or positional parameters")
 )
 
@@ -39,17 +41,6 @@ type GroupSet struct {
 
 type ArraySet []interface{}
 
-func DateNamed(name string, value time.Time, scale TimeUnit) driver.NamedDateValue {
-	return driver.NamedDateValue{
-		Name:  name,
-		Value: value,
-		Scale: uint8(scale),
-	}
-}
-
-var bindNumericRe = regexp.MustCompile(`\$[0-9]+`)
-var bindPositionalRe = regexp.MustCompile(`[^\\][?]`)
-
 func bind(tz *time.Location, query string, args ...interface{}) (string, error) {
 	if len(args) == 0 {
 		return query, nil
@@ -66,7 +57,7 @@ func bind(tz *time.Location, query string, args ...interface{}) (string, error) 
 	}
 	for _, v := range args {
 		switch v.(type) {
-		case driver.NamedValue, driver.NamedDateValue:
+		case driver.NamedValue:
 			haveNamed = true
 		default:
 		}
@@ -91,7 +82,7 @@ func bindPositional(tz *time.Location, query string, args ...interface{}) (_ str
 		params = make([]string, len(args))
 	)
 	for i, v := range args {
-		if fn, ok := v.(std_driver.Valuer); ok {
+		if fn, ok := v.(driver.Valuer); ok {
 			if v, err = fn.Value(); err != nil {
 				return "", nil
 			}
@@ -114,7 +105,7 @@ func bindPositional(tz *time.Location, query string, args ...interface{}) (_ str
 		})
 	})
 	for param := range unbind {
-		return "", fmt.Errorf("have no arg for param ? at position %d", param)
+		return "", xerrors.WithStackTrace(fmt.Errorf("have no arg for param ? at position %d", param))
 	}
 	// replace \? escape sequence
 	return strings.ReplaceAll(query, "\\?", "?"), nil
@@ -126,7 +117,7 @@ func bindNumeric(tz *time.Location, query string, args ...interface{}) (_ string
 		params = make(map[string]string)
 	)
 	for i, v := range args {
-		if fn, ok := v.(std_driver.Valuer); ok {
+		if fn, ok := v.(driver.Valuer); ok {
 			if v, err = fn.Value(); err != nil {
 				return "", nil
 			}
@@ -145,7 +136,7 @@ func bindNumeric(tz *time.Location, query string, args ...interface{}) (_ string
 		return params[n]
 	})
 	for param := range unbind {
-		return "", fmt.Errorf("have no arg for %s param", param)
+		return "", xerrors.WithStackTrace(fmt.Errorf("have no arg for %s param", param))
 	}
 	return query, nil
 }
@@ -161,7 +152,7 @@ func bindNamed(tz *time.Location, query string, args ...interface{}) (_ string, 
 		switch v := v.(type) {
 		case driver.NamedValue:
 			value := v.Value
-			if fn, ok := v.Value.(std_driver.Valuer); ok {
+			if fn, ok := v.Value.(driver.Valuer); ok {
 				if value, err = fn.Value(); err != nil {
 					return "", err
 				}
@@ -171,12 +162,8 @@ func bindNamed(tz *time.Location, query string, args ...interface{}) (_ string, 
 				return "", err
 			}
 			params["@"+v.Name] = val
-		case driver.NamedDateValue:
-			val, err := format(tz, TimeUnit(v.Scale), v.Value)
-			if err != nil {
-				return "", err
-			}
-			params["@"+v.Name] = val
+		default:
+			return "", xerrors.WithStackTrace(fmt.Errorf("unknown type of arg: %T", v))
 		}
 	}
 	query = bindNamedRe.ReplaceAllStringFunc(query, func(n string) string {
@@ -187,7 +174,7 @@ func bindNamed(tz *time.Location, query string, args ...interface{}) (_ string, 
 		return params[n]
 	})
 	for param := range unbind {
-		return "", fmt.Errorf("have no arg for %q param", param)
+		return "", xerrors.WithStackTrace(fmt.Errorf("have no arg for %q param", param))
 	}
 	return query, nil
 }
@@ -209,12 +196,21 @@ func formatTime(tz *time.Location, scale TimeUnit, value time.Time) (string, err
 		if scale == Seconds {
 			return value.Format("toDateTime('2006-01-02 15:04:05')"), nil
 		}
-		return fmt.Sprintf("toDateTime64('%s', %d)", value.Format(fmt.Sprintf("2006-01-02 15:04:05.%0*d", int(scale*3), 0)), int(scale*3)), nil
+		return fmt.Sprintf("toDateTime64('%s', %d)",
+			value.Format(fmt.Sprintf("2006-01-02 15:04:05.%0*d", int(scale*3), 0)),
+			int(scale*3),
+		), nil
 	}
 	if scale == Seconds {
-		return value.Format(fmt.Sprintf("toDateTime('2006-01-02 15:04:05', '%s')", value.Location().String())), nil
+		return value.Format(fmt.Sprintf("toDateTime('2006-01-02 15:04:05', '%s')",
+			value.Location().String()),
+		), nil
 	}
-	return fmt.Sprintf("toDateTime64('%s', %d, '%s')", value.Format(fmt.Sprintf("2006-01-02 15:04:05.%0*d", int(scale*3), 0)), int(scale*3), value.Location().String()), nil
+	return fmt.Sprintf("toDateTime64('%s', %d, '%s')",
+		value.Format(fmt.Sprintf("2006-01-02 15:04:05.%0*d", int(scale*3), 0)),
+		int(scale*3),
+		value.Location().String(),
+	), nil
 }
 
 func format(tz *time.Location, scale TimeUnit, v interface{}) (string, error) {
@@ -280,13 +276,12 @@ func format(tz *time.Location, scale TimeUnit, v interface{}) (string, error) {
 			values = append(values, fmt.Sprintf("%s, %s", name, val))
 		}
 		return "map(" + strings.Join(values, ", ") + ")", nil
-
 	}
 	return fmt.Sprint(v), nil
 }
 
 func join[E any](tz *time.Location, scale TimeUnit, values []E) (string, error) {
-	items := make([]string, len(values), len(values))
+	items := make([]string, len(values))
 	for i := range values {
 		val, err := format(tz, scale, values[i])
 		if err != nil {
@@ -297,7 +292,8 @@ func join[E any](tz *time.Location, scale TimeUnit, values []E) (string, error) 
 	return strings.Join(items, ", "), nil
 }
 
-func rebind(in []std_driver.NamedValue) []interface{} {
+//nolint:unused
+func rebind(in []driver.NamedValue) []interface{} {
 	args := make([]interface{}, 0, len(in))
 	for _, v := range in {
 		switch {
