@@ -199,6 +199,19 @@ func TestCheckRetryMode(t *testing.T) {
 			resBackoff:   nil,
 			resRetriable: false,
 		},
+		{
+			name: "NotCallForNil",
+			err:  nil,
+			settings: RetrySettings{
+				StartTimeout: time.Second,
+				CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
+					panic("must not call for nil err")
+				},
+			},
+			duration:     0,
+			resBackoff:   nil,
+			resRetriable: false,
+		},
 	}
 
 	for _, test := range table {

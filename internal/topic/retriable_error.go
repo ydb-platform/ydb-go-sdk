@@ -48,6 +48,11 @@ func CheckRetryMode(err error, settings RetrySettings, retriesDuration time.Dura
 	_ backoff.Backoff,
 	isRetriable bool,
 ) {
+	// nil is not error and doesn't need retry it.
+	if err == nil {
+		return nil, false
+	}
+
 	if retriesDuration > settings.StartTimeout {
 		return nil, false
 	}
