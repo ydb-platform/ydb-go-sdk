@@ -1,3 +1,6 @@
+* Supported binding parameters for `database/sql` driver
+* Supported `ydb.WithTablePathPrefix(tablePathPrefix)` connector option
+* Fixed bug with ignoring default scan and data query options
 * Fixed topic retry policy callback call: not call it with nil error 
 
 ## v3.42.10

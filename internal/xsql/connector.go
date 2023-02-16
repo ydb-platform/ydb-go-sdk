@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"io"
+	"path"
 	"sync"
 	"time"
 
@@ -18,6 +19,13 @@ import (
 )
 
 type ConnectorOption func(c *Connector) error
+
+func WithTablePathPrefix(tablePathPrefix string) ConnectorOption {
+	return func(c *Connector) error {
+		c.tablePathPrefix = tablePathPrefix
+		return nil
+	}
+}
 
 func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
 	return func(c *Connector) error {
@@ -91,6 +99,9 @@ func Open(d Driver, connection connection, opts ...ConnectorOption) (_ *Connecto
 }
 
 type connection interface {
+	// Name returns name of database
+	Name() string
+
 	// Table returns table client
 	Table() table.Client
 
@@ -121,6 +132,7 @@ type Connector struct {
 
 	idleStopper func()
 
+	tablePathPrefix       string
 	defaultTxControl      *table.TransactionControl
 	defaultQueryMode      QueryMode
 	defaultDataQueryOpts  []options.ExecuteDataQueryOption
@@ -198,13 +210,17 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	return newConn(c, s,
+	opts := []connOption{
 		withDefaultTxControl(c.defaultTxControl),
 		withDefaultQueryMode(c.defaultQueryMode),
 		withDataOpts(c.defaultDataQueryOpts...),
 		withScanOpts(c.defaultScanQueryOpts...),
 		withTrace(c.trace),
-	), nil
+	}
+	if c.tablePathPrefix != "" {
+		opts = append(opts, withTablePathPrefix(path.Join(c.connection.Name(), c.tablePathPrefix)))
+	}
+	return newConn(c, s, opts...), nil
 }
 
 func (c *Connector) Driver() driver.Driver {

@@ -28,5 +28,8 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 		}
 		connectorOpts = append(connectorOpts, WithDefaultQueryMode(mode))
 	}
+	if tablePathPrefix := uri.Query().Get("table_path_prefix"); tablePathPrefix != "" {
+		connectorOpts = append(connectorOpts, WithTablePathPrefix(tablePathPrefix))
+	}
 	return opts, connectorOpts, nil
 }

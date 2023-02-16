@@ -97,6 +97,13 @@ func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.C
 
 type ConnectorOption = xsql.ConnectorOption
 
+// WithTablePathPrefix prepends to query special PRAGMA TablePathPrefix
+//
+// Warning: this option modidified source query
+func WithTablePathPrefix(tablePathPrefix string) ConnectorOption {
+	return xsql.WithTablePathPrefix(tablePathPrefix)
+}
+
 func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
 	return xsql.WithDefaultQueryMode(mode)
 }

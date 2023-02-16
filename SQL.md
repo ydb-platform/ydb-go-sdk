@@ -299,35 +299,42 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
 ## Specifying query parameters <a name="arg-types"></a>
 
 `database/sql` driver for `YDB` supports the following types of query parameters:
-* multiple `sql.NamedArg` arguments (standard `database/sql` query parameters)
+* positional arguments:
    ```go
-   rows, err := db.QueryContext(ctx, `
-          DECLARE $seasonTitle AS Utf8;
-          DECLARE $views AS Uint64;
-          SELECT season_id FROM seasons WHERE title LIKE $seasonTitle AND vews > $views;
-      `,
+   rows, err := db.QueryContext(ctx, 
+      "SELECT season_id FROM seasons WHERE title LIKE ? AND views > ?",
+      "%Season 1%",
+      uint64(1000),
+   )
+   ```
+* numeric arguments:
+   ```go
+   rows, err := db.QueryContext(ctx, 
+      "SELECT season_id FROM seasons WHERE title LIKE $1 AND views > $2",
+      "%Season 1%",
+      uint64(1000),
+   )
+   ```
+* named arguments:
+   ```go
+   rows, err := db.QueryContext(ctx, 
+      "SELECT season_id FROM seasons WHERE title LIKE @seasonTitle AND views > @views",
       sql.Named("seasonTitle", "%Season 1%"),
       sql.Named("views", uint64(1000)),
    )
    ```
-* multiple native `ydb-go-sdk` `table.ParameterOption` arguments which are constructed with `table.ValueParam("name", value)`
+* `table.ParameterOption` arguments:
    ```go
-   rows, err := db.QueryContext(ctx, `
-          DECLARE $seasonTitle AS Utf8;
-          DECLARE $views AS Uint64;
-          SELECT season_id FROM seasons WHERE title LIKE $seasonTitle AND vews > $views;
-      `,
+   rows, err := db.QueryContext(ctx, 
+      "SELECT season_id FROM seasons WHERE title LIKE $seasonTitle AND views > $views",
       table.ValueParam("seasonTitle", types.TextValue("%Season 1%")),
       table.ValueParam("views", types.Uint64Value((1000)),
    )
    ```
-* single native `ydb-go-sdk` `*table.QueryParameters` argument which are constructed with `table.NewQueryParameters(parameterOptions...)`
+* single `*table.QueryParameters` argument:
    ```go
-   rows, err := db.QueryContext(ctx, `
-          DECLARE $seasonTitle AS Utf8;
-          DECLARE $views AS Uint64;
-          SELECT season_id FROM seasons WHERE title LIKE $seasonTitle AND vews > $views;
-      `,
+   rows, err := db.QueryContext(ctx, 
+      "SELECT season_id FROM seasons WHERE title LIKE $seasonTitle AND views > $views",
       table.NewQueryParameters(
           table.ValueParam("seasonTitle", types.TextValue("%Season 1%")),
           table.ValueParam("views", types.Uint64Value((1000)),
