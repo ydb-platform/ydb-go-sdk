@@ -7,36 +7,18 @@ import (
 	"time"
 
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-func toQueryParams(values []driver.NamedValue) *table.QueryParameters {
-	if len(values) == 0 {
-		return nil
-	}
-	opts := make([]table.ParameterOption, len(values))
-	for i, arg := range values {
-		switch v := arg.Value.(type) {
-		case types.Value:
-			opts[i] = table.ValueParam(arg.Name, arg.Value.(types.Value))
-		case table.ParameterOption:
-			opts[i] = v
-		case *table.QueryParameters:
-			if len(values) != 1 {
-				panic("only one arg with type *table.QueryParameters are supported")
-			}
-			return v
-		default:
-			panic(fmt.Sprintf("unsupported type: %T", v))
-		}
-	}
-	return table.NewQueryParameters(opts...)
-}
-
 //nolint:gocyclo
-func convertToValue(v interface{}) (value types.Value, err error) {
+func convertToValue(v interface{}) (_ types.Value, err error) {
+	if value, ok := v.(value.Value); ok {
+		return value, nil
+	}
+
 	if valuer, ok := v.(driver.Valuer); ok {
 		v, err = valuer.Value()
 		if err != nil {
@@ -45,12 +27,14 @@ func convertToValue(v interface{}) (value types.Value, err error) {
 	}
 
 	switch x := v.(type) {
-	case types.Value:
-		return x, nil
+	case nil:
+		return types.VoidValue(), nil
 	case bool:
 		return types.BoolValue(x), nil
 	case *bool:
 		return types.NullableBoolValue(x), nil
+	case int:
+		return types.Int32Value(int32(x)), nil
 	case int8:
 		return types.Int8Value(x), nil
 	case *int8:
@@ -126,28 +110,6 @@ func convertToValue(v interface{}) (value types.Value, err error) {
 	default:
 		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: unsupported type: %T", x))
 	}
-}
-
-func checkNamedValue(v *driver.NamedValue) (err error) {
-	if v.Name == "" {
-		switch v.Value.(type) {
-		case table.ParameterOption:
-			return nil
-		case *table.QueryParameters:
-			return nil
-		default:
-			return xerrors.WithStackTrace(internal.ErrNameRequired)
-		}
-	}
-
-	value, err := convertToValue(v.Value)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
-	v.Value = value
-
-	return nil
 }
 
 // GenerateDeclareSection generates DECLARE section text in YQL query by params

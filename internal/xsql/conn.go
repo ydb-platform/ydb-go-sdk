@@ -43,6 +43,12 @@ func withDefaultTxControl(defaultTxControl *table.TransactionControl) connOption
 	}
 }
 
+func withTablePathPrefix(tablePathPrefix string) connOption {
+	return func(c *conn) {
+		c.tablePathPrefix = tablePathPrefix
+	}
+}
+
 func withDefaultQueryMode(mode QueryMode) connOption {
 	return func(c *conn) {
 		c.defaultQueryMode = mode
@@ -63,6 +69,7 @@ type conn struct {
 	closed           uint32
 	lastUsage        int64
 	defaultQueryMode QueryMode
+	tablePathPrefix  string
 
 	defaultTxControl *table.TransactionControl
 	dataOpts         []options.ExecuteDataQueryOption
@@ -70,6 +77,11 @@ type conn struct {
 	scanOpts []options.ExecuteScanQueryOption
 
 	currentTx currentTx
+}
+
+func (c *conn) CheckNamedValue(*driver.NamedValue) error {
+	// on this stage allows all values
+	return nil
 }
 
 func (c *conn) IsValid() bool {
@@ -90,8 +102,8 @@ var (
 	_ driver.ExecerContext      = &conn{}
 	_ driver.QueryerContext     = &conn{}
 	_ driver.Pinger             = &conn{}
-	_ driver.NamedValueChecker  = &conn{}
 	_ driver.Validator          = &conn{}
+	_ driver.NamedValueChecker  = &conn{}
 )
 
 func newConn(c *Connector, s table.ClosableSession, opts ...connOption) *conn {
@@ -112,8 +124,21 @@ func (c *conn) isReady() bool {
 	return c.session.Status() == table.SessionReady
 }
 
-func (conn) CheckNamedValue(v *driver.NamedValue) (err error) {
-	return checkNamedValue(v)
+func (c *conn) bindTablePathPrefix(query string) string {
+	if c.tablePathPrefix != "" {
+		return "PRAGMA TablePathPrefix(\"" + c.tablePathPrefix + "\");\n" + query
+	}
+	return query
+}
+
+func (c *conn) bindbindTablePathPrefixAndParams(query string, args ...driver.NamedValue) (
+	string, *table.QueryParameters, error,
+) {
+	query, params, err := bind(query, args...)
+	if err != nil {
+		return "", nil, xerrors.WithStackTrace(err)
+	}
+	return c.bindTablePathPrefix(query), params, nil
 }
 
 func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, err error) {
@@ -136,27 +161,28 @@ func (c *conn) sinceLastUsage() time.Duration {
 }
 
 func (c *conn) execContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, err error) {
-	m := queryModeFromContext(ctx, c.defaultQueryMode)
-	onDone := trace.DatabaseSQLOnConnExec(
-		c.trace,
-		&ctx,
-		query,
-		m.String(),
-		xcontext.IsIdempotent(ctx),
-		c.sinceLastUsage(),
+	var (
+		m      = queryModeFromContext(ctx, c.defaultQueryMode)
+		onDone = trace.DatabaseSQLOnConnExec(c.trace, &ctx, query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage())
 	)
+
 	defer func() {
 		atomic.StoreInt64(&c.lastUsage, time.Now().Unix())
 		onDone(err)
 	}()
 	switch m {
 	case DataQueryMode:
-		var res result.Result
+		var (
+			res    result.Result
+			params *table.QueryParameters
+		)
+		query, params, err = c.bindbindTablePathPrefixAndParams(query, args...)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
 		_, res, err = c.session.Execute(ctx,
 			txControl(ctx, c.defaultTxControl),
-			query,
-			toQueryParams(args),
-			dataQueryOptions(ctx)...,
+			query, params, c.dataQueryOptions(ctx)...,
 		)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -172,14 +198,21 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		}
 		return driver.ResultNoRows, nil
 	case SchemeQueryMode:
-		err = c.session.ExecuteSchemeQuery(ctx, query)
+		err = c.session.ExecuteSchemeQuery(ctx, c.bindTablePathPrefix(query))
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
 		return driver.ResultNoRows, nil
 	case ScriptingQueryMode:
-		var res result.StreamResult
-		res, err = c.connector.connection.Scripting().StreamExecute(ctx, query, toQueryParams(args))
+		var (
+			res    result.StreamResult
+			params *table.QueryParameters
+		)
+		query, params, err = c.bindbindTablePathPrefixAndParams(query, args...)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+		res, err = c.connector.connection.Scripting().StreamExecute(ctx, query, params)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -234,12 +267,17 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 	}()
 	switch m {
 	case DataQueryMode:
-		var res result.Result
+		var (
+			res    result.Result
+			params *table.QueryParameters
+		)
+		query, params, err = c.bindbindTablePathPrefixAndParams(query, args...)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
 		_, res, err = c.session.Execute(ctx,
 			txControl(ctx, c.defaultTxControl),
-			query,
-			toQueryParams(args),
-			dataQueryOptions(ctx)...,
+			query, params, c.dataQueryOptions(ctx)...,
 		)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -252,11 +290,16 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 			result: res,
 		}, nil
 	case ScanQueryMode:
-		var res result.StreamResult
+		var (
+			res    result.StreamResult
+			params *table.QueryParameters
+		)
+		query, params, err = c.bindbindTablePathPrefixAndParams(query, args...)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
 		res, err = c.session.StreamExecuteScanQuery(ctx,
-			query,
-			toQueryParams(args),
-			scanQueryOptions(ctx)...,
+			query, params, c.scanQueryOptions(ctx)...,
 		)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -270,6 +313,10 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		}, nil
 	case ExplainQueryMode:
 		var exp table.DataQueryExplanation
+		query, _, err = c.bindbindTablePathPrefixAndParams(query, args...)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
 		exp, err = c.session.Explain(ctx, query)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -281,8 +328,15 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 			},
 		}, nil
 	case ScriptingQueryMode:
-		var res result.StreamResult
-		res, err = c.connector.connection.Scripting().StreamExecute(ctx, query, toQueryParams(args))
+		var (
+			res    result.StreamResult
+			params *table.QueryParameters
+		)
+		query, params, err = c.bindbindTablePathPrefixAndParams(query, args...)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+		res, err = c.connector.connection.Scripting().StreamExecute(ctx, query, params)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}

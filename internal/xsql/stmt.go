@@ -33,7 +33,7 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ dr
 	}
 	switch m := queryModeFromContext(ctx, s.conn.defaultQueryMode); m {
 	case DataQueryMode:
-		return s.conn.QueryContext(withKeepInCache(ctx), s.query, args)
+		return s.conn.QueryContext(s.conn.withKeepInCache(ctx), s.query, args)
 	default:
 		return nil, fmt.Errorf("unsupported query mode '%s' for execute query on prepared statement", m)
 	}
@@ -49,7 +49,7 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ dri
 	}
 	switch m := queryModeFromContext(ctx, s.conn.defaultQueryMode); m {
 	case DataQueryMode:
-		return s.conn.ExecContext(withKeepInCache(ctx), s.query, args)
+		return s.conn.ExecContext(s.conn.withKeepInCache(ctx), s.query, args)
 	default:
 		return nil, fmt.Errorf("unsupported query mode '%s' for execute query on prepared statement", m)
 	}

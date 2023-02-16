@@ -1,271 +1,724 @@
-//go:build go1.18
-// +build go1.18
-
 package xsql
 
 import (
+	"database/sql/driver"
+	"strings"
 	"testing"
-	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-func TestBindNumeric(t *testing.T) {
-	_, err := bind(time.Local, `
-	SELECT * FROM t WHERE col = $1
-		AND col2 = $2
-		AND col3 = $1
-		ANS col4 = $3
-		AND null_coll = $4
-	)
-	`, 1, 2, "I'm a string param", nil)
-	if assert.NoError(t, err) {
-		assets := []struct {
-			query    string
-			params   []interface{}
-			expected string
-		}{
-			{
-				query:    "SELECT $1",
-				params:   []interface{}{1},
-				expected: "SELECT 1",
-			},
-			{
-				query:    "SELECT $2 $1 $3",
-				params:   []interface{}{1, 2, 3},
-				expected: "SELECT 2 1 3",
-			},
-			{
-				query:    "SELECT $2 $1 $3",
-				params:   []interface{}{"a", "b", "c"},
-				expected: "SELECT 'b' 'a' 'c'",
-			},
+func queryLines(q string) []string {
+	lines := strings.Split(q, ";")
+	j := 0
+	for i := range lines {
+		l := strings.TrimSpace(lines[i])
+		if l != "" {
+			lines[j] = l
+			j++
 		}
+	}
+	return lines[:j]
+}
 
-		for _, asset := range assets {
-			if actual, err := bind(time.Local, asset.query, asset.params...); assert.NoError(t, err) {
-				assert.Equal(t, asset.expected, actual)
-			}
+func named(name string, value interface{}) driver.NamedValue {
+	return driver.NamedValue{
+		Name:  name,
+		Value: value,
+	}
+}
+
+func namedValues(args ...interface{}) (namedValues []driver.NamedValue) {
+	for i, v := range args {
+		if namedValue, has := v.(driver.NamedValue); has {
+			namedValues = append(namedValues, namedValue)
+		} else {
+			namedValues = append(namedValues, driver.NamedValue{
+				Name:    "",
+				Ordinal: i,
+				Value:   v,
+			})
 		}
+	}
+	return namedValues
+}
+
+func TestBindNumeric(t *testing.T) {
+	for _, tt := range []struct {
+		query          string
+		args           []interface{}
+		expectedQuery  string
+		expectedParams *table.QueryParameters
+		expectedErr    error
+	}{
+		{
+			query: `
+				SELECT * FROM t WHERE col = $1
+					AND col2 = $2
+					AND col3 = $1
+					ANS col4 = $3
+					AND null_coll = $4
+				)
+			`,
+			args: []interface{}{1, uint64(2), "I'm a string param", nil},
+			expectedQuery: `
+				DECLARE $p1 AS Int32;
+				DECLARE $p2 AS Uint64;
+				DECLARE $p3 AS Utf8;
+				DECLARE $p4 AS Void;
+
+				SELECT * FROM t WHERE col = $p1
+					AND col2 = $p2
+					AND col3 = $p1
+					ANS col4 = $p3
+					AND null_coll = $p4
+				)
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$p1", types.Int32Value(1)),
+				table.ValueParam("$p2", types.Uint64Value(2)),
+				table.ValueParam("$p3", types.TextValue("I'm a string param")),
+				table.ValueParam("$p4", types.VoidValue()),
+			),
+			expectedErr: nil,
+		},
+		{
+			query: `SELECT $1`,
+			args:  []interface{}{1},
+			expectedQuery: `
+				DECLARE $p1 AS Int32;
+
+				SELECT $p1;
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$p1", types.Int32Value(1)),
+			),
+			expectedErr: nil,
+		},
+		{
+			query: `SELECT $2, $1, $3`,
+			args:  []interface{}{1, 2, 3},
+			expectedQuery: `
+				DECLARE $p1 AS Int32;
+				DECLARE $p2 AS Int32;
+				DECLARE $p3 AS Int32;
+
+				SELECT $p2, $p1, $p3;
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$p1", types.Int32Value(1)),
+				table.ValueParam("$p2", types.Int32Value(2)),
+				table.ValueParam("$p3", types.Int32Value(3)),
+			),
+			expectedErr: nil,
+		},
+		{
+			query: `SELECT $2, $1, $3`,
+			args:  []interface{}{"a", "b", "c"},
+			expectedQuery: `
+				DECLARE $p1 AS Utf8;
+				DECLARE $p2 AS Utf8;
+				DECLARE $p3 AS Utf8;
+
+				SELECT $p2, $p1, $p3;
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$p1", types.TextValue("a")),
+				table.ValueParam("$p2", types.TextValue("b")),
+				table.ValueParam("$p3", types.TextValue("c")),
+			),
+			expectedErr: nil,
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			query, params, err := bind(tt.query, namedValues(tt.args...)...)
+			if tt.expectedErr != nil {
+				require.ErrorIs(t, err, tt.expectedErr)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, queryLines(tt.expectedQuery), queryLines(query))
+				require.Equal(t, tt.expectedParams, params)
+			}
+		})
 	}
 }
 
 func TestBindNamed(t *testing.T) {
-	_, err := bind(time.Local, `
-	SELECT * FROM t WHERE col = @col1
-		AND col2 = @col2
-		AND col3 = @col1
-		ANS col4 = @col3
-		AND col  @> 42
-		AND null_coll = @col4
-	)
-	`,
-		Named("col1", 1),
-		Named("col2", 2),
-		Named("col3", "I'm a string param"),
-		Named("col4", nil),
-	)
-	if assert.NoError(t, err) {
-		assets := []struct {
-			query    string
-			params   []interface{}
-			expected string
-		}{
-			{
-				query: "SELECT @col1",
-				params: []interface{}{
-					Named("col1", 1),
-				},
-				expected: "SELECT 1",
+	for _, tt := range []struct {
+		query          string
+		args           []interface{}
+		expectedQuery  string
+		expectedParams *table.QueryParameters
+		expectedErr    error
+	}{
+		{
+			query: `
+				SELECT * FROM t WHERE col = $1
+					AND col2 = @p2
+					AND col3 = @p1
+					ANS col4 = @p3
+					AND null_coll = @p4
+			`,
+			args: []interface{}{
+				named("$p1", 1),
+				named("$p2", uint64(2)),
+				named("$p3", "I'm a string param"),
+				named("$p4", nil),
 			},
-			{
-				query: "SELECT @col2 @col1 @col3",
-				params: []interface{}{
-					Named("col1", 1),
-					Named("col2", 2),
-					Named("col3", 3),
-				},
-				expected: "SELECT 2 1 3",
+			expectedQuery:  "",
+			expectedParams: nil,
+			expectedErr:    errBindMixedParamsFormats,
+		},
+		{
+			query: `
+				SELECT * FROM t WHERE col = @a
+					AND col2 = @b
+					AND col3 = @a
+					ANS col4 = @c
+					AND null_coll = $d
+			`,
+			args: []interface{}{
+				named("a", 1),
+				named("b", uint64(2)),
+				named("c", "I'm a string param"),
+				named("d", nil),
 			},
-			{
-				query: "SELECT @col2 @col1 @col3",
-				params: []interface{}{
-					Named("col1", "a"),
-					Named("col2", "b"),
-					Named("col3", "c"),
-				},
-				expected: "SELECT 'b' 'a' 'c'",
+			expectedQuery: `
+				DECLARE $a AS Int32;
+				DECLARE $b AS Uint64;
+				DECLARE $c AS Utf8;
+				DECLARE $d AS Void;
+
+				SELECT * FROM t WHERE col = $a
+					AND col2 = $b
+					AND col3 = $a
+					ANS col4 = $c
+					AND null_coll = $d
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$a", types.Int32Value(1)),
+				table.ValueParam("$b", types.Uint64Value(2)),
+				table.ValueParam("$c", types.TextValue("I'm a string param")),
+				table.ValueParam("$d", types.VoidValue()),
+			),
+			expectedErr: nil,
+		},
+		{
+			query: `SELECT @p1`,
+			args: []interface{}{
+				named("p1", 1),
 			},
-		}
-		for _, asset := range assets {
-			if actual, err := bind(time.Local, asset.query, asset.params...); assert.NoError(t, err) {
-				assert.Equal(t, asset.expected, actual)
+			expectedQuery: `
+				DECLARE $p1 AS Int32;
+
+				SELECT $p1
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$p1", types.Int32Value(1)),
+			),
+			expectedErr: nil,
+		},
+		{
+			query: `SELECT @p2, @p1, @p3`,
+			args: []interface{}{
+				named("p1", 1),
+				named("p2", 2),
+				named("p3", 3),
+			},
+			expectedQuery: `
+				DECLARE $p1 AS Int32;
+				DECLARE $p2 AS Int32;
+				DECLARE $p3 AS Int32;
+
+				SELECT $p2, $p1, $p3
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$p1", types.Int32Value(1)),
+				table.ValueParam("$p2", types.Int32Value(2)),
+				table.ValueParam("$p3", types.Int32Value(3)),
+			),
+			expectedErr: nil,
+		},
+		{
+			query: `SELECT @p2, @p1, @p3`,
+			args: []interface{}{
+				named("p1", "a"),
+				named("p2", "b"),
+				named("p3", "c"),
+			},
+			expectedQuery: `
+				DECLARE $p1 AS Utf8;
+				DECLARE $p2 AS Utf8;
+				DECLARE $p3 AS Utf8;
+
+				SELECT $p2, $p1, $p3
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$p1", types.TextValue("a")),
+				table.ValueParam("$p2", types.TextValue("b")),
+				table.ValueParam("$p3", types.TextValue("c")),
+			),
+			expectedErr: nil,
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			query, params, err := bind(tt.query, namedValues(tt.args...)...)
+			if tt.expectedErr != nil {
+				require.ErrorIs(t, err, tt.expectedErr)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, queryLines(tt.expectedQuery), queryLines(query))
+				require.Equal(t, tt.expectedParams, params)
 			}
-		}
+		})
 	}
 }
 
 func TestBindPositional(t *testing.T) {
-	_, err := bind(time.Local, `
-	SELECT * FROM t WHERE col = ?
-		AND col2 = ?
-		AND col3 = ?
-		ANS col4 = ?
-		AND null_coll = ?
-	)
-	`, 1, 2, 1, "I'm a string param", nil)
-	if assert.NoError(t, err) {
-		assets := []struct {
-			query    string
-			params   []interface{}
-			expected string
-		}{
-			{
-				query:    "SELECT ?",
-				params:   []interface{}{1},
-				expected: "SELECT 1",
+	for _, tt := range []struct {
+		query          string
+		args           []interface{}
+		expectedQuery  string
+		expectedParams *table.QueryParameters
+		expectedErr    error
+	}{
+		{
+			query: `
+				SELECT * FROM t WHERE col = ?
+					AND col2 = ?
+					AND col3 = ?
+					ANS col4 = ?
+					AND null_coll = ?
+			`,
+			args: []interface{}{
+				1,
+				uint64(2),
+				"I'm a string param",
+				nil,
 			},
-			{
-				query:    "SELECT ? ? ?",
-				params:   []interface{}{1, 2, 3},
-				expected: "SELECT 1 2 3",
+			expectedQuery:  "",
+			expectedParams: nil,
+			expectedErr:    errNoPositionalArg,
+		},
+		{
+			query: `
+				SELECT * FROM t WHERE col = ?
+					AND col2 = ?
+					AND col3 = ?
+					ANS col4 = ?
+					AND null_coll = ?
+			`,
+			args: []interface{}{
+				1,
+				uint64(2),
+				1,
+				"I'm a string param",
+				nil,
 			},
-			{
-				query:    "SELECT ? ? ?",
-				params:   []interface{}{"a", "b", "c"},
-				expected: "SELECT 'a' 'b' 'c'",
-			},
-			{
-				query:    "SELECT ? ? '\\?'",
-				params:   []interface{}{"a", "b"},
-				expected: "SELECT 'a' 'b' '?'",
-			},
-			{
-				query:    "SELECT x where col = 'blah\\?' AND col2 = ?",
-				params:   []interface{}{"a"},
-				expected: "SELECT x where col = 'blah?' AND col2 = 'a'",
-			},
-		}
+			expectedQuery: `
+				DECLARE $p1 AS Int32;
+				DECLARE $p2 AS Uint64;
+				DECLARE $p3 AS Int32;
+				DECLARE $p4 AS Utf8;
+				DECLARE $p5 AS Void;
 
-		for _, asset := range assets {
-			var actual string
-			if actual, err = bind(time.Local, asset.query, asset.params...); assert.NoError(t, err) {
-				assert.Equal(t, asset.expected, actual)
+				SELECT * FROM t WHERE col = $p1
+					AND col2 = $p2
+					AND col3 = $p3
+					ANS col4 = $p4
+					AND null_coll = $p5
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$p1", types.Int32Value(1)),
+				table.ValueParam("$p2", types.Uint64Value(2)),
+				table.ValueParam("$p3", types.Int32Value(1)),
+				table.ValueParam("$p4", types.TextValue("I'm a string param")),
+				table.ValueParam("$p5", types.VoidValue()),
+			),
+			expectedErr: nil,
+		},
+		{
+			query: `SELECT ?`,
+			args: []interface{}{
+				1,
+			},
+			expectedQuery: `
+				DECLARE $p1 AS Int32;
+
+				SELECT $p1
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$p1", types.Int32Value(1)),
+			),
+			expectedErr: nil,
+		},
+		{
+			query: `SELECT ?, ?, ?`,
+			args: []interface{}{
+				1,
+				2,
+				3,
+			},
+			expectedQuery: `
+				DECLARE $p1 AS Int32;
+				DECLARE $p2 AS Int32;
+				DECLARE $p3 AS Int32;
+
+				SELECT $p1, $p2, $p3
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$p1", types.Int32Value(1)),
+				table.ValueParam("$p2", types.Int32Value(2)),
+				table.ValueParam("$p3", types.Int32Value(3)),
+			),
+			expectedErr: nil,
+		},
+		{
+			query: `SELECT ?, ?, ?`,
+			args: []interface{}{
+				"a",
+				"b",
+				"c",
+			},
+			expectedQuery: `
+				DECLARE $p1 AS Utf8;
+				DECLARE $p2 AS Utf8;
+				DECLARE $p3 AS Utf8;
+
+				SELECT $p1, $p2, $p3
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$p1", types.TextValue("a")),
+				table.ValueParam("$p2", types.TextValue("b")),
+				table.ValueParam("$p3", types.TextValue("c")),
+			),
+			expectedErr: nil,
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			query, params, err := bind(tt.query, namedValues(tt.args...)...)
+			if tt.expectedErr != nil {
+				require.ErrorIs(t, err, tt.expectedErr)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, queryLines(tt.expectedQuery), queryLines(query))
+				require.Equal(t, tt.expectedParams, params)
 			}
-		}
-	}
-
-	_, err = bind(time.Local, `
-	SELECT * FROM t WHERE col = ?
-		AND col2 = ?
-		AND col3 = ?
-		ANS col4 = ?
-		AND null_coll = ?
-	)
-	`, 1, 2, "I'm a string param", nil)
-	assert.Error(t, err)
-}
-
-func TestFormatTime(t *testing.T) {
-	var (
-		t1, _   = time.Parse("2006-01-02 15:04:05", "2022-01-12 15:00:00")
-		tz, err = time.LoadLocation("Europe/London")
-	)
-	if assert.NoError(t, err) {
-		val, _ := format(t1.Location(), Seconds, t1)
-		if assert.Equal(t, "toDateTime('2022-01-12 15:00:00')", val) {
-			val, _ = format(tz, Seconds, t1)
-			assert.Equal(t, "toDateTime('2022-01-12 15:00:00', 'UTC')", val)
-		}
+		})
 	}
 }
 
-func TestFormatScaledTime(t *testing.T) {
-	var (
-		t1, _   = time.Parse("2006-01-02 15:04:05.000000000", "2022-01-12 15:00:00.123456789")
-		tz, err = time.LoadLocation("Europe/London")
-	)
-	require.NoError(t, err)
-	// seconds
-	val, _ := format(t1.Location(), Seconds, t1)
-	require.Equal(t, "toDateTime('2022-01-12 15:00:00')", val)
-	val, _ = format(t1.Location(), Seconds, t1.In(time.Now().Location()))
-	require.Equal(t, "toDateTime('1641999600')", val)
-	val, _ = format(tz, Seconds, t1)
-	require.Equal(t, "toDateTime('2022-01-12 15:00:00', 'UTC')", val)
-	// milliseconds
-	val, _ = format(t1.Location(), MilliSeconds, t1)
-	require.Equal(t, "toDateTime64('2022-01-12 15:00:00.123', 3)", val)
-	val, _ = format(t1.Location(), MilliSeconds, t1.In(time.Now().Location()))
-	require.Equal(t, "toDateTime64('1641999600123', 3)", val)
-	val, _ = format(tz, MilliSeconds, t1)
-	require.Equal(t, "toDateTime64('2022-01-12 15:00:00.123', 3, 'UTC')", val)
-	// microseconds
-	val, _ = format(t1.Location(), MicroSeconds, t1)
-	require.Equal(t, "toDateTime64('2022-01-12 15:00:00.123456', 6)", val)
-	val, _ = format(t1.Location(), MicroSeconds, t1.In(time.Now().Location()))
-	require.Equal(t, "toDateTime64('1641999600123456', 6)", val)
-	val, _ = format(tz, MicroSeconds, t1)
-	require.Equal(t, "toDateTime64('2022-01-12 15:00:00.123456', 6, 'UTC')", val)
-	// nanoseconds
-	val, _ = format(t1.Location(), NanoSeconds, t1)
-	require.Equal(t, "toDateTime64('2022-01-12 15:00:00.123456789', 9)", val)
-	val, _ = format(t1.Location(), NanoSeconds, t1.In(time.Now().Location()))
-	require.Equal(t, "toDateTime64('1641999600123456789', 9)", val)
-	val, _ = format(tz, NanoSeconds, t1)
-	require.Equal(t, "toDateTime64('2022-01-12 15:00:00.123456789', 9, 'UTC')", val)
-}
+func TestBindParameterOption(t *testing.T) {
+	for _, tt := range []struct {
+		query          string
+		args           []interface{}
+		expectedQuery  string
+		expectedParams *table.QueryParameters
+		expectedErr    error
+	}{
+		{
+			query: `
+				SELECT * FROM t WHERE col = $1
+					AND col2 = @p2
+					AND col3 = @p1
+					ANS col4 = @p3
+					AND null_coll = @p4
+			`,
+			args: []interface{}{
+				table.ValueParam("$p1", types.Int32Value(1)),
+				table.ValueParam("$p2", types.Uint64Value(2)),
+				table.ValueParam("$p3", types.TextValue("I'm a string param")),
+				table.ValueParam("$p4", types.VoidValue()),
+			},
+			expectedQuery:  "",
+			expectedParams: nil,
+			expectedErr:    errBindMixedParamsFormats,
+		},
+		{
+			query: `
+				SELECT * FROM t WHERE col = $a
+					AND col2 = $b
+					AND col3 = $a
+					ANS col4 = $c
+					AND null_coll = $d
+			`,
+			args: []interface{}{
+				table.ValueParam("$a", types.Int32Value(1)),
+				table.ValueParam("$b", types.Uint64Value(2)),
+				table.ValueParam("$c", types.TextValue("I'm a string param")),
+				table.ValueParam("$d", types.VoidValue()),
+			},
+			expectedQuery: `
+				DECLARE $a AS Int32;
+				DECLARE $b AS Uint64;
+				DECLARE $c AS Utf8;
+				DECLARE $d AS Void;
 
-func TestStringBasedType(t *testing.T) {
-	type (
-		SupperString       string
-		SupperSupperString string
-	)
-	val, _ := format(time.UTC, Seconds, SupperString("a"))
-	require.Equal(t, "'a'", val)
-	val, _ = format(time.UTC, Seconds, SupperSupperString("a"))
-	require.Equal(t, "'a'", val)
-	val, _ = format(time.UTC, Seconds, []SupperSupperString{"a", "b", "c"})
-	require.Equal(t, "'a', 'b', 'c'", val)
-}
+				SELECT * FROM t WHERE col = $a
+					AND col2 = $b
+					AND col3 = $a
+					ANS col4 = $c
+					AND null_coll = $d
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$a", types.Int32Value(1)),
+				table.ValueParam("$b", types.Uint64Value(2)),
+				table.ValueParam("$c", types.TextValue("I'm a string param")),
+				table.ValueParam("$d", types.VoidValue()),
+			),
+			expectedErr: nil,
+		},
+		{
+			query: `SELECT $p1`,
+			args: []interface{}{
+				table.ValueParam("$p1", types.Int32Value(1)),
+			},
+			expectedQuery: `
+				DECLARE $p1 AS Int32;
 
-func TestFormatGroup(t *testing.T) {
-	groupSet := GroupSet{Value: []interface{}{"A", 1}}
-	val, _ := format(time.UTC, Seconds, groupSet)
-	assert.Equal(t, "('A', 1)", val)
-	{
-		tuples := []GroupSet{
-			{Value: []interface{}{"A", 1}},
-			{Value: []interface{}{"B", 2}},
-		}
-		val, _ = format(time.UTC, Seconds, tuples)
-		assert.Equal(t, "('A', 1), ('B', 2)", val)
+				SELECT $p1
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$p1", types.Int32Value(1)),
+			),
+			expectedErr: nil,
+		},
+		{
+			query: `SELECT $p2, $p1, $p3`,
+			args: []interface{}{
+				table.ValueParam("$p1", types.Int32Value(1)),
+				table.ValueParam("$p2", types.Int32Value(2)),
+				table.ValueParam("$p3", types.Int32Value(3)),
+			},
+			expectedQuery: `
+				DECLARE $p1 AS Int32;
+				DECLARE $p2 AS Int32;
+				DECLARE $p3 AS Int32;
+
+				SELECT $p2, $p1, $p3
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$p1", types.Int32Value(1)),
+				table.ValueParam("$p2", types.Int32Value(2)),
+				table.ValueParam("$p3", types.Int32Value(3)),
+			),
+			expectedErr: nil,
+		},
+		{
+			query: `SELECT $p2, $p1, $p3`,
+			args: []interface{}{
+				table.ValueParam("$p1", types.TextValue("a")),
+				table.ValueParam("$p2", types.TextValue("b")),
+				table.ValueParam("$p3", types.TextValue("c")),
+			},
+			expectedQuery: `
+				DECLARE $p1 AS Utf8;
+				DECLARE $p2 AS Utf8;
+				DECLARE $p3 AS Utf8;
+
+				SELECT $p2, $p1, $p3
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$p1", types.TextValue("a")),
+				table.ValueParam("$p2", types.TextValue("b")),
+				table.ValueParam("$p3", types.TextValue("c")),
+			),
+			expectedErr: nil,
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			query, params, err := bind(tt.query, namedValues(tt.args...)...)
+			if tt.expectedErr != nil {
+				require.ErrorIs(t, err, tt.expectedErr)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, queryLines(tt.expectedQuery), queryLines(query))
+				require.Equal(t, tt.expectedParams, params)
+			}
+		})
 	}
 }
 
-func TestFormatArray(t *testing.T) {
-	arraySet := ArraySet{"A", 1}
-	val, _ := format(time.UTC, Seconds, arraySet)
-	assert.Equal(t, "['A', 1]", val)
-}
+func TestBindQueryParameters(t *testing.T) {
+	for _, tt := range []struct {
+		query          string
+		args           []interface{}
+		expectedQuery  string
+		expectedParams *table.QueryParameters
+		expectedErr    error
+	}{
+		{
+			query: `
+				SELECT * FROM t WHERE col = $p1
+					AND col2 = $p2
+					AND col3 = $p1
+					ANS col4 = $p3
+					AND null_coll = $p4
+			`,
+			args: []interface{}{
+				table.NewQueryParameters(
+					table.ValueParam("$p1", types.Int32Value(1)),
+					table.ValueParam("$p2", types.Uint64Value(2)),
+					table.ValueParam("$p3", types.TextValue("I'm a string param")),
+					table.ValueParam("$p4", types.VoidValue()),
+				),
+				table.NewQueryParameters(
+					table.ValueParam("$p1", types.Int32Value(1)),
+					table.ValueParam("$p2", types.Uint64Value(2)),
+					table.ValueParam("$p3", types.TextValue("I'm a string param")),
+					table.ValueParam("$p4", types.VoidValue()),
+				),
+			},
+			expectedQuery:  "",
+			expectedParams: nil,
+			expectedErr:    errFewQueryParametersArg,
+		},
+		{
+			query: `
+				SELECT * FROM t WHERE col = $1
+					AND col2 = @p2
+					AND col3 = @p1
+					ANS col4 = @p3
+					AND null_coll = @p4
+			`,
+			args: []interface{}{
+				table.NewQueryParameters(
+					table.ValueParam("$p1", types.Int32Value(1)),
+					table.ValueParam("$p2", types.Uint64Value(2)),
+					table.ValueParam("$p3", types.TextValue("I'm a string param")),
+					table.ValueParam("$p4", types.VoidValue()),
+				),
+			},
+			expectedQuery:  "",
+			expectedParams: nil,
+			expectedErr:    errBindMixedParamsFormats,
+		},
+		{
+			query: `
+				SELECT * FROM t WHERE col = $a
+					AND col2 = $b
+					AND col3 = $a
+					ANS col4 = $c
+					AND null_coll = $d
+			`,
+			args: []interface{}{
+				table.NewQueryParameters(
+					table.ValueParam("$a", types.Int32Value(1)),
+					table.ValueParam("$b", types.Uint64Value(2)),
+					table.ValueParam("$c", types.TextValue("I'm a string param")),
+					table.ValueParam("$d", types.VoidValue()),
+				),
+			},
+			expectedQuery: `
+				DECLARE $a AS Int32;
+				DECLARE $b AS Uint64;
+				DECLARE $c AS Utf8;
+				DECLARE $d AS Void;
 
-func TestFormatMap(t *testing.T) {
-	val, _ := format(time.UTC, Seconds, map[string]uint8{"a": 1})
-	assert.Equal(t, "map('a', 1)", val)
+				SELECT * FROM t WHERE col = $a
+					AND col2 = $b
+					AND col3 = $a
+					ANS col4 = $c
+					AND null_coll = $d
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$a", types.Int32Value(1)),
+				table.ValueParam("$b", types.Uint64Value(2)),
+				table.ValueParam("$c", types.TextValue("I'm a string param")),
+				table.ValueParam("$d", types.VoidValue()),
+			),
+			expectedErr: nil,
+		},
+		{
+			query: `SELECT $p1`,
+			args: []interface{}{
+				table.NewQueryParameters(
+					table.ValueParam("$p1", types.Int32Value(1)),
+				),
+			},
+			expectedQuery: `
+				DECLARE $p1 AS Int32;
+
+				SELECT $p1
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$p1", types.Int32Value(1)),
+			),
+			expectedErr: nil,
+		},
+		{
+			query: `SELECT $p2, $p1, $p3`,
+			args: []interface{}{
+				table.NewQueryParameters(
+					table.ValueParam("$p1", types.Int32Value(1)),
+					table.ValueParam("$p2", types.Int32Value(2)),
+					table.ValueParam("$p3", types.Int32Value(3)),
+				),
+			},
+			expectedQuery: `
+				DECLARE $p1 AS Int32;
+				DECLARE $p2 AS Int32;
+				DECLARE $p3 AS Int32;
+
+				SELECT $p2, $p1, $p3
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$p1", types.Int32Value(1)),
+				table.ValueParam("$p2", types.Int32Value(2)),
+				table.ValueParam("$p3", types.Int32Value(3)),
+			),
+			expectedErr: nil,
+		},
+		{
+			query: `SELECT $p2, $p1, $p3`,
+			args: []interface{}{
+				table.NewQueryParameters(
+					table.ValueParam("$p1", types.TextValue("a")),
+					table.ValueParam("$p2", types.TextValue("b")),
+					table.ValueParam("$p3", types.TextValue("c")),
+				),
+			},
+			expectedQuery: `
+				DECLARE $p1 AS Utf8;
+				DECLARE $p2 AS Utf8;
+				DECLARE $p3 AS Utf8;
+
+				SELECT $p2, $p1, $p3
+			`,
+			expectedParams: table.NewQueryParameters(
+				table.ValueParam("$p1", types.TextValue("a")),
+				table.ValueParam("$p2", types.TextValue("b")),
+				table.ValueParam("$p3", types.TextValue("c")),
+			),
+			expectedErr: nil,
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			query, params, err := bind(tt.query, namedValues(tt.args...)...)
+			if tt.expectedErr != nil {
+				require.ErrorIs(t, err, tt.expectedErr)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, queryLines(tt.expectedQuery), queryLines(query))
+				require.Equal(t, tt.expectedParams, params)
+			}
+		})
+	}
 }
 
 func BenchmarkBindNumeric(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_, err := bind(time.Local, `
+		_, _, err := bind(`
 		SELECT * FROM t WHERE col = $1
 			AND col2 = $2
 			AND col3 = $1
 			ANS col4 = $3
 			AND null_coll = $4
-		)
-		`, 1, 2, "I'm a string param", nil)
+		`, namedValues(1, 2, "I'm a string param", nil)...)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -275,14 +728,13 @@ func BenchmarkBindNumeric(b *testing.B) {
 func BenchmarkBindPositional(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_, err := bind(time.Local, `
+		_, _, err := bind(`
 		SELECT * FROM t WHERE col = ?
 			AND col2 = ?
 			AND col3 = ?
 			ANS col4 = ?
 			AND null_coll = ?
-		)
-		`, 1, 2, 1, "I'm a string param", nil)
+		`, namedValues(1, 2, 1, "I'm a string param", nil)...)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -292,18 +744,65 @@ func BenchmarkBindPositional(b *testing.B) {
 func BenchmarkBindNamed(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		_, err := bind(time.Local, `
-		SELECT * FROM t WHERE col = @col1
-			AND col2 = @col2
-			AND col3 = @col1
-			ANS col4 = @col3
-			AND null_coll = @col4
+		_, _, err := bind(`
+			SELECT * FROM t WHERE col = @col1
+				AND col2 = @col2
+				AND col3 = @col1
+				ANS col4 = @col3
+				AND null_coll = @col4
+			`,
+			named("col1", 1),
+			named("col2", 2),
+			named("col3", "I'm a string param"),
+			named("col4", nil),
 		)
-		`,
-			Named("col1", 1),
-			Named("col2", 2),
-			Named("col3", "I'm a string param"),
-			Named("col4", nil),
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkBindParameterOption(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, _, err := bind(`
+			SELECT * FROM t WHERE col = $col1
+				AND col2 = $col2
+				AND col3 = $col1
+				ANS col4 = $col3
+				AND null_coll = $col4
+			`,
+			namedValues(
+				table.ValueParam("$col1", types.Int32Value(1)),
+				table.ValueParam("$col2", types.Uint64Value(2)),
+				table.ValueParam("$col3", types.TextValue("I'm a string param")),
+				table.ValueParam("$col4", types.VoidValue()),
+			)...,
+		)
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkBindQueryParameters(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_, _, err := bind(`
+			SELECT * FROM t WHERE col = $col1
+				AND col2 = $col2
+				AND col3 = $col1
+				ANS col4 = $col3
+				AND null_coll = $col4
+			`,
+			namedValues(
+				table.NewQueryParameters(
+					table.ValueParam("$col1", types.Int32Value(1)),
+					table.ValueParam("$col2", types.Uint64Value(2)),
+					table.ValueParam("$col3", types.TextValue("I'm a string param")),
+					table.ValueParam("$col4", types.VoidValue()),
+				),
+			)...,
 		)
 		if err != nil {
 			b.Fatal(err)

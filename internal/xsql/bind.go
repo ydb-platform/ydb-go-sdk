@@ -1,41 +1,31 @@
-//go:build go1.18
-// +build go1.18
-
 package xsql
 
 import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
-	"reflect"
 	"regexp"
+	"sort"
 	"strings"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 var (
-	bindNumericRe    = regexp.MustCompile(`\$[0-9]+`)
-	bindPositionalRe = regexp.MustCompile(`[^\\][?]`)
+	bindNumericRe      = regexp.MustCompile(`\$\d+`)
+	bindPositionalRe   = regexp.MustCompile(`[^\\][?]`)
+	bindPositionCharRe = regexp.MustCompile(`[?]`)
+	bindNamedRe        = regexp.MustCompile(`@\w+`)
+	parameterOptionRe  = regexp.MustCompile(`\$[a-zA-Z\_]+\w+`)
 
 	errBindMixedParamsFormats = errors.New("mixed named, numeric or positional parameters")
-)
-
-func Named(name string, value interface{}) driver.NamedValue {
-	return driver.NamedValue{
-		Name:  name,
-		Value: value,
-	}
-}
-
-type TimeUnit uint8
-
-const (
-	Seconds TimeUnit = iota
-	MilliSeconds
-	MicroSeconds
-	NanoSeconds
+	errNoPositionalArg        = errors.New("have no arg for positional param")
+	errNoNumericArg           = errors.New("have no arg for numeric param")
+	errNoNamedArg             = errors.New("have no arg for named param")
+	errNoParameterOptionArg   = errors.New("have no arg for param")
+	errFewQueryParametersArg  = errors.New("more then one table.QueryParameters args")
 )
 
 type GroupSet struct {
@@ -44,271 +34,197 @@ type GroupSet struct {
 
 type ArraySet []interface{}
 
-func bind(tz *time.Location, query string, args ...interface{}) (string, error) {
+//nolint:gocyclo
+func bind(query string, args ...driver.NamedValue) (string, *table.QueryParameters, error) {
 	if len(args) == 0 {
-		return query, nil
+		return query, nil, nil
 	}
 	var (
-		haveNamed      bool
-		haveNumeric    bool
-		havePositional bool
+		haveNamed           bool
+		haveNumeric         bool
+		havePositional      bool
+		haveParameterOption bool
+		haveQueryParameters bool
 	)
 	haveNumeric = bindNumericRe.MatchString(query)
 	havePositional = bindPositionalRe.MatchString(query)
 	if haveNumeric && havePositional {
-		return "", xerrors.WithStackTrace(errBindMixedParamsFormats)
+		return "", nil, xerrors.WithStackTrace(errBindMixedParamsFormats)
 	}
-	for _, v := range args {
-		switch v.(type) {
-		case driver.NamedValue:
+	for _, namedValue := range args {
+		if namedValue.Name != "" {
 			haveNamed = true
-		default:
 		}
-		if haveNamed && (haveNumeric || havePositional) {
-			return "", xerrors.WithStackTrace(errBindMixedParamsFormats)
+		switch namedValue.Value.(type) {
+		case driver.NamedValue:
+		case table.ParameterOption:
+			haveParameterOption = true
+		case *table.QueryParameters:
+			haveQueryParameters = true
 		}
 	}
-	if haveNamed {
-		return bindNamed(tz, query, args...)
+	switch {
+	case haveNamed && !(haveNumeric || havePositional || haveParameterOption || haveQueryParameters):
+		return bindNamed(query, args...)
+	case haveNumeric && !(haveNamed || havePositional || haveParameterOption || haveQueryParameters):
+		return bindNumeric(query, args...)
+	case havePositional && !(haveNamed || haveNumeric || haveParameterOption || haveQueryParameters):
+		return bindPositional(query, args...)
+	case haveParameterOption && !(haveNamed || haveNumeric || havePositional || haveQueryParameters):
+		return bindParameterOption(query, args...)
+	case haveQueryParameters && !(haveNamed || haveNumeric || havePositional || haveParameterOption):
+		return bindQueryParameters(query, args...)
+	default:
+		return "", nil, xerrors.WithStackTrace(errBindMixedParamsFormats)
 	}
-	if haveNumeric {
-		return bindNumeric(tz, query, args...)
-	}
-	return bindPositional(tz, query, args...)
 }
 
-var bindPositionCharRe = regexp.MustCompile(`[?]`)
-
-func bindPositional(tz *time.Location, query string, args ...interface{}) (_ string, err error) {
+func bindQueryParameters(query string, args ...driver.NamedValue) (_ string, _ *table.QueryParameters, err error) {
+	if len(args) != 1 {
+		return "", nil, xerrors.WithStackTrace(fmt.Errorf("%v: %w", args, errFewQueryParametersArg))
+	}
+	params, has := args[0].Value.(*table.QueryParameters)
+	if !has {
+		return "", nil, xerrors.WithStackTrace(fmt.Errorf("arg %+v is not a *table.ParameterOption", args[0]))
+	}
 	var (
-		unbind = make(map[int]struct{})
-		params = make([]string, len(args))
+		queryParams = make(map[string]struct{}, len(args))
+		declares    = make([]string, 0, len(args))
 	)
-	for i, v := range args {
-		if fn, ok := v.(driver.Valuer); ok {
-			if v, err = fn.Value(); err != nil {
-				return "", nil
-			}
-		}
-		params[i], err = format(tz, Seconds, v)
-		if err != nil {
-			return "", err
+	params.Each(func(name string, v types.Value) {
+		declares = append(declares, "DECLARE "+name+" AS "+v.Type().Yql()+";")
+		queryParams[name] = struct{}{}
+	})
+	sort.Strings(declares)
+	for _, paramName := range parameterOptionRe.FindAllString(query, -1) {
+		if _, found := queryParams[paramName]; !found {
+			return "", nil, xerrors.WithStackTrace(fmt.Errorf("%s: %w", paramName, errNoParameterOptionArg))
 		}
 	}
+	return strings.Join(declares, "\n") + "\n" + query, params, nil
+}
+
+func bindParameterOption(query string, args ...driver.NamedValue) (_ string, _ *table.QueryParameters, err error) {
+	var (
+		queryParams = make(map[string]struct{}, len(args))
+		params      = make([]table.ParameterOption, len(args))
+		declares    = make([]string, len(args))
+	)
+	for i, namedValue := range args {
+		param, has := namedValue.Value.(table.ParameterOption)
+		if !has {
+			return "", nil, xerrors.WithStackTrace(fmt.Errorf("arg %+v is not a table.ParameterOption", namedValue.Value))
+		}
+		params[i] = param
+		declares[i] = "DECLARE " + param.Name() + " AS " + param.Value().Type().Yql() + ";"
+		queryParams[param.Name()] = struct{}{}
+	}
+	sort.Strings(declares)
+	for _, paramName := range parameterOptionRe.FindAllString(query, -1) {
+		if _, found := queryParams[paramName]; !found {
+			return "", nil, xerrors.WithStackTrace(fmt.Errorf("%s: %w", paramName, errNoParameterOptionArg))
+		}
+	}
+	return strings.Join(declares, "\n") + "\n" + query, table.NewQueryParameters(params...), nil
+}
+
+func bindPositional(query string, args ...driver.NamedValue) (_ string, _ *table.QueryParameters, err error) {
+	var (
+		unbind      = make(map[int]struct{}, len(args))
+		queryParams = make([]string, len(args))
+		params      = make([]table.ParameterOption, len(args))
+		declares    = make([]string, len(args))
+	)
+	for i, namedValue := range args {
+		value, err := convertToValue(namedValue.Value)
+		if err != nil {
+			return "", nil, xerrors.WithStackTrace(err)
+		}
+		paramName := fmt.Sprintf("$p%d", i+1)
+		params[i] = table.ValueParam(paramName, value)
+		queryParams[i] = paramName
+		declares[i] = "DECLARE " + paramName + " AS " + value.Type().Yql() + ";"
+	}
+	sort.Strings(declares)
 	i := 0
 	query = bindPositionalRe.ReplaceAllStringFunc(query, func(n string) string {
-		if i >= len(params) {
+		if i >= len(queryParams) {
 			unbind[i] = struct{}{}
 			return ""
 		}
-		val := params[i]
+		val := queryParams[i]
 		i++
 		return bindPositionCharRe.ReplaceAllStringFunc(n, func(m string) string {
 			return val
 		})
 	})
 	for param := range unbind {
-		return "", xerrors.WithStackTrace(fmt.Errorf("have no arg for param ? at position %d", param))
+		return "", nil, xerrors.WithStackTrace(fmt.Errorf("position %d: %w", param, errNoPositionalArg))
 	}
 	// replace \? escape sequence
-	return strings.ReplaceAll(query, "\\?", "?"), nil
+	query = strings.ReplaceAll(query, "\\?", "?")
+	return strings.Join(declares, "\n") + "\n" + query, table.NewQueryParameters(params...), nil
 }
 
-func bindNumeric(tz *time.Location, query string, args ...interface{}) (_ string, err error) {
+func bindNumeric(query string, args ...driver.NamedValue) (_ string, _ *table.QueryParameters, err error) {
 	var (
-		unbind = make(map[string]struct{})
-		params = make(map[string]string)
+		unbind      = make(map[string]struct{}, len(args))
+		queryParams = make(map[string]string, len(args))
+		params      = make([]table.ParameterOption, len(args))
+		declares    = make([]string, len(args))
 	)
-	for i, v := range args {
-		if fn, ok := v.(driver.Valuer); ok {
-			if v, err = fn.Value(); err != nil {
-				return "", nil
-			}
-		}
-		val, err := format(tz, Seconds, v)
+	for i, namedValue := range args {
+		paramName := fmt.Sprintf("$p%d", i+1)
+		value, err := convertToValue(namedValue.Value)
 		if err != nil {
-			return "", err
+			return "", nil, xerrors.WithStackTrace(err)
 		}
-		params[fmt.Sprintf("$%d", i+1)] = val
+		params[i] = table.ValueParam(paramName, value)
+		queryParams[fmt.Sprintf("$%d", i+1)] = paramName
+		declares[i] = "DECLARE " + paramName + " AS " + value.Type().Yql() + ";"
 	}
+	sort.Strings(declares)
 	query = bindNumericRe.ReplaceAllStringFunc(query, func(n string) string {
-		if _, found := params[n]; !found {
+		name, found := queryParams[n]
+		if !found {
 			unbind[n] = struct{}{}
 			return ""
 		}
-		return params[n]
+		return name
 	})
 	for param := range unbind {
-		return "", xerrors.WithStackTrace(fmt.Errorf("have no arg for %s param", param))
+		return "", nil, xerrors.WithStackTrace(fmt.Errorf("%s: %w", param, errNoNumericArg))
 	}
-	return query, nil
+	return strings.Join(declares, "\n") + "\n" + query, table.NewQueryParameters(params...), nil
 }
 
-var bindNamedRe = regexp.MustCompile(`@[a-zA-Z0-9\_]+`)
-
-func bindNamed(tz *time.Location, query string, args ...interface{}) (_ string, err error) {
+func bindNamed(query string, args ...driver.NamedValue) (_ string, _ *table.QueryParameters, err error) {
 	var (
-		unbind = make(map[string]struct{})
-		params = make(map[string]string)
+		unbind      = make(map[string]struct{}, len(args))
+		queryParams = make(map[string]string, len(args))
+		params      = make([]table.ParameterOption, len(args))
+		declares    = make([]string, len(args))
 	)
-	for _, v := range args {
-		switch v := v.(type) {
-		case driver.NamedValue:
-			value := v.Value
-			if fn, ok := v.Value.(driver.Valuer); ok {
-				if value, err = fn.Value(); err != nil {
-					return "", err
-				}
-			}
-			val, err := format(tz, Seconds, value)
-			if err != nil {
-				return "", err
-			}
-			params["@"+v.Name] = val
-		default:
-			return "", xerrors.WithStackTrace(fmt.Errorf("unknown type of arg: %T", v))
+	for i, namedValue := range args {
+		value, err := convertToValue(namedValue.Value)
+		if err != nil {
+			return "", nil, xerrors.WithStackTrace(err)
 		}
+		params[i] = table.ValueParam("$"+namedValue.Name, value)
+		queryParams["@"+namedValue.Name] = "$" + namedValue.Name
+		declares[i] = "DECLARE $" + namedValue.Name + " AS " + value.Type().Yql() + ";"
 	}
+	sort.Strings(declares)
 	query = bindNamedRe.ReplaceAllStringFunc(query, func(n string) string {
-		if _, found := params[n]; !found {
+		name, found := queryParams[n]
+		if !found {
 			unbind[n] = struct{}{}
 			return ""
 		}
-		return params[n]
+		return name
 	})
 	for param := range unbind {
-		return "", xerrors.WithStackTrace(fmt.Errorf("have no arg for %q param", param))
+		return "", nil, xerrors.WithStackTrace(fmt.Errorf("%s: %w", param, errNoNamedArg))
 	}
-	return query, nil
-}
-
-func formatTime(tz *time.Location, scale TimeUnit, value time.Time) (string, error) {
-	switch value.Location().String() {
-	case "Local", "":
-		switch scale {
-		case Seconds:
-			return fmt.Sprintf("toDateTime('%d')", value.Unix()), nil
-		case MilliSeconds:
-			return fmt.Sprintf("toDateTime64('%d', 3)", value.UnixMilli()), nil
-		case MicroSeconds:
-			return fmt.Sprintf("toDateTime64('%d', 6)", value.UnixMicro()), nil
-		case NanoSeconds:
-			return fmt.Sprintf("toDateTime64('%d', 9)", value.UnixNano()), nil
-		}
-	case tz.String():
-		if scale == Seconds {
-			return value.Format("toDateTime('2006-01-02 15:04:05')"), nil
-		}
-		return fmt.Sprintf("toDateTime64('%s', %d)",
-			value.Format(fmt.Sprintf("2006-01-02 15:04:05.%0*d", int(scale*3), 0)),
-			int(scale*3),
-		), nil
-	}
-	if scale == Seconds {
-		return value.Format(fmt.Sprintf("toDateTime('2006-01-02 15:04:05', '%s')",
-			value.Location().String()),
-		), nil
-	}
-	return fmt.Sprintf("toDateTime64('%s', %d, '%s')",
-		value.Format(fmt.Sprintf("2006-01-02 15:04:05.%0*d", int(scale*3), 0)),
-		int(scale*3),
-		value.Location().String(),
-	), nil
-}
-
-func format(tz *time.Location, scale TimeUnit, v interface{}) (string, error) {
-	quote := func(v string) string {
-		return "'" + strings.NewReplacer(`\`, `\\`, `'`, `\'`).Replace(v) + "'"
-	}
-	switch v := v.(type) {
-	case nil:
-		return "NULL", nil
-	case string:
-		return quote(v), nil
-	case time.Time:
-		return formatTime(tz, scale, v)
-	case GroupSet:
-		val, err := join(tz, scale, v.Value)
-		if err != nil {
-			return "", err
-		}
-		return fmt.Sprintf("(%s)", val), nil
-	case []GroupSet:
-		val, err := join(tz, scale, v)
-		if err != nil {
-			return "", err
-		}
-		return val, err
-	case ArraySet:
-		val, err := join(tz, scale, v)
-		if err != nil {
-			return "", err
-		}
-		return fmt.Sprintf("[%s]", val), nil
-	case fmt.Stringer:
-		return quote(v.String()), nil
-	}
-	switch v := reflect.ValueOf(v); v.Kind() {
-	case reflect.String:
-		return quote(v.String()), nil
-	case reflect.Slice, reflect.Array:
-		values := make([]string, 0, v.Len())
-		for i := 0; i < v.Len(); i++ {
-			val, err := format(tz, scale, v.Index(i).Interface())
-			if err != nil {
-				return "", err
-			}
-			values = append(values, val)
-		}
-		return strings.Join(values, ", "), nil
-	case reflect.Map: // map
-		values := make([]string, 0, len(v.MapKeys()))
-		for _, key := range v.MapKeys() {
-			name := fmt.Sprint(key.Interface())
-			if key.Kind() == reflect.String {
-				name = fmt.Sprintf("'%s'", name)
-			}
-			val, err := format(tz, scale, v.MapIndex(key).Interface())
-			if err != nil {
-				return "", err
-			}
-			if v.MapIndex(key).Kind() == reflect.Slice || v.MapIndex(key).Kind() == reflect.Array {
-				// assume slices in maps are arrays
-				val = fmt.Sprintf("[%s]", val)
-			}
-			values = append(values, fmt.Sprintf("%s, %s", name, val))
-		}
-		return "map(" + strings.Join(values, ", ") + ")", nil
-	}
-	return fmt.Sprint(v), nil
-}
-
-func join[E any](tz *time.Location, scale TimeUnit, values []E) (string, error) {
-	items := make([]string, len(values))
-	for i := range values {
-		val, err := format(tz, scale, values[i])
-		if err != nil {
-			return "", err
-		}
-		items[i] = val
-	}
-	return strings.Join(items, ", "), nil
-}
-
-//nolint:unused
-func rebind(in []driver.NamedValue) []interface{} {
-	args := make([]interface{}, 0, len(in))
-	for _, v := range in {
-		switch {
-		case len(v.Name) != 0:
-			args = append(args, driver.NamedValue{
-				Name:  v.Name,
-				Value: v.Value,
-			})
-
-		default:
-			args = append(args, v.Value)
-		}
-	}
-	return args
+	return strings.Join(declares, "\n") + "\n" + query, table.NewQueryParameters(params...), nil
 }

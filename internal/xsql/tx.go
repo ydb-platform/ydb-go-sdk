@@ -75,11 +75,16 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 	if m != DataQueryMode {
 		return nil, badconn.Map(xerrors.WithStackTrace(fmt.Errorf("wrong query mode: %s", m.String())))
 	}
-	var res result.Result
+	var (
+		res    result.Result
+		params *table.QueryParameters
+	)
+	query, params, err = tx.conn.bindbindTablePathPrefixAndParams(query, args...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
 	res, err = tx.tx.Execute(ctx,
-		query,
-		toQueryParams(args),
-		dataQueryOptions(ctx)...,
+		query, params, tx.conn.dataQueryOptions(ctx)...,
 	)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -102,10 +107,13 @@ func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.Named
 	if m != DataQueryMode {
 		return nil, badconn.Map(xerrors.WithStackTrace(fmt.Errorf("wrong query mode: %s", m.String())))
 	}
+	var params *table.QueryParameters
+	query, params, err = tx.conn.bindbindTablePathPrefixAndParams(query, args...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
 	_, err = tx.tx.Execute(ctx,
-		query,
-		toQueryParams(args),
-		dataQueryOptions(ctx)...,
+		query, params, tx.conn.dataQueryOptions(ctx)...,
 	)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))

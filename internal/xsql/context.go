@@ -38,40 +38,40 @@ func txControl(ctx context.Context, defaultTxControl *table.TransactionControl) 
 	return defaultTxControl
 }
 
-func WithScanQueryOptions(ctx context.Context, opts ...options.ExecuteScanQueryOption) context.Context {
+func (c *conn) WithScanQueryOptions(ctx context.Context, opts ...options.ExecuteScanQueryOption) context.Context {
 	return context.WithValue(ctx,
 		ctxScanQueryOptionsKey{},
 		append(
-			append([]options.ExecuteScanQueryOption{}, scanQueryOptions(ctx)...),
+			append([]options.ExecuteScanQueryOption{}, c.scanQueryOptions(ctx)...),
 			opts...,
 		),
 	)
 }
 
-func scanQueryOptions(ctx context.Context) []options.ExecuteScanQueryOption {
+func (c *conn) scanQueryOptions(ctx context.Context) []options.ExecuteScanQueryOption {
 	if opts, ok := ctx.Value(ctxScanQueryOptionsKey{}).([]options.ExecuteScanQueryOption); ok {
-		return opts
+		return append(c.scanOpts, opts...)
 	}
-	return nil
+	return c.scanOpts
 }
 
-func WithDataQueryOptions(ctx context.Context, opts ...options.ExecuteDataQueryOption) context.Context {
+func (c *conn) WithDataQueryOptions(ctx context.Context, opts ...options.ExecuteDataQueryOption) context.Context {
 	return context.WithValue(ctx,
 		ctxDataQueryOptionsKey{},
 		append(
-			append([]options.ExecuteDataQueryOption{}, dataQueryOptions(ctx)...),
+			append([]options.ExecuteDataQueryOption{}, c.dataQueryOptions(ctx)...),
 			opts...,
 		),
 	)
 }
 
-func dataQueryOptions(ctx context.Context) []options.ExecuteDataQueryOption {
+func (c *conn) dataQueryOptions(ctx context.Context) []options.ExecuteDataQueryOption {
 	if opts, ok := ctx.Value(ctxDataQueryOptionsKey{}).([]options.ExecuteDataQueryOption); ok {
-		return opts
+		return append(c.dataOpts, opts...)
 	}
-	return nil
+	return c.dataOpts
 }
 
-func withKeepInCache(ctx context.Context) context.Context {
-	return WithDataQueryOptions(ctx, options.WithKeepInCache(true))
+func (c *conn) withKeepInCache(ctx context.Context) context.Context {
+	return c.WithDataQueryOptions(ctx, options.WithKeepInCache(true))
 }
