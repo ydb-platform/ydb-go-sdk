@@ -42,48 +42,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// Connection interface provide access to YDB service clients
+// Connection provide access to YDB service clients
 // Interface and list of clients may be changed in the future
 //
 // This interface is central part for access to various systems
 // embedded to ydb through one configured connection method.
-type Connection interface {
-	// Endpoint returns initial endpoint
-	Endpoint() string
-
-	// Name returns database name
-	Name() string
-
-	// Secure returns true if database connection is secure
-	Secure() bool
-
-	// Close closes connection and clear resources
-	Close(ctx context.Context) error
-
-	// Table returns table client
-	Table() table.Client
-
-	// Scheme returns scheme client
-	Scheme() scheme.Client
-
-	// Coordination returns coordination client
-	Coordination() coordination.Client
-
-	// Ratelimiter returns ratelimiter client
-	Ratelimiter() ratelimiter.Client
-
-	// Discovery returns discovery client
-	Discovery() discovery.Client
-
-	// Scripting returns scripting client
-	Scripting() scripting.Client
-
-	// Topic returns topic client
-	Topic() topic.Client
-
-	// With makes child connection with the same options and another options
-	With(ctx context.Context, opts ...Option) (Connection, error)
-}
+type Connection = *connection
 
 //nolint:maligned
 type connection struct {
@@ -136,6 +100,7 @@ type connection struct {
 	panicCallback func(e interface{})
 }
 
+// Close closes connection and clear resources
 func (c *connection) Close(ctx context.Context) error {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
@@ -210,18 +175,22 @@ func (c *connection) NewStream(
 	)
 }
 
+// Endpoint returns initial endpoint
 func (c *connection) Endpoint() string {
 	return c.config.Endpoint()
 }
 
+// Name returns database name
 func (c *connection) Name() string {
 	return c.config.Database()
 }
 
+// Secure returns true if database connection is secure
 func (c *connection) Secure() bool {
 	return c.config.Secure()
 }
 
+// Table returns table client
 func (c *connection) Table() table.Client {
 	c.tableOnce.Init(func() closeFunc {
 		c.table = internalTable.New(
@@ -242,6 +211,7 @@ func (c *connection) Table() table.Client {
 	return c.table
 }
 
+// Scheme returns scheme client
 func (c *connection) Scheme() scheme.Client {
 	c.schemeOnce.Init(func() closeFunc {
 		c.scheme = internalScheme.New(
@@ -263,6 +233,7 @@ func (c *connection) Scheme() scheme.Client {
 	return c.scheme
 }
 
+// Coordination returns coordination client
 func (c *connection) Coordination() coordination.Client {
 	c.coordinationOnce.Init(func() closeFunc {
 		c.coordination = internalCoordination.New(
@@ -283,6 +254,7 @@ func (c *connection) Coordination() coordination.Client {
 	return c.coordination
 }
 
+// Ratelimiter returns ratelimiter client
 func (c *connection) Ratelimiter() ratelimiter.Client {
 	c.ratelimiterOnce.Init(func() closeFunc {
 		c.ratelimiter = internalRatelimiter.New(
@@ -303,6 +275,7 @@ func (c *connection) Ratelimiter() ratelimiter.Client {
 	return c.ratelimiter
 }
 
+// Discovery returns discovery client
 func (c *connection) Discovery() discovery.Client {
 	c.discoveryOnce.Init(func() closeFunc {
 		c.discovery = internalDiscovery.New(
@@ -327,6 +300,7 @@ func (c *connection) Discovery() discovery.Client {
 	return c.discovery
 }
 
+// Scripting returns scripting client
 func (c *connection) Scripting() scripting.Client {
 	c.scriptingOnce.Init(func() closeFunc {
 		c.scripting = internalScripting.New(
@@ -347,11 +321,7 @@ func (c *connection) Scripting() scripting.Client {
 	return c.scripting
 }
 
-// Topic return topic client
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Topic returns topic client
 func (c *connection) Topic() topic.Client {
 	c.topicOnce.Init(func() closeFunc {
 		c.topic = topicclientinternal.New(c.balancer, c.config.Credentials(), c.topicOptions...)
@@ -481,11 +451,8 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 // unary and streaming RPC over internal driver balancer.
 //
 // Warning: for connect to driver-unsupported YDB services
-func GRPCConn(conn Connection) grpc.ClientConnInterface {
-	if cc, ok := conn.(*connection); ok {
-		return cc
-	}
-	return nil
+func GRPCConn(cc Connection) grpc.ClientConnInterface {
+	return cc
 }
 
 // Helper types for closing lazy clients

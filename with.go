@@ -37,6 +37,7 @@ func (c *connection) with(ctx context.Context, opts ...Option) (*connection, uin
 	return child, id, nil
 }
 
+// With makes child connection with the same options and another options
 func (c *connection) With(ctx context.Context, opts ...Option) (Connection, error) {
 	child, id, err := c.with(ctx, opts...)
 	if err != nil {
