@@ -24,7 +24,7 @@ go get -u github.com/ydb-platform/ydb-go-sdk/v3
 ## Example Usage <a name="example"></a>
 * connect to YDB
 ```golang
-db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
+db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 if err != nil {
     log.Fatal(err)
 }

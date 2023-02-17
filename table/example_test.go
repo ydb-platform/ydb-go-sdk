@@ -16,7 +16,7 @@ import (
 
 func Example_select() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 		return
@@ -59,7 +59,7 @@ func Example_select() {
 
 func Example_createTable() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 		return
@@ -93,7 +93,7 @@ func Example_createTable() {
 
 func Example_bulkUpsert() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 		return
@@ -148,7 +148,7 @@ func Example_bulkUpsert() {
 
 func Example_alterTable() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 		return
@@ -183,7 +183,7 @@ func Example_alterTable() {
 
 func Example_lazyTransaction() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 		return

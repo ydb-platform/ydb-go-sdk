@@ -26,7 +26,7 @@ Second way (making driver from connector) are different in `v2` and `v3`:
 - in `v3`:
   `ydb.Connector` creates `sql.driver.Connector` from native `YDB` driver, returns two results (`sql.driver..Connector` and error) and exclude some lazy driver initialization.
   ```go
-  nativeDriver, err := ydb.Open(context.TODO(), "grpcs://localhost:2135/local")
+  nativeDriver, err := ydb.Open(context.TODO(), "grpc://localhost:2136/local")
   if err != nil {
     // fallback on error
   }
