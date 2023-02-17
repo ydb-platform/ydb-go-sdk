@@ -12,7 +12,7 @@ import (
 
 func Example_execute() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 		return
@@ -55,7 +55,7 @@ func Example_execute() {
 
 func Example_streamExecute() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 		return
@@ -99,7 +99,7 @@ func Example_streamExecute() {
 
 func Example_explainPlan() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 		return
@@ -123,7 +123,7 @@ func Example_explainPlan() {
 
 func Example_explainValidate() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 		return

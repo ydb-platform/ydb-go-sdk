@@ -39,7 +39,7 @@ import (
 
 func main() {
     // init native ydb-go-sdk driver
-    nativeDriver, err := ydb.Open(context.TODO(), "grpcs://localhost:2135/local",
+    nativeDriver, err := ydb.Open(context.TODO(), "grpc://localhost:2136/local",
         // See many ydb.Option's for configure driver https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#Option
     )
     if err != nil {
@@ -66,7 +66,7 @@ import (
 )
 
 func main() {
-    db, err := sql.Open("ydb", "grpcs://localhost:2135/local")
+    db, err := sql.Open("ydb", "grpc://localhost:2136/local")
     defer db.Close()
 }
 ```
@@ -86,7 +86,7 @@ import (
     "github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 )
 ...
-nativeDriver, err := ydb.Open(context.TODO(), "grpcs://localhost:2135/local",
+nativeDriver, err := ydb.Open(context.TODO(), "grpc://localhost:2136/local",
     ydb.WithBalancer(
         balancers.PreferLocationsWithFallback(
             balancers.RandomChoice(), "a", "b",
@@ -338,7 +338,7 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
 ## Accessing the native driver from `*sql.DB` <a name="unwrap"></a>
 
 ```go
-db, err := sql.Open("ydb", "grpcs://localhost:2135/local")
+db, err := sql.Open("ydb", "grpc://localhost:2136/local")
 if err != nil {
     t.Fatal(err)
 }

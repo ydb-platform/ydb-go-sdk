@@ -17,7 +17,7 @@ import (
 
 func Example_table() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func Example_table() {
 }
 
 func Example_databaseSQL() {
-	db, err := sql.Open("ydb", "grpcs://localhost:2135/local")
+	db, err := sql.Open("ydb", "grpc://localhost:2136/local")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func Example_databaseSQL() {
 
 func Example_topic() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 		return
@@ -115,7 +115,7 @@ func Example_topic() {
 
 func Example_scripting() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 		return
@@ -158,7 +158,7 @@ func Example_scripting() {
 
 func Example_discovery() {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpcs://localhost:2135/local")
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 		return
