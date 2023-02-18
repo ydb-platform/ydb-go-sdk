@@ -111,7 +111,7 @@ func TestRegressionKikimr17104(t *testing.T) {
 				tableAbsolutePath = path.Join(cc.Name(), tableRelativePath)
 			})
 			t.Run("scheme", func(t *testing.T) {
-				var cc ydb.Connection
+				var cc *ydb.Connection
 				t.Run("unwrap", func(t *testing.T) {
 					var err error
 					cc, err = ydb.Unwrap(db)

@@ -155,15 +155,15 @@ func TestSchemeList(t *testing.T) {
 	require.True(t, hasTopic)
 }
 
-func connect(t testing.TB, opts ...ydb.Option) ydb.Connection {
+func connect(t testing.TB, opts ...ydb.Option) *ydb.Connection {
 	return connectWithLogOption(t, false, opts...)
 }
 
-func connectWithGrpcLogging(t testing.TB, opts ...ydb.Option) ydb.Connection {
+func connectWithGrpcLogging(t testing.TB, opts ...ydb.Option) *ydb.Connection {
 	return connectWithLogOption(t, true, opts...)
 }
 
-func connectWithLogOption(t testing.TB, logGRPC bool, opts ...ydb.Option) ydb.Connection {
+func connectWithLogOption(t testing.TB, logGRPC bool, opts ...ydb.Option) *ydb.Connection {
 	connectionString := defaultConnectionString
 	if cs := os.Getenv("YDB_CONNECTION_STRING"); cs != "" {
 		connectionString = cs

@@ -9,7 +9,7 @@ import (
 
 var nextID = uint64(0)
 
-func (c *connection) with(ctx context.Context, opts ...Option) (*connection, uint64, error) {
+func (c *Connection) with(ctx context.Context, opts ...Option) (*Connection, uint64, error) {
 	id := atomic.AddUint64(&nextID, 1)
 
 	child, err := newConnectionFromOptions(
@@ -20,7 +20,7 @@ func (c *connection) with(ctx context.Context, opts ...Option) (*connection, uin
 				WithBalancer(
 					c.config.Balancer(),
 				),
-				withOnClose(func(child *connection) {
+				withOnClose(func(child *Connection) {
 					c.childrenMtx.Lock()
 					defer c.childrenMtx.Unlock()
 
@@ -38,7 +38,7 @@ func (c *connection) with(ctx context.Context, opts ...Option) (*connection, uin
 }
 
 // With makes child connection with the same options and another options
-func (c *connection) With(ctx context.Context, opts ...Option) (Connection, error) {
+func (c *Connection) With(ctx context.Context, opts ...Option) (*Connection, error) {
 	child, id, err := c.with(ctx, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

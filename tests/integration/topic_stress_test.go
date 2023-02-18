@@ -73,7 +73,7 @@ func TestReadersWritersStress(t *testing.T) {
 func stressTestInATopic(
 	ctx context.Context,
 	t testing.TB,
-	db ydb.Connection,
+	db *ydb.Connection,
 	testTime time.Duration,
 	topicPath string,
 	consumerName string,

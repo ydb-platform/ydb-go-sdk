@@ -390,7 +390,7 @@ func TestUpdateToken(t *testing.T) {
 
 var topicCounter int
 
-func createTopic(ctx context.Context, t testing.TB, db ydb.Connection) (topicPath string) {
+func createTopic(ctx context.Context, t testing.TB, db *ydb.Connection) (topicPath string) {
 	topicCounter++
 	topicPath = db.Name() + "/" + t.Name() + "--test-topic-" + strconv.Itoa(topicCounter)
 	_ = db.Topic().Drop(ctx, topicPath)
@@ -405,7 +405,7 @@ func createTopic(ctx context.Context, t testing.TB, db ydb.Connection) (topicPat
 	return topicPath
 }
 
-func addConsumer(ctx context.Context, db ydb.Connection, topicName, consumerName string) error {
+func addConsumer(ctx context.Context, db *ydb.Connection, topicName, consumerName string) error {
 	consumer := topictypes.Consumer{Name: consumerName}
 	return db.Topic().Alter(ctx, topicName, topicoptions.AlterWithAddConsumers(consumer))
 }

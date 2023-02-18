@@ -1,5 +1,5 @@
 * Fixed topic retry policy callback call: not call it with nil error 
-* Replaced `ydb.Connection` interface on alias `*ydb.connection`
+* Replaced `ydb.Connection` interface to struct `ydb.Connection`
 
 ## v3.42.10
 * Added exit from retryer if got grpc-error `Unauthenticated` on `discovery/ListEndpoints` call  

@@ -36,7 +36,7 @@ func TestIssue229UnexpectedNullWhileParseNilJsonDocumentValue(t *testing.T) {
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 	)
 	require.NoError(t, err)
-	defer func(db ydb.Connection) {
+	defer func(db *ydb.Connection) {
 		// cleanup
 		_ = db.Close(ctx)
 	}(db)

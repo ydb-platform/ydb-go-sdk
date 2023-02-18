@@ -233,7 +233,7 @@ func TestConnection(t *testing.T) {
 		}
 	})
 	t.Run("with.scripting.StreamExecuteYql", func(t *testing.T) {
-		var childDB ydb.Connection
+		var childDB *ydb.Connection
 		childDB, err = db.With(
 			ctx,
 			ydb.WithDialTimeout(time.Second*5),
