@@ -3,7 +3,6 @@ package traces
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -11,16 +10,10 @@ import (
 type endpoints []trace.EndpointInfo
 
 func (es endpoints) String() string {
-	bldr := strings.Builder{}
-	bldr.WriteByte('[')
-	for i, e := range es {
-		bldr.WriteString(e.String())
-		if i+1 < len(es) {
-			bldr.WriteByte(',')
-		}
-	}
-	bldr.WriteByte(']')
-	return bldr.String()
+
+	b, _ := json.Marshal(es)
+	return string(b)
+
 }
 
 type metadata map[string][]string

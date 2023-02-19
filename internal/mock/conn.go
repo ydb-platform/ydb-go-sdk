@@ -113,6 +113,10 @@ func (e *Endpoint) String() string {
 	panic("not implemented in mock")
 }
 
+func (e *Endpoint) MarshalText() ([]byte, error) {
+	panic("not implemented in mock")
+}
+
 func (e *Endpoint) Copy() endpoint.Endpoint {
 	c := *e
 	return &c

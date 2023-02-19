@@ -31,8 +31,10 @@ func (a adapter) Log(opts logs.Options, msg string, fields ...logs.Field) {
 		f = logger.Errorf
 	case logs.FATAL:
 		f = logger.Fatalf
-	default:
+	case logs.QUIET:
 		return
+	default:
+		panic("unknown log level")
 	}
 
 	fmtBldr := &strings.Builder{}
@@ -40,55 +42,12 @@ func (a adapter) Log(opts logs.Options, msg string, fields ...logs.Field) {
 	fmtBldr.WriteString(" {")
 	values := make([]interface{}, 0, len(fields))
 	for i, field := range fields {
-		var (
-			format string
-			value  interface{}
-		)
-		//nolint:goconst
-		switch field.Type() {
-		case logs.InvalidType:
-			continue
-		case logs.IntType:
-			format = "%d"
-			value = field.Int()
-		case logs.Int64Type:
-			format = "%d"
-			value = field.Int64()
-		case logs.StringType:
-			format = "%s"
-			value = field.String()
-		case logs.BoolType:
-			format = "%t"
-			value = field.Bool()
-		case logs.DurationType:
-			format = "%v"
-			value = field.Duration()
-		case logs.StringsType:
-			format = "%v"
-			value = field.Strings()
-		case logs.ErrorType:
-			format = "%v"
-			value = field.Error()
-		case logs.AnyType:
-			format = "%v"
-			value = field.Any()
-		case logs.StringerType:
-			format = "%s"
-			value = field.Stringer().String()
-		default:
-			if fb, err := field.Fallback(); err != nil {
-				format = "<error:%q>"
-				value = err
-			} else {
-				format = "%s"
-				value = fb
-			}
-		}
-		fmt.Fprintf(fmtBldr, `%q:%s`, field.Key(), format)
+
+		fmt.Fprintf(fmtBldr, `%q:%s`, field.Key(), "%s")
 		if i != len(fields)-1 {
 			fmtBldr.WriteByte(',')
 		}
-		values = append(values, value)
+		values = append(values, field)
 	}
 	fmtBldr.WriteByte('}')
 	f(fmtBldr.String(), values...)

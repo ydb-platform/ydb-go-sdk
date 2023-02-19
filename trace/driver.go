@@ -6,6 +6,7 @@ package trace
 
 import (
 	"context"
+	"encoding"
 	"fmt"
 	"strings"
 	"time"
@@ -119,6 +120,7 @@ type ConnState interface {
 
 type EndpointInfo interface {
 	fmt.Stringer
+	encoding.TextMarshaler
 
 	NodeID() uint32
 	Address() string

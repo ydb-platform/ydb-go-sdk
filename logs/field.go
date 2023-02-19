@@ -41,31 +41,37 @@ func (f Field) Key() string {
 }
 
 // String is a value getter for fields with StringType type
-func (f Field) String() string {
+func (f Field) StringValue() string {
+	f.checkType(StringType)
 	return f.vstr
 }
 
 // Int is a value getter for fields with IntType type
-func (f Field) Int() int {
+func (f Field) IntValue() int {
+	f.checkType(IntType)
 	return int(f.vint)
 }
 
-func (f Field) Int64() int64 {
+func (f Field) Int64Value() int64 {
+	f.checkType(Int64Type)
 	return f.vint
 }
 
 // Bool is a value getter for fields with BoolType type
-func (f Field) Bool() bool {
+func (f Field) BoolValue() bool {
+	f.checkType(BoolType)
 	return f.vint != 0
 }
 
 // Duration is a value getter for fields with DurationType type
-func (f Field) Duration() time.Duration {
+func (f Field) DurationValue() time.Duration {
+	f.checkType(DurationType)
 	return time.Nanosecond * time.Duration(f.vint)
 }
 
 // Strings is a value getter for fields with StringsType type
-func (f Field) Strings() []string {
+func (f Field) StringsValue() []string {
+	f.checkType(StringsType)
 	if f.vany == nil {
 		return nil
 	}
@@ -73,7 +79,8 @@ func (f Field) Strings() []string {
 }
 
 // Error is a value getter for fields with ErrorType type
-func (f Field) Error() error {
+func (f Field) ErrorValue() error {
+	f.checkType(ErrorType)
 	if f.vany == nil {
 		return nil
 	}
@@ -81,32 +88,50 @@ func (f Field) Error() error {
 }
 
 // Any is a value getter for fields with AnyType type
-func (f Field) Any() interface{} {
-	return f.vany
+func (f Field) AnyValue() interface{} {
+	f.checkType(AnyType)
+
+	switch f.vany.(type) {
+	case int:
+		return f.vany.(int)
+	case int64:
+		return f.vany.(int64)
+	case bool:
+		return f.vany.(bool)
+	case string:
+		return f.vany.(string)
+	case []string:
+		return f.vany.([]string)
+	case error:
+		return f.vany.(error)
+	default:
+		return f.vany
+	}
+
 }
 
-// Stringer is a value getteer for fields with StringerType type
+// Stringer is a value getter for fields with StringerType type
 func (f Field) Stringer() fmt.Stringer {
+	f.checkType(StringerType)
 	if f.vany == nil {
 		return nil
 	}
 	return f.vany.(fmt.Stringer)
 }
 
-// Fallback returns default string representation of Field value.
+// Panics on type mismatch
+func (f Field) checkType(want FieldType) {
+	if f.ftype != want {
+		panic(fmt.Sprintf("bad type. have: %s, want: %s", f.ftype, want))
+	}
+}
+
+// Returns default string representation of Field value.
 // It should be used by adapters that don't support f.Type directly.
-// Non-nil error indicates some fatal marshaling error and is most
-// likely a sign of invalid Field initialization.
-func (f Field) Fallback() (repr string, err error) {
-	defer func() {
-		if p := recover(); p != nil {
-			if e, ok := p.(error); ok {
-				err = e
-			} else {
-				err = fmt.Errorf("%v", p)
-			}
-		}
-	}()
+func (f Field) String() string {
+
+	var repr string
+
 	switch f.ftype {
 	case IntType:
 		fallthrough
@@ -115,21 +140,21 @@ func (f Field) Fallback() (repr string, err error) {
 	case StringType:
 		repr = f.vstr
 	case BoolType:
-		repr = strconv.FormatBool(f.Bool())
+		repr = strconv.FormatBool(f.BoolValue())
 	case DurationType:
-		repr = f.Duration().String()
+		repr = f.DurationValue().String()
 	case StringsType:
-		repr = fmt.Sprintf("%v", f.Strings())
+		repr = fmt.Sprintf("%v", f.StringsValue())
 	case ErrorType:
-		repr = f.Error().Error()
+		repr = fmt.Sprintf("%v", f.ErrorValue())
 	case AnyType:
 		repr = fmt.Sprint(f.vany)
 	case StringerType:
 		repr = f.Stringer().String()
 	default:
-		err = fmt.Errorf("unknown FieldType %d", f.ftype)
+		panic(fmt.Sprintf("unknown FieldType %d", f.ftype))
 	}
-	return repr, err
+	return repr
 }
 
 // String constructs Field with StringType
@@ -191,12 +216,8 @@ func Strings(key string, value []string) Field {
 	}
 }
 
-// NamedError constructs Field with ErrorType. If value is nil,
-// resulting Field will be of AnyType instead of ErrorType.
+// NamedError constructs Field with ErrorType
 func NamedError(key string, value error) Field {
-	if value == nil {
-		return Any(key, nil)
-	}
 	return Field{
 		ftype: ErrorType,
 		key:   key,
@@ -257,4 +278,12 @@ const (
 
 	// StringerType corresponds to fmt.Stringer
 	StringerType
+
+	EndType
 )
+
+func (ft FieldType) String() string {
+
+	return []string{"invalid", "int", "int64", "string", "bool", "time.Duration", "[]string", "error", "any", "stringer", "endtype"}[ft]
+
+}

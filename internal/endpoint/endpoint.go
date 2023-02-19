@@ -19,6 +19,7 @@ type Endpoint interface {
 	Info
 
 	String() string
+	MarshalText() ([]byte, error)
 	Copy() Endpoint
 	Touch(opts ...Option)
 }
@@ -61,6 +62,13 @@ func (e *endpoint) String() string {
 		e.loadFactor,
 		e.lastUpdated.Format(time.RFC3339),
 	)
+}
+
+func (e *endpoint) MarshalText() ([]byte, error) {
+
+	b := []byte(e.String())
+	return b, nil
+
 }
 
 func (e *endpoint) NodeID() uint32 {
