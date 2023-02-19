@@ -4,6 +4,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"path"
 	"sync/atomic"
 	"testing"
+	"text/template"
 	"time"
 
 	"google.golang.org/grpc/metadata"
@@ -19,7 +21,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -73,7 +74,7 @@ func TestDatabaseSql(t *testing.T) {
 			_ = cc.Close(ctx)
 		}()
 
-		c, err := ydb.Connector(cc, ydb.WithTablePathPrefix(scope.folder))
+		c, err := ydb.Connector(cc)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -114,8 +115,20 @@ func TestDatabaseSql(t *testing.T) {
 		// getting explain of query
 		row := db.QueryRowContext(
 			ydb.WithQueryMode(ctx, ydb.ExplainQueryMode),
-			"SELECT views FROM episodes "+
-				"WHERE series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID",
+			scope.render(
+				template.Must(template.New("").Parse(`
+					PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
+					DECLARE $seriesID AS Uint64;
+					DECLARE $seasonID AS Uint64;
+					DECLARE $episodeID AS Uint64;
+					SELECT views FROM episodes WHERE series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID;
+				`)),
+				struct {
+					TablePathPrefix string
+				}{
+					TablePathPrefix: path.Join(cc.Name(), scope.folder),
+				},
+			),
 			sql.Named("seriesID", uint64(1)),
 			sql.Named("seasonID", uint64(1)),
 			sql.Named("episodeID", uint64(1)),
@@ -131,9 +144,26 @@ func TestDatabaseSql(t *testing.T) {
 		t.Logf("plan = %v", plan)
 
 		err = retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) (err error) {
-			row = tx.QueryRowContext(ctx,
-				"SELECT views FROM episodes "+
-					"WHERE series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID",
+			var stmt *sql.Stmt
+			stmt, err = tx.PrepareContext(ctx, scope.render(
+				template.Must(template.New("").Parse(`
+					PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
+					DECLARE $seriesID AS Uint64;
+					DECLARE $seasonID AS Uint64;
+					DECLARE $episodeID AS Uint64;
+					SELECT views FROM episodes WHERE series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID;
+				`)),
+				struct {
+					TablePathPrefix string
+				}{
+					TablePathPrefix: path.Join(cc.Name(), scope.folder),
+				},
+			))
+			if err != nil {
+				return fmt.Errorf("cannot prepare query: %w", err)
+			}
+
+			row = stmt.QueryRowContext(ctx,
 				sql.Named("seriesID", uint64(1)),
 				sql.Named("seasonID", uint64(1)),
 				sql.Named("episodeID", uint64(1)),
@@ -148,8 +178,22 @@ func TestDatabaseSql(t *testing.T) {
 			t.Logf("views = %v", views)
 			// increment `views`
 			_, err = tx.ExecContext(ctx,
-				"UPSERT INTO episodes (series_id, season_id, episode_id, views) "+
-					"VALUES ($seriesID, $seasonID, $episodeID, $views)",
+				scope.render(
+					template.Must(template.New("").Parse(`
+						PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
+						DECLARE $seriesID AS Uint64;
+						DECLARE $seasonID AS Uint64;
+						DECLARE $episodeID AS Uint64;
+						DECLARE $views AS Uint64;
+						UPSERT INTO episodes ( series_id, season_id, episode_id, views )
+						VALUES ( $seriesID, $seasonID, $episodeID, $views );
+					`)),
+					struct {
+						TablePathPrefix string
+					}{
+						TablePathPrefix: path.Join(cc.Name(), scope.folder),
+					},
+				),
 				sql.Named("seriesID", uint64(1)),
 				sql.Named("seasonID", uint64(1)),
 				sql.Named("episodeID", uint64(1)),
@@ -166,8 +210,20 @@ func TestDatabaseSql(t *testing.T) {
 		err = retry.DoTx(ctx, db,
 			func(ctx context.Context, tx *sql.Tx) error {
 				row := tx.QueryRowContext(ctx,
-					"SELECT views FROM episodes "+
-						"WHERE series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID",
+					scope.render(
+						template.Must(template.New("").Parse(`
+							PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
+							DECLARE $seriesID AS Uint64;
+							DECLARE $seasonID AS Uint64;
+							DECLARE $episodeID AS Uint64;
+							SELECT views FROM episodes WHERE series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID;
+						`)),
+						struct {
+							TablePathPrefix string
+						}{
+							TablePathPrefix: path.Join(cc.Name(), scope.folder),
+						},
+					),
 					sql.Named("seriesID", uint64(1)),
 					sql.Named("seasonID", uint64(1)),
 					sql.Named("episodeID", uint64(1)),
@@ -355,14 +411,48 @@ func (scope *databaseSQLScope) fill(ctx context.Context, t *testing.T, db *sql.D
 	defer func() {
 		t.Logf("> filling tables done\n")
 	}()
-	_, err := db.ExecContext(ctx, `
-			REPLACE INTO series SELECT * FROM AS_TABLE($seriesData);
-			REPLACE INTO seasons SELECT * FROM AS_TABLE($seasonsData);
-			REPLACE INTO episodes SELECT * FROM AS_TABLE($episodesData);
-		`,
-		table.ValueParam("$seriesData", scope.getSeriesData()),
-		table.ValueParam("$seasonsData", scope.getSeasonsData()),
-		table.ValueParam("$episodesData", scope.getEpisodesData()),
+	stmt, err := db.PrepareContext(ctx, scope.render(template.Must(template.New("fillQuery database").Parse(`
+		PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
+		
+		DECLARE $seriesData AS List<Struct<
+			series_id: Optional<Uint64>,
+			title: Optional<Utf8>,
+			series_info: Optional<Utf8>,
+			release_date: Optional<Date>,
+			comment: Optional<Utf8>>>;
+		
+		DECLARE $seasonsData AS List<Struct<
+			series_id: Optional<Uint64>,
+			season_id: Optional<Uint64>,
+			title: Optional<Utf8>,
+			first_aired: Optional<Date>,
+			last_aired: Optional<Date>>>;
+		
+		DECLARE $episodesData AS List<Struct<
+			series_id: Optional<Uint64>,
+			season_id: Optional<Uint64>,
+			episode_id: Optional<Uint64>,
+			title: Optional<Utf8>,
+			air_date: Optional<Date>>>;
+		
+		REPLACE INTO series SELECT * FROM AS_TABLE($seriesData);
+		
+		REPLACE INTO seasons SELECT * FROM AS_TABLE($seasonsData);
+		
+		REPLACE INTO episodes SELECT * FROM AS_TABLE($episodesData);
+	`)), struct {
+		TablePathPrefix string
+	}{
+		TablePathPrefix: prefix,
+	}))
+	if err != nil {
+		t.Errorf("failed to prepare query: %v", err)
+		return err
+	}
+	_, err = stmt.ExecContext(ctx,
+		sql.Named("seriesData", scope.getSeriesData()),
+		sql.Named("seasonsData", scope.getSeasonsData()),
+		sql.Named("episodesData", scope.getEpisodesData()),
 	)
 	if err != nil {
 		t.Errorf("failed to execute statement: %v", err)
@@ -374,23 +464,25 @@ func (scope *databaseSQLScope) fill(ctx context.Context, t *testing.T, db *sql.D
 func (scope *databaseSQLScope) createTables(ctx context.Context, t *testing.T, db *sql.DB, prefix string) error {
 	_, err := db.ExecContext(
 		ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-		"DROP TABLE series",
+		fmt.Sprintf("DROP TABLE `%s`", path.Join(prefix, "series")),
 	)
 	if err != nil {
 		t.Logf("warn: drop series table failed: %v", err)
 	}
 	_, err = db.ExecContext(
 		ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-		`CREATE TABLE series (
-			series_id Uint64,
-			title UTF8,
-			series_info UTF8,
-			release_date Date,
-			comment UTF8,
-			PRIMARY KEY (
-				series_id
-			)
-		)`,
+		fmt.Sprintf(
+			`CREATE TABLE `+"`"+path.Join(prefix, "series")+"`"+` (
+				series_id Uint64,
+				title UTF8,
+				series_info UTF8,
+				release_date Date,
+				comment UTF8,
+				PRIMARY KEY (
+					series_id
+				)
+			)`,
+		),
 	)
 	if err != nil {
 		t.Fatalf("create series table failed: %v", err)
@@ -456,4 +548,13 @@ func (scope *databaseSQLScope) createTables(ctx context.Context, t *testing.T, d
 	}
 
 	return nil
+}
+
+func (scope *databaseSQLScope) render(t *template.Template, data interface{}) string {
+	var buf bytes.Buffer
+	err := t.Execute(&buf, data)
+	if err != nil {
+		panic(err)
+	}
+	return buf.String()
 }
