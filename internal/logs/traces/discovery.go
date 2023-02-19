@@ -27,8 +27,8 @@ func Discovery(l logs.Logger, details trace.Details) (t trace.Discovery) {
 				)
 			} else {
 				ll.Error("discover failed",
-					latency(start),
 					logs.Error(info.Error),
+					latency(start),
 					version(),
 				)
 			}
@@ -46,8 +46,8 @@ func Discovery(l logs.Logger, details trace.Details) (t trace.Discovery) {
 				)
 			} else {
 				ll.Error("whoAmI failed",
-					latency(start),
 					logs.Error(info.Error),
+					latency(start),
 					version(),
 				)
 			}

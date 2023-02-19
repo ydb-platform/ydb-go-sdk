@@ -3,7 +3,6 @@ package traces
 import (
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/logs"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -29,13 +28,13 @@ func DatabaseSQL(l logs.Logger, details trace.Details, opts ...Option) (t trace.
 			return func(info trace.DatabaseSQLConnectorConnectDoneInfo) {
 				if info.Error == nil {
 					ll.Info(`connected`,
-						logs.Duration("latency", time.Since(start)),
+						latency(start),
 					)
 				} else {
 					ll.Error(`connect failed`,
-						logs.Duration("latency", time.Since(start)),
 						logs.Error(info.Error),
-						logs.String("version", meta.Version),
+						latency(start),
+						version(),
 					)
 				}
 			}
@@ -51,13 +50,13 @@ func DatabaseSQL(l logs.Logger, details trace.Details, opts ...Option) (t trace.
 			return func(info trace.DatabaseSQLConnPingDoneInfo) {
 				if info.Error == nil {
 					ll.Debug(`ping done`,
-						logs.Duration("latency", time.Since(start)),
+						latency(start),
 					)
 				} else {
 					ll.Error(`ping failed`,
-						logs.Duration("latency", time.Since(start)),
 						logs.Error(info.Error),
-						logs.String("version", meta.Version),
+						latency(start),
+						version(),
 					)
 				}
 			}
@@ -68,13 +67,13 @@ func DatabaseSQL(l logs.Logger, details trace.Details, opts ...Option) (t trace.
 			return func(info trace.DatabaseSQLConnCloseDoneInfo) {
 				if info.Error == nil {
 					ll.Info(`closed`,
-						logs.Duration("latency", time.Since(start)),
+						latency(start),
 					)
 				} else {
 					ll.Error(`close failed`,
-						logs.Duration("latency", time.Since(start)),
 						logs.Error(info.Error),
-						logs.String("version", meta.Version),
+						latency(start),
+						version(),
 					)
 				}
 			}
@@ -85,13 +84,13 @@ func DatabaseSQL(l logs.Logger, details trace.Details, opts ...Option) (t trace.
 			return func(info trace.DatabaseSQLConnBeginDoneInfo) {
 				if info.Error == nil {
 					ll.Debug(`begin transaction was success`,
-						logs.Duration("latency", time.Since(start)),
+						latency(start),
 					)
 				} else {
 					ll.Error(`begin transaction failed`,
-						logs.Duration("latency", time.Since(start)),
 						logs.Error(info.Error),
-						logs.String("version", meta.Version),
+						latency(start),
+						version(),
 					)
 				}
 			}
@@ -109,21 +108,21 @@ func DatabaseSQL(l logs.Logger, details trace.Details, opts ...Option) (t trace.
 			return func(info trace.DatabaseSQLConnPrepareDoneInfo) {
 				if info.Error == nil {
 					ll.Debug(`prepare statement was success`,
-						logs.Duration("latency", time.Since(start)),
+						latency(start),
 					)
 				} else {
 					if options.LogQuery {
 						ll.Error(`prepare statement failed`,
-							logs.Duration("latency", time.Since(start)),
-							logs.String("query", query),
 							logs.Error(info.Error),
-							logs.String("version", meta.Version),
+							latency(start),
+							logs.String("query", query),
+							version(),
 						)
 					} else {
 						ll.Error(`prepare statement failed`,
-							logs.Duration("latency", time.Since(start)),
 							logs.Error(info.Error),
-							logs.String("version", meta.Version),
+							latency(start),
+							version(),
 						)
 					}
 				}
@@ -143,28 +142,28 @@ func DatabaseSQL(l logs.Logger, details trace.Details, opts ...Option) (t trace.
 			return func(info trace.DatabaseSQLConnExecDoneInfo) {
 				if info.Error == nil {
 					ll.Debug(`exec was success`,
-						logs.Duration("latency", time.Since(start)),
+						latency(start),
 					)
 				} else {
 					m := retry.Check(info.Error)
 					if options.LogQuery {
 						ll.Error(`exec failed`,
-							logs.Duration("latency", time.Since(start)),
-							logs.String("query", query),
 							logs.Error(info.Error),
+							latency(start),
+							logs.String("query", query),
 							logs.Bool("retryable", m.MustRetry(idempotent)),
 							logs.Int64("code", m.StatusCode()),
 							logs.Bool("deleteSession", m.MustDeleteSession()),
-							logs.String("version", meta.Version),
+							version(),
 						)
 					} else {
 						ll.Error(`exec failed`,
-							logs.Duration("latency", time.Since(start)),
 							logs.Error(info.Error),
+							latency(start),
 							logs.Bool("retryable", m.MustRetry(idempotent)),
 							logs.Int64("code", m.StatusCode()),
 							logs.Bool("deleteSession", m.MustDeleteSession()),
-							logs.String("version", meta.Version),
+							version(),
 						)
 					}
 				}
@@ -184,28 +183,28 @@ func DatabaseSQL(l logs.Logger, details trace.Details, opts ...Option) (t trace.
 			return func(info trace.DatabaseSQLConnQueryDoneInfo) {
 				if info.Error == nil {
 					ll.Debug(`query was success`,
-						logs.Duration("latency", time.Since(start)),
+						latency(start),
 					)
 				} else {
 					m := retry.Check(info.Error)
 					if options.LogQuery {
 						ll.Error(`exec failed`,
-							logs.Duration("latency", time.Since(start)),
-							logs.String("query", query),
 							logs.Error(info.Error),
+							latency(start),
+							logs.String("query", query),
 							logs.Bool("retryable", m.MustRetry(idempotent)),
 							logs.Int64("code", m.StatusCode()),
 							logs.Bool("deleteSession", m.MustDeleteSession()),
-							logs.String("version", meta.Version),
+							version(),
 						)
 					} else {
 						ll.Error(`exec failed`,
-							logs.Duration("latency", time.Since(start)),
 							logs.Error(info.Error),
+							latency(start),
 							logs.Bool("retryable", m.MustRetry(idempotent)),
 							logs.Int64("code", m.StatusCode()),
 							logs.Bool("deleteSession", m.MustDeleteSession()),
-							logs.String("version", meta.Version),
+							version(),
 						)
 					}
 				}
@@ -221,13 +220,13 @@ func DatabaseSQL(l logs.Logger, details trace.Details, opts ...Option) (t trace.
 			return func(info trace.DatabaseSQLTxCommitDoneInfo) {
 				if info.Error == nil {
 					ll.Debug(`committed`,
-						logs.Duration("latency", time.Since(start)),
+						latency(start),
 					)
 				} else {
 					ll.Error(`commit failed`,
-						logs.Duration("latency", time.Since(start)),
 						logs.Error(info.Error),
-						logs.String("version", meta.Version),
+						latency(start),
+						version(),
 					)
 				}
 			}
@@ -238,13 +237,13 @@ func DatabaseSQL(l logs.Logger, details trace.Details, opts ...Option) (t trace.
 			return func(info trace.DatabaseSQLTxRollbackDoneInfo) {
 				if info.Error == nil {
 					ll.Debug(`rollbacked`,
-						logs.Duration("latency", time.Since(start)),
+						latency(start),
 					)
 				} else {
 					ll.Error(`rollback failed`,
-						logs.Duration("latency", time.Since(start)),
 						logs.Error(info.Error),
-						logs.String("version", meta.Version),
+						latency(start),
+						version(),
 					)
 				}
 			}
@@ -260,13 +259,13 @@ func DatabaseSQL(l logs.Logger, details trace.Details, opts ...Option) (t trace.
 			return func(info trace.DatabaseSQLStmtCloseDoneInfo) {
 				if info.Error == nil {
 					ll.Trace(`closed`,
-						logs.Duration("latency", time.Since(start)),
+						latency(start),
 					)
 				} else {
 					ll.Error(`close failed`,
-						logs.Duration("latency", time.Since(start)),
 						logs.Error(info.Error),
-						logs.String("version", meta.Version),
+						latency(start),
+						version(),
 					)
 				}
 			}
@@ -284,23 +283,23 @@ func DatabaseSQL(l logs.Logger, details trace.Details, opts ...Option) (t trace.
 			return func(info trace.DatabaseSQLStmtExecDoneInfo) {
 				if info.Error == nil {
 					ll.Debug(`exec was success`,
-						logs.Duration("latency", time.Since(start)),
 						logs.Error(info.Error),
-						logs.String("version", meta.Version),
+						latency(start),
+						version(),
 					)
 				} else {
 					if options.LogQuery {
 						ll.Error(`exec failed`,
-							logs.Duration("latency", time.Since(start)),
-							logs.String("query", query),
 							logs.Error(info.Error),
-							logs.String("version", meta.Version),
+							latency(start),
+							logs.String("query", query),
+							version(),
 						)
 					} else {
 						ll.Error(`exec failed`,
-							logs.Duration("latency", time.Since(start)),
 							logs.Error(info.Error),
-							logs.String("version", meta.Version),
+							latency(start),
+							version(),
 						)
 					}
 				}
@@ -319,21 +318,21 @@ func DatabaseSQL(l logs.Logger, details trace.Details, opts ...Option) (t trace.
 			return func(info trace.DatabaseSQLStmtQueryDoneInfo) {
 				if info.Error == nil {
 					ll.Debug(`query was success`,
-						logs.Duration("latency", time.Since(start)),
+						latency(start),
 					)
 				} else {
 					if options.LogQuery {
 						ll.Error(`query failed`,
-							logs.Duration("latency", time.Since(start)),
-							logs.String("query", query),
 							logs.Error(info.Error),
-							logs.String("version", meta.Version),
+							latency(start),
+							logs.String("query", query),
+							version(),
 						)
 					} else {
 						ll.Error(`query failed`,
-							logs.Duration("latency", time.Since(start)),
 							logs.Error(info.Error),
-							logs.String("version", meta.Version),
+							latency(start),
+							version(),
 						)
 					}
 				}

@@ -35,9 +35,9 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 					)
 				} else {
 					ll.Warn("update failed",
+						logs.Error(info.Error),
 						logs.String("target", target),
 						logs.Strings("resolved", addresses),
-						logs.Error(info.Error),
 						version(),
 					)
 				}
@@ -163,11 +163,11 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 					)
 				} else {
 					ll.Warn("init failed",
+						logs.Error(info.Error),
 						logs.String("endpoint", endpoint),
 						logs.String("database", database),
 						logs.Bool("secure", secure),
 						latency(start),
-						logs.Error(info.Error),
 						version(),
 					)
 				}
@@ -183,8 +183,8 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 					)
 				} else {
 					ll.Warn("close failed",
-						latency(start),
 						logs.Error(info.Error),
+						latency(start),
 						version(),
 					)
 				}
@@ -209,9 +209,9 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 					)
 				} else {
 					ll.Warn("take failed",
+						logs.Error(info.Error),
 						logs.Stringer("endpoint", endpoint),
 						latency(start),
-						logs.Error(info.Error),
 						version(),
 					)
 				}
@@ -246,9 +246,9 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 					)
 				} else {
 					ll.Warn("conn park failed",
+						logs.Error(info.Error),
 						logs.Stringer("endpoint", endpoint),
 						latency(start),
-						logs.Error(info.Error),
 						version(),
 					)
 				}
@@ -268,9 +268,9 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 					)
 				} else {
 					ll.Warn("conn close failed",
+						logs.Error(info.Error),
 						logs.Stringer("endpoint", endpoint),
 						latency(start),
-						logs.Error(info.Error),
 						version(),
 					)
 				}
@@ -294,10 +294,10 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 					)
 				} else {
 					ll.Warn("invoke failed",
+						logs.Error(info.Error),
 						logs.Stringer("endpoint", endpoint),
 						logs.String("method", method),
 						latency(start),
-						logs.Error(info.Error),
 						logs.Stringer("metadata", metadata(info.Metadata)),
 						version(),
 					)
@@ -327,10 +327,10 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 					)
 				} else {
 					ll.Warn("streaming intermediate fail",
+						logs.Error(info.Error),
 						logs.Stringer("endpoint", endpoint),
 						logs.String("method", method),
 						latency(start),
-						logs.Error(info.Error),
 						version(),
 					)
 				}
@@ -344,10 +344,10 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 						)
 					} else {
 						ll.Warn("streaming failed",
+							logs.Error(info.Error),
 							logs.Stringer("endpoint", endpoint),
 							logs.String("method", method),
 							latency(start),
-							logs.Error(info.Error),
 							logs.Stringer("metadata", metadata(info.Metadata)),
 							version(),
 						)
@@ -410,10 +410,10 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 					)
 				} else {
 					ll.Error("repeater wake up failed",
+						logs.Error(info.Error),
 						logs.String("name", name),
 						logs.String("event", event),
 						latency(start),
-						logs.Error(info.Error),
 						version(),
 					)
 				}
@@ -443,8 +443,8 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 					)
 				} else {
 					ll.Error("close failed",
-						latency(start),
 						logs.Error(info.Error),
+						latency(start),
 						version(),
 					)
 				}
@@ -465,8 +465,8 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 					)
 				} else {
 					ll.Warn("select endpoint failed",
-						latency(start),
 						logs.Error(info.Error),
+						latency(start),
 						version(),
 					)
 				}
@@ -490,8 +490,8 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 					)
 				} else {
 					ll.Error("balancer discovery failed",
-						latency(start),
 						logs.Error(info.Error),
+						latency(start),
 					)
 				}
 			}
@@ -511,9 +511,9 @@ func Driver(l logs.Logger, details trace.Details) (t trace.Driver) {
 					)
 				} else {
 					ll.Error("get done",
+						logs.Error(info.Error),
 						latency(start),
 						logs.String("token", Secret(info.Token)),
-						logs.Error(info.Error),
 						version(),
 					)
 				}
