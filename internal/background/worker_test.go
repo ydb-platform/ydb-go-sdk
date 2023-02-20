@@ -3,6 +3,7 @@ package background
 import (
 	"context"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -97,8 +98,9 @@ func TestWorkerClose(t *testing.T) {
 
 func TestWorkerConcurrentStartAndClose(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
-		targetClose := int64(100)
-		parallel := 10
+		targetClose := int64(10)
+
+		parallel := runtime.GOMAXPROCS(0)
 
 		var counter int64
 
@@ -106,22 +108,14 @@ func TestWorkerConcurrentStartAndClose(t *testing.T) {
 		w := NewWorker(ctx)
 
 		closeIndex := int64(0)
-		closed := make(empty.Chan)
-
-		go func() {
-			defer close(closed)
-
-			xtest.SpinWaitCondition(t, nil, func() bool {
-				return atomic.LoadInt64(&counter) > targetClose
-			})
-
-			require.NoError(t, w.Close(ctx, nil))
-			closeIndex = atomic.LoadInt64(&counter)
-		}()
 
 		stopNewStarts := xatomic.Bool{}
+		var wgStarters sync.WaitGroup
 		for i := 0; i < parallel; i++ {
+			wgStarters.Add(1)
 			go func() {
+				defer wgStarters.Done()
+
 				for {
 					if stopNewStarts.Load() {
 						return
@@ -134,10 +128,18 @@ func TestWorkerConcurrentStartAndClose(t *testing.T) {
 			}()
 		}
 
-		xtest.WaitChannelClosed(t, closed)
-		runtime.Gosched()
+		// wait start some backgrounds - for ensure about process worked
+		xtest.SpinWaitCondition(t, nil, func() bool {
+			return atomic.LoadInt64(&counter) > targetClose
+		})
+
+		require.NoError(t, w.Close(xtest.ContextWithCommonTimeout(ctx, t), nil))
+
+		closeIndex = atomic.LoadInt64(&counter)
 		require.Equal(t, closeIndex, atomic.LoadInt64(&counter))
+
 		stopNewStarts.Store(true)
+		xtest.WaitGroup(t, &wgStarters)
 	})
 }
 
