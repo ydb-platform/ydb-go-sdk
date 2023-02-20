@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -97,11 +98,11 @@ func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.C
 
 type ConnectorOption = xsql.ConnectorOption
 
-// WithTablePathPrefix prepends to query special PRAGMA TablePathPrefix
+// WithBindings modified source query
 //
-// Warning: this option modidified source query
-func WithTablePathPrefix(tablePathPrefix string) ConnectorOption {
-	return xsql.WithTablePathPrefix(tablePathPrefix)
+// Warning: this option allows modification of source query
+func WithBindings(bindings ...bind.Binding) ConnectorOption {
+	return xsql.WithBindings(bindings...)
 }
 
 func WithDefaultQueryMode(mode QueryMode) ConnectorOption {

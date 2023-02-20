@@ -1,12 +1,11 @@
-package xsql
+package bind
 
 import (
-	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"net/url"
 	"time"
 
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -14,11 +13,7 @@ import (
 )
 
 //nolint:gocyclo
-func convertToValue(v interface{}) (_ types.Value, err error) {
-	if value, ok := v.(value.Value); ok {
-		return value, nil
-	}
-
+func ToValue(v interface{}) (_ types.Value, err error) {
 	if valuer, ok := v.(driver.Valuer); ok {
 		v, err = valuer.Value()
 		if err != nil {
@@ -29,6 +24,8 @@ func convertToValue(v interface{}) (_ types.Value, err error) {
 	switch x := v.(type) {
 	case nil:
 		return types.VoidValue(), nil
+	case value.Value:
+		return x, nil
 	case bool:
 		return types.BoolValue(x), nil
 	case *bool:
@@ -108,33 +105,27 @@ func convertToValue(v interface{}) (_ types.Value, err error) {
 	case *time.Duration:
 		return types.NullableIntervalValueFromDuration(x), nil
 	default:
-		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: unsupported type: %T", x))
+		return nil, xerrors.WithStackTrace(
+			fmt.Errorf("%T: %w. Create issue for support new type %s",
+				x, errUnsupportedType, supportNewTypeLink(x),
+			),
+		)
 	}
 }
 
-// GenerateDeclareSection generates DECLARE section text in YQL query by params
-//
-// Warning: This is an experimental feature and could change at any time
-func GenerateDeclareSection(args []sql.NamedArg) (string, error) {
-	values := make([]table.ParameterOption, len(args))
-	for i, arg := range args {
-		if arg.Name == "" {
-			return "", xerrors.WithStackTrace(internal.ErrNameRequired)
-		}
-		value, err := convertToValue(arg.Value)
-		if err != nil {
-			return "", xerrors.WithStackTrace(err)
-		}
-		values[i] = table.ValueParam(arg.Name, value)
-	}
-	return internal.GenerateDeclareSection(table.NewQueryParameters(values...))
+func supportNewTypeLink(x interface{}) string {
+	v := url.Values{}
+	v.Add("labels", "enhancement,database/sql")
+	v.Add("template", "02_FEATURE_REQUEST.md")
+	v.Add("title", fmt.Sprintf("feat: Support new type `%T` in `database/sql` query args", x))
+	return "https://github.com/ydb-platform/ydb-go-sdk/issues/new?" + v.Encode()
 }
 
-func ToYdbParam(param sql.NamedArg) (table.ParameterOption, error) {
-	if param.Name == "" {
-		return nil, xerrors.WithStackTrace(internal.ErrNameRequired)
+func ToYdbParam(param driver.NamedValue) (table.ParameterOption, error) {
+	if v, ok := param.Value.(table.ParameterOption); ok {
+		return v, nil
 	}
-	value, err := convertToValue(param.Value)
+	value, err := ToValue(param.Value)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

@@ -5,11 +5,13 @@ import (
 	"database/sql/driver"
 	"io"
 	"path"
+	"strings"
 	"sync"
 	"time"
 
 	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
@@ -20,9 +22,11 @@ import (
 
 type ConnectorOption func(c *Connector) error
 
-func WithTablePathPrefix(tablePathPrefix string) ConnectorOption {
+func WithBindings(bindings ...bind.Binding) ConnectorOption {
 	return func(c *Connector) error {
-		c.tablePathPrefix = tablePathPrefix
+		for _, b := range bindings {
+			b(&c.bindings)
+		}
 		return nil
 	}
 }
@@ -91,6 +95,9 @@ func Open(d Driver, connection connection, opts ...ConnectorOption) (_ *Connecto
 			}
 		}
 	}
+	if c.bindings.TablePathPrefix != "" && !strings.HasPrefix(c.bindings.TablePathPrefix, connection.Name()) {
+		c.bindings.TablePathPrefix = path.Join(connection.Name(), c.bindings.TablePathPrefix)
+	}
 	if c.idleThreshold > 0 {
 		c.idleStopper = c.idleCloser()
 	}
@@ -132,7 +139,7 @@ type Connector struct {
 
 	idleStopper func()
 
-	tablePathPrefix       string
+	bindings              bind.Bindings
 	defaultTxControl      *table.TransactionControl
 	defaultQueryMode      QueryMode
 	defaultDataQueryOpts  []options.ExecuteDataQueryOption
@@ -210,17 +217,14 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	opts := []connOption{
+	return newConn(c, s,
 		withDefaultTxControl(c.defaultTxControl),
 		withDefaultQueryMode(c.defaultQueryMode),
 		withDataOpts(c.defaultDataQueryOpts...),
 		withScanOpts(c.defaultScanQueryOpts...),
+		withBindings(c.bindings),
 		withTrace(c.trace),
-	}
-	if c.tablePathPrefix != "" {
-		opts = append(opts, withTablePathPrefix(path.Join(c.connection.Name(), c.tablePathPrefix)))
-	}
-	return newConn(c, s, opts...), nil
+	), nil
 }
 
 func (c *Connector) Driver() driver.Driver {
