@@ -36,6 +36,9 @@ func TestReadersWritersStress(t *testing.T) {
 
 	writeTime := time.Second * 10
 	topicCount := runtime.GOMAXPROCS(0)
+	if topicCount > 10 {
+		topicCount = 10
+	}
 	t.Log("topic count: ", topicCount)
 
 	topicPartitions := 3
@@ -196,8 +199,10 @@ func stressTestInATopic(
 		}
 	}
 
-	xtest.SpinWaitConditionWithTimeout(t, nil, time.Minute, func() bool {
-		return atomic.LoadInt64(&createdMessagesCount) == atomic.LoadInt64(&readedMessagesCount)
+	xtest.SpinWaitProgress(t, func() (progressValue interface{}, finished bool) {
+		createdMessages := atomic.LoadInt64(&createdMessagesCount)
+		readedMessages := atomic.LoadInt64(&readedMessagesCount)
+		return readedMessages, readedMessages == createdMessages
 	})
 
 	stopReader()

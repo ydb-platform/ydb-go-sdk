@@ -80,3 +80,29 @@ func SpinWaitConditionWithTimeout(tb testing.TB, l sync.Locker, condWaitTimeout 
 		runtime.Gosched()
 	}
 }
+
+// SpinWaitProgress failed if result of progress func no changes without timeout
+func SpinWaitProgress(tb testing.TB, progress func() (progressValue interface{}, finished bool)) {
+	tb.Helper()
+	SpinWaitProgressWithTimeout(tb, commonWaitTimeout, progress)
+}
+
+func SpinWaitProgressWithTimeout(
+	tb testing.TB,
+	timeout time.Duration,
+	progress func() (progressValue interface{}, finished bool),
+) {
+	tb.Helper()
+
+	for {
+		currentValue, finished := progress()
+		if finished {
+			return
+		}
+
+		SpinWaitConditionWithTimeout(tb, nil, timeout, func() bool {
+			progressValue, finished := progress()
+			return finished || progressValue != currentValue
+		})
+	}
+}
