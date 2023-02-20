@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/bind"
 )
 
 func Parse(dataSourceName string) (opts []config.Option, connectorOpts []ConnectorOption, err error) {
@@ -29,7 +30,7 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 		connectorOpts = append(connectorOpts, WithDefaultQueryMode(mode))
 	}
 	if tablePathPrefix := uri.Query().Get("table_path_prefix"); tablePathPrefix != "" {
-		connectorOpts = append(connectorOpts, WithTablePathPrefix(tablePathPrefix))
+		connectorOpts = append(connectorOpts, WithBindings(bind.WithTablePathPrefix(tablePathPrefix)))
 	}
 	return opts, connectorOpts, nil
 }

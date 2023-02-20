@@ -1,0 +1,18 @@
+-- modified by ydb-go-sdk@{{ .Version }}
+{{- if .PrintSourceQuery }}
+--
+-- source query:
+{{- range $line := Lines .SourceQuery }}
+--   {{ $line }}
+{{- end }}
+--
+{{- end }}
+{{- range $i, $pragma := .Pragmas }}
+{{ $pragma }};
+{{- end }}
+{{- range $i, $declare := .Declares }}
+DECLARE {{ $declare.Name }} AS {{ $declare.Type }};
+{{- end }}
+{{- range $i, $line := Lines .FinalQuery }}
+{{ $line }}
+{{- end -}}

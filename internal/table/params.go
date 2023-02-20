@@ -10,7 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-var ErrNameRequired = xerrors.Wrap(fmt.Errorf("ydb: only named parameters are supported"))
+var ErrNameRequired = xerrors.Wrap(fmt.Errorf("only named parameters are supported"))
 
 // GenerateDeclareSection generates DECLARE section text in YQL query by params
 //

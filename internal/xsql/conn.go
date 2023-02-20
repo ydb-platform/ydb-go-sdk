@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/isolation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
@@ -43,9 +44,9 @@ func withDefaultTxControl(defaultTxControl *table.TransactionControl) connOption
 	}
 }
 
-func withTablePathPrefix(tablePathPrefix string) connOption {
+func withBindings(b bind.Bindings) connOption {
 	return func(c *conn) {
-		c.tablePathPrefix = tablePathPrefix
+		c.bindings = b
 	}
 }
 
@@ -69,7 +70,7 @@ type conn struct {
 	closed           uint32
 	lastUsage        int64
 	defaultQueryMode QueryMode
-	tablePathPrefix  string
+	bindings         bind.Bindings
 
 	defaultTxControl *table.TransactionControl
 	dataOpts         []options.ExecuteDataQueryOption
@@ -124,23 +125,6 @@ func (c *conn) isReady() bool {
 	return c.session.Status() == table.SessionReady
 }
 
-func (c *conn) bindTablePathPrefix(query string) string {
-	if c.tablePathPrefix != "" {
-		return "PRAGMA TablePathPrefix(\"" + c.tablePathPrefix + "\");\n" + query
-	}
-	return query
-}
-
-func (c *conn) bindbindTablePathPrefixAndParams(query string, args ...driver.NamedValue) (
-	string, *table.QueryParameters, error,
-) {
-	query, params, err := bind(query, args...)
-	if err != nil {
-		return "", nil, xerrors.WithStackTrace(err)
-	}
-	return c.bindTablePathPrefix(query), params, nil
-}
-
 func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, err error) {
 	onDone := trace.DatabaseSQLOnConnPrepare(c.trace, &ctx, query)
 	defer func() {
@@ -176,7 +160,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 			res    result.Result
 			params *table.QueryParameters
 		)
-		query, params, err = c.bindbindTablePathPrefixAndParams(query, args...)
+		query, params, err = c.queryParams(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -198,7 +182,11 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		}
 		return driver.ResultNoRows, nil
 	case SchemeQueryMode:
-		err = c.session.ExecuteSchemeQuery(ctx, c.bindTablePathPrefix(query))
+		query, _, err = c.queryParams(query)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+		err = c.session.ExecuteSchemeQuery(ctx, query)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -208,7 +196,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 			res    result.StreamResult
 			params *table.QueryParameters
 		)
-		query, params, err = c.bindbindTablePathPrefixAndParams(query, args...)
+		query, params, err = c.queryParams(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -271,7 +259,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 			res    result.Result
 			params *table.QueryParameters
 		)
-		query, params, err = c.bindbindTablePathPrefixAndParams(query, args...)
+		query, params, err = c.queryParams(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -294,7 +282,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 			res    result.StreamResult
 			params *table.QueryParameters
 		)
-		query, params, err = c.bindbindTablePathPrefixAndParams(query, args...)
+		query, params, err = c.queryParams(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -313,7 +301,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		}, nil
 	case ExplainQueryMode:
 		var exp table.DataQueryExplanation
-		query, _, err = c.bindbindTablePathPrefixAndParams(query, args...)
+		query, _, err = c.queryParams(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -332,7 +320,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 			res    result.StreamResult
 			params *table.QueryParameters
 		)
-		query, params, err = c.bindbindTablePathPrefixAndParams(query, args...)
+		query, params, err = c.queryParams(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -388,6 +376,33 @@ func (c *conn) Prepare(string) (driver.Stmt, error) {
 
 func (c *conn) Begin() (driver.Tx, error) {
 	return nil, errDeprecated
+}
+
+func (c *conn) queryParams(q string, args ...driver.NamedValue) (
+	query string, _ *table.QueryParameters, _ error,
+) {
+	if c.bindings.Enabled() {
+		return c.bindings.Bind(q, args...)
+	}
+	params := make([]table.ParameterOption, len(args))
+	for i, arg := range args {
+		switch v := arg.Value.(type) {
+		case *table.QueryParameters:
+			if len(args) > 1 {
+				return "", nil, xerrors.WithStackTrace(fmt.Errorf("%v: %w", args, bind.ErrMultipleQueryParameters))
+			}
+			return q, v, nil
+		case table.ParameterOption:
+			params[i] = v
+		default:
+			param, err := bind.ToYdbParam(arg)
+			if err != nil {
+				return "", nil, xerrors.WithStackTrace(err)
+			}
+			params[i] = param
+		}
+	}
+	return q, table.NewQueryParameters(params...), nil
 }
 
 func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ driver.Tx, err error) {

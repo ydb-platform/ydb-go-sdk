@@ -3,6 +3,7 @@ package table
 import (
 	"bytes"
 	"context"
+	"sort"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
@@ -479,15 +480,22 @@ func (q *QueryParameters) Each(it func(name string, v types.Value)) {
 func (q *QueryParameters) String() string {
 	var buf bytes.Buffer
 	buf.WriteByte('(')
-	q.Each(func(name string, v types.Value) {
-		buf.WriteString("((")
-		buf.WriteString(name)
+	if q != nil {
+		names := make([]string, 0, len(q.m))
+		for k := range q.m {
+			names = append(names, k)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			buf.WriteString("((")
+			buf.WriteString(name)
+			buf.WriteByte(')')
+			buf.WriteByte('(')
+			buf.WriteString(q.m[name].Yql())
+			buf.WriteString("))")
+		}
 		buf.WriteByte(')')
-		buf.WriteByte('(')
-		buf.WriteString(v.Yql())
-		buf.WriteString("))")
-	})
-	buf.WriteByte(')')
+	}
 	return buf.String()
 }
 
