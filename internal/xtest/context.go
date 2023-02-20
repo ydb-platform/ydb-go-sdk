@@ -20,3 +20,13 @@ func Context(t testing.TB) context.Context {
 	})
 	return ctx
 }
+
+func ContextWithCommonTimeout(t testing.TB, ctx context.Context) context.Context {
+	if ctx.Done() == nil {
+		t.Fatal("Use context with timeout only with context, cancelled on finish test, for example xtest.Context")
+	}
+
+	ctx, ctxCancel := context.WithTimeout(ctx, commonWaitTimeout)
+	_ = ctxCancel // suppress linters, it is ok for leak for small amount of time: it will cancel by parent context
+	return ctx
+}
