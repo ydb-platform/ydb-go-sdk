@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"math/rand"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,7 +35,9 @@ func TestReadersWritersStress(t *testing.T) {
 	consumerName := commonConsumerName
 
 	writeTime := time.Second * 10
-	topicCount := 10
+	topicCount := runtime.GOMAXPROCS(0)
+	t.Log("topic count: ", topicCount)
+
 	topicPartitions := 3
 	writersPerTopic := topicPartitions * 2
 	readersPerTopic := 2
