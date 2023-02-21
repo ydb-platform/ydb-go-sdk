@@ -8,7 +8,6 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
-	"path"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -16,10 +15,8 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
-	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -43,31 +40,13 @@ func TestDatabaseSqlPositionalArgs(t *testing.T) {
 		atomic.AddUint64(&totalConsumedUnits, meta.ConsumedUnits(md))
 	})
 
-	t.Run("sql.OpenDB", func(t *testing.T) {
-		cc, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			// cleanup
-			_ = cc.Close(ctx)
-		}()
-
-		c, err := ydb.Connector(cc,
-			ydb.WithBindings(
-				bind.TablePathPrefix(scope.folder),
-				bind.Params(),
-			),
+	t.Run("sql.Open", func(t *testing.T) {
+		db, err := sql.Open("ydb",
+			os.Getenv("YDB_CONNECTION_STRING")+"?bind_params=1&table_path_prefix="+scope.folder,
 		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer func() {
-			// cleanup
-			_ = c.Close()
-		}()
-
-		db := sql.OpenDB(c)
 		defer func() {
 			// cleanup
 			_ = db.Close()
@@ -78,21 +57,13 @@ func TestDatabaseSqlPositionalArgs(t *testing.T) {
 		}
 
 		// prepare scheme
-		err = sugar.RemoveRecursive(ctx, cc, scope.folder)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = sugar.MakeRecursive(ctx, cc, scope.folder)
-		if err != nil {
-			t.Fatal(err)
-		}
-		err = scope.createTables(ctx, t, db, path.Join(cc.Name(), scope.folder))
+		err = scope.createTables(ctx, t, db)
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		// fill data
-		if err = scope.fill(ctx, t, db, path.Join(cc.Name(), scope.folder)); err != nil {
+		if err = scope.fill(ctx, t, db); err != nil {
 			t.Fatalf("fill failed: %v\n", err)
 		}
 
@@ -328,7 +299,7 @@ func (scope *sqlPositionalArgsScope) days(date string) time.Time {
 	return t
 }
 
-func (scope *sqlPositionalArgsScope) fill(ctx context.Context, t *testing.T, db *sql.DB, prefix string) error {
+func (scope *sqlPositionalArgsScope) fill(ctx context.Context, t *testing.T, db *sql.DB) error {
 	t.Logf("> filling tables\n")
 	defer func() {
 		t.Logf("> filling tables done\n")
@@ -349,7 +320,7 @@ func (scope *sqlPositionalArgsScope) fill(ctx context.Context, t *testing.T, db 
 	return nil
 }
 
-func (scope *sqlPositionalArgsScope) createTables(ctx context.Context, t *testing.T, db *sql.DB, prefix string) error {
+func (scope *sqlPositionalArgsScope) createTables(ctx context.Context, t *testing.T, db *sql.DB) error {
 	_, err := db.ExecContext(
 		ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
 		"DROP TABLE series",

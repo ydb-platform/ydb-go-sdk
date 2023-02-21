@@ -80,6 +80,10 @@ type conn struct {
 	currentTx currentTx
 }
 
+func (c *conn) GetDatabaseName() string {
+	return c.connector.connection.Name()
+}
+
 func (c *conn) CheckNamedValue(*driver.NamedValue) error {
 	// on this stage allows all values
 	return nil
