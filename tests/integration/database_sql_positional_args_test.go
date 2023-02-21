@@ -7,15 +7,14 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net/url"
 	"os"
-	"sync/atomic"
 	"testing"
 	"time"
 
-	"google.golang.org/grpc/metadata"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -31,41 +30,33 @@ func TestDatabaseSqlPositionalArgs(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
 	defer cancel()
 
-	var totalConsumedUnits uint64
-	defer func() {
-		t.Logf("total consumed units: %d", atomic.LoadUint64(&totalConsumedUnits))
-	}()
-
-	ctx = meta.WithTrailerCallback(ctx, func(md metadata.MD) {
-		atomic.AddUint64(&totalConsumedUnits, meta.ConsumedUnits(md))
-	})
-
 	t.Run("sql.Open", func(t *testing.T) {
-		db, err := sql.Open("ydb",
-			os.Getenv("YDB_CONNECTION_STRING")+"?bind_params=1&table_path_prefix="+scope.folder,
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		uri, err := url.Parse(os.Getenv("YDB_CONNECTION_STRING"))
+		require.NoError(t, err)
+
+		values := uri.Query()
+		values.Add("bind_params", "1")
+		values.Add("table_path_prefix", scope.folder)
+		uri.RawQuery = values.Encode()
+
+		db, err := sql.Open("ydb", uri.String())
+		require.NoError(t, err)
+
 		defer func() {
 			// cleanup
 			_ = db.Close()
 		}()
 
-		if err = db.PingContext(ctx); err != nil {
-			t.Fatalf("driver not initialized: %+v", err)
-		}
+		err = db.PingContext(ctx)
+		require.NoError(t, err)
 
 		// prepare scheme
 		err = scope.createTables(ctx, t, db)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		// fill data
-		if err = scope.fill(ctx, t, db); err != nil {
-			t.Fatalf("fill failed: %v\n", err)
-		}
+		err = scope.fill(ctx, t, db)
+		require.NoError(t, err)
 
 		// getting explain of query
 		row := db.QueryRowContext(
@@ -77,9 +68,10 @@ func TestDatabaseSqlPositionalArgs(t *testing.T) {
 			ast  string
 			plan string
 		)
-		if err = row.Scan(&ast, &plan); err != nil {
-			t.Fatalf("cannot explain: %v", err)
-		}
+
+		err = row.Scan(&ast, &plan)
+		require.NoError(t, err)
+
 		t.Logf("ast = %v", ast)
 		t.Logf("plan = %v", plan)
 
@@ -106,9 +98,8 @@ func TestDatabaseSqlPositionalArgs(t *testing.T) {
 			}
 			return nil
 		}, retry.WithDoTxRetryOptions(retry.WithIdempotent(true)))
-		if err != nil {
-			t.Fatalf("do tx failed: %v\n", err)
-		}
+		require.NoError(t, err)
+
 		err = retry.DoTx(ctx, db,
 			func(ctx context.Context, tx *sql.Tx) error {
 				row := tx.QueryRowContext(ctx,
@@ -136,9 +127,7 @@ func TestDatabaseSqlPositionalArgs(t *testing.T) {
 				ReadOnly:  true,
 			}),
 		)
-		if err != nil {
-			t.Fatalf("do tx failed: %v\n", err)
-		}
+		require.NoError(t, err)
 	})
 }
 

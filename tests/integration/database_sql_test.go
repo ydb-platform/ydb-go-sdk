@@ -15,6 +15,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
@@ -46,38 +47,30 @@ func TestDatabaseSql(t *testing.T) {
 
 	t.Run("sql.Open", func(t *testing.T) {
 		db, err := sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
-		if err = db.PingContext(ctx); err != nil {
-			t.Fatalf("driver not initialized: %+v", err)
-		}
+		err = db.PingContext(ctx)
+		require.NoError(t, err)
 
 		_, err = ydb.Unwrap(db)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
-		if err = db.Close(); err != nil {
-			t.Fatal(err)
-		}
+		err = db.Close()
+		require.NoError(t, err)
 	})
 
 	t.Run("sql.OpenDB", func(t *testing.T) {
 		cc, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"))
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+
 		defer func() {
 			// cleanup
 			_ = cc.Close(ctx)
 		}()
 
 		c, err := ydb.Connector(cc)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+
 		defer func() {
 			// cleanup
 			_ = c.Close()
@@ -89,28 +82,22 @@ func TestDatabaseSql(t *testing.T) {
 			_ = db.Close()
 		}()
 
-		if err = db.PingContext(ctx); err != nil {
-			t.Fatalf("driver not initialized: %+v", err)
-		}
+		err = db.PingContext(ctx)
+		require.NoError(t, err)
 
 		// prepare scheme
 		err = sugar.RemoveRecursive(ctx, cc, scope.folder)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+
 		err = sugar.MakeRecursive(ctx, cc, scope.folder)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+
 		err = scope.createTables(ctx, t, db, path.Join(cc.Name(), scope.folder))
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 
 		// fill data
-		if err = scope.fill(ctx, t, db, path.Join(cc.Name(), scope.folder)); err != nil {
-			t.Fatalf("fill failed: %v\n", err)
-		}
+		err = scope.fill(ctx, t, db, path.Join(cc.Name(), scope.folder))
+		require.NoError(t, err)
 
 		// getting explain of query
 		row := db.QueryRowContext(
@@ -137,9 +124,10 @@ func TestDatabaseSql(t *testing.T) {
 			ast  string
 			plan string
 		)
-		if err = row.Scan(&ast, &plan); err != nil {
-			t.Fatalf("cannot explain: %v", err)
-		}
+
+		err = row.Scan(&ast, &plan)
+		require.NoError(t, err)
+
 		t.Logf("ast = %v", ast)
 		t.Logf("plan = %v", plan)
 
@@ -204,9 +192,8 @@ func TestDatabaseSql(t *testing.T) {
 			}
 			return nil
 		}, retry.WithDoTxRetryOptions(retry.WithIdempotent(true)))
-		if err != nil {
-			t.Fatalf("do tx failed: %v\n", err)
-		}
+		require.NoError(t, err)
+
 		err = retry.DoTx(ctx, db,
 			func(ctx context.Context, tx *sql.Tx) error {
 				row := tx.QueryRowContext(ctx,
@@ -247,9 +234,7 @@ func TestDatabaseSql(t *testing.T) {
 				ReadOnly:  true,
 			}),
 		)
-		if err != nil {
-			t.Fatalf("do tx failed: %v\n", err)
-		}
+		require.NoError(t, err)
 	})
 }
 
