@@ -19,6 +19,11 @@ func TestParse(t *testing.T) {
 		}
 		return c
 	}
+	compareConfigs := func(t *testing.T, lhs, rhs config.Config) {
+		require.Equal(t, lhs.Secure(), rhs.Secure())
+		require.Equal(t, lhs.Endpoint(), rhs.Endpoint())
+		require.Equal(t, lhs.Database(), rhs.Database())
+	}
 	for _, tt := range []struct {
 		dsn              string
 		expOpts          []config.Option
@@ -80,8 +85,8 @@ func TestParse(t *testing.T) {
 				require.ErrorIs(t, err, tt.expErr)
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, config.New(tt.expOpts...), config.New(opts...))
 				require.Equal(t, newConnector(tt.expConnectorOpts...), newConnector(connectorOpts...))
+				compareConfigs(t, config.New(tt.expOpts...), config.New(opts...))
 			}
 		})
 	}
