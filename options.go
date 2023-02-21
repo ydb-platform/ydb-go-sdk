@@ -86,11 +86,6 @@ func WithConnectionString(connectionString string) Option {
 				fmt.Errorf("parse connection string '%s' failed: %w", connectionString, err),
 			)
 		}
-		c.options = append(c.options,
-			config.WithEndpoint(info.Endpoint),
-			config.WithDatabase(info.Database),
-			config.WithSecure(info.Secure),
-		)
 		c.options = append(c.options, info.Options...)
 		c.userInfo = info.UserInfo
 		return nil
