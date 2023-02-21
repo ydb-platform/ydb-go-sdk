@@ -1,7 +1,6 @@
 package dsn
 
 import (
-	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -111,11 +110,7 @@ func TestParseConnectionString(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Received unexpected error:\n%+v", err)
 			}
-			c := config.New(
-				config.WithEndpoint(info.Endpoint),
-				config.WithDatabase(info.Database),
-				config.WithSecure(info.Secure),
-			).With(info.Options...)
+			c := config.New(info.Options...)
 			require.Equal(t, test.secure, c.Secure())
 			require.Equal(t, test.endpoint, c.Endpoint())
 			require.Equal(t, test.database, c.Database())
@@ -128,27 +123,4 @@ func TestParseConnectionString(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestRegister(t *testing.T) {
-	var test1, test2, test3 int
-	_ = Register("test1", func(value string) (_ []config.Option, err error) {
-		test1, err = strconv.Atoi(value)
-		if err != nil {
-			return nil, err
-		}
-		return []config.Option{}, nil
-	})
-	_ = Register("test2", func(value string) (_ []config.Option, err error) {
-		test2, err = strconv.Atoi(value)
-		if err != nil {
-			return nil, err
-		}
-		return []config.Option{}, nil
-	})
-	_, err := Parse("grpc://ydb-ru.yandex.net:2135/ru/home/gvit/mydb?test1=1&test2=2&test3=3")
-	require.NoError(t, err, "")
-	require.Equal(t, 1, test1, "")
-	require.Equal(t, 2, test2, "")
-	require.NotEqualf(t, 3, test3, "")
 }

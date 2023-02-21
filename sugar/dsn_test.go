@@ -5,11 +5,12 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
 )
 
 func TestDSN(t *testing.T) {
-	for _, test := range []struct {
+	for _, tt := range []struct {
 		endpoint string
 		database string
 		secure   bool
@@ -40,18 +41,23 @@ func TestDSN(t *testing.T) {
 			"grpcs://lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv",
 		},
 	} {
-		t.Run(test.dsn, func(t *testing.T) {
-			s := DSN(test.endpoint, test.database, test.secure)
-			if s != test.dsn {
-				t.Fatalf("Unexpected result: %s, exp: %s", s, test.dsn)
+		t.Run(tt.dsn, func(t *testing.T) {
+			s := DSN(tt.endpoint, tt.database, tt.secure)
+			if s != tt.dsn {
+				t.Fatalf("Unexpected result: %s, exp: %s", s, tt.dsn)
 			}
 			info, err := dsn.Parse(s)
 			if err != nil {
 				t.Fatalf("")
 			}
-			require.Equal(t, info.Endpoint, test.endpoint)
-			require.Equal(t, info.Database, test.database)
-			require.Equal(t, info.Secure, test.secure)
+			lhs, rhs := config.New(info.Options...), config.New(
+				config.WithSecure(tt.secure),
+				config.WithEndpoint(tt.endpoint),
+				config.WithDatabase(tt.database),
+			)
+			require.Equal(t, lhs.Endpoint(), rhs.Endpoint())
+			require.Equal(t, lhs.Database(), rhs.Database())
+			require.Equal(t, lhs.Secure(), rhs.Secure())
 		})
 	}
 }

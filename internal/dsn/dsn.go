@@ -9,28 +9,9 @@ import (
 )
 
 var (
-	parsers = map[string]Parser{
-		// for compatibility with old connection string format
-		"database": func(database string) ([]config.Option, error) {
-			return []config.Option{
-				config.WithDatabase(database),
-			}, nil
-		},
-	}
-	insecureSchema  = "grpc"
-	errParserExists = xerrors.Wrap(fmt.Errorf("already exists parser. newest parser replaced old. param"))
+	insecureSchema = "grpc"
+	databaseParam  = "database"
 )
-
-type Parser func(value string) ([]config.Option, error)
-
-func Register(param string, parser Parser) error {
-	_, has := parsers[param]
-	parsers[param] = parser
-	if has {
-		return xerrors.WithStackTrace(fmt.Errorf("%w: %v", errParserExists, param))
-	}
-	return nil
-}
 
 type UserInfo struct {
 	User     string
@@ -38,11 +19,9 @@ type UserInfo struct {
 }
 
 type parsedInfo struct {
-	Endpoint string
-	Database string
-	Secure   bool
 	UserInfo *UserInfo
 	Options  []config.Option
+	Params   url.Values
 }
 
 func Parse(dsn string) (info parsedInfo, err error) {
@@ -53,9 +32,11 @@ func Parse(dsn string) (info parsedInfo, err error) {
 	if port := uri.Port(); port == "" {
 		return info, xerrors.WithStackTrace(fmt.Errorf("bad connection string '%s': port required", dsn))
 	}
-	info.Endpoint = uri.Host
-	info.Database = uri.Path
-	info.Secure = uri.Scheme != insecureSchema
+	info.Options = append(info.Options,
+		config.WithSecure(uri.Scheme != insecureSchema),
+		config.WithEndpoint(uri.Host),
+		config.WithDatabase(uri.Path),
+	)
 	if uri.User != nil {
 		password, _ := uri.User.Password()
 		info.UserInfo = &UserInfo{
@@ -63,16 +44,13 @@ func Parse(dsn string) (info parsedInfo, err error) {
 			Password: password,
 		}
 	}
-	for param, values := range uri.Query() {
-		if p, has := parsers[param]; has {
-			for _, v := range values {
-				var parsed []config.Option
-				if parsed, err = p(v); err != nil {
-					return info, xerrors.WithStackTrace(err)
-				}
-				info.Options = append(info.Options, parsed...)
-			}
-		}
+	info.Params = uri.Query()
+	if database, has := info.Params[databaseParam]; has && len(database) > 0 {
+		info.Options = append(info.Options,
+			config.WithDatabase(database[0]),
+		)
+		delete(info.Params, databaseParam)
 	}
+
 	return info, nil
 }
