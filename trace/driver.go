@@ -42,7 +42,9 @@ type (
 		) func(
 			DriverConnNewStreamDoneInfo,
 		)
+		// Deprecated: driver not support logging of net events
 		OnConnTake  func(DriverConnTakeStartInfo) func(DriverConnTakeDoneInfo)
+		OnConnDial  func(DriverConnDialStartInfo) func(DriverConnDialDoneInfo)
 		OnConnPark  func(DriverConnParkStartInfo) func(DriverConnParkDoneInfo)
 		OnConnBan   func(DriverConnBanStartInfo) func(DriverConnBanDoneInfo)
 		OnConnAllow func(DriverConnAllowStartInfo) func(DriverConnAllowDoneInfo)
@@ -207,6 +209,17 @@ type (
 		Endpoint EndpointInfo
 	}
 	DriverConnTakeDoneInfo struct {
+		Error error
+	}
+	DriverConnDialStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context  *context.Context
+		Endpoint EndpointInfo
+	}
+	DriverConnDialDoneInfo struct {
 		Error error
 	}
 	DriverConnParkStartInfo struct {

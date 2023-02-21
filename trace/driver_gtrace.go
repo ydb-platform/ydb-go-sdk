@@ -431,6 +431,41 @@ func (t Driver) Compose(x Driver, opts ...DriverComposeOption) (ret Driver) {
 		}
 	}
 	{
+		h1 := t.OnConnDial
+		h2 := x.OnConnDial
+		ret.OnConnDial = func(d DriverConnDialStartInfo) func(DriverConnDialDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverConnDialDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverConnDialDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
+					r1(d)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnConnPark
 		h2 := x.OnConnPark
 		ret.OnConnPark = func(d DriverConnParkStartInfo) func(DriverConnParkDoneInfo) {
@@ -1029,6 +1064,21 @@ func (t Driver) onConnTake(d DriverConnTakeStartInfo) func(DriverConnTakeDoneInf
 	}
 	return res
 }
+func (t Driver) onConnDial(d DriverConnDialStartInfo) func(DriverConnDialDoneInfo) {
+	fn := t.OnConnDial
+	if fn == nil {
+		return func(DriverConnDialDoneInfo) {
+			return
+		}
+	}
+	res := fn(d)
+	if res == nil {
+		return func(DriverConnDialDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t Driver) onConnPark(d DriverConnParkStartInfo) func(DriverConnParkDoneInfo) {
 	fn := t.OnConnPark
 	if fn == nil {
@@ -1341,6 +1391,17 @@ func DriverOnConnTake(t Driver, c *context.Context, endpoint EndpointInfo) func(
 	res := t.onConnTake(p)
 	return func(e error) {
 		var p DriverConnTakeDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func DriverOnConnDial(t Driver, c *context.Context, endpoint EndpointInfo) func(error) {
+	var p DriverConnDialStartInfo
+	p.Context = c
+	p.Endpoint = endpoint
+	res := t.onConnDial(p)
+	return func(e error) {
+		var p DriverConnDialDoneInfo
 		p.Error = e
 		res(p)
 	}
