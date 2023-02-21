@@ -4,6 +4,10 @@ import "context"
 
 var (
 	_ interface {
+		GetDatabaseName() string
+	} = (*conn)(nil)
+
+	_ interface {
 		Version(ctx context.Context) (version string, err error)
 	} = (*conn)(nil)
 

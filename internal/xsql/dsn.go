@@ -3,6 +3,7 @@ package xsql
 import (
 	"fmt"
 	"net/url"
+	"strconv"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
@@ -31,6 +32,15 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 	}
 	if tablePathPrefix := uri.Query().Get("table_path_prefix"); tablePathPrefix != "" {
 		connectorOpts = append(connectorOpts, WithBindings(bind.WithTablePathPrefix(tablePathPrefix)))
+	}
+	if bindParams := uri.Query().Get("bind_params"); bindParams != "" {
+		b, err := strconv.ParseBool(bindParams)
+		if err != nil {
+			return nil, nil, xerrors.WithStackTrace(err)
+		}
+		if b {
+			connectorOpts = append(connectorOpts, WithBindings(bind.WithAutoBindParams()))
+		}
 	}
 	return opts, connectorOpts, nil
 }

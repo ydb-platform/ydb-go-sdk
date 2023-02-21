@@ -9,7 +9,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
-	"github.com/ydb-platform/ydb-go-sdk/v3/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
@@ -66,13 +65,12 @@ func Example_databaseSQL() {
 	defer func() { _ = db.Close() }() // cleanup resources
 
 	var (
-		query = `SELECT 42 as id, "my string" as myStr`
 		id    int32  // required value
 		myStr string // optional value
 	)
 	// retry transaction
 	err = retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) error {
-		row := tx.QueryRowContext(ctx, query)
+		row := tx.QueryRowContext(ctx, `SELECT 42 as id, "my string" as myStr`)
 		if err = row.Scan(&id, &myStr); err != nil {
 			return err
 		}
@@ -85,25 +83,11 @@ func Example_databaseSQL() {
 }
 
 func Example_databaseSQLBindingNumericArgs() {
-	ctx := context.TODO()
-
-	cc, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	db, err := sql.Open("ydb", "grpc://localhost:2136/local?bind_params=1")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer func() { _ = cc.Close(ctx) }() // cleanup resources
-
-	connector, err := ydb.Connector(cc,
-		ydb.WithBindings(
-			bind.Params(),
-		),
-	)
-	if err != nil {
-		log.Printf("connector not created: %v", err)
-		return
-	}
-
-	db := sql.OpenDB(connector)
+	defer func() { _ = db.Close() }() // cleanup resources
 
 	var (
 		id    int32  // required value
@@ -111,7 +95,7 @@ func Example_databaseSQLBindingNumericArgs() {
 	)
 
 	// numeric args
-	row := db.QueryRowContext(ctx, "SELECT $2, $1", 42, "my string")
+	row := db.QueryRowContext(context.TODO(), "SELECT $2, $1", 42, "my string")
 	if err = row.Scan(&myStr, &id); err != nil {
 		log.Printf("query failed: %v", err)
 	} else {
@@ -120,25 +104,11 @@ func Example_databaseSQLBindingNumericArgs() {
 }
 
 func Example_databaseSQLBindingPositionalArgs() {
-	ctx := context.TODO()
-
-	cc, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	db, err := sql.Open("ydb", "grpc://localhost:2136/local?bind_params=1")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer func() { _ = cc.Close(ctx) }() // cleanup resources
-
-	connector, err := ydb.Connector(cc,
-		ydb.WithBindings(
-			bind.Params(),
-		),
-	)
-	if err != nil {
-		log.Printf("connector not created: %v", err)
-		return
-	}
-
-	db := sql.OpenDB(connector)
+	defer func() { _ = db.Close() }() // cleanup resources
 
 	var (
 		id    int32  // required value
@@ -146,7 +116,7 @@ func Example_databaseSQLBindingPositionalArgs() {
 	)
 
 	// positional args
-	row := db.QueryRowContext(ctx, "SELECT ?, ?", 42, "my string")
+	row := db.QueryRowContext(context.TODO(), "SELECT ?, ?", 42, "my string")
 	if err = row.Scan(&id, &myStr); err != nil {
 		log.Printf("query failed: %v", err)
 	} else {
@@ -155,25 +125,11 @@ func Example_databaseSQLBindingPositionalArgs() {
 }
 
 func Example_databaseSQLBindingTablePathPrefix() {
-	ctx := context.TODO()
-
-	cc, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	db, err := sql.Open("ydb", "grpc://localhost:2136/local?table_path_prefix=path/to/tables")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer func() { _ = cc.Close(ctx) }() // cleanup resources
-
-	connector, err := ydb.Connector(cc,
-		ydb.WithBindings(
-			bind.TablePathPrefix("path/to/tables"),
-		),
-	)
-	if err != nil {
-		log.Printf("connector not created: %v", err)
-		return
-	}
-
-	db := sql.OpenDB(connector)
+	defer func() { _ = db.Close() }() // cleanup resources
 
 	var (
 		id    int32  // required value
@@ -181,7 +137,7 @@ func Example_databaseSQLBindingTablePathPrefix() {
 	)
 
 	// full table path is "/local/path/to/tables/series"
-	row := db.QueryRowContext(ctx, "SELECT id, title FROM series")
+	row := db.QueryRowContext(context.TODO(), "SELECT id, title FROM series")
 	if err = row.Scan(&id, &title); err != nil {
 		log.Printf("query failed: %v", err)
 	} else {
