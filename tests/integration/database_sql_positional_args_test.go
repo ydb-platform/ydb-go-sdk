@@ -4,7 +4,6 @@
 package integration
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
@@ -12,25 +11,25 @@ import (
 	"path"
 	"sync/atomic"
 	"testing"
-	"text/template"
 	"time"
 
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-type sqlScope struct {
+type sqlPositionalArgsScope struct {
 	folder string
 }
 
-func TestDatabaseSql(t *testing.T) {
-	scope := sqlScope{
-		folder: "database/sql",
+func TestDatabaseSqlPositionalArgs(t *testing.T) {
+	scope := sqlPositionalArgsScope{
+		folder: "database/sql/args/positional",
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
 	defer cancel()
@@ -44,26 +43,6 @@ func TestDatabaseSql(t *testing.T) {
 		atomic.AddUint64(&totalConsumedUnits, meta.ConsumedUnits(md))
 	})
 
-	t.Run("sql.Open", func(t *testing.T) {
-		db, err := sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err = db.PingContext(ctx); err != nil {
-			t.Fatalf("driver not initialized: %+v", err)
-		}
-
-		_, err = ydb.Unwrap(db)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if err = db.Close(); err != nil {
-			t.Fatal(err)
-		}
-	})
-
 	t.Run("sql.OpenDB", func(t *testing.T) {
 		cc, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"))
 		if err != nil {
@@ -74,7 +53,12 @@ func TestDatabaseSql(t *testing.T) {
 			_ = cc.Close(ctx)
 		}()
 
-		c, err := ydb.Connector(cc)
+		c, err := ydb.Connector(cc,
+			ydb.WithBindings(
+				bind.WithTablePathPrefix(scope.folder),
+				bind.WithAutoBindParams(),
+			),
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -115,23 +99,8 @@ func TestDatabaseSql(t *testing.T) {
 		// getting explain of query
 		row := db.QueryRowContext(
 			ydb.WithQueryMode(ctx, ydb.ExplainQueryMode),
-			scope.render(
-				template.Must(template.New("").Parse(`
-					PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
-					DECLARE $seriesID AS Uint64;
-					DECLARE $seasonID AS Uint64;
-					DECLARE $episodeID AS Uint64;
-					SELECT views FROM episodes WHERE series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID;
-				`)),
-				struct {
-					TablePathPrefix string
-				}{
-					TablePathPrefix: path.Join(cc.Name(), scope.folder),
-				},
-			),
-			sql.Named("seriesID", uint64(1)),
-			sql.Named("seasonID", uint64(1)),
-			sql.Named("episodeID", uint64(1)),
+			`SELECT views FROM episodes WHERE series_id = ? AND season_id = ? AND episode_id = ?`,
+			uint64(1), uint64(1), uint64(1),
 		)
 		var (
 			ast  string
@@ -144,29 +113,9 @@ func TestDatabaseSql(t *testing.T) {
 		t.Logf("plan = %v", plan)
 
 		err = retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) (err error) {
-			var stmt *sql.Stmt
-			stmt, err = tx.PrepareContext(ctx, scope.render(
-				template.Must(template.New("").Parse(`
-					PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
-					DECLARE $seriesID AS Uint64;
-					DECLARE $seasonID AS Uint64;
-					DECLARE $episodeID AS Uint64;
-					SELECT views FROM episodes WHERE series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID;
-				`)),
-				struct {
-					TablePathPrefix string
-				}{
-					TablePathPrefix: path.Join(cc.Name(), scope.folder),
-				},
-			))
-			if err != nil {
-				return fmt.Errorf("cannot prepare query: %w", err)
-			}
-
-			row = stmt.QueryRowContext(ctx,
-				sql.Named("seriesID", uint64(1)),
-				sql.Named("seasonID", uint64(1)),
-				sql.Named("episodeID", uint64(1)),
+			row = tx.QueryRowContext(ctx,
+				`SELECT views FROM episodes WHERE series_id = ? AND season_id = ? AND episode_id = ?`,
+				uint64(1), uint64(1), uint64(1),
 			)
 			var views sql.NullFloat64
 			if err = row.Scan(&views); err != nil {
@@ -178,26 +127,8 @@ func TestDatabaseSql(t *testing.T) {
 			t.Logf("views = %v", views)
 			// increment `views`
 			_, err = tx.ExecContext(ctx,
-				scope.render(
-					template.Must(template.New("").Parse(`
-						PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
-						DECLARE $seriesID AS Uint64;
-						DECLARE $seasonID AS Uint64;
-						DECLARE $episodeID AS Uint64;
-						DECLARE $views AS Uint64;
-						UPSERT INTO episodes ( series_id, season_id, episode_id, views )
-						VALUES ( $seriesID, $seasonID, $episodeID, $views );
-					`)),
-					struct {
-						TablePathPrefix string
-					}{
-						TablePathPrefix: path.Join(cc.Name(), scope.folder),
-					},
-				),
-				sql.Named("seriesID", uint64(1)),
-				sql.Named("seasonID", uint64(1)),
-				sql.Named("episodeID", uint64(1)),
-				sql.Named("views", uint64(views.Float64+1)), // increment views
+				`UPSERT INTO episodes ( series_id, season_id, episode_id, views ) VALUES ( ?, ?, ?, ? )`,
+				uint64(1), uint64(1), uint64(1), uint64(views.Float64+1), // increment views
 			)
 			if err != nil {
 				return fmt.Errorf("cannot upsert views: %w", err)
@@ -210,23 +141,10 @@ func TestDatabaseSql(t *testing.T) {
 		err = retry.DoTx(ctx, db,
 			func(ctx context.Context, tx *sql.Tx) error {
 				row := tx.QueryRowContext(ctx,
-					scope.render(
-						template.Must(template.New("").Parse(`
-							PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
-							DECLARE $seriesID AS Uint64;
-							DECLARE $seasonID AS Uint64;
-							DECLARE $episodeID AS Uint64;
-							SELECT views FROM episodes WHERE series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID;
-						`)),
-						struct {
-							TablePathPrefix string
-						}{
-							TablePathPrefix: path.Join(cc.Name(), scope.folder),
-						},
-					),
-					sql.Named("seriesID", uint64(1)),
-					sql.Named("seasonID", uint64(1)),
-					sql.Named("episodeID", uint64(1)),
+					`SELECT views FROM episodes WHERE series_id = ? AND season_id = ? AND episode_id = ?`,
+					uint64(1),
+					uint64(1),
+					uint64(1),
 				)
 				var views sql.NullFloat64
 				if err = row.Scan(&views); err != nil {
@@ -253,7 +171,9 @@ func TestDatabaseSql(t *testing.T) {
 	})
 }
 
-func (scope *sqlScope) seriesData(id uint64, released time.Time, title, info, comment string) types.Value {
+func (scope *sqlPositionalArgsScope) seriesData(
+	id uint64, released time.Time, title, info, comment string,
+) types.Value {
 	var commenValue types.Value
 	if comment == "" {
 		commenValue = types.NullValue(types.TypeText)
@@ -269,7 +189,9 @@ func (scope *sqlScope) seriesData(id uint64, released time.Time, title, info, co
 	)
 }
 
-func (scope *sqlScope) seasonData(seriesID, seasonID uint64, title string, first, last time.Time) types.Value {
+func (scope *sqlPositionalArgsScope) seasonData(
+	seriesID, seasonID uint64, title string, first, last time.Time,
+) types.Value {
 	return types.StructValue(
 		types.StructFieldValue("series_id", types.OptionalValue(types.Uint64Value(seriesID))),
 		types.StructFieldValue("season_id", types.OptionalValue(types.Uint64Value(seasonID))),
@@ -279,7 +201,7 @@ func (scope *sqlScope) seasonData(seriesID, seasonID uint64, title string, first
 	)
 }
 
-func (scope *sqlScope) episodeData(
+func (scope *sqlPositionalArgsScope) episodeData(
 	seriesID, seasonID, episodeID uint64, title string, date time.Time,
 ) types.Value {
 	return types.StructValue(
@@ -291,7 +213,7 @@ func (scope *sqlScope) episodeData(
 	)
 }
 
-func (scope *sqlScope) getSeriesData() types.Value {
+func (scope *sqlPositionalArgsScope) getSeriesData() types.Value {
 	return types.ListValue(
 		scope.seriesData(
 			1, scope.days("2006-02-03"), "IT Crowd", ""+
@@ -308,7 +230,7 @@ func (scope *sqlScope) getSeriesData() types.Value {
 	)
 }
 
-func (scope *sqlScope) getSeasonsData() types.Value {
+func (scope *sqlPositionalArgsScope) getSeasonsData() types.Value {
 	return types.ListValue(
 		scope.seasonData(1, 1, "Season 1", scope.days("2006-02-03"), scope.days("2006-03-03")),
 		scope.seasonData(1, 2, "Season 2", scope.days("2007-08-24"), scope.days("2007-09-28")),
@@ -322,7 +244,7 @@ func (scope *sqlScope) getSeasonsData() types.Value {
 	)
 }
 
-func (scope *sqlScope) getEpisodesData() types.Value {
+func (scope *sqlPositionalArgsScope) getEpisodesData() types.Value {
 	return types.ListValue(
 		scope.episodeData(1, 1, 1, "Yesterday's Jam", scope.days("2006-02-03")),
 		scope.episodeData(1, 1, 2, "Calamity Jen", scope.days("2006-02-03")),
@@ -397,7 +319,7 @@ func (scope *sqlScope) getEpisodesData() types.Value {
 	)
 }
 
-func (scope *sqlScope) days(date string) time.Time {
+func (scope *sqlPositionalArgsScope) days(date string) time.Time {
 	const dateISO8601 = "2006-01-02"
 	t, err := time.Parse(dateISO8601, date)
 	if err != nil {
@@ -406,83 +328,47 @@ func (scope *sqlScope) days(date string) time.Time {
 	return t
 }
 
-func (scope *sqlScope) fill(ctx context.Context, t *testing.T, db *sql.DB, prefix string) error {
+func (scope *sqlPositionalArgsScope) fill(ctx context.Context, t *testing.T, db *sql.DB, prefix string) error {
 	t.Logf("> filling tables\n")
 	defer func() {
 		t.Logf("> filling tables done\n")
 	}()
-	stmt, err := db.PrepareContext(ctx, scope.render(template.Must(template.New("fillQuery database").Parse(`
-		PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
-		
-		DECLARE $seriesData AS List<Struct<
-			series_id: Optional<Uint64>,
-			title: Optional<Utf8>,
-			series_info: Optional<Utf8>,
-			release_date: Optional<Date>,
-			comment: Optional<Utf8>>>;
-		
-		DECLARE $seasonsData AS List<Struct<
-			series_id: Optional<Uint64>,
-			season_id: Optional<Uint64>,
-			title: Optional<Utf8>,
-			first_aired: Optional<Date>,
-			last_aired: Optional<Date>>>;
-		
-		DECLARE $episodesData AS List<Struct<
-			series_id: Optional<Uint64>,
-			season_id: Optional<Uint64>,
-			episode_id: Optional<Uint64>,
-			title: Optional<Utf8>,
-			air_date: Optional<Date>>>;
-		
-		REPLACE INTO series SELECT * FROM AS_TABLE($seriesData);
-		
-		REPLACE INTO seasons SELECT * FROM AS_TABLE($seasonsData);
-		
-		REPLACE INTO episodes SELECT * FROM AS_TABLE($episodesData);
-	`)), struct {
-		TablePathPrefix string
-	}{
-		TablePathPrefix: prefix,
-	}))
-	if err != nil {
-		t.Errorf("failed to prepare query: %v", err)
-		return err
-	}
-	_, err = stmt.ExecContext(ctx,
-		sql.Named("seriesData", scope.getSeriesData()),
-		sql.Named("seasonsData", scope.getSeasonsData()),
-		sql.Named("episodesData", scope.getEpisodesData()),
+	_, err := db.ExecContext(ctx,
+		`REPLACE INTO series SELECT * FROM AS_TABLE(?);
+		REPLACE INTO seasons SELECT * FROM AS_TABLE(?);
+		REPLACE INTO episodes SELECT * FROM AS_TABLE(?);
+		`,
+		scope.getSeriesData(),
+		scope.getSeasonsData(),
+		scope.getEpisodesData(),
 	)
 	if err != nil {
-		t.Errorf("failed to execute statement: %v", err)
+		t.Errorf("failed to execute query: %v", err)
 		return err
 	}
 	return nil
 }
 
-func (scope *sqlScope) createTables(ctx context.Context, t *testing.T, db *sql.DB, prefix string) error {
+func (scope *sqlPositionalArgsScope) createTables(ctx context.Context, t *testing.T, db *sql.DB, prefix string) error {
 	_, err := db.ExecContext(
 		ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-		fmt.Sprintf("DROP TABLE `%s`", path.Join(prefix, "series")),
+		"DROP TABLE series",
 	)
 	if err != nil {
 		t.Logf("warn: drop series table failed: %v", err)
 	}
 	_, err = db.ExecContext(
 		ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-		fmt.Sprintf(
-			`CREATE TABLE `+"`"+path.Join(prefix, "series")+"`"+` (
-				series_id Uint64,
-				title UTF8,
-				series_info UTF8,
-				release_date Date,
-				comment UTF8,
-				PRIMARY KEY (
-					series_id
-				)
-			)`,
-		),
+		`CREATE TABLE series (
+			series_id Uint64,
+			title UTF8,
+			series_info UTF8,
+			release_date Date,
+			comment UTF8,
+			PRIMARY KEY (
+				series_id
+			)
+		)`,
 	)
 	if err != nil {
 		t.Fatalf("create series table failed: %v", err)
@@ -491,26 +377,24 @@ func (scope *sqlScope) createTables(ctx context.Context, t *testing.T, db *sql.D
 
 	_, err = db.ExecContext(
 		ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-		fmt.Sprintf("DROP TABLE `%s`", path.Join(prefix, "seasons")),
+		"DROP TABLE seasons",
 	)
 	if err != nil {
 		t.Logf("warn: drop seasons table failed: %v", err)
 	}
 	_, err = db.ExecContext(
 		ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-		fmt.Sprintf(
-			`CREATE TABLE `+"`"+path.Join(prefix, "seasons")+"`"+` (
-				series_id Uint64,
-				season_id Uint64,
-				title UTF8,
-				first_aired Date,
-				last_aired Date,
-				PRIMARY KEY (
-					series_id,
-					season_id
-				)
-			)`,
-		),
+		`CREATE TABLE seasons (
+			series_id Uint64,
+			season_id Uint64,
+			title UTF8,
+			first_aired Date,
+			last_aired Date,
+			PRIMARY KEY (
+				series_id,
+				season_id
+			)
+		)`,
 	)
 	if err != nil {
 		t.Fatalf("create seasons table failed: %v", err)
@@ -519,28 +403,26 @@ func (scope *sqlScope) createTables(ctx context.Context, t *testing.T, db *sql.D
 
 	_, err = db.ExecContext(
 		ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-		fmt.Sprintf("DROP TABLE `%s`", path.Join(prefix, "episodes")),
+		"DROP TABLE episodes",
 	)
 	if err != nil {
 		t.Logf("warn: drop episodes table failed: %v", err)
 	}
 	_, err = db.ExecContext(
 		ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-		fmt.Sprintf(
-			`CREATE TABLE `+"`"+path.Join(prefix, "episodes")+"`"+` (
-				series_id Uint64,
-				season_id Uint64,
-				episode_id Uint64,
-				title UTF8,
-				air_date Date,
-				views Uint64,
-				PRIMARY KEY (
-					series_id,
-					season_id,
-					episode_id
-				)
-			)`,
-		),
+		`CREATE TABLE episodes (
+			series_id Uint64,
+			season_id Uint64,
+			episode_id Uint64,
+			title UTF8,
+			air_date Date,
+			views Uint64,
+			PRIMARY KEY (
+				series_id,
+				season_id,
+				episode_id
+			)
+		)`,
 	)
 	if err != nil {
 		t.Errorf("create episodes table failed: %v", err)
@@ -548,13 +430,4 @@ func (scope *sqlScope) createTables(ctx context.Context, t *testing.T, db *sql.D
 	}
 
 	return nil
-}
-
-func (scope *sqlScope) render(t *template.Template, data interface{}) string {
-	var buf bytes.Buffer
-	err := t.Execute(&buf, data)
-	if err != nil {
-		panic(err)
-	}
-	return buf.String()
 }
