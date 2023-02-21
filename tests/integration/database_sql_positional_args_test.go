@@ -16,7 +16,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/bind"
+	"github.com/ydb-platform/ydb-go-sdk/v3/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
@@ -55,8 +55,8 @@ func TestDatabaseSqlPositionalArgs(t *testing.T) {
 
 		c, err := ydb.Connector(cc,
 			ydb.WithBindings(
-				bind.WithTablePathPrefix(scope.folder),
-				bind.WithAutoBindParams(),
+				bind.TablePathPrefix(scope.folder),
+				bind.Params(),
 			),
 		)
 		if err != nil {

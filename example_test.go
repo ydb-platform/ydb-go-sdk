@@ -9,6 +9,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
+	"github.com/ydb-platform/ydb-go-sdk/v3/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
@@ -69,6 +70,7 @@ func Example_databaseSQL() {
 		id    int32  // required value
 		myStr string // optional value
 	)
+	// retry transaction
 	err = retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) error {
 		row := tx.QueryRowContext(ctx, query)
 		if err = row.Scan(&id, &myStr); err != nil {
@@ -79,6 +81,111 @@ func Example_databaseSQL() {
 	}, retry.WithDoTxRetryOptions(retry.WithIdempotent(true)))
 	if err != nil {
 		log.Printf("query failed: %v", err)
+	}
+}
+
+func Example_databaseSQLBindingNumericArgs() {
+	ctx := context.TODO()
+
+	cc, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() { _ = cc.Close(ctx) }() // cleanup resources
+
+	connector, err := ydb.Connector(cc,
+		ydb.WithBindings(
+			bind.Params(),
+		),
+	)
+	if err != nil {
+		log.Printf("connector not created: %v", err)
+		return
+	}
+
+	db := sql.OpenDB(connector)
+
+	var (
+		id    int32  // required value
+		myStr string // optional value
+	)
+
+	// numeric args
+	row := db.QueryRowContext(ctx, "SELECT $2, $1", 42, "my string")
+	if err = row.Scan(&myStr, &id); err != nil {
+		log.Printf("query failed: %v", err)
+	} else {
+		log.Printf("id=%v, myStr='%s'\n", id, myStr)
+	}
+}
+
+func Example_databaseSQLBindingPositionalArgs() {
+	ctx := context.TODO()
+
+	cc, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() { _ = cc.Close(ctx) }() // cleanup resources
+
+	connector, err := ydb.Connector(cc,
+		ydb.WithBindings(
+			bind.Params(),
+		),
+	)
+	if err != nil {
+		log.Printf("connector not created: %v", err)
+		return
+	}
+
+	db := sql.OpenDB(connector)
+
+	var (
+		id    int32  // required value
+		myStr string // optional value
+	)
+
+	// positional args
+	row := db.QueryRowContext(ctx, "SELECT ?, ?", 42, "my string")
+	if err = row.Scan(&id, &myStr); err != nil {
+		log.Printf("query failed: %v", err)
+	} else {
+		log.Printf("id=%v, myStr='%s'\n", id, myStr)
+	}
+}
+
+func Example_databaseSQLBindingTablePathPrefix() {
+	ctx := context.TODO()
+
+	cc, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() { _ = cc.Close(ctx) }() // cleanup resources
+
+	connector, err := ydb.Connector(cc,
+		ydb.WithBindings(
+			bind.TablePathPrefix("path/to/tables"),
+		),
+	)
+	if err != nil {
+		log.Printf("connector not created: %v", err)
+		return
+	}
+
+	db := sql.OpenDB(connector)
+
+	var (
+		id    int32  // required value
+		title string // optional value
+	)
+
+	// full table path is "/local/path/to/tables/series"
+	row := db.QueryRowContext(ctx, "SELECT id, title FROM series")
+	if err = row.Scan(&id, &title); err != nil {
+		log.Printf("query failed: %v", err)
+	} else {
+		log.Printf("id=%v, title='%s'\n", id, title)
 	}
 }
 
