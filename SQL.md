@@ -315,14 +315,6 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
       uint64(1000),
    )
    ```
-* named arguments:
-   ```go
-   rows, err := db.QueryContext(ctx, 
-      "SELECT season_id FROM seasons WHERE title LIKE @seasonTitle AND views > @views",
-      sql.Named("seasonTitle", "%Season 1%"),
-      sql.Named("views", uint64(1000)),
-   )
-   ```
 * `table.ParameterOption` arguments:
    ```go
    rows, err := db.QueryContext(ctx, 
