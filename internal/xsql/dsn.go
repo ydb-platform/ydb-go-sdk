@@ -17,6 +17,11 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
+	opts = append(opts,
+		config.WithSecure(uri.Scheme == "grpcs"),
+		config.WithEndpoint(uri.Host),
+		config.WithDatabase(uri.Path),
+	)
 	if token := uri.Query().Get("token"); token != "" {
 		opts = append(opts, config.WithCredentials(credentials.NewAccessTokenCredentials(token)))
 	}

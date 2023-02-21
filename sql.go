@@ -59,7 +59,7 @@ func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, erro
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	db, err := Open(context.Background(), dataSourceName, With(opts...))
+	db, err := Open(context.Background(), "", With(opts...))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
