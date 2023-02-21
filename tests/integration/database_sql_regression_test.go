@@ -29,9 +29,7 @@ import (
 
 func TestRegressionCloud109307(t *testing.T) {
 	db, err := sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
 	defer cancel()
@@ -41,7 +39,7 @@ func TestRegressionCloud109307(t *testing.T) {
 			break
 		}
 
-		if err = retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) error {
+		err = retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) error {
 			//nolint:gosec
 			if rand.Int31n(3) == 0 {
 				return badconn.Map(xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION)))
@@ -72,10 +70,9 @@ func TestRegressionCloud109307(t *testing.T) {
 			ReadOnly:  true,
 		}), retry.WithDoTxRetryOptions(
 			retry.WithIdempotent(true),
-		)); err != nil {
-			if ctx.Err() == nil {
-				t.Fatalf("error: %+v\n", err)
-			}
+		))
+		if ctx.Err() == nil {
+			require.NoError(t, err)
 		}
 	}
 }
