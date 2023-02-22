@@ -5,7 +5,7 @@
 * Fixed topic retry policy callback call: not call it with nil error 
 * Deprecated `trace.Driver.OnConnTake` event callback
 * Added `trace.Driver.OnConnDial` event callback
-* Fixed bug with no checking of operation result in `discovery` client calls
+* Fixed bug with no checking operation error on `discovery.Client` calls
 * Allowed zero create session timeout in `ydb.WithSessionPoolCreateSessionTimeout(timeout)` (less than or equal to zero - no used timeout on create session request)
 
 ## v3.42.10

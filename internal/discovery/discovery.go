@@ -45,7 +45,6 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 		}
 		response    *Ydb_Discovery.ListEndpointsResponse
 		result      Ydb_Discovery.ListEndpointsResult
-		useWrapping = conn.UseWrapping(ctx)
 	)
 
 	var location string
@@ -67,20 +66,14 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	if useWrapping {
-		switch {
-		case !response.GetOperation().GetReady():
-			return nil, xerrors.WithStackTrace(operation.ErrNotReady)
-
-		case response.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
-			return nil, xerrors.WithStackTrace(
-				xerrors.Operation(
-					xerrors.FromOperation(
-						response.GetOperation(),
-					),
+	if response.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS {
+		return nil, xerrors.WithStackTrace(
+			xerrors.Operation(
+				xerrors.FromOperation(
+					response.GetOperation(),
 				),
-			)
-		}
+			),
+		)
 	}
 
 	err = response.GetOperation().GetResult().UnmarshalTo(&result)
@@ -112,7 +105,6 @@ func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 		request            = Ydb_Discovery.WhoAmIRequest{}
 		response           *Ydb_Discovery.WhoAmIResponse
 		whoAmIResultResult Ydb_Discovery.WhoAmIResult
-		useWrapping        = conn.UseWrapping(ctx)
 	)
 	defer func() {
 		if err != nil {
@@ -132,20 +124,14 @@ func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	if useWrapping {
-		switch {
-		case !response.GetOperation().GetReady():
-			return nil, xerrors.WithStackTrace(operation.ErrNotReady)
-
-		case response.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
-			return nil, xerrors.WithStackTrace(
-				xerrors.Operation(
-					xerrors.FromOperation(
-						response.GetOperation(),
-					),
+	if response.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS {
+		return nil, xerrors.WithStackTrace(
+			xerrors.Operation(
+				xerrors.FromOperation(
+					response.GetOperation(),
 				),
-			)
-		}
+			),
+		)
 	}
 
 	result := response.GetOperation().GetResult()
