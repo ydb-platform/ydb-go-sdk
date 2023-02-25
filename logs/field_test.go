@@ -2,7 +2,6 @@ package logs
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 
@@ -22,6 +21,7 @@ func TestField_String(t *testing.T) {
 		f     Field
 		want  string
 		panic bool
+		fail  bool
 	}
 
 	tests := []test{}
@@ -29,8 +29,7 @@ func TestField_String(t *testing.T) {
 	for i := 0; i < int(EndType); i++ {
 
 		ftype := FieldType(i)
-
-		name := fmt.Sprintf("type %s", ftype)
+		name := ftype.String()
 
 		switch ftype {
 		case IntType:
@@ -59,8 +58,10 @@ func TestField_String(t *testing.T) {
 			tests = append(tests, test{name: name, f: Any(name, nil), want: "<nil>"})
 		case StringerType:
 			tests = append(tests, test{name: name, f: Stringer(name, &stringerTest{}), want: "stringerTest"})
+		case InvalidType:
+			tests = append(tests, test{name: "panic InvalidType" + name, f: Field{ftype: ftype, key: "default"}, want: "", panic: true})
 		default:
-			tests = append(tests, test{name: "panic " + name, f: Field{ftype: ftype, key: "default"}, want: "", panic: true})
+			tests = append(tests, test{name: "fail " + name, f: Field{ftype: ftype, key: "default"}, want: "", fail: true})
 		}
 
 	}
@@ -68,12 +69,57 @@ func TestField_String(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
+			// Known fieldType, but String() panics with it.
 			if tt.panic {
 				require.Panics(t, func() { _ = tt.f.String() })
-			} else {
-				require.Equal(t, tt.want, tt.f.String())
+				return
 			}
+
+			// Unknown fieldType, maybe a new one has been added
+			if tt.fail {
+				t.Fail()
+				return
+			}
+
+			require.Equal(t, tt.want, tt.f.String())
+
 		})
 	}
 
+}
+
+func TestField_AnyValue(t *testing.T) {
+
+	tests := []struct {
+		name string
+		f    Field
+		want interface{}
+	}{
+
+		{name: "int", f: Int("any", 1), want: 1},
+		{name: "int64", f: Int64("any", 9223372036854775807), want: int64(9223372036854775807)},
+		{name: "string", f: String("any", "any string"), want: "any string"},
+		{name: "bool", f: Bool("any", true), want: true},
+		{name: "[]string", f: Strings("any", []string{"Abc", "Def", "Ghi"}), want: []string{"Abc", "Def", "Ghi"}},
+		{name: "error", f: Error(errors.New("error")), want: errors.New("error")},
+		{name: "namedError", f: NamedError("any", nil), want: nil},
+		{name: "stringer", f: Stringer("any", &stringerTest{}), want: &stringerTest{}},
+
+		{name: "any_int", f: Any("any", 1), want: 1},
+		{name: "any_int64", f: Any("any", 9223372036854775807), want: 9223372036854775807},
+		{name: "any_string", f: Any("any", "any string"), want: "any string"},
+		{name: "any_bool", f: Any("any", true), want: true},
+		{name: "any_[]string", f: Any("any", []string{"Abc", "Def", "Ghi"}), want: []string{"Abc", "Def", "Ghi"}},
+		{name: "any_error", f: Any("any", errors.New("error")), want: errors.New("error")},
+		{name: "struct", f: Any("any", struct{ str string }{str: "test"}), want: struct{ str string }{str: "test"}},
+		{name: "any_nil", f: Any("any", nil), want: nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			require.Equal(t, tt.want, tt.f.AnyValue())
+
+		})
+	}
 }
