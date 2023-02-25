@@ -89,23 +89,28 @@ func (f Field) ErrorValue() error {
 
 // Any is a value getter for fields with AnyType type
 func (f Field) AnyValue() interface{} {
-	f.checkType(AnyType)
 
-	switch f.vany.(type) {
-	case int:
-		return f.vany.(int)
-	case int64:
-		return f.vany.(int64)
-	case bool:
-		return f.vany.(bool)
-	case string:
-		return f.vany.(string)
-	case []string:
-		return f.vany.([]string)
-	case error:
-		return f.vany.(error)
-	default:
+	switch f.ftype {
+	case AnyType:
 		return f.vany
+	case IntType:
+		return f.IntValue()
+	case Int64Type:
+		return f.Int64Value()
+	case StringType:
+		return f.StringValue()
+	case BoolType:
+		return f.BoolValue()
+	case DurationType:
+		return f.DurationValue()
+	case StringsType:
+		return f.StringsValue()
+	case ErrorType:
+		return f.ErrorValue()
+	case StringerType:
+		return f.Stringer()
+	default:
+		panic(fmt.Sprintf("unknown FieldType %d", f.ftype))
 	}
 
 }
@@ -282,8 +287,35 @@ const (
 	EndType
 )
 
-func (ft FieldType) String() string {
+func (ft FieldType) String() (typeName string) {
 
-	return []string{"invalid", "int", "int64", "string", "bool", "time.Duration", "[]string", "error", "any", "stringer", "endtype"}[ft]
+	switch ft {
+	case InvalidType:
+		typeName = "invalid"
+	case IntType:
+		typeName = "int"
+	case Int64Type:
+		typeName = "int64"
+	case StringType:
+		typeName = "string"
+	case BoolType:
+		typeName = "bool"
+	case DurationType:
+		typeName = "time.Duration"
+	case StringsType:
+		typeName = "[]string"
+	case ErrorType:
+		typeName = "error"
+	case AnyType:
+		typeName = "any"
+	case StringerType:
+		typeName = "stringer"
+	case EndType:
+		typeName = "endtype"
+	default:
+		panic("not implemented")
+	}
+
+	return typeName
 
 }
