@@ -7,6 +7,9 @@
 * Added `trace.Driver.OnConnDial` event callback
 * Fixed bug with no checking operation error on `discovery.Client` calls
 * Allowed zero create session timeout in `ydb.WithSessionPoolCreateSessionTimeout(timeout)` (less than or equal to zero - no used timeout on create session request)
+* Renamed private `ydb.connection` type to public `ydb.Driver` type
+* Marked as deprecated `ydb.Connection` interface
+* Changed result type of `ydb.Open` from `ydb.Connection` interface to `*ydb.Driver`
 
 ## v3.42.10
 * Added exit from retryer if got grpc-error `Unauthenticated` on `discovery/ListEndpoints` call  

@@ -81,7 +81,7 @@ type conn struct {
 }
 
 func (c *conn) GetDatabaseName() string {
-	return c.connector.connection.Name()
+	return c.connector.databaseName
 }
 
 func (c *conn) CheckNamedValue(*driver.NamedValue) error {
@@ -204,7 +204,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
-		res, err = c.connector.connection.Scripting().StreamExecute(ctx, query, params)
+		res, err = c.connector.scriptingExecute(ctx, query, params)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -328,7 +328,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
-		res, err = c.connector.connection.Scripting().StreamExecute(ctx, query, params)
+		res, err = c.connector.scriptingExecute(ctx, query, params)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -450,8 +450,7 @@ func (c *conn) Version(ctx context.Context) (_ string, err error) {
 }
 
 func (c *conn) IsTableExists(ctx context.Context, tableName string) (tableExists bool, err error) {
-	cc := c.connector.Connection()
-	tableExists, err = helpers.IsTableExists(ctx, cc.Scheme(), tableName)
+	tableExists, err = helpers.IsTableExists(ctx, listDirectoryFunc(c.connector.listDirectory), tableName)
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
@@ -459,12 +458,7 @@ func (c *conn) IsTableExists(ctx context.Context, tableName string) (tableExists
 }
 
 func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string) (columnExists bool, err error) {
-	var (
-		cc      = c.connector.Connection()
-		session = c.session
-	)
-
-	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
+	tableExist, err := helpers.IsTableExists(ctx, listDirectoryFunc(c.connector.listDirectory), tableName)
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
@@ -473,7 +467,7 @@ func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string)
 	}
 
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		desc, err := session.DescribeTable(ctx, tableName)
+		desc, err := c.session.DescribeTable(ctx, tableName)
 		if err != nil {
 			return err
 		}
@@ -492,12 +486,7 @@ func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string)
 }
 
 func (c *conn) GetColumns(ctx context.Context, tableName string) (columns []string, err error) {
-	var (
-		cc      = c.connector.Connection()
-		session = c.session
-	)
-
-	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
+	tableExist, err := helpers.IsTableExists(ctx, listDirectoryFunc(c.connector.listDirectory), tableName)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -506,7 +495,7 @@ func (c *conn) GetColumns(ctx context.Context, tableName string) (columns []stri
 	}
 
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		desc, err := session.DescribeTable(ctx, tableName)
+		desc, err := c.session.DescribeTable(ctx, tableName)
 		if err != nil {
 			return err
 		}
@@ -522,12 +511,7 @@ func (c *conn) GetColumns(ctx context.Context, tableName string) (columns []stri
 }
 
 func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) (dataType string, err error) {
-	var (
-		cc      = c.connector.Connection()
-		session = c.session
-	)
-
-	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
+	tableExist, err := helpers.IsTableExists(ctx, listDirectoryFunc(c.connector.listDirectory), tableName)
 	if err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
@@ -544,7 +528,7 @@ func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) 
 	}
 
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		desc, err := session.DescribeTable(ctx, tableName)
+		desc, err := c.session.DescribeTable(ctx, tableName)
 		if err != nil {
 			return err
 		}
@@ -563,12 +547,7 @@ func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) 
 }
 
 func (c *conn) GetPrimaryKeys(ctx context.Context, tableName string) (pkCols []string, err error) {
-	var (
-		cc      = c.connector.Connection()
-		session = c.session
-	)
-
-	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
+	tableExist, err := helpers.IsTableExists(ctx, listDirectoryFunc(c.connector.listDirectory), tableName)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -577,7 +556,7 @@ func (c *conn) GetPrimaryKeys(ctx context.Context, tableName string) (pkCols []s
 	}
 
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		desc, err := session.DescribeTable(ctx, tableName)
+		desc, err := c.session.DescribeTable(ctx, tableName)
 		if err != nil {
 			return err
 		}
@@ -591,9 +570,7 @@ func (c *conn) GetPrimaryKeys(ctx context.Context, tableName string) (pkCols []s
 }
 
 func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (ok bool, err error) {
-	cc := c.connector.Connection()
-
-	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
+	tableExist, err := helpers.IsTableExists(ctx, listDirectoryFunc(c.connector.listDirectory), tableName)
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
@@ -623,14 +600,9 @@ func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (
 }
 
 func (c *conn) GetTables(ctx context.Context, absPath string) (tables []string, err error) {
-	var (
-		cc           = c.connector.Connection()
-		schemeClient = cc.Scheme()
-	)
-
 	var e scheme.Entry
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		e, err = schemeClient.DescribePath(ctx, absPath)
+		e, err = c.connector.describePath(ctx, absPath)
 		return err
 	}, retry.WithIdempotent(true))
 
@@ -649,7 +621,7 @@ func (c *conn) GetTables(ctx context.Context, absPath string) (tables []string, 
 
 	var d scheme.Directory
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		d, err = schemeClient.ListDirectory(ctx, absPath)
+		d, err = c.connector.listDirectory(ctx, absPath)
 		return err
 	}, retry.WithIdempotent(true))
 
@@ -666,11 +638,6 @@ func (c *conn) GetTables(ctx context.Context, absPath string) (tables []string, 
 }
 
 func (c *conn) GetAllTables(ctx context.Context, absPath string) (tables []string, err error) {
-	var (
-		cc           = c.connector.Connection()
-		schemeClient = cc.Scheme()
-	)
-
 	ignoreDirs := map[string]bool{
 		".sys":        true,
 		".sys_health": true,
@@ -691,7 +658,7 @@ func (c *conn) GetAllTables(ctx context.Context, absPath string) (tables []strin
 
 		var e scheme.Entry
 		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-			e, err = schemeClient.DescribePath(ctx, curPath)
+			e, err = c.connector.describePath(ctx, curPath)
 			return err
 		}, retry.WithIdempotent(true))
 
@@ -706,7 +673,7 @@ func (c *conn) GetAllTables(ctx context.Context, absPath string) (tables []strin
 
 		var d scheme.Directory
 		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-			d, err = schemeClient.ListDirectory(ctx, curPath)
+			d, err = c.connector.listDirectory(ctx, curPath)
 			return err
 		}, retry.WithIdempotent(true))
 
@@ -726,12 +693,7 @@ func (c *conn) GetAllTables(ctx context.Context, absPath string) (tables []strin
 }
 
 func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []string, err error) {
-	var (
-		cc      = c.connector.Connection()
-		session = c.session
-	)
-
-	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
+	tableExist, err := helpers.IsTableExists(ctx, listDirectoryFunc(c.connector.listDirectory), tableName)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -740,7 +702,7 @@ func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []stri
 	}
 
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		desc, err := session.DescribeTable(ctx, tableName)
+		desc, err := c.session.DescribeTable(ctx, tableName)
 		if err != nil {
 			return err
 		}
@@ -757,13 +719,7 @@ func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []stri
 }
 
 func (c *conn) GetIndexColumns(ctx context.Context, tableName, indexName string) (columns []string, err error) {
-	var (
-		cc       = c.connector.Connection()
-		session  = c.session
-		hasIndex = false
-	)
-
-	tableExist, err := helpers.IsTableExists(ctx, cc.Scheme(), tableName)
+	tableExist, err := helpers.IsTableExists(ctx, listDirectoryFunc(c.connector.listDirectory), tableName)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -772,25 +728,21 @@ func (c *conn) GetIndexColumns(ctx context.Context, tableName, indexName string)
 	}
 
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		desc, err := session.DescribeTable(ctx, tableName)
+		desc, err := c.session.DescribeTable(ctx, tableName)
 		if err != nil {
 			return err
 		}
 		for _, indexDesc := range desc.Indexes {
 			if indexDesc.Name == indexName {
-				hasIndex = true
 				columns = append(columns, indexDesc.IndexColumns...)
-				break
+				return nil
 			}
 		}
-		return nil
+		return xerrors.WithStackTrace(fmt.Errorf("index '%s' not found in table '%s'", indexName, tableName))
 	}, retry.WithIdempotent(true))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	if !hasIndex {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("index '%s' not found in table '%s'", indexName, tableName))
-	}
 	return columns, nil
 }

@@ -13,7 +13,6 @@ import (
 )
 
 func Unwrap(db *sql.DB) (connector *Connector, err error) {
-	// hop with create session (connector.Connect()) helps to get ydb.Connection
 	c, err := db.Conn(context.Background())
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
