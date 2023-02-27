@@ -7,12 +7,15 @@ import (
 	"strconv"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Discovery"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -40,8 +43,9 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 		request = Ydb_Discovery.ListEndpointsRequest{
 			Database: c.config.Database(),
 		}
-		response *Ydb_Discovery.ListEndpointsResponse
-		result   Ydb_Discovery.ListEndpointsResult
+		response    *Ydb_Discovery.ListEndpointsResponse
+		result      Ydb_Discovery.ListEndpointsResult
+		useWrapping = conn.UseWrapping(ctx)
 	)
 
 	var location string
@@ -61,6 +65,22 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	response, err = c.client.ListEndpoints(ctx, &request)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
+	}
+
+	if useWrapping {
+		switch {
+		case !response.GetOperation().GetReady():
+			return nil, xerrors.WithStackTrace(operation.ErrNotReady)
+
+		case response.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
+			return nil, xerrors.WithStackTrace(
+				xerrors.Operation(
+					xerrors.FromOperation(
+						response.GetOperation(),
+					),
+				),
+			)
+		}
 	}
 
 	err = response.GetOperation().GetResult().UnmarshalTo(&result)
@@ -92,6 +112,7 @@ func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 		request            = Ydb_Discovery.WhoAmIRequest{}
 		response           *Ydb_Discovery.WhoAmIResponse
 		whoAmIResultResult Ydb_Discovery.WhoAmIResult
+		useWrapping        = conn.UseWrapping(ctx)
 	)
 	defer func() {
 		if err != nil {
@@ -109,6 +130,22 @@ func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 	response, err = c.client.WhoAmI(ctx, &request)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
+	}
+
+	if useWrapping {
+		switch {
+		case !response.GetOperation().GetReady():
+			return nil, xerrors.WithStackTrace(operation.ErrNotReady)
+
+		case response.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
+			return nil, xerrors.WithStackTrace(
+				xerrors.Operation(
+					xerrors.FromOperation(
+						response.GetOperation(),
+					),
+				),
+			)
+		}
 	}
 
 	result := response.GetOperation().GetResult()
