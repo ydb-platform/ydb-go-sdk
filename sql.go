@@ -50,7 +50,7 @@ func (d *sqlDriver) Close() error {
 	return nil
 }
 
-// Open returns a new connection to the ydb.
+// Open returns a new Driver to the ydb.
 func (d *sqlDriver) Open(string) (driver.Conn, error) {
 	return nil, xsql.ErrUnsupported
 }
@@ -130,11 +130,8 @@ func WithDisableServerBalancer() ConnectorOption {
 	return xsql.WithDisableServerBalancer()
 }
 
-func Connector(db Connection, opts ...ConnectorOption) (*xsql.Connector, error) {
-	if c, ok := db.(*connection); ok {
-		opts = append(opts, c.databaseSQLOptions...)
-	}
-	c, err := xsql.Open(d, db, opts...)
+func Connector(cc Connection, opts ...ConnectorOption) (*xsql.Connector, error) {
+	c, err := xsql.Open(d, cc, append(opts, cc.databaseSQLOptions...)...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

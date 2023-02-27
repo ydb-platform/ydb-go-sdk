@@ -6,7 +6,7 @@ import (
 )
 
 func ExampleWithWriterCheckRetryErrorFunction() {
-	var db ydb.Connection
+	var db *ydb.Driver
 	writer, err := db.Topic().StartWriter(
 		"",
 		"",

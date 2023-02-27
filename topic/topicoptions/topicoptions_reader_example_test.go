@@ -6,7 +6,7 @@ import (
 )
 
 func ExampleWithReaderCheckRetryErrorFunction() {
-	var db ydb.Connection
+	var db *ydb.Driver
 
 	reader, err := db.Topic().StartReader(
 		"consumer",
