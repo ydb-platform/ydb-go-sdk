@@ -1226,7 +1226,7 @@ func (scope *tableTestScope) describeTableOptions(ctx context.Context, c table.C
 	return nil
 }
 
-func (scope *tableTestScope) fill(ctx context.Context, db ydb.Connection, folder string) error {
+func (scope *tableTestScope) fill(ctx context.Context, db *ydb.Driver, folder string) error {
 	fmt.Printf("> filling tables\n")
 	defer func() {
 		fmt.Printf("> filling tables done\n")
@@ -1404,7 +1404,7 @@ func TestLongStream(t *testing.T) {
 	var (
 		tableName         = `long_stream_query`
 		discoveryInterval = 10 * time.Second
-		db                ydb.Connection
+		db                *ydb.Driver
 		err               error
 		upsertRowsCount   = 100000
 		batchSize         = 10000
@@ -1424,7 +1424,7 @@ func TestLongStream(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func(db ydb.Connection) {
+	defer func(db *ydb.Driver) {
 		// cleanup
 		_ = db.Close(ctx)
 	}(db)
@@ -1523,7 +1523,7 @@ func TestLongStream(t *testing.T) {
 		}
 	})
 
-	defer func(db ydb.Connection) {
+	defer func(db *ydb.Driver) {
 		// cleanup
 		_ = db.Close(ctx)
 	}(db)
@@ -1614,7 +1614,7 @@ func TestLongStream(t *testing.T) {
 func TestSplitRangesAndRead(t *testing.T) {
 	var (
 		tableName       = `ranges_table`
-		db              ydb.Connection
+		db              *ydb.Driver
 		err             error
 		upsertRowsCount = 100000
 		batchSize       = 10000
@@ -1634,7 +1634,7 @@ func TestSplitRangesAndRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func(db ydb.Connection) {
+	defer func(db *ydb.Driver) {
 		// cleanup
 		_ = db.Close(ctx)
 	}(db)

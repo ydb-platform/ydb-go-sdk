@@ -6,6 +6,9 @@
 * Deprecated `trace.Driver.OnConnTake` event callback
 * Added `trace.Driver.OnConnDial` event callback
 * Fixed bug with no checking of operation result in `discovery` client calls
+* Renamed private `ydb.connection` type to public `ydb.Driver` type
+* Replaced `ydb.Connection` interface type to type alias to `*ydb.Driver`
+* Marked as deprecated `ydb.Connection` type
 
 ## v3.42.10
 * Added exit from retryer if got grpc-error `Unauthenticated` on `discovery/ListEndpoints` call  

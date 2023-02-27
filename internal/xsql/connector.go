@@ -14,9 +14,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
-	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -80,10 +80,52 @@ func WithIdleThreshold(idleThreshold time.Duration) ConnectorOption {
 	}
 }
 
-func Open(d Driver, connection connection, opts ...ConnectorOption) (_ *Connector, err error) {
+func WithOnClose(f func(connector *Connector)) ConnectorOption {
+	return func(c *Connector) error {
+		c.onClose = append(c.onClose, f)
+		return nil
+	}
+}
+
+func WithCreateSession(f func(ctx context.Context) (s table.ClosableSession, err error)) ConnectorOption {
+	return func(c *Connector) error {
+		c.createSession = f
+		return nil
+	}
+}
+
+func WithDescribePath(f func(ctx context.Context, path string) (e scheme.Entry, err error)) ConnectorOption {
+	return func(c *Connector) error {
+		c.describePath = f
+		return nil
+	}
+}
+
+func WithListDirectory(f func(ctx context.Context, path string) (d scheme.Directory, err error)) ConnectorOption {
+	return func(c *Connector) error {
+		c.listDirectory = f
+		return nil
+	}
+}
+
+func WithScriptingExecute(scriptingExecute func(
+	ctx context.Context, query string, params *table.QueryParameters) (result.StreamResult, error),
+) ConnectorOption {
+	return func(c *Connector) error {
+		c.scriptingExecute = scriptingExecute
+		return nil
+	}
+}
+
+func WithDatabaseName(databaseName string) ConnectorOption {
+	return func(c *Connector) error {
+		c.databaseName = databaseName
+		return nil
+	}
+}
+
+func Open(opts ...ConnectorOption) (_ *Connector, err error) {
 	c := &Connector{
-		driver:           d,
-		connection:       connection,
 		conns:            make(map[*conn]struct{}),
 		defaultTxControl: table.DefaultTxControl(),
 		defaultQueryMode: DefaultQueryMode,
@@ -95,44 +137,30 @@ func Open(d Driver, connection connection, opts ...ConnectorOption) (_ *Connecto
 			}
 		}
 	}
-	if c.bindings.TablePathPrefix != "" && !strings.HasPrefix(c.bindings.TablePathPrefix, connection.Name()) {
-		c.bindings.TablePathPrefix = path.Join(connection.Name(), c.bindings.TablePathPrefix)
+	if c.bindings.TablePathPrefix != "" && !strings.HasPrefix(c.bindings.TablePathPrefix, c.databaseName) {
+		c.bindings.TablePathPrefix = path.Join(c.databaseName, c.bindings.TablePathPrefix)
 	}
 	if c.idleThreshold > 0 {
 		c.idleStopper = c.idleCloser()
 	}
-	d.Attach(c)
 	return c, nil
 }
 
-type connection interface {
-	// Name returns name of database
-	Name() string
+type listDirectoryFunc func(ctx context.Context, path string) (d scheme.Directory, err error)
 
-	// Table returns table client
-	Table() table.Client
-
-	// Scripting returns scripting client
-	Scripting() scripting.Client
-
-	// Scheme returns scheme client
-	Scheme() scheme.Client
-
-	// Close closes connection and clear resources
-	Close(ctx context.Context) error
-}
-
-type Driver interface {
-	driver.Driver
-
-	Attach(c *Connector)
-	Detach(c *Connector)
+func (ld listDirectoryFunc) ListDirectory(ctx context.Context, path string) (d scheme.Directory, err error) {
+	return ld(ctx, path)
 }
 
 // Connector is a producer of database/sql connections
 type Connector struct {
-	driver     Driver
-	connection connection
+	databaseName     string
+	scriptingExecute func(ctx context.Context, query string, params *table.QueryParameters) (result.StreamResult, error)
+	createSession    func(ctx context.Context) (s table.ClosableSession, err error)
+	describePath     func(ctx context.Context, path string) (e scheme.Entry, err error)
+	listDirectory    func(ctx context.Context, path string) (d scheme.Directory, err error)
+
+	onClose []func(connector *Connector)
 
 	conns    map[*conn]struct{}
 	connsMtx sync.RWMutex
@@ -182,15 +210,15 @@ func (c *Connector) idleCloser() (idleStopper func()) {
 }
 
 func (c *Connector) Close() (err error) {
-	defer c.driver.Detach(c)
+	defer func() {
+		for _, onClose := range c.onClose {
+			onClose(c)
+		}
+	}()
 	if c.idleStopper != nil {
 		c.idleStopper()
 	}
 	return nil
-}
-
-func (c *Connector) Connection() connection {
-	return c.connection
 }
 
 func (c *Connector) attach(cc *conn) {
@@ -213,7 +241,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 	if !c.disableServerBalancer {
 		ctx = meta.WithAllowFeatures(ctx, metaHeaders.HintSessionBalancer)
 	}
-	s, err := c.connection.Table().CreateSession(ctx) //nolint:staticcheck // SA1019
+	s, err := c.createSession(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -235,6 +263,6 @@ type driverWrapper struct {
 	c *Connector
 }
 
-func (d *driverWrapper) Open(name string) (driver.Conn, error) {
-	return d.c.driver.Open(name)
+func (d *driverWrapper) Open(_ string) (driver.Conn, error) {
+	return nil, ErrUnsupported
 }
