@@ -15,16 +15,15 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var d = &sqlDriver{connectors: make(map[*xsql.Connector]struct{})}
+var d = &sqlDriver{connectors: make(map[*xsql.Connector]*Driver)}
 
 func init() {
 	sql.Register("ydb", d)
 	sql.Register("ydb/v3", d)
 }
 
-// Driver is an adapter to allow the use table client as conn.Driver instance.
 type sqlDriver struct {
-	connectors    map[*xsql.Connector]struct{}
+	connectors    map[*xsql.Connector]*Driver
 	connectorsMtx xsync.RWMutex
 }
 
@@ -34,7 +33,7 @@ var (
 )
 
 func (d *sqlDriver) Close() error {
-	var connectors map[*xsql.Connector]struct{}
+	var connectors map[*xsql.Connector]*Driver
 	d.connectorsMtx.WithRLock(func() {
 		connectors = d.connectors
 	})
@@ -50,7 +49,7 @@ func (d *sqlDriver) Close() error {
 	return nil
 }
 
-// Open returns a new connection to the ydb.
+// Open returns a new Driver to the ydb.
 func (d *sqlDriver) Open(string) (driver.Conn, error) {
 	return nil, xsql.ErrUnsupported
 }
@@ -67,13 +66,13 @@ func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, erro
 	return Connector(db, connectorOpts...)
 }
 
-func (d *sqlDriver) Attach(c *xsql.Connector) {
+func (d *sqlDriver) attach(c *xsql.Connector, parent *Driver) {
 	d.connectorsMtx.WithLock(func() {
-		d.connectors[c] = struct{}{}
+		d.connectors[c] = parent
 	})
 }
 
-func (d *sqlDriver) Detach(c *xsql.Connector) {
+func (d *sqlDriver) detach(c *xsql.Connector) {
 	d.connectorsMtx.WithLock(func() {
 		delete(d.connectors, c)
 	})
@@ -130,13 +129,26 @@ func WithDisableServerBalancer() ConnectorOption {
 	return xsql.WithDisableServerBalancer()
 }
 
-func Connector(db Connection, opts ...ConnectorOption) (*xsql.Connector, error) {
-	if c, ok := db.(*connection); ok {
-		opts = append(opts, c.databaseSQLOptions...)
-	}
-	c, err := xsql.Open(d, db, opts...)
+func Connector(parent *Driver, opts ...ConnectorOption) (*xsql.Connector, error) {
+	c, err := xsql.Open(
+		append(
+			append(
+				parent.databaseSQLOptions,
+				opts...,
+			),
+			xsql.WithDatabaseName(parent.Name()),
+			xsql.WithCreateSession(func(ctx context.Context) (s table.ClosableSession, err error) {
+				return parent.Table().CreateSession(ctx) //nolint:staticcheck // SA1019
+			}),
+			xsql.WithScriptingExecute(parent.Scripting().StreamExecute),
+			xsql.WithDescribePath(parent.Scheme().DescribePath),
+			xsql.WithListDirectory(parent.Scheme().ListDirectory),
+			xsql.WithOnClose(d.detach),
+		)...,
+	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+	d.attach(c, parent)
 	return c, nil
 }

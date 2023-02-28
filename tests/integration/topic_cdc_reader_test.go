@@ -238,7 +238,7 @@ func TestCDCInTableDescribe(t *testing.T) {
 	})
 }
 
-func createCDCFeed(ctx context.Context, t *testing.T, db ydb.Connection) string {
+func createCDCFeed(ctx context.Context, t *testing.T, db *ydb.Driver) string {
 	err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
 		_ = s.ExecuteSchemeQuery(ctx, "DROP TABLE test")
 		err := s.ExecuteSchemeQuery(ctx, `
@@ -285,7 +285,7 @@ func createCDCFeed(ctx context.Context, t *testing.T, db ydb.Connection) string 
 	return topicPath
 }
 
-func createFeedReader(t *testing.T, db ydb.Connection, opts ...topicoptions.ReaderOption) *topicreader.Reader {
+func createFeedReader(t *testing.T, db *ydb.Driver, opts ...topicoptions.ReaderOption) *topicreader.Reader {
 	topicPath := testCDCFeedName(db)
 	reader, err := db.Topic().StartReader(consumerName, []topicoptions.ReadSelector{
 		{
@@ -300,7 +300,7 @@ func createFeedAndReader(
 	ctx context.Context,
 	t *testing.T,
 	opts ...topicoptions.ReaderOption,
-) (ydb.Connection, *topicreader.Reader) {
+) (*ydb.Driver, *topicreader.Reader) {
 	db := connect(t)
 	createCDCFeed(ctx, t, db)
 	reader := createFeedReader(t, db, opts...)
@@ -309,7 +309,7 @@ func createFeedAndReader(
 
 var sendCDCCounter int64
 
-func sendCDCMessage(ctx context.Context, t *testing.T, db ydb.Connection) {
+func sendCDCMessage(ctx context.Context, t *testing.T, db *ydb.Driver) {
 	counter := atomic.AddInt64(&sendCDCCounter, 1)
 	err := db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 		_, err := tx.Execute(ctx,
@@ -332,6 +332,6 @@ func testCtx(t testing.TB) context.Context {
 	return ctx
 }
 
-func testCDCFeedName(db ydb.Connection) string {
+func testCDCFeedName(db *ydb.Driver) string {
 	return db.Name() + "/test/feed"
 }

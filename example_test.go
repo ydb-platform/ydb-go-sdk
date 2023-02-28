@@ -242,7 +242,7 @@ func ExampleOpen() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2135/local")
 	if err != nil {
-		fmt.Printf("connection failed: %v", err)
+		fmt.Printf("Driver failed: %v", err)
 	}
 	defer db.Close(ctx) // cleanup resources
 	fmt.Printf("connected to %s, database '%s'", db.Endpoint(), db.Name())
@@ -262,7 +262,7 @@ func ExampleOpen_advanced() {
 		ydb.WithSessionPoolSizeLimit(100),
 	)
 	if err != nil {
-		fmt.Printf("connection failed: %v", err)
+		fmt.Printf("Driver failed: %v", err)
 	}
 	defer db.Close(ctx) // cleanup resources
 	fmt.Printf("connected to %s, database '%s'", db.Endpoint(), db.Name())

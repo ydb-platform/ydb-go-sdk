@@ -20,7 +20,7 @@ const (
 // pathToCreate is a database root relative path
 // MakeRecursive method equal bash command `mkdir -p ~/path/to/create`
 // where `~` - is a root of database
-func MakeRecursive(ctx context.Context, db ydb.Connection, pathToCreate string) error {
+func MakeRecursive(ctx context.Context, db *ydb.Driver, pathToCreate string) error {
 	if strings.HasPrefix(pathToCreate, sysTable+"/") {
 		return xerrors.WithStackTrace(
 			fmt.Errorf("making directory %q inside system path %q not supported", pathToCreate, sysTable),
@@ -61,7 +61,7 @@ func MakeRecursive(ctx context.Context, db ydb.Connection, pathToCreate string) 
 // Empty prefix means than use root of database.
 // RemoveRecursive method equal bash command `rm -rf ~/path/to/remove`
 // where `~` - is a root of database
-func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string) error {
+func RemoveRecursive(ctx context.Context, db *ydb.Driver, pathToRemove string) error {
 	fullSysTablePath := path.Join(db.Name(), sysTable)
 	var rmPath func(int, string) error
 	rmPath = func(i int, p string) error {
