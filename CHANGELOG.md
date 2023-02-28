@@ -1,10 +1,12 @@
+* Fixed validation error for topicoptions.WithPartitionID option of start topic writer.
+
 ## v3.42.10
 * Added exit from retryer if got grpc-error `Unauthenticated` on `discovery/ListEndpoints` call  
 
 ## v3.42.9
 * Added `internal/xerrors.Errorf` error for wrap multiple errors and check them with `errors.Is` of `errors.As`
 * Fixed corner cases of `internal/wait.Wait`
-* Added check of port in connection string and erro throw
+* Added check of port in connection string and error throw
 * Fixed bug with initialization of connection pool before apply static credentials
 * Refactored of applying grpc dial options with defaults
 * Added `trace.Driver.{OnBalancerDialEntrypoint,OnBalancerClusterDiscoveryAttempt}` trace events
