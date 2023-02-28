@@ -44,8 +44,7 @@ var query = template.Must(template.New("fill database").Parse(`
 	SELECT Variant(42, "2", $variantTupleType);
 `))
 
-type exampleStruct struct {
-}
+type exampleStruct struct{}
 
 func (*exampleStruct) UnmarshalYDB(res types.RawValue) error {
 	log.Printf("T: %s", res.Type())
@@ -58,8 +57,7 @@ func (*exampleStruct) UnmarshalYDB(res types.RawValue) error {
 	return res.Err()
 }
 
-type exampleList struct {
-}
+type exampleList struct{}
 
 func (*exampleList) UnmarshalYDB(res types.RawValue) error {
 	log.Printf("T: %s", res.Type())
@@ -71,8 +69,7 @@ func (*exampleList) UnmarshalYDB(res types.RawValue) error {
 	return res.Err()
 }
 
-type exampleTuple struct {
-}
+type exampleTuple struct{}
 
 func (*exampleTuple) UnmarshalYDB(res types.RawValue) error {
 	log.Printf("T: %s", res.Type())
@@ -96,8 +93,7 @@ func (*exampleTuple) UnmarshalYDB(res types.RawValue) error {
 	return res.Err()
 }
 
-type exampleDict struct {
-}
+type exampleDict struct{}
 
 func (*exampleDict) UnmarshalYDB(res types.RawValue) error {
 	log.Printf("T: %s", res.Type())
@@ -114,8 +110,7 @@ func (*exampleDict) UnmarshalYDB(res types.RawValue) error {
 	return res.Err()
 }
 
-type variantStruct struct {
-}
+type variantStruct struct{}
 
 func (*variantStruct) UnmarshalYDB(res types.RawValue) error {
 	log.Printf("T: %s", res.Type())
@@ -136,8 +131,7 @@ func (*variantStruct) UnmarshalYDB(res types.RawValue) error {
 	return res.Err()
 }
 
-type variantTuple struct {
-}
+type variantTuple struct{}
 
 func (*variantTuple) UnmarshalYDB(res types.RawValue) error {
 	log.Printf("T: %s", res.Type())

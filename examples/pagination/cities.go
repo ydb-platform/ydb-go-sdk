@@ -21,8 +21,7 @@ func selectPaging(
 	empty bool,
 	err error,
 ) {
-
-	var query = fmt.Sprintf(`
+	query := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 
 		DECLARE $limit AS Uint64;
@@ -94,7 +93,7 @@ func selectPaging(
 }
 
 func fillTableWithData(ctx context.Context, c table.Client, prefix string) (err error) {
-	var query = fmt.Sprintf(`
+	query := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 
 		DECLARE $schoolsData AS List<Struct<

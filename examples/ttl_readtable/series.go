@@ -18,7 +18,8 @@ const (
 )
 
 func deleteExpiredDocuments(ctx context.Context, c table.Client, prefix string, ids []uint64,
-	timestamp uint64) error {
+	timestamp uint64,
+) error {
 	fmt.Printf("> DeleteExpiredDocuments: %+v\n", ids)
 
 	query := fmt.Sprintf(`
@@ -42,7 +43,7 @@ func deleteExpiredDocuments(ctx context.Context, c table.Client, prefix string, 
         SELECT * FROM $expired;`, prefix)
 
 	keys := types.ListValue(func() []types.Value {
-		var k = make([]types.Value, len(ids))
+		k := make([]types.Value, len(ids))
 		for i := range ids {
 			k[i] = types.StructValue(types.StructFieldValue("doc_id", types.Uint64Value(ids[i])))
 		}
@@ -66,7 +67,8 @@ func deleteExpiredDocuments(ctx context.Context, c table.Client, prefix string, 
 }
 
 func deleteExpiredRange(ctx context.Context, c table.Client, prefix string, timestamp uint64,
-	keyRange options.KeyRange) error {
+	keyRange options.KeyRange,
+) error {
 	fmt.Printf("> DeleteExpiredRange: %+v\n", keyRange)
 
 	var res result.StreamResult
@@ -137,7 +139,6 @@ func deleteExpired(ctx context.Context, c table.Client, prefix string, timestamp
 			return err
 		},
 	)
-
 	if err != nil {
 		return err
 	}

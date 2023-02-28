@@ -20,10 +20,10 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydbMetrics "github.com/ydb-platform/ydb-go-sdk-prometheus"
 	ydbZerolog "github.com/ydb-platform/ydb-go-sdk-zerolog"
+
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -39,10 +39,8 @@ const (
 	invalidURLError  = "'%s' is not a valid URL."
 )
 
-var (
-	//go:embed static/index.html
-	static embed.FS
-)
+//go:embed static/index.html
+var static embed.FS
 
 var (
 	short = regexp.MustCompile(`[a-zA-Z0-9]{8}`)

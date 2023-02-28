@@ -5,13 +5,12 @@ import (
 	"log"
 	"os"
 
+	ydb "github.com/ydb-platform/gorm-driver"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
-
-	ydb "github.com/ydb-platform/gorm-driver"
 )
 
 func initDB(cfg *gorm.Config) (*gorm.DB, error) {
