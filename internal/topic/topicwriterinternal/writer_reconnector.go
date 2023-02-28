@@ -66,7 +66,7 @@ type WriterReconnectorConfig struct {
 }
 
 func (cfg *WriterReconnectorConfig) validate() error {
-	if cfg.producerID != cfg.defaultPartitioning.MessageGroupID {
+	if cfg.defaultPartitioning.Type == rawtopicwriter.PartitioningMessageGroupID && cfg.producerID != cfg.defaultPartitioning.MessageGroupID {
 		return xerrors.WithStackTrace(errProducerIDNotEqualMessageGroupID)
 	}
 	return nil
