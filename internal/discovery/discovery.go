@@ -12,10 +12,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -43,8 +41,8 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 		request = Ydb_Discovery.ListEndpointsRequest{
 			Database: c.config.Database(),
 		}
-		response    *Ydb_Discovery.ListEndpointsResponse
-		result      Ydb_Discovery.ListEndpointsResult
+		response *Ydb_Discovery.ListEndpointsResponse
+		result   Ydb_Discovery.ListEndpointsResult
 	)
 
 	var location string

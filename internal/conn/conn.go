@@ -16,13 +16,15 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var (
+	// errNotReady specified error when operation is not ready
+	errNotReady = xerrors.Wrap(fmt.Errorf("operation is not ready yet"))
+
 	// errClosedConnection specified error when connection are closed early
 	errClosedConnection = xerrors.Wrap(fmt.Errorf("connection closed early"))
 
@@ -353,7 +355,7 @@ func (c *conn) Invoke(
 		if useWrapping {
 			switch {
 			case !o.GetOperation().GetReady():
-				return xerrors.WithStackTrace(operation.ErrNotReady)
+				return xerrors.WithStackTrace(errNotReady)
 
 			case o.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
 				return xerrors.WithStackTrace(
