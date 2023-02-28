@@ -1,3 +1,7 @@
+* Change `RemoveRecursive`
+  - Add scheme.EntryTopic
+  - Remove pathToRemove (if not empty)
+
 ## v3.42.13
 * Fixed default state of `internal/xerrors.retryableError`: it inherit properties from parent error as possible
 * Marked event `grpc/stats.End` as ignored at observing status of grpc connection
@@ -12,7 +16,7 @@
 * Fixed validation error for topicoptions.WithPartitionID option of start topic writer.
 
 ## v3.42.10
-* Added exit from retryer if got grpc-error `Unauthenticated` on `discovery/ListEndpoints` call  
+* Added exit from retryer if got grpc-error `Unauthenticated` on `discovery/ListEndpoints` call
 
 ## v3.42.9
 * Added `internal/xerrors.Errorf` error for wrap multiple errors and check them with `errors.Is` of `errors.As`
