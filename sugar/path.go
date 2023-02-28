@@ -20,7 +20,7 @@ const (
 // pathToCreate is a database root relative path
 // MakeRecursive method equal bash command `mkdir -p ~/path/to/create`
 // where `~` - is a root of database
-func MakeRecursive(ctx context.Context, db ydb.Connection, pathToCreate string) error {
+func MakeRecursive(ctx context.Context, db *ydb.Driver, pathToCreate string) error {
 	if strings.HasPrefix(pathToCreate, sysTable+"/") {
 		return xerrors.WithStackTrace(
 			fmt.Errorf("making directory %q inside system path %q not supported", pathToCreate, sysTable),
