@@ -22,8 +22,8 @@ import (
 )
 
 var (
-	// errNotReady specified error when operation is not ready
-	errNotReady = xerrors.Wrap(fmt.Errorf("operation is not ready yet"))
+	// errOperationNotReady specified error when operation is not ready
+	errOperationNotReady = xerrors.Wrap(fmt.Errorf("operation is not ready yet"))
 
 	// errClosedConnection specified error when connection are closed early
 	errClosedConnection = xerrors.Wrap(fmt.Errorf("connection closed early"))
@@ -355,7 +355,7 @@ func (c *conn) Invoke(
 		if useWrapping {
 			switch {
 			case !o.GetOperation().GetReady():
-				return xerrors.WithStackTrace(errNotReady)
+				return xerrors.WithStackTrace(errOperationNotReady)
 
 			case o.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
 				return xerrors.WithStackTrace(
