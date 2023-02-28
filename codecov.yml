@@ -6,3 +6,4 @@
 ignore:
   - trace
   - testutil
+  - examples
