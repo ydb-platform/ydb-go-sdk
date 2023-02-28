@@ -25,7 +25,7 @@ type sqlPositionalArgsScope struct {
 
 func TestDatabaseSqlPositionalArgs(t *testing.T) {
 	scope := sqlPositionalArgsScope{
-		folder: "database/sql/args/positional",
+		folder: t.Name(),
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
 	defer cancel()

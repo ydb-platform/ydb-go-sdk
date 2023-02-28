@@ -31,7 +31,7 @@ type sqlScope struct {
 
 func TestDatabaseSql(t *testing.T) {
 	scope := sqlScope{
-		folder: "database/sql",
+		folder: t.Name(),
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
 	defer cancel()
