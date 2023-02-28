@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>URL shortener</title>
+    <style>
+        body {
+            padding: 2vh;
+        }
+        .row {
+            display: flex;
+            gap: 2vh;
+            padding: 2vh;
+        }
+        .source {
+            flex-grow: 1;
+        }
+        .button {
+        }
+        .shorten {
+            color: blue;
+            margin: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="row">
+        <input id="source" type="text" class="source" placeholder="https://">
+        <button id="button" class="button">
+            Generate
+        </button>
+    </div>
+    <div class="row">
+        <a id="shorten" class="shorten" href=""></a>
+    </div>
+    <script>
+        (function (){
+            let source = document.getElementById("source");
+            let shorten = document.getElementById("shorten");
+            let button = document.getElementById("button");
+
+            button.onclick = function(e) {
+                e.preventDefault();
+
+                fetch("shorten", {
+                    method: 'post',
+                    body: source.value,
+                }).then(function (response) {
+                    return response.text();
+                }).then(function (hash) {
+                    shorten.innerText = window.location.protocol + '//' + window.location.host + window.location.pathname + hash;
+                    shorten.setAttribute("href", window.location.protocol + '//' + window.location.host + window.location.pathname + hash);
+                }).catch(function (error) {
+                    shorten.innerText = error;
+                    shorten.setAttribute("href", "");
+                })
+            };
+        })()
+    </script>
+</body>
+</html>
