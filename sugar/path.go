@@ -120,7 +120,20 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 					return xerrors.WithStackTrace(err)
 				}
 
+			case scheme.EntryTopic:
+				err = db.Topic().Drop(ctx, pt)
+				if err != nil {
+					return xerrors.WithStackTrace(err)
+				}
+				
 			default:
+			}
+			
+			if len(p) != 0 {
+				err = db.Scheme().RemoveDirectory(ctx, p)
+				if err != nil {
+					return err
+				}
 			}
 		}
 		return nil
