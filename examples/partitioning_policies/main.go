@@ -8,6 +8,7 @@ import (
 	"path"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
+
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 )
@@ -63,7 +64,6 @@ func main() {
 	db, err := ydb.Open(ctx, dsn,
 		environ.WithEnvironCredentials(ctx),
 	)
-
 	if err != nil {
 		panic(fmt.Errorf("connect error: %w", err))
 	}

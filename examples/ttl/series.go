@@ -20,8 +20,8 @@ const (
 
 func readExpiredBatchTransaction(ctx context.Context, c table.Client, prefix string, queue,
 	timestamp, prevTimestamp, prevDocID uint64) (result.Result,
-	error) {
-
+	error,
+) {
 	query := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 

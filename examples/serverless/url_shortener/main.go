@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 )
 

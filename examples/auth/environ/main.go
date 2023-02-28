@@ -6,6 +6,7 @@ import (
 	"os"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
+
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
