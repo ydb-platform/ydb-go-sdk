@@ -207,8 +207,6 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 					defer cancel()
 				}
 
-				s, err = c.build(createSessionCtx)
-
 				closeSession := func(s *session) {
 					if s == nil {
 						return
@@ -222,8 +220,10 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 						defer cancel()
 					}
 
-					_ = s.Close(ctx)
+					_ = s.Close(closeSessionCtx)
 				}
+
+				s, err = c.build(createSessionCtx)
 
 				select {
 				case ch <- result{
@@ -537,6 +537,11 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t trace.Table) (s *
 		waitDone(s, err)
 	}()
 
+	var createSessionTimeoutCh <-chan time.Time
+	if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
+		createSessionTimeoutCh = time.After(timeout)
+	}
+
 	select {
 	case <-c.done:
 		c.mu.WithLock(func() {
@@ -559,7 +564,7 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t trace.Table) (s *
 		}
 		return s, nil
 
-	case <-time.After(c.config.CreateSessionTimeout()):
+	case <-createSessionTimeoutCh:
 		c.mu.WithLock(func() {
 			c.waitq.Remove(el)
 		})

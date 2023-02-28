@@ -99,12 +99,13 @@ func WithKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
 }
 
 // WithCreateSessionTimeout limits maximum time spent on Create session request
-// If createSessionTimeout is less than or equal to zero then the
-// DefaultSessionPoolCreateSessionTimeout is used.
+// If createSessionTimeout is less than or equal to zero then no used timeout on create session request
 func WithCreateSessionTimeout(createSessionTimeout time.Duration) Option {
 	return func(c *Config) {
 		if createSessionTimeout > 0 {
 			c.createSessionTimeout = createSessionTimeout
+		} else {
+			c.createSessionTimeout = 0
 		}
 	}
 }
@@ -205,8 +206,6 @@ func (c Config) KeepAliveTimeout() time.Duration {
 }
 
 // CreateSessionTimeout limits maximum time spent on Create session request
-//
-// If CreateSessionTimeout is less than or equal to zero then the DefaultSessionPoolCreateSessionTimeout is used.
 func (c Config) CreateSessionTimeout() time.Duration {
 	return c.createSessionTimeout
 }
