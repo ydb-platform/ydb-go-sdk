@@ -9,6 +9,7 @@ import (
 	"path"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
+
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -61,7 +62,6 @@ func main() {
 	db, err := ydb.Open(ctx, dsn,
 		environ.WithEnvironCredentials(ctx),
 	)
-
 	if err != nil {
 		panic(fmt.Errorf("connect error: %w", err))
 	}
@@ -69,9 +69,7 @@ func main() {
 
 	prefix = path.Join(db.Name(), prefix)
 
-	var (
-		tablePath = path.Join(prefix, "decimals")
-	)
+	tablePath := path.Join(prefix, "decimals")
 	err = db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, tablePath,
