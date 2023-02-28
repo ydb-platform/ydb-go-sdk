@@ -1,6 +1,4 @@
-* Change `RemoveRecursive`
-  - Add scheme.EntryTopic
-  - Remove pathToRemove (if not empty)
+* Supported `scheme.EntryTopic` path child entry in `sugar.RemoveRecursive`
 
 ## v3.42.13
 * Fixed default state of `internal/xerrors.retryableError`: it inherit properties from parent error as possible
