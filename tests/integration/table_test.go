@@ -34,7 +34,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -180,21 +179,9 @@ func (s *stats) removeFromInFlight(t testing.TB, id string) {
 	t.Logf("session '%s' removed from in-flight", id)
 }
 
-func TestTableMultiple(t *testing.T) {
-	xtest.AllowByFlag(t, "HUGE_TEST")
-	xtest.TestManyTimes(t, func(t testing.TB) {
-		testTable(t)
-	}, xtest.StopAfter(time.Hour))
-}
-
-func TestTable(t *testing.T) {
-	testTable(t)
-}
-
-//nolint:gocyclo
-func testTable(t testing.TB) {
+func TestTable(t *testing.T) { //nolint:gocyclo
 	scope := tableTestScope{
-		folder: "table_test",
+		folder: t.Name(),
 	}
 
 	testDuration := 55 * time.Second

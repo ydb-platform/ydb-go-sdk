@@ -25,7 +25,7 @@ type sqlNumericArgsScope struct {
 
 func TestDatabaseSqlNumericArgs(t *testing.T) {
 	scope := sqlNumericArgsScope{
-		folder: "database/sql/args/numeric",
+		folder: t.Name(),
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
 	defer cancel()

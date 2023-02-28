@@ -6,11 +6,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
@@ -23,53 +20,39 @@ const (
 // pathToCreate is a database root relative path
 // MakeRecursive method equal bash command `mkdir -p ~/path/to/create`
 // where `~` - is a root of database
-func MakeRecursive(ctx context.Context, db *ydb.Driver, pathToCreate string) error {
-	pathToCreate = path.Join(db.Name(), pathToCreate)
-	for i := len(db.Name()) + 1; i < len(pathToCreate); i++ {
-		x := strings.IndexByte(pathToCreate[i:], '/')
-		if x == -1 {
-			x = len(pathToCreate[i:]) - 1
-		}
-		i += x
-		var (
-			err  error
-			info scheme.Entry
-			sub  = pathToCreate[:i+1]
+func MakeRecursive(ctx context.Context, db ydb.Connection, pathToCreate string) error {
+	if strings.HasPrefix(pathToCreate, sysTable+"/") {
+		return xerrors.WithStackTrace(
+			fmt.Errorf("making directory %q inside system path %q not supported", pathToCreate, sysTable),
 		)
-		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-			info, err = db.Scheme().DescribePath(ctx, sub)
-			return err
-		}, retry.WithIdempotent(true))
-		if ydb.IsOperationError(err, Ydb.StatusIds_SCHEME_ERROR) {
-			err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-				return db.Scheme().MakeDirectory(ctx, sub)
-			}, retry.WithIdempotent(true))
-			if err != nil {
-				return xerrors.WithStackTrace(err)
-			}
-			err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-				info, err = db.Scheme().DescribePath(ctx, sub)
-				return err
-			}, retry.WithIdempotent(true))
-			if err != nil {
-				return xerrors.WithStackTrace(err)
-			}
-		}
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-		switch info.Type {
-		case
-			scheme.EntryDatabase,
-			scheme.EntryDirectory:
-			// OK
-		default:
-			return xerrors.WithStackTrace(fmt.Errorf("entry %q exists but it is a %s",
-				sub, info.Type,
-			))
-		}
 	}
-	return nil
+
+	absPath := path.Join(db.Name(), pathToCreate)
+
+	err := db.Scheme().MakeDirectory(ctx, absPath)
+	if err != nil {
+		return xerrors.WithStackTrace(
+			fmt.Errorf("cannot make directory %q: %w", absPath, err),
+		)
+	}
+
+	info, err := db.Scheme().DescribePath(ctx, absPath)
+	if err != nil {
+		return xerrors.WithStackTrace(
+			fmt.Errorf("cannot describe path %q: %w", absPath, err),
+		)
+	}
+
+	switch info.Type {
+	case
+		scheme.EntryDatabase,
+		scheme.EntryDirectory:
+		return nil
+	default:
+		return xerrors.WithStackTrace(
+			fmt.Errorf("entry %q exists but it is not a directory: %s", absPath, info.Type),
+		)
+	}
 }
 
 // RemoveRecursive remove selected directory or table names in database.
@@ -80,19 +63,32 @@ func MakeRecursive(ctx context.Context, db *ydb.Driver, pathToCreate string) err
 // where `~` - is a root of database
 func RemoveRecursive(ctx context.Context, db *ydb.Driver, pathToRemove string) error {
 	fullSysTablePath := path.Join(db.Name(), sysTable)
-	var list func(int, string) error
-	list = func(i int, p string) error {
-		var dir scheme.Directory
-		var err error
-		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-			dir, err = db.Scheme().ListDirectory(ctx, p)
-			return xerrors.WithStackTrace(err)
-		}, retry.WithIdempotent(true))
-		if ydb.IsOperationErrorSchemeError(err) {
+	var rmPath func(int, string) error
+	rmPath = func(i int, p string) error {
+		if exists, err := IsDirectoryExists(ctx, db.Scheme(), p); err != nil {
+			return xerrors.WithStackTrace(
+				fmt.Errorf("check directory %q exists failed: %w", p, err),
+			)
+		} else if !exists {
 			return nil
 		}
+
+		entry, err := db.Scheme().DescribePath(ctx, p)
 		if err != nil {
-			return xerrors.WithStackTrace(err)
+			return xerrors.WithStackTrace(
+				fmt.Errorf("cannot describe path %q: %w", p, err),
+			)
+		}
+
+		if entry.Type != scheme.EntryDirectory {
+			return nil
+		}
+
+		dir, err := db.Scheme().ListDirectory(ctx, p)
+		if err != nil {
+			return xerrors.WithStackTrace(
+				fmt.Errorf("listing directory %q failed: %w", p, err),
+			)
 		}
 
 		for _, child := range dir.Children {
@@ -102,14 +98,10 @@ func RemoveRecursive(ctx context.Context, db *ydb.Driver, pathToRemove string) e
 			}
 			switch child.Type {
 			case scheme.EntryDirectory:
-				if err = list(i+1, pt); err != nil {
-					return xerrors.WithStackTrace(err)
-				}
-				err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-					return db.Scheme().RemoveDirectory(ctx, pt)
-				}, retry.WithIdempotent(true))
-				if err != nil {
-					return xerrors.WithStackTrace(err)
+				if err = rmPath(i+1, pt); err != nil {
+					return xerrors.WithStackTrace(
+						fmt.Errorf("recursive removing directory %q failed: %w", pt, err),
+					)
 				}
 
 			case scheme.EntryTable:
@@ -117,13 +109,34 @@ func RemoveRecursive(ctx context.Context, db *ydb.Driver, pathToRemove string) e
 					return session.DropTable(ctx, pt)
 				}, table.WithIdempotent())
 				if err != nil {
-					return xerrors.WithStackTrace(err)
+					return xerrors.WithStackTrace(
+						fmt.Errorf("removing table %q failed: %w", pt, err),
+					)
+				}
+
+			case scheme.EntryTopic:
+				err = db.Topic().Drop(ctx, pt)
+				if err != nil {
+					return xerrors.WithStackTrace(
+						fmt.Errorf("removing topic %q failed: %w", pt, err),
+					)
 				}
 
 			default:
+				return xerrors.WithStackTrace(
+					fmt.Errorf("unknown entry type: %s", child.Type.String()),
+				)
 			}
 		}
+
+		err = db.Scheme().RemoveDirectory(ctx, p)
+		if err != nil {
+			return xerrors.WithStackTrace(
+				fmt.Errorf("removing directory %q failed: %w", p, err),
+			)
+		}
+
 		return nil
 	}
-	return list(0, path.Join(db.Name(), pathToRemove))
+	return rmPath(0, path.Join(db.Name(), pathToRemove))
 }
