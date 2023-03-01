@@ -140,8 +140,8 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 	logger := xtest.Logger(tb)
 	db := connect(tb, ydb.WithLogger(trace.DetailsAll,
 		ydb.WithMinLevel(log.TRACE),
-		ydb.WithOutWriter(logger.Out()),
-		ydb.WithErrWriter(logger.Err()),
+		ydb.WithOutWriter(logger),
+		ydb.WithErrWriter(logger),
 	))
 
 	// create topic

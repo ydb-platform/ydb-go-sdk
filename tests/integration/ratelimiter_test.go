@@ -43,8 +43,8 @@ func TestRatelimiter(t *testing.T) {
 		ydb.WithLogger(
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|ratelimiter|coordination).*`),
 			ydb.WithNamespace("ydb"),
-			ydb.WithOutWriter(logger.Out()),
-			ydb.WithErrWriter(logger.Err()),
+			ydb.WithOutWriter(logger),
+			ydb.WithErrWriter(logger),
 			ydb.WithMinLevel(log.WARN),
 		),
 	)
