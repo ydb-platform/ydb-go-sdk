@@ -305,15 +305,12 @@ func (s *sqlNumericArgsScope) fill(ctx context.Context) error {
 }
 
 func (s *sqlNumericArgsScope) createTables(ctx context.Context) error {
-	_, err := s.db.ExecContext(
+	_, _ = s.db.ExecContext(
 		ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
 		"DROP TABLE series",
 	)
-	if err != nil {
-		return fmt.Errorf("drop tables series failed: %w", err)
-	}
 
-	_, err = s.db.ExecContext(
+	_, err := s.db.ExecContext(
 		ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
 		`CREATE TABLE series (
 			series_id Uint64,
@@ -330,13 +327,10 @@ func (s *sqlNumericArgsScope) createTables(ctx context.Context) error {
 		return fmt.Errorf("create tables series failed: %w", err)
 	}
 
-	_, err = s.db.ExecContext(
+	_, _ = s.db.ExecContext(
 		ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
 		"DROP TABLE seasons",
 	)
-	if err != nil {
-		return fmt.Errorf("drop tables seasons failed: %w", err)
-	}
 
 	_, err = s.db.ExecContext(
 		ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
@@ -356,13 +350,10 @@ func (s *sqlNumericArgsScope) createTables(ctx context.Context) error {
 		return fmt.Errorf("create tables seasons failed: %w", err)
 	}
 
-	_, err = s.db.ExecContext(
+	_, _ = s.db.ExecContext(
 		ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
 		"DROP TABLE episodes",
 	)
-	if err != nil {
-		return fmt.Errorf("drop tables episodes failed: %w", err)
-	}
 
 	_, err = s.db.ExecContext(
 		ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),

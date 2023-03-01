@@ -106,15 +106,16 @@ func TestTableMultipleResultSets(t *testing.T) {
 							),
 							table.CommitTx(),
 						), `
-					DECLARE $values AS List<Struct<
-						val: Int32,
-					> >;
-					UPSERT INTO stream_query
-					SELECT
-						val 
-					FROM
-						AS_TABLE($values);            
-				`, table.NewQueryParameters(
+							PRAGMA TablePathPrefix("`+path.Join(db.Name(), scope.folder)+`");
+							DECLARE $values AS List<Struct<
+								val: Int32,
+							> >;
+							UPSERT INTO `+scope.tableName+`
+							SELECT
+								val 
+							FROM
+								AS_TABLE($values);            
+						`, table.NewQueryParameters(
 							table.ValueParam(
 								"$values",
 								types.ListValue(values...),
@@ -134,7 +135,10 @@ func TestTableMultipleResultSets(t *testing.T) {
 			err := db.Table().Do(ctx,
 				func(ctx context.Context, s table.Session) (err error) {
 					res, err := s.StreamExecuteScanQuery(
-						ctx, `SELECT val FROM stream_query;`, table.NewQueryParameters(),
+						ctx, `
+							PRAGMA TablePathPrefix("`+path.Join(db.Name(), scope.folder)+`");
+							SELECT val FROM `+scope.tableName+`;`,
+						table.NewQueryParameters(),
 						options.WithExecuteScanQueryStats(options.ExecuteScanQueryStatsTypeFull),
 					)
 					if err != nil {
@@ -172,6 +176,11 @@ func TestTableMultipleResultSets(t *testing.T) {
 							)
 						}
 					}
+
+					if err = res.Err(); err != nil {
+						return err
+					}
+
 					if rowsCount != scope.upsertRowsCount {
 						return fmt.Errorf("wrong rows count: %v, exp: %v", rowsCount, scope.upsertRowsCount)
 					}
@@ -184,7 +193,7 @@ func TestTableMultipleResultSets(t *testing.T) {
 						return fmt.Errorf("wrong result sets count: %v", resultSetsCount)
 					}
 
-					return res.Err()
+					return nil
 				},
 				table.WithIdempotent(),
 			)
