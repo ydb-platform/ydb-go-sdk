@@ -7,12 +7,17 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.3.0
 	github.com/jonboulle/clockwork v0.2.2
-	github.com/stretchr/testify v1.7.1
 	github.com/ydb-platform/ydb-go-genproto v0.0.0-20221215182650-986f9d10542f
 	golang.org/x/sync v0.0.0-20220601150217-0de741cfad7f
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	google.golang.org/grpc v1.49.0
 	google.golang.org/protobuf v1.28.0
+)
+
+// requires for tests only
+require (
+	github.com/rekby/fixenv v0.3.2
+	github.com/stretchr/testify v1.7.1
 )
 
 require (
