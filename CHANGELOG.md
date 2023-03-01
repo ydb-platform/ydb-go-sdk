@@ -1,3 +1,4 @@
+* Fixed validation error for topicoptions.WithPartitionID option of start topic writer.
 * Supported binding parameters for `database/sql` driver
 * Added packaged `bind` with bindings options `WithTablePathPrefix(tablePathPrefix)` and `Params()`
 * Added `ydb.WithBindings` connector option

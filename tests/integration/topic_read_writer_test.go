@@ -388,6 +388,22 @@ func TestUpdateToken(t *testing.T) {
 	xtest.WaitChannelClosed(t, activityStopped)
 }
 
+func TestTopicWriterWithManualPartitionSelect(t *testing.T) {
+	ctx := xtest.Context(t)
+	db := connect(t)
+	topicPath := createTopic(ctx, t, db)
+
+	writer, err := db.Topic().StartWriter(
+		"producer-id",
+		topicPath,
+		topicoptions.WithPartitionID(0),
+		topicoptions.WithSyncWrite(true),
+	)
+	require.NoError(t, err)
+	err = writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("asd")})
+	require.NoError(t, err)
+}
+
 var topicCounter int
 
 func createTopic(ctx context.Context, t testing.TB, db *ydb.Driver) (topicPath string) {
