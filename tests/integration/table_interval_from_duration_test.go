@@ -11,57 +11,16 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"golang.org/x/xerrors"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-type issue229Struct struct{}
-
-// UnmarshalJSON implements json.Unmarshaler
-func (i *issue229Struct) UnmarshalJSON(_ []byte) error {
-	return nil
-}
-
-func TestIssue229UnexpectedNullWhileParseNilJsonDocumentValue(t *testing.T) {
-	// https://github.com/ydb-platform/ydb-go-sdk/issues/229
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	db, err := ydb.Open(ctx,
-		os.Getenv("YDB_CONNECTION_STRING"),
-		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
-	)
-	require.NoError(t, err)
-	defer func(db *ydb.Driver) {
-		// cleanup
-		_ = db.Close(ctx)
-	}(db)
-	var val issue229Struct
-	err = db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) (err error) {
-		res, err := tx.Execute(ctx, `SELECT Nothing(JsonDocument?) AS r`, nil)
-		if err != nil {
-			return err
-		}
-		if err = res.NextResultSetErr(ctx); err != nil {
-			return err
-		}
-		if !res.NextRow() {
-			return fmt.Errorf("unexpected no rows in result set (err = %w)", res.Err())
-		}
-		if err = res.Scan(&val); err != nil {
-			return err
-		}
-		return res.Err()
-	}, table.WithIdempotent())
-	require.NoError(t, err)
-}
-
+// https://github.com/ydb-platform/ydb-go-sdk/issues/259
 func TestIssue259IntervalFromDuration(t *testing.T) {
-	// https://github.com/ydb-platform/ydb-go-sdk/issues/259
+	t.Parallel()
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -169,54 +128,4 @@ func TestIssue259IntervalFromDuration(t *testing.T) {
 		}, table.WithIdempotent())
 		require.NoError(t, err)
 	})
-}
-
-func TestIssue415ScanError(t *testing.T) {
-	// https://github.com/ydb-platform/ydb-go-sdk/issues/415
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	db, err := ydb.Open(ctx,
-		os.Getenv("YDB_CONNECTION_STRING"),
-		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
-	)
-	require.NoError(t, err)
-	err = db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) (err error) {
-		res, err := tx.Execute(ctx, `SELECT 1 as abc, 2 as def;`, nil)
-		if err != nil {
-			return err
-		}
-		err = res.NextResultSetErr(ctx)
-		if err != nil {
-			return err
-		}
-		if !res.NextRow() {
-			if err = res.Err(); err != nil {
-				return err
-			}
-			return fmt.Errorf("unexpected empty result set")
-		}
-		var abc, def int32
-		err = res.ScanNamed(
-			named.Required("abc", &abc),
-			named.Required("ghi", &def),
-		)
-		if err != nil {
-			return err
-		}
-		fmt.Println(abc, def)
-		return res.Err()
-	}, table.WithTxSettings(table.TxSettings(table.WithSnapshotReadOnly())))
-	require.Error(t, err)
-	err = func(err error) error {
-		for {
-			//nolint:errorlint
-			if unwrappedErr, has := err.(xerrors.Wrapper); has {
-				err = unwrappedErr.Unwrap()
-			} else {
-				return err
-			}
-		}
-	}(err)
-	require.Equal(t, "not found column 'ghi'", err.Error())
 }

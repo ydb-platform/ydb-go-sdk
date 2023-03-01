@@ -4,7 +4,6 @@
 package integration
 
 import (
-	"context"
 	"os"
 	"testing"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -24,8 +24,11 @@ func TestRatelimiter(t *testing.T) {
 		testResource             = "test_resource"
 	)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*4)
-	defer cancel()
+	var (
+		ctx    = xtest.Context(t)
+		logger = xtest.Logger(t)
+	)
+
 	db, err := ydb.Open(
 		ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
@@ -40,8 +43,8 @@ func TestRatelimiter(t *testing.T) {
 		ydb.WithLogger(
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|ratelimiter|coordination).*`),
 			ydb.WithNamespace("ydb"),
-			ydb.WithOutWriter(os.Stdout),
-			ydb.WithErrWriter(os.Stdout),
+			ydb.WithOutWriter(logger),
+			ydb.WithErrWriter(logger),
 			ydb.WithMinLevel(log.WARN),
 		),
 	)

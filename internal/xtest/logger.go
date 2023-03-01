@@ -5,12 +5,19 @@ import (
 	"testing"
 )
 
-type TestWriter struct {
-	Test testing.TB
+func Logger(t testing.TB) *testWriter {
+	return &testWriter{
+		t: t,
+	}
 }
 
-func (t *TestWriter) Write(p []byte) (n int, err error) {
-	t.Test.Log(string(p))
+type testWriter struct {
+	t testing.TB
+}
+
+func (t *testWriter) Write(p []byte) (n int, err error) {
+	t.t.Helper()
+	t.t.Log(string(p))
 	return len(p), nil
 }
 

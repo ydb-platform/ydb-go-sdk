@@ -27,6 +27,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -34,6 +35,8 @@ import (
 
 //nolint:gocyclo
 func TestConnection(t *testing.T) {
+	t.Parallel()
+
 	var (
 		userAgent     = "connection user agent"
 		requestType   = "connection request type"
@@ -58,8 +61,11 @@ func TestConnection(t *testing.T) {
 			}
 		}
 	)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
+	var (
+		ctx    = xtest.Context(t)
+		logger = xtest.Logger(t)
+	)
+
 	db, err := ydb.Open(
 		ctx,
 		"", // corner case for check replacement of endpoint+database+secure
@@ -76,8 +82,8 @@ func TestConnection(t *testing.T) {
 		ydb.WithLogger(
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
 			ydb.WithNamespace("ydb"),
-			ydb.WithOutWriter(os.Stdout),
-			ydb.WithErrWriter(os.Stdout),
+			ydb.WithOutWriter(logger),
+			ydb.WithErrWriter(logger),
 			ydb.WithMinLevel(log.WARN),
 		),
 		ydb.WithUserAgent(userAgent),
