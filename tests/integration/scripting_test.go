@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
@@ -22,8 +23,13 @@ import (
 )
 
 func TestScripting(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
+	t.Parallel()
+
+	var (
+		ctx    = xtest.Context(t)
+		logger = xtest.Logger(t)
+	)
+
 	db, err := ydb.Open(
 		ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
@@ -40,8 +46,8 @@ func TestScripting(t *testing.T) {
 		ydb.WithLogger(
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
 			ydb.WithNamespace("ydb"),
-			ydb.WithOutWriter(os.Stdout),
-			ydb.WithErrWriter(os.Stdout),
+			ydb.WithOutWriter(logger.Out()),
+			ydb.WithErrWriter(logger.Err()),
 			ydb.WithMinLevel(log.TRACE),
 		),
 		ydb.WithUserAgent("scripting"),

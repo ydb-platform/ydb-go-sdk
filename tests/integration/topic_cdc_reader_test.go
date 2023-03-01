@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"path"
-	"runtime/pprof"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -17,7 +16,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -33,7 +31,9 @@ const (
 )
 
 func TestReadMessages(t *testing.T) {
-	ctx := testCtx(t)
+	t.Parallel()
+
+	ctx := xtest.Context(t)
 
 	db, reader := createFeedAndReader(ctx, t)
 
@@ -57,7 +57,9 @@ func TestReadMessages(t *testing.T) {
 }
 
 func TestReadMessagesAndCommit(t *testing.T) {
-	ctx := testCtx(t)
+	t.Parallel()
+
+	ctx := xtest.Context(t)
 
 	db, reader := createFeedAndReader(ctx, t, topicoptions.WithCommitMode(topicoptions.CommitModeSync))
 
@@ -89,7 +91,9 @@ func TestReadMessagesAndCommit(t *testing.T) {
 }
 
 func TestCDCFeedSendTopicPathSameAsSubscribed(t *testing.T) {
-	ctx := testCtx(t)
+	t.Parallel()
+
+	ctx := xtest.Context(t)
 
 	db, reader := createFeedAndReader(ctx, t)
 
@@ -112,7 +116,9 @@ func TestCDCFeedSendTopicPathSameAsSubscribed(t *testing.T) {
 }
 
 func TestTopicPath(t *testing.T) {
-	ctx := testCtx(t)
+	t.Parallel()
+
+	ctx := xtest.Context(t)
 	db := connect(t)
 
 	topicPath := db.Name() + "/" + t.Name()
@@ -123,7 +129,9 @@ func TestTopicPath(t *testing.T) {
 }
 
 func TestPartitionsBalanced(t *testing.T) {
-	ctx := testCtx(t)
+	t.Parallel()
+
+	ctx := xtest.Context(t)
 	db := connect(t)
 	topicPath := db.Name() + "/topic-" + t.Name()
 
@@ -211,7 +219,9 @@ func TestPartitionsBalanced(t *testing.T) {
 }
 
 func TestCDCInTableDescribe(t *testing.T) {
-	ctx := testCtx(t)
+	t.Parallel()
+
+	ctx := xtest.Context(t)
 	db := connect(t)
 	topicPath := createCDCFeed(ctx, t, db)
 
@@ -318,18 +328,6 @@ func sendCDCMessage(ctx context.Context, t *testing.T, db *ydb.Driver) {
 		return err
 	})
 	require.NoError(t, err)
-}
-
-func testCtx(t testing.TB) context.Context {
-	ctx, cancel := xcontext.WithErrCancel(context.Background())
-	t.Cleanup(func() {
-		cancel(fmt.Errorf("ydb e2e test finished: %v", t.Name()))
-
-		pprof.SetGoroutineLabels(ctx)
-	})
-
-	pprof.SetGoroutineLabels(pprof.WithLabels(ctx, pprof.Labels("test", t.Name())))
-	return ctx
 }
 
 func testCDCFeedName(db *ydb.Driver) string {

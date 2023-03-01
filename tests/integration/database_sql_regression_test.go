@@ -28,6 +28,8 @@ import (
 )
 
 func TestRegressionCloud109307(t *testing.T) {
+	t.Parallel()
+
 	db, err := sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
 	require.NoError(t, err)
 
@@ -78,11 +80,12 @@ func TestRegressionCloud109307(t *testing.T) {
 }
 
 func TestRegressionKikimr17104(t *testing.T) {
-	const tableRelativePath = "database/sql/kikimr/17104/big_table"
+	t.Parallel()
 
 	var (
-		upsertRowsCount = 100000
-		upsertChecksum  uint64
+		tableRelativePath = path.Join(t.Name(), "big_table")
+		upsertRowsCount   = 100000
+		upsertChecksum    uint64
 	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
@@ -159,7 +162,7 @@ func TestRegressionKikimr17104(t *testing.T) {
 					upsertRowsCount = vv
 				}
 				// - upsert data
-				fmt.Printf("> preparing values to upsert...\n")
+				t.Logf("> preparing values to upsert...\n")
 				values := make([]types.Value, 0, upsertRowsCount)
 				for i := 0; i < upsertRowsCount; i++ {
 					upsertChecksum += uint64(i)
@@ -169,7 +172,7 @@ func TestRegressionKikimr17104(t *testing.T) {
 						),
 					)
 				}
-				fmt.Printf("> upsert data\n")
+				t.Logf("> upsert data\n")
 				err := retry.Do(ydb.WithQueryMode(ctx, ydb.DataQueryMode), db,
 					func(ctx context.Context, cc *sql.Conn) (err error) {
 						values := table.NewQueryParameters(table.ValueParam("$values", types.ListValue(values...)))

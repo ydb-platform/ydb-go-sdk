@@ -5,11 +5,11 @@ package integration
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Monitoring_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Monitoring"
 
@@ -18,6 +18,8 @@ import (
 )
 
 func TestMonitoring(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -36,7 +38,7 @@ func TestMonitoring(t *testing.T) {
 		}
 	}()
 	t.Run("monitoring.SelfCheck", func(t *testing.T) {
-		if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 			client := Ydb_Monitoring_V1.NewMonitoringServiceClient(ydb.GRPCConn(db))
 			response, err := client.SelfCheck(ctx, &Ydb_Monitoring.SelfCheckRequest{
 				OperationParams:     nil,
@@ -52,10 +54,9 @@ func TestMonitoring(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("%+v\n", &result)
+			t.Logf("%+v\n", &result)
 			return nil
-		}, retry.WithIdempotent(true)); err != nil {
-			t.Fatalf("Execute failed: %v", err)
-		}
+		}, retry.WithIdempotent(true))
+		require.NoError(t, err)
 	})
 }

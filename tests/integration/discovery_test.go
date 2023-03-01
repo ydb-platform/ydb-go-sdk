@@ -6,7 +6,6 @@ package integration
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -18,11 +17,14 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestDiscovery(t *testing.T) {
+	t.Parallel()
+
 	var (
 		userAgent     = "connection user agent"
 		requestType   = "connection request type"
@@ -48,8 +50,11 @@ func TestDiscovery(t *testing.T) {
 		}
 		parking = make(chan struct{})
 	)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
+	var (
+		ctx    = xtest.Context(t)
+		logger = xtest.Logger(t)
+	)
+
 	db, err := ydb.Open(
 		ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
@@ -66,8 +71,8 @@ func TestDiscovery(t *testing.T) {
 		ydb.WithLogger(
 			trace.MatchDetails(`ydb\.(driver|discovery|repeater).*`),
 			ydb.WithNamespace("ydb"),
-			ydb.WithOutWriter(os.Stdout),
-			ydb.WithErrWriter(os.Stdout),
+			ydb.WithOutWriter(logger.Out()),
+			ydb.WithErrWriter(logger.Err()),
 			ydb.WithMinLevel(log.WARN),
 			ydb.WithColoring(),
 		),
@@ -120,7 +125,7 @@ func TestDiscovery(t *testing.T) {
 		if endpoints, err := db.Discovery().Discover(ctx); err != nil {
 			t.Fatal(err)
 		} else {
-			fmt.Println(endpoints)
+			t.Log(endpoints)
 		}
 		t.Run("wait", func(t *testing.T) {
 			t.Run("parking", func(t *testing.T) {
@@ -129,7 +134,7 @@ func TestDiscovery(t *testing.T) {
 					if endpoints, err := db.Discovery().Discover(ctx); err != nil {
 						t.Fatal(err)
 					} else {
-						fmt.Println(endpoints)
+						t.Log(endpoints)
 					}
 				})
 			})

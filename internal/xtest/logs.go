@@ -1,17 +1,43 @@
 package xtest
 
 import (
+	"io"
 	"sync"
 	"testing"
 )
 
-type TestWriter struct {
-	Test testing.TB
+func Logger(t testing.TB) *testWriter {
+	return &testWriter{
+		t: t,
+	}
 }
 
-func (t *TestWriter) Write(p []byte) (n int, err error) {
-	t.Test.Log(string(p))
-	return len(p), nil
+type testWriter struct {
+	t testing.TB
+}
+
+type testWriterFunc func(p []byte) (n int, err error)
+
+func (t testWriterFunc) Write(p []byte) (n int, err error) {
+	return t(p)
+}
+
+func (t *testWriter) Out() io.Writer {
+	return testWriterFunc(func(p []byte) (n int, err error) {
+		t.t.Helper()
+		t.t.Helper()
+		t.t.Log(string(p))
+		return len(p), nil
+	})
+}
+
+func (t *testWriter) Err() io.Writer {
+	return testWriterFunc(func(p []byte) (n int, err error) {
+		t.t.Helper()
+		t.t.Helper()
+		t.t.Error(string(p))
+		return len(p), nil
+	})
 }
 
 func MakeSyncedTest(t testing.TB) *SyncedTest {

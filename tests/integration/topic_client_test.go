@@ -24,7 +24,9 @@ const defaultConnectionString = "grpc://localhost:2136/local"
 
 const commonConsumerName = "consumer"
 
-func TestClient_CreateDropTopic(t *testing.T) {
+func TestTopicCreateDrop(t *testing.T) {
+	t.Parallel()
+
 	ctx := xtest.Context(t)
 	db := connect(t)
 	topicPath := db.Name() + "/testtopic"
@@ -46,7 +48,9 @@ func TestClient_CreateDropTopic(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestClient_Describe(t *testing.T) {
+func TestTopicDescribe(t *testing.T) {
+	t.Parallel()
+
 	ctx := xtest.Context(t)
 	db := connect(t)
 	topicName := "test-topic-" + t.Name()

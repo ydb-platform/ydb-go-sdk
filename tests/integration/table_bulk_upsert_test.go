@@ -15,9 +15,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type tableBulkUpsertScope struct {
@@ -102,6 +105,8 @@ func (s *tableBulkUpsertScope) writeLogBatch(ctx context.Context, logs []logMess
 }
 
 func TestTableBulkUpsert(t *testing.T) {
+	t.Parallel()
+
 	scope := &tableBulkUpsertScope{
 		folder:     t.Name(),
 		tableName:  "bulk_upsert_example",
@@ -109,18 +114,30 @@ func TestTableBulkUpsert(t *testing.T) {
 		batchSize:  1000,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+	var (
+		ctx    = xtest.Context(t)
+		logger = xtest.Logger(t)
+	)
 
-	t.Run("connect", func(t *testing.T) {
-		var err error
-		scope.db, err = ydb.Open(
-			ctx,
-			"", // corner case for check replacement of endpoint+database+secure
-			ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
-		)
+	var err error
+	scope.db, err = ydb.Open(
+		ctx,
+		"", // corner case for check replacement of endpoint+database+secure
+		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
+		ydb.WithLogger(
+			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
+			ydb.WithNamespace("ydb"),
+			ydb.WithOutWriter(logger.Out()),
+			ydb.WithErrWriter(logger.Err()),
+			ydb.WithMinLevel(log.TRACE),
+		),
+	)
+	require.NoError(t, err)
+
+	defer func() {
+		err = scope.db.Close(ctx)
 		require.NoError(t, err)
-	})
+	}()
 
 	t.Run("scheme", func(t *testing.T) {
 		t.Run("prepare", func(t *testing.T) {
@@ -134,6 +151,7 @@ func TestTableBulkUpsert(t *testing.T) {
 			t.Run("upsert", func(t *testing.T) {
 				for offset := 0; offset < scope.batchCount; offset++ {
 					t.Run("batch#"+strconv.Itoa(offset), func(t *testing.T) {
+						t.Parallel()
 						var logs []logMessage
 						t.Run("prepare", func(t *testing.T) {
 							t.Run("data", func(t *testing.T) {
@@ -148,10 +166,5 @@ func TestTableBulkUpsert(t *testing.T) {
 				}
 			})
 		})
-	})
-
-	t.Run("disconnect", func(t *testing.T) {
-		err := scope.db.Close(ctx)
-		require.NoError(t, err)
 	})
 }

@@ -5,12 +5,12 @@ package integration
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	grpcCredentials "google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
@@ -20,6 +20,8 @@ import (
 )
 
 func TestStaticCredentials(t *testing.T) {
+	t.Parallel()
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -49,11 +51,9 @@ func TestStaticCredentials(t *testing.T) {
 	}())
 
 	token, err := staticCredentials.Token(ctx)
-	if err != nil {
-		t.Fatalf("get token failed: %v", err)
-	} else {
-		fmt.Printf("token: %s\n", token)
-	}
+	require.NoError(t, err)
+
+	t.Logf("token: %s\n", token)
 
 	db, err := ydb.Open(
 		ctx,

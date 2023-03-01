@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -34,6 +33,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -48,6 +48,7 @@ import (
 
 type tableTestScope struct {
 	folder string
+	db     *ydb.Driver
 }
 
 type stats struct {
@@ -266,7 +267,11 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 		}
 	)
 
-	db, err := ydb.Open(
+	var (
+		err    error
+		logger = xtest.Logger(t)
+	)
+	scope.db, err = ydb.Open(
 		ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
@@ -306,8 +311,8 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 		ydb.WithLogger(
 			trace.MatchDetails(`ydb\.(driver|table|discovery|retry|scheme).*`),
 			ydb.WithNamespace("ydb"),
-			ydb.WithOutWriter(os.Stdout),
-			ydb.WithErrWriter(os.Stdout),
+			ydb.WithOutWriter(logger.Out()),
+			ydb.WithErrWriter(logger.Err()),
 			ydb.WithMinLevel(log.WARN),
 		),
 		ydb.WithPanicCallback(func(e interface{}) {
@@ -382,10 +387,10 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 
 	defer func() {
 		// cleanup
-		_ = db.Close(ctx)
+		_ = scope.db.Close(ctx)
 	}()
 
-	if err = db.Table().Do(ctx, func(ctx context.Context, _ table.Session) error {
+	if err = scope.db.Table().Do(ctx, func(ctx context.Context, _ table.Session) error {
 		// hack for wait pool initializing
 		return nil
 	}); err != nil {
@@ -395,76 +400,99 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 	}
 
 	// prepare scheme
-	err = sugar.RemoveRecursive(ctx, db, scope.folder)
+	err = sugar.RemoveRecursive(ctx, scope.db, scope.folder)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = sugar.MakeRecursive(ctx, db, scope.folder)
+	err = sugar.MakeRecursive(ctx, scope.db, scope.folder)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = scope.describeTableOptions(ctx, db.Table())
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = scope.createTables(ctx, db.Table(), path.Join(db.Name(), scope.folder))
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = scope.describeTable(ctx, db.Table(), path.Join(db.Name(), scope.folder, "series"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = scope.describeTable(ctx, db.Table(), path.Join(db.Name(), scope.folder, "seasons"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = scope.describeTable(ctx, db.Table(), path.Join(db.Name(), scope.folder, "episodes"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			// lazy open transaction on first execute query
-			tx, res, err := s.Execute(ctx, table.SerializableReadWriteTxControl(), "SELECT 1", nil)
-			if err != nil {
-				return err // for auto-retry with driver
-			}
-			defer res.Close() // cleanup resources
-			if err = res.Err(); err != nil {
-				return err
-			}
-			// close transaction on last execute query
-			res, err = tx.Execute(ctx, "SELECT 2", nil, options.WithCommit())
-			if err != nil {
-				return err
-			}
-			defer res.Close()
-			return res.Err()
-		},
-		table.WithIdempotent(),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Run("describe", func(t *testing.T) {
+		t.Run("table", func(t *testing.T) {
+			t.Run("options", func(t *testing.T) {
+				var desc options.TableOptionsDescription
+				err = scope.db.Table().Do(ctx,
+					func(ctx context.Context, s table.Session) (err error) {
+						desc, err = s.DescribeTableOptions(ctx)
+						return err
+					},
+					table.WithIdempotent(),
+				)
+				require.NoError(t, err)
 
-	// fill data
-	if err = scope.fill(ctx, db, scope.folder); err != nil {
-		t.Fatalf("fillQuery failed: %v\n", err)
-	}
+				t.Log("> describe_options:")
+				for i, p := range desc.TableProfilePresets {
+					t.Logf("  > TableProfilePresets: %d/%d: %+v\n", i+1, len(desc.TableProfilePresets), p)
+				}
+				for i, p := range desc.StoragePolicyPresets {
+					t.Logf("  > StoragePolicyPresets: %d/%d: %+v\n", i+1, len(desc.StoragePolicyPresets), p)
+				}
+				for i, p := range desc.CompactionPolicyPresets {
+					t.Logf("  > CompactionPolicyPresets: %d/%d: %+v\n", i+1, len(desc.CompactionPolicyPresets), p)
+				}
+				for i, p := range desc.PartitioningPolicyPresets {
+					t.Logf("  > PartitioningPolicyPresets: %d/%d: %+v\n", i+1, len(desc.PartitioningPolicyPresets), p)
+				}
+				for i, p := range desc.ExecutionPolicyPresets {
+					t.Logf("  > ExecutionPolicyPresets: %d/%d: %+v\n", i+1, len(desc.ExecutionPolicyPresets), p)
+				}
+				for i, p := range desc.ReplicationPolicyPresets {
+					t.Logf("  > ReplicationPolicyPresets: %d/%d: %+v\n", i+1, len(desc.ReplicationPolicyPresets), p)
+				}
+				for i, p := range desc.CachingPolicyPresets {
+					t.Logf("  > CachingPolicyPresets: %d/%d: %+v\n", i+1, len(desc.CachingPolicyPresets), p)
+				}
+			})
+		})
+	})
 
-	// upsert with transaction
-	if err = db.Table().DoTx(ctx,
-		func(ctx context.Context, tx table.TransactionActor) (err error) {
-			var (
-				res   result.Result
-				views uint64
-			)
-			// select current value of `views`
-			res, err = tx.Execute(
-				ctx,
-				scope.render(
-					template.Must(template.New("").Parse(`
+	t.Run("create", func(t *testing.T) {
+		t.Run("tables", func(t *testing.T) {
+			err = scope.createTables(ctx)
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("check", func(t *testing.T) {
+		t.Run("table", func(t *testing.T) {
+			t.Run("exists", func(t *testing.T) {
+				t.Run("series", func(t *testing.T) {
+					err = scope.describeTable(ctx, "series")
+					require.NoError(t, err)
+				})
+				t.Run("seasons", func(t *testing.T) {
+					err = scope.describeTable(ctx, "seasons")
+					require.NoError(t, err)
+				})
+				t.Run("episodes", func(t *testing.T) {
+					err = scope.describeTable(ctx, "episodes")
+					require.NoError(t, err)
+				})
+			})
+		})
+	})
+
+	t.Run("data", func(t *testing.T) {
+		t.Run("fill", func(t *testing.T) {
+			err = scope.fill(ctx)
+			require.NoError(t, err)
+		})
+	})
+
+	t.Run("increment", func(t *testing.T) {
+		t.Run("views", func(t *testing.T) {
+			err = scope.db.Table().DoTx(ctx,
+				func(ctx context.Context, tx table.TransactionActor) (err error) {
+					var (
+						res   result.Result
+						views uint64
+					)
+					// select current value of `views`
+					res, err = tx.Execute(
+						ctx,
+						scope.render(
+							template.Must(template.New("").Parse(`
 						PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
 						DECLARE $seriesID AS Uint64;
 						DECLARE $seasonID AS Uint64;
@@ -476,43 +504,43 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 						WHERE
 							series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID;
 					`)),
-					struct {
-						TablePathPrefix string
-					}{
-						TablePathPrefix: path.Join(db.Name(), scope.folder),
-					},
-				),
-				table.NewQueryParameters(
-					table.ValueParam("$seriesID", types.Uint64Value(1)),
-					table.ValueParam("$seasonID", types.Uint64Value(1)),
-					table.ValueParam("$episodeID", types.Uint64Value(1)),
-				),
-			)
-			if err != nil {
-				return err
-			}
-			if err = res.NextResultSetErr(ctx); err != nil {
-				return err
-			}
-			if !res.NextRow() {
-				return fmt.Errorf("nothing rows")
-			}
-			if err = res.ScanNamed(
-				named.OptionalWithDefault("views", &views),
-			); err != nil {
-				return err
-			}
-			if err = res.Err(); err != nil {
-				return err
-			}
-			if err = res.Close(); err != nil {
-				return err
-			}
-			// increment `views`
-			res, err = tx.Execute(
-				ctx,
-				scope.render(
-					template.Must(template.New("").Parse(`
+							struct {
+								TablePathPrefix string
+							}{
+								TablePathPrefix: path.Join(scope.db.Name(), scope.folder),
+							},
+						),
+						table.NewQueryParameters(
+							table.ValueParam("$seriesID", types.Uint64Value(1)),
+							table.ValueParam("$seasonID", types.Uint64Value(1)),
+							table.ValueParam("$episodeID", types.Uint64Value(1)),
+						),
+					)
+					if err != nil {
+						return err
+					}
+					if err = res.NextResultSetErr(ctx); err != nil {
+						return err
+					}
+					if !res.NextRow() {
+						return fmt.Errorf("nothing rows")
+					}
+					if err = res.ScanNamed(
+						named.OptionalWithDefault("views", &views),
+					); err != nil {
+						return err
+					}
+					if err = res.Err(); err != nil {
+						return err
+					}
+					if err = res.Close(); err != nil {
+						return err
+					}
+					// increment `views`
+					res, err = tx.Execute(
+						ctx,
+						scope.render(
+							template.Must(template.New("").Parse(`
 						PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
 						DECLARE $seriesID AS Uint64;
 						DECLARE $seasonID AS Uint64;
@@ -521,33 +549,35 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 						UPSERT INTO episodes ( series_id, season_id, episode_id, views )
 						VALUES ( $seriesID, $seasonID, $episodeID, $views );
 					`)),
-					struct {
-						TablePathPrefix string
-					}{
-						TablePathPrefix: path.Join(db.Name(), scope.folder),
-					},
-				),
-				table.NewQueryParameters(
-					table.ValueParam("$seriesID", types.Uint64Value(1)),
-					table.ValueParam("$seasonID", types.Uint64Value(1)),
-					table.ValueParam("$episodeID", types.Uint64Value(1)),
-					table.ValueParam("$views", types.Uint64Value(views+1)), // increment views
-				),
+							struct {
+								TablePathPrefix string
+							}{
+								TablePathPrefix: path.Join(scope.db.Name(), scope.folder),
+							},
+						),
+						table.NewQueryParameters(
+							table.ValueParam("$seriesID", types.Uint64Value(1)),
+							table.ValueParam("$seasonID", types.Uint64Value(1)),
+							table.ValueParam("$episodeID", types.Uint64Value(1)),
+							table.ValueParam("$views", types.Uint64Value(views+1)), // increment views
+						),
+					)
+					if err != nil {
+						return err
+					}
+					if err = res.Err(); err != nil {
+						return err
+					}
+					return res.Close()
+				},
+				table.WithIdempotent(),
 			)
-			if err != nil {
-				return err
-			}
-			if err = res.Err(); err != nil {
-				return err
-			}
-			return res.Close()
-		},
-		table.WithIdempotent(),
-	); err != nil {
-		t.Fatalf("tx failed: %v\n", err)
-	}
+			require.NoError(t, err)
+		})
+	})
+
 	// select upserted data
-	if err = db.Table().Do(ctx,
+	if err = scope.db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			var (
 				res   result.Result
@@ -578,7 +608,7 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 					struct {
 						TablePathPrefix string
 					}{
-						TablePathPrefix: path.Join(db.Name(), scope.folder),
+						TablePathPrefix: path.Join(scope.db.Name(), scope.folder),
 					},
 				),
 				table.NewQueryParameters(
@@ -615,152 +645,9 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 		t.Fatalf("tx failed: %v\n", err)
 	}
 
-	// multiple result sets
-	// - create table
-	t.Logf("> creating table stream_query...\n")
-	if err = db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_ = s.ExecuteSchemeQuery(
-				ctx,
-				`DROP TABLE stream_query`,
-			)
-			return s.ExecuteSchemeQuery(
-				ctx,
-				`CREATE TABLE stream_query (val Int32, PRIMARY KEY (val))`,
-			)
-		},
-		table.WithIdempotent(),
-	); err != nil {
-		t.Fatalf("create table failed: %v\n", err)
-	}
-	fmt.Printf("> table stream_query upsert data\n")
-	var (
-		upsertRowsCount = 100000
-		sum             uint64
-	)
-	if v, ok := os.LookupEnv("UPSERT_ROWS_COUNT"); ok {
-		var vv int
-		vv, err = strconv.Atoi(v)
-		if err != nil {
-			t.Errorf("wrong value of UPSERT_ROWS_COUNT: '%s'", v)
-		} else {
-			upsertRowsCount = vv
-		}
-	}
-
-	// - upsert data
-	fmt.Printf("> preparing values to upsert...\n")
-	values := make([]types.Value, 0, upsertRowsCount)
-	for i := 0; i < upsertRowsCount; i++ {
-		sum += uint64(i)
-		values = append(
-			values,
-			types.StructValue(
-				types.StructFieldValue("val", types.Int32Value(int32(i))),
-			),
-		)
-	}
-	fmt.Printf("> values to upsert prepared\n")
-
-	fmt.Printf("> upserting prepared values...\n")
-	if err = db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, _, err = s.Execute(ctx,
-				table.TxControl(
-					table.BeginTx(
-						table.WithSerializableReadWrite(),
-					),
-					table.CommitTx(),
-				), `
-					DECLARE $values AS List<Struct<
-						val: Int32,
-					> >;
-					UPSERT INTO stream_query
-					SELECT
-						val 
-					FROM
-						AS_TABLE($values);            
-				`, table.NewQueryParameters(
-					table.ValueParam(
-						"$values",
-						types.ListValue(values...),
-					),
-				),
-			)
-			return err
-		},
-		table.WithIdempotent(),
-	); err != nil {
-		t.Fatalf("upsert failed: %v\n", err)
-	}
-	fmt.Printf("> prepared values upserted\n")
-
-	// - scan select
-	fmt.Printf("> scan-selecting values...\n")
-	if err = db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			res, err := s.StreamExecuteScanQuery(
-				ctx, `SELECT val FROM stream_query;`, table.NewQueryParameters(),
-				options.WithExecuteScanQueryStats(options.ExecuteScanQueryStatsTypeFull),
-			)
-			if err != nil {
-				return err
-			}
-			var (
-				resultSetsCount = 0
-				rowsCount       = 0
-				checkSum        uint64
-			)
-			for res.NextResultSet(ctx) {
-				resultSetsCount++
-				for res.NextRow() {
-					rowsCount++
-					var val *int32
-					err = res.Scan(&val)
-					if err != nil {
-						return err
-					}
-					checkSum += uint64(*val)
-				}
-				if stats := res.Stats(); stats != nil {
-					fmt.Printf(" --- query stats: compilation: %v, process CPU time: %v, affected shards: %v\n",
-						stats.Compilation(),
-						stats.ProcessCPUTime(),
-						func() (count uint64) {
-							for {
-								phase, ok := stats.NextPhase()
-								if !ok {
-									return
-								}
-								count += phase.AffectedShards()
-							}
-						}(),
-					)
-				}
-			}
-			if rowsCount != upsertRowsCount {
-				return fmt.Errorf("wrong rows count: %v, exp: %v", rowsCount, upsertRowsCount)
-			}
-
-			if sum != checkSum {
-				return fmt.Errorf("wrong checkSum: %v, exp: %v", checkSum, sum)
-			}
-
-			if resultSetsCount <= 1 {
-				return fmt.Errorf("wrong result sets count: %v", resultSetsCount)
-			}
-
-			return res.Err()
-		},
-		table.WithIdempotent(),
-	); err != nil {
-		t.Fatalf("scan select failed: %v\n", err)
-	}
-	fmt.Printf("> values selected\n")
 	// shutdown existing sessions
 	urls := os.Getenv("YDB_SESSIONS_SHUTDOWN_URLS")
 	if len(urls) > 0 {
-		fmt.Printf("> shutdowning existing sessions...\n")
 		for _, url := range strings.Split(urls, ",") {
 			//nolint:gosec
 			_, err = http.Get(url)
@@ -769,11 +656,9 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 			}
 		}
 		atomic.StoreUint32(&shutdowned, 1)
-		fmt.Printf("> existing sessions shutdowned\n")
 	}
 
 	// select concurrently
-	fmt.Printf("> concurrent quering...\n")
 	wg := sync.WaitGroup{}
 
 	for i := 0; i < limit; i++ {
@@ -786,7 +671,7 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 				case <-ctx.Done():
 					return
 				default:
-					scope.executeDataQuery(ctx, t, db.Table(), path.Join(db.Name(), scope.folder))
+					scope.executeDataQuery(ctx, t, scope.db.Table(), path.Join(scope.db.Name(), scope.folder))
 				}
 			}
 		}()
@@ -798,7 +683,7 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 				case <-ctx.Done():
 					return
 				default:
-					scope.executeScanQuery(ctx, t, db.Table(), path.Join(db.Name(), scope.folder))
+					scope.executeScanQuery(ctx, t, scope.db.Table(), path.Join(scope.db.Name(), scope.folder))
 				}
 			}
 		}()
@@ -810,16 +695,15 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 				case <-ctx.Done():
 					return
 				default:
-					scope.streamReadTable(ctx, t, db.Table(), path.Join(db.Name(), scope.folder, "series"))
+					scope.streamReadTable(ctx, t, scope.db.Table(), path.Join(scope.db.Name(), scope.folder, "series"))
 				}
 			}
 		}()
 	}
 	wg.Wait()
-	fmt.Printf("> concurrent quering done\n")
 }
 
-func (scope *tableTestScope) streamReadTable(ctx context.Context, t testing.TB, c table.Client, tableAbsPath string) {
+func (s *tableTestScope) streamReadTable(ctx context.Context, t testing.TB, c table.Client, tableAbsPath string) {
 	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			var (
@@ -840,14 +724,13 @@ func (scope *tableTestScope) streamReadTable(ctx context.Context, t testing.TB, 
 			defer func() {
 				_ = res.Close()
 			}()
-			fmt.Printf("> read_table:\n")
 			for res.NextResultSet(ctx, "series_id", "title", "release_date") {
 				for res.NextRow() {
 					err = res.Scan(&id, &title, &date)
 					if err != nil {
 						return err
 					}
-					fmt.Printf("  > %d %s %s\n", *id, *title, date.String())
+					t.Logf("  > %d %s %s\n", *id, *title, date.String())
 				}
 			}
 			if err = res.Err(); err != nil {
@@ -860,16 +743,12 @@ func (scope *tableTestScope) streamReadTable(ctx context.Context, t testing.TB, 
 					if !ok {
 						break
 					}
-					fmt.Printf(
-						"# phase #%d: took %s\n",
-						i, phase.Duration(),
-					)
 					for {
 						tbl, ok := phase.NextTableAccess()
 						if !ok {
 							break
 						}
-						fmt.Printf(
+						t.Logf(
 							"#  accessed %s: read=(%drows, %dbytes)\n",
 							tbl.Name, tbl.Reads.Rows, tbl.Reads.Bytes,
 						)
@@ -886,9 +765,9 @@ func (scope *tableTestScope) streamReadTable(ctx context.Context, t testing.TB, 
 	}
 }
 
-func (scope *tableTestScope) executeDataQuery(ctx context.Context, t testing.TB, c table.Client, folderAbsPath string) {
+func (s *tableTestScope) executeDataQuery(ctx context.Context, t testing.TB, c table.Client, folderAbsPath string) {
 	var (
-		query = scope.render(
+		query = s.render(
 			template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
 			DECLARE $seriesID AS Uint64;
@@ -934,7 +813,7 @@ func (scope *tableTestScope) executeDataQuery(ctx context.Context, t testing.TB,
 			defer func() {
 				_ = res.Close()
 			}()
-			fmt.Printf("> select_simple_transaction:\n")
+			t.Logf("> select_simple_transaction:\n")
 			for res.NextResultSet(ctx) {
 				for res.NextRow() {
 					err = res.ScanNamed(
@@ -945,7 +824,7 @@ func (scope *tableTestScope) executeDataQuery(ctx context.Context, t testing.TB,
 					if err != nil {
 						return err
 					}
-					fmt.Printf(
+					t.Logf(
 						"  > %d %s %s\n",
 						*id, *title, *date,
 					)
@@ -960,8 +839,8 @@ func (scope *tableTestScope) executeDataQuery(ctx context.Context, t testing.TB,
 	}
 }
 
-func (scope *tableTestScope) executeScanQuery(ctx context.Context, t testing.TB, c table.Client, folderAbsPath string) {
-	query := scope.render(
+func (s *tableTestScope) executeScanQuery(ctx context.Context, t testing.TB, c table.Client, folderAbsPath string) {
+	query := s.render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
 
@@ -1002,14 +881,14 @@ func (scope *tableTestScope) executeScanQuery(ctx context.Context, t testing.TB,
 			defer func() {
 				_ = res.Close()
 			}()
-			fmt.Printf("> scan_query_select:\n")
+			t.Logf("> scan_query_select:\n")
 			for res.NextResultSet(ctx) {
 				for res.NextRow() {
 					err = res.ScanWithDefaults(&seriesID, &seasonID, &title, &date)
 					if err != nil {
 						return err
 					}
-					fmt.Printf("  > SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s\n", seriesID, seasonID, title, date)
+					t.Logf("  > SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s\n", seriesID, seasonID, title, date)
 				}
 			}
 			return res.Err()
@@ -1021,7 +900,7 @@ func (scope *tableTestScope) executeScanQuery(ctx context.Context, t testing.TB,
 	}
 }
 
-func (scope *tableTestScope) seriesData(id uint64, released time.Time, title, info, comment string) types.Value {
+func (s *tableTestScope) seriesData(id uint64, released time.Time, title, info, comment string) types.Value {
 	var commentv types.Value
 	if comment == "" {
 		commentv = types.NullValue(types.TypeText)
@@ -1037,7 +916,7 @@ func (scope *tableTestScope) seriesData(id uint64, released time.Time, title, in
 	)
 }
 
-func (scope *tableTestScope) seasonData(seriesID, seasonID uint64, title string, first, last time.Time) types.Value {
+func (s *tableTestScope) seasonData(seriesID, seasonID uint64, title string, first, last time.Time) types.Value {
 	return types.StructValue(
 		types.StructFieldValue("series_id", types.Uint64Value(seriesID)),
 		types.StructFieldValue("season_id", types.Uint64Value(seasonID)),
@@ -1047,7 +926,7 @@ func (scope *tableTestScope) seasonData(seriesID, seasonID uint64, title string,
 	)
 }
 
-func (scope *tableTestScope) episodeData(
+func (s *tableTestScope) episodeData(
 	seriesID, seasonID, episodeID uint64, title string, date time.Time,
 ) types.Value {
 	return types.StructValue(
@@ -1059,16 +938,16 @@ func (scope *tableTestScope) episodeData(
 	)
 }
 
-func (scope *tableTestScope) getSeriesData() types.Value {
+func (s *tableTestScope) getSeriesData() types.Value {
 	return types.ListValue(
-		scope.seriesData(
-			1, scope.days("2006-02-03"), "IT Crowd", ""+
+		s.seriesData(
+			1, s.days("2006-02-03"), "IT Crowd", ""+
 				"The IT Crowd is a British sitcom produced by Channel 4, written by Graham Linehan, produced by "+
 				"Ash Atalla and starring Chris O'Dowd, Richard Ayoade, Katherine Parkinson, and Matt Berry.",
 			"", // NULL comment.
 		),
-		scope.seriesData(
-			2, scope.days("2014-04-06"), "Silicon Valley", ""+
+		s.seriesData(
+			2, s.days("2014-04-06"), "Silicon Valley", ""+
 				"Silicon Valley is an American comedy television series openSessions by Mike Judge, John Altschuler and "+
 				"Dave Krinsky. The series focuses on five young men who founded a startup company in Silicon Valley.",
 			"Some comment here",
@@ -1076,96 +955,96 @@ func (scope *tableTestScope) getSeriesData() types.Value {
 	)
 }
 
-func (scope *tableTestScope) getSeasonsData() types.Value {
+func (s *tableTestScope) getSeasonsData() types.Value {
 	return types.ListValue(
-		scope.seasonData(1, 1, "Season 1", scope.days("2006-02-03"), scope.days("2006-03-03")),
-		scope.seasonData(1, 2, "Season 2", scope.days("2007-08-24"), scope.days("2007-09-28")),
-		scope.seasonData(1, 3, "Season 3", scope.days("2008-11-21"), scope.days("2008-12-26")),
-		scope.seasonData(1, 4, "Season 4", scope.days("2010-06-25"), scope.days("2010-07-30")),
-		scope.seasonData(2, 1, "Season 1", scope.days("2014-04-06"), scope.days("2014-06-01")),
-		scope.seasonData(2, 2, "Season 2", scope.days("2015-04-12"), scope.days("2015-06-14")),
-		scope.seasonData(2, 3, "Season 3", scope.days("2016-04-24"), scope.days("2016-06-26")),
-		scope.seasonData(2, 4, "Season 4", scope.days("2017-04-23"), scope.days("2017-06-25")),
-		scope.seasonData(2, 5, "Season 5", scope.days("2018-03-25"), scope.days("2018-05-13")),
+		s.seasonData(1, 1, "Season 1", s.days("2006-02-03"), s.days("2006-03-03")),
+		s.seasonData(1, 2, "Season 2", s.days("2007-08-24"), s.days("2007-09-28")),
+		s.seasonData(1, 3, "Season 3", s.days("2008-11-21"), s.days("2008-12-26")),
+		s.seasonData(1, 4, "Season 4", s.days("2010-06-25"), s.days("2010-07-30")),
+		s.seasonData(2, 1, "Season 1", s.days("2014-04-06"), s.days("2014-06-01")),
+		s.seasonData(2, 2, "Season 2", s.days("2015-04-12"), s.days("2015-06-14")),
+		s.seasonData(2, 3, "Season 3", s.days("2016-04-24"), s.days("2016-06-26")),
+		s.seasonData(2, 4, "Season 4", s.days("2017-04-23"), s.days("2017-06-25")),
+		s.seasonData(2, 5, "Season 5", s.days("2018-03-25"), s.days("2018-05-13")),
 	)
 }
 
-func (scope *tableTestScope) getEpisodesData() types.Value {
+func (s *tableTestScope) getEpisodesData() types.Value {
 	return types.ListValue(
-		scope.episodeData(1, 1, 1, "Yesterday's Jam", scope.days("2006-02-03")),
-		scope.episodeData(1, 1, 2, "Calamity Jen", scope.days("2006-02-03")),
-		scope.episodeData(1, 1, 3, "Fifty-Fifty", scope.days("2006-02-10")),
-		scope.episodeData(1, 1, 4, "The Red Door", scope.days("2006-02-17")),
-		scope.episodeData(1, 1, 5, "The Haunting of Bill Crouse", scope.days("2006-02-24")),
-		scope.episodeData(1, 1, 6, "Aunt Irma Visits", scope.days("2006-03-03")),
-		scope.episodeData(1, 2, 1, "The Work Outing", scope.days("2006-08-24")),
-		scope.episodeData(1, 2, 2, "Return of the Golden Child", scope.days("2007-08-31")),
-		scope.episodeData(1, 2, 3, "Moss and the German", scope.days("2007-09-07")),
-		scope.episodeData(1, 2, 4, "The Dinner Party", scope.days("2007-09-14")),
-		scope.episodeData(1, 2, 5, "Smoke and Mirrors", scope.days("2007-09-21")),
-		scope.episodeData(1, 2, 6, "Men Without Women", scope.days("2007-09-28")),
-		scope.episodeData(1, 3, 1, "From Hell", scope.days("2008-11-21")),
-		scope.episodeData(1, 3, 2, "Are We Not Men?", scope.days("2008-11-28")),
-		scope.episodeData(1, 3, 3, "Tramps Like Us", scope.days("2008-12-05")),
-		scope.episodeData(1, 3, 4, "The Speech", scope.days("2008-12-12")),
-		scope.episodeData(1, 3, 5, "Friendface", scope.days("2008-12-19")),
-		scope.episodeData(1, 3, 6, "Calendar Geeks", scope.days("2008-12-26")),
-		scope.episodeData(1, 4, 1, "Jen The Fredo", scope.days("2010-06-25")),
-		scope.episodeData(1, 4, 2, "The Final Countdown", scope.days("2010-07-02")),
-		scope.episodeData(1, 4, 3, "Something Happened", scope.days("2010-07-09")),
-		scope.episodeData(1, 4, 4, "Italian For Beginners", scope.days("2010-07-16")),
-		scope.episodeData(1, 4, 5, "Bad Boys", scope.days("2010-07-23")),
-		scope.episodeData(1, 4, 6, "Reynholm vs Reynholm", scope.days("2010-07-30")),
-		scope.episodeData(2, 1, 1, "Minimum Viable Product", scope.days("2014-04-06")),
-		scope.episodeData(2, 1, 2, "The Cap Table", scope.days("2014-04-13")),
-		scope.episodeData(2, 1, 3, "Articles of Incorporation", scope.days("2014-04-20")),
-		scope.episodeData(2, 1, 4, "Fiduciary Duties", scope.days("2014-04-27")),
-		scope.episodeData(2, 1, 5, "Signaling Risk", scope.days("2014-05-04")),
-		scope.episodeData(2, 1, 6, "Third Party Insourcing", scope.days("2014-05-11")),
-		scope.episodeData(2, 1, 7, "Proof of Concept", scope.days("2014-05-18")),
-		scope.episodeData(2, 1, 8, "Optimal Tip-to-Tip Efficiency", scope.days("2014-06-01")),
-		scope.episodeData(2, 2, 1, "Sand Hill Shuffle", scope.days("2015-04-12")),
-		scope.episodeData(2, 2, 2, "Runaway Devaluation", scope.days("2015-04-19")),
-		scope.episodeData(2, 2, 3, "Bad Money", scope.days("2015-04-26")),
-		scope.episodeData(2, 2, 4, "The Lady", scope.days("2015-05-03")),
-		scope.episodeData(2, 2, 5, "Server Space", scope.days("2015-05-10")),
-		scope.episodeData(2, 2, 6, "Homicide", scope.days("2015-05-17")),
-		scope.episodeData(2, 2, 7, "Adult Content", scope.days("2015-05-24")),
-		scope.episodeData(2, 2, 8, "White Hat/Black Hat", scope.days("2015-05-31")),
-		scope.episodeData(2, 2, 9, "Binding Arbitration", scope.days("2015-06-07")),
-		scope.episodeData(2, 2, 10, "Two Days of the Condor", scope.days("2015-06-14")),
-		scope.episodeData(2, 3, 1, "Founder Friendly", scope.days("2016-04-24")),
-		scope.episodeData(2, 3, 2, "Two in the Box", scope.days("2016-05-01")),
-		scope.episodeData(2, 3, 3, "Meinertzhagen's Haversack", scope.days("2016-05-08")),
-		scope.episodeData(2, 3, 4, "Maleant Data Systems Solutions", scope.days("2016-05-15")),
-		scope.episodeData(2, 3, 5, "The Empty Chair", scope.days("2016-05-22")),
-		scope.episodeData(2, 3, 6, "Bachmanity Insanity", scope.days("2016-05-29")),
-		scope.episodeData(2, 3, 7, "To Build a Better Beta", scope.days("2016-06-05")),
-		scope.episodeData(2, 3, 8, "Bachman's Earnings Over-Ride", scope.days("2016-06-12")),
-		scope.episodeData(2, 3, 9, "Daily Active Users", scope.days("2016-06-19")),
-		scope.episodeData(2, 3, 10, "The Uptick", scope.days("2016-06-26")),
-		scope.episodeData(2, 4, 1, "Success Failure", scope.days("2017-04-23")),
-		scope.episodeData(2, 4, 2, "Terms of Service", scope.days("2017-04-30")),
-		scope.episodeData(2, 4, 3, "Intellectual Property", scope.days("2017-05-07")),
-		scope.episodeData(2, 4, 4, "Teambuilding Exercise", scope.days("2017-05-14")),
-		scope.episodeData(2, 4, 5, "The Blood Boy", scope.days("2017-05-21")),
-		scope.episodeData(2, 4, 6, "Customer Service", scope.days("2017-05-28")),
-		scope.episodeData(2, 4, 7, "The Patent Troll", scope.days("2017-06-04")),
-		scope.episodeData(2, 4, 8, "The Keenan Vortex", scope.days("2017-06-11")),
-		scope.episodeData(2, 4, 9, "Hooli-Con", scope.days("2017-06-18")),
-		scope.episodeData(2, 4, 10, "Server Error", scope.days("2017-06-25")),
-		scope.episodeData(2, 5, 1, "Grow Fast or Die Slow", scope.days("2018-03-25")),
-		scope.episodeData(2, 5, 2, "Reorientation", scope.days("2018-04-01")),
-		scope.episodeData(2, 5, 3, "Chief Operating Officer", scope.days("2018-04-08")),
-		scope.episodeData(2, 5, 4, "Tech Evangelist", scope.days("2018-04-15")),
-		scope.episodeData(2, 5, 5, "Facial Recognition", scope.days("2018-04-22")),
-		scope.episodeData(2, 5, 6, "Artificial Emotional Intelligence", scope.days("2018-04-29")),
-		scope.episodeData(2, 5, 7, "Initial Coin Offering", scope.days("2018-05-06")),
-		scope.episodeData(2, 5, 8, "Fifty-One Percent", scope.days("2018-05-13")),
+		s.episodeData(1, 1, 1, "Yesterday's Jam", s.days("2006-02-03")),
+		s.episodeData(1, 1, 2, "Calamity Jen", s.days("2006-02-03")),
+		s.episodeData(1, 1, 3, "Fifty-Fifty", s.days("2006-02-10")),
+		s.episodeData(1, 1, 4, "The Red Door", s.days("2006-02-17")),
+		s.episodeData(1, 1, 5, "The Haunting of Bill Crouse", s.days("2006-02-24")),
+		s.episodeData(1, 1, 6, "Aunt Irma Visits", s.days("2006-03-03")),
+		s.episodeData(1, 2, 1, "The Work Outing", s.days("2006-08-24")),
+		s.episodeData(1, 2, 2, "Return of the Golden Child", s.days("2007-08-31")),
+		s.episodeData(1, 2, 3, "Moss and the German", s.days("2007-09-07")),
+		s.episodeData(1, 2, 4, "The Dinner Party", s.days("2007-09-14")),
+		s.episodeData(1, 2, 5, "Smoke and Mirrors", s.days("2007-09-21")),
+		s.episodeData(1, 2, 6, "Men Without Women", s.days("2007-09-28")),
+		s.episodeData(1, 3, 1, "From Hell", s.days("2008-11-21")),
+		s.episodeData(1, 3, 2, "Are We Not Men?", s.days("2008-11-28")),
+		s.episodeData(1, 3, 3, "Tramps Like Us", s.days("2008-12-05")),
+		s.episodeData(1, 3, 4, "The Speech", s.days("2008-12-12")),
+		s.episodeData(1, 3, 5, "Friendface", s.days("2008-12-19")),
+		s.episodeData(1, 3, 6, "Calendar Geeks", s.days("2008-12-26")),
+		s.episodeData(1, 4, 1, "Jen The Fredo", s.days("2010-06-25")),
+		s.episodeData(1, 4, 2, "The Final Countdown", s.days("2010-07-02")),
+		s.episodeData(1, 4, 3, "Something Happened", s.days("2010-07-09")),
+		s.episodeData(1, 4, 4, "Italian For Beginners", s.days("2010-07-16")),
+		s.episodeData(1, 4, 5, "Bad Boys", s.days("2010-07-23")),
+		s.episodeData(1, 4, 6, "Reynholm vs Reynholm", s.days("2010-07-30")),
+		s.episodeData(2, 1, 1, "Minimum Viable Product", s.days("2014-04-06")),
+		s.episodeData(2, 1, 2, "The Cap Table", s.days("2014-04-13")),
+		s.episodeData(2, 1, 3, "Articles of Incorporation", s.days("2014-04-20")),
+		s.episodeData(2, 1, 4, "Fiduciary Duties", s.days("2014-04-27")),
+		s.episodeData(2, 1, 5, "Signaling Risk", s.days("2014-05-04")),
+		s.episodeData(2, 1, 6, "Third Party Insourcing", s.days("2014-05-11")),
+		s.episodeData(2, 1, 7, "Proof of Concept", s.days("2014-05-18")),
+		s.episodeData(2, 1, 8, "Optimal Tip-to-Tip Efficiency", s.days("2014-06-01")),
+		s.episodeData(2, 2, 1, "Sand Hill Shuffle", s.days("2015-04-12")),
+		s.episodeData(2, 2, 2, "Runaway Devaluation", s.days("2015-04-19")),
+		s.episodeData(2, 2, 3, "Bad Money", s.days("2015-04-26")),
+		s.episodeData(2, 2, 4, "The Lady", s.days("2015-05-03")),
+		s.episodeData(2, 2, 5, "Server Space", s.days("2015-05-10")),
+		s.episodeData(2, 2, 6, "Homicide", s.days("2015-05-17")),
+		s.episodeData(2, 2, 7, "Adult Content", s.days("2015-05-24")),
+		s.episodeData(2, 2, 8, "White Hat/Black Hat", s.days("2015-05-31")),
+		s.episodeData(2, 2, 9, "Binding Arbitration", s.days("2015-06-07")),
+		s.episodeData(2, 2, 10, "Two Days of the Condor", s.days("2015-06-14")),
+		s.episodeData(2, 3, 1, "Founder Friendly", s.days("2016-04-24")),
+		s.episodeData(2, 3, 2, "Two in the Box", s.days("2016-05-01")),
+		s.episodeData(2, 3, 3, "Meinertzhagen's Haversack", s.days("2016-05-08")),
+		s.episodeData(2, 3, 4, "Maleant Data Systems Solutions", s.days("2016-05-15")),
+		s.episodeData(2, 3, 5, "The Empty Chair", s.days("2016-05-22")),
+		s.episodeData(2, 3, 6, "Bachmanity Insanity", s.days("2016-05-29")),
+		s.episodeData(2, 3, 7, "To Build a Better Beta", s.days("2016-06-05")),
+		s.episodeData(2, 3, 8, "Bachman's Earnings Over-Ride", s.days("2016-06-12")),
+		s.episodeData(2, 3, 9, "Daily Active Users", s.days("2016-06-19")),
+		s.episodeData(2, 3, 10, "The Uptick", s.days("2016-06-26")),
+		s.episodeData(2, 4, 1, "Success Failure", s.days("2017-04-23")),
+		s.episodeData(2, 4, 2, "Terms of Service", s.days("2017-04-30")),
+		s.episodeData(2, 4, 3, "Intellectual Property", s.days("2017-05-07")),
+		s.episodeData(2, 4, 4, "Teambuilding Exercise", s.days("2017-05-14")),
+		s.episodeData(2, 4, 5, "The Blood Boy", s.days("2017-05-21")),
+		s.episodeData(2, 4, 6, "Customer Service", s.days("2017-05-28")),
+		s.episodeData(2, 4, 7, "The Patent Troll", s.days("2017-06-04")),
+		s.episodeData(2, 4, 8, "The Keenan Vortex", s.days("2017-06-11")),
+		s.episodeData(2, 4, 9, "Hooli-Con", s.days("2017-06-18")),
+		s.episodeData(2, 4, 10, "Server Error", s.days("2017-06-25")),
+		s.episodeData(2, 5, 1, "Grow Fast or Die Slow", s.days("2018-03-25")),
+		s.episodeData(2, 5, 2, "Reorientation", s.days("2018-04-01")),
+		s.episodeData(2, 5, 3, "Chief Operating Officer", s.days("2018-04-08")),
+		s.episodeData(2, 5, 4, "Tech Evangelist", s.days("2018-04-15")),
+		s.episodeData(2, 5, 5, "Facial Recognition", s.days("2018-04-22")),
+		s.episodeData(2, 5, 6, "Artificial Emotional Intelligence", s.days("2018-04-29")),
+		s.episodeData(2, 5, 7, "Initial Coin Offering", s.days("2018-05-06")),
+		s.episodeData(2, 5, 8, "Fifty-One Percent", s.days("2018-05-13")),
 	)
 }
 
-func (scope *tableTestScope) days(date string) time.Time {
+func (s *tableTestScope) days(date string) time.Time {
 	const dateISO8601 = "2006-01-02"
 	t, err := time.Parse(dateISO8601, date)
 	if err != nil {
@@ -1174,50 +1053,7 @@ func (scope *tableTestScope) days(date string) time.Time {
 	return t
 }
 
-func (scope *tableTestScope) describeTableOptions(ctx context.Context, c table.Client) error {
-	var desc options.TableOptionsDescription
-	err := c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			desc, err = s.DescribeTableOptions(ctx)
-			return err
-		},
-		table.WithIdempotent(),
-	)
-	if err != nil {
-		return err
-	}
-	fmt.Println("> describe_options:")
-
-	for i, p := range desc.TableProfilePresets {
-		fmt.Printf("  > TableProfilePresets: %d/%d: %+v\n", i+1, len(desc.TableProfilePresets), p)
-	}
-	for i, p := range desc.StoragePolicyPresets {
-		fmt.Printf("  > StoragePolicyPresets: %d/%d: %+v\n", i+1, len(desc.StoragePolicyPresets), p)
-	}
-	for i, p := range desc.CompactionPolicyPresets {
-		fmt.Printf("  > CompactionPolicyPresets: %d/%d: %+v\n", i+1, len(desc.CompactionPolicyPresets), p)
-	}
-	for i, p := range desc.PartitioningPolicyPresets {
-		fmt.Printf("  > PartitioningPolicyPresets: %d/%d: %+v\n", i+1, len(desc.PartitioningPolicyPresets), p)
-	}
-	for i, p := range desc.ExecutionPolicyPresets {
-		fmt.Printf("  > ExecutionPolicyPresets: %d/%d: %+v\n", i+1, len(desc.ExecutionPolicyPresets), p)
-	}
-	for i, p := range desc.ReplicationPolicyPresets {
-		fmt.Printf("  > ReplicationPolicyPresets: %d/%d: %+v\n", i+1, len(desc.ReplicationPolicyPresets), p)
-	}
-	for i, p := range desc.CachingPolicyPresets {
-		fmt.Printf("  > CachingPolicyPresets: %d/%d: %+v\n", i+1, len(desc.CachingPolicyPresets), p)
-	}
-
-	return nil
-}
-
-func (scope *tableTestScope) fill(ctx context.Context, db *ydb.Driver, folder string) error {
-	fmt.Printf("> filling tables\n")
-	defer func() {
-		fmt.Printf("> filling tables done\n")
-	}()
+func (s *tableTestScope) fill(ctx context.Context) error {
 	// prepare write transaction.
 	writeTx := table.TxControl(
 		table.BeginTx(
@@ -1225,9 +1061,9 @@ func (scope *tableTestScope) fill(ctx context.Context, db *ydb.Driver, folder st
 		),
 		table.CommitTx(),
 	)
-	return db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			stmt, err := s.Prepare(ctx, scope.render(template.Must(template.New("fillQuery database").Parse(`
+	return s.db.Table().Do(ctx,
+		func(ctx context.Context, session table.Session) (err error) {
+			stmt, err := session.Prepare(ctx, s.render(template.Must(template.New("fillQuery database").Parse(`
 				PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
 				
 				DECLARE $seriesData AS List<Struct<
@@ -1280,15 +1116,15 @@ func (scope *tableTestScope) fill(ctx context.Context, db *ydb.Driver, folder st
 			`)), struct {
 				TablePathPrefix string
 			}{
-				TablePathPrefix: path.Join(db.Name(), folder),
+				TablePathPrefix: path.Join(s.db.Name(), s.folder),
 			}))
 			if err != nil {
 				return
 			}
 			_, _, err = stmt.Execute(ctx, writeTx, table.NewQueryParameters(
-				table.ValueParam("$seriesData", scope.getSeriesData()),
-				table.ValueParam("$seasonsData", scope.getSeasonsData()),
-				table.ValueParam("$episodesData", scope.getEpisodesData()),
+				table.ValueParam("$seriesData", s.getSeriesData()),
+				table.ValueParam("$seasonsData", s.getSeasonsData()),
+				table.ValueParam("$episodesData", s.getEpisodesData()),
 			))
 			return
 		},
@@ -1296,13 +1132,13 @@ func (scope *tableTestScope) fill(ctx context.Context, db *ydb.Driver, folder st
 	)
 }
 
-func (scope *tableTestScope) createTables(ctx context.Context, c table.Client, folder string) error {
-	err := c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			if _, err = s.DescribeTable(ctx, path.Join(folder, "series")); err == nil {
-				_ = s.DropTable(ctx, path.Join(folder, "series"))
+func (s *tableTestScope) createTables(ctx context.Context) error {
+	err := s.db.Table().Do(ctx,
+		func(ctx context.Context, session table.Session) (err error) {
+			if _, err = session.DescribeTable(ctx, path.Join(s.db.Name(), s.folder, "series")); err == nil {
+				_ = session.DropTable(ctx, path.Join(s.db.Name(), s.folder, "series"))
 			}
-			return s.CreateTable(ctx, path.Join(folder, "series"),
+			return session.CreateTable(ctx, path.Join(s.db.Name(), s.folder, "series"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("title", types.Optional(types.TypeText)),
 				options.WithColumn("series_info", types.Optional(types.TypeText)),
@@ -1314,15 +1150,15 @@ func (scope *tableTestScope) createTables(ctx context.Context, c table.Client, f
 		table.WithIdempotent(),
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("create table series failed: %w", err)
 	}
 
-	err = c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			if _, err = s.DescribeTable(ctx, path.Join(folder, "seasons")); err == nil {
-				_ = s.DropTable(ctx, path.Join(folder, "seasons"))
+	err = s.db.Table().Do(ctx,
+		func(ctx context.Context, session table.Session) (err error) {
+			if _, err = session.DescribeTable(ctx, path.Join(s.db.Name(), s.folder, "seasons")); err == nil {
+				_ = session.DropTable(ctx, path.Join(s.db.Name(), s.folder, "seasons"))
 			}
-			return s.CreateTable(ctx, path.Join(folder, "seasons"),
+			return session.CreateTable(ctx, path.Join(s.db.Name(), s.folder, "seasons"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("season_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("title", types.Optional(types.TypeText)),
@@ -1334,15 +1170,15 @@ func (scope *tableTestScope) createTables(ctx context.Context, c table.Client, f
 		table.WithIdempotent(),
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("create table seasons failed: %w", err)
 	}
 
-	err = c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			if _, err = s.DescribeTable(ctx, path.Join(folder, "episodes")); err == nil {
-				_ = s.DropTable(ctx, path.Join(folder, "episodes"))
+	err = s.db.Table().Do(ctx,
+		func(ctx context.Context, session table.Session) (err error) {
+			if _, err = session.DescribeTable(ctx, path.Join(s.db.Name(), s.folder, "episodes")); err == nil {
+				_ = session.DropTable(ctx, path.Join(s.db.Name(), s.folder, "episodes"))
 			}
-			return s.CreateTable(ctx, path.Join(folder, "episodes"),
+			return session.CreateTable(ctx, path.Join(s.db.Name(), s.folder, "episodes"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("season_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("episode_id", types.Optional(types.TypeUint64)),
@@ -1354,248 +1190,37 @@ func (scope *tableTestScope) createTables(ctx context.Context, c table.Client, f
 		},
 		table.WithIdempotent(),
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("create table episodes failed: %w", err)
+	}
+
+	return nil
 }
 
-func (scope *tableTestScope) describeTable(ctx context.Context, c table.Client, path string) (err error) {
-	err = c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			desc, err := s.DescribeTable(ctx, path)
+func (s *tableTestScope) describeTable(ctx context.Context, tableName string) (err error) {
+	err = s.db.Table().Do(ctx,
+		func(ctx context.Context, session table.Session) (err error) {
+			_, err = session.DescribeTable(ctx, path.Join(s.db.Name(), s.folder, tableName))
 			if err != nil {
 				return
-			}
-			fmt.Printf("> describe table: %s\n", path)
-			for _, c := range desc.Columns {
-				fmt.Printf("  > column, name: %s, %s\n", c.Type, c.Name)
-			}
-			for i, keyRange := range desc.KeyRanges {
-				fmt.Printf("  > key range %d: %s\n", i, keyRange.String())
 			}
 			return err
 		},
 		table.WithIdempotent(),
 	)
-	return err
+	if err != nil {
+		return fmt.Errorf("describe table %q failed: %w", path.Join(s.db.Name(), s.folder, tableName), err)
+	}
+	return nil
 }
 
-func (scope *tableTestScope) render(t *template.Template, data interface{}) string {
+func (s *tableTestScope) render(t *template.Template, data interface{}) string {
 	var buf bytes.Buffer
 	err := t.Execute(&buf, data)
 	if err != nil {
 		panic(err)
 	}
 	return buf.String()
-}
-
-func TestLongStream(t *testing.T) {
-	var (
-		tableName         = `long_stream_query`
-		discoveryInterval = 10 * time.Second
-		db                *ydb.Driver
-		err               error
-		upsertRowsCount   = 100000
-		batchSize         = 10000
-	)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	db, err = ydb.Open(
-		ctx,
-		os.Getenv("YDB_CONNECTION_STRING"),
-		ydb.WithAccessTokenCredentials(
-			os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
-		),
-		ydb.WithDiscoveryInterval(0), // disable re-discovery on upsert time
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func(db *ydb.Driver) {
-		// cleanup
-		_ = db.Close(ctx)
-	}(db)
-
-	t.Run("creating stream table", func(t *testing.T) {
-		if err = db.Table().Do(ctx,
-			func(ctx context.Context, s table.Session) (err error) {
-				_, err = s.DescribeTable(ctx, path.Join(db.Name(), tableName))
-				if err == nil {
-					if err = s.DropTable(ctx, path.Join(db.Name(), tableName)); err != nil {
-						return err
-					}
-				}
-				return s.ExecuteSchemeQuery(
-					ctx,
-					`CREATE TABLE `+tableName+` (val Int64, PRIMARY KEY (val))`,
-				)
-			},
-			table.WithIdempotent(),
-		); err != nil {
-			t.Fatalf("create table failed: %v\n", err)
-		}
-	})
-
-	t.Run("check batch size", func(t *testing.T) {
-		if upsertRowsCount%batchSize != 0 {
-			t.Fatalf("wrong batch size: (%d mod %d = %d) != 0", upsertRowsCount, batchSize, upsertRowsCount%batchSize)
-		}
-	})
-
-	t.Run("upserting rows", func(t *testing.T) {
-		var upserted uint32
-		for i := 0; i < (upsertRowsCount / batchSize); i++ {
-			var (
-				from = int32(i * batchSize)
-				to   = int32((i + 1) * batchSize)
-			)
-			t.Run(fmt.Sprintf("upserting %d..%d", from, to-1), func(t *testing.T) {
-				values := make([]types.Value, 0, batchSize)
-				for j := from; j < to; j++ {
-					values = append(
-						values,
-						types.StructValue(
-							types.StructFieldValue("val", types.Int32Value(j)),
-						),
-					)
-				}
-				if err = db.Table().Do(ctx,
-					func(ctx context.Context, s table.Session) (err error) {
-						_, _, err = s.Execute(
-							ctx,
-							table.TxControl(
-								table.BeginTx(
-									table.WithSerializableReadWrite(),
-								),
-								table.CommitTx(),
-							), `
-								DECLARE $values AS List<Struct<
-									val: Int32,
-								>>;
-								UPSERT INTO `+"`"+path.Join(db.Name(), tableName)+"`"+`
-								SELECT
-									val 
-								FROM
-									AS_TABLE($values);            
-							`, table.NewQueryParameters(
-								table.ValueParam(
-									"$values",
-									types.ListValue(values...),
-								),
-							),
-						)
-						return err
-					},
-					table.WithIdempotent(),
-				); err != nil {
-					t.Fatalf("upsert failed: %v\n", err)
-				} else {
-					upserted += uint32(to - from)
-					fmt.Printf("upserted %d rows, total upserted rows: %d\n", uint32(to-from), upserted)
-				}
-			})
-		}
-		t.Run("check upserted rows", func(t *testing.T) {
-			fmt.Printf("total upserted rows: %d, expected: %d\n", upserted, upsertRowsCount)
-			if upserted != uint32(upsertRowsCount) {
-				t.Fatalf("wrong rows count: %v, expected: %d", upserted, upsertRowsCount)
-			}
-		})
-	})
-
-	t.Run("make child discovered connection", func(t *testing.T) {
-		db, err = db.With(ctx, ydb.WithDiscoveryInterval(discoveryInterval))
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
-
-	defer func(db *ydb.Driver) {
-		// cleanup
-		_ = db.Close(ctx)
-	}(db)
-
-	t.Run("execute stream query", func(t *testing.T) {
-		if err = db.Table().Do(ctx,
-			func(ctx context.Context, s table.Session) (err error) {
-				var (
-					start     = time.Now()
-					rowsCount = 0
-				)
-				res, err := s.StreamExecuteScanQuery(ctx, "SELECT val FROM "+tableName, table.NewQueryParameters())
-				if err != nil {
-					return err
-				}
-				defer func() {
-					_ = res.Close()
-				}()
-				for res.NextResultSet(ctx) {
-					count := 0
-					for res.NextRow() {
-						count++
-					}
-					rowsCount += count
-					fmt.Printf("received set with %d rows. total received: %d\n", count, rowsCount)
-					time.Sleep(discoveryInterval)
-				}
-				if err = res.Err(); err != nil {
-					return fmt.Errorf("received error (duration: %v): %w", time.Since(start), err)
-				}
-				if rowsCount != upsertRowsCount {
-					return fmt.Errorf("wrong rows count: %v, expected: %d (duration: %v)",
-						rowsCount,
-						upsertRowsCount,
-						time.Since(start),
-					)
-				}
-				return res.Err()
-			},
-			table.WithIdempotent(),
-		); err != nil {
-			t.Fatalf("stream query failed: %v\n", err)
-		}
-	})
-
-	t.Run("stream read table", func(t *testing.T) {
-		if err = db.Table().Do(ctx,
-			func(ctx context.Context, s table.Session) (err error) {
-				var (
-					start     = time.Now()
-					rowsCount = 0
-				)
-				res, err := s.StreamReadTable(ctx, path.Join(db.Name(), tableName), options.ReadColumn("val"))
-				if err != nil {
-					return err
-				}
-				defer func() {
-					_ = res.Close()
-				}()
-				for res.NextResultSet(ctx) {
-					count := 0
-					for res.NextRow() {
-						count++
-					}
-					rowsCount += count
-					fmt.Printf("received set with %d rows. total received: %d\n", count, rowsCount)
-					time.Sleep(discoveryInterval)
-				}
-				if err = res.Err(); err != nil {
-					return fmt.Errorf("received error (duration: %v): %w", time.Since(start), err)
-				}
-				if rowsCount != upsertRowsCount {
-					return fmt.Errorf("wrong rows count: %v, expected: %d (duration: %v)",
-						rowsCount,
-						upsertRowsCount,
-						time.Since(start),
-					)
-				}
-				return res.Err()
-			},
-			table.WithIdempotent(),
-		); err != nil {
-			t.Fatalf("stream query failed: %v\n", err)
-		}
-	})
 }
 
 func TestSplitRangesAndRead(t *testing.T) {
@@ -1707,12 +1332,10 @@ func TestSplitRangesAndRead(t *testing.T) {
 					t.Fatalf("upsert failed: %v\n", err)
 				} else {
 					upserted += to - from
-					fmt.Printf("upserted %d rows, total upserted rows: %d\n", to-from, upserted)
 				}
 			})
 		}
 		t.Run("check upserted rows", func(t *testing.T) {
-			fmt.Printf("total upserted rows: %d, expected: %d\n", upserted, upsertRowsCount)
 			if upserted != uint32(upsertRowsCount) {
 				t.Fatalf("wrong rows count: %v, expected: %d", upserted, upsertRowsCount)
 			}
@@ -1757,7 +1380,6 @@ func TestSplitRangesAndRead(t *testing.T) {
 							},
 						)
 					}
-					fmt.Printf("- range [%+v, %+v]\n", r.From, r.To)
 				}
 				return nil
 			},
@@ -1788,7 +1410,6 @@ func TestSplitRangesAndRead(t *testing.T) {
 							count++
 						}
 						rowsCount += count
-						fmt.Printf("received set with %d rows. total received: %d\n", count, rowsCount)
 					}
 					if err = res.Err(); err != nil {
 						return fmt.Errorf("received error (duration: %v): %w", time.Since(start), err)
@@ -1809,44 +1430,6 @@ func TestSplitRangesAndRead(t *testing.T) {
 			)
 		}
 	})
-}
-
-func TestNullType(t *testing.T) {
-	// https://github.com/ydb-platform/ydb-go-sdk/issues/415
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	db, err := ydb.Open(ctx,
-		os.Getenv("YDB_CONNECTION_STRING"),
-		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
-	)
-	require.NoError(t, err)
-	err = db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) (err error) {
-		res, err := tx.Execute(ctx, `SELECT NULL AS reschedule_due;`, nil)
-		if err != nil {
-			return err
-		}
-		err = res.NextResultSetErr(ctx)
-		if err != nil {
-			return err
-		}
-		if !res.NextRow() {
-			if err = res.Err(); err != nil {
-				return err
-			}
-			return fmt.Errorf("unexpected empty result set")
-		}
-		var rescheduleDue *time.Time
-		err = res.ScanNamed(
-			named.Optional("reschedule_due", &rescheduleDue),
-		)
-		if err != nil {
-			return err
-		}
-		fmt.Printf("%+v\n", rescheduleDue)
-		return res.Err()
-	}, table.WithTxSettings(table.TxSettings(table.WithSnapshotReadOnly())), table.WithIdempotent())
-	require.NoError(t, err)
 }
 
 func TestTypeToString(t *testing.T) {
@@ -2098,145 +1681,6 @@ func TestValueToYqlLiteral(t *testing.T) {
 				return res.Err()
 			}, table.WithIdempotent())
 			require.NoError(t, err)
-		})
-	}
-}
-
-func TestCreateTableDescription(t *testing.T) {
-	ctx := context.Background()
-	db, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		_ = db.Close(ctx)
-	}()
-	for _, tt := range []struct {
-		opts        []options.CreateTableOption
-		description options.Description
-		equal       func(t *testing.T, lhs, rhs options.Description)
-	}{
-		{
-			opts: []options.CreateTableOption{
-				options.WithColumn("a", types.TypeUint64),
-				options.WithPrimaryKeyColumn("a"),
-			},
-			description: options.Description{
-				Name: "table_0",
-				Columns: []options.Column{
-					{
-						Name: "a",
-						Type: types.TypeUint64,
-					},
-				},
-				PrimaryKey: []string{"a"},
-			},
-			equal: func(t *testing.T, lhs, rhs options.Description) {
-				require.Equal(t, lhs.Columns, rhs.Columns)
-				require.Equal(t, lhs.PrimaryKey, rhs.PrimaryKey)
-			},
-		},
-		{
-			opts: []options.CreateTableOption{
-				options.WithColumn("a", types.TypeUint64),
-				options.WithColumn("b", types.Optional(types.TypeUint64)),
-				options.WithPrimaryKeyColumn("a"),
-				options.WithIndex("idx_b",
-					options.WithIndexColumns("b"),
-					options.WithIndexType(options.GlobalIndex()),
-				),
-			},
-			description: options.Description{
-				Name: "table_1",
-				Columns: []options.Column{
-					{
-						Name: "a",
-						Type: types.TypeUint64,
-					},
-					{
-						Name: "b",
-						Type: types.Optional(types.TypeUint64),
-					},
-				},
-				PrimaryKey: []string{"a"},
-				Indexes: []options.IndexDescription{
-					{
-						Name:         "idx_b",
-						IndexColumns: []string{"b"},
-						Status:       Ydb_Table.TableIndexDescription_STATUS_READY,
-						Type:         options.IndexTypeGlobal,
-					},
-				},
-			},
-			equal: func(t *testing.T, lhs, rhs options.Description) {
-				require.Equal(t, lhs.Columns, rhs.Columns)
-				require.Equal(t, lhs.PrimaryKey, rhs.PrimaryKey)
-				require.Equal(t, lhs.Indexes, rhs.Indexes)
-			},
-		},
-		{
-			opts: []options.CreateTableOption{
-				options.WithColumn("a", types.TypeUint64),
-				options.WithColumn("b", types.Optional(types.TypeUint64)),
-				options.WithPrimaryKeyColumn("a"),
-				options.WithIndex("idx_b",
-					options.WithIndexColumns("b"),
-					options.WithIndexType(options.GlobalAsyncIndex()),
-				),
-			},
-			description: options.Description{
-				Name: "table_2",
-				Columns: []options.Column{
-					{
-						Name: "a",
-						Type: types.TypeUint64,
-					},
-					{
-						Name: "b",
-						Type: types.Optional(types.TypeUint64),
-					},
-				},
-				PrimaryKey: []string{"a"},
-				Indexes: []options.IndexDescription{
-					{
-						Name:         "idx_b",
-						IndexColumns: []string{"b"},
-						Status:       Ydb_Table.TableIndexDescription_STATUS_READY,
-						Type:         options.IndexTypeGlobalAsync,
-					},
-				},
-			},
-			equal: func(t *testing.T, lhs, rhs options.Description) {
-				require.Equal(t, lhs.Columns, rhs.Columns)
-				require.Equal(t, lhs.PrimaryKey, rhs.PrimaryKey)
-				require.Equal(t, lhs.Indexes, rhs.Indexes)
-			},
-		},
-	} {
-		t.Run(tt.description.Name, func(t *testing.T) {
-			var (
-				fullTablePath = path.Join(db.Name(), "TestCreateTableDescription", tt.description.Name)
-				description   options.Description
-			)
-			err = db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
-				var exists bool
-				if exists, err = sugar.IsTableExists(ctx, db.Scheme(), fullTablePath); err != nil {
-					return err
-				} else if exists {
-					_ = s.DropTable(ctx, fullTablePath)
-				}
-				err = s.CreateTable(ctx, fullTablePath, tt.opts...)
-				if err != nil {
-					return err
-				}
-				description, err = s.DescribeTable(ctx, fullTablePath)
-				if err != nil {
-					return err
-				}
-				return nil
-			}, table.WithIdempotent())
-			require.NoError(t, err)
-			tt.equal(t, tt.description, description)
 		})
 	}
 }
