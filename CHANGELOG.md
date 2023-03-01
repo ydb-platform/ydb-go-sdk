@@ -1,3 +1,4 @@
+## v3.42.11
 * Fixed validation error for topicoptions.WithPartitionID option of start topic writer.
 
 ## v3.42.10
