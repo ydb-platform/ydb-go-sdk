@@ -1,4 +1,3 @@
-* Fixed validation error for topicoptions.WithPartitionID option of start topic writer.
 * Supported binding parameters for `database/sql` driver
 * Added packaged `bind` with bindings options `WithTablePathPrefix(tablePathPrefix)` and `Params()`
 * Added `ydb.WithBindings` connector option
@@ -13,6 +12,9 @@
 * Renamed private `ydb.connection` type to public `ydb.Driver` type
 * Marked as deprecated `ydb.Connection` interface
 * Changed result type of `ydb.Open` from `ydb.Connection` interface to `*ydb.Driver`
+
+## v3.42.11
+* Fixed validation error for topicoptions.WithPartitionID option of start topic writer.
 
 ## v3.42.10
 * Added exit from retryer if got grpc-error `Unauthenticated` on `discovery/ListEndpoints` call  
