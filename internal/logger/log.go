@@ -103,7 +103,7 @@ func (l *logger) Warnf(format string, args ...interface{}) {
 	if l.external != nil {
 		l.external.Warnf(l.format(format, level.WARN), args...)
 	} else {
-		fmt.Fprintf(l.err, l.format(format, level.WARN), args...)
+		fmt.Fprintf(l.out, l.format(format, level.WARN), args...)
 	}
 }
 
