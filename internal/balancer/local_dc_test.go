@@ -9,7 +9,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
@@ -29,10 +28,6 @@ func (d discoveryMock) Close(ctx context.Context) error {
 
 func (d discoveryMock) Discover(ctx context.Context) ([]endpoint.Endpoint, error) {
 	return d.endpoints, nil
-}
-
-func (d discoveryMock) WhoAmI(ctx context.Context) (*discovery.WhoAmI, error) {
-	panic("not implemented")
 }
 
 func TestCheckFastestAddress(t *testing.T) {
@@ -142,13 +137,11 @@ func TestLocalDCDiscovery(t *testing.T) {
 		driverConfig:   cfg,
 		balancerConfig: *cfg.Balancer(),
 		pool:           conn.NewPool(cfg),
-		discoveryClient: func(context.Context, string) (discoveryClient, error) {
-			return discoveryMock{endpoints: []endpoint.Endpoint{
-				&mock.Endpoint{AddrField: "a:123", LocationField: "a"},
-				&mock.Endpoint{AddrField: "b:234", LocationField: "b"},
-				&mock.Endpoint{AddrField: "c:456", LocationField: "c"},
-			}}, nil
-		},
+		discoveryClient: discoveryMock{endpoints: []endpoint.Endpoint{
+			&mock.Endpoint{AddrField: "a:123", LocationField: "a"},
+			&mock.Endpoint{AddrField: "b:234", LocationField: "b"},
+			&mock.Endpoint{AddrField: "c:456", LocationField: "c"},
+		}},
 		localDCDetector: func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error) {
 			return "b", nil
 		},
