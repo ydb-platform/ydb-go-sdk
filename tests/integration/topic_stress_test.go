@@ -28,8 +28,6 @@ import (
 )
 
 func TestReadersWritersStress(t *testing.T) {
-	t.Parallel()
-
 	ctx := xtest.Context(t)
 	db := connect(t)
 

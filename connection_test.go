@@ -41,13 +41,16 @@ func TestClusterDiscoveryRetry(t *testing.T) {
 		"grpc://non-existent.com:2135/some",
 		ydb.WithDialTimeout(time.Second),
 		ydb.WithTraceDriver(trace.Driver{
-			OnBalancerUpdate: func(info trace.DriverBalancerUpdateStartInfo) func(trace.DriverBalancerUpdateDoneInfo) {
+			OnBalancerClusterDiscoveryAttempt: func(info trace.DriverBalancerClusterDiscoveryAttemptStartInfo) func(
+				trace.DriverBalancerClusterDiscoveryAttemptDoneInfo,
+			) {
 				counter++
 				return nil
 			},
 		}),
 	)
 	t.Logf("attempts: %d", counter)
+	t.Logf("err: %v", err)
 	require.Error(t, err)
 	require.Nil(t, db)
 	require.True(t, errors.Is(err, context.DeadlineExceeded) || ydb.IsTransportError(err, grpcCodes.DeadlineExceeded))

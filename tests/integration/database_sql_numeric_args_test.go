@@ -25,8 +25,6 @@ type sqlNumericArgsScope struct {
 }
 
 func TestDatabaseSqlNumericArgs(t *testing.T) {
-	t.Parallel()
-
 	scope := &sqlNumericArgsScope{
 		folder: t.Name(),
 	}

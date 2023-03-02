@@ -28,8 +28,6 @@ import (
 )
 
 func TestRegressionCloud109307(t *testing.T) {
-	t.Parallel()
-
 	db, err := sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
 	require.NoError(t, err)
 
@@ -80,8 +78,6 @@ func TestRegressionCloud109307(t *testing.T) {
 }
 
 func TestRegressionKikimr17104(t *testing.T) {
-	t.Parallel()
-
 	var (
 		tableRelativePath = path.Join(t.Name(), "big_table")
 		upsertRowsCount   = 100000

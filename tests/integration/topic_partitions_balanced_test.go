@@ -21,8 +21,6 @@ import (
 )
 
 func TestTopicPartitionsBalanced(t *testing.T) {
-	t.Parallel()
-
 	ctx := xtest.Context(t)
 	db := connect(t)
 	topicPath := db.Name() + "/topic-" + t.Name()

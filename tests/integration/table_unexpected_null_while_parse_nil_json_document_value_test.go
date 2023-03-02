@@ -24,8 +24,6 @@ func (i *issue229Struct) UnmarshalJSON(_ []byte) error {
 
 // https://github.com/ydb-platform/ydb-go-sdk/issues/229
 func TestIssue229UnexpectedNullWhileParseNilJsonDocumentValue(t *testing.T) {
-	t.Parallel()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

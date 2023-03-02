@@ -27,8 +27,6 @@ const (
 )
 
 func TestReadMessagesAndCommit(t *testing.T) {
-	// t.Parallel()
-
 	ctx := xtest.Context(t)
 
 	db, reader := createFeedAndReader(ctx, t, topicoptions.WithCommitMode(topicoptions.CommitModeSync))
@@ -61,8 +59,6 @@ func TestReadMessagesAndCommit(t *testing.T) {
 }
 
 func TestCDCFeedSendTopicPathSameAsSubscribed(t *testing.T) {
-	// t.Parallel()
-
 	ctx := xtest.Context(t)
 
 	db, reader := createFeedAndReader(ctx, t)
@@ -86,8 +82,6 @@ func TestCDCFeedSendTopicPathSameAsSubscribed(t *testing.T) {
 }
 
 func TestTopicPath(t *testing.T) {
-	t.Parallel()
-
 	ctx := xtest.Context(t)
 	db := connect(t)
 
@@ -99,8 +93,6 @@ func TestTopicPath(t *testing.T) {
 }
 
 func TestCDCInTableDescribe(t *testing.T) {
-	t.Parallel()
-
 	ctx := xtest.Context(t)
 	db := connect(t)
 	topicPath := createCDCFeed(ctx, t, db)
