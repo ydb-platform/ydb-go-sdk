@@ -8,15 +8,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"math/rand"
 	"os"
 	"path"
 	"strconv"
 	"testing"
-	"time"
-
-	"github.com/stretchr/testify/require"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -31,8 +30,7 @@ func TestRegressionCloud109307(t *testing.T) {
 	db, err := sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
-	defer cancel()
+	ctx := xtest.Context(t)
 
 	for i := int64(1); ; i++ {
 		if ctx.Err() != nil {
@@ -71,21 +69,17 @@ func TestRegressionCloud109307(t *testing.T) {
 		}), retry.WithDoTxRetryOptions(
 			retry.WithIdempotent(true),
 		))
-		if ctx.Err() == nil {
-			require.NoError(t, err)
-		}
+		require.NoError(t, err)
 	}
 }
 
 func TestRegressionKikimr17104(t *testing.T) {
 	var (
+		ctx               = xtest.Context(t)
 		tableRelativePath = path.Join(t.Name(), "big_table")
 		upsertRowsCount   = 100000
 		upsertChecksum    uint64
 	)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
-	defer cancel()
 
 	t.Run("data", func(t *testing.T) {
 		t.Run("prepare", func(t *testing.T) {
