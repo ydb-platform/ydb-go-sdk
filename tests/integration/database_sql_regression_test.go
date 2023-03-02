@@ -21,6 +21,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -31,7 +32,7 @@ func TestRegressionCloud109307(t *testing.T) {
 	db, err := sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
 	require.NoError(t, err)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
+	ctx, cancel := context.WithTimeout(xtest.Context(t), 42*time.Second)
 	defer cancel()
 
 	for i := int64(1); ; i++ {
@@ -79,13 +80,11 @@ func TestRegressionCloud109307(t *testing.T) {
 
 func TestRegressionKikimr17104(t *testing.T) {
 	var (
+		ctx               = xtest.Context(t)
 		tableRelativePath = path.Join(t.Name(), "big_table")
 		upsertRowsCount   = 100000
 		upsertChecksum    uint64
 	)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
-	defer cancel()
 
 	t.Run("data", func(t *testing.T) {
 		t.Run("prepare", func(t *testing.T) {
