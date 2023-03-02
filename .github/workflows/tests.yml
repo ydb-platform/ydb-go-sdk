@@ -70,7 +70,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Integration test
-        run: go test -race -coverpkg=./... -coverprofile integration-secure.txt -covermode atomic ./tests/integration
+        run: |
+          (cd ./tests/integration; go mod download)
+          go test -race -coverpkg=./... -coverprofile integration-secure.txt -covermode atomic ./tests/integration
       - name: Upload Test secure connection coverage report to Codecov
         uses: codecov/codecov-action@v2
         with:
@@ -113,7 +115,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Test insecure connection
-        run: go test -race -coverpkg=./... -coverprofile integration-insecure.txt -covermode atomic ./tests/integration
+        run: |
+          (cd ./tests/integration; go mod download)
+          go test -race -coverpkg=./... -coverprofile integration-insecure.txt -covermode atomic ./tests/integration
       - name: Upload Test insecure connection coverage report to Codecov
         uses: codecov/codecov-action@v2
         with:
