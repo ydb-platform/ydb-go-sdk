@@ -21,16 +21,14 @@ type logger struct {
 	namespace string
 	minLevel  level.Level
 	coloring  bool
-	out       io.Writer
-	err       io.Writer
+	w         io.Writer
 }
 
 func New(opts ...Option) *logger {
 	l := &logger{
 		minLevel: level.INFO,
 		coloring: false,
-		out:      os.Stdout,
-		err:      os.Stderr,
+		w:        os.Stderr,
 	}
 	for _, o := range opts {
 		if o != nil {
@@ -70,7 +68,7 @@ func (l *logger) Tracef(format string, args ...interface{}) {
 	if l.external != nil {
 		l.external.Tracef(l.format(format, level.TRACE), args...)
 	} else {
-		fmt.Fprintf(l.out, l.format(format, level.TRACE), args...)
+		fmt.Fprintf(l.w, l.format(format, level.TRACE), args...)
 	}
 }
 
@@ -81,7 +79,7 @@ func (l *logger) Debugf(format string, args ...interface{}) {
 	if l.external != nil {
 		l.external.Debugf(l.format(format, level.DEBUG), args...)
 	} else {
-		fmt.Fprintf(l.out, l.format(format, level.DEBUG), args...)
+		fmt.Fprintf(l.w, l.format(format, level.DEBUG), args...)
 	}
 }
 
@@ -92,7 +90,7 @@ func (l *logger) Infof(format string, args ...interface{}) {
 	if l.external != nil {
 		l.external.Infof(l.format(format, level.INFO), args...)
 	} else {
-		fmt.Fprintf(l.out, l.format(format, level.INFO), args...)
+		fmt.Fprintf(l.w, l.format(format, level.INFO), args...)
 	}
 }
 
@@ -103,7 +101,7 @@ func (l *logger) Warnf(format string, args ...interface{}) {
 	if l.external != nil {
 		l.external.Warnf(l.format(format, level.WARN), args...)
 	} else {
-		fmt.Fprintf(l.out, l.format(format, level.WARN), args...)
+		fmt.Fprintf(l.w, l.format(format, level.WARN), args...)
 	}
 }
 
@@ -114,7 +112,7 @@ func (l *logger) Errorf(format string, args ...interface{}) {
 	if l.external != nil {
 		l.external.Errorf(l.format(format, level.ERROR), args...)
 	} else {
-		fmt.Fprintf(l.err, l.format(format, level.ERROR), args...)
+		fmt.Fprintf(l.w, l.format(format, level.ERROR), args...)
 	}
 }
 
@@ -125,7 +123,7 @@ func (l *logger) Fatalf(format string, args ...interface{}) {
 	if l.external != nil {
 		l.external.Fatalf(l.format(format, level.FATAL), args...)
 	} else {
-		fmt.Fprintf(l.err, l.format(format, level.FATAL), args...)
+		fmt.Fprintf(l.w, l.format(format, level.FATAL), args...)
 	}
 }
 
@@ -142,8 +140,7 @@ func join(a, b string) string {
 func (l *logger) WithName(name string) log.Logger {
 	return &logger{
 		external:  l.external,
-		out:       l.out,
-		err:       l.err,
+		w:         l.w,
 		namespace: join(l.namespace, name),
 		minLevel:  l.minLevel,
 		coloring:  l.coloring,

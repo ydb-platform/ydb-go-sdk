@@ -33,10 +33,21 @@ func WithExternalLogger(external log.Logger) LoggerOption {
 	return LoggerOption(logger.WithExternalLogger(external))
 }
 
-func WithOutWriter(out io.Writer) LoggerOption {
-	return LoggerOption(logger.WithOutWriter(out))
+// WithOutWriter specified writer stream for internal logger
+//
+// Deprecated: use WithWriter instead
+func WithOutWriter(w io.Writer) LoggerOption {
+	return LoggerOption(logger.WithWriter(w))
 }
 
-func WithErrWriter(err io.Writer) LoggerOption {
-	return LoggerOption(logger.WithErrWriter(err))
+// WithErrWriter specified writer stream for internal logger error messages
+//
+// Deprecated: use WithWriter instead
+func WithErrWriter(io.Writer) LoggerOption {
+	return LoggerOption(logger.Nop())
+}
+
+// WithWriter specified writer stream for internal logger
+func WithWriter(w io.Writer) LoggerOption {
+	return LoggerOption(logger.WithWriter(w))
 }

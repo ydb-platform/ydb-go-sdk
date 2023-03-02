@@ -311,8 +311,7 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 		ydb.WithLogger(
 			trace.MatchDetails(`ydb\.(driver|table|discovery|retry|scheme).*`),
 			ydb.WithNamespace("ydb"),
-			ydb.WithOutWriter(logger),
-			ydb.WithErrWriter(logger),
+			ydb.WithWriter(logger),
 			ydb.WithMinLevel(log.WARN),
 		),
 		ydb.WithPanicCallback(func(e interface{}) {

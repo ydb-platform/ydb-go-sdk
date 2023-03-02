@@ -71,8 +71,7 @@ func TestDiscovery(t *testing.T) {
 		ydb.WithLogger(
 			trace.MatchDetails(`ydb\.(driver|discovery|repeater).*`),
 			ydb.WithNamespace("ydb"),
-			ydb.WithOutWriter(logger),
-			ydb.WithErrWriter(logger),
+			ydb.WithWriter(logger),
 			ydb.WithMinLevel(log.WARN),
 			ydb.WithColoring(),
 		),
