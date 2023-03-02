@@ -19,8 +19,6 @@ import (
 
 // https://github.com/ydb-platform/ydb-go-sdk/issues/259
 func TestIssue259IntervalFromDuration(t *testing.T) {
-	t.Parallel()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

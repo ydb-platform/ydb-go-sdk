@@ -21,8 +21,6 @@ import (
 )
 
 func TestLongStream(t *testing.T) {
-	t.Parallel()
-
 	var (
 		folder            = t.Name()
 		tableName         = `long_stream_query`

@@ -29,8 +29,6 @@ type sqlScope struct {
 }
 
 func TestDatabaseSql(t *testing.T) {
-	t.Parallel()
-
 	scope := sqlScope{
 		folder: t.Name(),
 	}

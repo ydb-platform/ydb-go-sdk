@@ -18,8 +18,6 @@ import (
 )
 
 func TestMonitoring(t *testing.T) {
-	t.Parallel()
-
 	ctx := xtest.Context(t)
 
 	db, err := ydb.Open(

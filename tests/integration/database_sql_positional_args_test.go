@@ -24,8 +24,6 @@ type sqlPositionalArgsScope struct {
 }
 
 func TestDatabaseSqlPositionalArgs(t *testing.T) {
-	t.Parallel()
-
 	scope := sqlPositionalArgsScope{
 		folder: t.Name(),
 	}

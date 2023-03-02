@@ -23,8 +23,6 @@ import (
 )
 
 func TestDiscovery(t *testing.T) {
-	t.Parallel()
-
 	var (
 		userAgent     = "connection user agent"
 		requestType   = "connection request type"

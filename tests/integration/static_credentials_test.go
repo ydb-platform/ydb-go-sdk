@@ -20,8 +20,6 @@ import (
 )
 
 func TestStaticCredentials(t *testing.T) {
-	t.Parallel()
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
