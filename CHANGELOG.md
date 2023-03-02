@@ -3,7 +3,7 @@
 * Added `ydb.WithBindings` connector option
 * Fixed bug with ignoring default scan and data query options
 * Fixed topic retry policy callback call: not call it with nil error 
-* Deprecated `trace.Driver.OnConnTake` event callback
+* Marked as deprecated `trace.Driver.OnConnTake` event callback
 * Added `trace.Driver.OnConnDial` event callback
 * Fixed bug with no checking operation error on `discovery.Client` calls
 * Allowed zero create session timeout in `ydb.WithSessionPoolCreateSessionTimeout(timeout)` (less than or equal to zero - no used timeout on create session request)
@@ -15,6 +15,8 @@
 * Changed default output stream of internal logger to `io.Stderr`
 * Marked as deprecated `ydb.WithErrWriter(w)` and `ydb.WithOutWriter(w)` logger options
 * Added `ydb.WithWriter(w)` logger option
+* Replaced the balancer connection to discovery service from short-lived grpc connection to `internal/conn` lazy connection (revert related changes from `v3.42.6`)
+* Marked as deprecated `trace.Driver.OnBalancerDialEntrypoint` event callback
 
 ## v3.42.11
 * Fixed validation error for topicoptions.WithPartitionID option of start topic writer.

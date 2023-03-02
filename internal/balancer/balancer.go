@@ -8,7 +8,6 @@ import (
 	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -25,15 +24,16 @@ import (
 var ErrNoEndpoints = xerrors.Wrap(fmt.Errorf("no endpoints"))
 
 type discoveryClient interface {
-	discovery.Client
 	closer.Closer
+
+	Discover(ctx context.Context) ([]endpoint.Endpoint, error)
 }
 
 type Balancer struct {
 	driverConfig      config.Config
 	balancerConfig    balancerConfig.Config
 	pool              *conn.Pool
-	discoveryClient   func(ctx context.Context, address string) (discoveryClient, error)
+	discoveryClient   discoveryClient
 	discoveryRepeater repeater.Repeater
 	localDCDetector   func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error)
 
@@ -91,15 +91,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 	}
 	defer cancel()
 
-	client, err := b.discoveryClient(ctx, address)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-	defer func() {
-		_ = client.Close(ctx)
-	}()
-
-	endpoints, err = client.Discover(ctx)
+	endpoints, err = b.discoveryClient.Discover(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -165,6 +157,10 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 		b.discoveryRepeater.Stop()
 	}
 
+	if err = b.discoveryClient.Close(ctx); err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
 	return nil
 }
 
@@ -195,21 +191,12 @@ func New(
 		driverConfig:    driverConfig,
 		pool:            pool,
 		localDCDetector: detectLocalDC,
-		discoveryClient: func(ctx context.Context, address string) (_ discoveryClient, err error) {
-			onBalancerDialEntrypointDone := trace.DriverOnBalancerDialEntrypoint(
-				b.driverConfig.Trace(),
-				&ctx,
-				address,
-			)
-			defer func() {
-				onBalancerDialEntrypointDone(err)
-			}()
-			cc, err := grpc.DialContext(ctx, address, b.driverConfig.GrpcDialOptions()...)
-			if err != nil {
-				return nil, xerrors.WithStackTrace(err)
-			}
-			return internalDiscovery.New(cc, discoveryConfig), nil
-		},
+		discoveryClient: internalDiscovery.New(
+			pool.Get(
+				endpoint.New(driverConfig.Endpoint()),
+			),
+			discoveryConfig,
+		),
 	}
 
 	if config := driverConfig.Balancer(); config == nil {
