@@ -91,8 +91,7 @@ func Driver(env *Scope) *ydb.Driver {
 			ydb.WithLogger(
 				trace.DetailsAll,
 				ydb.WithNamespace("ydb"),
-				ydb.WithOutWriter(logger),
-				ydb.WithErrWriter(logger),
+				ydb.WithWriter(logger),
 				ydb.WithMinLevel(log.TRACE),
 			),
 		)
