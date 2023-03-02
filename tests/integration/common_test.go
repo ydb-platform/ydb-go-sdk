@@ -22,21 +22,21 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type Scope struct {
+type scopeT struct {
 	Ctx context.Context
 	fixenv.Env
 	Require *require.Assertions
 	t       testing.TB
 }
 
-func NewScope(t *testing.T) *Scope {
+func newScope(t *testing.T) *scopeT {
 	at := require.New(t)
 	fEnv := fixenv.NewEnv(t)
 	ctx, ctxCancel := context.WithCancel(context.Background())
 	t.Cleanup(func() {
 		ctxCancel()
 	})
-	res := &Scope{
+	res := &scopeT{
 		Ctx:     ctx,
 		Env:     fEnv,
 		Require: at,
@@ -45,46 +45,46 @@ func NewScope(t *testing.T) *Scope {
 	return res
 }
 
-func (env *Scope) T() testing.TB {
-	return env.t
+func (scope *scopeT) T() testing.TB {
+	return scope.t
 }
 
-func (env *Scope) Logf(format string, args ...interface{}) {
-	env.t.Helper()
-	env.t.Logf(format, args...)
+func (scope *scopeT) Logf(format string, args ...interface{}) {
+	scope.t.Helper()
+	scope.t.Logf(format, args...)
 }
 
-func (env *Scope) Failed() bool {
-	return env.t.Failed()
+func (scope *scopeT) Failed() bool {
+	return scope.t.Failed()
 }
 
-func ConnectionString(env *Scope) string {
+func (scope *scopeT) ConnectionString() string {
 	if envString := os.Getenv("YDB_CONNECTION_STRING"); envString != "" {
 		return envString
 	}
 	return "grpc://localhost:2136/local"
 }
 
-func AuthToken(_ *Scope) string {
+func (scope *scopeT) AuthToken() string {
 	return os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")
 }
 
-func Driver(env *Scope) *ydb.Driver {
-	return env.CacheWithCleanup("", nil, func() (res interface{}, cleanup fixenv.FixtureCleanupFunc, err error) {
-		connectionString := ConnectionString(env)
-		env.Logf("Connect with connection string: %v", connectionString)
+func (scope *scopeT) Driver() *ydb.Driver {
+	return scope.CacheWithCleanup("", nil, func() (res interface{}, cleanup fixenv.FixtureCleanupFunc, err error) {
+		connectionString := scope.ConnectionString()
+		scope.Logf("Connect with connection string: %v", connectionString)
 
-		token := AuthToken(env)
+		token := scope.AuthToken()
 		if token == "" {
-			env.Logf("With empty auth token")
+			scope.Logf("With empty auth token")
 		} else {
-			env.Logf("With auth token")
+			scope.Logf("With auth token")
 		}
 
-		connectionContext, cancel := context.WithTimeout(env.Ctx, time.Second*10)
+		connectionContext, cancel := context.WithTimeout(scope.Ctx, time.Second*10)
 		defer cancel()
 
-		logger := xtest.Logger(env.T())
+		logger := xtest.Logger(scope.T())
 
 		driver, err := ydb.Open(connectionContext, connectionString,
 			ydb.WithAccessTokenCredentials(token),
@@ -96,23 +96,23 @@ func Driver(env *Scope) *ydb.Driver {
 			),
 		)
 		clean := func() {
-			env.Require.NoError(driver.Close(env.Ctx))
+			scope.Require.NoError(driver.Close(scope.Ctx))
 		}
 		return driver, clean, err
 	}).(*ydb.Driver)
 }
 
-func Folder(env *Scope) string {
-	return env.CacheWithCleanup(nil, nil, func() (res interface{}, cleanup fixenv.FixtureCleanupFunc, err error) {
-		driver := Driver(env)
-		folderPath := path.Join(driver.Name(), env.T().Name())
-		env.Require.NoError(sugar.RemoveRecursive(env.Ctx, driver, folderPath))
+func (scope *scopeT) Folder() string {
+	return scope.CacheWithCleanup(nil, nil, func() (res interface{}, cleanup fixenv.FixtureCleanupFunc, err error) {
+		driver := scope.Driver()
+		folderPath := path.Join(driver.Name(), scope.T().Name())
+		scope.Require.NoError(sugar.RemoveRecursive(scope.Ctx, driver, folderPath))
 
-		env.Logf("Create folder: %v", folderPath)
-		env.Require.NoError(driver.Scheme().MakeDirectory(env.Ctx, folderPath))
+		scope.Logf("Create folder: %v", folderPath)
+		scope.Require.NoError(driver.Scheme().MakeDirectory(scope.Ctx, folderPath))
 		clean := func() {
-			if !env.Failed() {
-				env.Require.NoError(sugar.RemoveRecursive(env.Ctx, driver, folderPath))
+			if !scope.Failed() {
+				scope.Require.NoError(sugar.RemoveRecursive(scope.Ctx, driver, folderPath))
 			}
 		}
 		return folderPath, clean, nil
@@ -122,20 +122,20 @@ func Folder(env *Scope) string {
 // TableName return name (without path) to example table with struct:
 // id Int64 NOT NULL,
 // val Text
-func TableName(env *Scope) string {
-	return env.Cache(nil, nil, func() (res interface{}, err error) {
+func (scope *scopeT) TableName() string {
+	return scope.Cache(nil, nil, func() (res interface{}, err error) {
 		tableName := "table"
 
-		err = Driver(env).Table().Do(env.Ctx, func(ctx context.Context, s table.Session) error {
+		err = scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
 			query := fmt.Sprintf(`PRAGMA TablePathPrefix("%s");
 
 CREATE TABLE %s (
 	id Int64 NOT NULL, val Text,
 	PRIMARY KEY (id)
 )
-`, Folder(env), tableName)
+`, scope.Folder(), tableName)
 
-			env.Logf("Create table query: %v", query)
+			scope.Logf("Create table query: %v", query)
 			return s.ExecuteSchemeQuery(ctx, query)
 		})
 		return tableName, err
@@ -145,6 +145,6 @@ CREATE TABLE %s (
 // TablePath return path to example table with struct:
 // id Int64 NOT NULL,
 // val Text
-func TablePath(env *Scope) string {
-	return path.Join(Folder(env), TableName(env))
+func TablePath(env *scopeT) string {
+	return path.Join(env.Folder(), env.TableName())
 }

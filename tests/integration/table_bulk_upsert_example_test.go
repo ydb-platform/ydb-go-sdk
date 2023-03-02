@@ -13,9 +13,9 @@ import (
 )
 
 func TestTableBulkUpsertExample(t *testing.T) {
-	env := NewScope(t)
-	driver := Driver(env)
-	tablePath := TablePath(env)
+	scope := newScope(t)
+	driver := scope.Driver()
+	tablePath := TablePath(scope)
 
 	// upsert
 	var rows []types.Value
@@ -28,8 +28,8 @@ func TestTableBulkUpsertExample(t *testing.T) {
 		))
 	}
 
-	err := driver.Table().Do(env.Ctx, func(ctx context.Context, s table.Session) error {
+	err := driver.Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
 		return s.BulkUpsert(ctx, tablePath, types.ListValue(rows...))
 	})
-	env.Require.NoError(err)
+	scope.Require.NoError(err)
 }
