@@ -13,6 +13,7 @@ import (
 	"path"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -31,7 +32,8 @@ func TestRegressionCloud109307(t *testing.T) {
 	db, err := sql.Open("ydb", os.Getenv("YDB_CONNECTION_STRING"))
 	require.NoError(t, err)
 
-	ctx := xtest.Context(t)
+	ctx, cancel := context.WithTimeout(xtest.Context(t), 42*time.Second)
+	defer cancel()
 
 	for i := int64(1); ; i++ {
 		if ctx.Err() != nil {
@@ -70,7 +72,9 @@ func TestRegressionCloud109307(t *testing.T) {
 		}), retry.WithDoTxRetryOptions(
 			retry.WithIdempotent(true),
 		))
-		require.NoError(t, err)
+		if ctx.Err() == nil {
+			require.NoError(t, err)
+		}
 	}
 }
 
