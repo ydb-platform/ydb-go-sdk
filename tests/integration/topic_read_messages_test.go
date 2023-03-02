@@ -13,8 +13,6 @@ import (
 )
 
 func TestTopicReadMessages(t *testing.T) {
-	// t.Parallel()
-
 	ctx := xtest.Context(t)
 
 	db, reader := createFeedAndReader(ctx, t)

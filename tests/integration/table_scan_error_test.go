@@ -19,8 +19,6 @@ import (
 
 // https://github.com/ydb-platform/ydb-go-sdk/issues/415
 func TestIssue415ScanError(t *testing.T) {
-	t.Parallel()
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

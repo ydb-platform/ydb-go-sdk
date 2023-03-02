@@ -33,8 +33,6 @@ import (
 )
 
 func TestSendAsyncMessages(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	db := connect(t)
 	topicPath := createTopic(ctx, t, db)
@@ -63,8 +61,6 @@ func TestSendAsyncMessages(t *testing.T) {
 }
 
 func TestSendSyncMessages(t *testing.T) {
-	t.Parallel()
-
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx := xtest.Context(t)
 
@@ -125,8 +121,6 @@ func TestSendSyncMessages(t *testing.T) {
 }
 
 func TestManyConcurentReadersWriters(t *testing.T) {
-	t.Parallel()
-
 	xtest.AllowByFlag(t, "ISSUE-389")
 
 	const partitionCount = 3
@@ -263,8 +257,6 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 }
 
 func TestCommitUnexpectedRange(t *testing.T) {
-	t.Parallel()
-
 	sleepTime := time.Second
 	ctx := xtest.Context(t)
 	db := connect(t)
@@ -319,8 +311,6 @@ func TestCommitUnexpectedRange(t *testing.T) {
 }
 
 func TestUpdateToken(t *testing.T) {
-	t.Parallel()
-
 	xtest.AllowByFlag(t, "LOGBROKER-7960")
 
 	ctx := context.Background()

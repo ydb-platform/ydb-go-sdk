@@ -30,8 +30,6 @@ type scopeTableStreamExecuteScanQuery struct {
 }
 
 func TestTableMultipleResultSets(t *testing.T) {
-	t.Parallel()
-
 	scope := &scopeTableStreamExecuteScanQuery{
 		folder:          t.Name(),
 		tableName:       "stream_query_table",

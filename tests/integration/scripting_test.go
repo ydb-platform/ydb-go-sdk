@@ -23,8 +23,6 @@ import (
 )
 
 func TestScripting(t *testing.T) {
-	t.Parallel()
-
 	var (
 		ctx    = xtest.Context(t)
 		logger = xtest.Logger(t)

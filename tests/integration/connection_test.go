@@ -35,8 +35,6 @@ import (
 
 //nolint:gocyclo
 func TestConnection(t *testing.T) {
-	t.Parallel()
-
 	var (
 		userAgent     = "connection user agent"
 		requestType   = "connection request type"
