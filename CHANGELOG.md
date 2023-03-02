@@ -12,6 +12,9 @@
 * Renamed private `ydb.connection` type to public `ydb.Driver` type
 * Marked as deprecated `ydb.Connection` interface
 * Changed result type of `ydb.Open` from `ydb.Connection` interface to `*ydb.Driver`
+* Changed default output stream of internal logger to `io.Stderr`
+* Marked as deprecated `ydb.WithErrWriter(w)` and `ydb.WithOutWriter(w)` logger options
+* Added `ydb.WithWriter(w)` logger option
 
 ## v3.42.11
 * Fixed validation error for topicoptions.WithPartitionID option of start topic writer.

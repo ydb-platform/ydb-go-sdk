@@ -37,14 +37,8 @@ func WithExternalLogger(external log.Logger) Option {
 	}
 }
 
-func WithOutWriter(out io.Writer) Option {
+func WithWriter(w io.Writer) Option {
 	return func(l *logger) {
-		l.out = out
-	}
-}
-
-func WithErrWriter(err io.Writer) Option {
-	return func(l *logger) {
-		l.err = err
+		l.w = w
 	}
 }
