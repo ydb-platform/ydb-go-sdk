@@ -15,7 +15,7 @@ import (
 func TestTableBulkUpsertExample(t *testing.T) {
 	scope := newScope(t)
 	driver := scope.Driver()
-	tablePath := TablePath(scope)
+	tablePath := scope.TablePath()
 
 	// upsert
 	var rows []types.Value
