@@ -19,12 +19,14 @@ func TestDatabaseSqlNumericArgs(t *testing.T) {
 
 	var row *sql.Row
 	err := retry.Retry(scope.Ctx, func(ctx context.Context) (err error) {
-		row = db.QueryRowContext(ctx, `SELECT 
-$1 AS vInt,
-$2 AS vText,
-$3 AS vDouble,
-$4 AS vDateTime 
-`, 1, "2", 3.0, dt)
+		row = db.QueryRowContext(ctx, `
+			SELECT 
+				$1 AS vInt,
+				$2 AS vText,
+				$3 AS vDouble,
+				$4 AS vDateTime 
+			`, 1, "2", 3.0, dt,
+		)
 		return row.Err()
 	})
 	scope.Require.NoError(err)
