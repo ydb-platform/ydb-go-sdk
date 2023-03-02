@@ -145,6 +145,6 @@ CREATE TABLE %s (
 // TablePath return path to example table with struct:
 // id Int64 NOT NULL,
 // val Text
-func (env *scopeT) TablePath() string {
-	return path.Join(env.Folder(), env.TableName())
+func (scope *scopeT) TablePath() string {
+	return path.Join(scope.Folder(), scope.TableName())
 }
