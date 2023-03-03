@@ -10,6 +10,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jonboulle/clockwork"
 	"golang.org/x/sync/semaphore"
 
@@ -100,8 +101,13 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 	if cfg.connectTimeout == 0 {
 		cfg.connectTimeout = cfg.Common.OperationTimeout()
 	}
+
 	if cfg.connectTimeout == 0 {
 		cfg.connectTimeout = value.InfiniteDuration
+	}
+
+	if cfg.producerID == "" {
+		WithProducerID(uuid.NewString())(&cfg)
 	}
 
 	return cfg
