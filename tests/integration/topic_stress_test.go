@@ -199,7 +199,7 @@ func stressTestInATopic(
 		}
 	}
 
-	xtest.SpinWaitProgress(t, func() (progressValue interface{}, finished bool) {
+	xtest.SpinWaitProgressWithTimeout(t, time.Minute, func() (progressValue interface{}, finished bool) {
 		createdMessages := atomic.LoadInt64(&createdMessagesCount)
 		readedMessages := atomic.LoadInt64(&readedMessagesCount)
 		return readedMessages, readedMessages == createdMessages
