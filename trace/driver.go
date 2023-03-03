@@ -19,14 +19,13 @@ type (
 		OnInit  func(DriverInitStartInfo) func(DriverInitDoneInfo)
 		OnClose func(DriverCloseStartInfo) func(DriverCloseDoneInfo)
 
-		// Network events
-		// Deprecated: driver not support logging of net events
+		// Deprecated: driver not notificate about this event
 		OnNetRead func(DriverNetReadStartInfo) func(DriverNetReadDoneInfo)
-		// Deprecated: driver not support logging of net events
+		// Deprecated: driver not notificate about this event
 		OnNetWrite func(DriverNetWriteStartInfo) func(DriverNetWriteDoneInfo)
-		// Deprecated: driver not support logging of net events
+		// Deprecated: driver not notificate about this event
 		OnNetDial func(DriverNetDialStartInfo) func(DriverNetDialDoneInfo)
-		// Deprecated: driver not support logging of net events
+		// Deprecated: driver not notificate about this event
 		OnNetClose func(DriverNetCloseStartInfo) func(DriverNetCloseDoneInfo)
 
 		// Resolver events
@@ -42,7 +41,9 @@ type (
 		) func(
 			DriverConnNewStreamDoneInfo,
 		)
+		// Deprecated: driver not notificate about this event
 		OnConnTake  func(DriverConnTakeStartInfo) func(DriverConnTakeDoneInfo)
+		OnConnDial  func(DriverConnDialStartInfo) func(DriverConnDialDoneInfo)
 		OnConnPark  func(DriverConnParkStartInfo) func(DriverConnParkDoneInfo)
 		OnConnBan   func(DriverConnBanStartInfo) func(DriverConnBanDoneInfo)
 		OnConnAllow func(DriverConnAllowStartInfo) func(DriverConnAllowDoneInfo)
@@ -52,7 +53,9 @@ type (
 		OnRepeaterWakeUp func(DriverRepeaterWakeUpStartInfo) func(DriverRepeaterWakeUpDoneInfo)
 
 		// Balancer events
-		OnBalancerInit           func(DriverBalancerInitStartInfo) func(DriverBalancerInitDoneInfo)
+		OnBalancerInit func(DriverBalancerInitStartInfo) func(DriverBalancerInitDoneInfo)
+
+		// Deprecated: driver not notificate about this event
 		OnBalancerDialEntrypoint func(
 			DriverBalancerDialEntrypointStartInfo,
 		) func(
@@ -207,6 +210,17 @@ type (
 		Endpoint EndpointInfo
 	}
 	DriverConnTakeDoneInfo struct {
+		Error error
+	}
+	DriverConnDialStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context  *context.Context
+		Endpoint EndpointInfo
+	}
+	DriverConnDialDoneInfo struct {
 		Error error
 	}
 	DriverConnParkStartInfo struct {

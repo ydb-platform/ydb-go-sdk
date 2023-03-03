@@ -101,20 +101,20 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 	if details&trace.DriverConnEvents != 0 {
 		//nolint:govet
 		l := l.WithName(`conn`)
-		t.OnConnTake = func(info trace.DriverConnTakeStartInfo) func(trace.DriverConnTakeDoneInfo) {
+		t.OnConnDial = func(info trace.DriverConnDialStartInfo) func(trace.DriverConnDialDoneInfo) {
 			endpoint := info.Endpoint.String()
-			l.Tracef(`take start {endpoint:%v}`,
+			l.Tracef(`dial start {endpoint:%v}`,
 				endpoint,
 			)
 			start := time.Now()
-			return func(info trace.DriverConnTakeDoneInfo) {
+			return func(info trace.DriverConnDialDoneInfo) {
 				if info.Error == nil {
-					l.Tracef(`take done {endpoint:%v,latency:"%v"}`,
+					l.Tracef(`dial done {endpoint:%v,latency:"%v"}`,
 						endpoint,
 						time.Since(start),
 					)
 				} else {
-					l.Warnf(`take failed {endpoint:%v,latency:"%v",error:"%s",version:"%s"}`,
+					l.Warnf(`dial failed {endpoint:%v,latency:"%v",error:"%s",version:"%s"}`,
 						endpoint,
 						time.Since(start),
 						info.Error,
@@ -371,27 +371,6 @@ func Driver(l Logger, details trace.Details) (t trace.Driver) {
 					)
 				} else {
 					l.Warnf(`select endpoint failed {latency:"%v",error:"%s",version:"%s"}`,
-						time.Since(start),
-						info.Error,
-						meta.Version,
-					)
-				}
-			}
-		}
-		t.OnBalancerDialEntrypoint = func(
-			info trace.DriverBalancerDialEntrypointStartInfo,
-		) func(
-			trace.DriverBalancerDialEntrypointDoneInfo,
-		) {
-			l.Tracef(`trying to dial entrypoint {address:"%s"}`, info.Address)
-			start := time.Now()
-			return func(info trace.DriverBalancerDialEntrypointDoneInfo) {
-				if info.Error == nil {
-					l.Tracef(`dial entrypoint done {latency:"%v"}`,
-						time.Since(start),
-					)
-				} else {
-					l.Errorf(`dial entrypoint failed {latency:"%v",error:"%s",version:"%s"}`,
 						time.Since(start),
 						info.Error,
 						meta.Version,

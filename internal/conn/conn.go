@@ -64,7 +64,7 @@ type conn struct {
 }
 
 func (c *conn) Ping(ctx context.Context) error {
-	cc, err := c.take(ctx)
+	cc, err := c.realConn(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -167,17 +167,7 @@ func (c *conn) GetState() (s State) {
 	return State(atomic.LoadUint32(&c.state))
 }
 
-func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
-	onDone := trace.DriverOnConnTake(
-		c.config.Trace(),
-		&ctx,
-		c.endpoint.Copy(),
-	)
-
-	defer func() {
-		onDone(err)
-	}()
-
+func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	if c.isClosed() {
 		return nil, xerrors.WithStackTrace(errClosedConnection)
 	}
@@ -195,6 +185,16 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 		defer cancel()
 	}
 
+	onDone := trace.DriverOnConnDial(
+		c.config.Trace(),
+		&ctx,
+		c.endpoint.Copy(),
+	)
+
+	defer func() {
+		onDone(err)
+	}()
+
 	// prepend "ydb" scheme for grpc dns-resolver to find the proper scheme
 	// three slashes in "ydb:///" is ok. It needs for good parse scheme in grpc resolver.
 	address := "ydb:///" + c.endpoint.Address()
@@ -208,7 +208,7 @@ func (c *conn) take(ctx context.Context) (cc *grpc.ClientConn, err error) {
 		err = xerrors.WithStackTrace(
 			xerrors.Retryable(
 				fmt.Errorf("dial to `%s` failed: %w", address, err),
-				xerrors.WithName("DialContext"),
+				xerrors.WithName("realConn"),
 				xerrors.WithBackoff(backoff.TypeSlow),
 				xerrors.WithDeleteSession(),
 			),
@@ -317,7 +317,7 @@ func (c *conn) Invoke(
 		meta.CallTrailerCallback(ctx, md)
 	}()
 
-	cc, err = c.take(ctx)
+	cc, err = c.realConn(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -405,7 +405,7 @@ func (c *conn) NewStream(
 		}
 	}()
 
-	cc, err = c.take(ctx)
+	cc, err = c.realConn(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
