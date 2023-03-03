@@ -1,6 +1,7 @@
 package topicwriterinternal
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
@@ -109,6 +110,11 @@ func WithPartitioning(partitioning PublicFuturePartitioning) PublicWriterOption 
 func WithProducerID(producerID string) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.producerID = producerID
+		oldPartitioningType := cfg.defaultPartitioning.Type
+		if oldPartitioningType == rawtopicwriter.PartitioningUndefined ||
+			oldPartitioningType == rawtopicwriter.PartitioningMessageGroupID {
+			WithPartitioning(NewPartitioningWithMessageGroupID(producerID))(cfg)
+		}
 	}
 }
 

@@ -104,8 +104,8 @@ func stressTestInATopic(
 			wg.Done()
 		}()
 
-		writer, err := db.Topic().StartWriter(producerID, topicPath,
-			topicoptions.WithMessageGroupID(producerID),
+		writer, err := db.Topic().StartWriter(topicPath,
+			topicoptions.WithProducerID(producerID),
 			topicoptions.WithSyncWrite(true),
 		)
 		if err != nil {
