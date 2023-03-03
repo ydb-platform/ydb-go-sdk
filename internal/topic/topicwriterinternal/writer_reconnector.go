@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"math"
 	"math/big"
 	"runtime"
@@ -100,8 +101,13 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 	if cfg.connectTimeout == 0 {
 		cfg.connectTimeout = cfg.Common.OperationTimeout()
 	}
+
 	if cfg.connectTimeout == 0 {
 		cfg.connectTimeout = value.InfiniteDuration
+	}
+
+	if cfg.producerID == "" {
+		WithProducerID(uuid.NewString())(&cfg)
 	}
 
 	return cfg

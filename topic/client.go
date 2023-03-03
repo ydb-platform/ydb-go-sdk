@@ -67,5 +67,5 @@ type Client interface {
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	StartWriter(producerID, path string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error)
+	StartWriter(topicPath string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error)
 }
