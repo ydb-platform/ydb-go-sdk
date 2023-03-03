@@ -19,10 +19,7 @@ func (d Declare) String() string {
 	return "DECLARE " + d.Name + " AS " + d.Type
 }
 
-func (b Bindings) declares(params *table.QueryParameters) (declares []Declare) {
-	if !b.AllowBindParams {
-		return nil
-	}
+func declares(params *table.QueryParameters) (declares []Declare) {
 	params.Each(func(name string, v types.Value) {
 		declares = append(declares, Declare{
 			Name: name,

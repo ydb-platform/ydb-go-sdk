@@ -5,13 +5,11 @@ import (
 	"database/sql/driver"
 	"io"
 	"path"
-	"strings"
 	"sync"
 	"time"
 
 	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -22,18 +20,16 @@ import (
 
 type ConnectorOption func(c *Connector) error
 
-func WithBindings(bindings ...bind.Binding) ConnectorOption {
+func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
 	return func(c *Connector) error {
-		for _, b := range bindings {
-			b(&c.bindings)
-		}
+		c.defaultQueryMode = mode
 		return nil
 	}
 }
 
-func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
+func WithTablePathPrefix(tablePathPrefix string) ConnectorOption {
 	return func(c *Connector) error {
-		c.defaultQueryMode = mode
+		c.tablePathPrefix = tablePathPrefix
 		return nil
 	}
 }
@@ -137,9 +133,6 @@ func Open(opts ...ConnectorOption) (_ *Connector, err error) {
 			}
 		}
 	}
-	if c.bindings.TablePathPrefix != "" && !strings.HasPrefix(c.bindings.TablePathPrefix, c.databaseName) {
-		c.bindings.TablePathPrefix = path.Join(c.databaseName, c.bindings.TablePathPrefix)
-	}
 	if c.idleThreshold > 0 {
 		c.idleStopper = c.idleCloser()
 	}
@@ -155,6 +148,7 @@ func (ld listDirectoryFunc) ListDirectory(ctx context.Context, path string) (d s
 // Connector is a producer of database/sql connections
 type Connector struct {
 	databaseName     string
+	tablePathPrefix  string
 	scriptingExecute func(ctx context.Context, query string, params *table.QueryParameters) (result.StreamResult, error)
 	createSession    func(ctx context.Context) (s table.ClosableSession, err error)
 	describePath     func(ctx context.Context, path string) (e scheme.Entry, err error)
@@ -167,7 +161,6 @@ type Connector struct {
 
 	idleStopper func()
 
-	bindings              bind.Bindings
 	defaultTxControl      *table.TransactionControl
 	defaultQueryMode      QueryMode
 	defaultDataQueryOpts  []options.ExecuteDataQueryOption
@@ -245,14 +238,17 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	return newConn(c, s,
+	opts := []connOption{
 		withDefaultTxControl(c.defaultTxControl),
 		withDefaultQueryMode(c.defaultQueryMode),
 		withDataOpts(c.defaultDataQueryOpts...),
 		withScanOpts(c.defaultScanQueryOpts...),
-		withBindings(c.bindings),
 		withTrace(c.trace),
-	), nil
+	}
+	if c.tablePathPrefix != "" {
+		opts = append(opts, withTablePathPrefix(path.Join(c.databaseName, c.tablePathPrefix)))
+	}
+	return newConn(c, s, opts...), nil
 }
 
 func (c *Connector) Driver() driver.Driver {

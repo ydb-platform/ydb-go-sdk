@@ -79,7 +79,7 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 		res    result.Result
 		params *table.QueryParameters
 	)
-	query, params, err = tx.conn.queryParams(query, args...)
+	query, params, err = tx.conn.native(ctx, query, args...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -108,7 +108,7 @@ func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.Named
 		return nil, badconn.Map(xerrors.WithStackTrace(fmt.Errorf("wrong query mode: %s", m.String())))
 	}
 	var params *table.QueryParameters
-	query, params, err = tx.conn.queryParams(query, args...)
+	query, params, err = tx.conn.native(ctx, query, args...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
