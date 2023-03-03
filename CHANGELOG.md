@@ -1,3 +1,6 @@
+* BROKEN CHANGE in experimantal topic api: producer id on start writer now is optional
+* BROKEN CHANGE in experimantal topic api: remove WithMessageGroupID option (because not supported now)
+
 ## v3.42.12
 * Replaced the balancer connection to discovery service from short-lived grpc connection to `internal/conn` lazy connection (revert related changes from `v3.42.6`)
 * Marked as deprecated `trace.Driver.OnBalancerDialEntrypoint` event callback
@@ -8,7 +11,7 @@
 * Fixed validation error for topicoptions.WithPartitionID option of start topic writer.
 
 ## v3.42.10
-* Added exit from retryer if got grpc-error `Unauthenticated` on `discovery/ListEndpoints` call  
+* Added exit from retryer if got grpc-error `Unauthenticated` on `discovery/ListEndpoints` call
 
 ## v3.42.9
 * Added `internal/xerrors.Errorf` error for wrap multiple errors and check them with `errors.Is` of `errors.As`

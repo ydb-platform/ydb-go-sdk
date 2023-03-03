@@ -39,10 +39,7 @@ func TestSendAsyncMessages(t *testing.T) {
 
 	content := "hello"
 
-	producerID := "test-producer-ang-message-group"
-	writer, err := db.Topic().StartWriter(producerID, topicPath,
-		topicoptions.WithMessageGroupID(producerID),
-	)
+	writer, err := db.Topic().StartWriter(topicPath)
 	require.NoError(t, err)
 	require.NotEmpty(t, writer)
 	require.NoError(t, writer.Write(ctx, topicwriter.Message{Data: strings.NewReader(content)}))
@@ -74,11 +71,8 @@ func TestSendSyncMessages(t *testing.T) {
 		)
 		topicPath := createTopic(ctx, t, db)
 
-		producerID := "test-producer"
 		writer, err := db.Topic().StartWriter(
-			producerID,
 			topicPath,
-			topicoptions.WithMessageGroupID(producerID),
 			topicoptions.WithSyncWrite(true),
 		)
 		require.NoError(t, err)
@@ -94,8 +88,7 @@ func TestSendSyncMessages(t *testing.T) {
 		require.Error(t, err)
 
 		db = connect(t)
-		writer, err = db.Topic().StartWriter(producerID, topicPath,
-			topicoptions.WithMessageGroupID(producerID),
+		writer, err = db.Topic().StartWriter(topicPath,
 			topicoptions.WithSyncWrite(true),
 		)
 		require.NoError(t, err)
@@ -151,7 +144,7 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 	// senders
 	writer := func(producerID string) {
 		pprof.Do(ctx, pprof.Labels("writer", producerID), func(ctx context.Context) {
-			w, errWriter := db.Topic().StartWriter(producerID, topicName, topicoptions.WithMessageGroupID(producerID))
+			w, errWriter := db.Topic().StartWriter(topicName, topicoptions.WithProducerID(producerID))
 			require.NoError(tb, errWriter)
 
 			for i := 0; i < sendMessageCount; i++ {
@@ -270,8 +263,7 @@ func TestCommitUnexpectedRange(t *testing.T) {
 	require.NoError(t, err)
 
 	// get range from other reader
-	producerID := "producer"
-	writer, err := db.Topic().StartWriter(producerID, topicName1, topicoptions.WithMessageGroupID(producerID))
+	writer, err := db.Topic().StartWriter(topicName1)
 	require.NoError(t, err)
 
 	err = writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("123")})
@@ -327,9 +319,8 @@ func TestUpdateToken(t *testing.T) {
 	require.NoError(t, err)
 
 	writer, err := db.Topic().StartWriter(
-		"producer-id",
 		topicPath,
-		topicoptions.WithMessageGroupID("producer-id"),
+		topicoptions.WithProducerID("producer-id"),
 		topicoptions.WithWriterUpdateTokenInterval(tokenInterval),
 	)
 	require.NoError(t, err)
@@ -394,7 +385,6 @@ func TestTopicWriterWithManualPartitionSelect(t *testing.T) {
 	topicPath := createTopic(ctx, t, db)
 
 	writer, err := db.Topic().StartWriter(
-		"producer-id",
 		topicPath,
 		topicoptions.WithPartitionID(0),
 		topicoptions.WithSyncWrite(true),

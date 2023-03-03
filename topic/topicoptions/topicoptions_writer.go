@@ -79,13 +79,13 @@ func WithWriteSessionMeta(meta map[string]string) WriterOption {
 	return topicwriterinternal.WithSessionMeta(meta)
 }
 
-// WithMessageGroupID set message groupid on write session level
+// WithProducerID set producer for write session
 //
 // # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func WithMessageGroupID(groupID string) WriterOption {
-	return topicwriterinternal.WithPartitioning(topicwriterinternal.NewPartitioningWithMessageGroupID(groupID))
+func WithProducerID(producerID string) WriterOption {
+	return topicwriterinternal.WithProducerID(producerID)
 }
 
 // WithPartitionID set direct partition id on write session level
