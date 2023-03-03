@@ -1,3 +1,4 @@
+## v3.42.12
 * Replaced the balancer connection to discovery service from short-lived grpc connection to `internal/conn` lazy connection (revert related changes from `v3.42.6`)
 * Marked as deprecated `trace.Driver.OnBalancerDialEntrypoint` event callback
 * Deprecated `trace.Driver.OnConnTake` event callback
