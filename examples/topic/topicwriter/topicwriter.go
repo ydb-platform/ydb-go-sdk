@@ -12,29 +12,18 @@ import (
 
 const groupID = "group-id"
 
-func ConnectSimple(ctx context.Context, db ydb.Connection) *topicwriter.Writer {
-	producerAndGroupID := groupID
-	writer, _ := db.Topic().StartWriter(producerAndGroupID, "topicName",
-		topicoptions.WithMessageGroupID(producerAndGroupID),
-	)
+func ConnectSimple(ctx context.Context, db *ydb.Driver) *topicwriter.Writer {
+	writer, _ := db.Topic().StartWriter("topicName")
 	return writer
 }
 
-func ConnectWithSyncWrite(ctx context.Context, db ydb.Connection) *topicwriter.Writer {
-	producerAndGroupID := groupID
-	writer, _ := db.Topic().StartWriter(producerAndGroupID, "topicName",
-		topicoptions.WithMessageGroupID(producerAndGroupID),
-		topicoptions.WithSyncWrite(true),
-	)
+func ConnectWithSyncWrite(ctx context.Context, db *ydb.Driver) *topicwriter.Writer {
+	writer, _ := db.Topic().StartWriter("topicName", topicoptions.WithSyncWrite(true))
 	return writer
 }
 
-func ConnectSelectCodec(ctx context.Context, db ydb.Connection) *topicwriter.Writer {
-	producerAndGroupID := groupID
-	writer, _ := db.Topic().StartWriter(producerAndGroupID, "topicName",
-		topicoptions.WithMessageGroupID(producerAndGroupID),
-		topicoptions.WithCodec(topictypes.CodecGzip),
-	)
+func ConnectSelectCodec(ctx context.Context, db *ydb.Driver) *topicwriter.Writer {
+	writer, _ := db.Topic().StartWriter("topicName", topicoptions.WithCodec(topictypes.CodecGzip))
 	return writer
 }
 
