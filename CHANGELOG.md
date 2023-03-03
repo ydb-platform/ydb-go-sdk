@@ -1,3 +1,5 @@
+* Up minimal supported version of go to 1.17 for update dependencies
+* Upgrade dependencies for prevent issues: CVE-2021-33194, CVE-2022-27664, CVE-2021-31525, CVE-2022-41723
 * Supported binding parameters for `database/sql` driver
 * Added packaged `bind` with bindings options `WithTablePathPrefix(tablePathPrefix)` and `Params()`
 * Added `ydb.WithBindings` connector option
