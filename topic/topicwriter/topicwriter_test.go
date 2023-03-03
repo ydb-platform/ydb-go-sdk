@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
@@ -19,10 +18,7 @@ func ExampleWriter_Write() {
 		log.Fatalf("failed ydb connection: %v", err)
 	}
 
-	producerAndGroupID := "group-id"
-	writer, err := db.Topic().StartWriter(producerAndGroupID, "topicName",
-		topicoptions.WithMessageGroupID(producerAndGroupID),
-	)
+	writer, err := db.Topic().StartWriter("topicName")
 	if err != nil {
 		log.Fatalf("failed to create topic writer: %v", err)
 	}

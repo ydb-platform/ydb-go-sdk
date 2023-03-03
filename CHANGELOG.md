@@ -1,3 +1,6 @@
+* BROKEN CHANGE in experimantal topic api: producer id on start writer now is optional
+* BROKEN CHANGE in experimantal topic api: remove WithMessageGroupID option (because not supported now)
+
 ## v3.42.15
 * Fixed checking `nil` error with `internal/xerrors.Is`
 
