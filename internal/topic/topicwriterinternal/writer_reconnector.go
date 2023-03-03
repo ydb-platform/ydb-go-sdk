@@ -5,12 +5,12 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"math"
 	"math/big"
 	"runtime"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jonboulle/clockwork"
 	"golang.org/x/sync/semaphore"
 
