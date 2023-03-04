@@ -14,21 +14,19 @@ import (
 
 func TestBindings_Bind(t *testing.T) {
 	for _, tt := range []struct {
-		b         Bindings
-		q         string
-		args      []driver.NamedValue
-		expQuery  string
-		expParams *table.QueryParameters
-		expErr    error
+		tablePathPrefix string
+		q               string
+		args            []driver.NamedValue
+		expQuery        string
+		expParams       *table.QueryParameters
+		expErr          error
 	}{
 		{
-			b:        Bindings{},
 			q:        "SELECT 1",
 			args:     nil,
 			expQuery: "SELECT 1",
 		},
 		{
-			b: Bindings{},
 			q: "SELECT $1, ?",
 			args: []driver.NamedValue{
 				{Value: 1},
@@ -36,7 +34,6 @@ func TestBindings_Bind(t *testing.T) {
 			expErr: errUnknownQueryType,
 		},
 		{
-			b: Bindings{},
 			q: "SELECT $1, ?, $p1",
 			args: []driver.NamedValue{
 				{Value: 1},
@@ -44,7 +41,6 @@ func TestBindings_Bind(t *testing.T) {
 			expErr: errUnknownQueryType,
 		},
 		{
-			b: Bindings{},
 			q: "SELECT ?, $p1",
 			args: []driver.NamedValue{
 				{Value: 1},
@@ -52,7 +48,6 @@ func TestBindings_Bind(t *testing.T) {
 			expErr: errUnknownQueryType,
 		},
 		{
-			b: Bindings{},
 			q: "SELECT $1, $p1",
 			args: []driver.NamedValue{
 				{Value: 1},
@@ -60,11 +55,9 @@ func TestBindings_Bind(t *testing.T) {
 			expErr: errUnknownQueryType,
 		},
 		{
-			b: Bindings{
-				TablePathPrefix: "/local/",
-			},
-			q:    "SELECT 1",
-			args: nil,
+			tablePathPrefix: "/local/",
+			q:               "SELECT 1",
+			args:            nil,
 			expQuery: `-- modified by ydb-go-sdk@v` + meta.Version + `
 --
 -- source query:
@@ -76,11 +69,8 @@ SELECT 1`,
 			expErr:    nil,
 		},
 		{
-			b: Bindings{
-				TablePathPrefix: "/local/",
-				AllowBindParams: true,
-			},
-			q: "SELECT $1",
+			tablePathPrefix: "/local/",
+			q:               "SELECT $1",
 			args: []driver.NamedValue{
 				{Value: 1},
 			},
@@ -98,11 +88,8 @@ SELECT $p0`,
 			expErr: nil,
 		},
 		{
-			b: Bindings{
-				TablePathPrefix: "/local/",
-				AllowBindParams: true,
-			},
-			q: "SELECT $1, $2, $3",
+			tablePathPrefix: "/local/",
+			q:               "SELECT $1, $2, $3",
 			args: []driver.NamedValue{
 				{Value: 1},
 				{Value: uint64(2)},
@@ -126,11 +113,8 @@ SELECT $p0, $p1, $p2`,
 			expErr: nil,
 		},
 		{
-			b: Bindings{
-				TablePathPrefix: "/local/",
-				AllowBindParams: true,
-			},
-			q: "SELECT $2, $1, $3, $1, $2",
+			tablePathPrefix: "/local/",
+			q:               "SELECT $2, $1, $3, $1, $2",
 			args: []driver.NamedValue{
 				{Value: 1},
 				{Value: uint64(2)},
@@ -154,11 +138,8 @@ SELECT $p1, $p0, $p2, $p0, $p1`,
 			expErr: nil,
 		},
 		{
-			b: Bindings{
-				TablePathPrefix: "/local/",
-				AllowBindParams: true,
-			},
-			q: "SELECT ?",
+			tablePathPrefix: "/local/",
+			q:               "SELECT ?",
 			args: []driver.NamedValue{
 				{
 					Value: 1,
@@ -178,11 +159,8 @@ SELECT $p0`,
 			expErr: nil,
 		},
 		{
-			b: Bindings{
-				TablePathPrefix: "/local/",
-				AllowBindParams: true,
-			},
-			q: "SELECT ?, ?, ?",
+			tablePathPrefix: "/local/",
+			q:               "SELECT ?, ?, ?",
 			args: []driver.NamedValue{
 				{Value: 1},
 				{Value: 2},
@@ -206,11 +184,8 @@ SELECT $p0, $p1, $p2`,
 			expErr: nil,
 		},
 		{
-			b: Bindings{
-				TablePathPrefix: "/local/",
-				AllowBindParams: true,
-			},
-			q: "SELECT ?, ?, ?",
+			tablePathPrefix: "/local/",
+			q:               "SELECT ?, ?, ?",
 			args: []driver.NamedValue{
 				{Value: 1},
 				{Value: int64(2)},
@@ -235,7 +210,7 @@ SELECT $p0, $p1, $p2`,
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			query, params, err := tt.b.Bind(tt.q, tt.args...)
+			query, params, err := Bind(tt.q, tt.tablePathPrefix, tt.args...)
 			if tt.expErr != nil {
 				require.ErrorIs(t, err, tt.expErr)
 			} else {

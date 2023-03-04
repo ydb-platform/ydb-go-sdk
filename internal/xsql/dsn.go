@@ -2,14 +2,12 @@ package xsql
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/bind"
 )
 
 func Parse(dataSourceName string) (opts []config.Option, connectorOpts []ConnectorOption, err error) {
@@ -32,16 +30,7 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 		connectorOpts = append(connectorOpts, WithDefaultQueryMode(mode))
 	}
 	if tablePathPrefix := info.Params.Get("table_path_prefix"); tablePathPrefix != "" {
-		connectorOpts = append(connectorOpts, WithBindings(bind.WithTablePathPrefix(tablePathPrefix)))
-	}
-	if bindParams := info.Params.Get("bind_params"); bindParams != "" {
-		b, err := strconv.ParseBool(bindParams)
-		if err != nil {
-			return nil, nil, xerrors.WithStackTrace(err)
-		}
-		if b {
-			connectorOpts = append(connectorOpts, WithBindings(bind.WithAutoBindParams()))
-		}
+		connectorOpts = append(connectorOpts, WithTablePathPrefix(tablePathPrefix))
 	}
 	return opts, connectorOpts, nil
 }

@@ -12,6 +12,7 @@ type (
 	ctxDataQueryOptionsKey   struct{}
 	ctxScanQueryOptionsKey   struct{}
 	ctxModeTypeKey           struct{}
+	ctxStrictYQLKey          struct{}
 )
 
 // WithQueryMode returns a copy of context with given QueryMode
@@ -25,6 +26,17 @@ func queryModeFromContext(ctx context.Context, defaultQueryMode QueryMode) Query
 		return m
 	}
 	return defaultQueryMode
+}
+
+// WithStrictYQL returns a copy of context with strict YQL flag
+func WithStrictYQL(ctx context.Context) context.Context {
+	return context.WithValue(ctx, ctxModeTypeKey{}, true)
+}
+
+// isStrictYQL returns true if context have strict YQL flag
+func isStrictYQL(ctx context.Context) bool {
+	v, ok := ctx.Value(ctxStrictYQLKey{}).(bool)
+	return ok && v
 }
 
 func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.Context {
