@@ -33,7 +33,7 @@ func TestDatabaseSql(t *testing.T) {
 	scope := sqlScope{
 		folder: t.Name(),
 	}
-	ctx, cancel := context.WithTimeout(ydb.WithStrictYQL(xtest.Context(t)), 42*time.Second)
+	ctx, cancel := context.WithTimeout(xtest.Context(t), 42*time.Second)
 	defer cancel()
 
 	var totalConsumedUnits uint64
