@@ -33,21 +33,19 @@ import (
 )
 
 func TestSendAsyncMessages(t *testing.T) {
-	ctx := context.Background()
-	db := connect(t)
-	topicPath := createTopic(ctx, t, db)
+	scope := newScope(t)
+	db := scope.Driver()
+	topicPath := scope.TopicPath()
+	reader := scope.TopicReader()
 
 	content := "hello"
 
 	writer, err := db.Topic().StartWriter(topicPath)
 	require.NoError(t, err)
 	require.NotEmpty(t, writer)
-	require.NoError(t, writer.Write(ctx, topicwriter.Message{Data: strings.NewReader(content)}))
+	require.NoError(t, writer.Write(scope.Ctx, topicwriter.Message{Data: strings.NewReader(content)}))
 
-	reader, err := db.Topic().StartReader(consumerName, topicoptions.ReadTopic(topicPath))
-	require.NoError(t, err)
-
-	readCtx, cancel := context.WithTimeout(ctx, time.Second)
+	readCtx, cancel := context.WithTimeout(scope.Ctx, time.Second)
 	defer cancel()
 	mess, err := reader.ReadMessage(readCtx)
 	require.NoError(t, err)

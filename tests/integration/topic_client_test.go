@@ -25,31 +25,30 @@ const defaultConnectionString = "grpc://localhost:2136/local"
 const commonConsumerName = "consumer"
 
 func TestTopicCreateDrop(t *testing.T) {
-	ctx := xtest.Context(t)
-	db := connect(t)
-	topicPath := db.Name() + "/testtopic"
+	scope := newScope(t)
+	ctx := scope.Ctx
+	db := scope.Driver()
+	topicPath := path.Join(scope.Folder(), "testtopic")
 
-	_ = db.Topic().Drop(ctx, topicPath)
-	err := db.Topic().Create(ctx, topicPath,
-		topicoptions.CreateWithConsumer(
-			topictypes.Consumer{
-				Name: "test",
-			},
-		),
-	)
-	require.NoError(t, err)
+	err := db.Topic().Create(ctx, topicPath)
+	scope.Require.NoError(err)
 
 	_, err = db.Topic().Describe(ctx, topicPath)
-	require.NoError(t, err)
+	scope.Require.NoError(err)
 
 	err = db.Topic().Drop(ctx, topicPath)
-	require.NoError(t, err)
+	scope.Require.NoError(err)
+
+	_, err = db.Topic().Describe(ctx, topicPath)
+	scope.Require.Error(err)
 }
 
 func TestTopicDescribe(t *testing.T) {
-	ctx := xtest.Context(t)
-	db := connect(t)
-	topicName := "test-topic-" + t.Name()
+	scope := newScope(t)
+	ctx := scope.Ctx
+	db := scope.Driver()
+	topicName := "topic"
+	topicPath := path.Join(scope.Folder(), topicName)
 
 	var (
 		supportedCodecs     = []topictypes.Codec{topictypes.CodecRaw, topictypes.CodecGzip}
@@ -73,8 +72,7 @@ func TestTopicDescribe(t *testing.T) {
 		}
 	)
 
-	_ = db.Topic().Drop(ctx, topicName)
-	err := db.Topic().Create(ctx, topicName,
+	err := db.Topic().Create(ctx, topicPath,
 		topicoptions.CreateWithSupportedCodecs(supportedCodecs...),
 		topicoptions.CreateWithMinActivePartitions(minActivePartitions),
 		// topicoptions.CreateWithPartitionCountLimit(partitionCountLimit), LOGBROKER-7800
@@ -85,10 +83,10 @@ func TestTopicDescribe(t *testing.T) {
 		topicoptions.CreateWithConsumer(consumers...),
 		// topicoptions.CreateWithMeteringMode(topictypes.MeteringModeRequestUnits), - work with serverless only
 	)
-	require.NoError(t, err)
+	scope.Require.NoError(err)
 
-	res, err := db.Topic().Describe(ctx, topicName)
-	require.NoError(t, err)
+	res, err := db.Topic().Describe(ctx, topicPath)
+	scope.Require.NoError(err)
 
 	expected := topictypes.TopicDescription{
 		Path: topicName,
@@ -120,8 +118,8 @@ func TestTopicDescribe(t *testing.T) {
 		t.Helper()
 		for k, subValue := range *subset {
 			checkedValue, ok := (*checked)[k]
-			require.True(t, ok, k)
-			require.Equal(t, subValue, checkedValue)
+			scope.Require.True(ok, k)
+			scope.Require.Equal(subValue, checkedValue)
 		}
 		*checked = nil
 		*subset = nil
@@ -133,16 +131,16 @@ func TestTopicDescribe(t *testing.T) {
 		requireAndCleanSubset(&res.Consumers[i].Attributes, &expected.Consumers[i].Attributes)
 	}
 
-	require.Equal(t, expected, res)
+	scope.Require.Equal(expected, res)
 }
 
 func TestSchemeList(t *testing.T) {
-	ctx := xtest.Context(t)
-	db := connect(t)
-
-	topicPath := createTopic(ctx, t, db)
-	list, err := db.Scheme().ListDirectory(ctx, db.Name())
-	require.NoError(t, err)
+	scope := newScope(t)
+	ctx := scope.Ctx
+	db := scope.Driver()
+	topicPath := scope.TopicPath()
+	list, err := db.Scheme().ListDirectory(ctx, scope.Folder())
+	scope.Require.NoError(err)
 
 	topicName := path.Base(topicPath)
 
@@ -152,7 +150,7 @@ func TestSchemeList(t *testing.T) {
 			hasTopic = true
 		}
 	}
-	require.True(t, hasTopic)
+	scope.Require.True(hasTopic)
 }
 
 func connect(t testing.TB, opts ...ydb.Option) *ydb.Driver {

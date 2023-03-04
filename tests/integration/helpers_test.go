@@ -7,9 +7,13 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/bind"
+	"github.com/rekby/fixenv"
+	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -18,15 +22,6 @@ import (
 	"path"
 	"testing"
 	"time"
-
-	"github.com/rekby/fixenv"
-	"github.com/stretchr/testify/require"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
-	"github.com/ydb-platform/ydb-go-sdk/v3/log"
-	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 type scopeT struct {
@@ -254,7 +249,7 @@ func (scope *scopeT) TopicReader(topicPath ...string) *topicreader.Reader {
 		func() (res interface{}, cleanup fixenv.FixtureCleanupFunc, err error) {
 			reader, err := scope.Driver().Topic().StartReader(
 				scope.TopicConsumer(topic),
-				topicoptions.ReadTopic(scope.TableCDCPath()),
+				topicoptions.ReadTopic(topic),
 			)
 			cleanup = func() {
 				if reader != nil {

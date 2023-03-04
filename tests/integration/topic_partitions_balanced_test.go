@@ -5,6 +5,7 @@ package integration
 
 import (
 	"context"
+	"path"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
@@ -21,17 +21,14 @@ import (
 )
 
 func TestTopicPartitionsBalanced(t *testing.T) {
-	ctx := xtest.Context(t)
-	db := connect(t)
-	topicPath := db.Name() + "/topic-" + t.Name()
+	scope := newScope(t)
+	ctx := scope.Ctx
+	db := scope.Driver()
 
-	err := db.Topic().Drop(ctx, topicPath)
-	if err != nil {
-		require.True(t, ydb.IsOperationErrorSchemeError(err))
-	}
+	topicPath := path.Join(scope.Folder(), "topic")
 
 	consumer := "test-consumer-" + t.Name()
-	err = db.Topic().Create(ctx, topicPath,
+	err := db.Topic().Create(ctx, topicPath,
 		topicoptions.CreateWithMinActivePartitions(2),
 		topicoptions.CreateWithPartitionCountLimit(2),
 		topicoptions.CreateWithConsumer(topictypes.Consumer{Name: consumer}),

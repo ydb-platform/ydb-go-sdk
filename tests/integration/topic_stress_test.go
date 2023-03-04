@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"math/rand"
+	"path"
 	"runtime"
 	"strconv"
 	"strings"
@@ -28,10 +29,11 @@ import (
 )
 
 func TestReadersWritersStress(t *testing.T) {
-	ctx := xtest.Context(t)
-	db := connect(t)
+	scope := newScope(t)
+	ctx := scope.Ctx
+	db := scope.Driver()
 
-	topicPrefix := db.Name() + "/stress-topic-"
+	topicPrefix := path.Join(scope.Folder(), "stress-topic-")
 	consumerName := commonConsumerName
 
 	writeTime := time.Second * 10
