@@ -24,12 +24,16 @@ func TestField_String(t *testing.T) {
 		fail  bool
 	}
 
+	types := make(map[FieldType]bool)
+
 	tests := []test{}
 
-	for i := 0; i < int(EndType); i++ {
+	for i := 0; i <= int(EndType); i++ {
 
 		ftype := FieldType(i)
 		name := ftype.String()
+
+		types[ftype] = false
 
 		switch ftype {
 		case IntType:
@@ -60,6 +64,8 @@ func TestField_String(t *testing.T) {
 			tests = append(tests, test{name: name, f: Stringer(name, &stringerTest{}), want: "stringerTest"})
 		case InvalidType:
 			tests = append(tests, test{name: "panic InvalidType" + name, f: Field{ftype: ftype, key: "default"}, want: "", panic: true})
+		case EndType:
+			tests = append(tests, test{name: "panic EndType" + name, f: Field{ftype: ftype, key: "default"}, want: "", panic: true})
 		default:
 			tests = append(tests, test{name: "fail " + name, f: Field{ftype: ftype, key: "default"}, want: "", fail: true})
 		}
@@ -67,6 +73,7 @@ func TestField_String(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+
 		t.Run(tt.name, func(t *testing.T) {
 
 			// Known fieldType, but String() panics with it.

@@ -56,6 +56,17 @@ func (st *stringerTest) String() string {
 	return "stringerTest"
 }
 
+func AllFieldTypesMap() map[logs.FieldType]bool {
+
+	allTypes := make(map[logs.FieldType]bool)
+
+	for i := 1; i < int(logs.EndType); i++ {
+		allTypes[logs.FieldType(i)] = false
+	}
+
+	return allTypes
+}
+
 func Test_adapter_Log(t *testing.T) {
 
 	l := &TestLogger{out: &bytes.Buffer{}}
@@ -144,6 +155,18 @@ func Test_adapter_Log(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+
+			allTypes := AllFieldTypesMap()
+
+			for _, field := range tt.args.fields {
+				allTypes[field.Type()] = true
+			}
+
+			for fieldType, typeIsPresent := range allTypes {
+				if !typeIsPresent {
+					require.Fail(t, fmt.Sprintf("type %s not present", fieldType.String()))
+				}
+			}
 
 			if tt.fail {
 				require.Panics(t, func() { tt.a.Log(tt.args.opts, tt.args.msg, tt.args.fields...) })
