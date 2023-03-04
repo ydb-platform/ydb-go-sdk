@@ -27,32 +27,52 @@ const (
 )
 
 func TestReadMessagesAndCommit(t *testing.T) {
-	ctx := xtest.Context(t)
+	scope := newScope(t)
+	db := scope.Driver()
+	tablePath := scope.TablePathBackticked()
+	cdcPath := scope.TableCDCPath()
+	syncReader := scope.TopicReaderSync(cdcPath)
 
-	db, reader := createFeedAndReader(ctx, t, topicoptions.WithCommitMode(topicoptions.CommitModeSync))
+	rowID := int64(0)
+	sendCDCMessage := func() {
+		query := fmt.Sprintf(`
+DECLARE $id AS Int64;
 
-	sendCDCMessage(ctx, t, db)
+INSERT INTO %s (id) VALUES ($id)`,
+			tablePath,
+		)
+		err := db.Table().DoTx(scope.Ctx, func(ctx context.Context, tx table.TransactionActor) error {
+			_, err := tx.Execute(ctx, query, table.NewQueryParameters(
+				table.ValueParam("$id", types.Int64Value(rowID)),
+			))
+			return err
+		})
+		scope.Require.NoError(err)
+		rowID++
+	}
 
-	msg, err := reader.ReadMessage(ctx)
+	sendCDCMessage()
+
+	msg, err := syncReader.ReadMessage(scope.Ctx)
 	require.NoError(t, err)
 	require.Equal(t, int64(1), msg.SeqNo)
 
-	require.NoError(t, reader.Commit(ctx, msg))
-	require.NoError(t, reader.Close(ctx))
+	require.NoError(t, syncReader.Commit(scope.Ctx, msg))
+	require.NoError(t, syncReader.Close(scope.Ctx))
 
-	sendCDCMessage(ctx, t, db)
-	sendCDCMessage(ctx, t, db)
-	reader = createFeedReader(t, db)
+	sendCDCMessage()
+	sendCDCMessage()
 
+	reader := scope.TopicReader(cdcPath)
 	// read only no committed messages
 	for i := 0; i < 2; i++ {
-		msg, err = reader.ReadMessage(ctx)
+		msg, err = reader.ReadMessage(scope.Ctx)
 		require.NoError(t, err)
 		require.Equal(t, int64(i)+2, msg.SeqNo)
 	}
 
 	// and can't read more messages
-	ctxTimeout, cancel := context.WithTimeout(ctx, time.Second/10)
+	ctxTimeout, cancel := context.WithTimeout(scope.Ctx, time.Second/10)
 	_, err = reader.ReadMessage(ctxTimeout)
 	cancel()
 	require.ErrorIs(t, err, context.DeadlineExceeded)
