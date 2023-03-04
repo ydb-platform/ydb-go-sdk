@@ -1,12 +1,10 @@
 -- modified by ydb-go-sdk@{{ .Version }}
-{{- if .PrintSourceQuery }}
 --
 -- source query:
 {{- range $line := Lines .SourceQuery }}
 --   {{ $line }}
 {{- end }}
 --
-{{- end }}
 {{- range $i, $pragma := .Pragmas }}
 {{ $pragma }};
 {{- end }}

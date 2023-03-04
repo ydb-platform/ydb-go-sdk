@@ -1,8 +1,8 @@
 package bind
 
-func (b Bindings) pragmas() (pragmas []string) {
-	if b.TablePathPrefix != "" {
-		pragmas = append(pragmas, "PRAGMA TablePathPrefix(\""+b.TablePathPrefix+"\")")
+func pragmas(tablePathPrefix string) (pragmas []string) {
+	if tablePathPrefix != "" {
+		pragmas = append(pragmas, "PRAGMA TablePathPrefix(\""+tablePathPrefix+"\")")
 	}
 	return pragmas
 }

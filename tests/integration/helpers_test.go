@@ -23,6 +23,8 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
@@ -121,15 +123,12 @@ func (scope *scopeT) Logf(format string, args ...interface{}) {
 	scope.t.Logf(format, args...)
 }
 
-func (scope *scopeT) SQLDriverWithBinded() *sql.DB {
+func (scope *scopeT) SQLDriverWithFolder() *sql.DB {
 	return scope.Cache(nil, nil, func() (res interface{}, err error) {
 		driver := scope.Driver()
 		scope.Logf("Create sql db connector")
 		connector, err := ydb.Connector(driver,
-			ydb.WithBindings(
-				bind.WithTablePathPrefix(scope.Folder()),
-				bind.WithAutoBindParams(),
-			),
+			ydb.WithTablePathPrefix(scope.Folder()),
 		)
 		if err != nil {
 			return nil, err

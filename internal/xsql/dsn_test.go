@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 )
 
@@ -63,7 +62,7 @@ func TestParse(t *testing.T) {
 			expErr: nil,
 		},
 		{
-			dsn: "grpc://localhost:2135/local?query_mode=scripting&bind_params=true&table_path_prefix=path/to/tables",
+			dsn: "grpc://localhost:2135/local?query_mode=scripting&table_path_prefix=path/to/tables",
 			expOpts: []config.Option{
 				config.WithSecure(false),
 				config.WithEndpoint("localhost:2135"),
@@ -71,10 +70,7 @@ func TestParse(t *testing.T) {
 			},
 			expConnectorOpts: []ConnectorOption{
 				WithDefaultQueryMode(ScriptingQueryMode),
-				WithBindings(
-					bind.TablePathPrefix("path/to/tables"),
-					bind.Params(),
-				),
+				WithTablePathPrefix("path/to/tables"),
 			},
 			expErr: nil,
 		},

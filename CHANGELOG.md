@@ -1,10 +1,8 @@
-* Fixed sugar.RecursiveRemove for remove full path 
-* BROKEN CHANGE in experimantal topic api: producer id on start writer now is optional
-* BROKEN CHANGE in experimantal topic api: remove WithMessageGroupID option (because not supported now)
-* Supported binding parameters for `database/sql` driver
-* Added packaged `bind` with bindings options `WithTablePathPrefix(tablePathPrefix)` and `Params()`
-* Added `ydb.WithBindings` connector option
-* Fixed bug with ignoring default scan and data query options
+* Fixed sugar.RecursiveRemove for remove full path
+* BROKEN CHANGE in experimental topic api: producer id on start writer now is optional
+* BROKEN CHANGE in experimental topic api: remove `WithMessageGroupID` option (because not supported now)
+* Supported binding parameters for `database/sql` driver by default
+* Added connector option `ydb.WithTablePathPrefix(tablePathPrefix)` and connection string parameter `table_path_prefix`
 * Fixed topic retry policy callback call: not call it with nil error 
 * Fixed bug with no checking operation error on `discovery.Client` calls
 * Allowed zero create session timeout in `ydb.WithSessionPoolCreateSessionTimeout(timeout)` (less than or equal to zero - no used timeout on create session request)

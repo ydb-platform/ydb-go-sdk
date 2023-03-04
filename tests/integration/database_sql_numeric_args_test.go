@@ -14,7 +14,7 @@ import (
 
 func TestDatabaseSqlNumericArgs(t *testing.T) {
 	scope := newScope(t)
-	db := scope.SQLDriverWithBinded()
+	db := scope.SQLDriverWithFolder()
 	dt := time.Date(2023, 3, 1, 16, 34, 18, 0, time.UTC)
 
 	var row *sql.Row

@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
@@ -32,7 +33,7 @@ func TestDatabaseSql(t *testing.T) {
 	scope := sqlScope{
 		folder: t.Name(),
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
+	ctx, cancel := context.WithTimeout(xtest.Context(t), 42*time.Second)
 	defer cancel()
 
 	var totalConsumedUnits uint64
