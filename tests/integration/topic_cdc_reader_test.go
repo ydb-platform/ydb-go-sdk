@@ -14,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
@@ -79,53 +78,51 @@ INSERT INTO %s (id) VALUES ($id)`,
 }
 
 func TestCDCFeedSendTopicPathSameAsSubscribed(t *testing.T) {
-	ctx := xtest.Context(t)
+	scope := newScope(t)
 
-	db, reader := createFeedAndReader(ctx, t)
+	db := scope.Driver()
+	cdcPath := scope.TableCDCPath()
 
-	topicName := "feed"
-	topicPath := db.Name() + "/test/feed"
+	reader := scope.TopicReader(cdcPath)
 
-	t.Run("ReceivedMessage", func(t *testing.T) {
-		sendCDCMessage(ctx, t, db)
-
-		msg, err := reader.ReadMessage(ctx)
-		require.NoError(t, err)
-
-		require.Equal(t, topicPath, msg.Topic())
+	// send cdc messages
+	err := db.Table().DoTx(scope.Ctx, func(ctx context.Context, tx table.TransactionActor) error {
+		query := fmt.Sprintf(`INSERT INTO %s (id) VALUES(1)`, scope.TablePathBackticked())
+		_, err := tx.Execute(ctx, query, nil)
+		return err
 	})
-	t.Run("Describe", func(t *testing.T) {
-		res, err := db.Topic().Describe(ctx, topicPath)
-		require.NoError(t, err)
-		require.Equal(t, topicName, res.Path)
-	})
-}
+	scope.Require.NoError(err)
 
-func TestTopicPath(t *testing.T) {
-	ctx := xtest.Context(t)
-	db := connect(t)
+	msg, err := reader.ReadMessage(scope.Ctx)
+	scope.Require.NoError(err)
+	scope.Require.Equal(cdcPath, msg.Topic())
 
-	topicPath := db.Name() + "/" + t.Name()
-	_ = db.Topic().Drop(ctx, topicPath)
+	description, err := db.Topic().Describe(scope.Ctx, cdcPath)
+	scope.Require.NoError(err)
 
-	err := db.Topic().Create(ctx, topicPath)
-	require.NoError(t, err)
+	cdcName := path.Base(cdcPath)
+	scope.Require.Equal(cdcName, description.Path)
 }
 
 func TestCDCInTableDescribe(t *testing.T) {
-	ctx := xtest.Context(t)
-	db := connect(t)
-	topicPath := createCDCFeed(ctx, t, db)
 
 	t.Run("SchemeDescribePath", func(t *testing.T) {
-		desc, err := db.Scheme().DescribePath(ctx, topicPath)
+		scope := newScope(t)
+		db := scope.Driver()
+		topicPath := scope.TableCDCPath()
+
+		desc, err := db.Scheme().DescribePath(scope.Ctx, topicPath)
 		require.NoError(t, err)
 		require.True(t, desc.IsTopic())
 	})
 
 	t.Run("DescribeTable", func(t *testing.T) {
-		err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
-			tablePath := path.Dir(topicPath)
+		scope := newScope(t)
+		db := scope.Driver()
+		topicPath := scope.TableCDCPath()
+
+		err := db.Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
+			tablePath := scope.TablePath()
 			topicName := path.Base(topicPath)
 			desc, err := s.DescribeTable(ctx, tablePath)
 			if err != nil {
