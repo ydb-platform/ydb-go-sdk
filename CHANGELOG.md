@@ -1,3 +1,4 @@
+* Fixed sugar.RecursiveRemove for remove full path 
 * BROKEN CHANGE in experimantal topic api: producer id on start writer now is optional
 * BROKEN CHANGE in experimantal topic api: remove WithMessageGroupID option (because not supported now)
 * Supported binding parameters for `database/sql` driver
