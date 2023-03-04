@@ -103,7 +103,7 @@ func (scope *scopeT) Driver() *ydb.Driver {
 	}).(*ydb.Driver)
 }
 
-func (scope *scopeT) SQLDriverWithBinded() *sql.DB {
+func (scope *scopeT) SQLDriverWithFolder() *sql.DB {
 	return scope.Cache(nil, nil, func() (res interface{}, err error) {
 		driver := scope.Driver()
 		scope.Logf("Create sql db connector")
