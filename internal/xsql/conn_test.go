@@ -1,6 +1,11 @@
 package xsql
 
-import "context"
+import (
+	"context"
+	"fmt"
+	"github.com/stretchr/testify/require"
+	"testing"
+)
 
 var (
 	_ interface {
@@ -51,3 +56,77 @@ var (
 		GetIndexColumns(ctx context.Context, tableName string, indexName string) (columns []string, err error)
 	} = (*conn)(nil)
 )
+
+func Test_hasDeclare(t *testing.T) {
+	for _, tt := range []struct {
+		query      string
+		hasDeclare bool
+	}{
+		{
+			query:      "",
+			hasDeclare: false,
+		},
+		{
+			query:      "SELECT 1",
+			hasDeclare: false,
+		},
+		{
+			query:      "DECLARE",
+			hasDeclare: false,
+		},
+		{
+			query:      "DECLARE v AS Utf8",
+			hasDeclare: false,
+		},
+		{
+			query:      "DECLARE v AS Utf8;",
+			hasDeclare: false,
+		},
+		{
+			query:      "DECLARE $v AS Utf8",
+			hasDeclare: false,
+		},
+		{
+			query:      "DECLARE $v AS Utf8;",
+			hasDeclare: true,
+		},
+		{
+			query:      "declare $v as Utf8;",
+			hasDeclare: true,
+		},
+		{
+			query:      "declare $v as Utf8 ;",
+			hasDeclare: true,
+		},
+		{
+			query: `
+				DECLARE $v AS
+				Utf8;`,
+			hasDeclare: true,
+		},
+		{
+			query: `
+				DECLARE 
+					$v
+				AS
+					Utf8;`,
+			hasDeclare: true,
+		},
+		{
+			query: `
+				DECLARE $v
+					AS				Utf8;`,
+			hasDeclare: true,
+		},
+		{
+			query: `
+				DECLARE 
+					$v AS Utf8;`,
+			hasDeclare: true,
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			require.Equal(t, tt.hasDeclare, hasDeclare(tt.query), fmt.Sprintf("%q must be %v, but not", tt.query, tt.hasDeclare))
+		})
+	}
+}

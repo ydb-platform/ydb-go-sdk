@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"path"
+	"regexp"
 	"sync/atomic"
 	"time"
 
@@ -382,10 +383,16 @@ func (c *conn) Begin() (driver.Tx, error) {
 	return nil, errDeprecated
 }
 
+var declareRe = regexp.MustCompile(`[dD][eE][cC][lL][aA][rR][eE]\s+\$([^\s]+)+\s+[aA][sS]\s+([^\s]+)+\s*\;`)
+
+func hasDeclare(query string) bool {
+	return declareRe.MatchString(query)
+}
+
 func (c *conn) native(ctx context.Context, q string, args ...driver.NamedValue) (
 	query string, _ *table.QueryParameters, _ error,
 ) {
-	if isStrictYQL(ctx) {
+	if isStrictYQL(ctx) || hasDeclare(q) {
 		params := make([]table.ParameterOption, len(args))
 		for i, arg := range args {
 			switch v := arg.Value.(type) {
