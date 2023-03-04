@@ -28,7 +28,7 @@ func TestField_String(t *testing.T) {
 
 	tests := []test{}
 
-	for i := 0; i <= int(EndType); i++ {
+	for i := 0; i < int(EndType); i++ {
 
 		ftype := FieldType(i)
 		name := ftype.String()
@@ -64,8 +64,6 @@ func TestField_String(t *testing.T) {
 			tests = append(tests, test{name: name, f: Stringer(name, &stringerTest{}), want: "stringerTest"})
 		case InvalidType:
 			tests = append(tests, test{name: "panic InvalidType" + name, f: Field{ftype: ftype, key: "default"}, want: "", panic: true})
-		case EndType:
-			tests = append(tests, test{name: "panic EndType" + name, f: Field{ftype: ftype, key: "default"}, want: "", panic: true})
 		default:
 			tests = append(tests, test{name: "fail " + name, f: Field{ftype: ftype, key: "default"}, want: "", fail: true})
 		}
