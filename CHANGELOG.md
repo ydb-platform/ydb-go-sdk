@@ -11,6 +11,8 @@ Changes in ydb connection:
 * BROKEN CHANGE: remove method With for ydb.Connection (use *Driver.With) if need.
 
 Notes:
+Most users can skip there notes and upgrade as usual because build beroken for rare used methods (expiremental API and api for special cases, not need for common use YDB) and this version will not change behaviour.
+
 For most users there changes will not broke them code because new *Driver is implement old ydb.Connection interface and previous code with ydb.Connection variables will continue to work. ydb.Connection.With not need for normal work with YDB. it need for rare special cases only.
 
 It is intermediate version for API changes: if you use topic writer or use strong linter with deny to use
