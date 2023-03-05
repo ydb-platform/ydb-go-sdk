@@ -690,9 +690,9 @@ func testTable(t testing.TB) {
 					> >;
 					UPSERT INTO stream_query
 					SELECT
-						val 
+						val
 					FROM
-						AS_TABLE($values);            
+						AS_TABLE($values);
 				`, table.NewQueryParameters(
 					table.ValueParam(
 						"$values",
@@ -1242,28 +1242,28 @@ func (scope *tableTestScope) fill(ctx context.Context, db ydb.Connection, folder
 		func(ctx context.Context, s table.Session) (err error) {
 			stmt, err := s.Prepare(ctx, scope.render(template.Must(template.New("fillQuery database").Parse(`
 				PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
-				
+
 				DECLARE $seriesData AS List<Struct<
 					series_id: Uint64,
 					title: Text,
 					series_info: Text,
 					release_date: Date,
 					comment: Optional<Text>>>;
-				
+
 				DECLARE $seasonsData AS List<Struct<
 					series_id: Uint64,
 					season_id: Uint64,
 					title: Text,
 					first_aired: Date,
 					last_aired: Date>>;
-				
+
 				DECLARE $episodesData AS List<Struct<
 					series_id: Uint64,
 					season_id: Uint64,
 					episode_id: Uint64,
 					title: Text,
 					air_date: Date>>;
-				
+
 				REPLACE INTO series
 				SELECT
 					series_id,
@@ -1272,7 +1272,7 @@ func (scope *tableTestScope) fill(ctx context.Context, db ydb.Connection, folder
 					release_date,
 					comment
 				FROM AS_TABLE($seriesData);
-				
+
 				REPLACE INTO seasons
 				SELECT
 					series_id,
@@ -1281,7 +1281,7 @@ func (scope *tableTestScope) fill(ctx context.Context, db ydb.Connection, folder
 					first_aired,
 					last_aired
 				FROM AS_TABLE($seasonsData);
-				
+
 				REPLACE INTO episodes
 				SELECT
 					series_id,
@@ -1404,7 +1404,7 @@ func TestLongStream(t *testing.T) {
 	var (
 		tableName         = `long_stream_query`
 		discoveryInterval = 10 * time.Second
-		db                ydb.Connection
+		db                *ydb.Driver
 		err               error
 		upsertRowsCount   = 100000
 		batchSize         = 10000
@@ -1487,9 +1487,9 @@ func TestLongStream(t *testing.T) {
 								>>;
 								UPSERT INTO `+"`"+path.Join(db.Name(), tableName)+"`"+`
 								SELECT
-									val 
+									val
 								FROM
-									AS_TABLE($values);            
+									AS_TABLE($values);
 							`, table.NewQueryParameters(
 								table.ValueParam(
 									"$values",
@@ -1703,9 +1703,9 @@ func TestSplitRangesAndRead(t *testing.T) {
 								>>;
 								UPSERT INTO `+"`"+path.Join(db.Name(), tableName)+"`"+`
 								SELECT
-									id 
+									id
 								FROM
-									AS_TABLE($values);            
+									AS_TABLE($values);
 							`, table.NewQueryParameters(
 								table.ValueParam(
 									"$values",
