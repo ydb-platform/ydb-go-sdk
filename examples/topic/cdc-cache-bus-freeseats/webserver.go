@@ -20,7 +20,7 @@ var errNotEnthoughtFreeSeats = errors.New("not enough free seats")
 type server struct {
 	cache     *Cache
 	mux       http.ServeMux
-	db        *ydb.Driver
+	db        ydb.Connection
 	dbCounter int64
 	id        int
 }
