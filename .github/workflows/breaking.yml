@@ -19,7 +19,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Build examples
-        run: go build ./examples/...
+        run: |
+          cd examples
+          go mod download
+          go build ./...
       - name: Gorelease cache
         uses: actions/cache@v3
         with:
