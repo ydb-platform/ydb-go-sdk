@@ -201,7 +201,6 @@ issues:
   # Default: []
   exclude:
     - "has been deprecated since Go 1.16"
-    - "ydb.Connection is deprecated"
 
   # Independently from option `exclude` we use default exclude patterns,
   # it can be disabled by this option. To list all
@@ -236,3 +235,5 @@ issues:
       linters:
         - unused
         - unparam
+    - path: _test\.go
+      text: "ydb.Connection is deprecated"
