@@ -122,7 +122,7 @@ func WithDisableServerBalancer() ConnectorOption {
 }
 
 func Connector(db Connection, opts ...ConnectorOption) (*xsql.Connector, error) {
-	if c, ok := db.(*connection); ok {
+	if c, ok := db.(*Driver); ok {
 		opts = append(opts, c.databaseSQLOptions...)
 	}
 	c, err := xsql.Open(d, db, opts...)

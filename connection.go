@@ -45,8 +45,7 @@ import (
 // Connection interface provide access to YDB service clients
 // Interface and list of clients may be changed in the future
 //
-// This interface is central part for access to various systems
-// embedded to ydb through one configured connection method.
+// Deprecated: use directly *Driver type from ydb.Open instead
 type Connection interface {
 	// Endpoint returns initial endpoint
 	Endpoint() string
@@ -80,13 +79,10 @@ type Connection interface {
 
 	// Topic returns topic client
 	Topic() topic.Client
-
-	// With makes child connection with the same options and another options
-	With(ctx context.Context, opts ...Option) (Connection, error)
 }
 
-//nolint:maligned
-type connection struct {
+// Driver type provide access to YDB service clients
+type Driver struct { //nolint:maligned
 	userInfo *dsn.UserInfo
 
 	opts []Option
@@ -131,12 +127,13 @@ type connection struct {
 
 	children    map[uint64]Connection
 	childrenMtx xsync.Mutex
-	onClose     []func(c *connection)
+	onClose     []func(c *Driver)
 
 	panicCallback func(e interface{})
 }
 
-func (c *connection) Close(ctx context.Context) error {
+// Close closes Driver and clear resources
+func (c *Driver) Close(ctx context.Context) error {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
@@ -180,49 +177,23 @@ func (c *connection) Close(ctx context.Context) error {
 	return nil
 }
 
-func (c *connection) Invoke(
-	ctx context.Context,
-	method string,
-	args interface{},
-	reply interface{},
-	opts ...grpc.CallOption,
-) (err error) {
-	return c.balancer.Invoke(
-		conn.WithoutWrapping(ctx),
-		method,
-		args,
-		reply,
-		opts...,
-	)
-}
-
-func (c *connection) NewStream(
-	ctx context.Context,
-	desc *grpc.StreamDesc,
-	method string,
-	opts ...grpc.CallOption,
-) (grpc.ClientStream, error) {
-	return c.balancer.NewStream(
-		conn.WithoutWrapping(ctx),
-		desc,
-		method,
-		opts...,
-	)
-}
-
-func (c *connection) Endpoint() string {
+// Endpoint returns initial endpoint
+func (c *Driver) Endpoint() string {
 	return c.config.Endpoint()
 }
 
-func (c *connection) Name() string {
+// Name returns database name
+func (c *Driver) Name() string {
 	return c.config.Database()
 }
 
-func (c *connection) Secure() bool {
+// Secure returns true if database Driver is secure
+func (c *Driver) Secure() bool {
 	return c.config.Secure()
 }
 
-func (c *connection) Table() table.Client {
+// Table returns table client
+func (c *Driver) Table() table.Client {
 	c.tableOnce.Init(func() closeFunc {
 		c.table = internalTable.New(
 			c.balancer,
@@ -242,7 +213,8 @@ func (c *connection) Table() table.Client {
 	return c.table
 }
 
-func (c *connection) Scheme() scheme.Client {
+// Scheme returns scheme client
+func (c *Driver) Scheme() scheme.Client {
 	c.schemeOnce.Init(func() closeFunc {
 		c.scheme = internalScheme.New(
 			c.balancer,
@@ -263,7 +235,8 @@ func (c *connection) Scheme() scheme.Client {
 	return c.scheme
 }
 
-func (c *connection) Coordination() coordination.Client {
+// Coordination returns coordination client
+func (c *Driver) Coordination() coordination.Client {
 	c.coordinationOnce.Init(func() closeFunc {
 		c.coordination = internalCoordination.New(
 			c.balancer,
@@ -283,7 +256,8 @@ func (c *connection) Coordination() coordination.Client {
 	return c.coordination
 }
 
-func (c *connection) Ratelimiter() ratelimiter.Client {
+// Ratelimiter returns ratelimiter client
+func (c *Driver) Ratelimiter() ratelimiter.Client {
 	c.ratelimiterOnce.Init(func() closeFunc {
 		c.ratelimiter = internalRatelimiter.New(
 			c.balancer,
@@ -303,7 +277,8 @@ func (c *connection) Ratelimiter() ratelimiter.Client {
 	return c.ratelimiter
 }
 
-func (c *connection) Discovery() discovery.Client {
+// Discovery returns discovery client
+func (c *Driver) Discovery() discovery.Client {
 	c.discoveryOnce.Init(func() closeFunc {
 		c.discovery = internalDiscovery.New(
 			c.pool.Get(endpoint.New(c.config.Endpoint())),
@@ -327,7 +302,8 @@ func (c *connection) Discovery() discovery.Client {
 	return c.discovery
 }
 
-func (c *connection) Scripting() scripting.Client {
+// Scripting returns scripting client
+func (c *Driver) Scripting() scripting.Client {
 	c.scriptingOnce.Init(func() closeFunc {
 		c.scripting = internalScripting.New(
 			c.balancer,
@@ -347,12 +323,8 @@ func (c *connection) Scripting() scripting.Client {
 	return c.scripting
 }
 
-// Topic return topic client
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func (c *connection) Topic() topic.Client {
+// Topic returns topic client
+func (c *Driver) Topic() topic.Client {
 	c.topicOnce.Init(func() closeFunc {
 		c.topic = topicclientinternal.New(c.balancer, c.config.Credentials(), c.topicOptions...)
 		return c.topic.Close
@@ -362,12 +334,12 @@ func (c *connection) Topic() topic.Client {
 
 // Open connects to database by DSN and return driver runtime holder
 //
-// DSN accept connection string like
+// DSN accept Driver string like
 //
 //	"grpc[s]://{endpoint}/{database}[?param=value]"
 //
 // See sugar.DSN helper for make dsn from endpoint and database
-func Open(ctx context.Context, dsn string, opts ...Option) (_ Connection, err error) {
+func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, err error) {
 	return open(
 		ctx,
 		append(
@@ -382,12 +354,12 @@ func Open(ctx context.Context, dsn string, opts ...Option) (_ Connection, err er
 // New connects to database and return driver runtime holder
 //
 // Deprecated: use Open with required param connectionString instead
-func New(ctx context.Context, opts ...Option) (_ Connection, err error) {
+func New(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 	return open(ctx, opts...)
 }
 
-func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *connection, err error) {
-	c := &connection{
+func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, err error) {
+	c := &Driver{
 		opts:     opts,
 		children: make(map[uint64]Connection),
 	}
@@ -422,7 +394,7 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *connectio
 	return c, nil
 }
 
-func connect(ctx context.Context, c *connection) error {
+func connect(ctx context.Context, c *Driver) error {
 	var err error
 
 	if c.config.Endpoint() == "" {
@@ -465,7 +437,7 @@ func connect(ctx context.Context, c *connection) error {
 	return nil
 }
 
-func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
+func open(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 	c, err := newConnectionFromOptions(ctx, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -477,15 +449,12 @@ func open(ctx context.Context, opts ...Option) (_ Connection, err error) {
 	return c, nil
 }
 
-// GRPCConn casts ydb.Connection to grpc.ClientConnInterface for executing
+// GRPCConn casts *ydb.Driver to grpc.ClientConnInterface for executing
 // unary and streaming RPC over internal driver balancer.
 //
 // Warning: for connect to driver-unsupported YDB services
-func GRPCConn(conn Connection) grpc.ClientConnInterface {
-	if cc, ok := conn.(*connection); ok {
-		return cc
-	}
-	return nil
+func GRPCConn(cc *Driver) grpc.ClientConnInterface {
+	return conn.WithContextModifier(cc.balancer, conn.WithoutWrapping)
 }
 
 // Helper types for closing lazy clients
