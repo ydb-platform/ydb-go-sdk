@@ -6,6 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -109,6 +110,11 @@ func WithPartitioning(partitioning PublicFuturePartitioning) PublicWriterOption 
 func WithProducerID(producerID string) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.producerID = producerID
+		oldPartitioningType := cfg.defaultPartitioning.Type
+		if oldPartitioningType == rawtopicwriter.PartitioningUndefined ||
+			oldPartitioningType == rawtopicwriter.PartitioningMessageGroupID {
+			WithPartitioning(NewPartitioningWithMessageGroupID(producerID))(cfg)
+		}
 	}
 }
 

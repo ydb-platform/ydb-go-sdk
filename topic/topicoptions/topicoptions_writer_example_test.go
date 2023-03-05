@@ -9,7 +9,6 @@ func ExampleWithWriterCheckRetryErrorFunction() {
 	var db ydb.Connection
 	writer, err := db.Topic().StartWriter(
 		"",
-		"",
 		topicoptions.WithWriterCheckRetryErrorFunction(
 			func(errInfo topicoptions.CheckErrorRetryArgs) topicoptions.CheckErrorRetryResult {
 				// Retry for all transport errors

@@ -224,7 +224,7 @@ func (c *Client) StartReader(
 // # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func (c *Client) StartWriter(producerID, path string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error) {
+func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error) {
 	var connector topicwriterinternal.ConnectFunc = func(ctx context.Context) (
 		topicwriterinternal.RawTopicWriterStream,
 		error,
@@ -234,8 +234,7 @@ func (c *Client) StartWriter(producerID, path string, opts ...topicoptions.Write
 
 	options := []topicoptions.WriterOption{
 		topicwriterinternal.WithConnectFunc(connector),
-		topicwriterinternal.WithTopic(path),
-		topicwriterinternal.WithProducerID(producerID),
+		topicwriterinternal.WithTopic(topicPath),
 		topicwriterinternal.WithCommonConfig(c.cfg.Common),
 		topicwriterinternal.WithTrace(c.cfg.Trace),
 	}
