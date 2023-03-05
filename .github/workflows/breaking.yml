@@ -21,7 +21,6 @@ jobs:
       - name: Build examples
         run: |
           cd examples
-          go mod download
           go build ./...
       - name: Gorelease cache
         uses: actions/cache@v3
