@@ -1,5 +1,9 @@
 * BROKEN CHANGE in experimantal topic api: producer id on start writer now is optional
 * BROKEN CHANGE in experimantal topic api: remove WithMessageGroupID option (because not supported now)
+* Publish internal private ydb.connection as ydb.Driver (implement ydb.Connection)
+* BROKEN CHANGE: ydb.Open(...) return *ydb.Driver instead of ydb.Connection
+* BROKEN CHANGE: ydb.New(...) return *ydb.Driver instead of ydb.Connection
+* BROKEN CHANGE: ydb.GRPCConn accept *ydb.Driver instead of ydb.Connection
 
 ## v3.42.15
 * Fixed checking `nil` error with `internal/xerrors.Is`
