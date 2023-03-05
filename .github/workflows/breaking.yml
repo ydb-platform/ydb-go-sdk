@@ -18,6 +18,8 @@ jobs:
           go-version: "1.20"
       - name: Checkout code
         uses: actions/checkout@v3
+      - name: Build examples
+        run: go build ./examples/...
       - name: Gorelease cache
         uses: actions/cache@v3
         with:
@@ -45,5 +47,5 @@ jobs:
           header: gorelease
           message: |
             ### API Changes
-            
+
             ${{ steps.gorelease.outputs.report }}
