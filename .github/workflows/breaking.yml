@@ -6,7 +6,7 @@ env:
   GO111MODULE: "on"
 
 jobs:
-  gorelease:
+  check-api-not-broken:
     concurrency:
       group: breaking-${{ github.ref }}
       cancel-in-progress: true
