@@ -14,6 +14,10 @@ Changes in ydb connection:
 * Changed argument type for ydb.GRPCConn from `ydb.Connection` to `*ydb.Driver`
 * Removed method `With` from `ydb.Connection` (use *Driver.With) if need.
 
+Dependencies:
+* Up minimal supported version of go to 1.17 for update dependencies (new golang.org/x doesn't compiled for go 1.16)
+* Upgrade golang.org/x/...  for prevent issues: CVE-2021-33194, CVE-2022-27664, CVE-2021-31525, CVE-2022-41723
+
 ## v3.42.15
 * Fixed checking `nil` error with `internal/xerrors.Is`
 
