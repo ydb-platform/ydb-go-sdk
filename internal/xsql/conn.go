@@ -101,6 +101,11 @@ type currentTx interface {
 	table.TransactionIdentifier
 }
 
+type resultNoRows struct{}
+
+func (resultNoRows) LastInsertId() (int64, error) { return 0, ErrUnsupported }
+func (resultNoRows) RowsAffected() (int64, error) { return 0, ErrUnsupported }
+
 var (
 	_ driver.Conn               = &conn{}
 	_ driver.ConnPrepareContext = &conn{}
@@ -110,6 +115,8 @@ var (
 	_ driver.Pinger             = &conn{}
 	_ driver.Validator          = &conn{}
 	_ driver.NamedValueChecker  = &conn{}
+
+	_ driver.Result = resultNoRows{}
 )
 
 func newConn(c *Connector, s table.ClosableSession, opts ...connOption) *conn {
@@ -185,7 +192,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		if err = res.Err(); err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
-		return driver.ResultNoRows, nil
+		return resultNoRows{}, nil
 	case SchemeQueryMode:
 		query, _, err = c.native(ctx, query)
 		if err != nil {
@@ -195,7 +202,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
-		return driver.ResultNoRows, nil
+		return resultNoRows{}, nil
 	case ScriptingQueryMode:
 		var (
 			res    result.StreamResult
@@ -218,7 +225,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		if err = res.Err(); err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
-		return driver.ResultNoRows, nil
+		return resultNoRows{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported query mode '%s' for execute query", m)
 	}
