@@ -15,16 +15,18 @@ import (
 
 func TestDatabaseSqlScheme(t *testing.T) {
 	var (
-		scope  = newScope(t)
-		db     = scope.SQLDriverWithFolder()
-		folder = t.Name()
-		dbName = ""
+		scope         = newScope(t)
+		db            = scope.SQLDriverWithFolder()
+		folder        = t.Name()
+		dbName string = ""
 	)
 
-	tydb, err := ydb.Unwrap(db)
-	require.NoError(t, err)
+	{
+		tydb, err := ydb.Unwrap(db)
+		require.NoError(t, err)
 
-	dbName = tydb.Name()
+		dbName = tydb.Name()
+	}
 
 	defer func() {
 		_ = db.Close()
@@ -39,7 +41,7 @@ func TestDatabaseSqlScheme(t *testing.T) {
 		}()
 
 		tables := make([]string, 0)
-		err = cc.Raw(func(drvConn any) error {
+		err = cc.Raw(func(drvConn interface{}) error {
 			q, ok := drvConn.(interface {
 				GetTables(context.Context, string) ([]string, error)
 			})
@@ -61,7 +63,7 @@ func TestDatabaseSqlScheme(t *testing.T) {
 	})
 
 	t.Run("create-tables", func(t *testing.T) {
-		_, err = db.ExecContext(
+		_, err := db.ExecContext(
 			ydb.WithQueryMode(scope.Ctx, ydb.SchemeQueryMode),
 			`
 			PRAGMA TablePathPrefix("`+path.Join(dbName, folder)+`");
@@ -88,7 +90,7 @@ func TestDatabaseSqlScheme(t *testing.T) {
 			_ = cc.Close()
 		}()
 
-		err = cc.Raw(func(drvConn any) error {
+		err = cc.Raw(func(drvConn interface{}) error {
 			q, ok := drvConn.(interface {
 				IsTableExists(context.Context, string) (bool, error)
 			})
@@ -119,7 +121,7 @@ func TestDatabaseSqlScheme(t *testing.T) {
 			_ = cc.Close()
 		}()
 
-		err = cc.Raw(func(drvConn any) error {
+		err = cc.Raw(func(drvConn interface{}) error {
 			q, ok := drvConn.(interface {
 				GetColumns(context.Context, string) ([]string, error)
 			})
