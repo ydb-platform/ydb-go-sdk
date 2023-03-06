@@ -1,27 +1,17 @@
+SMALL BROKEN CHANGES
+Most users can skip there notes and upgrade as usual because build break rare used methods (expiremental API and api for special cases, not need for common use YDB) and this version has no any behavior changes.
+
 Changes for expiremental topic API
-* BROKEN CHANGE in experimantal topic api: producer id on start writer now is optional
-* BROKEN CHANGE in experimantal topic api: remove WithMessageGroupID option (because not supported now)
+* Moved producer_id from required positional argument to option `WithProducerID` (and it is optional now)
+* Removed `WithMessageGroupID` option (because not supported now)
 
 Changes in ydb connection:
-* Publish internal private ydb.connection as ydb.Driver (implement ydb.Connection)
-* ydb.Connection was Deprected
-* BROKEN CHANGE: ydb.Open(...) return *ydb.Driver instead of ydb.Connection
-* BROKEN CHANGE: ydb.New(...) return *ydb.Driver instead of ydb.Connection
-* BROKEN CHANGE: ydb.GRPCConn accept *ydb.Driver instead of ydb.Connection
-* BROKEN CHANGE: remove method With for ydb.Connection (use *Driver.With) if need.
-
-Notes:
-Most users can skip there notes and upgrade as usual because build beroken for rare used methods (expiremental API and api for special cases, not need for common use YDB) and this version will not change behaviour.
-
-For most users there changes will not broke them code because new *Driver is implement old ydb.Connection interface and previous code with ydb.Connection variables will continue to work. ydb.Connection.With not need for normal work with YDB. it need for rare special cases only.
-
-It is intermediate version for API changes: if you use topic writer or use strong linter with deny to use
-deprecated functions/types.
-
-If your code build wwas broken recommend upgrade way to upgrade:
-1. Upgrade to latest v3.42.x version and check work your application. (Send issue if some bugs, we will fix it in v.3.42.x patches)
-2. Upgrade from v3.42 to v3.43 - it is API changes only version, without change behaviour.
-3. Upgrade next as usual (if any bugs you can downgrade to 3.42 without change you code)
+* Publish internal private ydb.connection as `ydb.Driver` (it is implement `ydb.Connection`)
+* `ydb.Connection` was Deprected
+* Changed return type of `ydb.Open(...)` from `ydb.Connection` to `*ydb.Driver`
+* Changed return type of `ydb.New(...)` from `ydb.Connection` to `*ydb.Driver`
+* Changed argument type for ydb.GRPCConn from `ydb.Connection` to `*ydb.Driver`
+* Removed method `With` from `ydb.Connection` (use *Driver.With) if need.
 
 ## v3.42.15
 * Fixed checking `nil` error with `internal/xerrors.Is`
