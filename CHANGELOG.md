@@ -1,3 +1,4 @@
+* Removed `driver.ResultNoRows` in `internal/xsql`
 * BROKEN CHANGE in experimental topic api: producer id on start writer now is optional
 * BROKEN CHANGE in experimental topic api: remove `WithMessageGroupID` option (because not supported now)
 * Supported binding parameters for `database/sql` driver by default

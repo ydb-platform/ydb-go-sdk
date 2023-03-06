@@ -118,5 +118,5 @@ func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.Named
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
-	return driver.ResultNoRows, nil
+	return resultNoRows{}, nil
 }
