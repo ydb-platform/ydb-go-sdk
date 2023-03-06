@@ -23,7 +23,10 @@ const (
 // pathToCreate is a database root relative path
 // MakeRecursive method equal bash command `mkdir -p ~/path/to/create`
 // where `~` - is a root of database
-func MakeRecursive(ctx context.Context, db ydb.Connection, pathToCreate string) error {
+//
+// Use deprecated ydb.Connection as param for backward compatibility
+// Usually use *ydb.Driver, that implement ydb.Connection
+func MakeRecursive(ctx context.Context, db ydb.Connection, pathToCreate string) error { //nolint:staticcheck
 	pathToCreate = path.Join(db.Name(), pathToCreate)
 	for i := len(db.Name()) + 1; i < len(pathToCreate); i++ {
 		x := strings.IndexByte(pathToCreate[i:], '/')
@@ -78,7 +81,10 @@ func MakeRecursive(ctx context.Context, db ydb.Connection, pathToCreate string) 
 // Empty prefix means than use root of database.
 // RemoveRecursive method equal bash command `rm -rf ~/path/to/remove`
 // where `~` - is a root of database
-func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string) error {
+//
+// Use deprecated ydb.Connection as param for backward compatibility
+// Usually use *ydb.Driver, that implement ydb.Connection
+func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string) error { //nolint:staticcheck
 	fullSysTablePath := path.Join(db.Name(), sysTable)
 	var list func(int, string) error
 	list = func(i int, p string) error {
