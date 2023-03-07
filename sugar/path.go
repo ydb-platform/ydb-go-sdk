@@ -105,9 +105,7 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 				if err = list(i+1, pt); err != nil {
 					return xerrors.WithStackTrace(err)
 				}
-				err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-					return db.Scheme().RemoveDirectory(ctx, pt)
-				}, retry.WithIdempotent(true))
+				err = db.Scheme().RemoveDirectory(ctx, pt)
 				if err != nil {
 					return xerrors.WithStackTrace(err)
 				}
@@ -120,7 +118,14 @@ func RemoveRecursive(ctx context.Context, db ydb.Connection, pathToRemove string
 					return xerrors.WithStackTrace(err)
 				}
 
+			case scheme.EntryTopic:
+				err = db.Topic().Drop(ctx, pt)
+				if err != nil {
+					return xerrors.WithStackTrace(err)
+				}
+
 			default:
+				return xerrors.WithStackTrace(fmt.Errorf("unknown entry type: %s", child.Type.String()))
 			}
 		}
 		return nil
