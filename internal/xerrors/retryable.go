@@ -62,9 +62,16 @@ func WithDeleteSession() RetryableErrorOption {
 }
 
 func Retryable(err error, opts ...RetryableErrorOption) error {
-	re := &retryableError{
-		err:  err,
-		name: "CUSTOM",
+	var (
+		e  Error
+		re = &retryableError{
+			err:  err,
+			name: "CUSTOM",
+		}
+	)
+	if As(err, &e) {
+		re.backoffType = e.BackoffType()
+		re.mustDeleteSession = e.MustDeleteSession()
 	}
 	for _, o := range opts {
 		if o != nil {
