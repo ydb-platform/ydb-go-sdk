@@ -382,32 +382,32 @@ func (s *sqlScope) fill(ctx context.Context) error {
 	return retry.Do(ctx, s.db, func(ctx context.Context, cc *sql.Conn) error {
 		stmt, err := s.db.PrepareContext(ctx, `
 		PRAGMA TablePathPrefix("`+path.Join(db.Name(), s.folder)+`");
-		
+
 		DECLARE $seriesData AS List<Struct<
 			series_id: Optional<Uint64>,
 			title: Optional<Utf8>,
 			series_info: Optional<Utf8>,
 			release_date: Optional<Date>,
 			comment: Optional<Utf8>>>;
-		
+
 		DECLARE $seasonsData AS List<Struct<
 			series_id: Optional<Uint64>,
 			season_id: Optional<Uint64>,
 			title: Optional<Utf8>,
 			first_aired: Optional<Date>,
 			last_aired: Optional<Date>>>;
-		
+
 		DECLARE $episodesData AS List<Struct<
 			series_id: Optional<Uint64>,
 			season_id: Optional<Uint64>,
 			episode_id: Optional<Uint64>,
 			title: Optional<Utf8>,
 			air_date: Optional<Date>>>;
-		
+
 		REPLACE INTO series SELECT * FROM AS_TABLE($seriesData);
-		
+
 		REPLACE INTO seasons SELECT * FROM AS_TABLE($seasonsData);
-		
+
 		REPLACE INTO episodes SELECT * FROM AS_TABLE($episodesData);
 	`)
 		if err != nil {

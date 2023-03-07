@@ -6,21 +6,49 @@ import (
 	"path"
 	"strings"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic"
 )
 
 const (
 	sysTable = ".sys"
 )
 
+type dbName interface {
+	Name() string
+}
+
+type dbScheme interface {
+	Scheme() scheme.Client
+}
+
+type dbTable interface {
+	Table() table.Client
+}
+
+type dbTopic interface {
+	Topic() topic.Client
+}
+
+type dbForMakeRecursive interface {
+	dbName
+	dbScheme
+}
+
+type dbFoRemoveRecursive interface {
+	dbName
+	dbScheme
+	dbTable
+	dbTopic
+}
+
 // MakeRecursive creates path inside database
 // pathToCreate is a database root relative path
 // MakeRecursive method equal bash command `mkdir -p ~/path/to/create`
 // where `~` - is a root of database
-func MakeRecursive(ctx context.Context, db *ydb.Driver, pathToCreate string) error {
+func MakeRecursive(ctx context.Context, db dbForMakeRecursive, pathToCreate string) error {
 	if strings.HasPrefix(pathToCreate, sysTable+"/") {
 		return xerrors.WithStackTrace(
 			fmt.Errorf("making directory %q inside system path %q not supported", pathToCreate, sysTable),
@@ -61,7 +89,7 @@ func MakeRecursive(ctx context.Context, db *ydb.Driver, pathToCreate string) err
 // Empty prefix means than use root of database.
 // RemoveRecursive method equal bash command `rm -rf ~/path/to/remove`
 // where `~` - is a root of database
-func RemoveRecursive(ctx context.Context, db *ydb.Driver, pathToRemove string) error {
+func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove string) error {
 	fullSysTablePath := path.Join(db.Name(), sysTable)
 	var rmPath func(int, string) error
 	rmPath = func(i int, p string) error {

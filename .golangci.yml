@@ -235,3 +235,5 @@ issues:
       linters:
         - unused
         - unparam
+    - path: _test\.go
+      text: "ydb.Connection is deprecated"
