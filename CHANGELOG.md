@@ -1,25 +1,25 @@
-SMALL BROKEN CHANGES
+**Small broken changes**
 
 Most users can skip there notes and upgrade as usual because build break rare used methods (expiremental API and api for special cases, not need for common use YDB) and this version has no any behavior changes.
 
-Changes for expiremental topic API
-* Moved producer_id from required positional argument to option `WithProducerID` (and it is optional now)
+Changes for experimental topic API:
+* Moved `producer_id` from required positional argument to option `WithProducerID` (and it is optional now)
 * Removed `WithMessageGroupID` option (because not supported now)
 
 Changes in ydb connection:
-* Publish internal private ydb.connection as `ydb.Driver` (it is implement `ydb.Connection`)
-* `ydb.Connection` was Deprected
+* Publish internal private struct `ydb.connection` as `ydb.Driver` (it is implement `ydb.Connection`)
+* `ydb.Connection` marked as deprecated
 * Changed return type of `ydb.Open(...)` from `ydb.Connection` to `*ydb.Driver`
 * Changed return type of `ydb.New(...)` from `ydb.Connection` to `*ydb.Driver`
-* Changed argument type for ydb.GRPCConn from `ydb.Connection` to `*ydb.Driver`
-* Removed method `With` from `ydb.Connection` (use *Driver.With) if need.
+* Changed argument type for `ydb.GRPCConn` from `ydb.Connection` to `*ydb.Driver`
+* Removed method `With` from `ydb.Connection` (use `*Driver.With` instead).
 
-Changes in sugar package:
+Changes in package `sugar`:
 * Changed a type of database arg in `sugar.{MakeRecursive,RemoveRecursive}` from `ydb.Connection` to minimal required local interface
 
 Dependencies:
-* Up minimal supported version of go to 1.17 for update dependencies (new golang.org/x doesn't compiled for go 1.16)
-* Upgrade golang.org/x/...  for prevent issues: CVE-2021-33194, CVE-2022-27664, CVE-2021-31525, CVE-2022-41723
+* Up minimal supported version of `go` to `1.17` for update dependencies (new `golang.org/x` doesn't compiled for `go1.16`)
+* Upgrade `golang.org/x/...`  for prevent issues: `CVE-2021-33194`, `CVE-2022-27664`, `CVE-2021-31525`, `CVE-2022-41723`
 
 ## v3.42.13
 * Fixed default state of `internal/xerrors.retryableError`: it inherit properties from parent error as possible
