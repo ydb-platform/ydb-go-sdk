@@ -138,5 +138,8 @@ func RemoveRecursive(ctx context.Context, db *ydb.Driver, pathToRemove string) e
 
 		return nil
 	}
-	return rmPath(0, path.Join(db.Name(), pathToRemove))
+	if !strings.HasPrefix(pathToRemove, db.Name()) {
+		pathToRemove = path.Join(db.Name(), pathToRemove)
+	}
+	return rmPath(0, pathToRemove)
 }
