@@ -1,4 +1,4 @@
-* Fixed sugar.RecursiveRemove for remove full path
+* Fixed `sugar.RecursiveRemove` for remove full path
 * Removed `driver.ResultNoRows` in `internal/xsql`
 * Supported binding parameters for `database/sql` driver by default
 * Added connector option `ydb.WithTablePathPrefix(tablePathPrefix)` and connection string parameter `table_path_prefix`
@@ -6,7 +6,6 @@
 * Fixed bug with no checking operation error on `discovery.Client` calls
 * Allowed zero create session timeout in `ydb.WithSessionPoolCreateSessionTimeout(timeout)` (less than or equal to zero - no used timeout on create session request)
 * Added examples with own `go.mod`
-* Supported `scheme.EntryTopic` path child entry in `sugar.RemoveRecursive`
 * Marked as deprecated `ydb.WithErrWriter(w)` and `ydb.WithOutWriter(w)` logger options
 * Added `ydb.WithWriter(w)` logger option
 
@@ -34,6 +33,8 @@ Dependencies:
 * Up minimal supported version of `go` to `1.17` for update dependencies (new `golang.org/x` doesn't compiled for `go1.16`)
 * Upgrade `golang.org/x/...`  for prevent issues: `CVE-2021-33194`, `CVE-2022-27664`, `CVE-2021-31525`, `CVE-2022-41723`
 
+## v3.42.14
+* Supported `scheme.EntryTopic` path child entry in `sugar.RemoveRecursive`
 
 ## v3.42.13
 * Fixed default state of `internal/xerrors.retryableError`: it inherit properties from parent error as possible
