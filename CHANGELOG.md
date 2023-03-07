@@ -1,3 +1,6 @@
+* Fixed default state of `internal/xerrors.retryableError`: it inherit properties from parent error as possible
+* Marked event `grpc/stats.End` as ignored at observing status of grpc connection
+
 ## v3.42.12
 * Replaced the balancer connection to discovery service from short-lived grpc connection to `internal/conn` lazy connection (revert related changes from `v3.42.6`)
 * Marked as deprecated `trace.Driver.OnBalancerDialEntrypoint` event callback

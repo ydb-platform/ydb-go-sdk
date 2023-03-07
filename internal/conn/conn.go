@@ -329,20 +329,19 @@ func (c *conn) Invoke(
 
 	err = cc.Invoke(ctx, method, req, res, append(opts, grpc.Trailer(&md))...)
 	if err != nil {
+		defer func() {
+			c.onTransportError(ctx, err)
+		}()
+
 		if useWrapping {
 			err = xerrors.Transport(err,
 				xerrors.WithAddress(c.Address()),
 			)
 			if sentMark.canRetry() {
-				err = xerrors.Retryable(err,
-					xerrors.WithName("Invoke"),
-					xerrors.WithDeleteSession(),
-				)
+				return xerrors.WithStackTrace(xerrors.Retryable(err))
 			}
-			err = xerrors.WithStackTrace(err)
+			return xerrors.WithStackTrace(err)
 		}
-
-		c.onTransportError(ctx, err)
 
 		return err
 	}
@@ -417,17 +416,19 @@ func (c *conn) NewStream(
 
 	s, err = cc.NewStream(ctx, desc, method, opts...)
 	if err != nil {
-		if useWrapping {
-			err = xerrors.Retryable(
-				xerrors.Transport(err,
-					xerrors.WithAddress(c.Address()),
-				),
-				xerrors.WithName("NewStream"),
-				xerrors.WithDeleteSession(),
-			)
-		}
+		defer func() {
+			c.onTransportError(ctx, err)
+		}()
 
-		c.onTransportError(ctx, err)
+		if useWrapping {
+			err = xerrors.Transport(err,
+				xerrors.WithAddress(c.Address()),
+			)
+			if sentMark.canRetry() {
+				return s, xerrors.WithStackTrace(xerrors.Retryable(err))
+			}
+			return s, xerrors.WithStackTrace(err)
+		}
 
 		return s, err
 	}
@@ -495,6 +496,8 @@ func (statsHandler) HandleRPC(ctx context.Context, rpcStats stats.RPCStats) {
 	switch rpcStats.(type) {
 	case *stats.Begin:
 		getContextMark(ctx).markSafeToRetry()
+	case *stats.End:
+		// if data was sent - markDirty() was called early then stats.End received
 	default:
 		getContextMark(ctx).markDirty()
 	}
@@ -511,7 +514,9 @@ type ctxHandleRPCKey struct{}
 var rpcKey = ctxHandleRPCKey{}
 
 func markContext(ctx context.Context) (context.Context, *modificationMark) {
-	mark := &modificationMark{}
+	mark := &modificationMark{
+		safeToRetry: 1,
+	}
 	return context.WithValue(ctx, rpcKey, mark), mark
 }
 
