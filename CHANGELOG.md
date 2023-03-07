@@ -10,20 +10,24 @@
 * Supported `scheme.EntryTopic` path child entry in `sugar.RemoveRecursive`
 * Renamed private `ydb.connection` type to public `ydb.Driver` type
 * Marked as deprecated `ydb.Connection` interface
-* BROKEN CHANGE remove method With from interface ydb.Connection
+* BROKEN CHANGE remove method `With` from interface `ydb.Connection`
 * Changed result type of `ydb.Open` from `ydb.Connection` interface to `*ydb.Driver`
 * Changed default output stream of internal logger to `io.Stderr`
 * Marked as deprecated `ydb.WithErrWriter(w)` and `ydb.WithOutWriter(w)` logger options
 * Added `ydb.WithWriter(w)` logger option
 
+## v3.42.13
+* Fixed default state of `internal/xerrors.retryableError`: it inherit properties from parent error as possible
+* Marked event `grpc/stats.End` as ignored at observing status of grpc connection
+
 ## v3.42.12
 * Replaced the balancer connection to discovery service from short-lived grpc connection to `internal/conn` lazy connection (revert related changes from `v3.42.6`)
 * Marked as deprecated `trace.Driver.OnBalancerDialEntrypoint` event callback
-* Marked as deprecated `trace.Driver.OnConnTake` event callback
+* Deprecated `trace.Driver.OnConnTake` event callback
 * Added `trace.Driver.OnConnDial` event callback
 
 ## v3.42.11
-* Fixed validation error for topicoptions.WithPartitionID option of start topic writer.
+* Fixed validation error for `topicoptions.WithPartitionID` option of start topic writer.
 
 ## v3.42.10
 * Added exit from retryer if got grpc-error `Unauthenticated` on `discovery/ListEndpoints` call
