@@ -1,3 +1,4 @@
+## v3.42.14
 * Supported `scheme.EntryTopic` path child entry in `sugar.RemoveRecursive`
 
 ## v3.42.13
