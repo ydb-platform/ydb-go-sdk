@@ -413,7 +413,7 @@ func hasTablePathPrefix(query string) bool {
 func (c *conn) nativeQueryAndParameters(ctx context.Context, q string, args ...driver.NamedValue) (
 	query string, _ *table.QueryParameters, _ error,
 ) {
-	if isStrictYQL(ctx) || hasDeclare(q) {
+	if isStrictYQL(ctx) || hasDeclare(q) || hasTablePathPrefix(q) {
 		params := make([]table.ParameterOption, len(args))
 		for i, arg := range args {
 			switch v := arg.Value.(type) {
