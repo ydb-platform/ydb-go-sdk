@@ -1,3 +1,4 @@
+## v3.42.13
 * Fixed default state of `internal/xerrors.retryableError`: it inherit properties from parent error as possible
 * Marked event `grpc/stats.End` as ignored at observing status of grpc connection
 
