@@ -1,31 +1,37 @@
 * Fixed sugar.RecursiveRemove for remove full path
+* Removed `driver.ResultNoRows` in `internal/xsql`
 * BROKEN CHANGE in experimental topic api: producer id on start writer now is optional
 * BROKEN CHANGE in experimental topic api: remove `WithMessageGroupID` option (because not supported now)
 * Supported binding parameters for `database/sql` driver by default
 * Added connector option `ydb.WithTablePathPrefix(tablePathPrefix)` and connection string parameter `table_path_prefix`
-* Fixed topic retry policy callback call: not call it with nil error 
+* Fixed topic retry policy callback call: not call it with nil error
 * Fixed bug with no checking operation error on `discovery.Client` calls
 * Allowed zero create session timeout in `ydb.WithSessionPoolCreateSessionTimeout(timeout)` (less than or equal to zero - no used timeout on create session request)
 * Added examples with own `go.mod`
 * Supported `scheme.EntryTopic` path child entry in `sugar.RemoveRecursive`
 * Renamed private `ydb.connection` type to public `ydb.Driver` type
 * Marked as deprecated `ydb.Connection` interface
+* BROKEN CHANGE remove method `With` from interface `ydb.Connection`
 * Changed result type of `ydb.Open` from `ydb.Connection` interface to `*ydb.Driver`
 * Changed default output stream of internal logger to `io.Stderr`
 * Marked as deprecated `ydb.WithErrWriter(w)` and `ydb.WithOutWriter(w)` logger options
 * Added `ydb.WithWriter(w)` logger option
 
+## v3.42.13
+* Fixed default state of `internal/xerrors.retryableError`: it inherit properties from parent error as possible
+* Marked event `grpc/stats.End` as ignored at observing status of grpc connection
+
 ## v3.42.12
 * Replaced the balancer connection to discovery service from short-lived grpc connection to `internal/conn` lazy connection (revert related changes from `v3.42.6`)
 * Marked as deprecated `trace.Driver.OnBalancerDialEntrypoint` event callback
-* Marked as deprecated `trace.Driver.OnConnTake` event callback
+* Deprecated `trace.Driver.OnConnTake` event callback
 * Added `trace.Driver.OnConnDial` event callback
 
 ## v3.42.11
-* Fixed validation error for topicoptions.WithPartitionID option of start topic writer.
+* Fixed validation error for `topicoptions.WithPartitionID` option of start topic writer.
 
 ## v3.42.10
-* Added exit from retryer if got grpc-error `Unauthenticated` on `discovery/ListEndpoints` call  
+* Added exit from retryer if got grpc-error `Unauthenticated` on `discovery/ListEndpoints` call
 
 ## v3.42.9
 * Added `internal/xerrors.Errorf` error for wrap multiple errors and check them with `errors.Is` of `errors.As`

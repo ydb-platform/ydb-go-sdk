@@ -79,9 +79,6 @@ type Connection interface {
 
 	// Topic returns topic client
 	Topic() topic.Client
-
-	// With makes child connection with the same options and another options
-	With(ctx context.Context, opts ...Option) (Connection, error)
 }
 
 // Driver type provide access to YDB service clients

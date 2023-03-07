@@ -6,7 +6,7 @@ env:
   GO111MODULE: "on"
 
 jobs:
-  gorelease:
+  check-api-not-broken:
     concurrency:
       group: breaking-${{ github.ref }}
       cancel-in-progress: true
@@ -18,6 +18,10 @@ jobs:
           go-version: "1.20"
       - name: Checkout code
         uses: actions/checkout@v3
+      - name: Build examples
+        run: |
+          cd examples
+          go build ./...
       - name: Gorelease cache
         uses: actions/cache@v3
         with:
@@ -45,5 +49,5 @@ jobs:
           header: gorelease
           message: |
             ### API Changes
-            
+
             ${{ steps.gorelease.outputs.report }}

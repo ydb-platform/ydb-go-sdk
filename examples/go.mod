@@ -7,16 +7,16 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/prometheus/client_golang v1.13.0
 	github.com/rs/zerolog v1.27.0
-	github.com/ydb-platform/gorm-driver v0.0.1
+	github.com/ydb-platform/gorm-driver v0.0.2-0.20230305090745-1fb54a06b51d
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.1.2
 	github.com/ydb-platform/ydb-go-sdk-prometheus v0.11.10
 	github.com/ydb-platform/ydb-go-sdk-zerolog v0.12.2
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.42.7
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.43.0-rc2.0.20230304160347-4f99c9dda534
 	github.com/ydb-platform/ydb-go-yc v0.9.1
 	google.golang.org/genproto v0.0.0-20220822174746-9e6da59bd2fc
 	gorm.io/driver/postgres v1.4.6
 	gorm.io/driver/sqlite v1.4.4
-	gorm.io/gorm v1.24.2
+	gorm.io/gorm v1.24.5
 )
 
 require (

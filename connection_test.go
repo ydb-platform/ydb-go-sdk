@@ -16,6 +16,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+// Check *Driver is implementation of Connection
+var _ ydb.Connection = &ydb.Driver{}
+
 func TestZeroDialTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
