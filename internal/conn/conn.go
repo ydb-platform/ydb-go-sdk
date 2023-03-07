@@ -494,10 +494,7 @@ func (statsHandler) TagRPC(ctx context.Context, _ *stats.RPCTagInfo) context.Con
 
 func (statsHandler) HandleRPC(ctx context.Context, rpcStats stats.RPCStats) {
 	switch rpcStats.(type) {
-	case *stats.Begin:
-		getContextMark(ctx).markSafeToRetry()
-	case *stats.End:
-		// if data was sent - markDirty() was called early then stats.End received
+	case *stats.Begin, *stats.End:
 	default:
 		getContextMark(ctx).markDirty()
 	}
@@ -514,9 +511,7 @@ type ctxHandleRPCKey struct{}
 var rpcKey = ctxHandleRPCKey{}
 
 func markContext(ctx context.Context) (context.Context, *modificationMark) {
-	mark := &modificationMark{
-		safeToRetry: 1,
-	}
+	mark := &modificationMark{}
 	return context.WithValue(ctx, rpcKey, mark), mark
 }
 
@@ -529,17 +524,13 @@ func getContextMark(ctx context.Context) *modificationMark {
 }
 
 type modificationMark struct {
-	safeToRetry uint32
+	dirty uint32
 }
 
 func (m *modificationMark) canRetry() bool {
-	return atomic.LoadUint32(&m.safeToRetry) != 0
-}
-
-func (m *modificationMark) markSafeToRetry() {
-	atomic.StoreUint32(&m.safeToRetry, 1)
+	return atomic.LoadUint32(&m.dirty) == 0
 }
 
 func (m *modificationMark) markDirty() {
-	atomic.StoreUint32(&m.safeToRetry, 0)
+	atomic.StoreUint32(&m.dirty, 1)
 }
