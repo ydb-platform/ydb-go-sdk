@@ -1,3 +1,5 @@
+* Fixed `internal/xerrors.Transport` error wrapping for case when given error is not transport error
+* Added `grpc.WithBlock()` dial option to defaults
 * Added grpc and operation codes to errors string description
 * Fixed extended API `internal/xsql/(*conn).GetTables(...)`, `internal/xsql/(*conn).GetAllTables(...)`
 * Fixed test for `database/sql` extended API

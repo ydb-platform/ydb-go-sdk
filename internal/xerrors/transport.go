@@ -122,7 +122,7 @@ func Transport(err error, opts ...teOpt) error {
 	}
 	var te *transportError
 	if errors.As(err, &te) {
-		return te
+		return err
 	}
 	if s, ok := grpcStatus.FromError(err); ok {
 		te = &transportError{
@@ -131,7 +131,7 @@ func Transport(err error, opts ...teOpt) error {
 		}
 	} else {
 		te = &transportError{
-			status: grpcStatus.New(grpcCodes.Unknown, err.Error()),
+			status: grpcStatus.New(grpcCodes.Unknown, StackRecord(1)),
 			err:    err,
 		}
 	}

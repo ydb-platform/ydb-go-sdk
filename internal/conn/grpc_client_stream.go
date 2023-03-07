@@ -50,20 +50,21 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 	err = s.ClientStream.SendMsg(m)
 
 	if err != nil {
+		defer func() {
+			s.c.onTransportError(s.Context(), err)
+		}()
+
 		if s.wrapping {
 			err = xerrors.Transport(err,
 				xerrors.WithAddress(s.c.Address()),
 			)
 			if s.sentMark.canRetry() {
-				err = xerrors.Retryable(err,
+				return xerrors.WithStackTrace(xerrors.Retryable(err,
 					xerrors.WithName("SendMsg"),
-					xerrors.WithDeleteSession(),
-				)
+				))
 			}
-			err = xerrors.WithStackTrace(err)
+			return xerrors.WithStackTrace(err)
 		}
-
-		s.c.onTransportError(s.Context(), err)
 
 		return err
 	}
@@ -87,21 +88,22 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	err = s.ClientStream.RecvMsg(m)
 
 	if err != nil {
+		defer func() {
+			if !xerrors.Is(err, io.EOF) {
+				s.c.onTransportError(s.Context(), err)
+			}
+		}()
+
 		if s.wrapping {
 			err = xerrors.Transport(err,
 				xerrors.WithAddress(s.c.Address()),
 			)
 			if s.sentMark.canRetry() {
-				err = xerrors.Retryable(err,
+				return xerrors.WithStackTrace(xerrors.Retryable(err,
 					xerrors.WithName("RecvMsg"),
-					xerrors.WithDeleteSession(),
-				)
+				))
 			}
-			err = xerrors.WithStackTrace(err)
-		}
-
-		if !xerrors.Is(err, io.EOF) {
-			s.c.onTransportError(s.Context(), err)
+			return xerrors.WithStackTrace(err)
 		}
 
 		return err
