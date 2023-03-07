@@ -10,15 +10,16 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
 func TestDatabaseSqlScheme(t *testing.T) {
 	var (
-		scope         = newScope(t)
-		db            = scope.SQLDriverWithFolder()
-		folder        = t.Name()
-		dbName string = ""
+		scope  = newScope(t)
+		db     = scope.SQLDriverWithFolder()
+		folder = t.Name()
+		dbName string
 	)
 
 	{
@@ -90,7 +91,7 @@ func TestDatabaseSqlScheme(t *testing.T) {
 			_ = cc.Close()
 		}()
 
-		err = cc.Raw(func(drvConn interface{}) error {
+		err = cc.Raw(func(drvConn interface{}) (err error) {
 			q, ok := drvConn.(interface {
 				IsTableExists(context.Context, string) (bool, error)
 			})
@@ -121,7 +122,7 @@ func TestDatabaseSqlScheme(t *testing.T) {
 			_ = cc.Close()
 		}()
 
-		err = cc.Raw(func(drvConn interface{}) error {
+		err = cc.Raw(func(drvConn interface{}) (err error) {
 			q, ok := drvConn.(interface {
 				GetColumns(context.Context, string) ([]string, error)
 			})
