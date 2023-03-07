@@ -11,26 +11,20 @@ import (
 )
 
 type schemeClient interface {
+	Database() string
 	ListDirectory(ctx context.Context, path string) (d scheme.Directory, err error)
 }
 
-func databaseName(c schemeClient) string {
-	if name, has := c.(interface {
-		Database() string
-	}); has {
-		return name.Database()
-	}
-	return "/"
-}
-
-func IsDirectoryExists(ctx context.Context, c schemeClient, directory string) (exists bool, _ error) {
-	if !strings.HasPrefix(directory, databaseName(c)) {
+func IsDirectoryExists(ctx context.Context, c schemeClient, directory string) (
+	exists bool, _ error,
+) {
+	if !strings.HasPrefix(directory, c.Database()) {
 		return false, xerrors.WithStackTrace(fmt.Errorf(
 			"path '%s' must be inside database '%s'",
-			directory, databaseName(c),
+			directory, c.Database(),
 		))
 	}
-	if directory == databaseName(c) {
+	if directory == c.Database() {
 		return true, nil
 	}
 	parentDirectory, childDirectory := path.Split(directory)
@@ -61,16 +55,18 @@ func IsDirectoryExists(ctx context.Context, c schemeClient, directory string) (e
 	return false, nil
 }
 
-func IsTableExists(ctx context.Context, c schemeClient, absTablePath string) (exists bool, _ error) {
-	if !strings.HasPrefix(absTablePath, databaseName(c)) {
+func IsTableExists(ctx context.Context, c schemeClient, absTablePath string) (
+	exists bool, _ error,
+) {
+	if !strings.HasPrefix(absTablePath, c.Database()) {
 		return false, xerrors.WithStackTrace(fmt.Errorf(
 			"table path '%s' must be inside database '%s'",
-			absTablePath, databaseName(c),
+			absTablePath, c.Database(),
 		))
-	} else if absTablePath == databaseName(c) {
+	} else if absTablePath == c.Database() {
 		return false, xerrors.WithStackTrace(fmt.Errorf(
 			"table path '%s' cannot be equals database name '%s'",
-			absTablePath, databaseName(c),
+			absTablePath, c.Database(),
 		))
 	}
 	directory, tableName := path.Split(absTablePath)

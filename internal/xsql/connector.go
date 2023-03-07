@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"io"
-	"path"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,9 +12,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
+	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -83,45 +83,16 @@ func WithOnClose(f func(connector *Connector)) ConnectorOption {
 	}
 }
 
-func WithCreateSession(f func(ctx context.Context) (s table.ClosableSession, err error)) ConnectorOption {
-	return func(c *Connector) error {
-		c.createSession = f
-		return nil
-	}
+type ydbDriver interface {
+	Name() string
+	Table() table.Client
+	Scripting() scripting.Client
+	Scheme() scheme.Client
 }
 
-func WithDescribePath(f func(ctx context.Context, path string) (e scheme.Entry, err error)) ConnectorOption {
-	return func(c *Connector) error {
-		c.describePath = f
-		return nil
-	}
-}
-
-func WithListDirectory(f func(ctx context.Context, path string) (d scheme.Directory, err error)) ConnectorOption {
-	return func(c *Connector) error {
-		c.listDirectory = f
-		return nil
-	}
-}
-
-func WithScriptingExecute(scriptingExecute func(
-	ctx context.Context, query string, params *table.QueryParameters) (result.StreamResult, error),
-) ConnectorOption {
-	return func(c *Connector) error {
-		c.scriptingExecute = scriptingExecute
-		return nil
-	}
-}
-
-func WithDatabaseName(databaseName string) ConnectorOption {
-	return func(c *Connector) error {
-		c.databaseName = databaseName
-		return nil
-	}
-}
-
-func Open(opts ...ConnectorOption) (_ *Connector, err error) {
+func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
 	c := &Connector{
+		parent:           parent,
 		conns:            make(map[*conn]struct{}),
 		defaultTxControl: table.DefaultTxControl(),
 		defaultQueryMode: DefaultQueryMode,
@@ -139,20 +110,11 @@ func Open(opts ...ConnectorOption) (_ *Connector, err error) {
 	return c, nil
 }
 
-type listDirectoryFunc func(ctx context.Context, path string) (d scheme.Directory, err error)
-
-func (ld listDirectoryFunc) ListDirectory(ctx context.Context, path string) (d scheme.Directory, err error) {
-	return ld(ctx, path)
-}
-
 // Connector is a producer of database/sql connections
 type Connector struct {
-	databaseName     string
-	tablePathPrefix  string
-	scriptingExecute func(ctx context.Context, query string, params *table.QueryParameters) (result.StreamResult, error)
-	createSession    func(ctx context.Context) (s table.ClosableSession, err error)
-	describePath     func(ctx context.Context, path string) (e scheme.Entry, err error)
-	listDirectory    func(ctx context.Context, path string) (d scheme.Directory, err error)
+	parent ydbDriver
+
+	tablePathPrefix string
 
 	onClose []func(connector *Connector)
 
@@ -234,21 +196,18 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 	if !c.disableServerBalancer {
 		ctx = meta.WithAllowFeatures(ctx, metaHeaders.HintSessionBalancer)
 	}
-	s, err := c.createSession(ctx)
+	s, err := c.parent.Table().CreateSession(ctx) //nolint
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	opts := []connOption{
-		withDefaultTxControl(c.defaultTxControl),
+
+	return newConn(c, s, withDefaultTxControl(c.defaultTxControl),
 		withDefaultQueryMode(c.defaultQueryMode),
 		withDataOpts(c.defaultDataQueryOpts...),
 		withScanOpts(c.defaultScanQueryOpts...),
+		withTablePathPrefix(strings.TrimLeft(c.tablePathPrefix, c.parent.Name())),
 		withTrace(c.trace),
-	}
-	if c.tablePathPrefix != "" {
-		opts = append(opts, withTablePathPrefix(path.Join(c.databaseName, c.tablePathPrefix)))
-	}
-	return newConn(c, s, opts...), nil
+	), nil
 }
 
 func (c *Connector) Driver() driver.Driver {

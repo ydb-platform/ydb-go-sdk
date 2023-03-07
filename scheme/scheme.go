@@ -7,6 +7,8 @@ import (
 )
 
 type Client interface {
+	Database() string
+
 	DescribePath(ctx context.Context, path string) (e Entry, err error)
 	MakeDirectory(ctx context.Context, path string) (err error)
 	ListDirectory(ctx context.Context, path string) (d Directory, err error)

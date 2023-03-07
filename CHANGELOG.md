@@ -1,3 +1,4 @@
+* Fixed test for `database/sql` extended API 
 * Fixed `sugar.RecursiveRemove` for remove full path
 * Removed `driver.ResultNoRows` in `internal/xsql`
 * Supported binding parameters for `database/sql` driver by default
