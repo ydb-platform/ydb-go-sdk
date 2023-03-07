@@ -130,19 +130,12 @@ func WithDisableServerBalancer() ConnectorOption {
 }
 
 func Connector(parent *Driver, opts ...ConnectorOption) (*xsql.Connector, error) {
-	c, err := xsql.Open(
+	c, err := xsql.Open(parent,
 		append(
 			append(
 				parent.databaseSQLOptions,
 				opts...,
 			),
-			xsql.WithDatabaseName(parent.Name()),
-			xsql.WithCreateSession(func(ctx context.Context) (s table.ClosableSession, err error) {
-				return parent.Table().CreateSession(ctx) //nolint:staticcheck // SA1019
-			}),
-			xsql.WithScriptingExecute(parent.Scripting().StreamExecute),
-			xsql.WithDescribePath(parent.Scheme().DescribePath),
-			xsql.WithListDirectory(parent.Scheme().ListDirectory),
 			xsql.WithOnClose(d.detach),
 		)...,
 	)

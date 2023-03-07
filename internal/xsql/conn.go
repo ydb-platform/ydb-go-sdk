@@ -8,6 +8,7 @@ import (
 	"io"
 	"path"
 	"regexp"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -82,7 +83,14 @@ type conn struct {
 }
 
 func (c *conn) GetDatabaseName() string {
-	return c.connector.databaseName
+	return c.connector.parent.Name()
+}
+
+func (c *conn) TablePathPrefix() string {
+	if c.tablePathPrefix == "" {
+		return ""
+	}
+	return path.Join(c.connector.parent.Name(), c.tablePathPrefix)
 }
 
 func (c *conn) CheckNamedValue(*driver.NamedValue) error {
@@ -172,7 +180,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 			res    result.Result
 			params *table.QueryParameters
 		)
-		query, params, err = c.native(ctx, query, args...)
+		query, params, err = c.nativeQueryAndParameters(ctx, query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -194,7 +202,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		}
 		return resultNoRows{}, nil
 	case SchemeQueryMode:
-		query, _, err = c.native(ctx, query)
+		query, _, err = c.nativeQueryAndParameters(ctx, query)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -208,11 +216,11 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 			res    result.StreamResult
 			params *table.QueryParameters
 		)
-		query, params, err = c.native(ctx, query, args...)
+		query, params, err = c.nativeQueryAndParameters(ctx, query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
-		res, err = c.connector.scriptingExecute(ctx, query, params)
+		res, err = c.connector.parent.Scripting().StreamExecute(ctx, query, params)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -271,7 +279,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 			res    result.Result
 			params *table.QueryParameters
 		)
-		query, params, err = c.native(ctx, query, args...)
+		query, params, err = c.nativeQueryAndParameters(ctx, query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -294,7 +302,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 			res    result.StreamResult
 			params *table.QueryParameters
 		)
-		query, params, err = c.native(ctx, query, args...)
+		query, params, err = c.nativeQueryAndParameters(ctx, query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -313,7 +321,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		}, nil
 	case ExplainQueryMode:
 		var exp table.DataQueryExplanation
-		query, _, err = c.native(ctx, query, args...)
+		query, _, err = c.nativeQueryAndParameters(ctx, query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -332,11 +340,11 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 			res    result.StreamResult
 			params *table.QueryParameters
 		)
-		query, params, err = c.native(ctx, query, args...)
+		query, params, err = c.nativeQueryAndParameters(ctx, query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
-		res, err = c.connector.scriptingExecute(ctx, query, params)
+		res, err = c.connector.parent.Scripting().StreamExecute(ctx, query, params)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -390,13 +398,19 @@ func (c *conn) Begin() (driver.Tx, error) {
 	return nil, errDeprecated
 }
 
-var declareRe = regexp.MustCompile(`[dD][eE][cC][lL][aA][rR][eE]\s+\$([^\s]+)+\s+[aA][sS]\s+([^\s]+)+\s*\;`)
+var declareRe = regexp.MustCompile(`[dD][eE][cC][lL][aA][rR][eE]\s+\$(\S+)+\s+[aA][sS]\s+(\S+)+\s*;`)
 
 func hasDeclare(query string) bool {
 	return declareRe.MatchString(query)
 }
 
-func (c *conn) native(ctx context.Context, q string, args ...driver.NamedValue) (
+var pragmaTablePathPrefixRe = regexp.MustCompile(`PRAGMA\s+TablePathPrefix\(\s*"[^"]+"\s*\)\s*;`)
+
+func hasTablePathPrefix(query string) bool {
+	return pragmaTablePathPrefixRe.MatchString(query)
+}
+
+func (c *conn) nativeQueryAndParameters(ctx context.Context, q string, args ...driver.NamedValue) (
 	query string, _ *table.QueryParameters, _ error,
 ) {
 	if isStrictYQL(ctx) || hasDeclare(q) {
@@ -420,7 +434,7 @@ func (c *conn) native(ctx context.Context, q string, args ...driver.NamedValue) 
 		}
 		return q, table.NewQueryParameters(params...), nil
 	}
-	return bind.Bind(q, c.tablePathPrefix, args...)
+	return bind.Bind(q, c.TablePathPrefix(), args...)
 }
 
 func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ driver.Tx, err error) {
@@ -458,13 +472,14 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 	return c.currentTx, nil
 }
 
-func (c *conn) Version(ctx context.Context) (_ string, err error) {
-	const version string = "default"
+func (c *conn) Version(context.Context) (_ string, err error) {
+	const version = "default"
 	return version, nil
 }
 
 func (c *conn) IsTableExists(ctx context.Context, tableName string) (tableExists bool, err error) {
-	tableExists, err = helpers.IsTableExists(ctx, listDirectoryFunc(c.connector.listDirectory), tableName)
+	tableName = c.normalizePath(tableName)
+	tableExists, err = helpers.IsTableExists(ctx, c.connector.parent.Scheme(), tableName)
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
@@ -472,11 +487,12 @@ func (c *conn) IsTableExists(ctx context.Context, tableName string) (tableExists
 }
 
 func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string) (columnExists bool, err error) {
-	tableExist, err := helpers.IsTableExists(ctx, listDirectoryFunc(c.connector.listDirectory), tableName)
+	tableName = c.normalizePath(tableName)
+	tableExists, err := helpers.IsTableExists(ctx, c.connector.parent.Scheme(), tableName)
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
-	if !tableExist {
+	if !tableExists {
 		return false, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
 
@@ -500,11 +516,12 @@ func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string)
 }
 
 func (c *conn) GetColumns(ctx context.Context, tableName string) (columns []string, err error) {
-	tableExist, err := helpers.IsTableExists(ctx, listDirectoryFunc(c.connector.listDirectory), tableName)
+	tableName = c.normalizePath(tableName)
+	tableExists, err := helpers.IsTableExists(ctx, c.connector.parent.Scheme(), tableName)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	if !tableExist {
+	if !tableExists {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
 
@@ -525,11 +542,12 @@ func (c *conn) GetColumns(ctx context.Context, tableName string) (columns []stri
 }
 
 func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) (dataType string, err error) {
-	tableExist, err := helpers.IsTableExists(ctx, listDirectoryFunc(c.connector.listDirectory), tableName)
+	tableName = c.normalizePath(tableName)
+	tableExists, err := helpers.IsTableExists(ctx, c.connector.parent.Scheme(), tableName)
 	if err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
-	if !tableExist {
+	if !tableExists {
 		return "", xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
 
@@ -561,11 +579,12 @@ func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) 
 }
 
 func (c *conn) GetPrimaryKeys(ctx context.Context, tableName string) (pkCols []string, err error) {
-	tableExist, err := helpers.IsTableExists(ctx, listDirectoryFunc(c.connector.listDirectory), tableName)
+	tableName = c.normalizePath(tableName)
+	tableExists, err := helpers.IsTableExists(ctx, c.connector.parent.Scheme(), tableName)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	if !tableExist {
+	if !tableExists {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
 
@@ -584,11 +603,12 @@ func (c *conn) GetPrimaryKeys(ctx context.Context, tableName string) (pkCols []s
 }
 
 func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (ok bool, err error) {
-	tableExist, err := helpers.IsTableExists(ctx, listDirectoryFunc(c.connector.listDirectory), tableName)
+	tableName = c.normalizePath(tableName)
+	tableExists, err := helpers.IsTableExists(ctx, c.connector.parent.Scheme(), tableName)
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
-	if !tableExist {
+	if !tableExists {
 		return false, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
 
@@ -613,45 +633,57 @@ func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (
 	return ok, nil
 }
 
-func (c *conn) GetTables(ctx context.Context, absPath string) (tables []string, err error) {
-	var e scheme.Entry
-	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		e, err = c.connector.describePath(ctx, absPath)
-		return err
-	}, retry.WithIdempotent(true))
-
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+func (c *conn) normalizePath(folderOrTable string) (absPath string) {
+	switch ch := folderOrTable[0]; ch {
+	case '/':
+		return folderOrTable
+	case '.':
+		return path.Join(c.GetDatabaseName(), c.tablePathPrefix, strings.TrimLeft(folderOrTable, "."))
+	default:
+		return path.Join(c.GetDatabaseName(), c.tablePathPrefix, folderOrTable)
 	}
-
-	if !e.IsTable() && !e.IsDirectory() {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("path '%s' should be a table or directory", absPath))
-	}
-
-	if e.IsTable() {
-		tables = append(tables, absPath)
-		return tables, nil
-	}
-
-	var d scheme.Directory
-	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		d, err = c.connector.listDirectory(ctx, absPath)
-		return err
-	}, retry.WithIdempotent(true))
-
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	for _, child := range d.Children {
-		if child.IsTable() {
-			tables = append(tables, path.Join(absPath, child.Name))
-		}
-	}
-	return tables, nil
 }
 
-func (c *conn) GetAllTables(ctx context.Context, absPath string) (tables []string, err error) {
+func (c *conn) GetTables(ctx context.Context, folder string) (tables []string, err error) {
+	absPath := c.normalizePath(folder)
+	var e scheme.Entry
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		e, err = c.connector.parent.Scheme().DescribePath(ctx, absPath)
+		return err
+	}, retry.WithIdempotent(true))
+
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	switch {
+	case e.IsTable():
+		tables = append(tables, strings.TrimLeft(absPath, folder))
+		return tables, nil
+	case e.IsDirectory():
+		var d scheme.Directory
+		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+			d, err = c.connector.parent.Scheme().ListDirectory(ctx, absPath)
+			return err
+		}, retry.WithIdempotent(true))
+
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		for _, child := range d.Children {
+			if child.IsTable() {
+				tables = append(tables, child.Name)
+			}
+		}
+		return tables, nil
+	default:
+		return nil, xerrors.WithStackTrace(fmt.Errorf("path '%s' should be a table or directory", folder))
+	}
+}
+
+func (c *conn) GetAllTables(ctx context.Context, folder string) (tables []string, err error) {
+	folder = c.normalizePath(folder)
 	ignoreDirs := map[string]bool{
 		".sys":        true,
 		".sys_health": true,
@@ -665,14 +697,14 @@ func (c *conn) GetAllTables(ctx context.Context, absPath string) (tables []strin
 	}
 
 	queue := make([]string, 0)
-	queue = append(queue, absPath)
+	queue = append(queue, folder)
 
 	for st := 0; st < len(queue); st++ {
 		curPath := queue[st]
 
 		var e scheme.Entry
 		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-			e, err = c.connector.describePath(ctx, curPath)
+			e, err = c.connector.parent.Scheme().DescribePath(ctx, curPath)
 			return err
 		}, retry.WithIdempotent(true))
 
@@ -687,7 +719,7 @@ func (c *conn) GetAllTables(ctx context.Context, absPath string) (tables []strin
 
 		var d scheme.Directory
 		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-			d, err = c.connector.listDirectory(ctx, curPath)
+			d, err = c.connector.parent.Scheme().ListDirectory(ctx, curPath)
 			return err
 		}, retry.WithIdempotent(true))
 
@@ -707,11 +739,12 @@ func (c *conn) GetAllTables(ctx context.Context, absPath string) (tables []strin
 }
 
 func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []string, err error) {
-	tableExist, err := helpers.IsTableExists(ctx, listDirectoryFunc(c.connector.listDirectory), tableName)
+	tableName = c.normalizePath(tableName)
+	tableExists, err := helpers.IsTableExists(ctx, c.connector.parent.Scheme(), tableName)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	if !tableExist {
+	if !tableExists {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
 
@@ -733,11 +766,12 @@ func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []stri
 }
 
 func (c *conn) GetIndexColumns(ctx context.Context, tableName, indexName string) (columns []string, err error) {
-	tableExist, err := helpers.IsTableExists(ctx, listDirectoryFunc(c.connector.listDirectory), tableName)
+	tableName = c.normalizePath(tableName)
+	tableExists, err := helpers.IsTableExists(ctx, c.connector.parent.Scheme(), tableName)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	if !tableExist {
+	if !tableExists {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
 

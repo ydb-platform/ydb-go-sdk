@@ -131,3 +131,57 @@ func Test_hasDeclare(t *testing.T) {
 		})
 	}
 }
+
+func Test_hasTablePathPrefix(t *testing.T) {
+	for _, tt := range []struct {
+		query              string
+		hasTablePathPrefix bool
+	}{
+		{
+			query:              "",
+			hasTablePathPrefix: false,
+		},
+		{
+			query:              "SELECT 1",
+			hasTablePathPrefix: false,
+		},
+		{
+			query:              "PRAGMA",
+			hasTablePathPrefix: false,
+		},
+		{
+			query:              "PRAGMA TablePathPrefix(\"/test/db/path/prefix\");",
+			hasTablePathPrefix: true,
+		},
+		{
+			query:              "PRAGMA TablePathPrefix(\"/test/db/path/prefix\") ;",
+			hasTablePathPrefix: true,
+		},
+		{
+			query:              "PRAGMA  TablePathPrefix(\"/test/db/path/prefix\");",
+			hasTablePathPrefix: true,
+		},
+		{
+			query:              "PRAGMA TablePathPrefix( \"/test/db/path/prefix\");",
+			hasTablePathPrefix: true,
+		},
+		{
+			query:              "PRAGMA TablePathPrefix(\"/test/db/path/prefix\" );",
+			hasTablePathPrefix: true,
+		},
+		{
+			query:              "PRAGMA TablePathPrefix(\"/test/db/path/prefix\") ;",
+			hasTablePathPrefix: true,
+		},
+		{
+			query:              "PRAGMA  TablePathPrefix( \"/test/db/path/prefix\" ) ;",
+			hasTablePathPrefix: true,
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			require.Equal(t, tt.hasTablePathPrefix, hasTablePathPrefix(tt.query),
+				fmt.Sprintf("%q must be %v, but not", tt.query, tt.hasTablePathPrefix),
+			)
+		})
+	}
+}

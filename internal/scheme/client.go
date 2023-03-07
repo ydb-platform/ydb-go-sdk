@@ -17,13 +17,7 @@ import (
 
 //nolint:gofumpt
 //nolint:nolintlint
-var (
-	errNilClient = xerrors.Wrap(errors.New("scheme client is not initialized"))
-
-	_ interface {
-		Database() string
-	} = (*Client)(nil)
-)
+var errNilClient = xerrors.Wrap(errors.New("scheme client is not initialized"))
 
 type Client struct {
 	config  config.Config

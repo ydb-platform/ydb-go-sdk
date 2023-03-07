@@ -6,7 +6,6 @@ package integration
 import (
 	"context"
 	"fmt"
-	"path"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -16,18 +15,9 @@ import (
 
 func TestDatabaseSqlScheme(t *testing.T) {
 	var (
-		scope  = newScope(t)
-		db     = scope.SQLDriverWithFolder()
-		folder = t.Name()
-		dbName string
+		scope = newScope(t)
+		db    = scope.SQLDriverWithFolder()
 	)
-
-	{
-		tydb, err := ydb.Unwrap(db)
-		require.NoError(t, err)
-
-		dbName = tydb.Name()
-	}
 
 	defer func() {
 		_ = db.Close()
@@ -50,7 +40,7 @@ func TestDatabaseSqlScheme(t *testing.T) {
 				return fmt.Errorf("drvConn does not implement scheme methods")
 			}
 
-			tables, err = q.GetTables(scope.Ctx, path.Join(dbName, folder))
+			tables, err = q.GetTables(scope.Ctx, ".")
 			return err
 		})
 		require.NoError(t, err)
@@ -67,8 +57,7 @@ func TestDatabaseSqlScheme(t *testing.T) {
 		_, err := db.ExecContext(
 			ydb.WithQueryMode(scope.Ctx, ydb.SchemeQueryMode),
 			`
-			PRAGMA TablePathPrefix("`+path.Join(dbName, folder)+`");
-			CREATE TABLE `+"series"+` (
+			CREATE TABLE series (
 				series_id Uint64,
 				title UTF8,
 				series_info UTF8,
@@ -99,7 +88,7 @@ func TestDatabaseSqlScheme(t *testing.T) {
 				return fmt.Errorf("drvConn does not implement scheme methods")
 			}
 
-			exists, err := q.IsTableExists(scope.Ctx, path.Join(dbName, folder, "series"))
+			exists, err := q.IsTableExists(scope.Ctx, "series")
 			if err != nil {
 				return err
 			}
@@ -130,7 +119,7 @@ func TestDatabaseSqlScheme(t *testing.T) {
 				return fmt.Errorf("drvConn does not implement scheme methods")
 			}
 
-			columns, err := q.GetColumns(scope.Ctx, path.Join(dbName, folder, "series"))
+			columns, err := q.GetColumns(scope.Ctx, "series")
 			if err != nil {
 				return err
 			}
