@@ -28,6 +28,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
@@ -637,148 +638,6 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 		t.Fatalf("tx failed: %v\n", err)
 	}
 
-	// multiple result sets
-	// - create table
-	t.Logf("> creating table stream_query...\n")
-	if err = db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_ = s.ExecuteSchemeQuery(
-				ctx,
-				`DROP TABLE stream_query`,
-			)
-			return s.ExecuteSchemeQuery(
-				ctx,
-				`CREATE TABLE stream_query (val Int32, PRIMARY KEY (val))`,
-			)
-		},
-		table.WithIdempotent(),
-	); err != nil {
-		t.Fatalf("create table failed: %v\n", err)
-	}
-	fmt.Printf("> table stream_query upsert data\n")
-	var (
-		upsertRowsCount = 100000
-		sum             uint64
-	)
-	if v, ok := os.LookupEnv("UPSERT_ROWS_COUNT"); ok {
-		var vv int
-		vv, err = strconv.Atoi(v)
-		if err != nil {
-			t.Errorf("wrong value of UPSERT_ROWS_COUNT: '%s'", v)
-		} else {
-			upsertRowsCount = vv
-		}
-	}
-
-	// - upsert data
-	fmt.Printf("> preparing values to upsert...\n")
-	values := make([]types.Value, 0, upsertRowsCount)
-	for i := 0; i < upsertRowsCount; i++ {
-		sum += uint64(i)
-		values = append(
-			values,
-			types.StructValue(
-				types.StructFieldValue("val", types.Int32Value(int32(i))),
-			),
-		)
-	}
-	fmt.Printf("> values to upsert prepared\n")
-
-	fmt.Printf("> upserting prepared values...\n")
-	if err = db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, _, err = s.Execute(ctx,
-				table.TxControl(
-					table.BeginTx(
-						table.WithSerializableReadWrite(),
-					),
-					table.CommitTx(),
-				), `
-					DECLARE $values AS List<Struct<
-						val: Int32,
-					> >;
-					UPSERT INTO stream_query
-					SELECT
-						val
-					FROM
-						AS_TABLE($values);
-				`, table.NewQueryParameters(
-					table.ValueParam(
-						"$values",
-						types.ListValue(values...),
-					),
-				),
-			)
-			return err
-		},
-		table.WithIdempotent(),
-	); err != nil {
-		t.Fatalf("upsert failed: %v\n", err)
-	}
-	fmt.Printf("> prepared values upserted\n")
-
-	// - scan select
-	fmt.Printf("> scan-selecting values...\n")
-	if err = db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			res, err := s.StreamExecuteScanQuery(
-				ctx, `SELECT val FROM stream_query;`, table.NewQueryParameters(),
-				options.WithExecuteScanQueryStats(options.ExecuteScanQueryStatsTypeFull),
-			)
-			if err != nil {
-				return err
-			}
-			var (
-				resultSetsCount = 0
-				rowsCount       = 0
-				checkSum        uint64
-			)
-			for res.NextResultSet(ctx) {
-				resultSetsCount++
-				for res.NextRow() {
-					rowsCount++
-					var val *int32
-					err = res.Scan(&val)
-					if err != nil {
-						return err
-					}
-					checkSum += uint64(*val)
-				}
-				if stats := res.Stats(); stats != nil {
-					fmt.Printf(" --- query stats: compilation: %v, process CPU time: %v, affected shards: %v\n",
-						stats.Compilation(),
-						stats.ProcessCPUTime(),
-						func() (count uint64) {
-							for {
-								phase, ok := stats.NextPhase()
-								if !ok {
-									return
-								}
-								count += phase.AffectedShards()
-							}
-						}(),
-					)
-				}
-			}
-			if rowsCount != upsertRowsCount {
-				return fmt.Errorf("wrong rows count: %v, exp: %v", rowsCount, upsertRowsCount)
-			}
-
-			if sum != checkSum {
-				return fmt.Errorf("wrong checkSum: %v, exp: %v", checkSum, sum)
-			}
-
-			if resultSetsCount <= 1 {
-				return fmt.Errorf("wrong result sets count: %v", resultSetsCount)
-			}
-
-			return res.Err()
-		},
-		table.WithIdempotent(),
-	); err != nil {
-		t.Fatalf("scan select failed: %v\n", err)
-	}
-	fmt.Printf("> values selected\n")
 	// shutdown existing sessions
 	urls := os.Getenv("YDB_SESSIONS_SHUTDOWN_URLS")
 	if len(urls) > 0 {
@@ -1199,28 +1058,28 @@ func (s *tableTestScope) fill(ctx context.Context) error {
 		func(ctx context.Context, session table.Session) (err error) {
 			stmt, err := session.Prepare(ctx, s.render(template.Must(template.New("fillQuery database").Parse(`
 				PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
-
+				
 				DECLARE $seriesData AS List<Struct<
 					series_id: Uint64,
 					title: Text,
 					series_info: Text,
 					release_date: Date,
 					comment: Optional<Text>>>;
-
+				
 				DECLARE $seasonsData AS List<Struct<
 					series_id: Uint64,
 					season_id: Uint64,
 					title: Text,
 					first_aired: Date,
 					last_aired: Date>>;
-
+				
 				DECLARE $episodesData AS List<Struct<
 					series_id: Uint64,
 					season_id: Uint64,
 					episode_id: Uint64,
 					title: Text,
 					air_date: Date>>;
-
+				
 				REPLACE INTO series
 				SELECT
 					series_id,
@@ -1229,7 +1088,7 @@ func (s *tableTestScope) fill(ctx context.Context) error {
 					release_date,
 					comment
 				FROM AS_TABLE($seriesData);
-
+				
 				REPLACE INTO seasons
 				SELECT
 					series_id,
@@ -1238,7 +1097,7 @@ func (s *tableTestScope) fill(ctx context.Context) error {
 					first_aired,
 					last_aired
 				FROM AS_TABLE($seasonsData);
-
+				
 				REPLACE INTO episodes
 				SELECT
 					series_id,
@@ -1331,385 +1190,22 @@ func (s *tableTestScope) createTables(ctx context.Context) error {
 	return nil
 }
 
-func TestLongStream(t *testing.T) {
-	var (
-		tableName         = `long_stream_query`
-		discoveryInterval = 10 * time.Second
-		db                ydb.Connection
-		err               error
-		upsertRowsCount   = 100000
-		batchSize         = 10000
-	)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	db, err = ydb.Open(
-		ctx,
-		os.Getenv("YDB_CONNECTION_STRING"),
-		ydb.WithAccessTokenCredentials(
-			os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
-		),
-		ydb.WithDiscoveryInterval(0), // disable re-discovery on upsert time
+func (s *tableTestScope) describeTable(ctx context.Context, tableName string) (err error) {
+	err = s.db.Table().Do(ctx,
+		func(ctx context.Context, session table.Session) (err error) {
+			_, err = session.DescribeTable(ctx, path.Join(s.db.Name(), s.folder, tableName))
+			if err != nil {
+				return
+			}
+			return err
+		},
+		table.WithIdempotent(),
 	)
 	if err != nil {
-		t.Fatal(err)
+		return fmt.Errorf("describe table %q failed: %w", path.Join(s.db.Name(), s.folder, tableName), err)
 	}
-	defer func(db ydb.Connection) {
-		// cleanup
-		_ = db.Close(ctx)
-	}(db)
-
-	t.Run("creating stream table", func(t *testing.T) {
-		if err = db.Table().Do(ctx,
-			func(ctx context.Context, s table.Session) (err error) {
-				_, err = s.DescribeTable(ctx, path.Join(db.Name(), tableName))
-				if err == nil {
-					if err = s.DropTable(ctx, path.Join(db.Name(), tableName)); err != nil {
-						return err
-					}
-				}
-				return s.ExecuteSchemeQuery(
-					ctx,
-					`CREATE TABLE `+tableName+` (val Int64, PRIMARY KEY (val))`,
-				)
-			},
-			table.WithIdempotent(),
-		); err != nil {
-			t.Fatalf("create table failed: %v\n", err)
-		}
-	})
-
-	t.Run("check batch size", func(t *testing.T) {
-		if upsertRowsCount%batchSize != 0 {
-			t.Fatalf("wrong batch size: (%d mod %d = %d) != 0", upsertRowsCount, batchSize, upsertRowsCount%batchSize)
-		}
-	})
-
-	t.Run("upserting rows", func(t *testing.T) {
-		var upserted uint32
-		for i := 0; i < (upsertRowsCount / batchSize); i++ {
-			var (
-				from = int32(i * batchSize)
-				to   = int32((i + 1) * batchSize)
-			)
-			t.Run(fmt.Sprintf("upserting %d..%d", from, to-1), func(t *testing.T) {
-				values := make([]types.Value, 0, batchSize)
-				for j := from; j < to; j++ {
-					values = append(
-						values,
-						types.StructValue(
-							types.StructFieldValue("val", types.Int32Value(j)),
-						),
-					)
-				}
-				if err = db.Table().Do(ctx,
-					func(ctx context.Context, s table.Session) (err error) {
-						_, _, err = s.Execute(
-							ctx,
-							table.TxControl(
-								table.BeginTx(
-									table.WithSerializableReadWrite(),
-								),
-								table.CommitTx(),
-							), `
-								DECLARE $values AS List<Struct<
-									val: Int32,
-								>>;
-								UPSERT INTO `+"`"+path.Join(db.Name(), tableName)+"`"+`
-								SELECT
-									val
-								FROM
-									AS_TABLE($values);
-							`, table.NewQueryParameters(
-								table.ValueParam(
-									"$values",
-									types.ListValue(values...),
-								),
-							),
-						)
-						return err
-					},
-					table.WithIdempotent(),
-				); err != nil {
-					t.Fatalf("upsert failed: %v\n", err)
-				} else {
-					upserted += uint32(to - from)
-					fmt.Printf("upserted %d rows, total upserted rows: %d\n", uint32(to-from), upserted)
-				}
-			})
-		}
-		t.Run("check upserted rows", func(t *testing.T) {
-			fmt.Printf("total upserted rows: %d, expected: %d\n", upserted, upsertRowsCount)
-			if upserted != uint32(upsertRowsCount) {
-				t.Fatalf("wrong rows count: %v, expected: %d", upserted, upsertRowsCount)
-			}
-		})
-	})
-
-	t.Run("make child discovered connection", func(t *testing.T) {
-		db, err = db.With(ctx, ydb.WithDiscoveryInterval(discoveryInterval))
-		if err != nil {
-			t.Fatal(err)
-		}
-	})
-
-	defer func(db ydb.Connection) {
-		// cleanup
-		_ = db.Close(ctx)
-	}(db)
-
-	t.Run("execute stream query", func(t *testing.T) {
-		if err = db.Table().Do(ctx,
-			func(ctx context.Context, s table.Session) (err error) {
-				var (
-					start     = time.Now()
-					rowsCount = 0
-				)
-				res, err := s.StreamExecuteScanQuery(ctx, "SELECT val FROM "+tableName, table.NewQueryParameters())
-				if err != nil {
-					return err
-				}
-				defer func() {
-					_ = res.Close()
-				}()
-				for res.NextResultSet(ctx) {
-					count := 0
-					for res.NextRow() {
-						count++
-					}
-					rowsCount += count
-					fmt.Printf("received set with %d rows. total received: %d\n", count, rowsCount)
-					time.Sleep(discoveryInterval)
-				}
-				if err = res.Err(); err != nil {
-					return fmt.Errorf("received error (duration: %v): %w", time.Since(start), err)
-				}
-				if rowsCount != upsertRowsCount {
-					return fmt.Errorf("wrong rows count: %v, expected: %d (duration: %v)",
-						rowsCount,
-						upsertRowsCount,
-						time.Since(start),
-					)
-				}
-				return res.Err()
-			},
-			table.WithIdempotent(),
-		); err != nil {
-			t.Fatalf("stream query failed: %v\n", err)
-		}
-	})
-
-	t.Run("stream read table", func(t *testing.T) {
-		if err = db.Table().Do(ctx,
-			func(ctx context.Context, s table.Session) (err error) {
-				var (
-					start     = time.Now()
-					rowsCount = 0
-				)
-				res, err := s.StreamReadTable(ctx, path.Join(db.Name(), tableName), options.ReadColumn("val"))
-				if err != nil {
-					return err
-				}
-				defer func() {
-					_ = res.Close()
-				}()
-				for res.NextResultSet(ctx) {
-					count := 0
-					for res.NextRow() {
-						count++
-					}
-					rowsCount += count
-					fmt.Printf("received set with %d rows. total received: %d\n", count, rowsCount)
-					time.Sleep(discoveryInterval)
-				}
-				if err = res.Err(); err != nil {
-					return fmt.Errorf("received error (duration: %v): %w", time.Since(start), err)
-				}
-				if rowsCount != upsertRowsCount {
-					return fmt.Errorf("wrong rows count: %v, expected: %d (duration: %v)",
-						rowsCount,
-						upsertRowsCount,
-						time.Since(start),
-					)
-				}
-				return res.Err()
-			},
-			table.WithIdempotent(),
-		); err != nil {
-			t.Fatalf("stream query failed: %v\n", err)
-		}
-	})
+	return nil
 }
-
-func TestSplitRangesAndRead(t *testing.T) {
-	var (
-		tableName       = `ranges_table`
-		db              ydb.Connection
-		err             error
-		upsertRowsCount = 100000
-		batchSize       = 10000
-	)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	db, err = ydb.Open(
-		ctx,
-		os.Getenv("YDB_CONNECTION_STRING"),
-		ydb.WithAccessTokenCredentials(
-			os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
-		),
-		ydb.WithDiscoveryInterval(0), // disable re-discovery on upsert time
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func(db ydb.Connection) {
-		// cleanup
-		_ = db.Close(ctx)
-	}(db)
-
-	t.Run("creating table", func(t *testing.T) {
-		if err = db.Table().Do(ctx,
-			func(ctx context.Context, s table.Session) (err error) {
-				_, err = s.DescribeTable(ctx, path.Join(db.Name(), tableName))
-				if err == nil {
-					if err = s.DropTable(ctx, path.Join(db.Name(), tableName)); err != nil {
-						return err
-					}
-				}
-				return s.ExecuteSchemeQuery(
-					ctx,
-					`CREATE TABLE `+tableName+` (
-						id Uint64,
-						PRIMARY KEY (id)
-					)
-					WITH (
-						UNIFORM_PARTITIONS = 8
-					)`,
-				)
-			},
-			table.WithIdempotent(),
-		); err != nil {
-			t.Fatalf("create table failed: %v\n", err)
-		}
-	})
-
-	t.Run("check batch size", func(t *testing.T) {
-		if upsertRowsCount%batchSize != 0 {
-			t.Fatalf("wrong batch size: (%d mod %d = %d) != 0", upsertRowsCount, batchSize, upsertRowsCount%batchSize)
-		}
-	})
-
-	t.Run("upserting rows", func(t *testing.T) {
-		var upserted uint32
-		for i := 0; i < (upsertRowsCount / batchSize); i++ {
-			from, to := uint32(i*batchSize), uint32((i+1)*batchSize)
-			t.Run(fmt.Sprintf("upserting %v...%v", from, to-1), func(t *testing.T) {
-				values := make([]types.Value, 0, batchSize)
-				for j := from; j < to; j++ {
-					b := make([]byte, 4)
-					binary.BigEndian.PutUint32(b, j)
-					s := sha256.Sum224(b)
-					values = append(
-						values,
-						types.StructValue(
-							types.StructFieldValue("id", types.Uint64Value(binary.BigEndian.Uint64(s[:]))),
-						),
-					)
-				}
-				if err = db.Table().Do(ctx,
-					func(ctx context.Context, s table.Session) (err error) {
-						_, _, err = s.Execute(
-							ctx,
-							table.TxControl(
-								table.BeginTx(
-									table.WithSerializableReadWrite(),
-								),
-								table.CommitTx(),
-							), `
-								DECLARE $values AS List<Struct<
-									id: Uint64,
-								>>;
-								UPSERT INTO `+"`"+path.Join(db.Name(), tableName)+"`"+`
-								SELECT
-									id
-								FROM
-									AS_TABLE($values);
-							`, table.NewQueryParameters(
-								table.ValueParam(
-									"$values",
-									types.ListValue(values...),
-								),
-							),
-						)
-						return err
-					},
-					table.WithIdempotent(),
-				); err != nil {
-					t.Fatalf("upsert failed: %v\n", err)
-				} else {
-					upserted += to - from
-					fmt.Printf("upserted %d rows, total upserted rows: %d\n", to-from, upserted)
-				}
-			})
-		}
-		t.Run("check upserted rows", func(t *testing.T) {
-			fmt.Printf("total upserted rows: %d, expected: %d\n", upserted, upsertRowsCount)
-			if upserted != uint32(upsertRowsCount) {
-				t.Fatalf("wrong rows count: %v, expected: %d", upserted, upsertRowsCount)
-			}
-		})
-	})
-
-	var ranges []options.KeyRange
-
-	t.Run("make ranges", func(t *testing.T) {
-		if err = db.Table().Do(ctx,
-			func(ctx context.Context, s table.Session) (err error) {
-				d, err := s.DescribeTable(ctx,
-					path.Join(db.Name(), tableName),
-					options.WithShardKeyBounds(),
-				)
-				if err != nil {
-					return err
-				}
-				for _, r := range d.KeyRanges {
-					if r.From == nil || r.To == nil {
-						ranges = append(ranges, r)
-					} else {
-						var from, to uint64
-						if err := types.CastTo(r.From, &from); err != nil {
-							return err
-						}
-						if err := types.CastTo(r.To, &to); err != nil {
-							return err
-						}
-						ranges = append(ranges,
-							options.KeyRange{
-								From: r.From,
-								To: types.TupleValue(
-									types.OptionalValue(types.Uint64Value(from + (to-from)/2)),
-								),
-							},
-							options.KeyRange{
-								From: types.TupleValue(
-									types.OptionalValue(types.Uint64Value(from + (to-from)/2)),
-								),
-								To: r.To,
-							},
-						)
-					}
-					fmt.Printf("- range [%+v, %+v]\n", r.From, r.To)
-				}
-				return nil
-			},
-			table.WithIdempotent(),
-		); err != nil {
-			t.Fatalf("stream query failed: %v\n", err)
-		}
-	})
 
 func (s *tableTestScope) render(t *template.Template, data interface{}) string {
 	var buf bytes.Buffer
