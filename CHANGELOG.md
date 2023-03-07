@@ -1,7 +1,5 @@
 * Fixed sugar.RecursiveRemove for remove full path
 * Removed `driver.ResultNoRows` in `internal/xsql`
-* BROKEN CHANGE in experimental topic api: producer id on start writer now is optional
-* BROKEN CHANGE in experimental topic api: remove `WithMessageGroupID` option (because not supported now)
 * Supported binding parameters for `database/sql` driver by default
 * Added connector option `ydb.WithTablePathPrefix(tablePathPrefix)` and connection string parameter `table_path_prefix`
 * Fixed topic retry policy callback call: not call it with nil error
@@ -9,13 +7,33 @@
 * Allowed zero create session timeout in `ydb.WithSessionPoolCreateSessionTimeout(timeout)` (less than or equal to zero - no used timeout on create session request)
 * Added examples with own `go.mod`
 * Supported `scheme.EntryTopic` path child entry in `sugar.RemoveRecursive`
-* Renamed private `ydb.connection` type to public `ydb.Driver` type
-* Marked as deprecated `ydb.Connection` interface
-* BROKEN CHANGE remove method `With` from interface `ydb.Connection`
-* Changed result type of `ydb.Open` from `ydb.Connection` interface to `*ydb.Driver`
-* Changed default output stream of internal logger to `io.Stderr`
 * Marked as deprecated `ydb.WithErrWriter(w)` and `ydb.WithOutWriter(w)` logger options
 * Added `ydb.WithWriter(w)` logger option
+
+## v3.43.0
+**Small broken changes**
+
+Most users can skip there notes and upgrade as usual because build break rare used methods (expiremental API and api for special cases, not need for common use YDB) and this version has no any behavior changes.
+
+Changes for experimental topic API:
+* Moved `producer_id` from required positional argument to option `WithProducerID` (and it is optional now)
+* Removed `WithMessageGroupID` option (because not supported now)
+
+Changes in ydb connection:
+* Publish internal private struct `ydb.connection` as `ydb.Driver` (it is implement `ydb.Connection`)
+* `ydb.Connection` marked as deprecated
+* Changed return type of `ydb.Open(...)` from `ydb.Connection` to `*ydb.Driver`
+* Changed return type of `ydb.New(...)` from `ydb.Connection` to `*ydb.Driver`
+* Changed argument type for `ydb.GRPCConn` from `ydb.Connection` to `*ydb.Driver`
+* Removed method `With` from `ydb.Connection` (use `*Driver.With` instead).
+
+Changes in package `sugar`:
+* Changed a type of database arg in `sugar.{MakeRecursive,RemoveRecursive}` from `ydb.Connection` to minimal required local interface
+
+Dependencies:
+* Up minimal supported version of `go` to `1.17` for update dependencies (new `golang.org/x` doesn't compiled for `go1.16`)
+* Upgrade `golang.org/x/...`  for prevent issues: `CVE-2021-33194`, `CVE-2022-27664`, `CVE-2021-31525`, `CVE-2022-41723`
+
 
 ## v3.42.13
 * Fixed default state of `internal/xerrors.retryableError`: it inherit properties from parent error as possible
