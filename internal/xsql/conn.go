@@ -658,7 +658,8 @@ func (c *conn) GetTables(ctx context.Context, folder string) (tables []string, e
 
 	switch {
 	case e.IsTable():
-		tables = append(tables, strings.TrimLeft(absPath, folder))
+		_, table := path.Split(absPath)
+		tables = append(tables, table)
 		return tables, nil
 	case e.IsDirectory():
 		var d scheme.Directory
@@ -713,7 +714,13 @@ func (c *conn) GetAllTables(ctx context.Context, folder string) (tables []string
 		}
 
 		if e.IsTable() {
-			tables = append(tables, curPath)
+			switch curPath {
+			case folder:
+				_, table := path.Split(curPath)
+				tables = append(tables, table)
+			default:
+				tables = append(tables, strings.TrimPrefix(curPath, folder+"/"))
+			}
 			continue
 		}
 
