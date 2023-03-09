@@ -1,3 +1,4 @@
+* Fixed extended API `internal/xsql/(*conn).GetTables(...)`, `internal/xsql/(*conn).GetAllTables(...)`
 * Fixed test for `database/sql` extended API
 * Extend `scheme.Client` interface with method `Database`
 * Fixed `sugar.RecursiveRemove` for remove full path
