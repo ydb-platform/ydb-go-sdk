@@ -66,7 +66,7 @@ func TestDatabaseSqlIsPrimaryKey(t *testing.T) {
 	t.Run("is-primary-key", func(t *testing.T) {
 		err := retry.Do(scope.Ctx, db, func(ctx context.Context, cc *sql.Conn) (err error) {
 			for _, pk := range []string{"series_id", "season_id", "episode_id"} {
-				var isPk = false
+				isPk := false
 				err = cc.Raw(func(drvConn interface{}) (err error) {
 					q, ok := drvConn.(interface {
 						IsPrimaryKey(context.Context, string, string) (bool, error)
@@ -95,7 +95,7 @@ func TestDatabaseSqlIsPrimaryKey(t *testing.T) {
 	t.Run("is-not-primary-key", func(t *testing.T) {
 		err := retry.Do(scope.Ctx, db, func(ctx context.Context, cc *sql.Conn) (err error) {
 			for _, pk := range []string{"title", "air_date", "views"} {
-				var isPk = false
+				isPk := false
 				err = cc.Raw(func(drvConn interface{}) (err error) {
 					q, ok := drvConn.(interface {
 						IsPrimaryKey(context.Context, string, string) (bool, error)
