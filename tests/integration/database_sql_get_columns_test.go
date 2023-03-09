@@ -63,7 +63,7 @@ func TestDatabaseSqlGetColumns(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("is-get-columns", func(t *testing.T) {
+	t.Run("get-columns", func(t *testing.T) {
 		err := retry.Do(scope.Ctx, db, func(ctx context.Context, cc *sql.Conn) (err error) {
 			columns := make([]string, 0)
 			err = cc.Raw(func(drvConn interface{}) (err error) {
