@@ -13,30 +13,17 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
-	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 )
 
 func TestDatabaseSqlGetColumns(t *testing.T) {
 	var (
-		scope  = newScope(t)
-		db     = scope.SQLDriverWithFolder()
-		folder = t.Name()
+		scope = newScope(t)
+		db    = scope.SQLDriverWithFolder()
 	)
 
 	defer func() {
 		_ = db.Close()
 	}()
-
-	t.Run("clear-folder", func(t *testing.T) {
-		cc, err := ydb.Unwrap(db)
-		require.NoError(t, err)
-
-		err = sugar.RemoveRecursive(scope.Ctx, cc, folder)
-		require.NoError(t, err)
-
-		err = sugar.MakeRecursive(scope.Ctx, cc, folder)
-		require.NoError(t, err)
-	})
 
 	t.Run("create-tables", func(t *testing.T) {
 		err := retry.Do(scope.Ctx, db, func(ctx context.Context, cc *sql.Conn) (err error) {

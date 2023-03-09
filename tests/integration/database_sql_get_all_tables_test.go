@@ -28,14 +28,8 @@ func TestDatabaseSqlGetAllTables(t *testing.T) {
 		_ = db.Close()
 	}()
 
-	t.Run("clear-folder", func(t *testing.T) {
+	t.Run("prepare-sub-folder", func(t *testing.T) {
 		cc, err := ydb.Unwrap(db)
-		require.NoError(t, err)
-
-		err = sugar.RemoveRecursive(scope.Ctx, cc, folder)
-		require.NoError(t, err)
-
-		err = sugar.MakeRecursive(scope.Ctx, cc, folder)
 		require.NoError(t, err)
 
 		err = sugar.MakeRecursive(scope.Ctx, cc, path.Join(folder, "subdir"))
