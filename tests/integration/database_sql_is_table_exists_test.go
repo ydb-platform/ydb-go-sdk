@@ -27,7 +27,7 @@ func TestDatabaseSqlIsTableExists(t *testing.T) {
 
 	t.Run("drop-if-exists", func(t *testing.T) {
 		err := retry.Do(scope.Ctx, db, func(ctx context.Context, cc *sql.Conn) (err error) {
-			var exists bool = true
+			var exists = true
 			err = cc.Raw(func(drvConn interface{}) (err error) {
 				q, ok := drvConn.(interface {
 					IsTableExists(context.Context, string) (bool, error)
@@ -82,7 +82,7 @@ func TestDatabaseSqlIsTableExists(t *testing.T) {
 
 	t.Run("is-table-exists", func(t *testing.T) {
 		err := retry.Do(scope.Ctx, db, func(ctx context.Context, cc *sql.Conn) (err error) {
-			var exists bool = true
+			var exists = true
 			err = cc.Raw(func(drvConn interface{}) (err error) {
 				q, ok := drvConn.(interface {
 					IsTableExists(context.Context, string) (bool, error)

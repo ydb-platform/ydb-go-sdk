@@ -64,7 +64,7 @@ func TestDatabaseSqlIsColumnExists(t *testing.T) {
 	t.Run("is-column-exists", func(t *testing.T) {
 		err := retry.Do(scope.Ctx, db, func(ctx context.Context, cc *sql.Conn) (err error) {
 			for _, column := range []string{"series_id", "title", "series_info", "release_date", "comment"} {
-				var exists bool = true
+				var exists = true
 				err = cc.Raw(func(drvConn interface{}) (err error) {
 					q, ok := drvConn.(interface {
 						IsColumnExists(context.Context, string, string) (bool, error)
