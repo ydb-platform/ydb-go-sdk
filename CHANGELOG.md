@@ -1,3 +1,5 @@
+* Fixed checking `nil` error with `internal/xerrors.Is`
+
 ## v3.42.14
 * Supported `scheme.EntryTopic` path child entry in `sugar.RemoveRecursive`
 
