@@ -1,3 +1,4 @@
+## v3.42.15
 * Fixed checking `nil` error with `internal/xerrors.Is`
 
 ## v3.42.14
