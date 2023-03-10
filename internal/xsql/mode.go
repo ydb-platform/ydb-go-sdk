@@ -5,7 +5,7 @@ import "fmt"
 type QueryMode int
 
 const (
-	UnknownQueryMode = iota
+	UnknownQueryMode = QueryMode(iota)
 	DataQueryMode
 	ExplainQueryMode
 	ScanQueryMode
