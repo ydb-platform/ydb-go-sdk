@@ -1,3 +1,4 @@
+## v3.43.0
 **Small broken changes**
 
 Most users can skip there notes and upgrade as usual because build break rare used methods (expiremental API and api for special cases, not need for common use YDB) and this version has no any behavior changes.
