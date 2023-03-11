@@ -36,6 +36,9 @@ Dependencies:
 * Up minimal supported version of `go` to `1.17` for update dependencies (new `golang.org/x` doesn't compiled for `go1.16`)
 * Upgrade `golang.org/x/...`  for prevent issues: `CVE-2021-33194`, `CVE-2022-27664`, `CVE-2021-31525`, `CVE-2022-41723`
 
+## v3.42.15
+* Fixed checking `nil` error with `internal/xerrors.Is`
+
 ## v3.42.14
 * Supported `scheme.EntryTopic` path child entry in `sugar.RemoveRecursive`
 

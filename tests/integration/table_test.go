@@ -1058,28 +1058,28 @@ func (s *tableTestScope) fill(ctx context.Context) error {
 		func(ctx context.Context, session table.Session) (err error) {
 			stmt, err := session.Prepare(ctx, s.render(template.Must(template.New("fillQuery database").Parse(`
 				PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
-				
+
 				DECLARE $seriesData AS List<Struct<
 					series_id: Uint64,
 					title: Text,
 					series_info: Text,
 					release_date: Date,
 					comment: Optional<Text>>>;
-				
+
 				DECLARE $seasonsData AS List<Struct<
 					series_id: Uint64,
 					season_id: Uint64,
 					title: Text,
 					first_aired: Date,
 					last_aired: Date>>;
-				
+
 				DECLARE $episodesData AS List<Struct<
 					series_id: Uint64,
 					season_id: Uint64,
 					episode_id: Uint64,
 					title: Text,
 					air_date: Date>>;
-				
+
 				REPLACE INTO series
 				SELECT
 					series_id,
@@ -1088,7 +1088,7 @@ func (s *tableTestScope) fill(ctx context.Context) error {
 					release_date,
 					comment
 				FROM AS_TABLE($seriesData);
-				
+
 				REPLACE INTO seasons
 				SELECT
 					series_id,
@@ -1097,7 +1097,7 @@ func (s *tableTestScope) fill(ctx context.Context) error {
 					first_aired,
 					last_aired
 				FROM AS_TABLE($seasonsData);
-				
+
 				REPLACE INTO episodes
 				SELECT
 					series_id,
