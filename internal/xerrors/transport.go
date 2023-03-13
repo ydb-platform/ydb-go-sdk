@@ -4,10 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"strconv"
-	"strings"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
@@ -45,7 +42,7 @@ func WithAddress(address string) teOpt {
 func (e *transportError) Error() string {
 	var b bytes.Buffer
 	b.WriteString(e.Name())
-	b.WriteString(fmt.Sprintf(" (%q", e.err.Error()))
+	b.WriteString(fmt.Sprintf(" (code = %d, source error = %q", e.status.Code(), e.err.Error()))
 	if len(e.address) > 0 {
 		b.WriteString(fmt.Sprintf(", address: %q", e.address))
 	}
@@ -55,26 +52,6 @@ func (e *transportError) Error() string {
 
 func (e *transportError) Unwrap() error {
 	return e.err
-}
-
-func dumpIssues(buf *bytes.Buffer, ms []*Ydb_Issue.IssueMessage) {
-	if len(ms) == 0 {
-		return
-	}
-	buf.WriteByte(' ')
-	buf.WriteByte('[')
-	defer buf.WriteByte(']')
-	for _, m := range ms {
-		buf.WriteByte('{')
-		if code := m.GetIssueCode(); code != 0 {
-			buf.WriteByte('#')
-			buf.WriteString(strconv.Itoa(int(code)))
-			buf.WriteByte(' ')
-		}
-		buf.WriteString(strings.TrimSuffix(m.GetMessage(), "."))
-		dumpIssues(buf, m.Issues)
-		buf.WriteByte('}')
-	}
 }
 
 func (e *transportError) Type() Type {
@@ -143,23 +120,27 @@ func Transport(err error, opts ...teOpt) error {
 	if err == nil {
 		return nil
 	}
-	var t *transportError
-	if errors.As(err, &t) {
-		return err
+	var te *transportError
+	if errors.As(err, &te) {
+		return te
 	}
 	if s, ok := grpcStatus.FromError(err); ok {
-		te := &transportError{
+		te = &transportError{
 			status: s,
 			err:    err,
 		}
-		for _, o := range opts {
-			if o != nil {
-				o(te)
-			}
+	} else {
+		te = &transportError{
+			status: grpcStatus.New(grpcCodes.Unknown, err.Error()),
+			err:    err,
 		}
-		return te
 	}
-	return err
+	for _, o := range opts {
+		if o != nil {
+			o(te)
+		}
+	}
+	return te
 }
 
 func MustPessimizeEndpoint(err error, codes ...grpcCodes.Code) bool {

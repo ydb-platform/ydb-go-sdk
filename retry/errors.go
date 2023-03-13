@@ -11,7 +11,10 @@ import (
 
 func unwrapErrBadConn(err error) error {
 	if xerrors.Is(err, driver.ErrBadConn) {
-		return xerrors.Retryable(err, xerrors.WithDeleteSession())
+		return xerrors.Retryable(err,
+			xerrors.WithName("unwrapErrBadConn"),
+			xerrors.WithDeleteSession(),
+		)
 	}
 	return err
 }
