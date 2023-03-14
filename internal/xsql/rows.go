@@ -68,12 +68,6 @@ func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 }
 
 func (r *rows) NextResultSet() (err error) {
-	defer func() {
-		if err != nil && xerrors.Is(err, io.EOF) {
-			// database/sql checks io.EOF with "==", not errors.Is(err, io.EOF)
-			err = io.EOF
-		}
-	}()
 	r.nextSet.Do(func() {})
 	err = r.result.NextResultSetErr(context.Background())
 	if err != nil {
@@ -87,12 +81,6 @@ func (r *rows) HasNextResultSet() bool {
 }
 
 func (r *rows) Next(dst []driver.Value) (err error) {
-	defer func() {
-		if err != nil && xerrors.Is(err, io.EOF) {
-			// database/sql checks io.EOF with "==", not errors.Is(err, io.EOF)
-			err = io.EOF
-		}
-	}()
 	r.nextSet.Do(func() {
 		err = r.result.NextResultSetErr(context.Background())
 	})

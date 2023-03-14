@@ -52,7 +52,7 @@ func TestTransportStackTraceError(t *testing.T) {
 				),
 			),
 			//nolint:lll
-			text: "transport/Aborted (\"rpc error: code = Aborted desc = some error\", address: \"example.com\") at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestTransportStackTraceError(stacktrace_test.go:48)`",
+			text: "transport/Aborted (code = 10, source error = \"rpc error: code = Aborted desc = some error\", address: \"example.com\") at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestTransportStackTraceError(stacktrace_test.go:48)`",
 		},
 		{
 			error: WithStackTrace(
@@ -63,7 +63,7 @@ func TestTransportStackTraceError(t *testing.T) {
 				),
 			),
 			//nolint:lll
-			text: "transport/Aborted (\"rpc error: code = Aborted desc = some error\") at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestTransportStackTraceError(stacktrace_test.go:59)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestTransportStackTraceError(stacktrace_test.go:58)`",
+			text: "transport/Aborted (code = 10, source error = \"rpc error: code = Aborted desc = some error\") at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestTransportStackTraceError(stacktrace_test.go:59)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestTransportStackTraceError(stacktrace_test.go:58)`",
 		},
 		{
 			error: WithStackTrace(
@@ -76,7 +76,7 @@ func TestTransportStackTraceError(t *testing.T) {
 				),
 			),
 			//nolint:lll
-			text: "transport/Aborted (\"rpc error: code = Aborted desc = some error\") at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestTransportStackTraceError(stacktrace_test.go:71)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestTransportStackTraceError(stacktrace_test.go:70)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestTransportStackTraceError(stacktrace_test.go:69)`",
+			text: "transport/Aborted (code = 10, source error = \"rpc error: code = Aborted desc = some error\") at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestTransportStackTraceError(stacktrace_test.go:71)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestTransportStackTraceError(stacktrace_test.go:70)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestTransportStackTraceError(stacktrace_test.go:69)`",
 		},
 	} {
 		t.Run(test.text, func(t *testing.T) {

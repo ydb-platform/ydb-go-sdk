@@ -1,19 +1,52 @@
 package xerrors
 
 import (
-	"bytes"
 	"errors"
+	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 )
 
 // operationError reports about operationStatus fail.
 type operationError struct {
 	code   Ydb.StatusIds_StatusCode
-	issues []*Ydb_Issue.IssueMessage
+	issues issues
+}
+
+type issues []*Ydb_Issue.IssueMessage
+
+func (ii issues) String() string {
+	if len(ii) == 0 {
+		return ""
+	}
+	b := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(b)
+	b.WriteByte('[')
+	for i, m := range ii {
+		if i != 0 {
+			b.WriteByte(',')
+		}
+		b.WriteByte('{')
+		if code := m.GetIssueCode(); code != 0 {
+			b.WriteByte('#')
+			b.WriteString(strconv.Itoa(int(code)))
+			b.WriteByte(' ')
+		}
+		b.WriteString(strings.TrimSuffix(m.GetMessage(), "."))
+		if len(m.Issues) > 0 {
+			b.WriteByte(' ')
+			b.WriteString(issues(m.Issues).String())
+		}
+		b.WriteByte('}')
+	}
+	b.WriteByte(']')
+	return b.String()
 }
 
 func (e *operationError) isYdbError() {}
@@ -75,14 +108,16 @@ func (e *operationError) Issues() []*Ydb_Issue.IssueMessage {
 }
 
 func (e *operationError) Error() string {
-	var buf bytes.Buffer
-	buf.WriteString("operationStatus error: ")
-	buf.WriteString(e.code.String())
+	b := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(b)
+	b.WriteString(e.Name())
+	b.WriteString(fmt.Sprintf(" (code = %d", e.code))
 	if len(e.issues) > 0 {
-		buf.WriteByte(':')
-		dumpIssues(&buf, e.issues)
+		b.WriteString(", issues = ")
+		b.WriteString(e.issues.String())
 	}
-	return buf.String()
+	b.WriteString(")")
+	return b.String()
 }
 
 // IsOperationError reports whether err is operationError with given errType codes.

@@ -168,3 +168,23 @@ func TestGrpcError(t *testing.T) {
 		})
 	}
 }
+
+func Test_transportError_Error(t *testing.T) {
+	for _, tt := range []struct {
+		err  error
+		text string
+	}{
+		{
+			err:  Transport(grpcStatus.Error(grpcCodes.FailedPrecondition, "")),
+			text: "transport/FailedPrecondition (code = 9, source error = \"rpc error: code = FailedPrecondition desc = \")",
+		},
+		{
+			err:  Transport(grpcStatus.Error(grpcCodes.Unavailable, ""), WithAddress("localhost:2135")),
+			text: "transport/Unavailable (code = 14, source error = \"rpc error: code = Unavailable desc = \", address: \"localhost:2135\")", //nolint:lll
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			require.Equal(t, tt.text, tt.err.Error())
+		})
+	}
+}
