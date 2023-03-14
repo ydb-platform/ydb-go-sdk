@@ -31,16 +31,25 @@ var (
 
 func defaultGrpcOptions(t trace.Driver, secure bool, tlsConfig *tls.Config) (opts []grpc.DialOption) {
 	opts = append(opts,
+		// Block call `DialContext` for dial done or fail
+		// For exclude dial errors on `Invoke` and `NewStream` steps
+		grpc.WithBlock(),
+		// keep-aliving all connections
 		grpc.WithKeepaliveParams(
 			DefaultGrpcConnectionPolicy,
 		),
+		// use round robin balancing policy for fastest dialing
 		grpc.WithDefaultServiceConfig(`{
 			"loadBalancingPolicy": "round_robin"
 		}`),
+		// limit size of outgoing and incoming packages
 		grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(DefaultGRPCMsgSize),
 			grpc.MaxCallSendMsgSize(DefaultGRPCMsgSize),
 		),
+		// use proxy-resolvers
+		// 1) for interpret schemas `ydb`, `grpc` and `grpcs` in node URLs as for dns resolver
+		// 2) for observe resolving events
 		grpc.WithResolvers(
 			xresolver.New("", t),
 			xresolver.New("ydb", t),

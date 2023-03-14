@@ -55,7 +55,7 @@ func bindYdb(query, tablePathPrefix string, args ...driver.NamedValue) (
 		}
 		switch v := arg.Value.(type) {
 		case *table.QueryParameters:
-			if len(args) > 0 {
+			if len(args) > 1 {
 				return "", nil, xerrors.WithStackTrace(fmt.Errorf("%v: %w", args, ErrMultipleQueryParameters))
 			}
 			query, err = binder{

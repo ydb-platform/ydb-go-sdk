@@ -13,7 +13,6 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/stats"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
@@ -205,18 +204,19 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 		}, c.config.GrpcDialOptions()...,
 	)...)
 	if err != nil {
-		err = xerrors.WithStackTrace(
-			xerrors.Retryable(
-				fmt.Errorf("dial to `%s` failed: %w", address, err),
-				xerrors.WithName("realConn"),
-				xerrors.WithBackoff(backoff.TypeSlow),
-				xerrors.WithDeleteSession(),
-			),
+		defer func() {
+			c.onTransportError(ctx, err)
+		}()
+
+		err = xerrors.Transport(err,
+			xerrors.WithAddress(address),
 		)
 
-		c.onTransportError(ctx, err)
-
-		return nil, err
+		return nil, xerrors.WithStackTrace(
+			xerrors.Retryable(err,
+				xerrors.WithName("realConn"),
+			),
+		)
 	}
 
 	c.cc = cc
@@ -338,7 +338,7 @@ func (c *conn) Invoke(
 				xerrors.WithAddress(c.Address()),
 			)
 			if sentMark.canRetry() {
-				return xerrors.WithStackTrace(xerrors.Retryable(err))
+				return xerrors.WithStackTrace(xerrors.Retryable(err, xerrors.WithName("Invoke")))
 			}
 			return xerrors.WithStackTrace(err)
 		}
@@ -425,7 +425,7 @@ func (c *conn) NewStream(
 				xerrors.WithAddress(c.Address()),
 			)
 			if sentMark.canRetry() {
-				return s, xerrors.WithStackTrace(xerrors.Retryable(err))
+				return s, xerrors.WithStackTrace(xerrors.Retryable(err, xerrors.WithName("NewStream")))
 			}
 			return s, xerrors.WithStackTrace(err)
 		}

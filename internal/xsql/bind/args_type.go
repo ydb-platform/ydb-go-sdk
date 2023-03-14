@@ -6,7 +6,7 @@ var (
 	// regexps for detect one of type of query
 	numericArgsRe    = regexp.MustCompile(`\$\d+`)
 	positionalArgsRe = regexp.MustCompile(`[^\\][?]`)
-	ydbArgsRe        = regexp.MustCompile(`\$[a-zA-Z\_]+\w+`)
+	ydbArgsRe        = regexp.MustCompile(`\$[a-zA-Z\_]+\w*`)
 )
 
 type argsType int
