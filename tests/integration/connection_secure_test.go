@@ -32,6 +32,7 @@ import (
 
 //nolint:gocyclo
 func TestConnectionSecure(t *testing.T) {
+	const sumColumn = "sum"
 	var (
 		ctx    = xtest.Context(t)
 		logger = xtest.Logger(t)
@@ -113,7 +114,7 @@ func TestConnectionSecure(t *testing.T) {
 					len(result.GetResultSets()[0].GetColumns()),
 				)
 			}
-			if result.GetResultSets()[0].GetColumns()[0].GetName() != "sum" {
+			if result.GetResultSets()[0].GetColumns()[0].GetName() != sumColumn {
 				return fmt.Errorf(
 					"unexpected colum name: %s",
 					result.GetResultSets()[0].GetColumns()[0].GetName(),
@@ -156,7 +157,7 @@ func TestConnectionSecure(t *testing.T) {
 					len(response.GetResult().GetResultSet().GetColumns()),
 				)
 			}
-			if response.GetResult().GetResultSet().GetColumns()[0].GetName() != "sum" {
+			if response.GetResult().GetResultSet().GetColumns()[0].GetName() != sumColumn {
 				return fmt.Errorf(
 					"unexpected colum name: %s",
 					response.GetResult().GetResultSet().GetColumns()[0].GetName(),
@@ -210,7 +211,7 @@ func TestConnectionSecure(t *testing.T) {
 					len(response.GetResult().GetResultSet().GetColumns()),
 				)
 			}
-			if response.GetResult().GetResultSet().GetColumns()[0].GetName() != "sum" {
+			if response.GetResult().GetResultSet().GetColumns()[0].GetName() != sumColumn {
 				return fmt.Errorf(
 					"unexpected colum name: %s",
 					response.GetResult().GetResultSet().GetColumns()[0].GetName(),

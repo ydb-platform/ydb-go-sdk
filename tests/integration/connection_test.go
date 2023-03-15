@@ -35,6 +35,7 @@ import (
 
 //nolint:gocyclo
 func TestConnection(t *testing.T) {
+	const sumColumn = "sum"
 	var (
 		userAgent     = "connection user agent"
 		requestType   = "connection request type"
@@ -168,8 +169,7 @@ func TestConnection(t *testing.T) {
 					len(result.GetResultSets()[0].GetColumns()),
 				)
 			}
-			//nolint:goconst
-			if result.GetResultSets()[0].GetColumns()[0].GetName() != "sum" {
+			if result.GetResultSets()[0].GetColumns()[0].GetName() != sumColumn {
 				return fmt.Errorf(
 					"unexpected colum name: %s",
 					result.GetResultSets()[0].GetColumns()[0].GetName(),
@@ -212,7 +212,7 @@ func TestConnection(t *testing.T) {
 					len(response.GetResult().GetResultSet().GetColumns()),
 				)
 			}
-			if response.GetResult().GetResultSet().GetColumns()[0].GetName() != "sum" {
+			if response.GetResult().GetResultSet().GetColumns()[0].GetName() != sumColumn {
 				return fmt.Errorf(
 					"unexpected colum name: %s",
 					response.GetResult().GetResultSet().GetColumns()[0].GetName(),
@@ -266,7 +266,7 @@ func TestConnection(t *testing.T) {
 					len(response.GetResult().GetResultSet().GetColumns()),
 				)
 			}
-			if response.GetResult().GetResultSet().GetColumns()[0].GetName() != "sum" {
+			if response.GetResult().GetResultSet().GetColumns()[0].GetName() != sumColumn {
 				return fmt.Errorf(
 					"unexpected colum name: %s",
 					response.GetResult().GetResultSet().GetColumns()[0].GetName(),
