@@ -19,14 +19,11 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Export"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scripting"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -34,32 +31,8 @@ import (
 )
 
 //nolint:gocyclo
-func TestConnection(t *testing.T) {
+func TestConnectionSecure(t *testing.T) {
 	const sumColumn = "sum"
-	var (
-		userAgent     = "connection user agent"
-		requestType   = "connection request type"
-		checkMedatada = func(ctx context.Context) {
-			md, has := metadata.FromOutgoingContext(ctx)
-			if !has {
-				t.Fatalf("no medatada")
-			}
-			userAgents := md.Get(meta.HeaderUserAgent)
-			if len(userAgents) == 0 {
-				t.Fatalf("no user agent")
-			}
-			if userAgents[0] != userAgent {
-				t.Fatalf("unknown user agent: %s", userAgents[0])
-			}
-			requestTypes := md.Get(meta.HeaderRequestType)
-			if len(requestTypes) == 0 {
-				t.Fatalf("no request type")
-			}
-			if requestTypes[0] != requestType {
-				t.Fatalf("unknown request type: %s", requestTypes[0])
-			}
-		}
-	)
 	var (
 		ctx    = xtest.Context(t)
 		logger = xtest.Logger(t)
@@ -68,7 +41,7 @@ func TestConnection(t *testing.T) {
 	db, err := ydb.Open(
 		ctx,
 		"", // corner case for check replacement of endpoint+database+secure
-		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
+		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING_SECURE")),
 		ydb.WithAccessTokenCredentials(
 			os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
 		),
@@ -83,34 +56,6 @@ func TestConnection(t *testing.T) {
 			ydb.WithNamespace("ydb"),
 			ydb.WithWriter(logger),
 			ydb.WithMinLevel(log.WARN),
-		),
-		ydb.WithUserAgent(userAgent),
-		ydb.WithRequestsType(requestType),
-		ydb.With(
-			config.WithGrpcOptions(
-				grpc.WithUnaryInterceptor(func(
-					ctx context.Context,
-					method string,
-					req, reply interface{},
-					cc *grpc.ClientConn,
-					invoker grpc.UnaryInvoker,
-					opts ...grpc.CallOption,
-				) error {
-					checkMedatada(ctx)
-					return invoker(ctx, method, req, reply, cc, opts...)
-				}),
-				grpc.WithStreamInterceptor(func(
-					ctx context.Context,
-					desc *grpc.StreamDesc,
-					cc *grpc.ClientConn,
-					method string,
-					streamer grpc.Streamer,
-					opts ...grpc.CallOption,
-				) (grpc.ClientStream, error) {
-					checkMedatada(ctx)
-					return streamer(ctx, desc, cc, method, opts...)
-				}),
-			),
 		),
 	)
 	if err != nil {
