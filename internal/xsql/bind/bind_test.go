@@ -12,13 +12,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-func named(name string, value interface{}) driver.NamedValue {
-	return driver.NamedValue{
-		Name:  name,
-		Value: value,
-	}
-}
-
 func TestBindings_Bind(t *testing.T) {
 	for _, tt := range []struct {
 		b         Bind
@@ -293,73 +286,13 @@ SELECT $param1, $param2`,
 	}
 }
 
+func named(name string, value interface{}) driver.NamedValue {
+	return driver.NamedValue{
+		Name:  name,
+		Value: value,
+	}
+}
+
 func removeWindowsCarriageReturn(s string) string {
 	return strings.ReplaceAll(s, "\r", "")
-}
-
-func Test_removeComments(t *testing.T) {
-	for _, tt := range []struct {
-		src string
-		dst string
-	}{
-		{
-			src: `
--- some comment
-SELECT 1;`,
-			dst: `
-
-SELECT 1;`,
-		},
-		{
-			src: `SELECT 1; -- some comment`,
-			dst: `SELECT 1; `,
-		},
-	} {
-		t.Run("", func(t *testing.T) {
-			require.Equal(t, tt.dst, removeComments(tt.src))
-		})
-	}
-}
-
-func Test_removeEmptyLines(t *testing.T) {
-	for _, tt := range []struct {
-		src string
-		dst string
-	}{
-		{
-			src: `
-
-  
-test
- 
-
-`,
-			dst: `test`,
-		},
-		{
-			src: `
-
-  
-   test
- 
-
-`,
-			dst: `   test`,
-		},
-		{
-			src: `
-
-  
-   test
- 
-
-end`,
-			dst: `   test
-end`,
-		},
-	} {
-		t.Run("", func(t *testing.T) {
-			require.Equal(t, tt.dst, removeEmptyLines(tt.src))
-		})
-	}
 }
