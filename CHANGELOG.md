@@ -1,13 +1,9 @@
 * Fixed `internal/xerrors.Transport` error wrapping for case when given error is not transport error
 * Added `grpc.WithBlock()` dial option to defaults
 * Added grpc and operation codes to errors string description
-* Fixed extended API `internal/xsql/(*conn).GetTables(...)`, `internal/xsql/(*conn).GetAllTables(...)`
-* Fixed test for `database/sql` extended API
 * Extend `scheme.Client` interface with method `Database`
-* Fixed `sugar.RecursiveRemove` for remove full path
 * Removed `driver.ResultNoRows` in `internal/xsql`
-* Supported binding parameters for `database/sql` driver by default
-* Added connector option `ydb.WithTablePathPrefix(tablePathPrefix)` and connection string parameter `table_path_prefix`
+* Supported binding parameters for `database/sql` driver over connector option `ydb.WithAUtoBind()` and connection string params `go_auto_bin.type={declare,numeric,positional}` and `go_auto_bin.table_path_prefix=path/to/tables`
 * Fixed topic retry policy callback call: not call it with nil error
 * Fixed bug with no checking operation error on `discovery.Client` calls
 * Allowed zero create session timeout in `ydb.WithSessionPoolCreateSessionTimeout(timeout)` (less than or equal to zero - no used timeout on create session request)

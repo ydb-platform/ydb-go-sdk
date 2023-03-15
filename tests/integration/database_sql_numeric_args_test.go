@@ -9,12 +9,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 
 func TestDatabaseSqlNumericArgs(t *testing.T) {
 	scope := newScope(t)
-	db := scope.SQLDriverWithFolder()
+	db := scope.SQLDriverWithFolder(ydb.WithAutoBind(
+		ydb.BindNumeric().WithTablePathPrefix(scope.Folder()),
+	))
 	dt := time.Date(2023, 3, 1, 16, 34, 18, 0, time.UTC)
 
 	var row *sql.Row

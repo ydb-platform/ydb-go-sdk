@@ -8,6 +8,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -91,10 +92,6 @@ func WithQueryMode(ctx context.Context, mode QueryMode) context.Context {
 	return xsql.WithQueryMode(ctx, mode)
 }
 
-func WithStrictYQL(ctx context.Context) context.Context {
-	return xsql.WithStrictYQL(ctx)
-}
-
 func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.Context {
 	return xsql.WithTxControl(ctx, txc)
 }
@@ -105,8 +102,24 @@ func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
 	return xsql.WithDefaultQueryMode(mode)
 }
 
-func WithTablePathPrefix(tablePathPrefix string) ConnectorOption {
-	return xsql.WithTablePathPrefix(tablePathPrefix)
+func BindPositional() bind.Bind {
+	return bind.Positional()
+}
+
+func BindNumeric() bind.Bind {
+	return bind.Numeric()
+}
+
+func BindDeclares() bind.Bind {
+	return bind.Declare()
+}
+
+func BindTablePathPrefix(tablePathPrefix string) bind.Bind {
+	return bind.TablePathPrefix(tablePathPrefix)
+}
+
+func WithAutoBind(bind bind.Bind) ConnectorOption {
+	return xsql.WithBind(bind)
 }
 
 func WithDefaultTxControl(txControl *table.TransactionControl) ConnectorOption {

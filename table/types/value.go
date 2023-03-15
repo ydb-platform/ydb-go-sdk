@@ -526,7 +526,7 @@ func NullableJSONValueFromBytes(v *[]byte) Value {
 
 func NullableUUIDValue(v *[16]byte) Value {
 	if v == nil {
-		return NullValue(TypeJSON)
+		return NullValue(TypeUUID)
 	}
 	return OptionalValue(UUIDValue(*v))
 }

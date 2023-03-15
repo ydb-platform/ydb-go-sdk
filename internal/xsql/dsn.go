@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/bind"
 )
 
 func Parse(dataSourceName string) (opts []config.Option, connectorOpts []ConnectorOption, err error) {
@@ -29,8 +30,17 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 		}
 		connectorOpts = append(connectorOpts, WithDefaultQueryMode(mode))
 	}
-	if tablePathPrefix := info.Params.Get("table_path_prefix"); tablePathPrefix != "" {
-		connectorOpts = append(connectorOpts, WithTablePathPrefix(tablePathPrefix))
+	b := bind.NoBind()
+	if info.Params.Has("go_auto_bind") {
+		t, err := bind.FromString(info.Params.Get("go_auto_bind"))
+		if err != nil {
+			return nil, nil, xerrors.WithStackTrace(err)
+		}
+		b = bind.SwitchType(b, t)
 	}
+	if info.Params.Has("go_auto_bind.table_path_prefix") {
+		b = b.WithTablePathPrefix(info.Params.Get("go_auto_bind.table_path_prefix"))
+	}
+	connectorOpts = append(connectorOpts, WithBind(b))
 	return opts, connectorOpts, nil
 }

@@ -39,6 +39,7 @@ jobs:
       group: integration-secure-connection-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
       cancel-in-progress: true
     strategy:
+      fail-fast: false
       matrix:
         go-version: [1.17.x, 1.19.x, 1.20.x]
         os: [ubuntu-latest]
@@ -84,6 +85,7 @@ jobs:
       group: integration-insecure-connection-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
       cancel-in-progress: true
     strategy:
+      fail-fast: false
       matrix:
         go-version: [1.17.x, 1.19.x, 1.20.x]
         os: [ubuntu-latest]

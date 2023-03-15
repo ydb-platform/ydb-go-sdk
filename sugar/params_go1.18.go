@@ -10,7 +10,8 @@ import (
 
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/bind"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/convert"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
@@ -26,7 +27,7 @@ func GenerateDeclareSection[T *table.QueryParameters | []table.ParameterOption |
 	case []table.ParameterOption:
 		return internal.GenerateDeclareSection(table.NewQueryParameters(v...))
 	case []sql.NamedArg:
-		return bind.GenerateDeclareSection(v)
+		return xsql.GenerateDeclareSection(v)
 	default:
 		return "", xerrors.WithStackTrace(fmt.Errorf("unsupported type: %T", v))
 	}
@@ -36,7 +37,7 @@ func GenerateDeclareSection[T *table.QueryParameters | []table.ParameterOption |
 //
 // Warning: This is an experimental feature and could change at any time
 func ToYdbParam(param sql.NamedArg) (table.ParameterOption, error) {
-	return bind.ToYdbParam(driver.NamedValue{
+	return convert.ToYdbParam(driver.NamedValue{
 		Name:  param.Name,
 		Value: param.Value,
 	})

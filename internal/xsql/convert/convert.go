@@ -1,7 +1,8 @@
-package bind
+package convert
 
 import (
 	"database/sql/driver"
+	"errors"
 	"fmt"
 	"net/url"
 	"time"
@@ -10,6 +11,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+)
+
+var (
+	errUnsupportedType = errors.New("unsupported type")
+	errUnnamedParam    = errors.New("unnamed param")
 )
 
 //nolint:gocyclo
@@ -32,6 +38,20 @@ func ToValue(v interface{}) (_ types.Value, err error) {
 		return types.NullableBoolValue(x), nil
 	case int:
 		return types.Int32Value(int32(x)), nil
+	case *int:
+		if x == nil {
+			return types.NullValue(types.TypeInt32), nil
+		}
+		xx := int32(*x)
+		return types.NullableInt32Value(&xx), nil
+	case uint:
+		return types.Uint32Value(uint32(x)), nil
+	case *uint:
+		if x == nil {
+			return types.NullValue(types.TypeUint32), nil
+		}
+		xx := uint32(*x)
+		return types.NullableUint32Value(&xx), nil
 	case int8:
 		return types.Int8Value(x), nil
 	case *int8:
@@ -86,12 +106,6 @@ func ToValue(v interface{}) (_ types.Value, err error) {
 			items[i] = types.TextValue(x[i])
 		}
 		return types.ListValue(items...), nil
-	case *[]string:
-		items := make([]types.Value, len(*x))
-		for i := range *x {
-			items[i] = types.TextValue((*x)[i])
-		}
-		return types.ListValue(items...), nil
 	case [16]byte:
 		return types.UUIDValue(x), nil
 	case *[16]byte:
@@ -128,6 +142,9 @@ func ToYdbParam(param driver.NamedValue) (table.ParameterOption, error) {
 	value, err := ToValue(param.Value)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
+	}
+	if param.Name == "" {
+		return nil, xerrors.WithStackTrace(errUnnamedParam)
 	}
 	return table.ValueParam(param.Name, value), nil
 }

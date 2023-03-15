@@ -12,205 +12,276 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
+func named(name string, value interface{}) driver.NamedValue {
+	return driver.NamedValue{
+		Name:  name,
+		Value: value,
+	}
+}
+
 func TestBindings_Bind(t *testing.T) {
 	for _, tt := range []struct {
-		tablePathPrefix string
-		q               string
-		args            []driver.NamedValue
-		expQuery        string
-		expParams       *table.QueryParameters
-		expErr          error
+		b         Bind
+		q         string
+		args      []driver.NamedValue
+		expQuery  string
+		expParams *table.QueryParameters
+		expErr    error
 	}{
 		{
 			q:        "SELECT 1",
-			args:     nil,
 			expQuery: "SELECT 1",
 		},
 		{
-			q: "SELECT $1, ?",
+			b: Positional(),
+			q: "SELECT ?, ?",
 			args: []driver.NamedValue{
 				{Value: 1},
 			},
-			expErr: errUnknownQueryType,
+			expErr: errArgsCount,
 		},
 		{
-			q: "SELECT $1, ?, $p1",
+			b: Positional(),
+			q: "SELECT ?, ?",
 			args: []driver.NamedValue{
-				{Value: 1},
+				{Value: 100},
+				{Value: 200},
 			},
-			expErr: errUnknownQueryType,
-		},
-		{
-			q: "SELECT ?, $p1",
-			args: []driver.NamedValue{
-				{Value: 1},
-			},
-			expErr: errUnknownQueryType,
-		},
-		{
-			q: "SELECT $1, $p1",
-			args: []driver.NamedValue{
-				{Value: 1},
-			},
-			expErr: errUnknownQueryType,
-		},
-		{
-			tablePathPrefix: "/local/",
-			q:               "SELECT 1",
-			args:            nil,
-			expQuery: `-- modified by ydb-go-sdk@v` + meta.Version + `
---
--- source query:
---   SELECT 1
---
-PRAGMA TablePathPrefix("/local/");
-SELECT 1`,
-			expParams: nil,
-			expErr:    nil,
-		},
-		{
-			tablePathPrefix: "/local/",
-			q:               "SELECT $1",
-			args: []driver.NamedValue{
-				{Value: 1},
-			},
-			expQuery: `-- modified by ydb-go-sdk@v` + meta.Version + `
---
--- source query:
---   SELECT $1
---
-PRAGMA TablePathPrefix("/local/");
-DECLARE $p0 AS Int32;
-SELECT $p0`,
-			expParams: table.NewQueryParameters(
-				table.ValueParam("$p0", types.Int32Value(1)),
-			),
-			expErr: nil,
-		},
-		{
-			tablePathPrefix: "/local/",
-			q:               "SELECT $1, $2, $3",
-			args: []driver.NamedValue{
-				{Value: 1},
-				{Value: uint64(2)},
-				{Value: true},
-			},
-			expQuery: `-- modified by ydb-go-sdk@v` + meta.Version + `
---
--- source query:
---   SELECT $1, $2, $3
---
-PRAGMA TablePathPrefix("/local/");
-DECLARE $p0 AS Int32;
-DECLARE $p1 AS Uint64;
-DECLARE $p2 AS Bool;
-SELECT $p0, $p1, $p2`,
-			expParams: table.NewQueryParameters(
-				table.ValueParam("$p0", types.Int32Value(1)),
-				table.ValueParam("$p1", types.Uint64Value(2)),
-				table.ValueParam("$p2", types.BoolValue(true)),
-			),
-			expErr: nil,
-		},
-		{
-			tablePathPrefix: "/local/",
-			q:               "SELECT $2, $1, $3, $1, $2",
-			args: []driver.NamedValue{
-				{Value: 1},
-				{Value: uint64(2)},
-				{Value: true},
-			},
-			expQuery: `-- modified by ydb-go-sdk@v` + meta.Version + `
---
--- source query:
---   SELECT $2, $1, $3, $1, $2
---
-PRAGMA TablePathPrefix("/local/");
-DECLARE $p0 AS Int32;
-DECLARE $p1 AS Uint64;
-DECLARE $p2 AS Bool;
-SELECT $p1, $p0, $p2, $p0, $p1`,
-			expParams: table.NewQueryParameters(
-				table.ValueParam("$p0", types.Int32Value(1)),
-				table.ValueParam("$p1", types.Uint64Value(2)),
-				table.ValueParam("$p2", types.BoolValue(true)),
-			),
-			expErr: nil,
-		},
-		{
-			tablePathPrefix: "/local/",
-			q:               "SELECT ?",
-			args: []driver.NamedValue{
-				{
-					Value: 1,
-				},
-			},
-			expQuery: `-- modified by ydb-go-sdk@v` + meta.Version + `
---
--- source query:
---   SELECT ?
---
-PRAGMA TablePathPrefix("/local/");
-DECLARE $p0 AS Int32;
-SELECT $p0`,
-			expParams: table.NewQueryParameters(
-				table.ValueParam("$p0", types.Int32Value(1)),
-			),
-			expErr: nil,
-		},
-		{
-			tablePathPrefix: "/local/",
-			q:               "SELECT ?, ?, ?",
-			args: []driver.NamedValue{
-				{Value: 1},
-				{Value: 2},
-				{Value: 3},
-			},
-			expQuery: `-- modified by ydb-go-sdk@v` + meta.Version + `
---
--- source query:
---   SELECT ?, ?, ?
---
-PRAGMA TablePathPrefix("/local/");
+			expQuery: `-- modified by ydb-go-sdk@v` + meta.Version + ` (bind type = Positional)
+--   SELECT ?, ?
+
+-- bind declares
 DECLARE $p0 AS Int32;
 DECLARE $p1 AS Int32;
-DECLARE $p2 AS Int32;
-SELECT $p0, $p1, $p2`,
+
+-- origin query with normalized args
+SELECT $p0, $p1`,
 			expParams: table.NewQueryParameters(
-				table.ValueParam("$p0", types.Int32Value(1)),
-				table.ValueParam("$p1", types.Int32Value(2)),
-				table.ValueParam("$p2", types.Int32Value(3)),
+				table.ValueParam("$p0", types.Int32Value(100)),
+				table.ValueParam("$p1", types.Int32Value(200)),
 			),
-			expErr: nil,
 		},
 		{
-			tablePathPrefix: "/local/",
-			q:               "SELECT ?, ?, ?",
+			b: Positional(),
+			q: `
+-- some comment with positional args like ?
+SELECT ?, ?`,
+			args: []driver.NamedValue{
+				{Value: 100},
+				{Value: 200},
+			},
+			expQuery: `-- modified by ydb-go-sdk@v` + meta.Version + ` (bind type = Positional)
+--   
+--   -- some comment with positional args like ?
+--   SELECT ?, ?
+
+-- bind declares
+DECLARE $p0 AS Int32;
+DECLARE $p1 AS Int32;
+
+-- origin query with normalized args
+SELECT $p0, $p1`,
+			expParams: table.NewQueryParameters(
+				table.ValueParam("$p0", types.Int32Value(100)),
+				table.ValueParam("$p1", types.Int32Value(200)),
+			),
+		},
+		{
+			b: Positional().WithTablePathPrefix("/local/"),
+			q: "SELECT ?, ?",
+			args: []driver.NamedValue{
+				{Value: 100},
+				{Value: 200},
+			},
+			expQuery: `-- modified by ydb-go-sdk@v` + meta.Version + ` (bind type = TablePathPrefix|Positional)
+--   SELECT ?, ?
+
+PRAGMA TablePathPrefix("/local/");
+
+-- bind declares
+DECLARE $p0 AS Int32;
+DECLARE $p1 AS Int32;
+
+-- origin query with normalized args
+SELECT $p0, $p1`,
+			expParams: table.NewQueryParameters(
+				table.ValueParam("$p0", types.Int32Value(100)),
+				table.ValueParam("$p1", types.Int32Value(200)),
+			),
+		},
+		{
+			b: Numeric(),
+			q: "SELECT $1, $2",
 			args: []driver.NamedValue{
 				{Value: 1},
-				{Value: int64(2)},
-				{Value: true},
 			},
-			expQuery: `-- modified by ydb-go-sdk@v` + meta.Version + `
---
--- source query:
---   SELECT ?, ?, ?
---
-PRAGMA TablePathPrefix("/local/");
+			expErr: errArgsCount,
+		},
+		{
+			b: Numeric(),
+			q: "SELECT $1, $2",
+			args: []driver.NamedValue{
+				{Value: 100},
+				{Value: 200},
+			},
+			expQuery: `-- modified by ydb-go-sdk@v` + meta.Version + ` (bind type = Numeric)
+--   SELECT $1, $2
+
+-- bind declares
 DECLARE $p0 AS Int32;
-DECLARE $p1 AS Int64;
-DECLARE $p2 AS Bool;
-SELECT $p0, $p1, $p2`,
+DECLARE $p1 AS Int32;
+
+-- origin query with normalized args
+SELECT $p0, $p1`,
 			expParams: table.NewQueryParameters(
-				table.ValueParam("$p0", types.Int32Value(1)),
-				table.ValueParam("$p1", types.Int64Value(2)),
-				table.ValueParam("$p2", types.BoolValue(true)),
+				table.ValueParam("$p0", types.Int32Value(100)),
+				table.ValueParam("$p1", types.Int32Value(200)),
 			),
-			expErr: nil,
+		},
+		{
+			b: Numeric(),
+			q: `
+-- some comment with numeric args like $3
+SELECT $1, $2`,
+			args: []driver.NamedValue{
+				{Value: 100},
+				{Value: 200},
+			},
+			expQuery: `-- modified by ydb-go-sdk@v` + meta.Version + ` (bind type = Numeric)
+--   
+--   -- some comment with numeric args like $3
+--   SELECT $1, $2
+
+-- bind declares
+DECLARE $p0 AS Int32;
+DECLARE $p1 AS Int32;
+
+-- origin query with normalized args
+SELECT $p0, $p1`,
+			expParams: table.NewQueryParameters(
+				table.ValueParam("$p0", types.Int32Value(100)),
+				table.ValueParam("$p1", types.Int32Value(200)),
+			),
+		},
+		{
+			b: Numeric().WithTablePathPrefix("/local/"),
+			q: "SELECT $1, $2",
+			args: []driver.NamedValue{
+				{Value: 100},
+				{Value: 200},
+			},
+			expQuery: `-- modified by ydb-go-sdk@v` + meta.Version + ` (bind type = TablePathPrefix|Numeric)
+--   SELECT $1, $2
+
+PRAGMA TablePathPrefix("/local/");
+
+-- bind declares
+DECLARE $p0 AS Int32;
+DECLARE $p1 AS Int32;
+
+-- origin query with normalized args
+SELECT $p0, $p1`,
+			expParams: table.NewQueryParameters(
+				table.ValueParam("$p0", types.Int32Value(100)),
+				table.ValueParam("$p1", types.Int32Value(200)),
+			),
+		},
+		{
+			b: NoBind().WithTablePathPrefix("/local/"),
+			q: "SELECT 1",
+			expQuery: `-- modified by ydb-go-sdk@v` + meta.Version + ` (bind type = TablePathPrefix)
+--   SELECT 1
+
+PRAGMA TablePathPrefix("/local/");
+
+-- origin query
+SELECT 1`,
+		},
+		{
+			b: Declare().WithTablePathPrefix("/local/"),
+			q: "SELECT $param1, $param2",
+			args: []driver.NamedValue{
+				named("param1", 100),
+				named("$param2", 200),
+			},
+			expQuery: `-- modified by ydb-go-sdk@v` + meta.Version + ` (bind type = TablePathPrefix|Declare)
+--   SELECT $param1, $param2
+
+PRAGMA TablePathPrefix("/local/");
+
+-- bind declares
+DECLARE $param1 AS Int32;
+DECLARE $param2 AS Int32;
+
+-- origin query
+SELECT $param1, $param2`,
+			expParams: table.NewQueryParameters(
+				table.ValueParam("$param1", types.Int32Value(100)),
+				table.ValueParam("$param2", types.Int32Value(200)),
+			),
+		},
+		{
+			b: Declare().WithTablePathPrefix("/local/"),
+			q: `
+DECLARE $param1 AS Text;
+DECLARE $param2 AS Text;
+SELECT $param1, $param2`,
+			args: []driver.NamedValue{
+				named("param1", 100),
+				named("$param2", 200),
+			},
+			expQuery: `-- modified by ydb-go-sdk@v` + meta.Version + ` (bind type = TablePathPrefix|Declare)
+--   
+--   DECLARE $param1 AS Text;
+--   DECLARE $param2 AS Text;
+--   SELECT $param1, $param2
+
+PRAGMA TablePathPrefix("/local/");
+
+-- bind declares
+DECLARE $param1 AS Int32;
+DECLARE $param2 AS Int32;
+
+-- origin query
+DECLARE $param1 AS Text;
+DECLARE $param2 AS Text;
+SELECT $param1, $param2`,
+			expParams: table.NewQueryParameters(
+				table.ValueParam("$param1", types.Int32Value(100)),
+				table.ValueParam("$param2", types.Int32Value(200)),
+			),
+		},
+		{
+			b: Declare().WithTablePathPrefix("/local/"),
+			q: `
+DECLARE $param2 AS Text;
+SELECT $param1, $param2`,
+			args: []driver.NamedValue{
+				named("param1", 100),
+				named("$param2", 200),
+			},
+			expQuery: `-- modified by ydb-go-sdk@v` + meta.Version + ` (bind type = TablePathPrefix|Declare)
+--   
+--   DECLARE $param2 AS Text;
+--   SELECT $param1, $param2
+
+PRAGMA TablePathPrefix("/local/");
+
+-- bind declares
+DECLARE $param1 AS Int32;
+DECLARE $param2 AS Int32;
+
+-- origin query
+DECLARE $param2 AS Text;
+SELECT $param1, $param2`,
+			expParams: table.NewQueryParameters(
+				table.ValueParam("$param1", types.Int32Value(100)),
+				table.ValueParam("$param2", types.Int32Value(200)),
+			),
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			query, params, err := Bind(tt.q, tt.tablePathPrefix, tt.args...)
+			query, params, err := tt.b.bind(tt.q, tt.args...)
 			if tt.expErr != nil {
 				require.ErrorIs(t, err, tt.expErr)
 			} else {
@@ -224,4 +295,71 @@ SELECT $p0, $p1, $p2`,
 
 func removeWindowsCarriageReturn(s string) string {
 	return strings.ReplaceAll(s, "\r", "")
+}
+
+func Test_removeComments(t *testing.T) {
+	for _, tt := range []struct {
+		src string
+		dst string
+	}{
+		{
+			src: `
+-- some comment
+SELECT 1;`,
+			dst: `
+
+SELECT 1;`,
+		},
+		{
+			src: `SELECT 1; -- some comment`,
+			dst: `SELECT 1; `,
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			require.Equal(t, tt.dst, removeComments(tt.src))
+		})
+	}
+}
+
+func Test_removeEmptyLines(t *testing.T) {
+	for _, tt := range []struct {
+		src string
+		dst string
+	}{
+		{
+			src: `
+
+  
+test
+ 
+
+`,
+			dst: `test`,
+		},
+		{
+			src: `
+
+  
+   test
+ 
+
+`,
+			dst: `   test`,
+		},
+		{
+			src: `
+
+  
+   test
+ 
+
+end`,
+			dst: `   test
+end`,
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			require.Equal(t, tt.dst, removeEmptyLines(tt.src))
+		})
+	}
 }
