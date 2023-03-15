@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"path"
-	"regexp"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -46,9 +45,9 @@ func withDefaultTxControl(defaultTxControl *table.TransactionControl) connOption
 	}
 }
 
-func withTablePathPrefix(tablePathPrefix string) connOption {
+func withBind(bind bind.Bind) connOption {
 	return func(c *conn) {
-		c.tablePathPrefix = tablePathPrefix
+		c.bind = bind
 	}
 }
 
@@ -72,7 +71,7 @@ type conn struct {
 	closed           uint32
 	lastUsage        int64
 	defaultQueryMode QueryMode
-	tablePathPrefix  string
+	bind             bind.Bind
 
 	defaultTxControl *table.TransactionControl
 	dataOpts         []options.ExecuteDataQueryOption
@@ -84,13 +83,6 @@ type conn struct {
 
 func (c *conn) GetDatabaseName() string {
 	return c.connector.parent.Name()
-}
-
-func (c *conn) TablePathPrefix() string {
-	if c.tablePathPrefix == "" {
-		return ""
-	}
-	return path.Join(c.connector.parent.Name(), c.tablePathPrefix)
 }
 
 func (c *conn) CheckNamedValue(*driver.NamedValue) error {
@@ -131,6 +123,7 @@ func newConn(c *Connector, s table.ClosableSession, opts ...connOption) *conn {
 	cc := &conn{
 		connector: c,
 		session:   s,
+		bind:      bind.NoBind(),
 	}
 	for _, o := range opts {
 		if o != nil {
@@ -180,7 +173,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 			res    result.Result
 			params *table.QueryParameters
 		)
-		query, params, err = c.nativeQueryAndParameters(ctx, query, args...)
+		query, params, err = c.normalize(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -202,7 +195,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		}
 		return resultNoRows{}, nil
 	case SchemeQueryMode:
-		query, _, err = c.nativeQueryAndParameters(ctx, query)
+		query, _, err = c.normalize(query)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -216,7 +209,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 			res    result.StreamResult
 			params *table.QueryParameters
 		)
-		query, params, err = c.nativeQueryAndParameters(ctx, query, args...)
+		query, params, err = c.normalize(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -279,7 +272,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 			res    result.Result
 			params *table.QueryParameters
 		)
-		query, params, err = c.nativeQueryAndParameters(ctx, query, args...)
+		query, params, err = c.normalize(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -302,7 +295,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 			res    result.StreamResult
 			params *table.QueryParameters
 		)
-		query, params, err = c.nativeQueryAndParameters(ctx, query, args...)
+		query, params, err = c.normalize(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -321,7 +314,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		}, nil
 	case ExplainQueryMode:
 		var exp table.DataQueryExplanation
-		query, _, err = c.nativeQueryAndParameters(ctx, query, args...)
+		query, _, err = c.normalize(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -340,7 +333,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 			res    result.StreamResult
 			params *table.QueryParameters
 		)
-		query, params, err = c.nativeQueryAndParameters(ctx, query, args...)
+		query, params, err = c.normalize(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -398,43 +391,8 @@ func (c *conn) Begin() (driver.Tx, error) {
 	return nil, errDeprecated
 }
 
-var declareRe = regexp.MustCompile(`[dD][eE][cC][lL][aA][rR][eE]\s+\$(\S+)+\s+[aA][sS]\s+(\S+)+\s*;`)
-
-func hasDeclare(query string) bool {
-	return declareRe.MatchString(query)
-}
-
-var pragmaTablePathPrefixRe = regexp.MustCompile(`PRAGMA\s+TablePathPrefix\(\s*"[^"]+"\s*\)\s*;`)
-
-func hasTablePathPrefix(query string) bool {
-	return pragmaTablePathPrefixRe.MatchString(query)
-}
-
-func (c *conn) nativeQueryAndParameters(ctx context.Context, q string, args ...driver.NamedValue) (
-	query string, _ *table.QueryParameters, _ error,
-) {
-	if isStrictYQL(ctx) || hasDeclare(q) || hasTablePathPrefix(q) {
-		params := make([]table.ParameterOption, len(args))
-		for i, arg := range args {
-			switch v := arg.Value.(type) {
-			case *table.QueryParameters:
-				if len(args) > 1 {
-					return "", nil, xerrors.WithStackTrace(fmt.Errorf("%v: %w", args, bind.ErrMultipleQueryParameters))
-				}
-				return q, v, nil
-			case table.ParameterOption:
-				params[i] = v
-			default:
-				param, err := bind.ToYdbParam(arg)
-				if err != nil {
-					return "", nil, xerrors.WithStackTrace(err)
-				}
-				params[i] = param
-			}
-		}
-		return q, table.NewQueryParameters(params...), nil
-	}
-	return bind.Bind(q, c.TablePathPrefix(), args...)
+func (c *conn) normalize(q string, args ...driver.NamedValue) (query string, _ *table.QueryParameters, _ error) {
+	return bind.Normalize(c.bind, q, args...)
 }
 
 func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ driver.Tx, err error) {
@@ -634,14 +592,7 @@ func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (
 }
 
 func (c *conn) normalizePath(folderOrTable string) (absPath string) {
-	switch ch := folderOrTable[0]; ch {
-	case '/':
-		return folderOrTable
-	case '.':
-		return path.Join(c.GetDatabaseName(), c.tablePathPrefix, strings.TrimLeft(folderOrTable, "."))
-	default:
-		return path.Join(c.GetDatabaseName(), c.tablePathPrefix, folderOrTable)
-	}
+	return bind.NormalizePath(c.bind, folderOrTable)
 }
 
 func (c *conn) GetTables(ctx context.Context, folder string) (tables []string, err error) {

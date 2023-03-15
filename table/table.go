@@ -1,7 +1,6 @@
 package table
 
 import (
-	"bytes"
 	"context"
 	"sort"
 
@@ -477,26 +476,34 @@ func (q *QueryParameters) Each(it func(name string, v types.Value)) {
 	}
 }
 
-func (q *QueryParameters) String() string {
-	var buf bytes.Buffer
-	buf.WriteByte('(')
-	if q != nil {
-		names := make([]string, 0, len(q.m))
-		for k := range q.m {
-			names = append(names, k)
-		}
-		sort.Strings(names)
-		for _, name := range names {
-			buf.WriteString("((")
-			buf.WriteString(name)
-			buf.WriteByte(')')
-			buf.WriteByte('(')
-			buf.WriteString(q.m[name].Yql())
-			buf.WriteString("))")
-		}
-		buf.WriteByte(')')
+func (q *QueryParameters) names() []string {
+	if q == nil {
+		return nil
 	}
-	return buf.String()
+	names := make([]string, 0, len(q.m))
+	for k := range q.m {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+	return names
+}
+
+func (q *QueryParameters) String() string {
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+
+	buffer.WriteByte('{')
+	for i, name := range q.names() {
+		if i != 0 {
+			buffer.WriteByte(',')
+		}
+		buffer.WriteByte('"')
+		buffer.WriteString(name)
+		buffer.WriteString("\":")
+		buffer.WriteString(q.m[name].Yql())
+	}
+	buffer.WriteByte('}')
+	return buffer.String()
 }
 
 func NewQueryParameters(opts ...ParameterOption) *QueryParameters {

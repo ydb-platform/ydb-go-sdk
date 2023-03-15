@@ -103,12 +103,12 @@ func (scope *scopeT) Driver() *ydb.Driver {
 	}).(*ydb.Driver)
 }
 
-func (scope *scopeT) SQLDriverWithFolder() *sql.DB {
+func (scope *scopeT) SQLDriverWithFolder(opts ...ydb.ConnectorOption) *sql.DB {
 	return scope.Cache(nil, nil, func() (res interface{}, err error) {
 		driver := scope.Driver()
 		scope.Logf("Create sql db connector")
 		connector, err := ydb.Connector(driver,
-			ydb.WithTablePathPrefix(scope.Folder()),
+			append([]ydb.ConnectorOption{ydb.WithAutoBind(ydb.BindTablePathPrefix(scope.Folder()))}, opts...)...,
 		)
 		if err != nil {
 			return nil, err

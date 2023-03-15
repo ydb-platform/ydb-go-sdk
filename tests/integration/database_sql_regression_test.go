@@ -26,7 +26,9 @@ import (
 
 func TestRegressionCloud109307(t *testing.T) {
 	scope := newScope(t)
-	db := scope.SQLDriverWithFolder()
+	db := scope.SQLDriverWithFolder(
+		ydb.WithAutoBind(ydb.BindDeclares().WithTablePathPrefix(scope.Folder())),
+	)
 
 	ctx, cancel := context.WithTimeout(xtest.Context(t), 42*time.Second)
 	defer cancel()
@@ -71,8 +73,12 @@ func TestRegressionCloud109307(t *testing.T) {
 }
 
 func TestRegressionKikimr17104(t *testing.T) {
-	scope := newScope(t)
-	db := scope.SQLDriverWithFolder()
+	var (
+		scope = newScope(t)
+		db    = scope.SQLDriverWithFolder(
+			ydb.WithAutoBind(ydb.BindDeclares().WithTablePathPrefix(scope.Folder())),
+		)
+	)
 
 	var (
 		ctx             = xtest.Context(t)

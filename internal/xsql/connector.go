@@ -4,12 +4,12 @@ import (
 	"context"
 	"database/sql/driver"
 	"io"
-	"strings"
 	"sync"
 	"time"
 
 	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
@@ -27,9 +27,9 @@ func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
 	}
 }
 
-func WithTablePathPrefix(tablePathPrefix string) ConnectorOption {
+func WithBind(b bind.Bind) ConnectorOption {
 	return func(c *Connector) error {
-		c.tablePathPrefix = tablePathPrefix
+		c.bind = b
 		return nil
 	}
 }
@@ -93,6 +93,7 @@ type ydbDriver interface {
 func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
 	c := &Connector{
 		parent:           parent,
+		bind:             bind.NoBind(),
 		conns:            make(map[*conn]struct{}),
 		defaultTxControl: table.DefaultTxControl(),
 		defaultQueryMode: DefaultQueryMode,
@@ -114,7 +115,7 @@ func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
 type Connector struct {
 	parent ydbDriver
 
-	tablePathPrefix string
+	bind bind.Bind
 
 	onClose []func(connector *Connector)
 
@@ -205,7 +206,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 		withDefaultQueryMode(c.defaultQueryMode),
 		withDataOpts(c.defaultDataQueryOpts...),
 		withScanOpts(c.defaultScanQueryOpts...),
-		withTablePathPrefix(strings.TrimLeft(c.tablePathPrefix, c.parent.Name())),
+		withBind(c.bind),
 		withTrace(c.trace),
 	), nil
 }
