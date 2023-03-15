@@ -360,6 +360,14 @@ func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, err error
 	)
 }
 
+func MustOpen(ctx context.Context, dsn string, opts ...Option) *Driver {
+	db, err := Open(ctx, dsn, opts...)
+	if err != nil {
+		panic(err)
+	}
+	return db
+}
+
 // New connects to database and return driver runtime holder
 //
 // Deprecated: use Open with required param connectionString instead

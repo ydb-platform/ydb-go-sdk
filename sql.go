@@ -158,3 +158,11 @@ func Connector(parent *Driver, opts ...ConnectorOption) (*xsql.Connector, error)
 	d.attach(c, parent)
 	return c, nil
 }
+
+func MustConnector(parent *Driver, opts ...ConnectorOption) *xsql.Connector {
+	c, err := Connector(parent, opts...)
+	if err != nil {
+		panic(err)
+	}
+	return c
+}

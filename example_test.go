@@ -82,8 +82,10 @@ func Example_databaseSQL() {
 	}
 }
 
-func Example_databaseSQLBindingNumericArgs() {
-	db, err := sql.Open("ydb", "grpc://localhost:2136/local?bind_params=1")
+func Example_databaseSQLBindNumericArgs() {
+	db, err := sql.Open("ydb",
+		"grpc://localhost:2136/local?go_auto_bind=numeric",
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -103,8 +105,42 @@ func Example_databaseSQLBindingNumericArgs() {
 	}
 }
 
-func Example_databaseSQLBindingPositionalArgs() {
-	db, err := sql.Open("ydb", "grpc://localhost:2136/local?bind_params=1")
+func Example_databaseSQLBindNumericArgsOverConnector() {
+	var (
+		ctx          = context.TODO()
+		nativeDriver = ydb.MustOpen(ctx, "grpc://localhost:2136/local")
+		db           = sql.OpenDB(
+			ydb.MustConnector(nativeDriver,
+				ydb.WithAutoBind(
+					ydb.BindNumeric(),
+				),
+			),
+		)
+	)
+	defer nativeDriver.Close(ctx) // cleanup resources
+	defer db.Close()
+
+	// numeric args
+	row := db.QueryRowContext(context.TODO(),
+		"SELECT $2, $1",
+		42, "my string",
+	)
+
+	var (
+		id    int32  // required value
+		myStr string // optional value
+	)
+	if err := row.Scan(&myStr, &id); err != nil {
+		log.Printf("query failed: %v", err)
+	} else {
+		log.Printf("id=%v, myStr='%s'\n", id, myStr)
+	}
+}
+
+func Example_databaseSQLBindPositionalArgs() {
+	db, err := sql.Open("ydb",
+		"grpc://localhost:2136/local?go_auto_bind=positional",
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -124,8 +160,39 @@ func Example_databaseSQLBindingPositionalArgs() {
 	}
 }
 
-func Example_databaseSQLBindingTablePathPrefix() {
-	db, err := sql.Open("ydb", "grpc://localhost:2136/local?table_path_prefix=path/to/tables")
+func Example_databaseSQLBindPositionalArgsOverConnector() {
+	var (
+		ctx          = context.TODO()
+		nativeDriver = ydb.MustOpen(ctx, "grpc://localhost:2136/local")
+		db           = sql.OpenDB(
+			ydb.MustConnector(nativeDriver,
+				ydb.WithAutoBind(
+					ydb.BindPositional().WithTablePathPrefix("/local/path/to/my/folder"),
+				),
+			),
+		)
+	)
+	defer nativeDriver.Close(ctx) // cleanup resources
+	defer db.Close()
+
+	// positional args
+	row := db.QueryRowContext(context.TODO(), "SELECT ?, ?", 42, "my string")
+
+	var (
+		id    int32  // required value
+		myStr string // optional value
+	)
+	if err := row.Scan(&id, &myStr); err != nil {
+		log.Printf("query failed: %v", err)
+	} else {
+		log.Printf("id=%v, myStr='%s'\n", id, myStr)
+	}
+}
+
+func Example_databaseSQLBindTablePathPrefix() {
+	db, err := sql.Open("ydb",
+		"grpc://localhost:2136/local?go_auto_bind.table_path_prefix=path/to/tables",
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -139,6 +206,33 @@ func Example_databaseSQLBindingTablePathPrefix() {
 	// full table path is "/local/path/to/tables/series"
 	row := db.QueryRowContext(context.TODO(), "SELECT id, title FROM series")
 	if err = row.Scan(&id, &title); err != nil {
+		log.Printf("query failed: %v", err)
+	} else {
+		log.Printf("id=%v, title='%s'\n", id, title)
+	}
+}
+
+func Example_databaseSQLBindTablePathPrefixOverConnector() {
+	var (
+		ctx          = context.TODO()
+		nativeDriver = ydb.MustOpen(ctx, "grpc://localhost:2136/local")
+		db           = sql.OpenDB(
+			ydb.MustConnector(nativeDriver,
+				ydb.WithAutoBind(
+					ydb.BindTablePathPrefix("/local/path/to/my/tables"),
+				),
+			),
+		)
+	)
+
+	// full table path is "/local/path/to/tables/series"
+	row := db.QueryRowContext(context.TODO(), "SELECT id, title FROM series")
+
+	var (
+		id    int32  // required value
+		title string // optional value
+	)
+	if err := row.Scan(&id, &title); err != nil {
 		log.Printf("query failed: %v", err)
 	} else {
 		log.Printf("id=%v, title='%s'\n", id, title)

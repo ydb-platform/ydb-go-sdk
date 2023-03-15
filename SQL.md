@@ -19,13 +19,14 @@ Behind the scene, `database/sql` APIs are implemented using the native interface
    * [Over `sql.Conn` object](#retry-conn)
    * [Over `sql.Tx`](#retry-tx)
 7. [Query args types](#arg-types)
-8. [Accessing the native driver from `*sql.DB`](#unwrap)
+8. [Query enrichment](#bindings)
+9. [Accessing the native driver from `*sql.DB`](#unwrap)
    * [Driver with go's 1.18 supports also `*sql.Conn` for unwrapping](#unwrap-cc)
-9. [Troubleshooting](#troubleshooting)
+10. [Troubleshooting](#troubleshooting)
    * [Logging driver events](#logging)
    * [Add metrics about SDK's events](#metrics)
    * [Add `Jaeger` traces about driver events](#jaeger)
-10. [Example of usage](#example)
+11. [Example of usage](#example)
 
 ## Initialization of `database/sql` driver <a name="init"></a>
 
@@ -299,40 +300,129 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
 ## Specifying query parameters <a name="arg-types"></a>
 
 `database/sql` driver for `YDB` supports the following types of query parameters:
-* positional arguments:
+* `sql.NamedArg` types with native Go's types and ydb types:
    ```go
    rows, err := db.QueryContext(ctx, 
-      "SELECT season_id FROM seasons WHERE title LIKE ? AND views > ?",
-      "%Season 1%",
-      uint64(1000),
-   )
-   ```
-* numeric arguments:
-   ```go
-   rows, err := db.QueryContext(ctx, 
-      "SELECT season_id FROM seasons WHERE title LIKE $1 AND views > $2",
-      "%Season 1%",
-      uint64(1000),
+      `
+        DECLARE $title AS Text;
+        DECLARE $views AS Uint64;
+        DECLARE $ts AS Datetime;
+        SELECT season_id FROM seasons WHERE title LIKE $title AND views > $views AND first_aired > $ts;
+      `,
+      sql.Named("$title", "%Season 1%"), // argument name with prefix `$` 
+      sql.Named("views", uint64(1000)),  // argument name without prefix `$` (driver will prepend `$` if necessary)
+      sql.Named("$ts", types.DatetimeValueFromTime( // native ydb type
+        time.Now().Add(-time.Hour*24*365), 
+      )),
    )
    ```
 * `table.ParameterOption` arguments:
    ```go
    rows, err := db.QueryContext(ctx, 
-      "SELECT season_id FROM seasons WHERE title LIKE $seasonTitle AND views > $views",
-      table.ValueParam("seasonTitle", types.TextValue("%Season 1%")),
-      table.ValueParam("views", types.Uint64Value((1000)),
+      `
+        DECLARE $title AS Text;
+        DECLARE $views AS Uint64;
+        SELECT season_id FROM seasons WHERE title LIKE $title AND views > $views;
+      `,
+      table.ValueParam("$seasonTitle", types.TextValue("%Season 1%")),
+      table.ValueParam("$views", types.Uint64Value((1000)),
    )
    ```
 * single `*table.QueryParameters` argument:
    ```go
    rows, err := db.QueryContext(ctx, 
-      "SELECT season_id FROM seasons WHERE title LIKE $seasonTitle AND views > $views",
+      `
+        DECLARE $title AS Text;
+        DECLARE $views AS Uint64;
+        SELECT season_id FROM seasons WHERE title LIKE $title AND views > $views;
+      `,
       table.NewQueryParameters(
-          table.ValueParam("seasonTitle", types.TextValue("%Season 1%")),
-          table.ValueParam("views", types.Uint64Value((1000)),
+          table.ValueParam("$seasonTitle", types.TextValue("%Season 1%")),
+          table.ValueParam("$views", types.Uint64Value((1000)),
       ),
    )
    ```
+
+## Query enrichment <a name="bindings"></a>
+
+`YQL` is a language with strict types. This means that a query to `YDB` must be 
+written with an explicit declaration of query parameter types using the `DECLARE`
+keyword. Also, in some cases, the special `PRAGMA` operator can be used to 
+simplify of the full table path prefix. 
+For example, a query to the table `/local/path/to/tables/seasons` might look like this:
+```
+DECLARE $title AS Text;
+DECLARE $views AS Uint64;
+SELECT season_id
+FROM `/local/path/to/tables/seasons`
+WHERE title LIKE $title AND views > $views;
+```
+Using the `PRAGMA` operator, you can simplify the prefix part in the name of all tables
+involved in the `YQL`-query:
+```
+PRAGMA TablePathPrefix("/local/path/to/tables/");
+DECLARE $title AS Text;
+DECLARE $views AS Uint64;
+SELECT season_id FROM seasons WHERE title LIKE $title AND views > $views;
+```
+
+`database/sql` driver for `YDB` supports query enrichment for:
+- specifying `TablePathPrefix`,
+- declaring types of parameters,
+- numeric or positional parameters
+
+This enrichments of queries can be enabled explicitly on initializing step
+using connector option `ydb.WithAutoBind(bind)` or connection string parameter
+`go_auto_bind`. By default `database/sql` driver for `YDB` not modifies source queries.
+
+Next example shows how to write easy queries with automatically query enrichment 
+for table path prefix and positional arguments:
+```go
+	var (
+		ctx          = context.TODO()
+		nativeDriver = ydb.MustOpen(ctx, "grpc://localhost:2136/local")
+		db           = sql.OpenDB(
+			ydb.MustConnector(nativeDriver,
+				ydb.WithAutoBind(
+					ydb.BindPositional().WithTablePathPrefix("/local/path/to/my/folder"),
+				),
+			),
+		)
+	)
+	defer nativeDriver.Close(ctx) // cleanup resources
+	defer db.Close()
+
+	// positional args
+	row := db.QueryRowContext(ctx, `SELECT ?, ?`, 42, "my string")
+```
+The original simple query `SELECT ?, ?` will expand on driver side to the following
+```sql
+-- modified by ydb-go-sdk@v3.44.0 (bind type = TablePathPrefix|Positional)
+--   
+--   SELECT ?, ?
+
+PRAGMA TablePathPrefix("/local/path/to/my/folder");
+
+-- bind declares
+DECLARE $p0 AS Int32;
+DECLARE $p1 AS Utf8;
+
+-- origin query with normalized args
+SELECT $p0, $p1
+```
+
+Additional examples of query enrichment see in `ydb-go-sdk` documentation:
+* specifying `TablePathPrefix`:
+  * using [connection string parameter](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#example-package-DatabaseSQLBindTablePathPrefix)
+  * using [connector option](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#example-package-DatabaseSQLBindTablePathPrefixOverConnector)
+* positional arguments binding:
+    * using [connection string parameter](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#example-package-DatabaseSQLBindPositionalArgs)
+    * using [connector option](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#example-package-DatabaseSQLBindPositionalArgsOverConnector)
+* numeric arguments binding:
+    * using [connection string parameter](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#example-package-DatabaseSQLBindNumericlArgs)
+    * using [connector option](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#example-package-DatabaseSQLBindNumericArgsOverConnector)
+
+For a deep understanding of query enrichment see also [unit-tests](https://github.com/ydb-platform/ydb-go-sdk/blob/master/internal/xsql/bind/bind_test.go)
 
 ## Accessing the native driver from `*sql.DB` <a name="unwrap"></a>
 
