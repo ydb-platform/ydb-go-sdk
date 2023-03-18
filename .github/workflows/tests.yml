@@ -13,11 +13,11 @@ jobs:
     strategy:
       matrix:
         go-version: [1.17.x, 1.19.x, 1.20.x]
-        os: [ubuntu-latest, windows-latest, macOS-latest]
+        os: [ubuntu, windows, macOS]
     env:
-      OS: ${{ matrix.os }}
+      OS: ${{ matrix.os }}-latest
       GO: ${{ matrix.go-version }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -36,16 +36,17 @@ jobs:
           name: unit
   integration:
     concurrency:
-      group: integration-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
+      group: integration-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
       cancel-in-progress: true
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         go-version: [1.17.x, 1.19.x, 1.20.x]
-        os: [ubuntu-latest]
+        ydb-version: [22-5, 23-1]
     services:
       ydb:
-        image: cr.yandex/yc/yandex-docker-local-ydb:stable-23-1-slim
+        image: cr.yandex/yc/yandex-docker-local-ydb:stable-${{ matrix.ydb-version }}-slim
         ports:
           - 2135:2135
           - 2136:2136
@@ -57,14 +58,13 @@ jobs:
           YDB_USE_IN_MEMORY_PDISKS: true
         options: '-h localhost'
     env:
-      OS: ${{ matrix.os }}
+      OS: ubuntu-latest
       GO: ${{ matrix.go-version }}
       YDB_CONNECTION_STRING: grpc://localhost:2136/local
       YDB_CONNECTION_STRING_SECURE: grpcs://localhost:2135/local
       YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
       YDB_SESSIONS_SHUTDOWN_URLS: http://localhost:8765/actors/kqp_proxy?force_shutdown=all
       HIDE_APPLICATION_OUTPUT: 1
-    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
