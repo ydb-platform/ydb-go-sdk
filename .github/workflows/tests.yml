@@ -15,7 +15,7 @@ jobs:
         go-version: [1.17.x, 1.19.x, 1.20.x]
         os: [ubuntu, windows, macOS]
     env:
-      OS: ${{ matrix.os }}
+      OS: ${{ matrix.os }}-latest
       GO: ${{ matrix.go-version }}
     runs-on: ${{ matrix.os }}-latest
     steps:
@@ -58,7 +58,7 @@ jobs:
           YDB_USE_IN_MEMORY_PDISKS: true
         options: '-h localhost'
     env:
-      OS: ${{ matrix.os }}
+      OS: ubuntu-latest
       GO: ${{ matrix.go-version }}
       YDB_CONNECTION_STRING: grpc://localhost:2136/local
       YDB_CONNECTION_STRING_SECURE: grpcs://localhost:2135/local
