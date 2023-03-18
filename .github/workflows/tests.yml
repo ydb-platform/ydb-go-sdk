@@ -13,11 +13,11 @@ jobs:
     strategy:
       matrix:
         go-version: [1.17.x, 1.19.x, 1.20.x]
-        os: [ubuntu-latest, windows-latest, macOS-latest]
+        os: [ubuntu, windows, macOS]
     env:
       OS: ${{ matrix.os }}
       GO: ${{ matrix.go-version }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -38,12 +38,12 @@ jobs:
     concurrency:
       group: integration-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
       cancel-in-progress: true
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         go-version: [1.17.x, 1.19.x, 1.20.x]
         ydb-version: [22-5, 23-1]
-        os: [ubuntu-latest]
     services:
       ydb:
         image: cr.yandex/yc/yandex-docker-local-ydb:stable-${{ matrix.ydb-version }}-slim
@@ -65,7 +65,6 @@ jobs:
       YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
       YDB_SESSIONS_SHUTDOWN_URLS: http://localhost:8765/actors/kqp_proxy?force_shutdown=all
       HIDE_APPLICATION_OUTPUT: 1
-    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
