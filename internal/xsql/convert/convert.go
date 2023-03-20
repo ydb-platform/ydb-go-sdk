@@ -1,10 +1,12 @@
 package convert
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"errors"
 	"fmt"
 	"net/url"
+	"sort"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
@@ -14,8 +16,9 @@ import (
 )
 
 var (
-	errUnsupportedType = errors.New("unsupported type")
-	errUnnamedParam    = errors.New("unnamed param")
+	errUnsupportedType         = errors.New("unsupported type")
+	errUnnamedParam            = errors.New("unnamed param")
+	errMultipleQueryParameters = errors.New("only one query arg *table.QueryParameters allowed")
 )
 
 //nolint:gocyclo
@@ -135,16 +138,82 @@ func supportNewTypeLink(x interface{}) string {
 	return "https://github.com/ydb-platform/ydb-go-sdk/issues/new?" + v.Encode()
 }
 
-func ToYdbParam(param driver.NamedValue) (table.ParameterOption, error) {
-	if v, ok := param.Value.(table.ParameterOption); ok {
+func ToYdbParam(name string, value interface{}) (table.ParameterOption, error) {
+	if v, ok := value.(table.ParameterOption); ok {
 		return v, nil
 	}
-	value, err := ToValue(param.Value)
+	v, err := ToValue(value)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	if param.Name == "" {
+	if name == "" {
 		return nil, xerrors.WithStackTrace(errUnnamedParam)
 	}
-	return table.ValueParam(param.Name, value), nil
+	if name[0] != '$' {
+		name = "$" + name
+	}
+	return table.ValueParam(name, v), nil
+}
+
+func ArgsToParams(args ...interface{}) (params []table.ParameterOption, _ error) {
+	params = make([]table.ParameterOption, 0, len(args))
+	for i, arg := range args {
+		switch x := arg.(type) {
+		case driver.NamedValue:
+			if x.Name == "" {
+				switch xx := x.Value.(type) {
+				case *table.QueryParameters:
+					if len(args) > 1 {
+						return nil, xerrors.WithStackTrace(errMultipleQueryParameters)
+					}
+					xx.Each(func(name string, v types.Value) {
+						params = append(params, table.ValueParam(name, v))
+					})
+				case table.ParameterOption:
+					params = append(params, xx)
+				default:
+					x.Name = fmt.Sprintf("$p%d", i)
+					param, err := ToYdbParam(x.Name, x.Value)
+					if err != nil {
+						return nil, xerrors.WithStackTrace(err)
+					}
+					params = append(params, param)
+				}
+			} else {
+				param, err := ToYdbParam(x.Name, x.Value)
+				if err != nil {
+					return nil, xerrors.WithStackTrace(err)
+				}
+				params = append(params, param)
+			}
+		case sql.NamedArg:
+			if x.Name == "" {
+				return nil, xerrors.WithStackTrace(errUnnamedParam)
+			}
+			param, err := ToYdbParam(x.Name, x.Value)
+			if err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
+			params = append(params, param)
+		case *table.QueryParameters:
+			if len(args) > 1 {
+				return nil, xerrors.WithStackTrace(errMultipleQueryParameters)
+			}
+			x.Each(func(name string, v types.Value) {
+				params = append(params, table.ValueParam(name, v))
+			})
+		case table.ParameterOption:
+			params = append(params, x)
+		default:
+			param, err := ToYdbParam(fmt.Sprintf("$p%d", i), x)
+			if err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
+			params = append(params, param)
+		}
+	}
+	sort.Slice(params, func(i, j int) bool {
+		return params[i].Name() < params[j].Name()
+	})
+	return params, nil
 }

@@ -2,13 +2,14 @@ package xsql
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/bind"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/query"
 )
 
 func Parse(dataSourceName string) (opts []config.Option, connectorOpts []ConnectorOption, err error) {
@@ -30,17 +31,33 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 		}
 		connectorOpts = append(connectorOpts, WithDefaultQueryMode(mode))
 	}
-	b := bind.NoBind()
+	var binders []query.Binder
 	if info.Params.Has("go_auto_bind") {
-		t, err := bind.FromString(info.Params.Get("go_auto_bind"))
-		if err != nil {
-			return nil, nil, xerrors.WithStackTrace(err)
+		binderNames := strings.Split(info.Params.Get("go_auto_bind"), ",")
+		for _, binderName := range binderNames {
+			switch binderName {
+			case "table_path_prefix":
+				if !info.Params.Has("go_auto_bind.table_path_prefix") {
+					return nil, nil, xerrors.WithStackTrace(
+						fmt.Errorf("table_path_prefix bind required 'go_auto_bind.table_path_prefix' param"),
+					)
+				}
+				binders = append(binders, query.TablePathPrefix(info.Params.Get("go_auto_bind.table_path_prefix")))
+			case "declare":
+				binders = append(binders, query.Declare())
+			case "positional":
+				binders = append(binders, query.Positional())
+			case "numeric":
+				binders = append(binders, query.Numeric())
+			case "origin":
+				binders = append(binders, query.Origin())
+			default:
+				return nil, nil, xerrors.WithStackTrace(
+					fmt.Errorf("unknown bind type: %s", binderName),
+				)
+			}
 		}
-		b = bind.SwitchType(b, t)
 	}
-	if info.Params.Has("go_auto_bind.table_path_prefix") {
-		b = b.WithTablePathPrefix(info.Params.Get("go_auto_bind.table_path_prefix"))
-	}
-	connectorOpts = append(connectorOpts, WithBind(b))
+	connectorOpts = append(connectorOpts, WithQueryBinders(binders...))
 	return opts, connectorOpts, nil
 }

@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"database/sql"
 	"database/sql/driver"
 	"fmt"
 	"testing"
@@ -370,11 +371,153 @@ func TestYdbParam(t *testing.T) {
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			dst, err := ToYdbParam(tt.src)
+			dst, err := ToYdbParam(tt.src.Name, tt.src.Value)
 			if tt.err != nil {
 				require.ErrorIs(t, err, tt.err)
 			} else {
 				require.Equal(t, tt.dst, dst)
+			}
+		})
+	}
+}
+
+func TestArgsToParams(t *testing.T) {
+	for _, tt := range []struct {
+		args   []interface{}
+		params []table.ParameterOption
+		err    error
+	}{
+		{
+			args:   []interface{}{},
+			params: []table.ParameterOption{},
+			err:    nil,
+		},
+		{
+			args: []interface{}{
+				1, uint64(2), "3",
+			},
+			params: []table.ParameterOption{
+				table.ValueParam("$p0", types.Int32Value(1)),
+				table.ValueParam("$p1", types.Uint64Value(2)),
+				table.ValueParam("$p2", types.TextValue("3")),
+			},
+			err: nil,
+		},
+		{
+			args: []interface{}{
+				table.NewQueryParameters(
+					table.ValueParam("$p0", types.Int32Value(1)),
+					table.ValueParam("$p1", types.Uint64Value(2)),
+					table.ValueParam("$p2", types.TextValue("3")),
+				),
+				table.NewQueryParameters(
+					table.ValueParam("$p0", types.Int32Value(1)),
+					table.ValueParam("$p1", types.Uint64Value(2)),
+					table.ValueParam("$p2", types.TextValue("3")),
+				),
+			},
+			err: errMultipleQueryParameters,
+		},
+		{
+			args: []interface{}{
+				table.ValueParam("$p0", types.Int32Value(1)),
+				table.ValueParam("$p1", types.Uint64Value(2)),
+				table.ValueParam("$p2", types.TextValue("3")),
+			},
+			params: []table.ParameterOption{
+				table.ValueParam("$p0", types.Int32Value(1)),
+				table.ValueParam("$p1", types.Uint64Value(2)),
+				table.ValueParam("$p2", types.TextValue("3")),
+			},
+			err: nil,
+		},
+		{
+			args: []interface{}{
+				sql.Named("$p0", types.Int32Value(1)),
+				sql.Named("$p1", types.Uint64Value(2)),
+				sql.Named("$p2", types.TextValue("3")),
+			},
+			params: []table.ParameterOption{
+				table.ValueParam("$p0", types.Int32Value(1)),
+				table.ValueParam("$p1", types.Uint64Value(2)),
+				table.ValueParam("$p2", types.TextValue("3")),
+			},
+			err: nil,
+		},
+		{
+			args: []interface{}{
+				driver.NamedValue{Name: "$p0", Value: types.Int32Value(1)},
+				driver.NamedValue{Name: "$p1", Value: types.Uint64Value(2)},
+				driver.NamedValue{Name: "$p2", Value: types.TextValue("3")},
+			},
+			params: []table.ParameterOption{
+				table.ValueParam("$p0", types.Int32Value(1)),
+				table.ValueParam("$p1", types.Uint64Value(2)),
+				table.ValueParam("$p2", types.TextValue("3")),
+			},
+			err: nil,
+		},
+		{
+			args: []interface{}{
+				driver.NamedValue{Value: table.ValueParam("$p0", types.Int32Value(1))},
+				driver.NamedValue{Value: table.ValueParam("$p1", types.Uint64Value(2))},
+				driver.NamedValue{Value: table.ValueParam("$p2", types.TextValue("3"))},
+			},
+			params: []table.ParameterOption{
+				table.ValueParam("$p0", types.Int32Value(1)),
+				table.ValueParam("$p1", types.Uint64Value(2)),
+				table.ValueParam("$p2", types.TextValue("3")),
+			},
+			err: nil,
+		},
+		{
+			args: []interface{}{
+				driver.NamedValue{Value: 1},
+				driver.NamedValue{Value: uint64(2)},
+				driver.NamedValue{Value: "3"},
+			},
+			params: []table.ParameterOption{
+				table.ValueParam("$p0", types.Int32Value(1)),
+				table.ValueParam("$p1", types.Uint64Value(2)),
+				table.ValueParam("$p2", types.TextValue("3")),
+			},
+			err: nil,
+		},
+		{
+			args: []interface{}{
+				driver.NamedValue{Value: table.NewQueryParameters(
+					table.ValueParam("$p0", types.Int32Value(1)),
+					table.ValueParam("$p1", types.Uint64Value(2)),
+					table.ValueParam("$p2", types.TextValue("3")),
+				)},
+			},
+			params: []table.ParameterOption{
+				table.ValueParam("$p0", types.Int32Value(1)),
+				table.ValueParam("$p1", types.Uint64Value(2)),
+				table.ValueParam("$p2", types.TextValue("3")),
+			},
+			err: nil,
+		},
+		{
+			args: []interface{}{
+				driver.NamedValue{Value: table.NewQueryParameters(
+					table.ValueParam("$p0", types.Int32Value(1)),
+					table.ValueParam("$p1", types.Uint64Value(2)),
+					table.ValueParam("$p2", types.TextValue("3")),
+				)},
+				driver.NamedValue{Value: table.ValueParam("$p1", types.Uint64Value(2))},
+				driver.NamedValue{Value: table.ValueParam("$p2", types.TextValue("3"))},
+			},
+			err: errMultipleQueryParameters,
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			params, err := ArgsToParams(tt.args...)
+			if tt.err != nil {
+				require.ErrorIs(t, err, tt.err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.params, params)
 			}
 		})
 	}

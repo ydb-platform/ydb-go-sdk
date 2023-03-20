@@ -4,7 +4,7 @@ package topic_test
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 
@@ -132,7 +132,7 @@ func Example_readMessage() {
 			return
 		}
 
-		content, err := ioutil.ReadAll(mess)
+		content, err := io.ReadAll(mess)
 		if err != nil {
 			fmt.Printf("failed start reader: %v", err)
 			return

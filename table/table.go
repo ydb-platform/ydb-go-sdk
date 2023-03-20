@@ -467,6 +467,13 @@ func (q *QueryParameters) Params() queryParams {
 	return q.m
 }
 
+func (q *QueryParameters) Count() int {
+	if q == nil {
+		return 0
+	}
+	return len(q.m)
+}
+
 func (q *QueryParameters) Each(it func(name string, v types.Value)) {
 	if q == nil {
 		return

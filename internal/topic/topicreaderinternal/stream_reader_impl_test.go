@@ -5,7 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
-	"io/ioutil"
+	"io"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -571,7 +571,7 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 
 		data := make([][]byte, 0, len(batch.Messages))
 		for i := range batch.Messages {
-			content, err := ioutil.ReadAll(&batch.Messages[i].data)
+			content, err := io.ReadAll(&batch.Messages[i].data)
 			require.NoError(t, err)
 			data = append(data, content)
 			batch.Messages[i].data = newOneTimeReader(nil)

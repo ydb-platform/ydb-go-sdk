@@ -15,12 +15,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/isolation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -45,7 +45,7 @@ func withDefaultTxControl(defaultTxControl *table.TransactionControl) connOption
 	}
 }
 
-func withBind(bind bind.Bind) connOption {
+func withBind(bind query.Bind) connOption {
 	return func(c *conn) {
 		c.bind = bind
 	}
@@ -71,7 +71,7 @@ type conn struct {
 	closed           uint32
 	lastUsage        int64
 	defaultQueryMode QueryMode
-	bind             bind.Bind
+	bind             query.Bind
 
 	defaultTxControl *table.TransactionControl
 	dataOpts         []options.ExecuteDataQueryOption
@@ -123,7 +123,6 @@ func newConn(c *Connector, s table.ClosableSession, opts ...connOption) *conn {
 	cc := &conn{
 		connector: c,
 		session:   s,
-		bind:      bind.NoBind(),
 	}
 	for _, o := range opts {
 		if o != nil {
@@ -392,7 +391,12 @@ func (c *conn) Begin() (driver.Tx, error) {
 }
 
 func (c *conn) normalize(q string, args ...driver.NamedValue) (query string, _ *table.QueryParameters, _ error) {
-	return bind.Normalize(c.bind, q, args...)
+	return c.bind.ToYQL(q, func() (ii []interface{}) {
+		for i := range args {
+			ii = append(ii, args[i])
+		}
+		return ii
+	}()...)
 }
 
 func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ driver.Tx, err error) {
@@ -592,7 +596,7 @@ func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (
 }
 
 func (c *conn) normalizePath(folderOrTable string) (absPath string) {
-	return bind.NormalizePath(c.bind, folderOrTable)
+	return c.bind.NormalizePath(folderOrTable)
 }
 
 func (c *conn) GetTables(ctx context.Context, folder string) (tables []string, err error) {

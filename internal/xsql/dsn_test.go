@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/bind"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/query"
 )
 
 func TestParse(t *testing.T) {
@@ -63,7 +63,7 @@ func TestParse(t *testing.T) {
 			expErr: nil,
 		},
 		{
-			dsn: "grpc://localhost:2135/local?query_mode=scripting&go_auto_bind.table_path_prefix=path/to/tables",
+			dsn: "grpc://localhost:2135/local?query_mode=scripting&go_auto_bind=table_path_prefix&go_auto_bind.table_path_prefix=path/to/tables", //nolint:lll
 			expOpts: []config.Option{
 				config.WithSecure(false),
 				config.WithEndpoint("localhost:2135"),
@@ -71,12 +71,12 @@ func TestParse(t *testing.T) {
 			},
 			expConnectorOpts: []ConnectorOption{
 				WithDefaultQueryMode(ScriptingQueryMode),
-				WithBind(bind.TablePathPrefix("path/to/tables")),
+				WithQueryBinders(query.TablePathPrefix("path/to/tables")),
 			},
 			expErr: nil,
 		},
 		{
-			dsn: "grpc://localhost:2135/local?query_mode=scripting&go_auto_bind=numeric&go_auto_bind.table_path_prefix=path/to/tables", //nolint:lll
+			dsn: "grpc://localhost:2135/local?query_mode=scripting&go_auto_bind=table_path_prefix,numeric&go_auto_bind.table_path_prefix=path/to/tables", //nolint:lll
 			expOpts: []config.Option{
 				config.WithSecure(false),
 				config.WithEndpoint("localhost:2135"),
@@ -84,12 +84,15 @@ func TestParse(t *testing.T) {
 			},
 			expConnectorOpts: []ConnectorOption{
 				WithDefaultQueryMode(ScriptingQueryMode),
-				WithBind(bind.Numeric().WithTablePathPrefix("path/to/tables")),
+				WithQueryBinders(
+					query.TablePathPrefix("path/to/tables"),
+					query.Numeric(),
+				),
 			},
 			expErr: nil,
 		},
 		{
-			dsn: "grpc://localhost:2135/local?query_mode=scripting&go_auto_bind=positional&go_auto_bind.table_path_prefix=path/to/tables", //nolint:lll
+			dsn: "grpc://localhost:2135/local?query_mode=scripting&go_auto_bind=table_path_prefix,positional&go_auto_bind.table_path_prefix=path/to/tables", //nolint:lll
 			expOpts: []config.Option{
 				config.WithSecure(false),
 				config.WithEndpoint("localhost:2135"),
@@ -97,12 +100,15 @@ func TestParse(t *testing.T) {
 			},
 			expConnectorOpts: []ConnectorOption{
 				WithDefaultQueryMode(ScriptingQueryMode),
-				WithBind(bind.Positional().WithTablePathPrefix("path/to/tables")),
+				WithQueryBinders(
+					query.TablePathPrefix("path/to/tables"),
+					query.Positional(),
+				),
 			},
 			expErr: nil,
 		},
 		{
-			dsn: "grpc://localhost:2135/local?query_mode=scripting&go_auto_bind=declare&go_auto_bind.table_path_prefix=path/to/tables", //nolint:lll
+			dsn: "grpc://localhost:2135/local?query_mode=scripting&go_auto_bind=table_path_prefix,declare&go_auto_bind.table_path_prefix=path/to/tables", //nolint:lll
 			expOpts: []config.Option{
 				config.WithSecure(false),
 				config.WithEndpoint("localhost:2135"),
@@ -110,12 +116,15 @@ func TestParse(t *testing.T) {
 			},
 			expConnectorOpts: []ConnectorOption{
 				WithDefaultQueryMode(ScriptingQueryMode),
-				WithBind(bind.Declare().WithTablePathPrefix("path/to/tables")),
+				WithQueryBinders(
+					query.TablePathPrefix("path/to/tables"),
+					query.Declare(),
+				),
 			},
 			expErr: nil,
 		},
 		{
-			dsn: "grpc://localhost:2135/local?query_mode=scripting&go_auto_bind.table_path_prefix=path/to/tables",
+			dsn: "grpc://localhost:2135/local?query_mode=scripting&go_auto_bind=table_path_prefix&go_auto_bind.table_path_prefix=path/to/tables", //nolint:lll
 			expOpts: []config.Option{
 				config.WithSecure(false),
 				config.WithEndpoint("localhost:2135"),
@@ -123,7 +132,7 @@ func TestParse(t *testing.T) {
 			},
 			expConnectorOpts: []ConnectorOption{
 				WithDefaultQueryMode(ScriptingQueryMode),
-				WithBind(bind.TablePathPrefix("path/to/tables")),
+				WithQueryBinders(query.TablePathPrefix("path/to/tables")),
 			},
 			expErr: nil,
 		},

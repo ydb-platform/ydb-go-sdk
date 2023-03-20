@@ -9,12 +9,12 @@ import (
 
 	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -27,9 +27,9 @@ func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
 	}
 }
 
-func WithBind(b bind.Bind) ConnectorOption {
+func WithQueryBinders(binders ...query.Binder) ConnectorOption {
 	return func(c *Connector) error {
-		c.bind = b
+		c.bind = binders
 		return nil
 	}
 }
@@ -93,7 +93,6 @@ type ydbDriver interface {
 func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
 	c := &Connector{
 		parent:           parent,
-		bind:             bind.NoBind(),
 		conns:            make(map[*conn]struct{}),
 		defaultTxControl: table.DefaultTxControl(),
 		defaultQueryMode: DefaultQueryMode,
@@ -115,7 +114,7 @@ func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
 type Connector struct {
 	parent ydbDriver
 
-	bind bind.Bind
+	bind query.Bind
 
 	onClose []func(connector *Connector)
 

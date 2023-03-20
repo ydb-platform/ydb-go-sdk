@@ -8,10 +8,10 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -102,24 +102,8 @@ func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
 	return xsql.WithDefaultQueryMode(mode)
 }
 
-func BindPositional() bind.Bind {
-	return bind.Positional()
-}
-
-func BindNumeric() bind.Bind {
-	return bind.Numeric()
-}
-
-func BindDeclares() bind.Bind {
-	return bind.Declare()
-}
-
-func BindTablePathPrefix(tablePathPrefix string) bind.Bind {
-	return bind.TablePathPrefix(tablePathPrefix)
-}
-
-func WithAutoBind(bind bind.Bind) ConnectorOption {
-	return xsql.WithBind(bind)
+func WithAutoBind(binders ...query.Binder) ConnectorOption {
+	return xsql.WithQueryBinders(binders...)
 }
 
 func WithDefaultTxControl(txControl *table.TransactionControl) ConnectorOption {

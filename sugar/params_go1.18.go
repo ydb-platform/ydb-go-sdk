@@ -5,7 +5,6 @@ package sugar
 
 import (
 	"database/sql"
-	"database/sql/driver"
 	"fmt"
 
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
@@ -37,8 +36,5 @@ func GenerateDeclareSection[T *table.QueryParameters | []table.ParameterOption |
 //
 // Warning: This is an experimental feature and could change at any time
 func ToYdbParam(param sql.NamedArg) (table.ParameterOption, error) {
-	return convert.ToYdbParam(driver.NamedValue{
-		Name:  param.Name,
-		Value: param.Value,
-	})
+	return convert.ToYdbParam(param.Name, param.Value)
 }
