@@ -30,7 +30,6 @@ func nextReaderID() int64 {
 	return atomic.AddInt64(&globalReaderCounter, 1)
 }
 
-//nolint:lll
 //go:generate mockgen -destination raw_topic_reader_stream_mock_test.go -package topicreaderinternal -write_package_comment=false . RawTopicReaderStream
 
 type RawTopicReaderStream interface {

@@ -3,7 +3,7 @@ package sugar
 import (
 	"crypto/x509"
 	"encoding/pem"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -11,7 +11,7 @@ import (
 
 // LoadCertificatesFromFile read and parse caFile and returns certificates
 func LoadCertificatesFromFile(caFile string) ([]*x509.Certificate, error) {
-	bytes, err := ioutil.ReadFile(filepath.Clean(caFile))
+	bytes, err := os.ReadFile(filepath.Clean(caFile))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

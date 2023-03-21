@@ -21,14 +21,16 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 func TestRegressionCloud109307(t *testing.T) {
 	scope := newScope(t)
-	db := scope.SQLDriverWithFolder(
-		ydb.WithAutoBind(ydb.BindDeclares().WithTablePathPrefix(scope.Folder())),
-	)
+	db := scope.SQLDriverWithFolder(ydb.WithAutoBind(
+		query.TablePathPrefix(scope.Folder()),
+		query.Declare(),
+	))
 
 	ctx, cancel := context.WithTimeout(xtest.Context(t), 42*time.Second)
 	defer cancel()
@@ -75,9 +77,10 @@ func TestRegressionCloud109307(t *testing.T) {
 func TestRegressionKikimr17104(t *testing.T) {
 	var (
 		scope = newScope(t)
-		db    = scope.SQLDriverWithFolder(
-			ydb.WithAutoBind(ydb.BindDeclares().WithTablePathPrefix(scope.Folder())),
-		)
+		db    = scope.SQLDriverWithFolder(ydb.WithAutoBind(
+			query.TablePathPrefix(scope.Folder()),
+			query.Declare(),
+		))
 	)
 
 	var (

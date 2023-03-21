@@ -9,7 +9,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 )
 
-//nolint:lll
 //go:generate mockgen -destination raw_topic_writer_stream_mock_test.go -package topicwriterinternal -write_package_comment=false github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal RawTopicWriterStream
 
 type RawTopicWriterStream interface {

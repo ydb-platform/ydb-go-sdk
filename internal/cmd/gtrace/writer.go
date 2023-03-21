@@ -8,7 +8,7 @@ import (
 	"go/token"
 	"go/types"
 	"io"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -260,7 +260,7 @@ func (w *Writer) ensureStdLibMapping() {
 	w.std = make(map[string]bool)
 
 	src := filepath.Join(w.Context.GOROOT, "src")
-	files, err := ioutil.ReadDir(src)
+	files, err := os.ReadDir(src)
 	if err != nil {
 		panic(fmt.Sprintf("can't list GOROOT's src: %v", err))
 	}
@@ -419,14 +419,6 @@ func (w *Writer) composeHookCall(fn *Func, h1, h2 string) {
 		w.line(`}`)
 	})
 }
-
-//nolint
-var contextType = (func() types.Type {
-	pkg := types.NewPackage("context", "context")
-	typ := types.NewInterfaceType(nil, nil)
-	name := types.NewTypeName(0, pkg, "Context", typ)
-	return types.NewNamed(name, typ, nil)
-})()
 
 func (w *Writer) options(trace *Trace) {
 	w.newScope(func() {

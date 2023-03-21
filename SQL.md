@@ -19,7 +19,7 @@ Behind the scene, `database/sql` APIs are implemented using the native interface
    * [Over `sql.Conn` object](#retry-conn)
    * [Over `sql.Tx`](#retry-tx)
 7. [Query args types](#arg-types)
-8. [Query enrichment](#bindings)
+8. [Query binding](#bindings)
 9. [Accessing the native driver from `*sql.DB`](#unwrap)
    * [Driver with go's 1.18 supports also `*sql.Conn` for unwrapping](#unwrap-cc)
 10. [Troubleshooting](#troubleshooting)
@@ -34,7 +34,7 @@ Behind the scene, `database/sql` APIs are implemented using the native interface
 ```go
 import (
     "database/sql"
-	
+  
     "github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
@@ -62,7 +62,7 @@ func main() {
 ```go
 import (
     "database/sql"
-	
+  
     _ "github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
@@ -378,36 +378,35 @@ using connector option `ydb.WithAutoBind(bind)` or connection string parameter
 Next example shows how to write easy queries with automatically query enrichment 
 for table path prefix and positional arguments:
 ```go
-	var (
-		ctx          = context.TODO()
-		nativeDriver = ydb.MustOpen(ctx, "grpc://localhost:2136/local")
-		db           = sql.OpenDB(
-			ydb.MustConnector(nativeDriver,
-				ydb.WithAutoBind(
-					ydb.BindPositional().WithTablePathPrefix("/local/path/to/my/folder"),
-				),
-			),
-		)
-	)
-	defer nativeDriver.Close(ctx) // cleanup resources
-	defer db.Close()
+  var (
+    ctx          = context.TODO()
+    nativeDriver = ydb.MustOpen(ctx, "grpc://localhost:2136/local")
+    db           = sql.OpenDB(
+      ydb.MustConnector(nativeDriver,
+        ydb.WithAutoBind(
+          query.TablePathPrefix("/local/path/to/my/folder"), // bind pragma TablePathPrefix
+          query.Declare(),                                   // bind parameters declare
+          query.Positional(),                                // bind positional args
+        ),
+      ),
+    )
+  )
+  defer nativeDriver.Close(ctx) // cleanup resources
+  defer db.Close()
 
-	// positional args
-	row := db.QueryRowContext(ctx, `SELECT ?, ?`, 42, "my string")
+  // positional args
+  row := db.QueryRowContext(ctx, `SELECT ?, ?`, 42, "my string")
 ```
 The original simple query `SELECT ?, ?` will expand on driver side to the following
 ```sql
--- modified by ydb-go-sdk@v3.44.0 (bind type = TablePathPrefix|Positional)
---   
---   SELECT ?, ?
-
+-- bind TablePathPrefix 
 PRAGMA TablePathPrefix("/local/path/to/my/folder");
 
 -- bind declares
 DECLARE $p0 AS Int32;
 DECLARE $p1 AS Utf8;
 
--- origin query with normalized args
+-- bind positional args
 SELECT $p0, $p1
 ```
 
@@ -422,22 +421,50 @@ Additional examples of query enrichment see in `ydb-go-sdk` documentation:
     * using [connection string parameter](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#example-package-DatabaseSQLBindNumericlArgs)
     * using [connector option](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#example-package-DatabaseSQLBindNumericArgsOverConnector)
 
-For a deep understanding of query enrichment see also [unit-tests](https://github.com/ydb-platform/ydb-go-sdk/blob/master/internal/xsql/bind/bind_test.go)
+For a deep understanding of query enrichment see also [unit-tests](https://github.com/ydb-platform/ydb-go-sdk/blob/master/query/bind_test.go).
+
+You can write your own unit-tests for check correct binding of your queries like this:
+```go
+func TestBinding(t *testing.T) {
+  bindings := query.NewBind(
+    query.TablePathPrefix("/local/path/to/my/folder"), // bind pragma TablePathPrefix
+    query.Declare(),    // bind parameters declare
+    query.Positional(), // auto-replace positional args
+  )
+  query, params, err := bindings.ToYQL("SELECT ?, ?, ?", 1, uint64(2), "3")
+  require.NoError(t, err)
+  require.Equal(t, `-- bind TablePathPrefix
+PRAGMA TablePathPrefix("/local/path/to/my/folder");
+
+-- bind declares
+DECLARE $p0 AS Int32;
+DECLARE $p1 AS Uint64;
+DECLARE $p2 AS Utf8;
+
+-- origin query with positional args replacement
+SELECT $p0, $p1, $p2`, query)
+  require.Equal(t, table.NewQueryParameters(
+    table.ValueParam("$p0", types.Int32Value(1)),
+    table.ValueParam("$p1", types.Uint64Value(2)),
+    table.ValueParam("$p2", types.TextValue("3")),
+  ), params)
+}
+```
 
 ## Accessing the native driver from `*sql.DB` <a name="unwrap"></a>
 
 ```go
 db, err := sql.Open("ydb", "grpc://localhost:2136/local")
 if err != nil {
-    t.Fatal(err)
+  t.Fatal(err)
 }
 nativeDriver, err = ydb.Unwrap(db)
 if err != nil {
-    t.Fatal(err)
+  t.Fatal(err)
 }
 nativeDriver.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
-    // doing with native YDB session
-    return nil
+  // doing with native YDB session
+  return nil
 })
 ```
 

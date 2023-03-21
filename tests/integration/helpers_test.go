@@ -20,6 +20,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -93,7 +94,7 @@ func (scope *scopeT) Driver() *ydb.Driver {
 				trace.DetailsAll,
 				ydb.WithNamespace("ydb"),
 				ydb.WithWriter(logger),
-				ydb.WithMinLevel(log.TRACE),
+				ydb.WithMinLevel(log.WARN),
 			),
 		)
 		clean := func() {
@@ -108,7 +109,7 @@ func (scope *scopeT) SQLDriverWithFolder(opts ...ydb.ConnectorOption) *sql.DB {
 		driver := scope.Driver()
 		scope.Logf("Create sql db connector")
 		connector, err := ydb.Connector(driver,
-			append([]ydb.ConnectorOption{ydb.WithAutoBind(ydb.BindTablePathPrefix(scope.Folder()))}, opts...)...,
+			append([]ydb.ConnectorOption{ydb.WithAutoBind(query.TablePathPrefix(scope.Folder()))}, opts...)...,
 		)
 		if err != nil {
 			return nil, err

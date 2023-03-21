@@ -4,7 +4,8 @@
 * Added grpc and operation codes to errors string description
 * Extend `scheme.Client` interface with method `Database`
 * Removed `driver.ResultNoRows` in `internal/xsql`
-* Supported binding parameters for `database/sql` driver over connector option `ydb.WithAUtoBind()` and connection string params `go_auto_bin.type={declare,numeric,positional}` and `go_auto_bin.table_path_prefix=path/to/tables`
+* Added package `table.query` with bindings
+* Supported binding parameters for `database/sql` driver over connector option `ydb.WithAutoBind()` and connection string params `go_auto_bind={origin,table_path_prefix,declare,numeric,positional}` and `go_auto_bind.table_path_prefix=path/to/tables`
 * Fixed topic retry policy callback call: not call it with nil error
 * Fixed bug with no checking operation error on `discovery.Client` calls
 * Allowed zero create session timeout in `ydb.WithSessionPoolCreateSessionTimeout(timeout)` (less than or equal to zero - no used timeout on create session request)
