@@ -401,8 +401,7 @@ func main() {
 }
 ```
 
-This example can be overwritten to easy usage over bindings:
-
+This example can be overwritten to easiest over bindings:
 ```go
 import (
   "context"
@@ -437,7 +436,6 @@ func main() {
 ```
 
 The original simple query `SELECT ?, ?` will expand on driver side to the following
-
 ```sql
 -- bind TablePathPrefix 
 PRAGMA TablePathPrefix("/local/path/to/my/folder");
@@ -449,6 +447,7 @@ DECLARE $p1 AS Utf8;
 -- origin query with positional args replacement
 SELECT $p0, $p1
 ```
+
 This expanded query will sended to `YDB`.
 
 Additional examples of query enrichment see in `ydb-go-sdk` documentation:
