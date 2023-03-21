@@ -89,7 +89,7 @@ func Example_databaseSQL() {
 
 func Example_databaseSQLBindNumericArgs() {
 	db, err := sql.Open("ydb",
-		"grpc://localhost:2136/local?go_auto_bind=numeric",
+		"grpc://localhost:2136/local?go_auto_bind=declare,numeric",
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -147,7 +147,7 @@ func Example_databaseSQLBindNumericArgsOverConnector() {
 
 func Example_databaseSQLBindPositionalArgs() {
 	db, err := sql.Open("ydb",
-		"grpc://localhost:2136/local?go_auto_bind=positional",
+		"grpc://localhost:2136/local?go_auto_bind=declare,positional",
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -202,7 +202,7 @@ func Example_databaseSQLBindPositionalArgsOverConnector() {
 
 func Example_databaseSQLBindTablePathPrefix() {
 	db, err := sql.Open("ydb",
-		"grpc://localhost:2136/local?go_auto_bind.table_path_prefix=path/to/tables",
+		"grpc://localhost:2136/local?go_auto_bind=table_path_prefix&go_auto_bind.table_path_prefix=path/to/tables",
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -230,10 +230,7 @@ func Example_databaseSQLBindTablePathPrefixOverConnector() {
 		db           = sql.OpenDB(
 			ydb.MustConnector(nativeDriver,
 				ydb.WithAutoBind(
-					query.Origin(),
 					query.TablePathPrefix("/local/path/to/my/folder"),
-					query.Declare(),
-					query.Numeric(),
 				),
 			),
 		)
@@ -241,6 +238,60 @@ func Example_databaseSQLBindTablePathPrefixOverConnector() {
 
 	// full table path is "/local/path/to/tables/series"
 	row := db.QueryRowContext(context.TODO(), "SELECT id, title FROM series")
+
+	var (
+		id    int32  // required value
+		title string // optional value
+	)
+	if err := row.Scan(&id, &title); err != nil {
+		log.Printf("query failed: %v", err)
+	} else {
+		log.Printf("id=%v, title='%s'\n", id, title)
+	}
+}
+
+func Example_databaseSQLBindDeclare() {
+	db, err := sql.Open("ydb",
+		"grpc://localhost:2136/local?go_auto_bind=declare",
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() { _ = db.Close() }() // cleanup resources
+
+	var (
+		id    int32  // required value
+		title string // optional value
+	)
+
+	row := db.QueryRowContext(context.TODO(), "SELECT $id, $title",
+		table.ValueParam("$id", types.Uint64Value(42)),
+		table.ValueParam("$title", types.TextValue("title")),
+	)
+	if err = row.Scan(&id, &title); err != nil {
+		log.Printf("query failed: %v", err)
+	} else {
+		log.Printf("id=%v, title='%s'\n", id, title)
+	}
+}
+
+func Example_databaseSQLBindDeclareOverConnector() {
+	var (
+		ctx          = context.TODO()
+		nativeDriver = ydb.MustOpen(ctx, "grpc://localhost:2136/local")
+		db           = sql.OpenDB(
+			ydb.MustConnector(nativeDriver,
+				ydb.WithAutoBind(
+					query.Declare(),
+				),
+			),
+		)
+	)
+
+	row := db.QueryRowContext(context.TODO(), "SELECT $id, $title",
+		table.ValueParam("$id", types.Uint64Value(42)),
+		table.ValueParam("$title", types.TextValue("title")),
+	)
 
 	var (
 		id    int32  // required value

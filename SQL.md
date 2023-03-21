@@ -343,13 +343,10 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
    )
    ```
 
-## Query enrichment <a name="bindings"></a>
+## Query bindings \<a name="bindings"\>\</a\>
 
-`YQL` is a language with strict types. This means that a query to `YDB` must be 
-written with an explicit declaration of query parameter types using the `DECLARE`
-keyword. Also, in some cases, the special `PRAGMA` operator can be used to 
-simplify of the full table path prefix. 
-For example, a query to the table `/local/path/to/tables/seasons` might look like this:
+`YQL` is a language with strict types. This means that a query to `YDB` must be written with an explicit declaration of query parameter types using the `DECLARE`keyword. Also, in some cases, the special `PRAGMA` operator can be used to simplify of the full table path prefix. For example, a query to the table `/local/path/to/tables/seasons` might look like this:
+
 ```
 DECLARE $title AS Text;
 DECLARE $views AS Uint64;
@@ -357,8 +354,9 @@ SELECT season_id
 FROM `/local/path/to/tables/seasons`
 WHERE title LIKE $title AND views > $views;
 ```
-Using the `PRAGMA` operator, you can simplify the prefix part in the name of all tables
-involved in the `YQL`-query:
+
+Using the `PRAGMA` operator, you can simplify the prefix part in the name of all tables involved in the `YQL`-query:
+
 ```
 PRAGMA TablePathPrefix("/local/path/to/tables/");
 DECLARE $title AS Text;
@@ -367,37 +365,79 @@ SELECT season_id FROM seasons WHERE title LIKE $title AND views > $views;
 ```
 
 `database/sql` driver for `YDB` supports query enrichment for:
-- specifying `TablePathPrefix`,
-- declaring types of parameters,
-- numeric or positional parameters
 
-This enrichments of queries can be enabled explicitly on initializing step
-using connector option `ydb.WithAutoBind(bind)` or connection string parameter
-`go_auto_bind`. By default `database/sql` driver for `YDB` not modifies source queries.
+* specifying `TablePathPrefix`,
+* declaring types of parameters,
+* numeric or positional parameters
 
-Next example shows how to write easy queries with automatically query enrichment 
-for table path prefix and positional arguments:
+This enrichments of queries can be enabled explicitly on initializing step using connector option `ydb.WithAutoBind(bind)` or connection string parameter `go_auto_bind`. By default `database/sql` driver for `YDB` not modifies source queries.
+
+Next example without bindings shows complexity and explicit importing of `ydb-go-sdk` packages:
+
 ```go
+import (
+  "context"
+  "database/sql"
+
+  "github.com/ydb-platform/ydb-go-sdk/v3"
+  "github.com/ydb-platform/ydb-go-sdk/v3/table"
+  "github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+)
+
+func main() {
+  db := sql.Open("ydb", "grpc://localhost:2136/local")
+  defer db.Close()
+
+  // positional args
+  row := db.QueryRowContext(context.TODO(), `
+    PRAGMA TablePathPrefix("/local/path/to/my/folder");
+    DECLARE $p0 AS Int32;
+    DECLARE $p1 AS Utf8;
+    SELECT $p0, $p1`, 
+    sql.Named("$p0", 42), 
+    table.ValueParam("$p1", types.TextValue("my string")),
+  )
+  // process row ...
+}
+```
+
+This example can be overwritten to easy usage over bindings:
+
+```go
+import (
+  "context"
+  "database/sql"
+
+  _ "github.com/ydb-platform/ydb-go-sdk/v3" // anonymous import for registering driver
+)
+
+func main() {
   var (
     ctx          = context.TODO()
-    nativeDriver = ydb.MustOpen(ctx, "grpc://localhost:2136/local")
-    db           = sql.OpenDB(
-      ydb.MustConnector(nativeDriver,
-        ydb.WithAutoBind(
-          query.TablePathPrefix("/local/path/to/my/folder"), // bind pragma TablePathPrefix
-          query.Declare(),                                   // bind parameters declare
-          query.Positional(),                                // bind positional args
-        ),
-      ),
-    )
+    db           = sql.Open("ydb", "grpc://localhost:2136/local?"+
+  					        "go_auto_bind=table_path_prefix,declare,positional&"+
+                            "go_auto_bind.table_path_prefix=/local/path/to/my/folder")
+
+//  alternate syntax for enabling bindings over connection string params
+//
+//  nativeDriver = ydb.MustOpen(ctx, "grpc://localhost:2136/local")
+//  db           = sql.OpenDB(ydb.MustConnector(nativeDriver,
+//      ydb.WithAutoBind(
+//        query.TablePathPrefix("/local/path/to/my/folder"), // bind pragma TablePathPrefix
+//        query.Declare(),                                   // bind parameters declare
+//        query.Positional(),                                // bind positional args
+//      ),
+//  ))
   )
-  defer nativeDriver.Close(ctx) // cleanup resources
+//defer nativeDriver.Close(ctx) // cleanup resources
   defer db.Close()
 
   // positional args
   row := db.QueryRowContext(ctx, `SELECT ?, ?`, 42, "my string")
 ```
+
 The original simple query `SELECT ?, ?` will expand on driver side to the following
+
 ```sql
 -- bind TablePathPrefix 
 PRAGMA TablePathPrefix("/local/path/to/my/folder");
@@ -406,14 +446,16 @@ PRAGMA TablePathPrefix("/local/path/to/my/folder");
 DECLARE $p0 AS Int32;
 DECLARE $p1 AS Utf8;
 
--- bind positional args
+-- origin query with positional args replacement
 SELECT $p0, $p1
 ```
+This expanded query will sended to `YDB`.
 
 Additional examples of query enrichment see in `ydb-go-sdk` documentation:
+
 * specifying `TablePathPrefix`:
-  * using [connection string parameter](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#example-package-DatabaseSQLBindTablePathPrefix)
-  * using [connector option](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#example-package-DatabaseSQLBindTablePathPrefixOverConnector)
+    * using [connection string parameter](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#example-package-DatabaseSQLBindTablePathPrefix)
+    * using [connector option](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#example-package-DatabaseSQLBindTablePathPrefixOverConnector)
 * positional arguments binding:
     * using [connection string parameter](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#example-package-DatabaseSQLBindPositionalArgs)
     * using [connector option](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#example-package-DatabaseSQLBindPositionalArgsOverConnector)
@@ -424,12 +466,13 @@ Additional examples of query enrichment see in `ydb-go-sdk` documentation:
 For a deep understanding of query enrichment see also [unit-tests](https://github.com/ydb-platform/ydb-go-sdk/blob/master/query/bind_test.go).
 
 You can write your own unit-tests for check correct binding of your queries like this:
+
 ```go
 func TestBinding(t *testing.T) {
   bindings := query.NewBind(
     query.TablePathPrefix("/local/path/to/my/folder"), // bind pragma TablePathPrefix
-    query.Declare(),    // bind parameters declare
-    query.Positional(), // auto-replace positional args
+    query.Declare(),                                   // bind parameters declare
+    query.Positional(),                                // auto-replace positional args
   )
   query, params, err := bindings.ToYQL("SELECT ?, ?, ?", 1, uint64(2), "3")
   require.NoError(t, err)
