@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
@@ -19,18 +19,13 @@ import (
 var (
 	errInconsistentArgs = errors.New("inconsistent args")
 
-	positionalArgsRe = regexp.MustCompile(`[^\\][?]`)
-	numericArgsRe    = regexp.MustCompile(`\$\d+`)
+	_ normalizePath = tablePathPrefixMiddleware{}
+	_ normalizePath = Bind(nil)
 )
 
 type Binder interface {
 	Bind(query string, args ...interface{}) (transformedQuery string, transformedArgs []interface{}, err error)
 }
-
-var (
-	_ normalizePath = tablePathPrefixMiddleware{}
-	_ normalizePath = Bind(nil)
-)
 
 type Bind []Binder
 
@@ -147,23 +142,21 @@ func (m positionalArgsMiddleware) Bind(query string, args ...interface{}) (
 		return query, args, nil
 	}
 
-	buffer := allocator.Buffers.Get()
+	var (
+		buffer = allocator.Buffers.Get()
+		hits   = make(map[string]struct{}, len(args))
+	)
 	defer allocator.Buffers.Put(buffer)
 
 	buffer.WriteString("-- origin query with positional args replacement\n")
 
-	position := 0
-	query = strings.TrimSpace(query)
-	query = positionalArgsRe.ReplaceAllStringFunc(query, func(s string) string {
-		defer func() {
-			position++
-		}()
-		return s[:1] + "$p" + strconv.Itoa(position)
+	query = bindParams(query, paramTypePositional, func(paramName string) {
+		hits[paramName] = struct{}{}
 	})
 
-	if position > len(params) {
+	if len(hits) > len(params) {
 		return "", nil, xerrors.WithStackTrace(
-			fmt.Errorf("%w: (positional args: %d, query args %d)", errInconsistentArgs, position, len(params)),
+			fmt.Errorf("%w: (positional args: %v, query args %d)", errInconsistentArgs, hits, len(params)),
 		)
 	}
 
@@ -207,14 +200,9 @@ func (m numericArgsMiddleware) Bind(query string, args ...interface{}) (
 
 	buffer.WriteString("-- origin query with numeric args replacement\n")
 
-	query = strings.TrimSpace(query)
-
-	query = numericArgsRe.ReplaceAllStringFunc(query, func(s string) string {
-		n, _ := strconv.Atoi(s[1:])
-		name := "$p" + strconv.Itoa(n-1)
-		hit[name] = struct{}{}
-		delete(miss, name)
-		return name
+	query = bindParams(query, paramTypeNumeric, func(paramName string) {
+		hit[paramName] = struct{}{}
+		delete(miss, paramName)
 	})
 
 	if len(miss) > 0 {
@@ -291,4 +279,107 @@ func (binders Bind) ToYQL(query string, args ...interface{}) (
 	}
 
 	return query, table.NewQueryParameters(params...), nil
+}
+
+type paramType int
+
+const (
+	paramTypePositional = paramType(iota)
+	paramTypeNumeric
+)
+
+var (
+	paramTypesChars = map[paramType]string{
+		paramTypePositional: "?",
+		paramTypeNumeric:    "$",
+	}
+	commentSingleLineStart = "--"
+	commentSingleLineEnd   = "\n"
+	commentMultiLineStart  = "/*"
+	commentMultiLineEnd    = "*/"
+	endByStart             = map[string]string{
+		commentSingleLineStart: commentSingleLineEnd,
+		commentMultiLineStart:  commentMultiLineEnd,
+	}
+)
+
+func indexAny(s string, ss ...string) (index int, substring string) {
+	indexes := make(map[string]int, len(ss))
+	for _, sss := range ss {
+		indexes[sss] = strings.Index(s, sss)
+	}
+	index = -1
+	for ss, i := range indexes {
+		if i < 0 {
+			continue
+		}
+		if i == 0 {
+			return i, ss
+		}
+		if index == -1 || index > i {
+			index = i
+			substring = ss
+		}
+	}
+	return index, substring
+}
+
+func bindParams(query string, t paramType, visitor func(paramName string)) string {
+	var (
+		i      = 0
+		j      = 0
+		ch     = paramTypesChars[t]
+		buffer = allocator.Buffers.Get()
+	)
+	defer allocator.Buffers.Put(buffer)
+	for {
+		idx, ss := indexAny(query[i:], commentSingleLineStart, commentMultiLineStart, ch)
+		switch {
+		case idx == -1:
+			buffer.WriteString(query[i:])
+			return buffer.String()
+		case ss == ch:
+			buffer.WriteString(query[i : i+idx])
+			i += idx + len(ch)
+			if ss == paramTypesChars[paramTypePositional] { //nolint:nestif
+				paramName := "$p" + strconv.Itoa(j)
+				buffer.WriteString(paramName)
+				j++
+				if visitor != nil {
+					visitor(paramName)
+				}
+			} else {
+				chars := ""
+				for k := 0; k < len(query)-i; k++ {
+					ch := query[i+k]
+					if !unicode.IsDigit(rune(ch)) {
+						break
+					}
+					chars += string(ch)
+				}
+				i += len(chars)
+				num, err := strconv.Atoi(chars)
+				if err != nil {
+					panic(err) // this should never happen
+				}
+				paramName := "$p" + strconv.Itoa(num-1)
+				buffer.WriteString(paramName)
+				if visitor != nil {
+					visitor(paramName)
+				}
+			}
+		case ss == commentSingleLineStart, ss == commentMultiLineStart:
+			chEnd := endByStart[ss]
+			sss := query[i+idx+len(ss):]
+			idxEnd := strings.Index(sss, chEnd)
+			if idxEnd == -1 {
+				idxEnd = len(query)
+			} else {
+				idxEnd += i + idx + len(ss) + len(chEnd)
+			}
+			sss = query[i:idxEnd]
+			buffer.WriteString(sss)
+			i = idxEnd
+		}
+	}
 }
