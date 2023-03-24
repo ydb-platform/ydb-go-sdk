@@ -80,6 +80,7 @@ func TestTypeToString(t *testing.T) {
 		types.Optional(types.TypeJSONDocument),
 		types.Optional(types.TypeDyNumber),
 		types.Dict(types.TypeText, types.TypeTimestamp),
+		types.Tagged("foo", types.TypeUint32),
 		types.List(types.TypeUint32),
 		types.VariantStruct(
 			types.StructField("a", types.TypeBool),

@@ -226,6 +226,10 @@ func TestTypeToString(t *testing.T) {
 			s: "Dict<Utf8,Timestamp>",
 		},
 		{
+			t: Tagged("foo", TypeUint32),
+			s: "Tagged<Uint32,'foo'>",
+		},
+		{
 			t: EmptyList(),
 			s: "EmptyList",
 		},

@@ -137,8 +137,16 @@ func (a *Allocator) TypeDict() (v *Ydb.Type_DictType) {
 	return new(Ydb.Type_DictType)
 }
 
+func (a *Allocator) TypeTagged() (v *Ydb.Type_TaggedType) {
+	return new(Ydb.Type_TaggedType)
+}
+
 func (a *Allocator) Dict() (v *Ydb.DictType) {
 	return new(Ydb.DictType)
+}
+
+func (a *Allocator) Tagged() (v *Ydb.TaggedType) {
+	return new(Ydb.TaggedType)
 }
 
 func (a *Allocator) Pair() (v *Ydb.ValuePair) {

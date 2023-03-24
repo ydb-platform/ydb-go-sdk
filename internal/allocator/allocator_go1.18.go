@@ -24,11 +24,13 @@ type (
 		typeTupleAllocator
 		typeStructAllocator
 		typeDictAllocator
+		typeTaggedAllocator
 		decimalAllocator
 		listAllocator
 		tupleAllocator
 		structAllocator
 		dictAllocator
+		taggedAllocator
 		structMemberAllocator
 		typeOptionalAllocator
 		optionalAllocator
@@ -73,11 +75,13 @@ func (a *Allocator) Free() {
 	a.typeTupleAllocator.free()
 	a.typeStructAllocator.free()
 	a.typeDictAllocator.free()
+	a.typeTaggedAllocator.free()
 	a.decimalAllocator.free()
 	a.listAllocator.free()
 	a.tupleAllocator.free()
 	a.structAllocator.free()
 	a.dictAllocator.free()
+	a.taggedAllocator.free()
 	a.structMemberAllocator.free()
 	a.typeOptionalAllocator.free()
 	a.optionalAllocator.free()
@@ -175,6 +179,24 @@ func (a *dictAllocator) free() {
 	for _, v := range a.allocations {
 		v.Reset()
 		dictPool.Put(v)
+	}
+	a.allocations = a.allocations[:0]
+}
+
+type taggedAllocator struct {
+	allocations []*Ydb.TaggedType
+}
+
+func (a *taggedAllocator) Tagged() (v *Ydb.TaggedType) {
+	v = taggedPool.Get()
+	a.allocations = append(a.allocations, v)
+	return v
+}
+
+func (a *taggedAllocator) free() {
+	for _, v := range a.allocations {
+		v.Reset()
+		taggedPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
 }
@@ -476,6 +498,24 @@ func (a *typeDictAllocator) free() {
 	for _, v := range a.allocations {
 		*v = Ydb.Type_DictType{}
 		typeDictPool.Put(v)
+	}
+	a.allocations = a.allocations[:0]
+}
+
+type typeTaggedAllocator struct {
+	allocations []*Ydb.Type_TaggedType
+}
+
+func (a *typeTaggedAllocator) TypeTagged() (v *Ydb.Type_TaggedType) {
+	v = typeTaggedPool.Get()
+	a.allocations = append(a.allocations, v)
+	return v
+}
+
+func (a *typeTaggedAllocator) free() {
+	for _, v := range a.allocations {
+		*v = Ydb.Type_TaggedType{}
+		typeTaggedPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
 }
@@ -901,12 +941,14 @@ var (
 	typeTuplePool                    Pool[Ydb.Type_TupleType]
 	typeStructPool                   Pool[Ydb.Type_StructType]
 	typeDictPool                     Pool[Ydb.Type_DictType]
+	typeTaggedPool                   Pool[Ydb.Type_TaggedType]
 	typeVariantPool                  Pool[Ydb.Type_VariantType]
 	decimalPool                      Pool[Ydb.DecimalType]
 	listPool                         Pool[Ydb.ListType]
 	tuplePool                        Pool[Ydb.TupleType]
 	structPool                       Pool[Ydb.StructType]
 	dictPool                         Pool[Ydb.DictType]
+	taggedPool                       Pool[Ydb.TaggedType]
 	variantPool                      Pool[Ydb.VariantType]
 	variantTupleItemsPool            Pool[Ydb.VariantType_TupleItems]
 	variantStructItemsPool           Pool[Ydb.VariantType_StructItems]

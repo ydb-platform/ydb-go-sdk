@@ -549,6 +549,41 @@ func DictValue(values ...DictValueField) *dictValue {
 	}
 }
 
+type taggedValue struct {
+	t     *taggedType
+	value Value
+}
+
+func (v *taggedValue) castTo(dst interface{}) error {
+	return v.value.castTo(dst)
+}
+
+func (v *taggedValue) Yql() string {
+	return fmt.Sprintf("%s(\"%v\")", v.Type().Yql(), v.value)
+}
+
+func (v *taggedValue) Type() Type {
+	return v.t
+}
+
+func (v *taggedValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	vv := a.Tagged()
+	vv.Tag = v.t.tag
+	vv.Type = v.t.toYDB(a)
+
+	vvv := a.Value()
+	vvv.Value = v.value.toYDB(a)
+
+	return vvv
+}
+
+func TaggedValue(tag string, v Value) *taggedValue {
+	return &taggedValue{
+		t:     Tagged(tag, v.Type()),
+		value: v,
+	}
+}
+
 type doubleValue struct {
 	value float64
 }

@@ -241,6 +241,62 @@ func Dict(key, value Type) (v *dictType) {
 	}
 }
 
+type taggedType struct {
+	tag string
+	t   Type
+}
+
+func (v *taggedType) String() string {
+	return v.Yql()
+}
+
+func (v *taggedType) Yql() string {
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString("Tagged<")
+	buffer.WriteString(v.t.Yql())
+	buffer.WriteString(",'")
+	buffer.WriteString(v.tag)
+	buffer.WriteString("'>")
+	return buffer.String()
+}
+
+func (v *taggedType) equalsTo(rhs Type) bool {
+	vv, ok := rhs.(*taggedType)
+	if !ok {
+		return false
+	}
+	if !v.t.equalsTo(vv.t) {
+		return false
+	}
+	if v.tag != vv.tag {
+		return false
+	}
+	return true
+}
+
+func (v *taggedType) toYDB(a *allocator.Allocator) *Ydb.Type {
+	t := a.Type()
+
+	typeTagged := a.TypeTagged()
+
+	typeTagged.TaggedType = a.Tagged()
+
+	typeTagged.TaggedType.Tag = v.tag
+	typeTagged.TaggedType.Type = v.t.toYDB(a)
+
+	t.Type = typeTagged
+
+	return t
+}
+
+func Tagged(tag string, t Type) (v *taggedType) {
+	return &taggedType{
+		tag: tag,
+		t:   t,
+	}
+}
+
 type emptyListType struct{}
 
 func (v emptyListType) Yql() string {

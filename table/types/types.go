@@ -53,6 +53,10 @@ func Dict(k, v Type) Type {
 	return value.Dict(k, v)
 }
 
+func Tagged(tag string, t Type) Type {
+	return value.Tagged(tag, t)
+}
+
 func VariantStruct(opts ...StructOption) Type {
 	var s tStructType
 	for _, opt := range opts {
