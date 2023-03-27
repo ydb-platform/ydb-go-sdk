@@ -8,13 +8,14 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 func TestTableBulkUpsertExample(t *testing.T) {
 	scope := newScope(t)
-	driver := scope.Driver()
+	driver := scope.Driver(ydb.WithCompression())
 	tablePath := scope.TablePath()
 
 	// upsert

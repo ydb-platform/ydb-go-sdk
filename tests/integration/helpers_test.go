@@ -71,7 +71,7 @@ func (scope *scopeT) AuthToken() string {
 	return os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")
 }
 
-func (scope *scopeT) Driver() *ydb.Driver {
+func (scope *scopeT) Driver(opts ...ydb.Option) *ydb.Driver {
 	return scope.CacheWithCleanup("", nil, func() (res interface{}, cleanup fixenv.FixtureCleanupFunc, err error) {
 		connectionString := scope.ConnectionString()
 		scope.Logf("Connect with connection string: %v", connectionString)
@@ -89,13 +89,15 @@ func (scope *scopeT) Driver() *ydb.Driver {
 		logger := xtest.Logger(scope.T())
 
 		driver, err := ydb.Open(connectionContext, connectionString,
-			ydb.WithAccessTokenCredentials(token),
-			ydb.WithLogger(
-				trace.DetailsAll,
-				ydb.WithNamespace("ydb"),
-				ydb.WithWriter(logger),
-				ydb.WithMinLevel(log.WARN),
-			),
+			append(opts,
+				ydb.WithAccessTokenCredentials(token),
+				ydb.WithLogger(
+					trace.DetailsAll,
+					ydb.WithNamespace("ydb"),
+					ydb.WithWriter(logger),
+					ydb.WithMinLevel(log.WARN),
+				),
+			)...,
 		)
 		clean := func() {
 			scope.Require.NoError(driver.Close(scope.Ctx))
