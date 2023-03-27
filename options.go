@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/encoding/gzip"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
@@ -96,6 +99,18 @@ func WithConnectionString(connectionString string) Option {
 func WithConnectionTTL(ttl time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithConnectionTTL(ttl))
+		return nil
+	}
+}
+
+// WithCompression option appends gzip compression to default grpc call options
+func WithCompression() Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.options = append(c.options, config.WithGrpcOptions(
+			grpc.WithDefaultCallOptions(
+				grpc.UseCompressor(gzip.Name),
+			),
+		))
 		return nil
 	}
 }
