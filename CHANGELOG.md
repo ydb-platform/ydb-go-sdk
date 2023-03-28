@@ -1,3 +1,4 @@
+* Fixed code -1 of retryable error if wrapped error with code
 * Added `ydb.WithCompression()` option
 * Added `ydb.MustOpen` and `ydb.MustConnector` helpers
 * Fixed `internal/xerrors.Transport` error wrapping for case when given error is not transport error
