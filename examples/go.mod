@@ -1,4 +1,4 @@
-module github.com/ydb-platform/ydb-go-examples
+module examples
 
 go 1.18
 
