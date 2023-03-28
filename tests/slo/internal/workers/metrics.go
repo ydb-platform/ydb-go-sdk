@@ -3,9 +3,9 @@ package workers
 import (
 	"log"
 
-	"github.com/beefsack/go-rate"
-
 	"slo/internal/metrics"
+
+	"github.com/beefsack/go-rate"
 )
 
 func Metrics(rl *rate.RateLimiter, m *metrics.Metrics) {

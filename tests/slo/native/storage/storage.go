@@ -8,15 +8,15 @@ import (
 	"path"
 	"time"
 
+	"slo/internal/configs"
+	"slo/internal/generator"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
-
-	"slo/internal/configs"
-	"slo/internal/generator"
 )
 
 const (
@@ -32,9 +32,7 @@ FROM %s WHERE id = $id;
 `
 )
 
-var (
-	ErrUnableToParseID = errors.New("unable to parse entry id as uuid")
-)
+var ErrUnableToParseID = errors.New("unable to parse entry id as uuid")
 
 type Storage struct {
 	db          *ydb.Driver
@@ -97,20 +95,16 @@ func (st *Storage) Read(ctx context.Context, entryID generator.EntryID) (e gener
 	ctxLocal, cancel := context.WithTimeout(ctx, time.Duration(st.cfg.ReadTimeout)*time.Millisecond)
 	defer cancel()
 
-	var (
-		readTx = table.TxControl(
-			table.BeginTx(
-				table.WithOnlineReadOnly(),
-			),
-			table.CommitTx(),
-		)
+	readTx := table.TxControl(
+		table.BeginTx(
+			table.WithOnlineReadOnly(),
+		),
+		table.CommitTx(),
 	)
 
 	err = st.db.Table().Do(ctxLocal,
 		func(ctx context.Context, s table.Session) (err error) {
-			var (
-				res result.Result
-			)
+			var res result.Result
 			_, res, err = s.Execute(ctx, readTx, st.selectQuery,
 				table.NewQueryParameters(
 					table.ValueParam("$id", types.UTF8Value(entryID.String())),

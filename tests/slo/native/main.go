@@ -8,13 +8,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/beefsack/go-rate"
-
 	"slo/internal/configs"
 	"slo/internal/generator"
 	"slo/internal/metrics"
 	"slo/internal/workers"
 	"slo/native/storage"
+
+	"github.com/beefsack/go-rate"
 )
 
 const (

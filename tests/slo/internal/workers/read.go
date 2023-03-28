@@ -7,14 +7,15 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/beefsack/go-rate"
-
 	"slo/internal/generator"
 	"slo/internal/metrics"
+
+	"github.com/beefsack/go-rate"
 )
 
 func Read(st Storager, rl *rate.RateLimiter, m *metrics.Metrics,
-	en generator.Entries, idsPtr *[]generator.EntryID, mu *sync.RWMutex, endChan chan struct{}) {
+	en generator.Entries, idsPtr *[]generator.EntryID, mu *sync.RWMutex, endChan chan struct{},
+) {
 	for {
 		select {
 		case <-endChan:

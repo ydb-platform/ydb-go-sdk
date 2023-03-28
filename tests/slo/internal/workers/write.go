@@ -5,14 +5,15 @@ import (
 	"log"
 	"sync"
 
-	"github.com/beefsack/go-rate"
-
 	"slo/internal/generator"
 	"slo/internal/metrics"
+
+	"github.com/beefsack/go-rate"
 )
 
 func Write(st Storager, rl *rate.RateLimiter, m *metrics.Metrics,
-	gen generator.Generator, en generator.Entries, ids *[]generator.EntryID, mu *sync.RWMutex, endChan chan struct{}) {
+	gen generator.Generator, en generator.Entries, ids *[]generator.EntryID, mu *sync.RWMutex, endChan chan struct{},
+) {
 	for {
 		select {
 		case <-endChan:

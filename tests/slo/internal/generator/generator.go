@@ -6,9 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
-var (
-	allowedCharacters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*(){}")
-)
+var allowedCharacters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*(){}")
 
 type Generator struct {
 	MinLength int
