@@ -32,30 +32,30 @@ type Config struct {
 }
 
 func NewConfig() (cfg Config, err error) {
-	if len(os.Args) < 2 {
+	if len(os.Args) < 3 {
 		fmt.Print(mainHelp)
 		return cfg, ErrWrongArgs
 	}
 
 	fs := flag.FlagSet{}
 
-	switch os.Args[1] {
+	switch os.Args[2] {
 	case "create":
-		if len(os.Args) < 4 {
+		if len(os.Args) < 5 {
 			fmt.Print(createHelp)
 			return cfg, ErrWrongArgs
 		}
 
 		cfg.Mode = CreateMode
 	case "cleanup":
-		if len(os.Args) < 4 {
+		if len(os.Args) < 5 {
 			fmt.Print(cleanupHelp)
 			return cfg, ErrWrongArgs
 		}
 
 		cfg.Mode = CleanupMode
 	case "run":
-		if len(os.Args) < 4 {
+		if len(os.Args) < 5 {
 			fmt.Print(runHelp)
 			return cfg, ErrWrongArgs
 		}
@@ -73,18 +73,18 @@ func NewConfig() (cfg Config, err error) {
 
 		fs.IntVar(&cfg.Time, "time", 600, "run time in seconds")
 	default:
-		log.Printf("unknown mode: %s", os.Args[1])
+		log.Printf("unknown mode: %s", os.Args[2])
 		fmt.Print(mainHelp)
 		return cfg, ErrWrongArgs
 	}
 
-	cfg.Endpoint = os.Args[2]
-	cfg.DB = os.Args[3]
+	cfg.Endpoint = os.Args[3]
+	cfg.DB = os.Args[4]
 
 	fs.StringVar(&cfg.YDBToken, "a", "", "YDB access token credentials")
 	fs.StringVar(&cfg.Table, "t", "testingTable", "table name")
 
-	err = fs.Parse(os.Args[4:])
+	err = fs.Parse(os.Args[5:])
 	if err != nil {
 		return cfg, err
 	}
