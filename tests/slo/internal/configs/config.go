@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 )
 
@@ -72,8 +73,9 @@ func NewConfig() (cfg Config, err error) {
 
 		fs.IntVar(&cfg.Time, "time", 600, "run time in seconds")
 	default:
+		log.Printf("unknown mode: %s", os.Args[1])
 		fmt.Print(mainHelp)
-		return
+		return cfg, ErrWrongArgs
 	}
 
 	cfg.Endpoint = os.Args[2]
