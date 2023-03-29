@@ -47,6 +47,17 @@ func TestTzSomeToTime(t *testing.T) {
 			),
 			TzTimestampToTime,
 		},
+		{
+			"TzTimestampToTime",
+			"2020-05-29T11:22:54,Europe/Berlin",
+			time.Date(2020, time.May, 29, 11, 22, 54, 0,
+				func() *time.Location {
+					l, _ := time.LoadLocation("Europe/Berlin")
+					return l
+				}(),
+			),
+			TzTimestampToTime,
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			v, err := tt.converter(tt.src)
