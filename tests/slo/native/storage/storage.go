@@ -4,12 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"path"
-	"time"
-
 	"slo/internal/configs"
 	"slo/internal/generator"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -117,10 +115,7 @@ func (st *Storage) Read(ctx context.Context, entryID generator.EntryID) (e gener
 				return err
 			}
 			defer func(res result.Result) {
-				err := res.Close()
-				if err != nil {
-					log.Printf("close failed: %v", err)
-				}
+				_ = res.Close()
 			}(res)
 			for res.NextResultSet(ctx) {
 				for res.NextRow() {
@@ -141,7 +136,7 @@ func (st *Storage) Read(ctx context.Context, entryID generator.EntryID) (e gener
 		},
 	)
 
-	return
+	return e, err
 }
 
 func (st *Storage) Write(ctx context.Context, e generator.Entry) error {

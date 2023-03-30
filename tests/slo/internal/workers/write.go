@@ -3,10 +3,9 @@ package workers
 import (
 	"context"
 	"log"
-	"sync"
-
 	"slo/internal/generator"
 	"slo/internal/metrics"
+	"sync"
 
 	"github.com/beefsack/go-rate"
 )

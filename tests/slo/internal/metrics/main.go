@@ -79,7 +79,7 @@ func NewMetrics(url string) (m *Metrics, err error) {
 
 	err = m.Reset()
 
-	return
+	return m, err
 }
 
 func (m *Metrics) Push() error {
@@ -117,21 +117,21 @@ func (m *Metrics) StartJob(name JobName) (id uuid.UUID) {
 
 	m.inflight.WithLabelValues(name).Add(1)
 
-	return
+	return id
 }
 
 func (m *Metrics) StopJob(id uuid.UUID, ok bool) {
 	m.jobsMutex.Lock()
 	defer m.jobsMutex.Unlock()
-	j, ok := m.jobs[id]
-	if !ok {
+	j, found := m.jobs[id]
+	if !found {
 		return
 	}
 	delete(m.jobs, id)
 
 	m.inflight.WithLabelValues(j.name).Sub(1)
 
-	latency := float64(time.Now().Sub(j.start).Milliseconds())
+	latency := float64(time.Since(j.start).Milliseconds())
 
 	if ok {
 		m.oks.WithLabelValues(j.name).Add(1)

@@ -2,7 +2,6 @@ package workers
 
 import (
 	"context"
-
 	"slo/internal/generator"
 )
 
