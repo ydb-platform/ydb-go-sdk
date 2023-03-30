@@ -58,7 +58,10 @@ func NewStorage(ctx context.Context, cfg configs.Config) (st Storage, err error)
 }
 
 func (st *Storage) Close(ctx context.Context) error {
-	return st.db.Close(ctx)
+	ctxLocal, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	return st.db.Close(ctxLocal)
 }
 
 func (st *Storage) CreateTable(ctx context.Context) (err error) {
