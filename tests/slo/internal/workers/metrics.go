@@ -2,6 +2,7 @@ package workers
 
 import (
 	"log"
+
 	"slo/internal/metrics"
 
 	"github.com/beefsack/go-rate"

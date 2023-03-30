@@ -5,9 +5,10 @@ import (
 	"log"
 	"math/rand"
 	"reflect"
+	"sync"
+
 	"slo/internal/generator"
 	"slo/internal/metrics"
-	"sync"
 
 	"github.com/beefsack/go-rate"
 )

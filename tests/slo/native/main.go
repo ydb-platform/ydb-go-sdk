@@ -6,13 +6,14 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"sync"
+	"time"
+
 	"slo/internal/configs"
 	"slo/internal/generator"
 	"slo/internal/metrics"
 	"slo/internal/workers"
 	"slo/native/storage"
-	"sync"
-	"time"
 
 	"github.com/beefsack/go-rate"
 )

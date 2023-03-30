@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"time"
+
 	"slo/internal/configs"
 	"slo/internal/generator"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
