@@ -50,16 +50,14 @@ func main() {
 	case configs.CreateMode:
 		err = st.CreateTable(context.Background())
 		if err != nil {
-			log.Printf("create table failed: %v", err)
-			return
+			log.Fatalf("create table failed: %v", err)
 		}
 		log.Print("create table ok")
 		return
 	case configs.CleanupMode:
 		err = st.DropTable(context.Background())
 		if err != nil {
-			log.Printf("drop table failed: %v", err)
-			return
+			log.Fatalf("drop table failed: %v", err)
 		}
 		log.Print("drop table ok")
 		return
