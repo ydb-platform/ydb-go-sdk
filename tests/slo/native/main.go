@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -30,18 +31,15 @@ func main() {
 		return
 	}
 	if err != nil {
-		log.Fatalf("Create config failed: %v", err)
+		panic(fmt.Errorf("create config failed: %w", err))
 	}
 
 	st, err := storage.NewStorage(context.Background(), cfg)
 	if err != nil {
-		log.Fatalf("create storage failed: %v", err)
+		panic(fmt.Errorf("ceate storage failed: %w", err))
 	}
 	defer func() {
-		err := st.Close(context.Background())
-		if err != nil {
-			log.Printf("close storage failed: %v", err)
-		}
+		_ = st.Close(context.Background())
 	}()
 
 	log.Print("db init ok")
@@ -50,14 +48,14 @@ func main() {
 	case configs.CreateMode:
 		err = st.CreateTable(context.Background())
 		if err != nil {
-			log.Fatalf("create table failed: %v", err)
+			panic(fmt.Errorf("create table failed: %w", err))
 		}
 		log.Print("create table ok")
 		return
 	case configs.CleanupMode:
 		err = st.DropTable(context.Background())
 		if err != nil {
-			log.Fatalf("drop table failed: %v", err)
+			panic(fmt.Errorf("create table failed: %w", err))
 		}
 		log.Print("drop table ok")
 		return
@@ -99,7 +97,7 @@ func main() {
 	log.Print("waiting for workers")
 
 	time.AfterFunc(time.Duration(cfg.ShutdownTime)*time.Second, func() {
-		log.Fatal("time limit exceed, exiting")
+		panic(errors.New("time limit exceed, exiting"))
 	})
 
 	for m.ActiveJobsCount() > 0 {
