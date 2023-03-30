@@ -28,7 +28,8 @@ type Config struct {
 	WriteRPS     int
 	WriteTimeout int
 
-	Time int
+	Time         int
+	ShutdownTime int
 }
 
 func NewConfig() (cfg Config, err error) {
@@ -72,6 +73,7 @@ func NewConfig() (cfg Config, err error) {
 		fs.IntVar(&cfg.WriteTimeout, "write-timeout", 10000, "write timeout milliseconds")
 
 		fs.IntVar(&cfg.Time, "time", 600, "run time in seconds")
+		fs.IntVar(&cfg.ShutdownTime, "shutdown-time", 30, "time to wait before force kill workers")
 	default:
 		log.Printf("unknown mode: %s", os.Args[2])
 		fmt.Print(mainHelp)

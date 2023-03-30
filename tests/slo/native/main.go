@@ -18,9 +18,8 @@ import (
 )
 
 const (
-	readWorkers       = 30
-	writeWorkers      = 10
-	shutdownTimeLimit = 30 * time.Second
+	readWorkers  = 30
+	writeWorkers = 10
 )
 
 func main() {
@@ -101,7 +100,7 @@ func main() {
 	close(workChan)
 	log.Print("waiting for workers")
 
-	time.AfterFunc(shutdownTimeLimit, func() {
+	time.AfterFunc(time.Duration(cfg.ShutdownTime)*time.Second, func() {
 		log.Fatal("time limit exceed, exiting")
 	})
 
