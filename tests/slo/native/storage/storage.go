@@ -68,7 +68,7 @@ func (st *Storage) CreateTable(ctx context.Context) (err error) {
 	err = st.db.Table().Do(ctxLocal,
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(st.db.Name(), st.cfg.Table),
-				options.WithColumn("id", types.TypeUTF8),
+				options.WithColumn("id", types.Optional(types.TypeUTF8)),
 				options.WithColumn("payload", types.Optional(types.TypeUTF8)),
 				options.WithPrimaryKeyColumn("id"),
 			)
