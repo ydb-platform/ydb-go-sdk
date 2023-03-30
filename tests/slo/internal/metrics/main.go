@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -26,10 +27,14 @@ type Metrics struct {
 
 	jobs      map[uuid.UUID]job
 	jobsMutex sync.RWMutex
+
+	label string
 }
 
-func NewMetrics(url string) (m *Metrics, err error) {
-	m = &Metrics{}
+func NewMetrics(url string, label string) (m *Metrics, err error) {
+	m = &Metrics{
+		label: label,
+	}
 
 	m.oks = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -70,7 +75,7 @@ func NewMetrics(url string) (m *Metrics, err error) {
 	m.jobs = make(map[uuid.UUID]job)
 
 	m.p = push.New(url, "workload-go").
-		Grouping("sdk", sdk).
+		Grouping("sdk", fmt.Sprintf("%s-%s", sdk, m.label)).
 		Grouping("sdkVersion", sdkVersion).
 		Collector(m.oks).
 		Collector(m.notOks).

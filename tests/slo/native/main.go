@@ -60,7 +60,7 @@ func main() {
 		return
 	}
 
-	m, err := metrics.NewMetrics(cfg.PushGateway)
+	m, err := metrics.NewMetrics(cfg.PushGateway, "native")
 	if err != nil {
 		log.Printf("create metrics failed: %v", err)
 		return
