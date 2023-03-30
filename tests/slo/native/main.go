@@ -104,5 +104,10 @@ func main() {
 		time.Sleep(time.Millisecond)
 	}
 
+	err = m.Reset()
+	if err != nil {
+		log.Printf("metrics reset failed: %v", err)
+	}
+
 	log.Print("shutdown successful")
 }
