@@ -84,11 +84,17 @@ func main() {
 	workChan := make(chan struct{})
 
 	readRL := rate.New(cfg.ReadRPS, time.Second)
+	for i := 0; i < cfg.ReadRPS; i++ {
+		readRL.Wait()
+	}
 	for i := 0; i < readWorkers; i++ {
 		go workers.Read(&st, readRL, m, entries, &entryIDs, &entriesMutex, workChan)
 	}
 
 	writeRL := rate.New(cfg.WriteRPS, time.Second)
+	for i := 0; i < cfg.WriteRPS; i++ {
+		writeRL.Wait()
+	}
 	for i := 0; i < writeWorkers; i++ {
 		go workers.Write(&st, writeRL, m, gen, entries, &entryIDs, &entriesMutex, workChan)
 	}
