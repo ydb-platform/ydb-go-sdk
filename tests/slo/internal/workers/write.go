@@ -38,11 +38,11 @@ func Write(st Storager, rl *rate.RateLimiter, m *metrics.Metrics,
 			continue
 		}
 
+		m.StopJob(metricID, true)
+
 		mu.Lock()
 		en[entry.ID] = entry
 		*ids = append(*ids, entry.ID)
 		mu.Unlock()
-
-		m.StopJob(metricID, true)
 	}
 }
