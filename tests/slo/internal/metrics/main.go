@@ -68,6 +68,7 @@ func NewMetrics(url string, label string) (m *Metrics, err error) {
 				0.99:  0.001,
 				0.999: 0.0001,
 			},
+			MaxAge: 5 * time.Second,
 		},
 		[]string{"status", "jobName"},
 	)
