@@ -3,7 +3,11 @@ package retry
 import (
 	"context"
 	"fmt"
+	"github.com/stretchr/testify/require"
+	grpcCodes "google.golang.org/grpc/codes"
+	grpcStatus "google.golang.org/grpc/status"
 	"testing"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
@@ -133,5 +137,45 @@ func TestRetryWithCustomErrors(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRetryTransportDeadlineExceeded(t *testing.T) {
+	cancelCounterValue := 5
+	for _, code := range []grpcCodes.Code{
+		grpcCodes.DeadlineExceeded,
+		grpcCodes.Canceled,
+	} {
+		counter := 0
+		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+		err := Retry(ctx, func(ctx context.Context) (err error) {
+			counter++
+			if !(counter < cancelCounterValue) {
+				cancel()
+			}
+			return xerrors.Transport(grpcStatus.Error(code, ""))
+		}, WithIdempotent(true))
+		require.ErrorIs(t, err, context.Canceled)
+		require.Equal(t, cancelCounterValue, counter)
+	}
+}
+
+func TestRetryTransportCancelled(t *testing.T) {
+	cancelCounterValue := 5
+	for _, code := range []grpcCodes.Code{
+		grpcCodes.DeadlineExceeded,
+		grpcCodes.Canceled,
+	} {
+		counter := 0
+		ctx, cancel := context.WithCancel(context.Background())
+		err := Retry(ctx, func(ctx context.Context) (err error) {
+			counter++
+			if !(counter < cancelCounterValue) {
+				cancel()
+			}
+			return xerrors.Transport(grpcStatus.Error(code, ""))
+		}, WithIdempotent(true))
+		require.ErrorIs(t, err, context.Canceled)
+		require.Equal(t, cancelCounterValue, counter)
 	}
 }

@@ -2,6 +2,8 @@ package retry
 
 import (
 	"context"
+	"fmt"
+	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wait"
@@ -144,11 +146,12 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			return xerrors.WithStackTrace(ctx.Err())
 
 		default:
-			err = func() error {
+			err = func() (err error) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
 							options.panicCallback(e)
+							err = xerrors.WithStackTrace(fmt.Errorf("panic recovered: %v", e))
 						}
 					}()
 				}
@@ -157,6 +160,17 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 
 			if err == nil {
 				return
+			}
+
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return ctxErr
+			}
+
+			if xerrors.IsTransportError(err,
+				grpcCodes.Canceled,
+				grpcCodes.DeadlineExceeded,
+			) {
+				err = xerrors.Retryable(err, xerrors.WithDeleteSession())
 			}
 
 			m := Check(err)
