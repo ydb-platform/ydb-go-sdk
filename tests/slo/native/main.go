@@ -67,6 +67,12 @@ func main() {
 		return
 	}
 
+	err = m.Reset()
+	if err != nil {
+		log.Printf("metrics reset failed: %v", err)
+		return
+	}
+
 	log.Print("metrics init ok")
 
 	gen := generator.NewGenerator(10, 20)

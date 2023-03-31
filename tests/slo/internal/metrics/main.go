@@ -82,8 +82,6 @@ func NewMetrics(url string, label string) (m *Metrics, err error) {
 		Collector(m.inflight).
 		Collector(m.latencies)
 
-	err = m.Reset()
-
 	return m, err
 }
 
