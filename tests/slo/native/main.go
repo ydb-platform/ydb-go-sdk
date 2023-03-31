@@ -6,19 +6,17 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"os"
 	"sync"
 	"time"
 
-	"github.com/rs/zerolog"
+	"github.com/beefsack/go-rate"
+	"go.uber.org/zap"
 
 	"slo/internal/configs"
 	"slo/internal/generator"
 	"slo/internal/metrics"
 	"slo/internal/workers"
 	"slo/native/storage"
-
-	"github.com/beefsack/go-rate"
 )
 
 const (
@@ -27,9 +25,13 @@ const (
 )
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-
-	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+	logger, err := zap.NewProduction()
+	if err != nil {
+		panic(fmt.Errorf("error create logger: %w", err))
+	}
+	defer func() {
+		_ = logger.Sync()
+	}()
 
 	cfg, err := configs.NewConfig()
 	if errors.Is(err, configs.ErrWrongArgs) || errors.Is(err, flag.ErrHelp) {
@@ -47,7 +49,7 @@ func main() {
 		_ = st.Close(context.Background())
 	}()
 
-	log.Print("db init ok")
+	logger.Info("db init ok")
 
 	switch cfg.Mode {
 	case configs.CreateMode:
@@ -68,17 +70,17 @@ func main() {
 
 	m, err := metrics.NewMetrics(cfg.PushGateway, "native")
 	if err != nil {
-		log.Printf("create metrics failed: %v", err)
+		logger.Error(fmt.Errorf("create metrics failed: %v", err).Error())
 		return
 	}
 
 	err = m.Reset()
 	if err != nil {
-		log.Printf("metrics reset failed: %v", err)
+		logger.Error(fmt.Errorf("metrics reset failed: %v", err).Error())
 		return
 	}
 
-	log.Print("metrics init ok")
+	logger.Info("metrics init ok")
 
 	gen := generator.NewGenerator(10, 20)
 
@@ -109,9 +111,9 @@ func main() {
 
 	time.Sleep(time.Duration(cfg.Time) * time.Second)
 
-	log.Print("shutdown started")
+	logger.Info("shutdown started")
 	close(workChan)
-	log.Print("waiting for workers")
+	logger.Info("waiting for workers")
 
 	time.AfterFunc(time.Duration(cfg.ShutdownTime)*time.Second, func() {
 		panic(errors.New("time limit exceed, exiting"))
@@ -123,8 +125,8 @@ func main() {
 
 	err = m.Reset()
 	if err != nil {
-		log.Printf("metrics reset failed: %v", err)
+		logger.Error(fmt.Errorf("metrics reset failed: %v", err).Error())
 	}
 
-	log.Print("shutdown successful")
+	logger.Info("shutdown successful")
 }

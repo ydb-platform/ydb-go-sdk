@@ -6,9 +6,9 @@ require (
 	github.com/beefsack/go-rate v0.0.0-20220214233405-116f4ca011a0
 	github.com/google/uuid v1.3.0
 	github.com/prometheus/client_golang v1.14.0
-	github.com/rs/zerolog v1.22.0
-	github.com/ydb-platform/ydb-go-sdk-zerolog v0.13.2
+	github.com/ydb-platform/ydb-go-sdk-zap v0.14.3
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.43.0
+	go.uber.org/zap v1.24.0
 )
 
 require (
@@ -21,8 +21,9 @@ require (
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
-	github.com/stretchr/testify v1.8.0 // indirect
 	github.com/ydb-platform/ydb-go-genproto v0.0.0-20221215182650-986f9d10542f // indirect
+	go.uber.org/atomic v1.10.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.8.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
 	golang.org/x/sys v0.6.0 // indirect

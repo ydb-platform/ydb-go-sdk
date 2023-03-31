@@ -7,19 +7,18 @@ import (
 	"path"
 	"time"
 
-	"github.com/rs/zerolog"
-	ydbZerolog "github.com/ydb-platform/ydb-go-sdk-zerolog"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-
-	"slo/internal/configs"
-	"slo/internal/generator"
-
+	ydbZap "github.com/ydb-platform/ydb-go-sdk-zap"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"go.uber.org/zap"
+
+	"slo/internal/configs"
+	"slo/internal/generator"
 )
 
 const (
@@ -44,7 +43,7 @@ type Storage struct {
 	selectQuery string
 }
 
-func NewStorage(ctx context.Context, cfg configs.Config, log zerolog.Logger) (st Storage, err error) {
+func NewStorage(ctx context.Context, cfg configs.Config, logger *zap.Logger) (st Storage, err error) {
 	localCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
 
@@ -53,8 +52,8 @@ func NewStorage(ctx context.Context, cfg configs.Config, log zerolog.Logger) (st
 		localCtx,
 		st.cfg.Endpoint+st.cfg.DB,
 		ydb.WithAccessTokenCredentials(st.cfg.YDBToken),
-		ydbZerolog.WithTraces(
-			&log,
+		ydbZap.WithTraces(
+			logger,
 			trace.DetailsAll,
 		),
 	)
