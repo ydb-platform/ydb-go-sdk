@@ -2,9 +2,9 @@ package storage
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path"
+	"sync"
 	"time"
 
 	"slo/internal/configs"
@@ -34,8 +34,6 @@ FROM %s WHERE id = $id;
 `
 )
 
-var ErrUnableToParseID = errors.New("unable to parse entry id as uuid")
-
 type Storage struct {
 	db          *ydb.Driver
 	cfg         configs.Config
@@ -43,11 +41,15 @@ type Storage struct {
 	selectQuery string
 }
 
-func NewStorage(ctx context.Context, cfg configs.Config, logger *zap.Logger) (st Storage, err error) {
+func New(ctx context.Context, cfg configs.Config, logger *zap.Logger, poolSize int) (_ Storage, err error) {
 	localCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
 
-	st.cfg = cfg
+	st := Storage{
+		cfg:         cfg,
+		upsertQuery: fmt.Sprintf(upsertTemplate, cfg.Table),
+		selectQuery: fmt.Sprintf(selectTemplate, cfg.Table),
+	}
 	st.db, err = ydb.Open(
 		localCtx,
 		st.cfg.Endpoint+st.cfg.DB,
@@ -56,15 +58,29 @@ func NewStorage(ctx context.Context, cfg configs.Config, logger *zap.Logger) (st
 			logger,
 			trace.DetailsAll,
 		),
+		ydb.WithSessionPoolSizeLimit(poolSize),
 	)
 	if err != nil {
 		return Storage{}, err
 	}
 
-	st.upsertQuery = fmt.Sprintf(upsertTemplate, st.cfg.Table)
-	st.selectQuery = fmt.Sprintf(selectTemplate, st.cfg.Table)
+	wg := sync.WaitGroup{}
+	wg.Add(poolSize)
+	for i := 0; i < poolSize; i++ {
+		go func() {
+			defer wg.Done()
+			err := st.db.Table().Do(localCtx, func(ctx context.Context, s table.Session) error {
+				return nil
+			})
+			if err != nil {
+				logger.Error(fmt.Errorf("error when create session: %w", err).Error())
+				// todo: return error from New
+			}
+		}()
+	}
+	wg.Wait()
 
-	return
+	return st, nil
 }
 
 func (st *Storage) Close(ctx context.Context) error {

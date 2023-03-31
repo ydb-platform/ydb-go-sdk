@@ -1,19 +1,19 @@
 package workers
 
 import (
-	"log"
-
+	"fmt"
+	"go.uber.org/zap"
 	"slo/internal/metrics"
 
 	"github.com/beefsack/go-rate"
 )
 
-func Metrics(rl *rate.RateLimiter, m *metrics.Metrics) {
+func Metrics(rl *rate.RateLimiter, m *metrics.Metrics, logger *zap.Logger) {
 	for {
 		rl.Wait()
 		err := m.Push()
 		if err != nil {
-			log.Printf("error while pushing: %v", err)
+			logger.Error(fmt.Errorf("error while pushing: %w", err).Error())
 		}
 	}
 }

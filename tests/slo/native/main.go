@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -19,12 +18,9 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	readWorkers  = 30
-	writeWorkers = 10
-)
-
 func main() {
+	ctx := context.Background()
+
 	logger, err := zap.NewProduction()
 	if err != nil {
 		panic(fmt.Errorf("error create logger: %w", err))
@@ -41,30 +37,30 @@ func main() {
 		panic(fmt.Errorf("create config failed: %w", err))
 	}
 
-	st, err := storage.NewStorage(context.Background(), cfg, logger)
+	st, err := storage.New(ctx, cfg, logger, cfg.ReadRPS+cfg.WriteRPS)
 	if err != nil {
-		panic(fmt.Errorf("ceate storage failed: %w", err))
+		panic(fmt.Errorf("create storage failed: %w", err))
 	}
 	defer func() {
-		_ = st.Close(context.Background())
+		_ = st.Close(ctx)
 	}()
 
 	logger.Info("db init ok")
 
 	switch cfg.Mode {
 	case configs.CreateMode:
-		err = st.CreateTable(context.Background())
+		err = st.CreateTable(ctx)
 		if err != nil {
 			panic(fmt.Errorf("create table failed: %w", err))
 		}
-		log.Print("create table ok")
+		logger.Info("create table ok")
 		return
 	case configs.CleanupMode:
-		err = st.DropTable(context.Background())
+		err = st.DropTable(ctx)
 		if err != nil {
 			panic(fmt.Errorf("create table failed: %w", err))
 		}
-		log.Print("drop table ok")
+		logger.Info("drop table ok")
 		return
 	}
 
@@ -90,29 +86,26 @@ func main() {
 
 	workChan := make(chan struct{})
 
+	// todo: create workers struct
 	readRL := rate.New(cfg.ReadRPS, time.Second)
 	for i := 0; i < cfg.ReadRPS; i++ {
-		readRL.Wait()
-	}
-	for i := 0; i < readWorkers; i++ {
-		go workers.Read(&st, readRL, m, entries, &entryIDs, &entriesMutex, workChan)
+		go workers.Read(&st, readRL, m, logger, entries, &entryIDs, &entriesMutex, workChan)
 	}
 
 	writeRL := rate.New(cfg.WriteRPS, time.Second)
 	for i := 0; i < cfg.WriteRPS; i++ {
-		writeRL.Wait()
-	}
-	for i := 0; i < writeWorkers; i++ {
-		go workers.Write(&st, writeRL, m, gen, entries, &entryIDs, &entriesMutex, workChan)
+		go workers.Write(&st, writeRL, m, logger, gen, entries, &entryIDs, &entriesMutex, workChan)
 	}
 
 	metricsRL := rate.New(1, time.Duration(cfg.ReportPeriod))
-	go workers.Metrics(metricsRL, m)
+	go workers.Metrics(metricsRL, m, logger)
 
 	time.Sleep(time.Duration(cfg.Time) * time.Second)
 
 	logger.Info("shutdown started")
+
 	close(workChan)
+
 	logger.Info("waiting for workers")
 
 	time.AfterFunc(time.Duration(cfg.ShutdownTime)*time.Second, func() {

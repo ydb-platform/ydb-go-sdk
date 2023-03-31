@@ -2,7 +2,8 @@ package workers
 
 import (
 	"context"
-	"log"
+	"fmt"
+	"go.uber.org/zap"
 	"sync"
 
 	"slo/internal/generator"
@@ -11,7 +12,7 @@ import (
 	"github.com/beefsack/go-rate"
 )
 
-func Write(st Storager, rl *rate.RateLimiter, m *metrics.Metrics,
+func Write(st Storager, rl *rate.RateLimiter, m *metrics.Metrics, logger *zap.Logger,
 	gen generator.Generator, en generator.Entries, ids *[]generator.EntryID, mu *sync.RWMutex, endChan chan struct{},
 ) {
 	for {
@@ -23,7 +24,7 @@ func Write(st Storager, rl *rate.RateLimiter, m *metrics.Metrics,
 
 		entry, err := gen.Generate()
 		if err != nil {
-			log.Print(err)
+			logger.Error(fmt.Errorf("generate error: %w", err).Error())
 			continue
 		}
 
@@ -33,7 +34,7 @@ func Write(st Storager, rl *rate.RateLimiter, m *metrics.Metrics,
 
 		err = st.Write(context.Background(), entry)
 		if err != nil {
-			log.Printf("error while upsert entry: %v", err)
+			logger.Error(fmt.Errorf("error when write entry: %w", err).Error())
 			m.StopJob(metricID, false)
 			continue
 		}

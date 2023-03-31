@@ -2,7 +2,8 @@ package workers
 
 import (
 	"context"
-	"log"
+	"fmt"
+	"go.uber.org/zap"
 	"math/rand"
 	"reflect"
 	"sync"
@@ -13,7 +14,7 @@ import (
 	"github.com/beefsack/go-rate"
 )
 
-func Read(st Storager, rl *rate.RateLimiter, m *metrics.Metrics,
+func Read(st Storager, rl *rate.RateLimiter, m *metrics.Metrics, logger *zap.Logger,
 	en generator.Entries, idsPtr *[]generator.EntryID, mu *sync.RWMutex, endChan chan struct{},
 ) {
 	for {
@@ -38,7 +39,7 @@ func Read(st Storager, rl *rate.RateLimiter, m *metrics.Metrics,
 
 		e, err := st.Read(context.Background(), id)
 		if err != nil {
-			log.Printf("get entry error: %v", err)
+			logger.Error(fmt.Errorf("get entry error: %w", err).Error())
 			m.StopJob(metricID, false)
 			continue
 		}
@@ -51,7 +52,7 @@ func Read(st Storager, rl *rate.RateLimiter, m *metrics.Metrics,
 			m.StopJob(metricID, true)
 			continue
 		}
-		log.Print("payload does not match")
+		logger.Info("payload does not match")
 		m.StopJob(metricID, false)
 	}
 }
