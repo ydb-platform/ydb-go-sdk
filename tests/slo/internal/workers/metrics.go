@@ -2,10 +2,11 @@ package workers
 
 import (
 	"fmt"
-	"go.uber.org/zap"
+
 	"slo/internal/metrics"
 
 	"github.com/beefsack/go-rate"
+	"go.uber.org/zap"
 )
 
 func Metrics(rl *rate.RateLimiter, m *metrics.Metrics, logger *zap.Logger) {

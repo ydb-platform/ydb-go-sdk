@@ -11,6 +11,8 @@ import (
 	"slo/internal/generator"
 
 	ydbZap "github.com/ydb-platform/ydb-go-sdk-zap"
+	"go.uber.org/zap"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -18,7 +20,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"go.uber.org/zap"
 )
 
 const (

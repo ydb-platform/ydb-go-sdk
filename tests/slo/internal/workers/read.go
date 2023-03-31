@@ -3,7 +3,6 @@ package workers
 import (
 	"context"
 	"fmt"
-	"go.uber.org/zap"
 	"math/rand"
 	"reflect"
 	"sync"
@@ -12,6 +11,7 @@ import (
 	"slo/internal/metrics"
 
 	"github.com/beefsack/go-rate"
+	"go.uber.org/zap"
 )
 
 func Read(st Storager, rl *rate.RateLimiter, m *metrics.Metrics, logger *zap.Logger,
