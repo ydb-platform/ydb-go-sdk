@@ -82,9 +82,8 @@ func (c *staticCredentials) Token(ctx context.Context) (token string, err error)
 	case response.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
 		return "", xerrors.WithStackTrace(
 			xerrors.Operation(
-				xerrors.FromOperation(
-					response.GetOperation(),
-				),
+				xerrors.FromOperation(response.GetOperation()),
+				xerrors.WithNodeAddress(c.endpoint),
 			),
 		)
 	}
