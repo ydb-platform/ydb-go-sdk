@@ -9,14 +9,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/beefsack/go-rate"
-	"go.uber.org/zap"
-
 	"slo/internal/configs"
 	"slo/internal/generator"
 	"slo/internal/metrics"
 	"slo/internal/workers"
 	"slo/native/storage"
+
+	"github.com/beefsack/go-rate"
+	"go.uber.org/zap"
 )
 
 const (

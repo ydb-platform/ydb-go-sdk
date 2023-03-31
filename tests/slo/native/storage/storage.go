@@ -7,6 +7,9 @@ import (
 	"path"
 	"time"
 
+	"slo/internal/configs"
+	"slo/internal/generator"
+
 	ydbZap "github.com/ydb-platform/ydb-go-sdk-zap"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -16,9 +19,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"go.uber.org/zap"
-
-	"slo/internal/configs"
-	"slo/internal/generator"
 )
 
 const (
