@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/rs/zerolog"
+	ydbZerolog "github.com/ydb-platform/ydb-go-sdk-zerolog"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"path"
 	"time"
 
@@ -40,12 +43,20 @@ type Storage struct {
 	selectQuery string
 }
 
-func NewStorage(ctx context.Context, cfg configs.Config) (st Storage, err error) {
+func NewStorage(ctx context.Context, cfg configs.Config, log zerolog.Logger) (st Storage, err error) {
 	localCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
 
 	st.cfg = cfg
-	st.db, err = ydb.Open(localCtx, st.cfg.Endpoint+st.cfg.DB, ydb.WithAccessTokenCredentials(st.cfg.YDBToken))
+	st.db, err = ydb.Open(
+		localCtx,
+		st.cfg.Endpoint+st.cfg.DB,
+		ydb.WithAccessTokenCredentials(st.cfg.YDBToken),
+		ydbZerolog.WithTraces(
+			&log,
+			trace.DetailsAll,
+		),
+	)
 	if err != nil {
 		return Storage{}, err
 	}

@@ -5,7 +5,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/rs/zerolog"
 	"log"
+	"os"
 	"sync"
 	"time"
 
@@ -26,6 +28,8 @@ const (
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
+	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+
 	cfg, err := configs.NewConfig()
 	if errors.Is(err, configs.ErrWrongArgs) || errors.Is(err, flag.ErrHelp) {
 		return
@@ -34,7 +38,7 @@ func main() {
 		panic(fmt.Errorf("create config failed: %w", err))
 	}
 
-	st, err := storage.NewStorage(context.Background(), cfg)
+	st, err := storage.NewStorage(context.Background(), cfg, logger)
 	if err != nil {
 		panic(fmt.Errorf("ceate storage failed: %w", err))
 	}
