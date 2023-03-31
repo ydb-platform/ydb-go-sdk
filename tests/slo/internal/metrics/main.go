@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -75,7 +74,8 @@ func NewMetrics(url string, label string) (m *Metrics, err error) {
 	m.jobs = make(map[uuid.UUID]job)
 
 	m.p = push.New(url, "workload-go").
-		Grouping("sdk", fmt.Sprintf("%s-%s", sdk, m.label)).
+		//Grouping("sdk", fmt.Sprintf("%s-%s", sdk, m.label)).
+		Grouping("sdk", sdk).
 		Grouping("sdkVersion", sdkVersion).
 		Collector(m.oks).
 		Collector(m.notOks).
