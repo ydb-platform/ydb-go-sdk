@@ -43,7 +43,7 @@ type Storage struct {
 }
 
 func New(ctx context.Context, cfg configs.Config, logger *zap.Logger, poolSize int) (_ Storage, err error) {
-	localCtx, cancel := context.WithTimeout(ctx, time.Second*10)
+	localCtx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
 	st := Storage{
