@@ -5,11 +5,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/rs/zerolog"
 	"log"
 	"os"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog"
 
 	"slo/internal/configs"
 	"slo/internal/generator"

@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path"
+	"time"
+
 	"github.com/rs/zerolog"
 	ydbZerolog "github.com/ydb-platform/ydb-go-sdk-zerolog"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"path"
-	"time"
 
 	"slo/internal/configs"
 	"slo/internal/generator"
