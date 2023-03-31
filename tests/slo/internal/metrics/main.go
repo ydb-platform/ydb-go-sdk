@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -74,8 +75,7 @@ func NewMetrics(url string, label string) (m *Metrics, err error) {
 	m.jobs = make(map[uuid.UUID]job)
 
 	m.p = push.New(url, "workload-go").
-		// Grouping("sdk", fmt.Sprintf("%s-%s", sdk, m.label)).
-		Grouping("sdk", sdk).
+		Grouping("sdk", fmt.Sprintf("%s-%s", sdk, m.label)).
 		Grouping("sdkVersion", sdkVersion).
 		Collector(m.oks).
 		Collector(m.notOks).
@@ -90,16 +90,19 @@ func (m *Metrics) Push() error {
 }
 
 func (m *Metrics) Reset() error {
-	m.oks.WithLabelValues(JobRead).Set(0)
-	m.oks.WithLabelValues(JobWrite).Set(0)
+	m.oks.WithLabelValues("read").Set(0)
+	m.oks.WithLabelValues("write").Set(0)
 
-	m.notOks.WithLabelValues(JobRead).Set(0)
-	m.notOks.WithLabelValues(JobWrite).Set(0)
+	m.notOks.WithLabelValues("read").Set(0)
+	m.notOks.WithLabelValues("write").Set(0)
 
-	m.inflight.WithLabelValues(JobRead).Set(0)
-	m.inflight.WithLabelValues(JobWrite).Set(0)
+	m.inflight.WithLabelValues("read").Set(0)
+	m.inflight.WithLabelValues("write").Set(0)
 
-	m.latencies.Reset()
+	m.latencies.WithLabelValues("ok", "read").Observe(0)
+	m.latencies.WithLabelValues("ok", "write").Observe(0)
+	m.latencies.WithLabelValues("err", "read").Observe(0)
+	m.latencies.WithLabelValues("err", "write").Observe(0)
 
 	return m.Push()
 }
