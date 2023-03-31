@@ -438,6 +438,9 @@ func TestSessionPoolRacyGet(t *testing.T) {
 				err = e
 				return
 			}
+			if _, ok := p.nodes[s.NodeID()]; !ok {
+				p.nodes[s.NodeID()] = make(map[*session]struct{})
+			}
 			if s != expSession {
 				err = fmt.Errorf("unexpected session: %v; want %v", s, expSession)
 				return
@@ -787,6 +790,9 @@ func mustGetSession(t testing.TB, p *Client) *session {
 		t.Helper()
 		t.Fatalf("%s: %v", caller(), err)
 	}
+	if _, ok := p.nodes[s.NodeID()]; !ok {
+		p.nodes[s.NodeID()] = make(map[*session]struct{})
+	}
 	return s
 }
 
@@ -949,10 +955,14 @@ func TestDeadlockOnUpdateNodes(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
-		nodes := make([]uint32, 0, 3)
+		var (
+			nodes         = make([]uint32, 0, 3)
+			nodeIDCounter = uint32(0)
+		)
 		balancer := testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 			testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
-				sessionID := testutil.SessionID()
+				sessionID := testutil.SessionID(testutil.WithNodeID(nodeIDCounter))
+				nodeIDCounter++
 				nodeID, err := nodeID(sessionID)
 				if err != nil {
 					return nil, err
@@ -967,6 +977,9 @@ func TestDeadlockOnUpdateNodes(t *testing.T) {
 		defer func() {
 			_ = c.Close(ctx)
 		}()
+		for nodeID := range make([]struct{}, 3) {
+			c.nodes[uint32(nodeID)] = make(map[*session]struct{})
+		}
 		s1, err := c.Get(ctx)
 		require.NoError(t, err)
 		s2, err := c.Get(ctx)
@@ -988,10 +1001,14 @@ func TestDeadlockOnInternalPoolGCTick(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
-		nodes := make([]uint32, 0, 3)
+		var (
+			nodes         = make([]uint32, 0, 3)
+			nodeIDCounter = uint32(0)
+		)
 		balancer := testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 			testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
-				sessionID := testutil.SessionID()
+				sessionID := testutil.SessionID(testutil.WithNodeID(nodeIDCounter))
+				nodeIDCounter++
 				nodeID, err := nodeID(sessionID)
 				if err != nil {
 					return nil, err
@@ -1006,6 +1023,9 @@ func TestDeadlockOnInternalPoolGCTick(t *testing.T) {
 		defer func() {
 			_ = c.Close(ctx)
 		}()
+		for nodeID := range make([]struct{}, 3) {
+			c.nodes[uint32(nodeID)] = make(map[*session]struct{})
+		}
 		s1, err := c.Get(ctx)
 		if err != nil && errors.Is(err, context.DeadlineExceeded) {
 			return

@@ -23,6 +23,12 @@ func WithServiceID(serviceID uint32) sessionIDOption {
 	}
 }
 
+func WithNodeID(nodeID uint32) sessionIDOption {
+	return func(h *sessionIDHolder) {
+		h.nodeID = nodeID
+	}
+}
+
 func SessionID(opts ...sessionIDOption) string {
 	h := &sessionIDHolder{
 		serviceID: uint32(xrand.New().Int64(math.MaxUint32)),
