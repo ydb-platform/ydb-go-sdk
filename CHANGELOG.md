@@ -1,3 +1,4 @@
+* Added address of node to operation error description as optional
 * Fixed bug with put session from unknown node
 * Fixed bug with parsing of `TzTimestamp` without microseconds
 * Fixed code -1 of retryable error if wrapped error with code

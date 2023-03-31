@@ -359,9 +359,8 @@ func (c *conn) Invoke(
 			case o.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
 				return xerrors.WithStackTrace(
 					xerrors.Operation(
-						xerrors.FromOperation(
-							o.GetOperation(),
-						),
+						xerrors.FromOperation(o.GetOperation()),
+						xerrors.WithNodeAddress(c.Address()),
 					),
 				)
 			}

@@ -3,10 +3,44 @@ package xerrors
 import (
 	"bytes"
 	"errors"
+	"strconv"
+	"strings"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 )
+
+type issues []*Ydb_Issue.IssueMessage
+
+func (ii issues) String() string {
+	if len(ii) == 0 {
+		return ""
+	}
+	b := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(b)
+	b.WriteByte('[')
+	for i, m := range ii {
+		if i != 0 {
+			b.WriteByte(',')
+		}
+		b.WriteByte('{')
+		if code := m.GetIssueCode(); code != 0 {
+			b.WriteByte('#')
+			b.WriteString(strconv.Itoa(int(code)))
+			b.WriteByte(' ')
+		}
+		b.WriteString(strings.TrimSuffix(m.GetMessage(), "."))
+		if len(m.Issues) > 0 {
+			b.WriteByte(' ')
+			b.WriteString(issues(m.Issues).String())
+		}
+		b.WriteByte('}')
+	}
+	b.WriteByte(']')
+	return b.String()
+}
 
 // NewWithIssues returns error which contains child issues
 func NewWithIssues(text string, issues ...error) error {
