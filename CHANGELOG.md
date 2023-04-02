@@ -1,4 +1,4 @@
-* Changed behaviour of retryer on transport errors `cancelled` and `deadline exceeded` - will be retry if context is not done  
+* Changed behaviour of retryer on transport errors `cancelled` and `deadline exceeded` - will retry idempotent operation if context is not done  
 * Added address of node to operation error description as optional
 * Fixed bug with put session from unknown node
 * Fixed bug with parsing of `TzTimestamp` without microseconds

@@ -63,6 +63,7 @@ func (e *transportError) Type() Type {
 	case
 		grpcCodes.Internal,
 		grpcCodes.Canceled,
+		grpcCodes.DeadlineExceeded,
 		grpcCodes.Unavailable:
 		return TypeConditionallyRetryable
 	default:
@@ -75,6 +76,7 @@ func (e *transportError) BackoffType() backoff.Type {
 	case
 		grpcCodes.Internal,
 		grpcCodes.Canceled,
+		grpcCodes.DeadlineExceeded,
 		grpcCodes.Unavailable:
 		return backoff.TypeFast
 	case grpcCodes.ResourceExhausted:

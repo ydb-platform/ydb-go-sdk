@@ -3,7 +3,6 @@ package retry
 import (
 	"context"
 	"fmt"
-	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wait"
@@ -164,13 +163,6 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				return ctxErr
-			}
-
-			if xerrors.IsTransportError(err,
-				grpcCodes.Canceled,
-				grpcCodes.DeadlineExceeded,
-			) {
-				err = xerrors.Retryable(err, xerrors.WithDeleteSession())
 			}
 
 			m := Check(err)
