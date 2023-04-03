@@ -14,7 +14,6 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -36,6 +35,8 @@ FROM %s WHERE id = $id;
 `
 )
 
+const DefaultSessionPoolSizeLimit = 50
+
 type Storage struct {
 	db          *ydb.Driver
 	cfg         configs.Config
@@ -47,7 +48,7 @@ func New(ctx context.Context, cfg configs.Config, logger *zap.Logger, poolSize i
 	localCtx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
-	poolSize = tableConfig.DefaultSessionPoolSizeLimit
+	poolSize = DefaultSessionPoolSizeLimit
 
 	st := Storage{
 		cfg:         cfg,
