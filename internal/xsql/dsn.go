@@ -1,18 +1,22 @@
 package xsql
 
 import (
+	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/query"
 )
 
-func Parse(dataSourceName string) (opts []config.Option, connectorOpts []ConnectorOption, err error) {
+const tablePathPrefixTransformer = "table_path_prefix"
+
+func Parse(dataSourceName string) (opts []config.Option, connectorOpts []ConnectorOption, _ error) {
 	info, err := dsn.Parse(dataSourceName)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
@@ -31,33 +35,45 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 		}
 		connectorOpts = append(connectorOpts, WithDefaultQueryMode(mode))
 	}
-	var binders []query.Binder
-	if info.Params.Has("go_auto_bind") {
-		binderNames := strings.Split(info.Params.Get("go_auto_bind"), ",")
-		for _, binderName := range binderNames {
-			switch binderName {
-			case "table_path_prefix":
-				if !info.Params.Has("go_auto_bind.table_path_prefix") {
+	var binders []ConnectorOption
+	if info.Params.Has("go_query_bind") {
+		queryTransformers := strings.Split(info.Params.Get("go_query_bind"), ",")
+		for _, transformer := range queryTransformers {
+			switch transformer {
+			case "declare":
+				binders = append(binders, WithQueryBind(query.AutoDeclareBind{}))
+			case "positional":
+				binders = append(binders, WithQueryBind(query.PositionalArgsBind{}))
+			case "numeric":
+				binders = append(binders, WithQueryBind(query.NumericArgsBind{}))
+			default:
+				if strings.HasPrefix(transformer, tablePathPrefixTransformer) {
+					prefix, err := extractTablePathPrefixFromBinderName(transformer)
+					if err != nil {
+						return nil, nil, xerrors.WithStackTrace(err)
+					}
+					binders = append(binders, WithQueryBindAndPathNormalizer(query.TablePathPrefixBind(prefix)))
+				} else {
 					return nil, nil, xerrors.WithStackTrace(
-						fmt.Errorf("table_path_prefix bind required 'go_auto_bind.table_path_prefix' param"),
+						fmt.Errorf("unknown query rewriter: %s", transformer),
 					)
 				}
-				binders = append(binders, query.TablePathPrefix(info.Params.Get("go_auto_bind.table_path_prefix")))
-			case "declare":
-				binders = append(binders, query.Declare())
-			case "positional":
-				binders = append(binders, query.Positional())
-			case "numeric":
-				binders = append(binders, query.Numeric())
-			case "origin":
-				binders = append(binders, query.Origin())
-			default:
-				return nil, nil, xerrors.WithStackTrace(
-					fmt.Errorf("unknown bind type: %s", binderName),
-				)
 			}
 		}
 	}
-	connectorOpts = append(connectorOpts, WithQueryBinders(binders...))
+	connectorOpts = append(connectorOpts, binders...)
 	return opts, connectorOpts, nil
+}
+
+var (
+	tablePathPrefixRe       = regexp.MustCompile(tablePathPrefixTransformer + "\\((.*)\\)")
+	errWrongTablePathPrefix = errors.New("wrong '" + tablePathPrefixTransformer + "' query transformer")
+)
+
+func extractTablePathPrefixFromBinderName(binderName string) (string, error) {
+	ss := tablePathPrefixRe.FindAllStringSubmatch(binderName, -1)
+	if len(ss) != 1 || len(ss[0]) != 2 || ss[0][1] == "" {
+		return "", xerrors.WithStackTrace(fmt.Errorf("%w: %s", errWrongTablePathPrefix, binderName))
+	}
+	return ss[0][1], nil
 }

@@ -2,10 +2,12 @@ package trace
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestDetailsMatch(t *testing.T) {
-	for _, test := range []struct {
+	for _, tt := range []struct {
 		pattern string
 		details Details
 	}{
@@ -61,16 +63,14 @@ func TestDetailsMatch(t *testing.T) {
 			pattern: `^ydb\.table\.(pool\.(session|api)|session).*$`,
 			details: TablePoolSessionLifeCycleEvents | TablePoolAPIEvents | TableSessionEvents,
 		},
+		{
+			pattern: `^ydb\.((database.sql.tx)|driver.(balancer|conn)|(table\.pool)|retry)$`,
+			details: DriverBalancerEvents | DriverConnEvents | TablePoolLifeCycleEvents | DatabaseSQLTxEvents | RetryEvents,
+		},
 	} {
-		t.Run(test.pattern, func(t *testing.T) {
-			if MatchDetails(test.pattern) != test.details {
-				t.Fatalf(
-					"unexpected match details by pattern '%s': %d, exp %d",
-					test.pattern,
-					MatchDetails(test.pattern),
-					test.details,
-				)
-			}
+		t.Run("", func(t *testing.T) {
+			details := MatchDetails(tt.pattern)
+			require.Equal(t, tt.details.String(), details.String())
 		})
 	}
 }

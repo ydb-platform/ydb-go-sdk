@@ -370,7 +370,7 @@ SELECT season_id FROM seasons WHERE title LIKE $title AND views > $views;
 * declaring types of parameters,
 * numeric or positional parameters
 
-This enrichments of queries can be enabled explicitly on initializing step using connector option `ydb.WithAutoBind(bind)` or connection string parameter `go_auto_bind`. By default `database/sql` driver for `YDB` not modifies source queries.
+This enrichments of queries can be enabled explicitly on initializing step using connector option `ydb.WithAutoBind(bind)` or connection string parameter `go_query_transformers`. By default `database/sql` driver for `YDB` not modifies source queries.
 
 Next example without bindings shows complexity and explicit importing of `ydb-go-sdk` packages:
 
@@ -414,18 +414,15 @@ func main() {
   var (
     ctx          = context.TODO()
     db           = sql.Open("ydb", "grpc://localhost:2136/local?"+
-  					        "go_auto_bind=table_path_prefix,declare,positional&"+
-                            "go_auto_bind.table_path_prefix=/local/path/to/my/folder")
+  					        "go_query_transformers=table_path_prefix(/local/path/to/my/folder),declare,positional")
 
 //  alternate syntax for enabling bindings over connection string params
 //
 //  nativeDriver = ydb.MustOpen(ctx, "grpc://localhost:2136/local")
-//  db           = sql.OpenDB(ydb.MustConnector(nativeDriver,
-//      ydb.WithAutoBind(
-//        query.TablePathPrefix("/local/path/to/my/folder"), // bind pragma TablePathPrefix
-//        query.Declare(),                                   // bind parameters declare
-//        query.Positional(),                                // bind positional args
-//      ),
+//  db = sql.OpenDB(ydb.MustConnector(nativeDriver,
+//      ydb.WithTablePathPrefix("/local/path/to/my/folder"), // bind pragma TablePathPrefix
+//      ydb.WithAutoDeclare(),                               // bind parameters declare
+//      ydb.WithPositionalArgs(),                            // bind positional args
 //  ))
   )
 //defer nativeDriver.Close(ctx) // cleanup resources
