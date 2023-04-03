@@ -8,13 +8,13 @@ on:
 jobs:
   test-slo:
     runs-on: ubuntu-latest
+    if: github.event.pull_request.head.repo.full_name == 'ydb-platform/ydb-go-sdk'
+    uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
     strategy:
       matrix:
         path: [native, database/sql]
     steps:
-      - if: github.event.pull_request.head.repo.full_name == 'ydb-platform/ydb-go-sdk'
-        uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
-        with:
+      - with:
           secrets: inherit
           language: go
           workload_path: tests/slo
