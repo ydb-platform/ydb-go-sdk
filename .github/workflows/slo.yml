@@ -7,9 +7,15 @@ on:
   workflow_dispatch:
 jobs:
   test-slo:
-    if: github.event.pull_request.head.repo.full_name == 'ydb-platform/ydb-go-sdk'
-    uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
-    secrets: inherit
-    with:
-      language: go
-      workload_path: tests/slo
+    strategy:
+      matrix:
+        path: [native, database/sql]
+    steps:
+      - if: github.event.pull_request.head.repo.full_name == 'ydb-platform/ydb-go-sdk'
+        uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
+        secrets: inherit
+        with:
+          language: go
+          workload_path: tests/slo
+          context: ../..
+          options: -f Dockerfile --build-arg SRC_PATH=${{ matrix.path }}
