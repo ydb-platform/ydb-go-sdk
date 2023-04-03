@@ -112,7 +112,6 @@ func Example_databaseSQLBindNumericArgsOverConnector() {
 		nativeDriver = ydb.MustOpen(ctx, "grpc://localhost:2136/local")
 		db           = sql.OpenDB(
 			ydb.MustConnector(nativeDriver,
-				ydb.WithTablePathPrefix("/local/path/to/my/folder"),
 				ydb.WithAutoDeclare(),
 				ydb.WithNumericArgs(),
 			),
@@ -167,7 +166,6 @@ func Example_databaseSQLBindPositionalArgsOverConnector() {
 		nativeDriver = ydb.MustOpen(ctx, "grpc://localhost:2136/local")
 		db           = sql.OpenDB(
 			ydb.MustConnector(nativeDriver,
-				ydb.WithTablePathPrefix("/local/path/to/my/folder"),
 				ydb.WithAutoDeclare(),
 				ydb.WithNumericArgs(),
 			),
@@ -192,7 +190,7 @@ func Example_databaseSQLBindPositionalArgsOverConnector() {
 
 func Example_databaseSQLBindTablePathPrefix() {
 	db, err := sql.Open("ydb",
-		"grpc://localhost:2136/local?go_query_bind=table_path_prefix(path/to/tables),declare,positional",
+		"grpc://localhost:2136/local?go_query_bind=table_path_prefix(/local/path/to/tables)",
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -236,7 +234,7 @@ func Example_databaseSQLBindTablePathPrefixOverConnector() {
 	}
 }
 
-func Example_databaseSQLBindDeclare() {
+func Example_databaseSQLBindAutoDeclare() {
 	db, err := sql.Open("ydb",
 		"grpc://localhost:2136/local?go_query_bind=declare",
 	)
@@ -261,15 +259,13 @@ func Example_databaseSQLBindDeclare() {
 	}
 }
 
-func Example_databaseSQLBindDeclareOverConnector() {
+func Example_databaseSQLBindAutoDeclareOverConnector() {
 	var (
 		ctx          = context.TODO()
 		nativeDriver = ydb.MustOpen(ctx, "grpc://localhost:2136/local")
-		db           = sql.OpenDB(
-			ydb.MustConnector(nativeDriver,
-				ydb.WithAutoDeclare(),
-			),
-		)
+		db           = sql.OpenDB(ydb.MustConnector(nativeDriver,
+			ydb.WithAutoDeclare(),
+		))
 	)
 
 	row := db.QueryRowContext(context.TODO(), "SELECT $id, $title",

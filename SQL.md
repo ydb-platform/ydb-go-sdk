@@ -370,7 +370,7 @@ SELECT season_id FROM seasons WHERE title LIKE $title AND views > $views;
 * declaring types of parameters,
 * numeric or positional parameters
 
-This enrichments of queries can be enabled explicitly on initializing step using connector option `ydb.WithAutoBind(bind)` or connection string parameter `go_query_transformers`. By default `database/sql` driver for `YDB` not modifies source queries.
+This enrichments of queries can be enabled explicitly on initializing step using connector option `ydb.WithAutoBind(bind)` or connection string parameter `go_query_bind`. By default `database/sql` driver for `YDB` not modifies source queries.
 
 Next example without bindings shows complexity and explicit importing of `ydb-go-sdk` packages:
 
@@ -414,7 +414,7 @@ func main() {
   var (
     ctx          = context.TODO()
     db           = sql.Open("ydb", "grpc://localhost:2136/local?"+
-  					        "go_query_transformers=table_path_prefix(/local/path/to/my/folder),declare,positional")
+  					        "go_query_bind=table_path_prefix(/local/path/to/my/folder),declare,positional")
 
 //  alternate syntax for enabling bindings over connection string params
 //
@@ -445,7 +445,7 @@ DECLARE $p1 AS Utf8;
 SELECT $p0, $p1
 ```
 
-This expanded query will sended to `YDB`.
+this expanded query will send to `YDB` instead of original sql-query.
 
 Additional examples of query enrichment see in `ydb-go-sdk` documentation:
 
@@ -462,16 +462,16 @@ Additional examples of query enrichment see in `ydb-go-sdk` documentation:
     * using [connection string parameter](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#example-package-DatabaseSQLBindNumericlArgs)
     * using [connector option](https://pkg.go.dev/github.com/ydb-platform/ydb-go-sdk/v3#example-package-DatabaseSQLBindNumericArgsOverConnector)
 
-For a deep understanding of query enrichment see also [unit-tests](https://github.com/ydb-platform/ydb-go-sdk/blob/master/query/bind_test.go).
+For a deep understanding of query enrichment see also [unit-tests](https://github.com/ydb-platform/ydb-go-sdk/blob/master/query_bind_test.go).
 
 You can write your own unit-tests for check correct binding of your queries like this:
 
 ```go
 func TestBinding(t *testing.T) {
-  bindings := query.NewBind(
-    query.TablePathPrefix("/local/path/to/my/folder"), // bind pragma TablePathPrefix
-    query.Declare(),                                   // bind parameters declare
-    query.Positional(),                                // auto-replace positional args
+  bindings := testutil.NewBind(
+    ydb.WithTablePathPrefix("/local/path/to/my/folder"), // bind pragma TablePathPrefix
+    ydb.WithDeclare(),                                   // bind parameters declare
+    ydb.WithPositional(),                                // auto-replace positional args
   )
   query, params, err := bindings.ToYQL("SELECT ?, ?, ?", 1, uint64(2), "3")
   require.NoError(t, err)
