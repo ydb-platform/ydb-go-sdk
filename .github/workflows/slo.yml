@@ -21,7 +21,7 @@ jobs:
     uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
     secrets: inherit
     with:
-      language: go-database/sql
+      language: go-database_sql
       workload_path: tests/slo
       workload_build_options: -f Dockerfile --build-arg SRC_PATH=database/sql
       workload_build_context: ../..
