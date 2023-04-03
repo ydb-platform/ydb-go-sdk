@@ -82,7 +82,7 @@ var errsToCheck = []struct {
 		backoff:       backoff.TypeFast,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
-			idempotent:    true,
+			idempotent:    true, // if client context is not done
 			nonIdempotent: false,
 		},
 	},
@@ -106,10 +106,10 @@ var errsToCheck = []struct {
 	},
 	{
 		err:           xerrors.Transport(grpcStatus.Error(grpcCodes.DeadlineExceeded, "")),
-		backoff:       backoff.TypeNoBackoff,
+		backoff:       backoff.TypeFast,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
-			idempotent:    false,
+			idempotent:    true, // if client context is not done
 			nonIdempotent: false,
 		},
 	},
