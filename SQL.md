@@ -445,7 +445,7 @@ DECLARE $p1 AS Utf8;
 SELECT $p0, $p1
 ```
 
-this expanded query will send to `YDB` instead of original sql-query.
+This expanded query will send to `YDB` instead of original sql-query.
 
 Additional examples of query enrichment see in `ydb-go-sdk` documentation:
 
