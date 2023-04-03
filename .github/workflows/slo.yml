@@ -16,5 +16,5 @@ jobs:
     with:
       language: go
       workload_path: tests/slo
-      context: ../..
-      options: -f Dockerfile --build-arg SRC_PATH=${{ matrix.path }}
+      workload_build_options: -f Dockerfile --build-arg SRC_PATH=${{ matrix.path }}
+      workload_build_context: ../..
