@@ -20,7 +20,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -45,12 +44,6 @@ func withDefaultTxControl(defaultTxControl *table.TransactionControl) connOption
 	}
 }
 
-func withBind(bind query.Bind) connOption {
-	return func(c *conn) {
-		c.bind = bind
-	}
-}
-
 func withDefaultQueryMode(mode QueryMode) connOption {
 	return func(c *conn) {
 		c.defaultQueryMode = mode
@@ -71,7 +64,6 @@ type conn struct {
 	closed           uint32
 	lastUsage        int64
 	defaultQueryMode QueryMode
-	bind             query.Bind
 
 	defaultTxControl *table.TransactionControl
 	dataOpts         []options.ExecuteDataQueryOption
@@ -391,7 +383,7 @@ func (c *conn) Begin() (driver.Tx, error) {
 }
 
 func (c *conn) normalize(q string, args ...driver.NamedValue) (query string, _ *table.QueryParameters, _ error) {
-	return c.bind.ToYQL(q, func() (ii []interface{}) {
+	return c.connector.Bindings.RewriteQuery(q, func() (ii []interface{}) {
 		for i := range args {
 			ii = append(ii, args[i])
 		}
@@ -596,7 +588,7 @@ func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (
 }
 
 func (c *conn) normalizePath(folderOrTable string) (absPath string) {
-	return c.bind.NormalizePath(folderOrTable)
+	return c.connector.PathNormalizer.NormalizePath(folderOrTable)
 }
 
 func (c *conn) GetTables(ctx context.Context, folder string) (tables []string, err error) {

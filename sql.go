@@ -6,12 +6,12 @@ import (
 	"database/sql/driver"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -98,12 +98,29 @@ func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.C
 
 type ConnectorOption = xsql.ConnectorOption
 
+type QueryBindConnectorOption interface {
+	ConnectorOption
+	query.Bind
+}
+
 func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
 	return xsql.WithDefaultQueryMode(mode)
 }
 
-func WithAutoBind(binders ...query.Binder) ConnectorOption {
-	return xsql.WithQueryBinders(binders...)
+func WithTablePathPrefix(tablePathPrefix string) QueryBindConnectorOption {
+	return xsql.WithQueryBindAndPathNormalizer(query.TablePathPrefixBind(tablePathPrefix))
+}
+
+func WithAutoDeclare() QueryBindConnectorOption {
+	return xsql.WithQueryBind(query.AutoDeclareBind{})
+}
+
+func WithPositionalArgs() QueryBindConnectorOption {
+	return xsql.WithQueryBind(query.PositionalArgsBind{})
+}
+
+func WithNumericArgs() QueryBindConnectorOption {
+	return xsql.WithQueryBind(query.NumericArgsBind{})
 }
 
 func WithDefaultTxControl(txControl *table.TransactionControl) ConnectorOption {

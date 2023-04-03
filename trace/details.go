@@ -2,12 +2,25 @@ package trace
 
 import (
 	"regexp"
+	"sort"
+	"strings"
 )
 
 type Details uint64
 
 func (d Details) Details() Details {
 	return d
+}
+
+func (d Details) String() string {
+	ss := make([]string, 0)
+	for bit, name := range detailsMap {
+		if d&bit != 0 {
+			ss = append(ss, name)
+		}
+	}
+	sort.Strings(ss)
+	return strings.Join(ss, "|")
 }
 
 const (

@@ -6,15 +6,11 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"testing"
-
-	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
@@ -89,7 +85,7 @@ func Example_databaseSQL() {
 
 func Example_databaseSQLBindNumericArgs() {
 	db, err := sql.Open("ydb",
-		"grpc://localhost:2136/local?go_auto_bind=declare,numeric",
+		"grpc://localhost:2136/local?go_query_bind=declare,numeric",
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -116,12 +112,9 @@ func Example_databaseSQLBindNumericArgsOverConnector() {
 		nativeDriver = ydb.MustOpen(ctx, "grpc://localhost:2136/local")
 		db           = sql.OpenDB(
 			ydb.MustConnector(nativeDriver,
-				ydb.WithAutoBind(
-					query.Origin(),
-					query.TablePathPrefix("/local/path/to/my/folder"),
-					query.Declare(),
-					query.Numeric(),
-				),
+				ydb.WithTablePathPrefix("/local/path/to/my/folder"),
+				ydb.WithAutoDeclare(),
+				ydb.WithNumericArgs(),
 			),
 		)
 	)
@@ -147,7 +140,7 @@ func Example_databaseSQLBindNumericArgsOverConnector() {
 
 func Example_databaseSQLBindPositionalArgs() {
 	db, err := sql.Open("ydb",
-		"grpc://localhost:2136/local?go_auto_bind=declare,positional",
+		"grpc://localhost:2136/local?go_query_bind=declare,positional",
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -174,12 +167,9 @@ func Example_databaseSQLBindPositionalArgsOverConnector() {
 		nativeDriver = ydb.MustOpen(ctx, "grpc://localhost:2136/local")
 		db           = sql.OpenDB(
 			ydb.MustConnector(nativeDriver,
-				ydb.WithAutoBind(
-					query.Origin(),
-					query.TablePathPrefix("/local/path/to/my/folder"),
-					query.Declare(),
-					query.Numeric(),
-				),
+				ydb.WithTablePathPrefix("/local/path/to/my/folder"),
+				ydb.WithAutoDeclare(),
+				ydb.WithNumericArgs(),
 			),
 		)
 	)
@@ -202,7 +192,7 @@ func Example_databaseSQLBindPositionalArgsOverConnector() {
 
 func Example_databaseSQLBindTablePathPrefix() {
 	db, err := sql.Open("ydb",
-		"grpc://localhost:2136/local?go_auto_bind=table_path_prefix&go_auto_bind.table_path_prefix=path/to/tables",
+		"grpc://localhost:2136/local?go_query_bind=table_path_prefix(path/to/tables),declare,positional",
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -227,13 +217,9 @@ func Example_databaseSQLBindTablePathPrefixOverConnector() {
 	var (
 		ctx          = context.TODO()
 		nativeDriver = ydb.MustOpen(ctx, "grpc://localhost:2136/local")
-		db           = sql.OpenDB(
-			ydb.MustConnector(nativeDriver,
-				ydb.WithAutoBind(
-					query.TablePathPrefix("/local/path/to/my/folder"),
-				),
-			),
-		)
+		db           = sql.OpenDB(ydb.MustConnector(nativeDriver,
+			ydb.WithTablePathPrefix("/local/path/to/my/folder"),
+		))
 	)
 
 	// full table path is "/local/path/to/tables/series"
@@ -252,7 +238,7 @@ func Example_databaseSQLBindTablePathPrefixOverConnector() {
 
 func Example_databaseSQLBindDeclare() {
 	db, err := sql.Open("ydb",
-		"grpc://localhost:2136/local?go_auto_bind=declare",
+		"grpc://localhost:2136/local?go_query_bind=declare",
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -281,9 +267,7 @@ func Example_databaseSQLBindDeclareOverConnector() {
 		nativeDriver = ydb.MustOpen(ctx, "grpc://localhost:2136/local")
 		db           = sql.OpenDB(
 			ydb.MustConnector(nativeDriver,
-				ydb.WithAutoBind(
-					query.Declare(),
-				),
+				ydb.WithAutoDeclare(),
 			),
 		)
 	)
@@ -425,29 +409,4 @@ func ExampleOpen_advanced() {
 	}
 	defer db.Close(ctx) // cleanup resources
 	fmt.Printf("connected to %s, database '%s'", db.Endpoint(), db.Name())
-}
-
-func TestWithAutoBind(t *testing.T) {
-	bindings := query.NewBind(
-		query.TablePathPrefix("/local/path/to/my/folder"), // bind pragma TablePathPrefix
-		query.Declare(),    // bind parameters declare
-		query.Positional(), // auto-replace of positional args
-	)
-	query, params, err := bindings.ToYQL("SELECT ?, ?, ?", 1, uint64(2), "3")
-	require.NoError(t, err)
-	require.Equal(t, `-- bind TablePathPrefix
-PRAGMA TablePathPrefix("/local/path/to/my/folder");
-
--- bind declares
-DECLARE $p0 AS Int32;
-DECLARE $p1 AS Uint64;
-DECLARE $p2 AS Utf8;
-
--- origin query with positional args replacement
-SELECT $p0, $p1, $p2`, query)
-	require.Equal(t, table.NewQueryParameters(
-		table.ValueParam("$p0", types.Int32Value(1)),
-		table.ValueParam("$p1", types.Uint64Value(2)),
-		table.ValueParam("$p2", types.TextValue("3")),
-	), params)
 }

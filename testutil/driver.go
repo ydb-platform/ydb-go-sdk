@@ -120,43 +120,6 @@ func setField(name string, dst, value interface{}) {
 	x.FieldByName(f.Name).Set(v)
 }
 
-func getField(name string, src, dst interface{}) bool {
-	var fn func(x reflect.Value, seg ...string) bool
-	fn = func(x reflect.Value, seg ...string) bool {
-		if x.Kind() == reflect.Ptr {
-			x = x.Elem()
-		}
-		t := x.Type()
-		f, ok := t.FieldByName(seg[0])
-		if !ok {
-			return false
-		}
-		fv := x.FieldByName(seg[0])
-		if fv.Kind() == reflect.Ptr && fv.IsNil() {
-			return false
-		}
-		if len(seg) > 1 {
-			return fn(fv.Elem(), seg[1:]...)
-		}
-
-		v := reflect.ValueOf(dst)
-		if v.Type().Kind() != reflect.Ptr {
-			panic("destination value must be a pointer")
-		}
-		if v.Type().Elem().Kind() != fv.Type().Kind() {
-			panic(fmt.Sprintf(
-				"struct %s field %q is types of %s, not %s",
-				t, name, f.Type, v.Type(),
-			))
-		}
-
-		v.Elem().Set(fv)
-
-		return true
-	}
-	return fn(reflect.ValueOf(src).Elem(), strings.Split(name, ".")...)
-}
-
 type balancerStub struct {
 	onInvoke func(
 		ctx context.Context,

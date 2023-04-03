@@ -1,4 +1,4 @@
-package convert
+package query
 
 import (
 	"database/sql"
@@ -326,7 +326,7 @@ func TestToValue(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%T(%v)", tt.src, tt.src), func(t *testing.T) {
-			dst, err := ToValue(tt.src)
+			dst, err := toValue(tt.src)
 			if tt.err != nil {
 				require.ErrorIs(t, err, tt.err)
 			} else {
@@ -371,7 +371,7 @@ func TestYdbParam(t *testing.T) {
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			dst, err := ToYdbParam(tt.src.Name, tt.src.Value)
+			dst, err := toParam(tt.src.Name, tt.src.Value)
 			if tt.err != nil {
 				require.ErrorIs(t, err, tt.err)
 			} else {
@@ -512,7 +512,7 @@ func TestArgsToParams(t *testing.T) {
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			params, err := ArgsToParams(tt.args...)
+			params, err := ToYdb(tt.args...)
 			if tt.err != nil {
 				require.ErrorIs(t, err, tt.err)
 			} else {

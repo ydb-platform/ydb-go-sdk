@@ -3,6 +3,7 @@ package xsql
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 )
@@ -13,6 +14,52 @@ type (
 	ctxScanQueryOptionsKey   struct{}
 	ctxModeTypeKey           struct{}
 )
+
+type queryBindConnectorOption struct {
+	bind query.Bind
+}
+
+func (q queryBindConnectorOption) RewriteQuery(
+	query string, args ...interface{},
+) (yql string, newArgs []interface{}, _ error) {
+	return q.bind.RewriteQuery(query, args...)
+}
+
+func (q queryBindConnectorOption) Apply(c *Connector) error {
+	c.Bindings = append(c.Bindings, q.bind)
+	return nil
+}
+
+type queryBindAndPathNormalizerConnectorOption struct {
+	bindAndPathNormalizer queryBindAndPathNormalizer
+}
+
+func (q queryBindAndPathNormalizerConnectorOption) RewriteQuery(
+	query string, args ...interface{},
+) (yql string, newArgs []interface{}, _ error) {
+	return q.bindAndPathNormalizer.RewriteQuery(query, args...)
+}
+
+func (q queryBindAndPathNormalizerConnectorOption) Apply(c *Connector) error {
+	c.Bindings = append(c.Bindings, q.bindAndPathNormalizer)
+	c.PathNormalizer = q.bindAndPathNormalizer
+	return nil
+}
+
+func WithQueryBind(bind query.Bind) QueryBindConnectorOption {
+	return queryBindConnectorOption{bind: bind}
+}
+
+type queryBindAndPathNormalizer interface {
+	query.Bind
+	pathNormalizer
+}
+
+func WithQueryBindAndPathNormalizer(bindAndPathNormalizer queryBindAndPathNormalizer) QueryBindConnectorOption {
+	return queryBindAndPathNormalizerConnectorOption{
+		bindAndPathNormalizer: bindAndPathNormalizer,
+	}
+}
 
 // WithQueryMode returns a copy of context with given QueryMode
 func WithQueryMode(ctx context.Context, m QueryMode) context.Context {
