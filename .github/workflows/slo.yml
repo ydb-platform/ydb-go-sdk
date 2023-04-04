@@ -11,7 +11,8 @@ jobs:
     uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
     secrets: inherit
     with:
-      language: go-native
+      language_id: go-native
+      language: go/v3/native
       workload_path: tests/slo
       workload_build_options: -f Dockerfile --build-arg SRC_PATH=native
       workload_build_context: ../..
@@ -21,7 +22,8 @@ jobs:
     uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
     secrets: inherit
     with:
-      language: go-database-sql
+      language_id: go-database-sql
+      language: go/v3/database/sql
       workload_path: tests/slo
       workload_build_options: -f Dockerfile --build-arg SRC_PATH=database/sql
       workload_build_context: ../..
