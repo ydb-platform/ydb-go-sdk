@@ -8,18 +8,17 @@ import (
 	"slo/internal/generator"
 	"slo/internal/metrics"
 
-	"github.com/beefsack/go-rate"
 	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 )
 
-func Write(st Storager, rl *rate.RateLimiter, m *metrics.Metrics, logger *zap.Logger,
-	gen generator.Generator, en generator.Entries, ids *[]generator.EntryID, mu *sync.RWMutex, endChan chan struct{},
+func Write(ctx context.Context, st Storager, rl *rate.Limiter, m *metrics.Metrics, logger *zap.Logger,
+	gen generator.Generator, en generator.Entries, ids *[]generator.EntryID, mu *sync.RWMutex,
 ) {
 	for {
-		select {
-		case <-endChan:
+		err := rl.Wait(ctx)
+		if err != nil {
 			return
-		default:
 		}
 
 		entry, err := gen.Generate()
@@ -28,11 +27,9 @@ func Write(st Storager, rl *rate.RateLimiter, m *metrics.Metrics, logger *zap.Lo
 			continue
 		}
 
-		rl.Wait()
-
 		metricID := m.StartJob(metrics.JobWrite)
 
-		err = st.Write(context.Background(), entry)
+		err = st.Write(ctx, entry)
 		if err != nil {
 			logger.Error(fmt.Errorf("error when write entry: %w", err).Error())
 			m.StopJob(metricID, false)

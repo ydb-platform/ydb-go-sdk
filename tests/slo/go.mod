@@ -3,12 +3,12 @@ module slo
 go 1.20
 
 require (
-	github.com/beefsack/go-rate v0.0.0-20220214233405-116f4ca011a0
 	github.com/google/uuid v1.3.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/ydb-platform/ydb-go-sdk-zap v0.14.3
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.43.0
 	go.uber.org/zap v1.24.0
+	golang.org/x/time v0.3.0
 )
 
 require (

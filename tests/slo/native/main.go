@@ -14,8 +14,8 @@ import (
 	"slo/internal/workers"
 	"slo/native/storage"
 
-	"github.com/beefsack/go-rate"
 	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 )
 
 func main() {
@@ -84,27 +84,28 @@ func main() {
 	entryIDs := make([]generator.EntryID, 0)
 	entriesMutex := sync.RWMutex{}
 
-	workChan := make(chan struct{})
+	workCtx, workCancel := context.WithCancel(ctx)
+	defer workCancel()
 
 	// todo: create workers struct
-	readRL := rate.New(cfg.ReadRPS, time.Second)
+	readRL := rate.NewLimiter(rate.Limit(cfg.ReadRPS), 1)
 	for i := 0; i < cfg.ReadRPS; i++ {
-		go workers.Read(&st, readRL, m, logger, entries, &entryIDs, &entriesMutex, workChan)
+		go workers.Read(workCtx, &st, readRL, m, logger, entries, &entryIDs, &entriesMutex)
 	}
 
-	writeRL := rate.New(cfg.WriteRPS, time.Second)
+	writeRL := rate.NewLimiter(rate.Limit(cfg.WriteRPS), 1)
 	for i := 0; i < cfg.WriteRPS; i++ {
-		go workers.Write(&st, writeRL, m, logger, gen, entries, &entryIDs, &entriesMutex, workChan)
+		go workers.Write(workCtx, &st, writeRL, m, logger, gen, entries, &entryIDs, &entriesMutex)
 	}
 
-	metricsRL := rate.New(1, time.Duration(cfg.ReportPeriod))
-	go workers.Metrics(metricsRL, m, logger)
+	metricsRL := rate.NewLimiter(rate.Every(time.Duration(cfg.ReportPeriod)*time.Millisecond), 1)
+	go workers.Metrics(workCtx, metricsRL, m, logger)
 
 	time.Sleep(time.Duration(cfg.Time) * time.Second)
 
 	logger.Info("shutdown started")
 
-	close(workChan)
+	workCancel()
 
 	logger.Info("waiting for workers")
 

@@ -10,18 +10,17 @@ import (
 	"slo/internal/generator"
 	"slo/internal/metrics"
 
-	"github.com/beefsack/go-rate"
 	"go.uber.org/zap"
+	"golang.org/x/time/rate"
 )
 
-func Read(st Storager, rl *rate.RateLimiter, m *metrics.Metrics, logger *zap.Logger,
-	en generator.Entries, idsPtr *[]generator.EntryID, mu *sync.RWMutex, endChan chan struct{},
+func Read(ctx context.Context, st Storager, rl *rate.Limiter, m *metrics.Metrics, logger *zap.Logger,
+	en generator.Entries, idsPtr *[]generator.EntryID, mu *sync.RWMutex,
 ) {
 	for {
-		select {
-		case <-endChan:
+		err := rl.Wait(ctx)
+		if err != nil {
 			return
-		default:
 		}
 
 		ids := *idsPtr
@@ -33,11 +32,9 @@ func Read(st Storager, rl *rate.RateLimiter, m *metrics.Metrics, logger *zap.Log
 		i := rand.Intn(len(ids))
 		id := ids[i]
 
-		rl.Wait()
-
 		metricID := m.StartJob(metrics.JobRead)
 
-		e, err := st.Read(context.Background(), id)
+		e, err := st.Read(ctx, id)
 		if err != nil {
 			logger.Error(fmt.Errorf("get entry error: %w", err).Error())
 			m.StopJob(metricID, false)
