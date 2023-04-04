@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"sync"
 	"time"
 
 	"slo/internal/configs"
@@ -47,8 +48,6 @@ func New(ctx context.Context, cfg configs.Config, logger *zap.Logger, poolSize i
 	localCtx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
-	//poolSize = DefaultSessionPoolSizeLimit
-
 	st := Storage{
 		cfg:         cfg,
 		upsertQuery: fmt.Sprintf(upsertTemplate, cfg.Table),
@@ -62,27 +61,27 @@ func New(ctx context.Context, cfg configs.Config, logger *zap.Logger, poolSize i
 			logger,
 			trace.DetailsAll,
 		),
-		//ydb.WithSessionPoolSizeLimit(poolSize),
+		ydb.WithSessionPoolSizeLimit(poolSize),
 	)
 	if err != nil {
 		return Storage{}, err
 	}
 
-	//wg := sync.WaitGroup{}
-	//wg.Add(poolSize)
-	//for i := 0; i < poolSize; i++ {
-	//	go func() {
-	//		defer wg.Done()
-	//		err := st.db.Table().Do(localCtx, func(ctx context.Context, s table.Session) error {
-	//			return nil
-	//		})
-	//		if err != nil {
-	//			logger.Error(fmt.Errorf("error when create session: %w", err).Error())
-	//			// todo: return error from New
-	//		}
-	//	}()
-	//}
-	//wg.Wait()
+	wg := sync.WaitGroup{}
+	wg.Add(poolSize)
+	for i := 0; i < poolSize; i++ {
+		go func() {
+			defer wg.Done()
+			err := st.db.Table().Do(localCtx, func(ctx context.Context, s table.Session) error {
+				return nil
+			})
+			if err != nil {
+				logger.Error(fmt.Errorf("error when create session: %w", err).Error())
+				// todo: return error from New
+			}
+		}()
+	}
+	wg.Wait()
 
 	return st, nil
 }
