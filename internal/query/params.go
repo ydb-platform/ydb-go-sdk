@@ -138,7 +138,21 @@ func supportNewTypeLink(x interface{}) string {
 	return "https://github.com/ydb-platform/ydb-go-sdk/issues/new?" + v.Encode()
 }
 
-func toParam(name string, value interface{}) (table.ParameterOption, error) {
+func toYdbParam(name string, value interface{}) (table.ParameterOption, error) {
+	if na, ok := value.(driver.NamedValue); ok {
+		n, v := na.Name, na.Value
+		if n != "" {
+			name = n
+		}
+		value = v
+	}
+	if na, ok := value.(sql.NamedArg); ok {
+		n, v := na.Name, na.Value
+		if n != "" {
+			name = n
+		}
+		value = v
+	}
 	if v, ok := value.(table.ParameterOption); ok {
 		return v, nil
 	}
@@ -173,14 +187,14 @@ func ToYdb(args ...interface{}) (params []table.ParameterOption, _ error) {
 					params = append(params, xx)
 				default:
 					x.Name = fmt.Sprintf("$p%d", i)
-					param, err := toParam(x.Name, x.Value)
+					param, err := toYdbParam(x.Name, x.Value)
 					if err != nil {
 						return nil, xerrors.WithStackTrace(err)
 					}
 					params = append(params, param)
 				}
 			} else {
-				param, err := toParam(x.Name, x.Value)
+				param, err := toYdbParam(x.Name, x.Value)
 				if err != nil {
 					return nil, xerrors.WithStackTrace(err)
 				}
@@ -190,7 +204,7 @@ func ToYdb(args ...interface{}) (params []table.ParameterOption, _ error) {
 			if x.Name == "" {
 				return nil, xerrors.WithStackTrace(errUnnamedParam)
 			}
-			param, err := toParam(x.Name, x.Value)
+			param, err := toYdbParam(x.Name, x.Value)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
@@ -205,7 +219,7 @@ func ToYdb(args ...interface{}) (params []table.ParameterOption, _ error) {
 		case table.ParameterOption:
 			params = append(params, x)
 		default:
-			param, err := toParam(fmt.Sprintf("$p%d", i), x)
+			param, err := toYdbParam(fmt.Sprintf("$p%d", i), x)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}

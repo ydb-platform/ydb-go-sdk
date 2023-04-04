@@ -345,10 +345,15 @@ func named(name string, value interface{}) driver.NamedValue {
 
 func TestYdbParam(t *testing.T) {
 	for _, tt := range []struct {
-		src driver.NamedValue
+		src interface{}
 		dst table.ParameterOption
 		err error
 	}{
+		{
+			src: table.ValueParam("$a", types.Int32Value(42)),
+			dst: table.ValueParam("$a", types.Int32Value(42)),
+			err: nil,
+		},
 		{
 			src: named("a", int(42)),
 			dst: table.ValueParam("$a", types.Int32Value(42)),
@@ -371,7 +376,7 @@ func TestYdbParam(t *testing.T) {
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			dst, err := toParam(tt.src.Name, tt.src.Value)
+			dst, err := toYdbParam("", tt.src)
 			if tt.err != nil {
 				require.ErrorIs(t, err, tt.err)
 			} else {
