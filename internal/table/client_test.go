@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
@@ -26,8 +27,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
-	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
-	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil/timetest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -667,15 +666,10 @@ func TestSessionPoolGetPut(t *testing.T) {
 
 func TestSessionPoolCloseIdleSessions(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
-		timer := timetest.StubSingleTimer(t)
-		defer timer.Cleanup()
-
-		shiftTime, cleanup := timeutil.StubTestHookTimeNow(time.Unix(0, 0))
-		defer cleanup()
-
 		var (
 			idleThreshold = 4 * time.Second
 			closedCount   uint32
+			fakeClock     = clockwork.NewFakeClock()
 		)
 		p := newClientWithStubBuilder(
 			t,
@@ -695,6 +689,7 @@ func TestSessionPoolCloseIdleSessions(t *testing.T) {
 			2,
 			config.WithSizeLimit(2),
 			config.WithIdleThreshold(idleThreshold),
+			config.WithClock(fakeClock),
 		)
 
 		s1 := mustGetSession(t, p)
@@ -705,34 +700,26 @@ func TestSessionPoolCloseIdleSessions(t *testing.T) {
 		mustPutSession(t, p, s1)
 		mustPutSession(t, p, s2)
 
-		interval := <-timer.Created
-		if interval != idleThreshold {
-			t.Fatalf(
-				"unexpected ticker duration: %s; want %s",
-				interval, idleThreshold,
-			)
-		}
-
 		// Emulate first simple tick event. We expect two sessions be keepalived.
-		shiftTime(idleThreshold)
-		timer.C <- timeutil.Now()
-		mustResetTimer(t, timer.Reset, idleThreshold/2)
+		fakeClock.Advance(idleThreshold / 2)
 		if !atomic.CompareAndSwapUint32(&closedCount, 2, 0) {
 			t.Fatal("unexpected number of keepalives")
 		}
 
 		// Now internalPoolGet first session and "spent" some time working within it.
 		x := mustGetSession(t, p)
-		shiftTime(idleThreshold / 2)
+
+		// Move time to idleThreshold / 2
+		fakeClock.Advance(idleThreshold / 2)
 
 		// Now put that session back and emulate keepalive moment.
 		mustPutSession(t, p, x)
-		shiftTime(idleThreshold / 2)
+
+		// Move time to idleThreshold / 2
+		fakeClock.Advance(idleThreshold / 2)
 		// We expect here next tick to be registered after half of a idleThreshold.
 		// That is, x was touched half of idleThreshold ago, so we need to wait for
 		// the second half until we must touch it.
-		timer.C <- timeutil.Now()
-		mustResetTimer(t, timer.Reset, idleThreshold/2)
 
 		_ = p.Close(context.Background())
 	}, xtest.StopAfter(12*time.Second))
@@ -799,10 +786,7 @@ func mustGetSession(t testing.TB, p *Client) *session {
 func mustPutSession(t testing.TB, p *Client, s *session) {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
-	if err := p.Put(
-		context.Background(),
-		s,
-	); err != nil {
+	if err := p.Put(context.Background(), s); err != nil {
 		t.Helper()
 		t.Fatalf("%s: %v", caller(), err)
 	}
