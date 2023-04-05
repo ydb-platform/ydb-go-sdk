@@ -14,7 +14,7 @@ import (
 	"slo/internal/metrics"
 )
 
-func Read(ctx context.Context, st Storager, rl *rate.Limiter, m *metrics.Metrics, logger *zap.Logger,
+func Read(ctx context.Context, st ReadWriter, rl *rate.Limiter, m *metrics.Metrics, logger *zap.Logger,
 	en generator.Entries, idsPtr *[]generator.EntryID, mu *sync.RWMutex,
 ) {
 	for {

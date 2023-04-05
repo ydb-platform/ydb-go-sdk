@@ -12,7 +12,7 @@ import (
 	"slo/internal/metrics"
 )
 
-func Write(ctx context.Context, st Storager, rl *rate.Limiter, m *metrics.Metrics, logger *zap.Logger,
+func Write(ctx context.Context, st ReadWriter, rl *rate.Limiter, m *metrics.Metrics, logger *zap.Logger,
 	gen generator.Generator, en generator.Entries, ids *[]generator.EntryID, mu *sync.RWMutex,
 ) {
 	for {

@@ -6,7 +6,7 @@ import (
 	"slo/internal/generator"
 )
 
-type Storager interface {
+type ReadWriter interface {
 	Read(context.Context, generator.EntryID) (generator.Entry, error)
 	Write(context.Context, generator.Entry) error
 }
