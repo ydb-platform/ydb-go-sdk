@@ -13,7 +13,7 @@ type Generator struct {
 	MaxLength int
 }
 
-func NewGenerator(min, max int) Generator {
+func New(min, max int) Generator {
 	return Generator{
 		MinLength: min,
 		MaxLength: max,

@@ -78,7 +78,7 @@ func main() {
 
 	logger.Info("metrics init ok")
 
-	gen := generator.NewGenerator(10, 20)
+	gen := generator.New(10, 20)
 
 	entries := make(generator.Entries)
 	entryIDs := make([]generator.EntryID, 0)
