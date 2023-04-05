@@ -34,8 +34,6 @@ FROM %s WHERE id = $id;
 `
 )
 
-const DefaultSessionPoolSizeLimit = 50
-
 type Storage struct {
 	db          *ydb.Driver
 	cfg         configs.Config
