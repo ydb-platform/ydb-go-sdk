@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -19,7 +20,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -50,6 +50,7 @@ func newClient(
 		onDone = trace.TableOnInit(config.Trace(), &ctx)
 	)
 	c := &Client{
+		clock:  config.Clock(),
 		config: config,
 		cc:     balancer,
 		build:  builder,
@@ -84,6 +85,7 @@ type Client struct {
 	config config.Config
 	build  sessionBuilder
 	cc     grpc.ClientConnInterface
+	clock  clockwork.Clock
 
 	// read-write fields
 	mu                xsync.Mutex
@@ -390,7 +392,7 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 		withCreateSessionOnCreate(func(s *session) {
 			c.mu.WithLock(func() {
 				c.index[s] = sessionInfo{
-					touched: timeutil.Now(),
+					touched: c.clock.Now(),
 				}
 				trace.TableOnPoolSessionAdd(c.config.Trace(), s)
 				trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "append")
@@ -628,7 +630,7 @@ func (c *Client) Put(ctx context.Context, s *session) (err error) {
 		}
 
 		if !c.internalPoolNotify(s) {
-			c.internalPoolPushIdle(s, timeutil.Now())
+			c.internalPoolPushIdle(s, c.clock.Now())
 		}
 
 		return nil
@@ -736,7 +738,7 @@ func (c *Client) internalPoolGCTick(ctx context.Context, idleThreshold time.Dura
 			if info.idle == nil {
 				panic("inconsistent session info")
 			}
-			if since := timeutil.Until(info.touched); since > idleThreshold {
+			if since := c.clock.Since(info.touched); since > idleThreshold {
 				s.SetStatus(table.SessionClosing)
 				c.wg.Add(1)
 				go func() {
@@ -751,7 +753,7 @@ func (c *Client) internalPoolGCTick(ctx context.Context, idleThreshold time.Dura
 func (c *Client) internalPoolGC(ctx context.Context, idleThreshold time.Duration) {
 	defer c.wg.Done()
 
-	timer := timeutil.NewTimer(idleThreshold)
+	timer := c.clock.NewTimer(idleThreshold)
 	defer timer.Stop()
 
 	for {
@@ -762,7 +764,7 @@ func (c *Client) internalPoolGC(ctx context.Context, idleThreshold time.Duration
 		case <-ctx.Done():
 			return
 
-		case <-timer.C():
+		case <-timer.Chan():
 			c.internalPoolGCTick(ctx, idleThreshold)
 			timer.Reset(idleThreshold / 2)
 		}

@@ -80,8 +80,8 @@ func TestOverallApproaches(t *testing.T) {
 }
 
 func TestOverallSliceApproaches(t *testing.T) {
-	sizear := []int{2, 5, 10, 20, 50, 100}
-	for _, testSize = range sizear {
+	ints := []int{2, 5, 10, 20, 50, 100}
+	for _, testSize = range ints {
 		t.Logf("Slice size: %d", testSize)
 		for _, test := range []struct {
 			name string

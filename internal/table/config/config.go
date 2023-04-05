@@ -3,6 +3,8 @@ package config
 import (
 	"time"
 
+	"github.com/jonboulle/clockwork"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -134,6 +136,13 @@ func WithIgnoreTruncated() Option {
 	}
 }
 
+// WithClock replaces default clock
+func WithClock(clock clockwork.Clock) Option {
+	return func(c *Config) {
+		c.clock = clock
+	}
+}
+
 // Config is a configuration of table client
 type Config struct {
 	config.Common
@@ -147,11 +156,18 @@ type Config struct {
 	ignoreTruncated bool
 
 	trace trace.Table
+
+	clock clockwork.Clock
 }
 
 // Trace defines trace over table client calls
 func (c Config) Trace() trace.Table {
 	return c.trace
+}
+
+// Clock defines clock
+func (c Config) Clock() clockwork.Clock {
+	return c.clock
 }
 
 // SizeLimit is an upper bound of pooled sessions.
@@ -223,5 +239,6 @@ func defaults() Config {
 		createSessionTimeout: DefaultSessionPoolCreateSessionTimeout,
 		deleteTimeout:        DefaultSessionPoolDeleteTimeout,
 		idleThreshold:        DefaultSessionPoolIdleThreshold,
+		clock:                clockwork.NewRealClock(),
 	}
 }
