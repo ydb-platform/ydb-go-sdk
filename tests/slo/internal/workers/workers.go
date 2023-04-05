@@ -8,7 +8,6 @@ import (
 
 	"slo/internal/generator"
 	"slo/internal/metrics"
-	"slo/native/storage"
 )
 
 type ReadWriter interface {
@@ -18,7 +17,7 @@ type ReadWriter interface {
 
 type Workers struct {
 	ctx          context.Context
-	st           storage.Storage
+	st           ReadWriter
 	m            *metrics.Metrics
 	logger       *zap.Logger
 	entries      generator.Entries
@@ -26,7 +25,7 @@ type Workers struct {
 	entriesMutex sync.RWMutex
 }
 
-func New(ctx context.Context, st storage.Storage, m *metrics.Metrics, logger *zap.Logger) *Workers {
+func New(ctx context.Context, st ReadWriter, m *metrics.Metrics, logger *zap.Logger) *Workers {
 	w := &Workers{
 		ctx:          ctx,
 		st:           st,

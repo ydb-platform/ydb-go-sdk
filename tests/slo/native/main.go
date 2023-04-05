@@ -82,7 +82,7 @@ func main() {
 	workCtx, workCancel := context.WithCancel(ctx)
 	defer workCancel()
 
-	w := workers.New(workCtx, st, m, logger)
+	w := workers.New(workCtx, &st, m, logger)
 
 	readRL := rate.NewLimiter(rate.Limit(cfg.ReadRPS), 1)
 	for i := 0; i < cfg.ReadRPS; i++ {
