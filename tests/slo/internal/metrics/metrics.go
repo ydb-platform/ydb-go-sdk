@@ -59,7 +59,7 @@ func NewMetrics(url string, label string) (m *Metrics, err error) {
 	m.latencies = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
 			Name: "latency",
-			Help: "histogram of latencies in ms",
+			Help: "summary of latencies in ms",
 			Objectives: map[float64]float64{
 				0.5:   0.05,
 				0.9:   0.01,

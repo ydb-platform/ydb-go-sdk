@@ -34,7 +34,7 @@ Arguments:
 
 Options:
   -a <token>                      YDB access token credentials
-  -t <tableName>                  table name to read from
+  -t <tableName>                  table name
   --prom-pgw <promPgw>            prometheus push gateway
   --read-rps <readRps>            read RPS
   --read-timeout <readTimeout>    read timeout milliseconds
