@@ -2,71 +2,153 @@ package query
 
 import (
 	"fmt"
+	"strconv"
+	"unicode/utf8"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 type NumericArgsBind struct{}
 
-func (m NumericArgsBind) RewriteQuery(query string, args ...interface{}) (
+func (m NumericArgsBind) RewriteQuery(sql string, args ...interface{}) (
 	yql string, newArgs []interface{}, err error,
 ) {
-	params, err := ToYdb(args...)
-	if err != nil {
-		return "", nil, xerrors.WithStackTrace(err)
+	l := &sqlLexer{
+		src:        sql,
+		stateFn:    numericArgsStateFn,
+		rawStateFn: numericArgsStateFn,
 	}
 
-	if len(params) == 0 {
-		return query, args, nil
-	}
-
-	for _, param := range params {
-		newArgs = append(newArgs, param)
+	for l.stateFn != nil {
+		l.stateFn = l.stateFn(l)
 	}
 
 	var (
 		buffer = allocator.Buffers.Get()
-		hit    = make(map[string]struct{}, len(params))
-		miss   = make(map[string]struct{}, len(params))
+		param  table.ParameterOption
 	)
 	defer allocator.Buffers.Put(buffer)
 
-	for _, param := range params {
-		miss[param.Name()] = struct{}{}
+	if len(args) > 0 {
+		newArgs = make([]interface{}, len(args))
 	}
 
-	buffer.WriteString("-- origin query with numeric args replacement\n")
-
-	query, err = bindParams(query, paramTypeNumeric, func(paramName string) {
-		hit[paramName] = struct{}{}
-		delete(miss, paramName)
-	})
-	if err != nil {
-		return "", nil, xerrors.WithStackTrace(err)
-	}
-
-	if len(miss) > 0 {
-		return "", nil, xerrors.WithStackTrace(
-			fmt.Errorf("%w: %v", ErrInconsistentArgs, miss),
-		)
-	}
-
-	if len(hit) != len(params) {
-		for k := range miss {
-			delete(miss, k)
-		}
-		for _, p := range params {
-			if _, has := hit[p.Name()]; !has {
-				miss[p.Name()] = struct{}{}
+	for _, p := range l.parts {
+		switch p := p.(type) {
+		case string:
+			buffer.WriteString(p)
+		case numericArg:
+			if p == 0 {
+				return "", nil, xerrors.WithStackTrace(ErrUnexpectedNumericArgZero)
+			}
+			if int(p) > len(args) {
+				return "", nil, xerrors.WithStackTrace(
+					fmt.Errorf("%w: $p%d, len(args) = %d", ErrInconsistentArgs, p, len(args)),
+				)
+			}
+			paramName := "$p" + strconv.Itoa(int(p-1))
+			if newArgs[p-1] == nil {
+				param, err = toYdbParam(paramName, args[p-1])
+				if err != nil {
+					return "", nil, xerrors.WithStackTrace(err)
+				}
+				newArgs[p-1] = param
+				buffer.WriteString(param.Name())
+			} else {
+				buffer.WriteString(newArgs[p-1].(table.ParameterOption).Name())
 			}
 		}
-		return "", nil, xerrors.WithStackTrace(
-			fmt.Errorf("%w: %v", ErrInconsistentArgs, miss),
-		)
 	}
 
-	buffer.WriteString(query)
+	for i, p := range newArgs {
+		if p == nil {
+			return "", nil, xerrors.WithStackTrace(
+				fmt.Errorf("%w: $p%d, len(args) = %d", ErrInconsistentArgs, i+1, len(args)),
+			)
+		}
+	}
+
+	if len(newArgs) > 0 {
+		const prefix = "-- origin query with numeric args replacement\n"
+		return prefix + buffer.String(), newArgs, nil
+	}
 
 	return buffer.String(), newArgs, nil
+}
+
+func numericArgsStateFn(l *sqlLexer) stateFn {
+	for {
+		r, width := utf8.DecodeRuneInString(l.src[l.pos:])
+		l.pos += width
+
+		switch r {
+		case '`':
+			return backtickState
+		case '\'':
+			return singleQuoteState
+		case '"':
+			return doubleQuoteState
+		case '$':
+			nextRune, _ := utf8.DecodeRuneInString(l.src[l.pos:])
+			if isNumber(nextRune) {
+				if l.pos-l.start > 0 {
+					l.parts = append(l.parts, l.src[l.start:l.pos-width])
+				}
+				l.start = l.pos
+				return numericArgState
+			}
+		case '-':
+			nextRune, width := utf8.DecodeRuneInString(l.src[l.pos:])
+			if nextRune == '-' {
+				l.pos += width
+				return oneLineCommentState
+			}
+		case '/':
+			nextRune, width := utf8.DecodeRuneInString(l.src[l.pos:])
+			if nextRune == '*' {
+				l.pos += width
+				return multilineCommentState
+			}
+		case utf8.RuneError:
+			if l.pos-l.start > 0 {
+				l.parts = append(l.parts, l.src[l.start:l.pos])
+				l.start = l.pos
+			}
+			return nil
+		}
+	}
+}
+
+func numericArgState(l *sqlLexer) stateFn {
+	numbers := ""
+	defer func() {
+		if len(numbers) > 0 {
+			i, err := strconv.Atoi(numbers)
+			if err != nil {
+				panic(err)
+			}
+			l.parts = append(l.parts, numericArg(i))
+			l.start = l.pos
+		} else {
+			l.parts = append(l.parts, l.src[l.start-1:l.pos])
+			l.start = l.pos
+		}
+	}()
+	for {
+		r, width := utf8.DecodeRuneInString(l.src[l.pos:])
+		l.pos += width
+
+		switch {
+		case isNumber(r):
+			numbers += string(r)
+		case isLetter(r):
+			numbers = ""
+			return l.rawStateFn
+		default:
+			l.pos -= width
+			return l.rawStateFn
+		}
+	}
 }
