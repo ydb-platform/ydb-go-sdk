@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -80,26 +79,25 @@ func main() {
 
 	gen := generator.New(10, 20)
 
-	entries := make(generator.Entries)
-	entryIDs := make([]generator.EntryID, 0)
-	entriesMutex := sync.RWMutex{}
-
 	workCtx, workCancel := context.WithCancel(ctx)
 	defer workCancel()
 
-	// todo: create workers struct
+	w := workers.New(workCtx, st, m, logger)
+
 	readRL := rate.NewLimiter(rate.Limit(cfg.ReadRPS), 1)
 	for i := 0; i < cfg.ReadRPS; i++ {
-		go workers.Read(workCtx, &st, readRL, m, logger, entries, &entryIDs, &entriesMutex)
+		go w.Read(readRL)
 	}
 
 	writeRL := rate.NewLimiter(rate.Limit(cfg.WriteRPS), 1)
 	for i := 0; i < cfg.WriteRPS; i++ {
-		go workers.Write(workCtx, &st, writeRL, m, logger, gen, entries, &entryIDs, &entriesMutex)
+		go w.Write(writeRL, gen)
 	}
 
 	metricsRL := rate.NewLimiter(rate.Every(time.Duration(cfg.ReportPeriod)*time.Millisecond), 1)
-	go workers.Metrics(workCtx, metricsRL, m, logger)
+	go w.Metrics(metricsRL)
+
+	logger.Info("workers init ok")
 
 	time.Sleep(time.Duration(cfg.Time) * time.Second)
 

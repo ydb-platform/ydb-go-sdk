@@ -1,46 +1,41 @@
 package workers
 
 import (
-	"context"
 	"fmt"
-	"sync"
 
-	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
 	"slo/internal/generator"
 	"slo/internal/metrics"
 )
 
-func Write(ctx context.Context, st ReadWriter, rl *rate.Limiter, m *metrics.Metrics, logger *zap.Logger,
-	gen generator.Generator, en generator.Entries, ids *[]generator.EntryID, mu *sync.RWMutex,
-) {
+func (w *Workers) Write(rl *rate.Limiter, gen generator.Generator) {
 	for {
-		err := rl.Wait(ctx)
+		err := rl.Wait(w.ctx)
 		if err != nil {
 			return
 		}
 
 		entry, err := gen.Generate()
 		if err != nil {
-			logger.Error(fmt.Errorf("generate error: %w", err).Error())
+			w.logger.Error(fmt.Errorf("generate error: %w", err).Error())
 			continue
 		}
 
-		metricID := m.StartJob(metrics.JobWrite)
+		metricID := w.m.StartJob(metrics.JobWrite)
 
-		err = st.Write(ctx, entry)
+		err = w.st.Write(w.ctx, entry)
 		if err != nil {
-			logger.Error(fmt.Errorf("error when write entry: %w", err).Error())
-			m.StopJob(metricID, false)
+			w.logger.Error(fmt.Errorf("error when write entry: %w", err).Error())
+			w.m.StopJob(metricID, false)
 			continue
 		}
 
-		m.StopJob(metricID, true)
+		w.m.StopJob(metricID, true)
 
-		mu.Lock()
-		en[entry.ID] = entry
-		*ids = append(*ids, entry.ID)
-		mu.Unlock()
+		w.entriesMutex.Lock()
+		w.entries[entry.ID] = entry
+		w.entryIDs = append(w.entryIDs, entry.ID)
+		w.entriesMutex.Unlock()
 	}
 }

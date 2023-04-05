@@ -1,25 +1,21 @@
 package workers
 
 import (
-	"context"
 	"fmt"
 
-	"go.uber.org/zap"
 	"golang.org/x/time/rate"
-
-	"slo/internal/metrics"
 )
 
-func Metrics(ctx context.Context, rl *rate.Limiter, m *metrics.Metrics, logger *zap.Logger) {
+func (w *Workers) Metrics(rl *rate.Limiter) {
 	for {
-		err := rl.Wait(ctx)
+		err := rl.Wait(w.ctx)
 		if err != nil {
 			return
 		}
 
-		err = m.Push()
+		err = w.m.Push()
 		if err != nil {
-			logger.Error(fmt.Errorf("error while pushing: %w", err).Error())
+			w.logger.Error(fmt.Errorf("error while pushing: %w", err).Error())
 		}
 	}
 }
