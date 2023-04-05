@@ -1,3 +1,4 @@
+* Supported fake transactions in `database/sql` driver over connector option `ydb.WithFakeTx(queryMode)` and connection string param `go_fake_tx`
 * Removed `testutil/timeutil` package (all usages replaced with `clockwork` package)
 * Changed behaviour of retryer on transport errors `cancelled` and `deadline exceeded` - will retry idempotent operation if context is not done  
 * Added address of node to operation error description as optional

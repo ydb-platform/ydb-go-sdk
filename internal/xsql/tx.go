@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/isolation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -25,6 +26,24 @@ var (
 	_ driver.QueryerContext       = &tx{}
 	_ table.TransactionIdentifier = &tx{}
 )
+
+func (c *conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (currentTx, error) {
+	var txc table.TxOption
+	txc, err := isolation.ToYDB(txOptions)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	transaction, err := c.session.BeginTransaction(ctx, table.TxSettings(txc))
+	if err != nil {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+	c.currentTx = &tx{
+		conn: c,
+		ctx:  ctx,
+		tx:   transaction,
+	}
+	return c.currentTx, nil
+}
 
 func (tx *tx) ID() string {
 	return tx.tx.ID()
