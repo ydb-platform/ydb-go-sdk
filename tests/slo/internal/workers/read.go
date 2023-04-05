@@ -7,11 +7,11 @@ import (
 	"reflect"
 	"sync"
 
-	"slo/internal/generator"
-	"slo/internal/metrics"
-
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
+
+	"slo/internal/generator"
+	"slo/internal/metrics"
 )
 
 func Read(ctx context.Context, st Storager, rl *rate.Limiter, m *metrics.Metrics, logger *zap.Logger,

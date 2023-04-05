@@ -8,14 +8,14 @@ import (
 	"sync"
 	"time"
 
+	"go.uber.org/zap"
+	"golang.org/x/time/rate"
+
 	"slo/internal/configs"
 	"slo/internal/generator"
 	"slo/internal/metrics"
 	"slo/internal/workers"
 	"slo/native/storage"
-
-	"go.uber.org/zap"
-	"golang.org/x/time/rate"
 )
 
 func main() {
