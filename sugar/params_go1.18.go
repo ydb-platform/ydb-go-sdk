@@ -7,7 +7,7 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -15,7 +15,7 @@ import (
 
 // GenerateDeclareSection generates DECLARE section text in YQL query by params
 //
-// Deprecated: use testutil/QueryBind helper
+// Deprecated: use testutil.QueryBind(ydb.WithAutoDeclare()) helper
 func GenerateDeclareSection[T *table.QueryParameters | []table.ParameterOption | []sql.NamedArg](
 	params T,
 ) (string, error) {
@@ -25,7 +25,7 @@ func GenerateDeclareSection[T *table.QueryParameters | []table.ParameterOption |
 	case []table.ParameterOption:
 		return internal.GenerateDeclareSection(table.NewQueryParameters(v...))
 	case []sql.NamedArg:
-		values, err := query.ToYdb(func() (newArgs []interface{}) {
+		values, err := bind.Params(func() (newArgs []interface{}) {
 			for i := range v {
 				newArgs = append(newArgs, v[i])
 			}
@@ -44,7 +44,7 @@ func GenerateDeclareSection[T *table.QueryParameters | []table.ParameterOption |
 //
 // Deprecated: use testutil/QueryBind helper
 func ToYdbParam(param sql.NamedArg) (table.ParameterOption, error) {
-	params, err := query.ToYdb([]interface{}{param})
+	params, err := bind.Params([]interface{}{param})
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

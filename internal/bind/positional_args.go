@@ -1,4 +1,4 @@
-package query
+package bind
 
 import (
 	"fmt"
@@ -10,9 +10,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
-type PositionalArgsBind struct{}
+type PositionalArgs struct{}
 
-func (m PositionalArgsBind) RewriteQuery(sql string, args ...interface{}) (
+func (m PositionalArgs) RewriteQuery(sql string, args ...interface{}) (
 	yql string, newArgs []interface{}, err error,
 ) {
 	l := &sqlLexer{

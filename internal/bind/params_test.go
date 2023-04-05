@@ -1,4 +1,4 @@
-package query
+package bind
 
 import (
 	"database/sql"
@@ -517,7 +517,7 @@ func TestArgsToParams(t *testing.T) {
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			params, err := ToYdb(tt.args...)
+			params, err := Params(tt.args...)
 			if tt.err != nil {
 				require.ErrorIs(t, err, tt.err)
 			} else {

@@ -3,7 +3,7 @@ package xsql
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 )
@@ -16,7 +16,7 @@ type (
 )
 
 type queryBindConnectorOption struct {
-	bind query.Bind
+	bind bind.Bind
 }
 
 func (q queryBindConnectorOption) RewriteQuery(
@@ -46,12 +46,12 @@ func (q queryBindAndPathNormalizerConnectorOption) Apply(c *Connector) error {
 	return nil
 }
 
-func WithQueryBind(bind query.Bind) QueryBindConnectorOption {
+func WithQueryBind(bind bind.Bind) QueryBindConnectorOption {
 	return queryBindConnectorOption{bind: bind}
 }
 
 type queryBindAndPathNormalizer interface {
-	query.Bind
+	bind.Bind
 	pathNormalizer
 }
 

@@ -9,8 +9,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -41,18 +41,18 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 		for _, transformer := range queryTransformers {
 			switch transformer {
 			case "declare":
-				binders = append(binders, WithQueryBind(query.AutoDeclareBind{}))
+				binders = append(binders, WithQueryBind(bind.AutoDeclare{}))
 			case "positional":
-				binders = append(binders, WithQueryBind(query.PositionalArgsBind{}))
+				binders = append(binders, WithQueryBind(bind.PositionalArgs{}))
 			case "numeric":
-				binders = append(binders, WithQueryBind(query.NumericArgsBind{}))
+				binders = append(binders, WithQueryBind(bind.NumericArgs{}))
 			default:
 				if strings.HasPrefix(transformer, tablePathPrefixTransformer) {
 					prefix, err := extractTablePathPrefixFromBinderName(transformer)
 					if err != nil {
 						return nil, nil, xerrors.WithStackTrace(err)
 					}
-					binders = append(binders, WithQueryBindAndPathNormalizer(query.TablePathPrefixBind(prefix)))
+					binders = append(binders, WithQueryBindAndPathNormalizer(bind.TablePathPrefix(prefix)))
 				} else {
 					return nil, nil, xerrors.WithStackTrace(
 						fmt.Errorf("unknown query rewriter: %s", transformer),

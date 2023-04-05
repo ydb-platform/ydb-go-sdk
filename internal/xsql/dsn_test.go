@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 )
 
 func TestParse(t *testing.T) {
@@ -71,7 +71,7 @@ func TestParse(t *testing.T) {
 			},
 			connectorOpts: []ConnectorOption{
 				WithDefaultQueryMode(ScriptingQueryMode),
-				WithQueryBindAndPathNormalizer(query.TablePathPrefixBind("path/to/tables")),
+				WithQueryBindAndPathNormalizer(bind.TablePathPrefix("path/to/tables")),
 			},
 			err: nil,
 		},
@@ -84,8 +84,8 @@ func TestParse(t *testing.T) {
 			},
 			connectorOpts: []ConnectorOption{
 				WithDefaultQueryMode(ScriptingQueryMode),
-				WithQueryBindAndPathNormalizer(query.TablePathPrefixBind("path/to/tables")),
-				WithQueryBind(query.NumericArgsBind{}),
+				WithQueryBindAndPathNormalizer(bind.TablePathPrefix("path/to/tables")),
+				WithQueryBind(bind.NumericArgs{}),
 			},
 			err: nil,
 		},
@@ -98,8 +98,8 @@ func TestParse(t *testing.T) {
 			},
 			connectorOpts: []ConnectorOption{
 				WithDefaultQueryMode(ScriptingQueryMode),
-				WithQueryBindAndPathNormalizer(query.TablePathPrefixBind("path/to/tables")),
-				WithQueryBind(query.PositionalArgsBind{}),
+				WithQueryBindAndPathNormalizer(bind.TablePathPrefix("path/to/tables")),
+				WithQueryBind(bind.PositionalArgs{}),
 			},
 			err: nil,
 		},
@@ -112,8 +112,8 @@ func TestParse(t *testing.T) {
 			},
 			connectorOpts: []ConnectorOption{
 				WithDefaultQueryMode(ScriptingQueryMode),
-				WithQueryBindAndPathNormalizer(query.TablePathPrefixBind("path/to/tables")),
-				WithQueryBind(query.AutoDeclareBind{}),
+				WithQueryBindAndPathNormalizer(bind.TablePathPrefix("path/to/tables")),
+				WithQueryBind(bind.AutoDeclare{}),
 			},
 			err: nil,
 		},
@@ -126,7 +126,7 @@ func TestParse(t *testing.T) {
 			},
 			connectorOpts: []ConnectorOption{
 				WithDefaultQueryMode(ScriptingQueryMode),
-				WithQueryBindAndPathNormalizer(query.TablePathPrefixBind("path/to/tables")),
+				WithQueryBindAndPathNormalizer(bind.TablePathPrefix("path/to/tables")),
 			},
 			err: nil,
 		},

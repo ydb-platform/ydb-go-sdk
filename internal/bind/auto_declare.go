@@ -1,4 +1,4 @@
-package query
+package bind
 
 import (
 	"sort"
@@ -7,12 +7,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-type AutoDeclareBind struct{}
+type AutoDeclare struct{}
 
-func (m AutoDeclareBind) RewriteQuery(query string, args ...interface{}) (
+func (m AutoDeclare) RewriteQuery(query string, args ...interface{}) (
 	yql string, newArgs []interface{}, err error,
 ) {
-	params, err := ToYdb(args...)
+	params, err := Params(args...)
 	if err != nil {
 		return "", nil, xerrors.WithStackTrace(err)
 	}
