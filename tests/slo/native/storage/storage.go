@@ -17,7 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"slo/internal/configs"
+	"slo/internal/config"
 	"slo/internal/generator"
 )
 
@@ -36,12 +36,12 @@ FROM %s WHERE id = $id;
 
 type Storage struct {
 	db          *ydb.Driver
-	cfg         configs.Config
+	cfg         config.Config
 	upsertQuery string
 	selectQuery string
 }
 
-func New(ctx context.Context, cfg configs.Config, logger *zap.Logger, poolSize int) (_ Storage, err error) {
+func New(ctx context.Context, cfg config.Config, logger *zap.Logger, poolSize int) (_ Storage, err error) {
 	localCtx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 

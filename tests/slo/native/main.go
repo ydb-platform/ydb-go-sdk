@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
-	"slo/internal/configs"
+	"slo/internal/config"
 	"slo/internal/generator"
 	"slo/internal/metrics"
 	"slo/internal/workers"
@@ -29,8 +29,8 @@ func main() {
 		_ = logger.Sync()
 	}()
 
-	cfg, err := configs.NewConfig()
-	if errors.Is(err, configs.ErrWrongArgs) || errors.Is(err, flag.ErrHelp) {
+	cfg, err := config.New()
+	if errors.Is(err, config.ErrWrongArgs) || errors.Is(err, flag.ErrHelp) {
 		return
 	}
 	if err != nil {
@@ -48,14 +48,14 @@ func main() {
 	logger.Info("db init ok")
 
 	switch cfg.Mode {
-	case configs.CreateMode:
+	case config.CreateMode:
 		err = st.CreateTable(ctx)
 		if err != nil {
 			panic(fmt.Errorf("create table failed: %w", err))
 		}
 		logger.Info("create table ok")
 		return
-	case configs.CleanupMode:
+	case config.CleanupMode:
 		err = st.DropTable(ctx)
 		if err != nil {
 			panic(fmt.Errorf("create table failed: %w", err))

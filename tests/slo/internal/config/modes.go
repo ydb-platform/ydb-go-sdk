@@ -1,4 +1,4 @@
-package configs
+package config
 
 type AppMode int
 

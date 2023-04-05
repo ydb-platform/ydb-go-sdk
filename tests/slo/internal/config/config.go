@@ -1,4 +1,4 @@
-package configs
+package config
 
 import (
 	"errors"
@@ -31,7 +31,7 @@ type Config struct {
 	ShutdownTime int
 }
 
-func NewConfig() (cfg Config, err error) {
+func New() (cfg Config, err error) {
 	if len(os.Args) < 3 {
 		fmt.Print(mainHelp)
 		return cfg, ErrWrongArgs
