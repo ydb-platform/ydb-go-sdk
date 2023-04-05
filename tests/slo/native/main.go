@@ -14,7 +14,6 @@ import (
 	"slo/internal/generator"
 	"slo/internal/metrics"
 	"slo/internal/workers"
-	"slo/native/storage"
 )
 
 func main() {
@@ -36,7 +35,7 @@ func main() {
 		panic(fmt.Errorf("create config failed: %w", err))
 	}
 
-	st, err := storage.New(ctx, cfg, logger, cfg.ReadRPS+cfg.WriteRPS)
+	st, err := NewStorage(ctx, cfg, logger, cfg.ReadRPS+cfg.WriteRPS)
 	if err != nil {
 		panic(fmt.Errorf("create storage failed: %w", err))
 	}
@@ -59,7 +58,7 @@ func main() {
 		if err != nil {
 			panic(fmt.Errorf("create table failed: %w", err))
 		}
-		logger.Info("drop table ok")
+		logger.Info("cleanup table ok")
 		return
 	}
 

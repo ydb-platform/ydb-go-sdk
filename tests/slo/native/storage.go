@@ -1,4 +1,4 @@
-package storage
+package main
 
 import (
 	"context"
@@ -41,7 +41,7 @@ type Storage struct {
 	selectQuery string
 }
 
-func New(ctx context.Context, cfg config.Config, logger *zap.Logger, poolSize int) (_ Storage, err error) {
+func NewStorage(ctx context.Context, cfg config.Config, logger *zap.Logger, poolSize int) (_ Storage, err error) {
 	localCtx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
