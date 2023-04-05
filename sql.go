@@ -107,6 +107,10 @@ func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
 	return xsql.WithDefaultQueryMode(mode)
 }
 
+func WithFakeTx(mode QueryMode) ConnectorOption {
+	return xsql.WithFakeTx(mode)
+}
+
 func WithTablePathPrefix(tablePathPrefix string) QueryBindConnectorOption {
 	return xsql.WithQueryBindAndPathNormalizer(bind.TablePathPrefix(tablePathPrefix))
 }

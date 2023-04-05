@@ -31,6 +31,19 @@ func TestParse(t *testing.T) {
 		err           error
 	}{
 		{
+			dsn: "grpc://localhost:2135/local?go_fake_tx=scripting,scheme",
+			opts: []config.Option{
+				config.WithSecure(false),
+				config.WithEndpoint("localhost:2135"),
+				config.WithDatabase("/local"),
+			},
+			connectorOpts: []ConnectorOption{
+				WithFakeTx(ScriptingQueryMode),
+				WithFakeTx(SchemeQueryMode),
+			},
+			err: nil,
+		},
+		{
 			dsn: "grpc://localhost:2135/local",
 			opts: []config.Option{
 				config.WithSecure(false),

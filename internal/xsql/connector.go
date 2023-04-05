@@ -120,6 +120,18 @@ func WithOnClose(f func(connector *Connector)) ConnectorOption {
 	return onCloseConnectorOption(f)
 }
 
+type fakeTxConnectorOption QueryMode
+
+func (m fakeTxConnectorOption) Apply(c *Connector) error {
+	c.fakeTxModes = append(c.fakeTxModes, QueryMode(m))
+	return nil
+}
+
+// WithFakeTx returns a copy of context with given QueryMode
+func WithFakeTx(m QueryMode) ConnectorOption {
+	return fakeTxConnectorOption(m)
+}
+
 type ydbDriver interface {
 	Name() string
 	Table() table.Client
@@ -164,6 +176,8 @@ type Connector struct {
 
 	Bindings       bind.Bindings
 	PathNormalizer pathNormalizer
+
+	fakeTxModes []QueryMode
 
 	onClose []func(connector *Connector)
 
@@ -255,6 +269,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 		withDataOpts(c.defaultDataQueryOpts...),
 		withScanOpts(c.defaultScanQueryOpts...),
 		withTrace(c.trace),
+		withFakeTxModes(c.fakeTxModes...),
 	), nil
 }
 
