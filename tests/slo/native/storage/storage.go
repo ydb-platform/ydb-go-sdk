@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"path"
-	"sync"
 	"time"
 
 	ydbZap "github.com/ydb-platform/ydb-go-sdk-zap"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -64,21 +64,24 @@ func New(ctx context.Context, cfg config.Config, logger *zap.Logger, poolSize in
 		return Storage{}, err
 	}
 
-	wg := sync.WaitGroup{}
-	wg.Add(poolSize)
+	g := errgroup.Group{}
+
 	for i := 0; i < poolSize; i++ {
-		go func() {
-			defer wg.Done()
+		g.Go(func() error {
 			err := st.db.Table().Do(localCtx, func(ctx context.Context, s table.Session) error {
 				return nil
 			})
 			if err != nil {
-				logger.Error(fmt.Errorf("error when create session: %w", err).Error())
-				// todo: return error from New
+				return fmt.Errorf("error when create session: %w", err)
 			}
-		}()
+			return nil
+		})
 	}
-	wg.Wait()
+
+	err = g.Wait()
+	if err != nil {
+		return Storage{}, err
+	}
 
 	return st, nil
 }
