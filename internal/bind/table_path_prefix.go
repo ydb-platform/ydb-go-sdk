@@ -1,4 +1,4 @@
-package query
+package bind
 
 import (
 	"path"
@@ -7,9 +7,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 )
 
-type TablePathPrefixBind string
+type TablePathPrefix string
 
-func (tablePathPrefix TablePathPrefixBind) NormalizePath(folderOrTable string) string {
+func (tablePathPrefix TablePathPrefix) NormalizePath(folderOrTable string) string {
 	switch ch := folderOrTable[0]; ch {
 	case '/':
 		return folderOrTable
@@ -20,7 +20,7 @@ func (tablePathPrefix TablePathPrefixBind) NormalizePath(folderOrTable string) s
 	}
 }
 
-func (tablePathPrefix TablePathPrefixBind) RewriteQuery(query string, args ...interface{}) (
+func (tablePathPrefix TablePathPrefix) RewriteQuery(query string, args ...interface{}) (
 	yql string, newArgs []interface{}, err error,
 ) {
 	buffer := allocator.Buffers.Get()

@@ -1,4 +1,4 @@
-package query
+package bind
 
 import (
 	"fmt"
@@ -10,9 +10,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
-type NumericArgsBind struct{}
+type NumericArgs struct{}
 
-func (m NumericArgsBind) RewriteQuery(sql string, args ...interface{}) (
+func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (
 	yql string, newArgs []interface{}, err error,
 ) {
 	l := &sqlLexer{

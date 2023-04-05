@@ -10,7 +10,7 @@ import (
 
 // GenerateDeclareSection generates DECLARE section text in YQL query by params
 //
-// Deprecated: use table/query.Transformers helper
+// Deprecated: use testutil.QueryBind(ydb.WithAutoDeclare()) helper
 func GenerateDeclareSection(params *table.QueryParameters) (string, error) {
 	return internal.GenerateDeclareSection(params)
 }

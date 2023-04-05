@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
@@ -31,7 +31,7 @@ func (mode defaultQueryModeConnectorOption) Apply(c *Connector) error {
 
 type QueryBindConnectorOption interface {
 	ConnectorOption
-	query.Bind
+	bind.Bind
 }
 
 func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
@@ -162,7 +162,7 @@ type pathNormalizer interface {
 type Connector struct {
 	parent ydbDriver
 
-	Bindings       query.Bindings
+	Bindings       bind.Bindings
 	PathNormalizer pathNormalizer
 
 	onClose []func(connector *Connector)

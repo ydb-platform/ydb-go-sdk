@@ -1,11 +1,11 @@
 package testutil
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 )
 
-type QueryBindings = query.Bindings
+type QueryBindings = bind.Bindings
 
-func QueryBind(bindings ...query.Bind) query.Bindings {
+func QueryBind(bindings ...bind.Bind) bind.Bindings {
 	return bindings
 }

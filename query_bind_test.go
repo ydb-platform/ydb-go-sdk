@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
@@ -279,7 +279,7 @@ SELECT 1`,
 			args: []interface{}{
 				1,
 			},
-			err: query.ErrInconsistentArgs,
+			err: bind.ErrInconsistentArgs,
 		},
 		{
 			b:   testutil.QueryBind(ydb.WithNumericArgs()),
@@ -287,7 +287,7 @@ SELECT 1`,
 			args: []interface{}{
 				1, 1,
 			},
-			err: query.ErrUnexpectedNumericArgZero,
+			err: bind.ErrUnexpectedNumericArgZero,
 		},
 		{
 			b:   testutil.QueryBind(ydb.WithPositionalArgs()),
@@ -314,7 +314,7 @@ SELECT $p0, $p1 -- some comment`,
 			params: table.NewQueryParameters(
 				table.ValueParam("$p0", types.Int32Value(100)),
 			),
-			err: query.ErrInconsistentArgs,
+			err: bind.ErrInconsistentArgs,
 		},
 		{
 			b:   testutil.QueryBind(ydb.WithPositionalArgs()),
@@ -329,7 +329,7 @@ SELECT $p0, $p1`,
 				table.ValueParam("$p0", types.Int32Value(100)),
 				table.ValueParam("$p1", types.Int32Value(200)),
 			),
-			err: query.ErrInconsistentArgs,
+			err: bind.ErrInconsistentArgs,
 		},
 		{
 			b: testutil.QueryBind(ydb.WithPositionalArgs()),
@@ -398,7 +398,7 @@ SELECT $p0, $p1`,
 			args: []interface{}{
 				1,
 			},
-			err: query.ErrInconsistentArgs,
+			err: bind.ErrInconsistentArgs,
 		},
 		{
 			b:   testutil.QueryBind(ydb.WithNumericArgs()),

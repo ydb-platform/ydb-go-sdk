@@ -1,4 +1,4 @@
-package query
+package bind
 
 import (
 	"testing"
@@ -10,10 +10,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-func TestPositionalArgsBindRewriteQuery(t *testing.T) {
+func TestNumericArgsBindRewriteQuery(t *testing.T) {
 	var (
 		now = time.Now()
-		b   = PositionalArgsBind{}
+		b   = NumericArgs{}
 	)
 	for _, tt := range []struct {
 		sql    string
@@ -23,12 +23,64 @@ func TestPositionalArgsBindRewriteQuery(t *testing.T) {
 		err    error
 	}{
 		{
-			sql: `SELECT ?, ?`,
+			sql: `SELECT $123abc, $2`,
+			args: []interface{}{
+				100,
+			},
+			err: ErrInconsistentArgs,
+		},
+		{
+			sql: `SELECT $123abc, $1`,
+			args: []interface{}{
+				200,
+			},
+			yql: `-- origin query with numeric args replacement
+SELECT $123abc, $p0`,
+			params: []interface{}{
+				table.ValueParam("$p0", types.Int32Value(200)),
+			},
+		},
+		{
+			sql: `SELECT $1, $2`,
+			args: []interface{}{
+				table.ValueParam("$name1", types.Int32Value(100)),
+				table.ValueParam("$name2", types.Int32Value(200)),
+			},
+			yql: `-- origin query with numeric args replacement
+SELECT $name1, $name2`,
+			params: []interface{}{
+				table.ValueParam("$name1", types.Int32Value(100)),
+				table.ValueParam("$name2", types.Int32Value(200)),
+			},
+		},
+		{
+			sql: `SELECT $1, $2`,
+			args: []interface{}{
+				table.ValueParam("$namedArg", types.Int32Value(100)),
+				200,
+			},
+			yql: `-- origin query with numeric args replacement
+SELECT $namedArg, $p1`,
+			params: []interface{}{
+				table.ValueParam("$namedArg", types.Int32Value(100)),
+				table.ValueParam("$p1", types.Int32Value(200)),
+			},
+		},
+		{
+			sql: `SELECT $0, $1`,
 			args: []interface{}{
 				100,
 				200,
 			},
-			yql: `-- origin query with positional args replacement
+			err: ErrUnexpectedNumericArgZero,
+		},
+		{
+			sql: `SELECT $1, $2`,
+			args: []interface{}{
+				100,
+				200,
+			},
+			yql: `-- origin query with numeric args replacement
 SELECT $p0, $p1`,
 			params: []interface{}{
 				table.ValueParam("$p0", types.Int32Value(100)),
@@ -36,50 +88,51 @@ SELECT $p0, $p1`,
 			},
 		},
 		{
-			sql: `SELECT ?, ?`,
+			sql: `SELECT $1, $2`,
 			args: []interface{}{
 				100,
 			},
 			err: ErrInconsistentArgs,
 		},
 		{
-			sql: `SELECT ?, "?"`,
+			sql: `SELECT $1, "$2"`,
 			args: []interface{}{
 				100,
 			},
-			yql: `-- origin query with positional args replacement
-SELECT $p0, "?"`,
+			yql: `-- origin query with numeric args replacement
+SELECT $p0, "$2"`,
 			params: []interface{}{
 				table.ValueParam("$p0", types.Int32Value(100)),
 			},
 		},
 		{
-			sql: `SELECT ?, '?'`,
+			sql: `SELECT $1, '$2'`,
 			args: []interface{}{
 				100,
 			},
-			yql: `-- origin query with positional args replacement
-SELECT $p0, '?'`,
+			yql: `-- origin query with numeric args replacement
+SELECT $p0, '$2'`,
 			params: []interface{}{
 				table.ValueParam("$p0", types.Int32Value(100)),
 			},
 		},
 		{
-			sql: "SELECT ?, `?`",
+			sql: "SELECT $1, `$2`",
 			args: []interface{}{
 				100,
 			},
-			yql: "-- origin query with positional args replacement\nSELECT $p0, `?`",
+			yql: "-- origin query with numeric args replacement\nSELECT $p0, `$2`",
 			params: []interface{}{
 				table.ValueParam("$p0", types.Int32Value(100)),
 			},
 		},
 		{
-			sql: "SELECT ?, $1, $p0",
-			err: ErrInconsistentArgs,
+			sql:    "SELECT ?, $1, $p0",
+			params: []interface{}{},
+			err:    ErrInconsistentArgs,
 		},
 		{
-			sql: "SELECT ?, ?, ?",
+			sql: "SELECT $1, $2, $3",
 			args: []interface{}{
 				1,
 				"test",
@@ -89,7 +142,7 @@ SELECT $p0, '?'`,
 					"test3",
 				},
 			},
-			yql: `-- origin query with positional args replacement
+			yql: `-- origin query with numeric args replacement
 SELECT $p0, $p1, $p2`,
 			params: []interface{}{
 				table.ValueParam("$p0", types.Int32Value(1)),
@@ -102,7 +155,30 @@ SELECT $p0, $p1, $p2`,
 			},
 		},
 		{
-			sql: "SELECT ?, ?, ?",
+			sql: "SELECT $1, $2, $3, $1, $2",
+			args: []interface{}{
+				1,
+				"test",
+				[]string{
+					"test1",
+					"test2",
+					"test3",
+				},
+			},
+			yql: `-- origin query with numeric args replacement
+SELECT $p0, $p1, $p2, $p0, $p1`,
+			params: []interface{}{
+				table.ValueParam("$p0", types.Int32Value(1)),
+				table.ValueParam("$p1", types.TextValue("test")),
+				table.ValueParam("$p2", types.ListValue(
+					types.TextValue("test1"),
+					types.TextValue("test2"),
+					types.TextValue("test3"),
+				)),
+			},
+		},
+		{
+			sql: "SELECT $1, $2, $3",
 			args: []interface{}{
 				types.Int32Value(1),
 				types.TextValue("test"),
@@ -112,7 +188,7 @@ SELECT $p0, $p1, $p2`,
 					types.TextValue("test3"),
 				),
 			},
-			yql: `-- origin query with positional args replacement
+			yql: `-- origin query with numeric args replacement
 SELECT $p0, $p1, $p2`,
 			params: []interface{}{
 				table.ValueParam("$p0", types.Int32Value(1)),
@@ -125,12 +201,12 @@ SELECT $p0, $p1, $p2`,
 			},
 		},
 		{
-			sql: "SELECT a, b, c WHERE id = ? AND date < ? AND value IN (?)",
+			sql: "SELECT $1, a, b, c WHERE id = $1 AND date < $2 AND value IN ($3)",
 			args: []interface{}{
 				1, now, []string{"3"},
 			},
-			yql: `-- origin query with positional args replacement
-SELECT a, b, c WHERE id = $p0 AND date < $p1 AND value IN ($p2)`,
+			yql: `-- origin query with numeric args replacement
+SELECT $p0, a, b, c WHERE id = $p0 AND date < $p1 AND value IN ($p2)`,
 			params: []interface{}{
 				table.ValueParam("$p0", types.Int32Value(1)),
 				table.ValueParam("$p1", types.TimestampValueFromTime(now)),
@@ -148,47 +224,47 @@ SELECT 1`,
 SELECT 1`,
 		},
 		{
-			sql: "SELECT ?, ?",
+			sql: "SELECT $1, $2",
 			args: []interface{}{
 				1,
 			},
 			err: ErrInconsistentArgs,
 		},
 		{
-			sql: "SELECT ?, ? -- some comment with ?",
+			sql: "SELECT $1, $2 -- some comment with $3",
 			args: []interface{}{
 				100,
 				200,
 			},
-			yql: `-- origin query with positional args replacement
-SELECT $p0, $p1 -- some comment with ?`,
+			yql: `-- origin query with numeric args replacement
+SELECT $p0, $p1 -- some comment with $3`,
 			params: []interface{}{
 				table.ValueParam("$p0", types.Int32Value(100)),
 				table.ValueParam("$p1", types.Int32Value(200)),
 			},
 		},
 		{
-			sql: "SELECT ? /* some comment with ? */, ?",
+			sql: "SELECT $1 /* some comment with $3 */, $2",
 			args: []interface{}{
 				100,
 				200,
 			},
-			yql: `-- origin query with positional args replacement
-SELECT $p0 /* some comment with ? */, $p1`,
+			yql: `-- origin query with numeric args replacement
+SELECT $p0 /* some comment with $3 */, $p1`,
 			params: []interface{}{
 				table.ValueParam("$p0", types.Int32Value(100)),
 				table.ValueParam("$p1", types.Int32Value(200)),
 			},
 		},
 		{
-			sql: "SELECT ?, ? -- some comment with ?",
+			sql: "SELECT $1, $2 -- some comment with $3",
 			args: []interface{}{
 				100,
 			},
 			err: ErrInconsistentArgs,
 		},
 		{
-			sql: "SELECT ?, ?, ?",
+			sql: "SELECT $1, $2, $3",
 			args: []interface{}{
 				100,
 				200,
@@ -197,26 +273,26 @@ SELECT $p0 /* some comment with ? */, $p1`,
 		},
 		{
 			sql: `
-SELECT ? /* some comment with ? */, ?`,
+SELECT $1 /* some comment with $3 */, $2`,
 			args: []interface{}{
 				100,
 				200,
 			},
-			yql: `-- origin query with positional args replacement
+			yql: `-- origin query with numeric args replacement
 
-SELECT $p0 /* some comment with ? */, $p1`,
+SELECT $p0 /* some comment with $3 */, $p1`,
 			params: []interface{}{
 				table.ValueParam("$p0", types.Int32Value(100)),
 				table.ValueParam("$p1", types.Int32Value(200)),
 			},
 		},
 		{
-			sql: "SELECT ?, ?",
+			sql: "SELECT $1, $2",
 			args: []interface{}{
 				100,
 				200,
 			},
-			yql: `-- origin query with positional args replacement
+			yql: `-- origin query with numeric args replacement
 SELECT $p0, $p1`,
 			params: []interface{}{
 				table.ValueParam("$p0", types.Int32Value(100)),
@@ -224,12 +300,12 @@ SELECT $p0, $p1`,
 			},
 		},
 		{
-			sql: "SELECT ?, ?",
+			sql: "SELECT $1, $2",
 			args: []interface{}{
 				100,
 				200,
 			},
-			yql: `-- origin query with positional args replacement
+			yql: `-- origin query with numeric args replacement
 SELECT $p0, $p1`,
 			params: []interface{}{
 				table.ValueParam("$p0", types.Int32Value(100)),

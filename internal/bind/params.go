@@ -1,4 +1,4 @@
-package query
+package bind
 
 import (
 	"database/sql"
@@ -169,7 +169,7 @@ func toYdbParam(name string, value interface{}) (table.ParameterOption, error) {
 	return table.ValueParam(name, v), nil
 }
 
-func ToYdb(args ...interface{}) (params []table.ParameterOption, _ error) {
+func Params(args ...interface{}) (params []table.ParameterOption, _ error) {
 	params = make([]table.ParameterOption, 0, len(args))
 	for i, arg := range args {
 		switch x := arg.(type) {
