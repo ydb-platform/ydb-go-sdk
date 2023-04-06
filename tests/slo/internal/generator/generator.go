@@ -1,42 +1,50 @@
 package generator
 
 import (
-	"math/rand"
+	"crypto/rand"
+	"encoding/base64"
+	"math/big"
 
 	"github.com/google/uuid"
 )
 
-var allowedCharacters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*(){}")
+const (
+	MinLength = 20
+	MaxLength = 40
+)
 
-type Generator struct {
-	MinLength int
-	MaxLength int
+type Generator struct{}
+
+func New() Generator {
+	return Generator{}
 }
 
-func New(min, max int) Generator {
-	return Generator{
-		MinLength: min,
-		MaxLength: max,
-	}
-}
-
-func (gen Generator) Generate() (Entry, error) {
-	return Entry{
-		ID:      uuid.New(),
-		Payload: gen.getRandomString(),
-	}, nil
-}
-
-func (gen Generator) getRandomString() string {
-	l := gen.MinLength + rand.Intn(gen.MaxLength-gen.MinLength+1)
-
-	sl := make([]rune, 0, l)
-
-	var n int
-	for i := 0; i < l; i++ {
-		n = rand.Intn(len(allowedCharacters))
-		sl = append(sl, allowedCharacters[n])
+func (g Generator) Generate() (Entry, error) {
+	e := Entry{
+		ID: uuid.New(),
 	}
 
-	return string(sl)
+	var err error
+	e.Payload, err = g.genPayload()
+	if err != nil {
+		return Entry{}, err
+	}
+
+	return e, nil
+}
+
+func (g Generator) genPayload() (string, error) {
+	l, err := rand.Int(rand.Reader, big.NewInt(MaxLength-MinLength+1))
+	if err != nil {
+		return "", err
+	}
+
+	sl := make([]byte, MinLength+l.Int64())
+
+	_, err = rand.Read(sl)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.StdEncoding.EncodeToString(sl), nil
 }

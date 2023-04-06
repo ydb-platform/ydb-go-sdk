@@ -76,7 +76,7 @@ func main() {
 
 	logger.Info("metrics init ok")
 
-	gen := generator.New(10, 20)
+	gen := generator.New()
 
 	workCtx, workCancel := context.WithCancel(ctx)
 	defer workCancel()

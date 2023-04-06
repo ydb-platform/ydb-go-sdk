@@ -61,16 +61,16 @@ Arguments:
   db                              YDB database to connect to
 
 Options:
-  -a <token>                      YDB access token credentials
-  -t <tableName>                  table name
-  --prom-pgw <promPgw>            prometheus push gateway
-  --read-rps <readRps>            read RPS
-  --read-timeout <readTimeout>    read timeout milliseconds
-  --write-rps <writeRps>          write RPS
-  --write-timeout <writeTimeout>  write timeout milliseconds
-  --time <time>                   run time in seconds
-  --shutdown-time <shutdownTime>  graceful shutdown time in seconds
-  --report-period <reportPeriod>  prometheus push period in milliseconds
+  -a              <token>         YDB access token credentials
+  -t              <tableName>     table name
+  -prom-pgw       <promPgw>       prometheus push gateway
+  -read-rps       <readRps>       read RPS
+  -read-timeout   <readTimeout>   read timeout milliseconds
+  -write-rps      <writeRps>      write RPS
+  -write-timeout  <writeTimeout>  write timeout milliseconds
+  -time           <time>          run time in seconds
+  -shutdown-time  <shutdownTime>  graceful shutdown time in seconds
+  -report-period  <reportPeriod>  prometheus push period in milliseconds
 ```
 
 
