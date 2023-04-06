@@ -12,6 +12,10 @@ import (
 
 type NumericArgs struct{}
 
+func (m NumericArgs) blockID() blockID {
+	return blockYQL
+}
+
 func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (
 	yql string, newArgs []interface{}, err error,
 ) {

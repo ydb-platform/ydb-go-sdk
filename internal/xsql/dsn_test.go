@@ -84,7 +84,7 @@ func TestParse(t *testing.T) {
 			},
 			connectorOpts: []ConnectorOption{
 				WithDefaultQueryMode(ScriptingQueryMode),
-				WithQueryBindAndPathNormalizer(bind.TablePathPrefix("path/to/tables")),
+				WithTablePathPrefix("path/to/tables"),
 			},
 			err: nil,
 		},
@@ -97,7 +97,7 @@ func TestParse(t *testing.T) {
 			},
 			connectorOpts: []ConnectorOption{
 				WithDefaultQueryMode(ScriptingQueryMode),
-				WithQueryBindAndPathNormalizer(bind.TablePathPrefix("path/to/tables")),
+				WithTablePathPrefix("path/to/tables"),
 				WithQueryBind(bind.NumericArgs{}),
 			},
 			err: nil,
@@ -111,7 +111,7 @@ func TestParse(t *testing.T) {
 			},
 			connectorOpts: []ConnectorOption{
 				WithDefaultQueryMode(ScriptingQueryMode),
-				WithQueryBindAndPathNormalizer(bind.TablePathPrefix("path/to/tables")),
+				WithTablePathPrefix("path/to/tables"),
 				WithQueryBind(bind.PositionalArgs{}),
 			},
 			err: nil,
@@ -125,7 +125,7 @@ func TestParse(t *testing.T) {
 			},
 			connectorOpts: []ConnectorOption{
 				WithDefaultQueryMode(ScriptingQueryMode),
-				WithQueryBindAndPathNormalizer(bind.TablePathPrefix("path/to/tables")),
+				WithTablePathPrefix("path/to/tables"),
 				WithQueryBind(bind.AutoDeclare{}),
 			},
 			err: nil,
@@ -139,7 +139,22 @@ func TestParse(t *testing.T) {
 			},
 			connectorOpts: []ConnectorOption{
 				WithDefaultQueryMode(ScriptingQueryMode),
-				WithQueryBindAndPathNormalizer(bind.TablePathPrefix("path/to/tables")),
+				WithTablePathPrefix("path/to/tables"),
+			},
+			err: nil,
+		},
+		{
+			dsn: "grpc://localhost:2135/local?query_mode=scripting&go_query_bind=positional,declare,table_path_prefix(path/to/tables)", //nolint:lll
+			opts: []config.Option{
+				config.WithSecure(false),
+				config.WithEndpoint("localhost:2135"),
+				config.WithDatabase("/local"),
+			},
+			connectorOpts: []ConnectorOption{
+				WithDefaultQueryMode(ScriptingQueryMode),
+				WithTablePathPrefix("path/to/tables"),
+				WithQueryBind(bind.PositionalArgs{}),
+				WithQueryBind(bind.AutoDeclare{}),
 			},
 			err: nil,
 		},

@@ -112,7 +112,7 @@ func WithFakeTx(mode QueryMode) ConnectorOption {
 }
 
 func WithTablePathPrefix(tablePathPrefix string) QueryBindConnectorOption {
-	return xsql.WithQueryBindAndPathNormalizer(bind.TablePathPrefix(tablePathPrefix))
+	return xsql.WithTablePathPrefix(tablePathPrefix)
 }
 
 func WithAutoDeclare() QueryBindConnectorOption {

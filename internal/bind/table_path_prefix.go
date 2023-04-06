@@ -9,6 +9,10 @@ import (
 
 type TablePathPrefix string
 
+func (tablePathPrefix TablePathPrefix) blockID() blockID {
+	return blockPragma
+}
+
 func (tablePathPrefix TablePathPrefix) NormalizePath(folderOrTable string) string {
 	switch ch := folderOrTable[0]; ch {
 	case '/':
