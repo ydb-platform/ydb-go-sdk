@@ -61,7 +61,7 @@ func (l *logger) format(format string, logLevel level.Level) string {
 	)
 }
 
-func (l *logger) Tracef(format string, args ...interface{}) {
+func (l *logger) Tracef(format string, args ...any) {
 	if l.minLevel > level.TRACE {
 		return
 	}
