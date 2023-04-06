@@ -9,6 +9,10 @@ import (
 
 type AutoDeclare struct{}
 
+func (m AutoDeclare) blockID() blockID {
+	return blockDeclare
+}
+
 func (m AutoDeclare) RewriteQuery(query string, args ...interface{}) (
 	yql string, newArgs []interface{}, err error,
 ) {

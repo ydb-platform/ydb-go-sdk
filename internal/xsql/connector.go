@@ -34,6 +34,33 @@ type QueryBindConnectorOption interface {
 	bind.Bind
 }
 
+type queryBindConnectorOption struct {
+	bind.Bind
+}
+
+func (o queryBindConnectorOption) Apply(c *Connector) error {
+	c.Bindings = bind.Sort(append(c.Bindings, o.Bind))
+	return nil
+}
+
+type tablePathPrefixConnectorOption struct {
+	bind.TablePathPrefix
+}
+
+func (o tablePathPrefixConnectorOption) Apply(c *Connector) error {
+	c.Bindings = bind.Sort(append(c.Bindings, o.TablePathPrefix))
+	c.PathNormalizer = o.TablePathPrefix
+	return nil
+}
+
+func WithQueryBind(bind bind.Bind) QueryBindConnectorOption {
+	return queryBindConnectorOption{Bind: bind}
+}
+
+func WithTablePathPrefix(tablePathPrefix string) QueryBindConnectorOption {
+	return tablePathPrefixConnectorOption{TablePathPrefix: bind.TablePathPrefix(tablePathPrefix)}
+}
+
 func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
 	return defaultQueryModeConnectorOption(mode)
 }

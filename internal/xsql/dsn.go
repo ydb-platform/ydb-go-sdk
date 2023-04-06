@@ -69,7 +69,7 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 					if err != nil {
 						return nil, nil, xerrors.WithStackTrace(err)
 					}
-					binders = append(binders, WithQueryBindAndPathNormalizer(bind.TablePathPrefix(prefix)))
+					binders = append(binders, WithTablePathPrefix(prefix))
 				} else {
 					return nil, nil, xerrors.WithStackTrace(
 						fmt.Errorf("unknown query rewriter: %s", transformer),

@@ -7,5 +7,5 @@ import (
 type QueryBindings = bind.Bindings
 
 func QueryBind(bindings ...bind.Bind) bind.Bindings {
-	return bindings
+	return bind.Sort(bindings)
 }
