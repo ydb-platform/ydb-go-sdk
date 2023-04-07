@@ -103,6 +103,11 @@ func (st *Storage) CreateTable(ctx context.Context) (err error) {
 				options.WithColumn("id", types.Optional(types.TypeUTF8)),
 				options.WithColumn("payload", types.Optional(types.TypeUTF8)),
 				options.WithPrimaryKeyColumn("id"),
+				options.WithProfile(
+					options.WithPartitioningPolicy(
+						options.WithPartitioningPolicyUniformPartitions(st.cfg.PartitionsCount),
+					),
+				),
 			)
 		},
 	)

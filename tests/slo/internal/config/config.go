@@ -18,6 +18,9 @@ type Config struct {
 
 	Table string
 
+	PartitionsCount  uint64
+	InitialDataCount int
+
 	PushGateway  string
 	ReportPeriod int
 
@@ -45,6 +48,11 @@ func New() (cfg Config, err error) {
 			fmt.Print(createHelp)
 			return cfg, ErrWrongArgs
 		}
+
+		fs.Uint64Var(
+			&cfg.PartitionsCount, "partitions-count", 64, "amount of partitions in table creation")
+		fs.IntVar(
+			&cfg.InitialDataCount, "initial-data-count", 1000, "amount of initially created rows")
 
 		cfg.Mode = CreateMode
 	case "cleanup":
