@@ -6,6 +6,7 @@ import (
 	"path"
 	"time"
 
+	env "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydbZap "github.com/ydb-platform/ydb-go-sdk-zap"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -53,7 +54,7 @@ func NewStorage(ctx context.Context, cfg config.Config, logger *zap.Logger, pool
 	st.db, err = ydb.Open(
 		localCtx,
 		st.cfg.Endpoint+st.cfg.DB,
-		ydb.WithAccessTokenCredentials(st.cfg.YDBToken),
+		env.WithEnvironCredentials(localCtx),
 		ydbZap.WithTraces(
 			logger,
 			trace.DetailsAll,

@@ -35,7 +35,6 @@ Arguments:
   db                              YDB database to connect to
 
 Options:
-  -a <token>                      YDB access token credentials
   -t <tableName>                  table name to create
 ```
 
@@ -48,7 +47,6 @@ Arguments:
   db                              YDB database to connect to
 
 Options:
-  -a <token>                      YDB access token credentials
   -t <tableName>                  table name to drop
 ```
 
@@ -61,7 +59,6 @@ Arguments:
   db                              YDB database to connect to
 
 Options:
-  -a              <token>         YDB access token credentials
   -t              <tableName>     table name
   -prom-pgw       <promPgw>       prometheus push gateway
   -read-rps       <readRps>       read RPS
@@ -73,6 +70,9 @@ Options:
   -report-period  <reportPeriod>  prometheus push period in milliseconds
 ```
 
+## Authentication
+
+Workload using [ydb-go-sdk-auth-environ](https://github.com/ydb-platform/ydb-go-sdk-auth-environ) for authentication.
 
 ## What's inside
 When running `run` command, the program creates three jobs: `readJob`, `writeJob`, `metricsJob`.

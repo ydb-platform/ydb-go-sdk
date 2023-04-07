@@ -13,7 +13,6 @@ Arguments:
   db                            YDB database to connect to
 
 Options:
-  -a                  <string>  YDB access token credentials
   -t                  <string>  table name to create
   -partitions-count   <int>     amount of partitions in table creation
   -initial-data-count <int>     amount of initially created rows
@@ -25,7 +24,6 @@ Arguments:
   db                            YDB database to connect to
 
 Options:
-  -a <string>                   YDB access token credentials
   -t <string>                   table name to drop
 `
 	runHelp = `Usage: slo-go-workload run <endpoint> <db> [options]
@@ -35,7 +33,6 @@ Arguments:
   db                            YDB database to connect to
 
 Options:
-  -a              <string>      YDB access token credentials
   -t              <string>      table name
   --prom-pgw      <string>      prometheus push gateway
   --read-rps      <int>         read RPS

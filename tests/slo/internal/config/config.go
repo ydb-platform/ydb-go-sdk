@@ -14,7 +14,6 @@ type Config struct {
 
 	Endpoint string
 	DB       string
-	YDBToken string
 
 	Table string
 
@@ -89,7 +88,6 @@ func New() (cfg Config, err error) {
 	cfg.Endpoint = os.Args[2]
 	cfg.DB = os.Args[3]
 
-	fs.StringVar(&cfg.YDBToken, "a", "", "YDB access token credentials")
 	fs.StringVar(&cfg.Table, "t", "testingTable", "table name")
 
 	err = fs.Parse(os.Args[4:])
