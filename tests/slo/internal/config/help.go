@@ -16,6 +16,7 @@ Options:
   -t                  <string>  table name to create
   -partitions-count   <int>     amount of partitions in table creation
   -initial-data-count <int>     amount of initially created rows
+  -write-timeout      <int>     write timeout milliseconds
 `
 	cleanupHelp = `Usage: slo-go-workload cleanup <endpoint> <db> [options]
 
@@ -25,6 +26,7 @@ Arguments:
 
 Options:
   -t <string>                   table name to drop
+  -write-timeout      <int>     write timeout milliseconds
 `
 	runHelp = `Usage: slo-go-workload run <endpoint> <db> [options]
 
@@ -33,14 +35,15 @@ Arguments:
   db                            YDB database to connect to
 
 Options:
-  -t              <string>      table name
-  --prom-pgw      <string>      prometheus push gateway
-  --read-rps      <int>         read RPS
-  --read-timeout  <int>         read timeout milliseconds
-  --write-rps     <int>         write RPS
-  --write-timeout <int>         write timeout milliseconds
-  --time          <int>         run time in seconds
-  --shutdown-time <int>         graceful shutdown time in seconds
-  --report-period <int>         prometheus push period in milliseconds
+  -t                  <string>  table name
+  -initial-data-count <int>     amount of initially created rows
+  -prom-pgw           <string>  prometheus push gateway
+  -read-rps           <int>     read RPS
+  -read-timeout       <int>     read timeout milliseconds
+  -write-rps          <int>     write RPS
+  -write-timeout      <int>     write timeout milliseconds
+  -time               <int>     run time in seconds
+  -shutdown-time      <int>     graceful shutdown time in seconds
+  -report-period      <int>     prometheus push period in milliseconds
 `
 )

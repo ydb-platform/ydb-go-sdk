@@ -24,14 +24,20 @@ import (
 
 const (
 	upsertTemplate = `
-DECLARE $id AS Utf8;
-DECLARE $payload AS Utf8;
-UPSERT INTO %s (id, payload) VALUES ($id, $payload);
+DECLARE $id AS Uint64;
+DECLARE $payload_str AS Utf8;
+DECLARE $payload_double AS Double;
+DECLARE $payload_timestamp AS Timestamp;
+UPSERT INTO %s (
+	id, hash, payload_str, payload_double, payload_timestamp
+) VALUES (
+	$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp
+);
 `
 	selectTemplate = `
-DECLARE $id AS UTf8;
-SELECT id, payload
-FROM %s WHERE id = $id;
+DECLARE $id AS Uint64;
+SELECT id, payload_str, payload_double, payload_timestamp, payload_hash
+FROM %s WHERE id = $id AND hash = Digest::NumericHash($id);
 `
 )
 
@@ -88,22 +94,26 @@ func NewStorage(ctx context.Context, cfg config.Config, logger *zap.Logger, pool
 }
 
 func (st *Storage) Close(ctx context.Context) error {
-	ctxLocal, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctxLocal, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
 
 	return st.db.Close(ctxLocal)
 }
 
 func (st *Storage) CreateTable(ctx context.Context) (err error) {
-	ctxLocal, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctxLocal, cancel := context.WithTimeout(ctx, time.Duration(st.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
 	err = st.db.Table().Do(ctxLocal,
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.CreateTable(ctx, path.Join(st.db.Name(), st.cfg.Table),
-				options.WithColumn("id", types.Optional(types.TypeUTF8)),
-				options.WithColumn("payload", types.Optional(types.TypeUTF8)),
-				options.WithPrimaryKeyColumn("id"),
+				options.WithColumn("id", types.Optional(types.TypeUint64)),
+				options.WithColumn("hash", types.Optional(types.TypeUint64)),
+				options.WithColumn("payload_str", types.Optional(types.TypeUTF8)),
+				options.WithColumn("payload_double", types.Optional(types.TypeDouble)),
+				options.WithColumn("payload_timestamp", types.Optional(types.TypeTimestamp)),
+				options.WithColumn("payload_hash", types.Optional(types.TypeUint64)),
+				options.WithPrimaryKeyColumn("hash", "id"),
 				options.WithProfile(
 					options.WithPartitioningPolicy(
 						options.WithPartitioningPolicyUniformPartitions(st.cfg.PartitionsCount),
@@ -117,7 +127,7 @@ func (st *Storage) CreateTable(ctx context.Context) (err error) {
 }
 
 func (st *Storage) DropTable(ctx context.Context) (err error) {
-	ctxLocal, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctxLocal, cancel := context.WithTimeout(ctx, time.Duration(st.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
 	err = st.db.Table().Do(ctxLocal,
@@ -145,7 +155,7 @@ func (st *Storage) Read(ctx context.Context, entryID generator.EntryID) (e gener
 			var res result.Result
 			_, res, err = s.Execute(ctx, readTx, st.selectQuery,
 				table.NewQueryParameters(
-					table.ValueParam("$id", types.UTF8Value(entryID.String())),
+					table.ValueParam("$id", types.Uint64Value(entryID)),
 				),
 			)
 			if err != nil {
@@ -160,13 +170,15 @@ func (st *Storage) Read(ctx context.Context, entryID generator.EntryID) (e gener
 
 					err = res.ScanNamed(
 						named.Required("id", &e.ID),
-						named.Optional("payload", &payload),
+						named.Optional("payload_str", &payload),
+						named.Required("payload_double", &e.PayloadDouble),
+						named.Required("payload_timestamp", &e.PayloadTimestamp),
 					)
 					if err != nil {
 						return err
 					}
 
-					e.Payload = *payload
+					e.PayloadStr = *payload
 				}
 			}
 			return res.Err()
@@ -184,8 +196,10 @@ func (st *Storage) Write(ctx context.Context, e generator.Entry) error {
 		func(ctx context.Context, tx table.TransactionActor) (err error) {
 			res, err := tx.Execute(ctxLocal, st.upsertQuery,
 				table.NewQueryParameters(
-					table.ValueParam("$id", types.UTF8Value(e.ID.String())),
-					table.ValueParam("$payload", types.UTF8Value(e.Payload)),
+					table.ValueParam("$id", types.Uint64Value(e.ID)),
+					table.ValueParam("$payload_str", types.UTF8Value(e.PayloadStr)),
+					table.ValueParam("$payload_double", types.DoubleValue(e.PayloadDouble)),
+					table.ValueParam("$payload_timestamp", types.TimestampValue(e.PayloadTimestamp)),
 				),
 			)
 			if err != nil {

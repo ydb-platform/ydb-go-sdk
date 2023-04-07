@@ -1,12 +1,12 @@
 package generator
 
-import "github.com/google/uuid"
-
-type EntryID = uuid.UUID
+type EntryID = uint64
 
 type Entry struct {
-	ID      EntryID
-	Payload string
+	ID               EntryID
+	PayloadStr       string
+	PayloadDouble    float64
+	PayloadTimestamp uint64
 }
 
 type Entries = map[EntryID]Entry

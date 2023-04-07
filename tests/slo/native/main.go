@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 
 	"slo/internal/config"
@@ -52,13 +53,43 @@ func main() {
 			panic(fmt.Errorf("create table failed: %w", err))
 		}
 		logger.Info("create table ok")
+
+		gen := generator.New(0)
+
+		g := errgroup.Group{}
+
+		for i := uint64(0); i < cfg.InitialDataCount; i++ {
+			g.Go(func() error {
+				e, err := gen.Generate()
+				if err != nil {
+					return err
+				}
+
+				err = st.Write(ctx, e)
+				if err != nil {
+					return err
+				}
+
+				return nil
+			})
+		}
+
+		err = g.Wait()
+		if err != nil {
+			panic(err)
+		}
+
+		logger.Info("entries write ok")
+
 		return
 	case config.CleanupMode:
 		err = st.DropTable(ctx)
 		if err != nil {
 			panic(fmt.Errorf("create table failed: %w", err))
 		}
+
 		logger.Info("cleanup table ok")
+
 		return
 	}
 
@@ -76,12 +107,12 @@ func main() {
 
 	logger.Info("metrics init ok")
 
-	gen := generator.New()
+	gen := generator.New(cfg.InitialDataCount)
 
 	workCtx, workCancel := context.WithCancel(ctx)
 	defer workCancel()
 
-	w := workers.New(workCtx, &st, m, logger)
+	w := workers.New(workCtx, cfg, &st, m, logger)
 
 	readRL := rate.NewLimiter(rate.Limit(cfg.ReadRPS), 1)
 	for i := 0; i < cfg.ReadRPS; i++ {

@@ -1,11 +1,11 @@
 package generator
 
 import (
-	"crypto/rand"
+	crypto "crypto/rand"
 	"encoding/base64"
-	"math/big"
-
-	"github.com/google/uuid"
+	"math/rand"
+	"sync"
+	"time"
 )
 
 const (
@@ -13,19 +13,31 @@ const (
 	MaxLength = 40
 )
 
-type Generator struct{}
-
-func New() Generator {
-	return Generator{}
+type Generator struct {
+	currentID EntryID
+	mu        sync.Mutex
 }
 
-func (g Generator) Generate() (Entry, error) {
+func New(id EntryID) Generator {
+	return Generator{
+		currentID: id,
+	}
+}
+
+func (g *Generator) Generate() (Entry, error) {
+	g.mu.Lock()
+	g.currentID++
+	id := g.currentID
+	g.mu.Unlock()
+
 	e := Entry{
-		ID: uuid.New(),
+		ID:               id,
+		PayloadDouble:    rand.Float64(),
+		PayloadTimestamp: uint64(time.Now().UnixMicro()),
 	}
 
 	var err error
-	e.Payload, err = g.genPayload()
+	e.PayloadStr, err = g.genPayloadString()
 	if err != nil {
 		return Entry{}, err
 	}
@@ -33,15 +45,12 @@ func (g Generator) Generate() (Entry, error) {
 	return e, nil
 }
 
-func (g Generator) genPayload() (string, error) {
-	l, err := rand.Int(rand.Reader, big.NewInt(MaxLength-MinLength+1))
-	if err != nil {
-		return "", err
-	}
+func (g *Generator) genPayloadString() (string, error) {
+	l := MinLength + rand.Intn(MaxLength-MinLength+1)
 
-	sl := make([]byte, MinLength+l.Int64())
+	sl := make([]byte, l)
 
-	_, err = rand.Read(sl)
+	_, err := crypto.Read(sl)
 	if err != nil {
 		return "", err
 	}

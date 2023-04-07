@@ -31,11 +31,14 @@ run:
 
 ```
 Arguments:
-  endpoint                        YDB endpoint to connect to
-  db                              YDB database to connect to
+  endpoint                      YDB endpoint to connect to
+  db                            YDB database to connect to
 
 Options:
-  -t <tableName>                  table name to create
+  -t                  <string>  table name to create
+  -partitions-count   <int>     amount of partitions in table creation
+  -initial-data-count <int>     amount of initially created rows
+  -write-timeout      <int>     write timeout milliseconds
 ```
 
 ### cleanup
@@ -43,11 +46,12 @@ Options:
 
 ```
 Arguments:
-  endpoint                        YDB endpoint to connect to
-  db                              YDB database to connect to
+  endpoint                      YDB endpoint to connect to
+  db                            YDB database to connect to
 
 Options:
-  -t <tableName>                  table name to drop
+  -t <string>                   table name to drop
+  -write-timeout      <int>     write timeout milliseconds
 ```
 
 ### run
@@ -55,19 +59,20 @@ Options:
 
 ```
 Arguments:
-  endpoint                        YDB endpoint to connect to
-  db                              YDB database to connect to
+  endpoint                      YDB endpoint to connect to
+  db                            YDB database to connect to
 
 Options:
-  -t              <tableName>     table name
-  -prom-pgw       <promPgw>       prometheus push gateway
-  -read-rps       <readRps>       read RPS
-  -read-timeout   <readTimeout>   read timeout milliseconds
-  -write-rps      <writeRps>      write RPS
-  -write-timeout  <writeTimeout>  write timeout milliseconds
-  -time           <time>          run time in seconds
-  -shutdown-time  <shutdownTime>  graceful shutdown time in seconds
-  -report-period  <reportPeriod>  prometheus push period in milliseconds
+  -t                  <string>  table name
+  -initial-data-count <int>     amount of initially created rows
+  -prom-pgw           <string>  prometheus push gateway
+  -read-rps           <int>     read RPS
+  -read-timeout       <int>     read timeout milliseconds
+  -write-rps          <int>     write RPS
+  -write-timeout      <int>     write timeout milliseconds
+  -time               <int>     run time in seconds
+  -shutdown-time      <int>     graceful shutdown time in seconds
+  -report-period      <int>     prometheus push period in milliseconds
 ```
 
 ## Authentication
@@ -82,8 +87,14 @@ When running `run` command, the program creates three jobs: `readJob`, `writeJob
 - `metricsJob` periodically sends metrics to Prometheus
 
 Table have these fields:
-- `id (primary) Utf8`
-- `payload Utf8`
+- `id Uint64`
+- `hash Uint64 Digest::NumericHash(id)`
+- `payload_str UTF8`
+- `payload_double Double`
+- `payload_timestamp Timestamp`
+- `payload_hash Uint64`
+
+Primary key: `("hash", "id")`
 
 ## Collected metrics
 - `oks`      - amount of OK requests

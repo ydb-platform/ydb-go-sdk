@@ -32,10 +32,5 @@ func (w *Workers) Write(rl *rate.Limiter, gen generator.Generator) {
 		}
 
 		w.m.StopJob(metricID, true)
-
-		w.entriesMutex.Lock()
-		w.entries[entry.ID] = entry
-		w.entryIDs = append(w.entryIDs, entry.ID)
-		w.entriesMutex.Unlock()
 	}
 }

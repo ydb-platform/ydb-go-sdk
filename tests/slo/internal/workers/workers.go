@@ -2,10 +2,10 @@ package workers
 
 import (
 	"context"
-	"sync"
 
 	"go.uber.org/zap"
 
+	"slo/internal/config"
 	"slo/internal/generator"
 	"slo/internal/metrics"
 )
@@ -16,24 +16,20 @@ type ReadWriter interface {
 }
 
 type Workers struct {
-	ctx          context.Context
-	st           ReadWriter
-	m            *metrics.Metrics
-	logger       *zap.Logger
-	entries      generator.Entries
-	entryIDs     []generator.EntryID
-	entriesMutex sync.RWMutex
+	ctx    context.Context
+	cfg    config.Config
+	st     ReadWriter
+	m      *metrics.Metrics
+	logger *zap.Logger
 }
 
-func New(ctx context.Context, st ReadWriter, m *metrics.Metrics, logger *zap.Logger) *Workers {
+func New(ctx context.Context, cfg config.Config, st ReadWriter, m *metrics.Metrics, logger *zap.Logger) *Workers {
 	w := &Workers{
-		ctx:          ctx,
-		st:           st,
-		m:            m,
-		logger:       logger,
-		entries:      make(generator.Entries),
-		entryIDs:     make([]generator.EntryID, 0),
-		entriesMutex: sync.RWMutex{},
+		ctx:    ctx,
+		cfg:    cfg,
+		st:     st,
+		m:      m,
+		logger: logger,
 	}
 
 	return w
