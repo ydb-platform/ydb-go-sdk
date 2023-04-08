@@ -7,8 +7,12 @@ import (
 	"io"
 	"log"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/encoding/gzip"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
+	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
@@ -375,6 +379,25 @@ func Example_discovery() {
 	for i, e := range endpoints {
 		fmt.Printf("%d) %s\n", i, e.String())
 	}
+}
+
+func Example_enableGzipCompression() {
+	ctx := context.TODO()
+	db, err := ydb.Open(
+		ctx,
+		"grpc://localhost:2135/local",
+		ydb.WithAnonymousCredentials(),
+		ydb.With(config.WithGrpcOptions(
+			grpc.WithDefaultCallOptions(
+				grpc.UseCompressor(gzip.Name),
+			),
+		)),
+	)
+	if err != nil {
+		fmt.Printf("Driver failed: %v", err)
+	}
+	defer db.Close(ctx) // cleanup resources
+	fmt.Printf("connected to %s, database '%s'", db.Endpoint(), db.Name())
 }
 
 func ExampleOpen() {
