@@ -114,6 +114,12 @@ func (st *Storage) CreateTable(ctx context.Context) (err error) {
 				options.WithColumn("payload_timestamp", types.Optional(types.TypeTimestamp)),
 				options.WithColumn("payload_hash", types.Optional(types.TypeUint64)),
 				options.WithPrimaryKeyColumn("hash", "id"),
+
+				options.WithPartitioningSettings(
+					options.WithPartitioningByLoad(options.FeatureEnabled),
+					options.WithMinPartitionsCount(st.cfg.PartitionsCount),
+					options.WithMaxPartitionsCount(1000),
+				),
 				options.WithProfile(
 					options.WithPartitioningPolicy(
 						options.WithPartitioningPolicyUniformPartitions(st.cfg.PartitionsCount),
