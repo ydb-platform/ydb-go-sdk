@@ -26,8 +26,8 @@ func New(id EntryID) *Generator {
 
 func (g *Generator) Generate() (Entry, error) {
 	g.mu.Lock()
-	g.currentID++
 	id := g.currentID
+	g.currentID++
 	g.mu.Unlock()
 
 	e := Entry{
