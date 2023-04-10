@@ -3,6 +3,15 @@
 SLO is the type of test where app based on ydb-sdk is tested against falling YDB cluster nodes, tablets, network
 (that is possible situations for distributed DBs with hundreds of nodes)
 
+### Implementations:
+
+There are two implementations:
+
+- `native`       - `./native`
+- `database/sql` - `./database/sql`
+
+### Usage:
+
 It has 3 commands:
 
 - `create`  - creates table in database
