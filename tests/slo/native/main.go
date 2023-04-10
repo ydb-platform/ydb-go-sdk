@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 
@@ -20,7 +21,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	logger, err := zap.NewProduction()
+	logger, err := zap.NewProduction(zap.AddStacktrace(zapcore.PanicLevel))
 	if err != nil {
 		panic(fmt.Errorf("error create logger: %w", err))
 	}

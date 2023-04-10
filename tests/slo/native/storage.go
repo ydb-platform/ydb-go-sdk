@@ -41,6 +41,19 @@ FROM %s WHERE id = $id AND hash = Digest::NumericHash($id);
 `
 )
 
+var (
+	readTx = table.TxControl(
+		table.BeginTx(
+			table.WithSnapshotReadOnly(),
+		),
+		table.CommitTx(),
+	)
+
+	writeTx = table.SerializableReadWriteTxControl(
+		table.CommitTx(),
+	)
+)
+
 type Storage struct {
 	db          *ydb.Driver
 	cfg         config.Config
@@ -150,13 +163,6 @@ func (st *Storage) Read(ctx context.Context, entryID generator.EntryID) (e gener
 	ctxLocal, cancel := context.WithTimeout(ctx, time.Duration(st.cfg.ReadTimeout)*time.Millisecond)
 	defer cancel()
 
-	readTx := table.TxControl(
-		table.BeginTx(
-			table.WithOnlineReadOnly(),
-		),
-		table.CommitTx(),
-	)
-
 	err = st.db.Table().Do(ctxLocal,
 		func(ctx context.Context, s table.Session) (err error) {
 			var res result.Result
@@ -199,9 +205,9 @@ func (st *Storage) Write(ctx context.Context, e generator.Entry) error {
 	ctxLocal, cancel := context.WithTimeout(ctx, time.Duration(st.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return st.db.Table().DoTx(ctx,
-		func(ctx context.Context, tx table.TransactionActor) (err error) {
-			res, err := tx.Execute(ctxLocal, st.upsertQuery,
+	return st.db.Table().Do(ctxLocal,
+		func(ctx context.Context, s table.Session) error {
+			_, res, err := s.Execute(ctx, writeTx, st.upsertQuery,
 				table.NewQueryParameters(
 					table.ValueParam("$id", types.Uint64Value(e.ID)),
 					table.ValueParam("$payload_str", types.UTF8Value(e.PayloadStr)),
