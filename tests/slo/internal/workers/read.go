@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 
@@ -9,9 +10,9 @@ import (
 	"slo/internal/metrics"
 )
 
-func (w *Workers) Read(rl *rate.Limiter) {
+func (w *Workers) Read(ctx context.Context, rl *rate.Limiter) {
 	for {
-		err := rl.Wait(w.shutdownCtx)
+		err := rl.Wait(ctx)
 		if err != nil {
 			return
 		}
@@ -20,7 +21,7 @@ func (w *Workers) Read(rl *rate.Limiter) {
 
 		metricID := w.m.StartJob(metrics.JobRead)
 
-		_, err = w.st.Read(w.ctx, id)
+		_, err = w.st.Read(ctx, id)
 		if err != nil {
 			w.logger.Error(fmt.Errorf("get entry error: %w", err).Error())
 			w.m.StopJob(metricID, false)

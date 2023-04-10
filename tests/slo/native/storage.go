@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
 	"time"
@@ -56,24 +57,25 @@ var (
 
 type Storage struct {
 	db          *ydb.Driver
-	cfg         config.Config
+	cfg         *config.Config
 	upsertQuery string
 	selectQuery string
 }
 
-func NewStorage(ctx context.Context, cfg config.Config, logger *zap.Logger, poolSize int) (_ Storage, err error) {
-	localCtx, cancel := context.WithTimeout(ctx, time.Minute*5)
+func NewStorage(ctx context.Context, cfg *config.Config, logger *zap.Logger, poolSize int) (*Storage, error) {
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
-	st := Storage{
+	st := &Storage{
 		cfg:         cfg,
 		upsertQuery: fmt.Sprintf(upsertTemplate, cfg.Table),
 		selectQuery: fmt.Sprintf(selectTemplate, cfg.Table),
 	}
+	var err error
 	st.db, err = ydb.Open(
-		localCtx,
+		ctx,
 		st.cfg.Endpoint+st.cfg.DB,
-		env.WithEnvironCredentials(localCtx),
+		env.WithEnvironCredentials(ctx),
 		ydbZap.WithTraces(
 			logger,
 			trace.DetailsAll,
@@ -81,14 +83,14 @@ func NewStorage(ctx context.Context, cfg config.Config, logger *zap.Logger, pool
 		ydb.WithSessionPoolSizeLimit(poolSize),
 	)
 	if err != nil {
-		return Storage{}, err
+		return nil, err
 	}
 
 	g := errgroup.Group{}
 
 	for i := 0; i < poolSize; i++ {
 		g.Go(func() error {
-			err := st.db.Table().Do(localCtx, func(ctx context.Context, s table.Session) error {
+			err := st.db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
 				return nil
 			})
 			if err != nil {
@@ -100,28 +102,28 @@ func NewStorage(ctx context.Context, cfg config.Config, logger *zap.Logger, pool
 
 	err = g.Wait()
 	if err != nil {
-		return Storage{}, err
+		return nil, err
 	}
 
 	return st, nil
 }
 
 func (st *Storage) Close(ctx context.Context) error {
-	ctxLocal, cancel := context.WithTimeout(ctx, time.Second*10)
+	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
 
-	return st.db.Close(ctxLocal)
+	return st.db.Close(ctx)
 }
 
-func (st *Storage) CreateTable(ctx context.Context) (err error) {
-	ctxLocal, cancel := context.WithTimeout(ctx, time.Duration(st.cfg.WriteTimeout)*time.Millisecond)
+func (st *Storage) CreateTable(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(st.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	err = st.db.Table().Do(ctxLocal,
-		func(ctx context.Context, s table.Session) (err error) {
+	return st.db.Table().Do(ctx,
+		func(ctx context.Context, s table.Session) error {
 			return s.CreateTable(ctx, path.Join(st.db.Name(), st.cfg.Table),
-				options.WithColumn("hash", types.Optional(types.TypeUint64)),
-				options.WithColumn("id", types.Optional(types.TypeUint64)),
+				options.WithColumn("hash", types.TypeUint64),
+				options.WithColumn("id", types.TypeUint64),
 				options.WithColumn("payload_str", types.Optional(types.TypeUTF8)),
 				options.WithColumn("payload_double", types.Optional(types.TypeDouble)),
 				options.WithColumn("payload_timestamp", types.Optional(types.TypeTimestamp)),
@@ -142,29 +144,40 @@ func (st *Storage) CreateTable(ctx context.Context) (err error) {
 			)
 		},
 	)
-
-	return
 }
 
-func (st *Storage) DropTable(ctx context.Context) (err error) {
-	ctxLocal, cancel := context.WithTimeout(ctx, time.Duration(st.cfg.WriteTimeout)*time.Millisecond)
+func (st *Storage) DropTable(ctx context.Context) error {
+	err := ctx.Err()
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(st.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	err = st.db.Table().Do(ctxLocal,
+	return st.db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			return s.DropTable(ctx, path.Join(st.db.Name(), st.cfg.Table))
 		},
 	)
-
-	return
 }
 
-func (st *Storage) Read(ctx context.Context, entryID generator.EntryID) (e generator.Entry, err error) {
-	ctxLocal, cancel := context.WithTimeout(ctx, time.Duration(st.cfg.ReadTimeout)*time.Millisecond)
+func (st *Storage) Read(ctx context.Context, entryID generator.EntryID) (generator.Entry, error) {
+	if err := ctx.Err(); err != nil {
+		return generator.Entry{}, err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(st.cfg.ReadTimeout)*time.Millisecond)
 	defer cancel()
 
-	err = st.db.Table().Do(ctxLocal,
+	e := generator.Entry{}
+
+	err := st.db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
+			if err = ctx.Err(); err != nil {
+				return err
+			}
+
 			var res result.Result
 			_, res, err = s.Execute(ctx, readTx, st.selectQuery,
 				table.NewQueryParameters(
@@ -177,23 +190,26 @@ func (st *Storage) Read(ctx context.Context, entryID generator.EntryID) (e gener
 			defer func(res result.Result) {
 				_ = res.Close()
 			}(res)
-			for res.NextResultSet(ctx) {
-				for res.NextRow() {
-					var payload *string
 
-					err = res.ScanNamed(
-						named.Required("id", &e.ID),
-						named.Optional("payload_str", &payload),
-						named.Required("payload_double", &e.PayloadDouble),
-						named.Required("payload_timestamp", &e.PayloadTimestamp),
-					)
-					if err != nil {
-						return err
-					}
-
-					e.PayloadStr = *payload
-				}
+			err = res.NextResultSetErr(ctx)
+			if err != nil {
+				return err
 			}
+
+			if !res.NextRow() {
+				return errors.New("entry not found")
+			}
+
+			err = res.ScanNamed(
+				named.Required("id", &e.ID),
+				named.Optional("payload_str", &e.PayloadStr),
+				named.Optional("payload_double", &e.PayloadDouble),
+				named.Optional("payload_timestamp", &e.PayloadTimestamp),
+			)
+			if err != nil {
+				return err
+			}
+
 			return res.Err()
 		},
 	)
@@ -202,26 +218,38 @@ func (st *Storage) Read(ctx context.Context, entryID generator.EntryID) (e gener
 }
 
 func (st *Storage) Write(ctx context.Context, e generator.Entry) error {
-	ctxLocal, cancel := context.WithTimeout(ctx, time.Duration(st.cfg.WriteTimeout)*time.Millisecond)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(st.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return st.db.Table().Do(ctxLocal,
+	return st.db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+
 			_, res, err := s.Execute(ctx, writeTx, st.upsertQuery,
 				table.NewQueryParameters(
 					table.ValueParam("$id", types.Uint64Value(e.ID)),
-					table.ValueParam("$payload_str", types.UTF8Value(e.PayloadStr)),
-					table.ValueParam("$payload_double", types.DoubleValue(e.PayloadDouble)),
-					table.ValueParam("$payload_timestamp", types.TimestampValue(e.PayloadTimestamp)),
+					table.ValueParam("$payload_str", types.UTF8Value(*e.PayloadStr)),
+					table.ValueParam("$payload_double", types.DoubleValue(*e.PayloadDouble)),
+					table.ValueParam("$payload_timestamp", types.TimestampValue(*e.PayloadTimestamp)),
 				),
 			)
 			if err != nil {
 				return err
 			}
-			if err = res.Err(); err != nil {
+
+			err = res.Err()
+			if err != nil {
 				return err
 			}
+
 			return res.Close()
-		}, table.WithIdempotent(),
+		},
+		table.WithIdempotent(),
 	)
 }

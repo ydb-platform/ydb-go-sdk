@@ -18,8 +18,8 @@ type Generator struct {
 	mu        sync.Mutex
 }
 
-func New(id EntryID) Generator {
-	return Generator{
+func New(id EntryID) *Generator {
+	return &Generator{
 		currentID: id,
 	}
 }
@@ -32,8 +32,8 @@ func (g *Generator) Generate() (Entry, error) {
 
 	e := Entry{
 		ID:               id,
-		PayloadDouble:    rand.Float64(),
-		PayloadTimestamp: uint64(time.Now().UnixMicro()),
+		PayloadDouble:    func(a float64) *float64 { return &a }(rand.Float64()),
+		PayloadTimestamp: func(a uint64) *uint64 { return &a }(uint64(time.Now().UnixMicro())),
 	}
 
 	var err error
@@ -45,15 +45,17 @@ func (g *Generator) Generate() (Entry, error) {
 	return e, nil
 }
 
-func (g *Generator) genPayloadString() (string, error) {
+func (g *Generator) genPayloadString() (*string, error) {
 	l := MinLength + rand.Intn(MaxLength-MinLength+1)
 
 	sl := make([]byte, l)
 
 	_, err := crypto.Read(sl)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return base64.StdEncoding.EncodeToString(sl), nil
+	s := base64.StdEncoding.EncodeToString(sl)
+
+	return &s, nil
 }

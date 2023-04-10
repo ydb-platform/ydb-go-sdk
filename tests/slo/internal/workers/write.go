@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"context"
 	"fmt"
 
 	"golang.org/x/time/rate"
@@ -9,9 +10,9 @@ import (
 	"slo/internal/metrics"
 )
 
-func (w *Workers) Write(rl *rate.Limiter, gen generator.Generator) {
+func (w *Workers) Write(ctx context.Context, rl *rate.Limiter, gen *generator.Generator) {
 	for {
-		err := rl.Wait(w.shutdownCtx)
+		err := rl.Wait(ctx)
 		if err != nil {
 			return
 		}
@@ -24,7 +25,7 @@ func (w *Workers) Write(rl *rate.Limiter, gen generator.Generator) {
 
 		metricID := w.m.StartJob(metrics.JobWrite)
 
-		err = w.st.Write(w.ctx, entry)
+		err = w.st.Write(ctx, entry)
 		if err != nil {
 			w.logger.Error(fmt.Errorf("error when write entry: %w", err).Error())
 			w.m.StopJob(metricID, false)

@@ -33,10 +33,12 @@ type Config struct {
 	ShutdownTime int
 }
 
-func New() (cfg Config, err error) {
+func New() (*Config, error) {
+	cfg := &Config{}
+
 	if len(os.Args) < 2 {
 		fmt.Print(mainHelp)
-		return cfg, ErrWrongArgs
+		return nil, ErrWrongArgs
 	}
 
 	fs := flag.FlagSet{}
@@ -45,26 +47,26 @@ func New() (cfg Config, err error) {
 	case "create":
 		if len(os.Args) < 4 {
 			fmt.Print(createHelp)
-			return cfg, ErrWrongArgs
+			return nil, ErrWrongArgs
 		}
+
+		cfg.Mode = CreateMode
 
 		fs.Uint64Var(
 			&cfg.PartitionsCount, "partitions-count", 6, "amount of partitions in table creation")
 		fs.Uint64Var(
 			&cfg.InitialDataCount, "initial-data-count", 1000, "amount of initially created rows")
-
-		cfg.Mode = CreateMode
 	case "cleanup":
 		if len(os.Args) < 4 {
 			fmt.Print(cleanupHelp)
-			return cfg, ErrWrongArgs
+			return nil, ErrWrongArgs
 		}
 
 		cfg.Mode = CleanupMode
 	case "run":
 		if len(os.Args) < 4 {
 			fmt.Print(runHelp)
-			return cfg, ErrWrongArgs
+			return nil, ErrWrongArgs
 		}
 
 		cfg.Mode = RunMode
@@ -83,7 +85,7 @@ func New() (cfg Config, err error) {
 		fs.IntVar(&cfg.ShutdownTime, "shutdown-time", 30, "time to wait before force kill workers")
 	default:
 		fmt.Print(mainHelp)
-		return cfg, ErrWrongArgs
+		return nil, ErrWrongArgs
 	}
 
 	cfg.Endpoint = os.Args[2]
@@ -93,9 +95,9 @@ func New() (cfg Config, err error) {
 
 	fs.IntVar(&cfg.WriteTimeout, "write-timeout", 10000, "write timeout milliseconds")
 
-	err = fs.Parse(os.Args[4:])
+	err := fs.Parse(os.Args[4:])
 	if err != nil {
-		return cfg, err
+		return nil, err
 	}
 
 	return cfg, nil

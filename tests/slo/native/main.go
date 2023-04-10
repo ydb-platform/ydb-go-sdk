@@ -19,7 +19,8 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	logger, err := zap.NewProduction(zap.AddStacktrace(zapcore.PanicLevel))
 	if err != nil {
@@ -96,13 +97,13 @@ func main() {
 
 	m, err := metrics.NewMetrics(cfg.PushGateway, "native")
 	if err != nil {
-		logger.Error(fmt.Errorf("create metrics failed: %v", err).Error())
+		logger.Error(fmt.Errorf("create metrics failed: %w", err).Error())
 		return
 	}
 
 	err = m.Reset()
 	if err != nil {
-		logger.Error(fmt.Errorf("metrics reset failed: %v", err).Error())
+		logger.Error(fmt.Errorf("metrics reset failed: %w", err).Error())
 		return
 	}
 
@@ -110,23 +111,20 @@ func main() {
 
 	gen := generator.New(cfg.InitialDataCount)
 
-	shutdownCtx, shutdownCancel := context.WithCancel(ctx)
-	defer shutdownCancel()
-
-	w := workers.New(ctx, shutdownCtx, cfg, &st, m, logger)
+	w := workers.New(cfg, st, m, logger)
 
 	readRL := rate.NewLimiter(rate.Limit(cfg.ReadRPS), 1)
 	for i := 0; i < cfg.ReadRPS; i++ {
-		go w.Read(readRL)
+		go w.Read(ctx, readRL)
 	}
 
 	writeRL := rate.NewLimiter(rate.Limit(cfg.WriteRPS), 1)
 	for i := 0; i < cfg.WriteRPS; i++ {
-		go w.Write(writeRL, gen)
+		go w.Write(ctx, writeRL, gen)
 	}
 
 	metricsRL := rate.NewLimiter(rate.Every(time.Duration(cfg.ReportPeriod)*time.Millisecond), 1)
-	go w.Metrics(metricsRL)
+	go w.Metrics(ctx, metricsRL)
 
 	logger.Info("workers init ok")
 
@@ -134,7 +132,7 @@ func main() {
 
 	logger.Info("shutdown started")
 
-	shutdownCancel()
+	cancel()
 
 	logger.Info("waiting for workers")
 
@@ -148,7 +146,7 @@ func main() {
 
 	err = m.Reset()
 	if err != nil {
-		logger.Error(fmt.Errorf("metrics reset failed: %v", err).Error())
+		logger.Error(fmt.Errorf("metrics reset failed: %w", err).Error())
 	}
 
 	logger.Info("shutdown successful")

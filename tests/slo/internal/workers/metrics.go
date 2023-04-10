@@ -1,14 +1,15 @@
 package workers
 
 import (
+	"context"
 	"fmt"
 
 	"golang.org/x/time/rate"
 )
 
-func (w *Workers) Metrics(rl *rate.Limiter) {
+func (w *Workers) Metrics(ctx context.Context, rl *rate.Limiter) {
 	for {
-		err := rl.Wait(w.shutdownCtx)
+		err := rl.Wait(ctx)
 		if err != nil {
 			return
 		}
