@@ -120,10 +120,9 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.
 	var (
 		response *Ydb_Table.CreateSessionResponse
 		result   Ydb_Table.CreateSessionResult
+		c        = Ydb_Table_V1.NewTableServiceClient(cc)
 	)
-	c := Ydb_Table_V1.NewTableServiceClient(cc)
-	response, err = c.CreateSession(
-		ctx,
+	response, err = c.CreateSession(ctx,
 		&Ydb_Table.CreateSessionRequest{
 			OperationParams: operation.Params(
 				ctx,
