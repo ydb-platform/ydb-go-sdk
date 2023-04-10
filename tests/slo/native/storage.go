@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path"
 	"time"
@@ -197,7 +196,7 @@ func (st *Storage) Read(ctx context.Context, entryID generator.EntryID) (generat
 			}
 
 			if !res.NextRow() {
-				return errors.New("entry not found")
+				return fmt.Errorf("entry not found, id = %v", entryID)
 			}
 
 			err = res.ScanNamed(
