@@ -49,7 +49,7 @@ func New() (cfg Config, err error) {
 		}
 
 		fs.Uint64Var(
-			&cfg.PartitionsCount, "partitions-count", 64, "amount of partitions in table creation")
+			&cfg.PartitionsCount, "partitions-count", 6, "amount of partitions in table creation")
 		fs.Uint64Var(
 			&cfg.InitialDataCount, "initial-data-count", 1000, "amount of initially created rows")
 
