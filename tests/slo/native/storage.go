@@ -44,7 +44,7 @@ FROM %s WHERE id = $id AND hash = Digest::NumericHash($id);
 var (
 	readTx = table.TxControl(
 		table.BeginTx(
-			table.WithSnapshotReadOnly(),
+			table.WithOnlineReadOnly(),
 		),
 		table.CommitTx(),
 	)
