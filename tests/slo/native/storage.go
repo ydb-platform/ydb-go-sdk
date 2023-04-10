@@ -122,8 +122,8 @@ func (st *Storage) CreateTable(ctx context.Context) error {
 	return st.db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) error {
 			return s.CreateTable(ctx, path.Join(st.db.Name(), st.cfg.Table),
-				options.WithColumn("hash", types.TypeUint64),
-				options.WithColumn("id", types.TypeUint64),
+				options.WithColumn("hash", types.Optional(types.TypeUint64)),
+				options.WithColumn("id", types.Optional(types.TypeUint64)),
 				options.WithColumn("payload_str", types.Optional(types.TypeUTF8)),
 				options.WithColumn("payload_double", types.Optional(types.TypeDouble)),
 				options.WithColumn("payload_timestamp", types.Optional(types.TypeTimestamp)),
