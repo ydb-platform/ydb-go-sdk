@@ -11,7 +11,7 @@ import (
 
 func (w *Workers) Read(rl *rate.Limiter) {
 	for {
-		err := rl.Wait(w.ctx)
+		err := rl.Wait(w.shutdownCtx)
 		if err != nil {
 			return
 		}

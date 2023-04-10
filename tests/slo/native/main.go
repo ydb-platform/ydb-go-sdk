@@ -110,10 +110,10 @@ func main() {
 
 	gen := generator.New(cfg.InitialDataCount)
 
-	workCtx, workCancel := context.WithCancel(ctx)
-	defer workCancel()
+	shutdownCtx, shutdownCancel := context.WithCancel(ctx)
+	defer shutdownCancel()
 
-	w := workers.New(workCtx, cfg, &st, m, logger)
+	w := workers.New(ctx, shutdownCtx, cfg, &st, m, logger)
 
 	readRL := rate.NewLimiter(rate.Limit(cfg.ReadRPS), 1)
 	for i := 0; i < cfg.ReadRPS; i++ {
@@ -134,7 +134,7 @@ func main() {
 
 	logger.Info("shutdown started")
 
-	workCancel()
+	shutdownCancel()
 
 	logger.Info("waiting for workers")
 

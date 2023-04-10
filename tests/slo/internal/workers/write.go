@@ -11,7 +11,7 @@ import (
 
 func (w *Workers) Write(rl *rate.Limiter, gen generator.Generator) {
 	for {
-		err := rl.Wait(w.ctx)
+		err := rl.Wait(w.shutdownCtx)
 		if err != nil {
 			return
 		}

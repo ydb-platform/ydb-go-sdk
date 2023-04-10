@@ -16,20 +16,22 @@ type ReadWriter interface {
 }
 
 type Workers struct {
-	ctx    context.Context
-	cfg    config.Config
-	st     ReadWriter
-	m      *metrics.Metrics
-	logger *zap.Logger
+	ctx         context.Context
+	shutdownCtx context.Context
+	cfg         config.Config
+	st          ReadWriter
+	m           *metrics.Metrics
+	logger      *zap.Logger
 }
 
-func New(ctx context.Context, cfg config.Config, st ReadWriter, m *metrics.Metrics, logger *zap.Logger) *Workers {
+func New(ctx context.Context, shutdownCtx context.Context, cfg config.Config, st ReadWriter, m *metrics.Metrics, logger *zap.Logger) *Workers {
 	w := &Workers{
-		ctx:    ctx,
-		cfg:    cfg,
-		st:     st,
-		m:      m,
-		logger: logger,
+		ctx:         ctx,
+		shutdownCtx: shutdownCtx,
+		cfg:         cfg,
+		st:          st,
+		m:           m,
+		logger:      logger,
 	}
 
 	return w
