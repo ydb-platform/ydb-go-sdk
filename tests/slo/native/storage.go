@@ -116,7 +116,8 @@ func (st *Storage) CreateTable(ctx context.Context) (err error) {
 				options.WithPrimaryKeyColumn("hash", "id"),
 
 				options.WithPartitioningSettings(
-					options.WithPartitioningByLoad(options.FeatureEnabled),
+					options.WithPartitioningBySize(options.FeatureEnabled),
+					options.WithPartitionSizeMb(1),
 					options.WithMinPartitionsCount(st.cfg.PartitionsCount),
 					options.WithMaxPartitionsCount(1000),
 				),

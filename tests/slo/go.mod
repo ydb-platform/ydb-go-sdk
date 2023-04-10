@@ -6,7 +6,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.1.2
-	github.com/ydb-platform/ydb-go-sdk-zap v0.14.3
+	github.com/ydb-platform/ydb-go-sdk-zap v0.15.0
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.43.0
 	go.uber.org/zap v1.24.0
 	golang.org/x/sync v0.1.0
