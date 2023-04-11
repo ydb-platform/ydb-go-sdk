@@ -21,7 +21,9 @@ It has 3 commands:
 ### Run examples with all arguments:
 
 create:
-`slo-go-workload create create grpcs://ydb.cool.example.com:2135 /some/folder -t tableName`
+`slo-go-workload create create grpcs://ydb.cool.example.com:2135 /some/folder -t tableName
+-min-partitions-count 6 -max-partitions-count 1000 -partition-size 1 -с 1000
+-write-timeout 10000`
 
 cleanup:
 `slo-go-workload create cleanup grpcs://ydb.cool.example.com:2135 /some/folder -t tableName`
@@ -40,14 +42,19 @@ run:
 
 ```
 Arguments:
-  endpoint                      YDB endpoint to connect to
-  db                            YDB database to connect to
+  endpoint                        YDB endpoint to connect to
+  db                              YDB database to connect to
 
 Options:
-  -t                  <string>  table name to create
-  -partitions-count   <int>     amount of partitions in table creation
-  -initial-data-count <int>     amount of initially created rows
-  -write-timeout      <int>     write timeout milliseconds
+  -t -table-name         <string> table name to create
+
+  -min-partitions-count  <int>    minimum amount of partitions in table
+  -max-partitions-count  <int>    maximum amount of partitions in table
+  -partition-size        <int>    partition size in mb
+                                   
+  -c -initial-data-count <int>    amount of initially created rows
+                                   
+  -write-timeout         <int>    write timeout milliseconds
 ```
 
 ### cleanup
@@ -55,12 +62,13 @@ Options:
 
 ```
 Arguments:
-  endpoint                      YDB endpoint to connect to
-  db                            YDB database to connect to
+  endpoint                        YDB endpoint to connect to
+  db                              YDB database to connect to
 
 Options:
-  -t <string>                   table name to drop
-  -write-timeout      <int>     write timeout milliseconds
+  -t -table-name         <string> table name to create
+                         
+  -write-timeout         <int>    write timeout milliseconds
 ```
 
 ### run
@@ -68,20 +76,25 @@ Options:
 
 ```
 Arguments:
-  endpoint                      YDB endpoint to connect to
-  db                            YDB database to connect to
+  endpoint                        YDB endpoint to connect to
+  db                              YDB database to connect to
 
 Options:
-  -t                  <string>  table name
-  -initial-data-count <int>     amount of initially created rows
-  -prom-pgw           <string>  prometheus push gateway
-  -read-rps           <int>     read RPS
-  -read-timeout       <int>     read timeout milliseconds
-  -write-rps          <int>     write RPS
-  -write-timeout      <int>     write timeout milliseconds
-  -time               <int>     run time in seconds
-  -shutdown-time      <int>     graceful shutdown time in seconds
-  -report-period      <int>     prometheus push period in milliseconds
+  -t -table-name         <string> table name to create
+                         
+  -initial-data-count    <int>    amount of initially created rows
+                         
+  -prom-pgw              <string> prometheus push gateway
+  -report-period         <int>    prometheus push period in milliseconds
+                         
+  -read-rps              <int>    read RPS
+  -read-timeout          <int>    read timeout milliseconds
+                         
+  -write-rps             <int>    write RPS
+  -write-timeout         <int>    write timeout milliseconds
+                         
+  -time                  <int>    run time in seconds
+  -shutdown-time         <int>    graceful shutdown time in seconds
 ```
 
 ## Authentication

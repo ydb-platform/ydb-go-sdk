@@ -131,13 +131,13 @@ func (st *Storage) CreateTable(ctx context.Context) error {
 
 				options.WithPartitioningSettings(
 					options.WithPartitioningBySize(options.FeatureEnabled),
-					options.WithPartitionSizeMb(1),
-					options.WithMinPartitionsCount(st.cfg.PartitionsCount),
-					options.WithMaxPartitionsCount(1000),
+					options.WithPartitionSizeMb(st.cfg.PartitionSize),
+					options.WithMinPartitionsCount(st.cfg.MinPartitionsCount),
+					options.WithMaxPartitionsCount(st.cfg.MaxPartitionsCount),
 				),
 				options.WithProfile(
 					options.WithPartitioningPolicy(
-						options.WithPartitioningPolicyUniformPartitions(st.cfg.PartitionsCount),
+						options.WithPartitioningPolicyUniformPartitions(st.cfg.MinPartitionsCount),
 					),
 				),
 			)

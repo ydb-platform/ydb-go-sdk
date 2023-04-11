@@ -17,8 +17,10 @@ type Config struct {
 
 	Table string
 
-	PartitionsCount  uint64
-	InitialDataCount uint64
+	MinPartitionsCount uint64
+	MaxPartitionsCount uint64
+	PartitionSize      uint64
+	InitialDataCount   uint64
 
 	PushGateway  string
 	ReportPeriod int
@@ -52,10 +54,17 @@ func New() (*Config, error) {
 
 		cfg.Mode = CreateMode
 
-		fs.Uint64Var(
-			&cfg.PartitionsCount, "partitions-count", 6, "amount of partitions in table creation")
-		fs.Uint64Var(
-			&cfg.InitialDataCount, "initial-data-count", 1000, "amount of initially created rows")
+		fs.Uint64Var(&cfg.MinPartitionsCount,
+			"min-partitions-count", 6, "minimum amount of partitions in table")
+		fs.Uint64Var(&cfg.MaxPartitionsCount,
+			"max-partitions-count", 1000, "maximum amount of partitions in table")
+		fs.Uint64Var(&cfg.PartitionSize,
+			"partition-size", 1, "partition size in mb")
+
+		fs.Uint64Var(&cfg.InitialDataCount,
+			"c", 1000, "amount of initially created rows")
+		fs.Uint64Var(&cfg.InitialDataCount,
+			"initial-data-count", 1000, "amount of initially created rows")
 	case "cleanup":
 		if len(os.Args) < 4 {
 			fmt.Print(cleanupHelp)
@@ -71,8 +80,10 @@ func New() (*Config, error) {
 
 		cfg.Mode = RunMode
 
-		fs.Uint64Var(
-			&cfg.InitialDataCount, "initial-data-count", 1000, "amount of initially created rows")
+		fs.Uint64Var(&cfg.InitialDataCount,
+			"c", 1000, "amount of initially created rows")
+		fs.Uint64Var(&cfg.InitialDataCount,
+			"initial-data-count", 1000, "amount of initially created rows")
 
 		fs.StringVar(&cfg.PushGateway, "prom-pgw", "", "prometheus push gateway")
 		fs.IntVar(&cfg.ReportPeriod, "report-period", 250, "prometheus push period in milliseconds")
@@ -92,6 +103,7 @@ func New() (*Config, error) {
 	cfg.DB = os.Args[3]
 
 	fs.StringVar(&cfg.Table, "t", "testingTable", "table name")
+	fs.StringVar(&cfg.Table, "table-name", "testingTable", "table name")
 
 	fs.IntVar(&cfg.WriteTimeout, "write-timeout", 10000, "write timeout milliseconds")
 
