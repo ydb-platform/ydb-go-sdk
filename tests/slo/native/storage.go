@@ -65,15 +65,15 @@ func NewStorage(ctx context.Context, cfg *config.Config, logger *zap.Logger, poo
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
-	st := &Storage{
+	s := &Storage{
 		cfg:         cfg,
 		upsertQuery: fmt.Sprintf(upsertTemplate, cfg.Table),
 		selectQuery: fmt.Sprintf(selectTemplate, cfg.Table),
 	}
 	var err error
-	st.db, err = ydb.Open(
+	s.db, err = ydb.Open(
 		ctx,
-		st.cfg.Endpoint+st.cfg.DB,
+		s.cfg.Endpoint+s.cfg.DB,
 		env.WithEnvironCredentials(ctx),
 		ydbZap.WithTraces(
 			logger,
@@ -89,7 +89,7 @@ func NewStorage(ctx context.Context, cfg *config.Config, logger *zap.Logger, poo
 
 	for i := 0; i < poolSize; i++ {
 		g.Go(func() error {
-			err := st.db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
+			err := s.db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
 				return nil
 			})
 			if err != nil {
@@ -104,23 +104,23 @@ func NewStorage(ctx context.Context, cfg *config.Config, logger *zap.Logger, poo
 		return nil, err
 	}
 
-	return st, nil
+	return s, nil
 }
 
-func (st *Storage) Close(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Second*10)
+func (s *Storage) Close(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ShutdownTime)*time.Second)
 	defer cancel()
 
-	return st.db.Close(ctx)
+	return s.db.Close(ctx)
 }
 
-func (st *Storage) CreateTable(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(st.cfg.WriteTimeout)*time.Millisecond)
+func (s *Storage) CreateTable(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return st.db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) error {
-			return s.CreateTable(ctx, path.Join(st.db.Name(), st.cfg.Table),
+	return s.db.Table().Do(ctx,
+		func(ctx context.Context, session table.Session) error {
+			return session.CreateTable(ctx, path.Join(s.db.Name(), s.cfg.Table),
 				options.WithColumn("hash", types.Optional(types.TypeUint64)),
 				options.WithColumn("id", types.Optional(types.TypeUint64)),
 				options.WithColumn("payload_str", types.Optional(types.TypeUTF8)),
@@ -131,13 +131,13 @@ func (st *Storage) CreateTable(ctx context.Context) error {
 
 				options.WithPartitioningSettings(
 					options.WithPartitioningBySize(options.FeatureEnabled),
-					options.WithPartitionSizeMb(st.cfg.PartitionSize),
-					options.WithMinPartitionsCount(st.cfg.MinPartitionsCount),
-					options.WithMaxPartitionsCount(st.cfg.MaxPartitionsCount),
+					options.WithPartitionSizeMb(s.cfg.PartitionSize),
+					options.WithMinPartitionsCount(s.cfg.MinPartitionsCount),
+					options.WithMaxPartitionsCount(s.cfg.MaxPartitionsCount),
 				),
 				options.WithProfile(
 					options.WithPartitioningPolicy(
-						options.WithPartitioningPolicyUniformPartitions(st.cfg.MinPartitionsCount),
+						options.WithPartitioningPolicyUniformPartitions(s.cfg.MinPartitionsCount),
 					),
 				),
 			)
@@ -145,40 +145,40 @@ func (st *Storage) CreateTable(ctx context.Context) error {
 	)
 }
 
-func (st *Storage) DropTable(ctx context.Context) error {
+func (s *Storage) DropTable(ctx context.Context) error {
 	err := ctx.Err()
 	if err != nil {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(st.cfg.WriteTimeout)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return st.db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			return s.DropTable(ctx, path.Join(st.db.Name(), st.cfg.Table))
+	return s.db.Table().Do(ctx,
+		func(ctx context.Context, session table.Session) (err error) {
+			return session.DropTable(ctx, path.Join(s.db.Name(), s.cfg.Table))
 		},
 	)
 }
 
-func (st *Storage) Read(ctx context.Context, entryID generator.RowID) (generator.Row, error) {
+func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (generator.Row, error) {
 	if err := ctx.Err(); err != nil {
 		return generator.Row{}, err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(st.cfg.ReadTimeout)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ReadTimeout)*time.Millisecond)
 	defer cancel()
 
 	e := generator.Row{}
 
-	err := st.db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+	err := s.db.Table().Do(ctx,
+		func(ctx context.Context, session table.Session) (err error) {
 			if err = ctx.Err(); err != nil {
 				return err
 			}
 
 			var res result.Result
-			_, res, err = s.Execute(ctx, readTx, st.selectQuery,
+			_, res, err = session.Execute(ctx, readTx, s.selectQuery,
 				table.NewQueryParameters(
 					table.ValueParam("$id", types.Uint64Value(entryID)),
 				),
@@ -216,21 +216,21 @@ func (st *Storage) Read(ctx context.Context, entryID generator.RowID) (generator
 	return e, err
 }
 
-func (st *Storage) Write(ctx context.Context, e generator.Row) error {
+func (s *Storage) Write(ctx context.Context, e generator.Row) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(st.cfg.WriteTimeout)*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return st.db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) error {
+	return s.db.Table().Do(ctx,
+		func(ctx context.Context, session table.Session) error {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
 
-			_, res, err := s.Execute(ctx, writeTx, st.upsertQuery,
+			_, res, err := session.Execute(ctx, writeTx, s.upsertQuery,
 				table.NewQueryParameters(
 					table.ValueParam("$id", types.Uint64Value(e.ID)),
 					table.ValueParam("$payload_str", types.UTF8Value(*e.PayloadStr)),

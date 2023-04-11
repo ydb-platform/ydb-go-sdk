@@ -32,7 +32,7 @@ func (w *Workers) read(ctx context.Context) (err error) {
 		w.logger.Error(fmt.Errorf("get entry error: %w", err).Error())
 	}()
 
-	_, err = w.st.Read(ctx, id)
+	_, err = w.s.Read(ctx, id)
 
 	// todo: check
 

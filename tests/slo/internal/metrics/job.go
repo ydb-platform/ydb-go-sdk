@@ -2,7 +2,7 @@ package metrics
 
 import "time"
 
-type job struct {
+type Job struct {
 	name  JobName
 	start time.Time
 	m     *Metrics

@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"fmt"
 
 	"go.uber.org/zap"
 
@@ -17,16 +18,26 @@ type ReadWriter interface {
 
 type Workers struct {
 	cfg    *config.Config
-	st     ReadWriter
+	s      ReadWriter
 	m      *metrics.Metrics
 	logger *zap.Logger
 }
 
-func New(cfg *config.Config, st ReadWriter, m *metrics.Metrics, logger *zap.Logger) *Workers {
+func New(cfg *config.Config, s ReadWriter, logger *zap.Logger) (*Workers, error) {
+	m, err := metrics.New(cfg.PushGateway, "native")
+	if err != nil {
+		logger.Error(fmt.Errorf("create metrics failed: %w", err).Error())
+		return nil, err
+	}
+
 	return &Workers{
 		cfg:    cfg,
-		st:     st,
-		m:      m,
+		s:      s,
 		logger: logger,
-	}
+		m:      m,
+	}, nil
+}
+
+func (w *Workers) Close() error {
+	return w.m.Reset()
 }

@@ -37,5 +37,5 @@ func (w *Workers) write(ctx context.Context, gen *generator.Generator) (err erro
 		w.logger.Error(fmt.Errorf("error when 'write' entry: %w", err).Error())
 	}()
 
-	return w.st.Write(ctx, row)
+	return w.s.Write(ctx, row)
 }

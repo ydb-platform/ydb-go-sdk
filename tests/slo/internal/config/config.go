@@ -7,7 +7,7 @@ import (
 	"os"
 )
 
-var ErrWrongArgs = errors.New("error: wrong args")
+var ErrWrongArgs = errors.New("wrong args")
 
 type Config struct {
 	Mode AppMode

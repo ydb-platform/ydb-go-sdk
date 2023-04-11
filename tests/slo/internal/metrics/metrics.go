@@ -27,8 +27,8 @@ type (
 	}
 )
 
-func New(url string, label string) (m *Metrics, err error) {
-	m = &Metrics{
+func New(url string, label string) (*Metrics, error) {
+	m := &Metrics{
 		label: label,
 	}
 
@@ -76,7 +76,7 @@ func New(url string, label string) (m *Metrics, err error) {
 		Collector(m.inflight).
 		Collector(m.latencies)
 
-	return m, err
+	return m, m.Reset()
 }
 
 func (m *Metrics) Push() error {
@@ -98,8 +98,8 @@ func (m *Metrics) Reset() error {
 	return m.Push()
 }
 
-func (m *Metrics) Start(name JobName) job {
-	j := job{
+func (m *Metrics) Start(name JobName) Job {
+	j := Job{
 		name:  name,
 		start: time.Now(),
 		m:     m,
@@ -110,7 +110,7 @@ func (m *Metrics) Start(name JobName) job {
 	return j
 }
 
-func (j job) Stop(err error) {
+func (j Job) Stop(err error) {
 	j.m.inflight.WithLabelValues(j.name).Sub(1)
 
 	latency := float64(time.Since(j.start).Milliseconds())
