@@ -166,6 +166,7 @@ type Session interface {
 		ctx context.Context,
 		table string,
 		rows types.Value,
+		opts ...options.BulkUpsertOption,
 	) (err error)
 
 	BeginTransaction(

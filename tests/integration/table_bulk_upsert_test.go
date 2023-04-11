@@ -8,24 +8,13 @@ import (
 	"fmt"
 	"testing"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/encoding/gzip"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-func TestTableBulkUpsertExample(t *testing.T) {
+func TestTableBulkUpsert(t *testing.T) {
 	scope := newScope(t)
-	driver := scope.Driver(
-		ydb.With(config.WithGrpcOptions(
-			grpc.WithDefaultCallOptions(
-				grpc.UseCompressor(gzip.Name),
-			),
-		)),
-	)
+	driver := scope.Driver()
 	tablePath := scope.TablePath()
 
 	// upsert

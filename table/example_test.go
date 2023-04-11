@@ -6,6 +6,9 @@ import (
 	"path"
 	"time"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/encoding/gzip"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -110,18 +113,13 @@ func Example_bulkUpsert() {
 	const batchSize = 10000
 	logs := make([]logMessage, 0, batchSize)
 	for i := 0; i < batchSize; i++ {
-		message := logMessage{
+		logs = append(logs, logMessage{
 			App:       fmt.Sprintf("App_%d", i/256),
 			Host:      fmt.Sprintf("192.168.0.%d", i%256),
 			Timestamp: time.Now().Add(time.Millisecond * time.Duration(i%1000)),
 			HTTPCode:  200,
-		}
-		if i%2 == 0 {
-			message.Message = "GET / HTTP/1.1"
-		} else {
-			message.Message = "GET /images/logo.png HTTP/1.1"
-		}
-		logs = append(logs, message)
+			Message:   "GET / HTTP/1.1",
+		})
 	}
 	// execute bulk upsert with native ydb data
 	err = db.Table().Do( // Do retry operation on errors with best effort
@@ -243,6 +241,152 @@ func Example_lazyTransaction() {
 				return err
 			}
 			return result.Err()
+		},
+		table.WithIdempotent(),
+	)
+	if err != nil {
+		fmt.Printf("unexpected error: %v", err)
+	}
+}
+
+func Example_bulkUpsertWithCompression() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		fmt.Printf("failed connect: %v", err)
+		return
+	}
+	defer db.Close(ctx) // cleanup resources
+	type logMessage struct {
+		App       string
+		Host      string
+		Timestamp time.Time
+		HTTPCode  uint32
+		Message   string
+	}
+	// prepare native go data
+	const batchSize = 10000
+	logs := make([]logMessage, 0, batchSize)
+	for i := 0; i < batchSize; i++ {
+		logs = append(logs, logMessage{
+			App:       fmt.Sprintf("App_%d", i/256),
+			Host:      fmt.Sprintf("192.168.0.%d", i%256),
+			Timestamp: time.Now().Add(time.Millisecond * time.Duration(i%1000)),
+			HTTPCode:  200,
+			Message:   "GET /images/logo.png HTTP/1.1",
+		})
+	}
+	// execute bulk upsert with native ydb data
+	err = db.Table().Do( // Do retry operation on errors with best effort
+		ctx, // context manage exiting from Do
+		func(ctx context.Context, s table.Session) (err error) { // retry operation
+			rows := make([]types.Value, 0, len(logs))
+			for _, msg := range logs {
+				rows = append(rows, types.StructValue(
+					types.StructFieldValue("App", types.TextValue(msg.App)),
+					types.StructFieldValue("Host", types.TextValue(msg.Host)),
+					types.StructFieldValue("Timestamp", types.TimestampValueFromTime(msg.Timestamp)),
+					types.StructFieldValue("HTTPCode", types.Uint32Value(msg.HTTPCode)),
+					types.StructFieldValue("Message", types.TextValue(msg.Message)),
+				))
+			}
+			return s.BulkUpsert(ctx, "/local/bulk_upsert_example", types.ListValue(rows...),
+				options.WithCallOptions(grpc.UseCompressor(gzip.Name)),
+			)
+		},
+		table.WithIdempotent(),
+	)
+	if err != nil {
+		fmt.Printf("unexpected error: %v", err)
+	}
+}
+
+func Example_dataQueryWithCompression() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		fmt.Printf("failed connect: %v", err)
+		return
+	}
+	defer db.Close(ctx) // cleanup resources
+	var (
+		query = `SELECT 42 as id, "my string" as myStr`
+		id    int32  // required value
+		myStr string // optional value
+	)
+	err = db.Table().Do( // Do retry operation on errors with best effort
+		ctx, // context manage exiting from Do
+		func(ctx context.Context, s table.Session) (err error) { // retry operation
+			_, res, err := s.Execute(ctx, table.DefaultTxControl(), query, nil,
+				options.WithCallOptions(
+					grpc.UseCompressor(gzip.Name),
+				),
+			)
+			if err != nil {
+				return err // for auto-retry with driver
+			}
+			defer res.Close()                                // cleanup resources
+			if err = res.NextResultSetErr(ctx); err != nil { // check single result set and switch to it
+				return err // for auto-retry with driver
+			}
+			for res.NextRow() { // iterate over rows
+				err = res.ScanNamed(
+					named.Required("id", &id),
+					named.OptionalWithDefault("myStr", &myStr),
+				)
+				if err != nil {
+					return err // generally scan error not retryable, return it for driver check error
+				}
+				fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
+			}
+			return res.Err() // return finally result error for auto-retry with driver
+		},
+		table.WithIdempotent(),
+	)
+	if err != nil {
+		fmt.Printf("unexpected error: %v", err)
+	}
+}
+
+func Example_scanQueryWithCompression() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		fmt.Printf("failed connect: %v", err)
+		return
+	}
+	defer db.Close(ctx) // cleanup resources
+	var (
+		query = `SELECT 42 as id, "my string" as myStr`
+		id    int32  // required value
+		myStr string // optional value
+	)
+	err = db.Table().Do( // Do retry operation on errors with best effort
+		ctx, // context manage exiting from Do
+		func(ctx context.Context, s table.Session) (err error) { // retry operation
+			res, err := s.StreamExecuteScanQuery(ctx, query, nil,
+				options.WithCallOptions(
+					grpc.UseCompressor(gzip.Name),
+				),
+			)
+			if err != nil {
+				return err // for auto-retry with driver
+			}
+			defer res.Close()                                // cleanup resources
+			if err = res.NextResultSetErr(ctx); err != nil { // check single result set and switch to it
+				return err // for auto-retry with driver
+			}
+			for res.NextRow() { // iterate over rows
+				err = res.ScanNamed(
+					named.Required("id", &id),
+					named.OptionalWithDefault("myStr", &myStr),
+				)
+				if err != nil {
+					return err // generally scan error not retryable, return it for driver check error
+				}
+				fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
+			}
+			return res.Err() // return finally result error for auto-retry with driver
 		},
 		table.WithIdempotent(),
 	)
