@@ -22,6 +22,9 @@ func (w *Workers) Write(ctx context.Context, rl *rate.Limiter, gen *generator.Ge
 }
 
 func (w *Workers) write(ctx context.Context, gen *generator.Generator) (err error) {
+	w.wg.Add(1)
+	defer w.wg.Done()
+
 	var row generator.Row
 	row, err = gen.Generate()
 	if err != nil {

@@ -140,7 +140,7 @@ func main() {
 		panic(errors.New("time limit exceed, exiting"))
 	})
 
-	// wg
+	w.Done()
 
 	err = m.Reset()
 	if err != nil {

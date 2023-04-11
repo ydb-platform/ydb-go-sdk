@@ -22,6 +22,9 @@ func (w *Workers) Read(ctx context.Context, rl *rate.Limiter) {
 }
 
 func (w *Workers) read(ctx context.Context) (err error) {
+	w.wg.Add(1)
+	defer w.wg.Done()
+
 	id := uint64(rand.Intn(int(w.cfg.InitialDataCount)))
 
 	m := w.m.Start(metrics.JobRead)
