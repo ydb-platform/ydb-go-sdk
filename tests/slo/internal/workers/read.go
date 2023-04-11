@@ -4,13 +4,15 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"sync"
 
 	"golang.org/x/time/rate"
 
 	"slo/internal/metrics"
 )
 
-func (w *Workers) Read(ctx context.Context, rl *rate.Limiter) {
+func (w *Workers) Read(ctx context.Context, wg *sync.WaitGroup, rl *rate.Limiter) {
+	defer wg.Done()
 	for {
 		err := rl.Wait(ctx)
 		if err != nil {
@@ -22,9 +24,6 @@ func (w *Workers) Read(ctx context.Context, rl *rate.Limiter) {
 }
 
 func (w *Workers) read(ctx context.Context) (err error) {
-	w.wg.Add(1)
-	defer w.wg.Done()
-
 	id := uint64(rand.Intn(int(w.cfg.InitialDataCount)))
 
 	m := w.m.Start(metrics.JobRead)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -37,6 +38,9 @@ func main() {
 	if err != nil {
 		panic(fmt.Errorf("create config failed: %w", err))
 	}
+
+	logger.Info("program started")
+	defer logger.Info("shutdown successful")
 
 	st, err := NewStorage(ctx, cfg, logger, cfg.ReadRPS+cfg.WriteRPS)
 	if err != nil {
@@ -100,6 +104,12 @@ func main() {
 		logger.Error(fmt.Errorf("create metrics failed: %w", err).Error())
 		return
 	}
+	defer func() {
+		err = m.Reset()
+		if err != nil {
+			logger.Error(fmt.Errorf("metrics reset failed: %w", err).Error())
+		}
+	}()
 
 	err = m.Reset()
 	if err != nil {
@@ -112,19 +122,23 @@ func main() {
 	gen := generator.New(cfg.InitialDataCount)
 
 	w := workers.New(cfg, st, m, logger)
+	wg := sync.WaitGroup{}
 
 	readRL := rate.NewLimiter(rate.Limit(cfg.ReadRPS), 1)
+	wg.Add(cfg.ReadRPS)
 	for i := 0; i < cfg.ReadRPS; i++ {
-		go w.Read(ctx, readRL)
+		go w.Read(ctx, &wg, readRL)
 	}
 
 	writeRL := rate.NewLimiter(rate.Limit(cfg.WriteRPS), 1)
+	wg.Add(cfg.WriteRPS)
 	for i := 0; i < cfg.WriteRPS; i++ {
-		go w.Write(ctx, writeRL, gen)
+		go w.Write(ctx, &wg, writeRL, gen)
 	}
 
 	metricsRL := rate.NewLimiter(rate.Every(time.Duration(cfg.ReportPeriod)*time.Millisecond), 1)
-	go w.Metrics(ctx, metricsRL)
+	wg.Add(1)
+	go w.Metrics(ctx, &wg, metricsRL)
 
 	logger.Info("workers init ok")
 
@@ -140,12 +154,5 @@ func main() {
 		panic(errors.New("time limit exceed, exiting"))
 	})
 
-	w.Done()
-
-	err = m.Reset()
-	if err != nil {
-		logger.Error(fmt.Errorf("metrics reset failed: %w", err).Error())
-	}
-
-	logger.Info("shutdown successful")
+	wg.Wait()
 }

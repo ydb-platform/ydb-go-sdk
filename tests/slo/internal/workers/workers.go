@@ -2,7 +2,6 @@ package workers
 
 import (
 	"context"
-	"sync"
 
 	"go.uber.org/zap"
 
@@ -21,7 +20,6 @@ type Workers struct {
 	st     ReadWriter
 	m      *metrics.Metrics
 	logger *zap.Logger
-	wg     sync.WaitGroup
 }
 
 func New(cfg *config.Config, st ReadWriter, m *metrics.Metrics, logger *zap.Logger) *Workers {
@@ -31,8 +29,4 @@ func New(cfg *config.Config, st ReadWriter, m *metrics.Metrics, logger *zap.Logg
 		m:      m,
 		logger: logger,
 	}
-}
-
-func (w *Workers) Done() {
-	w.wg.Done()
 }
