@@ -2,10 +2,8 @@ package metrics
 
 import (
 	"fmt"
-	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/push"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
@@ -16,21 +14,20 @@ const (
 	sdkVersion = ydb.Version
 )
 
-type Metrics struct {
-	oks       *prometheus.GaugeVec
-	notOks    *prometheus.GaugeVec
-	inflight  *prometheus.GaugeVec
-	latencies *prometheus.SummaryVec
+type (
+	Metrics struct {
+		oks       *prometheus.GaugeVec
+		notOks    *prometheus.GaugeVec
+		inflight  *prometheus.GaugeVec
+		latencies *prometheus.SummaryVec
 
-	p *push.Pusher
+		p *push.Pusher
 
-	jobs      map[uuid.UUID]job
-	jobsMutex sync.RWMutex
+		label string
+	}
+)
 
-	label string
-}
-
-func NewMetrics(url string, label string) (m *Metrics, err error) {
+func New(url string, label string) (m *Metrics, err error) {
 	m = &Metrics{
 		label: label,
 	}
@@ -71,8 +68,6 @@ func NewMetrics(url string, label string) (m *Metrics, err error) {
 		[]string{"status", "jobName"},
 	)
 
-	m.jobs = make(map[uuid.UUID]job)
-
 	m.p = push.New(url, "workload-go").
 		Grouping("sdk", fmt.Sprintf("%s-%s", sdk, m.label)).
 		Grouping("sdkVersion", sdkVersion).
@@ -103,44 +98,29 @@ func (m *Metrics) Reset() error {
 	return m.Push()
 }
 
-func (m *Metrics) StartJob(name JobName) (id uuid.UUID) {
-	id = uuid.New()
+func (m *Metrics) Start(name JobName) job {
 	j := job{
 		name:  name,
 		start: time.Now(),
+		m:     m,
 	}
-
-	m.jobsMutex.Lock()
-	m.jobs[id] = j
-	m.jobsMutex.Unlock()
 
 	m.inflight.WithLabelValues(name).Add(1)
 
-	return id
+	return j
 }
 
-func (m *Metrics) StopJob(id uuid.UUID, ok bool) {
-	m.jobsMutex.Lock()
-	defer m.jobsMutex.Unlock()
-	j, found := m.jobs[id]
-	if !found {
-		return
-	}
-	delete(m.jobs, id)
-
-	m.inflight.WithLabelValues(j.name).Sub(1)
+func (j job) Stop(err error) {
+	j.m.inflight.WithLabelValues(j.name).Sub(1)
 
 	latency := float64(time.Since(j.start).Milliseconds())
 
-	if ok {
-		m.oks.WithLabelValues(j.name).Add(1)
-		m.latencies.WithLabelValues("ok", j.name).Observe(latency)
+	if err != nil {
+		j.m.notOks.WithLabelValues(j.name).Add(1)
+		j.m.latencies.WithLabelValues("err", j.name).Observe(latency)
 		return
 	}
-	m.notOks.WithLabelValues(j.name).Add(1)
-	m.latencies.WithLabelValues("err", j.name).Observe(latency)
-}
 
-func (m *Metrics) ActiveJobsCount() int {
-	return len(m.jobs)
+	j.m.oks.WithLabelValues(j.name).Add(1)
+	j.m.latencies.WithLabelValues("ok", j.name).Observe(latency)
 }

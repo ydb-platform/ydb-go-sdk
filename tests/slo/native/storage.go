@@ -161,15 +161,15 @@ func (st *Storage) DropTable(ctx context.Context) error {
 	)
 }
 
-func (st *Storage) Read(ctx context.Context, entryID generator.EntryID) (generator.Entry, error) {
+func (st *Storage) Read(ctx context.Context, entryID generator.RowID) (generator.Row, error) {
 	if err := ctx.Err(); err != nil {
-		return generator.Entry{}, err
+		return generator.Row{}, err
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(st.cfg.ReadTimeout)*time.Millisecond)
 	defer cancel()
 
-	e := generator.Entry{}
+	e := generator.Row{}
 
 	err := st.db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
@@ -216,7 +216,7 @@ func (st *Storage) Read(ctx context.Context, entryID generator.EntryID) (generat
 	return e, err
 }
 
-func (st *Storage) Write(ctx context.Context, e generator.Entry) error {
+func (st *Storage) Write(ctx context.Context, e generator.Row) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}

@@ -14,23 +14,23 @@ const (
 )
 
 type Generator struct {
-	currentID EntryID
+	currentID RowID
 	mu        sync.Mutex
 }
 
-func New(id EntryID) *Generator {
+func New(id RowID) *Generator {
 	return &Generator{
 		currentID: id,
 	}
 }
 
-func (g *Generator) Generate() (Entry, error) {
+func (g *Generator) Generate() (Row, error) {
 	g.mu.Lock()
 	id := g.currentID
 	g.currentID++
 	g.mu.Unlock()
 
-	e := Entry{
+	e := Row{
 		ID:               id,
 		PayloadDouble:    func(a float64) *float64 { return &a }(rand.Float64()),
 		PayloadTimestamp: func(a uint64) *uint64 { return &a }(uint64(time.Now().UnixMicro())),
@@ -39,7 +39,7 @@ func (g *Generator) Generate() (Entry, error) {
 	var err error
 	e.PayloadStr, err = g.genPayloadString()
 	if err != nil {
-		return Entry{}, err
+		return Row{}, err
 	}
 
 	return e, nil

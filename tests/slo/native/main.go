@@ -95,7 +95,7 @@ func main() {
 		return
 	}
 
-	m, err := metrics.NewMetrics(cfg.PushGateway, "native")
+	m, err := metrics.New(cfg.PushGateway, "native")
 	if err != nil {
 		logger.Error(fmt.Errorf("create metrics failed: %w", err).Error())
 		return
@@ -140,9 +140,7 @@ func main() {
 		panic(errors.New("time limit exceed, exiting"))
 	})
 
-	for m.ActiveJobsCount() > 0 {
-		time.Sleep(time.Millisecond)
-	}
+	// wg
 
 	err = m.Reset()
 	if err != nil {

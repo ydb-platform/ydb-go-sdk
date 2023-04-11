@@ -3,7 +3,6 @@ module slo
 go 1.20
 
 require (
-	github.com/google/uuid v1.3.0
 	github.com/prometheus/client_golang v1.14.0
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.1.2
 	github.com/ydb-platform/ydb-go-sdk-zap v0.15.0
@@ -19,6 +18,7 @@ require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/google/uuid v1.3.0 // indirect
 	github.com/jonboulle/clockwork v0.4.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect

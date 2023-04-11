@@ -11,8 +11,8 @@ import (
 )
 
 type ReadWriter interface {
-	Read(context.Context, generator.EntryID) (generator.Entry, error)
-	Write(context.Context, generator.Entry) error
+	Read(context.Context, generator.RowID) (generator.Row, error)
+	Write(context.Context, generator.Row) error
 }
 
 type Workers struct {

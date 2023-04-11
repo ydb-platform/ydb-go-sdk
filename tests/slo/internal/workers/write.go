@@ -17,21 +17,23 @@ func (w *Workers) Write(ctx context.Context, rl *rate.Limiter, gen *generator.Ge
 			return
 		}
 
-		entry, err := gen.Generate()
-		if err != nil {
-			w.logger.Error(fmt.Errorf("generate error: %w", err).Error())
-			continue
-		}
-
-		metricID := w.m.StartJob(metrics.JobWrite)
-
-		err = w.st.Write(ctx, entry)
-		if err != nil {
-			w.logger.Error(fmt.Errorf("error when write entry: %w", err).Error())
-			w.m.StopJob(metricID, false)
-			continue
-		}
-
-		w.m.StopJob(metricID, true)
+		_ = w.write(ctx, gen)
 	}
+}
+
+func (w *Workers) write(ctx context.Context, gen *generator.Generator) (err error) {
+	var row generator.Row
+	row, err = gen.Generate()
+	if err != nil {
+		w.logger.Error(fmt.Errorf("generate error: %w", err).Error())
+		return err
+	}
+
+	m := w.m.Start(metrics.JobWrite)
+	defer func() {
+		m.Stop(err)
+		w.logger.Error(fmt.Errorf("error when 'write' entry: %w", err).Error())
+	}()
+
+	return w.st.Write(ctx, row)
 }
