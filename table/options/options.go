@@ -3,6 +3,7 @@ package options
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
@@ -753,8 +754,19 @@ type (
 
 type (
 	ExecuteDataQueryDesc   Ydb_Table.ExecuteDataQueryRequest
-	ExecuteDataQueryOption func(*ExecuteDataQueryDesc, *allocator.Allocator)
+	ExecuteDataQueryOption interface {
+		ApplyExecuteDataQueryOption(d *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption
+	}
+	executeDataQueryOptionFunc func(d *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption
 )
+
+func (f executeDataQueryOptionFunc) ApplyExecuteDataQueryOption(
+	d *ExecuteDataQueryDesc, a *allocator.Allocator,
+) []grpc.CallOption {
+	return f(d, a)
+}
+
+var _ ExecuteDataQueryOption = executeDataQueryOptionFunc(nil)
 
 type (
 	CommitTransactionDesc   Ydb_Table.CommitTransactionRequest
@@ -775,11 +787,33 @@ func WithKeepInCache(keepInCache bool) ExecuteDataQueryOption {
 	)
 }
 
+type withCallOptions []grpc.CallOption
+
+func (opts withCallOptions) ApplyExecuteScanQueryOption(d *ExecuteScanQueryDesc) []grpc.CallOption {
+	return opts
+}
+
+func (opts withCallOptions) ApplyBulkUpsertOption() []grpc.CallOption {
+	return opts
+}
+
+func (opts withCallOptions) ApplyExecuteDataQueryOption(
+	d *ExecuteDataQueryDesc, a *allocator.Allocator,
+) []grpc.CallOption {
+	return opts
+}
+
+// WithCallOptions appends flag of commit transaction with executing query
+func WithCallOptions(opts ...grpc.CallOption) withCallOptions {
+	return opts
+}
+
 // WithCommit appends flag of commit transaction with executing query
 func WithCommit() ExecuteDataQueryOption {
-	return func(desc *ExecuteDataQueryDesc, a *allocator.Allocator) {
+	return executeDataQueryOptionFunc(func(desc *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
 		desc.TxControl.CommitTx = true
-	}
+		return nil
+	})
 }
 
 // WithQueryCachePolicyKeepInCache manages keep-in-cache policy
@@ -804,7 +838,7 @@ func WithQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption
 }
 
 func withQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption {
-	return func(d *ExecuteDataQueryDesc, a *allocator.Allocator) {
+	return executeDataQueryOptionFunc(func(d *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
 		if d.QueryCachePolicy == nil {
 			d.QueryCachePolicy = a.TableQueryCachePolicy()
 			d.QueryCachePolicy.KeepInCache = true
@@ -814,7 +848,8 @@ func withQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption
 				opt((*queryCachePolicy)(d.QueryCachePolicy), a)
 			}
 		}
-	}
+		return nil
+	})
 }
 
 func WithCommitCollectStatsModeNone() CommitTransactionOption {
@@ -830,27 +865,45 @@ func WithCommitCollectStatsModeBasic() CommitTransactionOption {
 }
 
 func WithCollectStatsModeNone() ExecuteDataQueryOption {
-	return func(d *ExecuteDataQueryDesc, a *allocator.Allocator) {
+	return executeDataQueryOptionFunc(func(d *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
 		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE
-	}
+		return nil
+	})
 }
 
 func WithCollectStatsModeBasic() ExecuteDataQueryOption {
-	return func(d *ExecuteDataQueryDesc, a *allocator.Allocator) {
+	return executeDataQueryOptionFunc(func(d *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
 		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC
-	}
+		return nil
+	})
 }
 
 type (
-	ExecuteScanQueryDesc   Ydb_Table.ExecuteScanQueryRequest
-	ExecuteScanQueryOption func(*ExecuteScanQueryDesc)
+	BulkUpsertOption interface {
+		ApplyBulkUpsertOption() []grpc.CallOption
+	}
 )
+
+type (
+	ExecuteScanQueryDesc   Ydb_Table.ExecuteScanQueryRequest
+	ExecuteScanQueryOption interface {
+		ApplyExecuteScanQueryOption(d *ExecuteScanQueryDesc) []grpc.CallOption
+	}
+	executeScanQueryOptionFunc func(*ExecuteScanQueryDesc) []grpc.CallOption
+)
+
+func (f executeScanQueryOptionFunc) ApplyExecuteScanQueryOption(d *ExecuteScanQueryDesc) []grpc.CallOption {
+	return f(d)
+}
+
+var _ ExecuteScanQueryOption = (executeScanQueryOptionFunc)(nil)
 
 // WithExecuteScanQueryMode defines scan query mode: execute or explain
 func WithExecuteScanQueryMode(m ExecuteScanQueryRequestMode) ExecuteScanQueryOption {
-	return func(desc *ExecuteScanQueryDesc) {
+	return executeScanQueryOptionFunc(func(desc *ExecuteScanQueryDesc) []grpc.CallOption {
 		desc.Mode = m.toYDB()
-	}
+		return nil
+	})
 }
 
 // ExecuteScanQueryStatsType specified scan query mode
@@ -877,9 +930,10 @@ func (stats ExecuteScanQueryStatsType) toYDB() Ydb_Table.QueryStatsCollection_Mo
 
 // WithExecuteScanQueryStats defines query statistics mode
 func WithExecuteScanQueryStats(stats ExecuteScanQueryStatsType) ExecuteScanQueryOption {
-	return func(desc *ExecuteScanQueryDesc) {
+	return executeScanQueryOptionFunc(func(desc *ExecuteScanQueryDesc) []grpc.CallOption {
 		desc.CollectStats = stats.toYDB()
-	}
+		return nil
+	})
 }
 
 // Read table options

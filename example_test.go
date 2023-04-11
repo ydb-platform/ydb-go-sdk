@@ -381,7 +381,7 @@ func Example_discovery() {
 	}
 }
 
-func Example_enableGzipCompression() {
+func Example_enableGzipCompressionForAllRequests() {
 	ctx := context.TODO()
 	db, err := ydb.Open(
 		ctx,

@@ -80,17 +80,8 @@ func (tx *transaction) ExecuteStatement(
 	if params == nil {
 		params = table.NewQueryParameters()
 	}
-	var (
-		a          = allocator.New()
-		optsResult options.ExecuteDataQueryDesc
-	)
+	a := allocator.New()
 	defer a.Free()
-
-	for _, f := range opts {
-		if f != nil {
-			f(&optsResult, a)
-		}
-	}
 
 	onDone := trace.TableOnSessionTransactionExecuteStatement(
 		tx.s.config.Trace(),

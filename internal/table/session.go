@@ -656,9 +656,10 @@ func (s *session) Execute(
 	txr table.Transaction, r result.Result, err error,
 ) {
 	var (
-		a       = allocator.New()
-		q       = queryFromText(query)
-		request = a.TableExecuteDataQueryRequest()
+		a           = allocator.New()
+		q           = queryFromText(query)
+		request     = a.TableExecuteDataQueryRequest()
+		callOptions []grpc.CallOption
 	)
 	defer a.Free()
 
@@ -676,23 +677,19 @@ func (s *session) Execute(
 
 	for _, opt := range opts {
 		if opt != nil {
-			opt((*options.ExecuteDataQueryDesc)(request), a)
+			callOptions = append(callOptions, opt.ApplyExecuteDataQueryOption((*options.ExecuteDataQueryDesc)(request), a)...)
 		}
 	}
 
 	onDone := trace.TableOnSessionQueryExecute(
-		s.config.Trace(),
-		&ctx,
-		s,
-		q,
-		params,
+		s.config.Trace(), &ctx, s, q, params,
 		request.QueryCachePolicy.GetKeepInCache(),
 	)
 	defer func() {
 		onDone(txr, false, r, err)
 	}()
 
-	result, err := s.executeDataQuery(ctx, a, request)
+	result, err := s.executeDataQuery(ctx, a, request, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
@@ -727,6 +724,7 @@ func (s *session) executeQueryResult(
 // executeDataQuery executes data query.
 func (s *session) executeDataQuery(
 	ctx context.Context, a *allocator.Allocator, request *Ydb_Table.ExecuteDataQueryRequest,
+	callOptions ...grpc.CallOption,
 ) (
 	_ *Ydb_Table.ExecuteQueryResult,
 	err error,
@@ -736,7 +734,7 @@ func (s *session) executeDataQuery(
 		response *Ydb_Table.ExecuteDataQueryResponse
 	)
 
-	response, err = s.tableService.ExecuteDataQuery(ctx, request)
+	response, err = s.tableService.ExecuteDataQuery(ctx, request, callOptions...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -1008,7 +1006,8 @@ func (s *session) StreamExecuteScanQuery(
 			Parameters: params.Params().ToYDB(a),
 			Mode:       Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC, // set default
 		}
-		stream Ydb_Table_V1.TableService_StreamExecuteScanQueryClient
+		stream      Ydb_Table_V1.TableService_StreamExecuteScanQueryClient
+		callOptions []grpc.CallOption
 	)
 	defer func() {
 		a.Free()
@@ -1019,13 +1018,13 @@ func (s *session) StreamExecuteScanQuery(
 
 	for _, opt := range opts {
 		if opt != nil {
-			opt((*options.ExecuteScanQueryDesc)(&request))
+			callOptions = append(callOptions, opt.ApplyExecuteScanQueryOption((*options.ExecuteScanQueryDesc)(&request))...)
 		}
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
 
-	stream, err = s.tableService.StreamExecuteScanQuery(ctx, &request)
+	stream, err = s.tableService.StreamExecuteScanQuery(ctx, &request, callOptions...)
 
 	if err != nil {
 		cancel()
@@ -1065,9 +1064,19 @@ func (s *session) StreamExecuteScanQuery(
 }
 
 // BulkUpsert uploads given list of ydb struct values to the table.
-func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value) (err error) {
-	a := allocator.New()
+func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value,
+	opts ...options.BulkUpsertOption,
+) (err error) {
+	var (
+		a           = allocator.New()
+		callOptions []grpc.CallOption
+	)
 	defer a.Free()
+
+	for _, opt := range opts {
+		callOptions = append(callOptions, opt.ApplyBulkUpsertOption()...)
+	}
+
 	_, err = s.tableService.BulkUpsert(ctx,
 		&Ydb_Table.BulkUpsertRequest{
 			Table: table,
@@ -1079,6 +1088,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 				operation.ModeSync,
 			),
 		},
+		callOptions...,
 	)
 	return xerrors.WithStackTrace(err)
 }
