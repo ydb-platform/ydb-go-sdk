@@ -18,6 +18,20 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.52.0
+  golangci-slo:
+    name: golangci-lint
+    concurrency:
+      group: lint-golangci-${{ github.ref }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.52.0
+          working-directory: tests/slo
+          args: -c ../../.golangci.yml
   autoformatter:
     name: autoformat check
     concurrency:
