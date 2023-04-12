@@ -26,6 +26,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
+      - name: generate slo golangci-lint config
+        run: sed 's/github.com\/ydb-platform\/ydb-go-sdk\/v3/slo/g' .golangci.yml > tests/slo/.golangci.yml
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
