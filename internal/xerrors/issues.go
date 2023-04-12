@@ -26,12 +26,24 @@ func (ii issues) String() string {
 			b.WriteByte(',')
 		}
 		b.WriteByte('{')
+		if p := m.GetPosition(); p != nil {
+			if file := p.GetFile(); file != "" {
+				b.WriteString(file)
+				b.WriteByte(':')
+			}
+			b.WriteString(strconv.Itoa(int(p.GetRow())))
+			b.WriteByte(':')
+			b.WriteString(strconv.Itoa(int(p.GetColumn())))
+			b.WriteString(" => ")
+		}
 		if code := m.GetIssueCode(); code != 0 {
 			b.WriteByte('#')
 			b.WriteString(strconv.Itoa(int(code)))
 			b.WriteByte(' ')
 		}
+		b.WriteByte('\'')
 		b.WriteString(strings.TrimSuffix(m.GetMessage(), "."))
+		b.WriteByte('\'')
 		if len(m.Issues) > 0 {
 			b.WriteByte(' ')
 			b.WriteString(issues(m.Issues).String())

@@ -50,6 +50,11 @@ func Test_operationError_Error(t *testing.T) {
 				{
 					Message:   "issue one",
 					IssueCode: 1,
+					Position: &Ydb_Issue.IssueMessage_Position{
+						Row:    15,
+						Column: 3,
+						File:   "",
+					},
 				},
 				{
 					Message:   "issue two",
@@ -58,6 +63,11 @@ func Test_operationError_Error(t *testing.T) {
 						{
 							Message:   "issue three",
 							IssueCode: 3,
+							Position: &Ydb_Issue.IssueMessage_Position{
+								Row:    16,
+								Column: 4,
+								File:   "test.yql",
+							},
 						},
 						{
 							Message:   "issue four",
@@ -66,7 +76,7 @@ func Test_operationError_Error(t *testing.T) {
 					},
 				},
 			})),
-			text: "operation/PRECONDITION_FAILED (code = 400120, issues = [{#1 issue one},{#2 issue two [{#3 issue three},{#4 issue four}]}])", //nolint:lll
+			text: "operation/PRECONDITION_FAILED (code = 400120, issues = [{15:3 => #1 'issue one'},{#2 'issue two' [{test.yql:16:4 => #3 'issue three'},{#4 'issue four'}]}])", //nolint:lll
 		},
 	} {
 		t.Run("", func(t *testing.T) {
