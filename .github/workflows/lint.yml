@@ -19,7 +19,7 @@ jobs:
         with:
           version: v1.52.0
   golangci-slo:
-    name: golangci-lint
+    name: golangci-lint-slo
     concurrency:
       group: lint-golangci-${{ github.ref }}
       cancel-in-progress: true
