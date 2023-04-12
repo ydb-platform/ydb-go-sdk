@@ -72,7 +72,7 @@ func main() {
 		g := errgroup.Group{}
 
 		for i := uint64(0); i < cfg.InitialDataCount; i++ {
-			g.Go(func() error {
+			g.Go(func() (err error) {
 				e, err := gen.Generate()
 				if err != nil {
 					return err

@@ -29,10 +29,9 @@ func (g *Generator) Generate() (Row, error) {
 	id := g.currentID
 	g.currentID++
 	g.mu.Unlock()
-
 	e := Row{
 		ID:               id,
-		PayloadDouble:    func(a float64) *float64 { return &a }(rand.Float64()),
+		PayloadDouble:    func(a float64) *float64 { return &a }(rand.Float64()), //nolint:gosec // speed more important
 		PayloadTimestamp: func(a uint64) *uint64 { return &a }(uint64(time.Now().UnixMicro())),
 	}
 
@@ -46,7 +45,7 @@ func (g *Generator) Generate() (Row, error) {
 }
 
 func (g *Generator) genPayloadString() (*string, error) {
-	l := MinLength + rand.Intn(MaxLength-MinLength+1)
+	l := MinLength + rand.Intn(MaxLength-MinLength+1) //nolint:gosec // speed more important
 
 	sl := make([]byte, l)
 

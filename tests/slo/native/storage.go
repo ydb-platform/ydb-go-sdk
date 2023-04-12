@@ -88,8 +88,8 @@ func NewStorage(ctx context.Context, cfg *config.Config, logger *zap.Logger, poo
 	g := errgroup.Group{}
 
 	for i := 0; i < poolSize; i++ {
-		g.Go(func() error {
-			err := s.db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
+		g.Go(func() (err error) {
+			err = s.db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
 				return nil
 			})
 			if err != nil {

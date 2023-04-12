@@ -31,7 +31,6 @@ jobs:
         with:
           version: v1.52.0
           working-directory: tests/slo
-          args: -c ../../.golangci.yml
   autoformatter:
     name: autoformat check
     concurrency:

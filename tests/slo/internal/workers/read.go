@@ -24,7 +24,7 @@ func (w *Workers) Read(ctx context.Context, wg *sync.WaitGroup, rl *rate.Limiter
 }
 
 func (w *Workers) read(ctx context.Context) (err error) {
-	id := uint64(rand.Intn(int(w.cfg.InitialDataCount)))
+	id := uint64(rand.Intn(int(w.cfg.InitialDataCount))) //nolint:gosec // speed more important
 
 	m := w.m.Start(metrics.JobRead)
 	defer func() {
@@ -33,8 +33,6 @@ func (w *Workers) read(ctx context.Context) (err error) {
 	}()
 
 	_, err = w.s.Read(ctx, id)
-
-	// todo: check
 
 	return err
 }
