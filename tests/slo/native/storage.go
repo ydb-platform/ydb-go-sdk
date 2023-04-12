@@ -107,60 +107,6 @@ func NewStorage(ctx context.Context, cfg *config.Config, logger *zap.Logger, poo
 	return s, nil
 }
 
-func (s *Storage) Close(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ShutdownTime)*time.Second)
-	defer cancel()
-
-	return s.db.Close(ctx)
-}
-
-func (s *Storage) CreateTable(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
-	defer cancel()
-
-	return s.db.Table().Do(ctx,
-		func(ctx context.Context, session table.Session) error {
-			return session.CreateTable(ctx, path.Join(s.db.Name(), s.cfg.Table),
-				options.WithColumn("hash", types.Optional(types.TypeUint64)),
-				options.WithColumn("id", types.Optional(types.TypeUint64)),
-				options.WithColumn("payload_str", types.Optional(types.TypeUTF8)),
-				options.WithColumn("payload_double", types.Optional(types.TypeDouble)),
-				options.WithColumn("payload_timestamp", types.Optional(types.TypeTimestamp)),
-				options.WithColumn("payload_hash", types.Optional(types.TypeUint64)),
-				options.WithPrimaryKeyColumn("hash", "id"),
-
-				options.WithPartitioningSettings(
-					options.WithPartitioningBySize(options.FeatureEnabled),
-					options.WithPartitionSizeMb(s.cfg.PartitionSize),
-					options.WithMinPartitionsCount(s.cfg.MinPartitionsCount),
-					options.WithMaxPartitionsCount(s.cfg.MaxPartitionsCount),
-				),
-				options.WithProfile(
-					options.WithPartitioningPolicy(
-						options.WithPartitioningPolicyUniformPartitions(s.cfg.MinPartitionsCount),
-					),
-				),
-			)
-		},
-	)
-}
-
-func (s *Storage) DropTable(ctx context.Context) error {
-	err := ctx.Err()
-	if err != nil {
-		return err
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
-	defer cancel()
-
-	return s.db.Table().Do(ctx,
-		func(ctx context.Context, session table.Session) (err error) {
-			return session.DropTable(ctx, path.Join(s.db.Name(), s.cfg.Table))
-		},
-	)
-}
-
 func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (generator.Row, error) {
 	if err := ctx.Err(); err != nil {
 		return generator.Row{}, err
@@ -251,4 +197,58 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) error {
 		},
 		table.WithIdempotent(),
 	)
+}
+
+func (s *Storage) createTable(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
+	defer cancel()
+
+	return s.db.Table().Do(ctx,
+		func(ctx context.Context, session table.Session) error {
+			return session.CreateTable(ctx, path.Join(s.db.Name(), s.cfg.Table),
+				options.WithColumn("hash", types.Optional(types.TypeUint64)),
+				options.WithColumn("id", types.Optional(types.TypeUint64)),
+				options.WithColumn("payload_str", types.Optional(types.TypeUTF8)),
+				options.WithColumn("payload_double", types.Optional(types.TypeDouble)),
+				options.WithColumn("payload_timestamp", types.Optional(types.TypeTimestamp)),
+				options.WithColumn("payload_hash", types.Optional(types.TypeUint64)),
+				options.WithPrimaryKeyColumn("hash", "id"),
+
+				options.WithPartitioningSettings(
+					options.WithPartitioningBySize(options.FeatureEnabled),
+					options.WithPartitionSizeMb(s.cfg.PartitionSize),
+					options.WithMinPartitionsCount(s.cfg.MinPartitionsCount),
+					options.WithMaxPartitionsCount(s.cfg.MaxPartitionsCount),
+				),
+				options.WithProfile(
+					options.WithPartitioningPolicy(
+						options.WithPartitioningPolicyUniformPartitions(s.cfg.MinPartitionsCount),
+					),
+				),
+			)
+		},
+	)
+}
+
+func (s *Storage) dropTable(ctx context.Context) error {
+	err := ctx.Err()
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
+	defer cancel()
+
+	return s.db.Table().Do(ctx,
+		func(ctx context.Context, session table.Session) (err error) {
+			return session.DropTable(ctx, path.Join(s.db.Name(), s.cfg.Table))
+		},
+	)
+}
+
+func (s *Storage) close(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ShutdownTime)*time.Second)
+	defer cancel()
+
+	return s.db.Close(ctx)
 }

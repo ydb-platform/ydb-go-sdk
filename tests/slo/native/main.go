@@ -54,14 +54,14 @@ func main() {
 			time.Duration(cfg.ShutdownTime)*time.Second)
 		defer shutdownCancel()
 
-		_ = s.Close(shutdownCtx)
+		_ = s.close(shutdownCtx)
 	}()
 
 	logger.Info("db init ok")
 
 	switch cfg.Mode {
 	case config.CreateMode:
-		err = s.CreateTable(ctx)
+		err = s.createTable(ctx)
 		if err != nil {
 			panic(fmt.Errorf("create table failed: %w", err))
 		}
@@ -94,7 +94,7 @@ func main() {
 
 		logger.Info("entries write ok")
 	case config.CleanupMode:
-		err = s.DropTable(ctx)
+		err = s.dropTable(ctx)
 		if err != nil {
 			panic(fmt.Errorf("create table failed: %w", err))
 		}

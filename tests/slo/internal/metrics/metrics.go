@@ -98,8 +98,8 @@ func (m *Metrics) Reset() error {
 	return m.Push()
 }
 
-func (m *Metrics) Start(name JobName) Job {
-	j := Job{
+func (m *Metrics) Start(name SpanName) Span {
+	j := Span{
 		name:  name,
 		start: time.Now(),
 		m:     m,
@@ -110,7 +110,7 @@ func (m *Metrics) Start(name JobName) Job {
 	return j
 }
 
-func (j Job) Stop(err error) {
+func (j Span) Stop(err error) {
 	j.m.inflight.WithLabelValues(j.name).Sub(1)
 
 	latency := float64(time.Since(j.start).Milliseconds())
