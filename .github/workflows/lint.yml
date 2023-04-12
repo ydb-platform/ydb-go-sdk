@@ -21,7 +21,7 @@ jobs:
   golangci-slo:
     name: golangci-lint-slo
     concurrency:
-      group: lint-golangci-${{ github.ref }}
+      group: lint-golangci-slo-${{ github.ref }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     steps:
