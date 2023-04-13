@@ -87,10 +87,7 @@ type service struct {
 	callsErrors  *prometheus.GaugeVec
 }
 
-var (
-	s    *service
-	once sync.Once
-)
+var once sync.Once
 
 func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service, err error) {
 	once.Do(func() {
@@ -434,7 +431,8 @@ func (s *service) handleLonger(w http.ResponseWriter, r *http.Request) {
 }
 
 // Serverless is an entrypoint for serverless yandex function
-// nolint:deadcode
+//
+//nolint:deadcode
 func Serverless(w http.ResponseWriter, r *http.Request) {
 	s, err := getService(
 		r.Context(),

@@ -74,7 +74,9 @@ func readExpiredBatchTransaction(ctx context.Context, c table.Client, prefix str
 	return res, nil
 }
 
-func deleteDocumentWithTimestamp(ctx context.Context, c table.Client, prefix string, queue, lastDocID, timestamp uint64) error {
+func deleteDocumentWithTimestamp(ctx context.Context,
+	c table.Client, prefix string, queue, lastDocID, timestamp uint64,
+) error {
 	query := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 
@@ -203,7 +205,7 @@ func readDocument(ctx context.Context, c table.Client, prefix, url string) error
 func addDocument(ctx context.Context, c table.Client, prefix, url, html string, timestamp uint64) error {
 	fmt.Printf("> AddDocument: \n\tUrl: %v\n\tTimestamp: %v\n", url, timestamp)
 
-	queue := rand.Intn(expirationQueueCount)
+	queue := rand.Intn(expirationQueueCount) //nolint:gosec
 	query := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 

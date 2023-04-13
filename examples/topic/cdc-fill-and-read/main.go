@@ -79,7 +79,7 @@ func readFlags() {
 	}
 }
 
-func prepareTableWithCDC(ctx context.Context, db ydb.Connection, prefix, tableName, topicPath, consumerName string) {
+func prepareTableWithCDC(ctx context.Context, db *ydb.Driver, prefix, tableName, topicPath, consumerName string) {
 	log.Println("Drop table (if exists)...")
 	err := dropTableIfExists(
 		ctx,
@@ -107,6 +107,6 @@ func prepareTableWithCDC(ctx context.Context, db ydb.Connection, prefix, tableNa
 		Name: consumerName,
 	}))
 	if err != nil {
-		panic(fmt.Errorf("failed to create feed consumer: %+v", err))
+		panic(fmt.Errorf("failed to create feed consumer: %w", err))
 	}
 }

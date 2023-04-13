@@ -13,6 +13,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
+//nolint:lll
 func initDB(cfg *gorm.Config) (*gorm.DB, error) {
 	// docker run -it postgres psql -h 127.0.0.1 -p 5432 -U postgres -d postgres
 	// POSTGRES_CONNECTION_STRING="user=postgres password=mysecretpassword dbname=postgres host=127.0.0.1 port=5432 sslmode=disable"

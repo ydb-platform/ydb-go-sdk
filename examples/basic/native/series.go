@@ -184,7 +184,11 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) (err error
 			SELECT
 				series_id,
 				title,
-				$format(DateTime::FromSeconds(CAST(DateTime::ToSeconds(DateTime::IntervalFromDays(CAST(release_date AS Int16))) AS Uint32))) AS release_date
+				$format(
+					DateTime::FromSeconds(
+						CAST(DateTime::ToSeconds(DateTime::IntervalFromDays(CAST(release_date AS Int16))) AS Uint32)
+					)
+				) AS release_date
 			FROM
 				series
 			WHERE

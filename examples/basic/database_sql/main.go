@@ -70,33 +70,33 @@ func main() {
 
 	cc, err := ydb.Unwrap(db)
 	if err != nil {
-		log.Fatalf("unwrap failed: %v", err)
+		panic(fmt.Errorf("unwrap failed: %w", err))
 	}
 
 	prefix = path.Join(cc.Name(), prefix)
 
 	err = sugar.RemoveRecursive(ctx, cc, prefix)
 	if err != nil {
-		log.Fatalf("remove recursive failed: %v", err)
+		panic(fmt.Errorf("remove recursive failed: %w", err))
 	}
 
 	err = prepareSchema(ctx, db, prefix)
 	if err != nil {
-		log.Fatalf("create tables error: %v", err)
+		panic(fmt.Errorf("create tables error: %w", err))
 	}
 
 	err = fillTablesWithData(ctx, db, prefix)
 	if err != nil {
-		log.Fatalf("fill tables with data error: %v", err)
+		panic(fmt.Errorf("fill tables with data error: %w", err))
 	}
 
 	err = selectDefault(ctx, db, prefix)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	err = selectScan(ctx, db, prefix)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 }

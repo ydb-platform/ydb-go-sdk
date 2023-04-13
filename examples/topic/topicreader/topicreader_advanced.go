@@ -11,7 +11,7 @@ import (
 )
 
 // ReadMessagesWithCustomBatching example of custom of readed message batch
-func ReadMessagesWithCustomBatching(ctx context.Context, db ydb.Connection) {
+func ReadMessagesWithCustomBatching(ctx context.Context, db *ydb.Driver) {
 	reader, _ := db.Topic().StartReader("consumer", nil,
 		topicoptions.WithBatchReadMinCount(1000),
 	)
@@ -49,7 +49,7 @@ func UnmarshalMessageContentToOwnType(ctx context.Context, reader *topicreader.R
 }
 
 // ProcessMessagesWithSyncCommit example about guarantee wait for commit accepted by server
-func ProcessMessagesWithSyncCommit(ctx context.Context, db ydb.Connection) {
+func ProcessMessagesWithSyncCommit(ctx context.Context, db *ydb.Driver) {
 	reader, _ := db.Topic().StartReader("consumer", nil,
 		topicoptions.WithCommitMode(topicoptions.CommitModeSync),
 	)
@@ -66,7 +66,7 @@ func ProcessMessagesWithSyncCommit(ctx context.Context, db ydb.Connection) {
 
 // OwnReadProgressStorage example about store reading progress in external system and don't use
 // commit messages to YDB
-func OwnReadProgressStorage(ctx context.Context, db ydb.Connection) {
+func OwnReadProgressStorage(ctx context.Context, db *ydb.Driver) {
 	reader, _ := db.Topic().StartReader("consumer", topicoptions.ReadTopic("asd"),
 		topicoptions.WithGetPartitionStartOffset(
 			func(

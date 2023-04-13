@@ -14,19 +14,19 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
-func createTableAndCDC(ctx context.Context, db ydb.Connection, consumersCount int) {
+func createTableAndCDC(ctx context.Context, db *ydb.Driver, consumersCount int) {
 	err := createTables(ctx, db)
 	if err != nil {
-		log.Fatalf("failed to create tables: %+v", err)
+		panic(fmt.Errorf("failed to create tables: %w", err))
 	}
 
 	err = createCosumers(ctx, db, consumersCount)
 	if err != nil {
-		log.Fatalf("failed to create consumers: %+v", err)
+		panic(fmt.Errorf("failed to create consumers: %w", err))
 	}
 }
 
-func createTables(ctx context.Context, db ydb.Connection) error {
+func createTables(ctx context.Context, db *ydb.Driver) error {
 	err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
 		err := s.DropTable(ctx, path.Join(db.Name(), "bus"))
 		if ydb.IsOperationErrorSchemeError(err) {
@@ -62,7 +62,7 @@ UPSERT INTO bus (id, freeSeats) VALUES ("bus1", 40), ("bus2", 60);
 	return nil
 }
 
-func createCosumers(ctx context.Context, db ydb.Connection, consumersCount int) error {
+func createCosumers(ctx context.Context, db *ydb.Driver, consumersCount int) error {
 	for i := 0; i < consumersCount; i++ {
 		err := db.Topic().Alter(ctx, "bus/updates", topicoptions.AlterWithAddConsumers(topictypes.Consumer{
 			Name: consumerName(i),
@@ -75,7 +75,7 @@ func createCosumers(ctx context.Context, db ydb.Connection, consumersCount int) 
 	return nil
 }
 
-func connect() ydb.Connection {
+func connect() *ydb.Driver {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
@@ -101,7 +101,7 @@ func connect() ydb.Connection {
 	}
 	db, err := ydb.Open(ctx, connectionString, ydbOptions...)
 	if err != nil {
-		log.Fatalf("failed to create to ydb: %+v", err)
+		panic(fmt.Errorf("failed to create to ydb: %w", err))
 	}
 	log.Printf("connected to database")
 	return db
