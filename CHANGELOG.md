@@ -8,7 +8,6 @@
 * Fixed code -1 of retryable error if wrapped error with code
 * Added `ydb.MustOpen` and `ydb.MustConnector` helpers
 * Fixed `internal/xerrors.Transport` error wrapping for case when given error is not transport error
-* Added `grpc.WithBlock()` dial option to defaults
 * Added grpc and operation codes to errors string description
 * Extend `scheme.Client` interface with method `Database`
 * Removed `driver.ResultNoRows` in `internal/xsql`
