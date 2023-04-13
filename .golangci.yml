@@ -64,6 +64,8 @@ linters-settings:
   gofmt:
     # simplify code: gofmt with `-s` option, true by default
     simplify: true
+  gofumpt:
+    module-path: github.com/ydb-platform/ydb-go-sdk/v3
   goimports:
     # put imports beginning with prefix after 3rd-party packages;
     # it's a comma-separated list of prefixes
