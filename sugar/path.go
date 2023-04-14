@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	sysTable = ".sys"
+	sysDirectory = ".sys"
 )
 
 type dbName interface {
@@ -49,9 +49,9 @@ type dbFoRemoveRecursive interface {
 // MakeRecursive method equal bash command `mkdir -p ~/path/to/create`
 // where `~` - is a root of database
 func MakeRecursive(ctx context.Context, db dbForMakeRecursive, pathToCreate string) error {
-	if strings.HasPrefix(pathToCreate, sysTable+"/") {
+	if strings.HasPrefix(pathToCreate, sysDirectory+"/") {
 		return xerrors.WithStackTrace(
-			fmt.Errorf("making directory %q inside system path %q not supported", pathToCreate, sysTable),
+			fmt.Errorf("making directory %q inside system path %q not supported", pathToCreate, sysDirectory),
 		)
 	}
 
@@ -90,7 +90,7 @@ func MakeRecursive(ctx context.Context, db dbForMakeRecursive, pathToCreate stri
 // RemoveRecursive method equal bash command `rm -rf ~/path/to/remove`
 // where `~` - is a root of database
 func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove string) error {
-	fullSysTablePath := path.Join(db.Name(), sysTable)
+	fullSysTablePath := path.Join(db.Name(), sysDirectory)
 	var rmPath func(int, string) error
 	rmPath = func(i int, p string) error {
 		if exists, err := IsDirectoryExists(ctx, db.Scheme(), p); err != nil {
@@ -108,7 +108,7 @@ func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove s
 			)
 		}
 
-		if entry.Type != scheme.EntryDirectory {
+		if entry.Type != scheme.EntryDirectory && entry.Type != scheme.EntryDatabase {
 			return nil
 		}
 
@@ -155,6 +155,10 @@ func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove s
 					fmt.Errorf("unknown entry type: %s", child.Type.String()),
 				)
 			}
+		}
+
+		if entry.Type != scheme.EntryDirectory {
+			return nil
 		}
 
 		err = db.Scheme().RemoveDirectory(ctx, p)
