@@ -31,9 +31,6 @@ var (
 
 func defaultGrpcOptions(t trace.Driver, secure bool, tlsConfig *tls.Config) (opts []grpc.DialOption) {
 	opts = append(opts,
-		// Block call `DialContext` for dial done or fail
-		// For exclude dial errors on `Invoke` and `NewStream` steps
-		grpc.WithBlock(),
 		// keep-aliving all connections
 		grpc.WithKeepaliveParams(
 			DefaultGrpcConnectionPolicy,
