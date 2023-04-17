@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
-
+	
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
@@ -147,7 +147,13 @@ func WithDisableServerBalancer() ConnectorOption {
 	return xsql.WithDisableServerBalancer()
 }
 
-func Connector(parent *Driver, opts ...ConnectorOption) (*xsql.Connector, error) {
+type SQLConnector interface {
+	driver.Connector
+
+	Close() error
+}
+
+func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
 	c, err := xsql.Open(parent,
 		append(
 			append(
@@ -164,7 +170,7 @@ func Connector(parent *Driver, opts ...ConnectorOption) (*xsql.Connector, error)
 	return c, nil
 }
 
-func MustConnector(parent *Driver, opts ...ConnectorOption) *xsql.Connector {
+func MustConnector(parent *Driver, opts ...ConnectorOption) SQLConnector {
 	c, err := Connector(parent, opts...)
 	if err != nil {
 		panic(err)
