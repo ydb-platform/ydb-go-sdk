@@ -55,6 +55,9 @@ func main() {
     }
     db := sql.OpenDB(connector)
     defer db.Close()
+    db.SetMaxOpenConns(100)
+    db.SetMaxIdleConns(100)
+    db.SetConnMaxIdleTime(time.Second) // workaround for background keep-aliving of YDB sessions
 }
 ```
 
@@ -86,22 +89,26 @@ Client balancer may be re-configured with option `ydb.WithBalancer`:
 import (
     "github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 )
-...
-nativeDriver, err := ydb.Open(context.TODO(), "grpc://localhost:2136/local",
-    ydb.WithBalancer(
-        balancers.PreferLocationsWithFallback(
-            balancers.RandomChoice(), "a", "b",
+func main() {
+    nativeDriver, err := ydb.Open(context.TODO(), "grpc://localhost:2136/local",
+        ydb.WithBalancer(
+            balancers.PreferLocationsWithFallback(
+                balancers.RandomChoice(), "a", "b",
+            ),
         ),
-    ),
-)
-if err != nil {
-    // fallback on error
+    )
+    if err != nil {
+        // fallback on error
+    }
+    connector, err := ydb.Connector(nativeDriver)
+    if err != nil {
+        // fallback on error
+    }
+    db := sql.OpenDB(connector)
+    db.SetMaxOpenConns(100)
+    db.SetMaxIdleConns(100)
+    db.SetConnMaxIdleTime(time.Second) // workaround for background keep-aliving of YDB sessions
 }
-connector, err := ydb.Connector(nativeDriver)
-if err != nil {
-    // fallback on error
-}
-db := sql.OpenDB(connector)
 ```
 
 ## Session pooling <a name="session-pool"></a>

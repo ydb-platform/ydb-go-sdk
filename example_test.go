@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/encoding/gzip"
@@ -68,6 +69,10 @@ func Example_databaseSQL() {
 		log.Fatal(err)
 	}
 	defer func() { _ = db.Close() }() // cleanup resources
+
+	db.SetMaxOpenConns(100)
+	db.SetMaxIdleConns(100)
+	db.SetConnMaxIdleTime(time.Second) // workaround for background keep-aliving of YDB sessions
 
 	var (
 		id    int32  // required value
