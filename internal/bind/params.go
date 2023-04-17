@@ -1,4 +1,4 @@
-package convert
+package bind
 
 import (
 	"database/sql"
@@ -22,7 +22,7 @@ var (
 )
 
 //nolint:gocyclo
-func ToValue(v interface{}) (_ types.Value, err error) {
+func toValue(v interface{}) (_ types.Value, err error) {
 	if valuer, ok := v.(driver.Valuer); ok {
 		v, err = valuer.Value()
 		if err != nil {
@@ -138,11 +138,25 @@ func supportNewTypeLink(x interface{}) string {
 	return "https://github.com/ydb-platform/ydb-go-sdk/issues/new?" + v.Encode()
 }
 
-func ToYdbParam(name string, value interface{}) (table.ParameterOption, error) {
+func toYdbParam(name string, value interface{}) (table.ParameterOption, error) {
+	if na, ok := value.(driver.NamedValue); ok {
+		n, v := na.Name, na.Value
+		if n != "" {
+			name = n
+		}
+		value = v
+	}
+	if na, ok := value.(sql.NamedArg); ok {
+		n, v := na.Name, na.Value
+		if n != "" {
+			name = n
+		}
+		value = v
+	}
 	if v, ok := value.(table.ParameterOption); ok {
 		return v, nil
 	}
-	v, err := ToValue(value)
+	v, err := toValue(value)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -155,7 +169,7 @@ func ToYdbParam(name string, value interface{}) (table.ParameterOption, error) {
 	return table.ValueParam(name, v), nil
 }
 
-func ArgsToParams(args ...interface{}) (params []table.ParameterOption, _ error) {
+func Params(args ...interface{}) (params []table.ParameterOption, _ error) {
 	params = make([]table.ParameterOption, 0, len(args))
 	for i, arg := range args {
 		switch x := arg.(type) {
@@ -173,14 +187,14 @@ func ArgsToParams(args ...interface{}) (params []table.ParameterOption, _ error)
 					params = append(params, xx)
 				default:
 					x.Name = fmt.Sprintf("$p%d", i)
-					param, err := ToYdbParam(x.Name, x.Value)
+					param, err := toYdbParam(x.Name, x.Value)
 					if err != nil {
 						return nil, xerrors.WithStackTrace(err)
 					}
 					params = append(params, param)
 				}
 			} else {
-				param, err := ToYdbParam(x.Name, x.Value)
+				param, err := toYdbParam(x.Name, x.Value)
 				if err != nil {
 					return nil, xerrors.WithStackTrace(err)
 				}
@@ -190,7 +204,7 @@ func ArgsToParams(args ...interface{}) (params []table.ParameterOption, _ error)
 			if x.Name == "" {
 				return nil, xerrors.WithStackTrace(errUnnamedParam)
 			}
-			param, err := ToYdbParam(x.Name, x.Value)
+			param, err := toYdbParam(x.Name, x.Value)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
@@ -205,7 +219,7 @@ func ArgsToParams(args ...interface{}) (params []table.ParameterOption, _ error)
 		case table.ParameterOption:
 			params = append(params, x)
 		default:
-			param, err := ToYdbParam(fmt.Sprintf("$p%d", i), x)
+			param, err := toYdbParam(fmt.Sprintf("$p%d", i), x)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}

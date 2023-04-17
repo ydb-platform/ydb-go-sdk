@@ -11,10 +11,11 @@ type retryableError struct {
 	err               error
 	backoffType       backoff.Type
 	mustDeleteSession bool
+	code              int32
 }
 
 func (e *retryableError) Code() int32 {
-	return -1
+	return e.code
 }
 
 func (e *retryableError) Name() string {
@@ -67,11 +68,14 @@ func Retryable(err error, opts ...RetryableErrorOption) error {
 		re = &retryableError{
 			err:  err,
 			name: "CUSTOM",
+			code: -1,
 		}
 	)
 	if As(err, &e) {
 		re.backoffType = e.BackoffType()
 		re.mustDeleteSession = e.MustDeleteSession()
+		re.code = e.Code()
+		re.name = e.Name()
 	}
 	for _, o := range opts {
 		if o != nil {

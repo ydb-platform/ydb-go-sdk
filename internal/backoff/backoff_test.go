@@ -101,6 +101,27 @@ func TestLogBackoff(t *testing.T) {
 				{eq: 8 * time.Second}, // 1 << min(6, 3)
 			},
 		},
+		{
+			backoff: New(
+				WithSlotDuration(time.Second),
+				WithCeiling(6),
+				WithJitterLimit(1),
+			),
+			exp: []exp{
+				{eq: time.Second},      // 1 << min(0, 3)
+				{eq: 2 * time.Second},  // 1 << min(1, 3)
+				{eq: 4 * time.Second},  // 1 << min(2, 3)
+				{eq: 8 * time.Second},  // 1 << min(3, 3)
+				{eq: 16 * time.Second}, // 1 << min(4, 3)
+				{eq: 32 * time.Second}, // 1 << min(5, 3)
+				{eq: 64 * time.Second}, // 1 << min(6, 3)
+				{eq: 64 * time.Second}, // 1 << min(6, 3)
+				{eq: 64 * time.Second}, // 1 << min(6, 3)
+				{eq: 64 * time.Second}, // 1 << min(6, 3)
+				{eq: 64 * time.Second}, // 1 << min(6, 3)
+				{eq: 64 * time.Second}, // 1 << min(6, 3)
+			},
+		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			if test.seeds == 0 {

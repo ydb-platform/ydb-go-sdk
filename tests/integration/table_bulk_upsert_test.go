@@ -12,7 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-func TestTableBulkUpsertExample(t *testing.T) {
+func TestTableBulkUpsert(t *testing.T) {
 	scope := newScope(t)
 	driver := scope.Driver()
 	tablePath := scope.TablePath()

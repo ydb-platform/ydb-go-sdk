@@ -15,6 +15,13 @@ require (
 	google.golang.org/protobuf v1.28.0
 )
 
+// requires for tests only
+require (
+	github.com/golang/mock v1.6.0
+	github.com/rekby/fixenv v0.3.2
+	github.com/stretchr/testify v1.7.1
+)
+
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect

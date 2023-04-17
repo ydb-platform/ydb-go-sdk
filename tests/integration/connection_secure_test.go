@@ -32,6 +32,11 @@ import (
 
 //nolint:gocyclo
 func TestConnectionSecure(t *testing.T) {
+	dsn, has := os.LookupEnv("YDB_CONNECTION_STRING_SECURE")
+	if !has {
+		t.Skipf("require YDB_CONNECTION_STRING_SECURE env")
+	}
+
 	const sumColumn = "sum"
 	var (
 		ctx    = xtest.Context(t)
@@ -41,7 +46,7 @@ func TestConnectionSecure(t *testing.T) {
 	db, err := ydb.Open(
 		ctx,
 		"", // corner case for check replacement of endpoint+database+secure
-		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING_SECURE")),
+		ydb.WithConnectionString(dsn),
 		ydb.WithAccessTokenCredentials(
 			os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
 		),

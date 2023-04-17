@@ -20,7 +20,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -71,7 +70,7 @@ func (scope *scopeT) AuthToken() string {
 	return os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")
 }
 
-func (scope *scopeT) Driver() *ydb.Driver {
+func (scope *scopeT) Driver(opts ...ydb.Option) *ydb.Driver {
 	return scope.CacheWithCleanup("", nil, func() (res interface{}, cleanup fixenv.FixtureCleanupFunc, err error) {
 		connectionString := scope.ConnectionString()
 		scope.Logf("Connect with connection string: %v", connectionString)
@@ -89,13 +88,15 @@ func (scope *scopeT) Driver() *ydb.Driver {
 		logger := xtest.Logger(scope.T())
 
 		driver, err := ydb.Open(connectionContext, connectionString,
-			ydb.WithAccessTokenCredentials(token),
-			ydb.WithLogger(
-				trace.DetailsAll,
-				ydb.WithNamespace("ydb"),
-				ydb.WithWriter(logger),
-				ydb.WithMinLevel(log.WARN),
-			),
+			append(opts,
+				ydb.WithAccessTokenCredentials(token),
+				ydb.WithLogger(
+					trace.DetailsAll,
+					ydb.WithNamespace("ydb"),
+					ydb.WithWriter(logger),
+					ydb.WithMinLevel(log.WARN),
+				),
+			)...,
 		)
 		clean := func() {
 			scope.Require.NoError(driver.Close(scope.Ctx))
@@ -109,7 +110,7 @@ func (scope *scopeT) SQLDriverWithFolder(opts ...ydb.ConnectorOption) *sql.DB {
 		driver := scope.Driver()
 		scope.Logf("Create sql db connector")
 		connector, err := ydb.Connector(driver,
-			append([]ydb.ConnectorOption{ydb.WithAutoBind(query.TablePathPrefix(scope.Folder()))}, opts...)...,
+			append([]ydb.ConnectorOption{ydb.WithTablePathPrefix(scope.Folder())}, opts...)...,
 		)
 		if err != nil {
 			return nil, err

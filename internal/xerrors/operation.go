@@ -3,8 +3,6 @@ package xerrors
 import (
 	"errors"
 	"fmt"
-	"strconv"
-	"strings"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
@@ -15,38 +13,9 @@ import (
 
 // operationError reports about operationStatus fail.
 type operationError struct {
-	code   Ydb.StatusIds_StatusCode
-	issues issues
-}
-
-type issues []*Ydb_Issue.IssueMessage
-
-func (ii issues) String() string {
-	if len(ii) == 0 {
-		return ""
-	}
-	b := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(b)
-	b.WriteByte('[')
-	for i, m := range ii {
-		if i != 0 {
-			b.WriteByte(',')
-		}
-		b.WriteByte('{')
-		if code := m.GetIssueCode(); code != 0 {
-			b.WriteByte('#')
-			b.WriteString(strconv.Itoa(int(code)))
-			b.WriteByte(' ')
-		}
-		b.WriteString(strings.TrimSuffix(m.GetMessage(), "."))
-		if len(m.Issues) > 0 {
-			b.WriteByte(' ')
-			b.WriteString(issues(m.Issues).String())
-		}
-		b.WriteByte('}')
-	}
-	b.WriteByte(']')
-	return b.String()
+	code    Ydb.StatusIds_StatusCode
+	issues  issues
+	address string
 }
 
 func (e *operationError) isYdbError() {}
@@ -77,6 +46,14 @@ func WithIssues(issues []*Ydb_Issue.IssueMessage) oeOpt {
 func WithStatusCode(code Ydb.StatusIds_StatusCode) oeOpt {
 	return func(oe *operationError) {
 		oe.code = code
+	}
+}
+
+// WithNodeAddress is an option for construct operationStatus error with node address
+// WithNodeAddress must use as `Operation(WithNodeAddress(reason))`
+func WithNodeAddress(address string) oeOpt {
+	return func(oe *operationError) {
+		oe.address = address
 	}
 }
 
@@ -112,6 +89,10 @@ func (e *operationError) Error() string {
 	defer allocator.Buffers.Put(b)
 	b.WriteString(e.Name())
 	b.WriteString(fmt.Sprintf(" (code = %d", e.code))
+	if len(e.address) > 0 {
+		b.WriteString(", address = ")
+		b.WriteString(e.address)
+	}
 	if len(e.issues) > 0 {
 		b.WriteString(", issues = ")
 		b.WriteString(e.issues.String())

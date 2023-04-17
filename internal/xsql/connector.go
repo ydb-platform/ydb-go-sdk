@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
@@ -14,73 +15,148 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type ConnectorOption func(c *Connector) error
-
-func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
-	return func(c *Connector) error {
-		c.defaultQueryMode = mode
-		return nil
-	}
+type ConnectorOption interface {
+	Apply(c *Connector) error
 }
 
-func WithQueryBinders(binders ...query.Binder) ConnectorOption {
-	return func(c *Connector) error {
-		c.bind = binders
-		return nil
-	}
+type defaultQueryModeConnectorOption QueryMode
+
+func (mode defaultQueryModeConnectorOption) Apply(c *Connector) error {
+	c.defaultQueryMode = QueryMode(mode)
+	return nil
+}
+
+type QueryBindConnectorOption interface {
+	ConnectorOption
+	bind.Bind
+}
+
+type queryBindConnectorOption struct {
+	bind.Bind
+}
+
+func (o queryBindConnectorOption) Apply(c *Connector) error {
+	c.Bindings = bind.Sort(append(c.Bindings, o.Bind))
+	return nil
+}
+
+type tablePathPrefixConnectorOption struct {
+	bind.TablePathPrefix
+}
+
+func (o tablePathPrefixConnectorOption) Apply(c *Connector) error {
+	c.Bindings = bind.Sort(append(c.Bindings, o.TablePathPrefix))
+	c.PathNormalizer = o.TablePathPrefix
+	return nil
+}
+
+func WithQueryBind(bind bind.Bind) QueryBindConnectorOption {
+	return queryBindConnectorOption{Bind: bind}
+}
+
+func WithTablePathPrefix(tablePathPrefix string) QueryBindConnectorOption {
+	return tablePathPrefixConnectorOption{TablePathPrefix: bind.TablePathPrefix(tablePathPrefix)}
+}
+
+func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
+	return defaultQueryModeConnectorOption(mode)
+}
+
+type defaultTxControlOption struct {
+	txControl *table.TransactionControl
+}
+
+func (opt defaultTxControlOption) Apply(c *Connector) error {
+	c.defaultTxControl = opt.txControl
+	return nil
 }
 
 func WithDefaultTxControl(txControl *table.TransactionControl) ConnectorOption {
-	return func(c *Connector) error {
-		c.defaultTxControl = txControl
-		return nil
-	}
+	return defaultTxControlOption{txControl}
+}
+
+type defaultDataQueryOptionsConnectorOption []options.ExecuteDataQueryOption
+
+func (opts defaultDataQueryOptionsConnectorOption) Apply(c *Connector) error {
+	c.defaultDataQueryOpts = append(c.defaultDataQueryOpts, opts...)
+	return nil
 }
 
 func WithDefaultDataQueryOptions(opts ...options.ExecuteDataQueryOption) ConnectorOption {
-	return func(c *Connector) error {
-		c.defaultDataQueryOpts = append(c.defaultDataQueryOpts, opts...)
-		return nil
-	}
+	return defaultDataQueryOptionsConnectorOption(opts)
+}
+
+type defaultScanQueryOptionsConnectorOption []options.ExecuteScanQueryOption
+
+func (opts defaultScanQueryOptionsConnectorOption) Apply(c *Connector) error {
+	c.defaultScanQueryOpts = append(c.defaultScanQueryOpts, opts...)
+	return nil
 }
 
 func WithDefaultScanQueryOptions(opts ...options.ExecuteScanQueryOption) ConnectorOption {
-	return func(c *Connector) error {
-		c.defaultScanQueryOpts = append(c.defaultScanQueryOpts, opts...)
-		return nil
-	}
+	return defaultScanQueryOptionsConnectorOption(opts)
+}
+
+type traceConnectorOption struct {
+	t    trace.DatabaseSQL
+	opts []trace.DatabaseSQLComposeOption
+}
+
+func (option traceConnectorOption) Apply(c *Connector) error {
+	c.trace = c.trace.Compose(option.t, option.opts...)
+	return nil
 }
 
 func WithTrace(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) ConnectorOption {
-	return func(c *Connector) error {
-		c.trace = c.trace.Compose(t, opts...)
-		return nil
-	}
+	return traceConnectorOption{t, opts}
+}
+
+type disableServerBalancerConnectorOption struct{}
+
+func (d disableServerBalancerConnectorOption) Apply(c *Connector) error {
+	c.disableServerBalancer = true
+	return nil
 }
 
 func WithDisableServerBalancer() ConnectorOption {
-	return func(c *Connector) error {
-		c.disableServerBalancer = true
-		return nil
-	}
+	return disableServerBalancerConnectorOption{}
+}
+
+type idleThresholdConnectorOption time.Duration
+
+func (idleThreshold idleThresholdConnectorOption) Apply(c *Connector) error {
+	c.idleThreshold = time.Duration(idleThreshold)
+	return nil
 }
 
 func WithIdleThreshold(idleThreshold time.Duration) ConnectorOption {
-	return func(c *Connector) error {
-		c.idleThreshold = idleThreshold
-		return nil
-	}
+	return idleThresholdConnectorOption(idleThreshold)
+}
+
+type onCloseConnectorOption func(connector *Connector)
+
+func (f onCloseConnectorOption) Apply(c *Connector) error {
+	c.onClose = append(c.onClose, f)
+	return nil
 }
 
 func WithOnClose(f func(connector *Connector)) ConnectorOption {
-	return func(c *Connector) error {
-		c.onClose = append(c.onClose, f)
-		return nil
-	}
+	return onCloseConnectorOption(f)
+}
+
+type fakeTxConnectorOption QueryMode
+
+func (m fakeTxConnectorOption) Apply(c *Connector) error {
+	c.fakeTxModes = append(c.fakeTxModes, QueryMode(m))
+	return nil
+}
+
+// WithFakeTx returns a copy of context with given QueryMode
+func WithFakeTx(m QueryMode) ConnectorOption {
+	return fakeTxConnectorOption(m)
 }
 
 type ydbDriver interface {
@@ -90,16 +166,23 @@ type ydbDriver interface {
 	Scheme() scheme.Client
 }
 
+type nopPathNormalizer struct{}
+
+func (nopPathNormalizer) NormalizePath(folderOrTable string) string {
+	return tablePathPrefixTransformer
+}
+
 func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
 	c := &Connector{
 		parent:           parent,
 		conns:            make(map[*conn]struct{}),
 		defaultTxControl: table.DefaultTxControl(),
 		defaultQueryMode: DefaultQueryMode,
+		PathNormalizer:   nopPathNormalizer{},
 	}
 	for _, opt := range opts {
 		if opt != nil {
-			if err = opt(c); err != nil {
+			if err = opt.Apply(c); err != nil {
 				return nil, err
 			}
 		}
@@ -110,11 +193,18 @@ func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
 	return c, nil
 }
 
+type pathNormalizer interface {
+	NormalizePath(folderOrTable string) string
+}
+
 // Connector is a producer of database/sql connections
 type Connector struct {
 	parent ydbDriver
 
-	bind query.Bind
+	Bindings       bind.Bindings
+	PathNormalizer pathNormalizer
+
+	fakeTxModes []QueryMode
 
 	onClose []func(connector *Connector)
 
@@ -205,8 +295,8 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 		withDefaultQueryMode(c.defaultQueryMode),
 		withDataOpts(c.defaultDataQueryOpts...),
 		withScanOpts(c.defaultScanQueryOpts...),
-		withBind(c.bind),
 		withTrace(c.trace),
+		withFakeTxModes(c.fakeTxModes...),
 	), nil
 }
 

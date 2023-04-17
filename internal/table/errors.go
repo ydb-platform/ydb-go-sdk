@@ -31,6 +31,9 @@ var (
 	// errNoProgress returned by a Client instance to indicate that
 	// operation could not be completed.
 	errNoProgress = xerrors.Wrap(errors.New("no progress"))
+
+	// errNodeIsNotObservable returned by a Client instance to indicate that required node is not observable
+	errNodeIsNotObservable = xerrors.Wrap(errors.New("node is not observable"))
 )
 
 func isCreateSessionErrorRetriable(err error) bool {

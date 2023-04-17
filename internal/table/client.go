@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -19,7 +20,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/testutil/timeutil"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -50,13 +50,14 @@ func newClient(
 		onDone = trace.TableOnInit(config.Trace(), &ctx)
 	)
 	c := &Client{
+		clock:  config.Clock(),
 		config: config,
 		cc:     balancer,
 		build:  builder,
 		index:  make(map[*session]sessionInfo),
 		nodes:  make(map[uint32]map[*session]struct{}),
 		idle:   list.New(),
-		waitq:  list.New(),
+		waitQ:  list.New(),
 		limit:  config.SizeLimit(),
 		waitChPool: sync.Pool{
 			New: func() interface{} {
@@ -84,6 +85,7 @@ type Client struct {
 	config config.Config
 	build  sessionBuilder
 	cc     grpc.ClientConnInterface
+	clock  clockwork.Clock
 
 	// read-write fields
 	mu                xsync.Mutex
@@ -92,7 +94,7 @@ type Client struct {
 	createInProgress  int        // KIKIMR-9163: in-create-process counter
 	limit             int        // Upper bound for Client size.
 	idle              *list.List // list<*session>
-	waitq             *list.List // list<*chan *session>
+	waitQ             *list.List // list<*chan *session>
 	waitChPool        sync.Pool
 	testHookGetWaitCh func() // nil except some tests.
 	wg                sync.WaitGroup
@@ -148,6 +150,11 @@ func (c *Client) updateNodes(ctx context.Context, endpoints []endpoint.Info) {
 						}
 					}(s)
 				}
+			}
+		}
+		for _, nodeID := range nodeIDs {
+			if _, ok := c.nodes[nodeID]; !ok {
+				c.nodes[nodeID] = make(map[*session]struct{})
 			}
 		}
 	})
@@ -259,27 +266,29 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 func (c *Client) appendSessionToNodes(s *session) {
 	c.mu.WithLock(func() {
 		nodeID := s.NodeID()
-		sessions, has := c.nodes[nodeID]
-		if !has {
-			sessions = make(map[*session]struct{})
+		if _, has := c.nodes[nodeID]; has {
+			c.nodes[nodeID][s] = struct{}{}
 		}
-		sessions[s] = struct{}{}
-		c.nodes[nodeID] = sessions
 	})
+}
+
+func (c *Client) hasNodeID(nodeID uint32) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	_, ok := c.nodes[nodeID]
+	return ok
 }
 
 func (c *Client) removeSessionFromNodes(s *session) {
 	c.mu.WithLock(func() {
 		nodeID := s.NodeID()
-		sessions, has := c.nodes[nodeID]
-		if !has {
-			sessions = make(map[*session]struct{})
-		}
-		delete(sessions, s)
-		if len(sessions) == 0 {
-			delete(c.nodes, nodeID)
-		} else {
-			c.nodes[nodeID] = sessions
+		if sessions, has := c.nodes[nodeID]; has {
+			delete(sessions, s)
+			if len(sessions) == 0 {
+				delete(c.nodes, nodeID)
+			} else {
+				c.nodes[nodeID] = sessions
+			}
 		}
 	})
 }
@@ -383,7 +392,7 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 		withCreateSessionOnCreate(func(s *session) {
 			c.mu.WithLock(func() {
 				c.index[s] = sessionInfo{
-					touched: timeutil.Now(),
+					touched: c.clock.Now(),
 				}
 				trace.TableOnPoolSessionAdd(c.config.Trace(), s)
 				trace.TableOnPoolStateChange(c.config.Trace(), len(c.index), "append")
@@ -528,7 +537,7 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t trace.Table) (s *
 
 	c.mu.WithLock(func() {
 		ch = c.internalPoolGetWaitCh()
-		el = c.waitq.PushBack(ch)
+		el = c.waitQ.PushBack(ch)
 	})
 
 	waitDone := trace.TableOnPoolWait(t, &ctx)
@@ -545,7 +554,7 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t trace.Table) (s *
 	select {
 	case <-c.done:
 		c.mu.WithLock(func() {
-			c.waitq.Remove(el)
+			c.waitQ.Remove(el)
 		})
 		return nil, xerrors.WithStackTrace(errClosedClient)
 
@@ -566,13 +575,13 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t trace.Table) (s *
 
 	case <-createSessionTimeoutCh:
 		c.mu.WithLock(func() {
-			c.waitq.Remove(el)
+			c.waitQ.Remove(el)
 		})
 		return nil, nil
 
 	case <-ctx.Done():
 		c.mu.WithLock(func() {
-			c.waitq.Remove(el)
+			c.waitQ.Remove(el)
 		})
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	}
@@ -609,6 +618,9 @@ func (c *Client) Put(ctx context.Context, s *session) (err error) {
 	case s.isClosed():
 		return xerrors.WithStackTrace(errSessionClosed)
 
+	case !c.hasNodeID(s.NodeID()):
+		return xerrors.WithStackTrace(errNodeIsNotObservable)
+
 	default:
 		c.mu.Lock()
 		defer c.mu.Unlock()
@@ -618,7 +630,7 @@ func (c *Client) Put(ctx context.Context, s *session) (err error) {
 		}
 
 		if !c.internalPoolNotify(s) {
-			c.internalPoolPushIdle(s, timeutil.Now())
+			c.internalPoolPushIdle(s, c.clock.Now())
 		}
 
 		return nil
@@ -649,7 +661,7 @@ func (c *Client) Close(ctx context.Context) (err error) {
 
 			c.limit = 0
 
-			for el := c.waitq.Front(); el != nil; el = el.Next() {
+			for el := c.waitQ.Front(); el != nil; el = el.Next() {
 				ch := el.Value.(*chan *session)
 				close(*ch)
 			}
@@ -726,7 +738,7 @@ func (c *Client) internalPoolGCTick(ctx context.Context, idleThreshold time.Dura
 			if info.idle == nil {
 				panic("inconsistent session info")
 			}
-			if since := timeutil.Until(info.touched); since > idleThreshold {
+			if since := c.clock.Since(info.touched); since > idleThreshold {
 				s.SetStatus(table.SessionClosing)
 				c.wg.Add(1)
 				go func() {
@@ -741,7 +753,7 @@ func (c *Client) internalPoolGCTick(ctx context.Context, idleThreshold time.Dura
 func (c *Client) internalPoolGC(ctx context.Context, idleThreshold time.Duration) {
 	defer c.wg.Done()
 
-	timer := timeutil.NewTimer(idleThreshold)
+	timer := c.clock.NewTimer(idleThreshold)
 	defer timer.Stop()
 
 	for {
@@ -752,7 +764,7 @@ func (c *Client) internalPoolGC(ctx context.Context, idleThreshold time.Duration
 		case <-ctx.Done():
 			return
 
-		case <-timer.C():
+		case <-timer.Chan():
 			c.internalPoolGCTick(ctx, idleThreshold)
 			timer.Reset(idleThreshold / 2)
 		}
@@ -813,7 +825,7 @@ func (c *Client) internalPoolRemoveFirstIdle() *session {
 
 // c.mu must be held.
 func (c *Client) internalPoolNotify(s *session) (notified bool) {
-	for el := c.waitq.Front(); el != nil; el = c.waitq.Front() {
+	for el := c.waitQ.Front(); el != nil; el = c.waitQ.Front() {
 		// Some goroutine is waiting for a session.
 		//
 		// It could be in this states:
@@ -827,7 +839,7 @@ func (c *Client) internalPoolNotify(s *session) (notified bool) {
 		// missed something and may want to retry (especially for case (3)).
 		//
 		// After that we taking a next waiter and repeat the same.
-		ch := c.waitq.Remove(el).(*chan *session)
+		ch := c.waitQ.Remove(el).(*chan *session)
 		select {
 		case *ch <- s:
 			// Case (1).

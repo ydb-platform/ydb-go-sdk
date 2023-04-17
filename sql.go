@@ -6,12 +6,12 @@ import (
 	"database/sql/driver"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -98,12 +98,33 @@ func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.C
 
 type ConnectorOption = xsql.ConnectorOption
 
+type QueryBindConnectorOption interface {
+	ConnectorOption
+	bind.Bind
+}
+
 func WithDefaultQueryMode(mode QueryMode) ConnectorOption {
 	return xsql.WithDefaultQueryMode(mode)
 }
 
-func WithAutoBind(binders ...query.Binder) ConnectorOption {
-	return xsql.WithQueryBinders(binders...)
+func WithFakeTx(mode QueryMode) ConnectorOption {
+	return xsql.WithFakeTx(mode)
+}
+
+func WithTablePathPrefix(tablePathPrefix string) QueryBindConnectorOption {
+	return xsql.WithTablePathPrefix(tablePathPrefix)
+}
+
+func WithAutoDeclare() QueryBindConnectorOption {
+	return xsql.WithQueryBind(bind.AutoDeclare{})
+}
+
+func WithPositionalArgs() QueryBindConnectorOption {
+	return xsql.WithQueryBind(bind.PositionalArgs{})
+}
+
+func WithNumericArgs() QueryBindConnectorOption {
+	return xsql.WithQueryBind(bind.NumericArgs{})
 }
 
 func WithDefaultTxControl(txControl *table.TransactionControl) ConnectorOption {
@@ -126,7 +147,13 @@ func WithDisableServerBalancer() ConnectorOption {
 	return xsql.WithDisableServerBalancer()
 }
 
-func Connector(parent *Driver, opts ...ConnectorOption) (*xsql.Connector, error) {
+type SQLConnector interface {
+	driver.Connector
+
+	Close() error
+}
+
+func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
 	c, err := xsql.Open(parent,
 		append(
 			append(
@@ -143,7 +170,7 @@ func Connector(parent *Driver, opts ...ConnectorOption) (*xsql.Connector, error)
 	return c, nil
 }
 
-func MustConnector(parent *Driver, opts ...ConnectorOption) *xsql.Connector {
+func MustConnector(parent *Driver, opts ...ConnectorOption) SQLConnector {
 	c, err := Connector(parent, opts...)
 	if err != nil {
 		panic(err)

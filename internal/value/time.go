@@ -98,7 +98,11 @@ func TzTimestampToTime(s string) (t time.Time, err error) {
 	if err != nil {
 		return t, xerrors.WithStackTrace(err)
 	}
-	t, err = time.ParseInLocation(LayoutTzTimestamp, ss[0], location)
+	layout := LayoutTzTimestamp
+	if strings.IndexByte(ss[0], '.') < 0 {
+		layout = LayoutTzDatetime
+	}
+	t, err = time.ParseInLocation(layout, ss[0], location)
 	if err != nil {
 		return t, xerrors.WithStackTrace(fmt.Errorf("parse '%s' failed: %w", s, err))
 	}

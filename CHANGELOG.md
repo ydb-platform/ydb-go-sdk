@@ -1,11 +1,20 @@
+## v3.44.0
+* Added `table/options.WithCallOptions` options for append custom grpc call options into `session.{BulkUpsert,Execute,StreamExecuteScanQuery}`
+* Supported fake transactions in `database/sql` driver over connector option `ydb.WithFakeTx(queryMode)` and connection string param `go_fake_tx`
+* Removed `testutil/timeutil` package (all usages replaced with `clockwork` package)
+* Changed behaviour of retryer on transport errors `cancelled` and `deadline exceeded` - will retry idempotent operation if context is not done  
+* Added address of node to operation error description as optional
+* Fixed bug with put session from unknown node
+* Fixed bug with parsing of `TzTimestamp` without microseconds
+* Fixed code -1 of retryable error if wrapped error with code
 * Added `ydb.MustOpen` and `ydb.MustConnector` helpers
 * Fixed `internal/xerrors.Transport` error wrapping for case when given error is not transport error
-* Added `grpc.WithBlock()` dial option to defaults
 * Added grpc and operation codes to errors string description
 * Extend `scheme.Client` interface with method `Database`
 * Removed `driver.ResultNoRows` in `internal/xsql`
-* Added package `table.query` with bindings
-* Supported binding parameters for `database/sql` driver over connector option `ydb.WithAutoBind()` and connection string params `go_auto_bind={origin,table_path_prefix,declare,numeric,positional}` and `go_auto_bind.table_path_prefix=path/to/tables`
+* Added `ydb.{WithTablePathPrefix,WithAutoDeclare,WithPositionalArgs,WithNumericalArgs}` query modifiers options
+* Supported binding parameters for `database/sql` driver over connector option `ydb.WithAutoBind()` and connection string params `go_auto_bind={origin,table_path_prefix(path),declare,numeric,positional}`
+* Added `testutil.QueryBind` test helper
 * Fixed topic retry policy callback call: not call it with nil error
 * Fixed bug with no checking operation error on `discovery.Client` calls
 * Allowed zero create session timeout in `ydb.WithSessionPoolCreateSessionTimeout(timeout)` (less than or equal to zero - no used timeout on create session request)

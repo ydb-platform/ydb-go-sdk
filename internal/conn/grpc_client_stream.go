@@ -111,12 +111,11 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 
 	if s.wrapping {
 		if operation, ok := m.(wrap.StreamOperationResponse); ok {
-			if s := operation.GetStatus(); s != Ydb.StatusIds_SUCCESS {
+			if status := operation.GetStatus(); status != Ydb.StatusIds_SUCCESS {
 				return xerrors.WithStackTrace(
 					xerrors.Operation(
-						xerrors.FromOperation(
-							operation,
-						),
+						xerrors.FromOperation(operation),
+						xerrors.WithNodeAddress(s.c.Address()),
 					),
 				)
 			}

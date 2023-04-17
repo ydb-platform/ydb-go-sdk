@@ -11,16 +11,15 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/query"
 )
 
 func TestDatabaseSqlPositionalArgs(t *testing.T) {
 	scope := newScope(t)
-	db := scope.SQLDriverWithFolder(ydb.WithAutoBind(
-		query.TablePathPrefix(scope.Folder()),
-		query.Declare(),
-		query.Positional(),
-	))
+	db := scope.SQLDriverWithFolder(
+		ydb.WithTablePathPrefix(scope.Folder()),
+		ydb.WithAutoDeclare(),
+		ydb.WithPositionalArgs(),
+	)
 	dt := time.Date(2023, 3, 1, 16, 34, 18, 0, time.UTC)
 
 	var row *sql.Row

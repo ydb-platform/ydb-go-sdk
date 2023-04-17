@@ -15,17 +15,23 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/isolation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type connOption func(*conn)
+
+func withFakeTxModes(modes ...QueryMode) connOption {
+	return func(c *conn) {
+		for _, m := range modes {
+			c.beginTxFuncs[m] = c.beginTxFake
+		}
+	}
+}
 
 func withDataOpts(dataOpts ...options.ExecuteDataQueryOption) connOption {
 	return func(c *conn) {
@@ -45,12 +51,6 @@ func withDefaultTxControl(defaultTxControl *table.TransactionControl) connOption
 	}
 }
 
-func withBind(bind query.Bind) connOption {
-	return func(c *conn) {
-		c.bind = bind
-	}
-}
-
 func withDefaultQueryMode(mode QueryMode) connOption {
 	return func(c *conn) {
 		c.defaultQueryMode = mode
@@ -63,15 +63,18 @@ func withTrace(t trace.DatabaseSQL) connOption {
 	}
 }
 
+type beginTxFunc func(ctx context.Context, txOptions driver.TxOptions) (currentTx, error)
+
 type conn struct {
 	connector *Connector
 	trace     trace.DatabaseSQL
 	session   table.ClosableSession // Immutable and r/o usage.
 
+	beginTxFuncs map[QueryMode]beginTxFunc
+
 	closed           uint32
 	lastUsage        int64
 	defaultQueryMode QueryMode
-	bind             query.Bind
 
 	defaultTxControl *table.TransactionControl
 	dataOpts         []options.ExecuteDataQueryOption
@@ -123,6 +126,9 @@ func newConn(c *Connector, s table.ClosableSession, opts ...connOption) *conn {
 	cc := &conn{
 		connector: c,
 		session:   s,
+	}
+	cc.beginTxFuncs = map[QueryMode]beginTxFunc{
+		DataQueryMode: cc.beginTx,
 	}
 	for _, o := range opts {
 		if o != nil {
@@ -391,7 +397,7 @@ func (c *conn) Begin() (driver.Tx, error) {
 }
 
 func (c *conn) normalize(q string, args ...driver.NamedValue) (query string, _ *table.QueryParameters, _ error) {
-	return c.bind.ToYQL(q, func() (ii []interface{}) {
+	return c.connector.Bindings.RewriteQuery(q, func() (ii []interface{}) {
 		for i := range args {
 			ii = append(ii, args[i])
 		}
@@ -399,39 +405,32 @@ func (c *conn) normalize(q string, args ...driver.NamedValue) (query string, _ *
 	}()...)
 }
 
-func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ driver.Tx, err error) {
+func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (tx driver.Tx, err error) {
 	var transaction table.Transaction
 	onDone := trace.DatabaseSQLOnConnBegin(c.trace, &ctx)
 	defer func() {
 		onDone(transaction, err)
 	}()
-	m := queryModeFromContext(ctx, c.defaultQueryMode)
-	if m != DataQueryMode {
-		return nil, badconn.Map(xerrors.WithStackTrace(fmt.Errorf("wrong query mode: %s", m.String())))
-	}
-	if !c.isReady() {
-		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
-	}
+
 	if c.currentTx != nil {
 		return nil, xerrors.WithStackTrace(
 			fmt.Errorf("conn already have an opened currentTx: %s", c.currentTx.ID()),
 		)
 	}
-	var txc table.TxOption
-	txc, err = isolation.ToYDB(txOptions)
+
+	m := queryModeFromContext(ctx, c.defaultQueryMode)
+
+	beginTx, isKnown := c.beginTxFuncs[m]
+	if !isKnown {
+		return nil, badconn.Map(xerrors.WithStackTrace(fmt.Errorf("wrong query mode: %s", m.String())))
+	}
+
+	tx, err = beginTx(ctx, txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
-	transaction, err = c.session.BeginTransaction(ctx, table.TxSettings(txc))
-	if err != nil {
-		return nil, badconn.Map(xerrors.WithStackTrace(err))
-	}
-	c.currentTx = &tx{
-		conn: c,
-		ctx:  ctx,
-		tx:   transaction,
-	}
-	return c.currentTx, nil
+
+	return tx, nil
 }
 
 func (c *conn) Version(context.Context) (_ string, err error) {
@@ -596,7 +595,7 @@ func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (
 }
 
 func (c *conn) normalizePath(folderOrTable string) (absPath string) {
-	return c.bind.NormalizePath(folderOrTable)
+	return c.connector.PathNormalizer.NormalizePath(folderOrTable)
 }
 
 func (c *conn) GetTables(ctx context.Context, folder string) (tables []string, err error) {

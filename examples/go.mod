@@ -1,4 +1,4 @@
-module github.com/ydb-platform/ydb-go-examples
+module examples
 
 go 1.18
 
@@ -12,7 +12,7 @@ require (
 	github.com/ydb-platform/ydb-go-sdk-prometheus v0.11.10
 	github.com/ydb-platform/ydb-go-sdk-zerolog v0.12.2
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.43.0-rc2.0.20230304160347-4f99c9dda534
-	github.com/ydb-platform/ydb-go-yc v0.9.1
+	github.com/ydb-platform/ydb-go-yc v0.10.1
 	google.golang.org/genproto v0.0.0-20220822174746-9e6da59bd2fc
 	gorm.io/driver/postgres v1.4.6
 	gorm.io/driver/sqlite v1.4.4
@@ -30,7 +30,7 @@ require (
 	github.com/jackc/pgx/v5 v5.2.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
-	github.com/jonboulle/clockwork v0.3.0 // indirect
+	github.com/jonboulle/clockwork v0.4.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/mattn/go-sqlite3 v1.14.15 // indirect

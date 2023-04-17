@@ -6,9 +6,9 @@ env:
   GO111MODULE: "on"
 
 jobs:
-  check-api-not-broken:
+  broken-changes:
     concurrency:
-      group: breaking-${{ github.ref }}
+      group: broken-changes-${{ github.ref }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     steps:
@@ -18,28 +18,11 @@ jobs:
           go-version: "1.20"
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Build examples
-        run: |
-          cd examples
-          go build ./...
-      - name: Gorelease cache
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/go/bin/gorelease
-          key: ${{ runner.os }}-gorelease
       - name: Install gorelease
         run: test -e ~/go/bin/gorelease || go install golang.org/x/exp/cmd/gorelease@latest
-      - name: Install egrep
-        run: which egrep || apt install egrep
-      - name: Check API changes
-        id: gorelease
+      - name: Check broken API changes
         run: |
-          OUTPUT=$(gorelease -base=master || true);
-          OUTPUT=$(echo "$OUTPUT" | egrep -v "^.*from .*\/internal\/.* to .*\/internal\/.*$");
-          OUTPUT="${OUTPUT//'%'/'%25'}"
-          OUTPUT="${OUTPUT//$'\n'/'%0A'}"
-          OUTPUT="${OUTPUT//$'\r'/'%0D'}"
+          OUTPUT=$(gorelease -base=$GITHUB_BASE_REF || true);
           echo "::set-output name=report::$OUTPUT";
       - name: Comment Report
         if: always()
@@ -51,3 +34,19 @@ jobs:
             ### API Changes
 
             ${{ steps.gorelease.outputs.report }}
+  examples:
+    concurrency:
+      group: examples-${{ github.ref }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: "1.20"
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Build
+        run: |
+          cd examples
+          go build ./...
