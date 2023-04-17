@@ -181,7 +181,7 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) error {
 					table.ValueParam("$id", types.Uint64Value(e.ID)),
 					table.ValueParam("$payload_str", types.UTF8Value(*e.PayloadStr)),
 					table.ValueParam("$payload_double", types.DoubleValue(*e.PayloadDouble)),
-					table.ValueParam("$payload_timestamp", types.TimestampValue(*e.PayloadTimestamp)),
+					table.ValueParam("$payload_timestamp", types.TimestampValueFromTime(*e.PayloadTimestamp)),
 				),
 			)
 			if err != nil {
