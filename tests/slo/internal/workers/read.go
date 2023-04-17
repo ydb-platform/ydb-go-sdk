@@ -29,7 +29,9 @@ func (w *Workers) read(ctx context.Context) (err error) {
 	m := w.m.Start(metrics.JobRead)
 	defer func() {
 		m.Stop(err)
-		w.logger.Error(fmt.Errorf("get entry error: %w", err).Error())
+		if err != nil {
+			w.logger.Error(fmt.Errorf("get entry error: %w", err).Error())
+		}
 	}()
 
 	_, err = w.s.Read(ctx, id)

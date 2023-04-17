@@ -34,7 +34,9 @@ func (w *Workers) write(ctx context.Context, gen *generator.Generator) (err erro
 	m := w.m.Start(metrics.JobWrite)
 	defer func() {
 		m.Stop(err)
-		w.logger.Error(fmt.Errorf("error when 'write' entry: %w", err).Error())
+		if err != nil {
+			w.logger.Error(fmt.Errorf("error when 'write' entry: %w", err).Error())
+		}
 	}()
 
 	return w.s.Write(ctx, row)
