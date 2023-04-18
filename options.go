@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"google.golang.org/grpc"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
@@ -227,6 +229,14 @@ func WithBalancer(balancer *balancerConfig.Config) Option {
 func WithDialTimeout(timeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithDialTimeout(timeout))
+		return nil
+	}
+}
+
+// WithDialBlock append grpc option grpc.WithBlock() for sync dialing to endpoints
+func WithDialBlock() Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.options = append(c.options, config.WithGrpcOptions(grpc.WithBlock()))
 		return nil
 	}
 }

@@ -1,3 +1,5 @@
+* Added `ydb.WithDialBlock()` option for sync dialing to endpoints (by default used async dialing)
+
 ## v3.44.0
 * Added `table/options.WithCallOptions` options for append custom grpc call options into `session.{BulkUpsert,Execute,StreamExecuteScanQuery}`
 * Supported fake transactions in `database/sql` driver over connector option `ydb.WithFakeTx(queryMode)` and connection string param `go_fake_tx`
