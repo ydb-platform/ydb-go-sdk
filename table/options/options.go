@@ -286,6 +286,44 @@ func WithKeyBloomFilter(f FeatureFlag) CreateTableOption {
 	return keyBloomFilter(f)
 }
 
+func WithPartitions(p Partitions) CreateTableOption {
+	return p
+}
+
+type uniformPartitions uint64
+
+func (u uniformPartitions) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
+	d.Partitions = &Ydb_Table.CreateTableRequest_UniformPartitions{
+		UniformPartitions: uint64(u),
+	}
+}
+
+func (u uniformPartitions) isPartitions() {}
+
+func WithUniformPartitions(n uint64) Partitions {
+	return uniformPartitions(n)
+}
+
+type explicitPartitions []types.Value
+
+func (e explicitPartitions) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
+	values := make([]*Ydb.TypedValue, len(e))
+	for i := range values {
+		values[i] = value.ToYDB(e[i], a)
+	}
+	d.Partitions = &Ydb_Table.CreateTableRequest_PartitionAtKeys{
+		PartitionAtKeys: &Ydb_Table.ExplicitPartitions{
+			SplitPoints: values,
+		},
+	}
+}
+
+func (e explicitPartitions) isPartitions() {}
+
+func WithExplicitPartitions(splitPoints ...types.Value) Partitions {
+	return explicitPartitions(splitPoints)
+}
+
 type profileOption []ProfileOption
 
 func (opts profileOption) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
