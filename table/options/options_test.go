@@ -53,35 +53,30 @@ func TestSessionOptionsProfile(t *testing.T) {
 		}
 	}
 	{
-		opt := WithProfile(
-			WithPartitioningPolicy(
-				WithPartitioningPolicyUniformPartitions(3),
-			),
+		opt := WithPartitions(
+			WithUniformPartitions(3),
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
-		p := req.Profile.PartitioningPolicy
-		if pp, ok := p.Partitions.(*Ydb_Table.PartitioningPolicy_UniformPartitions); !ok || pp.UniformPartitions != 3 {
+		if p, ok := req.Partitions.(*Ydb_Table.CreateTableRequest_UniformPartitions); !ok || p.UniformPartitions != 3 {
 			t.Errorf("Uniform partitioning policy is not as expected")
 		}
 	}
 	{
-		opt := WithProfile(
-			WithPartitioningPolicy(
-				WithPartitioningPolicyExplicitPartitions(types.Int64Value(1)),
+		opt := WithPartitions(
+			WithExplicitPartitions(
+				types.Int64Value(1),
 			),
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
-		p := req.Profile.PartitioningPolicy
-
-		pp, ok := p.Partitions.(*Ydb_Table.PartitioningPolicy_ExplicitPartitions)
+		p, ok := req.Partitions.(*Ydb_Table.CreateTableRequest_PartitionAtKeys)
 		if !ok {
 			t.Errorf("Explicitly partitioning policy is not as expected")
 		} else {
 			require.Equal(
 				t,
-				pp.ExplicitPartitions.SplitPoints,
+				p.PartitionAtKeys.SplitPoints,
 				[]*Ydb.TypedValue{value.ToYDB(types.Int64Value(1), a)},
 			)
 		}

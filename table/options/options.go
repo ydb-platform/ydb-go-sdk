@@ -514,6 +514,7 @@ func WithPartitioningPolicyMode(mode PartitioningMode) PartitioningPolicyOption 
 	}
 }
 
+// Deprecated: use WithUniformPartitions instead
 func WithPartitioningPolicyUniformPartitions(n uint64) PartitioningPolicyOption {
 	return func(p *partitioningPolicy, a *allocator.Allocator) {
 		p.Partitions = &Ydb_Table.PartitioningPolicy_UniformPartitions{
@@ -522,6 +523,7 @@ func WithPartitioningPolicyUniformPartitions(n uint64) PartitioningPolicyOption 
 	}
 }
 
+// Deprecated: use WithExplicitPartitions instead
 func WithPartitioningPolicyExplicitPartitions(splitPoints ...types.Value) PartitioningPolicyOption {
 	return func(p *partitioningPolicy, a *allocator.Allocator) {
 		values := make([]*Ydb.TypedValue, len(splitPoints))
