@@ -220,11 +220,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 					options.WithMinPartitionsCount(s.cfg.MinPartitionsCount),
 					options.WithMaxPartitionsCount(s.cfg.MaxPartitionsCount),
 				),
-				options.WithProfile(
-					options.WithPartitioningPolicy(
-						options.WithPartitioningPolicyUniformPartitions(s.cfg.MinPartitionsCount),
-					),
-				),
+				options.WithPartitions(options.WithUniformPartitions(s.cfg.MinPartitionsCount)),
 			)
 		},
 	)
