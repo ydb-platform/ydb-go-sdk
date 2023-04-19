@@ -254,9 +254,7 @@ func createTables(ctx context.Context, c table.Client, prefix string) (err error
 				options.WithColumn("html", types.Optional(types.TypeUTF8)),
 				options.WithColumn("ts", types.Optional(types.TypeUint64)),
 				options.WithPrimaryKeyColumn("doc_id"),
-				options.WithProfile(
-					options.WithPartitioningPolicy(
-						options.WithPartitioningPolicyUniformPartitions(uint64(docTablePartitionCount)))),
+				options.WithPartitions(options.WithUniformPartitions(uint64(docTablePartitionCount))),
 			)
 		},
 	)

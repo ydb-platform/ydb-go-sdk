@@ -243,6 +243,12 @@ func NewStorageSettings(ss *Ydb_Table.StorageSettings) StorageSettings {
 	}
 }
 
+type Partitions interface {
+	CreateTableOption
+
+	isPartitions()
+}
+
 type PartitioningSettings struct {
 	PartitioningBySize FeatureFlag
 	PartitionSizeMb    uint64
