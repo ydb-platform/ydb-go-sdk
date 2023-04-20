@@ -3,50 +3,53 @@ package log
 import (
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 // Scripting returns trace.Scripting with logging events from details
-func Scripting(l Logger, details trace.Details, opts ...option) (t trace.Scripting) {
-	if details&trace.ScriptingEvents == 0 {
-		return
-	}
+func Scripting(l Logger, d trace.Detailer, opts ...option) (t trace.Scripting) {
 	options := parseOptions(opts...)
-	l = l.WithName(`scripting`)
 	t.OnExecute = func(info trace.ScriptingExecuteStartInfo) func(trace.ScriptingExecuteDoneInfo) {
-		l.Debugf(`execute start`)
+		if d.Details()&trace.ScriptingEvents == 0 {
+			return nil
+		}
+		ll := l.WithNames("scripting", "execute")
+		ll.Log(DEBUG, "start")
 		start := time.Now()
 		return func(info trace.ScriptingExecuteDoneInfo) {
 			if info.Error == nil {
-				l.Debugf(`execute done {latency:"%v",resultSetCount:%v,resultSetErr:"%v""}`,
-					time.Since(start),
-					info.Result.ResultSetCount(),
-					info.Result.Err(),
+				ll.Log(DEBUG, "done",
+					latency(start),
+					Int("resultSetCount", info.Result.ResultSetCount()),
+					NamedError("resultSetError", info.Result.Err()),
 				)
 			} else {
-				l.Errorf(`execute failed {latency:"%v",error:"%s",version:"%s"}`,
-					time.Since(start),
-					info.Error,
-					meta.Version,
+				ll.Log(ERROR, "failed",
+					Error(info.Error),
+					latency(start),
+					version(),
 				)
 			}
 		}
 	}
 	t.OnExplain = func(info trace.ScriptingExplainStartInfo) func(trace.ScriptingExplainDoneInfo) {
-		l.Debugf(`explain start`)
+		if d.Details()&trace.ScriptingEvents == 0 {
+			return nil
+		}
+		ll := l.WithNames("scripting", "explain")
+		ll.Log(TRACE, "start")
 		start := time.Now()
 		return func(info trace.ScriptingExplainDoneInfo) {
 			if info.Error == nil {
-				l.Debugf(`explain done {latency:"%v",plan:%v"}`,
-					time.Since(start),
-					info.Plan,
+				ll.Log(DEBUG, "done",
+					latency(start),
+					String("plan", info.Plan),
 				)
 			} else {
-				l.Errorf(`explain failed {latency:"%v",error:"%s",version:"%s"}`,
-					time.Since(start),
-					info.Error,
-					meta.Version,
+				ll.Log(ERROR, "failed",
+					Error(info.Error),
+					latency(start),
+					version(),
 				)
 			}
 		}
@@ -58,16 +61,17 @@ func Scripting(l Logger, details trace.Details, opts ...option) (t trace.Scripti
 	) func(
 		trace.ScriptingStreamExecuteDoneInfo,
 	) {
+		if d.Details()&trace.ScriptingEvents == 0 {
+			return nil
+		}
+		ll := l.WithNames("scripting", "stream", "execute")
 		query := info.Query
 		params := info.Parameters
-		if options.logQuery {
-			l.Tracef(`stream execute start {query:"%s",params:"%s"}`,
-				query,
-				params,
-			)
-		} else {
-			l.Tracef(`stream execute start`)
-		}
+		ll.Log(TRACE, "start",
+			appendFieldByCondition(options.logQuery,
+				String("query", query),
+			)...,
+		)
 		start := time.Now()
 		return func(
 			info trace.ScriptingStreamExecuteIntermediateInfo,
@@ -75,53 +79,50 @@ func Scripting(l Logger, details trace.Details, opts ...option) (t trace.Scripti
 			trace.ScriptingStreamExecuteDoneInfo,
 		) {
 			if info.Error == nil {
-				l.Tracef(`stream execute intermediate`)
+				ll.Log(TRACE, "intermediate")
 			} else {
-				l.Warnf(`stream execute intermediate failed {error:"%v",version:"%s"}`,
-					info.Error,
-					meta.Version,
+				ll.Log(WARN, "intermediate failed",
+					Error(info.Error),
+					version(),
 				)
 			}
 			return func(info trace.ScriptingStreamExecuteDoneInfo) {
 				if info.Error == nil {
-					l.Debugf(`stream execute done {latency:"%v",query:"%s",params:"%s"}`,
-						time.Since(start),
-						query,
-						params,
+					ll.Log(DEBUG, "done",
+						latency(start),
+						String("query", query),
+						Stringer("params", params),
 					)
 				} else {
-					if options.logQuery {
-						l.Errorf(`stream execute failed {latency:"%v",query:"%s",params:"%s",error:"%v",version:"%s"}`,
-							time.Since(start),
-							query,
-							params,
-							info.Error,
-							meta.Version,
-						)
-					} else {
-						l.Errorf(`stream execute failed {latency:"%v",error:"%v",version:"%s"}`,
-							time.Since(start),
-							info.Error,
-							meta.Version,
-						)
-					}
+					ll.Log(ERROR, "failed",
+						appendFieldByCondition(options.logQuery,
+							String("query", query),
+							Error(info.Error),
+							latency(start),
+							version(),
+						)...,
+					)
 				}
 			}
 		}
 	}
 	t.OnClose = func(info trace.ScriptingCloseStartInfo) func(trace.ScriptingCloseDoneInfo) {
-		l.Debugf(`close start`)
+		if d.Details()&trace.ScriptingEvents == 0 {
+			return nil
+		}
+		ll := l.WithNames("scripting", "close")
+		ll.Log(DEBUG, "start")
 		start := time.Now()
 		return func(info trace.ScriptingCloseDoneInfo) {
 			if info.Error == nil {
-				l.Debugf(`close done {latency:"%v"}`,
-					time.Since(start),
+				ll.Log(DEBUG, "done",
+					latency(start),
 				)
 			} else {
-				l.Errorf(`close failed {latency:"%v",error:"%s",version:"%s"}`,
-					time.Since(start),
-					info.Error,
-					meta.Version,
+				ll.Log(ERROR, "failed",
+					Error(info.Error),
+					latency(start),
+					version(),
 				)
 			}
 		}

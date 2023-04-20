@@ -28,7 +28,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
@@ -261,10 +260,7 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 		}
 	)
 
-	var (
-		err    error
-		logger = xtest.Logger(t)
-	)
+	var err error
 	scope.db, err = ydb.Open(
 		ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
@@ -305,8 +301,7 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 		ydb.WithLogger(
 			trace.MatchDetails(`ydb\.(driver|table|discovery|retry|scheme).*`),
 			ydb.WithNamespace("ydb"),
-			ydb.WithWriter(logger),
-			ydb.WithMinLevel(log.WARN),
+			ydb.WithMinLevel(log.TRACE),
 		),
 		ydb.WithPanicCallback(func(e interface{}) {
 			_, _ = fmt.Fprintf(os.Stderr, "panic recovered:%v:\n%s", e, debug.Stack())

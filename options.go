@@ -17,7 +17,6 @@ import (
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
 	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
 	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
@@ -166,14 +165,14 @@ func WithTLSSInsecureSkipVerify() Option {
 //
 // See trace package documentation for details.
 func WithLogger(details trace.Details, opts ...LoggerOption) Option {
-	loggerOpts := make([]logger.Option, 0, len(opts))
+	loggerOpts := make([]log.Option, 0, len(opts))
 	for _, o := range opts {
 		if o != nil {
-			loggerOpts = append(loggerOpts, logger.Option(o))
+			loggerOpts = append(loggerOpts, log.Option(o))
 		}
 	}
 
-	l := logger.New(loggerOpts...)
+	l := log.New(loggerOpts...)
 	return MergeOptions(
 		WithTraceDriver(log.Driver(l, details)),
 		WithTraceTable(log.Table(l, details)),
