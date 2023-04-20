@@ -5,10 +5,6 @@ import (
 )
 
 // Coordination makes trace.Coordination with logging events from details
-func Coordination(l Logger, details trace.Details) (t trace.Coordination) {
-	if details&trace.CoordinationEvents == 0 {
-		return
-	}
-	_ = l.WithName(`coordination`)
+func Coordination(l Logger, d trace.Detailer) (t trace.Coordination) {
 	return t
 }
