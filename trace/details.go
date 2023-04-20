@@ -6,6 +6,10 @@ import (
 	"strings"
 )
 
+type Detailer interface {
+	Details() Details
+}
+
 type Details uint64
 
 func (d Details) Details() Details {
