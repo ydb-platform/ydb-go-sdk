@@ -1,5 +1,6 @@
+* Refactored package `log` for support typed fields of log message
 * Added `table/options.WithPartitions` for configure partitioning policy
-* Marked as deprecated `table/options.WithPartitioningPolicy{UniformPartitions,ExplicitPartitions}` (use `With{UniformPartitions,ExplicitPartitions}` instead)
+* Marked as deprecated `table/options.WithPartitioningPolicy{UniformPartitions,ExplicitPartitions}` (use `table/options.With{UniformPartitions,ExplicitPartitions}` instead)
 
 ## v3.44.3
 * Fixed bug of processing endpoint with `node_id=0`
