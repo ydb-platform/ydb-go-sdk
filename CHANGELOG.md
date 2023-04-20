@@ -1,5 +1,6 @@
+* Refactored package `log` for support typed fields of log message
 * Added `table/options.WithPartitions` for configure partitioning policy
-* Marked as deprecated `table/options.WithPartitioningPolicy{UniformPartitions,ExplicitPartitions}` (use `With{UniformPartitions,ExplicitPartitions}` instead)
+* Marked as deprecated `table/options.WithPartitioningPolicy{UniformPartitions,ExplicitPartitions}` (use `table/options.With{UniformPartitions,ExplicitPartitions}` instead)
 
 ## v3.44.0
 * Added `table/options.WithCallOptions` options for append custom grpc call options into `session.{BulkUpsert,Execute,StreamExecuteScanQuery}`
