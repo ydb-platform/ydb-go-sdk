@@ -6,16 +6,12 @@
 .devcontainer
 *.vsix
 *.swp
-
-
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-
 *.test
-
 *.out
-
 vendor
+changes.txt

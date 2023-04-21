@@ -21,19 +21,14 @@ jobs:
       - name: Install gorelease
         run: test -e ~/go/bin/gorelease || go install golang.org/x/exp/cmd/gorelease@latest
       - name: Check broken API changes
-        run: |
-          OUTPUT=$(gorelease -base=$GITHUB_BASE_REF || true);
-          echo "::set-output name=report::$OUTPUT";
+        run: gorelease -base=$GITHUB_BASE_REF 2>&1 > changes.txt
       - name: Comment Report
         if: always()
         uses: marocchino/sticky-pull-request-comment@v2
         with:
+          path: changes.txt
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           header: gorelease
-          message: |
-            ### API Changes
-
-            ${{ steps.gorelease.outputs.report }}
   examples:
     concurrency:
       group: examples-${{ github.ref }}
