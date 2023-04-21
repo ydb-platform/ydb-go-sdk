@@ -17,7 +17,6 @@ jobs:
       workload_build_options: -f Dockerfile --build-arg SRC_PATH=native
       workload_build_context: ../..
   database_sql:
-    needs: native
     if: github.event.pull_request.head.repo.full_name == 'ydb-platform/ydb-go-sdk'
     uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
     secrets: inherit
