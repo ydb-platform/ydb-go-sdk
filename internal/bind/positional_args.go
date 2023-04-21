@@ -84,15 +84,8 @@ func positionalArgsStateFn(l *sqlLexer) stateFn {
 		case '"':
 			return doubleQuoteState
 		case '?':
-			nextRune, width := utf8.DecodeRuneInString(l.src[l.pos:])
-			if nextRune == '?' {
-				l.parts = append(l.parts, l.src[l.start:l.pos-1], "?")
-				l.pos += width
-				l.start = l.pos
-			} else {
-				l.parts = append(l.parts, l.src[l.start:l.pos-1], positionalArg{})
-				l.start = l.pos
-			}
+			l.parts = append(l.parts, l.src[l.start:l.pos-1], positionalArg{})
+			l.start = l.pos
 		case '-':
 			nextRune, width := utf8.DecodeRuneInString(l.src[l.pos:])
 			if nextRune == '-' {

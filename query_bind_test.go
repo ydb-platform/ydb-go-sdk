@@ -32,7 +32,7 @@ func TestQueryBind(t *testing.T) {
 			),
 			sql: `$cnt = (SELECT 2 * COUNT(*) FROM my_table);
 
-UPDATE my_table SET data = CAST($cnt AS Uint64??) WHERE id = ?;`,
+UPDATE my_table SET data = CAST($cnt AS Optional<Uint64>) WHERE id = ?;`,
 			args: []interface{}{uint64(6)},
 			yql: `-- bind TablePathPrefix
 PRAGMA TablePathPrefix("/local/test");
@@ -43,7 +43,7 @@ DECLARE $p0 AS Uint64;
 -- origin query with positional args replacement
 $cnt = (SELECT 2 * COUNT(*) FROM my_table);
 
-UPDATE my_table SET data = CAST($cnt AS Uint64?) WHERE id = $p0;`,
+UPDATE my_table SET data = CAST($cnt AS Optional<Uint64>) WHERE id = $p0;`,
 			params: table.NewQueryParameters(
 				table.ValueParam("$p0", types.Uint64Value(6)),
 			),
