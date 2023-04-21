@@ -11,7 +11,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"go.uber.org/zap"
 
@@ -106,7 +105,6 @@ func NewStorage(ctx context.Context, cfg *config.Config, logger *zap.Logger, poo
 			logger,
 			trace.DetailsAll,
 		),
-		ydb.WithSessionPoolSizeLimit(poolSize),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("ydb.Open error: %w", err)
@@ -139,9 +137,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (res genera
 	err = retry.Do(ydb.WithTxControl(ctx, readTx), s.db,
 		func(ctx context.Context, cc *sql.Conn) (err error) {
 			row := cc.QueryRowContext(ydb.WithQueryMode(ctx, ydb.DataQueryMode), s.selectQuery,
-				table.NewQueryParameters(
-					table.ValueParam("$id", types.Uint64Value(entryID)),
-				),
+				sql.Named("id", &entryID),
 			)
 			var hash uint64
 			return row.Scan(&res.ID, &res.PayloadStr, &res.PayloadDouble, &res.PayloadTimestamp, &hash)
@@ -162,12 +158,10 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) error {
 	return retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
 		func(ctx context.Context, cc *sql.Conn) error {
 			_, err := cc.ExecContext(ydb.WithQueryMode(ctx, ydb.DataQueryMode), s.upsertQuery,
-				table.NewQueryParameters(
-					table.ValueParam("$id", types.Uint64Value(e.ID)),
-					table.ValueParam("$payload_str", types.UTF8Value(*e.PayloadStr)),
-					table.ValueParam("$payload_double", types.DoubleValue(*e.PayloadDouble)),
-					table.ValueParam("$payload_timestamp", types.TimestampValueFromTime(*e.PayloadTimestamp)),
-				),
+				sql.Named("id", e.ID),
+				sql.Named("payload_str", *e.PayloadStr),
+				sql.Named("payload_double", *e.PayloadDouble),
+				sql.Named("payload_timestamp", *e.PayloadTimestamp),
 			)
 			return err
 		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)),
@@ -182,8 +176,12 @@ func (s *Storage) createTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	_, err := s.db.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), s.createQuery)
-	return err
+	return retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
+		func(ctx context.Context, cc *sql.Conn) error {
+			_, err := s.db.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), s.createQuery)
+			return err
+		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)),
+	)
 }
 
 func (s *Storage) dropTable(ctx context.Context) error {
@@ -194,8 +192,12 @@ func (s *Storage) dropTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	_, err := s.db.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), s.dropQuery)
-	return err
+	return retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
+		func(ctx context.Context, cc *sql.Conn) error {
+			_, err := s.db.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), s.dropQuery)
+			return err
+		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)),
+	)
 }
 
 func (s *Storage) close(ctx context.Context) error {
