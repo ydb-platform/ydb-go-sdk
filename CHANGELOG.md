@@ -1,3 +1,5 @@
+* Removed debug print
+
 ## v3.44.1
 * Fixed bug with returning session into pool before second discovery
 
