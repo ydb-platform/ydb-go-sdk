@@ -1,3 +1,4 @@
+## v3.44.1
 * Fixed bug with returning session into pool before second re-discovery
 
 ## v3.44.0
