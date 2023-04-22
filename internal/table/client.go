@@ -34,17 +34,27 @@ type balancerNotifier interface {
 	OnUpdate(onDiscovery func(ctx context.Context, endpoints []endpoint.Info))
 }
 
-func New(balancer balancerNotifier, config config.Config, knownNodeIDs []uint32) *Client {
+type Option func(c *Client)
+
+func WithNodeIDs(nodeIDs []uint32) Option {
+	return func(c *Client) {
+		for _, id := range nodeIDs {
+			c.nodes[id] = make(map[*session]struct{})
+		}
+	}
+}
+
+func New(balancer balancerNotifier, config config.Config, opts ...Option) *Client {
 	return newClient(balancer, func(ctx context.Context, opts ...sessionBuilderOption) (s *session, err error) {
 		return newSession(ctx, balancer, config, opts...)
-	}, config, knownNodeIDs)
+	}, config, opts...)
 }
 
 func newClient(
 	balancer balancerNotifier,
 	builder sessionBuilder,
 	config config.Config,
-	knownNodeIDs []uint32,
+	opts ...Option,
 ) *Client {
 	var (
 		ctx    = context.Background()
@@ -56,7 +66,7 @@ func newClient(
 		cc:     balancer,
 		build:  builder,
 		index:  make(map[*session]sessionInfo),
-		nodes:  make(map[uint32]map[*session]struct{}, len(knownNodeIDs)*2),
+		nodes:  make(map[uint32]map[*session]struct{}),
 		idle:   list.New(),
 		waitQ:  list.New(),
 		limit:  config.SizeLimit(),
@@ -68,15 +78,15 @@ func newClient(
 		},
 		done: make(chan struct{}),
 	}
-	for _, nodeID := range knownNodeIDs {
-		c.nodes[nodeID] = make(map[*session]struct{})
-	}
 	if balancer != nil {
 		balancer.OnUpdate(c.updateNodes)
 	}
 	if idleThreshold := config.IdleThreshold(); idleThreshold > 0 {
 		c.wg.Add(1)
 		go c.internalPoolGC(ctx, idleThreshold)
+	}
+	for _, o := range opts {
+		o(c)
 	}
 	onDone(c.limit)
 	return c
