@@ -1,3 +1,4 @@
+## v3.44.2
 * Removed debug print
 
 ## v3.44.1
