@@ -300,8 +300,9 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 		ydb.WithDiscoveryInterval(5*time.Second),
 		ydb.WithLogger(
 			trace.MatchDetails(`ydb\.(driver|table|discovery|retry|scheme).*`),
-			ydb.WithNamespace("ydb"),
-			ydb.WithMinLevel(log.TRACE),
+			log.WithNamespace("ydb"),
+			log.WithMinLevel(log.TRACE),
+			log.WithColoring(),
 		),
 		ydb.WithPanicCallback(func(e interface{}) {
 			_, _ = fmt.Fprintf(os.Stderr, "panic recovered:%v:\n%s", e, debug.Stack())
