@@ -165,14 +165,7 @@ func WithTLSSInsecureSkipVerify() Option {
 //
 // See trace package documentation for details.
 func WithLogger(details trace.Details, opts ...LoggerOption) Option {
-	loggerOpts := make([]log.Option, 0, len(opts))
-	for _, o := range opts {
-		if o != nil {
-			loggerOpts = append(loggerOpts, log.Option(o))
-		}
-	}
-
-	l := log.New(loggerOpts...)
+	l := log.New(opts...)
 	return MergeOptions(
 		WithTraceDriver(log.Driver(l, details)),
 		WithTraceTable(log.Table(l, details)),
