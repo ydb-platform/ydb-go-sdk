@@ -1,8 +1,11 @@
 * Added `table/options.WithPartitions` for configure partitioning policy
 * Marked as deprecated `table/options.WithPartitioningPolicy{UniformPartitions,ExplicitPartitions}` (use `With{UniformPartitions,ExplicitPartitions}` instead)
 
+## v3.44.2
+* Removed debug print
+
 ## v3.44.1
-* Fixed bug with returning session into pool before first re-discovery
+* Fixed bug with returning session into pool before second discovery
 
 ## v3.44.0
 * Added `table/options.WithCallOptions` options for append custom grpc call options into `session.{BulkUpsert,Execute,StreamExecuteScanQuery}`
