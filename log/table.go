@@ -9,10 +9,15 @@ import (
 )
 
 // Table makes trace.Table with logging events from details
-//
+func Table(l Logger, d trace.Detailer, opts ...Option) (t trace.Table) {
+	if ll, has := l.(*logger); has {
+		return internalTable(ll.with(opts...), d)
+	}
+	return internalTable(New(append(opts, withExternalLogger(l))...), d)
+}
+
 //nolint:gocyclo
-func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
-	options := parseOptions(opts...)
+func internalTable(l *logger, d trace.Detailer) (t trace.Table) {
 	t.OnDo = func(
 		info trace.TableDoStartInfo,
 	) func(
@@ -23,15 +28,19 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TablePoolAPIEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("table", "do")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"table", "do"},
+		}
 		idempotent := info.Idempotent
-		ll.Log(TRACE, "start",
+		l.Log(params.withLevel(TRACE), "start",
 			Bool("idempotent", idempotent),
 		)
 		start := time.Now()
 		return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
 			if info.Error == nil {
-				ll.Log(TRACE, "done",
+				l.Log(params.withLevel(TRACE), "done",
 					latency(start),
 					Bool("idempotent", idempotent),
 				)
@@ -41,7 +50,7 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 					lvl = DEBUG
 				}
 				m := retry.Check(info.Error)
-				ll.Log(lvl, "failed",
+				l.Log(params.withLevel(lvl), "failed",
 					latency(start),
 					Bool("idempotent", idempotent),
 					Error(info.Error),
@@ -53,7 +62,7 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 			}
 			return func(info trace.TableDoDoneInfo) {
 				if info.Error == nil {
-					ll.Log(TRACE, "done",
+					l.Log(params.withLevel(TRACE), "done",
 						latency(start),
 						Bool("idempotent", idempotent),
 						Int("attempts", info.Attempts),
@@ -64,7 +73,7 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 						lvl = DEBUG
 					}
 					m := retry.Check(info.Error)
-					ll.Log(lvl, "done",
+					l.Log(params.withLevel(lvl), "done",
 						latency(start),
 						Bool("idempotent", idempotent),
 						Int("attempts", info.Attempts),
@@ -88,15 +97,19 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TablePoolAPIEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("table", "do", "tx")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"table", "do", "tx"},
+		}
 		idempotent := info.Idempotent
-		ll.Log(TRACE, "start",
+		l.Log(params.withLevel(TRACE), "start",
 			Bool("idempotent", idempotent),
 		)
 		start := time.Now()
 		return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
 			if info.Error == nil {
-				ll.Log(TRACE, "done",
+				l.Log(params.withLevel(TRACE), "done",
 					latency(start),
 					Bool("idempotent", idempotent),
 				)
@@ -106,7 +119,7 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 					lvl = DEBUG
 				}
 				m := retry.Check(info.Error)
-				ll.Log(lvl, "done",
+				l.Log(params.withLevel(lvl), "done",
 					latency(start),
 					Bool("idempotent", idempotent),
 					Error(info.Error),
@@ -118,7 +131,7 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 			}
 			return func(info trace.TableDoTxDoneInfo) {
 				if info.Error == nil {
-					ll.Log(TRACE, "done",
+					l.Log(params.withLevel(TRACE), "done",
 						latency(start),
 						Bool("idempotent", idempotent),
 						Int("attempts", info.Attempts),
@@ -129,7 +142,7 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 						lvl = DEBUG
 					}
 					m := retry.Check(info.Error)
-					ll.Log(lvl, "done",
+					l.Log(params.withLevel(lvl), "done",
 						latency(start),
 						Bool("idempotent", idempotent),
 						Int("attempts", info.Attempts),
@@ -153,16 +166,20 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TablePoolAPIEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("table", "create", "session")
-		ll.Log(TRACE, "start")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"table", "create", "session"},
+		}
+		l.Log(params.withLevel(TRACE), "start")
 		start := time.Now()
 		return func(info trace.TableCreateSessionIntermediateInfo) func(trace.TableCreateSessionDoneInfo) {
 			if info.Error == nil {
-				ll.Log(TRACE, "intermediate",
+				l.Log(params.withLevel(TRACE), "intermediate",
 					latency(start),
 				)
 			} else {
-				ll.Log(ERROR, "intermediate",
+				l.Log(params.withLevel(ERROR), "intermediate",
 					latency(start),
 					Error(info.Error),
 					version(),
@@ -170,14 +187,14 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 			}
 			return func(info trace.TableCreateSessionDoneInfo) {
 				if info.Error == nil {
-					ll.Log(TRACE, "done",
+					l.Log(params.withLevel(TRACE), "done",
 						latency(start),
 						Int("attempts", info.Attempts),
 						String("session_id", info.Session.ID()),
 						String("session_status", info.Session.Status()),
 					)
 				} else {
-					ll.Log(ERROR, "failed",
+					l.Log(params.withLevel(ERROR), "failed",
 						latency(start),
 						Int("attempts", info.Attempts),
 						Error(info.Error),
@@ -191,24 +208,28 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TableSessionEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("table", "session", "new")
-		ll.Log(TRACE, "start")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"table", "session", "new"},
+		}
+		l.Log(params.withLevel(TRACE), "start")
 		start := time.Now()
 		return func(info trace.TableSessionNewDoneInfo) {
 			if info.Error == nil {
 				if info.Session != nil {
-					ll.Log(TRACE, "done",
+					l.Log(params.withLevel(TRACE), "done",
 						latency(start),
 						String("id", info.Session.ID()),
 					)
 				} else {
-					ll.Log(WARN, "failed",
+					l.Log(params.withLevel(WARN), "failed",
 						latency(start),
 						version(),
 					)
 				}
 			} else {
-				ll.Log(WARN, "failed",
+				l.Log(params.withLevel(WARN), "failed",
 					latency(start),
 					Error(info.Error),
 					version(),
@@ -220,22 +241,26 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TableSessionEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("table", "session", "delete")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"table", "session", "delete"},
+		}
 		session := info.Session
-		ll.Log(TRACE, "start",
+		l.Log(params.withLevel(TRACE), "start",
 			String("id", info.Session.ID()),
 			String("status", info.Session.Status()),
 		)
 		start := time.Now()
 		return func(info trace.TableSessionDeleteDoneInfo) {
 			if info.Error == nil {
-				ll.Log(TRACE, "done",
+				l.Log(params.withLevel(TRACE), "done",
 					latency(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 				)
 			} else {
-				ll.Log(WARN, "failed",
+				l.Log(params.withLevel(WARN), "failed",
 					latency(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
@@ -249,22 +274,26 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TableSessionEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("table", "session", "keep", "alive")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"table", "session", "keep", "alive"},
+		}
 		session := info.Session
-		ll.Log(TRACE, "start",
+		l.Log(params.withLevel(TRACE), "start",
 			String("id", session.ID()),
 			String("status", session.Status()),
 		)
 		start := time.Now()
 		return func(info trace.TableKeepAliveDoneInfo) {
 			if info.Error == nil {
-				ll.Log(TRACE, "done",
+				l.Log(params.withLevel(TRACE), "done",
 					latency(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 				)
 			} else {
-				ll.Log(WARN, "failed",
+				l.Log(params.withLevel(WARN), "failed",
 					latency(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
@@ -282,11 +311,15 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TableSessionQueryInvokeEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("table", "session", "query", "prepare")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"table", "session", "query", "prepare"},
+		}
 		session := info.Session
 		query := info.Query
-		ll.Log(TRACE, "start",
-			appendFieldByCondition(options.logQuery,
+		l.Log(params.withLevel(TRACE), "start",
+			appendFieldByCondition(l.logQuery,
 				String("query", info.Query),
 				String("id", session.ID()),
 				String("status", session.Status()),
@@ -295,10 +328,10 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		start := time.Now()
 		return func(info trace.TablePrepareDataQueryDoneInfo) {
 			if info.Error == nil {
-				ll.Log(DEBUG, "done",
-					appendFieldByCondition(options.logQuery,
+				l.Log(params.withLevel(DEBUG), "done",
+					appendFieldByCondition(l.logQuery,
 						Stringer("result", info.Result),
-						appendFieldByCondition(options.logQuery,
+						appendFieldByCondition(l.logQuery,
 							String("query", query),
 							String("id", session.ID()),
 							String("status", session.Status()),
@@ -307,8 +340,8 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 					)...,
 				)
 			} else {
-				ll.Log(ERROR, "failed",
-					appendFieldByCondition(options.logQuery,
+				l.Log(params.withLevel(ERROR), "failed",
+					appendFieldByCondition(l.logQuery,
 						String("query", query),
 						Error(info.Error),
 						String("id", session.ID()),
@@ -328,11 +361,15 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TableSessionQueryInvokeEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("table", "session", "query", "execute")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"table", "session", "query", "execute"},
+		}
 		session := info.Session
 		query := info.Query
-		ll.Log(TRACE, "start",
-			appendFieldByCondition(options.logQuery,
+		l.Log(params.withLevel(TRACE), "start",
+			appendFieldByCondition(l.logQuery,
 				Stringer("query", info.Query),
 				String("id", session.ID()),
 				String("status", session.Status()),
@@ -342,8 +379,8 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		return func(info trace.TableExecuteDataQueryDoneInfo) {
 			if info.Error == nil {
 				tx := info.Tx
-				ll.Log(DEBUG, "done",
-					appendFieldByCondition(options.logQuery,
+				l.Log(params.withLevel(DEBUG), "done",
+					appendFieldByCondition(l.logQuery,
 						Stringer("query", query),
 						String("id", session.ID()),
 						String("tx", tx.ID()),
@@ -354,8 +391,8 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 					)...,
 				)
 			} else {
-				ll.Log(ERROR, "failed",
-					appendFieldByCondition(options.logQuery,
+				l.Log(params.withLevel(ERROR), "failed",
+					appendFieldByCondition(l.logQuery,
 						Stringer("query", query),
 						Error(info.Error),
 						String("id", session.ID()),
@@ -378,11 +415,15 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TableSessionQueryStreamEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("table", "session", "query", "stream", "execute")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"table", "session", "query", "stream", "execute"},
+		}
 		session := info.Session
 		query := info.Query
-		ll.Log(TRACE, "start",
-			appendFieldByCondition(options.logQuery,
+		l.Log(params.withLevel(TRACE), "start",
+			appendFieldByCondition(l.logQuery,
 				Stringer("query", info.Query),
 				String("id", session.ID()),
 				String("status", session.Status()),
@@ -395,17 +436,17 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 			trace.TableSessionQueryStreamExecuteDoneInfo,
 		) {
 			if info.Error == nil {
-				ll.Log(TRACE, "intermediate")
+				l.Log(params.withLevel(TRACE), "intermediate")
 			} else {
-				ll.Log(WARN, "failed",
+				l.Log(params.withLevel(WARN), "failed",
 					Error(info.Error),
 					version(),
 				)
 			}
 			return func(info trace.TableSessionQueryStreamExecuteDoneInfo) {
 				if info.Error == nil {
-					ll.Log(DEBUG, "done",
-						appendFieldByCondition(options.logQuery,
+					l.Log(params.withLevel(DEBUG), "done",
+						appendFieldByCondition(l.logQuery,
 							Stringer("query", query),
 							Error(info.Error),
 							String("id", session.ID()),
@@ -414,8 +455,8 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 						)...,
 					)
 				} else {
-					ll.Log(ERROR, "failed",
-						appendFieldByCondition(options.logQuery,
+					l.Log(params.withLevel(ERROR), "failed",
+						appendFieldByCondition(l.logQuery,
 							Stringer("query", query),
 							Error(info.Error),
 							String("id", session.ID()),
@@ -438,9 +479,13 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TableSessionQueryStreamEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("table", "session", "query", "stream", "read")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"table", "session", "query", "stream", "read"},
+		}
 		session := info.Session
-		ll.Log(TRACE, "start",
+		l.Log(params.withLevel(TRACE), "start",
 			String("id", session.ID()),
 			String("status", session.Status()),
 		)
@@ -451,22 +496,22 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 			trace.TableSessionQueryStreamReadDoneInfo,
 		) {
 			if info.Error == nil {
-				ll.Log(TRACE, "intermediate")
+				l.Log(params.withLevel(TRACE), "intermediate")
 			} else {
-				ll.Log(WARN, "failed",
+				l.Log(params.withLevel(WARN), "failed",
 					Error(info.Error),
 					version(),
 				)
 			}
 			return func(info trace.TableSessionQueryStreamReadDoneInfo) {
 				if info.Error == nil {
-					ll.Log(DEBUG, "done",
+					l.Log(params.withLevel(DEBUG), "done",
 						latency(start),
 						String("id", session.ID()),
 						String("status", session.Status()),
 					)
 				} else {
-					ll.Log(ERROR, "failed",
+					l.Log(params.withLevel(ERROR), "failed",
 						latency(start),
 						String("id", session.ID()),
 						String("status", session.Status()),
@@ -485,23 +530,27 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TableSessionTransactionEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("table", "session", "tx", "begin")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"table", "session", "tx", "begin"},
+		}
 		session := info.Session
-		ll.Log(TRACE, "start",
+		l.Log(params.withLevel(TRACE), "start",
 			String("id", session.ID()),
 			String("status", session.Status()),
 		)
 		start := time.Now()
 		return func(info trace.TableSessionTransactionBeginDoneInfo) {
 			if info.Error == nil {
-				ll.Log(DEBUG, "done",
+				l.Log(params.withLevel(DEBUG), "done",
 					latency(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 					String("tx", info.Tx.ID()),
 				)
 			} else {
-				ll.Log(WARN, "failed",
+				l.Log(params.withLevel(WARN), "failed",
 					latency(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
@@ -519,10 +568,14 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TableSessionTransactionEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("table", "session", "tx", "commit")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"table", "session", "tx", "commit"},
+		}
 		session := info.Session
 		tx := info.Tx
-		ll.Log(TRACE, "start",
+		l.Log(params.withLevel(TRACE), "start",
 			String("id", session.ID()),
 			String("status", session.Status()),
 			String("tx", info.Tx.ID()),
@@ -530,14 +583,14 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		start := time.Now()
 		return func(info trace.TableSessionTransactionCommitDoneInfo) {
 			if info.Error == nil {
-				ll.Log(DEBUG, "done",
+				l.Log(params.withLevel(DEBUG), "done",
 					latency(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 					String("tx", tx.ID()),
 				)
 			} else {
-				ll.Log(ERROR, "failed",
+				l.Log(params.withLevel(ERROR), "failed",
 					latency(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
@@ -556,10 +609,14 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TableSessionTransactionEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("table", "session", "tx", "rollback")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"table", "session", "tx", "rollback"},
+		}
 		session := info.Session
 		tx := info.Tx
-		ll.Log(TRACE, "start",
+		l.Log(params.withLevel(TRACE), "start",
 			String("id", session.ID()),
 			String("status", session.Status()),
 			String("tx", tx.ID()),
@@ -567,14 +624,14 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		start := time.Now()
 		return func(info trace.TableSessionTransactionRollbackDoneInfo) {
 			if info.Error == nil {
-				ll.Log(DEBUG, "done",
+				l.Log(params.withLevel(DEBUG), "done",
 					latency(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 					String("tx", tx.ID()),
 				)
 			} else {
-				ll.Log(ERROR, "failed",
+				l.Log(params.withLevel(ERROR), "failed",
 					latency(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
@@ -589,11 +646,15 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TableEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("table", "init")
-		ll.Log(TRACE, "start")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"table", "init"},
+		}
+		l.Log(params.withLevel(TRACE), "start")
 		start := time.Now()
 		return func(info trace.TableInitDoneInfo) {
-			ll.Log(INFO, "done",
+			l.Log(params.withLevel(INFO), "done",
 				latency(start),
 				Int("size_max", info.Limit),
 			)
@@ -603,16 +664,20 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TableEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("table", "close")
-		ll.Log(TRACE, "start")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"table", "close"},
+		}
+		l.Log(params.withLevel(TRACE), "start")
 		start := time.Now()
 		return func(info trace.TableCloseDoneInfo) {
 			if info.Error == nil {
-				ll.Log(INFO, "done",
+				l.Log(params.withLevel(INFO), "done",
 					latency(start),
 				)
 			} else {
-				ll.Log(ERROR, "failed",
+				l.Log(params.withLevel(ERROR), "failed",
 					latency(start),
 					Error(info.Error),
 					version(),
@@ -624,8 +689,11 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TablePoolLifeCycleEvents == 0 {
 			return
 		}
-		ll := l.WithNames("table", "pool", "state", "change")
-		ll.Log(INFO, "start",
+		params := Params{
+			Level:     TRACE,
+			Namespace: []string{"table", "pool", "state", "change"},
+		}
+		l.Log(params.withLevel(INFO), "",
 			Int("size", info.Size),
 			String("event", info.Event),
 		)
@@ -634,8 +702,11 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TablePoolLifeCycleEvents == 0 {
 			return
 		}
-		ll := l.WithNames("table", "pool", "session", "add")
-		ll.Log(DEBUG, "start",
+		params := Params{
+			Level:     TRACE,
+			Namespace: []string{"table", "pool", "session", "add"},
+		}
+		l.Log(params.withLevel(DEBUG), "start",
 			String("id", info.Session.ID()),
 			String("status", info.Session.Status()),
 		)
@@ -644,8 +715,11 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TablePoolLifeCycleEvents == 0 {
 			return
 		}
-		ll := l.WithNames("table", "pool", "session", "remove")
-		ll.Log(DEBUG, "start",
+		params := Params{
+			Level:     TRACE,
+			Namespace: []string{"table", "pool", "session", "remove"},
+		}
+		l.Log(params.withLevel(DEBUG), "start",
 			String("id", info.Session.ID()),
 			String("status", info.Session.Status()),
 		)
@@ -654,22 +728,26 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TablePoolAPIEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("table", "pool", "put")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"table", "pool", "put"},
+		}
 		session := info.Session
-		ll.Log(DEBUG, "start",
+		l.Log(params.withLevel(DEBUG), "start",
 			String("id", session.ID()),
 			String("status", session.Status()),
 		)
 		start := time.Now()
 		return func(info trace.TablePoolPutDoneInfo) {
 			if info.Error == nil {
-				ll.Log(TRACE, "done",
+				l.Log(params.withLevel(TRACE), "done",
 					latency(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 				)
 			} else {
-				ll.Log(ERROR, "failed",
+				l.Log(params.withLevel(ERROR), "failed",
 					latency(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
@@ -683,20 +761,24 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TablePoolAPIEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("table", "pool", "get")
-		ll.Log(DEBUG, "start")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"table", "pool", "get"},
+		}
+		l.Log(params.withLevel(DEBUG), "start")
 		start := time.Now()
 		return func(info trace.TablePoolGetDoneInfo) {
 			if info.Error == nil {
 				session := info.Session
-				ll.Log(TRACE, "done",
+				l.Log(params.withLevel(TRACE), "done",
 					latency(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 					Int("attempts", info.Attempts),
 				)
 			} else {
-				ll.Log(WARN, "failed",
+				l.Log(params.withLevel(WARN), "failed",
 					latency(start),
 					Int("attempts", info.Attempts),
 					Error(info.Error),
@@ -709,8 +791,12 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 		if d.Details()&trace.TablePoolAPIEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("table", "pool", "wait")
-		ll.Log(DEBUG, "start")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"table", "pool", "wait"},
+		}
+		l.Log(params.withLevel(DEBUG), "start")
 		start := time.Now()
 		return func(info trace.TablePoolWaitDoneInfo) {
 			fields := []Field{
@@ -723,10 +809,10 @@ func Table(l Logger, d trace.Detailer, opts ...option) (t trace.Table) {
 				)
 			}
 			if info.Error == nil {
-				ll.Log(TRACE, "done", fields...)
+				l.Log(params.withLevel(TRACE), "done", fields...)
 			} else {
 				fields = append(fields, Error(info.Error))
-				ll.Log(TRACE, "failed", fields...)
+				l.Log(params.withLevel(TRACE), "failed", fields...)
 			}
 		}
 	}

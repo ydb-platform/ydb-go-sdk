@@ -3,6 +3,7 @@ package log
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"strconv"
 	"time"
 
@@ -328,9 +329,18 @@ func version() Field {
 
 type endpoints []trace.EndpointInfo
 
-func (es endpoints) String() string {
-	b, _ := json.Marshal(es)
-	return string(b)
+func (ee endpoints) String() string {
+	b := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(b)
+	b.WriteByte('[')
+	for i, e := range ee {
+		if i != 0 {
+			b.WriteByte(',')
+		}
+		b.WriteString(e.String())
+	}
+	b.WriteByte(']')
+	return b.String()
 }
 
 type metadata map[string][]string
