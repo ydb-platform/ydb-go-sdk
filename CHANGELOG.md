@@ -1,6 +1,9 @@
 * Added `table/options.WithPartitions` for configure partitioning policy
 * Marked as deprecated `table/options.WithPartitioningPolicy{UniformPartitions,ExplicitPartitions}` (use `With{UniformPartitions,ExplicitPartitions}` instead)
 
+## v3.44.1
+* Fixed bug with returning session into pool before first re-discovery
+
 ## v3.44.0
 * Added `table/options.WithCallOptions` options for append custom grpc call options into `session.{BulkUpsert,Execute,StreamExecuteScanQuery}`
 * Supported fake transactions in `database/sql` driver over connector option `ydb.WithFakeTx(queryMode)` and connection string param `go_fake_tx`

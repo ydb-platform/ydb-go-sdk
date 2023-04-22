@@ -421,6 +421,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 			config.WithSizeLimit(1),
 			config.WithIdleThreshold(-1),
 		),
+		nil,
 	)
 	var (
 		expSession *session
@@ -887,6 +888,7 @@ func newClientWithStubBuilder(
 			cc:    balancer,
 		}).createSession,
 		config.New(options...),
+		nil,
 	)
 }
 
