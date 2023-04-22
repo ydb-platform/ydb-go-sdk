@@ -378,6 +378,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 								),
 							),
 							config.New(),
+							nil,
 						)
 						ctx, cancel := context.WithTimeout(
 							context.Background(),
@@ -470,6 +471,7 @@ func TestCreateTableRegression(t *testing.T) {
 			),
 		),
 		config.New(),
+		nil,
 	)
 
 	ctx, cancel := context.WithTimeout(
@@ -564,6 +566,7 @@ func TestDescribeTableRegression(t *testing.T) {
 			),
 		),
 		config.New(),
+		nil,
 	)
 
 	ctx, cancel := context.WithTimeout(
