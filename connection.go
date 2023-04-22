@@ -206,7 +206,7 @@ func (c *Driver) Table() table.Client {
 					c.tableOptions...,
 				)...,
 			),
-			c.balancer.Nodes(),
+			internalTable.WithNodeIDs(c.balancer.Nodes()),
 		)
 		return c.table.Close
 	})
