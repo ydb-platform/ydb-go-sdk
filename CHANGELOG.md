@@ -1,3 +1,4 @@
+* Fixed bug with returning session into pool before first re-discovery
 * Added `table/options.WithPartitions` for configure partitioning policy
 * Marked as deprecated `table/options.WithPartitioningPolicy{UniformPartitions,ExplicitPartitions}` (use `With{UniformPartitions,ExplicitPartitions}` instead)
 
