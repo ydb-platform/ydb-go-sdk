@@ -1,9 +1,10 @@
 package log
 
 import (
+	"testing"
+
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestColoring(t *testing.T) {

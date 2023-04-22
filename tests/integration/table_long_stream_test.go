@@ -45,9 +45,9 @@ func TestLongStream(t *testing.T) {
 		ydb.WithDiscoveryInterval(0), // disable re-discovery on upsert time
 		ydb.WithLogger(
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
-			ydb.WithNamespace("ydb"),
-			ydb.WithWriter(logger),
-			ydb.WithMinLevel(log.TRACE),
+			log.WithNamespace("ydb"),
+			log.WithWriter(logger),
+			log.WithMinLevel(log.TRACE),
 		),
 	)
 	if err != nil {
