@@ -272,8 +272,6 @@ func (c *Client) appendSessionToNodes(s *session) {
 		nodeID := s.NodeID()
 		if _, has := c.nodes[nodeID]; has {
 			c.nodes[nodeID][s] = struct{}{}
-		} else {
-			fmt.Println("")
 		}
 	})
 }
