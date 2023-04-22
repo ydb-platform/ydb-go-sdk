@@ -92,9 +92,9 @@ func (scope *scopeT) Driver(opts ...ydb.Option) *ydb.Driver {
 				ydb.WithAccessTokenCredentials(token),
 				ydb.WithLogger(
 					trace.DetailsAll,
-					ydb.WithNamespace("ydb"),
-					ydb.WithWriter(logger),
-					ydb.WithMinLevel(log.WARN),
+					log.WithNamespace("ydb"),
+					log.WithWriter(logger),
+					log.WithMinLevel(log.WARN),
 				),
 			)...,
 		)

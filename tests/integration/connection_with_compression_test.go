@@ -81,9 +81,9 @@ func TestConnectionWithCompression(t *testing.T) {
 		ydb.WithMinTLSVersion(tls.VersionTLS10),
 		ydb.WithLogger(
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
-			ydb.WithNamespace("ydb"),
-			ydb.WithWriter(logger),
-			ydb.WithMinLevel(log.WARN),
+			log.WithNamespace("ydb"),
+			log.WithWriter(logger),
+			log.WithMinLevel(log.WARN),
 		),
 		ydb.WithUserAgent(userAgent),
 		ydb.WithRequestsType(requestType),

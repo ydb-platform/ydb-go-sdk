@@ -48,9 +48,9 @@ func TestTableMultipleResultSets(t *testing.T) {
 		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
 		ydb.WithLogger(
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
-			ydb.WithNamespace("ydb"),
-			ydb.WithWriter(logger),
-			ydb.WithMinLevel(log.TRACE),
+			log.WithNamespace("ydb"),
+			log.WithWriter(logger),
+			log.WithMinLevel(log.TRACE),
 		),
 	)
 	require.NoError(t, err)

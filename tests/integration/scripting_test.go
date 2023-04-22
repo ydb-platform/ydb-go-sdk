@@ -43,9 +43,9 @@ func TestScripting(t *testing.T) {
 		ydb.WithMinTLSVersion(tls.VersionTLS10),
 		ydb.WithLogger(
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
-			ydb.WithNamespace("ydb"),
-			ydb.WithWriter(logger),
-			ydb.WithMinLevel(log.TRACE),
+			log.WithNamespace("ydb"),
+			log.WithWriter(logger),
+			log.WithMinLevel(log.TRACE),
 		),
 		ydb.WithUserAgent("scripting"),
 	)

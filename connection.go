@@ -392,9 +392,9 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, e
 						os.Getenv("YDB_LOG_DETAILS"),
 						trace.WithDefaultDetails(trace.DetailsAll),
 					),
-					WithNamespace("ydb"),
-					WithMinLevel(log.FromString(logLevel)),
-					WithColoring(),
+					log.WithNamespace("ydb"),
+					log.WithMinLevel(log.FromString(logLevel)),
+					log.WithColoring(),
 				),
 			)
 		}
