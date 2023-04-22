@@ -3,10 +3,10 @@ package log
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"strconv"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )

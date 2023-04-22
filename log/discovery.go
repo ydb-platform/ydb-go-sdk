@@ -11,7 +11,7 @@ func Discovery(l Logger, d trace.Detailer, opts ...Option) (t trace.Discovery) {
 	if ll, has := l.(*logger); has {
 		return internalDiscovery(ll.with(opts...), d)
 	}
-	return internalDiscovery(New(append(opts, withExternalLogger(l))...), d)
+	return internalDiscovery(New(append(opts, WithExternalLogger(l))...), d)
 }
 
 func internalDiscovery(l *logger, d trace.Detailer) (t trace.Discovery) {

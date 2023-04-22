@@ -13,7 +13,7 @@ func Table(l Logger, d trace.Detailer, opts ...Option) (t trace.Table) {
 	if ll, has := l.(*logger); has {
 		return internalTable(ll.with(opts...), d)
 	}
-	return internalTable(New(append(opts, withExternalLogger(l))...), d)
+	return internalTable(New(append(opts, WithExternalLogger(l))...), d)
 }
 
 //nolint:gocyclo

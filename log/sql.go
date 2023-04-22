@@ -12,7 +12,7 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...Option) (t trace.DatabaseSQ
 	if ll, has := l.(*logger); has {
 		return internalDatabaseSQL(ll.with(opts...), d)
 	}
-	return internalDatabaseSQL(New(append(opts, withExternalLogger(l))...), d)
+	return internalDatabaseSQL(New(append(opts, WithExternalLogger(l))...), d)
 }
 
 func internalDatabaseSQL(l *logger, d trace.Detailer) (t trace.DatabaseSQL) {

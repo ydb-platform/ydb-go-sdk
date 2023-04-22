@@ -11,7 +11,7 @@ func Scripting(l Logger, d trace.Detailer, opts ...Option) (t trace.Scripting) {
 	if ll, has := l.(*logger); has {
 		return internalScripting(ll.with(opts...), d)
 	}
-	return internalScripting(New(append(opts, withExternalLogger(l))...), d)
+	return internalScripting(New(append(opts, WithExternalLogger(l))...), d)
 }
 
 func internalScripting(l *logger, d trace.Detailer) (t trace.Scripting) {

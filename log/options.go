@@ -16,7 +16,7 @@ func WithColoring() Option {
 	}
 }
 
-func withExternalLogger(ll Logger) Option {
+func WithExternalLogger(ll Logger) Option {
 	return func(l *logger) {
 		l.externalLogger = ll
 	}

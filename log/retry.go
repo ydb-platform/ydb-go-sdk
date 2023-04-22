@@ -1,10 +1,10 @@
 package log
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -13,10 +13,9 @@ func Retry(l Logger, d trace.Detailer, opts ...Option) (t trace.Retry) {
 	if ll, has := l.(*logger); has {
 		return internalRetry(ll.with(opts...), d)
 	}
-	return internalRetry(New(append(opts, withExternalLogger(l))...), d)
+	return internalRetry(New(append(opts, WithExternalLogger(l))...), d)
 }
 
-//nolint:gocyclo
 func internalRetry(l *logger, d trace.Detailer) (t trace.Retry) {
 	t.OnRetry = func(
 		info trace.RetryLoopStartInfo,
