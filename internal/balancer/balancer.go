@@ -43,6 +43,16 @@ type Balancer struct {
 	onApplyDiscoveredEndpoints []func(ctx context.Context, endpoints []endpoint.Info)
 }
 
+func (b *Balancer) Nodes() (nodes []uint32) {
+	b.mu.WithLock(func() {
+		nodes = make([]uint32, 0, len(b.connectionsState.connByNodeID))
+		for nodeID := range b.connectionsState.connByNodeID {
+			nodes = append(nodes, nodeID)
+		}
+	})
+	return nodes
+}
+
 func (b *Balancer) OnUpdate(onApplyDiscoveredEndpoints func(ctx context.Context, endpoints []endpoint.Info)) {
 	b.mu.WithLock(func() {
 		b.onApplyDiscoveredEndpoints = append(b.onApplyDiscoveredEndpoints, onApplyDiscoveredEndpoints)
