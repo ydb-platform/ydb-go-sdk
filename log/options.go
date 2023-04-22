@@ -16,6 +16,12 @@ func WithColoring() Option {
 	}
 }
 
+func withExternalLogger(ll Logger) Option {
+	return func(l *logger) {
+		l.externalLogger = ll
+	}
+}
+
 func WithMinLevel(level Level) Option {
 	return func(l *logger) {
 		l.minLevel = level
@@ -28,30 +34,14 @@ func WithNamespace(namespace string) Option {
 	}
 }
 
+func WithLogQuery() Option {
+	return func(l *logger) {
+		l.logQuery = true
+	}
+}
+
 func WithWriter(w io.Writer) Option {
 	return func(l *logger) {
 		l.w = w
 	}
-}
-
-type logOptions struct {
-	logQuery bool
-}
-
-type option func(o *logOptions)
-
-func WithLogQuery() option {
-	return func(o *logOptions) {
-		o.logQuery = true
-	}
-}
-
-func parseOptions(opts ...option) logOptions {
-	options := logOptions{}
-	for _, o := range opts {
-		if o != nil {
-			o(&options)
-		}
-	}
-	return options
 }
