@@ -1,5 +1,5 @@
 ## v3.44.1
-* Fixed bug with returning session into pool before second re-discovery
+* Fixed bug with returning session into pool before second discovery
 
 ## v3.44.0
 * Added `table/options.WithCallOptions` options for append custom grpc call options into `session.{BulkUpsert,Execute,StreamExecuteScanQuery}`
