@@ -1,15 +1,23 @@
 package log
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 // Retry returns trace.Retry with logging events from details
-func Retry(l Logger, d trace.Detailer) (t trace.Retry) {
+func Retry(l Logger, d trace.Detailer, opts ...Option) (t trace.Retry) {
+	if ll, has := l.(*logger); has {
+		return internalRetry(ll.with(opts...), d)
+	}
+	return internalRetry(New(append(opts, withExternalLogger(l))...), d)
+}
+
+//nolint:gocyclo
+func internalRetry(l *logger, d trace.Detailer) (t trace.Retry) {
 	t.OnRetry = func(
 		info trace.RetryLoopStartInfo,
 	) func(
@@ -20,17 +28,21 @@ func Retry(l Logger, d trace.Detailer) (t trace.Retry) {
 		if d.Details()&trace.RetryEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("retry")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"retry"},
+		}
 		id := info.ID
 		idempotent := info.Idempotent
-		ll.Log(TRACE, "start",
+		l.Log(params.withLevel(TRACE), "start",
 			String("id", id),
 			Bool("idempotent", idempotent),
 		)
 		start := time.Now()
 		return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 			if info.Error == nil {
-				ll.Log(TRACE, "attempt done",
+				l.Log(params.withLevel(TRACE), "attempt done",
 					String("id", id),
 					latency(start),
 				)
@@ -40,7 +52,7 @@ func Retry(l Logger, d trace.Detailer) (t trace.Retry) {
 					lvl = DEBUG
 				}
 				m := retry.Check(info.Error)
-				ll.Log(lvl, "attempt failed",
+				l.Log(params.withLevel(lvl), "attempt failed",
 					Error(info.Error),
 					String("id", id),
 					latency(start),
@@ -52,7 +64,7 @@ func Retry(l Logger, d trace.Detailer) (t trace.Retry) {
 			}
 			return func(info trace.RetryLoopDoneInfo) {
 				if info.Error == nil {
-					ll.Log(TRACE, "done",
+					l.Log(params.withLevel(TRACE), "done",
 						String("id", id),
 						latency(start),
 						Int("attempts", info.Attempts),
@@ -63,7 +75,7 @@ func Retry(l Logger, d trace.Detailer) (t trace.Retry) {
 						lvl = DEBUG
 					}
 					m := retry.Check(info.Error)
-					ll.Log(lvl, "failed",
+					l.Log(params.withLevel(lvl), "failed",
 						Error(info.Error),
 						String("id", id),
 						latency(start),

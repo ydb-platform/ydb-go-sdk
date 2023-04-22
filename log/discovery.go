@@ -7,25 +7,36 @@ import (
 )
 
 // Discovery makes trace.Discovery with logging events from details
-func Discovery(l Logger, d trace.Detailer) (t trace.Discovery) {
+func Discovery(l Logger, d trace.Detailer, opts ...Option) (t trace.Discovery) {
+	if ll, has := l.(*logger); has {
+		return internalDiscovery(ll.with(opts...), d)
+	}
+	return internalDiscovery(New(append(opts, withExternalLogger(l))...), d)
+}
+
+func internalDiscovery(l *logger, d trace.Detailer) (t trace.Discovery) {
 	t.OnDiscover = func(info trace.DiscoveryDiscoverStartInfo) func(trace.DiscoveryDiscoverDoneInfo) {
 		if d.Details()&trace.DiscoveryEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("discovery", "discover")
-		ll.Log(INFO, "start",
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     DEBUG,
+			Namespace: []string{"discovery", "list", "endpoints"},
+		}
+		l.Log(params, "start",
 			String("address", info.Address),
 			String("database", info.Database),
 		)
 		start := time.Now()
 		return func(info trace.DiscoveryDiscoverDoneInfo) {
 			if info.Error == nil {
-				ll.Log(DEBUG, "done",
+				l.Log(params.withLevel(INFO), "done",
 					latency(start),
 					Stringer("endpoints", endpoints(info.Endpoints)),
 				)
 			} else {
-				ll.Log(ERROR, "failed",
+				l.Log(params.withLevel(ERROR), "failed",
 					Error(info.Error),
 					latency(start),
 					version(),
@@ -37,18 +48,22 @@ func Discovery(l Logger, d trace.Detailer) (t trace.Discovery) {
 		if d.Details()&trace.DiscoveryEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("discovery", "whoAmI")
-		ll.Log(DEBUG, "start")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"discovery", "whoAmI"},
+		}
+		l.Log(params, "start")
 		start := time.Now()
 		return func(info trace.DiscoveryWhoAmIDoneInfo) {
 			if info.Error == nil {
-				ll.Log(DEBUG, "done",
+				l.Log(params.withLevel(TRACE), "done",
 					latency(start),
 					String("user", info.User),
 					Strings("groups", info.Groups),
 				)
 			} else {
-				ll.Log(ERROR, "failed",
+				l.Log(params.withLevel(WARN), "failed",
 					Error(info.Error),
 					latency(start),
 					version(),

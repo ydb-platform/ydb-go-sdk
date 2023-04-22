@@ -8,8 +8,14 @@ import (
 )
 
 // DatabaseSQL makes trace.DatabaseSQL with logging events from details
-func DatabaseSQL(l Logger, d trace.Detailer, opts ...option) (t trace.DatabaseSQL) {
-	options := parseOptions(opts...)
+func DatabaseSQL(l Logger, d trace.Detailer, opts ...Option) (t trace.DatabaseSQL) {
+	if ll, has := l.(*logger); has {
+		return internalDatabaseSQL(ll.with(opts...), d)
+	}
+	return internalDatabaseSQL(New(append(opts, withExternalLogger(l))...), d)
+}
+
+func internalDatabaseSQL(l *logger, d trace.Detailer) (t trace.DatabaseSQL) {
 	t.OnConnectorConnect = func(
 		info trace.DatabaseSQLConnectorConnectStartInfo,
 	) func(
@@ -18,16 +24,20 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...option) (t trace.DatabaseSQ
 		if d.Details()&trace.DatabaseSQLConnectorEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("database", "sql", "connector", "connect")
-		ll.Log(TRACE, "start")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"database", "sql", "connector", "connect"},
+		}
+		l.Log(params.withLevel(TRACE), "start")
 		start := time.Now()
 		return func(info trace.DatabaseSQLConnectorConnectDoneInfo) {
 			if info.Error == nil {
-				ll.Log(INFO, "connected",
+				l.Log(params.withLevel(INFO), "connected",
 					latency(start),
 				)
 			} else {
-				ll.Log(ERROR, "failed",
+				l.Log(params.withLevel(ERROR), "failed",
 					Error(info.Error),
 					latency(start),
 					version(),
@@ -40,16 +50,20 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...option) (t trace.DatabaseSQ
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("database", "sql", "conn", "ping")
-		ll.Log(TRACE, "start")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"database", "sql", "conn", "ping"},
+		}
+		l.Log(params.withLevel(TRACE), "start")
 		start := time.Now()
 		return func(info trace.DatabaseSQLConnPingDoneInfo) {
 			if info.Error == nil {
-				ll.Log(DEBUG, "done",
+				l.Log(params.withLevel(DEBUG), "done",
 					latency(start),
 				)
 			} else {
-				ll.Log(ERROR, "failed",
+				l.Log(params.withLevel(ERROR), "failed",
 					Error(info.Error),
 					latency(start),
 					version(),
@@ -61,16 +75,19 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...option) (t trace.DatabaseSQ
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("database", "sql", "conn", "close")
-		ll.Log(TRACE, "start")
+		params := Params{
+			Level:     TRACE,
+			Namespace: []string{"database", "sql", "conn", "close"},
+		}
+		l.Log(params.withLevel(TRACE), "start")
 		start := time.Now()
 		return func(info trace.DatabaseSQLConnCloseDoneInfo) {
 			if info.Error == nil {
-				ll.Log(INFO, "done",
+				l.Log(params.withLevel(INFO), "done",
 					latency(start),
 				)
 			} else {
-				ll.Log(ERROR, "failed",
+				l.Log(params.withLevel(ERROR), "failed",
 					Error(info.Error),
 					latency(start),
 					version(),
@@ -82,16 +99,20 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...option) (t trace.DatabaseSQ
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("database", "sql", "conn", "begin", "tx")
-		ll.Log(TRACE, "start")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"database", "sql", "conn", "begin", "tx"},
+		}
+		l.Log(params.withLevel(TRACE), "start")
 		start := time.Now()
 		return func(info trace.DatabaseSQLConnBeginDoneInfo) {
 			if info.Error == nil {
-				ll.Log(DEBUG, "done",
+				l.Log(params.withLevel(DEBUG), "done",
 					latency(start),
 				)
 			} else {
-				ll.Log(ERROR, "failed",
+				l.Log(params.withLevel(ERROR), "failed",
 					Error(info.Error),
 					latency(start),
 					version(),
@@ -103,9 +124,13 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...option) (t trace.DatabaseSQ
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("database", "sql", "conn", "prepare", "stmt")
-		ll.Log(TRACE, "start",
-			appendFieldByCondition(options.logQuery,
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"database", "sql", "conn", "prepare", "stmt"},
+		}
+		l.Log(params.withLevel(TRACE), "start",
+			appendFieldByCondition(l.logQuery,
 				String("query", info.Query),
 			)...,
 		)
@@ -113,12 +138,12 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...option) (t trace.DatabaseSQ
 		start := time.Now()
 		return func(info trace.DatabaseSQLConnPrepareDoneInfo) {
 			if info.Error == nil {
-				ll.Log(DEBUG, "done",
+				l.Log(params.withLevel(DEBUG), "done",
 					latency(start),
 				)
 			} else {
-				ll.Log(ERROR, "failed",
-					appendFieldByCondition(options.logQuery,
+				l.Log(params.withLevel(ERROR), "failed",
+					appendFieldByCondition(l.logQuery,
 						String("query", query),
 						Error(info.Error),
 						latency(start),
@@ -132,9 +157,13 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...option) (t trace.DatabaseSQ
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("database", "sql", "conn", "exec")
-		ll.Log(TRACE, "start",
-			appendFieldByCondition(options.logQuery,
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"database", "sql", "conn", "exec"},
+		}
+		l.Log(params.withLevel(TRACE), "start",
+			appendFieldByCondition(l.logQuery,
 				String("query", info.Query),
 			)...,
 		)
@@ -143,13 +172,13 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...option) (t trace.DatabaseSQ
 		start := time.Now()
 		return func(info trace.DatabaseSQLConnExecDoneInfo) {
 			if info.Error == nil {
-				ll.Log(DEBUG, "done",
+				l.Log(params.withLevel(DEBUG), "done",
 					latency(start),
 				)
 			} else {
 				m := retry.Check(info.Error)
-				ll.Log(ERROR, "failed",
-					appendFieldByCondition(options.logQuery,
+				l.Log(params.withLevel(ERROR), "failed",
+					appendFieldByCondition(l.logQuery,
 						String("query", query),
 						Bool("retryable", m.MustRetry(idempotent)),
 						Int64("code", m.StatusCode()),
@@ -166,9 +195,13 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...option) (t trace.DatabaseSQ
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("database", "sql", "conn", "query")
-		ll.Log(TRACE, "start",
-			appendFieldByCondition(options.logQuery,
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"database", "sql", "conn", "query"},
+		}
+		l.Log(params.withLevel(TRACE), "start",
+			appendFieldByCondition(l.logQuery,
 				String("query", info.Query),
 			)...,
 		)
@@ -177,13 +210,13 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...option) (t trace.DatabaseSQ
 		start := time.Now()
 		return func(info trace.DatabaseSQLConnQueryDoneInfo) {
 			if info.Error == nil {
-				ll.Log(DEBUG, "done",
+				l.Log(params.withLevel(DEBUG), "done",
 					latency(start),
 				)
 			} else {
 				m := retry.Check(info.Error)
-				ll.Log(ERROR, "failed",
-					appendFieldByCondition(options.logQuery,
+				l.Log(params.withLevel(ERROR), "failed",
+					appendFieldByCondition(l.logQuery,
 						String("query", query),
 						Bool("retryable", m.MustRetry(idempotent)),
 						Int64("code", m.StatusCode()),
@@ -200,16 +233,20 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...option) (t trace.DatabaseSQ
 		if d.Details()&trace.DatabaseSQLTxEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("database", "sql", "tx", "commit")
-		ll.Log(TRACE, "start")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"database", "sql", "tx", "commit"},
+		}
+		l.Log(params.withLevel(TRACE), "start")
 		start := time.Now()
 		return func(info trace.DatabaseSQLTxCommitDoneInfo) {
 			if info.Error == nil {
-				ll.Log(DEBUG, "committed",
+				l.Log(params.withLevel(DEBUG), "committed",
 					latency(start),
 				)
 			} else {
-				ll.Log(ERROR, "failed",
+				l.Log(params.withLevel(ERROR), "failed",
 					Error(info.Error),
 					latency(start),
 					version(),
@@ -221,16 +258,20 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...option) (t trace.DatabaseSQ
 		if d.Details()&trace.DatabaseSQLTxEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("database", "sql", "tx", "rollback")
-		ll.Log(TRACE, "start")
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"database", "sql", "tx", "rollback"},
+		}
+		l.Log(params.withLevel(TRACE), "start")
 		start := time.Now()
 		return func(info trace.DatabaseSQLTxRollbackDoneInfo) {
 			if info.Error == nil {
-				ll.Log(DEBUG, "done",
+				l.Log(params.withLevel(DEBUG), "done",
 					latency(start),
 				)
 			} else {
-				ll.Log(ERROR, "failed",
+				l.Log(params.withLevel(ERROR), "failed",
 					Error(info.Error),
 					latency(start),
 					version(),
@@ -242,16 +283,19 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...option) (t trace.DatabaseSQ
 		if d.Details()&trace.DatabaseSQLStmtEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("database", "sql", "stmt", "close")
-		ll.Log(TRACE, "start")
+		params := Params{
+			Level:     TRACE,
+			Namespace: []string{"database", "sql", "stmt", "close"},
+		}
+		l.Log(params.withLevel(TRACE), "start")
 		start := time.Now()
 		return func(info trace.DatabaseSQLStmtCloseDoneInfo) {
 			if info.Error == nil {
-				ll.Log(TRACE, "closed",
+				l.Log(params.withLevel(TRACE), "closed",
 					latency(start),
 				)
 			} else {
-				ll.Log(ERROR, "close failed",
+				l.Log(params.withLevel(ERROR), "close failed",
 					Error(info.Error),
 					latency(start),
 					version(),
@@ -263,9 +307,13 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...option) (t trace.DatabaseSQ
 		if d.Details()&trace.DatabaseSQLStmtEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("database", "sql", "stmt", "exec")
-		ll.Log(TRACE, "start",
-			appendFieldByCondition(options.logQuery,
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"database", "sql", "stmt", "exec"},
+		}
+		l.Log(params.withLevel(TRACE), "start",
+			appendFieldByCondition(l.logQuery,
 				String("query", info.Query),
 			)...,
 		)
@@ -273,13 +321,13 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...option) (t trace.DatabaseSQ
 		start := time.Now()
 		return func(info trace.DatabaseSQLStmtExecDoneInfo) {
 			if info.Error == nil {
-				ll.Log(DEBUG, "done",
+				l.Log(params.withLevel(DEBUG), "done",
 					Error(info.Error),
 					latency(start),
 				)
 			} else {
-				ll.Log(ERROR, "failed",
-					appendFieldByCondition(options.logQuery,
+				l.Log(params.withLevel(ERROR), "failed",
+					appendFieldByCondition(l.logQuery,
 						String("query", query),
 						Error(info.Error),
 						latency(start),
@@ -293,9 +341,13 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...option) (t trace.DatabaseSQ
 		if d.Details()&trace.DatabaseSQLStmtEvents == 0 {
 			return nil
 		}
-		ll := l.WithNames("database", "sql", "stmt", "query")
-		ll.Log(TRACE, "start",
-			appendFieldByCondition(options.logQuery,
+		params := Params{
+			Ctx:       *info.Context,
+			Level:     TRACE,
+			Namespace: []string{"database", "sql", "stmt", "query"},
+		}
+		l.Log(params.withLevel(TRACE), "start",
+			appendFieldByCondition(l.logQuery,
 				String("query", info.Query),
 			)...,
 		)
@@ -303,12 +355,12 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...option) (t trace.DatabaseSQ
 		start := time.Now()
 		return func(info trace.DatabaseSQLStmtQueryDoneInfo) {
 			if info.Error == nil {
-				ll.Log(DEBUG, "done",
+				l.Log(params.withLevel(DEBUG), "done",
 					latency(start),
 				)
 			} else {
-				ll.Log(ERROR, "failed",
-					appendFieldByCondition(options.logQuery,
+				l.Log(params.withLevel(ERROR), "failed",
+					appendFieldByCondition(l.logQuery,
 						String("query", query),
 						Error(info.Error),
 						latency(start),
