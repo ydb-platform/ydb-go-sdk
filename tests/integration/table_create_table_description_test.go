@@ -31,9 +31,9 @@ func TestCreateTableDescription(t *testing.T) {
 	db, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithLogger(
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
-			ydb.WithNamespace("ydb"),
-			ydb.WithWriter(logger),
-			ydb.WithMinLevel(log.WARN),
+			log.WithNamespace("ydb"),
+			log.WithWriter(logger),
+			log.WithMinLevel(log.WARN),
 		),
 	)
 	if err != nil {

@@ -3,10 +3,12 @@ package log
 import (
 	"context"
 	"fmt"
-	"github.com/jonboulle/clockwork"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"io"
 	"os"
+
+	"github.com/jonboulle/clockwork"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 )
 
 const (
@@ -41,14 +43,13 @@ type logger struct {
 	clock          clockwork.Clock
 }
 
-func (l *logger) with(opts ...Option) *logger {
-	copy := *l
+func (l logger) with(opts ...Option) *logger {
 	for _, o := range opts {
 		if o != nil {
-			o(&copy)
+			o(&l)
 		}
 	}
-	return &copy
+	return &l
 }
 
 func New(opts ...Option) *logger {
