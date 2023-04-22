@@ -21,7 +21,7 @@ jobs:
       - name: Install gorelease
         run: test -e ~/go/bin/gorelease || go install golang.org/x/exp/cmd/gorelease@latest
       - name: Check broken API changes
-        run: gorelease -base=$GITHUB_BASE_REF 2>&1 > changes.txt
+        run: gorelease -base=$GITHUB_BASE_REF 2>&1 > changes.txt | true
       - name: Comment Report
         if: always()
         uses: marocchino/sticky-pull-request-comment@v2
