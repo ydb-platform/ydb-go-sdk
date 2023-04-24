@@ -2,9 +2,9 @@ package workers
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
+	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 )
 
@@ -18,7 +18,7 @@ func (w *Workers) Metrics(ctx context.Context, wg *sync.WaitGroup, rl *rate.Limi
 
 		err = w.m.Push()
 		if err != nil {
-			w.logger.Error(fmt.Errorf("error while pushing: %w", err).Error())
+			w.logger.Error("error while pushing", zap.Error(err))
 		}
 	}
 }

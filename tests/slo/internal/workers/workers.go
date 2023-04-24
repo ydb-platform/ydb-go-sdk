@@ -2,7 +2,6 @@ package workers
 
 import (
 	"context"
-	"fmt"
 
 	"go.uber.org/zap"
 
@@ -26,7 +25,7 @@ type Workers struct {
 func New(cfg *config.Config, s ReadWriter, logger *zap.Logger) (*Workers, error) {
 	m, err := metrics.New(cfg.PushGateway, "native")
 	if err != nil {
-		logger.Error(fmt.Errorf("create metrics failed: %w", err).Error())
+		logger.Error("create metrics failed", zap.Error(err))
 		return nil, err
 	}
 
