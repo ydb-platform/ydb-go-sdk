@@ -2,10 +2,10 @@ package workers
 
 import (
 	"context"
-	"fmt"
 	"math/rand"
 	"sync"
 
+	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
 	"slo/internal/metrics"
@@ -30,7 +30,7 @@ func (w *Workers) read(ctx context.Context) (err error) {
 	defer func() {
 		m.Stop(err)
 		if err != nil {
-			w.logger.Error(fmt.Errorf("get entry error: %w", err).Error())
+			w.logger.Error("get entry error", zap.Error(err))
 		}
 	}()
 
