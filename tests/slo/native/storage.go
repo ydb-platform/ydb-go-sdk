@@ -16,7 +16,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"go.uber.org/zap"
-	"golang.org/x/sync/errgroup"
 
 	"slo/internal/config"
 	"slo/internal/generator"
@@ -81,25 +80,6 @@ func NewStorage(ctx context.Context, cfg *config.Config, logger *zap.Logger, poo
 		),
 		ydb.WithSessionPoolSizeLimit(poolSize),
 	)
-	if err != nil {
-		return nil, err
-	}
-
-	g := errgroup.Group{}
-
-	for i := 0; i < poolSize; i++ {
-		g.Go(func() (err error) {
-			err = s.db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
-				return nil
-			})
-			if err != nil {
-				return fmt.Errorf("error when create session: %w", err)
-			}
-			return nil
-		})
-	}
-
-	err = g.Wait()
 	if err != nil {
 		return nil, err
 	}
