@@ -132,7 +132,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (res genera
 			row := cc.QueryRowContext(ydb.WithQueryMode(ctx, ydb.DataQueryMode), s.selectQuery,
 				sql.Named("id", &entryID),
 			)
-			var hash uint64
+			var hash *uint64
 			return row.Scan(&res.ID, &res.PayloadStr, &res.PayloadDouble, &res.PayloadTimestamp, &hash)
 		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)),
 	)
