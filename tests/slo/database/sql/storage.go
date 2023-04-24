@@ -90,13 +90,6 @@ func NewStorage(ctx context.Context, cfg *config.Config, logger *zap.Logger, poo
 		selectQuery: fmt.Sprintf(selectTemplate, cfg.Table),
 	}
 
-	logger.Info("queries",
-		zap.String("create", s.createQuery),
-		zap.String("drop", s.dropQuery),
-		zap.String("upsert", s.upsertQuery),
-		zap.String("select", s.selectQuery),
-	)
-
 	s.cc, err = ydb.Open(
 		ctx,
 		s.cfg.Endpoint+s.cfg.DB,
