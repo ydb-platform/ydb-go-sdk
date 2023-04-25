@@ -28,7 +28,9 @@ func TestConnsToNodeIDMap(t *testing.T) {
 			source: []conn.Conn{
 				&mock.Conn{NodeIDField: 0},
 			},
-			res: nil,
+			res: map[uint32]conn.Conn{
+				0: &mock.Conn{NodeIDField: 0},
+			},
 		},
 		{
 			name: "NonZero",
@@ -49,6 +51,7 @@ func TestConnsToNodeIDMap(t *testing.T) {
 				&mock.Conn{NodeIDField: 10},
 			},
 			res: map[uint32]conn.Conn{
+				0:  &mock.Conn{NodeIDField: 0},
 				1:  &mock.Conn{NodeIDField: 1},
 				10: &mock.Conn{NodeIDField: 10},
 			},
@@ -247,70 +250,83 @@ func TestNewState(t *testing.T) {
 		{
 			name: "NoFilter",
 			state: newConnectionsState([]conn.Conn{
-				&mock.Conn{AddrField: "1"},
-				&mock.Conn{AddrField: "2"},
+				&mock.Conn{AddrField: "1", NodeIDField: 1},
+				&mock.Conn{AddrField: "2", NodeIDField: 2},
 			}, nil, balancerConfig.Info{}, false),
 			res: &connectionsState{
-				connByNodeID: nil,
+				connByNodeID: map[uint32]conn.Conn{
+					1: &mock.Conn{AddrField: "1", NodeIDField: 1},
+					2: &mock.Conn{AddrField: "2", NodeIDField: 2},
+				},
 				prefer: []conn.Conn{
-					&mock.Conn{AddrField: "1"},
-					&mock.Conn{AddrField: "2"},
+					&mock.Conn{AddrField: "1", NodeIDField: 1},
+					&mock.Conn{AddrField: "2", NodeIDField: 2},
 				},
 				fallback: nil,
 				all: []conn.Conn{
-					&mock.Conn{AddrField: "1"},
-					&mock.Conn{AddrField: "2"},
+					&mock.Conn{AddrField: "1", NodeIDField: 1},
+					&mock.Conn{AddrField: "2", NodeIDField: 2},
 				},
 			},
 		},
 		{
 			name: "FilterDenyFallback",
 			state: newConnectionsState([]conn.Conn{
-				&mock.Conn{AddrField: "t1", LocationField: "t"},
-				&mock.Conn{AddrField: "f1", LocationField: "f"},
-				&mock.Conn{AddrField: "t2", LocationField: "t"},
-				&mock.Conn{AddrField: "f2", LocationField: "f"},
+				&mock.Conn{AddrField: "t1", NodeIDField: 1, LocationField: "t"},
+				&mock.Conn{AddrField: "f1", NodeIDField: 2, LocationField: "f"},
+				&mock.Conn{AddrField: "t2", NodeIDField: 3, LocationField: "t"},
+				&mock.Conn{AddrField: "f2", NodeIDField: 4, LocationField: "f"},
 			}, func(info balancerConfig.Info, c conn.Conn) bool {
 				return info.SelfLocation == c.Endpoint().Location()
 			}, balancerConfig.Info{SelfLocation: "t"}, false),
 			res: &connectionsState{
-				connByNodeID: nil,
+				connByNodeID: map[uint32]conn.Conn{
+					1: &mock.Conn{AddrField: "t1", NodeIDField: 1, LocationField: "t"},
+					2: &mock.Conn{AddrField: "f1", NodeIDField: 2, LocationField: "f"},
+					3: &mock.Conn{AddrField: "t2", NodeIDField: 3, LocationField: "t"},
+					4: &mock.Conn{AddrField: "f2", NodeIDField: 4, LocationField: "f"},
+				},
 				prefer: []conn.Conn{
-					&mock.Conn{AddrField: "t1", LocationField: "t"},
-					&mock.Conn{AddrField: "t2", LocationField: "t"},
+					&mock.Conn{AddrField: "t1", NodeIDField: 1, LocationField: "t"},
+					&mock.Conn{AddrField: "t2", NodeIDField: 3, LocationField: "t"},
 				},
 				fallback: nil,
 				all: []conn.Conn{
-					&mock.Conn{AddrField: "t1", LocationField: "t"},
-					&mock.Conn{AddrField: "t2", LocationField: "t"},
+					&mock.Conn{AddrField: "t1", NodeIDField: 1, LocationField: "t"},
+					&mock.Conn{AddrField: "t2", NodeIDField: 3, LocationField: "t"},
 				},
 			},
 		},
 		{
 			name: "FilterAllowFallback",
 			state: newConnectionsState([]conn.Conn{
-				&mock.Conn{AddrField: "t1", LocationField: "t"},
-				&mock.Conn{AddrField: "f1", LocationField: "f"},
-				&mock.Conn{AddrField: "t2", LocationField: "t"},
-				&mock.Conn{AddrField: "f2", LocationField: "f"},
+				&mock.Conn{AddrField: "t1", NodeIDField: 1, LocationField: "t"},
+				&mock.Conn{AddrField: "f1", NodeIDField: 2, LocationField: "f"},
+				&mock.Conn{AddrField: "t2", NodeIDField: 3, LocationField: "t"},
+				&mock.Conn{AddrField: "f2", NodeIDField: 4, LocationField: "f"},
 			}, func(info balancerConfig.Info, c conn.Conn) bool {
 				return info.SelfLocation == c.Endpoint().Location()
 			}, balancerConfig.Info{SelfLocation: "t"}, true),
 			res: &connectionsState{
-				connByNodeID: nil,
+				connByNodeID: map[uint32]conn.Conn{
+					1: &mock.Conn{AddrField: "t1", NodeIDField: 1, LocationField: "t"},
+					2: &mock.Conn{AddrField: "f1", NodeIDField: 2, LocationField: "f"},
+					3: &mock.Conn{AddrField: "t2", NodeIDField: 3, LocationField: "t"},
+					4: &mock.Conn{AddrField: "f2", NodeIDField: 4, LocationField: "f"},
+				},
 				prefer: []conn.Conn{
-					&mock.Conn{AddrField: "t1", LocationField: "t"},
-					&mock.Conn{AddrField: "t2", LocationField: "t"},
+					&mock.Conn{AddrField: "t1", NodeIDField: 1, LocationField: "t"},
+					&mock.Conn{AddrField: "t2", NodeIDField: 3, LocationField: "t"},
 				},
 				fallback: []conn.Conn{
-					&mock.Conn{AddrField: "f1", LocationField: "f"},
-					&mock.Conn{AddrField: "f2", LocationField: "f"},
+					&mock.Conn{AddrField: "f1", NodeIDField: 2, LocationField: "f"},
+					&mock.Conn{AddrField: "f2", NodeIDField: 4, LocationField: "f"},
 				},
 				all: []conn.Conn{
-					&mock.Conn{AddrField: "t1", LocationField: "t"},
-					&mock.Conn{AddrField: "f1", LocationField: "f"},
-					&mock.Conn{AddrField: "t2", LocationField: "t"},
-					&mock.Conn{AddrField: "f2", LocationField: "f"},
+					&mock.Conn{AddrField: "t1", NodeIDField: 1, LocationField: "t"},
+					&mock.Conn{AddrField: "f1", NodeIDField: 2, LocationField: "f"},
+					&mock.Conn{AddrField: "t2", NodeIDField: 3, LocationField: "t"},
+					&mock.Conn{AddrField: "f2", NodeIDField: 4, LocationField: "f"},
 				},
 			},
 		},
