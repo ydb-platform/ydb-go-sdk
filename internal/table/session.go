@@ -17,7 +17,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
+	balancerContext "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
@@ -110,7 +110,7 @@ func (s *session) isClosing() bool {
 	return s.Status() == table.SessionClosing
 }
 
-func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.Config, opts ...sessionBuilderOption) (
+func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) (
 	s *session, err error,
 ) {
 	onDone := trace.TableOnSessionNew(config.Trace(), &ctx)
@@ -150,19 +150,13 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.
 	s.tableService = Ydb_Table_V1.NewTableServiceClient(
 		conn.WithBeforeFunc(
 			conn.WithContextModifier(cc, func(ctx context.Context) context.Context {
-				return meta.WithTrailerCallback(balancer.WithEndpoint(ctx, s), s.checkCloseHint)
+				return meta.WithTrailerCallback(balancerContext.WithEndpoint(ctx, s), s.checkCloseHint)
 			}),
 			func() {
 				atomic.StoreInt64(&s.lastUsage, time.Now().Unix())
 			},
 		),
 	)
-
-	for _, o := range opts {
-		if o != nil {
-			o(s)
-		}
-	}
 
 	return s, nil
 }

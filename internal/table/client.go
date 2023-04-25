@@ -4,14 +4,12 @@ import (
 	"container/list"
 	"context"
 	"fmt"
-	"sort"
 	"sync"
 	"time"
 
 	"github.com/jonboulle/clockwork"
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -23,43 +21,43 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type sessionBuilderOption func(s *session)
-
 // sessionBuilder is the interface that holds logic of creating sessions.
-type sessionBuilder func(ctx context.Context, opts ...sessionBuilderOption) (*session, error)
+type sessionBuilder func(ctx context.Context) (*session, error)
 
-type balancerNotifier interface {
-	grpc.ClientConnInterface
-
-	OnUpdate(onDiscovery func(ctx context.Context, endpoints []endpoint.Info))
+type nodeChecker interface {
+	HasNode(id uint32) bool
 }
 
-func New(balancer balancerNotifier, config config.Config, knownNodeIDs []uint32) *Client {
-	return newClient(balancer, func(ctx context.Context, opts ...sessionBuilderOption) (s *session, err error) {
-		return newSession(ctx, balancer, config, opts...)
-	}, config, knownNodeIDs)
+type balancer interface {
+	grpc.ClientConnInterface
+	nodeChecker
+}
+
+func New(balancer balancer, config config.Config) *Client {
+	return newClient(balancer, func(ctx context.Context) (s *session, err error) {
+		return newSession(ctx, balancer, config)
+	}, config)
 }
 
 func newClient(
-	balancer balancerNotifier,
+	balancer balancer,
 	builder sessionBuilder,
 	config config.Config,
-	knownNodeIDs []uint32,
 ) *Client {
 	var (
 		ctx    = context.Background()
 		onDone = trace.TableOnInit(config.Trace(), &ctx)
 	)
 	c := &Client{
-		clock:  config.Clock(),
-		config: config,
-		cc:     balancer,
-		build:  builder,
-		index:  make(map[*session]sessionInfo),
-		nodes:  make(map[uint32]map[*session]struct{}, len(knownNodeIDs)*2),
-		idle:   list.New(),
-		waitQ:  list.New(),
-		limit:  config.SizeLimit(),
+		clock:       config.Clock(),
+		config:      config,
+		cc:          balancer,
+		nodeChecker: balancer,
+		build:       builder,
+		index:       make(map[*session]sessionInfo),
+		idle:        list.New(),
+		waitQ:       list.New(),
+		limit:       config.SizeLimit(),
 		waitChPool: sync.Pool{
 			New: func() interface{} {
 				ch := make(chan *session)
@@ -67,12 +65,6 @@ func newClient(
 			},
 		},
 		done: make(chan struct{}),
-	}
-	for _, nodeID := range knownNodeIDs {
-		c.nodes[nodeID] = make(map[*session]struct{})
-	}
-	if balancer != nil {
-		balancer.OnUpdate(c.updateNodes)
 	}
 	if idleThreshold := config.IdleThreshold(); idleThreshold > 0 {
 		c.wg.Add(1)
@@ -86,15 +78,15 @@ func newClient(
 // A Client is safe for use by multiple goroutines simultaneously.
 type Client struct {
 	// read-only fields
-	config config.Config
-	build  sessionBuilder
-	cc     grpc.ClientConnInterface
-	clock  clockwork.Clock
+	config      config.Config
+	build       sessionBuilder
+	cc          grpc.ClientConnInterface
+	nodeChecker nodeChecker
+	clock       clockwork.Clock
 
 	// read-write fields
 	mu                xsync.Mutex
 	index             map[*session]sessionInfo
-	nodes             map[uint32]map[*session]struct{}
 	createInProgress  int        // KIKIMR-9163: in-create-process counter
 	limit             int        // Upper bound for Client size.
 	idle              *list.List // list<*session>
@@ -122,46 +114,6 @@ func withCreateSessionOnClose(onClose func(s *session)) createSessionOption {
 	return func(o *createSessionOptions) {
 		o.onClose = append(o.onClose, onClose)
 	}
-}
-
-func (c *Client) updateNodes(ctx context.Context, endpoints []endpoint.Info) {
-	nodeIDs := make([]uint32, len(endpoints))
-	for i, e := range endpoints {
-		nodeIDs[i] = e.NodeID()
-	}
-	sort.Slice(nodeIDs, func(i, j int) bool {
-		return nodeIDs[i] < nodeIDs[j]
-	})
-	c.mu.WithLock(func() {
-		if c.isClosed() {
-			return
-		}
-		for nodeID := range c.nodes {
-			if sort.Search(len(nodeIDs), func(i int) bool {
-				return nodeIDs[i] >= nodeID
-			}) == len(nodeIDs) {
-				for s := range c.nodes[nodeID] {
-					func(s *session) {
-						if info, has := c.index[s]; has && info.idle != nil {
-							s.SetStatus(table.SessionClosing)
-							c.wg.Add(1)
-							go func() {
-								defer c.wg.Done()
-								c.internalPoolSyncCloseSession(ctx, s)
-							}()
-						} else {
-							s.SetStatus(table.SessionClosing)
-						}
-					}(s)
-				}
-			}
-		}
-		for _, nodeID := range nodeIDs {
-			if _, ok := c.nodes[nodeID]; !ok {
-				c.nodes[nodeID] = make(map[*session]struct{})
-			}
-		}
-	})
 }
 
 func (c *Client) createSession(ctx context.Context, opts ...createSessionOption) (s *session, err error) {
@@ -267,34 +219,6 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 	}
 }
 
-func (c *Client) appendSessionToNodes(s *session) {
-	c.mu.WithLock(func() {
-		nodeID := s.NodeID()
-		if _, has := c.nodes[nodeID]; has {
-			c.nodes[nodeID][s] = struct{}{}
-		}
-	})
-}
-
-func (c *Client) hasNodeID(nodeID uint32) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	_, ok := c.nodes[nodeID]
-	return ok
-}
-
-func (c *Client) removeSessionFromNodes(s *session) {
-	c.mu.WithLock(func() {
-		nodeID := s.NodeID()
-		if sessions, has := c.nodes[nodeID]; has {
-			delete(sessions, s)
-			if len(sessions) == 0 {
-				delete(c.nodes, nodeID)
-			}
-		}
-	})
-}
-
 func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ table.ClosableSession, err error) {
 	if c == nil {
 		return nil, xerrors.WithStackTrace(errNilClient)
@@ -304,10 +228,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 	}
 	var s *session
 	createSession := func(ctx context.Context) (*session, error) {
-		s, err = c.createSession(ctx,
-			withCreateSessionOnCreate(c.appendSessionToNodes),
-			withCreateSessionOnClose(c.removeSessionFromNodes),
-		)
+		s, err = c.createSession(ctx)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -389,8 +310,6 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 		meta.WithAllowFeatures(ctx,
 			metaHeaders.HintSessionBalancer,
 		),
-		withCreateSessionOnCreate(c.appendSessionToNodes),
-		withCreateSessionOnClose(c.removeSessionFromNodes),
 		withCreateSessionOnCreate(func(s *session) {
 			c.mu.WithLock(func() {
 				c.index[s] = sessionInfo{
@@ -469,6 +388,12 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 		})
 
 		if s != nil {
+			if c.nodeChecker != nil && !c.nodeChecker.HasNode(s.NodeID()) {
+				_ = s.Close(ctx)
+				s = nil
+				continue
+			}
+
 			return s, nil
 		}
 
@@ -620,7 +545,7 @@ func (c *Client) Put(ctx context.Context, s *session) (err error) {
 	case s.isClosed():
 		return xerrors.WithStackTrace(errSessionClosed)
 
-	case !c.hasNodeID(s.NodeID()):
+	case c.nodeChecker != nil && !c.nodeChecker.HasNode(s.NodeID()):
 		return xerrors.WithStackTrace(errNodeIsNotObservable)
 
 	default:
