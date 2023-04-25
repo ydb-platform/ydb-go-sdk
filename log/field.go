@@ -3,6 +3,7 @@ package log
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+const nilPtr = "<nil>"
 
 // Field represents typed log field (a key-value pair). Adapters should determine
 // Field's type based on Type and use the corresponding getter method to retrieve
@@ -154,6 +157,15 @@ func (f Field) String() string {
 	case ErrorType:
 		return fmt.Sprintf("%v", f.ErrorValue())
 	case AnyType:
+		if f.vany == nil {
+			return nilPtr
+		}
+		if v := reflect.ValueOf(f.vany); v.Type().Kind() == reflect.Ptr {
+			if v.IsNil() {
+				return nilPtr
+			}
+			return v.Type().String() + "(" + fmt.Sprint(v.Elem()) + ")"
+		}
 		return fmt.Sprint(f.vany)
 	case StringerType:
 		return f.Stringer().String()
