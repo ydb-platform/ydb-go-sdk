@@ -137,6 +137,14 @@ type balancerStub struct {
 	onClose func(
 		ctx context.Context,
 	) error
+	onHasNode func(id uint32) bool
+}
+
+func (b *balancerStub) HasNode(id uint32) bool {
+	if b.onHasNode == nil {
+		panic(fmt.Errorf("database.onHasNode() not defined"))
+	}
+	return b.onHasNode(id)
 }
 
 func (b *balancerStub) Invoke(
@@ -147,7 +155,7 @@ func (b *balancerStub) Invoke(
 	opts ...grpc.CallOption,
 ) (err error) {
 	if b.onInvoke == nil {
-		return fmt.Errorf("database.onInvoke() not implemented")
+		return fmt.Errorf("database.onInvoke() not defined")
 	}
 	return b.onInvoke(ctx, method, args, reply, opts...)
 }
@@ -159,7 +167,7 @@ func (b *balancerStub) NewStream(
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, err error) {
 	if b.onNewStream == nil {
-		return nil, fmt.Errorf("database.onNewStream() not implemented")
+		return nil, fmt.Errorf("database.onNewStream() not defined")
 	}
 	return b.onNewStream(ctx, desc, method, opts...)
 }
