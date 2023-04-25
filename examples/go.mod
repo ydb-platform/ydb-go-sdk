@@ -7,7 +7,7 @@ require (
 	github.com/gorilla/mux v1.8.0
 	github.com/prometheus/client_golang v1.13.0
 	github.com/rs/zerolog v1.27.0
-	github.com/ydb-platform/gorm-driver v0.0.2-0.20230305090745-1fb54a06b51d
+	github.com/ydb-platform/gorm-driver v0.0.3
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.1.2
 	github.com/ydb-platform/ydb-go-sdk-prometheus v0.11.10
 	github.com/ydb-platform/ydb-go-sdk-zerolog v0.12.2
