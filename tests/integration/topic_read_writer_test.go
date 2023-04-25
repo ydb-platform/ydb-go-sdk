@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"os"
 	"runtime/pprof"
 	"strconv"
 	"strings"
@@ -124,10 +125,11 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 
 	tb := xtest.MakeSyncedTest(t)
 	ctx := xtest.Context(tb)
-	logger := xtest.Logger(tb)
-	db := connect(tb, ydb.WithLogger(trace.DetailsAll,
-		log.WithMinLevel(log.TRACE),
-		log.WithWriter(logger),
+	db := connect(tb, ydb.WithLogger(
+		log.Simple(os.Stderr,
+			log.WithMinLevel(log.TRACE),
+		),
+		trace.DetailsAll,
 	))
 
 	// create topic

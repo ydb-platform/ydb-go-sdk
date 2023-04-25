@@ -388,13 +388,16 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, e
 			opts = append(
 				opts,
 				WithLogger(
+					log.Simple(os.Stderr,
+						log.WithMinLevel(log.FromString(logLevel)),
+						log.WithColoring(),
+					),
 					trace.MatchDetails(
 						os.Getenv("YDB_LOG_DETAILS"),
 						trace.WithDefaultDetails(trace.DetailsAll),
 					),
+					log.WithLogQuery(),
 					log.WithNamespace("ydb"),
-					log.WithMinLevel(log.FromString(logLevel)),
-					log.WithColoring(),
 				),
 			)
 		}

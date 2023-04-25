@@ -9,13 +9,10 @@ import (
 
 // Topic returns trace.Topic with logging events from details
 func Topic(l Logger, d trace.Detailer, opts ...Option) (t trace.Topic) {
-	if ll, has := l.(*logger); has {
-		return internalTopic(ll.with(opts...), d)
-	}
-	return internalTopic(New(append(opts, withExternalLogger(l))...), d)
+	return internalTopic(wrapLogger(l, opts...), d)
 }
 
-func internalTopic(l *logger, d trace.Detailer) (t trace.Topic) { //nolint:gocyclo
+func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocyclo
 	t.OnReaderReconnect = func(info trace.TopicReaderReconnectStartInfo) func(doneInfo trace.TopicReaderReconnectDoneInfo) {
 		if d.Details()&trace.TopicReaderStreamLifeCycleEvents == 0 {
 			return nil

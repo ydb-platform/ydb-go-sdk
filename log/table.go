@@ -10,14 +10,11 @@ import (
 
 // Table makes trace.Table with logging events from details
 func Table(l Logger, d trace.Detailer, opts ...Option) (t trace.Table) {
-	if ll, has := l.(*logger); has {
-		return internalTable(ll.with(opts...), d)
-	}
-	return internalTable(New(append(opts, withExternalLogger(l))...), d)
+	return internalTable(wrapLogger(l, opts...), d)
 }
 
 //nolint:gocyclo
-func internalTable(l *logger, d trace.Detailer) (t trace.Table) {
+func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 	t.OnDo = func(
 		info trace.TableDoStartInfo,
 	) func(

@@ -31,8 +31,7 @@ func TestSplitRangesAndRead(t *testing.T) {
 
 	ctx := xtest.Context(t)
 
-	db, err = ydb.Open(
-		ctx,
+	db, err = ydb.Open(ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAccessTokenCredentials(
 			os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
