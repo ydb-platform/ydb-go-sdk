@@ -134,17 +134,10 @@ type balancerStub struct {
 		method string,
 		opts ...grpc.CallOption,
 	) (grpc.ClientStream, error)
-	onClose func(
-		ctx context.Context,
-	) error
-	onHasNode func(id uint32) bool
 }
 
 func (b *balancerStub) HasNode(id uint32) bool {
-	if b.onHasNode == nil {
-		panic(fmt.Errorf("database.onHasNode() not defined"))
-	}
-	return b.onHasNode(id)
+	return true
 }
 
 func (b *balancerStub) Invoke(
@@ -185,10 +178,7 @@ func (b *balancerStub) Name() string {
 }
 
 func (b *balancerStub) Close(ctx context.Context) error {
-	if b.onClose == nil {
-		return fmt.Errorf("database.Close() not implemented")
-	}
-	return b.onClose(ctx)
+	return nil
 }
 
 type (
@@ -245,12 +235,6 @@ func WithNewStreamHandlers(newStreamHandlers NewStreamHandlers) balancerOption {
 			}
 			return nil, fmt.Errorf("method '%s' not implemented", method)
 		}
-	}
-}
-
-func WithClose(onClose func(ctx context.Context) error) balancerOption {
-	return func(c *balancerStub) {
-		c.onClose = onClose
 	}
 }
 

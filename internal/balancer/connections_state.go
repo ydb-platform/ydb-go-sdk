@@ -118,19 +118,12 @@ func (s *connectionsState) selectRandomConnection(conns []conn.Conn, allowBanned
 	return nil, failedConns
 }
 
-func connsToNodeIDMap(conns []conn.Conn) (res map[uint32]conn.Conn) {
+func connsToNodeIDMap(conns []conn.Conn) (nodes map[uint32]conn.Conn) {
+	nodes = make(map[uint32]conn.Conn, len(conns))
 	for _, c := range conns {
-		nodeID := c.Endpoint().NodeID()
-
-		if nodeID == 0 {
-			continue
-		}
-		if res == nil {
-			res = make(map[uint32]conn.Conn, len(conns))
-		}
-		res[nodeID] = c
+		nodes[c.Endpoint().NodeID()] = c
 	}
-	return res
+	return nodes
 }
 
 func sortPreferConnections(

@@ -14,12 +14,17 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+type connsKey struct {
+	address string
+	nodeID  uint32
+}
+
 type Pool struct {
 	usages int64
 	config Config
 	mtx    xsync.RWMutex
 	opts   []grpc.DialOption
-	conns  map[string]*conn
+	conns  map[connsKey]*conn
 	done   chan struct{}
 }
 
@@ -33,7 +38,9 @@ func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 		has     bool
 	)
 
-	if cc, has = p.conns[address]; has {
+	key := connsKey{address, endpoint.NodeID()}
+
+	if cc, has = p.conns[key]; has {
 		return cc
 	}
 
@@ -44,7 +51,7 @@ func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 		withOnTransportError(p.Ban),
 	)
 
-	p.conns[address] = cc
+	p.conns[key] = cc
 
 	return cc
 }
@@ -52,7 +59,7 @@ func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 func (p *Pool) remove(c *conn) {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
-	delete(p.conns, c.Endpoint().Address())
+	delete(p.conns, connsKey{c.Endpoint().Address(), c.Endpoint().NodeID()})
 }
 
 func (p *Pool) isClosed() bool {
@@ -74,7 +81,7 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 	p.mtx.RLock()
 	defer p.mtx.RUnlock()
 
-	cc, ok := p.conns[e.Address()]
+	cc, ok := p.conns[connsKey{e.Address(), e.NodeID()}]
 	if !ok {
 		return
 	}
@@ -98,7 +105,7 @@ func (p *Pool) Allow(ctx context.Context, cc Conn) {
 	p.mtx.RLock()
 	defer p.mtx.RUnlock()
 
-	cc, ok := p.conns[e.Address()]
+	cc, ok := p.conns[connsKey{e.Address(), e.NodeID()}]
 	if !ok {
 		return
 	}
@@ -181,7 +188,7 @@ func NewPool(config Config) *Pool {
 		usages: 1,
 		config: config,
 		opts:   config.GrpcDialOptions(),
-		conns:  make(map[string]*conn),
+		conns:  make(map[connsKey]*conn),
 		done:   make(chan struct{}),
 	}
 	if ttl := config.ConnectionTTL(); ttl > 0 {

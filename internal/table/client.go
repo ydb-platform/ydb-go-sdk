@@ -388,7 +388,7 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 		})
 
 		if s != nil {
-			if !c.nodeChecker.HasNode(s.NodeID()) {
+			if c.nodeChecker != nil && !c.nodeChecker.HasNode(s.NodeID()) {
 				_ = s.Close(ctx)
 				s = nil
 				continue
@@ -545,7 +545,7 @@ func (c *Client) Put(ctx context.Context, s *session) (err error) {
 	case s.isClosed():
 		return xerrors.WithStackTrace(errSessionClosed)
 
-	case !c.nodeChecker.HasNode(s.NodeID()):
+	case c.nodeChecker != nil && !c.nodeChecker.HasNode(s.NodeID()):
 		return xerrors.WithStackTrace(errNodeIsNotObservable)
 
 	default:
