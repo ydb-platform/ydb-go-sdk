@@ -61,27 +61,31 @@ func internalTopic(l *logger, d trace.Detailer) (t trace.Topic) { //nolint:gocyc
 			Int64("partition_session_id", info.PartitionSessionID),
 		)
 		return func(doneInfo trace.TopicReaderPartitionReadStartResponseDoneInfo) {
-			if doneInfo.Error == nil {
-				l.Log(params.withLevel(INFO), "read partition response completed",
-					String("topic", info.Topic),
-					String("reader_connection_id", info.ReaderConnectionID),
-					Int64("partition_id", info.PartitionID),
-					Int64("partition_session_id", info.PartitionSessionID),
+			fields := []Field{
+				String("topic", info.Topic),
+				String("reader_connection_id", info.ReaderConnectionID),
+				Int64("partition_id", info.PartitionID),
+				Int64("partition_session_id", info.PartitionSessionID),
+				latency(start),
+			}
+			if doneInfo.CommitOffset != nil {
+				fields = append(fields,
 					Int64("commit_offset", *doneInfo.CommitOffset),
-					Int64("read_offset", *doneInfo.ReadOffset),
-					latency(start),
 				)
-			} else {
-				l.Log(params.withLevel(INFO), "read partition response completed",
-					Error(doneInfo.Error),
-					String("topic", info.Topic),
-					String("reader_connection_id", info.ReaderConnectionID),
-					Int64("partition_id", info.PartitionID),
-					Int64("partition_session_id", info.PartitionSessionID),
-					Int64("commit_offset", *doneInfo.CommitOffset),
+			}
+			if doneInfo.ReadOffset != nil {
+				fields = append(fields,
 					Int64("read_offset", *doneInfo.ReadOffset),
-					latency(start),
-					version(),
+				)
+			}
+			if doneInfo.Error == nil {
+				l.Log(params.withLevel(INFO), "read partition response completed", fields...)
+			} else {
+				l.Log(params.withLevel(WARN), "read partition response completed",
+					append(fields,
+						Error(doneInfo.Error),
+						version(),
+					)...,
 				)
 			}
 		}
@@ -103,27 +107,23 @@ func internalTopic(l *logger, d trace.Detailer) (t trace.Topic) { //nolint:gocyc
 			Int64("committed_offset", info.CommittedOffset),
 			Bool("graceful", info.Graceful))
 		return func(doneInfo trace.TopicReaderPartitionReadStopResponseDoneInfo) {
+			fields := []Field{
+				String("reader_connection_id", info.ReaderConnectionID),
+				String("topic", info.Topic),
+				Int64("partition_id", info.PartitionID),
+				Int64("partition_session_id", info.PartitionSessionID),
+				Int64("committed_offset", info.CommittedOffset),
+				Bool("graceful", info.Graceful),
+				latency(start),
+			}
 			if doneInfo.Error == nil {
-				l.Log(params.withLevel(INFO), "reader partition stopped",
-					Error(doneInfo.Error),
-					String("reader_connection_id", info.ReaderConnectionID),
-					String("topic", info.Topic),
-					Int64("partition_id", info.PartitionID),
-					Int64("partition_session_id", info.PartitionSessionID),
-					Int64("committed_offset", info.CommittedOffset),
-					Bool("graceful", info.Graceful),
-					latency(start),
-				)
+				l.Log(params.withLevel(INFO), "reader partition stopped", fields...)
 			} else {
-				l.Log(params.withLevel(INFO), "reader partition stopped",
-					String("reader_connection_id", info.ReaderConnectionID),
-					String("topic", info.Topic),
-					Int64("partition_id", info.PartitionID),
-					Int64("partition_session_id", info.PartitionSessionID),
-					Int64("committed_offset", info.CommittedOffset),
-					Bool("graceful", info.Graceful),
-					latency(start),
-					version(),
+				l.Log(params.withLevel(WARN), "reader partition stopped",
+					append(fields,
+						Error(doneInfo.Error),
+						version(),
+					)...,
 				)
 			}
 		}
@@ -145,25 +145,22 @@ func internalTopic(l *logger, d trace.Detailer) (t trace.Topic) { //nolint:gocyc
 			Int64("commit_end_offset", info.EndOffset),
 		)
 		return func(doneInfo trace.TopicReaderCommitDoneInfo) {
+			fields := []Field{
+				String("topic", info.Topic),
+				Int64("partition_id", info.PartitionID),
+				Int64("partition_session_id", info.PartitionSessionID),
+				Int64("commit_start_offset", info.StartOffset),
+				Int64("commit_end_offset", info.EndOffset),
+				latency(start),
+			}
 			if doneInfo.Error == nil {
-				l.Log(params.withLevel(DEBUG), "committed",
-					String("topic", info.Topic),
-					Int64("partition_id", info.PartitionID),
-					Int64("partition_session_id", info.PartitionSessionID),
-					Int64("commit_start_offset", info.StartOffset),
-					Int64("commit_end_offset", info.EndOffset),
-					latency(start),
-				)
+				l.Log(params.withLevel(DEBUG), "committed", fields...)
 			} else {
-				l.Log(params.withLevel(INFO), "committed",
-					Error(doneInfo.Error),
-					String("topic", info.Topic),
-					Int64("partition_id", info.PartitionID),
-					Int64("partition_session_id", info.PartitionSessionID),
-					Int64("commit_start_offset", info.StartOffset),
-					Int64("commit_end_offset", info.EndOffset),
-					latency(start),
-					version(),
+				l.Log(params.withLevel(WARN), "committed",
+					append(fields,
+						Error(doneInfo.Error),
+						version(),
+					)...,
 				)
 			}
 		}
@@ -182,19 +179,19 @@ func internalTopic(l *logger, d trace.Detailer) (t trace.Topic) { //nolint:gocyc
 			Any("partitions_session_id", info.CommitsInfo.PartitionSessionIDs()),
 		)
 		return func(doneInfo trace.TopicReaderSendCommitMessageDoneInfo) {
+			fields := []Field{
+				Any("partitions_id", info.CommitsInfo.PartitionIDs()),
+				Any("partitions_session_id", info.CommitsInfo.PartitionSessionIDs()),
+				latency(start),
+			}
 			if doneInfo.Error == nil {
-				l.Log(params.withLevel(DEBUG), "done",
-					Any("partitions_id", info.CommitsInfo.PartitionIDs()),
-					Any("partitions_session_id", info.CommitsInfo.PartitionSessionIDs()),
-					latency(start),
-				)
+				l.Log(params.withLevel(DEBUG), "done", fields...)
 			} else {
-				l.Log(params.withLevel(INFO), "commit message sent",
-					Error(doneInfo.Error),
-					Any("partitions_id", info.CommitsInfo.PartitionIDs()),
-					Any("partitions_session_id", info.CommitsInfo.PartitionSessionIDs()),
-					latency(start),
-					version(),
+				l.Log(params.withLevel(WARN), "commit message sent",
+					append(fields,
+						Error(doneInfo.Error),
+						version(),
+					)...,
 				)
 			}
 		}
@@ -229,18 +226,18 @@ func internalTopic(l *logger, d trace.Detailer) (t trace.Topic) { //nolint:gocyc
 			NamedError("close_reason", info.CloseReason),
 		)
 		return func(doneInfo trace.TopicReaderCloseDoneInfo) {
-			if doneInfo.CloseError != nil {
-				l.Log(params.withLevel(DEBUG), "closed",
-					String("reader_connection_id", info.ReaderConnectionID),
-					latency(start),
-				)
+			fields := []Field{
+				String("reader_connection_id", info.ReaderConnectionID),
+				latency(start),
+			}
+			if doneInfo.CloseError == nil {
+				l.Log(params.withLevel(DEBUG), "closed", fields...)
 			} else {
-				l.Log(params.withLevel(DEBUG), "closed",
-					Error(doneInfo.CloseError),
-					String("reader_connection_id", info.ReaderConnectionID),
-					NamedError("close_reason", info.CloseReason),
-					latency(start),
-					version(),
+				l.Log(params.withLevel(WARN), "closed",
+					append(fields,
+						Error(doneInfo.CloseError),
+						version(),
+					)...,
 				)
 			}
 		}
@@ -261,21 +258,20 @@ func internalTopic(l *logger, d trace.Detailer) (t trace.Topic) { //nolint:gocyc
 			Strings("topics", info.InitRequestInfo.GetTopics()),
 		)
 		return func(doneInfo trace.TopicReaderInitDoneInfo) {
+			fields := []Field{
+				String("pre_init_reader_connection_id", info.PreInitReaderConnectionID),
+				String("consumer", info.InitRequestInfo.GetConsumer()),
+				Strings("topics", info.InitRequestInfo.GetTopics()),
+				latency(start),
+			}
 			if doneInfo.Error == nil {
-				l.Log(params.withLevel(DEBUG), "topic reader stream initialized",
-					String("pre_init_reader_connection_id", info.PreInitReaderConnectionID),
-					String("consumer", info.InitRequestInfo.GetConsumer()),
-					Strings("topics", info.InitRequestInfo.GetTopics()),
-					latency(start),
-				)
+				l.Log(params.withLevel(DEBUG), "topic reader stream initialized", fields...)
 			} else {
-				l.Log(params.withLevel(DEBUG), "topic reader stream initialized",
-					Error(doneInfo.Error),
-					String("pre_init_reader_connection_id", info.PreInitReaderConnectionID),
-					String("consumer", info.InitRequestInfo.GetConsumer()),
-					Strings("topics", info.InitRequestInfo.GetTopics()),
-					latency(start),
-					version(),
+				l.Log(params.withLevel(WARN), "topic reader stream initialized",
+					append(fields,
+						Error(doneInfo.Error),
+						version(),
+					)...,
 				)
 			}
 		}
