@@ -19,7 +19,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
@@ -407,7 +406,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 		nil,
 		(&StubBuilder{
 			Limit: 1,
-			OnCreateSession: func(ctx context.Context, opts ...sessionBuilderOption) (*session, error) {
+			OnCreateSession: func(ctx context.Context) (*session, error) {
 				req := createReq{
 					release: make(chan struct{}),
 					session: simpleSession(t),
@@ -436,9 +435,6 @@ func TestSessionPoolRacyGet(t *testing.T) {
 			if e != nil {
 				err = e
 				return
-			}
-			if _, ok := p.nodes[s.NodeID()]; !ok {
-				p.nodes[s.NodeID()] = make(map[*session]struct{})
 			}
 			if s != expSession {
 				err = fmt.Errorf("unexpected session: %v; want %v", s, expSession)
@@ -751,24 +747,6 @@ func TestSessionPoolDoublePut(t *testing.T) {
 	_ = p.Put(context.Background(), s)
 }
 
-func mustResetTimer(t testing.TB, ch <-chan time.Duration, exp time.Duration) {
-	t.Helper()
-
-	runtime.Gosched()
-
-	select {
-	case act := <-ch:
-		if act != exp {
-			t.Errorf(
-				"unexpected timer reset: %s; want %s",
-				act, exp,
-			)
-		}
-	case <-time.After(200 * time.Millisecond):
-		t.Fatalf("%s: no timer reset", caller())
-	}
-}
-
 func mustGetSession(t testing.TB, p *Client) *session {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
@@ -776,9 +754,6 @@ func mustGetSession(t testing.TB, p *Client) *session {
 	if err != nil {
 		t.Helper()
 		t.Fatalf("%s: %v", caller(), err)
-	}
-	if _, ok := p.nodes[s.NodeID()]; !ok {
-		p.nodes[s.NodeID()] = make(map[*session]struct{})
 	}
 	return s
 }
@@ -863,7 +838,7 @@ func simpleSession(t *testing.T) *session {
 }
 
 type StubBuilder struct {
-	OnCreateSession func(ctx context.Context, opts ...sessionBuilderOption) (*session, error)
+	OnCreateSession func(ctx context.Context) (*session, error)
 
 	cc    grpc.ClientConnInterface
 	Limit int
@@ -875,7 +850,7 @@ type StubBuilder struct {
 
 func newClientWithStubBuilder(
 	t testing.TB,
-	balancer balancerNotifier,
+	balancer balancer,
 	stubLimit int,
 	options ...config.Option,
 ) *Client {
@@ -890,7 +865,7 @@ func newClientWithStubBuilder(
 	)
 }
 
-func (s *StubBuilder) createSession(ctx context.Context, opts ...sessionBuilderOption) (session *session, err error) {
+func (s *StubBuilder) createSession(ctx context.Context) (session *session, err error) {
 	defer s.mu.WithLock(func() {
 		if session != nil {
 			s.actual++
@@ -907,10 +882,10 @@ func (s *StubBuilder) createSession(ctx context.Context, opts ...sessionBuilderO
 	}
 
 	if f := s.OnCreateSession; f != nil {
-		return f(ctx, opts...)
+		return f(ctx)
 	}
 
-	return newSession(ctx, s.cc, config.New(), opts...)
+	return newSession(ctx, s.cc, config.New())
 }
 
 func (c *Client) debug() {
@@ -961,9 +936,6 @@ func TestDeadlockOnUpdateNodes(t *testing.T) {
 		defer func() {
 			_ = c.Close(ctx)
 		}()
-		for nodeID := range make([]struct{}, 3) {
-			c.nodes[uint32(nodeID)] = make(map[*session]struct{})
-		}
 		s1, err := c.Get(ctx)
 		require.NoError(t, err)
 		s2, err := c.Get(ctx)
@@ -977,7 +949,6 @@ func TestDeadlockOnUpdateNodes(t *testing.T) {
 		require.NoError(t, err)
 		err = c.Put(ctx, s3)
 		require.NoError(t, err)
-		c.updateNodes(ctx, []endpoint.Info{})
 	}, xtest.StopAfter(12*time.Second))
 }
 
@@ -1007,9 +978,6 @@ func TestDeadlockOnInternalPoolGCTick(t *testing.T) {
 		defer func() {
 			_ = c.Close(ctx)
 		}()
-		for nodeID := range make([]struct{}, 3) {
-			c.nodes[uint32(nodeID)] = make(map[*session]struct{})
-		}
 		s1, err := c.Get(ctx)
 		if err != nil && errors.Is(err, context.DeadlineExceeded) {
 			return

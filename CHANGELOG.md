@@ -1,6 +1,10 @@
 * Added `table/options.WithPartitions` for configure partitioning policy
 * Marked as deprecated `table/options.WithPartitioningPolicy{UniformPartitions,ExplicitPartitions}` (use `With{UniformPartitions,ExplicitPartitions}` instead)
 
+## v3.44.3
+* Fixed bug of processing endpoint with `node_id=0`
+* Refactored of checking node ID in cluster discovery before `Get` and during in `Put` of session into session pool
+
 ## v3.44.2
 * Removed debug print
 

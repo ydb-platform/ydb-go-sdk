@@ -134,9 +134,10 @@ type balancerStub struct {
 		method string,
 		opts ...grpc.CallOption,
 	) (grpc.ClientStream, error)
-	onClose func(
-		ctx context.Context,
-	) error
+}
+
+func (b *balancerStub) HasNode(id uint32) bool {
+	return true
 }
 
 func (b *balancerStub) Invoke(
@@ -147,7 +148,7 @@ func (b *balancerStub) Invoke(
 	opts ...grpc.CallOption,
 ) (err error) {
 	if b.onInvoke == nil {
-		return fmt.Errorf("database.onInvoke() not implemented")
+		return fmt.Errorf("database.onInvoke() not defined")
 	}
 	return b.onInvoke(ctx, method, args, reply, opts...)
 }
@@ -159,7 +160,7 @@ func (b *balancerStub) NewStream(
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, err error) {
 	if b.onNewStream == nil {
-		return nil, fmt.Errorf("database.onNewStream() not implemented")
+		return nil, fmt.Errorf("database.onNewStream() not defined")
 	}
 	return b.onNewStream(ctx, desc, method, opts...)
 }
@@ -177,10 +178,7 @@ func (b *balancerStub) Name() string {
 }
 
 func (b *balancerStub) Close(ctx context.Context) error {
-	if b.onClose == nil {
-		return fmt.Errorf("database.Close() not implemented")
-	}
-	return b.onClose(ctx)
+	return nil
 }
 
 type (
@@ -237,12 +235,6 @@ func WithNewStreamHandlers(newStreamHandlers NewStreamHandlers) balancerOption {
 			}
 			return nil, fmt.Errorf("method '%s' not implemented", method)
 		}
-	}
-}
-
-func WithClose(onClose func(ctx context.Context) error) balancerOption {
-	return func(c *balancerStub) {
-		c.onClose = onClose
 	}
 }
 
