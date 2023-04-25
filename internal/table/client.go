@@ -23,53 +23,46 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type sessionBuilderOption func(s *session)
-
 // sessionBuilder is the interface that holds logic of creating sessions.
-type sessionBuilder func(ctx context.Context, opts ...sessionBuilderOption) (*session, error)
+type sessionBuilder func(ctx context.Context) (*session, error)
+
+type nodeChecker interface {
+	HasNode(id uint32) bool
+}
 
 type balancerNotifier interface {
 	grpc.ClientConnInterface
+	nodeChecker
 
 	OnUpdate(onDiscovery func(ctx context.Context, endpoints []endpoint.Info))
 }
 
-type Option func(c *Client)
-
-func WithNodeIDs(nodeIDs []uint32) Option {
-	return func(c *Client) {
-		for _, id := range nodeIDs {
-			c.nodes[id] = make(map[*session]struct{})
-		}
-	}
-}
-
-func New(balancer balancerNotifier, config config.Config, opts ...Option) *Client {
-	return newClient(balancer, func(ctx context.Context, opts ...sessionBuilderOption) (s *session, err error) {
-		return newSession(ctx, balancer, config, opts...)
-	}, config, opts...)
+func New(balancer balancerNotifier, config config.Config) *Client {
+	return newClient(balancer, func(ctx context.Context) (s *session, err error) {
+		return newSession(ctx, balancer, config)
+	}, config)
 }
 
 func newClient(
 	balancer balancerNotifier,
 	builder sessionBuilder,
 	config config.Config,
-	opts ...Option,
 ) *Client {
 	var (
 		ctx    = context.Background()
 		onDone = trace.TableOnInit(config.Trace(), &ctx)
 	)
 	c := &Client{
-		clock:  config.Clock(),
-		config: config,
-		cc:     balancer,
-		build:  builder,
-		index:  make(map[*session]sessionInfo),
-		nodes:  make(map[uint32]map[*session]struct{}),
-		idle:   list.New(),
-		waitQ:  list.New(),
-		limit:  config.SizeLimit(),
+		clock:       config.Clock(),
+		config:      config,
+		cc:          balancer,
+		nodeChecker: balancer,
+		build:       builder,
+		index:       make(map[*session]sessionInfo),
+		nodes:       make(map[uint32]map[*session]struct{}),
+		idle:        list.New(),
+		waitQ:       list.New(),
+		limit:       config.SizeLimit(),
 		waitChPool: sync.Pool{
 			New: func() interface{} {
 				ch := make(chan *session)
@@ -85,9 +78,6 @@ func newClient(
 		c.wg.Add(1)
 		go c.internalPoolGC(ctx, idleThreshold)
 	}
-	for _, o := range opts {
-		o(c)
-	}
 	onDone(c.limit)
 	return c
 }
@@ -96,10 +86,11 @@ func newClient(
 // A Client is safe for use by multiple goroutines simultaneously.
 type Client struct {
 	// read-only fields
-	config config.Config
-	build  sessionBuilder
-	cc     grpc.ClientConnInterface
-	clock  clockwork.Clock
+	config      config.Config
+	build       sessionBuilder
+	cc          grpc.ClientConnInterface
+	nodeChecker nodeChecker
+	clock       clockwork.Clock
 
 	// read-write fields
 	mu                xsync.Mutex
@@ -286,21 +277,11 @@ func (c *Client) appendSessionToNodes(s *session) {
 	})
 }
 
-func (c *Client) hasNodeID(nodeID uint32) bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	_, ok := c.nodes[nodeID]
-	return ok
-}
-
 func (c *Client) removeSessionFromNodes(s *session) {
 	c.mu.WithLock(func() {
 		nodeID := s.NodeID()
 		if sessions, has := c.nodes[nodeID]; has {
 			delete(sessions, s)
-			if len(sessions) == 0 {
-				delete(c.nodes, nodeID)
-			}
 		}
 	})
 }
@@ -630,7 +611,7 @@ func (c *Client) Put(ctx context.Context, s *session) (err error) {
 	case s.isClosed():
 		return xerrors.WithStackTrace(errSessionClosed)
 
-	case !c.hasNodeID(s.NodeID()):
+	case !c.nodeChecker.HasNode(s.NodeID()):
 		return xerrors.WithStackTrace(errNodeIsNotObservable)
 
 	default:

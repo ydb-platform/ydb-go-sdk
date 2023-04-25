@@ -110,7 +110,7 @@ func (s *session) isClosing() bool {
 	return s.Status() == table.SessionClosing
 }
 
-func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.Config, opts ...sessionBuilderOption) (
+func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) (
 	s *session, err error,
 ) {
 	onDone := trace.TableOnSessionNew(config.Trace(), &ctx)
@@ -157,12 +157,6 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config config.
 			},
 		),
 	)
-
-	for _, o := range opts {
-		if o != nil {
-			o(s)
-		}
-	}
 
 	return s, nil
 }

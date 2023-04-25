@@ -407,7 +407,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 		nil,
 		(&StubBuilder{
 			Limit: 1,
-			OnCreateSession: func(ctx context.Context, opts ...sessionBuilderOption) (*session, error) {
+			OnCreateSession: func(ctx context.Context) (*session, error) {
 				req := createReq{
 					release: make(chan struct{}),
 					session: simpleSession(t),
@@ -863,7 +863,7 @@ func simpleSession(t *testing.T) *session {
 }
 
 type StubBuilder struct {
-	OnCreateSession func(ctx context.Context, opts ...sessionBuilderOption) (*session, error)
+	OnCreateSession func(ctx context.Context) (*session, error)
 
 	cc    grpc.ClientConnInterface
 	Limit int
@@ -890,7 +890,7 @@ func newClientWithStubBuilder(
 	)
 }
 
-func (s *StubBuilder) createSession(ctx context.Context, opts ...sessionBuilderOption) (session *session, err error) {
+func (s *StubBuilder) createSession(ctx context.Context) (session *session, err error) {
 	defer s.mu.WithLock(func() {
 		if session != nil {
 			s.actual++
@@ -907,10 +907,10 @@ func (s *StubBuilder) createSession(ctx context.Context, opts ...sessionBuilderO
 	}
 
 	if f := s.OnCreateSession; f != nil {
-		return f(ctx, opts...)
+		return f(ctx)
 	}
 
-	return newSession(ctx, s.cc, config.New(), opts...)
+	return newSession(ctx, s.cc, config.New())
 }
 
 func (c *Client) debug() {
