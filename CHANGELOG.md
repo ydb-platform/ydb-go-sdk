@@ -1,3 +1,6 @@
+* Fixed bug of processing endpoint with `node_id=0`
+* Refactored of checking node ID in cluster discovery before `Get` and during in `Put` of session into session pool
+
 ## v3.44.2
 * Removed debug print
 
