@@ -10,13 +10,10 @@ import (
 
 // Retry returns trace.Retry with logging events from details
 func Retry(l Logger, d trace.Detailer, opts ...Option) (t trace.Retry) {
-	if ll, has := l.(*logger); has {
-		return internalRetry(ll.with(opts...), d)
-	}
-	return internalRetry(New(append(opts, withExternalLogger(l))...), d)
+	return internalRetry(wrapLogger(l, opts...), d)
 }
 
-func internalRetry(l *logger, d trace.Detailer) (t trace.Retry) {
+func internalRetry(l *wrapper, d trace.Detailer) (t trace.Retry) {
 	t.OnRetry = func(
 		info trace.RetryLoopStartInfo,
 	) func(

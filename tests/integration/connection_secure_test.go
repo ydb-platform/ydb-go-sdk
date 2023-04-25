@@ -38,13 +38,9 @@ func TestConnectionSecure(t *testing.T) {
 	}
 
 	const sumColumn = "sum"
-	var (
-		ctx    = xtest.Context(t)
-		logger = xtest.Logger(t)
-	)
+	ctx := xtest.Context(t)
 
-	db, err := ydb.Open(
-		ctx,
+	db, err := ydb.Open(ctx,
 		"", // corner case for check replacement of endpoint+database+secure
 		ydb.WithConnectionString(dsn),
 		ydb.WithAccessTokenCredentials(
@@ -57,10 +53,11 @@ func TestConnectionSecure(t *testing.T) {
 		ydb.WithConnectionTTL(time.Millisecond*10000),
 		ydb.WithMinTLSVersion(tls.VersionTLS10),
 		ydb.WithLogger(
+			log.Simple(os.Stderr,
+				log.WithMinLevel(log.WARN),
+			),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
 			log.WithNamespace("ydb"),
-			log.WithWriter(logger),
-			log.WithMinLevel(log.WARN),
 		),
 	)
 	if err != nil {

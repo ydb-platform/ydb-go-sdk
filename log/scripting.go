@@ -8,13 +8,10 @@ import (
 
 // Scripting returns trace.Scripting with logging events from details
 func Scripting(l Logger, d trace.Detailer, opts ...Option) (t trace.Scripting) {
-	if ll, has := l.(*logger); has {
-		return internalScripting(ll.with(opts...), d)
-	}
-	return internalScripting(New(append(opts, withExternalLogger(l))...), d)
+	return internalScripting(wrapLogger(l, opts...), d)
 }
 
-func internalScripting(l *logger, d trace.Detailer) (t trace.Scripting) {
+func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 	t.OnExecute = func(info trace.ScriptingExecuteStartInfo) func(trace.ScriptingExecuteDoneInfo) {
 		if d.Details()&trace.ScriptingEvents == 0 {
 			return nil

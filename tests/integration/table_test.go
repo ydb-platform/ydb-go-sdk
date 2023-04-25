@@ -261,8 +261,7 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 	)
 
 	var err error
-	scope.db, err = ydb.Open(
-		ctx,
+	scope.db, err = ydb.Open(ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 		ydb.WithUserAgent("table/e2e"),
@@ -299,10 +298,12 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 		ydb.WithConnectionTTL(5*time.Second),
 		ydb.WithDiscoveryInterval(5*time.Second),
 		ydb.WithLogger(
+			log.Simple(os.Stderr,
+				log.WithMinLevel(log.TRACE),
+				log.WithColoring(),
+			),
 			trace.MatchDetails(`ydb\.(driver|table|discovery|retry|scheme).*`),
 			log.WithNamespace("ydb"),
-			log.WithMinLevel(log.TRACE),
-			log.WithColoring(),
 		),
 		ydb.WithPanicCallback(func(e interface{}) {
 			_, _ = fmt.Fprintf(os.Stderr, "panic recovered:%v:\n%s", e, debug.Stack())
