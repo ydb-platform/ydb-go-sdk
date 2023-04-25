@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 
 	"github.com/jonboulle/clockwork"
 
@@ -21,54 +20,47 @@ type Params struct {
 	Level     Level
 }
 
-func (p Params) withLevel(lvl Level) Params {
-	p.Level = lvl
-	return p
-}
-
 type Logger interface {
 	// Log logs the message with specified options and fields.
 	// Implementations must not in any way use slice of fields after Log returns.
 	Log(params Params, msg string, fields ...Field)
 }
 
-type logger struct {
-	namespace      []string
-	logQuery       bool
-	scopeMaxLen    int
-	minLevel       Level
-	coloring       bool
-	w              io.Writer
-	externalLogger Logger
-	clock          clockwork.Clock
+func (p Params) withLevel(lvl Level) Params {
+	p.Level = lvl
+	return p
 }
 
-func (l logger) with(opts ...Option) *logger {
-	for _, o := range opts {
-		if o != nil {
-			o(&l)
-		}
-	}
-	return &l
+var _ Logger = (*simpleLogger)(nil)
+
+type simpleLoggerOption interface {
+	applySimpleOption(l *simpleLogger)
 }
 
-func New(opts ...Option) *logger {
-	l := &logger{
-		scopeMaxLen: 24,
-		minLevel:    INFO,
-		coloring:    false,
-		w:           os.Stderr,
-		clock:       clockwork.NewRealClock(),
+func Simple(w io.Writer, opts ...simpleLoggerOption) *simpleLogger {
+	l := &simpleLogger{
+		namespaceMaxLen: 24,
+		coloring:        false,
+		minLevel:        INFO,
+		clock:           clockwork.NewRealClock(),
+		w:               w,
 	}
 	for _, o := range opts {
-		if o != nil {
-			o(l)
-		}
+		o.applySimpleOption(l)
 	}
 	return l
 }
 
-func (l *logger) format(namespace []string, msg string, logLevel Level) string {
+type simpleLogger struct {
+	namespaceMaxLen int
+	coloring        bool
+	clock           clockwork.Clock
+	logQuery        bool
+	minLevel        Level
+	w               io.Writer
+}
+
+func (l *simpleLogger) format(namespace []string, msg string, logLevel Level) string {
 	b := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(b)
 	if l.coloring {
@@ -89,16 +81,11 @@ func (l *logger) format(namespace []string, msg string, logLevel Level) string {
 		b.WriteString(colorReset)
 		b.WriteString(logLevel.Color())
 	}
-	scope := joinScope(
-		append(
-			append(
-				make([]string, 0, len(l.namespace)+len(namespace)),
-				l.namespace...,
-			),
-			namespace...),
-		l.scopeMaxLen,
+	scope := joinNamespace(
+		namespace,
+		l.namespaceMaxLen,
 	)
-	for ll := len(scope); ll < l.scopeMaxLen; ll++ {
+	for ll := len(scope); ll < l.namespaceMaxLen; ll++ {
 		b.WriteByte(' ')
 	}
 	b.WriteString(" [")
@@ -122,7 +109,32 @@ func (l *logger) format(namespace []string, msg string, logLevel Level) string {
 	return b.String()
 }
 
-func appendFields(msg string, fields ...Field) string {
+func (l *simpleLogger) Log(params Params, msg string, fields ...Field) {
+	if params.Level < l.minLevel {
+		return
+	}
+	_, _ = io.WriteString(l.w, l.format(params.Namespace, l.appendFields(msg, fields...), params.Level)+"\n")
+}
+
+type wrapper struct {
+	namespace []string
+	logQuery  bool
+	logger    Logger
+}
+
+func wrapLogger(l Logger, opts ...Option) *wrapper {
+	ll := &wrapper{
+		logger: l,
+	}
+	for _, o := range opts {
+		if o != nil {
+			o.applyHolderOption(ll)
+		}
+	}
+	return ll
+}
+
+func (l *simpleLogger) appendFields(msg string, fields ...Field) string {
 	if len(fields) == 0 {
 		return msg
 	}
@@ -140,14 +152,13 @@ func appendFields(msg string, fields ...Field) string {
 	return b.String()
 }
 
-func (l *logger) Log(params Params, msg string, fields ...Field) {
-	if params.Level < l.minLevel {
-		return
-	}
-	if l.externalLogger != nil {
-		l.externalLogger.Log(params, msg, fields...)
-	} else {
-		_, _ = l.w.Write([]byte(l.format(params.Namespace, appendFields(msg, fields...), params.Level)))
-		_, _ = l.w.Write([]byte{'\n'})
-	}
+func (l *wrapper) Log(params Params, msg string, fields ...Field) {
+	params.Namespace = append(
+		append(
+			make([]string, 0, len(l.namespace)+len(params.Namespace)),
+			l.namespace...,
+		),
+		params.Namespace...,
+	)
+	l.logger.Log(params, msg, fields...)
 }

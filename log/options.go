@@ -1,47 +1,49 @@
 package log
 
-import (
-	"io"
-)
-
-type Option func(l *logger)
-
-func Nop() Option {
-	return func(l *logger) {}
+type Option interface {
+	applyHolderOption(l *wrapper)
 }
 
-func WithColoring() Option {
-	return func(l *logger) {
-		l.coloring = true
-	}
+type coloringSimpleOption bool
+
+func (coloring coloringSimpleOption) applySimpleOption(l *simpleLogger) {
+	l.coloring = bool(coloring)
 }
 
-func withExternalLogger(ll Logger) Option {
-	return func(l *logger) {
-		l.externalLogger = ll
-	}
+func WithColoring() simpleLoggerOption {
+	return coloringSimpleOption(true)
 }
 
-func WithMinLevel(level Level) Option {
-	return func(l *logger) {
-		l.minLevel = level
-	}
+type minLevelSimpleOption Level
+
+func (minLevel minLevelSimpleOption) applySimpleOption(l *simpleLogger) {
+	l.minLevel = Level(minLevel)
 }
 
-func WithNamespace(namespace string) Option {
-	return func(l *logger) {
-		l.namespace = append(l.namespace, namespace)
-	}
+func WithMinLevel(level Level) simpleLoggerOption {
+	return minLevelSimpleOption(level)
 }
 
-func WithLogQuery() Option {
-	return func(l *logger) {
-		l.logQuery = true
-	}
+type namespaceOption string
+
+func (namespace namespaceOption) applyHolderOption(l *wrapper) {
+	l.namespace = append(l.namespace, string(namespace))
 }
 
-func WithWriter(w io.Writer) Option {
-	return func(l *logger) {
-		l.w = w
-	}
+func WithNamespace(namespace string) namespaceOption {
+	return namespaceOption(namespace)
+}
+
+type logQueryOption bool
+
+func (logQuery logQueryOption) applySimpleOption(l *simpleLogger) {
+	l.logQuery = bool(logQuery)
+}
+
+func (logQuery logQueryOption) applyHolderOption(l *wrapper) {
+	l.logQuery = bool(logQuery)
+}
+
+func WithLogQuery() logQueryOption {
+	return true
 }

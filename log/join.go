@@ -2,7 +2,7 @@ package log
 
 import "github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 
-func joinScope(names []string, maxLen int) (join string) {
+func joinNamespace(names []string, maxLen int) (join string) {
 	l := 0
 	for i, s := range names {
 		l += len([]rune(s))

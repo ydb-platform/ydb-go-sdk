@@ -16,7 +16,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -85,16 +84,15 @@ func (scope *scopeT) Driver(opts ...ydb.Option) *ydb.Driver {
 		connectionContext, cancel := context.WithTimeout(scope.Ctx, time.Second*10)
 		defer cancel()
 
-		logger := xtest.Logger(scope.T())
-
 		driver, err := ydb.Open(connectionContext, connectionString,
 			append(opts,
 				ydb.WithAccessTokenCredentials(token),
 				ydb.WithLogger(
+					log.Simple(os.Stderr,
+						log.WithMinLevel(log.WARN),
+					),
 					trace.DetailsAll,
 					log.WithNamespace("ydb"),
-					log.WithWriter(logger),
-					log.WithMinLevel(log.WARN),
 				),
 			)...,
 		)

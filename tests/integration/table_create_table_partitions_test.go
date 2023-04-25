@@ -22,17 +22,15 @@ import (
 )
 
 func TestTableCreateTablePartitions(t *testing.T) {
-	var (
-		ctx    = xtest.Context(t)
-		logger = xtest.Logger(t)
-	)
+	ctx := xtest.Context(t)
 
 	db, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithLogger(
+			log.Simple(os.Stderr,
+				log.WithMinLevel(log.WARN),
+			),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
 			log.WithNamespace("ydb"),
-			log.WithWriter(logger),
-			log.WithMinLevel(log.WARN),
 		),
 	)
 	if err != nil {

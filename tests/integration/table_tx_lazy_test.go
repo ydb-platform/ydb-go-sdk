@@ -24,8 +24,7 @@ func TestTableTxLazy(t *testing.T) {
 
 	t.Run("connect", func(t *testing.T) {
 		var err error
-		db, err = ydb.Open(
-			ctx,
+		db, err = ydb.Open(ctx,
 			"", // corner case for check replacement of endpoint+database+secure
 			ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
 		)

@@ -164,18 +164,17 @@ func WithTLSSInsecureSkipVerify() Option {
 // WithLogger add enables logging for selected tracing events.
 //
 // See trace package documentation for details.
-func WithLogger(details trace.Details, opts ...LoggerOption) Option {
-	l := log.New(opts...)
+func WithLogger(l log.Logger, details trace.Detailer, opts ...log.Option) Option {
 	return MergeOptions(
-		WithTraceDriver(log.Driver(l, details)),
-		WithTraceTable(log.Table(l, details)),
-		WithTraceScripting(log.Scripting(l, details)),
-		WithTraceScheme(log.Scheme(l, details)),
-		WithTraceCoordination(log.Coordination(l, details)),
-		WithTraceRatelimiter(log.Ratelimiter(l, details)),
-		WithTraceDiscovery(log.Discovery(l, details)),
-		WithTraceTopic(log.Topic(l, details)),
-		WithTraceDatabaseSQL(log.DatabaseSQL(l, details)),
+		WithTraceDriver(log.Driver(l, details, opts...)),
+		WithTraceTable(log.Table(l, details, opts...)),
+		WithTraceScripting(log.Scripting(l, details, opts...)),
+		WithTraceScheme(log.Scheme(l, details, opts...)),
+		WithTraceCoordination(log.Coordination(l, details, opts...)),
+		WithTraceRatelimiter(log.Ratelimiter(l, details, opts...)),
+		WithTraceDiscovery(log.Discovery(l, details, opts...)),
+		WithTraceTopic(log.Topic(l, details, opts...)),
+		WithTraceDatabaseSQL(log.DatabaseSQL(l, details, opts...)),
 	)
 }
 

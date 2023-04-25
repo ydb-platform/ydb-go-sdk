@@ -29,25 +29,21 @@ func TestLongStream(t *testing.T) {
 		err               error
 		upsertRowsCount   = 100000
 		batchSize         = 10000
+		ctx               = xtest.Context(t)
 	)
 
-	var (
-		ctx    = xtest.Context(t)
-		logger = xtest.Logger(t)
-	)
-
-	db, err = ydb.Open(
-		ctx,
+	db, err = ydb.Open(ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAccessTokenCredentials(
 			os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
 		),
 		ydb.WithDiscoveryInterval(0), // disable re-discovery on upsert time
 		ydb.WithLogger(
+			log.Simple(os.Stderr,
+				log.WithMinLevel(log.TRACE),
+			),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
 			log.WithNamespace("ydb"),
-			log.WithWriter(logger),
-			log.WithMinLevel(log.TRACE),
 		),
 	)
 	if err != nil {

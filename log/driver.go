@@ -8,13 +8,10 @@ import (
 
 // Driver makes trace.Driver with logging events from details
 func Driver(l Logger, d trace.Detailer, opts ...Option) (t trace.Driver) {
-	if ll, has := l.(*logger); has {
-		return internalDriver(ll.with(opts...), d)
-	}
-	return internalDriver(New(append(opts, withExternalLogger(l))...), d)
+	return internalDriver(wrapLogger(l, opts...), d)
 }
 
-func internalDriver(l *logger, d trace.Detailer) (t trace.Driver) { //nolint:gocyclo
+func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:gocyclo
 	t.OnResolve = func(
 		info trace.DriverResolveStartInfo,
 	) func(

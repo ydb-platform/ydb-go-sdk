@@ -44,7 +44,7 @@ func Test_join(t *testing.T) {
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			require.Equal(t, tt.join, joinScope(tt.ss, tt.maxLen))
+			require.Equal(t, tt.join, joinNamespace(tt.ss, tt.maxLen))
 		})
 	}
 }
