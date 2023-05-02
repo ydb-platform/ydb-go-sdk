@@ -14,21 +14,10 @@ const (
 	dateLayout = "2006-01-02 15:04:05.000"
 )
 
-type Params struct {
-	Ctx       context.Context
-	Namespace []string
-	Level     Level
-}
-
 type Logger interface {
 	// Log logs the message with specified options and fields.
 	// Implementations must not in any way use slice of fields after Log returns.
-	Log(params Params, msg string, fields ...Field)
-}
-
-func (p Params) withLevel(lvl Level) Params {
-	p.Level = lvl
-	return p
+	Log(ctx context.Context, msg string, fields ...Field)
 }
 
 var _ Logger = (*simpleLogger)(nil)
@@ -109,17 +98,22 @@ func (l *simpleLogger) format(namespace []string, msg string, logLevel Level) st
 	return b.String()
 }
 
-func (l *simpleLogger) Log(params Params, msg string, fields ...Field) {
-	if params.Level < l.minLevel {
+func (l *simpleLogger) Log(ctx context.Context, msg string, fields ...Field) {
+	lvl := LevelFromContext(ctx)
+	if lvl < l.minLevel {
 		return
 	}
-	_, _ = io.WriteString(l.w, l.format(params.Namespace, l.appendFields(msg, fields...), params.Level)+"\n")
+
+	_, _ = io.WriteString(l.w, l.format(
+		NamesFromContext(ctx),
+		l.appendFields(msg, fields...),
+		lvl,
+	)+"\n")
 }
 
 type wrapper struct {
-	namespace []string
-	logQuery  bool
-	logger    Logger
+	logQuery bool
+	logger   Logger
 }
 
 func wrapLogger(l Logger, opts ...Option) *wrapper {
@@ -152,13 +146,6 @@ func (l *simpleLogger) appendFields(msg string, fields ...Field) string {
 	return b.String()
 }
 
-func (l *wrapper) Log(params Params, msg string, fields ...Field) {
-	params.Namespace = append(
-		append(
-			make([]string, 0, len(l.namespace)+len(params.Namespace)),
-			l.namespace...,
-		),
-		params.Namespace...,
-	)
-	l.logger.Log(params, msg, fields...)
+func (l *wrapper) Log(ctx context.Context, msg string, fields ...Field) {
+	l.logger.Log(ctx, msg, fields...)
 }

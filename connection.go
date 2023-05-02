@@ -397,7 +397,6 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, e
 						trace.WithDefaultDetails(trace.DetailsAll),
 					),
 					log.WithLogQuery(),
-					log.WithNamespace("ydb"),
 				),
 			)
 		}

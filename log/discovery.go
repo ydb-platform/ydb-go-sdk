@@ -16,24 +16,20 @@ func internalDiscovery(l *wrapper, d trace.Detailer) (t trace.Discovery) {
 		if d.Details()&trace.DiscoveryEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     DEBUG,
-			Namespace: []string{"discovery", "list", "endpoints"},
-		}
-		l.Log(params, "start",
+		ctx := with(*info.Context, DEBUG, "ydb", "discovery", "list", "endpoints")
+		l.Log(ctx, "start",
 			String("address", info.Address),
 			String("database", info.Database),
 		)
 		start := time.Now()
 		return func(info trace.DiscoveryDiscoverDoneInfo) {
 			if info.Error == nil {
-				l.Log(params.withLevel(INFO), "done",
+				l.Log(WithLevel(ctx, INFO), "done",
 					latency(start),
 					Stringer("endpoints", endpoints(info.Endpoints)),
 				)
 			} else {
-				l.Log(params.withLevel(ERROR), "failed",
+				l.Log(WithLevel(ctx, ERROR), "failed",
 					Error(info.Error),
 					latency(start),
 					version(),
@@ -45,22 +41,18 @@ func internalDiscovery(l *wrapper, d trace.Detailer) (t trace.Discovery) {
 		if d.Details()&trace.DiscoveryEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"discovery", "whoAmI"},
-		}
-		l.Log(params, "start")
+		ctx := with(*info.Context, TRACE, "ydb", "discovery", "whoAmI")
+		l.Log(ctx, "start")
 		start := time.Now()
 		return func(info trace.DiscoveryWhoAmIDoneInfo) {
 			if info.Error == nil {
-				l.Log(params.withLevel(TRACE), "done",
+				l.Log(WithLevel(ctx, TRACE), "done",
 					latency(start),
 					String("user", info.User),
 					Strings("groups", info.Groups),
 				)
 			} else {
-				l.Log(params.withLevel(WARN), "failed",
+				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
 					latency(start),
 					version(),

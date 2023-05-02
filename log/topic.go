@@ -2,6 +2,7 @@
 package log
 
 import (
+	"context"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -17,14 +18,11 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicReaderStreamLifeCycleEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "reader", "reconnect"},
-		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "reconnect")
 		start := time.Now()
-		l.Log(params.withLevel(DEBUG), "start")
+		l.Log(ctx, "start")
 		return func(doneInfo trace.TopicReaderReconnectDoneInfo) {
-			l.Log(params.withLevel(INFO), "reconnected",
+			l.Log(WithLevel(ctx, INFO), "reconnected",
 				latency(start),
 			)
 		}
@@ -33,11 +31,8 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicReaderStreamLifeCycleEvents == 0 {
 			return
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "reader", "reconnect", "request"},
-		}
-		l.Log(params.withLevel(DEBUG), "start",
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "reconnect", "request")
+		l.Log(ctx, "start",
 			NamedError("reason", info.Reason),
 			Bool("was_sent", info.WasSent),
 		)
@@ -46,12 +41,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicReaderPartitionEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "reader", "partition", "read", "start", "response"},
-		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "partition", "read", "start", "response")
 		start := time.Now()
-		l.Log(params.withLevel(DEBUG), "start",
+		l.Log(ctx, "start",
 			String("topic", info.Topic),
 			String("reader_connection_id", info.ReaderConnectionID),
 			Int64("partition_id", info.PartitionID),
@@ -76,9 +68,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 				)
 			}
 			if doneInfo.Error == nil {
-				l.Log(params.withLevel(INFO), "read partition response completed", fields...)
+				l.Log(WithLevel(ctx, INFO), "read partition response completed", fields...)
 			} else {
-				l.Log(params.withLevel(WARN), "read partition response completed",
+				l.Log(WithLevel(ctx, WARN), "read partition response completed",
 					append(fields,
 						Error(doneInfo.Error),
 						version(),
@@ -91,12 +83,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicReaderPartitionEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "reader", "partition", "read", "stop", "response"},
-		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "partition", "read", "stop", "response")
 		start := time.Now()
-		l.Log(params.withLevel(DEBUG), "start",
+		l.Log(ctx, "start",
 			String("reader_connection_id", info.ReaderConnectionID),
 			String("topic", info.Topic),
 			Int64("partition_id", info.PartitionID),
@@ -114,9 +103,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 				latency(start),
 			}
 			if doneInfo.Error == nil {
-				l.Log(params.withLevel(INFO), "reader partition stopped", fields...)
+				l.Log(WithLevel(ctx, INFO), "reader partition stopped", fields...)
 			} else {
-				l.Log(params.withLevel(WARN), "reader partition stopped",
+				l.Log(WithLevel(ctx, WARN), "reader partition stopped",
 					append(fields,
 						Error(doneInfo.Error),
 						version(),
@@ -129,12 +118,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "reader", "commit"},
-		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "commit")
 		start := time.Now()
-		l.Log(params.withLevel(DEBUG), "start",
+		l.Log(ctx, "start",
 			String("topic", info.Topic),
 			Int64("partition_id", info.PartitionID),
 			Int64("partition_session_id", info.PartitionSessionID),
@@ -151,9 +137,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 				latency(start),
 			}
 			if doneInfo.Error == nil {
-				l.Log(params.withLevel(DEBUG), "committed", fields...)
+				l.Log(WithLevel(ctx, DEBUG), "committed", fields...)
 			} else {
-				l.Log(params.withLevel(WARN), "committed",
+				l.Log(WithLevel(ctx, WARN), "committed",
 					append(fields,
 						Error(doneInfo.Error),
 						version(),
@@ -166,12 +152,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "reader", "send", "commit", "message"},
-		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "send", "commit", "message")
 		start := time.Now()
-		l.Log(params.withLevel(DEBUG), "start",
+		l.Log(ctx, "start",
 			Any("partitions_id", info.CommitsInfo.PartitionIDs()),
 			Any("partitions_session_id", info.CommitsInfo.PartitionSessionIDs()),
 		)
@@ -182,9 +165,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 				latency(start),
 			}
 			if doneInfo.Error == nil {
-				l.Log(params.withLevel(DEBUG), "done", fields...)
+				l.Log(WithLevel(ctx, DEBUG), "done", fields...)
 			} else {
-				l.Log(params.withLevel(WARN), "commit message sent",
+				l.Log(WithLevel(ctx, WARN), "commit message sent",
 					append(fields,
 						Error(doneInfo.Error),
 						version(),
@@ -197,11 +180,8 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "reader", "committed", "notify"},
-		}
-		l.Log(params.withLevel(DEBUG), "ack",
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "committed", "notify")
+		l.Log(WithLevel(ctx, DEBUG), "ack",
 			String("reader_connection_id", info.ReaderConnectionID),
 			String("topic", info.Topic),
 			Int64("partition_id", info.PartitionID),
@@ -213,12 +193,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "reader", "close"},
-		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "close")
 		start := time.Now()
-		l.Log(params.withLevel(DEBUG), "done",
+		l.Log(WithLevel(ctx, DEBUG), "done",
 			String("reader_connection_id", info.ReaderConnectionID),
 			NamedError("close_reason", info.CloseReason),
 		)
@@ -228,9 +205,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 				latency(start),
 			}
 			if doneInfo.CloseError == nil {
-				l.Log(params.withLevel(DEBUG), "closed", fields...)
+				l.Log(WithLevel(ctx, DEBUG), "closed", fields...)
 			} else {
-				l.Log(params.withLevel(WARN), "closed",
+				l.Log(WithLevel(ctx, WARN), "closed",
 					append(fields,
 						Error(doneInfo.CloseError),
 						version(),
@@ -244,12 +221,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "reader", "init"},
-		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "init")
 		start := time.Now()
-		l.Log(params.withLevel(DEBUG), "start",
+		l.Log(ctx, "start",
 			String("pre_init_reader_connection_id", info.PreInitReaderConnectionID),
 			String("consumer", info.InitRequestInfo.GetConsumer()),
 			Strings("topics", info.InitRequestInfo.GetTopics()),
@@ -262,9 +236,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 				latency(start),
 			}
 			if doneInfo.Error == nil {
-				l.Log(params.withLevel(DEBUG), "topic reader stream initialized", fields...)
+				l.Log(WithLevel(ctx, DEBUG), "topic reader stream initialized", fields...)
 			} else {
-				l.Log(params.withLevel(WARN), "topic reader stream initialized",
+				l.Log(WithLevel(ctx, WARN), "topic reader stream initialized",
 					append(fields,
 						Error(doneInfo.Error),
 						version(),
@@ -277,11 +251,8 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "reader", "error"},
-		}
-		l.Log(params.withLevel(INFO), "stream error",
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "error")
+		l.Log(WithLevel(ctx, INFO), "stream error",
 			Error(info.Error),
 			String("reader_connection_id", info.ReaderConnectionID),
 			version(),
@@ -291,23 +262,20 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "reader", "update", "token"},
-		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "update", "token")
 		start := time.Now()
-		l.Log(params.withLevel(DEBUG), "token updating...",
+		l.Log(WithLevel(ctx, DEBUG), "token updating...",
 			String("reader_connection_id", info.ReaderConnectionID),
 		)
 		return func(updateTokenInfo trace.OnReadUpdateTokenMiddleTokenReceivedInfo) func(doneInfo trace.OnReadStreamUpdateTokenDoneInfo) {
 			if updateTokenInfo.Error == nil {
-				l.Log(params.withLevel(DEBUG), "got token",
+				l.Log(WithLevel(ctx, DEBUG), "got token",
 					String("reader_connection_id", info.ReaderConnectionID),
 					Int("token_len", updateTokenInfo.TokenLen),
 					latency(start),
 				)
 			} else {
-				l.Log(params.withLevel(DEBUG), "got token",
+				l.Log(WithLevel(ctx, DEBUG), "got token",
 					Error(updateTokenInfo.Error),
 					String("reader_connection_id", info.ReaderConnectionID),
 					Int("token_len", updateTokenInfo.TokenLen),
@@ -317,13 +285,13 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 			}
 			return func(doneInfo trace.OnReadStreamUpdateTokenDoneInfo) {
 				if doneInfo.Error == nil {
-					l.Log(params.withLevel(DEBUG), "token updated on stream",
+					l.Log(WithLevel(ctx, DEBUG), "token updated on stream",
 						String("reader_connection_id", info.ReaderConnectionID),
 						Int("token_len", updateTokenInfo.TokenLen),
 						latency(start),
 					)
 				} else {
-					l.Log(params.withLevel(DEBUG), "token updated on stream",
+					l.Log(WithLevel(ctx, DEBUG), "token updated on stream",
 						Error(doneInfo.Error),
 						String("reader_connection_id", info.ReaderConnectionID),
 						Int("token_len", updateTokenInfo.TokenLen),
@@ -338,11 +306,8 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicReaderMessageEvents == 0 {
 			return
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "reader", "sent", "data", "request"},
-		}
-		l.Log(params.withLevel(DEBUG), "sent data request",
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "sent", "data", "request")
+		l.Log(WithLevel(ctx, DEBUG), "sent data request",
 			String("reader_connection_id", info.ReaderConnectionID),
 			Int("request_bytes", info.RequestBytes),
 			Int("local_capacity", info.LocalBufferSizeAfterSent),
@@ -352,13 +317,10 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicReaderMessageEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "reader", "receive", "data", "response"},
-		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "receive", "data", "response")
 		start := time.Now()
 		partitionsCount, batchesCount, messagesCount := startInfo.DataResponse.GetPartitionBatchMessagesCounts()
-		l.Log(params.withLevel(DEBUG), "data response received, process starting...",
+		l.Log(WithLevel(ctx, DEBUG), "data response received, process starting...",
 			String("reader_connection_id", startInfo.ReaderConnectionID),
 			Int("received_bytes", startInfo.DataResponse.GetBytesSize()),
 			Int("local_capacity", startInfo.LocalBufferSizeAfterReceive),
@@ -368,7 +330,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		)
 		return func(doneInfo trace.TopicReaderReceiveDataResponseDoneInfo) {
 			if doneInfo.Error == nil {
-				l.Log(params.withLevel(DEBUG), "data response received and processed",
+				l.Log(WithLevel(ctx, DEBUG), "data response received and processed",
 					String("reader_connection_id", startInfo.ReaderConnectionID),
 					Int("received_bytes", startInfo.DataResponse.GetBytesSize()),
 					Int("local_capacity", startInfo.LocalBufferSizeAfterReceive),
@@ -378,7 +340,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 					latency(start),
 				)
 			} else {
-				l.Log(params.withLevel(DEBUG), "data response received and processed",
+				l.Log(WithLevel(ctx, DEBUG), "data response received and processed",
 					Error(doneInfo.Error),
 					String("reader_connection_id", startInfo.ReaderConnectionID),
 					Int("received_bytes", startInfo.DataResponse.GetBytesSize()),
@@ -396,26 +358,23 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicReaderMessageEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "reader", "read", "messages"},
-		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "read", "messages")
 		start := time.Now()
-		l.Log(params.withLevel(DEBUG), "read messages called, waiting...",
+		l.Log(WithLevel(ctx, DEBUG), "read messages called, waiting...",
 			Int("min_count", info.MinCount),
 			Int("max_count", info.MaxCount),
 			Int("local_capacity_before", info.FreeBufferCapacity),
 		)
 		return func(doneInfo trace.TopicReaderReadMessagesDoneInfo) {
 			if doneInfo.Error == nil {
-				l.Log(params.withLevel(DEBUG), "read messages returned",
+				l.Log(WithLevel(ctx, DEBUG), "read messages returned",
 					Int("min_count", info.MinCount),
 					Int("max_count", info.MaxCount),
 					Int("local_capacity_before", info.FreeBufferCapacity),
 					latency(start),
 				)
 			} else {
-				l.Log(params.withLevel(DEBUG), "read messages returned",
+				l.Log(WithLevel(ctx, DEBUG), "read messages returned",
 					Error(doneInfo.Error),
 					Int("min_count", info.MinCount),
 					Int("max_count", info.MaxCount),
@@ -430,11 +389,8 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicReaderMessageEvents == 0 {
 			return
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "reader", "unknown", "grpc", "message"},
-		}
-		l.Log(params.withLevel(INFO), "received unknown message",
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "unknown", "grpc", "message")
+		l.Log(WithLevel(ctx, INFO), "received unknown message",
 			Error(info.Error),
 			String("reader_connection_id", info.ReaderConnectionID),
 		)
@@ -447,19 +403,16 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicWriterStreamLifeCycleEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "writer", "reconnect"},
-		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "reconnect")
 		start := time.Now()
-		l.Log(params.withLevel(DEBUG), "connect to topic writer stream starting...",
+		l.Log(WithLevel(ctx, DEBUG), "connect to topic writer stream starting...",
 			String("topic", info.Topic),
 			String("producer_id", info.ProducerID),
 			String("writer_instance_id", info.WriterInstanceID),
 			Int("attempt", info.Attempt),
 		)
 		return func(doneInfo trace.TopicWriterReconnectDoneInfo) {
-			l.Log(params.withLevel(DEBUG), "connect to topic writer stream completed",
+			l.Log(WithLevel(ctx, DEBUG), "connect to topic writer stream completed",
 				Error(doneInfo.Error),
 				String("topic", info.Topic),
 				String("producer_id", info.ProducerID),
@@ -473,19 +426,16 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicWriterStreamLifeCycleEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "writer", "stream", "init"},
-		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "stream", "init")
 		start := time.Now()
-		l.Log(params.withLevel(DEBUG), "start",
+		l.Log(ctx, "start",
 			String("topic", info.Topic),
 			String("producer_id", info.ProducerID),
 			String("writer_instance_id", info.WriterInstanceID),
 		)
 
 		return func(doneInfo trace.TopicWriterInitStreamDoneInfo) {
-			l.Log(params.withLevel(DEBUG), "init stream completed",
+			l.Log(WithLevel(ctx, DEBUG), "init stream completed",
 				Error(doneInfo.Error),
 				String("topic", info.Topic),
 				String("producer_id", info.ProducerID),
@@ -499,17 +449,14 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicWriterStreamLifeCycleEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "writer", "close"},
-		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "close")
 		start := time.Now()
-		l.Log(params.withLevel(DEBUG), "start",
+		l.Log(ctx, "start",
 			String("writer_instance_id", info.WriterInstanceID),
 			NamedError("reason", info.Reason),
 		)
 		return func(doneInfo trace.TopicWriterCloseDoneInfo) {
-			l.Log(params.withLevel(DEBUG), "close topic writer completed",
+			l.Log(WithLevel(ctx, DEBUG), "close topic writer completed",
 				Error(doneInfo.Error),
 				String("writer_instance_id", info.WriterInstanceID),
 				NamedError("reason", info.Reason),
@@ -521,12 +468,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicWriterStreamEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "writer", "compress", "messages"},
-		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "compress", "messages")
 		start := time.Now()
-		l.Log(params.withLevel(DEBUG), "start",
+		l.Log(ctx, "start",
 			String("writer_instance_id", info.WriterInstanceID),
 			String("session_id", info.SessionID),
 			Any("reason", info.Reason),
@@ -535,7 +479,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 			Int64("first_seqno", info.FirstSeqNo),
 		)
 		return func(doneInfo trace.TopicWriterCompressMessagesDoneInfo) {
-			l.Log(params.withLevel(DEBUG), "compress message completed",
+			l.Log(WithLevel(ctx, DEBUG), "compress message completed",
 				Error(doneInfo.Error),
 				String("writer_instance_id", info.WriterInstanceID),
 				String("session_id", info.SessionID),
@@ -551,12 +495,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicWriterStreamEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "writer", "send", "messages"},
-		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "send", "messages")
 		start := time.Now()
-		l.Log(params.withLevel(DEBUG), "start",
+		l.Log(ctx, "start",
 			String("writer_instance_id", info.WriterInstanceID),
 			String("session_id", info.SessionID),
 			Any("codec", info.Codec),
@@ -564,7 +505,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 			Int64("first_seqno", info.FirstSeqNo),
 		)
 		return func(doneInfo trace.TopicWriterSendMessagesDoneInfo) {
-			l.Log(params.withLevel(DEBUG), "compress message completed",
+			l.Log(WithLevel(ctx, DEBUG), "compress message completed",
 				Error(doneInfo.Error),
 				String("writer_instance_id", info.WriterInstanceID),
 				String("session_id", info.SessionID),
@@ -579,11 +520,8 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		if d.Details()&trace.TopicWriterStreamEvents == 0 {
 			return
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"topic", "writer", "read", "unknown", "grpc", "message"},
-		}
-		l.Log(params.withLevel(INFO), "topic writer receive unknown message from server",
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "read", "unknown", "grpc", "message")
+		l.Log(WithLevel(ctx, INFO), "topic writer receive unknown message from server",
 			Error(info.Error),
 			String("writer_instance_id", info.WriterInstanceID),
 			String("session_id", info.SessionID),

@@ -303,7 +303,6 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 				log.WithColoring(),
 			),
 			trace.MatchDetails(`ydb\.(driver|table|discovery|retry|scheme).*`),
-			log.WithNamespace("ydb"),
 		),
 		ydb.WithPanicCallback(func(e interface{}) {
 			_, _ = fmt.Fprintf(os.Stderr, "panic recovered:%v:\n%s", e, debug.Stack())

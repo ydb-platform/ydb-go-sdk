@@ -92,7 +92,6 @@ func (scope *scopeT) Driver(opts ...ydb.Option) *ydb.Driver {
 						log.WithMinLevel(log.WARN),
 					),
 					trace.DetailsAll,
-					log.WithNamespace("ydb"),
 				),
 			)...,
 		)
