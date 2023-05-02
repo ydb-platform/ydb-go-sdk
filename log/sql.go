@@ -49,7 +49,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		start := time.Now()
 		return func(info trace.DatabaseSQLConnPingDoneInfo) {
 			if info.Error == nil {
-				l.Log(WithLevel(ctx, DEBUG), "done",
+				l.Log(ctx, "done",
 					latency(start),
 				)
 			} else {
@@ -70,11 +70,11 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		start := time.Now()
 		return func(info trace.DatabaseSQLConnCloseDoneInfo) {
 			if info.Error == nil {
-				l.Log(WithLevel(ctx, INFO), "done",
+				l.Log(ctx, "done",
 					latency(start),
 				)
 			} else {
-				l.Log(WithLevel(ctx, ERROR), "failed",
+				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
 					latency(start),
 					version(),
@@ -91,7 +91,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		start := time.Now()
 		return func(info trace.DatabaseSQLConnBeginDoneInfo) {
 			if info.Error == nil {
-				l.Log(WithLevel(ctx, DEBUG), "done",
+				l.Log(ctx, "done",
 					latency(start),
 				)
 			} else {
@@ -117,7 +117,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		start := time.Now()
 		return func(info trace.DatabaseSQLConnPrepareDoneInfo) {
 			if info.Error == nil {
-				l.Log(WithLevel(ctx, DEBUG), "done",
+				l.Log(ctx, "done",
 					latency(start),
 				)
 			} else {
@@ -147,7 +147,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		start := time.Now()
 		return func(info trace.DatabaseSQLConnExecDoneInfo) {
 			if info.Error == nil {
-				l.Log(WithLevel(ctx, DEBUG), "done",
+				l.Log(ctx, "done",
 					latency(start),
 				)
 			} else {
@@ -181,7 +181,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		start := time.Now()
 		return func(info trace.DatabaseSQLConnQueryDoneInfo) {
 			if info.Error == nil {
-				l.Log(WithLevel(ctx, DEBUG), "done",
+				l.Log(ctx, "done",
 					latency(start),
 				)
 			} else {
@@ -209,7 +209,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		start := time.Now()
 		return func(info trace.DatabaseSQLTxCommitDoneInfo) {
 			if info.Error == nil {
-				l.Log(WithLevel(ctx, DEBUG), "committed",
+				l.Log(ctx, "committed",
 					latency(start),
 				)
 			} else {
@@ -230,11 +230,11 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		start := time.Now()
 		return func(info trace.DatabaseSQLTxRollbackDoneInfo) {
 			if info.Error == nil {
-				l.Log(WithLevel(ctx, DEBUG), "done",
+				l.Log(ctx, "done",
 					latency(start),
 				)
 			} else {
-				l.Log(WithLevel(ctx, ERROR), "failed",
+				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
 					latency(start),
 					version(),
@@ -251,7 +251,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		start := time.Now()
 		return func(info trace.DatabaseSQLStmtCloseDoneInfo) {
 			if info.Error == nil {
-				l.Log(WithLevel(ctx, TRACE), "closed",
+				l.Log(ctx, "closed",
 					latency(start),
 				)
 			} else {
@@ -277,7 +277,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		start := time.Now()
 		return func(info trace.DatabaseSQLStmtExecDoneInfo) {
 			if info.Error == nil {
-				l.Log(WithLevel(ctx, DEBUG), "done",
+				l.Log(ctx, "done",
 					Error(info.Error),
 					latency(start),
 				)
@@ -307,7 +307,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		start := time.Now()
 		return func(info trace.DatabaseSQLStmtQueryDoneInfo) {
 			if info.Error == nil {
-				l.Log(WithLevel(ctx, DEBUG), "done",
+				l.Log(ctx, "done",
 					latency(start),
 				)
 			} else {

@@ -165,17 +165,12 @@ func WithTLSSInsecureSkipVerify() Option {
 //
 // See trace package documentation for details.
 func WithLogger(l log.Logger, details trace.Detailer, opts ...log.Option) Option {
-	return MergeOptions(
-		WithTraceDriver(log.Driver(l, details, opts...)),
-		WithTraceTable(log.Table(l, details, opts...)),
-		WithTraceScripting(log.Scripting(l, details, opts...)),
-		WithTraceScheme(log.Scheme(l, details, opts...)),
-		WithTraceCoordination(log.Coordination(l, details, opts...)),
-		WithTraceRatelimiter(log.Ratelimiter(l, details, opts...)),
-		WithTraceDiscovery(log.Discovery(l, details, opts...)),
-		WithTraceTopic(log.Topic(l, details, opts...)),
-		WithTraceDatabaseSQL(log.DatabaseSQL(l, details, opts...)),
-	)
+	return func(ctx context.Context, c *Driver) error {
+		c.logger = l
+		c.loggerOpts = opts
+		c.loggerDetails = details
+		return nil
+	}
 }
 
 // WithAnonymousCredentials force to make requests withou authentication.

@@ -126,7 +126,7 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 	tb := xtest.MakeSyncedTest(t)
 	ctx := xtest.Context(tb)
 	db := connect(tb, ydb.WithLogger(
-		log.Simple(os.Stderr,
+		log.Default(os.Stderr,
 			log.WithMinLevel(log.TRACE),
 		),
 		trace.DetailsAll,

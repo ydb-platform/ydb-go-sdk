@@ -34,7 +34,7 @@ func internalRetry(l *wrapper, d trace.Detailer) (t trace.Retry) {
 		start := time.Now()
 		return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 			if info.Error == nil {
-				l.Log(WithLevel(ctx, TRACE), "attempt done",
+				l.Log(ctx, "attempt done",
 					String("id", id),
 					latency(start),
 				)
@@ -56,7 +56,7 @@ func internalRetry(l *wrapper, d trace.Detailer) (t trace.Retry) {
 			}
 			return func(info trace.RetryLoopDoneInfo) {
 				if info.Error == nil {
-					l.Log(WithLevel(ctx, TRACE), "done",
+					l.Log(ctx, "done",
 						String("id", id),
 						latency(start),
 						Int("attempts", info.Attempts),

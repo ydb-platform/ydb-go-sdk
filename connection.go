@@ -85,6 +85,10 @@ type Connection interface {
 type Driver struct { //nolint:maligned
 	userInfo *dsn.UserInfo
 
+	logger        log.Logger
+	loggerOpts    []log.Option
+	loggerDetails trace.Detailer
+
 	opts []Option
 
 	config  config.Config
@@ -376,19 +380,19 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 }
 
 func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, err error) {
-	c := &Driver{
-		opts:     opts,
+	d := &Driver{
 		children: make(map[uint64]*Driver),
 	}
 	if caFile, has := os.LookupEnv("YDB_SSL_ROOT_CERTIFICATES_FILE"); has {
-		opts = append([]Option{WithCertificatesFromFile(caFile)}, opts...)
+		d.opts = append(d.opts,
+			WithCertificatesFromFile(caFile),
+		)
 	}
 	if logLevel, has := os.LookupEnv("YDB_LOG_SEVERITY_LEVEL"); has {
 		if l := log.FromString(logLevel); l < log.QUIET {
-			opts = append(
-				opts,
+			d.opts = append(d.opts,
 				WithLogger(
-					log.Simple(os.Stderr,
+					log.Default(os.Stderr,
 						log.WithMinLevel(log.FromString(logLevel)),
 						log.WithColoring(),
 					),
@@ -401,16 +405,37 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, e
 			)
 		}
 	}
-	for _, opt := range opts {
+	d.opts = append(d.opts, opts...)
+	for _, opt := range d.opts {
 		if opt != nil {
-			err = opt(ctx, c)
+			err = opt(ctx, d)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
 		}
 	}
-	c.config = config.New(c.options...)
-	return c, nil
+	if d.logger != nil {
+		for _, opt := range []Option{
+			WithTraceDriver(log.Driver(d.logger, d.loggerDetails, d.loggerOpts...)),
+			WithTraceTable(log.Table(d.logger, d.loggerDetails, d.loggerOpts...)),
+			WithTraceScripting(log.Scripting(d.logger, d.loggerDetails, d.loggerOpts...)),
+			WithTraceScheme(log.Scheme(d.logger, d.loggerDetails, d.loggerOpts...)),
+			WithTraceCoordination(log.Coordination(d.logger, d.loggerDetails, d.loggerOpts...)),
+			WithTraceRatelimiter(log.Ratelimiter(d.logger, d.loggerDetails, d.loggerOpts...)),
+			WithTraceDiscovery(log.Discovery(d.logger, d.loggerDetails, d.loggerOpts...)),
+			WithTraceTopic(log.Topic(d.logger, d.loggerDetails, d.loggerOpts...)),
+			WithTraceDatabaseSQL(log.DatabaseSQL(d.logger, d.loggerDetails, d.loggerOpts...)),
+		} {
+			if opt != nil {
+				err = opt(ctx, d)
+				if err != nil {
+					return nil, xerrors.WithStackTrace(err)
+				}
+			}
+		}
+	}
+	d.config = config.New(d.options...)
+	return d, nil
 }
 
 func connect(ctx context.Context, c *Driver) error {

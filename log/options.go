@@ -6,7 +6,7 @@ type Option interface {
 
 type coloringSimpleOption bool
 
-func (coloring coloringSimpleOption) applySimpleOption(l *simpleLogger) {
+func (coloring coloringSimpleOption) applySimpleOption(l *defaultLogger) {
 	l.coloring = bool(coloring)
 }
 
@@ -16,7 +16,7 @@ func WithColoring() simpleLoggerOption {
 
 type minLevelSimpleOption Level
 
-func (minLevel minLevelSimpleOption) applySimpleOption(l *simpleLogger) {
+func (minLevel minLevelSimpleOption) applySimpleOption(l *defaultLogger) {
 	l.minLevel = Level(minLevel)
 }
 
@@ -26,7 +26,7 @@ func WithMinLevel(level Level) simpleLoggerOption {
 
 type logQueryOption bool
 
-func (logQuery logQueryOption) applySimpleOption(l *simpleLogger) {
+func (logQuery logQueryOption) applySimpleOption(l *defaultLogger) {
 	l.logQuery = bool(logQuery)
 }
 
