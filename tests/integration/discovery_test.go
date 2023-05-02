@@ -68,7 +68,6 @@ func TestDiscovery(t *testing.T) {
 				log.WithColoring(),
 			),
 			trace.MatchDetails(`ydb\.(driver|discovery|repeater).*`),
-			log.WithNamespace("ydb"),
 		),
 		ydb.WithUserAgent(userAgent),
 		ydb.WithRequestsType(requestType),

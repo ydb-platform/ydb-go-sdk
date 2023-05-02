@@ -1,6 +1,7 @@
 package log
 
 import (
+	"context"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -20,24 +21,21 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		if d.Details()&trace.DriverResolverEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"driver", "resolver", "update"},
-		}
+		ctx := with(context.Background(), TRACE, "ydb", "driver", "resolver", "update")
 		target := info.Target
 		addresses := info.Resolved
-		l.Log(params, "start",
+		l.Log(ctx, "start",
 			String("target", target),
 			Strings("resolved", addresses),
 		)
 		return func(info trace.DriverResolveDoneInfo) {
 			if info.Error == nil {
-				l.Log(params.withLevel(DEBUG), "done",
+				l.Log(WithLevel(ctx, DEBUG), "done",
 					String("target", target),
 					Strings("resolved", addresses),
 				)
 			} else {
-				l.Log(params.withLevel(WARN), "failed",
+				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
 					String("target", target),
 					Strings("resolved", addresses),
@@ -53,12 +51,8 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		endpoint := info.Endpoint
 		database := info.Database
 		secure := info.Secure
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"driver", "resolver", "init"},
-		}
-		l.Log(params, "start",
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "resolver", "init")
+		l.Log(ctx, "start",
 			String("endpoint", endpoint),
 			String("database", database),
 			Bool("secure", secure),
@@ -66,14 +60,14 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		start := time.Now()
 		return func(info trace.DriverInitDoneInfo) {
 			if info.Error == nil {
-				l.Log(params.withLevel(DEBUG), "done",
+				l.Log(WithLevel(ctx, DEBUG), "done",
 					String("endpoint", endpoint),
 					String("database", database),
 					Bool("secure", secure),
 					latency(start),
 				)
 			} else {
-				l.Log(params.withLevel(WARN), "failed",
+				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
 					String("endpoint", endpoint),
 					String("database", database),
@@ -88,20 +82,16 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		if d.Details()&trace.DriverEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"driver", "resolver", "close"},
-		}
-		l.Log(params, "start")
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "resolver", "close")
+		l.Log(ctx, "start")
 		start := time.Now()
 		return func(info trace.DriverCloseDoneInfo) {
 			if info.Error == nil {
-				l.Log(params.withLevel(TRACE), "done",
+				l.Log(WithLevel(ctx, TRACE), "done",
 					latency(start),
 				)
 			} else {
-				l.Log(params.withLevel(WARN), "failed",
+				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
 					latency(start),
 					version(),
@@ -113,24 +103,20 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		if d.Details()&trace.DriverConnEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"driver", "conn", "dial"},
-		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "dial")
 		endpoint := info.Endpoint
-		l.Log(params, "start",
+		l.Log(ctx, "start",
 			Stringer("endpoint", endpoint),
 		)
 		start := time.Now()
 		return func(info trace.DriverConnDialDoneInfo) {
 			if info.Error == nil {
-				l.Log(params.withLevel(DEBUG), "done",
+				l.Log(WithLevel(ctx, DEBUG), "done",
 					Stringer("endpoint", endpoint),
 					latency(start),
 				)
 			} else {
-				l.Log(params.withLevel(ERROR), "failed",
+				l.Log(WithLevel(ctx, ERROR), "failed",
 					Error(info.Error),
 					Stringer("endpoint", endpoint),
 					latency(start),
@@ -143,18 +129,15 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		if d.Details()&trace.DriverConnEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Level:     TRACE,
-			Namespace: []string{"driver", "conn", "state", "change"},
-		}
+		ctx := with(context.Background(), TRACE, "ydb", "driver", "conn", "state", "change")
 		endpoint := info.Endpoint
-		l.Log(params, "start",
+		l.Log(ctx, "start",
 			Stringer("endpoint", endpoint),
 			Stringer("state", info.State),
 		)
 		start := time.Now()
 		return func(info trace.DriverConnStateChangeDoneInfo) {
-			l.Log(params, "done",
+			l.Log(ctx, "done",
 				Stringer("endpoint", endpoint),
 				latency(start),
 				Stringer("state", info.State),
@@ -165,24 +148,20 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		if d.Details()&trace.DriverConnEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"driver", "conn", "park"},
-		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "park")
 		endpoint := info.Endpoint
-		l.Log(params, "start",
+		l.Log(ctx, "start",
 			Stringer("endpoint", endpoint),
 		)
 		start := time.Now()
 		return func(info trace.DriverConnParkDoneInfo) {
 			if info.Error == nil {
-				l.Log(params, "done",
+				l.Log(ctx, "done",
 					Stringer("endpoint", endpoint),
 					latency(start),
 				)
 			} else {
-				l.Log(params.withLevel(WARN), "failed",
+				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
 					Stringer("endpoint", endpoint),
 					latency(start),
@@ -195,24 +174,20 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		if d.Details()&trace.DriverConnEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"driver", "conn", "close"},
-		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "close")
 		endpoint := info.Endpoint
-		l.Log(params.withLevel(TRACE), "start",
+		l.Log(ctx, "start",
 			Stringer("endpoint", endpoint),
 		)
 		start := time.Now()
 		return func(info trace.DriverConnCloseDoneInfo) {
 			if info.Error == nil {
-				l.Log(params.withLevel(TRACE), "done",
+				l.Log(WithLevel(ctx, TRACE), "done",
 					Stringer("endpoint", endpoint),
 					latency(start),
 				)
 			} else {
-				l.Log(params.withLevel(WARN), "failed",
+				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
 					Stringer("endpoint", endpoint),
 					latency(start),
@@ -225,28 +200,24 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		if d.Details()&trace.DriverConnEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"driver", "conn", "invoke"},
-		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "invoke")
 		endpoint := info.Endpoint
 		method := string(info.Method)
-		l.Log(params.withLevel(TRACE), "start",
+		l.Log(ctx, "start",
 			Stringer("endpoint", endpoint),
 			String("method", method),
 		)
 		start := time.Now()
 		return func(info trace.DriverConnInvokeDoneInfo) {
 			if info.Error == nil {
-				l.Log(params.withLevel(TRACE), "done",
+				l.Log(WithLevel(ctx, TRACE), "done",
 					Stringer("endpoint", endpoint),
 					String("method", method),
 					latency(start),
 					Stringer("metadata", metadata(info.Metadata)),
 				)
 			} else {
-				l.Log(params.withLevel(WARN), "failed",
+				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
 					Stringer("endpoint", endpoint),
 					String("method", method),
@@ -267,27 +238,23 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		if d.Details()&trace.DriverConnEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"driver", "conn", "new", "stream"},
-		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "new", "stream")
 		endpoint := info.Endpoint
 		method := string(info.Method)
-		l.Log(params.withLevel(TRACE), "start",
+		l.Log(ctx, "start",
 			Stringer("endpoint", endpoint),
 			String("method", method),
 		)
 		start := time.Now()
 		return func(info trace.DriverConnNewStreamRecvInfo) func(trace.DriverConnNewStreamDoneInfo) {
 			if info.Error == nil {
-				l.Log(params.withLevel(TRACE), "intermediate receive",
+				l.Log(WithLevel(ctx, TRACE), "intermediate receive",
 					Stringer("endpoint", endpoint),
 					String("method", method),
 					latency(start),
 				)
 			} else {
-				l.Log(params.withLevel(WARN), "intermediate fail",
+				l.Log(WithLevel(ctx, WARN), "intermediate fail",
 					Error(info.Error),
 					Stringer("endpoint", endpoint),
 					String("method", method),
@@ -297,14 +264,14 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 			}
 			return func(info trace.DriverConnNewStreamDoneInfo) {
 				if info.Error == nil {
-					l.Log(params.withLevel(TRACE), "done",
+					l.Log(WithLevel(ctx, TRACE), "done",
 						Stringer("endpoint", endpoint),
 						String("method", method),
 						latency(start),
 						Stringer("metadata", metadata(info.Metadata)),
 					)
 				} else {
-					l.Log(params.withLevel(WARN), "failed",
+					l.Log(WithLevel(ctx, WARN), "failed",
 						Error(info.Error),
 						Stringer("endpoint", endpoint),
 						String("method", method),
@@ -320,20 +287,16 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		if d.Details()&trace.DriverConnEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"driver", "conn", "ban"},
-		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "ban")
 		endpoint := info.Endpoint
-		l.Log(params.withLevel(WARN), "start",
+		l.Log(ctx, "start",
 			Stringer("endpoint", endpoint),
 			NamedError("cause", info.Cause),
 			version(),
 		)
 		start := time.Now()
 		return func(info trace.DriverConnBanDoneInfo) {
-			l.Log(params.withLevel(WARN), "done",
+			l.Log(WithLevel(ctx, WARN), "done",
 				Stringer("endpoint", endpoint),
 				latency(start),
 				Stringer("state", info.State),
@@ -345,18 +308,14 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		if d.Details()&trace.DriverConnEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"driver", "conn", "allow"},
-		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "allow")
 		endpoint := info.Endpoint
-		l.Log(params.withLevel(TRACE), "start",
+		l.Log(ctx, "start",
 			Stringer("endpoint", endpoint),
 		)
 		start := time.Now()
 		return func(info trace.DriverConnAllowDoneInfo) {
-			l.Log(params.withLevel(INFO), "done",
+			l.Log(WithLevel(ctx, INFO), "done",
 				Stringer("endpoint", endpoint),
 				latency(start),
 				Stringer("state", info.State),
@@ -367,27 +326,23 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		if d.Details()&trace.DriverRepeaterEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"driver", "repeater", "wake", "up"},
-		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "repeater", "wake", "up")
 		name := info.Name
 		event := info.Event
-		l.Log(params.withLevel(TRACE), "start",
+		l.Log(ctx, "start",
 			String("name", name),
 			String("event", event),
 		)
 		start := time.Now()
 		return func(info trace.DriverRepeaterWakeUpDoneInfo) {
 			if info.Error == nil {
-				l.Log(params.withLevel(TRACE), "done",
+				l.Log(WithLevel(ctx, TRACE), "done",
 					String("name", name),
 					String("event", event),
 					latency(start),
 				)
 			} else {
-				l.Log(params.withLevel(ERROR), "failed",
+				l.Log(WithLevel(ctx, ERROR), "failed",
 					Error(info.Error),
 					String("name", name),
 					String("event", event),
@@ -401,15 +356,11 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		if d.Details()&trace.DriverBalancerEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"driver", "balancer", "init"},
-		}
-		l.Log(params.withLevel(TRACE), "start")
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "balancer", "init")
+		l.Log(ctx, "start")
 		start := time.Now()
 		return func(info trace.DriverBalancerInitDoneInfo) {
-			l.Log(params.withLevel(DEBUG), "done",
+			l.Log(WithLevel(ctx, DEBUG), "done",
 				latency(start),
 			)
 		}
@@ -418,20 +369,16 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		if d.Details()&trace.DriverBalancerEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"driver", "balancer", "close"},
-		}
-		l.Log(params.withLevel(TRACE), "start")
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "balancer", "close")
+		l.Log(ctx, "start")
 		start := time.Now()
 		return func(info trace.DriverBalancerCloseDoneInfo) {
 			if info.Error == nil {
-				l.Log(params.withLevel(TRACE), "done",
+				l.Log(WithLevel(ctx, TRACE), "done",
 					latency(start),
 				)
 			} else {
-				l.Log(params.withLevel(ERROR), "failed",
+				l.Log(WithLevel(ctx, ERROR), "failed",
 					Error(info.Error),
 					latency(start),
 					version(),
@@ -447,21 +394,17 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		if d.Details()&trace.DriverBalancerEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"driver", "balancer", "choose", "endpoint"},
-		}
-		l.Log(params.withLevel(TRACE), "start")
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "balancer", "choose", "endpoint")
+		l.Log(ctx, "start")
 		start := time.Now()
 		return func(info trace.DriverBalancerChooseEndpointDoneInfo) {
 			if info.Error == nil {
-				l.Log(params.withLevel(TRACE), "done",
+				l.Log(WithLevel(ctx, TRACE), "done",
 					latency(start),
 					Stringer("endpoint", info.Endpoint),
 				)
 			} else {
-				l.Log(params.withLevel(WARN), "failed",
+				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
 					latency(start),
 					version(),
@@ -477,17 +420,13 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		if d.Details()&trace.DriverBalancerEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"driver", "balancer", "update"},
-		}
-		l.Log(params.withLevel(TRACE), "start",
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "balancer", "update")
+		l.Log(ctx, "start",
 			Bool("needLocalDC", info.NeedLocalDC),
 		)
 		start := time.Now()
 		return func(info trace.DriverBalancerUpdateDoneInfo) {
-			l.Log(params.withLevel(INFO), "done",
+			l.Log(WithLevel(ctx, INFO), "done",
 				latency(start),
 				Stringer("endpoints", endpoints(info.Endpoints)),
 				String("detectedLocalDC", info.LocalDC),
@@ -498,21 +437,17 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		if d.Details()&trace.DriverCredentialsEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"driver", "credentials", "get"},
-		}
-		l.Log(params.withLevel(TRACE), "start")
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "credentials", "get")
+		l.Log(ctx, "start")
 		start := time.Now()
 		return func(info trace.DriverGetCredentialsDoneInfo) {
 			if info.Error == nil {
-				l.Log(params.withLevel(TRACE), "done",
+				l.Log(WithLevel(ctx, TRACE), "done",
 					latency(start),
 					String("token", Secret(info.Token)),
 				)
 			} else {
-				l.Log(params.withLevel(ERROR), "done",
+				l.Log(WithLevel(ctx, ERROR), "done",
 					Error(info.Error),
 					latency(start),
 					String("token", Secret(info.Token)),

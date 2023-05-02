@@ -16,22 +16,18 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		if d.Details()&trace.ScriptingEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"scripting", "execute"},
-		}
-		l.Log(params.withLevel(DEBUG), "start")
+		ctx := with(*info.Context, TRACE, "ydb", "scripting", "execute")
+		l.Log(ctx, "start")
 		start := time.Now()
 		return func(info trace.ScriptingExecuteDoneInfo) {
 			if info.Error == nil {
-				l.Log(params.withLevel(DEBUG), "done",
+				l.Log(WithLevel(ctx, DEBUG), "done",
 					latency(start),
 					Int("resultSetCount", info.Result.ResultSetCount()),
 					NamedError("resultSetError", info.Result.Err()),
 				)
 			} else {
-				l.Log(params.withLevel(ERROR), "failed",
+				l.Log(WithLevel(ctx, ERROR), "failed",
 					Error(info.Error),
 					latency(start),
 					version(),
@@ -43,21 +39,17 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		if d.Details()&trace.ScriptingEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"scripting", "explain"},
-		}
-		l.Log(params.withLevel(TRACE), "start")
+		ctx := with(*info.Context, TRACE, "ydb", "scripting", "explain")
+		l.Log(ctx, "start")
 		start := time.Now()
 		return func(info trace.ScriptingExplainDoneInfo) {
 			if info.Error == nil {
-				l.Log(params.withLevel(DEBUG), "done",
+				l.Log(WithLevel(ctx, DEBUG), "done",
 					latency(start),
 					String("plan", info.Plan),
 				)
 			} else {
-				l.Log(params.withLevel(ERROR), "failed",
+				l.Log(WithLevel(ctx, ERROR), "failed",
 					Error(info.Error),
 					latency(start),
 					version(),
@@ -75,13 +67,9 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		if d.Details()&trace.ScriptingEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"scripting", "stream", "execute"},
-		}
+		ctx := with(*info.Context, TRACE, "ydb", "scripting", "stream", "execute")
 		query := info.Query
-		l.Log(params.withLevel(TRACE), "start",
+		l.Log(ctx, "start",
 			appendFieldByCondition(l.logQuery,
 				String("query", query),
 			)...,
@@ -93,23 +81,23 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 			trace.ScriptingStreamExecuteDoneInfo,
 		) {
 			if info.Error == nil {
-				l.Log(params.withLevel(TRACE), "intermediate")
+				l.Log(WithLevel(ctx, TRACE), "intermediate")
 			} else {
-				l.Log(params.withLevel(WARN), "intermediate failed",
+				l.Log(WithLevel(ctx, WARN), "intermediate failed",
 					Error(info.Error),
 					version(),
 				)
 			}
 			return func(info trace.ScriptingStreamExecuteDoneInfo) {
 				if info.Error == nil {
-					l.Log(params.withLevel(DEBUG), "done",
+					l.Log(WithLevel(ctx, DEBUG), "done",
 						appendFieldByCondition(l.logQuery,
 							String("query", query),
 							latency(start),
 						)...,
 					)
 				} else {
-					l.Log(params.withLevel(ERROR), "failed",
+					l.Log(WithLevel(ctx, ERROR), "failed",
 						appendFieldByCondition(l.logQuery,
 							String("query", query),
 							Error(info.Error),
@@ -125,20 +113,16 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		if d.Details()&trace.ScriptingEvents == 0 {
 			return nil
 		}
-		params := Params{
-			Ctx:       *info.Context,
-			Level:     TRACE,
-			Namespace: []string{"scripting", "close"},
-		}
-		l.Log(params.withLevel(DEBUG), "start")
+		ctx := with(*info.Context, TRACE, "ydb", "scripting", "close")
+		l.Log(ctx, "start")
 		start := time.Now()
 		return func(info trace.ScriptingCloseDoneInfo) {
 			if info.Error == nil {
-				l.Log(params.withLevel(DEBUG), "done",
+				l.Log(WithLevel(ctx, DEBUG), "done",
 					latency(start),
 				)
 			} else {
-				l.Log(params.withLevel(ERROR), "failed",
+				l.Log(WithLevel(ctx, ERROR), "failed",
 					Error(info.Error),
 					latency(start),
 					version(),

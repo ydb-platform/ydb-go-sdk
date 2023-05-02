@@ -41,7 +41,6 @@ func TestRatelimiter(t *testing.T) {
 				log.WithMinLevel(log.WARN),
 			),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|ratelimiter|coordination).*`),
-			log.WithNamespace("ydb"),
 		),
 	)
 	if err != nil {

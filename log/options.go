@@ -24,16 +24,6 @@ func WithMinLevel(level Level) simpleLoggerOption {
 	return minLevelSimpleOption(level)
 }
 
-type namespaceOption string
-
-func (namespace namespaceOption) applyHolderOption(l *wrapper) {
-	l.namespace = append(l.namespace, string(namespace))
-}
-
-func WithNamespace(namespace string) namespaceOption {
-	return namespaceOption(namespace)
-}
-
 type logQueryOption bool
 
 func (logQuery logQueryOption) applySimpleOption(l *simpleLogger) {

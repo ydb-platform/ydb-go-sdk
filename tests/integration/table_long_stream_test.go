@@ -43,7 +43,6 @@ func TestLongStream(t *testing.T) {
 				log.WithMinLevel(log.TRACE),
 			),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
-			log.WithNamespace("ydb"),
 		),
 	)
 	if err != nil {

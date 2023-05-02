@@ -49,7 +49,6 @@ func TestTableMultipleResultSets(t *testing.T) {
 				log.WithColoring(),
 			),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
-			log.WithNamespace("ydb"),
 		),
 	)
 	require.NoError(t, err)

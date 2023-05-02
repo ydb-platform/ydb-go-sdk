@@ -42,7 +42,6 @@ func TestScripting(t *testing.T) {
 				log.WithMinLevel(log.TRACE),
 			),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
-			log.WithNamespace("ydb"),
 		),
 		ydb.WithUserAgent("scripting"),
 	)
