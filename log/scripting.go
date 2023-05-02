@@ -21,7 +21,7 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		start := time.Now()
 		return func(info trace.ScriptingExecuteDoneInfo) {
 			if info.Error == nil {
-				l.Log(WithLevel(ctx, DEBUG), "done",
+				l.Log(ctx, "done",
 					latency(start),
 					Int("resultSetCount", info.Result.ResultSetCount()),
 					NamedError("resultSetError", info.Result.Err()),
@@ -44,7 +44,7 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		start := time.Now()
 		return func(info trace.ScriptingExplainDoneInfo) {
 			if info.Error == nil {
-				l.Log(WithLevel(ctx, DEBUG), "done",
+				l.Log(ctx, "done",
 					latency(start),
 					String("plan", info.Plan),
 				)
@@ -81,7 +81,7 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 			trace.ScriptingStreamExecuteDoneInfo,
 		) {
 			if info.Error == nil {
-				l.Log(WithLevel(ctx, TRACE), "intermediate")
+				l.Log(ctx, "intermediate")
 			} else {
 				l.Log(WithLevel(ctx, WARN), "intermediate failed",
 					Error(info.Error),
@@ -90,7 +90,7 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 			}
 			return func(info trace.ScriptingStreamExecuteDoneInfo) {
 				if info.Error == nil {
-					l.Log(WithLevel(ctx, DEBUG), "done",
+					l.Log(ctx, "done",
 						appendFieldByCondition(l.logQuery,
 							String("query", query),
 							latency(start),
@@ -118,11 +118,11 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		start := time.Now()
 		return func(info trace.ScriptingCloseDoneInfo) {
 			if info.Error == nil {
-				l.Log(WithLevel(ctx, DEBUG), "done",
+				l.Log(ctx, "done",
 					latency(start),
 				)
 			} else {
-				l.Log(WithLevel(ctx, ERROR), "failed",
+				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
 					latency(start),
 					version(),

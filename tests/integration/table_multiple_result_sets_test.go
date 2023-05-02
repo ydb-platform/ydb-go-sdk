@@ -44,7 +44,7 @@ func TestTableMultipleResultSets(t *testing.T) {
 		"", // corner case for check replacement of endpoint+database+secure
 		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
 		ydb.WithLogger(
-			log.Simple(os.Stderr,
+			log.Default(os.Stderr,
 				log.WithMinLevel(log.TRACE),
 				log.WithColoring(),
 			),

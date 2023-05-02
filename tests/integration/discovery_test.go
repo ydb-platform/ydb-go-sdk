@@ -63,7 +63,7 @@ func TestDiscovery(t *testing.T) {
 		ydb.WithConnectionTTL(time.Second*1),
 		ydb.WithMinTLSVersion(tls.VersionTLS10),
 		ydb.WithLogger(
-			log.Simple(os.Stderr,
+			log.Default(os.Stderr,
 				log.WithMinLevel(log.WARN),
 				log.WithColoring(),
 			),

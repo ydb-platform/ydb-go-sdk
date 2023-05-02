@@ -46,7 +46,7 @@ func internalDiscovery(l *wrapper, d trace.Detailer) (t trace.Discovery) {
 		start := time.Now()
 		return func(info trace.DiscoveryWhoAmIDoneInfo) {
 			if info.Error == nil {
-				l.Log(WithLevel(ctx, TRACE), "done",
+				l.Log(ctx, "done",
 					latency(start),
 					String("user", info.User),
 					Strings("groups", info.Groups),

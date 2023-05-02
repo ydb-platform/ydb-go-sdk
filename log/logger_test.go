@@ -9,12 +9,12 @@ import (
 
 func TestColoring(t *testing.T) {
 	for _, tt := range []struct {
-		l   *simpleLogger
+		l   *defaultLogger
 		msg string
 		exp string
 	}{
 		{
-			l: &simpleLogger{
+			l: &defaultLogger{
 				namespaceMaxLen: 26,
 				coloring:        true,
 				clock:           clockwork.NewFakeClock(),
@@ -23,7 +23,7 @@ func TestColoring(t *testing.T) {
 			exp: "\u001B[31m1984-04-04 00:00:00.000  \u001B[0m\u001B[101mERROR\u001B[0m\u001B[31m                 [\u001B[0m\u001B[101mtest.scope\u001B[0m] \u001B[0m\u001B[31mmessage\u001B[0m", //nolint:lll
 		},
 		{
-			l: &simpleLogger{
+			l: &defaultLogger{
 				namespaceMaxLen: 26,
 				coloring:        false,
 				clock:           clockwork.NewFakeClock(),

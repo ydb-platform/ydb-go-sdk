@@ -88,7 +88,7 @@ func (scope *scopeT) Driver(opts ...ydb.Option) *ydb.Driver {
 			append(opts,
 				ydb.WithAccessTokenCredentials(token),
 				ydb.WithLogger(
-					log.Simple(os.Stderr,
+					log.Default(os.Stderr,
 						log.WithMinLevel(log.WARN),
 					),
 					trace.DetailsAll,

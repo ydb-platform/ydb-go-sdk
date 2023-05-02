@@ -20,14 +20,14 @@ type Logger interface {
 	Log(ctx context.Context, msg string, fields ...Field)
 }
 
-var _ Logger = (*simpleLogger)(nil)
+var _ Logger = (*defaultLogger)(nil)
 
 type simpleLoggerOption interface {
-	applySimpleOption(l *simpleLogger)
+	applySimpleOption(l *defaultLogger)
 }
 
-func Simple(w io.Writer, opts ...simpleLoggerOption) *simpleLogger {
-	l := &simpleLogger{
+func Default(w io.Writer, opts ...simpleLoggerOption) *defaultLogger {
+	l := &defaultLogger{
 		namespaceMaxLen: 24,
 		coloring:        false,
 		minLevel:        INFO,
@@ -40,7 +40,7 @@ func Simple(w io.Writer, opts ...simpleLoggerOption) *simpleLogger {
 	return l
 }
 
-type simpleLogger struct {
+type defaultLogger struct {
 	namespaceMaxLen int
 	coloring        bool
 	clock           clockwork.Clock
@@ -49,7 +49,7 @@ type simpleLogger struct {
 	w               io.Writer
 }
 
-func (l *simpleLogger) format(namespace []string, msg string, logLevel Level) string {
+func (l *defaultLogger) format(namespace []string, msg string, logLevel Level) string {
 	b := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(b)
 	if l.coloring {
@@ -98,7 +98,7 @@ func (l *simpleLogger) format(namespace []string, msg string, logLevel Level) st
 	return b.String()
 }
 
-func (l *simpleLogger) Log(ctx context.Context, msg string, fields ...Field) {
+func (l *defaultLogger) Log(ctx context.Context, msg string, fields ...Field) {
 	lvl := LevelFromContext(ctx)
 	if lvl < l.minLevel {
 		return
@@ -128,7 +128,7 @@ func wrapLogger(l Logger, opts ...Option) *wrapper {
 	return ll
 }
 
-func (l *simpleLogger) appendFields(msg string, fields ...Field) string {
+func (l *defaultLogger) appendFields(msg string, fields ...Field) string {
 	if len(fields) == 0 {
 		return msg
 	}

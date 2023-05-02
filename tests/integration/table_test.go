@@ -296,10 +296,9 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 		ydb.WithDialTimeout(5*time.Second),
 		ydb.WithSessionPoolSizeLimit(limit),
 		ydb.WithConnectionTTL(5*time.Second),
-		ydb.WithDiscoveryInterval(5*time.Second),
 		ydb.WithLogger(
-			log.Simple(os.Stderr,
-				log.WithMinLevel(log.TRACE),
+			log.Default(os.Stderr,
+				log.WithMinLevel(log.FromString(os.Getenv("YDB_LOG_SEVERITY_LEVEL"))),
 				log.WithColoring(),
 			),
 			trace.MatchDetails(`ydb\.(driver|table|discovery|retry|scheme).*`),
