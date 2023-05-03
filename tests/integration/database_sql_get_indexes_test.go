@@ -1,5 +1,5 @@
-//go:build !fast
-// +build !fast
+//go:build integration
+// +build integration
 
 package integration
 
