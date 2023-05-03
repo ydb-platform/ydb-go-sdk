@@ -44,10 +44,10 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.17.x, 1.19.x, 1.20.x]
-        ydb-version: [22-5, 23-1]
+        ydb-version: [22.5, 23.1]
     services:
       ydb:
-        image: cr.yandex/yc/yandex-docker-local-ydb:stable-${{ matrix.ydb-version }}-slim
+        image: cr.yandex/yc/yandex-docker-local-ydb:${{ matrix.ydb-version }}-slim
         ports:
           - 2135:2135
           - 2136:2136
