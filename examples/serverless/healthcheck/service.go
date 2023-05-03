@@ -26,10 +26,7 @@ type service struct {
 	client *http.Client
 }
 
-var (
-	s    *service
-	once sync.Once
-)
+var once sync.Once
 
 func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service, err error) {
 	once.Do(func() {
@@ -37,7 +34,7 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 			client: &http.Client{
 				Transport: &http.Transport{
 					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: true,
+						InsecureSkipVerify: true, //nolint:gosec
 					},
 				},
 				Timeout: time.Second * 10,
@@ -127,7 +124,7 @@ func (s *service) check(ctx context.Context, urls []string) error {
 	for idx := range urls {
 		for _, u := range strings.Split(urls[idx], " ") {
 			wg.Add(1)
-			go func(idx int) {
+			go func(idx int, u string) {
 				defer wg.Done()
 				out := " > '" + u + "' => "
 				code, err := s.ping(u)
@@ -141,7 +138,7 @@ func (s *service) check(ctx context.Context, urls []string) error {
 					code: code,
 					err:  err,
 				}
-			}(idx)
+			}(idx, u)
 		}
 	}
 	wg.Wait()
@@ -196,7 +193,8 @@ func (s *service) upsertRows(ctx context.Context, rows []row) (err error) {
 }
 
 // Serverless is an entrypoint for serverless yandex function
-// nolint:deadcode
+//
+//nolint:deadcode
 func Serverless(ctx context.Context) error {
 	s, err := getService(
 		ctx,

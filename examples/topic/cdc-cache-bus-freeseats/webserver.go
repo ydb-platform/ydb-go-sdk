@@ -20,12 +20,12 @@ var errNotEnthoughtFreeSeats = errors.New("not enough free seats")
 type server struct {
 	cache     *Cache
 	mux       http.ServeMux
-	db        ydb.Connection
+	db        *ydb.Driver
 	dbCounter int64
 	id        int
 }
 
-func newServer(id int, db ydb.Connection, cacheTimeout time.Duration, useCDC bool) *server {
+func newServer(id int, db *ydb.Driver, cacheTimeout time.Duration, useCDC bool) *server {
 	res := &server{
 		cache: NewCache(cacheTimeout),
 		db:    db,

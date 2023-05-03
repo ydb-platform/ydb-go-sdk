@@ -10,7 +10,7 @@ import (
 )
 
 // CommitNotify is example for receive commit notifications with async commit mode
-func CommitNotify(ctx context.Context, db ydb.Connection) {
+func CommitNotify(ctx context.Context, db *ydb.Driver) {
 	reader, _ := db.Topic().StartReader("consumer", topicoptions.ReadTopic("asd"),
 		topicoptions.WithReaderTrace(trace.Topic{
 			OnReaderCommittedNotify: func(info trace.TopicReaderCommittedNotifyInfo) {
@@ -28,7 +28,7 @@ func CommitNotify(ctx context.Context, db ydb.Connection) {
 }
 
 // ExplicitPartitionStartStopHandler is example for create own handler for stop partition event from server
-func ExplicitPartitionStartStopHandler(ctx context.Context, db ydb.Connection) {
+func ExplicitPartitionStartStopHandler(ctx context.Context, db *ydb.Driver) {
 	readContext, stopReader := context.WithCancel(context.Background())
 	defer stopReader()
 
@@ -83,7 +83,7 @@ func ExplicitPartitionStartStopHandler(ctx context.Context, db ydb.Connection) {
 
 // PartitionStartStopHandlerAndOwnReadProgressStorage example of complex use explicit start/stop partition handler
 // and own progress storage in external system
-func PartitionStartStopHandlerAndOwnReadProgressStorage(ctx context.Context, db ydb.Connection) {
+func PartitionStartStopHandlerAndOwnReadProgressStorage(ctx context.Context, db *ydb.Driver) {
 	readContext, stopReader := context.WithCancel(context.Background())
 	defer stopReader()
 

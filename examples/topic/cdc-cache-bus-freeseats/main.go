@@ -18,9 +18,10 @@ var (
 	cacheTimeout        = flag.Duration("cache", time.Second*10, "cache timeout, 0 mean disable cache")
 	disableCDC          = flag.Bool("disable-cdc", false, "disable cdc")
 	skipCreateTable     = flag.Bool("skip-init", false, "skip recreate table and topic")
-	ydbConnectionString = flag.String("ydb-connection-string", "", "ydb connection string, default "+defaultConnectionString)
-	ydbToken            = flag.String("ydb-token", "", "Auth token for ydb")
-	backendCount        = flag.Int("backend-count", 1, "count of backend servers")
+	ydbConnectionString = flag.String("ydb-connection-string",
+		"", "ydb connection string, default "+defaultConnectionString)
+	ydbToken     = flag.String("ydb-token", "", "Auth token for ydb")
+	backendCount = flag.Int("backend-count", 1, "count of backend servers")
 )
 
 func main() {
@@ -43,7 +44,7 @@ func main() {
 
 	addr := *host + ":" + strconv.Itoa(*port)
 	log.Printf("Start listen http://%s\n", addr)
-	err := http.ListenAndServe(addr, handler)
+	err := http.ListenAndServe(addr, handler) //nolint:gosec
 	if errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("failed to listen and serve: %+v", err)
 	}

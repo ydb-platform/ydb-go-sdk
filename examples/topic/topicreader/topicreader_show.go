@@ -20,7 +20,7 @@ func PartitionStopHandled(ctx context.Context, reader *topicreader.Reader) {
 }
 
 // PartitionGracefulStopHandled is example of sdk handle server signal about graceful stop partition
-func PartitionGracefulStopHandled(ctx context.Context, db ydb.Connection) {
+func PartitionGracefulStopHandled(ctx context.Context, db *ydb.Driver) {
 	reader, _ := db.Topic().StartReader("consumer", nil,
 		topicoptions.WithBatchReadMinCount(1000),
 	)

@@ -101,11 +101,11 @@ func main() {
 	if err != nil {
 		fmt.Println()
 		fmt.Println("Create service failed. Re-run with flag '-log-level=warn' and see logs")
-		os.Exit(1)
+		return
 	}
 	defer s.Close(ctx)
 
-	server := &http.Server{
+	server := &http.Server{ //nolint:gosec
 		Addr:    ":" + strconv.Itoa(port),
 		Handler: s.router,
 	}

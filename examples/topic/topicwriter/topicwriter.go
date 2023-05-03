@@ -10,8 +10,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
-const groupID = "group-id"
-
 func ConnectSimple(ctx context.Context, db *ydb.Driver) *topicwriter.Writer {
 	writer, _ := db.Topic().StartWriter("topicName")
 	return writer

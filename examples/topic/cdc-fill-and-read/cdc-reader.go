@@ -10,7 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
 )
 
-func cdcRead(ctx context.Context, db ydb.Connection, consumerName, topicPath string) {
+func cdcRead(ctx context.Context, db *ydb.Driver, consumerName, topicPath string) {
 	// Connect to changefeed
 
 	log.Println("Start cdc read")
@@ -22,18 +22,18 @@ func cdcRead(ctx context.Context, db ydb.Connection, consumerName, topicPath str
 	for {
 		msg, err := reader.ReadMessage(ctx)
 		if err != nil {
-			panic(fmt.Errorf("failed to read message: %+v", err))
+			panic(fmt.Errorf("failed to read message: %w", err))
 		}
 
 		var event interface{}
 		err = topicsugar.JSONUnmarshal(msg, &event)
 		if err != nil {
-			panic(fmt.Errorf("failed to unmarshal json cdc: %+v", err))
+			panic(fmt.Errorf("failed to unmarshal json cdc: %w", err))
 		}
 		log.Println("new cdc event:", event)
 		err = reader.Commit(ctx, msg)
 		if err != nil {
-			panic(fmt.Errorf("failed to commit message: %+v", err))
+			panic(fmt.Errorf("failed to commit message: %w", err))
 		}
 	}
 }

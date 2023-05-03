@@ -157,7 +157,9 @@ func readTable(ctx context.Context, c table.Client, path string, opts ...options
 						if err != nil {
 							return err
 						}
-						log.Printf("#  Order, CustomerId: %d, OrderId: %d, Description: %s, Order date: %s", r.id, r.orderID, r.description, r.date.Format("2006-01-02"))
+						log.Printf("#  Order, CustomerId: %d, OrderId: %d, Description: %s, Order date: %s",
+							r.id, r.orderID, r.description, r.date.Format("2006-01-02"),
+						)
 					} else {
 						err = res.ScanNamed(
 							named.OptionalWithDefault("customer_id", &r.id),

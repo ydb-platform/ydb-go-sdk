@@ -82,8 +82,8 @@ VALUES
 	($id, $value)
 `, prefix, tableName)
 	for {
-		id := uint64(rand.Intn(maxID))
-		val := "val-" + strconv.Itoa(rand.Intn(10))
+		id := uint64(rand.Intn(maxID))              //nolint:gosec
+		val := "val-" + strconv.Itoa(rand.Intn(10)) //nolint:gosec
 		params := table.NewQueryParameters(
 			table.ValueParam("$id", types.Uint64Value(id)),
 			table.ValueParam("$value", types.UTF8Value(val)),
@@ -108,7 +108,7 @@ DELETE FROM
 WHERE id=$id
 `, prefix, tableName)
 	for {
-		id := uint64(rand.Intn(maxID))
+		id := uint64(rand.Intn(maxID)) //nolint:gosec
 		params := table.NewQueryParameters(
 			table.ValueParam("$id", types.Uint64Value(id)),
 		)

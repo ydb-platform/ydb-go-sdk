@@ -5,19 +5,14 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	"log"
 	"os"
-	"path"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 )
 
-var (
-	dsn    string
-	prefix string
-)
+var dsn string
 
 func init() {
 	required := []string{"ydb"}
@@ -31,10 +26,6 @@ func init() {
 	flagSet.StringVar(&dsn,
 		"ydb", "",
 		"YDB connection string",
-	)
-	flagSet.StringVar(&prefix,
-		"prefix", "",
-		"tables prefix",
 	)
 	if err := flagSet.Parse(os.Args[1:]); err != nil {
 		flagSet.Usage()
@@ -55,48 +46,52 @@ func init() {
 }
 
 func main() {
-	db, err := sql.Open("ydb", dsn)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	cc, err := ydb.Open(ctx, dsn)
 	if err != nil {
-		log.Fatalf("connect error: %v", err)
+		panic(fmt.Errorf("connect error: %w", err))
 	}
+	defer func() { _ = cc.Close(ctx) }()
+
+	c, err := ydb.Connector(cc,
+		ydb.WithAutoDeclare(),
+	)
+	if err != nil {
+		panic(err)
+	}
+	defer func() { _ = c.Close() }()
+
+	db := sql.OpenDB(c)
 	defer func() { _ = db.Close() }()
 
 	db.SetMaxOpenConns(50)
 	db.SetMaxIdleConns(50)
 	db.SetConnMaxIdleTime(time.Second)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	cc, err := ydb.Unwrap(db)
+	err = sugar.RemoveRecursive(ctx, cc, "")
 	if err != nil {
-		log.Fatalf("unwrap failed: %v", err)
+		panic(fmt.Errorf("remove recursive failed: %w", err))
 	}
 
-	prefix = path.Join(cc.Name(), prefix)
-
-	err = sugar.RemoveRecursive(ctx, cc, prefix)
+	err = prepareSchema(ctx, db)
 	if err != nil {
-		log.Fatalf("remove recursive failed: %v", err)
+		panic(fmt.Errorf("create tables error: %w", err))
 	}
 
-	err = prepareSchema(ctx, db, prefix)
+	err = fillTablesWithData(ctx, db)
 	if err != nil {
-		log.Fatalf("create tables error: %v", err)
+		panic(fmt.Errorf("fill tables with data error: %w", err))
 	}
 
-	err = fillTablesWithData(ctx, db, prefix)
+	err = selectDefault(ctx, db)
 	if err != nil {
-		log.Fatalf("fill tables with data error: %v", err)
+		panic(err)
 	}
 
-	err = selectDefault(ctx, db, prefix)
+	err = selectScan(ctx, db)
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = selectScan(ctx, db, prefix)
-	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 }

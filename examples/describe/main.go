@@ -97,7 +97,7 @@ func main() {
 	list(ctx, db, t, prefix)
 }
 
-func list(ctx context.Context, db ydb.Connection, t *template.Template, p string) {
+func list(ctx context.Context, db *ydb.Driver, t *template.Template, p string) {
 	var dir scheme.Directory
 	var err error
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
