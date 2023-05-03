@@ -1,4 +1,4 @@
-//go:build !fast
+//go:build integration
 
 package integration
 
