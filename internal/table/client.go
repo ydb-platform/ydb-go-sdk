@@ -475,7 +475,7 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t trace.Table) (s *
 
 	var createSessionTimeoutCh <-chan time.Time
 	if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
-		createSessionTimeoutCh = time.After(timeout)
+		createSessionTimeoutCh = c.clock.After(timeout)
 	}
 
 	select {
