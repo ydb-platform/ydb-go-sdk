@@ -412,14 +412,24 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 			Int("attempt", info.Attempt),
 		)
 		return func(doneInfo trace.TopicWriterReconnectDoneInfo) {
-			l.Log(ctx, "connect to topic writer stream completed",
-				Error(doneInfo.Error),
-				String("topic", info.Topic),
-				String("producer_id", info.ProducerID),
-				String("writer_instance_id", info.WriterInstanceID),
-				Int("attempt", info.Attempt),
-				latency(start),
-			)
+			if doneInfo.Error == nil {
+				l.Log(WithLevel(ctx, DEBUG), "connect to topic writer stream completed",
+					String("topic", info.Topic),
+					String("producer_id", info.ProducerID),
+					String("writer_instance_id", info.WriterInstanceID),
+					Int("attempt", info.Attempt),
+					latency(start),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "connect to topic writer stream completed",
+					Error(doneInfo.Error),
+					String("topic", info.Topic),
+					String("producer_id", info.ProducerID),
+					String("writer_instance_id", info.WriterInstanceID),
+					Int("attempt", info.Attempt),
+					latency(start),
+				)
+			}
 		}
 	}
 	t.OnWriterInitStream = func(info trace.TopicWriterInitStreamStartInfo) func(doneInfo trace.TopicWriterInitStreamDoneInfo) {
@@ -435,14 +445,25 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		)
 
 		return func(doneInfo trace.TopicWriterInitStreamDoneInfo) {
-			l.Log(ctx, "init stream completed",
-				Error(doneInfo.Error),
-				String("topic", info.Topic),
-				String("producer_id", info.ProducerID),
-				String("writer_instance_id", info.WriterInstanceID),
-				latency(start),
-				String("session_id", doneInfo.SessionID),
-			)
+			if doneInfo.Error == nil {
+				l.Log(WithLevel(ctx, DEBUG), "init stream completed",
+					Error(doneInfo.Error),
+					String("topic", info.Topic),
+					String("producer_id", info.ProducerID),
+					String("writer_instance_id", info.WriterInstanceID),
+					latency(start),
+					String("session_id", doneInfo.SessionID),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "init stream completed",
+					Error(doneInfo.Error),
+					String("topic", info.Topic),
+					String("producer_id", info.ProducerID),
+					String("writer_instance_id", info.WriterInstanceID),
+					latency(start),
+					String("session_id", doneInfo.SessionID),
+				)
+			}
 		}
 	}
 	t.OnWriterClose = func(info trace.TopicWriterCloseStartInfo) func(doneInfo trace.TopicWriterCloseDoneInfo) {
@@ -456,12 +477,21 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 			NamedError("reason", info.Reason),
 		)
 		return func(doneInfo trace.TopicWriterCloseDoneInfo) {
-			l.Log(ctx, "close topic writer completed",
-				Error(doneInfo.Error),
-				String("writer_instance_id", info.WriterInstanceID),
-				NamedError("reason", info.Reason),
-				latency(start),
-			)
+			if doneInfo.Error == nil {
+				l.Log(WithLevel(ctx, DEBUG), "close topic writer completed",
+					Error(doneInfo.Error),
+					String("writer_instance_id", info.WriterInstanceID),
+					NamedError("reason", info.Reason),
+					latency(start),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "close topic writer completed",
+					Error(doneInfo.Error),
+					String("writer_instance_id", info.WriterInstanceID),
+					NamedError("reason", info.Reason),
+					latency(start),
+				)
+			}
 		}
 	}
 	t.OnWriterCompressMessages = func(info trace.TopicWriterCompressMessagesStartInfo) func(doneInfo trace.TopicWriterCompressMessagesDoneInfo) {
@@ -479,16 +509,29 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 			Int64("first_seqno", info.FirstSeqNo),
 		)
 		return func(doneInfo trace.TopicWriterCompressMessagesDoneInfo) {
-			l.Log(ctx, "compress message completed",
-				Error(doneInfo.Error),
-				String("writer_instance_id", info.WriterInstanceID),
-				String("session_id", info.SessionID),
-				Any("reason", info.Reason),
-				Any("codec", info.Codec),
-				Int("messages_count", info.MessagesCount),
-				Int64("first_seqno", info.FirstSeqNo),
-				latency(start),
-			)
+			if doneInfo.Error == nil {
+				l.Log(WithLevel(ctx, TRACE), "compress message completed",
+					Error(doneInfo.Error),
+					String("writer_instance_id", info.WriterInstanceID),
+					String("session_id", info.SessionID),
+					Any("reason", info.Reason),
+					Any("codec", info.Codec),
+					Int("messages_count", info.MessagesCount),
+					Int64("first_seqno", info.FirstSeqNo),
+					latency(start),
+				)
+			} else {
+				l.Log(WithLevel(ctx, ERROR), "compress message completed",
+					Error(doneInfo.Error),
+					String("writer_instance_id", info.WriterInstanceID),
+					String("session_id", info.SessionID),
+					Any("reason", info.Reason),
+					Any("codec", info.Codec),
+					Int("messages_count", info.MessagesCount),
+					Int64("first_seqno", info.FirstSeqNo),
+					latency(start),
+				)
+			}
 		}
 	}
 	t.OnWriterSendMessages = func(info trace.TopicWriterSendMessagesStartInfo) func(doneInfo trace.TopicWriterSendMessagesDoneInfo) {
@@ -505,23 +548,34 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 			Int64("first_seqno", info.FirstSeqNo),
 		)
 		return func(doneInfo trace.TopicWriterSendMessagesDoneInfo) {
-			l.Log(ctx, "compress message completed",
-				Error(doneInfo.Error),
-				String("writer_instance_id", info.WriterInstanceID),
-				String("session_id", info.SessionID),
-				Any("codec", info.Codec),
-				Int("messages_count", info.MessagesCount),
-				Int64("first_seqno", info.FirstSeqNo),
-				latency(start),
-			)
+			if doneInfo.Error == nil {
+				l.Log(WithLevel(ctx, TRACE), "send messages completed",
+					String("writer_instance_id", info.WriterInstanceID),
+					String("session_id", info.SessionID),
+					Any("codec", info.Codec),
+					Int("messages_count", info.MessagesCount),
+					Int64("first_seqno", info.FirstSeqNo),
+					latency(start),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "send messages completed",
+					Error(doneInfo.Error),
+					String("writer_instance_id", info.WriterInstanceID),
+					String("session_id", info.SessionID),
+					Any("codec", info.Codec),
+					Int("messages_count", info.MessagesCount),
+					Int64("first_seqno", info.FirstSeqNo),
+					latency(start),
+				)
+			}
 		}
 	}
 	t.OnWriterReadUnknownGrpcMessage = func(info trace.TopicOnWriterReadUnknownGrpcMessageInfo) {
 		if d.Details()&trace.TopicWriterStreamEvents == 0 {
 			return
 		}
-		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "read", "unknown", "grpc", "message")
-		l.Log(WithLevel(ctx, INFO), "topic writer receive unknown message from server",
+		ctx := with(context.Background(), DEBUG, "ydb", "topic", "writer", "read", "unknown", "grpc", "message")
+		l.Log(ctx, "topic writer receive unknown message from server",
 			Error(info.Error),
 			String("writer_instance_id", info.WriterInstanceID),
 			String("session_id", info.SessionID),
