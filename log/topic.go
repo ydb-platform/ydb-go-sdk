@@ -510,7 +510,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		)
 		return func(doneInfo trace.TopicWriterCompressMessagesDoneInfo) {
 			if doneInfo.Error == nil {
-				l.Log(WithLevel(ctx, TRACE), "compress message completed",
+				l.Log(ctx, "compress message completed",
 					Error(doneInfo.Error),
 					String("writer_instance_id", info.WriterInstanceID),
 					String("session_id", info.SessionID),
@@ -549,7 +549,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		)
 		return func(doneInfo trace.TopicWriterSendMessagesDoneInfo) {
 			if doneInfo.Error == nil {
-				l.Log(WithLevel(ctx, TRACE), "send messages completed",
+				l.Log(ctx, "send messages completed",
 					String("writer_instance_id", info.WriterInstanceID),
 					String("session_id", info.SessionID),
 					Any("codec", info.Codec),
