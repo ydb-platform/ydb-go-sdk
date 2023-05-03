@@ -1,5 +1,3 @@
-# test SLO
-
 # `ydb-go-sdk` - pure Go native and `database/sql` driver for [YDB](https://github.com/ydb-platform/ydb)
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/ydb-platform/ydb/blob/main/LICENSE)
