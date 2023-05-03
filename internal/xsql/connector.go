@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jonboulle/clockwork"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -175,6 +177,7 @@ func (nopPathNormalizer) NormalizePath(folderOrTable string) string {
 func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
 	c := &Connector{
 		parent:           parent,
+		clock:            clockwork.NewRealClock(),
 		conns:            make(map[*conn]struct{}),
 		defaultTxControl: table.DefaultTxControl(),
 		defaultQueryMode: DefaultQueryMode,
@@ -200,6 +203,8 @@ type pathNormalizer interface {
 // Connector is a producer of database/sql connections
 type Connector struct {
 	parent ydbDriver
+
+	clock clockwork.Clock
 
 	Bindings       bind.Bindings
 	PathNormalizer pathNormalizer
@@ -236,7 +241,7 @@ func (c *Connector) idleCloser() (idleStopper func()) {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(c.idleThreshold):
+			case <-c.clock.After(c.idleThreshold):
 				c.connsMtx.RLock()
 				conns := make([]*conn, 0, len(c.conns))
 				for cc := range c.conns {

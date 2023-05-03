@@ -174,7 +174,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 						err, errClosedClient,
 					)
 				}
-			case <-time.After(timeout):
+			case <-p.clock.After(timeout):
 				t.Fatalf("no result after %s", timeout)
 			}
 		})
@@ -389,7 +389,7 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 			const timeout = time.Second
 			select {
 			case <-got:
-			case <-time.After(timeout):
+			case <-p.clock.After(timeout):
 				t.Fatalf("no internalPoolGet after %s", timeout)
 			}
 		})
@@ -451,7 +451,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 	select {
 	case <-create:
 		t.Fatalf("session 2 on race created while client size 1")
-	case <-time.After(time.Millisecond * 5):
+	case <-p.clock.After(time.Millisecond * 5):
 		// ok
 	}
 
@@ -591,7 +591,7 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 				if se.session != s {
 					t.Fatalf("unexpected session")
 				}
-			case <-time.After(timeout):
+			case <-p.clock.After(timeout):
 				t.Fatalf("no session after %s", timeout)
 			}
 		})
