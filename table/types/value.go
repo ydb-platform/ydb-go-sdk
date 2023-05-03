@@ -189,7 +189,7 @@ func (d *Decimal) BigInt() *big.Int {
 // DecimalValue creates decimal value of given types t and value v.
 // Note that Decimal.Bytes interpreted as big-endian int128.
 func DecimalValue(v *Decimal) Value {
-	return value.DecimalValue(v.Bytes, v.Precision, v.Scale)
+	return value.DecimalValueFromBytes(v.Bytes, v.Precision, v.Scale)
 }
 
 func DecimalValueFromBigInt(v *big.Int, precision, scale uint32) Value {

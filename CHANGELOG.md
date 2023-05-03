@@ -1,3 +1,5 @@
+* Added `*big.Int`, `[16]byte`, `int64` and `uint64` types as destination types for cast decimal value with `types.CastTo(types.Value, &dst)`
+
 ## v3.45.0
 * Added `table/options.WithPartitions` for configure partitioning policy
 * Marked as deprecated `table/options.WithPartitioningPolicy{UniformPartitions,ExplicitPartitions}` (use `With{UniformPartitions,ExplicitPartitions}` instead)

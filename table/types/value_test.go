@@ -2,6 +2,7 @@ package types
 
 import (
 	"fmt"
+	"math/big"
 	"reflect"
 	"testing"
 	"time"
@@ -613,5 +614,40 @@ func TestCastOtherTypes(t *testing.T) {
 				}
 			},
 		)
+	}
+}
+
+func TestCastDecimal(t *testing.T) {
+	for _, tt := range []struct {
+		v      Value
+		dst    interface{}
+		result interface{}
+	}{
+		{
+			v:      DecimalValueFromBigInt(big.NewInt(42*1000000000), 22, 9),
+			dst:    &big.Int{},
+			result: big.NewInt(42 * 1000000000),
+		},
+		{
+			v:      DecimalValueFromBigInt(big.NewInt(42*1000000000), 22, 9),
+			dst:    &[16]byte{},
+			result: &[16]byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 199, 101, 36, 0},
+		},
+		{
+			v:      DecimalValueFromBigInt(big.NewInt(42*1000000000), 22, 9),
+			dst:    func(v int64) *int64 { return &v }(9),
+			result: func(v int64) *int64 { return &v }(42000000000),
+		},
+		{
+			v:      DecimalValueFromBigInt(big.NewInt(42*1000000000), 22, 9),
+			dst:    func(v uint64) *uint64 { return &v }(9),
+			result: func(v uint64) *uint64 { return &v }(42000000000),
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			err := CastTo(tt.v, tt.dst)
+			require.NoError(t, err)
+			require.Equal(t, tt.dst, tt.result)
+		})
 	}
 }

@@ -176,7 +176,7 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		return NullValue(tt), nil
 
 	case *DecimalType:
-		return DecimalValue(BigEndianUint128(v.High_128, v.GetLow_128()), ttt.Precision, ttt.Scale), nil
+		return DecimalValueFromBytes(BigEndianUint128(v.High_128, v.GetLow_128()), ttt.Precision, ttt.Scale), nil
 
 	case optionalType:
 		t = t.Type.(*Ydb.Type_OptionalType).OptionalType.Item
@@ -416,7 +416,22 @@ type decimalValue struct {
 }
 
 func (v *decimalValue) castTo(dst interface{}) error {
-	return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, dst))
+	switch vv := dst.(type) {
+	case *big.Int:
+		*vv = *decimal.FromBytes(v.value[:], v.innerType.Precision, v.innerType.Scale)
+		return nil
+	case *[16]byte:
+		*vv = v.value
+		return nil
+	case *int64:
+		*vv = decimal.FromBytes(v.value[:], v.innerType.Precision, v.innerType.Scale).Int64()
+		return nil
+	case *uint64:
+		*vv = decimal.FromBytes(v.value[:], v.innerType.Precision, v.innerType.Scale).Uint64()
+		return nil
+	default:
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, dst))
+	}
 }
 
 func (v *decimalValue) Yql() string {
@@ -457,10 +472,10 @@ func (v *decimalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 
 func DecimalValueFromBigInt(v *big.Int, precision, scale uint32) *decimalValue {
 	b := decimal.BigIntToByte(v, precision, scale)
-	return DecimalValue(b, precision, scale)
+	return DecimalValueFromBytes(b, precision, scale)
 }
 
-func DecimalValue(v [16]byte, precision uint32, scale uint32) *decimalValue {
+func DecimalValueFromBytes(v [16]byte, precision uint32, scale uint32) *decimalValue {
 	return &decimalValue{
 		value: v,
 		innerType: &DecimalType{
@@ -2070,7 +2085,7 @@ func ZeroValue(t Type) Value {
 			return fields
 		}()...)
 	case *DecimalType:
-		return DecimalValue([16]byte{}, 22, 9)
+		return DecimalValueFromBytes([16]byte{}, 22, 9)
 
 	default:
 		panic(fmt.Sprintf("type '%T' have not a zero value", t))
