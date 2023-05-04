@@ -23,13 +23,9 @@ import (
 )
 
 func TestScripting(t *testing.T) {
-	var (
-		ctx    = xtest.Context(t)
-		logger = xtest.Logger(t)
-	)
+	ctx := xtest.Context(t)
 
-	db, err := ydb.Open(
-		ctx,
+	db, err := ydb.Open(ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAccessTokenCredentials(
 			os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
@@ -42,10 +38,10 @@ func TestScripting(t *testing.T) {
 		ydb.WithConnectionTTL(time.Millisecond*10000),
 		ydb.WithMinTLSVersion(tls.VersionTLS10),
 		ydb.WithLogger(
+			log.Default(os.Stderr,
+				log.WithMinLevel(log.TRACE),
+			),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
-			ydb.WithNamespace("ydb"),
-			ydb.WithWriter(logger),
-			ydb.WithMinLevel(log.TRACE),
 		),
 		ydb.WithUserAgent("scripting"),
 	)

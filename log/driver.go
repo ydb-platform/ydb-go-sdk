@@ -1,444 +1,458 @@
 package log
 
 import (
+	"context"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 // Driver makes trace.Driver with logging events from details
-func Driver(l Logger, details trace.Details) (t trace.Driver) {
-	if details&trace.DriverEvents == 0 {
-		return
-	}
-	l = l.WithName(`driver`)
-	if details&trace.DriverResolverEvents != 0 {
-		//nolint:govet
-		l := l.WithName(`resolver`)
-		t.OnResolve = func(
-			info trace.DriverResolveStartInfo,
-		) func(
-			trace.DriverResolveDoneInfo,
-		) {
-			target := info.Target
-			addresses := info.Resolved
-			l.Tracef(`update start {target:"%s",resolved:%v}`,
-				target,
-				addresses,
-			)
-			return func(info trace.DriverResolveDoneInfo) {
-				if info.Error == nil {
-					l.Infof(`update done {target:"%s",resolved:%v}`,
-						target,
-						addresses,
-					)
-				} else {
-					l.Warnf(`update failed {target:"%s",resolved:%v,error:"%v",version:"%s"}`,
-						target,
-						addresses,
-						info.Error,
-						meta.Version,
-					)
-				}
-			}
-		}
-	}
-	if details&trace.DriverEvents != 0 {
-		t.OnInit = func(info trace.DriverInitStartInfo) func(trace.DriverInitDoneInfo) {
-			endpoint := info.Endpoint
-			database := info.Database
-			secure := info.Secure
-			l.Infof(
-				`init start {version:%s,endpoint:"%s",database:"%s",secure:%v}`,
-				meta.VersionMajor+"."+meta.VersionMinor+"."+meta.VersionPatch,
-				endpoint,
-				database,
-				secure,
-			)
-			start := time.Now()
-			return func(info trace.DriverInitDoneInfo) {
-				if info.Error == nil {
-					l.Infof(
-						`init done {endpoint:"%s",database:"%s",secure:%t,latency:"%v"}`,
-						endpoint,
-						database,
-						secure,
-						time.Since(start),
-					)
-				} else {
-					l.Warnf(`init failed {endpoint:"%s",database:"%s",secure:%t,latency:"%v",error:"%s",version:"%s"}`,
-						endpoint,
-						database,
-						secure,
-						time.Since(start),
-						info.Error,
-						meta.Version,
-					)
-				}
-			}
-		}
-		t.OnClose = func(info trace.DriverCloseStartInfo) func(trace.DriverCloseDoneInfo) {
-			l.Infof(`close start`)
-			start := time.Now()
-			return func(info trace.DriverCloseDoneInfo) {
-				if info.Error == nil {
-					l.Infof(
-						`close done {latency:"%v"}`,
-						time.Since(start),
-					)
-				} else {
-					l.Warnf(`close failed {latency:"%v",error:"%s",version:"%s"}`,
-						time.Since(start),
-						info.Error,
-						meta.Version,
-					)
-				}
-			}
-		}
-	}
-	//nolint:nestif
-	if details&trace.DriverConnEvents != 0 {
-		//nolint:govet
-		l := l.WithName(`conn`)
-		t.OnConnDial = func(info trace.DriverConnDialStartInfo) func(trace.DriverConnDialDoneInfo) {
-			endpoint := info.Endpoint.String()
-			l.Tracef(`dial start {endpoint:%v}`,
-				endpoint,
-			)
-			start := time.Now()
-			return func(info trace.DriverConnDialDoneInfo) {
-				if info.Error == nil {
-					l.Tracef(`dial done {endpoint:%v,latency:"%v"}`,
-						endpoint,
-						time.Since(start),
-					)
-				} else {
-					l.Warnf(`dial failed {endpoint:%v,latency:"%v",error:"%s",version:"%s"}`,
-						endpoint,
-						time.Since(start),
-						info.Error,
-						meta.Version,
-					)
-				}
-			}
-		}
-		t.OnConnStateChange = func(info trace.DriverConnStateChangeStartInfo) func(trace.DriverConnStateChangeDoneInfo) {
-			endpoint := info.Endpoint.String()
-			l.Tracef(`conn state change start {endpoint:%v,state:"%s"}`,
-				endpoint,
-				info.State,
-			)
-			start := time.Now()
-			return func(info trace.DriverConnStateChangeDoneInfo) {
-				l.Tracef(`conn state change done {endpoint:%v,latency:"%v",state:"%s"}`,
-					endpoint,
-					time.Since(start),
-					info.State,
-				)
-			}
-		}
-		t.OnConnPark = func(info trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
-			endpoint := info.Endpoint
-			l.Tracef(`conn park start {endpoint:%v}`,
-				endpoint,
-			)
-			start := time.Now()
-			return func(info trace.DriverConnParkDoneInfo) {
-				if info.Error == nil {
-					l.Tracef(`conn park done {endpoint:%v,latency:"%v"}`,
-						endpoint,
-						time.Since(start),
-					)
-				} else {
-					l.Warnf(`conn park fail {endpoint:%v,latency:"%v",error:"%s",version:"%s"}`,
-						endpoint,
-						time.Since(start),
-						info.Error,
-						meta.Version,
-					)
-				}
-			}
-		}
-		t.OnConnClose = func(info trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
-			endpoint := info.Endpoint
-			l.Tracef(`conn close start {endpoint:%v}`,
-				endpoint,
-			)
-			start := time.Now()
-			return func(info trace.DriverConnCloseDoneInfo) {
-				if info.Error == nil {
-					l.Tracef(`conn close done {endpoint:%v,latency:"%v"}`,
-						endpoint,
-						time.Since(start),
-					)
-				} else {
-					l.Warnf(`conn close fail {endpoint:%v,latency:"%v",error:"%s",version:"%s"}`,
-						endpoint,
-						time.Since(start),
-						info.Error,
-						meta.Version,
-					)
-				}
-			}
-		}
-		t.OnConnInvoke = func(info trace.DriverConnInvokeStartInfo) func(trace.DriverConnInvokeDoneInfo) {
-			endpoint := info.Endpoint.String()
-			method := string(info.Method)
-			l.Tracef(`invoke start {endpoint:%v,method:"%s"}`,
-				endpoint,
-				method,
-			)
-			start := time.Now()
-			return func(info trace.DriverConnInvokeDoneInfo) {
-				if info.Error == nil {
-					l.Tracef(`invoke done {endpoint:%v,method:"%s",latency:"%v",,metadata:%v}`,
-						endpoint,
-						method,
-						time.Since(start),
-						info.Metadata,
-					)
-				} else {
-					l.Warnf(`invoke failed {endpoint:%v,method:"%s",latency:"%v",error:"%s",,metadata:%v,version:"%s"}`,
-						endpoint,
-						method,
-						time.Since(start),
-						info.Error,
-						info.Metadata,
-						meta.Version,
-					)
-				}
-			}
-		}
-		t.OnConnNewStream = func(
-			info trace.DriverConnNewStreamStartInfo,
-		) func(
-			trace.DriverConnNewStreamRecvInfo,
-		) func(
-			trace.DriverConnNewStreamDoneInfo,
-		) {
-			endpoint := info.Endpoint.String()
-			method := string(info.Method)
-			l.Tracef(`streaming start {endpoint:%v,method:"%s"}`,
-				endpoint,
-				method,
-			)
-			start := time.Now()
-			return func(info trace.DriverConnNewStreamRecvInfo) func(trace.DriverConnNewStreamDoneInfo) {
-				if info.Error == nil {
-					l.Tracef(`streaming intermediate receive {endpoint:%v,method:"%s",latency:"%v"}`,
-						endpoint,
-						method,
-						time.Since(start),
-					)
-				} else {
-					l.Warnf(`streaming intermediate fail {endpoint:%v,method:"%s",latency:"%v",error:"%s",version:"%s"}`,
-						endpoint,
-						method,
-						time.Since(start),
-						info.Error,
-						meta.Version,
-					)
-				}
-				return func(info trace.DriverConnNewStreamDoneInfo) {
-					if info.Error == nil {
-						l.Tracef(`streaming done {endpoint:%v,method:"%s",latency:"%v",metadata:%v}`,
-							endpoint,
-							method,
-							time.Since(start),
-							info.Metadata,
-						)
-					} else {
-						l.Warnf(`streaming done {endpoint:%v,method:"%s",latency:"%v",error:"%s",,metadata:%v,version:"%s"}`,
-							endpoint,
-							method,
-							time.Since(start),
-							info.Error,
-							info.Metadata,
-							meta.Version,
-						)
-					}
-				}
-			}
-		}
-		t.OnConnBan = func(info trace.DriverConnBanStartInfo) func(trace.DriverConnBanDoneInfo) {
-			endpoint := info.Endpoint.String()
-			l.Warnf(`conn.Conn ban start {endpoint:%v,cause:"%s",version:"%s"}`,
-				endpoint,
-				info.Cause,
-				meta.Version,
-			)
-			start := time.Now()
-			return func(info trace.DriverConnBanDoneInfo) {
-				l.Warnf(`conn.Conn ban done {endpoint:%v,latency:"%v",state:"%s",version:"%s"}`,
-					endpoint,
-					time.Since(start),
-					info.State,
-					meta.Version,
-				)
-			}
-		}
-		t.OnConnAllow = func(info trace.DriverConnAllowStartInfo) func(trace.DriverConnAllowDoneInfo) {
-			endpoint := info.Endpoint.String()
-			l.Infof(`conn.Conn allow start {endpoint:%v,version:"%s"}`,
-				endpoint,
-				meta.Version,
-			)
+func Driver(l Logger, d trace.Detailer, opts ...Option) (t trace.Driver) {
+	return internalDriver(wrapLogger(l, opts...), d)
+}
 
-			start := time.Now()
-			return func(info trace.DriverConnAllowDoneInfo) {
-				l.Infof(`conn.Conn allow done {endpoint:%v,latency:"%v",state:"%s",version:"%s"}`,
-					endpoint,
-					time.Since(start),
-					info.State,
-					meta.Version,
+func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:gocyclo
+	t.OnResolve = func(
+		info trace.DriverResolveStartInfo,
+	) func(
+		trace.DriverResolveDoneInfo,
+	) {
+		if d.Details()&trace.DriverResolverEvents == 0 {
+			return nil
+		}
+		ctx := with(context.Background(), TRACE, "ydb", "driver", "resolver", "update")
+		target := info.Target
+		addresses := info.Resolved
+		l.Log(ctx, "start",
+			String("target", target),
+			Strings("resolved", addresses),
+		)
+		return func(info trace.DriverResolveDoneInfo) {
+			if info.Error == nil {
+				l.Log(ctx, "done",
+					String("target", target),
+					Strings("resolved", addresses),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "failed",
+					Error(info.Error),
+					String("target", target),
+					Strings("resolved", addresses),
+					version(),
 				)
 			}
 		}
 	}
-	if details&trace.DriverRepeaterEvents != 0 {
-		//nolint:govet
-		l := l.WithName(`repeater`)
-		t.OnRepeaterWakeUp = func(info trace.DriverRepeaterWakeUpStartInfo) func(trace.DriverRepeaterWakeUpDoneInfo) {
-			name := info.Name
-			event := info.Event
-			l.Tracef(`repeater wake up {name:"%s",event:"%s"}`,
-				name,
-				event,
+	t.OnInit = func(info trace.DriverInitStartInfo) func(trace.DriverInitDoneInfo) {
+		if d.Details()&trace.DriverEvents == 0 {
+			return nil
+		}
+		endpoint := info.Endpoint
+		database := info.Database
+		secure := info.Secure
+		ctx := with(*info.Context, DEBUG, "ydb", "driver", "resolver", "init")
+		l.Log(ctx, "start",
+			String("endpoint", endpoint),
+			String("database", database),
+			Bool("secure", secure),
+		)
+		start := time.Now()
+		return func(info trace.DriverInitDoneInfo) {
+			if info.Error == nil {
+				l.Log(ctx, "done",
+					String("endpoint", endpoint),
+					String("database", database),
+					Bool("secure", secure),
+					latency(start),
+				)
+			} else {
+				l.Log(WithLevel(ctx, ERROR), "failed",
+					Error(info.Error),
+					String("endpoint", endpoint),
+					String("database", database),
+					Bool("secure", secure),
+					latency(start),
+					version(),
+				)
+			}
+		}
+	}
+	t.OnClose = func(info trace.DriverCloseStartInfo) func(trace.DriverCloseDoneInfo) {
+		if d.Details()&trace.DriverEvents == 0 {
+			return nil
+		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "resolver", "close")
+		l.Log(ctx, "start")
+		start := time.Now()
+		return func(info trace.DriverCloseDoneInfo) {
+			if info.Error == nil {
+				l.Log(ctx, "done",
+					latency(start),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "failed",
+					Error(info.Error),
+					latency(start),
+					version(),
+				)
+			}
+		}
+	}
+	t.OnConnDial = func(info trace.DriverConnDialStartInfo) func(trace.DriverConnDialDoneInfo) {
+		if d.Details()&trace.DriverConnEvents == 0 {
+			return nil
+		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "dial")
+		endpoint := info.Endpoint
+		l.Log(ctx, "start",
+			Stringer("endpoint", endpoint),
+		)
+		start := time.Now()
+		return func(info trace.DriverConnDialDoneInfo) {
+			if info.Error == nil {
+				l.Log(ctx, "done",
+					Stringer("endpoint", endpoint),
+					latency(start),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "failed",
+					Error(info.Error),
+					Stringer("endpoint", endpoint),
+					latency(start),
+					version(),
+				)
+			}
+		}
+	}
+	t.OnConnStateChange = func(info trace.DriverConnStateChangeStartInfo) func(trace.DriverConnStateChangeDoneInfo) {
+		if d.Details()&trace.DriverConnEvents == 0 {
+			return nil
+		}
+		ctx := with(context.Background(), TRACE, "ydb", "driver", "conn", "state", "change")
+		endpoint := info.Endpoint
+		l.Log(ctx, "start",
+			Stringer("endpoint", endpoint),
+			Stringer("state", info.State),
+		)
+		start := time.Now()
+		return func(info trace.DriverConnStateChangeDoneInfo) {
+			l.Log(ctx, "done",
+				Stringer("endpoint", endpoint),
+				latency(start),
+				Stringer("state", info.State),
 			)
-			start := time.Now()
-			return func(info trace.DriverRepeaterWakeUpDoneInfo) {
+		}
+	}
+	t.OnConnPark = func(info trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
+		if d.Details()&trace.DriverConnEvents == 0 {
+			return nil
+		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "park")
+		endpoint := info.Endpoint
+		l.Log(ctx, "start",
+			Stringer("endpoint", endpoint),
+		)
+		start := time.Now()
+		return func(info trace.DriverConnParkDoneInfo) {
+			if info.Error == nil {
+				l.Log(ctx, "done",
+					Stringer("endpoint", endpoint),
+					latency(start),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "failed",
+					Error(info.Error),
+					Stringer("endpoint", endpoint),
+					latency(start),
+					version(),
+				)
+			}
+		}
+	}
+	t.OnConnClose = func(info trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
+		if d.Details()&trace.DriverConnEvents == 0 {
+			return nil
+		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "close")
+		endpoint := info.Endpoint
+		l.Log(ctx, "start",
+			Stringer("endpoint", endpoint),
+		)
+		start := time.Now()
+		return func(info trace.DriverConnCloseDoneInfo) {
+			if info.Error == nil {
+				l.Log(ctx, "done",
+					Stringer("endpoint", endpoint),
+					latency(start),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "failed",
+					Error(info.Error),
+					Stringer("endpoint", endpoint),
+					latency(start),
+					version(),
+				)
+			}
+		}
+	}
+	t.OnConnInvoke = func(info trace.DriverConnInvokeStartInfo) func(trace.DriverConnInvokeDoneInfo) {
+		if d.Details()&trace.DriverConnEvents == 0 {
+			return nil
+		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "invoke")
+		endpoint := info.Endpoint
+		method := string(info.Method)
+		l.Log(ctx, "start",
+			Stringer("endpoint", endpoint),
+			String("method", method),
+		)
+		start := time.Now()
+		return func(info trace.DriverConnInvokeDoneInfo) {
+			if info.Error == nil {
+				l.Log(ctx, "done",
+					Stringer("endpoint", endpoint),
+					String("method", method),
+					latency(start),
+					Stringer("metadata", metadata(info.Metadata)),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "failed",
+					Error(info.Error),
+					Stringer("endpoint", endpoint),
+					String("method", method),
+					latency(start),
+					Stringer("metadata", metadata(info.Metadata)),
+					version(),
+				)
+			}
+		}
+	}
+	t.OnConnNewStream = func(
+		info trace.DriverConnNewStreamStartInfo,
+	) func(
+		trace.DriverConnNewStreamRecvInfo,
+	) func(
+		trace.DriverConnNewStreamDoneInfo,
+	) {
+		if d.Details()&trace.DriverConnEvents == 0 {
+			return nil
+		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "new", "stream")
+		endpoint := info.Endpoint
+		method := string(info.Method)
+		l.Log(ctx, "start",
+			Stringer("endpoint", endpoint),
+			String("method", method),
+		)
+		start := time.Now()
+		return func(info trace.DriverConnNewStreamRecvInfo) func(trace.DriverConnNewStreamDoneInfo) {
+			if info.Error == nil {
+				l.Log(ctx, "intermediate receive",
+					Stringer("endpoint", endpoint),
+					String("method", method),
+					latency(start),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "intermediate fail",
+					Error(info.Error),
+					Stringer("endpoint", endpoint),
+					String("method", method),
+					latency(start),
+					version(),
+				)
+			}
+			return func(info trace.DriverConnNewStreamDoneInfo) {
 				if info.Error == nil {
-					l.Tracef(`repeater wake up done {name:"%s",event:"%s",latency:"%v"}`,
-						name,
-						event,
-						time.Since(start),
+					l.Log(ctx, "done",
+						Stringer("endpoint", endpoint),
+						String("method", method),
+						latency(start),
+						Stringer("metadata", metadata(info.Metadata)),
 					)
 				} else {
-					l.Errorf(`repeater wake up fail {name:"%s",event:"%s",latency:"%v",error:"%v",version:"%s"}`,
-						name,
-						event,
-						time.Since(start),
-						info.Error,
-						meta.Version,
+					l.Log(WithLevel(ctx, WARN), "failed",
+						Error(info.Error),
+						Stringer("endpoint", endpoint),
+						String("method", method),
+						latency(start),
+						Stringer("metadata", metadata(info.Metadata)),
+						version(),
 					)
 				}
 			}
 		}
 	}
-	//nolint:nestif
-	if details&trace.DriverBalancerEvents != 0 {
-		//nolint:govet
-		l := l.WithName(`balancer`)
-		t.OnBalancerInit = func(info trace.DriverBalancerInitStartInfo) func(trace.DriverBalancerInitDoneInfo) {
-			l.Tracef(`init start`)
-			start := time.Now()
-			return func(info trace.DriverBalancerInitDoneInfo) {
-				l.Debugf(`init done {latency:"%v"}`,
-					time.Since(start),
-				)
-			}
+	t.OnConnBan = func(info trace.DriverConnBanStartInfo) func(trace.DriverConnBanDoneInfo) {
+		if d.Details()&trace.DriverConnEvents == 0 {
+			return nil
 		}
-		t.OnBalancerClose = func(info trace.DriverBalancerCloseStartInfo) func(trace.DriverBalancerCloseDoneInfo) {
-			l.Tracef(`close start`)
-			start := time.Now()
-			return func(info trace.DriverBalancerCloseDoneInfo) {
-				if info.Error == nil {
-					l.Tracef(`close done {latency:"%v"}`,
-						time.Since(start),
-					)
-				} else {
-					l.Errorf(`close failed {latency:"%v",error:"%s",version:"%s"}`,
-						time.Since(start),
-						info.Error,
-						meta.Version,
-					)
-				}
-			}
-		}
-		t.OnBalancerChooseEndpoint = func(
-			info trace.DriverBalancerChooseEndpointStartInfo,
-		) func(
-			trace.DriverBalancerChooseEndpointDoneInfo,
-		) {
-			l.Tracef(`select endpoint start`)
-			start := time.Now()
-			return func(info trace.DriverBalancerChooseEndpointDoneInfo) {
-				if info.Error == nil {
-					l.Tracef(`select endpoint done {latency:"%v",endpoint:%v}`,
-						time.Since(start),
-						info.Endpoint.String(),
-					)
-				} else {
-					l.Warnf(`select endpoint failed {latency:"%v",error:"%s",version:"%s"}`,
-						time.Since(start),
-						info.Error,
-						meta.Version,
-					)
-				}
-			}
-		}
-		t.OnBalancerClusterDiscoveryAttempt = func(
-			info trace.DriverBalancerClusterDiscoveryAttemptStartInfo,
-		) func(
-			trace.DriverBalancerClusterDiscoveryAttemptDoneInfo,
-		) {
-			l.Tracef(`trying to cluster discovery {address:"%s"}`, info.Address)
-			start := time.Now()
-			return func(info trace.DriverBalancerClusterDiscoveryAttemptDoneInfo) {
-				if info.Error == nil {
-					l.Tracef(`cluster discovery done {latency:"%v"}`,
-						time.Since(start),
-					)
-				} else {
-					l.Errorf(`cluster discovery failed {latency:"%v",error:"%s",version:"%s"}`,
-						time.Since(start),
-						info.Error,
-						meta.Version,
-					)
-				}
-			}
-		}
-		t.OnBalancerUpdate = func(
-			info trace.DriverBalancerUpdateStartInfo,
-		) func(
-			trace.DriverBalancerUpdateDoneInfo,
-		) {
-			l.Tracef(
-				`balancer update start {needLocalDC: "%v"}`,
-				info.NeedLocalDC,
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "ban")
+		endpoint := info.Endpoint
+		l.Log(ctx, "start",
+			Stringer("endpoint", endpoint),
+			NamedError("cause", info.Cause),
+			version(),
+		)
+		start := time.Now()
+		return func(info trace.DriverConnBanDoneInfo) {
+			l.Log(WithLevel(ctx, WARN), "done",
+				Stringer("endpoint", endpoint),
+				latency(start),
+				Stringer("state", info.State),
+				version(),
 			)
-			start := time.Now()
-			return func(info trace.DriverBalancerUpdateDoneInfo) {
-				l.Infof(
-					`balancer update done {latency:"%v", endpoints: "%v", detectedLocalDC: "%v"}`,
-					time.Since(start),
-					info.Endpoints,
-					info.LocalDC,
+		}
+	}
+	t.OnConnAllow = func(info trace.DriverConnAllowStartInfo) func(trace.DriverConnAllowDoneInfo) {
+		if d.Details()&trace.DriverConnEvents == 0 {
+			return nil
+		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "allow")
+		endpoint := info.Endpoint
+		l.Log(ctx, "start",
+			Stringer("endpoint", endpoint),
+		)
+		start := time.Now()
+		return func(info trace.DriverConnAllowDoneInfo) {
+			l.Log(ctx, "done",
+				Stringer("endpoint", endpoint),
+				latency(start),
+				Stringer("state", info.State),
+			)
+		}
+	}
+	t.OnRepeaterWakeUp = func(info trace.DriverRepeaterWakeUpStartInfo) func(trace.DriverRepeaterWakeUpDoneInfo) {
+		if d.Details()&trace.DriverRepeaterEvents == 0 {
+			return nil
+		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "repeater", "wake", "up")
+		name := info.Name
+		event := info.Event
+		l.Log(ctx, "start",
+			String("name", name),
+			String("event", event),
+		)
+		start := time.Now()
+		return func(info trace.DriverRepeaterWakeUpDoneInfo) {
+			if info.Error == nil {
+				l.Log(ctx, "done",
+					String("name", name),
+					String("event", event),
+					latency(start),
+				)
+			} else {
+				l.Log(WithLevel(ctx, ERROR), "failed",
+					Error(info.Error),
+					String("name", name),
+					String("event", event),
+					latency(start),
+					version(),
 				)
 			}
 		}
 	}
-	if details&trace.DriverCredentialsEvents != 0 {
-		//nolint:govet
-		l := l.WithName(`credentials`)
-		t.OnGetCredentials = func(info trace.DriverGetCredentialsStartInfo) func(trace.DriverGetCredentialsDoneInfo) {
-			l.Tracef(`get start`)
-			start := time.Now()
-			return func(info trace.DriverGetCredentialsDoneInfo) {
-				if info.Error == nil {
-					l.Tracef(`get done {latency:"%v",token:"%s"}`,
-						time.Since(start),
-						Secret(info.Token),
-					)
-				} else {
-					l.Errorf(`get failed {latency:"%v",token:"%s",error:"%s",version:"%s"}`,
-						time.Since(start),
-						Secret(info.Token),
-						info.Error,
-						meta.Version,
-					)
-				}
+	t.OnBalancerInit = func(info trace.DriverBalancerInitStartInfo) func(trace.DriverBalancerInitDoneInfo) {
+		if d.Details()&trace.DriverBalancerEvents == 0 {
+			return nil
+		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "balancer", "init")
+		l.Log(ctx, "start")
+		start := time.Now()
+		return func(info trace.DriverBalancerInitDoneInfo) {
+			l.Log(WithLevel(ctx, INFO), "done",
+				latency(start),
+			)
+		}
+	}
+	t.OnBalancerClose = func(info trace.DriverBalancerCloseStartInfo) func(trace.DriverBalancerCloseDoneInfo) {
+		if d.Details()&trace.DriverBalancerEvents == 0 {
+			return nil
+		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "balancer", "close")
+		l.Log(ctx, "start")
+		start := time.Now()
+		return func(info trace.DriverBalancerCloseDoneInfo) {
+			if info.Error == nil {
+				l.Log(ctx, "done",
+					latency(start),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "failed",
+					Error(info.Error),
+					latency(start),
+					version(),
+				)
+			}
+		}
+	}
+	t.OnBalancerChooseEndpoint = func(
+		info trace.DriverBalancerChooseEndpointStartInfo,
+	) func(
+		trace.DriverBalancerChooseEndpointDoneInfo,
+	) {
+		if d.Details()&trace.DriverBalancerEvents == 0 {
+			return nil
+		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "balancer", "choose", "endpoint")
+		l.Log(ctx, "start")
+		start := time.Now()
+		return func(info trace.DriverBalancerChooseEndpointDoneInfo) {
+			if info.Error == nil {
+				l.Log(ctx, "done",
+					latency(start),
+					Stringer("endpoint", info.Endpoint),
+				)
+			} else {
+				l.Log(WithLevel(ctx, ERROR), "failed",
+					Error(info.Error),
+					latency(start),
+					version(),
+				)
+			}
+		}
+	}
+	t.OnBalancerUpdate = func(
+		info trace.DriverBalancerUpdateStartInfo,
+	) func(
+		trace.DriverBalancerUpdateDoneInfo,
+	) {
+		if d.Details()&trace.DriverBalancerEvents == 0 {
+			return nil
+		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "balancer", "update")
+		l.Log(ctx, "start",
+			Bool("needLocalDC", info.NeedLocalDC),
+		)
+		start := time.Now()
+		return func(info trace.DriverBalancerUpdateDoneInfo) {
+			l.Log(ctx, "done",
+				latency(start),
+				Stringer("endpoints", endpoints(info.Endpoints)),
+				String("detectedLocalDC", info.LocalDC),
+			)
+		}
+	}
+	t.OnGetCredentials = func(info trace.DriverGetCredentialsStartInfo) func(trace.DriverGetCredentialsDoneInfo) {
+		if d.Details()&trace.DriverCredentialsEvents == 0 {
+			return nil
+		}
+		ctx := with(*info.Context, TRACE, "ydb", "driver", "credentials", "get")
+		l.Log(ctx, "start")
+		start := time.Now()
+		return func(info trace.DriverGetCredentialsDoneInfo) {
+			if info.Error == nil {
+				l.Log(ctx, "done",
+					latency(start),
+					String("token", Secret(info.Token)),
+				)
+			} else {
+				l.Log(WithLevel(ctx, ERROR), "done",
+					Error(info.Error),
+					latency(start),
+					String("token", Secret(info.Token)),
+					version(),
+				)
 			}
 		}
 	}

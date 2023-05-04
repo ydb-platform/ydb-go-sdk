@@ -5,10 +5,6 @@ import (
 )
 
 // Scheme returns trace.Scheme with logging events from details
-func Scheme(l Logger, details trace.Details) (t trace.Scheme) {
-	if details&trace.SchemeEvents == 0 {
-		return
-	}
-	_ = l.WithName(`scheme`)
+func Scheme(l Logger, d trace.Detailer, opts ...Option) (t trace.Scheme) {
 	return t
 }

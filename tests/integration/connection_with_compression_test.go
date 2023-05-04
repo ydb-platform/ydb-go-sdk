@@ -60,14 +60,10 @@ func TestConnectionWithCompression(t *testing.T) {
 				t.Fatalf("unknown request type: %s", requestTypes[0])
 			}
 		}
-	)
-	var (
-		ctx    = xtest.Context(t)
-		logger = xtest.Logger(t)
+		ctx = xtest.Context(t)
 	)
 
-	db, err := ydb.Open(
-		ctx,
+	db, err := ydb.Open(ctx,
 		"", // corner case for check replacement of endpoint+database+secure
 		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
 		ydb.WithAccessTokenCredentials(
@@ -80,10 +76,10 @@ func TestConnectionWithCompression(t *testing.T) {
 		ydb.WithConnectionTTL(time.Millisecond*10000),
 		ydb.WithMinTLSVersion(tls.VersionTLS10),
 		ydb.WithLogger(
+			log.Default(os.Stderr,
+				log.WithMinLevel(log.WARN),
+			),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
-			ydb.WithNamespace("ydb"),
-			ydb.WithWriter(logger),
-			ydb.WithMinLevel(log.WARN),
 		),
 		ydb.WithUserAgent(userAgent),
 		ydb.WithRequestsType(requestType),

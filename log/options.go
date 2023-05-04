@@ -1,23 +1,39 @@
 package log
 
-type logOptions struct {
-	logQuery bool
+type Option interface {
+	applyHolderOption(l *wrapper)
 }
 
-type option func(o *logOptions)
+type coloringSimpleOption bool
 
-func WithLogQuery() option {
-	return func(o *logOptions) {
-		o.logQuery = true
-	}
+func (coloring coloringSimpleOption) applySimpleOption(l *defaultLogger) {
+	l.coloring = bool(coloring)
 }
 
-func parseOptions(opts ...option) logOptions {
-	options := logOptions{}
-	for _, o := range opts {
-		if o != nil {
-			o(&options)
-		}
-	}
-	return options
+func WithColoring() simpleLoggerOption {
+	return coloringSimpleOption(true)
+}
+
+type minLevelSimpleOption Level
+
+func (minLevel minLevelSimpleOption) applySimpleOption(l *defaultLogger) {
+	l.minLevel = Level(minLevel)
+}
+
+func WithMinLevel(level Level) simpleLoggerOption {
+	return minLevelSimpleOption(level)
+}
+
+type logQueryOption bool
+
+func (logQuery logQueryOption) applySimpleOption(l *defaultLogger) {
+	l.logQuery = bool(logQuery)
+}
+
+func (logQuery logQueryOption) applyHolderOption(l *wrapper) {
+	l.logQuery = bool(logQuery)
+}
+
+func WithLogQuery() logQueryOption {
+	return true
 }

@@ -47,14 +47,10 @@ func TestDiscovery(t *testing.T) {
 			}
 		}
 		parking = make(chan struct{})
-	)
-	var (
-		ctx    = xtest.Context(t)
-		logger = xtest.Logger(t)
+		ctx     = xtest.Context(t)
 	)
 
-	db, err := ydb.Open(
-		ctx,
+	db, err := ydb.Open(ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAccessTokenCredentials(
 			os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
@@ -67,11 +63,11 @@ func TestDiscovery(t *testing.T) {
 		ydb.WithConnectionTTL(time.Second*1),
 		ydb.WithMinTLSVersion(tls.VersionTLS10),
 		ydb.WithLogger(
+			log.Default(os.Stderr,
+				log.WithMinLevel(log.WARN),
+				log.WithColoring(),
+			),
 			trace.MatchDetails(`ydb\.(driver|discovery|repeater).*`),
-			ydb.WithNamespace("ydb"),
-			ydb.WithWriter(logger),
-			ydb.WithMinLevel(log.WARN),
-			ydb.WithColoring(),
 		),
 		ydb.WithUserAgent(userAgent),
 		ydb.WithRequestsType(requestType),

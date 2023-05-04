@@ -2,351 +2,584 @@
 package log
 
 import (
+	"context"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 // Topic returns trace.Topic with logging events from details
-func Topic(topicLogger Logger, details trace.Details, opts ...option) trace.Topic {
-	topicLogger = topicLogger.WithName("ydb").WithName("topic")
-	t := trace.Topic{}
+func Topic(l Logger, d trace.Detailer, opts ...Option) (t trace.Topic) {
+	return internalTopic(wrapLogger(l, opts...), d)
+}
 
-	///
-	/// Topic Reader
-	///
-
-	if details&trace.TopicReaderStreamLifeCycleEvents != 0 {
-		logger := topicLogger.WithName("reader").WithName("lifecycle")
-
-		t.OnReaderReconnect = func(startInfo trace.TopicReaderReconnectStartInfo) func(doneInfo trace.TopicReaderReconnectDoneInfo) {
-			start := time.Now()
-
-			logger.Debugf("reconnecting")
-
-			return func(doneInfo trace.TopicReaderReconnectDoneInfo) {
-				logger.Infof(`reconnected {latency: "%v"}`, time.Since(start))
-			}
+func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocyclo
+	t.OnReaderReconnect = func(info trace.TopicReaderReconnectStartInfo) func(doneInfo trace.TopicReaderReconnectDoneInfo) {
+		if d.Details()&trace.TopicReaderStreamLifeCycleEvents == 0 {
+			return nil
 		}
-
-		t.OnReaderReconnectRequest = func(info trace.TopicReaderReconnectRequestInfo) {
-			logger.Debugf(`request reconnect {reason:"%v", was_sent:%v}`, info.Reason, info.WasSent)
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "reconnect")
+		start := time.Now()
+		l.Log(ctx, "start")
+		return func(doneInfo trace.TopicReaderReconnectDoneInfo) {
+			l.Log(WithLevel(ctx, INFO), "reconnected",
+				latency(start),
+			)
 		}
 	}
-	if details&trace.TopicReaderPartitionEvents != 0 {
-		logger := topicLogger.WithName("reader").WithName("partition")
-		t.OnReaderPartitionReadStartResponse = func(startInfo trace.TopicReaderPartitionReadStartResponseStartInfo) func(stopInfo trace.TopicReaderPartitionReadStartResponseDoneInfo) {
-			start := time.Now()
-			logger.Debugf(`read partition response starting... {topic:"%v", reader_connection_id:"%v", partition_id:%v, partition_session_id:%v}`,
-				startInfo.Topic, startInfo.ReaderConnectionID, startInfo.PartitionID, startInfo.PartitionSessionID)
-
-			return func(doneInfo trace.TopicReaderPartitionReadStartResponseDoneInfo) {
-				logInfoWarn(logger, doneInfo.Error, `read partition response completed {topic:"%v", reader_connection_id:"%v", partition_id:%v, partition_session_id:%v,`+
-					//
-					`latency:%v, commit_offset:%v, read_offset:%v, version:%v}`,
-					startInfo.Topic, startInfo.ReaderConnectionID, startInfo.PartitionID, startInfo.PartitionSessionID,
-					//
-					time.Since(start), doneInfo.CommitOffset, doneInfo.ReadOffset, meta.Version)
+	t.OnReaderReconnectRequest = func(info trace.TopicReaderReconnectRequestInfo) {
+		if d.Details()&trace.TopicReaderStreamLifeCycleEvents == 0 {
+			return
+		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "reconnect", "request")
+		l.Log(ctx, "start",
+			NamedError("reason", info.Reason),
+			Bool("was_sent", info.WasSent),
+		)
+	}
+	t.OnReaderPartitionReadStartResponse = func(info trace.TopicReaderPartitionReadStartResponseStartInfo) func(stopInfo trace.TopicReaderPartitionReadStartResponseDoneInfo) {
+		if d.Details()&trace.TopicReaderPartitionEvents == 0 {
+			return nil
+		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "partition", "read", "start", "response")
+		start := time.Now()
+		l.Log(ctx, "start",
+			String("topic", info.Topic),
+			String("reader_connection_id", info.ReaderConnectionID),
+			Int64("partition_id", info.PartitionID),
+			Int64("partition_session_id", info.PartitionSessionID),
+		)
+		return func(doneInfo trace.TopicReaderPartitionReadStartResponseDoneInfo) {
+			fields := []Field{
+				String("topic", info.Topic),
+				String("reader_connection_id", info.ReaderConnectionID),
+				Int64("partition_id", info.PartitionID),
+				Int64("partition_session_id", info.PartitionSessionID),
+				latency(start),
+			}
+			if doneInfo.CommitOffset != nil {
+				fields = append(fields,
+					Int64("commit_offset", *doneInfo.CommitOffset),
+				)
+			}
+			if doneInfo.ReadOffset != nil {
+				fields = append(fields,
+					Int64("read_offset", *doneInfo.ReadOffset),
+				)
+			}
+			if doneInfo.Error == nil {
+				l.Log(WithLevel(ctx, INFO), "read partition response completed", fields...)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "read partition response completed",
+					append(fields,
+						Error(doneInfo.Error),
+						version(),
+					)...,
+				)
 			}
 		}
-
-		t.OnReaderPartitionReadStopResponse = func(startInfo trace.TopicReaderPartitionReadStopResponseStartInfo) func(trace.TopicReaderPartitionReadStopResponseDoneInfo) {
-			start := time.Now()
-			logger.Debugf(`reader partition stopping... {reader_connection_id:"%v", topic:"%v", partition_id:%v, partition_session_id:%v, committed_offset:%v, graceful:%v}`,
-				startInfo.ReaderConnectionID, startInfo.Topic, startInfo.PartitionID, startInfo.PartitionSessionID, startInfo.CommittedOffset, startInfo.Graceful)
-
-			return func(doneInfo trace.TopicReaderPartitionReadStopResponseDoneInfo) {
-				logInfoWarn(logger, doneInfo.Error,
-					`reader partition stopped {reader_connection_id:"%v", topic:"%v", partition_id:%v, partition_session_id:%v, committed_offset:%v, graceful:%v, `+
-						//
-						`latency:%v, version:%v}`,
-					startInfo.ReaderConnectionID, startInfo.Topic, startInfo.PartitionID, startInfo.PartitionSessionID, startInfo.CommittedOffset, startInfo.Graceful,
-					//
-					time.Since(start), meta.Version)
+	}
+	t.OnReaderPartitionReadStopResponse = func(info trace.TopicReaderPartitionReadStopResponseStartInfo) func(trace.TopicReaderPartitionReadStopResponseDoneInfo) {
+		if d.Details()&trace.TopicReaderPartitionEvents == 0 {
+			return nil
+		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "partition", "read", "stop", "response")
+		start := time.Now()
+		l.Log(ctx, "start",
+			String("reader_connection_id", info.ReaderConnectionID),
+			String("topic", info.Topic),
+			Int64("partition_id", info.PartitionID),
+			Int64("partition_session_id", info.PartitionSessionID),
+			Int64("committed_offset", info.CommittedOffset),
+			Bool("graceful", info.Graceful))
+		return func(doneInfo trace.TopicReaderPartitionReadStopResponseDoneInfo) {
+			fields := []Field{
+				String("reader_connection_id", info.ReaderConnectionID),
+				String("topic", info.Topic),
+				Int64("partition_id", info.PartitionID),
+				Int64("partition_session_id", info.PartitionSessionID),
+				Int64("committed_offset", info.CommittedOffset),
+				Bool("graceful", info.Graceful),
+				latency(start),
+			}
+			if doneInfo.Error == nil {
+				l.Log(WithLevel(ctx, INFO), "reader partition stopped", fields...)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "reader partition stopped",
+					append(fields,
+						Error(doneInfo.Error),
+						version(),
+					)...,
+				)
+			}
+		}
+	}
+	t.OnReaderCommit = func(info trace.TopicReaderCommitStartInfo) func(doneInfo trace.TopicReaderCommitDoneInfo) {
+		if d.Details()&trace.TopicReaderStreamEvents == 0 {
+			return nil
+		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "commit")
+		start := time.Now()
+		l.Log(ctx, "start",
+			String("topic", info.Topic),
+			Int64("partition_id", info.PartitionID),
+			Int64("partition_session_id", info.PartitionSessionID),
+			Int64("commit_start_offset", info.StartOffset),
+			Int64("commit_end_offset", info.EndOffset),
+		)
+		return func(doneInfo trace.TopicReaderCommitDoneInfo) {
+			fields := []Field{
+				String("topic", info.Topic),
+				Int64("partition_id", info.PartitionID),
+				Int64("partition_session_id", info.PartitionSessionID),
+				Int64("commit_start_offset", info.StartOffset),
+				Int64("commit_end_offset", info.EndOffset),
+				latency(start),
+			}
+			if doneInfo.Error == nil {
+				l.Log(ctx, "committed", fields...)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "committed",
+					append(fields,
+						Error(doneInfo.Error),
+						version(),
+					)...,
+				)
+			}
+		}
+	}
+	t.OnReaderSendCommitMessage = func(info trace.TopicReaderSendCommitMessageStartInfo) func(doneInfo trace.TopicReaderSendCommitMessageDoneInfo) {
+		if d.Details()&trace.TopicReaderStreamEvents == 0 {
+			return nil
+		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "send", "commit", "message")
+		start := time.Now()
+		l.Log(ctx, "start",
+			Any("partitions_id", info.CommitsInfo.PartitionIDs()),
+			Any("partitions_session_id", info.CommitsInfo.PartitionSessionIDs()),
+		)
+		return func(doneInfo trace.TopicReaderSendCommitMessageDoneInfo) {
+			fields := []Field{
+				Any("partitions_id", info.CommitsInfo.PartitionIDs()),
+				Any("partitions_session_id", info.CommitsInfo.PartitionSessionIDs()),
+				latency(start),
+			}
+			if doneInfo.Error == nil {
+				l.Log(ctx, "done", fields...)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "commit message sent",
+					append(fields,
+						Error(doneInfo.Error),
+						version(),
+					)...,
+				)
+			}
+		}
+	}
+	t.OnReaderCommittedNotify = func(info trace.TopicReaderCommittedNotifyInfo) {
+		if d.Details()&trace.TopicReaderStreamEvents == 0 {
+			return
+		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "committed", "notify")
+		l.Log(ctx, "ack",
+			String("reader_connection_id", info.ReaderConnectionID),
+			String("topic", info.Topic),
+			Int64("partition_id", info.PartitionID),
+			Int64("partition_session_id", info.PartitionSessionID),
+			Int64("committed_offset", info.CommittedOffset),
+		)
+	}
+	t.OnReaderClose = func(info trace.TopicReaderCloseStartInfo) func(doneInfo trace.TopicReaderCloseDoneInfo) {
+		if d.Details()&trace.TopicReaderStreamEvents == 0 {
+			return nil
+		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "close")
+		start := time.Now()
+		l.Log(ctx, "done",
+			String("reader_connection_id", info.ReaderConnectionID),
+			NamedError("close_reason", info.CloseReason),
+		)
+		return func(doneInfo trace.TopicReaderCloseDoneInfo) {
+			fields := []Field{
+				String("reader_connection_id", info.ReaderConnectionID),
+				latency(start),
+			}
+			if doneInfo.CloseError == nil {
+				l.Log(ctx, "closed", fields...)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "closed",
+					append(fields,
+						Error(doneInfo.CloseError),
+						version(),
+					)...,
+				)
 			}
 		}
 	}
 
-	if details&trace.TopicReaderStreamEvents != 0 {
-		logger := topicLogger.WithName("reader").WithName("stream")
-
-		t.OnReaderCommit = func(startInfo trace.TopicReaderCommitStartInfo) func(doneInfo trace.TopicReaderCommitDoneInfo) {
-			start := time.Now()
-			logger.Debugf(`start committing... {topic:"%v", partition_id:%v, partition_session_id:%v, commit_start_offset:%v, commit_end_offset:%v}`,
-				startInfo.Topic, startInfo.PartitionID, startInfo.PartitionSessionID, startInfo.StartOffset, startInfo.EndOffset)
-
-			return func(doneInfo trace.TopicReaderCommitDoneInfo) {
-				logDebugWarn(logger, doneInfo.Error, `committed {topic:"%v", partition_id:%v, partition_session_id:%v, commit_start_offset:%v, commit_end_offset:%v, `+
-					//
-					`latency:%v, version:%v}`,
-					startInfo.Topic, startInfo.PartitionID, startInfo.PartitionSessionID, startInfo.StartOffset, startInfo.EndOffset,
-					//
-					time.Since(start), meta.Version)
+	t.OnReaderInit = func(info trace.TopicReaderInitStartInfo) func(doneInfo trace.TopicReaderInitDoneInfo) {
+		if d.Details()&trace.TopicReaderStreamEvents == 0 {
+			return nil
+		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "init")
+		start := time.Now()
+		l.Log(ctx, "start",
+			String("pre_init_reader_connection_id", info.PreInitReaderConnectionID),
+			String("consumer", info.InitRequestInfo.GetConsumer()),
+			Strings("topics", info.InitRequestInfo.GetTopics()),
+		)
+		return func(doneInfo trace.TopicReaderInitDoneInfo) {
+			fields := []Field{
+				String("pre_init_reader_connection_id", info.PreInitReaderConnectionID),
+				String("consumer", info.InitRequestInfo.GetConsumer()),
+				Strings("topics", info.InitRequestInfo.GetTopics()),
+				latency(start),
+			}
+			if doneInfo.Error == nil {
+				l.Log(ctx, "topic reader stream initialized", fields...)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "topic reader stream initialized",
+					append(fields,
+						Error(doneInfo.Error),
+						version(),
+					)...,
+				)
 			}
 		}
-
-		t.OnReaderSendCommitMessage = func(startInfo trace.TopicReaderSendCommitMessageStartInfo) func(doneInfo trace.TopicReaderSendCommitMessageDoneInfo) {
-			start := time.Now()
-			logger.Debugf(`commit message sending... {partitions_id:%v, partitions_session_id:%v}`,
-				startInfo.CommitsInfo.PartitionIDs(), startInfo.CommitsInfo.PartitionSessionIDs())
-
-			return func(doneInfo trace.TopicReaderSendCommitMessageDoneInfo) {
-				logDebugWarn(logger, doneInfo.Error, `commit message sent {partitions_id:%v, partitions_session_id:%v`+
-					//
-					`latency:%v, version:%v}`,
-					startInfo.CommitsInfo.PartitionIDs(), startInfo.CommitsInfo.PartitionSessionIDs(),
-					//
-					time.Since(start), meta.Version)
+	}
+	t.OnReaderError = func(info trace.TopicReaderErrorInfo) {
+		if d.Details()&trace.TopicReaderStreamEvents == 0 {
+			return
+		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "error")
+		l.Log(WithLevel(ctx, INFO), "stream error",
+			Error(info.Error),
+			String("reader_connection_id", info.ReaderConnectionID),
+			version(),
+		)
+	}
+	t.OnReaderUpdateToken = func(info trace.OnReadUpdateTokenStartInfo) func(updateTokenInfo trace.OnReadUpdateTokenMiddleTokenReceivedInfo) func(doneInfo trace.OnReadStreamUpdateTokenDoneInfo) {
+		if d.Details()&trace.TopicReaderStreamEvents == 0 {
+			return nil
+		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "update", "token")
+		start := time.Now()
+		l.Log(ctx, "token updating...",
+			String("reader_connection_id", info.ReaderConnectionID),
+		)
+		return func(updateTokenInfo trace.OnReadUpdateTokenMiddleTokenReceivedInfo) func(doneInfo trace.OnReadStreamUpdateTokenDoneInfo) {
+			if updateTokenInfo.Error == nil {
+				l.Log(ctx, "got token",
+					String("reader_connection_id", info.ReaderConnectionID),
+					Int("token_len", updateTokenInfo.TokenLen),
+					latency(start),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "got token",
+					Error(updateTokenInfo.Error),
+					String("reader_connection_id", info.ReaderConnectionID),
+					Int("token_len", updateTokenInfo.TokenLen),
+					latency(start),
+					version(),
+				)
 			}
-		}
-
-		t.OnReaderCommittedNotify = func(info trace.TopicReaderCommittedNotifyInfo) {
-			logger.Debugf(`commit ack {reader_connection_id:"%v", topic:"%v", partition_id:%v, partition_session_id:%v, committed_offset:%v}`,
-				info.ReaderConnectionID, info.Topic, info.PartitionID, info.PartitionSessionID, info.CommittedOffset)
-		}
-
-		t.OnReaderClose = func(startInfo trace.TopicReaderCloseStartInfo) func(doneInfo trace.TopicReaderCloseDoneInfo) {
-			start := time.Now()
-			logger.Debugf(`stream closing... {reader_connection_id:"%v", close_reason:"%v"}`,
-				startInfo.ReaderConnectionID, startInfo.CloseReason)
-
-			return func(doneInfo trace.TopicReaderCloseDoneInfo) {
-				logDebugWarn(logger, doneInfo.CloseError, `topic reader stream closed {reader_connection_id:"%v", close_reason:"%v", `+
-					//
-					`latency:%v, version:%v}`,
-					startInfo.ReaderConnectionID, startInfo.CloseReason,
-					//
-					time.Since(start), meta.Version)
-			}
-		}
-
-		t.OnReaderInit = func(startInfo trace.TopicReaderInitStartInfo) func(doneInfo trace.TopicReaderInitDoneInfo) {
-			start := time.Now()
-			logger.Debugf(`stream init starting... {pre_init_reader_connection_id:"%v", consumer:"%v", topics:%v}`,
-				startInfo.PreInitReaderConnectionID, startInfo.InitRequestInfo.GetConsumer(), startInfo.InitRequestInfo.GetTopics())
-
-			return func(doneInfo trace.TopicReaderInitDoneInfo) {
-				logDebugWarn(logger, doneInfo.Error, `topic reader stream initialized {pre_init_reader_connection_id:"%v", consumer:"%v", topics:%v, `+
-					//
-					`reader_connection_id:"%v", latency:%v, version:%v}`,
-					startInfo.PreInitReaderConnectionID, startInfo.InitRequestInfo.GetConsumer(), startInfo.InitRequestInfo.GetTopics(),
-					//
-					doneInfo.ReaderConnectionID, time.Since(start), meta.Version)
-			}
-		}
-
-		t.OnReaderError = func(info trace.TopicReaderErrorInfo) {
-			logger.Warnf(`stream error {reader_connection_id:"%v", error:"%v", version:%v}`,
-				info.ReaderConnectionID, info.Error, meta.Version)
-		}
-
-		t.OnReaderUpdateToken = func(startInfo trace.OnReadUpdateTokenStartInfo) func(updateTokenInfo trace.OnReadUpdateTokenMiddleTokenReceivedInfo) func(doneInfo trace.OnReadStreamUpdateTokenDoneInfo) {
-			start := time.Now()
-			logger.Debugf(`token updating... {reader_connection_id:"%v"}`,
-				startInfo.ReaderConnectionID)
-
-			return func(updateTokenInfo trace.OnReadUpdateTokenMiddleTokenReceivedInfo) func(doneInfo trace.OnReadStreamUpdateTokenDoneInfo) {
-				logDebugWarn(logger, updateTokenInfo.Error, `got token {reader_connection_id:"%v"`+
-					//
-					`token_len:%v, latency:%v, version:%v}`,
-					startInfo.ReaderConnectionID,
-					//
-					updateTokenInfo.TokenLen, time.Since(start), meta.Version)
-
-				return func(doneInfo trace.OnReadStreamUpdateTokenDoneInfo) {
-					logDebugWarn(logger, doneInfo.Error, `token updated on stream {reader_connection_id:"%v"`+
-						//
-						`token_len:%v, `+
-						//
-						`latency:%v, version:%v}`,
-						startInfo.ReaderConnectionID,
-						//
-						updateTokenInfo.TokenLen,
-						//
-						time.Since(start), meta.Version)
+			return func(doneInfo trace.OnReadStreamUpdateTokenDoneInfo) {
+				if doneInfo.Error == nil {
+					l.Log(ctx, "token updated on stream",
+						String("reader_connection_id", info.ReaderConnectionID),
+						Int("token_len", updateTokenInfo.TokenLen),
+						latency(start),
+					)
+				} else {
+					l.Log(WithLevel(ctx, WARN), "token updated on stream",
+						Error(doneInfo.Error),
+						String("reader_connection_id", info.ReaderConnectionID),
+						Int("token_len", updateTokenInfo.TokenLen),
+						latency(start),
+						version(),
+					)
 				}
 			}
 		}
 	}
-
-	if details&trace.TopicReaderMessageEvents != 0 {
-		logger := topicLogger.WithName("reader").WithName("message")
-
-		t.OnReaderSentDataRequest = func(info trace.TopicReaderSentDataRequestInfo) {
-			logger.Debugf(`sent data request {reader_connection_id:"%v", request_bytes:%v, local_capacity:%v} `,
-				info.ReaderConnectionID, info.RequestBytes, info.LocalBufferSizeAfterSent)
+	t.OnReaderSentDataRequest = func(info trace.TopicReaderSentDataRequestInfo) {
+		if d.Details()&trace.TopicReaderMessageEvents == 0 {
+			return
 		}
-
-		t.OnReaderReceiveDataResponse = func(startInfo trace.TopicReaderReceiveDataResponseStartInfo) func(doneInfo trace.TopicReaderReceiveDataResponseDoneInfo) {
-			start := time.Now()
-			partitionsCount, batchesCount, messagesCount := startInfo.DataResponse.GetPartitionBatchMessagesCounts()
-			logger.Debugf(`data response received, process starting... {reader_connection_id:"%v", received_bytes:%v, local_capacity:%v, partitions_count:%v, batches_count:%v, messages_count:%v}`,
-				startInfo.ReaderConnectionID, startInfo.DataResponse.GetBytesSize(), startInfo.LocalBufferSizeAfterReceive, partitionsCount, batchesCount, messagesCount)
-
-			return func(doneInfo trace.TopicReaderReceiveDataResponseDoneInfo) {
-				logDebugWarn(logger, doneInfo.Error, `data response received and processed {reader_connection_id:"%v", received_bytes:%v, local_capacity:%v, partitions_count:%v, batches_count:%v, messages_count:%v, `+
-					//
-					`latency:%v, version:%v}`,
-					startInfo.ReaderConnectionID, startInfo.DataResponse.GetBytesSize(), startInfo.LocalBufferSizeAfterReceive, partitionsCount, batchesCount, messagesCount,
-					//
-					time.Since(start), meta.Version)
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "sent", "data", "request")
+		l.Log(ctx, "sent data request",
+			String("reader_connection_id", info.ReaderConnectionID),
+			Int("request_bytes", info.RequestBytes),
+			Int("local_capacity", info.LocalBufferSizeAfterSent),
+		)
+	}
+	t.OnReaderReceiveDataResponse = func(startInfo trace.TopicReaderReceiveDataResponseStartInfo) func(doneInfo trace.TopicReaderReceiveDataResponseDoneInfo) {
+		if d.Details()&trace.TopicReaderMessageEvents == 0 {
+			return nil
+		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "receive", "data", "response")
+		start := time.Now()
+		partitionsCount, batchesCount, messagesCount := startInfo.DataResponse.GetPartitionBatchMessagesCounts()
+		l.Log(ctx, "data response received, process starting...",
+			String("reader_connection_id", startInfo.ReaderConnectionID),
+			Int("received_bytes", startInfo.DataResponse.GetBytesSize()),
+			Int("local_capacity", startInfo.LocalBufferSizeAfterReceive),
+			Int("partitions_count", partitionsCount),
+			Int("batches_count", batchesCount),
+			Int("messages_count", messagesCount),
+		)
+		return func(doneInfo trace.TopicReaderReceiveDataResponseDoneInfo) {
+			if doneInfo.Error == nil {
+				l.Log(ctx, "data response received and processed",
+					String("reader_connection_id", startInfo.ReaderConnectionID),
+					Int("received_bytes", startInfo.DataResponse.GetBytesSize()),
+					Int("local_capacity", startInfo.LocalBufferSizeAfterReceive),
+					Int("partitions_count", partitionsCount),
+					Int("batches_count", batchesCount),
+					Int("messages_count", messagesCount),
+					latency(start),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "data response received and processed",
+					Error(doneInfo.Error),
+					String("reader_connection_id", startInfo.ReaderConnectionID),
+					Int("received_bytes", startInfo.DataResponse.GetBytesSize()),
+					Int("local_capacity", startInfo.LocalBufferSizeAfterReceive),
+					Int("partitions_count", partitionsCount),
+					Int("batches_count", batchesCount),
+					Int("messages_count", messagesCount),
+					latency(start),
+					version(),
+				)
 			}
 		}
-
-		t.OnReaderReadMessages = func(startInfo trace.TopicReaderReadMessagesStartInfo) func(doneInfo trace.TopicReaderReadMessagesDoneInfo) {
-			start := time.Now()
-			logger.Debugf(`read messages called, waiting... {min_count:%v, max_count:%v, local_capacity_before:"%v"}`,
-				startInfo.MinCount, startInfo.MaxCount, startInfo.FreeBufferCapacity)
-
-			return func(doneInfo trace.TopicReaderReadMessagesDoneInfo) {
-				logDebugInfo(logger, doneInfo.Error, `read messages returned {min_count:%v, max_count:%v, local_capacity_before:"%v", `+
-					//
-					`topic:"%v", partition_id:%v, messages_count:%v, local_capacity_after:%v, latency:%v, version:%v}`,
-					startInfo.MinCount, startInfo.MaxCount, startInfo.FreeBufferCapacity,
-					//
-					doneInfo.Topic, doneInfo.PartitionID, doneInfo.MessagesCount, doneInfo.FreeBufferCapacity, time.Since(start), meta.Version)
+	}
+	t.OnReaderReadMessages = func(info trace.TopicReaderReadMessagesStartInfo) func(doneInfo trace.TopicReaderReadMessagesDoneInfo) {
+		if d.Details()&trace.TopicReaderMessageEvents == 0 {
+			return nil
+		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "read", "messages")
+		start := time.Now()
+		l.Log(ctx, "read messages called, waiting...",
+			Int("min_count", info.MinCount),
+			Int("max_count", info.MaxCount),
+			Int("local_capacity_before", info.FreeBufferCapacity),
+		)
+		return func(doneInfo trace.TopicReaderReadMessagesDoneInfo) {
+			if doneInfo.Error == nil {
+				l.Log(ctx, "read messages returned",
+					Int("min_count", info.MinCount),
+					Int("max_count", info.MaxCount),
+					Int("local_capacity_before", info.FreeBufferCapacity),
+					latency(start),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "read messages returned",
+					Error(doneInfo.Error),
+					Int("min_count", info.MinCount),
+					Int("max_count", info.MaxCount),
+					Int("local_capacity_before", info.FreeBufferCapacity),
+					latency(start),
+					version(),
+				)
 			}
 		}
-
-		t.OnReaderUnknownGrpcMessage = func(info trace.OnReadUnknownGrpcMessageInfo) {
-			logger.Infof(`received unknown message {reader_connection_id:"%v", error:"%v"}`,
-				info.ReaderConnectionID, info.Error)
+	}
+	t.OnReaderUnknownGrpcMessage = func(info trace.OnReadUnknownGrpcMessageInfo) {
+		if d.Details()&trace.TopicReaderMessageEvents == 0 {
+			return
 		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "unknown", "grpc", "message")
+		l.Log(WithLevel(ctx, INFO), "received unknown message",
+			Error(info.Error),
+			String("reader_connection_id", info.ReaderConnectionID),
+		)
 	}
 
 	///
 	/// Topic writer
 	///
-	if details&trace.TopicWriterStreamLifeCycleEvents != 0 {
-		logger := topicLogger.WithName("writer").WithName("lifecycle")
-		t.OnWriterReconnect = func(startInfo trace.TopicWriterReconnectStartInfo) func(doneInfo trace.TopicWriterReconnectDoneInfo) {
-			start := time.Now()
-			logger.Debugf("connect to topic writer stream starting... {topic:'%v', producer_id:'%v', writer_instance_id: '%v', attempt: %v}",
-				startInfo.Topic,
-				startInfo.ProducerID,
-				startInfo.WriterInstanceID,
-				startInfo.Attempt,
-			)
-			return func(doneInfo trace.TopicWriterReconnectDoneInfo) {
-				logger.Debugf("connect to topic writer stream completed {topic:'%v', producer_id:'%v', writer_instance_id: '%v', attempt: %v"+
-					//
-					"latency: %v, error: '%v'}",
-					startInfo.Topic,
-					startInfo.ProducerID,
-					startInfo.WriterInstanceID,
-					startInfo.Attempt,
-					//
-					time.Since(start),
-					doneInfo.Error,
-				)
-			}
+	t.OnWriterReconnect = func(info trace.TopicWriterReconnectStartInfo) func(doneInfo trace.TopicWriterReconnectDoneInfo) {
+		if d.Details()&trace.TopicWriterStreamLifeCycleEvents == 0 {
+			return nil
 		}
-		t.OnWriterInitStream = func(startInfo trace.TopicWriterInitStreamStartInfo) func(doneInfo trace.TopicWriterInitStreamDoneInfo) {
-			start := time.Now()
-			logger.Debugf("init stream starting... {topic:'%v', producer_id:'%v', writer_instance_id: '%v'}",
-				startInfo.Topic,
-				startInfo.ProducerID,
-				startInfo.WriterInstanceID,
-			)
-
-			return func(doneInfo trace.TopicWriterInitStreamDoneInfo) {
-				logger.Debugf("init stream completed {topic:'%v', producer_id:'%v', writer_instance_id: '%v'"+
-					//
-					"latency: %v, session_id: '%v', error: '%v'}",
-					startInfo.Topic,
-					startInfo.ProducerID,
-					startInfo.WriterInstanceID,
-					//
-					time.Since(start),
-					doneInfo.SessionID,
-					doneInfo.Error,
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "reconnect")
+		start := time.Now()
+		l.Log(ctx, "connect to topic writer stream starting...",
+			String("topic", info.Topic),
+			String("producer_id", info.ProducerID),
+			String("writer_instance_id", info.WriterInstanceID),
+			Int("attempt", info.Attempt),
+		)
+		return func(doneInfo trace.TopicWriterReconnectDoneInfo) {
+			if doneInfo.Error == nil {
+				l.Log(WithLevel(ctx, DEBUG), "connect to topic writer stream completed",
+					String("topic", info.Topic),
+					String("producer_id", info.ProducerID),
+					String("writer_instance_id", info.WriterInstanceID),
+					Int("attempt", info.Attempt),
+					latency(start),
 				)
-			}
-		}
-		t.OnWriterClose = func(startInfo trace.TopicWriterCloseStartInfo) func(doneInfo trace.TopicWriterCloseDoneInfo) {
-			start := time.Now()
-			logger.Debugf("close topic writer starting... {writer_instance_id: '%v', reason: '%v'}",
-				startInfo.WriterInstanceID,
-				startInfo.Reason,
-			)
-
-			return func(doneInfo trace.TopicWriterCloseDoneInfo) {
-				logger.Debugf("close topic writer completed {writer_instance_id: '%v', reason: '%v'",
-					//
-					"latency: %v, error: '%v'}",
-					startInfo.WriterInstanceID,
-					startInfo.Reason,
-					//
-					time.Since(start),
-					doneInfo.Error,
+			} else {
+				l.Log(WithLevel(ctx, WARN), "connect to topic writer stream completed",
+					Error(doneInfo.Error),
+					String("topic", info.Topic),
+					String("producer_id", info.ProducerID),
+					String("writer_instance_id", info.WriterInstanceID),
+					Int("attempt", info.Attempt),
+					latency(start),
 				)
 			}
 		}
 	}
-	if details&trace.TopicWriterStreamEvents != 0 {
-		logger := topicLogger.WithName("writer").WithName("stream")
-		t.OnWriterCompressMessages = func(startInfo trace.TopicWriterCompressMessagesStartInfo) func(doneInfo trace.TopicWriterCompressMessagesDoneInfo) {
-			start := time.Now()
-			logger.Debugf("compress message starting... {writer_instance_id:'%v', session_id: '%v', reason: %v, codec: %v, messages_count: %v, first_seqno: %v}",
-				startInfo.WriterInstanceID,
-				startInfo.SessionID,
-				startInfo.Reason,
-				startInfo.Codec,
-				startInfo.MessagesCount,
-				startInfo.FirstSeqNo,
-			)
+	t.OnWriterInitStream = func(info trace.TopicWriterInitStreamStartInfo) func(doneInfo trace.TopicWriterInitStreamDoneInfo) {
+		if d.Details()&trace.TopicWriterStreamLifeCycleEvents == 0 {
+			return nil
+		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "stream", "init")
+		start := time.Now()
+		l.Log(ctx, "start",
+			String("topic", info.Topic),
+			String("producer_id", info.ProducerID),
+			String("writer_instance_id", info.WriterInstanceID),
+		)
 
-			return func(doneInfo trace.TopicWriterCompressMessagesDoneInfo) {
-				logger.Debugf("compress message completed {writer_instance_id:'%v', session_id: '%v', reason: %v, codec: %v, messages_count: %v, first_seqno: %v}"+
-					//
-					"latency: %v, error: '%v'}",
-					startInfo.WriterInstanceID,
-					startInfo.SessionID,
-					startInfo.Reason,
-					startInfo.Codec,
-					startInfo.MessagesCount,
-					startInfo.FirstSeqNo,
-					//
-					time.Since(start),
-					doneInfo.Error,
+		return func(doneInfo trace.TopicWriterInitStreamDoneInfo) {
+			if doneInfo.Error == nil {
+				l.Log(WithLevel(ctx, DEBUG), "init stream completed",
+					Error(doneInfo.Error),
+					String("topic", info.Topic),
+					String("producer_id", info.ProducerID),
+					String("writer_instance_id", info.WriterInstanceID),
+					latency(start),
+					String("session_id", doneInfo.SessionID),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "init stream completed",
+					Error(doneInfo.Error),
+					String("topic", info.Topic),
+					String("producer_id", info.ProducerID),
+					String("writer_instance_id", info.WriterInstanceID),
+					latency(start),
+					String("session_id", doneInfo.SessionID),
 				)
 			}
-		}
-		t.OnWriterSendMessages = func(startInfo trace.TopicWriterSendMessagesStartInfo) func(doneInfo trace.TopicWriterSendMessagesDoneInfo) {
-			start := time.Now()
-			logger.Debugf("compress message starting... {writer_instance_id:'%v', session_id: '%v', codec: %v, messages_count: %v, first_seqno: %v}",
-				startInfo.WriterInstanceID,
-				startInfo.SessionID,
-				startInfo.Codec,
-				startInfo.MessagesCount,
-				startInfo.FirstSeqNo,
-			)
-
-			return func(doneInfo trace.TopicWriterSendMessagesDoneInfo) {
-				logger.Debugf("compress message completed {writer_instance_id:'%v', session_id: '%v', codec: %v, messages_count: %v, first_seqno: %v}"+
-					//
-					"latency: %v, error: '%v'}",
-					startInfo.WriterInstanceID,
-					startInfo.SessionID,
-					startInfo.Codec,
-					startInfo.MessagesCount,
-					startInfo.FirstSeqNo,
-					//
-					time.Since(start),
-					doneInfo.Error,
-				)
-			}
-		}
-		t.OnWriterReadUnknownGrpcMessage = func(info trace.TopicOnWriterReadUnknownGrpcMessageInfo) {
-			logger.Infof(
-				"topic writer receive unknown message from server {writer_instance_id:'%v', session_id:'%v', error: '%v'}",
-				info.WriterInstanceID,
-				info.SessionID,
-				info.Error,
-			)
 		}
 	}
-
+	t.OnWriterClose = func(info trace.TopicWriterCloseStartInfo) func(doneInfo trace.TopicWriterCloseDoneInfo) {
+		if d.Details()&trace.TopicWriterStreamLifeCycleEvents == 0 {
+			return nil
+		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "close")
+		start := time.Now()
+		l.Log(ctx, "start",
+			String("writer_instance_id", info.WriterInstanceID),
+			NamedError("reason", info.Reason),
+		)
+		return func(doneInfo trace.TopicWriterCloseDoneInfo) {
+			if doneInfo.Error == nil {
+				l.Log(WithLevel(ctx, DEBUG), "close topic writer completed",
+					Error(doneInfo.Error),
+					String("writer_instance_id", info.WriterInstanceID),
+					NamedError("reason", info.Reason),
+					latency(start),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "close topic writer completed",
+					Error(doneInfo.Error),
+					String("writer_instance_id", info.WriterInstanceID),
+					NamedError("reason", info.Reason),
+					latency(start),
+				)
+			}
+		}
+	}
+	t.OnWriterCompressMessages = func(info trace.TopicWriterCompressMessagesStartInfo) func(doneInfo trace.TopicWriterCompressMessagesDoneInfo) {
+		if d.Details()&trace.TopicWriterStreamEvents == 0 {
+			return nil
+		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "compress", "messages")
+		start := time.Now()
+		l.Log(ctx, "start",
+			String("writer_instance_id", info.WriterInstanceID),
+			String("session_id", info.SessionID),
+			Any("reason", info.Reason),
+			Any("codec", info.Codec),
+			Int("messages_count", info.MessagesCount),
+			Int64("first_seqno", info.FirstSeqNo),
+		)
+		return func(doneInfo trace.TopicWriterCompressMessagesDoneInfo) {
+			if doneInfo.Error == nil {
+				l.Log(ctx, "compress message completed",
+					Error(doneInfo.Error),
+					String("writer_instance_id", info.WriterInstanceID),
+					String("session_id", info.SessionID),
+					Any("reason", info.Reason),
+					Any("codec", info.Codec),
+					Int("messages_count", info.MessagesCount),
+					Int64("first_seqno", info.FirstSeqNo),
+					latency(start),
+				)
+			} else {
+				l.Log(WithLevel(ctx, ERROR), "compress message completed",
+					Error(doneInfo.Error),
+					String("writer_instance_id", info.WriterInstanceID),
+					String("session_id", info.SessionID),
+					Any("reason", info.Reason),
+					Any("codec", info.Codec),
+					Int("messages_count", info.MessagesCount),
+					Int64("first_seqno", info.FirstSeqNo),
+					latency(start),
+				)
+			}
+		}
+	}
+	t.OnWriterSendMessages = func(info trace.TopicWriterSendMessagesStartInfo) func(doneInfo trace.TopicWriterSendMessagesDoneInfo) {
+		if d.Details()&trace.TopicWriterStreamEvents == 0 {
+			return nil
+		}
+		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "send", "messages")
+		start := time.Now()
+		l.Log(ctx, "start",
+			String("writer_instance_id", info.WriterInstanceID),
+			String("session_id", info.SessionID),
+			Any("codec", info.Codec),
+			Int("messages_count", info.MessagesCount),
+			Int64("first_seqno", info.FirstSeqNo),
+		)
+		return func(doneInfo trace.TopicWriterSendMessagesDoneInfo) {
+			if doneInfo.Error == nil {
+				l.Log(ctx, "send messages completed",
+					String("writer_instance_id", info.WriterInstanceID),
+					String("session_id", info.SessionID),
+					Any("codec", info.Codec),
+					Int("messages_count", info.MessagesCount),
+					Int64("first_seqno", info.FirstSeqNo),
+					latency(start),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "send messages completed",
+					Error(doneInfo.Error),
+					String("writer_instance_id", info.WriterInstanceID),
+					String("session_id", info.SessionID),
+					Any("codec", info.Codec),
+					Int("messages_count", info.MessagesCount),
+					Int64("first_seqno", info.FirstSeqNo),
+					latency(start),
+				)
+			}
+		}
+	}
+	t.OnWriterReadUnknownGrpcMessage = func(info trace.TopicOnWriterReadUnknownGrpcMessageInfo) {
+		if d.Details()&trace.TopicWriterStreamEvents == 0 {
+			return
+		}
+		ctx := with(context.Background(), DEBUG, "ydb", "topic", "writer", "read", "unknown", "grpc", "message")
+		l.Log(ctx, "topic writer receive unknown message from server",
+			Error(info.Error),
+			String("writer_instance_id", info.WriterInstanceID),
+			String("session_id", info.SessionID),
+		)
+	}
 	return t
 }

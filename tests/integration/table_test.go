@@ -28,7 +28,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
@@ -261,12 +260,8 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 		}
 	)
 
-	var (
-		err    error
-		logger = xtest.Logger(t)
-	)
-	scope.db, err = ydb.Open(
-		ctx,
+	var err error
+	scope.db, err = ydb.Open(ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 		ydb.WithUserAgent("table/e2e"),
@@ -301,12 +296,12 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 		ydb.WithDialTimeout(5*time.Second),
 		ydb.WithSessionPoolSizeLimit(limit),
 		ydb.WithConnectionTTL(5*time.Second),
-		ydb.WithDiscoveryInterval(5*time.Second),
 		ydb.WithLogger(
+			log.Default(os.Stderr,
+				log.WithMinLevel(log.FromString(os.Getenv("YDB_LOG_SEVERITY_LEVEL"))),
+				log.WithColoring(),
+			),
 			trace.MatchDetails(`ydb\.(driver|table|discovery|retry|scheme).*`),
-			ydb.WithNamespace("ydb"),
-			ydb.WithWriter(logger),
-			ydb.WithMinLevel(log.WARN),
 		),
 		ydb.WithPanicCallback(func(e interface{}) {
 			_, _ = fmt.Fprintf(os.Stderr, "panic recovered:%v:\n%s", e, debug.Stack())

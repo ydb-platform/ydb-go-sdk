@@ -5,22 +5,6 @@ import (
 	"testing"
 )
 
-func Logger(t testing.TB) *testWriter {
-	return &testWriter{
-		t: t,
-	}
-}
-
-type testWriter struct {
-	t testing.TB
-}
-
-func (t *testWriter) Write(p []byte) (n int, err error) {
-	t.t.Helper()
-	t.t.Log(string(p))
-	return len(p), nil
-}
-
 func MakeSyncedTest(t testing.TB) *SyncedTest {
 	return &SyncedTest{
 		TB: t,

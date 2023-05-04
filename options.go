@@ -17,7 +17,6 @@ import (
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/logger"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
 	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
 	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
@@ -165,26 +164,13 @@ func WithTLSSInsecureSkipVerify() Option {
 // WithLogger add enables logging for selected tracing events.
 //
 // See trace package documentation for details.
-func WithLogger(details trace.Details, opts ...LoggerOption) Option {
-	loggerOpts := make([]logger.Option, 0, len(opts))
-	for _, o := range opts {
-		if o != nil {
-			loggerOpts = append(loggerOpts, logger.Option(o))
-		}
+func WithLogger(l log.Logger, details trace.Detailer, opts ...log.Option) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.logger = l
+		c.loggerOpts = opts
+		c.loggerDetails = details
+		return nil
 	}
-
-	l := logger.New(loggerOpts...)
-	return MergeOptions(
-		WithTraceDriver(log.Driver(l, details)),
-		WithTraceTable(log.Table(l, details)),
-		WithTraceScripting(log.Scripting(l, details)),
-		WithTraceScheme(log.Scheme(l, details)),
-		WithTraceCoordination(log.Coordination(l, details)),
-		WithTraceRatelimiter(log.Ratelimiter(l, details)),
-		WithTraceDiscovery(log.Discovery(l, details)),
-		WithTraceTopic(log.Topic(l, details)),
-		WithTraceDatabaseSQL(log.DatabaseSQL(l, details)),
-	)
 }
 
 // WithAnonymousCredentials force to make requests withou authentication.

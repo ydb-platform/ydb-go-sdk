@@ -5,10 +5,6 @@ import (
 )
 
 // Ratelimiter returns trace.Ratelimiter with logging events from details
-func Ratelimiter(l Logger, details trace.Details) (t trace.Ratelimiter) {
-	if details&trace.RatelimiterEvents == 0 {
-		return
-	}
-	_ = l.WithName(`ratelimiter`)
+func Ratelimiter(l Logger, d trace.Detailer, opts ...Option) (t trace.Ratelimiter) {
 	return t
 }

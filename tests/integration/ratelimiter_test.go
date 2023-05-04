@@ -24,13 +24,9 @@ func TestRatelimiter(t *testing.T) {
 		testResource             = "test_resource"
 	)
 
-	var (
-		ctx    = xtest.Context(t)
-		logger = xtest.Logger(t)
-	)
+	ctx := xtest.Context(t)
 
-	db, err := ydb.Open(
-		ctx,
+	db, err := ydb.Open(ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAccessTokenCredentials(
 			os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
@@ -41,10 +37,10 @@ func TestRatelimiter(t *testing.T) {
 		),
 		ydb.WithBalancer(balancers.SingleConn()),
 		ydb.WithLogger(
+			log.Default(os.Stderr,
+				log.WithMinLevel(log.WARN),
+			),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|ratelimiter|coordination).*`),
-			ydb.WithNamespace("ydb"),
-			ydb.WithWriter(logger),
-			ydb.WithMinLevel(log.WARN),
 		),
 	)
 	if err != nil {

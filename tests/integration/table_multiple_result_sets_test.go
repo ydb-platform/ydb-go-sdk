@@ -30,27 +30,25 @@ type scopeTableStreamExecuteScanQuery struct {
 }
 
 func TestTableMultipleResultSets(t *testing.T) {
-	scope := &scopeTableStreamExecuteScanQuery{
-		folder:          t.Name(),
-		tableName:       "stream_query_table",
-		upsertRowsCount: 100000,
-		sum:             0,
-	}
-
 	var (
-		ctx    = xtest.Context(t)
-		logger = xtest.Logger(t)
+		scope = &scopeTableStreamExecuteScanQuery{
+			folder:          t.Name(),
+			tableName:       "stream_query_table",
+			upsertRowsCount: 100000,
+			sum:             0,
+		}
+		ctx = xtest.Context(t)
 	)
 
-	db, err := ydb.Open(
-		ctx,
+	db, err := ydb.Open(ctx,
 		"", // corner case for check replacement of endpoint+database+secure
 		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
 		ydb.WithLogger(
+			log.Default(os.Stderr,
+				log.WithMinLevel(log.TRACE),
+				log.WithColoring(),
+			),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
-			ydb.WithNamespace("ydb"),
-			ydb.WithWriter(logger),
-			ydb.WithMinLevel(log.TRACE),
 		),
 	)
 	require.NoError(t, err)
