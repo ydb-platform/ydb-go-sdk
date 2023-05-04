@@ -80,5 +80,5 @@ jobs:
         uses: codecov/codecov-action@v2
         with:
           file: ./integration-secure.txt
-          flags: integration,${{ matrix.os }},go-${{ matrix.go-version }},ydb-{{ matrix.ydb-version }}
+          flags: integration,${{ matrix.os }},go-${{ matrix.go-version }},ydb-${{ matrix.ydb-version }}
           name: integration-secure
