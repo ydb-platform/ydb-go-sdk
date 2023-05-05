@@ -1,3 +1,4 @@
+## v3.46.0
 * Refactored package `log` for support typed fields in log messages
 
 ## v3.45.0
