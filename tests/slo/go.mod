@@ -19,12 +19,15 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/uuid v1.3.0 // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.4 // indirect
 	github.com/jonboulle/clockwork v0.4.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/yandex-cloud/go-genproto v0.0.0-20230403093326-123923969dc6 // indirect
+	github.com/ydb-platform/gorm-driver v0.0.4 // indirect
 	github.com/ydb-platform/ydb-go-genproto v0.0.0-20221215182650-986f9d10542f // indirect
 	github.com/ydb-platform/ydb-go-yc v0.10.2 // indirect
 	github.com/ydb-platform/ydb-go-yc-metadata v0.5.3 // indirect
@@ -36,6 +39,7 @@ require (
 	google.golang.org/genproto v0.0.0-20230403163135-c38d8f061ccd // indirect
 	google.golang.org/grpc v1.54.0 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
+	gorm.io/gorm v1.24.5 // indirect
 )
 
 replace github.com/ydb-platform/ydb-go-sdk/v3 => ../../.
