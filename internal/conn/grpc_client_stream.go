@@ -127,7 +127,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 
 func createPinger(c *conn) xcontext.CancelErrFunc {
 	c.touchLastUsage()
-	ctx, cancel := xcontext.WithErrCancel(context.Background())
+	ctx, cancel := xcontext.WithCancel(context.Background())
 	go func() {
 		ticker := time.NewTicker(time.Second)
 		ctxDone := ctx.Done()

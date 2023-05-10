@@ -162,7 +162,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 			})
 		}()
 
-		readCtx, readCtxCancel := xcontext.WithErrCancel(e.ctx)
+		readCtx, readCtxCancel := xcontext.WithCancel(e.ctx)
 		readerStopErr := errors.New("stop partition response sent")
 		go func() {
 			<-stopPartitionResponseSent
@@ -221,7 +221,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "TraceGracefulTrue", func(t testing.TB) {
 		e := newTopicReaderTestEnv(t)
 
-		readMessagesCtx, readMessagesCtxCancel := xcontext.WithErrCancel(context.Background())
+		readMessagesCtx, readMessagesCtxCancel := xcontext.WithCancel(context.Background())
 		committedOffset := int64(222)
 
 		e.reader.cfg.Tracer.OnReaderPartitionReadStopResponse = func(info trace.TopicReaderPartitionReadStopResponseStartInfo) func(doneInfo trace.TopicReaderPartitionReadStopResponseDoneInfo) { //nolint:lll
@@ -265,7 +265,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "TraceGracefulFalse", func(t testing.TB) {
 		e := newTopicReaderTestEnv(t)
 
-		readMessagesCtx, readMessagesCtxCancel := xcontext.WithErrCancel(context.Background())
+		readMessagesCtx, readMessagesCtxCancel := xcontext.WithCancel(context.Background())
 		committedOffset := int64(222)
 
 		e.reader.cfg.Tracer.OnReaderPartitionReadStopResponse = func(info trace.TopicReaderPartitionReadStopResponseStartInfo) func(doneInfo trace.TopicReaderPartitionReadStopResponseDoneInfo) { //nolint:lll

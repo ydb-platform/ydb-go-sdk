@@ -339,7 +339,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 
 	createStreamContext := func() (context.Context, xcontext.CancelErrFunc) {
 		// need suppress parent context cancelation for flush buffer while close writer
-		return xcontext.WithErrCancel(xcontext.WithoutDeadline(ctx))
+		return xcontext.WithCancel(xcontext.WithoutDeadline(ctx))
 	}
 
 	//nolint:ineffassign,staticcheck

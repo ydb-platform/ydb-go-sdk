@@ -27,7 +27,7 @@ func TestCommitterCommit(t *testing.T) {
 		}
 
 		testErr := errors.New("test error")
-		ctx, cancel := xcontext.WithErrCancel(ctx)
+		ctx, cancel := xcontext.WithCancel(ctx)
 		cancel(testErr)
 
 		err := c.Commit(ctx, commitRange{})
@@ -163,7 +163,7 @@ func TestCommitterCommitSync(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "SessionClosed", func(t testing.TB) {
 		ctx := xtest.Context(t)
 
-		sessionCtx, sessionCancel := xcontext.WithErrCancel(ctx)
+		sessionCtx, sessionCancel := xcontext.WithCancel(ctx)
 
 		session := &partitionSession{
 			ctx:                sessionCtx,

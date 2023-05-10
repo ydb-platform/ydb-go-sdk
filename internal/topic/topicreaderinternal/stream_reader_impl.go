@@ -135,7 +135,7 @@ func newTopicStreamReaderStopped(
 	cfg topicStreamReaderConfig,
 ) *topicStreamReaderImpl {
 	labeledContext := pprof.WithLabels(cfg.BaseContext, pprof.Labels("base-context", "topic-stream-reader"))
-	stopPump, cancel := xcontext.WithErrCancel(labeledContext)
+	stopPump, cancel := xcontext.WithCancel(labeledContext)
 
 	readerConnectionID, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
 	if err != nil {
@@ -463,7 +463,7 @@ func (r *topicStreamReaderImpl) getRestBufferBytes() int {
 }
 
 func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
-	ctx, cancel := xcontext.WithErrCancel(ctx)
+	ctx, cancel := xcontext.WithCancel(ctx)
 	defer cancel(xerrors.NewWithIssues("ydb: topic stream reader messages loop finished"))
 
 	for {

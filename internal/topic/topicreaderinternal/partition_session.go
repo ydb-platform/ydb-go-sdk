@@ -41,7 +41,7 @@ func newPartitionSession(
 	partitionSessionID rawtopicreader.PartitionSessionID,
 	committedOffset rawtopicreader.Offset,
 ) *partitionSession {
-	partitionContext, cancel := xcontext.WithErrCancel(partitionContext)
+	partitionContext, cancel := xcontext.WithCancel(partitionContext)
 
 	return &partitionSession{
 		Topic:                    topic,

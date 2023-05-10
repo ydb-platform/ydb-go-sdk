@@ -285,7 +285,7 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 		return nil, err
 	}
 
-	connectionContext, cancel := xcontext.WithErrCancel(context.Background())
+	connectionContext, cancel := xcontext.WithCancel(context.Background())
 
 	type connectResult struct {
 		stream batchedStreamReader

@@ -77,7 +77,7 @@ func New(
 	task func(ctx context.Context) (err error),
 	opts ...option,
 ) *repeater {
-	ctx, cancel := xcontext.WithErrCancel(context.Background())
+	ctx, cancel := xcontext.WithCancel(context.Background())
 
 	r := &repeater{
 		interval: interval,

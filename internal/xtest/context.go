@@ -10,7 +10,7 @@ import (
 )
 
 func Context(t testing.TB) context.Context {
-	ctx, cancel := xcontext.WithErrCancel(context.Background())
+	ctx, cancel := xcontext.WithCancel(context.Background())
 	ctx = pprof.WithLabels(ctx, pprof.Labels("test", t.Name()))
 	pprof.SetGoroutineLabels(ctx)
 

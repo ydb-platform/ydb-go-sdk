@@ -930,7 +930,7 @@ func (s *session) StreamReadTable(
 		}
 	}
 
-	ctx, cancel := xcontext.WithErrCancel(ctx)
+	ctx, cancel := xcontext.WithCancel(ctx)
 
 	stream, err = s.tableService.StreamReadTable(ctx, &request)
 
