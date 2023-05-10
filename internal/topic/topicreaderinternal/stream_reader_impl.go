@@ -35,7 +35,7 @@ type partitionSessionID = rawtopicreader.PartitionSessionID
 type topicStreamReaderImpl struct {
 	cfg    topicStreamReaderConfig
 	ctx    context.Context
-	cancel xcontext.CancelErrFunc
+	cancel context.CancelFunc
 
 	freeBytes                 chan int
 	atomicRestBufferSizeBytes int64
@@ -298,7 +298,7 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequestFromBuffer(
 	}()
 
 	if msg.Graceful {
-		session.Close(errPartitionSessionStoppedBySDK)
+		session.Close()
 		resp := &rawtopicreader.StopPartitionSessionResponse{
 			PartitionSessionID: session.partitionSessionID,
 		}
@@ -464,7 +464,7 @@ func (r *topicStreamReaderImpl) getRestBufferBytes() int {
 
 func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
 	ctx, cancel := xcontext.WithCancel(ctx)
-	defer cancel(xerrors.NewWithIssues("ydb: topic stream reader messages loop finished"))
+	defer cancel()
 
 	for {
 		serverMessage, err := r.stream.Recv()
@@ -652,7 +652,7 @@ func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error
 		r.closed = true
 
 		r.err = reason
-		r.cancel(reason)
+		r.cancel()
 	})
 	if !isFirstClose {
 		return nil
@@ -793,7 +793,7 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequest(m *rawtopicreader.
 	}
 
 	if !m.Graceful {
-		session.Close(xerrors.WithStackTrace(errPartitionSessionStoppedByServer))
+		session.Close()
 	}
 
 	return r.batcher.PushRawMessage(session, m)

@@ -163,10 +163,9 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		}()
 
 		readCtx, readCtxCancel := xcontext.WithCancel(e.ctx)
-		readerStopErr := errors.New("stop partition response sent")
 		go func() {
 			<-stopPartitionResponseSent
-			readCtxCancel(readerStopErr)
+			readCtxCancel()
 		}()
 
 		batch, err := e.reader.ReadMessageBatch(readCtx, newReadMessageBatchOptions())
@@ -174,7 +173,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		err = e.reader.Commit(e.ctx, batch.commitRange)
 		require.NoError(t, err)
 		_, err = e.reader.ReadMessageBatch(readCtx, newReadMessageBatchOptions())
-		require.ErrorIs(t, err, readerStopErr)
+		require.ErrorIs(t, err, context.Canceled)
 
 		select {
 		case <-e.partitionSession.Context().Done():
@@ -238,7 +237,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 
 			require.NoError(t, info.PartitionContext.Err())
 
-			readMessagesCtxCancel(errors.New("test tracer finished"))
+			readMessagesCtxCancel()
 			return nil
 		}
 
@@ -281,7 +280,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 			require.Equal(t, expected, info)
 			require.Error(t, info.PartitionContext.Err())
 
-			readMessagesCtxCancel(errors.New("test tracer finished"))
+			readMessagesCtxCancel()
 			return nil
 		}
 

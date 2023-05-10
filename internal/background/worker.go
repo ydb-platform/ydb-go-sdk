@@ -30,7 +30,7 @@ type Worker struct {
 	tasks chan backgroundTask
 
 	closed      bool
-	stop        xcontext.CancelErrFunc
+	stop        context.CancelFunc
 	closeReason error
 }
 
@@ -88,7 +88,7 @@ func (b *Worker) Close(ctx context.Context, err error) error {
 			b.closeReason = errClosedWithNilReason
 		}
 
-		b.stop(err)
+		b.stop()
 	})
 	if resErr != nil {
 		return resErr

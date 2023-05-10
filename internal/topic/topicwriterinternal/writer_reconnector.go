@@ -337,7 +337,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 	doneCtx := ctx.Done()
 	attempt := 0
 
-	createStreamContext := func() (context.Context, xcontext.CancelErrFunc) {
+	createStreamContext := func() (context.Context, context.CancelFunc) {
 		// need suppress parent context cancelation for flush buffer while close writer
 		return xcontext.WithCancel(xcontext.WithoutDeadline(ctx))
 	}
@@ -346,7 +346,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 	streamCtx, streamCtxCancel := createStreamContext()
 
 	defer func() {
-		streamCtxCancel(xerrors.WithStackTrace(errCloseWriterReconnectorConnectionLoop))
+		streamCtxCancel()
 	}()
 
 	var reconnectReason error
@@ -358,7 +358,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 			return
 		}
 
-		streamCtxCancel(xerrors.WithStackTrace(errCloseWriterReconnectorReconnect))
+		streamCtxCancel()
 		streamCtx, streamCtxCancel = createStreamContext()
 
 		now := time.Now()

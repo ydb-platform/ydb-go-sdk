@@ -2,7 +2,6 @@ package xtest
 
 import (
 	"context"
-	"fmt"
 	"runtime/pprof"
 	"testing"
 
@@ -16,7 +15,7 @@ func Context(t testing.TB) context.Context {
 
 	t.Cleanup(func() {
 		pprof.SetGoroutineLabels(ctx)
-		cancel(fmt.Errorf("test %q context finished", t.Name()))
+		cancel()
 	})
 	return ctx
 }

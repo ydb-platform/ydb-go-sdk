@@ -26,12 +26,11 @@ func TestCommitterCommit(t *testing.T) {
 			return nil
 		}
 
-		testErr := errors.New("test error")
 		ctx, cancel := xcontext.WithCancel(ctx)
-		cancel(testErr)
+		cancel()
 
 		err := c.Commit(ctx, commitRange{})
-		require.ErrorIs(t, err, testErr)
+		require.ErrorIs(t, err, context.Canceled)
 	})
 }
 
@@ -185,8 +184,7 @@ func TestCommitterCommitSync(t *testing.T) {
 			waitErr <- commitErr
 		}()
 
-		testErr := errors.New("test")
-		sessionCancel(testErr)
+		sessionCancel()
 
 		commitErr := <-waitErr
 		require.ErrorIs(t, commitErr, PublicErrCommitSessionToExpiredSession)

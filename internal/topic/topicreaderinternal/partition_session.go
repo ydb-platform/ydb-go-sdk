@@ -25,7 +25,7 @@ type partitionSession struct {
 	connectionID string
 
 	ctx                context.Context
-	ctxCancel          xcontext.CancelErrFunc
+	ctxCancel          context.CancelFunc
 	partitionSessionID rawtopicreader.PartitionSessionID
 
 	lastReceivedOffsetEndVal int64
@@ -60,8 +60,8 @@ func (s *partitionSession) Context() context.Context {
 	return s.ctx
 }
 
-func (s *partitionSession) Close(err error) {
-	s.ctxCancel(err)
+func (s *partitionSession) Close() {
+	s.ctxCancel()
 }
 
 func (s *partitionSession) committedOffset() rawtopicreader.Offset {
