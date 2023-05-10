@@ -49,7 +49,7 @@ func TestContextWithTimeoutError(t *testing.T) {
 				childCancel()
 				return childCtx.Err()
 			}(),
-			str: "context canceled at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithTimeoutError.func1(context_with_timeout_test.go:46)`", //nolint:lll
+			str: "context canceled at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithTimeoutError.func1(context_with_timeout_test.go:48)`", //nolint:lll
 		},
 		{
 			err: func() error {
@@ -57,7 +57,7 @@ func TestContextWithTimeoutError(t *testing.T) {
 				cancel()
 				return ctx.Err()
 			}(),
-			str: "context canceled at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithTimeoutError.func2(context_with_timeout_test.go:56)`", //nolint:lll
+			str: "context canceled at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithTimeoutError.func2(context_with_timeout_test.go:57)`", //nolint:lll
 		},
 		{
 			err: func() error {

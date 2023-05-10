@@ -38,8 +38,10 @@ func (ctx *timeoutCtx) Done() <-chan struct{} {
 
 func (ctx *timeoutCtx) withErrUnderLock(err error) error {
 	switch err { //nolint:errorlint
-	case context.DeadlineExceeded, context.Canceled:
+	case context.DeadlineExceeded:
 		ctx.err = fmt.Errorf("%w at `%s`", err, ctx.stackRecord)
+	case context.Canceled:
+		ctx.err = xerrors.WithStackTrace(err, xerrors.WithSkipDepth(2))
 	default:
 		ctx.err = err
 	}
