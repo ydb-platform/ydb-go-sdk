@@ -34,7 +34,7 @@ func (ctx *cancelCtx) Done() <-chan struct{} {
 }
 
 func (ctx *cancelCtx) withErrUnderLock(err error) error {
-	if err == context.Canceled {
+	if err == context.Canceled { //nolint:errorlint
 		ctx.err = xerrors.WithStackTrace(err, xerrors.WithSkipDepth(2))
 	} else {
 		ctx.err = err

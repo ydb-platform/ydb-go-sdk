@@ -26,7 +26,6 @@ var (
 	PublicErrCommitSessionToExpiredSession = xerrors.Wrap(errors.New("ydb: commit to expired session"))
 
 	errPartitionSessionStoppedByServer = xerrors.Wrap(errors.New("ydb: topic partition session stopped by server"))
-	errPartitionSessionStoppedBySDK    = xerrors.Wrap(errors.New("ydb: topic partition session stopped by sdk"))
 	errCommitWithNilPartitionSession   = xerrors.Wrap(errors.New("ydb: commit with nil partition session"))
 )
 

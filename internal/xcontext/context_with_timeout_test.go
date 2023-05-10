@@ -49,7 +49,7 @@ func TestContextWithTimeoutError(t *testing.T) {
 				childCancel()
 				return childCtx.Err()
 			}(),
-			str: "context canceled at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithTimeoutError.func1(context_with_timeout_test.go:46)`",
+			str: "context canceled at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithTimeoutError.func1(context_with_timeout_test.go:46)`", //nolint:lll
 		},
 		{
 			err: func() error {
@@ -57,7 +57,7 @@ func TestContextWithTimeoutError(t *testing.T) {
 				cancel()
 				return ctx.Err()
 			}(),
-			str: "context canceled at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithTimeoutError.func2(context_with_timeout_test.go:56)`",
+			str: "context canceled at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithTimeoutError.func2(context_with_timeout_test.go:56)`", //nolint:lll
 		},
 		{
 			err: func() error {
@@ -65,14 +65,14 @@ func TestContextWithTimeoutError(t *testing.T) {
 				childCtx, _ := WithTimeout(parentCtx, 0)
 				return childCtx.Err()
 			}(),
-			str: "context deadline exceeded at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithTimeoutError.func3(context_with_timeout_test.go:64)`",
+			str: "context deadline exceeded at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithTimeoutError.func3(context_with_timeout_test.go:64)`", //nolint:lll
 		},
 		{
 			err: func() error {
 				ctx, _ := WithTimeout(context.Background(), 0)
 				return ctx.Err()
 			}(),
-			str: "context deadline exceeded at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithTimeoutError.func4(context_with_timeout_test.go:72)`",
+			str: "context deadline exceeded at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithTimeoutError.func4(context_with_timeout_test.go:72)`", //nolint:lll
 		},
 	} {
 		t.Run("", func(t *testing.T) {
