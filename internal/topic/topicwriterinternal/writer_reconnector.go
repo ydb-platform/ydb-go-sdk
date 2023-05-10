@@ -424,7 +424,7 @@ func (w *WriterReconnector) needReceiveLastSeqNo() bool {
 }
 
 func (w *WriterReconnector) connectWithTimeout(streamLifetimeContext context.Context) (RawTopicWriterStream, error) {
-	connectCtx, connectCancel := context.WithCancel(streamLifetimeContext)
+	connectCtx, connectCancel := xcontext.WithCancel(streamLifetimeContext)
 
 	type resT struct {
 		stream RawTopicWriterStream

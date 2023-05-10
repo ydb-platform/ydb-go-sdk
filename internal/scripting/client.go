@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
@@ -213,7 +214,7 @@ func (c *Client) streamExecute(
 		}
 	}()
 
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := xcontext.WithCancel(ctx)
 
 	stream, err := c.service.StreamExecuteYql(ctx, request)
 	if err != nil {

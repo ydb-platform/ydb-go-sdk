@@ -1011,7 +1011,7 @@ func (s *session) StreamExecuteScanQuery(
 		}
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := xcontext.WithCancel(ctx)
 
 	stream, err = s.tableService.StreamExecuteScanQuery(ctx, &request, callOptions...)
 

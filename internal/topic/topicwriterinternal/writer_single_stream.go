@@ -185,7 +185,7 @@ func (w *SingleStreamWriter) receiveMessagesLoop(ctx context.Context) {
 		case *rawtopicwriter.WriteResult:
 			if err = w.cfg.queue.AcksReceived(m.Acks); err != nil {
 				reason := xerrors.WithStackTrace(err)
-				closeCtx, closeCtxCancel := context.WithCancel(ctx)
+				closeCtx, closeCtxCancel := xcontext.WithCancel(ctx)
 				closeCtxCancel()
 				_ = w.close(closeCtx, reason)
 				return

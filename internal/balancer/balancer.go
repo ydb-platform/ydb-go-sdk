@@ -15,6 +15,7 @@ import (
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -94,9 +95,9 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 	}()
 
 	if dialTimeout := b.driverConfig.DialTimeout(); dialTimeout > 0 {
-		ctx, cancel = context.WithTimeout(ctx, dialTimeout)
+		ctx, cancel = xcontext.WithTimeout(ctx, dialTimeout)
 	} else {
-		ctx, cancel = context.WithCancel(ctx)
+		ctx, cancel = xcontext.WithCancel(ctx)
 	}
 	defer cancel()
 

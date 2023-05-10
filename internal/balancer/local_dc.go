@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -19,7 +20,7 @@ const (
 )
 
 func checkFastestAddress(ctx context.Context, addresses []string) string {
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := xcontext.WithCancel(ctx)
 	defer cancel()
 
 	type result struct {

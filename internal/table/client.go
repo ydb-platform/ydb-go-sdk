@@ -166,7 +166,7 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 
 				if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
 					var cancel context.CancelFunc
-					createSessionCtx, cancel = context.WithTimeout(createSessionCtx, timeout)
+					createSessionCtx, cancel = xcontext.WithTimeout(createSessionCtx, timeout)
 					defer cancel()
 				}
 
@@ -179,7 +179,7 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 
 					if timeout := c.config.DeleteTimeout(); timeout > 0 {
 						var cancel context.CancelFunc
-						createSessionCtx, cancel = context.WithTimeout(closeSessionCtx, timeout)
+						createSessionCtx, cancel = xcontext.WithTimeout(closeSessionCtx, timeout)
 						defer cancel()
 					}
 
@@ -786,7 +786,7 @@ func (c *Client) internalPoolNotify(s *session) (notified bool) {
 
 func (c *Client) internalPoolSyncCloseSession(ctx context.Context, s *session) {
 	var cancel context.CancelFunc
-	ctx, cancel = context.WithTimeout(ctx, c.config.DeleteTimeout())
+	ctx, cancel = xcontext.WithTimeout(ctx, c.config.DeleteTimeout())
 	defer cancel()
 
 	_ = s.Close(ctx)
