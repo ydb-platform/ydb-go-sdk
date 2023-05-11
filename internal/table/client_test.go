@@ -20,6 +20,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -32,7 +33,7 @@ import (
 func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		limit := 100
-		ctx, cancel := context.WithTimeout(
+		ctx, cancel := xcontext.WithTimeout(
 			context.Background(),
 			55*time.Second,
 		)
@@ -61,7 +62,7 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 		errCh := make(chan error, limit*10)
 		fn := func(wg *sync.WaitGroup) {
 			defer wg.Done()
-			childCtx, childCancel := context.WithTimeout(
+			childCtx, childCancel := xcontext.WithTimeout(
 				ctx,
 				time.Duration(r.Int64(int64(time.Minute))),
 			)
@@ -270,7 +271,7 @@ func TestRaceWgClosed(t *testing.T) {
 				t.Logf("%0.1fs: %d times test passed", time.Since(start).Seconds(), counter)
 			}
 		}()
-		ctx, cancel := context.WithTimeout(context.Background(),
+		ctx, cancel := xcontext.WithTimeout(context.Background(),
 			//nolint:gosec
 			time.Duration(rand.Int31n(int32(100*time.Millisecond))),
 		)
@@ -536,7 +537,7 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 			}()
 			s := mustGetSession(t, p)
 			{
-				ctx, cancel := context.WithCancel(context.Background())
+				ctx, cancel := xcontext.WithCancel(context.Background())
 				cancel()
 				if _, err := p.Get(ctx); !xerrors.Is(err, context.Canceled) {
 					t.Fatalf(
@@ -912,7 +913,7 @@ func whenWantWaitCh(p *Client) <-chan struct{} {
 
 func TestDeadlockOnUpdateNodes(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		ctx, cancel := xcontext.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 		var (
 			nodes         = make([]uint32, 0, 3)
@@ -954,7 +955,7 @@ func TestDeadlockOnUpdateNodes(t *testing.T) {
 
 func TestDeadlockOnInternalPoolGCTick(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		ctx, cancel := xcontext.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 		var (
 			nodes         = make([]uint32, 0, 3)

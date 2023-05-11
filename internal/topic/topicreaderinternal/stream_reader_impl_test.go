@@ -403,7 +403,7 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 			needReadTwoMessages := newReadMessageBatchOptions()
 			needReadTwoMessages.MinCount = 2
 
-			readTimeoutCtx, cancel := context.WithTimeout(e.ctx, time.Second)
+			readTimeoutCtx, cancel := xcontext.WithTimeout(e.ctx, time.Second)
 			defer cancel()
 
 			batch, err := e.reader.ReadMessageBatch(readTimeoutCtx, needReadTwoMessages)
@@ -630,7 +630,7 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 		opts := newReadMessageBatchOptions()
 		opts.MinCount = 2
 
-		readCtx, cancel := context.WithTimeout(e.ctx, time.Second)
+		readCtx, cancel := xcontext.WithTimeout(e.ctx, time.Second)
 		defer cancel()
 		batch, err := e.reader.ReadMessageBatch(readCtx, opts)
 		require.NoError(t, err)
@@ -654,7 +654,7 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 			opts := newReadMessageBatchOptions()
 			opts.MinCount = 2
 
-			readCtx, cancel := context.WithTimeout(e.ctx, time.Second)
+			readCtx, cancel := xcontext.WithTimeout(e.ctx, time.Second)
 			defer cancel()
 			batch, readErr = e.reader.ReadMessageBatch(readCtx, opts)
 		}()
@@ -797,7 +797,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	})
 
 	t.Cleanup(func() {
-		cleanupTimeout, cancel := context.WithTimeout(context.Background(), time.Second)
+		cleanupTimeout, cancel := xcontext.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
 		close(env.stopReadEvents)

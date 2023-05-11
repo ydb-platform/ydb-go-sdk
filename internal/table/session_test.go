@@ -20,6 +20,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -27,7 +28,7 @@ import (
 )
 
 func TestSessionKeepAlive(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := xcontext.WithCancel(context.Background())
 	defer cancel()
 
 	var (
@@ -81,7 +82,7 @@ func TestSessionKeepAlive(t *testing.T) {
 }
 
 func TestSessionDescribeTable(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := xcontext.WithCancel(context.Background())
 	defer cancel()
 
 	var (
@@ -379,7 +380,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 							),
 							config.New(),
 						)
-						ctx, cancel := context.WithTimeout(
+						ctx, cancel := xcontext.WithTimeout(
 							context.Background(),
 							time.Second,
 						)
@@ -472,7 +473,7 @@ func TestCreateTableRegression(t *testing.T) {
 		config.New(),
 	)
 
-	ctx, cancel := context.WithTimeout(
+	ctx, cancel := xcontext.WithTimeout(
 		context.Background(),
 		time.Second,
 	)
@@ -566,7 +567,7 @@ func TestDescribeTableRegression(t *testing.T) {
 		config.New(),
 	)
 
-	ctx, cancel := context.WithTimeout(
+	ctx, cancel := xcontext.WithTimeout(
 		context.Background(),
 		time.Second,
 	)

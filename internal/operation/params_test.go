@@ -8,6 +8,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"google.golang.org/protobuf/types/known/durationpb"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 )
 
 func TestParams(t *testing.T) {
@@ -215,8 +217,7 @@ func TestParams(t *testing.T) {
 		},
 		{
 			ctx: func() context.Context {
-				//nolint:govet
-				ctx, _ := context.WithTimeout(WithCancelAfter(
+				ctx, _ := xcontext.WithTimeout(WithCancelAfter(
 					WithTimeout(
 						context.Background(),
 						time.Second*5,
@@ -236,8 +237,7 @@ func TestParams(t *testing.T) {
 		},
 		{
 			ctx: func() context.Context {
-				//nolint:govet
-				ctx, _ := context.WithTimeout(WithCancelAfter(
+				ctx, _ := xcontext.WithTimeout(WithCancelAfter(
 					WithTimeout(
 						context.Background(),
 						time.Second*5,
@@ -257,8 +257,7 @@ func TestParams(t *testing.T) {
 		},
 		{
 			ctx: func() context.Context {
-				//nolint:govet
-				ctx, _ := context.WithTimeout(WithCancelAfter(
+				ctx, _ := xcontext.WithTimeout(WithCancelAfter(
 					WithTimeout(
 						context.Background(),
 						time.Second*5,
@@ -279,8 +278,7 @@ func TestParams(t *testing.T) {
 		},
 		{
 			ctx: func() context.Context {
-				//nolint:govet
-				ctx, _ := context.WithTimeout(context.Background(), time.Second*1)
+				ctx, _ := xcontext.WithTimeout(context.Background(), time.Second*1)
 				return ctx
 			}(),
 			preferContextTimeout: true,

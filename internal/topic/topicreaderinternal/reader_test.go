@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
@@ -19,7 +20,7 @@ func TestReader_Close(t *testing.T) {
 		defer mc.Finish()
 
 		testErr := errors.New("test error")
-		readerContext, readerCancel := context.WithCancel(context.Background())
+		readerContext, readerCancel := xcontext.WithCancel(context.Background())
 		baseReader := NewMockbatchedStreamReader(mc)
 		baseReader.EXPECT().ReadMessageBatch(gomock.Any(), ReadMessageBatchOptions{}).Do(func(_, _ interface{}) {
 			<-readerContext.Done()

@@ -11,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
@@ -264,7 +265,7 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 
 		b.IgnoreMinRestrictionsOnNextPop()
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		ctx, cancel := xcontext.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
 		batch, err := b.Pop(ctx, batcherGetOptions{MinCount: 2})
@@ -291,7 +292,7 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 			b.IgnoreMinRestrictionsOnNextPop()
 		}()
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		ctx, cancel := xcontext.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
 		batch, err := b.Pop(ctx, batcherGetOptions{MinCount: 2})
@@ -310,7 +311,7 @@ func TestBatcherConcurency(t *testing.T) {
 			_ = b.PushBatches(&PublicBatch{Messages: []*PublicMessage{{SeqNo: 1}}})
 		}()
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		ctx, cancel := xcontext.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
 		batch, err := b.Pop(ctx, batcherGetOptions{MinCount: 1})
@@ -332,7 +333,7 @@ func TestBatcherConcurency(t *testing.T) {
 			}
 		}()
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		ctx, cancel := xcontext.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
 		for i := 0; i < count; i++ {
