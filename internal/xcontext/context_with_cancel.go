@@ -4,8 +4,6 @@ import (
 	"context"
 	"sync"
 	"time"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 func WithCancel(ctx context.Context) (context.Context, context.CancelFunc) {
@@ -35,7 +33,7 @@ func (ctx *cancelCtx) Done() <-chan struct{} {
 
 func (ctx *cancelCtx) withErrUnderLock(err error) error {
 	if err == context.Canceled { //nolint:errorlint
-		ctx.err = xerrors.WithStackTrace(err, xerrors.WithSkipDepth(2))
+		ctx.err = errAt(err, 2)
 	} else {
 		ctx.err = err
 	}

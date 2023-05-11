@@ -48,7 +48,7 @@ func TestContextWithCancelError(t *testing.T) {
 				childCancel()
 				return childCtx.Err()
 			}(),
-			str: "context canceled at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithCancelError.func1(context_with_cancel_test.go:47)`", //nolint:lll
+			str: "'context canceled' at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithCancelError.func1(context_with_cancel_test.go:47)`", //nolint:lll
 		},
 		{
 			err: func() error {
@@ -56,7 +56,7 @@ func TestContextWithCancelError(t *testing.T) {
 				cancel()
 				return ctx.Err()
 			}(),
-			str: "context canceled at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithCancelError.func2(context_with_cancel_test.go:56)`", //nolint:lll
+			str: "'context canceled' at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithCancelError.func2(context_with_cancel_test.go:56)`", //nolint:lll
 		},
 	} {
 		t.Run("", func(t *testing.T) {

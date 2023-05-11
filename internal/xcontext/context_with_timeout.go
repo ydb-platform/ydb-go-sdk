@@ -2,7 +2,6 @@ package xcontext
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -11,18 +10,18 @@ import (
 
 func WithTimeout(ctx context.Context, t time.Duration) (context.Context, context.CancelFunc) {
 	childCtx := &timeoutCtx{
-		parentCtx:   ctx,
-		stackRecord: xerrors.StackRecord(1),
+		parentCtx: ctx,
+		from:      xerrors.StackRecord(1),
 	}
 	childCtx.ctx, childCtx.ctxCancel = context.WithTimeout(ctx, t)
 	return childCtx, childCtx.cancel
 }
 
 type timeoutCtx struct {
-	parentCtx   context.Context
-	ctx         context.Context
-	ctxCancel   context.CancelFunc
-	stackRecord string
+	parentCtx context.Context
+	ctx       context.Context
+	ctxCancel context.CancelFunc
+	from      string
 
 	m   sync.Mutex
 	err error
@@ -39,9 +38,9 @@ func (ctx *timeoutCtx) Done() <-chan struct{} {
 func (ctx *timeoutCtx) withErrUnderLock(err error) error {
 	switch err { //nolint:errorlint
 	case context.DeadlineExceeded:
-		ctx.err = fmt.Errorf("%w at `%s`", err, ctx.stackRecord)
+		ctx.err = errFrom(err, ctx.from)
 	case context.Canceled:
-		ctx.err = xerrors.WithStackTrace(err, xerrors.WithSkipDepth(2))
+		ctx.err = errAt(err, 2)
 	default:
 		ctx.err = err
 	}
@@ -75,11 +74,11 @@ func (ctx *timeoutCtx) cancel() {
 	ctx.m.Lock()
 	defer ctx.m.Unlock()
 
+	ctx.ctxCancel()
+
 	if ctx.err != nil {
 		return
 	}
-
-	ctx.ctxCancel()
 
 	if err := ctx.parentCtx.Err(); err != nil {
 		_ = ctx.withErrUnderLock(err)
