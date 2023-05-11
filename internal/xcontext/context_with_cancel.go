@@ -31,13 +31,12 @@ func (ctx *cancelCtx) Done() <-chan struct{} {
 	return ctx.ctx.Done()
 }
 
-func (ctx *cancelCtx) withErrUnderLock(err error) error {
+func (ctx *cancelCtx) applyErrAndReturn(err error) {
 	if err == context.Canceled { //nolint:errorlint
 		ctx.err = errAt(err, 2)
 	} else {
 		ctx.err = err
 	}
-	return ctx.err
 }
 
 func (ctx *cancelCtx) Err() error {
@@ -48,15 +47,7 @@ func (ctx *cancelCtx) Err() error {
 		return ctx.err
 	}
 
-	if err := ctx.parentCtx.Err(); err != nil {
-		return ctx.withErrUnderLock(err)
-	}
-
-	if err := ctx.ctx.Err(); err != nil {
-		return ctx.withErrUnderLock(err)
-	}
-
-	return nil
+	return ctx.ctx.Err()
 }
 
 func (ctx *cancelCtx) Value(key interface{}) interface{} {
@@ -74,8 +65,8 @@ func (ctx *cancelCtx) cancel() {
 	ctx.ctxCancel()
 
 	if err := ctx.parentCtx.Err(); err != nil {
-		_ = ctx.withErrUnderLock(err)
+		ctx.applyErrAndReturn(err)
 	} else if err = ctx.ctx.Err(); err != nil {
-		_ = ctx.withErrUnderLock(err)
+		ctx.applyErrAndReturn(err)
 	}
 }

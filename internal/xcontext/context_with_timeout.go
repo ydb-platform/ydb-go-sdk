@@ -35,16 +35,21 @@ func (ctx *timeoutCtx) Done() <-chan struct{} {
 	return ctx.ctx.Done()
 }
 
-func (ctx *timeoutCtx) withErrUnderLock(err error) error {
-	switch err { //nolint:errorlint
-	case context.DeadlineExceeded:
+func (ctx *timeoutCtx) applyTimeoutErrAndReturn(err error) error {
+	if err == context.DeadlineExceeded { //nolint:errorlint
 		ctx.err = errFrom(err, ctx.from)
-	case context.Canceled:
-		ctx.err = errAt(err, 2)
-	default:
+	} else {
 		ctx.err = err
 	}
 	return ctx.err
+}
+
+func (ctx *timeoutCtx) applyCancelErr(err error) {
+	if err == context.Canceled { //nolint:errorlint
+		ctx.err = errAt(err, 2)
+	} else {
+		ctx.err = err
+	}
 }
 
 func (ctx *timeoutCtx) Err() error {
@@ -56,11 +61,11 @@ func (ctx *timeoutCtx) Err() error {
 	}
 
 	if err := ctx.parentCtx.Err(); err != nil {
-		return ctx.withErrUnderLock(err)
+		return ctx.applyTimeoutErrAndReturn(err)
 	}
 
 	if err := ctx.ctx.Err(); err != nil {
-		return ctx.withErrUnderLock(err)
+		return ctx.applyTimeoutErrAndReturn(err)
 	}
 
 	return nil
@@ -81,8 +86,8 @@ func (ctx *timeoutCtx) cancel() {
 	}
 
 	if err := ctx.parentCtx.Err(); err != nil {
-		_ = ctx.withErrUnderLock(err)
+		ctx.applyCancelErr(err)
 	} else if err = ctx.ctx.Err(); err != nil {
-		_ = ctx.withErrUnderLock(err)
+		ctx.applyCancelErr(err)
 	}
 }

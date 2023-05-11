@@ -74,6 +74,24 @@ func TestContextWithTimeoutError(t *testing.T) {
 			}(),
 			str: "'context deadline exceeded' from `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithTimeoutError.func4(context_with_timeout_test.go:72)`", //nolint:lll
 		},
+		{
+			err: func() error {
+				parentCtx, cancel := WithCancel(context.Background())
+				childCtx, _ := WithTimeout(parentCtx, 0)
+				cancel()
+				return childCtx.Err()
+			}(),
+			str: "'context canceled' at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithTimeoutError.func5(context_with_timeout_test.go:81)`", //nolint:lll
+		},
+		{
+			err: func() error {
+				parentCtx, cancel := context.WithCancel(context.Background())
+				childCtx, _ := WithTimeout(parentCtx, 0)
+				cancel()
+				return childCtx.Err()
+			}(),
+			str: "context canceled",
+		},
 	} {
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.str, tt.err.Error())
