@@ -313,3 +313,44 @@ func TestConnection(t *testing.T) {
 		}
 	})
 }
+
+func TestZeroDialTimeout(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	db, err := ydb.Open(
+		ctx,
+		"grpc://non-existent.com:2135/some",
+		ydb.WithDialTimeout(0),
+	)
+
+	require.Error(t, err)
+	require.Nil(t, db)
+	require.True(t, errors.Is(err, context.DeadlineExceeded) || ydb.IsTransportError(err, grpcCodes.DeadlineExceeded))
+}
+
+func TestClusterDiscoveryRetry(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	counter := 0
+
+	db, err := ydb.Open(ctx,
+		"grpc://non-existent.com:2135/some",
+		ydb.WithDialTimeout(time.Second),
+		ydb.WithTraceDriver(trace.Driver{
+			OnBalancerClusterDiscoveryAttempt: func(info trace.DriverBalancerClusterDiscoveryAttemptStartInfo) func(
+				trace.DriverBalancerClusterDiscoveryAttemptDoneInfo,
+			) {
+				counter++
+				return nil
+			},
+		}),
+	)
+	t.Logf("attempts: %d", counter)
+	t.Logf("err: %v", err)
+	require.Error(t, err)
+	require.Nil(t, db)
+	require.True(t, errors.Is(err, context.DeadlineExceeded) || ydb.IsTransportError(err, grpcCodes.DeadlineExceeded))
+	require.Greater(t, counter, 1)
+}
