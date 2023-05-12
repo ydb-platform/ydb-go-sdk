@@ -1,40 +1,40 @@
 package main
 
 import (
-	"errors"
+	"context"
 	"log"
 	"os"
+	"time"
 
 	ydb "github.com/ydb-platform/gorm-driver"
-	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
+	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 )
 
-//nolint:lll
-func initDB(cfg *gorm.Config) (*gorm.DB, error) {
-	// docker run -it postgres psql -h 127.0.0.1 -p 5432 -U postgres -d postgres
-	// POSTGRES_CONNECTION_STRING="user=postgres password=mysecretpassword dbname=postgres host=127.0.0.1 port=5432 sslmode=disable"
-	if dsn, has := os.LookupEnv("POSTGRES_CONNECTION_STRING"); has {
-		return gorm.Open(postgres.Open(dsn), cfg)
-	}
-	// SQLITE_CONNECTION_STRING=./test.db
-	if dsn, has := os.LookupEnv("SQLITE_CONNECTION_STRING"); has {
-		return gorm.Open(sqlite.Open(dsn), cfg)
-	}
-	if dsn, has := os.LookupEnv("YDB_CONNECTION_STRING"); has {
-		return gorm.Open(ydb.Open(dsn, ydb.WithTablePathPrefix("gorm")), cfg)
-	}
-	return nil, errors.New("cannot initialize DB")
-}
-
 func main() {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	// connect
-	db, err := initDB(&gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
-	})
+	dsn, exists := os.LookupEnv("YDB_CONNECTION_STRING")
+	if !exists {
+		panic("YDB_CONNECTION_STRING environment variable not defined")
+	}
+
+	db, err := gorm.Open(
+		ydb.Open(
+			dsn,
+			ydb.WithTablePathPrefix("gorm"),
+			ydb.With(
+				environ.WithEnvironCredentials(ctx),
+			),
+		),
+		&gorm.Config{
+			Logger: logger.Default.LogMode(logger.Error),
+		},
+	)
 	if err != nil {
 		panic(err)
 	}

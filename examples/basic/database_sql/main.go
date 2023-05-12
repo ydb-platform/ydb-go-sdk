@@ -3,60 +3,40 @@ package main
 import (
 	"context"
 	"database/sql"
-	"flag"
 	"fmt"
 	"os"
+	"path"
 	"time"
+
+	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 )
 
-var dsn string
-
-func init() {
-	required := []string{"ydb"}
-	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	flagSet.Usage = func() {
-		out := flagSet.Output()
-		_, _ = fmt.Fprintf(out, "Usage:\n%s [options]\n", os.Args[0])
-		_, _ = fmt.Fprintf(out, "\nOptions:\n")
-		flagSet.PrintDefaults()
-	}
-	flagSet.StringVar(&dsn,
-		"ydb", "",
-		"YDB connection string",
-	)
-	if err := flagSet.Parse(os.Args[1:]); err != nil {
-		flagSet.Usage()
-		os.Exit(1)
-	}
-	flagSet.Visit(func(f *flag.Flag) {
-		for i, arg := range required {
-			if arg == f.Name {
-				required = append(required[:i], required[i+1:]...)
-			}
-		}
-	})
-	if len(required) > 0 {
-		fmt.Printf("\nSome required options not defined: %v\n\n", required)
-		flagSet.Usage()
-		os.Exit(1)
-	}
-}
-
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	cc, err := ydb.Open(ctx, dsn)
+	dsn, exists := os.LookupEnv("YDB_CONNECTION_STRING")
+	if !exists {
+		panic("YDB_CONNECTION_STRING environment variable not defined")
+	}
+
+	cc, err := ydb.Open(ctx,
+		dsn,
+		environ.WithEnvironCredentials(ctx),
+	)
 	if err != nil {
 		panic(fmt.Errorf("connect error: %w", err))
 	}
 	defer func() { _ = cc.Close(ctx) }()
 
+	prefix := path.Join(cc.Name(), "database_sql")
+
 	c, err := ydb.Connector(cc,
 		ydb.WithAutoDeclare(),
+		ydb.WithTablePathPrefix(prefix),
 	)
 	if err != nil {
 		panic(err)
@@ -70,7 +50,7 @@ func main() {
 	db.SetMaxIdleConns(50)
 	db.SetConnMaxIdleTime(time.Second)
 
-	err = sugar.RemoveRecursive(ctx, cc, "")
+	err = sugar.RemoveRecursive(ctx, cc, prefix)
 	if err != nil {
 		panic(fmt.Errorf("remove recursive failed: %w", err))
 	}
