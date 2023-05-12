@@ -52,3 +52,56 @@ jobs:
       - name: Run examples for ${{ matrix.driver }}
         working-directory: ./examples/basic/${{ matrix.driver }}
         run: go run .
+  examples-gorm-postgres:
+    concurrency:
+      group: examples-gorm-postgres-${{ github.ref }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: examples
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      OS: ubuntu-latest
+      GO: 1.20.x
+      POSTGRES_CONNECTION_STRING: postgres://postgres:postgres@localhost:5432/examples?sslmode=disable
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.20.x
+          cache: true
+      - name: Run examples for gorm with postgres
+        working-directory: ./examples/basic/gorm
+        run: go run .
+  examples-gorm-sqlite:
+    concurrency:
+      group: examples-gorm-sqlite-${{ github.ref }}
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    env:
+      OS: ubuntu-latest
+      GO: 1.20.x
+      SQLITE_CONNECTION_STRING: gorm.db
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Install Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.20.x
+          cache: true
+      - name: Run examples for gorm with sqlite
+        working-directory: ./examples/basic/gorm
+        run: go run .
