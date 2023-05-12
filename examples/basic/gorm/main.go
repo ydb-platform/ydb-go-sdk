@@ -8,33 +8,50 @@ import (
 
 	ydb "github.com/ydb-platform/gorm-driver"
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
+	"gorm.io/driver/postgres"
+	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"
 )
 
+var envNotFoundMessage = `DSN environment variable not defined
+
+Use any of these:
+POSTGRES_CONNECTION_STRING
+SQLITE_CONNECTION_STRING
+YDB_CONNECTION_STRING`
+
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// connect
-	dsn, exists := os.LookupEnv("YDB_CONNECTION_STRING")
-	if !exists {
-		panic("YDB_CONNECTION_STRING environment variable not defined")
+	cfg := &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Error),
 	}
 
-	db, err := gorm.Open(
-		ydb.Open(
-			dsn,
-			ydb.WithTablePathPrefix("gorm"),
-			ydb.With(
-				environ.WithEnvironCredentials(ctx),
+	// connect
+	var db *gorm.DB
+	var err error
+	if dsn, exists := os.LookupEnv("POSTGRES_CONNECTION_STRING"); exists {
+		db, err = gorm.Open(postgres.Open(dsn), cfg)
+	} else if dsn, exists = os.LookupEnv("SQLITE_CONNECTION_STRING"); exists {
+		db, err = gorm.Open(sqlite.Open(dsn), cfg)
+	} else if dsn, exists = os.LookupEnv("YDB_CONNECTION_STRING"); exists {
+		db, err = gorm.Open(
+			ydb.Open(
+				dsn,
+				ydb.WithTablePathPrefix("gorm"),
+				ydb.With(
+					environ.WithEnvironCredentials(ctx),
+				),
 			),
-		),
-		&gorm.Config{
-			Logger: logger.Default.LogMode(logger.Error),
-		},
-	)
+			cfg,
+		)
+	} else {
+		panic(envNotFoundMessage)
+	}
+
 	if err != nil {
 		panic(err)
 	}
