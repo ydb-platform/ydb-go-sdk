@@ -328,7 +328,9 @@ func TestZeroDialTimeout(t *testing.T) {
 
 	require.Error(t, err)
 	require.Nil(t, db)
-	require.True(t, errors.Is(err, context.DeadlineExceeded) || ydb.IsTransportError(err, grpcCodes.DeadlineExceeded))
+	if !ydb.IsTransportError(err, grpcCodes.DeadlineExceeded) {
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	}
 }
 
 func TestClusterDiscoveryRetry(t *testing.T) {
@@ -353,6 +355,8 @@ func TestClusterDiscoveryRetry(t *testing.T) {
 	t.Logf("err: %v", err)
 	require.Error(t, err)
 	require.Nil(t, db)
-	require.True(t, errors.Is(err, context.DeadlineExceeded) || ydb.IsTransportError(err, grpcCodes.DeadlineExceeded))
+	if !ydb.IsTransportError(err, grpcCodes.DeadlineExceeded) {
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	}
 	require.Greater(t, counter, 1)
 }
