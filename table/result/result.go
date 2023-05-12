@@ -97,7 +97,7 @@ type BaseResult interface {
 	// For unknown types use interface types.
 	// Supported scanning byte arrays of various length.
 	// For complex yql types: Dict, List, Tuple and own specific scanning logic
-	// implement ydb.Scanner with UnmarshalYDB method
+	// implement ydb.table.types.Scanner with UnmarshalYDB method
 	// See examples for more detailed information.
 	// Output param - Scanner error
 	Scan(values ...indexed.RequiredOrOptional) error
