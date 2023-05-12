@@ -19,6 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
@@ -281,7 +282,7 @@ func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
 		err := w.Write(ctx, newTestMessages(1, 2))
 		require.NoError(t, err)
 
-		ctxNoQueueSpace, ctxNoQueueSpaceCancel := context.WithCancel(ctx)
+		ctxNoQueueSpace, ctxNoQueueSpaceCancel := xcontext.WithCancel(ctx)
 
 		go func() {
 			waitStartQueueWait(1)

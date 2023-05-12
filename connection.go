@@ -81,6 +81,8 @@ type Connection interface {
 	Topic() topic.Client
 }
 
+var _ Connection = (*Driver)(nil)
+
 // Driver type provide access to YDB service clients
 type Driver struct { //nolint:maligned
 	userInfo *dsn.UserInfo

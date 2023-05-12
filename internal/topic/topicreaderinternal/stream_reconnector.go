@@ -285,7 +285,7 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 		return nil, err
 	}
 
-	connectionContext, cancel := xcontext.WithErrCancel(context.Background())
+	connectionContext, cancel := xcontext.WithCancel(context.Background())
 
 	type connectResult struct {
 		stream batchedStreamReader
@@ -303,7 +303,7 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 	case <-r.clock.After(r.connectTimeout):
 		// cancel connection context only if timeout exceed while connection
 		// because if cancel context after connect - it will break
-		cancel(xerrors.WithStackTrace(fmt.Errorf("ydb: open stream reader timeout: %w", context.DeadlineExceeded)))
+		cancel()
 		res = <-result
 	case res = <-result:
 		// pass

@@ -2,7 +2,6 @@ package conn
 
 import (
 	"context"
-	"errors"
 	"io"
 	"time"
 
@@ -45,7 +44,7 @@ func (s *grpcClientStream) CloseSend() (err error) {
 
 func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 	cancel := createPinger(s.c)
-	defer cancel(xerrors.WithStackTrace(errors.New("send msg finished")))
+	defer cancel()
 
 	err = s.ClientStream.SendMsg(m)
 
@@ -74,7 +73,7 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 
 func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	cancel := createPinger(s.c)
-	defer cancel(xerrors.WithStackTrace(errors.New("receive msg finished")))
+	defer cancel()
 
 	defer func() {
 		onDone := s.recv(xerrors.HideEOF(err))
@@ -125,9 +124,9 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	return nil
 }
 
-func createPinger(c *conn) xcontext.CancelErrFunc {
+func createPinger(c *conn) context.CancelFunc {
 	c.touchLastUsage()
-	ctx, cancel := xcontext.WithErrCancel(context.Background())
+	ctx, cancel := xcontext.WithCancel(context.Background())
 	go func() {
 		ticker := time.NewTicker(time.Second)
 		ctxDone := ctx.Done()

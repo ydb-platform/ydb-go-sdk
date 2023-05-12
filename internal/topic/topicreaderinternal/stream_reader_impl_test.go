@@ -162,11 +162,10 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 			})
 		}()
 
-		readCtx, readCtxCancel := xcontext.WithErrCancel(e.ctx)
-		readerStopErr := errors.New("stop partition response sent")
+		readCtx, readCtxCancel := xcontext.WithCancel(e.ctx)
 		go func() {
 			<-stopPartitionResponseSent
-			readCtxCancel(readerStopErr)
+			readCtxCancel()
 		}()
 
 		batch, err := e.reader.ReadMessageBatch(readCtx, newReadMessageBatchOptions())
@@ -174,7 +173,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		err = e.reader.Commit(e.ctx, batch.commitRange)
 		require.NoError(t, err)
 		_, err = e.reader.ReadMessageBatch(readCtx, newReadMessageBatchOptions())
-		require.ErrorIs(t, err, readerStopErr)
+		require.ErrorIs(t, err, context.Canceled)
 
 		select {
 		case <-e.partitionSession.Context().Done():
@@ -221,7 +220,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "TraceGracefulTrue", func(t testing.TB) {
 		e := newTopicReaderTestEnv(t)
 
-		readMessagesCtx, readMessagesCtxCancel := xcontext.WithErrCancel(context.Background())
+		readMessagesCtx, readMessagesCtxCancel := xcontext.WithCancel(context.Background())
 		committedOffset := int64(222)
 
 		e.reader.cfg.Tracer.OnReaderPartitionReadStopResponse = func(info trace.TopicReaderPartitionReadStopResponseStartInfo) func(doneInfo trace.TopicReaderPartitionReadStopResponseDoneInfo) { //nolint:lll
@@ -238,7 +237,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 
 			require.NoError(t, info.PartitionContext.Err())
 
-			readMessagesCtxCancel(errors.New("test tracer finished"))
+			readMessagesCtxCancel()
 			return nil
 		}
 
@@ -265,7 +264,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "TraceGracefulFalse", func(t testing.TB) {
 		e := newTopicReaderTestEnv(t)
 
-		readMessagesCtx, readMessagesCtxCancel := xcontext.WithErrCancel(context.Background())
+		readMessagesCtx, readMessagesCtxCancel := xcontext.WithCancel(context.Background())
 		committedOffset := int64(222)
 
 		e.reader.cfg.Tracer.OnReaderPartitionReadStopResponse = func(info trace.TopicReaderPartitionReadStopResponseStartInfo) func(doneInfo trace.TopicReaderPartitionReadStopResponseDoneInfo) { //nolint:lll
@@ -281,7 +280,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 			require.Equal(t, expected, info)
 			require.Error(t, info.PartitionContext.Err())
 
-			readMessagesCtxCancel(errors.New("test tracer finished"))
+			readMessagesCtxCancel()
 			return nil
 		}
 
@@ -404,7 +403,7 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 			needReadTwoMessages := newReadMessageBatchOptions()
 			needReadTwoMessages.MinCount = 2
 
-			readTimeoutCtx, cancel := context.WithTimeout(e.ctx, time.Second)
+			readTimeoutCtx, cancel := xcontext.WithTimeout(e.ctx, time.Second)
 			defer cancel()
 
 			batch, err := e.reader.ReadMessageBatch(readTimeoutCtx, needReadTwoMessages)
@@ -631,7 +630,7 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 		opts := newReadMessageBatchOptions()
 		opts.MinCount = 2
 
-		readCtx, cancel := context.WithTimeout(e.ctx, time.Second)
+		readCtx, cancel := xcontext.WithTimeout(e.ctx, time.Second)
 		defer cancel()
 		batch, err := e.reader.ReadMessageBatch(readCtx, opts)
 		require.NoError(t, err)
@@ -655,7 +654,7 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 			opts := newReadMessageBatchOptions()
 			opts.MinCount = 2
 
-			readCtx, cancel := context.WithTimeout(e.ctx, time.Second)
+			readCtx, cancel := xcontext.WithTimeout(e.ctx, time.Second)
 			defer cancel()
 			batch, readErr = e.reader.ReadMessageBatch(readCtx, opts)
 		}()
@@ -798,7 +797,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	})
 
 	t.Cleanup(func() {
-		cleanupTimeout, cancel := context.WithTimeout(context.Background(), time.Second)
+		cleanupTimeout, cancel := xcontext.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
 		close(env.stopReadEvents)

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Export_V1"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scripting_V1"
@@ -20,6 +21,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scripting"
 	"google.golang.org/grpc"
+	grpcCodes "google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -312,4 +314,49 @@ func TestConnection(t *testing.T) {
 			t.Fatalf("check export failed: %v", err)
 		}
 	})
+}
+
+func TestZeroDialTimeout(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	db, err := ydb.Open(
+		ctx,
+		"grpc://non-existent.com:2135/some",
+		ydb.WithDialTimeout(0),
+	)
+
+	require.Error(t, err)
+	require.Nil(t, db)
+	if !ydb.IsTransportError(err, grpcCodes.DeadlineExceeded) {
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	}
+}
+
+func TestClusterDiscoveryRetry(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	counter := 0
+
+	db, err := ydb.Open(ctx,
+		"grpc://non-existent.com:2135/some",
+		ydb.WithDialTimeout(time.Second),
+		ydb.WithTraceDriver(trace.Driver{
+			OnBalancerClusterDiscoveryAttempt: func(info trace.DriverBalancerClusterDiscoveryAttemptStartInfo) func(
+				trace.DriverBalancerClusterDiscoveryAttemptDoneInfo,
+			) {
+				counter++
+				return nil
+			},
+		}),
+	)
+	t.Logf("attempts: %d", counter)
+	t.Logf("err: %v", err)
+	require.Error(t, err)
+	require.Nil(t, db)
+	if !ydb.IsTransportError(err, grpcCodes.DeadlineExceeded) {
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	}
+	require.Greater(t, counter, 1)
 }

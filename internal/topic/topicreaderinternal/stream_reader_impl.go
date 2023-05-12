@@ -26,7 +26,6 @@ var (
 	PublicErrCommitSessionToExpiredSession = xerrors.Wrap(errors.New("ydb: commit to expired session"))
 
 	errPartitionSessionStoppedByServer = xerrors.Wrap(errors.New("ydb: topic partition session stopped by server"))
-	errPartitionSessionStoppedBySDK    = xerrors.Wrap(errors.New("ydb: topic partition session stopped by sdk"))
 	errCommitWithNilPartitionSession   = xerrors.Wrap(errors.New("ydb: commit with nil partition session"))
 )
 
@@ -35,7 +34,7 @@ type partitionSessionID = rawtopicreader.PartitionSessionID
 type topicStreamReaderImpl struct {
 	cfg    topicStreamReaderConfig
 	ctx    context.Context
-	cancel xcontext.CancelErrFunc
+	cancel context.CancelFunc
 
 	freeBytes                 chan int
 	atomicRestBufferSizeBytes int64
@@ -135,7 +134,7 @@ func newTopicStreamReaderStopped(
 	cfg topicStreamReaderConfig,
 ) *topicStreamReaderImpl {
 	labeledContext := pprof.WithLabels(cfg.BaseContext, pprof.Labels("base-context", "topic-stream-reader"))
-	stopPump, cancel := xcontext.WithErrCancel(labeledContext)
+	stopPump, cancel := xcontext.WithCancel(labeledContext)
 
 	readerConnectionID, err := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
 	if err != nil {
@@ -298,7 +297,7 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequestFromBuffer(
 	}()
 
 	if msg.Graceful {
-		session.Close(errPartitionSessionStoppedBySDK)
+		session.Close()
 		resp := &rawtopicreader.StopPartitionSessionResponse{
 			PartitionSessionID: session.partitionSessionID,
 		}
@@ -463,8 +462,8 @@ func (r *topicStreamReaderImpl) getRestBufferBytes() int {
 }
 
 func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
-	ctx, cancel := xcontext.WithErrCancel(ctx)
-	defer cancel(xerrors.NewWithIssues("ydb: topic stream reader messages loop finished"))
+	ctx, cancel := xcontext.WithCancel(ctx)
+	defer cancel()
 
 	for {
 		serverMessage, err := r.stream.Recv()
@@ -652,7 +651,7 @@ func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error
 		r.closed = true
 
 		r.err = reason
-		r.cancel(reason)
+		r.cancel()
 	})
 	if !isFirstClose {
 		return nil
@@ -793,7 +792,7 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequest(m *rawtopicreader.
 	}
 
 	if !m.Graceful {
-		session.Close(xerrors.WithStackTrace(errPartitionSessionStoppedByServer))
+		session.Close()
 	}
 
 	return r.batcher.PushRawMessage(session, m)

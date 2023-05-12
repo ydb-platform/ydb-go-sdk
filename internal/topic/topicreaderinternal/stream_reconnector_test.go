@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
@@ -112,7 +113,7 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 	})
 
 	t.Run("StartWithCancelledContext", func(t *testing.T) {
-		cancelledCtx, cancelledCtxCancel := context.WithCancel(context.Background())
+		cancelledCtx, cancelledCtxCancel := xcontext.WithCancel(context.Background())
 		cancelledCtxCancel()
 
 		for i := 0; i < 100; i++ {
@@ -248,7 +249,7 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 	})
 
 	t.Run("StartWithCancelledContext", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := xcontext.WithCancel(context.Background())
 		cancel()
 		reconnector := &readerReconnector{}
 		reconnector.reconnectionLoop(ctx) // must return

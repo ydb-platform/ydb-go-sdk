@@ -2,7 +2,6 @@ package table
 
 import (
 	"context"
-	"fmt"
 	"net/url"
 	"strconv"
 	"sync"
@@ -930,12 +929,12 @@ func (s *session) StreamReadTable(
 		}
 	}
 
-	ctx, cancel := xcontext.WithErrCancel(ctx)
+	ctx, cancel := xcontext.WithCancel(ctx)
 
 	stream, err = s.tableService.StreamReadTable(ctx, &request)
 
 	if err != nil {
-		cancel(xerrors.WithStackTrace(fmt.Errorf("ydb: stream read error: %w", err)))
+		cancel()
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -962,11 +961,7 @@ func (s *session) StreamReadTable(
 			}
 		},
 		func(err error) error {
-			if err == nil {
-				cancel(nil)
-			} else {
-				cancel(xerrors.WithStackTrace(fmt.Errorf("ydb: stream closed with: %w", err)))
-			}
+			cancel()
 			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 			return err
 		},
@@ -1016,7 +1011,7 @@ func (s *session) StreamExecuteScanQuery(
 		}
 	}
 
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := xcontext.WithCancel(ctx)
 
 	stream, err = s.tableService.StreamExecuteScanQuery(ctx, &request, callOptions...)
 

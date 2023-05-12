@@ -31,15 +31,13 @@ import (
 )
 
 var (
-	errConnTimeout                          = xerrors.Wrap(errors.New("ydb: connection timeout"))
-	errStopWriterReconnector                = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
-	errCloseWriterReconnectorConnectionLoop = xerrors.Wrap(errors.New("ydb: close writer reconnector connection loop"))
-	errCloseWriterReconnectorReconnect      = xerrors.Wrap(errors.New("ydb: stream writer reconnect"))
-	errNonZeroSeqNo                         = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))
-	errNonZeroCreatedAt                     = xerrors.Wrap(errors.New("ydb: non zero Message.CreatedAt and set auto fill created at option")) //nolint:lll
-	errNoAllowedCodecs                      = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
-	errLargeMessage                         = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))
-	PublicErrQueueIsFull                    = xerrors.Wrap(errors.New("ydb: queue is full"))
+	errConnTimeout           = xerrors.Wrap(errors.New("ydb: connection timeout"))
+	errStopWriterReconnector = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
+	errNonZeroSeqNo          = xerrors.Wrap(errors.New("ydb: non zero seqno for auto set seqno mode"))
+	errNonZeroCreatedAt      = xerrors.Wrap(errors.New("ydb: non zero Message.CreatedAt and set auto fill created at option")) //nolint:lll
+	errNoAllowedCodecs       = xerrors.Wrap(errors.New("ydb: no allowed codecs for write to topic"))
+	errLargeMessage          = xerrors.Wrap(errors.New("ydb: message uncompressed size more, then limit"))
+	PublicErrQueueIsFull     = xerrors.Wrap(errors.New("ydb: queue is full"))
 
 	// errProducerIDNotEqualMessageGroupID is temporary
 	// WithMessageGroupID is optional parameter because it allowed to be skipped by protocol.
@@ -337,16 +335,16 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 	doneCtx := ctx.Done()
 	attempt := 0
 
-	createStreamContext := func() (context.Context, xcontext.CancelErrFunc) {
+	createStreamContext := func() (context.Context, context.CancelFunc) {
 		// need suppress parent context cancelation for flush buffer while close writer
-		return xcontext.WithErrCancel(xcontext.WithoutDeadline(ctx))
+		return xcontext.WithCancel(xcontext.WithoutDeadline(ctx))
 	}
 
 	//nolint:ineffassign,staticcheck
 	streamCtx, streamCtxCancel := createStreamContext()
 
 	defer func() {
-		streamCtxCancel(xerrors.WithStackTrace(errCloseWriterReconnectorConnectionLoop))
+		streamCtxCancel()
 	}()
 
 	var reconnectReason error
@@ -358,7 +356,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 			return
 		}
 
-		streamCtxCancel(xerrors.WithStackTrace(errCloseWriterReconnectorReconnect))
+		streamCtxCancel()
 		streamCtx, streamCtxCancel = createStreamContext()
 
 		now := time.Now()
@@ -426,7 +424,7 @@ func (w *WriterReconnector) needReceiveLastSeqNo() bool {
 }
 
 func (w *WriterReconnector) connectWithTimeout(streamLifetimeContext context.Context) (RawTopicWriterStream, error) {
-	connectCtx, connectCancel := context.WithCancel(streamLifetimeContext)
+	connectCtx, connectCancel := xcontext.WithCancel(streamLifetimeContext)
 
 	type resT struct {
 		stream RawTopicWriterStream

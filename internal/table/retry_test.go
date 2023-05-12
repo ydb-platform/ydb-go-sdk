@@ -12,6 +12,7 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -37,7 +38,7 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 				simpleSession(t),
 			)
 
-			ctx, cancel := context.WithCancel(context.Background())
+			ctx, cancel := xcontext.WithCancel(context.Background())
 			results := make(chan error)
 			go func() {
 				err := do(
@@ -96,7 +97,7 @@ func TestRetryerBadSession(t *testing.T) {
 		maxRetryes = 100
 		sessions   []table.Session
 	)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := xcontext.WithCancel(context.Background())
 	err := do(ctx, p, config.New(),
 		func(ctx context.Context, s table.Session) error {
 			sessions = append(sessions, s)
@@ -326,7 +327,7 @@ func TestRetryContextDeadline(t *testing.T) {
 			timeout := timeouts[i]
 			sleep := sleeps[j]
 			t.Run(fmt.Sprintf("Timeout=%v,Sleep=%v", timeout, sleep), func(t *testing.T) {
-				ctx, cancel := context.WithTimeout(context.Background(), timeout)
+				ctx, cancel := xcontext.WithTimeout(context.Background(), timeout)
 				defer cancel()
 				_ = do(
 					ctx,

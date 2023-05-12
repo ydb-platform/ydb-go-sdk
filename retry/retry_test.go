@@ -11,6 +11,7 @@ import (
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -147,7 +148,7 @@ func TestRetryTransportDeadlineExceeded(t *testing.T) {
 		grpcCodes.Canceled,
 	} {
 		counter := 0
-		ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+		ctx, cancel := xcontext.WithTimeout(context.Background(), time.Hour)
 		err := Retry(ctx, func(ctx context.Context) (err error) {
 			counter++
 			if !(counter < cancelCounterValue) {
@@ -167,7 +168,7 @@ func TestRetryTransportCancelled(t *testing.T) {
 		grpcCodes.Canceled,
 	} {
 		counter := 0
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := xcontext.WithCancel(context.Background())
 		err := Retry(ctx, func(ctx context.Context) (err error) {
 			counter++
 			if !(counter < cancelCounterValue) {

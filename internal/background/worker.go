@@ -30,7 +30,7 @@ type Worker struct {
 	tasks chan backgroundTask
 
 	closed      bool
-	stop        xcontext.CancelErrFunc
+	stop        context.CancelFunc
 	closeReason error
 }
 
@@ -38,7 +38,7 @@ type CallbackFunc func(ctx context.Context)
 
 func NewWorker(parent context.Context) *Worker {
 	w := Worker{}
-	w.ctx, w.stop = xcontext.WithErrCancel(parent)
+	w.ctx, w.stop = xcontext.WithCancel(parent)
 
 	return &w
 }
@@ -88,7 +88,7 @@ func (b *Worker) Close(ctx context.Context, err error) error {
 			b.closeReason = errClosedWithNilReason
 		}
 
-		b.stop(err)
+		b.stop()
 	})
 	if resErr != nil {
 		return resErr
@@ -121,7 +121,7 @@ func (b *Worker) CloseReason() error {
 func (b *Worker) init() {
 	b.onceInit.Do(func() {
 		if b.ctx == nil {
-			b.ctx, b.stop = xcontext.WithErrCancel(context.Background())
+			b.ctx, b.stop = xcontext.WithCancel(context.Background())
 		}
 		b.tasks = make(chan backgroundTask)
 		b.tasksCompleted = make(empty.Chan)

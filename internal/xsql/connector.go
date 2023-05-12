@@ -11,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
@@ -235,7 +236,7 @@ var (
 
 func (c *Connector) idleCloser() (idleStopper func()) {
 	var ctx context.Context
-	ctx, idleStopper = context.WithCancel(context.Background())
+	ctx, idleStopper = xcontext.WithCancel(context.Background())
 	go func() {
 		for {
 			select {

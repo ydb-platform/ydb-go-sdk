@@ -14,6 +14,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 )
 
 func TestMessageQueue_AddMessages(t *testing.T) {
@@ -142,7 +143,7 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 		readFinished := make(empty.Chan)
 		var lastReadSeqNo int64
 
-		readCtx, readCancel := context.WithCancel(ctx)
+		readCtx, readCancel := xcontext.WithCancel(ctx)
 		defer readCancel()
 
 		go func() {
@@ -193,7 +194,7 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 	})
 
 	t.Run("ClosedContext", func(t *testing.T) {
-		closedCtx, cancel := context.WithCancel(ctx)
+		closedCtx, cancel := xcontext.WithCancel(ctx)
 		cancel()
 
 		q := newMessageQueue()
