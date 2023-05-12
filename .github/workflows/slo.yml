@@ -8,6 +8,8 @@ on:
   workflow_dispatch:
 jobs:
   native:
+    concurrency:
+      group: slo-native-${{ github.ref }}
     if: github.event.pull_request.head.repo.full_name == 'ydb-platform/ydb-go-sdk'
     uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
     secrets: inherit
@@ -18,6 +20,8 @@ jobs:
       workload_build_options: -f Dockerfile --build-arg SRC_PATH=native
       workload_build_context: ../..
   database_sql:
+    concurrency:
+      group: slo-database-sql-${{ github.ref }}
     if: github.event.pull_request.head.repo.full_name == 'ydb-platform/ydb-go-sdk'
     uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
     secrets: inherit
