@@ -1,3 +1,4 @@
+## v3.46.1
 * Implemented `xcontext.With{Cancel,Timeout}` with stack record and switched all usages from standard `context.With{Cancel,Timeout}`
 
 ## v3.46.0
