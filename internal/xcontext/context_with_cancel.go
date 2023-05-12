@@ -31,14 +31,6 @@ func (ctx *cancelCtx) Done() <-chan struct{} {
 	return ctx.ctx.Done()
 }
 
-func (ctx *cancelCtx) applyErrAndReturn(err error) {
-	if err == context.Canceled { //nolint:errorlint
-		ctx.err = errAt(err, 2)
-	} else {
-		ctx.err = err
-	}
-}
-
 func (ctx *cancelCtx) Err() error {
 	ctx.m.Lock()
 	defer ctx.m.Unlock()
@@ -47,7 +39,9 @@ func (ctx *cancelCtx) Err() error {
 		return ctx.err
 	}
 
-	return ctx.ctx.Err()
+	ctx.err = ctx.ctx.Err()
+
+	return ctx.err
 }
 
 func (ctx *cancelCtx) Value(key interface{}) interface{} {
@@ -65,8 +59,12 @@ func (ctx *cancelCtx) cancel() {
 	ctx.ctxCancel()
 
 	if err := ctx.parentCtx.Err(); err != nil {
-		ctx.applyErrAndReturn(err)
+		ctx.err = err
 	} else if err = ctx.ctx.Err(); err != nil {
-		ctx.applyErrAndReturn(err)
+		if err == context.Canceled { //nolint:errorlint
+			ctx.err = errAt(err, 1)
+		} else {
+			ctx.err = err
+		}
 	}
 }

@@ -35,23 +35,6 @@ func (ctx *timeoutCtx) Done() <-chan struct{} {
 	return ctx.ctx.Done()
 }
 
-func (ctx *timeoutCtx) applyTimeoutErrAndReturn(err error) error {
-	if err == context.DeadlineExceeded { //nolint:errorlint
-		ctx.err = errFrom(err, ctx.from)
-	} else {
-		ctx.err = err
-	}
-	return ctx.err
-}
-
-func (ctx *timeoutCtx) applyCancelErr(err error) {
-	if err == context.Canceled { //nolint:errorlint
-		ctx.err = errAt(err, 2)
-	} else {
-		ctx.err = err
-	}
-}
-
 func (ctx *timeoutCtx) Err() error {
 	ctx.m.Lock()
 	defer ctx.m.Unlock()
@@ -61,11 +44,17 @@ func (ctx *timeoutCtx) Err() error {
 	}
 
 	if err := ctx.parentCtx.Err(); err != nil {
-		return ctx.applyTimeoutErrAndReturn(err)
+		ctx.err = err
+		return ctx.err
 	}
 
 	if err := ctx.ctx.Err(); err != nil {
-		return ctx.applyTimeoutErrAndReturn(err)
+		if err == context.DeadlineExceeded { //nolint:errorlint
+			ctx.err = errFrom(err, ctx.from)
+		} else {
+			ctx.err = err
+		}
+		return ctx.err
 	}
 
 	return nil
@@ -86,8 +75,12 @@ func (ctx *timeoutCtx) cancel() {
 	}
 
 	if err := ctx.parentCtx.Err(); err != nil {
-		ctx.applyCancelErr(err)
+		ctx.err = err
 	} else if err = ctx.ctx.Err(); err != nil {
-		ctx.applyCancelErr(err)
+		if err == context.Canceled { //nolint:errorlint
+			ctx.err = errAt(err, 1)
+		} else {
+			ctx.err = err
+		}
 	}
 }
