@@ -52,19 +52,15 @@ func (ctx *cancelCtx) cancel() {
 	ctx.m.Lock()
 	defer ctx.m.Unlock()
 
+	ctx.ctxCancel()
+
 	if ctx.err != nil {
 		return
 	}
 
-	ctx.ctxCancel()
-
 	if err := ctx.parentCtx.Err(); err != nil {
 		ctx.err = err
-	} else if err = ctx.ctx.Err(); err != nil {
-		if err == context.Canceled { //nolint:errorlint
-			ctx.err = errAt(err, 1)
-		} else {
-			ctx.err = err
-		}
+		return
 	}
+	ctx.err = errAt(context.Canceled, 1)
 }

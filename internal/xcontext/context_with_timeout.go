@@ -43,17 +43,13 @@ func (ctx *timeoutCtx) Err() error {
 		return ctx.err
 	}
 
-	if err := ctx.parentCtx.Err(); err != nil {
-		ctx.err = err
+	if ctx.ctx.Err() == context.DeadlineExceeded && ctx.parentCtx.Err() == nil { //nolint:errorlint
+		ctx.err = errFrom(context.DeadlineExceeded, ctx.from)
 		return ctx.err
 	}
 
-	if err := ctx.ctx.Err(); err != nil {
-		if err == context.DeadlineExceeded { //nolint:errorlint
-			ctx.err = errFrom(err, ctx.from)
-		} else {
-			ctx.err = err
-		}
+	if err := ctx.parentCtx.Err(); err != nil {
+		ctx.err = err
 		return ctx.err
 	}
 
@@ -76,11 +72,7 @@ func (ctx *timeoutCtx) cancel() {
 
 	if err := ctx.parentCtx.Err(); err != nil {
 		ctx.err = err
-	} else if err = ctx.ctx.Err(); err != nil {
-		if err == context.Canceled { //nolint:errorlint
-			ctx.err = errAt(err, 1)
-		} else {
-			ctx.err = err
-		}
+		return
 	}
+	ctx.err = errAt(context.Canceled, 1)
 }
