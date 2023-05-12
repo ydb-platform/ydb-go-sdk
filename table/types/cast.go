@@ -18,6 +18,17 @@ func CastTo(v Value, dst interface{}) error {
 	return value.CastTo(v, dst)
 }
 
+func ToDecimal(v Value) (*Decimal, error) {
+	if valuer, isDecimalValuer := v.(value.DecimalValuer); isDecimalValuer {
+		return &Decimal{
+			Bytes:     valuer.Value(),
+			Precision: valuer.Precision(),
+			Scale:     valuer.Scale(),
+		}, nil
+	}
+	return nil, xerrors.WithStackTrace(fmt.Errorf("value type '%s' is not decimal type", v.Type().Yql()))
+}
+
 func TupleItems(v Value) ([]Value, error) {
 	if vv, has := v.(interface {
 		Items() []Value

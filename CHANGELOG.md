@@ -1,5 +1,7 @@
+* Added `table/types.ToDecimal()` converter from `table/types.Value` to `table/types.Decimal`
+
 ## v3.46.1
-* Implemented `xcontext.With{Cancel,Timeout}` with stack record and switched all usages from standard `context.With{Cancel,Timeout}`
+* Implemented `internal/xcontext.With{Cancel,Timeout}` with stack record and switched all usages from standard `context.With{Cancel,Timeout}`
 
 ## v3.46.0
 * Refactored package `log` for support typed fields in log messages

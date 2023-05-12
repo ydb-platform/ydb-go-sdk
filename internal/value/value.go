@@ -410,9 +410,29 @@ func DatetimeValueFromTime(t time.Time) datetimeValue {
 	return datetimeValue(t.Unix())
 }
 
+var _ DecimalValuer = (*decimalValue)(nil)
+
 type decimalValue struct {
 	value     [16]byte
 	innerType *DecimalType
+}
+
+func (v *decimalValue) Value() [16]byte {
+	return v.value
+}
+
+func (v *decimalValue) Precision() uint32 {
+	return v.innerType.Precision
+}
+
+func (v *decimalValue) Scale() uint32 {
+	return v.innerType.Scale
+}
+
+type DecimalValuer interface {
+	Value() [16]byte
+	Precision() uint32
+	Scale() uint32
 }
 
 func (v *decimalValue) castTo(dst interface{}) error {
