@@ -1,3 +1,5 @@
+* Removed test artifacts from repository
+
 ## v3.47.0
 * Added `table/types.ToDecimal()` converter from `table/types.Value` to `table/types.Decimal`
 
