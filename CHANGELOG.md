@@ -1,3 +1,4 @@
+## v3.47.1
 * Removed test artifacts from repository
 
 ## v3.47.0
