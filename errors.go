@@ -92,3 +92,8 @@ func IsRatelimiterAcquireError(err error) bool {
 func ToRatelimiterAcquireError(err error) ratelimiter.AcquireError {
 	return ratelimiterErrors.ToAcquireError(err)
 }
+
+// WithStacktrace is a wrapper over original err with file:line identification.
+func WithStacktrace(err error) error {
+	return xerrors.WithStackTrace(err, xerrors.WithSkipDepth(1))
+}

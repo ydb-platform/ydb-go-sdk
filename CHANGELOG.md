@@ -1,3 +1,5 @@
+* Added `ydb.WithStacktrace()` for wrapping errors
+
 ## v3.47.1
 * Removed test artifacts from repository
 
