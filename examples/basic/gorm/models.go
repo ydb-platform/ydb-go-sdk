@@ -9,10 +9,10 @@ import (
 
 type Series struct {
 	ID          string    `gorm:"column:series_id;primarykey;not null"`
-	Title       string    `gorm:"column:title;not null"`
+	Title       string    `gorm:"column:title"`
 	Info        string    `gorm:"column:series_info"`
 	Comment     string    `gorm:"column:comment"`
-	ReleaseDate time.Time `gorm:"column:release_date;not null"`
+	ReleaseDate time.Time `gorm:"column:release_date"`
 
 	Seasons []Season
 }
@@ -30,11 +30,11 @@ func (s *Series) BeforeCreate(_ *gorm.DB) (err error) {
 }
 
 type Season struct {
-	ID         string    `gorm:"column:season_id;primarykey"`
+	ID         string    `gorm:"column:season_id;primarykey;not null"`
 	SeriesID   string    `gorm:"column:series_id;index"`
-	Title      string    `gorm:"column:title;not null"`
-	FirstAired time.Time `gorm:"column:first_aired;not null"`
-	LastAired  time.Time `gorm:"column:last_aired;not null"`
+	Title      string    `gorm:"column:title"`
+	FirstAired time.Time `gorm:"column:first_aired"`
+	LastAired  time.Time `gorm:"column:last_aired"`
 
 	Episodes []Episode
 }
@@ -52,10 +52,10 @@ func (s *Season) BeforeCreate(_ *gorm.DB) (err error) {
 }
 
 type Episode struct {
-	ID       string    `gorm:"column:episode_id;primarykey"`
-	SeasonID string    `gorm:"column:season_id;index;not null"`
-	Title    string    `gorm:"column:title;not null"`
-	AirDate  time.Time `gorm:"column:air_date;not null"`
+	ID       string    `gorm:"column:episode_id;primarykey;not null"`
+	SeasonID string    `gorm:"column:season_id;index"`
+	Title    string    `gorm:"column:title"`
+	AirDate  time.Time `gorm:"column:air_date"`
 }
 
 func (e *Episode) BeforeCreate(_ *gorm.DB) (err error) {
