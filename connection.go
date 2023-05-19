@@ -93,7 +93,7 @@ type Driver struct { //nolint:maligned
 
 	opts []Option
 
-	config  config.Config
+	config  *config.Config
 	options []config.Option
 
 	discoveryOnce    initOnce

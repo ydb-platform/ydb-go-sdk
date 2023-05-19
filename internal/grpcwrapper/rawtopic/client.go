@@ -19,7 +19,7 @@ func NewClient(service Ydb_Topic_V1.TopicServiceClient) Client {
 	return Client{service: service}
 }
 
-func (c *Client) AlterTopic(ctx context.Context, req AlterTopicRequest) (res AlterTopicResult, err error) {
+func (c *Client) AlterTopic(ctx context.Context, req *AlterTopicRequest) (res AlterTopicResult, err error) {
 	resp, err := c.service.AlterTopic(ctx, req.ToProto())
 	if err != nil {
 		return res, xerrors.WithStackTrace(fmt.Errorf("ydb: alter topic grpc failed: %w", err))
@@ -30,7 +30,7 @@ func (c *Client) AlterTopic(ctx context.Context, req AlterTopicRequest) (res Alt
 
 func (c *Client) CreateTopic(
 	ctx context.Context,
-	req CreateTopicRequest,
+	req *CreateTopicRequest,
 ) (res CreateTopicResult, err error) {
 	resp, err := c.service.CreateTopic(ctx, req.ToProto())
 	if err != nil {

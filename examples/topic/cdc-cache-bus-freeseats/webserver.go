@@ -75,6 +75,7 @@ func (s *server) BuyTicketHandler(writer http.ResponseWriter, request *http.Requ
 		}
 		return
 	}
+	//nolint:gocritic
 	// s.cache.Delete(id) // used without cdc, for single-instance application
 	duration := time.Since(start)
 	s.writeAnswer(writer, freeSeats, duration)

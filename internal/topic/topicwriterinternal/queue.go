@@ -109,17 +109,19 @@ func (q *messageQueue) checkNewMessagesBeforeAddNeedLock(messages []messageWithD
 	}
 
 	checkedSeqNo := q.lastSeqNo
-	for _, m := range messages {
-		if m.SeqNo <= checkedSeqNo {
+	for i := range messages {
+		if messages[i].SeqNo <= checkedSeqNo {
 			return xerrors.WithStackTrace(errAddUnorderedMessages)
 		}
-		checkedSeqNo = m.SeqNo
+		checkedSeqNo = messages[i].SeqNo
 	}
 
 	return nil
 }
 
-func (q *messageQueue) addMessageNeedLock(mess messageWithDataContent) (messageIndex int) {
+func (q *messageQueue) addMessageNeedLock(
+	mess messageWithDataContent, //nolint:gocritic
+) (messageIndex int) {
 	q.lastWrittenIndex++
 	messageIndex = q.lastWrittenIndex
 

@@ -53,7 +53,7 @@ func (e *endpoint) Copy() Endpoint {
 func (e *endpoint) String() string {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	return fmt.Sprintf(`{id:%d,address:"%s",local:%t,location:"%s",loadFactor:%f,lastUpdated:"%s"}`,
+	return fmt.Sprintf(`{id:%d,address:%q,local:%t,location:%q,loadFactor:%f,lastUpdated:%q}`,
 		e.id,
 		e.address,
 		e.local,

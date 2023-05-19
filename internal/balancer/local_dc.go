@@ -130,7 +130,7 @@ func detectLocalDC(ctx context.Context, endpoints []endpoint.Endpoint) (string, 
 	return "", err
 }
 
-func extractHostPort(address string) (host string, port string, _ error) {
+func extractHostPort(address string) (host, port string, _ error) {
 	if !strings.Contains(address, "://") {
 		address = "stub://" + address
 	}

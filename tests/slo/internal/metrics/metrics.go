@@ -27,7 +27,7 @@ type (
 	}
 )
 
-func New(url string, label string) (*Metrics, error) {
+func New(url, label string) (*Metrics, error) {
 	m := &Metrics{
 		label: label,
 	}
@@ -76,7 +76,7 @@ func New(url string, label string) (*Metrics, error) {
 		Collector(m.inflight).
 		Collector(m.latencies)
 
-	return m, m.Reset()
+	return m, m.Reset() //nolint:gocritic
 }
 
 func (m *Metrics) Push() error {

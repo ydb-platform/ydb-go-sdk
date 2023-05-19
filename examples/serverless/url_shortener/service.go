@@ -33,12 +33,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-const (
-	invalidHashError = "'%s' is not a valid short path."
-	hashNotFound     = "hash '%s' is not found"
-	invalidURLError  = "'%s' is not a valid URL."
-)
-
 //go:embed static/index.html
 var static embed.FS
 
@@ -182,7 +176,7 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 }
 
 func (s *service) Close(ctx context.Context) {
-	defer func() { _ = s.db.Close(ctx) }()
+	_ = s.db.Close(ctx)
 }
 
 func (s *service) createTable(ctx context.Context) (err error) {
@@ -302,7 +296,7 @@ func (s *service) selectLong(ctx context.Context, hash string) (url string, err 
 			return src, err
 		}
 	}
-	return "", fmt.Errorf(hashNotFound, hash)
+	return "", fmt.Errorf("hash '%s' is not found", hash)
 }
 
 func writeResponse(w http.ResponseWriter, statusCode int, body string) {
@@ -382,7 +376,7 @@ func (s *service) handleShorten(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !isLongCorrect(string(url)) {
-		err = fmt.Errorf(fmt.Sprintf(invalidURLError, url))
+		err = fmt.Errorf("'%s' is not a valid URL", url)
 		writeResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -418,7 +412,7 @@ func (s *service) handleLonger(w http.ResponseWriter, r *http.Request) {
 	}()
 	path := strings.Split(r.URL.Path, "/")
 	if !isShortCorrect(path[len(path)-1]) {
-		err = fmt.Errorf(fmt.Sprintf(invalidHashError, path[len(path)-1]))
+		err = fmt.Errorf("'%s' is not a valid short path", path[len(path)-1])
 		writeResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}

@@ -136,7 +136,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 			go func() {
 				_, err := p.internalPoolGet(
 					context.Background(),
-					withTrace(trace.Table{
+					withTrace(&trace.Table{
 						OnPoolGet: func(trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
 							get <- struct{}{}
 							return nil
@@ -549,7 +549,7 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 			go func() {
 				session, err := p.internalPoolGet(
 					context.Background(),
-					withTrace(trace.Table{
+					withTrace(&trace.Table{
 						OnPoolGet: func(trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
 							get <- struct{}{}
 							return nil

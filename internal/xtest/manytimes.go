@@ -169,11 +169,11 @@ func (tw *testWrapper) flushLogs() {
 	tw.m.Lock()
 	defer tw.m.Unlock()
 
-	for _, rec := range tw.logs {
-		if rec.format == "" {
-			tw.TB.Log(rec.args...)
+	for i := range tw.logs {
+		if tw.logs[i].format == "" {
+			tw.TB.Log(tw.logs[i].args...)
 		} else {
-			tw.TB.Logf(rec.format, rec.args...)
+			tw.TB.Logf(tw.logs[i].format, tw.logs[i].args...)
 		}
 	}
 

@@ -20,7 +20,7 @@ type TopicOption func(c *topic.Config)
 // # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func WithTrace(trace trace.Topic, opts ...trace.TopicComposeOption) TopicOption {
+func WithTrace(trace trace.Topic, opts ...trace.TopicComposeOption) TopicOption { //nolint:gocritic
 	return func(c *topic.Config) {
 		c.Trace = c.Trace.Compose(&trace, opts...)
 	}

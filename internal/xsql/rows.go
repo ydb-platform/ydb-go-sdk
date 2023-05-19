@@ -118,8 +118,8 @@ type single struct {
 }
 
 func (r *single) Columns() (columns []string) {
-	for _, v := range r.values {
-		columns = append(columns, v.Name)
+	for i := range r.values {
+		columns = append(columns, r.values[i].Name)
 	}
 	return columns
 }

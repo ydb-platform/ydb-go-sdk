@@ -121,7 +121,7 @@ func fillTable(ctx context.Context, c table.Client, prefix string) (err error) {
 	)
 }
 
-func order(customerID uint64, orderID uint64, description string, date string) types.Value {
+func order(customerID, orderID uint64, description, date string) types.Value {
 	orderDate, err := time.Parse(dateLayout, date)
 	if err != nil {
 		panic(err)

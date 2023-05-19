@@ -16,15 +16,15 @@ func New(
 	credentials credentials.Credentials,
 	trace *trace.Driver,
 	opts ...Option,
-) Meta {
-	m := Meta{
+) *Meta {
+	m := &Meta{
 		trace:       trace,
 		credentials: credentials,
 		database:    database,
 	}
 	for _, o := range opts {
 		if o != nil {
-			o(&m)
+			o(m)
 		}
 	}
 	return m
@@ -72,7 +72,7 @@ type Meta struct {
 	capabilities []string
 }
 
-func (m Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
+func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	md, has := metadata.FromOutgoingContext(ctx)
 	if !has {
 		md = metadata.MD{}
@@ -124,7 +124,7 @@ func (m Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	return md, nil
 }
 
-func (m Meta) Context(ctx context.Context) (_ context.Context, err error) {
+func (m *Meta) Context(ctx context.Context) (_ context.Context, err error) {
 	md, err := m.meta(ctx)
 	if err != nil {
 		return ctx, xerrors.WithStackTrace(err)

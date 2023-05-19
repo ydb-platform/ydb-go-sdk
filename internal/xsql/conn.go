@@ -462,8 +462,8 @@ func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string)
 		if err != nil {
 			return err
 		}
-		for _, col := range desc.Columns {
-			if col.Name == columnName {
+		for i := range desc.Columns {
+			if desc.Columns[i].Name == columnName {
 				columnExists = true
 				break
 			}
@@ -491,8 +491,8 @@ func (c *conn) GetColumns(ctx context.Context, tableName string) (columns []stri
 		if err != nil {
 			return err
 		}
-		for _, col := range desc.Columns {
-			columns = append(columns, col.Name)
+		for i := range desc.Columns {
+			columns = append(columns, desc.Columns[i].Name)
 		}
 		return nil
 	}, retry.WithIdempotent(true))
@@ -525,9 +525,9 @@ func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) 
 		if err != nil {
 			return err
 		}
-		for _, col := range desc.Columns {
-			if col.Name == columnName {
-				dataType = col.Type.Yql()
+		for i := range desc.Columns {
+			if desc.Columns[i].Name == columnName {
+				dataType = desc.Columns[i].Type.Yql()
 				break
 			}
 		}
@@ -626,9 +626,9 @@ func (c *conn) GetTables(ctx context.Context, folder string) (tables []string, e
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		for _, child := range d.Children {
-			if child.IsTable() {
-				tables = append(tables, child.Name)
+		for i := range d.Children {
+			if d.Children[i].IsTable() {
+				tables = append(tables, d.Children[i].Name)
 			}
 		}
 		return tables, nil
@@ -688,10 +688,10 @@ func (c *conn) GetAllTables(ctx context.Context, folder string) (tables []string
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		for _, child := range d.Children {
-			if child.IsDirectory() || child.IsTable() {
-				if canEnter(child.Name) {
-					queue = append(queue, path.Join(curPath, child.Name))
+		for i := range d.Children {
+			if d.Children[i].IsDirectory() || d.Children[i].IsTable() {
+				if canEnter(d.Children[i].Name) {
+					queue = append(queue, path.Join(curPath, d.Children[i].Name))
 				}
 			}
 		}
@@ -714,8 +714,8 @@ func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []stri
 		if err != nil {
 			return err
 		}
-		for _, indexDesc := range desc.Indexes {
-			indexes = append(indexes, indexDesc.Name)
+		for i := range desc.Indexes {
+			indexes = append(indexes, desc.Indexes[i].Name)
 		}
 		return nil
 	}, retry.WithIdempotent(true))
@@ -741,9 +741,9 @@ func (c *conn) GetIndexColumns(ctx context.Context, tableName, indexName string)
 		if err != nil {
 			return err
 		}
-		for _, indexDesc := range desc.Indexes {
-			if indexDesc.Name == indexName {
-				columns = append(columns, indexDesc.IndexColumns...)
+		for i := range desc.Indexes {
+			if desc.Indexes[i].Name == indexName {
+				columns = append(columns, desc.Indexes[i].IndexColumns...)
 				return nil
 			}
 		}

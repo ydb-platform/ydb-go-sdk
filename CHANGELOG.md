@@ -1,3 +1,5 @@
+* Improved code with `go-critic` linter
+
 ## v3.47.3
 * Added `table/options.Description.Tiering` field
 

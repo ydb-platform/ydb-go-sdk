@@ -33,7 +33,7 @@ type balancer interface {
 	nodeChecker
 }
 
-func New(balancer balancer, config config.Config) *Client {
+func New(balancer balancer, config *config.Config) *Client {
 	return newClient(balancer, func(ctx context.Context) (s *session, err error) {
 		return newSession(ctx, balancer, config)
 	}, config)
@@ -42,7 +42,7 @@ func New(balancer balancer, config config.Config) *Client {
 func newClient(
 	balancer balancer,
 	builder sessionBuilder,
-	config config.Config,
+	config *config.Config,
 ) *Client {
 	var (
 		ctx    = context.Background()
@@ -78,7 +78,7 @@ func newClient(
 // A Client is safe for use by multiple goroutines simultaneously.
 type Client struct {
 	// read-only fields
-	config      config.Config
+	config      *config.Config
 	build       sessionBuilder
 	cc          grpc.ClientConnInterface
 	nodeChecker nodeChecker
@@ -352,9 +352,9 @@ type getOptions struct {
 
 type getOption func(o *getOptions)
 
-func withTrace(t trace.Table) getOption {
+func withTrace(t *trace.Table) getOption {
 	return func(o *getOptions) {
-		o.t = o.t.Compose(&t)
+		o.t = o.t.Compose(t)
 	}
 }
 
@@ -703,7 +703,7 @@ func (c *Client) internalPoolGC(ctx context.Context, idleThreshold time.Duration
 // Note that returning a pointer reduces allocations on sync.Pool usage –
 // sync.Client.Get() returns empty interface, which leads to allocation for
 // non-pointer values.
-func (c *Client) internalPoolGetWaitCh() *chan *session {
+func (c *Client) internalPoolGetWaitCh() *chan *session { //nolint:gocritic
 	if c.testHookGetWaitCh != nil {
 		c.testHookGetWaitCh()
 	}
@@ -719,7 +719,7 @@ func (c *Client) internalPoolGetWaitCh() *chan *session {
 // use.
 // Note that ch MUST NOT be owned by any goroutine at the call moment and ch
 // MUST NOT contain any value.
-func (c *Client) internalPoolPutWaitCh(ch *chan *session) {
+func (c *Client) internalPoolPutWaitCh(ch *chan *session) { //nolint:gocritic
 	c.waitChPool.Put(ch)
 }
 

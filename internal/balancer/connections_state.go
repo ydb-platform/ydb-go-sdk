@@ -134,7 +134,7 @@ func sortPreferConnections(
 	preferFunc balancerConfig.PreferConnFunc,
 	info balancerConfig.Info,
 	allowFallback bool,
-) (prefer []conn.Conn, fallback []conn.Conn) {
+) (prefer, fallback []conn.Conn) {
 	if preferFunc == nil {
 		return conns, nil
 	}

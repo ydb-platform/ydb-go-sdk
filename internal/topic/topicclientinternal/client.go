@@ -70,12 +70,12 @@ func (c *Client) Close(_ context.Context) error {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.AlterOption) error {
-	req := rawtopic.AlterTopicRequest{}
+	req := &rawtopic.AlterTopicRequest{}
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
 	for _, o := range opts {
 		if o != nil {
-			o.ApplyAlterOption(&req)
+			o.ApplyAlterOption(req)
 		}
 	}
 
@@ -100,13 +100,13 @@ func (c *Client) Create(
 	path string,
 	opts ...topicoptions.CreateOption,
 ) error {
-	req := rawtopic.CreateTopicRequest{}
+	req := &rawtopic.CreateTopicRequest{}
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
 
 	for _, o := range opts {
 		if o != nil {
-			o.ApplyCreateOption(&req)
+			o.ApplyCreateOption(req)
 		}
 	}
 

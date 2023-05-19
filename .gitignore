@@ -16,3 +16,5 @@
 vendor
 changes.txt
 ./internal/cmd/gtrace/gtrace
+examples/.golangci.yml
+tests/slo/.golangci.yml

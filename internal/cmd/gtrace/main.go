@@ -109,15 +109,14 @@ func main() {
 		var file *os.File
 		file, err = os.Open(filepath.Join(workDir, name))
 		if err != nil {
-			//nolint:gocritic
-			log.Fatal(err)
+			panic(err)
 		}
-		defer file.Close()
+		defer file.Close() //nolint:gocritic
 
 		var ast *ast.File
 		ast, err = parser.ParseFile(fset, file.Name(), file, parser.ParseComments)
 		if err != nil {
-			log.Fatalf("parse %q error: %v", file.Name(), err)
+			panic(fmt.Sprintf("parse %q error: %v", file.Name(), err))
 		}
 
 		pkgFiles = append(pkgFiles, file)
@@ -125,15 +124,15 @@ func main() {
 
 		if name == gofile {
 			if _, err = file.Seek(0, io.SeekStart); err != nil {
-				log.Fatal(err)
+				panic(err)
 			}
 			buildConstraints, err = scanBuildConstraints(file)
 			if err != nil {
-				log.Fatal(err)
+				panic(err)
 			}
 		}
 	}
-	info := types.Info{
+	info := &types.Info{
 		Types: make(map[ast.Expr]types.TypeAndValue),
 		Defs:  make(map[*ast.Ident]types.Object),
 		Uses:  make(map[*ast.Ident]types.Object),
@@ -143,9 +142,9 @@ func main() {
 		DisableUnusedImportCheck: true,
 		Importer:                 importer.ForCompiler(fset, "source", nil),
 	}
-	pkg, err := conf.Check(".", fset, astFiles, &info)
+	pkg, err := conf.Check(".", fset, astFiles, info)
 	if err != nil {
-		log.Fatalf("type error: %v", err)
+		panic(fmt.Sprintf("type error: %v", err))
 	}
 	var items []*GenItem
 	for i, astFile := range astFiles {
@@ -239,14 +238,14 @@ func main() {
 	}
 	for _, w := range writers {
 		if err := w.Write(p); err != nil {
-			log.Fatal(err)
+			panic(err)
 		}
 	}
 
 	log.Println("OK")
 }
 
-func buildFunc(info types.Info, traces map[string]*Trace, fn *ast.FuncType) (ret *Func, err error) {
+func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (ret *Func, err error) {
 	ret = new(Func)
 	for _, p := range fn.Params.List {
 		t := info.TypeOf(p.Type)

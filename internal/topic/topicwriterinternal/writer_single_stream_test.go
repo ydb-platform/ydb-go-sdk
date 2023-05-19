@@ -35,7 +35,9 @@ func TestWriterImpl_CreateInitMessage(t *testing.T) {
 
 	t.Run("WithoutGetLastSeq", func(t *testing.T) {
 		ctx := xtest.Context(t)
-		w := newSingleStreamWriterStopped(ctx, SingleStreamWriterConfig{getAutoSeq: false})
+		w := newSingleStreamWriterStopped(ctx,
+			SingleStreamWriterConfig{getAutoSeq: false},
+		)
 		require.False(t, w.createInitRequest().GetLastSeqNo)
 	})
 }

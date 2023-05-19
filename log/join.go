@@ -1,6 +1,10 @@
 package log
 
-import "github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+import (
+	"unicode/utf8"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+)
 
 func joinNamespace(names []string, maxLen int) (join string) {
 	l := 0
@@ -18,7 +22,8 @@ func joinNamespace(names []string, maxLen int) (join string) {
 		}
 		ll := len([]rune(s))
 		if maxLen != 0 && l > maxLen {
-			b.WriteRune([]rune(s)[0])
+			r, _ := utf8.DecodeRuneInString(s)
+			b.WriteRune(r)
 			l += 1 - ll
 		} else {
 			b.WriteString(s)

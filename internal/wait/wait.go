@@ -22,7 +22,7 @@ func waitBackoff(ctx context.Context, b backoff.Backoff, i int) error {
 	}
 }
 
-func Wait(ctx context.Context, fastBackoff backoff.Backoff, slowBackoff backoff.Backoff, t backoff.Type, i int) error {
+func Wait(ctx context.Context, fastBackoff, slowBackoff backoff.Backoff, t backoff.Type, i int) error {
 	var b backoff.Backoff
 	switch t {
 	case backoff.TypeNoBackoff:

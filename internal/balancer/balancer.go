@@ -31,7 +31,7 @@ type discoveryClient interface {
 }
 
 type Balancer struct {
-	driverConfig      config.Config
+	driverConfig      *config.Config
 	balancerConfig    balancerConfig.Config
 	pool              *conn.Pool
 	discoveryClient   discoveryClient
@@ -176,7 +176,7 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 
 func New(
 	ctx context.Context,
-	driverConfig config.Config,
+	driverConfig *config.Config,
 	pool *conn.Pool,
 	opts ...discoveryConfig.Option,
 ) (b *Balancer, err error) {
@@ -276,10 +276,8 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 			if cc.GetState() == conn.Banned {
 				b.pool.Allow(ctx, cc)
 			}
-		} else {
-			if xerrors.MustPessimizeEndpoint(err, b.driverConfig.ExcludeGRPCCodesForPessimization()...) {
-				b.pool.Ban(ctx, cc, err)
-			}
+		} else if xerrors.MustPessimizeEndpoint(err, b.driverConfig.ExcludeGRPCCodesForPessimization()...) {
+			b.pool.Ban(ctx, cc, err)
 		}
 	}()
 

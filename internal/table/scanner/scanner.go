@@ -179,17 +179,17 @@ func (s *scanner) ScanNamed(namedValues ...named.Value) error {
 	if s.nextItem != 0 {
 		panic("scan row failed: double scan per row")
 	}
-	for _, v := range namedValues {
-		if err := s.seekItemByName(v.Name); err != nil {
+	for i := range namedValues {
+		if err := s.seekItemByName(namedValues[i].Name); err != nil {
 			return err
 		}
-		switch t := v.Type; t {
+		switch t := namedValues[i].Type; t {
 		case named.TypeRequired:
-			s.scanRequired(v.Value)
+			s.scanRequired(namedValues[i].Value)
 		case named.TypeOptional:
-			s.scanOptional(v.Value, false)
+			s.scanOptional(namedValues[i].Value, false)
 		case named.TypeOptionalWithUseDefault:
-			s.scanOptional(v.Value, true)
+			s.scanOptional(namedValues[i].Value, true)
 		default:
 			panic(fmt.Sprintf("unknown type of named.Value: %d", t))
 		}
@@ -294,12 +294,13 @@ func (s *scanner) seekItemByName(name string) error {
 		return s.notFoundColumnName(name)
 	}
 	for i, c := range s.set.Columns {
-		if name == c.Name {
-			s.stack.scanItem.name = c.Name
-			s.stack.scanItem.t = c.Type
-			s.stack.scanItem.v = s.row.Items[i]
-			return s.Err()
+		if name != c.Name {
+			continue
 		}
+		s.stack.scanItem.name = c.Name
+		s.stack.scanItem.t = c.Type
+		s.stack.scanItem.v = s.row.Items[i]
+		return s.Err()
 	}
 	return s.notFoundColumnName(name)
 }
@@ -702,7 +703,7 @@ func (s *scanner) setByte(dst *[]byte) {
 	}
 }
 
-func (s *scanner) trySetByteArray(v interface{}, optional bool, def bool) bool {
+func (s *scanner) trySetByteArray(v interface{}, optional, def bool) bool {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() == reflect.Ptr {
 		rv = rv.Elem()

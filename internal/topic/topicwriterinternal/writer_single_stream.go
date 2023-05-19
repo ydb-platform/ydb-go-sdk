@@ -29,7 +29,7 @@ type SingleStreamWriterConfig struct {
 }
 
 func newSingleStreamWriterConfig(
-	common WritersCommonConfig,
+	common WritersCommonConfig, //nolint:gocritic
 	stream RawTopicWriterStream,
 	queue *messageQueue,
 	encodersMap *EncoderMap,
@@ -63,7 +63,7 @@ type SingleStreamWriter struct {
 
 func NewSingleStreamWriter(
 	ctxForPProfLabelsOnly context.Context,
-	cfg SingleStreamWriterConfig,
+	cfg SingleStreamWriterConfig, //nolint:gocritic
 ) (*SingleStreamWriter, error) {
 	res := newSingleStreamWriterStopped(ctxForPProfLabelsOnly, cfg)
 	err := res.initStream()
@@ -77,7 +77,7 @@ func NewSingleStreamWriter(
 
 func newSingleStreamWriterStopped(
 	ctxForPProfLabelsOnly context.Context,
-	cfg SingleStreamWriterConfig,
+	cfg SingleStreamWriterConfig, //nolint:gocritic
 ) *SingleStreamWriter {
 	return &SingleStreamWriter{
 		cfg:            cfg,

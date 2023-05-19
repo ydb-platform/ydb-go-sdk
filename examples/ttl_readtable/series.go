@@ -142,11 +142,11 @@ func deleteExpired(ctx context.Context, c table.Client, prefix string, timestamp
 	if err != nil {
 		return err
 	}
-	for _, kr := range res.KeyRanges {
+	for i := range res.KeyRanges {
 		// DeleteExpiredRange can be run in parallel for different ranges.
 		// Keep in mind that deletion RPS should be somehow limited in this case to avoid
 		// spikes of cluster load due to TTL.
-		err = deleteExpiredRange(ctx, c, prefix, timestamp, kr)
+		err = deleteExpiredRange(ctx, c, prefix, timestamp, res.KeyRanges[i])
 		if err != nil {
 			return err
 		}

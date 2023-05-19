@@ -67,7 +67,7 @@ ALTER TABLE small_table3 SET (TTL = Interval("PT3H") ON d);
 `
 )
 
-func executeQuery(ctx context.Context, c table.Client, prefix string, query string) (err error) {
+func executeQuery(ctx context.Context, c table.Client, prefix, query string) (err error) {
 	err = c.Do(ctx,
 		func(ctx context.Context, s table.Session) error {
 			err = s.ExecuteSchemeQuery(ctx, fmt.Sprintf(query, prefix))

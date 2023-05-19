@@ -150,26 +150,40 @@ func describeTableOptions(ctx context.Context, c table.Client) (err error) {
 	}
 	log.Println("> describe_table_options:")
 
-	for i, p := range desc.TableProfilePresets {
-		log.Printf("TableProfilePresets: %d/%d: %+v", i+1, len(desc.TableProfilePresets), p)
+	for i := range desc.TableProfilePresets {
+		log.Printf("TableProfilePresets: %d/%d: %+v", i+1,
+			len(desc.TableProfilePresets), desc.TableProfilePresets[i],
+		)
 	}
-	for i, p := range desc.StoragePolicyPresets {
-		log.Printf("StoragePolicyPresets: %d/%d: %+v", i+1, len(desc.StoragePolicyPresets), p)
+	for i := range desc.StoragePolicyPresets {
+		log.Printf("StoragePolicyPresets: %d/%d: %+v", i+1,
+			len(desc.StoragePolicyPresets), desc.StoragePolicyPresets[i],
+		)
 	}
-	for i, p := range desc.CompactionPolicyPresets {
-		log.Printf("CompactionPolicyPresets: %d/%d: %+v", i+1, len(desc.CompactionPolicyPresets), p)
+	for i := range desc.CompactionPolicyPresets {
+		log.Printf("CompactionPolicyPresets: %d/%d: %+v", i+1,
+			len(desc.CompactionPolicyPresets), desc.CompactionPolicyPresets[i],
+		)
 	}
-	for i, p := range desc.PartitioningPolicyPresets {
-		log.Printf("PartitioningPolicyPresets: %d/%d: %+v", i+1, len(desc.PartitioningPolicyPresets), p)
+	for i := range desc.PartitioningPolicyPresets {
+		log.Printf("PartitioningPolicyPresets: %d/%d: %+v", i+1,
+			len(desc.PartitioningPolicyPresets), desc.PartitioningPolicyPresets[i],
+		)
 	}
-	for i, p := range desc.ExecutionPolicyPresets {
-		log.Printf("ExecutionPolicyPresets: %d/%d: %+v", i+1, len(desc.ExecutionPolicyPresets), p)
+	for i := range desc.ExecutionPolicyPresets {
+		log.Printf("ExecutionPolicyPresets: %d/%d: %+v", i+1,
+			len(desc.ExecutionPolicyPresets), desc.ExecutionPolicyPresets[i],
+		)
 	}
-	for i, p := range desc.ReplicationPolicyPresets {
-		log.Printf("ReplicationPolicyPresets: %d/%d: %+v", i+1, len(desc.ReplicationPolicyPresets), p)
+	for i := range desc.ReplicationPolicyPresets {
+		log.Printf("ReplicationPolicyPresets: %d/%d: %+v", i+1,
+			len(desc.ReplicationPolicyPresets), desc.ReplicationPolicyPresets[i],
+		)
 	}
-	for i, p := range desc.CachingPolicyPresets {
-		log.Printf("CachingPolicyPresets: %d/%d: %+v", i+1, len(desc.CachingPolicyPresets), p)
+	for i := range desc.CachingPolicyPresets {
+		log.Printf("CachingPolicyPresets: %d/%d: %+v", i+1,
+			len(desc.CachingPolicyPresets), desc.CachingPolicyPresets[i],
+		)
 	}
 
 	return nil
@@ -390,8 +404,8 @@ func describeTable(ctx context.Context, c table.Client, path string) (err error)
 				return err
 			}
 			log.Printf("> describe table: %s", path)
-			for _, c := range desc.Columns {
-				log.Printf("column, name: %s, %s", c.Type, c.Name)
+			for i := range desc.Columns {
+				log.Printf("column, name: %s, %s", desc.Columns[i].Type, desc.Columns[i].Name)
 			}
 			return nil
 		},

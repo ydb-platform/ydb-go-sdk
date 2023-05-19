@@ -62,7 +62,11 @@ func newBatch(session *partitionSession, messages []*PublicMessage) (*PublicBatc
 	}, nil
 }
 
-func newBatchFromStream(decoders decoderMap, session *partitionSession, sb rawtopicreader.Batch) (*PublicBatch, error) {
+func newBatchFromStream(
+	decoders decoderMap,
+	session *partitionSession,
+	sb rawtopicreader.Batch, //nolint:gocritic
+) (*PublicBatch, error) {
 	messages := make([]*PublicMessage, len(sb.MessageData))
 	prevOffset := session.lastReceivedMessageOffset()
 	for i := range sb.MessageData {

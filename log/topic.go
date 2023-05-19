@@ -1,4 +1,3 @@
-//nolint:lll
 package log
 
 import (
@@ -14,7 +13,9 @@ func Topic(l Logger, d trace.Detailer, opts ...Option) (t trace.Topic) {
 }
 
 func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocyclo
-	t.OnReaderReconnect = func(info trace.TopicReaderReconnectStartInfo) func(doneInfo trace.TopicReaderReconnectDoneInfo) {
+	t.OnReaderReconnect = func(
+		info trace.TopicReaderReconnectStartInfo,
+	) func(doneInfo trace.TopicReaderReconnectDoneInfo) {
 		if d.Details()&trace.TopicReaderStreamLifeCycleEvents == 0 {
 			return nil
 		}
@@ -37,7 +38,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 			Bool("was_sent", info.WasSent),
 		)
 	}
-	t.OnReaderPartitionReadStartResponse = func(info trace.TopicReaderPartitionReadStartResponseStartInfo) func(stopInfo trace.TopicReaderPartitionReadStartResponseDoneInfo) {
+	t.OnReaderPartitionReadStartResponse = func(
+		info trace.TopicReaderPartitionReadStartResponseStartInfo,
+	) func(stopInfo trace.TopicReaderPartitionReadStartResponseDoneInfo) {
 		if d.Details()&trace.TopicReaderPartitionEvents == 0 {
 			return nil
 		}
@@ -79,7 +82,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 			}
 		}
 	}
-	t.OnReaderPartitionReadStopResponse = func(info trace.TopicReaderPartitionReadStopResponseStartInfo) func(trace.TopicReaderPartitionReadStopResponseDoneInfo) {
+	t.OnReaderPartitionReadStopResponse = func(
+		info trace.TopicReaderPartitionReadStopResponseStartInfo,
+	) func(trace.TopicReaderPartitionReadStopResponseDoneInfo) {
 		if d.Details()&trace.TopicReaderPartitionEvents == 0 {
 			return nil
 		}
@@ -148,7 +153,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 			}
 		}
 	}
-	t.OnReaderSendCommitMessage = func(info trace.TopicReaderSendCommitMessageStartInfo) func(doneInfo trace.TopicReaderSendCommitMessageDoneInfo) {
+	t.OnReaderSendCommitMessage = func(
+		info trace.TopicReaderSendCommitMessageStartInfo,
+	) func(trace.TopicReaderSendCommitMessageDoneInfo) {
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
@@ -258,7 +265,11 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 			version(),
 		)
 	}
-	t.OnReaderUpdateToken = func(info trace.OnReadUpdateTokenStartInfo) func(updateTokenInfo trace.OnReadUpdateTokenMiddleTokenReceivedInfo) func(doneInfo trace.OnReadStreamUpdateTokenDoneInfo) {
+	t.OnReaderUpdateToken = func(
+		info trace.OnReadUpdateTokenStartInfo,
+	) func(
+		updateTokenInfo trace.OnReadUpdateTokenMiddleTokenReceivedInfo,
+	) func(doneInfo trace.OnReadStreamUpdateTokenDoneInfo) {
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
@@ -267,7 +278,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		l.Log(ctx, "token updating...",
 			String("reader_connection_id", info.ReaderConnectionID),
 		)
-		return func(updateTokenInfo trace.OnReadUpdateTokenMiddleTokenReceivedInfo) func(doneInfo trace.OnReadStreamUpdateTokenDoneInfo) {
+		return func(
+			updateTokenInfo trace.OnReadUpdateTokenMiddleTokenReceivedInfo,
+		) func(doneInfo trace.OnReadStreamUpdateTokenDoneInfo) {
 			if updateTokenInfo.Error == nil {
 				l.Log(ctx, "got token",
 					String("reader_connection_id", info.ReaderConnectionID),
@@ -313,17 +326,19 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 			Int("local_capacity", info.LocalBufferSizeAfterSent),
 		)
 	}
-	t.OnReaderReceiveDataResponse = func(startInfo trace.TopicReaderReceiveDataResponseStartInfo) func(doneInfo trace.TopicReaderReceiveDataResponseDoneInfo) {
+	t.OnReaderReceiveDataResponse = func(
+		info trace.TopicReaderReceiveDataResponseStartInfo,
+	) func(trace.TopicReaderReceiveDataResponseDoneInfo) {
 		if d.Details()&trace.TopicReaderMessageEvents == 0 {
 			return nil
 		}
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "receive", "data", "response")
 		start := time.Now()
-		partitionsCount, batchesCount, messagesCount := startInfo.DataResponse.GetPartitionBatchMessagesCounts()
+		partitionsCount, batchesCount, messagesCount := info.DataResponse.GetPartitionBatchMessagesCounts()
 		l.Log(ctx, "data response received, process starting...",
-			String("reader_connection_id", startInfo.ReaderConnectionID),
-			Int("received_bytes", startInfo.DataResponse.GetBytesSize()),
-			Int("local_capacity", startInfo.LocalBufferSizeAfterReceive),
+			String("reader_connection_id", info.ReaderConnectionID),
+			Int("received_bytes", info.DataResponse.GetBytesSize()),
+			Int("local_capacity", info.LocalBufferSizeAfterReceive),
 			Int("partitions_count", partitionsCount),
 			Int("batches_count", batchesCount),
 			Int("messages_count", messagesCount),
@@ -331,9 +346,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		return func(doneInfo trace.TopicReaderReceiveDataResponseDoneInfo) {
 			if doneInfo.Error == nil {
 				l.Log(ctx, "data response received and processed",
-					String("reader_connection_id", startInfo.ReaderConnectionID),
-					Int("received_bytes", startInfo.DataResponse.GetBytesSize()),
-					Int("local_capacity", startInfo.LocalBufferSizeAfterReceive),
+					String("reader_connection_id", info.ReaderConnectionID),
+					Int("received_bytes", info.DataResponse.GetBytesSize()),
+					Int("local_capacity", info.LocalBufferSizeAfterReceive),
 					Int("partitions_count", partitionsCount),
 					Int("batches_count", batchesCount),
 					Int("messages_count", messagesCount),
@@ -342,9 +357,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 			} else {
 				l.Log(WithLevel(ctx, WARN), "data response received and processed",
 					Error(doneInfo.Error),
-					String("reader_connection_id", startInfo.ReaderConnectionID),
-					Int("received_bytes", startInfo.DataResponse.GetBytesSize()),
-					Int("local_capacity", startInfo.LocalBufferSizeAfterReceive),
+					String("reader_connection_id", info.ReaderConnectionID),
+					Int("received_bytes", info.DataResponse.GetBytesSize()),
+					Int("local_capacity", info.LocalBufferSizeAfterReceive),
 					Int("partitions_count", partitionsCount),
 					Int("batches_count", batchesCount),
 					Int("messages_count", messagesCount),
@@ -354,7 +369,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 			}
 		}
 	}
-	t.OnReaderReadMessages = func(info trace.TopicReaderReadMessagesStartInfo) func(doneInfo trace.TopicReaderReadMessagesDoneInfo) {
+	t.OnReaderReadMessages = func(
+		info trace.TopicReaderReadMessagesStartInfo,
+	) func(doneInfo trace.TopicReaderReadMessagesDoneInfo) {
 		if d.Details()&trace.TopicReaderMessageEvents == 0 {
 			return nil
 		}
@@ -399,7 +416,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 	///
 	/// Topic writer
 	///
-	t.OnWriterReconnect = func(info trace.TopicWriterReconnectStartInfo) func(doneInfo trace.TopicWriterReconnectDoneInfo) {
+	t.OnWriterReconnect = func(
+		info trace.TopicWriterReconnectStartInfo,
+	) func(doneInfo trace.TopicWriterReconnectDoneInfo) {
 		if d.Details()&trace.TopicWriterStreamLifeCycleEvents == 0 {
 			return nil
 		}
@@ -432,7 +451,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 			}
 		}
 	}
-	t.OnWriterInitStream = func(info trace.TopicWriterInitStreamStartInfo) func(doneInfo trace.TopicWriterInitStreamDoneInfo) {
+	t.OnWriterInitStream = func(
+		info trace.TopicWriterInitStreamStartInfo,
+	) func(doneInfo trace.TopicWriterInitStreamDoneInfo) {
 		if d.Details()&trace.TopicWriterStreamLifeCycleEvents == 0 {
 			return nil
 		}
@@ -494,7 +515,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 			}
 		}
 	}
-	t.OnWriterCompressMessages = func(info trace.TopicWriterCompressMessagesStartInfo) func(doneInfo trace.TopicWriterCompressMessagesDoneInfo) {
+	t.OnWriterCompressMessages = func(
+		info trace.TopicWriterCompressMessagesStartInfo,
+	) func(doneInfo trace.TopicWriterCompressMessagesDoneInfo) {
 		if d.Details()&trace.TopicWriterStreamEvents == 0 {
 			return nil
 		}
@@ -534,7 +557,9 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 			}
 		}
 	}
-	t.OnWriterSendMessages = func(info trace.TopicWriterSendMessagesStartInfo) func(doneInfo trace.TopicWriterSendMessagesDoneInfo) {
+	t.OnWriterSendMessages = func(
+		info trace.TopicWriterSendMessagesStartInfo,
+	) func(doneInfo trace.TopicWriterSendMessagesDoneInfo) {
 		if d.Details()&trace.TopicWriterStreamEvents == 0 {
 			return nil
 		}

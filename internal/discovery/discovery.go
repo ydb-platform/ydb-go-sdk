@@ -18,7 +18,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func New(cc grpc.ClientConnInterface, config config.Config) *Client {
+func New(cc grpc.ClientConnInterface, config *config.Config) *Client {
 	return &Client{
 		config: config,
 		cc:     cc,
@@ -29,7 +29,7 @@ func New(cc grpc.ClientConnInterface, config config.Config) *Client {
 var _ discovery.Client = &Client{}
 
 type Client struct {
-	config config.Config
+	config *config.Config
 	cc     grpc.ClientConnInterface
 	client Ydb_Discovery_V1.DiscoveryServiceClient
 }

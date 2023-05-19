@@ -228,15 +228,15 @@ type columnFamilies []ColumnFamily
 
 func (cf columnFamilies) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) {
 	d.AddColumnFamilies = make([]*Ydb_Table.ColumnFamily, len(cf))
-	for i, c := range cf {
-		d.AddColumnFamilies[i] = c.toYDB()
+	for i := range cf {
+		d.AddColumnFamilies[i] = cf[i].toYDB()
 	}
 }
 
 func (cf columnFamilies) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
 	d.ColumnFamilies = make([]*Ydb_Table.ColumnFamily, len(cf))
-	for i, c := range cf {
-		d.ColumnFamilies[i] = c.toYDB()
+	for i := range cf {
+		d.ColumnFamilies[i] = cf[i].toYDB()
 	}
 }
 
@@ -936,7 +936,7 @@ func (f executeScanQueryOptionFunc) ApplyExecuteScanQueryOption(d *ExecuteScanQu
 	return f(d)
 }
 
-var _ ExecuteScanQueryOption = (executeScanQueryOptionFunc)(nil)
+var _ ExecuteScanQueryOption = executeScanQueryOptionFunc(nil)
 
 // WithExecuteScanQueryMode defines scan query mode: execute or explain
 func WithExecuteScanQueryMode(m ExecuteScanQueryRequestMode) ExecuteScanQueryOption {

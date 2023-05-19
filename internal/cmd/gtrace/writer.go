@@ -179,9 +179,9 @@ func unwrapStruct(t types.Type) (n *types.Named, s *types.Struct) {
 }
 
 func (w *Writer) funcImports(dst []dep, fn *Func) []dep {
-	for _, p := range fn.Params {
-		dst = w.typeImports(dst, p.Type)
-		if _, s := unwrapStruct(p.Type); s != nil {
+	for i := range fn.Params {
+		dst = w.typeImports(dst, fn.Params[i].Type)
+		if _, s := unwrapStruct(fn.Params[i].Type); s != nil {
 			forEachField(s, func(v *types.Var) {
 				if v.Exported() {
 					dst = w.typeImports(dst, v.Type())
@@ -234,14 +234,14 @@ func (w *Writer) importDeps(deps []dep) {
 	})
 	w.line(`import (`)
 	var lastStd bool
-	for _, d := range deps {
-		if w.isStdLib(d.pkgPath) {
+	for i := range deps {
+		if w.isStdLib(deps[i].pkgPath) {
 			lastStd = true
 		} else if lastStd {
 			lastStd = false
 			w.line()
 		}
-		w.line("\t", `"`, d.pkgPath, `"`)
+		w.line("\t", `"`, deps[i].pkgPath, `"`)
 	}
 	w.line(`)`)
 	w.line()
@@ -460,11 +460,11 @@ func (w *Writer) hook(trace *Trace, hook Hook) {
 
 		w.code(`(`)
 		var args []string
-		for i, p := range hook.Func.Params {
+		for i := range hook.Func.Params {
 			if i > 0 {
 				w.code(`, `)
 			}
-			args = append(args, w.funcParam(p))
+			args = append(args, w.funcParam(&hook.Func.Params[i]))
 		}
 		w.code(`)`)
 		if hook.Func.HasResult() {
@@ -527,7 +527,7 @@ func (w *Writer) hookFuncCall(fn *Func, name string, args []string) {
 	w.line(`return `, res)
 }
 
-func nameParam(p Param) (s string) {
+func nameParam(p *Param) (s string) {
 	s = p.Name
 	if s == "" {
 		s = firstChar(ident(typeBasename(p.Type)))
@@ -537,20 +537,20 @@ func nameParam(p Param) (s string) {
 
 func (w *Writer) declareParams(src []Param) (names []string) {
 	names = make([]string, len(src))
-	for i, p := range src {
-		names[i] = w.declare(nameParam(p))
+	for i := range src {
+		names[i] = w.declare(nameParam(&src[i]))
 	}
 	return names
 }
 
-func flattenParams(src []Param) (dst []Param) {
-	for _, p := range src {
-		_, s := unwrapStruct(p.Type)
+func flattenParams(params []Param) (dst []Param) {
+	for i := range params {
+		_, s := unwrapStruct(params[i].Type)
 		if s != nil {
 			dst = flattenStruct(dst, s)
 			continue
 		}
-		dst = append(dst, p)
+		dst = append(dst, params[i])
 	}
 	return dst
 }
@@ -586,8 +586,8 @@ func flattenStruct(dst []Param, s *types.Struct) []Param {
 }
 
 func (w *Writer) constructParams(params []Param, names []string) (res []string) {
-	for _, p := range params {
-		n, s := unwrapStruct(p.Type)
+	for i := range params {
+		n, s := unwrapStruct(params[i].Type)
 		if s != nil {
 			var v string
 			v, names = w.constructStruct(n, s, names)
@@ -633,9 +633,9 @@ func (w *Writer) hookShortcut(trace *Trace, hook Hook) {
 			params = flattenParams(hook.Func.Params)
 			names  = w.declareParams(params)
 		)
-		for i, p := range params {
+		for i := range params {
 			w.code(`, `)
-			w.code(names[i], ` `, w.typeString(p.Type))
+			w.code(names[i], ` `, w.typeString(params[i].Type))
 		}
 		w.code(`)`)
 		if hook.Func.HasResult() {
@@ -682,11 +682,11 @@ func (w *Writer) hookFuncShortcut(fn *Func, name string) {
 			params = flattenParams(fn.Params)
 			names  = w.declareParams(params)
 		)
-		for i, p := range params {
+		for i := range params {
 			if i > 0 {
 				w.code(`, `)
 			}
-			w.code(names[i], ` `, w.typeString(p.Type))
+			w.code(names[i], ` `, w.typeString(params[i].Type))
 		}
 		w.code(`)`)
 		if fn.HasResult() {
@@ -746,24 +746,24 @@ func (w *Writer) zeroReturn(fn *Func) {
 
 func (w *Writer) funcParams(params []Param) (vars []string) {
 	w.code(`(`)
-	for i, p := range params {
+	for i := range params {
 		if i > 0 {
 			w.code(`, `)
 		}
-		vars = append(vars, w.funcParam(p))
+		vars = append(vars, w.funcParam(&params[i]))
 	}
 	w.code(`)`)
 	return
 }
 
-func (w *Writer) funcParam(p Param) (name string) {
+func (w *Writer) funcParam(p *Param) (name string) {
 	name = w.declare(nameParam(p))
 	w.code(name, ` `)
 	w.code(w.typeString(p.Type))
 	return name
 }
 
-func (w *Writer) funcParamSign(p Param) {
+func (w *Writer) funcParamSign(p *Param) {
 	name := nameParam(p)
 	if len(name) == 1 || isPredeclared(name) {
 		name = "_"
@@ -803,14 +803,14 @@ func (w *Writer) funcResults(fn *Func) {
 func (w *Writer) funcSignatureFlags(fn *Func, flags flags) {
 	haveNames := haveNames(fn.Params)
 	w.code(`func(`)
-	for i, p := range fn.Params {
+	for i := range fn.Params {
 		if i > 0 {
 			w.code(`, `)
 		}
 		if flags.has(docs) && haveNames {
-			w.funcParamSign(p)
+			w.funcParamSign(&fn.Params[i])
 		} else {
-			w.code(w.typeString(p.Type))
+			w.code(w.typeString(fn.Params[i].Type))
 		}
 	}
 	w.code(`)`)
@@ -832,14 +832,14 @@ func (w *Writer) shortcutFuncSignFlags(fn *Func, flags flags) {
 		haveNames = haveNames(params)
 	)
 	w.code(`func(`)
-	for i, p := range params {
+	for i := range params {
 		if i > 0 {
 			w.code(`, `)
 		}
 		if flags.has(docs) && haveNames {
-			w.funcParamSign(p)
+			w.funcParamSign(&params[i])
 		} else {
-			w.code(w.typeString(p.Type))
+			w.code(w.typeString(params[i].Type))
 		}
 	}
 	w.code(`)`)
@@ -869,8 +869,8 @@ func (w *Writer) shortcutFuncResults(fn *Func) {
 }
 
 func haveNames(params []Param) bool {
-	for _, p := range params {
-		name := nameParam(p)
+	for i := range params {
+		name := nameParam(&params[i])
 		if len(name) > 1 && !isPredeclared(name) {
 			return true
 		}

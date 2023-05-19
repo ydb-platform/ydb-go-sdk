@@ -142,9 +142,7 @@ func (f Field) checkType(want FieldType) {
 // It should be used by adapters that don't support f.Type directly.
 func (f Field) String() string {
 	switch f.ftype {
-	case IntType:
-		fallthrough
-	case Int64Type:
+	case IntType, Int64Type:
 		return strconv.FormatInt(f.vint, 10)
 	case StringType:
 		return f.vstr
@@ -155,7 +153,10 @@ func (f Field) String() string {
 	case StringsType:
 		return fmt.Sprintf("%v", f.StringsValue())
 	case ErrorType:
-		return fmt.Sprintf("%v", f.ErrorValue())
+		if f.vany == nil || f.vany.(error) == nil {
+			return "<nil>"
+		}
+		return f.ErrorValue().Error()
 	case AnyType:
 		if f.vany == nil {
 			return nilPtr
@@ -175,28 +176,28 @@ func (f Field) String() string {
 }
 
 // String constructs Field with StringType
-func String(key string, value string) Field {
+func String(k, v string) Field {
 	return Field{
 		ftype: StringType,
-		key:   key,
-		vstr:  value,
+		key:   k,
+		vstr:  v,
 	}
 }
 
 // Int constructs Field with IntType
-func Int(key string, value int) Field {
+func Int(k string, v int) Field {
 	return Field{
 		ftype: IntType,
-		key:   key,
-		vint:  int64(value),
+		key:   k,
+		vint:  int64(v),
 	}
 }
 
-func Int64(key string, value int64) Field {
+func Int64(k string, v int64) Field {
 	return Field{
 		ftype: Int64Type,
-		key:   key,
-		vint:  value,
+		key:   k,
+		vint:  v,
 	}
 }
 

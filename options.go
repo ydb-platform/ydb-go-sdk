@@ -250,7 +250,7 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 }
 
 // WithTraceDriver returns deadline which has associated Driver with it.
-func WithTraceDriver(trace trace.Driver, opts ...trace.DriverComposeOption) Option {
+func WithTraceDriver(trace trace.Driver, opts ...trace.DriverComposeOption) Option { //nolint:gocritic
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithTrace(trace, opts...))
 		return nil
@@ -395,7 +395,7 @@ func WithPanicCallback(panicCallback func(e interface{})) Option {
 }
 
 // WithTraceTable returns table trace option
-func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option {
+func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option { //nolint:gocritic
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(
 			c.tableOptions,
@@ -517,7 +517,7 @@ func WithTraceDiscovery(t trace.Discovery, opts ...trace.DiscoveryComposeOption)
 }
 
 // WithTraceTopic adds configured discovery tracer to Driver
-func WithTraceTopic(t trace.Topic, opts ...trace.TopicComposeOption) Option {
+func WithTraceTopic(t trace.Topic, opts ...trace.TopicComposeOption) Option { //nolint:gocritic
 	return func(ctx context.Context, c *Driver) error {
 		c.topicOptions = append(
 			c.topicOptions,
@@ -536,12 +536,12 @@ func WithTraceTopic(t trace.Topic, opts ...trace.TopicComposeOption) Option {
 }
 
 // WithTraceDatabaseSQL adds configured discovery tracer to Driver
-func WithTraceDatabaseSQL(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) Option {
+func WithTraceDatabaseSQL(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) Option { //nolint:gocritic
 	return func(ctx context.Context, c *Driver) error {
 		c.databaseSQLOptions = append(
 			c.databaseSQLOptions,
 			xsql.WithTrace(
-				t,
+				&t,
 				append(
 					[]trace.DatabaseSQLComposeOption{
 						trace.WithDatabaseSQLPanicCallback(c.panicCallback),

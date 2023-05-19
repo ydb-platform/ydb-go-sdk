@@ -109,11 +109,11 @@ func list(ctx context.Context, db *ydb.Driver, t *template.Template, p string) {
 		return
 	}
 
-	for _, child := range dir.Children {
-		pt := path.Join(p, child.Name)
-		switch child.Type {
+	for i := range dir.Children {
+		pt := path.Join(p, dir.Children[i].Name)
+		switch dir.Children[i].Type {
 		case scheme.EntryDirectory, scheme.EntryDatabase:
-			if _, ok := ignoreDirs[child.Name]; ok {
+			if _, ok := ignoreDirs[dir.Children[i].Name]; ok {
 				continue
 			}
 			list(ctx, db, t, pt)

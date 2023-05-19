@@ -44,6 +44,7 @@ func (s *server) cdcLoop() {
 		}
 
 		busID := cdcEvent.Key[0]
+		//nolint:gocritic
 		// s.dropFromCache(busID) // used for clean cache and force database request
 		if cdcEvent.Erase == nil {
 			s.cache.Set(busID, cdcEvent.Update.FreeSeats) // used for direct update cache from cdc without database request

@@ -191,11 +191,11 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 
 // Check returns retry mode for queryErr.
 func Check(err error) (m retryMode) {
-	code, errType, backoff, deleteSession := xerrors.Check(err)
+	code, errType, backoffType, deleteSession := xerrors.Check(err)
 	return retryMode{
 		code:          code,
 		errType:       errType,
-		backoff:       backoff,
+		backoff:       backoffType,
 		deleteSession: deleteSession,
 	}
 }

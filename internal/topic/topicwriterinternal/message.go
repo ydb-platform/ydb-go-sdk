@@ -181,11 +181,12 @@ func (m *messageWithDataContent) getEncodedBytes(codec rawtopiccommon.Codec) ([]
 	}
 }
 
-func newMessageDataWithContent(mess Message, encoders *EncoderMap) (
-	res messageWithDataContent,
-) {
-	res.encoders = encoders
-	res.Message = mess
-
-	return res
+func newMessageDataWithContent(
+	message Message, //nolint:gocritic
+	encoders *EncoderMap,
+) messageWithDataContent {
+	return messageWithDataContent{
+		Message:  message,
+		encoders: encoders,
+	}
 }

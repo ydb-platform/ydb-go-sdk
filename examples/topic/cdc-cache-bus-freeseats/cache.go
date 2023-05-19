@@ -76,7 +76,7 @@ func (c *Cache) set(now time.Time, key string, value int64) {
 }
 
 func (c *Cache) cleanupNeedLock(now time.Time) {
-	for key, item := range c.values {
+	for key, item := range c.values { //nolint:gocritic
 		if now.After(item.ExpiresAt) {
 			delete(c.values, key)
 		}

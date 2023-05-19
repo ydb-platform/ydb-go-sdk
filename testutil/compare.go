@@ -44,22 +44,22 @@ func unwrapTypedValue(v *Ydb.TypedValue) *Ydb.TypedValue {
 	return &Ydb.TypedValue{Type: typ, Value: val}
 }
 
-func compare(l *Ydb.TypedValue, r *Ydb.TypedValue) (int, error) {
-	lTypeID := l.Type.GetTypeId()
-	rTypeID := r.Type.GetTypeId()
+func compare(lhs, rhs *Ydb.TypedValue) (int, error) {
+	lTypeID := lhs.Type.GetTypeId()
+	rTypeID := rhs.Type.GetTypeId()
 	switch {
 	case lTypeID != rTypeID:
-		return 0, notComparableError(l, r)
+		return 0, notComparableError(lhs, rhs)
 	case lTypeID != Ydb.Type_PRIMITIVE_TYPE_ID_UNSPECIFIED:
-		return comparePrimitives(lTypeID, l.Value, r.Value)
-	case l.Type.GetTupleType() != nil && r.Type.GetTupleType() != nil:
-		return compareTuplesOrLists(expandTuple(l), expandTuple(r))
-	case l.Type.GetListType() != nil && r.Type.GetListType() != nil:
-		return compareTuplesOrLists(expandList(l), expandList(r))
-	case l.Type.GetStructType() != nil && r.Type.GetStructType() != nil:
-		return compareStructs(expandStruct(l), expandStruct(r))
+		return comparePrimitives(lTypeID, lhs.Value, rhs.Value)
+	case lhs.Type.GetTupleType() != nil && rhs.Type.GetTupleType() != nil:
+		return compareTuplesOrLists(expandTuple(lhs), expandTuple(rhs))
+	case lhs.Type.GetListType() != nil && rhs.Type.GetListType() != nil:
+		return compareTuplesOrLists(expandList(lhs), expandList(rhs))
+	case lhs.Type.GetStructType() != nil && rhs.Type.GetStructType() != nil:
+		return compareStructs(expandStruct(lhs), expandStruct(rhs))
 	default:
-		return 0, notComparableError(l, r)
+		return 0, notComparableError(lhs, rhs)
 	}
 }
 
@@ -94,13 +94,13 @@ func expandTuple(v *Ydb.TypedValue) []*Ydb.TypedValue {
 	return values
 }
 
-func notComparableError(l interface{}, r interface{}) error {
-	return xerrors.WithStackTrace(fmt.Errorf("%w: %v and %v", ErrNotComparable, l, r), xerrors.WithSkipDepth(1))
+func notComparableError(lhs, rhs interface{}) error {
+	return xerrors.WithStackTrace(fmt.Errorf("%w: %v and %v", ErrNotComparable, lhs, rhs), xerrors.WithSkipDepth(1))
 }
 
-func comparePrimitives(t Ydb.Type_PrimitiveTypeId, l *Ydb.Value, r *Ydb.Value) (int, error) {
-	_, lIsNull := l.Value.(*Ydb.Value_NullFlagValue)
-	_, rIsNull := r.Value.(*Ydb.Value_NullFlagValue)
+func comparePrimitives(t Ydb.Type_PrimitiveTypeId, lhs, rhs *Ydb.Value) (int, error) {
+	_, lIsNull := lhs.Value.(*Ydb.Value_NullFlagValue)
+	_, rIsNull := rhs.Value.(*Ydb.Value_NullFlagValue)
 	if lIsNull {
 		if rIsNull {
 			return 0, nil
@@ -112,24 +112,24 @@ func comparePrimitives(t Ydb.Type_PrimitiveTypeId, l *Ydb.Value, r *Ydb.Value) (
 	}
 
 	if compare, found := comparators[t]; found {
-		return compare(l, r), nil
+		return compare(lhs, rhs), nil
 	}
 	// special cases
 	switch t {
 	case Ydb.Type_DYNUMBER:
-		return compareDyNumber(l, r)
+		return compareDyNumber(lhs, rhs)
 	default:
-		return 0, notComparableError(l, r)
+		return 0, notComparableError(lhs, rhs)
 	}
 }
 
-func compareTuplesOrLists(l []*Ydb.TypedValue, r []*Ydb.TypedValue) (int, error) {
-	for i, lval := range l {
-		if i >= len(r) {
-			// l is longer than r, first len(r) elements equal
+func compareTuplesOrLists(lhs, rhs []*Ydb.TypedValue) (int, error) {
+	for i, lval := range lhs {
+		if i >= len(rhs) {
+			// lhs is longer than rhs, first len(rhs) elements equal
 			return 1, nil
 		}
-		rval := r[i]
+		rval := rhs[i]
 		cmp, err := compare(lval, rval)
 		if err != nil {
 			return 0, xerrors.WithStackTrace(err)
@@ -138,20 +138,20 @@ func compareTuplesOrLists(l []*Ydb.TypedValue, r []*Ydb.TypedValue) (int, error)
 			return cmp, nil
 		}
 	}
-	// len(l) elements equal
-	if len(r) > len(l) {
+	// len(lhs) elements equal
+	if len(rhs) > len(lhs) {
 		return -1, nil
 	}
 	return 0, nil
 }
 
-func compareStructs(l []*Ydb.TypedValue, r []*Ydb.TypedValue) (int, error) {
-	for i, lval := range l {
-		if i >= len(r) {
-			// l is longer than r, first len(r) elements equal
+func compareStructs(lhs, rhs []*Ydb.TypedValue) (int, error) {
+	for i, lval := range lhs {
+		if i >= len(rhs) {
+			// lhs is longer than rhs, first len(rhs) elements equal
 			return 1, nil
 		}
-		rval := r[i]
+		rval := rhs[i]
 		cmp, err := compare(lval, rval)
 		if err != nil {
 			return 0, xerrors.WithStackTrace(err)
@@ -160,8 +160,8 @@ func compareStructs(l []*Ydb.TypedValue, r []*Ydb.TypedValue) (int, error) {
 			return cmp, nil
 		}
 	}
-	// len(l) elements equal
-	if len(r) > len(l) {
+	// len(lhs) elements equal
+	if len(rhs) > len(lhs) {
 		return -1, nil
 	}
 	return 0, nil

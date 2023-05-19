@@ -553,13 +553,13 @@ func (v *StructType) Yql() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
 	buffer.WriteString("Struct<")
-	for i, f := range v.fields {
+	for i := range v.fields {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
-		buffer.WriteString("'" + f.Name + "'")
+		buffer.WriteString("'" + v.fields[i].Name + "'")
 		buffer.WriteByte(':')
-		buffer.WriteString(f.T.Yql())
+		buffer.WriteString(v.fields[i].T.Yql())
 	}
 	buffer.WriteByte('>')
 	return buffer.String()
@@ -591,10 +591,10 @@ func (v *StructType) toYDB(a *allocator.Allocator) *Ydb.Type {
 
 	typeStruct.StructType = a.Struct()
 
-	for _, filed := range v.fields {
+	for i := range v.fields {
 		structMember := a.StructMember()
-		structMember.Name = filed.Name
-		structMember.Type = filed.T.toYDB(a)
+		structMember.Name = v.fields[i].Name
+		structMember.Type = v.fields[i].T.toYDB(a)
 		typeStruct.StructType.Members = append(
 			typeStruct.StructType.Members,
 			structMember,
@@ -695,13 +695,13 @@ func (v *variantStructType) Yql() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
 	buffer.WriteString("Variant<")
-	for i, f := range v.fields {
+	for i := range v.fields {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
-		buffer.WriteString("'" + f.Name + "'")
+		buffer.WriteString("'" + v.fields[i].Name + "'")
 		buffer.WriteByte(':')
-		buffer.WriteString(f.T.Yql())
+		buffer.WriteString(v.fields[i].T.Yql())
 	}
 	buffer.WriteByte('>')
 	return buffer.String()

@@ -103,20 +103,22 @@ func readAll(db *gorm.DB) error {
 		return err
 	}
 	log.Println("all known series:")
-	for _, s := range series {
+	for i := range series {
 		log.Printf(
 			"  > [%s]     %s (%s)\n",
-			s.ID, s.Title, s.ReleaseDate.Format("2006"),
+			series[i].ID, series[i].Title, series[i].ReleaseDate.Format("2006"),
 		)
-		for _, ss := range s.Seasons {
+		for j := range series[i].Seasons {
 			log.Printf(
 				"    > [%s]   %s\n",
-				ss.ID, ss.Title,
+				series[i].Seasons[j].ID, series[i].Seasons[j].Title,
 			)
-			for _, e := range ss.Episodes {
+			for k := range series[i].Seasons[j].Episodes {
 				log.Printf(
 					"      > [%s] [%s] %s\n",
-					e.ID, e.AirDate.Format(dateISO8601), e.Title,
+					series[i].Seasons[j].Episodes[k].ID,
+					series[i].Seasons[j].Episodes[k].AirDate.Format(dateISO8601),
+					series[i].Seasons[j].Episodes[k].Title,
 				)
 			}
 		}
@@ -133,9 +135,9 @@ func findEpisodesByTitle(db *gorm.DB, fragment string) error {
 		return err
 	}
 	log.Println("all episodes with title with word 'bad':")
-	for _, e := range episodes {
+	for i := range episodes {
 		ss := Season{
-			ID: e.SeasonID,
+			ID: episodes[i].SeasonID,
 		}
 		if err := db.Take(&ss).Error; err != nil {
 			return err
@@ -156,7 +158,7 @@ func findEpisodesByTitle(db *gorm.DB, fragment string) error {
 		)
 		log.Printf(
 			"      > [%s] [%s] %s\n",
-			e.ID, e.AirDate.Format(dateISO8601), e.Title,
+			episodes[i].ID, episodes[i].AirDate.Format(dateISO8601), episodes[i].Title,
 		)
 	}
 	return nil

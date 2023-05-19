@@ -139,8 +139,11 @@ func WithDefaultScanQueryOptions(opts ...options.ExecuteScanQueryOption) Connect
 	return xsql.WithDefaultScanQueryOptions(opts...)
 }
 
-func WithDatabaseSQLTrace(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) ConnectorOption {
-	return xsql.WithTrace(t, opts...)
+func WithDatabaseSQLTrace(
+	t trace.DatabaseSQL, //nolint:gocritic
+	opts ...trace.DatabaseSQLComposeOption,
+) ConnectorOption {
+	return xsql.WithTrace(&t, opts...)
 }
 
 func WithDisableServerBalancer() ConnectorOption {
