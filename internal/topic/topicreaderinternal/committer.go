@@ -47,14 +47,14 @@ type committer struct {
 	clock            clockwork.Clock
 	commitLoopSignal empty.Chan
 	backgroundWorker background.Worker
-	tracer           trace.Topic
+	tracer           *trace.Topic
 
 	m       xsync.Mutex
 	waiters []commitWaiter
 	commits CommitRanges
 }
 
-func newCommitter(tracer trace.Topic, lifeContext context.Context, mode PublicCommitMode, send sendMessageToServerFunc) *committer { //nolint:lll,revive
+func newCommitter(tracer *trace.Topic, lifeContext context.Context, mode PublicCommitMode, send sendMessageToServerFunc) *committer { //nolint:lll,revive
 	res := &committer{
 		mode:             mode,
 		clock:            clockwork.NewRealClock(),

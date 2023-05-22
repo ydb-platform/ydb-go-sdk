@@ -45,7 +45,7 @@ type TopicSteamReaderConnect func(connectionCtx context.Context) (RawTopicReader
 type Reader struct {
 	reader             batchedStreamReader
 	defaultBatchConfig ReadMessageBatchOptions
-	tracer             trace.Topic
+	tracer             *trace.Topic
 	readerID           int64
 }
 
@@ -232,7 +232,7 @@ func WithCredentials(cred credentials.Credentials) PublicReaderOption {
 	}
 }
 
-func WithTrace(tracer trace.Topic) PublicReaderOption {
+func WithTrace(tracer *trace.Topic) PublicReaderOption {
 	return func(cfg *ReaderConfig) {
 		cfg.Tracer = cfg.Tracer.Compose(tracer)
 	}

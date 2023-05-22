@@ -32,7 +32,7 @@ type readerReconnector struct {
 	clock      clockwork.Clock
 	background background.Worker
 
-	tracer        trace.Topic
+	tracer        *trace.Topic
 	baseContext   context.Context
 	retrySettings topic.RetrySettings
 
@@ -57,7 +57,7 @@ func newReaderReconnector(
 	connector readerConnectFunc,
 	connectTimeout time.Duration,
 	retrySettings topic.RetrySettings,
-	tracer trace.Topic,
+	tracer *trace.Topic,
 	baseContext context.Context,
 ) *readerReconnector {
 	res := &readerReconnector{

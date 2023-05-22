@@ -366,7 +366,7 @@ func TestCommitterBuffer(t *testing.T) {
 }
 
 func newTestCommitter(ctx context.Context, t testing.TB) *committer {
-	res := newCommitter(trace.Topic{}, ctx, CommitModeAsync, func(msg rawtopicreader.ClientMessage) error {
+	res := newCommitter(&trace.Topic{}, ctx, CommitModeAsync, func(msg rawtopicreader.ClientMessage) error {
 		return nil
 	})
 	t.Cleanup(func() {

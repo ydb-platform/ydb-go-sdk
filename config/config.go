@@ -19,7 +19,7 @@ import (
 type Config struct {
 	config.Common
 
-	trace          trace.Driver
+	trace          *trace.Driver
 	dialTimeout    time.Duration
 	connectionTTL  time.Duration
 	balancerConfig *balancerConfig.Config
@@ -93,7 +93,7 @@ func (c Config) Database() string {
 }
 
 // Trace contains driver tracing options.
-func (c Config) Trace() trace.Driver {
+func (c Config) Trace() *trace.Driver {
 	return c.trace
 }
 
@@ -151,7 +151,7 @@ func WithTLSConfig(tlsConfig *tls.Config) Option {
 
 func WithTrace(t trace.Driver, opts ...trace.DriverComposeOption) Option {
 	return func(c *Config) {
-		c.trace = c.trace.Compose(t, opts...)
+		c.trace = c.trace.Compose(&t, opts...)
 	}
 }
 

@@ -347,14 +347,14 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 }
 
 type getOptions struct {
-	t trace.Table
+	t *trace.Table
 }
 
 type getOption func(o *getOptions)
 
 func withTrace(t trace.Table) getOption {
 	return func(o *getOptions) {
-		o.t = o.t.Compose(t)
+		o.t = o.t.Compose(&t)
 	}
 }
 
@@ -455,7 +455,7 @@ func (c *Client) Get(ctx context.Context) (s *session, err error) {
 	return c.internalPoolGet(ctx)
 }
 
-func (c *Client) internalPoolWaitFromCh(ctx context.Context, t trace.Table) (s *session, err error) {
+func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s *session, err error) {
 	var (
 		ch *chan *session
 		el *list.Element // Element in the wait queue.

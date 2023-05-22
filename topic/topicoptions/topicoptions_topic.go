@@ -22,7 +22,7 @@ type TopicOption func(c *topic.Config)
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithTrace(trace trace.Topic, opts ...trace.TopicComposeOption) TopicOption {
 	return func(c *topic.Config) {
-		c.Trace = c.Trace.Compose(trace, opts...)
+		c.Trace = c.Trace.Compose(&trace, opts...)
 	}
 }
 

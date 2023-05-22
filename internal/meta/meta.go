@@ -14,7 +14,7 @@ import (
 func New(
 	database string,
 	credentials credentials.Credentials,
-	trace trace.Driver,
+	trace *trace.Driver,
 	opts ...Option,
 ) Meta {
 	m := Meta{
@@ -64,7 +64,7 @@ func ForbidOption(feature string) Option {
 }
 
 type Meta struct {
-	trace        trace.Driver
+	trace        *trace.Driver
 	credentials  credentials.Credentials
 	database     string
 	requestsType string

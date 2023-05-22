@@ -14,7 +14,7 @@ type stmt struct {
 	conn  *conn
 	query string
 
-	trace trace.DatabaseSQL
+	trace *trace.DatabaseSQL
 }
 
 var (
