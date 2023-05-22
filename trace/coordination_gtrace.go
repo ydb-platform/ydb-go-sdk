@@ -18,6 +18,7 @@ func WithCoordinationPanicCallback(cb func(e interface{})) CoordinationComposeOp
 }
 
 // Compose returns a new Coordination which has functional fields composed both from t and x.
-func (t Coordination) Compose(x Coordination, opts ...CoordinationComposeOption) (ret Coordination) {
-	return ret
+func (t *Coordination) Compose(x *Coordination, opts ...CoordinationComposeOption) *Coordination {
+	var ret Coordination
+	return &ret
 }

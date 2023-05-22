@@ -22,7 +22,8 @@ func WithDiscoveryPanicCallback(cb func(e interface{})) DiscoveryComposeOption {
 }
 
 // Compose returns a new Discovery which has functional fields composed both from t and x.
-func (t Discovery) Compose(x Discovery, opts ...DiscoveryComposeOption) (ret Discovery) {
+func (t *Discovery) Compose(x *Discovery, opts ...DiscoveryComposeOption) *Discovery {
+	var ret Discovery
 	options := discoveryComposeOptions{}
 	for _, opt := range opts {
 		if opt != nil {
@@ -99,9 +100,9 @@ func (t Discovery) Compose(x Discovery, opts ...DiscoveryComposeOption) (ret Dis
 			}
 		}
 	}
-	return ret
+	return &ret
 }
-func (t Discovery) onDiscover(d DiscoveryDiscoverStartInfo) func(DiscoveryDiscoverDoneInfo) {
+func (t *Discovery) onDiscover(d DiscoveryDiscoverStartInfo) func(DiscoveryDiscoverDoneInfo) {
 	fn := t.OnDiscover
 	if fn == nil {
 		return func(DiscoveryDiscoverDoneInfo) {
@@ -116,7 +117,7 @@ func (t Discovery) onDiscover(d DiscoveryDiscoverStartInfo) func(DiscoveryDiscov
 	}
 	return res
 }
-func (t Discovery) onWhoAmI(d DiscoveryWhoAmIStartInfo) func(DiscoveryWhoAmIDoneInfo) {
+func (t *Discovery) onWhoAmI(d DiscoveryWhoAmIStartInfo) func(DiscoveryWhoAmIDoneInfo) {
 	fn := t.OnWhoAmI
 	if fn == nil {
 		return func(DiscoveryWhoAmIDoneInfo) {
@@ -131,7 +132,7 @@ func (t Discovery) onWhoAmI(d DiscoveryWhoAmIStartInfo) func(DiscoveryWhoAmIDone
 	}
 	return res
 }
-func DiscoveryOnDiscover(t Discovery, c *context.Context, address string, database string) func(location string, endpoints []EndpointInfo, _ error) {
+func DiscoveryOnDiscover(t *Discovery, c *context.Context, address string, database string) func(location string, endpoints []EndpointInfo, _ error) {
 	var p DiscoveryDiscoverStartInfo
 	p.Context = c
 	p.Address = address
@@ -145,7 +146,7 @@ func DiscoveryOnDiscover(t Discovery, c *context.Context, address string, databa
 		res(p)
 	}
 }
-func DiscoveryOnWhoAmI(t Discovery, c *context.Context) func(user string, groups []string, _ error) {
+func DiscoveryOnWhoAmI(t *Discovery, c *context.Context) func(user string, groups []string, _ error) {
 	var p DiscoveryWhoAmIStartInfo
 	p.Context = c
 	res := t.onWhoAmI(p)

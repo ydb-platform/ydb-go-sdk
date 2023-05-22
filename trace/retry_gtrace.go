@@ -22,7 +22,8 @@ func WithRetryPanicCallback(cb func(e interface{})) RetryComposeOption {
 }
 
 // Compose returns a new Retry which has functional fields composed both from t and x.
-func (t Retry) Compose(x Retry, opts ...RetryComposeOption) (ret Retry) {
+func (t *Retry) Compose(x *Retry, opts ...RetryComposeOption) *Retry {
+	var ret Retry
 	options := retryComposeOptions{}
 	for _, opt := range opts {
 		if opt != nil {
@@ -80,9 +81,9 @@ func (t Retry) Compose(x Retry, opts ...RetryComposeOption) (ret Retry) {
 			}
 		}
 	}
-	return ret
+	return &ret
 }
-func (t Retry) onRetry(r RetryLoopStartInfo) func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
+func (t *Retry) onRetry(r RetryLoopStartInfo) func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
 	fn := t.OnRetry
 	if fn == nil {
 		return func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
@@ -109,7 +110,7 @@ func (t Retry) onRetry(r RetryLoopStartInfo) func(RetryLoopIntermediateInfo) fun
 		return res
 	}
 }
-func RetryOnRetry(t Retry, c *context.Context, iD string, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
+func RetryOnRetry(t *Retry, c *context.Context, iD string, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
 	var p RetryLoopStartInfo
 	p.Context = c
 	p.ID = iD

@@ -317,9 +317,10 @@ func (w *Writer) compose(trace *Trace) {
 		w.line(`// Compose returns a new `, trace.Name, ` which has functional fields composed both from `,
 			t, ` and `, x, `.`,
 		)
-		w.code(`func (`, t, ` `, trace.Name, `) Compose(`, x, ` `, trace.Name, `, opts ...`+trace.Name+`ComposeOption) `)
-		w.line(`(`, ret, ` `, trace.Name, `) {`)
+		w.code(`func (`, t, ` *`, trace.Name, `) Compose(`, x, ` *`, trace.Name, `, opts ...`+trace.Name+`ComposeOption) `)
+		w.line(`*`, trace.Name, ` {`)
 		w.block(func() {
+			w.line(`var `, ret, ` `, trace.Name, ``)
 			if len(trace.Hooks) > 0 {
 				w.line(`options := `, unexported(trace.Name), `ComposeOptions{}`)
 				w.line(`for _, opt := range opts {`)
@@ -335,7 +336,7 @@ func (w *Writer) compose(trace *Trace) {
 			for _, hook := range trace.Hooks {
 				w.composeHook(hook, t, x, ret+"."+hook.Name)
 			}
-			w.line(`return `, ret)
+			w.line(`return &`, ret)
 		})
 		w.line(`}`)
 	})
@@ -455,7 +456,7 @@ func (w *Writer) hook(trace *Trace, hook Hook) {
 		t := w.declare("t")
 		fn := w.declare("fn")
 
-		w.code(`func (`, t, ` `, trace.Name, `) `, unexported(hook.Name))
+		w.code(`func (`, t, ` *`, trace.Name, `) `, unexported(hook.Name))
 
 		w.code(`(`)
 		var args []string
@@ -626,7 +627,7 @@ func (w *Writer) hookShortcut(trace *Trace, hook Hook) {
 		w.code(`func `, name)
 		w.code(`(`)
 		var ctx string
-		w.code(t, ` `, trace.Name)
+		w.code(t, ` *`, trace.Name)
 
 		var (
 			params = flattenParams(hook.Func.Params)

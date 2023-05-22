@@ -22,7 +22,8 @@ func WithScriptingPanicCallback(cb func(e interface{})) ScriptingComposeOption {
 }
 
 // Compose returns a new Scripting which has functional fields composed both from t and x.
-func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scripting) {
+func (t *Scripting) Compose(x *Scripting, opts ...ScriptingComposeOption) *Scripting {
+	var ret Scripting
 	options := scriptingComposeOptions{}
 	for _, opt := range opts {
 		if opt != nil {
@@ -185,9 +186,9 @@ func (t Scripting) Compose(x Scripting, opts ...ScriptingComposeOption) (ret Scr
 			}
 		}
 	}
-	return ret
+	return &ret
 }
-func (t Scripting) onExecute(s ScriptingExecuteStartInfo) func(ScriptingExecuteDoneInfo) {
+func (t *Scripting) onExecute(s ScriptingExecuteStartInfo) func(ScriptingExecuteDoneInfo) {
 	fn := t.OnExecute
 	if fn == nil {
 		return func(ScriptingExecuteDoneInfo) {
@@ -202,7 +203,7 @@ func (t Scripting) onExecute(s ScriptingExecuteStartInfo) func(ScriptingExecuteD
 	}
 	return res
 }
-func (t Scripting) onStreamExecute(s ScriptingStreamExecuteStartInfo) func(ScriptingStreamExecuteIntermediateInfo) func(ScriptingStreamExecuteDoneInfo) {
+func (t *Scripting) onStreamExecute(s ScriptingStreamExecuteStartInfo) func(ScriptingStreamExecuteIntermediateInfo) func(ScriptingStreamExecuteDoneInfo) {
 	fn := t.OnStreamExecute
 	if fn == nil {
 		return func(ScriptingStreamExecuteIntermediateInfo) func(ScriptingStreamExecuteDoneInfo) {
@@ -229,7 +230,7 @@ func (t Scripting) onStreamExecute(s ScriptingStreamExecuteStartInfo) func(Scrip
 		return res
 	}
 }
-func (t Scripting) onExplain(s ScriptingExplainStartInfo) func(ScriptingExplainDoneInfo) {
+func (t *Scripting) onExplain(s ScriptingExplainStartInfo) func(ScriptingExplainDoneInfo) {
 	fn := t.OnExplain
 	if fn == nil {
 		return func(ScriptingExplainDoneInfo) {
@@ -244,7 +245,7 @@ func (t Scripting) onExplain(s ScriptingExplainStartInfo) func(ScriptingExplainD
 	}
 	return res
 }
-func (t Scripting) onClose(s ScriptingCloseStartInfo) func(ScriptingCloseDoneInfo) {
+func (t *Scripting) onClose(s ScriptingCloseStartInfo) func(ScriptingCloseDoneInfo) {
 	fn := t.OnClose
 	if fn == nil {
 		return func(ScriptingCloseDoneInfo) {
@@ -259,7 +260,7 @@ func (t Scripting) onClose(s ScriptingCloseStartInfo) func(ScriptingCloseDoneInf
 	}
 	return res
 }
-func ScriptingOnExecute(t Scripting, c *context.Context, query string, parameters scriptingQueryParameters) func(result scriptingResult, _ error) {
+func ScriptingOnExecute(t *Scripting, c *context.Context, query string, parameters scriptingQueryParameters) func(result scriptingResult, _ error) {
 	var p ScriptingExecuteStartInfo
 	p.Context = c
 	p.Query = query
@@ -272,7 +273,7 @@ func ScriptingOnExecute(t Scripting, c *context.Context, query string, parameter
 		res(p)
 	}
 }
-func ScriptingOnStreamExecute(t Scripting, c *context.Context, query string, parameters scriptingQueryParameters) func(error) func(error) {
+func ScriptingOnStreamExecute(t *Scripting, c *context.Context, query string, parameters scriptingQueryParameters) func(error) func(error) {
 	var p ScriptingStreamExecuteStartInfo
 	p.Context = c
 	p.Query = query
@@ -289,7 +290,7 @@ func ScriptingOnStreamExecute(t Scripting, c *context.Context, query string, par
 		}
 	}
 }
-func ScriptingOnExplain(t Scripting, c *context.Context, query string) func(plan string, _ error) {
+func ScriptingOnExplain(t *Scripting, c *context.Context, query string) func(plan string, _ error) {
 	var p ScriptingExplainStartInfo
 	p.Context = c
 	p.Query = query
@@ -301,7 +302,7 @@ func ScriptingOnExplain(t Scripting, c *context.Context, query string) func(plan
 		res(p)
 	}
 }
-func ScriptingOnClose(t Scripting, c *context.Context) func(error) {
+func ScriptingOnClose(t *Scripting, c *context.Context) func(error) {
 	var p ScriptingCloseStartInfo
 	p.Context = c
 	res := t.onClose(p)
