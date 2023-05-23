@@ -18,6 +18,7 @@ func WithRatelimiterPanicCallback(cb func(e interface{})) RatelimiterComposeOpti
 }
 
 // Compose returns a new Ratelimiter which has functional fields composed both from t and x.
-func (t Ratelimiter) Compose(x Ratelimiter, opts ...RatelimiterComposeOption) (ret Ratelimiter) {
-	return ret
+func (t *Ratelimiter) Compose(x *Ratelimiter, opts ...RatelimiterComposeOption) *Ratelimiter {
+	var ret Ratelimiter
+	return &ret
 }

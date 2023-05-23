@@ -123,7 +123,7 @@ func WithDeleteTimeout(deleteTimeout time.Duration) Option {
 }
 
 // WithTrace appends table trace to early defined traces
-func WithTrace(trace trace.Table, opts ...trace.TableComposeOption) Option {
+func WithTrace(trace *trace.Table, opts ...trace.TableComposeOption) Option {
 	return func(c *Config) {
 		c.trace = c.trace.Compose(trace, opts...)
 	}
@@ -155,13 +155,13 @@ type Config struct {
 
 	ignoreTruncated bool
 
-	trace trace.Table
+	trace *trace.Table
 
 	clock clockwork.Clock
 }
 
 // Trace defines trace over table client calls
-func (c Config) Trace() trace.Table {
+func (c Config) Trace() *trace.Table {
 	return c.trace
 }
 
@@ -240,5 +240,6 @@ func defaults() Config {
 		deleteTimeout:        DefaultSessionPoolDeleteTimeout,
 		idleThreshold:        DefaultSessionPoolIdleThreshold,
 		clock:                clockwork.NewRealClock(),
+		trace:                &trace.Table{},
 	}
 }

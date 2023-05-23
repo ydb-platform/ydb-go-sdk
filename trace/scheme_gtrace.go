@@ -18,6 +18,7 @@ func WithSchemePanicCallback(cb func(e interface{})) SchemeComposeOption {
 }
 
 // Compose returns a new Scheme which has functional fields composed both from t and x.
-func (t Scheme) Compose(x Scheme, opts ...SchemeComposeOption) (ret Scheme) {
-	return ret
+func (t *Scheme) Compose(x *Scheme, opts ...SchemeComposeOption) *Scheme {
+	var ret Scheme
+	return &ret
 }

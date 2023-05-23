@@ -21,12 +21,13 @@ type Config struct {
 	meta     meta.Meta
 
 	interval time.Duration
-	trace    trace.Discovery
+	trace    *trace.Discovery
 }
 
 func New(opts ...Option) Config {
 	c := Config{
 		interval: DefaultInterval,
+		trace:    &trace.Discovery{},
 	}
 	for _, o := range opts {
 		if o != nil {
@@ -56,7 +57,7 @@ func (c Config) Secure() bool {
 	return c.secure
 }
 
-func (c Config) Trace() trace.Discovery {
+func (c Config) Trace() *trace.Discovery {
 	return c.trace
 }
 
@@ -102,7 +103,7 @@ func WithMeta(meta meta.Meta) Option {
 // WithTrace configures discovery client calls tracing
 func WithTrace(trace trace.Discovery, opts ...trace.DiscoveryComposeOption) Option {
 	return func(c *Config) {
-		c.trace = c.trace.Compose(trace, opts...)
+		c.trace = c.trace.Compose(&trace, opts...)
 	}
 }
 

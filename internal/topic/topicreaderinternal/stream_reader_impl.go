@@ -65,7 +65,7 @@ type topicStreamReaderConfig struct {
 	CredUpdateInterval              time.Duration
 	Consumer                        string
 	ReadSelectors                   []PublicReadSelector
-	Tracer                          trace.Topic
+	Tracer                          *trace.Topic
 	GetPartitionStartOffsetCallback PublicGetPartitionStartOffsetFunc
 	CommitMode                      PublicCommitMode
 	Decoders                        decoderMap
@@ -80,6 +80,7 @@ func newTopicStreamReaderConfig() topicStreamReaderConfig {
 		CommitMode:            CommitModeAsync,
 		CommitterBatchTimeLag: time.Second,
 		Decoders:              newDecoderMap(),
+		Tracer:                &trace.Topic{},
 	}
 }
 

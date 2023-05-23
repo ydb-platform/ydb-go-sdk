@@ -23,7 +23,7 @@ type repeater struct {
 	interval time.Duration
 
 	name  string
-	trace trace.Driver
+	trace *trace.Driver
 
 	// Task is a function that must be executed periodically.
 	task func(context.Context) error
@@ -43,7 +43,7 @@ func WithName(name string) option {
 	}
 }
 
-func WithTrace(trace trace.Driver) option {
+func WithTrace(trace *trace.Driver) option {
 	return func(r *repeater) {
 		r.trace = trace
 	}
@@ -84,6 +84,7 @@ func New(
 		stopped:  make(chan struct{}),
 		force:    make(chan struct{}, 1),
 		clock:    clockwork.NewRealClock(),
+		trace:    &trace.Driver{},
 	}
 
 	for _, o := range opts {

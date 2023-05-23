@@ -7,43 +7,45 @@ import (
 )
 
 func TestTable(t *testing.T) {
-	testSingleTrace(t, Table{}, "Table")
+	testSingleTrace(t, &Table{}, "Table")
 }
 
 func TestDriver(t *testing.T) {
-	testSingleTrace(t, Driver{}, "Driver")
+	testSingleTrace(t, &Driver{}, "Driver")
 }
 
 func TestRetry(t *testing.T) {
-	testSingleTrace(t, Retry{}, "Retry")
+	testSingleTrace(t, &Retry{}, "Retry")
 }
 
 func TestCoordination(t *testing.T) {
-	testSingleTrace(t, Table{}, "Coordination")
+	testSingleTrace(t, &Table{}, "Coordination")
 }
 
 func TestRatelimiter(t *testing.T) {
-	testSingleTrace(t, Ratelimiter{}, "Ratelimiter")
+	testSingleTrace(t, &Ratelimiter{}, "Ratelimiter")
 }
 
 func TestTopic(t *testing.T) {
-	testSingleTrace(t, Topic{}, "Topic")
+	testSingleTrace(t, &Topic{}, "Topic")
 }
 
 func TestDiscovery(t *testing.T) {
-	testSingleTrace(t, Discovery{}, "Discovery")
+	testSingleTrace(t, &Discovery{}, "Discovery")
 }
 
 func TestDatabaseSQL(t *testing.T) {
-	testSingleTrace(t, DatabaseSQL{}, "DatabaseSQL")
+	testSingleTrace(t, &DatabaseSQL{}, "DatabaseSQL")
 }
 
 func testSingleTrace(t *testing.T, x interface{}, traceName string) {
 	t.Helper()
-	reflect.ValueOf(x).MethodByName("Compose").Call(
-		[]reflect.Value{reflect.New(reflect.ValueOf(x).Type()).Elem()},
+	v := reflect.ValueOf(x)
+	m := v.MethodByName("Compose")
+	m.Call(
+		[]reflect.Value{reflect.New(reflect.ValueOf(x).Elem().Type())},
 	)
-	a := reflect.New(reflect.TypeOf(x))
+	a := reflect.New(reflect.TypeOf(x).Elem())
 	defer assertCalled(t, traceName, stubEachFunc(a))
 	callEachFunc(a.Elem())
 }

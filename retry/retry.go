@@ -18,7 +18,7 @@ type retryOperation func(context.Context) (err error)
 
 type retryOptions struct {
 	id          string
-	trace       trace.Retry
+	trace       *trace.Retry
 	idempotent  bool
 	stackTrace  bool
 	fastBackoff backoff.Backoff
@@ -46,7 +46,7 @@ func WithStackTrace() retryOption {
 // WithTrace returns trace option
 func WithTrace(trace trace.Retry) retryOption {
 	return func(o *retryOptions) {
-		o.trace = trace
+		o.trace = &trace
 	}
 }
 
@@ -113,6 +113,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 	options := &retryOptions{
 		fastBackoff: backoff.Fast,
 		slowBackoff: backoff.Slow,
+		trace:       &trace.Retry{},
 	}
 	for _, o := range opts {
 		if o != nil {

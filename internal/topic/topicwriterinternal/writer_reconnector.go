@@ -79,6 +79,7 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 			credUpdateInterval: time.Hour,
 			clock:              clockwork.NewRealClock(),
 			compressorCount:    runtime.NumCPU(),
+			tracer:             &trace.Topic{},
 		},
 		AutoSetSeqNo:       true,
 		AutoSetCreatedTime: true,

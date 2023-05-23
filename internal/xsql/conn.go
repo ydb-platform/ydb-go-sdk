@@ -57,7 +57,7 @@ func withDefaultQueryMode(mode QueryMode) connOption {
 	}
 }
 
-func withTrace(t trace.DatabaseSQL) connOption {
+func withTrace(t *trace.DatabaseSQL) connOption {
 	return func(c *conn) {
 		c.trace = t
 	}
@@ -67,7 +67,7 @@ type beginTxFunc func(ctx context.Context, txOptions driver.TxOptions) (currentT
 
 type conn struct {
 	connector *Connector
-	trace     trace.DatabaseSQL
+	trace     *trace.DatabaseSQL
 	session   table.ClosableSession // Immutable and r/o usage.
 
 	beginTxFuncs map[QueryMode]beginTxFunc

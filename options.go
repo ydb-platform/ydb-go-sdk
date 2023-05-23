@@ -400,7 +400,7 @@ func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option {
 		c.tableOptions = append(
 			c.tableOptions,
 			tableConfig.WithTrace(
-				t,
+				&t,
 				append(
 					[]trace.TableComposeOption{
 						trace.WithTablePanicCallback(c.panicCallback),

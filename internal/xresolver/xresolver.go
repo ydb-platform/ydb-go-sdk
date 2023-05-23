@@ -12,13 +12,13 @@ import (
 type dnsBuilder struct {
 	resolver.Builder
 	scheme string
-	trace  trace.Driver
+	trace  *trace.Driver
 }
 
 type clientConn struct {
 	resolver.ClientConn
 	target resolver.Target
-	trace  trace.Driver
+	trace  *trace.Driver
 }
 
 func (c *clientConn) Endpoint() string {
@@ -62,7 +62,7 @@ func (d *dnsBuilder) Scheme() string {
 	return d.scheme
 }
 
-func New(scheme string, trace trace.Driver) resolver.Builder {
+func New(scheme string, trace *trace.Driver) resolver.Builder {
 	return &dnsBuilder{
 		Builder: resolver.Get("dns"),
 		scheme:  scheme,

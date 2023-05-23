@@ -104,7 +104,7 @@ func WithDefaultScanQueryOptions(opts ...options.ExecuteScanQueryOption) Connect
 }
 
 type traceConnectorOption struct {
-	t    trace.DatabaseSQL
+	t    *trace.DatabaseSQL
 	opts []trace.DatabaseSQLComposeOption
 }
 
@@ -114,7 +114,7 @@ func (option traceConnectorOption) Apply(c *Connector) error {
 }
 
 func WithTrace(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) ConnectorOption {
-	return traceConnectorOption{t, opts}
+	return traceConnectorOption{&t, opts}
 }
 
 type disableServerBalancerConnectorOption struct{}
@@ -183,6 +183,7 @@ func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
 		defaultTxControl: table.DefaultTxControl(),
 		defaultQueryMode: DefaultQueryMode,
 		PathNormalizer:   nopPathNormalizer{},
+		trace:            &trace.DatabaseSQL{},
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -226,7 +227,7 @@ type Connector struct {
 	disableServerBalancer bool
 	idleThreshold         time.Duration
 
-	trace trace.DatabaseSQL
+	trace *trace.DatabaseSQL
 }
 
 var (

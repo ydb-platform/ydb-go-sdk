@@ -549,7 +549,7 @@ type Options struct {
 	TxCommitOptions []options.CommitTransactionOption
 	FastBackoff     backoff.Backoff
 	SlowBackoff     backoff.Backoff
-	Trace           trace.Table
+	Trace           *trace.Table
 }
 
 type Option func(o *Options)
@@ -574,6 +574,6 @@ func WithTxCommitOptions(opts ...options.CommitTransactionOption) Option {
 
 func WithTrace(t trace.Table) Option {
 	return func(o *Options) {
-		o.Trace = o.Trace.Compose(t)
+		o.Trace = o.Trace.Compose(&t)
 	}
 }

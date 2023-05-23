@@ -308,8 +308,8 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 			os.Exit(1)
 		}),
 		ydb.WithTraceTable(
-			shutdownTrace.Compose(
-				trace.Table{
+			*shutdownTrace.Compose(
+				&trace.Table{
 					OnInit: func(
 						info trace.TableInitStartInfo,
 					) func(

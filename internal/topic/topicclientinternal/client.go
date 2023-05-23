@@ -17,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type Client struct {
@@ -43,7 +44,9 @@ func New(conn grpc.ClientConnInterface, cred credentials.Credentials, opts ...to
 }
 
 func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
-	c := topic.Config{}
+	c := topic.Config{
+		Trace: &trace.Topic{},
+	}
 	for _, o := range opts {
 		if o != nil {
 			o(&c)

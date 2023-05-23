@@ -119,7 +119,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 				1,
 				config.WithSizeLimit(1),
 				config.WithTrace(
-					trace.Table{
+					&trace.Table{
 						OnPoolWait: func(trace.TablePoolWaitStartInfo) func(trace.TablePoolWaitDoneInfo) {
 							wait <- struct{}{}
 							return nil
@@ -343,7 +343,7 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 				config.WithSizeLimit(1),
 				config.WithIdleThreshold(time.Hour),
 				config.WithTrace(
-					trace.Table{
+					&trace.Table{
 						OnPoolGet: func(trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
 							get <- struct{}{}
 							return nil

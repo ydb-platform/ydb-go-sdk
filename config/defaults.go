@@ -29,7 +29,7 @@ var (
 	}
 )
 
-func defaultGrpcOptions(t trace.Driver, secure bool, tlsConfig *tls.Config) (opts []grpc.DialOption) {
+func defaultGrpcOptions(t *trace.Driver, secure bool, tlsConfig *tls.Config) (opts []grpc.DialOption) {
 	opts = append(opts,
 		// keep-aliving all connections
 		grpc.WithKeepaliveParams(
@@ -89,5 +89,6 @@ func defaultConfig() (c Config) {
 		balancerConfig: balancers.Default(),
 		tlsConfig:      defaultTLSConfig(),
 		dialTimeout:    DefaultDialTimeout,
+		trace:          &trace.Driver{},
 	}
 }

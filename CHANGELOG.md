@@ -1,3 +1,6 @@
+* Refactored `internal/cmd/gtrace` tool (prefer pointers instead trace struct copies) for bust performance
+* Fixed usage of generated traces in code
+
 ## v3.47.1
 * Removed test artifacts from repository
 

@@ -72,7 +72,7 @@ func (nopWriteCloser) Close() error {
 type EncoderSelector struct {
 	m *EncoderMap
 
-	tracer              trace.Topic
+	tracer              *trace.Topic
 	writerReconnectorID string
 	sessionID           string
 
@@ -87,7 +87,7 @@ func NewEncoderSelector(
 	m *EncoderMap,
 	allowedCodecs rawtopiccommon.SupportedCodecs,
 	parallelCompressors int,
-	tracer trace.Topic,
+	tracer *trace.Topic,
 	writerReconnectorID, sessionID string,
 ) EncoderSelector {
 	if parallelCompressors <= 0 {

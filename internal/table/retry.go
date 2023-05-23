@@ -44,6 +44,9 @@ func doTx(
 	op table.TxOperation,
 	opts table.Options,
 ) (err error) {
+	if opts.Trace == nil {
+		opts.Trace = &trace.Table{}
+	}
 	attempts, onIntermediate := 0, trace.TableOnDoTx(
 		opts.Trace,
 		&ctx,
@@ -113,6 +116,9 @@ func do(
 	op table.Operation,
 	opts table.Options,
 ) (err error) {
+	if opts.Trace == nil {
+		opts.Trace = &trace.Table{}
+	}
 	attempts, onIntermediate := 0, trace.TableOnDo(opts.Trace, &ctx, opts.Idempotent, isRetryCalledAbove(ctx))
 	defer func() {
 		onIntermediate(err)(attempts, err)
@@ -184,7 +190,7 @@ func retryBackoff(
 	return nil
 }
 
-func retryOptions(trace trace.Table, opts ...table.Option) table.Options {
+func retryOptions(trace *trace.Table, opts ...table.Option) table.Options {
 	options := table.Options{
 		Trace:       trace,
 		FastBackoff: backoff.Fast,

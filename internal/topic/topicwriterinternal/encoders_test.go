@@ -14,7 +14,7 @@ import (
 
 func TestEncoderSelector_CodecMeasure(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
-		s := NewEncoderSelector(testCommonEncoders, nil, 1, trace.Topic{}, "", "")
+		s := NewEncoderSelector(testCommonEncoders, nil, 1, &trace.Topic{}, "", "")
 		_, err := s.measureCodecs(nil)
 		require.Error(t, err)
 	})
@@ -23,7 +23,7 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 			NewEncoderMap(),
 			rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},
 			1,
-			trace.Topic{},
+			&trace.Topic{},
 			"",
 			"",
 		)
@@ -45,7 +45,7 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 				rawtopiccommon.CodecRaw,
 				rawtopiccommon.CodecGzip,
 			}, 4,
-				trace.Topic{}, "", "",
+				&trace.Topic{}, "", "",
 			)
 
 			var messages []messageWithDataContent

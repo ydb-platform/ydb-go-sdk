@@ -7,5 +7,5 @@ import (
 
 type Config struct {
 	config.Common
-	Trace trace.Topic
+	Trace *trace.Topic
 }
