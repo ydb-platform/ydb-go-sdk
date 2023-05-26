@@ -118,9 +118,9 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Stora
 	return s, nil
 }
 
-func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (res generator.Row, err error) {
+func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (res generator.Row, attempts int, err error) {
 	if err = ctx.Err(); err != nil {
-		return generator.Row{}, err
+		return generator.Row{}, attempts, err
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ReadTimeout)*time.Millisecond)
@@ -128,35 +128,74 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (res genera
 
 	err = retry.Do(ydb.WithTxControl(ctx, readTx), s.db,
 		func(ctx context.Context, cc *sql.Conn) (err error) {
+			if err = ctx.Err(); err != nil {
+				return err
+			}
+
 			row := cc.QueryRowContext(ydb.WithQueryMode(ctx, ydb.DataQueryMode), s.selectQuery,
 				sql.Named("id", &entryID),
 			)
+
 			var hash *uint64
+
 			return row.Scan(&res.ID, &res.PayloadStr, &res.PayloadDouble, &res.PayloadTimestamp, &hash)
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)),
+		},
+		retry.WithDoRetryOptions(
+			retry.WithIdempotent(true),
+			retry.WithTrace(
+				trace.Retry{
+					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+						return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+							return func(info trace.RetryLoopDoneInfo) {
+								attempts = info.Attempts
+							}
+						}
+					},
+				},
+			),
+		),
 	)
 
-	return res, err
+	return res, attempts, err
 }
 
-func (s *Storage) Write(ctx context.Context, e generator.Row) error {
-	if err := ctx.Err(); err != nil {
-		return err
+func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err error) {
+	if err = ctx.Err(); err != nil {
+		return attempts, err
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
-		func(ctx context.Context, cc *sql.Conn) error {
-			_, err := cc.ExecContext(ydb.WithQueryMode(ctx, ydb.DataQueryMode), s.upsertQuery,
+	return attempts, retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
+		func(ctx context.Context, cc *sql.Conn) (err error) {
+			if err = ctx.Err(); err != nil {
+				return err
+			}
+
+			_, err = cc.ExecContext(ydb.WithQueryMode(ctx, ydb.DataQueryMode), s.upsertQuery,
 				sql.Named("id", e.ID),
 				sql.Named("payload_str", *e.PayloadStr),
 				sql.Named("payload_double", *e.PayloadDouble),
 				sql.Named("payload_timestamp", *e.PayloadTimestamp),
 			)
+
 			return err
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)),
+		},
+		retry.WithDoRetryOptions(
+			retry.WithIdempotent(true),
+			retry.WithTrace(
+				trace.Retry{
+					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+						return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+							return func(info trace.RetryLoopDoneInfo) {
+								attempts = info.Attempts
+							}
+						}
+					},
+				},
+			),
+		),
 	)
 }
 

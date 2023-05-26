@@ -86,9 +86,9 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	return s, nil
 }
 
-func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (generator.Row, error) {
-	if err := ctx.Err(); err != nil {
-		return generator.Row{}, err
+func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generator.Row, attempts int, err error) {
+	if err = ctx.Err(); err != nil {
+		return generator.Row{}, attempts, err
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ReadTimeout)*time.Millisecond)
@@ -96,7 +96,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (generator.
 
 	e := generator.Row{}
 
-	err := s.db.Table().Do(ctx,
+	return e, attempts, s.db.Table().Do(ctx,
 		func(ctx context.Context, session table.Session) (err error) {
 			if err = ctx.Err(); err != nil {
 				return err
@@ -136,20 +136,28 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (generator.
 
 			return res.Err()
 		},
+		table.WithIdempotent(),
+		table.WithTrace(trace.Table{
+			OnDo: func(info trace.TableDoStartInfo) func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
+				return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
+					return func(info trace.TableDoDoneInfo) {
+						attempts = info.Attempts
+					}
+				}
+			},
+		}),
 	)
-
-	return e, err
 }
 
-func (s *Storage) Write(ctx context.Context, e generator.Row) error {
+func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err error) {
 	if err := ctx.Err(); err != nil {
-		return err
+		return attempts, err
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return s.db.Table().Do(ctx,
+	return attempts, s.db.Table().Do(ctx,
 		func(ctx context.Context, session table.Session) error {
 			if err := ctx.Err(); err != nil {
 				return err
@@ -175,6 +183,15 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) error {
 			return res.Close()
 		},
 		table.WithIdempotent(),
+		table.WithTrace(trace.Table{
+			OnDo: func(info trace.TableDoStartInfo) func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
+				return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
+					return func(info trace.TableDoDoneInfo) {
+						attempts = info.Attempts
+					}
+				}
+			},
+		}),
 	)
 }
 
@@ -202,6 +219,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 				options.WithPartitions(options.WithUniformPartitions(s.cfg.MinPartitionsCount)),
 			)
 		},
+		table.WithIdempotent(),
 	)
 }
 
@@ -218,6 +236,7 @@ func (s *Storage) dropTable(ctx context.Context) error {
 		func(ctx context.Context, session table.Session) (err error) {
 			return session.DropTable(ctx, path.Join(s.db.Name(), s.cfg.Table))
 		},
+		table.WithIdempotent(),
 	)
 }
 

@@ -20,6 +20,8 @@ import (
 
 var logger *zap.Logger
 
+var label string
+
 func init() {
 	var err error
 	logger, err = zap.NewProduction(zap.AddStacktrace(zapcore.PanicLevel))
@@ -78,7 +80,7 @@ func main() {
 					return err
 				}
 
-				err = s.Write(ctx, e)
+				_, err = s.Write(ctx, e)
 				if err != nil {
 					return err
 				}
@@ -103,7 +105,7 @@ func main() {
 	case config.RunMode:
 		gen := generator.New(cfg.InitialDataCount)
 
-		w, err := workers.New(cfg, s, logger)
+		w, err := workers.New(cfg, s, logger, label)
 		if err != nil {
 			panic(fmt.Errorf("create workers failed: %w", err))
 		}
