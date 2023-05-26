@@ -10,7 +10,8 @@ jobs:
   native:
     concurrency:
       group: slo-native-${{ github.ref }}
-    if: github.event.pull_request.head.repo.full_name == 'ydb-platform/ydb-go-sdk'
+    if: github.event.pull_request.head.repo.full_name == 'ydb-platform/ydb-go-sdk' &&
+      !contains(github.event.pull_request.labels.*.name, 'no slo')
     uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
     secrets: inherit
     with:
@@ -22,7 +23,8 @@ jobs:
   database_sql:
     concurrency:
       group: slo-database-sql-${{ github.ref }}
-    if: github.event.pull_request.head.repo.full_name == 'ydb-platform/ydb-go-sdk'
+    if: github.event.pull_request.head.repo.full_name == 'ydb-platform/ydb-go-sdk' &&
+      !contains(github.event.pull_request.labels.*.name, 'no slo')
     uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
     secrets: inherit
     with:
