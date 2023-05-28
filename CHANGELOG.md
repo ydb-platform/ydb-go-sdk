@@ -1,3 +1,4 @@
+## v3.47.3
 * Added `table/options.Description.Tiering` field
 
 ## v3.47.2
