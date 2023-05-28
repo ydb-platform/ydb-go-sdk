@@ -67,6 +67,7 @@ type Description struct {
 	Indexes              []IndexDescription
 	TimeToLiveSettings   *TimeToLiveSettings
 	Changefeeds          []ChangefeedDescription
+	Tiering              string
 }
 
 type TableStats struct {

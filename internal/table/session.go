@@ -441,6 +441,7 @@ func (s *session) DescribeTable(
 		Indexes:              indexes,
 		TimeToLiveSettings:   NewTimeToLiveSettings(result.GetTtlSettings()),
 		Changefeeds:          changeFeeds,
+		Tiering:              result.GetTiering(),
 	}, nil
 }
 

@@ -1,3 +1,5 @@
+* Added `table/options.Description.Tiering` field
+
 ## v3.47.2
 * Refactored `internal/cmd/gtrace` tool (prefer pointers instead trace struct copies) for bust performance
 * Fixed usage of generated traces in code

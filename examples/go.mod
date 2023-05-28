@@ -39,7 +39,7 @@ require (
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/yandex-cloud/go-genproto v0.0.0-20220815090733-4c139c0154e2 // indirect
-	github.com/ydb-platform/ydb-go-genproto v0.0.0-20221215182650-986f9d10542f // indirect
+	github.com/ydb-platform/ydb-go-genproto v0.0.0-20230528143953-42c825ace222 // indirect
 	github.com/ydb-platform/ydb-go-sdk-metrics v0.16.3 // indirect
 	github.com/ydb-platform/ydb-go-yc-metadata v0.5.4 // indirect
 	golang.org/x/crypto v0.6.0 // indirect
