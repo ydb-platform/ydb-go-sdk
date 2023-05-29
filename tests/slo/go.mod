@@ -4,12 +4,14 @@ go 1.20
 
 require (
 	github.com/prometheus/client_golang v1.14.0
-	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.1.2
+	github.com/ydb-platform/gorm-driver v0.0.6-0.20230529184330-9104dd08ecae
+	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.1.3
 	github.com/ydb-platform/ydb-go-sdk-zap v0.15.0
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.43.0
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.47.2
 	go.uber.org/zap v1.24.0
 	golang.org/x/sync v0.1.0
 	golang.org/x/time v0.3.0
+	gorm.io/gorm v1.25.1
 )
 
 require (
@@ -19,12 +21,13 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/uuid v1.3.0 // indirect
+	github.com/jinzhu/inflection v1.0.0 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/jonboulle/clockwork v0.4.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
-	github.com/stretchr/testify v1.8.1 // indirect
 	github.com/yandex-cloud/go-genproto v0.0.0-20230403093326-123923969dc6 // indirect
 	github.com/ydb-platform/ydb-go-genproto v0.0.0-20230528143953-42c825ace222 // indirect
 	github.com/ydb-platform/ydb-go-yc v0.10.2 // indirect

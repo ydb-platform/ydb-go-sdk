@@ -45,7 +45,7 @@ func main() {
 	ctx, cancel = context.WithTimeout(ctx, time.Duration(cfg.Time)*time.Second)
 	defer cancel()
 
-	s, err := NewStorage(ctx, cfg, logger, cfg.ReadRPS+cfg.WriteRPS)
+	s, err := NewStorage(ctx, cfg, cfg.ReadRPS+cfg.WriteRPS)
 	if err != nil {
 		panic(fmt.Errorf("create storage failed: %w", err))
 	}
