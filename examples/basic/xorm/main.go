@@ -8,7 +8,6 @@ import (
 
 	_ "github.com/lib/pq"
 	_ "modernc.org/sqlite"
-
 	"xorm.io/builder"
 	"xorm.io/xorm"
 	xormLog "xorm.io/xorm/log"
@@ -72,13 +71,13 @@ func main() {
 }
 
 func prepareScheme(db *xorm.Engine) error {
-	if err := db.DropTables(&Series{}, &Seasons{}, &Episodes{}); err != nil {
+	err := db.DropTables(&Series{}, &Seasons{}, &Episodes{})
+	if err != nil {
 		return err
 	}
-	if err := db.CreateTables(&Series{}, &Seasons{}, &Episodes{}); err != nil {
-		return err
-	}
-	return nil
+
+	err = db.CreateTables(&Series{}, &Seasons{}, &Episodes{})
+	return err
 }
 
 func fillData(db *xorm.Engine) error {
