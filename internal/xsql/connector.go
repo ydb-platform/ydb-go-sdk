@@ -113,8 +113,8 @@ func (option traceConnectorOption) Apply(c *Connector) error {
 	return nil
 }
 
-func WithTrace(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) ConnectorOption {
-	return traceConnectorOption{&t, opts}
+func WithTrace(t *trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) ConnectorOption {
+	return traceConnectorOption{t, opts}
 }
 
 type disableServerBalancerConnectorOption struct{}

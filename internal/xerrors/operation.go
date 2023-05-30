@@ -88,7 +88,7 @@ func (e *operationError) Error() string {
 	b := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(b)
 	b.WriteString(e.Name())
-	b.WriteString(fmt.Sprintf(" (code = %d", e.code))
+	fmt.Fprintf(b, " (code = %d", e.code)
 	if len(e.address) > 0 {
 		b.WriteString(", address = ")
 		b.WriteString(e.address)

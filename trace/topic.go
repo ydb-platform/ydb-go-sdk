@@ -1,4 +1,3 @@
-//nolint:lll
 package trace
 
 import (
@@ -18,37 +17,51 @@ type (
 	// later release.
 	Topic struct {
 		// TopicReaderStreamLifeCycleEvents
-		OnReaderReconnect        func(startInfo TopicReaderReconnectStartInfo) func(doneInfo TopicReaderReconnectDoneInfo)
-		OnReaderReconnectRequest func(info TopicReaderReconnectRequestInfo)
+		OnReaderReconnect        func(TopicReaderReconnectStartInfo) func(TopicReaderReconnectDoneInfo)
+		OnReaderReconnectRequest func(TopicReaderReconnectRequestInfo)
 
 		// TopicReaderPartitionEvents
-		OnReaderPartitionReadStartResponse func(startInfo TopicReaderPartitionReadStartResponseStartInfo) func(doneInfo TopicReaderPartitionReadStartResponseDoneInfo)
-		OnReaderPartitionReadStopResponse  func(startInfo TopicReaderPartitionReadStopResponseStartInfo) func(doneInfo TopicReaderPartitionReadStopResponseDoneInfo)
+		OnReaderPartitionReadStartResponse func(
+			TopicReaderPartitionReadStartResponseStartInfo,
+		) func(
+			TopicReaderPartitionReadStartResponseDoneInfo,
+		)
+		OnReaderPartitionReadStopResponse func(
+			TopicReaderPartitionReadStopResponseStartInfo,
+		) func(
+			TopicReaderPartitionReadStopResponseDoneInfo,
+		)
 
 		// TopicReaderStreamEvents
-		OnReaderCommit            func(startInfo TopicReaderCommitStartInfo) func(doneInfo TopicReaderCommitDoneInfo)
-		OnReaderSendCommitMessage func(startInfo TopicReaderSendCommitMessageStartInfo) func(doneInfo TopicReaderSendCommitMessageDoneInfo)
-		OnReaderCommittedNotify   func(info TopicReaderCommittedNotifyInfo)
-		OnReaderClose             func(startInfo TopicReaderCloseStartInfo) func(doneInfo TopicReaderCloseDoneInfo)
-		OnReaderInit              func(startInfo TopicReaderInitStartInfo) func(doneInfo TopicReaderInitDoneInfo)
-		OnReaderError             func(info TopicReaderErrorInfo)
-		OnReaderUpdateToken       func(startInfo OnReadUpdateTokenStartInfo) func(updateTokenInfo OnReadUpdateTokenMiddleTokenReceivedInfo) func(doneInfo OnReadStreamUpdateTokenDoneInfo)
+		OnReaderCommit            func(TopicReaderCommitStartInfo) func(TopicReaderCommitDoneInfo)
+		OnReaderSendCommitMessage func(TopicReaderSendCommitMessageStartInfo) func(TopicReaderSendCommitMessageDoneInfo)
+		OnReaderCommittedNotify   func(TopicReaderCommittedNotifyInfo)
+		OnReaderClose             func(TopicReaderCloseStartInfo) func(TopicReaderCloseDoneInfo)
+		OnReaderInit              func(TopicReaderInitStartInfo) func(TopicReaderInitDoneInfo)
+		OnReaderError             func(TopicReaderErrorInfo)
+		OnReaderUpdateToken       func(
+			OnReadUpdateTokenStartInfo,
+		) func(
+			OnReadUpdateTokenMiddleTokenReceivedInfo,
+		) func(
+			OnReadStreamUpdateTokenDoneInfo,
+		)
 
 		// TopicReaderMessageEvents
-		OnReaderSentDataRequest     func(startInfo TopicReaderSentDataRequestInfo)
-		OnReaderReceiveDataResponse func(startInfo TopicReaderReceiveDataResponseStartInfo) func(doneInfo TopicReaderReceiveDataResponseDoneInfo)
-		OnReaderReadMessages        func(startInfo TopicReaderReadMessagesStartInfo) func(doneInfo TopicReaderReadMessagesDoneInfo)
-		OnReaderUnknownGrpcMessage  func(info OnReadUnknownGrpcMessageInfo)
+		OnReaderSentDataRequest     func(TopicReaderSentDataRequestInfo)
+		OnReaderReceiveDataResponse func(TopicReaderReceiveDataResponseStartInfo) func(TopicReaderReceiveDataResponseDoneInfo)
+		OnReaderReadMessages        func(TopicReaderReadMessagesStartInfo) func(TopicReaderReadMessagesDoneInfo)
+		OnReaderUnknownGrpcMessage  func(OnReadUnknownGrpcMessageInfo)
 
 		// TopicWriterStreamLifeCycleEvents
-		OnWriterReconnect  func(startInfo TopicWriterReconnectStartInfo) func(doneInfo TopicWriterReconnectDoneInfo)
-		OnWriterInitStream func(startInfo TopicWriterInitStreamStartInfo) func(doneInfo TopicWriterInitStreamDoneInfo)
-		OnWriterClose      func(startInfo TopicWriterCloseStartInfo) func(doneInfo TopicWriterCloseDoneInfo)
+		OnWriterReconnect  func(TopicWriterReconnectStartInfo) func(TopicWriterReconnectDoneInfo)
+		OnWriterInitStream func(TopicWriterInitStreamStartInfo) func(TopicWriterInitStreamDoneInfo)
+		OnWriterClose      func(TopicWriterCloseStartInfo) func(TopicWriterCloseDoneInfo)
 
 		// TopicWriterStreamEvents
-		OnWriterCompressMessages       func(startInfo TopicWriterCompressMessagesStartInfo) func(doneInfo TopicWriterCompressMessagesDoneInfo)
-		OnWriterSendMessages           func(startInfo TopicWriterSendMessagesStartInfo) func(doneInfo TopicWriterSendMessagesDoneInfo)
-		OnWriterReadUnknownGrpcMessage func(info TopicOnWriterReadUnknownGrpcMessageInfo)
+		OnWriterCompressMessages       func(TopicWriterCompressMessagesStartInfo) func(TopicWriterCompressMessagesDoneInfo)
+		OnWriterSendMessages           func(TopicWriterSendMessagesStartInfo) func(TopicWriterSendMessagesDoneInfo)
+		OnWriterReadUnknownGrpcMessage func(TopicOnWriterReadUnknownGrpcMessageInfo)
 	}
 
 	// TopicReaderPartitionReadStartResponseStartInfo
@@ -447,9 +460,9 @@ type (
 type TopicWriterCompressMessagesReason string
 
 const (
-	TopicWriterCompressMessagesReasonCompressData                = TopicWriterCompressMessagesReason("compress-on-send")
-	TopicWriterCompressMessagesReasonCompressDataOnWriteReadData = TopicWriterCompressMessagesReason("compress-on-call-write")
-	TopicWriterCompressMessagesReasonCodecsMeasure               = TopicWriterCompressMessagesReason("compress-on-codecs-measure")
+	TopicWriterCompressMessagesReasonCompressData                = TopicWriterCompressMessagesReason("compress-on-send")           //nolint:lll
+	TopicWriterCompressMessagesReasonCompressDataOnWriteReadData = TopicWriterCompressMessagesReason("compress-on-call-write")     //nolint:lll
+	TopicWriterCompressMessagesReasonCodecsMeasure               = TopicWriterCompressMessagesReason("compress-on-codecs-measure") //nolint:lll
 )
 
 func (r TopicWriterCompressMessagesReason) String() string {

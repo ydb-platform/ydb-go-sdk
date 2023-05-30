@@ -191,8 +191,8 @@ func WithWriterStartTimeout(timeout time.Duration) WriterOption {
 // # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func WithWriterTrace(tracer trace.Topic) WriterOption {
-	return topicwriterinternal.WithTrace(&tracer)
+func WithWriterTrace(t trace.Topic) WriterOption { //nolint:gocritic
+	return topicwriterinternal.WithTrace(&t)
 }
 
 // WithWriterUpdateTokenInterval

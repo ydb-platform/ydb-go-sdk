@@ -59,7 +59,7 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 }
 
 func (s *service) Close(ctx context.Context) {
-	defer func() { _ = s.db.Close(ctx) }()
+	_ = s.db.Close(ctx)
 }
 
 func (s *service) createTableIfNotExists(ctx context.Context) error {
@@ -98,7 +98,7 @@ func (s *service) ping(path string) (code int32, err error) {
 	if uri.Scheme == "" {
 		uri.Scheme = "http"
 	}
-	request, err := http.NewRequest(http.MethodGet, uri.String(), nil)
+	request, err := http.NewRequest(http.MethodGet, uri.String(), nil) //nolint:gocritic
 	if err != nil {
 		return -1, err
 	}
@@ -148,17 +148,17 @@ func (s *service) check(ctx context.Context, urls []string) error {
 
 func (s *service) upsertRows(ctx context.Context, rows []row) (err error) {
 	values := make([]types.Value, len(rows))
-	for i, row := range rows {
+	for i := range rows {
 		values[i] = types.StructValue(
-			types.StructFieldValue("url", types.TextValue(row.url)),
-			types.StructFieldValue("code", types.Int32Value(row.code)),
+			types.StructFieldValue("url", types.TextValue(rows[i].url)),
+			types.StructFieldValue("code", types.Int32Value(rows[i].code)),
 			types.StructFieldValue("ts", types.DatetimeValueFromTime(time.Now())),
 			types.StructFieldValue("error", types.TextValue(func(err error) string {
 				if err != nil {
 					return err.Error()
 				}
 				return ""
-			}(row.err))),
+			}(rows[i].err))),
 		)
 	}
 	err = s.db.Table().Do(ctx,

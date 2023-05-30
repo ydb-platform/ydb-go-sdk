@@ -4,7 +4,7 @@ import (
 	"sync"
 )
 
-type Mutex struct {
+type Mutex struct { //nolint:gocritic
 	sync.Mutex
 }
 
@@ -15,7 +15,7 @@ func (l *Mutex) WithLock(f func()) {
 	f()
 }
 
-type RWMutex struct {
+type RWMutex struct { //nolint:gocritic
 	sync.RWMutex
 }
 

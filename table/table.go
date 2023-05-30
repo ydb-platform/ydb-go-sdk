@@ -572,7 +572,7 @@ func WithTxCommitOptions(opts ...options.CommitTransactionOption) Option {
 	}
 }
 
-func WithTrace(t trace.Table) Option {
+func WithTrace(t trace.Table) Option { //nolint:gocritic
 	return func(o *Options) {
 		o.Trace = o.Trace.Compose(&t)
 	}

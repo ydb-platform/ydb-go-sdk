@@ -23,8 +23,8 @@ func (s *Series) BeforeCreate(_ *gorm.DB) (err error) {
 		return err
 	}
 	s.ID = id.String()
-	for _, season := range s.Seasons {
-		season.SeriesID = s.ID
+	for i := range s.Seasons {
+		s.Seasons[i].SeriesID = s.ID
 	}
 	return
 }
@@ -45,8 +45,8 @@ func (s *Season) BeforeCreate(_ *gorm.DB) (err error) {
 		return err
 	}
 	s.ID = id.String()
-	for _, episode := range s.Episodes {
-		episode.SeasonID = s.ID
+	for i := range s.Episodes {
+		s.Episodes[i].SeasonID = s.ID
 	}
 	return
 }

@@ -254,9 +254,9 @@ func WithGetPartitionStartOffset(f GetPartitionStartOffsetFunc) ReaderOption {
 // # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func WithReaderTrace(tracer trace.Topic) ReaderOption {
+func WithReaderTrace(t trace.Topic) ReaderOption { //nolint:gocritic
 	return func(cfg *topicreaderinternal.ReaderConfig) {
-		cfg.Tracer = cfg.Tracer.Compose(&tracer)
+		cfg.Trace = cfg.Trace.Compose(&t)
 	}
 }
 

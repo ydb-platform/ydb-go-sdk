@@ -40,9 +40,9 @@ func isRetryCalledAbove(ctx context.Context) bool {
 func doTx(
 	ctx context.Context,
 	c SessionProvider,
-	config config.Config,
+	config *config.Config,
 	op table.TxOperation,
-	opts table.Options,
+	opts *table.Options,
 ) (err error) {
 	if opts.Trace == nil {
 		opts.Trace = &trace.Table{}
@@ -112,9 +112,9 @@ func doTx(
 func do(
 	ctx context.Context,
 	c SessionProvider,
-	config config.Config,
+	config *config.Config,
 	op table.Operation,
-	opts table.Options,
+	opts *table.Options,
 ) (err error) {
 	if opts.Trace == nil {
 		opts.Trace = &trace.Table{}
@@ -190,8 +190,8 @@ func retryBackoff(
 	return nil
 }
 
-func retryOptions(trace *trace.Table, opts ...table.Option) table.Options {
-	options := table.Options{
+func retryOptions(trace *trace.Table, opts ...table.Option) *table.Options {
+	options := &table.Options{
 		Trace:       trace,
 		FastBackoff: backoff.Fast,
 		SlowBackoff: backoff.Slow,
@@ -201,7 +201,7 @@ func retryOptions(trace *trace.Table, opts ...table.Option) table.Options {
 	}
 	for _, o := range opts {
 		if o != nil {
-			o(&options)
+			o(options)
 		}
 	}
 	return options

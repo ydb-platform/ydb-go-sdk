@@ -70,6 +70,8 @@ type PublicReadBatchOption interface {
 	Apply(options ReadMessageBatchOptions) ReadMessageBatchOptions
 }
 
+type readExplicitMessagesCount int
+
 // Apply
 //
 // # Experimental
@@ -105,11 +107,11 @@ func NewReader(
 			readerConnector,
 			cfg.OperationTimeout(),
 			cfg.RetrySettings,
-			cfg.Tracer,
+			cfg.Trace,
 			cfg.BaseContext,
 		),
 		defaultBatchConfig: cfg.DefaultBatchConfig,
-		tracer:             cfg.Tracer,
+		tracer:             cfg.Trace,
 		readerID:           readerID,
 	}
 
@@ -119,8 +121,6 @@ func NewReader(
 func (r *Reader) Close(ctx context.Context) error {
 	return r.reader.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
 }
-
-type readExplicitMessagesCount int
 
 // ReadMessage read exactly one message
 func (r *Reader) ReadMessage(ctx context.Context) (*PublicMessage, error) {
@@ -143,7 +143,6 @@ func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOp
 		}
 	}
 
-forReadBatch:
 	for {
 		if err = ctx.Err(); err != nil {
 			return nil, err
@@ -156,10 +155,9 @@ forReadBatch:
 
 		// if batch context is canceled - do not return it to client
 		// and read next batch
-		if batch.Context().Err() != nil {
-			continue forReadBatch
+		if batch.Context().Err() == nil {
+			return batch, nil
 		}
-		return batch, nil
 	}
 }
 
@@ -234,7 +232,7 @@ func WithCredentials(cred credentials.Credentials) PublicReaderOption {
 
 func WithTrace(tracer *trace.Topic) PublicReaderOption {
 	return func(cfg *ReaderConfig) {
-		cfg.Tracer = cfg.Tracer.Compose(tracer)
+		cfg.Trace = cfg.Trace.Compose(tracer)
 	}
 }
 
@@ -247,7 +245,7 @@ func convertNewParamsToStreamConfig(
 	cfg.Consumer = consumer
 
 	// make own copy, for prevent changing internal states if readSelectors will change outside
-	cfg.ReadSelectors = make([]PublicReadSelector, len(readSelectors))
+	cfg.ReadSelectors = make([]*PublicReadSelector, len(readSelectors))
 	for i := range readSelectors {
 		cfg.ReadSelectors[i] = readSelectors[i].Clone()
 	}
@@ -278,9 +276,7 @@ type PublicReadSelector struct {
 // # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-func (s PublicReadSelector) Clone() PublicReadSelector {
-	dst := s
-	dst.Partitions = clone.Int64Slice(s.Partitions)
-
-	return dst
+func (s PublicReadSelector) Clone() *PublicReadSelector { //nolint:gocritic
+	s.Partitions = clone.Int64Slice(s.Partitions)
+	return &s
 }

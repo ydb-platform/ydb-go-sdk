@@ -91,7 +91,7 @@ func (s *partitionSession) setLastReceivedMessageOffset(v rawtopicreader.Offset)
 type partitionSessionStorage struct {
 	m sync.RWMutex
 
-	sessions map[partitionSessionID]sessionInfo
+	sessions map[partitionSessionID]*sessionInfo
 
 	removeIndex              int
 	lastCompactedTime        time.Time
@@ -99,7 +99,7 @@ type partitionSessionStorage struct {
 }
 
 func (c *partitionSessionStorage) init() {
-	c.sessions = make(map[partitionSessionID]sessionInfo)
+	c.sessions = make(map[partitionSessionID]*sessionInfo)
 	c.lastCompactedTime = time.Now()
 }
 
@@ -110,7 +110,7 @@ func (c *partitionSessionStorage) Add(session *partitionSession) error {
 	if _, ok := c.sessions[session.partitionSessionID]; ok {
 		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.partitionSessionID))
 	}
-	c.sessions[session.partitionSessionID] = sessionInfo{Session: session}
+	c.sessions[session.partitionSessionID] = &sessionInfo{Session: session}
 	return nil
 }
 
@@ -118,8 +118,8 @@ func (c *partitionSessionStorage) Get(id partitionSessionID) (*partitionSession,
 	c.m.RLock()
 	defer c.m.RUnlock()
 
-	partitionInfo := c.sessions[id]
-	if partitionInfo.Session == nil {
+	partitionInfo, has := c.sessions[id]
+	if !has || partitionInfo.Session == nil {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: read undefined partition session with id: %v", id))
 	}
 
@@ -155,8 +155,7 @@ func (c *partitionSessionStorage) isNeedCompactionNeedLock(now time.Time) bool {
 }
 
 func (c *partitionSessionStorage) doCompactionNeedLock(now time.Time) {
-	newSessions := make(map[partitionSessionID]sessionInfo, len(c.sessions))
-
+	newSessions := make(map[partitionSessionID]*sessionInfo, len(c.sessions))
 	for sessionID, info := range c.sessions {
 		if info.IsGarbage(c.removeIndex, now) {
 			continue

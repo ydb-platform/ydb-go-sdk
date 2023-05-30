@@ -15,42 +15,47 @@ type Value struct {
 	Type  Type
 }
 
-// Optional returns Value with key as column name and value as destination
+// Optional makes an object with destination address for column value with name columnName
+//
+// # If column value is NULL, then ScanNamed will write a nil into destination
+//
 // Warning: value must double-pointed data destination
-func Optional(key string, value interface{}) Value {
-	if key == "" {
-		panic("key must be not empty")
+func Optional(columnName string, destination interface{}) Value {
+	if columnName == "" {
+		panic("columnName must be not empty")
 	}
 	return Value{
-		Name:  key,
-		Value: value,
+		Name:  columnName,
+		Value: destination,
 		Type:  TypeOptional,
 	}
 }
 
-// Required returns Value with key as column name and value as destination
+// Required makes an object with destination address for column value with name columnName
+//
 // Warning: value must single-pointed data destination
-func Required(key string, value interface{}) Value {
-	if key == "" {
-		panic("key must be not empty")
+func Required(columnName string, destinationValueReference interface{}) Value {
+	if columnName == "" {
+		panic("columnName must be not empty")
 	}
 	return Value{
-		Name:  key,
-		Value: value,
+		Name:  columnName,
+		Value: destinationValueReference,
 		Type:  TypeRequired,
 	}
 }
 
-// OptionalWithDefault returns Value with key as column name and value as destination
+// OptionalWithDefault makes an object with destination address for column value with name columnName
+//
 // If scanned YDB value is NULL - default type value will be applied to value destination
 // Warning: value must single-pointed data destination
-func OptionalWithDefault(key string, value interface{}) Value {
-	if key == "" {
-		panic("key must be not empty")
+func OptionalWithDefault(columnName string, destinationValueReference interface{}) Value {
+	if columnName == "" {
+		panic("columnName must be not empty")
 	}
 	return Value{
-		Name:  key,
-		Value: value,
+		Name:  columnName,
+		Value: destinationValueReference,
 		Type:  TypeOptionalWithUseDefault,
 	}
 }

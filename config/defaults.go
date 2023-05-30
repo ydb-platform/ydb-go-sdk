@@ -81,8 +81,8 @@ func defaultTLSConfig() *tls.Config {
 	}
 }
 
-func defaultConfig() (c Config) {
-	return Config{
+func defaultConfig() (c *Config) {
+	return &Config{
 		credentials: credentials.NewAnonymousCredentials(
 			credentials.WithSourceInfo("default"),
 		),

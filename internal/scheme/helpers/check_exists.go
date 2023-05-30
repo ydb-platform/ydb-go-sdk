@@ -40,14 +40,14 @@ func IsDirectoryExists(ctx context.Context, c schemeClient, directory string) (
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
-	for _, e := range d.Children {
-		if e.Name != childDirectory {
+	for i := range d.Children {
+		if d.Children[i].Name != childDirectory {
 			continue
 		}
-		if e.Type != scheme.EntryDirectory {
+		if t := d.Children[i].Type; t != scheme.EntryDirectory {
 			return false, xerrors.WithStackTrace(fmt.Errorf(
 				"entry '%s' in path '%s' is not a directory: %s",
-				childDirectory, parentDirectory, e.Type.String(),
+				childDirectory, parentDirectory, t.String(),
 			))
 		}
 		return true, nil
@@ -79,14 +79,14 @@ func IsTableExists(ctx context.Context, c schemeClient, absTablePath string) (
 	if err != nil {
 		return false, err
 	}
-	for _, e := range d.Children {
-		if e.Name != tableName {
+	for i := range d.Children {
+		if d.Children[i].Name != tableName {
 			continue
 		}
-		if e.Type != scheme.EntryTable {
+		if d.Children[i].Type != scheme.EntryTable {
 			return false, xerrors.WithStackTrace(fmt.Errorf(
 				"entry '%s' in path '%s' is not a table: %s",
-				tableName, directory, e.Type.String(),
+				tableName, directory, d.Children[i].Type.String(),
 			))
 		}
 		return true, nil

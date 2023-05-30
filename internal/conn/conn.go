@@ -46,10 +46,6 @@ type Conn interface {
 	Unban() State
 }
 
-func (c *conn) Address() string {
-	return c.endpoint.Address()
-}
-
 type conn struct {
 	mtx               sync.RWMutex
 	config            Config // ro access
@@ -61,6 +57,10 @@ type conn struct {
 	lastUsage         time.Time
 	onClose           []func(*conn)
 	onTransportErrors []func(ctx context.Context, cc Conn, cause error)
+}
+
+func (c *conn) Address() string {
+	return c.endpoint.Address()
 }
 
 func (c *conn) Ping(ctx context.Context) error {

@@ -30,22 +30,22 @@ type Config struct {
 	grpcOptions    []grpc.DialOption
 	credentials    credentials.Credentials
 	tlsConfig      *tls.Config
-	meta           meta.Meta
+	meta           *meta.Meta
 
 	excludeGRPCCodesForPessimization []grpcCodes.Code
 }
 
-func (c Config) Credentials() credentials.Credentials {
+func (c *Config) Credentials() credentials.Credentials {
 	return c.credentials
 }
 
 // ExcludeGRPCCodesForPessimization defines grpc codes for exclude its from pessimization trigger
-func (c Config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
+func (c *Config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
 	return c.excludeGRPCCodesForPessimization
 }
 
 // GrpcDialOptions reports about used grpc dialing options
-func (c Config) GrpcDialOptions() []grpc.DialOption {
+func (c *Config) GrpcDialOptions() []grpc.DialOption {
 	return append(
 		defaultGrpcOptions(c.trace, c.secure, c.tlsConfig),
 		c.grpcOptions...,
@@ -53,29 +53,29 @@ func (c Config) GrpcDialOptions() []grpc.DialOption {
 }
 
 // Meta reports meta information about database connection
-func (c Config) Meta() meta.Meta {
+func (c *Config) Meta() *meta.Meta {
 	return c.meta
 }
 
 // ConnectionTTL defines interval for parking grpc connections.
 //
 // If ConnectionTTL is zero - connections are not park.
-func (c Config) ConnectionTTL() time.Duration {
+func (c *Config) ConnectionTTL() time.Duration {
 	return c.connectionTTL
 }
 
 // Secure is a flag for secure connection
-func (c Config) Secure() bool {
+func (c *Config) Secure() bool {
 	return c.secure
 }
 
 // Endpoint is a required starting endpoint for connect
-func (c Config) Endpoint() string {
+func (c *Config) Endpoint() string {
 	return c.endpoint
 }
 
 // TLSConfig reports about TLS configuration
-func (c Config) TLSConfig() *tls.Config {
+func (c *Config) TLSConfig() *tls.Config {
 	return c.tlsConfig
 }
 
@@ -83,23 +83,23 @@ func (c Config) TLSConfig() *tls.Config {
 // complete.
 //
 // If DialTimeout is zero then no timeout is used.
-func (c Config) DialTimeout() time.Duration {
+func (c *Config) DialTimeout() time.Duration {
 	return c.dialTimeout
 }
 
 // Database is a required database name.
-func (c Config) Database() string {
+func (c *Config) Database() string {
 	return c.database
 }
 
 // Trace contains driver tracing options.
-func (c Config) Trace() *trace.Driver {
+func (c *Config) Trace() *trace.Driver {
 	return c.trace
 }
 
 // Balancer is an optional configuration related to selected balancer.
 // That is, some balancing methods allow to be configured.
-func (c Config) Balancer() *balancerConfig.Config {
+func (c *Config) Balancer() *balancerConfig.Config {
 	return c.balancerConfig
 }
 
@@ -149,7 +149,7 @@ func WithTLSConfig(tlsConfig *tls.Config) Option {
 	}
 }
 
-func WithTrace(t trace.Driver, opts ...trace.DriverComposeOption) Option {
+func WithTrace(t trace.Driver, opts ...trace.DriverComposeOption) Option { //nolint:gocritic
 	return func(c *Config) {
 		c.trace = c.trace.Compose(&t, opts...)
 	}
@@ -259,12 +259,12 @@ func ExcludeGRPCCodesForPessimization(codes ...grpcCodes.Code) Option {
 	}
 }
 
-func New(opts ...Option) Config {
+func New(opts ...Option) *Config {
 	c := defaultConfig()
 
 	for _, o := range opts {
 		if o != nil {
-			o(&c)
+			o(c)
 		}
 	}
 
@@ -274,10 +274,10 @@ func New(opts ...Option) Config {
 }
 
 // With makes copy of current Config with specified options
-func (c Config) With(opts ...Option) Config {
+func (c *Config) With(opts ...Option) *Config {
 	for _, o := range opts {
 		if o != nil {
-			o(&c)
+			o(c)
 		}
 	}
 	c.meta = meta.New(

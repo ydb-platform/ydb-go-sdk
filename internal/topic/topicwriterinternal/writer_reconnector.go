@@ -130,13 +130,17 @@ type WriterReconnector struct {
 	encodersMap *EncoderMap
 }
 
-func newWriterReconnector(cfg WriterReconnectorConfig) *WriterReconnector {
+func newWriterReconnector(
+	cfg WriterReconnectorConfig, //nolint:gocritic
+) *WriterReconnector {
 	res := newWriterReconnectorStopped(cfg)
 	res.start()
 	return res
 }
 
-func newWriterReconnectorStopped(cfg WriterReconnectorConfig) *WriterReconnector {
+func newWriterReconnectorStopped(
+	cfg WriterReconnectorConfig, //nolint:gocritic
+) *WriterReconnector {
 	writerInstanceID, _ := rand.Int(rand.Reader, big.NewInt(math.MaxInt64))
 	res := &WriterReconnector{
 		cfg:                            cfg,
@@ -344,9 +348,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 	//nolint:ineffassign,staticcheck
 	streamCtx, streamCtxCancel := createStreamContext()
 
-	defer func() {
-		streamCtxCancel()
-	}()
+	defer streamCtxCancel()
 
 	var reconnectReason error
 	var prevAttemptTime time.Time
@@ -395,7 +397,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 	}
 }
 
-func (w *WriterReconnector) startWriteStream(ctx context.Context, streamCtx context.Context, attempt int) (
+func (w *WriterReconnector) startWriteStream(ctx, streamCtx context.Context, attempt int) (
 	writer *SingleStreamWriter,
 	err error,
 ) {

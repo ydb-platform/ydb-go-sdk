@@ -119,12 +119,12 @@ func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove s
 			)
 		}
 
-		for _, child := range dir.Children {
-			pt := path.Join(p, child.Name)
+		for j := range dir.Children {
+			pt := path.Join(p, dir.Children[j].Name)
 			if pt == fullSysTablePath {
 				continue
 			}
-			switch child.Type {
+			switch t := dir.Children[j].Type; t {
 			case scheme.EntryDirectory:
 				if err = rmPath(i+1, pt); err != nil {
 					return xerrors.WithStackTrace(
@@ -152,7 +152,7 @@ func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove s
 
 			default:
 				return xerrors.WithStackTrace(
-					fmt.Errorf("unknown entry type: %s", child.Type.String()),
+					fmt.Errorf("unknown entry type: %s", t.String()),
 				)
 			}
 		}

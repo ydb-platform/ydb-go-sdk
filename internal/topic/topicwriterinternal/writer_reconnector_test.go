@@ -658,9 +658,9 @@ func newTestMessageWithDataContent(num int) messageWithDataContent {
 }
 
 func newTestMessages(numbers ...int) []Message {
-	messages := make([]Message, 0, len(numbers))
-	for _, num := range numbers {
-		messages = append(messages, Message{SeqNo: int64(num)})
+	messages := make([]Message, len(numbers))
+	for i, num := range numbers {
+		messages[i].SeqNo = int64(num)
 	}
 	return messages
 }

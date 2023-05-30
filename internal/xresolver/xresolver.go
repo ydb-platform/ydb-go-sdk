@@ -31,8 +31,8 @@ func (c *clientConn) Endpoint() string {
 
 func (c *clientConn) UpdateState(state resolver.State) (err error) {
 	onDone := trace.DriverOnResolve(c.trace, c.Endpoint(), func() (addrs []string) {
-		for _, a := range state.Addresses {
-			addrs = append(addrs, a.Addr)
+		for i := range state.Addresses {
+			addrs = append(addrs, state.Addresses[i].Addr)
 		}
 		return
 	}())
@@ -47,7 +47,7 @@ func (c *clientConn) UpdateState(state resolver.State) (err error) {
 }
 
 func (d *dnsBuilder) Build(
-	target resolver.Target,
+	target resolver.Target, //nolint:gocritic
 	cc resolver.ClientConn,
 	opts resolver.BuildOptions,
 ) (resolver.Resolver, error) {

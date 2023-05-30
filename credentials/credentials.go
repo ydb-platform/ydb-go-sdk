@@ -56,6 +56,6 @@ func NewAnonymousCredentials(opts ...option) Credentials {
 }
 
 // NewStaticCredentials makes static credentials object
-func NewStaticCredentials(user, password string, authEndpoint string, opts ...grpc.DialOption) Credentials {
+func NewStaticCredentials(user, password, authEndpoint string, opts ...grpc.DialOption) Credentials {
 	return credentials.NewStaticCredentials(user, password, authEndpoint, opts...)
 }

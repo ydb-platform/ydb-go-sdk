@@ -61,7 +61,7 @@ func queryFromText(s string) query {
 	return textDataQuery(s)
 }
 
-func queryPrepared(id string, query string) query {
+func queryPrepared(id, query string) query {
 	return preparedDataQuery{
 		id:    id,
 		query: query,

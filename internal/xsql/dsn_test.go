@@ -19,7 +19,7 @@ func TestParse(t *testing.T) {
 		}
 		return c
 	}
-	compareConfigs := func(t *testing.T, lhs, rhs config.Config) {
+	compareConfigs := func(t *testing.T, lhs, rhs *config.Config) {
 		require.Equal(t, lhs.Secure(), rhs.Secure())
 		require.Equal(t, lhs.Endpoint(), rhs.Endpoint())
 		require.Equal(t, lhs.Database(), rhs.Database())

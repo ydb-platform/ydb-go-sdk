@@ -11,7 +11,7 @@ type accessTokenCredentials struct {
 	sourceInfo string
 }
 
-func NewAccessTokenCredentials(token string, sourceInfo string) Credentials {
+func NewAccessTokenCredentials(token, sourceInfo string) Credentials {
 	return &accessTokenCredentials{
 		token:      token,
 		sourceInfo: sourceInfo,

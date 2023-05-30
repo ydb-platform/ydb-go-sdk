@@ -16,7 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-func NewStaticCredentials(user, password string, authEndpoint string, opts ...grpc.DialOption) Credentials {
+func NewStaticCredentials(user, password, authEndpoint string, opts ...grpc.DialOption) Credentials {
 	return &staticCredentials{
 		user:     user,
 		password: password,

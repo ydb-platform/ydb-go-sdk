@@ -18,46 +18,46 @@ type Config struct {
 	endpoint string
 	database string
 	secure   bool
-	meta     meta.Meta
+	meta     *meta.Meta
 
 	interval time.Duration
 	trace    *trace.Discovery
 }
 
-func New(opts ...Option) Config {
-	c := Config{
+func New(opts ...Option) *Config {
+	c := &Config{
 		interval: DefaultInterval,
 		trace:    &trace.Discovery{},
 	}
 	for _, o := range opts {
 		if o != nil {
-			o(&c)
+			o(c)
 		}
 	}
 	return c
 }
 
-func (c Config) Meta() meta.Meta {
+func (c *Config) Meta() *meta.Meta {
 	return c.meta
 }
 
-func (c Config) Interval() time.Duration {
+func (c *Config) Interval() time.Duration {
 	return c.interval
 }
 
-func (c Config) Endpoint() string {
+func (c *Config) Endpoint() string {
 	return c.endpoint
 }
 
-func (c Config) Database() string {
+func (c *Config) Database() string {
 	return c.database
 }
 
-func (c Config) Secure() bool {
+func (c *Config) Secure() bool {
 	return c.secure
 }
 
-func (c Config) Trace() *trace.Discovery {
+func (c *Config) Trace() *trace.Discovery {
 	return c.trace
 }
 
@@ -94,7 +94,7 @@ func WithSecure(ssl bool) Option {
 // WithMeta is not for user.
 //
 // This option add meta information about database connection
-func WithMeta(meta meta.Meta) Option {
+func WithMeta(meta *meta.Meta) Option {
 	return func(c *Config) {
 		c.meta = meta
 	}

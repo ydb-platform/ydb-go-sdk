@@ -136,11 +136,11 @@ func (l *defaultLogger) appendFields(msg string, fields ...Field) string {
 	defer allocator.Buffers.Put(b)
 	b.WriteString(msg)
 	b.WriteString(" {")
-	for i, field := range fields {
+	for i := range fields {
 		if i != 0 {
 			b.WriteByte(',')
 		}
-		fmt.Fprintf(b, `%q:%q`, field.Key(), field.String())
+		fmt.Fprintf(b, `%q:%q`, fields[i].Key(), fields[i].String())
 	}
 	b.WriteByte('}')
 	return b.String()

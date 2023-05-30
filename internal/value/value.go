@@ -480,7 +480,7 @@ func DecimalValueFromBigInt(v *big.Int, precision, scale uint32) *decimalValue {
 	return DecimalValue(b, precision, scale)
 }
 
-func DecimalValue(v [16]byte, precision uint32, scale uint32) *decimalValue {
+func DecimalValue(v [16]byte, precision, scale uint32) *decimalValue {
 	return &decimalValue{
 		value: v,
 		innerType: &DecimalType{
@@ -503,8 +503,8 @@ type (
 
 func (v *dictValue) Values() map[Value]Value {
 	values := make(map[Value]Value, len(v.values))
-	for _, vv := range v.values {
-		values[vv.K] = vv.V
+	for i := range v.values {
+		values[v.values[i].K] = v.values[i].V
 	}
 	return values
 }
@@ -517,13 +517,13 @@ func (v *dictValue) Yql() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
 	buffer.WriteByte('{')
-	for i, value := range v.values {
+	for i := range v.values {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
-		buffer.WriteString(value.K.Yql())
+		buffer.WriteString(v.values[i].K.Yql())
 		buffer.WriteByte(':')
-		buffer.WriteString(value.V.Yql())
+		buffer.WriteString(v.values[i].V.Yql())
 	}
 	buffer.WriteByte('}')
 	return buffer.String()
@@ -540,11 +540,11 @@ func (v *dictValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	}
 	vvv := a.Value()
 
-	for _, vv := range values {
+	for i := range values {
 		pair := a.Pair()
 
-		pair.Key = vv.K.toYDB(a)
-		pair.Payload = vv.V.toYDB(a)
+		pair.Key = values[i].K.toYDB(a)
+		pair.Payload = values[i].V.toYDB(a)
 
 		vvv.Pairs = append(vvv.Pairs, pair)
 	}
@@ -943,7 +943,7 @@ func (v intervalValue) Yql() string {
 	}
 	if d > 0 {
 		seconds := float64(d) / float64(time.Second)
-		buffer.WriteString(fmt.Sprintf("%0.6f", seconds))
+		fmt.Fprintf(buffer, "%0.6f", seconds)
 		buffer.WriteByte('S')
 	}
 	buffer.WriteByte('"')
@@ -1232,8 +1232,8 @@ type (
 
 func (v *structValue) Fields() map[string]Value {
 	fields := make(map[string]Value, len(v.fields))
-	for _, f := range v.fields {
-		fields[f.Name] = f.V
+	for i := range v.fields {
+		fields[v.fields[i].Name] = v.fields[i].V
 	}
 	return fields
 }
@@ -1246,12 +1246,12 @@ func (v *structValue) Yql() string {
 	buffer := allocator.Buffers.Get()
 	defer allocator.Buffers.Put(buffer)
 	buffer.WriteString("<|")
-	for i, field := range v.fields {
+	for i := range v.fields {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
-		buffer.WriteString("`" + field.Name + "`:")
-		buffer.WriteString(field.V.Yql())
+		buffer.WriteString("`" + v.fields[i].Name + "`:")
+		buffer.WriteString(v.fields[i].V.Yql())
 	}
 	buffer.WriteString("|>")
 	return buffer.String()
@@ -1264,8 +1264,8 @@ func (v *structValue) Type() Type {
 func (v structValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vvv := a.Value()
 
-	for _, field := range v.fields {
-		vvv.Items = append(vvv.Items, field.V.toYDB(a))
+	for i := range v.fields {
+		vvv.Items = append(vvv.Items, v.fields[i].V.toYDB(a))
 	}
 
 	return vvv
@@ -1276,8 +1276,8 @@ func StructValue(fields ...StructValueField) *structValue {
 		return fields[i].Name < fields[j].Name
 	})
 	structFields := make([]StructField, 0, len(fields))
-	for _, field := range fields {
-		structFields = append(structFields, StructField{field.Name, field.V.Type()})
+	for i := range fields {
+		structFields = append(structFields, StructField{fields[i].Name, fields[i].V.Type()})
 	}
 	return &structValue{
 		t:      Struct(structFields...),
@@ -1830,9 +1830,9 @@ func (v *variantValue) Yql() string {
 	buffer.WriteByte(',')
 	switch t := v.innerType.(type) {
 	case *variantStructType:
-		buffer.WriteString(fmt.Sprintf("%q", t.fields[v.idx].Name))
+		fmt.Fprintf(buffer, "%q", t.fields[v.idx].Name)
 	case *variantTupleType:
-		buffer.WriteString("\"" + strconv.FormatUint(uint64(v.idx), 10) + "\"")
+		fmt.Fprintf(buffer, "\""+strconv.FormatUint(uint64(v.idx), 10)+"\"")
 	}
 	buffer.WriteByte(',')
 	buffer.WriteString(v.Type().Yql())
@@ -2081,10 +2081,10 @@ func ZeroValue(t Type) Value {
 	case *StructType:
 		return StructValue(func() []StructValueField {
 			fields := make([]StructValueField, len(t.fields))
-			for i, tt := range t.fields {
+			for i := range t.fields {
 				fields[i] = StructValueField{
-					Name: tt.Name,
-					V:    ZeroValue(tt.T),
+					Name: t.fields[i].Name,
+					V:    ZeroValue(t.fields[i].T),
 				}
 			}
 			return fields

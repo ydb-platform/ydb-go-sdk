@@ -10,7 +10,7 @@ func getEndOffset(b *topicreader.Batch) int64 {
 	panic("example stub")
 }
 
-func externalSystemCommit(ctx context.Context, topic string, partition int64, offset int64) error {
+func externalSystemCommit(ctx context.Context, topic string, partition, offset int64) error {
 	panic("example stub")
 }
 
