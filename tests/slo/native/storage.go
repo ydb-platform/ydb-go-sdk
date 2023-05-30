@@ -15,7 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"go.uber.org/zap"
 
 	"slo/internal/config"
 	"slo/internal/generator"
@@ -60,7 +59,7 @@ type Storage struct {
 	selectQuery string
 }
 
-func NewStorage(ctx context.Context, cfg *config.Config, logger *zap.Logger, poolSize int) (*Storage, error) {
+func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
