@@ -16,7 +16,7 @@ func seriesData(id string, released time.Time, title, info, comment string) *Ser
 	}
 }
 
-func seasonData(seriesID, seasonID string, title string, first, last time.Time) *Seasons {
+func seasonData(seriesID, seasonID, title string, first, last time.Time) *Seasons {
 	return &Seasons{
 		ID:         seasonID,
 		SeriesID:   seriesID,
@@ -26,7 +26,7 @@ func seasonData(seriesID, seasonID string, title string, first, last time.Time) 
 	}
 }
 
-func episodeData(seasonID, episodeID string, title string, date time.Time) *Episodes {
+func episodeData(seasonID, episodeID, title string, date time.Time) *Episodes {
 	return &Episodes{
 		ID:       episodeID,
 		SeasonID: seasonID,
@@ -36,7 +36,11 @@ func episodeData(seasonID, episodeID string, title string, date time.Time) *Epis
 }
 
 func getData() (series []*Series, seasons []*Seasons, episodes []*Episodes) {
-	for seriesID, fill := range map[string]func(seriesID string) (seriesData *Series, seasons []*Seasons, episodes []*Episodes){
+	for seriesID, fill := range map[string]func(seriesID string) (
+		seriesData *Series,
+		seasons []*Seasons,
+		episodes []*Episodes,
+	){
 		uuid.New().String(): getDataForITCrowd,
 		uuid.New().String(): getDataForSiliconValley,
 	} {
@@ -55,7 +59,7 @@ func getDataForITCrowd(seriesID string) (series *Series, seasons []*Seasons, epi
 			"Ash Atalla and starring Chris O'Dowd, Richard Ayoade, Katherine Parkinson, and Matt Berry.",
 		"", // NULL comment.
 	)
-	for _, season := range []struct {
+	for _, season := range []*struct {
 		title    string
 		first    time.Time
 		last     time.Time
@@ -108,7 +112,7 @@ func getDataForITCrowd(seriesID string) (series *Series, seasons []*Seasons, epi
 			episodes = append(episodes, episodeData(seasonID, uuid.New().String(), title, date))
 		}
 	}
-	return
+	return series, seasons, episodes
 }
 
 func getDataForSiliconValley(seriesID string) (series *Series, seasons []*Seasons, episodes []*Episodes) {
@@ -118,7 +122,7 @@ func getDataForSiliconValley(seriesID string) (series *Series, seasons []*Season
 			"Dave Krinsky. The series focuses on five young men who founded a startup company in Silicon Valley.",
 		"Some comment here",
 	)
-	for _, season := range []struct {
+	for _, season := range []*struct {
 		title    string
 		first    time.Time
 		last     time.Time
@@ -197,7 +201,7 @@ func getDataForSiliconValley(seriesID string) (series *Series, seasons []*Season
 			episodes = append(episodes, episodeData(seasonID, uuid.New().String(), title, date))
 		}
 	}
-	return
+	return series, seasons, episodes
 }
 
 const dateISO8601 = "2006-01-02"

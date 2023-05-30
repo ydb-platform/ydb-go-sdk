@@ -6,14 +6,14 @@ import (
 	"os"
 	"time"
 
-	"xorm.io/builder"
-	"xorm.io/xorm"
-
-	_ "github.com/ydb-platform/ydb-go-sdk/v3"
-
+	_ "github.com/lib/pq"
 	_ "modernc.org/sqlite"
 
-	_ "github.com/lib/pq"
+	"xorm.io/builder"
+	"xorm.io/xorm"
+	xormLog "xorm.io/xorm/log"
+
+	_ "github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
 var envNotFoundMessage = `DSN environment variable not defined
@@ -37,7 +37,7 @@ func main() {
 	} else if dsn, exists = os.LookupEnv("SQLITE_CONNECTION_STRING"); exists {
 		db, err = xorm.NewEngine("sqlite", dsn)
 	} else if dsn, exists = os.LookupEnv("YDB_CONNECTION_STRING"); exists {
-		dsn = dsn + "?go_query_bind=table_path_prefix(/local/xorm),declare,numeric&go_fake_tx=scripting&go_query_mode=scripting"
+		dsn += "?go_query_bind=table_path_prefix(/local/xorm),declare,numeric&go_fake_tx=scripting&go_query_mode=scripting"
 		db, err = xorm.NewEngine("ydb", dsn)
 	} else {
 		panic(envNotFoundMessage)
@@ -47,28 +47,31 @@ func main() {
 		panic(err)
 	}
 
+	db.SetDefaultContext(ctx)
+	db.SetLogLevel(xormLog.LOG_DEBUG)
+
 	// prepare scheme
-	if err = prepareScheme(ctx, db); err != nil {
+	if err = prepareScheme(db); err != nil {
 		panic(err)
 	}
 
 	// fill data
-	if err = fillData(ctx, db); err != nil {
+	if err = fillData(db); err != nil {
 		panic(err)
 	}
 
 	// read all data
-	if err = readAll(ctx, db); err != nil {
+	if err = readAll(db); err != nil {
 		panic(err)
 	}
 
 	// find by condition
-	if err = findEpisodesByTitle(ctx, db, "Bad"); err != nil {
+	if err = findEpisodesByTitle(db, "Bad"); err != nil {
 		panic(err)
 	}
 }
 
-func prepareScheme(ctx context.Context, db *xorm.Engine) error {
+func prepareScheme(db *xorm.Engine) error {
 	if err := db.DropTables(&Series{}, &Seasons{}, &Episodes{}); err != nil {
 		return err
 	}
@@ -78,10 +81,10 @@ func prepareScheme(ctx context.Context, db *xorm.Engine) error {
 	return nil
 }
 
-func fillData(ctx context.Context, db *xorm.Engine) error {
+func fillData(db *xorm.Engine) error {
 	series, seasons, episodes := getData()
 
-	session := db.NewSession().Context(ctx)
+	session := db.NewSession()
 	defer session.Close()
 
 	if _, err := session.Insert(&series, &seasons, &episodes); err != nil {
@@ -90,8 +93,8 @@ func fillData(ctx context.Context, db *xorm.Engine) error {
 	return nil
 }
 
-func readAll(ctx context.Context, db *xorm.Engine) error {
-	session := db.NewSession().Context(ctx)
+func readAll(db *xorm.Engine) error {
+	session := db.NewSession()
 	defer session.Close()
 
 	var series []*Series
@@ -136,8 +139,8 @@ func readAll(ctx context.Context, db *xorm.Engine) error {
 	return nil
 }
 
-func findEpisodesByTitle(ctx context.Context, db *xorm.Engine, fragment string) error {
-	session := db.NewSession().Context(ctx)
+func findEpisodesByTitle(db *xorm.Engine, fragment string) error {
+	session := db.NewSession()
 	defer session.Close()
 
 	var episodes []*Episodes
