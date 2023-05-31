@@ -9,14 +9,13 @@ on:
 jobs:
   basic-ydb:
     concurrency:
-      group: basic-${{ github.ref }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}-${{ matrix.application }}
+      group: basic-ydb-${{ github.ref }}-${{ matrix.ydb-version }}-${{ matrix.application }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        go-version: [ 1.17.x, 1.20.x ]
-        ydb-version: [ 22.5, 23.1, 23.2 ]
+        ydb-version: [ 23.1, 23.2 ]
         application: [ native, database_sql, gorm, xorm ]
     services:
       ydb:
@@ -33,7 +32,6 @@ jobs:
         options: '-h localhost'
     env:
       OS: ubuntu-latest
-      GO: ${{ matrix.go-version }}
       YDB_CONNECTION_STRING: grpc://localhost:2136/local
       YDB_ANONYMOUS_CREDENTIALS: 1
     steps:
@@ -42,14 +40,13 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v3
         with:
-          go-version: ${{ matrix.go-version }}
           cache: true
       - name: Run basic example ${{ matrix.application }}
         working-directory: ./examples/basic/${{ matrix.application }}
         run: go run .
   basic-postgres:
     concurrency:
-      group: basic-${{ matrix.application }}-postgres-${{ github.ref }}
+      group: basic-postgres-${{ matrix.application }}-${{ github.ref }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     strategy:
@@ -79,14 +76,13 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.20.x
           cache: true
       - name: Run basic example ${{ matrix.application }} with postgres
         working-directory: ./examples/basic/${{ matrix.application }}
         run: go run .
   basic-sqlite:
     concurrency:
-      group: basic-${{ matrix.application }}-sqlite-${{ github.ref }}
+      group: basic-sqlite-${{ matrix.application }}-${{ github.ref }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     strategy:
@@ -103,7 +99,6 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.20.x
           cache: true
       - name: Run basic example ${{ matrix.application }} with sqlite
         working-directory: ./examples/basic/${{ matrix.application }}
