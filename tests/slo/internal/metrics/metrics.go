@@ -18,12 +18,11 @@ const (
 
 type (
 	Metrics struct {
-		oks        *prometheus.GaugeVec
-		notOks     *prometheus.GaugeVec
-		inflight   *prometheus.GaugeVec
-		latencies  *prometheus.SummaryVec
-		latenciesH *prometheus.HistogramVec
-		attempts   *prometheus.HistogramVec
+		oks       *prometheus.GaugeVec
+		notOks    *prometheus.GaugeVec
+		inflight  *prometheus.GaugeVec
+		latencies *prometheus.SummaryVec
+		attempts  *prometheus.HistogramVec
 
 		p *push.Pusher
 
@@ -66,19 +65,11 @@ func New(logger *zap.Logger, url, label string) (*Metrics, error) {
 			Name: "latency",
 			Help: "summary of latencies in ms",
 			Objectives: map[float64]float64{
-				0.5:  0.05,
-				0.99: 0.001,
-				1.0:  0.0,
+				0.5:  0,
+				0.99: 0,
+				1.0:  0,
 			},
 			MaxAge: 15 * time.Second,
-		},
-		[]string{"status", "jobName"},
-	)
-	m.latenciesH = prometheus.NewHistogramVec(
-		prometheus.HistogramOpts{
-			Name:    "latencyH",
-			Help:    "latencies in ms",
-			Buckets: []float64{1, 2, 5, 10, 20, 50, 100, 200, 400, 800, 1600, 3200, 6400},
 		},
 		[]string{"status", "jobName"},
 	)
@@ -98,7 +89,6 @@ func New(logger *zap.Logger, url, label string) (*Metrics, error) {
 		Collector(m.notOks).
 		Collector(m.inflight).
 		Collector(m.latencies).
-		Collector(m.latenciesH).
 		Collector(m.attempts)
 
 	return m, m.Reset() //nolint:gocritic
@@ -119,7 +109,6 @@ func (m *Metrics) Reset() error {
 	m.inflight.WithLabelValues(JobWrite).Set(0)
 
 	m.latencies.Reset()
-	m.latenciesH.Reset()
 
 	m.attempts.Reset()
 
@@ -158,13 +147,11 @@ func (j Span) Stop(err error, attempts int) {
 	if err != nil {
 		j.m.notOks.WithLabelValues(j.name).Add(1)
 		j.m.latencies.WithLabelValues(JobStatusErr, j.name).Observe(latency)
-		j.m.latenciesH.WithLabelValues(JobStatusErr, j.name).Observe(latency)
 		j.m.attempts.WithLabelValues(JobStatusErr, j.name).Observe(float64(attempts))
 		return
 	}
 
 	j.m.oks.WithLabelValues(j.name).Add(1)
 	j.m.latencies.WithLabelValues(JobStatusOK, j.name).Observe(latency)
-	j.m.latenciesH.WithLabelValues(JobStatusOK, j.name).Observe(latency)
 	j.m.attempts.WithLabelValues(JobStatusOK, j.name).Observe(float64(attempts))
 }

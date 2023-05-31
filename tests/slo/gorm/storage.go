@@ -80,9 +80,10 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 			),
 			ydb.WithMaxOpenConns(poolSize),
 			ydb.WithMaxIdleConns(poolSize),
+			ydb.WithTablePathPrefix(label),
 		),
 		&gorm.Config{
-			Logger: gormLogger.Default.LogMode(gormLogger.Info),
+			Logger: gormLogger.Default.LogMode(gormLogger.Warn),
 		},
 	)
 	if err != nil {

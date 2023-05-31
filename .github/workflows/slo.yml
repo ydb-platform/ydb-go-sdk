@@ -10,8 +10,7 @@ jobs:
   native:
     concurrency:
       group: slo-native-${{ github.ref }}
-    if: github.event.pull_request.head.repo.full_name == 'ydb-platform/ydb-go-sdk' &&
-      !contains(github.event.pull_request.labels.*.name, 'no slo')
+    if: (!contains(github.event.pull_request.labels.*.name, 'no slo'))
     uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
     secrets: inherit
     with:
@@ -24,8 +23,7 @@ jobs:
     needs: [native]
     concurrency:
       group: slo-database-sql-${{ github.ref }}
-    if: github.event.pull_request.head.repo.full_name == 'ydb-platform/ydb-go-sdk' &&
-      !contains(github.event.pull_request.labels.*.name, 'no slo')
+    if: always() && !contains(github.event.pull_request.labels.*.name, 'no slo')
     uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
     secrets: inherit
     with:
@@ -38,8 +36,7 @@ jobs:
     needs: [database_sql]
     concurrency:
       group: slo-gorm-${{ github.ref }}
-    if: github.event.pull_request.head.repo.full_name == 'ydb-platform/ydb-go-sdk' &&
-      !contains(github.event.pull_request.labels.*.name, 'no slo')
+    if: always() && !contains(github.event.pull_request.labels.*.name, 'no slo')
     uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
     secrets: inherit
     with:

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"path"
 	"time"
 
 	env "github.com/ydb-platform/ydb-go-sdk-auth-environ"
@@ -104,6 +105,7 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Stora
 
 	s.c, err = ydb.Connector(s.cc,
 		ydb.WithAutoDeclare(),
+		ydb.WithTablePathPrefix(path.Join(s.cc.Name(), label)),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("ydb.Connector error: %w", err)

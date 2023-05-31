@@ -22,10 +22,13 @@ import (
 
 const (
 	upsertTemplate = `
+PRAGMA TablePathPrefix("%s");
+
 DECLARE $id AS Uint64;
 DECLARE $payload_str AS Utf8;
 DECLARE $payload_double AS Double;
 DECLARE $payload_timestamp AS Timestamp;
+
 UPSERT INTO %s (
 	id, hash, payload_str, payload_double, payload_timestamp
 ) VALUES (
@@ -33,6 +36,8 @@ UPSERT INTO %s (
 );
 `
 	selectTemplate = `
+PRAGMA TablePathPrefix("%s");
+
 DECLARE $id AS Uint64;
 SELECT id, payload_str, payload_double, payload_timestamp, payload_hash
 FROM %s WHERE id = $id AND hash = Digest::NumericHash($id);
@@ -55,6 +60,7 @@ var (
 type Storage struct {
 	db          *ydb.Driver
 	cfg         *config.Config
+	prefix      string
 	upsertQuery string
 	selectQuery string
 }
@@ -63,15 +69,9 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
-	s := &Storage{
-		cfg:         cfg,
-		upsertQuery: fmt.Sprintf(upsertTemplate, cfg.Table),
-		selectQuery: fmt.Sprintf(selectTemplate, cfg.Table),
-	}
-	var err error
-	s.db, err = ydb.Open(
+	db, err := ydb.Open(
 		ctx,
-		s.cfg.Endpoint+s.cfg.DB,
+		cfg.Endpoint+cfg.DB,
 		env.WithEnvironCredentials(ctx),
 		ydbZap.WithTraces(
 			logger,
@@ -81,6 +81,16 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	prefix := path.Join(db.Name(), label)
+
+	s := &Storage{
+		db:          db,
+		cfg:         cfg,
+		prefix:      prefix,
+		upsertQuery: fmt.Sprintf(upsertTemplate, prefix, cfg.Table),
+		selectQuery: fmt.Sprintf(selectTemplate, prefix, cfg.Table),
 	}
 
 	return s, nil
@@ -201,7 +211,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 
 	return s.db.Table().Do(ctx,
 		func(ctx context.Context, session table.Session) error {
-			return session.CreateTable(ctx, path.Join(s.db.Name(), s.cfg.Table),
+			return session.CreateTable(ctx, path.Join(s.prefix, s.cfg.Table),
 				options.WithColumn("hash", types.Optional(types.TypeUint64)),
 				options.WithColumn("id", types.Optional(types.TypeUint64)),
 				options.WithColumn("payload_str", types.Optional(types.TypeUTF8)),
@@ -234,7 +244,7 @@ func (s *Storage) dropTable(ctx context.Context) error {
 
 	return s.db.Table().Do(ctx,
 		func(ctx context.Context, session table.Session) (err error) {
-			return session.DropTable(ctx, path.Join(s.db.Name(), s.cfg.Table))
+			return session.DropTable(ctx, path.Join(s.prefix, s.cfg.Table))
 		},
 		table.WithIdempotent(),
 	)
