@@ -17,7 +17,7 @@ jobs:
       matrix:
         go-version: [ 1.17.x, 1.18.x, 1.19.x, 1.20.x ]
         ydb-version: [ 22.5, 23.1, 23.2 ]
-        driver: [ native, database_sql, gorm ]
+        driver: [ native, database_sql, gorm, xorm ]
         exclude:
           - driver: database_sql
             go-version: 1.17.x
@@ -52,11 +52,15 @@ jobs:
       - name: Run examples for ${{ matrix.driver }}
         working-directory: ./examples/basic/${{ matrix.driver }}
         run: go run .
-  examples-gorm-postgres:
+  examples-postgres:
     concurrency:
-      group: examples-gorm-postgres-${{ github.ref }}
+      group: examples-${{ matrix.driver }}-postgres-${{ github.ref }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        driver: [ gorm, xorm ]
     services:
       postgres:
         image: postgres
@@ -82,18 +86,22 @@ jobs:
         with:
           go-version: 1.20.x
           cache: true
-      - name: Run examples for gorm with postgres
-        working-directory: ./examples/basic/gorm
+      - name: Run examples for ${{ matrix.driver }} with postgres
+        working-directory: ./examples/basic/${{ matrix.driver }}
         run: go run .
-  examples-gorm-sqlite:
+  examples-sqlite:
     concurrency:
-      group: examples-gorm-sqlite-${{ github.ref }}
+      group: examples-${{ matrix.driver }}-sqlite-${{ github.ref }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        driver: [ gorm, xorm ]
     env:
       OS: ubuntu-latest
       GO: 1.20.x
-      SQLITE_CONNECTION_STRING: gorm.db
+      SQLITE_CONNECTION_STRING: ${{ matrix.driver }}.db
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -102,6 +110,6 @@ jobs:
         with:
           go-version: 1.20.x
           cache: true
-      - name: Run examples for gorm with sqlite
-        working-directory: ./examples/basic/gorm
+      - name: Run examples for ${{ matrix.driver }} with sqlite
+        working-directory: ./examples/basic/${{ matrix.driver }}
         run: go run .
