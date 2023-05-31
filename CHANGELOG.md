@@ -1,4 +1,5 @@
 * Improved code with `go-critic` linter
+* Added session info into `database/sql` event `connected`
 
 ## v3.47.3
 * Added `table/options.Description.Tiering` field

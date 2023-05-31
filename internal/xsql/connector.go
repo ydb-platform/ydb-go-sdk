@@ -286,19 +286,22 @@ func (c *Connector) detach(cc *conn) {
 }
 
 func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
-	onDone := trace.DatabaseSQLOnConnectorConnect(c.trace, &ctx)
+	var (
+		onDone  = trace.DatabaseSQLOnConnectorConnect(c.trace, &ctx)
+		session table.ClosableSession
+	)
 	defer func() {
-		onDone(err)
+		onDone(err, session)
 	}()
 	if !c.disableServerBalancer {
 		ctx = meta.WithAllowFeatures(ctx, metaHeaders.HintSessionBalancer)
 	}
-	s, err := c.parent.Table().CreateSession(ctx) //nolint
+	session, err = c.parent.Table().CreateSession(ctx) //nolint
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return newConn(c, s, withDefaultTxControl(c.defaultTxControl),
+	return newConn(c, session, withDefaultTxControl(c.defaultTxControl),
 		withDefaultQueryMode(c.defaultQueryMode),
 		withDataOpts(c.defaultDataQueryOpts...),
 		withScanOpts(c.defaultScanQueryOpts...),
