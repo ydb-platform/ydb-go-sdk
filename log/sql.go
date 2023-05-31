@@ -27,8 +27,10 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		start := time.Now()
 		return func(info trace.DatabaseSQLConnectorConnectDoneInfo) {
 			if info.Error == nil {
-				l.Log(WithLevel(ctx, INFO), "connected",
+				l.Log(WithLevel(ctx, DEBUG), "connected",
 					latency(start),
+					String("session_id", info.Session.ID()),
+					String("session_status", info.Session.Status()),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",

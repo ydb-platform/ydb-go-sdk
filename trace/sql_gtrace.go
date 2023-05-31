@@ -811,13 +811,14 @@ func (t *DatabaseSQL) onDoTx(d DatabaseSQLDoTxStartInfo) func(DatabaseSQLDoTxInt
 		return res
 	}
 }
-func DatabaseSQLOnConnectorConnect(t *DatabaseSQL, c *context.Context) func(error) {
+func DatabaseSQLOnConnectorConnect(t *DatabaseSQL, c *context.Context) func(_ error, session tableSessionInfo) {
 	var p DatabaseSQLConnectorConnectStartInfo
 	p.Context = c
 	res := t.onConnectorConnect(p)
-	return func(e error) {
+	return func(e error, session tableSessionInfo) {
 		var p DatabaseSQLConnectorConnectDoneInfo
 		p.Error = e
+		p.Session = session
 		res(p)
 	}
 }

@@ -3,6 +3,7 @@ package table
 import (
 	"context"
 	"sort"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
@@ -81,6 +82,7 @@ const (
 type SessionInfo interface {
 	ID() string
 	Status() SessionStatus
+	LastUsage() time.Time
 }
 
 type Session interface {

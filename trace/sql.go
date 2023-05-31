@@ -40,7 +40,8 @@ type (
 		Context *context.Context
 	}
 	DatabaseSQLConnectorConnectDoneInfo struct {
-		Error error
+		Error   error
+		Session tableSessionInfo
 	}
 	DatabaseSQLConnPingStartInfo struct {
 		// Context make available context in trace callback function.
