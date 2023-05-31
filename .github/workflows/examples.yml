@@ -7,22 +7,16 @@ on:
   pull_request:
   workflow_dispatch:
 jobs:
-  examples:
+  basic-ydb:
     concurrency:
-      group: examples-${{ github.ref }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}-${{ matrix.driver }}
+      group: basic-ydb-${{ github.ref }}-${{ matrix.ydb-version }}-${{ matrix.application }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        go-version: [ 1.17.x, 1.18.x, 1.19.x, 1.20.x ]
-        ydb-version: [ 22.5, 23.1, 23.2 ]
-        driver: [ native, database_sql, gorm, xorm ]
-        exclude:
-          - driver: database_sql
-            go-version: 1.17.x
-          - driver: gorm
-            go-version: 1.17.x
+        ydb-version: [ 23.1, 23.2 ]
+        application: [ native, database_sql, gorm, xorm ]
     services:
       ydb:
         image: cr.yandex/yc/yandex-docker-local-ydb:${{ matrix.ydb-version }}-slim
@@ -38,7 +32,6 @@ jobs:
         options: '-h localhost'
     env:
       OS: ubuntu-latest
-      GO: ${{ matrix.go-version }}
       YDB_CONNECTION_STRING: grpc://localhost:2136/local
       YDB_ANONYMOUS_CREDENTIALS: 1
     steps:
@@ -47,26 +40,25 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v3
         with:
-          go-version: ${{ matrix.go-version }}
           cache: true
-      - name: Run examples for ${{ matrix.driver }}
-        working-directory: ./examples/basic/${{ matrix.driver }}
+      - name: Run basic example ${{ matrix.application }}
+        working-directory: ./examples/basic/${{ matrix.application }}
         run: go run .
-  examples-postgres:
+  basic-postgres:
     concurrency:
-      group: examples-${{ matrix.driver }}-postgres-${{ github.ref }}
+      group: basic-postgres-${{ matrix.application }}-${{ github.ref }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        driver: [ gorm, xorm ]
+        application: [ gorm, xorm ]
     services:
       postgres:
         image: postgres
         env:
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: examples
+          POSTGRES_DB: basic
         options: >-
           --health-cmd pg_isready
           --health-interval 5s
@@ -77,39 +69,37 @@ jobs:
     env:
       OS: ubuntu-latest
       GO: 1.20.x
-      POSTGRES_CONNECTION_STRING: postgres://postgres:postgres@localhost:5432/examples?sslmode=disable
+      POSTGRES_CONNECTION_STRING: postgres://postgres:postgres@localhost:5432/basic?sslmode=disable
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Install Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.20.x
           cache: true
-      - name: Run examples for ${{ matrix.driver }} with postgres
-        working-directory: ./examples/basic/${{ matrix.driver }}
+      - name: Run basic example ${{ matrix.application }} with postgres
+        working-directory: ./examples/basic/${{ matrix.application }}
         run: go run .
-  examples-sqlite:
+  basic-sqlite:
     concurrency:
-      group: examples-${{ matrix.driver }}-sqlite-${{ github.ref }}
+      group: basic-sqlite-${{ matrix.application }}-${{ github.ref }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        driver: [ gorm, xorm ]
+        application: [ gorm, xorm ]
     env:
       OS: ubuntu-latest
       GO: 1.20.x
-      SQLITE_CONNECTION_STRING: ${{ matrix.driver }}.db
+      SQLITE_CONNECTION_STRING: ${{ matrix.application }}.db
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Install Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.20.x
           cache: true
-      - name: Run examples for ${{ matrix.driver }} with sqlite
-        working-directory: ./examples/basic/${{ matrix.driver }}
+      - name: Run basic example ${{ matrix.application }} with sqlite
+        working-directory: ./examples/basic/${{ matrix.application }}
         run: go run .

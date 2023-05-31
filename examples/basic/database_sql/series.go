@@ -16,14 +16,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-func sliceToInterfaces[T any](v []T) []interface{} {
-	ii := make([]interface{}, len(v))
-	for i, vv := range v {
-		ii[i] = vv
-	}
-	return ii
-}
-
 func selectDefault(ctx context.Context, db *sql.DB) (err error) {
 	// explain of query
 	err = retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) (err error) {
@@ -172,7 +164,7 @@ func selectScan(ctx context.Context, db *sql.DB) (err error) {
 
 func fillTablesWithData(ctx context.Context, db *sql.DB) (err error) {
 	series, seasonsData, episodesData := getData()
-	args := []sql.NamedArg{
+	args := []interface{}{
 		sql.Named("seriesData", types.ListValue(series...)),
 		sql.Named("seasonsData", types.ListValue(seasonsData...)),
 		sql.Named("episodesData", types.ListValue(episodesData...)),
@@ -205,7 +197,7 @@ func fillTablesWithData(ctx context.Context, db *sql.DB) (err error) {
 				title,
 				air_date
 			FROM AS_TABLE($episodesData);`,
-			sliceToInterfaces(args)...,
+			args...,
 		); err != nil {
 			return err
 		}
