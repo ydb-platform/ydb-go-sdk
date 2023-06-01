@@ -1,3 +1,4 @@
+* Fixed stop reader by grpc stream shutdown
 * Improved code with `go-critic` linter
 * Added session info into `database/sql` event `connected`
 
