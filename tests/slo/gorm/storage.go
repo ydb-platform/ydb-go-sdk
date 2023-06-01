@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -9,6 +10,8 @@ import (
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydbZap "github.com/ydb-platform/ydb-go-sdk-zap"
 	ydbSDK "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -27,6 +30,19 @@ WITH (
     AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = %d,
     UNIFORM_PARTITIONS = %d
 )`
+
+var (
+	readTx = table.TxControl(
+		table.BeginTx(
+			table.WithOnlineReadOnly(),
+		),
+		table.CommitTx(),
+	)
+
+	writeTx = table.SerializableReadWriteTxControl(
+		table.CommitTx(),
+	)
+)
 
 type entry struct {
 	Hash uint64 `gorm:"column:hash;primarykey;autoIncrement:false"`
@@ -64,62 +80,118 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 			),
 			ydb.WithMaxOpenConns(poolSize),
 			ydb.WithMaxIdleConns(poolSize),
+			ydb.WithTablePathPrefix(label),
 		),
 		&gorm.Config{
-			Logger: gormLogger.Default.LogMode(gormLogger.Info),
+			Logger: gormLogger.Default.LogMode(gormLogger.Warn),
 		},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	s.db = s.db.Debug()
-
 	return s, nil
 }
 
-func (s *Storage) Read(ctx context.Context, id generator.RowID) (generator.Row, error) {
-	if err := ctx.Err(); err != nil {
-		return generator.Row{}, err
+func (s *Storage) Read(ctx context.Context, id generator.RowID) (r generator.Row, attempts int, err error) {
+	if err = ctx.Err(); err != nil {
+		return generator.Row{}, attempts, err
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ReadTimeout)*time.Millisecond)
 	defer cancel()
 
-	var e entry
-	err := s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).Model(&entry{}).
-		First(&e, "hash = ? AND id = ?",
-			clause.Expr{
-				SQL:  "Digest::NumericHash(?)",
-				Vars: []interface{}{id},
-			},
-			id,
-		).Error
+	db, err := s.db.DB()
 	if err != nil {
-		return generator.Row{}, err
+		return generator.Row{}, attempts, err
 	}
 
-	return e.Row, err
+	return r, attempts, retry.Do(ydbSDK.WithTxControl(ctx, readTx), db,
+		func(ctx context.Context, cc *sql.Conn) (err error) {
+			if err = ctx.Err(); err != nil {
+				return err
+			}
+
+			var e entry
+			err = s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).Model(&entry{}).
+				First(&e, "hash = ? AND id = ?",
+					clause.Expr{
+						SQL:  "Digest::NumericHash(?)",
+						Vars: []interface{}{id},
+					},
+					id,
+				).Error
+			if err != nil {
+				return err
+			}
+
+			r = e.Row
+
+			return nil
+		},
+		retry.WithDoRetryOptions(
+			retry.WithIdempotent(true),
+			retry.WithTrace(
+				trace.Retry{
+					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+						return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+							return func(info trace.RetryLoopDoneInfo) {
+								attempts = info.Attempts
+							}
+						}
+					},
+				},
+			),
+		),
+	)
 }
 
-func (s *Storage) Write(ctx context.Context, row generator.Row) error {
-	if err := ctx.Err(); err != nil {
-		return err
+func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, err error) {
+	if err = ctx.Err(); err != nil {
+		return attempts, err
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).Model(&entry{}).Create(map[string]interface{}{
-		"Hash": clause.Expr{
-			SQL:  "Digest::NumericHash(?)",
-			Vars: []interface{}{row.ID},
+	db, err := s.db.DB()
+	if err != nil {
+		return attempts, err
+	}
+
+	return attempts, retry.Do(ydbSDK.WithTxControl(ctx, writeTx), db,
+		func(ctx context.Context, cc *sql.Conn) (err error) {
+			if err = ctx.Err(); err != nil {
+				return err
+			}
+
+			return s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).Model(&entry{}).
+				Create(map[string]interface{}{
+					"Hash": clause.Expr{
+						SQL:  "Digest::NumericHash(?)",
+						Vars: []interface{}{row.ID},
+					},
+					"ID":               row.ID,
+					"PayloadStr":       row.PayloadStr,
+					"PayloadDouble":    row.PayloadDouble,
+					"PayloadTimestamp": row.PayloadTimestamp,
+				}).Error
 		},
-		"ID":               row.ID,
-		"PayloadStr":       row.PayloadStr,
-		"PayloadDouble":    row.PayloadDouble,
-		"PayloadTimestamp": row.PayloadTimestamp,
-	}).Error
+		retry.WithDoRetryOptions(
+			retry.WithIdempotent(true),
+			retry.WithTrace(
+				trace.Retry{
+					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+						return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+							return func(info trace.RetryLoopDoneInfo) {
+								attempts = info.Attempts
+							}
+						}
+					},
+				},
+			),
+		),
+	)
 }
 
 func (s *Storage) createTable(ctx context.Context) error {

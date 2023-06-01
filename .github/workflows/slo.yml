@@ -8,11 +8,9 @@ on:
   workflow_dispatch:
 jobs:
   native:
-    needs: [gorm]
     concurrency:
       group: slo-native-${{ github.ref }}
-    if: github.event.pull_request.head.repo.full_name == 'ydb-platform/ydb-go-sdk' &&
-      !contains(github.event.pull_request.labels.*.name, 'no slo')
+    if: (!contains(github.event.pull_request.labels.*.name, 'no slo'))
     uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
     secrets: inherit
     with:
@@ -25,8 +23,7 @@ jobs:
     needs: [native]
     concurrency:
       group: slo-database-sql-${{ github.ref }}
-    if: github.event.pull_request.head.repo.full_name == 'ydb-platform/ydb-go-sdk' &&
-      !contains(github.event.pull_request.labels.*.name, 'no slo')
+    if: always() && !contains(github.event.pull_request.labels.*.name, 'no slo')
     uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
     secrets: inherit
     with:
@@ -36,10 +33,10 @@ jobs:
       workload_build_options: -f Dockerfile --build-arg SRC_PATH=database/sql
       workload_build_context: ../..
   gorm:
+    needs: [database_sql]
     concurrency:
       group: slo-gorm-${{ github.ref }}
-    if: github.event.pull_request.head.repo.full_name == 'ydb-platform/ydb-go-sdk' &&
-      !contains(github.event.pull_request.labels.*.name, 'no slo')
+    if: always() && !contains(github.event.pull_request.labels.*.name, 'no slo')
     uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
     secrets: inherit
     with:

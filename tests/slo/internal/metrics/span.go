@@ -14,3 +14,8 @@ const (
 	JobRead  SpanName = "read"
 	JobWrite SpanName = "write"
 )
+
+const (
+	JobStatusOK  = "ok"
+	JobStatusErr = "err"
+)
