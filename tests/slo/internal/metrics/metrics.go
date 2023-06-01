@@ -76,7 +76,7 @@ func New(logger *zap.Logger, url, label string) (*Metrics, error) {
 	m.attempts = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:    "attempts",
-			Help:    "amount of retries for request",
+			Help:    "summary of amount for request",
 			Buckets: prometheus.LinearBuckets(1, 1, 10),
 		},
 		[]string{"status", "jobName"},

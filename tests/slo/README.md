@@ -123,6 +123,7 @@ Primary key: `("hash", "id")`
 - `not_oks`  - amount of not OK requests
 - `inflight` - amount of requests in flight
 - `latency`  - summary of latencies in ms
+- `attempts` - summary of amount for request
 
 > You must reset metrics to keep them `0` in prometheus and grafana before beginning and after ending of jobs
 
@@ -139,6 +140,8 @@ func (m *Metrics) Reset() error {
     m.inflight.WithLabelValues(JobWrite).Set(0)
 
     m.latencies.Reset()
+
+    m.attempts.Reset()
 
     return m.Push()
 }
