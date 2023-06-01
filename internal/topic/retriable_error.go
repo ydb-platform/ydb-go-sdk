@@ -1,7 +1,10 @@
 package topic
 
 import (
+	"errors"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"io"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
@@ -51,6 +54,11 @@ func CheckRetryMode(err error, settings RetrySettings, retriesDuration time.Dura
 	// nil is not error and doesn't need retry it.
 	if err == nil {
 		return nil, false
+	}
+
+	// eof is retriable for topic
+	if errors.Is(err, io.EOF) && xerrors.RetryableError(err) == nil {
+		err = xerrors.Retryable(err, xerrors.WithName("TopicEOF"))
 	}
 
 	if retriesDuration > settings.StartTimeout {

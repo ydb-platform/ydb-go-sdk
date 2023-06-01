@@ -1,6 +1,8 @@
 package topic
 
 import (
+	"fmt"
+	"io"
 	"testing"
 	"time"
 
@@ -211,6 +213,14 @@ func TestCheckRetryMode(t *testing.T) {
 			duration:     0,
 			resBackoff:   nil,
 			resRetriable: false,
+		},
+		{
+			name:         "EOF", // Issue https://github.com/ydb-platform/ydb-go-sdk/issues/754
+			err:          fmt.Errorf("test wrap: %w", io.EOF),
+			settings:     RetrySettings{},
+			duration:     0,
+			resBackoff:   backoff.Slow,
+			resRetriable: true,
 		},
 	}
 
