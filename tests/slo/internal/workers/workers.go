@@ -22,10 +22,10 @@ type Workers struct {
 	logger *zap.Logger
 }
 
-func New(cfg *config.Config, s ReadWriter, logger *zap.Logger, label string) (*Workers, error) {
+func New(cfg *config.Config, s ReadWriter, logger *zap.Logger, label, jobName string) (*Workers, error) {
 	logger = logger.Named("workers")
 
-	m, err := metrics.New(logger, cfg.PushGateway, label)
+	m, err := metrics.New(logger, cfg.PushGateway, label, jobName)
 	if err != nil {
 		logger.Error("create metrics failed", zap.Error(err))
 		return nil, err

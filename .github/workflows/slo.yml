@@ -7,41 +7,56 @@ on:
   pull_request:
   workflow_dispatch:
 jobs:
-  native:
+  test-slo:
     concurrency:
-      group: slo-native-${{ github.ref }}
+      group: slo-${{ github.ref }}
     if: (!contains(github.event.pull_request.labels.*.name, 'no slo'))
-    uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
-    secrets: inherit
-    with:
-      language_id: go-native
-      language: go/v3/native
-      workload_path: tests/slo
-      workload_build_options: -f Dockerfile --build-arg SRC_PATH=native
-      workload_build_context: ../..
-  database_sql:
-    needs: [native]
-    concurrency:
-      group: slo-database-sql-${{ github.ref }}
-    if: always() && !contains(github.event.pull_request.labels.*.name, 'no slo')
-    uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
-    secrets: inherit
-    with:
-      language_id: go-database-sql
-      language: go/v3/database/sql
-      workload_path: tests/slo
-      workload_build_options: -f Dockerfile --build-arg SRC_PATH=database/sql
-      workload_build_context: ../..
-  gorm:
-    needs: [database_sql]
-    concurrency:
-      group: slo-gorm-${{ github.ref }}
-    if: always() && !contains(github.event.pull_request.labels.*.name, 'no slo')
-    uses: ydb-platform/slo-tests/.github/workflows/slo.yml@main
-    secrets: inherit
-    with:
-      language_id: go-gorm
-      language: go/v3/gorm
-      workload_path: tests/slo
-      workload_build_options: -f Dockerfile --build-arg SRC_PATH=gorm
-      workload_build_context: ../..
+
+    runs-on: ubuntu-latest
+    name: SLO test
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+      issues: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Run SLO
+        uses: ydb-platform/slo-tests@js-version
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KUBECONFIG_B64: ${{ secrets.SLO_KUBE_CONFIG }}
+          AWS_CREDENTIALS_B64: ${{ secrets.SLO_AWS_CREDENTIALS }}
+          AWS_CONFIG_B64: ${{ secrets.SLO_AWS_CONFIG }}
+          DOCKER_USERNAME: ${{ secrets.SLO_DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.SLO_DOCKER_PASSWORD }}
+          DOCKER_REPO: ${{ secrets.SLO_DOCKER_REPO }}
+          DOCKER_FOLDER: ${{ secrets.SLO_DOCKER_FOLDER }}
+          s3_endpoint: ${{ secrets.SLO_S3_ENDPOINT }}
+          s3_images_folder: ${{ vars.SLO_S3_IMAGES_FOLDER }}
+          grafana_domain: ${{ vars.SLO_GRAFANA_DOMAIN }}
+          grafana_dashboard: ${{ vars.SLO_GRAFANA_DASHBOARD }}
+          ydb_version: 'newest'
+          timeBetweenPhases: 30
+          shutdownTime: 30
+
+          language_id0: 'native'
+          workload_path0: 'tests/slo'
+          language0: 'Go SDK Native'
+          workload_build_context0: ../..
+          workload_build_options0: -f Dockerfile --build-arg SRC_PATH=native --build-arg JOB_NAME=workload-native
+
+          language_id1: 'databasesql'
+          workload_path1: 'tests/slo'
+          language1: 'Go SDK database/sql'
+          workload_build_context1: ../..
+          workload_build_options1: -f Dockerfile --build-arg SRC_PATH=database/sql --build-arg JOB_NAME=workload-databasesql
+
+          language_id2: 'gorm'
+          workload_path2: 'tests/slo'
+          language2: 'Go SDK gorm'
+          workload_build_context2: ../..
+          workload_build_options2: -f Dockerfile --build-arg SRC_PATH=gorm --build-arg JOB_NAME=workload-gorm

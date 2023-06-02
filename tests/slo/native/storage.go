@@ -29,7 +29,7 @@ DECLARE $payload_str AS Utf8;
 DECLARE $payload_double AS Double;
 DECLARE $payload_timestamp AS Timestamp;
 
-UPSERT INTO %s (
+UPSERT INTO ` + "`%s`" + ` (
 	id, hash, payload_str, payload_double, payload_timestamp
 ) VALUES (
 	$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp
@@ -40,7 +40,7 @@ PRAGMA TablePathPrefix("%s");
 
 DECLARE $id AS Uint64;
 SELECT id, payload_str, payload_double, payload_timestamp, payload_hash
-FROM %s WHERE id = $id AND hash = Digest::NumericHash($id);
+FROM ` + "`%s`" + ` WHERE id = $id AND hash = Digest::NumericHash($id);
 `
 )
 
