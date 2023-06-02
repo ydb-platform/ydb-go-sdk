@@ -20,7 +20,7 @@ import (
 
 const (
 	createTemplate = `
-CREATE TABLE %s (
+CREATE TABLE ` + "`%s`" + ` (
     hash              Uint64,
     id                Uint64,
     payload_str       Utf8,
@@ -39,9 +39,9 @@ CREATE TABLE %s (
     AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = %d,
     UNIFORM_PARTITIONS = %d
 );`
-	dropTemplate   = `DROP TABLE %s;`
+	dropTemplate   = `DROP TABLE ` + "`%s`" + `;`
 	upsertTemplate = `
-UPSERT INTO %s (
+UPSERT INTO ` + "`%s`" + ` (
 	id, hash, payload_str, payload_double, payload_timestamp
 ) VALUES (
 	$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp
@@ -49,7 +49,7 @@ UPSERT INTO %s (
 `
 	selectTemplate = `
 SELECT id, payload_str, payload_double, payload_timestamp, payload_hash
-FROM %s WHERE id = $id AND hash = Digest::NumericHash($id);
+FROM ` + "`%s`" + ` WHERE id = $id AND hash = Digest::NumericHash($id);
 `
 )
 
