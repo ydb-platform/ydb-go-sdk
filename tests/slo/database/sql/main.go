@@ -20,7 +20,10 @@ import (
 
 var logger *zap.Logger
 
-var label string
+var (
+	label   string
+	jobName string
+)
 
 func init() {
 	var err error
@@ -105,7 +108,7 @@ func main() {
 	case config.RunMode:
 		gen := generator.New(cfg.InitialDataCount)
 
-		w, err := workers.New(cfg, s, logger, label)
+		w, err := workers.New(cfg, s, logger, label, jobName)
 		if err != nil {
 			panic(fmt.Errorf("create workers failed: %w", err))
 		}

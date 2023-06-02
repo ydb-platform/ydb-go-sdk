@@ -11,7 +11,6 @@ import (
 )
 
 const (
-	jobName    = "workload-go"
 	sdk        = "go"
 	sdkVersion = ydb.Version
 )
@@ -32,7 +31,7 @@ type (
 	}
 )
 
-func New(logger *zap.Logger, url, label string) (*Metrics, error) {
+func New(logger *zap.Logger, url, label, jobName string) (*Metrics, error) {
 	m := &Metrics{
 		logger: logger.Named("metrics"),
 

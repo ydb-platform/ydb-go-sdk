@@ -47,16 +47,16 @@ jobs:
           workload_path0: 'tests/slo'
           language0: 'Go SDK'
           workload_build_context0: ../..
-          workload_build_options0: -f Dockerfile --build-arg SRC_PATH=native
+          workload_build_options0: -f Dockerfile --build-arg SRC_PATH=native --build-arg JOB_NAME=workload-native
 
           language_id1: 'databasesql'
           workload_path1: 'tests/slo'
           language1: 'Go SDK'
           workload_build_context1: ../..
-          workload_build_options1: -f Dockerfile --build-arg SRC_PATH=database/sql
+          workload_build_options1: -f Dockerfile --build-arg SRC_PATH=database/sql --build-arg JOB_NAME=workload-databasesql
 
           language_id2: 'gorm'
           workload_path2: 'tests/slo'
           language2: 'Go SDK'
           workload_build_context2: ../..
-          workload_build_options2: -f Dockerfile --build-arg SRC_PATH=gorm
+          workload_build_options2: -f Dockerfile --build-arg SRC_PATH=gorm --build-arg JOB_NAME=workload-gorm
