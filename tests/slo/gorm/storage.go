@@ -44,12 +44,6 @@ var (
 	)
 )
 
-type entry struct {
-	Hash uint64 `gorm:"column:hash;primarykey;autoIncrement:false"`
-
-	generator.Row
-}
-
 type Storage struct {
 	db           *gorm.DB
 	cfg          *config.Config
@@ -112,9 +106,8 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (r generator.Row
 				return err
 			}
 
-			var e entry
-			err = s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).Model(&entry{}).
-				First(&e, "hash = ? AND id = ?",
+			err = s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).Model(&generator.Row{}).
+				First(&r, "hash = ? AND id = ?",
 					clause.Expr{
 						SQL:  "Digest::NumericHash(?)",
 						Vars: []interface{}{id},
@@ -124,8 +117,6 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (r generator.Row
 			if err != nil {
 				return err
 			}
-
-			r = e.Row
 
 			return nil
 		},
@@ -165,7 +156,7 @@ func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, e
 				return err
 			}
 
-			return s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).Model(&entry{}).
+			return s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).Model(&generator.Row{}).
 				Create(map[string]interface{}{
 					"Hash": clause.Expr{
 						SQL:  "Digest::NumericHash(?)",
@@ -203,7 +194,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 	defer cancel()
 
 	return s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).
-		Set("gorm:table_options", s.tableOptions).AutoMigrate(&entry{})
+		Set("gorm:table_options", s.tableOptions).AutoMigrate(&generator.Row{})
 }
 
 func (s *Storage) dropTable(ctx context.Context) error {
@@ -214,7 +205,7 @@ func (s *Storage) dropTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).Migrator().DropTable(&entry{})
+	return s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).Migrator().DropTable(&generator.Row{})
 }
 
 func (s *Storage) close(ctx context.Context) error {

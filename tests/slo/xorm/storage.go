@@ -8,11 +8,14 @@ import (
 	"path"
 	"time"
 
-	ydbSDK "github.com/ydb-platform/ydb-go-sdk/v3"
+	env "github.com/ydb-platform/ydb-go-sdk-auth-environ"
+	ydbZap "github.com/ydb-platform/ydb-go-sdk-zap"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"xorm.io/xorm"
+	"xorm.io/xorm/core"
 	"xorm.io/xorm/log"
 
 	"slo/internal/config"
@@ -53,29 +56,58 @@ func (m mapper) Table2Obj(_ string) string {
 }
 
 type Storage struct {
-	db  *xorm.Engine
+	cc  *ydb.Driver
+	c   ydb.SQLConnector
+	db  *sql.DB
+	x   *xorm.Engine
 	cfg *config.Config
 }
 
-func NewStorage(_ context.Context, cfg *config.Config, _ int) (*Storage, error) {
-	dsn := fmt.Sprintf(
-		"%s%s?go_query_bind=table_path_prefix(%s),declare,numeric&go_fake_tx=scripting&go_query_mode=scripting",
-		cfg.Endpoint, cfg.DB, path.Join(cfg.DB, label),
-	)
+func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (_ *Storage, err error) {
+	s := &Storage{
+		cfg: cfg,
+	}
 
-	db, err := xorm.NewEngine("ydb", dsn)
+	dsn := s.cfg.Endpoint + s.cfg.DB
+
+	s.cc, err = ydb.Open(
+		ctx,
+		dsn,
+		env.WithEnvironCredentials(ctx),
+		ydbZap.WithTraces(
+			logger,
+			trace.DetailsAll,
+		),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("ydb.Open error: %w", err)
+	}
+
+	s.c, err = ydb.Connector(s.cc,
+		ydb.WithAutoDeclare(),
+		ydb.WithNumericArgs(),
+		ydb.WithTablePathPrefix(path.Join(s.cc.Name(), label)),
+		ydb.WithFakeTx(ydb.ScriptingQueryMode),
+		ydb.WithDefaultQueryMode(ydb.ScriptingQueryMode),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("ydb.Connector error: %w", err)
+	}
+
+	s.db = sql.OpenDB(s.c)
+
+	s.x, err = xorm.NewEngineWithDB("ydb", dsn, core.FromDB(s.db))
 	if err != nil {
 		return nil, err
 	}
 
-	db.SetTableMapper(newMapper(cfg.Table, "entry"))
+	s.x.DB().SetMaxOpenConns(poolSize)
+	s.x.DB().SetMaxIdleConns(poolSize)
+	s.x.DB().SetConnMaxIdleTime(time.Second)
 
-	db.SetLogLevel(log.LOG_DEBUG)
+	s.x.SetTableMapper(newMapper(cfg.Table, "entry"))
 
-	s := &Storage{
-		cfg: cfg,
-		db:  db,
-	}
+	s.x.SetLogLevel(log.LOG_DEBUG)
 
 	return s, nil
 }
@@ -90,9 +122,9 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (row generator.R
 
 	row.ID = id
 
-	err = retry.Do(ydbSDK.WithTxControl(ctx, readTx), s.db.DB().DB,
+	err = retry.Do(ydb.WithTxControl(ctx, readTx), s.x.DB().DB,
 		func(ctx context.Context, cc *sql.Conn) (err error) {
-			has, err := s.db.Context(ctx).Get(&row)
+			has, err := s.x.Context(ctx).Get(&row)
 			if err != nil {
 				return fmt.Errorf("get entry error: %w", err)
 			}
@@ -129,13 +161,13 @@ func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, e
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	err = retry.Do(ydbSDK.WithTxControl(ctx, writeTx), s.db.DB().DB,
+	err = retry.Do(ydb.WithTxControl(ctx, writeTx), s.x.DB().DB,
 		func(ctx context.Context, cc *sql.Conn) (err error) {
 			if err = ctx.Err(); err != nil {
 				return err
 			}
 
-			_, err = s.db.Context(ctx).Insert(row)
+			_, err = s.x.Context(ctx).SetExpr("hash", fmt.Sprintf("Digest::NumericHash(%d)", row.ID)).Insert(row)
 			return err
 		},
 		retry.WithDoRetryOptions(
@@ -165,7 +197,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return s.db.Context(ctx).CreateTable(generator.Row{})
+	return s.x.Context(ctx).CreateTable(generator.Row{})
 }
 
 func (s *Storage) dropTable(ctx context.Context) error {
@@ -176,7 +208,7 @@ func (s *Storage) dropTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return s.db.Context(ctx).DropTable(generator.Row{})
+	return s.x.Context(ctx).DropTable(generator.Row{})
 }
 
 func (s *Storage) close(ctx context.Context) error {
@@ -184,5 +216,21 @@ func (s *Storage) close(ctx context.Context) error {
 		return err
 	}
 
-	return s.db.Context(ctx).Close()
+	if err := s.x.Context(ctx).Close(); err != nil {
+		return fmt.Errorf("close sessions pool error: %w", err)
+	}
+
+	if err := s.db.Close(); err != nil {
+		return fmt.Errorf("close database/sql driver error: %w", err)
+	}
+
+	if err := s.c.Close(); err != nil {
+		return fmt.Errorf("close connector error: %w", err)
+	}
+
+	if err := s.cc.Close(ctx); err != nil {
+		return fmt.Errorf("close ydb driver error: %w", err)
+	}
+
+	return nil
 }
