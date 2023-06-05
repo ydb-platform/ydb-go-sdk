@@ -217,19 +217,19 @@ func (s *Storage) close(ctx context.Context) error {
 	}
 
 	if err := s.x.Context(ctx).Close(); err != nil {
-		return fmt.Errorf("close sessions pool error: %w", err)
+		return fmt.Errorf("error close sessions pool: %w", err)
 	}
 
 	if err := s.db.Close(); err != nil {
-		return fmt.Errorf("close database/sql driver error: %w", err)
+		return fmt.Errorf("error close database/sql driver: %w", err)
 	}
 
 	if err := s.c.Close(); err != nil {
-		return fmt.Errorf("close connector error: %w", err)
+		return fmt.Errorf("error close connector: %w", err)
 	}
 
 	if err := s.cc.Close(ctx); err != nil {
-		return fmt.Errorf("close ydb driver error: %w", err)
+		return fmt.Errorf("error close ydb driver: %w", err)
 	}
 
 	return nil

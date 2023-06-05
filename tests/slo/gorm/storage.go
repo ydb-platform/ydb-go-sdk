@@ -100,7 +100,7 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (r generator.Row
 		return generator.Row{}, attempts, err
 	}
 
-	return r, attempts, retry.Do(ydbSDK.WithTxControl(ctx, readTx), db,
+	err = retry.Do(ydbSDK.WithTxControl(ctx, readTx), db,
 		func(ctx context.Context, cc *sql.Conn) (err error) {
 			if err = ctx.Err(); err != nil {
 				return err
@@ -135,6 +135,8 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (r generator.Row
 			),
 		),
 	)
+
+	return r, attempts, err
 }
 
 func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, err error) {
@@ -150,7 +152,7 @@ func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, e
 		return attempts, err
 	}
 
-	return attempts, retry.Do(ydbSDK.WithTxControl(ctx, writeTx), db,
+	err = retry.Do(ydbSDK.WithTxControl(ctx, writeTx), db,
 		func(ctx context.Context, cc *sql.Conn) (err error) {
 			if err = ctx.Err(); err != nil {
 				return err
@@ -183,6 +185,8 @@ func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, e
 			),
 		),
 	)
+
+	return attempts, err
 }
 
 func (s *Storage) createTable(ctx context.Context) error {

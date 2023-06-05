@@ -169,7 +169,7 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return attempts, retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
+	err = retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
 		func(ctx context.Context, cc *sql.Conn) (err error) {
 			if err = ctx.Err(); err != nil {
 				return err
@@ -199,6 +199,8 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err
 			),
 		),
 	)
+
+	return attempts, err
 }
 
 func (s *Storage) createTable(ctx context.Context) error {
@@ -239,10 +241,16 @@ func (s *Storage) close(ctx context.Context) error {
 	}
 
 	if err := s.db.Close(); err != nil {
-		return err
+		return fmt.Errorf("error close database/sql driver: %w", err)
 	}
+
 	if err := s.c.Close(); err != nil {
-		return err
+		return fmt.Errorf("error close connector: %w", err)
 	}
-	return s.cc.Close(ctx)
+
+	if err := s.cc.Close(ctx); err != nil {
+		return fmt.Errorf("error close ydb driver: %w", err)
+	}
+
+	return nil
 }
