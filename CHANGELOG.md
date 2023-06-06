@@ -1,3 +1,4 @@
+## v3.47.5
 * Added `scheme.Entry.IsColumnTable()` helper
 
 ## v3.47.4
