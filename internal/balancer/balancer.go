@@ -45,6 +45,9 @@ type Balancer struct {
 }
 
 func (b *Balancer) HasNode(id uint32) bool {
+	if b.balancerConfig.SingleConn {
+		return true
+	}
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	if _, has := b.connectionsState.connByNodeID[id]; has {
