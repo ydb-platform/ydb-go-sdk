@@ -52,4 +52,4 @@ require (
 
 replace github.com/ydb-platform/ydb-go-sdk/v3 => ../../.
 
-replace xorm.io/xorm => github.com/ydb-platform/xorm v0.0.2
+replace xorm.io/xorm => github.com/ydb-platform/xorm v0.0.3

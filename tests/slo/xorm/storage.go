@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"strconv"
 	"time"
 
 	env "github.com/ydb-platform/ydb-go-sdk-auth-environ"
@@ -108,6 +109,16 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (_ *Stora
 	s.x.SetTableMapper(newMapper(cfg.Table, "entry"))
 
 	s.x.SetLogLevel(log.LOG_DEBUG)
+
+	tableParams := map[string]string{
+		"AUTO_PARTITIONING_BY_SIZE":              "ENABLED",
+		"AUTO_PARTITIONING_BY_LOAD":              "ENABLED",
+		"AUTO_PARTITIONING_PARTITION_SIZE_MB":    strconv.FormatUint(s.cfg.PartitionSize, 10),
+		"AUTO_PARTITIONING_MIN_PARTITIONS_COUNT": strconv.FormatUint(s.cfg.MinPartitionsCount, 10),
+		"AUTO_PARTITIONING_MAX_PARTITIONS_COUNT": strconv.FormatUint(s.cfg.MaxPartitionsCount, 10),
+		"UNIFORM_PARTITIONS":                     strconv.FormatUint(s.cfg.MinPartitionsCount, 10),
+	}
+	s.x.Dialect().SetParams(tableParams)
 
 	return s, nil
 }
