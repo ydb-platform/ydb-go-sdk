@@ -1,3 +1,5 @@
+* Added `scheme.Entry.IsColumnTable()` helper
+
 ## v3.47.4
 * Disabled check of node exists with `balancers.SingleConn`
 * Improved code with `go-critic` linter

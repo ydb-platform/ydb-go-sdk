@@ -80,6 +80,10 @@ func (e *Entry) IsTable() bool {
 	return e.Type == EntryTable
 }
 
+func (e *Entry) IsColumnTable() bool {
+	return e.Type == EntryColumnTable
+}
+
 func (e *Entry) IsPersQueueGroup() bool {
 	return e.Type == EntryPersQueueGroup
 }
