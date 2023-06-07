@@ -29,29 +29,38 @@ func ToDecimal(v Value) (*Decimal, error) {
 	return nil, xerrors.WithStackTrace(fmt.Errorf("value type '%s' is not decimal type", v.Type().Yql()))
 }
 
+func ListItems(v Value) ([]Value, error) {
+	if vv, has := v.(interface {
+		ListItems() []Value
+	}); has {
+		return vv.ListItems(), nil
+	}
+	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get list items from '%s'", v.Type().Yql()))
+}
+
 func TupleItems(v Value) ([]Value, error) {
 	if vv, has := v.(interface {
-		Items() []Value
+		TupleItems() []Value
 	}); has {
-		return vv.Items(), nil
+		return vv.TupleItems(), nil
 	}
 	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get tuple items from '%s'", v.Type().Yql()))
 }
 
 func StructFields(v Value) (map[string]Value, error) {
 	if vv, has := v.(interface {
-		Fields() map[string]Value
+		StructFields() map[string]Value
 	}); has {
-		return vv.Fields(), nil
+		return vv.StructFields(), nil
 	}
 	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get struct fields from '%s'", v.Type().Yql()))
 }
 
-func DictFields(v Value) (map[Value]Value, error) {
+func DictValues(v Value) (map[Value]Value, error) {
 	if vv, has := v.(interface {
-		Values() map[Value]Value
+		DictValues() map[Value]Value
 	}); has {
-		return vv.Values(), nil
+		return vv.DictValues(), nil
 	}
 	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get dict values from '%s'", v.Type().Yql()))
 }

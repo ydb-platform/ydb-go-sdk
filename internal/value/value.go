@@ -501,7 +501,7 @@ type (
 	}
 )
 
-func (v *dictValue) Values() map[Value]Value {
+func (v *dictValue) DictValues() map[Value]Value {
 	values := make(map[Value]Value, len(v.values))
 	for i := range v.values {
 		values[v.values[i].K] = v.values[i].V
@@ -1053,6 +1053,10 @@ type listValue struct {
 	items []Value
 }
 
+func (v *listValue) ListItems() []Value {
+	return v.items
+}
+
 func (v *listValue) castTo(dst interface{}) error {
 	return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, dst))
 }
@@ -1230,7 +1234,7 @@ type (
 	}
 )
 
-func (v *structValue) Fields() map[string]Value {
+func (v *structValue) StructFields() map[string]Value {
 	fields := make(map[string]Value, len(v.fields))
 	for i := range v.fields {
 		fields[v.fields[i].Name] = v.fields[i].V
@@ -1261,7 +1265,7 @@ func (v *structValue) Type() Type {
 	return v.t
 }
 
-func (v structValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v *structValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vvv := a.Value()
 
 	for i := range v.fields {
@@ -1332,7 +1336,7 @@ type tupleValue struct {
 	items []Value
 }
 
-func (v *tupleValue) Items() []Value {
+func (v *tupleValue) TupleItems() []Value {
 	return v.items
 }
 
