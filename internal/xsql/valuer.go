@@ -7,7 +7,7 @@ type valuer struct {
 }
 
 func (v *valuer) UnmarshalYDB(raw types.RawValue) error {
-	v.v = raw
+	v.v = raw.Any()
 	return nil
 }
 

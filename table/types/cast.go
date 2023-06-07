@@ -56,6 +56,17 @@ func StructFields(v Value) (map[string]Value, error) {
 	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get struct fields from '%s'", v.Type().Yql()))
 }
 
+func VariantValue(v Value) (name string, idx uint32, _ Value, _ error) {
+	if vv, has := v.(interface {
+		Variant() (name string, index uint32)
+		Value() Value
+	}); has {
+		name, idx := vv.Variant()
+		return name, idx, vv.Value(), nil
+	}
+	return "", 0, nil, xerrors.WithStackTrace(fmt.Errorf("cannot get variant value from '%s'", v.Type().Yql()))
+}
+
 func DictValues(v Value) (map[Value]Value, error) {
 	if vv, has := v.(interface {
 		DictValues() map[Value]Value
