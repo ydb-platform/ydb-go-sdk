@@ -18,6 +18,16 @@ func CastTo(v Value, dst interface{}) error {
 	return value.CastTo(v, dst)
 }
 
+func IsOptional(t Type) (isOptional bool, innerType Type) {
+	if optionalType, isOptional := t.(interface {
+		IsOptional()
+		InnerType() Type
+	}); isOptional {
+		return isOptional, optionalType.InnerType()
+	}
+	return false, nil
+}
+
 // ToDecimal returns Decimal struct from abstract Value
 func ToDecimal(v Value) (*Decimal, error) {
 	if valuer, isDecimalValuer := v.(value.DecimalValuer); isDecimalValuer {
