@@ -21,7 +21,7 @@ func Example() {
 	}
 	d, err := db.Scheme().ListDirectory(ctx, "/local/test")
 	if err != nil {
-		fmt.Printf("failed to lsit directory: %v", err)
+		fmt.Printf("failed to list directory: %v", err)
 	}
 	fmt.Printf("list directory: %+v\n", d)
 }

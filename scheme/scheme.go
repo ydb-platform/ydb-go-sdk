@@ -48,7 +48,7 @@ func (t EntryType) String() string {
 	case EntryPersQueueGroup:
 		return "PersQueueGroup"
 	case EntryDatabase:
-		return "Name"
+		return "Database"
 	case EntryRtmrVolume:
 		return "RtmrVolume"
 	case EntryBlockStoreVolume:
