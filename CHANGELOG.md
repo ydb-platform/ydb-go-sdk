@@ -1,5 +1,5 @@
-* Fixed `database/sql` driver for get and parse container ydb types 
-* Refactored `table/scanner.scanner.Any()` behaviour: for non-primitive types returns raw `table/types.Value` instead nil from previous behaviour
+* Fixed `database/sql` driver for get and parse container ydb types
+* Changed `table/scanner.scanner.Any()` behaviour: for non-primitive types returns raw `table/types.Value` instead nil from previous behaviour
 * Added `table/types.{ListItems,VariantValue,DictValues}` helpers for get internal content of abstract `table/types.Value`
 * Marked as deprecated `table/types.DictFields` (use `table/types.DictValues` instead)
 
