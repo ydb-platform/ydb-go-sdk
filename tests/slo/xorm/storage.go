@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"path"
+	"strconv"
 	"time"
 
 	env "github.com/ydb-platform/ydb-go-sdk-auth-environ"
@@ -13,44 +15,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"xorm.io/xorm"
+	"xorm.io/xorm/core"
+	"xorm.io/xorm/log"
 
 	"slo/internal/config"
 	"slo/internal/generator"
-)
-
-const (
-	createTemplate = `
-CREATE TABLE ` + "`%s`" + ` (
-    hash              Uint64,
-    id                Uint64,
-    payload_str       Utf8,
-    payload_double    Double,
-    payload_timestamp Timestamp,
-    payload_hash      Uint64,
-    PRIMARY KEY (
-        hash,
-        id
-    )
-) WITH (
-    AUTO_PARTITIONING_BY_SIZE = ENABLED,
-    AUTO_PARTITIONING_BY_LOAD = ENABLED,
-    AUTO_PARTITIONING_PARTITION_SIZE_MB = %d,
-    AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = %d,
-    AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = %d,
-    UNIFORM_PARTITIONS = %d
-);`
-	dropTemplate   = `DROP TABLE ` + "`%s`" + `;`
-	upsertTemplate = `
-UPSERT INTO ` + "`%s`" + ` (
-	id, hash, payload_str, payload_double, payload_timestamp
-) VALUES (
-	$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp
-);
-`
-	selectTemplate = `
-SELECT id, payload_str, payload_double, payload_timestamp, payload_hash
-FROM ` + "`%s`" + ` WHERE id = $id AND hash = Digest::NumericHash($id);
-`
 )
 
 var (
@@ -66,33 +36,44 @@ var (
 	)
 )
 
-type Storage struct {
-	cc          *ydb.Driver
-	c           ydb.SQLConnector
-	db          *sql.DB
-	cfg         *config.Config
-	createQuery string
-	dropQuery   string
-	upsertQuery string
-	selectQuery string
+type mapper struct {
+	tableName  string
+	objectName string
 }
 
-func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Storage, err error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
-	defer cancel()
-
-	s = &Storage{
-		cfg: cfg,
-		createQuery: fmt.Sprintf(createTemplate, cfg.Table,
-			cfg.PartitionSize, cfg.MinPartitionsCount, cfg.MaxPartitionsCount, cfg.MinPartitionsCount),
-		dropQuery:   fmt.Sprintf(dropTemplate, cfg.Table),
-		upsertQuery: fmt.Sprintf(upsertTemplate, cfg.Table),
-		selectQuery: fmt.Sprintf(selectTemplate, cfg.Table),
+func newMapper(tableName, objectName string) *mapper {
+	return &mapper{
+		tableName:  tableName,
+		objectName: objectName,
 	}
+}
+
+func (m mapper) Obj2Table(_ string) string {
+	return m.tableName
+}
+
+func (m mapper) Table2Obj(_ string) string {
+	return m.objectName
+}
+
+type Storage struct {
+	cc  *ydb.Driver
+	c   ydb.SQLConnector
+	db  *sql.DB
+	x   *xorm.Engine
+	cfg *config.Config
+}
+
+func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (_ *Storage, err error) {
+	s := &Storage{
+		cfg: cfg,
+	}
+
+	dsn := s.cfg.Endpoint + s.cfg.DB
 
 	s.cc, err = ydb.Open(
 		ctx,
-		s.cfg.Endpoint+s.cfg.DB,
+		dsn,
 		env.WithEnvironCredentials(ctx),
 		ydbZap.WithTraces(
 			logger,
@@ -105,7 +86,10 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Stora
 
 	s.c, err = ydb.Connector(s.cc,
 		ydb.WithAutoDeclare(),
+		ydb.WithNumericArgs(),
 		ydb.WithTablePathPrefix(path.Join(s.cc.Name(), label)),
+		ydb.WithFakeTx(ydb.ScriptingQueryMode),
+		ydb.WithDefaultQueryMode(ydb.ScriptingQueryMode),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("ydb.Connector error: %w", err)
@@ -113,14 +97,33 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Stora
 
 	s.db = sql.OpenDB(s.c)
 
-	s.db.SetMaxOpenConns(poolSize)
-	s.db.SetMaxIdleConns(poolSize)
-	s.db.SetConnMaxIdleTime(time.Second)
+	s.x, err = xorm.NewEngineWithDB("ydb", dsn, core.FromDB(s.db))
+	if err != nil {
+		return nil, err
+	}
+
+	s.x.DB().SetMaxOpenConns(poolSize)
+	s.x.DB().SetMaxIdleConns(poolSize)
+	s.x.DB().SetConnMaxIdleTime(time.Second)
+
+	s.x.SetTableMapper(newMapper(cfg.Table, "entry"))
+
+	s.x.SetLogLevel(log.LOG_DEBUG)
+
+	tableParams := map[string]string{
+		"AUTO_PARTITIONING_BY_SIZE":              "ENABLED",
+		"AUTO_PARTITIONING_BY_LOAD":              "ENABLED",
+		"AUTO_PARTITIONING_PARTITION_SIZE_MB":    strconv.FormatUint(s.cfg.PartitionSize, 10),
+		"AUTO_PARTITIONING_MIN_PARTITIONS_COUNT": strconv.FormatUint(s.cfg.MinPartitionsCount, 10),
+		"AUTO_PARTITIONING_MAX_PARTITIONS_COUNT": strconv.FormatUint(s.cfg.MaxPartitionsCount, 10),
+		"UNIFORM_PARTITIONS":                     strconv.FormatUint(s.cfg.MinPartitionsCount, 10),
+	}
+	s.x.Dialect().SetParams(tableParams)
 
 	return s, nil
 }
 
-func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (res generator.Row, attempts int, err error) {
+func (s *Storage) Read(ctx context.Context, id generator.RowID) (row generator.Row, attempts int, err error) {
 	if err = ctx.Err(); err != nil {
 		return generator.Row{}, attempts, err
 	}
@@ -128,19 +131,19 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (res genera
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ReadTimeout)*time.Millisecond)
 	defer cancel()
 
-	err = retry.Do(ydb.WithTxControl(ctx, readTx), s.db,
+	row.ID = id
+
+	err = retry.Do(ydb.WithTxControl(ctx, readTx), s.x.DB().DB,
 		func(ctx context.Context, cc *sql.Conn) (err error) {
-			if err = ctx.Err(); err != nil {
-				return err
+			has, err := s.x.Context(ctx).Get(&row)
+			if err != nil {
+				return fmt.Errorf("get entry error: %w", err)
+			}
+			if !has {
+				return errors.New("get entry: entry not found")
 			}
 
-			row := cc.QueryRowContext(ydb.WithQueryMode(ctx, ydb.DataQueryMode), s.selectQuery,
-				sql.Named("id", &entryID),
-			)
-
-			var hash *uint64
-
-			return row.Scan(&res.ID, &res.PayloadStr, &res.PayloadDouble, &res.PayloadTimestamp, &hash)
+			return nil
 		},
 		retry.WithDoRetryOptions(
 			retry.WithIdempotent(true),
@@ -158,10 +161,10 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (res genera
 		),
 	)
 
-	return res, attempts, err
+	return row, attempts, err
 }
 
-func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err error) {
+func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, err error) {
 	if err = ctx.Err(); err != nil {
 		return attempts, err
 	}
@@ -169,19 +172,13 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	err = retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
+	err = retry.Do(ydb.WithTxControl(ctx, writeTx), s.x.DB().DB,
 		func(ctx context.Context, cc *sql.Conn) (err error) {
 			if err = ctx.Err(); err != nil {
 				return err
 			}
 
-			_, err = cc.ExecContext(ydb.WithQueryMode(ctx, ydb.DataQueryMode), s.upsertQuery,
-				sql.Named("id", e.ID),
-				sql.Named("payload_str", *e.PayloadStr),
-				sql.Named("payload_double", *e.PayloadDouble),
-				sql.Named("payload_timestamp", *e.PayloadTimestamp),
-			)
-
+			_, err = s.x.Context(ctx).SetExpr("hash", fmt.Sprintf("Digest::NumericHash(%d)", row.ID)).Insert(row)
 			return err
 		},
 		retry.WithDoRetryOptions(
@@ -211,12 +208,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
-		func(ctx context.Context, cc *sql.Conn) error {
-			_, err := s.db.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), s.createQuery)
-			return err
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)),
-	)
+	return s.x.Context(ctx).CreateTable(generator.Row{})
 }
 
 func (s *Storage) dropTable(ctx context.Context) error {
@@ -227,17 +219,16 @@ func (s *Storage) dropTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
-		func(ctx context.Context, cc *sql.Conn) error {
-			_, err := s.db.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), s.dropQuery)
-			return err
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)),
-	)
+	return s.x.Context(ctx).DropTable(generator.Row{})
 }
 
 func (s *Storage) close(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+
+	if err := s.x.Context(ctx).Close(); err != nil {
+		return fmt.Errorf("error close sessions pool: %w", err)
 	}
 
 	if err := s.db.Close(); err != nil {

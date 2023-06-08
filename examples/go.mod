@@ -12,7 +12,7 @@ require (
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.1.2
 	github.com/ydb-platform/ydb-go-sdk-prometheus v0.11.10
 	github.com/ydb-platform/ydb-go-sdk-zerolog v0.12.2
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.47.2
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.47.3
 	github.com/ydb-platform/ydb-go-yc v0.10.1
 	google.golang.org/genproto v0.0.0-20230131230820-1c016267d619
 	gorm.io/driver/postgres v1.5.0
@@ -77,4 +77,4 @@ require (
 
 replace github.com/ydb-platform/ydb-go-sdk/v3 => ../
 
-replace xorm.io/xorm => github.com/ydb-platform/xorm v0.0.0
+replace xorm.io/xorm => github.com/ydb-platform/xorm v0.0.3

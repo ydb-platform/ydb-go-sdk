@@ -106,7 +106,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 
 	e := generator.Row{}
 
-	return e, attempts, s.db.Table().Do(ctx,
+	err = s.db.Table().Do(ctx,
 		func(ctx context.Context, session table.Session) (err error) {
 			if err = ctx.Err(); err != nil {
 				return err
@@ -157,9 +157,11 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 			},
 		}),
 	)
+
+	return e, attempts, err
 }
 
-func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err error) {
+func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, _ error) {
 	if err := ctx.Err(); err != nil {
 		return attempts, err
 	}
@@ -167,7 +169,7 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return attempts, s.db.Table().Do(ctx,
+	err := s.db.Table().Do(ctx,
 		func(ctx context.Context, session table.Session) error {
 			if err := ctx.Err(); err != nil {
 				return err
@@ -203,6 +205,8 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err
 			},
 		}),
 	)
+
+	return attempts, err
 }
 
 func (s *Storage) createTable(ctx context.Context) error {

@@ -25,7 +25,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Run SLO
-        uses: ydb-platform/slo-tests@js-version
+        uses: ydb-platform/slo-tests@additional-logs
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           KUBECONFIG_B64: ${{ secrets.SLO_KUBE_CONFIG }}
@@ -45,7 +45,7 @@ jobs:
 
           language_id0: 'native'
           workload_path0: 'tests/slo'
-          language0: 'Go SDK Native'
+          language0: 'Go SDK native'
           workload_build_context0: ../..
           workload_build_options0: -f Dockerfile --build-arg SRC_PATH=native --build-arg JOB_NAME=workload-native
 
@@ -60,3 +60,15 @@ jobs:
           language2: 'Go SDK gorm'
           workload_build_context2: ../..
           workload_build_options2: -f Dockerfile --build-arg SRC_PATH=gorm --build-arg JOB_NAME=workload-gorm
+
+          language_id3: 'xorm'
+          workload_path3: 'tests/slo'
+          language3: 'Go SDK xorm'
+          workload_build_context3: ../..
+          workload_build_options3: -f Dockerfile --build-arg SRC_PATH=xorm --build-arg JOB_NAME=workload-xorm
+
+      - uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: slo-logs
+          path: logs/
