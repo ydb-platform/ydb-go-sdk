@@ -1,3 +1,8 @@
+* Fixed `database/sql` driver for get and parse container ydb types 
+* Refactored `table/scanner.scanner.Any()` behaviour: for non-primitive types returns raw `table/types.Value` instead nil from previous behaviour
+* Added `table/types.{ListItems,VariantValue,DictValues}` helpers for get internal content of abstract `table/types.Value`
+* Marked as deprecated `table/types.DictFields` (use `table/types.DictValues` instead)
+
 ## v3.47.5
 * Added `scheme.Entry.IsColumnTable()` helper
 

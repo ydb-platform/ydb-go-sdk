@@ -1191,9 +1191,6 @@ func (v *optionalValue) castTo(dst interface{}) error {
 	}
 	return v.value.castTo(dst)
 }
-func (v *optionalValue) UnwrapOptional() Value {
-	return v.value
-}
 
 func (v *optionalValue) Yql() string {
 	if v.value == nil {
@@ -1832,8 +1829,9 @@ func (v *variantValue) Variant() (name string, index uint32) {
 	switch t := v.innerType.(type) {
 	case *variantStructType:
 		return t.fields[v.idx].Name, v.idx
+	default:
+		return "", v.idx
 	}
-	return "", v.idx
 }
 
 func (v *variantValue) Value() Value {

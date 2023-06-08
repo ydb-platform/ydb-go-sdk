@@ -18,6 +18,7 @@ func CastTo(v Value, dst interface{}) error {
 	return value.CastTo(v, dst)
 }
 
+// ToDecimal returns Decimal struct from abstract Value
 func ToDecimal(v Value) (*Decimal, error) {
 	if valuer, isDecimalValuer := v.(value.DecimalValuer); isDecimalValuer {
 		return &Decimal{
@@ -29,6 +30,7 @@ func ToDecimal(v Value) (*Decimal, error) {
 	return nil, xerrors.WithStackTrace(fmt.Errorf("value type '%s' is not decimal type", v.Type().Yql()))
 }
 
+// ListItems returns list items from abstract Value
 func ListItems(v Value) ([]Value, error) {
 	if vv, has := v.(interface {
 		ListItems() []Value
@@ -38,6 +40,7 @@ func ListItems(v Value) ([]Value, error) {
 	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get list items from '%s'", v.Type().Yql()))
 }
 
+// TupleItems returns tuple items from abstract Value
 func TupleItems(v Value) ([]Value, error) {
 	if vv, has := v.(interface {
 		TupleItems() []Value
@@ -47,6 +50,7 @@ func TupleItems(v Value) ([]Value, error) {
 	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get tuple items from '%s'", v.Type().Yql()))
 }
 
+// StructFields returns struct fields from abstract Value
 func StructFields(v Value) (map[string]Value, error) {
 	if vv, has := v.(interface {
 		StructFields() map[string]Value
@@ -56,6 +60,7 @@ func StructFields(v Value) (map[string]Value, error) {
 	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get struct fields from '%s'", v.Type().Yql()))
 }
 
+// VariantValue returns variant value from abstract Value
 func VariantValue(v Value) (name string, idx uint32, _ Value, _ error) {
 	if vv, has := v.(interface {
 		Variant() (name string, index uint32)
@@ -67,6 +72,14 @@ func VariantValue(v Value) (name string, idx uint32, _ Value, _ error) {
 	return "", 0, nil, xerrors.WithStackTrace(fmt.Errorf("cannot get variant value from '%s'", v.Type().Yql()))
 }
 
+// DictFields returns dict values from abstract Value
+//
+// Deprecated: use DictValues instead
+func DictFields(v Value) (map[Value]Value, error) {
+	return DictValues(v)
+}
+
+// DictValues returns dict values from abstract Value
 func DictValues(v Value) (map[Value]Value, error) {
 	if vv, has := v.(interface {
 		DictValues() map[Value]Value
