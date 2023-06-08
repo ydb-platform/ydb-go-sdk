@@ -140,7 +140,7 @@ func (p *Pool) Release(ctx context.Context) error {
 
 	var (
 		errCh = make(chan error, len(conns))
-		wg       sync.WaitGroup
+		wg      sync.WaitGroup
 	)
 	
 	wg.Add(len(conns))
