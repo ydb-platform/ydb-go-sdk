@@ -2,6 +2,7 @@ package conn
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -137,11 +138,26 @@ func (p *Pool) Release(ctx context.Context) error {
 		}
 	})
 
-	var issues []error
+	var (
+		errCh = make(chan error, len(conns))
+		wg    sync.WaitGroup
+	)
+
+	wg.Add(len(conns))
 	for _, c := range conns {
-		if err := c.Close(ctx); err != nil {
-			issues = append(issues, err)
-		}
+		go func(c closer.Closer) {
+			defer wg.Done()
+			if err := c.Close(ctx); err != nil {
+				errCh <- err
+			}
+		}(c)
+	}
+	wg.Wait()
+	close(errCh)
+
+	issues := make([]error, 0, len(conns))
+	for err := range errCh {
+		issues = append(issues, err)
 	}
 
 	if len(issues) > 0 {

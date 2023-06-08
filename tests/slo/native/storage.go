@@ -22,20 +22,25 @@ import (
 
 const (
 	upsertTemplate = `
+PRAGMA TablePathPrefix("%s");
+
 DECLARE $id AS Uint64;
 DECLARE $payload_str AS Utf8;
 DECLARE $payload_double AS Double;
 DECLARE $payload_timestamp AS Timestamp;
-UPSERT INTO %s (
+
+UPSERT INTO ` + "`%s`" + ` (
 	id, hash, payload_str, payload_double, payload_timestamp
 ) VALUES (
 	$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp
 );
 `
 	selectTemplate = `
+PRAGMA TablePathPrefix("%s");
+
 DECLARE $id AS Uint64;
 SELECT id, payload_str, payload_double, payload_timestamp, payload_hash
-FROM %s WHERE id = $id AND hash = Digest::NumericHash($id);
+FROM ` + "`%s`" + ` WHERE id = $id AND hash = Digest::NumericHash($id);
 `
 )
 
@@ -55,6 +60,7 @@ var (
 type Storage struct {
 	db          *ydb.Driver
 	cfg         *config.Config
+	prefix      string
 	upsertQuery string
 	selectQuery string
 }
@@ -63,15 +69,9 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
-	s := &Storage{
-		cfg:         cfg,
-		upsertQuery: fmt.Sprintf(upsertTemplate, cfg.Table),
-		selectQuery: fmt.Sprintf(selectTemplate, cfg.Table),
-	}
-	var err error
-	s.db, err = ydb.Open(
+	db, err := ydb.Open(
 		ctx,
-		s.cfg.Endpoint+s.cfg.DB,
+		cfg.Endpoint+cfg.DB,
 		env.WithEnvironCredentials(ctx),
 		ydbZap.WithTraces(
 			logger,
@@ -83,12 +83,22 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 		return nil, err
 	}
 
+	prefix := path.Join(db.Name(), label)
+
+	s := &Storage{
+		db:          db,
+		cfg:         cfg,
+		prefix:      prefix,
+		upsertQuery: fmt.Sprintf(upsertTemplate, prefix, cfg.Table),
+		selectQuery: fmt.Sprintf(selectTemplate, prefix, cfg.Table),
+	}
+
 	return s, nil
 }
 
-func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (generator.Row, error) {
-	if err := ctx.Err(); err != nil {
-		return generator.Row{}, err
+func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generator.Row, attempts int, err error) {
+	if err = ctx.Err(); err != nil {
+		return generator.Row{}, attempts, err
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ReadTimeout)*time.Millisecond)
@@ -96,7 +106,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (generator.
 
 	e := generator.Row{}
 
-	err := s.db.Table().Do(ctx,
+	err = s.db.Table().Do(ctx,
 		func(ctx context.Context, session table.Session) (err error) {
 			if err = ctx.Err(); err != nil {
 				return err
@@ -136,20 +146,30 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (generator.
 
 			return res.Err()
 		},
+		table.WithIdempotent(),
+		table.WithTrace(trace.Table{
+			OnDo: func(info trace.TableDoStartInfo) func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
+				return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
+					return func(info trace.TableDoDoneInfo) {
+						attempts = info.Attempts
+					}
+				}
+			},
+		}),
 	)
 
-	return e, err
+	return e, attempts, err
 }
 
-func (s *Storage) Write(ctx context.Context, e generator.Row) error {
+func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, _ error) {
 	if err := ctx.Err(); err != nil {
-		return err
+		return attempts, err
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return s.db.Table().Do(ctx,
+	err := s.db.Table().Do(ctx,
 		func(ctx context.Context, session table.Session) error {
 			if err := ctx.Err(); err != nil {
 				return err
@@ -175,7 +195,18 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) error {
 			return res.Close()
 		},
 		table.WithIdempotent(),
+		table.WithTrace(trace.Table{
+			OnDo: func(info trace.TableDoStartInfo) func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
+				return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
+					return func(info trace.TableDoDoneInfo) {
+						attempts = info.Attempts
+					}
+				}
+			},
+		}),
 	)
+
+	return attempts, err
 }
 
 func (s *Storage) createTable(ctx context.Context) error {
@@ -184,7 +215,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 
 	return s.db.Table().Do(ctx,
 		func(ctx context.Context, session table.Session) error {
-			return session.CreateTable(ctx, path.Join(s.db.Name(), s.cfg.Table),
+			return session.CreateTable(ctx, path.Join(s.prefix, s.cfg.Table),
 				options.WithColumn("hash", types.Optional(types.TypeUint64)),
 				options.WithColumn("id", types.Optional(types.TypeUint64)),
 				options.WithColumn("payload_str", types.Optional(types.TypeUTF8)),
@@ -202,6 +233,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 				options.WithPartitions(options.WithUniformPartitions(s.cfg.MinPartitionsCount)),
 			)
 		},
+		table.WithIdempotent(),
 	)
 }
 
@@ -216,8 +248,9 @@ func (s *Storage) dropTable(ctx context.Context) error {
 
 	return s.db.Table().Do(ctx,
 		func(ctx context.Context, session table.Session) (err error) {
-			return session.DropTable(ctx, path.Join(s.db.Name(), s.cfg.Table))
+			return session.DropTable(ctx, path.Join(s.prefix, s.cfg.Table))
 		},
+		table.WithIdempotent(),
 	)
 }
 

@@ -31,13 +31,17 @@ func (w *Workers) write(ctx context.Context, gen *generator.Generator) (err erro
 		return err
 	}
 
+	var attempts int
+
 	m := w.m.Start(metrics.JobWrite)
 	defer func() {
-		m.Stop(err)
+		m.Stop(err, attempts)
 		if err != nil {
 			w.logger.Error("error when stop 'write' worker", zap.Error(err))
 		}
 	}()
 
-	return w.s.Write(ctx, row)
+	attempts, err = w.s.Write(ctx, row)
+
+	return err
 }

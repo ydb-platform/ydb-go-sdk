@@ -48,7 +48,7 @@ func (t EntryType) String() string {
 	case EntryPersQueueGroup:
 		return "PersQueueGroup"
 	case EntryDatabase:
-		return "Name"
+		return "Database"
 	case EntryRtmrVolume:
 		return "RtmrVolume"
 	case EntryBlockStoreVolume:
@@ -78,6 +78,10 @@ func (e *Entry) IsDirectory() bool {
 
 func (e *Entry) IsTable() bool {
 	return e.Type == EntryTable
+}
+
+func (e *Entry) IsColumnTable() bool {
+	return e.Type == EntryColumnTable
 }
 
 func (e *Entry) IsPersQueueGroup() bool {

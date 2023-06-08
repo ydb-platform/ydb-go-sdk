@@ -6,11 +6,11 @@ type valuer struct {
 	v interface{}
 }
 
-func (p *valuer) UnmarshalYDB(raw types.RawValue) error {
-	p.v = raw.Any()
+func (v *valuer) UnmarshalYDB(raw types.RawValue) error {
+	v.v = raw.Any()
 	return nil
 }
 
-func (p *valuer) Value() interface{} {
-	return p.v
+func (v *valuer) Value() interface{} {
+	return v.v
 }

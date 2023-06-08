@@ -286,7 +286,7 @@ func (v boolValue) castTo(dst interface{}) error {
 		*vv = strconv.FormatBool(bool(v))
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -330,7 +330,7 @@ func (v dateValue) castTo(dst interface{}) error {
 		*vv = int32(v)
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -379,7 +379,7 @@ func (v datetimeValue) castTo(dst interface{}) error {
 		*vv = uint32(v)
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -501,7 +501,7 @@ type (
 	}
 )
 
-func (v *dictValue) Values() map[Value]Value {
+func (v *dictValue) DictValues() map[Value]Value {
 	values := make(map[Value]Value, len(v.values))
 	for i := range v.values {
 		values[v.values[i].K] = v.values[i].V
@@ -585,7 +585,7 @@ func (v *doubleValue) castTo(dst interface{}) error {
 		*vv = v.value
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -624,7 +624,7 @@ func (v dyNumberValue) castTo(dst interface{}) error {
 		*vv = []byte(v)
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -669,7 +669,7 @@ func (v *floatValue) castTo(dst interface{}) error {
 		*vv = v.value
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -726,7 +726,7 @@ func (v int8Value) castTo(dst interface{}) error {
 		*vv = float32(v)
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -778,7 +778,7 @@ func (v int16Value) castTo(dst interface{}) error {
 		*vv = float32(v)
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -817,6 +817,9 @@ func (v int32Value) castTo(dst interface{}) error {
 	case *int64:
 		*vv = int64(v)
 		return nil
+	case *int:
+		*vv = int(v)
+		return nil
 	case *int32:
 		*vv = int32(v)
 		return nil
@@ -827,7 +830,7 @@ func (v int32Value) castTo(dst interface{}) error {
 		*vv = float32(v)
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -870,7 +873,7 @@ func (v int64Value) castTo(dst interface{}) error {
 		*vv = float64(v)
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -907,7 +910,7 @@ func (v intervalValue) castTo(dst interface{}) error {
 		*vv = int64(v)
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -985,7 +988,7 @@ func (v jsonValue) castTo(dst interface{}) error {
 		*vv = []byte(v)
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -1022,7 +1025,7 @@ func (v jsonDocumentValue) castTo(dst interface{}) error {
 		*vv = []byte(v)
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -1053,8 +1056,12 @@ type listValue struct {
 	items []Value
 }
 
+func (v *listValue) ListItems() []Value {
+	return v.items
+}
+
 func (v *listValue) castTo(dst interface{}) error {
-	return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, dst))
+	return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), dst))
 }
 
 func (v *listValue) Yql() string {
@@ -1230,7 +1237,7 @@ type (
 	}
 )
 
-func (v *structValue) Fields() map[string]Value {
+func (v *structValue) StructFields() map[string]Value {
 	fields := make(map[string]Value, len(v.fields))
 	for i := range v.fields {
 		fields[v.fields[i].Name] = v.fields[i].V
@@ -1261,7 +1268,7 @@ func (v *structValue) Type() Type {
 	return v.t
 }
 
-func (v structValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v *structValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vvv := a.Value()
 
 	for i := range v.fields {
@@ -1296,7 +1303,7 @@ func (v timestampValue) castTo(dst interface{}) error {
 		*vv = uint64(v)
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -1332,7 +1339,7 @@ type tupleValue struct {
 	items []Value
 }
 
-func (v *tupleValue) Items() []Value {
+func (v *tupleValue) TupleItems() []Value {
 	return v.items
 }
 
@@ -1397,7 +1404,7 @@ func (v tzDateValue) castTo(dst interface{}) error {
 		*vv = []byte(v)
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -1438,7 +1445,7 @@ func (v tzDatetimeValue) castTo(dst interface{}) error {
 		*vv = []byte(v)
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -1479,7 +1486,7 @@ func (v tzTimestampValue) castTo(dst interface{}) error {
 		*vv = []byte(v)
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -1547,7 +1554,7 @@ func (v uint8Value) castTo(dst interface{}) error {
 		*vv = float32(v)
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -1605,7 +1612,7 @@ func (v uint16Value) castTo(dst interface{}) error {
 		*vv = float64(v)
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -1654,7 +1661,7 @@ func (v uint32Value) castTo(dst interface{}) error {
 		*vv = float64(v)
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -1694,7 +1701,7 @@ func (v uint64Value) castTo(dst interface{}) error {
 		*vv = uint64(v)
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -1731,7 +1738,7 @@ func (v textValue) castTo(dst interface{}) error {
 		*vv = []byte(v)
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -1773,7 +1780,7 @@ func (v *uuidValue) castTo(dst interface{}) error {
 		*vv = v.value
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -1816,6 +1823,19 @@ type variantValue struct {
 	innerType Type
 	value     Value
 	idx       uint32
+}
+
+func (v *variantValue) Variant() (name string, index uint32) {
+	switch t := v.innerType.(type) {
+	case *variantStructType:
+		return t.fields[v.idx].Name, v.idx
+	default:
+		return "", v.idx
+	}
+}
+
+func (v *variantValue) Value() Value {
+	return v.value
 }
 
 func (v *variantValue) castTo(dst interface{}) error {
@@ -1933,7 +1953,7 @@ func (v ysonValue) castTo(dst interface{}) error {
 		*vv = v
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 
@@ -2108,7 +2128,7 @@ func (v bytesValue) castTo(dst interface{}) error {
 		*vv = v
 		return nil
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' to '%T' destination", v, vv))
+		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
 	}
 }
 

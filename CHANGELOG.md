@@ -1,4 +1,14 @@
-* Fixed stop reader by grpc stream shutdown
+* Fixed stopping reader by grpc stream shutdown
+* Fixed `database/sql` driver for get and parse container ydb types
+* Changed `table/scanner.scanner.Any()` behaviour: for non-primitive types returns raw `table/types.Value` instead nil from previous behaviour
+* Added `table/types.{ListItems,VariantValue,DictValues}` helpers for get internal content of abstract `table/types.Value`
+* Marked as deprecated `table/types.DictFields` (use `table/types.DictValues` instead)
+
+## v3.47.5
+* Added `scheme.Entry.IsColumnTable()` helper
+
+## v3.47.4
+* Disabled check of node exists with `balancers.SingleConn`
 * Improved code with `go-critic` linter
 * Added session info into `database/sql` event `connected`
 

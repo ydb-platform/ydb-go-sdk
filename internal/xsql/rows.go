@@ -114,7 +114,8 @@ func (r *rows) Close() error {
 }
 
 type single struct {
-	values []sql.NamedArg
+	values  []sql.NamedArg
+	readAll bool
 }
 
 func (r *single) Columns() (columns []string) {
@@ -129,12 +130,12 @@ func (r *single) Close() error {
 }
 
 func (r *single) Next(dst []driver.Value) error {
-	if r.values == nil {
+	if r.values == nil || r.readAll {
 		return io.EOF
 	}
 	for i := range r.values {
 		dst[i] = r.values[i].Value
 	}
-	r.values = nil
+	r.readAll = true
 	return nil
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/push"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"go.uber.org/zap"
 )
 
 const (
@@ -20,15 +21,20 @@ type (
 		notOks    *prometheus.GaugeVec
 		inflight  *prometheus.GaugeVec
 		latencies *prometheus.SummaryVec
+		attempts  *prometheus.HistogramVec
 
 		p *push.Pusher
+
+		logger *zap.Logger
 
 		label string
 	}
 )
 
-func New(url, label string) (*Metrics, error) {
+func New(logger *zap.Logger, url, label, jobName string) (*Metrics, error) {
 	m := &Metrics{
+		logger: logger.Named("metrics"),
+
 		label: label,
 	}
 
@@ -58,23 +64,31 @@ func New(url, label string) (*Metrics, error) {
 			Name: "latency",
 			Help: "summary of latencies in ms",
 			Objectives: map[float64]float64{
-				0.5:   0.05,
-				0.9:   0.01,
-				0.95:  0.005,
-				0.99:  0.001,
-				0.999: 0.0001,
+				0.5:  0,
+				0.99: 0,
+				1.0:  0,
 			},
+			MaxAge: 15 * time.Second,
+		},
+		[]string{"status", "jobName"},
+	)
+	m.attempts = prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "attempts",
+			Help:    "summary of amount for request",
+			Buckets: prometheus.LinearBuckets(1, 1, 10),
 		},
 		[]string{"status", "jobName"},
 	)
 
-	m.p = push.New(url, "workload-go").
+	m.p = push.New(url, jobName).
 		Grouping("sdk", fmt.Sprintf("%s-%s", sdk, m.label)).
 		Grouping("sdkVersion", sdkVersion).
 		Collector(m.oks).
 		Collector(m.notOks).
 		Collector(m.inflight).
-		Collector(m.latencies)
+		Collector(m.latencies).
+		Collector(m.attempts)
 
 	return m, m.Reset() //nolint:gocritic
 }
@@ -95,6 +109,8 @@ func (m *Metrics) Reset() error {
 
 	m.latencies.Reset()
 
+	m.attempts.Reset()
+
 	return m.Push()
 }
 
@@ -110,17 +126,31 @@ func (m *Metrics) Start(name SpanName) Span {
 	return j
 }
 
-func (j Span) Stop(err error) {
+func (j Span) Stop(err error, attempts int) {
 	j.m.inflight.WithLabelValues(j.name).Sub(1)
 
-	latency := float64(time.Since(j.start).Milliseconds())
+	l := time.Since(j.start).Milliseconds()
+
+	if attempts > 1 {
+		j.m.logger.Warn("more than 1 attempt for request",
+			zap.String("request type", j.name),
+			zap.Int("attempts", attempts),
+			zap.Time("start", j.start),
+			zap.Int64("latency", l),
+			zap.Error(err),
+		)
+	}
+
+	latency := float64(l)
 
 	if err != nil {
 		j.m.notOks.WithLabelValues(j.name).Add(1)
-		j.m.latencies.WithLabelValues("err", j.name).Observe(latency)
+		j.m.latencies.WithLabelValues(JobStatusErr, j.name).Observe(latency)
+		j.m.attempts.WithLabelValues(JobStatusErr, j.name).Observe(float64(attempts))
 		return
 	}
 
 	j.m.oks.WithLabelValues(j.name).Add(1)
-	j.m.latencies.WithLabelValues("ok", j.name).Observe(latency)
+	j.m.latencies.WithLabelValues(JobStatusOK, j.name).Observe(latency)
+	j.m.attempts.WithLabelValues(JobStatusOK, j.name).Observe(float64(attempts))
 }
