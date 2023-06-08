@@ -139,24 +139,24 @@ func (p *Pool) Release(ctx context.Context) error {
 	})
 
 	var (
-		errorsCh = make(chan error, len(conns))
+		errCh = make(chan error, len(conns))
 		wg       sync.WaitGroup
 	)
+	
 	wg.Add(len(conns))
 	for _, c := range conns {
-
 		go func(c closer.Closer) {
 			defer wg.Done()
 			if err := c.Close(ctx); err != nil {
-				errorsCh <- err
+				errCh <- err
 			}
 		}(c)
 	}
 	wg.Wait()
-	close(errorsCh)
+	close(errCh)
 
-	var issues []error
-	for err := range errorsCh {
+	issues := make([]error, 0, len(conns))
+	for err := range errCh {
 		issues = append(issues, err)
 	}
 
