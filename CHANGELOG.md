@@ -1,4 +1,4 @@
-* Fixed stopping reader by grpc stream shutdown
+* Fixed stopping topic reader by grpc stream shutdown
 * Fixed `database/sql` driver for get and parse container ydb types
 * Changed `table/scanner.scanner.Any()` behaviour: for non-primitive types returns raw `table/types.Value` instead nil from previous behaviour
 * Added `table/types.{ListItems,VariantValue,DictValues}` helpers for get internal content of abstract `table/types.Value`
