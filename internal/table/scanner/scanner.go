@@ -364,7 +364,7 @@ func (s *scanner) any() interface{} {
 	t := value.TypeFromYDB(x.t)
 	p, primitive := t.(value.PrimitiveType)
 	if !primitive {
-		return nil
+		return s.value()
 	}
 
 	switch p {
