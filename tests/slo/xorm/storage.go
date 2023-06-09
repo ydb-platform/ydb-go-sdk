@@ -102,14 +102,13 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (_ *Stora
 		return nil, err
 	}
 
-	s.x.DB().SetMaxOpenConns(poolSize)
-	s.x.DB().SetMaxIdleConns(poolSize)
-	s.x.DB().SetConnMaxIdleTime(time.Second)
+	s.x.SetMaxOpenConns(poolSize)
+	s.x.SetMaxIdleConns(poolSize)
+	s.x.SetConnMaxIdleTime(time.Second)
 
-	s.x.SetTableMapper(newMapper(cfg.Table, "entry"))
+	s.x.SetTableMapper(newMapper(cfg.Table, cfg.Table))
 
 	s.x.SetLogLevel(log.LOG_DEBUG)
-	s.x.ShowSQL(true)
 
 	tableParams := map[string]string{
 		"AUTO_PARTITIONING_BY_SIZE":              "ENABLED",
@@ -136,7 +135,7 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (row generator.R
 
 	err = retry.Do(ydb.WithTxControl(ctx, readTx), s.x.DB().DB,
 		func(ctx context.Context, _ *sql.Conn) (err error) {
-			has, err := s.x.Context(ctx).Get(&row)
+			has, err := s.x.Context(ctx).Where("hash = Digest::NumericHash(?)", id).Get(&row)
 			if err != nil {
 				return fmt.Errorf("get entry error: %w", err)
 			}
