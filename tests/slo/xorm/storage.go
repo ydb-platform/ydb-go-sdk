@@ -102,11 +102,11 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (_ *Stora
 		return nil, err
 	}
 
-	s.x.DB().SetMaxOpenConns(poolSize)
-	s.x.DB().SetMaxIdleConns(poolSize)
-	s.x.DB().SetConnMaxIdleTime(time.Second)
+	s.x.SetMaxOpenConns(poolSize)
+	s.x.SetMaxIdleConns(poolSize)
+	s.x.SetConnMaxIdleTime(time.Second)
 
-	s.x.SetTableMapper(newMapper(cfg.Table, "entry"))
+	s.x.SetTableMapper(newMapper(cfg.Table, cfg.Table))
 
 	s.x.SetLogLevel(log.LOG_DEBUG)
 
@@ -134,8 +134,8 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (row generator.R
 	row.ID = id
 
 	err = retry.Do(ydb.WithTxControl(ctx, readTx), s.x.DB().DB,
-		func(ctx context.Context, cc *sql.Conn) (err error) {
-			has, err := s.x.Context(ctx).Get(&row)
+		func(ctx context.Context, _ *sql.Conn) (err error) {
+			has, err := s.x.Context(ctx).Where("hash = Digest::NumericHash(?)", id).Get(&row)
 			if err != nil {
 				return fmt.Errorf("get entry error: %w", err)
 			}
@@ -173,7 +173,7 @@ func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, e
 	defer cancel()
 
 	err = retry.Do(ydb.WithTxControl(ctx, writeTx), s.x.DB().DB,
-		func(ctx context.Context, cc *sql.Conn) (err error) {
+		func(ctx context.Context, _ *sql.Conn) (err error) {
 			if err = ctx.Err(); err != nil {
 				return err
 			}
@@ -208,7 +208,9 @@ func (s *Storage) createTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return s.x.Context(ctx).CreateTable(generator.Row{})
+	return retry.Do(ctx, s.x.DB().DB, func(ctx context.Context, _ *sql.Conn) error {
+		return s.x.Context(ctx).CreateTable(generator.Row{})
+	})
 }
 
 func (s *Storage) dropTable(ctx context.Context) error {
@@ -219,7 +221,9 @@ func (s *Storage) dropTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return s.x.Context(ctx).DropTable(generator.Row{})
+	return retry.Do(ctx, s.x.DB().DB, func(ctx context.Context, _ *sql.Conn) error {
+		return s.x.Context(ctx).DropTable(generator.Row{})
+	})
 }
 
 func (s *Storage) close(ctx context.Context) error {

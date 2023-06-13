@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Run SLO
-        uses: ydb-platform/slo-tests@additional-logs
+        uses: ydb-platform/slo-tests@js-version
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           KUBECONFIG_B64: ${{ secrets.SLO_KUBE_CONFIG }}
