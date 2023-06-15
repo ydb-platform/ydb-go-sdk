@@ -211,7 +211,7 @@ func fillTablesWithData(ctx context.Context, db *sql.DB) (err error) {
 
 func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 	err = retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
-		err = dropTableIfNotExists(ctx, cc, "series")
+		err = dropTableIfExists(ctx, cc, "series")
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stdout, "warn: drop series table failed: %v\n", err)
 		}
@@ -240,7 +240,7 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 		return fmt.Errorf("create table failed: %w", err)
 	}
 	err = retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
-		err = dropTableIfNotExists(ctx, cc, "seasons")
+		err = dropTableIfExists(ctx, cc, "seasons")
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stdout, "warn: drop seasons table failed: %v\n", err)
 		}
@@ -271,7 +271,7 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 		return fmt.Errorf("create table failed: %w", err)
 	}
 	err = retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
-		err = dropTableIfNotExists(ctx, cc, "episodes")
+		err = dropTableIfExists(ctx, cc, "episodes")
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stdout, "warn: drop episodes table failed: %v\n", err)
 		}
@@ -306,7 +306,7 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 	return nil
 }
 
-func dropTableIfNotExists(ctx context.Context, cc *sql.Conn, tableName string) error {
+func dropTableIfExists(ctx context.Context, cc *sql.Conn, tableName string) error {
 	driver, err := ydb.Unwrap(cc)
 	if err != nil {
 		return fmt.Errorf("driver unwrap failed: %w", err)
