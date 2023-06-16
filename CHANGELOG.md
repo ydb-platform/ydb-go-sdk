@@ -1,3 +1,4 @@
+## v3.48.2
 * Refactored tests
 
 ## v3.48.1
