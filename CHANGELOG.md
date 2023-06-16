@@ -1,3 +1,4 @@
+## v3.48.1
 * Added `sugar.Is{Entry,ColumnTable}Exists` helper
 
 ## v3.48.0
