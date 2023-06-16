@@ -215,7 +215,10 @@ func TestIsTableExists(t *testing.T) {
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			exists, err := IsTableExists(context.Background(), tt.client, tt.checkPath)
+			exists, err := IsEntryExists(context.Background(),
+				tt.client, tt.checkPath,
+				scheme.EntryTable, scheme.EntryColumnTable,
+			)
 			if tt.err {
 				require.Error(t, err)
 			} else {
