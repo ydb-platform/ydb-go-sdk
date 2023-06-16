@@ -9,7 +9,25 @@ import (
 )
 
 func IsTableExists(ctx context.Context, c scheme.Client, absTablePath string) (exists bool, _ error) {
-	exists, err := helpers.IsTableExists(ctx, c, absTablePath)
+	exists, err := helpers.IsEntryExists(ctx, c, absTablePath, scheme.EntryTable)
+	if err != nil {
+		return exists, xerrors.WithStackTrace(err)
+	}
+	return exists, nil
+}
+
+func IsColumnTableExists(ctx context.Context, c scheme.Client, absTablePath string) (exists bool, _ error) {
+	exists, err := helpers.IsEntryExists(ctx, c, absTablePath, scheme.EntryColumnTable)
+	if err != nil {
+		return exists, xerrors.WithStackTrace(err)
+	}
+	return exists, nil
+}
+
+func IsEntryExists(ctx context.Context, c scheme.Client, absPath string, entryTypes ...scheme.EntryType) (
+	exists bool, _ error,
+) {
+	exists, err := helpers.IsEntryExists(ctx, c, absPath, entryTypes...)
 	if err != nil {
 		return exists, xerrors.WithStackTrace(err)
 	}

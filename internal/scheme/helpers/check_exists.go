@@ -55,21 +55,21 @@ func IsDirectoryExists(ctx context.Context, c schemeClient, directory string) (
 	return false, nil
 }
 
-func IsTableExists(ctx context.Context, c schemeClient, absTablePath string) (
+func IsEntryExists(ctx context.Context, c schemeClient, absPath string, entryTypes ...scheme.EntryType) (
 	exists bool, _ error,
 ) {
-	if !strings.HasPrefix(absTablePath, c.Database()) {
+	if !strings.HasPrefix(absPath, c.Database()) {
 		return false, xerrors.WithStackTrace(fmt.Errorf(
-			"table path '%s' must be inside database '%s'",
-			absTablePath, c.Database(),
+			"entry path '%s' must be inside database '%s'",
+			absPath, c.Database(),
 		))
-	} else if absTablePath == c.Database() {
+	} else if absPath == c.Database() {
 		return false, xerrors.WithStackTrace(fmt.Errorf(
-			"table path '%s' cannot be equals database name '%s'",
-			absTablePath, c.Database(),
+			"entry path '%s' cannot be equals database name '%s'",
+			absPath, c.Database(),
 		))
 	}
-	directory, tableName := path.Split(absTablePath)
+	directory, entryName := path.Split(absPath)
 	if exists, err := IsDirectoryExists(ctx, c, strings.TrimRight(directory, "/")); err != nil {
 		return false, xerrors.WithStackTrace(err)
 	} else if !exists {
@@ -77,19 +77,25 @@ func IsTableExists(ctx context.Context, c schemeClient, absTablePath string) (
 	}
 	d, err := c.ListDirectory(ctx, directory)
 	if err != nil {
-		return false, err
+		return false, xerrors.WithStackTrace(fmt.Errorf(
+			"list directory '%s' failed: %w",
+			directory, err,
+		))
 	}
 	for i := range d.Children {
-		if d.Children[i].Name != tableName {
+		if d.Children[i].Name != entryName {
 			continue
 		}
-		if d.Children[i].Type != scheme.EntryTable {
-			return false, xerrors.WithStackTrace(fmt.Errorf(
-				"entry '%s' in path '%s' is not a table: %s",
-				tableName, directory, d.Children[i].Type.String(),
-			))
+		childrenType := d.Children[i].Type
+		for _, entryType := range entryTypes {
+			if childrenType == entryType {
+				return true, nil
+			}
 		}
-		return true, nil
+		return false, xerrors.WithStackTrace(fmt.Errorf(
+			"entry type of '%s' (%s) in path '%s' is not corresponds to %v",
+			entryName, childrenType, directory, entryTypes,
+		))
 	}
 	return false, nil
 }

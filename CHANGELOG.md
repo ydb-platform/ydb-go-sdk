@@ -1,3 +1,5 @@
+* Added `sugar.Is{Entry,ColumnTable}Exists` helper
+
 ## v3.48.0
 * Fixed stopping topic reader by grpc stream shutdown
 * Fixed `database/sql` driver for get and parse container ydb types
