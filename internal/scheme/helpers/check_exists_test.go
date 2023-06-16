@@ -230,5 +230,8 @@ func TestIsTableExists(t *testing.T) {
 }
 
 func TestEntryTypePrintf(t *testing.T) {
-	require.Equal(t, "[Table ColumnTable]", fmt.Sprintf("%v", []scheme.EntryType{scheme.EntryTable, scheme.EntryColumnTable}))
+	require.Equal(t,
+		"[Table ColumnTable]",
+		fmt.Sprintf("%v", []scheme.EntryType{scheme.EntryTable, scheme.EntryColumnTable}),
+	)
 }
