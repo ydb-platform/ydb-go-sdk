@@ -7,9 +7,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
@@ -121,4 +123,67 @@ func TestDatabaseSqlGetColumnType(t *testing.T) {
 
 		require.NoError(t, err)
 	})
+}
+
+func TestDatabaseSqlColumnTypes(t *testing.T) {
+	var (
+		scope = newScope(t)
+		db    = scope.SQLDriverWithFolder()
+	)
+
+	defer func() {
+		_ = db.Close()
+	}()
+
+	columns := []struct {
+		YQL      string
+		Nullable bool
+	}{
+		{
+			YQL:      "CAST(true AS Bool)",
+			Nullable: false,
+		},
+		{
+			YQL:      "CAST(true AS Optional<Bool>)",
+			Nullable: true,
+		},
+		{
+			YQL:      "CAST(123 AS Int32)",
+			Nullable: false,
+		},
+		{
+			YQL:      "CAST(456 AS Optional<Int32>)",
+			Nullable: true,
+		},
+	}
+	var result []*sql.ColumnType
+
+	err := retry.Do(scope.Ctx, db, func(ctx context.Context, cc *sql.Conn) (err error) {
+		entries := make([]string, 0, len(columns))
+		for i := range columns {
+			entries = append(entries, columns[i].YQL)
+		}
+
+		rows, err := cc.QueryContext(ctx, fmt.Sprintf("SELECT %s", strings.Join(entries, ", ")))
+		if err != nil {
+			return err
+		}
+		defer func() { _ = rows.Close() }()
+
+		result, err = rows.ColumnTypes()
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+
+	require.NoError(t, err)
+
+	for i := range columns {
+		v, ok := result[i].Nullable()
+		if assert.True(t, ok, "nullable not supported") {
+			assert.Equal(t, columns[i].Nullable, v, "nullable didn't match")
+		}
+	}
 }

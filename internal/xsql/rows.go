@@ -67,6 +67,26 @@ func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 	return yqlTypes[index]
 }
 
+// TODO: Need to store column nullables to internal rows cache.
+//
+//nolint:godox
+func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
+	r.nextSet.Do(func() {
+		r.result.NextResultSet(context.Background())
+	})
+
+	var i int
+	nullables := make([]bool, r.result.CurrentResultSet().ColumnCount())
+	r.result.CurrentResultSet().Columns(func(m options.Column) {
+		_, nullables[i] = m.Type.(interface {
+			IsOptional()
+		})
+		i++
+	})
+
+	return nullables[index], true
+}
+
 func (r *rows) NextResultSet() (err error) {
 	r.nextSet.Do(func() {})
 	err = r.result.NextResultSetErr(context.Background())
