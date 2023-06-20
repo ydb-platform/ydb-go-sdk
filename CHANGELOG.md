@@ -1,3 +1,5 @@
+* Added `table/types.IsOptional()` helper
+
 ## v3.48.2
 * Refactored tests
 
