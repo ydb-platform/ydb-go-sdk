@@ -18,6 +18,7 @@ func CastTo(v Value, dst interface{}) error {
 	return value.CastTo(v, dst)
 }
 
+// IsOptional checks if type is optional and returns innerType if it is.
 func IsOptional(t Type) (isOptional bool, innerType Type) {
 	if optionalType, isOptional := t.(interface {
 		IsOptional()

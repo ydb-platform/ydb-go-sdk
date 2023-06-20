@@ -7,6 +7,41 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestIsOptional(t *testing.T) {
+	for _, tt := range []struct {
+		t          Type
+		isOptional bool
+		innerType  Type
+	}{
+		{
+			t:          nil,
+			isOptional: false,
+			innerType:  nil,
+		},
+		{
+			t:          TypeBool,
+			isOptional: false,
+			innerType:  nil,
+		},
+		{
+			t:          Optional(TypeBool),
+			isOptional: true,
+			innerType:  TypeBool,
+		},
+		{
+			t:          Optional(Optional(TypeBool)),
+			isOptional: true,
+			innerType:  Optional(TypeBool),
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			isOptional, innerType := IsOptional(tt.t)
+			require.Equal(t, tt.isOptional, isOptional)
+			require.Equal(t, tt.innerType, innerType)
+		})
+	}
+}
+
 func TestToDecimal(t *testing.T) {
 	for _, tt := range []struct {
 		v   Value
