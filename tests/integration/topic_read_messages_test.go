@@ -4,34 +4,33 @@
 package integration
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
 )
 
 func TestTopicReadMessages(t *testing.T) {
-	ctx := xtest.Context(t)
+	scope := newScope(t)
+	ctx := scope.Ctx
 
-	db, reader := createFeedAndReader(ctx, t)
+	for i := 0; i < 2; i++ {
+		start := time.Now()
+		err := scope.TopicWriter().Write(ctx, topicwriter.Message{Data: strings.NewReader("asd")})
+		require.NoError(t, err)
+		msg, err := scope.TopicReader().ReadMessage(ctx)
+		require.NoError(t, err)
+		require.Less(t, start.UnixNano(), msg.CreatedAt.UnixNano())
 
-	sendCDCMessage(ctx, t, db)
-	msg, err := reader.ReadMessage(ctx)
-	require.NoError(t, err)
-	require.NotEmpty(t, msg.CreatedAt)
-	t.Logf("msg: %#v", msg)
-
-	require.NoError(t, err)
-	err = topicsugar.ReadMessageDataWithCallback(msg, func(data []byte) error {
-		t.Log("Content:", string(data))
-		return nil
-	})
-	require.NoError(t, err)
-
-	sendCDCMessage(ctx, t, db)
-	batch, err := reader.ReadMessageBatch(ctx)
-	require.NoError(t, err)
-	require.NotEmpty(t, batch.Messages)
+		require.NoError(t, err)
+		err = topicsugar.ReadMessageDataWithCallback(msg, func(data []byte) error {
+			require.Equal(t, "asd", string(data))
+			return nil
+		})
+		require.NoError(t, err)
+	}
 }

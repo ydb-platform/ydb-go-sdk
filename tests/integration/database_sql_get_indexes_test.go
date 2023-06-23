@@ -21,11 +21,7 @@ func TestDatabaseSqlGetIndexes(t *testing.T) {
 		db    = scope.SQLDriverWithFolder()
 	)
 
-	defer func() {
-		_ = db.Close()
-	}()
-
-	t.Run("create-tables", func(t *testing.T) {
+	// create table
 		err := retry.Do(scope.Ctx, db, func(ctx context.Context, cc *sql.Conn) (err error) {
 			_, err = cc.ExecContext(
 				ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),

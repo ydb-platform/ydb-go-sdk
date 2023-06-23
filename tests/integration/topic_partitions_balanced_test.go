@@ -12,31 +12,19 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestTopicPartitionsBalanced(t *testing.T) {
-	ctx := xtest.Context(t)
-	db := connect(t)
-	topicPath := db.Name() + "/topic-" + t.Name()
-
-	err := db.Topic().Drop(ctx, topicPath)
-	if err != nil {
-		require.True(t, ydb.IsOperationErrorSchemeError(err))
-	}
-
-	consumer := "test-consumer-" + t.Name()
-	err = db.Topic().Create(ctx, topicPath,
+	scope := newScope(t)
+	db := scope.Driver()
+	topicPath := scope.TopicPath(
 		topicoptions.CreateWithMinActivePartitions(2),
 		topicoptions.CreateWithPartitionCountLimit(2),
-		topicoptions.CreateWithConsumer(topictypes.Consumer{Name: consumer}),
 	)
-	require.NoError(t, err)
 
 	connectedPartitions := int32(0)
 	var handled int32
@@ -65,12 +53,12 @@ func TestTopicPartitionsBalanced(t *testing.T) {
 			return nil
 		},
 	}
-	firstReader, err := db.Topic().StartReader(consumer, topicoptions.ReadTopic(topicPath),
+	firstReader, err := db.Topic().StartReader(scope.TopicConsumer(), topicoptions.ReadTopic(topicPath),
 		topicoptions.WithReaderTrace(tracer),
 	)
 	require.NoError(t, err)
 
-	readCtx, firstReaderStopRead := context.WithCancel(ctx)
+	readCtx, firstReaderStopRead := context.WithCancel(scope.Ctx)
 	firstReaderReadStopped := make(empty.Chan)
 	go func() {
 		defer close(firstReaderReadStopped)
@@ -90,14 +78,14 @@ func TestTopicPartitionsBalanced(t *testing.T) {
 		return atomic.LoadInt32(&connectedPartitions) == 2
 	})
 
-	readerSecond, err := db.Topic().StartReader(consumer, topicoptions.ReadTopic(topicPath))
+	readerSecond, err := db.Topic().StartReader(scope.TopicConsumer(), topicoptions.ReadTopic(topicPath))
 	require.NoError(t, err)
 
 	xtest.SpinWaitConditionWithTimeout(t, nil, time.Second, func() bool {
 		return atomic.LoadInt32(&connectedPartitions) == 1
 	})
 
-	require.NoError(t, readerSecond.Close(ctx))
+	require.NoError(t, readerSecond.Close(scope.Ctx))
 
 	xtest.SpinWaitConditionWithTimeout(t, nil, time.Second, func() bool {
 		return atomic.LoadInt32(&connectedPartitions) == 2
@@ -105,5 +93,5 @@ func TestTopicPartitionsBalanced(t *testing.T) {
 
 	firstReaderStopRead()
 	xtest.WaitChannelClosed(t, firstReaderReadStopped)
-	require.NoError(t, firstReader.Close(ctx))
+	require.NoError(t, firstReader.Close(scope.Ctx))
 }

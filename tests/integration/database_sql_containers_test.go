@@ -8,12 +8,10 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -21,27 +19,10 @@ import (
 // https://github.com/ydb-platform/ydb-go-sdk/issues/757
 // Containers example demonstrates how to work with YDB container values such as `List`, `Tuple`, `Dict`, `Struct` and `Variant`
 func TestDatabaseSqlContainers(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	scope := newScope(t)
+	db := scope.SQLDriverWithFolder()
 
-	nativeDriver, err := ydb.Open(ctx,
-		os.Getenv("YDB_CONNECTION_STRING"),
-		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
-	)
-	require.NoError(t, err)
-	defer func() {
-		_ = nativeDriver.Close(ctx)
-	}()
-
-	connector, err := ydb.Connector(nativeDriver)
-	require.NoError(t, err)
-	defer func() {
-		_ = connector.Close()
-	}()
-
-	db := sql.OpenDB(connector)
-
-	err = retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
+	err := retry.Do(scope.Ctx, db, func(ctx context.Context, cc *sql.Conn) error {
 		rows, err := cc.QueryContext(ctx, `
 			SELECT
 				AsList("foo", "bar", "baz");

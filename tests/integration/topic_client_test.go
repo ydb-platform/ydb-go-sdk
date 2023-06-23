@@ -25,12 +25,12 @@ const defaultConnectionString = "grpc://localhost:2136/local"
 const commonConsumerName = "consumer"
 
 func TestTopicCreateDrop(t *testing.T) {
-	ctx := xtest.Context(t)
-	db := connect(t)
-	topicPath := db.Name() + "/testtopic"
+	scope := newScope(t)
+	db := scope.Driver()
+	topicPath := path.Join(scope.Folder(), "testtopic")
 
-	_ = db.Topic().Drop(ctx, topicPath)
-	err := db.Topic().Create(ctx, topicPath,
+	_ = db.Topic().Drop(scope.Ctx, topicPath)
+	err := db.Topic().Create(scope.Ctx, topicPath,
 		topicoptions.CreateWithConsumer(
 			topictypes.Consumer{
 				Name: "test",
@@ -39,17 +39,14 @@ func TestTopicCreateDrop(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = db.Topic().Describe(ctx, topicPath)
-	require.NoError(t, err)
-
-	err = db.Topic().Drop(ctx, topicPath)
+	_, err = db.Topic().Describe(scope.Ctx, topicPath)
 	require.NoError(t, err)
 }
 
 func TestTopicDescribe(t *testing.T) {
-	ctx := xtest.Context(t)
-	db := connect(t)
-	topicName := "test-topic-" + t.Name()
+	scope := newScope(t)
+	db := scope.Driver()
+	topicPath := path.Join(scope.Folder(), "testtopic")
 
 	var (
 		supportedCodecs     = []topictypes.Codec{topictypes.CodecRaw, topictypes.CodecGzip}
@@ -73,8 +70,7 @@ func TestTopicDescribe(t *testing.T) {
 		}
 	)
 
-	_ = db.Topic().Drop(ctx, topicName)
-	err := db.Topic().Create(ctx, topicName,
+	err := db.Topic().Create(scope.Ctx, topicPath,
 		topicoptions.CreateWithSupportedCodecs(supportedCodecs...),
 		topicoptions.CreateWithMinActivePartitions(minActivePartitions),
 		// topicoptions.CreateWithPartitionCountLimit(partitionCountLimit), LOGBROKER-7800
@@ -87,11 +83,11 @@ func TestTopicDescribe(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	res, err := db.Topic().Describe(ctx, topicName)
+	res, err := db.Topic().Describe(scope.Ctx, topicPath)
 	require.NoError(t, err)
 
 	expected := topictypes.TopicDescription{
-		Path: topicName,
+		Path: topicPath,
 		PartitionSettings: topictypes.PartitionSettings{
 			MinActivePartitions: minActivePartitions,
 			// PartitionCountLimit: partitionCountLimit, LOGBROKER-7800
@@ -137,11 +133,11 @@ func TestTopicDescribe(t *testing.T) {
 }
 
 func TestSchemeList(t *testing.T) {
-	ctx := xtest.Context(t)
-	db := connect(t)
+	scope := newScope(t)
+	db := scope.Driver()
 
-	topicPath := createTopic(ctx, t, db)
-	list, err := db.Scheme().ListDirectory(ctx, db.Name())
+	topicPath := scope.TopicPath()
+	list, err := db.Scheme().ListDirectory(scope.Ctx, scope.Folder())
 	require.NoError(t, err)
 
 	topicName := path.Base(topicPath)

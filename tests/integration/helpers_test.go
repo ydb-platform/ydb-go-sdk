@@ -7,6 +7,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 	"os"
 	"path"
 	"testing"
@@ -103,14 +107,17 @@ func (scope *scopeT) Driver(opts ...ydb.Option) *ydb.Driver {
 }
 
 func (scope *scopeT) SQLDriverWithFolder(opts ...ydb.ConnectorOption) *sql.DB {
-	return scope.Cache(nil, nil, func() (res interface{}, err error) {
+	createOptions := append([]ydb.ConnectorOption{ydb.WithTablePathPrefix(scope.Folder())}, opts...)
+	return scope.namedSQLDriver("with-folder", createOptions...)
+}
+
+func (scope *scopeT) namedSQLDriver(name string, opts ...ydb.ConnectorOption) *sql.DB {
+	return scope.CacheWithCleanup(name, nil, func() (res interface{}, clean fixenv.FixtureCleanupFunc, err error) {
 		driver := scope.Driver()
 		scope.Logf("Create sql db connector")
-		connector, err := ydb.Connector(driver,
-			append([]ydb.ConnectorOption{ydb.WithTablePathPrefix(scope.Folder())}, opts...)...,
-		)
+		connector, err := ydb.Connector(driver, opts...)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		db := sql.OpenDB(connector)
@@ -118,9 +125,15 @@ func (scope *scopeT) SQLDriverWithFolder(opts ...ydb.ConnectorOption) *sql.DB {
 		scope.Logf("Ping db")
 		err = db.PingContext(scope.Ctx)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return db, nil
+
+		clean = func() {
+			if db != nil {
+				_ = db.Close()
+			}
+		}
+		return db, clean, nil
 	}).(*sql.DB)
 }
 
@@ -169,4 +182,58 @@ CREATE TABLE %s (
 // val Text
 func (scope *scopeT) TablePath() string {
 	return path.Join(scope.Folder(), scope.TableName())
+}
+
+func (scope *scopeT) TopicConsumer() string {
+	return "test-consumer"
+}
+
+func (scope *scopeT) TopicPath(opts ...topicoptions.CreateOption) string {
+	return scope.Cache("", nil, func() (res interface{}, err error) {
+		db := scope.Driver()
+		topicPath := path.Join(scope.Folder(), "topic")
+		initOptions := []topicoptions.CreateOption{
+			topicoptions.CreateWithConsumer(
+				topictypes.Consumer{Name: scope.TopicConsumer()},
+			),
+		}
+		createOptions := append(initOptions, opts...)
+		err = db.Topic().Create(scope.Ctx, topicPath, createOptions...)
+		return topicPath, err
+	}).(string)
+}
+
+func (scope *scopeT) TopicReader() *topicreader.Reader {
+	return scope.CacheWithCleanup(nil, nil, func() (res interface{}, clean fixenv.FixtureCleanupFunc, err error) {
+		reader, err := scope.Driver().Topic().StartReader(
+			scope.TopicConsumer(), topicoptions.ReadTopic(scope.TopicPath()),
+		)
+		clean = func() {
+			if reader != nil {
+				_ = reader.Close(scope.Ctx)
+			}
+		}
+		return reader, clean, err
+	}).(*topicreader.Reader)
+}
+
+func (scope *scopeT) TopicWriter() *topicwriter.Writer {
+	return scope.CacheWithCleanup(nil, nil, func() (res interface{}, clean fixenv.FixtureCleanupFunc, err error) {
+
+		writer, err := scope.Driver().Topic().StartWriter(
+			scope.TopicPath(),
+			topicoptions.WithProducerID(scope.TopicProducerID()),
+			topicoptions.WithSyncWrite(true),
+		)
+		clean = func() {
+			if writer != nil {
+				_ = writer.Close(scope.Ctx)
+			}
+		}
+		return writer, clean, err
+	}).(*topicwriter.Writer)
+}
+
+func (scope *scopeT) TopicProducerID() string {
+	return "test-topic-writer-id"
 }
