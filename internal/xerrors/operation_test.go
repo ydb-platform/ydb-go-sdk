@@ -28,6 +28,53 @@ func TestIsOperationError(t *testing.T) {
 	}
 }
 
+func TestIsOperationErrorTransactionLocksInvalidated(t *testing.T) {
+	for _, tt := range [...]struct {
+		err   error
+		isTLI bool
+	}{
+		{
+			err: Operation(
+				WithStatusCode(Ydb.StatusIds_ABORTED),
+				WithIssues([]*Ydb_Issue.IssueMessage{{
+					IssueCode: issueCodeTransactionLocksInvalidated,
+				}}),
+			),
+			isTLI: true,
+		},
+		{
+			err: Operation(
+				WithStatusCode(Ydb.StatusIds_OVERLOADED),
+				WithIssues([]*Ydb_Issue.IssueMessage{{
+					IssueCode: issueCodeTransactionLocksInvalidated,
+				}}),
+			),
+			isTLI: false,
+		},
+		{
+			err: Operation(
+				WithStatusCode(Ydb.StatusIds_ABORTED),
+			),
+			isTLI: false,
+		},
+		{
+			err: Operation(
+				WithStatusCode(Ydb.StatusIds_ABORTED),
+				WithIssues([]*Ydb_Issue.IssueMessage{{
+					Issues: []*Ydb_Issue.IssueMessage{{
+						IssueCode: issueCodeTransactionLocksInvalidated,
+					}},
+				}}),
+			),
+			isTLI: true,
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			require.Equal(t, tt.isTLI, IsOperationErrorTransactionLocksInvalidated(tt.err))
+		})
+	}
+}
+
 func Test_operationError_Error(t *testing.T) {
 	for _, tt := range []struct {
 		err  error
