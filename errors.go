@@ -82,6 +82,11 @@ func IsOperationErrorSchemeError(err error) bool {
 	return IsOperationError(err, Ydb.StatusIds_SCHEME_ERROR)
 }
 
+// IsOperationErrorTransactionLocksInvalidated checks does err a TLI issue
+func IsOperationErrorTransactionLocksInvalidated(err error) (isTLI bool) {
+	return xerrors.IsOperationErrorTransactionLocksInvalidated(err)
+}
+
 // IsRatelimiterAcquireError checks whether given err is an ratelimiter acquire error
 func IsRatelimiterAcquireError(err error) bool {
 	return ratelimiterErrors.IsAcquireError(err)

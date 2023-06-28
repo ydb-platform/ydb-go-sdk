@@ -1,3 +1,5 @@
+* Added `ydb.IsOperationErrorTransactionLocksInvalidated(err)` helper for checks `TLI` flag in err
+
 ## v3.48.3
 * Added `table/types.IsOptional()` helper
 
