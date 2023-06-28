@@ -350,7 +350,7 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
    )
    ```
 
-## Query bindings \<a name="bindings"\>\</a\>
+## Query bindings <a name="bindings"></a>
 
 `YQL` is a language with strict types. This means that a query to `YDB` must be written with an explicit declaration of query parameter types using the `DECLARE`keyword. Also, in some cases, the special `PRAGMA` operator can be used to simplify of the full table path prefix. For example, a query to the table `/local/path/to/tables/seasons` might look like this:
 
