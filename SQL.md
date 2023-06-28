@@ -421,7 +421,7 @@ func main() {
   var (
     ctx          = context.TODO()
     db           = sql.Open("ydb", "grpc://localhost:2136/local?"+
-  					        "go_query_bind=table_path_prefix(/local/path/to/my/folder),declare,positional")
+                     "go_query_bind=table_path_prefix(/local/path/to/my/folder),declare,positional")
 
 //  alternate syntax for enabling bindings over connection string params
 //
