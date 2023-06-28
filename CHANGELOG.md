@@ -1,3 +1,4 @@
+## v3.48.4
 * Added `ydb.IsOperationErrorTransactionLocksInvalidated(err)` helper for checks `TLI` flag in err
 
 ## v3.48.3
