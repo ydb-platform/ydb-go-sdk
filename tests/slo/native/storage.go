@@ -6,8 +6,6 @@ import (
 	"path"
 	"time"
 
-	env "github.com/ydb-platform/ydb-go-sdk-auth-environ"
-	ydbZap "github.com/ydb-platform/ydb-go-sdk-zap"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -72,11 +70,6 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	db, err := ydb.Open(
 		ctx,
 		cfg.Endpoint+cfg.DB,
-		env.WithEnvironCredentials(ctx),
-		ydbZap.WithTraces(
-			logger,
-			trace.DetailsAll,
-		),
 		ydb.WithSessionPoolSizeLimit(poolSize),
 	)
 	if err != nil {

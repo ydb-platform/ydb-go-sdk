@@ -8,8 +8,6 @@ import (
 	"syscall"
 	"time"
 
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/time/rate"
 
@@ -18,39 +16,27 @@ import (
 	"slo/internal/workers"
 )
 
-var logger *zap.Logger
-
 var (
 	label   string
 	jobName string
 )
 
-func init() {
-	var err error
-	logger, err = zap.NewProduction(zap.AddStacktrace(zapcore.PanicLevel))
-	if err != nil {
-		panic(fmt.Errorf("error create logger: %w", err))
-	}
-}
-
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer cancel()
-
-	defer func() { _ = logger.Sync() }()
 
 	cfg, err := config.New()
 	if err != nil {
 		panic(fmt.Errorf("create config failed: %w", err))
 	}
 
-	logger.Info("program started")
-	defer logger.Info("program finished")
+	fmt.Println("program started")
+	defer fmt.Println("program finished")
 
 	ctx, cancel = context.WithTimeout(ctx, time.Duration(cfg.Time)*time.Second)
 	defer cancel()
 
-	s, err := NewStorage(ctx, cfg, cfg.ReadRPS+cfg.WriteRPS)
+	s, err := NewStorage(cfg, cfg.ReadRPS+cfg.WriteRPS)
 	if err != nil {
 		panic(fmt.Errorf("create storage failed: %w", err))
 	}
@@ -62,7 +48,7 @@ func main() {
 		_ = s.close(shutdownCtx)
 	}()
 
-	logger.Info("db init ok")
+	fmt.Println("db init ok")
 
 	switch cfg.Mode {
 	case config.CreateMode:
@@ -70,7 +56,7 @@ func main() {
 		if err != nil {
 			panic(fmt.Errorf("create table failed: %w", err))
 		}
-		logger.Info("create table ok")
+		fmt.Println("create table ok")
 
 		gen := generator.New(0)
 
@@ -97,18 +83,18 @@ func main() {
 			panic(err)
 		}
 
-		logger.Info("entries write ok")
+		fmt.Println("entries write ok")
 	case config.CleanupMode:
 		err = s.dropTable(ctx)
 		if err != nil {
 			panic(fmt.Errorf("create table failed: %w", err))
 		}
 
-		logger.Info("cleanup table ok")
+		fmt.Println("cleanup table ok")
 	case config.RunMode:
 		gen := generator.New(cfg.InitialDataCount)
 
-		w, err := workers.New(cfg, s, logger, label, jobName)
+		w, err := workers.New(cfg, s, label, jobName)
 		if err != nil {
 			panic(fmt.Errorf("create workers failed: %w", err))
 		}
@@ -117,7 +103,7 @@ func main() {
 			if err != nil {
 				panic(fmt.Errorf("workers close failed: %w", err))
 			}
-			logger.Info("workers close ok")
+			fmt.Println("workers close ok")
 		}()
 
 		wg := sync.WaitGroup{}

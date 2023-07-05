@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/rs/zerolog"
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 )
 
@@ -20,8 +19,6 @@ var (
 	sessionPoolLimit int
 	shutdownAfter    time.Duration
 	logLevel         string
-
-	log = zerolog.New(os.Stdout).With().Timestamp().Logger()
 )
 
 func init() {
@@ -72,11 +69,6 @@ func init() {
 		fmt.Printf("\nSome required options not defined: %v\n\n", required)
 		flagSet.Usage()
 		os.Exit(1)
-	}
-	if l, err := zerolog.ParseLevel(logLevel); err == nil {
-		zerolog.SetGlobalLevel(l)
-	} else {
-		panic(err)
 	}
 }
 

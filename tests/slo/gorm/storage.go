@@ -7,8 +7,6 @@ import (
 	"time"
 
 	ydb "github.com/ydb-platform/gorm-driver"
-	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
-	ydbZap "github.com/ydb-platform/ydb-go-sdk-zap"
 	ydbSDK "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -50,10 +48,7 @@ type Storage struct {
 	tableOptions string
 }
 
-func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
-	defer cancel()
-
+func NewStorage(cfg *config.Config, poolSize int) (*Storage, error) {
 	s := &Storage{
 		cfg: cfg,
 		tableOptions: fmt.Sprintf(optionsTemplate,
@@ -64,14 +59,6 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	s.db, err = gorm.Open(
 		ydb.Open(
 			cfg.Endpoint+cfg.DB,
-			ydb.With(
-				environ.WithEnvironCredentials(ctx),
-				ydbZap.WithTraces(
-					logger,
-					trace.DetailsAll,
-				),
-				ydbSDK.WithSessionPoolSizeLimit(poolSize),
-			),
 			ydb.WithMaxOpenConns(poolSize),
 			ydb.WithMaxIdleConns(poolSize),
 			ydb.WithTablePathPrefix(label),

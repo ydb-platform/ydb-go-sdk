@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -444,13 +445,13 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 			if info.Error == nil {
 				l.Log(ctx, "done",
 					latency(start),
-					String("token", Secret(info.Token)),
+					String("token", secret.Token(info.Token)),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "done",
 					Error(info.Error),
 					latency(start),
-					String("token", Secret(info.Token)),
+					String("token", secret.Token(info.Token)),
 					version(),
 				)
 			}

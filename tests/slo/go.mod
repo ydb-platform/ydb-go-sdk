@@ -5,10 +5,7 @@ go 1.20
 require (
 	github.com/prometheus/client_golang v1.14.0
 	github.com/ydb-platform/gorm-driver v0.0.6-0.20230529184330-9104dd08ecae
-	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.1.3
-	github.com/ydb-platform/ydb-go-sdk-zap v0.15.0
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.47.3
-	go.uber.org/zap v1.24.0
 	golang.org/x/sync v0.1.0
 	golang.org/x/time v0.3.0
 	gorm.io/gorm v1.25.1
@@ -37,10 +34,9 @@ require (
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/yandex-cloud/go-genproto v0.0.0-20230403093326-123923969dc6 // indirect
 	github.com/ydb-platform/ydb-go-genproto v0.0.0-20230528143953-42c825ace222 // indirect
+	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.1.3 // indirect
 	github.com/ydb-platform/ydb-go-yc v0.10.2 // indirect
 	github.com/ydb-platform/ydb-go-yc-metadata v0.5.3 // indirect
-	go.uber.org/atomic v1.10.0 // indirect
-	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/net v0.9.0 // indirect
 	golang.org/x/sys v0.7.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
