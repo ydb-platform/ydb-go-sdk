@@ -1,11 +1,9 @@
 package xerrors
 
 import (
-	"runtime"
-	"strconv"
-	"strings"
-
 	grpcStatus "google.golang.org/grpc/status"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 )
 
 type withStackTraceOptions struct {
@@ -34,30 +32,16 @@ func WithStackTrace(err error, opts ...withStackTraceOption) error {
 	if s, has := grpcStatus.FromError(err); has {
 		return &stackTransportError{
 			stackError: stackError{
-				stackRecord: StackRecord(options.skipDepth + 1),
+				stackRecord: stack.Record(options.skipDepth + 1),
 				err:         err,
 			},
 			status: s,
 		}
 	}
 	return &stackError{
-		stackRecord: StackRecord(options.skipDepth + 1),
+		stackRecord: stack.Record(options.skipDepth + 1),
 		err:         err,
 	}
-}
-
-func StackRecord(depth int) string {
-	function, file, line, _ := runtime.Caller(depth + 1)
-	name := runtime.FuncForPC(function).Name()
-	return name + "(" + fileName(file) + ":" + strconv.Itoa(line) + ")"
-}
-
-func fileName(original string) string {
-	i := strings.LastIndex(original, "/")
-	if i == -1 {
-		return original
-	}
-	return original[i+1:]
 }
 
 type stackError struct {

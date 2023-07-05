@@ -5,13 +5,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 )
 
 func WithTimeout(ctx context.Context, t time.Duration) (context.Context, context.CancelFunc) {
 	childCtx := &timeoutCtx{
 		parentCtx: ctx,
-		from:      xerrors.StackRecord(1),
+		from:      stack.Record(1),
 	}
 	childCtx.ctx, childCtx.ctxCancel = context.WithTimeout(ctx, t)
 	return childCtx, childCtx.cancel
