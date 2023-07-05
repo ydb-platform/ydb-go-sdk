@@ -8,6 +8,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 )
 
+var (
+	_ Credentials  = (*AccessToken)(nil)
+	_ fmt.Stringer = (*AccessToken)(nil)
+)
+
 // AccessToken implements Credentials interface with static
 // authorization parameters.
 type AccessToken struct {

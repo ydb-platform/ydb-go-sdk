@@ -7,6 +7,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 )
 
+var (
+	_ Credentials  = (*Anonymous)(nil)
+	_ fmt.Stringer = (*Anonymous)(nil)
+)
+
 // Anonymous implements Credentials interface with Anonymous access
 type Anonymous struct {
 	sourceInfo string

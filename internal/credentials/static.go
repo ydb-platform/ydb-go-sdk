@@ -39,6 +39,11 @@ func NewStaticCredentials(user, password string, config staticCredentialsConfig,
 	}
 }
 
+var (
+	_ Credentials  = (*Static)(nil)
+	_ fmt.Stringer = (*Static)(nil)
+)
+
 // Static implements Credentials interface with static
 // authorization parameters.
 type Static struct {
