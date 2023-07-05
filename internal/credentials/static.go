@@ -13,31 +13,46 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-func NewStaticCredentials(user, password, authEndpoint string, opts ...grpc.DialOption) Credentials {
-	return &staticCredentials{
-		user:     user,
-		password: password,
-		endpoint: authEndpoint,
-		opts:     opts,
+type staticCredentialsConfig interface {
+	Endpoint() string
+	GrpcDialOptions() []grpc.DialOption
+}
+
+func NewStaticCredentials(user, password string, config staticCredentialsConfig, opts ...Option) *Static {
+	options := optionsHolder{
+		sourceInfo: stack.Record(1),
+	}
+	for _, opt := range opts {
+		opt(&options)
+	}
+	return &Static{
+		user:       user,
+		password:   password,
+		endpoint:   config.Endpoint(),
+		sourceInfo: options.sourceInfo,
+		opts:       config.GrpcDialOptions(),
 	}
 }
 
-// staticCredentials implements Credentials interface with static
+// Static implements Credentials interface with static
 // authorization parameters.
-type staticCredentials struct {
-	user      string
-	password  string
-	endpoint  string
-	opts      []grpc.DialOption
-	token     string
-	requestAt time.Time
-	mu        sync.Mutex
+type Static struct {
+	user       string
+	password   string
+	endpoint   string
+	opts       []grpc.DialOption
+	token      string
+	requestAt  time.Time
+	mu         sync.Mutex
+	sourceInfo string
 }
 
-func (c *staticCredentials) Token(ctx context.Context) (token string, err error) {
+func (c *Static) Token(ctx context.Context) (token string, err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if time.Until(c.requestAt) > 0 {
@@ -109,4 +124,14 @@ func parseExpiresAt(raw string) (expiresAt time.Time, err error) {
 		return expiresAt, xerrors.WithStackTrace(err)
 	}
 	return claims.ExpiresAt.Time, nil
+}
+
+func (c *Static) String() string {
+	return fmt.Sprintf(
+		"Static(user:%q,password:%q,token:%q,from:%q)",
+		c.user,
+		secret.Password(c.password),
+		secret.Token(c.token),
+		c.sourceInfo,
+	)
 }
