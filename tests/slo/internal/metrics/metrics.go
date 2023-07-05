@@ -7,7 +7,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/push"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"go.uber.org/zap"
 )
 
 const (
@@ -25,16 +24,12 @@ type (
 
 		p *push.Pusher
 
-		logger *zap.Logger
-
 		label string
 	}
 )
 
-func New(logger *zap.Logger, url, label, jobName string) (*Metrics, error) {
+func New(url, label, jobName string) (*Metrics, error) {
 	m := &Metrics{
-		logger: logger.Named("metrics"),
-
 		label: label,
 	}
 
@@ -129,15 +124,15 @@ func (m *Metrics) Start(name SpanName) Span {
 func (j Span) Stop(err error, attempts int) {
 	j.m.inflight.WithLabelValues(j.name).Sub(1)
 
-	l := time.Since(j.start).Milliseconds()
+	l := time.Since(j.start)
 
 	if attempts > 1 {
-		j.m.logger.Warn("more than 1 attempt for request",
-			zap.String("request type", j.name),
-			zap.Int("attempts", attempts),
-			zap.Time("start", j.start),
-			zap.Int64("latency", l),
-			zap.Error(err),
+		fmt.Printf("more than 1 attempt for request (request_type: %q, attempts: %d, start: %s, latency: %s, err: %v)\n",
+			j.name,
+			attempts,
+			j.start.Format(time.DateTime),
+			l.String(),
+			err,
 		)
 	}
 

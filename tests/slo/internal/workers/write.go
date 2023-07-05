@@ -2,9 +2,9 @@ package workers
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
-	"go.uber.org/zap"
 	"golang.org/x/time/rate"
 
 	"slo/internal/generator"
@@ -27,7 +27,7 @@ func (w *Workers) write(ctx context.Context, gen *generator.Generator) (err erro
 	var row generator.Row
 	row, err = gen.Generate()
 	if err != nil {
-		w.logger.Error("generate error", zap.Error(err))
+		fmt.Printf("generate error: %v\n", err)
 		return err
 	}
 
@@ -37,7 +37,7 @@ func (w *Workers) write(ctx context.Context, gen *generator.Generator) (err erro
 	defer func() {
 		m.Stop(err, attempts)
 		if err != nil {
-			w.logger.Error("error when stop 'write' worker", zap.Error(err))
+			fmt.Printf("error when stop 'write' worker: %v\n", err)
 		}
 	}()
 

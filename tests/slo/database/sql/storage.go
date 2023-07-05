@@ -7,8 +7,6 @@ import (
 	"path"
 	"time"
 
-	env "github.com/ydb-platform/ydb-go-sdk-auth-environ"
-	ydbZap "github.com/ydb-platform/ydb-go-sdk-zap"
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -93,11 +91,6 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Stora
 	s.cc, err = ydb.Open(
 		ctx,
 		s.cfg.Endpoint+s.cfg.DB,
-		env.WithEnvironCredentials(ctx),
-		ydbZap.WithTraces(
-			logger,
-			trace.DetailsAll,
-		),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("ydb.Open error: %w", err)
