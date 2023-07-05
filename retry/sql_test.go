@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -26,12 +27,12 @@ type mockConnector struct {
 var _ driver.Connector = &mockConnector{}
 
 func (m *mockConnector) Open(name string) (driver.Conn, error) {
-	m.t.Log(xerrors.StackRecord(0))
+	m.t.Log(stack.Record(0))
 	return nil, driver.ErrSkip
 }
 
 func (m *mockConnector) Connect(ctx context.Context) (driver.Conn, error) {
-	m.t.Log(xerrors.StackRecord(0))
+	m.t.Log(stack.Record(0))
 	m.conns++
 	return &mockConn{
 		t:        m.t,
@@ -41,7 +42,7 @@ func (m *mockConnector) Connect(ctx context.Context) (driver.Conn, error) {
 }
 
 func (m *mockConnector) Driver() driver.Driver {
-	m.t.Log(xerrors.StackRecord(0))
+	m.t.Log(stack.Record(0))
 	return m
 }
 
@@ -61,12 +62,12 @@ var (
 )
 
 func (m *mockConn) Prepare(query string) (driver.Stmt, error) {
-	m.t.Log(xerrors.StackRecord(0))
+	m.t.Log(stack.Record(0))
 	return nil, driver.ErrSkip
 }
 
 func (m *mockConn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
-	m.t.Log(xerrors.StackRecord(0))
+	m.t.Log(stack.Record(0))
 	if m.closed {
 		return nil, driver.ErrBadConn
 	}
@@ -78,18 +79,18 @@ func (m *mockConn) PrepareContext(ctx context.Context, query string) (driver.Stm
 }
 
 func (m *mockConn) Close() error {
-	m.t.Log(xerrors.StackRecord(0))
+	m.t.Log(stack.Record(0))
 	m.closed = true
 	return nil
 }
 
 func (m *mockConn) Begin() (driver.Tx, error) {
-	m.t.Log(xerrors.StackRecord(0))
+	m.t.Log(stack.Record(0))
 	return nil, driver.ErrSkip
 }
 
 func (m *mockConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
-	m.t.Log(xerrors.StackRecord(0))
+	m.t.Log(stack.Record(0))
 	if m.closed {
 		return nil, driver.ErrBadConn
 	}
@@ -97,7 +98,7 @@ func (m *mockConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.T
 }
 
 func (m *mockConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
-	m.t.Log(xerrors.StackRecord(0))
+	m.t.Log(stack.Record(0))
 	if xerrors.MustDeleteSession(m.execErr) {
 		m.closed = true
 	}
@@ -105,7 +106,7 @@ func (m *mockConn) QueryContext(ctx context.Context, query string, args []driver
 }
 
 func (m *mockConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
-	m.t.Log(xerrors.StackRecord(0))
+	m.t.Log(stack.Record(0))
 	if xerrors.MustDeleteSession(m.execErr) {
 		m.closed = true
 	}
@@ -113,12 +114,12 @@ func (m *mockConn) ExecContext(ctx context.Context, query string, args []driver.
 }
 
 func (m *mockConn) Commit() error {
-	m.t.Log(xerrors.StackRecord(0))
+	m.t.Log(stack.Record(0))
 	return nil
 }
 
 func (m *mockConn) Rollback() error {
-	m.t.Log(xerrors.StackRecord(0))
+	m.t.Log(stack.Record(0))
 	return nil
 }
 
@@ -135,32 +136,32 @@ var (
 )
 
 func (m *mockStmt) Close() error {
-	m.t.Log(xerrors.StackRecord(0))
+	m.t.Log(stack.Record(0))
 	return nil
 }
 
 func (m *mockStmt) NumInput() int {
-	m.t.Log(xerrors.StackRecord(0))
+	m.t.Log(stack.Record(0))
 	return -1
 }
 
 func (m *mockStmt) Exec(args []driver.Value) (driver.Result, error) {
-	m.t.Log(xerrors.StackRecord(0))
+	m.t.Log(stack.Record(0))
 	return nil, driver.ErrSkip
 }
 
 func (m *mockStmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
-	m.t.Log(xerrors.StackRecord(0))
+	m.t.Log(stack.Record(0))
 	return m.conn.ExecContext(ctx, m.query, args)
 }
 
 func (m *mockStmt) Query(args []driver.Value) (driver.Rows, error) {
-	m.t.Log(xerrors.StackRecord(0))
+	m.t.Log(stack.Record(0))
 	return nil, driver.ErrSkip
 }
 
 func (m *mockStmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
-	m.t.Log(xerrors.StackRecord(0))
+	m.t.Log(stack.Record(0))
 	return m.conn.QueryContext(ctx, m.query, args)
 }
 

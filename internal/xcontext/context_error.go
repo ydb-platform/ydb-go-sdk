@@ -1,6 +1,8 @@
 package xcontext
 
-import "github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+)
 
 var _ error = (*ctxErr)(nil)
 
@@ -12,7 +14,7 @@ const (
 func errAt(err error, skipDepth int) error {
 	return &ctxErr{
 		err:         err,
-		stackRecord: xerrors.StackRecord(skipDepth + 1),
+		stackRecord: stack.Record(skipDepth + 1),
 		linkWord:    atWord,
 	}
 }

@@ -9,6 +9,7 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 )
 
 type transportError struct {
@@ -133,7 +134,7 @@ func Transport(err error, opts ...teOpt) error {
 		}
 	} else {
 		te = &transportError{
-			status: grpcStatus.New(grpcCodes.Unknown, StackRecord(1)),
+			status: grpcStatus.New(grpcCodes.Unknown, stack.Record(1)),
 			err:    err,
 		}
 	}
