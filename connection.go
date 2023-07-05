@@ -465,8 +465,7 @@ func connect(ctx context.Context, c *Driver) error {
 		c.config = c.config.With(config.WithCredentials(
 			credentials.NewStaticCredentials(
 				c.userInfo.User, c.userInfo.Password,
-				c.config.Endpoint(),
-				c.config.GrpcDialOptions()...,
+				c.config,
 			),
 		))
 	}
