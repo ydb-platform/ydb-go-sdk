@@ -22,7 +22,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydbMetrics "github.com/ydb-platform/ydb-go-sdk-prometheus"
-	ydbZerolog "github.com/ydb-platform/ydb-go-sdk-zerolog"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -132,10 +131,6 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 				ydbMetrics.WithDetails(
 					trace.DetailsAll,
 				),
-			),
-			ydbZerolog.WithTraces(
-				&log,
-				trace.DetailsAll,
 			),
 		)
 
