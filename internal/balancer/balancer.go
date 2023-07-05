@@ -66,7 +66,15 @@ func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
 	if err = retry.Retry(ctx, func(childCtx context.Context) (err error) {
 		if err = b.clusterDiscoveryAttempt(childCtx); err != nil {
 			if xerrors.IsTransportError(err, grpcCodes.Unauthenticated) {
-				return xerrors.WithStackTrace(err)
+				return xerrors.WithStackTrace(
+					fmt.Errorf(
+						"cluster discovery failed: %w (endpoint: %q, database: %q, credentials: %q)",
+						err,
+						b.driverConfig.Endpoint(),
+						b.driverConfig.Database(),
+						b.driverConfig.Credentials(),
+					),
+				)
 			}
 			// if got err but parent context is not done - mark error as retryable
 			if ctx.Err() == nil && xerrors.IsTimeoutError(err) {
