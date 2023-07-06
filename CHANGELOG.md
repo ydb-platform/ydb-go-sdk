@@ -1,3 +1,4 @@
+## v3.48.5
 * Removed `log.Secret` helper as unnessesarry in public API after refactoring logging subsystem
 * Enriched the error with important details from initial discovery
 * Added `internal.{secret,stack}` packages
