@@ -19,6 +19,7 @@ var (
 	_ driver.Rows                           = &rows{}
 	_ driver.RowsNextResultSet              = &rows{}
 	_ driver.RowsColumnTypeDatabaseTypeName = &rows{}
+	_ driver.RowsColumnTypeNullable         = &rows{}
 	_ driver.Rows                           = &single{}
 
 	_ types.Scanner = &valuer{}
