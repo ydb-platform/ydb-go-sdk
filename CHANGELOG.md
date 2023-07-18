@@ -1,3 +1,4 @@
+## v3.48.6
 * Added builder for topic reader message (usable for tests)
 
 ## v3.48.5
