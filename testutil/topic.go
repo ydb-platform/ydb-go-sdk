@@ -2,9 +2,9 @@ package testutil
 
 import "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 
-type MessageBuilder = topicreaderinternal.PublicMessageBuilder
+type TopicReaderMessageBuilder = topicreaderinternal.PublicMessageBuilder
 
-// NewMessageBuilder create builder, which can create Message (use for tests only)
-func NewMessageBuilder() *MessageBuilder {
+// NewTopicReaderMessageBuilder create builder, which can create Message (use for tests only)
+func NewTopicReaderMessageBuilder() *TopicReaderMessageBuilder {
 	return topicreaderinternal.NewPublicMessageBuilder()
 }
