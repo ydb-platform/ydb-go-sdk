@@ -60,13 +60,6 @@ func (r *Reader) ReadMessage(ctx context.Context) (*Message, error) {
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type Message = topicreaderinternal.PublicMessage
 
-type MessageBuilder = topicreaderinternal.PublicMessageBuilder
-
-// NewMessageBuilder create builder, which can create Message (use for tests only)
-func NewMessageBuilder() *MessageBuilder {
-	return topicreaderinternal.NewPublicMessageBuilder()
-}
-
 // MessageContentUnmarshaler
 //
 // # Experimental
