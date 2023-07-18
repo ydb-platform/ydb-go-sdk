@@ -115,3 +115,79 @@ type errorReader struct {
 func (u errorReader) Read(p []byte) (n int, err error) {
 	return 0, u.err
 }
+
+type PublicMessageBuilder struct {
+	mess *PublicMessage
+}
+
+func NewPublicMessageBuilder() *PublicMessageBuilder {
+	return &PublicMessageBuilder{
+		mess: &PublicMessage{},
+	}
+}
+
+// Seqno set message Seqno
+func (pmb *PublicMessageBuilder) Seqno(seqNo int64) *PublicMessageBuilder {
+	pmb.mess.SeqNo = seqNo
+	return pmb
+}
+
+// CreatedAt set message CreatedAt
+func (pmb *PublicMessageBuilder) CreatedAt(createdAt time.Time) *PublicMessageBuilder {
+	pmb.mess.CreatedAt = createdAt
+	return pmb
+}
+
+// MessageGroupID set message MessageGroupID
+func (pmb *PublicMessageBuilder) MessageGroupID(messageGroupID string) *PublicMessageBuilder {
+	pmb.mess.MessageGroupID = messageGroupID
+	return pmb
+}
+
+// WriteSessionMetadata set message WriteSessionMetadata
+func (pmb *PublicMessageBuilder) WriteSessionMetadata(writeSessionMetadata map[string]string) *PublicMessageBuilder {
+	pmb.mess.WriteSessionMetadata = writeSessionMetadata
+	return pmb
+}
+
+// Offset set message Offset
+func (pmb *PublicMessageBuilder) Offset(offset int64) *PublicMessageBuilder {
+	pmb.mess.Offset = offset
+	return pmb
+}
+
+// WrittenAt set message WrittenAt
+func (pmb *PublicMessageBuilder) WrittenAt(writtenAt time.Time) *PublicMessageBuilder {
+	pmb.mess.WrittenAt = writtenAt
+	return pmb
+}
+
+// ProducerID set message ProducerID
+func (pmb *PublicMessageBuilder) ProducerID(producerID string) *PublicMessageBuilder {
+	pmb.mess.ProducerID = producerID
+	return pmb
+}
+
+// DataAndUncompressedSize set message uncompressed content and field UncompressedSize
+func (pmb *PublicMessageBuilder) DataAndUncompressedSize(data []byte) *PublicMessageBuilder {
+	copyData := make([]byte, len(data))
+	copy(copyData, data)
+	pmb.mess.data = oneTimeReader{reader: bytes.NewReader(data)}
+	pmb.mess.dataConsumed = false
+	pmb.mess.rawDataLen = len(copyData)
+	pmb.mess.UncompressedSize = len(copyData)
+	return pmb
+}
+
+// UncompressedSize set message UncompressedSize
+func (pmb *PublicMessageBuilder) UncompressedSize(uncompressedSize int) *PublicMessageBuilder {
+	pmb.mess.UncompressedSize = uncompressedSize
+	return pmb
+}
+
+// Build return builded message and reset internal state for create new message
+func (pmb *PublicMessageBuilder) Build() *PublicMessage {
+	mess := pmb.mess
+	pmb.mess = &PublicMessage{}
+	return mess
+}
