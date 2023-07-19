@@ -121,8 +121,22 @@ type PublicMessageBuilder struct {
 }
 
 func NewPublicMessageBuilder() *PublicMessageBuilder {
-	return &PublicMessageBuilder{
-		mess: &PublicMessage{},
+	res := &PublicMessageBuilder{}
+	res.initMessage()
+	return res
+}
+
+func (pmb *PublicMessageBuilder) initMessage() {
+	pmb.mess = &PublicMessage{
+		commitRange: commitRange{partitionSession: newPartitionSession(
+			context.Background(),
+			"",
+			0,
+			0,
+			"",
+			0,
+			0,
+		)},
 	}
 }
 
@@ -185,9 +199,24 @@ func (pmb *PublicMessageBuilder) UncompressedSize(uncompressedSize int) *PublicM
 	return pmb
 }
 
+// Context set message Context
+func (pmb *PublicMessageBuilder) Context(ctx context.Context) {
+	pmb.mess.commitRange.partitionSession.ctx = ctx
+}
+
+// Topic set message Topic
+func (pmb *PublicMessageBuilder) Topic(topic string) {
+	pmb.mess.commitRange.partitionSession.Topic = topic
+}
+
+// PartitionID set message PartitionID
+func (pmb *PublicMessageBuilder) PartitionID(partitionID int64) {
+	pmb.mess.commitRange.partitionSession.PartitionID = partitionID
+}
+
 // Build return builded message and reset internal state for create new message
 func (pmb *PublicMessageBuilder) Build() *PublicMessage {
 	mess := pmb.mess
-	pmb.mess = &PublicMessage{}
+	pmb.initMessage()
 	return mess
 }
