@@ -124,28 +124,29 @@ func (m *Metrics) Start(name SpanName) Span {
 func (j Span) Stop(err error, attempts int) {
 	j.m.inflight.WithLabelValues(j.name).Sub(1)
 
-	l := time.Since(j.start)
+	latency := time.Since(j.start)
 
 	if attempts > 1 {
 		fmt.Printf("more than 1 attempt for request (request_type: %q, attempts: %d, start: %s, latency: %s, err: %v)\n",
 			j.name,
 			attempts,
 			j.start.Format(time.DateTime),
-			l.String(),
+			latency.String(),
 			err,
 		)
 	}
 
-	latency := float64(l)
+	var (
+		successLabel   = JobStatusOK
+		successCounter = j.m.oks
+	)
 
 	if err != nil {
-		j.m.notOks.WithLabelValues(j.name).Add(1)
-		j.m.latencies.WithLabelValues(JobStatusErr, j.name).Observe(latency)
-		j.m.attempts.WithLabelValues(JobStatusErr, j.name).Observe(float64(attempts))
-		return
+		successLabel = JobStatusErr
+		successCounter = j.m.notOks
 	}
 
-	j.m.oks.WithLabelValues(j.name).Add(1)
-	j.m.latencies.WithLabelValues(JobStatusOK, j.name).Observe(latency)
-	j.m.attempts.WithLabelValues(JobStatusOK, j.name).Observe(float64(attempts))
+	j.m.latencies.WithLabelValues(successLabel, j.name).Observe(float64(latency.Milliseconds()))
+	j.m.attempts.WithLabelValues(successLabel, j.name).Observe(float64(attempts))
+	successCounter.WithLabelValues(j.name).Add(1)
 }
