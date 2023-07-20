@@ -1,3 +1,5 @@
+* Added `sugar.StackRecord()` helper for stringification of current file path and line
+
 ## v3.48.6
 * Added builder for topic reader message (usable for tests)
 
@@ -82,7 +84,7 @@
 * Extend `scheme.Client` interface with method `Database`
 * Removed `driver.ResultNoRows` in `internal/xsql`
 * Added `ydb.{WithTablePathPrefix,WithAutoDeclare,WithPositionalArgs,WithNumericalArgs}` query modifiers options
-* Supported binding parameters for `database/sql` driver over connector option `ydb.WithAutoBind()` and connection string params `go_auto_bind={origin,table_path_prefix(path),declare,numeric,positional}`
+* Supported binding parameters for `database/sql` driver over connector option `ydb.WithAutoBind()` and connection string params `go_auto_bind={table_path_prefix(path),declare,numeric,positional}`
 * Added `testutil.QueryBind` test helper
 * Fixed topic retry policy callback call: not call it with nil error
 * Fixed bug with no checking operation error on `discovery.Client` calls
