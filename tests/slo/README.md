@@ -5,10 +5,10 @@ SLO is the type of test where app based on ydb-sdk is tested against falling YDB
 
 ### Implementations:
 
-There are two implementations:
-
-- `native`       - `./native`
-- `database/sql` - `./database/sql`
+- `native`       - over `./native` driver
+- `database/sql` - over `./database/sql` driver
+- `gorm` - over `gorm` driver
+- `xorm` - over `xorm` driver
 
 ### Usage:
 
@@ -21,24 +21,27 @@ It has 3 commands:
 ### Run examples with all arguments:
 
 create:
-`slo-go-workload create create grpcs://ydb.cool.example.com:2135 /some/folder -t tableName
--min-partitions-count 6 -max-partitions-count 1000 -partition-size 1 -с 1000
+
+`$APP create grpcs://ydb.cool.example.com:2135 /some/folder -t tableName 
+-min-partitions-count 6 -max-partitions-count 1000 -partition-size 1 -с 1000 
 -write-timeout 10000`
 
 cleanup:
-`slo-go-workload create cleanup grpcs://ydb.cool.example.com:2135 /some/folder -t tableName`
+
+`$APP cleanup grpcs://ydb.cool.example.com:2135 /some/folder -t tableName`
 
 run:
-`slo-go-workload create run grpcs://ydb.cool.example.com:2135 /some/folder -t tableName
--prom-pgw http://prometheus-pushgateway:9091 -report-period 250
--read-rps 1000 -read-timeout 10000
--write-rps 100 -write-timeout 10000
+
+`$APP create run grpcs://ydb.cool.example.com:2135 /some/folder -t tableName 
+-prom-pgw http://prometheus-pushgateway:9091 -report-period 250 
+-read-rps 1000 -read-timeout 10000 
+-write-rps 100 -write-timeout 10000 
 -time 600 -shutdown-time 30`
 
 ## Arguments for commands:
 
 ### create
-`slo-go-workload create <endpoint> <db> [options]`
+`$APP create <endpoint> <db> [options]`
 
 ```
 Arguments:
@@ -58,7 +61,7 @@ Options:
 ```
 
 ### cleanup
-`slo-go-workload cleanup <endpoint> <db> [options]`
+`$APP cleanup <endpoint> <db> [options]`
 
 ```
 Arguments:
@@ -72,7 +75,7 @@ Options:
 ```
 
 ### run
-`slo-go-workload run <endpoint> <db> [options]`
+`$APP run <endpoint> <db> [options]`
 
 ```
 Arguments:
@@ -99,7 +102,7 @@ Options:
 
 ## Authentication
 
-Workload using [ydb-go-sdk-auth-environ](https://github.com/ydb-platform/ydb-go-sdk-auth-environ) for authentication.
+Workload using anonymous credentials.
 
 ## What's inside
 When running `run` command, the program creates three jobs: `readJob`, `writeJob`, `metricsJob`.
