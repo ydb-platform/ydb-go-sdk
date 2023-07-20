@@ -24,7 +24,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Run SLO
-        uses: ydb-platform/slo-tests@js-version
+        uses: ydb-platform/slo-tests@fix-multiple-grafana-screenshots-failed
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           KUBECONFIG_B64: ${{ secrets.SLO_KUBE_CONFIG }}
