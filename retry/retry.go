@@ -137,7 +137,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 	defer func() {
 		onIntermediate(err)(attempts, err)
 		if err != nil {
-			err = xerrors.Errorf("done with %d attempts: %w", attempts, xerrors.WithStackTrace(err))
+			err = xerrors.Errorf("error retried %d times: %w", attempts-1, xerrors.WithStackTrace(err))
 		}
 	}()
 	for {
@@ -175,7 +175,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			}
 
 			if !m.MustRetry(options.idempotent) {
-				return xerrors.Errorf("retryable error: %w", err)
+				return xerrors.Errorf("not retryable error: %w", err)
 			}
 
 			if e := wait.Wait(ctx, options.fastBackoff, options.slowBackoff, m.BackoffType(), i); e != nil {
