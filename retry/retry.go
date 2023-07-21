@@ -141,7 +141,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 		attempts++
 		select {
 		case <-ctx.Done():
-			return xerrors.WithStackTrace(xerrors.Errorf("retry failed (%d attempts): %w", attempts, ctx.Err()))
+			return xerrors.WithStackTrace(xerrors.Errorf("retry failed on attempt No.%d: %w", attempts, ctx.Err()))
 
 		default:
 			err = func() (err error) {
@@ -161,7 +161,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			}
 
 			if ctxErr := ctx.Err(); ctxErr != nil {
-				return xerrors.WithStackTrace(xerrors.Errorf("retry failed (%d attempts): %w", ctx.Err()))
+				return xerrors.WithStackTrace(xerrors.Errorf("retry failed on attempt No.%d: %w", ctx.Err()))
 			}
 
 			m := Check(err)
@@ -171,12 +171,12 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			}
 
 			if !m.MustRetry(options.idempotent) {
-				return xerrors.WithStackTrace(xerrors.Errorf("retry failed (%d attempts): %w", err))
+				return xerrors.WithStackTrace(xerrors.Errorf("retry failed on attempt No.%d: %w", err))
 			}
 
 			if e := wait.Wait(ctx, options.fastBackoff, options.slowBackoff, m.BackoffType(), i); e != nil {
 				return xerrors.WithStackTrace(
-					xerrors.Errorf("retry failed (%d attempts): wait exit with error '%w' (origin error '%w')", e, err),
+					xerrors.Errorf("retry failed on attempt No.%d: wait exit with error '%w' (origin error '%w')", e, err),
 				)
 			}
 
