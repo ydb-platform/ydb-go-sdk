@@ -2,7 +2,6 @@ package retry
 
 import (
 	"context"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wait"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -136,16 +135,13 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 	)
 	defer func() {
 		onIntermediate(err)(attempts, err)
-		if err != nil {
-			err = xerrors.Errorf("error retried %d times: %w", attempts-1, xerrors.WithStackTrace(err))
-		}
 	}()
 	for {
 		i++
 		attempts++
 		select {
 		case <-ctx.Done():
-			return xerrors.Errorf("context done: ", ctx.Err())
+			return xerrors.WithStackTrace(xerrors.Errorf("retry failed (%d attempts): %w", attempts, ctx.Err()))
 
 		default:
 			err = func() (err error) {
@@ -153,7 +149,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 					defer func() {
 						if e := recover(); e != nil {
 							options.panicCallback(e)
-							err = xerrors.Errorf("panic recovered: %v", e)
+							err = xerrors.WithStackTrace(xerrors.Errorf("panic recovered: %v", e))
 						}
 					}()
 				}
@@ -165,7 +161,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			}
 
 			if ctxErr := ctx.Err(); ctxErr != nil {
-				return xerrors.Errorf("context error: %w", ctxErr)
+				return xerrors.WithStackTrace(xerrors.Errorf("retry failed (%d attempts): %w", ctx.Err()))
 			}
 
 			m := Check(err)
@@ -175,11 +171,13 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			}
 
 			if !m.MustRetry(options.idempotent) {
-				return xerrors.Errorf("not retryable error: %w", err)
+				return xerrors.WithStackTrace(xerrors.Errorf("retry failed (%d attempts): %w", err))
 			}
 
 			if e := wait.Wait(ctx, options.fastBackoff, options.slowBackoff, m.BackoffType(), i); e != nil {
-				return xerrors.Errorf("wait exit with error '%w' (origin error '%w')", e, err)
+				return xerrors.WithStackTrace(
+					xerrors.Errorf("retry failed (%d attempts): wait exit with error '%w' (origin error '%w')", e, err),
+				)
 			}
 
 			code = m.StatusCode()
