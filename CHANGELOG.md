@@ -1,4 +1,8 @@
 * Added `sugar.StackRecord()` helper for stringification of current file path and line
+* Updated `google.golang.org/grpc` from `v1.49.0` to `v1.53.0` due to vulnerability
+* Updated `google.golang.org/protobuf` from `v1.28.0` to `v1.28.1` due to vulnerability
+* Implemented implicit standard interface `driver.RowsColumnTypeNullable` in `internal/xsql.rows`
+* Upgraded errors description from `retry.Retry` with attempts info
 
 ## v3.48.6
 * Added builder for topic reader message (usable for tests)
