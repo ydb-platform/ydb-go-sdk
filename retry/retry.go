@@ -2,7 +2,6 @@ package retry
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wait"
@@ -143,7 +142,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 		attempts++
 		select {
 		case <-ctx.Done():
-			return xerrors.WithStackTrace(ctx.Err())
+			return xerrors.WithStackTrace(xerrors.Errorf("retry failed on attempt No.%d: %w", attempts, ctx.Err()))
 
 		default:
 			err = func() (err error) {
@@ -151,7 +150,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 					defer func() {
 						if e := recover(); e != nil {
 							options.panicCallback(e)
-							err = xerrors.WithStackTrace(fmt.Errorf("panic recovered: %v", e))
+							err = xerrors.WithStackTrace(xerrors.Errorf("panic recovered: %v", e))
 						}
 					}()
 				}
@@ -163,7 +162,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			}
 
 			if ctxErr := ctx.Err(); ctxErr != nil {
-				return ctxErr
+				return xerrors.WithStackTrace(xerrors.Errorf("retry failed on attempt No.%d: %w", attempts, ctx.Err()))
 			}
 
 			m := Check(err)
@@ -173,12 +172,12 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			}
 
 			if !m.MustRetry(options.idempotent) {
-				return xerrors.WithStackTrace(err)
+				return xerrors.WithStackTrace(xerrors.Errorf("retry failed on attempt No.%d: %w", attempts, err))
 			}
 
 			if e := wait.Wait(ctx, options.fastBackoff, options.slowBackoff, m.BackoffType(), i); e != nil {
 				return xerrors.WithStackTrace(
-					xerrors.Errorf("wait exit with error '%w' (origin error '%w')", e, err),
+					xerrors.Errorf("retry failed on attempt No.%d: wait exit with error '%w' (origin error '%w')", attempts, e, err),
 				)
 			}
 
