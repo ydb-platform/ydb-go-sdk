@@ -1,3 +1,4 @@
+* Added start reader with reader id and consumer to logs
 * Added builder for topic reader message (usable for tests)
 
 ## v3.48.5
