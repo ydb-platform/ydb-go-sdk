@@ -3,6 +3,7 @@ package topicreaderinternal
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -118,6 +119,14 @@ func NewReader(
 	return res
 }
 
+func (r *Reader) ID() int64 {
+	return r.readerID
+}
+
+func (r *Reader) Tracer() *trace.Topic {
+	return r.tracer
+}
+
 func (r *Reader) Close(ctx context.Context) error {
 	return r.reader.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
 }
@@ -164,7 +173,10 @@ func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOp
 func (r *Reader) Commit(ctx context.Context, offsets PublicCommitRangeGetter) (err error) {
 	cr := offsets.getCommitRange().priv
 	if cr.partitionSession.readerID != r.readerID {
-		return errCommitSessionFromOtherReader
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
+			"ydb: messages session reader id (%v) != current reader id (%v): %w",
+			cr.partitionSession.readerID, r.readerID, errCommitSessionFromOtherReader,
+		)))
 	}
 
 	return r.reader.Commit(ctx, cr)
@@ -173,7 +185,11 @@ func (r *Reader) Commit(ctx context.Context, offsets PublicCommitRangeGetter) (e
 func (r *Reader) CommitRanges(ctx context.Context, ranges []PublicCommitRange) error {
 	for i := range ranges {
 		if ranges[i].priv.partitionSession.readerID != r.readerID {
-			return errCommitSessionFromOtherReader
+			return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
+				"ydb: commit ranges (range item %v) "+
+					"messages session reader id (%v) != current reader id (%v): %w",
+				i, ranges[i].priv.partitionSession.readerID, r.readerID, errCommitSessionFromOtherReader,
+			)))
 		}
 	}
 

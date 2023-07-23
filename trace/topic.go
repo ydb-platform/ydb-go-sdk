@@ -16,6 +16,9 @@ type (
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
 	Topic struct {
+		// TopicReaderCustomerEvents - upper level, on bridge with customer code
+		OnReaderStart func(info TopicReaderStartInfo)
+
 		// TopicReaderStreamLifeCycleEvents
 		OnReaderReconnect        func(TopicReaderReconnectStartInfo) func(TopicReaderReconnectDoneInfo)
 		OnReaderReconnectRequest func(TopicReaderReconnectRequestInfo)
@@ -75,6 +78,16 @@ type (
 		Topic              string
 		PartitionID        int64
 		PartitionSessionID int64
+	}
+
+	// TopicReaderStartInfo
+	// Experimental
+	//
+	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
+	// later release.
+	TopicReaderStartInfo struct {
+		ReaderID int64
+		Consumer string
 	}
 
 	// TopicReaderPartitionReadStartResponseDoneInfo
@@ -257,7 +270,9 @@ type (
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TopicReaderReconnectStartInfo struct{}
+	TopicReaderReconnectStartInfo struct {
+		Reason error
+	}
 
 	// TopicReaderReconnectDoneInfo
 	//

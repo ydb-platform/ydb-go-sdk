@@ -24,6 +24,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		l.Log(ctx, "start")
 		return func(doneInfo trace.TopicReaderReconnectDoneInfo) {
 			l.Log(WithLevel(ctx, INFO), "reconnected",
+				NamedError("reason", info.Reason),
 				latency(start),
 			)
 		}

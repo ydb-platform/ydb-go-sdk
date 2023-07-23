@@ -219,6 +219,7 @@ func (c *Client) StartReader(
 	opts = append(defaultOpts, opts...)
 
 	internalReader := topicreaderinternal.NewReader(connector, consumer, readSelectors, opts...)
+	trace.TopicOnReaderStart(internalReader.Tracer(), internalReader.ID(), consumer)
 	return topicreader.NewReader(internalReader), nil
 }
 
