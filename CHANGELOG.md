@@ -1,3 +1,5 @@
+* Fixed `sugar.RemoveRecursive()` for column table type
+
 ## v3.48.7
 * Added `sugar.StackRecord()` helper for stringification of current file path and line
 * Updated `google.golang.org/grpc` from `v1.49.0` to `v1.53.0` due to vulnerability
