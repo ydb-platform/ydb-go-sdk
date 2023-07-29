@@ -61,6 +61,7 @@ jobs:
     env:
       OS: ubuntu-latest
       GO: ${{ matrix.go-version }}
+      YDB_VERSION: ${{ matrix.ydb-version }}
       YDB_CONNECTION_STRING: grpc://localhost:2136/local
       YDB_CONNECTION_STRING_SECURE: grpcs://localhost:2135/local
       YDB_SSL_ROOT_CERTIFICATES_FILE: /tmp/ydb_certs/ca.pem
