@@ -1,3 +1,4 @@
+## v3.48.8
 * Fixed `sugar.RemoveRecursive()` for column table type
 
 ## v3.48.7
