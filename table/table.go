@@ -171,6 +171,13 @@ type Session interface {
 		opts ...options.BulkUpsertOption,
 	) (err error)
 
+	ReadRows(
+		ctx context.Context,
+		path string,
+		keys types.Value,
+		opts ...options.ReadRowsOption,
+	) (_ result.Result, err error)
+
 	BeginTransaction(
 		ctx context.Context,
 		tx *TransactionSettings,

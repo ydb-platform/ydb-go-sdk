@@ -1,3 +1,5 @@
+* Added `table.Session.ReadRows` 
+
 ## v3.48.8
 * Fixed `sugar.RemoveRecursive()` for column table type
 
