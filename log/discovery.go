@@ -25,14 +25,14 @@ func internalDiscovery(l *wrapper, d trace.Detailer) (t trace.Discovery) {
 		return func(info trace.DiscoveryDiscoverDoneInfo) {
 			if info.Error == nil {
 				l.Log(WithLevel(ctx, INFO), "done",
-					latency(start),
+					latencyField(start),
 					Stringer("endpoints", endpoints(info.Endpoints)),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
 					Error(info.Error),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -47,15 +47,15 @@ func internalDiscovery(l *wrapper, d trace.Detailer) (t trace.Discovery) {
 		return func(info trace.DiscoveryWhoAmIDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 					String("user", info.User),
 					Strings("groups", info.Groups),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}

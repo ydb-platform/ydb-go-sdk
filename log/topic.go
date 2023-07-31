@@ -24,7 +24,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		l.Log(ctx, "start")
 		return func(doneInfo trace.TopicReaderReconnectDoneInfo) {
 			l.Log(WithLevel(ctx, INFO), "reconnected",
-				latency(start),
+				latencyField(start),
 			)
 		}
 	}
@@ -58,7 +58,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 				String("reader_connection_id", info.ReaderConnectionID),
 				Int64("partition_id", info.PartitionID),
 				Int64("partition_session_id", info.PartitionSessionID),
-				latency(start),
+				latencyField(start),
 			}
 			if doneInfo.CommitOffset != nil {
 				fields = append(fields,
@@ -76,7 +76,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 				l.Log(WithLevel(ctx, WARN), "read partition response completed",
 					append(fields,
 						Error(doneInfo.Error),
-						version(),
+						versionField(),
 					)...,
 				)
 			}
@@ -105,7 +105,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 				Int64("partition_session_id", info.PartitionSessionID),
 				Int64("committed_offset", info.CommittedOffset),
 				Bool("graceful", info.Graceful),
-				latency(start),
+				latencyField(start),
 			}
 			if doneInfo.Error == nil {
 				l.Log(WithLevel(ctx, INFO), "reader partition stopped", fields...)
@@ -113,7 +113,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 				l.Log(WithLevel(ctx, WARN), "reader partition stopped",
 					append(fields,
 						Error(doneInfo.Error),
-						version(),
+						versionField(),
 					)...,
 				)
 			}
@@ -139,7 +139,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 				Int64("partition_session_id", info.PartitionSessionID),
 				Int64("commit_start_offset", info.StartOffset),
 				Int64("commit_end_offset", info.EndOffset),
-				latency(start),
+				latencyField(start),
 			}
 			if doneInfo.Error == nil {
 				l.Log(ctx, "committed", fields...)
@@ -147,7 +147,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 				l.Log(WithLevel(ctx, WARN), "committed",
 					append(fields,
 						Error(doneInfo.Error),
-						version(),
+						versionField(),
 					)...,
 				)
 			}
@@ -169,7 +169,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 			fields := []Field{
 				Any("partitions_id", info.CommitsInfo.PartitionIDs()),
 				Any("partitions_session_id", info.CommitsInfo.PartitionSessionIDs()),
-				latency(start),
+				latencyField(start),
 			}
 			if doneInfo.Error == nil {
 				l.Log(ctx, "done", fields...)
@@ -177,7 +177,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 				l.Log(WithLevel(ctx, WARN), "commit message sent",
 					append(fields,
 						Error(doneInfo.Error),
-						version(),
+						versionField(),
 					)...,
 				)
 			}
@@ -209,7 +209,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		return func(doneInfo trace.TopicReaderCloseDoneInfo) {
 			fields := []Field{
 				String("reader_connection_id", info.ReaderConnectionID),
-				latency(start),
+				latencyField(start),
 			}
 			if doneInfo.CloseError == nil {
 				l.Log(ctx, "closed", fields...)
@@ -217,7 +217,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 				l.Log(WithLevel(ctx, WARN), "closed",
 					append(fields,
 						Error(doneInfo.CloseError),
-						version(),
+						versionField(),
 					)...,
 				)
 			}
@@ -240,7 +240,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 				String("pre_init_reader_connection_id", info.PreInitReaderConnectionID),
 				String("consumer", info.InitRequestInfo.GetConsumer()),
 				Strings("topics", info.InitRequestInfo.GetTopics()),
-				latency(start),
+				latencyField(start),
 			}
 			if doneInfo.Error == nil {
 				l.Log(ctx, "topic reader stream initialized", fields...)
@@ -248,7 +248,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 				l.Log(WithLevel(ctx, WARN), "topic reader stream initialized",
 					append(fields,
 						Error(doneInfo.Error),
-						version(),
+						versionField(),
 					)...,
 				)
 			}
@@ -262,7 +262,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		l.Log(WithLevel(ctx, INFO), "stream error",
 			Error(info.Error),
 			String("reader_connection_id", info.ReaderConnectionID),
-			version(),
+			versionField(),
 		)
 	}
 	t.OnReaderUpdateToken = func(
@@ -285,15 +285,15 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 				l.Log(ctx, "got token",
 					String("reader_connection_id", info.ReaderConnectionID),
 					Int("token_len", updateTokenInfo.TokenLen),
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "got token",
 					Error(updateTokenInfo.Error),
 					String("reader_connection_id", info.ReaderConnectionID),
 					Int("token_len", updateTokenInfo.TokenLen),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 			return func(doneInfo trace.OnReadStreamUpdateTokenDoneInfo) {
@@ -301,15 +301,15 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 					l.Log(ctx, "token updated on stream",
 						String("reader_connection_id", info.ReaderConnectionID),
 						Int("token_len", updateTokenInfo.TokenLen),
-						latency(start),
+						latencyField(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "token updated on stream",
 						Error(doneInfo.Error),
 						String("reader_connection_id", info.ReaderConnectionID),
 						Int("token_len", updateTokenInfo.TokenLen),
-						latency(start),
-						version(),
+						latencyField(start),
+						versionField(),
 					)
 				}
 			}
@@ -352,7 +352,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 					Int("partitions_count", partitionsCount),
 					Int("batches_count", batchesCount),
 					Int("messages_count", messagesCount),
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "data response received and processed",
@@ -363,8 +363,8 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 					Int("partitions_count", partitionsCount),
 					Int("batches_count", batchesCount),
 					Int("messages_count", messagesCount),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -388,7 +388,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 					Int("min_count", info.MinCount),
 					Int("max_count", info.MaxCount),
 					Int("local_capacity_before", info.FreeBufferCapacity),
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "read messages returned",
@@ -396,8 +396,8 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 					Int("min_count", info.MinCount),
 					Int("max_count", info.MaxCount),
 					Int("local_capacity_before", info.FreeBufferCapacity),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -437,7 +437,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 					String("producer_id", info.ProducerID),
 					String("writer_instance_id", info.WriterInstanceID),
 					Int("attempt", info.Attempt),
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "connect to topic writer stream completed",
@@ -446,7 +446,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 					String("producer_id", info.ProducerID),
 					String("writer_instance_id", info.WriterInstanceID),
 					Int("attempt", info.Attempt),
-					latency(start),
+					latencyField(start),
 				)
 			}
 		}
@@ -472,7 +472,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 					String("topic", info.Topic),
 					String("producer_id", info.ProducerID),
 					String("writer_instance_id", info.WriterInstanceID),
-					latency(start),
+					latencyField(start),
 					String("session_id", doneInfo.SessionID),
 				)
 			} else {
@@ -481,7 +481,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 					String("topic", info.Topic),
 					String("producer_id", info.ProducerID),
 					String("writer_instance_id", info.WriterInstanceID),
-					latency(start),
+					latencyField(start),
 					String("session_id", doneInfo.SessionID),
 				)
 			}
@@ -503,14 +503,14 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 					Error(doneInfo.Error),
 					String("writer_instance_id", info.WriterInstanceID),
 					NamedError("reason", info.Reason),
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "close topic writer completed",
 					Error(doneInfo.Error),
 					String("writer_instance_id", info.WriterInstanceID),
 					NamedError("reason", info.Reason),
-					latency(start),
+					latencyField(start),
 				)
 			}
 		}
@@ -541,7 +541,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 					Any("codec", info.Codec),
 					Int("messages_count", info.MessagesCount),
 					Int64("first_seqno", info.FirstSeqNo),
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "compress message completed",
@@ -552,7 +552,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 					Any("codec", info.Codec),
 					Int("messages_count", info.MessagesCount),
 					Int64("first_seqno", info.FirstSeqNo),
-					latency(start),
+					latencyField(start),
 				)
 			}
 		}
@@ -580,7 +580,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 					Any("codec", info.Codec),
 					Int("messages_count", info.MessagesCount),
 					Int64("first_seqno", info.FirstSeqNo),
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "send messages completed",
@@ -590,7 +590,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 					Any("codec", info.Codec),
 					Int("messages_count", info.MessagesCount),
 					Int64("first_seqno", info.FirstSeqNo),
-					latency(start),
+					latencyField(start),
 				)
 			}
 		}

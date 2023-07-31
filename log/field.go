@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -330,14 +330,14 @@ func (ft FieldType) String() (typeName string) {
 	return typeName
 }
 
-// latency creates Field "latency": time.Since(start)
-func latency(start time.Time) Field {
+// latencyField creates Field "latency": time.Since(start)
+func latencyField(start time.Time) Field {
 	return Duration("latency", time.Since(start))
 }
 
-// version creates Field "version": meta.Version
-func version() Field {
-	return String("version", meta.Version)
+// versionField creates Field "version": version.Version
+func versionField() Field {
+	return String("version", version.Version)
 }
 
 type endpoints []trace.EndpointInfo
