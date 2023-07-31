@@ -15,11 +15,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ydb-version: [ 23.1, 23.2 ]
+        ydb-version: [ 22.5, 23.1, 23.2 ]
         application: [ native, database_sql, gorm, xorm ]
     services:
       ydb:
-        image: cr.yandex/yc/yandex-docker-local-ydb:${{ matrix.ydb-version }}-slim
+        image: cr.yandex/crpsjg1coh47p81vh2lc/yandex-docker-local-ydb:${{ matrix.ydb-version }}
         ports:
           - 2135:2135
           - 2136:2136
