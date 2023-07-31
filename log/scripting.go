@@ -22,15 +22,15 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		return func(info trace.ScriptingExecuteDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 					Int("resultSetCount", info.Result.ResultSetCount()),
 					NamedError("resultSetError", info.Result.Err()),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
 					Error(info.Error),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -45,14 +45,14 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		return func(info trace.ScriptingExplainDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 					String("plan", info.Plan),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
 					Error(info.Error),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -85,7 +85,7 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 			} else {
 				l.Log(WithLevel(ctx, WARN), "intermediate failed",
 					Error(info.Error),
-					version(),
+					versionField(),
 				)
 			}
 			return func(info trace.ScriptingStreamExecuteDoneInfo) {
@@ -93,7 +93,7 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 					l.Log(ctx, "done",
 						appendFieldByCondition(l.logQuery,
 							String("query", query),
-							latency(start),
+							latencyField(start),
 						)...,
 					)
 				} else {
@@ -101,8 +101,8 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 						appendFieldByCondition(l.logQuery,
 							String("query", query),
 							Error(info.Error),
-							latency(start),
-							version(),
+							latencyField(start),
+							versionField(),
 						)...,
 					)
 				}
@@ -119,13 +119,13 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		return func(info trace.ScriptingCloseDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}

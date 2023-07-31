@@ -36,7 +36,7 @@ func internalRetry(l *wrapper, d trace.Detailer) (t trace.Retry) {
 			if info.Error == nil {
 				l.Log(ctx, "attempt done",
 					String("id", id),
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				lvl := ERROR
@@ -47,18 +47,18 @@ func internalRetry(l *wrapper, d trace.Detailer) (t trace.Retry) {
 				l.Log(WithLevel(ctx, lvl), "attempt failed",
 					Error(info.Error),
 					String("id", id),
-					latency(start),
+					latencyField(start),
 					Bool("retryable", m.MustRetry(idempotent)),
 					Int64("code", m.StatusCode()),
 					Bool("deleteSession", m.MustDeleteSession()),
-					version(),
+					versionField(),
 				)
 			}
 			return func(info trace.RetryLoopDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
 						String("id", id),
-						latency(start),
+						latencyField(start),
 						Int("attempts", info.Attempts),
 					)
 				} else {
@@ -70,12 +70,12 @@ func internalRetry(l *wrapper, d trace.Detailer) (t trace.Retry) {
 					l.Log(WithLevel(ctx, lvl), "failed",
 						Error(info.Error),
 						String("id", id),
-						latency(start),
+						latencyField(start),
 						Int("attempts", info.Attempts),
 						Bool("retryable", m.MustRetry(idempotent)),
 						Int64("code", m.StatusCode()),
 						Bool("deleteSession", m.MustDeleteSession()),
-						version(),
+						versionField(),
 					)
 				}
 			}
