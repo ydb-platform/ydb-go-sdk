@@ -67,6 +67,10 @@ github.com/stretchr/testify v1.7.1 h1:5TQK59W5E3v0r2duFAb7P95B6hEeOyEnHRa8MjYSMT
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/ydb-platform/ydb-go-genproto v0.0.0-20230528143953-42c825ace222 h1:8ddsk8HKBkVPH8w3k81si6SeCVJIAtw8dnw+s3h0ciE=
 github.com/ydb-platform/ydb-go-genproto v0.0.0-20230528143953-42c825ace222/go.mod h1:Er+FePu1dNUieD+XTMDduGpQuCPssK5Q4BjF+IIXJ3I=
+github.com/ydb-platform/ydb-go-genproto v0.0.0-20230710134411-552fdf84e4f1 h1:+nKxgNmwZXpWqFDfQfFhXlnd2AfABNE8Z2QEBdmrxRg=
+github.com/ydb-platform/ydb-go-genproto v0.0.0-20230710134411-552fdf84e4f1/go.mod h1:Er+FePu1dNUieD+XTMDduGpQuCPssK5Q4BjF+IIXJ3I=
+github.com/ydb-platform/ydb-go-genproto v0.0.0-20230801151335-81e01be38941 h1:QXgmY0vkYtOoGEXnTjWkyxhOkIzCosMrnoDyYjrv71Q=
+github.com/ydb-platform/ydb-go-genproto v0.0.0-20230801151335-81e01be38941/go.mod h1:Er+FePu1dNUieD+XTMDduGpQuCPssK5Q4BjF+IIXJ3I=
 github.com/yuin/goldmark v1.3.5/go.mod h1:mwnBkeHKe2W/ZEtQ+71ViKU8L12m81fl3OWwC1Zlc8k=
 go.opentelemetry.io/proto/otlp v0.7.0/go.mod h1:PqfVotwruBrMGOCsRd/89rSnXhoiJIqeYNgFYFoEGnI=
 golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACkg1iLfiJU5Ep61QUkGW8qpdssI0+w=
