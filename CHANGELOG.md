@@ -1,4 +1,4 @@
-* Added cons `table/options.ChangefeedFormatDynamoDBStreamsJSON` for define `CDC` format of `DynamoDB`
+* Added `table/options.ChangefeedFormatDynamoDBStreamsJSON` format of `DynamoDB` change feeds
 
 ## v3.48.8
 * Fixed `sugar.RemoveRecursive()` for column table type
