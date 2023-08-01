@@ -976,22 +976,96 @@ func WithExecuteScanQueryStats(stats ExecuteScanQueryStatsType) ExecuteScanQuery
 	})
 }
 
-// Read table options
-type (
-	ReadTableDesc   Ydb_Table.ReadTableRequest
-	ReadTableOption func(*ReadTableDesc, *allocator.Allocator)
+var (
+	_ ReadTableOption = readOrderedOption{}
+	_ ReadTableOption = readKeyRangeOption{}
+	_ ReadTableOption = readGreaterOrEqualOption{}
+	_ ReadTableOption = readLessOrEqualOption{}
+	_ ReadTableOption = readLessOption{}
+	_ ReadTableOption = readGreaterOption{}
+	_ ReadTableOption = readRowLimitOption(0)
 )
 
-func ReadColumn(name string) ReadTableOption {
-	return func(desc *ReadTableDesc, a *allocator.Allocator) {
-		desc.Columns = append(desc.Columns, name)
+type (
+	ReadTableDesc   Ydb_Table.ReadTableRequest
+	ReadTableOption interface {
+		ApplyReadTableOption(*ReadTableDesc, *allocator.Allocator)
+	}
+
+	readColumnsOption        []string
+	readOrderedOption        struct{}
+	readKeyRangeOption       KeyRange
+	readGreaterOrEqualOption struct{ types.Value }
+	readLessOrEqualOption    struct{ types.Value }
+	readLessOption           struct{ types.Value }
+	readGreaterOption        struct{ types.Value }
+	readRowLimitOption       uint64
+)
+
+func (n readRowLimitOption) ApplyReadTableOption(desc *ReadTableDesc, a *allocator.Allocator) {
+	desc.RowLimit = uint64(n)
+}
+
+func (x readGreaterOption) ApplyReadTableOption(desc *ReadTableDesc, a *allocator.Allocator) {
+	desc.initKeyRange()
+	desc.KeyRange.FromBound = &Ydb_Table.KeyRange_Greater{
+		Greater: value.ToYDB(x, a),
 	}
 }
 
-func ReadOrdered() ReadTableOption {
-	return func(desc *ReadTableDesc, a *allocator.Allocator) {
-		desc.Ordered = true
+func (x readLessOrEqualOption) ApplyReadTableOption(desc *ReadTableDesc, a *allocator.Allocator) {
+	desc.initKeyRange()
+	desc.KeyRange.ToBound = &Ydb_Table.KeyRange_LessOrEqual{
+		LessOrEqual: value.ToYDB(x, a),
 	}
+}
+
+func (x readLessOption) ApplyReadTableOption(desc *ReadTableDesc, a *allocator.Allocator) {
+	desc.initKeyRange()
+	desc.KeyRange.ToBound = &Ydb_Table.KeyRange_Less{
+		Less: value.ToYDB(x, a),
+	}
+}
+
+func (columns readColumnsOption) ApplyReadTableOption(desc *ReadTableDesc, a *allocator.Allocator) {
+	desc.Columns = append(desc.Columns, columns...)
+}
+
+func (r readOrderedOption) ApplyReadTableOption(desc *ReadTableDesc, a *allocator.Allocator) {
+	desc.Ordered = true
+}
+
+func (x readKeyRangeOption) ApplyReadTableOption(desc *ReadTableDesc, a *allocator.Allocator) {
+	desc.initKeyRange()
+	if x.From != nil {
+		desc.KeyRange.FromBound = &Ydb_Table.KeyRange_GreaterOrEqual{
+			GreaterOrEqual: value.ToYDB(x.From, a),
+		}
+	}
+	if x.To != nil {
+		desc.KeyRange.ToBound = &Ydb_Table.KeyRange_Less{
+			Less: value.ToYDB(x.To, a),
+		}
+	}
+}
+
+func (x readGreaterOrEqualOption) ApplyReadTableOption(desc *ReadTableDesc, a *allocator.Allocator) {
+	desc.initKeyRange()
+	desc.KeyRange.FromBound = &Ydb_Table.KeyRange_GreaterOrEqual{
+		GreaterOrEqual: value.ToYDB(x, a),
+	}
+}
+
+func ReadColumn(name string) readColumnsOption {
+	return []string{name}
+}
+
+func ReadColumns(names ...string) readColumnsOption {
+	return names
+}
+
+func ReadOrdered() readOrderedOption {
+	return readOrderedOption{}
 }
 
 // ReadKeyRange returns ReadTableOption which makes ReadTable read values
@@ -999,56 +1073,27 @@ func ReadOrdered() ReadTableOption {
 //
 // Both x.From and x.To may be nil.
 func ReadKeyRange(x KeyRange) ReadTableOption {
-	return func(desc *ReadTableDesc, a *allocator.Allocator) {
-		if x.From != nil {
-			ReadGreaterOrEqual(x.From)(desc, a)
-		}
-		if x.To != nil {
-			ReadLess(x.To)(desc, a)
-		}
-	}
+	return readKeyRangeOption(x)
 }
 
 func ReadGreater(x types.Value) ReadTableOption {
-	return func(desc *ReadTableDesc, a *allocator.Allocator) {
-		desc.initKeyRange()
-		desc.KeyRange.FromBound = &Ydb_Table.KeyRange_Greater{
-			Greater: value.ToYDB(x, a),
-		}
-	}
+	return readGreaterOption{x}
 }
 
 func ReadGreaterOrEqual(x types.Value) ReadTableOption {
-	return func(desc *ReadTableDesc, a *allocator.Allocator) {
-		desc.initKeyRange()
-		desc.KeyRange.FromBound = &Ydb_Table.KeyRange_GreaterOrEqual{
-			GreaterOrEqual: value.ToYDB(x, a),
-		}
-	}
+	return readGreaterOrEqualOption{x}
 }
 
 func ReadLess(x types.Value) ReadTableOption {
-	return func(desc *ReadTableDesc, a *allocator.Allocator) {
-		desc.initKeyRange()
-		desc.KeyRange.ToBound = &Ydb_Table.KeyRange_Less{
-			Less: value.ToYDB(x, a),
-		}
-	}
+	return readLessOption{x}
 }
 
 func ReadLessOrEqual(x types.Value) ReadTableOption {
-	return func(desc *ReadTableDesc, a *allocator.Allocator) {
-		desc.initKeyRange()
-		desc.KeyRange.ToBound = &Ydb_Table.KeyRange_LessOrEqual{
-			LessOrEqual: value.ToYDB(x, a),
-		}
-	}
+	return readLessOrEqualOption{x}
 }
 
 func ReadRowLimit(n uint64) ReadTableOption {
-	return func(desc *ReadTableDesc, a *allocator.Allocator) {
-		desc.RowLimit = n
-	}
+	return readRowLimitOption(n)
 }
 
 func (d *ReadTableDesc) initKeyRange() {

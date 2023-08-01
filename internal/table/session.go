@@ -926,7 +926,7 @@ func (s *session) StreamReadTable(
 
 	for _, opt := range opts {
 		if opt != nil {
-			opt((*options.ReadTableDesc)(&request), a)
+			opt.ApplyReadTableOption((*options.ReadTableDesc)(&request), a)
 		}
 	}
 
@@ -1080,7 +1080,11 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 		},
 		callOptions...,
 	)
-	return xerrors.WithStackTrace(err)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
 }
 
 // BeginTransaction begins new transaction within given session with given
