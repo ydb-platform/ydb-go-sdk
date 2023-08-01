@@ -977,6 +977,7 @@ func WithExecuteScanQueryStats(stats ExecuteScanQueryStatsType) ExecuteScanQuery
 }
 
 var (
+	_ ReadRowsOption  = readColumnsOption{}
 	_ ReadTableOption = readOrderedOption{}
 	_ ReadTableOption = readKeyRangeOption{}
 	_ ReadTableOption = readGreaterOrEqualOption{}
@@ -987,6 +988,11 @@ var (
 )
 
 type (
+	ReadRowsDesc   Ydb_Table.ReadRowsRequest
+	ReadRowsOption interface {
+		ApplyReadRowsOption(*ReadRowsDesc, *allocator.Allocator)
+	}
+
 	ReadTableDesc   Ydb_Table.ReadTableRequest
 	ReadTableOption interface {
 		ApplyReadTableOption(*ReadTableDesc, *allocator.Allocator)
@@ -1025,6 +1031,10 @@ func (x readLessOption) ApplyReadTableOption(desc *ReadTableDesc, a *allocator.A
 	desc.KeyRange.ToBound = &Ydb_Table.KeyRange_Less{
 		Less: value.ToYDB(x, a),
 	}
+}
+
+func (columns readColumnsOption) ApplyReadRowsOption(desc *ReadRowsDesc, a *allocator.Allocator) {
+	desc.Columns = append(desc.Columns, columns...)
 }
 
 func (columns readColumnsOption) ApplyReadTableOption(desc *ReadTableDesc, a *allocator.Allocator) {

@@ -1,3 +1,4 @@
+* Added `table.Session.ReadRows` method for getting rows by keys
 * Added `table/options.ChangefeedFormatDynamoDBStreamsJSON` format of `DynamoDB` change feeds
 
 ## v3.48.8

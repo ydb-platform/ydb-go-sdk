@@ -933,6 +933,8 @@ github.com/ydb-platform/xorm v0.0.3 h1:MXk42lANB6r/MMLg/XdJfyXJycGUDlCeLiMlLGDKV
 github.com/ydb-platform/xorm v0.0.3/go.mod h1:hFsU7EUF0o3S+l5c0eyP2yPVjJ0d4gsFdqCsyazzwBc=
 github.com/ydb-platform/ydb-go-genproto v0.0.0-20230528143953-42c825ace222 h1:8ddsk8HKBkVPH8w3k81si6SeCVJIAtw8dnw+s3h0ciE=
 github.com/ydb-platform/ydb-go-genproto v0.0.0-20230528143953-42c825ace222/go.mod h1:Er+FePu1dNUieD+XTMDduGpQuCPssK5Q4BjF+IIXJ3I=
+github.com/ydb-platform/ydb-go-genproto v0.0.0-20230710134411-552fdf84e4f1 h1:+nKxgNmwZXpWqFDfQfFhXlnd2AfABNE8Z2QEBdmrxRg=
+github.com/ydb-platform/ydb-go-genproto v0.0.0-20230710134411-552fdf84e4f1/go.mod h1:Er+FePu1dNUieD+XTMDduGpQuCPssK5Q4BjF+IIXJ3I=
 github.com/ydb-platform/ydb-go-genproto v0.0.0-20230801151335-81e01be38941 h1:QXgmY0vkYtOoGEXnTjWkyxhOkIzCosMrnoDyYjrv71Q=
 github.com/ydb-platform/ydb-go-genproto v0.0.0-20230801151335-81e01be38941/go.mod h1:Er+FePu1dNUieD+XTMDduGpQuCPssK5Q4BjF+IIXJ3I=
 github.com/ydb-platform/ydb-go-sdk-auth-environ v0.1.2 h1:EYSI1kulnHb0H0zt3yOw4cRj4ABMSMGwNe43D+fX7e4=

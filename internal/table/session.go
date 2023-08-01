@@ -970,6 +970,51 @@ func (s *session) StreamReadTable(
 	), nil
 }
 
+func (s *session) ReadRows(
+	ctx context.Context,
+	path string,
+	keys types.Value,
+	opts ...options.ReadRowsOption,
+) (_ result.Result, err error) {
+	var (
+		a       = allocator.New()
+		request = Ydb_Table.ReadRowsRequest{
+			SessionId: s.id,
+			Path:      path,
+			Keys:      value.ToYDB(keys, a),
+		}
+		response *Ydb_Table.ReadRowsResponse
+	)
+	defer func() {
+		a.Free()
+	}()
+
+	for _, opt := range opts {
+		if opt != nil {
+			opt.ApplyReadRowsOption((*options.ReadRowsDesc)(&request), a)
+		}
+	}
+
+	response, err = s.tableService.ReadRows(ctx, &request)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
+		return nil, xerrors.WithStackTrace(
+			xerrors.Operation(
+				xerrors.FromOperation(response),
+			),
+		)
+	}
+
+	return scanner.NewUnary(
+		[]*Ydb.ResultSet{response.GetResultSet()},
+		nil,
+		scanner.WithIgnoreTruncated(s.config.IgnoreTruncated()),
+	), nil
+}
+
 // StreamExecuteScanQuery scan-reads table at given path with given options.
 //
 // Note that given ctx controls the lifetime of the whole read, not only this
