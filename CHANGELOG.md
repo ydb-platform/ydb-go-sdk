@@ -1,3 +1,4 @@
+## v3.49.1
 * Added `table.options.WithIgnoreTruncated` option for `session.Execute` method
 * Added `table.result.ErrTruncated` error for check it with `errors.Is()` outside of `ydb-go-sdk`
 
