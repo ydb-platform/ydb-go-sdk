@@ -171,7 +171,7 @@ type ydbDriver interface {
 
 type nopPathNormalizer struct{}
 
-func (nopPathNormalizer) NormalizePath(folderOrTable string) string {
+func (nopPathNormalizer) NormalizePath(_ string) string {
 	return tablePathPrefixTransformer
 }
 

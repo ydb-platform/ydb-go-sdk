@@ -793,7 +793,11 @@ type (
 )
 
 type (
-	ExecuteDataQueryDesc   Ydb_Table.ExecuteDataQueryRequest
+	ExecuteDataQueryDesc struct {
+		*Ydb_Table.ExecuteDataQueryRequest
+
+		IgnoreTruncated bool
+	}
 	ExecuteDataQueryOption interface {
 		ApplyExecuteDataQueryOption(d *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption
 	}
@@ -852,6 +856,14 @@ func WithCallOptions(opts ...grpc.CallOption) withCallOptions {
 func WithCommit() ExecuteDataQueryOption {
 	return executeDataQueryOptionFunc(func(desc *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
 		desc.TxControl.CommitTx = true
+		return nil
+	})
+}
+
+// WithIgnoreTruncated mark truncated result as good (without error)
+func WithIgnoreTruncated() ExecuteDataQueryOption {
+	return executeDataQueryOptionFunc(func(desc *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
+		desc.IgnoreTruncated = true
 		return nil
 	})
 }

@@ -650,9 +650,12 @@ func (s *session) Execute(
 	txr table.Transaction, r result.Result, err error,
 ) {
 	var (
-		a           = allocator.New()
-		q           = queryFromText(query)
-		request     = a.TableExecuteDataQueryRequest()
+		a       = allocator.New()
+		q       = queryFromText(query)
+		request = options.ExecuteDataQueryDesc{
+			ExecuteDataQueryRequest: a.TableExecuteDataQueryRequest(),
+			IgnoreTruncated:         s.config.IgnoreTruncated(),
+		}
 		callOptions []grpc.CallOption
 	)
 	defer a.Free()
@@ -671,7 +674,7 @@ func (s *session) Execute(
 
 	for _, opt := range opts {
 		if opt != nil {
-			callOptions = append(callOptions, opt.ApplyExecuteDataQueryOption((*options.ExecuteDataQueryDesc)(request), a)...)
+			callOptions = append(callOptions, opt.ApplyExecuteDataQueryOption(&request, a)...)
 		}
 	}
 
@@ -683,18 +686,20 @@ func (s *session) Execute(
 		onDone(txr, false, r, err)
 	}()
 
-	result, err := s.executeDataQuery(ctx, a, request, callOptions...)
+	result, err := s.executeDataQuery(ctx, a, request.ExecuteDataQueryRequest, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	return s.executeQueryResult(result, request.TxControl)
+	return s.executeQueryResult(result, request.TxControl, request.IgnoreTruncated)
 }
 
 // executeQueryResult returns Transaction and result built from received
 // result.
 func (s *session) executeQueryResult(
-	res *Ydb_Table.ExecuteQueryResult, txControl *Ydb_Table.TransactionControl,
+	res *Ydb_Table.ExecuteQueryResult,
+	txControl *Ydb_Table.TransactionControl,
+	ignoreTruncated bool,
 ) (
 	table.Transaction, result.Result, error,
 ) {
@@ -711,7 +716,7 @@ func (s *session) executeQueryResult(
 	return tx, scanner.NewUnary(
 		res.GetResultSets(),
 		res.GetQueryStats(),
-		scanner.WithIgnoreTruncated(s.config.IgnoreTruncated()),
+		scanner.WithIgnoreTruncated(ignoreTruncated),
 	), nil
 }
 
