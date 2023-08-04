@@ -115,7 +115,6 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 
 		lastOffset := e.partitionSession.lastReceivedMessageOffset()
 		const dataSize = 4
-
 		// request new data portion
 		readRequestReceived := make(empty.Chan)
 		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: dataSize * 2}).Do(func(_ interface{}) {
