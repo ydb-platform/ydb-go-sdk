@@ -16,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -224,7 +225,7 @@ func (s *scanner) Err() error {
 	}
 	if !s.ignoreTruncated && s.truncated() {
 		err := xerrors.Wrap(
-			fmt.Errorf("truncated result (more than %d rows)", len(s.set.GetRows())),
+			fmt.Errorf("more than %d rows: %w", len(s.set.GetRows()), result.ErrTruncated),
 		)
 		if s.markTruncatedAsRetryable {
 			err = xerrors.Retryable(err)

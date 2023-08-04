@@ -1,5 +1,9 @@
 * Added check if commit order is bad in sync mode
 
+## v3.49.1
+* Added `table.options.WithIgnoreTruncated` option for `session.Execute` method
+* Added `table.result.ErrTruncated` error for check it with `errors.Is()` outside of `ydb-go-sdk`
+
 ## v3.49.0
 * Added `table.Session.ReadRows` method for getting rows by keys
 * Added `table/options.ChangefeedFormatDynamoDBStreamsJSON` format of `DynamoDB` change feeds
