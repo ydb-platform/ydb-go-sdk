@@ -108,7 +108,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		xtest.WaitChannelClosed(t, commitReceived)
 		xtest.WaitChannelClosed(t, readRequestReceived)
 	})
-	xtest.TestManyTimesWithName(t, "wrong order commit with sync commit mode", func(t testing.TB) {
+	xtest.TestManyTimesWithName(t, "WrongOrderCommitWithSyncMode", func(t testing.TB) {
 		e := newTopicReaderTestEnv(t)
 		e.reader.cfg.CommitMode = CommitModeSync
 		e.Start()
