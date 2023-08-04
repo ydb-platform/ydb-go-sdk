@@ -108,6 +108,66 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		xtest.WaitChannelClosed(t, commitReceived)
 		xtest.WaitChannelClosed(t, readRequestReceived)
 	})
+	xtest.TestManyTimesWithName(t, "WrongOrderCommitWithSyncMode", func(t testing.TB) {
+		e := newTopicReaderTestEnv(t)
+		e.reader.cfg.CommitMode = CommitModeSync
+		e.Start()
+
+		lastOffset := e.partitionSession.lastReceivedMessageOffset()
+		const dataSize = 4
+		// request new data portion
+		readRequestReceived := make(empty.Chan)
+		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: dataSize * 2}).Do(func(_ interface{}) {
+			close(readRequestReceived)
+		})
+
+		e.SendFromServer(&rawtopicreader.ReadResponse{
+			BytesSize: dataSize,
+			PartitionData: []rawtopicreader.PartitionData{
+				{
+					PartitionSessionID: e.partitionSessionID,
+					Batches: []rawtopicreader.Batch{
+						{
+							Codec:      rawtopiccommon.CodecRaw,
+							ProducerID: "1",
+							MessageData: []rawtopicreader.MessageData{
+								{
+									Offset: lastOffset + 1,
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+		e.SendFromServer(&rawtopicreader.ReadResponse{
+			BytesSize: dataSize,
+			PartitionData: []rawtopicreader.PartitionData{
+				{
+					PartitionSessionID: e.partitionSessionID,
+					Batches: []rawtopicreader.Batch{
+						{
+							Codec:      rawtopiccommon.CodecRaw,
+							ProducerID: "1",
+							MessageData: []rawtopicreader.MessageData{
+								{
+									Offset: lastOffset + 2,
+								},
+							},
+						},
+					},
+				},
+			},
+		})
+
+		opts := newReadMessageBatchOptions()
+		opts.MinCount = 2
+		batch, err := e.reader.ReadMessageBatch(e.ctx, opts)
+		require.NoError(t, err)
+		require.ErrorIs(t, e.reader.Commit(e.ctx, batch.Messages[1].getCommitRange().priv), ErrWrongCommitOrderInSyncMode)
+		xtest.WaitChannelClosed(t, readRequestReceived)
+	})
 
 	xtest.TestManyTimesWithName(t, "CommitAfterGracefulStopPartition", func(t testing.TB) {
 		e := newTopicReaderTestEnv(t)
