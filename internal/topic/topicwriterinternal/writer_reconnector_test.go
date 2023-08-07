@@ -14,7 +14,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
@@ -328,6 +327,42 @@ func TestWriterImpl_InitSession(t *testing.T) {
 	require.Equal(t, sessionID, w.sessionID)
 	require.Equal(t, lastSeqNo, w.lastSeqNo)
 	require.True(t, isClosed(w.firstInitResponseProcessedChan))
+}
+
+func TestWriterImpl_WaitInit(t *testing.T) {
+
+	t.Run("OK", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		w := newTestWriterStopped(WithAutoSetSeqNo(true))
+		expectedLastSeqNo := int64(123)
+		w.onWriterChange(&SingleStreamWriter{
+			ReceivedLastSeqNum: expectedLastSeqNo,
+		})
+
+		var (
+			gotLastSecNo int64
+			err          error
+		)
+		for i := 1; i <= 5; i++ {
+			gotLastSecNo, err = w.WaitInit(ctx)
+			require.NoError(t, err)
+			require.Equal(t, expectedLastSeqNo, gotLastSecNo)
+		}
+
+		require.True(t, isClosed(w.firstInitResponseProcessedChan))
+	})
+
+	t.Run("contextDeadlineError", func(t *testing.T) {
+		w := newTestWriterStopped(WithAutoSetSeqNo(true))
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_, err := w.WaitInit(ctx)
+		require.ErrorIs(t, err, ctx.Err())
+
+		w.onWriterChange(&SingleStreamWriter{})
+		require.True(t, isClosed(w.firstInitResponseProcessedChan))
+	})
 }
 
 func TestWriterImpl_Reconnect(t *testing.T) {
