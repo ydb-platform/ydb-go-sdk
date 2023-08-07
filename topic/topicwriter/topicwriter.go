@@ -41,6 +41,10 @@ func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 	return w.inner.Write(ctx, messages...)
 }
 
+func (w *Writer) WaitInit(ctx context.Context) (lastSegNo int64, err error) {
+	return w.inner.WaitInit(ctx)
+}
+
 func (w *Writer) Close(ctx context.Context) error {
 	return w.inner.Close(ctx)
 }
