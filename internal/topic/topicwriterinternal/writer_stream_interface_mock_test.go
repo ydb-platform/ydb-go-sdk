@@ -47,6 +47,21 @@ func (mr *MockStreamWriterMockRecorder) Close(ctx interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockStreamWriter)(nil).Close), ctx)
 }
 
+// WaitInit mocks base method.
+func (m *MockStreamWriter) WaitInit(ctx context.Context) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitInit", ctx)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// WaitInit indicates an expected call of WaitInit.
+func (mr *MockStreamWriterMockRecorder) WaitInit(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitInit", reflect.TypeOf((*MockStreamWriter)(nil).WaitInit), ctx)
+}
+
 // Write mocks base method.
 func (m *MockStreamWriter) Write(ctx context.Context, messages []Message) error {
 	m.ctrl.T.Helper()
