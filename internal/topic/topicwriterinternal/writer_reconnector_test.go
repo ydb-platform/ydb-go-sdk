@@ -332,20 +332,16 @@ func TestWriterImpl_InitSession(t *testing.T) {
 func TestWriterImpl_WaitInit(t *testing.T) {
 
 	t.Run("OK", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
 		w := newTestWriterStopped(WithAutoSetSeqNo(true))
 		expectedLastSeqNo := int64(123)
 		w.onWriterChange(&SingleStreamWriter{
 			ReceivedLastSeqNum: expectedLastSeqNo,
 		})
 
-		var (
-			gotLastSecNo int64
-			err          error
-		)
 		for i := 1; i <= 5; i++ {
-			gotLastSecNo, err = w.WaitInit(ctx)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			gotLastSecNo, err := w.WaitInit(ctx)
+			cancel()
 			require.NoError(t, err)
 			require.Equal(t, expectedLastSeqNo, gotLastSecNo)
 		}
@@ -356,8 +352,8 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 	t.Run("contextDeadlineError", func(t *testing.T) {
 		w := newTestWriterStopped(WithAutoSetSeqNo(true))
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
 		_, err := w.WaitInit(ctx)
+		cancel()
 		require.ErrorIs(t, err, ctx.Err())
 
 		w.onWriterChange(&SingleStreamWriter{})
