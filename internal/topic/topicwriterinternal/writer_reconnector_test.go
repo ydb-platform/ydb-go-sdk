@@ -349,11 +349,22 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 		require.True(t, isClosed(w.firstInitResponseProcessedChan))
 	})
 
-	t.Run("contextDeadlineError", func(t *testing.T) {
+	t.Run("contextDeadlineErrorInProgress", func(t *testing.T) {
 		w := newTestWriterStopped(WithAutoSetSeqNo(true))
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		_, err := w.WaitInit(ctx)
 		cancel()
+		require.ErrorIs(t, err, ctx.Err())
+
+		w.onWriterChange(&SingleStreamWriter{})
+		require.True(t, isClosed(w.firstInitResponseProcessedChan))
+	})
+
+	t.Run("contextDeadlineErrorBeforeStart", func(t *testing.T) {
+		w := newTestWriterStopped(WithAutoSetSeqNo(true))
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err := w.WaitInit(ctx)
 		require.ErrorIs(t, err, ctx.Err())
 
 		w.onWriterChange(&SingleStreamWriter{})

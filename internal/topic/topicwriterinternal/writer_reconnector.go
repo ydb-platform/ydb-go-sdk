@@ -165,7 +165,7 @@ func newWriterReconnectorStopped(
 
 	res.sessionID = "not-connected-" + writerInstanceID.String()
 
-	res.initDoneCh = make(empty.Chan, 1)
+	res.initDoneCh = make(empty.Chan)
 
 	return res
 }
@@ -496,16 +496,12 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 
 	if isFirstInit {
 		w.initDone = true
-		w.initDoneCh <- struct{}{}
+		close(w.initDoneCh)
 		w.onWriterInitCallbackHandler(writerStream)
 	}
 }
 
 func (w *WriterReconnector) WaitInit(ctx context.Context) (lastSegNo int64, err error) {
-	if w.initDone {
-		return w.lastSeqNo, nil
-	}
-
 	select {
 	case <-ctx.Done():
 		return 0, ctx.Err()
