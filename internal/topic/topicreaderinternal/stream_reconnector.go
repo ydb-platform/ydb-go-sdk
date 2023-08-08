@@ -73,7 +73,7 @@ func newReaderReconnector(
 		baseContext:    baseContext,
 		retrySettings:  retrySettings,
 	}
-	res.initDoneCh = make(empty.Chan, 1)
+	res.initDoneCh = make(empty.Chan)
 
 	if res.connectTimeout == 0 {
 		res.connectTimeout = value.InfiniteDuration
@@ -315,19 +315,21 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 	}
 
 	if res.err == nil {
-		if !r.initDone {
-			r.initDoneCh <- struct{}{}
-		}
-		r.initDone = true
+		r.m.WithLock(
+			func() {
+				if !r.initDone {
+					close(r.initDoneCh)
+				}
+				r.initDone = true
+			},
+		)
+
 		return res.stream, nil
 	}
 	return nil, res.err
 }
 
 func (r *readerReconnector) WaitInit(ctx context.Context) error {
-	if r.initDone {
-		return nil
-	}
 	select {
 	case <-ctx.Done():
 		return ctx.Err()

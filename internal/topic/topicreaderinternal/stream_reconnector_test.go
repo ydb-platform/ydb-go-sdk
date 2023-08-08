@@ -63,8 +63,9 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 				}
 				return baseReader, nil
 			},
-			streamErr: errUnconnected,
-			tracer:    &trace.Topic{},
+			streamErr:  errUnconnected,
+			tracer:     &trace.Topic{},
+			initDoneCh: make(empty.Chan),
 		}
 		reader.initChannelsAndClock()
 		reader.background.Start("test-reconnectionLoop", reader.reconnectionLoop)
@@ -105,8 +106,9 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 				connectCalled++
 				return readers[connectCalled-1], nil
 			},
-			streamErr: errUnconnected,
-			tracer:    &trace.Topic{},
+			streamErr:  errUnconnected,
+			tracer:     &trace.Topic{},
+			initDoneCh: make(empty.Chan),
 		}
 		reader.initChannelsAndClock()
 		reader.background.Start("test-reconnectionLoop", reader.reconnectionLoop)
@@ -205,6 +207,7 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 			connectTimeout: value.InfiniteDuration,
 			background:     *background.NewWorker(ctx),
 			tracer:         &trace.Topic{},
+			initDoneCh:     make(empty.Chan, 1),
 		}
 		reconnector.initChannelsAndClock()
 
@@ -268,7 +271,8 @@ func TestTopicReaderReconnectorStart(t *testing.T) {
 	ctx := context.Background()
 
 	reconnector := &readerReconnector{
-		tracer: &trace.Topic{},
+		tracer:     &trace.Topic{},
+		initDoneCh: make(empty.Chan),
 	}
 	reconnector.initChannelsAndClock()
 
@@ -302,9 +306,9 @@ func TestTopicReaderReconnectorWaitInit(t *testing.T) {
 		defer mc.Finish()
 
 		reconnector := &readerReconnector{
-			tracer: &trace.Topic{},
+			tracer:     &trace.Topic{},
+			initDoneCh: make(empty.Chan),
 		}
-		reconnector.initDoneCh = make(empty.Chan, 1)
 		reconnector.initChannelsAndClock()
 
 		stream := NewMockbatchedStreamReader(mc)
@@ -324,7 +328,7 @@ func TestTopicReaderReconnectorWaitInit(t *testing.T) {
 		}
 	})
 
-	t.Run("OK", func(t *testing.T) {
+	t.Run("contextDeadlineInProgress", func(t *testing.T) {
 		mc := gomock.NewController(t)
 		defer mc.Finish()
 
@@ -349,13 +353,39 @@ func TestTopicReaderReconnectorWaitInit(t *testing.T) {
 		require.ErrorIs(t, err, ctx.Err())
 	})
 
+	t.Run("contextDeadlineBeforeStart", func(t *testing.T) {
+		mc := gomock.NewController(t)
+		defer mc.Finish()
+
+		reconnector := &readerReconnector{
+			tracer: &trace.Topic{},
+		}
+		reconnector.initDoneCh = make(empty.Chan, 1)
+		reconnector.initChannelsAndClock()
+
+		stream := NewMockbatchedStreamReader(mc)
+
+		reconnector.readerConnect = readerConnectFuncMock(readerConnectFuncAnswer{
+			callback: func(ctx context.Context) (batchedStreamReader, error) {
+				return stream, nil
+			},
+		})
+
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		err := reconnector.WaitInit(ctx)
+
+		require.ErrorIs(t, err, ctx.Err())
+	})
+
 }
 
 func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {
 	t.Run("Ok", func(t *testing.T) {
 		mc := gomock.NewController(t)
 		reconnector := &readerReconnector{
-			tracer: &trace.Topic{},
+			tracer:     &trace.Topic{},
+			initDoneCh: make(empty.Chan),
 		}
 
 		stream := NewMockbatchedStreamReader(mc)
@@ -388,7 +418,10 @@ func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {
 		mc := gomock.NewController(t)
 		defer mc.Finish()
 
-		reconnector := &readerReconnector{tracer: &trace.Topic{}}
+		reconnector := &readerReconnector{
+			tracer:     &trace.Topic{},
+			initDoneCh: make(empty.Chan),
+		}
 		stream := NewMockbatchedStreamReader(mc)
 		reconnector.initChannelsAndClock()
 
@@ -417,8 +450,9 @@ func TestTopicReaderReconnectorReconnectWithError(t *testing.T) {
 		readerConnect: func(ctx context.Context) (batchedStreamReader, error) {
 			return nil, testErr
 		},
-		streamErr: errors.New("start-error"),
-		tracer:    &trace.Topic{},
+		streamErr:  errors.New("start-error"),
+		tracer:     &trace.Topic{},
+		initDoneCh: make(empty.Chan),
 	}
 	reconnector.initChannelsAndClock()
 	err := reconnector.reconnect(ctx, nil)
