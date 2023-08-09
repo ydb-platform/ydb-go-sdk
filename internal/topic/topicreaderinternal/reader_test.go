@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
@@ -152,4 +153,20 @@ func TestReader_Commit(t *testing.T) {
 		err := reader.Commit(ctx, forCommit)
 		require.ErrorIs(t, err, errCommitSessionFromOtherReader)
 	})
+}
+
+func TestReader_WaitInit(t *testing.T) {
+	mc := gomock.NewController(t)
+	defer mc.Finish()
+
+	readerID := nextReaderID()
+	baseReader := NewMockbatchedStreamReader(mc)
+	reader := &Reader{
+		reader:   baseReader,
+		readerID: readerID,
+	}
+
+	baseReader.EXPECT().WaitInit(gomock.Any())
+	err := reader.WaitInit(context.Background())
+	assert.NoError(t, err)
 }

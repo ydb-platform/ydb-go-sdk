@@ -118,6 +118,10 @@ func NewReader(
 	return res
 }
 
+func (r *Reader) WaitInit(ctx context.Context) error {
+	return r.reader.WaitInit(ctx)
+}
+
 func (r *Reader) Close(ctx context.Context) error {
 	return r.reader.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
 }
