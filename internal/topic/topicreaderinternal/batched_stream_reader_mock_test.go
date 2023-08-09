@@ -75,3 +75,17 @@ func (mr *MockbatchedStreamReaderMockRecorder) ReadMessageBatch(ctx, opts interf
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadMessageBatch", reflect.TypeOf((*MockbatchedStreamReader)(nil).ReadMessageBatch), ctx, opts)
 }
+
+// WaitInit mocks base method.
+func (m *MockbatchedStreamReader) WaitInit(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "WaitInit", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// WaitInit indicates an expected call of WaitInit.
+func (mr *MockbatchedStreamReaderMockRecorder) WaitInit(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitInit", reflect.TypeOf((*MockbatchedStreamReader)(nil).WaitInit), ctx)
+}
