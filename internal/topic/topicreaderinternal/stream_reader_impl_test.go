@@ -262,6 +262,21 @@ func TestTopicStreamReaderImpl_Create(t *testing.T) {
 	})
 }
 
+func TestTopicStreamReaderImpl_WaitInit(t *testing.T) {
+	t.Run("OK", func(t *testing.T) {
+		e := newTopicReaderTestEnv(t)
+		e.Start()
+		err := e.reader.WaitInit(context.Background())
+		require.NoError(t, err)
+	})
+
+	t.Run("not started", func(t *testing.T) {
+		e := newTopicReaderTestEnv(t)
+		err := e.reader.WaitInit(context.Background())
+		require.Error(t, err)
+	})
+}
+
 func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "GracefulFalseCancelPartitionContext", func(t testing.TB) {
 		e := newTopicReaderTestEnv(t)
