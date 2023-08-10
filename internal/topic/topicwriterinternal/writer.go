@@ -48,7 +48,7 @@ func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 	return w.streamWriter.Write(ctx, messages)
 }
 
-func (w *Writer) WaitInit(ctx context.Context) (lastSegNo int64, err error) {
+func (w *Writer) WaitInit(ctx context.Context) (info InitialInfo, err error) {
 	return w.streamWriter.WaitInit(ctx)
 }
 

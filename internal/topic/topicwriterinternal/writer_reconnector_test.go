@@ -343,7 +343,7 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 			gotLastSecNo, err := w.WaitInit(ctx)
 			cancel()
 			require.NoError(t, err)
-			require.Equal(t, expectedLastSeqNo, gotLastSecNo)
+			require.Equal(t, expectedLastSeqNo, gotLastSecNo.LastSeqNum)
 		}
 
 		require.True(t, isClosed(w.firstInitResponseProcessedChan))

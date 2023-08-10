@@ -18,6 +18,10 @@ type Writer struct {
 	inner *topicwriterinternal.Writer
 }
 
+type PublicInitialInfo struct {
+	LastSegNum int64
+}
+
 func NewWriter(writer *topicwriterinternal.Writer) *Writer {
 	return &Writer{
 		inner: writer,
@@ -41,8 +45,13 @@ func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 	return w.inner.Write(ctx, messages...)
 }
 
-func (w *Writer) WaitInit(ctx context.Context) (lastSegNo int64, err error) {
-	return w.inner.WaitInit(ctx)
+func (w *Writer) WaitInit(ctx context.Context) (info PublicInitialInfo, err error) {
+	privateInfo, err := w.inner.WaitInit(ctx)
+	if err != nil {
+		return PublicInitialInfo{}, err
+	}
+	publicInfo := PublicInitialInfo{LastSegNum: privateInfo.LastSeqNum}
+	return publicInfo, nil
 }
 
 func (w *Writer) Close(ctx context.Context) error {

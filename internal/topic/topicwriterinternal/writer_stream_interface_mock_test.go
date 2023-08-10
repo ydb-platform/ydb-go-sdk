@@ -48,10 +48,10 @@ func (mr *MockStreamWriterMockRecorder) Close(ctx interface{}) *gomock.Call {
 }
 
 // WaitInit mocks base method.
-func (m *MockStreamWriter) WaitInit(ctx context.Context) (int64, error) {
+func (m *MockStreamWriter) WaitInit(ctx context.Context) (InitialInfo, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WaitInit", ctx)
-	ret0, _ := ret[0].(int64)
+	ret0, _ := ret[0].(InitialInfo)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

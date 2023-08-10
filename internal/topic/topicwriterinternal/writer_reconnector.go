@@ -501,16 +501,16 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 	}
 }
 
-func (w *WriterReconnector) WaitInit(ctx context.Context) (lastSegNo int64, err error) {
+func (w *WriterReconnector) WaitInit(ctx context.Context) (info InitialInfo, err error) {
 	if ctx.Err() != nil {
-		return 0, ctx.Err()
+		return InitialInfo{}, ctx.Err()
 	}
 
 	select {
 	case <-ctx.Done():
-		return 0, ctx.Err()
+		return InitialInfo{}, ctx.Err()
 	case <-w.initDoneCh:
-		return w.lastSeqNo, nil
+		return InitialInfo{LastSeqNum: w.lastSeqNo}, nil
 	}
 }
 
