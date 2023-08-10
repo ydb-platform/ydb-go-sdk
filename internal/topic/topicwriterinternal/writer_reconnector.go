@@ -502,6 +502,10 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 }
 
 func (w *WriterReconnector) WaitInit(ctx context.Context) (lastSegNo int64, err error) {
+	if ctx.Err() != nil {
+		return 0, ctx.Err()
+	}
+
 	select {
 	case <-ctx.Done():
 		return 0, ctx.Err()

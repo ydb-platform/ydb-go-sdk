@@ -334,6 +334,10 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 }
 
 func (r *readerReconnector) WaitInit(ctx context.Context) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
