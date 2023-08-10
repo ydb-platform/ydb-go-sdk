@@ -974,7 +974,6 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 	}
 	return &ret
 }
-
 func (t *Table) onInit(t1 TableInitStartInfo) func(TableInitDoneInfo) {
 	fn := t.OnInit
 	if fn == nil {
@@ -990,7 +989,6 @@ func (t *Table) onInit(t1 TableInitStartInfo) func(TableInitDoneInfo) {
 	}
 	return res
 }
-
 func (t *Table) onClose(t1 TableCloseStartInfo) func(TableCloseDoneInfo) {
 	fn := t.OnClose
 	if fn == nil {
@@ -1006,7 +1004,6 @@ func (t *Table) onClose(t1 TableCloseStartInfo) func(TableCloseDoneInfo) {
 	}
 	return res
 }
-
 func (t *Table) onDo(t1 TableDoStartInfo) func(info TableDoIntermediateInfo) func(TableDoDoneInfo) {
 	fn := t.OnDo
 	if fn == nil {
@@ -1034,7 +1031,6 @@ func (t *Table) onDo(t1 TableDoStartInfo) func(info TableDoIntermediateInfo) fun
 		return res
 	}
 }
-
 func (t *Table) onDoTx(t1 TableDoTxStartInfo) func(info TableDoTxIntermediateInfo) func(TableDoTxDoneInfo) {
 	fn := t.OnDoTx
 	if fn == nil {
@@ -1062,7 +1058,6 @@ func (t *Table) onDoTx(t1 TableDoTxStartInfo) func(info TableDoTxIntermediateInf
 		return res
 	}
 }
-
 func (t *Table) onCreateSession(t1 TableCreateSessionStartInfo) func(info TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
 	fn := t.OnCreateSession
 	if fn == nil {
@@ -1090,7 +1085,6 @@ func (t *Table) onCreateSession(t1 TableCreateSessionStartInfo) func(info TableC
 		return res
 	}
 }
-
 func (t *Table) onSessionNew(t1 TableSessionNewStartInfo) func(TableSessionNewDoneInfo) {
 	fn := t.OnSessionNew
 	if fn == nil {
@@ -1106,7 +1100,6 @@ func (t *Table) onSessionNew(t1 TableSessionNewStartInfo) func(TableSessionNewDo
 	}
 	return res
 }
-
 func (t *Table) onSessionDelete(t1 TableSessionDeleteStartInfo) func(TableSessionDeleteDoneInfo) {
 	fn := t.OnSessionDelete
 	if fn == nil {
@@ -1122,7 +1115,6 @@ func (t *Table) onSessionDelete(t1 TableSessionDeleteStartInfo) func(TableSessio
 	}
 	return res
 }
-
 func (t *Table) onSessionKeepAlive(t1 TableKeepAliveStartInfo) func(TableKeepAliveDoneInfo) {
 	fn := t.OnSessionKeepAlive
 	if fn == nil {
@@ -1138,7 +1130,6 @@ func (t *Table) onSessionKeepAlive(t1 TableKeepAliveStartInfo) func(TableKeepAli
 	}
 	return res
 }
-
 func (t *Table) onSessionQueryPrepare(t1 TablePrepareDataQueryStartInfo) func(TablePrepareDataQueryDoneInfo) {
 	fn := t.OnSessionQueryPrepare
 	if fn == nil {
@@ -1154,7 +1145,6 @@ func (t *Table) onSessionQueryPrepare(t1 TablePrepareDataQueryStartInfo) func(Ta
 	}
 	return res
 }
-
 func (t *Table) onSessionQueryExecute(t1 TableExecuteDataQueryStartInfo) func(TableExecuteDataQueryDoneInfo) {
 	fn := t.OnSessionQueryExecute
 	if fn == nil {
@@ -1170,7 +1160,6 @@ func (t *Table) onSessionQueryExecute(t1 TableExecuteDataQueryStartInfo) func(Ta
 	}
 	return res
 }
-
 func (t *Table) onSessionQueryExplain(t1 TableExplainQueryStartInfo) func(TableExplainQueryDoneInfo) {
 	fn := t.OnSessionQueryExplain
 	if fn == nil {
@@ -1186,7 +1175,6 @@ func (t *Table) onSessionQueryExplain(t1 TableExplainQueryStartInfo) func(TableE
 	}
 	return res
 }
-
 func (t *Table) onSessionQueryStreamExecute(t1 TableSessionQueryStreamExecuteStartInfo) func(TableSessionQueryStreamExecuteIntermediateInfo) func(TableSessionQueryStreamExecuteDoneInfo) {
 	fn := t.OnSessionQueryStreamExecute
 	if fn == nil {
@@ -1214,7 +1202,6 @@ func (t *Table) onSessionQueryStreamExecute(t1 TableSessionQueryStreamExecuteSta
 		return res
 	}
 }
-
 func (t *Table) onSessionQueryStreamRead(t1 TableSessionQueryStreamReadStartInfo) func(TableSessionQueryStreamReadIntermediateInfo) func(TableSessionQueryStreamReadDoneInfo) {
 	fn := t.OnSessionQueryStreamRead
 	if fn == nil {
@@ -1242,7 +1229,6 @@ func (t *Table) onSessionQueryStreamRead(t1 TableSessionQueryStreamReadStartInfo
 		return res
 	}
 }
-
 func (t *Table) onSessionTransactionBegin(t1 TableSessionTransactionBeginStartInfo) func(TableSessionTransactionBeginDoneInfo) {
 	fn := t.OnSessionTransactionBegin
 	if fn == nil {
@@ -1258,7 +1244,6 @@ func (t *Table) onSessionTransactionBegin(t1 TableSessionTransactionBeginStartIn
 	}
 	return res
 }
-
 func (t *Table) onSessionTransactionExecute(t1 TableTransactionExecuteStartInfo) func(TableTransactionExecuteDoneInfo) {
 	fn := t.OnSessionTransactionExecute
 	if fn == nil {
@@ -1274,7 +1259,6 @@ func (t *Table) onSessionTransactionExecute(t1 TableTransactionExecuteStartInfo)
 	}
 	return res
 }
-
 func (t *Table) onSessionTransactionExecuteStatement(t1 TableTransactionExecuteStatementStartInfo) func(TableTransactionExecuteStatementDoneInfo) {
 	fn := t.OnSessionTransactionExecuteStatement
 	if fn == nil {
@@ -1290,7 +1274,6 @@ func (t *Table) onSessionTransactionExecuteStatement(t1 TableTransactionExecuteS
 	}
 	return res
 }
-
 func (t *Table) onSessionTransactionCommit(t1 TableSessionTransactionCommitStartInfo) func(TableSessionTransactionCommitDoneInfo) {
 	fn := t.OnSessionTransactionCommit
 	if fn == nil {
@@ -1306,7 +1289,6 @@ func (t *Table) onSessionTransactionCommit(t1 TableSessionTransactionCommitStart
 	}
 	return res
 }
-
 func (t *Table) onSessionTransactionRollback(t1 TableSessionTransactionRollbackStartInfo) func(TableSessionTransactionRollbackDoneInfo) {
 	fn := t.OnSessionTransactionRollback
 	if fn == nil {
@@ -1322,7 +1304,6 @@ func (t *Table) onSessionTransactionRollback(t1 TableSessionTransactionRollbackS
 	}
 	return res
 }
-
 func (t *Table) onPoolStateChange(t1 TablePoolStateChangeInfo) {
 	fn := t.OnPoolStateChange
 	if fn == nil {
@@ -1330,7 +1311,6 @@ func (t *Table) onPoolStateChange(t1 TablePoolStateChangeInfo) {
 	}
 	fn(t1)
 }
-
 func (t *Table) onPoolSessionAdd(info TablePoolSessionAddInfo) {
 	fn := t.OnPoolSessionAdd
 	if fn == nil {
@@ -1338,7 +1318,6 @@ func (t *Table) onPoolSessionAdd(info TablePoolSessionAddInfo) {
 	}
 	fn(info)
 }
-
 func (t *Table) onPoolSessionRemove(info TablePoolSessionRemoveInfo) {
 	fn := t.OnPoolSessionRemove
 	if fn == nil {
@@ -1346,7 +1325,6 @@ func (t *Table) onPoolSessionRemove(info TablePoolSessionRemoveInfo) {
 	}
 	fn(info)
 }
-
 func (t *Table) onPoolSessionNew(t1 TablePoolSessionNewStartInfo) func(TablePoolSessionNewDoneInfo) {
 	fn := t.OnPoolSessionNew
 	if fn == nil {
@@ -1362,7 +1340,6 @@ func (t *Table) onPoolSessionNew(t1 TablePoolSessionNewStartInfo) func(TablePool
 	}
 	return res
 }
-
 func (t *Table) onPoolSessionClose(t1 TablePoolSessionCloseStartInfo) func(TablePoolSessionCloseDoneInfo) {
 	fn := t.OnPoolSessionClose
 	if fn == nil {
@@ -1378,7 +1355,6 @@ func (t *Table) onPoolSessionClose(t1 TablePoolSessionCloseStartInfo) func(Table
 	}
 	return res
 }
-
 func (t *Table) onPoolPut(t1 TablePoolPutStartInfo) func(TablePoolPutDoneInfo) {
 	fn := t.OnPoolPut
 	if fn == nil {
@@ -1394,7 +1370,6 @@ func (t *Table) onPoolPut(t1 TablePoolPutStartInfo) func(TablePoolPutDoneInfo) {
 	}
 	return res
 }
-
 func (t *Table) onPoolGet(t1 TablePoolGetStartInfo) func(TablePoolGetDoneInfo) {
 	fn := t.OnPoolGet
 	if fn == nil {
@@ -1410,7 +1385,6 @@ func (t *Table) onPoolGet(t1 TablePoolGetStartInfo) func(TablePoolGetDoneInfo) {
 	}
 	return res
 }
-
 func (t *Table) onPoolWait(t1 TablePoolWaitStartInfo) func(TablePoolWaitDoneInfo) {
 	fn := t.OnPoolWait
 	if fn == nil {
@@ -1426,7 +1400,6 @@ func (t *Table) onPoolWait(t1 TablePoolWaitStartInfo) func(TablePoolWaitDoneInfo
 	}
 	return res
 }
-
 func TableOnInit(t *Table, c *context.Context) func(limit int) {
 	var p TableInitStartInfo
 	p.Context = c
@@ -1437,7 +1410,6 @@ func TableOnInit(t *Table, c *context.Context) func(limit int) {
 		res(p)
 	}
 }
-
 func TableOnClose(t *Table, c *context.Context) func(error) {
 	var p TableCloseStartInfo
 	p.Context = c
@@ -1448,7 +1420,6 @@ func TableOnClose(t *Table, c *context.Context) func(error) {
 		res(p)
 	}
 }
-
 func TableOnDo(t *Table, c *context.Context, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
 	var p TableDoStartInfo
 	p.Context = c
@@ -1467,7 +1438,6 @@ func TableOnDo(t *Table, c *context.Context, idempotent bool, nestedCall bool) f
 		}
 	}
 }
-
 func TableOnDoTx(t *Table, c *context.Context, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
 	var p TableDoTxStartInfo
 	p.Context = c
@@ -1486,7 +1456,6 @@ func TableOnDoTx(t *Table, c *context.Context, idempotent bool, nestedCall bool)
 		}
 	}
 }
-
 func TableOnCreateSession(t *Table, c *context.Context) func(error) func(session tableSessionInfo, attempts int, _ error) {
 	var p TableCreateSessionStartInfo
 	p.Context = c
@@ -1504,7 +1473,6 @@ func TableOnCreateSession(t *Table, c *context.Context) func(error) func(session
 		}
 	}
 }
-
 func TableOnSessionNew(t *Table, c *context.Context) func(session tableSessionInfo, _ error) {
 	var p TableSessionNewStartInfo
 	p.Context = c
@@ -1516,7 +1484,6 @@ func TableOnSessionNew(t *Table, c *context.Context) func(session tableSessionIn
 		res(p)
 	}
 }
-
 func TableOnSessionDelete(t *Table, c *context.Context, session tableSessionInfo) func(error) {
 	var p TableSessionDeleteStartInfo
 	p.Context = c
@@ -1528,7 +1495,6 @@ func TableOnSessionDelete(t *Table, c *context.Context, session tableSessionInfo
 		res(p)
 	}
 }
-
 func TableOnSessionKeepAlive(t *Table, c *context.Context, session tableSessionInfo) func(error) {
 	var p TableKeepAliveStartInfo
 	p.Context = c
@@ -1540,7 +1506,6 @@ func TableOnSessionKeepAlive(t *Table, c *context.Context, session tableSessionI
 		res(p)
 	}
 }
-
 func TableOnSessionQueryPrepare(t *Table, c *context.Context, session tableSessionInfo, query string) func(result tableDataQuery, _ error) {
 	var p TablePrepareDataQueryStartInfo
 	p.Context = c
@@ -1554,7 +1519,6 @@ func TableOnSessionQueryPrepare(t *Table, c *context.Context, session tableSessi
 		res(p)
 	}
 }
-
 func TableOnSessionQueryExecute(t *Table, c *context.Context, session tableSessionInfo, query tableDataQuery, parameters tableQueryParameters, keepInCache bool) func(tx tableTransactionInfo, prepared bool, result tableResult, _ error) {
 	var p TableExecuteDataQueryStartInfo
 	p.Context = c
@@ -1572,7 +1536,6 @@ func TableOnSessionQueryExecute(t *Table, c *context.Context, session tableSessi
 		res(p)
 	}
 }
-
 func TableOnSessionQueryExplain(t *Table, c *context.Context, session tableSessionInfo, query string) func(aST string, plan string, _ error) {
 	var p TableExplainQueryStartInfo
 	p.Context = c
@@ -1587,7 +1550,6 @@ func TableOnSessionQueryExplain(t *Table, c *context.Context, session tableSessi
 		res(p)
 	}
 }
-
 func TableOnSessionQueryStreamExecute(t *Table, c *context.Context, session tableSessionInfo, query tableDataQuery, parameters tableQueryParameters) func(error) func(error) {
 	var p TableSessionQueryStreamExecuteStartInfo
 	p.Context = c
@@ -1606,7 +1568,6 @@ func TableOnSessionQueryStreamExecute(t *Table, c *context.Context, session tabl
 		}
 	}
 }
-
 func TableOnSessionQueryStreamRead(t *Table, c *context.Context, session tableSessionInfo) func(error) func(error) {
 	var p TableSessionQueryStreamReadStartInfo
 	p.Context = c
@@ -1623,7 +1584,6 @@ func TableOnSessionQueryStreamRead(t *Table, c *context.Context, session tableSe
 		}
 	}
 }
-
 func TableOnSessionTransactionBegin(t *Table, c *context.Context, session tableSessionInfo) func(tx tableTransactionInfo, _ error) {
 	var p TableSessionTransactionBeginStartInfo
 	p.Context = c
@@ -1636,7 +1596,6 @@ func TableOnSessionTransactionBegin(t *Table, c *context.Context, session tableS
 		res(p)
 	}
 }
-
 func TableOnSessionTransactionExecute(t *Table, c *context.Context, session tableSessionInfo, tx tableTransactionInfo, query tableDataQuery, parameters tableQueryParameters) func(result tableResult, _ error) {
 	var p TableTransactionExecuteStartInfo
 	p.Context = c
@@ -1652,7 +1611,6 @@ func TableOnSessionTransactionExecute(t *Table, c *context.Context, session tabl
 		res(p)
 	}
 }
-
 func TableOnSessionTransactionExecuteStatement(t *Table, c *context.Context, session tableSessionInfo, tx tableTransactionInfo, statementQuery tableDataQuery, parameters tableQueryParameters) func(result tableResult, _ error) {
 	var p TableTransactionExecuteStatementStartInfo
 	p.Context = c
@@ -1668,7 +1626,6 @@ func TableOnSessionTransactionExecuteStatement(t *Table, c *context.Context, ses
 		res(p)
 	}
 }
-
 func TableOnSessionTransactionCommit(t *Table, c *context.Context, session tableSessionInfo, tx tableTransactionInfo) func(error) {
 	var p TableSessionTransactionCommitStartInfo
 	p.Context = c
@@ -1681,7 +1638,6 @@ func TableOnSessionTransactionCommit(t *Table, c *context.Context, session table
 		res(p)
 	}
 }
-
 func TableOnSessionTransactionRollback(t *Table, c *context.Context, session tableSessionInfo, tx tableTransactionInfo) func(error) {
 	var p TableSessionTransactionRollbackStartInfo
 	p.Context = c
@@ -1694,26 +1650,22 @@ func TableOnSessionTransactionRollback(t *Table, c *context.Context, session tab
 		res(p)
 	}
 }
-
 func TableOnPoolStateChange(t *Table, size int, event string) {
 	var p TablePoolStateChangeInfo
 	p.Size = size
 	p.Event = event
 	t.onPoolStateChange(p)
 }
-
 func TableOnPoolSessionAdd(t *Table, session tableSessionInfo) {
 	var p TablePoolSessionAddInfo
 	p.Session = session
 	t.onPoolSessionAdd(p)
 }
-
 func TableOnPoolSessionRemove(t *Table, session tableSessionInfo) {
 	var p TablePoolSessionRemoveInfo
 	p.Session = session
 	t.onPoolSessionRemove(p)
 }
-
 func TableOnPoolSessionNew(t *Table, c *context.Context) func(session tableSessionInfo, _ error) {
 	var p TablePoolSessionNewStartInfo
 	p.Context = c
@@ -1725,7 +1677,6 @@ func TableOnPoolSessionNew(t *Table, c *context.Context) func(session tableSessi
 		res(p)
 	}
 }
-
 func TableOnPoolSessionClose(t *Table, c *context.Context, session tableSessionInfo) func() {
 	var p TablePoolSessionCloseStartInfo
 	p.Context = c
@@ -1736,7 +1687,6 @@ func TableOnPoolSessionClose(t *Table, c *context.Context, session tableSessionI
 		res(p)
 	}
 }
-
 func TableOnPoolPut(t *Table, c *context.Context, session tableSessionInfo) func(error) {
 	var p TablePoolPutStartInfo
 	p.Context = c
@@ -1748,7 +1698,6 @@ func TableOnPoolPut(t *Table, c *context.Context, session tableSessionInfo) func
 		res(p)
 	}
 }
-
 func TableOnPoolGet(t *Table, c *context.Context) func(session tableSessionInfo, attempts int, _ error) {
 	var p TablePoolGetStartInfo
 	p.Context = c
@@ -1761,7 +1710,6 @@ func TableOnPoolGet(t *Table, c *context.Context) func(session tableSessionInfo,
 		res(p)
 	}
 }
-
 func TableOnPoolWait(t *Table, c *context.Context) func(session tableSessionInfo, _ error) {
 	var p TablePoolWaitStartInfo
 	p.Context = c

@@ -574,7 +574,6 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 	}
 	return &ret
 }
-
 func (t *DatabaseSQL) onConnectorConnect(d DatabaseSQLConnectorConnectStartInfo) func(DatabaseSQLConnectorConnectDoneInfo) {
 	fn := t.OnConnectorConnect
 	if fn == nil {
@@ -590,7 +589,6 @@ func (t *DatabaseSQL) onConnectorConnect(d DatabaseSQLConnectorConnectStartInfo)
 	}
 	return res
 }
-
 func (t *DatabaseSQL) onConnPing(d DatabaseSQLConnPingStartInfo) func(DatabaseSQLConnPingDoneInfo) {
 	fn := t.OnConnPing
 	if fn == nil {
@@ -606,7 +604,6 @@ func (t *DatabaseSQL) onConnPing(d DatabaseSQLConnPingStartInfo) func(DatabaseSQ
 	}
 	return res
 }
-
 func (t *DatabaseSQL) onConnPrepare(d DatabaseSQLConnPrepareStartInfo) func(DatabaseSQLConnPrepareDoneInfo) {
 	fn := t.OnConnPrepare
 	if fn == nil {
@@ -622,7 +619,6 @@ func (t *DatabaseSQL) onConnPrepare(d DatabaseSQLConnPrepareStartInfo) func(Data
 	}
 	return res
 }
-
 func (t *DatabaseSQL) onConnClose(d DatabaseSQLConnCloseStartInfo) func(DatabaseSQLConnCloseDoneInfo) {
 	fn := t.OnConnClose
 	if fn == nil {
@@ -638,7 +634,6 @@ func (t *DatabaseSQL) onConnClose(d DatabaseSQLConnCloseStartInfo) func(Database
 	}
 	return res
 }
-
 func (t *DatabaseSQL) onConnBegin(d DatabaseSQLConnBeginStartInfo) func(DatabaseSQLConnBeginDoneInfo) {
 	fn := t.OnConnBegin
 	if fn == nil {
@@ -654,7 +649,6 @@ func (t *DatabaseSQL) onConnBegin(d DatabaseSQLConnBeginStartInfo) func(Database
 	}
 	return res
 }
-
 func (t *DatabaseSQL) onConnQuery(d DatabaseSQLConnQueryStartInfo) func(DatabaseSQLConnQueryDoneInfo) {
 	fn := t.OnConnQuery
 	if fn == nil {
@@ -670,7 +664,6 @@ func (t *DatabaseSQL) onConnQuery(d DatabaseSQLConnQueryStartInfo) func(Database
 	}
 	return res
 }
-
 func (t *DatabaseSQL) onConnExec(d DatabaseSQLConnExecStartInfo) func(DatabaseSQLConnExecDoneInfo) {
 	fn := t.OnConnExec
 	if fn == nil {
@@ -686,7 +679,6 @@ func (t *DatabaseSQL) onConnExec(d DatabaseSQLConnExecStartInfo) func(DatabaseSQ
 	}
 	return res
 }
-
 func (t *DatabaseSQL) onTxQuery(d DatabaseSQLTxQueryStartInfo) func(DatabaseSQLTxQueryDoneInfo) {
 	fn := t.OnTxQuery
 	if fn == nil {
@@ -702,7 +694,6 @@ func (t *DatabaseSQL) onTxQuery(d DatabaseSQLTxQueryStartInfo) func(DatabaseSQLT
 	}
 	return res
 }
-
 func (t *DatabaseSQL) onTxExec(d DatabaseSQLTxExecStartInfo) func(DatabaseSQLTxExecDoneInfo) {
 	fn := t.OnTxExec
 	if fn == nil {
@@ -718,7 +709,6 @@ func (t *DatabaseSQL) onTxExec(d DatabaseSQLTxExecStartInfo) func(DatabaseSQLTxE
 	}
 	return res
 }
-
 func (t *DatabaseSQL) onTxCommit(d DatabaseSQLTxCommitStartInfo) func(DatabaseSQLTxCommitDoneInfo) {
 	fn := t.OnTxCommit
 	if fn == nil {
@@ -734,7 +724,6 @@ func (t *DatabaseSQL) onTxCommit(d DatabaseSQLTxCommitStartInfo) func(DatabaseSQ
 	}
 	return res
 }
-
 func (t *DatabaseSQL) onTxRollback(d DatabaseSQLTxRollbackStartInfo) func(DatabaseSQLTxRollbackDoneInfo) {
 	fn := t.OnTxRollback
 	if fn == nil {
@@ -750,7 +739,6 @@ func (t *DatabaseSQL) onTxRollback(d DatabaseSQLTxRollbackStartInfo) func(Databa
 	}
 	return res
 }
-
 func (t *DatabaseSQL) onStmtQuery(d DatabaseSQLStmtQueryStartInfo) func(DatabaseSQLStmtQueryDoneInfo) {
 	fn := t.OnStmtQuery
 	if fn == nil {
@@ -766,7 +754,6 @@ func (t *DatabaseSQL) onStmtQuery(d DatabaseSQLStmtQueryStartInfo) func(Database
 	}
 	return res
 }
-
 func (t *DatabaseSQL) onStmtExec(d DatabaseSQLStmtExecStartInfo) func(DatabaseSQLStmtExecDoneInfo) {
 	fn := t.OnStmtExec
 	if fn == nil {
@@ -782,7 +769,6 @@ func (t *DatabaseSQL) onStmtExec(d DatabaseSQLStmtExecStartInfo) func(DatabaseSQ
 	}
 	return res
 }
-
 func (t *DatabaseSQL) onStmtClose(d DatabaseSQLStmtCloseStartInfo) func(DatabaseSQLStmtCloseDoneInfo) {
 	fn := t.OnStmtClose
 	if fn == nil {
@@ -798,7 +784,6 @@ func (t *DatabaseSQL) onStmtClose(d DatabaseSQLStmtCloseStartInfo) func(Database
 	}
 	return res
 }
-
 func (t *DatabaseSQL) onDoTx(d DatabaseSQLDoTxStartInfo) func(DatabaseSQLDoTxIntermediateInfo) func(DatabaseSQLDoTxDoneInfo) {
 	fn := t.OnDoTx
 	if fn == nil {
@@ -826,7 +811,6 @@ func (t *DatabaseSQL) onDoTx(d DatabaseSQLDoTxStartInfo) func(DatabaseSQLDoTxInt
 		return res
 	}
 }
-
 func DatabaseSQLOnConnectorConnect(t *DatabaseSQL, c *context.Context) func(_ error, session tableSessionInfo) {
 	var p DatabaseSQLConnectorConnectStartInfo
 	p.Context = c
@@ -838,7 +822,6 @@ func DatabaseSQLOnConnectorConnect(t *DatabaseSQL, c *context.Context) func(_ er
 		res(p)
 	}
 }
-
 func DatabaseSQLOnConnPing(t *DatabaseSQL, c *context.Context) func(error) {
 	var p DatabaseSQLConnPingStartInfo
 	p.Context = c
@@ -849,7 +832,6 @@ func DatabaseSQLOnConnPing(t *DatabaseSQL, c *context.Context) func(error) {
 		res(p)
 	}
 }
-
 func DatabaseSQLOnConnPrepare(t *DatabaseSQL, c *context.Context, query string) func(error) {
 	var p DatabaseSQLConnPrepareStartInfo
 	p.Context = c
@@ -861,7 +843,6 @@ func DatabaseSQLOnConnPrepare(t *DatabaseSQL, c *context.Context, query string) 
 		res(p)
 	}
 }
-
 func DatabaseSQLOnConnClose(t *DatabaseSQL) func(error) {
 	var p DatabaseSQLConnCloseStartInfo
 	res := t.onConnClose(p)
@@ -871,7 +852,6 @@ func DatabaseSQLOnConnClose(t *DatabaseSQL) func(error) {
 		res(p)
 	}
 }
-
 func DatabaseSQLOnConnBegin(t *DatabaseSQL, c *context.Context) func(tx tableTransactionInfo, _ error) {
 	var p DatabaseSQLConnBeginStartInfo
 	p.Context = c
@@ -883,7 +863,6 @@ func DatabaseSQLOnConnBegin(t *DatabaseSQL, c *context.Context) func(tx tableTra
 		res(p)
 	}
 }
-
 func DatabaseSQLOnConnQuery(t *DatabaseSQL, c *context.Context, query string, mode string, idempotent bool, idleTime time.Duration) func(error) {
 	var p DatabaseSQLConnQueryStartInfo
 	p.Context = c
@@ -898,7 +877,6 @@ func DatabaseSQLOnConnQuery(t *DatabaseSQL, c *context.Context, query string, mo
 		res(p)
 	}
 }
-
 func DatabaseSQLOnConnExec(t *DatabaseSQL, c *context.Context, query string, mode string, idempotent bool, idleTime time.Duration) func(error) {
 	var p DatabaseSQLConnExecStartInfo
 	p.Context = c
@@ -913,7 +891,6 @@ func DatabaseSQLOnConnExec(t *DatabaseSQL, c *context.Context, query string, mod
 		res(p)
 	}
 }
-
 func DatabaseSQLOnTxQuery(t *DatabaseSQL, c *context.Context, txContext context.Context, tx tableTransactionInfo, query string, idempotent bool) func(error) {
 	var p DatabaseSQLTxQueryStartInfo
 	p.Context = c
@@ -928,7 +905,6 @@ func DatabaseSQLOnTxQuery(t *DatabaseSQL, c *context.Context, txContext context.
 		res(p)
 	}
 }
-
 func DatabaseSQLOnTxExec(t *DatabaseSQL, c *context.Context, txContext context.Context, tx tableTransactionInfo, query string, idempotent bool) func(error) {
 	var p DatabaseSQLTxExecStartInfo
 	p.Context = c
@@ -943,7 +919,6 @@ func DatabaseSQLOnTxExec(t *DatabaseSQL, c *context.Context, txContext context.C
 		res(p)
 	}
 }
-
 func DatabaseSQLOnTxCommit(t *DatabaseSQL, c *context.Context, tx tableTransactionInfo) func(error) {
 	var p DatabaseSQLTxCommitStartInfo
 	p.Context = c
@@ -955,7 +930,6 @@ func DatabaseSQLOnTxCommit(t *DatabaseSQL, c *context.Context, tx tableTransacti
 		res(p)
 	}
 }
-
 func DatabaseSQLOnTxRollback(t *DatabaseSQL, c *context.Context, tx tableTransactionInfo) func(error) {
 	var p DatabaseSQLTxRollbackStartInfo
 	p.Context = c
@@ -967,7 +941,6 @@ func DatabaseSQLOnTxRollback(t *DatabaseSQL, c *context.Context, tx tableTransac
 		res(p)
 	}
 }
-
 func DatabaseSQLOnStmtQuery(t *DatabaseSQL, c *context.Context, query string) func(error) {
 	var p DatabaseSQLStmtQueryStartInfo
 	p.Context = c
@@ -979,7 +952,6 @@ func DatabaseSQLOnStmtQuery(t *DatabaseSQL, c *context.Context, query string) fu
 		res(p)
 	}
 }
-
 func DatabaseSQLOnStmtExec(t *DatabaseSQL, c *context.Context, query string) func(error) {
 	var p DatabaseSQLStmtExecStartInfo
 	p.Context = c
@@ -991,7 +963,6 @@ func DatabaseSQLOnStmtExec(t *DatabaseSQL, c *context.Context, query string) fun
 		res(p)
 	}
 }
-
 func DatabaseSQLOnStmtClose(t *DatabaseSQL) func(error) {
 	var p DatabaseSQLStmtCloseStartInfo
 	res := t.onStmtClose(p)
@@ -1001,7 +972,6 @@ func DatabaseSQLOnStmtClose(t *DatabaseSQL) func(error) {
 		res(p)
 	}
 }
-
 func DatabaseSQLOnDoTx(t *DatabaseSQL, c *context.Context, iD string, idempotent bool) func(error) func(attempts int, _ error) {
 	var p DatabaseSQLDoTxStartInfo
 	p.Context = c
