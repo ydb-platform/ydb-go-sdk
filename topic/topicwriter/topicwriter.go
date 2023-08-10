@@ -18,6 +18,11 @@ type Writer struct {
 	inner *topicwriterinternal.Writer
 }
 
+// PublicInitialInfo is an information about writer after initialize
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicInitialInfo struct {
 	LastSegNum int64
 }
