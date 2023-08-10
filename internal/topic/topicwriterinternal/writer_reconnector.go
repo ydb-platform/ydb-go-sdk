@@ -495,8 +495,10 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 	})
 
 	if isFirstInit {
-		w.initDone = true
-		close(w.initDoneCh)
+		w.m.WithLock(func() {
+			w.initDone = true
+			close(w.initDoneCh)
+		})
 		w.onWriterInitCallbackHandler(writerStream)
 	}
 }
