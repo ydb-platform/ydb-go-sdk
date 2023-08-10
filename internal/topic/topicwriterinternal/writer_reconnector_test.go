@@ -14,6 +14,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
@@ -330,7 +331,6 @@ func TestWriterImpl_InitSession(t *testing.T) {
 }
 
 func TestWriterImpl_WaitInit(t *testing.T) {
-
 	t.Run("OK", func(t *testing.T) {
 		w := newTestWriterStopped(WithAutoSetSeqNo(true))
 		expectedLastSeqNo := int64(123)

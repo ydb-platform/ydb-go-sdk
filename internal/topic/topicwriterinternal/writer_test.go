@@ -26,7 +26,6 @@ func TestWriterWaitInit(t *testing.T) {
 			_, err := strm.WaitInit(ctx)
 			require.NoError(t, err)
 		}
-
 	})
 }
 
