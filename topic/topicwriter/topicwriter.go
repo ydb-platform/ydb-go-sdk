@@ -45,6 +45,12 @@ func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 	return w.inner.Write(ctx, messages...)
 }
 
+// WaitInit waits until the reader is initialized
+// or an error occurs
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (w *Writer) WaitInit(ctx context.Context) (info PublicInitialInfo, err error) {
 	privateInfo, err := w.inner.WaitInit(ctx)
 	if err != nil {
