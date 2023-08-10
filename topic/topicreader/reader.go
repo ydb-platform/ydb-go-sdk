@@ -38,6 +38,16 @@ func NewReader(internalReader topicreaderinternal.Reader) *Reader {
 	return &Reader{reader: internalReader}
 }
 
+// WaitInit waits until the reader is initialized
+// or an error occurs
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+func (r *Reader) WaitInit(ctx context.Context) error {
+	return r.reader.WaitInit(ctx)
+}
+
 // ReadMessage read exactly one message
 // exactly one of message, error is nil
 //
