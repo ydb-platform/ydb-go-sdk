@@ -102,6 +102,7 @@ func (t *Discovery) Compose(x *Discovery, opts ...DiscoveryComposeOption) *Disco
 	}
 	return &ret
 }
+
 func (t *Discovery) onDiscover(d DiscoveryDiscoverStartInfo) func(DiscoveryDiscoverDoneInfo) {
 	fn := t.OnDiscover
 	if fn == nil {
@@ -117,6 +118,7 @@ func (t *Discovery) onDiscover(d DiscoveryDiscoverStartInfo) func(DiscoveryDisco
 	}
 	return res
 }
+
 func (t *Discovery) onWhoAmI(d DiscoveryWhoAmIStartInfo) func(DiscoveryWhoAmIDoneInfo) {
 	fn := t.OnWhoAmI
 	if fn == nil {
@@ -132,6 +134,7 @@ func (t *Discovery) onWhoAmI(d DiscoveryWhoAmIStartInfo) func(DiscoveryWhoAmIDon
 	}
 	return res
 }
+
 func DiscoveryOnDiscover(t *Discovery, c *context.Context, address string, database string) func(location string, endpoints []EndpointInfo, _ error) {
 	var p DiscoveryDiscoverStartInfo
 	p.Context = c
@@ -146,6 +149,7 @@ func DiscoveryOnDiscover(t *Discovery, c *context.Context, address string, datab
 		res(p)
 	}
 }
+
 func DiscoveryOnWhoAmI(t *Discovery, c *context.Context) func(user string, groups []string, _ error) {
 	var p DiscoveryWhoAmIStartInfo
 	p.Context = c

@@ -152,6 +152,11 @@ func (r *readerReconnector) CloseWithError(ctx context.Context, err error) error
 				closeErr = streamCloseErr
 			}
 		}
+
+		if !r.initDone {
+			r.initErr = closeErr
+			close(r.initDoneCh)
+		}
 	})
 	return closeErr
 }
@@ -261,14 +266,6 @@ func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStre
 			r.reconnectFromBadStream <- newReconnectRequest(oldReader, reason)
 			trace.TopicOnReaderReconnectRequest(r.tracer, err, true)
 		}(err)
-	} else if err != nil {
-		r.m.WithLock(func() {
-			if !r.initDone {
-				r.initDone = true
-				close(r.initDoneCh)
-				r.initErr = err
-			}
-		})
 	}
 
 	r.m.WithLock(func() {

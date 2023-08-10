@@ -132,7 +132,10 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 	})
 
 	xtest.TestManyTimesWithName(t, "OnClose", func(t testing.TB) {
-		reconnector := &readerReconnector{tracer: &trace.Topic{}}
+		reconnector := &readerReconnector{
+			tracer:     &trace.Topic{},
+			initDoneCh: make(empty.Chan),
+		}
 		testErr := errors.New("test'")
 
 		go func() {
@@ -207,7 +210,7 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 			connectTimeout: value.InfiniteDuration,
 			background:     *background.NewWorker(ctx),
 			tracer:         &trace.Topic{},
-			initDoneCh:     make(empty.Chan, 1),
+			initDoneCh:     make(empty.Chan),
 		}
 		reconnector.initChannelsAndClock()
 
@@ -259,7 +262,10 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 	t.Run("StartWithCancelledContext", func(t *testing.T) {
 		ctx, cancel := xcontext.WithCancel(context.Background())
 		cancel()
-		reconnector := &readerReconnector{tracer: &trace.Topic{}}
+		reconnector := &readerReconnector{
+			tracer:     &trace.Topic{},
+			initDoneCh: make(empty.Chan),
+		}
 		reconnector.reconnectionLoop(ctx) // must return
 	})
 }
@@ -300,7 +306,6 @@ func TestTopicReaderReconnectorStart(t *testing.T) {
 }
 
 func TestTopicReaderReconnectorWaitInit(t *testing.T) {
-
 	t.Run("OK", func(t *testing.T) {
 		mc := gomock.NewController(t)
 		defer mc.Finish()
@@ -377,7 +382,6 @@ func TestTopicReaderReconnectorWaitInit(t *testing.T) {
 
 		require.ErrorIs(t, err, ctx.Err())
 	})
-
 }
 
 func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {
