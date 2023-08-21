@@ -320,7 +320,7 @@ func TestTopicReaderReconnectorWaitInit(t *testing.T) {
 		})
 
 		reconnector.start()
-		for i := 1; i <= 5; i++ {
+		for i := 0; i < 5; i++ {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			err := reconnector.WaitInit(ctx)
 			cancel()
