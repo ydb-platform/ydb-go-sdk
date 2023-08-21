@@ -320,12 +320,17 @@ func TestTopicReaderReconnectorWaitInit(t *testing.T) {
 		})
 
 		reconnector.start()
-		for i := 0; i < 5; i++ {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-			err := reconnector.WaitInit(ctx)
-			cancel()
-			require.NoError(t, err)
-		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		err := reconnector.WaitInit(ctx)
+		cancel()
+		require.NoError(t, err)
+
+		// one more run is needed to check idempotency
+		ctx, cancel = context.WithTimeout(context.Background(), time.Second)
+		err = reconnector.WaitInit(ctx)
+		cancel()
+		require.NoError(t, err)
 	})
 
 	t.Run("contextDeadlineInProgress", func(t *testing.T) {
