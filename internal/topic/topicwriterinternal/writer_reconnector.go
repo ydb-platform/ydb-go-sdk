@@ -131,6 +131,7 @@ type WriterReconnector struct {
 
 	initDone   bool
 	initDoneCh empty.Chan
+	initInfo   InitialInfo
 }
 
 func newWriterReconnector(
@@ -497,6 +498,7 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 	if isFirstInit {
 		w.m.WithLock(func() {
 			w.initDone = true
+			w.initInfo = InitialInfo{LastSeqNum: w.lastSeqNo}
 			close(w.initDoneCh)
 		})
 		w.onWriterInitCallbackHandler(writerStream)
@@ -512,7 +514,7 @@ func (w *WriterReconnector) WaitInit(ctx context.Context) (info InitialInfo, err
 	case <-ctx.Done():
 		return InitialInfo{}, ctx.Err()
 	case <-w.initDoneCh:
-		return InitialInfo{LastSeqNum: w.lastSeqNo}, nil
+		return w.initInfo, nil
 	}
 }
 

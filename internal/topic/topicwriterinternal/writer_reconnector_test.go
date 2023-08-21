@@ -346,6 +346,24 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 			require.Equal(t, expectedLastSeqNo, gotLastSecNo.LastSeqNum)
 		}
 
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		initData, err := w.WaitInit(ctx)
+		require.NoError(t, err)
+		require.Equal(t, expectedLastSeqNo, initData.LastSeqNum)
+		cancel()
+
+		ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
+		newTestMessages()
+		err = w.Write(ctx, newTestMessages(0))
+		require.NoError(t, err)
+
+		// one more run is needed to check idempotency
+		ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
+		initData, err = w.WaitInit(ctx)
+		require.NoError(t, err)
+		require.Equal(t, expectedLastSeqNo, initData.LastSeqNum)
+		cancel()
+
 		require.True(t, isClosed(w.firstInitResponseProcessedChan))
 	})
 
