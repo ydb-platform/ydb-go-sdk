@@ -63,9 +63,8 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 				}
 				return baseReader, nil
 			},
-			streamErr:  errUnconnected,
-			tracer:     &trace.Topic{},
-			initDoneCh: make(empty.Chan),
+			streamErr: errUnconnected,
+			tracer:    &trace.Topic{},
 		}
 		reader.initChannelsAndClock()
 		reader.background.Start("test-reconnectionLoop", reader.reconnectionLoop)
@@ -106,9 +105,8 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 				connectCalled++
 				return readers[connectCalled-1], nil
 			},
-			streamErr:  errUnconnected,
-			tracer:     &trace.Topic{},
-			initDoneCh: make(empty.Chan),
+			streamErr: errUnconnected,
+			tracer:    &trace.Topic{},
 		}
 		reader.initChannelsAndClock()
 		reader.background.Start("test-reconnectionLoop", reader.reconnectionLoop)
@@ -210,7 +208,6 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 			connectTimeout: value.InfiniteDuration,
 			background:     *background.NewWorker(ctx),
 			tracer:         &trace.Topic{},
-			initDoneCh:     make(empty.Chan),
 		}
 		reconnector.initChannelsAndClock()
 
@@ -277,8 +274,7 @@ func TestTopicReaderReconnectorStart(t *testing.T) {
 	ctx := context.Background()
 
 	reconnector := &readerReconnector{
-		tracer:     &trace.Topic{},
-		initDoneCh: make(empty.Chan),
+		tracer: &trace.Topic{},
 	}
 	reconnector.initChannelsAndClock()
 
@@ -311,8 +307,7 @@ func TestTopicReaderReconnectorWaitInit(t *testing.T) {
 		defer mc.Finish()
 
 		reconnector := &readerReconnector{
-			tracer:     &trace.Topic{},
-			initDoneCh: make(empty.Chan),
+			tracer: &trace.Topic{},
 		}
 		reconnector.initChannelsAndClock()
 
@@ -388,8 +383,7 @@ func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {
 	t.Run("Ok", func(t *testing.T) {
 		mc := gomock.NewController(t)
 		reconnector := &readerReconnector{
-			tracer:     &trace.Topic{},
-			initDoneCh: make(empty.Chan),
+			tracer: &trace.Topic{},
 		}
 
 		stream := NewMockbatchedStreamReader(mc)
@@ -423,8 +417,7 @@ func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {
 		defer mc.Finish()
 
 		reconnector := &readerReconnector{
-			tracer:     &trace.Topic{},
-			initDoneCh: make(empty.Chan),
+			tracer: &trace.Topic{},
 		}
 		stream := NewMockbatchedStreamReader(mc)
 		reconnector.initChannelsAndClock()
@@ -454,9 +447,8 @@ func TestTopicReaderReconnectorReconnectWithError(t *testing.T) {
 		readerConnect: func(ctx context.Context) (batchedStreamReader, error) {
 			return nil, testErr
 		},
-		streamErr:  errors.New("start-error"),
-		tracer:     &trace.Topic{},
-		initDoneCh: make(empty.Chan),
+		streamErr: errors.New("start-error"),
+		tracer:    &trace.Topic{},
 	}
 	reconnector.initChannelsAndClock()
 	err := reconnector.reconnect(ctx, nil)

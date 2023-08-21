@@ -74,7 +74,6 @@ func newReaderReconnector(
 		baseContext:    baseContext,
 		retrySettings:  retrySettings,
 	}
-	res.initDoneCh = make(empty.Chan)
 
 	if res.connectTimeout == 0 {
 		res.connectTimeout = value.InfiniteDuration
@@ -174,6 +173,7 @@ func (r *readerReconnector) initChannelsAndClock() {
 	}
 	r.reconnectFromBadStream = make(chan reconnectRequest, 1)
 	r.streamConnectionInProgress = make(empty.Chan)
+	r.initDoneCh = make(empty.Chan)
 	close(r.streamConnectionInProgress) // no progress at start
 }
 
