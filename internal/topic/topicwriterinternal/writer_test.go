@@ -27,7 +27,6 @@ func TestWriterWaitInit(t *testing.T) {
 		// one more run is needed to check idempotency
 		_, err = strm.WaitInit(ctx)
 		require.NoError(t, err)
-
 	})
 }
 
