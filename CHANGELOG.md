@@ -1,3 +1,4 @@
+## v3.50.0
 * Add method to QueryStats interface for add new stat fields
 * Added check if commit order is bad in sync mode
 
