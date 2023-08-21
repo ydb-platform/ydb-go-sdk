@@ -340,7 +340,6 @@ func TestTopicReaderReconnectorWaitInit(t *testing.T) {
 		reconnector := &readerReconnector{
 			tracer: &trace.Topic{},
 		}
-		reconnector.initDoneCh = make(empty.Chan, 1)
 		reconnector.initChannelsAndClock()
 
 		stream := NewMockbatchedStreamReader(mc)
@@ -351,7 +350,7 @@ func TestTopicReaderReconnectorWaitInit(t *testing.T) {
 			},
 		})
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		err := reconnector.WaitInit(ctx)
 		cancel()
 
