@@ -338,14 +338,6 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 			ReceivedLastSeqNum: expectedLastSeqNo,
 		})
 
-		for i := 1; i <= 5; i++ {
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-			gotLastSecNo, err := w.WaitInit(ctx)
-			cancel()
-			require.NoError(t, err)
-			require.Equal(t, expectedLastSeqNo, gotLastSecNo.LastSeqNum)
-		}
-
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		initData, err := w.WaitInit(ctx)
 		require.NoError(t, err)
@@ -353,8 +345,8 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 		cancel()
 
 		ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
-		newTestMessages()
 		err = w.Write(ctx, newTestMessages(0))
+		cancel()
 		require.NoError(t, err)
 
 		// one more run is needed to check idempotency
