@@ -19,13 +19,15 @@ func TestWriterWaitInit(t *testing.T) {
 
 		strm := NewMockStreamWriter(mc)
 
-		callsCount := 5
-		strm.EXPECT().WaitInit(ctx).Times(5)
+		strm.EXPECT().WaitInit(ctx).Times(2)
 
-		for i := 1; i <= callsCount; i++ {
-			_, err := strm.WaitInit(ctx)
-			require.NoError(t, err)
-		}
+		_, err := strm.WaitInit(ctx)
+		require.NoError(t, err)
+
+		// one more run is needed to check idempotency
+		_, err = strm.WaitInit(ctx)
+		require.NoError(t, err)
+
 	})
 }
 
