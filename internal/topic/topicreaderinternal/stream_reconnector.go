@@ -152,10 +152,12 @@ func (r *readerReconnector) CloseWithError(ctx context.Context, err error) error
 			}
 		}
 
-		if !r.initDone {
-			r.initErr = closeErr
-			close(r.initDoneCh)
-		}
+		r.m.WithLock(func() {
+			if !r.initDone {
+				r.initErr = closeErr
+				close(r.initDoneCh)
+			}
+		})
 	})
 	return closeErr
 }
