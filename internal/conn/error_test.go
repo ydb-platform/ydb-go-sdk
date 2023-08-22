@@ -2,8 +2,9 @@ package conn
 
 import (
 	"errors"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestNodeErrorError(t *testing.T) {
