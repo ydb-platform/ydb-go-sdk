@@ -125,6 +125,10 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 }
 
 func (s *grpcClientStream) wrapError(err error) error {
+	if err == nil {
+		return nil
+	}
+
 	nodeErr := newNodeError(s.c.endpoint.NodeID(), s.c.endpoint.Address(), err)
 	return xerrors.WithStackTrace(nodeErr, xerrors.WithSkipDepth(1))
 }
