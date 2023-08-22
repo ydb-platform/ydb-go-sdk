@@ -29,14 +29,14 @@ func (s *grpcClientStream) CloseSend() (err error) {
 
 	if err != nil {
 		if s.wrapping {
-			return xerrors.WithStackTrace(
+			return s.wrapError(
 				xerrors.Transport(
 					err,
 					xerrors.WithAddress(s.c.Address()),
 				),
 			)
 		}
-		return xerrors.WithStackTrace(err)
+		return s.wrapError(err)
 	}
 
 	return nil
@@ -58,11 +58,11 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 				xerrors.WithAddress(s.c.Address()),
 			)
 			if s.sentMark.canRetry() {
-				return xerrors.WithStackTrace(xerrors.Retryable(err,
+				return s.wrapError(xerrors.Retryable(err,
 					xerrors.WithName("SendMsg"),
 				))
 			}
-			return xerrors.WithStackTrace(err)
+			return s.wrapError(err)
 		}
 
 		return err
@@ -98,11 +98,11 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 				xerrors.WithAddress(s.c.Address()),
 			)
 			if s.sentMark.canRetry() {
-				return xerrors.WithStackTrace(xerrors.Retryable(err,
+				return s.wrapError(xerrors.Retryable(err,
 					xerrors.WithName("RecvMsg"),
 				))
 			}
-			return xerrors.WithStackTrace(err)
+			return s.wrapError(err)
 		}
 
 		return err
@@ -111,7 +111,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	if s.wrapping {
 		if operation, ok := m.(wrap.StreamOperationResponse); ok {
 			if status := operation.GetStatus(); status != Ydb.StatusIds_SUCCESS {
-				return xerrors.WithStackTrace(
+				return s.wrapError(
 					xerrors.Operation(
 						xerrors.FromOperation(operation),
 						xerrors.WithNodeAddress(s.c.Address()),
@@ -122,6 +122,11 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	}
 
 	return nil
+}
+
+func (s *grpcClientStream) wrapError(err error) error {
+	nodeErr := newNodeError(s.c.endpoint.NodeID(), s.c.endpoint.Address(), err)
+	return xerrors.WithStackTrace(nodeErr, xerrors.WithSkipDepth(1))
 }
 
 func createPinger(c *conn) context.CancelFunc {

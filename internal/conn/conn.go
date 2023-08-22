@@ -66,10 +66,10 @@ func (c *conn) Address() string {
 func (c *conn) Ping(ctx context.Context) error {
 	cc, err := c.realConn(ctx)
 	if err != nil {
-		return xerrors.WithStackTrace(err)
+		return c.wrapError(err)
 	}
 	if !isAvailable(cc) {
-		return xerrors.WithStackTrace(errUnavailableConnection)
+		return c.wrapError(errUnavailableConnection)
 	}
 	return nil
 }
@@ -115,7 +115,7 @@ func (c *conn) park(ctx context.Context) (err error) {
 	err = c.close()
 
 	if err != nil {
-		return xerrors.WithStackTrace(err)
+		return c.wrapError(err)
 	}
 
 	return nil
@@ -169,7 +169,7 @@ func (c *conn) GetState() (s State) {
 
 func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	if c.isClosed() {
-		return nil, xerrors.WithStackTrace(errClosedConnection)
+		return nil, c.wrapError(errClosedConnection)
 	}
 
 	c.mtx.Lock()
@@ -213,7 +213,7 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 			xerrors.WithAddress(address),
 		)
 
-		return nil, xerrors.WithStackTrace(
+		return nil, c.wrapError(
 			xerrors.Retryable(err,
 				xerrors.WithName("realConn"),
 			),
@@ -250,7 +250,7 @@ func (c *conn) close() (err error) {
 	err = c.cc.Close()
 	c.cc = nil
 	c.setState(Offline)
-	return xerrors.WithStackTrace(err)
+	return c.wrapError(err)
 }
 
 func (c *conn) isClosed() bool {
@@ -286,7 +286,7 @@ func (c *conn) Close(ctx context.Context) (err error) {
 		onClose(c)
 	}
 
-	return xerrors.WithStackTrace(err)
+	return c.wrapError(err)
 }
 
 func (c *conn) Invoke(
@@ -320,7 +320,7 @@ func (c *conn) Invoke(
 
 	cc, err = c.realConn(ctx)
 	if err != nil {
-		return xerrors.WithStackTrace(err)
+		return c.wrapError(err)
 	}
 
 	c.touchLastUsage()
@@ -339,9 +339,9 @@ func (c *conn) Invoke(
 				xerrors.WithAddress(c.Address()),
 			)
 			if sentMark.canRetry() {
-				return xerrors.WithStackTrace(xerrors.Retryable(err, xerrors.WithName("Invoke")))
+				return c.wrapError(xerrors.Retryable(err, xerrors.WithName("Invoke")))
 			}
-			return xerrors.WithStackTrace(err)
+			return c.wrapError(err)
 		}
 
 		return err
@@ -355,10 +355,10 @@ func (c *conn) Invoke(
 		if useWrapping {
 			switch {
 			case !o.GetOperation().GetReady():
-				return xerrors.WithStackTrace(errOperationNotReady)
+				return c.wrapError(errOperationNotReady)
 
 			case o.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
-				return xerrors.WithStackTrace(
+				return c.wrapError(
 					xerrors.Operation(
 						xerrors.FromOperation(o.GetOperation()),
 						xerrors.WithNodeAddress(c.Address()),
@@ -406,7 +406,7 @@ func (c *conn) NewStream(
 
 	cc, err = c.realConn(ctx)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		return nil, c.wrapError(err)
 	}
 
 	c.touchLastUsage()
@@ -425,9 +425,9 @@ func (c *conn) NewStream(
 				xerrors.WithAddress(c.Address()),
 			)
 			if sentMark.canRetry() {
-				return s, xerrors.WithStackTrace(xerrors.Retryable(err, xerrors.WithName("NewStream")))
+				return s, c.wrapError(xerrors.Retryable(err, xerrors.WithName("NewStream")))
 			}
-			return s, xerrors.WithStackTrace(err)
+			return s, c.wrapError(err)
 		}
 
 		return s, err
@@ -444,6 +444,11 @@ func (c *conn) NewStream(
 		},
 		recv: streamRecv,
 	}, nil
+}
+
+func (c *conn) wrapError(err error) error {
+	nodeErr := newNodeError(c.endpoint.NodeID(), c.endpoint.Address(), err)
+	return xerrors.WithStackTrace(nodeErr, xerrors.WithSkipDepth(1))
 }
 
 type option func(c *conn)
