@@ -1,3 +1,4 @@
+## v3.51.0
 * Added node info to grpc errors
 
 ## v3.50.0

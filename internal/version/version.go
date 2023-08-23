@@ -2,7 +2,7 @@ package version
 
 const (
 	Major = "3"
-	Minor = "50"
+	Minor = "51"
 	Patch = "0"
 )
 
