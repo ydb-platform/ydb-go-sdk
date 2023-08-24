@@ -161,8 +161,6 @@ func TestLogBackoff(t *testing.T) {
 }
 
 func TestFastSlowDelaysWithoutJitter(t *testing.T) {
-	type exp struct {
-	}
 	for _, tt := range []struct {
 		name    string
 		backoff Backoff
