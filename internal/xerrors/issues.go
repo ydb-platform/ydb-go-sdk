@@ -76,8 +76,12 @@ func (e *errorWithIssues) isYdbError() {}
 
 func (e *errorWithIssues) Error() string {
 	var b bytes.Buffer
-	b.WriteString(e.reason)
-	b.WriteString(", issues: [")
+	if len(e.reason) > 0 {
+		b.WriteString(e.reason)
+		b.WriteString(", issues: [")
+	} else {
+		b.WriteString("multiple errors: [")
+	}
 	for i, issue := range e.issues {
 		if i != 0 {
 			b.WriteString(", ")
