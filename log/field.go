@@ -9,6 +9,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -363,7 +364,7 @@ func (m metadata) String() string {
 	if err != nil {
 		return fmt.Sprintf("error:%s", err)
 	}
-	return string(b)
+	return xstring.FromBytes(b)
 }
 
 func appendFieldByCondition(condition bool, ifTrueField Field, fields ...Field) []Field {

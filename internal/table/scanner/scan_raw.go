@@ -12,6 +12,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -226,12 +227,12 @@ func (s *rawConverter) YSON() (v []byte) {
 
 func (s *rawConverter) JSON() (v []byte) {
 	s.unwrap()
-	return []byte(s.text())
+	return xstring.ToBytes(s.text())
 }
 
 func (s *rawConverter) JSONDocument() (v []byte) {
 	s.unwrap()
-	return []byte(s.text())
+	return xstring.ToBytes(s.text())
 }
 
 func (s *rawConverter) UUID() (v [16]byte) {
