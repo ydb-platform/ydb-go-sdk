@@ -1,4 +1,4 @@
-* Added `WaitInit` method to the topic reader and writer
+* Added `WaitInit` and `WaitInitInfo` method to the topic reader and writer
 * Added check if commit order is bad in sync mode
 
 ## v3.49.1
