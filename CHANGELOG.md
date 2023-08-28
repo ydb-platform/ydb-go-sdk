@@ -1,3 +1,4 @@
+## v3.51.1
 * Added checking condition for `tx.Rollback()` in `retry.DoTx`
 
 ## v3.51.0
