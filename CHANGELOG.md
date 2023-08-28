@@ -1,3 +1,5 @@
+* Added checking condition for `tx.Rollback()` in `retry.DoTx`
+
 ## v3.51.0
 * Added node info to grpc errors
 
