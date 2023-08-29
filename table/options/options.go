@@ -1012,6 +1012,7 @@ type (
 
 	readColumnsOption        []string
 	readOrderedOption        struct{}
+	readSnapshotOption       bool
 	readKeyRangeOption       KeyRange
 	readGreaterOrEqualOption struct{ types.Value }
 	readLessOrEqualOption    struct{ types.Value }
@@ -1053,8 +1054,16 @@ func (columns readColumnsOption) ApplyReadTableOption(desc *ReadTableDesc, a *al
 	desc.Columns = append(desc.Columns, columns...)
 }
 
-func (r readOrderedOption) ApplyReadTableOption(desc *ReadTableDesc, a *allocator.Allocator) {
+func (readOrderedOption) ApplyReadTableOption(desc *ReadTableDesc, a *allocator.Allocator) {
 	desc.Ordered = true
+}
+
+func (b readSnapshotOption) ApplyReadTableOption(desc *ReadTableDesc, a *allocator.Allocator) {
+	if b {
+		desc.UseSnapshot = FeatureEnabled.ToYDB()
+	} else {
+		desc.UseSnapshot = FeatureDisabled.ToYDB()
+	}
 }
 
 func (x readKeyRangeOption) ApplyReadTableOption(desc *ReadTableDesc, a *allocator.Allocator) {
@@ -1086,8 +1095,12 @@ func ReadColumns(names ...string) readColumnsOption {
 	return names
 }
 
-func ReadOrdered() readOrderedOption {
+func ReadOrdered() ReadTableOption {
 	return readOrderedOption{}
+}
+
+func ReadFromSnapshot(b bool) ReadTableOption {
+	return readSnapshotOption(b)
 }
 
 // ReadKeyRange returns ReadTableOption which makes ReadTable read values
