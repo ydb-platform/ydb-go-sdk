@@ -8,7 +8,7 @@
 * Added node info to grpc errors
 
 ## v3.50.0
-* Add method to QueryStats interface for add new stat fields
+* Added methods `TotalCPUTime()` and `TotalDuration()` to `table/stats/QueryStats` interface
 * Added check if commit order is bad in sync mode
 
 ## v3.49.1
