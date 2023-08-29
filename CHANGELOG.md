@@ -1,3 +1,4 @@
+## v3.51.2
 * Added `table/options.ReadFromSnapshot(bool)` option for `session.StreamReadTable()`
 
 ## v3.51.1
