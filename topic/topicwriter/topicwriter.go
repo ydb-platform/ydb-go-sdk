@@ -24,7 +24,7 @@ type Writer struct {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicInitialInfo struct {
-	LastSegNum int64
+	LastSeqNum int64
 }
 
 func NewWriter(writer *topicwriterinternal.Writer) *Writer {
@@ -75,7 +75,7 @@ func (w *Writer) WaitInitInfo(ctx context.Context) (info PublicInitialInfo, err 
 	if err != nil {
 		return PublicInitialInfo{}, err
 	}
-	publicInfo := PublicInitialInfo{LastSegNum: privateInfo.LastSeqNum}
+	publicInfo := PublicInitialInfo{LastSeqNum: privateInfo.LastSeqNum}
 	return publicInfo, nil
 }
 
