@@ -321,15 +321,11 @@ func TestTopicReaderReconnectorWaitInit(t *testing.T) {
 
 		reconnector.start()
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		err := reconnector.WaitInit(ctx)
-		cancel()
+		err := reconnector.WaitInit(context.Background())
 		require.NoError(t, err)
 
 		// one more run is needed to check idempotency
-		ctx, cancel = context.WithTimeout(context.Background(), time.Second)
-		err = reconnector.WaitInit(ctx)
-		cancel()
+		err = reconnector.WaitInit(context.Background())
 		require.NoError(t, err)
 	})
 
@@ -344,16 +340,16 @@ func TestTopicReaderReconnectorWaitInit(t *testing.T) {
 
 		stream := NewMockbatchedStreamReader(mc)
 
+		ctx, cancel := context.WithCancel(context.Background())
 		reconnector.readerConnect = readerConnectFuncMock(readerConnectFuncAnswer{
 			callback: func(ctx context.Context) (batchedStreamReader, error) {
+				cancel()
 				return stream, nil
 			},
 		})
+		reconnector.start()
 
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		err := reconnector.WaitInit(ctx)
-		cancel()
-
 		require.ErrorIs(t, err, ctx.Err())
 	})
 
