@@ -333,35 +333,31 @@ func TestWriterImpl_InitSession(t *testing.T) {
 func TestWriterImpl_WaitInit(t *testing.T) {
 	t.Run("OK", func(t *testing.T) {
 		w := newTestWriterStopped(WithAutoSetSeqNo(true))
-		expectedLastSeqNo := int64(123)
+		expectedInitData := InitialInfo{
+			LastSeqNum: int64(123),
+		}
 		w.onWriterChange(&SingleStreamWriter{
-			ReceivedLastSeqNum: expectedLastSeqNo,
+			ReceivedLastSeqNum: expectedInitData.LastSeqNum,
 		})
 
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-		initData, err := w.WaitInit(ctx)
+		initData, err := w.WaitInit(context.Background())
 		require.NoError(t, err)
-		require.Equal(t, expectedLastSeqNo, initData.LastSeqNum)
-		cancel()
+		require.Equal(t, expectedInitData, initData)
 
-		ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
-		err = w.Write(ctx, newTestMessages(0))
-		cancel()
+		err = w.Write(context.Background(), newTestMessages(0))
 		require.NoError(t, err)
 
 		// one more run is needed to check idempotency
-		ctx, cancel = context.WithTimeout(context.Background(), 100*time.Millisecond)
-		initData, err = w.WaitInit(ctx)
+		anotherInitData, err := w.WaitInit(context.Background())
 		require.NoError(t, err)
-		require.Equal(t, expectedLastSeqNo, initData.LastSeqNum)
-		cancel()
+		require.Equal(t, initData, anotherInitData)
 
 		require.True(t, isClosed(w.firstInitResponseProcessedChan))
 	})
 
 	t.Run("contextDeadlineErrorInProgress", func(t *testing.T) {
 		w := newTestWriterStopped(WithAutoSetSeqNo(true))
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		_, err := w.WaitInit(ctx)
 		cancel()
 		require.ErrorIs(t, err, ctx.Err())
