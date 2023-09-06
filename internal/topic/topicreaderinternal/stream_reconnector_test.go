@@ -131,9 +131,10 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 
 	xtest.TestManyTimesWithName(t, "OnClose", func(t testing.TB) {
 		reconnector := &readerReconnector{
-			tracer:     &trace.Topic{},
-			initDoneCh: make(empty.Chan),
+			tracer:    &trace.Topic{},
+			streamErr: errUnconnected,
 		}
+		reconnector.initChannelsAndClock()
 		testErr := errors.New("test'")
 
 		go func() {
@@ -260,9 +261,9 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 		ctx, cancel := xcontext.WithCancel(context.Background())
 		cancel()
 		reconnector := &readerReconnector{
-			tracer:     &trace.Topic{},
-			initDoneCh: make(empty.Chan),
+			tracer: &trace.Topic{},
 		}
+		reconnector.initChannelsAndClock()
 		reconnector.reconnectionLoop(ctx) // must return
 	})
 }
