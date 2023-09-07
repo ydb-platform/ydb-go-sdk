@@ -102,13 +102,11 @@ func (scope *scopeT) Driver(opts ...ydb.Option) *ydb.Driver {
 	}).(*ydb.Driver)
 }
 
-func (scope *scopeT) SQLDriverWithFolder(opts ...ydb.ConnectorOption) *sql.DB {
+func (scope *scopeT) SQLDriver(opts ...ydb.ConnectorOption) *sql.DB {
 	return scope.Cache(nil, nil, func() (res interface{}, err error) {
 		driver := scope.Driver()
 		scope.Logf("Create sql db connector")
-		connector, err := ydb.Connector(driver,
-			append([]ydb.ConnectorOption{ydb.WithTablePathPrefix(scope.Folder())}, opts...)...,
-		)
+		connector, err := ydb.Connector(driver, opts...)
 		if err != nil {
 			return nil, err
 		}
@@ -122,6 +120,12 @@ func (scope *scopeT) SQLDriverWithFolder(opts ...ydb.ConnectorOption) *sql.DB {
 		}
 		return db, nil
 	}).(*sql.DB)
+}
+
+func (scope *scopeT) SQLDriverWithFolder(opts ...ydb.ConnectorOption) *sql.DB {
+	return scope.SQLDriver(
+		append([]ydb.ConnectorOption{ydb.WithTablePathPrefix(scope.Folder())}, opts...)...,
+	)
 }
 
 func (scope *scopeT) Folder() string {

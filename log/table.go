@@ -35,7 +35,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 					Bool("idempotent", idempotent),
 				)
 			} else {
@@ -45,19 +45,19 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 				}
 				m := retry.Check(info.Error)
 				l.Log(WithLevel(ctx, lvl), "failed",
-					latency(start),
+					latencyField(start),
 					Bool("idempotent", idempotent),
 					Error(info.Error),
 					Bool("retryable", m.MustRetry(idempotent)),
 					Int64("code", m.StatusCode()),
 					Bool("deleteSession", m.MustDeleteSession()),
-					version(),
+					versionField(),
 				)
 			}
 			return func(info trace.TableDoDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latency(start),
+						latencyField(start),
 						Bool("idempotent", idempotent),
 						Int("attempts", info.Attempts),
 					)
@@ -68,14 +68,14 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 					}
 					m := retry.Check(info.Error)
 					l.Log(WithLevel(ctx, lvl), "done",
-						latency(start),
+						latencyField(start),
 						Bool("idempotent", idempotent),
 						Int("attempts", info.Attempts),
 						Error(info.Error),
 						Bool("retryable", m.MustRetry(idempotent)),
 						Int64("code", m.StatusCode()),
 						Bool("deleteSession", m.MustDeleteSession()),
-						version(),
+						versionField(),
 					)
 				}
 			}
@@ -100,7 +100,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 					Bool("idempotent", idempotent),
 				)
 			} else {
@@ -110,19 +110,19 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 				}
 				m := retry.Check(info.Error)
 				l.Log(WithLevel(ctx, lvl), "done",
-					latency(start),
+					latencyField(start),
 					Bool("idempotent", idempotent),
 					Error(info.Error),
 					Bool("retryable", m.MustRetry(idempotent)),
 					Int64("code", m.StatusCode()),
 					Bool("deleteSession", m.MustDeleteSession()),
-					version(),
+					versionField(),
 				)
 			}
 			return func(info trace.TableDoTxDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latency(start),
+						latencyField(start),
 						Bool("idempotent", idempotent),
 						Int("attempts", info.Attempts),
 					)
@@ -133,14 +133,14 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 					}
 					m := retry.Check(info.Error)
 					l.Log(WithLevel(ctx, lvl), "done",
-						latency(start),
+						latencyField(start),
 						Bool("idempotent", idempotent),
 						Int("attempts", info.Attempts),
 						Error(info.Error),
 						Bool("retryable", m.MustRetry(idempotent)),
 						Int64("code", m.StatusCode()),
 						Bool("deleteSession", m.MustDeleteSession()),
-						version(),
+						versionField(),
 					)
 				}
 			}
@@ -162,29 +162,29 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		return func(info trace.TableCreateSessionIntermediateInfo) func(trace.TableCreateSessionDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "intermediate",
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "intermediate",
-					latency(start),
+					latencyField(start),
 					Error(info.Error),
-					version(),
+					versionField(),
 				)
 			}
 			return func(info trace.TableCreateSessionDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latency(start),
+						latencyField(start),
 						Int("attempts", info.Attempts),
 						String("session_id", info.Session.ID()),
 						String("session_status", info.Session.Status()),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "failed",
-						latency(start),
+						latencyField(start),
 						Int("attempts", info.Attempts),
 						Error(info.Error),
-						version(),
+						versionField(),
 					)
 				}
 			}
@@ -201,20 +201,20 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			if info.Error == nil {
 				if info.Session != nil {
 					l.Log(ctx, "done",
-						latency(start),
+						latencyField(start),
 						String("id", info.Session.ID()),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
-						latency(start),
-						version(),
+						latencyField(start),
+						versionField(),
 					)
 				}
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
-					latency(start),
+					latencyField(start),
 					Error(info.Error),
-					version(),
+					versionField(),
 				)
 			}
 		}
@@ -233,17 +233,17 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		return func(info trace.TableSessionDeleteDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
-					latency(start),
+					latencyField(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 					Error(info.Error),
-					version(),
+					versionField(),
 				)
 			}
 		}
@@ -262,17 +262,17 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		return func(info trace.TableKeepAliveDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
-					latency(start),
+					latencyField(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 					Error(info.Error),
-					version(),
+					versionField(),
 				)
 			}
 		}
@@ -305,7 +305,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 							String("query", query),
 							String("id", session.ID()),
 							String("status", session.Status()),
-							latency(start),
+							latencyField(start),
 						)...,
 					)...,
 				)
@@ -316,8 +316,8 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 						Error(info.Error),
 						String("id", session.ID()),
 						String("status", session.Status()),
-						latency(start),
-						version(),
+						latencyField(start),
+						versionField(),
 					)...,
 				)
 			}
@@ -353,7 +353,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 						String("status", session.Status()),
 						Bool("prepared", info.Prepared),
 						NamedError("result_err", info.Result.Err()),
-						latency(start),
+						latencyField(start),
 					)...,
 				)
 			} else {
@@ -364,8 +364,8 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 						String("id", session.ID()),
 						String("status", session.Status()),
 						Bool("prepared", info.Prepared),
-						latency(start),
-						version(),
+						latencyField(start),
+						versionField(),
 					)...,
 				)
 			}
@@ -402,7 +402,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
-					version(),
+					versionField(),
 				)
 			}
 			return func(info trace.TableSessionQueryStreamExecuteDoneInfo) {
@@ -413,7 +413,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 							Error(info.Error),
 							String("id", session.ID()),
 							String("status", session.Status()),
-							latency(start),
+							latencyField(start),
 						)...,
 					)
 				} else {
@@ -423,8 +423,8 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 							Error(info.Error),
 							String("id", session.ID()),
 							String("status", session.Status()),
-							latency(start),
-							version(),
+							latencyField(start),
+							versionField(),
 						)...,
 					)
 				}
@@ -458,23 +458,23 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
-					version(),
+					versionField(),
 				)
 			}
 			return func(info trace.TableSessionQueryStreamReadDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						latency(start),
+						latencyField(start),
 						String("id", session.ID()),
 						String("status", session.Status()),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "failed",
-						latency(start),
+						latencyField(start),
 						String("id", session.ID()),
 						String("status", session.Status()),
 						Error(info.Error),
-						version(),
+						versionField(),
 					)
 				}
 			}
@@ -498,18 +498,18 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		return func(info trace.TableSessionTransactionBeginDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 					String("tx", info.Tx.ID()),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
-					latency(start),
+					latencyField(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 					Error(info.Error),
-					version(),
+					versionField(),
 				)
 			}
 		}
@@ -534,19 +534,19 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		return func(info trace.TableSessionTransactionCommitDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 					String("tx", tx.ID()),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
-					latency(start),
+					latencyField(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 					String("tx", tx.ID()),
 					Error(info.Error),
-					version(),
+					versionField(),
 				)
 			}
 		}
@@ -571,19 +571,19 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		return func(info trace.TableSessionTransactionRollbackDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 					String("tx", tx.ID()),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
-					latency(start),
+					latencyField(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 					String("tx", tx.ID()),
 					Error(info.Error),
-					version(),
+					versionField(),
 				)
 			}
 		}
@@ -597,7 +597,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		start := time.Now()
 		return func(info trace.TableInitDoneInfo) {
 			l.Log(WithLevel(ctx, INFO), "done",
-				latency(start),
+				latencyField(start),
 				Int("size_max", info.Limit),
 			)
 		}
@@ -612,13 +612,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		return func(info trace.TableCloseDoneInfo) {
 			if info.Error == nil {
 				l.Log(WithLevel(ctx, INFO), "done",
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
-					latency(start),
+					latencyField(start),
 					Error(info.Error),
-					version(),
+					versionField(),
 				)
 			}
 		}
@@ -667,17 +667,17 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		return func(info trace.TablePoolPutDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
-					latency(start),
+					latencyField(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 					Error(info.Error),
-					version(),
+					versionField(),
 				)
 			}
 		}
@@ -693,17 +693,17 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			if info.Error == nil {
 				session := info.Session
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 					String("id", session.ID()),
 					String("status", session.Status()),
 					Int("attempts", info.Attempts),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
-					latency(start),
+					latencyField(start),
 					Int("attempts", info.Attempts),
 					Error(info.Error),
-					version(),
+					versionField(),
 				)
 			}
 		}
@@ -717,7 +717,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		start := time.Now()
 		return func(info trace.TablePoolWaitDoneInfo) {
 			fields := []Field{
-				latency(start),
+				latencyField(start),
 			}
 			if info.Session != nil {
 				fields = append(fields,

@@ -24,7 +24,7 @@ jobs:
     env:
       VERSION_CHANGE: ${{ github.event.inputs.version-change }}
       RELEASE_CANDIDATE: ${{ github.event.inputs.release-candidate }}
-      VERSION_FILE: internal/meta/version.go
+      VERSION_FILE: internal/version/version.go
       CHANGELOG_FILE: CHANGELOG.md
       GITHUB_TOKEN: ${{ secrets.YDB_PLATFORM_BOT_TOKEN_REPO }}
     steps:
@@ -39,9 +39,9 @@ jobs:
             echo "CHANGELOG empty"
             exit 1;
           fi;
-          MAJOR=$(cat $VERSION_FILE | grep VersionMajor | sed -e 's/^.*\ \(=\ \)*\(\"\)*\([0-9]*\)\(\"\)*.*/\3/g');
-          MINOR=$(cat $VERSION_FILE | grep VersionMinor | sed -e 's/^.*\ \(=\ \)*\(\"\)*\([0-9]*\)\(\"\)*.*/\3/g');
-          PATCH=$(cat $VERSION_FILE | grep VersionPatch | sed -e 's/^.*\ \(=\ \)*\(\"\)*\([0-9]*\)\(\"\)*.*/\3/g');
+          MAJOR=$(cat $VERSION_FILE | grep Major | sed -e 's/^.*\ \(=\ \)*\(\"\)*\([0-9]*\)\(\"\)*.*/\3/g');
+          MINOR=$(cat $VERSION_FILE | grep Minor | sed -e 's/^.*\ \(=\ \)*\(\"\)*\([0-9]*\)\(\"\)*.*/\3/g');
+          PATCH=$(cat $VERSION_FILE | grep Patch | sed -e 's/^.*\ \(=\ \)*\(\"\)*\([0-9]*\)\(\"\)*.*/\3/g');
           LAST_TAG="v$MAJOR.$MINOR.$PATCH";
           if [ "$VERSION_CHANGE" = "MINOR" ]
           then
@@ -57,8 +57,8 @@ jobs:
             RC=$(git tag | grep "v$MAJOR.$MINOR.$PATCH-rc" | wc -l);
             TAG="v$MAJOR.$MINOR.$PATCH-rc$RC";
           else
-            sed -e 's/VersionMinor = "\([0-9]*\)"/VersionMinor = "'$MINOR'"/g' -i $VERSION_FILE;
-            sed -e 's/VersionPatch = "\([0-9]*\)"/VersionPatch = "'$PATCH'"/g' -i $VERSION_FILE;
+            sed -e 's/Minor = "\([0-9]*\)"/Minor = "'$MINOR'"/g' -i $VERSION_FILE;
+            sed -e 's/Patch = "\([0-9]*\)"/Patch = "'$PATCH'"/g' -i $VERSION_FILE;
             git add $VERSION_FILE;
             echo "## v$MAJOR.$MINOR.$PATCH" >> $CHANGELOG_FILE.tmp
             cat $CHANGELOG_FILE >> $CHANGELOG_FILE.tmp

@@ -650,9 +650,12 @@ func (s *session) Execute(
 	txr table.Transaction, r result.Result, err error,
 ) {
 	var (
-		a           = allocator.New()
-		q           = queryFromText(query)
-		request     = a.TableExecuteDataQueryRequest()
+		a       = allocator.New()
+		q       = queryFromText(query)
+		request = options.ExecuteDataQueryDesc{
+			ExecuteDataQueryRequest: a.TableExecuteDataQueryRequest(),
+			IgnoreTruncated:         s.config.IgnoreTruncated(),
+		}
 		callOptions []grpc.CallOption
 	)
 	defer a.Free()
@@ -671,7 +674,7 @@ func (s *session) Execute(
 
 	for _, opt := range opts {
 		if opt != nil {
-			callOptions = append(callOptions, opt.ApplyExecuteDataQueryOption((*options.ExecuteDataQueryDesc)(request), a)...)
+			callOptions = append(callOptions, opt.ApplyExecuteDataQueryOption(&request, a)...)
 		}
 	}
 
@@ -683,18 +686,20 @@ func (s *session) Execute(
 		onDone(txr, false, r, err)
 	}()
 
-	result, err := s.executeDataQuery(ctx, a, request, callOptions...)
+	result, err := s.executeDataQuery(ctx, a, request.ExecuteDataQueryRequest, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	return s.executeQueryResult(result, request.TxControl)
+	return s.executeQueryResult(result, request.TxControl, request.IgnoreTruncated)
 }
 
 // executeQueryResult returns Transaction and result built from received
 // result.
 func (s *session) executeQueryResult(
-	res *Ydb_Table.ExecuteQueryResult, txControl *Ydb_Table.TransactionControl,
+	res *Ydb_Table.ExecuteQueryResult,
+	txControl *Ydb_Table.TransactionControl,
+	ignoreTruncated bool,
 ) (
 	table.Transaction, result.Result, error,
 ) {
@@ -711,7 +716,7 @@ func (s *session) executeQueryResult(
 	return tx, scanner.NewUnary(
 		res.GetResultSets(),
 		res.GetQueryStats(),
-		scanner.WithIgnoreTruncated(s.config.IgnoreTruncated()),
+		scanner.WithIgnoreTruncated(ignoreTruncated),
 	), nil
 }
 
@@ -926,7 +931,7 @@ func (s *session) StreamReadTable(
 
 	for _, opt := range opts {
 		if opt != nil {
-			opt((*options.ReadTableDesc)(&request), a)
+			opt.ApplyReadTableOption((*options.ReadTableDesc)(&request), a)
 		}
 	}
 
@@ -967,6 +972,51 @@ func (s *session) StreamReadTable(
 			return err
 		},
 		scanner.WithIgnoreTruncated(true), // stream read table always returns truncated flag on last result set
+	), nil
+}
+
+func (s *session) ReadRows(
+	ctx context.Context,
+	path string,
+	keys types.Value,
+	opts ...options.ReadRowsOption,
+) (_ result.Result, err error) {
+	var (
+		a       = allocator.New()
+		request = Ydb_Table.ReadRowsRequest{
+			SessionId: s.id,
+			Path:      path,
+			Keys:      value.ToYDB(keys, a),
+		}
+		response *Ydb_Table.ReadRowsResponse
+	)
+	defer func() {
+		a.Free()
+	}()
+
+	for _, opt := range opts {
+		if opt != nil {
+			opt.ApplyReadRowsOption((*options.ReadRowsDesc)(&request), a)
+		}
+	}
+
+	response, err = s.tableService.ReadRows(ctx, &request)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
+		return nil, xerrors.WithStackTrace(
+			xerrors.Operation(
+				xerrors.FromOperation(response),
+			),
+		)
+	}
+
+	return scanner.NewUnary(
+		[]*Ydb.ResultSet{response.GetResultSet()},
+		nil,
+		scanner.WithIgnoreTruncated(s.config.IgnoreTruncated()),
 	), nil
 }
 
@@ -1080,7 +1130,11 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 		},
 		callOptions...,
 	)
-	return xerrors.WithStackTrace(err)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
 }
 
 // BeginTransaction begins new transaction within given session with given

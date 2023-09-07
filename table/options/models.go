@@ -597,6 +597,7 @@ const (
 type ChangefeedFormat int
 
 const (
-	ChangefeedFormatUnspecified = ChangefeedFormat(Ydb_Table.ChangefeedFormat_FORMAT_UNSPECIFIED)
-	ChangefeedFormatJSON        = ChangefeedFormat(Ydb_Table.ChangefeedFormat_FORMAT_JSON)
+	ChangefeedFormatUnspecified         = ChangefeedFormat(Ydb_Table.ChangefeedFormat_FORMAT_UNSPECIFIED)
+	ChangefeedFormatJSON                = ChangefeedFormat(Ydb_Table.ChangefeedFormat_FORMAT_JSON)
+	ChangefeedFormatDynamoDBStreamsJSON = ChangefeedFormat(Ydb_Table.ChangefeedFormat_FORMAT_DYNAMODB_STREAMS_JSON)
 )

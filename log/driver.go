@@ -40,7 +40,7 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 					Error(info.Error),
 					String("target", target),
 					Strings("resolved", addresses),
-					version(),
+					versionField(),
 				)
 			}
 		}
@@ -65,7 +65,7 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 					String("endpoint", endpoint),
 					String("database", database),
 					Bool("secure", secure),
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
@@ -73,8 +73,8 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 					String("endpoint", endpoint),
 					String("database", database),
 					Bool("secure", secure),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -89,13 +89,13 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		return func(info trace.DriverCloseDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -114,14 +114,14 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 			if info.Error == nil {
 				l.Log(ctx, "done",
 					Stringer("endpoint", endpoint),
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
 					Stringer("endpoint", endpoint),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -140,7 +140,7 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		return func(info trace.DriverConnStateChangeDoneInfo) {
 			l.Log(ctx, "done",
 				Stringer("endpoint", endpoint),
-				latency(start),
+				latencyField(start),
 				Stringer("state", info.State),
 			)
 		}
@@ -159,14 +159,14 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 			if info.Error == nil {
 				l.Log(ctx, "done",
 					Stringer("endpoint", endpoint),
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
 					Stringer("endpoint", endpoint),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -185,14 +185,14 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 			if info.Error == nil {
 				l.Log(ctx, "done",
 					Stringer("endpoint", endpoint),
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
 					Stringer("endpoint", endpoint),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -214,7 +214,7 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 				l.Log(ctx, "done",
 					Stringer("endpoint", endpoint),
 					String("method", method),
-					latency(start),
+					latencyField(start),
 					Stringer("metadata", metadata(info.Metadata)),
 				)
 			} else {
@@ -222,9 +222,9 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 					Error(info.Error),
 					Stringer("endpoint", endpoint),
 					String("method", method),
-					latency(start),
+					latencyField(start),
 					Stringer("metadata", metadata(info.Metadata)),
-					version(),
+					versionField(),
 				)
 			}
 		}
@@ -252,15 +252,15 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 				l.Log(ctx, "intermediate receive",
 					Stringer("endpoint", endpoint),
 					String("method", method),
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "intermediate fail",
 					Error(info.Error),
 					Stringer("endpoint", endpoint),
 					String("method", method),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 			return func(info trace.DriverConnNewStreamDoneInfo) {
@@ -268,7 +268,7 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 					l.Log(ctx, "done",
 						Stringer("endpoint", endpoint),
 						String("method", method),
-						latency(start),
+						latencyField(start),
 						Stringer("metadata", metadata(info.Metadata)),
 					)
 				} else {
@@ -276,9 +276,9 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 						Error(info.Error),
 						Stringer("endpoint", endpoint),
 						String("method", method),
-						latency(start),
+						latencyField(start),
 						Stringer("metadata", metadata(info.Metadata)),
-						version(),
+						versionField(),
 					)
 				}
 			}
@@ -293,15 +293,15 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		l.Log(ctx, "start",
 			Stringer("endpoint", endpoint),
 			NamedError("cause", info.Cause),
-			version(),
+			versionField(),
 		)
 		start := time.Now()
 		return func(info trace.DriverConnBanDoneInfo) {
 			l.Log(WithLevel(ctx, WARN), "done",
 				Stringer("endpoint", endpoint),
-				latency(start),
+				latencyField(start),
 				Stringer("state", info.State),
-				version(),
+				versionField(),
 			)
 		}
 	}
@@ -318,7 +318,7 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		return func(info trace.DriverConnAllowDoneInfo) {
 			l.Log(ctx, "done",
 				Stringer("endpoint", endpoint),
-				latency(start),
+				latencyField(start),
 				Stringer("state", info.State),
 			)
 		}
@@ -340,15 +340,15 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 				l.Log(ctx, "done",
 					String("name", name),
 					String("event", event),
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
 					Error(info.Error),
 					String("name", name),
 					String("event", event),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -362,7 +362,7 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		start := time.Now()
 		return func(info trace.DriverBalancerInitDoneInfo) {
 			l.Log(WithLevel(ctx, INFO), "done",
-				latency(start),
+				latencyField(start),
 			)
 		}
 	}
@@ -376,13 +376,13 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		return func(info trace.DriverBalancerCloseDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -401,14 +401,14 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		return func(info trace.DriverBalancerChooseEndpointDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 					Stringer("endpoint", info.Endpoint),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
 					Error(info.Error),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -428,7 +428,7 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		start := time.Now()
 		return func(info trace.DriverBalancerUpdateDoneInfo) {
 			l.Log(ctx, "done",
-				latency(start),
+				latencyField(start),
 				Stringer("endpoints", endpoints(info.Endpoints)),
 				String("detectedLocalDC", info.LocalDC),
 			)
@@ -444,15 +444,15 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 		return func(info trace.DriverGetCredentialsDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 					String("token", secret.Token(info.Token)),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "done",
 					Error(info.Error),
-					latency(start),
+					latencyField(start),
 					String("token", secret.Token(info.Token)),
-					version(),
+					versionField(),
 				)
 			}
 		}

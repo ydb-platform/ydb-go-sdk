@@ -28,15 +28,15 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLConnectorConnectDoneInfo) {
 			if info.Error == nil {
 				l.Log(WithLevel(ctx, DEBUG), "connected",
-					latency(start),
+					latencyField(start),
 					String("session_id", info.Session.ID()),
 					String("session_status", info.Session.Status()),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
 					Error(info.Error),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -52,13 +52,13 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLConnPingDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
 					Error(info.Error),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -73,13 +73,13 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLConnCloseDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -94,13 +94,13 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLConnBeginDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
 					Error(info.Error),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -120,15 +120,15 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLConnPrepareDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
 					appendFieldByCondition(l.logQuery,
 						String("query", query),
 						Error(info.Error),
-						latency(start),
-						version(),
+						latencyField(start),
+						versionField(),
 					)...,
 				)
 			}
@@ -150,7 +150,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLConnExecDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				m := retry.Check(info.Error)
@@ -161,8 +161,8 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 						Int64("code", m.StatusCode()),
 						Bool("deleteSession", m.MustDeleteSession()),
 						Error(info.Error),
-						latency(start),
-						version(),
+						latencyField(start),
+						versionField(),
 					)...,
 				)
 			}
@@ -184,7 +184,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLConnQueryDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				m := retry.Check(info.Error)
@@ -195,8 +195,8 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 						Int64("code", m.StatusCode()),
 						Bool("deleteSession", m.MustDeleteSession()),
 						Error(info.Error),
-						latency(start),
-						version(),
+						latencyField(start),
+						versionField(),
 					)...,
 				)
 			}
@@ -212,13 +212,13 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLTxCommitDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "committed",
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
 					Error(info.Error),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -233,13 +233,13 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLTxRollbackDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, WARN), "failed",
 					Error(info.Error),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -254,13 +254,13 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLStmtCloseDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "closed",
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "close failed",
 					Error(info.Error),
-					latency(start),
-					version(),
+					latencyField(start),
+					versionField(),
 				)
 			}
 		}
@@ -281,15 +281,15 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
 					Error(info.Error),
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
 					appendFieldByCondition(l.logQuery,
 						String("query", query),
 						Error(info.Error),
-						latency(start),
-						version(),
+						latencyField(start),
+						versionField(),
 					)...,
 				)
 			}
@@ -310,15 +310,15 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		return func(info trace.DatabaseSQLStmtQueryDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
-					latency(start),
+					latencyField(start),
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
 					appendFieldByCondition(l.logQuery,
 						String("query", query),
 						Error(info.Error),
-						latency(start),
-						version(),
+						latencyField(start),
+						versionField(),
 					)...,
 				)
 			}

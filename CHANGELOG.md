@@ -1,4 +1,41 @@
 * Added start reader with reader id and consumer to logs
+* Fixed `internal/xstring` package with deprecated warning in `go1.21` about `reflect.{String,Slice}Header`
+
+## v3.51.3
+* Added `internal/xstring.{FromBytes([]byte),ToBytes(string)` for increase performance on `string` from/to `[]byte` conversion
+
+## v3.51.2
+* Added `table/options.ReadFromSnapshot(bool)` option for `session.StreamReadTable()`
+
+## v3.51.1
+* Added checking condition for `tx.Rollback()` in `retry.DoTx`
+
+## v3.51.0
+* Added node info to grpc errors
+
+## v3.50.0
+* Added methods `TotalCPUTime()` and `TotalDuration()` to `table/stats/QueryStats` interface
+* Added check if commit order is bad in sync mode
+
+## v3.49.1
+* Added `table.options.WithIgnoreTruncated` option for `session.Execute` method
+* Added `table.result.ErrTruncated` error for check it with `errors.Is()` outside of `ydb-go-sdk`
+
+## v3.49.0
+* Added `table.Session.ReadRows` method for getting rows by keys
+* Added `table/options.ChangefeedFormatDynamoDBStreamsJSON` format of `DynamoDB` change feeds
+
+## v3.48.8
+* Fixed `sugar.RemoveRecursive()` for column table type
+
+## v3.48.7
+* Added `sugar.StackRecord()` helper for stringification of current file path and line
+* Updated `google.golang.org/grpc` from `v1.49.0` to `v1.53.0` due to vulnerability
+* Updated `google.golang.org/protobuf` from `v1.28.0` to `v1.28.1` due to vulnerability
+* Implemented implicit standard interface `driver.RowsColumnTypeNullable` in `internal/xsql.rows`
+* Upgraded errors description from `retry.Retry` with attempts info
+
+## v3.48.6
 * Added builder for topic reader message (usable for tests)
 
 ## v3.48.5
@@ -82,7 +119,7 @@
 * Extend `scheme.Client` interface with method `Database`
 * Removed `driver.ResultNoRows` in `internal/xsql`
 * Added `ydb.{WithTablePathPrefix,WithAutoDeclare,WithPositionalArgs,WithNumericalArgs}` query modifiers options
-* Supported binding parameters for `database/sql` driver over connector option `ydb.WithAutoBind()` and connection string params `go_auto_bind={origin,table_path_prefix(path),declare,numeric,positional}`
+* Supported binding parameters for `database/sql` driver over connector option `ydb.WithAutoBind()` and connection string params `go_auto_bind={table_path_prefix(path),declare,numeric,positional}`
 * Added `testutil.QueryBind` test helper
 * Fixed topic retry policy callback call: not call it with nil error
 * Fixed bug with no checking operation error on `discovery.Client` calls

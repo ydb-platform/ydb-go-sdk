@@ -16,7 +16,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var ErrCommitDisabled = xerrors.Wrap(errors.New("ydb: commits disabled"))
+var (
+	ErrCommitDisabled             = xerrors.Wrap(errors.New("ydb: commits disabled"))
+	ErrWrongCommitOrderInSyncMode = xerrors.Wrap(errors.New("ydb: wrong commit order in sync mode"))
+)
 
 type sendMessageToServerFunc func(msg rawtopicreader.ClientMessage) error
 

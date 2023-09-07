@@ -31,8 +31,11 @@ func (s *statement) Execute(
 	txr table.Transaction, r result.Result, err error,
 ) {
 	var (
-		a           = allocator.New()
-		request     = a.TableExecuteDataQueryRequest()
+		a       = allocator.New()
+		request = options.ExecuteDataQueryDesc{
+			ExecuteDataQueryRequest: a.TableExecuteDataQueryRequest(),
+			IgnoreTruncated:         s.session.config.IgnoreTruncated(),
+		}
 		callOptions []grpc.CallOption
 	)
 	defer a.Free()
@@ -51,7 +54,7 @@ func (s *statement) Execute(
 
 	for _, opt := range opts {
 		if opt != nil {
-			callOptions = append(callOptions, opt.ApplyExecuteDataQueryOption((*options.ExecuteDataQueryDesc)(request), a)...)
+			callOptions = append(callOptions, opt.ApplyExecuteDataQueryOption(&request, a)...)
 		}
 	}
 
@@ -63,22 +66,22 @@ func (s *statement) Execute(
 		onDone(txr, true, r, err)
 	}()
 
-	return s.execute(ctx, a, request, request.TxControl, callOptions...)
+	return s.execute(ctx, a, &request, request.TxControl, callOptions...)
 }
 
 // execute executes prepared query without any tracing.
 func (s *statement) execute(
 	ctx context.Context, a *allocator.Allocator,
-	request *Ydb_Table.ExecuteDataQueryRequest, txControl *Ydb_Table.TransactionControl,
+	request *options.ExecuteDataQueryDesc, txControl *Ydb_Table.TransactionControl,
 	callOptions ...grpc.CallOption,
 ) (
 	txr table.Transaction, r result.Result, err error,
 ) {
-	res, err := s.session.executeDataQuery(ctx, a, request, callOptions...)
+	res, err := s.session.executeDataQuery(ctx, a, request.ExecuteDataQueryRequest, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
-	return s.session.executeQueryResult(res, txControl)
+	return s.session.executeQueryResult(res, txControl, request.IgnoreTruncated)
 }
 
 func (s *statement) NumInput() int {

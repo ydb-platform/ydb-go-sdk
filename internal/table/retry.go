@@ -76,7 +76,15 @@ func doTx(
 
 			defer func() {
 				if err != nil {
-					_ = tx.Rollback(ctx)
+					errRollback := tx.Rollback(ctx)
+					if errRollback != nil {
+						err = xerrors.NewWithIssues("",
+							xerrors.WithStackTrace(err),
+							xerrors.WithStackTrace(errRollback),
+						)
+					} else {
+						err = xerrors.WithStackTrace(err)
+					}
 				}
 			}()
 

@@ -380,6 +380,9 @@ func (r *topicStreamReaderImpl) checkCommitRange(commitRange commitRange) error 
 	if err != nil || session != ownSession {
 		return xerrors.WithStackTrace(PublicErrCommitSessionToExpiredSession)
 	}
+	if session.committedOffset() != commitRange.commitOffsetStart && r.cfg.CommitMode == CommitModeSync {
+		return ErrWrongCommitOrderInSyncMode
+	}
 
 	return nil
 }

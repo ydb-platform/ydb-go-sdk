@@ -132,7 +132,7 @@ func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove s
 					)
 				}
 
-			case scheme.EntryTable:
+			case scheme.EntryTable, scheme.EntryColumnTable:
 				err = db.Table().Do(ctx, func(ctx context.Context, session table.Session) (err error) {
 					return session.DropTable(ctx, pt)
 				}, table.WithIdempotent())

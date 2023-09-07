@@ -38,6 +38,14 @@ func (s *queryStats) QueryAST() string {
 	return s.stats.GetQueryAst()
 }
 
+func (s *queryStats) TotalCPUTime() time.Duration {
+	return time.Microsecond * time.Duration(s.stats.TotalCpuTimeUs)
+}
+
+func (s *queryStats) TotalDuration() time.Duration {
+	return time.Microsecond * time.Duration(s.stats.TotalDurationUs)
+}
+
 // NextPhase returns next execution phase within query.
 // If ok flag is false, then there are no more phases and p is invalid.
 func (s *queryStats) NextPhase() (p stats.QueryPhase, ok bool) {

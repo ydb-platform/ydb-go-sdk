@@ -5,11 +5,13 @@ package integration
 
 import (
 	"fmt"
+	"os"
 	"path"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 )
 
@@ -35,6 +37,16 @@ func TestSugarMakeRemoveRecursive(t *testing.T) {
 	query := fmt.Sprintf("CREATE TABLE `%v` (id Uint64, PRIMARY KEY (id))", tablePath)
 	_, err = db.Scripting().Execute(scope.Ctx, query, nil)
 	require.NoError(t, err)
+
+	if version.Gte(os.Getenv("YDB_VERSION"), "23.1") {
+		tablePath = path.Join(testPrefix, "columnTableName")
+		query = fmt.Sprintf(
+			"CREATE TABLE `%v` (id Uint64 NOT NULL, PRIMARY KEY (id)) PARTITION BY HASH(id) WITH (STORE = COLUMN)",
+			tablePath,
+		)
+		_, err = db.Scripting().Execute(scope.Ctx, query, nil)
+		require.NoError(t, err)
+	}
 
 	err = db.Topic().Create(scope.Ctx, path.Join(testPrefix, "topic"))
 	require.NoError(t, err)

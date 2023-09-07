@@ -68,5 +68,5 @@ func TestScanQueryWithCompression(t *testing.T) {
 			}
 		}
 	}(err)
-	require.Equal(t, "not found column 'ghi'", err.Error())
+	require.ErrorContains(t, err, "not found column 'ghi'")
 }
