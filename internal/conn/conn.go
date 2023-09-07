@@ -420,7 +420,12 @@ func (c *conn) NewStream(
 	c.touchLastUsage()
 	defer c.touchLastUsage()
 
-	ctx, sentMark := markContext(ctx)
+	traceId, err := uuid.NewUUID()
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceId.String()))
 
 	s, err = cc.NewStream(ctx, desc, method, opts...)
 	if err != nil {
@@ -431,6 +436,7 @@ func (c *conn) NewStream(
 		if useWrapping {
 			err = xerrors.Transport(err,
 				xerrors.WithAddress(c.Address()),
+				xerrors.WithTraceID(traceId.String()),
 			)
 			if sentMark.canRetry() {
 				return s, c.wrapError(xerrors.Retryable(err, xerrors.WithName("NewStream")))
@@ -445,6 +451,7 @@ func (c *conn) NewStream(
 		ClientStream: s,
 		c:            c,
 		wrapping:     useWrapping,
+		traceId:      traceId,
 		sentMark:     sentMark,
 		onDone: func(ctx context.Context, md metadata.MD) {
 			cancel()

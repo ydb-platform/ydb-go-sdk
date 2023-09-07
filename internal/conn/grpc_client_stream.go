@@ -2,6 +2,7 @@ package conn
 
 import (
 	"context"
+	"github.com/google/uuid"
 	"io"
 	"time"
 
@@ -19,6 +20,7 @@ type grpcClientStream struct {
 	grpc.ClientStream
 	c        *conn
 	wrapping bool
+	traceId  uuid.UUID
 	sentMark *modificationMark
 	onDone   func(ctx context.Context, md metadata.MD)
 	recv     func(error) func(error, trace.ConnState, map[string][]string)
@@ -33,6 +35,7 @@ func (s *grpcClientStream) CloseSend() (err error) {
 				xerrors.Transport(
 					err,
 					xerrors.WithAddress(s.c.Address()),
+					xerrors.WithTraceID(s.traceId.String()),
 				),
 			)
 		}
@@ -56,6 +59,7 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 		if s.wrapping {
 			err = xerrors.Transport(err,
 				xerrors.WithAddress(s.c.Address()),
+				xerrors.WithTraceID(s.traceId.String()),
 			)
 			if s.sentMark.canRetry() {
 				return s.wrapError(xerrors.Retryable(err,
