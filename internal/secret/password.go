@@ -1,5 +1,9 @@
 package secret
 
+import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
+)
+
 func Password(password string) string {
 	var (
 		bytes         = []byte(password)
@@ -15,5 +19,5 @@ func Password(password string) string {
 			bytes[i] = '*'
 		}
 	}
-	return string(bytes)
+	return xstring.FromBytes(bytes)
 }

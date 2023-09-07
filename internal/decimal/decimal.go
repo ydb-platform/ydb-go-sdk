@@ -3,6 +3,8 @@ package decimal
 import (
 	"math/big"
 	"math/bits"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 const wordSize = bits.UintSize / 8
@@ -253,7 +255,7 @@ func Format(x *big.Int, precision, scale uint32) string {
 		bts[pos] = '-'
 	}
 
-	return string(bts[pos:])
+	return xstring.FromBytes(bts[pos:])
 }
 
 // BigIntToByte returns the 16-byte array representation of x.

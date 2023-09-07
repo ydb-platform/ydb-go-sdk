@@ -7,6 +7,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 type Value = value.Value
@@ -122,19 +123,19 @@ func StringValue(v []byte) Value { return value.BytesValue(v) }
 
 func BytesValue(v []byte) Value { return value.BytesValue(v) }
 
-func BytesValueFromString(v string) Value { return value.BytesValue([]byte(v)) }
+func BytesValueFromString(v string) Value { return value.BytesValue(xstring.ToBytes(v)) }
 
 // StringValueFromString makes String value from string
 //
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
-func StringValueFromString(v string) Value { return value.BytesValue([]byte(v)) }
+func StringValueFromString(v string) Value { return value.BytesValue(xstring.ToBytes(v)) }
 
 func UTF8Value(v string) Value { return value.TextValue(v) }
 
 func TextValue(v string) Value { return value.TextValue(v) }
 
-func YSONValue(v string) Value { return value.YSONValue([]byte(v)) }
+func YSONValue(v string) Value { return value.YSONValue(xstring.ToBytes(v)) }
 
 // YSONValueFromBytes makes YSON value from bytes
 //
@@ -148,7 +149,7 @@ func JSONValue(v string) Value { return value.JSONValue(v) }
 //
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
-func JSONValueFromBytes(v []byte) Value { return value.JSONValue(string(v)) }
+func JSONValueFromBytes(v []byte) Value { return value.JSONValue(xstring.FromBytes(v)) }
 
 func UUIDValue(v [16]byte) Value { return value.UUIDValue(v) }
 
@@ -158,7 +159,9 @@ func JSONDocumentValue(v string) Value { return value.JSONDocumentValue(v) }
 //
 // Warning: all *From* helpers will be removed at next major release
 // (functional will be implements with go1.18 type lists)
-func JSONDocumentValueFromBytes(v []byte) Value { return value.JSONDocumentValue(string(v)) }
+func JSONDocumentValueFromBytes(v []byte) Value {
+	return value.JSONDocumentValue(xstring.FromBytes(v))
+}
 
 func DyNumberValue(v string) Value { return value.DyNumberValue(v) }
 

@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 type Value interface {
@@ -122,7 +123,7 @@ func primitiveValueFromYDB(t PrimitiveType, v *Ydb.Value) (Value, error) {
 	case TypeYSON:
 		switch vv := v.GetValue().(type) {
 		case *Ydb.Value_TextValue:
-			return YSONValue([]byte(vv.TextValue)), nil
+			return YSONValue(xstring.ToBytes(vv.TextValue)), nil
 		case *Ydb.Value_BytesValue:
 			return YSONValue(vv.BytesValue), nil
 		default:
@@ -579,7 +580,7 @@ func (v *doubleValue) castTo(dst interface{}) error {
 		*vv = strconv.FormatFloat(v.value, 'f', -1, 64)
 		return nil
 	case *[]byte:
-		*vv = []byte(strconv.FormatFloat(v.value, 'f', -1, 64))
+		*vv = xstring.ToBytes(strconv.FormatFloat(v.value, 'f', -1, 64))
 		return nil
 	case *float64:
 		*vv = v.value
@@ -621,7 +622,7 @@ func (v dyNumberValue) castTo(dst interface{}) error {
 		*vv = string(v)
 		return nil
 	case *[]byte:
-		*vv = []byte(v)
+		*vv = xstring.ToBytes(string(v))
 		return nil
 	default:
 		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
@@ -660,7 +661,7 @@ func (v *floatValue) castTo(dst interface{}) error {
 		*vv = strconv.FormatFloat(float64(v.value), 'f', -1, 32)
 		return nil
 	case *[]byte:
-		*vv = []byte(strconv.FormatFloat(float64(v.value), 'f', -1, 32))
+		*vv = xstring.ToBytes(strconv.FormatFloat(float64(v.value), 'f', -1, 32))
 		return nil
 	case *float64:
 		*vv = float64(v.value)
@@ -705,7 +706,7 @@ func (v int8Value) castTo(dst interface{}) error {
 		*vv = strconv.FormatInt(int64(v), 10)
 		return nil
 	case *[]byte:
-		*vv = []byte(strconv.FormatInt(int64(v), 10))
+		*vv = xstring.ToBytes(strconv.FormatInt(int64(v), 10))
 		return nil
 	case *int64:
 		*vv = int64(v)
@@ -760,7 +761,7 @@ func (v int16Value) castTo(dst interface{}) error {
 		*vv = strconv.FormatInt(int64(v), 10)
 		return nil
 	case *[]byte:
-		*vv = []byte(strconv.FormatInt(int64(v), 10))
+		*vv = xstring.ToBytes(strconv.FormatInt(int64(v), 10))
 		return nil
 	case *int64:
 		*vv = int64(v)
@@ -812,7 +813,7 @@ func (v int32Value) castTo(dst interface{}) error {
 		*vv = strconv.FormatInt(int64(v), 10)
 		return nil
 	case *[]byte:
-		*vv = []byte(strconv.FormatInt(int64(v), 10))
+		*vv = xstring.ToBytes(strconv.FormatInt(int64(v), 10))
 		return nil
 	case *int64:
 		*vv = int64(v)
@@ -864,7 +865,7 @@ func (v int64Value) castTo(dst interface{}) error {
 		*vv = strconv.FormatInt(int64(v), 10)
 		return nil
 	case *[]byte:
-		*vv = []byte(strconv.FormatInt(int64(v), 10))
+		*vv = xstring.ToBytes(strconv.FormatInt(int64(v), 10))
 		return nil
 	case *int64:
 		*vv = int64(v)
@@ -985,7 +986,7 @@ func (v jsonValue) castTo(dst interface{}) error {
 		*vv = string(v)
 		return nil
 	case *[]byte:
-		*vv = []byte(v)
+		*vv = xstring.ToBytes(string(v))
 		return nil
 	default:
 		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
@@ -1022,7 +1023,7 @@ func (v jsonDocumentValue) castTo(dst interface{}) error {
 		*vv = string(v)
 		return nil
 	case *[]byte:
-		*vv = []byte(v)
+		*vv = xstring.ToBytes(string(v))
 		return nil
 	default:
 		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
@@ -1401,7 +1402,7 @@ func (v tzDateValue) castTo(dst interface{}) error {
 		*vv = string(v)
 		return nil
 	case *[]byte:
-		*vv = []byte(v)
+		*vv = xstring.ToBytes(string(v))
 		return nil
 	default:
 		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
@@ -1442,7 +1443,7 @@ func (v tzDatetimeValue) castTo(dst interface{}) error {
 		*vv = string(v)
 		return nil
 	case *[]byte:
-		*vv = []byte(v)
+		*vv = xstring.ToBytes(string(v))
 		return nil
 	default:
 		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
@@ -1483,7 +1484,7 @@ func (v tzTimestampValue) castTo(dst interface{}) error {
 		*vv = string(v)
 		return nil
 	case *[]byte:
-		*vv = []byte(v)
+		*vv = xstring.ToBytes(string(v))
 		return nil
 	default:
 		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
@@ -1524,7 +1525,7 @@ func (v uint8Value) castTo(dst interface{}) error {
 		*vv = strconv.FormatInt(int64(v), 10)
 		return nil
 	case *[]byte:
-		*vv = []byte(strconv.FormatInt(int64(v), 10))
+		*vv = xstring.ToBytes(strconv.FormatInt(int64(v), 10))
 		return nil
 	case *uint64:
 		*vv = uint64(v)
@@ -1588,7 +1589,7 @@ func (v uint16Value) castTo(dst interface{}) error {
 		*vv = strconv.FormatInt(int64(v), 10)
 		return nil
 	case *[]byte:
-		*vv = []byte(strconv.FormatInt(int64(v), 10))
+		*vv = xstring.ToBytes(strconv.FormatInt(int64(v), 10))
 		return nil
 	case *uint64:
 		*vv = uint64(v)
@@ -1646,7 +1647,7 @@ func (v uint32Value) castTo(dst interface{}) error {
 		*vv = strconv.FormatInt(int64(v), 10)
 		return nil
 	case *[]byte:
-		*vv = []byte(strconv.FormatInt(int64(v), 10))
+		*vv = xstring.ToBytes(strconv.FormatInt(int64(v), 10))
 		return nil
 	case *uint64:
 		*vv = uint64(v)
@@ -1695,7 +1696,7 @@ func (v uint64Value) castTo(dst interface{}) error {
 		*vv = strconv.FormatInt(int64(v), 10)
 		return nil
 	case *[]byte:
-		*vv = []byte(strconv.FormatInt(int64(v), 10))
+		*vv = xstring.ToBytes(strconv.FormatInt(int64(v), 10))
 		return nil
 	case *uint64:
 		*vv = uint64(v)
@@ -1735,7 +1736,7 @@ func (v textValue) castTo(dst interface{}) error {
 		*vv = string(v)
 		return nil
 	case *[]byte:
-		*vv = []byte(v)
+		*vv = xstring.ToBytes(string(v))
 		return nil
 	default:
 		return xerrors.WithStackTrace(fmt.Errorf("cannot cast '%+v' (type '%s') to '%T' destination", v, v.Type().Yql(), vv))
@@ -1947,7 +1948,7 @@ type ysonValue []byte
 func (v ysonValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
-		*vv = string(v)
+		*vv = xstring.FromBytes(v)
 		return nil
 	case *[]byte:
 		*vv = v
@@ -2122,7 +2123,7 @@ type bytesValue []byte
 func (v bytesValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
-		*vv = string(v)
+		*vv = xstring.FromBytes(v)
 		return nil
 	case *[]byte:
 		*vv = v
