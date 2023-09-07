@@ -25,64 +25,82 @@ import (
 )
 
 func TestTopicStreamReaderImpl_BufferCounterOnStopPartition(t *testing.T) {
-	e := newTopicReaderTestEnv(t)
-	e.Start()
+	table := []struct {
+		name     string
+		graceful bool
+	}{
+		{
+			name:     "graceful",
+			graceful: true,
+		},
+		{
+			name:     "force",
+			graceful: false,
+		},
+	}
 
-	initialBufferSize := atomic.LoadInt64(&e.reader.atomicRestBufferSizeBytes)
-	messageSize := initialBufferSize - 1
+	for _, test := range table {
+		t.Run(test.name, func(t *testing.T) {
+			e := newTopicReaderTestEnv(t)
+			e.Start()
 
-	e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: int(messageSize)})
+			initialBufferSize := atomic.LoadInt64(&e.reader.atomicRestBufferSizeBytes)
+			messageSize := initialBufferSize - 1
 
-	messageReaded := make(empty.Chan)
-	e.SendFromServerAndSetNextCallback(&rawtopicreader.ReadResponse{
-		BytesSize: int(messageSize),
-		PartitionData: []rawtopicreader.PartitionData{
-			{
-				PartitionSessionID: e.partitionSessionID,
-				Batches: []rawtopicreader.Batch{
+			e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: int(messageSize)}).MaxTimes(1)
+
+			messageReaded := make(empty.Chan)
+			e.SendFromServerAndSetNextCallback(&rawtopicreader.ReadResponse{
+				BytesSize: int(messageSize),
+				PartitionData: []rawtopicreader.PartitionData{
 					{
-						Codec:            0,
-						ProducerID:       "",
-						WriteSessionMeta: nil,
-						WrittenAt:        time.Time{},
-						MessageData: []rawtopicreader.MessageData{
+						PartitionSessionID: e.partitionSessionID,
+						Batches: []rawtopicreader.Batch{
 							{
-								Offset: 1,
-								SeqNo:  1,
+								Codec:            0,
+								ProducerID:       "",
+								WriteSessionMeta: nil,
+								WrittenAt:        time.Time{},
+								MessageData: []rawtopicreader.MessageData{
+									{
+										Offset: 1,
+										SeqNo:  1,
+									},
+								},
 							},
 						},
 					},
 				},
-			},
-		},
-	}, func() {
-		close(messageReaded)
-	})
-	<-messageReaded
-	require.Equal(t, int64(1), atomic.LoadInt64(&e.reader.atomicRestBufferSizeBytes))
+			}, func() {
+				close(messageReaded)
+			})
+			<-messageReaded
+			require.Equal(t, int64(1), atomic.LoadInt64(&e.reader.atomicRestBufferSizeBytes))
 
-	partitionStopped := make(empty.Chan)
-	e.SendFromServerAndSetNextCallback(&rawtopicreader.StopPartitionSessionRequest{
-		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{},
-		PartitionSessionID:    e.partitionSessionID,
-		Graceful:              false,
-		CommittedOffset:       0,
-	}, func() {
-		close(partitionStopped)
-	})
-	<-partitionStopped
+			partitionStopped := make(empty.Chan)
+			e.SendFromServerAndSetNextCallback(&rawtopicreader.StopPartitionSessionRequest{
+				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{},
+				PartitionSessionID:    e.partitionSessionID,
+				Graceful:              test.graceful,
+				CommittedOffset:       0,
+			}, func() {
+				close(partitionStopped)
+			})
+			<-partitionStopped
 
-	fixedBufferSizeCtx, cancel := context.WithCancel(e.ctx)
-	go func() {
-		xtest.SpinWaitCondition(t, nil, func() bool {
-			return initialBufferSize == atomic.LoadInt64(&e.reader.atomicRestBufferSizeBytes)
+			fixedBufferSizeCtx, cancel := context.WithCancel(e.ctx)
+			go func() {
+				xtest.SpinWaitCondition(t, nil, func() bool {
+					return initialBufferSize == atomic.LoadInt64(&e.reader.atomicRestBufferSizeBytes)
+				})
+				cancel()
+			}()
+
+			_, _ = e.reader.ReadMessageBatch(fixedBufferSizeCtx, newReadMessageBatchOptions())
+			<-fixedBufferSizeCtx.Done()
+			require.Equal(t, initialBufferSize, atomic.LoadInt64(&e.reader.atomicRestBufferSizeBytes))
 		})
-		cancel()
-	}()
-
-	_, _ = e.reader.ReadMessageBatch(fixedBufferSizeCtx, newReadMessageBatchOptions())
-	<-fixedBufferSizeCtx.Done()
-	require.Equal(t, initialBufferSize, atomic.LoadInt64(&e.reader.atomicRestBufferSizeBytes))
+	}
 }
 
 func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
