@@ -2,7 +2,6 @@ package balancer
 
 import (
 	"context"
-	"math/rand"
 
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -27,11 +26,7 @@ func newConnectionsState(
 ) *connectionsState {
 	res := &connectionsState{
 		connByNodeID: connsToNodeIDMap(conns),
-		rand: xrand.New(
-			xrand.WithLock(),
-			//nolint:gosec
-			xrand.WithSource(rand.Int63()),
-		),
+		rand:         xrand.New(xrand.WithLock()),
 	}
 
 	res.prefer, res.fallback = sortPreferConnections(conns, preferFunc, info, allowFallback)

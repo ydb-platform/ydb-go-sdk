@@ -2,10 +2,10 @@ package conn
 
 import (
 	"context"
-	"github.com/google/uuid"
 	"io"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -20,7 +20,7 @@ type grpcClientStream struct {
 	grpc.ClientStream
 	c        *conn
 	wrapping bool
-	traceId  uuid.UUID
+	traceID  uuid.UUID
 	sentMark *modificationMark
 	onDone   func(ctx context.Context, md metadata.MD)
 	recv     func(error) func(error, trace.ConnState, map[string][]string)
@@ -35,7 +35,7 @@ func (s *grpcClientStream) CloseSend() (err error) {
 				xerrors.Transport(
 					err,
 					xerrors.WithAddress(s.c.Address()),
-					xerrors.WithTraceID(s.traceId.String()),
+					xerrors.WithTraceID(s.traceID.String()),
 				),
 			)
 		}
@@ -59,7 +59,7 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 		if s.wrapping {
 			err = xerrors.Transport(err,
 				xerrors.WithAddress(s.c.Address()),
-				xerrors.WithTraceID(s.traceId.String()),
+				xerrors.WithTraceID(s.traceID.String()),
 			)
 			if s.sentMark.canRetry() {
 				return s.wrapError(xerrors.Retryable(err,

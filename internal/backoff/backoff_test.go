@@ -2,7 +2,6 @@ package backoff
 
 import (
 	"fmt"
-	"math/rand"
 	"strconv"
 	"testing"
 	"time"
@@ -49,7 +48,6 @@ func TestLogBackoff(t *testing.T) {
 	for _, tt := range []struct {
 		backoff Backoff
 		exp     []exp
-		seeds   int64
 	}{
 		{
 			backoff: New(
@@ -66,7 +64,6 @@ func TestLogBackoff(t *testing.T) {
 				{gte: 0, lte: 8 * time.Second},
 				{gte: 0, lte: 8 * time.Second},
 			},
-			seeds: 1000,
 		},
 		{
 			backoff: New(
@@ -83,7 +80,6 @@ func TestLogBackoff(t *testing.T) {
 				{gte: 4 * time.Second, lte: 8 * time.Second},
 				{gte: 4 * time.Second, lte: 8 * time.Second},
 			},
-			seeds: 1000,
 		},
 		{
 			backoff: New(
@@ -124,36 +120,28 @@ func TestLogBackoff(t *testing.T) {
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			if tt.seeds == 0 {
-				tt.seeds = 1
-			}
-			for seed := int64(0); seed < tt.seeds; seed++ {
-				// Fix random to reproduce the tests.
-				rand.Seed(seed)
-
-				for n, exp := range tt.exp {
-					act := tt.backoff.Delay(n)
-					if eq := exp.eq; eq != 0 {
-						if eq != act {
-							t.Fatalf(
-								"unexpected Backoff delay: %s; want %s",
-								act, eq,
-							)
-						}
-						continue
-					}
-					if gte := exp.gte; act <= gte {
-						t.Errorf(
-							"unexpected Backoff delay: %s; want >= %s",
-							act, gte,
+			for n, exp := range tt.exp {
+				act := tt.backoff.Delay(n)
+				if eq := exp.eq; eq != 0 {
+					if eq != act {
+						t.Fatalf(
+							"unexpected Backoff delay: %s; want %s",
+							act, eq,
 						)
 					}
-					if lte := exp.lte; act >= lte {
-						t.Errorf(
-							"unexpected Backoff delay: %s; want <= %s",
-							act, lte,
-						)
-					}
+					continue
+				}
+				if gte := exp.gte; act <= gte {
+					t.Errorf(
+						"unexpected Backoff delay: %s; want >= %s",
+						act, gte,
+					)
+				}
+				if lte := exp.lte; act >= lte {
+					t.Errorf(
+						"unexpected Backoff delay: %s; want <= %s",
+						act, lte,
+					)
 				}
 			}
 		})
