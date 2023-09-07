@@ -24,6 +24,67 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+func TestTopicStreamReaderImpl_BufferCounterOnStopPartition(t *testing.T) {
+	e := newTopicReaderTestEnv(t)
+	e.Start()
+
+	initialBufferSize := atomic.LoadInt64(&e.reader.atomicRestBufferSizeBytes)
+	messageSize := initialBufferSize - 1
+
+	e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: int(messageSize)})
+
+	messageReaded := make(empty.Chan)
+	e.SendFromServerAndSetNextCallback(&rawtopicreader.ReadResponse{
+		BytesSize: int(messageSize),
+		PartitionData: []rawtopicreader.PartitionData{
+			{
+				PartitionSessionID: e.partitionSessionID,
+				Batches: []rawtopicreader.Batch{
+					{
+						Codec:            0,
+						ProducerID:       "",
+						WriteSessionMeta: nil,
+						WrittenAt:        time.Time{},
+						MessageData: []rawtopicreader.MessageData{
+							{
+								Offset: 1,
+								SeqNo:  1,
+							},
+						},
+					},
+				},
+			},
+		},
+	}, func() {
+		close(messageReaded)
+	})
+	<-messageReaded
+	require.Equal(t, int64(1), atomic.LoadInt64(&e.reader.atomicRestBufferSizeBytes))
+
+	partitionStopped := make(empty.Chan)
+	e.SendFromServerAndSetNextCallback(&rawtopicreader.StopPartitionSessionRequest{
+		ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{},
+		PartitionSessionID:    e.partitionSessionID,
+		Graceful:              false,
+		CommittedOffset:       0,
+	}, func() {
+		close(partitionStopped)
+	})
+	<-partitionStopped
+
+	fixedBufferSizeCtx, cancel := context.WithCancel(e.ctx)
+	go func() {
+		xtest.SpinWaitCondition(t, nil, func() bool {
+			return initialBufferSize == atomic.LoadInt64(&e.reader.atomicRestBufferSizeBytes)
+		})
+		cancel()
+	}()
+
+	_, _ = e.reader.ReadMessageBatch(fixedBufferSizeCtx, newReadMessageBatchOptions())
+	<-fixedBufferSizeCtx.Done()
+	require.Equal(t, initialBufferSize, atomic.LoadInt64(&e.reader.atomicRestBufferSizeBytes))
+}
+
 func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "SimpleCommit", func(t testing.TB) {
 		e := newTopicReaderTestEnv(t)
