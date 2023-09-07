@@ -1,3 +1,5 @@
+* Fixed `internal/xstring` package with deprecated warning in `go1.21` about `reflect.{String,Slice}Header`
+
 ## v3.51.3
 * Added `internal/xstring.{FromBytes([]byte),ToBytes(string)` for increase performance on `string` from/to `[]byte` conversion
 
