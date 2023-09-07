@@ -1,4 +1,4 @@
-* Added `xstring.FromBytes([]byte)` and `xstring.ToBytes(string)` for fast conversion
+* Added `internal/xstring.{FromBytes([]byte),ToBytes(string)` for increase performance on `string` from/to `[]byte` conversion
 
 ## v3.51.2
 * Added `table/options.ReadFromSnapshot(bool)` option for `session.StreamReadTable()`
