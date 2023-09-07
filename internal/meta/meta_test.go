@@ -1,4 +1,4 @@
-package test
+package meta
 
 import (
 	"context"
@@ -8,19 +8,18 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestMetaRequiredHeaders(t *testing.T) {
-	m := internal.New(
+	m := New(
 		"database",
 		credentials.NewAccessTokenCredentials("token"),
 		&trace.Driver{},
-		internal.WithRequestTypeOption("requestType"),
-		internal.WithUserAgentOption("user-agent"),
+		WithRequestTypeOption("requestType"),
+		WithUserAgentOption("user-agent"),
 	)
 
 	ctx := context.Background()
@@ -40,13 +39,13 @@ func TestMetaRequiredHeaders(t *testing.T) {
 		t.Fatal("no outgoing metadata")
 	}
 
-	require.Equal(t, []string{"database"}, md.Get(internal.HeaderDatabase))
-	require.Equal(t, []string{"requestType"}, md.Get(internal.HeaderRequestType))
-	require.Equal(t, []string{"token"}, md.Get(internal.HeaderTicket))
-	require.Equal(t, []string{"userAgent", "user-agent"}, md.Get(internal.HeaderUserAgent))
-	require.Equal(t, []string{"traceID"}, md.Get(internal.HeaderTraceID))
+	require.Equal(t, []string{"database"}, md.Get(HeaderDatabase))
+	require.Equal(t, []string{"requestType"}, md.Get(HeaderRequestType))
+	require.Equal(t, []string{"token"}, md.Get(HeaderTicket))
+	require.Equal(t, []string{"userAgent", "user-agent"}, md.Get(HeaderUserAgent))
+	require.Equal(t, []string{"traceID"}, md.Get(HeaderTraceID))
 	require.Equal(t, []string{
 		"ydb-go-sdk/" + version.Major + "." + version.Minor + "." + version.Patch,
-	}, md.Get(internal.HeaderVersion))
+	}, md.Get(HeaderVersion))
 	require.Equal(t, []string{"some-user-value"}, md.Get("some-user-header"))
 }
