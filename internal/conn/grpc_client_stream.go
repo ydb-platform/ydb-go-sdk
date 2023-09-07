@@ -114,7 +114,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 				return s.wrapError(
 					xerrors.Operation(
 						xerrors.FromOperation(operation),
-						xerrors.WithNodeAddress(s.c.Address()),
+						xerrors.WithAddress(s.c.Address()),
 					),
 				)
 			}
