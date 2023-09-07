@@ -103,7 +103,7 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 		return "", xerrors.WithStackTrace(
 			xerrors.Operation(
 				xerrors.FromOperation(response.GetOperation()),
-				xerrors.WithNodeAddress(c.endpoint),
+				xerrors.WithAddress(c.endpoint),
 			),
 		)
 	}

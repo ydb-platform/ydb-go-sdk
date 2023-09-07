@@ -81,7 +81,7 @@ func Test_operationError_Error(t *testing.T) {
 		text string
 	}{
 		{
-			err:  Operation(WithStatusCode(Ydb.StatusIds_BAD_REQUEST), WithNodeAddress("localhost")),
+			err:  Operation(WithStatusCode(Ydb.StatusIds_BAD_REQUEST), WithAddress("localhost")),
 			text: "operation/BAD_REQUEST (code = 400010, address = localhost)",
 		},
 		{
