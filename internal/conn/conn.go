@@ -327,12 +327,12 @@ func (c *conn) Invoke(
 	c.touchLastUsage()
 	defer c.touchLastUsage()
 
-	traceId, err := uuid.NewUUID()
+	traceID, err := uuid.NewUUID()
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
-	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceId.String()))
+	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID.String()))
 
 	err = cc.Invoke(ctx, method, req, res, append(opts, grpc.Trailer(&md))...)
 	if err != nil {
@@ -343,7 +343,7 @@ func (c *conn) Invoke(
 		if useWrapping {
 			err = xerrors.Transport(err,
 				xerrors.WithAddress(c.Address()),
-				xerrors.WithTraceID(traceId.String()),
+				xerrors.WithTraceID(traceID.String()),
 			)
 			if sentMark.canRetry() {
 				return c.wrapError(xerrors.Retryable(err, xerrors.WithName("Invoke")))
@@ -369,7 +369,7 @@ func (c *conn) Invoke(
 					xerrors.Operation(
 						xerrors.FromOperation(o.GetOperation()),
 						xerrors.WithAddress(c.Address()),
-						xerrors.WithTraceID(traceId.String()),
+						xerrors.WithTraceID(traceID.String()),
 					),
 				)
 			}
@@ -420,7 +420,12 @@ func (c *conn) NewStream(
 	c.touchLastUsage()
 	defer c.touchLastUsage()
 
-	ctx, sentMark := markContext(ctx)
+	traceID, err := uuid.NewUUID()
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID.String()))
 
 	s, err = cc.NewStream(ctx, desc, method, opts...)
 	if err != nil {
@@ -431,6 +436,7 @@ func (c *conn) NewStream(
 		if useWrapping {
 			err = xerrors.Transport(err,
 				xerrors.WithAddress(c.Address()),
+				xerrors.WithTraceID(traceID.String()),
 			)
 			if sentMark.canRetry() {
 				return s, c.wrapError(xerrors.Retryable(err, xerrors.WithName("NewStream")))
@@ -445,6 +451,7 @@ func (c *conn) NewStream(
 		ClientStream: s,
 		c:            c,
 		wrapping:     useWrapping,
+		traceID:      traceID,
 		sentMark:     sentMark,
 		onDone: func(ctx context.Context, md metadata.MD) {
 			cancel()
