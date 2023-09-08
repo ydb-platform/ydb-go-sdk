@@ -27,20 +27,19 @@ func WithLock() option {
 
 func WithSeed(seed int64) option {
 	return func(r *r) {
-		r.r = rand.New(rand.NewSource(seed))
+		r.r = rand.New(rand.NewSource(seed)) //nolint:gosec
 	}
 }
 
 func New(opts ...option) Rand {
-	r := &r{}
+	r := &r{
+		r: rand.New(rand.NewSource(time.Now().Unix())), //nolint:gosec
+	}
 	for _, o := range opts {
 		if o != nil {
 			o(r)
 		}
 	}
-
-	//nolint:gosec
-	r.r = rand.New(rand.NewSource(time.Now().Unix()))
 	return r
 }
 

@@ -2,13 +2,13 @@ package topicwriterinternal
 
 import (
 	"bytes"
-	"math/rand"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -34,7 +34,7 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 
 	t.Run("SelectCodecByMeasure", func(t *testing.T) {
 		// for reproducible result between runs
-		r := rand.New(rand.NewSource(0)) //nolint:staticcheck
+		r := xrand.New(xrand.WithSeed(0))
 		const (
 			smallSize = 1
 			largeSize = 100
