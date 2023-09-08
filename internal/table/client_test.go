@@ -8,7 +8,6 @@ import (
 	"path"
 	"runtime"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -20,6 +19,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
@@ -665,7 +665,7 @@ func TestSessionPoolCloseIdleSessions(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		var (
 			idleThreshold = 4 * time.Second
-			closedCount   uint32
+			closedCount   xatomic.Int64
 			fakeClock     = clockwork.NewFakeClock()
 		)
 		p := newClientWithStubBuilder(
@@ -675,7 +675,7 @@ func TestSessionPoolCloseIdleSessions(t *testing.T) {
 					testutil.InvokeHandlers{
 						testutil.TableDeleteSession: okHandler,
 						testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
-							atomic.AddUint32(&closedCount, 1)
+							closedCount.Add(1)
 							return &Ydb_Table.CreateSessionResult{
 								SessionId: testutil.SessionID(),
 							}, nil
@@ -699,7 +699,7 @@ func TestSessionPoolCloseIdleSessions(t *testing.T) {
 
 		// Emulate first simple tick event. We expect two sessions be keepalived.
 		fakeClock.Advance(idleThreshold / 2)
-		if !atomic.CompareAndSwapUint32(&closedCount, 2, 0) {
+		if !closedCount.CompareAndSwap(2, 0) {
 			t.Fatal("unexpected number of keepalives")
 		}
 

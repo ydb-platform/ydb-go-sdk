@@ -3,13 +3,13 @@ package table
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -22,10 +22,22 @@ var (
 	errTxRollbackedEarly  = xerrors.Wrap(fmt.Errorf("transaction rollbacked early"))
 )
 
-type txState int32
+type txState struct {
+	rawVal xatomic.Uint32
+}
+
+func (s *txState) Load() txStateEnum {
+	return txStateEnum(s.rawVal.Load())
+}
+
+func (s *txState) Store(val txStateEnum) {
+	s.rawVal.Store(uint32(val))
+}
+
+type txStateEnum uint32
 
 const (
-	txStateInitialized = iota
+	txStateInitialized txStateEnum = iota
 	txStateCommitted
 	txStateRollbacked
 )
@@ -52,7 +64,7 @@ func (tx *transaction) Execute(
 		onDone(r, err)
 	}()
 
-	switch txState(atomic.LoadInt32((*int32)(&tx.state))) {
+	switch tx.state.Load() {
 	case txStateCommitted:
 		return nil, xerrors.WithStackTrace(errTxAlreadyCommitted)
 	case txStateRollbacked:
@@ -64,7 +76,7 @@ func (tx *transaction) Execute(
 		}
 
 		if tx.control.Desc().CommitTx {
-			atomic.StoreInt32((*int32)(&tx.state), txStateCommitted)
+			tx.state.Store(txStateCommitted)
 		}
 
 		return r, nil
@@ -95,7 +107,7 @@ func (tx *transaction) ExecuteStatement(
 		onDone(r, err)
 	}()
 
-	switch txState(atomic.LoadInt32((*int32)(&tx.state))) {
+	switch tx.state.Load() {
 	case txStateCommitted:
 		return nil, xerrors.WithStackTrace(errTxAlreadyCommitted)
 	case txStateRollbacked:
@@ -107,7 +119,7 @@ func (tx *transaction) ExecuteStatement(
 		}
 
 		if tx.control.Desc().CommitTx {
-			atomic.StoreInt32((*int32)(&tx.state), txStateCommitted)
+			tx.state.Store(txStateCommitted)
 		}
 
 		return r, nil
@@ -129,7 +141,7 @@ func (tx *transaction) CommitTx(
 		onDone(err)
 	}()
 
-	switch txState(atomic.LoadInt32((*int32)(&tx.state))) {
+	switch tx.state.Load() {
 	case txStateCommitted:
 		return nil, xerrors.WithStackTrace(errTxAlreadyCommitted)
 	case txStateRollbacked:
@@ -166,7 +178,7 @@ func (tx *transaction) CommitTx(
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		atomic.StoreInt32((*int32)(&tx.state), txStateCommitted)
+		tx.state.Store(txStateCommitted)
 
 		return scanner.NewUnary(
 			nil,
@@ -188,7 +200,7 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 		onDone(err)
 	}()
 
-	switch txState(atomic.LoadInt32((*int32)(&tx.state))) {
+	switch tx.state.Load() {
 	case txStateCommitted:
 		return nil // nop for committed tx
 	case txStateRollbacked:
@@ -210,7 +222,7 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 			return xerrors.WithStackTrace(err)
 		}
 
-		atomic.StoreInt32((*int32)(&tx.state), txStateRollbacked)
+		tx.state.Store(txStateRollbacked)
 
 		return nil
 	}
