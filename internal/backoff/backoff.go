@@ -91,6 +91,12 @@ func WithClock(clock clockwork.Clock) option {
 	}
 }
 
+func WithSeed(seed int64) option {
+	return func(b *logBackoff) {
+		b.r = xrand.New(xrand.WithLock(), xrand.WithSeed(seed))
+	}
+}
+
 func New(opts ...option) logBackoff {
 	b := logBackoff{
 		r:     xrand.New(xrand.WithLock()),

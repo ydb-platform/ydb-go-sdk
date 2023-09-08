@@ -34,7 +34,7 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 
 	t.Run("SelectCodecByMeasure", func(t *testing.T) {
 		// for reproducible result between runs
-		rand.Seed(0)
+		r := rand.New(rand.NewSource(0)) //nolint:staticcheck
 		const (
 			smallSize = 1
 			largeSize = 100
@@ -78,7 +78,7 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 			require.Equal(t, targetCodec, codec)
 
 			// shuffle
-			rand.Shuffle(len(messages), func(i, k int) {
+			r.Shuffle(len(messages), func(i, k int) {
 				messages[i], messages[k] = messages[k], messages[i]
 			})
 			codec, err = s.measureCodecs(messages)
