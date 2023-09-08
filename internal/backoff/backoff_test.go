@@ -2,7 +2,6 @@ package backoff
 
 import (
 	"fmt"
-	"math/rand"
 	"strconv"
 	"testing"
 	"time"
@@ -22,6 +21,7 @@ func TestDelays(t *testing.T) {
 		WithSlotDuration(duration("500ms")),
 		WithCeiling(6),
 		WithJitterLimit(1),
+		WithSeed(0),
 	)
 	for i, d := range map[int]time.Duration{
 		0: duration("500ms"),
@@ -56,6 +56,7 @@ func TestLogBackoff(t *testing.T) {
 				WithSlotDuration(time.Second),
 				WithCeiling(3),
 				WithJitterLimit(0),
+				WithSeed(0),
 			),
 			exp: []exp{
 				{gte: 0, lte: time.Second},
@@ -73,6 +74,7 @@ func TestLogBackoff(t *testing.T) {
 				WithSlotDuration(time.Second),
 				WithCeiling(3),
 				WithJitterLimit(0.5),
+				WithSeed(0),
 			),
 			exp: []exp{
 				{gte: 500 * time.Millisecond, lte: time.Second},
@@ -90,6 +92,7 @@ func TestLogBackoff(t *testing.T) {
 				WithSlotDuration(time.Second),
 				WithCeiling(3),
 				WithJitterLimit(1),
+				WithSeed(0),
 			),
 			exp: []exp{
 				{eq: time.Second},
@@ -106,6 +109,7 @@ func TestLogBackoff(t *testing.T) {
 				WithSlotDuration(time.Second),
 				WithCeiling(6),
 				WithJitterLimit(1),
+				WithSeed(0),
 			),
 			exp: []exp{
 				{eq: time.Second},
@@ -128,9 +132,6 @@ func TestLogBackoff(t *testing.T) {
 				tt.seeds = 1
 			}
 			for seed := int64(0); seed < tt.seeds; seed++ {
-				// Fix random to reproduce the tests.
-				rand.Seed(seed)
-
 				for n, exp := range tt.exp {
 					act := tt.backoff.Delay(n)
 					if eq := exp.eq; eq != 0 {

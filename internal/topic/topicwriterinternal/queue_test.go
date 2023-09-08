@@ -14,7 +14,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 )
 
@@ -142,7 +141,7 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 		}()
 
 		readFinished := make(empty.Chan)
-		var lastReadSeqNo xatomic.Int64
+		var lastReadSeqNo int64
 
 		readCtx, readCancel := xcontext.WithCancel(ctx)
 		defer readCancel()
@@ -157,11 +156,11 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 				}
 
 				for _, mess := range messages {
-					if lastReadSeqNo.Load()+1 != mess.SeqNo {
+					if atomic.LoadInt64(&lastReadSeqNo)+1 != mess.SeqNo {
 						fatalChan <- string(debug.Stack())
 						return
 					}
-					lastReadSeqNo.Store(mess.SeqNo)
+					atomic.StoreInt64(&lastReadSeqNo, mess.SeqNo)
 				}
 			}
 		}()
@@ -176,7 +175,7 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 		startWait := time.Now()
 	waitReader:
 		for {
-			if lastReadSeqNo.Load() == lastSentSeqNo {
+			if atomic.LoadInt64(&lastReadSeqNo) == lastSentSeqNo {
 				readCancel()
 			}
 			select {

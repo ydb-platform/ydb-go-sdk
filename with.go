@@ -2,15 +2,15 @@ package ydb
 
 import (
 	"context"
+	"sync/atomic"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var nextID xatomic.Uint64
+var nextID = uint64(0)
 
 func (c *Driver) with(ctx context.Context, opts ...Option) (*Driver, uint64, error) {
-	id := nextID.Add(1)
+	id := atomic.AddUint64(&nextID, 1)
 
 	child, err := newConnectionFromOptions(
 		ctx,

@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
@@ -28,8 +28,8 @@ type partitionSession struct {
 	ctxCancel          context.CancelFunc
 	partitionSessionID rawtopicreader.PartitionSessionID
 
-	lastReceivedOffsetEndVal xatomic.Int64
-	committedOffsetVal       xatomic.Int64
+	lastReceivedOffsetEndVal int64
+	committedOffsetVal       int64
 }
 
 func newPartitionSession(
@@ -43,18 +43,17 @@ func newPartitionSession(
 ) *partitionSession {
 	partitionContext, cancel := xcontext.WithCancel(partitionContext)
 
-	res := &partitionSession{
-		Topic:              topic,
-		PartitionID:        partitionID,
-		readerID:           readerID,
-		connectionID:       connectionID,
-		ctx:                partitionContext,
-		ctxCancel:          cancel,
-		partitionSessionID: partitionSessionID,
+	return &partitionSession{
+		Topic:                    topic,
+		PartitionID:              partitionID,
+		readerID:                 readerID,
+		connectionID:             connectionID,
+		ctx:                      partitionContext,
+		ctxCancel:                cancel,
+		partitionSessionID:       partitionSessionID,
+		committedOffsetVal:       committedOffset.ToInt64(),
+		lastReceivedOffsetEndVal: committedOffset.ToInt64() - 1,
 	}
-	res.committedOffsetVal.Store(committedOffset.ToInt64())
-	res.lastReceivedOffsetEndVal.Store(committedOffset.ToInt64() - 1)
-	return res
 }
 
 func (s *partitionSession) Context() context.Context {
@@ -66,7 +65,7 @@ func (s *partitionSession) Close() {
 }
 
 func (s *partitionSession) committedOffset() rawtopicreader.Offset {
-	v := s.committedOffsetVal.Load()
+	v := atomic.LoadInt64(&s.committedOffsetVal)
 
 	var res rawtopicreader.Offset
 	res.FromInt64(v)
@@ -74,11 +73,11 @@ func (s *partitionSession) committedOffset() rawtopicreader.Offset {
 }
 
 func (s *partitionSession) setCommittedOffset(v rawtopicreader.Offset) {
-	s.committedOffsetVal.Store(v.ToInt64())
+	atomic.StoreInt64(&s.committedOffsetVal, v.ToInt64())
 }
 
 func (s *partitionSession) lastReceivedMessageOffset() rawtopicreader.Offset {
-	v := s.lastReceivedOffsetEndVal.Load()
+	v := atomic.LoadInt64(&s.lastReceivedOffsetEndVal)
 
 	var res rawtopicreader.Offset
 	res.FromInt64(v)
@@ -86,7 +85,7 @@ func (s *partitionSession) lastReceivedMessageOffset() rawtopicreader.Offset {
 }
 
 func (s *partitionSession) setLastReceivedMessageOffset(v rawtopicreader.Offset) {
-	s.lastReceivedOffsetEndVal.Store(v.ToInt64())
+	atomic.StoreInt64(&s.lastReceivedOffsetEndVal, v.ToInt64())
 }
 
 type partitionSessionStorage struct {

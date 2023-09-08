@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -85,8 +86,8 @@ func stressTestInATopic(
 	topicWriters, topicReaders int,
 ) error {
 	maxMessagesInBatch := 5
-	var createdMessagesCount xatomic.Int64
-	var readedMessagesCount xatomic.Int64
+	createdMessagesCount := int64(0)
+	readedMessagesCount := int64(0)
 
 	var stopWrite xatomic.Bool
 
@@ -115,7 +116,7 @@ func stressTestInATopic(
 			messageCount := rand.Intn(maxMessagesInBatch) + 1 //nolint:gosec
 			var messages []topicwriter.Message
 			for i := 0; i < messageCount; i++ {
-				newMessageContent := createdMessagesCount.Add(1)
+				newMessageContent := atomic.AddInt64(&createdMessagesCount, 1)
 				message := topicwriter.Message{
 					Data: strings.NewReader(strconv.FormatInt(newMessageContent, 10)),
 				}
@@ -156,7 +157,7 @@ func stressTestInATopic(
 				return err
 			}
 
-			readedMessagesCount.Add(1)
+			atomic.AddInt64(&readedMessagesCount, 1)
 			err = reader.Commit(ctx, mess)
 			if err != nil {
 				return err
@@ -199,8 +200,8 @@ func stressTestInATopic(
 	}
 
 	xtest.SpinWaitProgressWithTimeout(t, time.Minute, func() (progressValue interface{}, finished bool) {
-		createdMessages := createdMessagesCount.Load()
-		readedMessages := readedMessagesCount.Load()
+		createdMessages := atomic.LoadInt64(&createdMessagesCount)
+		readedMessages := atomic.LoadInt64(&readedMessagesCount)
 		return readedMessages, readedMessages == createdMessages
 	})
 
