@@ -36,21 +36,21 @@ type Int64 struct {
 }
 
 // Load atomically loads and returns the value stored in x.
-func (x *Int64) Load() int64 { return LoadInt64(&x.v) }
+func (x *Int64) Load() int64 { return atomic.LoadInt64(&x.v) }
 
 // Store atomically stores val into x.
-func (x *Int64) Store(val int64) { StoreInt64(&x.v, val) }
+func (x *Int64) Store(val int64) { atomic.StoreInt64(&x.v, val) }
 
 // Swap atomically stores new into x and returns the previous value.
-func (x *Int64) Swap(new int64) (old int64) { return SwapInt64(&x.v, new) }
+func (x *Int64) Swap(new int64) (old int64) { return atomic.SwapInt64(&x.v, new) }
 
 // CompareAndSwap executes the compare-and-swap operation for x.
 func (x *Int64) CompareAndSwap(old, new int64) (swapped bool) {
-	return CompareAndSwapInt64(&x.v, old, new)
+	return atomic.CompareAndSwapInt64(&x.v, old, new)
 }
 
 // Add atomically adds delta to x and returns the new value.
-func (x *Int64) Add(delta int64) (new int64) { return AddInt64(&x.v, delta) }
+func (x *Int64) Add(delta int64) (new int64) { return atomic.AddInt64(&x.v, delta) }
 
 // An Uint32 is an atomic uint32. The zero value is zero.
 type Uint32 struct {
@@ -59,21 +59,21 @@ type Uint32 struct {
 }
 
 // Load atomically loads and returns the value stored in x.
-func (x *Uint32) Load() uint32 { return LoadUint32(&x.v) }
+func (x *Uint32) Load() uint32 { return atomic.LoadUint32(&x.v) }
 
 // Store atomically stores val into x.
-func (x *Uint32) Store(val uint32) { StoreUint32(&x.v, val) }
+func (x *Uint32) Store(val uint32) { atomic.StoreUint32(&x.v, val) }
 
 // Swap atomically stores new into x and returns the previous value.
-func (x *Uint32) Swap(new uint32) (old uint32) { return SwapUint32(&x.v, new) }
+func (x *Uint32) Swap(new uint32) (old uint32) { return atomic.SwapUint32(&x.v, new) }
 
 // CompareAndSwap executes the compare-and-swap operation for x.
 func (x *Uint32) CompareAndSwap(old, new uint32) (swapped bool) {
-	return CompareAndSwapUint32(&x.v, old, new)
+	return atomic.CompareAndSwapUint32(&x.v, old, new)
 }
 
 // Add atomically adds delta to x and returns the new value.
-func (x *Uint32) Add(delta uint32) (new uint32) { return AddUint32(&x.v, delta) }
+func (x *Uint32) Add(delta uint32) (new uint32) { return atomic.AddUint32(&x.v, delta) }
 
 // An Uint64 is an atomic uint64. The zero value is zero.
 type Uint64 struct {
@@ -83,21 +83,21 @@ type Uint64 struct {
 }
 
 // Load atomically loads and returns the value stored in x.
-func (x *Uint64) Load() uint64 { return LoadUint64(&x.v) }
+func (x *Uint64) Load() uint64 { return atomic.LoadUint64(&x.v) }
 
 // Store atomically stores val into x.
-func (x *Uint64) Store(val uint64) { StoreUint64(&x.v, val) }
+func (x *Uint64) Store(val uint64) { atomic.StoreUint64(&x.v, val) }
 
 // Swap atomically stores new into x and returns the previous value.
-func (x *Uint64) Swap(new uint64) (old uint64) { return SwapUint64(&x.v, new) }
+func (x *Uint64) Swap(new uint64) (old uint64) { return atomic.SwapUint64(&x.v, new) }
 
 // CompareAndSwap executes the compare-and-swap operation for x.
 func (x *Uint64) CompareAndSwap(old, new uint64) (swapped bool) {
-	return CompareAndSwapUint64(&x.v, old, new)
+	return atomic.CompareAndSwapUint64(&x.v, old, new)
 }
 
 // Add atomically adds delta to x and returns the new value.
-func (x *Uint64) Add(delta uint64) (new uint64) { return AddUint64(&x.v, delta) }
+func (x *Uint64) Add(delta uint64) (new uint64) { return atomic.AddUint64(&x.v, delta) }
 
 // b32 returns a uint32 0 or 1 representing b.
 func b32(b bool) uint32 {
@@ -119,3 +119,8 @@ type noCopy struct{}
 // Lock is a no-op used by -copylocks checker from `go vet`.
 func (*noCopy) Lock()   {}
 func (*noCopy) Unlock() {}
+
+// align64 may be added to structs that must be 64-bit aligned.
+// This struct is recognized by a special case in the compiler
+// and will not work if copied to any other package.
+type align64 struct{}
