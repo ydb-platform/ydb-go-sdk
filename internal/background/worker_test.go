@@ -4,7 +4,6 @@ import (
 	"context"
 	"runtime"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -102,7 +101,7 @@ func TestWorkerConcurrentStartAndClose(t *testing.T) {
 
 		parallel := runtime.GOMAXPROCS(0)
 
-		var counter int64
+		var counter xatomic.Int64
 
 		ctx := xtest.Context(t)
 		w := NewWorker(ctx)
@@ -122,7 +121,7 @@ func TestWorkerConcurrentStartAndClose(t *testing.T) {
 					}
 
 					w.Start("test", func(ctx context.Context) {
-						atomic.AddInt64(&counter, 1)
+						counter.Add(1)
 					})
 				}
 			}()
@@ -130,13 +129,13 @@ func TestWorkerConcurrentStartAndClose(t *testing.T) {
 
 		// wait start some backgrounds - for ensure about process worked
 		xtest.SpinWaitCondition(t, nil, func() bool {
-			return atomic.LoadInt64(&counter) > targetClose
+			return counter.Load() > targetClose
 		})
 
 		require.NoError(t, w.Close(xtest.ContextWithCommonTimeout(ctx, t), nil))
 
-		closeIndex = atomic.LoadInt64(&counter)
-		require.Equal(t, closeIndex, atomic.LoadInt64(&counter))
+		closeIndex = counter.Load()
+		require.Equal(t, closeIndex, counter.Load())
 
 		stopNewStarts.Store(true)
 		xtest.WaitGroup(t, &wgStarters)

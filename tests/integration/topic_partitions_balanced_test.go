@@ -6,7 +6,6 @@ package integration
 import (
 	"context"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -14,6 +13,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -38,21 +38,21 @@ func TestTopicPartitionsBalanced(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	connectedPartitions := int32(0)
-	var handled int32
+	var connectedPartitions xatomic.Int64
+	var handled xatomic.Int64
 
 	var sessionsMutex sync.Mutex
 	sessions := map[int64]bool{}
 
 	tracer := trace.Topic{
 		OnReaderPartitionReadStartResponse: func(startInfo trace.TopicReaderPartitionReadStartResponseStartInfo) func(doneInfo trace.TopicReaderPartitionReadStartResponseDoneInfo) { //nolint:lll
-			atomic.StoreInt32(&handled, 1)
+			handled.Store(1)
 
-			atomic.AddInt32(&connectedPartitions, 1)
+			connectedPartitions.Add(1)
 			return nil
 		},
 		OnReaderPartitionReadStopResponse: func(startInfo trace.TopicReaderPartitionReadStopResponseStartInfo) func(doneInfo trace.TopicReaderPartitionReadStopResponseDoneInfo) { //nolint:lll
-			atomic.StoreInt32(&handled, 1)
+			handled.Store(1)
 
 			sessionsMutex.Lock()
 			defer sessionsMutex.Unlock()
@@ -61,7 +61,7 @@ func TestTopicPartitionsBalanced(t *testing.T) {
 			}
 			sessions[startInfo.PartitionSessionID] = true
 
-			atomic.AddInt32(&connectedPartitions, -1)
+			connectedPartitions.Add(-1)
 			return nil
 		},
 	}
@@ -87,20 +87,20 @@ func TestTopicPartitionsBalanced(t *testing.T) {
 	}()
 
 	xtest.SpinWaitConditionWithTimeout(t, nil, time.Second, func() bool {
-		return atomic.LoadInt32(&connectedPartitions) == 2
+		return connectedPartitions.Load() == 2
 	})
 
 	readerSecond, err := db.Topic().StartReader(consumer, topicoptions.ReadTopic(topicPath))
 	require.NoError(t, err)
 
 	xtest.SpinWaitConditionWithTimeout(t, nil, time.Second, func() bool {
-		return atomic.LoadInt32(&connectedPartitions) == 1
+		return connectedPartitions.Load() == 1
 	})
 
 	require.NoError(t, readerSecond.Close(ctx))
 
 	xtest.SpinWaitConditionWithTimeout(t, nil, time.Second, func() bool {
-		return atomic.LoadInt32(&connectedPartitions) == 2
+		return connectedPartitions.Load() == 2
 	})
 
 	firstReaderStopRead()

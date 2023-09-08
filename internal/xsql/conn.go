@@ -8,10 +8,10 @@ import (
 	"io"
 	"path"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/helpers"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
@@ -72,8 +72,8 @@ type conn struct {
 
 	beginTxFuncs map[QueryMode]beginTxFunc
 
-	closed           uint32
-	lastUsage        int64
+	closed           xatomic.Bool
+	lastUsage        xatomic.Int64
 	defaultQueryMode QueryMode
 
 	defaultTxControl *table.TransactionControl
@@ -159,7 +159,7 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt,
 }
 
 func (c *conn) sinceLastUsage() time.Duration {
-	return time.Since(time.Unix(atomic.LoadInt64(&c.lastUsage), 0))
+	return time.Since(time.Unix(c.lastUsage.Load(), 0))
 }
 
 func (c *conn) execContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, err error) {
@@ -169,7 +169,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 	)
 
 	defer func() {
-		atomic.StoreInt64(&c.lastUsage, time.Now().Unix())
+		c.lastUsage.Store(time.Now().Unix())
 		onDone(err)
 	}()
 	switch m {
@@ -268,7 +268,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		c.sinceLastUsage(),
 	)
 	defer func() {
-		atomic.StoreInt64(&c.lastUsage, time.Now().Unix())
+		c.lastUsage.Store(time.Now().Unix())
 		onDone(err)
 	}()
 	switch m {
@@ -373,7 +373,7 @@ func (c *conn) Ping(ctx context.Context) (err error) {
 }
 
 func (c *conn) Close() (err error) {
-	if atomic.CompareAndSwapUint32(&c.closed, 0, 1) {
+	if c.closed.CompareAndSwap(false, true) {
 		c.connector.detach(c)
 		onDone := trace.DatabaseSQLOnConnClose(c.trace)
 		defer func() {
