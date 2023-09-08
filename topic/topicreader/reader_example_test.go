@@ -7,7 +7,7 @@ import (
 )
 
 func ExampleReader_ReadMessage() {
-	ctx := context.TODO()
+	ctx := context.TODO() //nolint:staticcheck
 	reader := readerConnect()
 
 	for {
@@ -18,7 +18,7 @@ func ExampleReader_ReadMessage() {
 }
 
 func ExampleReader_Commit() {
-	ctx := context.TODO()
+	ctx := context.TODO() //nolint:staticcheck
 	reader := readerConnect()
 
 	for {
@@ -31,7 +31,7 @@ func ExampleReader_Commit() {
 }
 
 func ExampleReader_ReadMessageBatch() {
-	ctx := context.TODO()
+	ctx := context.TODO() //nolint:staticcheck
 	reader := readerConnect()
 
 	for {
