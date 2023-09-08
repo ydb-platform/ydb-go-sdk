@@ -209,12 +209,12 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 			}
 		}
 
-		_ = r.reconnect(ctx, request.oldReader)
+		_ = r.reconnect(ctx, request.reason, request.oldReader)
 	}
 }
 
-func (r *readerReconnector) reconnect(ctx context.Context, oldReader batchedStreamReader) (err error) {
-	onDone := trace.TopicOnReaderReconnect(r.tracer)
+func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldReader batchedStreamReader) (err error) {
+	onDone := trace.TopicOnReaderReconnect(r.tracer, reason)
 	defer func() {
 		onDone(err)
 	}()
