@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -23,7 +23,7 @@ type baseResult struct {
 	statsMtx xsync.RWMutex
 	stats    *Ydb_TableStats.QueryStats
 
-	closed xatomic.Bool
+	closed uint32
 }
 
 type streamResult struct {
@@ -60,7 +60,7 @@ func (r *unaryResult) Err() error {
 
 // Close closes the result, preventing further iteration.
 func (r *unaryResult) Close() error {
-	if r.closed.CompareAndSwap(false, true) {
+	if atomic.CompareAndSwapUint32(&r.closed, 0, 1) {
 		return nil
 	}
 	return xerrors.WithStackTrace(errAlreadyClosed)
@@ -71,7 +71,7 @@ func (r *unaryResult) ResultSetCount() int {
 }
 
 func (r *baseResult) isClosed() bool {
-	return r.closed.Load()
+	return atomic.LoadUint32(&r.closed) != 0
 }
 
 type resultWithError interface {
@@ -206,7 +206,7 @@ func (r *baseResult) Stats() stats.QueryStats {
 
 // Close closes the result, preventing further iteration.
 func (r *streamResult) Close() (err error) {
-	if r.closed.CompareAndSwap(false, true) {
+	if atomic.CompareAndSwapUint32(&r.closed, 0, 1) {
 		return r.close(r.Err())
 	}
 	return xerrors.WithStackTrace(errAlreadyClosed)

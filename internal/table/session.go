@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
@@ -23,7 +24,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -48,15 +48,15 @@ type session struct {
 
 	status    table.SessionStatus
 	statusMtx sync.RWMutex
-	nodeID    xatomic.Uint32
-	lastUsage xatomic.Int64
+	nodeID    uint32
+	lastUsage int64
 
 	onClose   []func(s *session)
 	closeOnce sync.Once
 }
 
 func (s *session) LastUsage() time.Time {
-	return time.Unix(s.lastUsage.Load(), 0)
+	return time.Unix(atomic.LoadInt64(&s.lastUsage), 0)
 }
 
 func nodeID(sessionID string) (uint32, error) {
@@ -75,14 +75,14 @@ func (s *session) NodeID() uint32 {
 	if s == nil {
 		return 0
 	}
-	if id := s.nodeID.Load(); id != 0 {
+	if id := atomic.LoadUint32(&s.nodeID); id != 0 {
 		return id
 	}
 	id, err := nodeID(s.id)
 	if err != nil {
 		return 0
 	}
-	s.nodeID.Store(id)
+	atomic.StoreUint32(&s.nodeID, id)
 	return id
 }
 
@@ -140,11 +140,11 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config
 	}
 
 	s = &session{
-		id:     result.GetSessionId(),
-		config: config,
-		status: table.SessionReady,
+		id:        result.GetSessionId(),
+		config:    config,
+		status:    table.SessionReady,
+		lastUsage: time.Now().Unix(),
 	}
-	s.lastUsage.Store(time.Now().Unix())
 
 	s.tableService = Ydb_Table_V1.NewTableServiceClient(
 		conn.WithBeforeFunc(
@@ -152,7 +152,7 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config
 				return meta.WithTrailerCallback(balancerContext.WithEndpoint(ctx, s), s.checkCloseHint)
 			}),
 			func() {
-				s.lastUsage.Store(time.Now().Unix())
+				atomic.StoreInt64(&s.lastUsage, time.Now().Unix())
 			},
 		),
 	)
@@ -708,9 +708,9 @@ func (s *session) executeQueryResult(
 		s:  s,
 	}
 	if txControl.CommitTx {
-		tx.state.Store(txStateCommitted)
+		tx.state = txStateCommitted
 	} else {
-		tx.state.Store(txStateInitialized)
+		tx.state = txStateInitialized
 		tx.control = table.TxControl(table.WithTxID(tx.id))
 	}
 	return tx, scanner.NewUnary(
@@ -1175,11 +1175,10 @@ func (s *session) BeginTransaction(
 	if err != nil {
 		return
 	}
-	tx := &transaction{
+	return &transaction{
 		id:      result.GetTxMeta().GetId(),
+		state:   txStateInitialized,
 		s:       s,
 		control: table.TxControl(table.WithTxID(result.GetTxMeta().GetId())),
-	}
-	tx.state.Store(txStateInitialized)
-	return tx, nil
+	}, nil
 }

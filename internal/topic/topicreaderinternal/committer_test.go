@@ -146,8 +146,8 @@ func TestCommitterCommitSync(t *testing.T) {
 		session := &partitionSession{
 			ctx:                ctx,
 			partitionSessionID: 1,
+			committedOffsetVal: 2,
 		}
-		session.committedOffsetVal.Store(2)
 
 		cRange := commitRange{
 			commitOffsetStart: 1,
@@ -167,8 +167,8 @@ func TestCommitterCommitSync(t *testing.T) {
 		session := &partitionSession{
 			ctx:                sessionCtx,
 			partitionSessionID: 1,
+			committedOffsetVal: 1,
 		}
-		session.committedOffsetVal.Store(1)
 		cRange := commitRange{
 			commitOffsetStart: 1,
 			commitOffsetEnd:   2,

@@ -9,13 +9,13 @@ import (
 	"math/big"
 	"reflect"
 	"runtime/pprof"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -36,10 +36,10 @@ type topicStreamReaderImpl struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	freeBytes           chan int
-	restBufferSizeBytes xatomic.Int64
-	sessionController   partitionSessionStorage
-	backgroundWorkers   background.Worker
+	freeBytes                 chan int
+	atomicRestBufferSizeBytes int64
+	sessionController         partitionSessionStorage
+	backgroundWorkers         background.Worker
 
 	rawMessagesFromBuffer chan rawtopicreader.ServerMessage
 
@@ -454,7 +454,7 @@ func (r *topicStreamReaderImpl) initSession() (err error) {
 }
 
 func (r *topicStreamReaderImpl) addRestBufferBytes(delta int) int {
-	val := r.restBufferSizeBytes.Add(int64(delta))
+	val := atomic.AddInt64(&r.atomicRestBufferSizeBytes, int64(delta))
 	if val <= 0 {
 		r.batcher.IgnoreMinRestrictionsOnNextPop()
 	}
@@ -462,7 +462,7 @@ func (r *topicStreamReaderImpl) addRestBufferBytes(delta int) int {
 }
 
 func (r *topicStreamReaderImpl) getRestBufferBytes() int {
-	return int(r.restBufferSizeBytes.Load())
+	return int(atomic.LoadInt64(&r.atomicRestBufferSizeBytes))
 }
 
 func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {

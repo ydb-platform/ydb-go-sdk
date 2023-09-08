@@ -2,9 +2,9 @@ package topicreader
 
 import (
 	"context"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -25,8 +25,8 @@ import (
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type Reader struct {
 	reader         topicreaderinternal.Reader
-	readInFlyght   xatomic.Bool
-	commitInFlyght xatomic.Bool
+	readInFlyght   int32
+	commitInFlyght int32
 }
 
 // NewReader
@@ -149,16 +149,16 @@ func (r *Reader) Close(ctx context.Context) error {
 	return r.reader.Close(ctx)
 }
 
-func (r *Reader) inCall(inFlight *xatomic.Bool) error {
-	if inFlight.CompareAndSwap(false, true) {
+func (r *Reader) inCall(inFlight *int32) error {
+	if atomic.CompareAndSwapInt32(inFlight, 0, 1) {
 		return nil
 	}
 
 	return xerrors.WithStackTrace(ErrConcurrencyCall)
 }
 
-func (r *Reader) outCall(inFlight *xatomic.Bool) {
-	if inFlight.CompareAndSwap(true, false) {
+func (r *Reader) outCall(inFlight *int32) {
+	if atomic.CompareAndSwapInt32(inFlight, 1, 0) {
 		return
 	}
 

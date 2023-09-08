@@ -2,6 +2,7 @@ package xsync
 
 import (
 	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -24,9 +25,9 @@ func TestEventBroadcast(t *testing.T) {
 		testDuration := time.Second / 100
 
 		b := &EventBroadcast{}
-		var events xatomic.Int64
+		events := int64(0)
 
-		var backgroundCounter xatomic.Int64
+		backgroundCounter := int64(0)
 		firstWaiterStarted := xatomic.Bool{}
 
 		stopSubscribe := xatomic.Bool{}
@@ -38,12 +39,12 @@ func TestEventBroadcast(t *testing.T) {
 		go func() {
 			defer close(subscribeStopped)
 			for {
-				backgroundCounter.Add(1)
+				atomic.AddInt64(&backgroundCounter, 1)
 				waiter := b.Waiter()
 				firstWaiterStarted.Store(true)
 				go func() {
 					<-waiter.Done()
-					backgroundCounter.Add(-1)
+					atomic.AddInt64(&backgroundCounter, -1)
 				}()
 				if stopSubscribe.Load() {
 					return
@@ -57,7 +58,7 @@ func TestEventBroadcast(t *testing.T) {
 
 			// Fire events
 			for {
-				events.Add(1)
+				atomic.AddInt64(&events, 1)
 				b.Broadcast()
 				runtime.Gosched()
 				if stopBroadcast.Load() {
@@ -74,19 +75,19 @@ func TestEventBroadcast(t *testing.T) {
 		<-subscribeStopped
 
 		for {
-			oldCounter := backgroundCounter.Load()
+			oldCounter := atomic.LoadInt64(&backgroundCounter)
 			if oldCounter == 0 {
 				break
 			}
 
 			t.Log("background counter", oldCounter)
 			xtest.SpinWaitCondition(t, nil, func() bool {
-				return backgroundCounter.Load() < oldCounter
+				return atomic.LoadInt64(&backgroundCounter) < oldCounter
 			})
 		}
 		stopBroadcast.Store(true)
 		<-broadcastStopped
 
-		require.True(t, events.Load() > 0)
+		require.True(t, atomic.LoadInt64(&events) > 0)
 	})
 }

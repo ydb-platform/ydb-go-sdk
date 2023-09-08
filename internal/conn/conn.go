@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -15,7 +16,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -53,7 +53,7 @@ type conn struct {
 	done              chan struct{}
 	endpoint          endpoint.Endpoint // ro access
 	closed            bool
-	state             xatomic.Uint32
+	state             uint32
 	lastUsage         time.Time
 	onClose           []func(*conn)
 	onTransportErrors []func(ctx context.Context, cc Conn, cause error)
@@ -81,7 +81,7 @@ func (c *conn) LastUsage() time.Time {
 }
 
 func (c *conn) IsState(states ...State) bool {
-	state := State(c.state.Load())
+	state := State(atomic.LoadUint32(&c.state))
 	for _, s := range states {
 		if s == state {
 			return true
@@ -140,8 +140,8 @@ func (c *conn) SetState(s State) State {
 }
 
 func (c *conn) setState(s State) State {
-	state := c.state.Load()
-	if c.state.CompareAndSwap(state, uint32(s)) {
+	state := atomic.LoadUint32(&c.state)
+	if atomic.CompareAndSwapUint32(&c.state, state, uint32(s)) {
 		trace.DriverOnConnStateChange(
 			c.config.Trace(),
 			c.endpoint.Copy(),
@@ -164,7 +164,7 @@ func (c *conn) Unban() State {
 }
 
 func (c *conn) GetState() (s State) {
-	return State(c.state.Load())
+	return State(atomic.LoadUint32(&c.state))
 }
 
 func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
@@ -474,11 +474,11 @@ func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, ca
 
 func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	c := &conn{
+		state:    uint32(Created),
 		endpoint: e,
 		config:   config,
 		done:     make(chan struct{}),
 	}
-	c.state.Store(uint32(Created))
 	for _, o := range opts {
 		if o != nil {
 			o(c)
@@ -532,13 +532,13 @@ func getContextMark(ctx context.Context) *modificationMark {
 }
 
 type modificationMark struct {
-	dirty xatomic.Bool
+	dirty uint32
 }
 
 func (m *modificationMark) canRetry() bool {
-	return !m.dirty.Load()
+	return atomic.LoadUint32(&m.dirty) == 0
 }
 
 func (m *modificationMark) markDirty() {
-	m.dirty.Store(true)
+	atomic.StoreUint32(&m.dirty, 1)
 }

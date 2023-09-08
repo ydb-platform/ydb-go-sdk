@@ -3,6 +3,7 @@ package topicreaderinternal
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
@@ -282,9 +282,9 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 			},
 		}}))
 
-		var IgnoreMinRestrictionsOnNextPopDone xatomic.Int64
+		var IgnoreMinRestrictionsOnNextPopDone int64
 		go func() {
-			defer IgnoreMinRestrictionsOnNextPopDone.Add(1)
+			defer atomic.AddInt64(&IgnoreMinRestrictionsOnNextPopDone, 1)
 
 			xtest.SpinWaitCondition(t, &b.m, func() bool {
 				return len(b.hasNewMessages) == 0
@@ -297,7 +297,7 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 
 		batch, err := b.Pop(ctx, batcherGetOptions{MinCount: 2})
 
-		require.NoError(t, err, IgnoreMinRestrictionsOnNextPopDone.Load())
+		require.NoError(t, err, atomic.LoadInt64(&IgnoreMinRestrictionsOnNextPopDone))
 		require.Len(t, batch.Batch.Messages, 1)
 		require.False(t, b.forceIgnoreMinRestrictionsOnNextMessagesBatch)
 	})
