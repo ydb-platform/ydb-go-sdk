@@ -358,6 +358,133 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 	})
 }
 
+func TestTopicStreamReaderImpl_getCurrentBufferFreeSpacePercentage(t *testing.T) {
+	type input struct {
+		allSpaceSize  int
+		freeSpaceSize int
+	}
+	type expect struct {
+		resultPercentage int
+		haveError        bool
+		err              error
+	}
+
+	tests := []struct {
+		Name       string
+		InputData  input
+		ExpectData expect
+	}{
+		{
+			Name: "OK",
+			InputData: input{
+				allSpaceSize:  100,
+				freeSpaceSize: 30,
+			},
+			ExpectData: expect{
+				resultPercentage: 30,
+				haveError:        false,
+				err:              nil,
+			},
+		},
+		{
+			Name: "fullOK",
+			InputData: input{
+				allSpaceSize:  100,
+				freeSpaceSize: 100,
+			},
+			ExpectData: expect{
+				resultPercentage: 100,
+				haveError:        false,
+				err:              nil,
+			},
+		},
+		{
+			Name: "emptyOK",
+			InputData: input{
+				allSpaceSize:  100,
+				freeSpaceSize: 0,
+			},
+			ExpectData: expect{
+				resultPercentage: 0,
+				haveError:        false,
+				err:              nil,
+			},
+		},
+		{
+			Name: "badInputData",
+			InputData: input{
+				allSpaceSize:  10,
+				freeSpaceSize: 1000,
+			},
+			ExpectData: expect{
+				resultPercentage: 0,
+				haveError:        true,
+				err:              errCannotCalcFreeSpacePercentage,
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.Name, func(t *testing.T) {
+			e := newTopicReaderTestEnv(t)
+			e.reader.cfg.BufferSizeProtoBytes = tc.InputData.allSpaceSize
+			e.reader.atomicRestBufferSizeBytes = int64(tc.InputData.freeSpaceSize)
+
+			gotPercentage, err := e.reader.getCurrentBufferFreeSpacePercentage()
+			if tc.ExpectData.haveError {
+				require.ErrorIs(t, tc.ExpectData.err, err)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tc.ExpectData.resultPercentage, gotPercentage)
+		})
+	}
+}
+
+func TestTopicStreamReaderImpl_CheckSendMessageToServerAfterChangeBufferSize(t *testing.T) {
+	waitChangeRestBufferSizeBytes := func(r *topicStreamReaderImpl, old int64) {
+		xtest.SpinWaitCondition(t, nil, func() bool {
+			return atomic.LoadInt64(&r.atomicRestBufferSizeBytes) != old
+		})
+	}
+	e := newTopicReaderTestEnv(t)
+	e.Start()
+	waitChangeRestBufferSizeBytes(e.reader, 0)
+
+	const dataSize = 1000
+	e.SendFromServer(&rawtopicreader.ReadResponse{BytesSize: dataSize, PartitionData: []rawtopicreader.PartitionData{
+		{
+			PartitionSessionID: e.partitionSessionID,
+			Batches: []rawtopicreader.Batch{
+				{
+					MessageData: []rawtopicreader.MessageData{
+						{
+							Offset: 1,
+							SeqNo:  1,
+							Data:   []byte{1, 2},
+						},
+						{
+							Offset: 2,
+							SeqNo:  2,
+							Data:   []byte{4, 5, 6},
+						},
+						{
+							Offset: 3,
+							SeqNo:  3,
+							Data:   []byte{7},
+						},
+					},
+				},
+			},
+		},
+	}})
+	waitChangeRestBufferSizeBytes(e.reader, e.initialBufferSizeBytes)
+	expectedBufferSizeAfterReceiveMessages := e.initialBufferSizeBytes - dataSize
+	require.Equal(t, e.reader.atomicRestBufferSizeBytes, expectedBufferSizeAfterReceiveMessages)
+
+}
+
 func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 	t.Run("BufferSize", func(t *testing.T) {
 		waitChangeRestBufferSizeBytes := func(r *topicStreamReaderImpl, old int64) {
