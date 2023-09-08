@@ -6,6 +6,7 @@ package integration
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -38,7 +39,7 @@ func TestTopicPartitionsBalanced(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	var connectedPartitions xatomic.Int64
+	var connectedPartitions atomic.Int64
 	var handled xatomic.Int64
 
 	var sessionsMutex sync.Mutex

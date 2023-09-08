@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -85,8 +86,8 @@ func stressTestInATopic(
 	topicWriters, topicReaders int,
 ) error {
 	maxMessagesInBatch := 5
-	var createdMessagesCount xatomic.Int64
-	var readedMessagesCount xatomic.Int64
+	var createdMessagesCount atomic.Int64
+	var readedMessagesCount atomic.Int64
 
 	var stopWrite xatomic.Bool
 
