@@ -377,49 +377,49 @@ func TestTopicStreamReaderImpl_getCurrentBufferFreeSpacePercentage(t *testing.T)
 		{
 			Name: "OK",
 			InputData: input{
-				allSpaceSize:  100,
-				freeSpaceSize: 30,
+				SizeBytes:      100,
+				UsedSpaceBytes: 80,
 			},
 			ExpectData: expect{
-				resultPercentage: 30,
-				haveError:        false,
-				err:              nil,
+				FreeSpacePercentage: 20,
+				HaveError:           false,
+				Err:                 nil,
 			},
 		},
 		{
 			Name: "fullOK",
 			InputData: input{
-				allSpaceSize:  100,
-				freeSpaceSize: 100,
+				SizeBytes:      1234,
+				UsedSpaceBytes: 1234,
 			},
 			ExpectData: expect{
-				resultPercentage: 100,
-				haveError:        false,
-				err:              nil,
+				FreeSpacePercentage: 0,
+				HaveError:           false,
+				Err:                 nil,
 			},
 		},
 		{
 			Name: "emptyOK",
 			InputData: input{
-				allSpaceSize:  100,
-				freeSpaceSize: 0,
+				SizeBytes:      100,
+				UsedSpaceBytes: 0,
 			},
 			ExpectData: expect{
-				resultPercentage: 0,
-				haveError:        false,
-				err:              nil,
+				FreeSpacePercentage: 100,
+				HaveError:           false,
+				Err:                 nil,
 			},
 		},
 		{
 			Name: "badInputData",
 			InputData: input{
-				allSpaceSize:  10,
-				freeSpaceSize: 1000,
+				SizeBytes:      10,
+				UsedSpaceBytes: 1000,
 			},
 			ExpectData: expect{
-				resultPercentage: 0,
-				haveError:        true,
-				err:              errCannotCalcFreeSpacePercentage,
+				FreeSpacePercentage: 0,
+				HaveError:           true,
+				Err:                 errCannotCalcFreeSpacePercentage,
 			},
 		},
 	}
@@ -427,17 +427,17 @@ func TestTopicStreamReaderImpl_getCurrentBufferFreeSpacePercentage(t *testing.T)
 	for _, tc := range tests {
 		t.Run(tc.Name, func(t *testing.T) {
 			e := newTopicReaderTestEnv(t)
-			e.reader.cfg.BufferSizeProtoBytes = tc.InputData.allSpaceSize
-			e.reader.atomicRestBufferSizeBytes = int64(tc.InputData.freeSpaceSize)
+			e.reader.cfg.BufferSizeProtoBytes = tc.InputData.SizeBytes
+			e.reader.atomicRestBufferSizeBytes = int64(tc.InputData.UsedSpaceBytes)
 
-			gotPercentage, err := e.reader.getCurrentBufferFreeSpacePercentage()
-			if tc.ExpectData.haveError {
-				require.ErrorIs(t, tc.ExpectData.err, err)
+			actualFreeSpacePercentage, err := e.reader.getFreeSpacePercentage()
+			if tc.ExpectData.HaveError {
+				require.ErrorIs(t, tc.ExpectData.Err, err)
 				return
 			}
 
 			require.NoError(t, err)
-			require.Equal(t, tc.ExpectData.resultPercentage, gotPercentage)
+			require.Equal(t, tc.ExpectData.FreeSpacePercentage, actualFreeSpacePercentage)
 		})
 	}
 }
