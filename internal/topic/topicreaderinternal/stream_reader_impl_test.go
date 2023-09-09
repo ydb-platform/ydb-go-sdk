@@ -360,13 +360,13 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 
 func TestTopicStreamReaderImpl_getCurrentBufferFreeSpacePercentage(t *testing.T) {
 	type input struct {
-		allSpaceSize  int
-		freeSpaceSize int
+		SizeBytes      int
+		UsedSpaceBytes int
 	}
 	type expect struct {
-		resultPercentage int
-		haveError        bool
-		err              error
+		FreeSpacePercentage int
+		HaveError           bool
+		Err                 error
 	}
 
 	tests := []struct {
