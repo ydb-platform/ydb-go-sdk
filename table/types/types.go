@@ -2,14 +2,36 @@ package types
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"io"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 // Type describes YDB data types.
 type Type = value.Type
+
+var (
+	ErrTypeNotSupportCastToValue = errors.New("type not support cast `interface{}` to `types.Value`")
+	ErrInconsistentTypes         = errors.New("inconsistent types")
+)
+
+func MakeValueByType(t Type, v interface{}) (Value, error) {
+	if v, has := v.(Value); has {
+		if !Equal(v.Type(), t) {
+			return nil, xerrors.WithStackTrace(fmt.Errorf("%s != %s: %w", t.Yql(), v.Type().Yql(), ErrInconsistentTypes))
+		}
+		return v, nil
+	}
+	tt, has := t.(value.TypeToValue)
+	if !has {
+		return nil, xerrors.WithStackTrace(fmt.Errorf("%T.(%s): %w", v, t.Yql(), ErrTypeNotSupportCastToValue))
+	}
+	return tt.ToValue(v)
+}
 
 // Equal checks for type equivalence
 func Equal(lhs, rhs Type) bool {

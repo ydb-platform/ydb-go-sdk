@@ -1,3 +1,4 @@
+* Added `table/types.MakeValueByType` for construct `table/types.Value` from `table/types.Type` and `interface{}`
 * Improved topic reader logs
 * Fixed `internal/xstring` package with deprecated warning in `go1.21` about `reflect.{String,Slice}Header`
 

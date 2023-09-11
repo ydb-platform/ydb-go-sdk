@@ -1,11 +1,16 @@
 package value
 
 import (
+	"errors"
 	"fmt"
+	"math"
+	"reflect"
+	"strconv"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 type Type interface {
@@ -14,6 +19,12 @@ type Type interface {
 
 	toYDB(a *allocator.Allocator) *Ydb.Type
 	equalsTo(rhs Type) bool
+}
+
+type TypeToValue interface {
+	Type
+
+	ToValue(v interface{}) (Value, error)
 }
 
 func TypeToYDB(t Type, a *allocator.Allocator) *Ydb.Type {
@@ -381,44 +392,69 @@ func Set(t Type) *setType {
 	}
 }
 
+var (
+	_ TypeToValue = optionalType{}
+
+	ErrOptionalTypeNotSupportCastFromInterface = errors.New("inner type in optional not support cast from `interface{}`")
+)
+
 type optionalType struct {
 	innerType Type
 }
 
-func (v optionalType) IsOptional() {}
-
-func (v optionalType) InnerType() Type {
-	return v.innerType
+func (t optionalType) ToValue(v interface{}) (Value, error) {
+	value := reflect.ValueOf(v)
+	if v == nil || ((value.Kind() == reflect.Interface || value.Kind() == reflect.Ptr) && value.IsNil()) {
+		return NullValue(t.innerType), nil
+	}
+	tt, has := t.innerType.(TypeToValue)
+	if !has {
+		return nil, xerrors.WithStackTrace(fmt.Errorf("%T.(%s): %w", v, t.Yql(), ErrOptionalTypeNotSupportCastFromInterface))
+	}
+	if value.Kind() == reflect.Ptr {
+		v = value.Elem().Interface()
+	}
+	vv, err := tt.ToValue(v)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	return OptionalValue(vv), nil
 }
 
-func (v optionalType) String() string {
-	return v.Yql()
+func (t optionalType) IsOptional() {}
+
+func (t optionalType) InnerType() Type {
+	return t.innerType
 }
 
-func (v optionalType) Yql() string {
-	return "Optional<" + v.innerType.Yql() + ">"
+func (t optionalType) String() string {
+	return t.Yql()
 }
 
-func (v optionalType) equalsTo(rhs Type) bool {
+func (t optionalType) Yql() string {
+	return "Optional<" + t.innerType.Yql() + ">"
+}
+
+func (t optionalType) equalsTo(rhs Type) bool {
 	vv, ok := rhs.(optionalType)
 	if !ok {
 		return false
 	}
-	return v.innerType.equalsTo(vv.innerType)
+	return t.innerType.equalsTo(vv.innerType)
 }
 
-func (v optionalType) toYDB(a *allocator.Allocator) *Ydb.Type {
-	t := a.Type()
+func (t optionalType) toYDB(a *allocator.Allocator) *Ydb.Type {
+	tt := a.Type()
 
 	typeOptional := a.TypeOptional()
 
 	typeOptional.OptionalType = a.Optional()
 
-	typeOptional.OptionalType.Item = v.innerType.toYDB(a)
+	typeOptional.OptionalType.Item = t.innerType.toYDB(a)
 
-	t.Type = typeOptional
+	tt.Type = typeOptional
 
-	return t
+	return tt
 }
 
 func Optional(t Type) optionalType {
@@ -427,14 +463,72 @@ func Optional(t Type) optionalType {
 	}
 }
 
+var (
+	_ TypeToValue = PrimitiveType(0)
+
+	ErrPrimitiveTypeNotSupportCastFromInterface = errors.New("primitive type not support cast from `interface{}`")
+)
+
 type PrimitiveType uint
 
-func (v PrimitiveType) String() string {
-	return v.Yql()
+func (t PrimitiveType) ToValue(v interface{}) (Value, error) {
+	switch t {
+	case TypeBool:
+		switch vv := v.(type) {
+		case bool:
+			return BoolValue(vv), nil
+		case string:
+			b, err := strconv.ParseBool(vv)
+			if err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
+			return BoolValue(b), nil
+		}
+	case TypeUint32:
+		switch vv := v.(type) {
+		case int:
+			if vv >= 0 {
+				return Uint32Value(uint32(vv)), nil
+			}
+		case uint:
+			return Uint32Value(uint32(vv)), nil
+		case int8:
+			if vv >= 0 {
+				return Uint32Value(uint32(vv)), nil
+			}
+		case uint8:
+			return Uint32Value(uint32(vv)), nil
+		case int16:
+			if vv >= 0 {
+				return Uint32Value(uint32(vv)), nil
+			}
+		case uint16:
+			return Uint32Value(uint32(vv)), nil
+		case int32:
+			if vv >= 0 {
+				return Uint32Value(uint32(vv)), nil
+			}
+		case uint32:
+			return Uint32Value(vv), nil
+		case int64:
+			if vv >= 0 && vv <= math.MaxUint32 {
+				return Uint32Value(uint32(vv)), nil
+			}
+		case uint64:
+			if vv <= math.MaxUint32 {
+				return Uint32Value(uint32(vv)), nil
+			}
+		}
+	}
+	return nil, xerrors.WithStackTrace(fmt.Errorf("%T.(%s): %w", v, t.Yql(), ErrPrimitiveTypeNotSupportCastFromInterface))
 }
 
-func (v PrimitiveType) Yql() string {
-	return primitiveString[v]
+func (t PrimitiveType) String() string {
+	return t.Yql()
+}
+
+func (t PrimitiveType) Yql() string {
+	return primitiveString[t]
 }
 
 const (
@@ -523,16 +617,16 @@ var primitiveString = [...]string{
 	TypeDyNumber:     "DyNumber",
 }
 
-func (v PrimitiveType) equalsTo(rhs Type) bool {
+func (t PrimitiveType) equalsTo(rhs Type) bool {
 	vv, ok := rhs.(PrimitiveType)
 	if !ok {
 		return false
 	}
-	return v == vv
+	return t == vv
 }
 
-func (v PrimitiveType) toYDB(*allocator.Allocator) *Ydb.Type {
-	return primitive[v]
+func (t PrimitiveType) toYDB(*allocator.Allocator) *Ydb.Type {
+	return primitive[t]
 }
 
 type (
