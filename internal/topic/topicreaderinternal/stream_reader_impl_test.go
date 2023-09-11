@@ -429,7 +429,7 @@ func TestTopicStreamReaderImpl_getCurrentBufferFreeSpacePercentage(t *testing.T)
 	}
 }
 
-func TestTopicStreamReaderImpl_CheckSendMessageToServerAfterChangeBufferSize_NEW(t *testing.T) {
+func TestTopicStreamReaderImpl_CheckSendMessageToServerAfterChangeBufferSize(t *testing.T) {
 	waitChangeRestBufferSizeBytes := func(r *topicStreamReaderImpl, old int64) {
 		xtest.SpinWaitCondition(t, nil, func() bool {
 			return atomic.LoadInt64(&r.atomicRestBufferSizeBytes) != old
