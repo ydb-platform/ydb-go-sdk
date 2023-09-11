@@ -442,46 +442,153 @@ func TestTopicStreamReaderImpl_getCurrentBufferFreeSpacePercentage(t *testing.T)
 	}
 }
 
-func TestTopicStreamReaderImpl_CheckSendMessageToServerAfterChangeBufferSize(t *testing.T) {
+func TestTopicStreamReaderImpl_CheckSendMessageToServerAfterChangeBufferSize_NEW(t *testing.T) {
 	waitChangeRestBufferSizeBytes := func(r *topicStreamReaderImpl, old int64) {
 		xtest.SpinWaitCondition(t, nil, func() bool {
 			return atomic.LoadInt64(&r.atomicRestBufferSizeBytes) != old
 		})
 	}
-	e := newTopicReaderTestEnv(t)
-	e.Start()
-	waitChangeRestBufferSizeBytes(e.reader, 0)
 
-	const dataSize = 1000
-	e.SendFromServer(&rawtopicreader.ReadResponse{BytesSize: dataSize, PartitionData: []rawtopicreader.PartitionData{
-		{
-			PartitionSessionID: e.partitionSessionID,
-			Batches: []rawtopicreader.Batch{
-				{
-					MessageData: []rawtopicreader.MessageData{
-						{
-							Offset: 1,
-							SeqNo:  1,
-							Data:   []byte{1, 2},
-						},
-						{
-							Offset: 2,
-							SeqNo:  2,
-							Data:   []byte{4, 5, 6},
-						},
-						{
-							Offset: 3,
-							SeqNo:  3,
-							Data:   []byte{7},
+	t.Run("SendAfter35PersentFree", func(t *testing.T) {
+		e := newTopicReaderTestEnv(t)
+
+		e.Start()
+		waitChangeRestBufferSizeBytes(e.reader, 0)
+
+		// send 35% of buffer size
+		const dataSize = 350_000
+		e.SendFromServer(&rawtopicreader.ReadResponse{BytesSize: dataSize, PartitionData: []rawtopicreader.PartitionData{
+			{
+				PartitionSessionID: e.partitionSessionID,
+				Batches: []rawtopicreader.Batch{
+					{
+						MessageData: []rawtopicreader.MessageData{
+							{
+								Offset: 1,
+								SeqNo:  1,
+								Data:   []byte{1, 2},
+							},
 						},
 					},
 				},
 			},
-		},
-	}})
-	waitChangeRestBufferSizeBytes(e.reader, e.initialBufferSizeBytes)
-	expectedBufferSizeAfterReceiveMessages := e.initialBufferSizeBytes - dataSize
-	require.Equal(t, e.reader.atomicRestBufferSizeBytes, expectedBufferSizeAfterReceiveMessages)
+		}})
+		waitChangeRestBufferSizeBytes(e.reader, e.initialBufferSizeBytes)
+		expectedBufferSizeAfterReceiveMessages := e.initialBufferSizeBytes - dataSize
+		require.Equal(t, e.reader.atomicRestBufferSizeBytes, expectedBufferSizeAfterReceiveMessages)
+
+		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: dataSize})
+		oneOption := newReadMessageBatchOptions()
+		oneOption.MaxCount = 1
+		_, err := e.reader.ReadMessageBatch(e.ctx, oneOption)
+		require.NoError(t, err)
+
+		waitChangeRestBufferSizeBytes(e.reader, expectedBufferSizeAfterReceiveMessages)
+		require.Equal(t, e.initialBufferSizeBytes, e.reader.atomicRestBufferSizeBytes)
+	})
+	t.Run("NotSendAfter20PersentFree", func(t *testing.T) {
+		e := newTopicReaderTestEnv(t)
+
+		e.Start()
+		waitChangeRestBufferSizeBytes(e.reader, 0)
+
+		// send 20% of buffer size
+		const dataSize = 200_000
+		e.SendFromServer(&rawtopicreader.ReadResponse{BytesSize: dataSize, PartitionData: []rawtopicreader.PartitionData{
+			{
+				PartitionSessionID: e.partitionSessionID,
+				Batches: []rawtopicreader.Batch{
+					{
+						MessageData: []rawtopicreader.MessageData{
+							{
+								Offset: 1,
+								SeqNo:  1,
+								Data:   []byte{1, 2},
+							},
+						},
+					},
+				},
+			},
+		}})
+		waitChangeRestBufferSizeBytes(e.reader, e.initialBufferSizeBytes)
+		expectedBufferSizeAfterReceiveMessages := e.initialBufferSizeBytes - dataSize
+		require.Equal(t, e.reader.atomicRestBufferSizeBytes, expectedBufferSizeAfterReceiveMessages)
+
+		oneOption := newReadMessageBatchOptions()
+		oneOption.MaxCount = 1
+		oneOption.MinCount = 1
+		_, err := e.reader.ReadMessageBatch(e.ctx, oneOption)
+		require.NoError(t, err)
+
+	})
+	t.Run("NotSendAfter15PersentFreeSendAfterEven20PersentFree", func(t *testing.T) {
+		// first the reader reads one message from the buffer,
+		// 15 percent is released - no request to the server should be sent
+		//
+		// Then the reader reads another message, now another 20% is freed in the buffer,
+		// in the end 35% is free and the request should be sent.
+
+		e := newTopicReaderTestEnv(t)
+
+		e.Start()
+		waitChangeRestBufferSizeBytes(e.reader, 0)
+
+		// send 15% of buffer size
+		const firstMessageDataSize = 150_000
+		e.SendFromServer(&rawtopicreader.ReadResponse{BytesSize: firstMessageDataSize, PartitionData: []rawtopicreader.PartitionData{
+			{
+				PartitionSessionID: e.partitionSessionID,
+				Batches: []rawtopicreader.Batch{
+					{
+						MessageData: []rawtopicreader.MessageData{
+							{
+								Offset: 1,
+								SeqNo:  1,
+								Data:   []byte{1},
+							},
+						},
+					},
+				},
+			},
+		}})
+		waitChangeRestBufferSizeBytes(e.reader, e.initialBufferSizeBytes)
+		expectedBufferSizeAfterReceiveFirstMessage := e.initialBufferSizeBytes - firstMessageDataSize
+		require.Equal(t, e.reader.atomicRestBufferSizeBytes, expectedBufferSizeAfterReceiveFirstMessage)
+
+		oneOption := newReadMessageBatchOptions()
+		oneOption.MaxCount = 1
+
+		//send even 20%
+		const secondMessageDataSize = 200_000
+		e.SendFromServer(&rawtopicreader.ReadResponse{BytesSize: secondMessageDataSize, PartitionData: []rawtopicreader.PartitionData{
+			{
+				PartitionSessionID: e.partitionSessionID,
+				Batches: []rawtopicreader.Batch{
+					{
+						MessageData: []rawtopicreader.MessageData{
+							{
+								Offset: 1,
+								SeqNo:  1,
+								Data:   []byte{1},
+							},
+						},
+					},
+				},
+			},
+		}})
+		waitChangeRestBufferSizeBytes(e.reader, expectedBufferSizeAfterReceiveFirstMessage)
+		expectedBufferSizeAfterReceiveSecondMessage := expectedBufferSizeAfterReceiveFirstMessage - secondMessageDataSize
+		require.Equal(t, e.reader.atomicRestBufferSizeBytes, expectedBufferSizeAfterReceiveSecondMessage)
+
+		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: firstMessageDataSize + secondMessageDataSize})
+		oneOption = newReadMessageBatchOptions()
+		oneOption.MaxCount = 1
+		_, err := e.reader.ReadMessageBatch(e.ctx, oneOption)
+		require.NoError(t, err)
+
+		waitChangeRestBufferSizeBytes(e.reader, expectedBufferSizeAfterReceiveSecondMessage)
+		require.Equal(t, e.initialBufferSizeBytes, e.reader.atomicRestBufferSizeBytes)
+	})
 
 }
 

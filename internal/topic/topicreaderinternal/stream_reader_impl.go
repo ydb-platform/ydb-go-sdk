@@ -528,6 +528,8 @@ func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
 	}
 }
 
+const FreeSpacePercentageThreshold = 30
+
 func (r *topicStreamReaderImpl) dataRequestLoop(ctx context.Context) {
 	if r.ctx.Err() != nil {
 		return
@@ -541,30 +543,26 @@ func (r *topicStreamReaderImpl) dataRequestLoop(ctx context.Context) {
 			_ = r.CloseWithError(ctx, r.ctx.Err())
 			return
 
-		case free := <-r.freeBytes:
-			sum := free
-
-			// consume all messages from order and compress it to one data request
-		forConsumeRequests:
-			for {
-				select {
-				case free = <-r.freeBytes:
-					sum += free
-				default:
-					break forConsumeRequests
-				}
+		case <-r.freeBytes:
+			freeSpacePercentage, err := r.getFreeSpacePercentage()
+			if err != nil {
+				return
 			}
 
-			resCapacity := r.addRestBufferBytes(sum)
-			trace.TopicOnReaderSentDataRequest(r.cfg.Trace, r.readConnectionID, sum, resCapacity)
-			if err := r.sendDataRequest(sum); err != nil {
+			if freeSpacePercentage <= FreeSpacePercentageThreshold {
+				return
+			}
+
+			freeSpaceBytes := r.cfg.BufferSizeProtoBytes - r.getRestBufferBytes()
+			resCapacity := r.addRestBufferBytes(freeSpaceBytes)
+			trace.TopicOnReaderSentDataRequest(r.cfg.Trace, r.readConnectionID, freeSpaceBytes, resCapacity)
+
+			if err := r.sendDataRequest(freeSpaceBytes); err != nil {
 				return
 			}
 		}
 	}
 }
-
-const bufferUsedSpaceLimitPercentage = 70
 
 var errCannotCalcFreeSpacePercentage = errors.New("cannot calculate free space percentage")
 
