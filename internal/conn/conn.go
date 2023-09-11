@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
@@ -327,12 +326,12 @@ func (c *conn) Invoke(
 	c.touchLastUsage()
 	defer c.touchLastUsage()
 
-	traceID, err := uuid.NewUUID()
+	traceID, err := newTraceID()
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
-	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID.String()))
+	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID))
 
 	err = cc.Invoke(ctx, method, req, res, append(opts, grpc.Trailer(&md))...)
 	if err != nil {
@@ -343,7 +342,7 @@ func (c *conn) Invoke(
 		if useWrapping {
 			err = xerrors.Transport(err,
 				xerrors.WithAddress(c.Address()),
-				xerrors.WithTraceID(traceID.String()),
+				xerrors.WithTraceID(traceID),
 			)
 			if sentMark.canRetry() {
 				return c.wrapError(xerrors.Retryable(err, xerrors.WithName("Invoke")))
@@ -369,7 +368,7 @@ func (c *conn) Invoke(
 					xerrors.Operation(
 						xerrors.FromOperation(o.GetOperation()),
 						xerrors.WithAddress(c.Address()),
-						xerrors.WithTraceID(traceID.String()),
+						xerrors.WithTraceID(traceID),
 					),
 				)
 			}
@@ -420,12 +419,12 @@ func (c *conn) NewStream(
 	c.touchLastUsage()
 	defer c.touchLastUsage()
 
-	traceID, err := uuid.NewUUID()
+	traceID, err := newTraceID()
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID.String()))
+	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID))
 
 	s, err = cc.NewStream(ctx, desc, method, opts...)
 	if err != nil {
@@ -436,7 +435,7 @@ func (c *conn) NewStream(
 		if useWrapping {
 			err = xerrors.Transport(err,
 				xerrors.WithAddress(c.Address()),
-				xerrors.WithTraceID(traceID.String()),
+				xerrors.WithTraceID(traceID),
 			)
 			if sentMark.canRetry() {
 				return s, c.wrapError(xerrors.Retryable(err, xerrors.WithName("NewStream")))
