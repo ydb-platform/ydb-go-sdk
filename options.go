@@ -341,7 +341,7 @@ func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
 	return func(ctx context.Context, c *Driver) error { return nil }
 }
 
-// WithSessionPoolIdleThreshold defines keep-alive interval for idle sessions
+// WithSessionPoolIdleThreshold defines interval for idle sessions
 func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithIdleThreshold(idleThreshold))
