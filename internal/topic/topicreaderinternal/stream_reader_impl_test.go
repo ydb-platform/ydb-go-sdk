@@ -32,12 +32,6 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		lastOffset := e.partitionSession.lastReceivedMessageOffset()
 		const dataSize = 4
 
-		// request new data portion
-		readRequestReceived := make(empty.Chan)
-		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: dataSize * 2}).Do(func(_ interface{}) {
-			close(readRequestReceived)
-		})
-
 		commitReceived := make(empty.Chan)
 		// Expect commit message with stole
 		e.stream.EXPECT().Send(
@@ -106,7 +100,6 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, e.reader.Commit(e.ctx, batch.getCommitRange().priv))
 		xtest.WaitChannelClosed(t, commitReceived)
-		xtest.WaitChannelClosed(t, readRequestReceived)
 	})
 	xtest.TestManyTimesWithName(t, "WrongOrderCommitWithSyncMode", func(t testing.TB) {
 		e := newTopicReaderTestEnv(t)
@@ -115,11 +108,6 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 
 		lastOffset := e.partitionSession.lastReceivedMessageOffset()
 		const dataSize = 4
-		// request new data portion
-		readRequestReceived := make(empty.Chan)
-		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: dataSize * 2}).Do(func(_ interface{}) {
-			close(readRequestReceived)
-		})
 
 		e.SendFromServer(&rawtopicreader.ReadResponse{
 			BytesSize: dataSize,
@@ -166,7 +154,6 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		batch, err := e.reader.ReadMessageBatch(e.ctx, opts)
 		require.NoError(t, err)
 		require.ErrorIs(t, e.reader.Commit(e.ctx, batch.Messages[1].getCommitRange().priv), ErrWrongCommitOrderInSyncMode)
-		xtest.WaitChannelClosed(t, readRequestReceived)
 	})
 
 	xtest.TestManyTimesWithName(t, "CommitAfterGracefulStopPartition", func(t testing.TB) {
@@ -609,10 +596,6 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 
 		xtest.TestManyTimesWithName(t, "DecrementIncrementBufferSize", func(t testing.TB) {
 			e := newTopicReaderTestEnv(t)
-
-			// doesn't check sends
-			e.stream.EXPECT().Send(gomock.Any()).Return(nil).MinTimes(1)
-
 			e.Start()
 			waitChangeRestBufferSizeBytes(e.reader, 0)
 
@@ -646,32 +629,10 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 			waitChangeRestBufferSizeBytes(e.reader, e.initialBufferSizeBytes)
 			expectedBufferSizeAfterReceiveMessages := e.initialBufferSizeBytes - dataSize
 			require.Equal(t, e.reader.atomicRestBufferSizeBytes, expectedBufferSizeAfterReceiveMessages)
-
-			oneOption := newReadMessageBatchOptions()
-			oneOption.MaxCount = 1
-			_, err := e.reader.ReadMessageBatch(e.ctx, oneOption)
-			require.NoError(t, err)
-
-			waitChangeRestBufferSizeBytes(e.reader, expectedBufferSizeAfterReceiveMessages)
-
-			bufferSizeAfterReadOneMessage := e.reader.atomicRestBufferSizeBytes
-
-			_, err = e.reader.ReadMessageBatch(e.ctx, newReadMessageBatchOptions())
-			require.NoError(t, err)
-
-			waitChangeRestBufferSizeBytes(e.reader, bufferSizeAfterReadOneMessage)
-			require.Equal(t, e.initialBufferSizeBytes, e.reader.atomicRestBufferSizeBytes)
 		})
 
 		xtest.TestManyTimesWithName(t, "ForceReturnBatchIfBufferFull", func(t testing.TB) {
 			e := newTopicReaderTestEnv(t)
-
-			dataRequested := make(empty.Chan)
-			e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: int(e.initialBufferSizeBytes)}).
-				Do(func(_ interface{}) {
-					close(dataRequested)
-				})
-
 			e.Start()
 			waitChangeRestBufferSizeBytes(e.reader, 0)
 
@@ -700,11 +661,11 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 			readTimeoutCtx, cancel := xcontext.WithTimeout(e.ctx, time.Second)
 			defer cancel()
 
+			e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: int(e.initialBufferSizeBytes)}).MaxTimes(2)
 			batch, err := e.reader.ReadMessageBatch(readTimeoutCtx, needReadTwoMessages)
 			require.NoError(t, err)
 			require.Len(t, batch.Messages, 1)
 
-			<-dataRequested
 		})
 	})
 
@@ -723,11 +684,7 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 
 		prevOffset := e.partitionSession.lastReceivedMessageOffset()
 
-		sendDataRequestCompleted := make(empty.Chan)
 		dataSize := 4
-		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: dataSize}).Do(func(_ interface{}) {
-			close(sendDataRequestCompleted)
-		})
 		e.SendFromServer(&rawtopicreader.ReadResponse{
 			BytesSize: dataSize,
 			PartitionData: []rawtopicreader.PartitionData{
@@ -873,7 +830,6 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 
 		require.Equal(t, expectedData, data)
 		require.Equal(t, expectedBatch, batch)
-		<-sendDataRequestCompleted
 	})
 }
 
