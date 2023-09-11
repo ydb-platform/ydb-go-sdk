@@ -1,3 +1,5 @@
+* Now read requests are sent after buffer free space reaches 30% of buffer size
+
 ## v3.51.3
 * Added `internal/xstring.{FromBytes([]byte),ToBytes(string)` for increase performance on `string` from/to `[]byte` conversion
 
