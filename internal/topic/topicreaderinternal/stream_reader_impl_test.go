@@ -506,7 +506,6 @@ func TestTopicStreamReaderImpl_CheckSendMessageToServerAfterChangeBufferSize_NEW
 		oneOption.MinCount = 1
 		_, err := e.reader.ReadMessageBatch(e.ctx, oneOption)
 		require.NoError(t, err)
-
 	})
 	t.Run("NotSendAfter15PersentFreeSendAfterEven20PersentFree", func(t *testing.T) {
 		// first the reader reads one message from the buffer,
@@ -522,22 +521,25 @@ func TestTopicStreamReaderImpl_CheckSendMessageToServerAfterChangeBufferSize_NEW
 
 		// send 15% of buffer size
 		const firstMessageDataSize = 150_000
-		e.SendFromServer(&rawtopicreader.ReadResponse{BytesSize: firstMessageDataSize, PartitionData: []rawtopicreader.PartitionData{
-			{
-				PartitionSessionID: e.partitionSessionID,
-				Batches: []rawtopicreader.Batch{
-					{
-						MessageData: []rawtopicreader.MessageData{
-							{
-								Offset: 1,
-								SeqNo:  1,
-								Data:   []byte{1},
+		e.SendFromServer(&rawtopicreader.ReadResponse{
+			BytesSize: firstMessageDataSize,
+			PartitionData: []rawtopicreader.PartitionData{
+				{
+					PartitionSessionID: e.partitionSessionID,
+					Batches: []rawtopicreader.Batch{
+						{
+							MessageData: []rawtopicreader.MessageData{
+								{
+									Offset: 1,
+									SeqNo:  1,
+									Data:   []byte{1},
+								},
 							},
 						},
 					},
 				},
 			},
-		}})
+		})
 		waitChangeRestBufferSizeBytes(e.reader, e.initialBufferSizeBytes)
 		expectedBufferSizeAfterReceiveFirstMessage := e.initialBufferSizeBytes - firstMessageDataSize
 		require.Equal(t, e.reader.atomicRestBufferSizeBytes, expectedBufferSizeAfterReceiveFirstMessage)
@@ -545,24 +547,27 @@ func TestTopicStreamReaderImpl_CheckSendMessageToServerAfterChangeBufferSize_NEW
 		oneOption := newReadMessageBatchOptions()
 		oneOption.MaxCount = 1
 
-		//send even 20%
+		// send even 20%
 		const secondMessageDataSize = 200_000
-		e.SendFromServer(&rawtopicreader.ReadResponse{BytesSize: secondMessageDataSize, PartitionData: []rawtopicreader.PartitionData{
-			{
-				PartitionSessionID: e.partitionSessionID,
-				Batches: []rawtopicreader.Batch{
-					{
-						MessageData: []rawtopicreader.MessageData{
-							{
-								Offset: 1,
-								SeqNo:  1,
-								Data:   []byte{1},
+		e.SendFromServer(&rawtopicreader.ReadResponse{
+			BytesSize: secondMessageDataSize,
+			PartitionData: []rawtopicreader.PartitionData{
+				{
+					PartitionSessionID: e.partitionSessionID,
+					Batches: []rawtopicreader.Batch{
+						{
+							MessageData: []rawtopicreader.MessageData{
+								{
+									Offset: 1,
+									SeqNo:  1,
+									Data:   []byte{1},
+								},
 							},
 						},
 					},
 				},
 			},
-		}})
+		})
 		waitChangeRestBufferSizeBytes(e.reader, expectedBufferSizeAfterReceiveFirstMessage)
 		expectedBufferSizeAfterReceiveSecondMessage := expectedBufferSizeAfterReceiveFirstMessage - secondMessageDataSize
 		require.Equal(t, e.reader.atomicRestBufferSizeBytes, expectedBufferSizeAfterReceiveSecondMessage)
@@ -576,7 +581,6 @@ func TestTopicStreamReaderImpl_CheckSendMessageToServerAfterChangeBufferSize_NEW
 		waitChangeRestBufferSizeBytes(e.reader, expectedBufferSizeAfterReceiveSecondMessage)
 		require.Equal(t, e.initialBufferSizeBytes, e.reader.atomicRestBufferSizeBytes)
 	})
-
 }
 
 func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
@@ -665,7 +669,6 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 			batch, err := e.reader.ReadMessageBatch(readTimeoutCtx, needReadTwoMessages)
 			require.NoError(t, err)
 			require.Len(t, batch.Messages, 1)
-
 		})
 	})
 
