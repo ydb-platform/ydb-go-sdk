@@ -327,9 +327,7 @@ func TestZeroDialTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
-	var (
-		traceID string
-	)
+	var traceID string
 
 	db, err := ydb.Open(
 		ctx,
