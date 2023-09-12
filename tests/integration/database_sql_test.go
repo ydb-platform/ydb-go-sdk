@@ -270,7 +270,7 @@ func TestDatabaseSql(t *testing.T) {
 											return fmt.Errorf("cannot select current views: %w", err)
 										}
 										t.Logf("[%d][%d][%d] - %s %q (%d views)",
-											*seriesID, *seasonID, *episodeID, airDate.Format(time.DateOnly),
+											*seriesID, *seasonID, *episodeID, airDate.Format("2006-01-02"),
 											*title, uint64(views.Float64),
 										)
 									}
