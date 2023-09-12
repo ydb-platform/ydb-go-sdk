@@ -2,24 +2,24 @@ package conn
 
 import "fmt"
 
-type nodeError struct {
-	id       uint32
+type connError struct {
+	nodeID   uint32
 	endpoint string
 	err      error
 }
 
-func newNodeError(id uint32, endpoint string, err error) nodeError {
-	return nodeError{
-		id:       id,
+func newConnError(id uint32, endpoint string, err error) connError {
+	return connError{
+		nodeID:   id,
 		endpoint: endpoint,
 		err:      err,
 	}
 }
 
-func (n nodeError) Error() string {
-	return fmt.Sprintf("on node %v (%v): %v", n.id, n.endpoint, n.err)
+func (n connError) Error() string {
+	return fmt.Sprintf("connError(node_id = %d, address = %q): %v", n.nodeID, n.endpoint, n.err)
 }
 
-func (n nodeError) Unwrap() error {
+func (n connError) Unwrap() error {
 	return n.err
 }

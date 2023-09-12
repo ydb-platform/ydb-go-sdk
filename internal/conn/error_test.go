@@ -9,15 +9,15 @@ import (
 
 func TestNodeErrorError(t *testing.T) {
 	testErr := errors.New("test")
-	nodeErr := newNodeError(1, "localhost:1234", testErr)
+	nodeErr := newConnError(1, "localhost:1234", testErr)
 	message := nodeErr.Error()
 
-	require.Equal(t, "on node 1 (localhost:1234): test", message)
+	require.Equal(t, "connError(node_id = 1, address = \"localhost:1234\"): test", message)
 }
 
 func TestNodeErrorUnwrap(t *testing.T) {
 	testErr := errors.New("test")
-	nodeErr := newNodeError(1, "asd", testErr)
+	nodeErr := newConnError(1, "asd", testErr)
 
 	unwrapped := errors.Unwrap(nodeErr)
 	require.Equal(t, testErr, unwrapped)
@@ -26,7 +26,7 @@ func TestNodeErrorUnwrap(t *testing.T) {
 func TestNodeErrorIs(t *testing.T) {
 	testErr := errors.New("test")
 	testErr2 := errors.New("test2")
-	nodeErr := newNodeError(1, "localhost:1234", testErr)
+	nodeErr := newConnError(1, "localhost:1234", testErr)
 
 	require.True(t, errors.Is(nodeErr, testErr))
 	require.False(t, errors.Is(nodeErr, testErr2))
@@ -50,7 +50,7 @@ func (t testErrorType2) Error() string {
 
 func TestNodeErrorAs(t *testing.T) {
 	testErr := testErrorType1{msg: "test"}
-	nodeErr := newNodeError(1, "localhost:1234", testErr)
+	nodeErr := newConnError(1, "localhost:1234", testErr)
 
 	target := testErrorType1{}
 	require.True(t, errors.As(nodeErr, &target))
