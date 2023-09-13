@@ -14,7 +14,6 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"text/template"
 	"time"
@@ -27,6 +26,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
@@ -191,13 +191,13 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 	ctx, cancel := context.WithTimeout(context.Background(), testDuration)
 	defer cancel()
 
-	var totalConsumedUnits uint64
+	var totalConsumedUnits xatomic.Uint64
 	defer func() {
-		t.Logf("total consumed units: %d", atomic.LoadUint64(&totalConsumedUnits))
+		t.Logf("total consumed units: %d", totalConsumedUnits.Load())
 	}()
 
 	ctx = meta.WithTrailerCallback(ctx, func(md metadata.MD) {
-		atomic.AddUint64(&totalConsumedUnits, meta.ConsumedUnits(md))
+		totalConsumedUnits.Add(meta.ConsumedUnits(md))
 	})
 
 	s := &stats{
@@ -226,7 +226,7 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 		sessionsMtx sync.Mutex
 		sessions    = make(map[string]struct{}, limit)
 
-		shutdowned = uint32(0)
+		shutdowned xatomic.Bool
 
 		shutdownTrace = trace.Table{
 			OnPoolSessionAdd: func(info trace.TablePoolSessionAddInfo) {
@@ -243,7 +243,7 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 					if info.Session == nil {
 						return
 					}
-					if atomic.LoadUint32(&shutdowned) == 0 {
+					if shutdowned.Load() {
 						return
 					}
 					if info.Session.Status() != table.SessionClosing {
@@ -643,7 +643,7 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 				t.Fatalf("failed to send request: %v", err)
 			}
 		}
-		atomic.StoreUint32(&shutdowned, 1)
+		shutdowned.Store(true)
 	}
 
 	// select concurrently

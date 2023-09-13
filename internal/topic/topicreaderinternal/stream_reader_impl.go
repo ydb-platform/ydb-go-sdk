@@ -16,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -37,7 +38,7 @@ type topicStreamReaderImpl struct {
 	cancel context.CancelFunc
 
 	freeBytes                 chan int
-	atomicCountRequestedBytes int64
+	atomicCountRequestedBytes xatomic.Int64
 	sessionController         partitionSessionStorage
 	backgroundWorkers         background.Worker
 
@@ -454,7 +455,7 @@ func (r *topicStreamReaderImpl) initSession() (err error) {
 }
 
 func (r *topicStreamReaderImpl) addCountRequestedBytes(delta int) int {
-	val := atomic.AddInt64(&r.atomicCountRequestedBytes, int64(delta))
+	val := r.atomicCountRequestedBytes.Add(int64(delta))
 	if val <= 0 {
 		r.batcher.IgnoreMinRestrictionsOnNextPop()
 	}
@@ -462,7 +463,7 @@ func (r *topicStreamReaderImpl) addCountRequestedBytes(delta int) int {
 }
 
 func (r *topicStreamReaderImpl) getCountRequestedBytes() int {
-	return int(atomic.LoadInt64(&r.atomicCountRequestedBytes))
+	return int(r.atomicCountRequestedBytes.Load())
 }
 
 func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {

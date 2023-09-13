@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -16,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -53,7 +53,7 @@ type conn struct {
 	done              chan struct{}
 	endpoint          endpoint.Endpoint // ro access
 	closed            bool
-	state             uint32
+	state             xatomic.Uint32
 	lastUsage         time.Time
 	onClose           []func(*conn)
 	onTransportErrors []func(ctx context.Context, cc Conn, cause error)
@@ -81,7 +81,7 @@ func (c *conn) LastUsage() time.Time {
 }
 
 func (c *conn) IsState(states ...State) bool {
-	state := State(atomic.LoadUint32(&c.state))
+	state := State(c.state.Load())
 	for _, s := range states {
 		if s == state {
 			return true
@@ -140,8 +140,8 @@ func (c *conn) SetState(s State) State {
 }
 
 func (c *conn) setState(s State) State {
-	state := atomic.LoadUint32(&c.state)
-	if atomic.CompareAndSwapUint32(&c.state, state, uint32(s)) {
+	state := c.state.Load()
+	if c.state.CompareAndSwap(state, uint32(s)) {
 		trace.DriverOnConnStateChange(
 			c.config.Trace(),
 			c.endpoint.Copy(),
@@ -164,7 +164,7 @@ func (c *conn) Unban() State {
 }
 
 func (c *conn) GetState() (s State) {
-	return State(atomic.LoadUint32(&c.state))
+	return State(c.state.Load())
 }
 
 func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
@@ -326,7 +326,12 @@ func (c *conn) Invoke(
 	c.touchLastUsage()
 	defer c.touchLastUsage()
 
-	ctx, sentMark := markContext(ctx)
+	traceID, err := newTraceID()
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID))
 
 	err = cc.Invoke(ctx, method, req, res, append(opts, grpc.Trailer(&md))...)
 	if err != nil {
@@ -337,6 +342,7 @@ func (c *conn) Invoke(
 		if useWrapping {
 			err = xerrors.Transport(err,
 				xerrors.WithAddress(c.Address()),
+				xerrors.WithTraceID(traceID),
 			)
 			if sentMark.canRetry() {
 				return c.wrapError(xerrors.Retryable(err, xerrors.WithName("Invoke")))
@@ -361,7 +367,8 @@ func (c *conn) Invoke(
 				return c.wrapError(
 					xerrors.Operation(
 						xerrors.FromOperation(o.GetOperation()),
-						xerrors.WithNodeAddress(c.Address()),
+						xerrors.WithAddress(c.Address()),
+						xerrors.WithTraceID(traceID),
 					),
 				)
 			}
@@ -412,7 +419,12 @@ func (c *conn) NewStream(
 	c.touchLastUsage()
 	defer c.touchLastUsage()
 
-	ctx, sentMark := markContext(ctx)
+	traceID, err := newTraceID()
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID))
 
 	s, err = cc.NewStream(ctx, desc, method, opts...)
 	if err != nil {
@@ -423,6 +435,7 @@ func (c *conn) NewStream(
 		if useWrapping {
 			err = xerrors.Transport(err,
 				xerrors.WithAddress(c.Address()),
+				xerrors.WithTraceID(traceID),
 			)
 			if sentMark.canRetry() {
 				return s, c.wrapError(xerrors.Retryable(err, xerrors.WithName("NewStream")))
@@ -437,6 +450,7 @@ func (c *conn) NewStream(
 		ClientStream: s,
 		c:            c,
 		wrapping:     useWrapping,
+		traceID:      traceID,
 		sentMark:     sentMark,
 		onDone: func(ctx context.Context, md metadata.MD) {
 			cancel()
@@ -474,11 +488,11 @@ func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, ca
 
 func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	c := &conn{
-		state:    uint32(Created),
 		endpoint: e,
 		config:   config,
 		done:     make(chan struct{}),
 	}
+	c.state.Store(uint32(Created))
 	for _, o := range opts {
 		if o != nil {
 			o(c)
@@ -532,13 +546,13 @@ func getContextMark(ctx context.Context) *modificationMark {
 }
 
 type modificationMark struct {
-	dirty uint32
+	dirty xatomic.Bool
 }
 
 func (m *modificationMark) canRetry() bool {
-	return atomic.LoadUint32(&m.dirty) == 0
+	return !m.dirty.Load()
 }
 
 func (m *modificationMark) markDirty() {
-	atomic.StoreUint32(&m.dirty, 1)
+	m.dirty.Store(true)
 }

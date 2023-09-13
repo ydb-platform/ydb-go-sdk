@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -36,13 +36,13 @@ func TestDatabaseSql(t *testing.T) {
 	ctx, cancel := context.WithTimeout(xtest.Context(t), 42*time.Second)
 	defer cancel()
 
-	var totalConsumedUnits uint64
+	var totalConsumedUnits xatomic.Uint64
 	defer func() {
-		t.Logf("total consumed units: %d", atomic.LoadUint64(&totalConsumedUnits))
+		t.Logf("total consumed units: %d", totalConsumedUnits.Load())
 	}()
 
 	ctx = meta.WithTrailerCallback(ctx, func(md metadata.MD) {
-		atomic.AddUint64(&totalConsumedUnits, meta.ConsumedUnits(md))
+		totalConsumedUnits.Add(meta.ConsumedUnits(md))
 	})
 
 	t.Run("sql.Open", func(t *testing.T) {

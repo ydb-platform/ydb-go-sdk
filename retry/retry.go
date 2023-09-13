@@ -2,6 +2,7 @@ package retry
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wait"
@@ -142,7 +143,11 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 		attempts++
 		select {
 		case <-ctx.Done():
-			return xerrors.WithStackTrace(xerrors.Errorf("retry failed on attempt No.%d: %w", attempts, ctx.Err()))
+			return xerrors.WithStackTrace(
+				fmt.Errorf("retry failed on attempt No.%d: %w",
+					attempts, ctx.Err(),
+				),
+			)
 
 		default:
 			err = func() (err error) {
@@ -150,7 +155,9 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 					defer func() {
 						if e := recover(); e != nil {
 							options.panicCallback(e)
-							err = xerrors.WithStackTrace(xerrors.Errorf("panic recovered: %v", e))
+							err = xerrors.WithStackTrace(
+								fmt.Errorf("panic recovered: %v", e),
+							)
 						}
 					}()
 				}
@@ -162,7 +169,12 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			}
 
 			if ctxErr := ctx.Err(); ctxErr != nil {
-				return xerrors.WithStackTrace(xerrors.Errorf("retry failed on attempt No.%d: %w", attempts, ctx.Err()))
+				return xerrors.WithStackTrace(
+					xerrors.Join(
+						fmt.Errorf("context error occurred on attempt No.%d", attempts),
+						ctxErr, err,
+					),
+				)
 			}
 
 			m := Check(err)
@@ -172,12 +184,22 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 			}
 
 			if !m.MustRetry(options.idempotent) {
-				return xerrors.WithStackTrace(xerrors.Errorf("retry failed on attempt No.%d: %w", attempts, err))
+				return xerrors.WithStackTrace(
+					xerrors.Join(
+						fmt.Errorf("non-retryable error occurred on attempt No.%d (idempotent=%v)",
+							attempts, options.idempotent,
+						), err,
+					),
+				)
 			}
 
 			if e := wait.Wait(ctx, options.fastBackoff, options.slowBackoff, m.BackoffType(), i); e != nil {
 				return xerrors.WithStackTrace(
-					xerrors.Errorf("retry failed on attempt No.%d: wait exit with error '%w' (origin error '%w')", attempts, e, err),
+					xerrors.Join(
+						fmt.Errorf("wait exit on attempt No.%d",
+							attempts,
+						), e, err,
+					),
 				)
 			}
 

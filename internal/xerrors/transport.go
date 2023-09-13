@@ -16,6 +16,7 @@ type transportError struct {
 	status  *grpcStatus.Status
 	err     error
 	address string
+	traceID string
 }
 
 func (e *transportError) GRPCStatus() *grpcStatus.Status {
@@ -32,12 +33,18 @@ func (e *transportError) Name() string {
 	return "transport/" + e.status.Code().String()
 }
 
-type teOpt func(te *transportError)
+type teOpt interface {
+	applyToTransportError(te *transportError)
+}
 
-func WithAddress(address string) teOpt {
-	return func(te *transportError) {
-		te.address = address
-	}
+type addressOption string
+
+func (address addressOption) applyToTransportError(te *transportError) {
+	te.address = string(address)
+}
+
+func WithAddress(address string) addressOption {
+	return addressOption(address)
 }
 
 func (e *transportError) Error() string {
@@ -46,6 +53,9 @@ func (e *transportError) Error() string {
 	b.WriteString(fmt.Sprintf(" (code = %d, source error = %q", e.status.Code(), e.err.Error()))
 	if len(e.address) > 0 {
 		b.WriteString(fmt.Sprintf(", address: %q", e.address))
+	}
+	if len(e.traceID) > 0 {
+		b.WriteString(fmt.Sprintf(", traceID: %q", e.traceID))
 	}
 	b.WriteString(")")
 	return b.String()
@@ -138,9 +148,9 @@ func Transport(err error, opts ...teOpt) error {
 			err:    err,
 		}
 	}
-	for _, o := range opts {
-		if o != nil {
-			o(te)
+	for _, opt := range opts {
+		if opt != nil {
+			opt.applyToTransportError(te)
 		}
 	}
 	return te

@@ -19,6 +19,7 @@ type grpcClientStream struct {
 	grpc.ClientStream
 	c        *conn
 	wrapping bool
+	traceID  string
 	sentMark *modificationMark
 	onDone   func(ctx context.Context, md metadata.MD)
 	recv     func(error) func(error, trace.ConnState, map[string][]string)
@@ -33,6 +34,7 @@ func (s *grpcClientStream) CloseSend() (err error) {
 				xerrors.Transport(
 					err,
 					xerrors.WithAddress(s.c.Address()),
+					xerrors.WithTraceID(s.traceID),
 				),
 			)
 		}
@@ -56,6 +58,7 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 		if s.wrapping {
 			err = xerrors.Transport(err,
 				xerrors.WithAddress(s.c.Address()),
+				xerrors.WithTraceID(s.traceID),
 			)
 			if s.sentMark.canRetry() {
 				return s.wrapError(xerrors.Retryable(err,
@@ -114,7 +117,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 				return s.wrapError(
 					xerrors.Operation(
 						xerrors.FromOperation(operation),
-						xerrors.WithNodeAddress(s.c.Address()),
+						xerrors.WithAddress(s.c.Address()),
 					),
 				)
 			}

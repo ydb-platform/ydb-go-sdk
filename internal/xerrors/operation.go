@@ -16,6 +16,7 @@ type operationError struct {
 	code    Ydb.StatusIds_StatusCode
 	issues  issues
 	address string
+	traceID string
 }
 
 func (e *operationError) isYdbError() {}
@@ -33,48 +34,75 @@ type operationStatus interface {
 	GetIssues() []*Ydb_Issue.IssueMessage
 }
 
+type issuesOption []*Ydb_Issue.IssueMessage
+
+func (issues issuesOption) applyToOperationError(oe *operationError) {
+	oe.issues = []*Ydb_Issue.IssueMessage(issues)
+}
+
 // WithIssues is an option for construct operationStatus error with issues list
 // WithIssues must use as `Operation(WithIssues(issues))`
-func WithIssues(issues []*Ydb_Issue.IssueMessage) oeOpt {
-	return func(oe *operationError) {
-		oe.issues = issues
-	}
+func WithIssues(issues []*Ydb_Issue.IssueMessage) issuesOption {
+	return issues
+}
+
+type statusCodeOption Ydb.StatusIds_StatusCode
+
+func (code statusCodeOption) applyToOperationError(oe *operationError) {
+	oe.code = Ydb.StatusIds_StatusCode(code)
 }
 
 // WithStatusCode is an option for construct operationStatus error with reason code
 // WithStatusCode must use as `Operation(WithStatusCode(reason))`
-func WithStatusCode(code Ydb.StatusIds_StatusCode) oeOpt {
-	return func(oe *operationError) {
-		oe.code = code
-	}
+func WithStatusCode(code Ydb.StatusIds_StatusCode) statusCodeOption {
+	return statusCodeOption(code)
 }
 
-// WithNodeAddress is an option for construct operationStatus error with node address
-// WithNodeAddress must use as `Operation(WithNodeAddress(reason))`
-func WithNodeAddress(address string) oeOpt {
-	return func(oe *operationError) {
-		oe.address = address
-	}
+func (address addressOption) applyToOperationError(oe *operationError) {
+	oe.address = string(address)
+}
+
+type traceIDOption string
+
+func (traceID traceIDOption) applyToTransportError(te *transportError) {
+	te.traceID = string(traceID)
+}
+
+func (traceID traceIDOption) applyToOperationError(oe *operationError) {
+	oe.traceID = string(traceID)
+}
+
+// WithTraceID is an option for construct operationStatus error with traceID
+func WithTraceID(traceID string) traceIDOption {
+	return traceIDOption(traceID)
+}
+
+type operationOption struct {
+	operationStatus
+}
+
+func (operation operationOption) applyToOperationError(oe *operationError) {
+	oe.code = operation.GetStatus()
+	oe.issues = operation.GetIssues()
 }
 
 // FromOperation is an option for construct operationStatus error from operationStatus
 // FromOperation must use as `Operation(FromOperation(operationStatus))`
-func FromOperation(operation operationStatus) oeOpt {
-	return func(oe *operationError) {
-		oe.code = operation.GetStatus()
-		oe.issues = operation.GetIssues()
-	}
+func FromOperation(operation operationStatus) operationOption {
+	return operationOption{operation}
 }
 
-type oeOpt func(ops *operationError)
+type oeOpt interface {
+	applyToOperationError(oe *operationError)
+}
 
 func Operation(opts ...oeOpt) error {
 	oe := &operationError{
 		code: Ydb.StatusIds_STATUS_CODE_UNSPECIFIED,
 	}
-	for _, f := range opts {
-		if f != nil {
-			f(oe)
+	for _, opt := range opts {
+		if opt != nil {
+			opt.applyToOperationError(oe)
 		}
 	}
 	return oe
