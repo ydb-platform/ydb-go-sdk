@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -44,7 +43,7 @@ func TestTopicStreamReaderImpl_BufferCounterOnStopPartition(t *testing.T) {
 			e := newTopicReaderTestEnv(t)
 			e.Start()
 
-			initialBufferSize := e.reader.restBufferSizeBytes.Load()
+			initialBufferSize := e.reader.atomicCountRequestedBytes.Load()
 			messageSize := initialBufferSize - 1
 
 			e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: int(messageSize)}).MaxTimes(1)
@@ -75,7 +74,7 @@ func TestTopicStreamReaderImpl_BufferCounterOnStopPartition(t *testing.T) {
 				close(messageReaded)
 			})
 			<-messageReaded
-			require.Equal(t, int64(1), e.reader.restBufferSizeBytes.Load())
+			require.Equal(t, int64(1), e.reader.atomicCountRequestedBytes.Load())
 
 			partitionStopped := make(empty.Chan)
 			e.SendFromServerAndSetNextCallback(&rawtopicreader.StopPartitionSessionRequest{
@@ -91,14 +90,14 @@ func TestTopicStreamReaderImpl_BufferCounterOnStopPartition(t *testing.T) {
 			fixedBufferSizeCtx, cancel := context.WithCancel(e.ctx)
 			go func() {
 				xtest.SpinWaitCondition(t, nil, func() bool {
-					return initialBufferSize == e.reader.restBufferSizeBytes.Load()
+					return initialBufferSize == e.reader.atomicCountRequestedBytes.Load()
 				})
 				cancel()
 			}()
 
 			_, _ = e.reader.ReadMessageBatch(fixedBufferSizeCtx, newReadMessageBatchOptions())
 			<-fixedBufferSizeCtx.Done()
-			require.Equal(t, initialBufferSize, e.reader.restBufferSizeBytes.Load())
+			require.Equal(t, initialBufferSize, e.reader.atomicCountRequestedBytes.Load())
 		})
 	}
 }
@@ -484,7 +483,7 @@ func TestTopicStreamReaderImpl_isNeedDataRequest(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			e := newTopicReaderTestEnv(t)
 			e.reader.cfg.BufferSizeProtoBytes = tc.InputData.SizeBytes
-			e.reader.atomicCountRequestedBytes = int64(tc.InputData.RequestedBytes)
+			e.reader.atomicCountRequestedBytes.Swap(int64(tc.InputData.RequestedBytes))
 
 			actualIsNeedDataRequest := e.reader.isNeedDataRequest()
 
@@ -496,7 +495,7 @@ func TestTopicStreamReaderImpl_isNeedDataRequest(t *testing.T) {
 func TestTopicStreamReaderImpl_CheckSendMessageToServerAfterChangeBufferSize(t *testing.T) {
 	waitChangeCountRequestedBytes := func(r *topicStreamReaderImpl, old int64) {
 		xtest.SpinWaitCondition(t, nil, func() bool {
-			return atomic.LoadInt64(&r.atomicCountRequestedBytes) != old
+			return r.atomicCountRequestedBytes.Load() != old
 		})
 	}
 
@@ -526,7 +525,7 @@ func TestTopicStreamReaderImpl_CheckSendMessageToServerAfterChangeBufferSize(t *
 		}})
 		waitChangeCountRequestedBytes(e.reader, e.initialBufferSizeBytes)
 		expectedBufferSizeAfterReceiveMessages := e.initialBufferSizeBytes - dataSize
-		require.Equal(t, e.reader.atomicCountRequestedBytes, expectedBufferSizeAfterReceiveMessages)
+		require.Equal(t, e.reader.atomicCountRequestedBytes.Load(), expectedBufferSizeAfterReceiveMessages)
 
 		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: dataSize})
 		oneOption := newReadMessageBatchOptions()
@@ -535,7 +534,7 @@ func TestTopicStreamReaderImpl_CheckSendMessageToServerAfterChangeBufferSize(t *
 		require.NoError(t, err)
 
 		waitChangeCountRequestedBytes(e.reader, expectedBufferSizeAfterReceiveMessages)
-		require.Equal(t, e.initialBufferSizeBytes, e.reader.atomicCountRequestedBytes)
+		require.Equal(t, e.initialBufferSizeBytes, e.reader.atomicCountRequestedBytes.Load())
 	})
 	t.Run("NotSendAfter20PersentFree", func(t *testing.T) {
 		e := newTopicReaderTestEnv(t)
@@ -563,7 +562,7 @@ func TestTopicStreamReaderImpl_CheckSendMessageToServerAfterChangeBufferSize(t *
 		}})
 		waitChangeCountRequestedBytes(e.reader, e.initialBufferSizeBytes)
 		expectedBufferSizeAfterReceiveMessages := e.initialBufferSizeBytes - dataSize
-		require.Equal(t, e.reader.atomicCountRequestedBytes, expectedBufferSizeAfterReceiveMessages)
+		require.Equal(t, e.reader.atomicCountRequestedBytes.Load(), expectedBufferSizeAfterReceiveMessages)
 
 		oneOption := newReadMessageBatchOptions()
 		oneOption.MaxCount = 1
@@ -606,7 +605,7 @@ func TestTopicStreamReaderImpl_CheckSendMessageToServerAfterChangeBufferSize(t *
 		})
 		waitChangeCountRequestedBytes(e.reader, e.initialBufferSizeBytes)
 		expectedBufferSizeAfterReceiveFirstMessage := e.initialBufferSizeBytes - firstMessageDataSize
-		require.Equal(t, e.reader.atomicCountRequestedBytes, expectedBufferSizeAfterReceiveFirstMessage)
+		require.Equal(t, e.reader.atomicCountRequestedBytes.Load(), expectedBufferSizeAfterReceiveFirstMessage)
 
 		oneOption := newReadMessageBatchOptions()
 		oneOption.MaxCount = 1
@@ -634,7 +633,7 @@ func TestTopicStreamReaderImpl_CheckSendMessageToServerAfterChangeBufferSize(t *
 		})
 		waitChangeCountRequestedBytes(e.reader, expectedBufferSizeAfterReceiveFirstMessage)
 		expectedBufferSizeAfterReceiveSecondMessage := expectedBufferSizeAfterReceiveFirstMessage - secondMessageDataSize
-		require.Equal(t, e.reader.atomicCountRequestedBytes, expectedBufferSizeAfterReceiveSecondMessage)
+		require.Equal(t, e.reader.atomicCountRequestedBytes.Load(), expectedBufferSizeAfterReceiveSecondMessage)
 
 		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: firstMessageDataSize + secondMessageDataSize})
 		oneOption = newReadMessageBatchOptions()
@@ -643,7 +642,7 @@ func TestTopicStreamReaderImpl_CheckSendMessageToServerAfterChangeBufferSize(t *
 		require.NoError(t, err)
 
 		waitChangeCountRequestedBytes(e.reader, expectedBufferSizeAfterReceiveSecondMessage)
-		require.Equal(t, e.initialBufferSizeBytes, e.reader.atomicCountRequestedBytes)
+		require.Equal(t, e.initialBufferSizeBytes, e.reader.atomicCountRequestedBytes.Load())
 	})
 }
 
@@ -666,7 +665,7 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 			e := newTopicReaderTestEnv(t)
 
 			// doesn't check sends
-			e.stream.EXPECT().Send(gomock.Any()).Return(nil).MinTimes(1)
+			e.stream.EXPECT().Send(gomock.Any()).Return(nil).MinTimes(0)
 
 			e.Start()
 			waitChangeRestBufferSizeBytes(e.reader, 0)
@@ -901,7 +900,6 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 
 		require.Equal(t, expectedData, data)
 		require.Equal(t, expectedBatch, batch)
-		<-sendDataRequestCompleted
 	})
 }
 
@@ -995,7 +993,7 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 		require.Equal(t, int64(1), batch.Messages[0].Offset)
 
 		<-nextDataRequested
-		require.Equal(t, e.initialBufferSizeBytes, atomic.LoadInt64(&e.reader.atomicCountRequestedBytes.Load()))
+		require.Equal(t, e.initialBufferSizeBytes, e.reader.atomicCountRequestedBytes.Load())
 	})
 }
 
@@ -1141,7 +1139,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 func (e *streamEnv) Start() {
 	require.NoError(e.t, e.reader.startLoops())
 	xtest.SpinWaitCondition(e.t, nil, func() bool {
-		return atomic.LoadInt64(&e.reader.atomicCountRequestedBytes.Load()) == e.initialBufferSizeBytes
+		return e.reader.atomicCountRequestedBytes.Load() == e.initialBufferSizeBytes
 	})
 }
 

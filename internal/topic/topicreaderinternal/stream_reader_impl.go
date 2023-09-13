@@ -9,7 +9,6 @@ import (
 	"math/big"
 	"reflect"
 	"runtime/pprof"
-	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
