@@ -37,7 +37,7 @@ type topicStreamReaderImpl struct {
 	cancel context.CancelFunc
 
 	freeBytes                 chan int
-	atomicRestBufferSizeBytes int64
+	atomicCountRequestedBytes int64
 	sessionController         partitionSessionStorage
 	backgroundWorkers         background.Worker
 
@@ -172,11 +172,11 @@ func (r *topicStreamReaderImpl) ReadMessageBatch(
 		ctx,
 		opts.MinCount,
 		opts.MaxCount,
-		r.getRestBufferBytes(),
+		r.getCountRequestedBytes(),
 	)
 	defer func() {
 		if batch == nil {
-			onDone(0, "", -1, -1, -1, -1, r.getRestBufferBytes(), err)
+			onDone(0, "", -1, -1, -1, -1, r.getCountRequestedBytes(), err)
 		} else {
 			onDone(
 				len(batch.Messages),
@@ -185,7 +185,7 @@ func (r *topicStreamReaderImpl) ReadMessageBatch(
 				batch.partitionSession().partitionSessionID.ToInt64(),
 				batch.commitRange.commitOffsetStart.ToInt64(),
 				batch.commitRange.commitOffsetEnd.ToInt64(),
-				r.getRestBufferBytes(),
+				r.getCountRequestedBytes(),
 				err,
 			)
 		}
@@ -453,16 +453,16 @@ func (r *topicStreamReaderImpl) initSession() (err error) {
 	return nil
 }
 
-func (r *topicStreamReaderImpl) addRestBufferBytes(delta int) int {
-	val := atomic.AddInt64(&r.atomicRestBufferSizeBytes, int64(delta))
+func (r *topicStreamReaderImpl) addCountRequestedBytes(delta int) int {
+	val := atomic.AddInt64(&r.atomicCountRequestedBytes, int64(delta))
 	if val <= 0 {
 		r.batcher.IgnoreMinRestrictionsOnNextPop()
 	}
 	return int(val)
 }
 
-func (r *topicStreamReaderImpl) getRestBufferBytes() int {
-	return int(atomic.LoadInt64(&r.atomicRestBufferSizeBytes))
+func (r *topicStreamReaderImpl) getCountRequestedBytes() int {
+	return int(atomic.LoadInt64(&r.atomicCountRequestedBytes))
 }
 
 func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
@@ -528,7 +528,7 @@ func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
 	}
 }
 
-const freeSpacePercentageThreshold = 30
+const requestedBytesPercentageThreshold = 70
 
 func (r *topicStreamReaderImpl) dataRequestLoop(ctx context.Context) {
 	if r.ctx.Err() != nil {
@@ -544,36 +544,42 @@ func (r *topicStreamReaderImpl) dataRequestLoop(ctx context.Context) {
 			return
 
 		case <-r.freeBytes:
-			freeSpacePercentage := r.getFreeSpacePercentage()
 
-			if freeSpacePercentage <= freeSpacePercentageThreshold {
+			if !r.isNeedDataRequest() {
 				return
 			}
 
-			freeSpaceBytes := r.cfg.BufferSizeProtoBytes - r.getRestBufferBytes()
-			resCapacity := r.addRestBufferBytes(freeSpaceBytes)
-			trace.TopicOnReaderSentDataRequest(r.cfg.Trace, r.readConnectionID, freeSpaceBytes, resCapacity)
+			var (
+				countBytesForRequest int
+				err                  error
+			)
+			r.m.WithLock(func() {
+				countBytesForRequest = r.cfg.BufferSizeProtoBytes - r.getCountRequestedBytes()
+				resCapacity := r.addCountRequestedBytes(countBytesForRequest)
+				trace.TopicOnReaderSentDataRequest(r.cfg.Trace, r.readConnectionID, countBytesForRequest, resCapacity)
+				err = r.sendDataRequest(countBytesForRequest)
+			})
 
-			if err := r.sendDataRequest(freeSpaceBytes); err != nil {
+			if err != nil {
 				return
 			}
 		}
 	}
 }
 
-func (r *topicStreamReaderImpl) getFreeSpacePercentage() int {
-	sizeBytes := r.cfg.BufferSizeProtoBytes
-	freeSpaceBytes := sizeBytes - r.getRestBufferBytes()
-	freeSpacePercentage := freeSpaceBytes * 100 / sizeBytes
-
-	if freeSpacePercentage < 0 {
-		freeSpacePercentage = 0
+func (r *topicStreamReaderImpl) isNeedDataRequest() bool {
+	RequestedBytesPercentage := r.getCountRequestedBytes() * 100 / r.cfg.BufferSizeProtoBytes
+	if RequestedBytesPercentage < 0 {
+		RequestedBytesPercentage = 0
 	}
-	if freeSpacePercentage > 100 {
-		freeSpacePercentage = 100
+	if RequestedBytesPercentage > 100 {
+		RequestedBytesPercentage = 100
+	}
+	if RequestedBytesPercentage > requestedBytesPercentageThreshold {
+		return false
 	}
 
-	return freeSpacePercentage
+	return true
 }
 
 func (r *topicStreamReaderImpl) sendDataRequest(size int) error {
@@ -607,7 +613,7 @@ func (r *topicStreamReaderImpl) updateTokenLoop(ctx context.Context) {
 }
 
 func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse) (err error) {
-	resCapacity := r.addRestBufferBytes(-msg.BytesSize)
+	resCapacity := r.addCountRequestedBytes(-msg.BytesSize)
 	onDone := trace.TopicOnReaderReceiveDataResponse(r.cfg.Trace, r.readConnectionID, resCapacity, msg)
 	defer func() {
 		onDone(err)
