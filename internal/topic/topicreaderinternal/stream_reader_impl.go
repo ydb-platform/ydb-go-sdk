@@ -568,14 +568,14 @@ func (r *topicStreamReaderImpl) dataRequestLoop(ctx context.Context) {
 }
 
 func (r *topicStreamReaderImpl) isNeedDataRequest() bool {
-	RequestedBytesPercentage := r.getCountRequestedBytes() * 100 / r.cfg.BufferSizeProtoBytes
-	if RequestedBytesPercentage < 0 {
-		RequestedBytesPercentage = 0
+	requestedBytesPercentage := r.getCountRequestedBytes() * 100 / r.cfg.BufferSizeProtoBytes
+	if requestedBytesPercentage < 0 {
+		requestedBytesPercentage = 0
 	}
-	if RequestedBytesPercentage > 100 {
-		RequestedBytesPercentage = 100
+	if requestedBytesPercentage > 100 {
+		requestedBytesPercentage = 100
 	}
-	if RequestedBytesPercentage > requestedBytesPercentageThreshold {
+	if requestedBytesPercentage > requestedBytesPercentageThreshold {
 		return false
 	}
 
