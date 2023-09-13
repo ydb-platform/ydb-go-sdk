@@ -36,10 +36,10 @@ type topicStreamReaderImpl struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	freeBytes                 chan int
-	atomicCountRequestedBytes xatomic.Int64
-	sessionController         partitionSessionStorage
-	backgroundWorkers         background.Worker
+	freeBytes           chan int
+	CountRequestedBytes xatomic.Int64
+	sessionController   partitionSessionStorage
+	backgroundWorkers   background.Worker
 
 	rawMessagesFromBuffer chan rawtopicreader.ServerMessage
 
@@ -454,7 +454,7 @@ func (r *topicStreamReaderImpl) initSession() (err error) {
 }
 
 func (r *topicStreamReaderImpl) addCountRequestedBytes(delta int) int {
-	val := r.atomicCountRequestedBytes.Add(int64(delta))
+	val := r.CountRequestedBytes.Add(int64(delta))
 	if val <= 0 {
 		r.batcher.IgnoreMinRestrictionsOnNextPop()
 	}
@@ -462,7 +462,7 @@ func (r *topicStreamReaderImpl) addCountRequestedBytes(delta int) int {
 }
 
 func (r *topicStreamReaderImpl) getCountRequestedBytes() int {
-	return int(r.atomicCountRequestedBytes.Load())
+	return int(r.CountRequestedBytes.Load())
 }
 
 func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {

@@ -1,8 +1,7 @@
+* Now read requests are sent after buffer free space reaches 30% of buffer size
 * Added `x-ydb-trace-id` header into grpc calls
 * Improved topic reader logs
 * Fixed `internal/xstring` package with deprecated warning in `go1.21` about `reflect.{String,Slice}Header`
-
-* Now read requests are sent after buffer free space reaches 30% of buffer size
 
 ## v3.51.3
 * Added `internal/xstring.{FromBytes([]byte),ToBytes(string)` for increase performance on `string` from/to `[]byte` conversion
