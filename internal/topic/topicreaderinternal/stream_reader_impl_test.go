@@ -352,8 +352,6 @@ func TestTopicStreamReaderImpl_getCurrentBufferFreeSpacePercentage(t *testing.T)
 	}
 	type expect struct {
 		FreeSpacePercentage int
-		HaveError           bool
-		Err                 error
 	}
 
 	tests := []struct {
@@ -369,8 +367,6 @@ func TestTopicStreamReaderImpl_getCurrentBufferFreeSpacePercentage(t *testing.T)
 			},
 			ExpectData: expect{
 				FreeSpacePercentage: 20,
-				HaveError:           false,
-				Err:                 nil,
 			},
 		},
 		{
@@ -381,8 +377,6 @@ func TestTopicStreamReaderImpl_getCurrentBufferFreeSpacePercentage(t *testing.T)
 			},
 			ExpectData: expect{
 				FreeSpacePercentage: 0,
-				HaveError:           false,
-				Err:                 nil,
 			},
 		},
 		{
@@ -393,8 +387,6 @@ func TestTopicStreamReaderImpl_getCurrentBufferFreeSpacePercentage(t *testing.T)
 			},
 			ExpectData: expect{
 				FreeSpacePercentage: 100,
-				HaveError:           false,
-				Err:                 nil,
 			},
 		},
 		{
@@ -405,8 +397,6 @@ func TestTopicStreamReaderImpl_getCurrentBufferFreeSpacePercentage(t *testing.T)
 			},
 			ExpectData: expect{
 				FreeSpacePercentage: 0,
-				HaveError:           true,
-				Err:                 errCannotCalcFreeSpacePercentage,
 			},
 		},
 	}
@@ -417,13 +407,8 @@ func TestTopicStreamReaderImpl_getCurrentBufferFreeSpacePercentage(t *testing.T)
 			e.reader.cfg.BufferSizeProtoBytes = tc.InputData.SizeBytes
 			e.reader.atomicRestBufferSizeBytes = int64(tc.InputData.UsedSpaceBytes)
 
-			actualFreeSpacePercentage, err := e.reader.getFreeSpacePercentage()
-			if tc.ExpectData.HaveError {
-				require.ErrorIs(t, tc.ExpectData.Err, err)
-				return
-			}
+			actualFreeSpacePercentage := e.reader.getFreeSpacePercentage()
 
-			require.NoError(t, err)
 			require.Equal(t, tc.ExpectData.FreeSpacePercentage, actualFreeSpacePercentage)
 		})
 	}

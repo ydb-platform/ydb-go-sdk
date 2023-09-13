@@ -528,7 +528,7 @@ func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
 	}
 }
 
-const FreeSpacePercentageThreshold = 30
+const freeSpacePercentageThreshold = 30
 
 func (r *topicStreamReaderImpl) dataRequestLoop(ctx context.Context) {
 	if r.ctx.Err() != nil {
@@ -544,12 +544,9 @@ func (r *topicStreamReaderImpl) dataRequestLoop(ctx context.Context) {
 			return
 
 		case <-r.freeBytes:
-			freeSpacePercentage, err := r.getFreeSpacePercentage()
-			if err != nil {
-				return
-			}
+			freeSpacePercentage := r.getFreeSpacePercentage()
 
-			if freeSpacePercentage <= FreeSpacePercentageThreshold {
+			if freeSpacePercentage <= freeSpacePercentageThreshold {
 				return
 			}
 
@@ -564,17 +561,19 @@ func (r *topicStreamReaderImpl) dataRequestLoop(ctx context.Context) {
 	}
 }
 
-var errCannotCalcFreeSpacePercentage = errors.New("cannot calculate free space percentage")
+func (r *topicStreamReaderImpl) getFreeSpacePercentage() int {
+	sizeBytes := r.cfg.BufferSizeProtoBytes
+	freeSpaceBytes := sizeBytes - r.getRestBufferBytes()
+	freeSpacePercentage := freeSpaceBytes * 100 / sizeBytes
 
-func (r *topicStreamReaderImpl) getFreeSpacePercentage() (percentage int, err error) {
-	sizeBytes := float64(r.cfg.BufferSizeProtoBytes)
-	usedSpaceBytes := float64(r.getRestBufferBytes())
-	usedSpacePercentage := int(usedSpaceBytes / sizeBytes * 100)
-	if !(usedSpacePercentage >= 0 && usedSpacePercentage <= 100) {
-		return 0, errCannotCalcFreeSpacePercentage
+	if freeSpacePercentage < 0 {
+		freeSpacePercentage = 0
 	}
-	freeSpacePercentage := 100 - usedSpacePercentage
-	return freeSpacePercentage, nil
+	if freeSpacePercentage > 100 {
+		freeSpacePercentage = 100
+	}
+
+	return freeSpacePercentage
 }
 
 func (r *topicStreamReaderImpl) sendDataRequest(size int) error {
