@@ -464,7 +464,7 @@ func (c *conn) wrapError(err error) error {
 	if err == nil {
 		return nil
 	}
-	nodeErr := newNodeError(c.endpoint.NodeID(), c.endpoint.Address(), err)
+	nodeErr := newConnError(c.endpoint.NodeID(), c.endpoint.Address(), err)
 	return xerrors.WithStackTrace(nodeErr, xerrors.WithSkipDepth(1))
 }
 

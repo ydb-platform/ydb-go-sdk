@@ -132,7 +132,7 @@ func (s *grpcClientStream) wrapError(err error) error {
 		return nil
 	}
 
-	nodeErr := newNodeError(s.c.endpoint.NodeID(), s.c.endpoint.Address(), err)
+	nodeErr := newConnError(s.c.endpoint.NodeID(), s.c.endpoint.Address(), err)
 	return xerrors.WithStackTrace(nodeErr, xerrors.WithSkipDepth(1))
 }
 
