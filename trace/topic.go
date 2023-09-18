@@ -134,8 +134,7 @@ type (
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
 	TopicReaderSendCommitMessageStartInfo struct {
-		// ReaderConnectionID string unimplemented yet - need some internal changes
-		CommitsInfo TopicReaderStreamSendCommitMessageStartMessageInfo
+		CommitsInfo []TopicReaderStreamSendCommitMessageStartMessageInfo
 	}
 
 	// TopicReaderStreamSendCommitMessageStartMessageInfo
@@ -144,9 +143,12 @@ type (
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
 	// later release.
-	TopicReaderStreamSendCommitMessageStartMessageInfo interface {
-		PartitionIDs() []int64
-		PartitionSessionIDs() []int64
+	TopicReaderStreamSendCommitMessageStartMessageInfo struct {
+		Topic              string
+		PartitionID        int64
+		PartitionSessionID int64
+		StartOffset        int64
+		EndOffset          int64
 	}
 
 	// TopicReaderSendCommitMessageDoneInfo

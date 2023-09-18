@@ -162,25 +162,36 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		}
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "send", "commit", "message")
 		start := time.Now()
-		l.Log(ctx, "start",
-			Any("partitions_id", info.CommitsInfo.PartitionIDs()),
-			Any("partitions_session_id", info.CommitsInfo.PartitionSessionIDs()),
-		)
+
+		for _, commitInfo := range info.CommitsInfo {
+			l.Log(ctx, "start",
+				String("topic", commitInfo.Topic),
+				Int64("partitions_id", commitInfo.PartitionID),
+				Int64("partitions_session_id", commitInfo.PartitionSessionID),
+				Int64("commit_start_offset", commitInfo.StartOffset),
+				Int64("commit_end_offset", commitInfo.EndOffset),
+			)
+		}
 		return func(doneInfo trace.TopicReaderSendCommitMessageDoneInfo) {
-			fields := []Field{
-				Any("partitions_id", info.CommitsInfo.PartitionIDs()),
-				Any("partitions_session_id", info.CommitsInfo.PartitionSessionIDs()),
-				latencyField(start),
-			}
-			if doneInfo.Error == nil {
-				l.Log(ctx, "done", fields...)
-			} else {
-				l.Log(WithLevel(ctx, WARN), "commit message sent",
-					append(fields,
-						Error(doneInfo.Error),
-						versionField(),
-					)...,
-				)
+			for _, commitInfo := range info.CommitsInfo {
+				fields := []Field{
+					String("topic", commitInfo.Topic),
+					Int64("partitions_id", commitInfo.PartitionID),
+					Int64("partitions_session_id", commitInfo.PartitionSessionID),
+					Int64("commit_start_offset", commitInfo.StartOffset),
+					Int64("commit_end_offset", commitInfo.EndOffset),
+					latencyField(start),
+				}
+				if doneInfo.Error == nil {
+					l.Log(ctx, "done", fields...)
+				} else {
+					l.Log(WithLevel(ctx, WARN), "commit message sent",
+						append(fields,
+							Error(doneInfo.Error),
+							versionField(),
+						)...,
+					)
+				}
 			}
 		}
 	}
