@@ -2,6 +2,7 @@ package table
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -14,13 +15,16 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scheme"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
+	"google.golang.org/grpc"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -623,4 +627,139 @@ func TestDescribeTableRegression(t *testing.T) {
 	}
 
 	assert.Equal(t, exp, act)
+}
+
+var errUnexpectedRequest = errors.New("unexpected request")
+
+type copyTablesMock struct {
+	*Ydb_Table.CopyTablesRequest
+}
+
+func (mock *copyTablesMock) CopyTables(
+	_ context.Context, in *Ydb_Table.CopyTablesRequest, opts ...grpc.CallOption,
+) (*Ydb_Table.CopyTablesResponse, error) {
+	if in.String() == mock.String() {
+		return &Ydb_Table.CopyTablesResponse{}, nil
+	}
+	return nil, fmt.Errorf("%w: %s, exp: %s", errUnexpectedRequest, in, mock.String())
+}
+
+func Test_copyTables(t *testing.T) {
+	ctx := xtest.Context(t)
+	for _, tt := range []struct {
+		sessionID            string
+		operationTimeout     time.Duration
+		operationCancelAfter time.Duration
+		service              *copyTablesMock
+		opts                 []options.CopyTablesOption
+		err                  error
+	}{
+		{
+			sessionID:            "1",
+			operationTimeout:     time.Second,
+			operationCancelAfter: time.Second,
+			service: &copyTablesMock{
+				CopyTablesRequest: &Ydb_Table.CopyTablesRequest{
+					SessionId: "1",
+					Tables: []*Ydb_Table.CopyTableItem{
+						{
+							SourcePath:      "from",
+							DestinationPath: "to",
+							OmitIndexes:     true,
+						},
+					},
+					OperationParams: &Ydb_Operations.OperationParams{
+						OperationMode:    Ydb_Operations.OperationParams_SYNC,
+						OperationTimeout: durationpb.New(time.Second),
+						CancelAfter:      durationpb.New(time.Second),
+					},
+				},
+			},
+			opts: []options.CopyTablesOption{
+				options.CopyTablesItem("from", "to", true),
+			},
+			err: nil,
+		},
+		{
+			sessionID:            "2",
+			operationTimeout:     2 * time.Second,
+			operationCancelAfter: 2 * time.Second,
+			service: &copyTablesMock{
+				CopyTablesRequest: &Ydb_Table.CopyTablesRequest{
+					SessionId: "2",
+					Tables: []*Ydb_Table.CopyTableItem{
+						{
+							SourcePath:      "from1",
+							DestinationPath: "to1",
+							OmitIndexes:     true,
+						},
+						{
+							SourcePath:      "from2",
+							DestinationPath: "to2",
+							OmitIndexes:     false,
+						},
+						{
+							SourcePath:      "from3",
+							DestinationPath: "to3",
+							OmitIndexes:     true,
+						},
+					},
+					OperationParams: &Ydb_Operations.OperationParams{
+						OperationMode:    Ydb_Operations.OperationParams_SYNC,
+						OperationTimeout: durationpb.New(2 * time.Second),
+						CancelAfter:      durationpb.New(2 * time.Second),
+					},
+				},
+			},
+			opts: []options.CopyTablesOption{
+				options.CopyTablesItem("from1", "to1", true),
+				options.CopyTablesItem("from2", "to2", false),
+				options.CopyTablesItem("from3", "to3", true),
+			},
+			err: nil,
+		},
+		{
+			sessionID:            "3",
+			operationTimeout:     time.Second,
+			operationCancelAfter: time.Second,
+			service: &copyTablesMock{
+				CopyTablesRequest: &Ydb_Table.CopyTablesRequest{
+					SessionId: "1",
+					Tables: []*Ydb_Table.CopyTableItem{
+						{
+							SourcePath:      "from",
+							DestinationPath: "to",
+							OmitIndexes:     true,
+						},
+					},
+					OperationParams: &Ydb_Operations.OperationParams{
+						OperationMode:    Ydb_Operations.OperationParams_SYNC,
+						OperationTimeout: durationpb.New(time.Second),
+						CancelAfter:      durationpb.New(time.Second),
+					},
+				},
+			},
+			opts: []options.CopyTablesOption{
+				options.CopyTablesItem("from1", "to1", true),
+			},
+			err: errUnexpectedRequest,
+		},
+		{
+			sessionID:            "4",
+			operationTimeout:     time.Second,
+			operationCancelAfter: time.Second,
+			service:              &copyTablesMock{},
+			opts:                 nil,
+			err:                  errParamsRequired,
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			err := copyTables(ctx, tt.sessionID, tt.operationTimeout, tt.operationCancelAfter, tt.service, tt.opts...)
+			if tt.err != nil {
+				require.ErrorIs(t, err, tt.err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }

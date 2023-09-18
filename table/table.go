@@ -118,6 +118,11 @@ type Session interface {
 		opts ...options.CopyTableOption,
 	) (err error)
 
+	CopyTables(
+		ctx context.Context,
+		opts ...options.CopyTablesOption,
+	) (err error)
+
 	Explain(
 		ctx context.Context,
 		query string,
