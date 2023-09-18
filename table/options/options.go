@@ -788,6 +788,21 @@ type (
 )
 
 type (
+	CopyTablesDesc   Ydb_Table.CopyTablesRequest
+	CopyTablesOption func(*CopyTablesDesc)
+)
+
+func CopyTablesItem(src, dst string, omitIndexes bool) CopyTablesOption {
+	return func(desc *CopyTablesDesc) {
+		desc.Tables = append(desc.Tables, &Ydb_Table.CopyTableItem{
+			SourcePath:      src,
+			DestinationPath: dst,
+			OmitIndexes:     omitIndexes,
+		})
+	}
+}
+
+type (
 	ExecuteSchemeQueryDesc   Ydb_Table.ExecuteSchemeQueryRequest
 	ExecuteSchemeQueryOption func(*ExecuteSchemeQueryDesc)
 )

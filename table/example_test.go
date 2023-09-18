@@ -394,3 +394,28 @@ func Example_scanQueryWithCompression() {
 		fmt.Printf("unexpected error: %v", err)
 	}
 }
+
+func Example_copyTables() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		fmt.Printf("failed connect: %v", err)
+		return
+	}
+	defer db.Close(ctx) // cleanup resources
+	err = db.Table().Do(ctx,
+		func(ctx context.Context, s table.Session) (err error) {
+			return s.CopyTables(ctx,
+				options.CopyTablesItem(
+					path.Join(db.Name(), "from", "series"),
+					path.Join(db.Name(), "to", "series"),
+					true,
+				),
+			)
+		},
+		table.WithIdempotent(),
+	)
+	if err != nil {
+		fmt.Printf("unexpected error: %v", err)
+	}
+}

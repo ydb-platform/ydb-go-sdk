@@ -2,6 +2,7 @@ package table
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"strconv"
 	"sync"
@@ -531,7 +532,58 @@ func (s *session) CopyTable(
 		}
 	}
 	_, err = s.tableService.CopyTable(ctx, &request)
-	return xerrors.WithStackTrace(err)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+	return nil
+}
+
+func copyTables(
+	ctx context.Context,
+	sessionID string,
+	operationTimeout time.Duration,
+	operationCancelAfter time.Duration,
+	service interface {
+		CopyTables(
+			ctx context.Context, in *Ydb_Table.CopyTablesRequest, opts ...grpc.CallOption,
+		) (*Ydb_Table.CopyTablesResponse, error)
+	},
+	opts ...options.CopyTablesOption,
+) (err error) {
+	request := Ydb_Table.CopyTablesRequest{
+		SessionId: sessionID,
+		OperationParams: operation.Params(
+			ctx,
+			operationTimeout,
+			operationCancelAfter,
+			operation.ModeSync,
+		),
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt((*options.CopyTablesDesc)(&request))
+		}
+	}
+	if len(request.Tables) == 0 {
+		return xerrors.WithStackTrace(fmt.Errorf("no CopyTablesItem: %w", errParamsRequired))
+	}
+	_, err = service.CopyTables(ctx, &request)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+	return nil
+}
+
+// CopyTables creates copy of table at given path.
+func (s *session) CopyTables(
+	ctx context.Context,
+	opts ...options.CopyTablesOption,
+) (err error) {
+	err = copyTables(ctx, s.id, s.config.OperationTimeout(), s.config.OperationCancelAfter(), s.tableService, opts...)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+	return nil
 }
 
 // Explain explains data query represented by text.
