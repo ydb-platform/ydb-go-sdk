@@ -24,7 +24,7 @@ func (r *CommitRanges) len() int {
 	return len(r.ranges)
 }
 
-func (r *CommitRanges) toTopicReaderStreamSendCommitMessageStartMessageInfo() []trace.TopicReaderStreamSendCommitMessageStartMessageInfo {
+func (r *CommitRanges) toTopicReaderStreamSendCommitMessageStartMessageInfo() []trace.TopicReaderStreamSendCommitMessageStartMessageInfo { //nolint:lll
 	res := make([]trace.TopicReaderStreamSendCommitMessageStartMessageInfo, len(r.ranges))
 	for i := range res {
 		res[i] = trace.TopicReaderStreamSendCommitMessageStartMessageInfo{
