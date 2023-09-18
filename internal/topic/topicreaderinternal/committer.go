@@ -144,7 +144,10 @@ func (c *committer) pushCommitsLoop(ctx context.Context) {
 
 		commits.optimize()
 
-		onDone := trace.TopicOnReaderSendCommitMessage(c.tracer, commits.toTopicReaderStreamSendCommitMessageStartMessageInfo())
+		onDone := trace.TopicOnReaderSendCommitMessage(
+			c.tracer,
+			commits.toTopicReaderStreamSendCommitMessageStartMessageInfo(),
+		)
 		err := sendCommitMessage(c.send, commits)
 		onDone(err)
 

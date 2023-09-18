@@ -163,23 +163,23 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "send", "commit", "message")
 		start := time.Now()
 
-		for _, commitInfo := range info.CommitsInfo {
+		for i := range info.CommitsInfo {
 			l.Log(ctx, "start",
-				String("topic", commitInfo.Topic),
-				Int64("partitions_id", commitInfo.PartitionID),
-				Int64("partitions_session_id", commitInfo.PartitionSessionID),
-				Int64("commit_start_offset", commitInfo.StartOffset),
-				Int64("commit_end_offset", commitInfo.EndOffset),
+				String("topic", info.CommitsInfo[i].Topic),
+				Int64("partitions_id", info.CommitsInfo[i].PartitionID),
+				Int64("partitions_session_id", info.CommitsInfo[i].PartitionSessionID),
+				Int64("commit_start_offset", info.CommitsInfo[i].StartOffset),
+				Int64("commit_end_offset", info.CommitsInfo[i].EndOffset),
 			)
 		}
 		return func(doneInfo trace.TopicReaderSendCommitMessageDoneInfo) {
-			for _, commitInfo := range info.CommitsInfo {
+			for i := range info.CommitsInfo {
 				fields := []Field{
-					String("topic", commitInfo.Topic),
-					Int64("partitions_id", commitInfo.PartitionID),
-					Int64("partitions_session_id", commitInfo.PartitionSessionID),
-					Int64("commit_start_offset", commitInfo.StartOffset),
-					Int64("commit_end_offset", commitInfo.EndOffset),
+					String("topic", info.CommitsInfo[i].Topic),
+					Int64("partitions_id", info.CommitsInfo[i].PartitionID),
+					Int64("partitions_session_id", info.CommitsInfo[i].PartitionSessionID),
+					Int64("commit_start_offset", info.CommitsInfo[i].StartOffset),
+					Int64("commit_end_offset", info.CommitsInfo[i].EndOffset),
 					latencyField(start),
 				}
 				if doneInfo.Error == nil {
