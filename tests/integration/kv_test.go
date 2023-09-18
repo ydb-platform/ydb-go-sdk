@@ -40,7 +40,10 @@ func TestKeyValue(t *testing.T) {
 
 	// get
 	err = driver.Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
-		rows, err := s.ReadRows(ctx, tablePath, types.ListValue(types.Int64Value(id)),
+		rows, err := s.ReadRows(ctx, tablePath,
+			types.ListValue(types.StructValue(
+				types.StructFieldValue("id", types.Int64Value(id)),
+			)),
 			options.ReadColumn("val"),
 		)
 		if err != nil {
@@ -49,10 +52,10 @@ func TestKeyValue(t *testing.T) {
 		defer func() {
 			_ = rows.Close()
 		}()
-		if !rows.HasNextResultSet() {
+		if !rows.NextResultSet(ctx) {
 			return fmt.Errorf("no result sets")
 		}
-		if !rows.HasNextRow() {
+		if !rows.NextRow() {
 			return fmt.Errorf("no rows")
 		}
 		if rows.CurrentResultSet().RowCount() != 1 {
@@ -61,10 +64,11 @@ func TestKeyValue(t *testing.T) {
 		if rows.CurrentResultSet().ColumnCount() != 1 {
 			return fmt.Errorf("wrong column count (%d)", rows.CurrentResultSet().ColumnCount())
 		}
-		var actualValue int64
-		if err := rows.ScanNamed(named.Optional("val", &actualValue)); err != nil {
+		var actualValue string
+		if err := rows.ScanNamed(named.OptionalWithDefault("val", &actualValue)); err != nil {
 			return err
 		}
+		t.Logf("%s[%d] = %q", tablePath, id, actualValue)
 		return rows.Err()
 	})
 	scope.Require.NoError(err)
