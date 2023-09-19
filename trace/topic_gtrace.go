@@ -1061,7 +1061,7 @@ func TopicOnReaderCommit(t *Topic, requestContext context.Context, topic string,
 		res(p)
 	}
 }
-func TopicOnReaderSendCommitMessage(t *Topic, commitsInfo []TopicReaderStreamSendCommitMessageStartMessageInfo) func(error) {
+func TopicOnReaderSendCommitMessage(t *Topic, commitsInfo TopicReaderStreamSendCommitMessageStartMessageInfo) func(error) {
 	var p TopicReaderSendCommitMessageStartInfo
 	p.CommitsInfo = commitsInfo
 	res := t.onReaderSendCommitMessage(p)

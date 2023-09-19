@@ -24,10 +24,11 @@ func (r *CommitRanges) len() int {
 	return len(r.ranges)
 }
 
-func (r *CommitRanges) toTopicReaderStreamSendCommitMessageStartMessageInfo() []trace.TopicReaderStreamSendCommitMessageStartMessageInfo { //nolint:lll
-	res := make([]trace.TopicReaderStreamSendCommitMessageStartMessageInfo, len(r.ranges))
+func (r *CommitRanges) GetCommitedInfo() []trace.TopicReaderCommitStartInfo {
+	res := make([]trace.TopicReaderCommitStartInfo, len(r.ranges))
 	for i := range res {
-		res[i] = trace.TopicReaderStreamSendCommitMessageStartMessageInfo{
+		res[i] = trace.TopicReaderCommitStartInfo{
+			RequestContext:     r.ranges[i].partitionSession.ctx,
 			Topic:              r.ranges[i].partitionSession.Topic,
 			PartitionID:        r.ranges[i].partitionSession.PartitionID,
 			PartitionSessionID: r.ranges[i].partitionSession.partitionSessionID.ToInt64(),
