@@ -24,6 +24,7 @@ func (r *CommitRanges) len() int {
 	return len(r.ranges)
 }
 
+// GetCommitedInfo implements trace.TopicReaderStreamSendCommitMessageStartMessageInfo
 func (r *CommitRanges) GetCommitedInfo() []trace.TopicReaderCommitStartInfo {
 	res := make([]trace.TopicReaderCommitStartInfo, len(r.ranges))
 	for i := range res {
