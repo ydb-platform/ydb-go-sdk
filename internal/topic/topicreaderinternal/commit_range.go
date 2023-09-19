@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 // PublicCommitRangeGetter return data piece for commit messages range
@@ -23,20 +24,17 @@ func (r *CommitRanges) len() int {
 	return len(r.ranges)
 }
 
-// PartitionIDs implements trace.TopicReaderStreamSendCommitMessageStartMessageInfo
-func (r *CommitRanges) PartitionIDs() []int64 {
-	res := make([]int64, len(r.ranges))
+// GetCommitsInfo implements trace.TopicReaderStreamSendCommitMessageStartMessageInfo
+func (r *CommitRanges) GetCommitsInfo() []trace.TopicReaderStreamCommitInfo {
+	res := make([]trace.TopicReaderStreamCommitInfo, len(r.ranges))
 	for i := range res {
-		res[i] = r.ranges[i].partitionSession.PartitionID
-	}
-	return res
-}
-
-// PartitionSessionIDs implements trace.TopicReaderStreamSendCommitMessageStartMessageInfo
-func (r *CommitRanges) PartitionSessionIDs() []int64 {
-	res := make([]int64, len(r.ranges))
-	for i := range res {
-		res[i] = r.ranges[i].partitionSession.partitionSessionID.ToInt64()
+		res[i] = trace.TopicReaderStreamCommitInfo{
+			Topic:              r.ranges[i].partitionSession.Topic,
+			PartitionID:        r.ranges[i].partitionSession.PartitionID,
+			PartitionSessionID: r.ranges[i].partitionSession.partitionSessionID.ToInt64(),
+			StartOffset:        r.ranges[i].commitOffsetStart.ToInt64(),
+			EndOffset:          r.ranges[i].commitOffsetEnd.ToInt64(),
+		}
 	}
 	return res
 }

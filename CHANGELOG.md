@@ -1,3 +1,4 @@
+* Improved OnReaderSendCommitMessage logs
 * Added `table.Session.CopyTables` method
 * Added `x-ydb-trace-id` header into grpc calls
 * Improved topic reader logs
