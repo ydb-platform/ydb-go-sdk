@@ -534,12 +534,12 @@ func WithTraceScheme(t trace.Scheme, opts ...trace.SchemeComposeOption) Option {
 }
 
 // WithTraceCoordination returns coordination trace option
-func WithTraceCoordination(t trace.Coordination, opts ...trace.CoordinationComposeOption) Option {
+func WithTraceCoordination(t trace.Coordination, opts ...trace.CoordinationComposeOption) Option { //nolint:gocritic
 	return func(ctx context.Context, c *Driver) error {
 		c.coordinationOptions = append(
 			c.coordinationOptions,
 			coordinationConfig.WithTrace(
-				t,
+				&t,
 				append(
 					[]trace.CoordinationComposeOption{
 						trace.WithCoordinationPanicCallback(c.panicCallback),
