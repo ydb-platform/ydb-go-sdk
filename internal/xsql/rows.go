@@ -23,6 +23,8 @@ var (
 	_ driver.Rows                           = &single{}
 
 	_ types.Scanner = &valuer{}
+
+	ignoreColumnNamePlaceholder = "_"
 )
 
 type rows struct {
@@ -41,11 +43,11 @@ func (r *rows) Columns() []string {
 	r.nextSet.Do(func() {
 		r.result.NextResultSet(context.Background())
 	})
-	var i int
-	cs := make([]string, r.result.CurrentResultSet().ColumnCount())
+	cs := make([]string, 0, r.result.CurrentResultSet().ColumnCount())
 	r.result.CurrentResultSet().Columns(func(m options.Column) {
-		cs[i] = m.Name
-		i++
+		if m.Name != ignoreColumnNamePlaceholder {
+			cs = append(cs, m.Name)
+		}
 	})
 	return cs
 }
