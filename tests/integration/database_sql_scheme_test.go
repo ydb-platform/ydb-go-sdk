@@ -34,13 +34,13 @@ func TestDatabaseSqlScheme(t *testing.T) {
 		tables := make([]string, 0)
 		err = cc.Raw(func(drvConn interface{}) error {
 			q, ok := drvConn.(interface {
-				GetTables(context.Context, string) ([]string, error)
+				GetTables(ctx context.Context, folder string, recursive bool, excludeSysDirs bool) ([]string, error)
 			})
 			if !ok {
 				return fmt.Errorf("drvConn does not implement scheme methods")
 			}
 
-			tables, err = q.GetTables(scope.Ctx, ".")
+			tables, err = q.GetTables(scope.Ctx, ".", false, true)
 			return err
 		})
 		require.NoError(t, err)
