@@ -3,6 +3,8 @@ package coordination
 import (
 	"context"
 	"errors"
+	"sync"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Coordination_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Coordination"
@@ -26,12 +28,16 @@ var (
 type Client struct {
 	config  config.Config
 	service Ydb_Coordination_V1.CoordinationServiceClient
+
+	mutex    sync.Mutex // guards the fields below
+	sessions map[*session]struct{}
 }
 
 func New(cc grpc.ClientConnInterface, config config.Config) *Client {
 	return &Client{
-		config:  config,
-		service: Ydb_Coordination_V1.NewCoordinationServiceClient(cc),
+		config:   config,
+		service:  Ydb_Coordination_V1.NewCoordinationServiceClient(cc),
+		sessions: make(map[*session]struct{}),
 	}
 }
 
@@ -204,23 +210,69 @@ func (c *Client) describeNode(
 	}, nil
 }
 
+func newOpenSessionConfig(opts ...options.OpenSessionOption) *options.OpenSessionOptions {
+	c := defaultOpenSessionConfig()
+	for _, o := range opts {
+		if o != nil {
+			o(c)
+		}
+	}
+	return c
+}
+
+func (c *Client) sessionOpened(s *session) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.sessions[s] = struct{}{}
+}
+
+func (c *Client) sessionClosed(s *session) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	delete(c.sessions, s)
+}
+
+func (c *Client) closeSessions(ctx context.Context) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	for s := range c.sessions {
+		s.Close(ctx)
+	}
+}
+
+func defaultOpenSessionConfig() *options.OpenSessionOptions {
+	return &options.OpenSessionOptions{
+		Description:             "YDB Go SDK",
+		SessionTimeout:          time.Second * 5,
+		SessionStartTimeout:     time.Second * 1,
+		SessionStopTimeout:      time.Second * 1,
+		SessionKeepAliveTimeout: time.Second * 10,
+		SessionReconnectDelay:   time.Millisecond * 500,
+	}
+}
+
 func (c *Client) OpenSession(
 	ctx context.Context,
 	path string,
 	opts ...options.OpenSessionOption,
-) (s coordination.Session, err error) {
+) (coordination.Session, error) {
 	if c == nil {
-		err = xerrors.WithStackTrace(errNilClient)
-		return
+		return nil, xerrors.WithStackTrace(errNilClient)
 	}
-	err = errors.New("not implemented")
-	return
+
+	return openSession(ctx, c, path, newOpenSessionConfig(opts...))
 }
 
 func (c *Client) Close(ctx context.Context) error {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
+
+	c.closeSessions(ctx)
+
 	return c.close(ctx)
 }
 
