@@ -1,3 +1,5 @@
+* Supported placeholder "_" for ignored column names in `database/sql` result sets
+
 ## v3.52.0
 * Added `table.Session.CopyTables` method
 * Added `x-ydb-trace-id` header into grpc calls
