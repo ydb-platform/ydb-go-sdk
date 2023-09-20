@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
+	"github.com/ydb-platform/ydb-go-sdk/v3/coordination/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -227,6 +228,19 @@ func (c *Client) describeNode(
 		AttachConsistencyMode:    consistencyMode(result.GetConfig().GetAttachConsistencyMode()),
 		RatelimiterCountersMode:  ratelimiterCountersMode(result.GetConfig().GetRateLimiterCountersMode()),
 	}, nil
+}
+
+func (c *Client) OpenSession(
+	ctx context.Context,
+	path string,
+	opts ...options.OpenSessionOption,
+) (s coordination.Session, err error) {
+	if c == nil {
+		err = xerrors.WithStackTrace(errNilClient)
+		return
+	}
+	err = errors.New("not implemented")
+	return
 }
 
 func (c *Client) Close(ctx context.Context) error {
