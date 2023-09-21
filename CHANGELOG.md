@@ -1,3 +1,4 @@
+## v3.52.2
 * Removed support of placeholder "_" for ignoring columns in `database/sql` result sets
 
 ## v3.52.1
