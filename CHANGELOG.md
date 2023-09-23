@@ -2,6 +2,7 @@
 * Rename some topic APIs (old names was deprecated and will be removed in one of next versions).
 * Deprecated topic options (the option will be removed): min size of read messages batch
 * Deprecated WithOnWriterFirstConnected callback, use Writer.WaitInitInfo instead.
+* Changed topic Codec base type from int to int32 (was experimental code)
 * Added `WaitInit` and `WaitInitInfo` method to the topic reader and writer
 
 ## v3.52.2
