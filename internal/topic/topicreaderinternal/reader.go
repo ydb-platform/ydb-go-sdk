@@ -63,21 +63,13 @@ func newReadMessageBatchOptions() ReadMessageBatchOptions {
 }
 
 // PublicReadBatchOption для различных пожеланий к батчу вроде WithMaxMessages(int)
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicReadBatchOption interface {
 	Apply(options ReadMessageBatchOptions) ReadMessageBatchOptions
 }
 
 type readExplicitMessagesCount int
 
-// Apply
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Apply implements PublicReadBatchOption
 func (count readExplicitMessagesCount) Apply(options ReadMessageBatchOptions) ReadMessageBatchOptions {
 	options.MinCount = int(count)
 	options.MaxCount = int(count)
@@ -234,11 +226,6 @@ type ReaderConfig struct {
 	topicStreamReaderConfig
 }
 
-// PublicReaderOption
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicReaderOption func(cfg *ReaderConfig)
 
 func WithCredentials(cred credentials.Credentials) PublicReaderOption {
@@ -279,11 +266,6 @@ func convertNewParamsToStreamConfig(
 	return cfg
 }
 
-// PublicReadSelector
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicReadSelector struct {
 	Path       string
 	Partitions []int64
@@ -292,10 +274,6 @@ type PublicReadSelector struct {
 }
 
 // Clone create deep clone of the selector
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (s PublicReadSelector) Clone() *PublicReadSelector { //nolint:gocritic
 	s.Partitions = clone.Int64Slice(s.Partitions)
 	return &s

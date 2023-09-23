@@ -8,12 +8,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 )
 
-// Codec
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-type Codec int
+// Codec code for use in topics
+// Allow to use custom values in interval [10000,20000)
+type Codec int32
 
 const (
 	CodecRaw  = Codec(rawtopiccommon.CodecRaw)

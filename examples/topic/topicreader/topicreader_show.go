@@ -4,13 +4,12 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 )
 
 // PartitionStopHandled is example of sdk handle server signal about stop partition
 func PartitionStopHandled(ctx context.Context, reader *topicreader.Reader) {
-	batch, _ := reader.ReadMessageBatch(ctx)
+	batch, _ := reader.ReadMessagesBatch(ctx)
 	if len(batch.Messages) == 0 {
 		return
 	}
@@ -21,12 +20,10 @@ func PartitionStopHandled(ctx context.Context, reader *topicreader.Reader) {
 
 // PartitionGracefulStopHandled is example of sdk handle server signal about graceful stop partition
 func PartitionGracefulStopHandled(ctx context.Context, db *ydb.Driver) {
-	reader, _ := db.Topic().StartReader("consumer", nil,
-		topicoptions.WithBatchReadMinCount(1000),
-	)
+	reader, _ := db.Topic().StartReader("consumer", nil)
 
 	for {
-		batch, _ := reader.ReadMessageBatch(ctx) // <- if partition soft stop batch can be less, then 1000
+		batch, _ := reader.ReadMessagesBatch(ctx) // <- if partition soft stop batch can be less, then 1000
 		processBatch(batch.Context(), batch)
 		_ = reader.Commit(batch.Context(), batch)
 	}

@@ -10,6 +10,7 @@ import (
 )
 
 // Client is interface for topic client
+// Attention: the interface may be extended in the future.
 type Client interface {
 	// Alter change topic options
 	Alter(ctx context.Context, path string, opts ...topicoptions.AlterOption) error

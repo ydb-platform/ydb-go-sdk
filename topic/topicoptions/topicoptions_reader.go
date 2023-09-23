@@ -79,7 +79,7 @@ func WithCommonConfig(common config.Common) ReaderOption {
 }
 
 // WithCommitTimeLagTrigger
-// Deprecated: will be removed soon.
+// Deprecated: (was experimental) will be removed soon.
 // Use WithReaderCommitTimeLagTrigger instead
 func WithCommitTimeLagTrigger(lag time.Duration) ReaderOption {
 	return WithReaderCommitTimeLagTrigger(lag)
@@ -96,7 +96,7 @@ func WithReaderCommitTimeLagTrigger(lag time.Duration) ReaderOption {
 }
 
 // WithCommitCountTrigger
-// Deprecated: will be removed soon.
+// Deprecated: (was experimental) will be removed soon.
 // Use WithReaderCommitCountTrigger instead
 func WithCommitCountTrigger(count int) ReaderOption {
 	return WithReaderCommitCountTrigger(count)
@@ -115,10 +115,9 @@ func WithReaderCommitCountTrigger(count int) ReaderOption {
 // prefer min count messages in batch
 // sometimes batch can contain fewer messages, for example if local buffer is full and SDK can't receive more messages
 //
-// Deprecated: the method will be removed soon.
-// # Experimental
+// Deprecated: (was experimental) the method will be removed soon.
 //
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// The option will be removed for simplify code internals
 func WithBatchReadMinCount(count int) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.DefaultBatchConfig.MinCount = count
@@ -126,7 +125,7 @@ func WithBatchReadMinCount(count int) ReaderOption {
 }
 
 // WithBatchReadMaxCount
-// Deprecated: will be removed soon.
+// Deprecated: (was experimental) will be removed soon.
 // Use WithReaderBatchMaxCount instead.
 func WithBatchReadMaxCount(count int) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
@@ -142,7 +141,7 @@ func WithReaderBatchMaxCount(count int) ReaderOption {
 }
 
 // WithMessagesBufferSize
-// Deprecated: will be removed soon
+// Deprecated: (was experimental) will be removed soon
 // Use WithReaderBufferSizeBytes instead.
 func WithMessagesBufferSize(size int) ReaderOption {
 	return WithReaderBufferSizeBytes(size)
@@ -192,7 +191,7 @@ const (
 )
 
 // WithCommitMode
-// Deprecated: will be removed soon.
+// Deprecated: (was experimental) will be removed soon.
 // Use WithReaderCommitMode instead.
 func WithCommitMode(mode CommitMode) ReaderOption {
 	return WithReaderCommitMode(mode)
@@ -218,7 +217,7 @@ type (
 )
 
 // WithGetPartitionStartOffset
-// Deprecated: will be removed soon.
+// Deprecated: (was experimental) will be removed soon.
 // Use WithReaderGetPartitionStartOffset instead
 func WithGetPartitionStartOffset(f GetPartitionStartOffsetFunc) ReaderOption {
 	return WithReaderGetPartitionStartOffset(f)

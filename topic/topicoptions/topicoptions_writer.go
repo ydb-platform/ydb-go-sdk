@@ -61,7 +61,7 @@ func WithWriterMessageMaxBytesSize(size int) WriterOption {
 }
 
 // WithWriteSessionMeta
-// Deprecated: will be removed soon.
+// Deprecated: (was experimental) will be removed soon.
 // Use WithWriterSessionMeta instead
 func WithWriteSessionMeta(meta map[string]string) WriterOption {
 	return WithWriterSessionMeta(meta)
@@ -73,7 +73,7 @@ func WithWriterSessionMeta(meta map[string]string) WriterOption {
 }
 
 // WithProducerID
-// Deprecated: will be removed soon.
+// Deprecated: (was experimental) will be removed soon.
 // Use WithWriterProducerID instead
 func WithProducerID(producerID string) WriterOption {
 	return WithWriterProducerID(producerID)
@@ -85,7 +85,7 @@ func WithWriterProducerID(producerID string) WriterOption {
 }
 
 // WithPartitionID
-// Deprecated: will be removed soon
+// Deprecated: (was experimental) will be removed soon
 // Use WithWriterPartitionID instead
 func WithPartitionID(partitionID int64) WriterOption {
 	return WithWriterPartitionID(partitionID)
@@ -97,7 +97,7 @@ func WithWriterPartitionID(partitionID int64) WriterOption {
 }
 
 // WithSyncWrite
-// Deprecated: use WithWriterWaitServerAck instead
+// Deprecated: (was experimental) use WithWriterWaitServerAck instead
 func WithSyncWrite(sync bool) WriterOption {
 	return WithWriterWaitServerAck(sync)
 }
@@ -110,29 +110,17 @@ func WithWriterWaitServerAck(wait bool) WriterOption {
 
 type (
 	// WithOnWriterConnectedInfo present information, received from server
-	// Deprecated: will be removed soon
-	//
-	// # Experimental
-	//
-	// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+	// Deprecated: (was experimental) will be removed soon
 	WithOnWriterConnectedInfo = topicwriterinternal.PublicWithOnWriterConnectedInfo
 
 	// OnWriterInitResponseCallback
-	// Deprecated: will be removed soon.
-	//
-	// # Experimental
-	//
-	// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+	// Deprecated: (was experimental) will be removed soon.
 	OnWriterInitResponseCallback = topicwriterinternal.PublicOnWriterInitResponseCallback
 )
 
 // WithOnWriterFirstConnected set callback f, which will called once - after first successfully init topic writer stream
-// Deprecated: will be removed soon.
+// Deprecated: (was experimental) will be removed soon.
 // Use Writer.WaitInit function instead
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithOnWriterFirstConnected(f OnWriterInitResponseCallback) WriterOption {
 	return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
 		cfg.OnWriterInitResponseCallback = f
@@ -140,7 +128,7 @@ func WithOnWriterFirstConnected(f OnWriterInitResponseCallback) WriterOption {
 }
 
 // WithCodec
-// Deprecated: will be removed soon.
+// Deprecated: (was experimental) will be removed soon.
 // Use WithWriterCodec instead
 func WithCodec(codec topictypes.Codec) WriterOption {
 	return WithWriterCodec(codec)
@@ -152,7 +140,7 @@ func WithWriterCodec(codec topictypes.Codec) WriterOption {
 }
 
 // WithCodecAutoSelect
-// Deprecated: will be removed soon.
+// Deprecated: (was experimental) will be removed soon.
 // Use WithWriterCodecAutoSelect instead.
 func WithCodecAutoSelect() WriterOption {
 	return topicwriterinternal.WithAutoCodec()

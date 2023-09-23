@@ -21,10 +21,8 @@ func (count WithBatchMaxCount) Apply(
 // count must be 1 or greater
 // it will panic if count < 1
 //
-// Deprecated: will be removed soon.
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Deprecated: (was experimental) will be removed soon.
+// The option will be removed for simplify code internals
 type WithBatchPreferMinCount int
 
 // Apply implements ReadBatchOption interface
