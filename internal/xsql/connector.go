@@ -52,7 +52,7 @@ type tablePathPrefixConnectorOption struct {
 
 func (o tablePathPrefixConnectorOption) Apply(c *Connector) error {
 	c.Bindings = bind.Sort(append(c.Bindings, o.TablePathPrefix))
-	c.PathNormalizer = o.TablePathPrefix
+	c.pathNormalizer = o.TablePathPrefix
 	return nil
 }
 
@@ -169,12 +169,6 @@ type ydbDriver interface {
 	Scheme() scheme.Client
 }
 
-type nopPathNormalizer struct{}
-
-func (nopPathNormalizer) NormalizePath(_ string) string {
-	return tablePathPrefixTransformer
-}
-
 func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
 	c := &Connector{
 		parent:           parent,
@@ -182,7 +176,7 @@ func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
 		conns:            make(map[*conn]struct{}),
 		defaultTxControl: table.DefaultTxControl(),
 		defaultQueryMode: DefaultQueryMode,
-		PathNormalizer:   nopPathNormalizer{},
+		pathNormalizer:   bind.TablePathPrefix(parent.Name()),
 		trace:            &trace.DatabaseSQL{},
 	}
 	for _, opt := range opts {
@@ -209,7 +203,7 @@ type Connector struct {
 	clock clockwork.Clock
 
 	Bindings       bind.Bindings
-	PathNormalizer pathNormalizer
+	pathNormalizer pathNormalizer
 
 	fakeTxModes []QueryMode
 

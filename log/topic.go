@@ -24,6 +24,7 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		l.Log(ctx, "start")
 		return func(doneInfo trace.TopicReaderReconnectDoneInfo) {
 			l.Log(WithLevel(ctx, INFO), "reconnected",
+				NamedError("reason", info.Reason),
 				latencyField(start),
 			)
 		}
@@ -161,25 +162,37 @@ func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocy
 		}
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "send", "commit", "message")
 		start := time.Now()
-		l.Log(ctx, "start",
-			Any("partitions_id", info.CommitsInfo.PartitionIDs()),
-			Any("partitions_session_id", info.CommitsInfo.PartitionSessionIDs()),
-		)
+
+		commitInfo := info.CommitsInfo.GetCommitsInfo()
+		for i := range commitInfo {
+			l.Log(ctx, "start",
+				String("topic", commitInfo[i].Topic),
+				Int64("partitions_id", commitInfo[i].PartitionID),
+				Int64("partitions_session_id", commitInfo[i].PartitionSessionID),
+				Int64("commit_start_offset", commitInfo[i].StartOffset),
+				Int64("commit_end_offset", commitInfo[i].EndOffset),
+			)
+		}
 		return func(doneInfo trace.TopicReaderSendCommitMessageDoneInfo) {
-			fields := []Field{
-				Any("partitions_id", info.CommitsInfo.PartitionIDs()),
-				Any("partitions_session_id", info.CommitsInfo.PartitionSessionIDs()),
-				latencyField(start),
-			}
-			if doneInfo.Error == nil {
-				l.Log(ctx, "done", fields...)
-			} else {
-				l.Log(WithLevel(ctx, WARN), "commit message sent",
-					append(fields,
-						Error(doneInfo.Error),
-						versionField(),
-					)...,
-				)
+			for i := range commitInfo {
+				fields := []Field{
+					String("topic", commitInfo[i].Topic),
+					Int64("partitions_id", commitInfo[i].PartitionID),
+					Int64("partitions_session_id", commitInfo[i].PartitionSessionID),
+					Int64("commit_start_offset", commitInfo[i].StartOffset),
+					Int64("commit_end_offset", commitInfo[i].EndOffset),
+					latencyField(start),
+				}
+				if doneInfo.Error == nil {
+					l.Log(ctx, "done", fields...)
+				} else {
+					l.Log(WithLevel(ctx, WARN), "commit message sent",
+						append(fields,
+							Error(doneInfo.Error),
+							versionField(),
+						)...,
+					)
+				}
 			}
 		}
 	}

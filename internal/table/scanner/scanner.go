@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -427,7 +428,7 @@ func (s *scanner) any() interface{} {
 		value.TypeYSON,
 		value.TypeJSON,
 		value.TypeJSONDocument:
-		return []byte(s.text())
+		return xstring.ToBytes(s.text())
 	default:
 		_ = s.errorf(0, "unknown primitive types")
 		return nil
@@ -680,11 +681,11 @@ func (s *scanner) setString(dst *string) {
 	switch t := s.stack.current().t.GetTypeId(); t {
 	case Ydb.Type_UUID:
 		src := s.uint128()
-		*dst = string(src[:])
+		*dst = xstring.FromBytes(src[:])
 	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_YSON, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
 		*dst = s.text()
 	case Ydb.Type_STRING:
-		*dst = string(s.bytes())
+		*dst = xstring.FromBytes(s.bytes())
 	default:
 		_ = s.errorf(0, "scan row failed: incorrect source types %s", t)
 	}
@@ -696,7 +697,7 @@ func (s *scanner) setByte(dst *[]byte) {
 		src := s.uint128()
 		*dst = src[:]
 	case Ydb.Type_UTF8, Ydb.Type_DYNUMBER, Ydb.Type_YSON, Ydb.Type_JSON, Ydb.Type_JSON_DOCUMENT:
-		*dst = []byte(s.text())
+		*dst = xstring.ToBytes(s.text())
 	case Ydb.Type_STRING:
 		*dst = s.bytes()
 	default:

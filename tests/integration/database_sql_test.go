@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -36,13 +36,13 @@ func TestDatabaseSql(t *testing.T) {
 	ctx, cancel := context.WithTimeout(xtest.Context(t), 42*time.Second)
 	defer cancel()
 
-	var totalConsumedUnits uint64
+	var totalConsumedUnits xatomic.Uint64
 	defer func() {
-		t.Logf("total consumed units: %d", atomic.LoadUint64(&totalConsumedUnits))
+		t.Logf("total consumed units: %d", totalConsumedUnits.Load())
 	}()
 
 	ctx = meta.WithTrailerCallback(ctx, func(md metadata.MD) {
-		atomic.AddUint64(&totalConsumedUnits, meta.ConsumedUnits(md))
+		totalConsumedUnits.Add(meta.ConsumedUnits(md))
 	})
 
 	t.Run("sql.Open", func(t *testing.T) {
@@ -182,14 +182,20 @@ func TestDatabaseSql(t *testing.T) {
 			t.Run("select", func(t *testing.T) {
 				t.Run("isolation", func(t *testing.T) {
 					t.Run("snapshot", func(t *testing.T) {
+						query := `
+							PRAGMA TablePathPrefix("` + path.Join(cc.Name(), scope.folder) + `");
+							DECLARE $seriesID AS Uint64;
+							DECLARE $seasonID AS Uint64;
+							DECLARE $episodeID AS Uint64;
+							SELECT views FROM episodes 
+							WHERE 
+								series_id = $seriesID AND 
+								season_id = $seasonID AND 
+								episode_id = $episodeID;
+						`
 						err = retry.DoTx(ctx, scope.db,
 							func(ctx context.Context, tx *sql.Tx) error {
-								row := tx.QueryRowContext(ctx, `
-					PRAGMA TablePathPrefix("`+path.Join(cc.Name(), scope.folder)+`");
-					DECLARE $seriesID AS Uint64;
-					DECLARE $seasonID AS Uint64;
-					DECLARE $episodeID AS Uint64;
-					SELECT views FROM episodes WHERE series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID;`,
+								row := tx.QueryRowContext(ctx, query,
 									sql.Named("seriesID", uint64(1)),
 									sql.Named("seasonID", uint64(1)),
 									sql.Named("episodeID", uint64(1)),
@@ -211,6 +217,67 @@ func TestDatabaseSql(t *testing.T) {
 								Isolation: sql.LevelSnapshot,
 								ReadOnly:  true,
 							}),
+						)
+						require.NoError(t, err)
+					})
+				})
+				t.Run("scan", func(t *testing.T) {
+					t.Run("query", func(t *testing.T) {
+						var (
+							seriesID  *uint64
+							seasonID  *uint64
+							episodeID *uint64
+							title     *string
+							airDate   *time.Time
+							views     sql.NullFloat64
+							query     = `
+								PRAGMA TablePathPrefix("` + path.Join(cc.Name(), scope.folder) + `");
+								DECLARE $seriesID AS Optional<Uint64>;
+								DECLARE $seasonID AS Optional<Uint64>;
+								DECLARE $episodeID AS Optional<Uint64>;
+								SELECT 
+									series_id,
+									season_id,
+									episode_id,
+									title,
+									air_date,
+									views
+								FROM episodes
+								WHERE 
+									(series_id >= $seriesID OR $seriesID IS NULL) AND
+									(season_id >= $seasonID OR $seasonID IS NULL) AND
+									(episode_id >= $episodeID OR $episodeID IS NULL) 
+								ORDER BY 
+									series_id, season_id, episode_id;
+							`
+						)
+						err = retry.Do(ctx, scope.db,
+							func(ctx context.Context, cc *sql.Conn) error {
+								rows, err := cc.QueryContext(ydb.WithQueryMode(ctx, ydb.ScanQueryMode), query,
+									sql.Named("seriesID", seriesID),
+									sql.Named("seasonID", seasonID),
+									sql.Named("episodeID", episodeID),
+								)
+								if err != nil {
+									return err
+								}
+								defer func() {
+									_ = rows.Close()
+								}()
+								for rows.NextResultSet() {
+									for rows.Next() {
+										if err = rows.Scan(&seriesID, &seasonID, &episodeID, &title, &airDate, &views); err != nil {
+											return fmt.Errorf("cannot select current views: %w", err)
+										}
+										t.Logf("[%d][%d][%d] - %s %q (%d views)",
+											*seriesID, *seasonID, *episodeID, airDate.Format("2006-01-02"),
+											*title, uint64(views.Float64),
+										)
+									}
+								}
+								return rows.Err()
+							},
+							retry.WithDoRetryOptions(retry.WithIdempotent(true)),
 						)
 						require.NoError(t, err)
 					})

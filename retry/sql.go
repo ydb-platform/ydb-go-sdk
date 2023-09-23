@@ -107,7 +107,17 @@ func DoTx(ctx context.Context, db *sql.DB, f func(context.Context, *sql.Tx) erro
 			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 		defer func() {
-			_ = tx.Rollback()
+			if err != nil {
+				errRollback := tx.Rollback()
+				if errRollback != nil {
+					err = xerrors.NewWithIssues("",
+						xerrors.WithStackTrace(err),
+						xerrors.WithStackTrace(errRollback),
+					)
+				} else {
+					err = xerrors.WithStackTrace(err)
+				}
+			}
 		}()
 		if err = f(ctx, tx); err != nil {
 			return unwrapErrBadConn(xerrors.WithStackTrace(err))

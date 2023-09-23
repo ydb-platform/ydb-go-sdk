@@ -18,6 +18,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 )
 
 func TestDatabaseSqlStaticCredentials(t *testing.T) {
@@ -36,7 +37,11 @@ func TestDatabaseSqlStaticCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	u.User = url.UserPassword("root", "")
+	if version.Gte(os.Getenv("YDB_VERSION"), "23.3") {
+		u.User = url.UserPassword("root", "1234")
+	} else {
+		u.User = url.User("root")
+	}
 
 	t.Run("sql.Open", func(t *testing.T) {
 		var db *sql.DB
@@ -53,7 +58,10 @@ func TestDatabaseSqlStaticCredentials(t *testing.T) {
 	t.Run("sql.OpenDB", func(t *testing.T) {
 		var cc *ydb.Driver
 		cc, err = ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"),
-			ydb.WithCredentials(credentials.NewStaticCredentials("root", "", u.Host, func() grpc.DialOption {
+			ydb.WithCredentials(credentials.NewStaticCredentials(u.User.Username(), func() string {
+				password, _ := u.User.Password()
+				return password
+			}(), u.Host, func() grpc.DialOption {
 				if u.Scheme == "grpcs" { //nolint:goconst
 					transportCredentials, transportCredentialsErr := grpcCredentials.NewClientTLSFromFile(
 						os.Getenv("YDB_SSL_ROOT_CERTIFICATES_FILE"), u.Hostname(),
@@ -64,7 +72,8 @@ func TestDatabaseSqlStaticCredentials(t *testing.T) {
 					return grpc.WithTransportCredentials(transportCredentials)
 				}
 				return grpc.WithTransportCredentials(insecure.NewCredentials())
-			}())))
+			}())),
+		)
 		require.NoError(t, err)
 
 		defer func() {

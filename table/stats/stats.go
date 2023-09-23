@@ -19,6 +19,9 @@ type QueryStats interface {
 	Compilation() (c *CompilationStats)
 	QueryPlan() string
 	QueryAST() string
+	TotalCPUTime() time.Duration
+	TotalDuration() time.Duration
+
 	// NextPhase returns next execution phase within query.
 	// If ok flag is false, then there are no more phases and p is invalid.
 	NextPhase() (p QueryPhase, ok bool)

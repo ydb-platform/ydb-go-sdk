@@ -41,7 +41,7 @@ func TestConnection(t *testing.T) {
 	var (
 		userAgent     = "connection user agent"
 		requestType   = "connection request type"
-		checkMedatada = func(ctx context.Context) {
+		checkMetadata = func(ctx context.Context) {
 			md, has := metadata.FromOutgoingContext(ctx)
 			if !has {
 				t.Fatalf("no medatada")
@@ -59,6 +59,13 @@ func TestConnection(t *testing.T) {
 			}
 			if requestTypes[0] != requestType {
 				t.Fatalf("unknown request type: %s", requestTypes[0])
+			}
+			traceIDs := md.Get(meta.HeaderTraceID)
+			if len(traceIDs) == 0 {
+				t.Fatalf("no traceIDs")
+			}
+			if len(traceIDs[0]) == 0 {
+				t.Fatalf("no traceID")
 			}
 		}
 		ctx = xtest.Context(t)
@@ -94,7 +101,7 @@ func TestConnection(t *testing.T) {
 					invoker grpc.UnaryInvoker,
 					opts ...grpc.CallOption,
 				) error {
-					checkMedatada(ctx)
+					checkMetadata(ctx)
 					return invoker(ctx, method, req, reply, cc, opts...)
 				}),
 				grpc.WithStreamInterceptor(func(
@@ -105,7 +112,7 @@ func TestConnection(t *testing.T) {
 					streamer grpc.Streamer,
 					opts ...grpc.CallOption,
 				) (grpc.ClientStream, error) {
-					checkMedatada(ctx)
+					checkMetadata(ctx)
 					return streamer(ctx, desc, cc, method, opts...)
 				}),
 			),
@@ -320,13 +327,39 @@ func TestZeroDialTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 
+	var traceID string
+
 	db, err := ydb.Open(
 		ctx,
 		"grpc://non-existent.com:2135/some",
 		ydb.WithDialTimeout(0),
+		ydb.With(
+			config.WithGrpcOptions(
+				grpc.WithUnaryInterceptor(func(
+					ctx context.Context,
+					method string,
+					req, reply interface{},
+					cc *grpc.ClientConn,
+					invoker grpc.UnaryInvoker,
+					opts ...grpc.CallOption,
+				) error {
+					md, has := metadata.FromOutgoingContext(ctx)
+					if !has {
+						t.Fatalf("no medatada")
+					}
+					traceIDs := md.Get(meta.HeaderTraceID)
+					if len(traceIDs) == 0 {
+						t.Fatalf("no traceIDs")
+					}
+					traceID = traceIDs[0]
+					return invoker(ctx, method, req, reply, cc, opts...)
+				}),
+			),
+		),
 	)
 
 	require.Error(t, err)
+	require.ErrorContains(t, err, traceID)
 	require.Nil(t, db)
 	if !ydb.IsTransportError(err, grpcCodes.DeadlineExceeded) {
 		require.ErrorIs(t, err, context.DeadlineExceeded)

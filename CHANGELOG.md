@@ -1,4 +1,33 @@
 * Added `WaitInit` and `WaitInitInfo` method to the topic reader and writer
+
+## v3.52.2
+* Removed support of placeholder "_" for ignoring columns in `database/sql` result sets
+
+## v3.52.1
+* Merged `internal/xsql/conn.{GetTables,GetAllTables}` methods for `DRY`
+* Replaced `internal/xsql.Connector.PathNormalizer` default from `nopPathNormalizer` to `bind.TablePathPrefix` with database name as path prefix
+* Supported placeholder "_" for ignored column names in `database/sql` result sets
+
+## v3.52.0
+* Added `table.Session.CopyTables` method
+* Added `x-ydb-trace-id` header into grpc calls
+* Improved topic reader logs
+* Fixed `internal/xstring` package with deprecated warning in `go1.21` about `reflect.{String,Slice}Header`
+
+## v3.51.3
+* Added `internal/xstring.{FromBytes([]byte),ToBytes(string)` for increase performance on `string` from/to `[]byte` conversion
+
+## v3.51.2
+* Added `table/options.ReadFromSnapshot(bool)` option for `session.StreamReadTable()`
+
+## v3.51.1
+* Added checking condition for `tx.Rollback()` in `retry.DoTx`
+
+## v3.51.0
+* Added node info to grpc errors
+
+## v3.50.0
+* Added methods `TotalCPUTime()` and `TotalDuration()` to `table/stats/QueryStats` interface
 * Added check if commit order is bad in sync mode
 
 ## v3.49.1

@@ -8,10 +8,10 @@ import (
 	"io"
 	"path"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/helpers"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
@@ -72,8 +72,8 @@ type conn struct {
 
 	beginTxFuncs map[QueryMode]beginTxFunc
 
-	closed           uint32
-	lastUsage        int64
+	closed           xatomic.Bool
+	lastUsage        xatomic.Int64
 	defaultQueryMode QueryMode
 
 	defaultTxControl *table.TransactionControl
@@ -159,7 +159,7 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt,
 }
 
 func (c *conn) sinceLastUsage() time.Duration {
-	return time.Since(time.Unix(atomic.LoadInt64(&c.lastUsage), 0))
+	return time.Since(time.Unix(c.lastUsage.Load(), 0))
 }
 
 func (c *conn) execContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, err error) {
@@ -169,7 +169,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 	)
 
 	defer func() {
-		atomic.StoreInt64(&c.lastUsage, time.Now().Unix())
+		c.lastUsage.Store(time.Now().Unix())
 		onDone(err)
 	}()
 	switch m {
@@ -268,7 +268,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		c.sinceLastUsage(),
 	)
 	defer func() {
-		atomic.StoreInt64(&c.lastUsage, time.Now().Unix())
+		c.lastUsage.Store(time.Now().Unix())
 		onDone(err)
 	}()
 	switch m {
@@ -373,7 +373,7 @@ func (c *conn) Ping(ctx context.Context) (err error) {
 }
 
 func (c *conn) Close() (err error) {
-	if atomic.CompareAndSwapUint32(&c.closed, 0, 1) {
+	if c.closed.CompareAndSwap(false, true) {
 		c.connector.detach(c)
 		onDone := trace.DatabaseSQLOnConnClose(c.trace)
 		defer func() {
@@ -613,108 +613,91 @@ func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (
 }
 
 func (c *conn) normalizePath(folderOrTable string) (absPath string) {
-	return c.connector.PathNormalizer.NormalizePath(folderOrTable)
+	return c.connector.pathNormalizer.NormalizePath(folderOrTable)
 }
 
-func (c *conn) GetTables(ctx context.Context, folder string) (tables []string, err error) {
+func isSysDir(databaseName, dirAbsPath string) bool {
+	for _, sysDir := range [...]string{
+		path.Join(databaseName, ".sys"),
+		path.Join(databaseName, ".sys_health"),
+	} {
+		if strings.HasPrefix(dirAbsPath, sysDir) {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *conn) getTables(ctx context.Context, absPath string, recursive, excludeSysDirs bool) (
+	tables []string, err error,
+) {
+	if excludeSysDirs && isSysDir(c.connector.parent.Name(), absPath) {
+		return nil, nil
+	}
+
+	var d scheme.Directory
+	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+		d, err = c.connector.parent.Scheme().ListDirectory(ctx, absPath)
+		return err
+	}, retry.WithIdempotent(true))
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	if !d.IsDirectory() && !d.IsDatabase() {
+		return nil, xerrors.WithStackTrace(fmt.Errorf("'%s' is not a folder", absPath))
+	}
+
+	for i := range d.Children {
+		switch d.Children[i].Type {
+		case scheme.EntryTable, scheme.EntryColumnTable:
+			tables = append(tables, path.Join(absPath, d.Children[i].Name))
+		case scheme.EntryDirectory, scheme.EntryDatabase:
+			if recursive {
+				childTables, err := c.getTables(ctx, path.Join(absPath, d.Children[i].Name), recursive, excludeSysDirs)
+				if err != nil {
+					return nil, xerrors.WithStackTrace(err)
+				}
+				tables = append(tables, childTables...)
+			}
+		}
+	}
+
+	return tables, nil
+}
+
+func (c *conn) GetTables(ctx context.Context, folder string, recursive, excludeSysDirs bool) (
+	tables []string, err error,
+) {
 	absPath := c.normalizePath(folder)
+
 	var e scheme.Entry
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		e, err = c.connector.parent.Scheme().DescribePath(ctx, absPath)
 		return err
 	}, retry.WithIdempotent(true))
-
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	switch {
-	case e.IsTable():
-		_, table := path.Split(absPath)
-		tables = append(tables, table)
-		return tables, nil
-	case e.IsDirectory():
-		var d scheme.Directory
-		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-			d, err = c.connector.parent.Scheme().ListDirectory(ctx, absPath)
-			return err
-		}, retry.WithIdempotent(true))
-
+	switch e.Type {
+	case scheme.EntryTable, scheme.EntryColumnTable:
+		return []string{e.Name}, err
+	case scheme.EntryDirectory, scheme.EntryDatabase:
+		tables, err = c.getTables(ctx, absPath, recursive, excludeSysDirs)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		for i := range d.Children {
-			if d.Children[i].IsTable() {
-				tables = append(tables, d.Children[i].Name)
-			}
+		for i := range tables {
+			tables[i] = strings.TrimPrefix(tables[i], absPath+"/")
 		}
 		return tables, nil
 	default:
-		return nil, xerrors.WithStackTrace(fmt.Errorf("path '%s' should be a table or directory", folder))
+		return nil, xerrors.WithStackTrace(
+			fmt.Errorf("'%s' is not a table or directory (%s)", folder, e.Type.String()),
+		)
 	}
-}
-
-func (c *conn) GetAllTables(ctx context.Context, folder string) (tables []string, err error) {
-	folder = c.normalizePath(folder)
-	ignoreDirs := map[string]bool{
-		".sys":        true,
-		".sys_health": true,
-	}
-
-	canEnter := func(dir string) bool {
-		if _, ignore := ignoreDirs[dir]; ignore {
-			return false
-		}
-		return true
-	}
-
-	queue := make([]string, 0)
-	queue = append(queue, folder)
-
-	for st := 0; st < len(queue); st++ {
-		curPath := queue[st]
-
-		var e scheme.Entry
-		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-			e, err = c.connector.parent.Scheme().DescribePath(ctx, curPath)
-			return err
-		}, retry.WithIdempotent(true))
-
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
-		}
-
-		if e.IsTable() {
-			switch curPath {
-			case folder:
-				_, table := path.Split(curPath)
-				tables = append(tables, table)
-			default:
-				tables = append(tables, strings.TrimPrefix(curPath, folder+"/"))
-			}
-			continue
-		}
-
-		var d scheme.Directory
-		err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-			d, err = c.connector.parent.Scheme().ListDirectory(ctx, curPath)
-			return err
-		}, retry.WithIdempotent(true))
-
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
-		}
-
-		for i := range d.Children {
-			if d.Children[i].IsDirectory() || d.Children[i].IsTable() {
-				if canEnter(d.Children[i].Name) {
-					queue = append(queue, path.Join(curPath, d.Children[i].Name))
-				}
-			}
-		}
-	}
-	return tables, nil
 }
 
 func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []string, err error) {
