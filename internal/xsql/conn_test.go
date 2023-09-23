@@ -38,11 +38,7 @@ var (
 	} = (*conn)(nil)
 
 	_ interface {
-		GetTables(ctx context.Context, absPath string) (tables []string, err error)
-	} = (*conn)(nil)
-
-	_ interface {
-		GetAllTables(ctx context.Context, absPath string) (tables []string, err error)
+		GetTables(ctx context.Context, folder string, recursive bool, excludeSysDirs bool) (tables []string, err error)
 	} = (*conn)(nil)
 
 	_ interface {

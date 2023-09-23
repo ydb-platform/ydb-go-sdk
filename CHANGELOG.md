@@ -1,3 +1,11 @@
+## v3.52.2
+* Removed support of placeholder "_" for ignoring columns in `database/sql` result sets
+
+## v3.52.1
+* Merged `internal/xsql/conn.{GetTables,GetAllTables}` methods for `DRY`
+* Replaced `internal/xsql.Connector.PathNormalizer` default from `nopPathNormalizer` to `bind.TablePathPrefix` with database name as path prefix
+* Supported placeholder "_" for ignored column names in `database/sql` result sets
+
 ## v3.52.0
 * Added `table.Session.CopyTables` method
 * Added `x-ydb-trace-id` header into grpc calls
