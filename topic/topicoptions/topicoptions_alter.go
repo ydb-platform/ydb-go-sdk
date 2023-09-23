@@ -8,65 +8,37 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
-// AlterOption
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// AlterOption type of options for change topic settings
 type AlterOption interface {
 	ApplyAlterOption(req *rawtopic.AlterTopicRequest)
 }
 
-// AlterWithMeteringMode
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// AlterWithMeteringMode change metering mode for topic (need for serverless installations)
 func AlterWithMeteringMode(m topictypes.MeteringMode) AlterOption {
 	return withMeteringMode(m)
 }
 
-// AlterWithMinActivePartitions
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// AlterWithMinActivePartitions change min active partitions of the topic
 func AlterWithMinActivePartitions(minActivePartitions int64) AlterOption {
 	return withMinActivePartitions(minActivePartitions)
 }
 
-// AlterWithPartitionCountLimit
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// AlterWithPartitionCountLimit change partition count limit of the topic
 func AlterWithPartitionCountLimit(partitionCountLimit int64) AlterOption {
 	return withPartitionCountLimit(partitionCountLimit)
 }
 
-// AlterWithRetentionPeriod
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// AlterWithRetentionPeriod change retention period of topic
 func AlterWithRetentionPeriod(retentionPeriod time.Duration) AlterOption {
 	return withRetentionPeriod(retentionPeriod)
 }
 
-// AlterWithRetentionStorageMB
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// AlterWithRetentionStorageMB change retention storage size in MB.
 func AlterWithRetentionStorageMB(retentionStorageMB int64) AlterOption {
 	return withRetentionStorageMB(retentionStorageMB)
 }
 
-// AlterWithSupportedCodecs
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// AlterWithSupportedCodecs change set of codec, allowed for the topic
 func AlterWithSupportedCodecs(codecs ...topictypes.Codec) AlterOption {
 	sort.Slice(codecs, func(i, j int) bool {
 		return codecs[i] < codecs[j]
@@ -74,38 +46,22 @@ func AlterWithSupportedCodecs(codecs ...topictypes.Codec) AlterOption {
 	return withSupportedCodecs(codecs)
 }
 
-// AlterWithPartitionWriteSpeedBytesPerSecond
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// AlterWithPartitionWriteSpeedBytesPerSecond change limit of write speed for partitions of the topic
 func AlterWithPartitionWriteSpeedBytesPerSecond(bytesPerSecond int64) AlterOption {
 	return withPartitionWriteSpeedBytesPerSecond(bytesPerSecond)
 }
 
-// AlterWithPartitionWriteBurstBytes
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// AlterWithPartitionWriteBurstBytes change burst size for write to partition of topic
 func AlterWithPartitionWriteBurstBytes(burstBytes int64) AlterOption {
 	return withPartitionWriteBurstBytes(burstBytes)
 }
 
-// AlterWithAttributes
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// AlterWithAttributes change attributes map of topic
 func AlterWithAttributes(attributes map[string]string) AlterOption {
 	return withAttributes(attributes)
 }
 
-// AlterWithAddConsumers
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// AlterWithAddConsumers add consumer to the topic
 func AlterWithAddConsumers(consumers ...topictypes.Consumer) AlterOption {
 	sort.Slice(consumers, func(i, j int) bool {
 		return consumers[i].Name < consumers[j].Name
@@ -113,21 +69,13 @@ func AlterWithAddConsumers(consumers ...topictypes.Consumer) AlterOption {
 	return withAddConsumers(consumers)
 }
 
-// AlterWithDropConsumers
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// AlterWithDropConsumers drop consumer from the topic
 func AlterWithDropConsumers(consumersName ...string) AlterOption {
 	sort.Strings(consumersName)
 	return withDropConsumers(consumersName)
 }
 
-// AlterConsumerWithImportant
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// AlterConsumerWithImportant set/remove important flag for the consumer of topic
 func AlterConsumerWithImportant(name string, important bool) AlterOption {
 	return withConsumerWithImportant{
 		name:      name,
@@ -135,11 +83,7 @@ func AlterConsumerWithImportant(name string, important bool) AlterOption {
 	}
 }
 
-// AlterConsumerWithReadFrom
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// AlterConsumerWithReadFrom change min time of messages, received for the topic
 func AlterConsumerWithReadFrom(name string, readFrom time.Time) AlterOption {
 	return withConsumerWithReadFrom{
 		name:     name,
@@ -147,11 +91,7 @@ func AlterConsumerWithReadFrom(name string, readFrom time.Time) AlterOption {
 	}
 }
 
-// AlterConsumerWithSupportedCodecs
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// AlterConsumerWithSupportedCodecs change codecs, supported by the consumer
 func AlterConsumerWithSupportedCodecs(name string, codecs []topictypes.Codec) AlterOption {
 	sort.Slice(codecs, func(i, j int) bool {
 		return codecs[i] < codecs[j]
@@ -162,11 +102,7 @@ func AlterConsumerWithSupportedCodecs(name string, codecs []topictypes.Codec) Al
 	}
 }
 
-// AlterConsumerWithAttributes
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// AlterConsumerWithAttributes change attributes of the consumer
 func AlterConsumerWithAttributes(name string, attributes map[string]string) AlterOption {
 	return withConsumerWithAttributes{
 		name:       name,

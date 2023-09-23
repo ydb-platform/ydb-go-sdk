@@ -33,11 +33,7 @@ func (c Codec) ToRaw(r *rawtopiccommon.Codec) {
 	*r = rawtopiccommon.Codec(c)
 }
 
-// Consumer
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Consumer contains info about topic consumer
 type Consumer struct {
 	Name            string
 	Important       bool
@@ -46,11 +42,7 @@ type Consumer struct {
 	Attributes      map[string]string
 }
 
-// ToRaw
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// ToRaw public format to internal. Used internally only.
 func (c *Consumer) ToRaw(raw *rawtopic.Consumer) {
 	raw.Name = c.Name
 	raw.Important = c.Important
@@ -68,11 +60,7 @@ func (c *Consumer) ToRaw(raw *rawtopic.Consumer) {
 	raw.Attributes = c.Attributes
 }
 
-// FromRaw
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// FromRaw convert internal format to public. Used internally only.
 func (c *Consumer) FromRaw(raw *rawtopic.Consumer) {
 	c.Attributes = raw.Attributes
 	c.Important = raw.Important
@@ -88,11 +76,7 @@ func (c *Consumer) FromRaw(raw *rawtopic.Consumer) {
 	}
 }
 
-// MeteringMode
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// MeteringMode mode of topic's metering. Used for serverless installations.
 type MeteringMode int
 
 const (
@@ -101,59 +85,35 @@ const (
 	MeteringModeRequestUnits     = MeteringMode(rawtopic.MeteringModeRequestUnits)
 )
 
-// FromRaw
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// FromRaw convert from internal format to public. Used internally only.
 func (m *MeteringMode) FromRaw(raw rawtopic.MeteringMode) {
 	*m = MeteringMode(raw)
 }
 
-// ToRaw
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// ToRaw convert from public format to internal. Used internally only.
 func (m *MeteringMode) ToRaw(raw *rawtopic.MeteringMode) {
 	*raw = rawtopic.MeteringMode(*m)
 }
 
-// PartitionSettings
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// PartitionSettings settings of partitions
 type PartitionSettings struct {
 	MinActivePartitions int64
 	PartitionCountLimit int64
 }
 
-// ToRaw
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// ToRaw convert public format to internal. Used internally only.
 func (s *PartitionSettings) ToRaw(raw *rawtopic.PartitioningSettings) {
 	raw.MinActivePartitions = s.MinActivePartitions
 	raw.PartitionCountLimit = s.PartitionCountLimit
 }
 
-// FromRaw
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// FromRaw convert internal format to public. Used internally only.
 func (s *PartitionSettings) FromRaw(raw *rawtopic.PartitioningSettings) {
 	s.MinActivePartitions = raw.MinActivePartitions
 	s.PartitionCountLimit = raw.PartitionCountLimit
 }
 
-// TopicDescription
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// TopicDescription contains info about topic.
 type TopicDescription struct {
 	Path                              string
 	PartitionSettings                 PartitionSettings
@@ -168,11 +128,7 @@ type TopicDescription struct {
 	MeteringMode                      MeteringMode
 }
 
-// FromRaw
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// FromRaw convert from public format to internal. Used internally only.
 func (d *TopicDescription) FromRaw(raw *rawtopic.DescribeTopicResult) {
 	d.Path = raw.Self.Name
 	d.PartitionSettings.FromRaw(&raw.PartitioningSettings)
@@ -209,11 +165,7 @@ func (d *TopicDescription) FromRaw(raw *rawtopic.DescribeTopicResult) {
 	d.MeteringMode.FromRaw(raw.MeteringMode)
 }
 
-// PartitionInfo
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// PartitionInfo contains info about partition.
 type PartitionInfo struct {
 	PartitionID        int64
 	Active             bool
@@ -221,11 +173,7 @@ type PartitionInfo struct {
 	ParentPartitionIDs []int64
 }
 
-// FromRaw
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// FromRaw convert from internal format to public. Used internally only.
 func (p *PartitionInfo) FromRaw(raw *rawtopic.PartitionInfo) {
 	p.PartitionID = raw.PartitionID
 	p.Active = raw.Active

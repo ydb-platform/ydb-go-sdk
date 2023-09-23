@@ -8,65 +8,37 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
-// CreateOption
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// CreateOption type for options of topic create
 type CreateOption interface {
 	ApplyCreateOption(request *rawtopic.CreateTopicRequest)
 }
 
-// CreateWithMeteringMode
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// CreateWithMeteringMode set metering mode for the topic
 func CreateWithMeteringMode(mode topictypes.MeteringMode) CreateOption {
 	return withMeteringMode(mode)
 }
 
-// CreateWithMinActivePartitions
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// CreateWithMinActivePartitions set min active partitions for the topic
 func CreateWithMinActivePartitions(count int64) CreateOption {
 	return withMinActivePartitions(count)
 }
 
-// CreateWithPartitionCountLimit
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// CreateWithPartitionCountLimit set partition count limit for the topic
 func CreateWithPartitionCountLimit(count int64) CreateOption {
 	return withPartitionCountLimit(count)
 }
 
-// CreateWithRetentionPeriod
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// CreateWithRetentionPeriod set retention time interval for the topic.
 func CreateWithRetentionPeriod(retentionPeriod time.Duration) CreateOption {
 	return withRetentionPeriod(retentionPeriod)
 }
 
-// CreateWithRetentionStorageMB
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// CreateWithRetentionStorageMB set retention size for the topic.
 func CreateWithRetentionStorageMB(retentionStorageMB int64) CreateOption {
 	return withRetentionStorageMB(retentionStorageMB)
 }
 
-// CreateWithSupportedCodecs
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// CreateWithSupportedCodecs set supported codecs for the topic
 func CreateWithSupportedCodecs(codecs ...topictypes.Codec) CreateOption {
 	sort.Slice(codecs, func(i, j int) bool {
 		return codecs[i] < codecs[j]
@@ -74,38 +46,22 @@ func CreateWithSupportedCodecs(codecs ...topictypes.Codec) CreateOption {
 	return withSupportedCodecs(codecs)
 }
 
-// CreateWithPartitionWriteSpeedBytesPerSecond
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// CreateWithPartitionWriteSpeedBytesPerSecond set write size limit for partitions of the topic
 func CreateWithPartitionWriteSpeedBytesPerSecond(partitionWriteSpeedBytesPerSecond int64) CreateOption {
 	return withPartitionWriteSpeedBytesPerSecond(partitionWriteSpeedBytesPerSecond)
 }
 
-// CreateWithPartitionWriteBurstBytes
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// CreateWithPartitionWriteBurstBytes set burst limit for partitions of the topic
 func CreateWithPartitionWriteBurstBytes(partitionWriteBurstBytes int64) CreateOption {
 	return withPartitionWriteBurstBytes(partitionWriteBurstBytes)
 }
 
-// CreateWithAttributes
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// CreateWithAttributes set attributes for the topic.
 func CreateWithAttributes(attributes map[string]string) CreateOption {
 	return withAttributes(attributes)
 }
 
-// CreateWithConsumer
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// CreateWithConsumer create new consumers with the topic
 func CreateWithConsumer(consumers ...topictypes.Consumer) CreateOption {
 	sort.Slice(consumers, func(i, j int) bool {
 		return consumers[i].Name < consumers[j].Name

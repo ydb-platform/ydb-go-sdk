@@ -22,10 +22,6 @@ var errMessageWasReadEarly = xerrors.Wrap(errors.New("ydb: message was read earl
 var PublicErrUnexpectedCodec = errors.New("unexpected codec") //nolint:revive,stylecheck
 
 // PublicMessage is representation of topic message
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicMessage struct {
 	empty.DoNotCopy
 
@@ -81,19 +77,10 @@ func (m *PublicMessage) Read(p []byte) (n int, err error) {
 }
 
 // PublicMessageContentUnmarshaler is interface for unmarshal message content
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicMessageContentUnmarshaler interface {
 	// UnmarshalYDBTopicMessage MUST NOT use data after return.
 	// If you need content after return from Consume - copy data content to
 	// own slice with copy(dst, data)
-	//
-	// Experimental
-	//
-	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
-	// later release.
 	UnmarshalYDBTopicMessage(data []byte) error
 }
 
