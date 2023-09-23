@@ -49,6 +49,10 @@ type readerReconnector struct {
 	streamVal                  batchedStreamReader
 	streamErr                  error
 	closedErr                  error
+
+	initErr    error
+	initDone   bool
+	initDoneCh empty.Chan
 }
 
 //nolint:revive
@@ -70,6 +74,7 @@ func newReaderReconnector(
 		baseContext:    baseContext,
 		retrySettings:  retrySettings,
 	}
+
 	if res.connectTimeout == 0 {
 		res.connectTimeout = value.InfiniteDuration
 	}
@@ -146,6 +151,13 @@ func (r *readerReconnector) CloseWithError(ctx context.Context, err error) error
 				closeErr = streamCloseErr
 			}
 		}
+
+		r.m.WithLock(func() {
+			if !r.initDone {
+				r.initErr = closeErr
+				close(r.initDoneCh)
+			}
+		})
 	})
 	return closeErr
 }
@@ -163,6 +175,7 @@ func (r *readerReconnector) initChannelsAndClock() {
 	}
 	r.reconnectFromBadStream = make(chan reconnectRequest, 1)
 	r.streamConnectionInProgress = make(empty.Chan)
+	r.initDoneCh = make(empty.Chan)
 	close(r.streamConnectionInProgress) // no progress at start
 }
 
@@ -261,6 +274,10 @@ func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldRead
 		r.streamErr = err
 		if err == nil {
 			r.streamVal = newStream
+			if !r.initDone {
+				r.initDone = true
+				close(r.initDoneCh)
+			}
 		}
 	})
 	return err
@@ -312,8 +329,20 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 	if res.err == nil {
 		return res.stream, nil
 	}
-
 	return nil, res.err
+}
+
+func (r *readerReconnector) WaitInit(ctx context.Context) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-r.initDoneCh:
+		return r.initErr
+	}
 }
 
 func (r *readerReconnector) fireReconnectOnRetryableError(stream batchedStreamReader, err error) {

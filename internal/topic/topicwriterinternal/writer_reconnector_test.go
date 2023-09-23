@@ -330,6 +330,58 @@ func TestWriterImpl_InitSession(t *testing.T) {
 	require.True(t, isClosed(w.firstInitResponseProcessedChan))
 }
 
+func TestWriterImpl_WaitInit(t *testing.T) {
+	t.Run("OK", func(t *testing.T) {
+		w := newTestWriterStopped(WithAutoSetSeqNo(true))
+		expectedInitData := InitialInfo{
+			LastSeqNum: int64(123),
+		}
+		w.onWriterChange(&SingleStreamWriter{
+			ReceivedLastSeqNum: expectedInitData.LastSeqNum,
+		})
+
+		initData, err := w.WaitInit(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, expectedInitData, initData)
+
+		err = w.Write(context.Background(), newTestMessages(0))
+		require.NoError(t, err)
+
+		// one more run is needed to check idempotency
+		anotherInitData, err := w.WaitInit(context.Background())
+		require.NoError(t, err)
+		require.Equal(t, initData, anotherInitData)
+
+		require.True(t, isClosed(w.firstInitResponseProcessedChan))
+	})
+
+	t.Run("contextDeadlineErrorInProgress", func(t *testing.T) {
+		w := newTestWriterStopped(WithAutoSetSeqNo(true))
+		ctx, cancel := context.WithCancel(context.Background())
+
+		go func() {
+			cancel()
+			w.onWriterChange(&SingleStreamWriter{})
+		}()
+
+		_, err := w.WaitInit(ctx)
+		require.ErrorIs(t, err, ctx.Err())
+
+		require.True(t, isClosed(w.firstInitResponseProcessedChan))
+	})
+
+	t.Run("contextDeadlineErrorBeforeStart", func(t *testing.T) {
+		w := newTestWriterStopped(WithAutoSetSeqNo(true))
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err := w.WaitInit(ctx)
+		require.ErrorIs(t, err, ctx.Err())
+
+		w.onWriterChange(&SingleStreamWriter{})
+		require.True(t, isClosed(w.firstInitResponseProcessedChan))
+	})
+}
+
 func TestWriterImpl_Reconnect(t *testing.T) {
 	t.Run("StopReconnectOnUnretryableError", func(t *testing.T) {
 		mc := gomock.NewController(t)
