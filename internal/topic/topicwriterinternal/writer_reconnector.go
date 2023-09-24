@@ -128,6 +128,10 @@ type WriterReconnector struct {
 	sessionID   string
 	lastSeqNo   int64
 	encodersMap *EncoderMap
+
+	initDone   bool
+	initDoneCh empty.Chan
+	initInfo   InitialInfo
 }
 
 func newWriterReconnector(
@@ -161,6 +165,8 @@ func newWriterReconnectorStopped(
 	}
 
 	res.sessionID = "not-connected-" + writerInstanceID.String()
+
+	res.initDoneCh = make(empty.Chan)
 
 	return res
 }
@@ -490,7 +496,25 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 	})
 
 	if isFirstInit {
+		w.m.WithLock(func() {
+			w.initDone = true
+			w.initInfo = InitialInfo{LastSeqNum: w.lastSeqNo}
+			close(w.initDoneCh)
+		})
 		w.onWriterInitCallbackHandler(writerStream)
+	}
+}
+
+func (w *WriterReconnector) WaitInit(ctx context.Context) (info InitialInfo, err error) {
+	if ctx.Err() != nil {
+		return InitialInfo{}, ctx.Err()
+	}
+
+	select {
+	case <-ctx.Done():
+		return InitialInfo{}, ctx.Err()
+	case <-w.initDoneCh:
+		return w.initInfo, nil
 	}
 }
 

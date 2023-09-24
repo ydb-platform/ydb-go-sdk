@@ -1,3 +1,5 @@
+* Added `WaitInit` and `WaitInitInfo` method to the topic reader and writer
+
 ## v3.52.2
 * Removed support of placeholder "_" for ignoring columns in `database/sql` result sets
 

@@ -119,6 +119,10 @@ func NewReader(
 	return res
 }
 
+func (r *Reader) WaitInit(ctx context.Context) error {
+	return r.reader.WaitInit(ctx)
+}
+
 func (r *Reader) ID() int64 {
 	return r.readerID
 }
