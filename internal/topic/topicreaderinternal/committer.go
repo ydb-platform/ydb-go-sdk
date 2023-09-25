@@ -23,11 +23,6 @@ var (
 
 type sendMessageToServerFunc func(msg rawtopicreader.ClientMessage) error
 
-// PublicCommitMode
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicCommitMode int
 
 const (

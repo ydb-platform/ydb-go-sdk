@@ -8,10 +8,6 @@ import (
 )
 
 // PublicCommitRangeGetter return data piece for commit messages range
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicCommitRangeGetter interface {
 	getCommitRange() PublicCommitRange
 }

@@ -15,10 +15,6 @@ var (
 )
 
 // PublicBatch is ordered group of message from one partition
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicBatch struct {
 	empty.DoNotCopy
 
@@ -100,28 +96,16 @@ func newBatchFromStream(
 
 // Context is cancelled when code should stop to process messages batch
 // for example - lost connection to server or receive stop partition signal without graceful flag
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (m *PublicBatch) Context() context.Context {
 	return m.commitRange.partitionSession.Context()
 }
 
 // Topic is path of source topic of the messages in the batch
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (m *PublicBatch) Topic() string {
 	return m.partitionSession().Topic
 }
 
 // PartitionID of messages in the batch
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (m *PublicBatch) PartitionID() int64 {
 	return m.partitionSession().PartitionID
 }

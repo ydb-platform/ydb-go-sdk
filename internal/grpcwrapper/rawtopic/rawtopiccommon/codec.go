@@ -5,7 +5,7 @@ import (
 )
 
 // Codec any int value, for example for custom codec
-type Codec int
+type Codec int32
 
 const (
 	CodecUNSPECIFIED Codec = iota

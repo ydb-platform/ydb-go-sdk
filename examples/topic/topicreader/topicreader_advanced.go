@@ -12,12 +12,10 @@ import (
 
 // ReadMessagesWithCustomBatching example of custom of readed message batch
 func ReadMessagesWithCustomBatching(ctx context.Context, db *ydb.Driver) {
-	reader, _ := db.Topic().StartReader("consumer", nil,
-		topicoptions.WithBatchReadMinCount(1000),
-	)
+	reader, _ := db.Topic().StartReader("consumer", nil)
 
 	for {
-		batch, _ := reader.ReadMessageBatch(ctx)
+		batch, _ := reader.ReadMessagesBatch(ctx)
 		processBatch(batch.Context(), batch)
 		_ = reader.Commit(batch.Context(), batch)
 	}

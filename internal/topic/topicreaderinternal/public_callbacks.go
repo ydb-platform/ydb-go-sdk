@@ -6,36 +6,25 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 )
 
-// PublicGetPartitionStartOffsetResponse
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// PublicGetPartitionStartOffsetResponse allow to set start offset for read messages for the partition
 type PublicGetPartitionStartOffsetResponse struct {
 	startOffset     rawtopicreader.Offset
 	startOffsetUsed bool
 }
 
+// StartFrom set start offset for read the partition
 func (r *PublicGetPartitionStartOffsetResponse) StartFrom(offset int64) {
 	r.startOffset.FromInt64(offset)
 	r.startOffsetUsed = true
 }
 
-// PublicGetPartitionStartOffsetRequest
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// PublicGetPartitionStartOffsetRequest info about partition
 type PublicGetPartitionStartOffsetRequest struct {
 	Topic       string
 	PartitionID int64
 }
 
-// PublicGetPartitionStartOffsetFunc
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// PublicGetPartitionStartOffsetFunc callback function for optional manage read progress store at own side
 type PublicGetPartitionStartOffsetFunc func(
 	ctx context.Context,
 	req PublicGetPartitionStartOffsetRequest,

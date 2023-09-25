@@ -39,9 +39,4 @@ func (m *decoderMap) Decode(codec rawtopiccommon.Codec, input io.Reader) (io.Rea
 	))
 }
 
-// PublicCreateDecoderFunc
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicCreateDecoderFunc func(input io.Reader) (io.Reader, error)

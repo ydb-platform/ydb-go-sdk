@@ -55,20 +55,12 @@ func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
 	return c
 }
 
-// Close
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Close the client
 func (c *Client) Close(_ context.Context) error {
 	return nil
 }
 
 // Alter topic options
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.AlterOption) error {
 	req := &rawtopic.AlterTopicRequest{}
 	req.OperationParams = c.defaultOperationParams
@@ -91,10 +83,6 @@ func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.Al
 }
 
 // Create new topic
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (c *Client) Create(
 	ctx context.Context,
 	path string,
@@ -122,10 +110,6 @@ func (c *Client) Create(
 }
 
 // Describe topic
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (c *Client) Describe(
 	ctx context.Context,
 	path string,
@@ -166,10 +150,6 @@ func (c *Client) Describe(
 }
 
 // Drop topic
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.DropOption) error {
 	req := rawtopic.DropTopicRequest{}
 	req.OperationParams = c.defaultOperationParams
@@ -195,10 +175,6 @@ func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.Dro
 
 // StartReader create new topic reader and start pull messages from server
 // it is fast non block call, connection will start in background
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (c *Client) StartReader(
 	consumer string,
 	readSelectors topicoptions.ReadSelectors,
@@ -224,10 +200,6 @@ func (c *Client) StartReader(
 }
 
 // StartWriter create new topic writer wrapper
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error) {
 	var connector topicwriterinternal.ConnectFunc = func(ctx context.Context) (
 		topicwriterinternal.RawTopicWriterStream,
