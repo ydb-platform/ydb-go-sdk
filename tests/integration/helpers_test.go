@@ -4,12 +4,13 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
-	"fmt"
 	"os"
 	"path"
 	"testing"
+	"text/template"
 	"time"
 
 	"github.com/rekby/fixenv"
@@ -19,6 +20,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -145,32 +147,80 @@ func (scope *scopeT) Folder() string {
 	}).(string)
 }
 
+type tableNameParams struct {
+	tableName                string
+	createTableQueryTemplate string
+	createTableOptions       []options.CreateTableOption
+}
+
+func withTableName(tableName string) func(t *tableNameParams) {
+	return func(t *tableNameParams) {
+		t.tableName = tableName
+	}
+}
+
+func withCreateTableOptions(opts ...options.CreateTableOption) func(t *tableNameParams) {
+	return func(t *tableNameParams) {
+		t.createTableOptions = opts
+	}
+}
+
+func withCreateTableQueryTemplate(createTableQueryTemplate string) func(t *tableNameParams) {
+	return func(t *tableNameParams) {
+		t.createTableQueryTemplate = createTableQueryTemplate
+	}
+}
+
 // TableName return name (without path) to example table with struct:
 // id Int64 NOT NULL,
 // val Text
-func (scope *scopeT) TableName() string {
-	return scope.Cache(nil, nil, func() (res interface{}, err error) {
-		tableName := "table"
-
-		err = scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
-			query := fmt.Sprintf(`PRAGMA TablePathPrefix("%s");
-
-CREATE TABLE %s (
-	id Int64 NOT NULL, val Text,
-	PRIMARY KEY (id)
-)
-`, scope.Folder(), tableName)
-
-			scope.Logf("Create table query: %v", query)
-			return s.ExecuteSchemeQuery(ctx, query)
+func (scope *scopeT) TableName(opts ...func(t *tableNameParams)) string {
+	params := tableNameParams{
+		tableName: "table",
+		createTableQueryTemplate: `
+			PRAGMA TablePathPrefix("{{.TablePathPrefix}}");
+			CREATE TABLE {{.TableName}} (
+				id Int64 NOT NULL, 
+				val Text,
+				PRIMARY KEY (id)
+			)
+		`,
+	}
+	for _, opt := range opts {
+		opt(&params)
+	}
+	return scope.Cache(params.tableName, nil, func() (res interface{}, err error) {
+		err = scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) (err error) {
+			if len(params.createTableOptions) == 0 {
+				tmpl, err := template.New("").Parse(params.createTableQueryTemplate)
+				if err != nil {
+					return err
+				}
+				var query bytes.Buffer
+				err = tmpl.Execute(&query, struct {
+					TablePathPrefix string
+					TableName       string
+				}{
+					TablePathPrefix: scope.Folder(),
+					TableName:       params.tableName,
+				})
+				if err != nil {
+					return err
+				}
+				if err != nil {
+					panic(err)
+				}
+				return s.ExecuteSchemeQuery(ctx, query.String())
+			}
+			return s.CreateTable(ctx, path.Join(scope.Folder(), params.tableName), params.createTableOptions...)
 		})
-		return tableName, err
+		return params.tableName, err
 	}).(string)
 }
 
 // TablePath return path to example table with struct:
 // id Int64 NOT NULL,
 // val Text
-func (scope *scopeT) TablePath() string {
-	return path.Join(scope.Folder(), scope.TableName())
+func (scope *scopeT) TablePath(opts ...func(t *tableNameParams)) string {
+	return path.Join(scope.Folder(), scope.TableName(opts...))
 }
