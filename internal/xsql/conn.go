@@ -413,9 +413,9 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (tx driv
 	}()
 
 	if c.currentTx != nil {
-		return nil, xerrors.WithStackTrace(
-			fmt.Errorf("conn already have an opened currentTx: %s", c.currentTx.ID()),
-		)
+		return nil, xerrors.WithStackTrace(&ErrConnAlreadyHaveTx{
+			currentTx: c.currentTx.ID(),
+		})
 	}
 
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
