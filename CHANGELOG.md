@@ -4,6 +4,7 @@
 * Deprecated WithOnWriterFirstConnected callback, use Writer.WaitInitInfo instead.
 * Changed topic Codec base type from int to int32 (was experimental code)
 * Added `WaitInit` and `WaitInitInfo` method to the topic reader and writer
+* Remove extra allocations in `types.TupleValue`, `types.ListValue` and `types.SetValue`
 
 ## v3.52.2
 * Removed support of placeholder "_" for ignoring columns in `database/sql` result sets
