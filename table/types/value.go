@@ -200,21 +200,15 @@ func DecimalValueFromBigInt(v *big.Int, precision, scale uint32) Value {
 }
 
 func TupleValue(vs ...Value) Value {
-	return value.TupleValue(func() (vv []value.Value) {
-		return append(vv, vs...)
-	}()...)
+	return value.TupleValue(vs...)
 }
 
 func ListValue(vs ...Value) Value {
-	return value.ListValue(func() (vv []value.Value) {
-		return append(vv, vs...)
-	}()...)
+	return value.ListValue(vs...)
 }
 
 func SetValue(vs ...Value) Value {
-	return value.SetValue(func() (vv []value.Value) {
-		return append(vv, vs...)
-	}()...)
+	return value.SetValue(vs...)
 }
 
 type structValueFields struct {
