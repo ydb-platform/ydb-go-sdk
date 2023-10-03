@@ -28,11 +28,10 @@ type simpleLoggerOption interface {
 
 func Default(w io.Writer, opts ...simpleLoggerOption) *defaultLogger {
 	l := &defaultLogger{
-		namespaceMaxLen: 24,
-		coloring:        false,
-		minLevel:        INFO,
-		clock:           clockwork.NewRealClock(),
-		w:               w,
+		coloring: false,
+		minLevel: INFO,
+		clock:    clockwork.NewRealClock(),
+		w:        w,
 	}
 	for _, o := range opts {
 		o.applySimpleOption(l)
@@ -41,12 +40,11 @@ func Default(w io.Writer, opts ...simpleLoggerOption) *defaultLogger {
 }
 
 type defaultLogger struct {
-	namespaceMaxLen int
-	coloring        bool
-	clock           clockwork.Clock
-	logQuery        bool
-	minLevel        Level
-	w               io.Writer
+	coloring bool
+	clock    clockwork.Clock
+	logQuery bool
+	minLevel Level
+	w        io.Writer
 }
 
 func (l *defaultLogger) format(namespace []string, msg string, logLevel Level) string {
@@ -58,9 +56,6 @@ func (l *defaultLogger) format(namespace []string, msg string, logLevel Level) s
 	b.WriteString(l.clock.Now().Format(dateLayout))
 	b.WriteByte(' ')
 	lvl := logLevel.String()
-	for ll := len(lvl); ll <= 5; ll++ {
-		b.WriteByte(' ')
-	}
 	if l.coloring {
 		b.WriteString(colorReset)
 		b.WriteString(logLevel.BoldColor())
@@ -70,27 +65,14 @@ func (l *defaultLogger) format(namespace []string, msg string, logLevel Level) s
 		b.WriteString(colorReset)
 		b.WriteString(logLevel.Color())
 	}
-	scope := joinNamespace(
-		namespace,
-		l.namespaceMaxLen,
-	)
-	for ll := len(scope); ll < l.namespaceMaxLen; ll++ {
-		b.WriteByte(' ')
+	b.WriteString(" '")
+	for i, name := range namespace {
+		if i != 0 {
+			b.WriteByte('.')
+		}
+		b.WriteString(name)
 	}
-	b.WriteString(" [")
-	if l.coloring {
-		b.WriteString(colorReset)
-		b.WriteString(logLevel.BoldColor())
-	}
-	b.WriteString(scope)
-	if l.coloring {
-		b.WriteString(colorReset)
-	}
-	b.WriteString("] ")
-	if l.coloring {
-		b.WriteString(colorReset)
-		b.WriteString(logLevel.Color())
-	}
+	b.WriteString("' => ")
 	b.WriteString(msg)
 	if l.coloring {
 		b.WriteString(colorReset)

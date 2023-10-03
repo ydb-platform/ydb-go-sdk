@@ -1,4 +1,5 @@
 * Fixed redundant trace call for finished `database/sql` transactions
+* Refactored default logger format
 * Refactored `internal/conn.coonError` format
 * Fixed data race on `internal/conn.conn.cc` access
 
