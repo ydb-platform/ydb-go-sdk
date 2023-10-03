@@ -1,3 +1,5 @@
+* Refactored default logger format
+
 ## v3.52.3
 * Removed almost all experimental marks from topic api.
 * Rename some topic APIs (old names was deprecated and will be removed in one of next versions).
