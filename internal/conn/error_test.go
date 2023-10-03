@@ -12,7 +12,7 @@ func TestNodeErrorError(t *testing.T) {
 	nodeErr := newConnError(1, "localhost:1234", testErr)
 	message := nodeErr.Error()
 
-	require.Equal(t, "connError(node_id = 1, address = \"localhost:1234\"): test", message)
+	require.Equal(t, "connError{node_id:1,address:'localhost:1234'}: test", message)
 }
 
 func TestNodeErrorUnwrap(t *testing.T) {
