@@ -153,7 +153,10 @@ func (c *conn) setState(s State) State {
 
 func (c *conn) Unban() State {
 	var newState State
-	if isAvailable(c.cc) {
+	c.mtx.RLock()
+	cc := c.cc
+	c.mtx.RUnlock()
+	if isAvailable(cc) {
 		newState = Online
 	} else {
 		newState = Offline

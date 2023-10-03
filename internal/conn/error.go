@@ -17,7 +17,7 @@ func newConnError(id uint32, endpoint string, err error) connError {
 }
 
 func (n connError) Error() string {
-	return fmt.Sprintf("connError(node_id = %d, address = %q): %v", n.nodeID, n.endpoint, n.err)
+	return fmt.Sprintf("connError{node_id:%d,address:'%s'}: %v", n.nodeID, n.endpoint, n.err)
 }
 
 func (n connError) Unwrap() error {

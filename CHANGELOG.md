@@ -1,3 +1,6 @@
+* Refactored `internal/conn.coonError` format
+* Fixed data race on `internal/conn.conn.cc` access
+
 ## v3.52.3
 * Removed almost all experimental marks from topic api.
 * Rename some topic APIs (old names was deprecated and will be removed in one of next versions).
