@@ -18,6 +18,7 @@ type tx struct {
 	conn *conn
 	ctx  context.Context
 	tx   table.Transaction
+	done bool
 }
 
 var (
@@ -41,6 +42,7 @@ func (c *conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (current
 		conn: c,
 		ctx:  ctx,
 		tx:   transaction,
+		done: false,
 	}
 	return c.currentTx, nil
 }
@@ -50,6 +52,9 @@ func (tx *tx) ID() string {
 }
 
 func (tx *tx) Commit() (err error) {
+	if tx.done {
+		return badconn.Map(xerrors.WithStackTrace(errTxAlreadyDone))
+	}
 	onDone := trace.DatabaseSQLOnTxCommit(tx.conn.trace, &tx.ctx, tx)
 	defer func() {
 		onDone(err)
@@ -64,10 +69,14 @@ func (tx *tx) Commit() (err error) {
 	if err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
+	tx.done = true
 	return nil
 }
 
 func (tx *tx) Rollback() (err error) {
+	if tx.done {
+		return badconn.Map(xerrors.WithStackTrace(errTxAlreadyDone))
+	}
 	onDone := trace.DatabaseSQLOnTxRollback(tx.conn.trace, &tx.ctx, tx)
 	defer func() {
 		onDone(err)
@@ -82,6 +91,7 @@ func (tx *tx) Rollback() (err error) {
 	if err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
+	tx.done = true
 	return err
 }
 
