@@ -94,8 +94,6 @@ func (s *stats) addToOpen(t testing.TB, id string) {
 	}
 
 	s.openSessions[id] = struct{}{}
-
-	t.Logf("session '%s' added to open sessions", id)
 }
 
 func (s *stats) removeFromOpen(t testing.TB, id string) {
@@ -109,8 +107,6 @@ func (s *stats) removeFromOpen(t testing.TB, id string) {
 	}
 
 	delete(s.openSessions, id)
-
-	t.Logf("session '%s' removed from open sessions", id)
 }
 
 func (s *stats) addToPool(t testing.TB, id string) {
@@ -124,8 +120,6 @@ func (s *stats) addToPool(t testing.TB, id string) {
 	}
 
 	s.inPoolSessions[id] = struct{}{}
-
-	t.Logf("session '%s' added to pool", id)
 }
 
 func (s *stats) removeFromPool(t testing.TB, id string) {
@@ -139,8 +133,6 @@ func (s *stats) removeFromPool(t testing.TB, id string) {
 	}
 
 	delete(s.inPoolSessions, id)
-
-	t.Logf("session '%s' removed from pool", id)
 }
 
 func (s *stats) addToInFlight(t testing.TB, id string) {
@@ -154,8 +146,6 @@ func (s *stats) addToInFlight(t testing.TB, id string) {
 	}
 
 	s.inFlightSessions[id] = struct{}{}
-
-	t.Logf("session '%s' added to in-flight", id)
 }
 
 func (s *stats) removeFromInFlight(t testing.TB, id string) {
@@ -169,8 +159,6 @@ func (s *stats) removeFromInFlight(t testing.TB, id string) {
 	}
 
 	delete(s.inFlightSessions, id)
-
-	t.Logf("session '%s' removed from in-flight", id)
 }
 
 func TestTable(t *testing.T) { //nolint:gocyclo
@@ -265,6 +253,7 @@ func TestTable(t *testing.T) { //nolint:gocyclo
 		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 		ydb.WithUserAgent("table/e2e"),
+		withMetrics(t, trace.DetailsAll, time.Second),
 		ydb.With(
 			config.WithOperationTimeout(time.Second*5),
 			config.WithOperationCancelAfter(time.Second*5),
@@ -718,7 +707,7 @@ func (s *tableTestScope) streamReadTable(ctx context.Context, t testing.TB, c ta
 					if err != nil {
 						return err
 					}
-					t.Logf("  > %d %s %s\n", *id, *title, date.String())
+					// t.Logf("  > %d %s %s\n", *id, *title, date.String())
 				}
 			}
 			if err = res.Err(); err != nil {
@@ -801,7 +790,7 @@ func (s *tableTestScope) executeDataQuery(ctx context.Context, t testing.TB, c t
 			defer func() {
 				_ = res.Close()
 			}()
-			t.Logf("> select_simple_transaction:\n")
+			// t.Logf("> select_simple_transaction:\n")
 			for res.NextResultSet(ctx) {
 				for res.NextRow() {
 					err = res.ScanNamed(
@@ -812,10 +801,10 @@ func (s *tableTestScope) executeDataQuery(ctx context.Context, t testing.TB, c t
 					if err != nil {
 						return err
 					}
-					t.Logf(
-						"  > %d %s %s\n",
-						*id, *title, *date,
-					)
+					// t.Logf(
+					// 	"  > %d %s %s\n",
+					// 	*id, *title, *date,
+					// )
 				}
 			}
 			return res.Err()
@@ -869,14 +858,14 @@ func (s *tableTestScope) executeScanQuery(ctx context.Context, t testing.TB, c t
 			defer func() {
 				_ = res.Close()
 			}()
-			t.Logf("> scan_query_select:\n")
+			// t.Logf("> scan_query_select:\n")
 			for res.NextResultSet(ctx) {
 				for res.NextRow() {
 					err = res.ScanWithDefaults(&seriesID, &seasonID, &title, &date)
 					if err != nil {
 						return err
 					}
-					t.Logf("  > SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s\n", seriesID, seasonID, title, date)
+					// t.Logf("  > SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s\n", seriesID, seasonID, title, date)
 				}
 			}
 			return res.Err()

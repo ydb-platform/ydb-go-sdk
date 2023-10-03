@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"sync"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
 
@@ -22,6 +24,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type sqlScope struct {
@@ -60,7 +63,10 @@ func TestDatabaseSql(t *testing.T) {
 	})
 
 	t.Run("sql.OpenDB", func(t *testing.T) {
-		cc, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"))
+		cc, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"),
+			withMetrics(t, trace.DetailsAll, 0),
+			ydb.WithDiscoveryInterval(time.Second),
+		)
 		require.NoError(t, err)
 
 		defer func() {
@@ -68,7 +74,10 @@ func TestDatabaseSql(t *testing.T) {
 			_ = cc.Close(ctx)
 		}()
 
-		c, err := ydb.Connector(cc)
+		c, err := ydb.Connector(cc,
+			ydb.WithTablePathPrefix(path.Join(cc.Name(), scope.folder)),
+			ydb.WithAutoDeclare(),
+		)
 		require.NoError(t, err)
 
 		defer func() {
@@ -84,6 +93,9 @@ func TestDatabaseSql(t *testing.T) {
 
 		err = scope.db.PingContext(ctx)
 		require.NoError(t, err)
+
+		scope.db.SetMaxOpenConns(50)
+		scope.db.SetMaxIdleConns(50)
 
 		t.Run("prepare", func(t *testing.T) {
 			t.Run("scheme", func(t *testing.T) {
@@ -109,11 +121,8 @@ func TestDatabaseSql(t *testing.T) {
 			t.Run("explain", func(t *testing.T) {
 				row := scope.db.QueryRowContext(
 					ydb.WithQueryMode(ctx, ydb.ExplainQueryMode), `
-					PRAGMA TablePathPrefix("`+path.Join(cc.Name(), scope.folder)+`");
-					DECLARE $seriesID AS Uint64;
-					DECLARE $seasonID AS Uint64;
-					DECLARE $episodeID AS Uint64;
-					SELECT views FROM episodes WHERE series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID;`,
+						SELECT views FROM episodes WHERE series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID;
+					`,
 					sql.Named("seriesID", uint64(1)),
 					sql.Named("seasonID", uint64(1)),
 					sql.Named("episodeID", uint64(1)),
@@ -134,13 +143,11 @@ func TestDatabaseSql(t *testing.T) {
 					err = retry.DoTx(ctx, scope.db, func(ctx context.Context, tx *sql.Tx) (err error) {
 						var stmt *sql.Stmt
 						stmt, err = tx.PrepareContext(ctx, `
-					PRAGMA TablePathPrefix("`+path.Join(cc.Name(), scope.folder)+`");
-					DECLARE $seriesID AS Uint64;
-					DECLARE $seasonID AS Uint64;
-					DECLARE $episodeID AS Uint64;
-					SELECT views FROM episodes WHERE series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID;
-				`,
-						)
+							DECLARE $seriesID AS Uint64;
+							DECLARE $seasonID AS Uint64;
+							DECLARE $episodeID AS Uint64;
+							SELECT views FROM episodes WHERE series_id = $seriesID AND season_id = $seasonID AND episode_id = $episodeID;
+						`)
 						if err != nil {
 							return fmt.Errorf("cannot prepare query: %w", err)
 						}
@@ -159,13 +166,9 @@ func TestDatabaseSql(t *testing.T) {
 						}
 						// increment `views`
 						_, err = tx.ExecContext(ctx, `
-				PRAGMA TablePathPrefix("`+path.Join(cc.Name(), scope.folder)+`");
-				DECLARE $seriesID AS Uint64;
-				DECLARE $seasonID AS Uint64;
-				DECLARE $episodeID AS Uint64;
-				DECLARE $views AS Uint64;
-				UPSERT INTO episodes ( series_id, season_id, episode_id, views )
-				VALUES ( $seriesID, $seasonID, $episodeID, $views );`,
+								UPSERT INTO episodes ( series_id, season_id, episode_id, views )
+								VALUES ( $seriesID, $seasonID, $episodeID, $views );
+							`,
 							sql.Named("seriesID", uint64(1)),
 							sql.Named("seasonID", uint64(1)),
 							sql.Named("episodeID", uint64(1)),
@@ -183,10 +186,6 @@ func TestDatabaseSql(t *testing.T) {
 				t.Run("isolation", func(t *testing.T) {
 					t.Run("snapshot", func(t *testing.T) {
 						query := `
-							PRAGMA TablePathPrefix("` + path.Join(cc.Name(), scope.folder) + `");
-							DECLARE $seriesID AS Uint64;
-							DECLARE $seasonID AS Uint64;
-							DECLARE $episodeID AS Uint64;
 							SELECT views FROM episodes 
 							WHERE 
 								series_id = $seriesID AND 
@@ -223,18 +222,19 @@ func TestDatabaseSql(t *testing.T) {
 				})
 				t.Run("scan", func(t *testing.T) {
 					t.Run("query", func(t *testing.T) {
-						var (
-							seriesID  *uint64
-							seasonID  *uint64
-							episodeID *uint64
-							title     *string
-							airDate   *time.Time
-							views     sql.NullFloat64
-							query     = `
-								PRAGMA TablePathPrefix("` + path.Join(cc.Name(), scope.folder) + `");
-								DECLARE $seriesID AS Optional<Uint64>;
-								DECLARE $seasonID AS Optional<Uint64>;
-								DECLARE $episodeID AS Optional<Uint64>;
+						wg := sync.WaitGroup{}
+						wg.Add(500)
+						for range make([]struct{}, 500) {
+							go func() {
+								defer wg.Done()
+								var (
+									seriesID  *uint64
+									seasonID  *uint64
+									episodeID *uint64
+									title     *string
+									airDate   *time.Time
+									views     sql.NullFloat64
+									query     = `
 								SELECT 
 									series_id,
 									season_id,
@@ -250,36 +250,40 @@ func TestDatabaseSql(t *testing.T) {
 								ORDER BY 
 									series_id, season_id, episode_id;
 							`
-						)
-						err = retry.Do(ctx, scope.db,
-							func(ctx context.Context, cc *sql.Conn) error {
-								rows, err := cc.QueryContext(ydb.WithQueryMode(ctx, ydb.ScanQueryMode), query,
-									sql.Named("seriesID", seriesID),
-									sql.Named("seasonID", seasonID),
-									sql.Named("episodeID", episodeID),
 								)
-								if err != nil {
-									return err
-								}
-								defer func() {
-									_ = rows.Close()
-								}()
-								for rows.NextResultSet() {
-									for rows.Next() {
-										if err = rows.Scan(&seriesID, &seasonID, &episodeID, &title, &airDate, &views); err != nil {
-											return fmt.Errorf("cannot select current views: %w", err)
-										}
-										t.Logf("[%d][%d][%d] - %s %q (%d views)",
-											*seriesID, *seasonID, *episodeID, airDate.Format("2006-01-02"),
-											*title, uint64(views.Float64),
+								err := retry.DoTx(ctx, scope.db,
+									func(ctx context.Context, cc *sql.Tx) error {
+										rows, err := cc.QueryContext(ctx, query,
+											sql.Named("seriesID", seriesID),
+											sql.Named("seasonID", seasonID),
+											sql.Named("episodeID", episodeID),
 										)
-									}
-								}
-								return rows.Err()
-							},
-							retry.WithDoRetryOptions(retry.WithIdempotent(true)),
-						)
-						require.NoError(t, err)
+										if err != nil {
+											return err
+										}
+										defer func() {
+											_ = rows.Close()
+										}()
+										for rows.NextResultSet() {
+											for rows.Next() {
+												if err = rows.Scan(&seriesID, &seasonID, &episodeID, &title, &airDate, &views); err != nil {
+													return fmt.Errorf("cannot select current views: %w", err)
+												}
+												t.Logf("[%d][%d][%d] - %s %q (%d views)",
+													*seriesID, *seasonID, *episodeID, airDate.Format("2006-01-02"),
+													*title, uint64(views.Float64),
+												)
+											}
+										}
+										return rows.Err()
+									},
+									retry.WithDoTxRetryOptions(retry.WithIdempotent(true)),
+									retry.WithTxOptions(&sql.TxOptions{Isolation: sql.LevelSnapshot, ReadOnly: true}),
+								)
+								assert.NoError(t, err)
+							}()
+						}
+						wg.Wait()
 					})
 				})
 			})
@@ -441,42 +445,12 @@ func (s *sqlScope) days(date string) time.Time {
 }
 
 func (s *sqlScope) fill(ctx context.Context) error {
-	db, err := ydb.Unwrap(s.db)
-	if err != nil {
-		return fmt.Errorf("unwrap db failed: %w", err)
-	}
-
 	return retry.Do(ctx, s.db, func(ctx context.Context, cc *sql.Conn) error {
 		stmt, err := s.db.PrepareContext(ctx, `
-		PRAGMA TablePathPrefix("`+path.Join(db.Name(), s.folder)+`");
-
-		DECLARE $seriesData AS List<Struct<
-			series_id: Optional<Uint64>,
-			title: Optional<Utf8>,
-			series_info: Optional<Utf8>,
-			release_date: Optional<Date>,
-			comment: Optional<Utf8>>>;
-
-		DECLARE $seasonsData AS List<Struct<
-			series_id: Optional<Uint64>,
-			season_id: Optional<Uint64>,
-			title: Optional<Utf8>,
-			first_aired: Optional<Date>,
-			last_aired: Optional<Date>>>;
-
-		DECLARE $episodesData AS List<Struct<
-			series_id: Optional<Uint64>,
-			season_id: Optional<Uint64>,
-			episode_id: Optional<Uint64>,
-			title: Optional<Utf8>,
-			air_date: Optional<Date>>>;
-
-		REPLACE INTO series SELECT * FROM AS_TABLE($seriesData);
-
-		REPLACE INTO seasons SELECT * FROM AS_TABLE($seasonsData);
-
-		REPLACE INTO episodes SELECT * FROM AS_TABLE($episodesData);
-	`)
+			REPLACE INTO series SELECT * FROM AS_TABLE($seriesData);
+			REPLACE INTO seasons SELECT * FROM AS_TABLE($seasonsData);
+			REPLACE INTO episodes SELECT * FROM AS_TABLE($episodesData);
+		`)
 		if err != nil {
 			return fmt.Errorf("failed to prepare query: %w", err)
 		}
@@ -497,25 +471,20 @@ func (s *sqlScope) createTables(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("cannot unwrap db: %w", err)
 	}
-
+	ctx = ydb.WithQueryMode(ctx, ydb.SchemeQueryMode)
 	{
 		var exists bool
 		if exists, err = sugar.IsTableExists(ctx, db.Scheme(), path.Join(db.Name(), s.folder, "series")); err != nil {
 			return fmt.Errorf("check table series exists failed: %w", err)
 		} else if exists {
-			_, err = s.db.ExecContext(
-				ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-				fmt.Sprintf("DROP TABLE `%s`", path.Join(db.Name(), s.folder, "series")),
-			)
+			_, err = s.db.ExecContext(ctx, `DROP TABLE series`)
 			if err != nil {
 				return fmt.Errorf("drop table series failed: %w", err)
 			}
 		}
 
-		_, err = s.db.ExecContext(
-			ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-			fmt.Sprintf(
-				`CREATE TABLE `+"`"+path.Join(db.Name(), s.folder, "series")+"`"+` (
+		_, err = s.db.ExecContext(ctx, `
+			CREATE TABLE series (
 				series_id Uint64,
 				title UTF8,
 				series_info UTF8,
@@ -524,9 +493,8 @@ func (s *sqlScope) createTables(ctx context.Context) error {
 				PRIMARY KEY (
 					series_id
 				)
-			)`,
-			),
-		)
+			);
+		`)
 		if err != nil {
 			return fmt.Errorf("create table series failed: %w", err)
 		}
@@ -537,19 +505,14 @@ func (s *sqlScope) createTables(ctx context.Context) error {
 		if exists, err = sugar.IsTableExists(ctx, db.Scheme(), path.Join(db.Name(), s.folder, "seasons")); err != nil {
 			return fmt.Errorf("check table seasons exists failed: %w", err)
 		} else if exists {
-			_, err = s.db.ExecContext(
-				ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-				fmt.Sprintf("DROP TABLE `%s`", path.Join(db.Name(), s.folder, "seasons")),
-			)
+			_, err = s.db.ExecContext(ctx, `DROP TABLE seasons`)
 			if err != nil {
 				return fmt.Errorf("drop table seasons failed: %w", err)
 			}
 		}
 
-		_, err = s.db.ExecContext(
-			ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-			fmt.Sprintf(
-				`CREATE TABLE `+"`"+path.Join(db.Name(), s.folder, "seasons")+"`"+` (
+		_, err = s.db.ExecContext(ctx, `
+			CREATE TABLE seasons (
 				series_id Uint64,
 				season_id Uint64,
 				title UTF8,
@@ -559,9 +522,8 @@ func (s *sqlScope) createTables(ctx context.Context) error {
 					series_id,
 					season_id
 				)
-			)`,
-			),
-		)
+			);
+		`)
 		if err != nil {
 			return fmt.Errorf("create table seasons failed: %w", err)
 		}
@@ -573,19 +535,14 @@ func (s *sqlScope) createTables(ctx context.Context) error {
 		if exists, err = sugar.IsTableExists(ctx, db.Scheme(), path.Join(db.Name(), s.folder, "episodes")); err != nil {
 			return fmt.Errorf("check table episodes exists failed: %w", err)
 		} else if exists {
-			_, err = s.db.ExecContext(
-				ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-				fmt.Sprintf("DROP TABLE `%s`", path.Join(db.Name(), s.folder, "episodes")),
-			)
+			_, err = s.db.ExecContext(ctx, `DROP TABLE episodes`)
 			if err != nil {
 				return fmt.Errorf("drop table episodes failed: %w", err)
 			}
 		}
 
-		_, err = s.db.ExecContext(
-			ydb.WithQueryMode(ctx, ydb.SchemeQueryMode),
-			fmt.Sprintf(
-				`CREATE TABLE `+"`"+path.Join(db.Name(), s.folder, "episodes")+"`"+` (
+		_, err = s.db.ExecContext(ctx, `
+			CREATE TABLE episodes (
 				series_id Uint64,
 				season_id Uint64,
 				episode_id Uint64,
@@ -597,9 +554,8 @@ func (s *sqlScope) createTables(ctx context.Context) error {
 					season_id,
 					episode_id
 				)
-			)`,
-			),
-		)
+			);
+		`)
 		if err != nil {
 			return fmt.Errorf("create table episodes failed: %w", err)
 		}

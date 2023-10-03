@@ -1,3 +1,4 @@
+* Added experimental package `metrics` with SDK metrics
 * Fixed redundant trace call for finished `database/sql` transactions
 * Added repeater event type to wake-up func context
 * Refactored default logger format
