@@ -405,11 +405,11 @@ func (c *conn) normalize(q string, args ...driver.NamedValue) (query string, _ *
 	}()...)
 }
 
-func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (tx driver.Tx, err error) {
-	var transaction table.Transaction
+func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ driver.Tx, err error) {
+	var tx currentTx
 	onDone := trace.DatabaseSQLOnConnBegin(c.trace, &ctx)
 	defer func() {
-		onDone(transaction, err)
+		onDone(tx, err)
 	}()
 
 	if c.currentTx != nil {
@@ -433,7 +433,7 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (tx driv
 	return tx, nil
 }
 
-func (c *conn) Version(context.Context) (_ string, err error) {
+func (c *conn) Version(_ context.Context) (_ string, err error) {
 	const version = "default"
 	return version, nil
 }
