@@ -99,6 +99,7 @@ type (
 	}
 	tableSessionInfo interface {
 		ID() string
+		NodeID() uint32
 		Status() string
 		LastUsage() time.Time
 	}
