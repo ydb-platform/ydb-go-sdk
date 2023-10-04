@@ -7,7 +7,7 @@ import (
 )
 
 func Join(errs ...error) joinError {
-	return joinError(errs)
+	return errs
 }
 
 type joinError []error
