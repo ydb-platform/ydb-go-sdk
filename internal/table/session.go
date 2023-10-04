@@ -990,7 +990,6 @@ func (s *session) StreamReadTable(
 	ctx, cancel := xcontext.WithCancel(ctx)
 
 	stream, err = s.tableService.StreamReadTable(ctx, &request)
-
 	if err != nil {
 		cancel()
 		return nil, xerrors.WithStackTrace(err)
@@ -1117,7 +1116,6 @@ func (s *session) StreamExecuteScanQuery(
 	ctx, cancel := xcontext.WithCancel(ctx)
 
 	stream, err = s.tableService.StreamExecuteScanQuery(ctx, &request, callOptions...)
-
 	if err != nil {
 		cancel()
 		return nil, xerrors.WithStackTrace(err)
