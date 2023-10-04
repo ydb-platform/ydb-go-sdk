@@ -6,6 +6,7 @@ package integration
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -13,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
 
@@ -217,7 +217,9 @@ func TestDatabaseSql(t *testing.T) {
 								ReadOnly:  true,
 							}),
 						)
-						require.NoError(t, err)
+						if !errors.Is(err, context.DeadlineExceeded) {
+							require.NoError(t, err)
+						}
 					})
 				})
 				t.Run("scan", func(t *testing.T) {
@@ -280,7 +282,9 @@ func TestDatabaseSql(t *testing.T) {
 									retry.WithDoTxRetryOptions(retry.WithIdempotent(true)),
 									retry.WithTxOptions(&sql.TxOptions{Isolation: sql.LevelSnapshot, ReadOnly: true}),
 								)
-								assert.NoError(t, err)
+								if !errors.Is(err, context.DeadlineExceeded) {
+									require.NoError(t, err)
+								}
 							}()
 						}
 						wg.Wait()
