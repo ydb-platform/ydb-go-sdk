@@ -3,10 +3,14 @@ package scanner
 import (
 	"context"
 	"fmt"
+	"io"
 	"reflect"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
@@ -198,4 +202,76 @@ func NewResultSet(a *allocator.Allocator, opts ...ResultSetOption) *Ydb.ResultSe
 		}
 	}
 	return (*Ydb.ResultSet)(&d)
+}
+
+func TestNewStreamWithRecvFirstResultSet(t *testing.T) {
+	for _, tt := range []struct {
+		ctx         context.Context
+		recvCounter int
+		err         error
+	}{
+		{
+			ctx: context.Background(),
+			err: nil,
+		},
+		{
+			ctx: func() context.Context {
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				return ctx
+			}(),
+			err: context.Canceled,
+		},
+		{
+			ctx: func() context.Context {
+				ctx, cancel := context.WithTimeout(context.Background(), 0)
+				cancel()
+				return ctx
+			}(),
+			err: context.DeadlineExceeded,
+		},
+		{
+			ctx: func() context.Context {
+				ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
+				cancel()
+				return ctx
+			}(),
+			err: context.Canceled,
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			result, err := NewStream(tt.ctx,
+				func(ctx context.Context) (*Ydb.ResultSet, *Ydb_TableStats.QueryStats, error) {
+					tt.recvCounter++
+					if tt.recvCounter > 1000 {
+						return nil, nil, io.EOF
+					}
+					return &Ydb.ResultSet{}, nil, ctx.Err()
+				},
+				func(err error) error {
+					return err
+				},
+			)
+			if tt.err != nil {
+				require.ErrorIs(t, err, tt.err)
+				require.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				require.EqualValues(t, 1, tt.recvCounter)
+				require.EqualValues(t, 1, result.(*streamResult).nextResultSetCounter.Load())
+				for i := range make([]struct{}, 1000) {
+					err = result.NextResultSetErr(tt.ctx)
+					require.NoError(t, err)
+					require.Equal(t, i+1, tt.recvCounter)
+					require.Equal(t, i+2, int(result.(*streamResult).nextResultSetCounter.Load()))
+				}
+				err = result.NextResultSetErr(tt.ctx)
+				require.ErrorIs(t, err, io.EOF)
+				require.True(t, err == io.EOF) //nolint:errorlint
+				require.Equal(t, 1001, tt.recvCounter)
+				require.Equal(t, 1002, int(result.(*streamResult).nextResultSetCounter.Load()))
+			}
+		})
+	}
 }

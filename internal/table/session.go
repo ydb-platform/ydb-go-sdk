@@ -996,7 +996,7 @@ func (s *session) StreamReadTable(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return scanner.NewStream(
+	return scanner.NewStream(ctx,
 		func(ctx context.Context) (
 			set *Ydb.ResultSet,
 			stats *Ydb_TableStats.QueryStats,
@@ -1024,7 +1024,7 @@ func (s *session) StreamReadTable(
 			return err
 		},
 		scanner.WithIgnoreTruncated(true), // stream read table always returns truncated flag on last result set
-	), nil
+	)
 }
 
 func (s *session) ReadRows(
@@ -1123,7 +1123,7 @@ func (s *session) StreamExecuteScanQuery(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return scanner.NewStream(
+	return scanner.NewStream(ctx,
 		func(ctx context.Context) (
 			set *Ydb.ResultSet,
 			stats *Ydb_TableStats.QueryStats,
@@ -1152,7 +1152,7 @@ func (s *session) StreamExecuteScanQuery(
 		},
 		scanner.WithIgnoreTruncated(s.config.IgnoreTruncated()),
 		scanner.WithMarkTruncatedAsRetryable(),
-	), nil
+	)
 }
 
 // BulkUpsert uploads given list of ydb struct values to the table.
