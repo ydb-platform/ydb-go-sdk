@@ -222,7 +222,7 @@ func (c *Client) streamExecute(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return scanner.NewStream(
+	return scanner.NewStream(ctx,
 		func(ctx context.Context) (
 			set *Ydb.ResultSet,
 			stats *Ydb_TableStats.QueryStats,
@@ -249,7 +249,7 @@ func (c *Client) streamExecute(
 			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 			return err
 		},
-	), nil
+	)
 }
 
 func (c *Client) Close(ctx context.Context) (err error) {

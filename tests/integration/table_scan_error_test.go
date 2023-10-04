@@ -71,13 +71,8 @@ func TestIssue847ScanError(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		err = res.NextResultSetErr(ctx)
-		if err != nil {
-			return err
-		}
 		return res.Err()
 	}, table.WithTxSettings(table.TxSettings(table.WithSnapshotReadOnly())))
 	require.Error(t, err)
-	t.Log(err)
 	require.ErrorContains(t, err, "Unexpected token 'SELICT'")
 }
