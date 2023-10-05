@@ -99,7 +99,7 @@ func TestDatabaseSqlGetTables(t *testing.T) {
 			}
 
 			return nil
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})
@@ -128,7 +128,7 @@ func TestDatabaseSqlGetTables(t *testing.T) {
 				[]string{"episodes", "series"},
 				tables)
 			return nil
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})
@@ -157,7 +157,7 @@ func TestDatabaseSqlGetTables(t *testing.T) {
 				[]string{"seasons"},
 				tables)
 			return nil
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})
@@ -186,7 +186,7 @@ func TestDatabaseSqlGetTables(t *testing.T) {
 				[]string{"seasons"},
 				tables)
 			return nil
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})
@@ -273,7 +273,7 @@ func TestDatabaseSqlGetTablesRecursive(t *testing.T) {
 			}
 
 			return nil
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})
@@ -304,7 +304,7 @@ func TestDatabaseSqlGetTablesRecursive(t *testing.T) {
 				[]string{"episodes", "series", "subdir/seasons"},
 				tables)
 			return nil
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})
@@ -335,7 +335,7 @@ func TestDatabaseSqlGetTablesRecursive(t *testing.T) {
 				[]string{"seasons"},
 				tables)
 			return nil
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})
@@ -366,7 +366,7 @@ func TestDatabaseSqlGetTablesRecursive(t *testing.T) {
 				[]string{"seasons"},
 				tables)
 			return nil
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})

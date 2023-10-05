@@ -48,7 +48,7 @@ func TestDatabaseSqlGetColumnType(t *testing.T) {
 			)
 
 			return err
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})
@@ -119,7 +119,7 @@ func TestDatabaseSqlGetColumnType(t *testing.T) {
 
 			require.ElementsMatch(t, columns, result)
 			return nil
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})
@@ -176,7 +176,7 @@ func TestDatabaseSqlColumnTypes(t *testing.T) {
 		}
 
 		return nil
-	}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+	}, retry.WithIdempotent(true))
 
 	require.NoError(t, err)
 

@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -138,19 +137,17 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (row generator.R
 
 			return nil
 		},
-		retry.WithDoRetryOptions(
-			retry.WithIdempotent(true),
-			retry.WithTrace(
-				trace.Retry{
-					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-						return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-							return func(info trace.RetryLoopDoneInfo) {
-								attempts = info.Attempts
-							}
+		retry.WithIdempotent(true),
+		retry.WithTrace(
+			trace.Retry{
+				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+					return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+						return func(info trace.RetryLoopDoneInfo) {
+							attempts = info.Attempts
 						}
-					},
+					}
 				},
-			),
+			},
 		),
 	)
 
@@ -174,19 +171,17 @@ func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, e
 			_, err = s.x.Context(ctx).SetExpr("hash", fmt.Sprintf("Digest::NumericHash(%d)", row.ID)).Insert(row)
 			return err
 		},
-		retry.WithDoRetryOptions(
-			retry.WithIdempotent(true),
-			retry.WithTrace(
-				trace.Retry{
-					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-						return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-							return func(info trace.RetryLoopDoneInfo) {
-								attempts = info.Attempts
-							}
+		retry.WithIdempotent(true),
+		retry.WithTrace(
+			trace.Retry{
+				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+					return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+						return func(info trace.RetryLoopDoneInfo) {
+							attempts = info.Attempts
 						}
-					},
+					}
 				},
-			),
+			},
 		),
 	)
 

@@ -241,9 +241,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 		}
 		return s, nil
 	}
-	options := retryOptions(c.config.Trace(), opts...)
-	err = retry.Retry(
-		ctx,
+	err = retry.Retry(ctx,
 		func(ctx context.Context) (err error) {
 			s, err = createSession(ctx)
 			if err != nil {
@@ -251,21 +249,23 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 			}
 			return nil
 		},
-		retry.WithIdempotent(true),
-		retry.WithID("CreateSession"),
-		retry.WithFastBackoff(options.FastBackoff),
-		retry.WithSlowBackoff(options.SlowBackoff),
-		retry.WithTrace(trace.Retry{
-			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-				onIntermediate := trace.TableOnCreateSession(c.config.Trace(), info.Context)
-				return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-					onDone := onIntermediate(info.Error)
-					return func(info trace.RetryLoopDoneInfo) {
-						onDone(s, info.Attempts, info.Error)
-					}
-				}
-			},
-		}),
+		append(
+			[]retry.Option{
+				retry.WithIdempotent(true),
+				retry.WithID("CreateSession"),
+				retry.WithTrace(trace.Retry{
+					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+						onIntermediate := trace.TableOnCreateSession(c.config.Trace(), info.Context)
+						return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+							onDone := onIntermediate(info.Error)
+							return func(info trace.RetryLoopDoneInfo) {
+								onDone(s, info.Attempts, info.Error)
+							}
+						}
+					},
+				}),
+			}, retryOptions(c.config.Trace(), opts...).RetryOptions...,
+		)...,
 	)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

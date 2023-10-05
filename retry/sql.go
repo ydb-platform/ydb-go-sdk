@@ -9,18 +9,29 @@ import (
 )
 
 type doOptions struct {
-	retryOptions []retryOption
+	retryOptions []Option
 }
 
 // doTxOption defines option for redefine default Retry behavior
-type doOption func(o *doOptions) error
+type doOption interface {
+	ApplyDoOption(opts *doOptions)
+}
+
+var (
+	_ doOption = doRetryOptionsOption(nil)
+	_ doOption = idOption("")
+)
+
+type doRetryOptionsOption []Option
+
+func (retryOptions doRetryOptionsOption) ApplyDoOption(opts *doOptions) {
+	opts.retryOptions = append(opts.retryOptions, retryOptions...)
+}
 
 // WithDoRetryOptions specified retry options
-func WithDoRetryOptions(opts ...retryOption) doOption {
-	return func(o *doOptions) error {
-		o.retryOptions = append(o.retryOptions, opts...)
-		return nil
-	}
+// Deprecated: use implicit options instead
+func WithDoRetryOptions(opts ...Option) doRetryOptionsOption {
+	return opts
 }
 
 // Do is a retryer of database/sql Conn with fallbacks on errors
@@ -29,11 +40,9 @@ func Do(ctx context.Context, db *sql.DB, f func(ctx context.Context, cc *sql.Con
 		options  = doOptions{}
 		attempts = 0
 	)
-	for _, o := range opts {
-		if o != nil {
-			if err := o(&options); err != nil {
-				return xerrors.WithStackTrace(err)
-			}
+	for _, opt := range opts {
+		if opt != nil {
+			opt.ApplyDoOption(&options)
 		}
 	}
 	err := Retry(ctx, func(ctx context.Context) (err error) {
@@ -60,25 +69,42 @@ func Do(ctx context.Context, db *sql.DB, f func(ctx context.Context, cc *sql.Con
 
 type doTxOptions struct {
 	txOptions    *sql.TxOptions
-	retryOptions []retryOption
+	retryOptions []Option
 }
 
 // doTxOption defines option for redefine default Retry behavior
-type doTxOption func(o *doTxOptions) error
+type doTxOption interface {
+	ApplyDoTxOption(o *doTxOptions)
+}
+
+var _ doTxOption = doTxRetryOptionsOption(nil)
+
+type doTxRetryOptionsOption []Option
+
+func (doTxRetryOptions doTxRetryOptionsOption) ApplyDoTxOption(o *doTxOptions) {
+	o.retryOptions = append(o.retryOptions, doTxRetryOptions...)
+}
 
 // WithDoTxRetryOptions specified retry options
-func WithDoTxRetryOptions(opts ...retryOption) doTxOption {
-	return func(o *doTxOptions) error {
-		o.retryOptions = append(o.retryOptions, opts...)
-		return nil
-	}
+// Deprecated: use implicit options instead
+func WithDoTxRetryOptions(opts ...Option) doTxRetryOptionsOption {
+	return opts
+}
+
+var _ doTxOption = txOptionsOption{}
+
+type txOptionsOption struct {
+	txOptions *sql.TxOptions
+}
+
+func (txOptions txOptionsOption) ApplyDoTxOption(o *doTxOptions) {
+	o.txOptions = txOptions.txOptions
 }
 
 // WithTxOptions specified transaction options
-func WithTxOptions(txOptions *sql.TxOptions) doTxOption {
-	return func(o *doTxOptions) error {
-		o.txOptions = txOptions
-		return nil
+func WithTxOptions(txOptions *sql.TxOptions) txOptionsOption {
+	return txOptionsOption{
+		txOptions: txOptions,
 	}
 }
 
@@ -93,11 +119,9 @@ func DoTx(ctx context.Context, db *sql.DB, f func(context.Context, *sql.Tx) erro
 		}
 		attempts = 0
 	)
-	for _, o := range opts {
-		if o != nil {
-			if err := o(&options); err != nil {
-				return xerrors.WithStackTrace(err)
-			}
+	for _, opt := range opts {
+		if opt != nil {
+			opt.ApplyDoTxOption(&options)
 		}
 	}
 	err := Retry(ctx, func(ctx context.Context) (err error) {

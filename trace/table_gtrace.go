@@ -1420,9 +1420,10 @@ func TableOnClose(t *Table, c *context.Context) func(error) {
 		res(p)
 	}
 }
-func TableOnDo(t *Table, c *context.Context, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
+func TableOnDo(t *Table, c *context.Context, iD string, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
 	var p TableDoStartInfo
 	p.Context = c
+	p.ID = iD
 	p.Idempotent = idempotent
 	p.NestedCall = nestedCall
 	res := t.onDo(p)
@@ -1438,9 +1439,10 @@ func TableOnDo(t *Table, c *context.Context, idempotent bool, nestedCall bool) f
 		}
 	}
 }
-func TableOnDoTx(t *Table, c *context.Context, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
+func TableOnDoTx(t *Table, c *context.Context, iD string, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
 	var p TableDoTxStartInfo
 	p.Context = c
+	p.ID = iD
 	p.Idempotent = idempotent
 	p.NestedCall = nestedCall
 	res := t.onDoTx(p)

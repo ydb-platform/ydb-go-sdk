@@ -3,7 +3,6 @@ package table
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -50,18 +49,14 @@ func doTx(
 	attempts, onIntermediate := 0, trace.TableOnDoTx(
 		opts.Trace,
 		&ctx,
+		opts.ID,
 		opts.Idempotent,
 		isRetryCalledAbove(ctx),
 	)
 	defer func() {
 		onIntermediate(err)(attempts, err)
 	}()
-	err = retryBackoff(
-		ctx,
-		c,
-		opts.FastBackoff,
-		opts.SlowBackoff,
-		opts.Idempotent,
+	err = retryBackoff(ctx, c,
 		func(ctx context.Context, s table.Session) (err error) {
 			attempts++
 
@@ -110,6 +105,7 @@ func doTx(
 
 			return nil
 		},
+		opts.RetryOptions...,
 	)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -127,11 +123,11 @@ func do(
 	if opts.Trace == nil {
 		opts.Trace = &trace.Table{}
 	}
-	attempts, onIntermediate := 0, trace.TableOnDo(opts.Trace, &ctx, opts.Idempotent, isRetryCalledAbove(ctx))
+	attempts, onIntermediate := 0, trace.TableOnDo(opts.Trace, &ctx, opts.ID, opts.Idempotent, isRetryCalledAbove(ctx))
 	defer func() {
 		onIntermediate(err)(attempts, err)
 	}()
-	return retryBackoff(ctx, c, opts.FastBackoff, opts.SlowBackoff, opts.Idempotent,
+	return retryBackoff(ctx, c,
 		func(ctx context.Context, s table.Session) (err error) {
 			attempts++
 
@@ -156,16 +152,15 @@ func do(
 
 			return nil
 		},
+		opts.RetryOptions...,
 	)
 }
 
 func retryBackoff(
 	ctx context.Context,
 	p SessionProvider,
-	fastBackoff backoff.Backoff,
-	slowBackoff backoff.Backoff,
-	isOperationIdempotent bool,
 	op table.Operation,
+	opts ...retry.Option,
 ) (err error) {
 	err = retry.Retry(markRetryCall(ctx),
 		func(ctx context.Context) (err error) {
@@ -188,9 +183,7 @@ func retryBackoff(
 
 			return nil
 		},
-		retry.WithFastBackoff(fastBackoff),
-		retry.WithSlowBackoff(slowBackoff),
-		retry.WithIdempotent(isOperationIdempotent),
+		opts...,
 	)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -200,9 +193,7 @@ func retryBackoff(
 
 func retryOptions(trace *trace.Table, opts ...table.Option) *table.Options {
 	options := &table.Options{
-		Trace:       trace,
-		FastBackoff: backoff.Fast,
-		SlowBackoff: backoff.Slow,
+		Trace: trace,
 		TxSettings: table.TxSettings(
 			table.WithSerializableReadWrite(),
 		),

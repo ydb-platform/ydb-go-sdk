@@ -67,9 +67,7 @@ func TestRegressionCloud109307(t *testing.T) {
 		}, retry.WithTxOptions(&sql.TxOptions{
 			Isolation: sql.LevelSnapshot,
 			ReadOnly:  true,
-		}), retry.WithDoTxRetryOptions(
-			retry.WithIdempotent(true),
-		))
+		}), retry.WithIdempotent(true))
 		if ctx.Err() == nil {
 			require.NoError(t, err)
 		}
@@ -101,7 +99,7 @@ func TestRegressionKikimr17104(t *testing.T) {
 							return err
 						}
 						return nil
-					}, retry.WithDoRetryOptions(retry.WithIdempotent(true)),
+					}, retry.WithIdempotent(true),
 				)
 				require.NoError(t, err)
 			})
@@ -128,7 +126,7 @@ func TestRegressionKikimr17104(t *testing.T) {
 							return err
 						}
 						return nil
-					}, retry.WithDoRetryOptions(retry.WithIdempotent(true)),
+					}, retry.WithIdempotent(true),
 				)
 				require.NoError(t, err)
 			})
@@ -160,7 +158,7 @@ func TestRegressionKikimr17104(t *testing.T) {
 							}
 						}
 						return rows.Err()
-					}, retry.WithDoRetryOptions(retry.WithIdempotent(true)),
+					}, retry.WithIdempotent(true),
 				)
 				require.NoError(t, err)
 				require.Equal(t, upsertRowsCount, rowsCount)

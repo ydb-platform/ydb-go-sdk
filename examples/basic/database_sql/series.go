@@ -9,7 +9,6 @@ import (
 	"path"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -31,7 +30,7 @@ func selectDefault(ctx context.Context, db *sql.DB) (err error) {
 		}
 		log.Printf("AST = %s\n\nPlan = %s", ast, plan)
 		return nil
-	}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+	}, retry.WithIdempotent(true))
 	if err != nil {
 		return fmt.Errorf("explain query failed: %w", err)
 	}
@@ -62,7 +61,7 @@ func selectDefault(ctx context.Context, db *sql.DB) (err error) {
 				)
 			}
 			return rows.Err()
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 	if err != nil {
 		return fmt.Errorf("execute data query failed: %w", err)
 	}
@@ -155,7 +154,7 @@ func selectScan(ctx context.Context, db *sql.DB) (err error) {
 				)
 			}
 			return rows.Err()
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 	if err != nil {
 		return fmt.Errorf("scan query failed: %w", err)
 	}
@@ -202,7 +201,7 @@ func fillTablesWithData(ctx context.Context, db *sql.DB) (err error) {
 			return err
 		}
 		return nil
-	}, retry.WithDoTxRetryOptions(retry.WithIdempotent(true)))
+	}, retry.WithIdempotent(true))
 	if err != nil {
 		return fmt.Errorf("upsert query failed: %w", err)
 	}
@@ -235,7 +234,7 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 			return err
 		}
 		return nil
-	}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+	}, retry.WithIdempotent(true))
 	if err != nil {
 		return fmt.Errorf("create table failed: %w", err)
 	}
@@ -266,7 +265,7 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 			return err
 		}
 		return nil
-	}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+	}, retry.WithIdempotent(true))
 	if err != nil {
 		return fmt.Errorf("create table failed: %w", err)
 	}
@@ -299,7 +298,7 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 			return err
 		}
 		return nil
-	}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+	}, retry.WithIdempotent(true))
 	if err != nil {
 		return fmt.Errorf("create table failed: %w", err)
 	}

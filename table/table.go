@@ -9,9 +9,9 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -559,16 +559,41 @@ func ValueParam(name string, v types.Value) ParameterOption {
 }
 
 type Options struct {
+	ID              string
 	Idempotent      bool
 	TxSettings      *TransactionSettings
 	TxCommitOptions []options.CommitTransactionOption
-	FastBackoff     backoff.Backoff
-	SlowBackoff     backoff.Backoff
+	RetryOptions    []retry.Option
 	Trace           *trace.Table
 }
 
 type Option interface {
 	ApplyTableOption(opts *Options)
+}
+
+var _ Option = idOption("")
+
+type idOption string
+
+func (id idOption) ApplyTableOption(opts *Options) {
+	opts.ID = string(id)
+	opts.RetryOptions = append(opts.RetryOptions, retry.WithID(string(id)))
+}
+
+func WithID(id string) idOption {
+	return idOption(id)
+}
+
+var _ Option = retryOptionsOption{}
+
+type retryOptionsOption []retry.Option
+
+func (retryOptions retryOptionsOption) ApplyTableOption(opts *Options) {
+	opts.RetryOptions = append(opts.RetryOptions, retry.WithIdempotent(true))
+}
+
+func WithRetryOptions(retryOptions []retry.Option) retryOptionsOption {
+	return retryOptions
 }
 
 var _ Option = idempotentOption{}
@@ -577,6 +602,7 @@ type idempotentOption struct{}
 
 func (idempotentOption) ApplyTableOption(opts *Options) {
 	opts.Idempotent = true
+	opts.RetryOptions = append(opts.RetryOptions, retry.WithIdempotent(true))
 }
 
 func WithIdempotent() idempotentOption {

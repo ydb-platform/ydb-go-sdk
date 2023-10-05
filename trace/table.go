@@ -379,6 +379,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
+		ID         string
 		Idempotent bool
 		NestedCall bool // flag when Retry called inside head Retry
 	}
@@ -395,6 +396,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
+		ID         string
 		Idempotent bool
 		NestedCall bool // flag when Retry called inside head Retry
 	}

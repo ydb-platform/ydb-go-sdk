@@ -17,10 +17,14 @@ func table(config Config) (t trace.Table) {
 	wait := config.WithSystem("pool").GaugeVec("wait")
 	waitLatency := config.WithSystem("pool").WithSystem("wait").TimerVec("latency")
 	alive := config.GaugeVec("sessions", "node_id")
-	doAttempts := config.WithSystem("do").HistogramVec("attempts", []float64{0, 1, 2, 5, 10})
-	doErrors := config.WithSystem("do").WithSystem("intermediate").CounterVec("errors", "status")
-	doTxAttempts := config.WithSystem("doTx").HistogramVec("attempts", []float64{0, 1, 2, 5, 10})
-	doTxErrors := config.WithSystem("doTx").WithSystem("intermediate").CounterVec("errors", "status")
+	doAttempts := config.WithSystem("do").HistogramVec("attempts", []float64{0, 1, 2, 5, 10}, "name")
+	doErrors := config.WithSystem("do").CounterVec("errors", "status", "name")
+	doIntermediateErrors := config.WithSystem("do").WithSystem("intermediate").CounterVec("errors", "status", "name")
+	doLatency := config.WithSystem("do").TimerVec("latency", "status", "name")
+	doTxAttempts := config.WithSystem("doTx").HistogramVec("attempts", []float64{0, 1, 2, 5, 10}, "name")
+	doTxIntermediateErrors := config.WithSystem("doTx").WithSystem("intermediate").CounterVec("errors", "status", "name")
+	doTxErrors := config.WithSystem("doTx").CounterVec("errors", "status", "name")
+	doTxLatency := config.WithSystem("doTx").TimerVec("latency", "status", "name")
 	t.OnInit = func(info trace.TableInitStartInfo) func(trace.TableInitDoneInfo) {
 		return func(info trace.TableInitDoneInfo) {
 			limit.With(nil).Set(float64(info.Limit))
@@ -31,15 +35,28 @@ func table(config Config) (t trace.Table) {
 	) func(
 		trace.TableDoDoneInfo,
 	) {
+		var (
+			name  = info.ID
+			start = time.Now()
+		)
 		return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
 			if info.Error != nil && config.Details()&trace.TableEvents != 0 {
-				doErrors.With(map[string]string{
+				doIntermediateErrors.With(map[string]string{
 					"status": errorBrief(info.Error),
+					"name":   name,
 				}).Inc()
 			}
 			return func(info trace.TableDoDoneInfo) {
 				if config.Details()&trace.TableEvents != 0 {
 					doAttempts.With(nil).Record(float64(info.Attempts))
+					doErrors.With(map[string]string{
+						"status": errorBrief(info.Error),
+						"name":   name,
+					}).Inc()
+					doLatency.With(map[string]string{
+						"status": errorBrief(info.Error),
+						"name":   name,
+					}).Record(time.Since(start))
 				}
 			}
 		}
@@ -49,15 +66,28 @@ func table(config Config) (t trace.Table) {
 	) func(
 		trace.TableDoTxDoneInfo,
 	) {
+		var (
+			name  = info.ID
+			start = time.Now()
+		)
 		return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
 			if info.Error != nil && config.Details()&trace.TableEvents != 0 {
-				doTxErrors.With(map[string]string{
+				doTxIntermediateErrors.With(map[string]string{
 					"status": errorBrief(info.Error),
+					"name":   name,
 				}).Inc()
 			}
 			return func(info trace.TableDoTxDoneInfo) {
 				if config.Details()&trace.TableEvents != 0 {
 					doTxAttempts.With(nil).Record(float64(info.Attempts))
+					doTxErrors.With(map[string]string{
+						"status": errorBrief(info.Error),
+						"name":   name,
+					}).Inc()
+					doTxLatency.With(map[string]string{
+						"status": errorBrief(info.Error),
+						"name":   name,
+					}).Record(time.Since(start))
 				}
 			}
 		}

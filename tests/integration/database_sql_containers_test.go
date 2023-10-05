@@ -117,7 +117,7 @@ func TestDatabaseSqlContainers(t *testing.T) {
 			}
 		}
 		return rows.Err()
-	}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+	}, retry.WithIdempotent(true))
 	require.NoError(t, err)
 }
 
