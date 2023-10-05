@@ -270,7 +270,7 @@ err := retry.Do(context.TODO(), db, func(ctx context.Context, cc *sql.Conn) erro
    }
    ...
    return nil // good final of retry operation
-}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+}, retry.WithIdempotent(true))
 
 ```
 
@@ -296,9 +296,7 @@ err := retry.DoTx(context.TODO(), db, func(ctx context.Context, tx *sql.Tx) erro
     }
     ...
     return nil // good final of retry tx operation
-}, retry.WithDoTxRetryOptions(
-    retry.WithIdempotent(true),
-), retry.WithTxOptions(&sql.TxOptions{
+}, retry.WithIdempotent(true), retry.WithTxOptions(&sql.TxOptions{
     Isolation: sql.LevelSnapshot,
     ReadOnly:  true,
 }))
@@ -568,7 +566,7 @@ err := retry.Do(context.TODO(), db, func(ctx context.Context, cc *sql.Conn) erro
     }
     ...
     return nil // good final of retry operation
-}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+}, retry.WithIdempotent(true))
 ```
 
 ## Troubleshooting <a name="troubleshooting"></a>

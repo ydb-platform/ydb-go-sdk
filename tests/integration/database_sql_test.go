@@ -178,7 +178,7 @@ func TestDatabaseSql(t *testing.T) {
 							return fmt.Errorf("cannot upsert views: %w", err)
 						}
 						return nil
-					}, retry.WithDoTxRetryOptions(retry.WithIdempotent(true)))
+					}, retry.WithIdempotent(true))
 					require.NoError(t, err)
 				})
 			})
@@ -211,7 +211,7 @@ func TestDatabaseSql(t *testing.T) {
 								}
 								return nil
 							},
-							retry.WithDoTxRetryOptions(retry.WithIdempotent(true)),
+							retry.WithIdempotent(true),
 							retry.WithTxOptions(&sql.TxOptions{
 								Isolation: sql.LevelSnapshot,
 								ReadOnly:  true,
@@ -279,7 +279,7 @@ func TestDatabaseSql(t *testing.T) {
 										}
 										return rows.Err()
 									},
-									retry.WithDoTxRetryOptions(retry.WithIdempotent(true)),
+									retry.WithIdempotent(true),
 									retry.WithTxOptions(&sql.TxOptions{Isolation: sql.LevelSnapshot, ReadOnly: true}),
 								)
 								if !errors.Is(err, context.DeadlineExceeded) {
@@ -467,7 +467,7 @@ func (s *sqlScope) fill(ctx context.Context) error {
 			return fmt.Errorf("failed to execute statement: %w", err)
 		}
 		return nil
-	}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+	}, retry.WithIdempotent(true))
 }
 
 func (s *sqlScope) createTables(ctx context.Context) error {

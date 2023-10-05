@@ -83,7 +83,7 @@ func TestIssue798TruncatedError(t *testing.T) {
 				return fmt.Errorf("unexpected rows count: %d", count)
 			}
 			return rows.Err()
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 		scope.Require.NoError(err)
 	}
 
@@ -132,7 +132,7 @@ func TestIssue798TruncatedError(t *testing.T) {
 				count++
 			}
 			return rows.Err()
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 		scope.Require.ErrorIs(err, result.ErrTruncated)
 	}
 
@@ -197,7 +197,7 @@ func TestIssue798TruncatedError(t *testing.T) {
 				count++
 			}
 			return rows.Err()
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 		scope.Require.NoError(err)
 	}
 }

@@ -49,16 +49,22 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 						return testErr
 					},
 					&table.Options{
-						FastBackoff: testutil.BackoffFunc(func(n int) <-chan time.Time {
-							ch := make(chan time.Time)
-							backoff <- ch
-							return ch
-						}),
-						SlowBackoff: testutil.BackoffFunc(func(n int) <-chan time.Time {
-							ch := make(chan time.Time)
-							backoff <- ch
-							return ch
-						}),
+						RetryOptions: []retry.Option{
+							retry.WithFastBackoff(
+								testutil.BackoffFunc(func(n int) <-chan time.Time {
+									ch := make(chan time.Time)
+									backoff <- ch
+									return ch
+								}),
+							),
+							retry.WithSlowBackoff(
+								testutil.BackoffFunc(func(n int) <-chan time.Time {
+									ch := make(chan time.Time)
+									backoff <- ch
+									return ch
+								}),
+							),
+						},
 					},
 				)
 				results <- err
@@ -207,12 +213,18 @@ func TestRetryerImmediateReturn(t *testing.T) {
 					return testErr
 				},
 				&table.Options{
-					FastBackoff: testutil.BackoffFunc(func(n int) <-chan time.Time {
-						panic("this code will not be called")
-					}),
-					SlowBackoff: testutil.BackoffFunc(func(n int) <-chan time.Time {
-						panic("this code will not be called")
-					}),
+					RetryOptions: []retry.Option{
+						retry.WithFastBackoff(
+							testutil.BackoffFunc(func(n int) <-chan time.Time {
+								panic("this code will not be called")
+							}),
+						),
+						retry.WithSlowBackoff(
+							testutil.BackoffFunc(func(n int) <-chan time.Time {
+								panic("this code will not be called")
+							}),
+						),
+					},
 				},
 			)
 			if !xerrors.Is(err, testErr) {

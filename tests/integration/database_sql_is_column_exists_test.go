@@ -43,7 +43,7 @@ func TestDatabaseSqlIsColumnExists(t *testing.T) {
 			)
 
 			return err
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})
@@ -72,7 +72,7 @@ func TestDatabaseSqlIsColumnExists(t *testing.T) {
 				require.True(t, exists)
 			}
 			return nil
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})

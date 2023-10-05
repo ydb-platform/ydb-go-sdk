@@ -1,3 +1,4 @@
+* Marked as deprecated `retry.WithDoRetryOptions` and `retry.WithDoTxRetryOptions`
 * Added receiving first result set on construct `internal/table/scanner.NewStream()`
 * Added experimental package `metrics` with SDK metrics
 * Fixed redundant trace call for finished `database/sql` transactions

@@ -181,17 +181,18 @@ func TestDoTx(t *testing.T) {
 					}
 					db := sql.OpenDB(m)
 					var attempts int
-					err := DoTx(context.Background(), db, func(ctx context.Context, tx *sql.Tx) error {
-						attempts++
-						if attempts > 10 {
-							return nil
-						}
-						rows, err := tx.QueryContext(ctx, "SELECT 1")
-						if err != nil {
-							return err
-						}
-						return rows.Err()
-					}, WithDoTxRetryOptions(
+					err := DoTx(context.Background(), db,
+						func(ctx context.Context, tx *sql.Tx) error {
+							attempts++
+							if attempts > 10 {
+								return nil
+							}
+							rows, err := tx.QueryContext(ctx, "SELECT 1")
+							if err != nil {
+								return err
+							}
+							return rows.Err()
+						},
 						WithIdempotent(bool(idempotentType)),
 						WithFastBackoff(backoff.New(backoff.WithSlotDuration(time.Nanosecond))),
 						WithSlowBackoff(backoff.New(backoff.WithSlotDuration(time.Nanosecond))),
@@ -205,7 +206,7 @@ func TestDoTx(t *testing.T) {
 								}
 							},
 						}),
-					))
+					)
 					if tt.canRetry[idempotentType] {
 						if err != nil {
 							t.Errorf("unexpected err after attempts=%d and driver conns=%d: %v)", attempts, m.conns, err)

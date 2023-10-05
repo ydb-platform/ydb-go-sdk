@@ -49,7 +49,7 @@ func TestDatabaseSqlGetIndexColumns(t *testing.T) {
 			}
 
 			return nil
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})
@@ -91,7 +91,7 @@ func TestDatabaseSqlGetIndexColumns(t *testing.T) {
 					test.IndexedColumns,
 					columns)
 				return nil
-			}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+			}, retry.WithIdempotent(true))
 
 			require.NoError(t, err)
 		}

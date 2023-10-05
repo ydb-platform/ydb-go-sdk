@@ -86,7 +86,7 @@ func Example_databaseSQL() {
 		}
 		log.Printf("id=%v, myStr='%s'\n", id, myStr)
 		return nil
-	}, retry.WithDoTxRetryOptions(retry.WithIdempotent(true)))
+	}, retry.WithIdempotent(true))
 	if err != nil {
 		log.Printf("query failed: %v", err)
 	}
