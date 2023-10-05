@@ -27,60 +27,112 @@ type retryOptions struct {
 	panicCallback func(e interface{})
 }
 
-type retryOption func(o *retryOptions)
+type retryOption interface {
+	ApplyRetryOption(opts *retryOptions)
+}
+
+var _ retryOption = idOption("")
+
+type idOption string
+
+func (id idOption) ApplyRetryOption(opts *retryOptions) {
+	opts.id = string(id)
+}
 
 // WithID applies id for identification call Retry in trace.Retry.OnRetry
-func WithID(id string) retryOption {
-	return func(o *retryOptions) {
-		o.id = id
-	}
+func WithID(id string) idOption {
+	return idOption(id)
+}
+
+var _ retryOption = stackTraceOption{}
+
+type stackTraceOption struct{}
+
+func (stackTrace stackTraceOption) ApplyRetryOption(opts *retryOptions) {
+	opts.stackTrace = true
 }
 
 // WithStackTrace wraps errors with stacktrace from Retry call
-func WithStackTrace() retryOption {
-	return func(o *retryOptions) {
-		o.stackTrace = true
-	}
+func WithStackTrace() stackTraceOption {
+	return stackTraceOption{}
+}
+
+var _ retryOption = traceOption{}
+
+type traceOption struct {
+	trace *trace.Retry
+}
+
+func (t traceOption) ApplyRetryOption(opts *retryOptions) {
+	opts.trace = t.trace
 }
 
 // WithTrace returns trace option
-func WithTrace(trace trace.Retry) retryOption {
-	return func(o *retryOptions) {
-		o.trace = &trace
-	}
+func WithTrace(trace trace.Retry) traceOption {
+	return traceOption{trace: &trace}
+}
+
+var _ retryOption = idempotentOption(false)
+
+type idempotentOption bool
+
+func (idempotent idempotentOption) ApplyRetryOption(opts *retryOptions) {
+	opts.idempotent = bool(idempotent)
 }
 
 // WithIdempotent applies idempotent flag to retry operation
-func WithIdempotent(idempotent bool) retryOption {
-	return func(o *retryOptions) {
-		o.idempotent = idempotent
+func WithIdempotent(idempotent bool) idempotentOption {
+	return idempotentOption(idempotent)
+}
+
+var _ retryOption = fastBackoffOption{}
+
+type fastBackoffOption struct {
+	backoff backoff.Backoff
+}
+
+func (o fastBackoffOption) ApplyRetryOption(opts *retryOptions) {
+	if o.backoff != nil {
+		opts.fastBackoff = o.backoff
 	}
 }
 
 // WithFastBackoff replaces default fast backoff
-func WithFastBackoff(b backoff.Backoff) retryOption {
-	return func(o *retryOptions) {
-		if b != nil {
-			o.fastBackoff = b
-		}
+func WithFastBackoff(b backoff.Backoff) fastBackoffOption {
+	return fastBackoffOption{backoff: b}
+}
+
+var _ retryOption = slowBackoffOption{}
+
+type slowBackoffOption struct {
+	backoff backoff.Backoff
+}
+
+func (o slowBackoffOption) ApplyRetryOption(opts *retryOptions) {
+	if o.backoff != nil {
+		opts.slowBackoff = o.backoff
 	}
 }
 
 // WithSlowBackoff replaces default slow backoff
-func WithSlowBackoff(b backoff.Backoff) retryOption {
-	return func(o *retryOptions) {
-		if b != nil {
-			o.slowBackoff = b
-		}
-	}
+func WithSlowBackoff(b backoff.Backoff) slowBackoffOption {
+	return slowBackoffOption{backoff: b}
+}
+
+var _ retryOption = panicCallbackOption{}
+
+type panicCallbackOption struct {
+	callback func(e interface{})
+}
+
+func (o panicCallbackOption) ApplyRetryOption(opts *retryOptions) {
+	opts.panicCallback = o.callback
 }
 
 // WithPanicCallback returns panic callback option
 // If not defined - panic would not intercept with driver
-func WithPanicCallback(panicCallback func(e interface{})) retryOption {
-	return func(o *retryOptions) {
-		o.panicCallback = panicCallback
-	}
+func WithPanicCallback(panicCallback func(e interface{})) panicCallbackOption {
+	return panicCallbackOption{callback: panicCallback}
 }
 
 type (
@@ -115,9 +167,9 @@ func Retry(ctx context.Context, op retryOperation, opts ...retryOption) (err err
 		slowBackoff: backoff.Slow,
 		trace:       &trace.Retry{},
 	}
-	for _, o := range opts {
-		if o != nil {
-			o(options)
+	for _, opt := range opts {
+		if opt != nil {
+			opt.ApplyRetryOption(options)
 		}
 	}
 	ctx = xcontext.WithIdempotent(ctx, options.idempotent)

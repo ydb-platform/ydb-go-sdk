@@ -207,9 +207,9 @@ func retryOptions(trace *trace.Table, opts ...table.Option) *table.Options {
 			table.WithSerializableReadWrite(),
 		),
 	}
-	for _, o := range opts {
-		if o != nil {
-			o(options)
+	for _, opt := range opts {
+		if opt != nil {
+			opt.ApplyTableOption(options)
 		}
 	}
 	return options
