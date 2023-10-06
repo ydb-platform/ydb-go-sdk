@@ -20,7 +20,7 @@ type ErrConnAlreadyHaveTx struct {
 }
 
 func (err *ErrConnAlreadyHaveTx) Error() string {
-	return "conn already have an opened currentTx: " + err.currentTx
+	return "conn already have an open currentTx: " + err.currentTx
 }
 
 func (err *ErrConnAlreadyHaveTx) As(target interface{}) bool {
