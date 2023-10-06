@@ -94,11 +94,18 @@ func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessa
 
 	for {
 		if attempt > 0 {
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case <-backoff.Fast.Wait(attempt):
-				// pass
+			if err := func() error {
+				t := r.clock.NewTimer(backoff.Fast.Delay(attempt))
+				defer t.Stop()
+
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-t.Chan():
+					return nil
+				}
+			}(); err != nil {
+				return nil, err
 			}
 		}
 
@@ -211,13 +218,18 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 				request.reason,
 				r.clock.Since(retriesStarted),
 			); isRetriableErr {
-				delay := retryBackoff.Delay(attempt)
+				if err := func() error {
+					t := r.clock.NewTimer(retryBackoff.Delay(attempt))
+					defer t.Stop()
 
-				select {
-				case <-ctx.Done():
+					select {
+					case <-ctx.Done():
+						return ctx.Err()
+					case <-t.Chan():
+						return nil
+					}
+				}(); err != nil {
 					return
-				case <-r.clock.After(delay):
-					// pass
 				}
 			}
 		}

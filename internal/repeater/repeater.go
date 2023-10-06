@@ -168,7 +168,6 @@ func (r *repeater) worker(ctx context.Context, tick clockwork.Ticker) {
 		backoff.WithSlotDuration(500*time.Millisecond),
 		backoff.WithCeiling(6),
 		backoff.WithJitterLimit(1),
-		backoff.WithClock(r.clock),
 	)
 
 	// forceIndex defines delay index for force backoff
@@ -178,12 +177,16 @@ func (r *repeater) worker(ctx context.Context, tick clockwork.Ticker) {
 		if forceIndex == 0 {
 			return EventForce
 		}
+
+		force := r.clock.NewTimer(force.Delay(forceIndex))
+		defer force.Stop()
+
 		select {
 		case <-ctx.Done():
 			return EventCancel
 		case <-tick.Chan():
 			return EventTick
-		case <-force.Wait(forceIndex):
+		case <-force.Chan():
 			return EventForce
 		}
 	}
