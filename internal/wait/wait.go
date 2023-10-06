@@ -2,6 +2,7 @@ package wait
 
 import (
 	"context"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -11,8 +12,11 @@ import (
 // expiration.
 // It returns non-nil error if and only if deadline expiration branch wins.
 func waitBackoff(ctx context.Context, b backoff.Backoff, i int) error {
+	t := time.NewTimer(b.Delay(i))
+	defer t.Stop()
+
 	select {
-	case <-b.Wait(i):
+	case <-t.C:
 		return nil
 	case <-ctx.Done():
 		if err := ctx.Err(); err != nil {
