@@ -1,3 +1,4 @@
+## v3.53.0
 * Removed `internal/backoff.Backoff.Wait` interface method for exclude resource leak with bug-provoked usage of `time.After` method
 * Marked as deprecated `retry.WithDoRetryOptions` and `retry.WithDoTxRetryOptions`
 * Added receiving first result set on construct `internal/table/scanner.NewStream()`
