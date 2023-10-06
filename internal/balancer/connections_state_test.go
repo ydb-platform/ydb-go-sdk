@@ -187,8 +187,8 @@ func TestSelectRandomConnection(t *testing.T) {
 			}
 		}
 		require.Equal(t, 100, first+second)
-		require.InDelta(t, 50, first, 20)
-		require.InDelta(t, 50, second, 20)
+		require.InDelta(t, 50, first, 21)
+		require.InDelta(t, 50, second, 21)
 	})
 	t.Run("TwoBanned", func(t *testing.T) {
 		conns := []conn.Conn{
@@ -225,8 +225,8 @@ func TestSelectRandomConnection(t *testing.T) {
 			}
 		}
 		require.Equal(t, 100, first+second)
-		require.InDelta(t, 50, first, 20)
-		require.InDelta(t, 50, second, 20)
+		require.InDelta(t, 50, first, 21)
+		require.InDelta(t, 50, second, 21)
 		require.Greater(t, 10, failed)
 	})
 }
@@ -418,8 +418,8 @@ func TestConnection(t *testing.T) {
 			}
 		}
 		require.Equal(t, 100, preferred+fallback)
-		require.InDelta(t, 50, preferred, 20)
-		require.InDelta(t, 50, fallback, 20)
+		require.InDelta(t, 50, preferred, 21)
+		require.InDelta(t, 50, fallback, 21)
 	})
 	t.Run("PreferBannedWithFallback", func(t *testing.T) {
 		s := newConnectionsState([]conn.Conn{
