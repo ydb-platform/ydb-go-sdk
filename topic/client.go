@@ -3,14 +3,17 @@ package topic
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicclientinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
+type ClientType = topicclientinternal.PublicTopicClient
+
 // Client is interface for topic client
-// Attention: the interface may be extended in the future.
+// Deprecated: now returned concrete type
 type Client interface {
 	// Alter change topic options
 	Alter(ctx context.Context, path string, opts ...topicoptions.AlterOption) error

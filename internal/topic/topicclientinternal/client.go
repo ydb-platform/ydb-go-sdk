@@ -20,14 +20,18 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type Client struct {
+type PublicTopicClient struct {
 	cfg                    topic.Config
 	cred                   credentials.Credentials
 	defaultOperationParams rawydb.OperationParams
 	rawClient              rawtopic.Client
 }
 
-func New(conn grpc.ClientConnInterface, cred credentials.Credentials, opts ...topicoptions.TopicOption) *Client {
+func New(
+	conn grpc.ClientConnInterface,
+	cred credentials.Credentials,
+	opts ...topicoptions.TopicOption,
+) *PublicTopicClient {
 	rawClient := rawtopic.NewClient(Ydb_Topic_V1.NewTopicServiceClient(conn))
 
 	cfg := newTopicConfig(opts...)
@@ -35,7 +39,7 @@ func New(conn grpc.ClientConnInterface, cred credentials.Credentials, opts ...to
 	var defaultOperationParams rawydb.OperationParams
 	topic.OperationParamsFromConfig(&defaultOperationParams, &cfg.Common)
 
-	return &Client{
+	return &PublicTopicClient{
 		cfg:                    cfg,
 		cred:                   cred,
 		defaultOperationParams: defaultOperationParams,
@@ -56,12 +60,12 @@ func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
 }
 
 // Close the client
-func (c *Client) Close(_ context.Context) error {
+func (c *PublicTopicClient) Close(_ context.Context) error {
 	return nil
 }
 
-// Alter topic options
-func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.AlterOption) error {
+// Alter change topic options
+func (c *PublicTopicClient) Alter(ctx context.Context, path string, opts ...topicoptions.AlterOption) error {
 	req := &rawtopic.AlterTopicRequest{}
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
@@ -82,8 +86,8 @@ func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.Al
 	return call(ctx)
 }
 
-// Create new topic
-func (c *Client) Create(
+// Create topic
+func (c *PublicTopicClient) Create(
 	ctx context.Context,
 	path string,
 	opts ...topicoptions.CreateOption,
@@ -110,7 +114,7 @@ func (c *Client) Create(
 }
 
 // Describe topic
-func (c *Client) Describe(
+func (c *PublicTopicClient) Describe(
 	ctx context.Context,
 	path string,
 	opts ...topicoptions.DescribeOption,
@@ -150,7 +154,7 @@ func (c *Client) Describe(
 }
 
 // Drop topic
-func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.DropOption) error {
+func (c *PublicTopicClient) Drop(ctx context.Context, path string, opts ...topicoptions.DropOption) error {
 	req := rawtopic.DropTopicRequest{}
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
@@ -173,9 +177,9 @@ func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.Dro
 	return call(ctx)
 }
 
-// StartReader create new topic reader and start pull messages from server
-// it is fast non block call, connection will start in background
-func (c *Client) StartReader(
+// StartReader start read messages from topic
+// it is fast non block call, connection starts in background
+func (c *PublicTopicClient) StartReader(
 	consumer string,
 	readSelectors topicoptions.ReadSelectors,
 	opts ...topicoptions.ReaderOption,
@@ -199,8 +203,15 @@ func (c *Client) StartReader(
 	return topicreader.NewReader(internalReader), nil
 }
 
-// StartWriter create new topic writer wrapper
-func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error) {
+// StartWriter start write session to topic
+// it is fast non block call, connection starts in background
+func (c *PublicTopicClient) StartWriter(
+	topicPath string,
+	opts ...topicoptions.WriterOption,
+) (
+	*topicwriter.Writer,
+	error,
+) {
 	var connector topicwriterinternal.ConnectFunc = func(ctx context.Context) (
 		topicwriterinternal.RawTopicWriterStream,
 		error,

@@ -29,7 +29,7 @@ type dbTable interface {
 }
 
 type dbTopic interface {
-	Topic() topic.Client
+	Topic() *topic.ClientType
 }
 
 type dbForMakeRecursive interface {

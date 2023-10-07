@@ -78,7 +78,7 @@ type Connection interface {
 	Scripting() scripting.Client
 
 	// Topic returns topic client
-	Topic() topic.Client
+	Topic() *topic.ClientType
 }
 
 var _ Connection = (*Driver)(nil)
@@ -121,7 +121,7 @@ type Driver struct { //nolint:maligned
 	ratelimiterOptions []ratelimiterConfig.Option
 
 	topicOnce    initOnce
-	topic        *topicclientinternal.Client
+	topic        *topicclientinternal.PublicTopicClient
 	topicOptions []topicoptions.TopicOption
 
 	databaseSQLOptions []xsql.ConnectorOption
@@ -330,7 +330,7 @@ func (c *Driver) Scripting() scripting.Client {
 }
 
 // Topic returns topic client
-func (c *Driver) Topic() topic.Client {
+func (c *Driver) Topic() *topic.ClientType {
 	c.topicOnce.Init(func() closeFunc {
 		c.topic = topicclientinternal.New(c.balancer, c.config.Credentials(),
 			append(
