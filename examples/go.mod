@@ -52,13 +52,13 @@ require (
 	github.com/ydb-platform/ydb-go-genproto v0.0.0-20230801151335-81e01be38941 // indirect
 	github.com/ydb-platform/ydb-go-sdk-metrics v0.16.3 // indirect
 	github.com/ydb-platform/ydb-go-yc-metadata v0.5.4 // indirect
-	golang.org/x/crypto v0.6.0 // indirect
-	golang.org/x/mod v0.7.0 // indirect
-	golang.org/x/net v0.7.0 // indirect
+	golang.org/x/crypto v0.14.0 // indirect
+	golang.org/x/mod v0.8.0 // indirect
+	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect
-	golang.org/x/sys v0.5.0 // indirect
-	golang.org/x/text v0.7.0 // indirect
-	golang.org/x/tools v0.3.0 // indirect
+	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/text v0.13.0 // indirect
+	golang.org/x/tools v0.6.0 // indirect
 	google.golang.org/grpc v1.53.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	lukechampine.com/uint128 v1.1.1 // indirect
