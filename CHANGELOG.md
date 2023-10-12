@@ -1,3 +1,4 @@
+* Bumps `github.com/ydb-platform/ydb-go-genproto` for support `query` service
 * Bumps `golang.org/x/net` from `0.7.0` to `0.17.0`
 
 ## v3.53.0
