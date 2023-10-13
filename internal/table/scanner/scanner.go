@@ -1175,7 +1175,7 @@ func (x item) isEmpty() bool {
 
 type scanStack struct {
 	v        []item
-	p        int8
+	p        int
 	scanItem item
 }
 
@@ -1183,7 +1183,7 @@ func (s *scanStack) size() int {
 	if !s.scanItem.isEmpty() {
 		s.set(s.scanItem)
 	}
-	return int(s.p) + 1
+	return s.p + 1
 }
 
 func (s *scanStack) get(i int) item {
@@ -1212,7 +1212,7 @@ func (s *scanStack) leave() {
 }
 
 func (s *scanStack) set(v item) {
-	if int(s.p) == len(s.v) {
+	if s.p == len(s.v) {
 		s.v = append(s.v, v)
 	} else {
 		s.v[s.p] = v

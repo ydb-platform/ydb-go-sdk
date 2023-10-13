@@ -1,3 +1,5 @@
+* Fixed panic when try to unwrap values with more than 127 columns with custom ydb unmarshaler 
+
 ## v3.53.1
 * Bumps `github.com/ydb-platform/ydb-go-genproto` for support `query` service
 * Bumps `golang.org/x/net` from `0.7.0` to `0.17.0`
