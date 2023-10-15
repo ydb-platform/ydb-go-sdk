@@ -43,3 +43,8 @@ func (errs joinError) Is(target error) bool {
 	}
 	return false
 }
+
+func (errs joinError) Unwrap() []error {
+	return errs
+}
+
