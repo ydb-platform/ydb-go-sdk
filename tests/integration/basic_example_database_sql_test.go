@@ -395,8 +395,8 @@ func TestBasicExampleDatabaseSql(t *testing.T) {
 							`
 						)
 						err := retry.DoTx(ctx, db,
-							func(ctx context.Context, cc *sql.Tx) error {
-								rows, err := cc.QueryContext(ctx, query,
+							func(ctx context.Context, tx *sql.Tx) error {
+								rows, err := tx.QueryContext(ctx, query,
 									sql.Named("seriesID", seriesID),
 									sql.Named("seasonID", seasonID),
 									sql.Named("episodeID", episodeID),
