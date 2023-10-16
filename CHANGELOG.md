@@ -1,3 +1,4 @@
+## v3.53.2
 * Fixed panic when try to unwrap values with more than 127 columns with custom ydb unmarshaler 
 
 ## v3.53.1
