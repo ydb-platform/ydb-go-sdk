@@ -1,3 +1,4 @@
+* Refactored traces and metrics
 * Renamed `{retry,table}.WithID` option to `{retry,table}.WithLabel`
 * Added `ydb.WithTraceRetry` option
 * Moved `internal/allocator.Buffers` to package `internal/xstring`
