@@ -11,6 +11,7 @@ import (
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	internalDiscovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -66,14 +67,10 @@ func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
 	if err = retry.Retry(ctx, func(childCtx context.Context) (err error) {
 		if err = b.clusterDiscoveryAttempt(childCtx); err != nil {
 			if xerrors.IsTransportError(err, grpcCodes.Unauthenticated) {
-				return xerrors.WithStackTrace(
-					fmt.Errorf(
-						"cluster discovery failed: %w (endpoint: %q, database: %q, credentials: %q)",
-						err,
-						b.driverConfig.Endpoint(),
-						b.driverConfig.Database(),
-						b.driverConfig.Credentials(),
-					),
+				return credentials.UnauthenticatedError("cluster discovery failed", err,
+					credentials.WithEndpoint(b.driverConfig.Endpoint()),
+					credentials.WithDatabase(b.driverConfig.Database()),
+					credentials.WithCredentials(b.driverConfig.Credentials()),
 				)
 			}
 			// if got err but parent context is not done - mark error as retryable
@@ -298,6 +295,13 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 
 	if err = f(ctx, cc); err != nil {
 		if conn.UseWrapping(ctx) {
+			if xerrors.IsTransportError(err, grpcCodes.Unauthenticated) {
+				err = credentials.UnauthenticatedError("unauthenticated", err,
+					credentials.WithAddress(cc.Endpoint().String()),
+					credentials.WithNodeID(cc.Endpoint().NodeID()),
+					credentials.WithCredentials(b.driverConfig.Credentials()),
+				)
+			}
 			return xerrors.WithStackTrace(err)
 		}
 		return err

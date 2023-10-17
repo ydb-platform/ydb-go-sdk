@@ -13,30 +13,43 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-type staticCredentialsConfig interface {
-	Endpoint() string
-	GrpcDialOptions() []grpc.DialOption
+var (
+	_ Credentials             = (*Static)(nil)
+	_ fmt.Stringer            = (*Static)(nil)
+	_ StaticCredentialsOption = grpcDialOptionsOption(nil)
+)
+
+type grpcDialOptionsOption []grpc.DialOption
+
+func (opts grpcDialOptionsOption) ApplyStaticCredentialsOption(c *Static) {
+	c.opts = opts
 }
 
-func NewStaticCredentials(user, password string, config staticCredentialsConfig, opts ...Option) *Static {
-	options := optionsHolder{
+type StaticCredentialsOption interface {
+	ApplyStaticCredentialsOption(c *Static)
+}
+
+func WithGrpcDialOptions(opts ...grpc.DialOption) grpcDialOptionsOption {
+	return opts
+}
+
+func NewStaticCredentials(user, password, endpoint string, opts ...StaticCredentialsOption) *Static {
+	c := &Static{
+		user:       user,
+		password:   password,
+		endpoint:   endpoint,
 		sourceInfo: stack.Record(1),
 	}
 	for _, opt := range opts {
-		opt(&options)
+		opt.ApplyStaticCredentialsOption(c)
 	}
-	return &Static{
-		user:       user,
-		password:   password,
-		endpoint:   config.Endpoint(),
-		sourceInfo: options.sourceInfo,
-		opts:       config.GrpcDialOptions(),
-	}
+	return c
 }
 
 var (
@@ -132,11 +145,18 @@ func parseExpiresAt(raw string) (expiresAt time.Time, err error) {
 }
 
 func (c *Static) String() string {
-	return fmt.Sprintf(
-		"Static(user:%q,password:%q,token:%q,from:%q)",
-		c.user,
-		secret.Password(c.password),
-		secret.Token(c.token),
-		c.sourceInfo,
-	)
+	buffer := allocator.Buffers.Get()
+	defer allocator.Buffers.Put(buffer)
+	buffer.WriteString("Static(user:")
+	fmt.Fprintf(buffer, "%q", c.user)
+	buffer.WriteString(",password:")
+	fmt.Fprintf(buffer, "%q", secret.Password(c.password))
+	buffer.WriteString(",token:")
+	fmt.Fprintf(buffer, "%q", secret.Token(c.token))
+	if c.sourceInfo != "" {
+		buffer.WriteString(",from:")
+		fmt.Fprintf(buffer, "%q", c.sourceInfo)
+	}
+	buffer.WriteByte(')')
+	return buffer.String()
 }

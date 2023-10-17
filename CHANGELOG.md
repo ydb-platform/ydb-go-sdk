@@ -1,3 +1,6 @@
+* Refactored credentials options (from funcs to interfaces and types)
+* Fixed stringification of credentials object
+
 ## v3.53.2
 * Fixed panic when try to unwrap values with more than 127 columns with custom ydb unmarshaler 
 
