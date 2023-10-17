@@ -1,3 +1,4 @@
+## v3.53.3
 * Refactored credentials options (from funcs to interfaces and types)
 * Fixed stringification of credentials object
 
