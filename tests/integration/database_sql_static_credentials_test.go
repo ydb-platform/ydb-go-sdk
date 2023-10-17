@@ -61,7 +61,7 @@ func TestDatabaseSqlStaticCredentials(t *testing.T) {
 			ydb.WithCredentials(credentials.NewStaticCredentials(u.User.Username(), func() string {
 				password, _ := u.User.Password()
 				return password
-			}(), u.Host, func() grpc.DialOption {
+			}(), u.Host, credentials.WithGrpcDialOptions(func() grpc.DialOption {
 				if u.Scheme == "grpcs" { //nolint:goconst
 					transportCredentials, transportCredentialsErr := grpcCredentials.NewClientTLSFromFile(
 						os.Getenv("YDB_SSL_ROOT_CERTIFICATES_FILE"), u.Hostname(),
@@ -72,7 +72,7 @@ func TestDatabaseSqlStaticCredentials(t *testing.T) {
 					return grpc.WithTransportCredentials(transportCredentials)
 				}
 				return grpc.WithTransportCredentials(insecure.NewCredentials())
-			}())),
+			}()))),
 		)
 		require.NoError(t, err)
 
