@@ -3,6 +3,7 @@ package credentials
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -36,7 +37,7 @@ func TestUnauthenticatedError(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"Anonymous()\"" +
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestUnauthenticatedError(unauthenticated_error_test.go:27)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestUnauthenticatedError(unauthenticated_error_test.go:28)`", //nolint:lll
 		},
 		{
 			err: UnauthenticatedError(
@@ -51,7 +52,7 @@ func TestUnauthenticatedError(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"Anonymous(from:\\\"TestUnauthenticatedError\\\")\"" +
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestUnauthenticatedError(unauthenticated_error_test.go:42)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestUnauthenticatedError(unauthenticated_error_test.go:43)`", //nolint:lll
 		},
 		{
 			err: UnauthenticatedError(
@@ -66,7 +67,7 @@ func TestUnauthenticatedError(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"AccessToken(token:\\\"****(CRC-32c: 9B7801F4)\\\")\"" +
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestUnauthenticatedError(unauthenticated_error_test.go:57)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestUnauthenticatedError(unauthenticated_error_test.go:58)`", //nolint:lll
 		},
 		{
 			err: UnauthenticatedError(
@@ -81,7 +82,7 @@ func TestUnauthenticatedError(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"AccessToken(token:\\\"****(CRC-32c: 9B7801F4)\\\",from:\\\"TestUnauthenticatedError\\\")\"" + //nolint:lll
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestUnauthenticatedError(unauthenticated_error_test.go:72)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestUnauthenticatedError(unauthenticated_error_test.go:73)`", //nolint:lll
 		},
 		{
 			err: UnauthenticatedError(
@@ -100,7 +101,7 @@ func TestUnauthenticatedError(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"Static(user:\\\"USER\\\",password:\\\"SEC**********RD\\\",token:\\\"****(CRC-32c: 00000000)\\\")\"" + //nolint:lll
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestUnauthenticatedError(unauthenticated_error_test.go:87)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestUnauthenticatedError(unauthenticated_error_test.go:88)`", //nolint:lll
 		},
 		{
 			err: UnauthenticatedError(
@@ -119,7 +120,7 @@ func TestUnauthenticatedError(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"Static(user:\\\"USER\\\",password:\\\"SEC**********RD\\\",token:\\\"****(CRC-32c: 00000000)\\\",from:\\\"TestUnauthenticatedError\\\")\"" + //nolint:lll
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestUnauthenticatedError(unauthenticated_error_test.go:106)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestUnauthenticatedError(unauthenticated_error_test.go:107)`", //nolint:lll
 		},
 		{
 			err: UnauthenticatedError(
@@ -134,7 +135,7 @@ func TestUnauthenticatedError(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.customCredentials\"" +
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestUnauthenticatedError(unauthenticated_error_test.go:125)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestUnauthenticatedError(unauthenticated_error_test.go:126)`", //nolint:lll
 		},
 		{
 			err: UnauthenticatedError(
@@ -149,11 +150,15 @@ func TestUnauthenticatedError(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"Anonymous()\"" +
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestUnauthenticatedError(unauthenticated_error_test.go:140)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestUnauthenticatedError(unauthenticated_error_test.go:141)`", //nolint:lll
 		},
 	} {
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.errorString, tt.err.Error())
 		})
 	}
+}
+
+func TestWrongStringifyCustomCredentials(t *testing.T) {
+	require.Equal(t, "&{\"SECRET_TOKEN\"}", fmt.Sprintf("%q", &customCredentials{token: "SECRET_TOKEN"}))
 }
