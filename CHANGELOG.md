@@ -1,3 +1,4 @@
+## v3.53.4
 * Downgrade `golang.org/x/net` from `0.17.0` to `0.15.0`
 * Downgrade `golang.org/x/sys` from `v0.13.0` to `v0.12.0`
 * Downgrade `golang.org/x/crypto` from `v0.14.0` to `v0.13.0`
