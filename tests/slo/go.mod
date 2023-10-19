@@ -37,8 +37,8 @@ require (
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.2.0 // indirect
 	github.com/ydb-platform/ydb-go-yc v0.10.2 // indirect
 	github.com/ydb-platform/ydb-go-yc-metadata v0.5.3 // indirect
-	golang.org/x/net v0.17.0 // indirect
-	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/net v0.15.0 // indirect
+	golang.org/x/sys v0.12.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	google.golang.org/genproto v0.0.0-20230403163135-c38d8f061ccd // indirect
 	google.golang.org/grpc v1.54.0 // indirect

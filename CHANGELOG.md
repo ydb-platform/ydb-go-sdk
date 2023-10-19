@@ -1,3 +1,7 @@
+* Downgrade `golang.org/x/net` from `0.17.0` to `0.15.0`
+* Downgrade `golang.org/x/sys` from `v0.13.0` to `v0.12.0`
+* Downgrade `golang.org/x/crypto` from `v0.14.0` to `v0.13.0`
+
 ## v3.53.3
 * Refactored credentials options (from funcs to interfaces and types)
 * Fixed stringification of credentials object
@@ -8,6 +12,8 @@
 ## v3.53.1
 * Bumps `github.com/ydb-platform/ydb-go-genproto` for support `query` service
 * Bumps `golang.org/x/net` from `0.7.0` to `0.17.0`
+* Bumps `golang.org/x/sys` from `v0.5.0` to `v0.13.0`
+* Bumps `golang.org/x/text` from `v0.7.0` to `v0.13.0`
 
 ## v3.53.0
 * Removed `internal/backoff.Backoff.Wait` interface method for exclude resource leak with bug-provoked usage of `time.After` method
