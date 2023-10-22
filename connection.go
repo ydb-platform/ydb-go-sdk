@@ -139,34 +139,34 @@ type Driver struct { //nolint:maligned
 }
 
 // Close closes Driver and clear resources
-func (c *Driver) Close(ctx context.Context) error {
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
+func (d *Driver) Close(ctx context.Context) error {
+	d.mtx.Lock()
+	defer d.mtx.Unlock()
 
 	defer func() {
-		for _, f := range c.onClose {
-			f(c)
+		for _, f := range d.onClose {
+			f(d)
 		}
 	}()
 
 	closers := make([]func(context.Context) error, 0)
-	c.childrenMtx.WithLock(func() {
-		for _, child := range c.children {
+	d.childrenMtx.WithLock(func() {
+		for _, child := range d.children {
 			closers = append(closers, child.Close)
 		}
-		c.children = nil
+		d.children = nil
 	})
 
 	closers = append(
 		closers,
-		c.ratelimiterOnce.Close,
-		c.coordinationOnce.Close,
-		c.schemeOnce.Close,
-		c.scriptingOnce.Close,
-		c.tableOnce.Close,
-		c.topicOnce.Close,
-		c.balancer.Close,
-		c.pool.Release,
+		d.ratelimiterOnce.Close,
+		d.coordinationOnce.Close,
+		d.schemeOnce.Close,
+		d.scriptingOnce.Close,
+		d.tableOnce.Close,
+		d.topicOnce.Close,
+		d.balancer.Close,
+		d.pool.Release,
 	)
 
 	var issues []error
@@ -184,167 +184,167 @@ func (c *Driver) Close(ctx context.Context) error {
 }
 
 // Endpoint returns initial endpoint
-func (c *Driver) Endpoint() string {
-	return c.config.Endpoint()
+func (d *Driver) Endpoint() string {
+	return d.config.Endpoint()
 }
 
 // Name returns database name
-func (c *Driver) Name() string {
-	return c.config.Database()
+func (d *Driver) Name() string {
+	return d.config.Database()
 }
 
 // Secure returns true if database Driver is secure
-func (c *Driver) Secure() bool {
-	return c.config.Secure()
+func (d *Driver) Secure() bool {
+	return d.config.Secure()
 }
 
 // Table returns table client
-func (c *Driver) Table() table.Client {
-	c.tableOnce.Init(func() closeFunc {
-		c.table = internalTable.New(
-			c.balancer,
+func (d *Driver) Table() table.Client {
+	d.tableOnce.Init(func() closeFunc {
+		d.table = internalTable.New(
+			d.balancer,
 			tableConfig.New(
 				append(
 					// prepend common params from root config
 					[]tableConfig.Option{
-						tableConfig.With(c.config.Common),
+						tableConfig.With(d.config.Common),
 					},
-					c.tableOptions...,
+					d.tableOptions...,
 				)...,
 			),
 		)
-		return c.table.Close
+		return d.table.Close
 	})
 	// may be nil if driver closed early
-	return c.table
+	return d.table
 }
 
 // Scheme returns scheme client
-func (c *Driver) Scheme() scheme.Client {
-	c.schemeOnce.Init(func() closeFunc {
-		c.scheme = internalScheme.New(
-			c.balancer,
+func (d *Driver) Scheme() scheme.Client {
+	d.schemeOnce.Init(func() closeFunc {
+		d.scheme = internalScheme.New(
+			d.balancer,
 			schemeConfig.New(
 				append(
 					// prepend common params from root config
 					[]schemeConfig.Option{
-						schemeConfig.WithDatabaseName(c.Name()),
-						schemeConfig.With(c.config.Common),
+						schemeConfig.WithDatabaseName(d.Name()),
+						schemeConfig.With(d.config.Common),
 					},
-					c.schemeOptions...,
+					d.schemeOptions...,
 				)...,
 			),
 		)
-		return c.scheme.Close
+		return d.scheme.Close
 	})
 	// may be nil if driver closed early
-	return c.scheme
+	return d.scheme
 }
 
 // Coordination returns coordination client
-func (c *Driver) Coordination() coordination.Client {
-	c.coordinationOnce.Init(func() closeFunc {
-		c.coordination = internalCoordination.New(
-			c.balancer,
+func (d *Driver) Coordination() coordination.Client {
+	d.coordinationOnce.Init(func() closeFunc {
+		d.coordination = internalCoordination.New(
+			d.balancer,
 			coordinationConfig.New(
 				append(
 					// prepend common params from root config
 					[]coordinationConfig.Option{
-						coordinationConfig.With(c.config.Common),
+						coordinationConfig.With(d.config.Common),
 					},
-					c.coordinationOptions...,
+					d.coordinationOptions...,
 				)...,
 			),
 		)
-		return c.coordination.Close
+		return d.coordination.Close
 	})
 	// may be nil if driver closed early
-	return c.coordination
+	return d.coordination
 }
 
 // Ratelimiter returns ratelimiter client
-func (c *Driver) Ratelimiter() ratelimiter.Client {
-	c.ratelimiterOnce.Init(func() closeFunc {
-		c.ratelimiter = internalRatelimiter.New(
-			c.balancer,
+func (d *Driver) Ratelimiter() ratelimiter.Client {
+	d.ratelimiterOnce.Init(func() closeFunc {
+		d.ratelimiter = internalRatelimiter.New(
+			d.balancer,
 			ratelimiterConfig.New(
 				append(
 					// prepend common params from root config
 					[]ratelimiterConfig.Option{
-						ratelimiterConfig.With(c.config.Common),
+						ratelimiterConfig.With(d.config.Common),
 					},
-					c.ratelimiterOptions...,
+					d.ratelimiterOptions...,
 				)...,
 			),
 		)
-		return c.ratelimiter.Close
+		return d.ratelimiter.Close
 	})
 	// may be nil if driver closed early
-	return c.ratelimiter
+	return d.ratelimiter
 }
 
 // Discovery returns discovery client
-func (c *Driver) Discovery() discovery.Client {
-	c.discoveryOnce.Init(func() closeFunc {
-		c.discovery = internalDiscovery.New(
-			c.pool.Get(endpoint.New(c.config.Endpoint())),
+func (d *Driver) Discovery() discovery.Client {
+	d.discoveryOnce.Init(func() closeFunc {
+		d.discovery = internalDiscovery.New(
+			d.pool.Get(endpoint.New(d.config.Endpoint())),
 			discoveryConfig.New(
 				append(
 					// prepend common params from root config
 					[]discoveryConfig.Option{
-						discoveryConfig.With(c.config.Common),
-						discoveryConfig.WithEndpoint(c.Endpoint()),
-						discoveryConfig.WithDatabase(c.Name()),
-						discoveryConfig.WithSecure(c.Secure()),
-						discoveryConfig.WithMeta(c.config.Meta()),
+						discoveryConfig.With(d.config.Common),
+						discoveryConfig.WithEndpoint(d.Endpoint()),
+						discoveryConfig.WithDatabase(d.Name()),
+						discoveryConfig.WithSecure(d.Secure()),
+						discoveryConfig.WithMeta(d.config.Meta()),
 					},
-					c.discoveryOptions...,
+					d.discoveryOptions...,
 				)...,
 			),
 		)
-		return c.discovery.Close
+		return d.discovery.Close
 	})
 	// may be nil if driver closed early
-	return c.discovery
+	return d.discovery
 }
 
 // Scripting returns scripting client
-func (c *Driver) Scripting() scripting.Client {
-	c.scriptingOnce.Init(func() closeFunc {
-		c.scripting = internalScripting.New(
-			c.balancer,
+func (d *Driver) Scripting() scripting.Client {
+	d.scriptingOnce.Init(func() closeFunc {
+		d.scripting = internalScripting.New(
+			d.balancer,
 			scriptingConfig.New(
 				append(
 					// prepend common params from root config
 					[]scriptingConfig.Option{
-						scriptingConfig.With(c.config.Common),
+						scriptingConfig.With(d.config.Common),
 					},
-					c.scriptingOptions...,
+					d.scriptingOptions...,
 				)...,
 			),
 		)
-		return c.scripting.Close
+		return d.scripting.Close
 	})
 	// may be nil if driver closed early
-	return c.scripting
+	return d.scripting
 }
 
 // Topic returns topic client
-func (c *Driver) Topic() topic.Client {
-	c.topicOnce.Init(func() closeFunc {
-		c.topic = topicclientinternal.New(c.balancer, c.config.Credentials(),
+func (d *Driver) Topic() topic.Client {
+	d.topicOnce.Init(func() closeFunc {
+		d.topic = topicclientinternal.New(d.balancer, d.config.Credentials(),
 			append(
 				// prepend common params from root config
 				[]topicoptions.TopicOption{
-					topicoptions.WithOperationTimeout(c.config.OperationTimeout()),
-					topicoptions.WithOperationCancelAfter(c.config.OperationCancelAfter()),
+					topicoptions.WithOperationTimeout(d.config.OperationTimeout()),
+					topicoptions.WithOperationCancelAfter(d.config.OperationCancelAfter()),
 				},
-				c.topicOptions...,
+				d.topicOptions...,
 			)...,
 		)
-		return c.topic.Close
+		return d.topic.Close
 	})
-	return c.topic
+	return d.topic
 }
 
 // Open connects to database by DSN and return driver runtime holder

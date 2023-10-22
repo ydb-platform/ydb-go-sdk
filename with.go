@@ -9,24 +9,24 @@ import (
 
 var nextID xatomic.Uint64
 
-func (c *Driver) with(ctx context.Context, opts ...Option) (*Driver, uint64, error) {
+func (d *Driver) with(ctx context.Context, opts ...Option) (*Driver, uint64, error) {
 	id := nextID.Add(1)
 
 	child, err := newConnectionFromOptions(
 		ctx,
 		append(
 			append(
-				c.opts,
+				d.opts,
 				WithBalancer(
-					c.config.Balancer(),
+					d.config.Balancer(),
 				),
 				withOnClose(func(child *Driver) {
-					c.childrenMtx.Lock()
-					defer c.childrenMtx.Unlock()
+					d.childrenMtx.Lock()
+					defer d.childrenMtx.Unlock()
 
-					delete(c.children, id)
+					delete(d.children, id)
 				}),
-				withConnPool(c.pool),
+				withConnPool(d.pool),
 			),
 			opts...,
 		)...,
@@ -38,8 +38,8 @@ func (c *Driver) with(ctx context.Context, opts ...Option) (*Driver, uint64, err
 }
 
 // With makes child Driver with the same options and another options
-func (c *Driver) With(ctx context.Context, opts ...Option) (*Driver, error) {
-	child, id, err := c.with(ctx, opts...)
+func (d *Driver) With(ctx context.Context, opts ...Option) (*Driver, error) {
+	child, id, err := d.with(ctx, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -49,10 +49,10 @@ func (c *Driver) With(ctx context.Context, opts ...Option) (*Driver, error) {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	c.childrenMtx.Lock()
-	defer c.childrenMtx.Unlock()
+	d.childrenMtx.Lock()
+	defer d.childrenMtx.Unlock()
 
-	c.children[id] = child
+	d.children[id] = child
 
 	return child, nil
 }
