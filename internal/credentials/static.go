@@ -130,7 +130,7 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 		return "", xerrors.WithStackTrace(err)
 	}
 
-	c.requestAt = time.Now().Add(time.Until(expiresAt) / 2)
+	c.requestAt = time.Now().Add(time.Until(expiresAt) / 10)
 	c.token = result.GetToken()
 
 	return c.token, nil
