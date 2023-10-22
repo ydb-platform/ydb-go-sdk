@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"google.golang.org/grpc"
-	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
@@ -66,8 +65,8 @@ func (b *Balancer) OnUpdate(onApplyDiscoveredEndpoints func(ctx context.Context,
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
 	if err = retry.Retry(ctx, func(childCtx context.Context) (err error) {
 		if err = b.clusterDiscoveryAttempt(childCtx); err != nil {
-			if xerrors.IsTransportError(err, grpcCodes.Unauthenticated) {
-				return credentials.UnauthenticatedError("cluster discovery failed", err,
+			if credentials.IsAccessError(err) {
+				return credentials.AccessError("cluster discovery failed", err,
 					credentials.WithEndpoint(b.driverConfig.Endpoint()),
 					credentials.WithDatabase(b.driverConfig.Database()),
 					credentials.WithCredentials(b.driverConfig.Credentials()),
@@ -90,9 +89,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 	var (
 		address = "ydb:///" + b.driverConfig.Endpoint()
 		onDone  = trace.DriverOnBalancerClusterDiscoveryAttempt(
-			b.driverConfig.Trace(),
-			&ctx,
-			address,
+			b.driverConfig.Trace(), &ctx, address,
 		)
 		endpoints []endpoint.Endpoint
 		localDC   string
@@ -295,8 +292,8 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 
 	if err = f(ctx, cc); err != nil {
 		if conn.UseWrapping(ctx) {
-			if xerrors.IsTransportError(err, grpcCodes.Unauthenticated) {
-				err = credentials.UnauthenticatedError("unauthenticated", err,
+			if credentials.IsAccessError(err) {
+				err = credentials.AccessError("no access", err,
 					credentials.WithAddress(cc.Endpoint().String()),
 					credentials.WithNodeID(cc.Endpoint().NodeID()),
 					credentials.WithCredentials(b.driverConfig.Credentials()),
