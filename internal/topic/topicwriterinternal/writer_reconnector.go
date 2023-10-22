@@ -324,6 +324,10 @@ func (w *WriterReconnector) createMessagesWithContent(messages []Message) ([]mes
 	return res, nil
 }
 
+func (w *WriterReconnector) Flush(ctx context.Context) error {
+	return w.queue.WaitEmpty(ctx)
+}
+
 func (w *WriterReconnector) Close(ctx context.Context) error {
 	return w.close(ctx, xerrors.WithStackTrace(errStopWriterReconnector))
 }
