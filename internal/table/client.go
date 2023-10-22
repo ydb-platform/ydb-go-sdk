@@ -252,8 +252,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 		append(
 			[]retry.Option{
 				retry.WithIdempotent(true),
-				retry.WithID("CreateSession"),
-				retry.WithTrace(trace.Retry{
+				retry.WithTrace(&trace.Retry{
 					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 						onIntermediate := trace.TableOnCreateSession(c.config.Trace(), info.Context)
 						return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
@@ -264,13 +263,10 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 						}
 					},
 				}),
-			}, retryOptions(c.config.Trace(), opts...).RetryOptions...,
+			}, c.retryOptions(opts...).RetryOptions...,
 		)...,
 	)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-	return s, nil
+	return s, xerrors.WithStackTrace(err)
 }
 
 func (c *Client) isClosed() bool {
@@ -615,40 +611,24 @@ func (c *Client) Close(ctx context.Context) (err error) {
 // - deadline was canceled or deadlined
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
-func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
+func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Option) error {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
 	if c.isClosed() {
 		return xerrors.WithStackTrace(errClosedClient)
 	}
-	return do(
-		ctx,
-		c,
-		c.config,
-		op,
-		retryOptions(c.config.Trace(), opts...),
-	)
+	return xerrors.WithStackTrace(do(ctx, c, c.config, op, c.retryOptions(opts...)))
 }
 
-func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) (err error) {
+func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) error {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
 	if c.isClosed() {
 		return xerrors.WithStackTrace(errClosedClient)
 	}
-	err = doTx(
-		ctx,
-		c,
-		c.config,
-		op,
-		retryOptions(c.config.Trace(), opts...),
-	)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-	return nil
+	return xerrors.WithStackTrace(doTx(ctx, c, c.config, op, c.retryOptions(opts...)))
 }
 
 func (c *Client) internalPoolGCTick(ctx context.Context, idleThreshold time.Duration) {

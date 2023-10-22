@@ -63,26 +63,27 @@ func (b *Balancer) OnUpdate(onApplyDiscoveredEndpoints func(ctx context.Context,
 }
 
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
-	if err = retry.Retry(ctx, func(childCtx context.Context) (err error) {
-		if err = b.clusterDiscoveryAttempt(childCtx); err != nil {
-			if credentials.IsAccessError(err) {
-				return credentials.AccessError("cluster discovery failed", err,
-					credentials.WithEndpoint(b.driverConfig.Endpoint()),
-					credentials.WithDatabase(b.driverConfig.Database()),
-					credentials.WithCredentials(b.driverConfig.Credentials()),
-				)
+	return retry.Retry(ctx,
+		func(childCtx context.Context) (err error) {
+			if err = b.clusterDiscoveryAttempt(childCtx); err != nil {
+				if credentials.IsAccessError(err) {
+					return credentials.AccessError("cluster discovery failed", err,
+						credentials.WithEndpoint(b.driverConfig.Endpoint()),
+						credentials.WithDatabase(b.driverConfig.Database()),
+						credentials.WithCredentials(b.driverConfig.Credentials()),
+					)
+				}
+				// if got err but parent context is not done - mark error as retryable
+				if ctx.Err() == nil && xerrors.IsTimeoutError(err) {
+					return xerrors.WithStackTrace(xerrors.Retryable(err))
+				}
+				return xerrors.WithStackTrace(err)
 			}
-			// if got err but parent context is not done - mark error as retryable
-			if ctx.Err() == nil && xerrors.IsTimeoutError(err) {
-				return xerrors.WithStackTrace(xerrors.Retryable(err))
-			}
-			return xerrors.WithStackTrace(err)
-		}
-		return nil
-	}, retry.WithIdempotent(true)); err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-	return nil
+			return nil
+		},
+		retry.WithIdempotent(true),
+		retry.WithTrace(b.driverConfig.TraceRetry()),
+	)
 }
 
 func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {

@@ -3,7 +3,6 @@ package table
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -57,7 +56,7 @@ func doTx(
 	defer func() {
 		onIntermediate(err)(attempts, err)
 	}()
-	err = retryBackoff(ctx, c,
+	return retryBackoff(ctx, c,
 		func(ctx context.Context, s table.Session) (err error) {
 			attempts++
 
@@ -108,10 +107,6 @@ func doTx(
 		},
 		opts.RetryOptions...,
 	)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-	return nil
 }
 
 func do(
@@ -188,14 +183,14 @@ func retryBackoff(
 	)
 }
 
-func retryOptions(trace *trace.Table, opts ...table.Option) *table.Options {
+func (c *Client) retryOptions(opts ...table.Option) *table.Options {
 	options := &table.Options{
-		Trace: trace,
+		Trace: c.config.Trace(),
 		TxSettings: table.TxSettings(
 			table.WithSerializableReadWrite(),
 		),
 		RetryOptions: []retry.Option{
-			retry.WithID(stack.Record(1, stack.Lambda(false), stack.FileName(false))),
+			retry.WithTrace(c.config.TraceRetry()),
 		},
 	}
 	for _, opt := range opts {

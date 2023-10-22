@@ -249,10 +249,25 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	}
 }
 
-// WithTraceDriver returns deadline which has associated Driver with it.
-func WithTraceDriver(trace trace.Driver, opts ...trace.DriverComposeOption) Option { //nolint:gocritic
+// WithTraceDriver appends trace.Driver into driver traces
+func WithTraceDriver(t trace.Driver, opts ...trace.DriverComposeOption) Option { //nolint:gocritic
 	return func(ctx context.Context, c *Driver) error {
-		c.options = append(c.options, config.WithTrace(trace, opts...))
+		c.options = append(c.options, config.WithTrace(t, opts...))
+		return nil
+	}
+}
+
+// WithTraceRetry appends trace.Retry into retry traces
+func WithTraceRetry(t trace.Retry, opts ...trace.RetryComposeOption) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.options = append(c.options,
+			config.WithTraceRetry(&t, append(
+				[]trace.RetryComposeOption{
+					trace.WithRetryPanicCallback(c.panicCallback),
+				},
+				opts...,
+			)...),
+		)
 		return nil
 	}
 }
@@ -394,7 +409,7 @@ func WithPanicCallback(panicCallback func(e interface{})) Option {
 	}
 }
 
-// WithTraceTable returns table trace option
+// WithTraceTable appends trace.Table into table traces
 func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option { //nolint:gocritic
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(

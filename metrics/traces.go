@@ -18,5 +18,6 @@ func WithTraces(config Config) ydb.Option {
 		ydb.WithTraceRatelimiter(ratelimiter(config)),
 		ydb.WithTraceDiscovery(discovery(config)),
 		ydb.WithTraceDatabaseSQL(databaseSQL(config)),
+		ydb.WithTraceRetry(retry(config)),
 	)
 }

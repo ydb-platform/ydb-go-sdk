@@ -155,6 +155,12 @@ func WithTrace(t trace.Driver, opts ...trace.DriverComposeOption) Option { //nol
 	}
 }
 
+func WithTraceRetry(t *trace.Retry, opts ...trace.RetryComposeOption) Option {
+	return func(c *Config) {
+		config.SetTraceRetry(&c.Common, t, opts...)
+	}
+}
+
 func WithUserAgent(userAgent string) Option {
 	return func(c *Config) {
 		c.metaOptions = append(c.metaOptions, meta.WithUserAgentOption(userAgent))

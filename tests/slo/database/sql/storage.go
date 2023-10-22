@@ -137,7 +137,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (res genera
 		},
 		retry.WithIdempotent(true),
 		retry.WithTrace(
-			trace.Retry{
+			&trace.Retry{
 				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 					return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 						return func(info trace.RetryLoopDoneInfo) {
@@ -177,7 +177,7 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err
 		},
 		retry.WithIdempotent(true),
 		retry.WithTrace(
-			trace.Retry{
+			&trace.Retry{
 				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 					return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 						return func(info trace.RetryLoopDoneInfo) {

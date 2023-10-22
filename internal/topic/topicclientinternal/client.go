@@ -77,8 +77,12 @@ func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.Al
 	}
 
 	if c.cfg.AutoRetry() {
-		return retry.Retry(ctx, call, retry.WithIdempotent(true))
+		return retry.Retry(ctx, call,
+			retry.WithIdempotent(true),
+			retry.WithTrace(c.cfg.TraceRetry()),
+		)
 	}
+
 	return call(ctx)
 }
 
@@ -104,8 +108,12 @@ func (c *Client) Create(
 	}
 
 	if c.cfg.AutoRetry() {
-		return retry.Retry(ctx, call, retry.WithIdempotent(true))
+		return retry.Retry(ctx, call,
+			retry.WithIdempotent(true),
+			retry.WithTrace(c.cfg.TraceRetry()),
+		)
 	}
+
 	return call(ctx)
 }
 
@@ -136,7 +144,10 @@ func (c *Client) Describe(
 	var err error
 
 	if c.cfg.AutoRetry() {
-		err = retry.Retry(ctx, call, retry.WithIdempotent(true))
+		err = retry.Retry(ctx, call,
+			retry.WithIdempotent(true),
+			retry.WithTrace(c.cfg.TraceRetry()),
+		)
 	} else {
 		err = call(ctx)
 	}
@@ -167,7 +178,10 @@ func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.Dro
 	}
 
 	if c.cfg.AutoRetry() {
-		return retry.Retry(ctx, call, retry.WithIdempotent(true))
+		return retry.Retry(ctx, call,
+			retry.WithIdempotent(true),
+			retry.WithTrace(c.cfg.TraceRetry()),
+		)
 	}
 
 	return call(ctx)

@@ -76,24 +76,24 @@ func WithStackTrace() stackTraceOption {
 var _ Option = traceOption{}
 
 type traceOption struct {
-	trace *trace.Retry
+	t *trace.Retry
 }
 
 func (t traceOption) ApplyRetryOption(opts *retryOptions) {
-	opts.trace = t.trace
+	opts.trace = opts.trace.Compose(t.t)
 }
 
 func (t traceOption) ApplyDoOption(opts *doOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithTrace(*t.trace))
+	opts.retryOptions = append(opts.retryOptions, WithTrace(t.t))
 }
 
 func (t traceOption) ApplyDoTxOption(opts *doTxOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithTrace(*t.trace))
+	opts.retryOptions = append(opts.retryOptions, WithTrace(t.t))
 }
 
 // WithTrace returns trace option
-func WithTrace(trace trace.Retry) traceOption {
-	return traceOption{trace: &trace}
+func WithTrace(t *trace.Retry) traceOption {
+	return traceOption{t: t}
 }
 
 var _ Option = idempotentOption(false)
