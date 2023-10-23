@@ -3,6 +3,7 @@ package table
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -161,8 +162,8 @@ func retryBackoff(
 	p SessionProvider,
 	op table.Operation,
 	opts ...retry.Option,
-) (err error) {
-	err = retry.Retry(markRetryCall(ctx),
+) error {
+	return retry.Retry(markRetryCall(ctx),
 		func(ctx context.Context) (err error) {
 			var s *session
 
@@ -185,10 +186,6 @@ func retryBackoff(
 		},
 		opts...,
 	)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-	return nil
 }
 
 func retryOptions(trace *trace.Table, opts ...table.Option) *table.Options {
@@ -197,6 +194,9 @@ func retryOptions(trace *trace.Table, opts ...table.Option) *table.Options {
 		TxSettings: table.TxSettings(
 			table.WithSerializableReadWrite(),
 		),
+		RetryOptions: []retry.Option{
+			retry.WithID(stack.Record(1, stack.Lambda(false), stack.FileName(false))),
+		},
 	}
 	for _, opt := range opts {
 		if opt != nil {
