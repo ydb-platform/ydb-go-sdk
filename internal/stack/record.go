@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 type recordOptions struct {
@@ -109,8 +109,8 @@ func Record(depth int, opts ...recordOption) string {
 		structName = split[1]
 	}
 
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 	if optionsHolder.packagePath {
 		buffer.WriteString(pkgPath)
 	}

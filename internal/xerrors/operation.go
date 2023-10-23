@@ -7,8 +7,8 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 // operationError reports about operationStatus fail.
@@ -113,8 +113,8 @@ func (e *operationError) Issues() []*Ydb_Issue.IssueMessage {
 }
 
 func (e *operationError) Error() string {
-	b := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(b)
+	b := xstring.Buffer()
+	defer b.Free()
 	b.WriteString(e.Name())
 	fmt.Fprintf(b, " (code = %d", e.code)
 	if len(e.address) > 0 {

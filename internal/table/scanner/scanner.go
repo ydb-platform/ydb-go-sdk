@@ -11,7 +11,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
@@ -251,8 +250,8 @@ func (s *scanner) reset(set *Ydb.ResultSet, columnNames ...string) {
 }
 
 func (s *scanner) path() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
+	buf := xstring.Buffer()
+	defer buf.Free()
 	_, _ = s.writePathTo(buf)
 	return buf.String()
 }

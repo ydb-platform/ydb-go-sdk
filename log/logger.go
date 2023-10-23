@@ -7,7 +7,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 const (
@@ -48,8 +48,8 @@ type defaultLogger struct {
 }
 
 func (l *defaultLogger) format(namespace []string, msg string, logLevel Level) string {
-	b := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(b)
+	b := xstring.Buffer()
+	defer b.Free()
 	if l.coloring {
 		b.WriteString(logLevel.Color())
 	}
@@ -114,8 +114,8 @@ func (l *defaultLogger) appendFields(msg string, fields ...Field) string {
 	if len(fields) == 0 {
 		return msg
 	}
-	b := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(b)
+	b := xstring.Buffer()
+	defer b.Free()
 	b.WriteString(msg)
 	b.WriteString(" {")
 	for i := range fields {

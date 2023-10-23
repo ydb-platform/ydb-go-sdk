@@ -4,7 +4,6 @@
 package allocator
 
 import (
-	"bytes"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -880,17 +879,7 @@ func (p *Pool[T]) Put(t *T) {
 	(*sync.Pool)(p).Put(t)
 }
 
-type buffersPoolType struct {
-	Pool[bytes.Buffer]
-}
-
-func (p *buffersPoolType) Put(b *bytes.Buffer) {
-	b.Reset()
-	p.Pool.Put(b)
-}
-
 var (
-	Buffers                          = &buffersPoolType{}
 	allocatorPool                    Pool[Allocator]
 	valuePool                        Pool[Ydb.Value]
 	typePool                         Pool[Ydb.Type]

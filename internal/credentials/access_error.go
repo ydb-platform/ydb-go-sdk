@@ -1,20 +1,20 @@
 package credentials
 
 import (
-	"bytes"
 	"fmt"
+	"io"
 	"reflect"
 	"strconv"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 type authErrorOption interface {
-	applyAuthErrorOption(buffer *bytes.Buffer)
+	applyAuthErrorOption(w io.Writer)
 }
 
 var (
@@ -26,9 +26,9 @@ var (
 
 type addressAuthErrorOption string
 
-func (address addressAuthErrorOption) applyAuthErrorOption(buffer *bytes.Buffer) {
-	buffer.WriteString("address:")
-	fmt.Fprintf(buffer, "%q", address)
+func (address addressAuthErrorOption) applyAuthErrorOption(w io.Writer) {
+	fmt.Fprint(w, "address:")
+	fmt.Fprintf(w, "%q", address)
 }
 
 func WithAddress(address string) addressAuthErrorOption {
@@ -37,9 +37,9 @@ func WithAddress(address string) addressAuthErrorOption {
 
 type endpointAuthErrorOption string
 
-func (endpoint endpointAuthErrorOption) applyAuthErrorOption(buffer *bytes.Buffer) {
-	buffer.WriteString("endpoint:")
-	fmt.Fprintf(buffer, "%q", endpoint)
+func (endpoint endpointAuthErrorOption) applyAuthErrorOption(w io.Writer) {
+	fmt.Fprint(w, "endpoint:")
+	fmt.Fprintf(w, "%q", endpoint)
 }
 
 func WithEndpoint(endpoint string) endpointAuthErrorOption {
@@ -48,9 +48,9 @@ func WithEndpoint(endpoint string) endpointAuthErrorOption {
 
 type databaseAuthErrorOption string
 
-func (address databaseAuthErrorOption) applyAuthErrorOption(buffer *bytes.Buffer) {
-	buffer.WriteString("database:")
-	fmt.Fprintf(buffer, "%q", address)
+func (address databaseAuthErrorOption) applyAuthErrorOption(w io.Writer) {
+	fmt.Fprint(w, "database:")
+	fmt.Fprintf(w, "%q", address)
 }
 
 func WithDatabase(database string) databaseAuthErrorOption {
@@ -59,9 +59,9 @@ func WithDatabase(database string) databaseAuthErrorOption {
 
 type nodeIDAuthErrorOption uint32
 
-func (id nodeIDAuthErrorOption) applyAuthErrorOption(buffer *bytes.Buffer) {
-	buffer.WriteString("nodeID:")
-	buffer.WriteString(strconv.FormatUint(uint64(id), 10))
+func (id nodeIDAuthErrorOption) applyAuthErrorOption(w io.Writer) {
+	fmt.Fprint(w, "nodeID:")
+	fmt.Fprint(w, strconv.FormatUint(uint64(id), 10))
 }
 
 func WithNodeID(id uint32) authErrorOption {
@@ -72,13 +72,13 @@ type credentialsUnauthenticatedErrorOption struct {
 	credentials Credentials
 }
 
-func (opt credentialsUnauthenticatedErrorOption) applyAuthErrorOption(buffer *bytes.Buffer) {
-	buffer.WriteString("credentials:")
+func (opt credentialsUnauthenticatedErrorOption) applyAuthErrorOption(w io.Writer) {
+	fmt.Fprint(w, "credentials:")
 	if stringer, has := opt.credentials.(fmt.Stringer); has {
-		fmt.Fprintf(buffer, "%q", stringer.String())
+		fmt.Fprintf(w, "%q", stringer.String())
 	} else {
 		t := reflect.TypeOf(opt.credentials)
-		fmt.Fprintf(buffer, "%q", t.PkgPath()+"."+t.Name())
+		fmt.Fprintf(w, "%q", t.PkgPath()+"."+t.Name())
 	}
 }
 
@@ -89,8 +89,8 @@ func WithCredentials(credentials Credentials) credentialsUnauthenticatedErrorOpt
 }
 
 func AccessError(msg string, err error, opts ...authErrorOption) error {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 	buffer.WriteString(msg)
 	buffer.WriteString(" (")
 	for i, opt := range opts {
