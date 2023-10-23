@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"unicode/utf8"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
@@ -30,10 +30,10 @@ func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (
 	}
 
 	var (
-		buffer = allocator.Buffers.Get()
+		buffer = xstring.Buffer()
 		param  table.ParameterOption
 	)
-	defer allocator.Buffers.Put(buffer)
+	defer buffer.Free()
 
 	if len(args) > 0 {
 		newArgs = make([]interface{}, len(args))

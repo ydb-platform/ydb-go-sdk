@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -344,8 +343,8 @@ func versionField() Field {
 type endpoints []trace.EndpointInfo
 
 func (ee endpoints) String() string {
-	b := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(b)
+	b := xstring.Buffer()
+	defer b.Free()
 	b.WriteByte('[')
 	for i, e := range ee {
 		if i != 0 {

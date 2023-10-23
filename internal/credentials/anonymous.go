@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 var (
@@ -40,8 +40,8 @@ func (c Anonymous) Token(_ context.Context) (string, error) {
 
 // Token implements Credentials.
 func (c Anonymous) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 	buffer.WriteString("Anonymous(")
 	if c.sourceInfo != "" {
 		buffer.WriteString("from:")

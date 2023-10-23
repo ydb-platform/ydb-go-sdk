@@ -6,6 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 type Type interface {
@@ -195,8 +196,8 @@ func (v *dictType) String() string {
 }
 
 func (v *dictType) Yql() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 	buffer.WriteString("Dict<")
 	buffer.WriteString(v.keyType.Yql())
 	buffer.WriteByte(',')
@@ -550,8 +551,8 @@ func (v *StructType) String() string {
 }
 
 func (v *StructType) Yql() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 	buffer.WriteString("Struct<")
 	for i := range v.fields {
 		if i > 0 {
@@ -632,8 +633,8 @@ func (v *TupleType) String() string {
 }
 
 func (v *TupleType) Yql() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 	buffer.WriteString("Tuple<")
 	for i, t := range v.items {
 		if i > 0 {
@@ -692,8 +693,8 @@ type variantStructType struct {
 }
 
 func (v *variantStructType) Yql() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 	buffer.WriteString("Variant<")
 	for i := range v.fields {
 		if i > 0 {
@@ -746,8 +747,8 @@ type variantTupleType struct {
 }
 
 func (v *variantTupleType) Yql() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 	buffer.WriteString("Variant<")
 	for i, t := range v.items {
 		if i > 0 {

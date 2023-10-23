@@ -4,9 +4,6 @@
 package allocator
 
 import (
-	"bytes"
-	"sync"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 )
@@ -191,23 +188,4 @@ func (a *Allocator) TableQueryID(id string) (v *Ydb_Table.Query_Id) {
 	return &Ydb_Table.Query_Id{
 		Id: id,
 	}
-}
-
-var Buffers = &buffersPoolType{}
-
-type buffersPoolType struct {
-	sync.Pool
-}
-
-func (p *buffersPoolType) Get() *bytes.Buffer {
-	v := p.Pool.Get()
-	if v == nil {
-		v = new(bytes.Buffer)
-	}
-	return v.(*bytes.Buffer)
-}
-
-func (p *buffersPoolType) Put(b *bytes.Buffer) {
-	b.Reset()
-	p.Pool.Put(b)
 }

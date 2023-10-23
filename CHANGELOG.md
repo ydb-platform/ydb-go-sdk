@@ -1,3 +1,4 @@
+* Moved `internal/allocator.Buffers` to package `internal/xstring`
 * Bumped `golang.org/x/sync` to `v0.3.0`
 * Bumped `google.golang.org/protobuf` to `v1.31.0`
 * Bumped `google.golang.org/grpc` to `v1.57.1`

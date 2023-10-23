@@ -5,8 +5,8 @@ import (
 	"io"
 	"net"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 func errorBrief(err error) string {
@@ -17,8 +17,8 @@ func errorBrief(err error) string {
 		return "io/EOF"
 	}
 	if netErr := (*net.OpError)(nil); xerrors.As(err, &netErr) {
-		buffer := allocator.Buffers.Get()
-		defer allocator.Buffers.Put(buffer)
+		buffer := xstring.Buffer()
+		defer buffer.Free()
 		buffer.WriteString("network")
 		if netErr.Op != "" {
 			buffer.WriteByte('/')
