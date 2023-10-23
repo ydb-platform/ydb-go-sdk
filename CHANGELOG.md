@@ -1,3 +1,5 @@
+* Allowed grpc status error as arg in `internal/xerrors.TransportError(err)`
+* Added `interanl/xtest.CurrentFileLine()` helper for table tests
 * Added `internal/credentials.IsAccessError(err)` helper for check access errors
 * Changed period for re-fresh static credentials token from `1/2` to `1/10` to expiration time
 
