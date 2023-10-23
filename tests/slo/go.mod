@@ -6,7 +6,7 @@ require (
 	github.com/prometheus/client_golang v1.14.0
 	github.com/ydb-platform/gorm-driver v0.1.1
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.49.0
-	golang.org/x/sync v0.1.0
+	golang.org/x/sync v0.3.0
 	golang.org/x/time v0.3.0
 	gorm.io/gorm v1.25.1
 	xorm.io/xorm v1.3.2
