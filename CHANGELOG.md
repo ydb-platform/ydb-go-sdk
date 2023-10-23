@@ -1,4 +1,5 @@
 * Bumped `golang.org/x/sync` to `v0.3.0`
+* Bumped `google.golang.org/protobuf` to `v1.31.0`
 * Allowed grpc status error as arg in `internal/xerrors.TransportError(err)`
 * Added `interanl/xtest.CurrentFileLine()` helper for table tests
 * Added `internal/credentials.IsAccessError(err)` helper for check access errors
