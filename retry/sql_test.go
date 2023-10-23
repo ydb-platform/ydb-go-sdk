@@ -196,7 +196,7 @@ func TestDoTx(t *testing.T) {
 						WithIdempotent(bool(idempotentType)),
 						WithFastBackoff(backoff.New(backoff.WithSlotDuration(time.Nanosecond))),
 						WithSlowBackoff(backoff.New(backoff.WithSlotDuration(time.Nanosecond))),
-						WithTrace(trace.Retry{
+						WithTrace(&trace.Retry{
 							//nolint:lll
 							OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 								t.Logf("attempt %d, conn %d, mode: %+v", attempts, m.conns, Check(m.queryErr))

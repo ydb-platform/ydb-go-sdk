@@ -57,7 +57,11 @@ func (c *Client) CreateResource(
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
+	return retry.Retry(ctx, call,
+		retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+	)
 }
 
 func (c *Client) createResource(
@@ -100,7 +104,11 @@ func (c *Client) AlterResource(
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
+	return retry.Retry(ctx, call,
+		retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+	)
 }
 
 func (c *Client) alterResource(
@@ -143,7 +151,11 @@ func (c *Client) DropResource(
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
+	return retry.Retry(ctx, call,
+		retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+	)
 }
 
 func (c *Client) dropResource(
@@ -169,20 +181,24 @@ func (c *Client) ListResource(
 	coordinationNodePath string,
 	resourcePath string,
 	recursive bool,
-) (list []string, err error) {
+) (list []string, _ error) {
 	if c == nil {
 		return list, xerrors.WithStackTrace(errNilClient)
 	}
-	call := func(ctx context.Context) error {
+	call := func(ctx context.Context) (err error) {
 		list, err = c.listResource(ctx, coordinationNodePath, resourcePath, recursive)
 		return xerrors.WithStackTrace(err)
 	}
 	if !c.config.AutoRetry() {
-		err = call(ctx)
-		return
+		err := call(ctx)
+		return list, err
 	}
-	err = retry.Retry(ctx, call, retry.WithIdempotent(true), retry.WithStackTrace())
-	return
+	err := retry.Retry(ctx, call,
+		retry.WithIdempotent(true),
+		retry.WithStackTrace(),
+		retry.WithTrace(c.config.TraceRetry()),
+	)
+	return list, err
 }
 
 func (c *Client) listResource(
@@ -232,7 +248,11 @@ func (c *Client) DescribeResource(
 		err = call(ctx)
 		return
 	}
-	err = retry.Retry(ctx, call, retry.WithIdempotent(true), retry.WithStackTrace())
+	err = retry.Retry(ctx, call,
+		retry.WithIdempotent(true),
+		retry.WithStackTrace(),
+		retry.WithTrace(c.config.TraceRetry()),
+	)
 	return
 }
 
@@ -295,7 +315,10 @@ func (c *Client) AcquireResource(
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace())
+	return retry.Retry(ctx, call,
+		retry.WithStackTrace(),
+		retry.WithTrace(c.config.TraceRetry()),
+	)
 }
 
 func (c *Client) acquireResource(

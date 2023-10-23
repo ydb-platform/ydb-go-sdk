@@ -427,6 +427,7 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, e
 			WithTraceDiscovery(log.Discovery(d.logger, d.loggerDetails, d.loggerOpts...)),
 			WithTraceTopic(log.Topic(d.logger, d.loggerDetails, d.loggerOpts...)),
 			WithTraceDatabaseSQL(log.DatabaseSQL(d.logger, d.loggerDetails, d.loggerOpts...)),
+			WithTraceRetry(log.Retry(d.logger, d.loggerDetails, d.loggerOpts...)),
 		} {
 			if opt != nil {
 				err = opt(ctx, d)

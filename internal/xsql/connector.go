@@ -150,6 +150,19 @@ func WithOnClose(f func(connector *Connector)) ConnectorOption {
 	return onCloseConnectorOption(f)
 }
 
+type traceRetryConnectorOption struct {
+	t *trace.Retry
+}
+
+func (t traceRetryConnectorOption) Apply(c *Connector) error {
+	c.traceRetry = t.t
+	return nil
+}
+
+func WithTraceRetry(t *trace.Retry) ConnectorOption {
+	return traceRetryConnectorOption{t: t}
+}
+
 type fakeTxConnectorOption QueryMode
 
 func (m fakeTxConnectorOption) Apply(c *Connector) error {
@@ -221,7 +234,8 @@ type Connector struct {
 	disableServerBalancer bool
 	idleThreshold         time.Duration
 
-	trace *trace.DatabaseSQL
+	trace      *trace.DatabaseSQL
+	traceRetry *trace.Retry
 }
 
 var (
@@ -310,6 +324,10 @@ func (c *Connector) Driver() driver.Driver {
 
 type driverWrapper struct {
 	c *Connector
+}
+
+func (d *driverWrapper) TraceRetry() *trace.Retry {
+	return d.c.traceRetry
 }
 
 func (d *driverWrapper) Open(_ string) (driver.Conn, error) {

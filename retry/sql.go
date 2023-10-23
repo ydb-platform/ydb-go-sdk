@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type doOptions struct {
@@ -40,6 +41,13 @@ func Do(ctx context.Context, db *sql.DB, f func(ctx context.Context, cc *sql.Con
 		options  = doOptions{}
 		attempts = 0
 	)
+	if tracer, has := db.Driver().(interface {
+		TraceRetry() *trace.Retry
+	}); has {
+		options.retryOptions = append(options.retryOptions, nil)
+		copy(options.retryOptions[1:], options.retryOptions)
+		options.retryOptions[0] = WithTrace(tracer.TraceRetry())
+	}
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyDoOption(&options)
@@ -112,6 +120,7 @@ func WithTxOptions(txOptions *sql.TxOptions) txOptionsOption {
 func DoTx(ctx context.Context, db *sql.DB, f func(context.Context, *sql.Tx) error, opts ...doTxOption) error {
 	var (
 		options = doTxOptions{
+			retryOptions: []Option{},
 			txOptions: &sql.TxOptions{
 				Isolation: sql.LevelDefault,
 				ReadOnly:  false,
@@ -119,6 +128,13 @@ func DoTx(ctx context.Context, db *sql.DB, f func(context.Context, *sql.Tx) erro
 		}
 		attempts = 0
 	)
+	if tracer, has := db.Driver().(interface {
+		TraceRetry() *trace.Retry
+	}); has {
+		options.retryOptions = append(options.retryOptions, nil)
+		copy(options.retryOptions[1:], options.retryOptions)
+		options.retryOptions[0] = WithTrace(tracer.TraceRetry())
+	}
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyDoTxOption(&options)

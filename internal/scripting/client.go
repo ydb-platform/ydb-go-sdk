@@ -52,8 +52,11 @@ func (c *Client) Execute(
 		err = call(ctx)
 		return
 	}
-	err = retry.Retry(ctx, call, retry.WithStackTrace())
-	return
+	err = retry.Retry(ctx, call,
+		retry.WithStackTrace(),
+		retry.WithTrace(c.config.TraceRetry()),
+	)
+	return r, xerrors.WithStackTrace(err)
 }
 
 func (c *Client) execute(
@@ -120,8 +123,12 @@ func (c *Client) Explain(
 		err = call(ctx)
 		return
 	}
-	err = retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
-	return
+	err = retry.Retry(ctx, call,
+		retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+	)
+	return e, xerrors.WithStackTrace(err)
 }
 
 func (c *Client) explain(
@@ -184,8 +191,11 @@ func (c *Client) StreamExecute(
 		err = call(ctx)
 		return
 	}
-	err = retry.Retry(ctx, call, retry.WithStackTrace())
-	return
+	err = retry.Retry(ctx, call,
+		retry.WithStackTrace(),
+		retry.WithTrace(c.config.TraceRetry()),
+	)
+	return r, xerrors.WithStackTrace(err)
 }
 
 func (c *Client) streamExecute(
