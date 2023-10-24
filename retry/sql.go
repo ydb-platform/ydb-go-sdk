@@ -20,7 +20,7 @@ type doOption interface {
 
 var (
 	_ doOption = doRetryOptionsOption(nil)
-	_ doOption = idOption("")
+	_ doOption = labelOption("")
 )
 
 type doRetryOptionsOption []Option

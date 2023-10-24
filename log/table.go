@@ -28,8 +28,10 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		}
 		ctx := with(*info.Context, TRACE, "ydb", "table", "do")
 		idempotent := info.Idempotent
+		label := info.Label
 		l.Log(ctx, "start",
 			Bool("idempotent", idempotent),
+			String("label", label),
 		)
 		start := time.Now()
 		return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
@@ -37,6 +39,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 				l.Log(ctx, "done",
 					latencyField(start),
 					Bool("idempotent", idempotent),
+					String("label", label),
 				)
 			} else {
 				lvl := WARN
@@ -47,6 +50,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 				l.Log(WithLevel(ctx, lvl), "failed",
 					latencyField(start),
 					Bool("idempotent", idempotent),
+					String("label", label),
 					Error(info.Error),
 					Bool("retryable", m.MustRetry(idempotent)),
 					Int64("code", m.StatusCode()),
@@ -59,6 +63,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 					l.Log(ctx, "done",
 						latencyField(start),
 						Bool("idempotent", idempotent),
+						String("label", label),
 						Int("attempts", info.Attempts),
 					)
 				} else {
@@ -70,6 +75,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 					l.Log(WithLevel(ctx, lvl), "done",
 						latencyField(start),
 						Bool("idempotent", idempotent),
+						String("label", label),
 						Int("attempts", info.Attempts),
 						Error(info.Error),
 						Bool("retryable", m.MustRetry(idempotent)),
@@ -93,8 +99,10 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		}
 		ctx := with(*info.Context, TRACE, "ydb", "table", "do", "tx")
 		idempotent := info.Idempotent
+		label := info.Label
 		l.Log(ctx, "start",
 			Bool("idempotent", idempotent),
+			String("label", label),
 		)
 		start := time.Now()
 		return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
@@ -102,6 +110,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 				l.Log(ctx, "done",
 					latencyField(start),
 					Bool("idempotent", idempotent),
+					String("label", label),
 				)
 			} else {
 				lvl := ERROR
@@ -112,6 +121,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 				l.Log(WithLevel(ctx, lvl), "done",
 					latencyField(start),
 					Bool("idempotent", idempotent),
+					String("label", label),
 					Error(info.Error),
 					Bool("retryable", m.MustRetry(idempotent)),
 					Int64("code", m.StatusCode()),
@@ -124,6 +134,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 					l.Log(ctx, "done",
 						latencyField(start),
 						Bool("idempotent", idempotent),
+						String("label", label),
 						Int("attempts", info.Attempts),
 					)
 				} else {
@@ -135,6 +146,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 					l.Log(WithLevel(ctx, lvl), "done",
 						latencyField(start),
 						Bool("idempotent", idempotent),
+						String("label", label),
 						Int("attempts", info.Attempts),
 						Error(info.Error),
 						Bool("retryable", m.MustRetry(idempotent)),

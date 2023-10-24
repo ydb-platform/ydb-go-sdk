@@ -46,12 +46,8 @@ func doTx(
 	if opts.Trace == nil {
 		opts.Trace = &trace.Table{}
 	}
-	attempts, onIntermediate := 0, trace.TableOnDoTx(
-		opts.Trace,
-		&ctx,
-		opts.ID,
-		opts.Idempotent,
-		isRetryCalledAbove(ctx),
+	attempts, onIntermediate := 0, trace.TableOnDoTx(opts.Trace, &ctx,
+		opts.Label, opts.Label, opts.Idempotent, isRetryCalledAbove(ctx),
 	)
 	defer func() {
 		onIntermediate(err)(attempts, err)
@@ -119,7 +115,9 @@ func do(
 	if opts.Trace == nil {
 		opts.Trace = &trace.Table{}
 	}
-	attempts, onIntermediate := 0, trace.TableOnDo(opts.Trace, &ctx, opts.ID, opts.Idempotent, isRetryCalledAbove(ctx))
+	attempts, onIntermediate := 0, trace.TableOnDo(opts.Trace, &ctx,
+		opts.Label, opts.Label, opts.Idempotent, isRetryCalledAbove(ctx),
+	)
 	defer func() {
 		onIntermediate(err)(attempts, err)
 	}()
