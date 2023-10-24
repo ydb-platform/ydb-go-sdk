@@ -325,7 +325,7 @@ func (w *WriterReconnector) createMessagesWithContent(messages []Message) ([]mes
 }
 
 func (w *WriterReconnector) Flush(ctx context.Context) error {
-	return w.queue.WaitEmpty(ctx)
+	return w.queue.WaitLastWritten(ctx)
 }
 
 func (w *WriterReconnector) Close(ctx context.Context) error {

@@ -309,33 +309,13 @@ func (q *messageQueue) Wait(ctx context.Context, waiter MessageQueueAckWaiter) e
 	}
 }
 
-func (q *messageQueue) WaitEmpty(ctx context.Context) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	ctxDone := ctx.Done()
-	for {
-		ackReceived := q.acksReceivedEvent.Waiter()
-
-		keepWaiting := false
-		q.m.WithRLock(func() {
-			keepWaiting = len(q.messagesByOrder) > 0
-		})
-
-		if !keepWaiting {
-			return nil
-		}
-
-		select {
-		case <-ctxDone:
-			return ctx.Err()
-		case <-q.closedChan:
-			return q.closedErr
-		case <-ackReceived.Done():
-			// pass next iteration
-		}
-	}
+// WaitLastWritten waits for last written message gets ack.
+func (q *messageQueue) WaitLastWritten(ctx context.Context) error {
+	var lastIndex int
+	q.m.WithRLock(func() {
+		lastIndex = q.lastWrittenIndex
+	})
+	return q.Wait(ctx, MessageQueueAckWaiter{sequenseNumbers: []int{lastIndex}})
 }
 
 type MessageQueueAckWaiter struct {
