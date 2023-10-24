@@ -86,9 +86,9 @@ func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
 	return nullables[index], true
 }
 
-func (r *rows) NextResultSet() (err error) {
+func (r *rows) NextResultSet() (finalErr error) {
 	r.nextSet.Do(func() {})
-	err = r.result.NextResultSetErr(context.Background())
+	err := r.result.NextResultSetErr(context.Background())
 	if err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
@@ -99,7 +99,8 @@ func (r *rows) HasNextResultSet() bool {
 	return r.result.HasNextResultSet()
 }
 
-func (r *rows) Next(dst []driver.Value) (err error) {
+func (r *rows) Next(dst []driver.Value) error {
+	var err error
 	r.nextSet.Do(func() {
 		err = r.result.NextResultSetErr(context.Background())
 	})

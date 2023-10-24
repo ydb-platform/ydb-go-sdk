@@ -23,10 +23,10 @@ var (
 	_ driver.StmtExecContext  = &stmt{}
 )
 
-func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ driver.Rows, err error) {
+func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ driver.Rows, finalErr error) {
 	onDone := trace.DatabaseSQLOnStmtQuery(s.trace, &ctx, s.query)
 	defer func() {
-		onDone(err)
+		onDone(finalErr)
 	}()
 	if !s.conn.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
@@ -39,10 +39,10 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ dr
 	}
 }
 
-func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ driver.Result, err error) {
+func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ driver.Result, finalErr error) {
 	onDone := trace.DatabaseSQLOnStmtExec(s.trace, &ctx, s.query)
 	defer func() {
-		onDone(err)
+		onDone(finalErr)
 	}()
 	if !s.conn.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
@@ -59,10 +59,10 @@ func (s *stmt) NumInput() int {
 	return -1
 }
 
-func (s *stmt) Close() (err error) {
+func (s *stmt) Close() (finalErr error) {
 	onDone := trace.DatabaseSQLOnStmtClose(s.trace)
 	defer func() {
-		onDone(err)
+		onDone(finalErr)
 	}()
 	return nil
 }
