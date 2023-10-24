@@ -1,3 +1,4 @@
+* Renamed `{retry,table}.WithID` option to `{retry,table}.WithLabel`
 * Added `ydb.WithTraceRetry` option
 * Moved `internal/allocator.Buffers` to package `internal/xstring`
 * Bumped `golang.org/x/sync` to `v0.3.0`

@@ -25,17 +25,17 @@ func internalRetry(l *wrapper, d trace.Detailer) (t trace.Retry) {
 			return nil
 		}
 		ctx := with(*info.Context, TRACE, "ydb", "retry")
-		id := info.ID
+		label := info.Label
 		idempotent := info.Idempotent
 		l.Log(ctx, "start",
-			String("id", id),
+			String("label", label),
 			Bool("idempotent", idempotent),
 		)
 		start := time.Now()
 		return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "attempt done",
-					String("id", id),
+					String("label", label),
 					latencyField(start),
 				)
 			} else {
@@ -46,7 +46,7 @@ func internalRetry(l *wrapper, d trace.Detailer) (t trace.Retry) {
 				m := retry.Check(info.Error)
 				l.Log(WithLevel(ctx, lvl), "attempt failed",
 					Error(info.Error),
-					String("id", id),
+					String("label", label),
 					latencyField(start),
 					Bool("retryable", m.MustRetry(idempotent)),
 					Int64("code", m.StatusCode()),
@@ -57,7 +57,7 @@ func internalRetry(l *wrapper, d trace.Detailer) (t trace.Retry) {
 			return func(info trace.RetryLoopDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						String("id", id),
+						String("label", label),
 						latencyField(start),
 						Int("attempts", info.Attempts),
 					)
@@ -69,7 +69,7 @@ func internalRetry(l *wrapper, d trace.Detailer) (t trace.Retry) {
 					m := retry.Check(info.Error)
 					l.Log(WithLevel(ctx, lvl), "failed",
 						Error(info.Error),
-						String("id", id),
+						String("label", label),
 						latencyField(start),
 						Int("attempts", info.Attempts),
 						Bool("retryable", m.MustRetry(idempotent)),

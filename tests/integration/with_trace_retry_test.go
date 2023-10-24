@@ -29,7 +29,7 @@ func TestWithTraceRetry(t *testing.T) {
 					OnRetry: func(
 						info trace.RetryLoopStartInfo,
 					) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-						retryCalled[info.ID] = true
+						retryCalled[info.Label] = true
 						return nil
 					},
 				}),
@@ -40,14 +40,14 @@ func TestWithTraceRetry(t *testing.T) {
 			func(ctx context.Context, s table.Session) error {
 				return nil
 			},
-			table.WithID("db.Table().Do"),
+			table.WithLabel("db.Table().Do"),
 		))
 
 		require.NoError(t, db.Table().DoTx(ctx,
 			func(ctx context.Context, tx table.TransactionActor) error {
 				return nil
 			},
-			table.WithID("db.Table().DoTx"),
+			table.WithLabel("db.Table().DoTx"),
 		))
 
 		for _, key := range []string{
@@ -67,7 +67,7 @@ func TestWithTraceRetry(t *testing.T) {
 					OnRetry: func(
 						info trace.RetryLoopStartInfo,
 					) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-						retryCalled[info.ID] = true
+						retryCalled[info.Label] = true
 						return nil
 					},
 				}),
@@ -78,14 +78,14 @@ func TestWithTraceRetry(t *testing.T) {
 			func(ctx context.Context, cc *sql.Conn) error {
 				return nil
 			},
-			retry.WithID("retry.Do"),
+			retry.WithLabel("retry.Do"),
 		))
 
 		require.NoError(t, retry.DoTx(ctx, db,
 			func(ctx context.Context, tx *sql.Tx) error {
 				return nil
 			},
-			retry.WithID("retry.DoTx"),
+			retry.WithLabel("retry.DoTx"),
 		))
 
 		for _, key := range []string{

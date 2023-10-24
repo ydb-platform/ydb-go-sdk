@@ -17,7 +17,7 @@ import (
 type retryOperation func(context.Context) (err error)
 
 type retryOptions struct {
-	id          string
+	label       string
 	trace       *trace.Retry
 	idempotent  bool
 	stackTrace  bool
@@ -31,25 +31,25 @@ type Option interface {
 	ApplyRetryOption(opts *retryOptions)
 }
 
-var _ Option = idOption("")
+var _ Option = labelOption("")
 
-type idOption string
+type labelOption string
 
-func (id idOption) ApplyDoOption(opts *doOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithID(string(id)))
+func (label labelOption) ApplyDoOption(opts *doOptions) {
+	opts.retryOptions = append(opts.retryOptions, WithLabel(string(label)))
 }
 
-func (id idOption) ApplyDoTxOption(opts *doTxOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithID(string(id)))
+func (label labelOption) ApplyDoTxOption(opts *doTxOptions) {
+	opts.retryOptions = append(opts.retryOptions, WithLabel(string(label)))
 }
 
-func (id idOption) ApplyRetryOption(opts *retryOptions) {
-	opts.id = string(id)
+func (label labelOption) ApplyRetryOption(opts *retryOptions) {
+	opts.label = string(label)
 }
 
-// WithID applies id for identification call Retry in trace.Retry.OnRetry
-func WithID(id string) idOption {
-	return idOption(id)
+// WithLabel applies label for identification call Retry in trace.Retry.OnRetry
+func WithLabel(label string) labelOption {
+	return labelOption(label)
 }
 
 var _ Option = stackTraceOption{}
@@ -241,7 +241,9 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (err error) {
 		attempts int
 
 		code           = int64(0)
-		onIntermediate = trace.RetryOnRetry(options.trace, &ctx, options.id, options.idempotent, isRetryCalledAbove(ctx))
+		onIntermediate = trace.RetryOnRetry(options.trace, &ctx,
+			options.label, options.label, options.idempotent, isRetryCalledAbove(ctx),
+		)
 	)
 	defer func() {
 		onIntermediate(err)(attempts, err)

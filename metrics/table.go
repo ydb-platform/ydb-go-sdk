@@ -36,14 +36,14 @@ func table(config Config) (t trace.Table) {
 		trace.TableDoDoneInfo,
 	) {
 		var (
-			name  = info.ID
+			label = info.Label
 			start = time.Now()
 		)
 		return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
 			if info.Error != nil && config.Details()&trace.TableEvents != 0 {
 				doIntermediateErrors.With(map[string]string{
 					"status": errorBrief(info.Error),
-					"name":   name,
+					"label":  label,
 				}).Inc()
 			}
 			return func(info trace.TableDoDoneInfo) {
@@ -51,11 +51,11 @@ func table(config Config) (t trace.Table) {
 					doAttempts.With(nil).Record(float64(info.Attempts))
 					doErrors.With(map[string]string{
 						"status": errorBrief(info.Error),
-						"name":   name,
+						"label":  label,
 					}).Inc()
 					doLatency.With(map[string]string{
 						"status": errorBrief(info.Error),
-						"name":   name,
+						"label":  label,
 					}).Record(time.Since(start))
 				}
 			}
@@ -67,14 +67,14 @@ func table(config Config) (t trace.Table) {
 		trace.TableDoTxDoneInfo,
 	) {
 		var (
-			name  = info.ID
+			label = info.Label
 			start = time.Now()
 		)
 		return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
 			if info.Error != nil && config.Details()&trace.TableEvents != 0 {
 				doTxIntermediateErrors.With(map[string]string{
 					"status": errorBrief(info.Error),
-					"name":   name,
+					"label":  label,
 				}).Inc()
 			}
 			return func(info trace.TableDoTxDoneInfo) {
@@ -82,11 +82,11 @@ func table(config Config) (t trace.Table) {
 					doTxAttempts.With(nil).Record(float64(info.Attempts))
 					doTxErrors.With(map[string]string{
 						"status": errorBrief(info.Error),
-						"name":   name,
+						"label":  label,
 					}).Inc()
 					doTxLatency.With(map[string]string{
 						"status": errorBrief(info.Error),
-						"name":   name,
+						"label":  label,
 					}).Record(time.Since(start))
 				}
 			}

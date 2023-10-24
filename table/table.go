@@ -560,7 +560,7 @@ func ValueParam(name string, v types.Value) ParameterOption {
 }
 
 type Options struct {
-	ID              string
+	Label           string
 	Idempotent      bool
 	TxSettings      *TransactionSettings
 	TxCommitOptions []options.CommitTransactionOption
@@ -572,17 +572,17 @@ type Option interface {
 	ApplyTableOption(opts *Options)
 }
 
-var _ Option = idOption("")
+var _ Option = labelOption("")
 
-type idOption string
+type labelOption string
 
-func (id idOption) ApplyTableOption(opts *Options) {
-	opts.ID = string(id)
-	opts.RetryOptions = append(opts.RetryOptions, retry.WithID(string(id)))
+func (label labelOption) ApplyTableOption(opts *Options) {
+	opts.Label = string(label)
+	opts.RetryOptions = append(opts.RetryOptions, retry.WithLabel(string(label)))
 }
 
-func WithID(id string) idOption {
-	return idOption(id)
+func WithLabel(label string) labelOption {
+	return labelOption(label)
 }
 
 var _ Option = retryOptionsOption{}
