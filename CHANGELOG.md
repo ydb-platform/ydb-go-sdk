@@ -1,5 +1,5 @@
 * Refactored traces and metrics
-* Renamed `{retry,table}.WithID` option to `{retry,table}.WithLabel`
+* Added `{retry,table}.WithLabel` options for mark retriers calls
 * Added `ydb.WithTraceRetry` option
 * Moved `internal/allocator.Buffers` to package `internal/xstring`
 * Bumped `golang.org/x/sync` to `v0.3.0`
