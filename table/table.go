@@ -441,8 +441,15 @@ func StaleReadOnlyTxControl() *TransactionControl {
 	)
 }
 
-// QueryParameters
+// SnapshotReadOnlyTxControl returns snapshot read-only transaction control
+func SnapshotReadOnlyTxControl() *TransactionControl {
+	return TxControl(
+		BeginTx(WithSnapshotReadOnly()),
+		CommitTx(), // open transactions not supported for StaleReadOnly
+	)
+}
 
+// QueryParameters
 type (
 	queryParams     map[string]types.Value
 	ParameterOption interface {
