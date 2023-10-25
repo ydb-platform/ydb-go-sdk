@@ -63,7 +63,8 @@ func (b *Balancer) OnUpdate(onApplyDiscoveredEndpoints func(ctx context.Context,
 }
 
 func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
-	return retry.Retry(ctx,
+	return retry.Retry(
+		repeater.WithEvent(ctx, repeater.EventInit),
 		func(childCtx context.Context) (err error) {
 			if err = b.clusterDiscoveryAttempt(childCtx); err != nil {
 				if credentials.IsAccessError(err) {
