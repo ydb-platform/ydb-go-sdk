@@ -8,6 +8,7 @@
 * Added `interanl/xtest.CurrentFileLine()` helper for table tests
 * Added `internal/credentials.IsAccessError(err)` helper for check access errors
 * Changed period for re-fresh static credentials token from `1/2` to `1/10` to expiration time
+* Added `table.SnapshotReadOnlyTxControl()` helper for get transaction control with snapshot read-only
 
 ## v3.53.4
 * Downgrade `golang.org/x/net` from `0.17.0` to `0.15.0`

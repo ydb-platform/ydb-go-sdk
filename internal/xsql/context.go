@@ -12,7 +12,14 @@ type (
 	ctxDataQueryOptionsKey   struct{}
 	ctxScanQueryOptionsKey   struct{}
 	ctxModeTypeKey           struct{}
+	ctxTxControlHookKey      struct{}
+
+	txControlHook func(txControl *table.TransactionControl)
 )
+
+func WithTxControlHook(ctx context.Context, hook txControlHook) context.Context {
+	return context.WithValue(ctx, ctxTxControlHookKey{}, hook)
+}
 
 // WithQueryMode returns a copy of context with given QueryMode
 func WithQueryMode(ctx context.Context, m QueryMode) context.Context {
@@ -31,7 +38,12 @@ func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.C
 	return context.WithValue(ctx, ctxTransactionControlKey{}, txc)
 }
 
-func txControl(ctx context.Context, defaultTxControl *table.TransactionControl) *table.TransactionControl {
+func txControl(ctx context.Context, defaultTxControl *table.TransactionControl) (txControl *table.TransactionControl) {
+	defer func() {
+		if hook, has := ctx.Value(ctxTxControlHookKey{}).(txControlHook); has && hook != nil {
+			hook(txControl)
+		}
+	}()
 	if txc, ok := ctx.Value(ctxTransactionControlKey{}).(*table.TransactionControl); ok {
 		return txc
 	}
