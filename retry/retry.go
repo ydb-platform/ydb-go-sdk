@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wait"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -217,11 +218,12 @@ func isRetryCalledAbove(ctx context.Context) bool {
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 //
 // If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
-func Retry(ctx context.Context, op retryOperation, opts ...Option) (err error) {
+func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr error) {
 	options := &retryOptions{
+		trace:       &trace.Retry{},
 		fastBackoff: backoff.Fast,
 		slowBackoff: backoff.Slow,
-		trace:       &trace.Retry{},
+		label:       stack.Record(1, stack.Lambda(false), stack.FileName(false)),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -230,8 +232,8 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (err error) {
 	}
 	ctx = xcontext.WithIdempotent(ctx, options.idempotent)
 	defer func() {
-		if err != nil && options.stackTrace {
-			err = xerrors.WithStackTrace(err,
+		if finalErr != nil && options.stackTrace {
+			finalErr = xerrors.WithStackTrace(finalErr,
 				xerrors.WithSkipDepth(2), // 1 - exit from defer, 1 - exit from Retry call
 			)
 		}
@@ -246,7 +248,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (err error) {
 		)
 	)
 	defer func() {
-		onIntermediate(err)(attempts, err)
+		onIntermediate(finalErr)(attempts, finalErr)
 	}()
 	for {
 		i++
@@ -260,7 +262,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (err error) {
 			)
 
 		default:
-			err = func() (err error) {
+			err := func() (err error) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -295,10 +297,8 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (err error) {
 
 			if !m.MustRetry(options.idempotent) {
 				return xerrors.WithStackTrace(
-					xerrors.Join(
-						fmt.Errorf("non-retryable error occurred on attempt No.%d (idempotent=%v)",
-							attempts, options.idempotent,
-						), err,
+					fmt.Errorf("non-retryable error occurred on attempt No.%d (idempotent=%v): %w",
+						attempts, options.idempotent, err,
 					),
 				)
 			}
