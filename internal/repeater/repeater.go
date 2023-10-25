@@ -65,6 +65,7 @@ type Event = string
 
 const (
 	EventUnknown = Event("")
+	EventInit    = Event("init")
 	EventTick    = Event("tick")
 	EventForce   = Event("force")
 	EventCancel  = Event("cancel")
@@ -79,7 +80,7 @@ func EventType(ctx context.Context) Event {
 	return EventUnknown
 }
 
-func withEvent(ctx context.Context, event Event) context.Context {
+func WithEvent(ctx context.Context, event Event) context.Context {
 	return context.WithValue(ctx,
 		ctxEventTypeKey{},
 		event,
@@ -140,7 +141,7 @@ func (r *repeater) wakeUp(ctx context.Context, e Event) (err error) {
 		return err
 	}
 
-	ctx = withEvent(ctx, e)
+	ctx = WithEvent(ctx, e)
 
 	onDone := trace.DriverOnRepeaterWakeUp(r.trace, &ctx, r.name, e)
 	defer func() {
