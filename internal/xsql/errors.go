@@ -12,7 +12,6 @@ var (
 	errDeprecated      = driver.ErrSkip
 	errConnClosedEarly = xerrors.Retryable(errors.New("conn closed early"), xerrors.WithDeleteSession())
 	errNotReadyConn    = xerrors.Retryable(errors.New("conn not ready"), xerrors.WithDeleteSession())
-	errTxAlreadyDone   = xerrors.Retryable(errors.New("tx already committed or rollbacked"), xerrors.WithDeleteSession())
 )
 
 type ErrConnAlreadyHaveTx struct {
