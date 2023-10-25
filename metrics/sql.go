@@ -1,6 +1,8 @@
 package metrics
 
 import (
+	"time"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -8,7 +10,14 @@ import (
 func databaseSQL(config Config) (t trace.DatabaseSQL) {
 	config = config.WithSystem("database").WithSystem("sql")
 	conns := config.GaugeVec("conns")
-	txs := config.GaugeVec("txs")
+	inflight := config.WithSystem("conns").GaugeVec("inflight")
+	query := config.CounterVec("query", "status", "query_mode")
+	queryLatency := config.WithSystem("query").TimerVec("latency", "status", "query_mode")
+	exec := config.CounterVec("exec", "status", "query_label", "query_mode")
+	execLatency := config.WithSystem("exec").TimerVec("latency", "status", "query_mode")
+	txBegin := config.WithSystem("tx").CounterVec("begin", "status")
+	txCommit := config.WithSystem("tx").CounterVec("commit", "status")
+	txRollback := config.WithSystem("tx").CounterVec("rollback", "status")
 	t.OnConnectorConnect = func(info trace.DatabaseSQLConnectorConnectStartInfo) func(
 		trace.DatabaseSQLConnectorConnectDoneInfo,
 	) {
@@ -32,32 +41,80 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 	t.OnConnBegin = func(info trace.DatabaseSQLConnBeginStartInfo) func(trace.DatabaseSQLConnBeginDoneInfo) {
 		if config.Details()&trace.DatabaseSQLTxEvents != 0 {
 			return func(info trace.DatabaseSQLConnBeginDoneInfo) {
-				if info.Tx != nil {
-					txs.With(nil).Add(1)
-				}
+				txBegin.With(map[string]string{
+					"status": errorBrief(info.Error),
+				}).Inc()
 			}
 		}
 		return nil
 	}
 	t.OnTxCommit = func(info trace.DatabaseSQLTxCommitStartInfo) func(trace.DatabaseSQLTxCommitDoneInfo) {
-		if config.Details()&trace.DatabaseSQLTxEvents != 0 {
-			return func(info trace.DatabaseSQLTxCommitDoneInfo) {
-				if info.Error == nil {
-					txs.With(nil).Add(-1)
-				}
+		return func(info trace.DatabaseSQLTxCommitDoneInfo) {
+			if config.Details()&trace.DatabaseSQLTxEvents != 0 {
+				txCommit.With(map[string]string{
+					"status": errorBrief(info.Error),
+				}).Inc()
 			}
 		}
-		return nil
 	}
 	t.OnTxRollback = func(info trace.DatabaseSQLTxRollbackStartInfo) func(trace.DatabaseSQLTxRollbackDoneInfo) {
-		if config.Details()&trace.DatabaseSQLTxEvents != 0 {
-			return func(info trace.DatabaseSQLTxRollbackDoneInfo) {
-				if info.Error == nil {
-					txs.With(nil).Add(-1)
-				}
+		return func(info trace.DatabaseSQLTxRollbackDoneInfo) {
+			if config.Details()&trace.DatabaseSQLTxEvents != 0 {
+				txRollback.With(map[string]string{
+					"status": errorBrief(info.Error),
+				}).Inc()
 			}
 		}
-		return nil
+	}
+	t.OnConnExec = func(info trace.DatabaseSQLConnExecStartInfo) func(trace.DatabaseSQLConnExecDoneInfo) {
+		if config.Details()&trace.DatabaseSQLEvents != 0 {
+			inflight.With(nil).Add(1)
+		}
+		var (
+			mode  = info.Mode
+			start = time.Now()
+		)
+		return func(info trace.DatabaseSQLConnExecDoneInfo) {
+			if config.Details()&trace.DatabaseSQLEvents != 0 {
+				inflight.With(nil).Add(-1)
+			}
+			if config.Details()&trace.DatabaseSQLConnEvents != 0 {
+				status := errorBrief(info.Error)
+				exec.With(map[string]string{
+					"status":     status,
+					"query_mode": mode,
+				}).Inc()
+				execLatency.With(map[string]string{
+					"status":     status,
+					"query_mode": mode,
+				}).Record(time.Since(start))
+			}
+		}
+	}
+	t.OnConnQuery = func(info trace.DatabaseSQLConnQueryStartInfo) func(trace.DatabaseSQLConnQueryDoneInfo) {
+		if config.Details()&trace.DatabaseSQLEvents != 0 {
+			inflight.With(nil).Add(1)
+		}
+		var (
+			mode  = info.Mode
+			start = time.Now()
+		)
+		return func(info trace.DatabaseSQLConnQueryDoneInfo) {
+			if config.Details()&trace.DatabaseSQLEvents != 0 {
+				inflight.With(nil).Add(-1)
+			}
+			if config.Details()&trace.DatabaseSQLConnEvents != 0 {
+				status := errorBrief(info.Error)
+				query.With(map[string]string{
+					"status":     status,
+					"query_mode": mode,
+				}).Inc()
+				queryLatency.With(map[string]string{
+					"status":     status,
+					"query_mode": mode,
+				}).Record(time.Since(start))
+			}
+		}
 	}
 	return t
 }

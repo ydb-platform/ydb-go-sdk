@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wait"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -223,7 +222,6 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 		trace:       &trace.Retry{},
 		fastBackoff: backoff.Fast,
 		slowBackoff: backoff.Slow,
-		label:       stack.Record(1, stack.Lambda(false), stack.FileName(false)),
 	}
 	for _, opt := range opts {
 		if opt != nil {
