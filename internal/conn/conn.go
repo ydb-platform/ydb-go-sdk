@@ -329,7 +329,7 @@ func (c *conn) Invoke(
 	c.touchLastUsage()
 	defer c.touchLastUsage()
 
-	traceID, err := newTraceID()
+	ctx, traceID, err := meta.TraceID(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -422,7 +422,7 @@ func (c *conn) NewStream(
 	c.touchLastUsage()
 	defer c.touchLastUsage()
 
-	traceID, err := newTraceID()
+	ctx, traceID, err := meta.TraceID(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
