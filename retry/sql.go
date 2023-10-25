@@ -53,7 +53,7 @@ func Do(ctx context.Context, db *sql.DB, f func(ctx context.Context, cc *sql.Con
 			opt.ApplyDoOption(&options)
 		}
 	}
-	err := Retry(ctx, func(ctx context.Context) (err error) {
+	err := Retry(ctx, func(ctx context.Context) error {
 		attempts++
 		cc, err := db.Conn(ctx)
 		if err != nil {
@@ -140,24 +140,24 @@ func DoTx(ctx context.Context, db *sql.DB, f func(context.Context, *sql.Tx) erro
 			opt.ApplyDoTxOption(&options)
 		}
 	}
-	err := Retry(ctx, func(ctx context.Context) (err error) {
+	err := Retry(ctx, func(ctx context.Context) (finalErr error) {
 		attempts++
 		tx, err := db.BeginTx(ctx, options.txOptions)
 		if err != nil {
 			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 		defer func() {
-			if err != nil {
-				errRollback := tx.Rollback()
-				if errRollback != nil {
-					err = xerrors.NewWithIssues("",
-						xerrors.WithStackTrace(err),
-						xerrors.WithStackTrace(errRollback),
-					)
-				} else {
-					err = xerrors.WithStackTrace(err)
-				}
+			if finalErr == nil {
+				return
 			}
+			errRollback := tx.Rollback()
+			if errRollback == nil {
+				return
+			}
+			finalErr = xerrors.NewWithIssues("",
+				xerrors.WithStackTrace(finalErr),
+				xerrors.WithStackTrace(fmt.Errorf("rollback failed: %w", errRollback)),
+			)
 		}()
 		if err = f(ctx, tx); err != nil {
 			return unwrapErrBadConn(xerrors.WithStackTrace(err))
