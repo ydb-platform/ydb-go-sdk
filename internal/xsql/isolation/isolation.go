@@ -15,11 +15,15 @@ import (
 // It returns error on unsupported options.
 func ToYDB(opts driver.TxOptions) (txcControl table.TxOption, err error) {
 	level := sql.IsolationLevel(opts.Isolation)
-	if !opts.ReadOnly && level == sql.LevelDefault {
-		return table.WithSerializableReadWrite(), nil
-	}
-	if opts.ReadOnly && level == sql.LevelSnapshot {
-		return table.WithSnapshotReadOnly(), nil
+	switch level {
+	case sql.LevelDefault, sql.LevelSerializable:
+		if !opts.ReadOnly {
+			return table.WithSerializableReadWrite(), nil
+		}
+	case sql.LevelSnapshot:
+		if opts.ReadOnly {
+			return table.WithSnapshotReadOnly(), nil
+		}
 	}
 	return nil, xerrors.WithStackTrace(fmt.Errorf(
 		"unsupported transaction options: %+v", opts,
