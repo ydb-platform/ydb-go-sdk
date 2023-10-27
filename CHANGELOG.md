@@ -1,3 +1,4 @@
+## v3.54.0
 * Allowed `sql.LevelSerializable` isolation level in read-write mode in `database/sql` transactions 
 * Refactored traces and metrics
 * Added `{retry,table}.WithLabel` options for mark retriers calls
