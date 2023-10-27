@@ -47,4 +47,3 @@ func (errs joinError) Is(target error) bool {
 func (errs joinError) Unwrap() []error {
 	return errs
 }
-

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,4 +38,16 @@ func TestJoin(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestUnwrapJoined(t *testing.T) {
+	err1 := context.Canceled
+	err2 := context.DeadlineExceeded
+
+	var joined error = Join(err1, err2)
+
+	unwrappable := joined.(interface{ Unwrap() []error })
+	inners := unwrappable.Unwrap()
+	assert.Contains(t, inners, err1)
+	assert.Contains(t, inners, err2)
 }
