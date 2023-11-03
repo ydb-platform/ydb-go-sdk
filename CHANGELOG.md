@@ -1,3 +1,4 @@
+## v3.54.1
 * Fixed inconsistent labels in `metrics` 
 
 ## v3.54.0
