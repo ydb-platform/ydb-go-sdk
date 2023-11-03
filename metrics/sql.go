@@ -13,7 +13,7 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 	inflight := config.WithSystem("conns").GaugeVec("inflight")
 	query := config.CounterVec("query", "status", "query_mode")
 	queryLatency := config.WithSystem("query").TimerVec("latency", "status", "query_mode")
-	exec := config.CounterVec("exec", "status", "query_label", "query_mode")
+	exec := config.CounterVec("exec", "status", "query_mode")
 	execLatency := config.WithSystem("exec").TimerVec("latency", "status", "query_mode")
 	txBegin := config.WithSystem("tx").CounterVec("begin", "status")
 	txCommit := config.WithSystem("tx").CounterVec("commit", "status")
