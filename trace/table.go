@@ -30,6 +30,7 @@ type (
 		OnSessionDelete    func(TableSessionDeleteStartInfo) func(TableSessionDeleteDoneInfo)
 		OnSessionKeepAlive func(TableKeepAliveStartInfo) func(TableKeepAliveDoneInfo)
 		// Query events
+		OnSessionBulkUpsert   func(TableBulkUpsertStartInfo) func(TableBulkUpsertDoneInfo)
 		OnSessionQueryPrepare func(TablePrepareDataQueryStartInfo) func(TablePrepareDataQueryDoneInfo)
 		OnSessionQueryExecute func(TableExecuteDataQueryStartInfo) func(TableExecuteDataQueryDoneInfo)
 		OnSessionQueryExplain func(TableExplainQueryStartInfo) func(TableExplainQueryDoneInfo)
@@ -118,7 +119,8 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
+		Context    *context.Context
+		FunctionID string
 	}
 	TableSessionNewDoneInfo struct {
 		Session tableSessionInfo
@@ -129,10 +131,23 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Session tableSessionInfo
+		Context    *context.Context
+		FunctionID string
+		Session    tableSessionInfo
 	}
 	TableKeepAliveDoneInfo struct {
+		Error error
+	}
+	TableBulkUpsertStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context    *context.Context
+		FunctionID string
+		Session    tableSessionInfo
+	}
+	TableBulkUpsertDoneInfo struct {
 		Error error
 	}
 	TableSessionDeleteStartInfo struct {
@@ -140,8 +155,9 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Session tableSessionInfo
+		Context    *context.Context
+		FunctionID string
+		Session    tableSessionInfo
 	}
 	TableSessionDeleteDoneInfo struct {
 		Error error
@@ -151,9 +167,10 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Session tableSessionInfo
-		Query   string
+		Context    *context.Context
+		FunctionID string
+		Session    tableSessionInfo
+		Query      string
 	}
 	TablePrepareDataQueryDoneInfo struct {
 		Result tableDataQuery
@@ -165,6 +182,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context     *context.Context
+		FunctionID  string
 		Session     tableSessionInfo
 		Query       tableDataQuery
 		Parameters  tableQueryParameters
@@ -176,6 +194,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
+		FunctionID string
 		Session    tableSessionInfo
 		Tx         tableTransactionInfo
 		Query      tableDataQuery
@@ -187,6 +206,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context        *context.Context
+		FunctionID     string
 		Session        tableSessionInfo
 		Tx             tableTransactionInfo
 		StatementQuery tableDataQuery
@@ -197,9 +217,10 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Session tableSessionInfo
-		Query   string
+		Context    *context.Context
+		FunctionID string
+		Session    tableSessionInfo
+		Query      string
 	}
 	TableExplainQueryDoneInfo struct {
 		AST   string
@@ -225,8 +246,9 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Session tableSessionInfo
+		Context    *context.Context
+		FunctionID string
+		Session    tableSessionInfo
 	}
 	TableSessionQueryStreamReadIntermediateInfo struct {
 		Error error
@@ -240,6 +262,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
+		FunctionID string
 		Session    tableSessionInfo
 		Query      tableDataQuery
 		Parameters tableQueryParameters
@@ -255,8 +278,9 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Session tableSessionInfo
+		Context    *context.Context
+		FunctionID string
+		Session    tableSessionInfo
 	}
 	TableSessionTransactionBeginDoneInfo struct {
 		Tx    tableTransactionInfo
@@ -267,9 +291,10 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Session tableSessionInfo
-		Tx      tableTransactionInfo
+		Context    *context.Context
+		FunctionID string
+		Session    tableSessionInfo
+		Tx         tableTransactionInfo
 	}
 	TableSessionTransactionCommitDoneInfo struct {
 		Error error
@@ -279,9 +304,10 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Session tableSessionInfo
-		Tx      tableTransactionInfo
+		Context    *context.Context
+		FunctionID string
+		Session    tableSessionInfo
+		Tx         tableTransactionInfo
 	}
 	TableSessionTransactionRollbackDoneInfo struct {
 		Error error
@@ -291,7 +317,8 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
+		Context    *context.Context
+		FunctionID string
 	}
 	TableInitDoneInfo struct {
 		Limit int
@@ -306,7 +333,8 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
+		Context    *context.Context
+		FunctionID string
 	}
 	TablePoolSessionNewDoneInfo struct {
 		Session tableSessionInfo
@@ -317,7 +345,8 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
+		Context    *context.Context
+		FunctionID string
 	}
 	TablePoolGetDoneInfo struct {
 		Session  tableSessionInfo
@@ -329,7 +358,8 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
+		Context    *context.Context
+		FunctionID string
 	}
 	// TablePoolWaitDoneInfo means a wait iteration inside Get call is done
 	// Warning: Session and Error may be nil at the same time. This means
@@ -343,8 +373,9 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Session tableSessionInfo
+		Context    *context.Context
+		FunctionID string
+		Session    tableSessionInfo
 	}
 	TablePoolPutDoneInfo struct {
 		Error error
@@ -354,8 +385,9 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Session tableSessionInfo
+		Context    *context.Context
+		FunctionID string
+		Session    tableSessionInfo
 	}
 	TablePoolSessionCloseDoneInfo struct{}
 	TablePoolSessionAddInfo       struct {
@@ -369,7 +401,8 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
+		Context    *context.Context
+		FunctionID string
 	}
 	TableCloseDoneInfo struct {
 		Error error
@@ -379,7 +412,8 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
+		Context    *context.Context
+		FunctionID string
 
 		// Deprecated: use Label field instead
 		ID string
@@ -400,7 +434,8 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
+		Context    *context.Context
+		FunctionID string
 
 		// Deprecated: use Label field instead
 		ID string
@@ -421,7 +456,8 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
+		Context    *context.Context
+		FunctionID string
 	}
 	TableCreateSessionIntermediateInfo struct {
 		Error error

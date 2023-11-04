@@ -66,6 +66,8 @@ func withTrace(t *trace.DatabaseSQL) connOption {
 type beginTxFunc func(ctx context.Context, txOptions driver.TxOptions) (currentTx, error)
 
 type conn struct {
+	openConnCtx context.Context
+
 	connector *Connector
 	trace     *trace.DatabaseSQL
 	session   table.ClosableSession // Immutable and r/o usage.
@@ -101,6 +103,7 @@ type currentTx interface {
 	driver.Tx
 	driver.ExecerContext
 	driver.QueryerContext
+	driver.ConnPrepareContext
 	table.TransactionIdentifier
 }
 
@@ -122,10 +125,11 @@ var (
 	_ driver.Result = resultNoRows{}
 )
 
-func newConn(c *Connector, s table.ClosableSession, opts ...connOption) *conn {
+func newConn(ctx context.Context, c *Connector, s table.ClosableSession, opts ...connOption) *conn {
 	cc := &conn{
-		connector: c,
-		session:   s,
+		openConnCtx: ctx,
+		connector:   c,
+		session:     s,
 	}
 	cc.beginTxFuncs = map[QueryMode]beginTxFunc{
 		DataQueryMode: cc.beginTx,
@@ -144,6 +148,9 @@ func (c *conn) isReady() bool {
 }
 
 func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, finalErr error) {
+	if c.currentTx != nil {
+		return c.currentTx.PrepareContext(ctx, query)
+	}
 	onDone := trace.DatabaseSQLOnConnPrepare(c.trace, &ctx, query)
 	defer func() {
 		onDone(finalErr)
@@ -152,9 +159,11 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt,
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
 	return &stmt{
-		conn:  c,
-		query: query,
-		trace: c.trace,
+		conn:       c,
+		processor:  c,
+		prepareCtx: ctx,
+		query:      query,
+		trace:      c.trace,
 	}, nil
 }
 
@@ -364,7 +373,7 @@ func (c *conn) Close() (finalErr error) {
 		if c.currentTx != nil {
 			_ = c.currentTx.Rollback()
 		}
-		err := c.session.Close(context.Background())
+		err := c.session.Close(xcontext.WithoutDeadline(c.openConnCtx))
 		if err != nil {
 			return badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -441,8 +450,12 @@ func (c *conn) Version(_ context.Context) (_ string, _ error) {
 	return version, nil
 }
 
-func (c *conn) IsTableExists(ctx context.Context, tableName string) (tableExists bool, _ error) {
+func (c *conn) IsTableExists(ctx context.Context, tableName string) (tableExists bool, finalErr error) {
 	tableName = c.normalizePath(tableName)
+	onDone := trace.DatabaseSQLOnConnIsTableExists(c.trace, &ctx, trace.FunctionID(0), tableName)
+	defer func() {
+		onDone(tableExists, finalErr)
+	}()
 	tableExists, err := helpers.IsEntryExists(ctx,
 		c.connector.parent.Scheme(), tableName,
 		scheme.EntryTable, scheme.EntryColumnTable,

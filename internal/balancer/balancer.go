@@ -91,7 +91,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 	var (
 		address = "ydb:///" + b.driverConfig.Endpoint()
 		onDone  = trace.DriverOnBalancerClusterDiscoveryAttempt(
-			b.driverConfig.Trace(), &ctx, address,
+			b.driverConfig.Trace(), &ctx, trace.FunctionID(0), address,
 		)
 		endpoints []endpoint.Endpoint
 		localDC   string
@@ -127,9 +127,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 
 func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
 	onDone := trace.DriverOnBalancerUpdate(
-		b.driverConfig.Trace(),
-		&ctx,
-		b.balancerConfig.DetectlocalDC,
+		b.driverConfig.Trace(), &ctx, trace.FunctionID(0), b.balancerConfig.DetectlocalDC,
 	)
 	defer func() {
 		nodes := make([]trace.EndpointInfo, 0, len(endpoints))
@@ -163,8 +161,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
 	onDone := trace.DriverOnBalancerClose(
-		b.driverConfig.Trace(),
-		&ctx,
+		b.driverConfig.Trace(), &ctx, trace.FunctionID(0),
 	)
 	defer func() {
 		onDone(err)
@@ -189,8 +186,7 @@ func New(
 ) (b *Balancer, finalErr error) {
 	var (
 		onDone = trace.DriverOnBalancerInit(
-			driverConfig.Trace(),
-			&ctx,
+			driverConfig.Trace(), &ctx, trace.FunctionID(0),
 		)
 		discoveryConfig = discoveryConfig.New(append(opts,
 			discoveryConfig.With(driverConfig.Common),
@@ -235,7 +231,8 @@ func New(
 		}
 		// run background discovering
 		if d := discoveryConfig.Interval(); d > 0 {
-			b.discoveryRepeater = repeater.New(d, b.clusterDiscoveryAttempt,
+			b.discoveryRepeater = repeater.New(xcontext.WithoutDeadline(ctx),
+				d, b.clusterDiscoveryAttempt,
 				repeater.WithName("discovery"),
 				repeater.WithTrace(b.driverConfig.Trace()),
 			)
@@ -320,8 +317,7 @@ func (b *Balancer) connections() *connectionsState {
 
 func (b *Balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
 	onDone := trace.DriverOnBalancerChooseEndpoint(
-		b.driverConfig.Trace(),
-		&ctx,
+		b.driverConfig.Trace(), &ctx, trace.FunctionID(0),
 	)
 	defer func() {
 		if err == nil {

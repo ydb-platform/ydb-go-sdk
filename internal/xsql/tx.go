@@ -5,7 +5,6 @@ import (
 	"database/sql/driver"
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/isolation"
@@ -14,9 +13,9 @@ import (
 )
 
 type tx struct {
-	conn *conn
-	ctx  context.Context
-	tx   table.Transaction
+	conn     *conn
+	beginCtx context.Context
+	tx       table.Transaction
 }
 
 var (
@@ -45,9 +44,9 @@ func (c *conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (current
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
 	c.currentTx = &tx{
-		conn: c,
-		ctx:  ctx,
-		tx:   transaction,
+		conn:     c,
+		beginCtx: ctx,
+		tx:       transaction,
 	}
 	return c.currentTx, nil
 }
@@ -71,7 +70,7 @@ func (tx *tx) checkTxState() error {
 }
 
 func (tx *tx) Commit() (finalErr error) {
-	onDone := trace.DatabaseSQLOnTxCommit(tx.conn.trace, &tx.ctx, tx)
+	onDone := trace.DatabaseSQLOnTxCommit(tx.conn.trace, &tx.beginCtx, tx)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -81,7 +80,7 @@ func (tx *tx) Commit() (finalErr error) {
 	defer func() {
 		tx.conn.currentTx = nil
 	}()
-	_, err := tx.tx.CommitTx(tx.ctx)
+	_, err := tx.tx.CommitTx(tx.beginCtx)
 	if err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
@@ -89,7 +88,7 @@ func (tx *tx) Commit() (finalErr error) {
 }
 
 func (tx *tx) Rollback() (finalErr error) {
-	onDone := trace.DatabaseSQLOnTxRollback(tx.conn.trace, &tx.ctx, tx)
+	onDone := trace.DatabaseSQLOnTxRollback(tx.conn.trace, &tx.beginCtx, tx)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -99,7 +98,7 @@ func (tx *tx) Rollback() (finalErr error) {
 	defer func() {
 		tx.conn.currentTx = nil
 	}()
-	err := tx.tx.Rollback(tx.ctx)
+	err := tx.tx.Rollback(tx.beginCtx)
 	if err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
@@ -109,7 +108,7 @@ func (tx *tx) Rollback() (finalErr error) {
 func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (
 	_ driver.Rows, finalErr error,
 ) {
-	onDone := trace.DatabaseSQLOnTxQuery(tx.conn.trace, &ctx, tx.ctx, tx, query, xcontext.IsIdempotent(ctx))
+	onDone := trace.DatabaseSQLOnTxQuery(tx.conn.trace, &ctx, &tx.beginCtx, tx, query)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -147,7 +146,7 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (
 	_ driver.Result, finalErr error,
 ) {
-	onDone := trace.DatabaseSQLOnTxExec(tx.conn.trace, &ctx, tx.ctx, tx, query, xcontext.IsIdempotent(ctx))
+	onDone := trace.DatabaseSQLOnTxExec(tx.conn.trace, &ctx, &tx.beginCtx, tx, query)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -174,4 +173,21 @@ func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.Named
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
 	return resultNoRows{}, nil
+}
+
+func (tx *tx) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, finalErr error) {
+	onDone := trace.DatabaseSQLOnTxPrepare(tx.conn.trace, &ctx, &tx.beginCtx, tx, query)
+	defer func() {
+		onDone(finalErr)
+	}()
+	if !tx.conn.isReady() {
+		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+	}
+	return &stmt{
+		conn:       tx.conn,
+		processor:  tx,
+		prepareCtx: ctx,
+		query:      query,
+		trace:      tx.conn.trace,
+	}, nil
 }

@@ -309,7 +309,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return newConn(c, session, withDefaultTxControl(c.defaultTxControl),
+	return newConn(ctx, c, session, withDefaultTxControl(c.defaultTxControl),
 		withDefaultQueryMode(c.defaultQueryMode),
 		withDataOpts(c.defaultDataQueryOpts...),
 		withScanOpts(c.defaultScanQueryOpts...),

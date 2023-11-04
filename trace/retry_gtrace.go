@@ -110,10 +110,11 @@ func (t *Retry) onRetry(r RetryLoopStartInfo) func(RetryLoopIntermediateInfo) fu
 		return res
 	}
 }
-func RetryOnRetry(t *Retry, c *context.Context, iD string, label string, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
+func RetryOnRetry(t *Retry, c *context.Context, iD string, functionID string, label string, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
 	var p RetryLoopStartInfo
 	p.Context = c
 	p.ID = iD
+	p.FunctionID = functionID
 	p.Label = label
 	p.Idempotent = idempotent
 	p.NestedCall = nestedCall

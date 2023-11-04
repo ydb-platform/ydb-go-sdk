@@ -37,7 +37,9 @@ type Client struct {
 // Discover cluster endpoints
 func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
 	var (
-		onDone  = trace.DiscoveryOnDiscover(c.config.Trace(), &ctx, c.config.Endpoint(), c.config.Database())
+		onDone = trace.DiscoveryOnDiscover(
+			c.config.Trace(), &ctx, trace.FunctionID(0), c.config.Endpoint(), c.config.Database(),
+		)
 		request = Ydb_Discovery.ListEndpointsRequest{
 			Database: c.config.Database(),
 		}
@@ -97,7 +99,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 
 func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err error) {
 	var (
-		onDone             = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx)
+		onDone             = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx, trace.FunctionID(0))
 		request            = Ydb_Discovery.WhoAmIRequest{}
 		response           *Ydb_Discovery.WhoAmIResponse
 		whoAmIResultResult Ydb_Discovery.WhoAmIResult

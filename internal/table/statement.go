@@ -59,7 +59,7 @@ func (s *statement) Execute(
 	}
 
 	onDone := trace.TableOnSessionQueryExecute(
-		s.session.config.Trace(), &ctx, s.session, s.query, params,
+		s.session.config.Trace(), &ctx, trace.FunctionID(0), s.session, s.query, params,
 		request.QueryCachePolicy.GetKeepInCache(),
 	)
 	defer func() {

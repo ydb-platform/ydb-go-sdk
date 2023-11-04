@@ -30,7 +30,7 @@ func (c *clientConn) Endpoint() string {
 }
 
 func (c *clientConn) UpdateState(state resolver.State) (err error) {
-	onDone := trace.DriverOnResolve(c.trace, c.Endpoint(), func() (addrs []string) {
+	onDone := trace.DriverOnResolve(c.trace, trace.FunctionID(0), c.Endpoint(), func() (addrs []string) {
 		for i := range state.Addresses {
 			addrs = append(addrs, state.Addresses[i].Addr)
 		}

@@ -88,12 +88,8 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 	}
 
 	trace.DriverOnConnBan(
-		p.config.Trace(),
-		&ctx,
-		e,
-		cc.GetState(),
-		cause,
-	)(cc.SetState(Banned))
+		p.config.Trace(), &ctx, trace.FunctionID(0), e, cc.GetState(), cause,
+	)(cc.SetState(ctx, Banned))
 }
 
 func (p *Pool) Allow(ctx context.Context, cc Conn) {
@@ -111,11 +107,9 @@ func (p *Pool) Allow(ctx context.Context, cc Conn) {
 		return
 	}
 
-	trace.DriverOnConnAllow(p.config.Trace(),
-		&ctx,
-		e,
-		cc.GetState(),
-	)(cc.Unban())
+	trace.DriverOnConnAllow(
+		p.config.Trace(), &ctx, trace.FunctionID(0), e, cc.GetState(),
+	)(cc.Unban(ctx))
 }
 
 func (p *Pool) Take(context.Context) error {

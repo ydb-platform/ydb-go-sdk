@@ -206,7 +206,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLTxEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "tx", "commit")
+		ctx := with(*info.TxContext, TRACE, "ydb", "database", "sql", "tx", "commit")
 		l.Log(ctx, "start")
 		start := time.Now()
 		return func(info trace.DatabaseSQLTxCommitDoneInfo) {
@@ -227,7 +227,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLTxEvents == 0 {
 			return nil
 		}
-		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "tx", "rollback")
+		ctx := with(*info.TxContext, TRACE, "ydb", "database", "sql", "tx", "rollback")
 		l.Log(ctx, "start")
 		start := time.Now()
 		return func(info trace.DatabaseSQLTxRollbackDoneInfo) {

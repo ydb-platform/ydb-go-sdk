@@ -260,9 +260,10 @@ func (t *Scripting) onClose(s ScriptingCloseStartInfo) func(ScriptingCloseDoneIn
 	}
 	return res
 }
-func ScriptingOnExecute(t *Scripting, c *context.Context, query string, parameters scriptingQueryParameters) func(result scriptingResult, _ error) {
+func ScriptingOnExecute(t *Scripting, c *context.Context, functionID string, query string, parameters scriptingQueryParameters) func(result scriptingResult, _ error) {
 	var p ScriptingExecuteStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	p.Query = query
 	p.Parameters = parameters
 	res := t.onExecute(p)
@@ -273,9 +274,10 @@ func ScriptingOnExecute(t *Scripting, c *context.Context, query string, paramete
 		res(p)
 	}
 }
-func ScriptingOnStreamExecute(t *Scripting, c *context.Context, query string, parameters scriptingQueryParameters) func(error) func(error) {
+func ScriptingOnStreamExecute(t *Scripting, c *context.Context, functionID string, query string, parameters scriptingQueryParameters) func(error) func(error) {
 	var p ScriptingStreamExecuteStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	p.Query = query
 	p.Parameters = parameters
 	res := t.onStreamExecute(p)
@@ -290,9 +292,10 @@ func ScriptingOnStreamExecute(t *Scripting, c *context.Context, query string, pa
 		}
 	}
 }
-func ScriptingOnExplain(t *Scripting, c *context.Context, query string) func(plan string, _ error) {
+func ScriptingOnExplain(t *Scripting, c *context.Context, functionID string, query string) func(plan string, _ error) {
 	var p ScriptingExplainStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	p.Query = query
 	res := t.onExplain(p)
 	return func(plan string, e error) {
@@ -302,9 +305,10 @@ func ScriptingOnExplain(t *Scripting, c *context.Context, query string) func(pla
 		res(p)
 	}
 }
-func ScriptingOnClose(t *Scripting, c *context.Context) func(error) {
+func ScriptingOnClose(t *Scripting, c *context.Context, functionID string) func(error) {
 	var p ScriptingCloseStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	res := t.onClose(p)
 	return func(e error) {
 		var p ScriptingCloseDoneInfo

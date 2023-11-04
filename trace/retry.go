@@ -24,6 +24,7 @@ type (
 		// Deprecated: use Label field instead
 		ID string
 
+		FunctionID string
 		Label      string
 		Idempotent bool
 

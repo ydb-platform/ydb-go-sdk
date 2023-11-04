@@ -89,11 +89,12 @@ func WithEvent(ctx context.Context, event Event) context.Context {
 
 // New creates and begins to execute task periodically.
 func New(
+	ctx context.Context,
 	interval time.Duration,
 	task func(ctx context.Context) (err error),
 	opts ...option,
 ) *repeater {
-	ctx, cancel := xcontext.WithCancel(context.Background())
+	ctx, cancel := xcontext.WithCancel(ctx)
 
 	r := &repeater{
 		interval: interval,
@@ -143,7 +144,7 @@ func (r *repeater) wakeUp(ctx context.Context, e Event) (err error) {
 
 	ctx = WithEvent(ctx, e)
 
-	onDone := trace.DriverOnRepeaterWakeUp(r.trace, &ctx, r.name, e)
+	onDone := trace.DriverOnRepeaterWakeUp(r.trace, &ctx, trace.FunctionID(0), r.name, e)
 	defer func() {
 		onDone(err)
 

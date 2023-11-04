@@ -292,11 +292,7 @@ func connect(ctx context.Context, d *Driver) error {
 	}
 
 	onDone := trace.DriverOnInit(
-		d.config.Trace(),
-		&ctx,
-		d.config.Endpoint(),
-		d.config.Database(),
-		d.config.Secure(),
+		d.config.Trace(), &ctx, trace.FunctionID(2), d.config.Endpoint(), d.config.Database(), d.config.Secure(),
 	)
 	defer func() {
 		onDone(err)

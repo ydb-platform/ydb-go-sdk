@@ -1260,9 +1260,10 @@ func (t *Driver) onGetCredentials(d DriverGetCredentialsStartInfo) func(DriverGe
 	}
 	return res
 }
-func DriverOnInit(t *Driver, c *context.Context, endpoint string, database string, secure bool) func(error) {
+func DriverOnInit(t *Driver, c *context.Context, functionID string, endpoint string, database string, secure bool) func(error) {
 	var p DriverInitStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	p.Endpoint = endpoint
 	p.Database = database
 	p.Secure = secure
@@ -1273,9 +1274,10 @@ func DriverOnInit(t *Driver, c *context.Context, endpoint string, database strin
 		res(p)
 	}
 }
-func DriverOnClose(t *Driver, c *context.Context) func(error) {
+func DriverOnClose(t *Driver, c *context.Context, functionID string) func(error) {
 	var p DriverCloseStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	res := t.onClose(p)
 	return func(e error) {
 		var p DriverCloseDoneInfo
@@ -1283,8 +1285,9 @@ func DriverOnClose(t *Driver, c *context.Context) func(error) {
 		res(p)
 	}
 }
-func DriverOnNetRead(t *Driver, address string, buffer int) func(received int, _ error) {
+func DriverOnNetRead(t *Driver, functionID string, address string, buffer int) func(received int, _ error) {
 	var p DriverNetReadStartInfo
+	p.FunctionID = functionID
 	p.Address = address
 	p.Buffer = buffer
 	res := t.onNetRead(p)
@@ -1295,8 +1298,9 @@ func DriverOnNetRead(t *Driver, address string, buffer int) func(received int, _
 		res(p)
 	}
 }
-func DriverOnNetWrite(t *Driver, address string, bytes int) func(sent int, _ error) {
+func DriverOnNetWrite(t *Driver, functionID string, address string, bytes int) func(sent int, _ error) {
 	var p DriverNetWriteStartInfo
+	p.FunctionID = functionID
 	p.Address = address
 	p.Bytes = bytes
 	res := t.onNetWrite(p)
@@ -1307,9 +1311,10 @@ func DriverOnNetWrite(t *Driver, address string, bytes int) func(sent int, _ err
 		res(p)
 	}
 }
-func DriverOnNetDial(t *Driver, c *context.Context, address string) func(error) {
+func DriverOnNetDial(t *Driver, c *context.Context, functionID string, address string) func(error) {
 	var p DriverNetDialStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	p.Address = address
 	res := t.onNetDial(p)
 	return func(e error) {
@@ -1318,8 +1323,9 @@ func DriverOnNetDial(t *Driver, c *context.Context, address string) func(error) 
 		res(p)
 	}
 }
-func DriverOnNetClose(t *Driver, address string) func(error) {
+func DriverOnNetClose(t *Driver, functionID string, address string) func(error) {
 	var p DriverNetCloseStartInfo
+	p.FunctionID = functionID
 	p.Address = address
 	res := t.onNetClose(p)
 	return func(e error) {
@@ -1328,8 +1334,9 @@ func DriverOnNetClose(t *Driver, address string) func(error) {
 		res(p)
 	}
 }
-func DriverOnResolve(t *Driver, target string, resolved []string) func(error) {
+func DriverOnResolve(t *Driver, functionID string, target string, resolved []string) func(error) {
 	var p DriverResolveStartInfo
+	p.FunctionID = functionID
 	p.Target = target
 	p.Resolved = resolved
 	res := t.onResolve(p)
@@ -1339,8 +1346,10 @@ func DriverOnResolve(t *Driver, target string, resolved []string) func(error) {
 		res(p)
 	}
 }
-func DriverOnConnStateChange(t *Driver, endpoint EndpointInfo, state ConnState) func(state ConnState) {
+func DriverOnConnStateChange(t *Driver, c *context.Context, functionID string, endpoint EndpointInfo, state ConnState) func(state ConnState) {
 	var p DriverConnStateChangeStartInfo
+	p.Context = c
+	p.FunctionID = functionID
 	p.Endpoint = endpoint
 	p.State = state
 	res := t.onConnStateChange(p)
@@ -1350,9 +1359,10 @@ func DriverOnConnStateChange(t *Driver, endpoint EndpointInfo, state ConnState) 
 		res(p)
 	}
 }
-func DriverOnConnInvoke(t *Driver, c *context.Context, endpoint EndpointInfo, m Method) func(_ error, issues []Issue, opID string, state ConnState, metadata map[string][]string) {
+func DriverOnConnInvoke(t *Driver, c *context.Context, functionID string, endpoint EndpointInfo, m Method) func(_ error, issues []Issue, opID string, state ConnState, metadata map[string][]string) {
 	var p DriverConnInvokeStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	p.Endpoint = endpoint
 	p.Method = m
 	res := t.onConnInvoke(p)
@@ -1366,9 +1376,10 @@ func DriverOnConnInvoke(t *Driver, c *context.Context, endpoint EndpointInfo, m 
 		res(p)
 	}
 }
-func DriverOnConnNewStream(t *Driver, c *context.Context, endpoint EndpointInfo, m Method) func(error) func(_ error, state ConnState, metadata map[string][]string) {
+func DriverOnConnNewStream(t *Driver, c *context.Context, functionID string, endpoint EndpointInfo, m Method) func(error) func(_ error, state ConnState, metadata map[string][]string) {
 	var p DriverConnNewStreamStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	p.Endpoint = endpoint
 	p.Method = m
 	res := t.onConnNewStream(p)
@@ -1385,9 +1396,10 @@ func DriverOnConnNewStream(t *Driver, c *context.Context, endpoint EndpointInfo,
 		}
 	}
 }
-func DriverOnConnTake(t *Driver, c *context.Context, endpoint EndpointInfo) func(error) {
+func DriverOnConnTake(t *Driver, c *context.Context, functionID string, endpoint EndpointInfo) func(error) {
 	var p DriverConnTakeStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	p.Endpoint = endpoint
 	res := t.onConnTake(p)
 	return func(e error) {
@@ -1396,9 +1408,10 @@ func DriverOnConnTake(t *Driver, c *context.Context, endpoint EndpointInfo) func
 		res(p)
 	}
 }
-func DriverOnConnDial(t *Driver, c *context.Context, endpoint EndpointInfo) func(error) {
+func DriverOnConnDial(t *Driver, c *context.Context, functionID string, endpoint EndpointInfo) func(error) {
 	var p DriverConnDialStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	p.Endpoint = endpoint
 	res := t.onConnDial(p)
 	return func(e error) {
@@ -1407,9 +1420,10 @@ func DriverOnConnDial(t *Driver, c *context.Context, endpoint EndpointInfo) func
 		res(p)
 	}
 }
-func DriverOnConnPark(t *Driver, c *context.Context, endpoint EndpointInfo) func(error) {
+func DriverOnConnPark(t *Driver, c *context.Context, functionID string, endpoint EndpointInfo) func(error) {
 	var p DriverConnParkStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	p.Endpoint = endpoint
 	res := t.onConnPark(p)
 	return func(e error) {
@@ -1418,9 +1432,10 @@ func DriverOnConnPark(t *Driver, c *context.Context, endpoint EndpointInfo) func
 		res(p)
 	}
 }
-func DriverOnConnBan(t *Driver, c *context.Context, endpoint EndpointInfo, state ConnState, cause error) func(state ConnState) {
+func DriverOnConnBan(t *Driver, c *context.Context, functionID string, endpoint EndpointInfo, state ConnState, cause error) func(state ConnState) {
 	var p DriverConnBanStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	p.Endpoint = endpoint
 	p.State = state
 	p.Cause = cause
@@ -1431,9 +1446,10 @@ func DriverOnConnBan(t *Driver, c *context.Context, endpoint EndpointInfo, state
 		res(p)
 	}
 }
-func DriverOnConnAllow(t *Driver, c *context.Context, endpoint EndpointInfo, state ConnState) func(state ConnState) {
+func DriverOnConnAllow(t *Driver, c *context.Context, functionID string, endpoint EndpointInfo, state ConnState) func(state ConnState) {
 	var p DriverConnAllowStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	p.Endpoint = endpoint
 	p.State = state
 	res := t.onConnAllow(p)
@@ -1443,9 +1459,10 @@ func DriverOnConnAllow(t *Driver, c *context.Context, endpoint EndpointInfo, sta
 		res(p)
 	}
 }
-func DriverOnConnClose(t *Driver, c *context.Context, endpoint EndpointInfo) func(error) {
+func DriverOnConnClose(t *Driver, c *context.Context, functionID string, endpoint EndpointInfo) func(error) {
 	var p DriverConnCloseStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	p.Endpoint = endpoint
 	res := t.onConnClose(p)
 	return func(e error) {
@@ -1454,9 +1471,10 @@ func DriverOnConnClose(t *Driver, c *context.Context, endpoint EndpointInfo) fun
 		res(p)
 	}
 }
-func DriverOnRepeaterWakeUp(t *Driver, c *context.Context, name string, event string) func(error) {
+func DriverOnRepeaterWakeUp(t *Driver, c *context.Context, functionID string, name string, event string) func(error) {
 	var p DriverRepeaterWakeUpStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	p.Name = name
 	p.Event = event
 	res := t.onRepeaterWakeUp(p)
@@ -1466,9 +1484,10 @@ func DriverOnRepeaterWakeUp(t *Driver, c *context.Context, name string, event st
 		res(p)
 	}
 }
-func DriverOnBalancerInit(t *Driver, c *context.Context) func(error) {
+func DriverOnBalancerInit(t *Driver, c *context.Context, functionID string) func(error) {
 	var p DriverBalancerInitStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	res := t.onBalancerInit(p)
 	return func(e error) {
 		var p DriverBalancerInitDoneInfo
@@ -1476,9 +1495,10 @@ func DriverOnBalancerInit(t *Driver, c *context.Context) func(error) {
 		res(p)
 	}
 }
-func DriverOnBalancerDialEntrypoint(t *Driver, c *context.Context, address string) func(error) {
+func DriverOnBalancerDialEntrypoint(t *Driver, c *context.Context, functionID string, address string) func(error) {
 	var p DriverBalancerDialEntrypointStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	p.Address = address
 	res := t.onBalancerDialEntrypoint(p)
 	return func(e error) {
@@ -1487,9 +1507,10 @@ func DriverOnBalancerDialEntrypoint(t *Driver, c *context.Context, address strin
 		res(p)
 	}
 }
-func DriverOnBalancerClose(t *Driver, c *context.Context) func(error) {
+func DriverOnBalancerClose(t *Driver, c *context.Context, functionID string) func(error) {
 	var p DriverBalancerCloseStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	res := t.onBalancerClose(p)
 	return func(e error) {
 		var p DriverBalancerCloseDoneInfo
@@ -1497,9 +1518,10 @@ func DriverOnBalancerClose(t *Driver, c *context.Context) func(error) {
 		res(p)
 	}
 }
-func DriverOnBalancerChooseEndpoint(t *Driver, c *context.Context) func(endpoint EndpointInfo, _ error) {
+func DriverOnBalancerChooseEndpoint(t *Driver, c *context.Context, functionID string) func(endpoint EndpointInfo, _ error) {
 	var p DriverBalancerChooseEndpointStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	res := t.onBalancerChooseEndpoint(p)
 	return func(endpoint EndpointInfo, e error) {
 		var p DriverBalancerChooseEndpointDoneInfo
@@ -1508,9 +1530,10 @@ func DriverOnBalancerChooseEndpoint(t *Driver, c *context.Context) func(endpoint
 		res(p)
 	}
 }
-func DriverOnBalancerClusterDiscoveryAttempt(t *Driver, c *context.Context, address string) func(error) {
+func DriverOnBalancerClusterDiscoveryAttempt(t *Driver, c *context.Context, functionID string, address string) func(error) {
 	var p DriverBalancerClusterDiscoveryAttemptStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	p.Address = address
 	res := t.onBalancerClusterDiscoveryAttempt(p)
 	return func(e error) {
@@ -1519,9 +1542,10 @@ func DriverOnBalancerClusterDiscoveryAttempt(t *Driver, c *context.Context, addr
 		res(p)
 	}
 }
-func DriverOnBalancerUpdate(t *Driver, c *context.Context, needLocalDC bool) func(endpoints []EndpointInfo, localDC string, _ error) {
+func DriverOnBalancerUpdate(t *Driver, c *context.Context, functionID string, needLocalDC bool) func(endpoints []EndpointInfo, localDC string, _ error) {
 	var p DriverBalancerUpdateStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	p.NeedLocalDC = needLocalDC
 	res := t.onBalancerUpdate(p)
 	return func(endpoints []EndpointInfo, localDC string, e error) {
@@ -1532,9 +1556,10 @@ func DriverOnBalancerUpdate(t *Driver, c *context.Context, needLocalDC bool) fun
 		res(p)
 	}
 }
-func DriverOnGetCredentials(t *Driver, c *context.Context) func(token string, _ error) {
+func DriverOnGetCredentials(t *Driver, c *context.Context, functionID string) func(token string, _ error) {
 	var p DriverGetCredentialsStartInfo
 	p.Context = c
+	p.FunctionID = functionID
 	res := t.onGetCredentials(p)
 	return func(token string, e error) {
 		var p DriverGetCredentialsDoneInfo
