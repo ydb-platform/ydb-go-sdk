@@ -186,7 +186,7 @@ func New(
 	driverConfig *config.Config,
 	pool *conn.Pool,
 	opts ...discoveryConfig.Option,
-) (b *Balancer, err error) {
+) (b *Balancer, finalErr error) {
 	var (
 		onDone = trace.DriverOnBalancerInit(
 			driverConfig.Trace(),
@@ -201,20 +201,22 @@ func New(
 		)...)
 	)
 	defer func() {
-		onDone(err)
+		onDone(finalErr)
 	}()
 
 	b = &Balancer{
 		driverConfig:    driverConfig,
 		pool:            pool,
 		localDCDetector: detectLocalDC,
-		discoveryClient: internalDiscovery.New(
-			pool.Get(
-				endpoint.New(driverConfig.Endpoint()),
-			),
-			discoveryConfig,
-		),
 	}
+	d, err := internalDiscovery.New(ctx, pool.Get(
+		endpoint.New(driverConfig.Endpoint()),
+	), discoveryConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	b.discoveryClient = d
 
 	if config := driverConfig.Balancer(); config == nil {
 		b.balancerConfig = balancerConfig.Config{}
@@ -228,7 +230,7 @@ func New(
 		}, "")
 	} else {
 		// initialization of balancer state
-		if err = b.clusterDiscovery(ctx); err != nil {
+		if err := b.clusterDiscovery(ctx); err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
 		// run background discovering
