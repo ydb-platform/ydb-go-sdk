@@ -321,19 +321,7 @@ func connect(ctx context.Context, d *Driver) error {
 		return xerrors.WithStackTrace(err)
 	}
 
-	return nil
-}
-
-func open(ctx context.Context, opts ...Option) (_ *Driver, err error) {
-	d, err := newConnectionFromOptions(ctx, opts...)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-	err = connect(ctx, d)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-	d.table = internalTable.New(
+	d.table, err = internalTable.New(ctx,
 		d.balancer,
 		tableConfig.New(
 			append(
@@ -345,7 +333,11 @@ func open(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 			)...,
 		),
 	)
-	d.scheme = internalScheme.New(
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	d.scheme, err = internalScheme.New(ctx,
 		d.balancer,
 		schemeConfig.New(
 			append(
@@ -358,7 +350,11 @@ func open(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 			)...,
 		),
 	)
-	d.coordination = internalCoordination.New(
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	d.coordination, err = internalCoordination.New(ctx,
 		d.balancer,
 		coordinationConfig.New(
 			append(
@@ -370,7 +366,11 @@ func open(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 			)...,
 		),
 	)
-	d.ratelimiter = internalRatelimiter.New(
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	d.ratelimiter, err = internalRatelimiter.New(ctx,
 		d.balancer,
 		ratelimiterConfig.New(
 			append(
@@ -382,7 +382,11 @@ func open(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 			)...,
 		),
 	)
-	d.discovery = internalDiscovery.New(
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	d.discovery, err = internalDiscovery.New(ctx,
 		d.pool.Get(endpoint.New(d.config.Endpoint())),
 		discoveryConfig.New(
 			append(
@@ -398,7 +402,11 @@ func open(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 			)...,
 		),
 	)
-	d.scripting = internalScripting.New(
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	d.scripting, err = internalScripting.New(ctx,
 		d.balancer,
 		scriptingConfig.New(
 			append(
@@ -410,7 +418,13 @@ func open(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 			)...,
 		),
 	)
-	d.topic = topicclientinternal.New(d.balancer, d.config.Credentials(),
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	d.topic, err = topicclientinternal.New(ctx,
+		d.balancer,
+		d.config.Credentials(),
 		append(
 			// prepend common params from root config
 			[]topicoptions.TopicOption{
@@ -420,7 +434,22 @@ func open(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 			d.topicOptions...,
 		)...,
 	)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
 
+	return nil
+}
+
+func open(ctx context.Context, opts ...Option) (_ *Driver, err error) {
+	d, err := newConnectionFromOptions(ctx, opts...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	err = connect(ctx, d)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
 	return d, nil
 }
 

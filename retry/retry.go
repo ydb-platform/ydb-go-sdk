@@ -275,7 +275,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 			}()
 
 			if err == nil {
-				return
+				return nil
 			}
 
 			if ctxErr := ctx.Err(); ctxErr != nil {

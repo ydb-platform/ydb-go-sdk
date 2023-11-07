@@ -18,12 +18,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func New(cc grpc.ClientConnInterface, config *config.Config) *Client {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (*Client, error) {
 	return &Client{
 		config: config,
 		cc:     cc,
 		client: Ydb_Discovery_V1.NewDiscoveryServiceClient(cc),
-	}
+	}, nil
 }
 
 var _ discovery.Client = &Client{}

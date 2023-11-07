@@ -156,11 +156,11 @@ func (c *Client) explain(
 	}()
 	response, err = c.service.ExplainYql(ctx, request)
 	if err != nil {
-		return
+		return e, err
 	}
 	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
-		return
+		return e, err
 	}
 	result.GetParametersTypes()
 	e = table.ScriptingYQLExplanation{
@@ -273,9 +273,9 @@ func (c *Client) Close(ctx context.Context) (err error) {
 	return nil
 }
 
-func New(cc grpc.ClientConnInterface, config config.Config) *Client {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) (*Client, error) {
 	return &Client{
 		config:  config,
 		service: Ydb_Scripting_V1.NewScriptingServiceClient(cc),
-	}
+	}, nil
 }

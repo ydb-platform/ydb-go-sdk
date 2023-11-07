@@ -295,6 +295,7 @@ type (
 	}
 	TableInitDoneInfo struct {
 		Limit int
+		Error error
 	}
 	TablePoolStateChangeInfo struct {
 		Size  int
