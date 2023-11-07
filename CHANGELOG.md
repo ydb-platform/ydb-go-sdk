@@ -1,3 +1,5 @@
+* Replaced lazy initialization of ydb clients (table, topic, etc.) to explicit initialization on `ydb.Open` step
+
 ## v3.54.1
 * Fixed inconsistent labels in `metrics` 
 
