@@ -140,12 +140,9 @@ func (c *conn) SetState(s State) State {
 }
 
 func (c *conn) setState(s State) State {
-	state := c.state.Load()
-	if c.state.CompareAndSwap(state, uint32(s)) {
+	if state := State(c.state.Swap(uint32(s))); state != s {
 		trace.DriverOnConnStateChange(
-			c.config.Trace(),
-			c.endpoint.Copy(),
-			State(state),
+			c.config.Trace(), c.endpoint.Copy(), state,
 		)(s)
 	}
 	return s
