@@ -26,7 +26,8 @@ type (
 
 		Label      string
 		Idempotent bool
-		NestedCall bool // flag when Retry called inside head Retry
+
+		NestedCall bool // a sign for detect Retry calls inside head Retry
 	}
 	RetryLoopIntermediateInfo struct {
 		Error error

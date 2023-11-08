@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -36,7 +37,7 @@ func WithDoRetryOptions(opts ...Option) doRetryOptionsOption {
 }
 
 // Do is a retryer of database/sql Conn with fallbacks on errors
-func Do(ctx context.Context, db *sql.DB, f func(ctx context.Context, cc *sql.Conn) error, opts ...doOption) error {
+func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Conn) error, opts ...doOption) error {
 	var (
 		options  = doOptions{}
 		attempts = 0
@@ -62,7 +63,7 @@ func Do(ctx context.Context, db *sql.DB, f func(ctx context.Context, cc *sql.Con
 		defer func() {
 			_ = cc.Close()
 		}()
-		if err = f(ctx, cc); err != nil {
+		if err = op(xcontext.MarkRetryCall(ctx), cc); err != nil {
 			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 		return nil
@@ -117,7 +118,7 @@ func WithTxOptions(txOptions *sql.TxOptions) txOptionsOption {
 }
 
 // DoTx is a retryer of database/sql transactions with fallbacks on errors
-func DoTx(ctx context.Context, db *sql.DB, f func(context.Context, *sql.Tx) error, opts ...doTxOption) error {
+func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) error, opts ...doTxOption) error {
 	var (
 		options = doTxOptions{
 			retryOptions: []Option{},
@@ -159,7 +160,7 @@ func DoTx(ctx context.Context, db *sql.DB, f func(context.Context, *sql.Tx) erro
 				xerrors.WithStackTrace(fmt.Errorf("rollback failed: %w", errRollback)),
 			)
 		}()
-		if err = f(ctx, tx); err != nil {
+		if err = op(xcontext.MarkRetryCall(ctx), tx); err != nil {
 			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 		if err = tx.Commit(); err != nil {
