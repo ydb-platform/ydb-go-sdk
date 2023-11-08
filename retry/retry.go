@@ -191,21 +191,6 @@ func WithPanicCallback(panicCallback func(e interface{})) panicCallbackOption {
 	return panicCallbackOption{callback: panicCallback}
 }
 
-type (
-	markRetryCallKey struct{}
-)
-
-func markRetryCall(ctx context.Context) context.Context {
-	return context.WithValue(ctx, markRetryCallKey{}, true)
-}
-
-func isRetryCalledAbove(ctx context.Context) bool {
-	if _, has := ctx.Value(markRetryCallKey{}).(bool); has {
-		return true
-	}
-	return false
-}
-
 // Retry provide the best effort fo retrying operation
 //
 // Retry implements internal busy loop until one of the following conditions is met:
@@ -228,7 +213,9 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 			opt.ApplyRetryOption(options)
 		}
 	}
-	ctx = xcontext.WithIdempotent(ctx, options.idempotent)
+	if options.idempotent {
+		ctx = xcontext.WithIdempotent(ctx, options.idempotent)
+	}
 	defer func() {
 		if finalErr != nil && options.stackTrace {
 			finalErr = xerrors.WithStackTrace(finalErr,
@@ -242,7 +229,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 
 		code           = int64(0)
 		onIntermediate = trace.RetryOnRetry(options.trace, &ctx,
-			options.label, options.label, options.idempotent, isRetryCalledAbove(ctx),
+			options.label, options.label, options.idempotent, xcontext.IsNestedCall(ctx),
 		)
 	)
 	defer func() {
@@ -271,7 +258,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 						}
 					}()
 				}
-				return op(markRetryCall(ctx))
+				return op(ctx)
 			}()
 
 			if err == nil {

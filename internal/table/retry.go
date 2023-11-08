@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -21,21 +22,6 @@ type SessionProvider interface {
 	Put(context.Context, *session) (err error)
 }
 
-type (
-	markRetryCallKey struct{}
-)
-
-func markRetryCall(ctx context.Context) context.Context {
-	return context.WithValue(ctx, markRetryCallKey{}, true)
-}
-
-func isRetryCalledAbove(ctx context.Context) bool {
-	if _, has := ctx.Value(markRetryCallKey{}).(bool); has {
-		return true
-	}
-	return false
-}
-
 func doTx(
 	ctx context.Context,
 	c SessionProvider,
@@ -47,7 +33,7 @@ func doTx(
 		opts.Trace = &trace.Table{}
 	}
 	attempts, onIntermediate := 0, trace.TableOnDoTx(opts.Trace, &ctx,
-		opts.Label, opts.Label, opts.Idempotent, isRetryCalledAbove(ctx),
+		opts.Label, opts.Label, opts.Idempotent, xcontext.IsNestedCall(ctx),
 	)
 	defer func() {
 		onIntermediate(err)(attempts, err)
@@ -87,7 +73,7 @@ func doTx(
 						}
 					}()
 				}
-				return op(ctx, tx)
+				return op(xcontext.MarkRetryCall(ctx), tx)
 			}()
 
 			if err != nil {
@@ -116,7 +102,7 @@ func do(
 		opts.Trace = &trace.Table{}
 	}
 	attempts, onIntermediate := 0, trace.TableOnDo(opts.Trace, &ctx,
-		opts.Label, opts.Label, opts.Idempotent, isRetryCalledAbove(ctx),
+		opts.Label, opts.Label, opts.Idempotent, xcontext.IsNestedCall(ctx),
 	)
 	defer func() {
 		onIntermediate(err)(attempts, err)
@@ -137,7 +123,7 @@ func do(
 						}
 					}()
 				}
-				return op(ctx, s)
+				return op(xcontext.MarkRetryCall(ctx), s)
 			}()
 
 			if err != nil {
@@ -156,7 +142,7 @@ func retryBackoff(
 	op table.Operation,
 	opts ...retry.Option,
 ) error {
-	return retry.Retry(markRetryCall(ctx),
+	return retry.Retry(ctx,
 		func(ctx context.Context) (err error) {
 			var s *session
 
@@ -169,8 +155,7 @@ func retryBackoff(
 				_ = p.Put(ctx, s)
 			}()
 
-			err = op(ctx, s)
-			if err != nil {
+			if err = op(ctx, s); err != nil {
 				s.checkError(err)
 				return xerrors.WithStackTrace(err)
 			}
