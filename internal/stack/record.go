@@ -62,7 +62,16 @@ func PackagePath(b bool) recordOption {
 	}
 }
 
-func Record(depth int, opts ...recordOption) string {
+type call func() (function uintptr, file string, line int)
+
+func Call(depth int) call {
+	return func() (function uintptr, file string, line int) {
+		function, file, line, _ = runtime.Caller(depth + 2)
+		return function, file, line
+	}
+}
+
+func (call call) Record(opts ...recordOption) string {
 	optionsHolder := recordOptions{
 		packagePath:  true,
 		packageName:  true,
@@ -75,7 +84,7 @@ func Record(depth int, opts ...recordOption) string {
 	for _, opt := range opts {
 		opt(&optionsHolder)
 	}
-	function, file, line, _ := runtime.Caller(depth + 1)
+	function, file, line := call()
 	name := runtime.FuncForPC(function).Name()
 	var (
 		pkgPath    string
@@ -154,4 +163,12 @@ func Record(depth int, opts ...recordOption) string {
 		}
 	}
 	return buffer.String()
+}
+
+func (call call) FunctionID() string {
+	return call.Record(Lambda(false), FileName(false))
+}
+
+func Record(depth int, opts ...recordOption) string {
+	return Call(depth + 1).Record(opts...)
 }

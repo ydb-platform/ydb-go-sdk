@@ -256,3 +256,31 @@ func TestRecord(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkCall(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = Call(0)
+	}
+}
+
+func BenchmarkRecord(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = Record(0)
+	}
+}
+
+func BenchmarkCallRecord(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = Call(0).Record()
+	}
+}
+
+func BenchmarkCallFuncionID(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		_ = Call(0).FunctionID()
+	}
+}
