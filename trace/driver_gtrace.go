@@ -101,6 +101,76 @@ func (t *Driver) Compose(x *Driver, opts ...DriverComposeOption) *Driver {
 		}
 	}
 	{
+		h1 := t.OnPoolNew
+		h2 := x.OnPoolNew
+		ret.OnPoolNew = func(d DriverConnPoolNewStartInfo) func(DriverConnPoolNewDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverConnPoolNewDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverConnPoolNewDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
+					r1(d)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnPoolRelease
+		h2 := x.OnPoolRelease
+		ret.OnPoolRelease = func(d DriverConnPoolReleaseStartInfo) func(DriverConnPoolReleaseDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverConnPoolReleaseDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverConnPoolReleaseDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
+					r1(d)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnNetRead
 		h2 := x.OnNetRead
 		ret.OnNetRead = func(d DriverNetReadStartInfo) func(DriverNetReadDoneInfo) {
@@ -918,6 +988,36 @@ func (t *Driver) onClose(d DriverCloseStartInfo) func(DriverCloseDoneInfo) {
 	}
 	return res
 }
+func (t *Driver) onPoolNew(d DriverConnPoolNewStartInfo) func(DriverConnPoolNewDoneInfo) {
+	fn := t.OnPoolNew
+	if fn == nil {
+		return func(DriverConnPoolNewDoneInfo) {
+			return
+		}
+	}
+	res := fn(d)
+	if res == nil {
+		return func(DriverConnPoolNewDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Driver) onPoolRelease(d DriverConnPoolReleaseStartInfo) func(DriverConnPoolReleaseDoneInfo) {
+	fn := t.OnPoolRelease
+	if fn == nil {
+		return func(DriverConnPoolReleaseDoneInfo) {
+			return
+		}
+	}
+	res := fn(d)
+	if res == nil {
+		return func(DriverConnPoolReleaseDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Driver) onNetRead(d DriverNetReadStartInfo) func(DriverNetReadDoneInfo) {
 	fn := t.OnNetRead
 	if fn == nil {
@@ -1281,6 +1381,27 @@ func DriverOnClose(t *Driver, c *context.Context, call call) func(error) {
 	res := t.onClose(p)
 	return func(e error) {
 		var p DriverCloseDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func DriverOnPoolNew(t *Driver, c *context.Context, call call) func() {
+	var p DriverConnPoolNewStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onPoolNew(p)
+	return func() {
+		var p DriverConnPoolNewDoneInfo
+		res(p)
+	}
+}
+func DriverOnPoolRelease(t *Driver, c *context.Context, call call) func(error) {
+	var p DriverConnPoolReleaseStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onPoolRelease(p)
+	return func(e error) {
+		var p DriverConnPoolReleaseDoneInfo
 		p.Error = e
 		res(p)
 	}

@@ -19,6 +19,10 @@ type (
 		OnInit  func(DriverInitStartInfo) func(DriverInitDoneInfo)
 		OnClose func(DriverCloseStartInfo) func(DriverCloseDoneInfo)
 
+		// Pool of connections
+		OnPoolNew     func(DriverConnPoolNewStartInfo) func(DriverConnPoolNewDoneInfo)
+		OnPoolRelease func(DriverConnPoolReleaseStartInfo) func(DriverConnPoolReleaseDoneInfo)
+
 		// Deprecated: driver not notificate about this event
 		OnNetRead func(DriverNetReadStartInfo) func(DriverNetReadDoneInfo)
 		// Deprecated: driver not notificate about this event
@@ -407,6 +411,26 @@ type (
 		Secure   bool
 	}
 	DriverInitDoneInfo struct {
+		Error error
+	}
+	DriverConnPoolNewStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	DriverConnPoolNewDoneInfo      struct{}
+	DriverConnPoolReleaseStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	DriverConnPoolReleaseDoneInfo struct {
 		Error error
 	}
 	DriverCloseStartInfo struct {

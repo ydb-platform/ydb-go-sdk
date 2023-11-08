@@ -132,7 +132,7 @@ func TestWithCertificatesCached(t *testing.T) {
 			db, err := newConnectionFromOptions(ctx,
 				append(
 					test.options,
-					withConnPool(conn.NewPool(config.New())),
+					withConnPool(conn.NewPool(context.Background(), config.New())),
 				)...,
 			)
 			require.NoError(t, err)
