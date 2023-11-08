@@ -293,15 +293,15 @@ func SchemeOnListDirectory(t *Scheme, c *context.Context, call call) func(error)
 		res(p)
 	}
 }
-func SchemeOnDescribePath(t *Scheme, c *context.Context, call call, path string) func(entry entry, _ error) {
+func SchemeOnDescribePath(t *Scheme, c *context.Context, call call, path string) func(entryType string, _ error) {
 	var p SchemeDescribePathStartInfo
 	p.Context = c
 	p.Call = call
 	p.Path = path
 	res := t.onDescribePath(p)
-	return func(entry entry, e error) {
+	return func(entryType string, e error) {
 		var p SchemeDescribePathDoneInfo
-		p.Entry = entry
+		p.EntryType = entryType
 		p.Error = e
 		res(p)
 	}

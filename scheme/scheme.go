@@ -72,10 +72,6 @@ type Entry struct {
 	EffectivePermissions []Permissions
 }
 
-func (e *Entry) EntryType() string {
-	return e.Type.String()
-}
-
 func (e *Entry) IsDirectory() bool {
 	return e.Type == EntryDirectory
 }

@@ -168,7 +168,7 @@ func (c *Client) listDirectory(ctx context.Context, path string) (scheme.Directo
 func (c *Client) DescribePath(ctx context.Context, path string) (e scheme.Entry, finalErr error) {
 	onDone := trace.SchemeOnDescribePath(c.config.Trace(), &ctx, stack.FunctionID(0), path)
 	defer func() {
-		onDone(&e, finalErr)
+		onDone(e.Type.String(), finalErr)
 	}()
 	call := func(ctx context.Context) (err error) {
 		e, err = c.describePath(ctx, path)

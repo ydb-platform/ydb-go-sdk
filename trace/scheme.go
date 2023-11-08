@@ -1,6 +1,8 @@
 package trace
 
-import "context"
+import (
+	"context"
+)
 
 // tool gtrace used from ./internal/cmd/gtrace
 
@@ -41,8 +43,8 @@ type (
 		EntryType() string
 	}
 	SchemeDescribePathDoneInfo struct {
-		Entry entry
-		Error error
+		EntryType string
+		Error     error
 	}
 	SchemeMakeDirectoryStartInfo struct {
 		// Context make available context in trace callback function.
