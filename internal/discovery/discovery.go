@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -38,7 +39,7 @@ type Client struct {
 func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
 	var (
 		onDone = trace.DiscoveryOnDiscover(
-			c.config.Trace(), &ctx, trace.FunctionID(0), c.config.Endpoint(), c.config.Database(),
+			c.config.Trace(), &ctx, stack.FunctionID(0), c.config.Endpoint(), c.config.Database(),
 		)
 		request = Ydb_Discovery.ListEndpointsRequest{
 			Database: c.config.Database(),
@@ -99,7 +100,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 
 func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err error) {
 	var (
-		onDone             = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx, trace.FunctionID(0))
+		onDone             = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx, stack.FunctionID(0))
 		request            = Ydb_Discovery.WhoAmIRequest{}
 		response           *Ydb_Discovery.WhoAmIResponse
 		whoAmIResultResult Ydb_Discovery.WhoAmIResult

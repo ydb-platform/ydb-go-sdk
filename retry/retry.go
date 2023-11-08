@@ -19,7 +19,7 @@ type retryOperation func(context.Context) (err error)
 
 type retryOptions struct {
 	label       string
-	functionID  string
+	call        call
 	trace       *trace.Retry
 	idempotent  bool
 	stackTrace  bool
@@ -54,24 +54,30 @@ func WithLabel(label string) labelOption {
 	return labelOption(label)
 }
 
-var _ Option = functionIDOption("")
+var _ Option = (*callOption)(nil)
 
-type functionIDOption string
-
-func (functionID functionIDOption) ApplyDoOption(opts *doOptions) {
-	opts.retryOptions = append(opts.retryOptions, withFunctionID(string(functionID)))
+type callOption struct {
+	call
 }
 
-func (functionID functionIDOption) ApplyDoTxOption(opts *doTxOptions) {
-	opts.retryOptions = append(opts.retryOptions, withFunctionID(string(functionID)))
+func (call callOption) ApplyDoOption(opts *doOptions) {
+	opts.retryOptions = append(opts.retryOptions, withCaller(call))
 }
 
-func (functionID functionIDOption) ApplyRetryOption(opts *retryOptions) {
-	opts.functionID = string(functionID)
+func (call callOption) ApplyDoTxOption(opts *doTxOptions) {
+	opts.retryOptions = append(opts.retryOptions, withCaller(call))
 }
 
-func withFunctionID(functionID string) functionIDOption {
-	return functionIDOption(functionID)
+func (call callOption) ApplyRetryOption(opts *retryOptions) {
+	opts.call = call
+}
+
+type call interface {
+	FunctionID() string
+}
+
+func withCaller(call call) callOption {
+	return callOption{call}
 }
 
 var _ Option = stackTraceOption{}
@@ -226,7 +232,7 @@ func WithPanicCallback(panicCallback func(e interface{})) panicCallbackOption {
 // If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
 func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr error) {
 	options := &retryOptions{
-		functionID:  stack.Record(0, stack.FileName(false)),
+		call:        stack.FunctionID(0),
 		trace:       &trace.Retry{},
 		fastBackoff: backoff.Fast,
 		slowBackoff: backoff.Slow,
@@ -252,7 +258,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 
 		code           = int64(0)
 		onIntermediate = trace.RetryOnRetry(options.trace, &ctx,
-			options.label, options.functionID, options.label, options.idempotent, xcontext.IsNestedCall(ctx),
+			options.label, options.call, options.label, options.idempotent, xcontext.IsNestedCall(ctx),
 		)
 	)
 	defer func() {

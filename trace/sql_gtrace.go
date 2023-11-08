@@ -991,10 +991,10 @@ func DatabaseSQLOnConnExec(t *DatabaseSQL, c *context.Context, query string, mod
 		res(p)
 	}
 }
-func DatabaseSQLOnConnIsTableExists(t *DatabaseSQL, c *context.Context, functionID string, tableName string) func(exists bool, _ error) {
+func DatabaseSQLOnConnIsTableExists(t *DatabaseSQL, c *context.Context, call call, tableName string) func(exists bool, _ error) {
 	var p DatabaseSQLConnIsTableExistsStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.TableName = tableName
 	res := t.onConnIsTableExists(p)
 	return func(exists bool, e error) {

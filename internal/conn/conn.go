@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -93,7 +94,7 @@ func (c *conn) IsState(states ...State) bool {
 
 func (c *conn) park(ctx context.Context) (err error) {
 	onDone := trace.DriverOnConnPark(
-		c.config.Trace(), &ctx, trace.FunctionID(0), c.Endpoint(),
+		c.config.Trace(), &ctx, stack.FunctionID(0), c.Endpoint(),
 	)
 	defer func() {
 		onDone(err)
@@ -140,7 +141,7 @@ func (c *conn) SetState(ctx context.Context, s State) State {
 func (c *conn) setState(ctx context.Context, s State) State {
 	if state := State(c.state.Swap(uint32(s))); state != s {
 		trace.DriverOnConnStateChange(
-			c.config.Trace(), &ctx, trace.FunctionID(0), c.endpoint.Copy(), state,
+			c.config.Trace(), &ctx, stack.FunctionID(0), c.endpoint.Copy(), state,
 		)(s)
 	}
 	return s
@@ -184,7 +185,7 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	}
 
 	onDone := trace.DriverOnConnDial(
-		c.config.Trace(), &ctx, trace.FunctionID(0), c.endpoint.Copy(),
+		c.config.Trace(), &ctx, stack.FunctionID(0), c.endpoint.Copy(),
 	)
 
 	defer func() {
@@ -264,7 +265,7 @@ func (c *conn) Close(ctx context.Context) (err error) {
 	}
 
 	onDone := trace.DriverOnConnClose(
-		c.config.Trace(), &ctx, trace.FunctionID(0), c.Endpoint(),
+		c.config.Trace(), &ctx, stack.FunctionID(0), c.Endpoint(),
 	)
 	defer func() {
 		onDone(err)
@@ -295,7 +296,7 @@ func (c *conn) Invoke(
 		issues      []trace.Issue
 		useWrapping = UseWrapping(ctx)
 		onDone      = trace.DriverOnConnInvoke(
-			c.config.Trace(), &ctx, trace.FunctionID(0), c.endpoint, trace.Method(method),
+			c.config.Trace(), &ctx, stack.FunctionID(0), c.endpoint, trace.Method(method),
 		)
 		cc *grpc.ClientConn
 		md = metadata.MD{}
@@ -377,7 +378,7 @@ func (c *conn) NewStream(
 ) (_ grpc.ClientStream, err error) {
 	var (
 		streamRecv = trace.DriverOnConnNewStream(
-			c.config.Trace(), &ctx, trace.FunctionID(0), c.endpoint.Copy(), trace.Method(method),
+			c.config.Trace(), &ctx, stack.FunctionID(0), c.endpoint.Copy(), trace.Method(method),
 		)
 		useWrapping = UseWrapping(ctx)
 		cc          *grpc.ClientConn

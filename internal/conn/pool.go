@@ -10,6 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -88,7 +89,7 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 	}
 
 	trace.DriverOnConnBan(
-		p.config.Trace(), &ctx, trace.FunctionID(0), e, cc.GetState(), cause,
+		p.config.Trace(), &ctx, stack.FunctionID(0), e, cc.GetState(), cause,
 	)(cc.SetState(ctx, Banned))
 }
 
@@ -108,7 +109,7 @@ func (p *Pool) Allow(ctx context.Context, cc Conn) {
 	}
 
 	trace.DriverOnConnAllow(
-		p.config.Trace(), &ctx, trace.FunctionID(0), e, cc.GetState(),
+		p.config.Trace(), &ctx, stack.FunctionID(0), e, cc.GetState(),
 	)(cc.Unban(ctx))
 }
 

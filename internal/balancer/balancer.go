@@ -15,6 +15,7 @@ import (
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -91,7 +92,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 	var (
 		address = "ydb:///" + b.driverConfig.Endpoint()
 		onDone  = trace.DriverOnBalancerClusterDiscoveryAttempt(
-			b.driverConfig.Trace(), &ctx, trace.FunctionID(0), address,
+			b.driverConfig.Trace(), &ctx, stack.FunctionID(0), address,
 		)
 		endpoints []endpoint.Endpoint
 		localDC   string
@@ -127,7 +128,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 
 func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
 	onDone := trace.DriverOnBalancerUpdate(
-		b.driverConfig.Trace(), &ctx, trace.FunctionID(0), b.balancerConfig.DetectlocalDC,
+		b.driverConfig.Trace(), &ctx, stack.FunctionID(0), b.balancerConfig.DetectlocalDC,
 	)
 	defer func() {
 		nodes := make([]trace.EndpointInfo, 0, len(endpoints))
@@ -161,7 +162,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
 	onDone := trace.DriverOnBalancerClose(
-		b.driverConfig.Trace(), &ctx, trace.FunctionID(0),
+		b.driverConfig.Trace(), &ctx, stack.FunctionID(0),
 	)
 	defer func() {
 		onDone(err)
@@ -186,7 +187,7 @@ func New(
 ) (b *Balancer, finalErr error) {
 	var (
 		onDone = trace.DriverOnBalancerInit(
-			driverConfig.Trace(), &ctx, trace.FunctionID(0),
+			driverConfig.Trace(), &ctx, stack.FunctionID(0),
 		)
 		discoveryConfig = discoveryConfig.New(append(opts,
 			discoveryConfig.With(driverConfig.Common),
@@ -317,7 +318,7 @@ func (b *Balancer) connections() *connectionsState {
 
 func (b *Balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
 	onDone := trace.DriverOnBalancerChooseEndpoint(
-		b.driverConfig.Trace(), &ctx, trace.FunctionID(0),
+		b.driverConfig.Trace(), &ctx, stack.FunctionID(0),
 	)
 	defer func() {
 		if err == nil {

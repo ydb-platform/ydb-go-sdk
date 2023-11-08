@@ -282,10 +282,10 @@ func (t *Scheme) onModifyPermissions(s SchemeModifyPermissionsStartInfo) func(Sc
 	}
 	return res
 }
-func SchemeOnListDirectory(t *Scheme, c *context.Context, functionID string) func(error) {
+func SchemeOnListDirectory(t *Scheme, c *context.Context, call call) func(error) {
 	var p SchemeListDirectoryStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	res := t.onListDirectory(p)
 	return func(e error) {
 		var p SchemeListDirectoryDoneInfo
@@ -293,10 +293,10 @@ func SchemeOnListDirectory(t *Scheme, c *context.Context, functionID string) fun
 		res(p)
 	}
 }
-func SchemeOnDescribePath(t *Scheme, c *context.Context, functionID string, path string) func(entry entry, _ error) {
+func SchemeOnDescribePath(t *Scheme, c *context.Context, call call, path string) func(entry entry, _ error) {
 	var p SchemeDescribePathStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.Path = path
 	res := t.onDescribePath(p)
 	return func(entry entry, e error) {
@@ -306,10 +306,10 @@ func SchemeOnDescribePath(t *Scheme, c *context.Context, functionID string, path
 		res(p)
 	}
 }
-func SchemeOnMakeDirectory(t *Scheme, c *context.Context, functionID string, path string) func(error) {
+func SchemeOnMakeDirectory(t *Scheme, c *context.Context, call call, path string) func(error) {
 	var p SchemeMakeDirectoryStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.Path = path
 	res := t.onMakeDirectory(p)
 	return func(e error) {
@@ -318,10 +318,10 @@ func SchemeOnMakeDirectory(t *Scheme, c *context.Context, functionID string, pat
 		res(p)
 	}
 }
-func SchemeOnRemoveDirectory(t *Scheme, c *context.Context, functionID string, path string) func(error) {
+func SchemeOnRemoveDirectory(t *Scheme, c *context.Context, call call, path string) func(error) {
 	var p SchemeRemoveDirectoryStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.Path = path
 	res := t.onRemoveDirectory(p)
 	return func(e error) {
@@ -330,10 +330,10 @@ func SchemeOnRemoveDirectory(t *Scheme, c *context.Context, functionID string, p
 		res(p)
 	}
 }
-func SchemeOnModifyPermissions(t *Scheme, c *context.Context, functionID string, path string) func(error) {
+func SchemeOnModifyPermissions(t *Scheme, c *context.Context, call call, path string) func(error) {
 	var p SchemeModifyPermissionsStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.Path = path
 	res := t.onModifyPermissions(p)
 	return func(e error) {

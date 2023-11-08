@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/helpers"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -452,7 +453,7 @@ func (c *conn) Version(_ context.Context) (_ string, _ error) {
 
 func (c *conn) IsTableExists(ctx context.Context, tableName string) (tableExists bool, finalErr error) {
 	tableName = c.normalizePath(tableName)
-	onDone := trace.DatabaseSQLOnConnIsTableExists(c.trace, &ctx, trace.FunctionID(0), tableName)
+	onDone := trace.DatabaseSQLOnConnIsTableExists(c.trace, &ctx, stack.FunctionID(0), tableName)
 	defer func() {
 		onDone(tableExists, finalErr)
 	}()

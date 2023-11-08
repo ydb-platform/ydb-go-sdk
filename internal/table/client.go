@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 
 	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -45,7 +46,7 @@ func newClient(
 	builder sessionBuilder,
 	config *config.Config,
 ) (c *Client, finalErr error) {
-	onDone := trace.TableOnInit(config.Trace(), &ctx, trace.FunctionID(0))
+	onDone := trace.TableOnInit(config.Trace(), &ctx, stack.FunctionID(0))
 	defer func() {
 		onDone(config.SizeLimit(), finalErr)
 	}()
@@ -255,7 +256,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 				retry.WithIdempotent(true),
 				retry.WithTrace(&trace.Retry{
 					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-						onIntermediate := trace.TableOnCreateSession(c.config.Trace(), info.Context, trace.FunctionID(0))
+						onIntermediate := trace.TableOnCreateSession(c.config.Trace(), info.Context, stack.FunctionID(0))
 						return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 							onDone := onIntermediate(info.Error)
 							return func(info trace.RetryLoopDoneInfo) {
@@ -371,7 +372,7 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 		}
 	}
 
-	onDone := trace.TableOnPoolGet(o.t, &ctx, trace.FunctionID(0))
+	onDone := trace.TableOnPoolGet(o.t, &ctx, stack.FunctionID(0))
 	defer func() {
 		onDone(s, i, err)
 	}()
@@ -464,7 +465,7 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s 
 		el = c.waitQ.PushBack(ch)
 	})
 
-	waitDone := trace.TableOnPoolWait(t, &ctx, trace.FunctionID(0))
+	waitDone := trace.TableOnPoolWait(t, &ctx, stack.FunctionID(0))
 
 	defer func() {
 		waitDone(s, err)
@@ -521,7 +522,7 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s 
 // Get() or Take() calls. In other way it will produce unexpected behavior or
 // panic.
 func (c *Client) Put(ctx context.Context, s *session) (err error) {
-	onDone := trace.TableOnPoolPut(c.config.Trace(), &ctx, trace.FunctionID(0), s)
+	onDone := trace.TableOnPoolPut(c.config.Trace(), &ctx, stack.FunctionID(0), s)
 	defer func() {
 		onDone(err)
 	}()
@@ -578,7 +579,7 @@ func (c *Client) Close(ctx context.Context) (err error) {
 		default:
 			close(c.done)
 
-			onDone := trace.TableOnClose(c.config.Trace(), &ctx, trace.FunctionID(0))
+			onDone := trace.TableOnClose(c.config.Trace(), &ctx, stack.FunctionID(0))
 			defer func() {
 				onDone(err)
 			}()

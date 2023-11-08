@@ -7,6 +7,7 @@ import (
 	"github.com/jonboulle/clockwork"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -144,7 +145,7 @@ func (r *repeater) wakeUp(ctx context.Context, e Event) (err error) {
 
 	ctx = WithEvent(ctx, e)
 
-	onDone := trace.DriverOnRepeaterWakeUp(r.trace, &ctx, trace.FunctionID(0), r.name, e)
+	onDone := trace.DriverOnRepeaterWakeUp(r.trace, &ctx, stack.FunctionID(0), r.name, e)
 	defer func() {
 		onDone(err)
 

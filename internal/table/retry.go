@@ -3,6 +3,7 @@ package table
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -32,7 +33,7 @@ func doTx(
 	if opts.Trace == nil {
 		opts.Trace = &trace.Table{}
 	}
-	attempts, onIntermediate := 0, trace.TableOnDoTx(opts.Trace, &ctx, trace.FunctionID(1),
+	attempts, onIntermediate := 0, trace.TableOnDoTx(opts.Trace, &ctx, stack.FunctionID(1),
 		opts.Label, opts.Label, opts.Idempotent, xcontext.IsNestedCall(ctx),
 	)
 	defer func() {
@@ -101,7 +102,7 @@ func do(
 	if opts.Trace == nil {
 		opts.Trace = &trace.Table{}
 	}
-	attempts, onIntermediate := 0, trace.TableOnDo(opts.Trace, &ctx, trace.FunctionID(1),
+	attempts, onIntermediate := 0, trace.TableOnDo(opts.Trace, &ctx, stack.FunctionID(1),
 		opts.Label, opts.Label, opts.Idempotent, xcontext.IsNestedCall(ctx),
 	)
 	defer func() {

@@ -26,6 +26,7 @@ import (
 	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
 	internalScripting "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting"
 	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	internalTable "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicclientinternal"
@@ -292,7 +293,7 @@ func connect(ctx context.Context, d *Driver) error {
 	}
 
 	onDone := trace.DriverOnInit(
-		d.config.Trace(), &ctx, trace.FunctionID(2), d.config.Endpoint(), d.config.Database(), d.config.Secure(),
+		d.config.Trace(), &ctx, stack.FunctionID(2), d.config.Endpoint(), d.config.Database(), d.config.Secure(),
 	)
 	defer func() {
 		onDone(err)

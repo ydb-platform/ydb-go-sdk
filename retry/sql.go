@@ -42,7 +42,7 @@ func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Co
 	var (
 		options = doOptions{
 			retryOptions: []Option{
-				withFunctionID(stack.Record(0, stack.FileName(false))),
+				withCaller(stack.FunctionID(0)),
 			},
 		}
 		attempts = 0
@@ -127,7 +127,7 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 	var (
 		options = doTxOptions{
 			retryOptions: []Option{
-				withFunctionID(stack.Record(0, stack.FileName(false))),
+				withCaller(stack.FunctionID(0)),
 			},
 			txOptions: &sql.TxOptions{
 				Isolation: sql.LevelDefault,

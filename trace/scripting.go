@@ -39,7 +39,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
-		FunctionID string
+		Call       call
 		Query      string
 		Parameters scriptingQueryParameters
 	}
@@ -53,7 +53,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
-		FunctionID string
+		Call       call
 		Query      string
 		Parameters scriptingQueryParameters
 	}
@@ -68,9 +68,9 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context    *context.Context
-		FunctionID string
-		Query      string
+		Context *context.Context
+		Call    call
+		Query   string
 	}
 	ScriptingExplainDoneInfo struct {
 		Plan  string
@@ -81,8 +81,8 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context    *context.Context
-		FunctionID string
+		Context *context.Context
+		Call    call
 	}
 	ScriptingCloseDoneInfo struct {
 		Error error

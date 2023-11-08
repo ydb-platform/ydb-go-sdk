@@ -22,8 +22,8 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context    *context.Context
-		FunctionID string
+		Context *context.Context
+		Call    call
 	}
 	SchemeListDirectoryDoneInfo struct {
 		Error error
@@ -33,9 +33,9 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context    *context.Context
-		FunctionID string
-		Path       string
+		Context *context.Context
+		Call    call
+		Path    string
 	}
 	entry interface {
 		EntryType() string
@@ -49,9 +49,9 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context    *context.Context
-		FunctionID string
-		Path       string
+		Context *context.Context
+		Call    call
+		Path    string
 	}
 	SchemeMakeDirectoryDoneInfo struct {
 		Error error
@@ -61,9 +61,9 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context    *context.Context
-		FunctionID string
-		Path       string
+		Context *context.Context
+		Call    call
+		Path    string
 	}
 	SchemeRemoveDirectoryDoneInfo struct {
 		Error error
@@ -73,9 +73,9 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context    *context.Context
-		FunctionID string
-		Path       string
+		Context *context.Context
+		Call    call
+		Path    string
 	}
 	SchemeModifyPermissionsDoneInfo struct {
 		Error error

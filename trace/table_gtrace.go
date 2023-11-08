@@ -1450,10 +1450,10 @@ func (t *Table) onPoolWait(t1 TablePoolWaitStartInfo) func(TablePoolWaitDoneInfo
 	}
 	return res
 }
-func TableOnInit(t *Table, c *context.Context, functionID string) func(limit int, _ error) {
+func TableOnInit(t *Table, c *context.Context, call call) func(limit int, _ error) {
 	var p TableInitStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	res := t.onInit(p)
 	return func(limit int, e error) {
 		var p TableInitDoneInfo
@@ -1462,10 +1462,10 @@ func TableOnInit(t *Table, c *context.Context, functionID string) func(limit int
 		res(p)
 	}
 }
-func TableOnClose(t *Table, c *context.Context, functionID string) func(error) {
+func TableOnClose(t *Table, c *context.Context, call call) func(error) {
 	var p TableCloseStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	res := t.onClose(p)
 	return func(e error) {
 		var p TableCloseDoneInfo
@@ -1473,10 +1473,10 @@ func TableOnClose(t *Table, c *context.Context, functionID string) func(error) {
 		res(p)
 	}
 }
-func TableOnDo(t *Table, c *context.Context, functionID string, iD string, label string, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
+func TableOnDo(t *Table, c *context.Context, call call, iD string, label string, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
 	var p TableDoStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.ID = iD
 	p.Label = label
 	p.Idempotent = idempotent
@@ -1494,10 +1494,10 @@ func TableOnDo(t *Table, c *context.Context, functionID string, iD string, label
 		}
 	}
 }
-func TableOnDoTx(t *Table, c *context.Context, functionID string, iD string, label string, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
+func TableOnDoTx(t *Table, c *context.Context, call call, iD string, label string, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
 	var p TableDoTxStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.ID = iD
 	p.Label = label
 	p.Idempotent = idempotent
@@ -1515,10 +1515,10 @@ func TableOnDoTx(t *Table, c *context.Context, functionID string, iD string, lab
 		}
 	}
 }
-func TableOnCreateSession(t *Table, c *context.Context, functionID string) func(error) func(session tableSessionInfo, attempts int, _ error) {
+func TableOnCreateSession(t *Table, c *context.Context, call call) func(error) func(session tableSessionInfo, attempts int, _ error) {
 	var p TableCreateSessionStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	res := t.onCreateSession(p)
 	return func(e error) func(tableSessionInfo, int, error) {
 		var p TableCreateSessionIntermediateInfo
@@ -1533,10 +1533,10 @@ func TableOnCreateSession(t *Table, c *context.Context, functionID string) func(
 		}
 	}
 }
-func TableOnSessionNew(t *Table, c *context.Context, functionID string) func(session tableSessionInfo, _ error) {
+func TableOnSessionNew(t *Table, c *context.Context, call call) func(session tableSessionInfo, _ error) {
 	var p TableSessionNewStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	res := t.onSessionNew(p)
 	return func(session tableSessionInfo, e error) {
 		var p TableSessionNewDoneInfo
@@ -1545,10 +1545,10 @@ func TableOnSessionNew(t *Table, c *context.Context, functionID string) func(ses
 		res(p)
 	}
 }
-func TableOnSessionDelete(t *Table, c *context.Context, functionID string, session tableSessionInfo) func(error) {
+func TableOnSessionDelete(t *Table, c *context.Context, call call, session tableSessionInfo) func(error) {
 	var p TableSessionDeleteStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.Session = session
 	res := t.onSessionDelete(p)
 	return func(e error) {
@@ -1557,10 +1557,10 @@ func TableOnSessionDelete(t *Table, c *context.Context, functionID string, sessi
 		res(p)
 	}
 }
-func TableOnSessionKeepAlive(t *Table, c *context.Context, functionID string, session tableSessionInfo) func(error) {
+func TableOnSessionKeepAlive(t *Table, c *context.Context, call call, session tableSessionInfo) func(error) {
 	var p TableKeepAliveStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.Session = session
 	res := t.onSessionKeepAlive(p)
 	return func(e error) {
@@ -1569,10 +1569,10 @@ func TableOnSessionKeepAlive(t *Table, c *context.Context, functionID string, se
 		res(p)
 	}
 }
-func TableOnSessionBulkUpsert(t *Table, c *context.Context, functionID string, session tableSessionInfo) func(error) {
+func TableOnSessionBulkUpsert(t *Table, c *context.Context, call call, session tableSessionInfo) func(error) {
 	var p TableBulkUpsertStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.Session = session
 	res := t.onSessionBulkUpsert(p)
 	return func(e error) {
@@ -1581,10 +1581,10 @@ func TableOnSessionBulkUpsert(t *Table, c *context.Context, functionID string, s
 		res(p)
 	}
 }
-func TableOnSessionQueryPrepare(t *Table, c *context.Context, functionID string, session tableSessionInfo, query string) func(result tableDataQuery, _ error) {
+func TableOnSessionQueryPrepare(t *Table, c *context.Context, call call, session tableSessionInfo, query string) func(result tableDataQuery, _ error) {
 	var p TablePrepareDataQueryStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.Session = session
 	p.Query = query
 	res := t.onSessionQueryPrepare(p)
@@ -1595,10 +1595,10 @@ func TableOnSessionQueryPrepare(t *Table, c *context.Context, functionID string,
 		res(p)
 	}
 }
-func TableOnSessionQueryExecute(t *Table, c *context.Context, functionID string, session tableSessionInfo, query tableDataQuery, parameters tableQueryParameters, keepInCache bool) func(tx tableTransactionInfo, prepared bool, result tableResult, _ error) {
+func TableOnSessionQueryExecute(t *Table, c *context.Context, call call, session tableSessionInfo, query tableDataQuery, parameters tableQueryParameters, keepInCache bool) func(tx tableTransactionInfo, prepared bool, result tableResult, _ error) {
 	var p TableExecuteDataQueryStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.Session = session
 	p.Query = query
 	p.Parameters = parameters
@@ -1613,10 +1613,10 @@ func TableOnSessionQueryExecute(t *Table, c *context.Context, functionID string,
 		res(p)
 	}
 }
-func TableOnSessionQueryExplain(t *Table, c *context.Context, functionID string, session tableSessionInfo, query string) func(aST string, plan string, _ error) {
+func TableOnSessionQueryExplain(t *Table, c *context.Context, call call, session tableSessionInfo, query string) func(aST string, plan string, _ error) {
 	var p TableExplainQueryStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.Session = session
 	p.Query = query
 	res := t.onSessionQueryExplain(p)
@@ -1628,10 +1628,10 @@ func TableOnSessionQueryExplain(t *Table, c *context.Context, functionID string,
 		res(p)
 	}
 }
-func TableOnSessionQueryStreamExecute(t *Table, c *context.Context, functionID string, session tableSessionInfo, query tableDataQuery, parameters tableQueryParameters) func(error) func(error) {
+func TableOnSessionQueryStreamExecute(t *Table, c *context.Context, call call, session tableSessionInfo, query tableDataQuery, parameters tableQueryParameters) func(error) func(error) {
 	var p TableSessionQueryStreamExecuteStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.Session = session
 	p.Query = query
 	p.Parameters = parameters
@@ -1647,10 +1647,10 @@ func TableOnSessionQueryStreamExecute(t *Table, c *context.Context, functionID s
 		}
 	}
 }
-func TableOnSessionQueryStreamRead(t *Table, c *context.Context, functionID string, session tableSessionInfo) func(error) func(error) {
+func TableOnSessionQueryStreamRead(t *Table, c *context.Context, call call, session tableSessionInfo) func(error) func(error) {
 	var p TableSessionQueryStreamReadStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.Session = session
 	res := t.onSessionQueryStreamRead(p)
 	return func(e error) func(error) {
@@ -1664,10 +1664,10 @@ func TableOnSessionQueryStreamRead(t *Table, c *context.Context, functionID stri
 		}
 	}
 }
-func TableOnSessionTransactionBegin(t *Table, c *context.Context, functionID string, session tableSessionInfo) func(tx tableTransactionInfo, _ error) {
+func TableOnSessionTransactionBegin(t *Table, c *context.Context, call call, session tableSessionInfo) func(tx tableTransactionInfo, _ error) {
 	var p TableSessionTransactionBeginStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.Session = session
 	res := t.onSessionTransactionBegin(p)
 	return func(tx tableTransactionInfo, e error) {
@@ -1677,10 +1677,10 @@ func TableOnSessionTransactionBegin(t *Table, c *context.Context, functionID str
 		res(p)
 	}
 }
-func TableOnSessionTransactionExecute(t *Table, c *context.Context, functionID string, session tableSessionInfo, tx tableTransactionInfo, query tableDataQuery, parameters tableQueryParameters) func(result tableResult, _ error) {
+func TableOnSessionTransactionExecute(t *Table, c *context.Context, call call, session tableSessionInfo, tx tableTransactionInfo, query tableDataQuery, parameters tableQueryParameters) func(result tableResult, _ error) {
 	var p TableTransactionExecuteStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.Session = session
 	p.Tx = tx
 	p.Query = query
@@ -1693,10 +1693,10 @@ func TableOnSessionTransactionExecute(t *Table, c *context.Context, functionID s
 		res(p)
 	}
 }
-func TableOnSessionTransactionExecuteStatement(t *Table, c *context.Context, functionID string, session tableSessionInfo, tx tableTransactionInfo, statementQuery tableDataQuery, parameters tableQueryParameters) func(result tableResult, _ error) {
+func TableOnSessionTransactionExecuteStatement(t *Table, c *context.Context, call call, session tableSessionInfo, tx tableTransactionInfo, statementQuery tableDataQuery, parameters tableQueryParameters) func(result tableResult, _ error) {
 	var p TableTransactionExecuteStatementStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.Session = session
 	p.Tx = tx
 	p.StatementQuery = statementQuery
@@ -1709,10 +1709,10 @@ func TableOnSessionTransactionExecuteStatement(t *Table, c *context.Context, fun
 		res(p)
 	}
 }
-func TableOnSessionTransactionCommit(t *Table, c *context.Context, functionID string, session tableSessionInfo, tx tableTransactionInfo) func(error) {
+func TableOnSessionTransactionCommit(t *Table, c *context.Context, call call, session tableSessionInfo, tx tableTransactionInfo) func(error) {
 	var p TableSessionTransactionCommitStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.Session = session
 	p.Tx = tx
 	res := t.onSessionTransactionCommit(p)
@@ -1722,10 +1722,10 @@ func TableOnSessionTransactionCommit(t *Table, c *context.Context, functionID st
 		res(p)
 	}
 }
-func TableOnSessionTransactionRollback(t *Table, c *context.Context, functionID string, session tableSessionInfo, tx tableTransactionInfo) func(error) {
+func TableOnSessionTransactionRollback(t *Table, c *context.Context, call call, session tableSessionInfo, tx tableTransactionInfo) func(error) {
 	var p TableSessionTransactionRollbackStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.Session = session
 	p.Tx = tx
 	res := t.onSessionTransactionRollback(p)
@@ -1751,10 +1751,10 @@ func TableOnPoolSessionRemove(t *Table, session tableSessionInfo) {
 	p.Session = session
 	t.onPoolSessionRemove(p)
 }
-func TableOnPoolSessionNew(t *Table, c *context.Context, functionID string) func(session tableSessionInfo, _ error) {
+func TableOnPoolSessionNew(t *Table, c *context.Context, call call) func(session tableSessionInfo, _ error) {
 	var p TablePoolSessionNewStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	res := t.onPoolSessionNew(p)
 	return func(session tableSessionInfo, e error) {
 		var p TablePoolSessionNewDoneInfo
@@ -1763,10 +1763,10 @@ func TableOnPoolSessionNew(t *Table, c *context.Context, functionID string) func
 		res(p)
 	}
 }
-func TableOnPoolSessionClose(t *Table, c *context.Context, functionID string, session tableSessionInfo) func() {
+func TableOnPoolSessionClose(t *Table, c *context.Context, call call, session tableSessionInfo) func() {
 	var p TablePoolSessionCloseStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.Session = session
 	res := t.onPoolSessionClose(p)
 	return func() {
@@ -1774,10 +1774,10 @@ func TableOnPoolSessionClose(t *Table, c *context.Context, functionID string, se
 		res(p)
 	}
 }
-func TableOnPoolPut(t *Table, c *context.Context, functionID string, session tableSessionInfo) func(error) {
+func TableOnPoolPut(t *Table, c *context.Context, call call, session tableSessionInfo) func(error) {
 	var p TablePoolPutStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	p.Session = session
 	res := t.onPoolPut(p)
 	return func(e error) {
@@ -1786,10 +1786,10 @@ func TableOnPoolPut(t *Table, c *context.Context, functionID string, session tab
 		res(p)
 	}
 }
-func TableOnPoolGet(t *Table, c *context.Context, functionID string) func(session tableSessionInfo, attempts int, _ error) {
+func TableOnPoolGet(t *Table, c *context.Context, call call) func(session tableSessionInfo, attempts int, _ error) {
 	var p TablePoolGetStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	res := t.onPoolGet(p)
 	return func(session tableSessionInfo, attempts int, e error) {
 		var p TablePoolGetDoneInfo
@@ -1799,10 +1799,10 @@ func TableOnPoolGet(t *Table, c *context.Context, functionID string) func(sessio
 		res(p)
 	}
 }
-func TableOnPoolWait(t *Table, c *context.Context, functionID string) func(session tableSessionInfo, _ error) {
+func TableOnPoolWait(t *Table, c *context.Context, call call) func(session tableSessionInfo, _ error) {
 	var p TablePoolWaitStartInfo
 	p.Context = c
-	p.FunctionID = functionID
+	p.Call = call
 	res := t.onPoolWait(p)
 	return func(session tableSessionInfo, e error) {
 		var p TablePoolWaitDoneInfo
