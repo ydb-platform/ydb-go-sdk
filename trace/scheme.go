@@ -39,9 +39,6 @@ type (
 		Call    call
 		Path    string
 	}
-	entry interface {
-		EntryType() string
-	}
 	SchemeDescribePathDoneInfo struct {
 		EntryType string
 		Error     error
