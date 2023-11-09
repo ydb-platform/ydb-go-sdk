@@ -62,16 +62,18 @@ func PackagePath(b bool) recordOption {
 	}
 }
 
-type call func() (function uintptr, file string, line int)
-
-func Call(depth int) call {
-	return func() (function uintptr, file string, line int) {
-		function, file, line, _ = runtime.Caller(depth + 2)
-		return function, file, line
-	}
+type call struct {
+	function uintptr
+	file     string
+	line     int
 }
 
-func (call call) Record(opts ...recordOption) string {
+func Call(depth int) (c call) {
+	c.function, c.file, c.line, _ = runtime.Caller(depth + 1)
+	return c
+}
+
+func (c call) Record(opts ...recordOption) string {
 	optionsHolder := recordOptions{
 		packagePath:  true,
 		packageName:  true,
@@ -84,13 +86,13 @@ func (call call) Record(opts ...recordOption) string {
 	for _, opt := range opts {
 		opt(&optionsHolder)
 	}
-	function, file, line := call()
-	name := runtime.FuncForPC(function).Name()
+	name := runtime.FuncForPC(c.function).Name()
 	var (
 		pkgPath    string
 		pkgName    string
 		structName string
 		funcName   string
+		file       = c.file
 	)
 	if i := strings.LastIndex(file, "/"); i > -1 {
 		file = file[i+1:]
@@ -156,7 +158,7 @@ func (call call) Record(opts ...recordOption) string {
 		buffer.WriteString(file)
 		if optionsHolder.line {
 			buffer.WriteByte(':')
-			fmt.Fprintf(buffer, "%d", line)
+			fmt.Fprintf(buffer, "%d", c.line)
 		}
 		if closeBrace {
 			buffer.WriteByte(')')
@@ -165,8 +167,8 @@ func (call call) Record(opts ...recordOption) string {
 	return buffer.String()
 }
 
-func (call call) FunctionID() string {
-	return call.Record(Lambda(false), FileName(false))
+func (c call) FunctionID() string {
+	return c.Record(Lambda(false), FileName(false))
 }
 
 func Record(depth int, opts ...recordOption) string {

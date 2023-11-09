@@ -19,6 +19,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
+		Call     call
 		Address  string
 		Database string
 	}
@@ -33,6 +34,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
+		Call    call
 	}
 	DiscoveryWhoAmIDoneInfo struct {
 		User   string

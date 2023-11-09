@@ -26,6 +26,7 @@ import (
 	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
 	internalScripting "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting"
 	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	internalTable "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicclientinternal"
@@ -93,7 +94,12 @@ type Driver struct { //nolint:maligned
 }
 
 // Close closes Driver and clear resources
-func (d *Driver) Close(ctx context.Context) error {
+func (d *Driver) Close(ctx context.Context) (finalErr error) {
+	onDone := trace.DriverOnClose(d.config.Trace(), &ctx, stack.FunctionID(0))
+	defer func() {
+		onDone(finalErr)
+	}()
+
 	d.mtx.Lock()
 	defer d.mtx.Unlock()
 
@@ -103,16 +109,16 @@ func (d *Driver) Close(ctx context.Context) error {
 		}
 	}()
 
-	closers := make([]func(context.Context) error, 0)
+	closes := make([]func(context.Context) error, 0)
 	d.childrenMtx.WithLock(func() {
 		for _, child := range d.children {
-			closers = append(closers, child.Close)
+			closes = append(closes, child.Close)
 		}
 		d.children = nil
 	})
 
-	closers = append(
-		closers,
+	closes = append(
+		closes,
 		d.ratelimiter.Close,
 		d.coordination.Close,
 		d.scheme.Close,
@@ -124,8 +130,8 @@ func (d *Driver) Close(ctx context.Context) error {
 	)
 
 	var issues []error
-	for _, closer := range closers {
-		if err := closer(ctx); err != nil {
+	for _, f := range closes {
+		if err := f(ctx); err != nil {
 			issues = append(issues, err)
 		}
 	}
@@ -292,11 +298,7 @@ func connect(ctx context.Context, d *Driver) error {
 	}
 
 	onDone := trace.DriverOnInit(
-		d.config.Trace(),
-		&ctx,
-		d.config.Endpoint(),
-		d.config.Database(),
-		d.config.Secure(),
+		d.config.Trace(), &ctx, stack.FunctionID(2), d.config.Endpoint(), d.config.Database(), d.config.Secure(),
 	)
 	defer func() {
 		onDone(err)
@@ -313,7 +315,7 @@ func connect(ctx context.Context, d *Driver) error {
 	}
 
 	if d.pool == nil {
-		d.pool = conn.NewPool(d.config)
+		d.pool = conn.NewPool(ctx, d.config)
 	}
 
 	d.balancer, err = balancer.New(ctx, d.config, d.pool, d.discoveryOptions...)

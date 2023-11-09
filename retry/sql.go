@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -39,7 +40,11 @@ func WithDoRetryOptions(opts ...Option) doRetryOptionsOption {
 // Do is a retryer of database/sql Conn with fallbacks on errors
 func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Conn) error, opts ...doOption) error {
 	var (
-		options  = doOptions{}
+		options = doOptions{
+			retryOptions: []Option{
+				withCaller(stack.FunctionID(0)),
+			},
+		}
 		attempts = 0
 	)
 	if tracer, has := db.Driver().(interface {
@@ -121,7 +126,9 @@ func WithTxOptions(txOptions *sql.TxOptions) txOptionsOption {
 func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) error, opts ...doTxOption) error {
 	var (
 		options = doTxOptions{
-			retryOptions: []Option{},
+			retryOptions: []Option{
+				withCaller(stack.FunctionID(0)),
+			},
 			txOptions: &sql.TxOptions{
 				Isolation: sql.LevelDefault,
 				ReadOnly:  false,

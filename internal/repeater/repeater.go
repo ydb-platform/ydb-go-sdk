@@ -7,6 +7,7 @@ import (
 	"github.com/jonboulle/clockwork"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -89,11 +90,12 @@ func WithEvent(ctx context.Context, event Event) context.Context {
 
 // New creates and begins to execute task periodically.
 func New(
+	ctx context.Context,
 	interval time.Duration,
 	task func(ctx context.Context) (err error),
 	opts ...option,
 ) *repeater {
-	ctx, cancel := xcontext.WithCancel(context.Background())
+	ctx, cancel := xcontext.WithCancel(ctx)
 
 	r := &repeater{
 		interval: interval,
@@ -143,7 +145,7 @@ func (r *repeater) wakeUp(ctx context.Context, e Event) (err error) {
 
 	ctx = WithEvent(ctx, e)
 
-	onDone := trace.DriverOnRepeaterWakeUp(r.trace, &ctx, r.name, e)
+	onDone := trace.DriverOnRepeaterWakeUp(r.trace, &ctx, stack.FunctionID(0), r.name, e)
 	defer func() {
 		onDone(err)
 

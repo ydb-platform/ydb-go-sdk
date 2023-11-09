@@ -132,9 +132,10 @@ func (t *Discovery) onWhoAmI(d DiscoveryWhoAmIStartInfo) func(DiscoveryWhoAmIDon
 	}
 	return res
 }
-func DiscoveryOnDiscover(t *Discovery, c *context.Context, address string, database string) func(location string, endpoints []EndpointInfo, _ error) {
+func DiscoveryOnDiscover(t *Discovery, c *context.Context, call call, address string, database string) func(location string, endpoints []EndpointInfo, _ error) {
 	var p DiscoveryDiscoverStartInfo
 	p.Context = c
+	p.Call = call
 	p.Address = address
 	p.Database = database
 	res := t.onDiscover(p)
@@ -146,9 +147,10 @@ func DiscoveryOnDiscover(t *Discovery, c *context.Context, address string, datab
 		res(p)
 	}
 }
-func DiscoveryOnWhoAmI(t *Discovery, c *context.Context) func(user string, groups []string, _ error) {
+func DiscoveryOnWhoAmI(t *Discovery, c *context.Context, call call) func(user string, groups []string, _ error) {
 	var p DiscoveryWhoAmIStartInfo
 	p.Context = c
+	p.Call = call
 	res := t.onWhoAmI(p)
 	return func(user string, groups []string, e error) {
 		var p DiscoveryWhoAmIDoneInfo

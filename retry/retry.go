@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wait"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -18,6 +19,7 @@ type retryOperation func(context.Context) (err error)
 
 type retryOptions struct {
 	label       string
+	call        call
 	trace       *trace.Retry
 	idempotent  bool
 	stackTrace  bool
@@ -50,6 +52,32 @@ func (label labelOption) ApplyRetryOption(opts *retryOptions) {
 // WithLabel applies label for identification call Retry in trace.Retry.OnRetry
 func WithLabel(label string) labelOption {
 	return labelOption(label)
+}
+
+var _ Option = (*callOption)(nil)
+
+type callOption struct {
+	call
+}
+
+func (call callOption) ApplyDoOption(opts *doOptions) {
+	opts.retryOptions = append(opts.retryOptions, withCaller(call))
+}
+
+func (call callOption) ApplyDoTxOption(opts *doTxOptions) {
+	opts.retryOptions = append(opts.retryOptions, withCaller(call))
+}
+
+func (call callOption) ApplyRetryOption(opts *retryOptions) {
+	opts.call = call
+}
+
+type call interface {
+	FunctionID() string
+}
+
+func withCaller(call call) callOption {
+	return callOption{call}
 }
 
 var _ Option = stackTraceOption{}
@@ -204,6 +232,7 @@ func WithPanicCallback(panicCallback func(e interface{})) panicCallbackOption {
 // If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
 func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr error) {
 	options := &retryOptions{
+		call:        stack.FunctionID(0),
 		trace:       &trace.Retry{},
 		fastBackoff: backoff.Fast,
 		slowBackoff: backoff.Slow,
@@ -229,7 +258,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 
 		code           = int64(0)
 		onIntermediate = trace.RetryOnRetry(options.trace, &ctx,
-			options.label, options.label, options.idempotent, xcontext.IsNestedCall(ctx),
+			options.label, options.call, options.label, options.idempotent, xcontext.IsNestedCall(ctx),
 		)
 	)
 	defer func() {

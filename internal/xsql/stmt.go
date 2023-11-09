@@ -11,8 +11,13 @@ import (
 )
 
 type stmt struct {
-	conn  *conn
-	query string
+	conn      *conn
+	processor interface {
+		driver.ExecerContext
+		driver.QueryerContext
+	}
+	query      string
+	prepareCtx context.Context
 
 	trace *trace.DatabaseSQL
 }
@@ -24,7 +29,7 @@ var (
 )
 
 func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ driver.Rows, finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtQuery(s.trace, &ctx, s.query)
+	onDone := trace.DatabaseSQLOnStmtQuery(s.trace, &ctx, &s.prepareCtx, s.query)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -33,14 +38,14 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ dr
 	}
 	switch m := queryModeFromContext(ctx, s.conn.defaultQueryMode); m {
 	case DataQueryMode:
-		return s.conn.QueryContext(s.conn.withKeepInCache(ctx), s.query, args)
+		return s.processor.QueryContext(s.conn.withKeepInCache(ctx), s.query, args)
 	default:
 		return nil, fmt.Errorf("unsupported query mode '%s' for execute query on prepared statement", m)
 	}
 }
 
 func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ driver.Result, finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtExec(s.trace, &ctx, s.query)
+	onDone := trace.DatabaseSQLOnStmtExec(s.trace, &ctx, &s.prepareCtx, s.query)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -49,7 +54,7 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ dri
 	}
 	switch m := queryModeFromContext(ctx, s.conn.defaultQueryMode); m {
 	case DataQueryMode:
-		return s.conn.ExecContext(s.conn.withKeepInCache(ctx), s.query, args)
+		return s.processor.ExecContext(s.conn.withKeepInCache(ctx), s.query, args)
 	default:
 		return nil, fmt.Errorf("unsupported query mode '%s' for execute query on prepared statement", m)
 	}
@@ -60,7 +65,7 @@ func (s *stmt) NumInput() int {
 }
 
 func (s *stmt) Close() (finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtClose(s.trace)
+	onDone := trace.DatabaseSQLOnStmtClose(s.trace, &s.prepareCtx)
 	defer func() {
 		onDone(finalErr)
 	}()
