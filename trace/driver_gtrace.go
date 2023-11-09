@@ -1605,10 +1605,11 @@ func DriverOnRepeaterWakeUp(t *Driver, c *context.Context, call call, name strin
 		res(p)
 	}
 }
-func DriverOnBalancerInit(t *Driver, c *context.Context, call call) func(error) {
+func DriverOnBalancerInit(t *Driver, c *context.Context, call call, name string) func(error) {
 	var p DriverBalancerInitStartInfo
 	p.Context = c
 	p.Call = call
+	p.Name = name
 	res := t.onBalancerInit(p)
 	return func(e error) {
 		var p DriverBalancerInitDoneInfo

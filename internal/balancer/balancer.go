@@ -114,7 +114,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	if b.balancerConfig.DetectlocalDC {
+	if b.balancerConfig.DetectLocalDC {
 		localDC, err = b.localDCDetector(ctx, endpoints)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -128,7 +128,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 
 func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
 	onDone := trace.DriverOnBalancerUpdate(
-		b.driverConfig.Trace(), &ctx, stack.FunctionID(0), b.balancerConfig.DetectlocalDC,
+		b.driverConfig.Trace(), &ctx, stack.FunctionID(0), b.balancerConfig.DetectLocalDC,
 	)
 	defer func() {
 		nodes := make([]trace.EndpointInfo, 0, len(endpoints))
@@ -145,7 +145,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	}
 
 	info := balancerConfig.Info{SelfLocation: localDC}
-	state := newConnectionsState(connections, b.balancerConfig.IsPreferConn, info, b.balancerConfig.AllowFalback)
+	state := newConnectionsState(connections, b.balancerConfig.Filter, info, b.balancerConfig.AllowFallback)
 
 	endpointsInfo := make([]endpoint.Info, len(endpoints))
 	for i, e := range endpoints {
@@ -187,7 +187,7 @@ func New(
 ) (b *Balancer, finalErr error) {
 	var (
 		onDone = trace.DriverOnBalancerInit(
-			driverConfig.Trace(), &ctx, stack.FunctionID(0),
+			driverConfig.Trace(), &ctx, stack.FunctionID(0), driverConfig.Balancer().String(),
 		)
 		discoveryConfig = discoveryConfig.New(append(opts,
 			discoveryConfig.With(driverConfig.Common),
