@@ -70,11 +70,11 @@ func TestFromConfig(t *testing.T) {
 				"prefer": "local_dc"
 			}`,
 			res: balancerConfig.Config{
-				DetectlocalDC: true,
-				IsPreferConn: func(info balancerConfig.Info, c conn.Conn) bool {
+				DetectLocalDC: true,
+				Filter: filterFunc(func(info balancerConfig.Info, c conn.Conn) bool {
 					// some non nil func
 					return false
-				},
+				}),
 			},
 		},
 		{
@@ -93,12 +93,12 @@ func TestFromConfig(t *testing.T) {
 				"fallback": true
 			}`,
 			res: balancerConfig.Config{
-				AllowFalback:  true,
-				DetectlocalDC: true,
-				IsPreferConn: func(info balancerConfig.Info, c conn.Conn) bool {
+				AllowFallback: true,
+				DetectLocalDC: true,
+				Filter: filterFunc(func(info balancerConfig.Info, c conn.Conn) bool {
 					// some non nil func
 					return false
-				},
+				}),
 			},
 		},
 		{
@@ -109,10 +109,10 @@ func TestFromConfig(t *testing.T) {
 				"locations": ["AAA", "BBB", "CCC"]
 			}`,
 			res: balancerConfig.Config{
-				IsPreferConn: func(info balancerConfig.Info, c conn.Conn) bool {
+				Filter: filterFunc(func(info balancerConfig.Info, c conn.Conn) bool {
 					// some non nil func
 					return false
-				},
+				}),
 			},
 		},
 		{
@@ -124,11 +124,11 @@ func TestFromConfig(t *testing.T) {
 				"fallback": true
 			}`,
 			res: balancerConfig.Config{
-				AllowFalback: true,
-				IsPreferConn: func(info balancerConfig.Info, c conn.Conn) bool {
+				AllowFallback: true,
+				Filter: filterFunc(func(info balancerConfig.Info, c conn.Conn) bool {
 					// some non nil func
 					return false
-				},
+				}),
 			},
 		},
 	} {
@@ -155,10 +155,10 @@ func TestFromConfig(t *testing.T) {
 			}
 
 			// function pointers can check equal to nil only
-			if tt.res.IsPreferConn != nil {
-				require.NotNil(t, b.IsPreferConn)
-				b.IsPreferConn = nil
-				tt.res.IsPreferConn = nil
+			if tt.res.Filter != nil {
+				require.NotNil(t, b.Filter)
+				b.Filter = nil
+				tt.res.Filter = nil
 			}
 
 			require.Equal(t, &tt.res, b)

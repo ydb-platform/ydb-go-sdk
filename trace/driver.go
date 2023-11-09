@@ -335,6 +335,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
+		Name    string
 	}
 	DriverBalancerInitDoneInfo struct {
 		Error error

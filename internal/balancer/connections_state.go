@@ -20,7 +20,7 @@ type connectionsState struct {
 
 func newConnectionsState(
 	conns []conn.Conn,
-	preferFunc balancerConfig.PreferConnFunc,
+	filter balancerConfig.Filter,
 	info balancerConfig.Info,
 	allowFallback bool,
 ) *connectionsState {
@@ -29,7 +29,7 @@ func newConnectionsState(
 		rand:         xrand.New(xrand.WithLock()),
 	}
 
-	res.prefer, res.fallback = sortPreferConnections(conns, preferFunc, info, allowFallback)
+	res.prefer, res.fallback = sortPreferConnections(conns, filter, info, allowFallback)
 	if allowFallback {
 		res.all = conns
 	} else {
@@ -126,11 +126,11 @@ func connsToNodeIDMap(conns []conn.Conn) (nodes map[uint32]conn.Conn) {
 
 func sortPreferConnections(
 	conns []conn.Conn,
-	preferFunc balancerConfig.PreferConnFunc,
+	filter balancerConfig.Filter,
 	info balancerConfig.Info,
 	allowFallback bool,
 ) (prefer, fallback []conn.Conn) {
-	if preferFunc == nil {
+	if filter == nil {
 		return conns, nil
 	}
 
@@ -140,7 +140,7 @@ func sortPreferConnections(
 	}
 
 	for _, c := range conns {
-		if preferFunc(info, c) {
+		if filter.Allow(info, c) {
 			prefer = append(prefer, c)
 		} else if allowFallback {
 			fallback = append(fallback, c)

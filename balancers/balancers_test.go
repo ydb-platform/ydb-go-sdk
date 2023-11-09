@@ -17,7 +17,7 @@ func TestPreferLocalDC(t *testing.T) {
 		&mock.Conn{AddrField: "3", State: conn.Online, LocationField: "2"},
 	}
 	rr := PreferLocalDC(RandomChoice())
-	require.False(t, rr.AllowFalback)
+	require.False(t, rr.AllowFallback)
 	require.Equal(t, []conn.Conn{conns[1], conns[2]}, applyPreferFilter(balancerConfig.Info{SelfLocation: "2"}, rr, conns))
 }
 
@@ -28,7 +28,7 @@ func TestPreferLocalDCWithFallBack(t *testing.T) {
 		&mock.Conn{AddrField: "3", State: conn.Online, LocationField: "2"},
 	}
 	rr := PreferLocalDCWithFallBack(RandomChoice())
-	require.True(t, rr.AllowFalback)
+	require.True(t, rr.AllowFallback)
 	require.Equal(t, []conn.Conn{conns[1], conns[2]}, applyPreferFilter(balancerConfig.Info{SelfLocation: "2"}, rr, conns))
 }
 
@@ -40,7 +40,7 @@ func TestPreferLocations(t *testing.T) {
 	}
 
 	rr := PreferLocations(RandomChoice(), "zero", "two")
-	require.False(t, rr.AllowFalback)
+	require.False(t, rr.AllowFallback)
 	require.Equal(t, []conn.Conn{conns[0], conns[2]}, applyPreferFilter(balancerConfig.Info{}, rr, conns))
 }
 
@@ -52,17 +52,17 @@ func TestPreferLocationsWithFallback(t *testing.T) {
 	}
 
 	rr := PreferLocationsWithFallback(RandomChoice(), "zero", "two")
-	require.True(t, rr.AllowFalback)
+	require.True(t, rr.AllowFallback)
 	require.Equal(t, []conn.Conn{conns[0], conns[2]}, applyPreferFilter(balancerConfig.Info{}, rr, conns))
 }
 
 func applyPreferFilter(info balancerConfig.Info, b *balancerConfig.Config, conns []conn.Conn) []conn.Conn {
-	if b.IsPreferConn == nil {
-		b.IsPreferConn = func(info balancerConfig.Info, c conn.Conn) bool { return true }
+	if b.Filter == nil {
+		b.Filter = filterFunc(func(info balancerConfig.Info, c conn.Conn) bool { return true })
 	}
 	res := make([]conn.Conn, 0, len(conns))
 	for _, c := range conns {
-		if b.IsPreferConn(info, c) {
+		if b.Filter.Allow(info, c) {
 			res = append(res, c)
 		}
 	}

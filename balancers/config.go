@@ -20,8 +20,8 @@ const (
 type preferType string
 
 const (
-	preferLocalDC   = preferType("local_dc")
-	preferLocations = preferType("locations")
+	preferTypeLocalDC   = preferType("local_dc")
+	preferTypeLocations = preferType("locations")
 )
 
 type balancersConfig struct {
@@ -88,12 +88,12 @@ func CreateFromConfig(s string) (*balancerConfig.Config, error) {
 	}
 
 	switch c.Prefer {
-	case preferLocalDC:
+	case preferTypeLocalDC:
 		if c.Fallback {
 			return PreferLocalDCWithFallBack(b), nil
 		}
 		return PreferLocalDC(b), nil
-	case preferLocations:
+	case preferTypeLocations:
 		if len(c.Locations) == 0 {
 			return nil, xerrors.WithStackTrace(fmt.Errorf("empty locations list in balancer '%s' config", c.Type))
 		}
