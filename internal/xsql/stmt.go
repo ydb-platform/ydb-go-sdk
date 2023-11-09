@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -29,7 +30,7 @@ var (
 )
 
 func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ driver.Rows, finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtQuery(s.trace, &ctx, &s.prepareCtx, s.query)
+	onDone := trace.DatabaseSQLOnStmtQuery(s.trace, &ctx, stack.FunctionID(0), &s.prepareCtx, s.query)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -45,7 +46,7 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ dr
 }
 
 func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ driver.Result, finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtExec(s.trace, &ctx, &s.prepareCtx, s.query)
+	onDone := trace.DatabaseSQLOnStmtExec(s.trace, &ctx, stack.FunctionID(0), &s.prepareCtx, s.query)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -65,7 +66,7 @@ func (s *stmt) NumInput() int {
 }
 
 func (s *stmt) Close() (finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtClose(s.trace, &s.prepareCtx)
+	onDone := trace.DatabaseSQLOnStmtClose(s.trace, &s.prepareCtx, stack.FunctionID(0))
 	defer func() {
 		onDone(finalErr)
 	}()

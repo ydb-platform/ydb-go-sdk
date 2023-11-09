@@ -152,7 +152,7 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt,
 	if c.currentTx != nil {
 		return c.currentTx.PrepareContext(ctx, query)
 	}
-	onDone := trace.DatabaseSQLOnConnPrepare(c.trace, &ctx, query)
+	onDone := trace.DatabaseSQLOnConnPrepare(c.trace, &ctx, stack.FunctionID(0), query)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -177,7 +177,9 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 ) {
 	var (
 		m      = queryModeFromContext(ctx, c.defaultQueryMode)
-		onDone = trace.DatabaseSQLOnConnExec(c.trace, &ctx, query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage())
+		onDone = trace.DatabaseSQLOnConnExec(
+			c.trace, &ctx, stack.FunctionID(0), query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage(),
+		)
 	)
 
 	defer func() {
@@ -270,7 +272,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 ) {
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
 	onDone := trace.DatabaseSQLOnConnQuery(
-		c.trace, &ctx, query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage(),
+		c.trace, &ctx, stack.FunctionID(0), query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage(),
 	)
 	defer func() {
 		c.lastUsage.Store(time.Now().Unix())
@@ -351,7 +353,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 }
 
 func (c *conn) Ping(ctx context.Context) (finalErr error) {
-	onDone := trace.DatabaseSQLOnConnPing(c.trace, &ctx)
+	onDone := trace.DatabaseSQLOnConnPing(c.trace, &ctx, stack.FunctionID(0))
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -367,7 +369,9 @@ func (c *conn) Ping(ctx context.Context) (finalErr error) {
 func (c *conn) Close() (finalErr error) {
 	if c.closed.CompareAndSwap(false, true) {
 		c.connector.detach(c)
-		onDone := trace.DatabaseSQLOnConnClose(c.trace)
+		onDone := trace.DatabaseSQLOnConnClose(
+			c.trace, &c.openConnCtx, stack.FunctionID(0),
+		)
 		defer func() {
 			onDone(finalErr)
 		}()
@@ -406,7 +410,7 @@ func (c *conn) ID() string {
 
 func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ driver.Tx, finalErr error) {
 	var tx currentTx
-	onDone := trace.DatabaseSQLOnConnBegin(c.trace, &ctx)
+	onDone := trace.DatabaseSQLOnConnBegin(c.trace, &ctx, stack.FunctionID(0))
 	defer func() {
 		onDone(tx, finalErr)
 	}()

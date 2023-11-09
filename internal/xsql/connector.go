@@ -11,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
@@ -295,7 +296,9 @@ func (c *Connector) detach(cc *conn) {
 
 func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 	var (
-		onDone  = trace.DatabaseSQLOnConnectorConnect(c.trace, &ctx)
+		onDone = trace.DatabaseSQLOnConnectorConnect(
+			c.trace, &ctx, stack.FunctionID(0),
+		)
 		session table.ClosableSession
 	)
 	defer func() {
