@@ -911,9 +911,10 @@ func (t *DatabaseSQL) onDoTx(d DatabaseSQLDoTxStartInfo) func(DatabaseSQLDoTxInt
 		return res
 	}
 }
-func DatabaseSQLOnConnectorConnect(t *DatabaseSQL, c *context.Context) func(_ error, session tableSessionInfo) {
+func DatabaseSQLOnConnectorConnect(t *DatabaseSQL, c *context.Context, call call) func(_ error, session tableSessionInfo) {
 	var p DatabaseSQLConnectorConnectStartInfo
 	p.Context = c
+	p.Call = call
 	res := t.onConnectorConnect(p)
 	return func(e error, session tableSessionInfo) {
 		var p DatabaseSQLConnectorConnectDoneInfo
@@ -922,9 +923,10 @@ func DatabaseSQLOnConnectorConnect(t *DatabaseSQL, c *context.Context) func(_ er
 		res(p)
 	}
 }
-func DatabaseSQLOnConnPing(t *DatabaseSQL, c *context.Context) func(error) {
+func DatabaseSQLOnConnPing(t *DatabaseSQL, c *context.Context, call call) func(error) {
 	var p DatabaseSQLConnPingStartInfo
 	p.Context = c
+	p.Call = call
 	res := t.onConnPing(p)
 	return func(e error) {
 		var p DatabaseSQLConnPingDoneInfo
@@ -932,9 +934,10 @@ func DatabaseSQLOnConnPing(t *DatabaseSQL, c *context.Context) func(error) {
 		res(p)
 	}
 }
-func DatabaseSQLOnConnPrepare(t *DatabaseSQL, c *context.Context, query string) func(error) {
+func DatabaseSQLOnConnPrepare(t *DatabaseSQL, c *context.Context, call call, query string) func(error) {
 	var p DatabaseSQLConnPrepareStartInfo
 	p.Context = c
+	p.Call = call
 	p.Query = query
 	res := t.onConnPrepare(p)
 	return func(e error) {
@@ -943,8 +946,10 @@ func DatabaseSQLOnConnPrepare(t *DatabaseSQL, c *context.Context, query string) 
 		res(p)
 	}
 }
-func DatabaseSQLOnConnClose(t *DatabaseSQL) func(error) {
+func DatabaseSQLOnConnClose(t *DatabaseSQL, c *context.Context, call call) func(error) {
 	var p DatabaseSQLConnCloseStartInfo
+	p.Context = c
+	p.Call = call
 	res := t.onConnClose(p)
 	return func(e error) {
 		var p DatabaseSQLConnCloseDoneInfo
@@ -952,9 +957,10 @@ func DatabaseSQLOnConnClose(t *DatabaseSQL) func(error) {
 		res(p)
 	}
 }
-func DatabaseSQLOnConnBegin(t *DatabaseSQL, c *context.Context) func(tx tableTransactionInfo, _ error) {
+func DatabaseSQLOnConnBegin(t *DatabaseSQL, c *context.Context, call call) func(tx tableTransactionInfo, _ error) {
 	var p DatabaseSQLConnBeginStartInfo
 	p.Context = c
+	p.Call = call
 	res := t.onConnBegin(p)
 	return func(tx tableTransactionInfo, e error) {
 		var p DatabaseSQLConnBeginDoneInfo
@@ -963,9 +969,10 @@ func DatabaseSQLOnConnBegin(t *DatabaseSQL, c *context.Context) func(tx tableTra
 		res(p)
 	}
 }
-func DatabaseSQLOnConnQuery(t *DatabaseSQL, c *context.Context, query string, mode string, idempotent bool, idleTime time.Duration) func(error) {
+func DatabaseSQLOnConnQuery(t *DatabaseSQL, c *context.Context, call call, query string, mode string, idempotent bool, idleTime time.Duration) func(error) {
 	var p DatabaseSQLConnQueryStartInfo
 	p.Context = c
+	p.Call = call
 	p.Query = query
 	p.Mode = mode
 	p.Idempotent = idempotent
@@ -977,9 +984,10 @@ func DatabaseSQLOnConnQuery(t *DatabaseSQL, c *context.Context, query string, mo
 		res(p)
 	}
 }
-func DatabaseSQLOnConnExec(t *DatabaseSQL, c *context.Context, query string, mode string, idempotent bool, idleTime time.Duration) func(error) {
+func DatabaseSQLOnConnExec(t *DatabaseSQL, c *context.Context, call call, query string, mode string, idempotent bool, idleTime time.Duration) func(error) {
 	var p DatabaseSQLConnExecStartInfo
 	p.Context = c
+	p.Call = call
 	p.Query = query
 	p.Mode = mode
 	p.Idempotent = idempotent
@@ -1004,12 +1012,14 @@ func DatabaseSQLOnConnIsTableExists(t *DatabaseSQL, c *context.Context, call cal
 		res(p)
 	}
 }
-func DatabaseSQLOnTxQuery(t *DatabaseSQL, c *context.Context, txContext *context.Context, tx tableTransactionInfo, query string) func(error) {
+func DatabaseSQLOnTxQuery(t *DatabaseSQL, c *context.Context, call call, txContext *context.Context, tx tableTransactionInfo, query string, idempotent bool) func(error) {
 	var p DatabaseSQLTxQueryStartInfo
 	p.Context = c
+	p.Call = call
 	p.TxContext = txContext
 	p.Tx = tx
 	p.Query = query
+	p.Idempotent = idempotent
 	res := t.onTxQuery(p)
 	return func(e error) {
 		var p DatabaseSQLTxQueryDoneInfo
@@ -1017,12 +1027,14 @@ func DatabaseSQLOnTxQuery(t *DatabaseSQL, c *context.Context, txContext *context
 		res(p)
 	}
 }
-func DatabaseSQLOnTxExec(t *DatabaseSQL, c *context.Context, txContext *context.Context, tx tableTransactionInfo, query string) func(error) {
+func DatabaseSQLOnTxExec(t *DatabaseSQL, c *context.Context, call call, txContext *context.Context, tx tableTransactionInfo, query string, idempotent bool) func(error) {
 	var p DatabaseSQLTxExecStartInfo
 	p.Context = c
+	p.Call = call
 	p.TxContext = txContext
 	p.Tx = tx
 	p.Query = query
+	p.Idempotent = idempotent
 	res := t.onTxExec(p)
 	return func(e error) {
 		var p DatabaseSQLTxExecDoneInfo
@@ -1030,9 +1042,10 @@ func DatabaseSQLOnTxExec(t *DatabaseSQL, c *context.Context, txContext *context.
 		res(p)
 	}
 }
-func DatabaseSQLOnTxPrepare(t *DatabaseSQL, c *context.Context, txContext *context.Context, tx tableTransactionInfo, query string) func(error) {
+func DatabaseSQLOnTxPrepare(t *DatabaseSQL, c *context.Context, call call, txContext *context.Context, tx tableTransactionInfo, query string) func(error) {
 	var p DatabaseSQLTxPrepareStartInfo
 	p.Context = c
+	p.Call = call
 	p.TxContext = txContext
 	p.Tx = tx
 	p.Query = query
@@ -1043,9 +1056,10 @@ func DatabaseSQLOnTxPrepare(t *DatabaseSQL, c *context.Context, txContext *conte
 		res(p)
 	}
 }
-func DatabaseSQLOnTxCommit(t *DatabaseSQL, txContext *context.Context, tx tableTransactionInfo) func(error) {
+func DatabaseSQLOnTxCommit(t *DatabaseSQL, txContext *context.Context, call call, tx tableTransactionInfo) func(error) {
 	var p DatabaseSQLTxCommitStartInfo
 	p.TxContext = txContext
+	p.Call = call
 	p.Tx = tx
 	res := t.onTxCommit(p)
 	return func(e error) {
@@ -1054,9 +1068,10 @@ func DatabaseSQLOnTxCommit(t *DatabaseSQL, txContext *context.Context, tx tableT
 		res(p)
 	}
 }
-func DatabaseSQLOnTxRollback(t *DatabaseSQL, txContext *context.Context, tx tableTransactionInfo) func(error) {
+func DatabaseSQLOnTxRollback(t *DatabaseSQL, txContext *context.Context, call call, tx tableTransactionInfo) func(error) {
 	var p DatabaseSQLTxRollbackStartInfo
 	p.TxContext = txContext
+	p.Call = call
 	p.Tx = tx
 	res := t.onTxRollback(p)
 	return func(e error) {
@@ -1065,9 +1080,10 @@ func DatabaseSQLOnTxRollback(t *DatabaseSQL, txContext *context.Context, tx tabl
 		res(p)
 	}
 }
-func DatabaseSQLOnStmtQuery(t *DatabaseSQL, c *context.Context, stmtContext *context.Context, query string) func(error) {
+func DatabaseSQLOnStmtQuery(t *DatabaseSQL, c *context.Context, call call, stmtContext *context.Context, query string) func(error) {
 	var p DatabaseSQLStmtQueryStartInfo
 	p.Context = c
+	p.Call = call
 	p.StmtContext = stmtContext
 	p.Query = query
 	res := t.onStmtQuery(p)
@@ -1077,9 +1093,10 @@ func DatabaseSQLOnStmtQuery(t *DatabaseSQL, c *context.Context, stmtContext *con
 		res(p)
 	}
 }
-func DatabaseSQLOnStmtExec(t *DatabaseSQL, c *context.Context, stmtContext *context.Context, query string) func(error) {
+func DatabaseSQLOnStmtExec(t *DatabaseSQL, c *context.Context, call call, stmtContext *context.Context, query string) func(error) {
 	var p DatabaseSQLStmtExecStartInfo
 	p.Context = c
+	p.Call = call
 	p.StmtContext = stmtContext
 	p.Query = query
 	res := t.onStmtExec(p)
@@ -1089,9 +1106,10 @@ func DatabaseSQLOnStmtExec(t *DatabaseSQL, c *context.Context, stmtContext *cont
 		res(p)
 	}
 }
-func DatabaseSQLOnStmtClose(t *DatabaseSQL, stmtContext *context.Context) func(error) {
+func DatabaseSQLOnStmtClose(t *DatabaseSQL, stmtContext *context.Context, call call) func(error) {
 	var p DatabaseSQLStmtCloseStartInfo
 	p.StmtContext = stmtContext
+	p.Call = call
 	res := t.onStmtClose(p)
 	return func(e error) {
 		var p DatabaseSQLStmtCloseDoneInfo
@@ -1099,9 +1117,10 @@ func DatabaseSQLOnStmtClose(t *DatabaseSQL, stmtContext *context.Context) func(e
 		res(p)
 	}
 }
-func DatabaseSQLOnDoTx(t *DatabaseSQL, c *context.Context, iD string, idempotent bool) func(error) func(attempts int, _ error) {
+func DatabaseSQLOnDoTx(t *DatabaseSQL, c *context.Context, call call, iD string, idempotent bool) func(error) func(attempts int, _ error) {
 	var p DatabaseSQLDoTxStartInfo
 	p.Context = c
+	p.Call = call
 	p.ID = iD
 	p.Idempotent = idempotent
 	res := t.onDoTx(p)
