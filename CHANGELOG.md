@@ -1,3 +1,4 @@
+## v3.54.2
 * Added context to some internal methods for better tracing
 * Added `trace.FunctionID` helper and `FunctionID` field to trace start info's 
 * Replaced lazy initialization of ydb clients (table, topic, etc.) to explicit initialization on `ydb.Open` step
