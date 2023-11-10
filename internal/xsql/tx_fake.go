@@ -27,11 +27,11 @@ func (tx *txFake) PrepareContext(ctx context.Context, query string) (_ driver.St
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
 	return &stmt{
-		conn:       tx.conn,
-		processor:  tx,
-		prepareCtx: ctx,
-		query:      query,
-		trace:      tx.conn.trace,
+		conn:      tx.conn,
+		processor: tx,
+		stmtCtx:   ctx,
+		query:     query,
+		trace:     tx.conn.trace,
 	}, nil
 }
 
@@ -85,7 +85,7 @@ func (tx *txFake) QueryContext(ctx context.Context, query string, args []driver.
 	rows driver.Rows, err error,
 ) {
 	onDone := trace.DatabaseSQLOnTxQuery(
-		tx.conn.trace, &ctx, stack.FunctionID(0), &tx.ctx, tx, query, xcontext.IsIdempotent(ctx),
+		tx.conn.trace, &ctx, stack.FunctionID(0), tx.ctx, tx, query, xcontext.IsIdempotent(ctx),
 	)
 	defer func() {
 		onDone(err)
@@ -101,7 +101,7 @@ func (tx *txFake) ExecContext(ctx context.Context, query string, args []driver.N
 	result driver.Result, err error,
 ) {
 	onDone := trace.DatabaseSQLOnTxExec(
-		tx.conn.trace, &ctx, stack.FunctionID(0), &tx.ctx, tx, query, xcontext.IsIdempotent(ctx),
+		tx.conn.trace, &ctx, stack.FunctionID(0), tx.ctx, tx, query, xcontext.IsIdempotent(ctx),
 	)
 	defer func() {
 		onDone(err)

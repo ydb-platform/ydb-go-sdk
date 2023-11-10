@@ -160,11 +160,11 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt,
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
 	return &stmt{
-		conn:       c,
-		processor:  c,
-		prepareCtx: ctx,
-		query:      query,
-		trace:      c.trace,
+		conn:      c,
+		processor: c,
+		stmtCtx:   ctx,
+		query:     query,
+		trace:     c.trace,
 	}, nil
 }
 
@@ -175,6 +175,18 @@ func (c *conn) sinceLastUsage() time.Duration {
 func (c *conn) execContext(ctx context.Context, query string, args []driver.NamedValue) (
 	_ driver.Result, finalErr error,
 ) {
+	defer func() {
+		c.lastUsage.Store(time.Now().Unix())
+	}()
+
+	if !c.isReady() {
+		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+	}
+
+	if c.currentTx != nil {
+		return c.currentTx.ExecContext(ctx, query, args)
+	}
+
 	var (
 		m      = queryModeFromContext(ctx, c.defaultQueryMode)
 		onDone = trace.DatabaseSQLOnConnExec(
@@ -183,9 +195,9 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 	)
 
 	defer func() {
-		c.lastUsage.Store(time.Now().Unix())
 		onDone(finalErr)
 	}()
+
 	switch m {
 	case DataQueryMode:
 		normalizedQuery, params, err := c.normalize(query, args...)
@@ -270,14 +282,28 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 func (c *conn) queryContext(ctx context.Context, query string, args []driver.NamedValue) (
 	_ driver.Rows, finalErr error,
 ) {
-	m := queryModeFromContext(ctx, c.defaultQueryMode)
-	onDone := trace.DatabaseSQLOnConnQuery(
-		c.trace, &ctx, stack.FunctionID(0), query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage(),
-	)
 	defer func() {
 		c.lastUsage.Store(time.Now().Unix())
+	}()
+
+	if !c.isReady() {
+		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+	}
+
+	if c.currentTx != nil {
+		return c.currentTx.QueryContext(ctx, query, args)
+	}
+
+	var (
+		m      = queryModeFromContext(ctx, c.defaultQueryMode)
+		onDone = trace.DatabaseSQLOnConnQuery(
+			c.trace, &ctx, stack.FunctionID(0), query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage(),
+		)
+	)
+	defer func() {
 		onDone(finalErr)
 	}()
+
 	switch m {
 	case DataQueryMode:
 		normalizedQuery, params, err := c.normalize(query, args...)

@@ -156,7 +156,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context   *context.Context
 		Call      call
-		TxContext *context.Context
+		TxContext context.Context
 		Tx        tableTransactionInfo
 		Query     string
 
@@ -173,7 +173,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context   *context.Context
 		Call      call
-		TxContext *context.Context
+		TxContext context.Context
 		Tx        tableTransactionInfo
 		Query     string
 
@@ -188,9 +188,9 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		TxContext *context.Context
-		Call      call
-		Tx        tableTransactionInfo
+		Context *context.Context
+		Call    call
+		Tx      tableTransactionInfo
 	}
 	DatabaseSQLTxCommitDoneInfo struct {
 		Error error
@@ -200,9 +200,9 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		TxContext *context.Context
-		Call      call
-		Tx        tableTransactionInfo
+		Context *context.Context
+		Call    call
+		Tx      tableTransactionInfo
 	}
 	DatabaseSQLTxRollbackDoneInfo struct {
 		Error error
@@ -221,7 +221,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context     *context.Context
 		Call        call
-		StmtContext *context.Context
+		StmtContext context.Context
 		Query       string
 	}
 	DatabaseSQLStmtQueryDoneInfo struct {
@@ -234,7 +234,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context     *context.Context
 		Call        call
-		StmtContext *context.Context
+		StmtContext context.Context
 		Query       string
 	}
 	DatabaseSQLStmtExecDoneInfo struct {

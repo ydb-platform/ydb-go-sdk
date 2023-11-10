@@ -1012,7 +1012,7 @@ func DatabaseSQLOnConnIsTableExists(t *DatabaseSQL, c *context.Context, call cal
 		res(p)
 	}
 }
-func DatabaseSQLOnTxQuery(t *DatabaseSQL, c *context.Context, call call, txContext *context.Context, tx tableTransactionInfo, query string, idempotent bool) func(error) {
+func DatabaseSQLOnTxQuery(t *DatabaseSQL, c *context.Context, call call, txContext context.Context, tx tableTransactionInfo, query string, idempotent bool) func(error) {
 	var p DatabaseSQLTxQueryStartInfo
 	p.Context = c
 	p.Call = call
@@ -1027,7 +1027,7 @@ func DatabaseSQLOnTxQuery(t *DatabaseSQL, c *context.Context, call call, txConte
 		res(p)
 	}
 }
-func DatabaseSQLOnTxExec(t *DatabaseSQL, c *context.Context, call call, txContext *context.Context, tx tableTransactionInfo, query string, idempotent bool) func(error) {
+func DatabaseSQLOnTxExec(t *DatabaseSQL, c *context.Context, call call, txContext context.Context, tx tableTransactionInfo, query string, idempotent bool) func(error) {
 	var p DatabaseSQLTxExecStartInfo
 	p.Context = c
 	p.Call = call
@@ -1056,9 +1056,9 @@ func DatabaseSQLOnTxPrepare(t *DatabaseSQL, c *context.Context, call call, txCon
 		res(p)
 	}
 }
-func DatabaseSQLOnTxCommit(t *DatabaseSQL, txContext *context.Context, call call, tx tableTransactionInfo) func(error) {
+func DatabaseSQLOnTxCommit(t *DatabaseSQL, c *context.Context, call call, tx tableTransactionInfo) func(error) {
 	var p DatabaseSQLTxCommitStartInfo
-	p.TxContext = txContext
+	p.Context = c
 	p.Call = call
 	p.Tx = tx
 	res := t.onTxCommit(p)
@@ -1068,9 +1068,9 @@ func DatabaseSQLOnTxCommit(t *DatabaseSQL, txContext *context.Context, call call
 		res(p)
 	}
 }
-func DatabaseSQLOnTxRollback(t *DatabaseSQL, txContext *context.Context, call call, tx tableTransactionInfo) func(error) {
+func DatabaseSQLOnTxRollback(t *DatabaseSQL, c *context.Context, call call, tx tableTransactionInfo) func(error) {
 	var p DatabaseSQLTxRollbackStartInfo
-	p.TxContext = txContext
+	p.Context = c
 	p.Call = call
 	p.Tx = tx
 	res := t.onTxRollback(p)
@@ -1080,7 +1080,7 @@ func DatabaseSQLOnTxRollback(t *DatabaseSQL, txContext *context.Context, call ca
 		res(p)
 	}
 }
-func DatabaseSQLOnStmtQuery(t *DatabaseSQL, c *context.Context, call call, stmtContext *context.Context, query string) func(error) {
+func DatabaseSQLOnStmtQuery(t *DatabaseSQL, c *context.Context, call call, stmtContext context.Context, query string) func(error) {
 	var p DatabaseSQLStmtQueryStartInfo
 	p.Context = c
 	p.Call = call
@@ -1093,7 +1093,7 @@ func DatabaseSQLOnStmtQuery(t *DatabaseSQL, c *context.Context, call call, stmtC
 		res(p)
 	}
 }
-func DatabaseSQLOnStmtExec(t *DatabaseSQL, c *context.Context, call call, stmtContext *context.Context, query string) func(error) {
+func DatabaseSQLOnStmtExec(t *DatabaseSQL, c *context.Context, call call, stmtContext context.Context, query string) func(error) {
 	var p DatabaseSQLStmtExecStartInfo
 	p.Context = c
 	p.Call = call
