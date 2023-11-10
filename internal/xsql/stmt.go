@@ -17,8 +17,8 @@ type stmt struct {
 		driver.ExecerContext
 		driver.QueryerContext
 	}
-	query      string
-	prepareCtx context.Context
+	query   string
+	stmtCtx context.Context
 
 	trace *trace.DatabaseSQL
 }
@@ -30,7 +30,7 @@ var (
 )
 
 func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ driver.Rows, finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtQuery(s.trace, &ctx, stack.FunctionID(0), &s.prepareCtx, s.query)
+	onDone := trace.DatabaseSQLOnStmtQuery(s.trace, &ctx, stack.FunctionID(0), s.stmtCtx, s.query)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -46,7 +46,7 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ dr
 }
 
 func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ driver.Result, finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtExec(s.trace, &ctx, stack.FunctionID(0), &s.prepareCtx, s.query)
+	onDone := trace.DatabaseSQLOnStmtExec(s.trace, &ctx, stack.FunctionID(0), s.stmtCtx, s.query)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -66,17 +66,17 @@ func (s *stmt) NumInput() int {
 }
 
 func (s *stmt) Close() (finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtClose(s.trace, &s.prepareCtx, stack.FunctionID(0))
+	onDone := trace.DatabaseSQLOnStmtClose(s.trace, &s.stmtCtx, stack.FunctionID(0))
 	defer func() {
 		onDone(finalErr)
 	}()
 	return nil
 }
 
-func (s stmt) Exec(args []driver.Value) (driver.Result, error) {
+func (s *stmt) Exec([]driver.Value) (driver.Result, error) {
 	return nil, errDeprecated
 }
 
-func (s stmt) Query(args []driver.Value) (driver.Rows, error) {
+func (s *stmt) Query([]driver.Value) (driver.Rows, error) {
 	return nil, errDeprecated
 }
