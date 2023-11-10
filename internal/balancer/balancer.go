@@ -3,6 +3,7 @@ package balancer
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"google.golang.org/grpc"
 
@@ -33,7 +34,7 @@ type discoveryClient interface {
 
 type Balancer struct {
 	driverConfig      *config.Config
-	balancerConfig    balancerConfig.Config
+	config            balancerConfig.Config
 	pool              *conn.Pool
 	discoveryClient   discoveryClient
 	discoveryRepeater repeater.Repeater
@@ -46,7 +47,7 @@ type Balancer struct {
 }
 
 func (b *Balancer) HasNode(id uint32) bool {
-	if b.balancerConfig.SingleConn {
+	if b.config.SingleConn {
 		return true
 	}
 	b.mu.RLock()
@@ -114,7 +115,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	if b.balancerConfig.DetectLocalDC {
+	if b.config.DetectLocalDC {
 		localDC, err = b.localDCDetector(ctx, endpoints)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -126,16 +127,52 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 	return nil
 }
 
+func endpointsDiff(newestEndpoints []endpoint.Endpoint, previousConns []conn.Conn) (
+	nodes []trace.EndpointInfo,
+	added []trace.EndpointInfo,
+	dropped []trace.EndpointInfo,
+) {
+	nodes = make([]trace.EndpointInfo, 0, len(newestEndpoints))
+	added = make([]trace.EndpointInfo, 0, len(previousConns))
+	dropped = make([]trace.EndpointInfo, 0, len(previousConns))
+	var (
+		newestMap   = make(map[string]struct{}, len(newestEndpoints))
+		previousMap = make(map[string]struct{}, len(previousConns))
+	)
+	sort.Slice(newestEndpoints, func(i, j int) bool {
+		return newestEndpoints[i].Address() < newestEndpoints[j].Address()
+	})
+	sort.Slice(previousConns, func(i, j int) bool {
+		return previousConns[i].Endpoint().Address() < previousConns[j].Endpoint().Address()
+	})
+	for _, e := range previousConns {
+		previousMap[e.Endpoint().Address()] = struct{}{}
+	}
+	for _, e := range newestEndpoints {
+		nodes = append(nodes, e.Copy())
+		newestMap[e.Address()] = struct{}{}
+		if _, has := previousMap[e.Address()]; !has {
+			added = append(added, e.Copy())
+		}
+	}
+	for _, c := range previousConns {
+		if _, has := newestMap[c.Endpoint().Address()]; !has {
+			dropped = append(dropped, c.Endpoint().Copy())
+		}
+	}
+	return nodes, added, dropped
+}
+
 func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
-	onDone := trace.DriverOnBalancerUpdate(
-		b.driverConfig.Trace(), &ctx, stack.FunctionID(0), b.balancerConfig.DetectLocalDC,
+	var (
+		onDone = trace.DriverOnBalancerUpdate(
+			b.driverConfig.Trace(), &ctx, stack.FunctionID(0), b.config.DetectLocalDC,
+		)
+		previousConns []conn.Conn
 	)
 	defer func() {
-		nodes := make([]trace.EndpointInfo, 0, len(endpoints))
-		for _, e := range endpoints {
-			nodes = append(nodes, e.Copy())
-		}
-		onDone(nodes, localDC, nil)
+		nodes, added, dropped := endpointsDiff(endpoints, previousConns)
+		onDone(nodes, added, dropped, localDC, nil)
 	}()
 
 	connections := endpointsToConnections(b.pool, endpoints)
@@ -145,7 +182,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	}
 
 	info := balancerConfig.Info{SelfLocation: localDC}
-	state := newConnectionsState(connections, b.balancerConfig.Filter, info, b.balancerConfig.AllowFallback)
+	state := newConnectionsState(connections, b.config.Filter, info, b.config.AllowFallback)
 
 	endpointsInfo := make([]endpoint.Info, len(endpoints))
 	for i, e := range endpoints {
@@ -153,6 +190,9 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	}
 
 	b.mu.WithLock(func() {
+		if b.connectionsState != nil {
+			previousConns = b.connectionsState.all
+		}
 		b.connectionsState = state
 		for _, onApplyDiscoveredEndpoints := range b.onApplyDiscoveredEndpoints {
 			onApplyDiscoveredEndpoints(ctx, endpointsInfo)
@@ -216,12 +256,12 @@ func New(
 	b.discoveryClient = d
 
 	if config := driverConfig.Balancer(); config == nil {
-		b.balancerConfig = balancerConfig.Config{}
+		b.config = balancerConfig.Config{}
 	} else {
-		b.balancerConfig = *config
+		b.config = *config
 	}
 
-	if b.balancerConfig.SingleConn {
+	if b.config.SingleConn {
 		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
 			endpoint.New(driverConfig.Endpoint()),
 		}, "")

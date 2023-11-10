@@ -1664,15 +1664,17 @@ func DriverOnBalancerClusterDiscoveryAttempt(t *Driver, c *context.Context, call
 		res(p)
 	}
 }
-func DriverOnBalancerUpdate(t *Driver, c *context.Context, call call, needLocalDC bool) func(endpoints []EndpointInfo, localDC string, _ error) {
+func DriverOnBalancerUpdate(t *Driver, c *context.Context, call call, needLocalDC bool) func(endpoints []EndpointInfo, added []EndpointInfo, dropped []EndpointInfo, localDC string, _ error) {
 	var p DriverBalancerUpdateStartInfo
 	p.Context = c
 	p.Call = call
 	p.NeedLocalDC = needLocalDC
 	res := t.onBalancerUpdate(p)
-	return func(endpoints []EndpointInfo, localDC string, e error) {
+	return func(endpoints []EndpointInfo, added []EndpointInfo, dropped []EndpointInfo, localDC string, e error) {
 		var p DriverBalancerUpdateDoneInfo
 		p.Endpoints = endpoints
+		p.Added = added
+		p.Dropped = dropped
 		p.LocalDC = localDC
 		p.Error = e
 		res(p)

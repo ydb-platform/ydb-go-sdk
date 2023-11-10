@@ -165,6 +165,8 @@ type (
 	}
 	DriverBalancerUpdateDoneInfo struct {
 		Endpoints []EndpointInfo
+		Added     []EndpointInfo
+		Dropped   []EndpointInfo
 		LocalDC   string
 		// Deprecated: this field always nil
 		Error error

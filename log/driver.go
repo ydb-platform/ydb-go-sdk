@@ -430,6 +430,8 @@ func internalDriver(l *wrapper, d trace.Detailer) (t trace.Driver) { //nolint:go
 			l.Log(ctx, "done",
 				latencyField(start),
 				Stringer("endpoints", endpoints(info.Endpoints)),
+				Stringer("added", endpoints(info.Added)),
+				Stringer("dropped", endpoints(info.Dropped)),
 				String("detectedLocalDC", info.LocalDC),
 			)
 		}
