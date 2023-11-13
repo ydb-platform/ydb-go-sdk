@@ -40,7 +40,6 @@ func TestDatabaseSqlIsTableExists(t *testing.T) {
 				exists, err = q.IsTableExists(ctx, "series")
 				return err
 			})
-
 			if err != nil {
 				return err
 			}
