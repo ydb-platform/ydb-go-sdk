@@ -93,9 +93,16 @@ type Driver struct { //nolint:maligned
 	panicCallback func(e interface{})
 }
 
+func (d *Driver) trace() *trace.Driver {
+	if d.config != nil {
+		return d.config.Trace()
+	}
+	return &trace.Driver{}
+}
+
 // Close closes Driver and clear resources
 func (d *Driver) Close(ctx context.Context) (finalErr error) {
-	onDone := trace.DriverOnClose(d.config.Trace(), &ctx, stack.FunctionID(0))
+	onDone := trace.DriverOnClose(d.trace(), &ctx, stack.FunctionID(""))
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -201,15 +208,30 @@ func (d *Driver) Topic() topic.Client {
 //
 // See sugar.DSN helper for make dsn from endpoint and database
 func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, err error) {
-	return open(
-		ctx,
-		append(
-			[]Option{
-				WithConnectionString(dsn),
-			},
-			opts...,
-		)...,
+	d, err := newConnectionFromOptions(ctx, append(
+		[]Option{
+			WithConnectionString(dsn),
+		},
+		opts...,
+	)...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	onDone := trace.DriverOnInit(
+		d.trace(), &ctx,
+		stack.FunctionID(""),
+		d.config.Endpoint(), d.config.Database(), d.config.Secure(),
 	)
+	defer func() {
+		onDone(err)
+	}()
+
+	if err = d.connect(ctx); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return d, nil
 }
 
 func MustOpen(ctx context.Context, dsn string, opts ...Option) *Driver {
@@ -224,7 +246,25 @@ func MustOpen(ctx context.Context, dsn string, opts ...Option) *Driver {
 //
 // Deprecated: use Open with required param connectionString instead
 func New(ctx context.Context, opts ...Option) (_ *Driver, err error) {
-	return open(ctx, opts...)
+	d, err := newConnectionFromOptions(ctx, opts...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	onDone := trace.DriverOnInit(
+		d.trace(), &ctx,
+		stack.FunctionID(""),
+		d.config.Endpoint(), d.config.Database(), d.config.Secure(),
+	)
+	defer func() {
+		onDone(err)
+	}()
+
+	if err = d.connect(ctx); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return d, nil
 }
 
 func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, err error) {
@@ -287,22 +327,14 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, e
 	return d, nil
 }
 
-func connect(ctx context.Context, d *Driver) error {
-	var err error
-
+func (d *Driver) connect(ctx context.Context) (err error) {
 	if d.config.Endpoint() == "" {
 		return xerrors.WithStackTrace(errors.New("configuration: empty dial address"))
 	}
+
 	if d.config.Database() == "" {
 		return xerrors.WithStackTrace(errors.New("configuration: empty database"))
 	}
-
-	onDone := trace.DriverOnInit(
-		d.config.Trace(), &ctx, stack.FunctionID(2), d.config.Endpoint(), d.config.Database(), d.config.Secure(),
-	)
-	defer func() {
-		onDone(err)
-	}()
 
 	if d.userInfo != nil {
 		d.config = d.config.With(config.WithCredentials(
@@ -441,18 +473,6 @@ func connect(ctx context.Context, d *Driver) error {
 	}
 
 	return nil
-}
-
-func open(ctx context.Context, opts ...Option) (_ *Driver, err error) {
-	d, err := newConnectionFromOptions(ctx, opts...)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-	err = connect(ctx, d)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-	return d, nil
 }
 
 // GRPCConn casts *ydb.Driver to grpc.ClientConnInterface for executing

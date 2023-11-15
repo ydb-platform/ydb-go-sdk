@@ -145,7 +145,10 @@ func (r *repeater) wakeUp(ctx context.Context, e Event) (err error) {
 
 	ctx = WithEvent(ctx, e)
 
-	onDone := trace.DriverOnRepeaterWakeUp(r.trace, &ctx, stack.FunctionID(0), r.name, e)
+	onDone := trace.DriverOnRepeaterWakeUp(r.trace, &ctx,
+		stack.FunctionID(""),
+		r.name, e,
+	)
 	defer func() {
 		onDone(err)
 

@@ -114,7 +114,7 @@ func (s *session) isClosing() bool {
 func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (
 	s *session, err error,
 ) {
-	onDone := trace.TableOnSessionNew(config.Trace(), &ctx, stack.FunctionID(0))
+	onDone := trace.TableOnSessionNew(config.Trace(), &ctx, stack.FunctionID(""))
 	defer func() {
 		onDone(s, err)
 	}()
@@ -175,11 +175,14 @@ func (s *session) Close(ctx context.Context) (err error) {
 	}
 
 	s.closeOnce.Do(func() {
+		onDone := trace.TableOnSessionDelete(s.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			s,
+		)
 		defer func() {
 			s.SetStatus(table.SessionClosed)
+			onDone(err)
 		}()
-
-		onDone := trace.TableOnSessionDelete(s.config.Trace(), &ctx, stack.FunctionID(0), s)
 
 		if time.Since(s.LastUsage()) < s.config.IdleThreshold() {
 			_, err = s.tableService.DeleteSession(ctx,
@@ -197,8 +200,6 @@ func (s *session) Close(ctx context.Context) (err error) {
 		for _, onClose := range s.onClose {
 			onClose(s)
 		}
-
-		onDone(err)
 	})
 
 	if err != nil {
@@ -226,7 +227,9 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 	var (
 		result Ydb_Table.KeepAliveResult
 		onDone = trace.TableOnSessionKeepAlive(
-			s.config.Trace(), &ctx, stack.FunctionID(0), s,
+			s.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			s,
 		)
 	)
 	defer func() {
@@ -599,10 +602,11 @@ func (s *session) Explain(
 		result   Ydb_Table.ExplainQueryResult
 		response *Ydb_Table.ExplainDataQueryResponse
 		onDone   = trace.TableOnSessionQueryExplain(
-			s.config.Trace(), &ctx, stack.FunctionID(0), s, query,
+			s.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			s, query,
 		)
 	)
-
 	defer func() {
 		if err != nil {
 			onDone("", "", err)
@@ -647,7 +651,9 @@ func (s *session) Prepare(ctx context.Context, queryText string) (_ table.Statem
 		response *Ydb_Table.PrepareDataQueryResponse
 		result   Ydb_Table.PrepareQueryResult
 		onDone   = trace.TableOnSessionQueryPrepare(
-			s.config.Trace(), &ctx, stack.FunctionID(0), s, queryText,
+			s.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			s, queryText,
 		)
 	)
 	defer func() {
@@ -728,7 +734,9 @@ func (s *session) Execute(
 	}
 
 	onDone := trace.TableOnSessionQueryExecute(
-		s.config.Trace(), &ctx, stack.FunctionID(0), s, q, params,
+		s.config.Trace(), &ctx,
+		stack.FunctionID(""),
+		s, q, params,
 		request.QueryCachePolicy.GetKeepInCache(),
 	)
 	defer func() {
@@ -964,8 +972,11 @@ func (s *session) StreamReadTable(
 	opts ...options.ReadTableOption,
 ) (_ result.StreamResult, err error) {
 	var (
-		onIntermediate = trace.TableOnSessionQueryStreamRead(s.config.Trace(), &ctx, stack.FunctionID(0), s)
-		request        = Ydb_Table.ReadTableRequest{
+		onIntermediate = trace.TableOnSessionQueryStreamRead(s.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			s,
+		)
+		request = Ydb_Table.ReadTableRequest{
 			SessionId: s.id,
 			Path:      path,
 		}
@@ -1084,7 +1095,9 @@ func (s *session) StreamExecuteScanQuery(
 		a              = allocator.New()
 		q              = queryFromText(query)
 		onIntermediate = trace.TableOnSessionQueryStreamExecute(
-			s.config.Trace(), &ctx, stack.FunctionID(0), s, q, params,
+			s.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			s, q, params,
 		)
 		request = Ydb_Table.ExecuteScanQueryRequest{
 			Query:      q.toYDB(a),
@@ -1155,7 +1168,9 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 		a           = allocator.New()
 		callOptions []grpc.CallOption
 		onDone      = trace.TableOnSessionBulkUpsert(
-			s.config.Trace(), &ctx, stack.FunctionID(0), s,
+			s.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			s,
 		)
 	)
 	defer func() {
@@ -1197,7 +1212,9 @@ func (s *session) BeginTransaction(
 		result   Ydb_Table.BeginTransactionResult
 		response *Ydb_Table.BeginTransactionResponse
 		onDone   = trace.TableOnSessionTransactionBegin(
-			s.config.Trace(), &ctx, stack.FunctionID(0), s,
+			s.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			s,
 		)
 	)
 	defer func() {

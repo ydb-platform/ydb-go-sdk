@@ -1,5 +1,20 @@
 package stack
 
-func FunctionID(depth int) call {
-	return Call(depth + 1)
+type caller interface {
+	FunctionID() string
+}
+
+var _ caller = functionID("")
+
+type functionID string
+
+func (id functionID) FunctionID() string {
+	return string(id)
+}
+
+func FunctionID(id string) caller {
+	if id != "" {
+		return functionID(id)
+	}
+	return Call(1)
 }

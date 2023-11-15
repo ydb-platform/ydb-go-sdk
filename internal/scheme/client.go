@@ -45,7 +45,10 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config)
 }
 
 func (c *Client) MakeDirectory(ctx context.Context, path string) (finalErr error) {
-	onDone := trace.SchemeOnMakeDirectory(c.config.Trace(), &ctx, stack.FunctionID(0), path)
+	onDone := trace.SchemeOnMakeDirectory(c.config.Trace(), &ctx,
+		stack.FunctionID(""),
+		path,
+	)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -79,7 +82,10 @@ func (c *Client) makeDirectory(ctx context.Context, path string) (err error) {
 }
 
 func (c *Client) RemoveDirectory(ctx context.Context, path string) (finalErr error) {
-	onDone := trace.SchemeOnRemoveDirectory(c.config.Trace(), &ctx, stack.FunctionID(0), path)
+	onDone := trace.SchemeOnRemoveDirectory(c.config.Trace(), &ctx,
+		stack.FunctionID(""),
+		path,
+	)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -113,7 +119,7 @@ func (c *Client) removeDirectory(ctx context.Context, path string) (err error) {
 }
 
 func (c *Client) ListDirectory(ctx context.Context, path string) (d scheme.Directory, finalErr error) {
-	onDone := trace.SchemeOnListDirectory(c.config.Trace(), &ctx, stack.FunctionID(0))
+	onDone := trace.SchemeOnListDirectory(c.config.Trace(), &ctx, stack.FunctionID(""))
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -166,7 +172,10 @@ func (c *Client) listDirectory(ctx context.Context, path string) (scheme.Directo
 }
 
 func (c *Client) DescribePath(ctx context.Context, path string) (e scheme.Entry, finalErr error) {
-	onDone := trace.SchemeOnDescribePath(c.config.Trace(), &ctx, stack.FunctionID(0), path)
+	onDone := trace.SchemeOnDescribePath(c.config.Trace(), &ctx,
+		stack.FunctionID(""),
+		path,
+	)
 	defer func() {
 		onDone(e.Type.String(), finalErr)
 	}()
@@ -220,7 +229,10 @@ func (c *Client) describePath(ctx context.Context, path string) (e scheme.Entry,
 func (c *Client) ModifyPermissions(
 	ctx context.Context, path string, opts ...scheme.PermissionsOption,
 ) (finalErr error) {
-	onDone := trace.SchemeOnModifyPermissions(c.config.Trace(), &ctx, stack.FunctionID(0), path)
+	onDone := trace.SchemeOnModifyPermissions(c.config.Trace(), &ctx,
+		stack.FunctionID(""),
+		path,
+	)
 	defer func() {
 		onDone(finalErr)
 	}()

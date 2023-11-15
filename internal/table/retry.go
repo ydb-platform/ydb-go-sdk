@@ -3,7 +3,6 @@ package table
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -23,97 +22,20 @@ type SessionProvider interface {
 	Put(context.Context, *session) (err error)
 }
 
-func doTx(
-	ctx context.Context,
-	c SessionProvider,
-	config *config.Config,
-	op table.TxOperation,
-	opts *table.Options,
-) (err error) {
-	if opts.Trace == nil {
-		opts.Trace = &trace.Table{}
-	}
-	attempts, onIntermediate := 0, trace.TableOnDoTx(opts.Trace, &ctx, stack.FunctionID(1),
-		opts.Label, opts.Label, opts.Idempotent, xcontext.IsNestedCall(ctx),
-	)
-	defer func() {
-		onIntermediate(err)(attempts, err)
-	}()
-	return retryBackoff(ctx, c,
-		func(ctx context.Context, s table.Session) (err error) {
-			attempts++
-
-			defer func() {
-				onIntermediate(err)
-			}()
-
-			tx, err := s.BeginTransaction(ctx, opts.TxSettings)
-			if err != nil {
-				return xerrors.WithStackTrace(err)
-			}
-
-			defer func() {
-				if err != nil {
-					errRollback := tx.Rollback(ctx)
-					if errRollback != nil {
-						err = xerrors.NewWithIssues("",
-							xerrors.WithStackTrace(err),
-							xerrors.WithStackTrace(errRollback),
-						)
-					} else {
-						err = xerrors.WithStackTrace(err)
-					}
-				}
-			}()
-
-			err = func() error {
-				if panicCallback := config.PanicCallback(); panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							panicCallback(e)
-						}
-					}()
-				}
-				return op(xcontext.MarkRetryCall(ctx), tx)
-			}()
-
-			if err != nil {
-				return xerrors.WithStackTrace(err)
-			}
-
-			_, err = tx.CommitTx(ctx, opts.TxCommitOptions...)
-			if err != nil {
-				return xerrors.WithStackTrace(err)
-			}
-
-			return nil
-		},
-		opts.RetryOptions...,
-	)
-}
-
 func do(
 	ctx context.Context,
 	c SessionProvider,
 	config *config.Config,
 	op table.Operation,
-	opts *table.Options,
+	onAttempt func(err error),
+	opts ...retry.Option,
 ) (err error) {
-	if opts.Trace == nil {
-		opts.Trace = &trace.Table{}
-	}
-	attempts, onIntermediate := 0, trace.TableOnDo(opts.Trace, &ctx, stack.FunctionID(1),
-		opts.Label, opts.Label, opts.Idempotent, xcontext.IsNestedCall(ctx),
-	)
-	defer func() {
-		onIntermediate(err)(attempts, err)
-	}()
 	return retryBackoff(ctx, c,
 		func(ctx context.Context, s table.Session) (err error) {
-			attempts++
-
 			defer func() {
-				onIntermediate(err)
+				if onAttempt != nil {
+					onAttempt(err)
+				}
 			}()
 
 			err = func() error {
@@ -133,7 +55,7 @@ func do(
 
 			return nil
 		},
-		opts.RetryOptions...,
+		opts...,
 	)
 }
 
@@ -181,6 +103,9 @@ func (c *Client) retryOptions(opts ...table.Option) *table.Options {
 		if opt != nil {
 			opt.ApplyTableOption(options)
 		}
+	}
+	if options.Trace == nil {
+		options.Trace = &trace.Table{}
 	}
 	return options
 }

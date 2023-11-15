@@ -66,6 +66,41 @@ func (t *Driver) Compose(x *Driver, opts ...DriverComposeOption) *Driver {
 		}
 	}
 	{
+		h1 := t.OnWith
+		h2 := x.OnWith
+		ret.OnWith = func(d DriverWithStartInfo) func(DriverWithDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverWithDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverWithDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
+					r1(d)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnClose
 		h2 := x.OnClose
 		ret.OnClose = func(d DriverCloseStartInfo) func(DriverCloseDoneInfo) {
@@ -973,6 +1008,21 @@ func (t *Driver) onInit(d DriverInitStartInfo) func(DriverInitDoneInfo) {
 	}
 	return res
 }
+func (t *Driver) onWith(d DriverWithStartInfo) func(DriverWithDoneInfo) {
+	fn := t.OnWith
+	if fn == nil {
+		return func(DriverWithDoneInfo) {
+			return
+		}
+	}
+	res := fn(d)
+	if res == nil {
+		return func(DriverWithDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Driver) onClose(d DriverCloseStartInfo) func(DriverCloseDoneInfo) {
 	fn := t.OnClose
 	if fn == nil {
@@ -1370,6 +1420,20 @@ func DriverOnInit(t *Driver, c *context.Context, call call, endpoint string, dat
 	res := t.onInit(p)
 	return func(e error) {
 		var p DriverInitDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func DriverOnWith(t *Driver, c *context.Context, call call, endpoint string, database string, secure bool) func(error) {
+	var p DriverWithStartInfo
+	p.Context = c
+	p.Call = call
+	p.Endpoint = endpoint
+	p.Database = database
+	p.Secure = secure
+	res := t.onWith(p)
+	return func(e error) {
+		var p DriverWithDoneInfo
 		p.Error = e
 		res(p)
 	}

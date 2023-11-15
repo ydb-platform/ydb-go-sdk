@@ -90,7 +90,9 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 	}
 
 	trace.DriverOnConnBan(
-		p.config.Trace(), &ctx, stack.FunctionID(0), e, cc.GetState(), cause,
+		p.config.Trace(), &ctx,
+		stack.FunctionID(""),
+		e, cc.GetState(), cause,
 	)(cc.SetState(ctx, Banned))
 }
 
@@ -110,7 +112,9 @@ func (p *Pool) Allow(ctx context.Context, cc Conn) {
 	}
 
 	trace.DriverOnConnAllow(
-		p.config.Trace(), &ctx, stack.FunctionID(0), e, cc.GetState(),
+		p.config.Trace(), &ctx,
+		stack.FunctionID(""),
+		e, cc.GetState(),
 	)(cc.Unban(ctx))
 }
 
@@ -120,7 +124,7 @@ func (p *Pool) Take(context.Context) error {
 }
 
 func (p *Pool) Release(ctx context.Context) (finalErr error) {
-	onDone := trace.DriverOnPoolRelease(p.config.Trace(), &ctx, stack.FunctionID(0))
+	onDone := trace.DriverOnPoolRelease(p.config.Trace(), &ctx, stack.FunctionID(""))
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -201,7 +205,7 @@ func (p *Pool) collectConns() []*conn {
 }
 
 func NewPool(ctx context.Context, config Config) *Pool {
-	onDone := trace.DriverOnPoolNew(config.Trace(), &ctx, stack.FunctionID(0))
+	onDone := trace.DriverOnPoolNew(config.Trace(), &ctx, stack.FunctionID(""))
 	defer onDone()
 
 	p := &Pool{

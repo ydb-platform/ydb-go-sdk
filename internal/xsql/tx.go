@@ -71,7 +71,10 @@ func (tx *tx) checkTxState() error {
 }
 
 func (tx *tx) Commit() (finalErr error) {
-	onDone := trace.DatabaseSQLOnTxCommit(tx.conn.trace, &tx.txCtx, stack.FunctionID(0), tx)
+	onDone := trace.DatabaseSQLOnTxCommit(tx.conn.trace, &tx.txCtx,
+		stack.FunctionID(""),
+		tx,
+	)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -89,7 +92,10 @@ func (tx *tx) Commit() (finalErr error) {
 }
 
 func (tx *tx) Rollback() (finalErr error) {
-	onDone := trace.DatabaseSQLOnTxRollback(tx.conn.trace, &tx.txCtx, stack.FunctionID(0), tx)
+	onDone := trace.DatabaseSQLOnTxRollback(tx.conn.trace, &tx.txCtx,
+		stack.FunctionID(""),
+		tx,
+	)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -109,7 +115,10 @@ func (tx *tx) Rollback() (finalErr error) {
 func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (
 	_ driver.Rows, finalErr error,
 ) {
-	onDone := trace.DatabaseSQLOnTxQuery(tx.conn.trace, &ctx, stack.FunctionID(0), tx.txCtx, tx, query, true)
+	onDone := trace.DatabaseSQLOnTxQuery(tx.conn.trace, &ctx,
+		stack.FunctionID(""),
+		tx.txCtx, tx, query, true,
+	)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -147,7 +156,10 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (
 	_ driver.Result, finalErr error,
 ) {
-	onDone := trace.DatabaseSQLOnTxExec(tx.conn.trace, &ctx, stack.FunctionID(0), tx.txCtx, tx, query, true)
+	onDone := trace.DatabaseSQLOnTxExec(tx.conn.trace, &ctx,
+		stack.FunctionID(""),
+		tx.txCtx, tx, query, true,
+	)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -177,7 +189,10 @@ func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.Named
 }
 
 func (tx *tx) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, finalErr error) {
-	onDone := trace.DatabaseSQLOnTxPrepare(tx.conn.trace, &ctx, stack.FunctionID(0), &tx.txCtx, tx, query)
+	onDone := trace.DatabaseSQLOnTxPrepare(tx.conn.trace, &ctx,
+		stack.FunctionID(""),
+		&tx.txCtx, tx, query,
+	)
 	defer func() {
 		onDone(finalErr)
 	}()
