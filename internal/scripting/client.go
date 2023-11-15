@@ -66,7 +66,10 @@ func (c *Client) execute(
 	params *table.QueryParameters,
 ) (r result.Result, err error) {
 	var (
-		onDone  = trace.ScriptingOnExecute(c.config.Trace(), &ctx, stack.FunctionID(0), query, params)
+		onDone = trace.ScriptingOnExecute(c.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			query, params,
+		)
 		a       = allocator.New()
 		request = &Ydb_Scripting.ExecuteYqlRequest{
 			Script:     query,
@@ -138,7 +141,10 @@ func (c *Client) explain(
 	mode scripting.ExplainMode,
 ) (e table.ScriptingYQLExplanation, err error) {
 	var (
-		onDone  = trace.ScriptingOnExplain(c.config.Trace(), &ctx, stack.FunctionID(0), query)
+		onDone = trace.ScriptingOnExplain(c.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			query,
+		)
 		request = &Ydb_Scripting.ExplainYqlRequest{
 			Script: query,
 			Mode:   mode2mode(mode),
@@ -205,9 +211,12 @@ func (c *Client) streamExecute(
 	params *table.QueryParameters,
 ) (r result.StreamResult, err error) {
 	var (
-		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx, stack.FunctionID(0), query, params)
-		a              = allocator.New()
-		request        = &Ydb_Scripting.ExecuteYqlRequest{
+		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			query, params,
+		)
+		a       = allocator.New()
+		request = &Ydb_Scripting.ExecuteYqlRequest{
 			Script:     query,
 			Parameters: params.Params().ToYDB(a),
 			OperationParams: operation.Params(
@@ -267,7 +276,7 @@ func (c *Client) Close(ctx context.Context) (err error) {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
-	onDone := trace.ScriptingOnClose(c.config.Trace(), &ctx, stack.FunctionID(0))
+	onDone := trace.ScriptingOnClose(c.config.Trace(), &ctx, stack.FunctionID(""))
 	defer func() {
 		onDone(err)
 	}()

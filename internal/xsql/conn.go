@@ -152,13 +152,18 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt,
 	if c.currentTx != nil {
 		return c.currentTx.PrepareContext(ctx, query)
 	}
-	onDone := trace.DatabaseSQLOnConnPrepare(c.trace, &ctx, stack.FunctionID(0), query)
+	onDone := trace.DatabaseSQLOnConnPrepare(c.trace, &ctx,
+		stack.FunctionID(""),
+		query,
+	)
 	defer func() {
 		onDone(finalErr)
 	}()
+
 	if !c.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
+
 	return &stmt{
 		conn:      c,
 		processor: c,
@@ -190,10 +195,11 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 	var (
 		m      = queryModeFromContext(ctx, c.defaultQueryMode)
 		onDone = trace.DatabaseSQLOnConnExec(
-			c.trace, &ctx, stack.FunctionID(0), query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage(),
+			c.trace, &ctx,
+			stack.FunctionID(""),
+			query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage(),
 		)
 	)
-
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -297,7 +303,9 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 	var (
 		m      = queryModeFromContext(ctx, c.defaultQueryMode)
 		onDone = trace.DatabaseSQLOnConnQuery(
-			c.trace, &ctx, stack.FunctionID(0), query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage(),
+			c.trace, &ctx,
+			stack.FunctionID(""),
+			query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage(),
 		)
 	)
 	defer func() {
@@ -379,7 +387,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 }
 
 func (c *conn) Ping(ctx context.Context) (finalErr error) {
-	onDone := trace.DatabaseSQLOnConnPing(c.trace, &ctx, stack.FunctionID(0))
+	onDone := trace.DatabaseSQLOnConnPing(c.trace, &ctx, stack.FunctionID(""))
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -396,7 +404,8 @@ func (c *conn) Close() (finalErr error) {
 	if c.closed.CompareAndSwap(false, true) {
 		c.connector.detach(c)
 		onDone := trace.DatabaseSQLOnConnClose(
-			c.trace, &c.openConnCtx, stack.FunctionID(0),
+			c.trace, &c.openConnCtx,
+			stack.FunctionID(""),
 		)
 		defer func() {
 			onDone(finalErr)
@@ -436,7 +445,7 @@ func (c *conn) ID() string {
 
 func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ driver.Tx, finalErr error) {
 	var tx currentTx
-	onDone := trace.DatabaseSQLOnConnBegin(c.trace, &ctx, stack.FunctionID(0))
+	onDone := trace.DatabaseSQLOnConnBegin(c.trace, &ctx, stack.FunctionID(""))
 	defer func() {
 		onDone(tx, finalErr)
 	}()
@@ -483,7 +492,10 @@ func (c *conn) Version(_ context.Context) (_ string, _ error) {
 
 func (c *conn) IsTableExists(ctx context.Context, tableName string) (tableExists bool, finalErr error) {
 	tableName = c.normalizePath(tableName)
-	onDone := trace.DatabaseSQLOnConnIsTableExists(c.trace, &ctx, stack.FunctionID(0), tableName)
+	onDone := trace.DatabaseSQLOnConnIsTableExists(c.trace, &ctx,
+		stack.FunctionID(""),
+		tableName,
+	)
 	defer func() {
 		onDone(tableExists, finalErr)
 	}()

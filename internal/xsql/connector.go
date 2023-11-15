@@ -297,7 +297,8 @@ func (c *Connector) detach(cc *conn) {
 func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 	var (
 		onDone = trace.DatabaseSQLOnConnectorConnect(
-			c.trace, &ctx, stack.FunctionID(0),
+			c.trace, &ctx,
+			stack.FunctionID(""),
 		)
 		session table.ClosableSession
 	)

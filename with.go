@@ -3,8 +3,10 @@ package ydb
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var nextID xatomic.Uint64
@@ -44,8 +46,16 @@ func (d *Driver) With(ctx context.Context, opts ...Option) (*Driver, error) {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	err = connect(ctx, child)
-	if err != nil {
+	onDone := trace.DriverOnWith(
+		d.trace(), &ctx,
+		stack.FunctionID(""),
+		d.config.Endpoint(), d.config.Database(), d.config.Secure(),
+	)
+	defer func() {
+		onDone(err)
+	}()
+
+	if err = child.connect(ctx); err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 

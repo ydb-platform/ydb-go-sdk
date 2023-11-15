@@ -31,19 +31,24 @@ func (c *clientConn) Endpoint() string {
 }
 
 func (c *clientConn) UpdateState(state resolver.State) (err error) {
-	onDone := trace.DriverOnResolve(c.trace, stack.FunctionID(0), c.Endpoint(), func() (addrs []string) {
-		for i := range state.Addresses {
-			addrs = append(addrs, state.Addresses[i].Addr)
-		}
-		return
-	}())
+	onDone := trace.DriverOnResolve(c.trace,
+		stack.FunctionID(""),
+		c.Endpoint(), func() (addrs []string) {
+			for i := range state.Addresses {
+				addrs = append(addrs, state.Addresses[i].Addr)
+			}
+			return
+		}(),
+	)
 	defer func() {
 		onDone(err)
 	}()
+
 	err = c.ClientConn.UpdateState(state)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
+
 	return nil
 }
 

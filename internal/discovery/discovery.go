@@ -39,16 +39,17 @@ type Client struct {
 func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
 	var (
 		onDone = trace.DiscoveryOnDiscover(
-			c.config.Trace(), &ctx, stack.FunctionID(0), c.config.Endpoint(), c.config.Database(),
+			c.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			c.config.Endpoint(), c.config.Database(),
 		)
 		request = Ydb_Discovery.ListEndpointsRequest{
 			Database: c.config.Database(),
 		}
 		response *Ydb_Discovery.ListEndpointsResponse
 		result   Ydb_Discovery.ListEndpointsResult
+		location string
 	)
-
-	var location string
 	defer func() {
 		nodes := make([]trace.EndpointInfo, 0, len(endpoints))
 		for _, e := range endpoints {
@@ -100,7 +101,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 
 func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err error) {
 	var (
-		onDone             = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx, stack.FunctionID(0))
+		onDone             = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx, stack.FunctionID(""))
 		request            = Ydb_Discovery.WhoAmIRequest{}
 		response           *Ydb_Discovery.WhoAmIResponse
 		whoAmIResultResult Ydb_Discovery.WhoAmIResult

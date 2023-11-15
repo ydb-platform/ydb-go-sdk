@@ -17,6 +17,7 @@ type (
 	Driver struct {
 		// Driver runtime events
 		OnInit  func(DriverInitStartInfo) func(DriverInitDoneInfo)
+		OnWith  func(DriverWithStartInfo) func(DriverWithDoneInfo)
 		OnClose func(DriverCloseStartInfo) func(DriverCloseDoneInfo)
 
 		// Pool of connections
@@ -414,6 +415,20 @@ type (
 		Secure   bool
 	}
 	DriverInitDoneInfo struct {
+		Error error
+	}
+	DriverWithStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context  *context.Context
+		Call     call
+		Endpoint string
+		Database string
+		Secure   bool
+	}
+	DriverWithDoneInfo struct {
 		Error error
 	}
 	DriverConnPoolNewStartInfo struct {

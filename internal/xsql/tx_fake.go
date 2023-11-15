@@ -19,7 +19,10 @@ type txFake struct {
 }
 
 func (tx *txFake) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, finalErr error) {
-	onDone := trace.DatabaseSQLOnTxPrepare(tx.conn.trace, &ctx, stack.FunctionID(0), &tx.beginCtx, tx, query)
+	onDone := trace.DatabaseSQLOnTxPrepare(tx.conn.trace, &ctx,
+		stack.FunctionID(""),
+		&tx.beginCtx, tx, query,
+	)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -54,7 +57,10 @@ func (tx *txFake) ID() string {
 }
 
 func (tx *txFake) Commit() (err error) {
-	onDone := trace.DatabaseSQLOnTxCommit(tx.conn.trace, &tx.ctx, stack.FunctionID(0), tx)
+	onDone := trace.DatabaseSQLOnTxCommit(tx.conn.trace, &tx.ctx,
+		stack.FunctionID(""),
+		tx,
+	)
 	defer func() {
 		onDone(err)
 	}()
@@ -68,7 +74,10 @@ func (tx *txFake) Commit() (err error) {
 }
 
 func (tx *txFake) Rollback() (err error) {
-	onDone := trace.DatabaseSQLOnTxRollback(tx.conn.trace, &tx.ctx, stack.FunctionID(0), tx)
+	onDone := trace.DatabaseSQLOnTxRollback(tx.conn.trace, &tx.ctx,
+		stack.FunctionID(""),
+		tx,
+	)
 	defer func() {
 		onDone(err)
 	}()
@@ -85,7 +94,9 @@ func (tx *txFake) QueryContext(ctx context.Context, query string, args []driver.
 	rows driver.Rows, err error,
 ) {
 	onDone := trace.DatabaseSQLOnTxQuery(
-		tx.conn.trace, &ctx, stack.FunctionID(0), tx.ctx, tx, query, xcontext.IsIdempotent(ctx),
+		tx.conn.trace, &ctx,
+		stack.FunctionID(""),
+		tx.ctx, tx, query, xcontext.IsIdempotent(ctx),
 	)
 	defer func() {
 		onDone(err)
@@ -101,7 +112,9 @@ func (tx *txFake) ExecContext(ctx context.Context, query string, args []driver.N
 	result driver.Result, err error,
 ) {
 	onDone := trace.DatabaseSQLOnTxExec(
-		tx.conn.trace, &ctx, stack.FunctionID(0), tx.ctx, tx, query, xcontext.IsIdempotent(ctx),
+		tx.conn.trace, &ctx,
+		stack.FunctionID(""),
+		tx.ctx, tx, query, xcontext.IsIdempotent(ctx),
 	)
 	defer func() {
 		onDone(err)

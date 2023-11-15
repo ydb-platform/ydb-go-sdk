@@ -93,7 +93,9 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 	var (
 		address = "ydb:///" + b.driverConfig.Endpoint()
 		onDone  = trace.DriverOnBalancerClusterDiscoveryAttempt(
-			b.driverConfig.Trace(), &ctx, stack.FunctionID(0), address,
+			b.driverConfig.Trace(), &ctx,
+			stack.FunctionID(""),
+			address,
 		)
 		endpoints []endpoint.Endpoint
 		localDC   string
@@ -166,7 +168,9 @@ func endpointsDiff(newestEndpoints []endpoint.Endpoint, previousConns []conn.Con
 func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
 	var (
 		onDone = trace.DriverOnBalancerUpdate(
-			b.driverConfig.Trace(), &ctx, stack.FunctionID(0), b.config.DetectLocalDC,
+			b.driverConfig.Trace(), &ctx,
+			stack.FunctionID(""),
+			b.config.DetectLocalDC,
 		)
 		previousConns []conn.Conn
 	)
@@ -202,7 +206,8 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 
 func (b *Balancer) Close(ctx context.Context) (err error) {
 	onDone := trace.DriverOnBalancerClose(
-		b.driverConfig.Trace(), &ctx, stack.FunctionID(0),
+		b.driverConfig.Trace(), &ctx,
+		stack.FunctionID(""),
 	)
 	defer func() {
 		onDone(err)
@@ -227,7 +232,9 @@ func New(
 ) (b *Balancer, finalErr error) {
 	var (
 		onDone = trace.DriverOnBalancerInit(
-			driverConfig.Trace(), &ctx, stack.FunctionID(0), driverConfig.Balancer().String(),
+			driverConfig.Trace(), &ctx,
+			stack.FunctionID(""),
+			driverConfig.Balancer().String(),
 		)
 		discoveryConfig = discoveryConfig.New(append(opts,
 			discoveryConfig.With(driverConfig.Common),
@@ -358,7 +365,8 @@ func (b *Balancer) connections() *connectionsState {
 
 func (b *Balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
 	onDone := trace.DriverOnBalancerChooseEndpoint(
-		b.driverConfig.Trace(), &ctx, stack.FunctionID(0),
+		b.driverConfig.Trace(), &ctx,
+		stack.FunctionID(""),
 	)
 	defer func() {
 		if err == nil {

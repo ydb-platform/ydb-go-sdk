@@ -232,7 +232,7 @@ func WithPanicCallback(panicCallback func(e interface{})) panicCallbackOption {
 // If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
 func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr error) {
 	options := &retryOptions{
-		call:        stack.FunctionID(0),
+		call:        stack.FunctionID(""),
 		trace:       &trace.Retry{},
 		fastBackoff: backoff.Fast,
 		slowBackoff: backoff.Slow,
