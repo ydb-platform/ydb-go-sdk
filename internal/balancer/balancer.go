@@ -9,11 +9,11 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
+	internalDiscovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/client/discovery"
+	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/client/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
-	internalDiscovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery"
-	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/repeater"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"

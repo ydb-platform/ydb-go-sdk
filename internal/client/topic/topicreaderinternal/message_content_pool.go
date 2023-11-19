@@ -11,7 +11,7 @@ import (
 
 // Pool is interface for sync.Pool and may be extended by follow to original type
 //
-//go:generate mockgen -destination=pool_interface_mock_test.go -write_package_comment=false -package=topicreaderinternal github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal Pool
+//go:generate mockgen -destination=pool_interface_mock_test.go -write_package_comment=false -package=topicreaderinternal github.com/ydb-platform/ydb-go-sdk/v3/internal/client/topic/topicreaderinternal Pool
 type Pool interface {
 	Get() interface{}
 	Put(x interface{})

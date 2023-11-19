@@ -3,7 +3,7 @@ package topicreader
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/client/topic/topicreaderinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )

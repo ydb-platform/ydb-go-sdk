@@ -4,7 +4,7 @@
 package sugar
 
 import (
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/client/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 

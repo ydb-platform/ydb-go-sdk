@@ -3,7 +3,7 @@ package sugar
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/helpers"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/client/scheme/helpers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )

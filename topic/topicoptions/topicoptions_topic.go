@@ -3,8 +3,8 @@ package topicoptions
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/client/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 

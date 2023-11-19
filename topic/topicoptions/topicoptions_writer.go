@@ -3,8 +3,8 @@ package topicoptions
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/client/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
