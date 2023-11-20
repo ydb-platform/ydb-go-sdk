@@ -3,21 +3,22 @@ package topicoptions
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/topicImpl"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
 type (
-	CheckErrorRetryFunction = topic.PublicCheckErrorRetryFunction
-	CheckErrorRetryArgs     = topic.PublicCheckErrorRetryArgs
-	CheckErrorRetryResult   = topic.PublicCheckRetryResult
+	CheckErrorRetryFunction = topicImpl.PublicCheckErrorRetryFunction
+	CheckErrorRetryArgs     = topicImpl.PublicCheckErrorRetryArgs
+	CheckErrorRetryResult   = topicImpl.PublicCheckRetryResult
 )
 
 var (
-	CheckErrorRetryDecisionDefault = topic.PublicRetryDecisionDefault // Apply default behavior for the error
-	CheckErrorRetryDecisionRetry   = topic.PublicRetryDecisionRetry   // Do once more retry
-	CheckErrorRetryDecisionStop    = topic.PublicRetryDecisionStop    // Do not retry
+	CheckErrorRetryDecisionDefault = topicImpl.PublicRetryDecisionDefault // Apply default behavior for the error
+	CheckErrorRetryDecisionRetry   = topicImpl.PublicRetryDecisionRetry   // Do once more retry
+	CheckErrorRetryDecisionStop    = topicImpl.PublicRetryDecisionStop    // Do not retry
 )
 
 type withMeteringMode topictypes.MeteringMode

@@ -3,6 +3,7 @@ package topicoptions
 import (
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/topicImpl"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -12,7 +13,7 @@ import (
 // # Experimental
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-type TopicOption func(c *topic.Config)
+type TopicOption func(c *topicImpl.Config)
 
 // WithTrace defines trace over persqueue client calls
 //
@@ -20,7 +21,7 @@ type TopicOption func(c *topic.Config)
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithTrace(trace trace.Topic, opts ...trace.TopicComposeOption) TopicOption { //nolint:gocritic
-	return func(c *topic.Config) {
+	return func(c *topicImpl.Config) {
 		c.Trace = c.Trace.Compose(&trace, opts...)
 	}
 }
@@ -35,7 +36,7 @@ func WithTrace(trace trace.Topic, opts ...trace.TopicComposeOption) TopicOption 
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithOperationTimeout(operationTimeout time.Duration) TopicOption {
-	return func(c *topic.Config) {
+	return func(c *topicImpl.Config) {
 		config.SetOperationTimeout(&c.Common, operationTimeout)
 	}
 }
@@ -50,7 +51,7 @@ func WithOperationTimeout(operationTimeout time.Duration) TopicOption {
 //
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func WithOperationCancelAfter(operationCancelAfter time.Duration) TopicOption {
-	return func(c *topic.Config) {
+	return func(c *topicImpl.Config) {
 		config.SetOperationCancelAfter(&c.Common, operationCancelAfter)
 	}
 }

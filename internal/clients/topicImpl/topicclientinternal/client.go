@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/topicImpl"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/topicImpl/topicreaderinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/topicImpl/topicwriterinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
@@ -20,7 +21,7 @@ import (
 )
 
 type Client struct {
-	cfg                    topic.Config
+	cfg                    topicImpl.Config
 	cred                   credentials.Credentials
 	defaultOperationParams rawydb.OperationParams
 	rawClient              rawtopic.Client
@@ -37,7 +38,7 @@ func New(
 	cfg := newTopicConfig(opts...)
 
 	var defaultOperationParams rawydb.OperationParams
-	topic.OperationParamsFromConfig(&defaultOperationParams, &cfg.Common)
+	topicImpl.OperationParamsFromConfig(&defaultOperationParams, &cfg.Common)
 
 	return &Client{
 		cfg:                    cfg,
@@ -47,8 +48,8 @@ func New(
 	}, nil
 }
 
-func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
-	c := topic.Config{
+func newTopicConfig(opts ...topicoptions.TopicOption) topicImpl.Config {
+	c := topicImpl.Config{
 		Trace: &trace.Topic{},
 	}
 	for _, o := range opts {
@@ -208,7 +209,7 @@ func (c *Client) StartReader(
 		topicoptions.WithCommonConfig(c.cfg.Common),
 		topicreaderinternal.WithCredentials(c.cred),
 		topicreaderinternal.WithTrace(c.cfg.Trace),
-		topicoptions.WithReaderStartTimeout(topic.DefaultStartTimeout),
+		topicoptions.WithReaderStartTimeout(topicImpl.DefaultStartTimeout),
 	}
 	opts = append(defaultOpts, opts...)
 

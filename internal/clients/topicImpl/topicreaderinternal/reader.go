@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/topicImpl"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clone"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
@@ -220,7 +221,7 @@ func (r *Reader) CommitRanges(ctx context.Context, ranges []PublicCommitRange) e
 type ReaderConfig struct {
 	config.Common
 
-	RetrySettings      topic.RetrySettings
+	RetrySettings      topicImpl.RetrySettings
 	DefaultBatchConfig ReadMessageBatchOptions
 	topicStreamReaderConfig
 }

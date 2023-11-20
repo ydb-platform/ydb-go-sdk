@@ -16,6 +16,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/topicImpl"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
@@ -58,7 +59,7 @@ type WriterReconnectorConfig struct {
 	AutoSetSeqNo                 bool
 	AutoSetCreatedTime           bool
 	OnWriterInitResponseCallback PublicOnWriterInitResponseCallback
-	RetrySettings                topic.RetrySettings
+	RetrySettings                topicImpl.RetrySettings
 
 	connectTimeout time.Duration
 }
@@ -84,8 +85,8 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		AutoSetCreatedTime: true,
 		MaxMessageSize:     50 * 1024 * 1024,
 		MaxQueueLen:        1000,
-		RetrySettings: topic.RetrySettings{
-			StartTimeout: topic.DefaultStartTimeout,
+		RetrySettings: topicImpl.RetrySettings{
+			StartTimeout: topicImpl.DefaultStartTimeout,
 		},
 	}
 	if cfg.compressorCount == 0 {
@@ -113,7 +114,7 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 
 type WriterReconnector struct {
 	cfg           WriterReconnectorConfig
-	retrySettings topic.RetrySettings
+	retrySettings topicImpl.RetrySettings
 
 	semaphore                      *semaphore.Weighted
 	queue                          messageQueue
@@ -368,7 +369,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		streamCtx, streamCtxCancel = createStreamContext()
 
 		now := time.Now()
-		if topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
+		if topicImpl.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
 			attempt = 0
 			startOfRetries = w.clock.Now()
 		} else {
@@ -377,7 +378,9 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		prevAttemptTime = now
 
 		if reconnectReason != nil {
-			if backoff, retry := topic.CheckRetryMode(reconnectReason, w.retrySettings, w.clock.Since(startOfRetries)); retry {
+			if backoff, retry := topicImpl.CheckRetryMode(
+				reconnectReason, w.retrySettings, w.clock.Since(startOfRetries),
+			); retry {
 				delay := backoff.Delay(attempt)
 				select {
 				case <-doneCtx:

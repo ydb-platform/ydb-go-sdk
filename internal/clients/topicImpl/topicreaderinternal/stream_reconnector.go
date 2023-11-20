@@ -12,6 +12,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/topicImpl"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -33,7 +34,7 @@ type readerReconnector struct {
 
 	tracer        *trace.Topic
 	baseContext   context.Context
-	retrySettings topic.RetrySettings
+	retrySettings topicImpl.RetrySettings
 
 	readerConnect readerConnectFunc
 
@@ -59,7 +60,7 @@ func newReaderReconnector(
 	readerID int64,
 	connector readerConnectFunc,
 	connectTimeout time.Duration,
-	retrySettings topic.RetrySettings,
+	retrySettings topicImpl.RetrySettings,
 	tracer *trace.Topic,
 	baseContext context.Context,
 ) *readerReconnector {
@@ -193,7 +194,7 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 	attempt := 0
 	for {
 		now := r.clock.Now()
-		if topic.CheckResetReconnectionCounters(lastTime, now, r.connectTimeout) {
+		if topicImpl.CheckResetReconnectionCounters(lastTime, now, r.connectTimeout) {
 			attempt = 0
 			retriesStarted = time.Now()
 		} else {
@@ -295,7 +296,7 @@ func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldRead
 }
 
 func (r *readerReconnector) isRetriableError(err error) bool {
-	_, res := topic.CheckRetryMode(err, r.retrySettings, 0)
+	_, res := topicImpl.CheckRetryMode(err, r.retrySettings, 0)
 	return res
 }
 
@@ -303,7 +304,7 @@ func (r *readerReconnector) checkErrRetryMode(err error, retriesDuration time.Du
 	backoffType backoff.Backoff,
 	isRetriableErr bool,
 ) {
-	return topic.CheckRetryMode(err, r.retrySettings, retriesDuration)
+	return topicImpl.CheckRetryMode(err, r.retrySettings, retriesDuration)
 }
 
 func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err error) {
