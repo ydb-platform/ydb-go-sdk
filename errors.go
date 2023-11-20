@@ -4,7 +4,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
 
-	ratelimiterErrors "github.com/ydb-platform/ydb-go-sdk/v3/internal/client/ratelimiter/errors"
+	ratelimiterErrors "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/ratelimiter/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 )

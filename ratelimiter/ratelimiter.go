@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/client/ratelimiter/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/ratelimiter/options"
 )
 
 type Client interface {

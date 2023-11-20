@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/client/table"
+	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )

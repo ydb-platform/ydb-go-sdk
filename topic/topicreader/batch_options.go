@@ -1,7 +1,7 @@
 package topicreader
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/client/topic/topicreaderinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/topic/topicreaderinternal"
 )
 
 // WithBatchMaxCount max messages within batch

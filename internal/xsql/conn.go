@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/client/scheme/helpers"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/scheme/helpers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
