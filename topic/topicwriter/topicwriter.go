@@ -3,7 +3,7 @@ package topicwriter
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/topic/topicwriterinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/topicImpl/topicwriterinternal"
 )
 
 type (

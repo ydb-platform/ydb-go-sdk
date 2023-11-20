@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/tableImpl"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
@@ -21,9 +21,9 @@ func GenerateDeclareSection[T *table.QueryParameters | []table.ParameterOption |
 ) (string, error) {
 	switch v := any(params).(type) {
 	case *table.QueryParameters:
-		return internal.GenerateDeclareSection(v)
+		return tableImpl.GenerateDeclareSection(v)
 	case []table.ParameterOption:
-		return internal.GenerateDeclareSection(table.NewQueryParameters(v...))
+		return tableImpl.GenerateDeclareSection(table.NewQueryParameters(v...))
 	case []sql.NamedArg:
 		values, err := bind.Params(func() (newArgs []interface{}) {
 			for i := range v {
@@ -34,7 +34,7 @@ func GenerateDeclareSection[T *table.QueryParameters | []table.ParameterOption |
 		if err != nil {
 			return "", xerrors.WithStackTrace(err)
 		}
-		return internal.GenerateDeclareSection(table.NewQueryParameters(values...))
+		return tableImpl.GenerateDeclareSection(table.NewQueryParameters(values...))
 	default:
 		return "", xerrors.WithStackTrace(fmt.Errorf("unsupported type: %T", v))
 	}

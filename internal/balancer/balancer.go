@@ -9,8 +9,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
-	internalDiscovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/discovery"
-	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/discovery/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/discoveryImpl"
+	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/discoveryImpl/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
@@ -253,7 +253,7 @@ func New(
 		pool:            pool,
 		localDCDetector: detectLocalDC,
 	}
-	d, err := internalDiscovery.New(ctx, pool.Get(
+	d, err := discoveryImpl.New(ctx, pool.Get(
 		endpoint.New(driverConfig.Endpoint()),
 	), discoveryConfig)
 	if err != nil {

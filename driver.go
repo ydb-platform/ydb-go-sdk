@@ -12,19 +12,19 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
-	internalCoordination "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/coordination"
-	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/coordination/config"
-	internalDiscovery "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/discovery"
-	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/discovery/config"
-	internalRatelimiter "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/ratelimiter"
-	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/ratelimiter/config"
-	internalScheme "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/scheme"
-	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/scheme/config"
-	internalScripting "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/scripting"
-	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/scripting/config"
-	internalTable "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/table"
-	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/table/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/topic/topicclientinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/coordinationImpl"
+	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/coordinationImpl/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/discoveryImpl"
+	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/discoveryImpl/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/ratelimiterImpl"
+	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/ratelimiterImpl/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/schemeImpl"
+	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/schemeImpl/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/scriptingImpl"
+	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/scriptingImpl/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/tableImpl"
+	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/tableImpl/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/clients/topicImpl/topicclientinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
@@ -58,22 +58,22 @@ type Driver struct { //nolint:maligned
 	config  *config.Config
 	options []config.Option
 
-	discovery        *internalDiscovery.Client
+	discovery        *discoveryImpl.Client
 	discoveryOptions []discoveryConfig.Option
 
-	table        *internalTable.Client
+	table        *tableImpl.Client
 	tableOptions []tableConfig.Option
 
-	scripting        *internalScripting.Client
+	scripting        *scriptingImpl.Client
 	scriptingOptions []scriptingConfig.Option
 
-	scheme        *internalScheme.Client
+	scheme        *schemeImpl.Client
 	schemeOptions []schemeConfig.Option
 
-	coordination        *internalCoordination.Client
+	coordination        *coordinationImpl.Client
 	coordinationOptions []coordinationConfig.Option
 
-	ratelimiter        *internalRatelimiter.Client
+	ratelimiter        *ratelimiterImpl.Client
 	ratelimiterOptions []ratelimiterConfig.Option
 
 	topic        *topicclientinternal.Client
@@ -355,7 +355,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	d.table, err = internalTable.New(ctx,
+	d.table, err = tableImpl.New(ctx,
 		d.balancer,
 		tableConfig.New(
 			append(
@@ -371,7 +371,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	d.scheme, err = internalScheme.New(ctx,
+	d.scheme, err = schemeImpl.New(ctx,
 		d.balancer,
 		schemeConfig.New(
 			append(
@@ -388,7 +388,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	d.coordination, err = internalCoordination.New(ctx,
+	d.coordination, err = coordinationImpl.New(ctx,
 		d.balancer,
 		coordinationConfig.New(
 			append(
@@ -404,7 +404,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	d.ratelimiter, err = internalRatelimiter.New(ctx,
+	d.ratelimiter, err = ratelimiterImpl.New(ctx,
 		d.balancer,
 		ratelimiterConfig.New(
 			append(
@@ -420,7 +420,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	d.discovery, err = internalDiscovery.New(ctx,
+	d.discovery, err = discoveryImpl.New(ctx,
 		d.pool.Get(endpoint.New(d.config.Endpoint())),
 		discoveryConfig.New(
 			append(
@@ -440,7 +440,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	d.scripting, err = internalScripting.New(ctx,
+	d.scripting, err = scriptingImpl.New(ctx,
 		d.balancer,
 		scriptingConfig.New(
 			append(
