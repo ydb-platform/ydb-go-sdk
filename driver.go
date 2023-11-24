@@ -30,6 +30,7 @@ import (
 	internalTable "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicclientinternal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -47,6 +48,9 @@ var _ Connection = (*Driver)(nil)
 
 // Driver type provide access to YDB service clients
 type Driver struct { //nolint:maligned
+	ctx       context.Context // cancel while Driver.Close called.
+	ctxCancel context.CancelFunc
+
 	userInfo *dsn.UserInfo
 
 	logger        log.Logger
@@ -106,9 +110,12 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 	defer func() {
 		onDone(finalErr)
 	}()
+	d.ctxCancel()
 
 	d.mtx.Lock()
 	defer d.mtx.Unlock()
+
+	d.ctxCancel()
 
 	defer func() {
 		for _, f := range d.onClose {
@@ -268,9 +275,19 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 }
 
 func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, err error) {
+	ctx, driverCtxCancel := xcontext.WithCancel(xcontext.WithoutDeadline(ctx))
+	defer func() {
+		if err != nil {
+			driverCtxCancel()
+		}
+	}()
+
 	d := &Driver{
-		children: make(map[uint64]*Driver),
+		children:  make(map[uint64]*Driver),
+		ctx:       ctx,
+		ctxCancel: driverCtxCancel,
 	}
+
 	if caFile, has := os.LookupEnv("YDB_SSL_ROOT_CERTIFICATES_FILE"); has {
 		d.opts = append(d.opts,
 			WithCertificatesFromFile(caFile),
