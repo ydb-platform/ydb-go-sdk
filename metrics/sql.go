@@ -15,9 +15,18 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 	queryLatency := config.WithSystem("query").TimerVec("latency", "status", "query_mode")
 	exec := config.CounterVec("exec", "status", "query_mode")
 	execLatency := config.WithSystem("exec").TimerVec("latency", "status", "query_mode")
-	txBegin := config.WithSystem("tx").CounterVec("begin", "status")
-	txCommit := config.WithSystem("tx").CounterVec("commit", "status")
-	txRollback := config.WithSystem("tx").CounterVec("rollback", "status")
+
+	txConfig := config.WithSystem("tx")
+	txBegin := txConfig.CounterVec("begin", "status")
+	txBeginLatency := txConfig.WithSystem("begin").TimerVec("latency")
+	txExec := txConfig.CounterVec("exec", "status")
+	txExecLatency := txConfig.WithSystem("exec").TimerVec("latency")
+	txQuery := txConfig.CounterVec("query", "status")
+	txQueryLatency := txConfig.WithSystem("query").TimerVec("latency")
+	txCommit := txConfig.CounterVec("commit", "status")
+	txCommitLatency := txConfig.WithSystem("commit").TimerVec("latency")
+	txRollback := txConfig.CounterVec("rollback", "status")
+	txRollbackLatency := txConfig.WithSystem("rollback").TimerVec("latency")
 	t.OnConnectorConnect = func(info trace.DatabaseSQLConnectorConnectStartInfo) func(
 		trace.DatabaseSQLConnectorConnectDoneInfo,
 	) {
@@ -39,30 +48,60 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 		return nil
 	}
 	t.OnConnBegin = func(info trace.DatabaseSQLConnBeginStartInfo) func(trace.DatabaseSQLConnBeginDoneInfo) {
+		start := time.Now()
 		if config.Details()&trace.DatabaseSQLTxEvents != 0 {
 			return func(info trace.DatabaseSQLConnBeginDoneInfo) {
 				txBegin.With(map[string]string{
 					"status": errorBrief(info.Error),
 				}).Inc()
+				txBeginLatency.With(nil).Record(time.Since(start))
 			}
 		}
 		return nil
 	}
 	t.OnTxCommit = func(info trace.DatabaseSQLTxCommitStartInfo) func(trace.DatabaseSQLTxCommitDoneInfo) {
+		start := time.Now()
 		return func(info trace.DatabaseSQLTxCommitDoneInfo) {
 			if config.Details()&trace.DatabaseSQLTxEvents != 0 {
 				txCommit.With(map[string]string{
 					"status": errorBrief(info.Error),
 				}).Inc()
+				txCommitLatency.With(nil).Record(time.Since(start))
+			}
+		}
+	}
+	t.OnTxExec = func(info trace.DatabaseSQLTxExecStartInfo) func(trace.DatabaseSQLTxExecDoneInfo) {
+		start := time.Now()
+		return func(info trace.DatabaseSQLTxExecDoneInfo) {
+			if config.Details()&trace.DatabaseSQLTxEvents != 0 {
+				status := errorBrief(info.Error)
+				txExec.With(map[string]string{
+					"status": status,
+				}).Inc()
+				txExecLatency.With(nil).Record(time.Since(start))
+			}
+		}
+	}
+	t.OnTxQuery = func(info trace.DatabaseSQLTxQueryStartInfo) func(trace.DatabaseSQLTxQueryDoneInfo) {
+		start := time.Now()
+		return func(info trace.DatabaseSQLTxQueryDoneInfo) {
+			if config.Details()&trace.DatabaseSQLTxEvents != 0 {
+				status := errorBrief(info.Error)
+				txQuery.With(map[string]string{
+					"status": status,
+				}).Inc()
+				txQueryLatency.With(nil).Record(time.Since(start))
 			}
 		}
 	}
 	t.OnTxRollback = func(info trace.DatabaseSQLTxRollbackStartInfo) func(trace.DatabaseSQLTxRollbackDoneInfo) {
+		start := time.Now()
 		return func(info trace.DatabaseSQLTxRollbackDoneInfo) {
 			if config.Details()&trace.DatabaseSQLTxEvents != 0 {
 				txRollback.With(map[string]string{
 					"status": errorBrief(info.Error),
 				}).Inc()
+				txRollbackLatency.With(nil).Record(time.Since(start))
 			}
 		}
 	}
