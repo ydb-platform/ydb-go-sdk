@@ -45,6 +45,9 @@ func errorBrief(err error) string {
 	if xerrors.IsTransportError(err) {
 		return xerrors.TransportError(err).Name()
 	}
+	if xerrors.IsOperationErrorTransactionLocksInvalidated(err) {
+		return "operation/ABORTED/TLI"
+	}
 	if xerrors.IsOperationError(err) {
 		return xerrors.OperationError(err).Name()
 	}
