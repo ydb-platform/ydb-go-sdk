@@ -10,7 +10,7 @@ func retry(config Config) (t trace.Retry) {
 	config = config.WithSystem("retry")
 	errs := config.CounterVec("errors", "status", "retry_label", "final")
 	attempts := config.HistogramVec("attempts", []float64{0, 1, 2, 3, 4, 5, 7, 10}, "retry_label")
-	latency := config.TimerVec("latency", "status", "retry_label")
+	latency := config.TimerVec("latency", "retry_label")
 	t.OnRetry = func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 		label := info.Label
 		if label == "" {
@@ -36,7 +36,6 @@ func retry(config Config) (t trace.Retry) {
 						"final":       "true",
 					}).Inc()
 					latency.With(map[string]string{
-						"status":      errorBrief(info.Error),
 						"retry_label": label,
 					}).Record(time.Since(start))
 				}

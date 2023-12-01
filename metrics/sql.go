@@ -12,9 +12,9 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 	conns := config.GaugeVec("conns")
 	inflight := config.WithSystem("conns").GaugeVec("inflight")
 	query := config.CounterVec("query", "status", "query_mode")
-	queryLatency := config.WithSystem("query").TimerVec("latency", "status", "query_mode")
+	queryLatency := config.WithSystem("query").TimerVec("latency", "query_mode")
 	exec := config.CounterVec("exec", "status", "query_mode")
-	execLatency := config.WithSystem("exec").TimerVec("latency", "status", "query_mode")
+	execLatency := config.WithSystem("exec").TimerVec("latency", "query_mode")
 
 	txConfig := config.WithSystem("tx")
 	txBegin := txConfig.CounterVec("begin", "status")
@@ -124,7 +124,6 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 					"query_mode": mode,
 				}).Inc()
 				execLatency.With(map[string]string{
-					"status":     status,
 					"query_mode": mode,
 				}).Record(time.Since(start))
 			}
@@ -149,7 +148,6 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 					"query_mode": mode,
 				}).Inc()
 				queryLatency.With(map[string]string{
-					"status":     status,
 					"query_mode": mode,
 				}).Record(time.Since(start))
 			}
