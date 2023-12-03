@@ -19,6 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
@@ -426,50 +427,53 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			connectionError error
 		}
 
-		newStream := func(name string, onSendInitCallback func()) *MockRawTopicWriterStream {
+		newStream := func(name string) *MockRawTopicWriterStream {
 			strm := NewMockRawTopicWriterStream(mc)
 			initReq := testCreateInitRequest(w)
 
 			streamClosed := make(empty.Chan)
 			strm.EXPECT().CloseSend().Do(func() {
+				t.Logf("closed stream: %v", name)
 				close(streamClosed)
 			})
 
 			strm.EXPECT().Send(&initReq).Do(func(_ interface{}) {
-				if onSendInitCallback != nil {
-					onSendInitCallback()
-				}
+				t.Logf("sent init request stream: %v", name)
 			})
 
-			strm.EXPECT().Recv().Return(&rawtopicwriter.InitResult{
+			strm.EXPECT().Recv().Do(func() {
+				t.Logf("receive init response stream: %v", name)
+			}).Return(&rawtopicwriter.InitResult{
 				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
 				SessionID:             name,
 			}, nil)
 
 			strm.EXPECT().Recv().Do(func() {
+				t.Logf("waiting close channel: %v", name)
 				xtest.WaitChannelClosed(t, streamClosed)
+				t.Logf("channel closed: %v", name)
 			}).Return(nil, errors.New("test stream closed")).MaxTimes(1)
 			return strm
 		}
 
-		strm2InitSent := make(empty.Chan)
-
-		strm2 := newStream("strm2", func() {
-			close(strm2InitSent)
-		})
+		strm2 := newStream("strm2")
 		strm2.EXPECT().Send(&rawtopicwriter.WriteRequest{
 			Messages: []rawtopicwriter.MessageData{
 				{SeqNo: 1},
 			},
 			Codec: rawtopiccommon.CodecRaw,
+		}).Do(func() {
+			t.Logf("strm2 sent message and return retriable error")
 		}).Return(xerrors.Retryable(errors.New("retriable on strm2")))
 
-		strm3 := newStream("strm3", nil)
+		strm3 := newStream("strm3")
 		strm3.EXPECT().Send(&rawtopicwriter.WriteRequest{
 			Messages: []rawtopicwriter.MessageData{
 				{SeqNo: 1},
 			},
 			Codec: rawtopiccommon.CodecRaw,
+		}).Do(func() {
+			t.Logf("strm3 sent message and return unretriable error")
 		}).Return(errors.New("strm3"))
 
 		connectsResult := []connectionAttemptContext{
@@ -488,10 +492,12 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			},
 		}
 
-		connectionAttempt := 0
+		var connectionAttempt xatomic.Int64
 		w.cfg.Connect = func(ctx context.Context) (RawTopicWriterStream, error) {
-			res := connectsResult[connectionAttempt]
-			connectionAttempt++
+			attemptIndex := int(connectionAttempt.Add(1)) - 1
+			t.Logf("connect with attempt index: %v", attemptIndex)
+			res := connectsResult[attemptIndex]
+
 			return res.stream, res.connectionError
 		}
 
@@ -499,6 +505,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		go func() {
 			defer close(connectionLoopStopped)
 			w.connectionLoop(ctx)
+			t.Log("connection loop stopped")
 		}()
 
 		err := w.Write(ctx, newTestMessages(1))
