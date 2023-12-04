@@ -16,17 +16,17 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 	exec := config.CounterVec("exec", "status", "query_mode")
 	execLatency := config.WithSystem("exec").TimerVec("latency", "query_mode")
 
-	txConfig := config.WithSystem("tx")
-	txBegin := txConfig.CounterVec("begin", "status")
-	txBeginLatency := txConfig.WithSystem("begin").TimerVec("latency")
-	txExec := txConfig.CounterVec("exec", "status")
-	txExecLatency := txConfig.WithSystem("exec").TimerVec("latency")
-	txQuery := txConfig.CounterVec("query", "status")
-	txQueryLatency := txConfig.WithSystem("query").TimerVec("latency")
-	txCommit := txConfig.CounterVec("commit", "status")
-	txCommitLatency := txConfig.WithSystem("commit").TimerVec("latency")
-	txRollback := txConfig.CounterVec("rollback", "status")
-	txRollbackLatency := txConfig.WithSystem("rollback").TimerVec("latency")
+	config = config.WithSystem("tx")
+	txBegin := config.CounterVec("begin", "status")
+	txBeginLatency := config.WithSystem("begin").TimerVec("latency")
+	txExec := config.CounterVec("exec", "status")
+	txExecLatency := config.WithSystem("exec").TimerVec("latency")
+	txQuery := config.CounterVec("query", "status")
+	txQueryLatency := config.WithSystem("query").TimerVec("latency")
+	txCommit := config.CounterVec("commit", "status")
+	txCommitLatency := config.WithSystem("commit").TimerVec("latency")
+	txRollback := config.CounterVec("rollback", "status")
+	txRollbackLatency := config.WithSystem("rollback").TimerVec("latency")
 	t.OnConnectorConnect = func(info trace.DatabaseSQLConnectorConnectStartInfo) func(
 		trace.DatabaseSQLConnectorConnectDoneInfo,
 	) {
