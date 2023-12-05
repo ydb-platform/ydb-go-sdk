@@ -462,7 +462,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 				{SeqNo: 1},
 			},
 			Codec: rawtopiccommon.CodecRaw,
-		}).Do(func() {
+		}).Do(func(_ *rawtopicwriter.WriteRequest) {
 			t.Logf("strm2 sent message and return retriable error")
 		}).Return(xerrors.Retryable(errors.New("retriable on strm2")))
 
@@ -472,7 +472,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 				{SeqNo: 1},
 			},
 			Codec: rawtopiccommon.CodecRaw,
-		}).Do(func() {
+		}).Do(func(_ *rawtopicwriter.WriteRequest) {
 			t.Logf("strm3 sent message and return unretriable error")
 		}).Return(errors.New("strm3"))
 
