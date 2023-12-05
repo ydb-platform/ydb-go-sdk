@@ -225,66 +225,27 @@ linters-settings:
         # Default: false
         checkExported: true
 linters:
-  disable-all: true
-  enable:
-#    - cyclop
+  enable-all: true
+  disable:
+    - godot
+    - varnamelen
+    - wrapcheck
+    - nosnakecase
+    - deadcode
+    - golint
+    - interfacer
+    - maligned
+    - ifshort
+    - structcheck
+    - exhaustivestruct
+    - scopelint
+    - varcheck
+    - ireturn
     - depguard
-    - dogsled
-#    - dupl
-    - errcheck
-    - errorlint
-#    - exhaustive
-#    - exhaustivestruct
-#    - forbidigo
-#    - funlen
-#    - gci
-#    - gocognit
-    - goconst
-    - gocritic
-    - gocyclo
-#    - godot
-    - godox
-    - gofmt # On why gofmt when goimports is enabled - https://github.com/golang/go/issues/21476
-    - gofumpt
-    - goheader
-    - goimports
-#    - gomnd
-#    - gomoddirectives
-#    - gomodguard
-    - gosec
-    - gosimple
-    - govet
-    - depguard
-#    - ifshort
-#    - ireturn
-    - lll
-    - makezero
-    - misspell
-    - ineffassign
-    - misspell
-    - nakedret
-    - nestif
-#    - nilnil
-#    - nlreturn
-    - nolintlint
-    - prealloc
-    - predeclared
-    - rowserrcheck
-    - revive
-    - staticcheck
-    - stylecheck
-#    - tagliatelle
-#    - testpackage
-#    - thelper
-#    - tenv
-    - typecheck
-    - unconvert
-    - unparam
-    - unused
-#    - varnamelen
-    - whitespace
-#    - wrapcheck
-#    - wsl
+    - wsl
+    - exhaustruct
+    - gci
+    - paralleltest #need be enabled
 
 issues:
   # List of regexps of issue texts to exclude, empty list by default.

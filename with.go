@@ -9,7 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var nextID xatomic.Uint64
+var nextID xatomic.Uint64 //nolint:gochecknoglobals
 
 func (d *Driver) with(ctx context.Context, opts ...Option) (*Driver, uint64, error) {
 	id := nextID.Add(1)
@@ -36,6 +36,7 @@ func (d *Driver) with(ctx context.Context, opts ...Option) (*Driver, uint64, err
 	if err != nil {
 		return nil, 0, xerrors.WithStackTrace(err)
 	}
+
 	return child, id, nil
 }
 

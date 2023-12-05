@@ -15,9 +15,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var d = &sqlDriver{connectors: make(map[*xsql.Connector]*Driver)}
+var d = &sqlDriver{connectors: make(map[*xsql.Connector]*Driver)} //nolint:gochecknoglobals
 
-func init() {
+func init() { //nolint:gochecknoinits
 	sql.Register("ydb", d)
 	sql.Register("ydb/v3", d)
 }
@@ -46,6 +46,7 @@ func (d *sqlDriver) Close() error {
 	if len(errs) > 0 {
 		return xerrors.NewWithIssues("ydb legacy driver close failed", errs...)
 	}
+
 	return nil
 }
 
@@ -63,6 +64,7 @@ func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, erro
 	if err != nil {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("failed to connect by data source name '%s': %w", dataSourceName, err))
 	}
+
 	return Connector(db, connectorOpts...)
 }
 
@@ -171,6 +173,7 @@ func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
 		return nil, xerrors.WithStackTrace(err)
 	}
 	d.attach(c, parent)
+
 	return c, nil
 }
 
@@ -179,5 +182,6 @@ func MustConnector(parent *Driver, opts ...ConnectorOption) SQLConnector {
 	if err != nil {
 		panic(err)
 	}
+
 	return c
 }

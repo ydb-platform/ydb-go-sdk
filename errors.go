@@ -83,6 +83,8 @@ func IsOperationErrorSchemeError(err error) bool {
 }
 
 // IsOperationErrorTransactionLocksInvalidated checks does err a TLI issue
+//
+//nolint:nonamedreturns
 func IsOperationErrorTransactionLocksInvalidated(err error) (isTLI bool) {
 	return xerrors.IsOperationErrorTransactionLocksInvalidated(err)
 }

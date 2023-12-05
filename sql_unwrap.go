@@ -17,5 +17,6 @@ func Unwrap(db *sql.DB) (*Driver, error) {
 	}
 	d.connectorsMtx.RLock()
 	defer d.connectorsMtx.RUnlock()
+
 	return d.connectors[c], nil
 }
