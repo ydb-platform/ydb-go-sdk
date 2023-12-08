@@ -278,7 +278,7 @@ func (t *testLogger) Log(ctx context.Context, msg string, fields ...log.Field) {
 		values[field.Key()] = field.String()
 	}
 	timeString := time.Now().UTC().Format("15:04:05.999999999") // RFC3339Nano without date and timezone
-	message := fmt.Sprintf("%s [%s] %s: %v (%v)", timeString, lvl, loggerName, msg, values)
+	message := fmt.Sprintf("%s: %s [%s] %s: %v (%v)", t.testName, timeString, lvl, loggerName, msg, values)
 	t.m.WithLock(func() {
 		if t.closed {
 			_, _ = fmt.Fprintf(os.Stderr, "\nFINISHED TEST %q:\n%s\n\n", t.testName, message)
