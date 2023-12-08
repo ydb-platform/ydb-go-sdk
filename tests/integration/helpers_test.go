@@ -241,9 +241,11 @@ func (scope *scopeT) TablePath(opts ...func(t *tableNameParams)) string {
 // logger for tests
 type testLogger struct {
 	test     testing.TB
+	testName string
 	minLevel log.Level
 
 	m        xsync.Mutex
+	closed   bool
 	messages []string
 }
 
@@ -252,7 +254,11 @@ func newLogger(t testing.TB) *testLogger {
 }
 
 func newLoggerWithMinLevel(t testing.TB, level log.Level) *testLogger {
-	logger := &testLogger{test: t, minLevel: level}
+	logger := &testLogger{
+		test:     t,
+		testName: t.Name(),
+		minLevel: level,
+	}
 	t.Cleanup(logger.flush)
 	return logger
 }
@@ -274,12 +280,17 @@ func (t *testLogger) Log(ctx context.Context, msg string, fields ...log.Field) {
 	timeString := time.Now().UTC().Format("15:04:05.999999999") // RFC3339Nano without date and timezone
 	message := fmt.Sprintf("%s [%s] %s: %v (%v)", timeString, lvl, loggerName, msg, values)
 	t.m.WithLock(func() {
-		t.messages = append(t.messages, message)
+		if t.closed {
+			_, _ = fmt.Fprintf(os.Stderr, "TEST FINISHED %s:\n%s", t.testName, message)
+		} else {
+			t.messages = append(t.messages, message)
+		}
 	})
 }
 
 func (t *testLogger) flush() {
 	t.m.WithLock(func() {
+		t.closed = true
 		message := "\n" + strings.Join(t.messages, "\n")
 		t.test.Log(message)
 	})
