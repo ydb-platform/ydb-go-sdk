@@ -57,12 +57,12 @@ func TestReadersWritersStress(t *testing.T) {
 		topics = append(topics, topicPath)
 	}
 
-	errGrp := errgroup.WithContext(ctx)
+	errGrp, grpCtx := errgroup.WithContext(ctx)
 	for _, topicOuter := range topics {
 		topicInner := topicOuter
 		errGrp.Go(func() error {
 			return stressTestInATopic(
-				ctx,
+				grpCtx,
 				t,
 				db,
 				writeTime,
