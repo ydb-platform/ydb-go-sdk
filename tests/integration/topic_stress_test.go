@@ -6,6 +6,7 @@ package integration
 import (
 	"context"
 	"errors"
+	"golang.org/x/sync/errgroup"
 	"math/rand"
 	"runtime"
 	"strconv"
@@ -56,12 +57,11 @@ func TestReadersWritersStress(t *testing.T) {
 		topics = append(topics, topicPath)
 	}
 
+	errGrp := errgroup.WithContext(ctx)
 	for _, topicOuter := range topics {
 		topicInner := topicOuter
-		t.Run(topicInner, func(t *testing.T) {
-			t.Parallel()
-
-			require.NoError(t, stressTestInATopic(
+		errGrp.Go(func() error {
+			return stressTestInATopic(
 				ctx,
 				t,
 				db,
@@ -70,9 +70,10 @@ func TestReadersWritersStress(t *testing.T) {
 				consumerName,
 				writersPerTopic,
 				readersPerTopic,
-			))
+			)
 		})
 	}
+	require.NoError(t, errGrp.Wait())
 }
 
 func stressTestInATopic(
