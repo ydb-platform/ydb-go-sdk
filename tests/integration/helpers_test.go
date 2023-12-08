@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"path"
 	"strings"
@@ -18,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -250,7 +252,10 @@ func newLoggerWithMinLevel(t testing.TB, level log.Level) *testLogger {
 	return &testLogger{test: t, minLevel: level}
 }
 
+var loggerMutex xsync.Mutex
+
 func (t testLogger) Log(ctx context.Context, msg string, fields ...log.Field) {
+	t.test.Helper()
 	lvl := log.LevelFromContext(ctx)
 	if lvl < t.minLevel {
 		return
@@ -264,5 +269,8 @@ func (t testLogger) Log(ctx context.Context, msg string, fields ...log.Field) {
 		values[field.Key()] = field.String()
 	}
 
-	t.test.Logf("[%s] %s: %v (%v)", lvl, loggerName, msg, values)
+	message := fmt.Sprintf("[%s] %s: %v (%v)", lvl, loggerName, msg, values)
+	loggerMutex.WithLock(func() {
+		t.test.Log(message)
+	})
 }
