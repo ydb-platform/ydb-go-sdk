@@ -242,6 +242,9 @@ func (scope *scopeT) TablePath(opts ...func(t *tableNameParams)) string {
 type testLogger struct {
 	test     testing.TB
 	minLevel log.Level
+
+	m        xsync.Mutex
+	messages []string
 }
 
 func newLogger(t testing.TB) *testLogger {
@@ -249,12 +252,12 @@ func newLogger(t testing.TB) *testLogger {
 }
 
 func newLoggerWithMinLevel(t testing.TB, level log.Level) *testLogger {
-	return &testLogger{test: t, minLevel: level}
+	logger := &testLogger{test: t, minLevel: level}
+	t.Cleanup(logger.flush)
+	return logger
 }
 
-var loggerMutex xsync.Mutex
-
-func (t testLogger) Log(ctx context.Context, msg string, fields ...log.Field) {
+func (t *testLogger) Log(ctx context.Context, msg string, fields ...log.Field) {
 	t.test.Helper()
 	lvl := log.LevelFromContext(ctx)
 	if lvl < t.minLevel {
@@ -268,9 +271,16 @@ func (t testLogger) Log(ctx context.Context, msg string, fields ...log.Field) {
 	for _, field := range fields {
 		values[field.Key()] = field.String()
 	}
+	timeString := time.Now().UTC().Format("15:04:05.999999999") // RFC3339Nano without date and timezone
+	message := fmt.Sprintf("%s [%s] %s: %v (%v)", timeString, lvl, loggerName, msg, values)
+	t.m.WithLock(func() {
+		t.messages = append(t.messages, message)
+	})
+}
 
-	message := fmt.Sprintf("[%s] %s: %v (%v)", lvl, loggerName, msg, values)
-	loggerMutex.WithLock(func() {
+func (t *testLogger) flush() {
+	t.m.WithLock(func() {
+		message := "\n" + strings.Join(t.messages, "\n")
 		t.test.Log(message)
 	})
 }
