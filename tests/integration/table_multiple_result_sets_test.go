@@ -14,7 +14,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
-	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -44,10 +43,7 @@ func TestTableMultipleResultSets(t *testing.T) {
 		"", // corner case for check replacement of endpoint+database+secure
 		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
 		ydb.WithLogger(
-			log.Default(os.Stderr,
-				log.WithMinLevel(log.TRACE),
-				log.WithColoring(),
-			),
+			newLogger(t),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
 		),
 	)

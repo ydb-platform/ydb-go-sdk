@@ -15,7 +15,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
-	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
@@ -43,9 +42,7 @@ func TestLongStream(t *testing.T) {
 		),
 		ydb.WithDiscoveryInterval(0), // disable re-discovery on upsert time
 		ydb.WithLogger(
-			log.Default(os.Stderr,
-				log.WithMinLevel(log.TRACE),
-			),
+			newLogger(t),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
 		),
 	)

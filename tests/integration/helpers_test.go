@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"os"
 	"path"
+	"strings"
 	"testing"
 	"text/template"
 	"time"
@@ -90,9 +91,7 @@ func (scope *scopeT) Driver(opts ...ydb.Option) *ydb.Driver {
 			append(opts,
 				ydb.WithAccessTokenCredentials(token),
 				ydb.WithLogger(
-					log.Default(os.Stderr,
-						log.WithMinLevel(log.WARN),
-					),
+					scope.LoggerMinLevel(log.WARN),
 					trace.DetailsAll,
 				),
 			)...,
@@ -145,6 +144,18 @@ func (scope *scopeT) Folder() string {
 		}
 		return folderPath, clean, nil
 	}).(string)
+}
+
+func (scope *scopeT) Logger() *testLogger {
+	return scope.Cache(nil, nil, func() (res interface{}, err error) {
+		return newLogger(scope.t), nil
+	}).(*testLogger)
+}
+
+func (scope *scopeT) LoggerMinLevel(level log.Level) *testLogger {
+	return scope.Cache(level, nil, func() (res interface{}, err error) {
+		return newLoggerWithMinLevel(scope.t, level), nil
+	}).(*testLogger)
 }
 
 type tableNameParams struct {
@@ -223,4 +234,35 @@ func (scope *scopeT) TableName(opts ...func(t *tableNameParams)) string {
 // val Text
 func (scope *scopeT) TablePath(opts ...func(t *tableNameParams)) string {
 	return path.Join(scope.Folder(), scope.TableName(opts...))
+}
+
+// logger for tests
+type testLogger struct {
+	test     testing.TB
+	minLevel log.Level
+}
+
+func newLogger(t testing.TB) *testLogger {
+	return newLoggerWithMinLevel(t, 0)
+}
+
+func newLoggerWithMinLevel(t testing.TB, level log.Level) *testLogger {
+	return &testLogger{test: t, minLevel: level}
+}
+
+func (t testLogger) Log(ctx context.Context, msg string, fields ...log.Field) {
+	lvl := log.LevelFromContext(ctx)
+	if lvl < t.minLevel {
+		return
+	}
+
+	names := log.NamesFromContext(ctx)
+
+	loggerName := strings.Join(names, ".")
+	values := make(map[string]string)
+	for _, field := range fields {
+		values[field.Key()] = field.String()
+	}
+
+	t.test.Logf("[%s] %s: %v (%v)", lvl, loggerName, msg, values)
 }

@@ -266,15 +266,11 @@ func TestBasicExampleNative(t *testing.T) { //nolint:gocyclo
 		ydb.WithSessionPoolSizeLimit(limit),
 		ydb.WithConnectionTTL(5*time.Second),
 		ydb.WithLogger(
-			log.Default(os.Stderr,
-				log.WithMinLevel(log.FromString(os.Getenv("YDB_LOG_SEVERITY_LEVEL"))),
-				log.WithColoring(),
-			),
+			newLoggerWithMinLevel(t, log.FromString(os.Getenv("YDB_LOG_SEVERITY_LEVEL"))),
 			trace.MatchDetails(`ydb\.(driver|table|discovery|retry|scheme).*`),
 		),
 		ydb.WithPanicCallback(func(e interface{}) {
-			_, _ = fmt.Fprintf(os.Stderr, "panic recovered:%v:\n%s", e, debug.Stack())
-			os.Exit(1)
+			t.Fatalf("panic recovered:%v:\n%s", e, debug.Stack())
 		}),
 		ydb.WithTraceTable(
 			*shutdownTrace.Compose(

@@ -26,9 +26,7 @@ func TestTableCreateTablePartitions(t *testing.T) {
 
 	db, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithLogger(
-			log.Default(os.Stderr,
-				log.WithMinLevel(log.WARN),
-			),
+			newLoggerWithMinLevel(t, log.WARN),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
 		),
 	)
