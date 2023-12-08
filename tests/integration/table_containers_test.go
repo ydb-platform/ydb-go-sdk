@@ -81,7 +81,7 @@ func TestContainers(t *testing.T) {
 				return res.Scan(&testContainersExampleStruct{test: t})
 			},
 			func() error {
-				return res.Scan(&testContainersVariantStruct{})
+				return res.Scan(&testContainersVariantStruct{test: t})
 			},
 			func() error {
 				return res.Scan(&testContainersVariantTuple{test: t})
