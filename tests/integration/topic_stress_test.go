@@ -6,7 +6,6 @@ package integration
 import (
 	"context"
 	"errors"
-	"golang.org/x/sync/errgroup"
 	"math/rand"
 	"runtime"
 	"strconv"
@@ -16,6 +15,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
