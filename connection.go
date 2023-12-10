@@ -16,6 +16,8 @@ import (
 // Interface and list of clients may be changed in the future
 //
 // Deprecated: use directly *Driver type from ydb.Open instead
+//
+//nolint:interfacebloat
 type Connection interface {
 	// Endpoint returns initial endpoint
 	Endpoint() string

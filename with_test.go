@@ -1,4 +1,4 @@
-package ydb
+package ydb //nolint:testpackage
 
 import (
 	"bytes"
@@ -21,7 +21,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 )
 
-func TestWithCertificatesCached(t *testing.T) {
+func TestWithCertificatesCached(t *testing.T) { //nolint:funlen
 	ca := &x509.Certificate{
 		SerialNumber: big.NewInt(2019),
 		Subject: pkix.Name{
@@ -61,7 +61,6 @@ func TestWithCertificatesCached(t *testing.T) {
 		missCounter uint64
 		ctx         = context.TODO()
 	)
-
 	for _, test := range []struct {
 		name    string
 		options []Option
@@ -132,7 +131,7 @@ func TestWithCertificatesCached(t *testing.T) {
 			db, err := newConnectionFromOptions(ctx,
 				append(
 					test.options,
-					withConnPool(conn.NewPool(context.Background(), config.New())),
+					withConnPool(conn.NewPool(context.Background(), config.New())), //nolint:contextcheck
 				)...,
 			)
 			require.NoError(t, err)

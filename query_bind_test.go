@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
+//nolint:funlen, maintidx
 func TestQueryBind(t *testing.T) {
 	now := time.Now()
 	for _, tt := range []struct {
