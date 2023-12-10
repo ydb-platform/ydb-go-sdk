@@ -1,5 +1,8 @@
 * Context for call options now have same lifetime as driver (previous - same lifetime as context for call Open function).
 
+## v3.54.3
+* Implement `String` interface for `Driver` struct
+
 ## v3.54.2
 * Added context to some internal methods for better tracing
 * Added `trace.FunctionID` helper and `FunctionID` field to trace start info's 
