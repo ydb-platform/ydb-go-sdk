@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
@@ -56,13 +57,12 @@ func TestReadersWritersStress(t *testing.T) {
 		topics = append(topics, topicPath)
 	}
 
+	errGrp, grpCtx := errgroup.WithContext(ctx)
 	for _, topicOuter := range topics {
 		topicInner := topicOuter
-		t.Run(topicInner, func(t *testing.T) {
-			t.Parallel()
-
-			require.NoError(t, stressTestInATopic(
-				ctx,
+		errGrp.Go(func() error {
+			return stressTestInATopic(
+				grpCtx,
 				t,
 				db,
 				writeTime,
@@ -70,9 +70,10 @@ func TestReadersWritersStress(t *testing.T) {
 				consumerName,
 				writersPerTopic,
 				readersPerTopic,
-			))
+			)
 		})
 	}
+	require.NoError(t, errGrp.Wait())
 }
 
 func stressTestInATopic(
@@ -85,8 +86,9 @@ func stressTestInATopic(
 	topicWriters, topicReaders int,
 ) error {
 	maxMessagesInBatch := 5
-	var createdMessagesCount xatomic.Int64
-	var readedMessagesCount xatomic.Int64
+	var mStatus sync.Mutex
+	writeStatusWriterSeqno := map[string]int64{}
+	readStatusWriterMaxSeqNo := map[string]int64{}
 
 	var stopWrite xatomic.Bool
 
@@ -106,18 +108,21 @@ func stressTestInATopic(
 		writer, err := db.Topic().StartWriter(topicPath,
 			topicoptions.WithProducerID(producerID),
 			topicoptions.WithSyncWrite(true),
+			topicoptions.WithWriterSetAutoSeqNo(false),
 		)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
 
+		seqNo := int64(0)
 		for !stopWrite.Load() {
 			messageCount := rand.Intn(maxMessagesInBatch) + 1 //nolint:gosec
 			var messages []topicwriter.Message
 			for i := 0; i < messageCount; i++ {
-				newMessageContent := createdMessagesCount.Add(1)
+				seqNo++
 				message := topicwriter.Message{
-					Data: strings.NewReader(strconv.FormatInt(newMessageContent, 10)),
+					SeqNo: seqNo,
+					Data:  strings.NewReader(strconv.FormatInt(seqNo, 10) + "-content"),
 				}
 				messages = append(messages, message)
 			}
@@ -125,6 +130,9 @@ func stressTestInATopic(
 			if err != nil {
 				return err
 			}
+			mStatus.Lock()
+			writeStatusWriterSeqno[producerID] = seqNo
+			mStatus.Unlock()
 		}
 		return nil
 	}
@@ -156,7 +164,14 @@ func stressTestInATopic(
 				return err
 			}
 
-			readedMessagesCount.Add(1)
+			// store max readed seqno for every producer id
+			mStatus.Lock()
+			oldSeq := readStatusWriterMaxSeqNo[mess.ProducerID]
+			if mess.SeqNo > oldSeq {
+				readStatusWriterMaxSeqNo[mess.ProducerID] = mess.SeqNo
+			}
+			mStatus.Unlock()
+
 			err = reader.Commit(ctx, mess)
 			if err != nil {
 				return err
@@ -199,9 +214,15 @@ func stressTestInATopic(
 	}
 
 	xtest.SpinWaitProgressWithTimeout(t, time.Minute, func() (progressValue interface{}, finished bool) {
-		createdMessages := createdMessagesCount.Load()
-		readedMessages := readedMessagesCount.Load()
-		return readedMessages, readedMessages == createdMessages
+		time.Sleep(time.Millisecond)
+		needReadMessages := int64(0)
+		mStatus.Lock()
+		for producerID, writtenSeqNo := range writeStatusWriterSeqno {
+			readedSeqNo := readStatusWriterMaxSeqNo[producerID]
+			needReadMessages += writtenSeqNo - readedSeqNo
+		}
+		mStatus.Unlock()
+		return needReadMessages, needReadMessages == 0
 	})
 
 	stopReader()

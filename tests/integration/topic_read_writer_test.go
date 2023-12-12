@@ -9,7 +9,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
-	"os"
 	"runtime/pprof"
 	"strconv"
 	"strings"
@@ -25,7 +24,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
-	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -126,9 +124,7 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 	tb := xtest.MakeSyncedTest(t)
 	ctx := xtest.Context(tb)
 	db := connect(tb, ydb.WithLogger(
-		log.Default(os.Stderr,
-			log.WithMinLevel(log.TRACE),
-		),
+		newLogger(t),
 		trace.DetailsAll,
 	))
 

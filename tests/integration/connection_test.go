@@ -84,9 +84,7 @@ func TestConnection(t *testing.T) {
 		ydb.WithConnectionTTL(time.Millisecond*10000),
 		ydb.WithMinTLSVersion(tls.VersionTLS10),
 		ydb.WithLogger(
-			log.Default(os.Stderr,
-				log.WithMinLevel(log.WARN),
-			),
+			newLoggerWithMinLevel(t, log.WARN),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
 		),
 		ydb.WithUserAgent(userAgent),

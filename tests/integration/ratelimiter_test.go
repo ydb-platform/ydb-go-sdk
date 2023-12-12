@@ -37,9 +37,7 @@ func TestRatelimiter(t *testing.T) {
 		),
 		ydb.WithBalancer(balancers.SingleConn()),
 		ydb.WithLogger(
-			log.Default(os.Stderr,
-				log.WithMinLevel(log.WARN),
-			),
+			newLoggerWithMinLevel(t, log.WARN),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|ratelimiter|coordination).*`),
 		),
 	)
