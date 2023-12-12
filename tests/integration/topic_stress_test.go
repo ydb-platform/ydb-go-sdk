@@ -86,8 +86,9 @@ func stressTestInATopic(
 	topicWriters, topicReaders int,
 ) error {
 	maxMessagesInBatch := 5
-	var writeStatusWriterSeqno sync.Map   // map[writerId string] int64 - lastseqno
-	var readStatusWriterMaxSeqNo sync.Map // map[writerId string] int64 - lastseqno
+	var mStatus sync.Mutex
+	writeStatusWriterSeqno := map[string]int64{}
+	readStatusWriterMaxSeqNo := map[string]int64{}
 
 	var stopWrite xatomic.Bool
 
@@ -129,7 +130,9 @@ func stressTestInATopic(
 			if err != nil {
 				return err
 			}
-			writeStatusWriterSeqno.Store(producerID, seqNo)
+			mStatus.Lock()
+			writeStatusWriterSeqno[producerID] = seqNo
+			mStatus.Unlock()
 		}
 		return nil
 	}
@@ -162,16 +165,13 @@ func stressTestInATopic(
 			}
 
 			// store max readed seqno for every producer id
-			for {
-				val, _ := readStatusWriterMaxSeqNo.LoadOrStore(mess.ProducerID, int64(0))
-				oldSeq := val.(int64)
-				if mess.SeqNo <= oldSeq {
-					break
-				}
-				if readStatusWriterMaxSeqNo.CompareAndSwap(mess.ProducerID, val, mess.SeqNo) {
-					break
-				}
+			mStatus.Lock()
+			oldSeq := readStatusWriterMaxSeqNo[mess.ProducerID]
+			if mess.SeqNo > oldSeq {
+				readStatusWriterMaxSeqNo[mess.ProducerID] = mess.SeqNo
 			}
+			mStatus.Unlock()
+
 			err = reader.Commit(ctx, mess)
 			if err != nil {
 				return err
@@ -214,18 +214,14 @@ func stressTestInATopic(
 	}
 
 	xtest.SpinWaitProgressWithTimeout(t, time.Minute, func() (progressValue interface{}, finished bool) {
+		time.Sleep(time.Millisecond)
 		needReadMessages := int64(0)
-		writeStatusWriterSeqno.Range(func(key, value any) bool {
-			writtenSeqno := value.(int64)
-
-			readed, ok := readStatusWriterMaxSeqNo.Load(key)
-			if !ok {
-				readed = int64(0)
-			}
-			readedSeqNo := readed.(int64)
-			needReadMessages += writtenSeqno - readedSeqNo
-			return true
-		})
+		mStatus.Lock()
+		for producerID, writtenSeqNo := range writeStatusWriterSeqno {
+			readedSeqNo := readStatusWriterMaxSeqNo[producerID]
+			needReadMessages += writtenSeqNo - readedSeqNo
+		}
+		mStatus.Unlock()
 		return needReadMessages, needReadMessages == 0
 	})
 
