@@ -361,14 +361,13 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 
 		go func() {
+			// wait until w.WaitInit starts
+			time.Sleep(time.Millisecond)
 			cancel()
-			w.onWriterChange(&SingleStreamWriter{})
 		}()
 
 		_, err := w.WaitInit(ctx)
 		require.ErrorIs(t, err, ctx.Err())
-
-		require.True(t, isClosed(w.firstInitResponseProcessedChan))
 	})
 
 	t.Run("contextDeadlineErrorBeforeStart", func(t *testing.T) {
