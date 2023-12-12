@@ -21,6 +21,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 )
 
+//nolint:testableexamples, nonamedreturns
 func Example_table() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
@@ -54,6 +55,7 @@ func Example_table() {
 				}
 				log.Printf("id=%v, myStr='%s'\n", id, myStr)
 			}
+
 			return res.Err() // return finally result error for auto-retry with driver
 		},
 		table.WithIdempotent(),
@@ -63,6 +65,7 @@ func Example_table() {
 	}
 }
 
+//nolint:testableexamples
 func Example_databaseSQL() {
 	db, err := sql.Open("ydb", "grpc://localhost:2136/local")
 	if err != nil {
@@ -85,6 +88,7 @@ func Example_databaseSQL() {
 			return err
 		}
 		log.Printf("id=%v, myStr='%s'\n", id, myStr)
+
 		return nil
 	}, retry.WithIdempotent(true))
 	if err != nil {
@@ -92,6 +96,7 @@ func Example_databaseSQL() {
 	}
 }
 
+//nolint:testableexamples
 func Example_databaseSQLBindNumericArgs() {
 	db, err := sql.Open("ydb",
 		"grpc://localhost:2136/local?go_query_bind=declare,numeric",
@@ -115,6 +120,7 @@ func Example_databaseSQLBindNumericArgs() {
 	}
 }
 
+//nolint:testableexamples
 func Example_databaseSQLBindNumericArgsOverConnector() {
 	var (
 		ctx          = context.TODO()
@@ -146,6 +152,7 @@ func Example_databaseSQLBindNumericArgsOverConnector() {
 	}
 }
 
+//nolint:testableexamples
 func Example_databaseSQLBindPositionalArgs() {
 	db, err := sql.Open("ydb",
 		"grpc://localhost:2136/local?go_query_bind=declare,positional",
@@ -169,6 +176,7 @@ func Example_databaseSQLBindPositionalArgs() {
 	}
 }
 
+//nolint:testableexamples
 func Example_databaseSQLBindPositionalArgsOverConnector() {
 	var (
 		ctx          = context.TODO()
@@ -197,6 +205,7 @@ func Example_databaseSQLBindPositionalArgsOverConnector() {
 	}
 }
 
+//nolint:testableexamples
 func Example_databaseSQLBindTablePathPrefix() {
 	db, err := sql.Open("ydb",
 		"grpc://localhost:2136/local?go_query_bind=table_path_prefix(/local/path/to/tables)",
@@ -220,6 +229,7 @@ func Example_databaseSQLBindTablePathPrefix() {
 	}
 }
 
+//nolint:testableexamples
 func Example_databaseSQLBindTablePathPrefixOverConnector() {
 	var (
 		ctx          = context.TODO()
@@ -243,6 +253,7 @@ func Example_databaseSQLBindTablePathPrefixOverConnector() {
 	}
 }
 
+//nolint:testableexamples
 func Example_databaseSQLBindAutoDeclare() {
 	db, err := sql.Open("ydb",
 		"grpc://localhost:2136/local?go_query_bind=declare",
@@ -268,6 +279,7 @@ func Example_databaseSQLBindAutoDeclare() {
 	}
 }
 
+//nolint:testableexamples
 func Example_databaseSQLBindAutoDeclareOverConnector() {
 	var (
 		ctx          = context.TODO()
@@ -293,11 +305,13 @@ func Example_databaseSQLBindAutoDeclareOverConnector() {
 	}
 }
 
+//nolint:testableexamples
 func Example_topic() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
+
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
@@ -305,6 +319,7 @@ func Example_topic() {
 	reader, err := db.Topic().StartReader("consumer", topicoptions.ReadTopic("/topic/path"))
 	if err != nil {
 		fmt.Printf("failed start reader: %v", err)
+
 		return
 	}
 
@@ -312,27 +327,31 @@ func Example_topic() {
 		mess, err := reader.ReadMessage(ctx)
 		if err != nil {
 			fmt.Printf("failed start reader: %v", err)
+
 			return
 		}
 
 		content, err := io.ReadAll(mess)
 		if err != nil {
 			fmt.Printf("failed start reader: %v", err)
+
 			return
 		}
 		fmt.Println(string(content))
 	}
 }
 
+//nolint:testableexamples
 func Example_scripting() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
+
 		return
 	}
-	defer db.Close(ctx) // cleanup resources
-	if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+	defer db.Close(ctx)                                               // cleanup resources
+	if err = retry.Retry(ctx, func(ctx context.Context) (err error) { //nolint:nonamedreturns
 		res, err := db.Scripting().Execute(
 			ctx,
 			"SELECT 1+1",
@@ -344,13 +363,13 @@ func Example_scripting() {
 		defer res.Close() // cleanup resources
 		if !res.NextResultSet(ctx) {
 			return retry.RetryableError(
-				fmt.Errorf("no result sets"),
+				fmt.Errorf("no result sets"), //nolint:goerr113
 				retry.WithBackoff(retry.TypeNoBackoff),
 			)
 		}
 		if !res.NextRow() {
 			return retry.RetryableError(
-				fmt.Errorf("no rows"),
+				fmt.Errorf("no rows"), //nolint:goerr113
 				retry.WithBackoff(retry.TypeSlowBackoff),
 			)
 		}
@@ -359,25 +378,29 @@ func Example_scripting() {
 			return fmt.Errorf("scan failed: %w", err)
 		}
 		if sum != 2 {
-			return fmt.Errorf("unexpected sum: %v", sum)
+			return fmt.Errorf("unexpected sum: %v", sum) //nolint:goerr113
 		}
+
 		return res.Err()
 	}, retry.WithIdempotent(true)); err != nil {
 		fmt.Printf("Execute failed: %v", err)
 	}
 }
 
+//nolint:testableexamples
 func Example_discovery() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
+
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
 	endpoints, err := db.Discovery().Discover(ctx)
 	if err != nil {
 		fmt.Printf("discover failed: %v", err)
+
 		return
 	}
 	fmt.Printf("%s endpoints:\n", db.Name())
@@ -386,6 +409,7 @@ func Example_discovery() {
 	}
 }
 
+//nolint:testableexamples
 func Example_enableGzipCompressionForAllRequests() {
 	ctx := context.TODO()
 	db, err := ydb.Open(
@@ -405,6 +429,7 @@ func Example_enableGzipCompressionForAllRequests() {
 	fmt.Printf("connected to %s, database '%s'", db.Endpoint(), db.Name())
 }
 
+//nolint:testableexamples
 func ExampleOpen() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2135/local")
@@ -415,6 +440,7 @@ func ExampleOpen() {
 	fmt.Printf("connected to %s, database '%s'", db.Endpoint(), db.Name())
 }
 
+//nolint:testableexamples
 func ExampleOpen_advanced() {
 	ctx := context.TODO()
 	db, err := ydb.Open(

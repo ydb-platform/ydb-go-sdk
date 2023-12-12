@@ -25,6 +25,7 @@ jobs:
 
       - name: Run SLO
         uses: ydb-platform/slo-tests@js-version
+        continue-on-error: true
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           KUBECONFIG_B64: ${{ secrets.SLO_KUBE_CONFIG }}

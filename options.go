@@ -37,6 +37,7 @@ func WithStaticCredentials(user, password string) Option {
 			User:     user,
 			Password: password,
 		}
+
 		return nil
 	}
 }
@@ -56,6 +57,7 @@ func WithAccessTokenCredentials(accessToken string) Option {
 func WithUserAgent(userAgent string) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithUserAgent(userAgent))
+
 		return nil
 	}
 }
@@ -63,6 +65,7 @@ func WithUserAgent(userAgent string) Option {
 func WithRequestsType(requestsType string) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithRequestsType(requestsType))
+
 		return nil
 	}
 }
@@ -87,6 +90,7 @@ func WithConnectionString(connectionString string) Option {
 		}
 		c.options = append(c.options, info.Options...)
 		c.userInfo = info.UserInfo
+
 		return nil
 	}
 }
@@ -95,6 +99,7 @@ func WithConnectionString(connectionString string) Option {
 func WithConnectionTTL(ttl time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithConnectionTTL(ttl))
+
 		return nil
 	}
 }
@@ -107,6 +112,7 @@ func WithConnectionTTL(ttl time.Duration) Option {
 func WithEndpoint(endpoint string) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithEndpoint(endpoint))
+
 		return nil
 	}
 }
@@ -119,6 +125,7 @@ func WithEndpoint(endpoint string) Option {
 func WithDatabase(database string) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithDatabase(database))
+
 		return nil
 	}
 }
@@ -131,6 +138,7 @@ func WithDatabase(database string) Option {
 func WithSecure(secure bool) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithSecure(secure))
+
 		return nil
 	}
 }
@@ -141,6 +149,7 @@ func WithSecure(secure bool) Option {
 func WithInsecure() Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithSecure(false))
+
 		return nil
 	}
 }
@@ -149,6 +158,7 @@ func WithInsecure() Option {
 func WithMinTLSVersion(minVersion uint16) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithMinTLSVersion(minVersion))
+
 		return nil
 	}
 }
@@ -157,6 +167,7 @@ func WithMinTLSVersion(minVersion uint16) Option {
 func WithTLSSInsecureSkipVerify() Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithTLSSInsecureSkipVerify())
+
 		return nil
 	}
 }
@@ -169,6 +180,7 @@ func WithLogger(l log.Logger, details trace.Detailer, opts ...log.Option) Option
 		c.logger = l
 		c.loggerOpts = opts
 		c.loggerDetails = details
+
 		return nil
 	}
 }
@@ -188,6 +200,7 @@ func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (cred
 			return xerrors.WithStackTrace(err)
 		}
 		c.options = append(c.options, config.WithCredentials(creds))
+
 		return nil
 	}
 }
@@ -203,6 +216,7 @@ func WithCredentials(c credentials.Credentials) Option {
 func WithBalancer(balancer *balancerConfig.Config) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithBalancer(balancer))
+
 		return nil
 	}
 }
@@ -213,6 +227,7 @@ func WithBalancer(balancer *balancerConfig.Config) Option {
 func WithDialTimeout(timeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithDialTimeout(timeout))
+
 		return nil
 	}
 }
@@ -223,6 +238,7 @@ func WithDialTimeout(timeout time.Duration) Option {
 func With(options ...config.Option) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, options...)
+
 		return nil
 	}
 }
@@ -237,6 +253,7 @@ func MergeOptions(opts ...Option) Option {
 				}
 			}
 		}
+
 		return nil
 	}
 }
@@ -245,6 +262,7 @@ func MergeOptions(opts ...Option) Option {
 func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.discoveryOptions = append(c.discoveryOptions, discoveryConfig.WithInterval(discoveryInterval))
+
 		return nil
 	}
 }
@@ -253,6 +271,7 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 func WithTraceDriver(t trace.Driver, opts ...trace.DriverComposeOption) Option { //nolint:gocritic
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithTrace(t, opts...))
+
 		return nil
 	}
 }
@@ -268,6 +287,7 @@ func WithTraceRetry(t trace.Retry, opts ...trace.RetryComposeOption) Option {
 				opts...,
 			)...),
 		)
+
 		return nil
 	}
 }
@@ -276,6 +296,7 @@ func WithTraceRetry(t trace.Retry, opts ...trace.RetryComposeOption) Option {
 func WithCertificate(cert *x509.Certificate) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithCertificate(cert))
+
 		return nil
 	}
 }
@@ -293,6 +314,7 @@ func WithCertificatesFromFile(caFile string, opts ...certificates.FromFileOption
 	if file, err := filepath.EvalSymlinks(caFile); err == nil {
 		caFile = file
 	}
+
 	return func(ctx context.Context, c *Driver) error {
 		certs, err := certificates.FromFile(caFile, opts...)
 		if err != nil {
@@ -303,6 +325,7 @@ func WithCertificatesFromFile(caFile string, opts ...certificates.FromFileOption
 				return xerrors.WithStackTrace(err)
 			}
 		}
+
 		return nil
 	}
 }
@@ -314,6 +337,7 @@ func WithCertificatesFromFile(caFile string, opts ...certificates.FromFileOption
 func WithTLSConfig(tlsConfig *tls.Config) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithTLSConfig(tlsConfig))
+
 		return nil
 	}
 }
@@ -328,6 +352,7 @@ func WithCertificatesFromPem(bytes []byte, opts ...certificates.FromPemOption) O
 		for _, cert := range certs {
 			_ = WithCertificate(cert)(ctx, c)
 		}
+
 		return nil
 	}
 }
@@ -337,6 +362,7 @@ func WithCertificatesFromPem(bytes []byte, opts ...certificates.FromPemOption) O
 func WithTableConfigOption(option tableConfig.Option) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, option)
+
 		return nil
 	}
 }
@@ -345,6 +371,7 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
+
 		return nil
 	}
 }
@@ -364,6 +391,7 @@ func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 			c.databaseSQLOptions,
 			xsql.WithIdleThreshold(idleThreshold),
 		)
+
 		return nil
 	}
 }
@@ -377,6 +405,7 @@ func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
 func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithCreateSessionTimeout(createSessionTimeout))
+
 		return nil
 	}
 }
@@ -385,6 +414,7 @@ func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Opt
 func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithDeleteTimeout(deleteTimeout))
+
 		return nil
 	}
 }
@@ -393,6 +423,7 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 func WithIgnoreTruncated() Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithIgnoreTruncated())
+
 		return nil
 	}
 }
@@ -405,6 +436,7 @@ func WithPanicCallback(panicCallback func(e interface{})) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.panicCallback = panicCallback
 		c.options = append(c.options, config.WithPanicCallback(panicCallback))
+
 		return nil
 	}
 }
@@ -424,6 +456,7 @@ func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option { //
 				)...,
 			),
 		)
+
 		return nil
 	}
 }
@@ -443,6 +476,7 @@ func WithTraceScripting(t trace.Scripting, opts ...trace.ScriptingComposeOption)
 				)...,
 			),
 		)
+
 		return nil
 	}
 }
@@ -462,6 +496,7 @@ func WithTraceScheme(t trace.Scheme, opts ...trace.SchemeComposeOption) Option {
 				)...,
 			),
 		)
+
 		return nil
 	}
 }
@@ -481,6 +516,7 @@ func WithTraceCoordination(t trace.Coordination, opts ...trace.CoordinationCompo
 				)...,
 			),
 		)
+
 		return nil
 	}
 }
@@ -500,6 +536,7 @@ func WithTraceRatelimiter(t trace.Ratelimiter, opts ...trace.RatelimiterComposeO
 				)...,
 			),
 		)
+
 		return nil
 	}
 }
@@ -508,6 +545,7 @@ func WithTraceRatelimiter(t trace.Ratelimiter, opts ...trace.RatelimiterComposeO
 func WithRatelimiterOptions(opts ...ratelimiterConfig.Option) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.ratelimiterOptions = append(c.ratelimiterOptions, opts...)
+
 		return nil
 	}
 }
@@ -527,6 +565,7 @@ func WithTraceDiscovery(t trace.Discovery, opts ...trace.DiscoveryComposeOption)
 				)...,
 			),
 		)
+
 		return nil
 	}
 }
@@ -546,6 +585,7 @@ func WithTraceTopic(t trace.Topic, opts ...trace.TopicComposeOption) Option { //
 				)...,
 			),
 		)
+
 		return nil
 	}
 }
@@ -565,6 +605,7 @@ func WithTraceDatabaseSQL(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeO
 				)...,
 			),
 		)
+
 		return nil
 	}
 }
@@ -574,6 +615,7 @@ func WithTraceDatabaseSQL(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeO
 func withOnClose(onClose func(c *Driver)) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.onClose = append(c.onClose, onClose)
+
 		return nil
 	}
 }
@@ -581,6 +623,7 @@ func withOnClose(onClose func(c *Driver)) Option {
 func withConnPool(pool *conn.Pool) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.pool = pool
+
 		return pool.Take(ctx)
 	}
 }
