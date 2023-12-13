@@ -10,13 +10,14 @@ import (
 
 func table(config Config) (t trace.Table) {
 	config = config.WithSystem("table")
-	limit := config.WithSystem("pool").GaugeVec("limit")
-	size := config.WithSystem("pool").GaugeVec("size")
-	inflight := config.WithSystem("pool").GaugeVec("inflight")
-	inflightLatency := config.WithSystem("pool").WithSystem("inflight").TimerVec("latency")
-	wait := config.WithSystem("pool").GaugeVec("wait")
-	waitLatency := config.WithSystem("pool").WithSystem("wait").TimerVec("latency")
 	alive := config.GaugeVec("sessions", "node_id")
+	config = config.WithSystem("pool")
+	limit := config.GaugeVec("limit")
+	size := config.GaugeVec("size")
+	inflight := config.GaugeVec("inflight")
+	inflightLatency := config.WithSystem("inflight").TimerVec("latency")
+	wait := config.GaugeVec("wait")
+	waitLatency := config.WithSystem("wait").TimerVec("latency")
 	t.OnInit = func(info trace.TableInitStartInfo) func(trace.TableInitDoneInfo) {
 		return func(info trace.TableInitDoneInfo) {
 			limit.With(nil).Set(float64(info.Limit))
