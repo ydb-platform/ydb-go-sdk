@@ -40,7 +40,7 @@ func NewWriter(cred credentials.Credentials, options []PublicWriterOption) (*Wri
 	}, nil
 }
 
-func (w *Writer) Write(ctx context.Context, messages ...Message) error {
+func (w *Writer) Write(ctx context.Context, messages ...PublicMessage) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
