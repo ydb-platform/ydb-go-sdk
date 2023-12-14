@@ -1,3 +1,4 @@
+* Added per message metadata support for topic api
 * Context for call options now have same lifetime as driver (previous - same lifetime as context for call Open function).
 * Extended metrics (fill database.sql callbacks, recognize TLI error)
 * Refactored config prefix in metrics

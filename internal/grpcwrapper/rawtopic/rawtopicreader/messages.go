@@ -245,6 +245,15 @@ func (r *ReadResponse) fromProto(p *Ydb_Topic.StreamReadMessage_ReadResponse) er
 				dstMessage.Data = srcMessage.Data
 				dstMessage.UncompressedSize = srcMessage.UncompressedSize
 				dstMessage.MessageGroupID = srcMessage.MessageGroupId
+				if len(srcMessage.MetadataItems) > 0 {
+					dstMessage.MetadataItems = make([]rawtopiccommon.MetadataItem, 0, len(srcMessage.MetadataItems))
+					for _, protoItem := range srcMessage.MetadataItems {
+						dstMessage.MetadataItems = append(dstMessage.MetadataItems, rawtopiccommon.MetadataItem{
+							Key:   protoItem.Key,
+							Value: protoItem.Value[:len(protoItem.Value):len(protoItem.Value)],
+						})
+					}
+				}
 			}
 		}
 	}
@@ -273,6 +282,7 @@ type MessageData struct {
 	Data             []byte
 	UncompressedSize int64
 	MessageGroupID   string
+	MetadataItems    []rawtopiccommon.MetadataItem
 }
 
 //

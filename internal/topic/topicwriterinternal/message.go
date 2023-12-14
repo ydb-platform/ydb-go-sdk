@@ -9,15 +9,17 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xbytes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 var errNoRawContent = xerrors.Wrap(errors.New("ydb: internal state error - no raw message content"))
 
-type Message struct {
+type PublicMessage struct {
 	SeqNo     int64
 	CreatedAt time.Time
 	Data      io.Reader
+	Metadata  map[string][]byte
 
 	// partitioning at level message available by protocol, but doesn't available by current server implementation
 	// the field hidden from public access for prevent runtime errors.
@@ -53,7 +55,7 @@ func NewPartitioningWithPartitionID(id int64) PublicFuturePartitioning {
 }
 
 type messageWithDataContent struct {
-	Message
+	PublicMessage
 
 	dataWasRead         bool
 	encoders            *EncoderMap
@@ -63,6 +65,7 @@ type messageWithDataContent struct {
 	bufCodec            rawtopiccommon.Codec
 	bufEncoded          bytes.Buffer
 	BufUncompressedSize int
+	metadataCached      bool
 }
 
 func (m *messageWithDataContent) GetEncodedBytes(codec rawtopiccommon.Codec) ([]byte, error) {
@@ -71,6 +74,30 @@ func (m *messageWithDataContent) GetEncodedBytes(codec rawtopiccommon.Codec) ([]
 	}
 
 	return m.getEncodedBytes(codec)
+}
+
+func (m *messageWithDataContent) cacheMetadata() {
+	if m.metadataCached {
+		return
+	}
+
+	// ensure message metadata can't be changed by external code
+	if len(m.Metadata) > 0 {
+		ownCopy := make(map[string][]byte, len(m.Metadata))
+		for key, val := range m.Metadata {
+			ownCopy[key] = xbytes.Clone(val)
+		}
+		m.Metadata = ownCopy
+	} else {
+		m.Metadata = nil
+	}
+	m.metadataCached = true
+}
+
+func (m *messageWithDataContent) CacheMessageData(codec rawtopiccommon.Codec) error {
+	m.cacheMetadata()
+	_, err := m.GetEncodedBytes(codec)
+	return err
 }
 
 func (m *messageWithDataContent) encodeRawContent(codec rawtopiccommon.Codec) ([]byte, error) {
@@ -182,11 +209,11 @@ func (m *messageWithDataContent) getEncodedBytes(codec rawtopiccommon.Codec) ([]
 }
 
 func newMessageDataWithContent(
-	message Message, //nolint:gocritic
+	message PublicMessage, //nolint:gocritic
 	encoders *EncoderMap,
 ) messageWithDataContent {
 	return messageWithDataContent{
-		Message:  message,
-		encoders: encoders,
+		PublicMessage: message,
+		encoders:      encoders,
 	}
 }

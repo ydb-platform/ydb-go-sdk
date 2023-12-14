@@ -112,6 +112,48 @@ func TestSendSyncMessages(t *testing.T) {
 	})
 }
 
+func TestMessageMetadata(t *testing.T) {
+	t.Run("NoMetadata", func(t *testing.T) {
+		e := newScope(t)
+		err := e.TopicWriter().Write(e.Ctx, topicwriter.Message{})
+		e.Require.NoError(err)
+
+		mess, err := e.TopicReader().ReadMessage(e.Ctx)
+		e.Require.NoError(err)
+		e.Require.Nil(mess.Metadata)
+	})
+	t.Run("Meta1", func(t *testing.T) {
+		e := newScope(t)
+		meta := map[string][]byte{
+			"key": []byte("val"),
+		}
+		err := e.TopicWriter().Write(e.Ctx, topicwriter.Message{
+			Metadata: meta,
+		})
+		e.Require.NoError(err)
+
+		mess, err := e.TopicReader().ReadMessage(e.Ctx)
+		e.Require.NoError(err)
+		e.Require.Equal(meta, mess.Metadata)
+	})
+	t.Run("Meta2", func(t *testing.T) {
+		e := newScope(t)
+		meta := map[string][]byte{
+			"key1": []byte("val1"),
+			"key2": []byte("val2"),
+			"key3": []byte("val3"),
+		}
+		err := e.TopicWriter().Write(e.Ctx, topicwriter.Message{
+			Metadata: meta,
+		})
+		e.Require.NoError(err)
+
+		mess, err := e.TopicReader().ReadMessage(e.Ctx)
+		e.Require.NoError(err)
+		e.Require.Equal(meta, mess.Metadata)
+	})
+}
+
 func TestManyConcurentReadersWriters(t *testing.T) {
 	xtest.AllowByFlag(t, "ISSUE-389")
 

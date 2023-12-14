@@ -86,6 +86,13 @@ func newBatchFromStream(
 		dstMess.commitRange.commitOffsetStart = prevOffset + 1
 		dstMess.commitRange.commitOffsetEnd = sMess.Offset + 1
 
+		if len(sMess.MetadataItems) > 0 {
+			dstMess.Metadata = make(map[string][]byte, len(sMess.MetadataItems))
+			for _, item := range sMess.MetadataItems {
+				dstMess.Metadata[item.Key] = item.Value
+			}
+		}
+
 		prevOffset = sMess.Offset
 	}
 
