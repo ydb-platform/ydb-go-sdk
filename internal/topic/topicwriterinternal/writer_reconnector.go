@@ -207,7 +207,7 @@ func (w *WriterReconnector) start() {
 	w.background.Start(name+", sendloop", w.connectionLoop)
 }
 
-func (w *WriterReconnector) Write(ctx context.Context, messages []Message) error {
+func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage) error {
 	if err := w.background.CloseReason(); err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: writer is closed: %w", err))
 	}
@@ -291,7 +291,7 @@ func (w *WriterReconnector) checkMessages(messages []messageWithDataContent) err
 	return nil
 }
 
-func (w *WriterReconnector) createMessagesWithContent(messages []Message) ([]messageWithDataContent, error) {
+func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) ([]messageWithDataContent, error) {
 	res := make([]messageWithDataContent, 0, len(messages))
 	for i := range messages {
 		mess := newMessageDataWithContent(messages[i], w.encodersMap)

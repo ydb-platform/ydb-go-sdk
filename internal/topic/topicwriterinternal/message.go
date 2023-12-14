@@ -14,7 +14,7 @@ import (
 
 var errNoRawContent = xerrors.Wrap(errors.New("ydb: internal state error - no raw message content"))
 
-type Message struct {
+type PublicMessage struct {
 	SeqNo     int64
 	CreatedAt time.Time
 	Data      io.Reader
@@ -53,7 +53,7 @@ func NewPartitioningWithPartitionID(id int64) PublicFuturePartitioning {
 }
 
 type messageWithDataContent struct {
-	Message
+	PublicMessage
 
 	dataWasRead         bool
 	encoders            *EncoderMap
@@ -182,11 +182,11 @@ func (m *messageWithDataContent) getEncodedBytes(codec rawtopiccommon.Codec) ([]
 }
 
 func newMessageDataWithContent(
-	message Message, //nolint:gocritic
+	message PublicMessage, //nolint:gocritic
 	encoders *EncoderMap,
 ) messageWithDataContent {
 	return messageWithDataContent{
-		Message:  message,
-		encoders: encoders,
+		PublicMessage: message,
+		encoders:      encoders,
 	}
 }

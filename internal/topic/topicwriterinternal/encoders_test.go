@@ -51,13 +51,13 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 			var messages []messageWithDataContent
 			for i := 0; i < smallCount; i++ {
 				data := make([]byte, smallSize)
-				message := newMessageDataWithContent(Message{Data: bytes.NewReader(data)}, testCommonEncoders)
+				message := newMessageDataWithContent(PublicMessage{Data: bytes.NewReader(data)}, testCommonEncoders)
 				messages = append(messages, message)
 			}
 
 			for i := 0; i < largeCount; i++ {
 				data := make([]byte, largeSize)
-				message := newMessageDataWithContent(Message{Data: bytes.NewReader(data)}, testCommonEncoders)
+				message := newMessageDataWithContent(PublicMessage{Data: bytes.NewReader(data)}, testCommonEncoders)
 				messages = append(messages, message)
 			}
 
@@ -160,7 +160,7 @@ func TestCompressMessages(t *testing.T) {
 		require.NoError(t, readInParallelWithCodec(messages, rawtopiccommon.CodecRaw, 1))
 	})
 	t.Run("RawError", func(t *testing.T) {
-		mess := newMessageDataWithContent(Message{}, testCommonEncoders)
+		mess := newMessageDataWithContent(PublicMessage{}, testCommonEncoders)
 		_, err := mess.GetEncodedBytes(rawtopiccommon.CodecGzip)
 		require.NoError(t, err)
 		messages := []messageWithDataContent{mess}
@@ -171,7 +171,7 @@ func TestCompressMessages(t *testing.T) {
 	t.Run("GzipOneThread", func(t *testing.T) {
 		var messages []messageWithDataContent
 		for i := 0; i < messageCount; i++ {
-			mess := newMessageDataWithContent(Message{Data: strings.NewReader("asdf")}, testCommonEncoders)
+			mess := newMessageDataWithContent(PublicMessage{Data: strings.NewReader("asdf")}, testCommonEncoders)
 			messages = append(messages, mess)
 		}
 
@@ -185,7 +185,7 @@ func TestCompressMessages(t *testing.T) {
 	t.Run("GzipOk", func(t *testing.T) {
 		var messages []messageWithDataContent
 		for i := 0; i < messageCount; i++ {
-			mess := newMessageDataWithContent(Message{Data: strings.NewReader("asdf")}, testCommonEncoders)
+			mess := newMessageDataWithContent(PublicMessage{Data: strings.NewReader("asdf")}, testCommonEncoders)
 			messages = append(messages, mess)
 		}
 
@@ -198,7 +198,7 @@ func TestCompressMessages(t *testing.T) {
 	t.Run("GzipErr", func(t *testing.T) {
 		var messages []messageWithDataContent
 		for i := 0; i < messageCount; i++ {
-			mess := newMessageDataWithContent(Message{Data: strings.NewReader("asdf")}, testCommonEncoders)
+			mess := newMessageDataWithContent(PublicMessage{Data: strings.NewReader("asdf")}, testCommonEncoders)
 			messages = append(messages, mess)
 		}
 		messages[0].dataWasRead = true

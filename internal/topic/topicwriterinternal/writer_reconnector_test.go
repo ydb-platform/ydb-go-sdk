@@ -77,10 +77,10 @@ func TestWriterImpl_CheckMessages(t *testing.T) {
 		maxSize := 5
 		w.cfg.MaxMessageSize = maxSize
 
-		err := w.Write(ctx, []Message{{Data: bytes.NewReader(make([]byte, maxSize))}})
+		err := w.Write(ctx, []PublicMessage{{Data: bytes.NewReader(make([]byte, maxSize))}})
 		require.NoError(t, err)
 
-		err = w.Write(ctx, []Message{{Data: bytes.NewReader(make([]byte, maxSize+1))}})
+		err = w.Write(ctx, []PublicMessage{{Data: bytes.NewReader(make([]byte, maxSize+1))}})
 		require.Error(t, err)
 	})
 }
@@ -141,7 +141,11 @@ func TestWriterImpl_Write(t *testing.T) {
 
 			writeCompleted := make(empty.Chan)
 			go func() {
-				err := e.writer.Write(e.ctx, []Message{{SeqNo: seqNo, CreatedAt: messageTime, Data: bytes.NewReader(messageData)}})
+				err := e.writer.Write(e.ctx, []PublicMessage{{
+					SeqNo:     seqNo,
+					CreatedAt: messageTime,
+					Data:      bytes.NewReader(messageData),
+				}})
 				require.NoError(t, err)
 				close(writeCompleted)
 			}()
@@ -187,7 +191,7 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		require.NoError(t, e.writer.Write(e.ctx, []Message{{
+		require.NoError(t, e.writer.Write(e.ctx, []PublicMessage{{
 			Data: bytes.NewReader(messContent),
 		}}))
 
@@ -215,7 +219,7 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		require.NoError(t, e.writer.Write(e.ctx, []Message{{
+		require.NoError(t, e.writer.Write(e.ctx, []PublicMessage{{
 			Data: bytes.NewReader(messContent),
 		}}))
 
@@ -242,7 +246,7 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 		codecs := make(map[rawtopiccommon.Codec]empty.Struct)
 
 		for i := 0; i < codecMeasureIntervalBatches; i++ {
-			require.NoError(t, e.writer.Write(e.ctx, []Message{{
+			require.NoError(t, e.writer.Write(e.ctx, []PublicMessage{{
 				Data: bytes.NewReader(messContentShort),
 			}}))
 			// wait send
@@ -251,7 +255,7 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 		}
 
 		for i := 0; i < codecMeasureIntervalBatches; i++ {
-			require.NoError(t, e.writer.Write(e.ctx, []Message{{
+			require.NoError(t, e.writer.Write(e.ctx, []PublicMessage{{
 				Data: bytes.NewReader(messContentLong),
 			}}))
 			// wait send
@@ -711,12 +715,12 @@ func TestCalculateAllowedCodecs(t *testing.T) {
 }
 
 func newTestMessageWithDataContent(num int) messageWithDataContent {
-	res := newMessageDataWithContent(Message{SeqNo: int64(num)}, testCommonEncoders)
+	res := newMessageDataWithContent(PublicMessage{SeqNo: int64(num)}, testCommonEncoders)
 	return res
 }
 
-func newTestMessages(numbers ...int) []Message {
-	messages := make([]Message, len(numbers))
+func newTestMessages(numbers ...int) []PublicMessage {
+	messages := make([]PublicMessage, len(numbers))
 	for i, num := range numbers {
 		messages[i].SeqNo = int64(num)
 	}
