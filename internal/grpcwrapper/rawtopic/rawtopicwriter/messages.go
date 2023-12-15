@@ -187,10 +187,10 @@ func (d *MessageData) ToProto() (*Ydb_Topic.StreamWriteMessage_WriteRequest_Mess
 		return nil, err
 	}
 
-	for _, item := range d.MetadataItems {
+	for i := range d.MetadataItems {
 		res.MetadataItems = append(res.MetadataItems, &Ydb_Topic.MetadataItem{
-			Key:   item.Key,
-			Value: item.Value,
+			Key:   d.MetadataItems[i].Key,
+			Value: d.MetadataItems[i].Value,
 		})
 	}
 

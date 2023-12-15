@@ -88,8 +88,8 @@ func newBatchFromStream(
 
 		if len(sMess.MetadataItems) > 0 {
 			dstMess.Metadata = make(map[string][]byte, len(sMess.MetadataItems))
-			for _, item := range sMess.MetadataItems {
-				dstMess.Metadata[item.Key] = item.Value
+			for metadataIndex := range sMess.MetadataItems {
+				dstMess.Metadata[sMess.MetadataItems[metadataIndex].Key] = sMess.MetadataItems[metadataIndex].Value
 			}
 		}
 

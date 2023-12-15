@@ -108,7 +108,6 @@ func TestWriterImpl_Write(t *testing.T) {
 			require.NoError(t, err)
 			mess.metadataCached = true
 			expectedMap[k] = mess
-
 		}
 
 		require.Equal(t, expectedMap, w.queue.messagesByOrder)
