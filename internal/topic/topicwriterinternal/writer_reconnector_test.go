@@ -106,7 +106,9 @@ func TestWriterImpl_Write(t *testing.T) {
 			mess := expectedMap[k]
 			_, err = mess.GetEncodedBytes(rawtopiccommon.CodecRaw)
 			require.NoError(t, err)
+			mess.metadataCached = true
 			expectedMap[k] = mess
+
 		}
 
 		require.Equal(t, expectedMap, w.queue.messagesByOrder)
