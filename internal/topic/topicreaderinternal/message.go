@@ -9,6 +9,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xbytes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -28,6 +29,7 @@ type PublicMessage struct {
 	Offset               int64
 	WrittenAt            time.Time
 	ProducerID           string
+	Metadata             map[string][]byte // Metadata, nil if no metadata
 
 	commitRange        commitRange
 	data               oneTimeReader
@@ -132,6 +134,14 @@ func (pmb *PublicMessageBuilder) Seqno(seqNo int64) *PublicMessageBuilder {
 // CreatedAt set message CreatedAt
 func (pmb *PublicMessageBuilder) CreatedAt(createdAt time.Time) *PublicMessageBuilder {
 	pmb.mess.CreatedAt = createdAt
+	return pmb
+}
+
+func (pmb *PublicMessageBuilder) Metadata(metadata map[string][]byte) *PublicMessageBuilder {
+	pmb.mess.Metadata = make(map[string][]byte, len(metadata))
+	for key, val := range metadata {
+		pmb.mess.Metadata[key] = xbytes.Clone(val)
+	}
 	return pmb
 }
 

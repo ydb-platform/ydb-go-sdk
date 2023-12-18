@@ -171,6 +171,7 @@ type MessageData struct {
 	CreatedAt        time.Time
 	UncompressedSize int64
 	Partitioning     Partitioning
+	MetadataItems    []rawtopiccommon.MetadataItem
 	Data             []byte
 }
 
@@ -185,6 +186,14 @@ func (d *MessageData) ToProto() (*Ydb_Topic.StreamWriteMessage_WriteRequest_Mess
 	if err != nil {
 		return nil, err
 	}
+
+	for i := range d.MetadataItems {
+		res.MetadataItems = append(res.MetadataItems, &Ydb_Topic.MetadataItem{
+			Key:   d.MetadataItems[i].Key,
+			Value: d.MetadataItems[i].Value,
+		})
+	}
+
 	return res, nil
 }
 

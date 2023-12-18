@@ -24,6 +24,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -158,6 +162,68 @@ func (scope *scopeT) LoggerMinLevel(level log.Level) *testLogger {
 	return scope.Cache(level, nil, func() (res interface{}, err error) {
 		return newLoggerWithMinLevel(scope.t, level), nil
 	}).(*testLogger)
+}
+
+func (scope *scopeT) TopicConsumerName() string {
+	return "test-consumer"
+}
+
+func (scope *scopeT) TopicPath() string {
+	return scope.CacheWithCleanup(nil, nil, func() (res interface{}, cleanup fixenv.FixtureCleanupFunc, err error) {
+		topicName := strings.Replace(scope.T().Name(), "/", "__", -1)
+		topicPath := path.Join(scope.Folder(), topicName)
+		client := scope.Driver().Topic()
+
+		cleanup = func() {
+			if !scope.Failed() {
+				_ = client.Drop(scope.Ctx, topicPath)
+			}
+		}
+		cleanup()
+
+		err = client.Create(scope.Ctx, topicPath, topicoptions.CreateWithConsumer(
+			topictypes.Consumer{
+				Name: scope.TopicConsumerName(),
+			},
+		))
+
+		return topicPath, cleanup, err
+	}).(string)
+}
+
+func (scope *scopeT) TopicReader() *topicreader.Reader {
+	return scope.CacheWithCleanup(nil, nil, func() (res interface{}, cleanup fixenv.FixtureCleanupFunc, err error) {
+		reader, err := scope.Driver().Topic().StartReader(
+			scope.TopicConsumerName(),
+			topicoptions.ReadTopic(scope.TopicPath()),
+		)
+		cleanup = func() {
+			if reader != nil {
+				_ = reader.Close(scope.Ctx)
+			}
+		}
+		return reader, cleanup, err
+	}).(*topicreader.Reader)
+}
+
+func (scope *scopeT) TopicWriter() *topicwriter.Writer {
+	return scope.CacheWithCleanup(nil, nil, func() (res interface{}, cleanup fixenv.FixtureCleanupFunc, err error) {
+		writer, err := scope.Driver().Topic().StartWriter(
+			scope.TopicPath(),
+			topicoptions.WithWriterProducerID(scope.TopicWriterProducerID()),
+			topicoptions.WithWriterWaitServerAck(true),
+		)
+		cleanup = func() {
+			if writer != nil {
+				_ = writer.Close(scope.Ctx)
+			}
+		}
+		return writer, cleanup, err
+	}).(*topicwriter.Writer)
+}
+
+func (scope *scopeT) TopicWriterProducerID() string {
+	return "test-producer-id"
 }
 
 type tableNameParams struct {

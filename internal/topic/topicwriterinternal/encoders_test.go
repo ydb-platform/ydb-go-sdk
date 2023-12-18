@@ -152,19 +152,19 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 
 func TestCompressMessages(t *testing.T) {
 	t.Run("NoMessages", func(t *testing.T) {
-		require.NoError(t, readInParallelWithCodec(nil, rawtopiccommon.CodecRaw, 1))
+		require.NoError(t, cacheMessages(nil, rawtopiccommon.CodecRaw, 1))
 	})
 
 	t.Run("RawOk", func(t *testing.T) {
 		messages := newTestMessagesWithContent(1)
-		require.NoError(t, readInParallelWithCodec(messages, rawtopiccommon.CodecRaw, 1))
+		require.NoError(t, cacheMessages(messages, rawtopiccommon.CodecRaw, 1))
 	})
 	t.Run("RawError", func(t *testing.T) {
 		mess := newMessageDataWithContent(PublicMessage{}, testCommonEncoders)
 		_, err := mess.GetEncodedBytes(rawtopiccommon.CodecGzip)
 		require.NoError(t, err)
 		messages := []messageWithDataContent{mess}
-		require.Error(t, readInParallelWithCodec(messages, rawtopiccommon.CodecRaw, 1))
+		require.Error(t, cacheMessages(messages, rawtopiccommon.CodecRaw, 1))
 	})
 
 	const messageCount = 10
@@ -175,7 +175,7 @@ func TestCompressMessages(t *testing.T) {
 			messages = append(messages, mess)
 		}
 
-		require.NoError(t, readInParallelWithCodec(messages, rawtopiccommon.CodecGzip, 1))
+		require.NoError(t, cacheMessages(messages, rawtopiccommon.CodecGzip, 1))
 		for i := 0; i < messageCount; i++ {
 			require.Equal(t, rawtopiccommon.CodecGzip, messages[i].bufCodec)
 		}
@@ -189,7 +189,7 @@ func TestCompressMessages(t *testing.T) {
 			messages = append(messages, mess)
 		}
 
-		require.NoError(t, readInParallelWithCodec(messages, rawtopiccommon.CodecGzip, parallelCount))
+		require.NoError(t, cacheMessages(messages, rawtopiccommon.CodecGzip, parallelCount))
 		for i := 0; i < messageCount; i++ {
 			require.Equal(t, rawtopiccommon.CodecGzip, messages[i].bufCodec)
 		}
@@ -203,6 +203,6 @@ func TestCompressMessages(t *testing.T) {
 		}
 		messages[0].dataWasRead = true
 
-		require.Error(t, readInParallelWithCodec(messages, rawtopiccommon.CodecGzip, parallelCount))
+		require.Error(t, cacheMessages(messages, rawtopiccommon.CodecGzip, parallelCount))
 	})
 }

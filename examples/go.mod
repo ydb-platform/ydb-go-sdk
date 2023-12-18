@@ -49,7 +49,7 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/yandex-cloud/go-genproto v0.0.0-20220815090733-4c139c0154e2 // indirect
-	github.com/ydb-platform/ydb-go-genproto v0.0.0-20231012155159-f85a672542fd // indirect
+	github.com/ydb-platform/ydb-go-genproto v0.0.0-20231215113745-46f6d30f974a // indirect
 	github.com/ydb-platform/ydb-go-sdk-metrics v0.16.3 // indirect
 	github.com/ydb-platform/ydb-go-yc-metadata v0.5.4 // indirect
 	golang.org/x/crypto v0.13.0 // indirect

@@ -316,7 +316,7 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 	if targetCodec == rawtopiccommon.CodecUNSPECIFIED {
 		targetCodec = rawtopiccommon.CodecRaw
 	}
-	err := readInParallelWithCodec(res, targetCodec, w.cfg.compressorCount)
+	err := cacheMessages(res, targetCodec, w.cfg.compressorCount)
 	onCompressDone(err)
 	if err != nil {
 		return nil, err
@@ -653,6 +653,17 @@ func createRawMessageData(
 
 	res.UncompressedSize = int64(mess.BufUncompressedSize)
 	res.Data, err = mess.GetEncodedBytes(codec)
+
+	if len(mess.Metadata) > 0 {
+		res.MetadataItems = make([]rawtopiccommon.MetadataItem, 0, len(mess.Metadata))
+		for key, val := range mess.Metadata {
+			res.MetadataItems = append(res.MetadataItems, rawtopiccommon.MetadataItem{
+				Key:   key,
+				Value: val,
+			})
+		}
+	}
+
 	return res, err
 }
 

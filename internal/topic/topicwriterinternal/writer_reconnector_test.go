@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -105,6 +106,7 @@ func TestWriterImpl_Write(t *testing.T) {
 			mess := expectedMap[k]
 			_, err = mess.GetEncodedBytes(rawtopiccommon.CodecRaw)
 			require.NoError(t, err)
+			mess.metadataCached = true
 			expectedMap[k] = mess
 		}
 
@@ -550,6 +552,38 @@ func TestCreateRawMessageData(t *testing.T) {
 			},
 			req,
 		)
+	})
+	t.Run("WithMessageMetadata", func(t *testing.T) {
+		messages := newTestMessagesWithContent(1)
+		messages[0].Metadata = map[string][]byte{
+			"a": {1, 2, 3},
+			"b": {4, 5},
+		}
+		req, err := createWriteRequest(messages, rawtopiccommon.CodecRaw)
+
+		sort.Slice(req.Messages[0].MetadataItems, func(i, j int) bool {
+			return req.Messages[0].MetadataItems[i].Key < req.Messages[0].MetadataItems[j].Key
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, rawtopicwriter.WriteRequest{
+			Messages: []rawtopicwriter.MessageData{
+				{
+					SeqNo: 1,
+					MetadataItems: []rawtopiccommon.MetadataItem{
+						{
+							Key:   "a",
+							Value: []byte{1, 2, 3},
+						},
+						{
+							Key:   "b",
+							Value: []byte{4, 5},
+						},
+					},
+				},
+			},
+			Codec: rawtopiccommon.CodecRaw,
+		}, req)
 	})
 	t.Run("WithSeqno", func(t *testing.T) {
 		req, err := createWriteRequest(newTestMessagesWithContent(1, 2, 3), rawtopiccommon.CodecRaw)

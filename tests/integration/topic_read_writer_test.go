@@ -9,6 +9,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"os"
 	"runtime/pprof"
 	"strconv"
 	"strings"
@@ -22,6 +23,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
@@ -109,6 +111,54 @@ func TestSendSyncMessages(t *testing.T) {
 			require.Equal(t, "2", string(data))
 			return nil
 		}))
+	})
+}
+
+func TestMessageMetadata(t *testing.T) {
+	t.Run("NoMetadata", func(t *testing.T) {
+		e := newScope(t)
+		err := e.TopicWriter().Write(e.Ctx, topicwriter.Message{})
+		e.Require.NoError(err)
+
+		mess, err := e.TopicReader().ReadMessage(e.Ctx)
+		e.Require.NoError(err)
+		e.Require.Nil(mess.Metadata)
+	})
+	t.Run("Meta1", func(t *testing.T) {
+		if version.Lt(os.Getenv("YDB_VERSION"), "24.0") {
+			t.Skip()
+		}
+		e := newScope(t)
+		meta := map[string][]byte{
+			"key": []byte("val"),
+		}
+		err := e.TopicWriter().Write(e.Ctx, topicwriter.Message{
+			Metadata: meta,
+		})
+		e.Require.NoError(err)
+
+		mess, err := e.TopicReader().ReadMessage(e.Ctx)
+		e.Require.NoError(err)
+		e.Require.Equal(meta, mess.Metadata)
+	})
+	t.Run("Meta2", func(t *testing.T) {
+		if version.Lt(os.Getenv("YDB_VERSION"), "24.0") {
+			t.Skip()
+		}
+		e := newScope(t)
+		meta := map[string][]byte{
+			"key1": []byte("val1"),
+			"key2": []byte("val2"),
+			"key3": []byte("val3"),
+		}
+		err := e.TopicWriter().Write(e.Ctx, topicwriter.Message{
+			Metadata: meta,
+		})
+		e.Require.NoError(err)
+
+		mess, err := e.TopicReader().ReadMessage(e.Ctx)
+		e.Require.NoError(err)
+		e.Require.Equal(meta, mess.Metadata)
 	})
 }
 

@@ -119,7 +119,7 @@ func (s *EncoderSelector) CompressMessages(messages []messageWithDataContent) (r
 			len(messages),
 			trace.TopicWriterCompressMessagesReasonCompressData,
 		)
-		err = readInParallelWithCodec(messages, codec, s.parallelCompressors)
+		err = cacheMessages(messages, codec, s.parallelCompressors)
 		onCompressDone(err)
 	}
 	return codec, err
@@ -188,7 +188,7 @@ func (s *EncoderSelector) measureCodecs(messages []messageWithDataContent) (rawt
 			len(messages),
 			trace.TopicWriterCompressMessagesReasonCodecsMeasure,
 		)
-		err := readInParallelWithCodec(messages, codec, s.parallelCompressors)
+		err := cacheMessages(messages, codec, s.parallelCompressors)
 		onCompressDone(err)
 		if err != nil {
 			return codecUnknown, err
@@ -215,8 +215,7 @@ func (s *EncoderSelector) measureCodecs(messages []messageWithDataContent) (rawt
 	return s.allowedCodecs[minSizeIndex], nil
 }
 
-func readInParallelWithCodec(messages []messageWithDataContent, codec rawtopiccommon.Codec, parallel int) error {
-	workerCount := parallel
+func cacheMessages(messages []messageWithDataContent, codec rawtopiccommon.Codec, workerCount int) error {
 	if len(messages) < workerCount {
 		workerCount = len(messages)
 	}
@@ -253,7 +252,7 @@ func readInParallelWithCodec(messages []messageWithDataContent, codec rawtopicco
 			if localErr != nil {
 				return
 			}
-			_, localErr = task.GetEncodedBytes(codec)
+			localErr = task.CacheMessageData(codec)
 			if localErr != nil {
 				resErrMutex.WithLock(func() {
 					resErr = localErr
