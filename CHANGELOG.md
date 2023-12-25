@@ -3,6 +3,7 @@
 * Extended metrics (fill database.sql callbacks, recognize TLI error)
 * Refactored config prefix in metrics
 * Removed excess status labels from metrics
+* Implement `fmt.Stringer` interface for `Driver` struct
 
 ## v3.54.2
 * Added context to some internal methods for better tracing

@@ -147,16 +147,16 @@ func parseExpiresAt(raw string) (expiresAt time.Time, err error) {
 func (c *Static) String() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
-	buffer.WriteString("Static(user:")
+	buffer.WriteString("Static{User:")
 	fmt.Fprintf(buffer, "%q", c.user)
-	buffer.WriteString(",password:")
+	buffer.WriteString(",Password:")
 	fmt.Fprintf(buffer, "%q", secret.Password(c.password))
-	buffer.WriteString(",token:")
+	buffer.WriteString(",Token:")
 	fmt.Fprintf(buffer, "%q", secret.Token(c.token))
 	if c.sourceInfo != "" {
-		buffer.WriteString(",from:")
+		buffer.WriteString(",From:")
 		fmt.Fprintf(buffer, "%q", c.sourceInfo)
 	}
-	buffer.WriteByte(')')
+	buffer.WriteByte('}')
 	return buffer.String()
 }
