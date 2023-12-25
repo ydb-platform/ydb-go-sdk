@@ -42,11 +42,11 @@ func (c Anonymous) Token(_ context.Context) (string, error) {
 func (c Anonymous) String() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
-	buffer.WriteString("Anonymous(")
+	buffer.WriteString("Anonymous{")
 	if c.sourceInfo != "" {
-		buffer.WriteString("from:")
+		buffer.WriteString("From:")
 		fmt.Fprintf(buffer, "%q", c.sourceInfo)
 	}
-	buffer.WriteByte(')')
+	buffer.WriteByte('}')
 	return buffer.String()
 }

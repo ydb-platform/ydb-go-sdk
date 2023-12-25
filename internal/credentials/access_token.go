@@ -46,12 +46,12 @@ func (c AccessToken) Token(_ context.Context) (string, error) {
 func (c AccessToken) String() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
-	buffer.WriteString("AccessToken(token:")
+	buffer.WriteString("AccessToken{Token:")
 	fmt.Fprintf(buffer, "%q", secret.Token(c.token))
 	if c.sourceInfo != "" {
-		buffer.WriteString(",from:")
+		buffer.WriteString(",From:")
 		fmt.Fprintf(buffer, "%q", c.sourceInfo)
 	}
-	buffer.WriteByte(')')
+	buffer.WriteByte('}')
 	return buffer.String()
 }

@@ -3,7 +3,6 @@ package ydb
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os"
 	"sync"
 
@@ -209,17 +208,6 @@ func (d *Driver) Scripting() scripting.Client {
 // Topic returns topic client
 func (d *Driver) Topic() topic.Client {
 	return d.topic
-}
-
-// String returns string representation of Driver
-func (d *Driver) String() string {
-	return fmt.Sprintf(
-		"Driver{User: %s, Endpoint: %s, Database: %s, IsSecure %t}",
-		d.userInfo.User,
-		d.config.Endpoint(),
-		d.config.Database(),
-		d.config.Secure(),
-	)
 }
 
 // Open connects to database by DSN and return driver runtime holder
