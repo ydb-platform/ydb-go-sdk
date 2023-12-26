@@ -1,11 +1,5 @@
 # options for analysis running
 run:
-  # default concurrency is a available CPU number
-  concurrency: 4
-
-  # timeout for analysis, e.g. 30s, 5m, default is 1m
-  deadline: 5m
-
   # exit code when at least one issue was found, default is 1
   issues-exit-code: 1
 
@@ -58,7 +52,6 @@ linters-settings:
   govet:
     # report about shadowed variables
     check-shadowing: true
-    fieldalignment: true
   golint:
     # minimal confidence for issues, default is 0.8
     min-confidence: 0.8
@@ -76,9 +69,6 @@ linters-settings:
     min-len: 2
     # minimal occurrences count to trigger, 3 by default
     min-occurrences: 2
-  fieldalignment:
-    # print struct with more effective memory layout or not, false by default
-    suggest-new: true
   misspell:
     # Correct spellings using locale preferences for US or UK.
     # Default is to use a neutral variety of English.
@@ -109,17 +99,7 @@ linters-settings:
       - name: empty-block
       - name: superfluous-else
       - name: unreachable-code
-  unused:
-    # treat code as a program (not a library) and report unused exported identifiers; default is false.
-    # XXX: if you enable this setting, unused will report a lot of false-positives in text editors:
-    # if it's called for subdir of a project it can't find funcs usages. All text editor integrations
-    # with golangci-lint call it on a directory with the changed file.
-    check-exported: false
   unparam:
-    # call graph construction algorithm (cha, rta). In general, use cha for libraries,
-    # and rta for programs with main packages. Default is cha.
-    algo: cha
-
     # Inspect exported functions, default is false. Set to true if no external program/library imports your code.
     # XXX: if you enable this setting, unparam will report a lot of false-positives in text editors:
     # if it's called for subdir of a project it can't find external interfaces. All text editor integrations
@@ -130,7 +110,7 @@ linters-settings:
       - whyNoLint # https://github.com/go-critic/go-critic/issues/1063
       - importShadow
       - sloppyReassign
-#      - typeDefFirst
+    #      - typeDefFirst
     # Enable multiple checks by tags, run `GL_DEBUG=gocritic golangci-lint run` to see all tags and checks.
     # See https://github.com/go-critic/go-critic#usage -> section "Tags".
     # Default: []
@@ -227,25 +207,58 @@ linters-settings:
 linters:
   enable-all: true
   disable:
-    - godot
-    - varnamelen
-    - wrapcheck
-    - nosnakecase
+    - asasalint
+    - containedctx
+    - contextcheck
+    - cyclop
     - deadcode
-    - golint
-    - interfacer
-    - maligned
-    - ifshort
-    - structcheck
-    - exhaustivestruct
-    - scopelint
-    - varcheck
-    - ireturn
     - depguard
-    - wsl
+    - dupl
+    - dupword
+    - durationcheck
+    - errname
+    - exhaustive
+    - exhaustivestruct
     - exhaustruct
+    - forbidigo
+    - forcetypeassert
+    - funlen
     - gci
-    - paralleltest #need be enabled
+    - gochecknoglobals
+    - gocognit
+    - goconst
+    - godot
+    - goerr113
+    - golint
+    - gomnd
+    - gosec
+    - ifshort
+    - interfacebloat
+    - interfacer
+    - inamedparam
+    - ireturn
+    - maintidx
+    - maligned
+    - nilerr
+    - nilnil
+    - nlreturn
+    - nonamedreturns
+    - nosnakecase
+    - paralleltest
+    - protogetter
+    - revive
+    - scopelint
+    - structcheck
+    - sqlclosecheck
+    - testableexamples
+    - testpackage
+    - testifylint
+    - thelper
+    - varcheck
+    - varnamelen
+    - wastedassign
+    - wrapcheck
+    - wsl
 
 issues:
   # List of regexps of issue texts to exclude, empty list by default.
@@ -269,9 +282,6 @@ issues:
   # excluded by default patterns execute `golangci-lint run --help`.
   # Default value for this option is true.
   exclude-use-default: true
-
-  # Maximum issues count per one linter. Set to 0 to disable. Default is 50.
-  max-per-linter: 0
 
   # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
   max-same-issues: 0
