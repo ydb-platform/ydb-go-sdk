@@ -106,6 +106,9 @@ func (s *service) ping(path string) (code int32, err error) {
 	if err != nil {
 		return -1, err
 	}
+	defer func() {
+		_ = response.Body.Close()
+	}()
 	return int32(response.StatusCode), nil
 }
 
