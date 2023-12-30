@@ -44,7 +44,7 @@ func GenerateDeclareSection[T *table.QueryParameters | []table.ParameterOption |
 //
 // Deprecated: use testutil/QueryBind helper
 func ToYdbParam(param sql.NamedArg) (table.ParameterOption, error) {
-	params, err := bind.Params([]interface{}{param})
+	params, err := bind.Params(param)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
