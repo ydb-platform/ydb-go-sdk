@@ -210,7 +210,6 @@ linters:
     - containedctx
     - contextcheck
     - cyclop
-    - deadcode
     - depguard
     - dupl
     - dupword
