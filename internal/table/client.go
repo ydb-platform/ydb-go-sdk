@@ -502,7 +502,7 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s 
 		c.mu.WithLock(func() {
 			c.waitQ.Remove(el)
 		})
-		return nil, nil
+		return nil, nil //nolint:nilnil
 
 	case <-ctx.Done():
 		c.mu.WithLock(func() {
