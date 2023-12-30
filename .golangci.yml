@@ -207,7 +207,6 @@ linters-settings:
 linters:
   enable-all: true
   disable:
-    - asasalint
     - bodyclose
     - containedctx
     - contextcheck

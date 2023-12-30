@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
@@ -267,6 +268,52 @@ func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 			yql, _, err := b.RewriteQuery("", tt.params...)
 			require.NoError(t, err)
 			require.Equal(t, tt.declares, getDeclares(yql))
+		})
+	}
+}
+
+func TestToYdbParam(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		param    sql.NamedArg
+		ydbParam table.ParameterOption
+		err      error
+	}{
+		{
+			name:     xtest.CurrentFileLine(),
+			param:    sql.Named("a", "b"),
+			ydbParam: table.ValueParam("$a", types.TextValue("b")),
+			err:      nil,
+		},
+		{
+			name:     xtest.CurrentFileLine(),
+			param:    sql.Named("a", 123),
+			ydbParam: table.ValueParam("$a", types.Int32Value(123)),
+			err:      nil,
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			param: sql.Named("a", types.OptionalValue(types.TupleValue(
+				types.BytesValue([]byte("test")),
+				types.TextValue("test"),
+				types.Uint64Value(123),
+			))),
+			ydbParam: table.ValueParam("$a", types.OptionalValue(types.TupleValue(
+				types.BytesValue([]byte("test")),
+				types.TextValue("test"),
+				types.Uint64Value(123),
+			))),
+			err: nil,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			ydbParam, err := ToYdbParam(tt.param)
+			if tt.err != nil {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.ydbParam, ydbParam)
+			}
 		})
 	}
 }
