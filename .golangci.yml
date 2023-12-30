@@ -253,7 +253,6 @@ linters:
     - protogetter
     - revive
     - scopelint
-    - sqlclosecheck
     - structcheck
     - tagalign
     - tagliatelle
