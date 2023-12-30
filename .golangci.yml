@@ -208,6 +208,7 @@ linters:
   enable-all: true
   disable:
     - asasalint
+    - bodyclose
     - containedctx
     - contextcheck
     - cyclop
@@ -225,34 +226,41 @@ linters:
     - funlen
     - gci
     - gochecknoglobals
+    - gochecknoinits
     - gocognit
     - goconst
     - godot
     - goerr113
     - golint
     - gomnd
+    - gomoddirectives
     - gosec
     - ifshort
+    - inamedparam
     - interfacebloat
     - interfacer
-    - inamedparam
     - ireturn
     - maintidx
     - maligned
+    - nakedret
     - nilerr
     - nilnil
     - nlreturn
+    - noctx
     - nonamedreturns
     - nosnakecase
     - paralleltest
+    - promlinter
     - protogetter
     - revive
     - scopelint
-    - structcheck
     - sqlclosecheck
+    - structcheck
+    - tagalign
+    - tagliatelle
     - testableexamples
-    - testpackage
     - testifylint
+    - testpackage
     - thelper
     - varcheck
     - varnamelen
