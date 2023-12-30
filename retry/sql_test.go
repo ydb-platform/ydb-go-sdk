@@ -191,6 +191,9 @@ func TestDoTx(t *testing.T) {
 							if err != nil {
 								return err
 							}
+							defer func() {
+								_ = rows.Close()
+							}()
 							return rows.Err()
 						},
 						WithIdempotent(bool(idempotentType)),
