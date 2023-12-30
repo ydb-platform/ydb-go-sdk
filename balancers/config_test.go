@@ -161,7 +161,7 @@ func TestFromConfig(t *testing.T) {
 				tt.res.Filter = nil
 			}
 
-			require.Equal(t, &tt.res, b)
+			require.Equal(t, tt.res, *b)
 		})
 	}
 }
