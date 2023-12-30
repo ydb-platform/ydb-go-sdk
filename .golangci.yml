@@ -207,7 +207,6 @@ linters-settings:
 linters:
   enable-all: true
   disable:
-    - bodyclose
     - containedctx
     - contextcheck
     - cyclop
