@@ -43,11 +43,11 @@ func BigEndianUint128(hi, lo uint64) (v [16]byte) {
 }
 
 func FromYDB(t *Ydb.Type, v *Ydb.Value) Value {
-	if vv, err := fromYDB(t, v); err != nil {
+	vv, err := fromYDB(t, v)
+	if err != nil {
 		panic(err)
-	} else {
-		return vv
 	}
+	return vv
 }
 
 func nullValueFromYDB(x *Ydb.Value, t Type) (_ Value, ok bool) {

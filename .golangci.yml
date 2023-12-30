@@ -250,7 +250,6 @@ linters:
     - paralleltest
     - promlinter
     - protogetter
-    - revive
     - scopelint
     - structcheck
     - tagalign
