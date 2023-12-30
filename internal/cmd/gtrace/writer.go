@@ -779,7 +779,7 @@ func (f flags) has(x flags) bool {
 }
 
 const (
-	zeroFlags flags = 1 << iota >> 1
+	_ flags = 1 << iota >> 1
 	docs
 )
 
