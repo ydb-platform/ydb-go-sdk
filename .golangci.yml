@@ -231,7 +231,6 @@ linters:
     - golint
     - gomnd
     - gomoddirectives
-    - gosec
     - ifshort
     - inamedparam
     - interfacebloat
