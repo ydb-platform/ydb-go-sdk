@@ -241,7 +241,6 @@ linters:
     - nakedret
     - nilerr
     - nlreturn
-    - noctx
     - nonamedreturns
     - nosnakecase
     - paralleltest
