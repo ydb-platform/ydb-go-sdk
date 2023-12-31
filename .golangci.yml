@@ -247,7 +247,6 @@ linters:
     - protogetter
     - scopelint
     - structcheck
-    - tagliatelle
     - testableexamples
     - testifylint
     - testpackage

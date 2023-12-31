@@ -33,6 +33,7 @@ func ReadMessagesByBatch(ctx context.Context, reader *topicreader.Reader) {
 
 // UnmarshalMessageContentToJSONStruct is example for effective way for unmarshal json message content to value
 func UnmarshalMessageContentToJSONStruct(msg *topicreader.Message) {
+	//nolint:tagliatelle
 	type S struct {
 		MyField int `json:"my_field"`
 	}
