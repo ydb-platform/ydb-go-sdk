@@ -250,7 +250,6 @@ linters:
     - scopelint
     - structcheck
     - tagalign
-    - tagliatelle
     - testableexamples
     - testifylint
     - testpackage
