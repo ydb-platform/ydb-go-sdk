@@ -69,7 +69,7 @@ func selectPaging(
 			}()
 			if !res.NextResultSet(ctx) || !res.HasNextRow() {
 				empty = true
-				return
+				return res.Err()
 			}
 			var addr string
 			for res.NextRow() {
@@ -86,10 +86,7 @@ func selectPaging(
 			return res.Err()
 		},
 	)
-	if err != nil {
-		return
-	}
-	return empty, nil
+	return empty, err
 }
 
 func fillTableWithData(ctx context.Context, c table.Client, prefix string) (err error) {

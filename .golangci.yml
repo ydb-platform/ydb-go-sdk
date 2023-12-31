@@ -238,10 +238,8 @@ linters:
     - ireturn
     - maintidx
     - maligned
-    - nakedret
     - nilerr
     - nlreturn
-    - noctx
     - nonamedreturns
     - nosnakecase
     - paralleltest
@@ -249,7 +247,6 @@ linters:
     - protogetter
     - scopelint
     - structcheck
-    - tagalign
     - testableexamples
     - testifylint
     - testpackage
