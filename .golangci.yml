@@ -250,7 +250,6 @@ linters:
     - testifylint
     - testpackage
     - thelper
-    - varcheck
     - varnamelen
     - wastedassign
     - wrapcheck
