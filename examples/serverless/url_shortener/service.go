@@ -89,6 +89,7 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 			calls    = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 				Namespace: "app",
 				Name:      "calls",
+				Help:      "application calls counter",
 			}, []string{
 				"method",
 				"success",
@@ -96,6 +97,7 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 			callsLatency = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 				Namespace: "app",
 				Name:      "latency",
+				Help:      "application calls latencies",
 				Buckets: []float64{
 					(1 * time.Millisecond).Seconds(),
 					(5 * time.Millisecond).Seconds(),
@@ -114,6 +116,7 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 			callsErrors = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 				Namespace: "app",
 				Name:      "errors",
+				Help:      "application errors counter",
 			}, []string{
 				"method",
 			})

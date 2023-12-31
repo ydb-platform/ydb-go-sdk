@@ -243,7 +243,6 @@ linters:
     - nonamedreturns
     - nosnakecase
     - paralleltest
-    - promlinter
     - protogetter
     - scopelint
     - structcheck
