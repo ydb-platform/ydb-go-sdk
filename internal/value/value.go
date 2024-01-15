@@ -928,7 +928,7 @@ func (v intervalValue) Yql() string {
 	}
 	buffer.WriteByte('P')
 	if days := d / time.Hour / 24; days > 0 {
-		d -= days * time.Hour * 24
+		d -= days * time.Hour * 24 //nolint:durationcheck
 		buffer.WriteString(strconv.FormatInt(int64(days), 10))
 		buffer.WriteByte('D')
 	}
@@ -936,12 +936,12 @@ func (v intervalValue) Yql() string {
 		buffer.WriteByte('T')
 	}
 	if hours := d / time.Hour; hours > 0 {
-		d -= hours * time.Hour
+		d -= hours * time.Hour //nolint:durationcheck
 		buffer.WriteString(strconv.FormatInt(int64(hours), 10))
 		buffer.WriteByte('H')
 	}
 	if minutes := d / time.Minute; minutes > 0 {
-		d -= minutes * time.Minute
+		d -= minutes * time.Minute //nolint:durationcheck
 		buffer.WriteString(strconv.FormatInt(int64(minutes), 10))
 		buffer.WriteByte('M')
 	}

@@ -213,7 +213,6 @@ linters:
     - depguard
     - dupl
     - dupword
-    - durationcheck
     - errname
     - exhaustive
     - exhaustivestruct
