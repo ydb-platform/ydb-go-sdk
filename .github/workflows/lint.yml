@@ -19,6 +19,7 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.55.2
+          args: --timeout=5m
   golangci-examples:
     name: golangci-lint-examples
     concurrency:
@@ -35,6 +36,7 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.55.2
+          args: --timeout=5m
           working-directory: examples
   golangci-slo:
     name: golangci-lint-slo
@@ -52,6 +54,7 @@ jobs:
         uses: golangci/golangci-lint-action@v3
         with:
           version: v1.55.2
+          args: --timeout=5m
           working-directory: tests/slo
   autoformatter:
     name: autoformat check
