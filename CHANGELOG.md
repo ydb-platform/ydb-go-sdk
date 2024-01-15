@@ -1,3 +1,5 @@
+* Refactored `internal/value/intervalValue.Yql()`
+
 ## v3.54.3
 * Added per message metadata support for topic api
 * Context for call options now have same lifetime as driver (previous - same lifetime as context for call Open function).
