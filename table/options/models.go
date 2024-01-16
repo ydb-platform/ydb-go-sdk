@@ -22,7 +22,7 @@ type Column struct {
 func (c Column) toYDB(a *allocator.Allocator) *Ydb_Table.ColumnMeta {
 	return &Ydb_Table.ColumnMeta{
 		Name:   c.Name,
-		Type:   value.TypeToYDB(c.Type, a),
+		Type:   c.Type.ToYDB(a),
 		Family: c.Family,
 	}
 }
@@ -406,8 +406,8 @@ type (
 )
 
 type KeyRange struct {
-	From types.Value
-	To   types.Value
+	From value.Value
+	To   value.Value
 }
 
 func (kr KeyRange) String() string {

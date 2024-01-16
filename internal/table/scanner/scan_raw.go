@@ -10,6 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	types2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
@@ -583,7 +584,7 @@ func (s *rawConverter) IsDecimal() bool {
 }
 
 func isEqualDecimal(d *Ydb.DecimalType, t types.Type) bool {
-	w := t.(*value.DecimalType)
+	w := t.(*types2.DecimalType)
 
 	return d.Precision == w.Precision && d.Scale == w.Scale
 }
@@ -712,8 +713,8 @@ func (s *rawConverter) assertCurrentTypeNullable() bool {
 
 func (s *rawConverter) assertCurrentTypeIs(t types.Type) bool {
 	c := s.stack.current()
-	act := value.TypeFromYDB(c.t)
-	if !value.TypesEqual(act, t) {
+	act := types2.TypeFromYDB(c.t)
+	if !types2.TypesEqual(act, t) {
 		_ = s.errorf(
 			1,
 			"unexpected types at %q %s: %s; want %s",

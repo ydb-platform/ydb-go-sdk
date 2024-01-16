@@ -15,7 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	types2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -184,7 +184,7 @@ func (c *Client) explain(
 		ParameterTypes: make(map[string]types.Type, len(result.GetParametersTypes())),
 	}
 	for k, v := range result.GetParametersTypes() {
-		e.ParameterTypes[k] = value.TypeFromYDB(v)
+		e.ParameterTypes[k] = types2.TypeFromYDB(v)
 	}
 
 	return e, nil

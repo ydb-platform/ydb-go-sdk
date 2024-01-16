@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 )
 
 func BenchmarkMemory(b *testing.B) {
@@ -68,24 +69,24 @@ func BenchmarkMemory(b *testing.B) {
 			DictValueField{TextValue("air_date"), Uint64Value(3)},
 			DictValueField{TextValue("remove_date"), Uint64Value(4)},
 		),
-		NullValue(Optional(Optional(Optional(TypeBool)))),
-		VariantValueTuple(Int32Value(42), 1, Tuple(
-			TypeBytes,
-			TypeInt32,
+		NullValue(types.Optional(types.Optional(types.Optional(types.TypeBool)))),
+		VariantValueTuple(Int32Value(42), 1, types.Tuple(
+			types.TypeBytes,
+			types.TypeInt32,
 		)),
-		VariantValueStruct(Int32Value(42), "bar", Struct(
-			StructField{
+		VariantValueStruct(Int32Value(42), "bar", types.Struct(
+			types.StructField{
 				Name: "foo",
-				T:    TypeBytes,
+				T:    types.TypeBytes,
 			},
-			StructField{
+			types.StructField{
 				Name: "bar",
-				T:    TypeInt32,
+				T:    types.TypeInt32,
 			},
 		)),
-		ZeroValue(TypeText),
-		ZeroValue(Struct()),
-		ZeroValue(Tuple()),
+		ZeroValue(types.TypeText),
+		ZeroValue(types.Struct()),
+		ZeroValue(types.Tuple()),
 	)
 	for i := 0; i < b.N; i++ {
 		a := allocator.New()
@@ -153,25 +154,25 @@ func TestToYDBFromYDB(t *testing.T) {
 			DictValueField{TextValue("air_date"), Uint64Value(3)},
 			DictValueField{TextValue("remove_date"), Uint64Value(4)},
 		),
-		NullValue(TypeBool),
-		NullValue(Optional(TypeBool)),
-		VariantValueTuple(Int32Value(42), 1, Tuple(
-			TypeBytes,
-			TypeInt32,
+		NullValue(types.TypeBool),
+		NullValue(types.Optional(types.TypeBool)),
+		VariantValueTuple(Int32Value(42), 1, types.Tuple(
+			types.TypeBytes,
+			types.TypeInt32,
 		)),
-		VariantValueStruct(Int32Value(42), "bar", Struct(
-			StructField{
+		VariantValueStruct(Int32Value(42), "bar", types.Struct(
+			types.StructField{
 				Name: "foo",
-				T:    TypeBytes,
+				T:    types.TypeBytes,
 			},
-			StructField{
+			types.StructField{
 				Name: "bar",
-				T:    TypeInt32,
+				T:    types.TypeInt32,
 			},
 		)),
-		ZeroValue(TypeText),
-		ZeroValue(Struct()),
-		ZeroValue(Tuple()),
+		ZeroValue(types.TypeText),
+		ZeroValue(types.Struct()),
+		ZeroValue(types.Tuple()),
 	} {
 		t.Run(strconv.Itoa(i)+"."+v.Yql(), func(t *testing.T) {
 			a := allocator.New()
@@ -329,11 +330,11 @@ func TestValueYql(t *testing.T) {
 			literal: `TzTimestamp("1997-12-14T03:09:42.123456,Europe/Berlin")`,
 		},
 		{
-			value:   NullValue(TypeInt32),
+			value:   NullValue(types.TypeInt32),
 			literal: `Nothing(Optional<Int32>)`,
 		},
 		{
-			value:   NullValue(Optional(TypeBool)),
+			value:   NullValue(types.Optional(types.TypeBool)),
 			literal: `Nothing(Optional<Optional<Bool>>)`,
 		},
 		{
@@ -390,30 +391,30 @@ func TestValueYql(t *testing.T) {
 			literal: `(0,1l,Float("2"),"3"u)`,
 		},
 		{
-			value: VariantValueTuple(Int32Value(42), 1, Tuple(
-				TypeBytes,
-				TypeInt32,
+			value: VariantValueTuple(Int32Value(42), 1, types.Tuple(
+				types.TypeBytes,
+				types.TypeInt32,
 			)),
 			literal: `Variant(42,"1",Variant<String,Int32>)`,
 		},
 		{
-			value: VariantValueTuple(TextValue("foo"), 1, Tuple(
-				TypeBytes,
-				TypeText,
+			value: VariantValueTuple(TextValue("foo"), 1, types.Tuple(
+				types.TypeBytes,
+				types.TypeText,
 			)),
 			literal: `Variant("foo"u,"1",Variant<String,Utf8>)`,
 		},
 		{
-			value: VariantValueTuple(BoolValue(true), 0, Tuple(
-				TypeBytes,
-				TypeInt32,
+			value: VariantValueTuple(BoolValue(true), 0, types.Tuple(
+				types.TypeBytes,
+				types.TypeInt32,
 			)),
 			literal: `Variant(true,"0",Variant<String,Int32>)`,
 		},
 		{
-			value: VariantValueStruct(Int32Value(42), "bar", Struct(
-				StructField{"foo", TypeBytes},
-				StructField{"bar", TypeInt32},
+			value: VariantValueStruct(Int32Value(42), "bar", types.Struct(
+				types.StructField{"foo", types.TypeBytes},
+				types.StructField{"bar", types.TypeInt32},
 			)),
 			literal: `Variant(42,"bar",Variant<'bar':Int32,'foo':String>)`,
 		},
@@ -440,26 +441,26 @@ func TestValueYql(t *testing.T) {
 			literal: `{"bar"u:Void(),"foo"u:Void()}`,
 		},
 		{
-			value:   ZeroValue(TypeBool),
+			value:   ZeroValue(types.TypeBool),
 			literal: `false`,
 		},
 		{
-			value:   ZeroValue(Optional(TypeBool)),
+			value:   ZeroValue(types.Optional(types.TypeBool)),
 			literal: `Nothing(Optional<Bool>)`,
 		},
 		{
-			value:   ZeroValue(Tuple(TypeBool, TypeDouble)),
+			value:   ZeroValue(types.Tuple(types.TypeBool, types.TypeDouble)),
 			literal: `(false,Double("0"))`,
 		},
 		{
-			value: ZeroValue(Struct(
-				StructField{"foo", TypeBool},
-				StructField{"bar", TypeText},
+			value: ZeroValue(types.Struct(
+				types.StructField{"foo", types.TypeBool},
+				types.StructField{"bar", types.TypeText},
 			)),
 			literal: "<|`bar`:\"\"u,`foo`:false|>",
 		},
 		{
-			value:   ZeroValue(TypeUUID),
+			value:   ZeroValue(types.TypeUUID),
 			literal: `Uuid("00000000-0000-0000-0000-000000000000")`,
 		},
 		{

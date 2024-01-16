@@ -10,6 +10,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/session"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -70,14 +71,14 @@ type Client interface {
 	DoTx(ctx context.Context, op TxOperation, opts ...Option) error
 }
 
-type SessionStatus = string
+type SessionStatus = session.Status
 
 const (
-	SessionStatusUnknown = SessionStatus("unknown")
-	SessionReady         = SessionStatus("ready")
-	SessionBusy          = SessionStatus("busy")
-	SessionClosing       = SessionStatus("closing")
-	SessionClosed        = SessionStatus("closed")
+	SessionStatusUnknown = session.StatusUnknown
+	SessionReady         = session.StatusReady
+	SessionBusy          = session.StatusBusy
+	SessionClosing       = session.StatusClosing
+	SessionClosed        = session.StatusClosed
 )
 
 type SessionInfo interface {

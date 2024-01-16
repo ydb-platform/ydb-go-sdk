@@ -5,34 +5,34 @@ import (
 	"io"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 )
 
 // Type describes YDB data types.
-type Type = value.Type
+type Type = types.Type
 
 // Equal checks for type equivalence
 func Equal(lhs, rhs Type) bool {
-	return value.TypesEqual(lhs, rhs)
+	return types.TypesEqual(lhs, rhs)
 }
 
 func List(t Type) Type {
-	return value.List(t)
+	return types.List(t)
 }
 
 func Tuple(elems ...Type) Type {
-	return value.Tuple(elems...)
+	return types.Tuple(elems...)
 }
 
 type tStructType struct {
-	fields []value.StructField
+	fields []types.StructField
 }
 
 type StructOption func(*tStructType)
 
 func StructField(name string, t Type) StructOption {
 	return func(s *tStructType) {
-		s.fields = append(s.fields, value.StructField{
+		s.fields = append(s.fields, types.StructField{
 			Name: name,
 			T:    t,
 		})
@@ -47,11 +47,11 @@ func Struct(opts ...StructOption) Type {
 		}
 	}
 
-	return value.Struct(s.fields...)
+	return types.Struct(s.fields...)
 }
 
 func Dict(k, v Type) Type {
-	return value.Dict(k, v)
+	return types.Dict(k, v)
 }
 
 func VariantStruct(opts ...StructOption) Type {
@@ -62,61 +62,61 @@ func VariantStruct(opts ...StructOption) Type {
 		}
 	}
 
-	return value.VariantStruct(s.fields...)
+	return types.VariantStruct(s.fields...)
 }
 
 func VariantTuple(elems ...Type) Type {
-	return value.VariantTuple(elems...)
+	return types.VariantTuple(elems...)
 }
 
 func Void() Type {
-	return value.Void()
+	return types.Void()
 }
 
 func Optional(t Type) Type {
-	return value.Optional(t)
+	return types.Optional(t)
 }
 
 var DefaultDecimal = DecimalType(22, 9)
 
 func DecimalType(precision, scale uint32) Type {
-	return value.Decimal(precision, scale)
+	return types.Decimal(precision, scale)
 }
 
 func DecimalTypeFromDecimal(d *Decimal) Type {
-	return value.Decimal(d.Precision, d.Scale)
+	return types.Decimal(d.Precision, d.Scale)
 }
 
 // Primitive types known by YDB.
 const (
-	TypeUnknown      = value.TypeUnknown
-	TypeBool         = value.TypeBool
-	TypeInt8         = value.TypeInt8
-	TypeUint8        = value.TypeUint8
-	TypeInt16        = value.TypeInt16
-	TypeUint16       = value.TypeUint16
-	TypeInt32        = value.TypeInt32
-	TypeUint32       = value.TypeUint32
-	TypeInt64        = value.TypeInt64
-	TypeUint64       = value.TypeUint64
-	TypeFloat        = value.TypeFloat
-	TypeDouble       = value.TypeDouble
-	TypeDate         = value.TypeDate
-	TypeDatetime     = value.TypeDatetime
-	TypeTimestamp    = value.TypeTimestamp
-	TypeInterval     = value.TypeInterval
-	TypeTzDate       = value.TypeTzDate
-	TypeTzDatetime   = value.TypeTzDatetime
-	TypeTzTimestamp  = value.TypeTzTimestamp
-	TypeString       = value.TypeBytes
-	TypeBytes        = value.TypeBytes
-	TypeUTF8         = value.TypeText
-	TypeText         = value.TypeText
-	TypeYSON         = value.TypeYSON
-	TypeJSON         = value.TypeJSON
-	TypeUUID         = value.TypeUUID
-	TypeJSONDocument = value.TypeJSONDocument
-	TypeDyNumber     = value.TypeDyNumber
+	TypeUnknown      = types.TypeUnknown
+	TypeBool         = types.TypeBool
+	TypeInt8         = types.TypeInt8
+	TypeUint8        = types.TypeUint8
+	TypeInt16        = types.TypeInt16
+	TypeUint16       = types.TypeUint16
+	TypeInt32        = types.TypeInt32
+	TypeUint32       = types.TypeUint32
+	TypeInt64        = types.TypeInt64
+	TypeUint64       = types.TypeUint64
+	TypeFloat        = types.TypeFloat
+	TypeDouble       = types.TypeDouble
+	TypeDate         = types.TypeDate
+	TypeDatetime     = types.TypeDatetime
+	TypeTimestamp    = types.TypeTimestamp
+	TypeInterval     = types.TypeInterval
+	TypeTzDate       = types.TypeTzDate
+	TypeTzDatetime   = types.TypeTzDatetime
+	TypeTzTimestamp  = types.TypeTzTimestamp
+	TypeString       = types.TypeBytes
+	TypeBytes        = types.TypeBytes
+	TypeUTF8         = types.TypeText
+	TypeText         = types.TypeText
+	TypeYSON         = types.TypeYSON
+	TypeJSON         = types.TypeJSON
+	TypeUUID         = types.TypeUUID
+	TypeJSONDocument = types.TypeJSONDocument
+	TypeDyNumber     = types.TypeDyNumber
 )
 
 // WriteTypeStringTo writes ydb type string representation into buffer

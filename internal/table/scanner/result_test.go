@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	types2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -151,7 +152,7 @@ func WithColumns(cs ...options.Column) ResultSetOption {
 		for _, c := range cs {
 			r.Columns = append(r.Columns, &Ydb.Column{
 				Name: c.Name,
-				Type: value.TypeToYDB(c.Type, a),
+				Type: types2.TypeToYDB(c.Type, a),
 			})
 		}
 	}
@@ -178,9 +179,9 @@ func WithValues(vs ...types.Value) ResultSetOption {
 				}
 			}
 			tv := value.ToYDB(v, a)
-			act := value.TypeFromYDB(tv.Type)
-			exp := value.TypeFromYDB(r.Columns[j].Type)
-			if !value.TypesEqual(act, exp) {
+			act := types2.TypeFromYDB(tv.Type)
+			exp := types2.TypeFromYDB(r.Columns[j].Type)
+			if !types2.TypesEqual(act, exp) {
 				panic(fmt.Sprintf(
 					"unexpected types for #%d column: %s; want %s",
 					j, act, exp,

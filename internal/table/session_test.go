@@ -22,6 +22,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
+	types2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
@@ -182,7 +183,7 @@ func TestSessionDescribeTable(t *testing.T) {
 			Columns: []*Ydb_Table.ColumnMeta{
 				{
 					Name:   expect.Columns[0].Name,
-					Type:   value.TypeToYDB(expect.Columns[0].Type, a),
+					Type:   types2.TypeToYDB(expect.Columns[0].Type, a),
 					Family: "testFamily",
 				},
 			},

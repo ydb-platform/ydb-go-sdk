@@ -25,6 +25,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
+	types2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -344,7 +345,7 @@ func (s *session) DescribeTable(
 	for i, c := range result.Columns {
 		cs[i] = options.Column{
 			Name:   c.GetName(),
-			Type:   value.TypeFromYDB(c.GetType()),
+			Type:   types2.TypeFromYDB(c.GetType()),
 			Family: c.GetFamily(),
 		}
 	}
@@ -1083,9 +1084,7 @@ func (s *session) ReadRows(
 
 	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
 		return nil, xerrors.WithStackTrace(
-			xerrors.Operation(
-				xerrors.FromOperation(response),
-			),
+			xerrors.FromOperation(response),
 		)
 	}
 

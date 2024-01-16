@@ -11,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	types2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
@@ -55,7 +56,7 @@ func (s *scanner) Columns(it func(options.Column)) {
 	for _, m := range s.set.Columns {
 		it(options.Column{
 			Name: m.Name,
-			Type: value.TypeFromYDB(m.Type),
+			Type: types2.TypeFromYDB(m.Type),
 		})
 	}
 }
@@ -287,7 +288,7 @@ func (s *scanner) getType() types.Type {
 		return nil
 	}
 
-	return value.TypeFromYDB(x.t)
+	return types2.TypeFromYDB(x.t)
 }
 
 func (s *scanner) hasItems() bool {
@@ -383,74 +384,74 @@ func (s *scanner) any() interface{} {
 		x = s.stack.current()
 	}
 
-	t := value.TypeFromYDB(x.t)
-	p, primitive := t.(value.PrimitiveType)
+	t := types2.TypeFromYDB(x.t)
+	p, primitive := t.(types2.PrimitiveType)
 	if !primitive {
 		return s.value()
 	}
 
 	switch p {
-	case value.TypeBool:
+	case types2.TypeBool:
 		return s.bool()
-	case value.TypeInt8:
+	case types2.TypeInt8:
 		return s.int8()
-	case value.TypeUint8:
+	case types2.TypeUint8:
 		return s.uint8()
-	case value.TypeInt16:
+	case types2.TypeInt16:
 		return s.int16()
-	case value.TypeUint16:
+	case types2.TypeUint16:
 		return s.uint16()
-	case value.TypeInt32:
+	case types2.TypeInt32:
 		return s.int32()
-	case value.TypeFloat:
+	case types2.TypeFloat:
 		return s.float()
-	case value.TypeDouble:
+	case types2.TypeDouble:
 		return s.double()
-	case value.TypeBytes:
+	case types2.TypeBytes:
 		return s.bytes()
-	case value.TypeUUID:
+	case types2.TypeUUID:
 		return s.uint128()
-	case value.TypeUint32:
+	case types2.TypeUint32:
 		return s.uint32()
-	case value.TypeDate:
+	case types2.TypeDate:
 		return value.DateToTime(s.uint32())
-	case value.TypeDatetime:
+	case types2.TypeDatetime:
 		return value.DatetimeToTime(s.uint32())
-	case value.TypeUint64:
+	case types2.TypeUint64:
 		return s.uint64()
-	case value.TypeTimestamp:
+	case types2.TypeTimestamp:
 		return value.TimestampToTime(s.uint64())
-	case value.TypeInt64:
+	case types2.TypeInt64:
 		return s.int64()
-	case value.TypeInterval:
+	case types2.TypeInterval:
 		return value.IntervalToDuration(s.int64())
-	case value.TypeTzDate:
+	case types2.TypeTzDate:
 		src, err := value.TzDateToTime(s.text())
 		if err != nil {
 			_ = s.errorf(0, "scanner.any(): %w", err)
 		}
 
 		return src
-	case value.TypeTzDatetime:
+	case types2.TypeTzDatetime:
 		src, err := value.TzDatetimeToTime(s.text())
 		if err != nil {
 			_ = s.errorf(0, "scanner.any(): %w", err)
 		}
 
 		return src
-	case value.TypeTzTimestamp:
+	case types2.TypeTzTimestamp:
 		src, err := value.TzTimestampToTime(s.text())
 		if err != nil {
 			_ = s.errorf(0, "scanner.any(): %w", err)
 		}
 
 		return src
-	case value.TypeText, value.TypeDyNumber:
+	case types2.TypeText, types2.TypeDyNumber:
 		return s.text()
 	case
-		value.TypeYSON,
-		value.TypeJSON,
-		value.TypeJSONDocument:
+		types2.TypeYSON,
+		types2.TypeJSON,
+		types2.TypeJSONDocument:
 		return xstring.ToBytes(s.text())
 	default:
 		_ = s.errorf(0, "unknown primitive types")

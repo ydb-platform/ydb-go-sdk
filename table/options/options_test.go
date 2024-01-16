@@ -173,7 +173,7 @@ func TestAlterTableOptions(t *testing.T) {
 		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
 		if len(req.AddColumns) != 1 ||
 			req.AddColumns[0].Name != column.Name ||
-			req.AddColumns[0].Type != value.TypeToYDB(column.Type, a) ||
+			req.AddColumns[0].Type != column.Type.ToYDB(a) ||
 			req.AddColumns[0].Family != column.Family {
 			t.Errorf("Alter table options is not as expected")
 		}

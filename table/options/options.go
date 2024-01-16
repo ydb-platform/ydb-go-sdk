@@ -59,14 +59,14 @@ type column struct {
 func (c column) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) {
 	d.AddColumns = append(d.AddColumns, &Ydb_Table.ColumnMeta{
 		Name: c.name,
-		Type: value.TypeToYDB(c.typ, a),
+		Type: c.typ.ToYDB(a),
 	})
 }
 
 func (c column) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
 	d.Columns = append(d.Columns, &Ydb_Table.ColumnMeta{
 		Name: c.name,
-		Type: value.TypeToYDB(c.typ, a),
+		Type: c.typ.ToYDB(a),
 	})
 }
 

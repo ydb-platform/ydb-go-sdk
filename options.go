@@ -17,6 +17,7 @@ import (
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
+	queryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
 	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
 	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
@@ -352,7 +353,6 @@ func WithCertificatesFromPem(bytes []byte, opts ...certificates.FromPemOption) O
 		for _, cert := range certs {
 			_ = WithCertificate(cert)(ctx, c)
 		}
-
 		return nil
 	}
 }
@@ -362,7 +362,15 @@ func WithCertificatesFromPem(bytes []byte, opts ...certificates.FromPemOption) O
 func WithTableConfigOption(option tableConfig.Option) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, option)
+		return nil
+	}
+}
 
+// WithQueryConfigOption collects additional configuration options for query.Client.
+// This option does not replace collected option, instead it will appen provided options.
+func WithQueryConfigOption(option queryConfig.Option) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.queryOptions = append(c.queryOptions, option)
 		return nil
 	}
 }
@@ -371,7 +379,7 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
-
+		c.queryOptions = append(c.queryOptions, queryConfig.WithSizeLimit(sizeLimit))
 		return nil
 	}
 }
@@ -405,7 +413,7 @@ func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
 func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithCreateSessionTimeout(createSessionTimeout))
-
+		c.queryOptions = append(c.queryOptions, queryConfig.WithCreateSessionTimeout(createSessionTimeout))
 		return nil
 	}
 }
@@ -414,7 +422,7 @@ func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Opt
 func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithDeleteTimeout(deleteTimeout))
-
+		c.queryOptions = append(c.queryOptions, queryConfig.WithDeleteTimeout(deleteTimeout))
 		return nil
 	}
 }
@@ -423,7 +431,6 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 func WithIgnoreTruncated() Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithIgnoreTruncated())
-
 		return nil
 	}
 }
@@ -436,7 +443,6 @@ func WithPanicCallback(panicCallback func(e interface{})) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.panicCallback = panicCallback
 		c.options = append(c.options, config.WithPanicCallback(panicCallback))
-
 		return nil
 	}
 }
@@ -456,7 +462,6 @@ func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option { //
 				)...,
 			),
 		)
-
 		return nil
 	}
 }
