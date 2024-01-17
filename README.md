@@ -17,6 +17,11 @@ Supports `table`, `discovery`, `coordination`, `ratelimiter`, `scheme`, `scripti
 `YDB` is an open-source Distributed SQL Database that combines high availability and scalability with strict consistency and [ACID](https://en.wikipedia.org/wiki/ACID) transactions.
 `YDB` was created primarily for [OLTP](https://en.wikipedia.org/wiki/Online_transaction_processing) workloads and supports some [OLAP](https://en.wikipedia.org/wiki/Online_analytical_processing) scenarious.
 
+## Supported Go Versions
+
+`ydb-go-sdk` supports all Go versions supported by the official [Go Release Policy](https://go.dev/doc/devel/release#policy). 
+That is, the two most recent releases of Go.
+
 ## Installation
 
 ```sh

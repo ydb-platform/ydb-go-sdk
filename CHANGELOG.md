@@ -1,4 +1,5 @@
 * Refactored `internal/value/intervalValue.Yql()`
+* The minimum version of Go in `ydb-go-sdk` has been raised to `go1.20`
 
 ## v3.54.3
 * Added per message metadata support for topic api
