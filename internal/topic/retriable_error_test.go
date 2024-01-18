@@ -236,7 +236,6 @@ func TestCheckRetryMode(t *testing.T) {
 
 func TestCheckResetReconnectionCounters(t *testing.T) {
 	now := time.Now()
-	fmt.Println(now.Sub(now.Add(-61 * time.Second)))
 	table := []struct {
 		name              string
 		lastTry           time.Time
