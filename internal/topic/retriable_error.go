@@ -93,9 +93,10 @@ func CheckRetryMode(err error, settings RetrySettings, retriesDuration time.Dura
 		return nil, false
 	}
 
-	if mode.BackoffType() == backoff.TypeFast {
+	switch mode.BackoffType() {
+	case backoff.TypeFast:
 		return backoff.Fast, true
+	default:
+		return backoff.Slow, true
 	}
-
-	return backoff.Slow, true
 }
