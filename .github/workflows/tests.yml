@@ -14,7 +14,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.17.x, 1.20.x, 1.21.x]
+        go-version: [1.20.x, 1.21.x]
         os: [ubuntu, windows, macOS]
     env:
       OS: ${{ matrix.os }}-latest
@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.17.x, 1.20.x, 1.21.x]
+        go-version: [1.20.x, 1.21.x]
         ydb-version: [22.5, 23.1, 23.2, 23.3]
     services:
       ydb:
