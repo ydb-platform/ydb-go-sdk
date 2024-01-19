@@ -67,6 +67,16 @@ func (scope *scopeT) Failed() bool {
 	return scope.t.Failed()
 }
 
+// CacheWithCleanup wrap new interface as deprecated - for prevent re-write a lot of code
+// in new code prefer to use generic version of cache: fixenv.CacheResult(env, ...)
+func (scope *scopeT) CacheWithCleanup(cacheKey interface{}, opt *fixenv.FixtureOptions, f fixenv.FixtureCallbackWithCleanupFunc) interface{} {
+	fWrap := func() (*fixenv.Result, error) {
+		res, cleanup, err := f()
+		return fixenv.NewResultWithCleanup(res, cleanup), err
+	}
+	return scope.CacheResult(fWrap)
+}
+
 func (scope *scopeT) ConnectionString() string {
 	if envString := os.Getenv("YDB_CONNECTION_STRING"); envString != "" {
 		return envString
