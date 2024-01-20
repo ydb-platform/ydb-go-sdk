@@ -15,7 +15,7 @@ require (
 
 // requires for tests only
 require (
-	github.com/golang/mock v1.6.0
+	go.uber.org/mock v0.3.1-0.20231011042131-892b665398ec // indirect
 	github.com/rekby/fixenv v0.3.2
 	github.com/stretchr/testify v1.7.1
 )
