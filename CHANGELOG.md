@@ -1,3 +1,4 @@
+## v3.55.0
 * Refactored `internal/value/intervalValue.Yql()`
 * The minimum version of Go in `ydb-go-sdk` has been raised to `go1.20`
 
