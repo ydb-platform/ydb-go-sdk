@@ -52,7 +52,7 @@ func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (
 					fmt.Errorf("%w: $p%d, len(args) = %d", ErrInconsistentArgs, p, len(args)),
 				)
 			}
-			paramName := "$p" + strconv.Itoa(int(p-1))
+			paramName := "$p" + strconv.Itoa(int(p-1)) //nolint:goconst
 			if newArgs[p-1] == nil {
 				param, err = toYdbParam(paramName, args[p-1])
 				if err != nil {
