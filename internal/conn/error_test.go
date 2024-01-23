@@ -29,7 +29,7 @@ func TestNodeErrorIs(t *testing.T) {
 	nodeErr := newConnError(1, "localhost:1234", testErr)
 
 	require.ErrorIs(t, nodeErr, testErr)
-	require.ErrorIs(t, nodeErr, testErr2)
+	require.NotErrorIs(t, nodeErr, testErr2)
 }
 
 type testErrorType1 struct {
