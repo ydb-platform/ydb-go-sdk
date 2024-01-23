@@ -191,7 +191,7 @@ func TestTransportErrorName(t *testing.T) {
 	} {
 		t.Run("", func(t *testing.T) {
 			if tt.err == nil {
-				require.Nil(t, TransportError(tt.err))
+				require.Nil(t, TransportError(tt.err)) //nolint:testifylint
 			} else {
 				require.Equal(t, tt.name, TransportError(tt.err).Name())
 			}

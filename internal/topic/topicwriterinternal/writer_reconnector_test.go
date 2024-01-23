@@ -640,7 +640,7 @@ func TestSplitMessagesByBufCodec(t *testing.T) {
 			for _, group := range groups {
 				require.NotEmpty(t, group)
 				require.True(t, allMessagesHasSameBufCodec(group))
-				require.Equal(t, len(group), cap(group))
+				require.Len(t, group, cap(group))
 				for _, mess := range group {
 					expectedNum++
 					require.Equal(t, test[int(expectedNum)], mess.bufCodec)

@@ -87,6 +87,6 @@ func TestEventBroadcast(t *testing.T) {
 		stopBroadcast.Store(true)
 		<-broadcastStopped
 
-		require.True(t, events.Load() > 0)
+		require.Greater(t, events.Load(), 0)
 	})
 }
