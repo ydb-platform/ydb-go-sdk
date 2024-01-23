@@ -947,7 +947,7 @@ func TestDeadlockOnUpdateNodes(t *testing.T) {
 		require.NoError(t, err)
 		s3, err := c.Get(ctx)
 		require.NoError(t, err)
-		require.Equal(t, 3, len(nodes))
+		require.Len(t, nodes, 3)
 		err = c.Put(ctx, s1)
 		require.NoError(t, err)
 		err = c.Put(ctx, s2)
@@ -998,7 +998,7 @@ func TestDeadlockOnInternalPoolGCTick(t *testing.T) {
 			return
 		}
 		require.NoError(t, err)
-		require.Equal(t, 3, len(nodes))
+		require.Len(t, nodes, 3)
 		err = c.Put(ctx, s1)
 		if err != nil && errors.Is(err, context.DeadlineExceeded) {
 			return

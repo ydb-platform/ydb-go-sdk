@@ -6,7 +6,6 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -168,5 +167,5 @@ func TestReader_WaitInit(t *testing.T) {
 
 	baseReader.EXPECT().WaitInit(gomock.Any())
 	err := reader.WaitInit(context.Background())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }

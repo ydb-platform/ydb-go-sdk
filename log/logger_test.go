@@ -10,7 +10,7 @@ import (
 
 func TestColoring(t *testing.T) {
 	zeroClock := clockwork.NewFakeClock()
-	fullDuration := zeroClock.Now().Sub(time.Date(1984, 4, 4, 0, 0, 0, 0, time.Local))
+	fullDuration := zeroClock.Now().Sub(time.Date(1984, 4, 4, 0, 0, 0, 0, time.UTC))
 	zeroClock.Advance(-fullDuration) // set zero time
 	for _, tt := range []struct {
 		l   *defaultLogger

@@ -268,7 +268,7 @@ func TestNewStreamWithRecvFirstResultSet(t *testing.T) {
 				}
 				err = result.NextResultSetErr(tt.ctx)
 				require.ErrorIs(t, err, io.EOF)
-				require.True(t, err == io.EOF) //nolint:errorlint
+				require.True(t, err == io.EOF) //nolint:errorlint,testifylint
 				require.Equal(t, 1001, tt.recvCounter)
 				require.Equal(t, 1002, int(result.(*streamResult).nextResultSetCounter.Load()))
 			}

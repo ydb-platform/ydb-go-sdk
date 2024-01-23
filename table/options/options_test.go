@@ -76,8 +76,8 @@ func TestSessionOptionsProfile(t *testing.T) {
 		} else {
 			require.Equal(
 				t,
-				p.PartitionAtKeys.SplitPoints,
 				[]*Ydb.TypedValue{value.ToYDB(types.Int64Value(1), a)},
+				p.PartitionAtKeys.SplitPoints,
 			)
 		}
 	}
