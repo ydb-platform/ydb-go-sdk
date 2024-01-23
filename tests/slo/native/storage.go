@@ -18,6 +18,7 @@ import (
 	"slo/internal/generator"
 )
 
+//nolint:goconst
 const (
 	upsertTemplate = `
 PRAGMA TablePathPrefix("%s");
