@@ -237,7 +237,6 @@ linters:
     - nilerr
     - nlreturn
     - nonamedreturns
-    - nosnakecase
     - paralleltest
     - protogetter
     - scopelint
@@ -302,3 +301,9 @@ issues:
         - staticcheck
     - path: _test\.go
       text: "ydb.Connection is deprecated"
+
+      # Allow underscore and capital camel case for readability
+      # Examples: Type_PRIMITIVE_TYPE_ID_UNSPECIFIED, Ydb_Discovery_V1, _voidValue
+    - linters:
+        - nosnakecase
+      text : "(?:_[a-z]+(?:[A-Z](?:[a-z\\d]+|[A-Z\\d]+))+|(?:[A-Z][a-z\\d]+|[A-Z][A-Z\\d]+)+_(?:(?:[A-Z][a-z\\d]+|[A-Z\\d][A-Z\\d]+)_?)+)"
