@@ -106,8 +106,6 @@ func TestWorkerConcurrentStartAndClose(t *testing.T) {
 		ctx := xtest.Context(t)
 		w := NewWorker(ctx)
 
-		closeIndex := int64(0)
-
 		stopNewStarts := xatomic.Bool{}
 		var wgStarters sync.WaitGroup
 		for i := 0; i < parallel; i++ {
@@ -134,11 +132,12 @@ func TestWorkerConcurrentStartAndClose(t *testing.T) {
 
 		require.NoError(t, w.Close(xtest.ContextWithCommonTimeout(ctx, t), nil))
 
-		closeIndex = counter.Load()
-		require.Equal(t, closeIndex, counter.Load())
-
 		stopNewStarts.Store(true)
 		xtest.WaitGroup(t, &wgStarters)
+
+		_, ok := <-w.tasks
+		require.False(t, ok)
+		require.True(t, w.closed)
 	})
 }
 

@@ -351,7 +351,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		return xcontext.WithCancel(xcontext.WithoutDeadline(ctx))
 	}
 
-	//nolint:ineffassign,staticcheck
+	//nolint:ineffassign,staticcheck,wastedassign
 	streamCtx, streamCtxCancel := createStreamContext()
 
 	defer streamCtxCancel()
