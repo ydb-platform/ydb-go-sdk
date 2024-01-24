@@ -247,7 +247,6 @@ linters:
     - testpackage
     - thelper
     - varnamelen
-    - wastedassign
     - wrapcheck
     - wsl
 
