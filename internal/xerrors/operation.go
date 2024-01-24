@@ -164,7 +164,8 @@ func (e *operationError) Type() Type {
 		Ydb.StatusIds_UNAVAILABLE,
 		Ydb.StatusIds_OVERLOADED,
 		Ydb.StatusIds_BAD_SESSION,
-		Ydb.StatusIds_SESSION_BUSY:
+		Ydb.StatusIds_SESSION_BUSY,
+		Ydb.StatusIds_SESSION_EXPIRED:
 		return TypeRetryable
 	case Ydb.StatusIds_UNDETERMINED:
 		return TypeConditionallyRetryable

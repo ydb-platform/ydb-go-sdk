@@ -408,8 +408,8 @@ var errsToCheck = []struct {
 		backoff:       backoff.TypeNoBackoff,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
-			idempotent:    false,
-			nonIdempotent: false,
+			idempotent:    true,
+			nonIdempotent: true,
 		},
 	},
 	{
