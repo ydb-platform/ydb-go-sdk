@@ -65,8 +65,6 @@ func CheckRetryMode(err error, settings RetrySettings, retriesDuration time.Dura
 		return nil, false
 	}
 
-	isRetriable = true
-
 	mode := retry.Check(err)
 
 	decision := PublicRetryDecisionDefault
