@@ -69,6 +69,7 @@ linters-settings:
     min-len: 2
     # minimal occurrences count to trigger, 3 by default
     min-occurrences: 2
+    ignore-tests: true
   misspell:
     # Correct spellings using locale preferences for US or UK.
     # Default is to use a neutral variety of English.
@@ -222,7 +223,6 @@ linters:
     - gci
     - gochecknoglobals
     - gocognit
-    - goconst
     - godot
     - goerr113
     - golint
