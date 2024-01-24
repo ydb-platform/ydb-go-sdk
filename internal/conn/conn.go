@@ -43,8 +43,8 @@ type Conn interface {
 	Ping(ctx context.Context) error
 	IsState(states ...State) bool
 	GetState() State
-	SetState(context.Context, State) State
-	Unban(context.Context) State
+	SetState(ctx context.Context, state State) State
+	Unban(ctx context.Context) State
 }
 
 type conn struct {

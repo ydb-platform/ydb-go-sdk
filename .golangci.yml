@@ -229,7 +229,6 @@ linters:
     - gomnd
     - gomoddirectives
     - ifshort
-    - inamedparam
     - interfacebloat
     - interfacer
     - ireturn

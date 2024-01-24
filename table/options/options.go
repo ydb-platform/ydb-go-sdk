@@ -686,14 +686,14 @@ func WithMaxPartitionsCount(maxPartitionsCount uint64) PartitioningSettingsOptio
 type (
 	DropTableDesc   Ydb_Table.DropTableRequest
 	DropTableOption interface {
-		ApplyDropTableOption(*DropTableDesc)
+		ApplyDropTableOption(desc *DropTableDesc)
 	}
 )
 
 type (
 	AlterTableDesc   Ydb_Table.AlterTableRequest
 	AlterTableOption interface {
-		ApplyAlterTableOption(*AlterTableDesc, *allocator.Allocator)
+		ApplyAlterTableOption(desc *AlterTableDesc, a *allocator.Allocator)
 	}
 )
 
@@ -1017,12 +1017,12 @@ var (
 type (
 	ReadRowsDesc   Ydb_Table.ReadRowsRequest
 	ReadRowsOption interface {
-		ApplyReadRowsOption(*ReadRowsDesc, *allocator.Allocator)
+		ApplyReadRowsOption(desc *ReadRowsDesc, a *allocator.Allocator)
 	}
 
 	ReadTableDesc   Ydb_Table.ReadTableRequest
 	ReadTableOption interface {
-		ApplyReadTableOption(*ReadTableDesc, *allocator.Allocator)
+		ApplyReadTableOption(desc *ReadTableDesc, a *allocator.Allocator)
 	}
 
 	readColumnsOption        []string
