@@ -409,7 +409,7 @@ var errsToCheck = []struct {
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
 			idempotent:    true,
-			nonIdempotent: true,
+			nonIdempotent: false,
 		},
 	},
 	{
