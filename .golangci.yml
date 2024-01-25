@@ -217,7 +217,6 @@ linters:
     - exhaustive
     - exhaustivestruct
     - exhaustruct
-    - forbidigo
     - forcetypeassert
     - funlen
     - gci
@@ -307,3 +306,7 @@ issues:
     - linters:
         - nosnakecase
       text : "(?:_[a-z]+(?:[A-Z](?:[a-z\\d]+|[A-Z\\d]+))+|(?:[A-Z][a-z\\d]+|[A-Z][A-Z\\d]+)+_(?:(?:[A-Z][a-z\\d]+|[A-Z\\d][A-Z\\d]+)_?)+)"
+
+    - path: ../examples
+      linters:
+        - forbidigo
