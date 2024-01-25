@@ -1,4 +1,4 @@
-* Made StatusIds_SESSION_EXPIRED retriable
+* Made `StatusIds_SESSION_EXPIRED` retriable
 
 ## v3.55.0
 * Refactored `internal/value/intervalValue.Yql()`
