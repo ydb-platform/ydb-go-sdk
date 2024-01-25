@@ -246,6 +246,8 @@ linters:
     - varnamelen
     - wrapcheck
     - wsl
+#disable:examples    - forbidigo
+#disable:slo    - forbidigo
 
 issues:
   # List of regexps of issue texts to exclude, empty list by default.
@@ -306,7 +308,3 @@ issues:
     - linters:
         - nosnakecase
       text : "(?:_[a-z]+(?:[A-Z](?:[a-z\\d]+|[A-Z\\d]+))+|(?:[A-Z][a-z\\d]+|[A-Z][A-Z\\d]+)+_(?:(?:[A-Z][a-z\\d]+|[A-Z\\d][A-Z\\d]+)_?)+)"
-
-    - path: ../examples
-      linters:
-        - forbidigo
