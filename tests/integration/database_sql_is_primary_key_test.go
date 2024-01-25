@@ -45,7 +45,7 @@ func TestDatabaseSqlIsPrimaryKey(t *testing.T) {
 			)
 
 			return err
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})
@@ -74,7 +74,7 @@ func TestDatabaseSqlIsPrimaryKey(t *testing.T) {
 				require.True(t, isPk)
 			}
 			return nil
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})
@@ -103,7 +103,7 @@ func TestDatabaseSqlIsPrimaryKey(t *testing.T) {
 				require.False(t, isPk)
 			}
 			return nil
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})

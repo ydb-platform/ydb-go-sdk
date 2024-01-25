@@ -7,7 +7,7 @@ import (
 )
 
 type (
-	Message = topicwriterinternal.Message
+	Message = topicwriterinternal.PublicMessage
 )
 
 var ErrQueueLimitExceed = topicwriterinternal.PublicErrQueueIsFull
@@ -19,14 +19,11 @@ type Writer struct {
 }
 
 // PublicInitialInfo is an information about writer after initialize
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicInitialInfo struct {
 	LastSeqNum int64
 }
 
+// NewWriter create new writer from internal type. Used internally only.
 func NewWriter(writer *topicwriterinternal.Writer) *Writer {
 	return &Writer{
 		inner: writer,
@@ -42,20 +39,12 @@ func NewWriter(writer *topicwriterinternal.Writer) *Writer {
 //
 // It returns ErrQueueLimitExceed (must be checked by errors.Is)
 // if ctx cancelled before messages put to internal buffer or try to add more messages, that can be put to queue
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 	return w.inner.Write(ctx, messages...)
 }
 
 // WaitInit waits until the reader is initialized
 // or an error occurs, return PublicInitialInfo and err
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (w *Writer) WaitInit(ctx context.Context) (err error) {
 	_, err = w.inner.WaitInit(ctx)
 	if err != nil {
@@ -66,10 +55,6 @@ func (w *Writer) WaitInit(ctx context.Context) (err error) {
 
 // WaitInitInfo waits until the reader is initialized
 // or an error occurs, return PublicInitialInfo and err
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (w *Writer) WaitInitInfo(ctx context.Context) (info PublicInitialInfo, err error) {
 	privateInfo, err := w.inner.WaitInit(ctx)
 	if err != nil {

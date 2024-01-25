@@ -49,7 +49,7 @@ func TestDatabaseSqlGetIndexes(t *testing.T) {
 			}
 
 			return nil
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})
@@ -78,7 +78,7 @@ func TestDatabaseSqlGetIndexes(t *testing.T) {
 				[]string{"index_series_title", "index_seasons_aired_date"},
 				indexes)
 			return nil
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})

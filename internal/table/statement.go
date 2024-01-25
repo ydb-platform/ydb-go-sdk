@@ -9,6 +9,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -59,7 +60,9 @@ func (s *statement) Execute(
 	}
 
 	onDone := trace.TableOnSessionQueryExecute(
-		s.session.config.Trace(), &ctx, s.session, s.query, params,
+		s.session.config.Trace(), &ctx,
+		stack.FunctionID(""),
+		s.session, s.query, params,
 		request.QueryCachePolicy.GetKeepInCache(),
 	)
 	defer func() {

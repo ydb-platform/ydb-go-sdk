@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
 func TestParse(t *testing.T) {
@@ -65,118 +67,90 @@ func TestParse(t *testing.T) {
 	}
 }
 
+var cases = []struct {
+	name string
+	lhs  string
+	rhs  string
+	lt   bool
+	gte  bool
+}{
+	{
+		name: xtest.CurrentFileLine(),
+		lhs:  "1",
+		rhs:  "2",
+		lt:   true,
+		gte:  false,
+	},
+	{
+		name: xtest.CurrentFileLine(),
+		lhs:  "2",
+		rhs:  "1",
+		lt:   false,
+		gte:  true,
+	},
+	{
+		name: xtest.CurrentFileLine(),
+		lhs:  "1",
+		rhs:  "1",
+		lt:   false,
+		gte:  true,
+	},
+	{
+		name: xtest.CurrentFileLine(),
+		lhs:  "22.5",
+		rhs:  "23.1",
+		lt:   true,
+		gte:  false,
+	},
+	{
+		name: xtest.CurrentFileLine(),
+		lhs:  "23.1",
+		rhs:  "22.5",
+		lt:   false,
+		gte:  true,
+	},
+	{
+		name: xtest.CurrentFileLine(),
+		lhs:  "trunk",
+		rhs:  "22.5",
+		lt:   false,
+		gte:  false,
+	},
+	{
+		name: xtest.CurrentFileLine(),
+		lhs:  "trunk",
+		rhs:  "23.1",
+		lt:   false,
+		gte:  false,
+	},
+	{
+		name: xtest.CurrentFileLine(),
+		lhs:  "22.5",
+		rhs:  "trunk",
+		lt:   false,
+		gte:  false,
+	},
+	{
+		name: xtest.CurrentFileLine(),
+		lhs:  "23.1",
+		rhs:  "trunk",
+		lt:   false,
+		gte:  false,
+	},
+}
+
 func TestLt(t *testing.T) {
-	for _, tt := range []struct {
-		lhs  string
-		rhs  string
-		less bool
-	}{
-		{
-			lhs:  "1",
-			rhs:  "2",
-			less: true,
-		},
-		{
-			lhs:  "2",
-			rhs:  "1",
-			less: false,
-		},
-		{
-			lhs:  "1",
-			rhs:  "1",
-			less: false,
-		},
-		{
-			lhs:  "22.5",
-			rhs:  "23.1",
-			less: true,
-		},
-		{
-			lhs:  "23.1",
-			rhs:  "22.5",
-			less: false,
-		},
-		{
-			lhs:  "trunk",
-			rhs:  "22.5",
-			less: false,
-		},
-		{
-			lhs:  "trunk",
-			rhs:  "23.1",
-			less: false,
-		},
-		{
-			lhs:  "22.5",
-			rhs:  "trunk",
-			less: false,
-		},
-		{
-			lhs:  "23.1",
-			rhs:  "trunk",
-			less: false,
-		},
-	} {
-		t.Run("", func(t *testing.T) {
-			require.Equal(t, tt.less, Lt(tt.lhs, tt.rhs))
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.lt, Lt(tt.lhs, tt.rhs))
 		})
 	}
 }
 
 func TestGte(t *testing.T) {
-	for _, tt := range []struct {
-		lhs  string
-		rhs  string
-		less bool
-	}{
-		{
-			lhs:  "1",
-			rhs:  "2",
-			less: false,
-		},
-		{
-			lhs:  "2",
-			rhs:  "1",
-			less: true,
-		},
-		{
-			lhs:  "1",
-			rhs:  "1",
-			less: true,
-		},
-		{
-			lhs:  "22.5",
-			rhs:  "23.1",
-			less: false,
-		},
-		{
-			lhs:  "23.1",
-			rhs:  "22.5",
-			less: true,
-		},
-		{
-			lhs:  "trunk",
-			rhs:  "22.5",
-			less: false,
-		},
-		{
-			lhs:  "trunk",
-			rhs:  "23.1",
-			less: false,
-		},
-		{
-			lhs:  "22.5",
-			rhs:  "trunk",
-			less: false,
-		},
-		{
-			lhs:  "23.1",
-			rhs:  "trunk",
-			less: false,
-		},
-	} {
-		t.Run("", func(t *testing.T) {
-			require.Equal(t, tt.less, Gte(tt.lhs, tt.rhs))
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.gte, Gte(tt.lhs, tt.rhs))
 		})
 	}
 }

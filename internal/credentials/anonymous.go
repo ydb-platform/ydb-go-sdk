@@ -5,28 +5,32 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 var (
-	_ Credentials  = (*Anonymous)(nil)
-	_ fmt.Stringer = (*Anonymous)(nil)
+	_ Credentials                = (*Anonymous)(nil)
+	_ fmt.Stringer               = (*Anonymous)(nil)
+	_ AnonymousCredentialsOption = SourceInfoOption("")
 )
+
+type AnonymousCredentialsOption interface {
+	ApplyAnonymousCredentialsOption(c *Anonymous)
+}
 
 // Anonymous implements Credentials interface with Anonymous access
 type Anonymous struct {
 	sourceInfo string
 }
 
-func NewAnonymousCredentials(opts ...Option) *Anonymous {
-	options := optionsHolder{
+func NewAnonymousCredentials(opts ...AnonymousCredentialsOption) *Anonymous {
+	c := &Anonymous{
 		sourceInfo: stack.Record(1),
 	}
 	for _, opt := range opts {
-		opt(&options)
+		opt.ApplyAnonymousCredentialsOption(c)
 	}
-	return &Anonymous{
-		sourceInfo: options.sourceInfo,
-	}
+	return c
 }
 
 // Token implements Credentials.
@@ -36,5 +40,13 @@ func (c Anonymous) Token(_ context.Context) (string, error) {
 
 // Token implements Credentials.
 func (c Anonymous) String() string {
-	return fmt.Sprintf("Anonymous(from:%q)", c.sourceInfo)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
+	buffer.WriteString("Anonymous{")
+	if c.sourceInfo != "" {
+		buffer.WriteString("From:")
+		fmt.Fprintf(buffer, "%q", c.sourceInfo)
+	}
+	buffer.WriteByte('}')
+	return buffer.String()
 }

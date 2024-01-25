@@ -35,7 +35,7 @@ func (u *URLs) Set(s string) error {
 	return nil
 }
 
-func init() {
+func init() { //nolint:gochecknoinits
 	required := []string{"ydb", "url"}
 	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	flagSet.Usage = func() {

@@ -12,7 +12,7 @@ func TestNodeErrorError(t *testing.T) {
 	nodeErr := newConnError(1, "localhost:1234", testErr)
 	message := nodeErr.Error()
 
-	require.Equal(t, "connError(node_id = 1, address = \"localhost:1234\"): test", message)
+	require.Equal(t, "connError{node_id:1,address:'localhost:1234'}: test", message)
 }
 
 func TestNodeErrorUnwrap(t *testing.T) {
@@ -28,8 +28,8 @@ func TestNodeErrorIs(t *testing.T) {
 	testErr2 := errors.New("test2")
 	nodeErr := newConnError(1, "localhost:1234", testErr)
 
-	require.True(t, errors.Is(nodeErr, testErr))
-	require.False(t, errors.Is(nodeErr, testErr2))
+	require.ErrorIs(t, nodeErr, testErr)
+	require.NotErrorIs(t, nodeErr, testErr2)
 }
 
 type testErrorType1 struct {
@@ -53,7 +53,6 @@ func TestNodeErrorAs(t *testing.T) {
 	nodeErr := newConnError(1, "localhost:1234", testErr)
 
 	target := testErrorType1{}
-	require.True(t, errors.As(nodeErr, &target))
 	require.ErrorAs(t, nodeErr, &target)
 	require.Equal(t, testErr, target)
 

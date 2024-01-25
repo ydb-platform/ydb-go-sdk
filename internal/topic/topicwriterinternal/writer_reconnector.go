@@ -207,7 +207,7 @@ func (w *WriterReconnector) start() {
 	w.background.Start(name+", sendloop", w.connectionLoop)
 }
 
-func (w *WriterReconnector) Write(ctx context.Context, messages []Message) error {
+func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage) error {
 	if err := w.background.CloseReason(); err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: writer is closed: %w", err))
 	}
@@ -291,7 +291,7 @@ func (w *WriterReconnector) checkMessages(messages []messageWithDataContent) err
 	return nil
 }
 
-func (w *WriterReconnector) createMessagesWithContent(messages []Message) ([]messageWithDataContent, error) {
+func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) ([]messageWithDataContent, error) {
 	res := make([]messageWithDataContent, 0, len(messages))
 	for i := range messages {
 		mess := newMessageDataWithContent(messages[i], w.encodersMap)
@@ -316,7 +316,7 @@ func (w *WriterReconnector) createMessagesWithContent(messages []Message) ([]mes
 	if targetCodec == rawtopiccommon.CodecUNSPECIFIED {
 		targetCodec = rawtopiccommon.CodecRaw
 	}
-	err := readInParallelWithCodec(res, targetCodec, w.cfg.compressorCount)
+	err := cacheMessages(res, targetCodec, w.cfg.compressorCount)
 	onCompressDone(err)
 	if err != nil {
 		return nil, err
@@ -351,7 +351,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		return xcontext.WithCancel(xcontext.WithoutDeadline(ctx))
 	}
 
-	//nolint:ineffassign,staticcheck
+	//nolint:ineffassign,staticcheck,wastedassign
 	streamCtx, streamCtxCancel := createStreamContext()
 
 	defer streamCtxCancel()
@@ -653,6 +653,17 @@ func createRawMessageData(
 
 	res.UncompressedSize = int64(mess.BufUncompressedSize)
 	res.Data, err = mess.GetEncodedBytes(codec)
+
+	if len(mess.Metadata) > 0 {
+		res.MetadataItems = make([]rawtopiccommon.MetadataItem, 0, len(mess.Metadata))
+		for key, val := range mess.Metadata {
+			res.MetadataItems = append(res.MetadataItems, rawtopiccommon.MetadataItem{
+				Key:   key,
+				Value: val,
+			})
+		}
+	}
+
 	return res, err
 }
 

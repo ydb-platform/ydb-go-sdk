@@ -20,8 +20,9 @@ var errAlreadyClosed = xerrors.Wrap(errors.New("result closed early"))
 type baseResult struct {
 	scanner
 
-	statsMtx xsync.RWMutex
-	stats    *Ydb_TableStats.QueryStats
+	nextResultSetCounter xatomic.Uint64
+	statsMtx             xsync.RWMutex
+	stats                *Ydb_TableStats.QueryStats
 
 	closed xatomic.Bool
 }
@@ -103,10 +104,11 @@ func WithMarkTruncatedAsRetryable() option {
 }
 
 func NewStream(
+	ctx context.Context,
 	recv func(ctx context.Context) (*Ydb.ResultSet, *Ydb_TableStats.QueryStats, error),
 	onClose func(error) error,
 	opts ...option,
-) StreamResult {
+) (StreamResult, error) {
 	r := &streamResult{
 		recv:  recv,
 		close: onClose,
@@ -116,7 +118,10 @@ func NewStream(
 			o(&r.baseResult)
 		}
 	}
-	return r
+	if err := r.nextResultSetErr(ctx); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	return r, nil
 }
 
 func NewUnary(sets []*Ydb.ResultSet, stats *Ydb_TableStats.QueryStats, opts ...option) UnaryResult {
@@ -157,12 +162,11 @@ func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool
 	return r.NextResultSetErr(ctx, columns...) == nil
 }
 
-func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) (err error) {
-	if r.isClosed() {
-		return xerrors.WithStackTrace(errAlreadyClosed)
-	}
-	if err = r.Err(); err != nil {
-		return xerrors.WithStackTrace(err)
+func (r *streamResult) nextResultSetErr(ctx context.Context, columns ...string) (err error) {
+	// skipping second recv because first call of recv is from New Stream(), second call is from user
+	if r.nextResultSetCounter.Add(1) == 2 {
+		r.setColumnIndexes(columns)
+		return ctx.Err()
 	}
 	s, stats, err := r.recv(ctx)
 	if err != nil {
@@ -170,7 +174,7 @@ func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) 
 		if xerrors.Is(err, io.EOF) {
 			return err
 		}
-		return r.errorf(0, "streamResult.NextResultSetErr(): %w", err)
+		return r.errorf(1, "streamResult.NextResultSetErr(): %w", err)
 	}
 	r.Reset(s, columns...)
 	if stats != nil {
@@ -179,6 +183,22 @@ func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) 
 		})
 	}
 	return ctx.Err()
+}
+
+func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) (err error) {
+	if r.isClosed() {
+		return xerrors.WithStackTrace(errAlreadyClosed)
+	}
+	if err = r.Err(); err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+	if err := r.nextResultSetErr(ctx, columns...); err != nil {
+		if xerrors.Is(err, io.EOF) {
+			return io.EOF
+		}
+		return xerrors.WithStackTrace(err)
+	}
+	return nil
 }
 
 func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) bool {

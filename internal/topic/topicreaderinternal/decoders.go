@@ -35,13 +35,8 @@ func (m *decoderMap) Decode(codec rawtopiccommon.Codec, input io.Reader) (io.Rea
 		return f(input)
 	}
 	return nil, xerrors.WithStackTrace(xerrors.Wrap(
-		fmt.Errorf("ydb: failed decompress message with codec codec %v: %w", codec, PublicErrUnexpectedCodec),
+		fmt.Errorf("ydb: failed decompress message with codec %v: %w", codec, PublicErrUnexpectedCodec),
 	))
 }
 
-// PublicCreateDecoderFunc
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicCreateDecoderFunc func(input io.Reader) (io.Reader, error)

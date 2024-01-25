@@ -65,13 +65,13 @@ func (c *Conn) GetState() conn.State {
 	return c.State
 }
 
-func (c *Conn) SetState(state conn.State) conn.State {
+func (c *Conn) SetState(ctx context.Context, state conn.State) conn.State {
 	c.State = state
 	return c.State
 }
 
-func (c *Conn) Unban() conn.State {
-	c.SetState(conn.Online)
+func (c *Conn) Unban(ctx context.Context) conn.State {
+	c.SetState(ctx, conn.Online)
 	return conn.Online
 }
 

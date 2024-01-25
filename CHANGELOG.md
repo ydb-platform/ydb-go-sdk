@@ -1,4 +1,75 @@
+## v3.55.0
+* Refactored `internal/value/intervalValue.Yql()`
+* The minimum version of Go in `ydb-go-sdk` has been raised to `go1.20`
+
+## v3.54.3
+* Added per message metadata support for topic api
+* Context for call options now have same lifetime as driver (previous - same lifetime as context for call Open function).
+* Extended metrics (fill database.sql callbacks, recognize TLI error)
+* Refactored config prefix in metrics
+* Removed excess status labels from metrics
+* Implement `fmt.Stringer` interface for `Driver` struct
+
+## v3.54.2
+* Added context to some internal methods for better tracing
+* Added `trace.FunctionID` helper and `FunctionID` field to trace start info's 
+* Replaced lazy initialization of ydb clients (table, topic, etc.) to explicit initialization on `ydb.Open` step
+
+## v3.54.1
+* Fixed inconsistent labels in `metrics` 
+
+## v3.54.0
+* Allowed `sql.LevelSerializable` isolation level in read-write mode in `database/sql` transactions 
+* Refactored traces and metrics
+* Added `{retry,table}.WithLabel` options for mark retriers calls
+* Added `ydb.WithTraceRetry` option
+* Moved `internal/allocator.Buffers` to package `internal/xstring`
+* Bumped `golang.org/x/sync` to `v0.3.0`
+* Bumped `google.golang.org/protobuf` to `v1.31.0`
+* Bumped `google.golang.org/grpc` to `v1.57.1`
+* Allowed grpc status error as arg in `internal/xerrors.TransportError(err)`
+* Added `interanl/xtest.CurrentFileLine()` helper for table tests
+* Added `internal/credentials.IsAccessError(err)` helper for check access errors
+* Changed period for re-fresh static credentials token from `1/2` to `1/10` to expiration time
+* Added `table.SnapshotReadOnlyTxControl()` helper for get transaction control with snapshot read-only
+
+## v3.53.4
+* Downgrade `golang.org/x/net` from `0.17.0` to `0.15.0`
+* Downgrade `golang.org/x/sys` from `v0.13.0` to `v0.12.0`
+* Downgrade `golang.org/x/crypto` from `v0.14.0` to `v0.13.0`
+
+## v3.53.3
+* Refactored credentials options (from funcs to interfaces and types)
+* Fixed stringification of credentials object
+
+## v3.53.2
+* Fixed panic when try to unwrap values with more than 127 columns with custom ydb unmarshaler 
+
+## v3.53.1
+* Bumps `github.com/ydb-platform/ydb-go-genproto` for support `query` service
+* Bumps `golang.org/x/net` from `0.7.0` to `0.17.0`
+* Bumps `golang.org/x/sys` from `v0.5.0` to `v0.13.0`
+* Bumps `golang.org/x/text` from `v0.7.0` to `v0.13.0`
+
+## v3.53.0
+* Removed `internal/backoff.Backoff.Wait` interface method for exclude resource leak with bug-provoked usage of `time.After` method
+* Marked as deprecated `retry.WithDoRetryOptions` and `retry.WithDoTxRetryOptions`
+* Added receiving first result set on construct `internal/table/scanner.NewStream()`
+* Added experimental package `metrics` with SDK metrics
+* Fixed redundant trace call for finished `database/sql` transactions
+* Added repeater event type to wake-up func context
+* Refactored default logger format
+* Refactored `internal/conn.coonError` format
+* Fixed data race on `internal/conn.conn.cc` access
+
+## v3.52.3
+* Removed almost all experimental marks from topic api.
+* Rename some topic APIs (old names was deprecated and will be removed in one of next versions).
+* Deprecated topic options (the option will be removed): min size of read messages batch
+* Deprecated WithOnWriterFirstConnected callback, use Writer.WaitInitInfo instead.
+* Changed topic Codec base type from int to int32 (was experimental code)
 * Added `WaitInit` and `WaitInitInfo` method to the topic reader and writer
+* Remove extra allocations in `types.TupleValue`, `types.ListValue` and `types.SetValue`
 
 ## v3.52.2
 * Removed support of placeholder "_" for ignoring columns in `database/sql` result sets

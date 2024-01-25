@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -42,8 +43,8 @@ type Conn interface {
 	Ping(ctx context.Context) error
 	IsState(states ...State) bool
 	GetState() State
-	SetState(State) State
-	Unban() State
+	SetState(ctx context.Context, state State) State
+	Unban(ctx context.Context) State
 }
 
 type conn struct {
@@ -93,8 +94,8 @@ func (c *conn) IsState(states ...State) bool {
 
 func (c *conn) park(ctx context.Context) (err error) {
 	onDone := trace.DriverOnConnPark(
-		c.config.Trace(),
-		&ctx,
+		c.config.Trace(), &ctx,
+		stack.FunctionID(""),
 		c.Endpoint(),
 	)
 	defer func() {
@@ -112,7 +113,7 @@ func (c *conn) park(ctx context.Context) (err error) {
 		return nil
 	}
 
-	err = c.close()
+	err = c.close(ctx)
 
 	if err != nil {
 		return c.wrapError(err)
@@ -135,31 +136,33 @@ func (c *conn) Endpoint() endpoint.Endpoint {
 	return nil
 }
 
-func (c *conn) SetState(s State) State {
-	return c.setState(s)
+func (c *conn) SetState(ctx context.Context, s State) State {
+	return c.setState(ctx, s)
 }
 
-func (c *conn) setState(s State) State {
-	state := c.state.Load()
-	if c.state.CompareAndSwap(state, uint32(s)) {
+func (c *conn) setState(ctx context.Context, s State) State {
+	if state := State(c.state.Swap(uint32(s))); state != s {
 		trace.DriverOnConnStateChange(
-			c.config.Trace(),
-			c.endpoint.Copy(),
-			State(state),
+			c.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			c.endpoint.Copy(), state,
 		)(s)
 	}
 	return s
 }
 
-func (c *conn) Unban() State {
+func (c *conn) Unban(ctx context.Context) State {
 	var newState State
-	if isAvailable(c.cc) {
+	c.mtx.RLock()
+	cc := c.cc
+	c.mtx.RUnlock()
+	if isAvailable(cc) {
 		newState = Online
 	} else {
 		newState = Offline
 	}
 
-	c.setState(newState)
+	c.setState(ctx, newState)
 	return newState
 }
 
@@ -186,11 +189,10 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	}
 
 	onDone := trace.DriverOnConnDial(
-		c.config.Trace(),
-		&ctx,
+		c.config.Trace(), &ctx,
+		stack.FunctionID(""),
 		c.endpoint.Copy(),
 	)
-
 	defer func() {
 		onDone(err)
 	}()
@@ -221,7 +223,7 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	}
 
 	c.cc = cc
-	c.setState(Online)
+	c.setState(ctx, Online)
 
 	return c.cc, nil
 }
@@ -243,13 +245,13 @@ func isAvailable(raw *grpc.ClientConn) bool {
 }
 
 // conn must be locked
-func (c *conn) close() (err error) {
+func (c *conn) close(ctx context.Context) (err error) {
 	if c.cc == nil {
 		return nil
 	}
 	err = c.cc.Close()
 	c.cc = nil
-	c.setState(Offline)
+	c.setState(ctx, Offline)
 	return c.wrapError(err)
 }
 
@@ -268,8 +270,8 @@ func (c *conn) Close(ctx context.Context) (err error) {
 	}
 
 	onDone := trace.DriverOnConnClose(
-		c.config.Trace(),
-		&ctx,
+		c.config.Trace(), &ctx,
+		stack.FunctionID(""),
 		c.Endpoint(),
 	)
 	defer func() {
@@ -278,9 +280,9 @@ func (c *conn) Close(ctx context.Context) (err error) {
 
 	c.closed = true
 
-	err = c.close()
+	err = c.close(ctx)
 
-	c.setState(Destroyed)
+	c.setState(ctx, Destroyed)
 
 	for _, onClose := range c.onClose {
 		onClose(c)
@@ -301,21 +303,16 @@ func (c *conn) Invoke(
 		issues      []trace.Issue
 		useWrapping = UseWrapping(ctx)
 		onDone      = trace.DriverOnConnInvoke(
-			c.config.Trace(),
-			&ctx,
-			c.endpoint,
-			trace.Method(method),
+			c.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			c.endpoint, trace.Method(method),
 		)
 		cc *grpc.ClientConn
 		md = metadata.MD{}
 	)
-
-	defer func() {
-		onDone(err, issues, opID, c.GetState(), md)
-	}()
-
 	defer func() {
 		meta.CallTrailerCallback(ctx, md)
+		onDone(err, issues, opID, c.GetState(), md)
 	}()
 
 	cc, err = c.realConn(ctx)
@@ -326,7 +323,7 @@ func (c *conn) Invoke(
 	c.touchLastUsage()
 	defer c.touchLastUsage()
 
-	traceID, err := newTraceID()
+	ctx, traceID, err := meta.TraceID(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -386,10 +383,9 @@ func (c *conn) NewStream(
 ) (_ grpc.ClientStream, err error) {
 	var (
 		streamRecv = trace.DriverOnConnNewStream(
-			c.config.Trace(),
-			&ctx,
-			c.endpoint.Copy(),
-			trace.Method(method),
+			c.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			c.endpoint.Copy(), trace.Method(method),
 		)
 		useWrapping = UseWrapping(ctx)
 		cc          *grpc.ClientConn
@@ -419,7 +415,7 @@ func (c *conn) NewStream(
 	c.touchLastUsage()
 	defer c.touchLastUsage()
 
-	traceID, err := newTraceID()
+	ctx, traceID, err := meta.TraceID(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

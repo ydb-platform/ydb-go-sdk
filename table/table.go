@@ -9,9 +9,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -81,6 +82,7 @@ const (
 
 type SessionInfo interface {
 	ID() string
+	NodeID() uint32
 	Status() SessionStatus
 	LastUsage() time.Time
 }
@@ -439,8 +441,15 @@ func StaleReadOnlyTxControl() *TransactionControl {
 	)
 }
 
-// QueryParameters
+// SnapshotReadOnlyTxControl returns snapshot read-only transaction control
+func SnapshotReadOnlyTxControl() *TransactionControl {
+	return TxControl(
+		BeginTx(WithSnapshotReadOnly()),
+		CommitTx(), // open transactions not supported for StaleReadOnly
+	)
+}
 
+// QueryParameters
 type (
 	queryParams     map[string]types.Value
 	ParameterOption interface {
@@ -511,8 +520,8 @@ func (q *QueryParameters) names() []string {
 }
 
 func (q *QueryParameters) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 
 	buffer.WriteByte('{')
 	for i, name := range q.names() {
@@ -558,36 +567,92 @@ func ValueParam(name string, v types.Value) ParameterOption {
 }
 
 type Options struct {
+	Label           string
 	Idempotent      bool
 	TxSettings      *TransactionSettings
 	TxCommitOptions []options.CommitTransactionOption
-	FastBackoff     backoff.Backoff
-	SlowBackoff     backoff.Backoff
+	RetryOptions    []retry.Option
 	Trace           *trace.Table
 }
 
-type Option func(o *Options)
-
-func WithIdempotent() Option {
-	return func(o *Options) {
-		o.Idempotent = true
-	}
+type Option interface {
+	ApplyTableOption(opts *Options)
 }
 
-func WithTxSettings(tx *TransactionSettings) Option {
-	return func(o *Options) {
-		o.TxSettings = tx
-	}
+var _ Option = labelOption("")
+
+type labelOption string
+
+func (label labelOption) ApplyTableOption(opts *Options) {
+	opts.Label = string(label)
+	opts.RetryOptions = append(opts.RetryOptions, retry.WithLabel(string(label)))
 }
 
-func WithTxCommitOptions(opts ...options.CommitTransactionOption) Option {
-	return func(o *Options) {
-		o.TxCommitOptions = append(o.TxCommitOptions, opts...)
-	}
+func WithLabel(label string) labelOption {
+	return labelOption(label)
 }
 
-func WithTrace(t trace.Table) Option { //nolint:gocritic
-	return func(o *Options) {
-		o.Trace = o.Trace.Compose(&t)
-	}
+var _ Option = retryOptionsOption{}
+
+type retryOptionsOption []retry.Option
+
+func (retryOptions retryOptionsOption) ApplyTableOption(opts *Options) {
+	opts.RetryOptions = append(opts.RetryOptions, retry.WithIdempotent(true))
+}
+
+func WithRetryOptions(retryOptions []retry.Option) retryOptionsOption {
+	return retryOptions
+}
+
+var _ Option = idempotentOption{}
+
+type idempotentOption struct{}
+
+func (idempotentOption) ApplyTableOption(opts *Options) {
+	opts.Idempotent = true
+	opts.RetryOptions = append(opts.RetryOptions, retry.WithIdempotent(true))
+}
+
+func WithIdempotent() idempotentOption {
+	return idempotentOption{}
+}
+
+var _ Option = txSettingsOption{}
+
+type txSettingsOption struct {
+	txSettings *TransactionSettings
+}
+
+func (opt txSettingsOption) ApplyTableOption(opts *Options) {
+	opts.TxSettings = opt.txSettings
+}
+
+func WithTxSettings(txSettings *TransactionSettings) txSettingsOption {
+	return txSettingsOption{txSettings: txSettings}
+}
+
+var _ Option = txCommitOptionsOption(nil)
+
+type txCommitOptionsOption []options.CommitTransactionOption
+
+func (txCommitOpts txCommitOptionsOption) ApplyTableOption(opts *Options) {
+	opts.TxCommitOptions = append(opts.TxCommitOptions, txCommitOpts...)
+}
+
+func WithTxCommitOptions(opts ...options.CommitTransactionOption) txCommitOptionsOption {
+	return opts
+}
+
+var _ Option = traceOption{}
+
+type traceOption struct {
+	t *trace.Table
+}
+
+func (opt traceOption) ApplyTableOption(opts *Options) {
+	opts.Trace = opts.Trace.Compose(opt.t)
+}
+
+func WithTrace(t trace.Table) traceOption { //nolint:gocritic
+	return traceOption{t: &t}
 }

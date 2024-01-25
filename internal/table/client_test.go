@@ -403,7 +403,8 @@ func TestSessionPoolRacyGet(t *testing.T) {
 		session *session
 	}
 	create := make(chan createReq)
-	p := newClient(
+	p, err := newClient(
+		context.Background(),
 		nil,
 		(&StubBuilder{
 			Limit: 1,
@@ -422,11 +423,11 @@ func TestSessionPoolRacyGet(t *testing.T) {
 			config.WithIdleThreshold(-1),
 		),
 	)
+	require.NoError(t, err)
 	var (
 		expSession *session
 		done       = make(chan struct{}, 2)
 	)
-	var err error
 	for i := 0; i < 2; i++ {
 		go func() {
 			defer func() {
@@ -855,7 +856,8 @@ func newClientWithStubBuilder(
 	stubLimit int,
 	options ...config.Option,
 ) *Client {
-	return newClient(
+	c, err := newClient(
+		context.Background(),
 		balancer,
 		(&StubBuilder{
 			T:     t,
@@ -864,6 +866,8 @@ func newClientWithStubBuilder(
 		}).createSession,
 		config.New(options...),
 	)
+	require.NoError(t, err)
+	return c
 }
 
 func (s *StubBuilder) createSession(ctx context.Context) (session *session, err error) {
@@ -943,7 +947,7 @@ func TestDeadlockOnUpdateNodes(t *testing.T) {
 		require.NoError(t, err)
 		s3, err := c.Get(ctx)
 		require.NoError(t, err)
-		require.Equal(t, 3, len(nodes))
+		require.Len(t, nodes, 3)
 		err = c.Put(ctx, s1)
 		require.NoError(t, err)
 		err = c.Put(ctx, s2)
@@ -994,7 +998,7 @@ func TestDeadlockOnInternalPoolGCTick(t *testing.T) {
 			return
 		}
 		require.NoError(t, err)
-		require.Equal(t, 3, len(nodes))
+		require.Len(t, nodes, 3)
 		err = c.Put(ctx, s1)
 		if err != nil && errors.Is(err, context.DeadlineExceeded) {
 			return

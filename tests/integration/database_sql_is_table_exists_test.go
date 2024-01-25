@@ -40,7 +40,6 @@ func TestDatabaseSqlIsTableExists(t *testing.T) {
 				exists, err = q.IsTableExists(ctx, "series")
 				return err
 			})
-
 			if err != nil {
 				return err
 			}
@@ -52,7 +51,7 @@ func TestDatabaseSqlIsTableExists(t *testing.T) {
 			}
 
 			return err
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})
@@ -75,7 +74,7 @@ func TestDatabaseSqlIsTableExists(t *testing.T) {
 			)
 
 			return err
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})
@@ -102,7 +101,7 @@ func TestDatabaseSqlIsTableExists(t *testing.T) {
 
 			require.True(t, exists)
 			return nil
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})

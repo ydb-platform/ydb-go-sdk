@@ -7,6 +7,7 @@ import (
 	"github.com/jonboulle/clockwork"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -61,21 +62,40 @@ func WithClock(clock clockwork.Clock) option {
 	}
 }
 
-type event string
+type Event = string
 
 const (
-	eventTick   = event("tick")
-	eventForce  = event("force")
-	eventCancel = event("cancel")
+	EventUnknown = Event("")
+	EventInit    = Event("init")
+	EventTick    = Event("tick")
+	EventForce   = Event("force")
+	EventCancel  = Event("cancel")
 )
+
+type ctxEventTypeKey struct{}
+
+func EventType(ctx context.Context) Event {
+	if eventType, ok := ctx.Value(ctxEventTypeKey{}).(Event); ok {
+		return eventType
+	}
+	return EventUnknown
+}
+
+func WithEvent(ctx context.Context, event Event) context.Context {
+	return context.WithValue(ctx,
+		ctxEventTypeKey{},
+		event,
+	)
+}
 
 // New creates and begins to execute task periodically.
 func New(
+	ctx context.Context,
 	interval time.Duration,
 	task func(ctx context.Context) (err error),
 	opts ...option,
 ) *repeater {
-	ctx, cancel := xcontext.WithCancel(context.Background())
+	ctx, cancel := xcontext.WithCancel(ctx)
 
 	r := &repeater{
 		interval: interval,
@@ -118,18 +138,17 @@ func (r *repeater) Force() {
 	}
 }
 
-func (r *repeater) wakeUp(ctx context.Context, e event) (err error) {
+func (r *repeater) wakeUp(ctx context.Context, e Event) (err error) {
 	if err = ctx.Err(); err != nil {
 		return err
 	}
 
-	onDone := trace.DriverOnRepeaterWakeUp(
-		r.trace,
-		&ctx,
-		r.name,
-		string(e),
-	)
+	ctx = WithEvent(ctx, e)
 
+	onDone := trace.DriverOnRepeaterWakeUp(r.trace, &ctx,
+		stack.FunctionID(""),
+		r.name, e,
+	)
 	defer func() {
 		onDone(err)
 
@@ -155,29 +174,32 @@ func (r *repeater) worker(ctx context.Context, tick clockwork.Ticker) {
 		backoff.WithSlotDuration(500*time.Millisecond),
 		backoff.WithCeiling(6),
 		backoff.WithJitterLimit(1),
-		backoff.WithClock(r.clock),
 	)
 
 	// forceIndex defines delay index for force backoff
 	forceIndex := 0
 
-	waitForceEvent := func() event {
+	waitForceEvent := func() Event {
 		if forceIndex == 0 {
-			return eventForce
+			return EventForce
 		}
+
+		force := r.clock.NewTimer(force.Delay(forceIndex))
+		defer force.Stop()
+
 		select {
 		case <-ctx.Done():
-			return eventCancel
+			return EventCancel
 		case <-tick.Chan():
-			return eventTick
-		case <-force.Wait(forceIndex):
-			return eventForce
+			return EventTick
+		case <-force.Chan():
+			return EventForce
 		}
 	}
 
 	// processEvent func checks wakeup error and returns new force index
-	processEvent := func(event event) {
-		if event == eventCancel {
+	processEvent := func(event Event) {
+		if event == EventCancel {
 			return
 		}
 		if err := r.wakeUp(ctx, event); err != nil {
@@ -193,7 +215,7 @@ func (r *repeater) worker(ctx context.Context, tick clockwork.Ticker) {
 			return
 
 		case <-tick.Chan():
-			processEvent(eventTick)
+			processEvent(EventTick)
 
 		case <-r.force:
 			processEvent(waitForceEvent())

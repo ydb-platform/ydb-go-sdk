@@ -17,7 +17,12 @@ type (
 	Driver struct {
 		// Driver runtime events
 		OnInit  func(DriverInitStartInfo) func(DriverInitDoneInfo)
+		OnWith  func(DriverWithStartInfo) func(DriverWithDoneInfo)
 		OnClose func(DriverCloseStartInfo) func(DriverCloseDoneInfo)
+
+		// Pool of connections
+		OnPoolNew     func(DriverConnPoolNewStartInfo) func(DriverConnPoolNewDoneInfo)
+		OnPoolRelease func(DriverConnPoolReleaseStartInfo) func(DriverConnPoolReleaseDoneInfo)
 
 		// Deprecated: driver not notificate about this event
 		OnNetRead func(DriverNetReadStartInfo) func(DriverNetReadDoneInfo)
@@ -130,6 +135,12 @@ type EndpointInfo interface {
 
 type (
 	DriverConnStateChangeStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context  *context.Context
+		Call     call
 		Endpoint EndpointInfo
 		State    ConnState
 	}
@@ -137,6 +148,7 @@ type (
 		State ConnState
 	}
 	DriverResolveStartInfo struct {
+		Call     call
 		Target   string
 		Resolved []string
 	}
@@ -149,10 +161,13 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context     *context.Context
+		Call        call
 		NeedLocalDC bool
 	}
 	DriverBalancerUpdateDoneInfo struct {
 		Endpoints []EndpointInfo
+		Added     []EndpointInfo
+		Dropped   []EndpointInfo
 		LocalDC   string
 		// Deprecated: this field always nil
 		Error error
@@ -163,12 +178,14 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
+		Call    call
 		Address string
 	}
 	DriverBalancerClusterDiscoveryAttemptDoneInfo struct {
 		Error error
 	}
 	DriverNetReadStartInfo struct {
+		Call    call
 		Address string
 		Buffer  int
 	}
@@ -177,6 +194,7 @@ type (
 		Error    error
 	}
 	DriverNetWriteStartInfo struct {
+		Call    call
 		Address string
 		Bytes   int
 	}
@@ -190,12 +208,14 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
+		Call    call
 		Address string
 	}
 	DriverNetDialDoneInfo struct {
 		Error error
 	}
 	DriverNetCloseStartInfo struct {
+		Call    call
 		Address string
 	}
 	DriverNetCloseDoneInfo struct {
@@ -207,6 +227,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
+		Call     call
 		Endpoint EndpointInfo
 	}
 	DriverConnTakeDoneInfo struct {
@@ -218,6 +239,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
+		Call     call
 		Endpoint EndpointInfo
 	}
 	DriverConnDialDoneInfo struct {
@@ -229,6 +251,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
+		Call     call
 		Endpoint EndpointInfo
 	}
 	DriverConnParkDoneInfo struct {
@@ -240,6 +263,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
+		Call     call
 		Endpoint EndpointInfo
 	}
 	DriverConnCloseDoneInfo struct {
@@ -251,6 +275,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
+		Call     call
 		Endpoint EndpointInfo
 		State    ConnState
 		Cause    error
@@ -264,6 +289,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
+		Call     call
 		Endpoint EndpointInfo
 		State    ConnState
 	}
@@ -276,6 +302,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
+		Call     call
 		Endpoint EndpointInfo
 		Method   Method
 	}
@@ -292,6 +319,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
+		Call     call
 		Endpoint EndpointInfo
 		Method   Method
 	}
@@ -309,6 +337,8 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
+		Call    call
+		Name    string
 	}
 	DriverBalancerInitDoneInfo struct {
 		Error error
@@ -319,6 +349,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
+		Call    call
 		Address string
 	}
 	DriverBalancerDialEntrypointDoneInfo struct {
@@ -330,6 +361,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
+		Call    call
 	}
 	DriverBalancerCloseDoneInfo struct {
 		Error error
@@ -340,6 +372,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
+		Call    call
 	}
 	DriverBalancerChooseEndpointDoneInfo struct {
 		Endpoint EndpointInfo
@@ -351,6 +384,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
+		Call    call
 		Name    string
 		Event   string
 	}
@@ -363,6 +397,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
+		Call    call
 	}
 	DriverGetCredentialsDoneInfo struct {
 		Token string
@@ -374,11 +409,46 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context  *context.Context
+		Call     call
 		Endpoint string
 		Database string
 		Secure   bool
 	}
 	DriverInitDoneInfo struct {
+		Error error
+	}
+	DriverWithStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context  *context.Context
+		Call     call
+		Endpoint string
+		Database string
+		Secure   bool
+	}
+	DriverWithDoneInfo struct {
+		Error error
+	}
+	DriverConnPoolNewStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	DriverConnPoolNewDoneInfo      struct{}
+	DriverConnPoolReleaseStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	DriverConnPoolReleaseDoneInfo struct {
 		Error error
 	}
 	DriverCloseStartInfo struct {
@@ -387,6 +457,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
+		Call    call
 	}
 	DriverCloseDoneInfo struct {
 		Error error

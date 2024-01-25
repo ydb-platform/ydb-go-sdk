@@ -10,8 +10,8 @@ import (
 )
 
 type ReadWriter interface {
-	Read(context.Context, generator.RowID) (_ generator.Row, attempts int, err error)
-	Write(context.Context, generator.Row) (attempts int, err error)
+	Read(ctx context.Context, rowID generator.RowID) (_ generator.Row, attempts int, err error)
+	Write(ctx context.Context, row generator.Row) (attempts int, err error)
 }
 
 type Workers struct {

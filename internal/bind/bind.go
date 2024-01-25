@@ -3,8 +3,8 @@ package bind
 import (
 	"sort"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
@@ -38,8 +38,8 @@ func (bindings Bindings) RewriteQuery(query string, args ...interface{}) (
 		return query, table.NewQueryParameters(params...), nil
 	}
 
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 
 	for i := range bindings {
 		query, args, err = bindings[len(bindings)-1-i].RewriteQuery(query, args...)

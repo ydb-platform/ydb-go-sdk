@@ -16,27 +16,40 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
-type staticCredentialsConfig interface {
-	Endpoint() string
-	GrpcDialOptions() []grpc.DialOption
+var (
+	_ Credentials             = (*Static)(nil)
+	_ fmt.Stringer            = (*Static)(nil)
+	_ StaticCredentialsOption = grpcDialOptionsOption(nil)
+)
+
+type grpcDialOptionsOption []grpc.DialOption
+
+func (opts grpcDialOptionsOption) ApplyStaticCredentialsOption(c *Static) {
+	c.opts = opts
 }
 
-func NewStaticCredentials(user, password string, config staticCredentialsConfig, opts ...Option) *Static {
-	options := optionsHolder{
+type StaticCredentialsOption interface {
+	ApplyStaticCredentialsOption(c *Static)
+}
+
+func WithGrpcDialOptions(opts ...grpc.DialOption) grpcDialOptionsOption {
+	return opts
+}
+
+func NewStaticCredentials(user, password, endpoint string, opts ...StaticCredentialsOption) *Static {
+	c := &Static{
+		user:       user,
+		password:   password,
+		endpoint:   endpoint,
 		sourceInfo: stack.Record(1),
 	}
 	for _, opt := range opts {
-		opt(&options)
+		opt.ApplyStaticCredentialsOption(c)
 	}
-	return &Static{
-		user:       user,
-		password:   password,
-		endpoint:   config.Endpoint(),
-		sourceInfo: options.sourceInfo,
-		opts:       config.GrpcDialOptions(),
-	}
+	return c
 }
 
 var (
@@ -117,7 +130,7 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 		return "", xerrors.WithStackTrace(err)
 	}
 
-	c.requestAt = time.Now().Add(time.Until(expiresAt) / 2)
+	c.requestAt = time.Now().Add(time.Until(expiresAt) / 10)
 	c.token = result.GetToken()
 
 	return c.token, nil
@@ -132,11 +145,18 @@ func parseExpiresAt(raw string) (expiresAt time.Time, err error) {
 }
 
 func (c *Static) String() string {
-	return fmt.Sprintf(
-		"Static(user:%q,password:%q,token:%q,from:%q)",
-		c.user,
-		secret.Password(c.password),
-		secret.Token(c.token),
-		c.sourceInfo,
-	)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
+	buffer.WriteString("Static{User:")
+	fmt.Fprintf(buffer, "%q", c.user)
+	buffer.WriteString(",Password:")
+	fmt.Fprintf(buffer, "%q", secret.Password(c.password))
+	buffer.WriteString(",Token:")
+	fmt.Fprintf(buffer, "%q", secret.Token(c.token))
+	if c.sourceInfo != "" {
+		buffer.WriteString(",From:")
+		fmt.Fprintf(buffer, "%q", c.sourceInfo)
+	}
+	buffer.WriteByte('}')
+	return buffer.String()
 }

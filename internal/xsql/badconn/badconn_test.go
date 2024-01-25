@@ -1,6 +1,3 @@
-//go:build go1.18
-// +build go1.18
-
 package badconn
 
 import (
@@ -8,6 +5,7 @@ import (
 	"database/sql/driver"
 	"errors"
 	"fmt"
+	"io"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -113,20 +111,20 @@ var errsToCheck = []error{
 	xerrors.Operation(
 		xerrors.WithStatusCode(Ydb.StatusIds_SESSION_BUSY),
 	),
+	xerrors.Retryable(errors.New("retryable error")),
+	xerrors.Retryable(errors.New("retryable error"), xerrors.WithDeleteSession()),
+	io.EOF,
+	xerrors.WithStackTrace(io.EOF),
 }
 
 func Test_badConnError_Is(t *testing.T) {
 	for _, err := range errsToCheck {
 		t.Run(err.Error(), func(t *testing.T) {
-			e := Map(err)
-
-			if xerrors.Is(e, driver.ErrBadConn) {
-				require.True(t, xerrors.Is(e, err))
-			}
-
-			if errors.Is(e, driver.ErrBadConn) {
-				require.True(t, errors.Is(e, err))
-			}
+			err = Map(err)
+			require.Equal(t,
+				xerrors.MustDeleteSession(err),
+				xerrors.Is(err, driver.ErrBadConn),
+			)
 		})
 	}
 }
@@ -134,12 +132,7 @@ func Test_badConnError_Is(t *testing.T) {
 func Test_badConnError_As_Error(t *testing.T) {
 	for _, err := range errsToCheck {
 		t.Run(err.Error(), func(t *testing.T) {
-			var e xerrors.Error
-			if !xerrors.As(err, &e) {
-				t.Skip()
-			}
-
-			require.True(t, xerrors.As(Map(err), &e))
+			require.ErrorAs(t, Map(err), &err) //nolint:gosec
 		})
 	}
 }

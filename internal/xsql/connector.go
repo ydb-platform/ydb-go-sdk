@@ -11,6 +11,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
@@ -150,6 +151,19 @@ func WithOnClose(f func(connector *Connector)) ConnectorOption {
 	return onCloseConnectorOption(f)
 }
 
+type traceRetryConnectorOption struct {
+	t *trace.Retry
+}
+
+func (t traceRetryConnectorOption) Apply(c *Connector) error {
+	c.traceRetry = t.t
+	return nil
+}
+
+func WithTraceRetry(t *trace.Retry) ConnectorOption {
+	return traceRetryConnectorOption{t: t}
+}
+
 type fakeTxConnectorOption QueryMode
 
 func (m fakeTxConnectorOption) Apply(c *Connector) error {
@@ -221,7 +235,8 @@ type Connector struct {
 	disableServerBalancer bool
 	idleThreshold         time.Duration
 
-	trace *trace.DatabaseSQL
+	trace      *trace.DatabaseSQL
+	traceRetry *trace.Retry
 }
 
 var (
@@ -281,7 +296,10 @@ func (c *Connector) detach(cc *conn) {
 
 func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 	var (
-		onDone  = trace.DatabaseSQLOnConnectorConnect(c.trace, &ctx)
+		onDone = trace.DatabaseSQLOnConnectorConnect(
+			c.trace, &ctx,
+			stack.FunctionID(""),
+		)
 		session table.ClosableSession
 	)
 	defer func() {
@@ -295,7 +313,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return newConn(c, session, withDefaultTxControl(c.defaultTxControl),
+	return newConn(ctx, c, session, withDefaultTxControl(c.defaultTxControl),
 		withDefaultQueryMode(c.defaultQueryMode),
 		withDataOpts(c.defaultDataQueryOpts...),
 		withScanOpts(c.defaultScanQueryOpts...),
@@ -310,6 +328,10 @@ func (c *Connector) Driver() driver.Driver {
 
 type driverWrapper struct {
 	c *Connector
+}
+
+func (d *driverWrapper) TraceRetry() *trace.Retry {
+	return d.c.traceRetry
 }
 
 func (d *driverWrapper) Open(_ string) (driver.Conn, error) {

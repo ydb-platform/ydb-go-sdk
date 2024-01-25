@@ -11,6 +11,7 @@ import (
 	"google.golang.org/grpc"
 
 	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -33,22 +34,23 @@ type balancer interface {
 	nodeChecker
 }
 
-func New(balancer balancer, config *config.Config) *Client {
-	return newClient(balancer, func(ctx context.Context) (s *session, err error) {
+func New(ctx context.Context, balancer balancer, config *config.Config) (*Client, error) {
+	return newClient(ctx, balancer, func(ctx context.Context) (s *session, err error) {
 		return newSession(ctx, balancer, config)
 	}, config)
 }
 
 func newClient(
+	ctx context.Context,
 	balancer balancer,
 	builder sessionBuilder,
 	config *config.Config,
-) *Client {
-	var (
-		ctx    = context.Background()
-		onDone = trace.TableOnInit(config.Trace(), &ctx)
-	)
-	c := &Client{
+) (c *Client, finalErr error) {
+	onDone := trace.TableOnInit(config.Trace(), &ctx, stack.FunctionID(""))
+	defer func() {
+		onDone(config.SizeLimit(), finalErr)
+	}()
+	c = &Client{
 		clock:       config.Clock(),
 		config:      config,
 		cc:          balancer,
@@ -70,8 +72,8 @@ func newClient(
 		c.wg.Add(1)
 		go c.internalPoolGC(ctx, idleThreshold)
 	}
-	onDone(c.limit)
-	return c
+
+	return c, nil
 }
 
 // Client is a set of session instances that may be reused.
@@ -241,9 +243,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 		}
 		return s, nil
 	}
-	options := retryOptions(c.config.Trace(), opts...)
-	err = retry.Retry(
-		ctx,
+	err = retry.Retry(ctx,
 		func(ctx context.Context) (err error) {
 			s, err = createSession(ctx)
 			if err != nil {
@@ -251,26 +251,24 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 			}
 			return nil
 		},
-		retry.WithIdempotent(true),
-		retry.WithID("CreateSession"),
-		retry.WithFastBackoff(options.FastBackoff),
-		retry.WithSlowBackoff(options.SlowBackoff),
-		retry.WithTrace(trace.Retry{
-			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-				onIntermediate := trace.TableOnCreateSession(c.config.Trace(), info.Context)
-				return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-					onDone := onIntermediate(info.Error)
-					return func(info trace.RetryLoopDoneInfo) {
-						onDone(s, info.Attempts, info.Error)
-					}
-				}
-			},
-		}),
+		append(
+			[]retry.Option{
+				retry.WithIdempotent(true),
+				retry.WithTrace(&trace.Retry{
+					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+						onIntermediate := trace.TableOnCreateSession(c.config.Trace(), info.Context, stack.FunctionID(""))
+						return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+							onDone := onIntermediate(info.Error)
+							return func(info trace.RetryLoopDoneInfo) {
+								onDone(s, info.Attempts, info.Error)
+							}
+						}
+					},
+				}),
+			}, c.retryOptions(opts...).RetryOptions...,
+		)...,
 	)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-	return s, nil
+	return s, xerrors.WithStackTrace(err)
 }
 
 func (c *Client) isClosed() bool {
@@ -374,7 +372,7 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 		}
 	}
 
-	onDone := trace.TableOnPoolGet(o.t, &ctx)
+	onDone := trace.TableOnPoolGet(o.t, &ctx, stack.FunctionID(""))
 	defer func() {
 		onDone(s, i, err)
 	}()
@@ -467,7 +465,7 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s 
 		el = c.waitQ.PushBack(ch)
 	})
 
-	waitDone := trace.TableOnPoolWait(t, &ctx)
+	waitDone := trace.TableOnPoolWait(t, &ctx, stack.FunctionID(""))
 
 	defer func() {
 		waitDone(s, err)
@@ -504,7 +502,7 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s 
 		c.mu.WithLock(func() {
 			c.waitQ.Remove(el)
 		})
-		return nil, nil
+		return nil, nil //nolint:nilnil
 
 	case <-ctx.Done():
 		c.mu.WithLock(func() {
@@ -524,7 +522,10 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s 
 // Get() or Take() calls. In other way it will produce unexpected behavior or
 // panic.
 func (c *Client) Put(ctx context.Context, s *session) (err error) {
-	onDone := trace.TableOnPoolPut(c.config.Trace(), &ctx, s)
+	onDone := trace.TableOnPoolPut(c.config.Trace(), &ctx,
+		stack.FunctionID(""),
+		s,
+	)
 	defer func() {
 		onDone(err)
 	}()
@@ -581,7 +582,7 @@ func (c *Client) Close(ctx context.Context) (err error) {
 		default:
 			close(c.done)
 
-			onDone := trace.TableOnClose(c.config.Trace(), &ctx)
+			onDone := trace.TableOnClose(c.config.Trace(), &ctx, stack.FunctionID(""))
 			defer func() {
 				onDone(err)
 			}()
@@ -615,40 +616,106 @@ func (c *Client) Close(ctx context.Context) (err error) {
 // - deadline was canceled or deadlined
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
-func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Option) (err error) {
+func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Option) (finalErr error) {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
-	if c.isClosed() {
-		return xerrors.WithStackTrace(errClosedClient)
-	}
-	return do(
-		ctx,
-		c,
-		c.config,
-		op,
-		retryOptions(c.config.Trace(), opts...),
-	)
-}
 
-func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) (err error) {
-	if c == nil {
-		return xerrors.WithStackTrace(errNilClient)
-	}
 	if c.isClosed() {
 		return xerrors.WithStackTrace(errClosedClient)
 	}
-	err = doTx(
-		ctx,
-		c,
-		c.config,
-		op,
-		retryOptions(c.config.Trace(), opts...),
+
+	config := c.retryOptions(opts...)
+
+	attempts, onIntermediate := 0, trace.TableOnDo(config.Trace, &ctx,
+		stack.FunctionID(""),
+		config.Label, config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
 	)
+	defer func() {
+		onIntermediate(finalErr)(attempts, finalErr)
+	}()
+
+	err := do(ctx, c, c.config, op, func(err error) {
+		attempts++
+		onIntermediate(err)
+	}, config.RetryOptions...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
+
 	return nil
+}
+
+func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) (finalErr error) {
+	if c == nil {
+		return xerrors.WithStackTrace(errNilClient)
+	}
+
+	if c.isClosed() {
+		return xerrors.WithStackTrace(errClosedClient)
+	}
+
+	config := c.retryOptions(opts...)
+
+	attempts, onIntermediate := 0, trace.TableOnDoTx(config.Trace, &ctx,
+		stack.FunctionID(""),
+		config.Label, config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
+	)
+	defer func() {
+		onIntermediate(finalErr)(attempts, finalErr)
+	}()
+
+	return retryBackoff(ctx, c,
+		func(ctx context.Context, s table.Session) (err error) {
+			attempts++
+
+			defer func() {
+				onIntermediate(err)
+			}()
+
+			tx, err := s.BeginTransaction(ctx, config.TxSettings)
+			if err != nil {
+				return xerrors.WithStackTrace(err)
+			}
+
+			defer func() {
+				if err != nil {
+					errRollback := tx.Rollback(ctx)
+					if errRollback != nil {
+						err = xerrors.NewWithIssues("",
+							xerrors.WithStackTrace(err),
+							xerrors.WithStackTrace(errRollback),
+						)
+					} else {
+						err = xerrors.WithStackTrace(err)
+					}
+				}
+			}()
+
+			err = func() error {
+				if panicCallback := c.config.PanicCallback(); panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							panicCallback(e)
+						}
+					}()
+				}
+				return op(xcontext.MarkRetryCall(ctx), tx)
+			}()
+
+			if err != nil {
+				return xerrors.WithStackTrace(err)
+			}
+
+			_, err = tx.CommitTx(ctx, config.TxCommitOptions...)
+			if err != nil {
+				return xerrors.WithStackTrace(err)
+			}
+
+			return nil
+		},
+		config.RetryOptions...,
+	)
 }
 
 func (c *Client) internalPoolGCTick(ctx context.Context, idleThreshold time.Duration) {

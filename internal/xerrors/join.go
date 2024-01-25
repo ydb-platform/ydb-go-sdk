@@ -3,18 +3,18 @@ package xerrors
 import (
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 func Join(errs ...error) joinError {
-	return joinError(errs)
+	return errs
 }
 
 type joinError []error
 
 func (errs joinError) Error() string {
-	b := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(b)
+	b := xstring.Buffer()
+	defer b.Free()
 	b.WriteByte('[')
 	for i, err := range errs {
 		if i > 0 {
@@ -42,4 +42,8 @@ func (errs joinError) Is(target error) bool {
 		}
 	}
 	return false
+}
+
+func (errs joinError) Unwrap() []error {
+	return errs
 }

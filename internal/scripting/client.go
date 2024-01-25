@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -52,8 +53,11 @@ func (c *Client) Execute(
 		err = call(ctx)
 		return
 	}
-	err = retry.Retry(ctx, call, retry.WithStackTrace())
-	return
+	err = retry.Retry(ctx, call,
+		retry.WithStackTrace(),
+		retry.WithTrace(c.config.TraceRetry()),
+	)
+	return r, xerrors.WithStackTrace(err)
 }
 
 func (c *Client) execute(
@@ -62,7 +66,10 @@ func (c *Client) execute(
 	params *table.QueryParameters,
 ) (r result.Result, err error) {
 	var (
-		onDone  = trace.ScriptingOnExecute(c.config.Trace(), &ctx, query, params)
+		onDone = trace.ScriptingOnExecute(c.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			query, params,
+		)
 		a       = allocator.New()
 		request = &Ydb_Scripting.ExecuteYqlRequest{
 			Script:     query,
@@ -120,8 +127,12 @@ func (c *Client) Explain(
 		err = call(ctx)
 		return
 	}
-	err = retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
-	return
+	err = retry.Retry(ctx, call,
+		retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+	)
+	return e, xerrors.WithStackTrace(err)
 }
 
 func (c *Client) explain(
@@ -130,7 +141,10 @@ func (c *Client) explain(
 	mode scripting.ExplainMode,
 ) (e table.ScriptingYQLExplanation, err error) {
 	var (
-		onDone  = trace.ScriptingOnExplain(c.config.Trace(), &ctx, query)
+		onDone = trace.ScriptingOnExplain(c.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			query,
+		)
 		request = &Ydb_Scripting.ExplainYqlRequest{
 			Script: query,
 			Mode:   mode2mode(mode),
@@ -149,11 +163,11 @@ func (c *Client) explain(
 	}()
 	response, err = c.service.ExplainYql(ctx, request)
 	if err != nil {
-		return
+		return e, err
 	}
 	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
-		return
+		return e, err
 	}
 	result.GetParametersTypes()
 	e = table.ScriptingYQLExplanation{
@@ -184,8 +198,11 @@ func (c *Client) StreamExecute(
 		err = call(ctx)
 		return
 	}
-	err = retry.Retry(ctx, call, retry.WithStackTrace())
-	return
+	err = retry.Retry(ctx, call,
+		retry.WithStackTrace(),
+		retry.WithTrace(c.config.TraceRetry()),
+	)
+	return r, xerrors.WithStackTrace(err)
 }
 
 func (c *Client) streamExecute(
@@ -194,9 +211,12 @@ func (c *Client) streamExecute(
 	params *table.QueryParameters,
 ) (r result.StreamResult, err error) {
 	var (
-		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx, query, params)
-		a              = allocator.New()
-		request        = &Ydb_Scripting.ExecuteYqlRequest{
+		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			query, params,
+		)
+		a       = allocator.New()
+		request = &Ydb_Scripting.ExecuteYqlRequest{
 			Script:     query,
 			Parameters: params.Params().ToYDB(a),
 			OperationParams: operation.Params(
@@ -222,7 +242,7 @@ func (c *Client) streamExecute(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return scanner.NewStream(
+	return scanner.NewStream(ctx,
 		func(ctx context.Context) (
 			set *Ydb.ResultSet,
 			stats *Ydb_TableStats.QueryStats,
@@ -249,23 +269,23 @@ func (c *Client) streamExecute(
 			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 			return err
 		},
-	), nil
+	)
 }
 
 func (c *Client) Close(ctx context.Context) (err error) {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
-	onDone := trace.ScriptingOnClose(c.config.Trace(), &ctx)
+	onDone := trace.ScriptingOnClose(c.config.Trace(), &ctx, stack.FunctionID(""))
 	defer func() {
 		onDone(err)
 	}()
 	return nil
 }
 
-func New(cc grpc.ClientConnInterface, config config.Config) *Client {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) (*Client, error) {
 	return &Client{
 		config:  config,
 		service: Ydb_Scripting_V1.NewScriptingServiceClient(cc),
-	}
+	}, nil
 }

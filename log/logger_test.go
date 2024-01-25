@@ -2,12 +2,16 @@ package log
 
 import (
 	"testing"
+	"time"
 
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
 )
 
 func TestColoring(t *testing.T) {
+	zeroClock := clockwork.NewFakeClock()
+	fullDuration := zeroClock.Now().Sub(time.Date(1984, 4, 4, 0, 0, 0, 0, time.UTC))
+	zeroClock.Advance(-fullDuration) // set zero time
 	for _, tt := range []struct {
 		l   *defaultLogger
 		msg string
@@ -15,25 +19,24 @@ func TestColoring(t *testing.T) {
 	}{
 		{
 			l: &defaultLogger{
-				namespaceMaxLen: 26,
-				coloring:        true,
-				clock:           clockwork.NewFakeClock(),
+				coloring: true,
+				clock:    zeroClock,
 			},
 			msg: "test",
-			exp: "\u001B[31m1984-04-04 00:00:00.000  \u001B[0m\u001B[101mERROR\u001B[0m\u001B[31m                 [\u001B[0m\u001B[101mtest.scope\u001B[0m] \u001B[0m\u001B[31mmessage\u001B[0m", //nolint:lll
+			exp: "\u001B[31m1984-04-04 00:00:00.000 \u001B[0m\u001B[101mERROR\u001B[0m\u001B[31m 'test.scope' => message\u001B[0m", //nolint:lll
 		},
 		{
 			l: &defaultLogger{
-				namespaceMaxLen: 26,
-				coloring:        false,
-				clock:           clockwork.NewFakeClock(),
+				coloring: false,
+				clock:    zeroClock,
 			},
 			msg: "test",
-			exp: "1984-04-04 00:00:00.000  ERROR                 [test.scope] message",
+			exp: "1984-04-04 00:00:00.000 ERROR 'test.scope' => message",
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			require.Equal(t, tt.exp, tt.l.format([]string{"test", "scope"}, "message", ERROR))
+			act := tt.l.format([]string{"test", "scope"}, "message", ERROR)
+			require.Equal(t, tt.exp, act)
 		})
 	}
 }

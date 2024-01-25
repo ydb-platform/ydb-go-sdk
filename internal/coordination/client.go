@@ -33,15 +33,15 @@ type Client struct {
 	sessions map[*session]struct{}
 }
 
-func New(cc grpc.ClientConnInterface, config config.Config) *Client {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) (*Client, error) {
 	return &Client{
 		config:   config,
 		service:  Ydb_Coordination_V1.NewCoordinationServiceClient(cc),
 		sessions: make(map[*session]struct{}),
-	}
+	}, nil
 }
 
-func (c *Client) CreateNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
+func (c *Client) CreateNode(ctx context.Context, path string, config coordination.NodeConfig) error {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
@@ -49,13 +49,17 @@ func (c *Client) CreateNode(ctx context.Context, path string, config coordinatio
 		return xerrors.WithStackTrace(c.createNode(ctx, path, config))
 	}
 	if !c.config.AutoRetry() {
-		return call(ctx)
+		return xerrors.WithStackTrace(call(ctx))
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
+	return retry.Retry(ctx,
+		call, retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+	)
 }
 
-func (c *Client) createNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
-	_, err = c.service.CreateNode(
+func (c *Client) createNode(ctx context.Context, path string, config coordination.NodeConfig) error {
+	_, err := c.service.CreateNode(
 		ctx,
 		&Ydb_Coordination.CreateNodeRequest{
 			Path: path,
@@ -78,7 +82,7 @@ func (c *Client) createNode(ctx context.Context, path string, config coordinatio
 	return xerrors.WithStackTrace(err)
 }
 
-func (c *Client) AlterNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
+func (c *Client) AlterNode(ctx context.Context, path string, config coordination.NodeConfig) error {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
@@ -86,13 +90,18 @@ func (c *Client) AlterNode(ctx context.Context, path string, config coordination
 		return xerrors.WithStackTrace(c.alterNode(ctx, path, config))
 	}
 	if !c.config.AutoRetry() {
-		return call(ctx)
+		return xerrors.WithStackTrace(call(ctx))
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
+	return retry.Retry(ctx,
+		call,
+		retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+	)
 }
 
-func (c *Client) alterNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
-	_, err = c.service.AlterNode(
+func (c *Client) alterNode(ctx context.Context, path string, config coordination.NodeConfig) error {
+	_, err := c.service.AlterNode(
 		ctx,
 		&Ydb_Coordination.AlterNodeRequest{
 			Path: path,
@@ -115,7 +124,7 @@ func (c *Client) alterNode(ctx context.Context, path string, config coordination
 	return xerrors.WithStackTrace(err)
 }
 
-func (c *Client) DropNode(ctx context.Context, path string) (err error) {
+func (c *Client) DropNode(ctx context.Context, path string) error {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
@@ -123,13 +132,17 @@ func (c *Client) DropNode(ctx context.Context, path string) (err error) {
 		return xerrors.WithStackTrace(c.dropNode(ctx, path))
 	}
 	if !c.config.AutoRetry() {
-		return call(ctx)
+		return xerrors.WithStackTrace(call(ctx))
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
+	return retry.Retry(ctx, call,
+		retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+	)
 }
 
-func (c *Client) dropNode(ctx context.Context, path string) (err error) {
-	_, err = c.service.DropNode(
+func (c *Client) dropNode(ctx context.Context, path string) error {
+	_, err := c.service.DropNode(
 		ctx,
 		&Ydb_Coordination.DropNodeRequest{
 			Path: path,
@@ -150,22 +163,25 @@ func (c *Client) DescribeNode(
 ) (
 	entry *scheme.Entry,
 	config *coordination.NodeConfig,
-	err error,
+	_ error,
 ) {
 	if c == nil {
-		err = xerrors.WithStackTrace(errNilClient)
-		return
+		return nil, nil, xerrors.WithStackTrace(errNilClient)
 	}
-	call := func(ctx context.Context) error {
+	call := func(ctx context.Context) (err error) {
 		entry, config, err = c.describeNode(ctx, path)
 		return xerrors.WithStackTrace(err)
 	}
 	if !c.config.AutoRetry() {
-		err = call(ctx)
-		return
+		err := call(ctx)
+		return entry, config, xerrors.WithStackTrace(err)
 	}
-	err = retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
-	return
+	err := retry.Retry(ctx, call,
+		retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+	)
+	return entry, config, xerrors.WithStackTrace(err)
 }
 
 // DescribeNode describes a coordination node

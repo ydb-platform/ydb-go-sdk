@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
@@ -12,8 +13,29 @@ import (
 )
 
 type txFake struct {
-	conn *conn
-	ctx  context.Context
+	beginCtx context.Context
+	conn     *conn
+	ctx      context.Context
+}
+
+func (tx *txFake) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, finalErr error) {
+	onDone := trace.DatabaseSQLOnTxPrepare(tx.conn.trace, &ctx,
+		stack.FunctionID(""),
+		&tx.beginCtx, tx, query,
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+	if !tx.conn.isReady() {
+		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+	}
+	return &stmt{
+		conn:      tx.conn,
+		processor: tx,
+		stmtCtx:   ctx,
+		query:     query,
+		trace:     tx.conn.trace,
+	}, nil
 }
 
 var (
@@ -35,7 +57,10 @@ func (tx *txFake) ID() string {
 }
 
 func (tx *txFake) Commit() (err error) {
-	onDone := trace.DatabaseSQLOnTxCommit(tx.conn.trace, &tx.ctx, tx)
+	onDone := trace.DatabaseSQLOnTxCommit(tx.conn.trace, &tx.ctx,
+		stack.FunctionID(""),
+		tx,
+	)
 	defer func() {
 		onDone(err)
 	}()
@@ -49,7 +74,10 @@ func (tx *txFake) Commit() (err error) {
 }
 
 func (tx *txFake) Rollback() (err error) {
-	onDone := trace.DatabaseSQLOnTxRollback(tx.conn.trace, &tx.ctx, tx)
+	onDone := trace.DatabaseSQLOnTxRollback(tx.conn.trace, &tx.ctx,
+		stack.FunctionID(""),
+		tx,
+	)
 	defer func() {
 		onDone(err)
 	}()
@@ -65,7 +93,11 @@ func (tx *txFake) Rollback() (err error) {
 func (tx *txFake) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (
 	rows driver.Rows, err error,
 ) {
-	onDone := trace.DatabaseSQLOnTxQuery(tx.conn.trace, &ctx, tx.ctx, tx, query, xcontext.IsIdempotent(ctx))
+	onDone := trace.DatabaseSQLOnTxQuery(
+		tx.conn.trace, &ctx,
+		stack.FunctionID(""),
+		tx.ctx, tx, query, xcontext.IsIdempotent(ctx),
+	)
 	defer func() {
 		onDone(err)
 	}()
@@ -79,7 +111,11 @@ func (tx *txFake) QueryContext(ctx context.Context, query string, args []driver.
 func (tx *txFake) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (
 	result driver.Result, err error,
 ) {
-	onDone := trace.DatabaseSQLOnTxExec(tx.conn.trace, &ctx, tx.ctx, tx, query, xcontext.IsIdempotent(ctx))
+	onDone := trace.DatabaseSQLOnTxExec(
+		tx.conn.trace, &ctx,
+		stack.FunctionID(""),
+		tx.ctx, tx, query, xcontext.IsIdempotent(ctx),
+	)
 	defer func() {
 		onDone(err)
 	}()

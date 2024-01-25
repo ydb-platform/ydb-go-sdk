@@ -11,11 +11,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
-	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -29,6 +31,7 @@ func TestLongStream(t *testing.T) {
 		err               error
 		upsertRowsCount   = 100000
 		batchSize         = 10000
+		expectedCheckSum  = uint64(4999950000)
 		ctx               = xtest.Context(t)
 	)
 
@@ -39,9 +42,7 @@ func TestLongStream(t *testing.T) {
 		),
 		ydb.WithDiscoveryInterval(0), // disable re-discovery on upsert time
 		ydb.WithLogger(
-			log.Default(os.Stderr,
-				log.WithMinLevel(log.TRACE),
-			),
+			newLogger(t),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
 		),
 	)
@@ -146,6 +147,60 @@ func TestLongStream(t *testing.T) {
 						if upserted != uint32(upsertRowsCount) {
 							t.Fatalf("wrong rows count: %v, expected: %d", upserted, upsertRowsCount)
 						}
+						err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
+							_, res, err := s.Execute(ctx, table.DefaultTxControl(),
+								"SELECT CAST(COUNT(*) AS Uint64) FROM `"+path.Join(db.Name(), folder, tableName)+"`;",
+								nil,
+							)
+							if err != nil {
+								return err
+							}
+							if !res.NextResultSet(ctx) {
+								return fmt.Errorf("no result sets")
+							}
+							if !res.NextRow() {
+								return fmt.Errorf("no rows")
+							}
+							var rowsFromDb uint64
+							if err := res.ScanWithDefaults(indexed.Required(&rowsFromDb)); err != nil {
+								return err
+							}
+							if rowsFromDb != uint64(upsertRowsCount) {
+								return fmt.Errorf("wrong rows count: %d, expected: %d",
+									rowsFromDb,
+									upsertRowsCount,
+								)
+							}
+							return res.Err()
+						}, table.WithIdempotent())
+						require.NoError(t, err)
+						err = db.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
+							_, res, err := s.Execute(ctx, table.DefaultTxControl(),
+								"SELECT CAST(SUM(val) AS Uint64) FROM `"+path.Join(db.Name(), folder, tableName)+"`;",
+								nil,
+							)
+							if err != nil {
+								return err
+							}
+							if !res.NextResultSet(ctx) {
+								return fmt.Errorf("no result sets")
+							}
+							if !res.NextRow() {
+								return fmt.Errorf("no rows")
+							}
+							var checkSumFromDb uint64
+							if err := res.ScanWithDefaults(indexed.Required(&checkSumFromDb)); err != nil {
+								return err
+							}
+							if checkSumFromDb != expectedCheckSum {
+								return fmt.Errorf("wrong checksum: %d, expected: %d",
+									checkSumFromDb,
+									expectedCheckSum,
+								)
+							}
+							return res.Err()
+						}, table.WithIdempotent())
+						require.NoError(t, err)
 					})
 				})
 			})
@@ -178,6 +233,7 @@ func TestLongStream(t *testing.T) {
 						var (
 							start     = time.Now()
 							rowsCount = 0
+							checkSum  = uint64(0)
 						)
 						res, err := s.StreamExecuteScanQuery(ctx,
 							"SELECT val FROM `"+path.Join(db.Name(), folder, tableName)+"`;", nil,
@@ -192,6 +248,11 @@ func TestLongStream(t *testing.T) {
 							count := 0
 							for res.NextRow() {
 								count++
+								var val int64
+								if err = res.ScanWithDefaults(indexed.Required(&val)); err != nil {
+									return err
+								}
+								checkSum += uint64(val)
 							}
 							rowsCount += count
 							time.Sleep(discoveryInterval)
@@ -204,6 +265,12 @@ func TestLongStream(t *testing.T) {
 								rowsCount,
 								upsertRowsCount,
 								time.Since(start),
+							)
+						}
+						if checkSum != expectedCheckSum {
+							return fmt.Errorf("wrong checksum: %d, expected: %d",
+								checkSum,
+								expectedCheckSum,
 							)
 						}
 						return res.Err()
@@ -224,6 +291,7 @@ func TestLongStream(t *testing.T) {
 						var (
 							start     = time.Now()
 							rowsCount = 0
+							checkSum  = uint64(0)
 						)
 						res, err := s.StreamReadTable(ctx, path.Join(db.Name(), folder, tableName), options.ReadColumn("val"))
 						if err != nil {
@@ -236,6 +304,11 @@ func TestLongStream(t *testing.T) {
 							count := 0
 							for res.NextRow() {
 								count++
+								var val int64
+								if err = res.ScanWithDefaults(indexed.Required(&val)); err != nil {
+									return err
+								}
+								checkSum += uint64(val)
 							}
 							rowsCount += count
 							time.Sleep(discoveryInterval)
@@ -248,6 +321,12 @@ func TestLongStream(t *testing.T) {
 								rowsCount,
 								upsertRowsCount,
 								time.Since(start),
+							)
+						}
+						if checkSum != expectedCheckSum {
+							return fmt.Errorf("wrong checksum: %d, expected: %d",
+								checkSum,
+								expectedCheckSum,
 							)
 						}
 						return res.Err()

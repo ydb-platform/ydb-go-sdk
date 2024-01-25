@@ -338,52 +338,50 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			func(t *testing.T) {
 				for _, srcDst := range fromTo {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
-						client := New(
-							testutil.NewBalancer(
-								testutil.WithInvokeHandlers(
-									testutil.InvokeHandlers{
-										testutil.TableExecuteDataQuery: func(interface{}) (proto.Message, error) {
-											return &Ydb_Table.ExecuteQueryResult{
-												TxMeta: &Ydb_Table.TransactionMeta{
-													Id: "",
-												},
-											}, nil
-										},
-										testutil.TableBeginTransaction: func(interface{}) (proto.Message, error) {
-											return &Ydb_Table.BeginTransactionResult{
-												TxMeta: &Ydb_Table.TransactionMeta{
-													Id: "",
-												},
-											}, nil
-										},
-										testutil.TableExplainDataQuery: func(request interface{}) (result proto.Message, err error) {
-											return &Ydb_Table.ExplainQueryResult{}, nil
-										},
-										testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
-											return &Ydb_Table.PrepareQueryResult{}, nil
-										},
-										testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
-											return &Ydb_Table.CreateSessionResult{
-												SessionId: testutil.SessionID(),
-											}, nil
-										},
-										testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
-											return &Ydb_Table.DeleteSessionResponse{}, nil
-										},
-										testutil.TableCommitTransaction: func(request interface{}) (result proto.Message, err error) {
-											return &Ydb_Table.CommitTransactionResult{}, nil
-										},
-										testutil.TableRollbackTransaction: func(request interface{}) (result proto.Message, err error) {
-											return &Ydb_Table.RollbackTransactionResponse{}, nil
-										},
-										testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
-											return &Ydb_Table.KeepAliveResult{}, nil
-										},
+						client, err := New(context.Background(), testutil.NewBalancer(
+							testutil.WithInvokeHandlers(
+								testutil.InvokeHandlers{
+									testutil.TableExecuteDataQuery: func(interface{}) (proto.Message, error) {
+										return &Ydb_Table.ExecuteQueryResult{
+											TxMeta: &Ydb_Table.TransactionMeta{
+												Id: "",
+											},
+										}, nil
 									},
-								),
+									testutil.TableBeginTransaction: func(interface{}) (proto.Message, error) {
+										return &Ydb_Table.BeginTransactionResult{
+											TxMeta: &Ydb_Table.TransactionMeta{
+												Id: "",
+											},
+										}, nil
+									},
+									testutil.TableExplainDataQuery: func(request interface{}) (result proto.Message, err error) {
+										return &Ydb_Table.ExplainQueryResult{}, nil
+									},
+									testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
+										return &Ydb_Table.PrepareQueryResult{}, nil
+									},
+									testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
+										return &Ydb_Table.CreateSessionResult{
+											SessionId: testutil.SessionID(),
+										}, nil
+									},
+									testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
+										return &Ydb_Table.DeleteSessionResponse{}, nil
+									},
+									testutil.TableCommitTransaction: func(request interface{}) (result proto.Message, err error) {
+										return &Ydb_Table.CommitTransactionResult{}, nil
+									},
+									testutil.TableRollbackTransaction: func(request interface{}) (result proto.Message, err error) {
+										return &Ydb_Table.RollbackTransactionResponse{}, nil
+									},
+									testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+										return &Ydb_Table.KeepAliveResult{}, nil
+									},
+								},
 							),
-							config.New(),
-						)
+						), config.New())
+						require.NoError(t, err)
 						ctx, cancel := xcontext.WithTimeout(
 							context.Background(),
 							time.Second,
@@ -398,84 +396,83 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 }
 
 func TestCreateTableRegression(t *testing.T) {
-	client := New(
-		testutil.NewBalancer(
-			testutil.WithInvokeHandlers(
-				testutil.InvokeHandlers{
-					testutil.TableCreateSession: func(request interface{}) (proto.Message, error) {
-						return &Ydb_Table.CreateSessionResult{
-							SessionId: "",
-						}, nil
-					},
-					testutil.TableCreateTable: func(act interface{}) (proto.Message, error) {
-						exp := &Ydb_Table.CreateTableRequest{
-							SessionId: "",
-							Path:      "episodes",
-							Columns: []*Ydb_Table.ColumnMeta{
-								{
-									Name: "series_id",
-									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-											TypeId: Ydb.Type_UINT64,
-										}}},
-									}},
-								},
-								{
-									Name: "season_id",
-									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-											TypeId: Ydb.Type_UINT64,
-										}}},
-									}},
-								},
-								{
-									Name: "episode_id",
-									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-											TypeId: Ydb.Type_UINT64,
-										}}},
-									}},
-								},
-								{
-									Name: "title",
-									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-											TypeId: Ydb.Type_UTF8,
-										}}},
-									}},
-								},
-								{
-									Name: "air_date",
-									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-											TypeId: Ydb.Type_UINT64,
-										}}},
-									}},
-								},
-							},
-							PrimaryKey: []string{
-								"series_id",
-								"season_id",
-								"episode_id",
-							},
-							OperationParams: &Ydb_Operations.OperationParams{
-								OperationMode: Ydb_Operations.OperationParams_SYNC,
-							},
-							Attributes: map[string]string{
-								"attr": "attr_value",
-							},
-						}
-						if !proto.Equal(exp, act.(proto.Message)) {
-							//nolint:revive
-							return nil, fmt.Errorf("proto's not equal: \n\nact: %v\n\nexp: %s\n\n", act, exp)
-						}
-						return &Ydb_Table.CreateTableResponse{}, nil
-					},
+	client, err := New(context.Background(), testutil.NewBalancer(
+		testutil.WithInvokeHandlers(
+			testutil.InvokeHandlers{
+				testutil.TableCreateSession: func(request interface{}) (proto.Message, error) {
+					return &Ydb_Table.CreateSessionResult{
+						SessionId: "",
+					}, nil
 				},
-			),
+				testutil.TableCreateTable: func(act interface{}) (proto.Message, error) {
+					exp := &Ydb_Table.CreateTableRequest{
+						SessionId: "",
+						Path:      "episodes",
+						Columns: []*Ydb_Table.ColumnMeta{
+							{
+								Name: "series_id",
+								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UINT64,
+									}}},
+								}},
+							},
+							{
+								Name: "season_id",
+								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UINT64,
+									}}},
+								}},
+							},
+							{
+								Name: "episode_id",
+								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UINT64,
+									}}},
+								}},
+							},
+							{
+								Name: "title",
+								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UTF8,
+									}}},
+								}},
+							},
+							{
+								Name: "air_date",
+								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UINT64,
+									}}},
+								}},
+							},
+						},
+						PrimaryKey: []string{
+							"series_id",
+							"season_id",
+							"episode_id",
+						},
+						OperationParams: &Ydb_Operations.OperationParams{
+							OperationMode: Ydb_Operations.OperationParams_SYNC,
+						},
+						Attributes: map[string]string{
+							"attr": "attr_value",
+						},
+					}
+					if !proto.Equal(exp, act.(proto.Message)) {
+						//nolint:revive
+						return nil, fmt.Errorf("proto's not equal: \n\nact: %v\n\nexp: %s\n\n", act, exp)
+					}
+					return &Ydb_Table.CreateTableResponse{}, nil
+				},
+			},
 		),
-		config.New(),
-	)
+	), config.New())
+
+	require.NoError(t, err)
 
 	ctx, cancel := xcontext.WithTimeout(
 		context.Background(),
@@ -483,7 +480,7 @@ func TestCreateTableRegression(t *testing.T) {
 	)
 	defer cancel()
 
-	err := client.Do(ctx, func(ctx context.Context, s table.Session) error {
+	err = client.Do(ctx, func(ctx context.Context, s table.Session) error {
 		return s.CreateTable(ctx, "episodes",
 			options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 			options.WithColumn("season_id", types.Optional(types.TypeUint64)),
@@ -499,77 +496,76 @@ func TestCreateTableRegression(t *testing.T) {
 }
 
 func TestDescribeTableRegression(t *testing.T) {
-	client := New(
-		testutil.NewBalancer(
-			testutil.WithInvokeHandlers(
-				testutil.InvokeHandlers{
-					testutil.TableCreateSession: func(request interface{}) (proto.Message, error) {
-						return &Ydb_Table.CreateSessionResult{
-							SessionId: "",
-						}, nil
-					},
-					testutil.TableDescribeTable: func(act interface{}) (proto.Message, error) {
-						return &Ydb_Table.DescribeTableResult{
-							Self: &Ydb_Scheme.Entry{
-								Name: "episodes",
-							},
-							Columns: []*Ydb_Table.ColumnMeta{
-								{
-									Name: "series_id",
-									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-											TypeId: Ydb.Type_UINT64,
-										}}},
-									}},
-								},
-								{
-									Name: "season_id",
-									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-											TypeId: Ydb.Type_UINT64,
-										}}},
-									}},
-								},
-								{
-									Name: "episode_id",
-									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-											TypeId: Ydb.Type_UINT64,
-										}}},
-									}},
-								},
-								{
-									Name: "title",
-									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-											TypeId: Ydb.Type_UTF8,
-										}}},
-									}},
-								},
-								{
-									Name: "air_date",
-									Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
-										OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
-											TypeId: Ydb.Type_UINT64,
-										}}},
-									}},
-								},
-							},
-							PrimaryKey: []string{
-								"series_id",
-								"season_id",
-								"episode_id",
-							},
-							Attributes: map[string]string{
-								"attr": "attr_value",
-							},
-						}, nil
-					},
+	client, err := New(context.Background(), testutil.NewBalancer(
+		testutil.WithInvokeHandlers(
+			testutil.InvokeHandlers{
+				testutil.TableCreateSession: func(request interface{}) (proto.Message, error) {
+					return &Ydb_Table.CreateSessionResult{
+						SessionId: "",
+					}, nil
 				},
-			),
+				testutil.TableDescribeTable: func(act interface{}) (proto.Message, error) {
+					return &Ydb_Table.DescribeTableResult{
+						Self: &Ydb_Scheme.Entry{
+							Name: "episodes",
+						},
+						Columns: []*Ydb_Table.ColumnMeta{
+							{
+								Name: "series_id",
+								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UINT64,
+									}}},
+								}},
+							},
+							{
+								Name: "season_id",
+								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UINT64,
+									}}},
+								}},
+							},
+							{
+								Name: "episode_id",
+								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UINT64,
+									}}},
+								}},
+							},
+							{
+								Name: "title",
+								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UTF8,
+									}}},
+								}},
+							},
+							{
+								Name: "air_date",
+								Type: &Ydb.Type{Type: &Ydb.Type_OptionalType{
+									OptionalType: &Ydb.OptionalType{Item: &Ydb.Type{Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UINT64,
+									}}},
+								}},
+							},
+						},
+						PrimaryKey: []string{
+							"series_id",
+							"season_id",
+							"episode_id",
+						},
+						Attributes: map[string]string{
+							"attr": "attr_value",
+						},
+					}, nil
+				},
+			},
 		),
-		config.New(),
-	)
+	), config.New())
+
+	require.NoError(t, err)
 
 	ctx, cancel := xcontext.WithTimeout(
 		context.Background(),
@@ -579,7 +575,7 @@ func TestDescribeTableRegression(t *testing.T) {
 
 	var act options.Description
 
-	err := client.Do(ctx, func(ctx context.Context, s table.Session) (err error) {
+	err = client.Do(ctx, func(ctx context.Context, s table.Session) (err error) {
 		act, err = s.DescribeTable(ctx, "episodes")
 		return err
 	})

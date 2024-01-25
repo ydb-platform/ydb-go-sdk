@@ -19,10 +19,16 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context    *context.Context
-		ID         string
+		Context *context.Context
+
+		// Deprecated: use Label field instead
+		ID string
+
+		Call       call
+		Label      string
 		Idempotent bool
-		NestedCall bool // flag when Retry called inside head Retry
+
+		NestedCall bool // a sign for detect Retry calls inside head Retry
 	}
 	RetryLoopIntermediateInfo struct {
 		Error error

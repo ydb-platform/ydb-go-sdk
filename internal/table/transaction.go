@@ -8,6 +8,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -59,7 +60,11 @@ func (tx *transaction) Execute(
 	query string, params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
-	onDone := trace.TableOnSessionTransactionExecute(tx.s.config.Trace(), &ctx, tx.s, tx, queryFromText(query), params)
+	onDone := trace.TableOnSessionTransactionExecute(
+		tx.s.config.Trace(), &ctx,
+		stack.FunctionID(""),
+		tx.s, tx, queryFromText(query), params,
+	)
 	defer func() {
 		onDone(r, err)
 	}()
@@ -96,12 +101,9 @@ func (tx *transaction) ExecuteStatement(
 	defer a.Free()
 
 	onDone := trace.TableOnSessionTransactionExecuteStatement(
-		tx.s.config.Trace(),
-		&ctx,
-		tx.s,
-		tx,
-		stmt.(*statement).query,
-		params,
+		tx.s.config.Trace(), &ctx,
+		stack.FunctionID(""),
+		tx.s, tx, stmt.(*statement).query, params,
 	)
 	defer func() {
 		onDone(r, err)
@@ -132,10 +134,9 @@ func (tx *transaction) CommitTx(
 	opts ...options.CommitTransactionOption,
 ) (r result.Result, err error) {
 	onDone := trace.TableOnSessionTransactionCommit(
-		tx.s.config.Trace(),
-		&ctx,
-		tx.s,
-		tx,
+		tx.s.config.Trace(), &ctx,
+		stack.FunctionID(""),
+		tx.s, tx,
 	)
 	defer func() {
 		onDone(err)
@@ -191,10 +192,9 @@ func (tx *transaction) CommitTx(
 // Rollback performs a rollback of the specified active transaction.
 func (tx *transaction) Rollback(ctx context.Context) (err error) {
 	onDone := trace.TableOnSessionTransactionRollback(
-		tx.s.config.Trace(),
-		&ctx,
-		tx.s,
-		tx,
+		tx.s.config.Trace(), &ctx,
+		stack.FunctionID(""),
+		tx.s, tx,
 	)
 	defer func() {
 		onDone(err)

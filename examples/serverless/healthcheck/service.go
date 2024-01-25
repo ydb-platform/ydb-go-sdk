@@ -90,7 +90,7 @@ func (s *service) createTableIfNotExists(ctx context.Context) error {
 	)
 }
 
-func (s *service) ping(path string) (code int32, err error) {
+func (s *service) ping(ctx context.Context, path string) (code int32, err error) {
 	uri, err := url.Parse(path)
 	if err != nil {
 		return -1, err
@@ -98,7 +98,7 @@ func (s *service) ping(path string) (code int32, err error) {
 	if uri.Scheme == "" {
 		uri.Scheme = "http"
 	}
-	request, err := http.NewRequest(http.MethodGet, uri.String(), nil) //nolint:gocritic
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, uri.String(), nil) //nolint:gocritic
 	if err != nil {
 		return -1, err
 	}
@@ -106,6 +106,9 @@ func (s *service) ping(path string) (code int32, err error) {
 	if err != nil {
 		return -1, err
 	}
+	defer func() {
+		_ = response.Body.Close()
+	}()
 	return int32(response.StatusCode), nil
 }
 
@@ -127,7 +130,7 @@ func (s *service) check(ctx context.Context, urls []string) error {
 			go func(idx int, u string) {
 				defer wg.Done()
 				out := " > '" + u + "' => "
-				code, err := s.ping(u)
+				code, err := s.ping(ctx, u)
 				if err != nil {
 					fmt.Println(out + err.Error())
 				} else {

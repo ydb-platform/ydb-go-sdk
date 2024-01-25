@@ -1,4 +1,3 @@
-//nolint:goconst
 package topic_test
 
 import (

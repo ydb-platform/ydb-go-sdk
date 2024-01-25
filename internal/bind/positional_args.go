@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"unicode/utf8"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
@@ -30,11 +30,11 @@ func (m PositionalArgs) RewriteQuery(sql string, args ...interface{}) (
 	}
 
 	var (
-		buffer   = allocator.Buffers.Get()
+		buffer   = xstring.Buffer()
 		position = 0
 		param    table.ParameterOption
 	)
-	defer allocator.Buffers.Put(buffer)
+	defer buffer.Free()
 
 	for _, p := range l.parts {
 		switch p := p.(type) {

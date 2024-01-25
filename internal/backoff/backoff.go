@@ -4,20 +4,11 @@ import (
 	"math"
 	"time"
 
-	"github.com/jonboulle/clockwork"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
 
 // Backoff is the interface that contains logic of delaying operation retry.
 type Backoff interface {
-	// Wait maps index of the retry to a channel which fulfillment means that
-	// Delay is over.
-	//
-	// Note that retry index begins from 0 and 0-th index means that it is the
-	// first retry attempt after an initial error.
-	Wait(n int) <-chan time.Time
-
 	// Delay returns mapping of i to Delay.
 	Delay(i int) time.Duration
 }
@@ -39,6 +30,8 @@ var (
 	)
 )
 
+var _ Backoff = (*logBackoff)(nil)
+
 // logBackoff contains logarithmic Backoff policy.
 type logBackoff struct {
 	// slotDuration is a size of a single time slot used in Backoff Delay
@@ -58,8 +51,6 @@ type logBackoff struct {
 	// where F is a result of multiplication of this value and calculated Delay
 	// duration D; and R is a random sized part from [0,(D - F)].
 	jitterLimit float64
-
-	clock clockwork.Clock
 
 	// generator of jitter
 	r xrand.Rand
@@ -85,12 +76,6 @@ func WithJitterLimit(jitterLimit float64) option {
 	}
 }
 
-func WithClock(clock clockwork.Clock) option {
-	return func(b *logBackoff) {
-		b.clock = clock
-	}
-}
-
 func WithSeed(seed int64) option {
 	return func(b *logBackoff) {
 		b.r = xrand.New(xrand.WithLock(), xrand.WithSeed(seed))
@@ -99,8 +84,7 @@ func WithSeed(seed int64) option {
 
 func New(opts ...option) logBackoff {
 	b := logBackoff{
-		r:     xrand.New(xrand.WithLock()),
-		clock: clockwork.NewRealClock(),
+		r: xrand.New(xrand.WithLock()),
 	}
 	for _, o := range opts {
 		if o != nil {
@@ -108,11 +92,6 @@ func New(opts ...option) logBackoff {
 		}
 	}
 	return b
-}
-
-// Wait implements Backoff interface.
-func (b logBackoff) Wait(n int) <-chan time.Time {
-	return b.clock.After(b.Delay(n))
 }
 
 // Delay returns mapping of i to Delay.

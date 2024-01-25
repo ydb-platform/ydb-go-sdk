@@ -107,19 +107,17 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (r generator.Row
 
 			return nil
 		},
-		retry.WithDoRetryOptions(
-			retry.WithIdempotent(true),
-			retry.WithTrace(
-				trace.Retry{
-					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-						return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-							return func(info trace.RetryLoopDoneInfo) {
-								attempts = info.Attempts
-							}
+		retry.WithIdempotent(true),
+		retry.WithTrace(
+			&trace.Retry{
+				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+					return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+						return func(info trace.RetryLoopDoneInfo) {
+							attempts = info.Attempts
 						}
-					},
+					}
 				},
-			),
+			},
 		),
 	)
 
@@ -157,19 +155,17 @@ func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, e
 					"PayloadTimestamp": row.PayloadTimestamp,
 				}).Error
 		},
-		retry.WithDoRetryOptions(
-			retry.WithIdempotent(true),
-			retry.WithTrace(
-				trace.Retry{
-					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-						return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-							return func(info trace.RetryLoopDoneInfo) {
-								attempts = info.Attempts
-							}
+		retry.WithIdempotent(true),
+		retry.WithTrace(
+			&trace.Retry{
+				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+					return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+						return func(info trace.RetryLoopDoneInfo) {
+							attempts = info.Attempts
 						}
-					},
+					}
 				},
-			),
+			},
 		),
 	)
 

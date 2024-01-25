@@ -9,23 +9,16 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xbytes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 var errMessageWasReadEarly = xerrors.Wrap(errors.New("ydb: message was read early"))
 
 // PublicErrUnexpectedCodec return when try to read message content with unknown codec
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 var PublicErrUnexpectedCodec = errors.New("unexpected codec") //nolint:revive,stylecheck
 
 // PublicMessage is representation of topic message
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicMessage struct {
 	empty.DoNotCopy
 
@@ -36,6 +29,7 @@ type PublicMessage struct {
 	Offset               int64
 	WrittenAt            time.Time
 	ProducerID           string
+	Metadata             map[string][]byte // Metadata, nil if no metadata
 
 	commitRange        commitRange
 	data               oneTimeReader
@@ -81,19 +75,10 @@ func (m *PublicMessage) Read(p []byte) (n int, err error) {
 }
 
 // PublicMessageContentUnmarshaler is interface for unmarshal message content
-//
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 type PublicMessageContentUnmarshaler interface {
 	// UnmarshalYDBTopicMessage MUST NOT use data after return.
 	// If you need content after return from Consume - copy data content to
 	// own slice with copy(dst, data)
-	//
-	// Experimental
-	//
-	// Notice: This API is EXPERIMENTAL and may be changed or removed in a
-	// later release.
 	UnmarshalYDBTopicMessage(data []byte) error
 }
 
@@ -149,6 +134,14 @@ func (pmb *PublicMessageBuilder) Seqno(seqNo int64) *PublicMessageBuilder {
 // CreatedAt set message CreatedAt
 func (pmb *PublicMessageBuilder) CreatedAt(createdAt time.Time) *PublicMessageBuilder {
 	pmb.mess.CreatedAt = createdAt
+	return pmb
+}
+
+func (pmb *PublicMessageBuilder) Metadata(metadata map[string][]byte) *PublicMessageBuilder {
+	pmb.mess.Metadata = make(map[string][]byte, len(metadata))
+	for key, val := range metadata {
+		pmb.mess.Metadata[key] = xbytes.Clone(val)
+	}
 	return pmb
 }
 

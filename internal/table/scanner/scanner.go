@@ -11,7 +11,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
@@ -251,8 +250,8 @@ func (s *scanner) reset(set *Ydb.ResultSet, columnNames ...string) {
 }
 
 func (s *scanner) path() string {
-	buf := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buf)
+	buf := xstring.Buffer()
+	defer buf.Free()
 	_, _ = s.writePathTo(buf)
 	return buf.String()
 }
@@ -1175,7 +1174,7 @@ func (x item) isEmpty() bool {
 
 type scanStack struct {
 	v        []item
-	p        int8
+	p        int
 	scanItem item
 }
 
@@ -1183,7 +1182,7 @@ func (s *scanStack) size() int {
 	if !s.scanItem.isEmpty() {
 		s.set(s.scanItem)
 	}
-	return int(s.p) + 1
+	return s.p + 1
 }
 
 func (s *scanStack) get(i int) item {
@@ -1212,7 +1211,7 @@ func (s *scanStack) leave() {
 }
 
 func (s *scanStack) set(v item) {
-	if int(s.p) == len(s.v) {
+	if s.p == len(s.v) {
 		s.v = append(s.v, v)
 	} else {
 		s.v[s.p] = v

@@ -43,11 +43,11 @@ func BigEndianUint128(hi, lo uint64) (v [16]byte) {
 }
 
 func FromYDB(t *Ydb.Type, v *Ydb.Value) Value {
-	if vv, err := fromYDB(t, v); err != nil {
+	vv, err := fromYDB(t, v)
+	if err != nil {
 		panic(err)
-	} else {
-		return vv
 	}
+	return vv
 }
 
 func nullValueFromYDB(x *Ydb.Value, t Type) (_ Value, ok bool) {
@@ -441,8 +441,8 @@ func (v *decimalValue) castTo(dst interface{}) error {
 }
 
 func (v *decimalValue) Yql() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 	buffer.WriteString(v.innerType.Name())
 	buffer.WriteByte('(')
 	buffer.WriteByte('"')
@@ -515,8 +515,8 @@ func (v *dictValue) castTo(dst interface{}) error {
 }
 
 func (v *dictValue) Yql() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 	buffer.WriteByte('{')
 	for i := range v.values {
 		if i != 0 {
@@ -916,8 +916,8 @@ func (v intervalValue) castTo(dst interface{}) error {
 }
 
 func (v intervalValue) Yql() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 	buffer.WriteString(v.Type().Yql())
 	buffer.WriteByte('(')
 	buffer.WriteByte('"')
@@ -928,7 +928,7 @@ func (v intervalValue) Yql() string {
 	}
 	buffer.WriteByte('P')
 	if days := d / time.Hour / 24; days > 0 {
-		d -= days * time.Hour * 24
+		d -= days * time.Hour * 24 //nolint:durationcheck
 		buffer.WriteString(strconv.FormatInt(int64(days), 10))
 		buffer.WriteByte('D')
 	}
@@ -936,12 +936,12 @@ func (v intervalValue) Yql() string {
 		buffer.WriteByte('T')
 	}
 	if hours := d / time.Hour; hours > 0 {
-		d -= hours * time.Hour
+		d -= hours * time.Hour //nolint:durationcheck
 		buffer.WriteString(strconv.FormatInt(int64(hours), 10))
 		buffer.WriteByte('H')
 	}
 	if minutes := d / time.Minute; minutes > 0 {
-		d -= minutes * time.Minute
+		d -= minutes * time.Minute //nolint:durationcheck
 		buffer.WriteString(strconv.FormatInt(int64(minutes), 10))
 		buffer.WriteByte('M')
 	}
@@ -1066,8 +1066,8 @@ func (v *listValue) castTo(dst interface{}) error {
 }
 
 func (v *listValue) Yql() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 	buffer.WriteByte('[')
 	for i, item := range v.items {
 		if i != 0 {
@@ -1121,8 +1121,8 @@ func (v *setValue) castTo(dst interface{}) error {
 }
 
 func (v *setValue) Yql() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 	buffer.WriteByte('{')
 	for i, item := range v.items {
 		if i != 0 {
@@ -1251,8 +1251,8 @@ func (v *structValue) castTo(dst interface{}) error {
 }
 
 func (v *structValue) Yql() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 	buffer.WriteString("<|")
 	for i := range v.fields {
 		if i != 0 {
@@ -1352,8 +1352,8 @@ func (v *tupleValue) castTo(dst interface{}) error {
 }
 
 func (v *tupleValue) Yql() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 	buffer.WriteByte('(')
 	for i, item := range v.items {
 		if i != 0 {
@@ -1786,8 +1786,8 @@ func (v *uuidValue) castTo(dst interface{}) error {
 }
 
 func (v *uuidValue) Yql() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 	buffer.WriteString(v.Type().Yql())
 	buffer.WriteByte('(')
 	buffer.WriteByte('"')
@@ -1844,8 +1844,8 @@ func (v *variantValue) castTo(dst interface{}) error {
 }
 
 func (v *variantValue) Yql() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 	buffer.WriteString("Variant(")
 	buffer.WriteString(v.value.Yql())
 	buffer.WriteByte(',')

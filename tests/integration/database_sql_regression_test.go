@@ -25,13 +25,16 @@ import (
 )
 
 func TestRegressionCloud109307(t *testing.T) {
-	scope := newScope(t)
-	db := scope.SQLDriverWithFolder(
-		ydb.WithTablePathPrefix(scope.Folder()),
-		ydb.WithAutoDeclare(),
+	var (
+		ctx   = xtest.Context(t)
+		scope = newScope(t)
+		db    = scope.SQLDriverWithFolder(
+			ydb.WithTablePathPrefix(scope.Folder()),
+			ydb.WithAutoDeclare(),
+		)
 	)
 
-	ctx, cancel := context.WithTimeout(xtest.Context(t), 42*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 42*time.Second)
 	defer cancel()
 
 	for i := int64(1); ; i++ {
@@ -64,9 +67,7 @@ func TestRegressionCloud109307(t *testing.T) {
 		}, retry.WithTxOptions(&sql.TxOptions{
 			Isolation: sql.LevelSnapshot,
 			ReadOnly:  true,
-		}), retry.WithDoTxRetryOptions(
-			retry.WithIdempotent(true),
-		))
+		}), retry.WithIdempotent(true))
 		if ctx.Err() == nil {
 			require.NoError(t, err)
 		}
@@ -75,15 +76,12 @@ func TestRegressionCloud109307(t *testing.T) {
 
 func TestRegressionKikimr17104(t *testing.T) {
 	var (
+		ctx   = xtest.Context(t)
 		scope = newScope(t)
 		db    = scope.SQLDriverWithFolder(
 			ydb.WithTablePathPrefix(scope.Folder()),
 			ydb.WithAutoDeclare(),
 		)
-	)
-
-	var (
-		ctx             = xtest.Context(t)
 		tableName       = t.Name()
 		upsertRowsCount = 100000
 		upsertChecksum  uint64
@@ -101,7 +99,7 @@ func TestRegressionKikimr17104(t *testing.T) {
 							return err
 						}
 						return nil
-					}, retry.WithDoRetryOptions(retry.WithIdempotent(true)),
+					}, retry.WithIdempotent(true),
 				)
 				require.NoError(t, err)
 			})
@@ -128,7 +126,7 @@ func TestRegressionKikimr17104(t *testing.T) {
 							return err
 						}
 						return nil
-					}, retry.WithDoRetryOptions(retry.WithIdempotent(true)),
+					}, retry.WithIdempotent(true),
 				)
 				require.NoError(t, err)
 			})
@@ -160,7 +158,7 @@ func TestRegressionKikimr17104(t *testing.T) {
 							}
 						}
 						return rows.Err()
-					}, retry.WithDoRetryOptions(retry.WithIdempotent(true)),
+					}, retry.WithIdempotent(true),
 				)
 				require.NoError(t, err)
 				require.Equal(t, upsertRowsCount, rowsCount)

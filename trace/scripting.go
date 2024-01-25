@@ -39,6 +39,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
+		Call       call
 		Query      string
 		Parameters scriptingQueryParameters
 	}
@@ -52,6 +53,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context    *context.Context
+		Call       call
 		Query      string
 		Parameters scriptingQueryParameters
 	}
@@ -67,6 +69,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
+		Call    call
 		Query   string
 	}
 	ScriptingExplainDoneInfo struct {
@@ -79,6 +82,7 @@ type (
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
+		Call    call
 	}
 	ScriptingCloseDoneInfo struct {
 		Error error

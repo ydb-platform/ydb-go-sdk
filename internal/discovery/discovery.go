@@ -14,16 +14,17 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func New(cc grpc.ClientConnInterface, config *config.Config) *Client {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (*Client, error) {
 	return &Client{
 		config: config,
 		cc:     cc,
 		client: Ydb_Discovery_V1.NewDiscoveryServiceClient(cc),
-	}
+	}, nil
 }
 
 var _ discovery.Client = &Client{}
@@ -37,15 +38,18 @@ type Client struct {
 // Discover cluster endpoints
 func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
 	var (
-		onDone  = trace.DiscoveryOnDiscover(c.config.Trace(), &ctx, c.config.Endpoint(), c.config.Database())
+		onDone = trace.DiscoveryOnDiscover(
+			c.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			c.config.Endpoint(), c.config.Database(),
+		)
 		request = Ydb_Discovery.ListEndpointsRequest{
 			Database: c.config.Database(),
 		}
 		response *Ydb_Discovery.ListEndpointsResponse
 		result   Ydb_Discovery.ListEndpointsResult
+		location string
 	)
-
-	var location string
 	defer func() {
 		nodes := make([]trace.EndpointInfo, 0, len(endpoints))
 		for _, e := range endpoints {
@@ -97,7 +101,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 
 func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err error) {
 	var (
-		onDone             = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx)
+		onDone             = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx, stack.FunctionID(""))
 		request            = Ydb_Discovery.WhoAmIRequest{}
 		response           *Ydb_Discovery.WhoAmIResponse
 		whoAmIResultResult Ydb_Discovery.WhoAmIResult

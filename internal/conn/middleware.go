@@ -80,21 +80,3 @@ func WithBeforeFunc(
 		},
 	}
 }
-
-func WithAfterFunc(
-	cc grpc.ClientConnInterface,
-	after func(),
-) grpc.ClientConnInterface {
-	return &middleware{
-		invoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
-			defer after()
-			return cc.Invoke(ctx, method, args, reply, opts...)
-		},
-		newStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (
-			grpc.ClientStream, error,
-		) {
-			defer after()
-			return cc.NewStream(ctx, desc, method, opts...)
-		},
-	}
-}

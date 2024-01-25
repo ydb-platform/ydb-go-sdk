@@ -45,7 +45,7 @@ func TestDatabaseSqlGetColumns(t *testing.T) {
 			)
 
 			return err
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})
@@ -74,7 +74,7 @@ func TestDatabaseSqlGetColumns(t *testing.T) {
 				[]string{"series_id", "season_id", "episode_id", "title", "air_date", "views"},
 				columns)
 			return nil
-		}, retry.WithDoRetryOptions(retry.WithIdempotent(true)))
+		}, retry.WithIdempotent(true))
 
 		require.NoError(t, err)
 	})

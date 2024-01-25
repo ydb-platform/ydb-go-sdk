@@ -1,23 +1,22 @@
-//go:build !go1.20
-// +build !go1.20
-
 package xstring
 
 import (
-	"reflect"
 	"unsafe"
 )
 
 func FromBytes(b []byte) string {
-	return *(*string)(unsafe.Pointer(&b))
+	if len(b) == 0 {
+		return ""
+	}
+	if len(b) == 0 {
+		return ""
+	}
+	return unsafe.String(&b[0], len(b))
 }
 
 func ToBytes(s string) (b []byte) {
-	pb := (*reflect.SliceHeader)(unsafe.Pointer(&b))
-	ps := (*reflect.StringHeader)(unsafe.Pointer(&s))
-	pb.Data = ps.Data
-	pb.Len = ps.Len
-	pb.Cap = ps.Len
-
-	return b
+	if s == "" {
+		return nil
+	}
+	return unsafe.Slice(unsafe.StringData(s), len(s))
 }

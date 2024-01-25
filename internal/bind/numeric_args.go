@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"unicode/utf8"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
@@ -30,10 +30,10 @@ func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (
 	}
 
 	var (
-		buffer = allocator.Buffers.Get()
+		buffer = xstring.Buffer()
 		param  table.ParameterOption
 	)
-	defer allocator.Buffers.Put(buffer)
+	defer buffer.Free()
 
 	if len(args) > 0 {
 		newArgs = make([]interface{}, len(args))
@@ -52,7 +52,7 @@ func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (
 					fmt.Errorf("%w: $p%d, len(args) = %d", ErrInconsistentArgs, p, len(args)),
 				)
 			}
-			paramName := "$p" + strconv.Itoa(int(p-1))
+			paramName := "$p" + strconv.Itoa(int(p-1)) //nolint:goconst
 			if newArgs[p-1] == nil {
 				param, err = toYdbParam(paramName, args[p-1])
 				if err != nil {
