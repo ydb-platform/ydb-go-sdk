@@ -1,4 +1,3 @@
-## v3.55.1
 * Made StatusIds_SESSION_EXPIRED retriable
 
 ## v3.55.0
