@@ -516,7 +516,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		err := w.Write(ctx, newTestMessages(1))
 		require.NoError(t, err)
 
-		xtest.WaitChannelClosed(t, connectionLoopStopped)
+		xtest.WaitChannelClosedWithTimeout(t, connectionLoopStopped, 4*time.Second)
 	})
 }
 
