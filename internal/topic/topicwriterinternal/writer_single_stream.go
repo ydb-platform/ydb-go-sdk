@@ -24,7 +24,7 @@ type SingleStreamWriterConfig struct {
 	stream                RawTopicWriterStream
 	queue                 *messageQueue
 	encodersMap           *EncoderMap
-	getAutoSeq            bool
+	getLastSeqNum         bool
 	reconnectorInstanceID string
 }
 
@@ -33,7 +33,7 @@ func newSingleStreamWriterConfig(
 	stream RawTopicWriterStream,
 	queue *messageQueue,
 	encodersMap *EncoderMap,
-	getAutoSeq bool,
+	getLastSeqNum bool,
 	reconnectorID string,
 ) SingleStreamWriterConfig {
 	return SingleStreamWriterConfig{
@@ -41,17 +41,18 @@ func newSingleStreamWriterConfig(
 		stream:                stream,
 		queue:                 queue,
 		encodersMap:           encodersMap,
-		getAutoSeq:            getAutoSeq,
+		getLastSeqNum:         getLastSeqNum,
 		reconnectorInstanceID: reconnectorID,
 	}
 }
 
 type SingleStreamWriter struct {
-	ReceivedLastSeqNum int64
-	SessionID          string
-	PartitionID        int64
-	CodecsFromServer   rawtopiccommon.SupportedCodecs
-	Encoder            EncoderSelector
+	ReceivedLastSeqNum  int64
+	LastSeqNumRequested bool
+	SessionID           string
+	PartitionID         int64
+	CodecsFromServer    rawtopiccommon.SupportedCodecs
+	Encoder             EncoderSelector
 
 	cfg            SingleStreamWriterConfig
 	allowedCodecs  rawtopiccommon.SupportedCodecs
@@ -152,6 +153,7 @@ func (w *SingleStreamWriter) initStream() (err error) {
 	)
 
 	w.SessionID = result.SessionID
+	w.LastSeqNumRequested = req.GetLastSeqNo
 	w.ReceivedLastSeqNum = result.LastSeqNo
 	w.PartitionID = result.PartitionID
 	w.CodecsFromServer = result.SupportedCodecs
@@ -164,7 +166,7 @@ func (w *SingleStreamWriter) createInitRequest() rawtopicwriter.InitRequest {
 		ProducerID:       w.cfg.producerID,
 		WriteSessionMeta: w.cfg.writerMeta,
 		Partitioning:     w.cfg.defaultPartitioning,
-		GetLastSeqNo:     w.cfg.getAutoSeq,
+		GetLastSeqNo:     w.cfg.getLastSeqNum,
 	}
 }
 

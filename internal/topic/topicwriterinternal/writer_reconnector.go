@@ -428,7 +428,7 @@ func (w *WriterReconnector) startWriteStream(ctx, streamCtx context.Context, att
 }
 
 func (w *WriterReconnector) needReceiveLastSeqNo() bool {
-	res := w.cfg.AutoSetSeqNo && !w.firstConnectionHandled.Load()
+	res := !w.firstConnectionHandled.Load()
 	return res
 }
 
@@ -490,7 +490,7 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 		defer close(w.firstInitResponseProcessedChan)
 		isFirstInit = true
 
-		if w.cfg.AutoSetSeqNo {
+		if writerStream.LastSeqNumRequested {
 			w.lastSeqNo = writerStream.ReceivedLastSeqNum
 		}
 	})

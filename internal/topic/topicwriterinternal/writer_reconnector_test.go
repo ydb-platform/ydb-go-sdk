@@ -328,8 +328,9 @@ func TestWriterImpl_InitSession(t *testing.T) {
 	sessionID := "test-session-id"
 
 	w.onWriterChange(&SingleStreamWriter{
-		ReceivedLastSeqNum: lastSeqNo,
-		SessionID:          sessionID,
+		ReceivedLastSeqNum:  lastSeqNo,
+		LastSeqNumRequested: true,
+		SessionID:           sessionID,
 	})
 
 	require.Equal(t, sessionID, w.sessionID)
@@ -344,7 +345,8 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 			LastSeqNum: int64(123),
 		}
 		w.onWriterChange(&SingleStreamWriter{
-			ReceivedLastSeqNum: expectedInitData.LastSeqNum,
+			ReceivedLastSeqNum:  expectedInitData.LastSeqNum,
+			LastSeqNumRequested: true,
 		})
 
 		initData, err := w.WaitInit(context.Background())
@@ -432,9 +434,15 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			connectionError error
 		}
 
+		isFirstConnection := true
 		newStream := func(name string) *MockRawTopicWriterStream {
 			strm := NewMockRawTopicWriterStream(mc)
 			initReq := testCreateInitRequest(w)
+			if isFirstConnection {
+				isFirstConnection = false
+			} else {
+				initReq.GetLastSeqNo = false
+			}
 
 			streamClosed := make(empty.Chan)
 			strm.EXPECT().CloseSend().Do(func() {
