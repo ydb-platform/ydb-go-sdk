@@ -10,6 +10,8 @@ gofmt -s -w "$FILEPATH"
 if [[ "$FILEPATH" == *"tests/slo/"* ]]
 then
   gci write --skip-generated -s standard -s default -s "prefix(slo)" "$FILEPATH"
+elif [ "$FILEPATH" == *"examples/"* ]; then
+  gci write --skip-generated -s standard -s default -s "examples" "$FILEPATH"
 else
   gci write --skip-generated -s standard -s default -s "prefix(github.com/ydb-platform/ydb-go-sdk/v3)" "$FILEPATH"
 fi
