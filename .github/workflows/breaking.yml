@@ -12,6 +12,8 @@ jobs:
       cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions:
+      contents: write
+      repository-projects: write
       pull-requests: write
     steps:
       - name: Install Go
