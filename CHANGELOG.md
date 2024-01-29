@@ -1,3 +1,4 @@
+## v3.55.2
 * Fixed init info in topic writer, when autoseq num turned off.
 
 ## v3.55.1
