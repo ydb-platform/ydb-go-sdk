@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"golang.org/x/time/rate"
-
 	"slo/internal/generator"
 	"slo/internal/metrics"
 )

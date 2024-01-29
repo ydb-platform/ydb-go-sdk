@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"io"
 
+	firestore "google.golang.org/genproto/firestore/bundle"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
-	firestore "google.golang.org/genproto/firestore/bundle"
 )
 
 // PrintMessageContent is simple example for easy start read messages

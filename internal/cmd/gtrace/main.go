@@ -16,10 +16,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	_ "unsafe" // For go:linkname.
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-
-	_ "unsafe" // For go:linkname.
 )
 
 //go:linkname build_goodOSArchFile go/build.(*Context).goodOSArchFile

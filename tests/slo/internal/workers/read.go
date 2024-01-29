@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"golang.org/x/time/rate"
-
 	"slo/internal/metrics"
 )
 
