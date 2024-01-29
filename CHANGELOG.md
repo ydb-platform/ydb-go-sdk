@@ -1,3 +1,5 @@
+* Fixed init info in topic writer, when autoseq num turned off.
+
 ## v3.55.1
 * Supported column name prefix `__discard_column_` for discard columns in result sets
 * Made `StatusIds_SESSION_EXPIRED` retriable for idempotent operations
