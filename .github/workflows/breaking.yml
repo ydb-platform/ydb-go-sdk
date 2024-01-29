@@ -25,6 +25,17 @@ jobs:
         run: test -e ~/go/bin/gorelease || go install golang.org/x/exp/cmd/gorelease@latest
       - name: Check broken API changes
         run: gorelease -base=$GITHUB_BASE_REF 2>&1 > changes.txt | true
+      - name: Generate a token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+      - name: Use the token
+        env:
+          GH_TOKEN: ${{ steps.generate_token.outputs.token }}
+        run: |
+          gh api octocat
       - name: Comment Report
         if: always()
         uses: marocchino/sticky-pull-request-comment@v2
