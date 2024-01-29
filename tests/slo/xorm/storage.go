@@ -9,16 +9,16 @@ import (
 	"strconv"
 	"time"
 
-	"slo/internal/config"
-	"slo/internal/generator"
-	"xorm.io/xorm"
-	"xorm.io/xorm/core"
-	"xorm.io/xorm/log"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+	"xorm.io/xorm"
+	"xorm.io/xorm/core"
+	"xorm.io/xorm/log"
+
+	"slo/internal/config"
+	"slo/internal/generator"
 )
 
 var (

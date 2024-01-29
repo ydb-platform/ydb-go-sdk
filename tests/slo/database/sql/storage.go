@@ -7,13 +7,13 @@ import (
 	"path"
 	"time"
 
-	"slo/internal/config"
-	"slo/internal/generator"
-
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
+
+	"slo/internal/config"
+	"slo/internal/generator"
 )
 
 //nolint:goconst
