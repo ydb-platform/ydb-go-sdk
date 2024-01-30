@@ -407,9 +407,7 @@ func (r *readerReconnector) stream(ctx context.Context) (batchedStreamReader, er
 }
 
 func (r *readerReconnector) handlePanic() {
-	p := recover()
-
-	if p != nil {
+	if p := recover(); recover() != nil {
 		_ = r.CloseWithError(context.Background(), xerrors.WithStackTrace(fmt.Errorf("handled panic: %v", p)))
 	}
 }

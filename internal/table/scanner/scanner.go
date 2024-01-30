@@ -494,9 +494,8 @@ func (s *scanner) unwrapDecimal() (v types.Decimal) {
 }
 
 func (s *scanner) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.Type_DecimalType) {
-	x := typ.Type
-	if t, _ = x.(*Ydb.Type_DecimalType); t == nil {
-		s.typeError(x, t)
+	if t, _ = typ.Type.(*Ydb.Type_DecimalType); t == nil {
+		s.typeError(typ.Type, t)
 	}
 	return
 }

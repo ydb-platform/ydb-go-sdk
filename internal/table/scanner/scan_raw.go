@@ -630,9 +630,8 @@ func (s *rawConverter) boundsCheck(n, i int) bool {
 }
 
 func (s *scanner) assertTypeOptional(typ *Ydb.Type) (t *Ydb.Type_OptionalType) {
-	x := typ.Type
-	if t, _ = x.(*Ydb.Type_OptionalType); t == nil {
-		s.typeError(x, t)
+	if t, _ = typ.Type.(*Ydb.Type_OptionalType); t == nil {
+		s.typeError(typ.Type, t)
 	}
 	return
 }
@@ -688,49 +687,43 @@ func (s *rawConverter) assertCurrentTypeDecimal(t types.Type) bool {
 }
 
 func (s *rawConverter) assertTypeList(typ *Ydb.Type) (t *Ydb.Type_ListType) {
-	x := typ.Type
-	if t, _ = x.(*Ydb.Type_ListType); t == nil {
-		s.typeError(x, t)
+	if t, _ = typ.Type.(*Ydb.Type_ListType); t == nil {
+		s.typeError(typ.Type, t)
 	}
 	return
 }
 
 func (s *rawConverter) assertTypeTuple(typ *Ydb.Type) (t *Ydb.Type_TupleType) {
-	x := typ.Type
-	if t, _ = x.(*Ydb.Type_TupleType); t == nil {
-		s.typeError(x, t)
+	if t, _ = typ.Type.(*Ydb.Type_TupleType); t == nil {
+		s.typeError(typ.Type, t)
 	}
 	return
 }
 
 func (s *rawConverter) assertTypeStruct(typ *Ydb.Type) (t *Ydb.Type_StructType) {
-	x := typ.Type
-	if t, _ = x.(*Ydb.Type_StructType); t == nil {
-		s.typeError(x, t)
+	if t, _ = typ.Type.(*Ydb.Type_StructType); t == nil {
+		s.typeError(typ.Type, t)
 	}
 	return
 }
 
 func (s *rawConverter) assertTypeDict(typ *Ydb.Type) (t *Ydb.Type_DictType) {
-	x := typ.Type
-	if t, _ = x.(*Ydb.Type_DictType); t == nil {
-		s.typeError(x, t)
+	if t, _ = typ.Type.(*Ydb.Type_DictType); t == nil {
+		s.typeError(typ.Type, t)
 	}
 	return
 }
 
 func (s *rawConverter) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.Type_DecimalType) {
-	x := typ.Type
-	if t, _ = x.(*Ydb.Type_DecimalType); t == nil {
-		s.typeError(x, t)
+	if t, _ = typ.Type.(*Ydb.Type_DecimalType); t == nil {
+		s.typeError(typ.Type, t)
 	}
 	return
 }
 
 func (s *rawConverter) assertTypeVariant(typ *Ydb.Type) (t *Ydb.Type_VariantType) {
-	x := typ.Type
-	if t, _ = x.(*Ydb.Type_VariantType); t == nil {
-		s.typeError(x, t)
+	if t, _ = typ.Type.(*Ydb.Type_VariantType); t == nil {
+		s.typeError(typ.Type, t)
 	}
 	return
 }

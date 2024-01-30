@@ -36,8 +36,7 @@ type streamResult struct {
 
 // Err returns error caused Scanner to be broken.
 func (r *streamResult) Err() error {
-	err := r.scanner.Err()
-	if err != nil {
+	if err := r.scanner.Err(); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 	return nil
@@ -52,8 +51,7 @@ type unaryResult struct {
 
 // Err returns error caused Scanner to be broken.
 func (r *unaryResult) Err() error {
-	err := r.scanner.Err()
-	if err != nil {
+	if err := r.scanner.Err(); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 	return nil
