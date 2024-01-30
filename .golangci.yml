@@ -243,7 +243,6 @@ linters:
     - structcheck
     - testableexamples
     - testpackage
-    - thelper
     - varnamelen
     - wrapcheck
     - wsl
