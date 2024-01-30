@@ -228,7 +228,6 @@ linters:
     - golint
     - gomnd
     - gomoddirectives
-    - ifshort
     - interfacebloat
     - interfacer
     - ireturn
