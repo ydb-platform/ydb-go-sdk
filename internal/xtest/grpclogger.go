@@ -54,7 +54,7 @@ func (l GrpcLogger) StreamClientInterceptor(
 	opts ...grpc.CallOption,
 ) (grpc.ClientStream, error) {
 	stream, err := streamer(ctx, desc, cc, method, opts...)
-	streamWrapper := newGrpcLoggerStream(stream, l.t)
+	streamWrapper := newGrpcLoggerStream(l.t, stream)
 	if stream != nil {
 		stream = streamWrapper
 	}
@@ -73,7 +73,7 @@ type grpcLoggerStream struct {
 	t        testing.TB
 }
 
-func newGrpcLoggerStream(stream grpc.ClientStream, tb testing.TB) grpcLoggerStream {
+func newGrpcLoggerStream(tb testing.TB, stream grpc.ClientStream) grpcLoggerStream {
 	return grpcLoggerStream{stream, atomic.AddInt64(&globalLastStreamID, 1), tb}
 }
 
