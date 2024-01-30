@@ -32,6 +32,7 @@ import (
 
 func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
 		limit := 100
 		ctx, cancel := xcontext.WithTimeout(
 			context.Background(),
@@ -185,6 +186,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 func TestSessionPoolClose(t *testing.T) {
 	counter := 0
 	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
 		counter++
 		defer func() {
 			if counter%1000 == 0 {
@@ -265,6 +267,7 @@ func TestRaceWgClosed(t *testing.T) {
 	)
 
 	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
 		counter++
 		defer func() {
 			if counter%1000 == 0 {
@@ -664,6 +667,7 @@ func TestSessionPoolGetPut(t *testing.T) {
 
 func TestSessionPoolCloseIdleSessions(t *testing.T) {
 	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
 		var (
 			idleThreshold = 4 * time.Second
 			closedCount   xatomic.Int64
@@ -750,6 +754,7 @@ func TestSessionPoolDoublePut(t *testing.T) {
 }
 
 func mustGetSession(tb testing.TB, p *Client) *session {
+	tb.Helper()
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	s, err := p.Get(context.Background())
@@ -761,6 +766,7 @@ func mustGetSession(tb testing.TB, p *Client) *session {
 }
 
 func mustPutSession(tb testing.TB, p *Client, s *session) {
+	tb.Helper()
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	if err := p.Put(context.Background(), s); err != nil {
@@ -770,6 +776,7 @@ func mustPutSession(tb testing.TB, p *Client, s *session) {
 }
 
 func mustClose(tb testing.TB, p *Client) {
+	tb.Helper()
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	if err := p.Close(context.Background()); err != nil {
@@ -857,6 +864,7 @@ func newClientWithStubBuilder(
 	stubLimit int,
 	options ...config.Option,
 ) *Client {
+	tb.Helper()
 	c, err := newClient(
 		context.Background(),
 		balancer,
@@ -918,6 +926,7 @@ func whenWantWaitCh(p *Client) <-chan struct{} {
 
 func TestDeadlockOnUpdateNodes(t *testing.T) {
 	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
 		ctx, cancel := xcontext.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 		var (
@@ -960,6 +969,7 @@ func TestDeadlockOnUpdateNodes(t *testing.T) {
 
 func TestDeadlockOnInternalPoolGCTick(t *testing.T) {
 	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
 		ctx, cancel := xcontext.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 		var (

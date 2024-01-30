@@ -13,6 +13,7 @@ import (
 
 func TestMutex(t *testing.T) {
 	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
 		var m Mutex
 		a, b := 1, 1
 
@@ -39,6 +40,7 @@ func TestMutex(t *testing.T) {
 
 func TestRWMutex(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "WithLock", func(tb testing.TB) {
+		tb.Helper()
 		var m Mutex
 		a, b := 1, 1
 
@@ -62,6 +64,7 @@ func TestRWMutex(t *testing.T) {
 		require.Equal(tb, 2, b)
 	})
 	xtest.TestManyTimesWithName(t, "WithRLock", func(tb testing.TB) {
+		tb.Helper()
 		var m RWMutex
 		a, b := 1, 1
 

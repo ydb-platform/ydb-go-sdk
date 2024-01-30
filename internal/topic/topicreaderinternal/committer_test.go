@@ -104,6 +104,7 @@ func TestCommitterCommitSync(t *testing.T) {
 	})
 
 	xtest.TestManyTimesWithName(t, "SuccessCommitWithNotifyAfterCommit", func(tb testing.TB) {
+		tb.Helper()
 		ctx := xtest.Context(tb)
 		session := &partitionSession{
 			ctx:                context.Background(),
@@ -160,6 +161,7 @@ func TestCommitterCommitSync(t *testing.T) {
 	})
 
 	xtest.TestManyTimesWithName(t, "SessionClosed", func(tb testing.TB) {
+		tb.Helper()
 		ctx := xtest.Context(tb)
 
 		sessionCtx, sessionCancel := xcontext.WithCancel(ctx)
@@ -366,6 +368,7 @@ func TestCommitterBuffer(t *testing.T) {
 }
 
 func newTestCommitter(ctx context.Context, tb testing.TB) *committer {
+	tb.Helper()
 	res := newCommitter(&trace.Topic{}, ctx, CommitModeAsync, func(msg rawtopicreader.ClientMessage) error {
 		return nil
 	})

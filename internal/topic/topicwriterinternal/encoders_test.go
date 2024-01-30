@@ -41,6 +41,7 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 		)
 
 		testSelectCodec := func(tb testing.TB, targetCodec rawtopiccommon.Codec, smallCount, largeCount int) {
+			tb.Helper()
 			s := NewEncoderSelector(testCommonEncoders, rawtopiccommon.SupportedCodecs{
 				rawtopiccommon.CodecRaw,
 				rawtopiccommon.CodecGzip,

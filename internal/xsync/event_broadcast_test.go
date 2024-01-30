@@ -21,6 +21,7 @@ func TestEventBroadcast(t *testing.T) {
 	})
 
 	xtest.TestManyTimesWithName(t, "SubscribeAndEventsInRace", func(tb testing.TB) {
+		tb.Helper()
 		testDuration := time.Second / 100
 
 		b := &EventBroadcast{}

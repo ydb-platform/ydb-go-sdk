@@ -130,6 +130,7 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 	})
 
 	xtest.TestManyTimesWithName(t, "OnClose", func(tb testing.TB) {
+		tb.Helper()
 		reconnector := &readerReconnector{
 			tracer:    &trace.Topic{},
 			streamErr: errUnconnected,

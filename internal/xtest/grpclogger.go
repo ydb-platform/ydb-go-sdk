@@ -22,7 +22,7 @@ type GrpcLogger struct {
 	t testing.TB
 }
 
-func NewGrpcLogger(tb testing.TB) GrpcLogger {
+func NewGrpcLogger(tb testing.TB) GrpcLogger { //nolint:thelper
 	return GrpcLogger{t: tb}
 }
 
@@ -73,7 +73,7 @@ type grpcLoggerStream struct {
 	t        testing.TB
 }
 
-func newGrpcLoggerStream(tb testing.TB, stream grpc.ClientStream) grpcLoggerStream {
+func newGrpcLoggerStream(tb testing.TB, stream grpc.ClientStream) grpcLoggerStream { //nolint:thelper
 	return grpcLoggerStream{stream, atomic.AddInt64(&globalLastStreamID, 1), tb}
 }
 

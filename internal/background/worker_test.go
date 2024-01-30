@@ -97,6 +97,7 @@ func TestWorkerClose(t *testing.T) {
 
 func TestWorkerConcurrentStartAndClose(t *testing.T) {
 	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
 		targetClose := int64(10)
 
 		parallel := runtime.GOMAXPROCS(0)
@@ -143,6 +144,7 @@ func TestWorkerConcurrentStartAndClose(t *testing.T) {
 
 func TestWorkerStartCompletedWhileLongWait(t *testing.T) {
 	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
 		ctx := xtest.Context(tb)
 		w := NewWorker(ctx)
 

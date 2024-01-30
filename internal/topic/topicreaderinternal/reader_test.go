@@ -16,6 +16,7 @@ import (
 
 func TestReader_Close(t *testing.T) {
 	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
 		mc := gomock.NewController(tb)
 		defer mc.Finish()
 

@@ -154,6 +154,7 @@ func TestBatcher_Pop(t *testing.T) {
 	})
 
 	xtest.TestManyTimesWithName(t, "GetBeforePut", func(tb testing.TB) {
+		tb.Helper()
 		ctx := context.Background()
 		batch := mustNewBatch(nil, []*PublicMessage{{WrittenAt: testTime(1)}})
 
@@ -222,6 +223,7 @@ func TestBatcher_Pop(t *testing.T) {
 	})
 
 	xtest.TestManyTimesWithName(t, "CloseBatcherWhilePopWait", func(tb testing.TB) {
+		tb.Helper()
 		ctx := xtest.Context(tb)
 		testErr := errors.New("test")
 
@@ -275,6 +277,7 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 	})
 
 	xtest.TestManyTimesWithName(t, "ForceAfterPop", func(tb testing.TB) {
+		tb.Helper()
 		b := newBatcher()
 		require.NoError(tb, b.PushBatches(&PublicBatch{Messages: []*PublicMessage{
 			{
@@ -305,6 +308,7 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 
 func TestBatcherConcurency(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "OneBatch", func(tb testing.TB) {
+		tb.Helper()
 		b := newBatcher()
 
 		go func() {
@@ -320,6 +324,7 @@ func TestBatcherConcurency(t *testing.T) {
 	})
 
 	xtest.TestManyTimesWithName(t, "ManyRawMessages", func(tb testing.TB) {
+		tb.Helper()
 		const count = 10
 		b := newBatcher()
 		session := &partitionSession{}

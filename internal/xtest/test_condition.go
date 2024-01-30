@@ -10,7 +10,7 @@ import (
 // not published to common test docker image
 const enableAllTestsFlag = "YDB_GO_SDK_ENABLE_ALL_TESTS"
 
-func AllowByFlag(tb testing.TB, flag string) {
+func AllowByFlag(tb testing.TB, flag string) { //nolint:thelper
 	if os.Getenv(flag) != "" {
 		return
 	}

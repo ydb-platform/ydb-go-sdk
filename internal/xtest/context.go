@@ -9,6 +9,7 @@ import (
 )
 
 func Context(tb testing.TB) context.Context {
+	tb.Helper()
 	ctx, cancel := xcontext.WithCancel(context.Background())
 	ctx = pprof.WithLabels(ctx, pprof.Labels("test", tb.Name()))
 	pprof.SetGoroutineLabels(ctx)
@@ -21,6 +22,7 @@ func Context(tb testing.TB) context.Context {
 }
 
 func ContextWithCommonTimeout(ctx context.Context, tb testing.TB) context.Context {
+	tb.Helper()
 	if ctx.Done() == nil {
 		tb.Fatal("Use context with timeout only with context, cancelled on finish test, for example xtest.Context")
 	}

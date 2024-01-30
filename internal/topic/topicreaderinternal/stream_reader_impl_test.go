@@ -104,6 +104,7 @@ func TestTopicStreamReaderImpl_BufferCounterOnStopPartition(t *testing.T) {
 
 func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "SimpleCommit", func(tb testing.TB) {
+		tb.Helper()
 		e := newTopicReaderTestEnv(tb)
 		e.Start()
 
@@ -187,6 +188,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		xtest.WaitChannelClosed(tb, readRequestReceived)
 	})
 	xtest.TestManyTimesWithName(t, "WrongOrderCommitWithSyncMode", func(tb testing.TB) {
+		tb.Helper()
 		e := newTopicReaderTestEnv(tb)
 		e.reader.cfg.CommitMode = CommitModeSync
 		e.Start()
@@ -248,6 +250,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 	})
 
 	xtest.TestManyTimesWithName(t, "CommitAfterGracefulStopPartition", func(tb testing.TB) {
+		tb.Helper()
 		e := newTopicReaderTestEnv(tb)
 
 		committed := e.partitionSession.committedOffset()
@@ -326,6 +329,7 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 
 func TestTopicStreamReaderImpl_Create(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "BadSessionInitialization", func(tb testing.TB) {
+		tb.Helper()
 		mc := gomock.NewController(tb)
 		stream := NewMockRawTopicReaderStream(mc)
 		stream.EXPECT().Send(gomock.Any()).Return(nil)
@@ -357,6 +361,7 @@ func TestTopicStreamReaderImpl_WaitInit(t *testing.T) {
 
 func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "GracefulFalseCancelPartitionContext", func(tb testing.TB) {
+		tb.Helper()
 		e := newTopicReaderTestEnv(tb)
 		e.Start()
 
@@ -371,6 +376,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		e.WaitMessageReceived()
 	})
 	xtest.TestManyTimesWithName(t, "TraceGracefulTrue", func(tb testing.TB) {
+		tb.Helper()
 		e := newTopicReaderTestEnv(tb)
 
 		readMessagesCtx, readMessagesCtxCancel := xcontext.WithCancel(context.Background())
@@ -415,6 +421,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		xtest.WaitChannelClosed(tb, stopPartitionResponseSent)
 	})
 	xtest.TestManyTimesWithName(t, "TraceGracefulFalse", func(tb testing.TB) {
+		tb.Helper()
 		e := newTopicReaderTestEnv(tb)
 
 		readMessagesCtx, readMessagesCtxCancel := xcontext.WithCancel(context.Background())
@@ -460,6 +467,7 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 		}
 
 		xtest.TestManyTimesWithName(t, "InitialBufferSize", func(tb testing.TB) {
+			tb.Helper()
 			e := newTopicReaderTestEnv(tb)
 			e.Start()
 			waitChangeRestBufferSizeBytes(e.reader, 0)
@@ -467,6 +475,7 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 		})
 
 		xtest.TestManyTimesWithName(t, "DecrementIncrementBufferSize", func(tb testing.TB) {
+			tb.Helper()
 			e := newTopicReaderTestEnv(tb)
 
 			// doesn't check sends
@@ -523,6 +532,7 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 		})
 
 		xtest.TestManyTimesWithName(t, "ForceReturnBatchIfBufferFull", func(tb testing.TB) {
+			tb.Helper()
 			e := newTopicReaderTestEnv(tb)
 
 			dataRequested := make(empty.Chan)
@@ -568,6 +578,7 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 	})
 
 	xtest.TestManyTimesWithName(t, "ReadBatch", func(tb testing.TB) {
+		tb.Helper()
 		e := newTopicReaderTestEnv(tb)
 		e.Start()
 
@@ -846,6 +857,7 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 	}
 
 	xtest.TestManyTimesWithName(t, "ReadAfterMessageInBuffer", func(tb testing.TB) {
+		tb.Helper()
 		e := newTopicReaderTestEnv(tb)
 		e.Start()
 
@@ -875,6 +887,7 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 	})
 
 	xtest.TestManyTimesWithName(t, "ReadBeforeMessageInBuffer", func(tb testing.TB) {
+		tb.Helper()
 		e := newTopicReaderTestEnv(tb)
 		e.Start()
 
@@ -972,6 +985,7 @@ type testStreamResult struct {
 }
 
 func newTopicReaderTestEnv(tb testing.TB) streamEnv {
+	tb.Helper()
 	ctx := xtest.Context(tb)
 
 	mc := gomock.NewController(tb)

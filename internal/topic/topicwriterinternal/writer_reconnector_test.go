@@ -114,6 +114,7 @@ func TestWriterImpl_Write(t *testing.T) {
 	})
 	t.Run("WriteWithSyncMode", func(t *testing.T) {
 		xtest.TestManyTimes(t, func(tb testing.TB) {
+			tb.Helper()
 			e := newTestEnv(tb, &testEnvOptions{
 				writerOptions: []PublicWriterOption{
 					WithWaitAckOnWrite(true),
@@ -272,6 +273,7 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 
 func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
 	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
 		ctx := xtest.Context(tb)
 		w := newWriterReconnectorStopped(newWriterReconnectorConfig(
 			WithAutoSetSeqNo(false),
@@ -317,6 +319,7 @@ func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
 
 func TestEnv(t *testing.T) {
 	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
 		env := newTestEnv(tb, nil)
 		xtest.WaitChannelClosed(tb, env.writer.firstInitResponseProcessedChan)
 	})
@@ -420,6 +423,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 	})
 
 	xtest.TestManyTimesWithName(t, "ReconnectOnErrors", func(tb testing.TB) {
+		tb.Helper()
 		ctx := xtest.Context(tb)
 
 		w := newTestWriterStopped()
@@ -823,6 +827,7 @@ type testEnvOptions struct {
 }
 
 func newTestEnv(tb testing.TB, options *testEnvOptions) *testEnv {
+	tb.Helper()
 	if options == nil {
 		options = &testEnvOptions{}
 	}

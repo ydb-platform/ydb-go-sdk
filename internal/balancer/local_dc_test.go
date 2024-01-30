@@ -97,6 +97,7 @@ func TestCheckFastestAddress(t *testing.T) {
 func TestDetectLocalDC(t *testing.T) {
 	ctx := context.Background()
 	xtest.TestManyTimesWithName(t, "Ok", func(tb testing.TB) {
+		tb.Helper()
 		listen1, err := net.ListenTCP("tcp", &net.TCPAddr{IP: localIP})
 		require.NoError(tb, err)
 		defer func() { _ = listen1.Close() }()
@@ -223,6 +224,7 @@ func TestGetRandomEndpoints(t *testing.T) {
 		require.Equal(t, source, res)
 	})
 	xtest.TestManyTimesWithName(t, "SelectRandom", func(tb testing.TB) {
+		tb.Helper()
 		res := getRandomEndpoints(source, 2)
 		require.Len(tb, res, 2)
 		for _, ep := range res {
