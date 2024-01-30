@@ -153,7 +153,7 @@ func TestBatcher_Pop(t *testing.T) {
 		require.Empty(t, b.messages)
 	})
 
-	xtest.TestManyTimesWithName(t, "GetBeforePut", func(t testing.TB) {
+	xtest.TestManyTimesWithName(t, "GetBeforePut", func(tb testing.TB) {
 		ctx := context.Background()
 		batch := mustNewBatch(nil, []*PublicMessage{{WrittenAt: testTime(1)}})
 
@@ -161,16 +161,16 @@ func TestBatcher_Pop(t *testing.T) {
 		b.notifyAboutNewMessages()
 
 		go func() {
-			xtest.SpinWaitCondition(t, &b.m, func() bool {
+			xtest.SpinWaitCondition(tb, &b.m, func() bool {
 				return len(b.hasNewMessages) == 0
 			})
 			_ = b.PushBatches(batch)
 		}()
 
 		res, err := b.Pop(ctx, batcherGetOptions{})
-		require.NoError(t, err)
-		require.Equal(t, newBatcherItemBatch(batch), res)
-		require.Empty(t, b.messages)
+		require.NoError(tb, err)
+		require.Equal(tb, newBatcherItemBatch(batch), res)
+		require.Empty(tb, b.messages)
 	})
 
 	t.Run("GetMaxOne", func(t *testing.T) {
@@ -221,14 +221,14 @@ func TestBatcher_Pop(t *testing.T) {
 		require.Equal(t, newBatcherItemRawMessage(m), res)
 	})
 
-	xtest.TestManyTimesWithName(t, "CloseBatcherWhilePopWait", func(t testing.TB) {
-		ctx := xtest.Context(t)
+	xtest.TestManyTimesWithName(t, "CloseBatcherWhilePopWait", func(tb testing.TB) {
+		ctx := xtest.Context(tb)
 		testErr := errors.New("test")
 
 		b := newBatcher()
 		b.notifyAboutNewMessages()
 
-		require.Len(t, b.hasNewMessages, 1)
+		require.Len(tb, b.hasNewMessages, 1)
 
 		popFinished := make(empty.Chan)
 		popGoroutineStarted := make(empty.Chan)
@@ -236,21 +236,21 @@ func TestBatcher_Pop(t *testing.T) {
 			close(popGoroutineStarted)
 
 			_, popErr := b.Pop(ctx, batcherGetOptions{MinCount: 1})
-			require.ErrorIs(t, popErr, testErr)
+			require.ErrorIs(tb, popErr, testErr)
 			close(popFinished)
 		}()
 
-		xtest.WaitChannelClosed(t, popGoroutineStarted)
+		xtest.WaitChannelClosed(tb, popGoroutineStarted)
 
 		// loop for wait Pop start wait message
-		xtest.SpinWaitCondition(t, &b.m, func() bool {
+		xtest.SpinWaitCondition(tb, &b.m, func() bool {
 			return len(b.hasNewMessages) == 0
 		})
 
-		require.NoError(t, b.Close(testErr))
-		require.Error(t, b.Close(errors.New("second close")))
+		require.NoError(tb, b.Close(testErr))
+		require.Error(tb, b.Close(errors.New("second close")))
 
-		xtest.WaitChannelClosed(t, popFinished)
+		xtest.WaitChannelClosed(tb, popFinished)
 	})
 }
 
@@ -274,9 +274,9 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 		require.False(t, b.forceIgnoreMinRestrictionsOnNextMessagesBatch)
 	})
 
-	xtest.TestManyTimesWithName(t, "ForceAfterPop", func(t testing.TB) {
+	xtest.TestManyTimesWithName(t, "ForceAfterPop", func(tb testing.TB) {
 		b := newBatcher()
-		require.NoError(t, b.PushBatches(&PublicBatch{Messages: []*PublicMessage{
+		require.NoError(tb, b.PushBatches(&PublicBatch{Messages: []*PublicMessage{
 			{
 				SeqNo: 1,
 			},
@@ -286,7 +286,7 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 		go func() {
 			defer IgnoreMinRestrictionsOnNextPopDone.Add(1)
 
-			xtest.SpinWaitCondition(t, &b.m, func() bool {
+			xtest.SpinWaitCondition(tb, &b.m, func() bool {
 				return len(b.hasNewMessages) == 0
 			})
 			b.IgnoreMinRestrictionsOnNextPop()
@@ -297,9 +297,9 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 
 		batch, err := b.Pop(ctx, batcherGetOptions{MinCount: 2})
 
-		require.NoError(t, err, IgnoreMinRestrictionsOnNextPopDone.Load())
-		require.Len(t, batch.Batch.Messages, 1)
-		require.False(t, b.forceIgnoreMinRestrictionsOnNextMessagesBatch)
+		require.NoError(tb, err, IgnoreMinRestrictionsOnNextPopDone.Load())
+		require.Len(tb, batch.Batch.Messages, 1)
+		require.False(tb, b.forceIgnoreMinRestrictionsOnNextMessagesBatch)
 	})
 }
 

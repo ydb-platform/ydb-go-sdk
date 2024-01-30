@@ -12,7 +12,7 @@ import (
 )
 
 func TestMutex(t *testing.T) {
-	xtest.TestManyTimes(t, func(t testing.TB) {
+	xtest.TestManyTimes(t, func(tb testing.TB) {
 		var m Mutex
 		a, b := 1, 1
 
@@ -32,13 +32,13 @@ func TestMutex(t *testing.T) {
 		go m.WithLock(f)
 
 		wg.Wait()
-		require.Equal(t, 2, a)
-		require.Equal(t, 2, b)
+		require.Equal(tb, 2, a)
+		require.Equal(tb, 2, b)
 	})
 }
 
 func TestRWMutex(t *testing.T) {
-	xtest.TestManyTimesWithName(t, "WithLock", func(t testing.TB) {
+	xtest.TestManyTimesWithName(t, "WithLock", func(tb testing.TB) {
 		var m Mutex
 		a, b := 1, 1
 
@@ -58,10 +58,10 @@ func TestRWMutex(t *testing.T) {
 		go m.WithLock(f)
 
 		wg.Wait()
-		require.Equal(t, 2, a)
-		require.Equal(t, 2, b)
+		require.Equal(tb, 2, a)
+		require.Equal(tb, 2, b)
 	})
-	xtest.TestManyTimesWithName(t, "WithRLock", func(t testing.TB) {
+	xtest.TestManyTimesWithName(t, "WithRLock", func(tb testing.TB) {
 		var m RWMutex
 		a, b := 1, 1
 
@@ -98,7 +98,7 @@ func TestRWMutex(t *testing.T) {
 		}()
 
 		wg.Wait()
-		require.Equal(t, 2, a+b)
-		require.Equal(t, int64(0), badSummCount)
+		require.Equal(tb, 2, a+b)
+		require.Equal(tb, int64(0), badSummCount)
 	})
 }

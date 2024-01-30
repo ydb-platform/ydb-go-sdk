@@ -103,8 +103,8 @@ func TestCommitterCommitSync(t *testing.T) {
 		require.True(t, sendCalled)
 	})
 
-	xtest.TestManyTimesWithName(t, "SuccessCommitWithNotifyAfterCommit", func(t testing.TB) {
-		ctx := xtest.Context(t)
+	xtest.TestManyTimesWithName(t, "SuccessCommitWithNotifyAfterCommit", func(tb testing.TB) {
+		ctx := xtest.Context(tb)
 		session := &partitionSession{
 			ctx:                context.Background(),
 			partitionSessionID: 1,
@@ -117,7 +117,7 @@ func TestCommitterCommitSync(t *testing.T) {
 		}
 
 		commitSended := make(empty.Chan)
-		c := newTestCommitter(ctx, t)
+		c := newTestCommitter(ctx, tb)
 		c.mode = CommitModeSync
 		c.send = func(msg rawtopicreader.ClientMessage) error {
 			close(commitSended)
@@ -126,7 +126,7 @@ func TestCommitterCommitSync(t *testing.T) {
 
 		commitCompleted := make(empty.Chan)
 		go func() {
-			require.NoError(t, c.Commit(ctx, cRange))
+			require.NoError(tb, c.Commit(ctx, cRange))
 			close(commitCompleted)
 		}()
 
@@ -138,7 +138,7 @@ func TestCommitterCommitSync(t *testing.T) {
 		}()
 
 		<-commitCompleted
-		require.True(t, notifySended)
+		require.True(tb, notifySended)
 	})
 
 	t.Run("SuccessCommitPreviousCommitted", func(t *testing.T) {
@@ -159,8 +159,8 @@ func TestCommitterCommitSync(t *testing.T) {
 		require.NoError(t, c.Commit(ctx, cRange))
 	})
 
-	xtest.TestManyTimesWithName(t, "SessionClosed", func(t testing.TB) {
-		ctx := xtest.Context(t)
+	xtest.TestManyTimesWithName(t, "SessionClosed", func(tb testing.TB) {
+		ctx := xtest.Context(tb)
 
 		sessionCtx, sessionCancel := xcontext.WithCancel(ctx)
 
@@ -175,7 +175,7 @@ func TestCommitterCommitSync(t *testing.T) {
 			partitionSession:  session,
 		}
 
-		c := newTestCommitter(ctx, t)
+		c := newTestCommitter(ctx, tb)
 		c.mode = CommitModeSync
 
 		waitErr := make(chan error)
@@ -187,7 +187,7 @@ func TestCommitterCommitSync(t *testing.T) {
 		sessionCancel()
 
 		commitErr := <-waitErr
-		require.ErrorIs(t, commitErr, PublicErrCommitSessionToExpiredSession)
+		require.ErrorIs(tb, commitErr, PublicErrCommitSessionToExpiredSession)
 	})
 }
 
@@ -365,13 +365,13 @@ func TestCommitterBuffer(t *testing.T) {
 	})
 }
 
-func newTestCommitter(ctx context.Context, t testing.TB) *committer {
+func newTestCommitter(ctx context.Context, tb testing.TB) *committer {
 	res := newCommitter(&trace.Topic{}, ctx, CommitModeAsync, func(msg rawtopicreader.ClientMessage) error {
 		return nil
 	})
-	t.Cleanup(func() {
+	tb.Cleanup(func() {
 		if err := res.Close(ctx, errors.New("test comitter closed")); err != nil {
-			require.ErrorIs(t, err, background.ErrAlreadyClosed)
+			require.ErrorIs(tb, err, background.ErrAlreadyClosed)
 		}
 	})
 	return res

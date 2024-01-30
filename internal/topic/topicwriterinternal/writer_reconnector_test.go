@@ -113,8 +113,8 @@ func TestWriterImpl_Write(t *testing.T) {
 		require.Equal(t, expectedMap, w.queue.messagesByOrder)
 	})
 	t.Run("WriteWithSyncMode", func(t *testing.T) {
-		xtest.TestManyTimes(t, func(t testing.TB) {
-			e := newTestEnv(t, &testEnvOptions{
+		xtest.TestManyTimes(t, func(tb testing.TB) {
+			e := newTestEnv(tb, &testEnvOptions{
 				writerOptions: []PublicWriterOption{
 					WithWaitAckOnWrite(true),
 				},
@@ -148,7 +148,7 @@ func TestWriterImpl_Write(t *testing.T) {
 					CreatedAt: messageTime,
 					Data:      bytes.NewReader(messageData),
 				}})
-				require.NoError(t, err)
+				require.NoError(tb, err)
 				close(writeCompleted)
 			}()
 
@@ -156,7 +156,7 @@ func TestWriterImpl_Write(t *testing.T) {
 
 			select {
 			case <-writeCompleted:
-				t.Fatal("sync write must complete after receive ack only")
+				tb.Fatal("sync write must complete after receive ack only")
 			default:
 				// pass
 			}
@@ -174,7 +174,7 @@ func TestWriterImpl_Write(t *testing.T) {
 				PartitionID: e.partitionID,
 			})
 
-			xtest.WaitChannelClosed(t, writeCompleted)
+			xtest.WaitChannelClosed(tb, writeCompleted)
 		})
 	})
 }
@@ -271,8 +271,8 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 }
 
 func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
-	xtest.TestManyTimes(t, func(t testing.TB) {
-		ctx := xtest.Context(t)
+	xtest.TestManyTimes(t, func(tb testing.TB) {
+		ctx := xtest.Context(tb)
 		w := newWriterReconnectorStopped(newWriterReconnectorConfig(
 			WithAutoSetSeqNo(false),
 			WithMaxQueueLen(2),
@@ -280,14 +280,14 @@ func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
 		w.firstConnectionHandled.Store(true)
 
 		waitStartQueueWait := func(targetWaiters int) {
-			xtest.SpinWaitCondition(t, nil, func() bool {
+			xtest.SpinWaitCondition(tb, nil, func() bool {
 				res := getWaitersCount(w.semaphore) == targetWaiters
 				return res
 			})
 		}
 
 		err := w.Write(ctx, newTestMessages(1, 2))
-		require.NoError(t, err)
+		require.NoError(tb, err)
 
 		ctxNoQueueSpace, ctxNoQueueSpaceCancel := xcontext.WithCancel(ctx)
 
@@ -297,7 +297,7 @@ func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
 		}()
 		err = w.Write(ctxNoQueueSpace, newTestMessages(3))
 		if !errors.Is(err, PublicErrQueueIsFull) {
-			require.ErrorIs(t, err, PublicErrQueueIsFull)
+			require.ErrorIs(tb, err, PublicErrQueueIsFull)
 		}
 
 		go func() {
@@ -307,18 +307,18 @@ func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
 					SeqNo: 1,
 				},
 			})
-			require.NoError(t, ackErr)
+			require.NoError(tb, ackErr)
 		}()
 
 		err = w.Write(ctx, newTestMessages(3))
-		require.NoError(t, err)
+		require.NoError(tb, err)
 	})
 }
 
 func TestEnv(t *testing.T) {
-	xtest.TestManyTimes(t, func(t testing.TB) {
-		env := newTestEnv(t, nil)
-		xtest.WaitChannelClosed(t, env.writer.firstInitResponseProcessedChan)
+	xtest.TestManyTimes(t, func(tb testing.TB) {
+		env := newTestEnv(tb, nil)
+		xtest.WaitChannelClosed(tb, env.writer.firstInitResponseProcessedChan)
 	})
 }
 
@@ -419,12 +419,12 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		require.ErrorIs(t, w.background.CloseReason(), testErr)
 	})
 
-	xtest.TestManyTimesWithName(t, "ReconnectOnErrors", func(t testing.TB) {
-		ctx := xtest.Context(t)
+	xtest.TestManyTimesWithName(t, "ReconnectOnErrors", func(tb testing.TB) {
+		ctx := xtest.Context(tb)
 
 		w := newTestWriterStopped()
 
-		mc := gomock.NewController(t)
+		mc := gomock.NewController(tb)
 
 		type connectionAttemptContext struct {
 			name            string
@@ -438,25 +438,25 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 
 			streamClosed := make(empty.Chan)
 			strm.EXPECT().CloseSend().Do(func() {
-				t.Logf("closed stream: %v", name)
+				tb.Logf("closed stream: %v", name)
 				close(streamClosed)
 			})
 
 			strm.EXPECT().Send(&initReq).Do(func(_ interface{}) {
-				t.Logf("sent init request stream: %v", name)
+				tb.Logf("sent init request stream: %v", name)
 			})
 
 			strm.EXPECT().Recv().Do(func() {
-				t.Logf("receive init response stream: %v", name)
+				tb.Logf("receive init response stream: %v", name)
 			}).Return(&rawtopicwriter.InitResult{
 				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
 				SessionID:             name,
 			}, nil)
 
 			strm.EXPECT().Recv().Do(func() {
-				t.Logf("waiting close channel: %v", name)
-				xtest.WaitChannelClosed(t, streamClosed)
-				t.Logf("channel closed: %v", name)
+				tb.Logf("waiting close channel: %v", name)
+				xtest.WaitChannelClosed(tb, streamClosed)
+				tb.Logf("channel closed: %v", name)
 			}).Return(nil, errors.New("test stream closed")).MaxTimes(1)
 			return strm
 		}
@@ -468,7 +468,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			},
 			Codec: rawtopiccommon.CodecRaw,
 		}).Do(func(_ *rawtopicwriter.WriteRequest) {
-			t.Logf("strm2 sent message and return retriable error")
+			tb.Logf("strm2 sent message and return retriable error")
 		}).Return(xerrors.Retryable(errors.New("retriable on strm2")))
 
 		strm3 := newStream("strm3")
@@ -478,7 +478,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			},
 			Codec: rawtopiccommon.CodecRaw,
 		}).Do(func(_ *rawtopicwriter.WriteRequest) {
-			t.Logf("strm3 sent message and return unretriable error")
+			tb.Logf("strm3 sent message and return unretriable error")
 		}).Return(errors.New("strm3"))
 
 		connectsResult := []connectionAttemptContext{
@@ -500,7 +500,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		var connectionAttempt xatomic.Int64
 		w.cfg.Connect = func(ctx context.Context) (RawTopicWriterStream, error) {
 			attemptIndex := int(connectionAttempt.Add(1)) - 1
-			t.Logf("connect with attempt index: %v", attemptIndex)
+			tb.Logf("connect with attempt index: %v", attemptIndex)
 			res := connectsResult[attemptIndex]
 
 			return res.stream, res.connectionError
@@ -510,13 +510,13 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		go func() {
 			defer close(connectionLoopStopped)
 			w.connectionLoop(ctx)
-			t.Log("connection loop stopped")
+			tb.Log("connection loop stopped")
 		}()
 
 		err := w.Write(ctx, newTestMessages(1))
-		require.NoError(t, err)
+		require.NoError(tb, err)
 
-		xtest.WaitChannelClosed(t, connectionLoopStopped)
+		xtest.WaitChannelClosed(tb, connectionLoopStopped)
 	})
 }
 
@@ -822,14 +822,14 @@ type testEnvOptions struct {
 	topicCodecs   rawtopiccommon.SupportedCodecs
 }
 
-func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
+func newTestEnv(tb testing.TB, options *testEnvOptions) *testEnv {
 	if options == nil {
 		options = &testEnvOptions{}
 	}
 
 	res := &testEnv{
-		ctx:                   xtest.Context(t),
-		stream:                NewMockRawTopicWriterStream(gomock.NewController(t)),
+		ctx:                   xtest.Context(tb),
+		stream:                NewMockRawTopicWriterStream(gomock.NewController(tb)),
 		sendFromServerChannel: make(chan sendFromServerResponse, 1),
 		stopReadEvents:        make(empty.Chan),
 		partitionID:           14,
@@ -841,7 +841,7 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 	) {
 		connectNum := atomic.AddInt64(&res.connectCount, 1)
 		if connectNum > 1 {
-			t.Fatalf("test: default env support most one connection")
+			tb.Fatalf("test: default env support most one connection")
 		}
 		return res.stream, nil
 	}))
@@ -861,7 +861,7 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 		res.sendFromServer(&rawtopicwriter.InitResult{
 			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{},
 			LastSeqNo:             options.lastSeqNo,
-			SessionID:             "session-" + t.Name(),
+			SessionID:             "session-" + tb.Name(),
 			PartitionID:           res.partitionID,
 			SupportedCodecs:       supportedCodecs,
 		})
@@ -873,9 +873,9 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 	})
 
 	res.writer.start()
-	require.NoError(t, res.writer.waitFirstInitResponse(res.ctx))
+	require.NoError(tb, res.writer.waitFirstInitResponse(res.ctx))
 
-	t.Cleanup(func() {
+	tb.Cleanup(func() {
 		res.writer.close(context.Background(), errors.New("stop writer test environment"))
 		close(res.stopReadEvents)
 		<-streamClosed

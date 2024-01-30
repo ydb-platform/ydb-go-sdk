@@ -8,21 +8,21 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 )
 
-func Context(t testing.TB) context.Context {
+func Context(tb testing.TB) context.Context {
 	ctx, cancel := xcontext.WithCancel(context.Background())
-	ctx = pprof.WithLabels(ctx, pprof.Labels("test", t.Name()))
+	ctx = pprof.WithLabels(ctx, pprof.Labels("test", tb.Name()))
 	pprof.SetGoroutineLabels(ctx)
 
-	t.Cleanup(func() {
+	tb.Cleanup(func() {
 		pprof.SetGoroutineLabels(ctx)
 		cancel()
 	})
 	return ctx
 }
 
-func ContextWithCommonTimeout(ctx context.Context, t testing.TB) context.Context {
+func ContextWithCommonTimeout(ctx context.Context, tb testing.TB) context.Context {
 	if ctx.Done() == nil {
-		t.Fatal("Use context with timeout only with context, cancelled on finish test, for example xtest.Context")
+		tb.Fatal("Use context with timeout only with context, cancelled on finish test, for example xtest.Context")
 	}
 
 	ctx, ctxCancel := xcontext.WithTimeout(ctx, commonWaitTimeout)

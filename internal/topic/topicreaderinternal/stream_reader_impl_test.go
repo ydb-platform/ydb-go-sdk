@@ -103,8 +103,8 @@ func TestTopicStreamReaderImpl_BufferCounterOnStopPartition(t *testing.T) {
 }
 
 func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
-	xtest.TestManyTimesWithName(t, "SimpleCommit", func(t testing.TB) {
-		e := newTopicReaderTestEnv(t)
+	xtest.TestManyTimesWithName(t, "SimpleCommit", func(tb testing.TB) {
+		e := newTopicReaderTestEnv(tb)
 		e.Start()
 
 		lastOffset := e.partitionSession.lastReceivedMessageOffset()
@@ -181,13 +181,13 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		opts := newReadMessageBatchOptions()
 		opts.MinCount = 2
 		batch, err := e.reader.ReadMessageBatch(e.ctx, opts)
-		require.NoError(t, err)
-		require.NoError(t, e.reader.Commit(e.ctx, batch.getCommitRange().priv))
-		xtest.WaitChannelClosed(t, commitReceived)
-		xtest.WaitChannelClosed(t, readRequestReceived)
+		require.NoError(tb, err)
+		require.NoError(tb, e.reader.Commit(e.ctx, batch.getCommitRange().priv))
+		xtest.WaitChannelClosed(tb, commitReceived)
+		xtest.WaitChannelClosed(tb, readRequestReceived)
 	})
-	xtest.TestManyTimesWithName(t, "WrongOrderCommitWithSyncMode", func(t testing.TB) {
-		e := newTopicReaderTestEnv(t)
+	xtest.TestManyTimesWithName(t, "WrongOrderCommitWithSyncMode", func(tb testing.TB) {
+		e := newTopicReaderTestEnv(tb)
 		e.reader.cfg.CommitMode = CommitModeSync
 		e.Start()
 
@@ -242,13 +242,13 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		opts := newReadMessageBatchOptions()
 		opts.MinCount = 2
 		batch, err := e.reader.ReadMessageBatch(e.ctx, opts)
-		require.NoError(t, err)
-		require.ErrorIs(t, e.reader.Commit(e.ctx, batch.Messages[1].getCommitRange().priv), ErrWrongCommitOrderInSyncMode)
-		xtest.WaitChannelClosed(t, readRequestReceived)
+		require.NoError(tb, err)
+		require.ErrorIs(tb, e.reader.Commit(e.ctx, batch.Messages[1].getCommitRange().priv), ErrWrongCommitOrderInSyncMode)
+		xtest.WaitChannelClosed(tb, readRequestReceived)
 	})
 
-	xtest.TestManyTimesWithName(t, "CommitAfterGracefulStopPartition", func(t testing.TB) {
-		e := newTopicReaderTestEnv(t)
+	xtest.TestManyTimesWithName(t, "CommitAfterGracefulStopPartition", func(tb testing.TB) {
+		e := newTopicReaderTestEnv(tb)
 
 		committed := e.partitionSession.committedOffset()
 		commitReceived := make(empty.Chan)
@@ -307,26 +307,26 @@ func TestTopicStreamReaderImpl_CommitStolen(t *testing.T) {
 		}()
 
 		batch, err := e.reader.ReadMessageBatch(readCtx, newReadMessageBatchOptions())
-		require.NoError(t, err)
+		require.NoError(tb, err)
 		err = e.reader.Commit(e.ctx, batch.commitRange)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 		_, err = e.reader.ReadMessageBatch(readCtx, newReadMessageBatchOptions())
-		require.ErrorIs(t, err, context.Canceled)
+		require.ErrorIs(tb, err, context.Canceled)
 
 		select {
 		case <-e.partitionSession.Context().Done():
 			// pass
 		case <-time.After(time.Second):
-			t.Fatal("partition session not closed")
+			tb.Fatal("partition session not closed")
 		}
 
-		xtest.WaitChannelClosed(t, commitReceived)
+		xtest.WaitChannelClosed(tb, commitReceived)
 	})
 }
 
 func TestTopicStreamReaderImpl_Create(t *testing.T) {
-	xtest.TestManyTimesWithName(t, "BadSessionInitialization", func(t testing.TB) {
-		mc := gomock.NewController(t)
+	xtest.TestManyTimesWithName(t, "BadSessionInitialization", func(tb testing.TB) {
+		mc := gomock.NewController(tb)
 		stream := NewMockRawTopicReaderStream(mc)
 		stream.EXPECT().Send(gomock.Any()).Return(nil)
 		stream.EXPECT().Recv().Return(&rawtopicreader.StartPartitionSessionRequest{
@@ -335,8 +335,8 @@ func TestTopicStreamReaderImpl_Create(t *testing.T) {
 		stream.EXPECT().CloseSend().Return(nil)
 
 		reader, err := newTopicStreamReader(nextReaderID(), stream, newTopicStreamReaderConfig())
-		require.Error(t, err)
-		require.Nil(t, reader)
+		require.Error(tb, err)
+		require.Nil(tb, reader)
 	})
 }
 
@@ -356,22 +356,22 @@ func TestTopicStreamReaderImpl_WaitInit(t *testing.T) {
 }
 
 func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
-	xtest.TestManyTimesWithName(t, "GracefulFalseCancelPartitionContext", func(t testing.TB) {
-		e := newTopicReaderTestEnv(t)
+	xtest.TestManyTimesWithName(t, "GracefulFalseCancelPartitionContext", func(tb testing.TB) {
+		e := newTopicReaderTestEnv(tb)
 		e.Start()
 
-		require.NoError(t, e.partitionSession.Context().Err())
+		require.NoError(tb, e.partitionSession.Context().Err())
 
 		// stop partition
 		e.SendFromServerAndSetNextCallback(
 			&rawtopicreader.StopPartitionSessionRequest{PartitionSessionID: e.partitionSessionID},
 			func() {
-				require.Error(t, e.partitionSession.Context().Err())
+				require.Error(tb, e.partitionSession.Context().Err())
 			})
 		e.WaitMessageReceived()
 	})
-	xtest.TestManyTimesWithName(t, "TraceGracefulTrue", func(t testing.TB) {
-		e := newTopicReaderTestEnv(t)
+	xtest.TestManyTimesWithName(t, "TraceGracefulTrue", func(tb testing.TB) {
+		e := newTopicReaderTestEnv(tb)
 
 		readMessagesCtx, readMessagesCtxCancel := xcontext.WithCancel(context.Background())
 		committedOffset := int64(222)
@@ -386,9 +386,9 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 				CommittedOffset:    committedOffset,
 				Graceful:           true,
 			}
-			require.Equal(t, expected, info)
+			require.Equal(tb, expected, info)
 
-			require.NoError(t, info.PartitionContext.Err())
+			require.NoError(tb, info.PartitionContext.Err())
 
 			readMessagesCtxCancel()
 			return nil
@@ -410,12 +410,12 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		})
 
 		_, err := e.reader.ReadMessageBatch(readMessagesCtx, newReadMessageBatchOptions())
-		require.Error(t, err)
-		require.Error(t, readMessagesCtx.Err())
-		xtest.WaitChannelClosed(t, stopPartitionResponseSent)
+		require.Error(tb, err)
+		require.Error(tb, readMessagesCtx.Err())
+		xtest.WaitChannelClosed(tb, stopPartitionResponseSent)
 	})
-	xtest.TestManyTimesWithName(t, "TraceGracefulFalse", func(t testing.TB) {
-		e := newTopicReaderTestEnv(t)
+	xtest.TestManyTimesWithName(t, "TraceGracefulFalse", func(tb testing.TB) {
+		e := newTopicReaderTestEnv(tb)
 
 		readMessagesCtx, readMessagesCtxCancel := xcontext.WithCancel(context.Background())
 		committedOffset := int64(222)
@@ -430,8 +430,8 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 				CommittedOffset:    committedOffset,
 				Graceful:           false,
 			}
-			require.Equal(t, expected, info)
-			require.Error(t, info.PartitionContext.Err())
+			require.Equal(tb, expected, info)
+			require.Error(tb, info.PartitionContext.Err())
 
 			readMessagesCtxCancel()
 			return nil
@@ -446,8 +446,8 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		})
 
 		_, err := e.reader.ReadMessageBatch(readMessagesCtx, newReadMessageBatchOptions())
-		require.Error(t, err)
-		require.Error(t, readMessagesCtx.Err())
+		require.Error(tb, err)
+		require.Error(tb, readMessagesCtx.Err())
 	})
 }
 
@@ -459,15 +459,15 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 			})
 		}
 
-		xtest.TestManyTimesWithName(t, "InitialBufferSize", func(t testing.TB) {
-			e := newTopicReaderTestEnv(t)
+		xtest.TestManyTimesWithName(t, "InitialBufferSize", func(tb testing.TB) {
+			e := newTopicReaderTestEnv(tb)
 			e.Start()
 			waitChangeRestBufferSizeBytes(e.reader, 0)
-			require.Equal(t, e.initialBufferSizeBytes, e.reader.restBufferSizeBytes.Load())
+			require.Equal(tb, e.initialBufferSizeBytes, e.reader.restBufferSizeBytes.Load())
 		})
 
-		xtest.TestManyTimesWithName(t, "DecrementIncrementBufferSize", func(t testing.TB) {
-			e := newTopicReaderTestEnv(t)
+		xtest.TestManyTimesWithName(t, "DecrementIncrementBufferSize", func(tb testing.TB) {
+			e := newTopicReaderTestEnv(tb)
 
 			// doesn't check sends
 			e.stream.EXPECT().Send(gomock.Any()).Return(nil).MinTimes(1)
@@ -504,26 +504,26 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 			}})
 			waitChangeRestBufferSizeBytes(e.reader, e.initialBufferSizeBytes)
 			expectedBufferSizeAfterReceiveMessages := e.initialBufferSizeBytes - dataSize
-			require.Equal(t, expectedBufferSizeAfterReceiveMessages, e.reader.restBufferSizeBytes.Load())
+			require.Equal(tb, expectedBufferSizeAfterReceiveMessages, e.reader.restBufferSizeBytes.Load())
 
 			oneOption := newReadMessageBatchOptions()
 			oneOption.MaxCount = 1
 			_, err := e.reader.ReadMessageBatch(e.ctx, oneOption)
-			require.NoError(t, err)
+			require.NoError(tb, err)
 
 			waitChangeRestBufferSizeBytes(e.reader, expectedBufferSizeAfterReceiveMessages)
 
 			bufferSizeAfterReadOneMessage := e.reader.restBufferSizeBytes.Load()
 
 			_, err = e.reader.ReadMessageBatch(e.ctx, newReadMessageBatchOptions())
-			require.NoError(t, err)
+			require.NoError(tb, err)
 
 			waitChangeRestBufferSizeBytes(e.reader, bufferSizeAfterReadOneMessage)
-			require.Equal(t, e.initialBufferSizeBytes, e.reader.restBufferSizeBytes.Load())
+			require.Equal(tb, e.initialBufferSizeBytes, e.reader.restBufferSizeBytes.Load())
 		})
 
-		xtest.TestManyTimesWithName(t, "ForceReturnBatchIfBufferFull", func(t testing.TB) {
-			e := newTopicReaderTestEnv(t)
+		xtest.TestManyTimesWithName(t, "ForceReturnBatchIfBufferFull", func(tb testing.TB) {
+			e := newTopicReaderTestEnv(tb)
 
 			dataRequested := make(empty.Chan)
 			e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: int(e.initialBufferSizeBytes)}).
@@ -560,23 +560,23 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 			defer cancel()
 
 			batch, err := e.reader.ReadMessageBatch(readTimeoutCtx, needReadTwoMessages)
-			require.NoError(t, err)
-			require.Len(t, batch.Messages, 1)
+			require.NoError(tb, err)
+			require.Len(tb, batch.Messages, 1)
 
 			<-dataRequested
 		})
 	})
 
-	xtest.TestManyTimesWithName(t, "ReadBatch", func(t testing.TB) {
-		e := newTopicReaderTestEnv(t)
+	xtest.TestManyTimesWithName(t, "ReadBatch", func(tb testing.TB) {
+		e := newTopicReaderTestEnv(tb)
 		e.Start()
 
 		compress := func(msg string) []byte {
 			b := &bytes.Buffer{}
 			writer := gzip.NewWriter(b)
 			_, err := writer.Write([]byte(msg))
-			require.NoError(t, writer.Close())
-			require.NoError(t, err)
+			require.NoError(tb, writer.Close())
+			require.NoError(tb, err)
 			return b.Bytes()
 		}
 
@@ -799,19 +799,19 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 		opts := newReadMessageBatchOptions()
 		opts.MinCount = 6
 		batch, err := e.reader.ReadMessageBatch(e.ctx, opts)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 
 		data := make([][]byte, 0, len(batch.Messages))
 		for i := range batch.Messages {
 			content, err := io.ReadAll(&batch.Messages[i].data)
-			require.NoError(t, err)
+			require.NoError(tb, err)
 			data = append(data, content)
 			batch.Messages[i].data = newOneTimeReader(nil)
 			batch.Messages[i].bufferBytesAccount = 0
 		}
 
-		require.Equal(t, expectedData, data)
-		require.Equal(t, expectedBatch, batch)
+		require.Equal(tb, expectedData, data)
+		require.Equal(tb, expectedBatch, batch)
 		<-sendDataRequestCompleted
 	})
 }
@@ -845,18 +845,18 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 		return nextDataRequested
 	}
 
-	xtest.TestManyTimesWithName(t, "ReadAfterMessageInBuffer", func(t testing.TB) {
-		e := newTopicReaderTestEnv(t)
+	xtest.TestManyTimesWithName(t, "ReadAfterMessageInBuffer", func(tb testing.TB) {
+		e := newTopicReaderTestEnv(tb)
 		e.Start()
 
 		nextDataRequested := sendMessageWithFullBuffer(&e)
 
 		// wait message received to internal buffer
-		xtest.SpinWaitCondition(t, &e.reader.batcher.m, func() bool {
+		xtest.SpinWaitCondition(tb, &e.reader.batcher.m, func() bool {
 			return len(e.reader.batcher.messages) > 0
 		})
 
-		xtest.SpinWaitCondition(t, nil, func() bool {
+		xtest.SpinWaitCondition(tb, nil, func() bool {
 			return e.reader.restBufferSizeBytes.Load() == 0
 		})
 
@@ -866,16 +866,16 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 		readCtx, cancel := xcontext.WithTimeout(e.ctx, time.Second)
 		defer cancel()
 		batch, err := e.reader.ReadMessageBatch(readCtx, opts)
-		require.NoError(t, err)
-		require.Len(t, batch.Messages, 1)
-		require.Equal(t, int64(1), batch.Messages[0].Offset)
+		require.NoError(tb, err)
+		require.Len(tb, batch.Messages, 1)
+		require.Equal(tb, int64(1), batch.Messages[0].Offset)
 
 		<-nextDataRequested
-		require.Equal(t, e.initialBufferSizeBytes, e.reader.restBufferSizeBytes.Load())
+		require.Equal(tb, e.initialBufferSizeBytes, e.reader.restBufferSizeBytes.Load())
 	})
 
-	xtest.TestManyTimesWithName(t, "ReadBeforeMessageInBuffer", func(t testing.TB) {
-		e := newTopicReaderTestEnv(t)
+	xtest.TestManyTimesWithName(t, "ReadBeforeMessageInBuffer", func(tb testing.TB) {
+		e := newTopicReaderTestEnv(tb)
 		e.Start()
 
 		readCompleted := make(empty.Chan)
@@ -894,19 +894,19 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 
 		// wait to start pop
 		e.reader.batcher.notifyAboutNewMessages()
-		xtest.SpinWaitCondition(t, &e.reader.batcher.m, func() bool {
+		xtest.SpinWaitCondition(tb, &e.reader.batcher.m, func() bool {
 			return len(e.reader.batcher.hasNewMessages) == 0
 		})
 
 		nextDataRequested := sendMessageWithFullBuffer(&e)
 
 		<-readCompleted
-		require.NoError(t, readErr)
-		require.Len(t, batch.Messages, 1)
-		require.Equal(t, int64(1), batch.Messages[0].Offset)
+		require.NoError(tb, readErr)
+		require.Len(tb, batch.Messages, 1)
+		require.Equal(tb, int64(1), batch.Messages[0].Offset)
 
 		<-nextDataRequested
-		require.Equal(t, e.initialBufferSizeBytes, e.reader.restBufferSizeBytes.Load())
+		require.Equal(tb, e.initialBufferSizeBytes, e.reader.restBufferSizeBytes.Load())
 	})
 }
 
@@ -971,10 +971,10 @@ type testStreamResult struct {
 	waitOnly            bool
 }
 
-func newTopicReaderTestEnv(t testing.TB) streamEnv {
-	ctx := xtest.Context(t)
+func newTopicReaderTestEnv(tb testing.TB) streamEnv {
+	ctx := xtest.Context(tb)
 
-	mc := gomock.NewController(t)
+	mc := gomock.NewController(tb)
 
 	stream := NewMockRawTopicReaderStream(mc)
 
@@ -1001,11 +1001,11 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 		testSessionID,
 		testSessionComitted,
 	)
-	require.NoError(t, reader.sessionController.Add(session))
+	require.NoError(tb, reader.sessionController.Add(session))
 
 	env := streamEnv{
 		ctx:                        ctx,
-		t:                          t,
+		t:                          tb,
 		initialBufferSizeBytes:     initialBufferSizeBytes,
 		reader:                     reader,
 		stopReadEvents:             make(empty.Chan),
@@ -1029,19 +1029,19 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 		close(streamClosed)
 	})
 
-	t.Cleanup(func() {
+	tb.Cleanup(func() {
 		cleanupTimeout, cancel := xcontext.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 
 		close(env.stopReadEvents)
 		_ = env.reader.CloseWithError(ctx, errors.New("test finished"))
-		require.NoError(t, cleanupTimeout.Err())
-		xtest.WaitChannelClosed(t, streamClosed)
+		require.NoError(tb, cleanupTimeout.Err())
+		xtest.WaitChannelClosed(tb, streamClosed)
 	})
 
-	t.Cleanup(func() {
+	tb.Cleanup(func() {
 		if messLen := len(env.messagesFromServerToClient); messLen != 0 {
-			t.Fatalf("not all messages consumed from server: %v", messLen)
+			tb.Fatalf("not all messages consumed from server: %v", messLen)
 		}
 	})
 

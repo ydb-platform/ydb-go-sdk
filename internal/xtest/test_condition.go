@@ -10,12 +10,12 @@ import (
 // not published to common test docker image
 const enableAllTestsFlag = "YDB_GO_SDK_ENABLE_ALL_TESTS"
 
-func AllowByFlag(t testing.TB, flag string) {
+func AllowByFlag(tb testing.TB, flag string) {
 	if os.Getenv(flag) != "" {
 		return
 	}
 	if os.Getenv(enableAllTestsFlag) != "" {
 		return
 	}
-	t.Skipf("Skip test, because it need flag to run: '%v'", flag)
+	tb.Skipf("Skip test, because it need flag to run: '%v'", flag)
 }
