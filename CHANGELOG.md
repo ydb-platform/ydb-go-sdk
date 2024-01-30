@@ -1,3 +1,6 @@
+* Refactored nil on err `internal/grpcwrapper/rawydb/issues.go`, when golangci-lint nilerr enabled
+* Refactored nil on err `internal/grpcwrapper/rawtopic/describe_topic.go`, when golangci-lint nilerr enabled
+
 ## v3.55.2
 * Fixed init info in topic writer, when autoseq num turned off.
 
