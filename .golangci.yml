@@ -234,7 +234,6 @@ linters:
     - ireturn
     - maintidx
     - maligned
-    - nilerr
     - nlreturn
     - nonamedreturns
     - paralleltest
