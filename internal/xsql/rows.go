@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -23,6 +24,8 @@ var (
 	_ driver.Rows                           = &single{}
 
 	_ types.Scanner = &valuer{}
+
+	ignoreColumnPrefixName = "__discard_column_"
 )
 
 type rows struct {
@@ -43,7 +46,9 @@ func (r *rows) Columns() []string {
 	})
 	cs := make([]string, 0, r.result.CurrentResultSet().ColumnCount())
 	r.result.CurrentResultSet().Columns(func(m options.Column) {
-		cs = append(cs, m.Name)
+		if !strings.HasPrefix(m.Name, ignoreColumnPrefixName) {
+			cs = append(cs, m.Name)
+		}
 	})
 	return cs
 }

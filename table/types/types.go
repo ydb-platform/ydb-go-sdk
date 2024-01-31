@@ -120,7 +120,7 @@ const (
 // WriteTypeStringTo writes ydb type string representation into buffer
 //
 // Deprecated: use types.Type.Yql() instead
-func WriteTypeStringTo(buf *bytes.Buffer, t Type) {
+func WriteTypeStringTo(buf *bytes.Buffer, t Type) { //nolint: interfacer
 	buf.WriteString(t.Yql())
 }
 
