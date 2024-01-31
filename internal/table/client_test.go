@@ -854,12 +854,12 @@ type StubBuilder struct {
 	actual int
 }
 
-func newClientWithStubBuilder(
+func newClientWithStubBuilder( //nolint:thelper
 	tb testing.TB,
 	balancer balancer,
 	stubLimit int,
 	options ...config.Option,
-) *Client { //nolint:thelper
+) *Client {
 	c, err := newClient(
 		context.Background(),
 		balancer,
