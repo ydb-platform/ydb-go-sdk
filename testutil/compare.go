@@ -281,9 +281,8 @@ func compareBytes(l, r *Ydb.Value) int {
 }
 
 func compareBool(l, r *Ydb.Value) int {
-	ll := l.GetBoolValue()
-	rr := r.GetBoolValue()
-	if ll {
+	rr := r.GetBoolValue() //nolint:ifshort
+	if ll := l.GetBoolValue(); ll {
 		if rr {
 			return 0
 		}
