@@ -235,7 +235,6 @@ linters:
     - gomoddirectives
     - ifshort
     - interfacebloat
-    - interfacer
     - ireturn
     - maintidx
     - maligned

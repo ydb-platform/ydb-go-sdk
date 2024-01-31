@@ -601,7 +601,7 @@ func (w *Writer) constructParams(params []Param, names []string) (res []string) 
 	return res
 }
 
-func (w *Writer) constructStruct(n *types.Named, s *types.Struct, vars []string) (string, []string) {
+func (w *Writer) constructStruct(n types.Type, s *types.Struct, vars []string) (string, []string) {
 	p := w.declare("p")
 	// maybe skip pointers from flattening to not allocate anyhing during trace.
 	w.line(`var `, p, ` `, w.typeString(n))
