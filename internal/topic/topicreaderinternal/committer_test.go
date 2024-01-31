@@ -367,7 +367,7 @@ func TestCommitterBuffer(t *testing.T) {
 	})
 }
 
-func newTestCommitter(ctx context.Context, tb testing.TB) *committer {
+func newTestCommitter(ctx context.Context, tb testing.TB) *committer { //nolint:thelper
 	res := newCommitter(&trace.Topic{}, ctx, CommitModeAsync, func(msg rawtopicreader.ClientMessage) error {
 		return nil
 	})
