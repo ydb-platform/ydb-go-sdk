@@ -12,7 +12,7 @@ func Topic(l Logger, d trace.Detailer, opts ...Option) (t trace.Topic) {
 	return internalTopic(wrapLogger(l, opts...), d)
 }
 
-func internalTopic(l *wrapper, d trace.Detailer) (t trace.Topic) { //nolint:gocyclo
+func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocyclo
 	t.OnReaderReconnect = func(
 		info trace.TopicReaderReconnectStartInfo,
 	) func(doneInfo trace.TopicReaderReconnectDoneInfo) {
