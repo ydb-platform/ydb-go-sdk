@@ -256,7 +256,9 @@ func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldRead
 		return err
 	}
 
-	if stream, _ := r.stream(ctx); oldReader != stream {
+	if stream, err := r.stream(ctx); err != nil {
+		return xerrors.WithStackTrace(err)
+	} else if oldReader != stream {
 		return xerrors.WithStackTrace(errReconnectRequestOutdated)
 	}
 
