@@ -1,10 +1,4 @@
-* Refactored -if- at Unban function on `internal/conn/conn.go`, when golangci-lint ifshort enabled
-* Refactored -ifs- at Err functions on `internal/table/scanner/result.go`, when golangci-lint ifshort enabled
-* Refactored -ifs- at assertType functions on `internal/table/scanner/scan_raw.go`, when golangci-lint ifshort enabled
-* Refactored -if- assertTypeDecimal function on `internal/table/scanner/scanner.go`, when golangci-lint ifshort enabled
-* Refactored -if- at handlePanic function on `internal/topic/topicreaderinternal/stream_reconnector.go`, when golangci-lint ifshort enabled
-* Refactored -if- at getRawBytes function on `internal/topic/topicwriterinternal/message.go`, when golangci-lint ifshort enabled
-
+* Refactored internal packages by `ifshort` linter issues
 * Refactored nil on err `internal/grpcwrapper/rawydb/issues.go`, when golangci-lint nilerr enabled
 * Refactored nil on err `internal/grpcwrapper/rawtopic/describe_topic.go`, when golangci-lint nilerr enabled
 
