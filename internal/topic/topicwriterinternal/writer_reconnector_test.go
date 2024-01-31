@@ -834,7 +834,7 @@ type testEnvOptions struct {
 	topicCodecs   rawtopiccommon.SupportedCodecs
 }
 
-func newTestEnv(tb testing.TB, options *testEnvOptions) *testEnv {
+func newTestEnv(tb testing.TB, options *testEnvOptions) *testEnv { //nolint:thelper
 	if options == nil {
 		options = &testEnvOptions{}
 	}
@@ -851,6 +851,7 @@ func newTestEnv(tb testing.TB, options *testEnvOptions) *testEnv {
 		RawTopicWriterStream,
 		error,
 	) {
+		tb.Helper()
 		connectNum := atomic.AddInt64(&res.connectCount, 1)
 		if connectNum > 1 {
 			tb.Fatalf("test: default env support most one connection")
