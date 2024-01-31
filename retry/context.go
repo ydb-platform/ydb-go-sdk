@@ -22,5 +22,6 @@ func WithNonIdempotentOperation(ctx context.Context) context.Context {
 // Deprecated: context cannot store idempotent value now
 func IsOperationIdempotent(ctx context.Context) bool {
 	v, ok := ctx.Value(ctxIsOperationIdempotentKey{}).(bool)
+
 	return ok && v
 }

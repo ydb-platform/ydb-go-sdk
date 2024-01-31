@@ -34,6 +34,7 @@ func RetryableError(err error, opts ...retryableErrorOption) error {
 					retryableErrorOptions = append(retryableErrorOptions, xerrors.RetryableErrorOption(o))
 				}
 			}
+
 			return retryableErrorOptions
 		}()...,
 	)

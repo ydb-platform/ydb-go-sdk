@@ -160,6 +160,7 @@ func (w *Writer) typeImports(dst []dep, t types.Type) []dep {
 			typName: obj.Name(),
 		})
 	}
+
 	return dst
 }
 
@@ -175,6 +176,7 @@ func unwrapStruct(t types.Type) (n *types.Named, s *types.Struct) {
 	if ok {
 		s, _ = n.Underlying().(*types.Struct)
 	}
+
 	return
 }
 
@@ -194,6 +196,7 @@ func (w *Writer) funcImports(dst []dep, fn *Func) []dep {
 			dst = w.funcImports(dst, fn)
 		}
 	}
+
 	return dst
 }
 
@@ -201,6 +204,7 @@ func (w *Writer) traceImports(dst []dep, t *Trace) []dep {
 	for _, h := range t.Hooks {
 		dst = w.funcImports(dst, h.Func)
 	}
+
 	return dst
 }
 
@@ -230,6 +234,7 @@ func (w *Writer) importDeps(deps []dep) {
 		if std0 != std1 {
 			return std0
 		}
+
 		return d0.pkgPath < d1.pkgPath
 	})
 	w.line(`import (`)

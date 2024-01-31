@@ -79,5 +79,6 @@ func NewAcquire(opts ...AcquireOption) Acquire {
 			o(h)
 		}
 	}
+
 	return h
 }

@@ -48,5 +48,6 @@ func (c Anonymous) String() string {
 		fmt.Fprintf(buffer, "%q", c.sourceInfo)
 	}
 	buffer.WriteByte('}')
+
 	return buffer.String()
 }

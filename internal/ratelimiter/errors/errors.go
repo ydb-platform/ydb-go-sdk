@@ -25,6 +25,7 @@ func (e *acquireError) Unwrap() error {
 }
 
 func NewAcquire(amoount uint64, err error) ratelimiter.AcquireError {
+
 	return &acquireError{
 		err:    err,
 		amount: amoount,
@@ -33,6 +34,7 @@ func NewAcquire(amoount uint64, err error) ratelimiter.AcquireError {
 
 func IsAcquireError(err error) bool {
 	var ae *acquireError
+
 	return xerrors.As(err, &ae)
 }
 
@@ -41,5 +43,6 @@ func ToAcquireError(err error) ratelimiter.AcquireError {
 	if xerrors.As(err, &ae) {
 		return ae
 	}
+
 	return nil
 }

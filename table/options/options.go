@@ -879,6 +879,7 @@ func WithCommit() ExecuteDataQueryOption {
 func WithIgnoreTruncated() ExecuteDataQueryOption {
 	return executeDataQueryOptionFunc(func(desc *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
 		desc.IgnoreTruncated = true
+
 		return nil
 	})
 }
@@ -915,6 +916,7 @@ func withQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption
 				opt((*queryCachePolicy)(d.QueryCachePolicy), a)
 			}
 		}
+
 		return nil
 	})
 }
@@ -969,6 +971,7 @@ var _ ExecuteScanQueryOption = executeScanQueryOptionFunc(nil)
 func WithExecuteScanQueryMode(m ExecuteScanQueryRequestMode) ExecuteScanQueryOption {
 	return executeScanQueryOptionFunc(func(desc *ExecuteScanQueryDesc) []grpc.CallOption {
 		desc.Mode = m.toYDB()
+
 		return nil
 	})
 }
@@ -999,6 +1002,7 @@ func (stats ExecuteScanQueryStatsType) toYDB() Ydb_Table.QueryStatsCollection_Mo
 func WithExecuteScanQueryStats(stats ExecuteScanQueryStatsType) ExecuteScanQueryOption {
 	return executeScanQueryOptionFunc(func(desc *ExecuteScanQueryDesc) []grpc.CallOption {
 		desc.CollectStats = stats.toYDB()
+
 		return nil
 	})
 }

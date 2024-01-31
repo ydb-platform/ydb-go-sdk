@@ -15,6 +15,7 @@ func TestDelays(t *testing.T) {
 		if err != nil {
 			panic(err)
 		}
+
 		return d
 	}
 	b := New(
@@ -172,6 +173,7 @@ func TestFastSlowDelaysWithoutJitter(t *testing.T) {
 			backoff: func() (backoff logBackoff) {
 				backoff = Fast
 				backoff.jitterLimit = 1
+
 				return backoff
 			}(),
 			exp: []time.Duration{
@@ -193,6 +195,7 @@ func TestFastSlowDelaysWithoutJitter(t *testing.T) {
 			backoff: func() (backoff logBackoff) {
 				backoff = Slow
 				backoff.jitterLimit = 1
+
 				return backoff
 			}(),
 			exp: []time.Duration{

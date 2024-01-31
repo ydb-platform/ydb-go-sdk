@@ -48,6 +48,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 		resp := &InitResponse{}
 		resp.ServerMessageMetadata = meta
 		resp.fromProto(m.InitResponse)
+
 		return resp, nil
 	case *Ydb_Topic.StreamReadMessage_FromServer_ReadResponse:
 		resp := &ReadResponse{}
@@ -55,6 +56,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 		if err = resp.fromProto(m.ReadResponse); err != nil {
 			return nil, err
 		}
+
 		return resp, nil
 	case *Ydb_Topic.StreamReadMessage_FromServer_StartPartitionSessionRequest:
 		resp := &StartPartitionSessionRequest{}
@@ -62,6 +64,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 		if err = resp.fromProto(m.StartPartitionSessionRequest); err != nil {
 			return nil, err
 		}
+
 		return resp, nil
 	case *Ydb_Topic.StreamReadMessage_FromServer_StopPartitionSessionRequest:
 		req := &StopPartitionSessionRequest{}
@@ -69,6 +72,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 		if err = req.fromProto(m.StopPartitionSessionRequest); err != nil {
 			return nil, err
 		}
+
 		return req, nil
 	case *Ydb_Topic.StreamReadMessage_FromServer_CommitOffsetResponse:
 		resp := &CommitOffsetResponse{}
@@ -76,6 +80,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 		if err = resp.fromProto(m.CommitOffsetResponse); err != nil {
 			return nil, err
 		}
+
 		return resp, nil
 	case *Ydb_Topic.StreamReadMessage_FromServer_PartitionSessionStatusResponse:
 		resp := &PartitionSessionStatusResponse{}
@@ -83,11 +88,13 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 		if err = resp.fromProto(m.PartitionSessionStatusResponse); err != nil {
 			return nil, err
 		}
+
 		return resp, nil
 	case *Ydb_Topic.StreamReadMessage_FromServer_UpdateTokenResponse:
 		resp := &UpdateTokenResponse{}
 		resp.ServerMessageMetadata = meta
 		resp.MustFromProto(m.UpdateTokenResponse)
+
 		return resp, nil
 	default:
 		return nil, xerrors.WithStackTrace(fmt.Errorf(

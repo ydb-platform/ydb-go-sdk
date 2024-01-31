@@ -117,6 +117,7 @@ func (s StoragePool) toYDB() *Ydb_Table.StoragePool {
 	if s.Media == "" {
 		return nil
 	}
+
 	return &Ydb_Table.StoragePool{
 		Media: s.Media,
 	}
@@ -463,6 +464,7 @@ func NewTTLSettings() TimeToLiveSettings {
 func (ttl TimeToLiveSettings) ColumnDateType(columnName string) TimeToLiveSettings {
 	ttl.Mode = TimeToLiveModeDateType
 	ttl.ColumnName = columnName
+
 	return ttl
 }
 
@@ -474,6 +476,7 @@ func (ttl TimeToLiveSettings) ColumnSeconds(columnName string) TimeToLiveSetting
 	ttl.Mode = TimeToLiveModeValueSinceUnixEpoch
 	ttl.ColumnName = columnName
 	ttl.ColumnUnit = unitToPointer(TimeToLiveUnitSeconds)
+
 	return ttl
 }
 
@@ -481,6 +484,7 @@ func (ttl TimeToLiveSettings) ColumnMilliseconds(columnName string) TimeToLiveSe
 	ttl.Mode = TimeToLiveModeValueSinceUnixEpoch
 	ttl.ColumnName = columnName
 	ttl.ColumnUnit = unitToPointer(TimeToLiveUnitMilliseconds)
+
 	return ttl
 }
 
@@ -488,6 +492,7 @@ func (ttl TimeToLiveSettings) ColumnMicroseconds(columnName string) TimeToLiveSe
 	ttl.Mode = TimeToLiveModeValueSinceUnixEpoch
 	ttl.ColumnName = columnName
 	ttl.ColumnUnit = unitToPointer(TimeToLiveUnitMicroseconds)
+
 	return ttl
 }
 
@@ -495,11 +500,13 @@ func (ttl TimeToLiveSettings) ColumnNanoseconds(columnName string) TimeToLiveSet
 	ttl.Mode = TimeToLiveModeValueSinceUnixEpoch
 	ttl.ColumnName = columnName
 	ttl.ColumnUnit = unitToPointer(TimeToLiveUnitNanoseconds)
+
 	return ttl
 }
 
 func (ttl TimeToLiveSettings) ExpireAfter(expireAfter time.Duration) TimeToLiveSettings {
 	ttl.ExpireAfterSeconds = uint32(expireAfter.Seconds())
+
 	return ttl
 }
 
