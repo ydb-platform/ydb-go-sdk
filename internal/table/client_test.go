@@ -835,7 +835,7 @@ var simpleCluster = testutil.NewBalancer(
 	),
 )
 
-func simpleSession(t *testing.T) *session {
+func simpleSession(t *testing.T) *session { //nolint:thelper
 	s, err := newSession(context.Background(), simpleCluster, config.New())
 	if err != nil {
 		t.Fatalf("newSession unexpected error: %v", err)
@@ -859,7 +859,7 @@ func newClientWithStubBuilder(
 	balancer balancer,
 	stubLimit int,
 	options ...config.Option,
-) *Client {
+) *Client { //nolint:thelper
 	c, err := newClient(
 		context.Background(),
 		balancer,
