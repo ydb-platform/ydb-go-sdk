@@ -81,7 +81,7 @@ func (s *server) BuyTicketHandler(writer http.ResponseWriter, request *http.Requ
 	s.writeAnswer(writer, freeSeats, duration)
 }
 
-func (s *server) writeAnswer(writer http.ResponseWriter, freeSeats int64, duration time.Duration) {
+func (s *server) writeAnswer(writer io.Writer, freeSeats int64, duration time.Duration) {
 	_, _ = fmt.Fprintf(writer, "%v\n\nDuration: %v\n", freeSeats, duration)
 }
 
