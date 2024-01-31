@@ -25,12 +25,14 @@ var _ driver.Connector = &mockConnector{}
 
 func (m *mockConnector) Open(name string) (driver.Conn, error) {
 	m.t.Log(stack.Record(0))
+
 	return nil, driver.ErrSkip
 }
 
 func (m *mockConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	m.t.Log(stack.Record(0))
 	m.conns++
+
 	return &mockConn{
 		t:        m.t,
 		queryErr: m.queryErr,
@@ -40,6 +42,7 @@ func (m *mockConnector) Connect(ctx context.Context) (driver.Conn, error) {
 
 func (m *mockConnector) Driver() driver.Driver {
 	m.t.Log(stack.Record(0))
+
 	return m
 }
 
@@ -60,6 +63,7 @@ var (
 
 func (m *mockConn) Prepare(query string) (driver.Stmt, error) {
 	m.t.Log(stack.Record(0))
+
 	return nil, driver.ErrSkip
 }
 

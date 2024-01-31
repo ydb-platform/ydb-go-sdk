@@ -352,6 +352,7 @@ func (c *conn) Invoke(
 			if sentMark.canRetry() {
 				return c.wrapError(xerrors.Retryable(err, xerrors.WithName("Invoke")))
 			}
+
 			return c.wrapError(err)
 		}
 
@@ -540,6 +541,7 @@ var rpcKey = ctxHandleRPCKey{}
 
 func markContext(ctx context.Context) (context.Context, *modificationMark) {
 	mark := &modificationMark{}
+
 	return context.WithValue(ctx, rpcKey, mark), mark
 }
 
@@ -548,6 +550,7 @@ func getContextMark(ctx context.Context) *modificationMark {
 	if v == nil {
 		return &modificationMark{}
 	}
+
 	return v.(*modificationMark)
 }
 

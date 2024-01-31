@@ -102,12 +102,14 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 		if neg {
 			return v.Set(neginf), nil
 		}
+
 		return v.Set(inf), nil
 	}
 	if isNaN(s) {
 		if neg {
 			return v.Set(negnan), nil
 		}
+
 		return v.Set(nan), nil
 	}
 
@@ -176,6 +178,7 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 	if neg {
 		v.Neg(v)
 	}
+
 	return v, nil
 }
 
@@ -187,12 +190,14 @@ func Format(x *big.Int, precision, scale uint32) string {
 		if x.Sign() < 0 {
 			return "-inf"
 		}
+
 		return "inf"
 
 	case x.CmpAbs(nan) == 0:
 		if x.Sign() < 0 {
 			return "-nan"
 		}
+
 		return "nan"
 
 	case x == nil:
@@ -301,6 +306,7 @@ func Append(p []byte, x *big.Int) []byte {
 	n := len(p)
 	p = ensure(p, size(x))
 	put(x, p[n:])
+
 	return p
 }
 
@@ -308,6 +314,7 @@ func size(x *big.Int) int {
 	if x.Sign() < 0 {
 		x = complement(x)
 	}
+
 	return len(x.Bits()) * wordSize
 }
 
@@ -346,6 +353,7 @@ func pow(x *big.Int, n uint32) *big.Int {
 		n >>= 1
 		m.Mul(m, m)
 	}
+
 	return v
 }
 

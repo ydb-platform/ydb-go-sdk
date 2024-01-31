@@ -203,6 +203,7 @@ func (t *TransactionSettings) Settings() *Ydb_Table.TransactionSettings {
 	if t == nil {
 		return nil
 	}
+
 	return &t.settings
 }
 

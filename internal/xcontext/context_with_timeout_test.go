@@ -47,6 +47,7 @@ func TestContextWithTimeoutError(t *testing.T) {
 				childCtx, childCancel := WithTimeout(parentCtx, time.Hour)
 				parentCancel()
 				childCancel()
+
 				return childCtx.Err()
 			}(),
 			str: "'context canceled' at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithTimeoutError.func1(context_with_timeout_test.go:48)`", //nolint:lll
@@ -55,6 +56,7 @@ func TestContextWithTimeoutError(t *testing.T) {
 			err: func() error {
 				ctx, cancel := WithTimeout(context.Background(), time.Hour)
 				cancel()
+
 				return ctx.Err()
 			}(),
 			str: "'context canceled' at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithTimeoutError.func2(context_with_timeout_test.go:57)`", //nolint:lll
@@ -63,6 +65,7 @@ func TestContextWithTimeoutError(t *testing.T) {
 			err: func() error {
 				parentCtx, _ := WithTimeout(context.Background(), 0)
 				childCtx, _ := WithTimeout(parentCtx, 0)
+
 				return childCtx.Err()
 			}(),
 			str: "'context deadline exceeded' from `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithTimeoutError.func3(context_with_timeout_test.go:64)`", //nolint:lll
@@ -70,6 +73,7 @@ func TestContextWithTimeoutError(t *testing.T) {
 		{
 			err: func() error {
 				ctx, _ := WithTimeout(context.Background(), 0)
+
 				return ctx.Err()
 			}(),
 			str: "'context deadline exceeded' from `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithTimeoutError.func4(context_with_timeout_test.go:72)`", //nolint:lll
@@ -79,6 +83,7 @@ func TestContextWithTimeoutError(t *testing.T) {
 				parentCtx, cancel := WithCancel(context.Background())
 				childCtx, _ := WithTimeout(parentCtx, 0)
 				cancel()
+
 				return childCtx.Err()
 			}(),
 			str: "'context canceled' at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithTimeoutError.func5(context_with_timeout_test.go:81)`", //nolint:lll
@@ -88,6 +93,7 @@ func TestContextWithTimeoutError(t *testing.T) {
 				parentCtx, cancel := context.WithCancel(context.Background())
 				childCtx, _ := WithTimeout(parentCtx, 0)
 				cancel()
+
 				return childCtx.Err()
 			}(),
 			str: "context canceled",

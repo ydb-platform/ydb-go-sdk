@@ -421,6 +421,7 @@ func scanBuildConstraints(r io.Reader) (cs []string, err error) {
 			comm = bytes.TrimSpace(comm)
 			if bytes.HasPrefix(comm, []byte("+build")) {
 				cs = append(cs, string(line))
+
 				continue
 			}
 		}

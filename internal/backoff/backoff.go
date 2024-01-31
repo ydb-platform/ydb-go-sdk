@@ -91,6 +91,7 @@ func New(opts ...option) logBackoff {
 			o(&b)
 		}
 	}
+
 	return b
 }
 

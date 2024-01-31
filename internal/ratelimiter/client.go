@@ -33,6 +33,7 @@ func (c *Client) Close(ctx context.Context) error {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
+
 	return nil
 }
 
@@ -57,6 +58,7 @@ func (c *Client) CreateResource(
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
+
 	return retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
@@ -87,6 +89,7 @@ func (c *Client) createResource(
 			operation.ModeSync,
 		),
 	})
+
 	return
 }
 
@@ -104,6 +107,7 @@ func (c *Client) AlterResource(
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
+
 	return retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
@@ -151,6 +155,7 @@ func (c *Client) DropResource(
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
+
 	return retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
@@ -173,6 +178,7 @@ func (c *Client) dropResource(
 			operation.ModeSync,
 		),
 	})
+
 	return
 }
 
@@ -198,6 +204,7 @@ func (c *Client) ListResource(
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
 	)
+
 	return list, err
 }
 
@@ -229,6 +236,7 @@ func (c *Client) listResource(
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	return result.GetResourcePaths(), nil
 }
 
@@ -253,6 +261,7 @@ func (c *Client) DescribeResource(
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
 	)
+
 	return
 }
 
@@ -315,6 +324,7 @@ func (c *Client) AcquireResource(
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
+
 	return retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),

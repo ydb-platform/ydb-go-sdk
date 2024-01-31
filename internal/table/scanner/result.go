@@ -40,6 +40,7 @@ func (r *streamResult) Err() error {
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
+
 	return nil
 }
 
@@ -56,6 +57,7 @@ func (r *unaryResult) Err() error {
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
+
 	return nil
 }
 
@@ -64,6 +66,7 @@ func (r *unaryResult) Close() error {
 	if r.closed.CompareAndSwap(false, true) {
 		return nil
 	}
+
 	return xerrors.WithStackTrace(errAlreadyClosed)
 }
 
@@ -121,6 +124,7 @@ func NewStream(
 	if err := r.nextResultSetErr(ctx); err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	return r, nil
 }
 

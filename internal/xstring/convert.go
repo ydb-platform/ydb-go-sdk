@@ -19,5 +19,6 @@ func ToBytes(s string) (b []byte) {
 	if s == "" {
 		return nil
 	}
+
 	return unsafe.Slice(unsafe.StringData(s), len(s))
 }

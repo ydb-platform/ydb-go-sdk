@@ -142,6 +142,7 @@ func TestLogBackoff(t *testing.T) {
 								act, eq,
 							)
 						}
+
 						continue
 					}
 					if gte := exp.gte; act <= gte {

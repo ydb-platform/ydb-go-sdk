@@ -39,6 +39,7 @@ func ToYDB(v Value, a *allocator.Allocator) *Ydb.TypedValue {
 func BigEndianUint128(hi, lo uint64) (v [16]byte) {
 	binary.BigEndian.PutUint64(v[0:8], hi)
 	binary.BigEndian.PutUint64(v[8:16], lo)
+
 	return v
 }
 
@@ -184,6 +185,7 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		if nestedValue, ok := v.Value.(*Ydb.Value_NestedValue); ok {
 			return OptionalValue(FromYDB(t, nestedValue.NestedValue)), nil
 		}
+
 		return OptionalValue(FromYDB(t, v)), nil
 
 	case *listType:

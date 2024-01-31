@@ -15,5 +15,6 @@ func IsIdempotent(ctx context.Context) bool {
 	if idempotent, ok := ctx.Value(ctxIdempotentKey{}).(bool); ok {
 		return idempotent
 	}
+
 	return false
 }

@@ -131,5 +131,6 @@ func (m *Meta) Context(ctx context.Context) (_ context.Context, err error) {
 	if err != nil {
 		return ctx, xerrors.WithStackTrace(err)
 	}
+
 	return metadata.NewOutgoingContext(ctx, md), nil
 }

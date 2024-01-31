@@ -226,6 +226,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		if err = res.Err(); err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		return resultNoRows{}, nil
 	case SchemeQueryMode:
 		normalizedQuery, _, err := c.normalize(query)
@@ -236,6 +237,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		return resultNoRows{}, nil
 	case ScriptingQueryMode:
 		var (
@@ -259,6 +261,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		if err = res.Err(); err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		return resultNoRows{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported query mode '%s' for execute query", m)
@@ -282,6 +285,7 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	if c.currentTx != nil {
 		return c.currentTx.QueryContext(ctx, query, args)
 	}
+
 	return c.queryContext(ctx, query, args)
 }
 
@@ -328,6 +332,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		if err = res.Err(); err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		return &rows{
 			conn:   c,
 			result: res,
@@ -346,6 +351,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		if err = res.Err(); err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		return &rows{
 			conn:   c,
 			result: res,
@@ -359,6 +365,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		return &single{
 			values: []sql.NamedArg{
 				sql.Named("AST", exp.AST),
@@ -397,6 +404,7 @@ func (c *conn) Ping(ctx context.Context) (finalErr error) {
 	if err := c.session.KeepAlive(ctx); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	return nil
 }
 
@@ -419,6 +427,7 @@ func (c *conn) Close() (finalErr error) {
 		}
 		return nil
 	}
+
 	return badconn.Map(xerrors.WithStackTrace(errConnClosedEarly))
 }
 
@@ -487,6 +496,7 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 
 func (c *conn) Version(_ context.Context) (_ string, _ error) {
 	const version = "default"
+
 	return version, nil
 }
 
@@ -506,6 +516,7 @@ func (c *conn) IsTableExists(ctx context.Context, tableName string) (tableExists
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
+
 	return tableExists, nil
 }
 
@@ -538,6 +549,7 @@ func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string)
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
+
 	return columnExists, nil
 }
 
@@ -607,6 +619,7 @@ func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) 
 	if err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
+
 	return dataType, nil
 }
 

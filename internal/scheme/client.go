@@ -34,6 +34,7 @@ func (c *Client) Close(_ context.Context) error {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
+
 	return nil
 }
 
@@ -58,6 +59,7 @@ func (c *Client) MakeDirectory(ctx context.Context, path string) (finalErr error
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
+
 	return retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
@@ -78,6 +80,7 @@ func (c *Client) makeDirectory(ctx context.Context, path string) (err error) {
 			),
 		},
 	)
+
 	return xerrors.WithStackTrace(err)
 }
 
@@ -95,6 +98,7 @@ func (c *Client) RemoveDirectory(ctx context.Context, path string) (finalErr err
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
+
 	return retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
@@ -115,6 +119,7 @@ func (c *Client) removeDirectory(ctx context.Context, path string) (err error) {
 			),
 		},
 	)
+
 	return xerrors.WithStackTrace(err)
 }
 
@@ -136,6 +141,7 @@ func (c *Client) ListDirectory(ctx context.Context, path string) (d scheme.Direc
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
 	)
+
 	return d, xerrors.WithStackTrace(err)
 }
 
@@ -168,6 +174,7 @@ func (c *Client) listDirectory(ctx context.Context, path string) (scheme.Directo
 	d.From(result.Self)
 	d.Children = make([]scheme.Entry, len(result.Children))
 	putEntry(d.Children, result.Children)
+
 	return d, nil
 }
 
@@ -195,6 +202,7 @@ func (c *Client) DescribePath(ctx context.Context, path string) (e scheme.Entry,
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
 	)
+
 	return e, xerrors.WithStackTrace(err)
 }
 
@@ -273,6 +281,7 @@ func (c *Client) modifyPermissions(ctx context.Context, path string, desc permis
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
+
 	return nil
 }
 

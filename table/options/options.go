@@ -871,6 +871,7 @@ func WithCallOptions(opts ...grpc.CallOption) withCallOptions {
 func WithCommit() ExecuteDataQueryOption {
 	return executeDataQueryOptionFunc(func(desc *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
 		desc.TxControl.CommitTx = true
+
 		return nil
 	})
 }
@@ -943,6 +944,7 @@ func WithCollectStatsModeNone() ExecuteDataQueryOption {
 func WithCollectStatsModeBasic() ExecuteDataQueryOption {
 	return executeDataQueryOptionFunc(func(d *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
 		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC
+
 		return nil
 	})
 }

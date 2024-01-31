@@ -32,6 +32,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 	grpcMess, err := s.Stream.Recv()
 	if err != nil {
 		err = xerrors.Transport(err)
+
 		return nil, err
 	}
 
@@ -114,11 +115,13 @@ func (s StreamReader) Send(msg ClientMessage) (err error) {
 		grpcMess := &Ydb_Topic.StreamReadMessage_FromClient{
 			ClientMessage: &Ydb_Topic.StreamReadMessage_FromClient_InitRequest{InitRequest: m.toProto()},
 		}
+
 		return s.Stream.Send(grpcMess)
 	case *ReadRequest:
 		grpcMess := &Ydb_Topic.StreamReadMessage_FromClient{
 			ClientMessage: &Ydb_Topic.StreamReadMessage_FromClient_ReadRequest{ReadRequest: m.toProto()},
 		}
+
 		return s.Stream.Send(grpcMess)
 	case *StartPartitionSessionResponse:
 		grpcMess := &Ydb_Topic.StreamReadMessage_FromClient{
@@ -126,6 +129,7 @@ func (s StreamReader) Send(msg ClientMessage) (err error) {
 				StartPartitionSessionResponse: m.toProto(),
 			},
 		}
+
 		return s.Stream.Send(grpcMess)
 	case *StopPartitionSessionResponse:
 		grpcMess := &Ydb_Topic.StreamReadMessage_FromClient{
@@ -133,6 +137,7 @@ func (s StreamReader) Send(msg ClientMessage) (err error) {
 				StopPartitionSessionResponse: m.toProto(),
 			},
 		}
+
 		return s.Stream.Send(grpcMess)
 	case *CommitOffsetRequest:
 		grpcMess := &Ydb_Topic.StreamReadMessage_FromClient{
@@ -140,6 +145,7 @@ func (s StreamReader) Send(msg ClientMessage) (err error) {
 				CommitOffsetRequest: m.toProto(),
 			},
 		}
+
 		return s.Stream.Send(grpcMess)
 	case *PartitionSessionStatusRequest:
 		grpcMess := &Ydb_Topic.StreamReadMessage_FromClient{
@@ -147,6 +153,7 @@ func (s StreamReader) Send(msg ClientMessage) (err error) {
 				PartitionSessionStatusRequest: m.toProto(),
 			},
 		}
+
 		return s.Stream.Send(grpcMess)
 	case *UpdateTokenRequest:
 		grpcMess := &Ydb_Topic.StreamReadMessage_FromClient{
@@ -154,6 +161,7 @@ func (s StreamReader) Send(msg ClientMessage) (err error) {
 				UpdateTokenRequest: m.ToProto(),
 			},
 		}
+
 		return s.Stream.Send(grpcMess)
 	default:
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: send unexpected message type: %v", reflect.TypeOf(msg)))

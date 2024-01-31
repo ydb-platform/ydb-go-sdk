@@ -25,7 +25,6 @@ func (e *acquireError) Unwrap() error {
 }
 
 func NewAcquire(amoount uint64, err error) ratelimiter.AcquireError {
-
 	return &acquireError{
 		err:    err,
 		amount: amoount,

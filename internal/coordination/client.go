@@ -117,6 +117,7 @@ func (c *Client) alterNode(ctx context.Context, path string, config coordination
 			),
 		},
 	)
+
 	return xerrors.WithStackTrace(err)
 }
 
@@ -168,10 +169,12 @@ func (c *Client) DescribeNode(
 	}
 	call := func(ctx context.Context) (err error) {
 		entry, config, err = c.describeNode(ctx, path)
+
 		return xerrors.WithStackTrace(err)
 	}
 	if !c.config.AutoRetry() {
 		err := call(ctx)
+
 		return entry, config, xerrors.WithStackTrace(err)
 	}
 	err := retry.Retry(ctx, call,
@@ -230,6 +233,7 @@ func (c *Client) Close(ctx context.Context) error {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
+
 	return c.close(ctx)
 }
 

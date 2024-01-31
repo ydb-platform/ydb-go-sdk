@@ -25,6 +25,7 @@ func (c *Client) AlterTopic(ctx context.Context, req *AlterTopicRequest) (res Al
 		return res, xerrors.WithStackTrace(fmt.Errorf("ydb: alter topic grpc failed: %w", err))
 	}
 	err = res.FromProto(resp)
+
 	return res, err
 }
 
@@ -37,6 +38,7 @@ func (c *Client) CreateTopic(
 		return res, xerrors.WithStackTrace(fmt.Errorf("ydb: create topic grpc failed: %w", err))
 	}
 	err = res.FromProto(resp)
+
 	return res, err
 }
 

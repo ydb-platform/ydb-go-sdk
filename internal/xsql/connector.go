@@ -30,6 +30,7 @@ type defaultQueryModeConnectorOption QueryMode
 
 func (mode defaultQueryModeConnectorOption) Apply(c *Connector) error {
 	c.defaultQueryMode = QueryMode(mode)
+
 	return nil
 }
 
@@ -44,6 +45,7 @@ type queryBindConnectorOption struct {
 
 func (o queryBindConnectorOption) Apply(c *Connector) error {
 	c.Bindings = bind.Sort(append(c.Bindings, o.Bind))
+
 	return nil
 }
 
@@ -54,6 +56,7 @@ type tablePathPrefixConnectorOption struct {
 func (o tablePathPrefixConnectorOption) Apply(c *Connector) error {
 	c.Bindings = bind.Sort(append(c.Bindings, o.TablePathPrefix))
 	c.pathNormalizer = o.TablePathPrefix
+
 	return nil
 }
 
@@ -75,6 +78,7 @@ type defaultTxControlOption struct {
 
 func (opt defaultTxControlOption) Apply(c *Connector) error {
 	c.defaultTxControl = opt.txControl
+
 	return nil
 }
 
@@ -86,6 +90,7 @@ type defaultDataQueryOptionsConnectorOption []options.ExecuteDataQueryOption
 
 func (opts defaultDataQueryOptionsConnectorOption) Apply(c *Connector) error {
 	c.defaultDataQueryOpts = append(c.defaultDataQueryOpts, opts...)
+
 	return nil
 }
 
@@ -97,6 +102,7 @@ type defaultScanQueryOptionsConnectorOption []options.ExecuteScanQueryOption
 
 func (opts defaultScanQueryOptionsConnectorOption) Apply(c *Connector) error {
 	c.defaultScanQueryOpts = append(c.defaultScanQueryOpts, opts...)
+
 	return nil
 }
 
@@ -111,6 +117,7 @@ type traceConnectorOption struct {
 
 func (option traceConnectorOption) Apply(c *Connector) error {
 	c.trace = c.trace.Compose(option.t, option.opts...)
+
 	return nil
 }
 
@@ -122,6 +129,7 @@ type disableServerBalancerConnectorOption struct{}
 
 func (d disableServerBalancerConnectorOption) Apply(c *Connector) error {
 	c.disableServerBalancer = true
+
 	return nil
 }
 
@@ -144,6 +152,7 @@ type onCloseConnectorOption func(connector *Connector)
 
 func (f onCloseConnectorOption) Apply(c *Connector) error {
 	c.onClose = append(c.onClose, f)
+
 	return nil
 }
 
@@ -157,6 +166,7 @@ type traceRetryConnectorOption struct {
 
 func (t traceRetryConnectorOption) Apply(c *Connector) error {
 	c.traceRetry = t.t
+
 	return nil
 }
 
@@ -168,6 +178,7 @@ type fakeTxConnectorOption QueryMode
 
 func (m fakeTxConnectorOption) Apply(c *Connector) error {
 	c.fakeTxModes = append(c.fakeTxModes, QueryMode(m))
+
 	return nil
 }
 
@@ -203,6 +214,7 @@ func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
 	if c.idleThreshold > 0 {
 		c.idleStopper = c.idleCloser()
 	}
+
 	return c, nil
 }
 
@@ -267,6 +279,7 @@ func (c *Connector) idleCloser() (idleStopper func()) {
 			}
 		}
 	}()
+
 	return idleStopper
 }
 
@@ -279,6 +292,7 @@ func (c *Connector) Close() (err error) {
 	if c.idleStopper != nil {
 		c.idleStopper()
 	}
+
 	return nil
 }
 

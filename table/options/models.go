@@ -425,6 +425,7 @@ func (kr KeyRange) String() string {
 		buf.WriteString(kr.To.Yql())
 	}
 	buf.WriteString("]")
+
 	return buf.String()
 }
 

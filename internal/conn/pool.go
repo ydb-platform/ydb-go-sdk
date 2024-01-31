@@ -120,6 +120,7 @@ func (p *Pool) Allow(ctx context.Context, cc Conn) {
 
 func (p *Pool) Take(context.Context) error {
 	atomic.AddInt64(&p.usages, 1)
+
 	return nil
 }
 
@@ -218,5 +219,6 @@ func NewPool(ctx context.Context, config Config) *Pool {
 	if ttl := config.ConnectionTTL(); ttl > 0 {
 		go p.connParker(xcontext.WithoutDeadline(ctx), ttl, ttl/2)
 	}
+
 	return p
 }

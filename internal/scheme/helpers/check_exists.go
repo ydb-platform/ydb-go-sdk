@@ -50,8 +50,10 @@ func IsDirectoryExists(ctx context.Context, c schemeClient, directory string) (
 				childDirectory, parentDirectory, t.String(),
 			))
 		}
+
 		return true, nil
 	}
+
 	return false, nil
 }
 
@@ -92,10 +94,12 @@ func IsEntryExists(ctx context.Context, c schemeClient, absPath string, entryTyp
 				return true, nil
 			}
 		}
+
 		return false, xerrors.WithStackTrace(fmt.Errorf(
 			"entry type of '%s' (%s) in path '%s' is not corresponds to %v",
 			entryName, childrenType, directory, entryTypes,
 		))
 	}
+
 	return false, nil
 }

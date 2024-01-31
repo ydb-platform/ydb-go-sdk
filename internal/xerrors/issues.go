@@ -89,6 +89,7 @@ func (e *errorWithIssues) Error() string {
 		b.WriteString(issue.Error())
 	}
 	b.WriteString("]")
+
 	return b.String()
 }
 
@@ -98,6 +99,7 @@ func (e *errorWithIssues) As(target interface{}) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -107,6 +109,7 @@ func (e *errorWithIssues) Is(target error) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -128,6 +131,7 @@ func (it IssueIterator) Get(i int) (issue Issue, nested IssueIterator) {
 	if xs := x.Issues; len(xs) > 0 {
 		nested = IssueIterator(xs)
 	}
+
 	return Issue{
 		Message:  x.GetMessage(),
 		Code:     x.GetIssueCode(),
