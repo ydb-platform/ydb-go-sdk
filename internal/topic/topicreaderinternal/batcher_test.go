@@ -162,6 +162,7 @@ func TestBatcher_Pop(t *testing.T) {
 		b.notifyAboutNewMessages()
 
 		go func() {
+			tb.Helper()
 			xtest.SpinWaitCondition(tb, &b.m, func() bool {
 				return len(b.hasNewMessages) == 0
 			})
@@ -287,6 +288,7 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 
 		var IgnoreMinRestrictionsOnNextPopDone xatomic.Int64
 		go func() {
+			tb.Helper()
 			defer IgnoreMinRestrictionsOnNextPopDone.Add(1)
 
 			xtest.SpinWaitCondition(tb, &b.m, func() bool {

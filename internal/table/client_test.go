@@ -759,7 +759,6 @@ func mustGetSession(tb testing.TB, p *Client) *session {
 	defer wg.Wait()
 	s, err := p.Get(context.Background())
 	if err != nil {
-		tb.Helper()
 		tb.Fatalf("%s: %v", caller(), err)
 	}
 	return s
@@ -770,7 +769,6 @@ func mustPutSession(tb testing.TB, p *Client, s *session) {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	if err := p.Put(context.Background(), s); err != nil {
-		tb.Helper()
 		tb.Fatalf("%s: %v", caller(), err)
 	}
 }
@@ -780,7 +778,6 @@ func mustClose(tb testing.TB, p *Client) {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	if err := p.Close(context.Background()); err != nil {
-		tb.Helper()
 		tb.Fatalf("%s: %v", caller(), err)
 	}
 }
@@ -839,7 +836,6 @@ var simpleCluster = testutil.NewBalancer(
 )
 
 func simpleSession(t *testing.T) *session {
-	t.Helper()
 	s, err := newSession(context.Background(), simpleCluster, config.New())
 	if err != nil {
 		t.Fatalf("newSession unexpected error: %v", err)
@@ -864,7 +860,6 @@ func newClientWithStubBuilder(
 	stubLimit int,
 	options ...config.Option,
 ) *Client {
-	tb.Helper()
 	c, err := newClient(
 		context.Background(),
 		balancer,

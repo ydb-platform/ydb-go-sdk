@@ -442,15 +442,18 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 
 			streamClosed := make(empty.Chan)
 			strm.EXPECT().CloseSend().Do(func() {
+				tb.Helper()
 				tb.Logf("closed stream: %v", name)
 				close(streamClosed)
 			})
 
 			strm.EXPECT().Send(&initReq).Do(func(_ interface{}) {
+				tb.Helper()
 				tb.Logf("sent init request stream: %v", name)
 			})
 
 			strm.EXPECT().Recv().Do(func() {
+				tb.Helper()
 				tb.Logf("receive init response stream: %v", name)
 			}).Return(&rawtopicwriter.InitResult{
 				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
@@ -458,6 +461,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			}, nil)
 
 			strm.EXPECT().Recv().Do(func() {
+				tb.Helper()
 				tb.Logf("waiting close channel: %v", name)
 				xtest.WaitChannelClosed(tb, streamClosed)
 				tb.Logf("channel closed: %v", name)
@@ -472,6 +476,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			},
 			Codec: rawtopiccommon.CodecRaw,
 		}).Do(func(_ *rawtopicwriter.WriteRequest) {
+			tb.Helper()
 			tb.Logf("strm2 sent message and return retriable error")
 		}).Return(xerrors.Retryable(errors.New("retriable on strm2")))
 
@@ -482,6 +487,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			},
 			Codec: rawtopiccommon.CodecRaw,
 		}).Do(func(_ *rawtopicwriter.WriteRequest) {
+			tb.Helper()
 			tb.Logf("strm3 sent message and return unretriable error")
 		}).Return(errors.New("strm3"))
 
@@ -504,6 +510,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		var connectionAttempt xatomic.Int64
 		w.cfg.Connect = func(ctx context.Context) (RawTopicWriterStream, error) {
 			attemptIndex := int(connectionAttempt.Add(1)) - 1
+			tb.Helper()
 			tb.Logf("connect with attempt index: %v", attemptIndex)
 			res := connectsResult[attemptIndex]
 
@@ -514,6 +521,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		go func() {
 			defer close(connectionLoopStopped)
 			w.connectionLoop(ctx)
+			tb.Helper()
 			tb.Log("connection loop stopped")
 		}()
 
@@ -827,7 +835,6 @@ type testEnvOptions struct {
 }
 
 func newTestEnv(tb testing.TB, options *testEnvOptions) *testEnv {
-	tb.Helper()
 	if options == nil {
 		options = &testEnvOptions{}
 	}
