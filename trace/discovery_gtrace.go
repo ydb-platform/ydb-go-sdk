@@ -48,7 +48,6 @@ func (t *Discovery) Compose(x *Discovery, opts ...DiscoveryComposeOption) *Disco
 			if h2 != nil {
 				r1 = h2(d)
 			}
-
 			return func(d DiscoveryDiscoverDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -84,7 +83,6 @@ func (t *Discovery) Compose(x *Discovery, opts ...DiscoveryComposeOption) *Disco
 			if h2 != nil {
 				r1 = h2(d)
 			}
-
 			return func(d DiscoveryWhoAmIDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -102,7 +100,6 @@ func (t *Discovery) Compose(x *Discovery, opts ...DiscoveryComposeOption) *Disco
 			}
 		}
 	}
-
 	return &ret
 }
 func (t *Discovery) onDiscover(d DiscoveryDiscoverStartInfo) func(DiscoveryDiscoverDoneInfo) {
@@ -118,7 +115,6 @@ func (t *Discovery) onDiscover(d DiscoveryDiscoverStartInfo) func(DiscoveryDisco
 			return
 		}
 	}
-
 	return res
 }
 func (t *Discovery) onWhoAmI(d DiscoveryWhoAmIStartInfo) func(DiscoveryWhoAmIDoneInfo) {
@@ -134,7 +130,6 @@ func (t *Discovery) onWhoAmI(d DiscoveryWhoAmIStartInfo) func(DiscoveryWhoAmIDon
 			return
 		}
 	}
-
 	return res
 }
 func DiscoveryOnDiscover(t *Discovery, c *context.Context, call call, address string, database string) func(location string, endpoints []EndpointInfo, _ error) {
@@ -144,7 +139,6 @@ func DiscoveryOnDiscover(t *Discovery, c *context.Context, call call, address st
 	p.Address = address
 	p.Database = database
 	res := t.onDiscover(p)
-
 	return func(location string, endpoints []EndpointInfo, e error) {
 		var p DiscoveryDiscoverDoneInfo
 		p.Location = location
@@ -158,7 +152,6 @@ func DiscoveryOnWhoAmI(t *Discovery, c *context.Context, call call) func(user st
 	p.Context = c
 	p.Call = call
 	res := t.onWhoAmI(p)
-
 	return func(user string, groups []string, e error) {
 		var p DiscoveryWhoAmIDoneInfo
 		p.User = user
