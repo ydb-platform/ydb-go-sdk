@@ -29,6 +29,7 @@ func New(
 			o(m)
 		}
 	}
+
 	return m
 }
 
@@ -118,6 +119,7 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		if stringer, ok := m.credentials.(fmt.Stringer); ok {
 			return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %s", err, stringer.String()))
 		}
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 

@@ -43,6 +43,7 @@ func CreateWithSupportedCodecs(codecs ...topictypes.Codec) CreateOption {
 	sort.Slice(codecs, func(i, j int) bool {
 		return codecs[i] < codecs[j]
 	})
+
 	return withSupportedCodecs(codecs)
 }
 
@@ -66,5 +67,6 @@ func CreateWithConsumer(consumers ...topictypes.Consumer) CreateOption {
 	sort.Slice(consumers, func(i, j int) bool {
 		return consumers[i].Name < consumers[j].Name
 	})
+
 	return withAddConsumers(consumers)
 }

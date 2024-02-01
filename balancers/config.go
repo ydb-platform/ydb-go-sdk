@@ -127,6 +127,7 @@ func FromConfig(config string, opts ...fromConfigOption) *balancerConfig.Config 
 		if h.errorHandler != nil {
 			h.errorHandler(err)
 		}
+
 		return h.fallbackBalancer
 	}
 

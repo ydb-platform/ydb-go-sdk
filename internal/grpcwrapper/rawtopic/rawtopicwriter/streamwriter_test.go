@@ -26,6 +26,7 @@ func TestSendWriteRequest(t *testing.T) {
 		var send sendFunc = func(req *Ydb_Topic.StreamWriteMessage_FromClient) error {
 			sendCounter++
 			require.Equal(t, expected, req.ClientMessage)
+
 			return nil
 		}
 		err := sendWriteRequest(send, expected)

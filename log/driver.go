@@ -29,6 +29,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			String("target", target),
 			Strings("resolved", addresses),
 		)
+
 		return func(info trace.DriverResolveDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -186,6 +187,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			Stringer("endpoint", endpoint),
 		)
 		start := time.Now()
+
 		return func(info trace.DriverConnCloseDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -304,6 +306,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			versionField(),
 		)
 		start := time.Now()
+
 		return func(info trace.DriverConnBanDoneInfo) {
 			l.Log(WithLevel(ctx, WARN), "done",
 				Stringer("endpoint", endpoint),
@@ -370,6 +373,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 		ctx := with(*info.Context, TRACE, "ydb", "driver", "balancer", "init")
 		l.Log(ctx, "start")
 		start := time.Now()
+
 		return func(info trace.DriverBalancerInitDoneInfo) {
 			l.Log(WithLevel(ctx, INFO), "done",
 				latencyField(start),
@@ -383,6 +387,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 		ctx := with(*info.Context, TRACE, "ydb", "driver", "balancer", "close")
 		l.Log(ctx, "start")
 		start := time.Now()
+
 		return func(info trace.DriverBalancerCloseDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -408,6 +413,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 		ctx := with(*info.Context, TRACE, "ydb", "driver", "balancer", "choose", "endpoint")
 		l.Log(ctx, "start")
 		start := time.Now()
+
 		return func(info trace.DriverBalancerChooseEndpointDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -454,6 +460,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 		ctx := with(*info.Context, TRACE, "ydb", "driver", "credentials", "get")
 		l.Log(ctx, "start")
 		start := time.Now()
+
 		return func(info trace.DriverGetCredentialsDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",

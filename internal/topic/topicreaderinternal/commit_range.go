@@ -32,6 +32,7 @@ func (r *CommitRanges) GetCommitsInfo() []trace.TopicReaderStreamCommitInfo {
 			EndOffset:          r.ranges[i].commitOffsetEnd.ToInt64(),
 		}
 	}
+
 	return res
 }
 
@@ -45,6 +46,7 @@ func NewCommitRangesFromPublicCommits(ranges []PublicCommitRange) CommitRanges {
 	for i := 0; i < len(res.ranges); i++ {
 		res.ranges[i] = ranges[i].priv
 	}
+
 	return res
 }
 
@@ -84,6 +86,7 @@ func (r *CommitRanges) toPartitionsOffsets() []rawtopicreader.PartitionCommitOff
 	}
 
 	r.optimize()
+
 	return r.toRawPartitionCommitOffset()
 }
 
@@ -149,6 +152,7 @@ func (r *CommitRanges) toRawPartitionCommitOffset() []rawtopicreader.PartitionCo
 		}
 		partition.Offsets = append(partition.Offsets, offsetsRange)
 	}
+
 	return partitionOffsets
 }
 

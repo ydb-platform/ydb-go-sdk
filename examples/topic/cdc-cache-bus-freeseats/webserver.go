@@ -55,6 +55,7 @@ func (s *server) GetFreeSeatsHandler(writer http.ResponseWriter, request *http.R
 	freeSeats, err := s.getFreeSeats(ctx, id)
 	if err != nil {
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
+
 		return
 	}
 	duration := time.Since(start)
@@ -73,6 +74,7 @@ func (s *server) BuyTicketHandler(writer http.ResponseWriter, request *http.Requ
 		} else {
 			http.Error(writer, err.Error(), http.StatusInternalServerError)
 		}
+
 		return
 	}
 	//nolint:gocritic
@@ -105,6 +107,7 @@ func (s *server) getContentFromDB(ctx context.Context, id string) (int64, error)
 	err := s.db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 		var err error
 		freeSeats, err = s.getFreeSeatsTx(ctx, tx, id)
+
 		return err
 	})
 
@@ -129,6 +132,7 @@ SELECT freeSeats FROM bus WHERE id=$id;
 
 	if !res.NextRow() {
 		freeSeats = 0
+
 		return 0, errors.New("not found")
 	}
 
@@ -157,11 +161,13 @@ DECLARE $id AS Text;
 
 UPDATE bus SET freeSeats = freeSeats - 1 WHERE id=$id;
 `, table.NewQueryParameters(table.ValueParam("$id", types.UTF8Value(id))))
+
 		return err
 	})
 	if err == nil {
 		freeSeats--
 	}
+
 	return freeSeats, err
 }
 
@@ -192,6 +198,7 @@ func (s *server) IndexPageHandler(writer http.ResponseWriter, request *http.Requ
 	})
 	if err != nil {
 		http.Error(writer, err.Error(), http.StatusInternalServerError)
+
 		return
 	}
 

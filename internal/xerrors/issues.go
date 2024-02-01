@@ -51,6 +51,7 @@ func (ii issues) String() string {
 		b.WriteByte('}')
 	}
 	b.WriteByte(']')
+
 	return b.String()
 }
 
@@ -64,6 +65,7 @@ func NewWithIssues(text string, issues ...error) error {
 			err.issues = append(err.issues, issues[i])
 		}
 	}
+
 	return err
 }
 

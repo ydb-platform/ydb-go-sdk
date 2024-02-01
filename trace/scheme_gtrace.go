@@ -48,6 +48,7 @@ func (t *Scheme) Compose(x *Scheme, opts ...SchemeComposeOption) *Scheme {
 			if h2 != nil {
 				r1 = h2(s)
 			}
+
 			return func(s SchemeListDirectoryDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -83,6 +84,7 @@ func (t *Scheme) Compose(x *Scheme, opts ...SchemeComposeOption) *Scheme {
 			if h2 != nil {
 				r1 = h2(s)
 			}
+
 			return func(s SchemeDescribePathDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -118,6 +120,7 @@ func (t *Scheme) Compose(x *Scheme, opts ...SchemeComposeOption) *Scheme {
 			if h2 != nil {
 				r1 = h2(s)
 			}
+
 			return func(s SchemeMakeDirectoryDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -153,6 +156,7 @@ func (t *Scheme) Compose(x *Scheme, opts ...SchemeComposeOption) *Scheme {
 			if h2 != nil {
 				r1 = h2(s)
 			}
+
 			return func(s SchemeRemoveDirectoryDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -188,6 +192,7 @@ func (t *Scheme) Compose(x *Scheme, opts ...SchemeComposeOption) *Scheme {
 			if h2 != nil {
 				r1 = h2(s)
 			}
+
 			return func(s SchemeModifyPermissionsDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -205,6 +210,7 @@ func (t *Scheme) Compose(x *Scheme, opts ...SchemeComposeOption) *Scheme {
 			}
 		}
 	}
+
 	return &ret
 }
 func (t *Scheme) onListDirectory(s SchemeListDirectoryStartInfo) func(SchemeListDirectoryDoneInfo) {
@@ -220,6 +226,7 @@ func (t *Scheme) onListDirectory(s SchemeListDirectoryStartInfo) func(SchemeList
 			return
 		}
 	}
+
 	return res
 }
 func (t *Scheme) onDescribePath(s SchemeDescribePathStartInfo) func(SchemeDescribePathDoneInfo) {
@@ -235,6 +242,7 @@ func (t *Scheme) onDescribePath(s SchemeDescribePathStartInfo) func(SchemeDescri
 			return
 		}
 	}
+
 	return res
 }
 func (t *Scheme) onMakeDirectory(s SchemeMakeDirectoryStartInfo) func(SchemeMakeDirectoryDoneInfo) {
@@ -250,6 +258,7 @@ func (t *Scheme) onMakeDirectory(s SchemeMakeDirectoryStartInfo) func(SchemeMake
 			return
 		}
 	}
+
 	return res
 }
 func (t *Scheme) onRemoveDirectory(s SchemeRemoveDirectoryStartInfo) func(SchemeRemoveDirectoryDoneInfo) {
@@ -265,6 +274,7 @@ func (t *Scheme) onRemoveDirectory(s SchemeRemoveDirectoryStartInfo) func(Scheme
 			return
 		}
 	}
+
 	return res
 }
 func (t *Scheme) onModifyPermissions(s SchemeModifyPermissionsStartInfo) func(SchemeModifyPermissionsDoneInfo) {
@@ -280,6 +290,7 @@ func (t *Scheme) onModifyPermissions(s SchemeModifyPermissionsStartInfo) func(Sc
 			return
 		}
 	}
+
 	return res
 }
 func SchemeOnListDirectory(t *Scheme, c *context.Context, call call) func(error) {
@@ -287,6 +298,7 @@ func SchemeOnListDirectory(t *Scheme, c *context.Context, call call) func(error)
 	p.Context = c
 	p.Call = call
 	res := t.onListDirectory(p)
+
 	return func(e error) {
 		var p SchemeListDirectoryDoneInfo
 		p.Error = e
@@ -299,6 +311,7 @@ func SchemeOnDescribePath(t *Scheme, c *context.Context, call call, path string)
 	p.Call = call
 	p.Path = path
 	res := t.onDescribePath(p)
+
 	return func(entryType string, e error) {
 		var p SchemeDescribePathDoneInfo
 		p.EntryType = entryType
@@ -312,6 +325,7 @@ func SchemeOnMakeDirectory(t *Scheme, c *context.Context, call call, path string
 	p.Call = call
 	p.Path = path
 	res := t.onMakeDirectory(p)
+
 	return func(e error) {
 		var p SchemeMakeDirectoryDoneInfo
 		p.Error = e
@@ -324,6 +338,7 @@ func SchemeOnRemoveDirectory(t *Scheme, c *context.Context, call call, path stri
 	p.Call = call
 	p.Path = path
 	res := t.onRemoveDirectory(p)
+
 	return func(e error) {
 		var p SchemeRemoveDirectoryDoneInfo
 		p.Error = e
@@ -336,6 +351,7 @@ func SchemeOnModifyPermissions(t *Scheme, c *context.Context, call call, path st
 	p.Call = call
 	p.Path = path
 	res := t.onModifyPermissions(p)
+
 	return func(e error) {
 		var p SchemeModifyPermissionsDoneInfo
 		p.Error = e

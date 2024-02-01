@@ -232,6 +232,7 @@ func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 			}
 		}
 		sort.Strings(declares)
+
 		return declares
 	}
 	for _, tt := range []struct {

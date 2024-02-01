@@ -47,10 +47,12 @@ func (c *Client) Execute(
 	}
 	call := func(ctx context.Context) error {
 		r, err = c.execute(ctx, query, params)
+
 		return xerrors.WithStackTrace(err)
 	}
 	if !c.config.AutoRetry() {
 		err = call(ctx)
+
 		return
 	}
 	err = retry.Retry(ctx, call,
@@ -123,10 +125,12 @@ func (c *Client) Explain(
 	}
 	call := func(ctx context.Context) error {
 		e, err = c.explain(ctx, query, mode)
+
 		return xerrors.WithStackTrace(err)
 	}
 	if !c.config.AutoRetry() {
 		err = call(ctx)
+
 		return
 	}
 	err = retry.Retry(ctx, call,
@@ -196,10 +200,12 @@ func (c *Client) StreamExecute(
 	}
 	call := func(ctx context.Context) error {
 		r, err = c.streamExecute(ctx, query, params)
+
 		return xerrors.WithStackTrace(err)
 	}
 	if !c.config.AutoRetry() {
 		err = call(ctx)
+
 		return
 	}
 	err = retry.Retry(ctx, call,
@@ -244,6 +250,7 @@ func (c *Client) streamExecute(
 	stream, err := c.service.StreamExecuteYql(ctx, request)
 	if err != nil {
 		cancel()
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 

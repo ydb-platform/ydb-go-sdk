@@ -414,6 +414,7 @@ func (r *PartitionSessionStatusResponse) fromProto(
 		return err
 	}
 	r.WriteTimeHighWatermark = p.GetWriteTimeHighWatermark().AsTime()
+
 	return nil
 }
 

@@ -48,6 +48,7 @@ func (t *Retry) Compose(x *Retry, opts ...RetryComposeOption) *Retry {
 			if h2 != nil {
 				r2 = h2(r)
 			}
+
 			return func(r RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -63,6 +64,7 @@ func (t *Retry) Compose(x *Retry, opts ...RetryComposeOption) *Retry {
 				if r2 != nil {
 					r4 = r2(r)
 				}
+
 				return func(r RetryLoopDoneInfo) {
 					if options.panicCallback != nil {
 						defer func() {
@@ -81,6 +83,7 @@ func (t *Retry) Compose(x *Retry, opts ...RetryComposeOption) *Retry {
 			}
 		}
 	}
+
 	return &ret
 }
 func (t *Retry) onRetry(r RetryLoopStartInfo) func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
@@ -100,6 +103,7 @@ func (t *Retry) onRetry(r RetryLoopStartInfo) func(RetryLoopIntermediateInfo) fu
 			}
 		}
 	}
+
 	return func(r RetryLoopIntermediateInfo) func(RetryLoopDoneInfo) {
 		res := res(r)
 		if res == nil {
@@ -107,6 +111,7 @@ func (t *Retry) onRetry(r RetryLoopStartInfo) func(RetryLoopIntermediateInfo) fu
 				return
 			}
 		}
+
 		return res
 	}
 }
@@ -119,10 +124,12 @@ func RetryOnRetry(t *Retry, c *context.Context, iD string, call call, label stri
 	p.Idempotent = idempotent
 	p.NestedCall = nestedCall
 	res := t.onRetry(p)
+
 	return func(e error) func(int, error) {
 		var p RetryLoopIntermediateInfo
 		p.Error = e
 		res := res(p)
+
 		return func(attempts int, e error) {
 			var p RetryLoopDoneInfo
 			p.Attempts = attempts

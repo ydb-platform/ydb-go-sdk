@@ -141,6 +141,7 @@ type idleThresholdConnectorOption time.Duration
 
 func (idleThreshold idleThresholdConnectorOption) Apply(c *Connector) error {
 	c.idleThreshold = time.Duration(idleThreshold)
+
 	return nil
 }
 

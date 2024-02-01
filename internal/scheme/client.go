@@ -130,10 +130,12 @@ func (c *Client) ListDirectory(ctx context.Context, path string) (d scheme.Direc
 	}()
 	call := func(ctx context.Context) (err error) {
 		d, err = c.listDirectory(ctx, path)
+
 		return xerrors.WithStackTrace(err)
 	}
 	if !c.config.AutoRetry() {
 		err := call(ctx)
+
 		return d, xerrors.WithStackTrace(err)
 	}
 	err := retry.Retry(ctx, call,
@@ -191,10 +193,12 @@ func (c *Client) DescribePath(ctx context.Context, path string) (e scheme.Entry,
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
+
 		return nil
 	}
 	if !c.config.AutoRetry() {
 		err := call(ctx)
+
 		return e, err
 	}
 	err := retry.Retry(ctx, call,
@@ -231,6 +235,7 @@ func (c *Client) describePath(ctx context.Context, path string) (e scheme.Entry,
 		return e, xerrors.WithStackTrace(err)
 	}
 	e.From(result.Self)
+
 	return e, nil
 }
 
@@ -256,6 +261,7 @@ func (c *Client) ModifyPermissions(
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
+
 	return retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),

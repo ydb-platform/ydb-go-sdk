@@ -37,6 +37,7 @@ func WithContextModifier(
 	return &middleware{
 		invoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
 			ctx = modifyCtx(ctx)
+
 			return cc.Invoke(ctx, method, args, reply, opts...)
 		},
 		newStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (
@@ -53,6 +54,7 @@ func WithAppendOptions(cc grpc.ClientConnInterface, appendOpts ...grpc.CallOptio
 	return &middleware{
 		invoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
 			opts = append(opts, appendOpts...)
+
 			return cc.Invoke(ctx, method, args, reply, opts...)
 		},
 		newStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (

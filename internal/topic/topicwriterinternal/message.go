@@ -98,6 +98,7 @@ func (m *messageWithDataContent) cacheMetadata() {
 func (m *messageWithDataContent) CacheMessageData(codec rawtopiccommon.Codec) error {
 	m.cacheMetadata()
 	_, err := m.GetEncodedBytes(codec)
+
 	return err
 }
 

@@ -18,6 +18,7 @@ func seriesData(id string, released time.Time, title, info, comment string) type
 	} else {
 		commentv = types.OptionalValue(types.TextValue(comment))
 	}
+
 	return types.StructValue(
 		types.StructFieldValue("series_id", types.BytesValueFromString(id)),
 		types.StructFieldValue("release_date", types.DateValueFromTime(released)),
@@ -59,6 +60,7 @@ func getData() (series, seasons, episodes []types.Value) {
 		seasons = append(seasons, seasonsData...)
 		episodes = append(episodes, episodesData...)
 	}
+
 	return
 }
 
@@ -114,6 +116,7 @@ func getDataForITCrowd(seriesID string) (series types.Value, seasons, episodes [
 			episodes = append(episodes, episodeData(seriesID, seasonID, uuid.New().String(), title, date))
 		}
 	}
+
 	return series, seasons, episodes
 }
 
@@ -193,6 +196,7 @@ func getDataForSiliconValley(seriesID string) (series types.Value, seasons, epis
 			episodes = append(episodes, episodeData(seriesID, seasonID, uuid.New().String(), title, date))
 		}
 	}
+
 	return series, seasons, episodes
 }
 
@@ -203,5 +207,6 @@ func date(date string) time.Time {
 	if err != nil {
 		panic(err)
 	}
+
 	return t
 }

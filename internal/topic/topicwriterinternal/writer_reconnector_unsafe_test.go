@@ -24,5 +24,6 @@ func getWaitersCount(sem *semaphore.Weighted) int {
 	waitersField := semVal.FieldByName("waiters")
 	waitersPointer := unsafe.Pointer(waitersField.UnsafeAddr())
 	waiters := (*list.List)(waitersPointer)
+
 	return waiters.Len()
 }

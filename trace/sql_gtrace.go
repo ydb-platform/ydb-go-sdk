@@ -49,6 +49,7 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 			if h2 != nil {
 				r1 = h2(d)
 			}
+
 			return func(d DatabaseSQLConnectorConnectDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -84,6 +85,7 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 			if h2 != nil {
 				r1 = h2(d)
 			}
+
 			return func(d DatabaseSQLConnPingDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -119,6 +121,7 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 			if h2 != nil {
 				r1 = h2(d)
 			}
+
 			return func(d DatabaseSQLConnPrepareDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -154,6 +157,7 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 			if h2 != nil {
 				r1 = h2(d)
 			}
+
 			return func(d DatabaseSQLConnCloseDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -189,6 +193,7 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 			if h2 != nil {
 				r1 = h2(d)
 			}
+
 			return func(d DatabaseSQLConnBeginDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -224,6 +229,7 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 			if h2 != nil {
 				r1 = h2(d)
 			}
+
 			return func(d DatabaseSQLConnQueryDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -259,6 +265,7 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 			if h2 != nil {
 				r1 = h2(d)
 			}
+
 			return func(d DatabaseSQLConnExecDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -294,6 +301,7 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 			if h2 != nil {
 				r1 = h2(d)
 			}
+
 			return func(d DatabaseSQLConnIsTableExistsDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -329,6 +337,7 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 			if h2 != nil {
 				r1 = h2(d)
 			}
+
 			return func(d DatabaseSQLTxQueryDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -364,6 +373,7 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 			if h2 != nil {
 				r1 = h2(d)
 			}
+
 			return func(d DatabaseSQLTxExecDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -399,6 +409,7 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 			if h2 != nil {
 				r1 = h2(d)
 			}
+
 			return func(d DatabaseSQLTxPrepareDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -434,6 +445,7 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 			if h2 != nil {
 				r1 = h2(d)
 			}
+
 			return func(d DatabaseSQLTxCommitDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -469,6 +481,7 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 			if h2 != nil {
 				r1 = h2(d)
 			}
+
 			return func(d DatabaseSQLTxRollbackDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -504,6 +517,7 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 			if h2 != nil {
 				r1 = h2(d)
 			}
+
 			return func(d DatabaseSQLStmtQueryDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -539,6 +553,7 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 			if h2 != nil {
 				r1 = h2(d)
 			}
+
 			return func(d DatabaseSQLStmtExecDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -574,6 +589,7 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 			if h2 != nil {
 				r1 = h2(d)
 			}
+
 			return func(d DatabaseSQLStmtCloseDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -609,6 +625,7 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 			if h2 != nil {
 				r1 = h2(d)
 			}
+
 			return func(d DatabaseSQLDoTxIntermediateInfo) func(DatabaseSQLDoTxDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -624,6 +641,7 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 				if r1 != nil {
 					r3 = r1(d)
 				}
+
 				return func(d DatabaseSQLDoTxDoneInfo) {
 					if options.panicCallback != nil {
 						defer func() {
@@ -642,6 +660,7 @@ func (t *DatabaseSQL) Compose(x *DatabaseSQL, opts ...DatabaseSQLComposeOption) 
 			}
 		}
 	}
+
 	return &ret
 }
 func (t *DatabaseSQL) onConnectorConnect(d DatabaseSQLConnectorConnectStartInfo) func(DatabaseSQLConnectorConnectDoneInfo) {
@@ -657,6 +676,7 @@ func (t *DatabaseSQL) onConnectorConnect(d DatabaseSQLConnectorConnectStartInfo)
 			return
 		}
 	}
+
 	return res
 }
 func (t *DatabaseSQL) onConnPing(d DatabaseSQLConnPingStartInfo) func(DatabaseSQLConnPingDoneInfo) {
@@ -672,6 +692,7 @@ func (t *DatabaseSQL) onConnPing(d DatabaseSQLConnPingStartInfo) func(DatabaseSQ
 			return
 		}
 	}
+
 	return res
 }
 func (t *DatabaseSQL) onConnPrepare(d DatabaseSQLConnPrepareStartInfo) func(DatabaseSQLConnPrepareDoneInfo) {
@@ -687,6 +708,7 @@ func (t *DatabaseSQL) onConnPrepare(d DatabaseSQLConnPrepareStartInfo) func(Data
 			return
 		}
 	}
+
 	return res
 }
 func (t *DatabaseSQL) onConnClose(d DatabaseSQLConnCloseStartInfo) func(DatabaseSQLConnCloseDoneInfo) {
@@ -702,6 +724,7 @@ func (t *DatabaseSQL) onConnClose(d DatabaseSQLConnCloseStartInfo) func(Database
 			return
 		}
 	}
+
 	return res
 }
 func (t *DatabaseSQL) onConnBegin(d DatabaseSQLConnBeginStartInfo) func(DatabaseSQLConnBeginDoneInfo) {
@@ -717,6 +740,7 @@ func (t *DatabaseSQL) onConnBegin(d DatabaseSQLConnBeginStartInfo) func(Database
 			return
 		}
 	}
+
 	return res
 }
 func (t *DatabaseSQL) onConnQuery(d DatabaseSQLConnQueryStartInfo) func(DatabaseSQLConnQueryDoneInfo) {
@@ -732,6 +756,7 @@ func (t *DatabaseSQL) onConnQuery(d DatabaseSQLConnQueryStartInfo) func(Database
 			return
 		}
 	}
+
 	return res
 }
 func (t *DatabaseSQL) onConnExec(d DatabaseSQLConnExecStartInfo) func(DatabaseSQLConnExecDoneInfo) {
@@ -747,6 +772,7 @@ func (t *DatabaseSQL) onConnExec(d DatabaseSQLConnExecStartInfo) func(DatabaseSQ
 			return
 		}
 	}
+
 	return res
 }
 func (t *DatabaseSQL) onConnIsTableExists(d DatabaseSQLConnIsTableExistsStartInfo) func(DatabaseSQLConnIsTableExistsDoneInfo) {
@@ -762,6 +788,7 @@ func (t *DatabaseSQL) onConnIsTableExists(d DatabaseSQLConnIsTableExistsStartInf
 			return
 		}
 	}
+
 	return res
 }
 func (t *DatabaseSQL) onTxQuery(d DatabaseSQLTxQueryStartInfo) func(DatabaseSQLTxQueryDoneInfo) {
@@ -777,6 +804,7 @@ func (t *DatabaseSQL) onTxQuery(d DatabaseSQLTxQueryStartInfo) func(DatabaseSQLT
 			return
 		}
 	}
+
 	return res
 }
 func (t *DatabaseSQL) onTxExec(d DatabaseSQLTxExecStartInfo) func(DatabaseSQLTxExecDoneInfo) {
@@ -792,6 +820,7 @@ func (t *DatabaseSQL) onTxExec(d DatabaseSQLTxExecStartInfo) func(DatabaseSQLTxE
 			return
 		}
 	}
+
 	return res
 }
 func (t *DatabaseSQL) onTxPrepare(d DatabaseSQLTxPrepareStartInfo) func(DatabaseSQLTxPrepareDoneInfo) {
@@ -807,6 +836,7 @@ func (t *DatabaseSQL) onTxPrepare(d DatabaseSQLTxPrepareStartInfo) func(Database
 			return
 		}
 	}
+
 	return res
 }
 func (t *DatabaseSQL) onTxCommit(d DatabaseSQLTxCommitStartInfo) func(DatabaseSQLTxCommitDoneInfo) {
@@ -822,6 +852,7 @@ func (t *DatabaseSQL) onTxCommit(d DatabaseSQLTxCommitStartInfo) func(DatabaseSQ
 			return
 		}
 	}
+
 	return res
 }
 func (t *DatabaseSQL) onTxRollback(d DatabaseSQLTxRollbackStartInfo) func(DatabaseSQLTxRollbackDoneInfo) {
@@ -837,6 +868,7 @@ func (t *DatabaseSQL) onTxRollback(d DatabaseSQLTxRollbackStartInfo) func(Databa
 			return
 		}
 	}
+
 	return res
 }
 func (t *DatabaseSQL) onStmtQuery(d DatabaseSQLStmtQueryStartInfo) func(DatabaseSQLStmtQueryDoneInfo) {
@@ -852,6 +884,7 @@ func (t *DatabaseSQL) onStmtQuery(d DatabaseSQLStmtQueryStartInfo) func(Database
 			return
 		}
 	}
+
 	return res
 }
 func (t *DatabaseSQL) onStmtExec(d DatabaseSQLStmtExecStartInfo) func(DatabaseSQLStmtExecDoneInfo) {
@@ -867,6 +900,7 @@ func (t *DatabaseSQL) onStmtExec(d DatabaseSQLStmtExecStartInfo) func(DatabaseSQ
 			return
 		}
 	}
+
 	return res
 }
 func (t *DatabaseSQL) onStmtClose(d DatabaseSQLStmtCloseStartInfo) func(DatabaseSQLStmtCloseDoneInfo) {
@@ -882,6 +916,7 @@ func (t *DatabaseSQL) onStmtClose(d DatabaseSQLStmtCloseStartInfo) func(Database
 			return
 		}
 	}
+
 	return res
 }
 func (t *DatabaseSQL) onDoTx(d DatabaseSQLDoTxStartInfo) func(DatabaseSQLDoTxIntermediateInfo) func(DatabaseSQLDoTxDoneInfo) {
@@ -901,6 +936,7 @@ func (t *DatabaseSQL) onDoTx(d DatabaseSQLDoTxStartInfo) func(DatabaseSQLDoTxInt
 			}
 		}
 	}
+
 	return func(d DatabaseSQLDoTxIntermediateInfo) func(DatabaseSQLDoTxDoneInfo) {
 		res := res(d)
 		if res == nil {
@@ -908,6 +944,7 @@ func (t *DatabaseSQL) onDoTx(d DatabaseSQLDoTxStartInfo) func(DatabaseSQLDoTxInt
 				return
 			}
 		}
+
 		return res
 	}
 }
@@ -916,6 +953,7 @@ func DatabaseSQLOnConnectorConnect(t *DatabaseSQL, c *context.Context, call call
 	p.Context = c
 	p.Call = call
 	res := t.onConnectorConnect(p)
+
 	return func(e error, session tableSessionInfo) {
 		var p DatabaseSQLConnectorConnectDoneInfo
 		p.Error = e
@@ -928,6 +966,7 @@ func DatabaseSQLOnConnPing(t *DatabaseSQL, c *context.Context, call call) func(e
 	p.Context = c
 	p.Call = call
 	res := t.onConnPing(p)
+
 	return func(e error) {
 		var p DatabaseSQLConnPingDoneInfo
 		p.Error = e
@@ -940,6 +979,7 @@ func DatabaseSQLOnConnPrepare(t *DatabaseSQL, c *context.Context, call call, que
 	p.Call = call
 	p.Query = query
 	res := t.onConnPrepare(p)
+
 	return func(e error) {
 		var p DatabaseSQLConnPrepareDoneInfo
 		p.Error = e
@@ -951,6 +991,7 @@ func DatabaseSQLOnConnClose(t *DatabaseSQL, c *context.Context, call call) func(
 	p.Context = c
 	p.Call = call
 	res := t.onConnClose(p)
+
 	return func(e error) {
 		var p DatabaseSQLConnCloseDoneInfo
 		p.Error = e
@@ -962,6 +1003,7 @@ func DatabaseSQLOnConnBegin(t *DatabaseSQL, c *context.Context, call call) func(
 	p.Context = c
 	p.Call = call
 	res := t.onConnBegin(p)
+
 	return func(tx tableTransactionInfo, e error) {
 		var p DatabaseSQLConnBeginDoneInfo
 		p.Tx = tx
@@ -978,6 +1020,7 @@ func DatabaseSQLOnConnQuery(t *DatabaseSQL, c *context.Context, call call, query
 	p.Idempotent = idempotent
 	p.IdleTime = idleTime
 	res := t.onConnQuery(p)
+
 	return func(e error) {
 		var p DatabaseSQLConnQueryDoneInfo
 		p.Error = e
@@ -993,6 +1036,7 @@ func DatabaseSQLOnConnExec(t *DatabaseSQL, c *context.Context, call call, query 
 	p.Idempotent = idempotent
 	p.IdleTime = idleTime
 	res := t.onConnExec(p)
+
 	return func(e error) {
 		var p DatabaseSQLConnExecDoneInfo
 		p.Error = e
@@ -1005,6 +1049,7 @@ func DatabaseSQLOnConnIsTableExists(t *DatabaseSQL, c *context.Context, call cal
 	p.Call = call
 	p.TableName = tableName
 	res := t.onConnIsTableExists(p)
+
 	return func(exists bool, e error) {
 		var p DatabaseSQLConnIsTableExistsDoneInfo
 		p.Exists = exists
@@ -1021,6 +1066,7 @@ func DatabaseSQLOnTxQuery(t *DatabaseSQL, c *context.Context, call call, txConte
 	p.Query = query
 	p.Idempotent = idempotent
 	res := t.onTxQuery(p)
+
 	return func(e error) {
 		var p DatabaseSQLTxQueryDoneInfo
 		p.Error = e
@@ -1036,6 +1082,7 @@ func DatabaseSQLOnTxExec(t *DatabaseSQL, c *context.Context, call call, txContex
 	p.Query = query
 	p.Idempotent = idempotent
 	res := t.onTxExec(p)
+
 	return func(e error) {
 		var p DatabaseSQLTxExecDoneInfo
 		p.Error = e
@@ -1050,6 +1097,7 @@ func DatabaseSQLOnTxPrepare(t *DatabaseSQL, c *context.Context, call call, txCon
 	p.Tx = tx
 	p.Query = query
 	res := t.onTxPrepare(p)
+
 	return func(e error) {
 		var p DatabaseSQLTxPrepareDoneInfo
 		p.Error = e
@@ -1062,6 +1110,7 @@ func DatabaseSQLOnTxCommit(t *DatabaseSQL, c *context.Context, call call, tx tab
 	p.Call = call
 	p.Tx = tx
 	res := t.onTxCommit(p)
+
 	return func(e error) {
 		var p DatabaseSQLTxCommitDoneInfo
 		p.Error = e
@@ -1074,6 +1123,7 @@ func DatabaseSQLOnTxRollback(t *DatabaseSQL, c *context.Context, call call, tx t
 	p.Call = call
 	p.Tx = tx
 	res := t.onTxRollback(p)
+
 	return func(e error) {
 		var p DatabaseSQLTxRollbackDoneInfo
 		p.Error = e
@@ -1087,6 +1137,7 @@ func DatabaseSQLOnStmtQuery(t *DatabaseSQL, c *context.Context, call call, stmtC
 	p.StmtContext = stmtContext
 	p.Query = query
 	res := t.onStmtQuery(p)
+
 	return func(e error) {
 		var p DatabaseSQLStmtQueryDoneInfo
 		p.Error = e
@@ -1100,6 +1151,7 @@ func DatabaseSQLOnStmtExec(t *DatabaseSQL, c *context.Context, call call, stmtCo
 	p.StmtContext = stmtContext
 	p.Query = query
 	res := t.onStmtExec(p)
+
 	return func(e error) {
 		var p DatabaseSQLStmtExecDoneInfo
 		p.Error = e
@@ -1111,6 +1163,7 @@ func DatabaseSQLOnStmtClose(t *DatabaseSQL, stmtContext *context.Context, call c
 	p.StmtContext = stmtContext
 	p.Call = call
 	res := t.onStmtClose(p)
+
 	return func(e error) {
 		var p DatabaseSQLStmtCloseDoneInfo
 		p.Error = e
@@ -1124,10 +1177,12 @@ func DatabaseSQLOnDoTx(t *DatabaseSQL, c *context.Context, call call, iD string,
 	p.ID = iD
 	p.Idempotent = idempotent
 	res := t.onDoTx(p)
+
 	return func(e error) func(int, error) {
 		var p DatabaseSQLDoTxIntermediateInfo
 		p.Error = e
 		res := res(p)
+
 		return func(attempts int, e error) {
 			var p DatabaseSQLDoTxDoneInfo
 			p.Attempts = attempts

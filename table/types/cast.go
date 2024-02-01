@@ -27,6 +27,7 @@ func IsOptional(t Type) (isOptional bool, innerType Type) {
 	}); isOptional {
 		return isOptional, optionalType.InnerType()
 	}
+
 	return false, nil
 }
 
@@ -50,6 +51,7 @@ func ListItems(v Value) ([]Value, error) {
 	}); has {
 		return vv.ListItems(), nil
 	}
+
 	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get list items from '%s'", v.Type().Yql()))
 }
 
@@ -82,6 +84,7 @@ func VariantValue(v Value) (name string, idx uint32, _ Value, _ error) {
 		Value() Value
 	}); has {
 		name, idx := vv.Variant()
+
 		return name, idx, vv.Value(), nil
 	}
 

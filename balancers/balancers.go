@@ -40,6 +40,7 @@ func (filterLocalDC) String() string {
 func PreferLocalDC(balancer *balancerConfig.Config) *balancerConfig.Config {
 	balancer.Filter = filterLocalDC{}
 	balancer.DetectLocalDC = true
+
 	return balancer
 }
 
@@ -49,6 +50,7 @@ func PreferLocalDC(balancer *balancerConfig.Config) *balancerConfig.Config {
 func PreferLocalDCWithFallBack(balancer *balancerConfig.Config) *balancerConfig.Config {
 	balancer = PreferLocalDC(balancer)
 	balancer.AllowFallback = true
+
 	return balancer
 }
 

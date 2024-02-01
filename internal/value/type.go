@@ -209,6 +209,7 @@ func (v *dictType) Yql() string {
 	buffer.WriteByte(',')
 	buffer.WriteString(v.valueType.Yql())
 	buffer.WriteByte('>')
+
 	return buffer.String()
 }
 
@@ -261,6 +262,7 @@ func (v emptyListType) String() string {
 
 func (emptyListType) equalsTo(rhs Type) bool {
 	_, ok := rhs.(emptyListType)
+
 	return ok
 }
 
@@ -288,6 +290,7 @@ func (v emptyDictType) Yql() string {
 
 func (emptyDictType) equalsTo(rhs Type) bool {
 	_, ok := rhs.(emptyDictType)
+
 	return ok
 }
 
@@ -366,6 +369,7 @@ func (v *setType) equalsTo(rhs Type) bool {
 	if !ok {
 		return false
 	}
+
 	return v.itemType.equalsTo(vv.itemType)
 }
 
@@ -413,6 +417,7 @@ func (v optionalType) equalsTo(rhs Type) bool {
 	if !ok {
 		return false
 	}
+
 	return v.innerType.equalsTo(vv.innerType)
 }
 
@@ -537,6 +542,7 @@ func (v PrimitiveType) equalsTo(rhs Type) bool {
 	if !ok {
 		return false
 	}
+
 	return v == vv
 }
 
@@ -654,6 +660,7 @@ func (v *TupleType) Yql() string {
 		buffer.WriteString(t.Yql())
 	}
 	buffer.WriteByte('>')
+
 	return buffer.String()
 }
 
@@ -670,6 +677,7 @@ func (v *TupleType) equalsTo(rhs Type) bool {
 			return false
 		}
 	}
+
 	return true
 }
 

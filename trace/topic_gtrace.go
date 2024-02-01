@@ -67,6 +67,7 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TopicReaderReconnectDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -121,6 +122,7 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TopicReaderPartitionReadStartResponseDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -156,6 +158,7 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TopicReaderPartitionReadStopResponseDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -191,6 +194,7 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TopicReaderCommitDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -226,6 +230,7 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TopicReaderSendCommitMessageDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -280,6 +285,7 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TopicReaderCloseDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -315,6 +321,7 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TopicReaderInitDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -369,6 +376,7 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 			if h2 != nil {
 				r1 = h2(o)
 			}
+
 			return func(o OnReadUpdateTokenMiddleTokenReceivedInfo) func(OnReadStreamUpdateTokenDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -384,6 +392,7 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 				if r1 != nil {
 					r3 = r1(o)
 				}
+
 				return func(o OnReadStreamUpdateTokenDoneInfo) {
 					if options.panicCallback != nil {
 						defer func() {
@@ -439,6 +448,7 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TopicReaderReceiveDataResponseDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -474,6 +484,7 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TopicReaderReadMessagesDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -528,6 +539,7 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TopicWriterReconnectDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -563,6 +575,7 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TopicWriterInitStreamDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -598,6 +611,7 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TopicWriterCloseDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -633,6 +647,7 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TopicWriterCompressMessagesDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -668,6 +683,7 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TopicWriterSendMessagesDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -704,6 +720,7 @@ func (t *Topic) Compose(x *Topic, opts ...TopicComposeOption) *Topic {
 			}
 		}
 	}
+
 	return &ret
 }
 func (t *Topic) onReaderStart(info TopicReaderStartInfo) {
@@ -726,6 +743,7 @@ func (t *Topic) onReaderReconnect(t1 TopicReaderReconnectStartInfo) func(TopicRe
 			return
 		}
 	}
+
 	return res
 }
 func (t *Topic) onReaderReconnectRequest(t1 TopicReaderReconnectRequestInfo) {
@@ -748,6 +766,7 @@ func (t *Topic) onReaderPartitionReadStartResponse(t1 TopicReaderPartitionReadSt
 			return
 		}
 	}
+
 	return res
 }
 func (t *Topic) onReaderPartitionReadStopResponse(t1 TopicReaderPartitionReadStopResponseStartInfo) func(TopicReaderPartitionReadStopResponseDoneInfo) {
@@ -763,6 +782,7 @@ func (t *Topic) onReaderPartitionReadStopResponse(t1 TopicReaderPartitionReadSto
 			return
 		}
 	}
+
 	return res
 }
 func (t *Topic) onReaderCommit(t1 TopicReaderCommitStartInfo) func(TopicReaderCommitDoneInfo) {
@@ -778,6 +798,7 @@ func (t *Topic) onReaderCommit(t1 TopicReaderCommitStartInfo) func(TopicReaderCo
 			return
 		}
 	}
+
 	return res
 }
 func (t *Topic) onReaderSendCommitMessage(t1 TopicReaderSendCommitMessageStartInfo) func(TopicReaderSendCommitMessageDoneInfo) {
@@ -793,6 +814,7 @@ func (t *Topic) onReaderSendCommitMessage(t1 TopicReaderSendCommitMessageStartIn
 			return
 		}
 	}
+
 	return res
 }
 func (t *Topic) onReaderCommittedNotify(t1 TopicReaderCommittedNotifyInfo) {
@@ -815,6 +837,7 @@ func (t *Topic) onReaderClose(t1 TopicReaderCloseStartInfo) func(TopicReaderClos
 			return
 		}
 	}
+
 	return res
 }
 func (t *Topic) onReaderInit(t1 TopicReaderInitStartInfo) func(TopicReaderInitDoneInfo) {
@@ -830,6 +853,7 @@ func (t *Topic) onReaderInit(t1 TopicReaderInitStartInfo) func(TopicReaderInitDo
 			return
 		}
 	}
+
 	return res
 }
 func (t *Topic) onReaderError(t1 TopicReaderErrorInfo) {
@@ -856,6 +880,7 @@ func (t *Topic) onReaderUpdateToken(o OnReadUpdateTokenStartInfo) func(OnReadUpd
 			}
 		}
 	}
+
 	return func(o OnReadUpdateTokenMiddleTokenReceivedInfo) func(OnReadStreamUpdateTokenDoneInfo) {
 		res := res(o)
 		if res == nil {
@@ -863,6 +888,7 @@ func (t *Topic) onReaderUpdateToken(o OnReadUpdateTokenStartInfo) func(OnReadUpd
 				return
 			}
 		}
+
 		return res
 	}
 }
@@ -886,6 +912,7 @@ func (t *Topic) onReaderReceiveDataResponse(t1 TopicReaderReceiveDataResponseSta
 			return
 		}
 	}
+
 	return res
 }
 func (t *Topic) onReaderReadMessages(t1 TopicReaderReadMessagesStartInfo) func(TopicReaderReadMessagesDoneInfo) {
@@ -901,6 +928,7 @@ func (t *Topic) onReaderReadMessages(t1 TopicReaderReadMessagesStartInfo) func(T
 			return
 		}
 	}
+
 	return res
 }
 func (t *Topic) onReaderUnknownGrpcMessage(o OnReadUnknownGrpcMessageInfo) {
@@ -923,6 +951,7 @@ func (t *Topic) onWriterReconnect(t1 TopicWriterReconnectStartInfo) func(TopicWr
 			return
 		}
 	}
+
 	return res
 }
 func (t *Topic) onWriterInitStream(t1 TopicWriterInitStreamStartInfo) func(TopicWriterInitStreamDoneInfo) {
@@ -938,6 +967,7 @@ func (t *Topic) onWriterInitStream(t1 TopicWriterInitStreamStartInfo) func(Topic
 			return
 		}
 	}
+
 	return res
 }
 func (t *Topic) onWriterClose(t1 TopicWriterCloseStartInfo) func(TopicWriterCloseDoneInfo) {
@@ -953,6 +983,7 @@ func (t *Topic) onWriterClose(t1 TopicWriterCloseStartInfo) func(TopicWriterClos
 			return
 		}
 	}
+
 	return res
 }
 func (t *Topic) onWriterCompressMessages(t1 TopicWriterCompressMessagesStartInfo) func(TopicWriterCompressMessagesDoneInfo) {
@@ -968,6 +999,7 @@ func (t *Topic) onWriterCompressMessages(t1 TopicWriterCompressMessagesStartInfo
 			return
 		}
 	}
+
 	return res
 }
 func (t *Topic) onWriterSendMessages(t1 TopicWriterSendMessagesStartInfo) func(TopicWriterSendMessagesDoneInfo) {
@@ -983,6 +1015,7 @@ func (t *Topic) onWriterSendMessages(t1 TopicWriterSendMessagesStartInfo) func(T
 			return
 		}
 	}
+
 	return res
 }
 func (t *Topic) onWriterReadUnknownGrpcMessage(t1 TopicOnWriterReadUnknownGrpcMessageInfo) {
@@ -1002,6 +1035,7 @@ func TopicOnReaderReconnect(t *Topic, reason error) func(error) {
 	var p TopicReaderReconnectStartInfo
 	p.Reason = reason
 	res := t.onReaderReconnect(p)
+
 	return func(e error) {
 		var p TopicReaderReconnectDoneInfo
 		p.Error = e
@@ -1022,6 +1056,7 @@ func TopicOnReaderPartitionReadStartResponse(t *Topic, readerConnectionID string
 	p.PartitionID = partitionID
 	p.PartitionSessionID = partitionSessionID
 	res := t.onReaderPartitionReadStartResponse(p)
+
 	return func(readOffset *int64, commitOffset *int64, e error) {
 		var p TopicReaderPartitionReadStartResponseDoneInfo
 		p.ReadOffset = readOffset
@@ -1040,6 +1075,7 @@ func TopicOnReaderPartitionReadStopResponse(t *Topic, readerConnectionID string,
 	p.CommittedOffset = committedOffset
 	p.Graceful = graceful
 	res := t.onReaderPartitionReadStopResponse(p)
+
 	return func(e error) {
 		var p TopicReaderPartitionReadStopResponseDoneInfo
 		p.Error = e
@@ -1055,6 +1091,7 @@ func TopicOnReaderCommit(t *Topic, requestContext context.Context, topic string,
 	p.StartOffset = startOffset
 	p.EndOffset = endOffset
 	res := t.onReaderCommit(p)
+
 	return func(e error) {
 		var p TopicReaderCommitDoneInfo
 		p.Error = e
@@ -1065,6 +1102,7 @@ func TopicOnReaderSendCommitMessage(t *Topic, commitsInfo TopicReaderStreamSendC
 	var p TopicReaderSendCommitMessageStartInfo
 	p.CommitsInfo = commitsInfo
 	res := t.onReaderSendCommitMessage(p)
+
 	return func(e error) {
 		var p TopicReaderSendCommitMessageDoneInfo
 		p.Error = e
@@ -1085,6 +1123,7 @@ func TopicOnReaderClose(t *Topic, readerConnectionID string, closeReason error) 
 	p.ReaderConnectionID = readerConnectionID
 	p.CloseReason = closeReason
 	res := t.onReaderClose(p)
+
 	return func(closeError error) {
 		var p TopicReaderCloseDoneInfo
 		p.CloseError = closeError
@@ -1096,6 +1135,7 @@ func TopicOnReaderInit(t *Topic, preInitReaderConnectionID string, initRequestIn
 	p.PreInitReaderConnectionID = preInitReaderConnectionID
 	p.InitRequestInfo = initRequestInfo
 	res := t.onReaderInit(p)
+
 	return func(readerConnectionID string, e error) {
 		var p TopicReaderInitDoneInfo
 		p.ReaderConnectionID = readerConnectionID
@@ -1113,11 +1153,13 @@ func TopicOnReaderUpdateToken(t *Topic, readerConnectionID string) func(tokenLen
 	var p OnReadUpdateTokenStartInfo
 	p.ReaderConnectionID = readerConnectionID
 	res := t.onReaderUpdateToken(p)
+
 	return func(tokenLen int, e error) func(error) {
 		var p OnReadUpdateTokenMiddleTokenReceivedInfo
 		p.TokenLen = tokenLen
 		p.Error = e
 		res := res(p)
+
 		return func(e error) {
 			var p OnReadStreamUpdateTokenDoneInfo
 			p.Error = e
@@ -1138,6 +1180,7 @@ func TopicOnReaderReceiveDataResponse(t *Topic, readerConnectionID string, local
 	p.LocalBufferSizeAfterReceive = localBufferSizeAfterReceive
 	p.DataResponse = dataResponse
 	res := t.onReaderReceiveDataResponse(p)
+
 	return func(e error) {
 		var p TopicReaderReceiveDataResponseDoneInfo
 		p.Error = e
@@ -1151,6 +1194,7 @@ func TopicOnReaderReadMessages(t *Topic, requestContext context.Context, minCoun
 	p.MaxCount = maxCount
 	p.FreeBufferCapacity = freeBufferCapacity
 	res := t.onReaderReadMessages(p)
+
 	return func(messagesCount int, topic string, partitionID int64, partitionSessionID int64, offsetStart int64, offsetEnd int64, freeBufferCapacity int, e error) {
 		var p TopicReaderReadMessagesDoneInfo
 		p.MessagesCount = messagesCount
@@ -1177,6 +1221,7 @@ func TopicOnWriterReconnect(t *Topic, writerInstanceID string, topic string, pro
 	p.ProducerID = producerID
 	p.Attempt = attempt
 	res := t.onWriterReconnect(p)
+
 	return func(e error) {
 		var p TopicWriterReconnectDoneInfo
 		p.Error = e
@@ -1189,6 +1234,7 @@ func TopicOnWriterInitStream(t *Topic, writerInstanceID string, topic string, pr
 	p.Topic = topic
 	p.ProducerID = producerID
 	res := t.onWriterInitStream(p)
+
 	return func(sessionID string, e error) {
 		var p TopicWriterInitStreamDoneInfo
 		p.SessionID = sessionID
@@ -1201,6 +1247,7 @@ func TopicOnWriterClose(t *Topic, writerInstanceID string, reason error) func(er
 	p.WriterInstanceID = writerInstanceID
 	p.Reason = reason
 	res := t.onWriterClose(p)
+
 	return func(e error) {
 		var p TopicWriterCloseDoneInfo
 		p.Error = e
@@ -1216,6 +1263,7 @@ func TopicOnWriterCompressMessages(t *Topic, writerInstanceID string, sessionID 
 	p.MessagesCount = messagesCount
 	p.Reason = reason
 	res := t.onWriterCompressMessages(p)
+
 	return func(e error) {
 		var p TopicWriterCompressMessagesDoneInfo
 		p.Error = e
@@ -1230,6 +1278,7 @@ func TopicOnWriterSendMessages(t *Topic, writerInstanceID string, sessionID stri
 	p.FirstSeqNo = firstSeqNo
 	p.MessagesCount = messagesCount
 	res := t.onWriterSendMessages(p)
+
 	return func(e error) {
 		var p TopicWriterSendMessagesDoneInfo
 		p.Error = e

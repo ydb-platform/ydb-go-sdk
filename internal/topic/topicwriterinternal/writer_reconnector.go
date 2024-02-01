@@ -69,6 +69,7 @@ func (cfg *WriterReconnectorConfig) validate() error {
 		cfg.producerID != cfg.defaultPartitioning.MessageGroupID {
 		return xerrors.WithStackTrace(errProducerIDNotEqualMessageGroupID)
 	}
+
 	return nil
 }
 
@@ -139,6 +140,7 @@ func newWriterReconnector(
 ) *WriterReconnector {
 	res := newWriterReconnectorStopped(cfg)
 	res.start()
+
 	return res
 }
 
@@ -341,6 +343,7 @@ func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr err
 	if resErr == nil {
 		resErr = bgErr
 	}
+
 	return resErr
 }
 
@@ -487,6 +490,7 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 	w.m.WithLock(func() {
 		if writerStream == nil {
 			w.sessionID = ""
+
 			return
 		}
 		w.sessionID = writerStream.SessionID
@@ -589,6 +593,7 @@ func sendMessagesToStream(
 	if err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: failed send write request: %w", err))
 	}
+
 	return nil
 }
 
@@ -622,6 +627,7 @@ func splitMessagesByBufCodec(messages []messageWithDataContent) (res [][]message
 		}
 	}
 	res = append(res, messages[currentGroupStart:len(messages):len(messages)])
+
 	return res
 }
 
@@ -682,6 +688,7 @@ func calculateAllowedCodecs(forceCodec rawtopiccommon.Codec, encoderMap *Encoder
 		if serverCodecs.AllowedByCodecsList(forceCodec) && encoderMap.IsSupported(forceCodec) {
 			return rawtopiccommon.SupportedCodecs{forceCodec}
 		}
+
 		return nil
 	}
 
@@ -700,6 +707,7 @@ func calculateAllowedCodecs(forceCodec rawtopiccommon.Codec, encoderMap *Encoder
 	if len(res) == 0 {
 		res = nil
 	}
+
 	return res
 }
 
@@ -710,5 +718,6 @@ func createPublicCodecsFromRaw(codecs rawtopiccommon.SupportedCodecs) []topictyp
 	for i, v := range codecs {
 		res[i] = topictypes.Codec(v)
 	}
+
 	return res
 }

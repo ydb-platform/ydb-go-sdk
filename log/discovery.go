@@ -45,6 +45,7 @@ func internalDiscovery(l Logger, d trace.Detailer) (t trace.Discovery) {
 		ctx := with(*info.Context, TRACE, "ydb", "discovery", "whoAmI")
 		l.Log(ctx, "start")
 		start := time.Now()
+
 		return func(info trace.DiscoveryWhoAmIDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -61,5 +62,6 @@ func internalDiscovery(l Logger, d trace.Detailer) (t trace.Discovery) {
 			}
 		}
 	}
+
 	return t
 }

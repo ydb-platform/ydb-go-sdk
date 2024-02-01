@@ -279,6 +279,7 @@ func BigIntToByte(x *big.Int, precision, scale uint32) (p [16]byte) {
 		}
 	}
 	put(x, p[:])
+
 	return p
 }
 

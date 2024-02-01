@@ -202,6 +202,7 @@ func (p *Pool) collectConns() []*conn {
 	for _, c := range p.conns {
 		conns = append(conns, c)
 	}
+
 	return conns
 }
 

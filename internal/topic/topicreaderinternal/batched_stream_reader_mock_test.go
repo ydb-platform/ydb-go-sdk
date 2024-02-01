@@ -28,6 +28,7 @@ type MockbatchedStreamReaderMockRecorder struct {
 func NewMockbatchedStreamReader(ctrl *gomock.Controller) *MockbatchedStreamReader {
 	mock := &MockbatchedStreamReader{ctrl: ctrl}
 	mock.recorder = &MockbatchedStreamReaderMockRecorder{mock}
+
 	return mock
 }
 
@@ -41,12 +42,14 @@ func (m *MockbatchedStreamReader) CloseWithError(ctx context.Context, err error)
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CloseWithError", ctx, err)
 	ret0, _ := ret[0].(error)
+
 	return ret0
 }
 
 // CloseWithError indicates an expected call of CloseWithError.
 func (mr *MockbatchedStreamReaderMockRecorder) CloseWithError(ctx, err any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
+
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CloseWithError", reflect.TypeOf((*MockbatchedStreamReader)(nil).CloseWithError), ctx, err)
 }
 
@@ -55,12 +58,14 @@ func (m *MockbatchedStreamReader) Commit(ctx context.Context, commitRange commit
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Commit", ctx, commitRange)
 	ret0, _ := ret[0].(error)
+
 	return ret0
 }
 
 // Commit indicates an expected call of Commit.
 func (mr *MockbatchedStreamReaderMockRecorder) Commit(ctx, commitRange any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
+
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Commit", reflect.TypeOf((*MockbatchedStreamReader)(nil).Commit), ctx, commitRange)
 }
 
@@ -70,12 +75,14 @@ func (m *MockbatchedStreamReader) ReadMessageBatch(ctx context.Context, opts Rea
 	ret := m.ctrl.Call(m, "ReadMessageBatch", ctx, opts)
 	ret0, _ := ret[0].(*PublicBatch)
 	ret1, _ := ret[1].(error)
+
 	return ret0, ret1
 }
 
 // ReadMessageBatch indicates an expected call of ReadMessageBatch.
 func (mr *MockbatchedStreamReaderMockRecorder) ReadMessageBatch(ctx, opts any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
+
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadMessageBatch", reflect.TypeOf((*MockbatchedStreamReader)(nil).ReadMessageBatch), ctx, opts)
 }
 
@@ -84,11 +91,13 @@ func (m *MockbatchedStreamReader) WaitInit(ctx context.Context) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WaitInit", ctx)
 	ret0, _ := ret[0].(error)
+
 	return ret0
 }
 
 // WaitInit indicates an expected call of WaitInit.
 func (mr *MockbatchedStreamReaderMockRecorder) WaitInit(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
+
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitInit", reflect.TypeOf((*MockbatchedStreamReader)(nil).WaitInit), ctx)
 }

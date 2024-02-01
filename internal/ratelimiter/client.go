@@ -138,6 +138,7 @@ func (c *Client) alterResource(
 			operation.ModeSync,
 		),
 	})
+
 	return
 }
 
@@ -193,10 +194,12 @@ func (c *Client) ListResource(
 	}
 	call := func(ctx context.Context) (err error) {
 		list, err = c.listResource(ctx, coordinationNodePath, resourcePath, recursive)
+
 		return xerrors.WithStackTrace(err)
 	}
 	if !c.config.AutoRetry() {
 		err := call(ctx)
+
 		return list, err
 	}
 	err := retry.Retry(ctx, call,
@@ -250,10 +253,12 @@ func (c *Client) DescribeResource(
 	}
 	call := func(ctx context.Context) error {
 		resource, err = c.describeResource(ctx, coordinationNodePath, resourcePath)
+
 		return xerrors.WithStackTrace(err)
 	}
 	if !c.config.AutoRetry() {
 		err = call(ctx)
+
 		return
 	}
 	err = retry.Retry(ctx, call,

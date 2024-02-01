@@ -164,6 +164,7 @@ func (f Field) String() string {
 		if f.vany == nil || f.vany.(error) == nil {
 			return "<nil>"
 		}
+
 		return f.ErrorValue().Error()
 	case AnyType:
 		if f.vany == nil {
@@ -173,8 +174,10 @@ func (f Field) String() string {
 			if v.IsNil() {
 				return nilPtr
 			}
+
 			return v.Type().String() + "(" + fmt.Sprint(v.Elem()) + ")"
 		}
+
 		return fmt.Sprint(f.vany)
 	case StringerType:
 		return f.Stringer().String()
@@ -217,6 +220,7 @@ func Bool(key string, value bool) Field {
 	} else {
 		vint = 0
 	}
+
 	return Field{
 		ftype: BoolType,
 		key:   key,
@@ -271,6 +275,7 @@ func Stringer(key string, value fmt.Stringer) Field {
 	if value == nil {
 		return Any(key, nil)
 	}
+
 	return Field{
 		ftype: StringerType,
 		key:   key,
@@ -335,6 +340,7 @@ func (ft FieldType) String() (typeName string) {
 	default:
 		panic("not implemented")
 	}
+
 	return typeName
 }
 
@@ -361,6 +367,7 @@ func (ee endpoints) String() string {
 		b.WriteString(e.String())
 	}
 	b.WriteByte(']')
+
 	return b.String()
 }
 
@@ -371,6 +378,7 @@ func (m metadata) String() string {
 	if err != nil {
 		return fmt.Sprintf("error:%s", err)
 	}
+
 	return xstring.FromBytes(b)
 }
 
@@ -378,5 +386,6 @@ func appendFieldByCondition(condition bool, ifTrueField Field, fields ...Field) 
 	if condition {
 		fields = append(fields, ifTrueField)
 	}
+
 	return fields
 }

@@ -48,6 +48,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TableInitDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -83,6 +84,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TableCloseDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -118,6 +120,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(info TableDoIntermediateInfo) func(TableDoDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -133,6 +136,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 				if r1 != nil {
 					r3 = r1(info)
 				}
+
 				return func(t TableDoDoneInfo) {
 					if options.panicCallback != nil {
 						defer func() {
@@ -169,6 +173,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(info TableDoTxIntermediateInfo) func(TableDoTxDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -184,6 +189,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 				if r1 != nil {
 					r3 = r1(info)
 				}
+
 				return func(t TableDoTxDoneInfo) {
 					if options.panicCallback != nil {
 						defer func() {
@@ -220,6 +226,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(info TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -235,6 +242,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 				if r1 != nil {
 					r3 = r1(info)
 				}
+
 				return func(t TableCreateSessionDoneInfo) {
 					if options.panicCallback != nil {
 						defer func() {
@@ -271,6 +279,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TableSessionNewDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -306,6 +315,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TableSessionDeleteDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -341,6 +351,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TableKeepAliveDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -376,6 +387,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TableBulkUpsertDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -411,6 +423,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TablePrepareDataQueryDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -446,6 +459,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TableExecuteDataQueryDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -481,6 +495,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TableExplainQueryDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -516,6 +531,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TableSessionQueryStreamExecuteIntermediateInfo) func(TableSessionQueryStreamExecuteDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -531,6 +547,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 				if r1 != nil {
 					r3 = r1(t)
 				}
+
 				return func(t TableSessionQueryStreamExecuteDoneInfo) {
 					if options.panicCallback != nil {
 						defer func() {
@@ -567,6 +584,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TableSessionQueryStreamReadIntermediateInfo) func(TableSessionQueryStreamReadDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -582,6 +600,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 				if r1 != nil {
 					r3 = r1(t)
 				}
+
 				return func(t TableSessionQueryStreamReadDoneInfo) {
 					if options.panicCallback != nil {
 						defer func() {
@@ -618,6 +637,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TableSessionTransactionBeginDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -653,6 +673,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TableTransactionExecuteDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -688,6 +709,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TableTransactionExecuteStatementDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -723,6 +745,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TableSessionTransactionCommitDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -758,6 +781,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TableSessionTransactionRollbackDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -850,6 +874,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TablePoolSessionNewDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -885,6 +910,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TablePoolSessionCloseDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -920,6 +946,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TablePoolPutDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -955,6 +982,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TablePoolGetDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -990,6 +1018,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			if h2 != nil {
 				r1 = h2(t)
 			}
+
 			return func(t TablePoolWaitDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -1007,6 +1036,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			}
 		}
 	}
+
 	return &ret
 }
 func (t *Table) onInit(t1 TableInitStartInfo) func(TableInitDoneInfo) {
@@ -1022,6 +1052,7 @@ func (t *Table) onInit(t1 TableInitStartInfo) func(TableInitDoneInfo) {
 			return
 		}
 	}
+
 	return res
 }
 func (t *Table) onClose(t1 TableCloseStartInfo) func(TableCloseDoneInfo) {
@@ -1037,6 +1068,7 @@ func (t *Table) onClose(t1 TableCloseStartInfo) func(TableCloseDoneInfo) {
 			return
 		}
 	}
+
 	return res
 }
 func (t *Table) onDo(t1 TableDoStartInfo) func(info TableDoIntermediateInfo) func(TableDoDoneInfo) {
@@ -1056,6 +1088,7 @@ func (t *Table) onDo(t1 TableDoStartInfo) func(info TableDoIntermediateInfo) fun
 			}
 		}
 	}
+
 	return func(info TableDoIntermediateInfo) func(TableDoDoneInfo) {
 		res := res(info)
 		if res == nil {
@@ -1063,6 +1096,7 @@ func (t *Table) onDo(t1 TableDoStartInfo) func(info TableDoIntermediateInfo) fun
 				return
 			}
 		}
+
 		return res
 	}
 }
@@ -1083,6 +1117,7 @@ func (t *Table) onDoTx(t1 TableDoTxStartInfo) func(info TableDoTxIntermediateInf
 			}
 		}
 	}
+
 	return func(info TableDoTxIntermediateInfo) func(TableDoTxDoneInfo) {
 		res := res(info)
 		if res == nil {
@@ -1090,6 +1125,7 @@ func (t *Table) onDoTx(t1 TableDoTxStartInfo) func(info TableDoTxIntermediateInf
 				return
 			}
 		}
+
 		return res
 	}
 }
@@ -1110,6 +1146,7 @@ func (t *Table) onCreateSession(t1 TableCreateSessionStartInfo) func(info TableC
 			}
 		}
 	}
+
 	return func(info TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
 		res := res(info)
 		if res == nil {
@@ -1117,6 +1154,7 @@ func (t *Table) onCreateSession(t1 TableCreateSessionStartInfo) func(info TableC
 				return
 			}
 		}
+
 		return res
 	}
 }
@@ -1133,6 +1171,7 @@ func (t *Table) onSessionNew(t1 TableSessionNewStartInfo) func(TableSessionNewDo
 			return
 		}
 	}
+
 	return res
 }
 func (t *Table) onSessionDelete(t1 TableSessionDeleteStartInfo) func(TableSessionDeleteDoneInfo) {
@@ -1148,6 +1187,7 @@ func (t *Table) onSessionDelete(t1 TableSessionDeleteStartInfo) func(TableSessio
 			return
 		}
 	}
+
 	return res
 }
 func (t *Table) onSessionKeepAlive(t1 TableKeepAliveStartInfo) func(TableKeepAliveDoneInfo) {
@@ -1163,6 +1203,7 @@ func (t *Table) onSessionKeepAlive(t1 TableKeepAliveStartInfo) func(TableKeepAli
 			return
 		}
 	}
+
 	return res
 }
 func (t *Table) onSessionBulkUpsert(t1 TableBulkUpsertStartInfo) func(TableBulkUpsertDoneInfo) {
@@ -1178,6 +1219,7 @@ func (t *Table) onSessionBulkUpsert(t1 TableBulkUpsertStartInfo) func(TableBulkU
 			return
 		}
 	}
+
 	return res
 }
 func (t *Table) onSessionQueryPrepare(t1 TablePrepareDataQueryStartInfo) func(TablePrepareDataQueryDoneInfo) {
@@ -1193,6 +1235,7 @@ func (t *Table) onSessionQueryPrepare(t1 TablePrepareDataQueryStartInfo) func(Ta
 			return
 		}
 	}
+
 	return res
 }
 func (t *Table) onSessionQueryExecute(t1 TableExecuteDataQueryStartInfo) func(TableExecuteDataQueryDoneInfo) {
@@ -1208,6 +1251,7 @@ func (t *Table) onSessionQueryExecute(t1 TableExecuteDataQueryStartInfo) func(Ta
 			return
 		}
 	}
+
 	return res
 }
 func (t *Table) onSessionQueryExplain(t1 TableExplainQueryStartInfo) func(TableExplainQueryDoneInfo) {
@@ -1223,6 +1267,7 @@ func (t *Table) onSessionQueryExplain(t1 TableExplainQueryStartInfo) func(TableE
 			return
 		}
 	}
+
 	return res
 }
 func (t *Table) onSessionQueryStreamExecute(t1 TableSessionQueryStreamExecuteStartInfo) func(TableSessionQueryStreamExecuteIntermediateInfo) func(TableSessionQueryStreamExecuteDoneInfo) {
@@ -1242,6 +1287,7 @@ func (t *Table) onSessionQueryStreamExecute(t1 TableSessionQueryStreamExecuteSta
 			}
 		}
 	}
+
 	return func(t TableSessionQueryStreamExecuteIntermediateInfo) func(TableSessionQueryStreamExecuteDoneInfo) {
 		res := res(t)
 		if res == nil {
@@ -1249,6 +1295,7 @@ func (t *Table) onSessionQueryStreamExecute(t1 TableSessionQueryStreamExecuteSta
 				return
 			}
 		}
+
 		return res
 	}
 }
@@ -1269,6 +1316,7 @@ func (t *Table) onSessionQueryStreamRead(t1 TableSessionQueryStreamReadStartInfo
 			}
 		}
 	}
+
 	return func(t TableSessionQueryStreamReadIntermediateInfo) func(TableSessionQueryStreamReadDoneInfo) {
 		res := res(t)
 		if res == nil {
@@ -1276,6 +1324,7 @@ func (t *Table) onSessionQueryStreamRead(t1 TableSessionQueryStreamReadStartInfo
 				return
 			}
 		}
+
 		return res
 	}
 }
@@ -1292,6 +1341,7 @@ func (t *Table) onSessionTransactionBegin(t1 TableSessionTransactionBeginStartIn
 			return
 		}
 	}
+
 	return res
 }
 func (t *Table) onSessionTransactionExecute(t1 TableTransactionExecuteStartInfo) func(TableTransactionExecuteDoneInfo) {
@@ -1307,6 +1357,7 @@ func (t *Table) onSessionTransactionExecute(t1 TableTransactionExecuteStartInfo)
 			return
 		}
 	}
+
 	return res
 }
 func (t *Table) onSessionTransactionExecuteStatement(t1 TableTransactionExecuteStatementStartInfo) func(TableTransactionExecuteStatementDoneInfo) {
@@ -1322,6 +1373,7 @@ func (t *Table) onSessionTransactionExecuteStatement(t1 TableTransactionExecuteS
 			return
 		}
 	}
+
 	return res
 }
 func (t *Table) onSessionTransactionCommit(t1 TableSessionTransactionCommitStartInfo) func(TableSessionTransactionCommitDoneInfo) {
@@ -1337,6 +1389,7 @@ func (t *Table) onSessionTransactionCommit(t1 TableSessionTransactionCommitStart
 			return
 		}
 	}
+
 	return res
 }
 func (t *Table) onSessionTransactionRollback(t1 TableSessionTransactionRollbackStartInfo) func(TableSessionTransactionRollbackDoneInfo) {
@@ -1352,6 +1405,7 @@ func (t *Table) onSessionTransactionRollback(t1 TableSessionTransactionRollbackS
 			return
 		}
 	}
+
 	return res
 }
 func (t *Table) onPoolStateChange(t1 TablePoolStateChangeInfo) {
@@ -1388,6 +1442,7 @@ func (t *Table) onPoolSessionNew(t1 TablePoolSessionNewStartInfo) func(TablePool
 			return
 		}
 	}
+
 	return res
 }
 func (t *Table) onPoolSessionClose(t1 TablePoolSessionCloseStartInfo) func(TablePoolSessionCloseDoneInfo) {
@@ -1403,6 +1458,7 @@ func (t *Table) onPoolSessionClose(t1 TablePoolSessionCloseStartInfo) func(Table
 			return
 		}
 	}
+
 	return res
 }
 func (t *Table) onPoolPut(t1 TablePoolPutStartInfo) func(TablePoolPutDoneInfo) {
@@ -1418,6 +1474,7 @@ func (t *Table) onPoolPut(t1 TablePoolPutStartInfo) func(TablePoolPutDoneInfo) {
 			return
 		}
 	}
+
 	return res
 }
 func (t *Table) onPoolGet(t1 TablePoolGetStartInfo) func(TablePoolGetDoneInfo) {
@@ -1433,6 +1490,7 @@ func (t *Table) onPoolGet(t1 TablePoolGetStartInfo) func(TablePoolGetDoneInfo) {
 			return
 		}
 	}
+
 	return res
 }
 func (t *Table) onPoolWait(t1 TablePoolWaitStartInfo) func(TablePoolWaitDoneInfo) {
@@ -1448,6 +1506,7 @@ func (t *Table) onPoolWait(t1 TablePoolWaitStartInfo) func(TablePoolWaitDoneInfo
 			return
 		}
 	}
+
 	return res
 }
 func TableOnInit(t *Table, c *context.Context, call call) func(limit int, _ error) {
@@ -1455,6 +1514,7 @@ func TableOnInit(t *Table, c *context.Context, call call) func(limit int, _ erro
 	p.Context = c
 	p.Call = call
 	res := t.onInit(p)
+
 	return func(limit int, e error) {
 		var p TableInitDoneInfo
 		p.Limit = limit
@@ -1467,6 +1527,7 @@ func TableOnClose(t *Table, c *context.Context, call call) func(error) {
 	p.Context = c
 	p.Call = call
 	res := t.onClose(p)
+
 	return func(e error) {
 		var p TableCloseDoneInfo
 		p.Error = e
@@ -1482,10 +1543,12 @@ func TableOnDo(t *Table, c *context.Context, call call, iD string, label string,
 	p.Idempotent = idempotent
 	p.NestedCall = nestedCall
 	res := t.onDo(p)
+
 	return func(e error) func(int, error) {
 		var p TableDoIntermediateInfo
 		p.Error = e
 		res := res(p)
+
 		return func(attempts int, e error) {
 			var p TableDoDoneInfo
 			p.Attempts = attempts
@@ -1503,10 +1566,12 @@ func TableOnDoTx(t *Table, c *context.Context, call call, iD string, label strin
 	p.Idempotent = idempotent
 	p.NestedCall = nestedCall
 	res := t.onDoTx(p)
+
 	return func(e error) func(int, error) {
 		var p TableDoTxIntermediateInfo
 		p.Error = e
 		res := res(p)
+
 		return func(attempts int, e error) {
 			var p TableDoTxDoneInfo
 			p.Attempts = attempts
@@ -1520,10 +1585,12 @@ func TableOnCreateSession(t *Table, c *context.Context, call call) func(error) f
 	p.Context = c
 	p.Call = call
 	res := t.onCreateSession(p)
+
 	return func(e error) func(tableSessionInfo, int, error) {
 		var p TableCreateSessionIntermediateInfo
 		p.Error = e
 		res := res(p)
+
 		return func(session tableSessionInfo, attempts int, e error) {
 			var p TableCreateSessionDoneInfo
 			p.Session = session
@@ -1538,6 +1605,7 @@ func TableOnSessionNew(t *Table, c *context.Context, call call) func(session tab
 	p.Context = c
 	p.Call = call
 	res := t.onSessionNew(p)
+
 	return func(session tableSessionInfo, e error) {
 		var p TableSessionNewDoneInfo
 		p.Session = session
@@ -1551,6 +1619,7 @@ func TableOnSessionDelete(t *Table, c *context.Context, call call, session table
 	p.Call = call
 	p.Session = session
 	res := t.onSessionDelete(p)
+
 	return func(e error) {
 		var p TableSessionDeleteDoneInfo
 		p.Error = e
@@ -1563,6 +1632,7 @@ func TableOnSessionKeepAlive(t *Table, c *context.Context, call call, session ta
 	p.Call = call
 	p.Session = session
 	res := t.onSessionKeepAlive(p)
+
 	return func(e error) {
 		var p TableKeepAliveDoneInfo
 		p.Error = e
@@ -1575,6 +1645,7 @@ func TableOnSessionBulkUpsert(t *Table, c *context.Context, call call, session t
 	p.Call = call
 	p.Session = session
 	res := t.onSessionBulkUpsert(p)
+
 	return func(e error) {
 		var p TableBulkUpsertDoneInfo
 		p.Error = e
@@ -1588,6 +1659,7 @@ func TableOnSessionQueryPrepare(t *Table, c *context.Context, call call, session
 	p.Session = session
 	p.Query = query
 	res := t.onSessionQueryPrepare(p)
+
 	return func(result tableDataQuery, e error) {
 		var p TablePrepareDataQueryDoneInfo
 		p.Result = result
@@ -1604,6 +1676,7 @@ func TableOnSessionQueryExecute(t *Table, c *context.Context, call call, session
 	p.Parameters = parameters
 	p.KeepInCache = keepInCache
 	res := t.onSessionQueryExecute(p)
+
 	return func(tx tableTransactionInfo, prepared bool, result tableResult, e error) {
 		var p TableExecuteDataQueryDoneInfo
 		p.Tx = tx
@@ -1620,6 +1693,7 @@ func TableOnSessionQueryExplain(t *Table, c *context.Context, call call, session
 	p.Session = session
 	p.Query = query
 	res := t.onSessionQueryExplain(p)
+
 	return func(aST string, plan string, e error) {
 		var p TableExplainQueryDoneInfo
 		p.AST = aST
@@ -1636,10 +1710,12 @@ func TableOnSessionQueryStreamExecute(t *Table, c *context.Context, call call, s
 	p.Query = query
 	p.Parameters = parameters
 	res := t.onSessionQueryStreamExecute(p)
+
 	return func(e error) func(error) {
 		var p TableSessionQueryStreamExecuteIntermediateInfo
 		p.Error = e
 		res := res(p)
+
 		return func(e error) {
 			var p TableSessionQueryStreamExecuteDoneInfo
 			p.Error = e
@@ -1653,10 +1729,12 @@ func TableOnSessionQueryStreamRead(t *Table, c *context.Context, call call, sess
 	p.Call = call
 	p.Session = session
 	res := t.onSessionQueryStreamRead(p)
+
 	return func(e error) func(error) {
 		var p TableSessionQueryStreamReadIntermediateInfo
 		p.Error = e
 		res := res(p)
+
 		return func(e error) {
 			var p TableSessionQueryStreamReadDoneInfo
 			p.Error = e
@@ -1670,6 +1748,7 @@ func TableOnSessionTransactionBegin(t *Table, c *context.Context, call call, ses
 	p.Call = call
 	p.Session = session
 	res := t.onSessionTransactionBegin(p)
+
 	return func(tx tableTransactionInfo, e error) {
 		var p TableSessionTransactionBeginDoneInfo
 		p.Tx = tx
@@ -1686,6 +1765,7 @@ func TableOnSessionTransactionExecute(t *Table, c *context.Context, call call, s
 	p.Query = query
 	p.Parameters = parameters
 	res := t.onSessionTransactionExecute(p)
+
 	return func(result tableResult, e error) {
 		var p TableTransactionExecuteDoneInfo
 		p.Result = result
@@ -1702,6 +1782,7 @@ func TableOnSessionTransactionExecuteStatement(t *Table, c *context.Context, cal
 	p.StatementQuery = statementQuery
 	p.Parameters = parameters
 	res := t.onSessionTransactionExecuteStatement(p)
+
 	return func(result tableResult, e error) {
 		var p TableTransactionExecuteStatementDoneInfo
 		p.Result = result
@@ -1716,6 +1797,7 @@ func TableOnSessionTransactionCommit(t *Table, c *context.Context, call call, se
 	p.Session = session
 	p.Tx = tx
 	res := t.onSessionTransactionCommit(p)
+
 	return func(e error) {
 		var p TableSessionTransactionCommitDoneInfo
 		p.Error = e
@@ -1729,6 +1811,7 @@ func TableOnSessionTransactionRollback(t *Table, c *context.Context, call call, 
 	p.Session = session
 	p.Tx = tx
 	res := t.onSessionTransactionRollback(p)
+
 	return func(e error) {
 		var p TableSessionTransactionRollbackDoneInfo
 		p.Error = e
@@ -1756,6 +1839,7 @@ func TableOnPoolSessionNew(t *Table, c *context.Context, call call) func(session
 	p.Context = c
 	p.Call = call
 	res := t.onPoolSessionNew(p)
+
 	return func(session tableSessionInfo, e error) {
 		var p TablePoolSessionNewDoneInfo
 		p.Session = session
@@ -1769,6 +1853,7 @@ func TableOnPoolSessionClose(t *Table, c *context.Context, call call, session ta
 	p.Call = call
 	p.Session = session
 	res := t.onPoolSessionClose(p)
+
 	return func() {
 		var p TablePoolSessionCloseDoneInfo
 		res(p)
@@ -1780,6 +1865,7 @@ func TableOnPoolPut(t *Table, c *context.Context, call call, session tableSessio
 	p.Call = call
 	p.Session = session
 	res := t.onPoolPut(p)
+
 	return func(e error) {
 		var p TablePoolPutDoneInfo
 		p.Error = e
@@ -1791,6 +1877,7 @@ func TableOnPoolGet(t *Table, c *context.Context, call call) func(session tableS
 	p.Context = c
 	p.Call = call
 	res := t.onPoolGet(p)
+
 	return func(session tableSessionInfo, attempts int, e error) {
 		var p TablePoolGetDoneInfo
 		p.Session = session
@@ -1804,6 +1891,7 @@ func TableOnPoolWait(t *Table, c *context.Context, call call) func(session table
 	p.Context = c
 	p.Call = call
 	res := t.onPoolWait(p)
+
 	return func(session tableSessionInfo, e error) {
 		var p TablePoolWaitDoneInfo
 		p.Session = session

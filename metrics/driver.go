@@ -31,6 +31,7 @@ func driver(config Config) (t trace.Driver) {
 			endpoint = info.Endpoint.Address()
 			nodeID   = info.Endpoint.NodeID()
 		)
+
 		return func(info trace.DriverConnInvokeDoneInfo) {
 			if config.Details()&trace.DriverConnEvents != 0 {
 				requests.With(map[string]string{
@@ -55,6 +56,7 @@ func driver(config Config) (t trace.Driver) {
 			endpoint = info.Endpoint.Address()
 			nodeID   = info.Endpoint.NodeID()
 		)
+
 		return func(info trace.DriverConnNewStreamRecvInfo) func(trace.DriverConnNewStreamDoneInfo) {
 			return func(info trace.DriverConnNewStreamDoneInfo) {
 				if config.Details()&trace.DriverConnEvents != 0 {
@@ -76,12 +78,14 @@ func driver(config Config) (t trace.Driver) {
 				"cause":    errorBrief(info.Cause),
 			}).Add(1)
 		}
+
 		return nil
 	}
 	t.OnBalancerClusterDiscoveryAttempt = func(info trace.DriverBalancerClusterDiscoveryAttemptStartInfo) func(
 		trace.DriverBalancerClusterDiscoveryAttemptDoneInfo,
 	) {
 		eventType := repeater.EventType(*info.Context)
+
 		return func(info trace.DriverBalancerClusterDiscoveryAttemptDoneInfo) {
 			balancersDiscoveries.With(map[string]string{
 				"status": errorBrief(info.Error),
@@ -91,6 +95,7 @@ func driver(config Config) (t trace.Driver) {
 	}
 	t.OnBalancerUpdate = func(info trace.DriverBalancerUpdateStartInfo) func(trace.DriverBalancerUpdateDoneInfo) {
 		eventType := repeater.EventType(*info.Context)
+
 		return func(info trace.DriverBalancerUpdateDoneInfo) {
 			if config.Details()&trace.DriverBalancerEvents != 0 {
 				balancerUpdates.With(map[string]string{
@@ -126,6 +131,7 @@ func driver(config Config) (t trace.Driver) {
 	t.OnConnDial = func(info trace.DriverConnDialStartInfo) func(trace.DriverConnDialDoneInfo) {
 		endpoint := info.Endpoint.Address()
 		nodeID := info.Endpoint.NodeID()
+
 		return func(info trace.DriverConnDialDoneInfo) {
 			if config.Details()&trace.DriverConnEvents != 0 {
 				if info.Error == nil {
@@ -144,7 +150,9 @@ func driver(config Config) (t trace.Driver) {
 				"node_id":  idToString(info.Endpoint.NodeID()),
 			}).Add(-1)
 		}
+
 		return nil
 	}
+
 	return t
 }

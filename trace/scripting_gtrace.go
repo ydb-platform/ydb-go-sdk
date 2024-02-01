@@ -48,6 +48,7 @@ func (t *Scripting) Compose(x *Scripting, opts ...ScriptingComposeOption) *Scrip
 			if h2 != nil {
 				r1 = h2(s)
 			}
+
 			return func(s ScriptingExecuteDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -83,6 +84,7 @@ func (t *Scripting) Compose(x *Scripting, opts ...ScriptingComposeOption) *Scrip
 			if h2 != nil {
 				r1 = h2(s)
 			}
+
 			return func(s ScriptingStreamExecuteIntermediateInfo) func(ScriptingStreamExecuteDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -98,6 +100,7 @@ func (t *Scripting) Compose(x *Scripting, opts ...ScriptingComposeOption) *Scrip
 				if r1 != nil {
 					r3 = r1(s)
 				}
+
 				return func(s ScriptingStreamExecuteDoneInfo) {
 					if options.panicCallback != nil {
 						defer func() {
@@ -134,6 +137,7 @@ func (t *Scripting) Compose(x *Scripting, opts ...ScriptingComposeOption) *Scrip
 			if h2 != nil {
 				r1 = h2(s)
 			}
+
 			return func(s ScriptingExplainDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -169,6 +173,7 @@ func (t *Scripting) Compose(x *Scripting, opts ...ScriptingComposeOption) *Scrip
 			if h2 != nil {
 				r1 = h2(s)
 			}
+
 			return func(s ScriptingCloseDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
@@ -186,6 +191,7 @@ func (t *Scripting) Compose(x *Scripting, opts ...ScriptingComposeOption) *Scrip
 			}
 		}
 	}
+
 	return &ret
 }
 func (t *Scripting) onExecute(s ScriptingExecuteStartInfo) func(ScriptingExecuteDoneInfo) {
@@ -201,6 +207,7 @@ func (t *Scripting) onExecute(s ScriptingExecuteStartInfo) func(ScriptingExecute
 			return
 		}
 	}
+
 	return res
 }
 func (t *Scripting) onStreamExecute(s ScriptingStreamExecuteStartInfo) func(ScriptingStreamExecuteIntermediateInfo) func(ScriptingStreamExecuteDoneInfo) {
@@ -220,6 +227,7 @@ func (t *Scripting) onStreamExecute(s ScriptingStreamExecuteStartInfo) func(Scri
 			}
 		}
 	}
+
 	return func(s ScriptingStreamExecuteIntermediateInfo) func(ScriptingStreamExecuteDoneInfo) {
 		res := res(s)
 		if res == nil {
@@ -227,6 +235,7 @@ func (t *Scripting) onStreamExecute(s ScriptingStreamExecuteStartInfo) func(Scri
 				return
 			}
 		}
+
 		return res
 	}
 }
@@ -243,6 +252,7 @@ func (t *Scripting) onExplain(s ScriptingExplainStartInfo) func(ScriptingExplain
 			return
 		}
 	}
+
 	return res
 }
 func (t *Scripting) onClose(s ScriptingCloseStartInfo) func(ScriptingCloseDoneInfo) {
@@ -258,6 +268,7 @@ func (t *Scripting) onClose(s ScriptingCloseStartInfo) func(ScriptingCloseDoneIn
 			return
 		}
 	}
+
 	return res
 }
 func ScriptingOnExecute(t *Scripting, c *context.Context, call call, query string, parameters scriptingQueryParameters) func(result scriptingResult, _ error) {
@@ -267,6 +278,7 @@ func ScriptingOnExecute(t *Scripting, c *context.Context, call call, query strin
 	p.Query = query
 	p.Parameters = parameters
 	res := t.onExecute(p)
+
 	return func(result scriptingResult, e error) {
 		var p ScriptingExecuteDoneInfo
 		p.Result = result
@@ -281,10 +293,12 @@ func ScriptingOnStreamExecute(t *Scripting, c *context.Context, call call, query
 	p.Query = query
 	p.Parameters = parameters
 	res := t.onStreamExecute(p)
+
 	return func(e error) func(error) {
 		var p ScriptingStreamExecuteIntermediateInfo
 		p.Error = e
 		res := res(p)
+
 		return func(e error) {
 			var p ScriptingStreamExecuteDoneInfo
 			p.Error = e
@@ -298,6 +312,7 @@ func ScriptingOnExplain(t *Scripting, c *context.Context, call call, query strin
 	p.Call = call
 	p.Query = query
 	res := t.onExplain(p)
+
 	return func(plan string, e error) {
 		var p ScriptingExplainDoneInfo
 		p.Plan = plan
@@ -310,6 +325,7 @@ func ScriptingOnClose(t *Scripting, c *context.Context, call call) func(error) {
 	p.Context = c
 	p.Call = call
 	res := t.onClose(p)
+
 	return func(e error) {
 		var p ScriptingCloseDoneInfo
 		p.Error = e

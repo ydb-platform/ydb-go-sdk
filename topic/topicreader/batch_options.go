@@ -12,6 +12,7 @@ func (count WithBatchMaxCount) Apply(
 	options topicreaderinternal.ReadMessageBatchOptions,
 ) topicreaderinternal.ReadMessageBatchOptions {
 	options.MaxCount = int(count)
+
 	return options
 }
 
@@ -33,5 +34,6 @@ func (count WithBatchPreferMinCount) Apply(
 		panic("ydb: min batch size must be 1 or greater")
 	}
 	options.MinCount = int(count)
+
 	return options
 }

@@ -293,6 +293,7 @@ func (q *messageQueue) Wait(ctx context.Context, waiter MessageQueueAckWaiter) e
 				checkMessageIndex := waiter.sequenseNumbers[0]
 				if _, ok := q.messagesByOrder[checkMessageIndex]; ok {
 					hasWaited = true
+
 					return
 				}
 				waiter.sequenseNumbers = waiter.sequenseNumbers[1:]

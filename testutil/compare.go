@@ -29,6 +29,7 @@ var ErrNotComparable = xerrors.Wrap(fmt.Errorf("not comparable"))
 func Compare(l, r value.Value) (int, error) {
 	a := allocator.New()
 	defer a.Free()
+
 	return compare(unwrapTypedValue(value.ToYDB(l, a)), unwrapTypedValue(value.ToYDB(r, a)))
 }
 
@@ -41,6 +42,7 @@ func unwrapTypedValue(v *Ydb.TypedValue) *Ydb.TypedValue {
 			val = nested
 		}
 	}
+
 	return &Ydb.TypedValue{Type: typ, Value: val}
 }
 
@@ -69,6 +71,7 @@ func expandItems(v *Ydb.TypedValue, itemType func(i int) *Ydb.Type) []*Ydb.Typed
 	for i, val := range v.GetValue().GetItems() {
 		values = append(values, unwrapTypedValue(&Ydb.TypedValue{Type: itemType(i), Value: val}))
 	}
+
 	return values
 }
 
@@ -91,6 +94,7 @@ func expandTuple(v *Ydb.TypedValue) []*Ydb.TypedValue {
 	for idx, typ := range tuple.Elements {
 		values = append(values, unwrapTypedValue(&Ydb.TypedValue{Type: typ, Value: v.Value.Items[idx]}))
 	}
+
 	return values
 }
 
@@ -105,6 +109,7 @@ func comparePrimitives(t Ydb.Type_PrimitiveTypeId, lhs, rhs *Ydb.Value) (int, er
 		if rIsNull {
 			return 0, nil
 		}
+
 		return -1, nil
 	}
 	if rIsNull {
@@ -142,6 +147,7 @@ func compareTuplesOrLists(lhs, rhs []*Ydb.TypedValue) (int, error) {
 	if len(rhs) > len(lhs) {
 		return -1, nil
 	}
+
 	return 0, nil
 }
 
@@ -164,6 +170,7 @@ func compareStructs(lhs, rhs []*Ydb.TypedValue) (int, error) {
 	if len(rhs) > len(lhs) {
 		return -1, nil
 	}
+
 	return 0, nil
 }
 
@@ -271,12 +278,14 @@ func compareDouble(l, r *Ydb.Value) int {
 func compareText(l, r *Ydb.Value) int {
 	ll := l.GetTextValue()
 	rr := r.GetTextValue()
+
 	return strings.Compare(ll, rr)
 }
 
 func compareBytes(l, r *Ydb.Value) int {
 	ll := l.GetBytesValue()
 	rr := r.GetBytesValue()
+
 	return bytes.Compare(ll, rr)
 }
 
@@ -287,11 +296,13 @@ func compareBool(l, r *Ydb.Value) int {
 		if rr {
 			return 0
 		}
+
 		return 1
 	}
 	if rr {
 		return -1
 	}
+
 	return 0
 }
 
@@ -306,6 +317,7 @@ func compareDyNumber(l, r *Ydb.Value) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	return lf.Cmp(rf), nil
 }
 
