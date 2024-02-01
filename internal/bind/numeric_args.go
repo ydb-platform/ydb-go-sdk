@@ -61,7 +61,11 @@ func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (
 				newArgs[p-1] = param
 				buffer.WriteString(param.Name())
 			} else {
-				buffer.WriteString(newArgs[p-1].(table.ParameterOption).Name())
+				val, ok := newArgs[p-1].(table.ParameterOption)
+				if !ok {
+					panic(fmt.Sprintf("unsupported type conversion from %T to table.ParameterOption", val))
+				}
+				buffer.WriteString(val.Name())
 			}
 		}
 	}

@@ -180,7 +180,11 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		return DecimalValue(BigEndianUint128(v.High_128, v.GetLow_128()), ttt.Precision, ttt.Scale), nil
 
 	case optionalType:
-		t = t.Type.(*Ydb.Type_OptionalType).OptionalType.Item
+		val, ok := t.Type.(*Ydb.Type_OptionalType)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Type_OptionalType", val))
+		}
+		t = val.OptionalType.Item
 		if nestedValue, ok := v.Value.(*Ydb.Value_NestedValue); ok {
 			return OptionalValue(FromYDB(t, nestedValue.NestedValue)), nil
 		}
@@ -250,10 +254,16 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 	case *variantStructType:
 		a := allocator.New()
 		defer a.Free()
+
+		val, ok := v.Value.(*Ydb.Value_NestedValue)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Value_NestedValue", val))
+		}
+
 		return VariantValueStruct(
 			FromYDB(
 				ttt.StructType.fields[v.VariantIndex].T.toYDB(a),
-				v.Value.(*Ydb.Value_NestedValue).NestedValue,
+				val.NestedValue,
 			),
 			ttt.StructType.fields[v.VariantIndex].Name,
 			ttt.StructType,
@@ -262,10 +272,16 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 	case *variantTupleType:
 		a := allocator.New()
 		defer a.Free()
+
+		val, ok := v.Value.(*Ydb.Value_NestedValue)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Value_NestedValue", val))
+		}
+
 		return VariantValueTuple(
 			FromYDB(
 				ttt.TupleType.items[v.VariantIndex].toYDB(a),
-				v.Value.(*Ydb.Value_NestedValue).NestedValue,
+				val.NestedValue,
 			),
 			v.VariantIndex,
 			ttt.TupleType,

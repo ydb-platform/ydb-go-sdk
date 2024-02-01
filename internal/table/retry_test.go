@@ -153,7 +153,11 @@ func TestRetryerSessionClosing(t *testing.T) {
 			config.New(),
 			func(ctx context.Context, s table.Session) error {
 				sessions = append(sessions, s)
-				s.(*session).SetStatus(table.SessionClosing)
+				val, ok := s.(*session)
+				if !ok {
+					panic(fmt.Sprintf("unsupported type conversion from %T to *session", val))
+				}
+				val.SetStatus(table.SessionClosing)
 				return nil
 			},
 			nil,

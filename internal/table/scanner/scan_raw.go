@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"reflect"
 	"strconv"
@@ -544,8 +545,11 @@ func (s *rawConverter) IsDecimal() bool {
 }
 
 func isEqualDecimal(d *Ydb.DecimalType, t types.Type) bool {
-	w := t.(*value.DecimalType)
-	return d.Precision == w.Precision && d.Scale == w.Scale
+	val, ok := t.(*value.DecimalType)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to  *value.DecimalType", val))
+	}
+	return d.Precision == val.Precision && d.Scale == val.Scale
 }
 
 func (s *rawConverter) isCurrentTypeDecimal() bool {

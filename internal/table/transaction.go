@@ -100,10 +100,15 @@ func (tx *transaction) ExecuteStatement(
 	a := allocator.New()
 	defer a.Free()
 
+	val, ok := stmt.(*statement)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to *statement", val))
+	}
+
 	onDone := trace.TableOnSessionTransactionExecuteStatement(
 		tx.s.config.Trace(), &ctx,
 		stack.FunctionID(""),
-		tx.s, tx, stmt.(*statement).query, params,
+		tx.s, tx, val.query, params,
 	)
 	defer func() {
 		onDone(r, err)

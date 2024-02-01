@@ -590,12 +590,19 @@ func (c *Client) Close(ctx context.Context) (err error) {
 			c.limit = 0
 
 			for el := c.waitQ.Front(); el != nil; el = el.Next() {
-				ch := el.Value.(*chan *session)
+				ch, ok := el.Value.(*chan *session)
+				if !ok {
+					panic(fmt.Sprintf("unsupported type conversion from %T to *chan *session", ch))
+				}
 				close(*ch)
 			}
 
 			for e := c.idle.Front(); e != nil; e = e.Next() {
-				s := e.Value.(*session)
+				s, ok := e.Value.(*session)
+				if !ok {
+					panic(fmt.Sprintf("unsupported type conversion from %T to *chan *session", s))
+				}
+
 				s.SetStatus(table.SessionClosing)
 				c.wg.Add(1)
 				go func() {
@@ -724,7 +731,11 @@ func (c *Client) internalPoolGCTick(ctx context.Context, idleThreshold time.Dura
 			return
 		}
 		for e := c.idle.Front(); e != nil; e = e.Next() {
-			s := e.Value.(*session)
+			s, ok := e.Value.(*session)
+			if !ok {
+				panic(fmt.Sprintf("unsupported type conversion from %T to *session", s))
+			}
+
 			info, has := c.index[s]
 			if !has {
 				panic("session not found in pool")
@@ -796,7 +807,11 @@ func (c *Client) internalPoolPeekFirstIdle() (s *session, touched time.Time) {
 	if el == nil {
 		return
 	}
-	s = el.Value.(*session)
+	s, ok := el.Value.(*session)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to *session", s))
+	}
+
 	info, has := c.index[s]
 	if !has || el != info.idle {
 		panic("inconsistent session client index")
@@ -833,7 +848,10 @@ func (c *Client) internalPoolNotify(s *session) (notified bool) {
 		// missed something and may want to retry (especially for case (3)).
 		//
 		// After that we taking a next waiter and repeat the same.
-		ch := c.waitQ.Remove(el).(*chan *session)
+		ch, ok := c.waitQ.Remove(el).(*chan *session)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to  *chan *session", ch))
+		}
 		select {
 		case *ch <- s:
 			// Case (1).
