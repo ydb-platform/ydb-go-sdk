@@ -219,7 +219,6 @@ linters:
     - exhaustruct
     - forbidigo
     - forcetypeassert
-    - funlen
     - gci
     - gochecknoglobals
     - gocognit

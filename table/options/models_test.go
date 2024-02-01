@@ -8,7 +8,126 @@ import (
 )
 
 func TestTimeToLiveSettingsFluentModifiers(t *testing.T) {
-	for _, tt := range []struct {
+	for _, tt := range getSecondsTTLTestCases() {
+		t.Run("Seconds", func(t *testing.T) {
+			require.Equal(t, tt.expectedSettings, tt.fluentSettings)
+		})
+	}
+	for _, tt := range getMillisecondsTTLTestCases() {
+		t.Run("Milliseconds", func(t *testing.T) {
+			require.Equal(t, tt.expectedSettings, tt.fluentSettings)
+		})
+	}
+	for _, tt := range getMicrosecondsTTLTestCases() {
+		t.Run("Microseconds", func(t *testing.T) {
+			require.Equal(t, tt.expectedSettings, tt.fluentSettings)
+		})
+	}
+	for _, tt := range getNanosecondsTTLTestCases() {
+		t.Run("Nanoseconds", func(t *testing.T) {
+			require.Equal(t, tt.expectedSettings, tt.fluentSettings)
+		})
+	}
+	for _, tt := range getDateTypeTTLTestCases() {
+		t.Run("DateType", func(t *testing.T) {
+			require.Equal(t, tt.expectedSettings, tt.fluentSettings)
+		})
+	}
+}
+
+func getSecondsTTLTestCases() []struct {
+	fluentSettings   TimeToLiveSettings
+	expectedSettings TimeToLiveSettings
+} {
+	return []struct {
+		fluentSettings   TimeToLiveSettings
+		expectedSettings TimeToLiveSettings
+	}{
+		{
+			fluentSettings: NewTTLSettings().
+				ColumnSeconds("a").
+				ExpireAfter(time.Hour),
+			expectedSettings: TimeToLiveSettings{
+				ColumnName:         "a",
+				Mode:               TimeToLiveModeValueSinceUnixEpoch,
+				ExpireAfterSeconds: uint32(time.Hour.Seconds()),
+				ColumnUnit:         unitToPointer(TimeToLiveUnitSeconds),
+			},
+		},
+	}
+}
+
+func getMillisecondsTTLTestCases() []struct {
+	fluentSettings   TimeToLiveSettings
+	expectedSettings TimeToLiveSettings
+} {
+	return []struct {
+		fluentSettings   TimeToLiveSettings
+		expectedSettings TimeToLiveSettings
+	}{
+		{
+			fluentSettings: NewTTLSettings().
+				ColumnMilliseconds("a").
+				ExpireAfter(time.Hour),
+			expectedSettings: TimeToLiveSettings{
+				ColumnName:         "a",
+				Mode:               TimeToLiveModeValueSinceUnixEpoch,
+				ExpireAfterSeconds: uint32(time.Hour.Seconds()),
+				ColumnUnit:         unitToPointer(TimeToLiveUnitMilliseconds),
+			},
+		},
+	}
+}
+
+func getMicrosecondsTTLTestCases() []struct {
+	fluentSettings   TimeToLiveSettings
+	expectedSettings TimeToLiveSettings
+} {
+	return []struct {
+		fluentSettings   TimeToLiveSettings
+		expectedSettings TimeToLiveSettings
+	}{
+		{
+			fluentSettings: NewTTLSettings().
+				ColumnMicroseconds("a").
+				ExpireAfter(time.Hour),
+			expectedSettings: TimeToLiveSettings{
+				ColumnName:         "a",
+				Mode:               TimeToLiveModeValueSinceUnixEpoch,
+				ExpireAfterSeconds: uint32(time.Hour.Seconds()),
+				ColumnUnit:         unitToPointer(TimeToLiveUnitMicroseconds),
+			},
+		},
+	}
+}
+
+func getNanosecondsTTLTestCases() []struct {
+	fluentSettings   TimeToLiveSettings
+	expectedSettings TimeToLiveSettings
+} {
+	return []struct {
+		fluentSettings   TimeToLiveSettings
+		expectedSettings TimeToLiveSettings
+	}{
+		{
+			fluentSettings: NewTTLSettings().
+				ColumnNanoseconds("a").
+				ExpireAfter(time.Hour),
+			expectedSettings: TimeToLiveSettings{
+				ColumnName:         "a",
+				Mode:               TimeToLiveModeValueSinceUnixEpoch,
+				ExpireAfterSeconds: uint32(time.Hour.Seconds()),
+				ColumnUnit:         unitToPointer(TimeToLiveUnitNanoseconds),
+			},
+		},
+	}
+}
+
+func getDateTypeTTLTestCases() []struct {
+	fluentSettings   TimeToLiveSettings
+	expectedSettings TimeToLiveSettings
+} {
+	return []struct {
 		fluentSettings   TimeToLiveSettings
 		expectedSettings TimeToLiveSettings
 	}{
@@ -22,53 +141,5 @@ func TestTimeToLiveSettingsFluentModifiers(t *testing.T) {
 				ExpireAfterSeconds: uint32(time.Hour.Seconds()),
 			},
 		},
-		{
-			fluentSettings: NewTTLSettings().
-				ColumnSeconds("a").
-				ExpireAfter(time.Hour),
-			expectedSettings: TimeToLiveSettings{
-				ColumnName:         "a",
-				Mode:               TimeToLiveModeValueSinceUnixEpoch,
-				ExpireAfterSeconds: uint32(time.Hour.Seconds()),
-				ColumnUnit:         unitToPointer(TimeToLiveUnitSeconds),
-			},
-		},
-		{
-			fluentSettings: NewTTLSettings().
-				ColumnMilliseconds("a").
-				ExpireAfter(time.Hour),
-			expectedSettings: TimeToLiveSettings{
-				ColumnName:         "a",
-				Mode:               TimeToLiveModeValueSinceUnixEpoch,
-				ExpireAfterSeconds: uint32(time.Hour.Seconds()),
-				ColumnUnit:         unitToPointer(TimeToLiveUnitMilliseconds),
-			},
-		},
-		{
-			fluentSettings: NewTTLSettings().
-				ColumnMicroseconds("a").
-				ExpireAfter(time.Hour),
-			expectedSettings: TimeToLiveSettings{
-				ColumnName:         "a",
-				Mode:               TimeToLiveModeValueSinceUnixEpoch,
-				ExpireAfterSeconds: uint32(time.Hour.Seconds()),
-				ColumnUnit:         unitToPointer(TimeToLiveUnitMicroseconds),
-			},
-		},
-		{
-			fluentSettings: NewTTLSettings().
-				ColumnNanoseconds("a").
-				ExpireAfter(time.Hour),
-			expectedSettings: TimeToLiveSettings{
-				ColumnName:         "a",
-				Mode:               TimeToLiveModeValueSinceUnixEpoch,
-				ExpireAfterSeconds: uint32(time.Hour.Seconds()),
-				ColumnUnit:         unitToPointer(TimeToLiveUnitNanoseconds),
-			},
-		},
-	} {
-		t.Run("", func(t *testing.T) {
-			require.Equal(t, tt.expectedSettings, tt.fluentSettings)
-		})
 	}
 }

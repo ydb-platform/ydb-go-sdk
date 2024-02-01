@@ -13,80 +13,84 @@ import (
 )
 
 func TestEventBroadcast(t *testing.T) {
-	t.Run("Simple", func(t *testing.T) {
-		b := &EventBroadcast{}
-		waiter := b.Waiter()
-		b.Broadcast()
-		xtest.WaitChannelClosed(t, waiter.Done())
-	})
+	t.Run("Simple", simpleTest)
 
 	xtest.TestManyTimesWithName(t, "SubscribeAndEventsInRace", func(t testing.TB) {
 		testDuration := time.Second / 100
-
 		b := &EventBroadcast{}
 		var events xatomic.Int64
 
 		var backgroundCounter xatomic.Int64
 		firstWaiterStarted := xatomic.Bool{}
-
 		stopSubscribe := xatomic.Bool{}
-
 		subscribeStopped := make(empty.Chan)
-		broadcastStopped := make(empty.Chan)
-
-		// Add subscribers
-		go func() {
-			defer close(subscribeStopped)
-			for {
-				backgroundCounter.Add(1)
-				waiter := b.Waiter()
-				firstWaiterStarted.Store(true)
-				go func() {
-					<-waiter.Done()
-					backgroundCounter.Add(-1)
-				}()
-				if stopSubscribe.Load() {
-					return
-				}
-			}
-		}()
 
 		stopBroadcast := xatomic.Bool{}
-		go func() {
-			defer close(broadcastStopped)
+		broadcastStopped := make(empty.Chan)
 
-			// Fire events
-			for {
-				events.Add(1)
-				b.Broadcast()
-				runtime.Gosched()
-				if stopBroadcast.Load() {
-					return
-				}
-			}
-		}()
+		go subscribeHelper(b, &stopSubscribe, &firstWaiterStarted, &backgroundCounter, subscribeStopped)
+		go broadcastHelper(b, &events, &stopBroadcast, broadcastStopped)
 
 		xtest.SpinWaitCondition(t, nil, firstWaiterStarted.Load)
-
 		<-time.After(testDuration)
 
 		stopSubscribe.Store(true)
 		<-subscribeStopped
 
-		for {
-			oldCounter := backgroundCounter.Load()
-			if oldCounter == 0 {
-				break
-			}
+		waitForBackgroundCounterToZero(t, &backgroundCounter)
 
-			t.Log("background counter", oldCounter)
-			xtest.SpinWaitCondition(t, nil, func() bool {
-				return backgroundCounter.Load() < oldCounter
-			})
-		}
 		stopBroadcast.Store(true)
 		<-broadcastStopped
 
 		require.Greater(t, events.Load(), int64(0))
 	})
+}
+
+func simpleTest(t *testing.T) {
+	b := &EventBroadcast{}
+	waiter := b.Waiter()
+	b.Broadcast()
+	xtest.WaitChannelClosed(t, waiter.Done())
+}
+
+func subscribeHelper(b *EventBroadcast, stopSubscribe *xatomic.Bool, firstWaiterStarted *xatomic.Bool, backgroundCounter *xatomic.Int64, subscribeStopped empty.Chan) {
+	defer close(subscribeStopped)
+	for {
+		backgroundCounter.Add(1)
+		waiter := b.Waiter()
+		firstWaiterStarted.Store(true)
+		go func() {
+			<-waiter.Done()
+			backgroundCounter.Add(-1)
+		}()
+		if stopSubscribe.Load() {
+			return
+		}
+	}
+}
+
+func broadcastHelper(b *EventBroadcast, events *xatomic.Int64, stopBroadcast *xatomic.Bool, broadcastStopped empty.Chan) {
+	defer close(broadcastStopped)
+	for {
+		events.Add(1)
+		b.Broadcast()
+		runtime.Gosched()
+		if stopBroadcast.Load() {
+			return
+		}
+	}
+}
+
+func waitForBackgroundCounterToZero(t testing.TB, backgroundCounter *xatomic.Int64) {
+	for {
+		oldCounter := backgroundCounter.Load()
+		if oldCounter == 0 {
+			break
+		}
+
+		t.Log("background counter", oldCounter)
+		xtest.SpinWaitCondition(t, nil, func() bool {
+			return backgroundCounter.Load() < oldCounter
+		})
+	}
 }

@@ -71,11 +71,45 @@ func (e *CustomError) Unwrap() error {
 }
 
 func TestRetryWithCustomErrors(t *testing.T) {
-	var (
-		limit = 10
-		ctx   = context.Background()
-	)
-	for _, tt := range []struct {
+	ctx := context.Background()
+	testCases := defineTestCases()
+
+	for _, tc := range testCases {
+		t.Run(tc.error.Error(), func(t *testing.T) {
+			runTestCase(t, ctx, tc)
+		})
+	}
+}
+
+func runTestCase(t *testing.T, ctx context.Context, tc struct {
+	error     error
+	retriable bool
+}) {
+	limit := 10
+	i := 0
+	err := Retry(ctx, func(ctx context.Context) error {
+		i++
+		if i < limit {
+			return tc.error
+		}
+		return nil
+	})
+	if tc.retriable {
+		if i != limit {
+			t.Fatalf("unexpected i: %d, queryErr: %v", i, err)
+		}
+	} else {
+		if i != 1 {
+			t.Fatalf("unexpected i: %d, queryErr: %v", i, err)
+		}
+	}
+}
+
+func defineTestCases() []struct {
+	error     error
+	retriable bool
+} {
+	return []struct {
 		error     error
 		retriable bool
 	}{
@@ -118,26 +152,6 @@ func TestRetryWithCustomErrors(t *testing.T) {
 			},
 			retriable: false,
 		},
-	} {
-		t.Run(tt.error.Error(), func(t *testing.T) {
-			i := 0
-			err := Retry(ctx, func(ctx context.Context) error {
-				i++
-				if i < limit {
-					return tt.error
-				}
-				return nil
-			})
-			if tt.retriable {
-				if i != limit {
-					t.Fatalf("unexpected i: %d, queryErr: %v", i, err)
-				}
-			} else {
-				if i != 1 {
-					t.Fatalf("unexpected i: %d, queryErr: %v", i, err)
-				}
-			}
-		})
 	}
 }
 

@@ -76,54 +76,18 @@ func Call(depth int) (c call) {
 }
 
 func (c call) Record(opts ...recordOption) string {
-	optionsHolder := recordOptions{
-		packagePath:  true,
-		packageName:  true,
-		structName:   true,
-		functionName: true,
-		fileName:     true,
-		line:         true,
-		lambdas:      true,
-	}
+	optionsHolder := defaultOptions()
+
 	for _, opt := range opts {
 		opt(&optionsHolder)
 	}
+
 	name := runtime.FuncForPC(c.function).Name()
-	var (
-		pkgPath    string
-		pkgName    string
-		structName string
-		funcName   string
-		file       = c.file
-	)
-	if i := strings.LastIndex(file, "/"); i > -1 {
-		file = file[i+1:]
-	}
-	if i := strings.LastIndex(name, "/"); i > -1 {
-		pkgPath, name = name[:i], name[i+1:]
-	}
-	split := strings.Split(name, ".")
-	lambdas := make([]string, 0, len(split))
-	for i := range split {
-		elem := split[len(split)-i-1]
-		if !strings.HasPrefix(elem, "func") {
-			break
-		}
-		lambdas = append(lambdas, elem)
-	}
-	split = split[:len(split)-len(lambdas)]
-	if len(split) > 0 {
-		pkgName = split[0]
-	}
-	if len(split) > 1 {
-		funcName = split[len(split)-1]
-	}
-	if len(split) > 2 {
-		structName = split[1]
-	}
+	pkgPath, pkgName, structName, funcName, file, lambdas := parseFunctionName(name, c.file)
 
 	buffer := xstring.Buffer()
 	defer buffer.Free()
+
 	if optionsHolder.packagePath {
 		buffer.WriteString(pkgPath)
 	}
@@ -145,9 +109,9 @@ func (c call) Record(opts ...recordOption) string {
 		}
 		buffer.WriteString(funcName)
 		if optionsHolder.lambdas {
-			for i := range lambdas {
+			for _, lambda := range lambdas {
 				buffer.WriteByte('.')
-				buffer.WriteString(lambdas[len(lambdas)-i-1])
+				buffer.WriteString(lambda)
 			}
 		}
 	}
@@ -160,12 +124,13 @@ func (c call) Record(opts ...recordOption) string {
 		buffer.WriteString(file)
 		if optionsHolder.line {
 			buffer.WriteByte(':')
-			fmt.Fprintf(buffer, "%d", c.line)
+			buffer.WriteString(fmt.Sprintf("%d", c.line))
 		}
 		if closeBrace {
 			buffer.WriteByte(')')
 		}
 	}
+
 	return buffer.String()
 }
 
@@ -175,4 +140,49 @@ func (c call) FunctionID() string {
 
 func Record(depth int, opts ...recordOption) string {
 	return Call(depth + 1).Record(opts...)
+}
+
+func defaultOptions() recordOptions {
+	return recordOptions{
+		packagePath:  true,
+		packageName:  true,
+		structName:   true,
+		functionName: true,
+		fileName:     true,
+		line:         true,
+		lambdas:      true,
+	}
+}
+
+func parseFunctionName(fullName, file string) (pkgPath, pkgName, structName, funcName string, fileName string, lambdas []string) {
+	if i := strings.LastIndex(file, "/"); i > -1 {
+		fileName = file[i+1:]
+	}
+
+	if i := strings.LastIndex(fullName, "/"); i > -1 {
+		pkgPath, fullName = fullName[:i], fullName[i+1:]
+	}
+
+	split := strings.Split(fullName, ".")
+	lambdas = make([]string, 0)
+	for i := range split {
+		elem := split[len(split)-i-1]
+		if !strings.HasPrefix(elem, "func") {
+			break
+		}
+		lambdas = append(lambdas, elem)
+	}
+
+	split = split[:len(split)-len(lambdas)]
+	if len(split) > 0 {
+		pkgName = split[0]
+	}
+	if len(split) > 1 {
+		funcName = split[len(split)-1]
+	}
+	if len(split) > 2 {
+		structName = split[1]
+	}
+
+	return pkgPath, pkgName, structName, funcName, fileName, lambdas
 }

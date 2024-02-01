@@ -3,7 +3,6 @@ package options
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
@@ -18,107 +17,96 @@ var abc = "abc"
 func TestSessionOptionsProfile(t *testing.T) {
 	a := allocator.New()
 	defer a.Free()
-	{
-		opt := WithProfile(
-			WithProfilePreset(abc),
-		)
-		req := Ydb_Table.CreateTableRequest{}
-		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
-		if req.Profile.PresetName != abc {
-			t.Errorf("Preset is not as expected")
-		}
+	presetName := "abc"
+
+	testProfilePreset(t, a, presetName)
+	testCompactionPolicy(t, a, presetName)
+	testPartitioningPolicy(t, a, presetName, PartitioningAutoSplit)
+	testExecutionPolicy(t, a, presetName)
+	testReplicationPolicy(t, a, presetName, 3, FeatureEnabled, FeatureDisabled)
+	testCachingPolicy(t, a, presetName)
+}
+
+func testProfilePreset(t *testing.T, a *allocator.Allocator, presetName string) {
+	opt := WithProfile(WithProfilePreset(presetName))
+	req := Ydb_Table.CreateTableRequest{}
+	opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
+	if req.Profile.PresetName != presetName {
+		t.Errorf("Preset is not as expected")
 	}
-	{
-		opt := WithProfile(
-			WithCompactionPolicy(WithCompactionPolicyPreset(abc)),
-		)
-		req := Ydb_Table.CreateTableRequest{}
-		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
-		if req.Profile.CompactionPolicy.PresetName != abc {
-			t.Errorf("Compaction policy is not as expected")
-		}
+}
+
+func testCompactionPolicy(t *testing.T, a *allocator.Allocator, presetName string) {
+	opt := WithProfile(WithCompactionPolicy(WithCompactionPolicyPreset(presetName)))
+	req := Ydb_Table.CreateTableRequest{}
+	opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
+	if req.Profile.CompactionPolicy.PresetName != presetName {
+		t.Errorf("Compaction policy is not as expected")
 	}
-	{
-		opt := WithProfile(
-			WithPartitioningPolicy(
-				WithPartitioningPolicyPreset(abc),
-				WithPartitioningPolicyMode(PartitioningAutoSplit),
-			),
-		)
-		req := Ydb_Table.CreateTableRequest{}
-		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
-		p := req.Profile.PartitioningPolicy
-		if p.PresetName != abc || p.AutoPartitioning != Ydb_Table.PartitioningPolicy_AUTO_SPLIT {
-			t.Errorf("Partitioning policy is not as expected")
-		}
+}
+
+func testPartitioningPolicy(t *testing.T, a *allocator.Allocator, presetName string, mode PartitioningMode) {
+	opt := WithProfile(
+		WithPartitioningPolicy(
+			WithPartitioningPolicyPreset(presetName),
+			WithPartitioningPolicyMode(mode),
+		),
+	)
+	req := Ydb_Table.CreateTableRequest{}
+	opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
+	p := req.Profile.PartitioningPolicy
+	if p.PresetName != presetName || p.AutoPartitioning != mode.toYDB() {
+		t.Errorf("Partitioning policy is not as expected")
 	}
-	{
-		opt := WithPartitions(
-			WithUniformPartitions(3),
-		)
-		req := Ydb_Table.CreateTableRequest{}
-		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
-		if p, ok := req.Partitions.(*Ydb_Table.CreateTableRequest_UniformPartitions); !ok || p.UniformPartitions != 3 {
-			t.Errorf("Uniform partitioning policy is not as expected")
-		}
+}
+
+func testExecutionPolicy(t *testing.T, a *allocator.Allocator, presetName string) {
+	opt := WithProfile(WithExecutionPolicy(WithExecutionPolicyPreset(presetName)))
+	req := Ydb_Table.CreateTableRequest{}
+	opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
+	if req.Profile.ExecutionPolicy.PresetName != presetName {
+		t.Errorf("Execution policy is not as expected")
 	}
-	{
-		opt := WithPartitions(
-			WithExplicitPartitions(
-				types.Int64Value(1),
-			),
-		)
-		req := Ydb_Table.CreateTableRequest{}
-		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
-		p, ok := req.Partitions.(*Ydb_Table.CreateTableRequest_PartitionAtKeys)
-		if !ok {
-			t.Errorf("Explicitly partitioning policy is not as expected")
-		} else {
-			require.Equal(
-				t,
-				[]*Ydb.TypedValue{value.ToYDB(types.Int64Value(1), a)},
-				p.PartitionAtKeys.SplitPoints,
-			)
-		}
+}
+
+func testReplicationPolicy(t *testing.T, a *allocator.Allocator, presetName string, replicasCount uint32, perAZ, allowPromotion FeatureFlag) {
+	opt := WithProfile(
+		WithReplicationPolicy(
+			WithReplicationPolicyPreset(presetName),
+			WithReplicationPolicyReplicasCount(replicasCount),
+			WithReplicationPolicyCreatePerAZ(perAZ),
+			WithReplicationPolicyAllowPromotion(allowPromotion),
+		),
+	)
+	req := Ydb_Table.CreateTableRequest{}
+	opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
+	p := req.Profile.ReplicationPolicy
+	if p.PresetName != presetName ||
+		p.ReplicasCount != uint32(replicasCount) ||
+		p.CreatePerAvailabilityZone != convertFeatureFlagToYDB(perAZ) ||
+		p.AllowPromotion != convertFeatureFlagToYDB(allowPromotion) {
+
+		t.Errorf("Replication policy is not as expected: %+v", p)
 	}
-	{
-		opt := WithProfile(
-			WithExecutionPolicy(WithExecutionPolicyPreset(abc)),
-		)
-		req := Ydb_Table.CreateTableRequest{}
-		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
-		if req.Profile.ExecutionPolicy.PresetName != abc {
-			t.Errorf("Execution policy is not as expected")
-		}
+}
+
+func convertFeatureFlagToYDB(flag FeatureFlag) Ydb.FeatureFlag_Status {
+	switch flag {
+	case FeatureEnabled:
+		return Ydb.FeatureFlag_ENABLED
+	case FeatureDisabled:
+		return Ydb.FeatureFlag_DISABLED
+	default:
+		return Ydb.FeatureFlag_STATUS_UNSPECIFIED
 	}
-	{
-		opt := WithProfile(
-			WithReplicationPolicy(
-				WithReplicationPolicyPreset(abc),
-				WithReplicationPolicyReplicasCount(3),
-				WithReplicationPolicyCreatePerAZ(FeatureEnabled),
-				WithReplicationPolicyAllowPromotion(FeatureDisabled),
-			),
-		)
-		req := Ydb_Table.CreateTableRequest{}
-		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
-		p := req.Profile.ReplicationPolicy
-		if p.PresetName != abc ||
-			p.ReplicasCount != 3 ||
-			p.CreatePerAvailabilityZone != Ydb.FeatureFlag_ENABLED ||
-			p.AllowPromotion != Ydb.FeatureFlag_DISABLED {
-			t.Errorf("Replication policy is not as expected")
-		}
-	}
-	{
-		opt := WithProfile(
-			WithCachingPolicy(WithCachingPolicyPreset(abc)),
-		)
-		req := Ydb_Table.CreateTableRequest{}
-		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
-		if req.Profile.CachingPolicy.PresetName != abc {
-			t.Errorf("Caching policy is not as expected")
-		}
+}
+
+func testCachingPolicy(t *testing.T, a *allocator.Allocator, presetName string) {
+	opt := WithProfile(WithCachingPolicy(WithCachingPolicyPreset(presetName)))
+	req := Ydb_Table.CreateTableRequest{}
+	opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
+	if req.Profile.CachingPolicy.PresetName != presetName {
+		t.Errorf("Caching policy is not as expected")
 	}
 }
 

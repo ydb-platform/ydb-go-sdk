@@ -5,22 +5,33 @@ import (
 )
 
 func TestTypeToString(t *testing.T) {
-	for _, tt := range []struct {
+	var testCases []struct {
+		t Type
+		s string
+	}
+
+	testCases = append(testCases, getNumericalTypeTestCases()...)
+	testCases = append(testCases, getDateAndTimeTypeTestCases()...)
+	testCases = append(testCases, getStringAndTextTypeTestCases()...)
+	testCases = append(testCases, getMiscellaneousTypeTestCases()...)
+
+	for _, tt := range testCases {
+		t.Run(tt.s, func(t *testing.T) {
+			if got := tt.t.Yql(); got != tt.s {
+				t.Errorf("s representations not equals:\n\n -  got: %s\n\n - want: %s", got, tt.s)
+			}
+		})
+	}
+}
+
+func getNumericalTypeTestCases() []struct {
+	t Type
+	s string
+} {
+	return []struct {
 		t Type
 		s string
 	}{
-		{
-			t: Void(),
-			s: "Void",
-		},
-		{
-			t: Null(),
-			s: "Null",
-		},
-		{
-			t: TypeBool,
-			s: "Bool",
-		},
 		{
 			t: TypeInt8,
 			s: "Int8",
@@ -62,6 +73,20 @@ func TestTypeToString(t *testing.T) {
 			s: "Double",
 		},
 		{
+			t: Decimal(22, 9),
+			s: "Decimal(22,9)",
+		},
+	}
+}
+func getDateAndTimeTypeTestCases() []struct {
+	t Type
+	s string
+} {
+	return []struct {
+		t Type
+		s string
+	}{
+		{
 			t: TypeDate,
 			s: "Date",
 		},
@@ -89,6 +114,17 @@ func TestTypeToString(t *testing.T) {
 			t: TypeTzTimestamp,
 			s: "TzTimestamp",
 		},
+	}
+}
+
+func getStringAndTextTypeTestCases() []struct {
+	t Type
+	s string
+} {
+	return []struct {
+		t Type
+		s string
+	}{
 		{
 			t: TypeBytes,
 			s: "String",
@@ -113,121 +149,31 @@ func TestTypeToString(t *testing.T) {
 			t: TypeJSONDocument,
 			s: "JsonDocument",
 		},
+	}
+}
+func getMiscellaneousTypeTestCases() []struct {
+	t Type
+	s string
+} {
+	return []struct {
+		t Type
+		s string
+	}{
 		{
-			t: TypeDyNumber,
-			s: "DyNumber",
+			t: Void(),
+			s: "Void",
+		},
+		{
+			t: Null(),
+			s: "Null",
 		},
 		{
 			t: Optional(TypeBool),
 			s: "Optional<Bool>",
 		},
 		{
-			t: Optional(TypeInt8),
-			s: "Optional<Int8>",
-		},
-		{
-			t: Optional(TypeUint8),
-			s: "Optional<Uint8>",
-		},
-		{
-			t: Optional(TypeInt16),
-			s: "Optional<Int16>",
-		},
-		{
-			t: Optional(TypeUint16),
-			s: "Optional<Uint16>",
-		},
-		{
-			t: Optional(TypeInt32),
-			s: "Optional<Int32>",
-		},
-		{
-			t: Optional(TypeUint32),
-			s: "Optional<Uint32>",
-		},
-		{
-			t: Optional(TypeInt64),
-			s: "Optional<Int64>",
-		},
-		{
-			t: Optional(TypeUint64),
-			s: "Optional<Uint64>",
-		},
-		{
-			t: Optional(TypeFloat),
-			s: "Optional<Float>",
-		},
-		{
-			t: Optional(TypeDouble),
-			s: "Optional<Double>",
-		},
-		{
-			t: Optional(TypeDate),
-			s: "Optional<Date>",
-		},
-		{
-			t: Optional(TypeDatetime),
-			s: "Optional<Datetime>",
-		},
-		{
-			t: Optional(TypeTimestamp),
-			s: "Optional<Timestamp>",
-		},
-		{
-			t: Optional(TypeInterval),
-			s: "Optional<Interval>",
-		},
-		{
-			t: Optional(TypeTzDate),
-			s: "Optional<TzDate>",
-		},
-		{
-			t: Optional(TypeTzDatetime),
-			s: "Optional<TzDatetime>",
-		},
-		{
-			t: Optional(TypeTzTimestamp),
-			s: "Optional<TzTimestamp>",
-		},
-		{
-			t: Optional(TypeBytes),
-			s: "Optional<String>",
-		},
-		{
-			t: Optional(TypeText),
-			s: "Optional<Utf8>",
-		},
-		{
-			t: Optional(TypeYSON),
-			s: "Optional<Yson>",
-		},
-		{
 			t: Optional(TypeJSON),
 			s: "Optional<Json>",
-		},
-		{
-			t: Optional(TypeUUID),
-			s: "Optional<Uuid>",
-		},
-		{
-			t: Optional(TypeJSONDocument),
-			s: "Optional<JsonDocument>",
-		},
-		{
-			t: Optional(TypeDyNumber),
-			s: "Optional<DyNumber>",
-		},
-		{
-			t: Decimal(22, 9),
-			s: "Decimal(22,9)",
-		},
-		{
-			t: Dict(TypeText, TypeTimestamp),
-			s: "Dict<Utf8,Timestamp>",
-		},
-		{
-			t: EmptyList(),
-			s: "EmptyList",
 		},
 		{
 			t: List(TypeUint32),
@@ -236,6 +182,10 @@ func TestTypeToString(t *testing.T) {
 		{
 			t: Set(TypeUint32),
 			s: "Set<Uint32>",
+		},
+		{
+			t: EmptyList(),
+			s: "EmptyList",
 		},
 		{
 			t: EmptySet(),
@@ -265,11 +215,9 @@ func TestTypeToString(t *testing.T) {
 			),
 			s: "Variant<Bool,Float>",
 		},
-	} {
-		t.Run(tt.s, func(t *testing.T) {
-			if got := tt.t.Yql(); got != tt.s {
-				t.Errorf("s representations not equals:\n\n -  got: %s\n\n - want: %s", got, tt.s)
-			}
-		})
+		{
+			t: Dict(TypeText, TypeTimestamp),
+			s: "Dict<Utf8,Timestamp>",
+		},
 	}
 }

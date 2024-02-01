@@ -57,49 +57,57 @@ func New() (v *Allocator) {
 	return allocatorPool.Get()
 }
 
-func (a *Allocator) Free() {
-	a.valueAllocator.free()
-	a.typeAllocator.free()
-	a.typedValueAllocator.free()
-	a.boolAllocator.free()
-	a.typeDecimalAllocator.free()
-	a.typeListAllocator.free()
-	a.typeEmptyListAllocator.free()
-	a.typeEmptyDictAllocator.free()
-	a.typeTupleAllocator.free()
-	a.typeStructAllocator.free()
-	a.typeDictAllocator.free()
-	a.decimalAllocator.free()
-	a.listAllocator.free()
-	a.tupleAllocator.free()
-	a.structAllocator.free()
-	a.dictAllocator.free()
-	a.structMemberAllocator.free()
-	a.typeOptionalAllocator.free()
-	a.optionalAllocator.free()
-	a.bytesAllocator.free()
-	a.textAllocator.free()
-	a.uint32Allocator.free()
-	a.int32Allocator.free()
-	a.low128Allocator.free()
-	a.uint64Allocator.free()
-	a.int64Allocator.free()
-	a.floatAllocator.free()
-	a.doubleAllocator.free()
-	a.nestedAllocator.free()
-	a.pairAllocator.free()
-	a.nullFlagAllocator.free()
-	a.variantAllocator.free()
-	a.typeVariantAllocator.free()
-	a.variantStructItemsAllocator.free()
-	a.variantTupleItemsAllocator.free()
-	a.tableExecuteQueryRequestAllocator.free()
-	a.tableExecuteQueryResultAllocator.free()
-	a.tableQueryCachePolicyAllocator.free()
-	a.tableQueryAllocator.free()
-	a.tableQueryYqlTextAllocator.free()
-	a.tableQueryIDAllocator.free()
+type Freeable interface {
+	free()
+}
 
+func (a *Allocator) Free() {
+	allocators := []Freeable{
+		&a.valueAllocator,
+		&a.typeAllocator,
+		&a.typedValueAllocator,
+		&a.boolAllocator,
+		&a.typeDecimalAllocator,
+		&a.typeListAllocator,
+		&a.typeEmptyListAllocator,
+		&a.typeEmptyDictAllocator,
+		&a.typeTupleAllocator,
+		&a.typeStructAllocator,
+		&a.typeDictAllocator,
+		&a.decimalAllocator,
+		&a.listAllocator,
+		&a.tupleAllocator,
+		&a.structAllocator,
+		&a.dictAllocator,
+		&a.structMemberAllocator,
+		&a.typeOptionalAllocator,
+		&a.optionalAllocator,
+		&a.bytesAllocator,
+		&a.textAllocator,
+		&a.uint32Allocator,
+		&a.int32Allocator,
+		&a.low128Allocator,
+		&a.uint64Allocator,
+		&a.int64Allocator,
+		&a.floatAllocator,
+		&a.doubleAllocator,
+		&a.nestedAllocator,
+		&a.pairAllocator,
+		&a.nullFlagAllocator,
+		&a.variantAllocator,
+		&a.typeVariantAllocator,
+		&a.variantStructItemsAllocator,
+		&a.variantTupleItemsAllocator,
+		&a.tableExecuteQueryRequestAllocator,
+		&a.tableExecuteQueryResultAllocator,
+		&a.tableQueryCachePolicyAllocator,
+		&a.tableQueryAllocator,
+		&a.tableQueryYqlTextAllocator,
+		&a.tableQueryIDAllocator,
+	}
+	for _, allocator := range allocators {
+		allocator.free()
+	}
 	allocatorPool.Put(a)
 }
 

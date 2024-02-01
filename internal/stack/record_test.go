@@ -24,236 +24,165 @@ func (s *testStruct) TestPointerFunc() string {
 }
 
 func TestRecord(t *testing.T) {
-	for _, tt := range []struct {
-		act string
-		exp string
+	var testCases []struct {
+		name string
+		act  string
+		exp  string
+	}
+
+	testCases = append(testCases, getRecordFunctionDepthTestCases()...)
+	testCases = append(testCases, getTestStructOptionCombinationsTestCases()...)
+	testCases = append(testCases, getTestStructSelectiveOptionsTestCases()...)
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.exp, tc.act)
+		})
+	}
+}
+
+func getRecordFunctionDepthTestCases() []struct {
+	name string
+	act  string
+	exp  string
+} {
+	return []struct {
+		name string
+		act  string
+		exp  string
 	}{
 		{
-			act: Record(0),
-			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.TestRecord(record_test.go:32)",
+			name: "Record Depth 0",
+			act:  Record(0),
+			exp:  "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.getRecordFunctionDepthTestCases(record_test.go:56)",
 		},
 		{
+			name: "Record Depth 1",
 			act: func() string {
 				return Record(1)
 			}(),
-			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.TestRecord(record_test.go:38)",
+			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.getRecordFunctionDepthTestCases(record_test.go:63)",
 		},
 		{
+			name: "Record Depth 2",
 			act: func() string {
 				return func() string {
 					return Record(2)
 				}()
 			}(),
-			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.TestRecord(record_test.go:46)",
+			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.getRecordFunctionDepthTestCases(record_test.go:72)",
+		},
+	}
+}
+
+func getTestStructOptionCombinationsTestCases() []struct {
+	name string
+	act  string
+	exp  string
+} {
+	return []struct {
+		name string
+		act  string
+		exp  string
+	}{
+		{
+			name: "PackageName Only",
+			act:  testStruct{depth: 0, opts: []recordOption{PackagePath(false), StructName(false), FunctionName(false), Lambda(false), FileName(false), Line(false)}}.TestFunc(),
+			exp:  "stack",
 		},
 		{
-			act: testStruct{depth: 0, opts: []recordOption{
-				PackagePath(false),
-				PackageName(false),
-				StructName(false),
-				FunctionName(false),
-				Lambda(false),
-				FileName(false),
-				Line(false),
-			}}.TestFunc(),
-			exp: "",
+			name: "StructName Only",
+			act:  testStruct{depth: 0, opts: []recordOption{PackagePath(false), PackageName(false), FunctionName(false), Lambda(false), FileName(false), Line(false)}}.TestFunc(),
+			exp:  "testStruct",
 		},
 		{
-			act: testStruct{depth: 0, opts: []recordOption{
-				// PackagePath(false),
-				PackageName(false),
-				StructName(false),
-				FunctionName(false),
-				Lambda(false),
-				FileName(false),
-				Line(false),
-			}}.TestFunc(),
-			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal",
+			name: "FunctionName Only",
+			act:  testStruct{depth: 0, opts: []recordOption{PackagePath(false), PackageName(false), StructName(false), Lambda(false), FileName(false), Line(false)}}.TestFunc(),
+			exp:  "TestFunc",
 		},
 		{
-			act: testStruct{depth: 0, opts: []recordOption{
-				PackagePath(false),
-				// PackageName(false),
-				StructName(false),
-				FunctionName(false),
-				Lambda(false),
-				FileName(false),
-				Line(false),
-			}}.TestFunc(),
-			exp: "stack",
+			name: "Lambda Only",
+			act:  testStruct{depth: 0, opts: []recordOption{PackagePath(false), PackageName(false), StructName(false), FunctionName(false), FileName(false), Line(false)}}.TestFunc(),
+			exp:  "",
 		},
 		{
-			act: testStruct{depth: 0, opts: []recordOption{
-				PackagePath(false),
-				PackageName(false),
-				// StructName(false),
-				FunctionName(false),
-				Lambda(false),
-				FileName(false),
-				Line(false),
-			}}.TestFunc(),
-			exp: "testStruct",
+			name: "FunctionName and Lambda Only",
+			act:  testStruct{depth: 0, opts: []recordOption{PackagePath(false), PackageName(false), StructName(false), FileName(false), Line(false)}}.TestFunc(),
+			exp:  "TestFunc.func1",
 		},
 		{
-			act: testStruct{depth: 0, opts: []recordOption{
-				PackagePath(false),
-				PackageName(false),
-				StructName(false),
-				// FunctionName(false),
-				Lambda(false),
-				FileName(false),
-				Line(false),
-			}}.TestFunc(),
-			exp: "TestFunc",
+			name: "FileName Only",
+			act:  testStruct{depth: 0, opts: []recordOption{PackagePath(false), PackageName(false), StructName(false), FunctionName(false), Lambda(false), Line(false)}}.TestFunc(),
+			exp:  "record_test.go",
 		},
 		{
-			act: testStruct{depth: 0, opts: []recordOption{
-				PackagePath(false),
-				PackageName(false),
-				StructName(false),
-				FunctionName(false),
-				// Lambda(false),
-				FileName(false),
-				Line(false),
-			}}.TestFunc(),
-			exp: "",
+			name: "Line Only",
+			act:  testStruct{depth: 0, opts: []recordOption{PackagePath(false), PackageName(false), StructName(false), FunctionName(false), Lambda(false), FileName(false)}}.TestFunc(),
+			exp:  "",
 		},
 		{
-			act: testStruct{depth: 0, opts: []recordOption{
-				PackagePath(false),
-				PackageName(false),
-				StructName(false),
-				// FunctionName(false),
-				// Lambda(false),
-				FileName(false),
-				Line(false),
-			}}.TestFunc(),
-			exp: "TestFunc.func1",
+			name: "FileName and Line Only",
+			act:  testStruct{depth: 0, opts: []recordOption{PackagePath(false), PackageName(false), StructName(false), FunctionName(false), Lambda(false)}}.TestFunc(),
+			exp:  "record_test.go:16",
 		},
 		{
-			act: testStruct{depth: 0, opts: []recordOption{
-				PackagePath(false),
-				PackageName(false),
-				StructName(false),
-				FunctionName(false),
-				Lambda(false),
-				// FileName(false),
-				Line(false),
-			}}.TestFunc(),
-			exp: "record_test.go",
+			name: "All Options Disabled",
+			act:  testStruct{depth: 0, opts: []recordOption{PackagePath(false), PackageName(false), StructName(false), FunctionName(false), Lambda(false), FileName(false), Line(false)}}.TestFunc(),
+			exp:  "",
+		},
+	}
+}
+
+func getTestStructSelectiveOptionsTestCases() []struct {
+	name string
+	act  string
+	exp  string
+} {
+	return []struct {
+		name string
+		act  string
+		exp  string
+	}{
+		{
+			name: "PackagePath Only",
+			act:  testStruct{depth: 0, opts: []recordOption{PackageName(false), StructName(false), FunctionName(false), Lambda(false), FileName(false), Line(false)}}.TestFunc(),
+			exp:  "github.com/ydb-platform/ydb-go-sdk/v3/internal",
 		},
 		{
-			act: testStruct{depth: 0, opts: []recordOption{
-				PackagePath(false),
-				PackageName(false),
-				StructName(false),
-				FunctionName(false),
-				Lambda(false),
-				FileName(false),
-				// Line(false),
-			}}.TestFunc(),
-			exp: "",
+			name: "PackagePath and PackageName Only",
+			act:  testStruct{depth: 0, opts: []recordOption{StructName(false), FunctionName(false), Lambda(false), FileName(false), Line(false)}}.TestFunc(),
+			exp:  "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack",
 		},
 		{
-			act: testStruct{depth: 0, opts: []recordOption{
-				PackagePath(false),
-				PackageName(false),
-				StructName(false),
-				FunctionName(false),
-				Lambda(false),
-				// FileName(false),
-				// Line(false),
-			}}.TestFunc(),
-			exp: "record_test.go:16",
+			name: "PackagePath, PackageName and StructName Only",
+			act:  testStruct{depth: 0, opts: []recordOption{FunctionName(false), Lambda(false), FileName(false), Line(false)}}.TestFunc(),
+			exp:  "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.testStruct",
 		},
 		{
-			act: testStruct{depth: 0, opts: []recordOption{
-				// PackagePath(false),
-				// PackageName(false),
-				StructName(false),
-				FunctionName(false),
-				Lambda(false),
-				FileName(false),
-				Line(false),
-			}}.TestFunc(),
-			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack",
+			name: "No Lambda, FileName and Line Only",
+			act:  testStruct{depth: 0, opts: []recordOption{Lambda(false), FileName(false), Line(false)}}.TestFunc(),
+			exp:  "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.testStruct.TestFunc",
 		},
 		{
-			act: testStruct{depth: 0, opts: []recordOption{
-				// PackagePath(false),
-				// PackageName(false),
-				// StructName(false),
-				FunctionName(false),
-				Lambda(false),
-				FileName(false),
-				Line(false),
-			}}.TestFunc(),
-			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.testStruct",
+			name: "No FileName and Line Only",
+			act:  testStruct{depth: 0, opts: []recordOption{FileName(false), Line(false)}}.TestFunc(),
+			exp:  "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.testStruct.TestFunc.func1",
 		},
 		{
-			act: testStruct{depth: 0, opts: []recordOption{
-				// PackagePath(false),
-				// PackageName(false),
-				// StructName(false),
-				// FunctionName(false),
-				Lambda(false),
-				FileName(false),
-				Line(false),
-			}}.TestFunc(),
-			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.testStruct.TestFunc",
+			name: "No Line Only",
+			act:  testStruct{depth: 0, opts: []recordOption{Line(false)}}.TestFunc(),
+			exp:  "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.testStruct.TestFunc.func1(record_test.go)",
 		},
 		{
-			act: testStruct{depth: 0, opts: []recordOption{
-				// PackagePath(false),
-				// PackageName(false),
-				// StructName(false),
-				// FunctionName(false),
-				// Lambda(false),
-				FileName(false),
-				Line(false),
-			}}.TestFunc(),
-			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.testStruct.TestFunc.func1",
+			name: "All Options",
+			act:  testStruct{depth: 0, opts: []recordOption{}}.TestFunc(),
+			exp:  "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.testStruct.TestFunc.func1(record_test.go:16)",
 		},
 		{
-			act: testStruct{depth: 0, opts: []recordOption{
-				// PackagePath(false),
-				// PackageName(false),
-				// StructName(false),
-				// FunctionName(false),
-				// Lambda(false),
-				// FileName(false),
-				Line(false),
-			}}.TestFunc(),
-			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.testStruct.TestFunc.func1(record_test.go)",
+			name: "Pointer Receiver Test",
+			act:  (&testStruct{depth: 0, opts: []recordOption{}}).TestPointerFunc(),
+			exp:  "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.(*testStruct).TestPointerFunc.func1(record_test.go:22)",
 		},
-		{
-			act: testStruct{depth: 0, opts: []recordOption{
-				// PackagePath(false),
-				// PackageName(false),
-				// StructName(false),
-				// FunctionName(false),
-				// Lambda(false),
-				// FileName(false),
-				// Line(false),
-			}}.TestFunc(),
-			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.testStruct.TestFunc.func1(record_test.go:16)",
-		},
-		{
-			act: (&testStruct{depth: 0, opts: []recordOption{
-				// PackagePath(false),
-				// PackageName(false),
-				// StructName(false),
-				// FunctionName(false),
-				// Lambda(false),
-				// FileName(false),
-				// Line(false),
-			}}).TestPointerFunc(),
-			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.(*testStruct).TestPointerFunc.func1(record_test.go:22)",
-		},
-	} {
-		t.Run("", func(t *testing.T) {
-			require.Equal(t, tt.exp, tt.act)
-		})
 	}
 }
 

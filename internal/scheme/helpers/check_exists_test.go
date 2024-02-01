@@ -50,76 +50,124 @@ func (c isDirectoryExistsSchemeClient) ListDirectory(ctx context.Context, path s
 }
 
 func TestIsDirectoryExists(t *testing.T) {
-	for _, tt := range []struct {
+	var testCases []struct {
+		name      string
+		checkPath string
+		client    isDirectoryExistsSchemeClient
+		exists    bool
+		err       bool
+	}
+
+	testCases = append(testCases, getExistingPathTestCases()...)
+	testCases = append(testCases, getNonexistentPathTestCases()...)
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			exists, err := IsDirectoryExists(context.Background(), tc.client, tc.checkPath)
+			if tc.err {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, tc.exists, exists)
+		})
+	}
+}
+
+func getExistingPathTestCases() []struct {
+	name      string
+	checkPath string
+	client    isDirectoryExistsSchemeClient
+	exists    bool
+	err       bool
+} {
+	return []struct {
+		name      string
 		checkPath string
 		client    isDirectoryExistsSchemeClient
 		exists    bool
 		err       bool
 	}{
 		{
-			checkPath: "/c/d",
-			client:    isDirectoryExistsSchemeClient{"/a", "/a/b/"},
-			exists:    false,
-			err:       true,
-		},
-		{
+			name:      "Root Path Exists in Client",
 			checkPath: "/a",
 			client:    isDirectoryExistsSchemeClient{"/a", "/a/b/"},
 			exists:    true,
 			err:       false,
 		},
 		{
+			name:      "Nested Path Exists in Client",
 			checkPath: "/a/b/c",
 			client:    isDirectoryExistsSchemeClient{"/a/b/c", "/a/b/c/d/"},
 			exists:    true,
 			err:       false,
 		},
 		{
+			name:      "Intermediate Path Exists in Client",
 			checkPath: "/a/b",
 			client:    isDirectoryExistsSchemeClient{"/a", "/a/b/"},
 			exists:    true,
 			err:       false,
 		},
 		{
-			checkPath: "/a/b/c/d",
-			client:    isDirectoryExistsSchemeClient{"/a", "/a/"},
-			exists:    false,
-			err:       false,
-		},
-		{
-			checkPath: "/a/b/c/d",
-			client:    isDirectoryExistsSchemeClient{"/a", "/a/b/"},
-			exists:    false,
-			err:       false,
-		},
-		{
-			checkPath: "/a/b/c/d",
-			client:    isDirectoryExistsSchemeClient{"/a", "/a/b/c/"},
-			exists:    false,
-			err:       false,
-		},
-		{
+			name:      "Exact Match Path in Client",
 			checkPath: "/a/b/c/d",
 			client:    isDirectoryExistsSchemeClient{"/a", "/a/b/c/d/"},
 			exists:    true,
 			err:       false,
 		},
 		{
+			name:      "Parent Path of Existing Subdirectory in Client",
 			checkPath: "/a/b/c/d",
 			client:    isDirectoryExistsSchemeClient{"/a", "/a/b/c/d/e/"},
 			exists:    true,
 			err:       false,
 		},
-	} {
-		t.Run("", func(t *testing.T) {
-			exists, err := IsDirectoryExists(context.Background(), tt.client, tt.checkPath)
-			if tt.err {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-			}
-			require.Equal(t, tt.exists, exists)
-		})
+	}
+}
+
+func getNonexistentPathTestCases() []struct {
+	name      string
+	checkPath string
+	client    isDirectoryExistsSchemeClient
+	exists    bool
+	err       bool
+} {
+	return []struct {
+		name      string
+		checkPath string
+		client    isDirectoryExistsSchemeClient
+		exists    bool
+		err       bool
+	}{
+		{
+			name:      "Nonexistent Path in Client",
+			checkPath: "/c/d",
+			client:    isDirectoryExistsSchemeClient{"/a", "/a/b/"},
+			exists:    false,
+			err:       true,
+		},
+		{
+			name:      "Deep Nested Nonexistent Path",
+			checkPath: "/a/b/c/d",
+			client:    isDirectoryExistsSchemeClient{"/a", "/a/"},
+			exists:    false,
+			err:       false,
+		},
+		{
+			name:      "Path Beyond Client Directory Scope",
+			checkPath: "/a/b/c/d",
+			client:    isDirectoryExistsSchemeClient{"/a", "/a/b/"},
+			exists:    false,
+			err:       false,
+		},
+		{
+			name:      "Path Just Before Existing Directory",
+			checkPath: "/a/b/c/d",
+			client:    isDirectoryExistsSchemeClient{"/a", "/a/b/c/"},
+			exists:    false,
+			err:       false,
+		},
 	}
 }
 

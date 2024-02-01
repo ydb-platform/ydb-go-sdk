@@ -21,40 +21,86 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
+
 	opts = append(opts, info.Options...)
-	if token := info.Params.Get("token"); token != "" {
+	opts = appendTokenOptions(opts, info.Params.Get("token"))
+
+	balancer := info.Params.Get("go_balancer")
+	if balancer == "" {
+		balancer = info.Params.Get("balancer")
+	}
+	opts = appendBalancerOptions(opts, balancer)
+
+	queryMode := info.Params.Get("go_query_mode")
+	if queryMode == "" {
+		queryMode = info.Params.Get("query_mode")
+	}
+	queryModeOpts, err := appendQueryModeOptions(queryMode)
+	if err != nil {
+		return nil, nil, err
+	}
+	connectorOpts = append(connectorOpts, queryModeOpts...)
+
+	fakeTxOpts, err := appendFakeTxOptions(info.Params.Get("go_fake_tx"))
+	if err != nil {
+		return nil, nil, err
+	}
+	connectorOpts = append(connectorOpts, fakeTxOpts...)
+
+	binders, err := appendQueryBindOptions(info.Params.Get("go_query_bind"))
+	if err != nil {
+		return nil, nil, err
+	}
+	connectorOpts = append(connectorOpts, binders...)
+
+	return opts, connectorOpts, nil
+}
+
+func appendTokenOptions(opts []config.Option, token string) []config.Option {
+	if token != "" {
 		opts = append(opts, config.WithCredentials(credentials.NewAccessTokenCredentials(token)))
 	}
-	if balancer := info.Params.Get("go_balancer"); balancer != "" {
-		opts = append(opts, config.WithBalancer(balancers.FromConfig(balancer)))
-	} else if balancer := info.Params.Get("balancer"); balancer != "" {
+	return opts
+}
+
+func appendBalancerOptions(opts []config.Option, balancer string) []config.Option {
+	if balancer != "" {
 		opts = append(opts, config.WithBalancer(balancers.FromConfig(balancer)))
 	}
-	if queryMode := info.Params.Get("go_query_mode"); queryMode != "" {
+	return opts
+}
+
+func appendQueryModeOptions(queryMode string) ([]ConnectorOption, error) {
+	var connectorOpts []ConnectorOption
+	if queryMode != "" {
 		mode := QueryModeFromString(queryMode)
 		if mode == UnknownQueryMode {
-			return nil, nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
+			return nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode '%s'", queryMode))
 		}
 		connectorOpts = append(connectorOpts, WithDefaultQueryMode(mode))
-	} else if queryMode := info.Params.Get("query_mode"); queryMode != "" {
-		mode := QueryModeFromString(queryMode)
+	}
+	return connectorOpts, nil
+}
+
+func appendFakeTxOptions(fakeTx string) ([]ConnectorOption, error) {
+	var connectorOpts []ConnectorOption
+	for _, queryModeStr := range strings.Split(fakeTx, ",") {
+		if queryModeStr == "" {
+			continue
+		}
+		mode := QueryModeFromString(queryModeStr)
 		if mode == UnknownQueryMode {
-			return nil, nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
+			return nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode '%s' in fakeTx option", queryModeStr))
 		}
-		connectorOpts = append(connectorOpts, WithDefaultQueryMode(mode))
+		connectorOpts = append(connectorOpts, WithFakeTx(mode))
 	}
-	if fakeTx := info.Params.Get("go_fake_tx"); fakeTx != "" {
-		for _, queryMode := range strings.Split(fakeTx, ",") {
-			mode := QueryModeFromString(queryMode)
-			if mode == UnknownQueryMode {
-				return nil, nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
-			}
-			connectorOpts = append(connectorOpts, WithFakeTx(mode))
-		}
-	}
-	if info.Params.Has("go_query_bind") {
-		var binders []ConnectorOption
-		queryTransformers := strings.Split(info.Params.Get("go_query_bind"), ",")
+	return connectorOpts, nil
+}
+
+func appendQueryBindOptions(queryBind string) ([]ConnectorOption, error) {
+	var binders []ConnectorOption
+	if queryBind != "" {
+		queryTransformers := strings.Split(queryBind, ",")
 		for _, transformer := range queryTransformers {
 			switch transformer {
 			case "declare":
@@ -67,19 +113,16 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 				if strings.HasPrefix(transformer, tablePathPrefixTransformer) {
 					prefix, err := extractTablePathPrefixFromBinderName(transformer)
 					if err != nil {
-						return nil, nil, xerrors.WithStackTrace(err)
+						return nil, xerrors.WithStackTrace(fmt.Errorf("error extracting table path prefix from '%s': %v", transformer, err))
 					}
 					binders = append(binders, WithTablePathPrefix(prefix))
 				} else {
-					return nil, nil, xerrors.WithStackTrace(
-						fmt.Errorf("unknown query rewriter: %s", transformer),
-					)
+					return nil, xerrors.WithStackTrace(fmt.Errorf("unknown query transformer '%s'", transformer))
 				}
 			}
 		}
-		connectorOpts = append(connectorOpts, binders...)
 	}
-	return opts, connectorOpts, nil
+	return binders, nil
 }
 
 var (

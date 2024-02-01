@@ -177,9 +177,7 @@ func (c *conn) sinceLastUsage() time.Duration {
 	return time.Since(time.Unix(c.lastUsage.Load(), 0))
 }
 
-func (c *conn) execContext(ctx context.Context, query string, args []driver.NamedValue) (
-	_ driver.Result, finalErr error,
-) {
+func (c *conn) execContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, finalErr error) {
 	defer func() {
 		c.lastUsage.Store(time.Now().Unix())
 	}()
@@ -192,77 +190,95 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		return c.currentTx.ExecContext(ctx, query, args)
 	}
 
-	var (
-		m      = queryModeFromContext(ctx, c.defaultQueryMode)
-		onDone = trace.DatabaseSQLOnConnExec(
-			c.trace, &ctx,
-			stack.FunctionID(""),
-			query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage(),
-		)
-	)
+	m := queryModeFromContext(ctx, c.defaultQueryMode)
+	onDone := c.traceExecStart(ctx, m, query, args)
 	defer func() {
 		onDone(finalErr)
 	}()
 
+	return c.executeBasedOnMode(ctx, query, args, m)
+}
+
+func (c *conn) traceExecStart(ctx context.Context, m QueryMode, query string, args []driver.NamedValue) func(error) {
+	return trace.DatabaseSQLOnConnExec(
+		c.trace, &ctx,
+		stack.FunctionID(""),
+		query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage(),
+	)
+}
+
+func (c *conn) executeBasedOnMode(ctx context.Context, query string, args []driver.NamedValue, m QueryMode) (driver.Result, error) {
 	switch m {
 	case DataQueryMode:
-		normalizedQuery, params, err := c.normalize(query, args...)
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
-		}
-		_, res, err := c.session.Execute(ctx,
-			txControl(ctx, c.defaultTxControl),
-			normalizedQuery, params, c.dataQueryOptions(ctx)...,
-		)
-		if err != nil {
-			return nil, badconn.Map(xerrors.WithStackTrace(err))
-		}
-		defer func() {
-			_ = res.Close()
-		}()
-		if err = res.NextResultSetErr(ctx); !xerrors.Is(err, nil, io.EOF) {
-			return nil, badconn.Map(xerrors.WithStackTrace(err))
-		}
-		if err = res.Err(); err != nil {
-			return nil, badconn.Map(xerrors.WithStackTrace(err))
-		}
-		return resultNoRows{}, nil
+		return c.executeDataQuery(ctx, query, args)
 	case SchemeQueryMode:
-		normalizedQuery, _, err := c.normalize(query)
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
-		}
-		err = c.session.ExecuteSchemeQuery(ctx, normalizedQuery)
-		if err != nil {
-			return nil, badconn.Map(xerrors.WithStackTrace(err))
-		}
-		return resultNoRows{}, nil
+		return c.executeSchemeQuery(ctx, query)
 	case ScriptingQueryMode:
-		var (
-			res    result.StreamResult
-			params *table.QueryParameters
-		)
-		normalizedQuery, params, err := c.normalize(query, args...)
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
-		}
-		res, err = c.connector.parent.Scripting().StreamExecute(ctx, normalizedQuery, params)
-		if err != nil {
-			return nil, badconn.Map(xerrors.WithStackTrace(err))
-		}
-		defer func() {
-			_ = res.Close()
-		}()
-		if err = res.NextResultSetErr(ctx); !xerrors.Is(err, nil, io.EOF) {
-			return nil, badconn.Map(xerrors.WithStackTrace(err))
-		}
-		if err = res.Err(); err != nil {
-			return nil, badconn.Map(xerrors.WithStackTrace(err))
-		}
-		return resultNoRows{}, nil
+		return c.executeScriptingQuery(ctx, query, args)
 	default:
 		return nil, fmt.Errorf("unsupported query mode '%s' for execute query", m)
 	}
+}
+
+func (c *conn) executeDataQuery(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	normalizedQuery, params, err := c.normalize(query, args...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	_, res, err := c.session.Execute(ctx,
+		txControl(ctx, c.defaultTxControl),
+		normalizedQuery, params, c.dataQueryOptions(ctx)...,
+	)
+	if err != nil {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+	defer func() {
+		_ = res.Close()
+	}()
+	if err = res.NextResultSetErr(ctx); !xerrors.Is(err, nil, io.EOF) {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+	if err = res.Err(); err != nil {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+	return resultNoRows{}, nil
+}
+
+func (c *conn) executeSchemeQuery(ctx context.Context, query string) (driver.Result, error) {
+	normalizedQuery, _, err := c.normalize(query)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	err = c.session.ExecuteSchemeQuery(ctx, normalizedQuery)
+	if err != nil {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+	return resultNoRows{}, nil
+}
+
+func (c *conn) executeScriptingQuery(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	var (
+		res    result.StreamResult
+		params *table.QueryParameters
+	)
+	normalizedQuery, params, err := c.normalize(query, args...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	res, err = c.connector.parent.Scripting().StreamExecute(ctx, normalizedQuery, params)
+	if err != nil {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+	defer func() {
+		_ = res.Close()
+	}()
+	if err = res.NextResultSetErr(ctx); !xerrors.Is(err, nil, io.EOF) {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+	if err = res.Err(); err != nil {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+	return resultNoRows{}, nil
 }
 
 func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, _ error) {
@@ -285,12 +301,8 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	return c.queryContext(ctx, query, args)
 }
 
-func (c *conn) queryContext(ctx context.Context, query string, args []driver.NamedValue) (
-	_ driver.Rows, finalErr error,
-) {
-	defer func() {
-		c.lastUsage.Store(time.Now().Unix())
-	}()
+func (c *conn) queryContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, finalErr error) {
+	defer c.updateLastUsage()
 
 	if !c.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
@@ -300,90 +312,115 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		return c.currentTx.QueryContext(ctx, query, args)
 	}
 
-	var (
-		m      = queryModeFromContext(ctx, c.defaultQueryMode)
-		onDone = trace.DatabaseSQLOnConnQuery(
-			c.trace, &ctx,
-			stack.FunctionID(""),
-			query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage(),
-		)
-	)
-	defer func() {
-		onDone(finalErr)
-	}()
+	m, onDone := c.prepareQueryContext(ctx, query)
+	defer onDone(finalErr)
 
+	return c.executeQueryContext(ctx, query, args, m)
+}
+
+func (c *conn) updateLastUsage() {
+	c.lastUsage.Store(time.Now().Unix())
+}
+
+func (c *conn) prepareQueryContext(ctx context.Context, query string) (QueryMode, func(error)) {
+	m := queryModeFromContext(ctx, c.defaultQueryMode)
+	onDone := trace.DatabaseSQLOnConnQuery(
+		c.trace, &ctx,
+		stack.FunctionID(""),
+		query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage(),
+	)
+	return m, onDone
+}
+
+func (c *conn) executeQueryContext(ctx context.Context, query string, args []driver.NamedValue, m QueryMode) (driver.Rows, error) {
 	switch m {
 	case DataQueryMode:
-		normalizedQuery, params, err := c.normalize(query, args...)
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
-		}
-		_, res, err := c.session.Execute(ctx,
-			txControl(ctx, c.defaultTxControl),
-			normalizedQuery, params, c.dataQueryOptions(ctx)...,
-		)
-		if err != nil {
-			return nil, badconn.Map(xerrors.WithStackTrace(err))
-		}
-		if err = res.Err(); err != nil {
-			return nil, badconn.Map(xerrors.WithStackTrace(err))
-		}
-		return &rows{
-			conn:   c,
-			result: res,
-		}, nil
+		return c.executeQuery(ctx, query, args)
 	case ScanQueryMode:
-		normalizedQuery, params, err := c.normalize(query, args...)
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
-		}
-		res, err := c.session.StreamExecuteScanQuery(ctx,
-			normalizedQuery, params, c.scanQueryOptions(ctx)...,
-		)
-		if err != nil {
-			return nil, badconn.Map(xerrors.WithStackTrace(err))
-		}
-		if err = res.Err(); err != nil {
-			return nil, badconn.Map(xerrors.WithStackTrace(err))
-		}
-		return &rows{
-			conn:   c,
-			result: res,
-		}, nil
+		return c.executeScanQuery(ctx, query, args)
 	case ExplainQueryMode:
-		normalizedQuery, _, err := c.normalize(query, args...)
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
-		}
-		exp, err := c.session.Explain(ctx, normalizedQuery)
-		if err != nil {
-			return nil, badconn.Map(xerrors.WithStackTrace(err))
-		}
-		return &single{
-			values: []sql.NamedArg{
-				sql.Named("AST", exp.AST),
-				sql.Named("Plan", exp.Plan),
-			},
-		}, nil
+		return c.executeExplainQuery(ctx, query, args)
 	case ScriptingQueryMode:
-		normalizedQuery, params, err := c.normalize(query, args...)
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
-		}
-		res, err := c.connector.parent.Scripting().StreamExecute(ctx, normalizedQuery, params)
-		if err != nil {
-			return nil, badconn.Map(xerrors.WithStackTrace(err))
-		}
-		if err = res.Err(); err != nil {
-			return nil, badconn.Map(xerrors.WithStackTrace(err))
-		}
-		return &rows{
-			conn:   c,
-			result: res,
-		}, nil
+		return c.executeScriptQuery(ctx, query, args)
 	default:
 		return nil, fmt.Errorf("unsupported query mode '%s' on conn query", m)
 	}
+}
+
+func (c *conn) executeQuery(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	normalizedQuery, params, err := c.normalize(query, args...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	_, res, err := c.session.Execute(ctx,
+		txControl(ctx, c.defaultTxControl),
+		normalizedQuery, params, c.dataQueryOptions(ctx)...,
+	)
+	if err != nil {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+	if err = res.Err(); err != nil {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+	return &rows{
+		conn:   c,
+		result: res,
+	}, nil
+}
+
+func (c *conn) executeScanQuery(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	normalizedQuery, params, err := c.normalize(query, args...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	res, err := c.session.StreamExecuteScanQuery(ctx,
+		normalizedQuery, params, c.scanQueryOptions(ctx)...,
+	)
+	if err != nil {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+	if err = res.Err(); err != nil {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+	return &rows{
+		conn:   c,
+		result: res,
+	}, nil
+}
+
+func (c *conn) executeExplainQuery(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	normalizedQuery, _, err := c.normalize(query, args...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	exp, err := c.session.Explain(ctx, normalizedQuery)
+	if err != nil {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+	return &single{
+		values: []sql.NamedArg{
+			sql.Named("AST", exp.AST),
+			sql.Named("Plan", exp.Plan),
+		},
+	}, nil
+}
+
+func (c *conn) executeScriptQuery(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	normalizedQuery, params, err := c.normalize(query, args...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	res, err := c.connector.parent.Scripting().StreamExecute(ctx, normalizedQuery, params)
+	if err != nil {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+	if err = res.Err(); err != nil {
+		return nil, badconn.Map(xerrors.WithStackTrace(err))
+	}
+	return &rows{
+		conn:   c,
+		result: res,
+	}, nil
 }
 
 func (c *conn) Ping(ctx context.Context) (finalErr error) {
