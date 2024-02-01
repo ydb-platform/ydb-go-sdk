@@ -23,7 +23,7 @@ func TestDriver_String(t *testing.T) {
 				config.WithDatabase("local"),
 				config.WithSecure(false),
 			)},
-			s: `Driver{Endpoint:"localhost",Database:"local",Secure:false,Credentials:Anonymous{From:"github.com/ydb-platform/ydb-go-sdk/v3/config.defaultConfig(defaults.go:88)"}}`, //nolint:lll
+			s: `Driver{Endpoint:"localhost",Database:"local",Secure:false,Credentials:Anonymous{From:"github.com/ydb-platform/ydb-go-sdk/v3/config.defaultConfig(defaults.go:90)"}}`, //nolint:lll
 		},
 		{
 			name: xtest.CurrentFileLine(),
@@ -32,7 +32,7 @@ func TestDriver_String(t *testing.T) {
 				config.WithDatabase("local"),
 				config.WithSecure(true),
 			)},
-			s: `Driver{Endpoint:"localhost",Database:"local",Secure:true,Credentials:Anonymous{From:"github.com/ydb-platform/ydb-go-sdk/v3/config.defaultConfig(defaults.go:88)"}}`, //nolint:lll
+			s: `Driver{Endpoint:"localhost",Database:"local",Secure:true,Credentials:Anonymous{From:"github.com/ydb-platform/ydb-go-sdk/v3/config.defaultConfig(defaults.go:90)"}}`, //nolint:lll
 		},
 		{
 			name: xtest.CurrentFileLine(),
