@@ -27,7 +27,6 @@ type MockPoolMockRecorder struct {
 func NewMockPool(ctrl *gomock.Controller) *MockPool {
 	mock := &MockPool{ctrl: ctrl}
 	mock.recorder = &MockPoolMockRecorder{mock}
-
 	return mock
 }
 
@@ -41,14 +40,12 @@ func (m *MockPool) Get() any {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get")
 	ret0, _ := ret[0].(any)
-
 	return ret0
 }
 
 // Get indicates an expected call of Get.
 func (mr *MockPoolMockRecorder) Get() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockPool)(nil).Get))
 }
 
@@ -61,6 +58,5 @@ func (m *MockPool) Put(arg0 any) {
 // Put indicates an expected call of Put.
 func (mr *MockPoolMockRecorder) Put(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Put", reflect.TypeOf((*MockPool)(nil).Put), arg0)
 }

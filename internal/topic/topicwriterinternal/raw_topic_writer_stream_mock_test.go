@@ -28,7 +28,6 @@ type MockRawTopicWriterStreamMockRecorder struct {
 func NewMockRawTopicWriterStream(ctrl *gomock.Controller) *MockRawTopicWriterStream {
 	mock := &MockRawTopicWriterStream{ctrl: ctrl}
 	mock.recorder = &MockRawTopicWriterStreamMockRecorder{mock}
-
 	return mock
 }
 
@@ -42,14 +41,12 @@ func (m *MockRawTopicWriterStream) CloseSend() error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CloseSend")
 	ret0, _ := ret[0].(error)
-
 	return ret0
 }
 
 // CloseSend indicates an expected call of CloseSend.
 func (mr *MockRawTopicWriterStreamMockRecorder) CloseSend() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CloseSend", reflect.TypeOf((*MockRawTopicWriterStream)(nil).CloseSend))
 }
 
@@ -59,14 +56,12 @@ func (m *MockRawTopicWriterStream) Recv() (rawtopicwriter.ServerMessage, error) 
 	ret := m.ctrl.Call(m, "Recv")
 	ret0, _ := ret[0].(rawtopicwriter.ServerMessage)
 	ret1, _ := ret[1].(error)
-
 	return ret0, ret1
 }
 
 // Recv indicates an expected call of Recv.
 func (mr *MockRawTopicWriterStreamMockRecorder) Recv() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Recv", reflect.TypeOf((*MockRawTopicWriterStream)(nil).Recv))
 }
 
@@ -75,13 +70,11 @@ func (m *MockRawTopicWriterStream) Send(arg0 rawtopicwriter.ClientMessage) error
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Send", arg0)
 	ret0, _ := ret[0].(error)
-
 	return ret0
 }
 
 // Send indicates an expected call of Send.
 func (mr *MockRawTopicWriterStreamMockRecorder) Send(arg0 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockRawTopicWriterStream)(nil).Send), arg0)
 }

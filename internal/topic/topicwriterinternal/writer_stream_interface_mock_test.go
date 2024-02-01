@@ -28,7 +28,6 @@ type MockStreamWriterMockRecorder struct {
 func NewMockStreamWriter(ctrl *gomock.Controller) *MockStreamWriter {
 	mock := &MockStreamWriter{ctrl: ctrl}
 	mock.recorder = &MockStreamWriterMockRecorder{mock}
-
 	return mock
 }
 
@@ -42,14 +41,12 @@ func (m *MockStreamWriter) Close(ctx context.Context) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Close", ctx)
 	ret0, _ := ret[0].(error)
-
 	return ret0
 }
 
 // Close indicates an expected call of Close.
 func (mr *MockStreamWriterMockRecorder) Close(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockStreamWriter)(nil).Close), ctx)
 }
 
@@ -59,14 +56,12 @@ func (m *MockStreamWriter) WaitInit(ctx context.Context) (InitialInfo, error) {
 	ret := m.ctrl.Call(m, "WaitInit", ctx)
 	ret0, _ := ret[0].(InitialInfo)
 	ret1, _ := ret[1].(error)
-
 	return ret0, ret1
 }
 
 // WaitInit indicates an expected call of WaitInit.
 func (mr *MockStreamWriterMockRecorder) WaitInit(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WaitInit", reflect.TypeOf((*MockStreamWriter)(nil).WaitInit), ctx)
 }
 
@@ -75,13 +70,11 @@ func (m *MockStreamWriter) Write(ctx context.Context, messages []PublicMessage) 
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Write", ctx, messages)
 	ret0, _ := ret[0].(error)
-
 	return ret0
 }
 
 // Write indicates an expected call of Write.
 func (mr *MockStreamWriterMockRecorder) Write(ctx, messages any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Write", reflect.TypeOf((*MockStreamWriter)(nil).Write), ctx, messages)
 }
