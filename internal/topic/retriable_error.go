@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	DefaultStartTimeout = time.Minute
+	DefaultStartTimeout          = time.Minute
+	connectionEstablishedTimeout = time.Minute
 )
 
 type RetrySettings struct {
@@ -46,7 +47,7 @@ var (
 func CheckResetReconnectionCounters(lastTry, now time.Time, connectionTimeout time.Duration) bool {
 	const resetAttemptEmpiricalCoefficient = 10
 	if connectionTimeout == value.InfiniteDuration {
-		return false
+		return now.Sub(lastTry) > connectionEstablishedTimeout
 	}
 	return now.Sub(lastTry) > connectionTimeout*resetAttemptEmpiricalCoefficient
 }

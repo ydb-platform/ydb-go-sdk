@@ -243,10 +243,16 @@ func TestCheckResetReconnectionCounters(t *testing.T) {
 		shouldReset       bool
 	}{
 		{
-			name:              "InfiniteConnectionTimeout",
-			lastTry:           time.Time{},
+			name:              "RecentLastTryWithInfiniteConnectionTimeout",
+			lastTry:           now.Add(-30 * time.Second),
 			connectionTimeout: value.InfiniteDuration,
 			shouldReset:       false,
+		},
+		{
+			name:              "OldLastTryWithInfiniteConnectionTimeout",
+			lastTry:           now.Add(-30 * time.Minute),
+			connectionTimeout: value.InfiniteDuration,
+			shouldReset:       true,
 		},
 		{
 			name:              "LastTryLessThanConnectionTimeout",
