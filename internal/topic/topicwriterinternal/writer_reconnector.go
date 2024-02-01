@@ -369,7 +369,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		streamCtx, streamCtxCancel = createStreamContext()
 
 		now := time.Now()
-		if topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
+		if startOfRetries.IsZero() || topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
 			attempt = 0
 			startOfRetries = w.clock.Now()
 		} else {
