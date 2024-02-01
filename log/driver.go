@@ -59,6 +59,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			Bool("secure", secure),
 		)
 		start := time.Now()
+
 		return func(info trace.DriverInitDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -86,6 +87,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 		ctx := with(*info.Context, TRACE, "ydb", "driver", "resolver", "close")
 		l.Log(ctx, "start")
 		start := time.Now()
+
 		return func(info trace.DriverCloseDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -110,6 +112,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			Stringer("endpoint", endpoint),
 		)
 		start := time.Now()
+
 		return func(info trace.DriverConnDialDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -137,6 +140,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			Stringer("state", info.State),
 		)
 		start := time.Now()
+
 		return func(info trace.DriverConnStateChangeDoneInfo) {
 			l.Log(ctx, "done",
 				Stringer("endpoint", endpoint),
@@ -155,6 +159,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			Stringer("endpoint", endpoint),
 		)
 		start := time.Now()
+
 		return func(info trace.DriverConnParkDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -209,6 +214,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			String("method", method),
 		)
 		start := time.Now()
+
 		return func(info trace.DriverConnInvokeDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -247,6 +253,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			String("method", method),
 		)
 		start := time.Now()
+
 		return func(info trace.DriverConnNewStreamRecvInfo) func(trace.DriverConnNewStreamDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "intermediate receive",
@@ -263,6 +270,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 					versionField(),
 				)
 			}
+
 			return func(info trace.DriverConnNewStreamDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
@@ -315,6 +323,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			Stringer("endpoint", endpoint),
 		)
 		start := time.Now()
+
 		return func(info trace.DriverConnAllowDoneInfo) {
 			l.Log(ctx, "done",
 				Stringer("endpoint", endpoint),
@@ -335,6 +344,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			String("event", event),
 		)
 		start := time.Now()
+
 		return func(info trace.DriverRepeaterWakeUpDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -426,6 +436,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			Bool("needLocalDC", info.NeedLocalDC),
 		)
 		start := time.Now()
+
 		return func(info trace.DriverBalancerUpdateDoneInfo) {
 			l.Log(ctx, "done",
 				latencyField(start),
@@ -459,5 +470,6 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			}
 		}
 	}
+
 	return t
 }

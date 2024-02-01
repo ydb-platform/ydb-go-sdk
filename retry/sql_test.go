@@ -209,6 +209,7 @@ func TestDoTx(t *testing.T) {
 							defer func() {
 								_ = rows.Close()
 							}()
+
 							return rows.Err()
 						},
 						WithIdempotent(bool(idempotentType)),
@@ -218,6 +219,7 @@ func TestDoTx(t *testing.T) {
 							//nolint:lll
 							OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 								t.Logf("attempt %d, conn %d, mode: %+v", attempts, m.conns, Check(m.queryErr))
+
 								return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 									t.Logf("attempt %d, conn %d, mode: %+v", attempts, m.conns, Check(m.queryErr))
 

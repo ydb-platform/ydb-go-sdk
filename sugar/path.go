@@ -173,5 +173,6 @@ func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove s
 	if !strings.HasPrefix(pathToRemove, db.Name()) {
 		pathToRemove = path.Join(db.Name(), pathToRemove)
 	}
+
 	return rmPath(0, pathToRemove)
 }

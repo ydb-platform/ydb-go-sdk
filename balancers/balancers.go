@@ -61,6 +61,7 @@ func (locations filterLocations) Allow(_ balancerConfig.Info, c conn.Conn) bool 
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -91,6 +92,7 @@ func PreferLocations(balancer *balancerConfig.Config, locations ...string) *bala
 	}
 	sort.Strings(locations)
 	balancer.Filter = filterLocations(locations)
+
 	return balancer
 }
 
@@ -100,6 +102,7 @@ func PreferLocations(balancer *balancerConfig.Config, locations ...string) *bala
 func PreferLocationsWithFallback(balancer *balancerConfig.Config, locations ...string) *balancerConfig.Config {
 	balancer = PreferLocations(balancer, locations...)
 	balancer.AllowFallback = true
+
 	return balancer
 }
 
@@ -129,6 +132,7 @@ func Prefer(balancer *balancerConfig.Config, filter func(endpoint Endpoint) bool
 	balancer.Filter = filterFunc(func(_ balancerConfig.Info, c conn.Conn) bool {
 		return filter(c.Endpoint())
 	})
+
 	return balancer
 }
 
@@ -138,6 +142,7 @@ func Prefer(balancer *balancerConfig.Config, filter func(endpoint Endpoint) bool
 func PreferWithFallback(balancer *balancerConfig.Config, filter func(endpoint Endpoint) bool) *balancerConfig.Config {
 	balancer = Prefer(balancer, filter)
 	balancer.AllowFallback = true
+
 	return balancer
 }
 

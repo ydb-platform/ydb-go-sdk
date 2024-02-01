@@ -25,6 +25,7 @@ func TestGenerateDeclareSection(t *testing.T) {
 			}
 		}
 		sort.Strings(declares)
+
 		return declares
 	}
 	for _, tt := range []struct {
@@ -124,6 +125,7 @@ func TestGenerateDeclareSection_ParameterOption(t *testing.T) {
 			}
 		}
 		sort.Strings(declares)
+
 		return declares
 	}
 	for _, tt := range []struct {

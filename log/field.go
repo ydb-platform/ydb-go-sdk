@@ -51,30 +51,35 @@ func (f Field) Key() string {
 // StringValue is a value getter for fields with StringType type
 func (f Field) StringValue() string {
 	f.checkType(StringType)
+
 	return f.vstr
 }
 
 // IntValue is a value getter for fields with IntType type
 func (f Field) IntValue() int {
 	f.checkType(IntType)
+
 	return int(f.vint)
 }
 
 // Int64Value is a value getter for fields with Int64Type type
 func (f Field) Int64Value() int64 {
 	f.checkType(Int64Type)
+
 	return f.vint
 }
 
 // BoolValue is a value getter for fields with BoolType type
 func (f Field) BoolValue() bool {
 	f.checkType(BoolType)
+
 	return f.vint != 0
 }
 
 // DurationValue is a value getter for fields with DurationType type
 func (f Field) DurationValue() time.Duration {
 	f.checkType(DurationType)
+
 	return time.Nanosecond * time.Duration(f.vint)
 }
 
@@ -84,6 +89,7 @@ func (f Field) StringsValue() []string {
 	if f.vany == nil {
 		return nil
 	}
+
 	return f.vany.([]string)
 }
 
@@ -93,6 +99,7 @@ func (f Field) ErrorValue() error {
 	if f.vany == nil {
 		return nil
 	}
+
 	return f.vany.(error)
 }
 
@@ -128,6 +135,7 @@ func (f Field) Stringer() fmt.Stringer {
 	if f.vany == nil {
 		return nil
 	}
+
 	return f.vany.(fmt.Stringer)
 }
 

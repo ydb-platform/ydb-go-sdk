@@ -38,6 +38,7 @@ func (p PublicFuturePartitioning) ToRaw() rawtopicwriter.Partitioning {
 	if p.hasPartitionID {
 		return rawtopicwriter.NewPartitioningPartitionID(p.partitionID)
 	}
+
 	return rawtopicwriter.NewPartitioningMessageGroup(p.messageGroupID)
 }
 
@@ -128,6 +129,7 @@ func (m *messageWithDataContent) encodeRawContent(codec rawtopiccommon.Codec) ([
 	}
 
 	m.bufCodec = codec
+
 	return m.bufEncoded.Bytes(), nil
 }
 
@@ -142,6 +144,7 @@ func (m *messageWithDataContent) readDataToRawBuf() error {
 		m.BufUncompressedSize = int(writtenBytes)
 		m.Data = nil
 	}
+
 	return nil
 }
 
@@ -173,6 +176,7 @@ func (m *messageWithDataContent) readDataToTargetCodec(codec rawtopiccommon.Code
 	}
 	m.BufUncompressedSize = int(bytesCount)
 	m.Data = nil
+
 	return nil
 }
 
@@ -188,6 +192,7 @@ func (m *messageWithDataContent) getRawBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return m.rawBuf.Bytes(), nil
 }
 
@@ -204,6 +209,7 @@ func (m *messageWithDataContent) getEncodedBytes(codec rawtopiccommon.Codec) ([]
 		if err != nil {
 			return nil, err
 		}
+
 		return m.bufEncoded.Bytes(), nil
 	}
 }

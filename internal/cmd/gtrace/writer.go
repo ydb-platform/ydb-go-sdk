@@ -558,6 +558,7 @@ func flattenParams(params []Param) (dst []Param) {
 		_, s := unwrapStruct(params[i].Type)
 		if s != nil {
 			dst = flattenStruct(dst, s)
+
 			continue
 		}
 		dst = append(dst, params[i])
@@ -605,6 +606,7 @@ func (w *Writer) constructParams(params []Param, names []string) (res []string) 
 			var v string
 			v, names = w.constructStruct(n, s, names)
 			res = append(res, v)
+
 			continue
 		}
 		name := names[0]
@@ -741,6 +743,7 @@ func (w *Writer) hookFuncShortcut(fn *Func, name string) {
 func (w *Writer) zeroReturn(fn *Func) {
 	if !fn.HasResult() {
 		w.line(`return`)
+
 		return
 	}
 	w.code(`return `)
@@ -901,6 +904,7 @@ func (w *Writer) typeString(t types.Type) string {
 		if pkg.Path() == w.pkg.Path() {
 			return "" // same package; unqualified
 		}
+
 		return pkg.Name()
 	})
 }

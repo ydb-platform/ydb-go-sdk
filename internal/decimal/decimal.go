@@ -73,6 +73,7 @@ func FromBytes(bts []byte, precision, scale uint32) *big.Int {
 			v.Set(inf)
 		}
 	}
+
 	return v
 }
 
@@ -123,6 +124,7 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 				return nil, syntaxError(s)
 			}
 			dot = true
+
 			continue
 		}
 		if dot {
@@ -144,6 +146,7 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 			if neg {
 				return neginf, nil
 			}
+
 			return inf, nil
 		}
 		integral--
@@ -328,6 +331,7 @@ func ensure(p []byte, n int) []byte {
 		copy(cp, p)
 		p = cp
 	}
+
 	return p[:l+n]
 }
 
@@ -364,6 +368,7 @@ func complement(x *big.Int) *big.Int {
 	not(x)
 	x.Neg(x)
 	x.Add(x, one)
+
 	return x
 }
 

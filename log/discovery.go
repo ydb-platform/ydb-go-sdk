@@ -22,6 +22,7 @@ func internalDiscovery(l Logger, d trace.Detailer) (t trace.Discovery) {
 			String("database", info.Database),
 		)
 		start := time.Now()
+
 		return func(info trace.DiscoveryDiscoverDoneInfo) {
 			if info.Error == nil {
 				l.Log(WithLevel(ctx, INFO), "done",

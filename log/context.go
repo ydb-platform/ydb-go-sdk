@@ -25,6 +25,7 @@ func NamesFromContext(ctx context.Context) []string {
 	if v == nil {
 		return []string{}
 	}
+
 	return v
 }
 

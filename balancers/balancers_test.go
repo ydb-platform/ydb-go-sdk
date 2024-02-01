@@ -66,5 +66,6 @@ func applyPreferFilter(info balancerConfig.Info, b *balancerConfig.Config, conns
 			res = append(res, c)
 		}
 	}
+
 	return res
 }

@@ -288,6 +288,7 @@ func (w *WriterReconnector) checkMessages(messages []messageWithDataContent) err
 			return xerrors.WithStackTrace(fmt.Errorf("message size bytes %v: %w", size, errLargeMessage))
 		}
 	}
+
 	return nil
 }
 
@@ -321,6 +322,7 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 	if err != nil {
 		return nil, err
 	}
+
 	return res, nil
 }
 
@@ -388,6 +390,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 				}
 			} else {
 				_ = w.close(ctx, reconnectReason)
+
 				return
 			}
 		}
@@ -424,11 +427,13 @@ func (w *WriterReconnector) startWriteStream(ctx, streamCtx context.Context, att
 	}
 
 	w.queue.ResetSentProgress()
+
 	return NewSingleStreamWriter(ctx, w.createWriterStreamConfig(stream))
 }
 
 func (w *WriterReconnector) needReceiveLastSeqNo() bool {
 	res := !w.firstConnectionHandled.Load()
+
 	return res
 }
 
@@ -462,11 +467,13 @@ func (w *WriterReconnector) connectWithTimeout(streamLifetimeContext context.Con
 	select {
 	case <-timer.C:
 		connectCancel()
+
 		return nil, xerrors.WithStackTrace(errConnTimeout)
 	case res := <-resCh:
 		// force no cancel connect context - because it will break stream
 		// context will cancel by cancel streamLifetimeContext while reconnect or stop connection
 		_ = connectCancel
+
 		return res.stream, res.err
 	}
 }
@@ -561,6 +568,7 @@ func (w *WriterReconnector) createWriterStreamConfig(stream RawTopicWriterStream
 		w.needReceiveLastSeqNo(),
 		w.writerInstanceID,
 	)
+
 	return cfg
 }
 

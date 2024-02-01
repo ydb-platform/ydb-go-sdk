@@ -50,6 +50,7 @@ func (c *Client) DescribeTopic(ctx context.Context, req DescribeTopicRequest) (r
 		))
 	}
 	err = res.FromProto(resp)
+
 	return res, err
 }
 
@@ -62,6 +63,7 @@ func (c *Client) DropTopic(
 		return res, xerrors.WithStackTrace(fmt.Errorf("ydb: drop topic grpc failed: %w", err))
 	}
 	err = res.FromProto(resp)
+
 	return res, err
 }
 
@@ -74,6 +76,7 @@ func (c *Client) StreamRead(ctxStreamLifeTime context.Context) (rawtopicreader.S
 			),
 		)
 	}
+
 	return rawtopicreader.StreamReader{Stream: protoResp}, nil
 }
 
@@ -86,5 +89,6 @@ func (c *Client) StreamWrite(ctxStreamLifeTime context.Context) (*rawtopicwriter
 			),
 		)
 	}
+
 	return &rawtopicwriter.StreamWriter{Stream: protoResp}, nil
 }

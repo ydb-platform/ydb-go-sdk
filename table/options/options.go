@@ -937,6 +937,7 @@ func WithCommitCollectStatsModeBasic() CommitTransactionOption {
 func WithCollectStatsModeNone() ExecuteDataQueryOption {
 	return executeDataQueryOptionFunc(func(d *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
 		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE
+
 		return nil
 	})
 }
