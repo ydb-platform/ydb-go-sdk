@@ -222,7 +222,6 @@ linters:
     - errname
     - exhaustive
     - exhaustivestruct
-    - exhaustruct
     - forbidigo
     - forcetypeassert
     - funlen
