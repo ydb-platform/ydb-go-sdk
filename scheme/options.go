@@ -7,6 +7,7 @@ import (
 func permissions(p Permissions) *Ydb_Scheme.Permissions {
 	var y Ydb_Scheme.Permissions
 	p.To(&y)
+
 	return &y
 }
 

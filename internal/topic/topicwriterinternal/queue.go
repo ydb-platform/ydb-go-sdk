@@ -57,6 +57,7 @@ func newMessageQueue() messageQueue {
 
 func (q *messageQueue) AddMessages(messages []messageWithDataContent) error {
 	_, err := q.addMessages(messages, false)
+
 	return err
 }
 
@@ -136,6 +137,7 @@ func (q *messageQueue) addMessageNeedLock(
 	q.messagesByOrder[messageIndex] = mess
 	q.seqNoToOrderID[mess.SeqNo] = messageIndex
 	q.lastSeqNo = mess.SeqNo
+
 	return messageIndex
 }
 
@@ -158,6 +160,7 @@ func (q *messageQueue) AcksReceived(acks []rawtopicwriter.WriteAck) error {
 	}
 
 	q.acksReceivedEvent.Broadcast()
+
 	return nil
 }
 
@@ -169,6 +172,7 @@ func (q *messageQueue) ackReceivedNeedLock(seqNo int64) error {
 
 	delete(q.seqNoToOrderID, seqNo)
 	delete(q.messagesByOrder, orderID)
+
 	return nil
 }
 
@@ -270,6 +274,7 @@ func (q *messageQueue) getMessagesForSendWithLock() []messageWithDataContent {
 			res = append(res, msg)
 		}
 	}
+
 	return res
 }
 
@@ -288,6 +293,7 @@ func (q *messageQueue) Wait(ctx context.Context, waiter MessageQueueAckWaiter) e
 				checkMessageIndex := waiter.sequenseNumbers[0]
 				if _, ok := q.messagesByOrder[checkMessageIndex]; ok {
 					hasWaited = true
+
 					return
 				}
 				waiter.sequenseNumbers = waiter.sequenseNumbers[1:]

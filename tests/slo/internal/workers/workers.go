@@ -24,6 +24,7 @@ func New(cfg *config.Config, s ReadWriter, label, jobName string) (*Workers, err
 	m, err := metrics.New(cfg.PushGateway, label, jobName)
 	if err != nil {
 		fmt.Printf("create metrics failed: %v\n", err)
+
 		return nil, err
 	}
 

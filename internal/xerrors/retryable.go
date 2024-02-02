@@ -82,6 +82,7 @@ func Retryable(err error, opts ...RetryableErrorOption) error {
 			o(re)
 		}
 	}
+
 	return re
 }
 
@@ -91,5 +92,6 @@ func RetryableError(err error) Error {
 	if errors.As(err, &e) {
 		return e
 	}
+
 	return nil
 }

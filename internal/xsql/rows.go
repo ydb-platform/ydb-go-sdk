@@ -50,6 +50,7 @@ func (r *rows) Columns() []string {
 			cs = append(cs, m.Name)
 		}
 	})
+
 	return cs
 }
 
@@ -97,6 +98,7 @@ func (r *rows) NextResultSet() (finalErr error) {
 	if err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	return nil
 }
 
@@ -131,6 +133,7 @@ func (r *rows) Next(dst []driver.Value) error {
 	if err = r.result.Err(); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	return nil
 }
 
@@ -147,6 +150,7 @@ func (r *single) Columns() (columns []string) {
 	for i := range r.values {
 		columns = append(columns, r.values[i].Name)
 	}
+
 	return columns
 }
 
@@ -162,5 +166,6 @@ func (r *single) Next(dst []driver.Value) error {
 		dst[i] = r.values[i].Value
 	}
 	r.readAll = true
+
 	return nil
 }

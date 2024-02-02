@@ -48,6 +48,7 @@ func TestCallbackOnReaderContent(t *testing.T) {
 		err := callbackOnReaderContent(p, newReader(), 0, testFuncConsumer(func(data []byte) error {
 			called = true
 			require.Equal(t, expectedData, data)
+
 			return nil
 		}))
 		require.NoError(t, err)
@@ -76,6 +77,7 @@ func TestCallbackOnReaderContent(t *testing.T) {
 		// first call with empty reader - for check internal capacity without reallocation
 		_ = callbackOnReaderContent(p, ErrReader(io.EOF), estimatedSize, testFuncConsumer(func(data []byte) error {
 			require.Empty(t, data)
+
 			return nil
 		}))
 
@@ -84,6 +86,7 @@ func TestCallbackOnReaderContent(t *testing.T) {
 		err := callbackOnReaderContent(p, newReader(), estimatedSize, testFuncConsumer(func(data []byte) error {
 			require.Equal(t, expectedData, data)
 			called = true
+
 			return nil
 		}))
 		require.NoError(t, err)
@@ -103,6 +106,7 @@ func TestCallbackOnReaderContent(t *testing.T) {
 		err := callbackOnReaderContent(p, newReader(), maxInitialBufferSize+10, testFuncConsumer(func(data []byte) error {
 			require.Equal(t, expectedData, data)
 			called = true
+
 			return nil
 		}))
 		require.NoError(t, err)
@@ -121,6 +125,7 @@ func TestCallbackOnReaderContent(t *testing.T) {
 		err := callbackOnReaderContent(p, newReader(), 0, testFuncConsumer(func(data []byte) error {
 			require.Equal(t, expectedData, data)
 			called = true
+
 			return nil
 		}))
 		require.NoError(t, err)

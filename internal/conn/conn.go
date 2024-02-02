@@ -72,12 +72,14 @@ func (c *conn) Ping(ctx context.Context) error {
 	if !isAvailable(cc) {
 		return c.wrapError(errUnavailableConnection)
 	}
+
 	return nil
 }
 
 func (c *conn) LastUsage() time.Time {
 	c.mtx.RLock()
 	defer c.mtx.RUnlock()
+
 	return c.lastUsage
 }
 
@@ -126,6 +128,7 @@ func (c *conn) NodeID() uint32 {
 	if c != nil {
 		return c.endpoint.NodeID()
 	}
+
 	return 0
 }
 
@@ -133,6 +136,7 @@ func (c *conn) Endpoint() endpoint.Endpoint {
 	if c != nil {
 		return c.endpoint
 	}
+
 	return nil
 }
 
@@ -148,6 +152,7 @@ func (c *conn) setState(ctx context.Context, s State) State {
 			c.endpoint.Copy(), state,
 		)(s)
 	}
+
 	return s
 }
 
@@ -163,6 +168,7 @@ func (c *conn) Unban(ctx context.Context) State {
 	}
 
 	c.setState(ctx, newState)
+
 	return newState
 }
 
@@ -252,12 +258,14 @@ func (c *conn) close(ctx context.Context) (err error) {
 	err = c.cc.Close()
 	c.cc = nil
 	c.setState(ctx, Offline)
+
 	return c.wrapError(err)
 }
 
 func (c *conn) isClosed() bool {
 	c.mtx.RLock()
 	defer c.mtx.RUnlock()
+
 	return c.closed
 }
 
@@ -344,6 +352,7 @@ func (c *conn) Invoke(
 			if sentMark.canRetry() {
 				return c.wrapError(xerrors.Retryable(err, xerrors.WithName("Invoke")))
 			}
+
 			return c.wrapError(err)
 		}
 
@@ -436,6 +445,7 @@ func (c *conn) NewStream(
 			if sentMark.canRetry() {
 				return s, c.wrapError(xerrors.Retryable(err, xerrors.WithName("NewStream")))
 			}
+
 			return s, c.wrapError(err)
 		}
 
@@ -461,6 +471,7 @@ func (c *conn) wrapError(err error) error {
 		return nil
 	}
 	nodeErr := newConnError(c.endpoint.NodeID(), c.endpoint.Address(), err)
+
 	return xerrors.WithStackTrace(nodeErr, xerrors.WithSkipDepth(1))
 }
 
@@ -530,6 +541,7 @@ var rpcKey = ctxHandleRPCKey{}
 
 func markContext(ctx context.Context) (context.Context, *modificationMark) {
 	mark := &modificationMark{}
+
 	return context.WithValue(ctx, rpcKey, mark), mark
 }
 
@@ -538,6 +550,7 @@ func getContextMark(ctx context.Context) *modificationMark {
 	if v == nil {
 		return &modificationMark{}
 	}
+
 	return v.(*modificationMark)
 }
 

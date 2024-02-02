@@ -58,6 +58,7 @@ func (s *PartitioningSettings) FromProto(proto *Ydb_Topic.PartitioningSettings) 
 
 	s.MinActivePartitions = proto.MinActivePartitions
 	s.PartitionCountLimit = proto.PartitionCountLimit
+
 	return nil
 }
 

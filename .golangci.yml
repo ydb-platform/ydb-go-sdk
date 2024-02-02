@@ -64,6 +64,12 @@ linters-settings:
     # put imports beginning with prefix after 3rd-party packages;
     # it's a comma-separated list of prefixes
     local-prefixes: github.com/ydb-platform/ydb-go-sdk/v3
+  gci:
+    sections:
+      - standard # Standard section: captures all standard packages.
+      - default # Default section: contains all imports that could not be matched to another section type.
+      - prefix(github.com/ydb-platform/ydb-go-sdk/v3) # Custom section: groups all imports with the specified Prefix.
+    skip-generated: true
   goconst:
     # minimal length of string constant, 3 by default
     min-len: 2
@@ -220,7 +226,6 @@ linters:
     - forbidigo
     - forcetypeassert
     - funlen
-    - gci
     - gochecknoglobals
     - gocognit
     - godot
@@ -229,11 +234,9 @@ linters:
     - gomnd
     - gomoddirectives
     - interfacebloat
-    - interfacer
     - ireturn
     - maintidx
     - maligned
-    - nlreturn
     - nonamedreturns
     - paralleltest
     - protogetter

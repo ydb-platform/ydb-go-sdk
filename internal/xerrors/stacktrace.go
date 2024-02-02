@@ -38,6 +38,7 @@ func WithStackTrace(err error, opts ...withStackTraceOption) error {
 			status: s,
 		}
 	}
+
 	return &stackError{
 		stackRecord: stack.Record(options.skipDepth + 1),
 		err:         err,

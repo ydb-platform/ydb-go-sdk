@@ -182,6 +182,7 @@ type Decimal struct {
 
 func (d *Decimal) String() string {
 	v := decimal.FromInt128(d.Bytes, d.Precision, d.Scale)
+
 	return decimal.Format(v, d.Precision, d.Scale)
 }
 
@@ -230,6 +231,7 @@ func StructValue(opts ...StructValueOption) Value {
 			opt(&p)
 		}
 	}
+
 	return value.StructValue(p.fields...)
 }
 
@@ -252,6 +254,7 @@ func DictValue(opts ...DictValueOption) Value {
 			opt(&p)
 		}
 	}
+
 	return value.DictValue(p.fields...)
 }
 
@@ -267,6 +270,7 @@ func NullableBoolValue(v *bool) Value {
 	if v == nil {
 		return NullValue(TypeBool)
 	}
+
 	return OptionalValue(BoolValue(*v))
 }
 
@@ -274,6 +278,7 @@ func NullableInt8Value(v *int8) Value {
 	if v == nil {
 		return NullValue(TypeInt8)
 	}
+
 	return OptionalValue(Int8Value(*v))
 }
 
@@ -281,6 +286,7 @@ func NullableInt16Value(v *int16) Value {
 	if v == nil {
 		return NullValue(TypeInt16)
 	}
+
 	return OptionalValue(Int16Value(*v))
 }
 
@@ -288,6 +294,7 @@ func NullableInt32Value(v *int32) Value {
 	if v == nil {
 		return NullValue(TypeInt32)
 	}
+
 	return OptionalValue(Int32Value(*v))
 }
 
@@ -295,6 +302,7 @@ func NullableInt64Value(v *int64) Value {
 	if v == nil {
 		return NullValue(TypeInt64)
 	}
+
 	return OptionalValue(Int64Value(*v))
 }
 
@@ -302,6 +310,7 @@ func NullableUint8Value(v *uint8) Value {
 	if v == nil {
 		return NullValue(TypeUint8)
 	}
+
 	return OptionalValue(Uint8Value(*v))
 }
 
@@ -309,6 +318,7 @@ func NullableUint16Value(v *uint16) Value {
 	if v == nil {
 		return NullValue(TypeUint16)
 	}
+
 	return OptionalValue(Uint16Value(*v))
 }
 
@@ -316,6 +326,7 @@ func NullableUint32Value(v *uint32) Value {
 	if v == nil {
 		return NullValue(TypeUint32)
 	}
+
 	return OptionalValue(Uint32Value(*v))
 }
 
@@ -323,6 +334,7 @@ func NullableUint64Value(v *uint64) Value {
 	if v == nil {
 		return NullValue(TypeUint64)
 	}
+
 	return OptionalValue(Uint64Value(*v))
 }
 
@@ -330,6 +342,7 @@ func NullableFloatValue(v *float32) Value {
 	if v == nil {
 		return NullValue(TypeFloat)
 	}
+
 	return OptionalValue(FloatValue(*v))
 }
 
@@ -337,6 +350,7 @@ func NullableDoubleValue(v *float64) Value {
 	if v == nil {
 		return NullValue(TypeDouble)
 	}
+
 	return OptionalValue(DoubleValue(*v))
 }
 
@@ -344,6 +358,7 @@ func NullableDateValue(v *uint32) Value {
 	if v == nil {
 		return NullValue(TypeDate)
 	}
+
 	return OptionalValue(DateValue(*v))
 }
 
@@ -351,6 +366,7 @@ func NullableDateValueFromTime(v *time.Time) Value {
 	if v == nil {
 		return NullValue(TypeDate)
 	}
+
 	return OptionalValue(DateValueFromTime(*v))
 }
 
@@ -358,6 +374,7 @@ func NullableDatetimeValue(v *uint32) Value {
 	if v == nil {
 		return NullValue(TypeDatetime)
 	}
+
 	return OptionalValue(DatetimeValue(*v))
 }
 
@@ -365,6 +382,7 @@ func NullableDatetimeValueFromTime(v *time.Time) Value {
 	if v == nil {
 		return NullValue(TypeDatetime)
 	}
+
 	return OptionalValue(DatetimeValueFromTime(*v))
 }
 
@@ -372,6 +390,7 @@ func NullableTzDateValue(v *string) Value {
 	if v == nil {
 		return NullValue(TypeTzDate)
 	}
+
 	return OptionalValue(TzDateValue(*v))
 }
 
@@ -379,6 +398,7 @@ func NullableTzDateValueFromTime(v *time.Time) Value {
 	if v == nil {
 		return NullValue(TypeTzDate)
 	}
+
 	return OptionalValue(TzDateValueFromTime(*v))
 }
 
@@ -386,6 +406,7 @@ func NullableTzDatetimeValue(v *string) Value {
 	if v == nil {
 		return NullValue(TypeTzDatetime)
 	}
+
 	return OptionalValue(TzDatetimeValue(*v))
 }
 
@@ -393,6 +414,7 @@ func NullableTzDatetimeValueFromTime(v *time.Time) Value {
 	if v == nil {
 		return NullValue(TypeTzDatetime)
 	}
+
 	return OptionalValue(TzDatetimeValueFromTime(*v))
 }
 
@@ -400,6 +422,7 @@ func NullableTimestampValue(v *uint64) Value {
 	if v == nil {
 		return NullValue(TypeTimestamp)
 	}
+
 	return OptionalValue(TimestampValue(*v))
 }
 
@@ -407,6 +430,7 @@ func NullableTimestampValueFromTime(v *time.Time) Value {
 	if v == nil {
 		return NullValue(TypeTimestamp)
 	}
+
 	return OptionalValue(TimestampValueFromTime(*v))
 }
 
@@ -414,6 +438,7 @@ func NullableTzTimestampValue(v *string) Value {
 	if v == nil {
 		return NullValue(TypeTzTimestamp)
 	}
+
 	return OptionalValue(TzTimestampValue(*v))
 }
 
@@ -421,6 +446,7 @@ func NullableTzTimestampValueFromTime(v *time.Time) Value {
 	if v == nil {
 		return NullValue(TypeTzTimestamp)
 	}
+
 	return OptionalValue(TzTimestampValueFromTime(*v))
 }
 
@@ -431,6 +457,7 @@ func NullableIntervalValue(v *int64) Value {
 	if v == nil {
 		return NullValue(TypeInterval)
 	}
+
 	return OptionalValue(IntervalValue(*v))
 }
 
@@ -438,6 +465,7 @@ func NullableIntervalValueFromMicroseconds(v *int64) Value {
 	if v == nil {
 		return NullValue(TypeInterval)
 	}
+
 	return OptionalValue(IntervalValueFromMicroseconds(*v))
 }
 
@@ -445,6 +473,7 @@ func NullableIntervalValueFromDuration(v *time.Duration) Value {
 	if v == nil {
 		return NullValue(TypeInterval)
 	}
+
 	return OptionalValue(IntervalValueFromDuration(*v))
 }
 
@@ -455,6 +484,7 @@ func NullableStringValue(v *[]byte) Value {
 	if v == nil {
 		return NullValue(TypeBytes)
 	}
+
 	return OptionalValue(StringValue(*v))
 }
 
@@ -462,6 +492,7 @@ func NullableBytesValue(v *[]byte) Value {
 	if v == nil {
 		return NullValue(TypeBytes)
 	}
+
 	return OptionalValue(BytesValue(*v))
 }
 
@@ -469,6 +500,7 @@ func NullableStringValueFromString(v *string) Value {
 	if v == nil {
 		return NullValue(TypeBytes)
 	}
+
 	return OptionalValue(BytesValueFromString(*v))
 }
 
@@ -476,6 +508,7 @@ func NullableBytesValueFromString(v *string) Value {
 	if v == nil {
 		return NullValue(TypeBytes)
 	}
+
 	return OptionalValue(BytesValueFromString(*v))
 }
 
@@ -483,6 +516,7 @@ func NullableUTF8Value(v *string) Value {
 	if v == nil {
 		return NullValue(TypeText)
 	}
+
 	return OptionalValue(TextValue(*v))
 }
 
@@ -490,6 +524,7 @@ func NullableTextValue(v *string) Value {
 	if v == nil {
 		return NullValue(TypeText)
 	}
+
 	return OptionalValue(TextValue(*v))
 }
 
@@ -497,6 +532,7 @@ func NullableYSONValue(v *string) Value {
 	if v == nil {
 		return NullValue(TypeYSON)
 	}
+
 	return OptionalValue(YSONValue(*v))
 }
 
@@ -504,6 +540,7 @@ func NullableYSONValueFromBytes(v *[]byte) Value {
 	if v == nil {
 		return NullValue(TypeYSON)
 	}
+
 	return OptionalValue(YSONValueFromBytes(*v))
 }
 
@@ -511,6 +548,7 @@ func NullableJSONValue(v *string) Value {
 	if v == nil {
 		return NullValue(TypeJSON)
 	}
+
 	return OptionalValue(JSONValue(*v))
 }
 
@@ -518,6 +556,7 @@ func NullableJSONValueFromBytes(v *[]byte) Value {
 	if v == nil {
 		return NullValue(TypeJSON)
 	}
+
 	return OptionalValue(JSONValueFromBytes(*v))
 }
 
@@ -525,6 +564,7 @@ func NullableUUIDValue(v *[16]byte) Value {
 	if v == nil {
 		return NullValue(TypeUUID)
 	}
+
 	return OptionalValue(UUIDValue(*v))
 }
 
@@ -532,6 +572,7 @@ func NullableJSONDocumentValue(v *string) Value {
 	if v == nil {
 		return NullValue(TypeJSONDocument)
 	}
+
 	return OptionalValue(JSONDocumentValue(*v))
 }
 
@@ -539,6 +580,7 @@ func NullableJSONDocumentValueFromBytes(v *[]byte) Value {
 	if v == nil {
 		return NullValue(TypeJSONDocument)
 	}
+
 	return OptionalValue(JSONDocumentValueFromBytes(*v))
 }
 
@@ -546,6 +588,7 @@ func NullableDyNumberValue(v *string) Value {
 	if v == nil {
 		return NullValue(TypeDyNumber)
 	}
+
 	return OptionalValue(DyNumberValue(*v))
 }
 

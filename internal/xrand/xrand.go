@@ -40,6 +40,7 @@ func New(opts ...option) Rand {
 			o(r)
 		}
 	}
+
 	return r
 }
 

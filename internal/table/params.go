@@ -36,5 +36,6 @@ func GenerateDeclareSection(params *table.QueryParameters) (string, error) {
 		}
 		buf.WriteString(declares[name])
 	}
+
 	return buf.String(), nil
 }

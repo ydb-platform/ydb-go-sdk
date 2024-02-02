@@ -46,6 +46,7 @@ func toValue(v interface{}) (_ types.Value, err error) {
 			return types.NullValue(types.TypeInt32), nil
 		}
 		xx := int32(*x)
+
 		return types.NullableInt32Value(&xx), nil
 	case uint:
 		return types.Uint32Value(uint32(x)), nil
@@ -54,6 +55,7 @@ func toValue(v interface{}) (_ types.Value, err error) {
 			return types.NullValue(types.TypeUint32), nil
 		}
 		xx := uint32(*x)
+
 		return types.NullableUint32Value(&xx), nil
 	case int8:
 		return types.Int8Value(x), nil
@@ -108,6 +110,7 @@ func toValue(v interface{}) (_ types.Value, err error) {
 		for i := range x {
 			items[i] = types.TextValue(x[i])
 		}
+
 		return types.ListValue(items...), nil
 	case [16]byte:
 		return types.UUIDValue(x), nil
@@ -135,6 +138,7 @@ func supportNewTypeLink(x interface{}) string {
 	v.Add("labels", "enhancement,database/sql")
 	v.Add("template", "02_FEATURE_REQUEST.md")
 	v.Add("title", fmt.Sprintf("feat: Support new type `%T` in `database/sql` query args", x))
+
 	return "https://github.com/ydb-platform/ydb-go-sdk/issues/new?" + v.Encode()
 }
 
@@ -166,6 +170,7 @@ func toYdbParam(name string, value interface{}) (table.ParameterOption, error) {
 	if name[0] != '$' {
 		name = "$" + name
 	}
+
 	return table.ValueParam(name, v), nil
 }
 
@@ -229,5 +234,6 @@ func Params(args ...interface{}) (params []table.ParameterOption, _ error) {
 	sort.Slice(params, func(i, j int) bool {
 		return params[i].Name() < params[j].Name()
 	})
+
 	return params, nil
 }

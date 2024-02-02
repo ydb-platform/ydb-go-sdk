@@ -35,6 +35,7 @@ func newConnectionsState(
 	} else {
 		res.all = res.prefer
 	}
+
 	return res
 }
 
@@ -54,6 +55,7 @@ func (s *connectionsState) GetConnection(ctx context.Context) (_ conn.Conn, fail
 	try := func(conns []conn.Conn) conn.Conn {
 		c, tryFailed := s.selectRandomConnection(conns, false)
 		failedCount += tryFailed
+
 		return c
 	}
 
@@ -121,6 +123,7 @@ func connsToNodeIDMap(conns []conn.Conn) (nodes map[uint32]conn.Conn) {
 	for _, c := range conns {
 		nodes[c.Endpoint().NodeID()] = c
 	}
+
 	return nodes
 }
 
@@ -146,6 +149,7 @@ func sortPreferConnections(
 			fallback = append(fallback, c)
 		}
 	}
+
 	return prefer, fallback
 }
 

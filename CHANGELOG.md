@@ -1,4 +1,5 @@
 * Refactored internal packages by `ifshort` linter issues
+* Fixed topic writer infinite reconnections in some cases
 * Refactored nil on err `internal/grpcwrapper/rawydb/issues.go`, when golangci-lint nilerr enabled
 * Refactored nil on err `internal/grpcwrapper/rawtopic/describe_topic.go`, when golangci-lint nilerr enabled
 

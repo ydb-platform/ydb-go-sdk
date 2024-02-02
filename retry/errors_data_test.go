@@ -19,6 +19,7 @@ func (t idempotency) String() string {
 	if t {
 		return "idempotent"
 	}
+
 	return "non-idempotent"
 }
 
