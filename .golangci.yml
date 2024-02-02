@@ -233,7 +233,6 @@ linters:
     - golint
     - gomnd
     - gomoddirectives
-    - ifshort
     - interfacebloat
     - ireturn
     - maintidx

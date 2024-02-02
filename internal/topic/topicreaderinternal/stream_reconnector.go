@@ -261,8 +261,7 @@ func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldRead
 		return err
 	}
 
-	stream, _ := r.stream(ctx)
-	if oldReader != stream {
+	if stream, _ := r.stream(ctx); oldReader != stream {
 		return xerrors.WithStackTrace(errReconnectRequestOutdated)
 	}
 
@@ -417,9 +416,7 @@ func (r *readerReconnector) stream(ctx context.Context) (batchedStreamReader, er
 }
 
 func (r *readerReconnector) handlePanic() {
-	p := recover()
-
-	if p != nil {
+	if p := recover(); p != nil {
 		_ = r.CloseWithError(context.Background(), xerrors.WithStackTrace(fmt.Errorf("handled panic: %v", p)))
 	}
 }
