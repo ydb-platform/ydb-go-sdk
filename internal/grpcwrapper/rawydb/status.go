@@ -11,6 +11,7 @@ const (
 
 func (s *StatusCode) FromProto(p Ydb.StatusIds_StatusCode) error {
 	*s = StatusCode(p)
+
 	return nil
 }
 

@@ -18,6 +18,7 @@ func (b *Bool) ToProto() *bool {
 	}
 
 	val := b.Value
+
 	return &val
 }
 
@@ -30,6 +31,7 @@ func (v *Duration) ToProto() *durationpb.Duration {
 	if v.HasValue {
 		return durationpb.New(v.Value)
 	}
+
 	return nil
 }
 
@@ -44,6 +46,7 @@ func (v *Int64) ToProto() *int64 {
 	}
 
 	val := v.Value
+
 	return &val
 }
 
@@ -56,6 +59,7 @@ func (v *Time) ToProto() *timestamppb.Timestamp {
 	if v.HasValue {
 		return timestamppb.New(v.Value)
 	}
+
 	return nil
 }
 
@@ -63,6 +67,7 @@ func (v *Time) MustFromProto(proto *timestamppb.Timestamp) {
 	if proto == nil {
 		v.Value = time.Time{}
 		v.HasValue = false
+
 		return
 	}
 

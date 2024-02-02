@@ -40,6 +40,7 @@ func (r *streamResult) Err() error {
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
+
 	return nil
 }
 
@@ -56,6 +57,7 @@ func (r *unaryResult) Err() error {
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
+
 	return nil
 }
 
@@ -64,6 +66,7 @@ func (r *unaryResult) Close() error {
 	if r.closed.CompareAndSwap(false, true) {
 		return nil
 	}
+
 	return xerrors.WithStackTrace(errAlreadyClosed)
 }
 
@@ -121,6 +124,7 @@ func NewStream(
 	if err := r.nextResultSetErr(ctx); err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	return r, nil
 }
 
@@ -136,6 +140,7 @@ func NewUnary(sets []*Ydb.ResultSet, stats *Ydb_TableStats.QueryStats, opts ...o
 			o(&r.baseResult)
 		}
 	}
+
 	return r
 }
 
@@ -155,6 +160,7 @@ func (r *unaryResult) NextResultSetErr(ctx context.Context, columns ...string) (
 	}
 	r.Reset(r.sets[r.nextSet], columns...)
 	r.nextSet++
+
 	return ctx.Err()
 }
 
@@ -166,6 +172,7 @@ func (r *streamResult) nextResultSetErr(ctx context.Context, columns ...string) 
 	// skipping second recv because first call of recv is from New Stream(), second call is from user
 	if r.nextResultSetCounter.Add(1) == 2 {
 		r.setColumnIndexes(columns)
+
 		return ctx.Err()
 	}
 	s, stats, err := r.recv(ctx)
@@ -174,6 +181,7 @@ func (r *streamResult) nextResultSetErr(ctx context.Context, columns ...string) 
 		if xerrors.Is(err, io.EOF) {
 			return err
 		}
+
 		return r.errorf(1, "streamResult.NextResultSetErr(): %w", err)
 	}
 	r.Reset(s, columns...)
@@ -182,6 +190,7 @@ func (r *streamResult) nextResultSetErr(ctx context.Context, columns ...string) 
 			r.stats = stats
 		})
 	}
+
 	return ctx.Err()
 }
 
@@ -196,8 +205,10 @@ func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) 
 		if xerrors.Is(err, io.EOF) {
 			return io.EOF
 		}
+
 		return xerrors.WithStackTrace(err)
 	}
+
 	return nil
 }
 
@@ -229,6 +240,7 @@ func (r *streamResult) Close() (err error) {
 	if r.closed.CompareAndSwap(false, true) {
 		return r.close(r.Err())
 	}
+
 	return xerrors.WithStackTrace(errAlreadyClosed)
 }
 
@@ -252,5 +264,6 @@ func (r *unaryResult) HasNextResultSet() bool {
 	if r.inactive() || r.nextSet >= len(r.sets) {
 		return false
 	}
+
 	return true
 }

@@ -71,6 +71,7 @@ func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Co
 		if err = op(xcontext.MarkRetryCall(ctx), cc); err != nil {
 			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
+
 		return nil
 	}, options.retryOptions...)
 	if err != nil {
@@ -78,6 +79,7 @@ func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Co
 			fmt.Errorf("operation failed with %d attempts: %w", attempts, err),
 		)
 	}
+
 	return nil
 }
 
@@ -173,6 +175,7 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 		if err = tx.Commit(); err != nil {
 			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
+
 		return nil
 	}, options.retryOptions...)
 	if err != nil {
@@ -180,5 +183,6 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 			fmt.Errorf("tx operation failed with %d attempts: %w", attempts, err),
 		)
 	}
+
 	return nil
 }

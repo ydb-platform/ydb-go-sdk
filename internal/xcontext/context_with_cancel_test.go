@@ -46,6 +46,7 @@ func TestContextWithCancelError(t *testing.T) {
 				childCtx, childCancel := WithCancel(parentCtx)
 				parentCancel()
 				childCancel()
+
 				return childCtx.Err()
 			}(),
 			str: "'context canceled' at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithCancelError.func1(context_with_cancel_test.go:47)`", //nolint:lll
@@ -54,24 +55,27 @@ func TestContextWithCancelError(t *testing.T) {
 			err: func() error {
 				ctx, cancel := WithCancel(context.Background())
 				cancel()
+
 				return ctx.Err()
 			}(),
-			str: "'context canceled' at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithCancelError.func2(context_with_cancel_test.go:56)`", //nolint:lll
+			str: "'context canceled' at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithCancelError.func2(context_with_cancel_test.go:57)`", //nolint:lll
 		},
 		{
 			err: func() error {
 				parentCtx, _ := WithTimeout(context.Background(), 0)
 				childCtx, cancel := WithCancel(parentCtx)
 				cancel()
+
 				return childCtx.Err()
 			}(),
-			str: "'context deadline exceeded' from `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithCancelError.func3(context_with_cancel_test.go:63)`", //nolint:lll
+			str: "'context deadline exceeded' from `github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext.TestContextWithCancelError.func3(context_with_cancel_test.go:65)`", //nolint:lll
 		},
 		{
 			err: func() error {
 				parentCtx, _ := context.WithTimeout(context.Background(), 0) //nolint:govet
 				childCtx, cancel := WithCancel(parentCtx)
 				cancel()
+
 				return childCtx.Err()
 			}(),
 			str: "context deadline exceeded",

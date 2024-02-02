@@ -9,6 +9,7 @@ func WithTraces(config Config) ydb.Option {
 		return nil
 	}
 	config = config.WithSystem("ydb")
+
 	return ydb.MergeOptions(
 		ydb.WithTraceDriver(driver(config)),
 		ydb.WithTraceTable(table(config)),

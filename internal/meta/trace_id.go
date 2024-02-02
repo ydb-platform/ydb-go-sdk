@@ -26,5 +26,6 @@ func TraceID(ctx context.Context, opts ...func(opts *newTraceIDOpts)) (context.C
 		return ctx, "", xerrors.WithStackTrace(err)
 	}
 	id := uuid.String()
+
 	return metadata.AppendToOutgoingContext(ctx, HeaderTraceID, id), id, nil
 }

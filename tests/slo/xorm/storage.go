@@ -170,6 +170,7 @@ func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, e
 			}
 
 			_, err = s.x.Context(ctx).SetExpr("hash", fmt.Sprintf("Digest::NumericHash(%d)", row.ID)).Insert(row)
+
 			return err
 		},
 		retry.WithIdempotent(true),

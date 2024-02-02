@@ -24,6 +24,7 @@ func (m MethodCode) String() string {
 	if method, ok := codeToString[m]; ok {
 		return method
 	}
+
 	return ""
 }
 
@@ -33,6 +34,7 @@ func (m Method) Code() MethodCode {
 	if code, ok := grpcMethodToCode[m]; ok {
 		return code
 	}
+
 	return UnknownMethod
 }
 
@@ -150,6 +152,7 @@ func (b *balancerStub) Invoke(
 	if b.onInvoke == nil {
 		return fmt.Errorf("database.onInvoke() not defined")
 	}
+
 	return b.onInvoke(ctx, method, args, reply, opts...)
 }
 
@@ -162,6 +165,7 @@ func (b *balancerStub) NewStream(
 	if b.onNewStream == nil {
 		return nil, fmt.Errorf("database.onNewStream() not defined")
 	}
+
 	return b.onNewStream(ctx, desc, method, opts...)
 }
 
@@ -170,6 +174,7 @@ func (b *balancerStub) Get(context.Context) (conn grpc.ClientConnInterface, err 
 		onInvoke:    b.onInvoke,
 		onNewStream: b.onNewStream,
 	}
+
 	return cc, nil
 }
 
@@ -215,8 +220,10 @@ func WithInvokeHandlers(invokeHandlers InvokeHandlers) balancerOption {
 						Result: anyResult,
 					},
 				)
+
 				return nil
 			}
+
 			return fmt.Errorf("method '%s' not implemented", method)
 		}
 	}
@@ -233,6 +240,7 @@ func WithNewStreamHandlers(newStreamHandlers NewStreamHandlers) balancerOption {
 			if handler, ok := newStreamHandlers[Method(method).Code()]; ok {
 				return handler(desc)
 			}
+
 			return nil, fmt.Errorf("method '%s' not implemented", method)
 		}
 	}
@@ -245,6 +253,7 @@ func NewBalancer(opts ...balancerOption) *balancerStub {
 			opt(c)
 		}
 	}
+
 	return c
 }
 
@@ -272,6 +281,7 @@ func (c *clientConn) Address() string {
 	if c.onAddress != nil {
 		return c.onAddress()
 	}
+
 	return ""
 }
 
@@ -285,6 +295,7 @@ func (c *clientConn) Invoke(
 	if c.onInvoke == nil {
 		return fmt.Errorf("onInvoke not implemented (method: %s, request: %v, response: %v)", method, args, reply)
 	}
+
 	return c.onInvoke(ctx, method, args, reply, opts...)
 }
 
@@ -297,6 +308,7 @@ func (c *clientConn) NewStream(
 	if c.onNewStream == nil {
 		return nil, fmt.Errorf("onNewStream not implemented (method: %s, desc: %v)", method, desc)
 	}
+
 	return c.onNewStream(ctx, desc, method, opts...)
 }
 
@@ -313,6 +325,7 @@ func (s *ClientStream) Header() (metadata.MD, error) {
 	if s.OnHeader == nil {
 		return nil, xerrors.WithStackTrace(ErrNotImplemented)
 	}
+
 	return s.OnHeader()
 }
 
@@ -320,6 +333,7 @@ func (s *ClientStream) Trailer() metadata.MD {
 	if s.OnTrailer == nil {
 		return nil
 	}
+
 	return s.OnTrailer()
 }
 
@@ -327,6 +341,7 @@ func (s *ClientStream) CloseSend() error {
 	if s.OnCloseSend == nil {
 		return xerrors.WithStackTrace(ErrNotImplemented)
 	}
+
 	return s.OnCloseSend()
 }
 
@@ -334,6 +349,7 @@ func (s *ClientStream) Context() context.Context {
 	if s.OnContext == nil {
 		return nil
 	}
+
 	return s.OnContext()
 }
 
@@ -341,6 +357,7 @@ func (s *ClientStream) SendMsg(m interface{}) error {
 	if s.OnSendMsg == nil {
 		return xerrors.WithStackTrace(ErrNotImplemented)
 	}
+
 	return s.OnSendMsg(m)
 }
 
@@ -348,10 +365,12 @@ func (s *ClientStream) RecvMsg(m interface{}) error {
 	if s.OnRecvMsg == nil {
 		return xerrors.WithStackTrace(ErrNotImplemented)
 	}
+
 	return s.OnRecvMsg(m)
 }
 
 func lastSegment(m string) string {
 	s := strings.Split(m, "/")
+
 	return s[len(s)-1]
 }

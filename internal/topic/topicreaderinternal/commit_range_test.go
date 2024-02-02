@@ -284,5 +284,6 @@ func TestCommitsToRawPartitionCommitOffset(t *testing.T) {
 func testNewCommitRanges(commitable ...PublicCommitRangeGetter) *CommitRanges {
 	var res CommitRanges
 	res.Append(commitable...)
+
 	return &res
 }

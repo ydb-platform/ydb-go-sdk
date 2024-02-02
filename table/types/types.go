@@ -46,6 +46,7 @@ func Struct(opts ...StructOption) Type {
 			opt(&s)
 		}
 	}
+
 	return value.Struct(s.fields...)
 }
 
@@ -60,6 +61,7 @@ func VariantStruct(opts ...StructOption) Type {
 			opt(&s)
 		}
 	}
+
 	return value.VariantStruct(s.fields...)
 }
 

@@ -34,6 +34,7 @@ func NewAccessTokenCredentials(token string, opts ...AccessTokenCredentialsOptio
 	for _, opt := range opts {
 		opt.ApplyAccessTokenCredentialsOption(c)
 	}
+
 	return c
 }
 
@@ -53,5 +54,6 @@ func (c AccessToken) String() string {
 		fmt.Fprintf(buffer, "%q", c.sourceInfo)
 	}
 	buffer.WriteByte('}')
+
 	return buffer.String()
 }

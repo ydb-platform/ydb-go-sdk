@@ -101,10 +101,12 @@ func list(ctx context.Context, db *ydb.Driver, t *template.Template, p string) {
 	var err error
 	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		dir, err = db.Scheme().ListDirectory(ctx, p)
+
 		return err
 	}, retry.WithIdempotent(true))
 	if err != nil {
 		fmt.Printf("list directory '%s' failed: %v\n", p, err)
+
 		return
 	}
 
@@ -121,10 +123,12 @@ func list(ctx context.Context, db *ydb.Driver, t *template.Template, p string) {
 			var desc options.Description
 			err = db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
 				desc, err = s.DescribeTable(ctx, pt)
+
 				return err
 			}, table.WithIdempotent())
 			if err != nil {
 				fmt.Printf("describe '%s' failed: %v\n", pt, err)
+
 				continue
 			}
 			desc.Name = pt

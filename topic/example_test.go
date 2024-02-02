@@ -21,6 +21,7 @@ func Example_createTopic() {
 	db, err := ydb.Open(ctx, connectionString)
 	if err != nil {
 		log.Printf("failed connect: %v", err)
+
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
@@ -35,6 +36,7 @@ func Example_createTopic() {
 	)
 	if err != nil {
 		log.Printf("failed create topic: %v", err)
+
 		return
 	}
 }
@@ -48,6 +50,7 @@ func Example_alterTopic() {
 	db, err := ydb.Open(ctx, connectionString)
 	if err != nil {
 		log.Printf("failed connect: %v", err)
+
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
@@ -60,6 +63,7 @@ func Example_alterTopic() {
 	)
 	if err != nil {
 		log.Printf("failed alter topic: %v", err)
+
 		return
 	}
 }
@@ -73,6 +77,7 @@ func Example_describeTopic() {
 	db, err := ydb.Open(ctx, connectionString)
 	if err != nil {
 		log.Printf("failed connect: %v", err)
+
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
@@ -80,6 +85,7 @@ func Example_describeTopic() {
 	descResult, err := db.Topic().Describe(ctx, "topic-path")
 	if err != nil {
 		log.Printf("failed drop topic: %v", err)
+
 		return
 	}
 	fmt.Printf("describe: %#v\n", descResult)
@@ -94,6 +100,7 @@ func Example_dropTopic() {
 	db, err := ydb.Open(ctx, connectionString)
 	if err != nil {
 		log.Printf("failed connect: %v", err)
+
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
@@ -101,6 +108,7 @@ func Example_dropTopic() {
 	err = db.Topic().Drop(ctx, "topic-path")
 	if err != nil {
 		log.Printf("failed drop topic: %v", err)
+
 		return
 	}
 }
@@ -114,6 +122,7 @@ func Example_readMessage() {
 	db, err := ydb.Open(ctx, connectionString)
 	if err != nil {
 		log.Printf("failed connect: %v", err)
+
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
@@ -121,6 +130,7 @@ func Example_readMessage() {
 	reader, err := db.Topic().StartReader("consumer", topicoptions.ReadTopic("/topic/path"))
 	if err != nil {
 		fmt.Printf("failed start reader: %v", err)
+
 		return
 	}
 
@@ -128,12 +138,14 @@ func Example_readMessage() {
 		mess, err := reader.ReadMessage(ctx)
 		if err != nil {
 			fmt.Printf("failed start reader: %v", err)
+
 			return
 		}
 
 		content, err := io.ReadAll(mess)
 		if err != nil {
 			fmt.Printf("failed start reader: %v", err)
+
 			return
 		}
 		fmt.Println(string(content))

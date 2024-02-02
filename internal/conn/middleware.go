@@ -37,12 +37,14 @@ func WithContextModifier(
 	return &middleware{
 		invoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
 			ctx = modifyCtx(ctx)
+
 			return cc.Invoke(ctx, method, args, reply, opts...)
 		},
 		newStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (
 			grpc.ClientStream, error,
 		) {
 			ctx = modifyCtx(ctx)
+
 			return cc.NewStream(ctx, desc, method, opts...)
 		},
 	}
@@ -52,12 +54,14 @@ func WithAppendOptions(cc grpc.ClientConnInterface, appendOpts ...grpc.CallOptio
 	return &middleware{
 		invoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
 			opts = append(opts, appendOpts...)
+
 			return cc.Invoke(ctx, method, args, reply, opts...)
 		},
 		newStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (
 			grpc.ClientStream, error,
 		) {
 			opts = append(opts, appendOpts...)
+
 			return cc.NewStream(ctx, desc, method, opts...)
 		},
 	}
@@ -70,12 +74,14 @@ func WithBeforeFunc(
 	return &middleware{
 		invoke: func(ctx context.Context, method string, args interface{}, reply interface{}, opts ...grpc.CallOption) error {
 			before()
+
 			return cc.Invoke(ctx, method, args, reply, opts...)
 		},
 		newStream: func(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (
 			grpc.ClientStream, error,
 		) {
 			before()
+
 			return cc.NewStream(ctx, desc, method, opts...)
 		},
 	}

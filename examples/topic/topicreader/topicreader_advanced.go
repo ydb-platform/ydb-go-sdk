@@ -36,6 +36,7 @@ func (m *MyMessage) UnmarshalYDBTopicMessage(data []byte) error {
 	m.ID = data[0]
 	m.ChangeType = data[1]
 	m.Delta = binary.BigEndian.Uint32(data[2:])
+
 	return nil
 }
 

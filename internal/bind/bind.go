@@ -35,6 +35,7 @@ func (bindings Bindings) RewriteQuery(query string, args ...interface{}) (
 		if err != nil {
 			return "", nil, xerrors.WithStackTrace(err)
 		}
+
 		return query, table.NewQueryParameters(params...), nil
 	}
 
@@ -60,5 +61,6 @@ func Sort(bindings []Bind) []Bind {
 	sort.Slice(bindings, func(i, j int) bool {
 		return bindings[i].blockID() < bindings[j].blockID()
 	})
+
 	return bindings
 }

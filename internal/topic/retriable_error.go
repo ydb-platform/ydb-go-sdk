@@ -49,6 +49,7 @@ func CheckResetReconnectionCounters(lastTry, now time.Time, connectionTimeout ti
 	if connectionTimeout == value.InfiniteDuration {
 		return now.Sub(lastTry) > connectionEstablishedTimeout
 	}
+
 	return now.Sub(lastTry) > connectionTimeout*resetAttemptEmpiricalCoefficient
 }
 

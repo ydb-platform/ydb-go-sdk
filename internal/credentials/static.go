@@ -49,6 +49,7 @@ func NewStaticCredentials(user, password, endpoint string, opts ...StaticCredent
 	for _, opt := range opts {
 		opt.ApplyStaticCredentialsOption(c)
 	}
+
 	return c
 }
 
@@ -141,6 +142,7 @@ func parseExpiresAt(raw string) (expiresAt time.Time, err error) {
 	if _, _, err = jwt.NewParser().ParseUnverified(raw, &claims); err != nil {
 		return expiresAt, xerrors.WithStackTrace(err)
 	}
+
 	return claims.ExpiresAt.Time, nil
 }
 
@@ -158,5 +160,6 @@ func (c *Static) String() string {
 		fmt.Fprintf(buffer, "%q", c.sourceInfo)
 	}
 	buffer.WriteByte('}')
+
 	return buffer.String()
 }

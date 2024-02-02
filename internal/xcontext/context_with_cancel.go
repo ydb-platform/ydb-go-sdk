@@ -11,6 +11,7 @@ func WithCancel(ctx context.Context) (context.Context, context.CancelFunc) {
 		parentCtx: ctx,
 	}
 	childCtx.ctx, childCtx.ctxCancel = context.WithCancel(ctx)
+
 	return childCtx, childCtx.cancel
 }
 
@@ -60,6 +61,7 @@ func (ctx *cancelCtx) cancel() {
 
 	if err := ctx.parentCtx.Err(); err != nil {
 		ctx.err = err
+
 		return
 	}
 	ctx.err = errAt(context.Canceled, 1)
