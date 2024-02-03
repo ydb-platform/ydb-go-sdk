@@ -1,3 +1,4 @@
+* Added `retry/retry.RecoveryCallbackWrapper` to exclude from the linter gocognit
 * Added `internal/xsql/dsn.bindTablePathPrefixInConnectorOptions()` to exclude from the linter gocognit
 * Refactored `internal/table/client` and extract defer func `loadAndFinalizeSession`
 * Fixed topic writer infinite reconnections in some cases
