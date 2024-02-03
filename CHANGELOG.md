@@ -1,4 +1,5 @@
-* Refactored `internal/stack/record.go` and extract functions `record.extractSubstringAfterLastSlash`, `record.extractPackagePathAndName`
+* Refactored `internal/bind/params.go` and extract code in `params.addParam`
+* Refactored `internal/stack/record.go` and extract code in functions `record.extractSubstringAfterLastSlash`, `record.extractPackagePathAndName`
 * Refactored `metrics/driver.go` and extract functions
 * Refactored `internal/backoff/backoff_test.go` and extract test functions
 * Refactored `metrics/sql.go` and extract functions
