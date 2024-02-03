@@ -1,3 +1,4 @@
+* Refactored `sugar/path.go` and extract code in functions `sugar.checkDirectoryExists`, `sugar.isValidEntry`, `sugar.removeWithPrefix`, `sugar.removeDirectory`
 * Refactored `internal/bind/params.go` and extract code in `params.addParam`
 * Refactored `internal/stack/record.go` and extract code in functions `record.extractSubstringAfterLastSlash`, `record.extractPackagePathAndName`
 * Refactored `metrics/driver.go` and extract functions
