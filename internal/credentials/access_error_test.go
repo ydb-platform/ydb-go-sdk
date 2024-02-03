@@ -42,7 +42,7 @@ func TestAccessErrorWithAnonymousCredentials(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"Anonymous{}\"" +
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessErrorWithAnonymousCredentials(access_error_test.go:173)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessErrorWithAnonymousCredentials(access_error_test.go:33)`", //nolint:lll
 		},
 		{
 			err: AccessError(
@@ -57,7 +57,7 @@ func TestAccessErrorWithAnonymousCredentials(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"Anonymous{From:\\\"TestAccessErrorWithAnonymousCredentials\\\"}\"" +
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessErrorWithAnonymousCredentials(access_error_test.go:188)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessErrorWithAnonymousCredentials(access_error_test.go:48)`", //nolint:lll
 		},
 		{
 			err: AccessError(
@@ -72,7 +72,7 @@ func TestAccessErrorWithAnonymousCredentials(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"Anonymous{}\"" +
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessErrorWithAnonymousCredentials(access_error_test.go:203)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessErrorWithAnonymousCredentials(access_error_test.go:63)`", //nolint:lll
 		},
 	}
 
@@ -101,7 +101,7 @@ func TestAccessErrorWithAccessTokenCredentials(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"AccessToken{Token:\\\"****(CRC-32c: 9B7801F4)\\\"}\"" +
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessErrorWithAccessTokenCredentials(access_error_test.go:232)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessErrorWithAccessTokenCredentials(access_error_test.go:92)`", //nolint:lll
 		},
 		{
 			err: AccessError(
@@ -116,7 +116,7 @@ func TestAccessErrorWithAccessTokenCredentials(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"AccessToken{Token:\\\"****(CRC-32c: 9B7801F4)\\\",From:\\\"TestAccessErrorWithAccessTokenCredentials\\\"}\"" +
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessErrorWithAccessTokenCredentials(access_error_test.go:247)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessErrorWithAccessTokenCredentials(access_error_test.go:107)`", //nolint:lll
 		},
 	}
 
@@ -149,7 +149,7 @@ func TestAccessErrorWithStaticCredentials(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"Static{User:\\\"USER\\\",Password:\\\"SEC**********RD\\\",Token:\\\"****(CRC-32c: 00000000)\\\"}\"" + //nolint:lll
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessErrorWithStaticCredentials(access_error_test.go:276)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessErrorWithStaticCredentials(access_error_test.go:136)`", //nolint:lll
 		},
 		{
 			err: AccessError(
@@ -168,7 +168,7 @@ func TestAccessErrorWithStaticCredentials(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"Static{User:\\\"USER\\\",Password:\\\"SEC**********RD\\\",Token:\\\"****(CRC-32c: 00000000)\\\",From:\\\"TestAccessErrorWithStaticCredentials\\\"}\"" + //nolint:lll
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessErrorWithStaticCredentials(access_error_test.go:295)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessErrorWithStaticCredentials(access_error_test.go:155)`", //nolint:lll
 		},
 	}
 
@@ -197,7 +197,7 @@ func TestAccessErrorWithCustomCredentials(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.customCredentials\"" +
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessErrorWithCustomCredentials(access_error_test.go:328)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessErrorWithCustomCredentials(access_error_test.go:188)`", //nolint:lll
 		},
 	}
 
