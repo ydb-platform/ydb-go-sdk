@@ -9,13 +9,9 @@ import (
 )
 
 // endpointKey represents a key for mapping endpoints to their properties.
-//
-// Fields:
-// - localDC: a boolean indicating if the endpoint is in the local data center
-// - az: a string representing the availability zone of the endpoint
 type endpointKey struct {
-	localDC bool
-	az      string
+	localDC bool   // a boolean indicating if the endpoint is in the local data center
+	az      string // a string representing the availability zone of the endpoint
 }
 
 // driver makes driver with New publishing

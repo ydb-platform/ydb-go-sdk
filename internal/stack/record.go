@@ -97,12 +97,8 @@ func (c call) Record(opts ...recordOption) string {
 		funcName   string
 		file       = c.file
 	)
-	if i := strings.LastIndex(file, "/"); i > -1 {
-		file = file[i+1:]
-	}
-	if i := strings.LastIndex(name, "/"); i > -1 {
-		pkgPath, name = name[:i], name[i+1:]
-	}
+	file = extractSubstringAfterLastSlash(file)
+	pkgPath, name = extractPackagePathAndName(name)
 	split := strings.Split(name, ".")
 	lambdas := make([]string, 0, len(split))
 	for i := range split {
@@ -177,4 +173,23 @@ func (c call) FunctionID() string {
 
 func Record(depth int, opts ...recordOption) string {
 	return Call(depth + 1).Record(opts...)
+}
+
+// extractSubstringAfterLastSlash takes an originalString and extracts the substring after the last occurrence
+// of "/" character.
+func extractSubstringAfterLastSlash(originalString string) string {
+	if i := strings.LastIndex(originalString, "/"); i > -1 {
+		return originalString[i+1:]
+	}
+
+	return originalString
+}
+
+// extractPackagePathAndName takes a name string and extracts the package path and name.
+func extractPackagePathAndName(name string) (string, string) {
+	if i := strings.LastIndex(name, "/"); i > -1 {
+		return name[:i], name[i+1:]
+	}
+
+	return "", name
 }
