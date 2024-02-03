@@ -553,6 +553,155 @@ func NullableDyNumberValue(v *string) Value {
 // Warning: type interface will be replaced in the future with typed parameters pattern from go1.18
 //
 //nolint:gocyclo
+// func Nullable(t Type, v interface{}) Value {
+// 	switch t {
+// 	case TypeBool:
+// 		return NullableBoolValue(v.(*bool))
+// 	case TypeInt8:
+// 		return NullableInt8Value(v.(*int8))
+// 	case TypeUint8:
+// 		return NullableUint8Value(v.(*uint8))
+// 	case TypeInt16:
+// 		return NullableInt16Value(v.(*int16))
+// 	case TypeUint16:
+// 		return NullableUint16Value(v.(*uint16))
+// 	case TypeInt32:
+// 		return NullableInt32Value(v.(*int32))
+// 	case TypeUint32:
+// 		return NullableUint32Value(v.(*uint32))
+// 	case TypeInt64:
+// 		return NullableInt64Value(v.(*int64))
+// 	case TypeUint64:
+// 		return NullableUint64Value(v.(*uint64))
+// 	case TypeFloat:
+// 		return NullableFloatValue(v.(*float32))
+// 	case TypeDouble:
+// 		return NullableDoubleValue(v.(*float64))
+// 	case TypeDate:
+// 		switch tt := v.(type) {
+// 		case *uint32:
+// 			return NullableDateValue(tt)
+// 		case *time.Time:
+// 			return NullableDateValueFromTime(tt)
+// 		default:
+// 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeDate", tt))
+// 		}
+// 	case TypeDatetime:
+// 		switch tt := v.(type) {
+// 		case *uint32:
+// 			return NullableDatetimeValue(tt)
+// 		case *time.Time:
+// 			return NullableDatetimeValueFromTime(tt)
+// 		default:
+// 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeDatetime", tt))
+// 		}
+// 	case TypeTimestamp:
+// 		switch tt := v.(type) {
+// 		case *uint64:
+// 			return NullableTimestampValue(tt)
+// 		case *time.Time:
+// 			return NullableTimestampValueFromTime(tt)
+// 		default:
+// 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeTimestamp", tt))
+// 		}
+// 	case TypeInterval:
+// 		switch tt := v.(type) {
+// 		case *int64:
+// 			return NullableIntervalValueFromMicroseconds(tt)
+// 		case *time.Duration:
+// 			return NullableIntervalValueFromDuration(tt)
+// 		default:
+// 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeInterval", tt))
+// 		}
+// 	case TypeTzDate:
+// 		switch tt := v.(type) {
+// 		case *string:
+// 			return NullableTzDateValue(tt)
+// 		case *time.Time:
+// 			return NullableTzDateValueFromTime(tt)
+// 		default:
+// 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeTzDate", tt))
+// 		}
+// 	case TypeTzDatetime:
+// 		switch tt := v.(type) {
+// 		case *string:
+// 			return NullableTzDatetimeValue(tt)
+// 		case *time.Time:
+// 			return NullableTzDatetimeValueFromTime(tt)
+// 		default:
+// 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeTzDatetime", tt))
+// 		}
+// 	case TypeTzTimestamp:
+// 		switch tt := v.(type) {
+// 		case *string:
+// 			return NullableTzTimestampValue(tt)
+// 		case *time.Time:
+// 			return NullableTzTimestampValueFromTime(tt)
+// 		default:
+// 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeTzTimestamp", tt))
+// 		}
+// 	case TypeBytes:
+// 		switch tt := v.(type) {
+// 		case *[]byte:
+// 			return NullableBytesValue(tt)
+// 		case *string:
+// 			return NullableStringValueFromString(tt)
+// 		default:
+// 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeBytes", tt))
+// 		}
+// 	case TypeText:
+// 		switch tt := v.(type) {
+// 		case *string:
+// 			return NullableTextValue(tt)
+// 		default:
+// 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeText", tt))
+// 		}
+// 	case TypeYSON:
+// 		switch tt := v.(type) {
+// 		case *string:
+// 			return NullableYSONValue(tt)
+// 		case *[]byte:
+// 			return NullableYSONValueFromBytes(tt)
+// 		default:
+// 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeYSON", tt))
+// 		}
+// 	case TypeJSON:
+// 		switch tt := v.(type) {
+// 		case *string:
+// 			return NullableJSONValue(tt)
+// 		case *[]byte:
+// 			return NullableJSONValueFromBytes(tt)
+// 		default:
+// 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeJSON", tt))
+// 		}
+// 	case TypeUUID:
+// 		switch tt := v.(type) {
+// 		case *[16]byte:
+// 			return NullableUUIDValue(tt)
+// 		default:
+// 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeUUID", tt))
+// 		}
+// 	case TypeJSONDocument:
+// 		switch tt := v.(type) {
+// 		case *string:
+// 			return NullableJSONDocumentValue(tt)
+// 		case *[]byte:
+// 			return NullableJSONDocumentValueFromBytes(tt)
+// 		default:
+// 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeJSONDocument", tt))
+// 		}
+// 	case TypeDyNumber:
+// 		switch tt := v.(type) {
+// 		case *string:
+// 			return NullableDyNumberValue(tt)
+// 		default:
+// 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeDyNumber", tt))
+// 		}
+// 	default:
+// 		panic(fmt.Sprintf("unsupported type: %T", t))
+// 	}
+// }
+
 func Nullable(t Type, v interface{}) Value {
 	switch t {
 	case TypeBool:
@@ -577,127 +726,190 @@ func Nullable(t Type, v interface{}) Value {
 		return NullableFloatValue(v.(*float32))
 	case TypeDouble:
 		return NullableDoubleValue(v.(*float64))
+	default:
+		return nullableComplexTypes(t, v)
+	}
+}
+
+func nullableComplexTypes(t Type, v interface{}) Value {
+	switch t {
 	case TypeDate:
-		switch tt := v.(type) {
-		case *uint32:
-			return NullableDateValue(tt)
-		case *time.Time:
-			return NullableDateValueFromTime(tt)
-		default:
-			panic(fmt.Sprintf("unsupported type conversion from %T to TypeDate", tt))
-		}
+		return nullableDate(v)
 	case TypeDatetime:
-		switch tt := v.(type) {
-		case *uint32:
-			return NullableDatetimeValue(tt)
-		case *time.Time:
-			return NullableDatetimeValueFromTime(tt)
-		default:
-			panic(fmt.Sprintf("unsupported type conversion from %T to TypeDatetime", tt))
-		}
+		return nullableDatetime(v)
 	case TypeTimestamp:
-		switch tt := v.(type) {
-		case *uint64:
-			return NullableTimestampValue(tt)
-		case *time.Time:
-			return NullableTimestampValueFromTime(tt)
-		default:
-			panic(fmt.Sprintf("unsupported type conversion from %T to TypeTimestamp", tt))
-		}
+		return nullableTimestamp(v)
 	case TypeInterval:
-		switch tt := v.(type) {
-		case *int64:
-			return NullableIntervalValueFromMicroseconds(tt)
-		case *time.Duration:
-			return NullableIntervalValueFromDuration(tt)
-		default:
-			panic(fmt.Sprintf("unsupported type conversion from %T to TypeInterval", tt))
-		}
+		return nullableInterval(v)
 	case TypeTzDate:
-		switch tt := v.(type) {
-		case *string:
-			return NullableTzDateValue(tt)
-		case *time.Time:
-			return NullableTzDateValueFromTime(tt)
-		default:
-			panic(fmt.Sprintf("unsupported type conversion from %T to TypeTzDate", tt))
-		}
+		return nullableTzDate(v)
 	case TypeTzDatetime:
-		switch tt := v.(type) {
-		case *string:
-			return NullableTzDatetimeValue(tt)
-		case *time.Time:
-			return NullableTzDatetimeValueFromTime(tt)
-		default:
-			panic(fmt.Sprintf("unsupported type conversion from %T to TypeTzDatetime", tt))
-		}
+		return nullableTzDatetime(v)
 	case TypeTzTimestamp:
-		switch tt := v.(type) {
-		case *string:
-			return NullableTzTimestampValue(tt)
-		case *time.Time:
-			return NullableTzTimestampValueFromTime(tt)
-		default:
-			panic(fmt.Sprintf("unsupported type conversion from %T to TypeTzTimestamp", tt))
-		}
+		return nullableTzTimestamp(v)
 	case TypeBytes:
-		switch tt := v.(type) {
-		case *[]byte:
-			return NullableBytesValue(tt)
-		case *string:
-			return NullableStringValueFromString(tt)
-		default:
-			panic(fmt.Sprintf("unsupported type conversion from %T to TypeBytes", tt))
-		}
+		return nullableBytes(v)
 	case TypeText:
-		switch tt := v.(type) {
-		case *string:
-			return NullableTextValue(tt)
-		default:
-			panic(fmt.Sprintf("unsupported type conversion from %T to TypeText", tt))
-		}
+		return nullableText(v)
 	case TypeYSON:
-		switch tt := v.(type) {
-		case *string:
-			return NullableYSONValue(tt)
-		case *[]byte:
-			return NullableYSONValueFromBytes(tt)
-		default:
-			panic(fmt.Sprintf("unsupported type conversion from %T to TypeYSON", tt))
-		}
+		return nullableYSON(v)
 	case TypeJSON:
-		switch tt := v.(type) {
-		case *string:
-			return NullableJSONValue(tt)
-		case *[]byte:
-			return NullableJSONValueFromBytes(tt)
-		default:
-			panic(fmt.Sprintf("unsupported type conversion from %T to TypeJSON", tt))
-		}
+		return nullableJSON(v)
 	case TypeUUID:
-		switch tt := v.(type) {
-		case *[16]byte:
-			return NullableUUIDValue(tt)
-		default:
-			panic(fmt.Sprintf("unsupported type conversion from %T to TypeUUID", tt))
-		}
+		return nullableUUID(v)
 	case TypeJSONDocument:
-		switch tt := v.(type) {
-		case *string:
-			return NullableJSONDocumentValue(tt)
-		case *[]byte:
-			return NullableJSONDocumentValueFromBytes(tt)
-		default:
-			panic(fmt.Sprintf("unsupported type conversion from %T to TypeJSONDocument", tt))
-		}
+		return nullableJSONDocument(v)
 	case TypeDyNumber:
-		switch tt := v.(type) {
-		case *string:
-			return NullableDyNumberValue(tt)
-		default:
-			panic(fmt.Sprintf("unsupported type conversion from %T to TypeDyNumber", tt))
-		}
+		return nullableDyNumber(v)
 	default:
 		panic(fmt.Sprintf("unsupported type: %T", t))
+	}
+}
+
+func nullableDate(v interface{}) Value {
+	switch tt := v.(type) {
+	case *uint32:
+		return NullableDateValue(tt)
+	case *time.Time:
+		return NullableDateValueFromTime(tt)
+	default:
+		panic(fmt.Sprintf("unsupported type conversion from %T to TypeDate", tt))
+	}
+}
+
+func nullableDatetime(v interface{}) Value {
+	switch tt := v.(type) {
+	case *uint32:
+		return NullableDatetimeValue(tt)
+	case *time.Time:
+		return NullableDatetimeValueFromTime(tt)
+	default:
+		panic(fmt.Sprintf("unsupported type conversion from %T to TypeDatetime", tt))
+	}
+}
+
+func nullableTimestamp(v interface{}) Value {
+	switch tt := v.(type) {
+	case *uint64:
+		return NullableTimestampValue(tt)
+	case *time.Time:
+		return NullableTimestampValueFromTime(tt)
+	default:
+		panic(fmt.Sprintf("unsupported type conversion from %T to TypeTimestamp", tt))
+	}
+}
+
+func nullableInterval(v interface{}) Value {
+	switch tt := v.(type) {
+	case *int64:
+		return NullableIntervalValueFromMicroseconds(tt)
+	case *time.Duration:
+		return NullableIntervalValueFromDuration(tt)
+	default:
+		panic(fmt.Sprintf("unsupported type conversion from %T to TypeInterval", tt))
+	}
+}
+
+func nullableTzDate(v interface{}) Value {
+	switch tt := v.(type) {
+	case *string:
+		return NullableTzDateValue(tt)
+	case *time.Time:
+		return NullableTzDateValueFromTime(tt)
+	default:
+		panic(fmt.Sprintf("unsupported type conversion from %T to TypeTzDate", tt))
+	}
+}
+
+func nullableTzDatetime(v interface{}) Value {
+	switch tt := v.(type) {
+	case *string:
+		return NullableTzDatetimeValue(tt)
+	case *time.Time:
+		return NullableTzDatetimeValueFromTime(tt)
+	default:
+		panic(fmt.Sprintf("unsupported type conversion from %T to TypeTzDatetime", tt))
+	}
+}
+
+func nullableTzTimestamp(v interface{}) Value {
+	switch tt := v.(type) {
+	case *string:
+		return NullableTzTimestampValue(tt)
+	case *time.Time:
+		return NullableTzTimestampValueFromTime(tt)
+	default:
+		panic(fmt.Sprintf("unsupported type conversion from %T to TypeTzTimestamp", tt))
+	}
+}
+
+func nullableBytes(v interface{}) Value {
+	switch tt := v.(type) {
+	case *[]byte:
+		return NullableBytesValue(tt)
+	case *string:
+		return NullableStringValueFromString(tt)
+	default:
+		panic(fmt.Sprintf("unsupported type conversion from %T to TypeBytes", tt))
+	}
+}
+
+func nullableText(v interface{}) Value {
+	switch tt := v.(type) {
+	case *string:
+		return NullableTextValue(tt)
+	default:
+		panic(fmt.Sprintf("unsupported type conversion from %T to TypeText", tt))
+	}
+}
+
+func nullableYSON(v interface{}) Value {
+	switch tt := v.(type) {
+	case *string:
+		return NullableYSONValue(tt)
+	case *[]byte:
+		return NullableYSONValueFromBytes(tt)
+	default:
+		panic(fmt.Sprintf("unsupported type conversion from %T to TypeYSON", tt))
+	}
+}
+
+func nullableJSON(v interface{}) Value {
+	switch tt := v.(type) {
+	case *string:
+		return NullableJSONValue(tt)
+	case *[]byte:
+		return NullableJSONValueFromBytes(tt)
+	default:
+		panic(fmt.Sprintf("unsupported type conversion from %T to TypeJSON", tt))
+	}
+}
+
+func nullableUUID(v interface{}) Value {
+	switch tt := v.(type) {
+	case *[16]byte:
+		return NullableUUIDValue(tt)
+	default:
+		panic(fmt.Sprintf("unsupported type conversion from %T to TypeUUID", tt))
+	}
+}
+
+func nullableJSONDocument(v interface{}) Value {
+	switch tt := v.(type) {
+	case *string:
+		return NullableJSONDocumentValue(tt)
+	case *[]byte:
+		return NullableJSONDocumentValueFromBytes(tt)
+	default:
+		panic(fmt.Sprintf("unsupported type conversion from %T to TypeJSONDocument", tt))
+	}
+}
+
+func nullableDyNumber(v interface{}) Value {
+	switch tt := v.(type) {
+	case *string:
+		return NullableDyNumberValue(tt)
+	default:
+		panic(fmt.Sprintf("unsupported type conversion from %T to TypeDyNumber", tt))
 	}
 }

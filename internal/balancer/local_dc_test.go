@@ -30,68 +30,72 @@ func (d discoveryMock) Discover(ctx context.Context) ([]endpoint.Endpoint, error
 	return d.endpoints, nil
 }
 
-func TestCheckFastestAddress(t *testing.T) {
+func TestCheckFastestAddress_Ok(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("Ok", func(t *testing.T) {
-		var firstCount int64
-		var secondCount int64
+	var firstCount int64
+	var secondCount int64
 
-		for i := 0; i < 100; i++ {
-			listen1, err := net.ListenTCP("tcp", &net.TCPAddr{IP: localIP})
-			require.NoError(t, err)
-			listen2, err := net.ListenTCP("tcp", &net.TCPAddr{IP: localIP})
-			require.NoError(t, err)
-			addr1 := listen1.Addr().String()
-			addr2 := listen2.Addr().String()
-
-			fastest := checkFastestAddress(ctx, []string{addr1, addr2})
-			require.NotEmpty(t, fastest)
-
-			switch fastest {
-			case addr1:
-				firstCount++
-			case addr2:
-				secondCount++
-			default:
-				require.Contains(t, []string{addr1, addr2}, fastest)
-			}
-
-			_ = listen1.Close()
-			_ = listen2.Close()
-		}
-		require.NotEmpty(t, firstCount)
-		require.NotEmpty(t, secondCount)
-	})
-	t.Run("HasError", func(t *testing.T) {
+	for i := 0; i < 100; i++ {
 		listen1, err := net.ListenTCP("tcp", &net.TCPAddr{IP: localIP})
 		require.NoError(t, err)
 		listen2, err := net.ListenTCP("tcp", &net.TCPAddr{IP: localIP})
 		require.NoError(t, err)
 		addr1 := listen1.Addr().String()
 		addr2 := listen2.Addr().String()
-
-		_ = listen2.Close() // for can't accept connections
 
 		fastest := checkFastestAddress(ctx, []string{addr1, addr2})
-		require.Equal(t, addr1, fastest)
+		require.NotEmpty(t, fastest)
+
+		switch fastest {
+		case addr1:
+			firstCount++
+		case addr2:
+			secondCount++
+		default:
+			require.Contains(t, []string{addr1, addr2}, fastest)
+		}
 
 		_ = listen1.Close()
-	})
-	t.Run("AllErrors", func(t *testing.T) {
-		listen1, err := net.ListenTCP("tcp", &net.TCPAddr{IP: localIP})
-		require.NoError(t, err)
-		listen2, err := net.ListenTCP("tcp", &net.TCPAddr{IP: localIP})
-		require.NoError(t, err)
-		addr1 := listen1.Addr().String()
-		addr2 := listen2.Addr().String()
+		_ = listen2.Close()
+	}
+	require.NotEmpty(t, firstCount)
+	require.NotEmpty(t, secondCount)
+}
 
-		_ = listen1.Close() // for can't accept connections
-		_ = listen2.Close() // for can't accept connections
+func TestCheckFastestAddress_HasError(t *testing.T) {
+	ctx := context.Background()
 
-		res := checkFastestAddress(ctx, []string{addr1, addr2})
-		require.Empty(t, res)
-	})
+	listen1, err := net.ListenTCP("tcp", &net.TCPAddr{IP: localIP})
+	require.NoError(t, err)
+	listen2, err := net.ListenTCP("tcp", &net.TCPAddr{IP: localIP})
+	require.NoError(t, err)
+	addr1 := listen1.Addr().String()
+	addr2 := listen2.Addr().String()
+
+	_ = listen2.Close() // for can't accept connections
+
+	fastest := checkFastestAddress(ctx, []string{addr1, addr2})
+	require.Equal(t, addr1, fastest)
+
+	_ = listen1.Close()
+}
+
+func TestCheckFastestAddress_AllErrors(t *testing.T) {
+	ctx := context.Background()
+
+	listen1, err := net.ListenTCP("tcp", &net.TCPAddr{IP: localIP})
+	require.NoError(t, err)
+	listen2, err := net.ListenTCP("tcp", &net.TCPAddr{IP: localIP})
+	require.NoError(t, err)
+	addr1 := listen1.Addr().String()
+	addr2 := listen2.Addr().String()
+
+	_ = listen1.Close() // for can't accept connections
+	_ = listen2.Close() // for can't accept connections
+
+	res := checkFastestAddress(ctx, []string{addr1, addr2})
+	require.Empty(t, res)
 }
 
 func TestDetectLocalDC(t *testing.T) {

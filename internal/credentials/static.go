@@ -73,22 +73,50 @@ type Static struct {
 func (c *Static) Token(ctx context.Context) (token string, err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if time.Until(c.requestAt) > 0 {
+
+	if shouldUseCachedToken(c.requestAt) {
 		return c.token, nil
 	}
-	cc, err := grpc.DialContext(ctx, c.endpoint, c.opts...)
+
+	cc, err := createGRPCClient(ctx, c.endpoint, c.opts...)
 	if err != nil {
-		return "", xerrors.WithStackTrace(
-			fmt.Errorf("dial failed: %w", err),
-		)
+		return "", formatDialError(err)
 	}
-	defer func() {
-		_ = cc.Close()
-	}()
+	defer closeClient(cc)
 
+	response, err := requestLogin(ctx, cc, c.user, c.password)
+	if err != nil {
+		return "", xerrors.WithStackTrace(err)
+	}
+
+	token, err = processLoginResponse(response, c.endpoint)
+	if err != nil {
+		return "", err
+	}
+
+	c.updateTokenCache(token)
+	return c.token, nil
+}
+
+func shouldUseCachedToken(requestAt time.Time) bool {
+	return time.Until(requestAt) > 0
+}
+
+func createGRPCClient(ctx context.Context, endpoint string, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	return grpc.DialContext(ctx, endpoint, opts...)
+}
+
+func formatDialError(err error) error {
+	return xerrors.WithStackTrace(fmt.Errorf("dial failed: %w", err))
+}
+
+func closeClient(cc *grpc.ClientConn) {
+	_ = cc.Close()
+}
+
+func requestLogin(ctx context.Context, cc *grpc.ClientConn, user, password string) (*Ydb_Auth.LoginResponse, error) {
 	client := Ydb_Auth_V1.NewAuthServiceClient(cc)
-
-	response, err := client.Login(ctx, &Ydb_Auth.LoginRequest{
+	return client.Login(ctx, &Ydb_Auth.LoginRequest{
 		OperationParams: &Ydb_Operations.OperationParams{
 			OperationMode:    0,
 			OperationTimeout: nil,
@@ -96,44 +124,55 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 			Labels:           nil,
 			ReportCostInfo:   0,
 		},
-		User:     c.user,
-		Password: c.password,
+		User:     user,
+		Password: password,
 	})
-	if err != nil {
-		return "", xerrors.WithStackTrace(err)
-	}
+}
 
+func processLoginResponse(response *Ydb_Auth.LoginResponse, endpoint string) (string, error) {
 	switch {
 	case !response.GetOperation().GetReady():
-		return "", xerrors.WithStackTrace(
-			fmt.Errorf("operation '%s' not ready: %v",
-				response.GetOperation().GetId(),
-				response.GetOperation().GetIssues(),
-			),
-		)
-
+		return "", formatOperationNotReadyError(response)
 	case response.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
-		return "", xerrors.WithStackTrace(
-			xerrors.Operation(
-				xerrors.FromOperation(response.GetOperation()),
-				xerrors.WithAddress(c.endpoint),
-			),
-		)
+		return "", formatOperationStatusError(response, endpoint)
 	}
+
+	return extractTokenFromResponse(response)
+}
+
+func formatOperationNotReadyError(response *Ydb_Auth.LoginResponse) error {
+	return xerrors.WithStackTrace(fmt.Errorf("operation '%s' not ready: %v",
+		response.GetOperation().GetId(),
+		response.GetOperation().GetIssues(),
+	))
+}
+
+func formatOperationStatusError(response *Ydb_Auth.LoginResponse, endpoint string) error {
+	return xerrors.WithStackTrace(
+		xerrors.Operation(
+			xerrors.FromOperation(response.GetOperation()),
+			xerrors.WithAddress(endpoint),
+		),
+	)
+}
+
+func extractTokenFromResponse(response *Ydb_Auth.LoginResponse) (string, error) {
 	var result Ydb_Auth.LoginResult
-	if err = response.GetOperation().GetResult().UnmarshalTo(&result); err != nil {
+	if err := response.GetOperation().GetResult().UnmarshalTo(&result); err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
 
-	expiresAt, err := parseExpiresAt(result.GetToken())
+	return result.GetToken(), nil
+}
+
+func (c *Static) updateTokenCache(token string) {
+	expiresAt, err := parseExpiresAt(token)
 	if err != nil {
-		return "", xerrors.WithStackTrace(err)
+		return
 	}
 
 	c.requestAt = time.Now().Add(time.Until(expiresAt) / 10)
-	c.token = result.GetToken()
-
-	return c.token, nil
+	c.token = token
 }
 
 func parseExpiresAt(raw string) (expiresAt time.Time, err error) {

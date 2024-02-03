@@ -11,14 +11,14 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
-func TestToYDB(t *testing.T) {
+func TestToYDBReadWriteTransactions(t *testing.T) {
 	for _, tt := range []struct {
 		name      string
 		txOptions driver.TxOptions
 		txControl table.TxOption
 		err       bool
 	}{
-		// read-write
+		// read-write transactions
 		{
 			name: xtest.CurrentFileLine(),
 			txOptions: driver.TxOptions{
@@ -85,8 +85,27 @@ func TestToYDB(t *testing.T) {
 			},
 			err: true,
 		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			toYDB, err := ToYDB(tt.txOptions)
+			if !tt.err {
+				require.NoError(t, err)
+				require.Equal(t, table.TxSettings(tt.txControl).Settings(), table.TxSettings(toYDB).Settings())
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
 
-		// read-only
+func TestToYDBReadOnlyTransactions(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		txOptions driver.TxOptions
+		txControl table.TxOption
+		err       bool
+	}{
+		// read-only transactions
 		{
 			name: xtest.CurrentFileLine(),
 			txOptions: driver.TxOptions{

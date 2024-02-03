@@ -291,6 +291,49 @@ func (c *conn) Close(ctx context.Context) (err error) {
 	return c.wrapError(err)
 }
 
+func (c *conn) realConnInvoke(ctx context.Context, method string, req interface{}, res interface{}, opts []grpc.CallOption) (md metadata.MD, err error) {
+	cc, err := c.realConn(ctx)
+	if err != nil {
+		return nil, c.wrapError(err)
+	}
+
+	c.touchLastUsage()
+	defer c.touchLastUsage()
+
+	err = cc.Invoke(ctx, method, req, res, append(opts, grpc.Trailer(&md))...)
+	if err != nil {
+		defer c.onTransportError(ctx, err)
+		return md, err
+	}
+
+	return md, nil
+}
+
+func (c *conn) handleResponse(ctx context.Context, traceID string, res interface{}, md metadata.MD) (opID string, issues []trace.Issue, err error) {
+	if o, ok := res.(response.Response); ok {
+		opID = o.GetOperation().GetId()
+		for _, issue := range o.GetOperation().GetIssues() {
+			issues = append(issues, issue)
+		}
+		if UseWrapping(ctx) {
+			switch {
+			case !o.GetOperation().GetReady():
+				err = c.wrapError(errOperationNotReady)
+
+			case o.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
+				err = c.wrapError(
+					xerrors.Operation(
+						xerrors.FromOperation(o.GetOperation()),
+						xerrors.WithAddress(c.Address()),
+						xerrors.WithTraceID(traceID),
+					),
+				)
+			}
+		}
+	}
+	return opID, issues, err
+}
+
 func (c *conn) Invoke(
 	ctx context.Context,
 	method string,
@@ -307,21 +350,13 @@ func (c *conn) Invoke(
 			stack.FunctionID(""),
 			c.endpoint, trace.Method(method),
 		)
-		cc *grpc.ClientConn
-		md = metadata.MD{}
+		md metadata.MD
 	)
+
 	defer func() {
 		meta.CallTrailerCallback(ctx, md)
 		onDone(err, issues, opID, c.GetState(), md)
 	}()
-
-	cc, err = c.realConn(ctx)
-	if err != nil {
-		return c.wrapError(err)
-	}
-
-	c.touchLastUsage()
-	defer c.touchLastUsage()
 
 	ctx, traceID, err := meta.TraceID(ctx)
 	if err != nil {
@@ -330,12 +365,8 @@ func (c *conn) Invoke(
 
 	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID))
 
-	err = cc.Invoke(ctx, method, req, res, append(opts, grpc.Trailer(&md))...)
+	md, err = c.realConnInvoke(ctx, method, req, res, opts)
 	if err != nil {
-		defer func() {
-			c.onTransportError(ctx, err)
-		}()
-
 		if useWrapping {
 			err = xerrors.Transport(err,
 				xerrors.WithAddress(c.Address()),
@@ -346,32 +377,10 @@ func (c *conn) Invoke(
 			}
 			return c.wrapError(err)
 		}
-
 		return err
 	}
 
-	if o, ok := res.(response.Response); ok {
-		opID = o.GetOperation().GetId()
-		for _, issue := range o.GetOperation().GetIssues() {
-			issues = append(issues, issue)
-		}
-		if useWrapping {
-			switch {
-			case !o.GetOperation().GetReady():
-				return c.wrapError(errOperationNotReady)
-
-			case o.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
-				return c.wrapError(
-					xerrors.Operation(
-						xerrors.FromOperation(o.GetOperation()),
-						xerrors.WithAddress(c.Address()),
-						xerrors.WithTraceID(traceID),
-					),
-				)
-			}
-		}
-	}
-
+	opID, issues, err = c.handleResponse(ctx, traceID, res, md)
 	return err
 }
 

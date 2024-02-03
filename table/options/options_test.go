@@ -138,105 +138,133 @@ func TestStoragePolicyOptions(t *testing.T) {
 	}
 }
 
-func TestAlterTableOptions(t *testing.T) {
+func TestAlterTableOptions_AddColumn(t *testing.T) {
 	a := allocator.New()
 	defer a.Free()
-	{
-		opt := WithAddColumn("a", types.TypeBool)
-		req := Ydb_Table.AlterTableRequest{}
-		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
-		if len(req.AddColumns) != 1 ||
-			req.AddColumns[0].Name != "a" {
-			t.Errorf("Alter table options is not as expected")
-		}
+
+	opt := WithAddColumn("a", types.TypeBool)
+	req := Ydb_Table.AlterTableRequest{}
+	opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
+
+	if len(req.AddColumns) != 1 || req.AddColumns[0].Name != "a" {
+		t.Errorf("Alter table options is not as expected")
 	}
-	{
-		column := Column{
-			Name:   "a",
-			Type:   types.TypeBool,
-			Family: "b",
-		}
-		opt := WithAddColumnMeta(column)
-		req := Ydb_Table.AlterTableRequest{}
-		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
-		if len(req.AddColumns) != 1 ||
-			req.AddColumns[0].Name != column.Name ||
-			req.AddColumns[0].Type != value.TypeToYDB(column.Type, a) ||
-			req.AddColumns[0].Family != column.Family {
-			t.Errorf("Alter table options is not as expected")
-		}
+}
+
+func TestAlterTableOptions_AddColumnMeta(t *testing.T) {
+	a := allocator.New()
+	defer a.Free()
+
+	column := Column{
+		Name:   "a",
+		Type:   types.TypeBool,
+		Family: "b",
 	}
-	{
-		opt := WithDropColumn("a")
-		req := Ydb_Table.AlterTableRequest{}
-		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
-		if len(req.DropColumns) != 1 ||
-			req.DropColumns[0] != "a" {
-			t.Errorf("Alter table options is not as expected")
-		}
+	opt := WithAddColumnMeta(column)
+	req := Ydb_Table.AlterTableRequest{}
+	opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
+
+	if len(req.AddColumns) != 1 ||
+		req.AddColumns[0].Name != column.Name ||
+		req.AddColumns[0].Type != value.TypeToYDB(column.Type, a) ||
+		req.AddColumns[0].Family != column.Family {
+		t.Errorf("Alter table options is not as expected")
 	}
-	{
-		cf := ColumnFamily{
-			Name: "a",
-			Data: StoragePool{
-				Media: "ssd",
-			},
-			Compression:  ColumnFamilyCompressionLZ4,
-			KeepInMemory: FeatureEnabled,
-		}
-		opt := WithAlterColumnFamilies(cf)
-		req := Ydb_Table.AlterTableRequest{}
-		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
-		if len(req.AddColumnFamilies) != 1 ||
-			req.AddColumnFamilies[0].Name != cf.Name ||
-			req.AddColumnFamilies[0].Data.Media != cf.Data.Media ||
-			req.AddColumnFamilies[0].Compression != cf.Compression.toYDB() ||
-			req.AddColumnFamilies[0].KeepInMemory != cf.KeepInMemory.ToYDB() {
-			t.Errorf("Alter table options is not as expected")
-		}
+}
+
+func TestAlterTableOptions_DropColumn(t *testing.T) {
+	a := allocator.New()
+	defer a.Free()
+
+	opt := WithDropColumn("a")
+	req := Ydb_Table.AlterTableRequest{}
+	opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
+
+	if len(req.DropColumns) != 1 || req.DropColumns[0] != "a" {
+		t.Errorf("Alter table options is not as expected")
 	}
-	{
-		cf := ColumnFamily{
-			Name:        "default",
-			Compression: ColumnFamilyCompressionLZ4,
-		}
-		opt := WithAlterColumnFamilies(cf)
-		req := Ydb_Table.AlterTableRequest{}
-		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
-		if len(req.AddColumnFamilies) != 1 ||
-			req.AddColumnFamilies[0].Name != cf.Name ||
-			req.AddColumnFamilies[0].Data != nil ||
-			req.AddColumnFamilies[0].Compression != cf.Compression.toYDB() ||
-			req.AddColumnFamilies[0].KeepInMemory != Ydb.FeatureFlag_STATUS_UNSPECIFIED {
-			t.Errorf("Alter table options is not as expected")
-		}
+}
+
+func TestAlterTableOptions_AlterColumnFamilies(t *testing.T) {
+	a := allocator.New()
+	defer a.Free()
+
+	cf := ColumnFamily{
+		Name: "a",
+		Data: StoragePool{
+			Media: "ssd",
+		},
+		Compression:  ColumnFamilyCompressionLZ4,
+		KeepInMemory: FeatureEnabled,
 	}
-	{
-		rr := ReadReplicasSettings{
-			Type:  ReadReplicasAnyAzReadReplicas,
-			Count: 42,
-		}
-		opt := WithAlterReadReplicasSettings(rr)
-		req := Ydb_Table.AlterTableRequest{}
-		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
-		rrOut := NewReadReplicasSettings(req.GetSetReadReplicasSettings())
-		if rr != rrOut {
-			t.Errorf("Alter table set read replicas options is not as expected")
-		}
+	opt := WithAlterColumnFamilies(cf)
+	req := Ydb_Table.AlterTableRequest{}
+	opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
+
+	if len(req.AddColumnFamilies) != 1 ||
+		req.AddColumnFamilies[0].Name != cf.Name ||
+		req.AddColumnFamilies[0].Data.Media != cf.Data.Media ||
+		req.AddColumnFamilies[0].Compression != cf.Compression.toYDB() ||
+		req.AddColumnFamilies[0].KeepInMemory != cf.KeepInMemory.ToYDB() {
+		t.Errorf("Alter table options is not as expected")
 	}
-	{
-		ss := StorageSettings{
-			TableCommitLog0:    StoragePool{Media: "m1"},
-			TableCommitLog1:    StoragePool{Media: "m2"},
-			External:           StoragePool{Media: "m3"},
-			StoreExternalBlobs: feature.Enabled,
-		}
-		opt := WithAlterStorageSettings(ss)
-		req := Ydb_Table.AlterTableRequest{}
-		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
-		rrOut := NewStorageSettings(req.GetAlterStorageSettings())
-		if ss != rrOut {
-			t.Errorf("Alter table storage settings options is not as expected")
-		}
+}
+
+func TestAlterTableOptions_AlterColumnFamilies_Default(t *testing.T) {
+	a := allocator.New()
+	defer a.Free()
+
+	cf := ColumnFamily{
+		Name:        "default",
+		Compression: ColumnFamilyCompressionLZ4,
+	}
+	opt := WithAlterColumnFamilies(cf)
+	req := Ydb_Table.AlterTableRequest{}
+	opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
+
+	if len(req.AddColumnFamilies) != 1 ||
+		req.AddColumnFamilies[0].Name != cf.Name ||
+		req.AddColumnFamilies[0].Data != nil ||
+		req.AddColumnFamilies[0].Compression != cf.Compression.toYDB() ||
+		req.AddColumnFamilies[0].KeepInMemory != Ydb.FeatureFlag_STATUS_UNSPECIFIED {
+		t.Errorf("Alter table options is not as expected")
+	}
+}
+
+func TestAlterTableOptions_AlterReadReplicasSettings(t *testing.T) {
+	a := allocator.New()
+	defer a.Free()
+
+	rr := ReadReplicasSettings{
+		Type:  ReadReplicasAnyAzReadReplicas,
+		Count: 42,
+	}
+	opt := WithAlterReadReplicasSettings(rr)
+	req := Ydb_Table.AlterTableRequest{}
+	opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
+
+	rrOut := NewReadReplicasSettings(req.GetSetReadReplicasSettings())
+	if rr != rrOut {
+		t.Errorf("Alter table set read replicas options is not as expected")
+	}
+}
+
+func TestAlterTableOptions_AlterStorageSettings(t *testing.T) {
+	a := allocator.New()
+	defer a.Free()
+
+	ss := StorageSettings{
+		TableCommitLog0:    StoragePool{Media: "m1"},
+		TableCommitLog1:    StoragePool{Media: "m2"},
+		External:           StoragePool{Media: "m3"},
+		StoreExternalBlobs: feature.Enabled,
+	}
+	opt := WithAlterStorageSettings(ss)
+	req := Ydb_Table.AlterTableRequest{}
+	opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
+
+	rrOut := NewStorageSettings(req.GetAlterStorageSettings())
+	if ss != rrOut {
+		t.Errorf("Alter table storage settings options is not as expected")
 	}
 }

@@ -12,114 +12,123 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func TestEndpointsDiff(t *testing.T) {
-	for _, tt := range []struct {
-		newestEndpoints []endpoint.Endpoint
-		previousConns   []conn.Conn
-		nodes           []trace.EndpointInfo
-		added           []trace.EndpointInfo
-		dropped         []trace.EndpointInfo
-	}{
-		{
-			newestEndpoints: []endpoint.Endpoint{
-				&mock.Endpoint{AddrField: "1"},
-				&mock.Endpoint{AddrField: "3"},
-				&mock.Endpoint{AddrField: "2"},
-				&mock.Endpoint{AddrField: "0"},
-			},
-			previousConns: []conn.Conn{
-				&mock.Conn{AddrField: "2"},
-				&mock.Conn{AddrField: "1"},
-				&mock.Conn{AddrField: "0"},
-				&mock.Conn{AddrField: "3"},
-			},
-			nodes: []trace.EndpointInfo{
-				&mock.Endpoint{AddrField: "0"},
-				&mock.Endpoint{AddrField: "1"},
-				&mock.Endpoint{AddrField: "2"},
-				&mock.Endpoint{AddrField: "3"},
-			},
-			added:   []trace.EndpointInfo{},
-			dropped: []trace.EndpointInfo{},
-		},
-		{
-			newestEndpoints: []endpoint.Endpoint{
-				&mock.Endpoint{AddrField: "1"},
-				&mock.Endpoint{AddrField: "3"},
-				&mock.Endpoint{AddrField: "2"},
-				&mock.Endpoint{AddrField: "0"},
-			},
-			previousConns: []conn.Conn{
-				&mock.Conn{AddrField: "1"},
-				&mock.Conn{AddrField: "0"},
-				&mock.Conn{AddrField: "3"},
-			},
-			nodes: []trace.EndpointInfo{
-				&mock.Endpoint{AddrField: "0"},
-				&mock.Endpoint{AddrField: "1"},
-				&mock.Endpoint{AddrField: "2"},
-				&mock.Endpoint{AddrField: "3"},
-			},
-			added: []trace.EndpointInfo{
-				&mock.Endpoint{AddrField: "2"},
-			},
-			dropped: []trace.EndpointInfo{},
-		},
-		{
-			newestEndpoints: []endpoint.Endpoint{
-				&mock.Endpoint{AddrField: "1"},
-				&mock.Endpoint{AddrField: "3"},
-				&mock.Endpoint{AddrField: "0"},
-			},
-			previousConns: []conn.Conn{
-				&mock.Conn{AddrField: "1"},
-				&mock.Conn{AddrField: "2"},
-				&mock.Conn{AddrField: "0"},
-				&mock.Conn{AddrField: "3"},
-			},
-			nodes: []trace.EndpointInfo{
-				&mock.Endpoint{AddrField: "0"},
-				&mock.Endpoint{AddrField: "1"},
-				&mock.Endpoint{AddrField: "3"},
-			},
-			added: []trace.EndpointInfo{},
-			dropped: []trace.EndpointInfo{
-				&mock.Endpoint{AddrField: "2"},
-			},
-		},
-		{
-			newestEndpoints: []endpoint.Endpoint{
-				&mock.Endpoint{AddrField: "1"},
-				&mock.Endpoint{AddrField: "3"},
-				&mock.Endpoint{AddrField: "0"},
-			},
-			previousConns: []conn.Conn{
-				&mock.Conn{AddrField: "4"},
-				&mock.Conn{AddrField: "7"},
-				&mock.Conn{AddrField: "8"},
-			},
-			nodes: []trace.EndpointInfo{
-				&mock.Endpoint{AddrField: "0"},
-				&mock.Endpoint{AddrField: "1"},
-				&mock.Endpoint{AddrField: "3"},
-			},
-			added: []trace.EndpointInfo{
-				&mock.Endpoint{AddrField: "0"},
-				&mock.Endpoint{AddrField: "1"},
-				&mock.Endpoint{AddrField: "3"},
-			},
-			dropped: []trace.EndpointInfo{
-				&mock.Endpoint{AddrField: "4"},
-				&mock.Endpoint{AddrField: "7"},
-				&mock.Endpoint{AddrField: "8"},
-			},
-		},
-	} {
-		t.Run(xtest.CurrentFileLine(), func(t *testing.T) {
-			nodes, added, dropped := endpointsDiff(tt.newestEndpoints, tt.previousConns)
-			require.Equal(t, tt.nodes, nodes)
-			require.Equal(t, tt.added, added)
-			require.Equal(t, tt.dropped, dropped)
-		})
+func TestEndpointsDiff_FirstCase(t *testing.T) {
+	newestEndpoints := []endpoint.Endpoint{
+		&mock.Endpoint{AddrField: "1"},
+		&mock.Endpoint{AddrField: "3"},
+		&mock.Endpoint{AddrField: "2"},
+		&mock.Endpoint{AddrField: "0"},
 	}
+	previousConns := []conn.Conn{
+		&mock.Conn{AddrField: "2"},
+		&mock.Conn{AddrField: "1"},
+		&mock.Conn{AddrField: "0"},
+		&mock.Conn{AddrField: "3"},
+	}
+	expectedNodes := []trace.EndpointInfo{
+		&mock.Endpoint{AddrField: "0"},
+		&mock.Endpoint{AddrField: "1"},
+		&mock.Endpoint{AddrField: "2"},
+		&mock.Endpoint{AddrField: "3"},
+	}
+	expectedAdded := []trace.EndpointInfo{}
+	expectedDropped := []trace.EndpointInfo{}
+
+	t.Run(xtest.CurrentFileLine(), func(t *testing.T) {
+		testEndpointsDiffHelper(t, newestEndpoints, previousConns, expectedNodes, expectedAdded, expectedDropped)
+	})
+}
+
+func TestEndpointsDiff_SecondCase(t *testing.T) {
+	newestEndpoints := []endpoint.Endpoint{
+		&mock.Endpoint{AddrField: "1"},
+		&mock.Endpoint{AddrField: "3"},
+		&mock.Endpoint{AddrField: "2"},
+		&mock.Endpoint{AddrField: "0"},
+	}
+	previousConns := []conn.Conn{
+		&mock.Conn{AddrField: "1"},
+		&mock.Conn{AddrField: "0"},
+		&mock.Conn{AddrField: "3"},
+	}
+	expectedNodes := []trace.EndpointInfo{
+		&mock.Endpoint{AddrField: "0"},
+		&mock.Endpoint{AddrField: "1"},
+		&mock.Endpoint{AddrField: "2"},
+		&mock.Endpoint{AddrField: "3"},
+	}
+	expectedAdded := []trace.EndpointInfo{
+		&mock.Endpoint{AddrField: "2"},
+	}
+	expectedDropped := []trace.EndpointInfo{}
+
+	t.Run(xtest.CurrentFileLine(), func(t *testing.T) {
+		testEndpointsDiffHelper(t, newestEndpoints, previousConns, expectedNodes, expectedAdded, expectedDropped)
+	})
+}
+
+func TestEndpointsDiff_ThirdCase(t *testing.T) {
+	newestEndpoints := []endpoint.Endpoint{
+		&mock.Endpoint{AddrField: "1"},
+		&mock.Endpoint{AddrField: "3"},
+		&mock.Endpoint{AddrField: "0"},
+	}
+	previousConns := []conn.Conn{
+		&mock.Conn{AddrField: "1"},
+		&mock.Conn{AddrField: "2"},
+		&mock.Conn{AddrField: "0"},
+		&mock.Conn{AddrField: "3"},
+	}
+	expectedNodes := []trace.EndpointInfo{
+		&mock.Endpoint{AddrField: "0"},
+		&mock.Endpoint{AddrField: "1"},
+		&mock.Endpoint{AddrField: "3"},
+	}
+	expectedAdded := []trace.EndpointInfo{}
+	expectedDropped := []trace.EndpointInfo{
+		&mock.Endpoint{AddrField: "2"},
+	}
+
+	t.Run(xtest.CurrentFileLine(), func(t *testing.T) {
+		testEndpointsDiffHelper(t, newestEndpoints, previousConns, expectedNodes, expectedAdded, expectedDropped)
+	})
+}
+
+func TestEndpointsDiff_FourthCase(t *testing.T) {
+	newestEndpoints := []endpoint.Endpoint{
+		&mock.Endpoint{AddrField: "1"},
+		&mock.Endpoint{AddrField: "3"},
+		&mock.Endpoint{AddrField: "0"},
+	}
+	previousConns := []conn.Conn{
+		&mock.Conn{AddrField: "4"},
+		&mock.Conn{AddrField: "7"},
+		&mock.Conn{AddrField: "8"},
+	}
+	expectedNodes := []trace.EndpointInfo{
+		&mock.Endpoint{AddrField: "0"},
+		&mock.Endpoint{AddrField: "1"},
+		&mock.Endpoint{AddrField: "3"},
+	}
+	expectedAdded := []trace.EndpointInfo{
+		&mock.Endpoint{AddrField: "0"},
+		&mock.Endpoint{AddrField: "1"},
+		&mock.Endpoint{AddrField: "3"},
+	}
+	expectedDropped := []trace.EndpointInfo{
+		&mock.Endpoint{AddrField: "4"},
+		&mock.Endpoint{AddrField: "7"},
+		&mock.Endpoint{AddrField: "8"},
+	}
+
+	t.Run(xtest.CurrentFileLine(), func(t *testing.T) {
+		testEndpointsDiffHelper(t, newestEndpoints, previousConns, expectedNodes, expectedAdded, expectedDropped)
+	})
+}
+
+func testEndpointsDiffHelper(t *testing.T, newestEndpoints []endpoint.Endpoint, previousConns []conn.Conn, expectedNodes, expectedAdded, expectedDropped []trace.EndpointInfo) {
+	nodes, added, dropped := endpointsDiff(newestEndpoints, previousConns)
+	require.Equal(t, expectedNodes, nodes)
+	require.Equal(t, expectedAdded, added)
+	require.Equal(t, expectedDropped, dropped)
 }
