@@ -1,3 +1,4 @@
+* Added `internal/xsql/dsn.bindTablePathPrefixInConnectorOptions()` to exclude from the linter gocognit
 * Refactored `internal/table/client` and extract defer func `loadAndFinalizeSession`
 * Fixed topic writer infinite reconnections in some cases
 * Refactored nil on err `internal/grpcwrapper/rawydb/issues.go`, when golangci-lint nilerr enabled
