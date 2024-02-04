@@ -1,3 +1,4 @@
+* Refactored `internal/cmd/gtrace/main` and extract functions
 * Refactored `internal/decimal/decimal` and extract functions
 * Refactored `log/table` and extract functions
 * Refactored `log/topic` and extract functions
