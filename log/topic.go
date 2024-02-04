@@ -12,8 +12,42 @@ func Topic(l Logger, d trace.Detailer, opts ...Option) (t trace.Topic) {
 	return internalTopic(wrapLogger(l, opts...), d)
 }
 
-func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocyclo
-	t.OnReaderReconnect = func(
+func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) {
+	t.OnReaderReconnect = onReaderReconnect(l, d)
+	t.OnReaderReconnectRequest = onReaderReconnectRequest(l, d)
+	t.OnReaderPartitionReadStartResponse = onReaderPartitionReadStartResponse(l, d)
+	t.OnReaderPartitionReadStopResponse = onReaderPartitionReadStopResponse(l, d)
+	t.OnReaderCommit = onReaderCommit(l, d)
+	t.OnReaderSendCommitMessage = onReaderSendCommitMessage(l, d)
+	t.OnReaderCommittedNotify = onReaderCommittedNotify(l, d)
+	t.OnReaderClose = onReaderClose(l, d)
+
+	t.OnReaderInit = onReaderInit(l, d)
+	t.OnReaderError = onReaderError(l, d)
+	t.OnReaderUpdateToken = onReaderUpdateToken(l, d)
+	t.OnReaderSentDataRequest = onReaderSentDataRequest(l, d)
+	t.OnReaderReceiveDataResponse = onReaderReceiveDataResponse(l, d)
+	t.OnReaderReadMessages = onReaderReadMessages(l, d)
+	t.OnReaderUnknownGrpcMessage = onReaderUnknownGrpcMessage(l, d)
+
+	///
+	/// Topic writer
+	///
+	t.OnWriterReconnect = onWriterReconnect(l, d)
+	t.OnWriterInitStream = onWriterInitStream(l, d)
+	t.OnWriterClose = onWriterClose(l, d)
+	t.OnWriterCompressMessages = onWriterCompressMessages(l, d)
+	t.OnWriterSendMessages = onWriterSendMessages(l, d)
+	t.OnWriterReadUnknownGrpcMessage = onWriterReadUnknownGrpcMessage(l, d)
+
+	return t
+}
+
+func onReaderReconnect(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TopicReaderReconnectStartInfo) func(doneInfo trace.TopicReaderReconnectDoneInfo) {
+	return func(
 		info trace.TopicReaderReconnectStartInfo,
 	) func(doneInfo trace.TopicReaderReconnectDoneInfo) {
 		if d.Details()&trace.TopicReaderStreamLifeCycleEvents == 0 {
@@ -30,7 +64,13 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			)
 		}
 	}
-	t.OnReaderReconnectRequest = func(info trace.TopicReaderReconnectRequestInfo) {
+}
+
+func onReaderReconnectRequest(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TopicReaderReconnectRequestInfo) {
+	return func(info trace.TopicReaderReconnectRequestInfo) {
 		if d.Details()&trace.TopicReaderStreamLifeCycleEvents == 0 {
 			return
 		}
@@ -40,7 +80,15 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			Bool("was_sent", info.WasSent),
 		)
 	}
-	t.OnReaderPartitionReadStartResponse = func(
+}
+
+func onReaderPartitionReadStartResponse(
+	l Logger,
+	d trace.Detailer,
+) func(
+	info trace.TopicReaderPartitionReadStartResponseStartInfo) func(
+	stopInfo trace.TopicReaderPartitionReadStartResponseDoneInfo) {
+	return func(
 		info trace.TopicReaderPartitionReadStartResponseStartInfo,
 	) func(stopInfo trace.TopicReaderPartitionReadStartResponseDoneInfo) {
 		if d.Details()&trace.TopicReaderPartitionEvents == 0 {
@@ -85,7 +133,15 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			}
 		}
 	}
-	t.OnReaderPartitionReadStopResponse = func(
+}
+
+func onReaderPartitionReadStopResponse(
+	l Logger,
+	d trace.Detailer,
+) func(
+	info trace.TopicReaderPartitionReadStopResponseStartInfo) func(
+	trace.TopicReaderPartitionReadStopResponseDoneInfo) {
+	return func(
 		info trace.TopicReaderPartitionReadStopResponseStartInfo,
 	) func(trace.TopicReaderPartitionReadStopResponseDoneInfo) {
 		if d.Details()&trace.TopicReaderPartitionEvents == 0 {
@@ -123,7 +179,13 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			}
 		}
 	}
-	t.OnReaderCommit = func(info trace.TopicReaderCommitStartInfo) func(doneInfo trace.TopicReaderCommitDoneInfo) {
+}
+
+func onReaderCommit(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TopicReaderCommitStartInfo) func(doneInfo trace.TopicReaderCommitDoneInfo) {
+	return func(info trace.TopicReaderCommitStartInfo) func(doneInfo trace.TopicReaderCommitDoneInfo) {
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
@@ -158,7 +220,13 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			}
 		}
 	}
-	t.OnReaderSendCommitMessage = func(
+}
+
+func onReaderSendCommitMessage(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TopicReaderSendCommitMessageStartInfo) func(trace.TopicReaderSendCommitMessageDoneInfo) {
+	return func(
 		info trace.TopicReaderSendCommitMessageStartInfo,
 	) func(trace.TopicReaderSendCommitMessageDoneInfo) {
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
@@ -201,7 +269,13 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			}
 		}
 	}
-	t.OnReaderCommittedNotify = func(info trace.TopicReaderCommittedNotifyInfo) {
+}
+
+func onReaderCommittedNotify(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TopicReaderCommittedNotifyInfo) {
+	return func(info trace.TopicReaderCommittedNotifyInfo) {
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return
 		}
@@ -214,7 +288,13 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			Int64("committed_offset", info.CommittedOffset),
 		)
 	}
-	t.OnReaderClose = func(info trace.TopicReaderCloseStartInfo) func(doneInfo trace.TopicReaderCloseDoneInfo) {
+}
+
+func onReaderClose(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TopicReaderCloseStartInfo) func(doneInfo trace.TopicReaderCloseDoneInfo) {
+	return func(info trace.TopicReaderCloseStartInfo) func(doneInfo trace.TopicReaderCloseDoneInfo) {
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
@@ -242,8 +322,13 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			}
 		}
 	}
+}
 
-	t.OnReaderInit = func(info trace.TopicReaderInitStartInfo) func(doneInfo trace.TopicReaderInitDoneInfo) {
+func onReaderInit(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TopicReaderInitStartInfo) func(doneInfo trace.TopicReaderInitDoneInfo) {
+	return func(info trace.TopicReaderInitStartInfo) func(doneInfo trace.TopicReaderInitDoneInfo) {
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
@@ -274,7 +359,13 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			}
 		}
 	}
-	t.OnReaderError = func(info trace.TopicReaderErrorInfo) {
+}
+
+func onReaderError(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TopicReaderErrorInfo) {
+	return func(info trace.TopicReaderErrorInfo) {
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return
 		}
@@ -285,7 +376,15 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			versionField(),
 		)
 	}
-	t.OnReaderUpdateToken = func(
+}
+
+func onReaderUpdateToken(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.OnReadUpdateTokenStartInfo) func(
+	updateTokenInfo trace.OnReadUpdateTokenMiddleTokenReceivedInfo) func(
+	doneInfo trace.OnReadStreamUpdateTokenDoneInfo) {
+	return func(
 		info trace.OnReadUpdateTokenStartInfo,
 	) func(
 		updateTokenInfo trace.OnReadUpdateTokenMiddleTokenReceivedInfo,
@@ -337,7 +436,13 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			}
 		}
 	}
-	t.OnReaderSentDataRequest = func(info trace.TopicReaderSentDataRequestInfo) {
+}
+
+func onReaderSentDataRequest(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TopicReaderSentDataRequestInfo) {
+	return func(info trace.TopicReaderSentDataRequestInfo) {
 		if d.Details()&trace.TopicReaderMessageEvents == 0 {
 			return
 		}
@@ -348,7 +453,13 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			Int("local_capacity", info.LocalBufferSizeAfterSent),
 		)
 	}
-	t.OnReaderReceiveDataResponse = func(
+}
+
+func onReaderReceiveDataResponse(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TopicReaderReceiveDataResponseStartInfo) func(trace.TopicReaderReceiveDataResponseDoneInfo) {
+	return func(
 		info trace.TopicReaderReceiveDataResponseStartInfo,
 	) func(trace.TopicReaderReceiveDataResponseDoneInfo) {
 		if d.Details()&trace.TopicReaderMessageEvents == 0 {
@@ -392,7 +503,13 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			}
 		}
 	}
-	t.OnReaderReadMessages = func(
+}
+
+func onReaderReadMessages(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TopicReaderReadMessagesStartInfo) func(doneInfo trace.TopicReaderReadMessagesDoneInfo) {
+	return func(
 		info trace.TopicReaderReadMessagesStartInfo,
 	) func(doneInfo trace.TopicReaderReadMessagesDoneInfo) {
 		if d.Details()&trace.TopicReaderMessageEvents == 0 {
@@ -426,7 +543,13 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			}
 		}
 	}
-	t.OnReaderUnknownGrpcMessage = func(info trace.OnReadUnknownGrpcMessageInfo) {
+}
+
+func onReaderUnknownGrpcMessage(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.OnReadUnknownGrpcMessageInfo) {
+	return func(info trace.OnReadUnknownGrpcMessageInfo) {
 		if d.Details()&trace.TopicReaderMessageEvents == 0 {
 			return
 		}
@@ -436,11 +559,13 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			String("reader_connection_id", info.ReaderConnectionID),
 		)
 	}
+}
 
-	///
-	/// Topic writer
-	///
-	t.OnWriterReconnect = func(
+func onWriterReconnect(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TopicWriterReconnectStartInfo) func(doneInfo trace.TopicWriterReconnectDoneInfo) {
+	return func(
 		info trace.TopicWriterReconnectStartInfo,
 	) func(doneInfo trace.TopicWriterReconnectDoneInfo) {
 		if d.Details()&trace.TopicWriterStreamLifeCycleEvents == 0 {
@@ -476,7 +601,13 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			}
 		}
 	}
-	t.OnWriterInitStream = func(
+}
+
+func onWriterInitStream(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TopicWriterInitStreamStartInfo) func(doneInfo trace.TopicWriterInitStreamDoneInfo) {
+	return func(
 		info trace.TopicWriterInitStreamStartInfo,
 	) func(doneInfo trace.TopicWriterInitStreamDoneInfo) {
 		if d.Details()&trace.TopicWriterStreamLifeCycleEvents == 0 {
@@ -512,7 +643,13 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			}
 		}
 	}
-	t.OnWriterClose = func(info trace.TopicWriterCloseStartInfo) func(doneInfo trace.TopicWriterCloseDoneInfo) {
+}
+
+func onWriterClose(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TopicWriterCloseStartInfo) func(doneInfo trace.TopicWriterCloseDoneInfo) {
+	return func(info trace.TopicWriterCloseStartInfo) func(doneInfo trace.TopicWriterCloseDoneInfo) {
 		if d.Details()&trace.TopicWriterStreamLifeCycleEvents == 0 {
 			return nil
 		}
@@ -541,7 +678,13 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			}
 		}
 	}
-	t.OnWriterCompressMessages = func(
+}
+
+func onWriterCompressMessages(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TopicWriterCompressMessagesStartInfo) func(doneInfo trace.TopicWriterCompressMessagesDoneInfo) {
+	return func(
 		info trace.TopicWriterCompressMessagesStartInfo,
 	) func(doneInfo trace.TopicWriterCompressMessagesDoneInfo) {
 		if d.Details()&trace.TopicWriterStreamEvents == 0 {
@@ -584,7 +727,13 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			}
 		}
 	}
-	t.OnWriterSendMessages = func(
+}
+
+func onWriterSendMessages(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TopicWriterSendMessagesStartInfo) func(doneInfo trace.TopicWriterSendMessagesDoneInfo) {
+	return func(
 		info trace.TopicWriterSendMessagesStartInfo,
 	) func(doneInfo trace.TopicWriterSendMessagesDoneInfo) {
 		if d.Details()&trace.TopicWriterStreamEvents == 0 {
@@ -623,7 +772,13 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			}
 		}
 	}
-	t.OnWriterReadUnknownGrpcMessage = func(info trace.TopicOnWriterReadUnknownGrpcMessageInfo) {
+}
+
+func onWriterReadUnknownGrpcMessage(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TopicOnWriterReadUnknownGrpcMessageInfo) {
+	return func(info trace.TopicOnWriterReadUnknownGrpcMessageInfo) {
 		if d.Details()&trace.TopicWriterStreamEvents == 0 {
 			return
 		}
@@ -634,6 +789,4 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 			String("session_id", info.SessionID),
 		)
 	}
-
-	return t
 }

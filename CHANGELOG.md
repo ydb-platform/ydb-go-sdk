@@ -1,3 +1,4 @@
+* Refactored `log/topic` and extract functions
 * Refactored `log/driver` and extract functions
 * Refactored `internal/table/scanner/scanner` and extract functions
 * Refactored `internal/table/scanner/scanner_test` and extract functions
