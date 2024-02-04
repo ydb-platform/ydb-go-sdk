@@ -1,3 +1,4 @@
+* Refactored `internal/table/scanner/scanner_test` and extract functions
 * Refactored `retry/sql_test` and extract function `sql_test.validateRetry, sql_test.withTestSelectOne` 
 * Refactored `internal/table/retry_test.go` and extract function `retry_test.checkResultsRetryWithCustomErrors`
 * Refactored `internal/topic/topicwriterinternal/queue_test` and extract functions
