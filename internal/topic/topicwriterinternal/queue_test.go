@@ -89,7 +89,16 @@ func TestMessageQueue_Close(t *testing.T) {
 
 func TestMessageQueue_GetMessages(t *testing.T) {
 	ctx := context.Background()
-	t.Run("Simple", func(t *testing.T) {
+	simple(ctx, t)
+	sendMessagesAfterStartWait(ctx, t)
+	stress(ctx, t)
+	closedContext(ctx, t)
+	callOnClosedQueue(ctx, t)
+	closeContextAfterCall(ctx, t)
+}
+
+func simple(ctx context.Context, t *testing.T) bool {
+	return t.Run("Simple", func(t *testing.T) {
 		q := newMessageQueue()
 		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 2)))
 		require.NoError(t, q.AddMessages(newTestMessagesWithContent(3, 4)))
@@ -98,27 +107,54 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, []int64{1, 2, 3, 4}, getSeqNumbers(messages))
 	})
+}
 
-	t.Run("SendMessagesAfterStartWait", func(t *testing.T) {
+func closeContextAfterCall(ctx context.Context, t *testing.T) bool {
+	return t.Run("CloseContextAfterCall", func(t *testing.T) {
 		q := newMessageQueue()
+		q.notifyNewMessages()
 
 		var err error
-		var messages []messageWithDataContent
-		gotMessages := make(empty.Chan)
+		gotErr := make(empty.Chan)
 		go func() {
-			messages, err = q.GetMessagesForSend(ctx)
-			close(gotMessages)
+			_, err = q.GetMessagesForSend(ctx)
+			close(gotErr)
 		}()
 
 		waitGetMessageStarted(&q)
-		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 2, 3)))
 
-		<-gotMessages
-		require.NoError(t, err)
-		require.Equal(t, []int64{1, 2, 3}, getSeqNumbers(messages))
+		testErr := errors.New("test")
+		require.NoError(t, q.Close(testErr))
+
+		<-gotErr
+		require.ErrorIs(t, err, testErr)
 	})
+}
 
-	t.Run("Stress", func(t *testing.T) {
+func callOnClosedQueue(ctx context.Context, t *testing.T) bool {
+	return t.Run("CallOnClosedQueue", func(t *testing.T) {
+		q := newMessageQueue()
+		_ = q.Close(errors.New("test"))
+		_, err := q.GetMessagesForSend(ctx)
+		require.Error(t, err)
+	})
+}
+
+func closedContext(ctx context.Context, t *testing.T) bool {
+	return t.Run("ClosedContext", func(t *testing.T) {
+		closedCtx, cancel := xcontext.WithCancel(ctx)
+		cancel()
+
+		q := newMessageQueue()
+		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 2)))
+
+		_, err := q.GetMessagesForSend(closedCtx)
+		require.ErrorIs(t, err, context.Canceled)
+	})
+}
+
+func stress(ctx context.Context, t *testing.T) bool {
+	return t.Run("Stress", func(t *testing.T) {
 		iterations := 100000
 		q := newMessageQueue()
 
@@ -126,20 +162,7 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 		sendFinished := make(empty.Chan)
 		fatalChan := make(chan string)
 
-		go func() {
-			//nolint:gosec
-			sendRand := rand.New(rand.NewSource(0))
-			for i := 0; i < iterations; i++ {
-				count := sendRand.Intn(10) + 1
-				var m []messageWithDataContent
-				for k := 0; k < count; k++ {
-					number := int(atomic.AddInt64(&lastSentSeqNo, 1))
-					m = append(m, newTestMessageWithDataContent(number))
-				}
-				require.NoError(t, q.AddMessages(m))
-			}
-			close(sendFinished)
-		}()
+		go sendMessage(t, iterations, lastSentSeqNo, &q, sendFinished)
 
 		readFinished := make(empty.Chan)
 		var lastReadSeqNo xatomic.Int64
@@ -194,43 +217,41 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 			}
 		}
 	})
+}
 
-	t.Run("ClosedContext", func(t *testing.T) {
-		closedCtx, cancel := xcontext.WithCancel(ctx)
-		cancel()
+func sendMessage(t *testing.T, iterations int, lastSentSeqNo int64, q *messageQueue, sendFinished empty.Chan) {
+	//nolint:gosec
+	sendRand := rand.New(rand.NewSource(0))
+	for i := 0; i < iterations; i++ {
+		count := sendRand.Intn(10) + 1
+		var m []messageWithDataContent
+		for k := 0; k < count; k++ {
+			number := int(atomic.AddInt64(&lastSentSeqNo, 1))
+			m = append(m, newTestMessageWithDataContent(number))
+		}
+		require.NoError(t, q.AddMessages(m))
+	}
+	close(sendFinished)
+}
 
+func sendMessagesAfterStartWait(ctx context.Context, t *testing.T) bool {
+	return t.Run("SendMessagesAfterStartWait", func(t *testing.T) {
 		q := newMessageQueue()
-		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 2)))
-
-		_, err := q.GetMessagesForSend(closedCtx)
-		require.ErrorIs(t, err, context.Canceled)
-	})
-
-	t.Run("CallOnClosedQueue", func(t *testing.T) {
-		q := newMessageQueue()
-		_ = q.Close(errors.New("test"))
-		_, err := q.GetMessagesForSend(ctx)
-		require.Error(t, err)
-	})
-
-	t.Run("CloseContextAfterCall", func(t *testing.T) {
-		q := newMessageQueue()
-		q.notifyNewMessages()
 
 		var err error
-		gotErr := make(empty.Chan)
+		var messages []messageWithDataContent
+		gotMessages := make(empty.Chan)
 		go func() {
-			_, err = q.GetMessagesForSend(ctx)
-			close(gotErr)
+			messages, err = q.GetMessagesForSend(ctx)
+			close(gotMessages)
 		}()
 
 		waitGetMessageStarted(&q)
+		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 2, 3)))
 
-		testErr := errors.New("test")
-		require.NoError(t, q.Close(testErr))
-
-		<-gotErr
-		require.ErrorIs(t, err, testErr)
+		<-gotMessages
+		require.NoError(t, err)
+		require.Equal(t, []int64{1, 2, 3}, getSeqNumbers(messages))
 	})
 }
 
