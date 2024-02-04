@@ -26,6 +26,7 @@ func (s *Series) BeforeCreate(_ *gorm.DB) (err error) {
 	for i := range s.Seasons {
 		s.Seasons[i].SeriesID = s.ID
 	}
+
 	return
 }
 
@@ -48,6 +49,7 @@ func (s *Season) BeforeCreate(_ *gorm.DB) (err error) {
 	for i := range s.Episodes {
 		s.Episodes[i].SeasonID = s.ID
 	}
+
 	return
 }
 
@@ -64,5 +66,6 @@ func (e *Episode) BeforeCreate(_ *gorm.DB) (err error) {
 		return err
 	}
 	e.ID = id.String()
+
 	return
 }

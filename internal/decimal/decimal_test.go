@@ -61,6 +61,7 @@ func uint128(hi, lo uint64) []byte {
 	p := make([]byte, 16)
 	binary.BigEndian.PutUint64(p[:8], hi)
 	binary.BigEndian.PutUint64(p[8:], lo)
+
 	return p
 }
 

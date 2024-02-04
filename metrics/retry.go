@@ -17,6 +17,7 @@ func retry(config Config) (t trace.Retry) {
 			return nil
 		}
 		start := time.Now()
+
 		return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 			if info.Error != nil && config.Details()&trace.RetryEvents != 0 {
 				errs.With(map[string]string{
@@ -25,6 +26,7 @@ func retry(config Config) (t trace.Retry) {
 					"final":       "false",
 				}).Inc()
 			}
+
 			return func(info trace.RetryLoopDoneInfo) {
 				if config.Details()&trace.RetryEvents != 0 {
 					attempts.With(map[string]string{
@@ -42,5 +44,6 @@ func retry(config Config) (t trace.Retry) {
 			}
 		}
 	}
+
 	return t
 }

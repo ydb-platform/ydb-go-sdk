@@ -43,6 +43,7 @@ func AlterWithSupportedCodecs(codecs ...topictypes.Codec) AlterOption {
 	sort.Slice(codecs, func(i, j int) bool {
 		return codecs[i] < codecs[j]
 	})
+
 	return withSupportedCodecs(codecs)
 }
 
@@ -66,12 +67,14 @@ func AlterWithAddConsumers(consumers ...topictypes.Consumer) AlterOption {
 	sort.Slice(consumers, func(i, j int) bool {
 		return consumers[i].Name < consumers[j].Name
 	})
+
 	return withAddConsumers(consumers)
 }
 
 // AlterWithDropConsumers drop consumer from the topic
 func AlterWithDropConsumers(consumersName ...string) AlterOption {
 	sort.Strings(consumersName)
+
 	return withDropConsumers(consumersName)
 }
 
@@ -96,6 +99,7 @@ func AlterConsumerWithSupportedCodecs(name string, codecs []topictypes.Codec) Al
 	sort.Slice(codecs, func(i, j int) bool {
 		return codecs[i] < codecs[j]
 	})
+
 	return withConsumerWithSupportedCodecs{
 		name:   name,
 		codecs: codecs,
@@ -123,5 +127,6 @@ func ensureAlterConsumer(
 		}
 	}
 	consumers = append(consumers, rawtopic.AlterConsumer{Name: name})
+
 	return consumers, len(consumers) - 1
 }

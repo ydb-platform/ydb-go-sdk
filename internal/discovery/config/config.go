@@ -34,6 +34,7 @@ func New(opts ...Option) *Config {
 			o(c)
 		}
 	}
+
 	return c
 }
 

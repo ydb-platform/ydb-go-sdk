@@ -23,6 +23,7 @@ func (errs joinError) Error() string {
 		_, _ = fmt.Fprintf(b, "%q", err.Error())
 	}
 	b.WriteByte(']')
+
 	return b.String()
 }
 
@@ -32,6 +33,7 @@ func (errs joinError) As(target interface{}) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -41,6 +43,7 @@ func (errs joinError) Is(target error) bool {
 			return true
 		}
 	}
+
 	return false
 }
 

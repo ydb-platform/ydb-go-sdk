@@ -27,6 +27,7 @@ func TestSendWriteRequest(t *testing.T) {
 		var send sendFunc = func(req *Ydb_Topic.StreamWriteMessage_FromClient) error {
 			sendCounter++
 			require.Equal(t, expected, req.ClientMessage)
+
 			return nil
 		}
 		err := sendWriteRequest(send, expected)
@@ -86,6 +87,7 @@ func TestSendWriteRequest(t *testing.T) {
 			switch sendCounter {
 			case 1:
 				require.Equal(t, originalMessage, req)
+
 				return grpcStatus.Error(codes.ResourceExhausted, "test resource exhausted")
 			case 2:
 				require.Equal(t, split1, req)
@@ -94,6 +96,7 @@ func TestSendWriteRequest(t *testing.T) {
 			default:
 				t.Fatal()
 			}
+
 			return nil
 		}
 

@@ -106,6 +106,7 @@ func TestSessionDescribeTable(t *testing.T) {
 					testutil.TableDescribeTable: func(interface{}) (proto.Message, error) {
 						r := &Ydb_Table.DescribeTableResult{}
 						proto.Merge(r, result)
+
 						return r, e
 					},
 				},
@@ -470,6 +471,7 @@ func TestCreateTableRegression(t *testing.T) {
 						//nolint:revive
 						return nil, fmt.Errorf("proto's not equal: \n\nact: %v\n\nexp: %s\n\n", act, exp)
 					}
+
 					return &Ydb_Table.CreateTableResponse{}, nil
 				},
 			},
@@ -581,6 +583,7 @@ func TestDescribeTableRegression(t *testing.T) {
 
 	err = client.Do(ctx, func(ctx context.Context, s table.Session) (err error) {
 		act, err = s.DescribeTable(ctx, "episodes")
+
 		return err
 	})
 
@@ -641,6 +644,7 @@ func (mock *copyTablesMock) CopyTables(
 	if in.String() == mock.String() {
 		return &Ydb_Table.CopyTablesResponse{}, nil
 	}
+
 	return nil, fmt.Errorf("%w: %s, exp: %s", errUnexpectedRequest, in, mock.String())
 }
 

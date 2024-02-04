@@ -19,5 +19,6 @@ func ExtractLocalDC(ctx context.Context) string {
 		}
 		return res
 	}
+
 	return ""
 }

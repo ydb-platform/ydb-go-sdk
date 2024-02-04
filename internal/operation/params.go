@@ -25,6 +25,7 @@ func Params(
 	if timeout == 0 && cancelAfter == 0 && mode == 0 {
 		return nil
 	}
+
 	return &Ydb_Operations.OperationParams{
 		OperationMode:    mode.toYDB(),
 		OperationTimeout: timeoutParam(timeout),

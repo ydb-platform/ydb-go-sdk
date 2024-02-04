@@ -111,6 +111,7 @@ type boolAllocator struct {
 func (a *boolAllocator) Bool() (v *Ydb.Value_BoolValue) {
 	v = boolPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -129,6 +130,7 @@ type bytesAllocator struct {
 func (a *bytesAllocator) Bytes() (v *Ydb.Value_BytesValue) {
 	v = bytesPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -147,6 +149,7 @@ type decimalAllocator struct {
 func (a *decimalAllocator) Decimal() (v *Ydb.DecimalType) {
 	v = decimalPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -165,6 +168,7 @@ type dictAllocator struct {
 func (a *dictAllocator) Dict() (v *Ydb.DictType) {
 	v = dictPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -183,6 +187,7 @@ type doubleAllocator struct {
 func (a *doubleAllocator) Double() (v *Ydb.Value_DoubleValue) {
 	v = doublePool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -201,6 +206,7 @@ type floatAllocator struct {
 func (a *floatAllocator) Float() (v *Ydb.Value_FloatValue) {
 	v = floatPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -219,6 +225,7 @@ type int32Allocator struct {
 func (a *int32Allocator) Int32() (v *Ydb.Value_Int32Value) {
 	v = int32Pool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -237,6 +244,7 @@ type int64Allocator struct {
 func (a *int64Allocator) Int64() (v *Ydb.Value_Int64Value) {
 	v = int64Pool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -255,6 +263,7 @@ type listAllocator struct {
 func (a *listAllocator) List() (v *Ydb.ListType) {
 	v = listPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -273,6 +282,7 @@ type low128Allocator struct {
 func (a *low128Allocator) Low128() (v *Ydb.Value_Low_128) {
 	v = low128Pool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -291,6 +301,7 @@ type nestedAllocator struct {
 func (a *nestedAllocator) Nested() (v *Ydb.Value_NestedValue) {
 	v = nestedPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -309,6 +320,7 @@ type nullFlagAllocator struct {
 func (a *nullFlagAllocator) NullFlag() (v *Ydb.Value_NullFlagValue) {
 	v = nullFlagPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -327,6 +339,7 @@ type optionalAllocator struct {
 func (a *optionalAllocator) Optional() (v *Ydb.OptionalType) {
 	v = optionalPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -345,6 +358,7 @@ type pairAllocator struct {
 func (a *pairAllocator) Pair() (v *Ydb.ValuePair) {
 	v = pairPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -366,6 +380,7 @@ func (a *structAllocator) Struct() (v *Ydb.StructType) {
 		v.Members = make([]*Ydb.StructMember, 0, 10)
 	}
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -389,6 +404,7 @@ type structMemberAllocator struct {
 func (a *structMemberAllocator) StructMember() (v *Ydb.StructMember) {
 	v = structMemberPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -407,6 +423,7 @@ type textAllocator struct {
 func (a *textAllocator) Text() (v *Ydb.Value_TextValue) {
 	v = textPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -425,6 +442,7 @@ type tupleAllocator struct {
 func (a *tupleAllocator) Tuple() (v *Ydb.TupleType) {
 	v = tuplePool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -448,6 +466,7 @@ type typeDecimalAllocator struct {
 func (a *typeDecimalAllocator) TypeDecimal() (v *Ydb.Type_DecimalType) {
 	v = typeDecimalPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -466,6 +485,7 @@ type typeDictAllocator struct {
 func (a *typeDictAllocator) TypeDict() (v *Ydb.Type_DictType) {
 	v = typeDictPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -484,6 +504,7 @@ type typeEmptyListAllocator struct {
 func (a *typeEmptyListAllocator) TypeEmptyList() (v *Ydb.Type_EmptyListType) {
 	v = typeEmptyListPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -502,6 +523,7 @@ type typeEmptyDictAllocator struct {
 func (a *typeEmptyDictAllocator) TypeEmptyDict() (v *Ydb.Type_EmptyDictType) {
 	v = typeEmptyDictPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -520,6 +542,7 @@ type typeAllocator struct {
 func (a *typeAllocator) Type() (v *Ydb.Type) {
 	v = typePool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -538,6 +561,7 @@ type typeListAllocator struct {
 func (a *typeListAllocator) TypeList() (v *Ydb.Type_ListType) {
 	v = typeListPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -556,6 +580,7 @@ type typeOptionalAllocator struct {
 func (a *typeOptionalAllocator) TypeOptional() (v *Ydb.Type_OptionalType) {
 	v = typeOptionalPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -574,6 +599,7 @@ type typeStructAllocator struct {
 func (a *typeStructAllocator) TypeStruct() (v *Ydb.Type_StructType) {
 	v = typeStructPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -592,6 +618,7 @@ type typeTupleAllocator struct {
 func (a *typeTupleAllocator) TypeTuple() (v *Ydb.Type_TupleType) {
 	v = typeTuplePool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -610,6 +637,7 @@ type typeVariantAllocator struct {
 func (a *typeVariantAllocator) TypeVariant() (v *Ydb.Type_VariantType) {
 	v = typeVariantPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -628,6 +656,7 @@ type typedValueAllocator struct {
 func (a *typedValueAllocator) TypedValue() (v *Ydb.TypedValue) {
 	v = typedValuePool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -646,6 +675,7 @@ type uint32Allocator struct {
 func (a *uint32Allocator) Uint32() (v *Ydb.Value_Uint32Value) {
 	v = uint32Pool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -664,6 +694,7 @@ type uint64Allocator struct {
 func (a *uint64Allocator) Uint64() (v *Ydb.Value_Uint64Value) {
 	v = uint64Pool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -682,6 +713,7 @@ type valueAllocator struct {
 func (a *valueAllocator) Value() (v *Ydb.Value) {
 	v = valuePool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -710,6 +742,7 @@ type variantAllocator struct {
 func (a *variantAllocator) Variant() (v *Ydb.VariantType) {
 	v = variantPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -727,6 +760,7 @@ type variantStructItemsAllocator struct {
 func (a *variantStructItemsAllocator) VariantStructItems() (v *Ydb.VariantType_StructItems) {
 	v = variantStructItemsPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -744,6 +778,7 @@ type variantTupleItemsAllocator struct {
 func (a *variantTupleItemsAllocator) VariantTupleItems() (v *Ydb.VariantType_TupleItems) {
 	v = variantTupleItemsPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -761,6 +796,7 @@ type tableExecuteQueryResultAllocator struct {
 func (a *tableExecuteQueryResultAllocator) TableExecuteQueryResult() (v *Ydb_Table.ExecuteQueryResult) {
 	v = tableExecuteQueryResultPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -779,6 +815,7 @@ type tableExecuteQueryRequestAllocator struct {
 func (a *tableExecuteQueryRequestAllocator) TableExecuteDataQueryRequest() (v *Ydb_Table.ExecuteDataQueryRequest) {
 	v = tableExecuteDataQueryRequestPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -797,6 +834,7 @@ type tableQueryCachePolicyAllocator struct {
 func (a *tableQueryCachePolicyAllocator) TableQueryCachePolicy() (v *Ydb_Table.QueryCachePolicy) {
 	v = tableQueryCachePolicyPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -815,6 +853,7 @@ type tableQueryAllocator struct {
 func (a *tableQueryAllocator) TableQuery() (v *Ydb_Table.Query) {
 	v = tableQueryPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -834,6 +873,7 @@ func (a *tableQueryYqlTextAllocator) TableQueryYqlText(s string) (v *Ydb_Table.Q
 	v = tableQueryYqlTextPool.Get()
 	v.YqlText = s
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -852,6 +892,7 @@ func (a *tableQueryIDAllocator) TableQueryID(id string) (v *Ydb_Table.Query_Id) 
 	v = tableQueryIDPool.Get()
 	v.Id = id
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -870,6 +911,7 @@ func (p *Pool[T]) Get() *T {
 		var zero T
 		v = &zero
 	}
+
 
 	val, ok := v.(*T)
 	if !ok {

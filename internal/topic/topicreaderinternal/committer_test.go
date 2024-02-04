@@ -24,6 +24,7 @@ func TestCommitterCommit(t *testing.T) {
 		c := newTestCommitter(ctx, t)
 		c.send = func(msg rawtopicreader.ClientMessage) error {
 			t.Fatalf("must not call")
+
 			return nil
 		}
 
@@ -66,6 +67,7 @@ func TestCommitterCommitAsync(t *testing.T) {
 					CommitOffsets: testNewCommitRanges(&cRange).toPartitionsOffsets(),
 				},
 				msg)
+
 			return nil
 		}
 		require.NoError(t, c.Commit(ctx, cRange))
@@ -98,6 +100,7 @@ func TestCommitterCommitSync(t *testing.T) {
 				},
 				msg)
 			c.OnCommitNotify(session, cRange.commitOffsetEnd)
+
 			return nil
 		}
 		require.NoError(t, c.Commit(ctx, cRange))
@@ -122,6 +125,7 @@ func TestCommitterCommitSync(t *testing.T) {
 		c.mode = CommitModeSync
 		c.send = func(msg rawtopicreader.ClientMessage) error {
 			close(commitSended)
+
 			return nil
 		}
 
@@ -202,6 +206,7 @@ func TestCommitterBuffer(t *testing.T) {
 		c.clock = clock
 		c.send = func(msg rawtopicreader.ClientMessage) error {
 			close(sendCalled)
+
 			return nil
 		}
 
@@ -234,6 +239,7 @@ func TestCommitterBuffer(t *testing.T) {
 			commitMess := val
 			require.Len(t, commitMess.CommitOffsets, 2)
 			close(sendCalled)
+
 			return nil
 		}
 
@@ -270,6 +276,7 @@ func TestCommitterBuffer(t *testing.T) {
 
 			require.Len(t, commitMess.CommitOffsets, 4)
 			close(sendCalled)
+
 			return nil
 		}
 		c.commits.appendCommitRanges([]commitRange{
@@ -308,6 +315,7 @@ func TestCommitterBuffer(t *testing.T) {
 
 			require.Len(t, commitMess.CommitOffsets, 4)
 			close(sendCalled)
+
 			return nil
 		}
 
@@ -343,6 +351,7 @@ func TestCommitterBuffer(t *testing.T) {
 		sendCalled := make(empty.Chan)
 		c.send = func(msg rawtopicreader.ClientMessage) error {
 			close(sendCalled)
+
 			return nil
 		}
 		_, err := c.pushCommit(commitRange{partitionSession: &partitionSession{}})
@@ -357,6 +366,7 @@ func TestCommitterBuffer(t *testing.T) {
 		c := newTestCommitter(ctx, t)
 		c.send = func(msg rawtopicreader.ClientMessage) error {
 			t.Fatal()
+
 			return nil
 		}
 		c.commitLoopSignal <- empty.Struct{} // to buffer
@@ -370,6 +380,7 @@ func TestCommitterBuffer(t *testing.T) {
 		sendCalled := false
 		c.send = func(msg rawtopicreader.ClientMessage) error {
 			sendCalled = true
+
 			return nil
 		}
 		c.commits.appendCommitRange(commitRange{partitionSession: &partitionSession{}})
@@ -387,5 +398,6 @@ func newTestCommitter(ctx context.Context, t testing.TB) *committer {
 			require.ErrorIs(t, err, background.ErrAlreadyClosed)
 		}
 	})
+
 	return res
 }

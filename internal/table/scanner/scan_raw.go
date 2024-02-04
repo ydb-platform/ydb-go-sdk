@@ -23,6 +23,7 @@ type rawConverter struct {
 
 func (s *rawConverter) String() (v []byte) {
 	s.unwrap()
+
 	return s.bytes()
 }
 
@@ -37,6 +38,7 @@ func (s *rawConverter) HasNextItem() bool {
 func (s *rawConverter) Path() string {
 	var buf bytes.Buffer
 	_, _ = s.WritePathTo(&buf)
+
 	return buf.String()
 }
 
@@ -62,6 +64,7 @@ func (s *rawConverter) WritePathTo(w io.Writer) (n int64, err error) {
 		}
 		n += int64(m)
 	}
+
 	return n, nil
 }
 
@@ -74,6 +77,7 @@ func (s *rawConverter) Bool() (v bool) {
 		return
 	}
 	s.unwrap()
+
 	return s.bool()
 }
 
@@ -82,6 +86,7 @@ func (s *rawConverter) Int8() (v int8) {
 		return
 	}
 	s.unwrap()
+
 	return s.int8()
 }
 
@@ -90,6 +95,7 @@ func (s *rawConverter) Uint8() (v uint8) {
 		return
 	}
 	s.unwrap()
+
 	return s.uint8()
 }
 
@@ -98,6 +104,7 @@ func (s *rawConverter) Int16() (v int16) {
 		return
 	}
 	s.unwrap()
+
 	return s.int16()
 }
 
@@ -106,6 +113,7 @@ func (s *rawConverter) Uint16() (v uint16) {
 		return
 	}
 	s.unwrap()
+
 	return s.uint16()
 }
 
@@ -114,6 +122,7 @@ func (s *rawConverter) Int32() (v int32) {
 		return
 	}
 	s.unwrap()
+
 	return s.int32()
 }
 
@@ -122,6 +131,7 @@ func (s *rawConverter) Uint32() (v uint32) {
 		return
 	}
 	s.unwrap()
+
 	return s.uint32()
 }
 
@@ -130,6 +140,7 @@ func (s *rawConverter) Int64() (v int64) {
 		return
 	}
 	s.unwrap()
+
 	return s.int64()
 }
 
@@ -138,6 +149,7 @@ func (s *rawConverter) Uint64() (v uint64) {
 		return
 	}
 	s.unwrap()
+
 	return s.uint64()
 }
 
@@ -146,6 +158,7 @@ func (s *rawConverter) Float() (v float32) {
 		return
 	}
 	s.unwrap()
+
 	return s.float()
 }
 
@@ -154,26 +167,31 @@ func (s *rawConverter) Double() (v float64) {
 		return
 	}
 	s.unwrap()
+
 	return s.double()
 }
 
 func (s *rawConverter) Date() (v time.Time) {
 	s.unwrap()
+
 	return value.DateToTime(s.uint32())
 }
 
 func (s *rawConverter) Datetime() (v time.Time) {
 	s.unwrap()
+
 	return value.DatetimeToTime(s.uint32())
 }
 
 func (s *rawConverter) Timestamp() (v time.Time) {
 	s.unwrap()
+
 	return value.TimestampToTime(s.uint64())
 }
 
 func (s *rawConverter) Interval() (v time.Duration) {
 	s.unwrap()
+
 	return value.IntervalToDuration(s.int64())
 }
 
@@ -186,6 +204,7 @@ func (s *rawConverter) TzDate() (v time.Time) {
 	if err != nil {
 		_ = s.errorf(0, "rawConverter.TzDate(): %w", err)
 	}
+
 	return src
 }
 
@@ -198,6 +217,7 @@ func (s *rawConverter) TzDatetime() (v time.Time) {
 	if err != nil {
 		_ = s.errorf(0, "rawConverter.TzDatetime(): %w", err)
 	}
+
 	return src
 }
 
@@ -210,6 +230,7 @@ func (s *rawConverter) TzTimestamp() (v time.Time) {
 	if err != nil {
 		_ = s.errorf(0, "rawConverter.TzTimestamp(): %w", err)
 	}
+
 	return src
 }
 
@@ -218,21 +239,25 @@ func (s *rawConverter) UTF8() (v string) {
 		return
 	}
 	s.unwrap()
+
 	return s.text()
 }
 
 func (s *rawConverter) YSON() (v []byte) {
 	s.unwrap()
+
 	return s.bytes()
 }
 
 func (s *rawConverter) JSON() (v []byte) {
 	s.unwrap()
+
 	return xstring.ToBytes(s.text())
 }
 
 func (s *rawConverter) JSONDocument() (v []byte) {
 	s.unwrap()
+
 	return xstring.ToBytes(s.text())
 }
 
@@ -241,6 +266,7 @@ func (s *rawConverter) UUID() (v [16]byte) {
 		return
 	}
 	s.unwrap()
+
 	return s.uint128()
 }
 
@@ -249,6 +275,7 @@ func (s *rawConverter) DyNumber() (v string) {
 		return
 	}
 	s.unwrap()
+
 	return s.text()
 }
 
@@ -262,6 +289,7 @@ func (s *rawConverter) Value() types.Value {
 		return nil
 	}
 	s.unwrap()
+
 	return s.value()
 }
 
@@ -280,6 +308,7 @@ func (s *rawConverter) IsNull() bool {
 	if s.Err() != nil {
 		return false
 	}
+
 	return s.isNull()
 }
 
@@ -287,6 +316,7 @@ func (s *rawConverter) IsOptional() bool {
 	if s.Err() != nil {
 		return false
 	}
+
 	return s.isCurrentTypeOptional()
 }
 
@@ -300,6 +330,7 @@ func (s *rawConverter) ListIn() (size int) {
 	if s.assertTypeList(x.t) != nil {
 		return s.itemsIn()
 	}
+
 	return 0
 }
 
@@ -338,6 +369,7 @@ func (s *rawConverter) TupleIn() (size int) {
 	if s.assertTypeTuple(x.t) != nil {
 		return s.itemsIn()
 	}
+
 	return 0
 }
 
@@ -376,6 +408,7 @@ func (s *rawConverter) StructIn() (size int) {
 	if s.assertTypeStruct(x.t) != nil {
 		return s.itemsIn()
 	}
+
 	return 0
 }
 
@@ -397,6 +430,7 @@ func (s *rawConverter) StructField(i int) (name string) {
 			v:    p.v.Items[i],
 		})
 	}
+
 	return
 }
 
@@ -418,6 +452,7 @@ func (s *rawConverter) DictIn() (size int) {
 	if s.assertTypeDict(x.t) != nil {
 		return s.pairsIn()
 	}
+
 	return 0
 }
 
@@ -486,6 +521,7 @@ func (s *rawConverter) Variant() (name string, index uint32) {
 		t:    typ,
 		v:    v,
 	})
+
 	return name, index
 }
 
@@ -518,6 +554,7 @@ func (s *rawConverter) Decimal(t types.Type) (v [16]byte) {
 	if !s.assertCurrentTypeDecimal(t) {
 		return
 	}
+
 	return s.uint128()
 }
 
@@ -530,6 +567,7 @@ func (s *rawConverter) UnwrapDecimal() (v types.Decimal) {
 	if d == nil {
 		return
 	}
+
 	return types.Decimal{
 		Bytes:     s.uint128(),
 		Precision: d.DecimalType.Precision,
@@ -541,20 +579,24 @@ func (s *rawConverter) IsDecimal() bool {
 	if s.Err() != nil {
 		return false
 	}
+
 	return s.isCurrentTypeDecimal()
 }
 
 func isEqualDecimal(d *Ydb.DecimalType, t types.Type) bool {
+
 	val, ok := t.(*value.DecimalType)
 	if !ok {
 		panic(fmt.Sprintf("unsupported type conversion from %T to  *value.DecimalType", val))
 	}
 	return d.Precision == val.Precision && d.Scale == val.Scale
+
 }
 
 func (s *rawConverter) isCurrentTypeDecimal() bool {
 	c := s.stack.current()
 	_, ok := c.t.Type.(*Ydb.Type_DecimalType)
+
 	return ok
 }
 
@@ -564,16 +606,20 @@ func (s *rawConverter) unwrapVariantType(typ *Ydb.Type_VariantType, index uint32
 	case *Ydb.VariantType_TupleItems:
 		if i >= len(x.TupleItems.Elements) {
 			_ = s.errorf(0, "unimplemented")
+
 			return
 		}
+
 		return "", x.TupleItems.Elements[i]
 
 	case *Ydb.VariantType_StructItems:
 		if i >= len(x.StructItems.Members) {
 			_ = s.errorf(0, "unimplemented")
+
 			return
 		}
 		m := x.StructItems.Members[i]
+
 		return m.Name, m.Type
 
 	default:
@@ -588,6 +634,7 @@ func (s *rawConverter) variant() (v *Ydb.Value, index uint32) {
 	}
 	x := s.stack.current() // Is not nil if unwrapValue succeeded.
 	index = x.v.VariantIndex
+
 	return
 }
 
@@ -597,6 +644,7 @@ func (s *rawConverter) itemsIn() int {
 		return -1
 	}
 	s.stack.enter()
+
 	return len(x.v.Items)
 }
 
@@ -614,6 +662,7 @@ func (s *rawConverter) pairsIn() int {
 		return -1
 	}
 	s.stack.enter()
+
 	return len(x.v.Pairs)
 }
 
@@ -628,8 +677,10 @@ func (s *rawConverter) pairsBoundsCheck(xs []*Ydb.ValuePair, i int) bool {
 func (s *rawConverter) boundsCheck(n, i int) bool {
 	if i < 0 || n <= i {
 		s.boundsError(n, i)
+
 		return false
 	}
+
 	return true
 }
 
@@ -638,6 +689,7 @@ func (s *scanner) assertTypeOptional(typ *Ydb.Type) (t *Ydb.Type_OptionalType) {
 	if t, _ = x.(*Ydb.Type_OptionalType); t == nil {
 		s.typeError(x, t)
 	}
+
 	return
 }
 
@@ -659,6 +711,7 @@ func (s *rawConverter) assertCurrentTypeNullable() bool {
 		c.t,
 		p.t,
 	)
+
 	return false
 }
 
@@ -674,8 +727,10 @@ func (s *rawConverter) assertCurrentTypeIs(t types.Type) bool {
 			act,
 			t,
 		)
+
 		return false
 	}
+
 	return true
 }
 
@@ -686,8 +741,10 @@ func (s *rawConverter) assertCurrentTypeDecimal(t types.Type) bool {
 	}
 	if !isEqualDecimal(d.DecimalType, t) {
 		s.decimalTypeError(t)
+
 		return false
 	}
+
 	return true
 }
 
@@ -696,6 +753,7 @@ func (s *rawConverter) assertTypeList(typ *Ydb.Type) (t *Ydb.Type_ListType) {
 	if t, _ = x.(*Ydb.Type_ListType); t == nil {
 		s.typeError(x, t)
 	}
+
 	return
 }
 
@@ -704,6 +762,7 @@ func (s *rawConverter) assertTypeTuple(typ *Ydb.Type) (t *Ydb.Type_TupleType) {
 	if t, _ = x.(*Ydb.Type_TupleType); t == nil {
 		s.typeError(x, t)
 	}
+
 	return
 }
 
@@ -712,6 +771,7 @@ func (s *rawConverter) assertTypeStruct(typ *Ydb.Type) (t *Ydb.Type_StructType) 
 	if t, _ = x.(*Ydb.Type_StructType); t == nil {
 		s.typeError(x, t)
 	}
+
 	return
 }
 
@@ -720,6 +780,7 @@ func (s *rawConverter) assertTypeDict(typ *Ydb.Type) (t *Ydb.Type_DictType) {
 	if t, _ = x.(*Ydb.Type_DictType); t == nil {
 		s.typeError(x, t)
 	}
+
 	return
 }
 
@@ -728,6 +789,7 @@ func (s *rawConverter) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.Type_DecimalType
 	if t, _ = x.(*Ydb.Type_DecimalType); t == nil {
 		s.typeError(x, t)
 	}
+
 	return
 }
 
@@ -736,6 +798,7 @@ func (s *rawConverter) assertTypeVariant(typ *Ydb.Type) (t *Ydb.Type_VariantType
 	if t, _ = x.(*Ydb.Type_VariantType); t == nil {
 		s.typeError(x, t)
 	}
+
 	return
 }
 
@@ -763,5 +826,6 @@ func nameIface(v interface{}) string {
 	s = strings.TrimSuffix(s, "Value")
 	s = strings.TrimPrefix(s, "*Ydb.Type_")
 	s = strings.TrimSuffix(s, "Type")
+
 	return s
 }

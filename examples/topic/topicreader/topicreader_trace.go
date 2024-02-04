@@ -44,6 +44,7 @@ func ExplicitPartitionStartStopHandler(ctx context.Context, db *ydb.Driver) {
 					if err != nil {
 						stopReader()
 					}
+
 					return nil
 				},
 				OnReaderPartitionReadStopResponse: func(
@@ -57,6 +58,7 @@ func ExplicitPartitionStartStopHandler(ctx context.Context, db *ydb.Driver) {
 							stopReader()
 						}
 					}
+
 					return nil
 				},
 			},
@@ -107,6 +109,7 @@ func PartitionStartStopHandlerAndOwnReadProgressStorage(ctx context.Context, db 
 		if err != nil {
 			stopReader()
 		}
+
 		return nil
 	}
 
@@ -121,6 +124,7 @@ func PartitionStartStopHandlerAndOwnReadProgressStorage(ctx context.Context, db 
 				stopReader()
 			}
 		}
+
 		return nil
 	}
 

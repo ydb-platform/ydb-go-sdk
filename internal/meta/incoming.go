@@ -20,6 +20,7 @@ func WithTrailerCallback(ctx context.Context, callback MetadataCallback) context
 			},
 		))
 	}
+
 	return context.WithValue(ctx, metadataCallbackKey{}, callback)
 }
 

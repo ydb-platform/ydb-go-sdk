@@ -508,5 +508,6 @@ func mustNewBatch(session *partitionSession, messages []*PublicMessage) *PublicB
 	if err != nil {
 		panic(err)
 	}
+
 	return batch
 }
