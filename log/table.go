@@ -14,9 +14,37 @@ func Table(l Logger, d trace.Detailer, opts ...Option) (t trace.Table) {
 	return internalTable(wrapLogger(l, opts...), d)
 }
 
-//nolint:gocyclo
 func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
-	t.OnDo = func(
+	t.OnDo = onDo(l, d)
+	t.OnDoTx = onDoTx(l, d)
+	t.OnCreateSession = onCreateSession(l, d)
+	t.OnSessionNew = onSessionNew(l, d)
+	t.OnSessionDelete = onSessionDelete(l, d)
+	t.OnSessionKeepAlive = onSessionKeepAlive(l, d)
+	t.OnSessionQueryPrepare = onSessionQueryPrepare(l, d)
+	t.OnSessionQueryExecute = onSessionQueryExecute(l, d)
+	t.OnSessionQueryStreamExecute = onSessionQueryStreamExecute(l, d)
+	t.OnSessionQueryStreamRead = onSessionQueryStreamRead(l, d)
+	t.OnSessionTransactionBegin = onSessionTransactionBegin(l, d)
+	t.OnSessionTransactionCommit = onSessionTransactionCommit(l, d)
+	t.OnSessionTransactionRollback = OnSessionTransactionRollback(l, d)
+	t.OnInit = onInitInternalTable(l, d)
+	t.OnClose = onCloseInternalTable(l, d)
+	t.OnPoolStateChange = onPoolStateChange(l, d)
+	t.OnPoolSessionAdd = onPoolSessionAdd(l, d)
+	t.OnPoolSessionRemove = onPoolSessionRemove(l, d)
+	t.OnPoolPut = onPoolPut(l, d)
+	t.OnPoolGet = onPoolGet(l, d)
+	t.OnPoolWait = onPoolWait(l, d)
+
+	return t
+}
+
+func onDo(
+	l *wrapper,
+	d trace.Detailer,
+) func(info trace.TableDoStartInfo) func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
+	return func(
 		info trace.TableDoStartInfo,
 	) func(
 		info trace.TableDoIntermediateInfo,
@@ -89,7 +117,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-	t.OnDoTx = func(
+}
+
+func onDoTx(
+	l *wrapper,
+	d trace.Detailer,
+) func(info trace.TableDoTxStartInfo) func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
+	return func(
 		info trace.TableDoTxStartInfo,
 	) func(
 		info trace.TableDoTxIntermediateInfo,
@@ -162,7 +196,15 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-	t.OnCreateSession = func(
+}
+
+func onCreateSession(
+	l *wrapper,
+	d trace.Detailer,
+) func(
+	info trace.TableCreateSessionStartInfo) func(
+	info trace.TableCreateSessionIntermediateInfo) func(trace.TableCreateSessionDoneInfo) {
+	return func(
 		info trace.TableCreateSessionStartInfo,
 	) func(
 		info trace.TableCreateSessionIntermediateInfo,
@@ -208,7 +250,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-	t.OnSessionNew = func(info trace.TableSessionNewStartInfo) func(trace.TableSessionNewDoneInfo) {
+}
+
+func onSessionNew(
+	l *wrapper,
+	d trace.Detailer,
+) func(info trace.TableSessionNewStartInfo) func(trace.TableSessionNewDoneInfo) {
+	return func(info trace.TableSessionNewStartInfo) func(trace.TableSessionNewDoneInfo) {
 		if d.Details()&trace.TableSessionEvents == 0 {
 			return nil
 		}
@@ -238,7 +286,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-	t.OnSessionDelete = func(info trace.TableSessionDeleteStartInfo) func(trace.TableSessionDeleteDoneInfo) {
+}
+
+func onSessionDelete(
+	l *wrapper,
+	d trace.Detailer,
+) func(info trace.TableSessionDeleteStartInfo) func(trace.TableSessionDeleteDoneInfo) {
+	return func(info trace.TableSessionDeleteStartInfo) func(trace.TableSessionDeleteDoneInfo) {
 		if d.Details()&trace.TableSessionEvents == 0 {
 			return nil
 		}
@@ -268,7 +322,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-	t.OnSessionKeepAlive = func(info trace.TableKeepAliveStartInfo) func(trace.TableKeepAliveDoneInfo) {
+}
+
+func onSessionKeepAlive(
+	l *wrapper,
+	d trace.Detailer,
+) func(info trace.TableKeepAliveStartInfo) func(trace.TableKeepAliveDoneInfo) {
+	return func(info trace.TableKeepAliveStartInfo) func(trace.TableKeepAliveDoneInfo) {
 		if d.Details()&trace.TableSessionEvents == 0 {
 			return nil
 		}
@@ -298,7 +358,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-	t.OnSessionQueryPrepare = func(
+}
+
+func onSessionQueryPrepare(
+	l *wrapper,
+	d trace.Detailer,
+) func(info trace.TablePrepareDataQueryStartInfo) func(trace.TablePrepareDataQueryDoneInfo) {
+	return func(
 		info trace.TablePrepareDataQueryStartInfo,
 	) func(
 		trace.TablePrepareDataQueryDoneInfo,
@@ -345,7 +411,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-	t.OnSessionQueryExecute = func(
+}
+
+func onSessionQueryExecute(
+	l *wrapper,
+	d trace.Detailer,
+) func(info trace.TableExecuteDataQueryStartInfo) func(trace.TableExecuteDataQueryDoneInfo) {
+	return func(
 		info trace.TableExecuteDataQueryStartInfo,
 	) func(
 		trace.TableExecuteDataQueryDoneInfo,
@@ -394,7 +466,15 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-	t.OnSessionQueryStreamExecute = func(
+}
+
+func onSessionQueryStreamExecute(
+	l *wrapper,
+	d trace.Detailer,
+) func(
+	info trace.TableSessionQueryStreamExecuteStartInfo) func(
+	trace.TableSessionQueryStreamExecuteIntermediateInfo) func(trace.TableSessionQueryStreamExecuteDoneInfo) {
+	return func(
 		info trace.TableSessionQueryStreamExecuteStartInfo,
 	) func(
 		trace.TableSessionQueryStreamExecuteIntermediateInfo,
@@ -456,7 +536,16 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-	t.OnSessionQueryStreamRead = func(
+}
+
+func onSessionQueryStreamRead(
+	l *wrapper,
+	d trace.Detailer,
+) func(
+	info trace.TableSessionQueryStreamReadStartInfo) func(
+	intermediateInfo trace.TableSessionQueryStreamReadIntermediateInfo) func(
+	trace.TableSessionQueryStreamReadDoneInfo) {
+	return func(
 		info trace.TableSessionQueryStreamReadStartInfo,
 	) func(
 		intermediateInfo trace.TableSessionQueryStreamReadIntermediateInfo,
@@ -507,7 +596,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-	t.OnSessionTransactionBegin = func(
+}
+
+func onSessionTransactionBegin(
+	l *wrapper,
+	d trace.Detailer,
+) func(info trace.TableSessionTransactionBeginStartInfo) func(trace.TableSessionTransactionBeginDoneInfo) {
+	return func(
 		info trace.TableSessionTransactionBeginStartInfo,
 	) func(
 		trace.TableSessionTransactionBeginDoneInfo,
@@ -542,7 +637,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-	t.OnSessionTransactionCommit = func(
+}
+
+func onSessionTransactionCommit(
+	l *wrapper,
+	d trace.Detailer,
+) func(info trace.TableSessionTransactionCommitStartInfo) func(trace.TableSessionTransactionCommitDoneInfo) {
+	return func(
 		info trace.TableSessionTransactionCommitStartInfo,
 	) func(
 		trace.TableSessionTransactionCommitDoneInfo,
@@ -580,7 +681,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-	t.OnSessionTransactionRollback = func(
+}
+
+func OnSessionTransactionRollback(
+	l *wrapper,
+	d trace.Detailer,
+) func(info trace.TableSessionTransactionRollbackStartInfo) func(trace.TableSessionTransactionRollbackDoneInfo) {
+	return func(
 		info trace.TableSessionTransactionRollbackStartInfo,
 	) func(
 		trace.TableSessionTransactionRollbackDoneInfo,
@@ -618,7 +725,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-	t.OnInit = func(info trace.TableInitStartInfo) func(trace.TableInitDoneInfo) {
+}
+
+func onInitInternalTable(
+	l *wrapper,
+	d trace.Detailer,
+) func(info trace.TableInitStartInfo) func(trace.TableInitDoneInfo) {
+	return func(info trace.TableInitStartInfo) func(trace.TableInitDoneInfo) {
 		if d.Details()&trace.TableEvents == 0 {
 			return nil
 		}
@@ -633,7 +746,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			)
 		}
 	}
-	t.OnClose = func(info trace.TableCloseStartInfo) func(trace.TableCloseDoneInfo) {
+}
+
+func onCloseInternalTable(
+	l *wrapper,
+	d trace.Detailer,
+) func(info trace.TableCloseStartInfo) func(trace.TableCloseDoneInfo) {
+	return func(info trace.TableCloseStartInfo) func(trace.TableCloseDoneInfo) {
 		if d.Details()&trace.TableEvents == 0 {
 			return nil
 		}
@@ -655,7 +774,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-	t.OnPoolStateChange = func(info trace.TablePoolStateChangeInfo) {
+}
+
+func onPoolStateChange(
+	l *wrapper,
+	d trace.Detailer,
+) func(info trace.TablePoolStateChangeInfo) {
+	return func(info trace.TablePoolStateChangeInfo) {
 		if d.Details()&trace.TablePoolLifeCycleEvents == 0 {
 			return
 		}
@@ -665,7 +790,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			String("event", info.Event),
 		)
 	}
-	t.OnPoolSessionAdd = func(info trace.TablePoolSessionAddInfo) {
+}
+
+func onPoolSessionAdd(
+	l *wrapper,
+	d trace.Detailer,
+) func(info trace.TablePoolSessionAddInfo) {
+	return func(info trace.TablePoolSessionAddInfo) {
 		if d.Details()&trace.TablePoolLifeCycleEvents == 0 {
 			return
 		}
@@ -675,7 +806,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			String("status", info.Session.Status()),
 		)
 	}
-	t.OnPoolSessionRemove = func(info trace.TablePoolSessionRemoveInfo) {
+}
+
+func onPoolSessionRemove(
+	l *wrapper,
+	d trace.Detailer,
+) func(info trace.TablePoolSessionRemoveInfo) {
+	return func(info trace.TablePoolSessionRemoveInfo) {
 		if d.Details()&trace.TablePoolLifeCycleEvents == 0 {
 			return
 		}
@@ -685,7 +822,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			String("status", info.Session.Status()),
 		)
 	}
-	t.OnPoolPut = func(info trace.TablePoolPutStartInfo) func(trace.TablePoolPutDoneInfo) {
+}
+
+func onPoolPut(
+	l *wrapper,
+	d trace.Detailer,
+) func(info trace.TablePoolPutStartInfo) func(trace.TablePoolPutDoneInfo) {
+	return func(info trace.TablePoolPutStartInfo) func(trace.TablePoolPutDoneInfo) {
 		if d.Details()&trace.TablePoolAPIEvents == 0 {
 			return nil
 		}
@@ -715,7 +858,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-	t.OnPoolGet = func(info trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
+}
+
+func onPoolGet(
+	l *wrapper,
+	d trace.Detailer,
+) func(info trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
+	return func(info trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
 		if d.Details()&trace.TablePoolAPIEvents == 0 {
 			return nil
 		}
@@ -742,7 +891,13 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-	t.OnPoolWait = func(info trace.TablePoolWaitStartInfo) func(trace.TablePoolWaitDoneInfo) {
+}
+
+func onPoolWait(
+	l *wrapper,
+	d trace.Detailer,
+) func(info trace.TablePoolWaitStartInfo) func(trace.TablePoolWaitDoneInfo) {
+	return func(info trace.TablePoolWaitStartInfo) func(trace.TablePoolWaitDoneInfo) {
 		if d.Details()&trace.TablePoolAPIEvents == 0 {
 			return nil
 		}
@@ -768,6 +923,4 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-
-	return t
 }
