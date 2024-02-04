@@ -1,17 +1,18 @@
+* Refactored `internal/decimal/decimal` and extract functions
 * Refactored `log/table` and extract functions
 * Refactored `log/topic` and extract functions
 * Refactored `log/driver` and extract functions
 * Refactored `internal/table/scanner/scanner` and extract functions
 * Refactored `internal/table/scanner/scanner_test` and extract functions
 * Refactored `retry/sql_test` and extract function `sql_test.validateRetry, sql_test.withTestSelectOne` 
-* Refactored `internal/table/retry_test.go` and extract function `retry_test.checkResultsRetryWithCustomErrors`
+* Refactored `internal/table/retry_test` and extract function `retry_test.checkResultsRetryWithCustomErrors`
 * Refactored `internal/topic/topicwriterinternal/queue_test` and extract functions
 * Refactored `sugar/path.go` and extract code in functions `sugar.checkDirectoryExists`, `sugar.isValidEntry`, `sugar.removeWithPrefix`, `sugar.removeDirectory`
-* Refactored `internal/bind/params.go` and extract code in `params.addParam`
-* Refactored `internal/stack/record.go` and extract code in functions `record.extractSubstringAfterLastSlash`, `record.extractPackagePathAndName`
+* Refactored `internal/bind/params` and extract code in `params.addParam`
+* Refactored `internal/stack/record` and extract code in functions `record.extractSubstringAfterLastSlash`, `record.extractPackagePathAndName`
 * Refactored `metrics/driver.go` and extract functions
-* Refactored `internal/backoff/backoff_test.go` and extract test functions
-* Refactored `metrics/sql.go` and extract functions
+* Refactored `internal/backoff/backoff_test` and extract test functions
+* Refactored `metrics/sql` and extract functions
 * Added `retry/retry.RecoveryCallbackWrapper` to exclude from the linter gocognit
 * Added `internal/xsql/dsn.bindTablePathPrefixInConnectorOptions()` to exclude from the linter gocognit
 * Refactored `internal/table/client` and extract defer func `loadAndFinalizeSession`
