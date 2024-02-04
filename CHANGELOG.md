@@ -1,3 +1,4 @@
+* Refactored `internal/table/retry_test.go` and extract function `retry_test.checkResultsRetryWithCustomErrors`
 * Refactored `internal/topic/topicwriterinternal/queue_test` and extract functions
 * Refactored `sugar/path.go` and extract code in functions `sugar.checkDirectoryExists`, `sugar.isValidEntry`, `sugar.removeWithPrefix`, `sugar.removeDirectory`
 * Refactored `internal/bind/params.go` and extract code in `params.addParam`

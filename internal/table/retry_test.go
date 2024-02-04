@@ -457,30 +457,42 @@ func TestRetryWithCustomErrors(t *testing.T) {
 				},
 				nil,
 			)
-			//nolint:nestif
-			if test.retriable {
-				if i != limit {
-					t.Fatalf("unexpected i: %d, err: %v", i, err)
-				}
-				if test.deleteSession {
-					if len(sessions) != limit {
-						t.Fatalf("unexpected len(sessions): %d, err: %v", len(sessions), err)
-					}
-					for s, n := range sessions {
-						if n != 1 {
-							t.Fatalf("unexpected session usage: %d, session: %v", n, s.ID())
-						}
-					}
-				}
-			} else {
-				if i != 1 {
-					t.Fatalf("unexpected i: %d, err: %v", i, err)
-				}
-				if len(sessions) != 1 {
-					t.Fatalf("unexpected len(sessions): %d, err: %v", len(sessions), err)
+			checkResultsRetryWithCustomErrors(t, test, i, limit, err, sessions)
+		})
+	}
+}
+
+func checkResultsRetryWithCustomErrors(t *testing.T, test struct {
+	error         error
+	retriable     bool
+	deleteSession bool
+}, i int,
+	limit int,
+	err error,
+	sessions map[table.Session]int,
+) {
+	//nolint:nestif
+	if test.retriable {
+		if i != limit {
+			t.Fatalf("unexpected i: %d, err: %v", i, err)
+		}
+		if test.deleteSession {
+			if len(sessions) != limit {
+				t.Fatalf("unexpected len(sessions): %d, err: %v", len(sessions), err)
+			}
+			for s, n := range sessions {
+				if n != 1 {
+					t.Fatalf("unexpected session usage: %d, session: %v", n, s.ID())
 				}
 			}
-		})
+		}
+	} else {
+		if i != 1 {
+			t.Fatalf("unexpected i: %d, err: %v", i, err)
+		}
+		if len(sessions) != 1 {
+			t.Fatalf("unexpected len(sessions): %d, err: %v", len(sessions), err)
+		}
 	}
 }
 
