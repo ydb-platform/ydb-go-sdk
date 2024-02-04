@@ -165,12 +165,12 @@ func (f Field) String() string {
 	case StringsType:
 		return fmt.Sprintf("%v", f.StringsValue())
 	case ErrorType:
+		if f.vany == nil {
+			return "<nil>"
+		}
 		val, ok := f.vany.(error)
 		if !ok {
 			panic(fmt.Sprintf("unsupported type conversion from %T to error", val))
-		}
-		if f.vany == nil || val == nil {
-			return "<nil>"
 		}
 		return f.ErrorValue().Error()
 	case AnyType:
