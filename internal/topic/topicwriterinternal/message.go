@@ -59,14 +59,14 @@ type messageWithDataContent struct {
 	PublicMessage
 
 	dataWasRead         bool
-	encoders            *EncoderMap
 	hasRawContent       bool
-	rawBuf              bytes.Buffer
 	hasEncodedContent   bool
+	metadataCached      bool
 	bufCodec            rawtopiccommon.Codec
 	bufEncoded          bytes.Buffer
+	rawBuf              bytes.Buffer
+	encoders            *EncoderMap
 	BufUncompressedSize int
-	metadataCached      bool
 }
 
 func (m *messageWithDataContent) GetEncodedBytes(codec rawtopiccommon.Codec) ([]byte, error) {

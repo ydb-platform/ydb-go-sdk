@@ -47,19 +47,18 @@ func newSingleStreamWriterConfig(
 }
 
 type SingleStreamWriter struct {
-	ReceivedLastSeqNum  int64
-	LastSeqNumRequested bool
-	SessionID           string
-	PartitionID         int64
-	CodecsFromServer    rawtopiccommon.SupportedCodecs
+	cfg                 SingleStreamWriterConfig
 	Encoder             EncoderSelector
-
-	cfg            SingleStreamWriterConfig
-	allowedCodecs  rawtopiccommon.SupportedCodecs
-	background     background.Worker
-	closed         xatomic.Bool
-	closeReason    error
-	closeCompleted empty.Chan
+	background          background.Worker
+	CodecsFromServer    rawtopiccommon.SupportedCodecs
+	allowedCodecs       rawtopiccommon.SupportedCodecs
+	SessionID           string
+	closeReason         error
+	ReceivedLastSeqNum  int64
+	PartitionID         int64
+	closeCompleted      empty.Chan
+	closed              xatomic.Bool
+	LastSeqNumRequested bool
 }
 
 func NewSingleStreamWriter(

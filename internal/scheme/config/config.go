@@ -6,8 +6,6 @@ import (
 )
 
 // Config is a configuration of scheme client
-//
-//nolint:maligned
 type Config struct {
 	config.Common
 

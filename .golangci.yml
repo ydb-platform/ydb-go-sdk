@@ -237,7 +237,6 @@ linters:
     - interfacebloat
     - ireturn
     - maintidx
-    - maligned
     - nonamedreturns
     - paralleltest
     - protogetter

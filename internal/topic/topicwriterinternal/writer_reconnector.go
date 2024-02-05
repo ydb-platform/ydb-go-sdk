@@ -114,25 +114,22 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 }
 
 type WriterReconnector struct {
-	cfg           WriterReconnectorConfig
-	retrySettings topic.RetrySettings
-
-	semaphore                      *semaphore.Weighted
+	cfg                            WriterReconnectorConfig
 	queue                          messageQueue
 	background                     background.Worker
+	retrySettings                  topic.RetrySettings
 	clock                          clockwork.Clock
-	firstConnectionHandled         xatomic.Bool
-	firstInitResponseProcessedChan empty.Chan
 	writerInstanceID               string
-
-	m           xsync.RWMutex
-	sessionID   string
-	lastSeqNo   int64
-	encodersMap *EncoderMap
-
-	initDone   bool
-	initDoneCh empty.Chan
-	initInfo   InitialInfo
+	sessionID                      string
+	semaphore                      *semaphore.Weighted
+	firstInitResponseProcessedChan empty.Chan
+	lastSeqNo                      int64
+	encodersMap                    *EncoderMap
+	initDoneCh                     empty.Chan
+	initInfo                       InitialInfo
+	m                              xsync.RWMutex
+	firstConnectionHandled         xatomic.Bool
+	initDone                       bool
 }
 
 func newWriterReconnector(
