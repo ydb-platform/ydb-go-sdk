@@ -467,7 +467,7 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 	if c.currentTx != nil {
 		return nil, xerrors.WithStackTrace(
 			xerrors.Retryable(
-				&ErrConnAlreadyHaveTx{
+				&ConnAlreadyHaveTxError{
 					currentTx: c.currentTx.ID(),
 				},
 				xerrors.WithDeleteSession(),
