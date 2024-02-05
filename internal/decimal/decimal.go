@@ -270,7 +270,8 @@ func Format(x *big.Int, precision, scale uint32) string {
 //
 // If x value does not fit in 16 bytes with given precision, it returns 16-byte
 // representation of infinity or negative infinity value accordingly to x's sign.
-func BigIntToByte(x *big.Int, precision, scale uint32) (p [16]byte) {
+func BigIntToByte(x *big.Int, precision, scale uint32) [16]byte {
+	var p [16]byte
 	if !IsInf(x) && !IsNaN(x) && !IsErr(x) && x.CmpAbs(pow(ten, precision)) >= 0 {
 		if x.Sign() < 0 {
 			x = neginf

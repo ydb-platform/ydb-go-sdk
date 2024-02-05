@@ -83,7 +83,11 @@ type service struct {
 
 var once sync.Once
 
-func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service, err error) {
+func getService(ctx context.Context, dsn string, opts ...ydb.Option) (*service, error) {
+	var (
+		s   *service
+		err error
+	)
 	once.Do(func() {
 		var (
 			registry = prometheus.NewRegistry()
@@ -182,7 +186,7 @@ func (s *service) Close(ctx context.Context) {
 	_ = s.db.Close(ctx)
 }
 
-func (s *service) createTable(ctx context.Context) (err error) {
+func (s *service) createTable(ctx context.Context) error {
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -208,8 +212,8 @@ func (s *service) createTable(ctx context.Context) (err error) {
 	)
 }
 
-func (s *service) insertShort(ctx context.Context, url string) (h string, err error) {
-	h, err = hash(url)
+func (s *service) insertShort(ctx context.Context, url string) (string, error) {
+	h, err := hash(url)
 	if err != nil {
 		return "", err
 	}
@@ -236,7 +240,7 @@ func (s *service) insertShort(ctx context.Context, url string) (h string, err er
 		table.CommitTx(),
 	)
 	err = s.db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s table.Session) error {
 			_, _, err = s.Execute(ctx, writeTx, query,
 				table.NewQueryParameters(
 					table.ValueParam("$hash", types.TextValue(h)),
@@ -245,14 +249,14 @@ func (s *service) insertShort(ctx context.Context, url string) (h string, err er
 				options.WithCollectStatsModeBasic(),
 			)
 
-			return
+			return err
 		},
 	)
 
 	return h, err
 }
 
-func (s *service) selectLong(ctx context.Context, hash string) (url string, err error) {
+func (s *service) selectLong(ctx context.Context, hash string) (string, error) {
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -276,9 +280,12 @@ func (s *service) selectLong(ctx context.Context, hash string) (url string, err 
 		),
 		table.CommitTx(),
 	)
-	var res result.Result
+	var (
+		res result.Result
+		err error
+	)
 	err = s.db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s table.Session) error {
 			_, res, err = s.Execute(ctx, readTx, query,
 				table.NewQueryParameters(
 					table.ValueParam("$hash", types.TextValue(hash)),

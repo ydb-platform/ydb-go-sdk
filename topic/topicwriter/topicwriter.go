@@ -45,8 +45,8 @@ func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 
 // WaitInit waits until the reader is initialized
 // or an error occurs, return PublicInitialInfo and err
-func (w *Writer) WaitInit(ctx context.Context) (err error) {
-	_, err = w.inner.WaitInit(ctx)
+func (w *Writer) WaitInit(ctx context.Context) error {
+	_, err := w.inner.WaitInit(ctx)
 	if err != nil {
 		return err
 	}
@@ -56,7 +56,7 @@ func (w *Writer) WaitInit(ctx context.Context) (err error) {
 
 // WaitInitInfo waits until the reader is initialized
 // or an error occurs, return PublicInitialInfo and err
-func (w *Writer) WaitInitInfo(ctx context.Context) (info PublicInitialInfo, err error) {
+func (w *Writer) WaitInitInfo(ctx context.Context) (PublicInitialInfo, error) {
 	privateInfo, err := w.inner.WaitInit(ctx)
 	if err != nil {
 		return PublicInitialInfo{}, err

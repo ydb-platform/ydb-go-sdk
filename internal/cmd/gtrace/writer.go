@@ -170,14 +170,17 @@ func forEachField(s *types.Struct, fn func(*types.Var)) {
 	}
 }
 
-func unwrapStruct(t types.Type) (n *types.Named, s *types.Struct) {
-	var ok bool
-	n, ok = t.(*types.Named)
+func unwrapStruct(t types.Type) (*types.Named, *types.Struct) {
+	var (
+		ok bool
+		s  *types.Struct
+	)
+	n, ok := t.(*types.Named)
 	if ok {
 		s, _ = n.Underlying().(*types.Struct)
 	}
 
-	return
+	return n, s
 }
 
 func (w *Writer) funcImports(dst []dep, fn *Func) []dep {
@@ -535,8 +538,8 @@ func (w *Writer) hookFuncCall(fn *Func, name string, args []string) {
 	w.line(`return `, res)
 }
 
-func nameParam(p *Param) (s string) {
-	s = p.Name
+func nameParam(p *Param) string {
+	s := p.Name
 	if s == "" {
 		s = firstChar(ident(typeBasename(p.Type)))
 	}
@@ -544,8 +547,8 @@ func nameParam(p *Param) (s string) {
 	return unexported(s)
 }
 
-func (w *Writer) declareParams(src []Param) (names []string) {
-	names = make([]string, len(src))
+func (w *Writer) declareParams(src []Param) []string {
+	names := make([]string, len(src))
 	for i := range src {
 		names[i] = w.declare(nameParam(&src[i]))
 	}
@@ -553,7 +556,8 @@ func (w *Writer) declareParams(src []Param) (names []string) {
 	return names
 }
 
-func flattenParams(params []Param) (dst []Param) {
+func flattenParams(params []Param) []Param {
+	dst := make([]Param, 0)
 	for i := range params {
 		_, s := unwrapStruct(params[i].Type)
 		if s != nil {
@@ -567,7 +571,7 @@ func flattenParams(params []Param) (dst []Param) {
 	return dst
 }
 
-func typeBasename(t types.Type) (name string) {
+func typeBasename(t types.Type) string {
 	lo, name := rsplit(t.String(), '.')
 	if name == "" {
 		name = lo
@@ -599,7 +603,8 @@ func flattenStruct(dst []Param, s *types.Struct) []Param {
 	return dst
 }
 
-func (w *Writer) constructParams(params []Param, names []string) (res []string) {
+func (w *Writer) constructParams(params []Param, names []string) []string {
+	res := make([]string, 0, len(params))
 	for i := range params {
 		n, s := unwrapStruct(params[i].Type)
 		if s != nil {
@@ -762,7 +767,8 @@ func (w *Writer) zeroReturn(fn *Func) {
 	}
 }
 
-func (w *Writer) funcParams(params []Param) (vars []string) {
+func (w *Writer) funcParams(params []Param) []string {
+	vars := make([]string, 0, len(params))
 	w.code(`(`)
 	for i := range params {
 		if i > 0 {
@@ -772,11 +778,11 @@ func (w *Writer) funcParams(params []Param) (vars []string) {
 	}
 	w.code(`)`)
 
-	return
+	return vars
 }
 
-func (w *Writer) funcParam(p *Param) (name string) {
-	name = w.declare(nameParam(p))
+func (w *Writer) funcParam(p *Param) string {
+	name := w.declare(nameParam(p))
 	w.code(name, ` `)
 	w.code(w.typeString(p.Type))
 

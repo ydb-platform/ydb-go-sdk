@@ -12,6 +12,7 @@ import (
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -70,7 +71,7 @@ func main() {
 
 	tablePath := path.Join(prefix, "decimals")
 	err = db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s table.Session) error {
 			return s.CreateTable(ctx, tablePath,
 				options.WithColumn("id", types.Optional(types.TypeUint32)),
 				options.WithColumn("value", types.Optional(types.DefaultDecimal)),
@@ -83,7 +84,7 @@ func main() {
 	}
 
 	err = db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s table.Session) error {
 			txc := table.TxControl(
 				table.BeginTx(
 					table.WithSerializableReadWrite(),
@@ -110,7 +111,8 @@ func main() {
 				return err
 			}
 
-			_, res, err := s.Execute(ctx, txc, render(readQuery, templateConfig{
+			var res result.Result
+			_, res, err = s.Execute(ctx, txc, render(readQuery, templateConfig{
 				TablePathPrefix: prefix,
 			}), nil)
 			if err != nil {

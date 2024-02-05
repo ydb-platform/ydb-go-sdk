@@ -59,11 +59,15 @@ func (tx *transaction) Execute(
 	ctx context.Context,
 	query string, params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
-) (r result.Result, err error) {
-	onDone := trace.TableOnSessionTransactionExecute(
-		tx.s.config.Trace(), &ctx,
-		stack.FunctionID(""),
-		tx.s, tx, queryFromText(query), params,
+) (result.Result, error) {
+	var (
+		r      result.Result
+		err    error
+		onDone = trace.TableOnSessionTransactionExecute(
+			tx.s.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			tx.s, tx, queryFromText(query), params,
+		)
 	)
 	defer func() {
 		onDone(r, err)
@@ -93,17 +97,21 @@ func (tx *transaction) ExecuteStatement(
 	ctx context.Context,
 	stmt table.Statement, params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
-) (r result.Result, err error) {
+) (result.Result, error) {
 	if params == nil {
 		params = table.NewQueryParameters()
 	}
 	a := allocator.New()
 	defer a.Free()
 
-	onDone := trace.TableOnSessionTransactionExecuteStatement(
-		tx.s.config.Trace(), &ctx,
-		stack.FunctionID(""),
-		tx.s, tx, stmt.(*statement).query, params,
+	var (
+		r      result.Result
+		err    error
+		onDone = trace.TableOnSessionTransactionExecuteStatement(
+			tx.s.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			tx.s, tx, stmt.(*statement).query, params,
+		)
 	)
 	defer func() {
 		onDone(r, err)
@@ -132,11 +140,14 @@ func (tx *transaction) ExecuteStatement(
 func (tx *transaction) CommitTx(
 	ctx context.Context,
 	opts ...options.CommitTransactionOption,
-) (r result.Result, err error) {
-	onDone := trace.TableOnSessionTransactionCommit(
-		tx.s.config.Trace(), &ctx,
-		stack.FunctionID(""),
-		tx.s, tx,
+) (result.Result, error) {
+	var (
+		err    error
+		onDone = trace.TableOnSessionTransactionCommit(
+			tx.s.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			tx.s, tx,
+		)
 	)
 	defer func() {
 		onDone(err)
@@ -190,11 +201,14 @@ func (tx *transaction) CommitTx(
 }
 
 // Rollback performs a rollback of the specified active transaction.
-func (tx *transaction) Rollback(ctx context.Context) (err error) {
-	onDone := trace.TableOnSessionTransactionRollback(
-		tx.s.config.Trace(), &ctx,
-		stack.FunctionID(""),
-		tx.s, tx,
+func (tx *transaction) Rollback(ctx context.Context) error {
+	var (
+		err    error
+		onDone = trace.TableOnSessionTransactionRollback(
+			tx.s.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			tx.s, tx,
+		)
 	)
 	defer func() {
 		onDone(err)

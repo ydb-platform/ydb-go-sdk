@@ -29,10 +29,10 @@ func Example_consumedUnitsCount() {
 		meta.WithTrailerCallback(ctx, func(md metadata.MD) {
 			totalConsumedUnits += meta.ConsumedUnits(md)
 		}),
-		func(ctx context.Context, s table.Session) (err error) { // retry operation
-			_, res, err := s.Execute(ctx, table.DefaultTxControl(), query, nil)
-			if err != nil {
-				return err // for auto-retry with driver
+		func(ctx context.Context, s table.Session) error { // retry operation
+			_, res, errIn := s.Execute(ctx, table.DefaultTxControl(), query, nil)
+			if errIn != nil {
+				return errIn // for auto-retry with driver
 			}
 			defer res.Close()                                // cleanup resources
 			if err = res.NextResultSetErr(ctx); err != nil { // check single result set and switch to it

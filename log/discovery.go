@@ -7,11 +7,12 @@ import (
 )
 
 // Discovery makes trace.Discovery with logging events from details
-func Discovery(l Logger, d trace.Detailer, opts ...Option) (t trace.Discovery) {
+func Discovery(l Logger, d trace.Detailer, opts ...Option) trace.Discovery {
 	return internalDiscovery(wrapLogger(l, opts...), d)
 }
 
-func internalDiscovery(l Logger, d trace.Detailer) (t trace.Discovery) {
+func internalDiscovery(l *wrapper, d trace.Detailer) trace.Discovery { //nolint:interfacer //deprecated
+	var t trace.Discovery
 	t.OnDiscover = func(info trace.DiscoveryDiscoverStartInfo) func(trace.DiscoveryDiscoverDoneInfo) {
 		if d.Details()&trace.DiscoveryEvents == 0 {
 			return nil

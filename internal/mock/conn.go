@@ -49,7 +49,7 @@ func (c *Conn) LastUsage() time.Time {
 	panic("not implemented in mock")
 }
 
-func (c *Conn) Park(ctx context.Context) (err error) {
+func (c *Conn) Park(ctx context.Context) error {
 	panic("not implemented in mock")
 }
 

@@ -45,10 +45,13 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config)
 	}, nil
 }
 
-func (c *Client) MakeDirectory(ctx context.Context, path string) (finalErr error) {
-	onDone := trace.SchemeOnMakeDirectory(c.config.Trace(), &ctx,
-		stack.FunctionID(""),
-		path,
+func (c *Client) MakeDirectory(ctx context.Context, path string) error {
+	var (
+		finalErr error
+		onDone   = trace.SchemeOnMakeDirectory(c.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			path,
+		)
 	)
 	defer func() {
 		onDone(finalErr)
@@ -67,8 +70,8 @@ func (c *Client) MakeDirectory(ctx context.Context, path string) (finalErr error
 	)
 }
 
-func (c *Client) makeDirectory(ctx context.Context, path string) (err error) {
-	_, err = c.service.MakeDirectory(
+func (c *Client) makeDirectory(ctx context.Context, path string) error {
+	_, err := c.service.MakeDirectory(
 		ctx,
 		&Ydb_Scheme.MakeDirectoryRequest{
 			Path: path,
@@ -84,10 +87,13 @@ func (c *Client) makeDirectory(ctx context.Context, path string) (err error) {
 	return xerrors.WithStackTrace(err)
 }
 
-func (c *Client) RemoveDirectory(ctx context.Context, path string) (finalErr error) {
-	onDone := trace.SchemeOnRemoveDirectory(c.config.Trace(), &ctx,
-		stack.FunctionID(""),
-		path,
+func (c *Client) RemoveDirectory(ctx context.Context, path string) error {
+	var (
+		finalErr error
+		onDone   = trace.SchemeOnRemoveDirectory(c.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			path,
+		)
 	)
 	defer func() {
 		onDone(finalErr)
@@ -106,8 +112,8 @@ func (c *Client) RemoveDirectory(ctx context.Context, path string) (finalErr err
 	)
 }
 
-func (c *Client) removeDirectory(ctx context.Context, path string) (err error) {
-	_, err = c.service.RemoveDirectory(
+func (c *Client) removeDirectory(ctx context.Context, path string) error {
+	_, err := c.service.RemoveDirectory(
 		ctx,
 		&Ydb_Scheme.RemoveDirectoryRequest{
 			Path: path,
@@ -123,15 +129,19 @@ func (c *Client) removeDirectory(ctx context.Context, path string) (err error) {
 	return xerrors.WithStackTrace(err)
 }
 
-func (c *Client) ListDirectory(ctx context.Context, path string) (d scheme.Directory, finalErr error) {
-	onDone := trace.SchemeOnListDirectory(c.config.Trace(), &ctx, stack.FunctionID(""))
+func (c *Client) ListDirectory(ctx context.Context, path string) (scheme.Directory, error) {
+	var (
+		d        scheme.Directory
+		finalErr error
+		onDone   = trace.SchemeOnListDirectory(c.config.Trace(), &ctx, stack.FunctionID(""))
+	)
 	defer func() {
 		onDone(finalErr)
 	}()
-	call := func(ctx context.Context) (err error) {
-		d, err = c.listDirectory(ctx, path)
+	call := func(ctx context.Context) error {
+		d, finalErr = c.listDirectory(ctx, path)
 
-		return xerrors.WithStackTrace(err)
+		return xerrors.WithStackTrace(finalErr)
 	}
 	if !c.config.AutoRetry() {
 		err := call(ctx)
@@ -180,18 +190,22 @@ func (c *Client) listDirectory(ctx context.Context, path string) (scheme.Directo
 	return d, nil
 }
 
-func (c *Client) DescribePath(ctx context.Context, path string) (e scheme.Entry, finalErr error) {
-	onDone := trace.SchemeOnDescribePath(c.config.Trace(), &ctx,
-		stack.FunctionID(""),
-		path,
+func (c *Client) DescribePath(ctx context.Context, path string) (scheme.Entry, error) {
+	var (
+		e        scheme.Entry
+		finalErr error
+		onDone   = trace.SchemeOnDescribePath(c.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			path,
+		)
 	)
 	defer func() {
 		onDone(e.Type.String(), finalErr)
 	}()
-	call := func(ctx context.Context) (err error) {
-		e, err = c.describePath(ctx, path)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
+	call := func(ctx context.Context) error {
+		e, finalErr = c.describePath(ctx, path)
+		if finalErr != nil {
+			return xerrors.WithStackTrace(finalErr)
 		}
 
 		return nil
@@ -210,12 +224,13 @@ func (c *Client) DescribePath(ctx context.Context, path string) (e scheme.Entry,
 	return e, xerrors.WithStackTrace(err)
 }
 
-func (c *Client) describePath(ctx context.Context, path string) (e scheme.Entry, err error) {
+func (c *Client) describePath(ctx context.Context, path string) (scheme.Entry, error) {
 	var (
 		response *Ydb_Scheme.DescribePathResponse
 		result   Ydb_Scheme.DescribePathResult
+		e        scheme.Entry
 	)
-	response, err = c.service.DescribePath(
+	response, err := c.service.DescribePath(
 		ctx,
 		&Ydb_Scheme.DescribePathRequest{
 			Path: path,
@@ -241,10 +256,13 @@ func (c *Client) describePath(ctx context.Context, path string) (e scheme.Entry,
 
 func (c *Client) ModifyPermissions(
 	ctx context.Context, path string, opts ...scheme.PermissionsOption,
-) (finalErr error) {
-	onDone := trace.SchemeOnModifyPermissions(c.config.Trace(), &ctx,
-		stack.FunctionID(""),
-		path,
+) error {
+	var (
+		finalErr error
+		onDone   = trace.SchemeOnModifyPermissions(c.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			path,
+		)
 	)
 	defer func() {
 		onDone(finalErr)
@@ -269,8 +287,8 @@ func (c *Client) ModifyPermissions(
 	)
 }
 
-func (c *Client) modifyPermissions(ctx context.Context, path string, desc permissionsDesc) (err error) {
-	_, err = c.service.ModifyPermissions(
+func (c *Client) modifyPermissions(ctx context.Context, path string, desc permissionsDesc) error {
+	_, err := c.service.ModifyPermissions(
 		ctx,
 		&Ydb_Scheme.ModifyPermissionsRequest{
 			Path:             path,

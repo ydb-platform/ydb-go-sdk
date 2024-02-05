@@ -35,7 +35,7 @@ type balancer interface {
 }
 
 func New(ctx context.Context, balancer balancer, config *config.Config) (*Client, error) {
-	return newClient(ctx, balancer, func(ctx context.Context) (s *session, err error) {
+	return newClient(ctx, balancer, func(ctx context.Context) (*session, error) {
 		return newSession(ctx, balancer, config)
 	}, config)
 }
@@ -45,12 +45,15 @@ func newClient(
 	balancer balancer,
 	builder sessionBuilder,
 	config *config.Config,
-) (c *Client, finalErr error) {
-	onDone := trace.TableOnInit(config.Trace(), &ctx, stack.FunctionID(""))
+) (*Client, error) {
+	var (
+		finalErr error
+		onDone   = trace.TableOnInit(config.Trace(), &ctx, stack.FunctionID(""))
+	)
 	defer func() {
 		onDone(config.SizeLimit(), finalErr)
 	}()
-	c = &Client{
+	c := &Client{
 		clock:       config.Clock(),
 		config:      config,
 		cc:          balancer,
@@ -119,8 +122,11 @@ func withCreateSessionOnClose(onClose func(s *session)) createSessionOption {
 	}
 }
 
-func (c *Client) createSession(ctx context.Context, opts ...createSessionOption) (s *session, err error) {
-	options := createSessionOptions{}
+func (c *Client) createSession(ctx context.Context, opts ...createSessionOption) (*session, error) {
+	var (
+		s       *session
+		options = createSessionOptions{}
+	)
 	for _, o := range opts {
 		if o != nil {
 			o(&options)
@@ -223,14 +229,17 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 	}
 }
 
-func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ table.ClosableSession, err error) {
+func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (table.ClosableSession, error) {
 	if c == nil {
 		return nil, xerrors.WithStackTrace(errNilClient)
 	}
 	if c.isClosed() {
 		return nil, xerrors.WithStackTrace(errClosedClient)
 	}
-	var s *session
+	var (
+		s   *session
+		err error
+	)
 	createSession := func(ctx context.Context) (*session, error) {
 		s, err = c.createSession(ctx)
 		if err != nil {
@@ -248,7 +257,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 		return s, nil
 	}
 	err = retry.Retry(ctx,
-		func(ctx context.Context) (err error) {
+		func(ctx context.Context) error {
 			s, err = createSession(ctx)
 			if err != nil {
 				return xerrors.WithStackTrace(err)
@@ -289,7 +298,7 @@ func (c *Client) isClosed() bool {
 }
 
 // c.mu must NOT be held.
-func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err error) {
+func (c *Client) internalPoolCreateSession(ctx context.Context) (*session, error) {
 	if c.isClosed() {
 		return nil, errClosedClient
 	}
@@ -312,7 +321,7 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 		})
 	}()
 
-	s, err = c.createSession(
+	s, err := c.createSession(
 		meta.WithAllowFeatures(ctx,
 			metaHeaders.HintSessionBalancer,
 		),
@@ -364,7 +373,7 @@ func withTrace(t *trace.Table) getOption {
 	}
 }
 
-func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *session, err error) {
+func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (*session, error) {
 	if c.isClosed() {
 		return nil, xerrors.WithStackTrace(errClosedClient)
 	}
@@ -380,7 +389,11 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 		}
 	}
 
-	onDone := trace.TableOnPoolGet(o.t, &ctx, stack.FunctionID(""))
+	var (
+		s      *session
+		err    error
+		onDone = trace.TableOnPoolGet(o.t, &ctx, stack.FunctionID(""))
+	)
 	defer func() {
 		onDone(s, i, err)
 	}()
@@ -460,15 +473,17 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 
 // Get returns first idle session from the Client and removes it from
 // there. If no items stored in Client it creates new one returns it.
-func (c *Client) Get(ctx context.Context) (s *session, err error) {
+func (c *Client) Get(ctx context.Context) (*session, error) {
 	return c.internalPoolGet(ctx)
 }
 
-func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s *session, err error) {
+func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (*session, error) {
 	var (
-		ch *chan *session
-		el *list.Element // Element in the wait queue.
-		ok bool
+		ch  *chan *session
+		el  *list.Element // Element in the wait queue.
+		ok  bool
+		s   *session
+		err error
 	)
 
 	c.mu.WithLock(func() {
@@ -536,10 +551,13 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s 
 // Note that Put() must be called only once after being created or received by
 // Get() or Take() calls. In other way it will produce unexpected behavior or
 // panic.
-func (c *Client) Put(ctx context.Context, s *session) (err error) {
-	onDone := trace.TableOnPoolPut(c.config.Trace(), &ctx,
-		stack.FunctionID(""),
-		s,
+func (c *Client) Put(ctx context.Context, s *session) error {
+	var (
+		err    error
+		onDone = trace.TableOnPoolPut(c.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			s,
+		)
 	)
 	defer func() {
 		onDone(err)
@@ -584,7 +602,7 @@ func (c *Client) Put(ctx context.Context, s *session) (err error) {
 // It also stops all underlying timers and goroutines.
 // It returns first error occurred during stale sessions' deletion.
 // Note that even on error it calls Close() on each session.
-func (c *Client) Close(ctx context.Context) (err error) {
+func (c *Client) Close(ctx context.Context) error {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
@@ -597,7 +615,10 @@ func (c *Client) Close(ctx context.Context) (err error) {
 		default:
 			close(c.done)
 
-			onDone := trace.TableOnClose(c.config.Trace(), &ctx, stack.FunctionID(""))
+			var (
+				err    error
+				onDone = trace.TableOnClose(c.config.Trace(), &ctx, stack.FunctionID(""))
+			)
 			defer func() {
 				onDone(err)
 			}()
@@ -631,7 +652,7 @@ func (c *Client) Close(ctx context.Context) (err error) {
 // - deadline was canceled or deadlined
 // - retry operation returned nil as error
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
-func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Option) (finalErr error) {
+func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Option) error {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
@@ -639,6 +660,8 @@ func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 	if c.isClosed() {
 		return xerrors.WithStackTrace(errClosedClient)
 	}
+
+	var finalErr error
 
 	config := c.retryOptions(opts...)
 
@@ -661,7 +684,7 @@ func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 	return nil
 }
 
-func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) (finalErr error) {
+func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.Option) error {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
@@ -669,6 +692,8 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 	if c.isClosed() {
 		return xerrors.WithStackTrace(errClosedClient)
 	}
+
+	var finalErr error
 
 	config := c.retryOptions(opts...)
 
@@ -808,10 +833,14 @@ func (c *Client) internalPoolPutWaitCh(ch *chan *session) { //nolint:gocritic
 }
 
 // c.mu must be held.
-func (c *Client) internalPoolPeekFirstIdle() (s *session, touched time.Time) {
+func (c *Client) internalPoolPeekFirstIdle() (*session, time.Time) {
+	var (
+		s       *session
+		touched time.Time
+	)
 	el := c.idle.Front()
 	if el == nil {
-		return
+		return s, touched
 	}
 	s = el.Value.(*session)
 	info, has := c.index[s]
@@ -837,7 +866,7 @@ func (c *Client) internalPoolRemoveFirstIdle() *session {
 }
 
 // c.mu must be held.
-func (c *Client) internalPoolNotify(s *session) (notified bool) {
+func (c *Client) internalPoolNotify(s *session) bool {
 	for el := c.waitQ.Front(); el != nil; el = c.waitQ.Front() {
 		// Some goroutine is waiting for a session.
 		//

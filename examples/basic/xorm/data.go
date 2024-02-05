@@ -35,11 +35,16 @@ func episodeData(seasonID, episodeID, title string, date time.Time) *Episodes {
 	}
 }
 
-func getData() (series []*Series, seasons []*Seasons, episodes []*Episodes) {
+func getData() ([]*Series, []*Seasons, []*Episodes) {
+	var (
+		series   = make([]*Series, 0)
+		seasons  = make([]*Seasons, 0)
+		episodes = make([]*Episodes, 0)
+	)
 	for seriesID, fill := range map[string]func(seriesID string) (
-		seriesData *Series,
-		seasons []*Seasons,
-		episodes []*Episodes,
+		*Series,
+		[]*Seasons,
+		[]*Episodes,
 	){
 		uuid.New().String(): getDataForITCrowd,
 		uuid.New().String(): getDataForSiliconValley,
@@ -50,15 +55,19 @@ func getData() (series []*Series, seasons []*Seasons, episodes []*Episodes) {
 		episodes = append(episodes, episodesData...)
 	}
 
-	return
+	return series, seasons, episodes
 }
 
-func getDataForITCrowd(seriesID string) (series *Series, seasons []*Seasons, episodes []*Episodes) {
-	series = seriesData(
-		seriesID, date("2006-02-03"), "IT Crowd", ""+
-			"The IT Crowd is a British sitcom produced by Channel 4, written by Graham Linehan, produced by "+
-			"Ash Atalla and starring Chris O'Dowd, Richard Ayoade, Katherine Parkinson, and Matt Berry.",
-		"", // NULL comment.
+func getDataForITCrowd(seriesID string) (*Series, []*Seasons, []*Episodes) {
+	var (
+		series = seriesData(
+			seriesID, date("2006-02-03"), "IT Crowd", ""+
+				"The IT Crowd is a British sitcom produced by Channel 4, written by Graham Linehan, produced by "+
+				"Ash Atalla and starring Chris O'Dowd, Richard Ayoade, Katherine Parkinson, and Matt Berry.",
+			"", // NULL comment.
+		)
+		seasons  = make([]*Seasons, 0)
+		episodes = make([]*Episodes, 0)
 	)
 	for _, season := range []*struct {
 		title    string
@@ -117,12 +126,16 @@ func getDataForITCrowd(seriesID string) (series *Series, seasons []*Seasons, epi
 	return series, seasons, episodes
 }
 
-func getDataForSiliconValley(seriesID string) (series *Series, seasons []*Seasons, episodes []*Episodes) {
-	series = seriesData(
-		seriesID, date("2014-04-06"), "Silicon Valley", ""+
-			"Silicon Valley is an American comedy television series created by Mike Judge, John Altschuler and "+
-			"Dave Krinsky. The series focuses on five young men who founded a startup company in Silicon Valley.",
-		"Some comment here",
+func getDataForSiliconValley(seriesID string) (*Series, []*Seasons, []*Episodes) {
+	var (
+		series = seriesData(
+			seriesID, date("2014-04-06"), "Silicon Valley", ""+
+				"Silicon Valley is an American comedy television series created by Mike Judge, John Altschuler and "+
+				"Dave Krinsky. The series focuses on five young men who founded a startup company in Silicon Valley.",
+			"Some comment here",
+		)
+		seasons  = make([]*Seasons, 0)
+		episodes = make([]*Episodes, 0)
 	)
 	for _, season := range []*struct {
 		title    string

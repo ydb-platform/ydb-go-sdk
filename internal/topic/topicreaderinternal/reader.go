@@ -140,8 +140,12 @@ func (r *Reader) ReadMessage(ctx context.Context) (*PublicMessage, error) {
 
 // ReadMessageBatch read batch of messages.
 // Batch is collection of messages, which can be atomically committed
-func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOption) (batch *PublicBatch, err error) {
-	readOptions := r.defaultBatchConfig.clone()
+func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOption) (*PublicBatch, error) {
+	var (
+		readOptions = r.defaultBatchConfig.clone()
+		batch       *PublicBatch
+		err         error
+	)
 
 	for _, opt := range opts {
 		if opt != nil {
@@ -167,7 +171,7 @@ func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOp
 	}
 }
 
-func (r *Reader) Commit(ctx context.Context, offsets PublicCommitRangeGetter) (err error) {
+func (r *Reader) Commit(ctx context.Context, offsets PublicCommitRangeGetter) error {
 	cr := offsets.getCommitRange().priv
 	if cr.partitionSession.readerID != r.readerID {
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
@@ -248,7 +252,8 @@ func convertNewParamsToStreamConfig(
 	consumer string,
 	readSelectors []PublicReadSelector,
 	opts ...PublicReaderOption,
-) (cfg ReaderConfig) {
+) ReaderConfig {
+	var cfg ReaderConfig
 	cfg.topicStreamReaderConfig = newTopicStreamReaderConfig()
 	cfg.Consumer = consumer
 

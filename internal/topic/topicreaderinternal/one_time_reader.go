@@ -15,13 +15,12 @@ func newOneTimeReader(reader io.Reader) oneTimeReader {
 	}
 }
 
-func (s *oneTimeReader) Read(p []byte) (n int, err error) {
+func (s *oneTimeReader) Read(p []byte) (int, error) {
 	if s.err != nil {
 		return 0, s.err
 	}
 
-	n, err = s.reader.Read(p)
-
+	n, err := s.reader.Read(p)
 	if err != nil {
 		s.err = err
 		s.reader = nil

@@ -356,10 +356,10 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 											},
 										}, nil
 									},
-									testutil.TableExplainDataQuery: func(request interface{}) (result proto.Message, err error) {
+									testutil.TableExplainDataQuery: func(request interface{}) (proto.Message, error) {
 										return &Ydb_Table.ExplainQueryResult{}, nil
 									},
-									testutil.TablePrepareDataQuery: func(request interface{}) (result proto.Message, err error) {
+									testutil.TablePrepareDataQuery: func(request interface{}) (proto.Message, error) {
 										return &Ydb_Table.PrepareQueryResult{}, nil
 									},
 									testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
@@ -367,16 +367,16 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 											SessionId: testutil.SessionID(),
 										}, nil
 									},
-									testutil.TableDeleteSession: func(request interface{}) (result proto.Message, err error) {
+									testutil.TableDeleteSession: func(request interface{}) (proto.Message, error) {
 										return &Ydb_Table.DeleteSessionResponse{}, nil
 									},
-									testutil.TableCommitTransaction: func(request interface{}) (result proto.Message, err error) {
+									testutil.TableCommitTransaction: func(request interface{}) (proto.Message, error) {
 										return &Ydb_Table.CommitTransactionResult{}, nil
 									},
-									testutil.TableRollbackTransaction: func(request interface{}) (result proto.Message, err error) {
+									testutil.TableRollbackTransaction: func(request interface{}) (proto.Message, error) {
 										return &Ydb_Table.RollbackTransactionResponse{}, nil
 									},
-									testutil.TableKeepAlive: func(request interface{}) (result proto.Message, err error) {
+									testutil.TableKeepAlive: func(request interface{}) (proto.Message, error) {
 										return &Ydb_Table.KeepAliveResult{}, nil
 									},
 								},
@@ -577,7 +577,7 @@ func TestDescribeTableRegression(t *testing.T) {
 
 	var act options.Description
 
-	err = client.Do(ctx, func(ctx context.Context, s table.Session) (err error) {
+	err = client.Do(ctx, func(ctx context.Context, s table.Session) error {
 		act, err = s.DescribeTable(ctx, "episodes")
 
 		return err

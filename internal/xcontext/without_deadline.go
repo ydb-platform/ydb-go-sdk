@@ -7,7 +7,7 @@ import (
 
 type valueOnlyContext struct{ context.Context }
 
-func (valueOnlyContext) Deadline() (deadline time.Time, ok bool) { return }
+func (valueOnlyContext) Deadline() (time.Time, bool) { return time.Time{}, false }
 
 func (valueOnlyContext) Done() <-chan struct{} { return nil }
 

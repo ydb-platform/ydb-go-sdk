@@ -8,7 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func table(config Config) (t trace.Table) {
+func table(config Config) trace.Table {
 	config = config.WithSystem("table")
 	alive := config.GaugeVec("sessions", "node_id")
 	config = config.WithSystem("pool")
@@ -18,6 +18,7 @@ func table(config Config) (t trace.Table) {
 	inflightLatency := config.WithSystem("inflight").TimerVec("latency")
 	wait := config.GaugeVec("wait")
 	waitLatency := config.WithSystem("wait").TimerVec("latency")
+	var t trace.Table
 	t.OnInit = func(info trace.TableInitStartInfo) func(trace.TableInitDoneInfo) {
 		return func(info trace.TableInitDoneInfo) {
 			limit.With(nil).Set(float64(info.Limit))

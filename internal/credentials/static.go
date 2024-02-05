@@ -71,7 +71,7 @@ type Static struct {
 	sourceInfo string
 }
 
-func (c *Static) Token(ctx context.Context) (token string, err error) {
+func (c *Static) Token(ctx context.Context) (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if time.Until(c.requestAt) > 0 {
@@ -137,9 +137,12 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 	return c.token, nil
 }
 
-func parseExpiresAt(raw string) (expiresAt time.Time, err error) {
-	var claims jwt.RegisteredClaims
-	if _, _, err = jwt.NewParser().ParseUnverified(raw, &claims); err != nil {
+func parseExpiresAt(raw string) (time.Time, error) {
+	var (
+		claims    jwt.RegisteredClaims
+		expiresAt time.Time
+	)
+	if _, _, err := jwt.NewParser().ParseUnverified(raw, &claims); err != nil {
 		return expiresAt, xerrors.WithStackTrace(err)
 	}
 

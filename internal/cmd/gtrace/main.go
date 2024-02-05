@@ -156,7 +156,8 @@ func main() {
 			depth int
 			item  *GenItem
 		)
-		ast.Inspect(astFile, func(n ast.Node) (next bool) {
+		ast.Inspect(astFile, func(n ast.Node) bool {
+			var next bool
 			if n == nil {
 				item = nil
 				depth--
@@ -251,8 +252,8 @@ func main() {
 	log.Println("OK")
 }
 
-func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (ret *Func, err error) {
-	ret = new(Func)
+func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (*Func, error) {
+	ret := new(Func)
 	for _, p := range fn.Params.List {
 		t := info.TypeOf(p.Type)
 		if t == nil {
@@ -313,10 +314,11 @@ func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (re
 	)
 }
 
-func splitOSArchTags(ctx *build.Context, name string) (base, tags, ext string) {
+func splitOSArchTags(ctx *build.Context, name string) (string, string, string) {
+	var base, tags string
 	fileTags := make(map[string]bool)
 	build_goodOSArchFile(ctx, name, fileTags)
-	ext = filepath.Ext(name)
+	ext := filepath.Ext(name)
 	switch len(fileTags) {
 	case 0: // *
 		base = strings.TrimSuffix(name, ext)
@@ -342,7 +344,7 @@ func splitOSArchTags(ctx *build.Context, name string) (base, tags, ext string) {
 		))
 	}
 
-	return
+	return base, tags, ext
 }
 
 type Package struct {
@@ -400,7 +402,7 @@ type GenItem struct {
 	StructType *ast.StructType
 }
 
-func rsplit(s string, c byte) (s1, s2 string) {
+func rsplit(s string, c byte) (string, string) {
 	i := strings.LastIndexByte(s, c)
 	if i == -1 {
 		return s, ""
@@ -409,7 +411,8 @@ func rsplit(s string, c byte) (s1, s2 string) {
 	return s[:i], s[i+1:]
 }
 
-func scanBuildConstraints(r io.Reader) (cs []string, err error) {
+func scanBuildConstraints(r io.Reader) ([]string, error) {
+	cs := make([]string, 0)
 	br := bufio.NewReader(r)
 	for {
 		line, err := br.ReadBytes('\n')

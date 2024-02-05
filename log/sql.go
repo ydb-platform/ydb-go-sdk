@@ -9,11 +9,12 @@ import (
 )
 
 // DatabaseSQL makes trace.DatabaseSQL with logging events from details
-func DatabaseSQL(l Logger, d trace.Detailer, opts ...Option) (t trace.DatabaseSQL) {
+func DatabaseSQL(l Logger, d trace.Detailer, opts ...Option) trace.DatabaseSQL {
 	return internalDatabaseSQL(wrapLogger(l, opts...), d)
 }
 
-func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
+func internalDatabaseSQL(l *wrapper, d trace.Detailer) trace.DatabaseSQL {
+	var t trace.DatabaseSQL
 	t.OnConnectorConnect = func(
 		info trace.DatabaseSQLConnectorConnectStartInfo,
 	) func(

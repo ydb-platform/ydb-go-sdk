@@ -145,7 +145,8 @@ func entryType(t Ydb_Scheme.Entry_Type) EntryType {
 	}
 }
 
-func makePermissions(src []*Ydb_Scheme.Permissions) (dst []Permissions) {
+func makePermissions(src []*Ydb_Scheme.Permissions) []Permissions {
+	dst := make([]Permissions, 0, len(src))
 	for _, p := range src {
 		dst = append(dst, from(p))
 	}
@@ -153,7 +154,7 @@ func makePermissions(src []*Ydb_Scheme.Permissions) (dst []Permissions) {
 	return dst
 }
 
-func from(y *Ydb_Scheme.Permissions) (p Permissions) {
+func from(y *Ydb_Scheme.Permissions) Permissions {
 	return Permissions{
 		Subject:         y.Subject,
 		PermissionNames: y.PermissionNames,

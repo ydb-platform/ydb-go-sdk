@@ -36,7 +36,7 @@ type Client struct {
 }
 
 // Discover cluster endpoints
-func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
+func (c *Client) Discover(ctx context.Context) ([]endpoint.Endpoint, error) {
 	var (
 		onDone = trace.DiscoveryOnDiscover(
 			c.config.Trace(), &ctx,
@@ -46,9 +46,11 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 		request = Ydb_Discovery.ListEndpointsRequest{
 			Database: c.config.Database(),
 		}
-		response *Ydb_Discovery.ListEndpointsResponse
-		result   Ydb_Discovery.ListEndpointsResult
-		location string
+		response  *Ydb_Discovery.ListEndpointsResponse
+		result    Ydb_Discovery.ListEndpointsResult
+		location  string
+		endpoints = make([]endpoint.Endpoint, 0, len(result.Endpoints))
+		err       error
 	)
 	defer func() {
 		nodes := make([]trace.EndpointInfo, 0, len(endpoints))
@@ -82,7 +84,6 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	}
 
 	location = result.GetSelfLocation()
-	endpoints = make([]endpoint.Endpoint, 0, len(result.Endpoints))
 	for _, e := range result.Endpoints {
 		if e.Ssl == c.config.Secure() {
 			endpoints = append(endpoints, endpoint.New(
@@ -99,12 +100,14 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	return endpoints, nil
 }
 
-func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err error) {
+func (c *Client) WhoAmI(ctx context.Context) (*discovery.WhoAmI, error) {
 	var (
 		onDone             = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx, stack.FunctionID(""))
 		request            = Ydb_Discovery.WhoAmIRequest{}
 		response           *Ydb_Discovery.WhoAmIResponse
 		whoAmIResultResult Ydb_Discovery.WhoAmIResult
+		whoAmI             *discovery.WhoAmI
+		err                error
 	)
 	defer func() {
 		if err != nil {

@@ -151,7 +151,7 @@ func (r *baseResult) Reset(set *Ydb.ResultSet, columnNames ...string) {
 	}
 }
 
-func (r *unaryResult) NextResultSetErr(ctx context.Context, columns ...string) (err error) {
+func (r *unaryResult) NextResultSetErr(ctx context.Context, columns ...string) error {
 	if r.isClosed() {
 		return xerrors.WithStackTrace(errAlreadyClosed)
 	}
@@ -168,7 +168,7 @@ func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool
 	return r.NextResultSetErr(ctx, columns...) == nil
 }
 
-func (r *streamResult) nextResultSetErr(ctx context.Context, columns ...string) (err error) {
+func (r *streamResult) nextResultSetErr(ctx context.Context, columns ...string) error {
 	// skipping second recv because first call of recv is from New Stream(), second call is from user
 	if r.nextResultSetCounter.Add(1) == 2 {
 		r.setColumnIndexes(columns)
@@ -194,11 +194,11 @@ func (r *streamResult) nextResultSetErr(ctx context.Context, columns ...string) 
 	return ctx.Err()
 }
 
-func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) (err error) {
+func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) error {
 	if r.isClosed() {
 		return xerrors.WithStackTrace(errAlreadyClosed)
 	}
-	if err = r.Err(); err != nil {
+	if err := r.Err(); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 	if err := r.nextResultSetErr(ctx, columns...); err != nil {
@@ -236,7 +236,7 @@ func (r *baseResult) Stats() stats.QueryStats {
 }
 
 // Close closes the result, preventing further iteration.
-func (r *streamResult) Close() (err error) {
+func (r *streamResult) Close() error {
 	if r.closed.CompareAndSwap(false, true) {
 		return r.close(r.Err())
 	}

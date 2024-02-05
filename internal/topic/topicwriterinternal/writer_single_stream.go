@@ -121,8 +121,11 @@ func (w *SingleStreamWriter) start() {
 	w.background.Start("topic writer receive messages", w.receiveMessagesLoop)
 }
 
-func (w *SingleStreamWriter) initStream() (err error) {
-	traceOnDone := trace.TopicOnWriterInitStream(w.cfg.tracer, w.cfg.reconnectorInstanceID, w.cfg.topic, w.cfg.producerID)
+func (w *SingleStreamWriter) initStream() error {
+	var (
+		err         error
+		traceOnDone = trace.TopicOnWriterInitStream(w.cfg.tracer, w.cfg.reconnectorInstanceID, w.cfg.topic, w.cfg.producerID)
+	)
 	defer traceOnDone(w.SessionID, err)
 
 	req := w.createInitRequest()
@@ -268,7 +271,7 @@ func (w *SingleStreamWriter) updateTokenLoop(ctx context.Context) {
 	}
 }
 
-func (w *SingleStreamWriter) sendUpdateToken(ctx context.Context) (err error) {
+func (w *SingleStreamWriter) sendUpdateToken(ctx context.Context) error {
 	token, err := w.cfg.cred.Token(ctx)
 	if err != nil {
 		return err

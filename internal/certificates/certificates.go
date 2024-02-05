@@ -38,7 +38,7 @@ func FromFileOnHit(onHit func()) FromFileOption {
 	}
 }
 
-func loadFromFileCache(key string) (_ []*x509.Certificate, exists bool) {
+func loadFromFileCache(key string) ([]*x509.Certificate, bool) {
 	value, exists := fileCache.Load(key)
 	if !exists {
 		return nil, false
@@ -93,7 +93,7 @@ func FromFile(file string, opts ...FromFileOption) ([]*x509.Certificate, error) 
 	return certs, nil
 }
 
-func loadFromPemCache(key string) (_ *x509.Certificate, exists bool) {
+func loadFromPemCache(key string) (*x509.Certificate, bool) {
 	value, exists := pemCache.Load(key)
 	if !exists {
 		return nil, false
@@ -173,8 +173,12 @@ func FromPemNoCache(noCache bool) FromPemOption {
 // FromPem parses one or more certificate from pem blocks in bytes.
 // It returns nil error if at least one certificate was successfully parsed.
 // This function uses cached parseCertificate.
-func FromPem(bytes []byte, opts ...FromPemOption) (certs []*x509.Certificate, err error) {
-	var block *pem.Block
+func FromPem(bytes []byte, opts ...FromPemOption) ([]*x509.Certificate, error) {
+	var (
+		block *pem.Block
+		certs []*x509.Certificate
+		err   error
+	)
 
 	for len(bytes) > 0 {
 		block, bytes = pem.Decode(bytes)

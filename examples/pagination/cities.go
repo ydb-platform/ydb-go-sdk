@@ -6,6 +6,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
@@ -18,10 +19,13 @@ func selectPaging(
 	lastNum *uint,
 	lastCity *string,
 ) (
-	empty bool,
-	err error,
+	bool,
+	error,
 ) {
-	query := fmt.Sprintf(`
+	var (
+		empty bool
+		err   error
+		query = fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 
 		DECLARE $limit AS Uint64;
@@ -49,12 +53,14 @@ func selectPaging(
 		SELECT * FROM $union
 		ORDER BY city, number LIMIT $limit;
 		`, prefix)
+	)
 
 	readTx := table.TxControl(table.BeginTx(table.WithOnlineReadOnly()), table.CommitTx())
 
 	err = c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, res, err := s.Execute(ctx, readTx, query,
+		func(ctx context.Context, s table.Session) error {
+			var res result.Result
+			_, res, err = s.Execute(ctx, readTx, query,
 				table.NewQueryParameters(
 					table.ValueParam("$limit", types.Uint64Value(uint64(limit))),
 					table.ValueParam("$lastCity", types.TextValue(*lastCity)),
@@ -92,7 +98,7 @@ func selectPaging(
 	return empty, err
 }
 
-func fillTableWithData(ctx context.Context, c table.Client, prefix string) (err error) {
+func fillTableWithData(ctx context.Context, c table.Client, prefix string) error {
 	query := fmt.Sprintf(`
 		PRAGMA TablePathPrefix("%v");
 
@@ -110,9 +116,9 @@ func fillTableWithData(ctx context.Context, c table.Client, prefix string) (err 
 
 	writeTx := table.TxControl(table.BeginTx(table.WithSerializableReadWrite()), table.CommitTx())
 
-	err = c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, _, err = s.Execute(ctx, writeTx, query, table.NewQueryParameters(
+	err := c.Do(ctx,
+		func(ctx context.Context, s table.Session) error {
+			_, _, err := s.Execute(ctx, writeTx, query, table.NewQueryParameters(
 				table.ValueParam("$schoolsData", getSchoolData()),
 			))
 
@@ -122,8 +128,8 @@ func fillTableWithData(ctx context.Context, c table.Client, prefix string) (err 
 	return err
 }
 
-func createTable(ctx context.Context, c table.Client, path string) (err error) {
-	err = c.Do(ctx,
+func createTable(ctx context.Context, c table.Client, path string) error {
+	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) error {
 			return s.CreateTable(ctx, path,
 				options.WithColumn("city", types.Optional(types.TypeUTF8)),

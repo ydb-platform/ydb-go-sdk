@@ -17,7 +17,7 @@ type Series struct {
 	Seasons []Season
 }
 
-func (s *Series) BeforeCreate(_ *gorm.DB) (err error) {
+func (s *Series) BeforeCreate(_ *gorm.DB) error {
 	id, err := uuid.NewUUID()
 	if err != nil {
 		return err
@@ -27,7 +27,7 @@ func (s *Series) BeforeCreate(_ *gorm.DB) (err error) {
 		s.Seasons[i].SeriesID = s.ID
 	}
 
-	return
+	return err
 }
 
 type Season struct {
@@ -40,7 +40,7 @@ type Season struct {
 	Episodes []Episode
 }
 
-func (s *Season) BeforeCreate(_ *gorm.DB) (err error) {
+func (s *Season) BeforeCreate(_ *gorm.DB) error {
 	id, err := uuid.NewUUID()
 	if err != nil {
 		return err
@@ -50,7 +50,7 @@ func (s *Season) BeforeCreate(_ *gorm.DB) (err error) {
 		s.Episodes[i].SeasonID = s.ID
 	}
 
-	return
+	return err
 }
 
 type Episode struct {
@@ -60,12 +60,12 @@ type Episode struct {
 	AirDate  time.Time `gorm:"column:air_date"`
 }
 
-func (e *Episode) BeforeCreate(_ *gorm.DB) (err error) {
+func (e *Episode) BeforeCreate(_ *gorm.DB) error {
 	id, err := uuid.NewUUID()
 	if err != nil {
 		return err
 	}
 	e.ID = id.String()
 
-	return
+	return err
 }

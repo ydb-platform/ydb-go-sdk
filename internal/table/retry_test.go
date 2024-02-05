@@ -446,7 +446,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 				ctx,
 				p,
 				config.New(),
-				func(ctx context.Context, s table.Session) (err error) {
+				func(ctx context.Context, s table.Session) error {
 					sessions[s]++
 					i++
 					if i < limit {

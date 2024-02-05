@@ -128,8 +128,11 @@ func (it IssueIterator) Len() int {
 	return len(it)
 }
 
-func (it IssueIterator) Get(i int) (issue Issue, nested IssueIterator) {
-	x := it[i]
+func (it IssueIterator) Get(i int) (Issue, IssueIterator) {
+	var (
+		x      = it[i]
+		nested IssueIterator
+	)
 	if xs := x.Issues; len(xs) > 0 {
 		nested = IssueIterator(xs)
 	}

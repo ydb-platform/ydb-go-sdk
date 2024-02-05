@@ -72,7 +72,7 @@ func (e *endpoint) NodeID() uint32 {
 	return e.id
 }
 
-func (e *endpoint) Address() (address string) {
+func (e *endpoint) Address() string {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 

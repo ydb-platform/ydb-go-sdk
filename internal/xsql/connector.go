@@ -195,7 +195,7 @@ type ydbDriver interface {
 	Scheme() scheme.Client
 }
 
-func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
+func Open(parent ydbDriver, opts ...ConnectorOption) (*Connector, error) {
 	c := &Connector{
 		parent:           parent,
 		clock:            clockwork.NewRealClock(),
@@ -207,7 +207,7 @@ func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
 	}
 	for _, opt := range opts {
 		if opt != nil {
-			if err = opt.Apply(c); err != nil {
+			if err := opt.Apply(c); err != nil {
 				return nil, err
 			}
 		}
@@ -257,9 +257,8 @@ var (
 	_ io.Closer        = &Connector{}
 )
 
-func (c *Connector) idleCloser() (idleStopper func()) {
-	var ctx context.Context
-	ctx, idleStopper = xcontext.WithCancel(context.Background())
+func (c *Connector) idleCloser() func() {
+	ctx, idleStopper := xcontext.WithCancel(context.Background())
 	go func() {
 		for {
 			select {
@@ -284,7 +283,7 @@ func (c *Connector) idleCloser() (idleStopper func()) {
 	return idleStopper
 }
 
-func (c *Connector) Close() (err error) {
+func (c *Connector) Close() error {
 	defer func() {
 		for _, onClose := range c.onClose {
 			onClose(c)
@@ -309,13 +308,14 @@ func (c *Connector) detach(cc *conn) {
 	delete(c.conns, cc)
 }
 
-func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
+func (c *Connector) Connect(ctx context.Context) (driver.Conn, error) {
 	var (
 		onDone = trace.DatabaseSQLOnConnectorConnect(
 			c.trace, &ctx,
 			stack.FunctionID(""),
 		)
 		session table.ClosableSession
+		err     error
 	)
 	defer func() {
 		onDone(err, session)

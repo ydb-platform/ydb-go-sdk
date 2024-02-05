@@ -29,7 +29,7 @@ func (s *statement) Execute(
 	params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
-	txr table.Transaction, r result.Result, err error,
+	table.Transaction, result.Result, error,
 ) {
 	var (
 		a       = allocator.New()
@@ -38,6 +38,9 @@ func (s *statement) Execute(
 			IgnoreTruncated:         s.session.config.IgnoreTruncated(),
 		}
 		callOptions []grpc.CallOption
+		txr         table.Transaction
+		r           result.Result
+		err         error
 	)
 	defer a.Free()
 
@@ -78,7 +81,7 @@ func (s *statement) execute(
 	request *options.ExecuteDataQueryDesc, txControl *Ydb_Table.TransactionControl,
 	callOptions ...grpc.CallOption,
 ) (
-	txr table.Transaction, r result.Result, err error,
+	table.Transaction, result.Result, error,
 ) {
 	res, err := s.session.executeDataQuery(ctx, a, request.ExecuteDataQueryRequest, callOptions...)
 	if err != nil {

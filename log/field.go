@@ -313,7 +313,8 @@ const (
 	endType
 )
 
-func (ft FieldType) String() (typeName string) {
+func (ft FieldType) String() string {
+	var typeName string
 	switch ft {
 	case InvalidType:
 		typeName = "invalid"

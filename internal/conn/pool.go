@@ -124,8 +124,11 @@ func (p *Pool) Take(context.Context) error {
 	return nil
 }
 
-func (p *Pool) Release(ctx context.Context) (finalErr error) {
-	onDone := trace.DriverOnPoolRelease(p.config.Trace(), &ctx, stack.FunctionID(""))
+func (p *Pool) Release(ctx context.Context) error {
+	var (
+		finalErr error
+		onDone   = trace.DriverOnPoolRelease(p.config.Trace(), &ctx, stack.FunctionID(""))
+	)
 	defer func() {
 		onDone(finalErr)
 	}()

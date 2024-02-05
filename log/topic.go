@@ -8,11 +8,13 @@ import (
 )
 
 // Topic returns trace.Topic with logging events from details
-func Topic(l Logger, d trace.Detailer, opts ...Option) (t trace.Topic) {
+func Topic(l Logger, d trace.Detailer, opts ...Option) trace.Topic {
 	return internalTopic(wrapLogger(l, opts...), d)
 }
 
-func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocyclo
+//nolint:gocyclo
+func internalTopic(l *wrapper, d trace.Detailer) trace.Topic { //nolint:interfacer //deprecated
+	var t trace.Topic
 	t.OnReaderReconnect = func(
 		info trace.TopicReaderReconnectStartInfo,
 	) func(doneInfo trace.TopicReaderReconnectDoneInfo) {

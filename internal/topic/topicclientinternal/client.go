@@ -130,11 +130,15 @@ func (c *Client) Describe(
 	ctx context.Context,
 	path string,
 	opts ...topicoptions.DescribeOption,
-) (res topictypes.TopicDescription, _ error) {
-	req := rawtopic.DescribeTopicRequest{
-		OperationParams: c.defaultOperationParams,
-		Path:            path,
-	}
+) (topictypes.TopicDescription, error) {
+	var (
+		describeErr error
+		res         topictypes.TopicDescription
+		req         = rawtopic.DescribeTopicRequest{
+			OperationParams: c.defaultOperationParams,
+			Path:            path,
+		}
+	)
 
 	for _, o := range opts {
 		if o != nil {
@@ -144,7 +148,7 @@ func (c *Client) Describe(
 
 	var rawRes rawtopic.DescribeTopicResult
 
-	call := func(ctx context.Context) (describeErr error) {
+	call := func(ctx context.Context) error {
 		rawRes, describeErr = c.rawClient.DescribeTopic(ctx, req)
 
 		return describeErr

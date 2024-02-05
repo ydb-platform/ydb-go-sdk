@@ -13,7 +13,8 @@ func (m AutoDeclare) blockID() blockID {
 	return blockDeclare
 }
 
-func (m AutoDeclare) RewriteQuery(query string, args ...interface{}) (
+func (m AutoDeclare) RewriteQuery(query string, args ...interface{}) ( //nolint:nonamedreturns
+	// gocritic more important
 	yql string, newArgs []interface{}, err error,
 ) {
 	params, err := Params(args...)

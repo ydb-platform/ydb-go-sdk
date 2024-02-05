@@ -14,7 +14,7 @@ func externalSystemCommit(ctx context.Context, topic string, partition, offset i
 	panic("example stub")
 }
 
-func externalSystemLock(ctx context.Context, topic string, partition int64) (err error) {
+func externalSystemLock(ctx context.Context, topic string, partition int64) error {
 	panic("example stub")
 }
 

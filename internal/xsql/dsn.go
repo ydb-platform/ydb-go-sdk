@@ -16,11 +16,15 @@ import (
 
 const tablePathPrefixTransformer = "table_path_prefix"
 
-func Parse(dataSourceName string) (opts []config.Option, connectorOpts []ConnectorOption, _ error) {
+func Parse(dataSourceName string) ([]config.Option, []ConnectorOption, error) {
 	info, err := dsn.Parse(dataSourceName)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
+	var (
+		opts          []config.Option
+		connectorOpts []ConnectorOption
+	)
 	opts = append(opts, info.Options...)
 	if token := info.Params.Get("token"); token != "" {
 		opts = append(opts, config.WithCredentials(credentials.NewAccessTokenCredentials(token)))

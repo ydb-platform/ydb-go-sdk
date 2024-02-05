@@ -139,7 +139,8 @@ func (r *repeater) Force() {
 	}
 }
 
-func (r *repeater) wakeUp(ctx context.Context, e Event) (err error) {
+func (r *repeater) wakeUp(ctx context.Context, e Event) error {
+	var err error
 	if err = ctx.Err(); err != nil {
 		return err
 	}

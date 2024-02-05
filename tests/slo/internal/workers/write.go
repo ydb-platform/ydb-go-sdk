@@ -23,8 +23,11 @@ func (w *Workers) Write(ctx context.Context, wg *sync.WaitGroup, rl *rate.Limite
 	}
 }
 
-func (w *Workers) write(ctx context.Context, gen *generator.Generator) (err error) {
-	var row generator.Row
+func (w *Workers) write(ctx context.Context, gen *generator.Generator) error {
+	var (
+		row generator.Row
+		err error
+	)
 	row, err = gen.Generate()
 	if err != nil {
 		fmt.Printf("generate error: %v\n", err)

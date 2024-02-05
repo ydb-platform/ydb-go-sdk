@@ -19,14 +19,14 @@ func Example_execute() {
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
-	if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		res, err := db.Scripting().Execute(
+	if err = retry.Retry(ctx, func(ctx context.Context) error {
+		res, errIn := db.Scripting().Execute(
 			ctx,
 			"SELECT 1+1",
 			table.NewQueryParameters(),
 		)
-		if err != nil {
-			return err
+		if errIn != nil {
+			return errIn
 		}
 		defer res.Close() // cleanup resources
 		if !res.NextResultSet(ctx) {
@@ -64,14 +64,14 @@ func Example_streamExecute() {
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
-	if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		res, err := db.Scripting().StreamExecute(
+	if err = retry.Retry(ctx, func(ctx context.Context) error {
+		res, errIn := db.Scripting().StreamExecute(
 			ctx,
 			"SELECT 1+1",
 			table.NewQueryParameters(),
 		)
-		if err != nil {
-			return err
+		if errIn != nil {
+			return errIn
 		}
 		defer res.Close() // cleanup resources
 		if !res.NextResultSet(ctx) {
@@ -137,14 +137,14 @@ func Example_explainValidate() {
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
-	if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
-		res, err := db.Scripting().Explain(
+	if err = retry.Retry(ctx, func(ctx context.Context) error {
+		res, errIn := db.Scripting().Explain(
 			ctx,
 			"SELECT 1+1",
 			scripting.ExplainModeValidate,
 		)
-		if err != nil {
-			return err
+		if errIn != nil {
+			return errIn
 		}
 		if len(res.ParameterTypes) > 0 {
 			return retry.RetryableError(fmt.Errorf("unexpected parameter types"))

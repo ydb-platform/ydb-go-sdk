@@ -23,10 +23,13 @@ func (w *Workers) Read(ctx context.Context, wg *sync.WaitGroup, rl *rate.Limiter
 	}
 }
 
-func (w *Workers) read(ctx context.Context) (err error) {
+func (w *Workers) read(ctx context.Context) error {
 	id := uint64(rand.Intn(int(w.cfg.InitialDataCount))) //nolint:gosec // speed more important
 
-	var attempts int
+	var (
+		attempts int
+		err      error
+	)
 
 	m := w.m.Start(metrics.JobRead)
 	defer func() {

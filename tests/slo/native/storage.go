@@ -90,7 +90,11 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	return s, nil
 }
 
-func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generator.Row, attempts int, err error) {
+func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (generator.Row, int, error) {
+	var (
+		attempts int
+		err      error
+	)
 	if err = ctx.Err(); err != nil {
 		return generator.Row{}, attempts, err
 	}
@@ -101,7 +105,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 	e := generator.Row{}
 
 	err = s.db.Table().Do(ctx,
-		func(ctx context.Context, session table.Session) (err error) {
+		func(ctx context.Context, session table.Session) error {
 			if err = ctx.Err(); err != nil {
 				return err
 			}
@@ -155,21 +159,26 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 	return e, attempts, err
 }
 
-func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, _ error) {
-	if err := ctx.Err(); err != nil {
+func (s *Storage) Write(ctx context.Context, e generator.Row) (int, error) {
+	var (
+		attempts int
+		err      error
+	)
+	if err = ctx.Err(); err != nil {
 		return attempts, err
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	err := s.db.Table().Do(ctx,
+	err = s.db.Table().Do(ctx,
 		func(ctx context.Context, session table.Session) error {
-			if err := ctx.Err(); err != nil {
+			if err = ctx.Err(); err != nil {
 				return err
 			}
 
-			_, res, err := session.Execute(ctx, writeTx, s.upsertQuery,
+			var res result.Result
+			_, res, err = session.Execute(ctx, writeTx, s.upsertQuery,
 				table.NewQueryParameters(
 					table.ValueParam("$id", types.Uint64Value(e.ID)),
 					table.ValueParam("$payload_str", types.UTF8Value(*e.PayloadStr)),
@@ -241,7 +250,7 @@ func (s *Storage) dropTable(ctx context.Context) error {
 	defer cancel()
 
 	return s.db.Table().Do(ctx,
-		func(ctx context.Context, session table.Session) (err error) {
+		func(ctx context.Context, session table.Session) error {
 			return session.DropTable(ctx, path.Join(s.prefix, s.cfg.Table))
 		},
 		table.WithIdempotent(),

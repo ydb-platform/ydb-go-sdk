@@ -7,7 +7,7 @@ import (
 )
 
 // databaseSQL makes trace.DatabaseSQL with measuring `database/sql` events
-func databaseSQL(config Config) (t trace.DatabaseSQL) {
+func databaseSQL(config Config) trace.DatabaseSQL {
 	config = config.WithSystem("database").WithSystem("sql")
 	conns := config.GaugeVec("conns")
 	inflight := config.WithSystem("conns").GaugeVec("inflight")
@@ -27,6 +27,7 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 	txCommitLatency := config.WithSystem("commit").TimerVec("latency")
 	txRollback := config.CounterVec("rollback", "status")
 	txRollbackLatency := config.WithSystem("rollback").TimerVec("latency")
+	var t trace.DatabaseSQL
 	t.OnConnectorConnect = func(info trace.DatabaseSQLConnectorConnectStartInfo) func(
 		trace.DatabaseSQLConnectorConnectDoneInfo,
 	) {

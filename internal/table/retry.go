@@ -29,9 +29,11 @@ func do(
 	op table.Operation,
 	onAttempt func(err error),
 	opts ...retry.Option,
-) (err error) {
+) error {
+	var err error
+
 	return retryBackoff(ctx, c,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s table.Session) error {
 			defer func() {
 				if onAttempt != nil {
 					onAttempt(err)
@@ -66,8 +68,10 @@ func retryBackoff(
 	op table.Operation,
 	opts ...retry.Option,
 ) error {
+	var err error
+
 	return retry.Retry(ctx,
-		func(ctx context.Context) (err error) {
+		func(ctx context.Context) error {
 			var s *session
 
 			s, err = p.Get(ctx)

@@ -28,7 +28,7 @@ type timeoutCtx struct {
 	err error
 }
 
-func (ctx *timeoutCtx) Deadline() (deadline time.Time, ok bool) {
+func (ctx *timeoutCtx) Deadline() (time.Time, bool) {
 	return ctx.ctx.Deadline()
 }
 

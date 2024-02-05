@@ -16,7 +16,7 @@ type schemeClient interface {
 }
 
 func IsDirectoryExists(ctx context.Context, c schemeClient, directory string) (
-	exists bool, _ error,
+	bool, error,
 ) {
 	if !strings.HasPrefix(directory, c.Database()) {
 		return false, xerrors.WithStackTrace(fmt.Errorf(
@@ -58,7 +58,7 @@ func IsDirectoryExists(ctx context.Context, c schemeClient, directory string) (
 }
 
 func IsEntryExists(ctx context.Context, c schemeClient, absPath string, entryTypes ...scheme.EntryType) (
-	exists bool, _ error,
+	bool, error,
 ) {
 	if !strings.HasPrefix(absPath, c.Database()) {
 		return false, xerrors.WithStackTrace(fmt.Errorf(

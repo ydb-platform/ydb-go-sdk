@@ -24,7 +24,8 @@ type parsedInfo struct {
 	Params   url.Values
 }
 
-func Parse(dsn string) (info parsedInfo, err error) {
+func Parse(dsn string) (parsedInfo, error) {
+	var info parsedInfo
 	uri, err := url.Parse(dsn)
 	if err != nil {
 		return info, xerrors.WithStackTrace(err)

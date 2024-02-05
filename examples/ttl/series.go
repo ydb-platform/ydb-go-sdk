@@ -54,9 +54,12 @@ func readExpiredBatchTransaction(ctx context.Context, c table.Client, prefix str
 
 	readTx := table.TxControl(table.BeginTx(table.WithOnlineReadOnly()), table.CommitTx())
 
-	var res result.Result
-	err := c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+	var (
+		res result.Result
+		err error
+	)
+	err = c.Do(ctx,
+		func(ctx context.Context, s table.Session) error {
 			_, res, err = s.Execute(ctx, readTx, query, table.NewQueryParameters(
 				table.ValueParam("$timestamp", types.Uint64Value(timestamp)),
 				table.ValueParam("$prev_timestamp", types.Uint64Value(prevTimestamp)),
@@ -94,8 +97,8 @@ func deleteDocumentWithTimestamp(ctx context.Context,
 	writeTx := table.TxControl(table.BeginTx(table.WithSerializableReadWrite()), table.CommitTx())
 
 	err := c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, _, err = s.Execute(ctx, writeTx, query, table.NewQueryParameters(
+		func(ctx context.Context, s table.Session) error {
+			_, _, err := s.Execute(ctx, writeTx, query, table.NewQueryParameters(
 				table.ValueParam("$doc_id", types.Uint64Value(lastDocID)),
 				table.ValueParam("$timestamp", types.Uint64Value(timestamp)),
 			))
@@ -107,14 +110,14 @@ func deleteDocumentWithTimestamp(ctx context.Context,
 	return err
 }
 
-func deleteExpired(ctx context.Context, c table.Client, prefix string, queue, timestamp uint64) (err error) {
+func deleteExpired(ctx context.Context, c table.Client, prefix string, queue, timestamp uint64) error {
 	fmt.Printf("> DeleteExpired from queue #%d:\n", queue)
 	empty := false
 	lastTimestamp := uint64(0)
 	lastDocID := uint64(0)
 
 	for !empty {
-		err = func() (err error) { // for isolate defer inside lambda
+		err := func() error { // for isolate defer inside lambda
 			res, err := readExpiredBatchTransaction(ctx, c, prefix, queue, timestamp, lastTimestamp, lastDocID)
 			if err != nil {
 				return err
@@ -169,7 +172,7 @@ func readDocument(ctx context.Context, c table.Client, prefix, url string) error
 	readTx := table.TxControl(table.BeginTx(table.WithOnlineReadOnly()), table.CommitTx())
 
 	err := c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s table.Session) error {
 			_, res, err := s.Execute(ctx, readTx, query, table.NewQueryParameters(
 				table.ValueParam("$url", types.TextValue(url)),
 			))
@@ -236,8 +239,8 @@ func addDocument(ctx context.Context, c table.Client, prefix, url, html string, 
 	writeTx := table.TxControl(table.BeginTx(table.WithSerializableReadWrite()), table.CommitTx())
 
 	err := c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, _, err = s.Execute(ctx, writeTx, query, table.NewQueryParameters(
+		func(ctx context.Context, s table.Session) error {
+			_, _, err := s.Execute(ctx, writeTx, query, table.NewQueryParameters(
 				table.ValueParam("$url", types.TextValue(url)),
 				table.ValueParam("$html", types.TextValue(html)),
 				table.ValueParam("$timestamp", types.Uint64Value(timestamp)),
@@ -250,8 +253,8 @@ func addDocument(ctx context.Context, c table.Client, prefix, url, html string, 
 	return err
 }
 
-func createTables(ctx context.Context, c table.Client, prefix string) (err error) {
-	err = c.Do(ctx,
+func createTables(ctx context.Context, c table.Client, prefix string) error {
+	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) error {
 			return s.CreateTable(ctx, path.Join(prefix, "documents"),
 				options.WithColumn("doc_id", types.Optional(types.TypeUint64)),

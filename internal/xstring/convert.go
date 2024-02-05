@@ -15,7 +15,7 @@ func FromBytes(b []byte) string {
 	return unsafe.String(&b[0], len(b))
 }
 
-func ToBytes(s string) (b []byte) {
+func ToBytes(s string) []byte {
 	if s == "" {
 		return nil
 	}

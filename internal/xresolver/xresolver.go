@@ -31,15 +31,17 @@ func (c *clientConn) Endpoint() string {
 	return strings.TrimPrefix(endpoint, "/")
 }
 
-func (c *clientConn) UpdateState(state resolver.State) (err error) {
+func (c *clientConn) UpdateState(state resolver.State) error {
+	var err error
 	onDone := trace.DriverOnResolve(c.trace,
 		stack.FunctionID(""),
-		c.Endpoint(), func() (addrs []string) {
+		c.Endpoint(), func() []string {
+			var addrs []string
 			for i := range state.Addresses {
 				addrs = append(addrs, state.Addresses[i].Addr)
 			}
 
-			return
+			return addrs
 		}(),
 	)
 	defer func() {

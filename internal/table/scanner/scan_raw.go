@@ -20,7 +20,7 @@ type rawConverter struct {
 	*scanner
 }
 
-func (s *rawConverter) String() (v []byte) {
+func (s *rawConverter) String() []byte {
 	s.unwrap()
 
 	return s.bytes()
@@ -41,7 +41,11 @@ func (s *rawConverter) Path() string {
 	return buf.String()
 }
 
-func (s *rawConverter) WritePathTo(w io.Writer) (n int64, err error) {
+func (s *rawConverter) WritePathTo(w io.Writer) (int64, error) {
+	var (
+		n   int64
+		err error
+	)
 	for sp := 0; sp < s.stack.size(); sp++ {
 		if sp > 0 {
 			var m int
@@ -71,133 +75,133 @@ func (s *rawConverter) Type() types.Type {
 	return s.getType()
 }
 
-func (s *rawConverter) Bool() (v bool) {
+func (s *rawConverter) Bool() bool {
 	if s.Err() != nil {
-		return
+		return false
 	}
 	s.unwrap()
 
 	return s.bool()
 }
 
-func (s *rawConverter) Int8() (v int8) {
+func (s *rawConverter) Int8() int8 {
 	if s.Err() != nil {
-		return
+		return 0
 	}
 	s.unwrap()
 
 	return s.int8()
 }
 
-func (s *rawConverter) Uint8() (v uint8) {
+func (s *rawConverter) Uint8() uint8 {
 	if s.Err() != nil {
-		return
+		return 0
 	}
 	s.unwrap()
 
 	return s.uint8()
 }
 
-func (s *rawConverter) Int16() (v int16) {
+func (s *rawConverter) Int16() int16 {
 	if s.Err() != nil {
-		return
+		return 0
 	}
 	s.unwrap()
 
 	return s.int16()
 }
 
-func (s *rawConverter) Uint16() (v uint16) {
+func (s *rawConverter) Uint16() uint16 {
 	if s.Err() != nil {
-		return
+		return 0
 	}
 	s.unwrap()
 
 	return s.uint16()
 }
 
-func (s *rawConverter) Int32() (v int32) {
+func (s *rawConverter) Int32() int32 {
 	if s.Err() != nil {
-		return
+		return 0
 	}
 	s.unwrap()
 
 	return s.int32()
 }
 
-func (s *rawConverter) Uint32() (v uint32) {
+func (s *rawConverter) Uint32() uint32 {
 	if s.Err() != nil {
-		return
+		return 0
 	}
 	s.unwrap()
 
 	return s.uint32()
 }
 
-func (s *rawConverter) Int64() (v int64) {
+func (s *rawConverter) Int64() int64 {
 	if s.Err() != nil {
-		return
+		return 0
 	}
 	s.unwrap()
 
 	return s.int64()
 }
 
-func (s *rawConverter) Uint64() (v uint64) {
+func (s *rawConverter) Uint64() uint64 {
 	if s.Err() != nil {
-		return
+		return 0
 	}
 	s.unwrap()
 
 	return s.uint64()
 }
 
-func (s *rawConverter) Float() (v float32) {
+func (s *rawConverter) Float() float32 {
 	if s.Err() != nil {
-		return
+		return 0
 	}
 	s.unwrap()
 
 	return s.float()
 }
 
-func (s *rawConverter) Double() (v float64) {
+func (s *rawConverter) Double() float64 {
 	if s.Err() != nil {
-		return
+		return 0
 	}
 	s.unwrap()
 
 	return s.double()
 }
 
-func (s *rawConverter) Date() (v time.Time) {
+func (s *rawConverter) Date() time.Time {
 	s.unwrap()
 
 	return value.DateToTime(s.uint32())
 }
 
-func (s *rawConverter) Datetime() (v time.Time) {
+func (s *rawConverter) Datetime() time.Time {
 	s.unwrap()
 
 	return value.DatetimeToTime(s.uint32())
 }
 
-func (s *rawConverter) Timestamp() (v time.Time) {
+func (s *rawConverter) Timestamp() time.Time {
 	s.unwrap()
 
 	return value.TimestampToTime(s.uint64())
 }
 
-func (s *rawConverter) Interval() (v time.Duration) {
+func (s *rawConverter) Interval() time.Duration {
 	s.unwrap()
 
 	return value.IntervalToDuration(s.int64())
 }
 
-func (s *rawConverter) TzDate() (v time.Time) {
+func (s *rawConverter) TzDate() time.Time {
 	s.unwrap()
 	if s.isNull() {
-		return
+		return time.Time{}
 	}
 	src, err := value.TzDateToTime(s.text())
 	if err != nil {
@@ -207,10 +211,10 @@ func (s *rawConverter) TzDate() (v time.Time) {
 	return src
 }
 
-func (s *rawConverter) TzDatetime() (v time.Time) {
+func (s *rawConverter) TzDatetime() time.Time {
 	s.unwrap()
 	if s.isNull() {
-		return
+		return time.Time{}
 	}
 	src, err := value.TzDatetimeToTime(s.text())
 	if err != nil {
@@ -220,10 +224,10 @@ func (s *rawConverter) TzDatetime() (v time.Time) {
 	return src
 }
 
-func (s *rawConverter) TzTimestamp() (v time.Time) {
+func (s *rawConverter) TzTimestamp() time.Time {
 	s.unwrap()
 	if s.isNull() {
-		return
+		return time.Time{}
 	}
 	src, err := value.TzTimestampToTime(s.text())
 	if err != nil {
@@ -233,45 +237,45 @@ func (s *rawConverter) TzTimestamp() (v time.Time) {
 	return src
 }
 
-func (s *rawConverter) UTF8() (v string) {
+func (s *rawConverter) UTF8() string {
 	if s.Err() != nil {
-		return
+		return ""
 	}
 	s.unwrap()
 
 	return s.text()
 }
 
-func (s *rawConverter) YSON() (v []byte) {
+func (s *rawConverter) YSON() []byte {
 	s.unwrap()
 
 	return s.bytes()
 }
 
-func (s *rawConverter) JSON() (v []byte) {
+func (s *rawConverter) JSON() []byte {
 	s.unwrap()
 
 	return xstring.ToBytes(s.text())
 }
 
-func (s *rawConverter) JSONDocument() (v []byte) {
+func (s *rawConverter) JSONDocument() []byte {
 	s.unwrap()
 
 	return xstring.ToBytes(s.text())
 }
 
-func (s *rawConverter) UUID() (v [16]byte) {
+func (s *rawConverter) UUID() [16]byte {
 	if s.Err() != nil {
-		return
+		return [16]byte{}
 	}
 	s.unwrap()
 
 	return s.uint128()
 }
 
-func (s *rawConverter) DyNumber() (v string) {
+func (s *rawConverter) DyNumber() string {
 	if s.Err() != nil {
-		return
+		return ""
 	}
 	s.unwrap()
 
@@ -321,16 +325,17 @@ func (s *rawConverter) IsOptional() bool {
 
 // --------non-primitive---------
 
-func (s *rawConverter) ListIn() (size int) {
+func (s *rawConverter) ListIn() int {
+	var v int
 	if s.Err() != nil {
-		return 0
+		return v
 	}
 	x := s.stack.current()
 	if s.assertTypeList(x.t) != nil {
 		return s.itemsIn()
 	}
 
-	return 0
+	return v
 }
 
 func (s *rawConverter) ListItem(i int) {
@@ -360,16 +365,17 @@ func (s *rawConverter) ListOut() {
 	}
 }
 
-func (s *rawConverter) TupleIn() (size int) {
+func (s *rawConverter) TupleIn() int {
+	var v int
 	if s.Err() != nil {
-		return 0
+		return v
 	}
 	x := s.stack.current()
 	if s.assertTypeTuple(x.t) != nil {
 		return s.itemsIn()
 	}
 
-	return 0
+	return v
 }
 
 func (s *rawConverter) TupleItem(i int) {
@@ -399,25 +405,27 @@ func (s *rawConverter) TupleOut() {
 	}
 }
 
-func (s *rawConverter) StructIn() (size int) {
+func (s *rawConverter) StructIn() int {
+	var v int
 	if s.Err() != nil {
-		return 0
+		return v
 	}
 	x := s.stack.current()
 	if s.assertTypeStruct(x.t) != nil {
 		return s.itemsIn()
 	}
 
-	return 0
+	return v
 }
 
-func (s *rawConverter) StructField(i int) (name string) {
+func (s *rawConverter) StructField(i int) string {
+	var name string
 	if s.Err() != nil {
-		return
+		return name
 	}
 	p := s.stack.parent()
 	if !s.itemsBoundsCheck(p.v.Items, i) {
-		return
+		return name
 	}
 	if t := s.assertTypeStruct(p.t); t != nil {
 		m := t.StructType.Members[i]
@@ -430,7 +438,7 @@ func (s *rawConverter) StructField(i int) (name string) {
 		})
 	}
 
-	return
+	return name
 }
 
 func (s *rawConverter) StructOut() {
@@ -443,16 +451,17 @@ func (s *rawConverter) StructOut() {
 	}
 }
 
-func (s *rawConverter) DictIn() (size int) {
+func (s *rawConverter) DictIn() int {
+	var v int
 	if s.Err() != nil {
-		return 0
+		return v
 	}
 	x := s.stack.current()
 	if s.assertTypeDict(x.t) != nil {
 		return s.pairsIn()
 	}
 
-	return 0
+	return v
 }
 
 func (s *rawConverter) DictKey(i int) {
@@ -499,18 +508,18 @@ func (s *rawConverter) DictOut() {
 	}
 }
 
-func (s *rawConverter) Variant() (name string, index uint32) {
+func (s *rawConverter) Variant() (name string, index uint32) { //nolint:nonamedreturns //gocritic more important
 	if s.Err() != nil {
-		return
+		return name, index
 	}
 	x := s.stack.current()
 	t := s.assertTypeVariant(x.t)
 	if t == nil {
-		return
+		return name, index
 	}
 	v, index := s.variant()
 	if v == nil {
-		return
+		return name, index
 	}
 	name, typ := s.unwrapVariantType(t, index)
 	s.stack.scanItem.v = nil
@@ -545,26 +554,28 @@ func (s *rawConverter) Unwrap() {
 	})
 }
 
-func (s *rawConverter) Decimal(t types.Type) (v [16]byte) {
+func (s *rawConverter) Decimal(t types.Type) [16]byte {
+	v := [16]byte{}
 	if s.Err() != nil {
-		return
+		return v
 	}
 	s.unwrap()
 	if !s.assertCurrentTypeDecimal(t) {
-		return
+		return v
 	}
 
 	return s.uint128()
 }
 
-func (s *rawConverter) UnwrapDecimal() (v types.Decimal) {
+func (s *rawConverter) UnwrapDecimal() types.Decimal {
+	v := types.Decimal{}
 	if s.Err() != nil {
-		return
+		return v
 	}
 	s.unwrap()
 	d := s.assertTypeDecimal(s.stack.current().t)
 	if d == nil {
-		return
+		return v
 	}
 
 	return types.Decimal{
@@ -595,14 +606,15 @@ func (s *rawConverter) isCurrentTypeDecimal() bool {
 	return ok
 }
 
-func (s *rawConverter) unwrapVariantType(typ *Ydb.Type_VariantType, index uint32) (name string, t *Ydb.Type) {
+func (s *rawConverter) unwrapVariantType(typ *Ydb.Type_VariantType, index uint32) (string, *Ydb.Type) {
 	i := int(index)
+	t := Ydb.Type{}
 	switch x := typ.VariantType.Type.(type) {
 	case *Ydb.VariantType_TupleItems:
 		if i >= len(x.TupleItems.Elements) {
 			_ = s.errorf(0, "unimplemented")
 
-			return
+			return "", &t
 		}
 
 		return "", x.TupleItems.Elements[i]
@@ -611,7 +623,7 @@ func (s *rawConverter) unwrapVariantType(typ *Ydb.Type_VariantType, index uint32
 		if i >= len(x.StructItems.Members) {
 			_ = s.errorf(0, "unimplemented")
 
-			return
+			return "", &t
 		}
 		m := x.StructItems.Members[i]
 
@@ -622,15 +634,15 @@ func (s *rawConverter) unwrapVariantType(typ *Ydb.Type_VariantType, index uint32
 	}
 }
 
-func (s *rawConverter) variant() (v *Ydb.Value, index uint32) {
-	v = s.unwrapValue()
+func (s *rawConverter) variant() (*Ydb.Value, uint32) {
+	v := s.unwrapValue()
 	if v == nil {
-		return
+		return &Ydb.Value{}, 0
 	}
 	x := s.stack.current() // Is not nil if unwrapValue succeeded.
-	index = x.v.VariantIndex
+	index := x.v.VariantIndex
 
-	return
+	return v, index
 }
 
 func (s *rawConverter) itemsIn() int {
@@ -679,13 +691,13 @@ func (s *rawConverter) boundsCheck(n, i int) bool {
 	return true
 }
 
-func (s *scanner) assertTypeOptional(typ *Ydb.Type) (t *Ydb.Type_OptionalType) {
+func (s *scanner) assertTypeOptional(typ *Ydb.Type) *Ydb.Type_OptionalType {
 	x := typ.Type
-	if t, _ = x.(*Ydb.Type_OptionalType); t == nil {
+	if t, _ := x.(*Ydb.Type_OptionalType); t == nil {
 		s.typeError(x, t)
 	}
 
-	return
+	return &Ydb.Type_OptionalType{}
 }
 
 func (s *rawConverter) assertCurrentTypeNullable() bool {
@@ -743,58 +755,58 @@ func (s *rawConverter) assertCurrentTypeDecimal(t types.Type) bool {
 	return true
 }
 
-func (s *rawConverter) assertTypeList(typ *Ydb.Type) (t *Ydb.Type_ListType) {
+func (s *rawConverter) assertTypeList(typ *Ydb.Type) *Ydb.Type_ListType {
 	x := typ.Type
-	if t, _ = x.(*Ydb.Type_ListType); t == nil {
+	if t, _ := x.(*Ydb.Type_ListType); t == nil {
 		s.typeError(x, t)
 	}
 
-	return
+	return &Ydb.Type_ListType{}
 }
 
-func (s *rawConverter) assertTypeTuple(typ *Ydb.Type) (t *Ydb.Type_TupleType) {
+func (s *rawConverter) assertTypeTuple(typ *Ydb.Type) *Ydb.Type_TupleType {
 	x := typ.Type
-	if t, _ = x.(*Ydb.Type_TupleType); t == nil {
+	if t, _ := x.(*Ydb.Type_TupleType); t == nil {
 		s.typeError(x, t)
 	}
 
-	return
+	return &Ydb.Type_TupleType{}
 }
 
-func (s *rawConverter) assertTypeStruct(typ *Ydb.Type) (t *Ydb.Type_StructType) {
+func (s *rawConverter) assertTypeStruct(typ *Ydb.Type) *Ydb.Type_StructType {
 	x := typ.Type
-	if t, _ = x.(*Ydb.Type_StructType); t == nil {
+	if t, _ := x.(*Ydb.Type_StructType); t == nil {
 		s.typeError(x, t)
 	}
 
-	return
+	return &Ydb.Type_StructType{}
 }
 
-func (s *rawConverter) assertTypeDict(typ *Ydb.Type) (t *Ydb.Type_DictType) {
+func (s *rawConverter) assertTypeDict(typ *Ydb.Type) *Ydb.Type_DictType {
 	x := typ.Type
-	if t, _ = x.(*Ydb.Type_DictType); t == nil {
+	if t, _ := x.(*Ydb.Type_DictType); t == nil {
 		s.typeError(x, t)
 	}
 
-	return
+	return &Ydb.Type_DictType{}
 }
 
-func (s *rawConverter) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.Type_DecimalType) {
+func (s *rawConverter) assertTypeDecimal(typ *Ydb.Type) *Ydb.Type_DecimalType {
 	x := typ.Type
-	if t, _ = x.(*Ydb.Type_DecimalType); t == nil {
+	if t, _ := x.(*Ydb.Type_DecimalType); t == nil {
 		s.typeError(x, t)
 	}
 
-	return
+	return &Ydb.Type_DecimalType{}
 }
 
-func (s *rawConverter) assertTypeVariant(typ *Ydb.Type) (t *Ydb.Type_VariantType) {
+func (s *rawConverter) assertTypeVariant(typ *Ydb.Type) *Ydb.Type_VariantType {
 	x := typ.Type
-	if t, _ = x.(*Ydb.Type_VariantType); t == nil {
+	if t, _ := x.(*Ydb.Type_VariantType); t == nil {
 		s.typeError(x, t)
 	}
 
-	return
+	return &Ydb.Type_VariantType{}
 }
 
 func (s *rawConverter) boundsError(n, i int) {

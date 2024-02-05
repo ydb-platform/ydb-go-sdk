@@ -22,9 +22,9 @@ var (
 )
 
 //nolint:gocyclo
-func toValue(v interface{}) (_ types.Value, err error) {
+func toValue(v interface{}) (types.Value, error) {
 	if valuer, ok := v.(driver.Valuer); ok {
-		v, err = valuer.Value()
+		_, err := valuer.Value()
 		if err != nil {
 			return nil, fmt.Errorf("ydb: driver.Valuer error: %w", err)
 		}
@@ -174,8 +174,8 @@ func toYdbParam(name string, value interface{}) (table.ParameterOption, error) {
 	return table.ValueParam(name, v), nil
 }
 
-func Params(args ...interface{}) (params []table.ParameterOption, _ error) {
-	params = make([]table.ParameterOption, 0, len(args))
+func Params(args ...interface{}) ([]table.ParameterOption, error) {
+	params := make([]table.ParameterOption, 0, len(args))
 	for i, arg := range args {
 		switch x := arg.(type) {
 		case driver.NamedValue:

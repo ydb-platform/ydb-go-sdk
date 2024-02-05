@@ -30,7 +30,8 @@ var (
 	}
 )
 
-func defaultGrpcOptions(t *trace.Driver, secure bool, tlsConfig *tls.Config) (opts []grpc.DialOption) {
+func defaultGrpcOptions(t *trace.Driver, secure bool, tlsConfig *tls.Config) []grpc.DialOption {
+	var opts []grpc.DialOption
 	opts = append(opts,
 		// keep-aliving all connections
 		grpc.WithKeepaliveParams(
@@ -84,7 +85,7 @@ func defaultTLSConfig() *tls.Config {
 	}
 }
 
-func defaultConfig() (c *Config) {
+func defaultConfig() *Config {
 	return &Config{
 		credentials: credentials.NewAnonymousCredentials(
 			credentials.WithSourceInfo(stack.Record(0)),

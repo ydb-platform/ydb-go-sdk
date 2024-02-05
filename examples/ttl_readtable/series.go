@@ -54,8 +54,8 @@ func deleteExpiredDocuments(ctx context.Context, c table.Client, prefix string, 
 	writeTx := table.TxControl(table.BeginTx(table.WithSerializableReadWrite()), table.CommitTx())
 
 	err := c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, _, err = s.Execute(ctx, writeTx, query,
+		func(ctx context.Context, s table.Session) error {
+			_, _, err := s.Execute(ctx, writeTx, query,
 				table.NewQueryParameters(
 					table.ValueParam("$keys", keys),
 					table.ValueParam("$timestamp", types.Uint64Value(timestamp)),
@@ -74,9 +74,12 @@ func deleteExpiredRange(ctx context.Context, c table.Client, prefix string, time
 ) error {
 	fmt.Printf("> DeleteExpiredRange: %+v\n", keyRange)
 
-	var res result.StreamResult
-	err := c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+	var (
+		res result.StreamResult
+		err error
+	)
+	err = c.Do(ctx,
+		func(ctx context.Context, s table.Session) error {
 			res, err = s.StreamReadTable(ctx, path.Join(prefix, "documents"),
 				options.ReadKeyRange(keyRange),
 				options.ReadColumn("doc_id"),
@@ -136,9 +139,12 @@ func deleteExpiredRange(ctx context.Context, c table.Client, prefix string, time
 func deleteExpired(ctx context.Context, c table.Client, prefix string, timestamp uint64) error {
 	fmt.Printf("> DeleteExpired: timestamp: %v:\n", timestamp)
 
-	var res options.Description
-	err := c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+	var (
+		res options.Description
+		err error
+	)
+	err = c.Do(ctx,
+		func(ctx context.Context, s table.Session) error {
 			res, err = s.DescribeTable(ctx, path.Join(prefix, "documents"), options.WithShardKeyBounds())
 
 			return err
@@ -176,9 +182,12 @@ func readDocument(ctx context.Context, c table.Client, prefix, url string) error
 
 	readTx := table.TxControl(table.BeginTx(table.WithOnlineReadOnly()), table.CommitTx())
 
-	var res result.Result
-	err := c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+	var (
+		res result.Result
+		err error
+	)
+	err = c.Do(ctx,
+		func(ctx context.Context, s table.Session) error {
 			_, res, err = s.Execute(ctx, readTx, query, table.NewQueryParameters(
 				table.ValueParam("$url", types.TextValue(url))),
 			)
@@ -239,8 +248,8 @@ func addDocument(ctx context.Context, c table.Client, prefix, url, html string, 
 	writeTx := table.TxControl(table.BeginTx(table.WithSerializableReadWrite()), table.CommitTx())
 
 	err := c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, _, err = s.Execute(ctx, writeTx, query, table.NewQueryParameters(
+		func(ctx context.Context, s table.Session) error {
+			_, _, err := s.Execute(ctx, writeTx, query, table.NewQueryParameters(
 				table.ValueParam("$url", types.TextValue(url)),
 				table.ValueParam("$html", types.TextValue(html)),
 				table.ValueParam("$timestamp", types.Uint64Value(timestamp))),
@@ -253,8 +262,8 @@ func addDocument(ctx context.Context, c table.Client, prefix, url, html string, 
 	return err
 }
 
-func createTables(ctx context.Context, c table.Client, prefix string) (err error) {
-	err = c.Do(ctx,
+func createTables(ctx context.Context, c table.Client, prefix string) error {
+	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) error {
 			return s.CreateTable(ctx, path.Join(prefix, "documents"),
 				options.WithColumn("doc_id", types.Optional(types.TypeUint64)),

@@ -22,7 +22,8 @@ func GenerateDeclareSection[T *table.QueryParameters | []table.ParameterOption |
 	case []table.ParameterOption:
 		return internal.GenerateDeclareSection(table.NewQueryParameters(v...))
 	case []sql.NamedArg:
-		values, err := bind.Params(func() (newArgs []interface{}) {
+		values, err := bind.Params(func() []interface{} {
+			var newArgs []interface{}
 			for i := range v {
 				newArgs = append(newArgs, v[i])
 			}

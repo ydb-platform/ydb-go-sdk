@@ -68,8 +68,12 @@ func Gte(lhs, rhs string) bool {
 	return true
 }
 
-func parse(s string) (v version, err error) {
-	ss := strings.SplitN(s, "-", 2)
+func parse(s string) (version, error) {
+	var (
+		v   version
+		err error
+		ss  = strings.SplitN(s, "-", 2)
+	)
 	if len(ss) == 2 {
 		v.Suffix = ss[1]
 	}

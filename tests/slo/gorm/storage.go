@@ -74,7 +74,12 @@ func NewStorage(cfg *config.Config, poolSize int) (*Storage, error) {
 	return s, nil
 }
 
-func (s *Storage) Read(ctx context.Context, id generator.RowID) (r generator.Row, attempts int, err error) {
+func (s *Storage) Read(ctx context.Context, id generator.RowID) (generator.Row, int, error) {
+	var (
+		r        generator.Row
+		attempts int
+		err      error
+	)
 	if err = ctx.Err(); err != nil {
 		return generator.Row{}, attempts, err
 	}
@@ -88,7 +93,7 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (r generator.Row
 	}
 
 	err = retry.Do(ydbSDK.WithTxControl(ctx, readTx), db,
-		func(ctx context.Context, cc *sql.Conn) (err error) {
+		func(ctx context.Context, cc *sql.Conn) error {
 			if err = ctx.Err(); err != nil {
 				return err
 			}
@@ -124,7 +129,11 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (r generator.Row
 	return r, attempts, err
 }
 
-func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, err error) {
+func (s *Storage) Write(ctx context.Context, row generator.Row) (int, error) {
+	var (
+		attempts int
+		err      error
+	)
 	if err = ctx.Err(); err != nil {
 		return attempts, err
 	}
@@ -138,7 +147,7 @@ func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, e
 	}
 
 	err = retry.Do(ydbSDK.WithTxControl(ctx, writeTx), db,
-		func(ctx context.Context, cc *sql.Conn) (err error) {
+		func(ctx context.Context, cc *sql.Conn) error {
 			if err = ctx.Err(); err != nil {
 				return err
 			}

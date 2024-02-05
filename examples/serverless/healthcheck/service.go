@@ -27,7 +27,11 @@ type service struct {
 
 var once sync.Once
 
-func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service, err error) {
+func getService(ctx context.Context, dsn string, opts ...ydb.Option) (*service, error) {
+	var (
+		s   *service
+		err error
+	)
 	once.Do(func() {
 		s = &service{
 			client: &http.Client{
@@ -93,7 +97,7 @@ func (s *service) createTableIfNotExists(ctx context.Context) error {
 	)
 }
 
-func (s *service) ping(ctx context.Context, path string) (code int32, err error) {
+func (s *service) ping(ctx context.Context, path string) (int32, error) {
 	uri, err := url.Parse(path)
 	if err != nil {
 		return -1, err
@@ -153,7 +157,7 @@ func (s *service) check(ctx context.Context, urls []string) error {
 	return s.upsertRows(ctx, rows)
 }
 
-func (s *service) upsertRows(ctx context.Context, rows []row) (err error) {
+func (s *service) upsertRows(ctx context.Context, rows []row) error {
 	values := make([]types.Value, len(rows))
 	for i := range rows {
 		values[i] = types.StructValue(
@@ -169,9 +173,9 @@ func (s *service) upsertRows(ctx context.Context, rows []row) (err error) {
 			}(rows[i].err))),
 		)
 	}
-	err = s.db.Table().Do(ctx,
-		func(ctx context.Context, session table.Session) (err error) {
-			_, _, err = session.Execute(ctx,
+	err := s.db.Table().Do(ctx,
+		func(ctx context.Context, session table.Session) error {
+			_, _, err := session.Execute(ctx,
 				table.SerializableReadWriteTxControl(table.CommitTx()),
 				fmt.Sprintf(`
 					PRAGMA TablePathPrefix("%s");

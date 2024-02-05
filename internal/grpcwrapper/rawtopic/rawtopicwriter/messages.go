@@ -146,8 +146,11 @@ type WriteRequest struct {
 	Codec    rawtopiccommon.Codec
 }
 
-func (r *WriteRequest) toProto() (p *Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest, err error) {
-	messages := make([]*Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData, len(r.Messages))
+func (r *WriteRequest) toProto() (*Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest, error) {
+	var (
+		messages = make([]*Ydb_Topic.StreamWriteMessage_WriteRequest_MessageData, len(r.Messages))
+		err      error
+	)
 
 	for i := range r.Messages {
 		messages[i], err = r.Messages[i].ToProto()

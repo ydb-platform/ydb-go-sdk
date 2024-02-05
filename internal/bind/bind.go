@@ -27,11 +27,11 @@ type Bind interface {
 type Bindings []Bind
 
 func (bindings Bindings) RewriteQuery(query string, args ...interface{}) (
-	yql string, _ *table.QueryParameters, err error,
+	string, *table.QueryParameters, error,
 ) {
 	if len(bindings) == 0 {
 		var params []table.ParameterOption
-		params, err = Params(args...)
+		params, err := Params(args...)
 		if err != nil {
 			return "", nil, xerrors.WithStackTrace(err)
 		}
@@ -39,7 +39,10 @@ func (bindings Bindings) RewriteQuery(query string, args ...interface{}) (
 		return query, table.NewQueryParameters(params...), nil
 	}
 
-	buffer := xstring.Buffer()
+	var (
+		err    error
+		buffer = xstring.Buffer()
+	)
 	defer buffer.Free()
 
 	for i := range bindings {
