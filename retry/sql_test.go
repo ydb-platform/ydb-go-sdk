@@ -196,7 +196,21 @@ func TestDoTx(t *testing.T) {
 					db := sql.OpenDB(m)
 					var attempts int
 					err := DoTx(context.Background(), db,
-						withTestSelectOne(attempts),
+						func(ctx context.Context, tx *sql.Tx) error {
+							attempts++
+							if attempts > 10 {
+								return nil
+							}
+							rows, err := tx.QueryContext(ctx, "SELECT 1")
+							if err != nil {
+								return err
+							}
+							defer func() {
+								_ = rows.Close()
+							}()
+
+							return rows.Err()
+						},
 						WithIdempotent(bool(idempotentType)),
 						WithFastBackoff(backoff.New(backoff.WithSlotDuration(time.Nanosecond))),
 						WithSlowBackoff(backoff.New(backoff.WithSlotDuration(time.Nanosecond))),
@@ -213,63 +227,44 @@ func TestDoTx(t *testing.T) {
 							},
 						}),
 					)
-					if tt.canRetry[idempotentType] {
-						validateRetry(t, err, attempts, m, tt)
-					} else if err == nil {
-						t.Errorf("unexpected nil err (attempts=%d, driver conns=%d)", attempts, m.conns)
-					}
+					canRetry(t, tt, idempotentType, err, attempts, m)
 				})
 			}
 		})
 	}
 }
 
-// validateRetry is a function that validates the retry behavior of a transaction.
-func validateRetry(
-	t *testing.T,
+// canRetry checks if a retry can be performed based on the given parameters.
+//
+//nolint:nestif
+func canRetry(t *testing.T, tt struct {
+	err           error
+	backoff       backoff.Type
+	deleteSession bool
+	canRetry      map[idempotency]bool
+},
+	idempotentType idempotency,
 	err error,
 	attempts int,
 	m *mockConnector,
-	tt struct {
-		err           error
-		backoff       backoff.Type
-		deleteSession bool
-		canRetry      map[idempotency]bool
-	},
 ) {
-	if err != nil {
-		t.Errorf("unexpected err after attempts=%d and driver conns=%d: %v)", attempts, m.conns, err)
-	}
-	if attempts <= 1 {
-		t.Errorf("must be attempts > 1 (actual=%d), driver conns=%d)", attempts, m.conns)
-	}
-	if tt.deleteSession {
-		if m.conns <= 1 {
-			t.Errorf("must be retry on different conns (attempts=%d, driver conns=%d)", attempts, m.conns)
-		}
-	} else {
-		if m.conns > 1 {
-			t.Errorf("must be retry on single conn (attempts=%d, driver conns=%d)", attempts, m.conns)
-		}
-	}
-}
-
-// withTestSelectOne is a function that returns a closure. The closure takes a context and a *sql.Tx
-// as arguments and performs a query on the transaction. It is used to execute a query on a database.
-func withTestSelectOne(attempts int) func(ctx context.Context, tx *sql.Tx) error {
-	return func(ctx context.Context, tx *sql.Tx) error {
-		attempts++
-		if attempts > 10 {
-			return nil
-		}
-		rows, err := tx.QueryContext(ctx, "SELECT 1")
+	if tt.canRetry[idempotentType] {
 		if err != nil {
-			return err
+			t.Errorf("unexpected err after attempts=%d and driver conns=%d: %v)", attempts, m.conns, err)
 		}
-		defer func() {
-			_ = rows.Close()
-		}()
-
-		return rows.Err()
+		if attempts <= 1 {
+			t.Errorf("must be attempts > 1 (actual=%d), driver conns=%d)", attempts, m.conns)
+		}
+		if tt.deleteSession {
+			if m.conns <= 1 {
+				t.Errorf("must be retry on different conns (attempts=%d, driver conns=%d)", attempts, m.conns)
+			}
+		} else {
+			if m.conns > 1 {
+				t.Errorf("must be retry on single conn (attempts=%d, driver conns=%d)", attempts, m.conns)
+			}
+		}
+	} else if err == nil {
+		t.Errorf("unexpected nil err (attempts=%d, driver conns=%d)", attempts, m.conns)
 	}
 }

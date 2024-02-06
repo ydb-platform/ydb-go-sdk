@@ -217,6 +217,9 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 	})
 }
 
+// waitReader waits for a condition where the lastReadSeqNo is equal to the lastSentSeqNo.
+// It periodically checks for changes in the lastReadSeqNo and waits for a read to finish or a fatal error to occur.
+// If the waitTimeout is reached, a fatal error is triggered.
 func waitReader(
 	lastReadSeqNo *xatomic.Int64,
 	lastSentSeqNo int64,
