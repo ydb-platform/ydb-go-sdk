@@ -13,8 +13,33 @@ func Driver(l Logger, d trace.Detailer, opts ...Option) (t trace.Driver) {
 	return internalDriver(wrapLogger(l, opts...), d)
 }
 
-func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocyclo
-	t.OnResolve = func(
+func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) {
+	t.OnResolve = onResolve(l, d)
+	t.OnInit = onInit(l, d)
+	t.OnClose = onClose(l, d)
+	t.OnConnDial = connDial(l, d)
+	t.OnConnStateChange = connStateChange(l, d)
+	t.OnConnPark = connPark(l, d)
+	t.OnConnClose = onConnClose(l, d)
+	t.OnConnInvoke = connInvoke(l, d)
+	t.OnConnNewStream = connNewStream(l, d)
+	t.OnConnBan = connBan(l, d)
+	t.OnConnAllow = connAllow(l, d)
+	t.OnRepeaterWakeUp = repeaterWakeUp(l, d)
+	t.OnBalancerInit = balancerInit(l, d)
+	t.OnBalancerClose = balancerClose(l, d)
+	t.OnBalancerChooseEndpoint = balancerChooseEndpoint(l, d)
+	t.OnBalancerUpdate = balancerUpdate(l, d)
+	t.OnGetCredentials = getCredentials(l, d)
+
+	return t
+}
+
+func onResolve(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DriverResolveStartInfo) func(trace.DriverResolveDoneInfo) {
+	return func(
 		info trace.DriverResolveStartInfo,
 	) func(
 		trace.DriverResolveDoneInfo,
@@ -46,7 +71,13 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			}
 		}
 	}
-	t.OnInit = func(info trace.DriverInitStartInfo) func(trace.DriverInitDoneInfo) {
+}
+
+func onInit(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DriverInitStartInfo) func(trace.DriverInitDoneInfo) {
+	return func(info trace.DriverInitStartInfo) func(trace.DriverInitDoneInfo) {
 		if d.Details()&trace.DriverEvents == 0 {
 			return nil
 		}
@@ -81,7 +112,13 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			}
 		}
 	}
-	t.OnClose = func(info trace.DriverCloseStartInfo) func(trace.DriverCloseDoneInfo) {
+}
+
+func onClose(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DriverCloseStartInfo) func(trace.DriverCloseDoneInfo) {
+	return func(info trace.DriverCloseStartInfo) func(trace.DriverCloseDoneInfo) {
 		if d.Details()&trace.DriverEvents == 0 {
 			return nil
 		}
@@ -103,7 +140,13 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			}
 		}
 	}
-	t.OnConnDial = func(info trace.DriverConnDialStartInfo) func(trace.DriverConnDialDoneInfo) {
+}
+
+func connDial(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DriverConnDialStartInfo) func(trace.DriverConnDialDoneInfo) {
+	return func(info trace.DriverConnDialStartInfo) func(trace.DriverConnDialDoneInfo) {
 		if d.Details()&trace.DriverConnEvents == 0 {
 			return nil
 		}
@@ -130,7 +173,13 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			}
 		}
 	}
-	t.OnConnStateChange = func(info trace.DriverConnStateChangeStartInfo) func(trace.DriverConnStateChangeDoneInfo) {
+}
+
+func connStateChange(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DriverConnStateChangeStartInfo) func(trace.DriverConnStateChangeDoneInfo) {
+	return func(info trace.DriverConnStateChangeStartInfo) func(trace.DriverConnStateChangeDoneInfo) {
 		if d.Details()&trace.DriverConnEvents == 0 {
 			return nil
 		}
@@ -150,7 +199,13 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			)
 		}
 	}
-	t.OnConnPark = func(info trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
+}
+
+func connPark(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
+	return func(info trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
 		if d.Details()&trace.DriverConnEvents == 0 {
 			return nil
 		}
@@ -177,7 +232,13 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			}
 		}
 	}
-	t.OnConnClose = func(info trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
+}
+
+func onConnClose(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
+	return func(info trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
 		if d.Details()&trace.DriverConnEvents == 0 {
 			return nil
 		}
@@ -204,7 +265,13 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			}
 		}
 	}
-	t.OnConnInvoke = func(info trace.DriverConnInvokeStartInfo) func(trace.DriverConnInvokeDoneInfo) {
+}
+
+func connInvoke(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DriverConnInvokeStartInfo) func(trace.DriverConnInvokeDoneInfo) {
+	return func(info trace.DriverConnInvokeStartInfo) func(trace.DriverConnInvokeDoneInfo) {
 		if d.Details()&trace.DriverConnEvents == 0 {
 			return nil
 		}
@@ -237,7 +304,14 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			}
 		}
 	}
-	t.OnConnNewStream = func(
+}
+
+func connNewStream(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DriverConnNewStreamStartInfo) func(trace.DriverConnNewStreamRecvInfo) func(
+	trace.DriverConnNewStreamDoneInfo) {
+	return func(
 		info trace.DriverConnNewStreamStartInfo,
 	) func(
 		trace.DriverConnNewStreamRecvInfo,
@@ -294,7 +368,13 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			}
 		}
 	}
-	t.OnConnBan = func(info trace.DriverConnBanStartInfo) func(trace.DriverConnBanDoneInfo) {
+}
+
+func connBan(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DriverConnBanStartInfo) func(trace.DriverConnBanDoneInfo) {
+	return func(info trace.DriverConnBanStartInfo) func(trace.DriverConnBanDoneInfo) {
 		if d.Details()&trace.DriverConnEvents == 0 {
 			return nil
 		}
@@ -316,7 +396,13 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			)
 		}
 	}
-	t.OnConnAllow = func(info trace.DriverConnAllowStartInfo) func(trace.DriverConnAllowDoneInfo) {
+}
+
+func connAllow(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DriverConnAllowStartInfo) func(trace.DriverConnAllowDoneInfo) {
+	return func(info trace.DriverConnAllowStartInfo) func(trace.DriverConnAllowDoneInfo) {
 		if d.Details()&trace.DriverConnEvents == 0 {
 			return nil
 		}
@@ -335,7 +421,13 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			)
 		}
 	}
-	t.OnRepeaterWakeUp = func(info trace.DriverRepeaterWakeUpStartInfo) func(trace.DriverRepeaterWakeUpDoneInfo) {
+}
+
+func repeaterWakeUp(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DriverRepeaterWakeUpStartInfo) func(trace.DriverRepeaterWakeUpDoneInfo) {
+	return func(info trace.DriverRepeaterWakeUpStartInfo) func(trace.DriverRepeaterWakeUpDoneInfo) {
 		if d.Details()&trace.DriverRepeaterEvents == 0 {
 			return nil
 		}
@@ -366,7 +458,13 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			}
 		}
 	}
-	t.OnBalancerInit = func(info trace.DriverBalancerInitStartInfo) func(trace.DriverBalancerInitDoneInfo) {
+}
+
+func balancerInit(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DriverBalancerInitStartInfo) func(trace.DriverBalancerInitDoneInfo) {
+	return func(info trace.DriverBalancerInitStartInfo) func(trace.DriverBalancerInitDoneInfo) {
 		if d.Details()&trace.DriverBalancerEvents == 0 {
 			return nil
 		}
@@ -380,7 +478,13 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			)
 		}
 	}
-	t.OnBalancerClose = func(info trace.DriverBalancerCloseStartInfo) func(trace.DriverBalancerCloseDoneInfo) {
+}
+
+func balancerClose(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DriverBalancerCloseStartInfo) func(trace.DriverBalancerCloseDoneInfo) {
+	return func(info trace.DriverBalancerCloseStartInfo) func(trace.DriverBalancerCloseDoneInfo) {
 		if d.Details()&trace.DriverBalancerEvents == 0 {
 			return nil
 		}
@@ -402,7 +506,13 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			}
 		}
 	}
-	t.OnBalancerChooseEndpoint = func(
+}
+
+func balancerChooseEndpoint(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DriverBalancerChooseEndpointStartInfo) func(trace.DriverBalancerChooseEndpointDoneInfo) {
+	return func(
 		info trace.DriverBalancerChooseEndpointStartInfo,
 	) func(
 		trace.DriverBalancerChooseEndpointDoneInfo,
@@ -429,7 +539,13 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			}
 		}
 	}
-	t.OnBalancerUpdate = func(
+}
+
+func balancerUpdate(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DriverBalancerUpdateStartInfo) func(trace.DriverBalancerUpdateDoneInfo) {
+	return func(
 		info trace.DriverBalancerUpdateStartInfo,
 	) func(
 		trace.DriverBalancerUpdateDoneInfo,
@@ -453,7 +569,13 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			)
 		}
 	}
-	t.OnGetCredentials = func(info trace.DriverGetCredentialsStartInfo) func(trace.DriverGetCredentialsDoneInfo) {
+}
+
+func getCredentials(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DriverGetCredentialsStartInfo) func(trace.DriverGetCredentialsDoneInfo) {
+	return func(info trace.DriverGetCredentialsStartInfo) func(trace.DriverGetCredentialsDoneInfo) {
 		if d.Details()&trace.DriverCredentialsEvents == 0 {
 			return nil
 		}
@@ -477,6 +599,4 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 			}
 		}
 	}
-
-	return t
 }

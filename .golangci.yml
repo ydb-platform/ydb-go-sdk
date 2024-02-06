@@ -227,7 +227,6 @@ linters:
     - forcetypeassert
     - funlen
     - gochecknoglobals
-    - gocognit
     - godot
     - goerr113
     - golint

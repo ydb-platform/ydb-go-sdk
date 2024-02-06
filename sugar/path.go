@@ -93,12 +93,9 @@ func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove s
 	fullSysTablePath := path.Join(db.Name(), sysDirectory)
 	var rmPath func(int, string) error
 	rmPath = func(i int, p string) error {
-		if exists, err := IsDirectoryExists(ctx, db.Scheme(), p); err != nil {
-			return xerrors.WithStackTrace(
-				fmt.Errorf("check directory %q exists failed: %w", p, err),
-			)
-		} else if !exists {
-			return nil
+		err := checkDirectoryExists(ctx, db, p)
+		if err != nil {
+			return err
 		}
 
 		entry, err := db.Scheme().DescribePath(ctx, p)
@@ -108,7 +105,7 @@ func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove s
 			)
 		}
 
-		if entry.Type != scheme.EntryDirectory && entry.Type != scheme.EntryDatabase {
+		if !isValidEntry(&entry) {
 			return nil
 		}
 
@@ -157,22 +154,61 @@ func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove s
 			}
 		}
 
-		if entry.Type != scheme.EntryDirectory {
-			return nil
-		}
-
-		err = db.Scheme().RemoveDirectory(ctx, p)
+		err = removeDirectory(ctx, db, &entry, p)
 		if err != nil {
-			return xerrors.WithStackTrace(
-				fmt.Errorf("removing directory %q failed: %w", p, err),
-			)
+			return err
 		}
 
 		return nil
 	}
+	pathToRemove = removeWithPrefix(pathToRemove, db)
+
+	return rmPath(0, pathToRemove)
+}
+
+// checkDirectoryExists checks if a directory exists in the specified database.
+func checkDirectoryExists(ctx context.Context, db dbFoRemoveRecursive, p string) error {
+	exists, err := IsDirectoryExists(ctx, db.Scheme(), p)
+	if err != nil {
+		return xerrors.WithStackTrace(
+			fmt.Errorf("check directory %q exists failed: %w", p, err),
+		)
+	} else if !exists {
+		return nil
+	}
+
+	return nil
+}
+
+// isValidEntry checks if the given entry is a valid directory or database entry.
+func isValidEntry(entry *scheme.Entry) bool {
+	if entry.Type != scheme.EntryDirectory && entry.Type != scheme.EntryDatabase {
+		return false
+	}
+
+	return true
+}
+
+// removeWithPrefix prepends the db.Name() to the pathToRemove string if it does not already have the prefix.
+func removeWithPrefix(pathToRemove string, db dbFoRemoveRecursive) string {
 	if !strings.HasPrefix(pathToRemove, db.Name()) {
 		pathToRemove = path.Join(db.Name(), pathToRemove)
 	}
 
-	return rmPath(0, pathToRemove)
+	return pathToRemove
+}
+
+// removeDirectory removes a directory from the database.
+func removeDirectory(ctx context.Context, db dbFoRemoveRecursive, entry *scheme.Entry, p string) error {
+	if entry.Type != scheme.EntryDirectory {
+		return nil
+	}
+	err := db.Scheme().RemoveDirectory(ctx, p)
+	if err != nil {
+		return xerrors.WithStackTrace(
+			fmt.Errorf("removing directory %q failed: %w", p, err),
+		)
+	}
+
+	return nil
 }

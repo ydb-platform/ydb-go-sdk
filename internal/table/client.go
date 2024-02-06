@@ -127,15 +127,7 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 		}
 	}
 
-	defer func() {
-		if s == nil {
-			return
-		}
-		for _, onCreate := range options.onCreate {
-			onCreate(s)
-		}
-		s.onClose = append(s.onClose, options.onClose...)
-	}()
+	defer c.loadAndFinalizeSession(&options, s)
 
 	type result struct {
 		s   *session
@@ -221,6 +213,17 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 
 		return r.s, nil
 	}
+}
+
+// loadAndFinalizeSession loads and finalizes a session with the specified options and session.
+func (c *Client) loadAndFinalizeSession(options *createSessionOptions, s *session) {
+	if s == nil {
+		return
+	}
+	for _, onCreate := range options.onCreate {
+		onCreate(s)
+	}
+	s.onClose = append(s.onClose, options.onClose...)
 }
 
 func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ table.ClosableSession, err error) {

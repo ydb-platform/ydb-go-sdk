@@ -180,7 +180,6 @@ func (m *mockStmt) QueryContext(ctx context.Context, args []driver.NamedValue) (
 	return m.conn.QueryContext(ctx, m.query, args)
 }
 
-//nolint:nestif
 func TestDoTx(t *testing.T) {
 	for _, idempotentType := range []idempotency{
 		idempotent,
@@ -228,27 +227,44 @@ func TestDoTx(t *testing.T) {
 							},
 						}),
 					)
-					if tt.canRetry[idempotentType] {
-						if err != nil {
-							t.Errorf("unexpected err after attempts=%d and driver conns=%d: %v)", attempts, m.conns, err)
-						}
-						if attempts <= 1 {
-							t.Errorf("must be attempts > 1 (actual=%d), driver conns=%d)", attempts, m.conns)
-						}
-						if tt.deleteSession {
-							if m.conns <= 1 {
-								t.Errorf("must be retry on different conns (attempts=%d, driver conns=%d)", attempts, m.conns)
-							}
-						} else {
-							if m.conns > 1 {
-								t.Errorf("must be retry on single conn (attempts=%d, driver conns=%d)", attempts, m.conns)
-							}
-						}
-					} else if err == nil {
-						t.Errorf("unexpected nil err (attempts=%d, driver conns=%d)", attempts, m.conns)
-					}
+					canRetry(t, tt, idempotentType, err, attempts, m)
 				})
 			}
 		})
+	}
+}
+
+// canRetry checks if a retry can be performed based on the given parameters.
+//
+//nolint:nestif
+func canRetry(t *testing.T, tt struct {
+	err           error
+	backoff       backoff.Type
+	deleteSession bool
+	canRetry      map[idempotency]bool
+},
+	idempotentType idempotency,
+	err error,
+	attempts int,
+	m *mockConnector,
+) {
+	if tt.canRetry[idempotentType] {
+		if err != nil {
+			t.Errorf("unexpected err after attempts=%d and driver conns=%d: %v)", attempts, m.conns, err)
+		}
+		if attempts <= 1 {
+			t.Errorf("must be attempts > 1 (actual=%d), driver conns=%d)", attempts, m.conns)
+		}
+		if tt.deleteSession {
+			if m.conns <= 1 {
+				t.Errorf("must be retry on different conns (attempts=%d, driver conns=%d)", attempts, m.conns)
+			}
+		} else {
+			if m.conns > 1 {
+				t.Errorf("must be retry on single conn (attempts=%d, driver conns=%d)", attempts, m.conns)
+			}
+		}
+	} else if err == nil {
+		t.Errorf("unexpected nil err (attempts=%d, driver conns=%d)", attempts, m.conns)
 	}
 }

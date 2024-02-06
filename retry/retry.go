@@ -276,21 +276,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 			)
 
 		default:
-			err := func() (err error) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-							err = xerrors.WithStackTrace(
-								fmt.Errorf("panic recovered: %v", e),
-							)
-						}
-					}()
-				}
-
-				return op(ctx)
-			}()
-
+			err := RecoveryCallbackWrapper(ctx, op, options)
 			if err == nil {
 				return nil
 			}
@@ -333,6 +319,25 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 			onIntermediate(err)
 		}
 	}
+}
+
+// RecoveryCallbackWrapper is a function that wraps the provided `op` retry operation
+// with a panic recovery mechanism. If the `options.panicCallback` is specified, it
+// is invoked with the recovered value, and an error is returned with the recovered value wrapped
+// as the cause. This function returns the result of the `op` retry operation.
+func RecoveryCallbackWrapper(context context.Context, op retryOperation, options *retryOptions) (err error) {
+	if options.panicCallback != nil {
+		defer func() {
+			if e := recover(); e != nil {
+				options.panicCallback(e)
+				err = xerrors.WithStackTrace(
+					fmt.Errorf("panic recovered: %v", e),
+				)
+			}
+		}()
+	}
+
+	return op(context)
 }
 
 // Check returns retry mode for queryErr.
