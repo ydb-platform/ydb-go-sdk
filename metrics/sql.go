@@ -58,6 +58,7 @@ func setupOnConnectorConnect(config Config, conns GaugeVec) func(trace.DatabaseS
 				}
 			}
 		}
+
 		return nil
 	}
 }
@@ -69,6 +70,7 @@ func setupOnConnCloseConnect(config Config, conns GaugeVec) func(trace.DatabaseS
 				conns.With(nil).Add(-1)
 			}
 		}
+
 		return nil
 	}
 }
@@ -84,6 +86,7 @@ func setupOnConnBegin(config Config, txBegin CounterVec, txBeginLatency TimerVec
 				txBeginLatency.With(nil).Record(time.Since(start))
 			}
 		}
+
 		return nil
 	}
 }
@@ -91,6 +94,7 @@ func setupOnConnBegin(config Config, txBegin CounterVec, txBeginLatency TimerVec
 func setupOnTxCommit(config Config, txCommit CounterVec, txCommitLatency TimerVec) func(trace.DatabaseSQLTxCommitStartInfo) func(trace.DatabaseSQLTxCommitDoneInfo) {
 	return func(info trace.DatabaseSQLTxCommitStartInfo) func(trace.DatabaseSQLTxCommitDoneInfo) {
 		start := time.Now()
+
 		return func(info trace.DatabaseSQLTxCommitDoneInfo) {
 			if config.Details()&trace.DatabaseSQLTxEvents != 0 {
 				txCommit.With(map[string]string{
@@ -105,6 +109,7 @@ func setupOnTxCommit(config Config, txCommit CounterVec, txCommitLatency TimerVe
 func setupOnTxExec(config Config, txExec CounterVec, txExecLatency TimerVec) func(trace.DatabaseSQLTxExecStartInfo) func(trace.DatabaseSQLTxExecDoneInfo) {
 	return func(info trace.DatabaseSQLTxExecStartInfo) func(trace.DatabaseSQLTxExecDoneInfo) {
 		start := time.Now()
+
 		return func(info trace.DatabaseSQLTxExecDoneInfo) {
 			if config.Details()&trace.DatabaseSQLTxEvents != 0 {
 				status := errorBrief(info.Error)
@@ -120,6 +125,7 @@ func setupOnTxExec(config Config, txExec CounterVec, txExecLatency TimerVec) fun
 func setupOnTxQuery(config Config, txQuery CounterVec, txQueryLatency TimerVec) func(trace.DatabaseSQLTxQueryStartInfo) func(trace.DatabaseSQLTxQueryDoneInfo) {
 	return func(info trace.DatabaseSQLTxQueryStartInfo) func(trace.DatabaseSQLTxQueryDoneInfo) {
 		start := time.Now()
+
 		return func(info trace.DatabaseSQLTxQueryDoneInfo) {
 			if config.Details()&trace.DatabaseSQLTxEvents != 0 {
 				status := errorBrief(info.Error)
@@ -135,6 +141,7 @@ func setupOnTxQuery(config Config, txQuery CounterVec, txQueryLatency TimerVec) 
 func setupOnTxRollback(config Config, txRollback CounterVec, txRollbackLatency TimerVec) func(trace.DatabaseSQLTxRollbackStartInfo) func(trace.DatabaseSQLTxRollbackDoneInfo) {
 	return func(info trace.DatabaseSQLTxRollbackStartInfo) func(trace.DatabaseSQLTxRollbackDoneInfo) {
 		start := time.Now()
+
 		return func(info trace.DatabaseSQLTxRollbackDoneInfo) {
 			if config.Details()&trace.DatabaseSQLTxEvents != 0 {
 				txRollback.With(map[string]string{
@@ -155,6 +162,7 @@ func setupOnConnExec(config Config, inflight GaugeVec, exec CounterVec, execLate
 			mode  = info.Mode
 			start = time.Now()
 		)
+
 		return func(info trace.DatabaseSQLConnExecDoneInfo) {
 			if config.Details()&trace.DatabaseSQLEvents != 0 {
 				inflight.With(nil).Add(-1)
@@ -182,6 +190,7 @@ func setupOnConnQuery(config Config, inflight GaugeVec, query CounterVec, queryL
 			mode  = info.Mode
 			start = time.Now()
 		)
+
 		return func(info trace.DatabaseSQLConnQueryDoneInfo) {
 			if config.Details()&trace.DatabaseSQLEvents != 0 {
 				inflight.With(nil).Add(-1)

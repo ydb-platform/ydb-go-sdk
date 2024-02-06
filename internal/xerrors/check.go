@@ -21,6 +21,7 @@ func Check(err error) (
 	if As(err, &e) {
 		return int64(e.Code()), e.Type(), e.BackoffType(), e.MustDeleteSession()
 	}
+
 	return -1,
 		TypeNonRetryable, // unknown errors are not retryable
 		backoff.TypeNoBackoff,
@@ -32,5 +33,6 @@ func MustDeleteSession(err error) bool {
 	if As(err, &e) {
 		return e.MustDeleteSession()
 	}
+
 	return false
 }

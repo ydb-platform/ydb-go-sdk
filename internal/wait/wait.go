@@ -22,6 +22,7 @@ func waitBackoff(ctx context.Context, b backoff.Backoff, i int) error {
 		if err := ctx.Err(); err != nil {
 			return xerrors.WithStackTrace(err)
 		}
+
 		return nil
 	}
 }
@@ -33,6 +34,7 @@ func Wait(ctx context.Context, fastBackoff, slowBackoff backoff.Backoff, t backo
 		if err := ctx.Err(); err != nil {
 			return xerrors.WithStackTrace(err)
 		}
+
 		return nil
 	case backoff.TypeFast:
 		if fastBackoff == nil {
@@ -45,5 +47,6 @@ func Wait(ctx context.Context, fastBackoff, slowBackoff backoff.Backoff, t backo
 		}
 		b = slowBackoff
 	}
+
 	return waitBackoff(ctx, b, i)
 }

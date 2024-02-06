@@ -93,6 +93,7 @@ func setupOnConnBan(config Config, banned GaugeVec) func(trace.DriverConnBanStar
 				"cause":    errorBrief(info.Cause),
 			}).Add(1)
 		}
+
 		return nil
 	}
 }
@@ -181,6 +182,7 @@ func setupOnConnClose(config Config, conns GaugeVec) func(trace.DriverConnCloseS
 				"node_id":  idToString(info.Endpoint.NodeID()),
 			}).Add(-1)
 		}
+
 		return nil
 	}
 }

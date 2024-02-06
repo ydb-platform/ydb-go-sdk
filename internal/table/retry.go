@@ -46,6 +46,7 @@ func do(
 						}
 					}()
 				}
+
 				return op(xcontext.MarkRetryCall(ctx), s)
 			}()
 
@@ -80,6 +81,7 @@ func retryBackoff(
 
 			if err = op(ctx, s); err != nil {
 				s.checkError(err)
+
 				return xerrors.WithStackTrace(err)
 			}
 
@@ -107,5 +109,6 @@ func (c *Client) retryOptions(opts ...table.Option) *table.Options {
 	if options.Trace == nil {
 		options.Trace = &trace.Table{}
 	}
+
 	return options
 }

@@ -203,6 +203,7 @@ func (t *TransactionSettings) Settings() *Ydb_Table.TransactionSettings {
 	if t == nil {
 		return nil
 	}
+
 	return &t.settings
 }
 
@@ -302,6 +303,7 @@ func TxSettings(opts ...TxOption) *TransactionSettings {
 			opt((*txDesc)(&s.settings))
 		}
 	}
+
 	return s
 }
 
@@ -394,6 +396,7 @@ func (t *TransactionControl) Desc() *Ydb_Table.TransactionControl {
 	if t == nil {
 		return nil
 	}
+
 	return &t.desc
 }
 
@@ -405,6 +408,7 @@ func TxControl(opts ...TxControlOption) *TransactionControl {
 			opt((*txControlDesc)(&c.desc))
 		}
 	}
+
 	return c
 }
 
@@ -481,6 +485,7 @@ func (qp queryParams) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
 	for k, v := range qp {
 		params[k] = value.ToYDB(v, a)
 	}
+
 	return params
 }
 
@@ -488,6 +493,7 @@ func (q *QueryParameters) Params() queryParams {
 	if q == nil {
 		return nil
 	}
+
 	return q.m
 }
 
@@ -495,6 +501,7 @@ func (q *QueryParameters) Count() int {
 	if q == nil {
 		return 0
 	}
+
 	return len(q.m)
 }
 
@@ -516,6 +523,7 @@ func (q *QueryParameters) names() []string {
 		names = append(names, k)
 	}
 	sort.Strings(names)
+
 	return names
 }
 
@@ -534,6 +542,7 @@ func (q *QueryParameters) String() string {
 		buffer.WriteString(q.m[name].Yql())
 	}
 	buffer.WriteByte('}')
+
 	return buffer.String()
 }
 
@@ -542,6 +551,7 @@ func NewQueryParameters(opts ...ParameterOption) *QueryParameters {
 		m: make(queryParams, len(opts)),
 	}
 	q.Add(opts...)
+
 	return q
 }
 
@@ -560,6 +570,7 @@ func ValueParam(name string, v types.Value) ParameterOption {
 			name = "$" + name
 		}
 	}
+
 	return &parameterOption{
 		name:  name,
 		value: v,

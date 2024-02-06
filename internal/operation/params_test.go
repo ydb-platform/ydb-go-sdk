@@ -388,12 +388,12 @@ func TestParamsWithPreferContextTimeout(t *testing.T) {
 					),
 					time.Second*5,
 				), time.Second*10)
+
 				return ctx
 			}(),
-			timeout:              time.Second * 2,
-			cancelAfter:          0,
-			mode:                 ModeAsync,
-			preferContextTimeout: false,
+			timeout:     time.Second * 2,
+			cancelAfter: 0,
+			mode:        ModeAsync,
 			exp: &Ydb_Operations.OperationParams{
 				OperationMode:    Ydb_Operations.OperationParams_ASYNC,
 				OperationTimeout: durationpb.New(time.Second * 5),
@@ -409,6 +409,28 @@ func TestParamsWithPreferContextTimeout(t *testing.T) {
 					),
 					time.Second*5,
 				), time.Second*1)
+
+				return ctx
+			}(),
+			timeout:     time.Second * 2,
+			cancelAfter: 0,
+			mode:        ModeAsync,
+			exp: &Ydb_Operations.OperationParams{
+				OperationMode:    Ydb_Operations.OperationParams_ASYNC,
+				OperationTimeout: durationpb.New(time.Second * 5),
+				CancelAfter:      durationpb.New(time.Second * 5),
+			},
+		},
+		{
+			ctx: func() context.Context {
+				ctx, _ := xcontext.WithTimeout(WithCancelAfter(
+					WithTimeout(
+						context.Background(),
+						time.Second*5,
+					),
+					time.Second*5,
+				), time.Second*1)
+
 				return ctx
 			}(),
 			preferContextTimeout: true,
@@ -424,6 +446,7 @@ func TestParamsWithPreferContextTimeout(t *testing.T) {
 		{
 			ctx: func() context.Context {
 				ctx, _ := xcontext.WithTimeout(context.Background(), time.Second*1)
+
 				return ctx
 			}(),
 			preferContextTimeout: true,
@@ -445,6 +468,7 @@ func TestParamsWithPreferContextTimeout(t *testing.T) {
 				if !reflect.DeepEqual(got, tt.exp) {
 					t.Errorf("Params(): {%v}, want: {%v}", got, tt.exp)
 				}
+
 				return
 			}
 			if !reflect.DeepEqual(got.OperationMode, tt.exp.OperationMode) {

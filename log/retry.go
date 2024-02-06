@@ -13,7 +13,7 @@ func Retry(l Logger, d trace.Detailer, opts ...Option) (t trace.Retry) {
 	return internalRetry(wrapLogger(l, opts...), d)
 }
 
-func internalRetry(l *wrapper, d trace.Detailer) (t trace.Retry) {
+func internalRetry(l Logger, d trace.Detailer) (t trace.Retry) {
 	t.OnRetry = func(
 		info trace.RetryLoopStartInfo,
 	) func(
@@ -32,6 +32,7 @@ func internalRetry(l *wrapper, d trace.Detailer) (t trace.Retry) {
 			Bool("idempotent", idempotent),
 		)
 		start := time.Now()
+
 		return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "attempt done",
@@ -54,6 +55,7 @@ func internalRetry(l *wrapper, d trace.Detailer) (t trace.Retry) {
 					versionField(),
 				)
 			}
+
 			return func(info trace.RetryLoopDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
@@ -81,5 +83,6 @@ func internalRetry(l *wrapper, d trace.Detailer) (t trace.Retry) {
 			}
 		}
 	}
+
 	return t
 }

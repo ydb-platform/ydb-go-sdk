@@ -160,6 +160,7 @@ func newTopicStreamReaderStopped(
 	res.committer.BufferCountTrigger = cfg.CommitterBatchCounterTrigger
 	res.sessionController.init()
 	res.freeBytes <- cfg.BufferSizeProtoBytes
+
 	return res
 }
 
@@ -167,6 +168,7 @@ func (r *topicStreamReaderImpl) WaitInit(_ context.Context) error {
 	if !r.started {
 		return errors.New("not started: can be started only after initialize from constructor")
 	}
+
 	return nil
 }
 
@@ -263,6 +265,7 @@ func (r *topicStreamReaderImpl) consumeRawMessageFromBuffer(ctx context.Context)
 		case *rawtopicreader.StartPartitionSessionRequest:
 			if err := r.onStartPartitionSessionRequestFromBuffer(m); err != nil {
 				_ = r.CloseWithError(ctx, err)
+
 				return
 			}
 		case *rawtopicreader.StopPartitionSessionRequest:
@@ -270,6 +273,7 @@ func (r *topicStreamReaderImpl) consumeRawMessageFromBuffer(ctx context.Context)
 				_ = r.CloseWithError(ctx, xerrors.WithStackTrace(
 					fmt.Errorf("ydb: unexpected error on stop partition handler: %w", err),
 				))
+
 				return
 			}
 		case *rawtopicreader.PartitionSessionStatusResponse:
@@ -366,6 +370,7 @@ func (r *topicStreamReaderImpl) Commit(ctx context.Context, commitRange commitRa
 	if err = r.checkCommitRange(commitRange); err != nil {
 		return err
 	}
+
 	return r.committer.Commit(ctx, commitRange)
 }
 
@@ -400,6 +405,7 @@ func (r *topicStreamReaderImpl) send(msg rawtopicreader.ClientMessage) error {
 		trace.TopicOnReaderError(r.cfg.Trace, r.readConnectionID, err)
 		_ = r.CloseWithError(r.ctx, err)
 	}
+
 	return err
 }
 
@@ -426,6 +432,7 @@ func (r *topicStreamReaderImpl) setStarted() error {
 	}
 
 	r.started = true
+
 	return nil
 }
 
@@ -465,6 +472,7 @@ func (r *topicStreamReaderImpl) addRestBufferBytes(delta int) int {
 	if val <= 0 {
 		r.batcher.IgnoreMinRestrictionsOnNextPop()
 	}
+
 	return int(val)
 }
 
@@ -487,6 +495,7 @@ func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
 				continue
 			}
 			_ = r.CloseWithError(ctx, err)
+
 			return
 		}
 
@@ -507,16 +516,19 @@ func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
 		case *rawtopicreader.StartPartitionSessionRequest:
 			if err = r.onStartPartitionSessionRequest(m); err != nil {
 				_ = r.CloseWithError(ctx, err)
+
 				return
 			}
 		case *rawtopicreader.StopPartitionSessionRequest:
 			if err = r.onStopPartitionSessionRequest(m); err != nil {
 				_ = r.CloseWithError(ctx, err)
+
 				return
 			}
 		case *rawtopicreader.CommitOffsetResponse:
 			if err = r.onCommitResponse(m); err != nil {
 				_ = r.CloseWithError(ctx, err)
+
 				return
 			}
 
@@ -546,6 +558,7 @@ func (r *topicStreamReaderImpl) dataRequestLoop(ctx context.Context) {
 		select {
 		case <-doneChan:
 			_ = r.CloseWithError(ctx, r.ctx.Err())
+
 			return
 
 		case free := <-r.freeBytes:
@@ -686,6 +699,7 @@ func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error
 	if closeErr == nil {
 		closeErr = bgCloseErr
 	}
+
 	return closeErr
 }
 
@@ -741,6 +755,7 @@ func (r *topicStreamReaderImpl) onStartPartitionSessionRequest(m *rawtopicreader
 	if err := r.sessionController.Add(session); err != nil {
 		return err
 	}
+
 	return r.batcher.PushRawMessage(session, m)
 }
 

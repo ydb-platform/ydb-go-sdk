@@ -84,6 +84,7 @@ func (s *statement) execute(
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
+
 	return s.session.executeQueryResult(res, txControl, request.IgnoreTruncated)
 }
 

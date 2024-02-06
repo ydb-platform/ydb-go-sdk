@@ -62,6 +62,7 @@ func newCommitter(tracer *trace.Topic, lifeContext context.Context, mode PublicC
 	}
 	res.initChannels()
 	res.start()
+
 	return res
 }
 
@@ -100,6 +101,7 @@ func (c *committer) pushCommit(commitRange commitRange) (commitWaiter, error) {
 	c.m.WithLock(func() {
 		if err := c.backgroundWorker.Context().Err(); err != nil {
 			resErr = err
+
 			return
 		}
 
@@ -170,6 +172,7 @@ func (c *committer) waitSendTrigger(ctx context.Context) {
 		case <-ctxDone:
 		case <-finish:
 		}
+
 		return
 	}
 
@@ -260,6 +263,7 @@ var commitWaiterLastID int64
 
 func newCommitWaiter(session *partitionSession, endOffset rawtopicreader.Offset) commitWaiter {
 	id := atomic.AddInt64(&commitWaiterLastID, 1)
+
 	return commitWaiter{
 		ID:        id,
 		Session:   session,
@@ -272,5 +276,6 @@ func sendCommitMessage(send sendMessageToServerFunc, batch CommitRanges) error {
 	req := &rawtopicreader.CommitOffsetRequest{
 		CommitOffsets: batch.toPartitionsOffsets(),
 	}
+
 	return send(req)
 }

@@ -66,6 +66,7 @@ func setupOnSessionDelete(config Config, alive GaugeVec) func(trace.TableSession
 				"node_id": idToString(info.Session.NodeID()),
 			}).Add(-1)
 		}
+
 		return nil
 	}
 }
@@ -90,6 +91,7 @@ func setupOnPoolGet(config Config, inflight GaugeVec, inflightLatency TimerVec, 
 	return func(info trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
 		wait.With(nil).Add(1)
 		start := time.Now()
+
 		return func(info trace.TablePoolGetDoneInfo) {
 			wait.With(nil).Add(-1)
 			if info.Error == nil && config.Details()&trace.TablePoolEvents != 0 {
@@ -111,6 +113,7 @@ func setupOnPoolPut(config Config, inflight GaugeVec, inflightLatency TimerVec, 
 			}
 			inflightLatency.With(nil).Record(time.Since(start.(time.Time)))
 		}
+
 		return nil
 	}
 }

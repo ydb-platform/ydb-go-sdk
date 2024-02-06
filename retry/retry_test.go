@@ -168,6 +168,7 @@ func TestRetryTransportDeadlineExceeded(t *testing.T) {
 			if !(counter < cancelCounterValue) {
 				cancel()
 			}
+
 			return xerrors.Transport(grpcStatus.Error(code, ""))
 		}, WithIdempotent(true))
 		require.ErrorIs(t, err, context.Canceled)
@@ -188,6 +189,7 @@ func TestRetryTransportCancelled(t *testing.T) {
 			if !(counter < cancelCounterValue) {
 				cancel()
 			}
+
 			return xerrors.Transport(grpcStatus.Error(code, ""))
 		}, WithIdempotent(true))
 		require.ErrorIs(t, err, context.Canceled)

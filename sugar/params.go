@@ -26,11 +26,13 @@ func GenerateDeclareSection[T *table.QueryParameters | []table.ParameterOption |
 			for i := range v {
 				newArgs = append(newArgs, v[i])
 			}
+
 			return newArgs
 		}()...)
 		if err != nil {
 			return "", xerrors.WithStackTrace(err)
 		}
+
 		return internal.GenerateDeclareSection(table.NewQueryParameters(values...))
 	default:
 		return "", xerrors.WithStackTrace(fmt.Errorf("unsupported type: %T", v))
@@ -48,5 +50,6 @@ func ToYdbParam(param sql.NamedArg) (table.ParameterOption, error) {
 	if len(params) != 1 {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("internal error: wrong parameters count: %v", params))
 	}
+
 	return params[0], nil
 }

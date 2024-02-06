@@ -141,6 +141,7 @@ func newConn(ctx context.Context, c *Connector, s table.ClosableSession, opts ..
 		}
 	}
 	c.attach(cc)
+
 	return cc
 }
 
@@ -288,6 +289,7 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 	if c.currentTx != nil {
 		return c.currentTx.ExecContext(ctx, query, args)
 	}
+
 	return c.execContext(ctx, query, args)
 }
 
@@ -298,6 +300,7 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	if c.currentTx != nil {
 		return c.currentTx.QueryContext(ctx, query, args)
 	}
+
 	return c.queryContext(ctx, query, args)
 }
 
@@ -434,6 +437,7 @@ func (c *conn) Ping(ctx context.Context) (finalErr error) {
 	if err := c.session.KeepAlive(ctx); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	return nil
 }
 
@@ -454,8 +458,10 @@ func (c *conn) Close() (finalErr error) {
 		if err != nil {
 			return badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		return nil
 	}
+
 	return badconn.Map(xerrors.WithStackTrace(errConnClosedEarly))
 }
 
@@ -472,6 +478,7 @@ func (c *conn) normalize(q string, args ...driver.NamedValue) (query string, _ *
 		for i := range args {
 			ii = append(ii, args[i])
 		}
+
 		return ii
 	}()...)
 }
@@ -524,6 +531,7 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 
 func (c *conn) Version(_ context.Context) (_ string, _ error) {
 	const version = "default"
+
 	return version, nil
 }
 
@@ -543,6 +551,7 @@ func (c *conn) IsTableExists(ctx context.Context, tableName string) (tableExists
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
+
 	return tableExists, nil
 }
 
@@ -567,14 +576,17 @@ func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string)
 		for i := range desc.Columns {
 			if desc.Columns[i].Name == columnName {
 				columnExists = true
+
 				break
 			}
 		}
+
 		return nil
 	}, retry.WithIdempotent(true))
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
+
 	return columnExists, nil
 }
 
@@ -599,11 +611,13 @@ func (c *conn) GetColumns(ctx context.Context, tableName string) (columns []stri
 		for i := range desc.Columns {
 			columns = append(columns, desc.Columns[i].Name)
 		}
+
 		return nil
 	}, retry.WithIdempotent(true))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	return columns, nil
 }
 
@@ -636,14 +650,17 @@ func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) 
 		for i := range desc.Columns {
 			if desc.Columns[i].Name == columnName {
 				dataType = desc.Columns[i].Type.Yql()
+
 				break
 			}
 		}
+
 		return nil
 	}, retry.WithIdempotent(true))
 	if err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
+
 	return dataType, nil
 }
 
@@ -666,11 +683,13 @@ func (c *conn) GetPrimaryKeys(ctx context.Context, tableName string) (pkCols []s
 			return err
 		}
 		pkCols = append(pkCols, desc.PrimaryKey...)
+
 		return nil
 	}, retry.WithIdempotent(true))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	return pkCols, nil
 }
 
@@ -702,9 +721,11 @@ func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (
 	for _, pkCol := range pkCols {
 		if pkCol == columnName {
 			ok = true
+
 			break
 		}
 	}
+
 	return ok, nil
 }
 
@@ -721,6 +742,7 @@ func isSysDir(databaseName, dirAbsPath string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -734,6 +756,7 @@ func (c *conn) getTables(ctx context.Context, absPath string, recursive, exclude
 	var d scheme.Directory
 	err := retry.Retry(ctx, func(ctx context.Context) (err error) {
 		d, err = c.connector.parent.Scheme().ListDirectory(ctx, absPath)
+
 		return err
 	}, retry.WithIdempotent(true))
 	if err != nil {
@@ -770,6 +793,7 @@ func (c *conn) GetTables(ctx context.Context, folder string, recursive, excludeS
 	var e scheme.Entry
 	err := retry.Retry(ctx, func(ctx context.Context) (err error) {
 		e, err = c.connector.parent.Scheme().DescribePath(ctx, absPath)
+
 		return err
 	}, retry.WithIdempotent(true))
 	if err != nil {
@@ -788,6 +812,7 @@ func (c *conn) GetTables(ctx context.Context, folder string, recursive, excludeS
 		for i := range tables {
 			tables[i] = strings.TrimPrefix(tables[i], absPath+"/")
 		}
+
 		return tables, nil
 	default:
 		return nil, xerrors.WithStackTrace(
@@ -817,6 +842,7 @@ func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []stri
 		for i := range desc.Indexes {
 			indexes = append(indexes, desc.Indexes[i].Name)
 		}
+
 		return nil
 	}, retry.WithIdempotent(true))
 	if err != nil {
@@ -847,9 +873,11 @@ func (c *conn) GetIndexColumns(ctx context.Context, tableName, indexName string)
 		for i := range desc.Indexes {
 			if desc.Indexes[i].Name == indexName {
 				columns = append(columns, desc.Indexes[i].IndexColumns...)
+
 				return nil
 			}
 		}
+
 		return xerrors.WithStackTrace(fmt.Errorf("index '%s' not found in table '%s'", indexName, tableName))
 	}, retry.WithIdempotent(true))
 	if err != nil {

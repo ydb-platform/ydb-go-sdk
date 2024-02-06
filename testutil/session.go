@@ -40,5 +40,6 @@ func SessionID(opts ...sessionIDOption) string {
 			o(h)
 		}
 	}
+
 	return fmt.Sprintf("ydb://session/%d?node_id=%d&id=%s==", h.serviceID, h.nodeID, h.hash)
 }

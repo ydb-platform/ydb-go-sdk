@@ -12,12 +12,14 @@ func Example_discoverCluster() {
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
+
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
 	endpoints, err := db.Discovery().Discover(ctx)
 	if err != nil {
 		fmt.Printf("discover failed: %v", err)
+
 		return
 	}
 	fmt.Printf("%s endpoints:\n", db.Name())
@@ -31,12 +33,14 @@ func Example_whoAmI() {
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
+
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
 	whoAmI, err := db.Discovery().WhoAmI(ctx)
 	if err != nil {
 		fmt.Printf("discover failed: %v", err)
+
 		return
 	}
 	fmt.Printf("%s whoAmI: %s\n", db.Name(), whoAmI.String())
