@@ -15,220 +15,231 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-func TestCheckRetryMode(t *testing.T) {
+func TestCheckRetryMode_OK(t *testing.T) {
+	err := error(nil)
+	settings := RetrySettings{}
+	duration := time.Duration(0)
+
+	resBackoff, retriable := CheckRetryMode(err, settings, duration)
+	require.Equal(t, backoff.Backoff(nil), resBackoff)
+	require.Equal(t, false, retriable)
+}
+
+func TestCheckRetryMode_RetryRetriableErrorFast(t *testing.T) {
 	fastError := xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, ""))
+	settings := RetrySettings{}
+	duration := time.Duration(0)
+
+	resBackoff, retriable := CheckRetryMode(fastError, settings, duration)
+	require.Equal(t, backoff.Fast, resBackoff)
+	require.Equal(t, true, retriable)
+}
+
+func TestCheckRetryMode_RetryRetriableErrorFastWithTimeout(t *testing.T) {
+	fastError := xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, ""))
+	settings := RetrySettings{
+		StartTimeout: time.Second,
+	}
+	duration := time.Second * 2
+
+	resBackoff, retriable := CheckRetryMode(fastError, settings, duration)
+	require.Equal(t, backoff.Backoff(nil), resBackoff)
+	require.Equal(t, false, retriable)
+}
+
+func TestCheckRetryMode_RetryRetriableErrorSlow(t *testing.T) {
 	slowError := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
+	settings := RetrySettings{}
+	duration := time.Duration(0)
+
+	resBackoff, retriable := CheckRetryMode(slowError, settings, duration)
+	require.Equal(t, backoff.Slow, resBackoff)
+	require.Equal(t, true, retriable)
+}
+
+func TestCheckRetryMode_RetryRetriableErrorSlowWithTimeout(t *testing.T) {
+	slowError := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
+	settings := RetrySettings{
+		StartTimeout: time.Second,
+	}
+	duration := time.Second * 2
+
+	resBackoff, retriable := CheckRetryMode(slowError, settings, duration)
+	require.Equal(t, backoff.Backoff(nil), resBackoff)
+	require.Equal(t, false, retriable)
+}
+
+func TestCheckRetryMode_UnretriableError(t *testing.T) {
 	unretriable := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED))
+	settings := RetrySettings{}
+	duration := time.Duration(0)
 
-	table := []struct {
-		name         string
-		err          error
-		settings     RetrySettings
-		duration     time.Duration
-		resBackoff   backoff.Backoff
-		resRetriable bool
-	}{
-		{
-			name:         "OK",
-			err:          nil,
-			settings:     RetrySettings{},
-			duration:     0,
-			resBackoff:   nil,
-			resRetriable: false,
-		},
-		{
-			name:         "RetryRetriableErrorFast",
-			err:          fastError,
-			settings:     RetrySettings{},
-			duration:     0,
-			resBackoff:   backoff.Fast,
-			resRetriable: true,
-		},
-		{
-			name: "RetryRetriableErrorFastWithTimeout",
-			err:  fastError,
-			settings: RetrySettings{
-				StartTimeout: time.Second,
-			},
-			duration:     time.Second * 2,
-			resBackoff:   nil,
-			resRetriable: false,
-		},
-		{
-			name:         "RetryRetriableErrorSlow",
-			err:          slowError,
-			settings:     RetrySettings{},
-			duration:     0,
-			resBackoff:   backoff.Slow,
-			resRetriable: true,
-		},
-		{
-			name: "RetryRetriableErrorSlowWithTimeout",
-			err:  slowError,
-			settings: RetrySettings{
-				StartTimeout: time.Second,
-			},
-			duration:     time.Second * 2,
-			resBackoff:   nil,
-			resRetriable: false,
-		},
-		{
-			name:         "UnretriableError",
-			err:          unretriable,
-			settings:     RetrySettings{},
-			duration:     0,
-			resBackoff:   nil,
-			resRetriable: false,
-		},
-		{
-			name: "UserOverrideFastErrorDefault",
-			err:  fastError,
-			settings: RetrySettings{
-				CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
-					return PublicRetryDecisionDefault
-				},
-			},
-			duration:     0,
-			resBackoff:   backoff.Fast,
-			resRetriable: true,
-		},
-		{
-			name: "UserOverrideFastErrorRetry",
-			err:  fastError,
-			settings: RetrySettings{
-				CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
-					return PublicRetryDecisionRetry
-				},
-			},
-			duration:     0,
-			resBackoff:   backoff.Fast,
-			resRetriable: true,
-		},
-		{
-			name: "UserOverrideFastErrorStop",
-			err:  fastError,
-			settings: RetrySettings{
-				CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
-					return PublicRetryDecisionStop
-				},
-			},
-			duration:     0,
-			resBackoff:   nil,
-			resRetriable: false,
-		},
-		{
-			name: "UserOverrideSlowErrorDefault",
-			err:  slowError,
-			settings: RetrySettings{
-				CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
-					return PublicRetryDecisionDefault
-				},
-			},
-			duration:     0,
-			resBackoff:   backoff.Slow,
-			resRetriable: true,
-		},
-		{
-			name: "UserOverrideSlowErrorRetry",
-			err:  slowError,
-			settings: RetrySettings{
-				CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
-					return PublicRetryDecisionRetry
-				},
-			},
-			duration:     0,
-			resBackoff:   backoff.Slow,
-			resRetriable: true,
-		},
-		{
-			name: "UserOverrideSlowErrorStop",
-			err:  slowError,
-			settings: RetrySettings{
-				CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
-					return PublicRetryDecisionStop
-				},
-			},
-			duration:     0,
-			resBackoff:   nil,
-			resRetriable: false,
-		},
-		{
-			name: "UserOverrideUnretriableErrorDefault",
-			err:  xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED)),
-			settings: RetrySettings{
-				CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
-					return PublicRetryDecisionDefault
-				},
-			},
-			duration:     0,
-			resBackoff:   nil,
-			resRetriable: false,
-		},
-		{
-			name: "UserOverrideUnretriableErrorRetry",
-			err:  xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED)),
-			settings: RetrySettings{
-				CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
-					return PublicRetryDecisionRetry
-				},
-			},
-			duration:     0,
-			resBackoff:   backoff.Slow,
-			resRetriable: true,
-		},
-		{
-			name: "UserOverrideUnretriableErrorStop",
-			err:  xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED)),
-			settings: RetrySettings{
-				CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
-					return PublicRetryDecisionStop
-				},
-			},
-			duration:     0,
-			resBackoff:   nil,
-			resRetriable: false,
-		},
-		{
-			name: "UserOverrideFastErrorRetryWithTimeout",
-			err:  xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED)),
-			settings: RetrySettings{
-				StartTimeout: time.Second,
-				CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
-					return PublicRetryDecisionRetry
-				},
-			},
-			duration:     time.Second * 2,
-			resBackoff:   nil,
-			resRetriable: false,
-		},
-		{
-			name: "NotCallForNil",
-			err:  nil,
-			settings: RetrySettings{
-				StartTimeout: time.Second,
-				CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
-					panic("must not call for nil err")
-				},
-			},
-			duration:     0,
-			resBackoff:   nil,
-			resRetriable: false,
-		},
-		{
-			name:         "EOF", // Issue https://github.com/ydb-platform/ydb-go-sdk/issues/754
-			err:          fmt.Errorf("test wrap: %w", io.EOF),
-			settings:     RetrySettings{},
-			duration:     0,
-			resBackoff:   backoff.Slow,
-			resRetriable: true,
+	resBackoff, retriable := CheckRetryMode(unretriable, settings, duration)
+	require.Equal(t, backoff.Backoff(nil), resBackoff)
+	require.Equal(t, false, retriable)
+}
+
+func TestCheckRetryMode_UserOverrideFastErrorDefault(t *testing.T) {
+	fastError := xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, ""))
+	settings := RetrySettings{
+		CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
+			return PublicRetryDecisionDefault
 		},
 	}
+	duration := time.Duration(0)
 
-	for _, test := range table {
-		t.Run(test.name, func(t *testing.T) {
-			resBackoff, retriable := CheckRetryMode(test.err, test.settings, test.duration)
-			require.Equal(t, test.resBackoff, resBackoff)
-			require.Equal(t, test.resRetriable, retriable)
-		})
+	resBackoff, retriable := CheckRetryMode(fastError, settings, duration)
+	require.Equal(t, backoff.Fast, resBackoff)
+	require.Equal(t, true, retriable)
+}
+
+func TestCheckRetryMode_UserOverrideFastErrorRetry(t *testing.T) {
+	fastError := xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, ""))
+	settings := RetrySettings{
+		CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
+			return PublicRetryDecisionRetry
+		},
 	}
+	duration := time.Duration(0)
+
+	resBackoff, retriable := CheckRetryMode(fastError, settings, duration)
+	require.Equal(t, backoff.Fast, resBackoff)
+	require.Equal(t, true, retriable)
+}
+
+func TestCheckRetryMode_UserOverrideFastErrorStop(t *testing.T) {
+	fastError := xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, ""))
+	settings := RetrySettings{
+		CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
+			return PublicRetryDecisionStop
+		},
+	}
+	duration := time.Duration(0)
+
+	resBackoff, retriable := CheckRetryMode(fastError, settings, duration)
+	require.Equal(t, backoff.Backoff(nil), resBackoff)
+	require.Equal(t, false, retriable)
+}
+
+func TestCheckRetryMode_UserOverrideSlowErrorDefault(t *testing.T) {
+	slowError := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
+	settings := RetrySettings{
+		CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
+			return PublicRetryDecisionDefault
+		},
+	}
+	duration := time.Duration(0)
+
+	resBackoff, retriable := CheckRetryMode(slowError, settings, duration)
+	require.Equal(t, backoff.Slow, resBackoff)
+	require.Equal(t, true, retriable)
+}
+
+func TestCheckRetryMode_UserOverrideSlowErrorRetry(t *testing.T) {
+	slowError := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
+	settings := RetrySettings{
+		CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
+			return PublicRetryDecisionRetry
+		},
+	}
+	duration := time.Duration(0)
+
+	resBackoff, retriable := CheckRetryMode(slowError, settings, duration)
+	require.Equal(t, backoff.Slow, resBackoff)
+	require.Equal(t, true, retriable)
+}
+
+func TestCheckRetryMode_UserOverrideSlowErrorStop(t *testing.T) {
+	slowError := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))
+	settings := RetrySettings{
+		CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
+			return PublicRetryDecisionStop
+		},
+	}
+	duration := time.Duration(0)
+
+	resBackoff, retriable := CheckRetryMode(slowError, settings, duration)
+	require.Equal(t, backoff.Backoff(nil), resBackoff)
+	require.Equal(t, false, retriable)
+}
+
+func TestCheckRetryMode_UserOverrideUnretriableErrorDefault(t *testing.T) {
+	unretriable := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED))
+	settings := RetrySettings{
+		CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
+			return PublicRetryDecisionDefault
+		},
+	}
+	duration := time.Duration(0)
+
+	resBackoff, retriable := CheckRetryMode(unretriable, settings, duration)
+	require.Equal(t, backoff.Backoff(nil), resBackoff)
+	require.Equal(t, false, retriable)
+}
+
+func TestCheckRetryMode_UserOverrideUnretriableErrorRetry(t *testing.T) {
+	unretriable := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED))
+	settings := RetrySettings{
+		CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
+			return PublicRetryDecisionRetry
+		},
+	}
+	duration := time.Duration(0)
+
+	resBackoff, retriable := CheckRetryMode(unretriable, settings, duration)
+	require.Equal(t, backoff.Slow, resBackoff)
+	require.Equal(t, true, retriable)
+}
+
+func TestCheckRetryMode_UserOverrideUnretriableErrorStop(t *testing.T) {
+	unretriable := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED))
+	settings := RetrySettings{
+		CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
+			return PublicRetryDecisionStop
+		},
+	}
+	duration := time.Duration(0)
+
+	resBackoff, retriable := CheckRetryMode(unretriable, settings, duration)
+	require.Equal(t, backoff.Backoff(nil), resBackoff)
+	require.Equal(t, false, retriable)
+}
+
+func TestCheckRetryMode_UserOverrideFastErrorRetryWithTimeout(t *testing.T) {
+	fastError := xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAUTHORIZED))
+	settings := RetrySettings{
+		StartTimeout: time.Second,
+		CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
+			return PublicRetryDecisionRetry
+		},
+	}
+	duration := time.Second * 2
+
+	resBackoff, retriable := CheckRetryMode(fastError, settings, duration)
+	require.Equal(t, backoff.Backoff(nil), resBackoff)
+	require.Equal(t, false, retriable)
+}
+
+func TestCheckRetryMode_NotCallForNil(t *testing.T) {
+	settings := RetrySettings{
+		StartTimeout: time.Second,
+		CheckError: func(errInfo PublicCheckErrorRetryArgs) PublicCheckRetryResult {
+			panic("must not call for nil err")
+		},
+	}
+	duration := time.Duration(0)
+
+	resBackoff, retriable := CheckRetryMode(nil, settings, duration)
+	require.Equal(t, backoff.Backoff(nil), resBackoff)
+	require.Equal(t, false, retriable)
+}
+
+func TestCheckRetryMode_EOF(t *testing.T) {
+	eofError := fmt.Errorf("test wrap: %w", io.EOF)
+	settings := RetrySettings{}
+	duration := time.Duration(0)
+
+	resBackoff, retriable := CheckRetryMode(eofError, settings, duration)
+	require.Equal(t, backoff.Slow, resBackoff)
+	require.Equal(t, true, retriable)
 }
