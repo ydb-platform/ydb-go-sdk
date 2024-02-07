@@ -18,11 +18,13 @@ func (d Details) Details() Details {
 
 func (d Details) String() string {
 	ss := make([]string, 0)
+
 	for bit, name := range detailsMap {
 		if d&bit != 0 {
 			ss = append(ss, name)
 		}
 	}
+
 	sort.Strings(ss)
 
 	return strings.Join(ss, "|")
@@ -196,19 +198,23 @@ func MatchDetails(pattern string, opts ...matchDetailsOption) (d Details) {
 			o(h)
 		}
 	}
+
 	if h.posixMatch {
 		re, err = regexp.CompilePOSIX(pattern)
 	} else {
 		re, err = regexp.Compile(pattern)
 	}
+
 	if err != nil {
 		return h.defaultDetails
 	}
+
 	for k, v := range detailsMap {
 		if re.MatchString(v) {
 			d |= k
 		}
 	}
+
 	if d == 0 {
 		return h.defaultDetails
 	}

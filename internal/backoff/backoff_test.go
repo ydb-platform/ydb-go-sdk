@@ -24,6 +24,7 @@ func TestDelays(t *testing.T) {
 		WithJitterLimit(1),
 		WithSeed(0),
 	)
+
 	for i, d := range map[int]time.Duration{
 		0: duration("500ms"),
 		1: duration("1s"),
@@ -47,6 +48,7 @@ func TestLogBackoff(t *testing.T) {
 		gte time.Duration
 		lte time.Duration
 	}
+
 	for _, tt := range []struct {
 		backoff Backoff
 		exp     []exp

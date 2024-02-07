@@ -40,18 +40,22 @@ func TestDatabaseSQL(t *testing.T) {
 
 func testSingleTrace(t *testing.T, x interface{}, traceName string) {
 	t.Helper()
+
 	v := reflect.ValueOf(x)
 	m := v.MethodByName("Compose")
 	m.Call(
 		[]reflect.Value{reflect.New(reflect.ValueOf(x).Elem().Type())},
 	)
+
 	a := reflect.New(reflect.TypeOf(x).Elem())
+
 	defer assertCalled(t, traceName, stubEachFunc(a))
 	callEachFunc(a.Elem())
 }
 
 func assertCalled(t *testing.T, prefix string, called map[string]bool) {
 	t.Helper()
+
 	for name, called := range called {
 		if !called {
 			t.Error(prefix, fmt.Sprintf("%s field is not called", name))
@@ -61,6 +65,7 @@ func assertCalled(t *testing.T, prefix string, called map[string]bool) {
 
 func stubEachFunc(x reflect.Value) map[string]bool {
 	fs := make(map[string]bool)
+
 	(FieldStubber{
 		OnStub: func(name string) {
 			fs[name] = false
@@ -77,13 +82,17 @@ func callFunc(f reflect.Value, ft reflect.Type) {
 	if ft.Kind() != reflect.Func {
 		return
 	}
+
 	if f.IsNil() {
 		return
 	}
+
 	args := make([]reflect.Value, ft.NumIn())
+
 	for j := range args {
 		args[j] = reflect.New(ft.In(j)).Elem()
 	}
+
 	for _, xx := range f.Call(args) {
 		switch xx.Type().Kind() {
 		case reflect.Struct:
@@ -103,6 +112,7 @@ func callEachFunc(x reflect.Value) {
 			f  = x.Field(i)
 			ft = f.Type()
 		)
+
 		callFunc(f, ft)
 	}
 }

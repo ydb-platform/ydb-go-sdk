@@ -8,6 +8,7 @@ func FromBytes(b []byte) string {
 	if len(b) == 0 {
 		return ""
 	}
+
 	if len(b) == 0 {
 		return ""
 	}

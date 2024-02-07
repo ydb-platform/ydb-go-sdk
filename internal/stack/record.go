@@ -89,7 +89,9 @@ func (c call) Record(opts ...recordOption) string {
 	for _, opt := range opts {
 		opt(&optionsHolder)
 	}
+
 	name := runtime.FuncForPC(c.function).Name()
+
 	var (
 		pkgPath    string
 		pkgName    string
@@ -97,19 +99,24 @@ func (c call) Record(opts ...recordOption) string {
 		funcName   string
 		file       = c.file
 	)
+
 	if i := strings.LastIndex(file, "/"); i > -1 {
 		file = file[i+1:]
 	}
+
 	if i := strings.LastIndex(name, "/"); i > -1 {
 		pkgPath, name = name[:i], name[i+1:]
 	}
+
 	split := strings.Split(name, ".")
 	lambdas := make([]string, 0, len(split))
+
 	for i := range split {
 		elem := split[len(split)-i-1]
 		if !strings.HasPrefix(elem, "func") {
 			break
 		}
+
 		lambdas = append(lambdas, elem)
 	}
 	split = split[:len(split)-len(lambdas)]

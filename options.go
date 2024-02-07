@@ -82,12 +82,15 @@ func WithConnectionString(connectionString string) Option {
 		if connectionString == "" {
 			return nil
 		}
+
 		info, err := dsn.Parse(connectionString)
+
 		if err != nil {
 			return xerrors.WithStackTrace(
 				fmt.Errorf("parse connection string '%s' failed: %w", connectionString, err),
 			)
 		}
+
 		c.options = append(c.options, info.Options...)
 		c.userInfo = info.UserInfo
 
@@ -199,6 +202,7 @@ func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (cred
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
+
 		c.options = append(c.options, config.WithCredentials(creds))
 
 		return nil
@@ -308,9 +312,11 @@ func WithCertificatesFromFile(caFile string, opts ...certificates.FromFileOption
 			caFile = filepath.Join(home, caFile[1:])
 		}
 	}
+
 	if file, err := filepath.Abs(caFile); err == nil {
 		caFile = file
 	}
+
 	if file, err := filepath.EvalSymlinks(caFile); err == nil {
 		caFile = file
 	}
@@ -320,6 +326,7 @@ func WithCertificatesFromFile(caFile string, opts ...certificates.FromFileOption
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
+
 		for _, cert := range certs {
 			if err := WithCertificate(cert)(ctx, c); err != nil {
 				return xerrors.WithStackTrace(err)
@@ -349,6 +356,7 @@ func WithCertificatesFromPem(bytes []byte, opts ...certificates.FromPemOption) O
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
+
 		for _, cert := range certs {
 			_ = WithCertificate(cert)(ctx, c)
 		}

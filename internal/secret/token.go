@@ -15,6 +15,7 @@ func Token(token string) string {
 	} else {
 		mask.WriteString("****")
 	}
+
 	mask.WriteString(fmt.Sprintf("(CRC-32c: %08X)", crc32.Checksum([]byte(token), crc32.IEEETable)))
 
 	return mask.String()

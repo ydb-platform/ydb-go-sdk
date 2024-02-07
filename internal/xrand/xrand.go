@@ -35,6 +35,7 @@ func New(opts ...option) Rand {
 	r := &r{
 		r: rand.New(rand.NewSource(time.Now().Unix())), //nolint:gosec
 	}
+
 	for _, o := range opts {
 		if o != nil {
 			o(r)

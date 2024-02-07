@@ -49,18 +49,23 @@ func (f FieldStubber) Stub(x reflect.Value) {
 			fx = v.Field(i)
 			ft = fx.Type()
 		)
+
 		if ft.Kind() != reflect.Func {
 			continue
 		}
+
 		name := t.Field(i).Name
 		if f.OnStub != nil {
 			f.OnStub(name)
 		}
+
 		out := []reflect.Value{}
+
 		for i := 0; i < ft.NumOut(); i++ {
 			ti := reflect.New(ft.Out(i)).Elem()
 			out = append(out, ti)
 		}
+
 		fn := reflect.MakeFunc(ft, func(args []reflect.Value) []reflect.Value {
 			if f.OnCall == nil {
 				return out

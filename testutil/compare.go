@@ -36,8 +36,10 @@ func Compare(l, r value.Value) (int, error) {
 func unwrapTypedValue(v *Ydb.TypedValue) *Ydb.TypedValue {
 	typ := v.Type
 	val := v.Value
+
 	for opt := typ.GetOptionalType(); opt != nil; opt = typ.GetOptionalType() {
 		typ = opt.Item
+
 		if nested := val.GetNestedValue(); nested != nil {
 			val = nested
 		}
@@ -49,6 +51,7 @@ func unwrapTypedValue(v *Ydb.TypedValue) *Ydb.TypedValue {
 func compare(lhs, rhs *Ydb.TypedValue) (int, error) {
 	lTypeID := lhs.Type.GetTypeId()
 	rTypeID := rhs.Type.GetTypeId()
+
 	switch {
 	case lTypeID != rTypeID:
 		return 0, notComparableError(lhs, rhs)
@@ -68,6 +71,7 @@ func compare(lhs, rhs *Ydb.TypedValue) (int, error) {
 func expandItems(v *Ydb.TypedValue, itemType func(i int) *Ydb.Type) []*Ydb.TypedValue {
 	size := len(v.GetValue().GetItems())
 	values := make([]*Ydb.TypedValue, 0, size)
+
 	for i, val := range v.GetValue().GetItems() {
 		values = append(values, unwrapTypedValue(&Ydb.TypedValue{Type: itemType(i), Value: val}))
 	}
@@ -91,6 +95,7 @@ func expandTuple(v *Ydb.TypedValue) []*Ydb.TypedValue {
 	tuple := v.Type.GetTupleType()
 	size := len(tuple.Elements)
 	values := make([]*Ydb.TypedValue, 0, size)
+
 	for idx, typ := range tuple.Elements {
 		values = append(values, unwrapTypedValue(&Ydb.TypedValue{Type: typ, Value: v.Value.Items[idx]}))
 	}
@@ -105,6 +110,7 @@ func notComparableError(lhs, rhs interface{}) error {
 func comparePrimitives(t Ydb.Type_PrimitiveTypeId, lhs, rhs *Ydb.Value) (int, error) {
 	_, lIsNull := lhs.Value.(*Ydb.Value_NullFlagValue)
 	_, rIsNull := rhs.Value.(*Ydb.Value_NullFlagValue)
+
 	if lIsNull {
 		if rIsNull {
 			return 0, nil
@@ -112,6 +118,7 @@ func comparePrimitives(t Ydb.Type_PrimitiveTypeId, lhs, rhs *Ydb.Value) (int, er
 
 		return -1, nil
 	}
+
 	if rIsNull {
 		return 1, nil
 	}
@@ -134,11 +141,14 @@ func compareTuplesOrLists(lhs, rhs []*Ydb.TypedValue) (int, error) {
 			// lhs is longer than rhs, first len(rhs) elements equal
 			return 1, nil
 		}
+
 		rval := rhs[i]
 		cmp, err := compare(lval, rval)
+
 		if err != nil {
 			return 0, xerrors.WithStackTrace(err)
 		}
+
 		if cmp != 0 {
 			return cmp, nil
 		}
@@ -157,11 +167,14 @@ func compareStructs(lhs, rhs []*Ydb.TypedValue) (int, error) {
 			// lhs is longer than rhs, first len(rhs) elements equal
 			return 1, nil
 		}
+
 		rval := rhs[i]
 		cmp, err := compare(lval, rval)
+
 		if err != nil {
 			return 0, xerrors.WithStackTrace(err)
 		}
+
 		if cmp != 0 {
 			return cmp, nil
 		}
@@ -200,6 +213,7 @@ var comparators = map[Ydb.Type_PrimitiveTypeId]comparator{
 func compareUint32(l, r *Ydb.Value) int {
 	ll := l.GetUint32Value()
 	rr := r.GetUint32Value()
+
 	switch {
 	case ll < rr:
 		return -1
@@ -213,6 +227,7 @@ func compareUint32(l, r *Ydb.Value) int {
 func compareInt32(l, r *Ydb.Value) int {
 	ll := l.GetInt32Value()
 	rr := r.GetInt32Value()
+
 	switch {
 	case ll < rr:
 		return -1
@@ -226,6 +241,7 @@ func compareInt32(l, r *Ydb.Value) int {
 func compareUint64(l, r *Ydb.Value) int {
 	ll := l.GetUint64Value()
 	rr := r.GetUint64Value()
+
 	switch {
 	case ll < rr:
 		return -1
@@ -239,6 +255,7 @@ func compareUint64(l, r *Ydb.Value) int {
 func compareInt64(l, r *Ydb.Value) int {
 	ll := l.GetInt64Value()
 	rr := r.GetInt64Value()
+
 	switch {
 	case ll < rr:
 		return -1
@@ -252,6 +269,7 @@ func compareInt64(l, r *Ydb.Value) int {
 func compareFloat(l, r *Ydb.Value) int {
 	ll := l.GetFloatValue()
 	rr := r.GetFloatValue()
+
 	switch {
 	case ll < rr:
 		return -1
@@ -265,6 +283,7 @@ func compareFloat(l, r *Ydb.Value) int {
 func compareDouble(l, r *Ydb.Value) int {
 	ll := l.GetDoubleValue()
 	rr := r.GetDoubleValue()
+
 	switch {
 	case ll < rr:
 		return -1
@@ -292,6 +311,7 @@ func compareBytes(l, r *Ydb.Value) int {
 func compareBool(l, r *Ydb.Value) int {
 	ll := l.GetBoolValue()
 	rr := r.GetBoolValue()
+
 	if ll {
 		if rr {
 			return 0
@@ -299,6 +319,7 @@ func compareBool(l, r *Ydb.Value) int {
 
 		return 1
 	}
+
 	if rr {
 		return -1
 	}

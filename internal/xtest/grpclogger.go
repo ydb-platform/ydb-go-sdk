@@ -56,9 +56,11 @@ func (l GrpcLogger) StreamClientInterceptor(
 ) (grpc.ClientStream, error) {
 	stream, err := streamer(ctx, desc, cc, method, opts...)
 	streamWrapper := newGrpcLoggerStream(stream, l.t)
+
 	if stream != nil {
 		stream = streamWrapper
 	}
+
 	l.t.Logf(
 		"StreamStart: %v with err '%v' (streamID: %v)",
 		method,

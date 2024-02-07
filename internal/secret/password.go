@@ -10,6 +10,7 @@ func Password(password string) string {
 		startPosition = 3
 		endPosition   = len(bytes) - 2
 	)
+
 	if startPosition > endPosition {
 		for i := range bytes {
 			bytes[i] = '*'

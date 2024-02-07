@@ -14,9 +14,11 @@ func (d *Driver) String() string {
 	fmt.Fprintf(buffer, "Endpoint:%q,", d.config.Endpoint())
 	fmt.Fprintf(buffer, "Database:%q,", d.config.Database())
 	fmt.Fprintf(buffer, "Secure:%v", d.config.Secure())
+
 	if c, has := d.config.Credentials().(fmt.Stringer); has {
 		fmt.Fprintf(buffer, ",Credentials:%v", c.String())
 	}
+
 	buffer.WriteByte('}')
 
 	return buffer.String()

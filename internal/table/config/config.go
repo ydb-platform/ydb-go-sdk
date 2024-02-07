@@ -27,6 +27,7 @@ const (
 
 func New(opts ...Option) *Config {
 	c := defaults()
+
 	for _, o := range opts {
 		if o != nil {
 			o(c)
@@ -88,6 +89,7 @@ func WithIdleThreshold(idleThreshold time.Duration) Option {
 		if idleThreshold < 0 {
 			idleThreshold = 0
 		}
+
 		c.idleThreshold = idleThreshold
 	}
 }
