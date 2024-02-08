@@ -97,13 +97,7 @@ func (c call) Record(opts ...recordOption) string {
 		funcName   string
 		file       = c.file
 	)
-	if i := strings.LastIndex(file, "/"); i > -1 {
-		file = file[i+1:]
-	}
-	if i := strings.LastIndex(name, "/"); i > -1 {
-		pkgPath, name = name[:i], name[i+1:]
-	}
-	split := strings.Split(name, ".")
+	file, pkgPath, split := findFileNameAndPkgPath(file, name, pkgPath)
 	lambdas := make([]string, 0, len(split))
 	for i := range split {
 		elem := split[len(split)-i-1]
@@ -169,6 +163,23 @@ func (c call) Record(opts ...recordOption) string {
 	}
 
 	return buffer.String()
+}
+
+// findFileNameAndPkgPath extracts the file name and package path from a string and splits the name into its components.
+func findFileNameAndPkgPath(
+	file string,
+	name string,
+	pkgPath string,
+) (string, string, []string) {
+	if i := strings.LastIndex(file, "/"); i > -1 {
+		file = file[i+1:]
+	}
+	if i := strings.LastIndex(name, "/"); i > -1 {
+		pkgPath, name = name[:i], name[i+1:]
+	}
+	split := strings.Split(name, ".")
+
+	return file, pkgPath, split
 }
 
 func (c call) FunctionID() string {
