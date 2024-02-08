@@ -1,3 +1,4 @@
+* Refactored `internal/table/client.go` and extract func `client.onCloseSession`
 * Refactored `internal/decimal/decimal.go` and extract func `decimal.dotStringAnalysis`
 * Refactored `internal/backoff/backoff_test.go` and extract func `backoff_test.checkExpWithAct` for compare
 * Refactored `internal/xsql/dsn.go` and extract func `dsn.bindTablePathPrefixInConnectorOptions`
