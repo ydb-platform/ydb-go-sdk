@@ -1,3 +1,4 @@
+* Refactored `metrics/sql.go` and extract funcs
 * Refactored `internal/table/retry_test.go` and extract func `retry_test.checkResultsRetryWithCustomErrors`
 * Refactored `internal/table/client.go` and extract func `client.onCloseSession`
 * Refactored `internal/decimal/decimal.go` and extract func `decimal.dotStringAnalysis`

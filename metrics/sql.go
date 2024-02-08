@@ -27,10 +27,34 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 	txCommitLatency := config.WithSystem("commit").TimerVec("latency")
 	txRollback := config.CounterVec("rollback", "status")
 	txRollbackLatency := config.WithSystem("rollback").TimerVec("latency")
-	t.OnConnectorConnect = func(info trace.DatabaseSQLConnectorConnectStartInfo) func(
+
+	databaseSQLConnectorEvents := config.Details() & trace.DatabaseSQLConnectorEvents
+	databaseSQLTxEvents := config.Details() & trace.DatabaseSQLTxEvents
+	databaseSQLEvents := config.Details() & trace.DatabaseSQLEvents
+	databaseSQLConnEvents := config.Details() & trace.DatabaseSQLConnEvents
+
+	t.OnConnectorConnect = onConnectorConnect(databaseSQLConnectorEvents, conns)
+	t.OnConnClose = onConnCloseDatabaseSQL(databaseSQLConnectorEvents, conns)
+	t.OnConnBegin = onConnBeginDatabaseSQL(databaseSQLTxEvents, txBegin, txBeginLatency)
+	t.OnTxCommit = onTxCommit(databaseSQLTxEvents, txCommit, txCommitLatency)
+	t.OnTxExec = onTxExec(databaseSQLTxEvents, txExec, txExecLatency)
+	t.OnTxQuery = onTxQuery(databaseSQLTxEvents, txQuery, txQueryLatency)
+	t.OnTxRollback = onTxRollback(databaseSQLTxEvents, txRollback, txRollbackLatency)
+	t.OnConnExec = onConnExec(databaseSQLEvents, databaseSQLConnEvents, inflight, exec, execLatency)
+	t.OnConnQuery = onConnQuery(databaseSQLEvents, databaseSQLConnEvents, inflight, query, queryLatency)
+
+	return t
+}
+
+// The `onConnectorConnect` function is called when a connection is established to the database.
+func onConnectorConnect(
+	databaseSQLConnectorEvents trace.Details,
+	conns GaugeVec,
+) func(info trace.DatabaseSQLConnectorConnectStartInfo) func(trace.DatabaseSQLConnectorConnectDoneInfo) {
+	return func(info trace.DatabaseSQLConnectorConnectStartInfo) func(
 		trace.DatabaseSQLConnectorConnectDoneInfo,
 	) {
-		if config.Details()&trace.DatabaseSQLConnectorEvents != 0 {
+		if databaseSQLConnectorEvents != 0 {
 			return func(info trace.DatabaseSQLConnectorConnectDoneInfo) {
 				if info.Error == nil {
 					conns.With(nil).Add(1)
@@ -40,8 +64,15 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 
 		return nil
 	}
-	t.OnConnClose = func(info trace.DatabaseSQLConnCloseStartInfo) func(trace.DatabaseSQLConnCloseDoneInfo) {
-		if config.Details()&trace.DatabaseSQLConnectorEvents != 0 {
+}
+
+// onConnCloseDatabaseSQL is a function that is used to handle the closing of a database connection.
+func onConnCloseDatabaseSQL(
+	databaseSQLConnectorEvents trace.Details,
+	conns GaugeVec,
+) func(info trace.DatabaseSQLConnCloseStartInfo) func(trace.DatabaseSQLConnCloseDoneInfo) {
+	return func(info trace.DatabaseSQLConnCloseStartInfo) func(trace.DatabaseSQLConnCloseDoneInfo) {
+		if databaseSQLConnectorEvents != 0 {
 			return func(info trace.DatabaseSQLConnCloseDoneInfo) {
 				conns.With(nil).Add(-1)
 			}
@@ -49,9 +80,18 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 
 		return nil
 	}
-	t.OnConnBegin = func(info trace.DatabaseSQLConnBeginStartInfo) func(trace.DatabaseSQLConnBeginDoneInfo) {
+}
+
+// onConnBeginDatabaseSQL measures `trace.DatabaseSQLConnBeginStartInfo` events and updates `txBegin`
+// and `txBeginLatency`
+func onConnBeginDatabaseSQL(
+	databaseSQLTxEvents trace.Details,
+	txBegin CounterVec,
+	txBeginLatency TimerVec,
+) func(info trace.DatabaseSQLConnBeginStartInfo) func(trace.DatabaseSQLConnBeginDoneInfo) {
+	return func(info trace.DatabaseSQLConnBeginStartInfo) func(trace.DatabaseSQLConnBeginDoneInfo) {
 		start := time.Now()
-		if config.Details()&trace.DatabaseSQLTxEvents != 0 {
+		if databaseSQLTxEvents != 0 {
 			return func(info trace.DatabaseSQLConnBeginDoneInfo) {
 				txBegin.With(map[string]string{
 					"status": errorBrief(info.Error),
@@ -62,11 +102,20 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 
 		return nil
 	}
-	t.OnTxCommit = func(info trace.DatabaseSQLTxCommitStartInfo) func(trace.DatabaseSQLTxCommitDoneInfo) {
+}
+
+// onTxCommit is a function that returns a closure function. The closure function
+// takes a trace.DatabaseSQLTxCommitDoneInfo argument and performs certain actions based on the input.
+func onTxCommit(
+	databaseSQLTxEvents trace.Details,
+	txCommit CounterVec,
+	txCommitLatency TimerVec,
+) func(info trace.DatabaseSQLTxCommitStartInfo) func(trace.DatabaseSQLTxCommitDoneInfo) {
+	return func(info trace.DatabaseSQLTxCommitStartInfo) func(trace.DatabaseSQLTxCommitDoneInfo) {
 		start := time.Now()
 
 		return func(info trace.DatabaseSQLTxCommitDoneInfo) {
-			if config.Details()&trace.DatabaseSQLTxEvents != 0 {
+			if databaseSQLTxEvents != 0 {
 				txCommit.With(map[string]string{
 					"status": errorBrief(info.Error),
 				}).Inc()
@@ -74,11 +123,20 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 			}
 		}
 	}
-	t.OnTxExec = func(info trace.DatabaseSQLTxExecStartInfo) func(trace.DatabaseSQLTxExecDoneInfo) {
+}
+
+// onTxExec is a function that returns a callback function to be executed when a trace.DatabaseSQLTxExecDoneInfo event
+// occurs.
+func onTxExec(
+	databaseSQLTxEvents trace.Details,
+	txExec CounterVec,
+	txExecLatency TimerVec,
+) func(info trace.DatabaseSQLTxExecStartInfo) func(trace.DatabaseSQLTxExecDoneInfo) {
+	return func(info trace.DatabaseSQLTxExecStartInfo) func(trace.DatabaseSQLTxExecDoneInfo) {
 		start := time.Now()
 
 		return func(info trace.DatabaseSQLTxExecDoneInfo) {
-			if config.Details()&trace.DatabaseSQLTxEvents != 0 {
+			if databaseSQLTxEvents != 0 {
 				status := errorBrief(info.Error)
 				txExec.With(map[string]string{
 					"status": status,
@@ -87,11 +145,20 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 			}
 		}
 	}
-	t.OnTxQuery = func(info trace.DatabaseSQLTxQueryStartInfo) func(trace.DatabaseSQLTxQueryDoneInfo) {
+}
+
+// onTxQuery is a callback function that measures trace events related to database transactions and queries
+// in the "database/sql" package.
+func onTxQuery(
+	databaseSQLTxEvents trace.Details,
+	txQuery CounterVec,
+	txQueryLatency TimerVec,
+) func(info trace.DatabaseSQLTxQueryStartInfo) func(trace.DatabaseSQLTxQueryDoneInfo) {
+	return func(info trace.DatabaseSQLTxQueryStartInfo) func(trace.DatabaseSQLTxQueryDoneInfo) {
 		start := time.Now()
 
 		return func(info trace.DatabaseSQLTxQueryDoneInfo) {
-			if config.Details()&trace.DatabaseSQLTxEvents != 0 {
+			if databaseSQLTxEvents != 0 {
 				status := errorBrief(info.Error)
 				txQuery.With(map[string]string{
 					"status": status,
@@ -100,11 +167,20 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 			}
 		}
 	}
-	t.OnTxRollback = func(info trace.DatabaseSQLTxRollbackStartInfo) func(trace.DatabaseSQLTxRollbackDoneInfo) {
+}
+
+// onTxRollback is a function that returns a closure. The closure takes in a `trace.DatabaseSQLTxRollbackStartInfo`
+// argument and returns another closure that takes in a `trace.Database`.
+func onTxRollback(
+	databaseSQLTxEvents trace.Details,
+	txRollback CounterVec,
+	txRollbackLatency TimerVec,
+) func(info trace.DatabaseSQLTxRollbackStartInfo) func(trace.DatabaseSQLTxRollbackDoneInfo) {
+	return func(info trace.DatabaseSQLTxRollbackStartInfo) func(trace.DatabaseSQLTxRollbackDoneInfo) {
 		start := time.Now()
 
 		return func(info trace.DatabaseSQLTxRollbackDoneInfo) {
-			if config.Details()&trace.DatabaseSQLTxEvents != 0 {
+			if databaseSQLTxEvents != 0 {
 				txRollback.With(map[string]string{
 					"status": errorBrief(info.Error),
 				}).Inc()
@@ -112,8 +188,18 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 			}
 		}
 	}
-	t.OnConnExec = func(info trace.DatabaseSQLConnExecStartInfo) func(trace.DatabaseSQLConnExecDoneInfo) {
-		if config.Details()&trace.DatabaseSQLEvents != 0 {
+}
+
+// onConnExec measures the execution of a database/sql connection command.
+func onConnExec(
+	databaseSQLEvents trace.Details,
+	databaseSQLConnEvents trace.Details,
+	inflight GaugeVec,
+	exec CounterVec,
+	execLatency TimerVec,
+) func(info trace.DatabaseSQLConnExecStartInfo) func(trace.DatabaseSQLConnExecDoneInfo) {
+	return func(info trace.DatabaseSQLConnExecStartInfo) func(trace.DatabaseSQLConnExecDoneInfo) {
+		if databaseSQLEvents != 0 {
 			inflight.With(nil).Add(1)
 		}
 		var (
@@ -122,10 +208,10 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 		)
 
 		return func(info trace.DatabaseSQLConnExecDoneInfo) {
-			if config.Details()&trace.DatabaseSQLEvents != 0 {
+			if databaseSQLEvents != 0 {
 				inflight.With(nil).Add(-1)
 			}
-			if config.Details()&trace.DatabaseSQLConnEvents != 0 {
+			if databaseSQLConnEvents != 0 {
 				status := errorBrief(info.Error)
 				exec.With(map[string]string{
 					"status":     status,
@@ -137,8 +223,18 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 			}
 		}
 	}
-	t.OnConnQuery = func(info trace.DatabaseSQLConnQueryStartInfo) func(trace.DatabaseSQLConnQueryDoneInfo) {
-		if config.Details()&trace.DatabaseSQLEvents != 0 {
+}
+
+// onConnQuery handles the start and completion of a connection query event.
+func onConnQuery(
+	databaseSQLEvents trace.Details,
+	databaseSQLConnEvents trace.Details,
+	inflight GaugeVec,
+	query CounterVec,
+	queryLatency TimerVec,
+) func(info trace.DatabaseSQLConnQueryStartInfo) func(trace.DatabaseSQLConnQueryDoneInfo) {
+	return func(info trace.DatabaseSQLConnQueryStartInfo) func(trace.DatabaseSQLConnQueryDoneInfo) {
+		if databaseSQLEvents != 0 {
 			inflight.With(nil).Add(1)
 		}
 		var (
@@ -147,10 +243,10 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 		)
 
 		return func(info trace.DatabaseSQLConnQueryDoneInfo) {
-			if config.Details()&trace.DatabaseSQLEvents != 0 {
+			if databaseSQLEvents != 0 {
 				inflight.With(nil).Add(-1)
 			}
-			if config.Details()&trace.DatabaseSQLConnEvents != 0 {
+			if databaseSQLConnEvents != 0 {
 				status := errorBrief(info.Error)
 				query.With(map[string]string{
 					"status":     status,
@@ -162,6 +258,4 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 			}
 		}
 	}
-
-	return t
 }
