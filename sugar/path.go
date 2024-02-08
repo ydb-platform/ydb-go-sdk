@@ -124,36 +124,9 @@ func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove s
 			if pt == fullSysTablePath {
 				continue
 			}
-			switch t := dir.Children[j].Type; t {
-			case scheme.EntryDirectory:
-				if err = rmPath(i+1, pt); err != nil {
-					return xerrors.WithStackTrace(
-						fmt.Errorf("recursive removing directory %q failed: %w", pt, err),
-					)
-				}
-
-			case scheme.EntryTable, scheme.EntryColumnTable:
-				err = db.Table().Do(ctx, func(ctx context.Context, session table.Session) (err error) {
-					return session.DropTable(ctx, pt)
-				}, table.WithIdempotent())
-				if err != nil {
-					return xerrors.WithStackTrace(
-						fmt.Errorf("removing table %q failed: %w", pt, err),
-					)
-				}
-
-			case scheme.EntryTopic:
-				err = db.Topic().Drop(ctx, pt)
-				if err != nil {
-					return xerrors.WithStackTrace(
-						fmt.Errorf("removing topic %q failed: %w", pt, err),
-					)
-				}
-
-			default:
-				return xerrors.WithStackTrace(
-					fmt.Errorf("unknown entry type: %s", t.String()),
-				)
+			err = removeEntry(ctx, i, pt, j, db, &dir, rmPath)
+			if err != nil {
+				return err
 			}
 		}
 
@@ -182,4 +155,51 @@ func removeWithPrefix(pathToRemove string, db dbFoRemoveRecursive) string {
 	}
 
 	return pathToRemove
+}
+
+// removeEntry removes an entry from the database.
+// It takes a context, an index, a path, an index, a database, a directory, and a function to recursively remove directories.
+// It returns an error if the removal fails.
+func removeEntry(
+	ctx context.Context,
+	i int,
+	pt string,
+	j int,
+	db dbFoRemoveRecursive,
+	dir *scheme.Directory,
+	rmPath func(int, string) error,
+) error {
+	switch t := dir.Children[j].Type; t {
+	case scheme.EntryDirectory:
+		if err := rmPath(i+1, pt); err != nil {
+			return xerrors.WithStackTrace(
+				fmt.Errorf("recursive removing directory %q failed: %w", pt, err),
+			)
+		}
+
+	case scheme.EntryTable, scheme.EntryColumnTable:
+		err := db.Table().Do(ctx, func(ctx context.Context, session table.Session) (err error) {
+			return session.DropTable(ctx, pt)
+		}, table.WithIdempotent())
+		if err != nil {
+			return xerrors.WithStackTrace(
+				fmt.Errorf("removing table %q failed: %w", pt, err),
+			)
+		}
+
+	case scheme.EntryTopic:
+		err := db.Topic().Drop(ctx, pt)
+		if err != nil {
+			return xerrors.WithStackTrace(
+				fmt.Errorf("removing topic %q failed: %w", pt, err),
+			)
+		}
+
+	default:
+		return xerrors.WithStackTrace(
+			fmt.Errorf("unknown entry type: %s", t.String()),
+		)
+	}
+
+	return nil
 }
