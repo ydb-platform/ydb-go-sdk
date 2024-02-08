@@ -1,3 +1,4 @@
+* Refactored `log/sql.go` and extract funcs
 * Refactored `metrics/driver.go` and extract funcs
 * Refactored `metrics/sql.go` and extract funcs
 * Refactored `internal/table/retry_test.go` and extract func `retry_test.checkResultsRetryWithCustomErrors`
