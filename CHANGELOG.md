@@ -1,3 +1,4 @@
+* Refactored `sugar/path.go` and extract funcs `path.rmPath`, `path.removeWithPrefix`, `path.checkDirectoryExists`, `path.removeDirectoryIfNotEntry`, `path.checkEntryAndListDirectory`
 * Refactored `internal/stack/record.go` and extract func `record.findFileNameAndPkgPath`
 * Fixed topic writer infinite reconnections in some cases
 * Refactored nil on err `internal/grpcwrapper/rawydb/issues.go`, when golangci-lint nilerr enabled

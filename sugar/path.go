@@ -91,14 +91,24 @@ func MakeRecursive(ctx context.Context, db dbForMakeRecursive, pathToCreate stri
 // where `~` - is a root of database
 func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove string) error {
 	fullSysTablePath := path.Join(db.Name(), sysDirectory)
-	var rmPath func(int, string) error
-	rmPath = func(i int, p string) error {
-		if exists, err := IsDirectoryExists(ctx, db.Scheme(), p); err != nil {
-			return xerrors.WithStackTrace(
-				fmt.Errorf("check directory %q exists failed: %w", p, err),
-			)
-		} else if !exists {
-			return nil
+	var removePathRecursively func(int, string) error
+	removePathRecursively = rmPath(ctx, db, fullSysTablePath, removePathRecursively)
+	pathToRemove = removeWithPrefix(pathToRemove, db)
+
+	return removePathRecursively(0, pathToRemove)
+}
+
+// rmPath removes a path recursively from the database
+func rmPath(
+	ctx context.Context,
+	db dbFoRemoveRecursive,
+	fullSysTablePath string,
+	removePathRecursively func(int, string) error,
+) func(i int, p string) error {
+	return func(i int, p string) error {
+		err := checkDirectoryExists(ctx, db, p)
+		if err != nil {
+			return err
 		}
 
 		entry, err := db.Scheme().DescribePath(ctx, p)
@@ -108,15 +118,9 @@ func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove s
 			)
 		}
 
-		if entry.Type != scheme.EntryDirectory && entry.Type != scheme.EntryDatabase {
-			return nil
-		}
-
-		dir, err := db.Scheme().ListDirectory(ctx, p)
+		dir, err := checkEntryAndListDirectory(ctx, db, &entry, p)
 		if err != nil {
-			return xerrors.WithStackTrace(
-				fmt.Errorf("listing directory %q failed: %w", p, err),
-			)
+			return err
 		}
 
 		for j := range dir.Children {
@@ -126,7 +130,7 @@ func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove s
 			}
 			switch t := dir.Children[j].Type; t {
 			case scheme.EntryDirectory:
-				if err = rmPath(i+1, pt); err != nil {
+				if err = removePathRecursively(i+1, pt); err != nil {
 					return xerrors.WithStackTrace(
 						fmt.Errorf("recursive removing directory %q failed: %w", pt, err),
 					)
@@ -157,22 +161,76 @@ func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove s
 			}
 		}
 
-		if entry.Type != scheme.EntryDirectory {
-			return nil
+		err = removeDirectoryIfNotEntry(ctx, db, &entry, p)
+		if err != nil {
+			return err
 		}
 
-		err = db.Scheme().RemoveDirectory(ctx, p)
+		return nil
+	}
+}
+
+// removeWithPrefix prepends the db.Name() to the pathToRemove string if it does not already have the prefix.
+func removeWithPrefix(pathToRemove string, db dbFoRemoveRecursive) string {
+	if !strings.HasPrefix(pathToRemove, db.Name()) {
+		pathToRemove = path.Join(db.Name(), pathToRemove)
+	}
+
+	return pathToRemove
+}
+
+// checkDirectoryExists checks if a directory exists in the specified database.
+func checkDirectoryExists(ctx context.Context, db dbFoRemoveRecursive, p string) error {
+	exists, err := IsDirectoryExists(ctx, db.Scheme(), p)
+	if err != nil {
+		return xerrors.WithStackTrace(
+			fmt.Errorf("check directory %q exists failed: %w", p, err),
+		)
+	} else if !exists {
+		return nil
+	}
+
+	return nil
+}
+
+// removeDirectoryIfNotEntry removes a directory if it is not an entry.
+func removeDirectoryIfNotEntry(
+	ctx context.Context,
+	db dbFoRemoveRecursive,
+	entry *scheme.Entry,
+	p string,
+) error {
+	if entry.Type == scheme.EntryDirectory {
+		err := db.Scheme().RemoveDirectory(ctx, p)
 		if err != nil {
 			return xerrors.WithStackTrace(
 				fmt.Errorf("removing directory %q failed: %w", p, err),
 			)
 		}
-
-		return nil
-	}
-	if !strings.HasPrefix(pathToRemove, db.Name()) {
-		pathToRemove = path.Join(db.Name(), pathToRemove)
 	}
 
-	return rmPath(0, pathToRemove)
+	return nil
+}
+
+// checkEntryAndListDirectory checks if the given entry is not a EntryDirectory or a EntryDatabase
+// and lists its children directories and files.
+func checkEntryAndListDirectory(
+	ctx context.Context,
+	db dbFoRemoveRecursive,
+	entry *scheme.Entry,
+	p string,
+) (scheme.Directory, error) {
+	var dir scheme.Directory
+	if entry.Type != scheme.EntryDirectory && entry.Type != scheme.EntryDatabase {
+		return dir, nil
+	}
+
+	dir, err := db.Scheme().ListDirectory(ctx, p)
+	if err != nil {
+		return dir, xerrors.WithStackTrace(
+			fmt.Errorf("listing directory %q failed: %w", p, err),
+		)
+	}
+
+	return dir, nil
 }
