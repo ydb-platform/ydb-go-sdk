@@ -158,8 +158,6 @@ func removeWithPrefix(pathToRemove string, db dbFoRemoveRecursive) string {
 }
 
 // removeEntry removes an entry from the database.
-// It takes a context, an index, a path, an index, a database, a directory, and a function to recursively remove directories.
-// It returns an error if the removal fails.
 func removeEntry(
 	ctx context.Context,
 	i int,
