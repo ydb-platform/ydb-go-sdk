@@ -117,39 +117,9 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 	integral := precision - scale
 
 	var dot bool
-	for ; len(s) > 0; s = s[1:] {
-		c := s[0]
-		if c == '.' {
-			if dot {
-				return nil, syntaxError(s)
-			}
-			dot = true
-
-			continue
-		}
-		if dot {
-			if scale > 0 {
-				scale--
-			} else {
-				break
-			}
-		}
-
-		if !isDigit(c) {
-			return nil, syntaxError(s)
-		}
-
-		v.Mul(v, ten)
-		v.Add(v, big.NewInt(int64(c-'0')))
-
-		if !dot && v.Cmp(zero) > 0 && integral == 0 {
-			if neg {
-				return neginf, nil
-			}
-
-			return inf, nil
-		}
-		integral--
+	bInt, done, err := dotStringAnalysis(s, dot, scale, v, integral, neg)
+	if done {
+		return bInt, err
 	}
 	//nolint:nestif
 	if len(s) > 0 { // Characters remaining.
@@ -177,12 +147,17 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 			}
 		}
 	}
+	multipliedByTen(v, scale, neg)
+
+	return v, nil
+}
+
+// multipliedByTen multiplies the given big.Int value by 10 raised to the power of scale.
+func multipliedByTen(v *big.Int, scale uint32, neg bool) {
 	v.Mul(v, pow(ten, scale))
 	if neg {
 		v.Neg(v)
 	}
-
-	return v, nil
 }
 
 // Format returns the string representation of x with the given precision and
@@ -264,6 +239,57 @@ func Format(x *big.Int, precision, scale uint32) string {
 	}
 
 	return xstring.FromBytes(bts[pos:])
+}
+
+// dotStringAnalysis performs analysis on a string representation of a decimal number.
+func dotStringAnalysis(
+	s string,
+	dot bool,
+	scale uint32,
+	v *big.Int,
+	integral uint32,
+	neg bool,
+) (
+	*big.Int,
+	bool,
+	error,
+) {
+	for ; len(s) > 0; s = s[1:] {
+		c := s[0]
+		if c == '.' {
+			if dot {
+				return nil, true, syntaxError(s)
+			}
+			dot = true
+
+			continue
+		}
+		if dot {
+			if scale > 0 {
+				scale--
+			} else {
+				break
+			}
+		}
+
+		if !isDigit(c) {
+			return nil, true, syntaxError(s)
+		}
+
+		v.Mul(v, ten)
+		v.Add(v, big.NewInt(int64(c-'0')))
+
+		if !dot && v.Cmp(zero) > 0 && integral == 0 {
+			if neg {
+				return neginf, true, nil
+			}
+
+			return inf, true, nil
+		}
+		integral--
+	}
+
+	return nil, false, nil
 }
 
 // BigIntToByte returns the 16-byte array representation of x.
