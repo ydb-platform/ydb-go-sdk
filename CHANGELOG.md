@@ -1,3 +1,4 @@
+* Refactored `internal/xsql/dsn.go` and extract func `dsn.bindTablePathPrefixInConnectorOptions`
 * Refactored `sugar/path.go` and extract funcs `path.removeWithPrefix`,  `path.removeEntry`
 * Refactored `internal/stack/record.go` and extract func `record.findFileNameAndPkgPath`
 * Fixed topic writer infinite reconnections in some cases
