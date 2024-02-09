@@ -1,4 +1,5 @@
-* Refactored `log/topic` and extract funcs
+* Refactored `internal/table/scanner/scanner.go` and extract funcs
+* Refactored `log/topic.go` and extract funcs
 * Refactored `internal/table/scanner/scanner_test.go` and extract funcs
 * Refactored `log/sql.go` and extract funcs
 * Refactored `metrics/driver.go` and extract funcs
