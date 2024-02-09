@@ -175,24 +175,7 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 
 		waitTimeout := time.Second * 10
 		startWait := time.Now()
-	waitReader:
-		for {
-			if lastReadSeqNo.Load() == lastSentSeqNo {
-				readCancel()
-			}
-			select {
-			case <-readFinished:
-				break waitReader
-			case stack := <-fatalChan:
-				t.Fatal(stack)
-			default:
-			}
-
-			runtime.Gosched()
-			if time.Since(startWait) > waitTimeout {
-				t.Fatal()
-			}
-		}
+		waitReader(&lastReadSeqNo, lastSentSeqNo, readCancel, readFinished, fatalChan, startWait, waitTimeout, t)
 	})
 
 	t.Run("ClosedContext", func(t *testing.T) {
@@ -232,6 +215,38 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 		<-gotErr
 		require.ErrorIs(t, err, testErr)
 	})
+}
+
+// waitReader waits for a condition where the lastReadSeqNo is equal to the lastSentSeqNo.
+// It periodically checks for changes in the lastReadSeqNo and waits for a read to finish or a fatal error to occur.
+// If the waitTimeout is reached, a fatal error is triggered.
+func waitReader(
+	lastReadSeqNo *xatomic.Int64,
+	lastSentSeqNo int64,
+	readCancel func(),
+	readFinished <-chan struct{},
+	fatalChan <-chan string,
+	startWait time.Time,
+	waitTimeout time.Duration,
+	t *testing.T,
+) {
+waitReader:
+	for {
+		if lastReadSeqNo.Load() == lastSentSeqNo {
+			readCancel()
+		}
+		select {
+		case <-readFinished:
+			break waitReader
+		case stack := <-fatalChan:
+			t.Fatal(stack)
+		default:
+		}
+		runtime.Gosched()
+		if time.Since(startWait) > waitTimeout {
+			t.Fatal()
+		}
+	}
 }
 
 func TestMessageQueue_ResetSentProgress(t *testing.T) {
