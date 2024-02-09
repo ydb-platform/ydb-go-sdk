@@ -25,7 +25,6 @@ import (
 //nolint:revive
 func build_goodOSArchFile(*build.Context, string, map[string]bool) bool
 
-//nolint:gocyclo
 func main() {
 	var (
 		// Reports whether we were called from go:generate.
@@ -66,22 +65,7 @@ func main() {
 	if isGoGenerate {
 		// We should respect Go suffixes like `_linux.go`.
 		name, tags, ext := splitOSArchTags(&buildCtx, gofile)
-		openFile := func(name string) (*os.File, func()) {
-			var f *os.File
-			//nolint:gofumpt
-			//nolint:nolintlint
-			//nolint:gosec
-			f, err = os.OpenFile(
-				filepath.Join(workDir, filepath.Clean(name)),
-				os.O_WRONLY|os.O_CREATE|os.O_TRUNC,
-				0o600,
-			)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			return f, func() { f.Close() }
-		}
+		openFile := openFileMain(err, workDir)
 		f, clean := openFile(name + "_gtrace" + tags + ext)
 		defer clean()
 		writers = append(writers, &Writer{
@@ -156,53 +140,7 @@ func main() {
 			depth int
 			item  *GenItem
 		)
-		ast.Inspect(astFile, func(n ast.Node) (next bool) {
-			if n == nil {
-				item = nil
-				depth--
-
-				return true
-			}
-			defer func() {
-				if next {
-					depth++
-				}
-			}()
-
-			switch v := n.(type) {
-			case *ast.FuncDecl, *ast.ValueSpec:
-				return false
-
-			case *ast.Ident:
-				if item != nil {
-					item.Ident = v
-				}
-
-				return false
-
-			case *ast.CommentGroup:
-				for _, c := range v.List {
-					if strings.Contains(strings.TrimPrefix(c.Text, "//"), "gtrace:gen") {
-						if item == nil {
-							item = &GenItem{}
-						}
-					}
-				}
-
-				return false
-
-			case *ast.StructType:
-				if item != nil {
-					item.StructType = v
-					items = append(items, item)
-					item = nil
-				}
-
-				return false
-			}
-
-			return true
-		})
+		ast.Inspect(astFile, astInspect(item, depth, items))
 	}
 	p := Package{
 		Package:          pkg,
@@ -216,6 +154,66 @@ func main() {
 		p.Traces = append(p.Traces, t)
 		traces[item.Ident.Name] = t
 	}
+	extractNameAndDetails(items, p, info, traces)
+	iterateOverWriter(writers, p)
+
+	log.Println("OK")
+}
+
+// Check if node is nil
+func astInspect(item *GenItem, depth int, items []*GenItem) func(n ast.Node) (next bool) {
+	return func(n ast.Node) (next bool) {
+		if n == nil {
+			item = nil
+			depth--
+
+			return true
+		}
+		defer func() {
+			if next {
+				depth++
+			}
+		}()
+
+		switch v := n.(type) {
+		case *ast.FuncDecl, *ast.ValueSpec:
+			return false
+
+		case *ast.Ident:
+			if item != nil {
+				item.Ident = v
+			}
+
+			return false
+
+		case *ast.CommentGroup:
+			for _, c := range v.List {
+				if strings.Contains(strings.TrimPrefix(c.Text, "//"), "gtrace:gen") {
+					if item == nil {
+						item = &GenItem{}
+					}
+				}
+			}
+
+			return false
+
+		case *ast.StructType:
+			if item != nil {
+				item.StructType = v
+				items = append(items, item)
+				item = nil
+			}
+
+			return false
+		}
+
+		return true
+	}
+}
+
+// extractNameAndDetails extracts the name and details of functions from the given items, and populates the traces
+// in the package with hooks based on the extracted functions.
+func extractNameAndDetails(items []*GenItem, p Package, info *types.Info, traces map[string]*Trace) {
 	for i, item := range items {
 		t := p.Traces[i]
 		for _, field := range item.StructType.Fields.List {
@@ -242,13 +240,35 @@ func main() {
 			})
 		}
 	}
+}
+
+// Iterate over each Writer in the writers slice
+func iterateOverWriter(writers []*Writer, p Package) {
 	for _, w := range writers {
 		if err := w.Write(p); err != nil {
 			panic(err)
 		}
 	}
+}
 
-	log.Println("OK")
+// openFileMain returns a function that opens a file with a given name in the working directory specified by workDir.
+func openFileMain(err error, workDir string) func(name string) (*os.File, func()) {
+	return func(name string) (*os.File, func()) {
+		var f *os.File
+		//nolint:gofumpt
+		//nolint:nolintlint
+		//nolint:gosec
+		f, err = os.OpenFile(
+			filepath.Join(workDir, filepath.Clean(name)),
+			os.O_WRONLY|os.O_CREATE|os.O_TRUNC,
+			0o600,
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		return f, func() { f.Close() }
+	}
 }
 
 func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (ret *Func, err error) {

@@ -1,3 +1,4 @@
+* Refactored `internal/cmd/gtrace/main.go` and extract funcs for gocognit linter
 * Refactored `retry/retry.go` and extract func `retry.RecoveryCallbackWrapper` for gocognit linter
 * Refactored `retry/sql_test.go` and extract func `sql_test.canRetry` for gocognit linter
 * Refactored `internal/topic/topicwriterinternal/queue_test.go` and extract funcs for gocognit linter
