@@ -1,18 +1,20 @@
-* Refactored `internal/topic/topicwriterinternal/queue_test.go` and extract funcs
-* Refactored `log/driver.go` and extract funcs
-* Refactored `internal/table/scanner/scanner.go` and extract funcs
-* Refactored `log/topic.go` and extract funcs
-* Refactored `internal/table/scanner/scanner_test.go` and extract funcs
-* Refactored `log/sql.go` and extract funcs
-* Refactored `metrics/driver.go` and extract funcs
-* Refactored `metrics/sql.go` and extract funcs
-* Refactored `internal/table/retry_test.go` and extract func `retry_test.checkResultsRetryWithCustomErrors`
-* Refactored `internal/table/client.go` and extract func `client.onCloseSession`
-* Refactored `internal/decimal/decimal.go` and extract func `decimal.dotStringAnalysis`
-* Refactored `internal/backoff/backoff_test.go` and extract func `backoff_test.checkExpWithAct` for compare
-* Refactored `internal/xsql/dsn.go` and extract func `dsn.bindTablePathPrefixInConnectorOptions`
-* Refactored `sugar/path.go` and extract funcs `path.removeWithPrefix`,  `path.removeEntry`
-* Refactored `internal/stack/record.go` and extract func `record.findFileNameAndPkgPath`
+* Refactored `retry/retry.go` and extract func `retry.RecoveryCallbackWrapper` for gocognit linter
+* Refactored `retry/sql_test.go` and extract func `sql_test.canRetry` for gocognit linter
+* Refactored `internal/topic/topicwriterinternal/queue_test.go` and extract funcs for gocognit linter
+* Refactored `log/driver.go` and extract funcs for gocognit linter
+* Refactored `internal/table/scanner/scanner.go` and extract funcs for gocognit linter
+* Refactored `log/topic.go` and extract funcs for gocognit linter
+* Refactored `internal/table/scanner/scanner_test.go` and extract funcs for gocognit linter
+* Refactored `log/sql.go` and extract funcs for gocognit linter
+* Refactored `metrics/driver.go` and extract funcs for gocognit linter
+* Refactored `metrics/sql.go` and extract funcs for gocognit linter
+* Refactored `internal/table/retry_test.go` and extract func `retry_test.checkResultsRetryWithCustomErrors` for gocognit linter
+* Refactored `internal/table/client.go` and extract func `client.onCloseSession` for gocognit linter
+* Refactored `internal/decimal/decimal.go` and extract func `decimal.dotStringAnalysis` for gocognit linter
+* Refactored `internal/backoff/backoff_test.go` and extract func `backoff_test.checkExpWithAct` for gocognit linter
+* Refactored `internal/xsql/dsn.go` and extract func `dsn.bindTablePathPrefixInConnectorOptions` for gocognit linter
+* Refactored `sugar/path.go` and extract funcs `path.removeWithPrefix`,  `path.removeEntry` for gocognit linter
+* Refactored `internal/stack/record.go` and extract func `record.findFileNameAndPkgPath` for gocognit linter
 * Fixed topic writer infinite reconnections in some cases
 * Refactored nil on err `internal/grpcwrapper/rawydb/issues.go`, when golangci-lint nilerr enabled
 * Refactored nil on err `internal/grpcwrapper/rawtopic/describe_topic.go`, when golangci-lint nilerr enabled
