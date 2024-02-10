@@ -146,6 +146,28 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("type error: %v", err))
 	}
+	items := findGtraceGen(astFiles, pkgFiles, srcFilePath)
+	p := Package{
+		Package:          pkg,
+		BuildConstraints: buildConstraints,
+	}
+	traces := make(map[string]*Trace)
+	for _, item := range items {
+		t := &Trace{
+			Name: item.Ident.Name,
+		}
+		p.Traces = append(p.Traces, t)
+		traces[item.Ident.Name] = t
+	}
+	extractNameAndDetails(items, &p, info, traces)
+	checkErrsInWriters(writers, p)
+
+	log.Println("OK")
+}
+
+// findGtraceGen iterates over the astFiles and pkgFiles to find elements marked with a comment containing "gtrace:gen"
+// and collects them into GenItems.
+func findGtraceGen(astFiles []*ast.File, pkgFiles []*os.File, srcFilePath string) []*GenItem {
 	var items []*GenItem
 	for i, astFile := range astFiles {
 		if pkgFiles[i].Name() != srcFilePath {
@@ -205,26 +227,12 @@ func main() {
 			},
 		)
 	}
-	p := Package{
-		Package:          pkg,
-		BuildConstraints: buildConstraints,
-	}
-	traces := make(map[string]*Trace)
-	for _, item := range items {
-		t := &Trace{
-			Name: item.Ident.Name,
-		}
-		p.Traces = append(p.Traces, t)
-		traces[item.Ident.Name] = t
-	}
-	extractNameAndDetails(items, &p, info, traces)
-	iterateOverWriter(writers, p)
 
-	log.Println("OK")
+	return items
 }
 
-// Iterate over each Writer in the writers slice and checks errors
-func iterateOverWriter(writers []*Writer, p Package) {
+// checkErrsInWriters iterate over each Writer in the writers slice and checks errors
+func checkErrsInWriters(writers []*Writer, p Package) {
 	for _, w := range writers {
 		if err := w.Write(p); err != nil {
 			panic(err)
