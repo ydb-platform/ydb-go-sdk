@@ -25,7 +25,6 @@ import (
 //nolint:revive
 func build_goodOSArchFile(*build.Context, string, map[string]bool) bool
 
-//nolint:gocyclo
 func main() {
 	var (
 		// Reports whether we were called from go:generate.
@@ -156,53 +155,55 @@ func main() {
 			depth int
 			item  *GenItem
 		)
-		ast.Inspect(astFile, func(n ast.Node) (next bool) {
-			if n == nil {
-				item = nil
-				depth--
+		ast.Inspect(astFile,
+			func(n ast.Node) (next bool) {
+				if n == nil {
+					item = nil
+					depth--
 
-				return true
-			}
-			defer func() {
-				if next {
-					depth++
+					return true
 				}
-			}()
+				defer func() {
+					if next {
+						depth++
+					}
+				}()
 
-			switch v := n.(type) {
-			case *ast.FuncDecl, *ast.ValueSpec:
-				return false
+				switch v := n.(type) {
+				case *ast.FuncDecl, *ast.ValueSpec:
+					return false
 
-			case *ast.Ident:
-				if item != nil {
-					item.Ident = v
-				}
+				case *ast.Ident:
+					if item != nil {
+						item.Ident = v
+					}
 
-				return false
+					return false
 
-			case *ast.CommentGroup:
-				for _, c := range v.List {
-					if strings.Contains(strings.TrimPrefix(c.Text, "//"), "gtrace:gen") {
-						if item == nil {
-							item = &GenItem{}
+				case *ast.CommentGroup:
+					for _, c := range v.List {
+						if strings.Contains(strings.TrimPrefix(c.Text, "//"), "gtrace:gen") {
+							if item == nil {
+								item = &GenItem{}
+							}
 						}
 					}
+
+					return false
+
+				case *ast.StructType:
+					if item != nil {
+						item.StructType = v
+						items = append(items, item)
+						item = nil
+					}
+
+					return false
 				}
 
-				return false
-
-			case *ast.StructType:
-				if item != nil {
-					item.StructType = v
-					items = append(items, item)
-					item = nil
-				}
-
-				return false
-			}
-
-			return true
-		})
+				return true
+			},
+		)
 	}
 	p := Package{
 		Package:          pkg,
@@ -217,13 +218,18 @@ func main() {
 		traces[item.Ident.Name] = t
 	}
 	extractNameAndDetails(items, &p, info, traces)
+	iterateOverWriter(writers, p)
+
+	log.Println("OK")
+}
+
+// Iterate over each Writer in the writers slice and checks errors
+func iterateOverWriter(writers []*Writer, p Package) {
 	for _, w := range writers {
 		if err := w.Write(p); err != nil {
 			panic(err)
 		}
 	}
-
-	log.Println("OK")
 }
 
 // extractNameAndDetails extracts the name and details of functions from the given items, and populates the traces
