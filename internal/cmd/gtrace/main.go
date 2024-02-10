@@ -216,6 +216,19 @@ func main() {
 		p.Traces = append(p.Traces, t)
 		traces[item.Ident.Name] = t
 	}
+	extractNameAndDetails(items, &p, info, traces)
+	for _, w := range writers {
+		if err := w.Write(p); err != nil {
+			panic(err)
+		}
+	}
+
+	log.Println("OK")
+}
+
+// extractNameAndDetails extracts the name and details of functions from the given items, and populates the traces
+// in the package with hooks based on the extracted functions.
+func extractNameAndDetails(items []*GenItem, p *Package, info *types.Info, traces map[string]*Trace) {
 	for i, item := range items {
 		t := p.Traces[i]
 		for _, field := range item.StructType.Fields.List {
@@ -242,13 +255,6 @@ func main() {
 			})
 		}
 	}
-	for _, w := range writers {
-		if err := w.Write(p); err != nil {
-			panic(err)
-		}
-	}
-
-	log.Println("OK")
 }
 
 func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (ret *Func, err error) {
