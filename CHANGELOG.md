@@ -1,3 +1,4 @@
+* Refactored `log/table.go` and extract funcs for gocognit linter
 * Refactored `internal/cmd/gtrace/main.go` and extract funcs for gocognit linter
 * Refactored `internal/bind/params.go` and extract func `params.checkDriverNamedValue` for gocognit linter
 * Refactored `internal/cmd/gtrace/main.go` and extract funcs for gocognit linter
