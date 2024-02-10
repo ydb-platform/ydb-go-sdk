@@ -1,3 +1,4 @@
+* Refactored `internal/bind/params.go` and extract func `params.checkDriverNamedValue` for gocognit linter
 * Refactored `internal/cmd/gtrace/main.go` and extract funcs for gocognit linter
 * Refactored `retry/retry.go` and extract func `retry.RecoveryCallbackWrapper` for gocognit linter
 * Refactored `retry/sql_test.go` and extract func `sql_test.canRetry` for gocognit linter
