@@ -167,6 +167,8 @@ func main() {
 
 // findGtraceGen iterates over the astFiles and pkgFiles to find elements marked with a comment containing "gtrace:gen"
 // and collects them into GenItems.
+//
+//nolint:gocognit
 func findGtraceGen(astFiles []*ast.File, pkgFiles []*os.File, srcFilePath string) []*GenItem {
 	var items []*GenItem
 	for i, astFile := range astFiles {
@@ -203,7 +205,13 @@ func findGtraceGen(astFiles []*ast.File, pkgFiles []*os.File, srcFilePath string
 					return false
 
 				case *ast.CommentGroup:
-					findCommentsWithGtrace(v, item)
+					for _, c := range v.List {
+						if strings.Contains(strings.TrimPrefix(c.Text, "//"), "gtrace:gen") {
+							if item == nil {
+								item = &GenItem{}
+							}
+						}
+					}
 
 					return false
 
@@ -223,20 +231,6 @@ func findGtraceGen(astFiles []*ast.File, pkgFiles []*os.File, srcFilePath string
 	}
 
 	return items
-}
-
-// Iterate over each comment in the comment group and find comment prefix with gtrace:gen
-func findCommentsWithGtrace(
-	cg *ast.CommentGroup,
-	item *GenItem,
-) {
-	for _, c := range cg.List {
-		if strings.Contains(strings.TrimPrefix(c.Text, "//"), "gtrace:gen") {
-			if item == nil {
-				item = &GenItem{}
-			}
-		}
-	}
 }
 
 // checkErrsInWriters iterate over each Writer in the writers slice and checks errors
