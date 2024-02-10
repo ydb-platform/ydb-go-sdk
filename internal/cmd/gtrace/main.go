@@ -203,7 +203,7 @@ func findGtraceGen(astFiles []*ast.File, pkgFiles []*os.File, srcFilePath string
 					return false
 
 				case *ast.CommentGroup:
-					item = findCommentsWithGtrace(v, item)
+					findCommentsWithGtrace(v, item)
 
 					return false
 
@@ -226,16 +226,17 @@ func findGtraceGen(astFiles []*ast.File, pkgFiles []*os.File, srcFilePath string
 }
 
 // Iterate over each comment in the comment group and find comment prefix with gtrace:gen
-func findCommentsWithGtrace(v *ast.CommentGroup, item *GenItem) *GenItem {
-	for _, c := range v.List {
+func findCommentsWithGtrace(
+	cg *ast.CommentGroup,
+	item *GenItem,
+) {
+	for _, c := range cg.List {
 		if strings.Contains(strings.TrimPrefix(c.Text, "//"), "gtrace:gen") {
 			if item == nil {
 				item = &GenItem{}
 			}
 		}
 	}
-
-	return item
 }
 
 // checkErrsInWriters iterate over each Writer in the writers slice and checks errors
