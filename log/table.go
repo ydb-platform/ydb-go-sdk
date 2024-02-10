@@ -17,153 +17,9 @@ func Table(l Logger, d trace.Detailer, opts ...Option) (t trace.Table) {
 func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 	logger := l.logger
 
-	t.OnDo = func(
-		info trace.TableDoStartInfo,
-	) func(
-		info trace.TableDoIntermediateInfo,
-	) func(
-		trace.TableDoDoneInfo,
-	) {
-		if d.Details()&trace.TablePoolAPIEvents == 0 {
-			return nil
-		}
-		ctx := with(*info.Context, TRACE, "ydb", "table", "do")
-		idempotent := info.Idempotent
-		label := info.Label
-		l.Log(ctx, "start",
-			Bool("idempotent", idempotent),
-			String("label", label),
-		)
-		start := time.Now()
-
-		return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
-			if info.Error == nil {
-				l.Log(ctx, "done",
-					latencyField(start),
-					Bool("idempotent", idempotent),
-					String("label", label),
-				)
-			} else {
-				lvl := WARN
-				if !xerrors.IsYdb(info.Error) {
-					lvl = DEBUG
-				}
-				m := retry.Check(info.Error)
-				l.Log(WithLevel(ctx, lvl), "failed",
-					latencyField(start),
-					Bool("idempotent", idempotent),
-					String("label", label),
-					Error(info.Error),
-					Bool("retryable", m.MustRetry(idempotent)),
-					Int64("code", m.StatusCode()),
-					Bool("deleteSession", m.MustDeleteSession()),
-					versionField(),
-				)
-			}
-
-			return func(info trace.TableDoDoneInfo) {
-				if info.Error == nil {
-					l.Log(ctx, "done",
-						latencyField(start),
-						Bool("idempotent", idempotent),
-						String("label", label),
-						Int("attempts", info.Attempts),
-					)
-				} else {
-					lvl := ERROR
-					if !xerrors.IsYdb(info.Error) {
-						lvl = DEBUG
-					}
-					m := retry.Check(info.Error)
-					l.Log(WithLevel(ctx, lvl), "done",
-						latencyField(start),
-						Bool("idempotent", idempotent),
-						String("label", label),
-						Int("attempts", info.Attempts),
-						Error(info.Error),
-						Bool("retryable", m.MustRetry(idempotent)),
-						Int64("code", m.StatusCode()),
-						Bool("deleteSession", m.MustDeleteSession()),
-						versionField(),
-					)
-				}
-			}
-		}
-	}
-	t.OnDoTx = func(
-		info trace.TableDoTxStartInfo,
-	) func(
-		info trace.TableDoTxIntermediateInfo,
-	) func(
-		trace.TableDoTxDoneInfo,
-	) {
-		if d.Details()&trace.TablePoolAPIEvents == 0 {
-			return nil
-		}
-		ctx := with(*info.Context, TRACE, "ydb", "table", "do", "tx")
-		idempotent := info.Idempotent
-		label := info.Label
-		l.Log(ctx, "start",
-			Bool("idempotent", idempotent),
-			String("label", label),
-		)
-		start := time.Now()
-
-		return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
-			if info.Error == nil {
-				l.Log(ctx, "done",
-					latencyField(start),
-					Bool("idempotent", idempotent),
-					String("label", label),
-				)
-			} else {
-				lvl := ERROR
-				if !xerrors.IsYdb(info.Error) {
-					lvl = DEBUG
-				}
-				m := retry.Check(info.Error)
-				l.Log(WithLevel(ctx, lvl), "done",
-					latencyField(start),
-					Bool("idempotent", idempotent),
-					String("label", label),
-					Error(info.Error),
-					Bool("retryable", m.MustRetry(idempotent)),
-					Int64("code", m.StatusCode()),
-					Bool("deleteSession", m.MustDeleteSession()),
-					versionField(),
-				)
-			}
-
-			return func(info trace.TableDoTxDoneInfo) {
-				if info.Error == nil {
-					l.Log(ctx, "done",
-						latencyField(start),
-						Bool("idempotent", idempotent),
-						String("label", label),
-						Int("attempts", info.Attempts),
-					)
-				} else {
-					lvl := WARN
-					if !xerrors.IsYdb(info.Error) {
-						lvl = DEBUG
-					}
-					m := retry.Check(info.Error)
-					l.Log(WithLevel(ctx, lvl), "done",
-						latencyField(start),
-						Bool("idempotent", idempotent),
-						String("label", label),
-						Int("attempts", info.Attempts),
-						Error(info.Error),
-						Bool("retryable", m.MustRetry(idempotent)),
-						Int64("code", m.StatusCode()),
-						Bool("deleteSession", m.MustDeleteSession()),
-						versionField(),
-					)
-				}
-			}
-		}
-	}
-	t.OnCreateSession = onCreateSession(l, d)
+	t.OnDo = onDo(logger, d)
+	t.OnDoTx = onDoTx(logger, d)
+	t.OnCreateSession = onCreateSession(logger, d)
 	t.OnSessionNew = onSessionNew(logger, d)
 	t.OnSessionDelete = onSessionDelete(logger, d)
 	t.OnSessionKeepAlive = onSessionKeepAlive(logger, d)
@@ -340,6 +196,165 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 	t.OnPoolWait = onPoolWait(logger, d)
 
 	return t
+}
+
+func onDo(l Logger,
+	d trace.Detailer,
+) func(info trace.TableDoStartInfo) func(
+	info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
+	return func(
+		info trace.TableDoStartInfo,
+	) func(
+		info trace.TableDoIntermediateInfo,
+	) func(
+		trace.TableDoDoneInfo,
+	) {
+		if d.Details()&trace.TablePoolAPIEvents == 0 {
+			return nil
+		}
+		ctx := with(*info.Context, TRACE, "ydb", "table", "do")
+		idempotent := info.Idempotent
+		label := info.Label
+		l.Log(ctx, "start",
+			Bool("idempotent", idempotent),
+			String("label", label),
+		)
+		start := time.Now()
+
+		return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
+			if info.Error == nil {
+				l.Log(ctx, "done",
+					latencyField(start),
+					Bool("idempotent", idempotent),
+					String("label", label),
+				)
+			} else {
+				lvl := WARN
+				if !xerrors.IsYdb(info.Error) {
+					lvl = DEBUG
+				}
+				m := retry.Check(info.Error)
+				l.Log(WithLevel(ctx, lvl), "failed",
+					latencyField(start),
+					Bool("idempotent", idempotent),
+					String("label", label),
+					Error(info.Error),
+					Bool("retryable", m.MustRetry(idempotent)),
+					Int64("code", m.StatusCode()),
+					Bool("deleteSession", m.MustDeleteSession()),
+					versionField(),
+				)
+			}
+
+			return func(info trace.TableDoDoneInfo) {
+				if info.Error == nil {
+					l.Log(ctx, "done",
+						latencyField(start),
+						Bool("idempotent", idempotent),
+						String("label", label),
+						Int("attempts", info.Attempts),
+					)
+				} else {
+					lvl := ERROR
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					m := retry.Check(info.Error)
+					l.Log(WithLevel(ctx, lvl), "done",
+						latencyField(start),
+						Bool("idempotent", idempotent),
+						String("label", label),
+						Int("attempts", info.Attempts),
+						Error(info.Error),
+						Bool("retryable", m.MustRetry(idempotent)),
+						Int64("code", m.StatusCode()),
+						Bool("deleteSession", m.MustDeleteSession()),
+						versionField(),
+					)
+				}
+			}
+		}
+	}
+}
+
+func onDoTx(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TableDoTxStartInfo) func(
+	info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
+	return func(
+		info trace.TableDoTxStartInfo,
+	) func(
+		info trace.TableDoTxIntermediateInfo,
+	) func(
+		trace.TableDoTxDoneInfo,
+	) {
+		if d.Details()&trace.TablePoolAPIEvents == 0 {
+			return nil
+		}
+		ctx := with(*info.Context, TRACE, "ydb", "table", "do", "tx")
+		idempotent := info.Idempotent
+		label := info.Label
+		l.Log(ctx, "start",
+			Bool("idempotent", idempotent),
+			String("label", label),
+		)
+		start := time.Now()
+
+		return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
+			if info.Error == nil {
+				l.Log(ctx, "done",
+					latencyField(start),
+					Bool("idempotent", idempotent),
+					String("label", label),
+				)
+			} else {
+				lvl := ERROR
+				if !xerrors.IsYdb(info.Error) {
+					lvl = DEBUG
+				}
+				m := retry.Check(info.Error)
+				l.Log(WithLevel(ctx, lvl), "done",
+					latencyField(start),
+					Bool("idempotent", idempotent),
+					String("label", label),
+					Error(info.Error),
+					Bool("retryable", m.MustRetry(idempotent)),
+					Int64("code", m.StatusCode()),
+					Bool("deleteSession", m.MustDeleteSession()),
+					versionField(),
+				)
+			}
+
+			return func(info trace.TableDoTxDoneInfo) {
+				if info.Error == nil {
+					l.Log(ctx, "done",
+						latencyField(start),
+						Bool("idempotent", idempotent),
+						String("label", label),
+						Int("attempts", info.Attempts),
+					)
+				} else {
+					lvl := WARN
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					m := retry.Check(info.Error)
+					l.Log(WithLevel(ctx, lvl), "done",
+						latencyField(start),
+						Bool("idempotent", idempotent),
+						String("label", label),
+						Int("attempts", info.Attempts),
+						Error(info.Error),
+						Bool("retryable", m.MustRetry(idempotent)),
+						Int64("code", m.StatusCode()),
+						Bool("deleteSession", m.MustDeleteSession()),
+						versionField(),
+					)
+				}
+			}
+		}
+	}
 }
 
 func onCreateSession(
