@@ -14,8 +14,9 @@ func Table(l Logger, d trace.Detailer, opts ...Option) (t trace.Table) {
 	return internalTable(wrapLogger(l, opts...), d)
 }
 
-//nolint:gocyclo
 func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
+	logger := l.logger
+
 	t.OnDo = func(
 		info trace.TableDoStartInfo,
 	) func(
@@ -162,142 +163,10 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-	t.OnCreateSession = func(
-		info trace.TableCreateSessionStartInfo,
-	) func(
-		info trace.TableCreateSessionIntermediateInfo,
-	) func(
-		trace.TableCreateSessionDoneInfo,
-	) {
-		if d.Details()&trace.TablePoolAPIEvents == 0 {
-			return nil
-		}
-		ctx := with(*info.Context, TRACE, "ydb", "table", "create", "session")
-		l.Log(ctx, "start")
-		start := time.Now()
-
-		return func(info trace.TableCreateSessionIntermediateInfo) func(trace.TableCreateSessionDoneInfo) {
-			if info.Error == nil {
-				l.Log(ctx, "intermediate",
-					latencyField(start),
-				)
-			} else {
-				l.Log(WithLevel(ctx, ERROR), "intermediate",
-					latencyField(start),
-					Error(info.Error),
-					versionField(),
-				)
-			}
-
-			return func(info trace.TableCreateSessionDoneInfo) {
-				if info.Error == nil {
-					l.Log(ctx, "done",
-						latencyField(start),
-						Int("attempts", info.Attempts),
-						String("session_id", info.Session.ID()),
-						String("session_status", info.Session.Status()),
-					)
-				} else {
-					l.Log(WithLevel(ctx, ERROR), "failed",
-						latencyField(start),
-						Int("attempts", info.Attempts),
-						Error(info.Error),
-						versionField(),
-					)
-				}
-			}
-		}
-	}
-	t.OnSessionNew = func(info trace.TableSessionNewStartInfo) func(trace.TableSessionNewDoneInfo) {
-		if d.Details()&trace.TableSessionEvents == 0 {
-			return nil
-		}
-		ctx := with(*info.Context, TRACE, "ydb", "table", "session", "new")
-		l.Log(ctx, "start")
-		start := time.Now()
-
-		return func(info trace.TableSessionNewDoneInfo) {
-			if info.Error == nil {
-				if info.Session != nil {
-					l.Log(ctx, "done",
-						latencyField(start),
-						String("id", info.Session.ID()),
-					)
-				} else {
-					l.Log(WithLevel(ctx, WARN), "failed",
-						latencyField(start),
-						versionField(),
-					)
-				}
-			} else {
-				l.Log(WithLevel(ctx, WARN), "failed",
-					latencyField(start),
-					Error(info.Error),
-					versionField(),
-				)
-			}
-		}
-	}
-	t.OnSessionDelete = func(info trace.TableSessionDeleteStartInfo) func(trace.TableSessionDeleteDoneInfo) {
-		if d.Details()&trace.TableSessionEvents == 0 {
-			return nil
-		}
-		ctx := with(*info.Context, TRACE, "ydb", "table", "session", "delete")
-		session := info.Session
-		l.Log(ctx, "start",
-			String("id", info.Session.ID()),
-			String("status", info.Session.Status()),
-		)
-		start := time.Now()
-
-		return func(info trace.TableSessionDeleteDoneInfo) {
-			if info.Error == nil {
-				l.Log(ctx, "done",
-					latencyField(start),
-					String("id", session.ID()),
-					String("status", session.Status()),
-				)
-			} else {
-				l.Log(WithLevel(ctx, WARN), "failed",
-					latencyField(start),
-					String("id", session.ID()),
-					String("status", session.Status()),
-					Error(info.Error),
-					versionField(),
-				)
-			}
-		}
-	}
-	t.OnSessionKeepAlive = func(info trace.TableKeepAliveStartInfo) func(trace.TableKeepAliveDoneInfo) {
-		if d.Details()&trace.TableSessionEvents == 0 {
-			return nil
-		}
-		ctx := with(*info.Context, TRACE, "ydb", "table", "session", "keep", "alive")
-		session := info.Session
-		l.Log(ctx, "start",
-			String("id", session.ID()),
-			String("status", session.Status()),
-		)
-		start := time.Now()
-
-		return func(info trace.TableKeepAliveDoneInfo) {
-			if info.Error == nil {
-				l.Log(ctx, "done",
-					latencyField(start),
-					String("id", session.ID()),
-					String("status", session.Status()),
-				)
-			} else {
-				l.Log(WithLevel(ctx, WARN), "failed",
-					latencyField(start),
-					String("id", session.ID()),
-					String("status", session.Status()),
-					Error(info.Error),
-					versionField(),
-				)
-			}
-		}
-	}
+	t.OnCreateSession = onCreateSession(l, d)
+	t.OnSessionNew = onSessionNew(logger, d)
+	t.OnSessionDelete = onSessionDelete(logger, d)
+	t.OnSessionKeepAlive = onSessionKeepAlive(logger, d)
 	t.OnSessionQueryPrepare = func(
 		info trace.TablePrepareDataQueryStartInfo,
 	) func(
@@ -456,7 +325,191 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-	t.OnSessionQueryStreamRead = func(
+
+	t.OnSessionQueryStreamRead = onSessionQueryStreamRead(logger, d)
+	t.OnSessionTransactionBegin = onSessionTransactionBegin(logger, d)
+	t.OnSessionTransactionCommit = onSessionTransactionCommit(logger, d)
+	t.OnSessionTransactionRollback = onSessionTransactionRollback(logger, d)
+	t.OnInit = OnInitTable(logger, d)
+	t.OnClose = onCloseTable(logger, d)
+	t.OnPoolStateChange = onPoolStateChange(logger, d)
+	t.OnPoolSessionAdd = onPoolSessionAdd(logger, d)
+	t.OnPoolSessionRemove = onPoolSessionRemove(logger, d)
+	t.OnPoolPut = onPoolPut(logger, d)
+	t.OnPoolGet = onPoolGet(logger, d)
+	t.OnPoolWait = onPoolWait(logger, d)
+
+	return t
+}
+
+func onCreateSession(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TableCreateSessionStartInfo) func(
+	info trace.TableCreateSessionIntermediateInfo) func(trace.TableCreateSessionDoneInfo) {
+	return func(
+		info trace.TableCreateSessionStartInfo,
+	) func(
+		info trace.TableCreateSessionIntermediateInfo,
+	) func(
+		trace.TableCreateSessionDoneInfo,
+	) {
+		if d.Details()&trace.TablePoolAPIEvents == 0 {
+			return nil
+		}
+		ctx := with(*info.Context, TRACE, "ydb", "table", "create", "session")
+		l.Log(ctx, "start")
+		start := time.Now()
+
+		return func(info trace.TableCreateSessionIntermediateInfo) func(trace.TableCreateSessionDoneInfo) {
+			if info.Error == nil {
+				l.Log(ctx, "intermediate",
+					latencyField(start),
+				)
+			} else {
+				l.Log(WithLevel(ctx, ERROR), "intermediate",
+					latencyField(start),
+					Error(info.Error),
+					versionField(),
+				)
+			}
+
+			return func(info trace.TableCreateSessionDoneInfo) {
+				if info.Error == nil {
+					l.Log(ctx, "done",
+						latencyField(start),
+						Int("attempts", info.Attempts),
+						String("session_id", info.Session.ID()),
+						String("session_status", info.Session.Status()),
+					)
+				} else {
+					l.Log(WithLevel(ctx, ERROR), "failed",
+						latencyField(start),
+						Int("attempts", info.Attempts),
+						Error(info.Error),
+						versionField(),
+					)
+				}
+			}
+		}
+	}
+}
+
+func onSessionNew(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TableSessionNewStartInfo) func(trace.TableSessionNewDoneInfo) {
+	return func(info trace.TableSessionNewStartInfo) func(trace.TableSessionNewDoneInfo) {
+		if d.Details()&trace.TableSessionEvents == 0 {
+			return nil
+		}
+		ctx := with(*info.Context, TRACE, "ydb", "table", "session", "new")
+		l.Log(ctx, "start")
+		start := time.Now()
+
+		return func(info trace.TableSessionNewDoneInfo) {
+			if info.Error == nil {
+				if info.Session != nil {
+					l.Log(ctx, "done",
+						latencyField(start),
+						String("id", info.Session.ID()),
+					)
+				} else {
+					l.Log(WithLevel(ctx, WARN), "failed",
+						latencyField(start),
+						versionField(),
+					)
+				}
+			} else {
+				l.Log(WithLevel(ctx, WARN), "failed",
+					latencyField(start),
+					Error(info.Error),
+					versionField(),
+				)
+			}
+		}
+	}
+}
+
+func onSessionDelete(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TableSessionDeleteStartInfo) func(trace.TableSessionDeleteDoneInfo) {
+	return func(info trace.TableSessionDeleteStartInfo) func(trace.TableSessionDeleteDoneInfo) {
+		if d.Details()&trace.TableSessionEvents == 0 {
+			return nil
+		}
+		ctx := with(*info.Context, TRACE, "ydb", "table", "session", "delete")
+		session := info.Session
+		l.Log(ctx, "start",
+			String("id", info.Session.ID()),
+			String("status", info.Session.Status()),
+		)
+		start := time.Now()
+
+		return func(info trace.TableSessionDeleteDoneInfo) {
+			if info.Error == nil {
+				l.Log(ctx, "done",
+					latencyField(start),
+					String("id", session.ID()),
+					String("status", session.Status()),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "failed",
+					latencyField(start),
+					String("id", session.ID()),
+					String("status", session.Status()),
+					Error(info.Error),
+					versionField(),
+				)
+			}
+		}
+	}
+}
+
+func onSessionKeepAlive(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TableKeepAliveStartInfo) func(trace.TableKeepAliveDoneInfo) {
+	return func(info trace.TableKeepAliveStartInfo) func(trace.TableKeepAliveDoneInfo) {
+		if d.Details()&trace.TableSessionEvents == 0 {
+			return nil
+		}
+		ctx := with(*info.Context, TRACE, "ydb", "table", "session", "keep", "alive")
+		session := info.Session
+		l.Log(ctx, "start",
+			String("id", session.ID()),
+			String("status", session.Status()),
+		)
+		start := time.Now()
+
+		return func(info trace.TableKeepAliveDoneInfo) {
+			if info.Error == nil {
+				l.Log(ctx, "done",
+					latencyField(start),
+					String("id", session.ID()),
+					String("status", session.Status()),
+				)
+			} else {
+				l.Log(WithLevel(ctx, WARN), "failed",
+					latencyField(start),
+					String("id", session.ID()),
+					String("status", session.Status()),
+					Error(info.Error),
+					versionField(),
+				)
+			}
+		}
+	}
+}
+
+func onSessionQueryStreamRead(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.TableSessionQueryStreamReadStartInfo) func(
+	intermediateInfo trace.TableSessionQueryStreamReadIntermediateInfo,
+) func(trace.TableSessionQueryStreamReadDoneInfo) {
+	return func(
 		info trace.TableSessionQueryStreamReadStartInfo,
 	) func(
 		intermediateInfo trace.TableSessionQueryStreamReadIntermediateInfo,
@@ -507,20 +560,6 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
-	logger := l.logger
-	t.OnSessionTransactionBegin = onSessionTransactionBegin(logger, d)
-	t.OnSessionTransactionCommit = onSessionTransactionCommit(logger, d)
-	t.OnSessionTransactionRollback = onSessionTransactionRollback(logger, d)
-	t.OnInit = OnInitTable(logger, d)
-	t.OnClose = onCloseTable(logger, d)
-	t.OnPoolStateChange = onPoolStateChange(logger, d)
-	t.OnPoolSessionAdd = onPoolSessionAdd(logger, d)
-	t.OnPoolSessionRemove = onPoolSessionRemove(logger, d)
-	t.OnPoolPut = onPoolPut(logger, d)
-	t.OnPoolGet = onPoolGet(logger, d)
-	t.OnPoolWait = onPoolWait(logger, d)
-
-	return t
 }
 
 func onSessionTransactionBegin(
