@@ -1,3 +1,4 @@
+* Added explicit initialization of all fields of the `logBackoff` structure in `internal/backoff/backoff.go`, when golangci-lint exhaustruct enabled
 * Added explicit initialization of fields of structures in `internal/allocator/allocator.go`, when golangci-lint exhaustruct enabled
 * Added explicit initialization of all fields of the `endpoint` structure in `internal/endpoint/endpoint.go`, when golangci-lint exhaustruct enabled
 
