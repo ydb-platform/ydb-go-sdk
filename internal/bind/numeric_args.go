@@ -21,8 +21,12 @@ func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (
 ) {
 	l := &sqlLexer{
 		src:        sql,
+		start:      0,
+		pos:        0,
+		nested:     0,
 		stateFn:    numericArgsStateFn,
 		rawStateFn: numericArgsStateFn,
+		parts:      []interface{}{},
 	}
 
 	for l.stateFn != nil {
