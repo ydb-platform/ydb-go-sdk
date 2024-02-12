@@ -1,6 +1,6 @@
 module slo
 
-go 1.20
+go 1.21
 
 require (
 	github.com/prometheus/client_golang v1.14.0
