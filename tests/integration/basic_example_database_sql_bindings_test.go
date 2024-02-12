@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,7 +18,6 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -31,7 +31,7 @@ func TestBasicExampleDatabaseSqlBindings(t *testing.T) {
 	ctx, cancel := context.WithTimeout(xtest.Context(t), 42*time.Second)
 	defer cancel()
 
-	var totalConsumedUnits xatomic.Uint64
+	var totalConsumedUnits atomic.Uint64
 	defer func() {
 		t.Logf("total consumed units: %d", totalConsumedUnits.Load())
 	}()

@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -24,7 +25,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
@@ -372,7 +372,7 @@ func TestUpdateToken(t *testing.T) {
 	var wg sync.WaitGroup
 
 	wg.Add(1)
-	stopTopicActivity := xatomic.Bool{}
+	stopTopicActivity := atomic.Bool{}
 	go func() {
 		defer wg.Done()
 
@@ -387,7 +387,7 @@ func TestUpdateToken(t *testing.T) {
 		}
 	}()
 
-	hasMessages := xatomic.Bool{}
+	hasMessages := atomic.Bool{}
 
 	wg.Add(1)
 	go func() {
