@@ -296,6 +296,7 @@ func put(x *big.Int, p []byte) {
 			d >>= 8
 		}
 	}
+
 	var pad byte
 	if neg {
 		pad = 0xff

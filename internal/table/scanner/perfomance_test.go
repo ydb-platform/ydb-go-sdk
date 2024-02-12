@@ -36,6 +36,7 @@ func BenchmarkTestScan(b *testing.B) {
 		title *string    // for optional scan
 		date  *time.Time // for optional scan with default type value
 	)
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		if res.NextRow() {
@@ -49,6 +50,7 @@ func BenchmarkTestScan(b *testing.B) {
 func BenchmarkTestScanNamed(b *testing.B) {
 	b.ReportAllocs()
 	res := PrepareScannerPerformanceTest(b.N)
+
 	var (
 		id    uint64    // for requied scan
 		title *string   // for optional scan

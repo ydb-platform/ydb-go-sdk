@@ -106,19 +106,23 @@ func setField(name string, dst, value interface{}) {
 	x := reflect.ValueOf(dst).Elem()
 	t := x.Type()
 	f, ok := t.FieldByName(name)
+
 	if !ok {
 		panic(fmt.Sprintf(
 			"struct %s has no field %q",
 			t, name,
 		))
 	}
+
 	v := reflect.ValueOf(value)
+
 	if f.Type.Kind() != v.Type().Kind() {
 		panic(fmt.Sprintf(
 			"struct %s field %q is types of %s, not %s",
 			t, name, f.Type, v.Type(),
 		))
 	}
+
 	x.FieldByName(f.Name).Set(v)
 }
 
@@ -205,14 +209,18 @@ func WithInvokeHandlers(invokeHandlers InvokeHandlers) balancerOption {
 			if handler, ok := invokeHandlers[Method(method).Code()]; ok {
 				var result proto.Message
 				result, err = handler(args)
+
 				if err != nil {
 					return xerrors.WithStackTrace(err)
 				}
+
 				var anyResult *anypb.Any
 				anyResult, err = anypb.New(result)
+
 				if err != nil {
 					return xerrors.WithStackTrace(err)
 				}
+
 				setField(
 					"Operation",
 					reply,
@@ -248,6 +256,7 @@ func WithNewStreamHandlers(newStreamHandlers NewStreamHandlers) balancerOption {
 
 func NewBalancer(opts ...balancerOption) *balancerStub {
 	c := &balancerStub{}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt(c)

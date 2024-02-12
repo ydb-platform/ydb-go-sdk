@@ -44,6 +44,7 @@ func (f FieldStubber) Stub(x reflect.Value) {
 		v = x.Elem()
 		t = v.Type()
 	)
+
 	for i := 0; i < t.NumField(); i++ {
 		var (
 			fx = v.Field(i)

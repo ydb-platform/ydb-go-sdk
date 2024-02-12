@@ -30,6 +30,7 @@ func GenerateDeclareSection(params *table.QueryParameters) (string, error) {
 		)
 	})
 	sort.Strings(names)
+
 	for _, name := range names {
 		if name == "" {
 			return "", xerrors.WithStackTrace(ErrNameRequired)

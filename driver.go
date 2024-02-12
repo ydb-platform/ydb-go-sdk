@@ -325,11 +325,8 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, e
 	}
 
 	d.opts = append(d.opts, opts...)
-
 	for _, opt := range d.opts {
-
 		if opt != nil {
-
 			err = opt(ctx, d)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)

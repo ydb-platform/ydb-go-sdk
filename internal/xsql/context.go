@@ -45,6 +45,7 @@ func txControl(ctx context.Context, defaultTxControl *table.TransactionControl) 
 			hook(txControl)
 		}
 	}()
+
 	if txc, ok := ctx.Value(ctxTransactionControlKey{}).(*table.TransactionControl); ok {
 		return txc
 	}

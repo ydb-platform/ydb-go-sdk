@@ -76,8 +76,10 @@ func (locations filterLocations) String() string {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString(l)
 	}
+
 	buffer.WriteByte('}')
 
 	return buffer.String()
@@ -92,6 +94,7 @@ func PreferLocations(balancer *balancerConfig.Config, locations ...string) *bala
 	for i := range locations {
 		locations[i] = strings.ToUpper(locations[i])
 	}
+
 	sort.Strings(locations)
 	balancer.Filter = filterLocations(locations)
 

@@ -56,11 +56,14 @@ func (s *rawConverter) WritePathTo(w io.Writer) (n int64, err error) {
 		if s == "" {
 			s = strconv.Itoa(x.i)
 		}
+
 		var m int
 		m, err = io.WriteString(w, s)
+
 		if err != nil {
 			return n, xerrors.WithStackTrace(err)
 		}
+
 		n += int64(m)
 	}
 
@@ -75,6 +78,7 @@ func (s *rawConverter) Bool() (v bool) {
 	if s.Err() != nil {
 		return
 	}
+
 	s.unwrap()
 
 	return s.bool()
@@ -84,6 +88,7 @@ func (s *rawConverter) Int8() (v int8) {
 	if s.Err() != nil {
 		return
 	}
+
 	s.unwrap()
 
 	return s.int8()
@@ -93,6 +98,7 @@ func (s *rawConverter) Uint8() (v uint8) {
 	if s.Err() != nil {
 		return
 	}
+
 	s.unwrap()
 
 	return s.uint8()
@@ -102,6 +108,7 @@ func (s *rawConverter) Int16() (v int16) {
 	if s.Err() != nil {
 		return
 	}
+
 	s.unwrap()
 
 	return s.int16()

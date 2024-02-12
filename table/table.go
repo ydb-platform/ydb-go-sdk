@@ -522,6 +522,7 @@ func (q *QueryParameters) names() []string {
 	for k := range q.m {
 		names = append(names, k)
 	}
+
 	sort.Strings(names)
 
 	return names
@@ -536,11 +537,13 @@ func (q *QueryParameters) String() string {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteByte('"')
 		buffer.WriteString(name)
 		buffer.WriteString("\":")
 		buffer.WriteString(q.m[name].Yql())
 	}
+
 	buffer.WriteByte('}')
 
 	return buffer.String()

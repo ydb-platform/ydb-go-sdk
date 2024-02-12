@@ -149,6 +149,7 @@ func (w *Writer) typeImports(dst []dep, t types.Type) []dep {
 	if !ok {
 		return dst
 	}
+
 	var (
 		obj = n.Obj()
 		pkg = obj.Pkg()
@@ -239,6 +240,7 @@ func (w *Writer) importDeps(deps []dep) {
 		return d0.pkgPath < d1.pkgPath
 	})
 	w.line(`import (`)
+
 	var lastStd bool
 	for i := range deps {
 		if w.isStdLib(deps[i].pkgPath) {

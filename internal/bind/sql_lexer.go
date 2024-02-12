@@ -38,6 +38,7 @@ func backtickState(l *sqlLexer) stateFn {
 			if nextRune != '`' {
 				return l.rawStateFn
 			}
+
 			l.pos += width
 		case utf8.RuneError:
 			if l.pos-l.start > 0 {
@@ -84,6 +85,7 @@ func doubleQuoteState(l *sqlLexer) stateFn {
 			if nextRune != '"' {
 				return l.rawStateFn
 			}
+
 			l.pos += width
 		case utf8.RuneError:
 			if l.pos-l.start > 0 {

@@ -86,6 +86,7 @@ func (f Field) DurationValue() time.Duration {
 // StringsValue is a value getter for fields with StringsType type
 func (f Field) StringsValue() []string {
 	f.checkType(StringsType)
+
 	if f.vany == nil {
 		return nil
 	}
@@ -96,6 +97,7 @@ func (f Field) StringsValue() []string {
 // ErrorValue is a value getter for fields with ErrorType type
 func (f Field) ErrorValue() error {
 	f.checkType(ErrorType)
+
 	if f.vany == nil {
 		return nil
 	}
@@ -364,8 +366,10 @@ func (ee endpoints) String() string {
 		if i != 0 {
 			b.WriteByte(',')
 		}
+
 		b.WriteString(e.String())
 	}
+
 	b.WriteByte(']')
 
 	return b.String()

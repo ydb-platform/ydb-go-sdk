@@ -45,16 +45,19 @@ func (c *Client) Execute(
 	if c == nil {
 		return r, xerrors.WithStackTrace(errNilClient)
 	}
+
 	call := func(ctx context.Context) error {
 		r, err = c.execute(ctx, query, params)
 
 		return xerrors.WithStackTrace(err)
 	}
+
 	if !c.config.AutoRetry() {
 		err = call(ctx)
 
 		return
 	}
+
 	err = retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
@@ -87,11 +90,14 @@ func (c *Client) execute(
 		result   = Ydb_Scripting.ExecuteYqlResult{}
 		response *Ydb_Scripting.ExecuteYqlResponse
 	)
+
 	defer func() {
 		a.Free()
 		onDone(r, err)
 	}()
+
 	response, err = c.service.ExecuteYql(ctx, request)
+
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -123,16 +129,19 @@ func (c *Client) Explain(
 	if c == nil {
 		return e, xerrors.WithStackTrace(errNilClient)
 	}
+
 	call := func(ctx context.Context) error {
 		e, err = c.explain(ctx, query, mode)
 
 		return xerrors.WithStackTrace(err)
 	}
+
 	if !c.config.AutoRetry() {
 		err = call(ctx)
 
 		return
 	}
+
 	err = retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
@@ -165,17 +174,23 @@ func (c *Client) explain(
 		response *Ydb_Scripting.ExplainYqlResponse
 		result   = Ydb_Scripting.ExplainYqlResult{}
 	)
+
 	defer func() {
 		onDone(e.Explanation.Plan, err)
 	}()
+
 	response, err = c.service.ExplainYql(ctx, request)
+
 	if err != nil {
 		return e, err
 	}
+
 	err = response.GetOperation().GetResult().UnmarshalTo(&result)
+
 	if err != nil {
 		return e, err
 	}
+
 	result.GetParametersTypes()
 	e = table.ScriptingYQLExplanation{
 		Explanation: table.Explanation{
@@ -183,6 +198,7 @@ func (c *Client) explain(
 		},
 		ParameterTypes: make(map[string]types.Type, len(result.GetParametersTypes())),
 	}
+
 	for k, v := range result.GetParametersTypes() {
 		e.ParameterTypes[k] = value.TypeFromYDB(v)
 	}
@@ -198,16 +214,19 @@ func (c *Client) StreamExecute(
 	if c == nil {
 		return r, xerrors.WithStackTrace(errNilClient)
 	}
+
 	call := func(ctx context.Context) error {
 		r, err = c.streamExecute(ctx, query, params)
 
 		return xerrors.WithStackTrace(err)
 	}
+
 	if !c.config.AutoRetry() {
 		err = call(ctx)
 
 		return
 	}
+
 	err = retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
@@ -238,8 +257,11 @@ func (c *Client) streamExecute(
 			),
 		}
 	)
+
 	defer func() {
+
 		a.Free()
+
 		if err != nil {
 			onIntermediate(err)(err)
 		}
@@ -290,7 +312,9 @@ func (c *Client) Close(ctx context.Context) (err error) {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
+
 	onDone := trace.ScriptingOnClose(c.config.Trace(), &ctx, stack.FunctionID(""))
+
 	defer func() {
 		onDone(err)
 	}()

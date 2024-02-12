@@ -474,6 +474,7 @@ type readerConnectFuncAnswer struct {
 func readerConnectFuncMock(answers ...readerConnectFuncAnswer) readerConnectFunc {
 	return func(ctx context.Context) (batchedStreamReader, error) {
 		res := answers[0]
+
 		if len(answers) > 1 {
 			answers = answers[1:]
 		}

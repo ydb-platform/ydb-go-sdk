@@ -68,11 +68,13 @@ func NewSingleStreamWriter(
 ) (*SingleStreamWriter, error) {
 	res := newSingleStreamWriterStopped(ctxForPProfLabelsOnly, cfg)
 	err := res.initStream()
+
 	if err != nil {
 		_ = res.close(context.Background(), err)
 
 		return nil, err
 	}
+
 	res.start()
 
 	return res, nil
@@ -130,10 +132,12 @@ func (w *SingleStreamWriter) initStream() (err error) {
 		return err
 	}
 	recvMessage, err := w.cfg.stream.Recv()
+
 	if err != nil {
 		return err
 	}
 	result, ok := recvMessage.(*rawtopicwriter.InitResult)
+
 	if !ok {
 		return xerrors.WithStackTrace(
 			fmt.Errorf("ydb: failed init response message type: %v", reflect.TypeOf(recvMessage)),
@@ -239,6 +243,7 @@ func (w *SingleStreamWriter) sendMessagesFromQueueToStreamLoop(ctx context.Conte
 		)
 		err = sendMessagesToStream(w.cfg.stream, targetCodec, messages)
 		onSentComplete(err)
+
 		if err != nil {
 			err = xerrors.WithStackTrace(fmt.Errorf("ydb: error send message to topic stream: %w", err))
 			_ = w.close(ctx, err)
@@ -258,6 +263,7 @@ func (w *SingleStreamWriter) updateTokenLoop(ctx context.Context) {
 
 	ctxDone := ctx.Done()
 	tickerChan := ticker.Chan()
+
 	for {
 		select {
 		case <-ctxDone:

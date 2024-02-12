@@ -216,6 +216,7 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
+
 	if len(messages) == 0 {
 		return nil
 	}
@@ -255,6 +256,7 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 	}
 
 	var waiter MessageQueueAckWaiter
+
 	w.m.WithLock(func() {
 		// need set numbers and add to queue atomically
 		err = w.fillFields(messagesSlice)
@@ -272,6 +274,7 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 			semaphoreWeight = 0
 		}
 	})
+
 	if err != nil {
 		return err
 	}
@@ -296,12 +299,14 @@ func (w *WriterReconnector) checkMessages(messages []messageWithDataContent) err
 
 func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) ([]messageWithDataContent, error) {
 	res := make([]messageWithDataContent, 0, len(messages))
+
 	for i := range messages {
 		mess := newMessageDataWithContent(messages[i], w.encodersMap)
 		res = append(res, mess)
 	}
 
 	var sessionID string
+
 	w.m.WithRLock(func() {
 		sessionID = w.sessionID
 	})
@@ -321,6 +326,7 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 	}
 	err := cacheMessages(res, targetCodec, w.cfg.compressorCount)
 	onCompressDone(err)
+
 	if err != nil {
 		return nil, err
 	}
@@ -362,6 +368,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 	defer streamCtxCancel()
 
 	var reconnectReason error
+
 	var prevAttemptTime time.Time
 	var startOfRetries time.Time
 
@@ -380,6 +387,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		} else {
 			attempt++
 		}
+
 		prevAttemptTime = now
 
 		if reconnectReason != nil {
@@ -400,6 +408,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 
 		writer, err := w.startWriteStream(ctx, streamCtx, attempt)
 		w.onWriterChange(writer)
+
 		if err == nil {
 			reconnectReason = writer.WaitClose(ctx)
 			startOfRetries = time.Now()
@@ -487,6 +496,7 @@ func (w *WriterReconnector) onAckReceived(count int) {
 
 func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 	isFirstInit := false
+
 	w.m.WithLock(func() {
 		if writerStream == nil {
 			w.sessionID = ""
@@ -589,7 +599,9 @@ func sendMessagesToStream(
 	if err != nil {
 		return err
 	}
+
 	err = stream.Send(&request)
+
 	if err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: failed send write request: %w", err))
 	}
@@ -619,6 +631,7 @@ func splitMessagesByBufCodec(messages []messageWithDataContent) (res [][]message
 
 	currentGroupStart := 0
 	currentCodec := messages[0].bufCodec
+
 	for i := range messages {
 		if messages[i].bufCodec != currentCodec {
 			res = append(res, messages[currentGroupStart:i:i])
@@ -637,6 +650,7 @@ func createWriteRequest(messages []messageWithDataContent, targetCodec rawtopicc
 ) {
 	res.Codec = targetCodec
 	res.Messages = make([]rawtopicwriter.MessageData, len(messages))
+
 	for i := range messages {
 		res.Messages[i], err = createRawMessageData(res.Codec, &messages[i])
 		if err != nil {
@@ -699,11 +713,13 @@ func calculateAllowedCodecs(forceCodec rawtopiccommon.Codec, encoderMap *Encoder
 	}
 
 	res := make(rawtopiccommon.SupportedCodecs, 0, len(serverCodecs))
+
 	for _, codec := range serverCodecs {
 		if encoderMap.IsSupported(codec) {
 			res = append(res, codec)
 		}
 	}
+
 	if len(res) == 0 {
 		res = nil
 	}

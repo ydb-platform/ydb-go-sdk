@@ -760,6 +760,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 					String("status", info.Session.Status()),
 				)
 			}
+
 			if info.Error == nil {
 				l.Log(ctx, "done", fields...)
 			} else {

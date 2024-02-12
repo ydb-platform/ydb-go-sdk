@@ -25,6 +25,7 @@ func TestParse(t *testing.T) {
 		require.Equal(t, lhs.Endpoint(), rhs.Endpoint())
 		require.Equal(t, lhs.Database(), rhs.Database())
 	}
+
 	for _, tt := range []struct {
 		dsn           string
 		opts          []config.Option

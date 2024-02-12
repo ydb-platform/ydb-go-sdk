@@ -20,6 +20,7 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 		commit   = 0
 		rollback = 0
 	)
+
 	b := StubBuilder{
 		T: t,
 		cc: testutil.NewBalancer(
@@ -71,6 +72,7 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 		),
 	}
 	s, err := b.createSession(context.Background())
+
 	if err != nil {
 		t.Fatal(err)
 	}

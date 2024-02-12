@@ -135,11 +135,13 @@ func newConn(ctx context.Context, c *Connector, s table.ClosableSession, opts ..
 	cc.beginTxFuncs = map[QueryMode]beginTxFunc{
 		DataQueryMode: cc.beginTx,
 	}
+
 	for _, o := range opts {
 		if o != nil {
 			o(cc)
 		}
 	}
+
 	c.attach(cc)
 
 	return cc
@@ -153,10 +155,12 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt,
 	if c.currentTx != nil {
 		return c.currentTx.PrepareContext(ctx, query)
 	}
+
 	onDone := trace.DatabaseSQLOnConnPrepare(c.trace, &ctx,
 		stack.FunctionID(""),
 		query,
 	)
+
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -201,6 +205,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 			query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage(),
 		)
 	)
+
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -211,19 +216,24 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
+
 		_, res, err := c.session.Execute(ctx,
 			txControl(ctx, c.defaultTxControl),
 			normalizedQuery, params, c.dataQueryOptions(ctx)...,
 		)
+
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		defer func() {
 			_ = res.Close()
 		}()
+
 		if err = res.NextResultSetErr(ctx); !xerrors.Is(err, nil, io.EOF) {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		if err = res.Err(); err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -234,7 +244,9 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
+
 		err = c.session.ExecuteSchemeQuery(ctx, normalizedQuery)
+
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -245,20 +257,27 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 			res    result.StreamResult
 			params *table.QueryParameters
 		)
+
 		normalizedQuery, params, err := c.normalize(query, args...)
+
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
+
 		res, err = c.connector.parent.Scripting().StreamExecute(ctx, normalizedQuery, params)
+
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		defer func() {
 			_ = res.Close()
 		}()
+
 		if err = res.NextResultSetErr(ctx); !xerrors.Is(err, nil, io.EOF) {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		if err = res.Err(); err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -273,6 +292,7 @@ func (c *conn) ExecContext(ctx context.Context, query string, args []driver.Name
 	if !c.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
+
 	if c.currentTx != nil {
 		return c.currentTx.ExecContext(ctx, query, args)
 	}
@@ -284,6 +304,7 @@ func (c *conn) QueryContext(ctx context.Context, query string, args []driver.Nam
 	if !c.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
+
 	if c.currentTx != nil {
 		return c.currentTx.QueryContext(ctx, query, args)
 	}
@@ -314,6 +335,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 			query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage(),
 		)
 	)
+
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -324,13 +346,16 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
+
 		_, res, err := c.session.Execute(ctx,
 			txControl(ctx, c.defaultTxControl),
 			normalizedQuery, params, c.dataQueryOptions(ctx)...,
 		)
+
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		if err = res.Err(); err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -344,12 +369,15 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
+
 		res, err := c.session.StreamExecuteScanQuery(ctx,
 			normalizedQuery, params, c.scanQueryOptions(ctx)...,
 		)
+
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		if err = res.Err(); err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -363,7 +391,9 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
+
 		exp, err := c.session.Explain(ctx, normalizedQuery)
+
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -379,10 +409,13 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
+
 		res, err := c.connector.parent.Scripting().StreamExecute(ctx, normalizedQuery, params)
+
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		if err = res.Err(); err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -401,9 +434,11 @@ func (c *conn) Ping(ctx context.Context) (finalErr error) {
 	defer func() {
 		onDone(finalErr)
 	}()
+
 	if !c.isReady() {
 		return badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
+
 	if err := c.session.KeepAlive(ctx); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
@@ -418,13 +453,17 @@ func (c *conn) Close() (finalErr error) {
 			c.trace, &c.openConnCtx,
 			stack.FunctionID(""),
 		)
+
 		defer func() {
 			onDone(finalErr)
 		}()
+
 		if c.currentTx != nil {
 			_ = c.currentTx.Rollback()
 		}
+
 		err := c.session.Close(xcontext.WithoutDeadline(c.openConnCtx))
+
 		if err != nil {
 			return badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -459,7 +498,9 @@ func (c *conn) ID() string {
 
 func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ driver.Tx, finalErr error) {
 	var tx currentTx
+
 	onDone := trace.DatabaseSQLOnConnBegin(c.trace, &ctx, stack.FunctionID(""))
+
 	defer func() {
 		onDone(tx, finalErr)
 	}()
@@ -492,6 +533,7 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 
 	var err error
 	tx, err = beginTx(ctx, txOptions)
+
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -511,13 +553,16 @@ func (c *conn) IsTableExists(ctx context.Context, tableName string) (tableExists
 		stack.FunctionID(""),
 		tableName,
 	)
+
 	defer func() {
 		onDone(tableExists, finalErr)
 	}()
+
 	tableExists, err := helpers.IsEntryExists(ctx,
 		c.connector.parent.Scheme(), tableName,
 		scheme.EntryTable, scheme.EntryColumnTable,
 	)
+
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
@@ -531,9 +576,11 @@ func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string)
 		c.connector.parent.Scheme(), tableName,
 		scheme.EntryTable, scheme.EntryColumnTable,
 	)
+
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
+
 	if !tableExists {
 		return false, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
@@ -566,9 +613,11 @@ func (c *conn) GetColumns(ctx context.Context, tableName string) (columns []stri
 		c.connector.parent.Scheme(), tableName,
 		scheme.EntryTable, scheme.EntryColumnTable,
 	)
+
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	if !tableExists {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
@@ -597,9 +646,11 @@ func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) 
 		c.connector.parent.Scheme(), tableName,
 		scheme.EntryTable, scheme.EntryColumnTable,
 	)
+
 	if err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
+
 	if !tableExists {
 		return "", xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
@@ -608,6 +659,7 @@ func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) 
 	if err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
+
 	if !columnExist {
 		return "", xerrors.WithStackTrace(fmt.Errorf("column '%s' not exist in table '%s'", columnName, tableName))
 	}
@@ -640,9 +692,11 @@ func (c *conn) GetPrimaryKeys(ctx context.Context, tableName string) (pkCols []s
 		c.connector.parent.Scheme(), tableName,
 		scheme.EntryTable, scheme.EntryColumnTable,
 	)
+
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	if !tableExists {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
@@ -669,9 +723,11 @@ func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (
 		c.connector.parent.Scheme(), tableName,
 		scheme.EntryTable, scheme.EntryColumnTable,
 	)
+
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
+
 	if !tableExists {
 		return false, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
@@ -680,6 +736,7 @@ func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
+
 	if !columnExist {
 		return false, xerrors.WithStackTrace(fmt.Errorf("column '%s' not exist in table '%s'", columnName, tableName))
 	}
@@ -688,6 +745,7 @@ func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
+
 	for _, pkCol := range pkCols {
 		if pkCol == columnName {
 			ok = true
@@ -724,11 +782,13 @@ func (c *conn) getTables(ctx context.Context, absPath string, recursive, exclude
 	}
 
 	var d scheme.Directory
+
 	err := retry.Retry(ctx, func(ctx context.Context) (err error) {
 		d, err = c.connector.parent.Scheme().ListDirectory(ctx, absPath)
 
 		return err
 	}, retry.WithIdempotent(true))
+
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -761,11 +821,13 @@ func (c *conn) GetTables(ctx context.Context, folder string, recursive, excludeS
 	absPath := c.normalizePath(folder)
 
 	var e scheme.Entry
+
 	err := retry.Retry(ctx, func(ctx context.Context) (err error) {
 		e, err = c.connector.parent.Scheme().DescribePath(ctx, absPath)
 
 		return err
 	}, retry.WithIdempotent(true))
+
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -797,9 +859,11 @@ func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []stri
 		c.connector.parent.Scheme(), tableName,
 		scheme.EntryTable, scheme.EntryColumnTable,
 	)
+
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	if !tableExists {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
@@ -828,9 +892,11 @@ func (c *conn) GetIndexColumns(ctx context.Context, tableName, indexName string)
 		c.connector.parent.Scheme(), tableName,
 		scheme.EntryTable, scheme.EntryColumnTable,
 	)
+
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	if !tableExists {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}

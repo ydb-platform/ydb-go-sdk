@@ -36,14 +36,17 @@ func (c *conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (current
 			),
 		)
 	}
+
 	txc, err := isolation.ToYDB(txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	transaction, err := c.session.BeginTransaction(ctx, table.TxSettings(txc))
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	c.currentTx = &tx{
 		conn:  c,
 		txCtx: ctx,
@@ -83,9 +86,11 @@ func (tx *tx) Commit() (finalErr error) {
 	if err := tx.checkTxState(); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	defer func() {
 		tx.conn.currentTx = nil
 	}()
+
 	_, err := tx.tx.CommitTx(tx.txCtx)
 	if err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
@@ -105,10 +110,13 @@ func (tx *tx) Rollback() (finalErr error) {
 	if err := tx.checkTxState(); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	defer func() {
 		tx.conn.currentTx = nil
 	}()
+
 	err := tx.tx.Rollback(tx.txCtx)
+
 	if err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
@@ -126,7 +134,9 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 	defer func() {
 		onDone(finalErr)
 	}()
+
 	m := queryModeFromContext(ctx, tx.conn.defaultQueryMode)
+
 	if m != DataQueryMode {
 		return nil, badconn.Map(
 			xerrors.WithStackTrace(
@@ -138,16 +148,21 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 			),
 		)
 	}
+
 	query, params, err := tx.conn.normalize(query, args...)
+
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	res, err := tx.tx.Execute(ctx,
 		query, params, tx.conn.dataQueryOptions(ctx)...,
 	)
+
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	if err = res.Err(); err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
@@ -168,7 +183,9 @@ func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.Named
 	defer func() {
 		onDone(finalErr)
 	}()
+
 	m := queryModeFromContext(ctx, tx.conn.defaultQueryMode)
+
 	if m != DataQueryMode {
 		return nil, badconn.Map(
 			xerrors.WithStackTrace(
@@ -180,13 +197,17 @@ func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.Named
 			),
 		)
 	}
+
 	query, params, err := tx.conn.normalize(query, args...)
+
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	_, err = tx.tx.Execute(ctx,
 		query, params, tx.conn.dataQueryOptions(ctx)...,
 	)
+
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
@@ -202,6 +223,7 @@ func (tx *tx) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, 
 	defer func() {
 		onDone(finalErr)
 	}()
+
 	if !tx.conn.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}

@@ -91,6 +91,7 @@ func MakeRecursive(ctx context.Context, db dbForMakeRecursive, pathToCreate stri
 // where `~` - is a root of database
 func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove string) error {
 	fullSysTablePath := path.Join(db.Name(), sysDirectory)
+
 	var rmPath func(int, string) error
 	rmPath = func(i int, p string) error {
 		if exists, err := IsDirectoryExists(ctx, db.Scheme(), p); err != nil {
@@ -170,6 +171,7 @@ func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove s
 
 		return nil
 	}
+
 	if !strings.HasPrefix(pathToRemove, db.Name()) {
 		pathToRemove = path.Join(db.Name(), pathToRemove)
 	}

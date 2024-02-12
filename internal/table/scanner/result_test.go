@@ -167,6 +167,7 @@ func WithValues(vs ...types.Value) ResultSetOption {
 			panic("malformed values set")
 		}
 		var row *Ydb.Value
+
 		for i, v := range vs {
 			j := i % n
 			if j == 0 && i > 0 {
@@ -188,6 +189,7 @@ func WithValues(vs ...types.Value) ResultSetOption {
 			}
 			row.Items[j] = tv.Value
 		}
+
 		if row != nil {
 			r.Rows = append(r.Rows, row)
 		}

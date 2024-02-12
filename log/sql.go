@@ -22,6 +22,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLConnectorEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "connector", "connect")
 		l.Log(ctx, "start")
 		start := time.Now()

@@ -97,7 +97,9 @@ func (tx *transaction) ExecuteStatement(
 	if params == nil {
 		params = table.NewQueryParameters()
 	}
+
 	a := allocator.New()
+
 	defer a.Free()
 
 	onDone := trace.TableOnSessionTransactionExecuteStatement(

@@ -22,6 +22,7 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 	opts = append(opts, info.Options...)
+
 	if token := info.Params.Get("token"); token != "" {
 		opts = append(opts, config.WithCredentials(credentials.NewAccessTokenCredentials(token)))
 	}
@@ -54,7 +55,9 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 	}
 	if info.Params.Has("go_query_bind") {
 		var binders []ConnectorOption
+
 		queryTransformers := strings.Split(info.Params.Get("go_query_bind"), ",")
+
 		for _, transformer := range queryTransformers {
 			switch transformer {
 			case "declare":

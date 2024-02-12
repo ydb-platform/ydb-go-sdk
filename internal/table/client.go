@@ -69,6 +69,7 @@ func newClient(
 		},
 		done: make(chan struct{}),
 	}
+
 	if idleThreshold := config.IdleThreshold(); idleThreshold > 0 {
 		c.wg.Add(1)
 		go c.internalPoolGC(ctx, idleThreshold)
@@ -230,7 +231,9 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 	if c.isClosed() {
 		return nil, xerrors.WithStackTrace(errClosedClient)
 	}
+
 	var s *session
+
 	createSession := func(ctx context.Context) (*session, error) {
 		s, err = c.createSession(ctx)
 		if err != nil {
@@ -441,6 +444,7 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 			idle             int
 			createInProgress int
 		)
+
 		c.mu.WithLock(func() {
 			index = len(c.index)
 			idle = c.idle.Len()
@@ -813,8 +817,10 @@ func (c *Client) internalPoolPeekFirstIdle() (s *session, touched time.Time) {
 	if el == nil {
 		return
 	}
+
 	s = el.Value.(*session)
 	info, has := c.index[s]
+
 	if !has || el != info.idle {
 		panic("inconsistent session client index")
 	}

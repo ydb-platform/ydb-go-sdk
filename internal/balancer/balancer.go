@@ -140,6 +140,7 @@ func endpointsDiff(newestEndpoints []endpoint.Endpoint, previousConns []conn.Con
 	nodes = make([]trace.EndpointInfo, 0, len(newestEndpoints))
 	added = make([]trace.EndpointInfo, 0, len(previousConns))
 	dropped = make([]trace.EndpointInfo, 0, len(previousConns))
+
 	var (
 		newestMap   = make(map[string]struct{}, len(newestEndpoints))
 		previousMap = make(map[string]struct{}, len(previousConns))
@@ -150,11 +151,14 @@ func endpointsDiff(newestEndpoints []endpoint.Endpoint, previousConns []conn.Con
 	sort.Slice(previousConns, func(i, j int) bool {
 		return previousConns[i].Endpoint().Address() < previousConns[j].Endpoint().Address()
 	})
+
 	for _, e := range previousConns {
 		previousMap[e.Endpoint().Address()] = struct{}{}
 	}
+
 	for _, e := range newestEndpoints {
 		nodes = append(nodes, e.Copy())
+
 		newestMap[e.Address()] = struct{}{}
 		if _, has := previousMap[e.Address()]; !has {
 			added = append(added, e.Copy())
@@ -178,6 +182,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 		)
 		previousConns []conn.Conn
 	)
+
 	defer func() {
 		nodes, added, dropped := endpointsDiff(endpoints, previousConns)
 		onDone(nodes, added, dropped, localDC, nil)
@@ -260,6 +265,7 @@ func New(
 	d, err := internalDiscovery.New(ctx, pool.Get(
 		endpoint.New(driverConfig.Endpoint()),
 	), discoveryConfig)
+
 	if err != nil {
 		return nil, err
 	}
@@ -313,6 +319,7 @@ func (b *Balancer) NewStream(
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, err error) {
 	var client grpc.ClientStream
+
 	err = b.wrapCall(ctx, func(ctx context.Context, cc conn.Conn) error {
 		client, err = cc.NewStream(ctx, desc, method, opts...)
 

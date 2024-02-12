@@ -24,10 +24,12 @@ func TestGenerateDeclareSection(t *testing.T) {
 				declares = append(declares, s)
 			}
 		}
+
 		sort.Strings(declares)
 
 		return declares
 	}
+
 	for _, tt := range []struct {
 		params  *table.QueryParameters
 		declare string
@@ -124,10 +126,12 @@ func TestGenerateDeclareSection_ParameterOption(t *testing.T) {
 				declares = append(declares, strings.TrimRight(s, ";"))
 			}
 		}
+
 		sort.Strings(declares)
 
 		return declares
 	}
+
 	for _, tt := range []struct {
 		params   []interface{}
 		declares []string
@@ -231,10 +235,12 @@ func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 				declares = append(declares, strings.TrimRight(s, ";"))
 			}
 		}
+
 		sort.Strings(declares)
 
 		return declares
 	}
+
 	for _, tt := range []struct {
 		params   []interface{}
 		declares []string

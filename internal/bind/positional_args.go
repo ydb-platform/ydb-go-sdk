@@ -34,6 +34,7 @@ func (m PositionalArgs) RewriteQuery(sql string, args ...interface{}) (
 		position = 0
 		param    table.ParameterOption
 	)
+
 	defer buffer.Free()
 
 	for _, p := range l.parts {
@@ -51,6 +52,7 @@ func (m PositionalArgs) RewriteQuery(sql string, args ...interface{}) (
 			if err != nil {
 				return "", nil, xerrors.WithStackTrace(err)
 			}
+
 			newArgs = append(newArgs, param)
 			buffer.WriteString(paramName)
 			position++

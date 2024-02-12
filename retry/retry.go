@@ -252,6 +252,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 			)
 		}
 	}()
+
 	var (
 		i        int
 		attempts int

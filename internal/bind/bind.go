@@ -32,6 +32,7 @@ func (bindings Bindings) RewriteQuery(query string, args ...interface{}) (
 	if len(bindings) == 0 {
 		var params []table.ParameterOption
 		params, err = Params(args...)
+
 		if err != nil {
 			return "", nil, xerrors.WithStackTrace(err)
 		}

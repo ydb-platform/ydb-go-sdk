@@ -29,6 +29,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 				BoolValue: v,
 			},
 		}
+
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -43,6 +44,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 				Int32Value: int32(v),
 			},
 		}
+
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -55,15 +57,18 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 			ydbval := &Ydb.Value{
 				Value: &Ydb.Value_NullFlagValue{},
 			}
+
 			if c.testDefault {
 				var dv uint8
 
 				return ydbval, &dv
 			}
+
 			var dv *uint8
 
 			return ydbval, &dv
 		}
+
 		v := uint8(rv)
 		ydbval := &Ydb.Value{
 			Value: &Ydb.Value_Uint32Value{
@@ -84,6 +89,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 				Int32Value: int32(v),
 			},
 		}
+
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -98,6 +104,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 				Uint32Value: uint32(v),
 			},
 		}
+
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -115,16 +122,19 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 
 				return ydbval, &dv
 			}
+
 			var dv *int32
 
 			return ydbval, &dv
 		}
+
 		v := int32(rv)
 		ydbval := &Ydb.Value{
 			Value: &Ydb.Value_Int32Value{
 				Int32Value: v,
 			},
 		}
+
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -139,6 +149,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 				Uint32Value: v,
 			},
 		}
+
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -158,11 +169,13 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 
 			return ydbval, &vp
 		}
+
 		if c.scanner {
 			s := intIncScanner(v + 10)
 
 			return ydbval, &s
 		}
+
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -191,6 +204,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 				FloatValue: v,
 			},
 		}
+
 		if c.ydbvalue {
 			vp := types.FloatValue(v)
 
@@ -210,6 +224,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 				DoubleValue: v,
 			},
 		}
+
 		if c.optional && !c.testDefault {
 			vp := &v
 
@@ -225,6 +240,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 			},
 		}
 		src := value.DateToTime(v)
+
 		if c.scanner {
 			s := dateScanner(src)
 
@@ -245,6 +261,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 			},
 		}
 		src := value.DatetimeToTime(v)
+
 		if c.optional && !c.testDefault {
 			vp := &src
 
@@ -260,6 +277,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 			},
 		}
 		src := value.TimestampToTime(v)
+
 		if c.optional && !c.testDefault {
 			vp := &src
 
@@ -272,11 +290,13 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 			ydbval := &Ydb.Value{
 				Value: &Ydb.Value_NullFlagValue{},
 			}
+
 			if c.testDefault {
 				var dv time.Duration
 
 				return ydbval, &dv
 			}
+
 			var dv *time.Duration
 
 			return ydbval, &dv
@@ -289,6 +309,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 			},
 		}
 		src := value.IntervalToDuration(v)
+
 		if c.optional && !c.testDefault {
 			vp := &src
 
@@ -316,15 +337,18 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 			ydbval := &Ydb.Value{
 				Value: &Ydb.Value_NullFlagValue{},
 			}
+
 			if c.testDefault {
 				var dv time.Time
 
 				return ydbval, &dv
 			}
+
 			var dv *time.Time
 
 			return ydbval, &dv
 		}
+
 		rv %= time.Now().Unix()
 		v := value.DatetimeToTime(uint32(rv)).Format(value.LayoutTzDatetime) + ",Europe/Berlin"
 		ydbval := &Ydb.Value{
@@ -349,6 +373,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 			},
 		}
 		src, _ := value.TzTimestampToTime(v)
+
 		if c.optional && !c.testDefault {
 			vp := &src
 
@@ -366,6 +391,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 
 				return ydbval, &dv
 			}
+
 			var dv *[]byte
 
 			return ydbval, &dv
@@ -405,6 +431,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 			ydbval := &Ydb.Value{
 				Value: &Ydb.Value_NullFlagValue{},
 			}
+
 			if c.testDefault {
 				var dv []byte
 
@@ -435,11 +462,13 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 				TextValue: v,
 			},
 		}
+
 		if c.ydbvalue {
 			vp := types.JSONValue(v)
 
 			return ydbval, &vp
 		}
+
 		src := []byte(v)
 		if c.optional && !c.testDefault {
 			vp := &src
@@ -453,15 +482,18 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 			ydbval := &Ydb.Value{
 				Value: &Ydb.Value_NullFlagValue{},
 			}
+
 			if c.testDefault {
 				var dv [16]byte
 
 				return ydbval, &dv
 			}
+
 			var dv *[16]byte
 
 			return ydbval, &dv
 		}
+
 		v := [16]byte{}
 		binary.BigEndian.PutUint64(v[0:8], uint64(rv))
 		binary.BigEndian.PutUint64(v[8:16], uint64(rv))
@@ -486,6 +518,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 			},
 		}
 		src := []byte(v)
+
 		if c.optional && !c.testDefault {
 			vp := &src
 
@@ -514,6 +547,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 
 func getResultSet(count int, col []*column) (result *Ydb.ResultSet, testValues [][]indexed.RequiredOrOptional) {
 	result = &Ydb.ResultSet{}
+
 	for _, c := range col {
 		t := &Ydb.Type{
 			Type: &Ydb.Type_TypeId{
@@ -540,8 +574,10 @@ func getResultSet(count int, col []*column) (result *Ydb.ResultSet, testValues [
 
 	r := xrand.New(xrand.WithLock())
 	testValues = make([][]indexed.RequiredOrOptional, count)
+
 	for i := 0; i < count; i++ {
 		var items []*Ydb.Value
+
 		var vals []indexed.RequiredOrOptional
 		for j := range result.Columns {
 			v, val := valueFromPrimitiveTypeID(col[j], r)
@@ -559,6 +595,7 @@ func getResultSet(count int, col []*column) (result *Ydb.ResultSet, testValues [
 
 func TestScanSqlTypes(t *testing.T) {
 	s := initScanner()
+
 	for _, test := range scannerData {
 		t.Run(test.name, func(t *testing.T) {
 			set, expected := getResultSet(test.count, test.columns)
@@ -601,6 +638,7 @@ func TestScanNamed(t *testing.T) {
 
 		return columns[i]
 	}
+
 	for _, test := range scannerData {
 		t.Run(test.name, func(t *testing.T) {
 			set, expected := getResultSet(test.count, test.columns)
@@ -754,6 +792,7 @@ func TestScanToJsonUnmarshaller(t *testing.T) {
 		s.reset(set)
 		for s.NextRow() {
 			values := make([]indexed.RequiredOrOptional, 0, len(test.values))
+
 			for i, col := range test.columns {
 				if col.optional {
 					values = append(
@@ -771,6 +810,7 @@ func TestScanToJsonUnmarshaller(t *testing.T) {
 					)
 				}
 			}
+
 			if err := s.Scan(values...); err != nil {
 				t.Fatalf("test: %s; error: %s", test.name, err)
 			}

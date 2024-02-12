@@ -232,6 +232,7 @@ func (c *Client) listResource(
 			operation.ModeSync,
 		),
 	})
+
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -255,6 +256,7 @@ func (c *Client) DescribeResource(
 		resource, err = c.describeResource(ctx, coordinationNodePath, resourcePath)
 
 		return xerrors.WithStackTrace(err)
+
 	}
 	if !c.config.AutoRetry() {
 		err = call(ctx)

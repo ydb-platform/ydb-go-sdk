@@ -528,6 +528,7 @@ func PrepareScannerPerformanceTest(count int) *scanner {
 		},
 	}}
 	res.set.Rows = []*Ydb.Value{}
+
 	for i := 0; i < count; i++ {
 		res.set.Rows = append(res.set.Rows, &Ydb.Value{
 			Items: []*Ydb.Value{{
@@ -545,6 +546,7 @@ func PrepareScannerPerformanceTest(count int) *scanner {
 			}},
 		})
 	}
+
 	res.converter = &rawConverter{res}
 
 	return res

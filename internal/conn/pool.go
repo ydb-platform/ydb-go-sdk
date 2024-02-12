@@ -158,6 +158,7 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 			}
 		}(c)
 	}
+
 	wg.Wait()
 	close(errCh)
 

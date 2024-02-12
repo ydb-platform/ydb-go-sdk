@@ -28,9 +28,11 @@ func checkFastestAddress(ctx context.Context, addresses []string) string {
 		err     error
 	}
 	results := make(chan result, len(addresses))
+
 	defer close(results)
 
 	startDial := make(chan struct{})
+
 	var dialer net.Dialer
 
 	var wg sync.WaitGroup
@@ -42,6 +44,7 @@ func checkFastestAddress(ctx context.Context, addresses []string) string {
 			defer wg.Done()
 			<-startDial
 			conn, err := dialer.DialContext(ctx, "tcp", address)
+
 			if err == nil {
 				cancel()
 				_ = conn.Close()
@@ -85,6 +88,7 @@ func detectFastestEndpoint(ctx context.Context, endpoints []endpoint.Endpoint) (
 
 			continue
 		}
+
 		if len(addresses) == 0 {
 			lastErr = xerrors.WithStackTrace(fmt.Errorf("no ips for fqdn: %q", host))
 
@@ -99,6 +103,7 @@ func detectFastestEndpoint(ctx context.Context, endpoints []endpoint.Endpoint) (
 	if len(addressToEndpoint) == 0 {
 		return nil, xerrors.WithStackTrace(lastErr)
 	}
+
 	addressesToPing := make([]string, 0, len(addressToEndpoint))
 	for ip := range addressToEndpoint {
 		addressesToPing = append(addressesToPing, ip)

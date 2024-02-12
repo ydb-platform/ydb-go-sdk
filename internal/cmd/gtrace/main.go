@@ -107,6 +107,7 @@ func main() {
 		if isGenerated(base, "_gtrace") {
 			continue
 		}
+
 		var file *os.File
 		file, err = os.Open(filepath.Join(workDir, name))
 		if err != nil {
@@ -147,11 +148,13 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("type error: %v", err))
 	}
+
 	var items []*GenItem
 	for i, astFile := range astFiles {
 		if pkgFiles[i].Name() != srcFilePath {
 			continue
 		}
+
 		var (
 			depth int
 			item  *GenItem
@@ -258,6 +261,7 @@ func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (re
 		if t == nil {
 			log.Fatalf("unknown type: %s", p.Type)
 		}
+
 		var names []string
 		for _, n := range p.Names {
 			name := n.Name

@@ -10,6 +10,7 @@ func NewTimeToLiveSettings(settings *Ydb_Table.TtlSettings) *options.TimeToLiveS
 	if settings == nil {
 		return nil
 	}
+
 	switch mode := settings.Mode.(type) {
 	case *Ydb_Table.TtlSettings_DateTypeColumn:
 		return &options.TimeToLiveSettings{
@@ -32,6 +33,7 @@ func NewTimeToLiveSettings(settings *Ydb_Table.TtlSettings) *options.TimeToLiveS
 
 func timeToLiveUnit(unit Ydb_Table.ValueSinceUnixEpochModeSettings_Unit) *options.TimeToLiveUnit {
 	var res options.TimeToLiveUnit
+
 	switch unit {
 	case Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_SECONDS:
 		res = options.TimeToLiveUnitSeconds

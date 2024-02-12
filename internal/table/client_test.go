@@ -187,6 +187,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 
 func TestSessionPoolClose(t *testing.T) {
 	counter := 0
+
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		counter++
 		defer func() {
@@ -407,6 +408,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 		release chan struct{}
 		session *session
 	}
+
 	create := make(chan createReq)
 	p, err := newClient(
 		context.Background(),
@@ -434,17 +436,21 @@ func TestSessionPoolRacyGet(t *testing.T) {
 		expSession *session
 		done       = make(chan struct{}, 2)
 	)
+
 	for i := 0; i < 2; i++ {
 		go func() {
 			defer func() {
 				done <- struct{}{}
 			}()
+
 			s, e := p.Get(context.Background())
+
 			if e != nil {
 				err = e
 
 				return
 			}
+
 			if s != expSession {
 				err = fmt.Errorf("unexpected session: %v; want %v", s, expSession)
 
@@ -453,6 +459,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 			mustPutSession(t, p, s)
 		}()
 	}
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -464,13 +471,13 @@ func TestSessionPoolRacyGet(t *testing.T) {
 	case <-p.clock.After(time.Millisecond * 5):
 		// ok
 	}
-
 	// Release the first create session request.
 	// Created session must be stored in the Client.
 	expSession = r1.session
 	expSession.onClose = append(expSession.onClose, func(s *session) {
 		t.Fatalf("unexpected first session close")
 	})
+
 	close(r1.release)
 
 	// Wait for r1's session will be stored in the Client.
@@ -496,6 +503,7 @@ func TestSessionPoolPutInFull(t *testing.T) {
 		config.WithIdleThreshold(-1),
 	)
 	s := mustGetSession(t, p)
+
 	if err := p.Put(context.Background(), s); err != nil {
 		t.Fatalf("unexpected error on put session into non-full client: %v, wand: %v", err, nil)
 	}
@@ -510,6 +518,7 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 		session *session
 		err     error
 	}
+
 	for _, test := range []struct {
 		name string
 		racy bool
@@ -615,6 +624,7 @@ func TestSessionPoolGetPut(t *testing.T) {
 		created int
 		deleted int
 	)
+
 	assertCreated := func(exp int) {
 		if act := created; act != exp {
 			t.Errorf(
@@ -654,11 +664,13 @@ func TestSessionPoolGetPut(t *testing.T) {
 		0,
 		config.WithSizeLimit(1),
 	)
+
 	defer func() {
 		_ = p.Close(context.Background())
 	}()
 
 	s := mustGetSession(t, p)
+
 	assertCreated(1)
 
 	mustPutSession(t, p, s)
@@ -668,6 +680,7 @@ func TestSessionPoolGetPut(t *testing.T) {
 	assertCreated(1)
 
 	_ = s.Close(context.Background())
+
 	assertDeleted(1)
 
 	mustGetSession(t, p)
@@ -759,13 +772,16 @@ func TestSessionPoolDoublePut(t *testing.T) {
 			t.Fatalf("no panic")
 		}
 	}()
+
 	_ = p.Put(context.Background(), s)
 }
 
 func mustGetSession(t testing.TB, p *Client) *session {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
+
 	s, err := p.Get(context.Background())
+
 	if err != nil {
 		t.Helper()
 		t.Fatalf("%s: %v", caller(), err)
@@ -777,6 +793,7 @@ func mustGetSession(t testing.TB, p *Client) *session {
 func mustPutSession(t testing.TB, p *Client, s *session) {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
+
 	if err := p.Put(context.Background(), s); err != nil {
 		t.Helper()
 		t.Fatalf("%s: %v", caller(), err)
@@ -786,6 +803,7 @@ func mustPutSession(t testing.TB, p *Client, s *session) {
 func mustClose(t testing.TB, p closer.Closer) {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
+
 	if err := p.Close(context.Background()); err != nil {
 		t.Helper()
 		t.Fatalf("%s: %v", caller(), err)
@@ -899,6 +917,7 @@ func (s *StubBuilder) createSession(ctx context.Context) (session *session, err 
 			err = fmt.Errorf("stub session: limit overflow")
 		}
 	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -912,6 +931,7 @@ func (s *StubBuilder) createSession(ctx context.Context) (session *session, err 
 
 func (c *Client) debug() {
 	fmt.Print("head ")
+
 	for el := c.idle.Front(); el != nil; el = el.Next() {
 		s := el.Value.(*session)
 		x := c.index[s]
@@ -925,8 +945,10 @@ func whenWantWaitCh(p *Client) <-chan struct{} {
 		prev = p.testHookGetWaitCh
 		ch   = make(chan struct{})
 	)
+
 	p.testHookGetWaitCh = func() {
 		p.testHookGetWaitCh = prev
+
 		close(ch)
 	}
 

@@ -581,6 +581,7 @@ func DictValue(values ...DictValueField) *dictValue {
 	sort.Slice(values, func(i, j int) bool {
 		return values[i].K.Yql() < values[j].K.Yql()
 	})
+
 	var t Type
 	switch {
 	case len(values) > 0:

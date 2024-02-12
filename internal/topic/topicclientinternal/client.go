@@ -38,6 +38,7 @@ func New(
 	cfg := newTopicConfig(opts...)
 
 	var defaultOperationParams rawydb.OperationParams
+
 	topic.OperationParamsFromConfig(&defaultOperationParams, &cfg.Common)
 
 	return &Client{

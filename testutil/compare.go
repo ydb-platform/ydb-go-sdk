@@ -331,10 +331,13 @@ func compareDyNumber(l, r *Ydb.Value) (int, error) {
 	ll := l.GetTextValue()
 	rr := r.GetTextValue()
 	lf, _, err := big.ParseFloat(ll, 10, 127, big.ToNearestEven)
+
 	if err != nil {
 		return 0, xerrors.WithStackTrace(err)
 	}
+
 	rf, _, err := big.ParseFloat(rr, 10, 127, big.ToNearestEven)
+
 	if err != nil {
 		return 0, err
 	}
@@ -345,14 +348,17 @@ func compareDyNumber(l, r *Ydb.Value) (int, error) {
 func compareUUID(l, r *Ydb.Value) int {
 	lh := l.GetHigh_128()
 	rh := r.GetHigh_128()
+
 	switch {
 	case lh > rh:
 		return 1
 	case lh < rh:
 		return -1
 	}
+
 	ll := l.GetLow_128()
 	rl := r.GetLow_128()
+
 	switch {
 	case ll < rl:
 		return -1

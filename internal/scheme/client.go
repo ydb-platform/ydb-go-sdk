@@ -249,6 +249,7 @@ func (c *Client) ModifyPermissions(
 	defer func() {
 		onDone(finalErr)
 	}()
+
 	var desc permissionsDesc
 	for _, o := range opts {
 		if o != nil {

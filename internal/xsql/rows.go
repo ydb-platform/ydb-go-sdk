@@ -44,6 +44,7 @@ func (r *rows) Columns() []string {
 	r.nextSet.Do(func() {
 		r.result.NextResultSet(context.Background())
 	})
+
 	cs := make([]string, 0, r.result.CurrentResultSet().ColumnCount())
 	r.result.CurrentResultSet().Columns(func(m options.Column) {
 		if !strings.HasPrefix(m.Name, ignoreColumnPrefixName) {
@@ -63,6 +64,7 @@ func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 	})
 
 	var i int
+
 	yqlTypes := make([]string, r.result.CurrentResultSet().ColumnCount())
 	r.result.CurrentResultSet().Columns(func(m options.Column) {
 		yqlTypes[i] = m.Type.Yql()
@@ -81,6 +83,7 @@ func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
 	})
 
 	var i int
+
 	nullables := make([]bool, r.result.CurrentResultSet().ColumnCount())
 	r.result.CurrentResultSet().Columns(func(m options.Column) {
 		_, nullables[i] = m.Type.(interface {
@@ -95,6 +98,7 @@ func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
 func (r *rows) NextResultSet() (finalErr error) {
 	r.nextSet.Do(func() {})
 	err := r.result.NextResultSetErr(context.Background())
+
 	if err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
@@ -108,28 +112,37 @@ func (r *rows) HasNextResultSet() bool {
 
 func (r *rows) Next(dst []driver.Value) error {
 	var err error
+
 	r.nextSet.Do(func() {
 		err = r.result.NextResultSetErr(context.Background())
 	})
+
 	if err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	if err = r.result.Err(); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	if !r.result.NextRow() {
 		return io.EOF
 	}
+
 	values := make([]indexed.RequiredOrOptional, len(dst))
+
 	for i := range dst {
 		values[i] = &valuer{}
 	}
+
 	if err = r.result.Scan(values...); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	for i := range values {
 		dst[i] = values[i].(*valuer).Value()
 	}
+
 	if err = r.result.Err(); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
@@ -162,9 +175,11 @@ func (r *single) Next(dst []driver.Value) error {
 	if r.values == nil || r.readAll {
 		return io.EOF
 	}
+
 	for i := range r.values {
 		dst[i] = r.values[i].Value
 	}
+
 	r.readAll = true
 
 	return nil

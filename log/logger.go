@@ -54,25 +54,31 @@ func (l *defaultLogger) format(namespace []string, msg string, logLevel Level) s
 	if l.coloring {
 		b.WriteString(logLevel.Color())
 	}
+
 	b.WriteString(l.clock.Now().Format(dateLayout))
 	b.WriteByte(' ')
 	lvl := logLevel.String()
+
 	if l.coloring {
 		b.WriteString(colorReset)
 		b.WriteString(logLevel.BoldColor())
 	}
+
 	b.WriteString(lvl)
 	if l.coloring {
 		b.WriteString(colorReset)
 		b.WriteString(logLevel.Color())
 	}
+
 	b.WriteString(" '")
 	for i, name := range namespace {
 		if i != 0 {
 			b.WriteByte('.')
 		}
+
 		b.WriteString(name)
 	}
+
 	b.WriteString("' => ")
 	b.WriteString(msg)
 	if l.coloring {
@@ -125,8 +131,10 @@ func (l *defaultLogger) appendFields(msg string, fields ...Field) string {
 		if i != 0 {
 			b.WriteByte(',')
 		}
+
 		fmt.Fprintf(b, `%q:%q`, fields[i].Key(), fields[i].String())
 	}
+
 	b.WriteByte('}')
 
 	return b.String()

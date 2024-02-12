@@ -68,11 +68,13 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 					Int64("commit_offset", *doneInfo.CommitOffset),
 				)
 			}
+
 			if doneInfo.ReadOffset != nil {
 				fields = append(fields,
 					Int64("read_offset", *doneInfo.ReadOffset),
 				)
 			}
+
 			if doneInfo.Error == nil {
 				l.Log(WithLevel(ctx, INFO), "read partition response completed", fields...)
 			} else {

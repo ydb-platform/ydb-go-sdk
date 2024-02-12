@@ -35,6 +35,7 @@ func SessionID(opts ...sessionIDOption) string {
 		nodeID:    uint32(xrand.New().Int64(math.MaxUint32)),
 		hash:      strconv.FormatInt(xrand.New().Int64(math.MaxInt64), 16),
 	}
+
 	for _, o := range opts {
 		if o != nil {
 			o(h)
