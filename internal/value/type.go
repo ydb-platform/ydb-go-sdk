@@ -22,30 +22,30 @@ func TypeToYDB(t Type, a *allocator.Allocator) *Ydb.Type {
 }
 
 func TypeFromYDB(x *Ydb.Type) Type {
-	switch v := x.Type.(type) {
+	switch v := x.GetType().(type) {
 	case *Ydb.Type_TypeId:
 		return primitiveTypeFromYDB(v.TypeId)
 
 	case *Ydb.Type_OptionalType:
-		return Optional(TypeFromYDB(v.OptionalType.Item))
+		return Optional(TypeFromYDB(v.OptionalType.GetItem()))
 
 	case *Ydb.Type_ListType:
-		return List(TypeFromYDB(v.ListType.Item))
+		return List(TypeFromYDB(v.ListType.GetItem()))
 
 	case *Ydb.Type_DecimalType:
 		d := v.DecimalType
-		return Decimal(d.Precision, d.Scale)
+		return Decimal(d.GetPrecision(), d.GetScale())
 
 	case *Ydb.Type_TupleType:
 		t := v.TupleType
-		return Tuple(TypesFromYDB(t.Elements)...)
+		return Tuple(TypesFromYDB(t.GetElements())...)
 
 	case *Ydb.Type_StructType:
 		s := v.StructType
-		return Struct(StructFields(s.Members)...)
+		return Struct(StructFields(s.GetMembers())...)
 
 	case *Ydb.Type_DictType:
-		keyType, valueType := TypeFromYDB(v.DictType.Key), TypeFromYDB(v.DictType.Payload)
+		keyType, valueType := TypeFromYDB(v.DictType.GetKey()), TypeFromYDB(v.DictType.GetPayload())
 		if valueType.equalsTo(Void()) {
 			return Set(keyType)
 		}
@@ -53,11 +53,11 @@ func TypeFromYDB(x *Ydb.Type) Type {
 
 	case *Ydb.Type_VariantType:
 		t := v.VariantType
-		switch x := t.Type.(type) {
+		switch x := t.GetType().(type) {
 		case *Ydb.VariantType_TupleItems:
-			return VariantTuple(TypesFromYDB(x.TupleItems.Elements)...)
+			return VariantTuple(TypesFromYDB(x.TupleItems.GetElements())...)
 		case *Ydb.VariantType_StructItems:
-			return VariantStruct(StructFields(x.StructItems.Members)...)
+			return VariantStruct(StructFields(x.StructItems.GetMembers())...)
 		default:
 			panic("ydb: unknown variant type")
 		}
@@ -597,7 +597,7 @@ func (v *StructType) toYDB(a *allocator.Allocator) *Ydb.Type {
 		structMember.Name = v.fields[i].Name
 		structMember.Type = v.fields[i].T.toYDB(a)
 		typeStruct.StructType.Members = append(
-			typeStruct.StructType.Members,
+			typeStruct.StructType.GetMembers(),
 			structMember,
 		)
 	}
@@ -617,8 +617,8 @@ func StructFields(ms []*Ydb.StructMember) []StructField {
 	fs := make([]StructField, len(ms))
 	for i, m := range ms {
 		fs[i] = StructField{
-			Name: m.Name,
-			T:    TypeFromYDB(m.Type),
+			Name: m.GetName(),
+			T:    TypeFromYDB(m.GetType()),
 		}
 	}
 	return fs
@@ -674,7 +674,7 @@ func (v *TupleType) toYDB(a *allocator.Allocator) *Ydb.Type {
 	typeTuple.TupleType = a.Tuple()
 
 	for _, vv := range items {
-		typeTuple.TupleType.Elements = append(typeTuple.TupleType.Elements, vv.toYDB(a))
+		typeTuple.TupleType.Elements = append(typeTuple.TupleType.GetElements(), vv.toYDB(a))
 	}
 
 	t.Type = typeTuple
@@ -727,7 +727,7 @@ func (v *variantStructType) toYDB(a *allocator.Allocator) *Ydb.Type {
 	typeVariant.VariantType = a.Variant()
 
 	structItems := a.VariantStructItems()
-	structItems.StructItems = v.StructType.toYDB(a).Type.(*Ydb.Type_StructType).StructType
+	structItems.StructItems = v.StructType.toYDB(a).GetType().(*Ydb.Type_StructType).StructType
 
 	typeVariant.VariantType.Type = structItems
 
@@ -779,7 +779,7 @@ func (v *variantTupleType) toYDB(a *allocator.Allocator) *Ydb.Type {
 	typeVariant.VariantType = a.Variant()
 
 	tupleItems := a.VariantTupleItems()
-	tupleItems.TupleItems = v.TupleType.toYDB(a).Type.(*Ydb.Type_TupleType).TupleType
+	tupleItems.TupleItems = v.TupleType.toYDB(a).GetType().(*Ydb.Type_TupleType).TupleType
 
 	typeVariant.VariantType.Type = tupleItems
 

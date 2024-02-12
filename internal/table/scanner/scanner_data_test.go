@@ -526,7 +526,7 @@ func PrepareScannerPerformanceTest(count int) *scanner {
 	}}
 	res.set.Rows = []*Ydb.Value{}
 	for i := 0; i < count; i++ {
-		res.set.Rows = append(res.set.Rows, &Ydb.Value{
+		res.set.Rows = append(res.set.GetRows(), &Ydb.Value{
 			Items: []*Ydb.Value{{
 				Value: &Ydb.Value_Uint64Value{
 					Uint64Value: uint64(i),

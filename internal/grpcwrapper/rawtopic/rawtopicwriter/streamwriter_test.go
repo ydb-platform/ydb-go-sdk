@@ -25,7 +25,7 @@ func TestSendWriteRequest(t *testing.T) {
 		sendCounter := 0
 		var send sendFunc = func(req *Ydb_Topic.StreamWriteMessage_FromClient) error {
 			sendCounter++
-			require.Equal(t, expected, req.ClientMessage)
+			require.Equal(t, expected, req.GetClientMessage())
 			return nil
 		}
 		err := sendWriteRequest(send, expected)
@@ -71,7 +71,7 @@ func TestSendWriteRequest(t *testing.T) {
 		}
 
 		getWriteRequest := func(req *Ydb_Topic.StreamWriteMessage_FromClient) *Ydb_Topic.StreamWriteMessage_WriteRequest {
-			return req.ClientMessage.(*Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest).WriteRequest
+			return req.GetClientMessage().(*Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest).WriteRequest
 		}
 
 		sendCounter := 0

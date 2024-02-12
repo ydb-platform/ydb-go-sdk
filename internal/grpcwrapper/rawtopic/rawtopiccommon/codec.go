@@ -94,7 +94,7 @@ func (c *SupportedCodecs) ToProto() *Ydb_Topic.SupportedCodecs {
 func (c *SupportedCodecs) MustFromProto(proto *Ydb_Topic.SupportedCodecs) {
 	res := make([]Codec, len(proto.GetCodecs()))
 	for i := range proto.GetCodecs() {
-		res[i].MustFromProto(Ydb_Topic.Codec(proto.Codecs[i]))
+		res[i].MustFromProto(Ydb_Topic.Codec(proto.GetCodecs()[i]))
 	}
 	*c = res
 }

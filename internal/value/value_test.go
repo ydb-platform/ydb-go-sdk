@@ -177,7 +177,7 @@ func TestToYDBFromYDB(t *testing.T) {
 			a := allocator.New()
 			defer a.Free()
 			value := ToYDB(v, a)
-			dualConversedValue, err := fromYDB(value.Type, value.Value)
+			dualConversedValue, err := fromYDB(value.GetType(), value.GetValue())
 			require.NoError(t, err)
 			if !proto.Equal(value, ToYDB(dualConversedValue, a)) {
 				t.Errorf("dual conversion failed:\n\n - got:  %v\n\n - want: %v", ToYDB(dualConversedValue, a), value)

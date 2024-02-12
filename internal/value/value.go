@@ -52,7 +52,7 @@ func FromYDB(t *Ydb.Type, v *Ydb.Value) Value {
 
 func nullValueFromYDB(x *Ydb.Value, t Type) (_ Value, ok bool) {
 	for {
-		switch xx := x.Value.(type) {
+		switch xx := x.GetValue().(type) {
 		case *Ydb.Value_NestedValue:
 			x = xx.NestedValue
 		case *Ydb.Value_NullFlagValue:
@@ -152,7 +152,7 @@ func primitiveValueFromYDB(t PrimitiveType, v *Ydb.Value) (Value, error) {
 		return BytesValue(v.GetBytesValue()), nil
 
 	case TypeUUID:
-		return UUIDValue(BigEndianUint128(v.High_128, v.GetLow_128())), nil
+		return UUIDValue(BigEndianUint128(v.GetHigh_128(), v.GetLow_128())), nil
 
 	default:
 		return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered primitive type: %T", t))
@@ -177,11 +177,11 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		return NullValue(tt), nil
 
 	case *DecimalType:
-		return DecimalValue(BigEndianUint128(v.High_128, v.GetLow_128()), ttt.Precision, ttt.Scale), nil
+		return DecimalValue(BigEndianUint128(v.GetHigh_128(), v.GetLow_128()), ttt.Precision, ttt.Scale), nil
 
 	case optionalType:
-		t = t.Type.(*Ydb.Type_OptionalType).OptionalType.Item
-		if nestedValue, ok := v.Value.(*Ydb.Value_NestedValue); ok {
+		t = t.GetType().(*Ydb.Type_OptionalType).OptionalType.GetItem()
+		if nestedValue, ok := v.GetValue().(*Ydb.Value_NestedValue); ok {
 			return OptionalValue(FromYDB(t, nestedValue.NestedValue)), nil
 		}
 		return OptionalValue(FromYDB(t, v)), nil
@@ -229,8 +229,8 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 			defer a.Free()
 			for i, vvv := range v.GetPairs() {
 				vv[i] = DictValueField{
-					K: FromYDB(ttt.keyType.toYDB(a), vvv.Key),
-					V: FromYDB(ttt.valueType.toYDB(a), vvv.Payload),
+					K: FromYDB(ttt.keyType.toYDB(a), vvv.GetKey()),
+					V: FromYDB(ttt.valueType.toYDB(a), vvv.GetPayload()),
 				}
 			}
 			return vv
@@ -242,7 +242,7 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 			a := allocator.New()
 			defer a.Free()
 			for i, vvv := range v.GetPairs() {
-				vv[i] = FromYDB(ttt.itemType.toYDB(a), vvv.Key)
+				vv[i] = FromYDB(ttt.itemType.toYDB(a), vvv.GetKey())
 			}
 			return vv
 		}()...), nil
@@ -252,10 +252,10 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		defer a.Free()
 		return VariantValueStruct(
 			FromYDB(
-				ttt.StructType.fields[v.VariantIndex].T.toYDB(a),
-				v.Value.(*Ydb.Value_NestedValue).NestedValue,
+				ttt.StructType.fields[v.GetVariantIndex()].T.toYDB(a),
+				v.GetValue().(*Ydb.Value_NestedValue).NestedValue,
 			),
-			ttt.StructType.fields[v.VariantIndex].Name,
+			ttt.StructType.fields[v.GetVariantIndex()].Name,
 			ttt.StructType,
 		), nil
 
@@ -264,10 +264,10 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		defer a.Free()
 		return VariantValueTuple(
 			FromYDB(
-				ttt.TupleType.items[v.VariantIndex].toYDB(a),
-				v.Value.(*Ydb.Value_NestedValue).NestedValue,
+				ttt.TupleType.items[v.GetVariantIndex()].toYDB(a),
+				v.GetValue().(*Ydb.Value_NestedValue).NestedValue,
 			),
-			v.VariantIndex,
+			v.GetVariantIndex(),
 			ttt.TupleType,
 		), nil
 
@@ -547,7 +547,7 @@ func (v *dictValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 		pair.Key = values[i].K.toYDB(a)
 		pair.Payload = values[i].V.toYDB(a)
 
-		vvv.Pairs = append(vvv.Pairs, pair)
+		vvv.Pairs = append(vvv.GetPairs(), pair)
 	}
 
 	return vvv
@@ -1091,7 +1091,7 @@ func (v *listValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vvv := a.Value()
 
 	for _, vv := range items {
-		vvv.Items = append(vvv.Items, vv.toYDB(a))
+		vvv.Items = append(vvv.GetItems(), vv.toYDB(a))
 	}
 
 	return vvv
@@ -1147,7 +1147,7 @@ func (v *setValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 		pair.Key = vv.toYDB(a)
 		pair.Payload = _voidValue
 
-		vvv.Pairs = append(vvv.Pairs, pair)
+		vvv.Pairs = append(vvv.GetPairs(), pair)
 	}
 
 	return vvv
@@ -1212,7 +1212,7 @@ func (v *optionalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 		vv.Value = vvv
 	} else {
 		if v.value != nil {
-			vv.Value = v.value.toYDB(a).Value
+			vv.Value = v.value.toYDB(a).GetValue()
 		} else {
 			vv.Value = a.NullFlag()
 		}
@@ -1273,7 +1273,7 @@ func (v *structValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vvv := a.Value()
 
 	for i := range v.fields {
-		vvv.Items = append(vvv.Items, v.fields[i].V.toYDB(a))
+		vvv.Items = append(vvv.GetItems(), v.fields[i].V.toYDB(a))
 	}
 
 	return vvv
@@ -1377,7 +1377,7 @@ func (v *tupleValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vvv := a.Value()
 
 	for _, vv := range items {
-		vvv.Items = append(vvv.Items, vv.toYDB(a))
+		vvv.Items = append(vvv.GetItems(), vv.toYDB(a))
 	}
 
 	return vvv

@@ -43,7 +43,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: bad status from topic server: %v", meta.Status))
 	}
 
-	switch m := grpcMess.ServerMessage.(type) {
+	switch m := grpcMess.GetServerMessage().(type) {
 	case *Ydb_Topic.StreamReadMessage_FromServer_InitResponse:
 		resp := &InitResponse{}
 		resp.ServerMessageMetadata = meta
@@ -92,7 +92,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 	default:
 		return nil, xerrors.WithStackTrace(fmt.Errorf(
 			"ydb: receive unexpected message (%v): %w",
-			reflect.TypeOf(grpcMess.ServerMessage),
+			reflect.TypeOf(grpcMess.GetServerMessage()),
 			ErrUnexpectedMessageType,
 		))
 	}

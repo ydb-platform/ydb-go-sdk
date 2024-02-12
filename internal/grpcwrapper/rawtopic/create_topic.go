@@ -41,7 +41,7 @@ func (req *CreateTopicRequest) ToProto() *Ydb_Topic.CreateTopicRequest {
 	proto.Attributes = req.Attributes
 
 	proto.Consumers = make([]*Ydb_Topic.Consumer, len(req.Consumers))
-	for i := range proto.Consumers {
+	for i := range proto.GetConsumers() {
 		proto.Consumers[i] = req.Consumers[i].ToProto()
 	}
 
@@ -55,5 +55,5 @@ type CreateTopicResult struct {
 }
 
 func (r *CreateTopicResult) FromProto(proto *Ydb_Topic.CreateTopicResponse) error {
-	return r.Operation.FromProtoWithStatusCheck(proto.Operation)
+	return r.Operation.FromProtoWithStatusCheck(proto.GetOperation())
 }

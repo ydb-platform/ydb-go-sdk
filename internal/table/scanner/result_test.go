@@ -178,15 +178,15 @@ func WithValues(vs ...types.Value) ResultSetOption {
 				}
 			}
 			tv := value.ToYDB(v, a)
-			act := value.TypeFromYDB(tv.Type)
-			exp := value.TypeFromYDB(r.Columns[j].Type)
+			act := value.TypeFromYDB(tv.GetType())
+			exp := value.TypeFromYDB(r.Columns[j].GetType())
 			if !value.TypesEqual(act, exp) {
 				panic(fmt.Sprintf(
 					"unexpected types for #%d column: %s; want %s",
 					j, act, exp,
 				))
 			}
-			row.Items[j] = tv.Value
+			row.Items[j] = tv.GetValue()
 		}
 		if row != nil {
 			r.Rows = append(r.Rows, row)

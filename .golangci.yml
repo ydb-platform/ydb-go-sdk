@@ -238,7 +238,6 @@ linters:
     - nlreturn
     - nonamedreturns
     - paralleltest
-    - protogetter
     - scopelint
     - structcheck
     - testableexamples

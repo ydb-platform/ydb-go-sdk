@@ -20,13 +20,13 @@ func (s *queryStats) ProcessCPUTime() time.Duration {
 }
 
 func (s *queryStats) Compilation() (c *stats.CompilationStats) {
-	if s.stats == nil || s.stats.Compilation == nil {
+	if s.stats == nil || s.stats.GetCompilation() == nil {
 		return nil
 	}
 	return &stats.CompilationStats{
-		FromCache: s.stats.Compilation.FromCache,
-		Duration:  time.Microsecond * time.Duration(s.stats.Compilation.DurationUs),
-		CPUTime:   time.Microsecond * time.Duration(s.stats.Compilation.CpuTimeUs),
+		FromCache: s.stats.GetCompilation().GetFromCache(),
+		Duration:  time.Microsecond * time.Duration(s.stats.GetCompilation().GetDurationUs()),
+		CPUTime:   time.Microsecond * time.Duration(s.stats.GetCompilation().GetCpuTimeUs()),
 	}
 }
 
@@ -39,31 +39,31 @@ func (s *queryStats) QueryAST() string {
 }
 
 func (s *queryStats) TotalCPUTime() time.Duration {
-	return time.Microsecond * time.Duration(s.stats.TotalCpuTimeUs)
+	return time.Microsecond * time.Duration(s.stats.GetTotalCpuTimeUs())
 }
 
 func (s *queryStats) TotalDuration() time.Duration {
-	return time.Microsecond * time.Duration(s.stats.TotalDurationUs)
+	return time.Microsecond * time.Duration(s.stats.GetTotalDurationUs())
 }
 
 // NextPhase returns next execution phase within query.
 // If ok flag is false, then there are no more phases and p is invalid.
 func (s *queryStats) NextPhase() (p stats.QueryPhase, ok bool) {
-	if s.pos >= len(s.stats.QueryPhases) {
+	if s.pos >= len(s.stats.GetQueryPhases()) {
 		return
 	}
-	x := s.stats.QueryPhases[s.pos]
+	x := s.stats.GetQueryPhases()[s.pos]
 	if x == nil {
 		return
 	}
 	s.pos++
 	return &queryPhase{
-		tables:         x.TableAccess,
+		tables:         x.GetTableAccess(),
 		pos:            0,
-		duration:       time.Microsecond * time.Duration(x.DurationUs),
-		cpuTime:        time.Microsecond * time.Duration(x.CpuTimeUs),
-		affectedShards: x.AffectedShards,
-		literalPhase:   x.LiteralPhase,
+		duration:       time.Microsecond * time.Duration(x.GetDurationUs()),
+		cpuTime:        time.Microsecond * time.Duration(x.GetCpuTimeUs()),
+		affectedShards: x.GetAffectedShards(),
+		literalPhase:   x.GetLiteralPhase(),
 	}, true
 }
 
@@ -88,10 +88,10 @@ func (q *queryPhase) NextTableAccess() (t *stats.TableAccess, ok bool) {
 	x := q.tables[q.pos]
 	q.pos++
 	return &stats.TableAccess{
-		Name:    x.Name,
-		Reads:   initOperationStats(x.Reads),
-		Updates: initOperationStats(x.Updates),
-		Deletes: initOperationStats(x.Deletes),
+		Name:    x.GetName(),
+		Reads:   initOperationStats(x.GetReads()),
+		Updates: initOperationStats(x.GetUpdates()),
+		Deletes: initOperationStats(x.GetDeletes()),
 	}, true
 }
 
@@ -116,7 +116,7 @@ func initOperationStats(x *Ydb_TableStats.OperationStats) stats.OperationStats {
 		return stats.OperationStats{}
 	}
 	return stats.OperationStats{
-		Rows:  x.Rows,
-		Bytes: x.Bytes,
+		Rows:  x.GetRows(),
+		Bytes: x.GetBytes(),
 	}
 }

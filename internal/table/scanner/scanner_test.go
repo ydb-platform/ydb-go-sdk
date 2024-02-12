@@ -461,7 +461,7 @@ func getResultSet(count int, col []*column) (result *Ydb.ResultSet, testValues [
 			}
 		}
 		result.Columns = append(
-			result.Columns,
+			result.GetColumns(),
 			&Ydb.Column{
 				Name: c.name,
 				Type: t,
@@ -474,12 +474,12 @@ func getResultSet(count int, col []*column) (result *Ydb.ResultSet, testValues [
 	for i := 0; i < count; i++ {
 		var items []*Ydb.Value
 		var vals []indexed.RequiredOrOptional
-		for j := range result.Columns {
+		for j := range result.GetColumns() {
 			v, val := valueFromPrimitiveTypeID(col[j], r)
 			vals = append(vals, val)
 			items = append(items, v)
 		}
-		result.Rows = append(result.Rows, &Ydb.Value{
+		result.Rows = append(result.GetRows(), &Ydb.Value{
 			Items: items,
 		})
 		testValues[i] = vals

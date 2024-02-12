@@ -308,25 +308,25 @@ func TestParams(t *testing.T) {
 				}
 				return
 			}
-			if !reflect.DeepEqual(got.OperationMode, tt.exp.OperationMode) {
+			if !reflect.DeepEqual(got.GetOperationMode(), tt.exp.GetOperationMode()) {
 				t.Errorf(
 					"Params().OperationMode: %v, want: %v",
-					got.OperationMode,
-					tt.exp.OperationMode,
+					got.GetOperationMode(),
+					tt.exp.GetOperationMode(),
 				)
 			}
-			if !reflect.DeepEqual(got.CancelAfter, tt.exp.CancelAfter) {
+			if !reflect.DeepEqual(got.GetCancelAfter(), tt.exp.GetCancelAfter()) {
 				t.Errorf(
 					"Params().CancelAfter: %v, want: %v",
-					got.CancelAfter.AsDuration(),
-					tt.exp.CancelAfter.AsDuration(),
+					got.GetCancelAfter().AsDuration(),
+					tt.exp.GetCancelAfter().AsDuration(),
 				)
 			}
-			if got.OperationTimeout.AsDuration() > tt.exp.OperationTimeout.AsDuration() {
+			if got.GetOperationTimeout().AsDuration() > tt.exp.GetOperationTimeout().AsDuration() {
 				t.Errorf(
 					"Params().OperationTimeout: %v, want: <= %v",
-					got.OperationTimeout.AsDuration(),
-					tt.exp.OperationTimeout.AsDuration(),
+					got.GetOperationTimeout().AsDuration(),
+					tt.exp.GetOperationTimeout().AsDuration(),
 				)
 			}
 		})

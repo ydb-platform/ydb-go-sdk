@@ -30,7 +30,7 @@ func (s *rawConverter) HasItems() bool {
 }
 
 func (s *rawConverter) HasNextItem() bool {
-	return s.hasItems() && s.nextItem < len(s.row.Items)
+	return s.hasItems() && s.nextItem < len(s.row.GetItems())
 }
 
 func (s *rawConverter) Path() string {
@@ -307,14 +307,14 @@ func (s *rawConverter) ListItem(i int) {
 		return
 	}
 	p := s.stack.parent()
-	if !s.itemsBoundsCheck(p.v.Items, i) {
+	if !s.itemsBoundsCheck(p.v.GetItems(), i) {
 		return
 	}
 	if t := s.assertTypeList(p.t); t != nil {
 		s.stack.set(item{
 			i: i,
-			t: t.ListType.Item,
-			v: p.v.Items[i],
+			t: t.ListType.GetItem(),
+			v: p.v.GetItems()[i],
 		})
 	}
 }
@@ -345,14 +345,14 @@ func (s *rawConverter) TupleItem(i int) {
 		return
 	}
 	p := s.stack.parent()
-	if !s.itemsBoundsCheck(p.v.Items, i) {
+	if !s.itemsBoundsCheck(p.v.GetItems(), i) {
 		return
 	}
 	if t := s.assertTypeTuple(p.t); t != nil {
 		s.stack.set(item{
 			i: i,
-			t: t.TupleType.Elements[i],
-			v: p.v.Items[i],
+			t: t.TupleType.GetElements()[i],
+			v: p.v.GetItems()[i],
 		})
 	}
 }
@@ -383,17 +383,17 @@ func (s *rawConverter) StructField(i int) (name string) {
 		return
 	}
 	p := s.stack.parent()
-	if !s.itemsBoundsCheck(p.v.Items, i) {
+	if !s.itemsBoundsCheck(p.v.GetItems(), i) {
 		return
 	}
 	if t := s.assertTypeStruct(p.t); t != nil {
-		m := t.StructType.Members[i]
-		name = m.Name
+		m := t.StructType.GetMembers()[i]
+		name = m.GetName()
 		s.stack.set(item{
-			name: m.Name,
+			name: m.GetName(),
 			i:    i,
-			t:    m.Type,
-			v:    p.v.Items[i],
+			t:    m.GetType(),
+			v:    p.v.GetItems()[i],
 		})
 	}
 	return
@@ -425,14 +425,14 @@ func (s *rawConverter) DictKey(i int) {
 		return
 	}
 	p := s.stack.parent()
-	if !s.pairsBoundsCheck(p.v.Pairs, i) {
+	if !s.pairsBoundsCheck(p.v.GetPairs(), i) {
 		return
 	}
 	if t := s.assertTypeDict(p.t); t != nil {
 		s.stack.set(item{
 			i: i,
-			t: t.DictType.Key,
-			v: p.v.Pairs[i].Key,
+			t: t.DictType.GetKey(),
+			v: p.v.GetPairs()[i].GetKey(),
 		})
 	}
 }
@@ -442,14 +442,14 @@ func (s *rawConverter) DictPayload(i int) {
 		return
 	}
 	p := s.stack.parent()
-	if !s.pairsBoundsCheck(p.v.Pairs, i) {
+	if !s.pairsBoundsCheck(p.v.GetPairs(), i) {
 		return
 	}
 	if t := s.assertTypeDict(p.t); t != nil {
 		s.stack.set(item{
 			i: i,
-			t: t.DictType.Payload,
-			v: p.v.Pairs[i].Payload,
+			t: t.DictType.GetPayload(),
+			v: p.v.GetPairs()[i].GetPayload(),
 		})
 	}
 }
@@ -498,13 +498,13 @@ func (s *rawConverter) Unwrap() {
 		return
 	}
 	v := x.v
-	if isOptional(t.OptionalType.Item) {
+	if isOptional(t.OptionalType.GetItem()) {
 		v = s.unwrapValue()
 	}
 	s.stack.enter()
 	s.stack.set(item{
 		name: "*",
-		t:    t.OptionalType.Item,
+		t:    t.OptionalType.GetItem(),
 		v:    v,
 	})
 }
@@ -531,8 +531,8 @@ func (s *rawConverter) UnwrapDecimal() (v types.Decimal) {
 	}
 	return types.Decimal{
 		Bytes:     s.uint128(),
-		Precision: d.DecimalType.Precision,
-		Scale:     d.DecimalType.Scale,
+		Precision: d.DecimalType.GetPrecision(),
+		Scale:     d.DecimalType.GetScale(),
 	}
 }
 
@@ -545,32 +545,32 @@ func (s *rawConverter) IsDecimal() bool {
 
 func isEqualDecimal(d *Ydb.DecimalType, t types.Type) bool {
 	w := t.(*value.DecimalType)
-	return d.Precision == w.Precision && d.Scale == w.Scale
+	return d.GetPrecision() == w.Precision && d.GetScale() == w.Scale
 }
 
 func (s *rawConverter) isCurrentTypeDecimal() bool {
 	c := s.stack.current()
-	_, ok := c.t.Type.(*Ydb.Type_DecimalType)
+	_, ok := c.t.GetType().(*Ydb.Type_DecimalType)
 	return ok
 }
 
 func (s *rawConverter) unwrapVariantType(typ *Ydb.Type_VariantType, index uint32) (name string, t *Ydb.Type) {
 	i := int(index)
-	switch x := typ.VariantType.Type.(type) {
+	switch x := typ.VariantType.GetType().(type) {
 	case *Ydb.VariantType_TupleItems:
-		if i >= len(x.TupleItems.Elements) {
+		if i >= len(x.TupleItems.GetElements()) {
 			_ = s.errorf(0, "unimplemented")
 			return
 		}
-		return "", x.TupleItems.Elements[i]
+		return "", x.TupleItems.GetElements()[i]
 
 	case *Ydb.VariantType_StructItems:
-		if i >= len(x.StructItems.Members) {
+		if i >= len(x.StructItems.GetMembers()) {
 			_ = s.errorf(0, "unimplemented")
 			return
 		}
-		m := x.StructItems.Members[i]
-		return m.Name, m.Type
+		m := x.StructItems.GetMembers()[i]
+		return m.GetName(), m.GetType()
 
 	default:
 		panic("unexpected variant items types")
@@ -583,7 +583,7 @@ func (s *rawConverter) variant() (v *Ydb.Value, index uint32) {
 		return
 	}
 	x := s.stack.current() // Is not nil if unwrapValue succeeded.
-	index = x.v.VariantIndex
+	index = x.v.GetVariantIndex()
 	return
 }
 
@@ -593,7 +593,7 @@ func (s *rawConverter) itemsIn() int {
 		return -1
 	}
 	s.stack.enter()
-	return len(x.v.Items)
+	return len(x.v.GetItems())
 }
 
 func (s *rawConverter) itemsOut() {
@@ -610,7 +610,7 @@ func (s *rawConverter) pairsIn() int {
 		return -1
 	}
 	s.stack.enter()
-	return len(x.v.Pairs)
+	return len(x.v.GetPairs())
 }
 
 func (s *rawConverter) pairsOut() {
@@ -630,7 +630,7 @@ func (s *rawConverter) boundsCheck(n, i int) bool {
 }
 
 func (s *scanner) assertTypeOptional(typ *Ydb.Type) (t *Ydb.Type_OptionalType) {
-	x := typ.Type
+	x := typ.GetType()
 	if t, _ = x.(*Ydb.Type_OptionalType); t == nil {
 		s.typeError(x, t)
 	}
@@ -688,7 +688,7 @@ func (s *rawConverter) assertCurrentTypeDecimal(t types.Type) bool {
 }
 
 func (s *rawConverter) assertTypeList(typ *Ydb.Type) (t *Ydb.Type_ListType) {
-	x := typ.Type
+	x := typ.GetType()
 	if t, _ = x.(*Ydb.Type_ListType); t == nil {
 		s.typeError(x, t)
 	}
@@ -696,7 +696,7 @@ func (s *rawConverter) assertTypeList(typ *Ydb.Type) (t *Ydb.Type_ListType) {
 }
 
 func (s *rawConverter) assertTypeTuple(typ *Ydb.Type) (t *Ydb.Type_TupleType) {
-	x := typ.Type
+	x := typ.GetType()
 	if t, _ = x.(*Ydb.Type_TupleType); t == nil {
 		s.typeError(x, t)
 	}
@@ -704,7 +704,7 @@ func (s *rawConverter) assertTypeTuple(typ *Ydb.Type) (t *Ydb.Type_TupleType) {
 }
 
 func (s *rawConverter) assertTypeStruct(typ *Ydb.Type) (t *Ydb.Type_StructType) {
-	x := typ.Type
+	x := typ.GetType()
 	if t, _ = x.(*Ydb.Type_StructType); t == nil {
 		s.typeError(x, t)
 	}
@@ -712,7 +712,7 @@ func (s *rawConverter) assertTypeStruct(typ *Ydb.Type) (t *Ydb.Type_StructType) 
 }
 
 func (s *rawConverter) assertTypeDict(typ *Ydb.Type) (t *Ydb.Type_DictType) {
-	x := typ.Type
+	x := typ.GetType()
 	if t, _ = x.(*Ydb.Type_DictType); t == nil {
 		s.typeError(x, t)
 	}
@@ -720,7 +720,7 @@ func (s *rawConverter) assertTypeDict(typ *Ydb.Type) (t *Ydb.Type_DictType) {
 }
 
 func (s *rawConverter) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.Type_DecimalType) {
-	x := typ.Type
+	x := typ.GetType()
 	if t, _ = x.(*Ydb.Type_DecimalType); t == nil {
 		s.typeError(x, t)
 	}
@@ -728,7 +728,7 @@ func (s *rawConverter) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.Type_DecimalType
 }
 
 func (s *rawConverter) assertTypeVariant(typ *Ydb.Type) (t *Ydb.Type_VariantType) {
-	x := typ.Type
+	x := typ.GetType()
 	if t, _ = x.(*Ydb.Type_VariantType); t == nil {
 		s.typeError(x, t)
 	}
