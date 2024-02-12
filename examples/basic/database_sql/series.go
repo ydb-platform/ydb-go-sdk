@@ -30,6 +30,7 @@ func selectDefault(ctx context.Context, db *sql.DB) (err error) {
 			return err
 		}
 		log.Printf("AST = %s\n\nPlan = %s", ast, plan)
+
 		return nil
 	}, retry.WithIdempotent(true))
 	if err != nil {
@@ -61,11 +62,13 @@ func selectDefault(ctx context.Context, db *sql.DB) (err error) {
 					*id, *title, releaseDate.Format("2006-01-02"),
 				)
 			}
+
 			return rows.Err()
 		}, retry.WithIdempotent(true))
 	if err != nil {
 		return fmt.Errorf("execute data query failed: %w", err)
 	}
+
 	return nil
 }
 
@@ -154,11 +157,13 @@ func selectScan(ctx context.Context, db *sql.DB) (err error) {
 					episodeID, title, firstAired.Format("2006-01-02"),
 				)
 			}
+
 			return rows.Err()
 		}, retry.WithIdempotent(true))
 	if err != nil {
 		return fmt.Errorf("scan query failed: %w", err)
 	}
+
 	return nil
 }
 
@@ -201,11 +206,13 @@ func fillTablesWithData(ctx context.Context, db *sql.DB) (err error) {
 		); err != nil {
 			return err
 		}
+
 		return nil
 	}, retry.WithIdempotent(true))
 	if err != nil {
 		return fmt.Errorf("upsert query failed: %w", err)
 	}
+
 	return nil
 }
 
@@ -232,8 +239,10 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 		)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "create series table failed: %v", err)
+
 			return err
 		}
+
 		return nil
 	}, retry.WithIdempotent(true))
 	if err != nil {
@@ -263,8 +272,10 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 		)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "create seasons table failed: %v\n", err)
+
 			return err
 		}
+
 		return nil
 	}, retry.WithIdempotent(true))
 	if err != nil {
@@ -296,13 +307,16 @@ func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
 		)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "create episodes table failed: %v\n", err)
+
 			return err
 		}
+
 		return nil
 	}, retry.WithIdempotent(true))
 	if err != nil {
 		return fmt.Errorf("create table failed: %w", err)
 	}
+
 	return nil
 }
 
@@ -326,5 +340,6 @@ func dropTableIfExists(ctx context.Context, cc *sql.Conn, tableName string) erro
 	if err != nil {
 		return fmt.Errorf("drop table failed: %w", err)
 	}
+
 	return nil
 }

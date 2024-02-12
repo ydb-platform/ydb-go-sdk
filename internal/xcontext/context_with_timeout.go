@@ -14,6 +14,7 @@ func WithTimeout(ctx context.Context, t time.Duration) (context.Context, context
 		from:      stack.Record(1),
 	}
 	childCtx.ctx, childCtx.ctxCancel = context.WithTimeout(ctx, t)
+
 	return childCtx, childCtx.cancel
 }
 
@@ -45,11 +46,13 @@ func (ctx *timeoutCtx) Err() error {
 
 	if ctx.ctx.Err() == context.DeadlineExceeded && ctx.parentCtx.Err() == nil { //nolint:errorlint
 		ctx.err = errFrom(context.DeadlineExceeded, ctx.from)
+
 		return ctx.err
 	}
 
 	if err := ctx.parentCtx.Err(); err != nil {
 		ctx.err = err
+
 		return ctx.err
 	}
 
@@ -72,6 +75,7 @@ func (ctx *timeoutCtx) cancel() {
 
 	if err := ctx.parentCtx.Err(); err != nil {
 		ctx.err = err
+
 		return
 	}
 	ctx.err = errAt(context.Canceled, 1)

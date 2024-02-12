@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"io"
+	"strings"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -23,6 +24,8 @@ var (
 	_ driver.Rows                           = &single{}
 
 	_ types.Scanner = &valuer{}
+
+	ignoreColumnPrefixName = "__discard_column_"
 )
 
 type rows struct {
@@ -43,8 +46,11 @@ func (r *rows) Columns() []string {
 	})
 	cs := make([]string, 0, r.result.CurrentResultSet().ColumnCount())
 	r.result.CurrentResultSet().Columns(func(m options.Column) {
-		cs = append(cs, m.Name)
+		if !strings.HasPrefix(m.Name, ignoreColumnPrefixName) {
+			cs = append(cs, m.Name)
+		}
 	})
+
 	return cs
 }
 
@@ -92,6 +98,7 @@ func (r *rows) NextResultSet() (finalErr error) {
 	if err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	return nil
 }
 
@@ -126,6 +133,7 @@ func (r *rows) Next(dst []driver.Value) error {
 	if err = r.result.Err(); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	return nil
 }
 
@@ -142,6 +150,7 @@ func (r *single) Columns() (columns []string) {
 	for i := range r.values {
 		columns = append(columns, r.values[i].Name)
 	}
+
 	return columns
 }
 
@@ -157,5 +166,6 @@ func (r *single) Next(dst []driver.Value) error {
 		dst[i] = r.values[i].Value
 	}
 	r.readAll = true
+
 	return nil
 }

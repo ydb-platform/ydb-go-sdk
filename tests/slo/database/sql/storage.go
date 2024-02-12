@@ -16,6 +16,7 @@ import (
 	"slo/internal/generator"
 )
 
+//nolint:goconst
 const (
 	createTemplate = `
 CREATE TABLE ` + "`%s`" + ` (
@@ -203,6 +204,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 	return retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
 		func(ctx context.Context, cc *sql.Conn) error {
 			_, err := s.db.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), s.createQuery)
+
 			return err
 		}, retry.WithIdempotent(true),
 	)
@@ -219,6 +221,7 @@ func (s *Storage) dropTable(ctx context.Context) error {
 	return retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
 		func(ctx context.Context, cc *sql.Conn) error {
 			_, err := s.db.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), s.dropQuery)
+
 			return err
 		}, retry.WithIdempotent(true),
 	)

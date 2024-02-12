@@ -20,6 +20,7 @@ func TestRepeaterNoWakeUpsAfterStop(t *testing.T) {
 	r := New(context.Background(), interval, func(ctx context.Context) (err error) {
 		wakeUpStart <- struct{}{}
 		<-wakeUpDone
+
 		return nil
 	}, WithClock(fakeClock))
 
@@ -83,6 +84,7 @@ func TestRepeaterForceLogBackoff(t *testing.T) {
 		}
 		lastWakeUp = fakeClock.Now()
 		wakeUps++
+
 		return fmt.Errorf("special error for force with log backoff")
 	}, WithClock(fakeClock))
 	defer r.Stop()

@@ -14,12 +14,12 @@ import (
 // SessionProvider is the interface that holds session lifecycle logic.
 type SessionProvider interface {
 	// Get returns alive idle session or creates new one.
-	Get(context.Context) (*session, error)
+	Get(ctx context.Context) (*session, error)
 
 	// Put takes no longer needed session for reuse or deletion depending
 	// on implementation.
 	// Put must be fast, if necessary must be async
-	Put(context.Context, *session) (err error)
+	Put(ctx context.Context, s *session) (err error)
 }
 
 func do(
@@ -46,6 +46,7 @@ func do(
 						}
 					}()
 				}
+
 				return op(xcontext.MarkRetryCall(ctx), s)
 			}()
 
@@ -80,6 +81,7 @@ func retryBackoff(
 
 			if err = op(ctx, s); err != nil {
 				s.checkError(err)
+
 				return xerrors.WithStackTrace(err)
 			}
 
@@ -107,5 +109,6 @@ func (c *Client) retryOptions(opts ...table.Option) *table.Options {
 	if options.Trace == nil {
 		options.Trace = &trace.Table{}
 	}
+
 	return options
 }

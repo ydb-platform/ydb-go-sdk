@@ -373,5 +373,6 @@ func date(date string) time.Time {
 	if err != nil {
 		panic(err)
 	}
+
 	return t
 }

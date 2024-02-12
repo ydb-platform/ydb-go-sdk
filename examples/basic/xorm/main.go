@@ -7,12 +7,11 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
+	_ "github.com/ydb-platform/ydb-go-sdk/v3"
 	_ "modernc.org/sqlite"
 	"xorm.io/builder"
 	"xorm.io/xorm"
 	xormLog "xorm.io/xorm/log"
-
-	_ "github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
 var envNotFoundMessage = `DSN environment variable not defined
@@ -77,6 +76,7 @@ func prepareScheme(db *xorm.Engine) error {
 	}
 
 	err = db.CreateTables(&Series{}, &Seasons{}, &Episodes{})
+
 	return err
 }
 
@@ -89,6 +89,7 @@ func fillData(db *xorm.Engine) error {
 	if _, err := session.Insert(&series, &seasons, &episodes); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -178,5 +179,6 @@ func findEpisodesByTitle(db *xorm.Engine, fragment string) error {
 			e.ID, e.AirDate.Format(dateISO8601), e.Title,
 		)
 	}
+
 	return nil
 }

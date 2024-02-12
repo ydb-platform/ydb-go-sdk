@@ -24,7 +24,7 @@ func TestTraceID(t *testing.T) {
 		require.Equal(t, "00000000-0000-0000-0000-000000000000", id)
 		md, has := metadata.FromOutgoingContext(ctx)
 		require.True(t, has)
-		require.Equal(t, 1, len(md[HeaderTraceID]))
+		require.Len(t, md[HeaderTraceID], 1)
 		require.Equal(t, id, md[HeaderTraceID][0])
 	})
 	t.Run("TraceID from rand failed", func(t *testing.T) {
@@ -51,7 +51,7 @@ func TestTraceID(t *testing.T) {
 		require.Equal(t, "{test}", id)
 		md, has := metadata.FromOutgoingContext(ctx)
 		require.True(t, has)
-		require.Equal(t, 1, len(md[HeaderTraceID]))
+		require.Len(t, md[HeaderTraceID], 1)
 		require.Equal(t, id, md[HeaderTraceID][0])
 	})
 }

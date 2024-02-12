@@ -13,6 +13,7 @@ func IsTableExists(ctx context.Context, c scheme.Client, absTablePath string) (e
 	if err != nil {
 		return exists, xerrors.WithStackTrace(err)
 	}
+
 	return exists, nil
 }
 
@@ -21,6 +22,7 @@ func IsColumnTableExists(ctx context.Context, c scheme.Client, absTablePath stri
 	if err != nil {
 		return exists, xerrors.WithStackTrace(err)
 	}
+
 	return exists, nil
 }
 
@@ -31,6 +33,7 @@ func IsEntryExists(ctx context.Context, c scheme.Client, absPath string, entryTy
 	if err != nil {
 		return exists, xerrors.WithStackTrace(err)
 	}
+
 	return exists, nil
 }
 
@@ -39,5 +42,6 @@ func IsDirectoryExists(ctx context.Context, c scheme.Client, absTablePath string
 	if err != nil {
 		return exists, xerrors.WithStackTrace(err)
 	}
+
 	return exists, nil
 }

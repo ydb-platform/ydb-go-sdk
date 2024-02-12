@@ -44,6 +44,7 @@ func backtickState(l *sqlLexer) stateFn {
 				l.parts = append(l.parts, l.src[l.start:l.pos])
 				l.start = l.pos
 			}
+
 			return nil
 		}
 	}
@@ -66,6 +67,7 @@ func singleQuoteState(l *sqlLexer) stateFn {
 				l.parts = append(l.parts, l.src[l.start:l.pos])
 				l.start = l.pos
 			}
+
 			return nil
 		}
 	}
@@ -88,6 +90,7 @@ func doubleQuoteState(l *sqlLexer) stateFn {
 				l.parts = append(l.parts, l.src[l.start:l.pos])
 				l.start = l.pos
 			}
+
 			return nil
 		}
 	}
@@ -109,6 +112,7 @@ func oneLineCommentState(l *sqlLexer) stateFn {
 				l.parts = append(l.parts, l.src[l.start:l.pos])
 				l.start = l.pos
 			}
+
 			return nil
 		}
 	}
@@ -143,6 +147,7 @@ func multilineCommentState(l *sqlLexer) stateFn {
 				l.parts = append(l.parts, l.src[l.start:l.pos])
 				l.start = l.pos
 			}
+
 			return nil
 		}
 	}

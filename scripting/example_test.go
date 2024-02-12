@@ -15,6 +15,7 @@ func Example_execute() {
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
+
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
@@ -47,6 +48,7 @@ func Example_execute() {
 		if sum != 2 {
 			return fmt.Errorf("unexpected sum: %v", sum)
 		}
+
 		return res.Err()
 	}, retry.WithIdempotent(true)); err != nil {
 		fmt.Printf("Execute failed: %v", err)
@@ -58,6 +60,7 @@ func Example_streamExecute() {
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
+
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
@@ -91,6 +94,7 @@ func Example_streamExecute() {
 		if sum != 2 {
 			return fmt.Errorf("unexpected sum: %v", sum)
 		}
+
 		return res.Err()
 	}, retry.WithIdempotent(true)); err != nil {
 		fmt.Printf("StreamExecute failed: %v", err)
@@ -102,6 +106,7 @@ func Example_explainPlan() {
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
+
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
@@ -112,10 +117,12 @@ func Example_explainPlan() {
 	)
 	if err != nil {
 		fmt.Printf("Explain failed: %v", err)
+
 		return
 	}
 	if res.Plan == "" {
 		fmt.Printf("Unexpected empty plan")
+
 		return
 	}
 	fmt.Printf("")
@@ -126,6 +133,7 @@ func Example_explainValidate() {
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
+
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
@@ -141,6 +149,7 @@ func Example_explainValidate() {
 		if len(res.ParameterTypes) > 0 {
 			return retry.RetryableError(fmt.Errorf("unexpected parameter types"))
 		}
+
 		return nil
 	}, retry.WithIdempotent(true)); err != nil {
 		fmt.Printf("Explain failed: %v", err)

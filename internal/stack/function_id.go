@@ -16,5 +16,6 @@ func FunctionID(id string) caller {
 	if id != "" {
 		return functionID(id)
 	}
+
 	return Call(1)
 }

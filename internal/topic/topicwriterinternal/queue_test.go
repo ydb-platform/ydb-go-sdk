@@ -159,6 +159,7 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 				for _, mess := range messages {
 					if lastReadSeqNo.Load()+1 != mess.SeqNo {
 						fatalChan <- string(debug.Stack())
+
 						return
 					}
 					lastReadSeqNo.Store(mess.SeqNo)
@@ -491,5 +492,6 @@ func getSeqNumbers(messages []messageWithDataContent) []int64 {
 	for i := range messages {
 		res = append(res, messages[i].SeqNo)
 	}
+
 	return res
 }

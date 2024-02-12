@@ -70,6 +70,7 @@ func nodeID(sessionID string) (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	return uint32(id), err
 }
 
@@ -85,6 +86,7 @@ func (s *session) NodeID() uint32 {
 		return 0
 	}
 	s.nodeID.Store(id)
+
 	return id
 }
 
@@ -94,6 +96,7 @@ func (s *session) Status() table.SessionStatus {
 	}
 	s.statusMtx.RLock()
 	defer s.statusMtx.RUnlock()
+
 	return s.status
 }
 
@@ -166,6 +169,7 @@ func (s *session) ID() string {
 	if s == nil {
 		return ""
 	}
+
 	return s.id
 }
 
@@ -262,6 +266,7 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 	case Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY:
 		s.SetStatus(table.SessionBusy)
 	}
+
 	return nil
 }
 
@@ -294,6 +299,7 @@ func (s *session) CreateTable(
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
+
 	return nil
 }
 
@@ -472,6 +478,7 @@ func (s *session) DropTable(
 		}
 	}
 	_, err = s.tableService.DropTable(ctx, &request)
+
 	return xerrors.WithStackTrace(err)
 }
 
@@ -510,6 +517,7 @@ func (s *session) AlterTable(
 		}
 	}
 	_, err = s.tableService.AlterTable(ctx, &request)
+
 	return xerrors.WithStackTrace(err)
 }
 
@@ -539,6 +547,7 @@ func (s *session) CopyTable(
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
+
 	return nil
 }
 
@@ -575,6 +584,7 @@ func copyTables(
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
+
 	return nil
 }
 
@@ -587,6 +597,7 @@ func (s *session) CopyTables(
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
+
 	return nil
 }
 
@@ -770,6 +781,7 @@ func (s *session) executeQueryResult(
 		tx.state.Store(txStateInitialized)
 		tx.control = table.TxControl(table.WithTxID(tx.id))
 	}
+
 	return tx, scanner.NewUnary(
 		res.GetResultSets(),
 		res.GetQueryStats(),
@@ -825,6 +837,7 @@ func (s *session) ExecuteSchemeQuery(
 		}
 	}
 	_, err = s.tableService.ExecuteSchemeQuery(ctx, &request)
+
 	return xerrors.WithStackTrace(err)
 }
 
@@ -1001,6 +1014,7 @@ func (s *session) StreamReadTable(
 	stream, err = s.tableService.StreamReadTable(ctx, &request)
 	if err != nil {
 		cancel()
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -1023,12 +1037,14 @@ func (s *session) StreamReadTable(
 				if result == nil || err != nil {
 					return nil, nil, xerrors.WithStackTrace(err)
 				}
+
 				return result.GetResultSet(), nil, nil
 			}
 		},
 		func(err error) error {
 			cancel()
 			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
+
 			return err
 		},
 		scanner.WithIgnoreTruncated(true), // stream read table always returns truncated flag on last result set
@@ -1125,6 +1141,7 @@ func (s *session) StreamExecuteScanQuery(
 	stream, err = s.tableService.StreamExecuteScanQuery(ctx, &request, callOptions...)
 	if err != nil {
 		cancel()
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -1147,12 +1164,14 @@ func (s *session) StreamExecuteScanQuery(
 				if result == nil || err != nil {
 					return nil, nil, xerrors.WithStackTrace(err)
 				}
+
 				return result.GetResultSet(), result.GetQueryStats(), nil
 			}
 		},
 		func(err error) error {
 			cancel()
 			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
+
 			return err
 		},
 		scanner.WithIgnoreTruncated(s.config.IgnoreTruncated()),
@@ -1246,5 +1265,6 @@ func (s *session) BeginTransaction(
 		control: table.TxControl(table.WithTxID(result.GetTxMeta().GetId())),
 	}
 	tx.state.Store(txStateInitialized)
+
 	return tx, nil
 }

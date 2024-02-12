@@ -29,6 +29,7 @@ func dropTableIfExists(ctx context.Context, c table.Client, path string) (err er
 	if !ydb.IsOperationErrorSchemeError(err) {
 		return err
 	}
+
 	return nil
 }
 
@@ -60,11 +61,13 @@ WITH (
 	MODE = 'NEW_AND_OLD_IMAGES'
 )
 `, prefix, tableName)
+
 		return s.ExecuteSchemeQuery(ctx, query)
 	})
 	if err != nil {
 		return fmt.Errorf("failed to add changefeed to test table: %w", err)
 	}
+
 	return nil
 }
 
@@ -90,6 +93,7 @@ VALUES
 		)
 		_ = c.DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 			_, err := tx.Execute(ctx, query, params)
+
 			return err
 		})
 
@@ -114,6 +118,7 @@ WHERE id=$id
 		)
 		_ = c.DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 			_, err := tx.Execute(ctx, query, params)
+
 			return err
 		})
 

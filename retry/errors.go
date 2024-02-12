@@ -10,5 +10,6 @@ func unwrapErrBadConn(err error) error {
 	if xerrors.As(err, &e) {
 		return e.Origin()
 	}
+
 	return err
 }

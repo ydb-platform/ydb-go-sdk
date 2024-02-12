@@ -64,11 +64,18 @@ linters-settings:
     # put imports beginning with prefix after 3rd-party packages;
     # it's a comma-separated list of prefixes
     local-prefixes: github.com/ydb-platform/ydb-go-sdk/v3
+  gci:
+    sections:
+      - standard # Standard section: captures all standard packages.
+      - default # Default section: contains all imports that could not be matched to another section type.
+      - prefix(github.com/ydb-platform/ydb-go-sdk/v3) # Custom section: groups all imports with the specified Prefix.
+    skip-generated: true
   goconst:
     # minimal length of string constant, 3 by default
     min-len: 2
     # minimal occurrences count to trigger, 3 by default
     min-occurrences: 2
+    ignore-tests: true
   misspell:
     # Correct spellings using locale preferences for US or UK.
     # Default is to use a neutral variety of English.
@@ -219,36 +226,27 @@ linters:
     - forbidigo
     - forcetypeassert
     - funlen
-    - gci
     - gochecknoglobals
     - gocognit
-    - goconst
     - godot
     - goerr113
     - golint
     - gomnd
     - gomoddirectives
     - ifshort
-    - inamedparam
     - interfacebloat
-    - interfacer
     - ireturn
     - maintidx
     - maligned
-    - nilerr
-    - nlreturn
     - nonamedreturns
-    - nosnakecase
     - paralleltest
     - protogetter
     - scopelint
     - structcheck
     - testableexamples
-    - testifylint
     - testpackage
     - thelper
     - varnamelen
-    - wastedassign
     - wrapcheck
     - wsl
 
@@ -305,3 +303,9 @@ issues:
         - staticcheck
     - path: _test\.go
       text: "ydb.Connection is deprecated"
+
+      # Allow underscore and capital camel case for readability
+      # Examples: Type_PRIMITIVE_TYPE_ID_UNSPECIFIED, Ydb_Discovery_V1, _voidValue
+    - linters:
+        - nosnakecase
+      text : "(?:_[a-z]+(?:[A-Z](?:[a-z\\d]+|[A-Z\\d]+))+|(?:[A-Z][a-z\\d]+|[A-Z][A-Z\\d]+)+_(?:(?:[A-Z][a-z\\d]+|[A-Z\\d][A-Z\\d]+)_?)+)"

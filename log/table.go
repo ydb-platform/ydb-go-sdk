@@ -34,6 +34,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			String("label", label),
 		)
 		start := time.Now()
+
 		return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -58,6 +59,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 					versionField(),
 				)
 			}
+
 			return func(info trace.TableDoDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
@@ -105,6 +107,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			String("label", label),
 		)
 		start := time.Now()
+
 		return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -129,6 +132,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 					versionField(),
 				)
 			}
+
 			return func(info trace.TableDoTxDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
@@ -171,6 +175,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		ctx := with(*info.Context, TRACE, "ydb", "table", "create", "session")
 		l.Log(ctx, "start")
 		start := time.Now()
+
 		return func(info trace.TableCreateSessionIntermediateInfo) func(trace.TableCreateSessionDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "intermediate",
@@ -183,6 +188,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 					versionField(),
 				)
 			}
+
 			return func(info trace.TableCreateSessionDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
@@ -209,6 +215,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		ctx := with(*info.Context, TRACE, "ydb", "table", "session", "new")
 		l.Log(ctx, "start")
 		start := time.Now()
+
 		return func(info trace.TableSessionNewDoneInfo) {
 			if info.Error == nil {
 				if info.Session != nil {
@@ -242,6 +249,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			String("status", info.Session.Status()),
 		)
 		start := time.Now()
+
 		return func(info trace.TableSessionDeleteDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -271,6 +279,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			String("status", session.Status()),
 		)
 		start := time.Now()
+
 		return func(info trace.TableKeepAliveDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -308,6 +317,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			)...,
 		)
 		start := time.Now()
+
 		return func(info trace.TablePrepareDataQueryDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -354,6 +364,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			)...,
 		)
 		start := time.Now()
+
 		return func(info trace.TableExecuteDataQueryDoneInfo) {
 			if info.Error == nil {
 				tx := info.Tx
@@ -404,6 +415,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			)...,
 		)
 		start := time.Now()
+
 		return func(
 			info trace.TableSessionQueryStreamExecuteIntermediateInfo,
 		) func(
@@ -417,6 +429,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 					versionField(),
 				)
 			}
+
 			return func(info trace.TableSessionQueryStreamExecuteDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
@@ -460,6 +473,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			String("status", session.Status()),
 		)
 		start := time.Now()
+
 		return func(
 			info trace.TableSessionQueryStreamReadIntermediateInfo,
 		) func(
@@ -473,6 +487,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 					versionField(),
 				)
 			}
+
 			return func(info trace.TableSessionQueryStreamReadDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
@@ -507,6 +522,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			String("status", session.Status()),
 		)
 		start := time.Now()
+
 		return func(info trace.TableSessionTransactionBeginDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -543,6 +559,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			String("tx", info.Tx.ID()),
 		)
 		start := time.Now()
+
 		return func(info trace.TableSessionTransactionCommitDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -580,6 +597,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			String("tx", tx.ID()),
 		)
 		start := time.Now()
+
 		return func(info trace.TableSessionTransactionRollbackDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -607,6 +625,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		ctx := with(*info.Context, TRACE, "ydb", "table", "init")
 		l.Log(ctx, "start")
 		start := time.Now()
+
 		return func(info trace.TableInitDoneInfo) {
 			l.Log(WithLevel(ctx, INFO), "done",
 				latencyField(start),
@@ -621,6 +640,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		ctx := with(*info.Context, TRACE, "ydb", "table", "close")
 		l.Log(ctx, "start")
 		start := time.Now()
+
 		return func(info trace.TableCloseDoneInfo) {
 			if info.Error == nil {
 				l.Log(WithLevel(ctx, INFO), "done",
@@ -676,6 +696,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			String("status", session.Status()),
 		)
 		start := time.Now()
+
 		return func(info trace.TablePoolPutDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -701,6 +722,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		ctx := with(*info.Context, TRACE, "ydb", "table", "pool", "get")
 		l.Log(ctx, "start")
 		start := time.Now()
+
 		return func(info trace.TablePoolGetDoneInfo) {
 			if info.Error == nil {
 				session := info.Session
@@ -727,6 +749,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		ctx := with(*info.Context, TRACE, "ydb", "table", "pool", "wait")
 		l.Log(ctx, "start")
 		start := time.Now()
+
 		return func(info trace.TablePoolWaitDoneInfo) {
 			fields := []Field{
 				latencyField(start),
@@ -745,5 +768,6 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			}
 		}
 	}
+
 	return t
 }

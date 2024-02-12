@@ -1,3 +1,15 @@
+* Fixed topic writer infinite reconnections in some cases
+* Refactored nil on err `internal/grpcwrapper/rawydb/issues.go`, when golangci-lint nilerr enabled
+* Refactored nil on err `internal/grpcwrapper/rawtopic/describe_topic.go`, when golangci-lint nilerr enabled
+
+## v3.55.2
+* Fixed init info in topic writer, when autoseq num turned off.
+
+## v3.55.1
+* Supported column name prefix `__discard_column_` for discard columns in result sets
+* Made `StatusIds_SESSION_EXPIRED` retriable for idempotent operations
+
+## v3.55.0
 * Refactored `internal/value/intervalValue.Yql()`
 * The minimum version of Go in `ydb-go-sdk` has been raised to `go1.20`
 

@@ -49,6 +49,7 @@ func getData() (series []*Series, seasons []*Seasons, episodes []*Episodes) {
 		seasons = append(seasons, seasonsData...)
 		episodes = append(episodes, episodesData...)
 	}
+
 	return
 }
 
@@ -112,6 +113,7 @@ func getDataForITCrowd(seriesID string) (series *Series, seasons []*Seasons, epi
 			episodes = append(episodes, episodeData(seasonID, uuid.New().String(), title, date))
 		}
 	}
+
 	return series, seasons, episodes
 }
 
@@ -201,6 +203,7 @@ func getDataForSiliconValley(seriesID string) (series *Series, seasons []*Season
 			episodes = append(episodes, episodeData(seasonID, uuid.New().String(), title, date))
 		}
 	}
+
 	return series, seasons, episodes
 }
 
@@ -211,5 +214,6 @@ func date(date string) time.Time {
 	if err != nil {
 		panic(err)
 	}
+
 	return t
 }
