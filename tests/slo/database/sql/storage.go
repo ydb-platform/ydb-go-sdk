@@ -16,7 +16,6 @@ import (
 	"slo/internal/generator"
 )
 
-//nolint:goconst
 const (
 	createTemplate = `
 CREATE TABLE ` + "`%s`" + ` (
