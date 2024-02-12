@@ -13,6 +13,7 @@ import (
 	"runtime/debug"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -24,7 +25,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
@@ -160,7 +160,7 @@ func TestBasicExampleNative(t *testing.T) { //nolint:gocyclo
 	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)
 	defer cancel()
 
-	var totalConsumedUnits xatomic.Uint64
+	var totalConsumedUnits atomic.Uint64
 	defer func() {
 		t.Logf("total consumed units: %d", totalConsumedUnits.Load())
 	}()
@@ -195,7 +195,7 @@ func TestBasicExampleNative(t *testing.T) { //nolint:gocyclo
 		sessionsMtx sync.Mutex
 		sessions    = make(map[string]struct{}, limit)
 
-		shutdowned xatomic.Bool
+		shutdowned atomic.Bool
 
 		shutdownTrace = trace.Table{
 			OnPoolSessionAdd: func(info trace.TablePoolSessionAddInfo) {

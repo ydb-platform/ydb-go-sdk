@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -16,7 +17,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -54,7 +54,7 @@ type conn struct {
 	done              chan struct{}
 	endpoint          endpoint.Endpoint // ro access
 	closed            bool
-	state             xatomic.Uint32
+	state             atomic.Uint32
 	lastUsage         time.Time
 	onClose           []func(*conn)
 	onTransportErrors []func(ctx context.Context, cc Conn, cause error)
@@ -566,7 +566,7 @@ func getContextMark(ctx context.Context) *modificationMark {
 }
 
 type modificationMark struct {
-	dirty xatomic.Bool
+	dirty atomic.Bool
 }
 
 func (m *modificationMark) canRetry() bool {

@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -20,11 +20,11 @@ var errAlreadyClosed = xerrors.Wrap(errors.New("result closed early"))
 type baseResult struct {
 	scanner
 
-	nextResultSetCounter xatomic.Uint64
+	nextResultSetCounter atomic.Uint64
 	statsMtx             xsync.RWMutex
 	stats                *Ydb_TableStats.QueryStats
 
-	closed xatomic.Bool
+	closed atomic.Bool
 }
 
 type streamResult struct {
