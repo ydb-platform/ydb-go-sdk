@@ -31,7 +31,9 @@ func (s StreamReader) CloseSend() error {
 func (s StreamReader) Recv() (ServerMessage, error) {
 	grpcMess, err := s.Stream.Recv()
 	if err != nil {
-		err = xerrors.Transport(err)
+		if !xerrors.IsErrorFromServer(err) {
+			err = xerrors.Transport(err)
+		}
 		return nil, err
 	}
 
