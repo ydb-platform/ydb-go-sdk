@@ -9,13 +9,13 @@ import (
 	"math/big"
 	"reflect"
 	"runtime/pprof"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -37,7 +37,7 @@ type topicStreamReaderImpl struct {
 	cancel context.CancelFunc
 
 	freeBytes           chan int
-	restBufferSizeBytes xatomic.Int64
+	restBufferSizeBytes atomic.Int64
 	sessionController   partitionSessionStorage
 	backgroundWorkers   background.Worker
 

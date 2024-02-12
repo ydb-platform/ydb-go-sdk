@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/big"
 	"runtime"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,7 +23,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -121,7 +121,7 @@ type WriterReconnector struct {
 	queue                          messageQueue
 	background                     background.Worker
 	clock                          clockwork.Clock
-	firstConnectionHandled         xatomic.Bool
+	firstConnectionHandled         atomic.Bool
 	firstInitResponseProcessedChan empty.Chan
 	writerInstanceID               string
 
