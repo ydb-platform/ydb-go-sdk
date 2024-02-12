@@ -63,12 +63,15 @@ func (t *topicWriterOperationUnavailable) StreamWrite(server Ydb_Topic_V1.TopicS
 
 	err = server.Send(&Ydb_Topic.StreamWriteMessage_FromServer{
 		Status: Ydb.StatusIds_SUCCESS,
-		ServerMessage: &Ydb_Topic.StreamWriteMessage_FromServer_InitResponse{InitResponse: &Ydb_Topic.StreamWriteMessage_InitResponse{
-			LastSeqNo:       0,
-			SessionId:       "test",
-			PartitionId:     0,
-			SupportedCodecs: nil,
-		}}})
+		ServerMessage: &Ydb_Topic.StreamWriteMessage_FromServer_InitResponse{
+			InitResponse: &Ydb_Topic.StreamWriteMessage_InitResponse{
+				LastSeqNo:       0,
+				SessionId:       "test",
+				PartitionId:     0,
+				SupportedCodecs: nil,
+			},
+		},
+	})
 	if err != nil {
 		return fmt.Errorf("failed to send init response: %w", err)
 	}
@@ -98,7 +101,8 @@ func (t *topicWriterOperationUnavailable) StreamWrite(server Ydb_Topic_V1.TopicS
 		return errors.New("failed to read messages block")
 	}
 
-	if len(messagesMsg.GetClientMessage().(*Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest).WriteRequest.GetMessages()) == 0 {
+	if len(messagesMsg.GetClientMessage().(*Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest).
+		WriteRequest.GetMessages()) == 0 {
 		return errors.New("received zero messages block")
 	}
 
@@ -119,7 +123,8 @@ func (t *topicWriterOperationUnavailable) StreamWrite(server Ydb_Topic_V1.TopicS
 				PartitionId:     0,
 				WriteStatistics: &Ydb_Topic.StreamWriteMessage_WriteResponse_WriteStatistics{},
 			},
-		}})
+		},
+	})
 
 	if err != nil {
 		return fmt.Errorf("failed to sent write ack: %w", err)

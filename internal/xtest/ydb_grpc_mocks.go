@@ -50,6 +50,7 @@ type grpcMock struct {
 
 func (m *grpcMock) Close() error {
 	m.grpcServer.Stop()
+
 	return m.listener.Close()
 }
 
@@ -99,7 +100,10 @@ func newMockDiscoveryService(host string, port uint32) *mockDiscoveryService {
 	}
 }
 
-func (m mockDiscoveryService) ListEndpoints(ctx context.Context, request *Ydb_Discovery.ListEndpointsRequest) (*Ydb_Discovery.ListEndpointsResponse, error) {
+func (m mockDiscoveryService) ListEndpoints(
+	ctx context.Context,
+	request *Ydb_Discovery.ListEndpointsRequest,
+) (*Ydb_Discovery.ListEndpointsResponse, error) {
 	res := &Ydb_Discovery.ListEndpointsResult{
 		Endpoints: []*Ydb_Discovery.EndpointInfo{
 			{
@@ -121,12 +125,16 @@ func (m mockDiscoveryService) ListEndpoints(ctx context.Context, request *Ydb_Di
 			Ready:  true,
 			Status: Ydb.StatusIds_SUCCESS,
 			Result: &anypb.Any{},
-		}}
+		},
+	}
 	err := resp.GetOperation().GetResult().MarshalFrom(res)
+
 	return resp, err
 }
 
-func (m mockDiscoveryService) WhoAmI(ctx context.Context, request *Ydb_Discovery.WhoAmIRequest) (*Ydb_Discovery.WhoAmIResponse, error) {
-	//TODO implement me
-	panic("implement me")
+func (m mockDiscoveryService) WhoAmI(
+	ctx context.Context,
+	request *Ydb_Discovery.WhoAmIRequest,
+) (*Ydb_Discovery.WhoAmIResponse, error) {
+	panic("unimplemented")
 }
