@@ -1,3 +1,4 @@
+## v3.55.3
 * Fixed handle of operational errors in topic streams (backported fix only)
 
 ## v3.55.2
