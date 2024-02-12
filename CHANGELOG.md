@@ -1,3 +1,4 @@
+## v3.56.0
 * Fixed handle of operational errors in topic streams
 * The minimum version of Go in `ydb-go-sdk` has been raised to `go1.21`
 * Fixed topic writer infinite reconnections in some cases
