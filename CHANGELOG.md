@@ -7,8 +7,6 @@
 * Fixed topic writer infinite reconnections in some cases
 * Refactored nil on err `internal/grpcwrapper/rawydb/issues.go`, when golangci-lint nilerr enabled
 * Refactored nil on err `internal/grpcwrapper/rawtopic/describe_topic.go`, when golangci-lint nilerr enabled
-* Enabled maligned linter
-* Reordered fields in several structs to optimize memory layout
 
 ## v3.55.3
 * Fixed handle of operational errors in topic streams (backported fix only)
