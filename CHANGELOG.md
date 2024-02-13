@@ -1,7 +1,7 @@
 * Fixed topic writer infinite reconnections in some cases
 * Refactored nil on err `internal/grpcwrapper/rawydb/issues.go`, when golangci-lint nilerr enabled
 * Refactored nil on err `internal/grpcwrapper/rawtopic/describe_topic.go`, when golangci-lint nilerr enabled
-* Renamed some variables
+* The names of internal errors fixed for errname linter
 
 ## v3.55.2
 * Fixed init info in topic writer, when autoseq num turned off.
