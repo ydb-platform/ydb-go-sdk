@@ -14,7 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var _ Credentials = customCredentials{}
+var _ Credentials = customCredentials{token: ""}
 
 type customCredentials struct {
 	token string
