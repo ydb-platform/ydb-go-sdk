@@ -1,8 +1,17 @@
+## v3.56.1
+* Fixed fixenv usage (related to tests only)
+
+## v3.56.0
+* Fixed handle of operational errors in topic streams
+* The minimum version of Go in `ydb-go-sdk` has been raised to `go1.21`
 * Fixed topic writer infinite reconnections in some cases
 * Refactored nil on err `internal/grpcwrapper/rawydb/issues.go`, when golangci-lint nilerr enabled
 * Refactored nil on err `internal/grpcwrapper/rawtopic/describe_topic.go`, when golangci-lint nilerr enabled
 * Enabled maligned linter
 * Reordered fields in several structs to optimize memory layout
+
+## v3.55.3
+* Fixed handle of operational errors in topic streams (backported fix only)
 
 ## v3.55.2
 * Fixed init info in topic writer, when autoseq num turned off.

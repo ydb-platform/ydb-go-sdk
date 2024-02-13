@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
@@ -25,7 +26,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -49,10 +49,10 @@ type session struct {
 	tableService Ydb_Table_V1.TableServiceClient
 	status       table.SessionStatus
 	config       *config.Config
-	lastUsage    xatomic.Int64
+	lastUsage    atomic.Int64
 	statusMtx    sync.RWMutex
 	closeOnce    sync.Once
-	nodeID       xatomic.Uint32
+	nodeID       atomic.Uint32
 }
 
 func (s *session) LastUsage() time.Time {
