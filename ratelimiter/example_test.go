@@ -11,6 +11,7 @@ import (
 func Example() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 
@@ -31,6 +32,7 @@ func Example() {
 
 		return
 	}
+
 	defer func() {
 		// cleanup node
 		err = db.Coordination().DropNode(ctx, "/local/ratelimiter_test")
@@ -49,6 +51,7 @@ func Example() {
 	if err != nil {
 		fmt.Printf("failed to create resource: %v", err)
 	}
+
 	defer func() {
 		// cleanup resource
 		err = db.Ratelimiter().DropResource(ctx, "/local/ratelimiter_test", "test_resource")

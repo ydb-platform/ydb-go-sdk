@@ -409,6 +409,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 				}
 			} else {
 				_ = w.close(ctx, reconnectReason)
+
 				return
 			}
 		}
@@ -687,7 +688,6 @@ func createRawMessageData(
 	default:
 		// pass
 	}
-
 	res.UncompressedSize = int64(mess.BufUncompressedSize)
 	res.Data, err = mess.GetEncodedBytes(codec)
 

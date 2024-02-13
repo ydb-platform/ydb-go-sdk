@@ -142,6 +142,7 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 		}
 		attempts = 0
 	)
+
 	if tracer, has := db.Driver().(interface {
 		TraceRetry() *trace.Retry
 	}); has {

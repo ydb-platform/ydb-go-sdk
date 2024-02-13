@@ -51,6 +51,7 @@ type defaultLogger struct {
 func (l *defaultLogger) format(namespace []string, msg string, logLevel Level) string {
 	b := xstring.Buffer()
 	defer b.Free()
+
 	if l.coloring {
 		b.WriteString(logLevel.Color())
 	}
@@ -66,6 +67,7 @@ func (l *defaultLogger) format(namespace []string, msg string, logLevel Level) s
 	}
 
 	b.WriteString(lvl)
+
 	if l.coloring {
 		b.WriteString(colorReset)
 		b.WriteString(logLevel.Color())
@@ -83,6 +85,7 @@ func (l *defaultLogger) format(namespace []string, msg string, logLevel Level) s
 
 	b.WriteString("' => ")
 	b.WriteString(msg)
+
 	if l.coloring {
 		b.WriteString(colorReset)
 	}

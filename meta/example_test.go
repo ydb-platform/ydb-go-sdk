@@ -15,16 +15,19 @@ import (
 func Example_consumedUnitsCount() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close(ctx) // cleanup resources
+
 	var (
 		query              = `SELECT 42 as id, "my string" as myStr`
 		id                 int32  // required value
 		myStr              string // optional value
 		totalConsumedUnits uint64
 	)
+
 	err = db.Table().Do( // Do retry operation on errors with best effort
 		meta.WithTrailerCallback(ctx, func(md metadata.MD) {
 			totalConsumedUnits += meta.ConsumedUnits(md)
@@ -53,8 +56,10 @@ func Example_consumedUnitsCount() {
 		},
 		table.WithIdempotent(),
 	)
+
 	if err != nil {
 		log.Printf("unexpected error: %v", err)
 	}
+
 	log.Println("total consumed units:", totalConsumedUnits)
 }

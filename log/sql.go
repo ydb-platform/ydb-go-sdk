@@ -25,6 +25,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "connector", "connect")
 		l.Log(ctx, "start")
+
 		start := time.Now()
 
 		return func(info trace.DatabaseSQLConnectorConnectDoneInfo) {
@@ -48,8 +49,10 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "conn", "ping")
 		l.Log(ctx, "start")
+
 		start := time.Now()
 
 		return func(info trace.DatabaseSQLConnPingDoneInfo) {
@@ -70,8 +73,10 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "database", "sql", "conn", "close")
 		l.Log(ctx, "start")
+
 		start := time.Now()
 
 		return func(info trace.DatabaseSQLConnCloseDoneInfo) {
@@ -92,8 +97,10 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "conn", "begin", "tx")
 		l.Log(ctx, "start")
+
 		start := time.Now()
 
 		return func(info trace.DatabaseSQLConnBeginDoneInfo) {

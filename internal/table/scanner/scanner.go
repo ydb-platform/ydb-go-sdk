@@ -158,7 +158,7 @@ func (s *scanner) ScanWithDefaults(values ...indexed.Required) (err error) {
 
 func (s *scanner) Scan(values ...indexed.RequiredOrOptional) (err error) {
 	if err = s.preScanChecks(len(values)); err != nil {
-		return
+		return err
 	}
 
 	for i := range values {
@@ -168,13 +168,12 @@ func (s *scanner) Scan(values ...indexed.RequiredOrOptional) (err error) {
 
 		if s.columnIndexes == nil {
 			if err = s.seekItemByID(i); err != nil {
-				return
+				return err
 			}
 		} else {
 			if err = s.seekItemByID(s.columnIndexes[i]); err != nil {
-				return
+				return err
 			}
-
 		}
 
 		if s.isCurrentTypeOptional() {

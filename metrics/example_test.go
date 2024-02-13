@@ -14,9 +14,11 @@ func ExampleConfig() {
 		os.Getenv("YDB_CONNECTION_STRING"),
 		metrics.WithTraces(registryConfig),
 	)
+
 	if err != nil {
 		panic(err)
 	}
+
 	defer func() {
 		_ = db.Close(context.TODO())
 	}()

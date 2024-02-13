@@ -240,7 +240,6 @@ func main() {
 	}
 
 	for i, item := range items {
-
 		t := p.Traces[i]
 
 		for _, field := range item.StructType.Fields.List {
@@ -383,7 +382,7 @@ func splitOSArchTags(ctx *build.Context, name string) (base, tags, ext string) {
 		))
 	}
 
-	return
+	return base, tags, ext
 }
 
 type Package struct {

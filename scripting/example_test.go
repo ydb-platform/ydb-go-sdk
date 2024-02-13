@@ -12,12 +12,14 @@ import (
 func Example_execute() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
+
 	if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		res, err := db.Scripting().Execute(
 			ctx,
@@ -57,12 +59,14 @@ func Example_execute() {
 func Example_streamExecute() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
+
 	if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		res, err := db.Scripting().StreamExecute(
 			ctx,
@@ -103,6 +107,7 @@ func Example_streamExecute() {
 func Example_explainPlan() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 
@@ -114,28 +119,33 @@ func Example_explainPlan() {
 		"SELECT 1+1",
 		scripting.ExplainModePlan,
 	)
+
 	if err != nil {
 		fmt.Printf("Explain failed: %v", err)
 
 		return
 	}
+
 	if res.Plan == "" {
 		fmt.Printf("Unexpected empty plan")
 
 		return
 	}
+
 	fmt.Printf("")
 }
 
 func Example_explainValidate() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
+
 	if err = retry.Retry(ctx, func(ctx context.Context) (err error) {
 		res, err := db.Scripting().Explain(
 			ctx,

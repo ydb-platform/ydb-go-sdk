@@ -200,6 +200,7 @@ func (rr ReadReplicasSettings) ToYDB() *Ydb_Table.ReadReplicasSettings {
 
 func NewReadReplicasSettings(rr *Ydb_Table.ReadReplicasSettings) ReadReplicasSettings {
 	t := ReadReplicasPerAzReadReplicas
+
 	var c uint64
 
 	if c = rr.GetPerAzReadReplicasCount(); c != 0 {

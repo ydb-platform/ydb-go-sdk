@@ -267,7 +267,6 @@ func (w *Writer) importDeps(deps []dep) {
 		} else if lastStd {
 			lastStd = false
 			w.line()
-
 		}
 
 		w.line("\t", `"`, deps[i].pkgPath, `"`)

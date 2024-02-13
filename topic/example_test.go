@@ -14,10 +14,13 @@ import (
 func Example_createTopic() {
 	ctx := context.TODO()
 	connectionString := os.Getenv("YDB_CONNECTION_STRING")
+
 	if connectionString == "" {
 		connectionString = "grpc://localhost:2136/local"
 	}
+
 	db, err := ydb.Open(ctx, connectionString)
+
 	if err != nil {
 		log.Printf("failed connect: %v", err)
 
@@ -43,10 +46,13 @@ func Example_createTopic() {
 func Example_alterTopic() {
 	ctx := context.TODO()
 	connectionString := os.Getenv("YDB_CONNECTION_STRING")
+
 	if connectionString == "" {
 		connectionString = "grpc://localhost:2136/local"
 	}
+
 	db, err := ydb.Open(ctx, connectionString)
+
 	if err != nil {
 		log.Printf("failed connect: %v", err)
 
@@ -70,10 +76,13 @@ func Example_alterTopic() {
 func Example_describeTopic() {
 	ctx := context.TODO()
 	connectionString := os.Getenv("YDB_CONNECTION_STRING")
+
 	if connectionString == "" {
 		connectionString = "grpc://localhost:2136/local"
 	}
+
 	db, err := ydb.Open(ctx, connectionString)
+
 	if err != nil {
 		log.Printf("failed connect: %v", err)
 
@@ -87,16 +96,20 @@ func Example_describeTopic() {
 
 		return
 	}
+
 	fmt.Printf("describe: %#v\n", descResult)
 }
 
 func Example_dropTopic() {
 	ctx := context.TODO()
 	connectionString := os.Getenv("YDB_CONNECTION_STRING")
+
 	if connectionString == "" {
 		connectionString = "grpc://localhost:2136/local"
 	}
+
 	db, err := ydb.Open(ctx, connectionString)
+
 	if err != nil {
 		log.Printf("failed connect: %v", err)
 
@@ -115,10 +128,13 @@ func Example_dropTopic() {
 func Example_readMessage() {
 	ctx := context.TODO()
 	connectionString := os.Getenv("YDB_CONNECTION_STRING")
+
 	if connectionString == "" {
 		connectionString = "grpc://localhost:2136/local"
 	}
+
 	db, err := ydb.Open(ctx, connectionString)
+
 	if err != nil {
 		log.Printf("failed connect: %v", err)
 
@@ -147,6 +163,7 @@ func Example_readMessage() {
 
 			return
 		}
+
 		fmt.Println(string(content))
 	}
 }

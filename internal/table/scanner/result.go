@@ -185,7 +185,6 @@ func (r *streamResult) nextResultSetErr(ctx context.Context, columns ...string) 
 	s, stats, err := r.recv(ctx)
 
 	if err != nil {
-
 		r.Reset(nil)
 
 		if xerrors.Is(err, io.EOF) {

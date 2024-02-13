@@ -13,6 +13,7 @@ import (
 func ExampleWriter_Write() {
 	ctx := context.Background()
 	db, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"))
+
 	if err != nil {
 		log.Fatalf("failed ydb connection: %v", err)
 	}
