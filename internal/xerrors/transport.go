@@ -118,6 +118,7 @@ func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 	if err == nil {
 		return false
 	}
+
 	var status *grpcStatus.Status
 
 	if t := (*transportError)(nil); errors.As(err, &t) {
@@ -146,6 +147,7 @@ func Transport(err error, opts ...teOpt) error {
 	if err == nil {
 		return nil
 	}
+
 	var te *transportError
 
 	if errors.As(err, &te) {
@@ -198,6 +200,7 @@ func TransportError(err error) Error {
 	if err == nil {
 		return nil
 	}
+
 	var t *transportError
 
 	if errors.As(err, &t) {

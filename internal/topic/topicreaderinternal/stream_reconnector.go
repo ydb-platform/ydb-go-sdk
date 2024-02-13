@@ -210,7 +210,6 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 			retriesStarted = time.Now()
 		} else {
 			attempt++
-
 		}
 
 		lastTime = now
@@ -354,7 +353,6 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 
 		res = <-result
 	case res = <-result:
-
 		// pass
 	}
 

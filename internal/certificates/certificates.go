@@ -137,7 +137,6 @@ func parseCertificate(der []byte, opts ...FromPemOption) (*x509.Certificate, err
 
 	cert, err := x509.ParseCertificate(der)
 	if err != nil {
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 

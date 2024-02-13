@@ -432,6 +432,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 		),
 	)
 	require.NoError(t, err)
+
 	var (
 		expSession *session
 		done       = make(chan struct{}, 2)

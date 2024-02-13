@@ -259,7 +259,6 @@ func (c *Client) streamExecute(
 	)
 
 	defer func() {
-
 		a.Free()
 
 		if err != nil {

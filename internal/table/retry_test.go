@@ -131,7 +131,6 @@ func TestRetryerBadSession(t *testing.T) {
 			t.Errorf("session used twice")
 		} else {
 			seen[s] = true
-
 		}
 
 		if !closed[s] {

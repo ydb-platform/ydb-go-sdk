@@ -83,6 +83,8 @@ linters-settings:
     locale: US
     ignore-words:
       - cancelled
+  wsl:
+    allow-trailing-comment: true
   revive:
     rules:
       - name: blank-imports

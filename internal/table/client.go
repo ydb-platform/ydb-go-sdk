@@ -920,7 +920,6 @@ func (c *Client) internalPoolPushIdle(s *session, now time.Time) {
 
 // c.mu must be held.
 func (c *Client) internalPoolHandlePushIdle(s *session, now time.Time, el *list.Element) {
-
 	info, has := c.index[s]
 	if !has {
 		panic("trying to store session created outside of the client")

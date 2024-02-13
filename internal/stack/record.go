@@ -176,7 +176,6 @@ func (c call) Record(opts ...recordOption) string {
 		var closeBrace bool
 
 		if buffer.Len() > 0 {
-
 			buffer.WriteByte('(')
 
 			closeBrace = true

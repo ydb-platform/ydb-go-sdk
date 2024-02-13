@@ -154,7 +154,6 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 
 	for _, c := range conns {
 		go func(c closer.Closer) {
-
 			defer wg.Done()
 
 			if err := c.Close(ctx); err != nil {

@@ -255,8 +255,8 @@ func cacheMessages(messages []messageWithDataContent, codec rawtopiccommon.Codec
 
 	worker := func() {
 		defer wg.Done()
-		for task := range tasks {
 
+		for task := range tasks {
 			var localErr error
 
 			resErrMutex.WithLock(func() {

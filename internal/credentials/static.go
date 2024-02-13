@@ -125,6 +125,7 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 			),
 		)
 	}
+
 	var result Ydb_Auth.LoginResult
 
 	if err = response.GetOperation().GetResult().UnmarshalTo(&result); err != nil {

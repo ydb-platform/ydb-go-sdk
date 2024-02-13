@@ -197,7 +197,6 @@ func (r *ReadResponse) GetPartitionBatchMessagesCounts() (partitionDataCount, ba
 	partitionDataCount = len(r.PartitionData)
 
 	for partitionIndex := range r.PartitionData {
-
 		partitionData := &r.PartitionData[partitionIndex]
 
 		batchCount += len(partitionData.Batches)

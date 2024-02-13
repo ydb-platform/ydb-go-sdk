@@ -171,11 +171,10 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 
 			plus = x.And(v, one).Cmp(zero) != 0 // Last digit is not a zero.
 			for !plus && len(s) > 1 {
-
 				s = s[1:]
 				c := s[0]
-				if !isDigit(c) {
 
+				if !isDigit(c) {
 					return nil, syntaxError(s)
 				}
 
@@ -184,7 +183,6 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 		}
 
 		if plus {
-
 			v.Add(v, one)
 
 			if v.Cmp(pow(ten, precision)) >= 0 {
@@ -249,7 +247,6 @@ func Format(x *big.Int, precision, scale uint32) string {
 
 		d := int(digit.Int64())
 		if d != 0 || scale == 0 || pos > 0 {
-
 			const numbers = "0123456789"
 			pos--
 
@@ -259,7 +256,6 @@ func Format(x *big.Int, precision, scale uint32) string {
 		if scale > 0 {
 			scale--
 			if scale == 0 && pos > 0 {
-
 				pos--
 
 				bts[pos] = '.'
@@ -285,14 +281,12 @@ func Format(x *big.Int, precision, scale uint32) string {
 	}
 
 	if bts[pos] == '.' {
-
 		pos--
 
 		bts[pos] = '0'
 	}
 
 	if neg {
-
 		pos--
 
 		bts[pos] = '-'
@@ -329,7 +323,6 @@ func put(x *big.Int, p []byte) {
 
 	for _, d := range x.Bits() {
 		for j := 0; j < wordSize; j++ {
-
 			i--
 
 			p[i] = byte(d)
@@ -343,7 +336,6 @@ func put(x *big.Int, p []byte) {
 	}
 
 	for 0 < i && i < len(p) {
-
 		i--
 
 		p[i] = pad

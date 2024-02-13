@@ -688,6 +688,7 @@ func createRawMessageData(
 	default:
 		// pass
 	}
+
 	res.UncompressedSize = int64(mess.BufUncompressedSize)
 	res.Data, err = mess.GetEncodedBytes(codec)
 
