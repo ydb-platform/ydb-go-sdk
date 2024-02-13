@@ -98,6 +98,7 @@ func CreateFromConfig(s string) (*balancerConfig.Config, error) {
 		if len(c.Locations) == 0 {
 			return nil, xerrors.WithStackTrace(fmt.Errorf("empty locations list in balancer '%s' config", c.Type))
 		}
+
 		if c.Fallback {
 			return PreferLocationsWithFallback(b, c.Locations...), nil
 		}
@@ -116,6 +117,7 @@ func FromConfig(config string, opts ...fromConfigOption) *balancerConfig.Config 
 		b   *balancerConfig.Config
 		err error
 	)
+
 	for _, o := range opts {
 		if o != nil {
 			o(&h)

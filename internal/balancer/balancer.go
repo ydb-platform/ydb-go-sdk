@@ -50,8 +50,10 @@ func (b *Balancer) HasNode(id uint32) bool {
 	if b.config.SingleConn {
 		return true
 	}
+
 	b.mu.RLock()
 	defer b.mu.RUnlock()
+
 	if _, has := b.connectionsState.connByNodeID[id]; has {
 		return true
 	}
@@ -104,6 +106,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 		localDC   string
 		cancel    context.CancelFunc
 	)
+
 	defer func() {
 		onDone(err)
 	}()
@@ -113,6 +116,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 	} else {
 		ctx, cancel = xcontext.WithCancel(ctx)
 	}
+
 	defer cancel()
 
 	endpoints, err = b.discoveryClient.Discover(ctx)
@@ -145,6 +149,7 @@ func endpointsDiff(newestEndpoints []endpoint.Endpoint, previousConns []conn.Con
 		newestMap   = make(map[string]struct{}, len(newestEndpoints))
 		previousMap = make(map[string]struct{}, len(previousConns))
 	)
+
 	sort.Slice(newestEndpoints, func(i, j int) bool {
 		return newestEndpoints[i].Address() < newestEndpoints[j].Address()
 	})
@@ -160,10 +165,12 @@ func endpointsDiff(newestEndpoints []endpoint.Endpoint, previousConns []conn.Con
 		nodes = append(nodes, e.Copy())
 
 		newestMap[e.Address()] = struct{}{}
+
 		if _, has := previousMap[e.Address()]; !has {
 			added = append(added, e.Copy())
 		}
 	}
+
 	for _, c := range previousConns {
 		if _, has := newestMap[c.Endpoint().Address()]; !has {
 			dropped = append(dropped, c.Endpoint().Copy())
@@ -253,6 +260,7 @@ func New(
 			discoveryConfig.WithMeta(driverConfig.Meta()),
 		)...)
 	)
+
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -383,6 +391,7 @@ func (b *Balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
 		b.driverConfig.Trace(), &ctx,
 		stack.FunctionID(""),
 	)
+
 	defer func() {
 		if err == nil {
 			onDone(c.Endpoint(), nil)

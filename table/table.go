@@ -298,6 +298,7 @@ type (
 // TxSettings returns transaction settings
 func TxSettings(opts ...TxOption) *TransactionSettings {
 	s := new(TransactionSettings)
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt((*txDesc)(&s.settings))
@@ -361,6 +362,7 @@ func WithStaleReadOnly() TxOption {
 func WithOnlineReadOnly(opts ...TxOnlineReadOnlyOption) TxOption {
 	return func(d *txDesc) {
 		var ro txOnlineReadOnly
+
 		for _, opt := range opts {
 			if opt != nil {
 				opt(&ro)
@@ -403,6 +405,7 @@ func (t *TransactionControl) Desc() *Ydb_Table.TransactionControl {
 // TxControl makes transaction control from given options
 func TxControl(opts ...TxControlOption) *TransactionControl {
 	c := new(TransactionControl)
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt((*txControlDesc)(&c.desc))
@@ -509,6 +512,7 @@ func (q *QueryParameters) Each(it func(name string, v types.Value)) {
 	if q == nil {
 		return
 	}
+
 	for key, v := range q.m {
 		it(key, v)
 	}
@@ -533,6 +537,7 @@ func (q *QueryParameters) String() string {
 	defer buffer.Free()
 
 	buffer.WriteByte('{')
+
 	for i, name := range q.names() {
 		if i != 0 {
 			buffer.WriteByte(',')

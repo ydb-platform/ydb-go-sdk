@@ -97,7 +97,9 @@ func (c *committer) Commit(ctx context.Context, commitRange commitRange) error {
 
 func (c *committer) pushCommit(commitRange commitRange) (commitWaiter, error) {
 	var resErr error
+
 	waiter := newCommitWaiter(commitRange.partitionSession, commitRange.commitOffsetEnd)
+
 	c.m.WithLock(func() {
 		if err := c.backgroundWorker.Context().Err(); err != nil {
 			resErr = err
@@ -124,6 +126,7 @@ func (c *committer) pushCommitsLoop(ctx context.Context) {
 		c.waitSendTrigger(ctx)
 
 		var commits CommitRanges
+
 		c.m.WithLock(func() {
 			commits = c.commits
 			c.commits = NewCommitRangesWithCapacity(commits.len() * 2)
@@ -167,6 +170,7 @@ func (c *committer) waitSendTrigger(ctx context.Context) {
 	}
 
 	finish := c.clock.After(c.BufferTimeLagTrigger)
+
 	if c.BufferCountTrigger == 0 {
 		select {
 		case <-ctxDone:
@@ -178,9 +182,11 @@ func (c *committer) waitSendTrigger(ctx context.Context) {
 
 	for {
 		var commitsLen int
+
 		c.m.WithLock(func() {
 			commitsLen = c.commits.len()
 		})
+
 		if commitsLen >= c.BufferCountTrigger {
 			return
 		}
@@ -204,6 +210,7 @@ func (c *committer) waitCommitAck(ctx context.Context, waiter commitWaiter) erro
 	defer c.m.WithLock(func() {
 		c.removeWaiterByIDNeedLock(waiter.ID)
 	})
+
 	if waiter.checkCondition(waiter.Session, waiter.Session.committedOffset()) {
 		return nil
 	}
@@ -238,6 +245,7 @@ func (c *committer) addWaiterNeedLock(waiter commitWaiter) {
 
 func (c *committer) removeWaiterByIDNeedLock(id int64) {
 	newWaiters := c.waiters[:0]
+
 	for i := range c.waiters {
 		if c.waiters[i].ID == id {
 			continue
@@ -245,6 +253,7 @@ func (c *committer) removeWaiterByIDNeedLock(id int64) {
 
 		newWaiters = append(newWaiters, c.waiters[i])
 	}
+
 	c.waiters = newWaiters
 }
 

@@ -21,6 +21,7 @@ func GenerateDeclareSection(params *table.QueryParameters) (string, error) {
 		names    []string
 		declares = make(map[string]string, len(params.Params()))
 	)
+
 	params.Each(func(name string, v types.Value) {
 		names = append(names, name)
 		declares[name] = fmt.Sprintf(

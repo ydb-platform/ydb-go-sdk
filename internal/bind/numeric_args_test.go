@@ -15,6 +15,7 @@ func TestNumericArgsBindRewriteQuery(t *testing.T) {
 		now = time.Now()
 		b   = NumericArgs{}
 	)
+
 	for _, tt := range []struct {
 		sql    string
 		args   []interface{}

@@ -110,7 +110,9 @@ func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessa
 		}
 
 		attempt++
+
 		stream, err := r.stream(ctx)
+
 		switch {
 		case r.isRetriableError(err):
 			r.fireReconnectOnRetryableError(stream, err)
@@ -120,6 +122,7 @@ func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessa
 		case err != nil:
 			return nil, err
 		default:
+
 			// pass
 		}
 
@@ -149,6 +152,7 @@ func (r *readerReconnector) Commit(ctx context.Context, commitRange commitRange)
 
 func (r *readerReconnector) CloseWithError(ctx context.Context, err error) error {
 	var closeErr error
+
 	r.closeOnce.Do(func() {
 		r.m.WithLock(func() {
 			r.closedErr = err
@@ -185,6 +189,7 @@ func (r *readerReconnector) initChannelsAndClock() {
 	if r.clock == nil {
 		r.clock = clockwork.NewRealClock()
 	}
+
 	r.reconnectFromBadStream = make(chan reconnectRequest, 1)
 	r.streamConnectionInProgress = make(empty.Chan)
 	r.initDoneCh = make(empty.Chan)
@@ -195,8 +200,10 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 	defer r.handlePanic()
 
 	var retriesStarted time.Time
+
 	lastTime := time.Time{}
 	attempt := 0
+
 	for {
 		now := r.clock.Now()
 		if topic.CheckResetReconnectionCounters(lastTime, now, r.connectTimeout) {
@@ -204,7 +211,9 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 			retriesStarted = time.Now()
 		} else {
 			attempt++
+
 		}
+
 		lastTime = now
 
 		var request reconnectRequest
@@ -254,9 +263,11 @@ func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldRead
 	}
 
 	var closedErr error
+
 	r.m.WithRLock(func() {
 		closedErr = r.closedErr
 	})
+
 	if closedErr != nil {
 		return err
 	}
@@ -327,6 +338,7 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 		stream batchedStreamReader
 		err    error
 	}
+
 	result := make(chan connectResult, 1)
 
 	go func() {
@@ -340,8 +352,10 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 		// cancel connection context only if timeout exceed while connection
 		// because if cancel context after connect - it will break
 		cancel()
+
 		res = <-result
 	case res = <-result:
+
 		// pass
 	}
 
@@ -386,7 +400,9 @@ func (r *readerReconnector) stream(ctx context.Context) (batchedStreamReader, er
 	}
 
 	var err error
+
 	var connectionChan empty.Chan
+
 	r.m.WithRLock(func() {
 		connectionChan = r.streamConnectionInProgress
 		if r.closedErr != nil {
@@ -395,6 +411,7 @@ func (r *readerReconnector) stream(ctx context.Context) (batchedStreamReader, er
 			return
 		}
 	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -406,6 +423,7 @@ func (r *readerReconnector) stream(ctx context.Context) (batchedStreamReader, er
 		return nil, r.closedErr
 	case <-connectionChan:
 		var reader batchedStreamReader
+
 		r.m.WithRLock(func() {
 			reader = r.streamVal
 			err = r.streamErr

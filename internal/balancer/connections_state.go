@@ -120,6 +120,7 @@ func connsToNodeIDMap(conns []conn.Conn) (nodes map[uint32]conn.Conn) {
 	if len(conns) == 0 {
 		return nil
 	}
+
 	nodes = make(map[uint32]conn.Conn, len(conns))
 
 	for _, c := range conns {

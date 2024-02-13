@@ -35,6 +35,7 @@ func TestMetaRequiredHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	md, has := metadata.FromOutgoingContext(ctx)
 	if !has {
 		t.Fatal("no outgoing metadata")

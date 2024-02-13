@@ -87,6 +87,7 @@ func (codecs withSupportedCodecs) ApplyCreateOption(request *rawtopic.CreateTopi
 func (codecs withSupportedCodecs) ApplyAlterOption(req *rawtopic.AlterTopicRequest) {
 	req.SetSupportedCodecs = true
 	req.SetSupportedCodecsValue = make(rawtopiccommon.SupportedCodecs, len(codecs))
+
 	for i, codec := range codecs {
 		req.SetSupportedCodecsValue[i] = rawtopiccommon.Codec(codec)
 	}
@@ -181,6 +182,7 @@ func (consumerCodecs withConsumerWithSupportedCodecs) ApplyAlterOption(req *rawt
 
 	consumer := &req.AlterConsumers[index]
 	consumer.SetSupportedCodecs = make(rawtopiccommon.SupportedCodecs, len(consumerCodecs.codecs))
+
 	for i, codec := range consumerCodecs.codecs {
 		consumer.SetSupportedCodecs[i] = rawtopiccommon.Codec(codec)
 	}

@@ -12,13 +12,16 @@ var testSize = 10000
 func BenchmarkTestScanWithColumns(b *testing.B) {
 	b.ReportAllocs()
 	res := PrepareScannerPerformanceTest(b.N)
+
 	var (
 		id    uint64     // for requied scan
 		title *string    // for optional scan
 		date  *time.Time // for optional scan with default type value
 	)
+
 	res.setColumnIndexes([]string{"series_id", "title", "release_date"})
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		for res.NextRow() {
 			if err := res.Scan(&id, &title, &date); err != nil {
@@ -31,6 +34,7 @@ func BenchmarkTestScanWithColumns(b *testing.B) {
 func BenchmarkTestScan(b *testing.B) {
 	b.ReportAllocs()
 	res := PrepareScannerPerformanceTest(b.N)
+
 	var (
 		id    uint64     // for requied scan
 		title *string    // for optional scan
@@ -38,6 +42,7 @@ func BenchmarkTestScan(b *testing.B) {
 	)
 
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		if res.NextRow() {
 			if err := res.Scan(&id, &title, &date); err != nil {
@@ -56,7 +61,9 @@ func BenchmarkTestScanNamed(b *testing.B) {
 		title *string   // for optional scan
 		date  time.Time // for optional scan with default type value
 	)
+
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		for res.NextRow() {
 			if err := res.ScanNamed(
@@ -85,6 +92,7 @@ func TestOverallSliceApproaches(t *testing.T) {
 	ints := []int{2, 5, 10, 20, 50, 100}
 	for _, testSize = range ints {
 		t.Logf("Slice size: %d", testSize)
+
 		for _, test := range []struct {
 			name string
 			f    func(b *testing.B)
@@ -109,7 +117,9 @@ func BenchmarkTestSliceReduce(b *testing.B) {
 		slice[j] = &column{}
 	}
 	b.ResetTimer()
+
 	var row column
+
 	for i := 0; i < b.N; i++ {
 		c := slice
 		for j := 0; j < testSize; j++ {
@@ -117,6 +127,7 @@ func BenchmarkTestSliceReduce(b *testing.B) {
 			slice = c[1:]
 		}
 	}
+
 	_ = row
 }
 
@@ -125,9 +136,13 @@ func BenchmarkTestSliceIncrement(b *testing.B) {
 	for j := 0; j < testSize; j++ {
 		slice[j] = &column{}
 	}
+
 	var cnt int
+
 	var row column
+
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		cnt = 0
 		for i := 0; i < testSize; i++ {
@@ -135,6 +150,7 @@ func BenchmarkTestSliceIncrement(b *testing.B) {
 			cnt++
 		}
 	}
+
 	_ = row
 }
 
@@ -144,6 +160,7 @@ func BenchmarkTestTempValue(b *testing.B) {
 		slice[j] = &column{}
 	}
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		for i := 0; i < testSize; i++ {
 			col := slice[i]
@@ -159,6 +176,7 @@ func BenchmarkTestDoubleIndex(b *testing.B) {
 		slice[j] = &column{}
 	}
 	b.ResetTimer()
+
 	for i := 0; i < b.N; i++ {
 		for i := 0; i < testSize; i++ {
 			slice[i].name = "test2"

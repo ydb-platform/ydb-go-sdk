@@ -53,9 +53,11 @@ func (c *Client) MakeDirectory(ctx context.Context, path string) (finalErr error
 	defer func() {
 		onDone(finalErr)
 	}()
+
 	call := func(ctx context.Context) error {
 		return xerrors.WithStackTrace(c.makeDirectory(ctx, path))
 	}
+
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
@@ -92,9 +94,11 @@ func (c *Client) RemoveDirectory(ctx context.Context, path string) (finalErr err
 	defer func() {
 		onDone(finalErr)
 	}()
+
 	call := func(ctx context.Context) error {
 		return xerrors.WithStackTrace(c.removeDirectory(ctx, path))
 	}
+
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
@@ -128,6 +132,7 @@ func (c *Client) ListDirectory(ctx context.Context, path string) (d scheme.Direc
 	defer func() {
 		onDone(finalErr)
 	}()
+
 	call := func(ctx context.Context) (err error) {
 		d, err = c.listDirectory(ctx, path)
 
@@ -138,6 +143,7 @@ func (c *Client) ListDirectory(ctx context.Context, path string) (d scheme.Direc
 
 		return d, xerrors.WithStackTrace(err)
 	}
+
 	err := retry.Retry(ctx, call,
 		retry.WithIdempotent(true),
 		retry.WithStackTrace(),
@@ -154,6 +160,7 @@ func (c *Client) listDirectory(ctx context.Context, path string) (scheme.Directo
 		response *Ydb_Scheme.ListDirectoryResponse
 		result   Ydb_Scheme.ListDirectoryResult
 	)
+
 	response, err = c.service.ListDirectory(
 		ctx,
 		&Ydb_Scheme.ListDirectoryRequest{
@@ -166,9 +173,11 @@ func (c *Client) listDirectory(ctx context.Context, path string) (scheme.Directo
 			),
 		},
 	)
+
 	if err != nil {
 		return d, xerrors.WithStackTrace(err)
 	}
+
 	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return d, xerrors.WithStackTrace(err)
@@ -188,6 +197,7 @@ func (c *Client) DescribePath(ctx context.Context, path string) (e scheme.Entry,
 	defer func() {
 		onDone(e.Type.String(), finalErr)
 	}()
+
 	call := func(ctx context.Context) (err error) {
 		e, err = c.describePath(ctx, path)
 		if err != nil {
@@ -196,11 +206,13 @@ func (c *Client) DescribePath(ctx context.Context, path string) (e scheme.Entry,
 
 		return nil
 	}
+
 	if !c.config.AutoRetry() {
 		err := call(ctx)
 
 		return e, err
 	}
+
 	err := retry.Retry(ctx, call,
 		retry.WithIdempotent(true),
 		retry.WithStackTrace(),
@@ -215,6 +227,7 @@ func (c *Client) describePath(ctx context.Context, path string) (e scheme.Entry,
 		response *Ydb_Scheme.DescribePathResponse
 		result   Ydb_Scheme.DescribePathResult
 	)
+
 	response, err = c.service.DescribePath(
 		ctx,
 		&Ydb_Scheme.DescribePathRequest{
@@ -227,10 +240,13 @@ func (c *Client) describePath(ctx context.Context, path string) (e scheme.Entry,
 			),
 		},
 	)
+
 	if err != nil {
 		return e, xerrors.WithStackTrace(err)
 	}
+
 	err = response.GetOperation().GetResult().UnmarshalTo(&result)
+
 	if err != nil {
 		return e, xerrors.WithStackTrace(err)
 	}
@@ -251,14 +267,17 @@ func (c *Client) ModifyPermissions(
 	}()
 
 	var desc permissionsDesc
+
 	for _, o := range opts {
 		if o != nil {
 			o(&desc)
 		}
 	}
+
 	call := func(ctx context.Context) error {
 		return xerrors.WithStackTrace(c.modifyPermissions(ctx, path, desc))
 	}
+
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}

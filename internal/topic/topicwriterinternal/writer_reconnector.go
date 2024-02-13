@@ -194,6 +194,7 @@ func (w *WriterReconnector) fillFields(messages []messageWithDataContent) error 
 				if now.IsZero() {
 					now = w.clock.Now()
 				}
+
 				msg.CreatedAt = now
 			} else {
 				return xerrors.WithStackTrace(errNonZeroCreatedAt)
@@ -213,6 +214,7 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 	if err := w.background.CloseReason(); err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: writer is closed: %w", err))
 	}
+
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -230,6 +232,7 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 			PublicErrQueueIsFull,
 		))
 	}
+
 	if err := w.semaphore.Acquire(ctx, semaphoreWeight); err != nil {
 		return xerrors.WithStackTrace(
 			fmt.Errorf("ydb: add new messages exceed max queue size limit. Add count: %v, max size: %v: %w",
@@ -238,6 +241,7 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 				PublicErrQueueIsFull,
 			))
 	}
+
 	defer func() {
 		w.semaphore.Release(semaphoreWeight)
 	}()
@@ -310,6 +314,7 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 	w.m.WithRLock(func() {
 		sessionID = w.sessionID
 	})
+
 	onCompressDone := trace.TopicOnWriterCompressMessages(
 		w.cfg.tracer,
 		w.writerInstanceID,
@@ -324,6 +329,7 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 	if targetCodec == rawtopiccommon.CodecUNSPECIFIED {
 		targetCodec = rawtopiccommon.CodecRaw
 	}
+
 	err := cacheMessages(res, targetCodec, w.cfg.compressorCount)
 	onCompressDone(err)
 
@@ -346,6 +352,7 @@ func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr err
 
 	resErr = w.queue.Close(reason)
 	bgErr := w.background.Close(ctx, reason)
+
 	if resErr == nil {
 		resErr = bgErr
 	}
@@ -370,6 +377,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 	var reconnectReason error
 
 	var prevAttemptTime time.Time
+
 	var startOfRetries time.Time
 
 	for {
@@ -456,6 +464,7 @@ func (w *WriterReconnector) connectWithTimeout(streamLifetimeContext context.Con
 		stream RawTopicWriterStream
 		err    error
 	}
+
 	resCh := make(chan resT, 1)
 
 	go func() {
@@ -639,6 +648,7 @@ func splitMessagesByBufCodec(messages []messageWithDataContent) (res [][]message
 			currentCodec = messages[i].bufCodec
 		}
 	}
+
 	res = append(res, messages[currentGroupStart:len(messages):len(messages)])
 
 	return res

@@ -126,6 +126,7 @@ func ensureAlterConsumer(
 			return consumers, i
 		}
 	}
+
 	consumers = append(consumers, rawtopic.AlterConsumer{Name: name})
 
 	return consumers, len(consumers) - 1

@@ -400,6 +400,7 @@ func (s *session) DescribeTable(
 			[]options.PartitionStats,
 			len(result.GetTableStats().GetPartitionStats()),
 		)
+
 		for i, v := range result.TableStats.PartitionStats {
 			partStats[i].RowsEstimate = v.GetRowsEstimate()
 			partStats[i].StoreSize = v.GetStoreSize()
@@ -450,6 +451,7 @@ func (s *session) DescribeTable(
 		case *Ydb_Table.TableIndexDescription_GlobalIndex:
 			typ = options.IndexTypeGlobal
 		}
+
 		indexes[i] = options.IndexDescription{
 			Name:         idx.GetName(),
 			IndexColumns: idx.GetIndexColumns(),

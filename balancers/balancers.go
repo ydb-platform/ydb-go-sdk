@@ -72,6 +72,7 @@ func (locations filterLocations) String() string {
 	defer buffer.Free()
 
 	buffer.WriteString("Locations{")
+
 	for i, l := range locations {
 		if i != 0 {
 			buffer.WriteByte(',')
@@ -91,6 +92,7 @@ func PreferLocations(balancer *balancerConfig.Config, locations ...string) *bala
 	if len(locations) == 0 {
 		panic("empty list of locations")
 	}
+
 	for i := range locations {
 		locations[i] = strings.ToUpper(locations[i])
 	}

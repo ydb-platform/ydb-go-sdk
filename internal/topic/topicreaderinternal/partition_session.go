@@ -70,6 +70,7 @@ func (s *partitionSession) committedOffset() rawtopicreader.Offset {
 	v := s.committedOffsetVal.Load()
 
 	var res rawtopicreader.Offset
+
 	res.FromInt64(v)
 
 	return res
@@ -83,6 +84,7 @@ func (s *partitionSession) lastReceivedMessageOffset() rawtopicreader.Offset {
 	v := s.lastReceivedOffsetEndVal.Load()
 
 	var res rawtopicreader.Offset
+
 	res.FromInt64(v)
 
 	return res
@@ -114,6 +116,7 @@ func (c *partitionSessionStorage) Add(session *partitionSession) error {
 	if _, ok := c.sessions[session.partitionSessionID]; ok {
 		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.partitionSessionID))
 	}
+
 	c.sessions[session.partitionSessionID] = &sessionInfo{Session: session}
 
 	return nil
@@ -133,6 +136,7 @@ func (c *partitionSessionStorage) Get(id partitionSessionID) (*partitionSession,
 
 func (c *partitionSessionStorage) Remove(id partitionSessionID) (*partitionSession, error) {
 	now := time.Now()
+
 	c.m.Lock()
 	defer c.m.Unlock()
 
@@ -152,6 +156,7 @@ func (c *partitionSessionStorage) compactionNeedLock(now time.Time) {
 	if !c.isNeedCompactionNeedLock(now) {
 		return
 	}
+
 	c.doCompactionNeedLock(now)
 }
 
@@ -162,12 +167,15 @@ func (c *partitionSessionStorage) isNeedCompactionNeedLock(now time.Time) bool {
 
 func (c *partitionSessionStorage) doCompactionNeedLock(now time.Time) {
 	newSessions := make(map[partitionSessionID]*sessionInfo, len(c.sessions))
+
 	for sessionID, info := range c.sessions {
 		if info.IsGarbage(c.removeIndex, now) {
 			continue
 		}
+
 		newSessions[sessionID] = info
 	}
+
 	c.sessions = newSessions
 }
 

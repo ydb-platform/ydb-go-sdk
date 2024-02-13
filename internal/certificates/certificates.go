@@ -43,6 +43,7 @@ func loadFromFileCache(key string) (_ []*x509.Certificate, exists bool) {
 	if !exists {
 		return nil, false
 	}
+
 	certs, ok := value.([]*x509.Certificate)
 	if !ok {
 		panic(fmt.Sprintf("unexpected value type '%T'", value))
@@ -52,7 +53,8 @@ func loadFromFileCache(key string) (_ []*x509.Certificate, exists bool) {
 }
 
 // FromFile reads and parses pem-encoded certificate(s) from file.
-func FromFile(file string, opts ...FromFileOption) ([]*x509.Certificate, error) {
+f
+unc FromFile(file string, opts ...FromFileOption) ([]*x509.Certificate, error) {
 	options := fromFileOptions{}
 	for _, opt := range opts {
 		if opt != nil {
@@ -83,7 +85,8 @@ func FromFile(file string, opts ...FromFileOption) ([]*x509.Certificate, error) 
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	if !options.noCache {
+	i
+	f !options.noCache {
 		fileCache.Store(file, certs)
 		if options.onMiss != nil {
 			options.onMiss()
@@ -95,6 +98,8 @@ func FromFile(file string, opts ...FromFileOption) ([]*x509.Certificate, error) 
 
 func loadFromPemCache(key string) (_ *x509.Certificate, exists bool) {
 	value, exists := pemCache.Load(key)
+
+
 	if !exists {
 		return nil, false
 	}
@@ -130,6 +135,8 @@ func parseCertificate(der []byte, opts ...FromPemOption) (*x509.Certificate, err
 
 	cert, err := x509.ParseCertificate(der)
 	if err != nil {
+
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -174,9 +181,11 @@ func FromPemNoCache(noCache bool) FromPemOption {
 // It returns nil error if at least one certificate was successfully parsed.
 // This function uses cached parseCertificate.
 func FromPem(bytes []byte, opts ...FromPemOption) (certs []*x509.Certificate, err error) {
-	var block *pem.Block
+	v
+	ar block *pem.Block
 
-	for len(bytes) > 0 {
+	f
+	or len(bytes) > 0 {
 		block, bytes = pem.Decode(bytes)
 		if block == nil {
 			break

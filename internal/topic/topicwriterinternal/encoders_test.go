@@ -168,6 +168,7 @@ func TestCompressMessages(t *testing.T) {
 	})
 
 	const messageCount = 10
+
 	t.Run("GzipOneThread", func(t *testing.T) {
 		var messages []messageWithDataContent
 		for i := 0; i < messageCount; i++ {
@@ -182,6 +183,7 @@ func TestCompressMessages(t *testing.T) {
 	})
 
 	const parallelCount = 10
+
 	t.Run("GzipOk", func(t *testing.T) {
 		var messages []messageWithDataContent
 		for i := 0; i < messageCount; i++ {

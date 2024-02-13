@@ -48,6 +48,7 @@ func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (
 			if p == 0 {
 				return "", nil, xerrors.WithStackTrace(ErrUnexpectedNumericArgZero)
 			}
+
 			if int(p) > len(args) {
 				return "", nil, xerrors.WithStackTrace(
 					fmt.Errorf("%w: $p%d, len(args) = %d", ErrInconsistentArgs, p, len(args)),
@@ -61,6 +62,7 @@ func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (
 				if err != nil {
 					return "", nil, xerrors.WithStackTrace(err)
 				}
+
 				newArgs[p-1] = param
 				buffer.WriteString(param.Name())
 			} else {
@@ -142,6 +144,7 @@ func numericArgState(l *sqlLexer) stateFn {
 			if err != nil {
 				panic(err)
 			}
+
 			l.parts = append(l.parts, numericArg(i))
 			l.start = l.pos
 		} else {
@@ -149,6 +152,7 @@ func numericArgState(l *sqlLexer) stateFn {
 			l.start = l.pos
 		}
 	}()
+
 	for {
 		r, width := utf8.DecodeRuneInString(l.src[l.pos:])
 		l.pos += width

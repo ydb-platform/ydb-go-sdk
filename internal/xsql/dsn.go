@@ -26,11 +26,13 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 	if token := info.Params.Get("token"); token != "" {
 		opts = append(opts, config.WithCredentials(credentials.NewAccessTokenCredentials(token)))
 	}
+
 	if balancer := info.Params.Get("go_balancer"); balancer != "" {
 		opts = append(opts, config.WithBalancer(balancers.FromConfig(balancer)))
 	} else if balancer := info.Params.Get("balancer"); balancer != "" {
 		opts = append(opts, config.WithBalancer(balancers.FromConfig(balancer)))
 	}
+
 	if queryMode := info.Params.Get("go_query_mode"); queryMode != "" {
 		mode := QueryModeFromString(queryMode)
 		if mode == UnknownQueryMode {
@@ -44,6 +46,7 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 		}
 		connectorOpts = append(connectorOpts, WithDefaultQueryMode(mode))
 	}
+
 	if fakeTx := info.Params.Get("go_fake_tx"); fakeTx != "" {
 		for _, queryMode := range strings.Split(fakeTx, ",") {
 			mode := QueryModeFromString(queryMode)
@@ -53,6 +56,7 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 			connectorOpts = append(connectorOpts, WithFakeTx(mode))
 		}
 	}
+
 	if info.Params.Has("go_query_bind") {
 		var binders []ConnectorOption
 

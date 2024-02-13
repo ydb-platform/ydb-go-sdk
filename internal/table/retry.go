@@ -101,11 +101,13 @@ func (c *Client) retryOptions(opts ...table.Option) *table.Options {
 			retry.WithTrace(c.config.TraceRetry()),
 		},
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyTableOption(options)
 		}
 	}
+
 	if options.Trace == nil {
 		options.Trace = &trace.Table{}
 	}

@@ -125,6 +125,7 @@ func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove s
 			if pt == fullSysTablePath {
 				continue
 			}
+
 			switch t := dir.Children[j].Type; t {
 			case scheme.EntryDirectory:
 				if err = rmPath(i+1, pt); err != nil {

@@ -37,6 +37,7 @@ func Parse(dsn string) (info parsedInfo, err error) {
 		config.WithEndpoint(uri.Host),
 		config.WithDatabase(uri.Path),
 	)
+
 	if uri.User != nil {
 		password, _ := uri.User.Password()
 		info.UserInfo = &UserInfo{
@@ -44,6 +45,7 @@ func Parse(dsn string) (info parsedInfo, err error) {
 			Password: password,
 		}
 	}
+
 	info.Params = uri.Query()
 	if database, has := info.Params[databaseParam]; has && len(database) > 0 {
 		info.Options = append(info.Options,

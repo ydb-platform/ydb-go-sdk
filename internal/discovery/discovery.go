@@ -50,11 +50,13 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 		result   Ydb_Discovery.ListEndpointsResult
 		location string
 	)
+
 	defer func() {
 		nodes := make([]trace.EndpointInfo, 0, len(endpoints))
 		for _, e := range endpoints {
 			nodes = append(nodes, e.Copy())
 		}
+
 		onDone(location, nodes, err)
 	}()
 
@@ -83,6 +85,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 
 	location = result.GetSelfLocation()
 	endpoints = make([]endpoint.Endpoint, 0, len(result.Endpoints))
+
 	for _, e := range result.Endpoints {
 		if e.Ssl == c.config.Secure() {
 			endpoints = append(endpoints, endpoint.New(
@@ -106,6 +109,7 @@ func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 		response           *Ydb_Discovery.WhoAmIResponse
 		whoAmIResultResult Ydb_Discovery.WhoAmIResult
 	)
+
 	defer func() {
 		if err != nil {
 			onDone("", nil, err)

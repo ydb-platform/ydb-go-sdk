@@ -456,6 +456,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 
 				return
 			}
+
 			mustPutSession(t, p, s)
 		}()
 	}
@@ -471,6 +472,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 	case <-p.clock.After(time.Millisecond * 5):
 		// ok
 	}
+
 	// Release the first create session request.
 	// Created session must be stored in the Client.
 	expSession = r1.session

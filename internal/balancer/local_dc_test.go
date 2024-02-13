@@ -96,6 +96,7 @@ func TestCheckFastestAddress(t *testing.T) {
 
 func TestDetectLocalDC(t *testing.T) {
 	ctx := context.Background()
+
 	xtest.TestManyTimesWithName(t, "Ok", func(t testing.TB) {
 		listen1, err := net.ListenTCP("tcp", &net.TCPAddr{IP: localIP})
 		require.NoError(t, err)

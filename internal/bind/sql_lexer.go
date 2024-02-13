@@ -62,6 +62,7 @@ func singleQuoteState(l *sqlLexer) stateFn {
 			if nextRune != '\'' {
 				return l.rawStateFn
 			}
+
 			l.pos += width
 		case utf8.RuneError:
 			if l.pos-l.start > 0 {

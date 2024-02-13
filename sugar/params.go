@@ -47,6 +47,7 @@ func ToYdbParam(param sql.NamedArg) (table.ParameterOption, error) {
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	if len(params) != 1 {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("internal error: wrong parameters count: %v", params))
 	}

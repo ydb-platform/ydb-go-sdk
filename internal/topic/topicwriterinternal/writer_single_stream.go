@@ -101,6 +101,7 @@ func (w *SingleStreamWriter) close(ctx context.Context, reason error) error {
 
 	resErr := w.cfg.stream.CloseSend()
 	bgWaitErr := w.background.Close(ctx, reason)
+
 	if resErr == nil {
 		resErr = bgWaitErr
 	}
@@ -131,11 +132,13 @@ func (w *SingleStreamWriter) initStream() (err error) {
 	if err = w.cfg.stream.Send(&req); err != nil {
 		return err
 	}
+
 	recvMessage, err := w.cfg.stream.Recv()
 
 	if err != nil {
 		return err
 	}
+
 	result, ok := recvMessage.(*rawtopicwriter.InitResult)
 
 	if !ok {
@@ -197,6 +200,7 @@ func (w *SingleStreamWriter) receiveMessagesLoop(ctx context.Context) {
 				reason := xerrors.WithStackTrace(err)
 				closeCtx, closeCtxCancel := xcontext.WithCancel(ctx)
 				closeCtxCancel()
+
 				_ = w.close(closeCtx, reason)
 
 				return

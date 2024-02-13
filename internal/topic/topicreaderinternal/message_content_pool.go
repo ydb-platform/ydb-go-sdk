@@ -36,10 +36,13 @@ func callbackOnReaderContent(
 	consumer PublicMessageContentUnmarshaler,
 ) error {
 	var buf *bytes.Buffer
+
 	var ok bool
+
 	if buf, ok = p.Get().(*bytes.Buffer); !ok {
 		buf = &bytes.Buffer{}
 	}
+
 	defer func() {
 		buf.Reset()
 		p.Put(buf)
@@ -47,6 +50,7 @@ func callbackOnReaderContent(
 
 	// + bytes.MinRead need for prevent additional allocation for read io.EOF after read message content
 	targetSize := estinamedSize + bytes.MinRead
+
 	switch {
 	case targetSize < minInitializeBufferSize:
 		buf.Grow(minInitializeBufferSize)

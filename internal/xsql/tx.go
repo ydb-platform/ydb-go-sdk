@@ -64,6 +64,7 @@ func (tx *tx) checkTxState() error {
 	if tx.conn.currentTx == tx {
 		return nil
 	}
+
 	if tx.conn.currentTx == nil {
 		return fmt.Errorf("broken conn state: tx=%q not related to conn=%q",
 			tx.ID(), tx.conn.ID(),
@@ -83,6 +84,7 @@ func (tx *tx) Commit() (finalErr error) {
 	defer func() {
 		onDone(finalErr)
 	}()
+
 	if err := tx.checkTxState(); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
@@ -107,6 +109,7 @@ func (tx *tx) Rollback() (finalErr error) {
 	defer func() {
 		onDone(finalErr)
 	}()
+
 	if err := tx.checkTxState(); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}

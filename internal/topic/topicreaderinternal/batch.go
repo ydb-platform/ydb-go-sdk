@@ -30,6 +30,7 @@ func newBatch(session *partitionSession, messages []*PublicMessage) (*PublicBatc
 		if msg.commitRange.partitionSession == nil {
 			msg.commitRange.partitionSession = session
 		}
+
 		if session != msg.commitRange.partitionSession {
 			return nil, xerrors.WithStackTrace(errBadSessionWhileMessageBatchCreate)
 		}
@@ -65,6 +66,7 @@ func newBatchFromStream(
 ) (*PublicBatch, error) {
 	messages := make([]*PublicMessage, len(sb.MessageData))
 	prevOffset := session.lastReceivedMessageOffset()
+
 	for i := range sb.MessageData {
 		sMess := &sb.MessageData[i]
 
@@ -189,6 +191,7 @@ func splitBytesByMessagesInBatches(batches []*PublicBatch, totalBytesCount int) 
 	messagesCount := 0
 	for batchIndex := range batches {
 		messagesCount += len(batches[batchIndex].Messages)
+
 		for messageIndex := range batches[batchIndex].Messages {
 			message := batches[batchIndex].Messages[messageIndex]
 			message.bufferBytesAccount = cutBytes(batches[batchIndex].Messages[messageIndex].rawDataLen)

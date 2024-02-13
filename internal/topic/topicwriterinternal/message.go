@@ -88,10 +88,12 @@ func (m *messageWithDataContent) cacheMetadata() {
 		for key, val := range m.Metadata {
 			ownCopy[key] = xbytes.Clone(val)
 		}
+
 		m.Metadata = ownCopy
 	} else {
 		m.Metadata = nil
 	}
+
 	m.metadataCached = true
 }
 
@@ -117,10 +119,13 @@ func (m *messageWithDataContent) encodeRawContent(codec rawtopiccommon.Codec) ([
 			err,
 		)))
 	}
+
 	_, err = writer.Write(m.rawBuf.Bytes())
+
 	if err == nil {
 		err = writer.Close()
 	}
+
 	if err != nil {
 		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: failed to compress message, codec '%v': %w",
@@ -137,11 +142,13 @@ func (m *messageWithDataContent) encodeRawContent(codec rawtopiccommon.Codec) ([
 func (m *messageWithDataContent) readDataToRawBuf() error {
 	m.rawBuf.Reset()
 	m.hasRawContent = true
+
 	if m.Data != nil {
 		writtenBytes, err := io.Copy(&m.rawBuf, m.Data)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
+
 		m.BufUncompressedSize = int(writtenBytes)
 		m.Data = nil
 	}
@@ -164,10 +171,13 @@ func (m *messageWithDataContent) readDataToTargetCodec(codec rawtopiccommon.Code
 	if reader == nil {
 		reader = &bytes.Reader{}
 	}
+
 	bytesCount, err := io.Copy(encoder, reader)
+
 	if err == nil {
 		err = encoder.Close()
 	}
+
 	if err != nil {
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: failed compress message with codec '%v': %w",
@@ -175,6 +185,7 @@ func (m *messageWithDataContent) readDataToTargetCodec(codec rawtopiccommon.Code
 			err,
 		)))
 	}
+
 	m.BufUncompressedSize = int(bytesCount)
 	m.Data = nil
 
@@ -185,6 +196,7 @@ func (m *messageWithDataContent) getRawBytes() ([]byte, error) {
 	if m.hasRawContent {
 		return m.rawBuf.Bytes(), nil
 	}
+
 	if m.dataWasRead {
 		return nil, xerrors.WithStackTrace(errNoRawContent)
 	}

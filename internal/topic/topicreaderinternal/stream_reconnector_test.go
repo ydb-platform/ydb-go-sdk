@@ -150,10 +150,12 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 
 func TestTopicReaderReconnectorCommit(t *testing.T) {
 	type k struct{}
+
 	ctx := context.WithValue(context.Background(), k{}, "v")
 	expectedCommitRange := commitRange{commitOffsetStart: 1, commitOffsetEnd: 2}
 	testErr := errors.New("test")
 	testErr2 := errors.New("test2")
+
 	t.Run("AllOk", func(t *testing.T) {
 		mc := gomock.NewController(t)
 		defer mc.Finish()
@@ -306,6 +308,7 @@ func TestTopicReaderReconnectorStart(t *testing.T) {
 	reconnector.start()
 
 	<-connectionRequested
+
 	_ = reconnector.CloseWithError(ctx, nil)
 }
 

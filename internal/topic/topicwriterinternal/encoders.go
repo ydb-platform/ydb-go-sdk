@@ -143,6 +143,7 @@ func (s *EncoderSelector) selectCodec(messages []messageWithDataContent) (rawtop
 	if len(s.allowedCodecs) == 0 {
 		return codecUnknown, errNoAllowedCodecs
 	}
+
 	if len(s.allowedCodecs) == 1 {
 		return s.allowedCodecs[0], nil
 	}
@@ -183,6 +184,7 @@ func (s *EncoderSelector) measureCodecs(messages []messageWithDataContent) (rawt
 		if len(messages) > 0 {
 			firstSeqNo = messages[0].SeqNo
 		}
+
 		onCompressDone := trace.TopicOnWriterCompressMessages(
 			s.tracer,
 			s.writerReconnectorID,
@@ -194,11 +196,13 @@ func (s *EncoderSelector) measureCodecs(messages []messageWithDataContent) (rawt
 		)
 		err := cacheMessages(messages, codec, s.parallelCompressors)
 		onCompressDone(err)
+
 		if err != nil {
 			return codecUnknown, err
 		}
 
 		size := 0
+
 		for messIndex := range messages {
 			content, err := messages[messIndex].GetEncodedBytes(codec)
 			if err != nil {
@@ -206,6 +210,7 @@ func (s *EncoderSelector) measureCodecs(messages []messageWithDataContent) (rawt
 			}
 			size += len(content)
 		}
+
 		sizes[codecIndex] = size
 	}
 
@@ -238,16 +243,20 @@ func cacheMessages(messages []messageWithDataContent, codec rawtopiccommon.Codec
 	for i := range messages {
 		tasks <- &messages[i]
 	}
+
 	close(tasks)
 
 	var resErrMutex xsync.Mutex
+
 	var resErr error
 
 	var wg sync.WaitGroup
+
 	worker := func() {
 		defer wg.Done()
 
 		for task := range tasks {
+
 			var localErr error
 			resErrMutex.WithLock(func() {
 				localErr = resErr
@@ -257,6 +266,7 @@ func cacheMessages(messages []messageWithDataContent, codec rawtopiccommon.Codec
 				return
 			}
 			localErr = task.CacheMessageData(codec)
+
 			if localErr != nil {
 				resErrMutex.WithLock(func() {
 					resErr = localErr
@@ -268,6 +278,7 @@ func cacheMessages(messages []messageWithDataContent, codec rawtopiccommon.Codec
 	}
 
 	wg.Add(workerCount)
+
 	for i := 0; i < workerCount; i++ {
 		go worker()
 	}

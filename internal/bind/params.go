@@ -159,8 +159,10 @@ func toYdbParam(name string, value interface{}) (table.ParameterOption, error) {
 		if n != "" {
 			name = n
 		}
+
 		value = v
 	}
+
 	if v, ok := value.(table.ParameterOption); ok {
 		return v, nil
 	}
@@ -169,9 +171,11 @@ func toYdbParam(name string, value interface{}) (table.ParameterOption, error) {
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	if name == "" {
 		return nil, xerrors.WithStackTrace(errUnnamedParam)
 	}
+
 	if name[0] != '$' {
 		name = "$" + name
 	}
@@ -203,6 +207,7 @@ func Params(args ...interface{}) (params []table.ParameterOption, _ error) {
 					if err != nil {
 						return nil, xerrors.WithStackTrace(err)
 					}
+
 					params = append(params, param)
 				}
 			} else {
@@ -216,10 +221,12 @@ func Params(args ...interface{}) (params []table.ParameterOption, _ error) {
 			if x.Name == "" {
 				return nil, xerrors.WithStackTrace(errUnnamedParam)
 			}
+
 			param, err := toYdbParam(x.Name, x.Value)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
+
 			params = append(params, param)
 		case *table.QueryParameters:
 			if len(args) > 1 {
@@ -235,6 +242,7 @@ func Params(args ...interface{}) (params []table.ParameterOption, _ error) {
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
+
 			params = append(params, param)
 		}
 	}

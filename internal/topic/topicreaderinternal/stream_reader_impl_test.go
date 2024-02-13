@@ -822,6 +822,7 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *testing.T) {
 	sendMessageWithFullBuffer := func(e *streamEnv) empty.Chan {
 		nextDataRequested := make(empty.Chan)
+
 		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: int(e.initialBufferSizeBytes)}).Do(func(_ interface{}) {
 			close(nextDataRequested)
 		})
@@ -942,6 +943,7 @@ func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
 
 		return commitErr
 	}
+
 	t.Run("CommitModeNone", func(t *testing.T) {
 		require.ErrorIs(t, commitByMode(CommitModeNone), ErrCommitDisabled)
 	})
@@ -994,7 +996,9 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	// reader.initSession() - skip stream level initialization
 
 	const testPartitionID = 5
+
 	const testSessionID = 15
+
 	const testSessionComitted = 20
 
 	session := newPartitionSession(
@@ -1030,6 +1034,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: 0}).AnyTimes()
 
 	streamClosed := make(empty.Chan)
+
 	stream.EXPECT().CloseSend().Return(nil).Do(func() {
 		close(streamClosed)
 	})
@@ -1091,6 +1096,7 @@ func (e *streamEnv) receiveMessageHandler() (rawtopicreader.ServerMessage, error
 	}
 
 	var callback func()
+
 	e.m.WithLock(func() {
 		callback = e.nextMessageNeedCallback
 		e.nextMessageNeedCallback = nil

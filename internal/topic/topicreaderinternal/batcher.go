@@ -53,6 +53,7 @@ func (b *batcher) Close(err error) error {
 func (b *batcher) PushBatches(batches ...*PublicBatch) error {
 	b.m.Lock()
 	defer b.m.Unlock()
+
 	if b.closed {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: push batch to closed batcher :%w", b.closeErr))
 	}
@@ -79,8 +80,11 @@ func (b *batcher) PushRawMessage(session *partitionSession, m rawtopicreader.Ser
 
 func (b *batcher) addNeedLock(session *partitionSession, item batcherMessageOrderItem) error {
 	var currentItems batcherMessageOrderItems
+
 	var ok bool
+
 	var err error
+
 	if currentItems, ok = b.messages[session]; ok {
 		if currentItems, err = currentItems.Append(item); err != nil {
 			return err
@@ -166,6 +170,7 @@ func (b *batcher) Pop(ctx context.Context, opts batcherGetOptions) (_ batcherMes
 
 	for {
 		var findRes batcherResultCandidate
+
 		var closed bool
 
 		b.m.WithLock(func() {
@@ -181,10 +186,12 @@ func (b *batcher) Pop(ctx context.Context, opts batcherGetOptions) (_ batcherMes
 				return
 			}
 		})
+
 		if closed {
 			return batcherMessageOrderItem{},
 				xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: try pop messages from closed batcher: %w", b.closeErr)))
 		}
+
 		if findRes.Ok {
 			return findRes.Result, nil
 		}
@@ -246,6 +253,7 @@ func (b *batcher) findNeedLock(filter batcherGetOptions) batcherResultCandidate 
 	rawMessageOpts := batcherGetOptions{rawMessagesOnly: true}
 
 	var batchResult batcherResultCandidate
+
 	needBatchResult := true
 
 	for k, items := range b.messages {

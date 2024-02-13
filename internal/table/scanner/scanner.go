@@ -52,6 +52,7 @@ func (s *scanner) Columns(it func(options.Column)) {
 	if s.set == nil {
 		return
 	}
+
 	for _, m := range s.set.Columns {
 		it(options.Column{
 			Name: m.Name,
@@ -110,6 +111,7 @@ func (s *scanner) preScanChecks(lenValues int) (err error) {
 			)
 		}
 	}
+
 	if s.ColumnCount() < lenValues {
 		panic(fmt.Sprintf("scan row failed: count of columns less then values (%d < %d)", s.ColumnCount(), lenValues))
 	}
@@ -124,6 +126,7 @@ func (s *scanner) ScanWithDefaults(values ...indexed.Required) (err error) {
 	if err = s.preScanChecks(len(values)); err != nil {
 		return
 	}
+
 	for i := range values {
 		if _, ok := values[i].(named.Value); ok {
 			panic("dont use NamedValue with ScanWithDefaults. Use ScanNamed instead")
@@ -156,6 +159,7 @@ func (s *scanner) Scan(values ...indexed.RequiredOrOptional) (err error) {
 		if _, ok := values[i].(named.Value); ok {
 			panic("dont use NamedValue with Scan. Use ScanNamed instead")
 		}
+
 		if s.columnIndexes == nil {
 			if err = s.seekItemByID(i); err != nil {
 				return
@@ -171,6 +175,7 @@ func (s *scanner) Scan(values ...indexed.RequiredOrOptional) (err error) {
 			s.scanRequired(values[i])
 		}
 	}
+
 	s.nextItem += len(values)
 
 	return s.Err()
@@ -732,6 +737,7 @@ func (s *scanner) setTime(dst *time.Time) {
 		if err != nil {
 			_ = s.errorf(0, "scanner.setTime(): %w", err)
 		}
+
 		*dst = src
 	default:
 		_ = s.errorf(0, "scanner.setTime(): incorrect source types %s", t)
@@ -780,15 +786,19 @@ func (s *scanner) trySetByteArray(v interface{}, optional, def bool) bool {
 
 			return true
 		}
+
 		if rv.IsZero() {
 			nv := reflect.New(rv.Type().Elem())
 			rv.Set(nv)
 		}
+
 		rv = rv.Elem()
 	}
+
 	if rv.Kind() != reflect.Array {
 		return false
 	}
+
 	if rv.Type().Elem().Kind() != reflect.Uint8 {
 		return false
 	}
@@ -798,7 +808,9 @@ func (s *scanner) trySetByteArray(v interface{}, optional, def bool) bool {
 		return true
 	}
 	var dst []byte
+
 	s.setByte(&dst)
+
 	if rv.Len() != len(dst) {
 		return false
 	}
@@ -864,6 +876,7 @@ func (s *scanner) scanRequired(v interface{}) {
 		}
 	case json.Unmarshaler:
 		var err error
+
 		switch s.getType() {
 		case types.TypeJSON:
 			err = v.UnmarshalJSON(s.converter.JSON())
@@ -895,6 +908,7 @@ func (s *scanner) scanOptional(v interface{}, defaultValueForOptional bool) {
 
 		return
 	}
+
 	switch v := v.(type) {
 	case **bool:
 		if s.isNull() {
@@ -1057,6 +1071,7 @@ func (s *scanner) scanOptional(v interface{}, defaultValueForOptional bool) {
 	case json.Unmarshaler:
 		s.unwrap()
 		var err error
+
 		switch s.getType() {
 		case types.TypeJSON:
 			if s.isNull() {
@@ -1079,6 +1094,7 @@ func (s *scanner) scanOptional(v interface{}, defaultValueForOptional bool) {
 	default:
 		s.unwrap()
 		ok := s.trySetByteArray(v, true, false)
+
 		if !ok {
 			rv := reflect.TypeOf(v)
 			if rv.Kind() == reflect.Ptr && rv.Elem().Kind() == reflect.Ptr {
@@ -1162,6 +1178,7 @@ func (r *baseResult) SetErr(err error) {
 func (s *scanner) errorf(depth int, f string, args ...interface{}) error {
 	s.errMtx.Lock()
 	defer s.errMtx.Unlock()
+
 	if s.err != nil {
 		return s.err
 	}
@@ -1267,12 +1284,14 @@ func (s *scanStack) enter() {
 	if !s.scanItem.isEmpty() {
 		s.set(s.scanItem)
 	}
+
 	s.scanItem = emptyItem
 	s.p++
 }
 
 func (s *scanStack) leave() {
 	s.set(emptyItem)
+
 	if s.p > 0 {
 		s.p--
 	}
@@ -1298,6 +1317,7 @@ func (s *scanStack) current() item {
 	if !s.scanItem.isEmpty() {
 		return s.scanItem
 	}
+
 	if s.v == nil {
 		return emptyItem
 	}
@@ -1325,6 +1345,7 @@ func isOptional(typ *Ydb.Type) bool {
 	if typ == nil {
 		return false
 	}
+
 	_, yes := typ.Type.(*Ydb.Type_OptionalType)
 
 	return yes

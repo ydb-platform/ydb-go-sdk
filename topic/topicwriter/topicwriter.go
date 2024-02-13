@@ -61,6 +61,7 @@ func (w *Writer) WaitInitInfo(ctx context.Context) (info PublicInitialInfo, err 
 	if err != nil {
 		return PublicInitialInfo{}, err
 	}
+
 	publicInfo := PublicInitialInfo{LastSeqNum: privateInfo.LastSeqNum}
 
 	return publicInfo, nil

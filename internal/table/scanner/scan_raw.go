@@ -46,6 +46,7 @@ func (s *rawConverter) WritePathTo(w io.Writer) (n int64, err error) {
 		if sp > 0 {
 			var m int
 			m, err = io.WriteString(w, ".")
+
 			if err != nil {
 				return n, xerrors.WithStackTrace(err)
 			}
@@ -118,6 +119,7 @@ func (s *rawConverter) Uint16() (v uint16) {
 	if s.Err() != nil {
 		return
 	}
+
 	s.unwrap()
 
 	return s.uint16()
@@ -332,7 +334,9 @@ func (s *rawConverter) ListIn() (size int) {
 	if s.Err() != nil {
 		return 0
 	}
+
 	x := s.stack.current()
+
 	if s.assertTypeList(x.t) != nil {
 		return s.itemsIn()
 	}
@@ -344,10 +348,13 @@ func (s *rawConverter) ListItem(i int) {
 	if s.Err() != nil {
 		return
 	}
+
 	p := s.stack.parent()
+
 	if !s.itemsBoundsCheck(p.v.Items, i) {
 		return
 	}
+
 	if t := s.assertTypeList(p.t); t != nil {
 		s.stack.set(item{
 			i: i,
@@ -361,6 +368,7 @@ func (s *rawConverter) ListOut() {
 	if s.Err() != nil {
 		return
 	}
+
 	p := s.stack.parent()
 	if t := s.assertTypeList(p.t); t != nil {
 		s.itemsOut()
@@ -371,7 +379,9 @@ func (s *rawConverter) TupleIn() (size int) {
 	if s.Err() != nil {
 		return 0
 	}
+
 	x := s.stack.current()
+
 	if s.assertTypeTuple(x.t) != nil {
 		return s.itemsIn()
 	}
@@ -384,9 +394,11 @@ func (s *rawConverter) TupleItem(i int) {
 		return
 	}
 	p := s.stack.parent()
+
 	if !s.itemsBoundsCheck(p.v.Items, i) {
 		return
 	}
+
 	if t := s.assertTypeTuple(p.t); t != nil {
 		s.stack.set(item{
 			i: i,
@@ -400,6 +412,7 @@ func (s *rawConverter) TupleOut() {
 	if s.Err() != nil {
 		return
 	}
+
 	p := s.stack.parent()
 	if t := s.assertTypeTuple(p.t); t != nil {
 		s.itemsOut()
@@ -410,7 +423,9 @@ func (s *rawConverter) StructIn() (size int) {
 	if s.Err() != nil {
 		return 0
 	}
+
 	x := s.stack.current()
+
 	if s.assertTypeStruct(x.t) != nil {
 		return s.itemsIn()
 	}
@@ -423,9 +438,11 @@ func (s *rawConverter) StructField(i int) (name string) {
 		return
 	}
 	p := s.stack.parent()
+
 	if !s.itemsBoundsCheck(p.v.Items, i) {
 		return
 	}
+
 	if t := s.assertTypeStruct(p.t); t != nil {
 		m := t.StructType.Members[i]
 		name = m.Name
@@ -454,6 +471,7 @@ func (s *rawConverter) DictIn() (size int) {
 	if s.Err() != nil {
 		return 0
 	}
+
 	x := s.stack.current()
 	if s.assertTypeDict(x.t) != nil {
 		return s.pairsIn()
@@ -467,6 +485,7 @@ func (s *rawConverter) DictKey(i int) {
 		return
 	}
 	p := s.stack.parent()
+
 	if !s.pairsBoundsCheck(p.v.Pairs, i) {
 		return
 	}
@@ -557,6 +576,7 @@ func (s *rawConverter) Decimal(t types.Type) (v [16]byte) {
 		return
 	}
 	s.unwrap()
+
 	if !s.assertCurrentTypeDecimal(t) {
 		return
 	}
@@ -620,6 +640,7 @@ func (s *rawConverter) unwrapVariantType(typ *Ydb.Type_VariantType, index uint32
 
 			return
 		}
+
 		m := x.StructItems.Members[i]
 
 		return m.Name, m.Type
@@ -634,6 +655,7 @@ func (s *rawConverter) variant() (v *Ydb.Value, index uint32) {
 	if v == nil {
 		return
 	}
+
 	x := s.stack.current() // Is not nil if unwrapValue succeeded.
 	index = x.v.VariantIndex
 
@@ -645,6 +667,7 @@ func (s *rawConverter) itemsIn() int {
 	if x.isEmpty() {
 		return -1
 	}
+
 	s.stack.enter()
 
 	return len(x.v.Items)
@@ -701,6 +724,7 @@ func (s *rawConverter) assertCurrentTypeNullable() bool {
 		return true
 	}
 	p := s.stack.parent()
+
 	if isOptional(p.t) {
 		return true
 	}
@@ -720,6 +744,7 @@ func (s *rawConverter) assertCurrentTypeNullable() bool {
 func (s *rawConverter) assertCurrentTypeIs(t types.Type) bool {
 	c := s.stack.current()
 	act := value.TypeFromYDB(c.t)
+
 	if !value.TypesEqual(act, t) {
 		_ = s.errorf(
 			1,
@@ -822,6 +847,7 @@ func nameIface(v interface{}) string {
 	if v == nil {
 		return "nil"
 	}
+
 	t := reflect.TypeOf(v)
 	s := t.String()
 	s = strings.TrimPrefix(s, "*Ydb.Value_")
