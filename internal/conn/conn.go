@@ -69,6 +69,7 @@ func (c *conn) Ping(ctx context.Context) error {
 	if err != nil {
 		return c.wrapError(err)
 	}
+
 	if !isAvailable(cc) {
 		return c.wrapError(errUnavailableConnection)
 	}
@@ -158,9 +159,11 @@ func (c *conn) setState(ctx context.Context, s State) State {
 
 func (c *conn) Unban(ctx context.Context) State {
 	var newState State
+
 	c.mtx.RLock()
 	cc := c.cc
 	c.mtx.RUnlock()
+
 	if isAvailable(cc) {
 		newState = Online
 	} else {
@@ -191,6 +194,7 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	if dialTimeout := c.config.DialTimeout(); dialTimeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = xcontext.WithTimeout(ctx, dialTimeout)
+
 		defer cancel()
 	}
 
@@ -255,6 +259,7 @@ func (c *conn) close(ctx context.Context) (err error) {
 	if c.cc == nil {
 		return nil
 	}
+
 	err = c.cc.Close()
 	c.cc = nil
 	c.setState(ctx, Offline)
@@ -318,6 +323,7 @@ func (c *conn) Invoke(
 		cc *grpc.ClientConn
 		md = metadata.MD{}
 	)
+
 	defer func() {
 		meta.CallTrailerCallback(ctx, md)
 		onDone(err, issues, opID, c.GetState(), md)
@@ -361,9 +367,11 @@ func (c *conn) Invoke(
 
 	if o, ok := res.(response.Response); ok {
 		opID = o.GetOperation().GetId()
+
 		for _, issue := range o.GetOperation().GetIssues() {
 			issues = append(issues, issue)
 		}
+
 		if useWrapping {
 			switch {
 			case !o.GetOperation().GetReady():
@@ -470,6 +478,7 @@ func (c *conn) wrapError(err error) error {
 	if err == nil {
 		return nil
 	}
+
 	nodeErr := newConnError(c.endpoint.NodeID(), c.endpoint.Address(), err)
 
 	return xerrors.WithStackTrace(nodeErr, xerrors.WithSkipDepth(1))
@@ -500,6 +509,7 @@ func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 		done:     make(chan struct{}),
 	}
 	c.state.Store(uint32(Created))
+
 	for _, o := range opts {
 		if o != nil {
 			o(c)

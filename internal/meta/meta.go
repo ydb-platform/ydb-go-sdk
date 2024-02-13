@@ -24,6 +24,7 @@ func New(
 		credentials: credentials,
 		database:    database,
 	}
+
 	for _, o := range opts {
 		if o != nil {
 			o(m)
@@ -56,12 +57,14 @@ func AllowOption(feature string) Option {
 func ForbidOption(feature string) Option {
 	return func(m *Meta) {
 		n := 0
+
 		for _, capability := range m.capabilities {
 			if capability != feature {
 				m.capabilities[n] = capability
 				n++
 			}
 		}
+
 		m.capabilities = m.capabilities[:n]
 	}
 }

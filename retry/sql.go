@@ -55,6 +55,7 @@ func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Co
 		copy(options.retryOptions[1:], options.retryOptions)
 		options.retryOptions[0] = WithTrace(tracer.TraceRetry())
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyDoOption(&options)

@@ -41,6 +41,7 @@ func Wait(ctx context.Context, fastBackoff, slowBackoff backoff.Backoff, t backo
 		if fastBackoff == nil {
 			fastBackoff = backoff.Fast
 		}
+
 		b = fastBackoff
 	case backoff.TypeSlow:
 		if slowBackoff == nil {

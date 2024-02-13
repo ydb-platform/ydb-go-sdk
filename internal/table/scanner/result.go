@@ -149,6 +149,7 @@ func NewUnary(sets []*Ydb.ResultSet, stats *Ydb_TableStats.QueryStats, opts ...o
 
 func (r *baseResult) Reset(set *Ydb.ResultSet, columnNames ...string) {
 	r.reset(set)
+
 	if set != nil {
 		r.setColumnIndexes(columnNames)
 	}
@@ -158,6 +159,7 @@ func (r *unaryResult) NextResultSetErr(ctx context.Context, columns ...string) (
 	if r.isClosed() {
 		return xerrors.WithStackTrace(errAlreadyClosed)
 	}
+
 	if !r.HasNextResultSet() {
 		return io.EOF
 	}
@@ -185,6 +187,7 @@ func (r *streamResult) nextResultSetErr(ctx context.Context, columns ...string) 
 	if err != nil {
 
 		r.Reset(nil)
+
 		if xerrors.Is(err, io.EOF) {
 			return err
 		}
@@ -211,6 +214,7 @@ func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) 
 	if err = r.Err(); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
+
 	if err := r.nextResultSetErr(ctx, columns...); err != nil {
 		if xerrors.Is(err, io.EOF) {
 			return io.EOF

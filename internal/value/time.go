@@ -63,11 +63,15 @@ func TzDateToTime(s string) (t time.Time, err error) {
 	if len(ss) != 2 {
 		return t, xerrors.WithStackTrace(fmt.Errorf("not found timezone location in '%s'", s))
 	}
+
 	location, err := time.LoadLocation(ss[1])
+
 	if err != nil {
 		return t, xerrors.WithStackTrace(err)
 	}
+
 	t, err = time.ParseInLocation(LayoutDate, ss[0], location)
+
 	if err != nil {
 		return t, xerrors.WithStackTrace(fmt.Errorf("parse '%s' failed: %w", s, err))
 	}
@@ -80,11 +84,14 @@ func TzDatetimeToTime(s string) (t time.Time, err error) {
 	if len(ss) != 2 {
 		return t, xerrors.WithStackTrace(fmt.Errorf("not found timezone location in '%s'", s))
 	}
+
 	location, err := time.LoadLocation(ss[1])
 	if err != nil {
 		return t, xerrors.WithStackTrace(err)
 	}
+
 	t, err = time.ParseInLocation(LayoutTzDatetime, ss[0], location)
+
 	if err != nil {
 		return t, xerrors.WithStackTrace(fmt.Errorf("parse '%s' failed: %w", s, err))
 	}
@@ -97,15 +104,20 @@ func TzTimestampToTime(s string) (t time.Time, err error) {
 	if len(ss) != 2 {
 		return t, xerrors.WithStackTrace(fmt.Errorf("not found timezone location in '%s'", s))
 	}
+
 	location, err := time.LoadLocation(ss[1])
 	if err != nil {
 		return t, xerrors.WithStackTrace(err)
 	}
+
 	layout := LayoutTzTimestamp
+
 	if strings.IndexByte(ss[0], '.') < 0 {
 		layout = LayoutTzDatetime
 	}
+
 	t, err = time.ParseInLocation(layout, ss[0], location)
+
 	if err != nil {
 		return t, xerrors.WithStackTrace(fmt.Errorf("parse '%s' failed: %w", s, err))
 	}

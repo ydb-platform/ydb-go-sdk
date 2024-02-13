@@ -71,6 +71,7 @@ func (l *defaultLogger) format(namespace []string, msg string, logLevel Level) s
 	}
 
 	b.WriteString(" '")
+
 	for i, name := range namespace {
 		if i != 0 {
 			b.WriteByte('.')
@@ -110,6 +111,7 @@ func wrapLogger(l Logger, opts ...Option) *wrapper {
 	ll := &wrapper{
 		logger: l,
 	}
+
 	for _, o := range opts {
 		if o != nil {
 			o.applyHolderOption(ll)

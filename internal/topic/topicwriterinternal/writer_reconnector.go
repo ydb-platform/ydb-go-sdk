@@ -406,6 +406,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 					return
 				case <-w.clock.After(delay):
 					// pass
+
 				}
 			} else {
 				_ = w.close(ctx, reconnectReason)
@@ -687,6 +688,7 @@ func createRawMessageData(
 		res.Partitioning.MessageGroupID = mess.futurePartitioning.messageGroupID
 	default:
 		// pass
+
 	}
 
 	res.UncompressedSize = int64(mess.BufUncompressedSize)

@@ -137,6 +137,7 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 	close(p.done)
 
 	var conns []closer.Closer
+
 	p.mtx.WithRLock(func() {
 		conns = make([]closer.Closer, 0, len(p.conns))
 		for _, c := range p.conns {
@@ -150,9 +151,12 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 	)
 
 	wg.Add(len(conns))
+
 	for _, c := range conns {
 		go func(c closer.Closer) {
+
 			defer wg.Done()
+
 			if err := c.Close(ctx); err != nil {
 				errCh <- err
 			}
@@ -177,6 +181,7 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 func (p *Pool) connParker(ctx context.Context, ttl, interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
+
 	for {
 		select {
 		case <-p.done:
@@ -200,6 +205,7 @@ func (p *Pool) collectConns() []*conn {
 	p.mtx.RLock()
 	defer p.mtx.RUnlock()
 	conns := make([]*conn, 0, len(p.conns))
+
 	for _, c := range p.conns {
 		conns = append(conns, c)
 	}

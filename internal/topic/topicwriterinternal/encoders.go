@@ -208,6 +208,7 @@ func (s *EncoderSelector) measureCodecs(messages []messageWithDataContent) (rawt
 			if err != nil {
 				return codecUnknown, err
 			}
+
 			size += len(content)
 		}
 
@@ -258,6 +259,7 @@ func cacheMessages(messages []messageWithDataContent, codec rawtopiccommon.Codec
 		for task := range tasks {
 
 			var localErr error
+
 			resErrMutex.WithLock(func() {
 				localErr = resErr
 			})
@@ -265,6 +267,7 @@ func cacheMessages(messages []messageWithDataContent, codec rawtopiccommon.Codec
 			if localErr != nil {
 				return
 			}
+
 			localErr = task.CacheMessageData(codec)
 
 			if localErr != nil {

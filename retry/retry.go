@@ -237,6 +237,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 		fastBackoff: backoff.Fast,
 		slowBackoff: backoff.Slow,
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyRetryOption(options)
@@ -262,6 +263,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 			options.label, options.call, options.label, options.idempotent, xcontext.IsNestedCall(ctx),
 		)
 	)
+
 	defer func() {
 		onIntermediate(finalErr)(attempts, finalErr)
 	}()

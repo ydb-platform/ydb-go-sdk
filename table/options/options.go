@@ -127,6 +127,7 @@ func (a attribute) ApplyAlterTableOption(d *AlterTableDesc, _ *allocator.Allocat
 	if d.AlterAttributes == nil {
 		d.AlterAttributes = make(map[string]string)
 	}
+
 	d.AlterAttributes[a.key] = a.value
 }
 
@@ -134,6 +135,7 @@ func (a attribute) ApplyCreateTableOption(d *CreateTableDesc, _ *allocator.Alloc
 	if d.Attributes == nil {
 		d.Attributes = make(map[string]string)
 	}
+
 	d.Attributes[a.key] = a.value
 }
 
@@ -163,6 +165,7 @@ func (i index) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) 
 	for _, opt := range i.opts {
 		opt.ApplyIndexOption((*indexDesc)(x))
 	}
+
 	d.AddIndexes = append(d.AddIndexes, x)
 }
 
@@ -173,6 +176,7 @@ func (i index) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator
 	for _, opt := range i.opts {
 		opt.ApplyIndexOption((*indexDesc)(x))
 	}
+
 	d.Indexes = append(d.Indexes, x)
 }
 
@@ -311,6 +315,7 @@ func (e explicitPartitions) ApplyCreateTableOption(d *CreateTableDesc, a *alloca
 	for i := range values {
 		values[i] = value.ToYDB(e[i], a)
 	}
+
 	d.Partitions = &Ydb_Table.CreateTableRequest_PartitionAtKeys{
 		PartitionAtKeys: &Ydb_Table.ExplicitPartitions{
 			SplitPoints: values,
@@ -330,6 +335,7 @@ func (opts profileOption) ApplyCreateTableOption(d *CreateTableDesc, a *allocato
 	if d.Profile == nil {
 		d.Profile = new(Ydb_Table.TableProfile)
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyProfileOption((*profile)(d.Profile), a)
@@ -357,6 +363,7 @@ func (opts storagePolicyProfileOption) ApplyProfileOption(p *profile, a *allocat
 	if p.StoragePolicy == nil {
 		p.StoragePolicy = new(Ydb_Table.StoragePolicy)
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt((*storagePolicy)(p.StoragePolicy))
@@ -374,6 +381,7 @@ func (opts compactionPolicyProfileOption) ApplyProfileOption(p *profile, a *allo
 	if p.CompactionPolicy == nil {
 		p.CompactionPolicy = new(Ydb_Table.CompactionPolicy)
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt((*compactionPolicy)(p.CompactionPolicy))
@@ -391,6 +399,7 @@ func (opts partitioningPolicyProfileOption) ApplyProfileOption(p *profile, a *al
 	if p.PartitioningPolicy == nil {
 		p.PartitioningPolicy = new(Ydb_Table.PartitioningPolicy)
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt((*partitioningPolicy)(p.PartitioningPolicy), a)
@@ -408,6 +417,7 @@ func (opts executionPolicyProfileOption) ApplyProfileOption(p *profile, a *alloc
 	if p.ExecutionPolicy == nil {
 		p.ExecutionPolicy = new(Ydb_Table.ExecutionPolicy)
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt((*executionPolicy)(p.ExecutionPolicy))
@@ -425,6 +435,7 @@ func (opts replicationPolicyProfileOption) ApplyProfileOption(p *profile, a *all
 	if p.ReplicationPolicy == nil {
 		p.ReplicationPolicy = new(Ydb_Table.ReplicationPolicy)
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt((*replicationPolicy)(p.ReplicationPolicy))
@@ -442,6 +453,7 @@ func (opts cachingPolicyProfileOption) ApplyProfileOption(p *profile, a *allocat
 	if p.CachingPolicy == nil {
 		p.CachingPolicy = new(Ydb_Table.CachingPolicy)
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt((*cachingPolicy)(p.CachingPolicy))
@@ -530,6 +542,7 @@ func WithPartitioningPolicyExplicitPartitions(splitPoints ...types.Value) Partit
 		for i := range values {
 			values[i] = value.ToYDB(splitPoints[i], a)
 		}
+
 		p.Partitions = &Ydb_Table.PartitioningPolicy_ExplicitPartitions{
 			ExplicitPartitions: &Ydb_Table.ExplicitPartitions{
 				SplitPoints: values,
@@ -592,11 +605,13 @@ type partitioningSettings []PartitioningSettingsOption
 
 func (opts partitioningSettings) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
 	settings := &ydbPartitioningSettings{}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyPartitioningSettingsOption(settings)
 		}
 	}
+
 	d.PartitioningSettings = (*Ydb_Table.PartitioningSettings)(settings)
 }
 
@@ -1090,11 +1105,13 @@ func (b readSnapshotOption) ApplyReadTableOption(desc *ReadTableDesc, a *allocat
 
 func (x readKeyRangeOption) ApplyReadTableOption(desc *ReadTableDesc, a *allocator.Allocator) {
 	desc.initKeyRange()
+
 	if x.From != nil {
 		desc.KeyRange.FromBound = &Ydb_Table.KeyRange_GreaterOrEqual{
 			GreaterOrEqual: value.ToYDB(x.From, a),
 		}
 	}
+
 	if x.To != nil {
 		desc.KeyRange.ToBound = &Ydb_Table.KeyRange_Less{
 			Less: value.ToYDB(x.To, a),

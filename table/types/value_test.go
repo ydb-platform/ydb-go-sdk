@@ -495,6 +495,7 @@ func TestCastNumbers(t *testing.T) {
 			len:         8,
 		},
 	}
+
 	for _, dst := range numberDestinations {
 		t.Run(reflect.ValueOf(dst.destination).Type().Elem().String(), func(t *testing.T) {
 			for _, src := range numberValues {

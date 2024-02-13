@@ -53,6 +53,7 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 			if mode == UnknownQueryMode {
 				return nil, nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
 			}
+
 			connectorOpts = append(connectorOpts, WithFakeTx(mode))
 		}
 	}
@@ -76,6 +77,7 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 					if err != nil {
 						return nil, nil, xerrors.WithStackTrace(err)
 					}
+
 					binders = append(binders, WithTablePathPrefix(prefix))
 				} else {
 					return nil, nil, xerrors.WithStackTrace(
@@ -84,6 +86,7 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 				}
 			}
 		}
+
 		connectorOpts = append(connectorOpts, binders...)
 	}
 
