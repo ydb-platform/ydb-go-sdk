@@ -198,7 +198,6 @@ func (c *committer) waitSendTrigger(ctx context.Context) {
 			return
 		case <-c.commitLoopSignal:
 			// check count on next loop iteration
-
 		}
 	}
 }

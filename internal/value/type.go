@@ -575,10 +575,12 @@ func (v *StructType) Yql() string {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString("'" + v.fields[i].Name + "'")
 		buffer.WriteByte(':')
 		buffer.WriteString(v.fields[i].T.Yql())
 	}
+
 	buffer.WriteByte('>')
 
 	return buffer.String()
@@ -597,8 +599,8 @@ func (v *StructType) equalsTo(rhs Type) bool {
 	for i := range v.fields {
 		if v.fields[i].Name != vv.fields[i].Name {
 			return false
-
 		}
+
 		if !v.fields[i].T.equalsTo(vv.fields[i].T) {
 			return false
 		}
@@ -664,8 +666,10 @@ func (v *TupleType) Yql() string {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString(t.Yql())
 	}
+
 	buffer.WriteByte('>')
 
 	return buffer.String()
@@ -730,10 +734,12 @@ func (v *variantStructType) Yql() string {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString("'" + v.fields[i].Name + "'")
 		buffer.WriteByte(':')
 		buffer.WriteString(v.fields[i].T.Yql())
 	}
+
 	buffer.WriteByte('>')
 
 	return buffer.String()
@@ -786,8 +792,10 @@ func (v *variantTupleType) Yql() string {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString(t.Yql())
 	}
+
 	buffer.WriteByte('>')
 
 	return buffer.String()

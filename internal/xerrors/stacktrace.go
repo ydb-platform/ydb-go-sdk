@@ -23,12 +23,15 @@ func WithStackTrace(err error, opts ...withStackTraceOption) error {
 	if err == nil {
 		return nil
 	}
+
 	options := withStackTraceOptions{}
+
 	for _, o := range opts {
 		if o != nil {
 			o(&options)
 		}
 	}
+
 	if s, has := grpcStatus.FromError(err); has {
 		return &stackTransportError{
 			stackError: stackError{

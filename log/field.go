@@ -362,6 +362,7 @@ func (ee endpoints) String() string {
 	b := xstring.Buffer()
 	defer b.Free()
 	b.WriteByte('[')
+
 	for i, e := range ee {
 		if i != 0 {
 			b.WriteByte(',')

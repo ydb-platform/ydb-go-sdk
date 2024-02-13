@@ -259,6 +259,7 @@ func TestRecord(t *testing.T) {
 
 func BenchmarkCall(b *testing.B) {
 	b.ReportAllocs()
+
 	for i := 0; i < b.N; i++ {
 		_ = Call(0)
 	}
@@ -266,6 +267,7 @@ func BenchmarkCall(b *testing.B) {
 
 func BenchmarkRecord(b *testing.B) {
 	b.ReportAllocs()
+
 	for i := 0; i < b.N; i++ {
 		_ = Record(0)
 	}
@@ -273,6 +275,7 @@ func BenchmarkRecord(b *testing.B) {
 
 func BenchmarkCallRecord(b *testing.B) {
 	b.ReportAllocs()
+
 	for i := 0; i < b.N; i++ {
 		_ = Call(0).Record()
 	}
@@ -280,6 +283,7 @@ func BenchmarkCallRecord(b *testing.B) {
 
 func BenchmarkCallFuncionID(b *testing.B) {
 	b.ReportAllocs()
+
 	for i := 0; i < b.N; i++ {
 		_ = Call(0).FunctionID()
 	}

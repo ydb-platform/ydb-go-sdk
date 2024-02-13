@@ -183,6 +183,7 @@ func (d *MessageData) ToProto() (*Ydb_Topic.StreamWriteMessage_WriteRequest_Mess
 		UncompressedSize: d.UncompressedSize,
 	}
 	err := d.Partitioning.setToProtoMessage(res)
+
 	if err != nil {
 		return nil, err
 	}
@@ -210,12 +211,15 @@ func (r *WriteResult) fromProto(response *Ydb_Topic.StreamWriteMessage_WriteResp
 	if response == nil {
 		return xerrors.WithStackTrace(errWriteResultProtoIsNil)
 	}
+
 	r.Acks = make([]WriteAck, len(response.Acks))
+
 	for i := range response.Acks {
 		if err := r.Acks[i].fromProto(response.Acks[i]); err != nil {
 			return err
 		}
 	}
+
 	r.PartitionID = response.PartitionId
 
 	return r.WriteStatistics.fromProto(response.WriteStatistics)
@@ -230,6 +234,7 @@ func (wa *WriteAck) fromProto(pb *Ydb_Topic.StreamWriteMessage_WriteResponse_Wri
 	if pb == nil {
 		return xerrors.WithStackTrace(errWriteResultResponseWriteAckIsNil)
 	}
+
 	wa.SeqNo = pb.SeqNo
 
 	return wa.MessageWriteStatus.fromProto(pb.MessageWriteStatus)

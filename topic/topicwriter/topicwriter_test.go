@@ -3,12 +3,11 @@ package topicwriter_test
 import (
 	"context"
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 	"log"
 	"os"
 	"strings"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
 func ExampleWriter_Write() {

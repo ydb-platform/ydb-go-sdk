@@ -243,9 +243,11 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 			opt.ApplyRetryOption(options)
 		}
 	}
+
 	if options.idempotent {
 		ctx = xcontext.WithIdempotent(ctx, options.idempotent)
 	}
+
 	defer func() {
 		if finalErr != nil && options.stackTrace {
 			finalErr = xerrors.WithStackTrace(finalErr,
@@ -267,6 +269,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 	defer func() {
 		onIntermediate(finalErr)(attempts, finalErr)
 	}()
+
 	for {
 		i++
 		attempts++

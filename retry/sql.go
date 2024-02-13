@@ -61,6 +61,7 @@ func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Co
 			opt.ApplyDoOption(&options)
 		}
 	}
+
 	err := Retry(ctx, func(ctx context.Context) error {
 		attempts++
 		cc, err := db.Conn(ctx)
@@ -148,11 +149,13 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 		copy(options.retryOptions[1:], options.retryOptions)
 		options.retryOptions[0] = WithTrace(tracer.TraceRetry())
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyDoTxOption(&options)
 		}
 	}
+
 	err := Retry(ctx, func(ctx context.Context) (finalErr error) {
 		attempts++
 		tx, err := db.BeginTx(ctx, options.txOptions)

@@ -220,7 +220,6 @@ func (b *batcher) notifyAboutNewMessages() {
 		// sent signal
 	default:
 		// signal already in progress
-
 	}
 }
 

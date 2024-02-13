@@ -100,6 +100,7 @@ func Operation(opts ...oeOpt) error {
 	oe := &operationError{
 		code: Ydb.StatusIds_STATUS_CODE_UNSPECIFIED,
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt.applyToOperationError(oe)
@@ -118,14 +119,17 @@ func (e *operationError) Error() string {
 	defer b.Free()
 	b.WriteString(e.Name())
 	fmt.Fprintf(b, " (code = %d", e.code)
+
 	if len(e.address) > 0 {
 		b.WriteString(", address = ")
 		b.WriteString(e.address)
 	}
+
 	if len(e.issues) > 0 {
 		b.WriteString(", issues = ")
 		b.WriteString(e.issues.String())
 	}
+
 	b.WriteString(")")
 
 	return b.String()
@@ -137,9 +141,11 @@ func IsOperationError(err error, codes ...Ydb.StatusIds_StatusCode) bool {
 	if !errors.As(err, &op) {
 		return false
 	}
+
 	if len(codes) == 0 {
 		return true
 	}
+
 	for _, code := range codes {
 		if op.code == code {
 			return true

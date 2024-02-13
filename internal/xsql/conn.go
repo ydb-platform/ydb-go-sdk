@@ -807,6 +807,7 @@ func (c *conn) getTables(ctx context.Context, absPath string, recursive, exclude
 				if err != nil {
 					return nil, xerrors.WithStackTrace(err)
 				}
+
 				tables = append(tables, childTables...)
 			}
 		}

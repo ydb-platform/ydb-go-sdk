@@ -31,6 +31,7 @@ func (c isDirectoryExistsSchemeClient) ListDirectory(ctx context.Context, path s
 			},
 		}, nil
 	}
+
 	if strings.HasPrefix(c.existingPath, path) {
 		children := strings.Split(strings.TrimLeft(c.existingPath, path), "/")
 
@@ -139,6 +140,7 @@ func (c isTableExistsSchemeClient) ListDirectory(ctx context.Context, path strin
 ) {
 	if strings.HasPrefix(c.tablePath, path) {
 		children := strings.Split(strings.TrimLeft(c.tablePath, path), "/")
+
 		switch {
 		case len(children) == 1:
 			return scheme.Directory{

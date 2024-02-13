@@ -263,7 +263,6 @@ func (r *topicStreamReaderImpl) consumeRawMessageFromBuffer(ctx context.Context)
 			return
 		case msg = <-r.rawMessagesFromBuffer:
 			// pass
-
 		}
 
 		switch m := msg.(type) {

@@ -49,14 +49,18 @@ func WithAddress(address string) addressOption {
 
 func (e *transportError) Error() string {
 	var b bytes.Buffer
+
 	b.WriteString(e.Name())
 	b.WriteString(fmt.Sprintf(" (code = %d, source error = %q", e.status.Code(), e.err.Error()))
+
 	if len(e.address) > 0 {
 		b.WriteString(fmt.Sprintf(", address: %q", e.address))
 	}
+
 	if len(e.traceID) > 0 {
 		b.WriteString(fmt.Sprintf(", traceID: %q", e.traceID))
 	}
+
 	b.WriteString(")")
 
 	return b.String()
@@ -115,15 +119,18 @@ func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 		return false
 	}
 	var status *grpcStatus.Status
+
 	if t := (*transportError)(nil); errors.As(err, &t) {
 		status = t.status
 	} else if t, has := grpcStatus.FromError(err); has {
 		status = t
 	}
+
 	if status != nil {
 		if len(codes) == 0 {
 			return true
 		}
+
 		for _, code := range codes {
 			if status.Code() == code {
 				return true
@@ -140,9 +147,11 @@ func Transport(err error, opts ...teOpt) error {
 		return nil
 	}
 	var te *transportError
+
 	if errors.As(err, &te) {
 		return err
 	}
+
 	if s, ok := grpcStatus.FromError(err); ok {
 		te = &transportError{
 			status: s,
@@ -154,6 +163,7 @@ func Transport(err error, opts ...teOpt) error {
 			err:    err,
 		}
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt.applyToTransportError(te)
@@ -189,9 +199,11 @@ func TransportError(err error) Error {
 		return nil
 	}
 	var t *transportError
+
 	if errors.As(err, &t) {
 		return t
 	}
+
 	if s, ok := grpcStatus.FromError(err); ok {
 		return &transportError{
 			status: s,

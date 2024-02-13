@@ -123,7 +123,6 @@ func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessa
 			return nil, err
 		default:
 			// pass
-
 		}
 
 		res, err := stream.ReadMessageBatch(ctx, opts)
@@ -357,7 +356,6 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 	case res = <-result:
 
 		// pass
-
 	}
 
 	if res.err == nil {

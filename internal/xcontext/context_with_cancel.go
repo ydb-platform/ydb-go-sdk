@@ -64,5 +64,6 @@ func (ctx *cancelCtx) cancel() {
 
 		return
 	}
+
 	ctx.err = errAt(context.Canceled, 1)
 }

@@ -21,6 +21,7 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
+
 	opts = append(opts, info.Options...)
 
 	if token := info.Params.Get("token"); token != "" {
@@ -38,6 +39,7 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 		if mode == UnknownQueryMode {
 			return nil, nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
 		}
+
 		connectorOpts = append(connectorOpts, WithDefaultQueryMode(mode))
 	} else if queryMode := info.Params.Get("query_mode"); queryMode != "" {
 		mode := QueryModeFromString(queryMode)

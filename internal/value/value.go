@@ -548,10 +548,12 @@ func (v *dictValue) Yql() string {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString(v.values[i].K.Yql())
 		buffer.WriteByte(':')
 		buffer.WriteString(v.values[i].V.Yql())
 	}
+
 	buffer.WriteByte('}')
 
 	return buffer.String()
@@ -997,6 +999,7 @@ func (v intervalValue) Yql() string {
 
 		d = -d
 	}
+
 	buffer.WriteByte('P')
 
 	if days := d / time.Hour / 24; days > 0 {
@@ -1026,6 +1029,7 @@ func (v intervalValue) Yql() string {
 		fmt.Fprintf(buffer, "%0.6f", seconds)
 		buffer.WriteByte('S')
 	}
+
 	buffer.WriteByte('"')
 	buffer.WriteByte(')')
 
@@ -1155,8 +1159,10 @@ func (v *listValue) Yql() string {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString(item.Yql())
 	}
+
 	buffer.WriteByte(']')
 
 	return buffer.String()
@@ -1215,8 +1221,10 @@ func (v *setValue) Yql() string {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString(item.Yql())
 	}
+
 	buffer.WriteByte('}')
 
 	return buffer.String()
@@ -1353,9 +1361,11 @@ func (v *structValue) Yql() string {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString("`" + v.fields[i].Name + "`:")
 		buffer.WriteString(v.fields[i].V.Yql())
 	}
+
 	buffer.WriteString("|>")
 
 	return buffer.String()
@@ -1461,8 +1471,10 @@ func (v *tupleValue) Yql() string {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString(item.Yql())
 	}
+
 	buffer.WriteByte(')')
 
 	return buffer.String()

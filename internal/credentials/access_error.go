@@ -74,6 +74,7 @@ type credentialsUnauthenticatedErrorOption struct {
 
 func (opt credentialsUnauthenticatedErrorOption) applyAuthErrorOption(w io.Writer) {
 	fmt.Fprint(w, "credentials:")
+
 	if stringer, has := opt.credentials.(fmt.Stringer); has {
 		fmt.Fprintf(w, "%q", stringer.String())
 	} else {
@@ -93,12 +94,15 @@ func AccessError(msg string, err error, opts ...authErrorOption) error {
 	defer buffer.Free()
 	buffer.WriteString(msg)
 	buffer.WriteString(" (")
+
 	for i, opt := range opts {
 		if i != 0 {
 			buffer.WriteString(",")
 		}
+
 		opt.applyAuthErrorOption(buffer)
 	}
+
 	buffer.WriteString("): %w")
 
 	return xerrors.WithStackTrace(fmt.Errorf(buffer.String(), err), xerrors.WithSkipDepth(1))
@@ -111,6 +115,7 @@ func IsAccessError(err error) bool {
 	) {
 		return true
 	}
+
 	if xerrors.IsOperationError(err,
 		Ydb.StatusIds_UNAUTHORIZED,
 	) {

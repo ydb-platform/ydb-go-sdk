@@ -126,13 +126,13 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 		if c == '.' {
 			if dot {
 				return nil, syntaxError(s)
-
 			}
+
 			dot = true
 
 			continue
-
 		}
+
 		if dot {
 			if scale > 0 {
 				scale--
@@ -178,6 +178,7 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 
 					return nil, syntaxError(s)
 				}
+
 				plus = c != '0'
 			}
 		}
@@ -185,6 +186,7 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 		if plus {
 
 			v.Add(v, one)
+
 			if v.Cmp(pow(ten, precision)) >= 0 {
 				v.Set(inf)
 			}
@@ -250,13 +252,16 @@ func Format(x *big.Int, precision, scale uint32) string {
 
 			const numbers = "0123456789"
 			pos--
-			bts[pos] = numbers[d]
 
+			bts[pos] = numbers[d]
 		}
+
 		if scale > 0 {
 			scale--
 			if scale == 0 && pos > 0 {
+
 				pos--
+
 				bts[pos] = '.'
 			}
 		}
@@ -270,22 +275,26 @@ func Format(x *big.Int, precision, scale uint32) string {
 			precision--
 
 			pos--
+
 			bts[pos] = '0'
 		}
 
 		pos--
+
 		bts[pos] = '.'
 	}
 
 	if bts[pos] == '.' {
 
 		pos--
+
 		bts[pos] = '0'
 	}
 
 	if neg {
 
 		pos--
+
 		bts[pos] = '-'
 	}
 
@@ -322,6 +331,7 @@ func put(x *big.Int, p []byte) {
 		for j := 0; j < wordSize; j++ {
 
 			i--
+
 			p[i] = byte(d)
 			d >>= 8
 		}
@@ -335,6 +345,7 @@ func put(x *big.Int, p []byte) {
 	for 0 < i && i < len(p) {
 
 		i--
+
 		p[i] = pad
 	}
 }
@@ -389,10 +400,10 @@ func pow(x *big.Int, n uint32) *big.Int {
 	for n > 0 {
 		if n&1 != 0 {
 			v.Mul(v, m)
-
 		}
 
 		n >>= 1
+
 		m.Mul(m, m)
 	}
 

@@ -54,6 +54,7 @@ func HideEOF(err error) error {
 	if err == nil {
 		return nil
 	}
+
 	if errors.Is(err, io.EOF) {
 		return nil
 	}
@@ -67,9 +68,11 @@ func As(err error, targets ...interface{}) bool {
 	if err == nil {
 		panic("nil err")
 	}
+
 	if len(targets) == 0 {
 		panic("empty targets")
 	}
+
 	for _, t := range targets {
 		if errors.As(err, t) {
 			return true
@@ -85,6 +88,7 @@ func Is(err error, targets ...error) bool {
 	if len(targets) == 0 {
 		panic("empty targets")
 	}
+
 	for _, target := range targets {
 		if errors.Is(err, target) {
 			return true

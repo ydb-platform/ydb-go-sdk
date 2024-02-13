@@ -18,6 +18,7 @@ type Operation struct {
 func (o *Operation) FromProto(proto *Ydb_Operations.Operation) error {
 	o.ID = proto.GetId()
 	o.Ready = proto.GetReady()
+
 	if err := o.Status.FromProto(proto.GetStatus()); err != nil {
 		return err
 	}

@@ -78,5 +78,6 @@ func (ctx *timeoutCtx) cancel() {
 
 		return
 	}
+
 	ctx.err = errAt(context.Canceled, 1)
 }

@@ -320,7 +320,6 @@ func (q *messageQueue) Wait(ctx context.Context, waiter MessageQueueAckWaiter) e
 			return q.closedErr
 		case <-ackReceived.Done():
 			// pass next iteration
-
 		}
 	}
 }

@@ -172,7 +172,6 @@ func (s *scanner) Scan(values ...indexed.RequiredOrOptional) (err error) {
 			}
 		} else {
 			if err = s.seekItemByID(s.columnIndexes[i]); err != nil {
-
 				return
 			}
 
@@ -843,6 +842,7 @@ func (s *scanner) trySetByteArray(v interface{}, optional, def bool) bool {
 
 		return true
 	}
+
 	var dst []byte
 
 	s.setByte(&dst)
@@ -1108,6 +1108,7 @@ func (s *scanner) scanOptional(v interface{}, defaultValueForOptional bool) {
 		}
 	case json.Unmarshaler:
 		s.unwrap()
+
 		var err error
 
 		switch s.getType() {

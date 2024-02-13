@@ -53,6 +53,7 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 	if err = meta.MetaFromStatusAndIssues(grpcMsg); err != nil {
 		return nil, err
 	}
+
 	if !meta.Status.IsSuccess() {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: bad status from topic server: %v", meta.Status))
 	}
@@ -68,6 +69,7 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 		var res WriteResult
 		res.ServerMessageMetadata = meta
 		err = res.fromProto(v.WriteResponse)
+
 		if err != nil {
 			return nil, err
 		}
@@ -75,6 +77,7 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 		return &res, nil
 	case *Ydb_Topic.StreamWriteMessage_FromServer_UpdateTokenResponse:
 		var res UpdateTokenResponse
+
 		res.MustFromProto(v.UpdateTokenResponse)
 
 		return &res, nil
@@ -90,16 +93,19 @@ func (w *StreamWriter) Send(rawMsg ClientMessage) (err error) {
 	w.sendCloseMtx.Lock()
 	defer func() {
 		w.sendCloseMtx.Unlock()
+
 		err = xerrors.Transport(err)
 	}()
 
 	var protoMsg Ydb_Topic.StreamWriteMessage_FromClient
+
 	switch v := rawMsg.(type) {
 	case *InitRequest:
 		initReqProto, initErr := v.toProto()
 		if initErr != nil {
 			return initErr
 		}
+
 		protoMsg.ClientMessage = &Ydb_Topic.StreamWriteMessage_FromClient_InitRequest{
 			InitRequest: initReqProto,
 		}
@@ -177,12 +183,14 @@ func sendWriteRequest(send sendFunc, req *Ydb_Topic.StreamWriteMessage_FromClien
 
 	splitIndex := len(grpcMessages) / 2
 	firstMessages, lastMessages := grpcMessages[:splitIndex], grpcMessages[splitIndex:]
+
 	defer func() {
 		req.WriteRequest.Messages = grpcMessages
 	}()
 
 	req.WriteRequest.Messages = firstMessages
 	err := sendWriteRequest(send, req)
+
 	if err != nil {
 		return err
 	}

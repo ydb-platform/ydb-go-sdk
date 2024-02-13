@@ -420,6 +420,7 @@ func (kr KeyRange) String() string {
 	} else {
 		buf.WriteString(kr.From.Yql())
 	}
+
 	buf.WriteString(",")
 
 	if kr.To == nil {
@@ -427,6 +428,7 @@ func (kr KeyRange) String() string {
 	} else {
 		buf.WriteString(kr.To.Yql())
 	}
+
 	buf.WriteString("]")
 
 	return buf.String()

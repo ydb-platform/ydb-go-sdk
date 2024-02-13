@@ -40,6 +40,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 	if err = meta.MetaFromStatusAndIssues(grpcMess); err != nil {
 		return nil, err
 	}
+
 	if !meta.Status.IsSuccess() {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: bad status from topic server: %v", meta.Status))
 	}
@@ -54,6 +55,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 	case *Ydb_Topic.StreamReadMessage_FromServer_ReadResponse:
 		resp := &ReadResponse{}
 		resp.ServerMessageMetadata = meta
+
 		if err = resp.fromProto(m.ReadResponse); err != nil {
 			return nil, err
 		}
@@ -62,6 +64,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 	case *Ydb_Topic.StreamReadMessage_FromServer_StartPartitionSessionRequest:
 		resp := &StartPartitionSessionRequest{}
 		resp.ServerMessageMetadata = meta
+
 		if err = resp.fromProto(m.StartPartitionSessionRequest); err != nil {
 			return nil, err
 		}
@@ -70,6 +73,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 	case *Ydb_Topic.StreamReadMessage_FromServer_StopPartitionSessionRequest:
 		req := &StopPartitionSessionRequest{}
 		req.ServerMessageMetadata = meta
+
 		if err = req.fromProto(m.StopPartitionSessionRequest); err != nil {
 			return nil, err
 		}
@@ -78,6 +82,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 	case *Ydb_Topic.StreamReadMessage_FromServer_CommitOffsetResponse:
 		resp := &CommitOffsetResponse{}
 		resp.ServerMessageMetadata = meta
+
 		if err = resp.fromProto(m.CommitOffsetResponse); err != nil {
 			return nil, err
 		}
@@ -86,6 +91,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 	case *Ydb_Topic.StreamReadMessage_FromServer_PartitionSessionStatusResponse:
 		resp := &PartitionSessionStatusResponse{}
 		resp.ServerMessageMetadata = meta
+
 		if err = resp.fromProto(m.PartitionSessionStatusResponse); err != nil {
 			return nil, err
 		}
@@ -110,6 +116,7 @@ func (s StreamReader) Send(msg ClientMessage) (err error) {
 	defer func() {
 		err = xerrors.Transport(err)
 	}()
+
 	switch m := msg.(type) {
 	case *InitRequest:
 		grpcMess := &Ydb_Topic.StreamReadMessage_FromClient{

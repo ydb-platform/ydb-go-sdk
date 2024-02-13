@@ -114,12 +114,14 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "conn", "prepare", "stmt")
 		l.Log(ctx, "start",
 			appendFieldByCondition(l.logQuery,
 				String("query", info.Query),
 			)...,
 		)
+
 		query := info.Query
 		start := time.Now()
 
@@ -144,12 +146,14 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "conn", "exec")
 		l.Log(ctx, "start",
 			appendFieldByCondition(l.logQuery,
 				String("query", info.Query),
 			)...,
 		)
+
 		query := info.Query
 		idempotent := info.Idempotent
 		start := time.Now()
@@ -179,12 +183,14 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "conn", "query")
 		l.Log(ctx, "start",
 			appendFieldByCondition(l.logQuery,
 				String("query", info.Query),
 			)...,
 		)
+
 		query := info.Query
 		idempotent := info.Idempotent
 		start := time.Now()
@@ -214,8 +220,10 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLTxEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "tx", "commit")
 		l.Log(ctx, "start")
+
 		start := time.Now()
 
 		return func(info trace.DatabaseSQLTxCommitDoneInfo) {
@@ -236,8 +244,10 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLTxEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "tx", "rollback")
 		l.Log(ctx, "start")
+
 		start := time.Now()
 
 		return func(info trace.DatabaseSQLTxRollbackDoneInfo) {
@@ -258,8 +268,10 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLStmtEvents == 0 {
 			return nil
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "database", "sql", "stmt", "close")
 		l.Log(ctx, "start")
+
 		start := time.Now()
 
 		return func(info trace.DatabaseSQLStmtCloseDoneInfo) {
@@ -280,12 +292,14 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLStmtEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "stmt", "exec")
 		l.Log(ctx, "start",
 			appendFieldByCondition(l.logQuery,
 				String("query", info.Query),
 			)...,
 		)
+
 		query := info.Query
 		start := time.Now()
 
@@ -311,12 +325,14 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 		if d.Details()&trace.DatabaseSQLStmtEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "stmt", "query")
 		l.Log(ctx, "start",
 			appendFieldByCondition(l.logQuery,
 				String("query", info.Query),
 			)...,
 		)
+
 		query := info.Query
 		start := time.Now()
 

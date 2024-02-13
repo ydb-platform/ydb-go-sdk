@@ -421,6 +421,7 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 			if err = ctx.Err(); err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
+
 			panic("both of session and err are nil")
 		}
 		// got session or err is not recoverable

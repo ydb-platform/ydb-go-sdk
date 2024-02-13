@@ -14,6 +14,7 @@ func AllowByFlag(t testing.TB, flag string) {
 	if os.Getenv(flag) != "" {
 		return
 	}
+
 	if os.Getenv(enableAllTestsFlag) != "" {
 		return
 	}

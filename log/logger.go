@@ -57,6 +57,7 @@ func (l *defaultLogger) format(namespace []string, msg string, logLevel Level) s
 
 	b.WriteString(l.clock.Now().Format(dateLayout))
 	b.WriteByte(' ')
+
 	lvl := logLevel.String()
 
 	if l.coloring {
@@ -125,10 +126,13 @@ func (l *defaultLogger) appendFields(msg string, fields ...Field) string {
 	if len(fields) == 0 {
 		return msg
 	}
+
 	b := xstring.Buffer()
+
 	defer b.Free()
 	b.WriteString(msg)
 	b.WriteString(" {")
+
 	for i := range fields {
 		if i != 0 {
 			b.WriteByte(',')

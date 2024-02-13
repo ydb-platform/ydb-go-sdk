@@ -24,6 +24,7 @@ func internalRetry(l Logger, d trace.Detailer) (t trace.Retry) {
 		if d.Details()&trace.RetryEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "retry")
 		label := info.Label
 		idempotent := info.Idempotent
@@ -31,6 +32,7 @@ func internalRetry(l Logger, d trace.Detailer) (t trace.Retry) {
 			String("label", label),
 			Bool("idempotent", idempotent),
 		)
+
 		start := time.Now()
 
 		return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {

@@ -18,18 +18,23 @@ func (lhs version) Less(rhs version) bool {
 	if lhs.Major < rhs.Major {
 		return true
 	}
+
 	if lhs.Major > rhs.Major {
 		return false
 	}
+
 	if lhs.Minor < rhs.Minor {
 		return true
 	}
+
 	if lhs.Minor > rhs.Minor {
 		return false
 	}
+
 	if lhs.Patch < rhs.Patch {
 		return true
 	}
+
 	if lhs.Patch > rhs.Patch {
 		return false
 	}
@@ -43,7 +48,9 @@ func Lt(lhs, rhs string) bool {
 	if err != nil {
 		return false
 	}
+
 	v2, err := parse(rhs)
+
 	if err != nil {
 		return false
 	}
@@ -57,10 +64,13 @@ func Gte(lhs, rhs string) bool {
 	if err != nil {
 		return false
 	}
+
 	v2, err := parse(rhs)
+
 	if err != nil {
 		return false
 	}
+
 	if v1.Less(v2) {
 		return false
 	}
@@ -73,19 +83,23 @@ func parse(s string) (v version, err error) {
 	if len(ss) == 2 {
 		v.Suffix = ss[1]
 	}
+
 	sss := strings.SplitN(ss[0], ".", 3)
+
 	if len(sss) == 3 {
 		v.Patch, err = strconv.ParseUint(sss[2], 10, 64)
 		if err != nil {
 			return version{}, xerrors.WithStackTrace(err)
 		}
 	}
+
 	if len(sss) >= 2 {
 		v.Minor, err = strconv.ParseUint(sss[1], 10, 64)
 		if err != nil {
 			return version{}, xerrors.WithStackTrace(err)
 		}
 	}
+
 	if len(sss) >= 1 {
 		v.Major, err = strconv.ParseUint(sss[0], 10, 64)
 		if err != nil {

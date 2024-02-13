@@ -54,6 +54,7 @@ func (c *Consumer) ToRaw(raw *rawtopic.Consumer) {
 		raw.ReadFrom.HasValue = true
 		raw.ReadFrom.Value = c.ReadFrom
 	}
+
 	raw.Attributes = c.Attributes
 }
 

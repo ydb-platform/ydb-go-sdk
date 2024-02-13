@@ -115,6 +115,7 @@ func (r *InitRequest) toProto() *Ydb_Topic.StreamReadMessage_InitRequest {
 	}
 
 	p.TopicsReadSettings = make([]*Ydb_Topic.StreamReadMessage_InitRequest_TopicReadSettings, len(r.TopicsReadSettings))
+
 	for topicSettingsIndex := range r.TopicsReadSettings {
 		srcTopicSettings := &r.TopicsReadSettings[topicSettingsIndex]
 		dstTopicSettings := &Ydb_Topic.StreamReadMessage_InitRequest_TopicReadSettings{}
@@ -194,9 +195,13 @@ func (r *ReadResponse) GetBytesSize() int {
 // GetPartitionBatchMessagesCounts implements trace.TopicReaderDataResponseInfo
 func (r *ReadResponse) GetPartitionBatchMessagesCounts() (partitionDataCount, batchCount, messagesCount int) {
 	partitionDataCount = len(r.PartitionData)
+
 	for partitionIndex := range r.PartitionData {
+
 		partitionData := &r.PartitionData[partitionIndex]
+
 		batchCount += len(partitionData.Batches)
+
 		for batchIndex := range partitionData.Batches {
 			messagesCount += len(partitionData.Batches[batchIndex].MessageData)
 		}
@@ -209,14 +214,17 @@ func (r *ReadResponse) fromProto(p *Ydb_Topic.StreamReadMessage_ReadResponse) er
 	if p == nil {
 		return xerrors.WithStackTrace(errUnexpectedNilStreamReadMessageReadResponse)
 	}
+
 	r.BytesSize = int(p.BytesSize)
 
 	r.PartitionData = make([]PartitionData, len(p.PartitionData))
+
 	for partitionIndex := range p.PartitionData {
 		srcPartition := p.PartitionData[partitionIndex]
 		if srcPartition == nil {
 			return xerrors.WithStackTrace(errNilPartitionData)
 		}
+
 		dstPartition := &r.PartitionData[partitionIndex]
 		dstPartition.PartitionSessionID.FromInt64(srcPartition.PartitionSessionId)
 
@@ -227,6 +235,7 @@ func (r *ReadResponse) fromProto(p *Ydb_Topic.StreamReadMessage_ReadResponse) er
 			if srcBatch == nil {
 				return xerrors.WithStackTrace(errUnexpectedNilBatchInPartitionData)
 			}
+
 			dstBatch := &dstPartition.Batches[batchIndex]
 
 			dstBatch.ProducerID = srcBatch.ProducerId
@@ -236,11 +245,13 @@ func (r *ReadResponse) fromProto(p *Ydb_Topic.StreamReadMessage_ReadResponse) er
 			dstBatch.WrittenAt = srcBatch.WrittenAt.AsTime()
 
 			dstBatch.MessageData = make([]MessageData, len(srcBatch.MessageData))
+
 			for messageIndex := range srcBatch.MessageData {
 				srcMessage := srcBatch.MessageData[messageIndex]
 				if srcMessage == nil {
 					return xerrors.WithStackTrace(errUnexpectedMessageNilInPartitionData)
 				}
+
 				dstMessage := &dstBatch.MessageData[messageIndex]
 
 				dstMessage.Offset.FromInt64(srcMessage.Offset)
@@ -249,6 +260,7 @@ func (r *ReadResponse) fromProto(p *Ydb_Topic.StreamReadMessage_ReadResponse) er
 				dstMessage.Data = srcMessage.Data
 				dstMessage.UncompressedSize = srcMessage.UncompressedSize
 				dstMessage.MessageGroupID = srcMessage.MessageGroupId
+
 				if len(srcMessage.MetadataItems) > 0 {
 					dstMessage.MetadataItems = make([]rawtopiccommon.MetadataItem, 0, len(srcMessage.MetadataItems))
 					for _, protoItem := range srcMessage.MetadataItems {
@@ -366,6 +378,7 @@ func (r *CommitOffsetResponse) fromProto(proto *Ydb_Topic.StreamReadMessage_Comm
 		if srcCommitted == nil {
 			return xerrors.WithStackTrace(errors.New("unexpected nil while parse commit offset response"))
 		}
+
 		dstCommitted := &r.PartitionsCommittedOffsets[i]
 
 		dstCommitted.PartitionSessionID.FromInt64(srcCommitted.PartitionSessionId)
@@ -410,9 +423,11 @@ func (r *PartitionSessionStatusResponse) fromProto(
 	p *Ydb_Topic.StreamReadMessage_PartitionSessionStatusResponse,
 ) error {
 	r.PartitionSessionID.FromInt64(p.GetPartitionSessionId())
+
 	if err := r.PartitionOffsets.FromProto(p.GetPartitionOffsets()); err != nil {
 		return err
 	}
+
 	r.WriteTimeHighWatermark = p.GetWriteTimeHighWatermark().AsTime()
 
 	return nil
@@ -440,6 +455,7 @@ func (r *StartPartitionSessionRequest) fromProto(p *Ydb_Topic.StreamReadMessage_
 	if p.PartitionSession == nil {
 		return xerrors.WithStackTrace(errUnexpectedNilPartitionSession)
 	}
+
 	r.PartitionSession.PartitionID = p.PartitionSession.PartitionId
 	r.PartitionSession.Path = p.PartitionSession.Path
 	r.PartitionSession.PartitionSessionID.FromInt64(p.PartitionSession.PartitionSessionId)
@@ -491,6 +507,7 @@ func (r *StopPartitionSessionRequest) fromProto(proto *Ydb_Topic.StreamReadMessa
 	if proto == nil {
 		return xerrors.WithStackTrace(errUnexpectedGrpcNilStopPartitionSessionRequest)
 	}
+
 	r.PartitionSessionID.FromInt64(proto.PartitionSessionId)
 	r.Graceful = proto.Graceful
 	r.CommittedOffset.FromInt64(proto.CommittedOffset)

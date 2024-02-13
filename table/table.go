@@ -368,6 +368,7 @@ func WithOnlineReadOnly(opts ...TxOnlineReadOnlyOption) TxOption {
 				opt(&ro)
 			}
 		}
+
 		d.TxMode = &Ydb_Table.TransactionSettings_OnlineReadOnly{
 			OnlineReadOnly: (*Ydb_Table.OnlineModeSettings)(&ro),
 		}
@@ -484,7 +485,9 @@ func (qp queryParams) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
 	if qp == nil {
 		return nil
 	}
+
 	params := make(map[string]*Ydb.TypedValue, len(qp))
+
 	for k, v := range qp {
 		params[k] = value.ToYDB(v, a)
 	}
@@ -522,7 +525,9 @@ func (q *QueryParameters) names() []string {
 	if q == nil {
 		return nil
 	}
+
 	names := make([]string, 0, len(q.m))
+
 	for k := range q.m {
 		names = append(names, k)
 	}

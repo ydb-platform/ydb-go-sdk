@@ -44,10 +44,12 @@ func (c Anonymous) String() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
 	buffer.WriteString("Anonymous{")
+
 	if c.sourceInfo != "" {
 		buffer.WriteString("From:")
 		fmt.Fprintf(buffer, "%q", c.sourceInfo)
 	}
+
 	buffer.WriteByte('}')
 
 	return buffer.String()

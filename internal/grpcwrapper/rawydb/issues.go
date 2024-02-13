@@ -15,6 +15,7 @@ type Issues []Issue
 func (issuesPointer *Issues) FromProto(p []*Ydb_Issue.IssueMessage) error {
 	*issuesPointer = make(Issues, len(p))
 	issues := *issuesPointer
+
 	for i := range issues {
 		if err := issues[i].FromProto(p[i]); err != nil {
 			return err
@@ -27,6 +28,7 @@ func (issuesPointer *Issues) FromProto(p []*Ydb_Issue.IssueMessage) error {
 func (issuesPointer *Issues) String() string {
 	issues := *issuesPointer
 	issuesStrings := make([]string, len(issues))
+
 	for i := range issues {
 		issuesStrings[i] = issues[i].String()
 	}
@@ -44,6 +46,7 @@ func (issue *Issue) FromProto(p *Ydb_Issue.IssueMessage) error {
 	if p == nil {
 		return xerrors.WithStackTrace(errors.New("receive nil issue message pointer from protobuf"))
 	}
+
 	issue.Code = p.GetIssueCode()
 	issue.Message = p.GetMessage()
 

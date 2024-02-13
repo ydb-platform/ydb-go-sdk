@@ -89,6 +89,7 @@ func (s *session) NodeID() uint32 {
 	if err != nil {
 		return 0
 	}
+
 	s.nodeID.Store(id)
 
 	return id
@@ -98,6 +99,7 @@ func (s *session) Status() table.SessionStatus {
 	if s == nil {
 		return table.SessionStatusUnknown
 	}
+
 	s.statusMtx.RLock()
 	defer s.statusMtx.RUnlock()
 

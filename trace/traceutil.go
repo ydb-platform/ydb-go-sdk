@@ -16,6 +16,7 @@ func ClearContext(x interface{}) interface{} {
 	p := reflect.ValueOf(x).Index(0)
 	t := p.Elem().Type()
 	f, has := t.FieldByName("Context")
+
 	if has && f.Type.Kind() == reflect.Interface {
 		x := reflect.New(t)
 		x.Elem().Set(p.Elem())

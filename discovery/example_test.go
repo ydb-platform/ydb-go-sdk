@@ -3,7 +3,6 @@ package discovery_test
 import (
 	"context"
 	"fmt"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 

@@ -195,6 +195,7 @@ func Params(args ...interface{}) (params []table.ParameterOption, _ error) {
 					if len(args) > 1 {
 						return nil, xerrors.WithStackTrace(errMultipleQueryParameters)
 					}
+
 					xx.Each(func(name string, v types.Value) {
 						params = append(params, table.ValueParam(name, v))
 					})
@@ -232,6 +233,7 @@ func Params(args ...interface{}) (params []table.ParameterOption, _ error) {
 			if len(args) > 1 {
 				return nil, xerrors.WithStackTrace(errMultipleQueryParameters)
 			}
+
 			x.Each(func(name string, v types.Value) {
 				params = append(params, table.ValueParam(name, v))
 			})
@@ -246,6 +248,7 @@ func Params(args ...interface{}) (params []table.ParameterOption, _ error) {
 			params = append(params, param)
 		}
 	}
+
 	sort.Slice(params, func(i, j int) bool {
 		return params[i].Name() < params[j].Name()
 	})

@@ -34,5 +34,6 @@ func CallTrailerCallback(ctx context.Context, md metadata.MD) {
 	if !has {
 		return
 	}
+
 	callback(md)
 }
