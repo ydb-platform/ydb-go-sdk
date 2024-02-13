@@ -1,9 +1,3 @@
-* Added explicit initialization of all fields of the `sqlLexer` structure in `internal/bind/numeric_args.go`, when golangci-lint exhaustruct enabled
-* Added explicit initialization of all fields of the `sqlLexer` structure in `internal/bind/positional_args.go`, when golangci-lint exhaustruct enabled
-* Added explicit initialization of all fields of the `logBackoff` structure in `internal/backoff/backoff.go`, when golangci-lint exhaustruct enabled
-* Added explicit initialization of fields of structures in `internal/allocator/allocator.go`, when golangci-lint exhaustruct enabled
-* Added explicit initialization of all fields of the `endpoint` structure in `internal/endpoint/endpoint.go`, when golangci-lint exhaustruct enabled
-
 * Fixed topic writer infinite reconnections in some cases
 * Refactored nil on err `internal/grpcwrapper/rawydb/issues.go`, when golangci-lint nilerr enabled
 * Refactored nil on err `internal/grpcwrapper/rawtopic/describe_topic.go`, when golangci-lint nilerr enabled
