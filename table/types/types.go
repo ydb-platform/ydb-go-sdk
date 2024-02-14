@@ -8,6 +8,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
+const (
+	decimalPrecision uint32 = 22
+	decimalScale     uint32 = 9
+)
+
 // Type describes YDB data types.
 type Type = value.Type
 
@@ -75,7 +80,7 @@ func Optional(t Type) Type {
 	return value.Optional(t)
 }
 
-var DefaultDecimal = DecimalType(22, 9)
+var DefaultDecimal = DecimalType(decimalPrecision, decimalScale)
 
 func DecimalType(precision, scale uint32) Type {
 	return value.Decimal(precision, scale)

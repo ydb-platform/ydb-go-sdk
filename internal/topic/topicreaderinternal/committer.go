@@ -124,7 +124,7 @@ func (c *committer) pushCommitsLoop(ctx context.Context) {
 		var commits CommitRanges
 		c.m.WithLock(func() {
 			commits = c.commits
-			c.commits = NewCommitRangesWithCapacity(commits.len() * 2)
+			c.commits = NewCommitRangesWithCapacity(commits.len() * 2) //nolint:gomnd
 		})
 
 		if commits.len() == 0 && c.backgroundWorker.Context().Err() != nil {

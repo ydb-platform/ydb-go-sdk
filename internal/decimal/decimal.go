@@ -7,15 +7,19 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
-const wordSize = bits.UintSize / 8
+const (
+	wordSize   = bits.UintSize / 8
+	bufferSize = 40
+	negMask    = 0x80
+)
 
 var (
-	ten  = big.NewInt(10)
+	ten  = big.NewInt(10) //nolint:gomnd
 	zero = big.NewInt(0)
 	one  = big.NewInt(1)
 	inf  = big.NewInt(0).Mul(
-		big.NewInt(100000000000000000),
-		big.NewInt(1000000000000000000),
+		big.NewInt(100000000000000000),  //nolint:gomnd
+		big.NewInt(1000000000000000000), //nolint:gomnd
 	)
 	nan    = big.NewInt(0).Add(inf, one)
 	err    = big.NewInt(0).Add(nan, one)
@@ -58,7 +62,7 @@ func FromBytes(bts []byte, precision, scale uint32) *big.Int {
 
 	v.SetBytes(bts)
 
-	neg := bts[0]&0x80 != 0
+	neg := bts[0]&negMask != 0
 	if neg {
 		// Given bytes contains negative value.
 		// Interpret is as two's complement.
@@ -208,7 +212,7 @@ func Format(x *big.Int, precision, scale uint32) string {
 
 	// log_{10}(2^120) ~= 36.12, 37 decimal places
 	// plus dot, zero before dot, sign.
-	bts := make([]byte, 40)
+	bts := make([]byte, bufferSize)
 	pos := len(bts)
 
 	var digit big.Int

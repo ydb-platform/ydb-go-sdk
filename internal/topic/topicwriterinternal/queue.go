@@ -20,6 +20,7 @@ var (
 )
 
 const (
+	//nolint:gomnd
 	intSize = 32 << (^uint(0) >> 63) // copy from math package for use in go <= 1.16
 	maxInt  = 1<<(intSize-1) - 1     // copy from math package for use in go <= 1.16
 	minInt  = -1 << (intSize - 1)    // copy from math package for use in go <= 1.16

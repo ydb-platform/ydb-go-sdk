@@ -74,7 +74,7 @@ func main() {
 			f, err = os.OpenFile(
 				filepath.Join(workDir, filepath.Clean(name)),
 				os.O_WRONLY|os.O_CREATE|os.O_TRUNC,
-				0o600,
+				0o600, //nolint:gomnd
 			)
 			if err != nil {
 				log.Fatal(err)
@@ -319,6 +319,7 @@ func splitOSArchTags(ctx *build.Context, name string) (base, tags, ext string) {
 		base = name[:i]
 		tags = strings.TrimSuffix(name[i:], ext)
 
+	//nolint:gomnd
 	case 2: // *_GOOS_GOARCH
 		var i int
 		i = strings.LastIndexByte(name, '_')

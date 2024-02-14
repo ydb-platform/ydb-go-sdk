@@ -216,7 +216,7 @@ func NewPool(ctx context.Context, config Config) *Pool {
 		done:   make(chan struct{}),
 	}
 	if ttl := config.ConnectionTTL(); ttl > 0 {
-		go p.connParker(xcontext.WithoutDeadline(ctx), ttl, ttl/2)
+		go p.connParker(xcontext.WithoutDeadline(ctx), ttl, ttl/2) //nolint:gomnd
 	}
 	return p
 }

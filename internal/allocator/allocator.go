@@ -360,9 +360,10 @@ type structAllocator struct {
 }
 
 func (a *structAllocator) Struct() (v *Ydb.StructType) {
+	initialCapacity := 10
 	v = structPool.Get()
 	if cap(v.Members) <= 0 {
-		v.Members = make([]*Ydb.StructMember, 0, 10)
+		v.Members = make([]*Ydb.StructMember, 0, initialCapacity)
 	}
 	a.allocations = append(a.allocations, v)
 	return v
