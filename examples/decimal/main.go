@@ -91,8 +91,8 @@ func main() {
 				table.CommitTx(),
 			)
 
-			x := big.NewInt(42 * 1000000000)
-			x.Mul(x, big.NewInt(2))
+			x := big.NewInt(42 * 1000000000) //nolint:gomnd
+			x.Mul(x, big.NewInt(2))          //nolint:gomnd
 
 			_, _, err = s.Execute(ctx, txc, render(writeQuery, templateConfig{
 				TablePathPrefix: prefix,
@@ -100,8 +100,8 @@ func main() {
 				table.ValueParam("$decimals",
 					types.ListValue(
 						types.StructValue(
-							types.StructFieldValue("id", types.Uint32Value(42)),
-							types.StructFieldValue("value", types.DecimalValueFromBigInt(x, 22, 9)),
+							types.StructFieldValue("id", types.Uint32Value(42)),                     //nolint:gomnd
+							types.StructFieldValue("value", types.DecimalValueFromBigInt(x, 22, 9)), //nolint:gomnd
 						),
 					),
 				),

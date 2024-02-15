@@ -50,6 +50,7 @@ func getSeriesData() types.Value {
 				"Ash Atalla and starring Chris O'Dowd, Richard Ayoade, Katherine Parkinson, and Matt Berry.",
 			"", // NULL comment.
 		),
+		//nolint:gomnd
 		seriesData(
 			2, days("2014-04-06"), "Silicon Valley", ""+
 				"Silicon Valley is an American comedy television series created by Mike Judge, John Altschuler and "+
@@ -59,6 +60,7 @@ func getSeriesData() types.Value {
 	)
 }
 
+//nolint:gomnd
 func getSeasonsData() types.Value {
 	return types.ListValue(
 		seasonData(1, 1, "Season 1", days("2006-02-03"), days("2006-03-03")),
@@ -73,6 +75,7 @@ func getSeasonsData() types.Value {
 	)
 }
 
+//nolint:gomnd
 func getEpisodesData() types.Value {
 	return types.ListValue(
 		episodeData(1, 1, 1, "Yesterday's Jam", days("2006-02-03")),

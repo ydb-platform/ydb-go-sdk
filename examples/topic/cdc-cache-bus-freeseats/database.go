@@ -76,7 +76,7 @@ func createCosumers(ctx context.Context, db *ydb.Driver, consumersCount int) err
 }
 
 func connect() *ydb.Driver {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10) //nolint:gomnd
 	defer cancel()
 
 	connectionString := os.Getenv("YDB_CONNECTION_STRING")

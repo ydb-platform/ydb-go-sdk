@@ -36,7 +36,7 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 						InsecureSkipVerify: true, //nolint:gosec
 					},
 				},
-				Timeout: time.Second * 10,
+				Timeout: time.Second * 10, //nolint:gomnd
 			},
 		}
 		s.db, err = ydb.Open(ctx, dsn, opts...)

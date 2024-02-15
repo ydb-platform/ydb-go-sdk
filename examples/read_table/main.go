@@ -128,7 +128,7 @@ func main() {
 		ctx,
 		db.Table(),
 		path.Join(prefix, tableName),
-		options.ReadRowLimit(5),
+		options.ReadRowLimit(5), //nolint:gomnd
 	)
 	if err != nil {
 		panic(fmt.Errorf("read table error: %w", err))
@@ -139,7 +139,7 @@ func main() {
 		ctx,
 		db.Table(),
 		path.Join(prefix, tableName),
-		options.ReadRowLimit(5),
+		options.ReadRowLimit(5), //nolint:gomnd
 		options.ReadColumn("customer_id"),
 		options.ReadColumn("order_id"),
 		options.ReadColumn("order_date"),
@@ -152,10 +152,10 @@ func main() {
 	log.Println("Read all rows with first PK component (customer_id,) greater or equal than 2 and less then 3:")
 	keyRange := options.KeyRange{
 		From: types.TupleValue(
-			types.OptionalValue(types.Uint64Value(2)),
+			types.OptionalValue(types.Uint64Value(2)), //nolint:gomnd
 		),
 		To: types.TupleValue(
-			types.OptionalValue(types.Uint64Value(3)),
+			types.OptionalValue(types.Uint64Value(3)), //nolint:gomnd
 		),
 	}
 	err = readTable(
@@ -176,7 +176,7 @@ func main() {
 		options.ReadLessOrEqual(
 			types.TupleValue(
 				types.OptionalValue(types.Uint64Value(1)),
-				types.OptionalValue(types.Uint64Value(4)),
+				types.OptionalValue(types.Uint64Value(4)), //nolint:gomnd
 			),
 		),
 	)
@@ -188,10 +188,10 @@ func main() {
 	keyRange = options.KeyRange{
 		From: types.TupleValue(
 			types.OptionalValue(types.Uint64Value(1)),
-			types.OptionalValue(types.Uint64Value(2)),
+			types.OptionalValue(types.Uint64Value(2)), //nolint:gomnd
 		),
 		To: types.TupleValue(
-			types.OptionalValue(types.Uint64Value(3)),
+			types.OptionalValue(types.Uint64Value(3)), //nolint:gomnd
 			types.OptionalValue(types.Uint64Value(1)),
 		),
 	}

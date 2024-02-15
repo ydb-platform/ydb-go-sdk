@@ -30,7 +30,7 @@ type MyMessage struct {
 
 // UnmarshalYDBTopicMessage implements topicreader.MessageContentUnmarshaler interface
 func (m *MyMessage) UnmarshalYDBTopicMessage(data []byte) error {
-	if len(data) != 6 {
+	if len(data) != 6 { //nolint:gomnd // The length of the data slice is fixed and equal to 6 bytes
 		return errors.New("bad data len")
 	}
 	m.ID = data[0]

@@ -285,7 +285,7 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) (err er
 					table.ValueParam("$series",
 						types.ListValue(
 							types.Uint64Value(1),
-							types.Uint64Value(10),
+							types.Uint64Value(10), //nolint:gomnd // the number 10 represents the upper limit of a range of series IDs
 						),
 					),
 				),

@@ -14,8 +14,8 @@ const defaultConnectionString = "grpc://localhost:2136/local"
 
 var (
 	host                = flag.String("listen-host", "localhost", "host/ip for start listener")
-	port                = flag.Int("port", 3619, "port to listen")
-	cacheTimeout        = flag.Duration("cache", time.Second*10, "cache timeout, 0 mean disable cache")
+	port                = flag.Int("port", 3619, "port to listen")                                      //nolint:gomnd
+	cacheTimeout        = flag.Duration("cache", time.Second*10, "cache timeout, 0 mean disable cache") //nolint:gomnd
 	disableCDC          = flag.Bool("disable-cdc", false, "disable cdc")
 	skipCreateTable     = flag.Bool("skip-init", false, "skip recreate table and topic")
 	ydbConnectionString = flag.String("ydb-connection-string",

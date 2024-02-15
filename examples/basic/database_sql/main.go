@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) //nolint:gomnd
 	defer cancel()
 
 	dsn, exists := os.LookupEnv("YDB_CONNECTION_STRING")
@@ -45,8 +45,8 @@ func main() {
 	db := sql.OpenDB(c)
 	defer func() { _ = db.Close() }()
 
-	db.SetMaxOpenConns(50)
-	db.SetMaxIdleConns(50)
+	db.SetMaxOpenConns(50) //nolint:gomnd
+	db.SetMaxIdleConns(50) //nolint:gomnd
 	db.SetConnMaxIdleTime(time.Second)
 
 	err = sugar.RemoveRecursive(ctx, cc, prefix)

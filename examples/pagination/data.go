@@ -12,6 +12,7 @@ func schoolData(city string, num uint32, addr string) types.Value {
 	)
 }
 
+//nolint:gomnd
 func getSchoolData() types.Value {
 	return types.ListValue(
 		schoolData("Орлов", 1, "Ст.Халтурина, 2"),

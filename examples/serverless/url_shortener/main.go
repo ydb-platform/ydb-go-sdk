@@ -43,11 +43,11 @@ func init() { //nolint:gochecknoinits
 		"logging level",
 	)
 	flagSet.IntVar(&port,
-		"port", 80,
+		"port", 80, //nolint:gomnd
 		"http port for web-server",
 	)
 	flagSet.IntVar(&sessionPoolLimit,
-		"session-pool-limit", 50,
+		"session-pool-limit", 50, //nolint:gomnd
 		"session pool size limit",
 	)
 	flagSet.DurationVar(&shutdownAfter,
