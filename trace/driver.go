@@ -90,12 +90,14 @@ type Method string
 // Name returns the rpc method name.
 func (m Method) Name() (s string) {
 	_, s = m.Split()
+
 	return
 }
 
 // Service returns the rpc service name.
 func (m Method) Service() (s string) {
 	s, _ = m.Split()
+
 	return
 }
 
@@ -112,6 +114,7 @@ func (m Method) Split() (service, method string) {
 	if i == -1 {
 		return string(m), string(m)
 	}
+
 	return strings.TrimPrefix(string(m[:i]), "/"), string(m[i+1:])
 }
 

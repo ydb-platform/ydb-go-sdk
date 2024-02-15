@@ -43,6 +43,7 @@ func (s *scanner) ColumnCount() int {
 	if s.set == nil {
 		return 0
 	}
+
 	return len(s.set.Columns)
 }
 
@@ -64,6 +65,7 @@ func (s *scanner) RowCount() int {
 	if s.set == nil {
 		return 0
 	}
+
 	return len(s.set.Rows)
 }
 
@@ -72,6 +74,7 @@ func (s *scanner) ItemCount() int {
 	if s.row == nil {
 		return 0
 	}
+
 	return len(s.row.Items)
 }
 
@@ -113,6 +116,7 @@ func (s *scanner) preScanChecks(lenValues int) (err error) {
 	if s.nextItem != 0 {
 		panic("scan row failed: double scan per row")
 	}
+
 	return s.Err()
 }
 
@@ -140,6 +144,7 @@ func (s *scanner) ScanWithDefaults(values ...indexed.Required) (err error) {
 		}
 	}
 	s.nextItem += len(values)
+
 	return s.Err()
 }
 
@@ -167,6 +172,7 @@ func (s *scanner) Scan(values ...indexed.RequiredOrOptional) (err error) {
 		}
 	}
 	s.nextItem += len(values)
+
 	return s.Err()
 }
 
@@ -196,6 +202,7 @@ func (s *scanner) ScanNamed(namedValues ...named.Value) error {
 		}
 	}
 	s.nextItem += len(namedValues)
+
 	return s.Err()
 }
 
@@ -203,8 +210,10 @@ func (s *scanner) ScanNamed(namedValues ...named.Value) error {
 func (s *scanner) Truncated() bool {
 	if s.set == nil {
 		_ = s.errorf(0, "there are no sets in the scanner")
+
 		return false
 	}
+
 	return s.set.Truncated
 }
 
@@ -213,6 +222,7 @@ func (s *scanner) truncated() bool {
 	if s.set == nil {
 		return false
 	}
+
 	return s.set.Truncated
 }
 
@@ -230,8 +240,10 @@ func (s *scanner) Err() error {
 		if s.markTruncatedAsRetryable {
 			err = xerrors.Retryable(err)
 		}
+
 		return xerrors.WithStackTrace(err)
 	}
+
 	return nil
 }
 
@@ -253,6 +265,7 @@ func (s *scanner) path() string {
 	buf := xstring.Buffer()
 	defer buf.Free()
 	_, _ = s.writePathTo(buf)
+
 	return buf.String()
 }
 
@@ -264,6 +277,7 @@ func (s *scanner) writePathTo(w io.Writer) (n int64, err error) {
 		return n, xerrors.WithStackTrace(err)
 	}
 	n += int64(m)
+
 	return n, nil
 }
 
@@ -272,6 +286,7 @@ func (s *scanner) getType() types.Type {
 	if x.isEmpty() {
 		return nil
 	}
+
 	return value.TypeFromYDB(x.t)
 }
 
@@ -287,6 +302,7 @@ func (s *scanner) seekItemByID(id int) error {
 	s.stack.scanItem.name = col.Name
 	s.stack.scanItem.t = col.Type
 	s.stack.scanItem.v = s.row.Items[id]
+
 	return nil
 }
 
@@ -301,14 +317,17 @@ func (s *scanner) seekItemByName(name string) error {
 		s.stack.scanItem.name = c.Name
 		s.stack.scanItem.t = c.Type
 		s.stack.scanItem.v = s.row.Items[i]
+
 		return s.Err()
 	}
+
 	return s.notFoundColumnName(name)
 }
 
 func (s *scanner) setColumnIndexes(columns []string) {
 	if columns == nil {
 		s.columnIndexes = nil
+
 		return
 	}
 	s.columnIndexes = make([]int, len(columns))
@@ -318,11 +337,13 @@ func (s *scanner) setColumnIndexes(columns []string) {
 			if c.Name == col {
 				s.columnIndexes[i] = j
 				found = true
+
 				break
 			}
 		}
 		if !found {
 			_ = s.noColumnError(col)
+
 			return
 		}
 	}
@@ -408,18 +429,21 @@ func (s *scanner) any() interface{} {
 		if err != nil {
 			_ = s.errorf(0, "scanner.any(): %w", err)
 		}
+
 		return src
 	case value.TypeTzDatetime:
 		src, err := value.TzDatetimeToTime(s.text())
 		if err != nil {
 			_ = s.errorf(0, "scanner.any(): %w", err)
 		}
+
 		return src
 	case value.TypeTzTimestamp:
 		src, err := value.TzTimestampToTime(s.text())
 		if err != nil {
 			_ = s.errorf(0, "scanner.any(): %w", err)
 		}
+
 		return src
 	case value.TypeText, value.TypeDyNumber:
 		return s.text()
@@ -430,6 +454,7 @@ func (s *scanner) any() interface{} {
 		return xstring.ToBytes(s.text())
 	default:
 		_ = s.errorf(0, "unknown primitive types")
+
 		return nil
 	}
 }
@@ -437,16 +462,19 @@ func (s *scanner) any() interface{} {
 // Value returns current item under scan as ydb.Value types.
 func (s *scanner) value() types.Value {
 	x := s.stack.current()
+
 	return value.FromYDB(x.t, x.v)
 }
 
 func (s *scanner) isCurrentTypeOptional() bool {
 	c := s.stack.current()
+
 	return isOptional(c.t)
 }
 
 func (s *scanner) isNull() bool {
 	_, yes := s.stack.currentValue().(*Ydb.Value_NullFlagValue)
+
 	return yes
 }
 
@@ -472,8 +500,10 @@ func (s *scanner) unwrapValue() (v *Ydb.Value) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_NestedValue)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
+
 		return
 	}
+
 	return x.NestedValue
 }
 
@@ -486,6 +516,7 @@ func (s *scanner) unwrapDecimal() (v types.Decimal) {
 	if d == nil {
 		return
 	}
+
 	return types.Decimal{
 		Bytes:     s.uint128(),
 		Precision: d.DecimalType.Precision,
@@ -498,6 +529,7 @@ func (s *scanner) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.Type_DecimalType) {
 	if t, _ = x.(*Ydb.Type_DecimalType); t == nil {
 		s.typeError(x, t)
 	}
+
 	return
 }
 
@@ -505,8 +537,10 @@ func (s *scanner) bool() (v bool) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_BoolValue)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
+
 		return
 	}
+
 	return x.BoolValue
 }
 
@@ -514,8 +548,10 @@ func (s *scanner) int8() (v int8) {
 	d := s.int32()
 	if d < math.MinInt8 || math.MaxInt8 < d {
 		_ = s.overflowError(d, v)
+
 		return
 	}
+
 	return int8(d)
 }
 
@@ -523,8 +559,10 @@ func (s *scanner) uint8() (v uint8) {
 	d := s.uint32()
 	if d > math.MaxUint8 {
 		_ = s.overflowError(d, v)
+
 		return
 	}
+
 	return uint8(d)
 }
 
@@ -532,8 +570,10 @@ func (s *scanner) int16() (v int16) {
 	d := s.int32()
 	if d < math.MinInt16 || math.MaxInt16 < d {
 		_ = s.overflowError(d, v)
+
 		return
 	}
+
 	return int16(d)
 }
 
@@ -541,8 +581,10 @@ func (s *scanner) uint16() (v uint16) {
 	d := s.uint32()
 	if d > math.MaxUint16 {
 		_ = s.overflowError(d, v)
+
 		return
 	}
+
 	return uint16(d)
 }
 
@@ -550,8 +592,10 @@ func (s *scanner) int32() (v int32) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_Int32Value)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
+
 		return
 	}
+
 	return x.Int32Value
 }
 
@@ -559,8 +603,10 @@ func (s *scanner) uint32() (v uint32) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_Uint32Value)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
+
 		return
 	}
+
 	return x.Uint32Value
 }
 
@@ -568,8 +614,10 @@ func (s *scanner) int64() (v int64) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_Int64Value)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
+
 		return
 	}
+
 	return x.Int64Value
 }
 
@@ -577,8 +625,10 @@ func (s *scanner) uint64() (v uint64) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_Uint64Value)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
+
 		return
 	}
+
 	return x.Uint64Value
 }
 
@@ -586,8 +636,10 @@ func (s *scanner) float() (v float32) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_FloatValue)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
+
 		return
 	}
+
 	return x.FloatValue
 }
 
@@ -595,8 +647,10 @@ func (s *scanner) double() (v float64) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_DoubleValue)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
+
 		return
 	}
+
 	return x.DoubleValue
 }
 
@@ -604,8 +658,10 @@ func (s *scanner) bytes() (v []byte) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_BytesValue)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
+
 		return
 	}
+
 	return x.BytesValue
 }
 
@@ -613,8 +669,10 @@ func (s *scanner) text() (v string) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_TextValue)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
+
 		return
 	}
+
 	return x.TextValue
 }
 
@@ -622,8 +680,10 @@ func (s *scanner) low128() (v uint64) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_Low_128)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
+
 		return
 	}
+
 	return x.Low_128
 }
 
@@ -631,10 +691,12 @@ func (s *scanner) uint128() (v [16]byte) {
 	c := s.stack.current()
 	if c.isEmpty() {
 		_ = s.errorf(0, "not implemented convert to [16]byte")
+
 		return
 	}
 	lo := s.low128()
 	hi := c.v.High_128
+
 	return value.BigEndianUint128(hi, lo)
 }
 
@@ -715,6 +777,7 @@ func (s *scanner) trySetByteArray(v interface{}, optional, def bool) bool {
 		}
 		if s.isNull() {
 			rv.Set(reflect.Zero(rv.Type()))
+
 			return true
 		}
 		if rv.IsZero() {
@@ -731,6 +794,7 @@ func (s *scanner) trySetByteArray(v interface{}, optional, def bool) bool {
 	}
 	if def {
 		rv.Set(reflect.Zero(rv.Type()))
+
 		return true
 	}
 	var dst []byte
@@ -739,6 +803,7 @@ func (s *scanner) trySetByteArray(v interface{}, optional, def bool) bool {
 		return false
 	}
 	reflect.Copy(rv, reflect.ValueOf(dst))
+
 	return true
 }
 
@@ -827,6 +892,7 @@ func (s *scanner) scanOptional(v interface{}, defaultValueForOptional bool) {
 			s.unwrap()
 			s.scanRequired(v)
 		}
+
 		return
 	}
 	switch v := v.(type) {
@@ -1100,6 +1166,7 @@ func (s *scanner) errorf(depth int, f string, args ...interface{}) error {
 		return s.err
 	}
 	s.err = xerrors.WithStackTrace(fmt.Errorf(f, args...), xerrors.WithSkipDepth(depth+1))
+
 	return s.err
 }
 
@@ -1182,6 +1249,7 @@ func (s *scanStack) size() int {
 	if !s.scanItem.isEmpty() {
 		s.set(s.scanItem)
 	}
+
 	return s.p + 1
 }
 
@@ -1222,6 +1290,7 @@ func (s *scanStack) parent() item {
 	if s.p == 0 {
 		return emptyItem
 	}
+
 	return s.v[s.p-1]
 }
 
@@ -1232,6 +1301,7 @@ func (s *scanStack) current() item {
 	if s.v == nil {
 		return emptyItem
 	}
+
 	return s.v[s.p]
 }
 
@@ -1239,6 +1309,7 @@ func (s *scanStack) currentValue() interface{} {
 	if v := s.current().v; v != nil {
 		return v.Value
 	}
+
 	return nil
 }
 
@@ -1246,6 +1317,7 @@ func (s *scanStack) currentType() interface{} {
 	if t := s.current().t; t != nil {
 		return t.Type
 	}
+
 	return nil
 }
 
@@ -1254,5 +1326,6 @@ func isOptional(typ *Ydb.Type) bool {
 		return false
 	}
 	_, yes := typ.Type.(*Ydb.Type_OptionalType)
+
 	return yes
 }

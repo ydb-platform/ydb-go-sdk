@@ -85,6 +85,7 @@ func prepareScheme(db *gorm.DB) error {
 	); err != nil {
 		return err
 	}
+
 	return db.AutoMigrate(
 		&Series{},
 		&Season{},
@@ -123,6 +124,7 @@ func readAll(db *gorm.DB) error {
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -161,5 +163,6 @@ func findEpisodesByTitle(db *gorm.DB, fragment string) error {
 			episodes[i].ID, episodes[i].AirDate.Format(dateISO8601), episodes[i].Title,
 		)
 	}
+
 	return nil
 }

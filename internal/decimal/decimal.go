@@ -77,6 +77,7 @@ func FromBytes(bts []byte, precision, scale uint32) *big.Int {
 			v.Set(inf)
 		}
 	}
+
 	return v
 }
 
@@ -106,12 +107,14 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 		if neg {
 			return v.Set(neginf), nil
 		}
+
 		return v.Set(inf), nil
 	}
 	if isNaN(s) {
 		if neg {
 			return v.Set(negnan), nil
 		}
+
 		return v.Set(nan), nil
 	}
 
@@ -125,6 +128,7 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 				return nil, syntaxError(s)
 			}
 			dot = true
+
 			continue
 		}
 		if dot {
@@ -146,6 +150,7 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 			if neg {
 				return neginf, nil
 			}
+
 			return inf, nil
 		}
 		integral--
@@ -180,6 +185,7 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 	if neg {
 		v.Neg(v)
 	}
+
 	return v, nil
 }
 
@@ -191,12 +197,14 @@ func Format(x *big.Int, precision, scale uint32) string {
 		if x.Sign() < 0 {
 			return "-inf"
 		}
+
 		return "inf"
 
 	case x.CmpAbs(nan) == 0:
 		if x.Sign() < 0 {
 			return "-nan"
 		}
+
 		return "nan"
 
 	case x == nil:
@@ -275,6 +283,7 @@ func BigIntToByte(x *big.Int, precision, scale uint32) (p [16]byte) {
 		}
 	}
 	put(x, p[:])
+
 	return p
 }
 
@@ -305,6 +314,7 @@ func Append(p []byte, x *big.Int) []byte {
 	n := len(p)
 	p = ensure(p, size(x))
 	put(x, p[n:])
+
 	return p
 }
 
@@ -312,6 +322,7 @@ func size(x *big.Int) int {
 	if x.Sign() < 0 {
 		x = complement(x)
 	}
+
 	return len(x.Bits()) * wordSize
 }
 
@@ -325,6 +336,7 @@ func ensure(p []byte, n int) []byte {
 		copy(cp, p)
 		p = cp
 	}
+
 	return p[:l+n]
 }
 
@@ -350,6 +362,7 @@ func pow(x *big.Int, n uint32) *big.Int {
 		n >>= 1
 		m.Mul(m, m)
 	}
+
 	return v
 }
 
@@ -360,6 +373,7 @@ func complement(x *big.Int) *big.Int {
 	not(x)
 	x.Neg(x)
 	x.Add(x, one)
+
 	return x
 }
 

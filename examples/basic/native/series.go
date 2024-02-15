@@ -80,6 +80,7 @@ func readTable(ctx context.Context, c table.Client, path string) (err error) {
 				options.ReadColumn("title"),
 				options.ReadColumn("release_date"),
 			)
+
 			return
 		},
 	)
@@ -142,6 +143,7 @@ func describeTableOptions(ctx context.Context, c table.Client) (err error) {
 	err = c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			desc, err = s.DescribeTableOptions(ctx)
+
 			return
 		},
 	)
@@ -227,6 +229,7 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) (err error
 				),
 				options.WithCollectStatsModeBasic(),
 			)
+
 			return
 		},
 	)
@@ -259,6 +262,7 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) (err error
 			)
 		}
 	}
+
 	return res.Err()
 }
 
@@ -317,6 +321,7 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) (err er
 					log.Printf("#  Season, SeriesId: %d, SeasonId: %d, Title: %s, Air date: %s", seriesID, seasonID, title, date)
 				}
 			}
+
 			return res.Err()
 		},
 	)
@@ -338,9 +343,11 @@ func fillTablesWithData(ctx context.Context, c table.Client, prefix string) (err
 				table.ValueParam("$seasonsData", getSeasonsData()),
 				table.ValueParam("$episodesData", getEpisodesData()),
 			))
+
 			return err
 		},
 	)
+
 	return err
 }
 
@@ -407,9 +414,11 @@ func describeTable(ctx context.Context, c table.Client, path string) (err error)
 			for i := range desc.Columns {
 				log.Printf("column, name: %s, %s", desc.Columns[i].Type, desc.Columns[i].Name)
 			}
+
 			return nil
 		},
 	)
+
 	return
 }
 
@@ -419,5 +428,6 @@ func render(t *template.Template, data interface{}) string {
 	if err != nil {
 		panic(err)
 	}
+
 	return buf.String()
 }

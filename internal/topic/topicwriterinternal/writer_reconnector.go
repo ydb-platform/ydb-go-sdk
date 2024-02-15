@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/big"
 	"runtime"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,7 +23,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -74,6 +74,7 @@ func (cfg *WriterReconnectorConfig) validate() error {
 		cfg.producerID != cfg.defaultPartitioning.MessageGroupID {
 		return xerrors.WithStackTrace(errProducerIDNotEqualMessageGroupID)
 	}
+
 	return nil
 }
 
@@ -125,7 +126,7 @@ type WriterReconnector struct {
 	queue                          messageQueue
 	background                     background.Worker
 	clock                          clockwork.Clock
-	firstConnectionHandled         xatomic.Bool
+	firstConnectionHandled         atomic.Bool
 	firstInitResponseProcessedChan empty.Chan
 	writerInstanceID               string
 
@@ -144,6 +145,7 @@ func newWriterReconnector(
 ) *WriterReconnector {
 	res := newWriterReconnectorStopped(cfg)
 	res.start()
+
 	return res
 }
 
@@ -293,6 +295,7 @@ func (w *WriterReconnector) checkMessages(messages []messageWithDataContent) err
 			return xerrors.WithStackTrace(fmt.Errorf("message size bytes %v: %w", size, errLargeMessage))
 		}
 	}
+
 	return nil
 }
 
@@ -326,6 +329,7 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 	if err != nil {
 		return nil, err
 	}
+
 	return res, nil
 }
 
@@ -344,6 +348,7 @@ func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr err
 	if resErr == nil {
 		resErr = bgErr
 	}
+
 	return resErr
 }
 
@@ -374,7 +379,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		streamCtx, streamCtxCancel = createStreamContext()
 
 		now := time.Now()
-		if topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
+		if startOfRetries.IsZero() || topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
 			attempt = 0
 			startOfRetries = w.clock.Now()
 		} else {
@@ -393,6 +398,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 				}
 			} else {
 				_ = w.close(ctx, reconnectReason)
+
 				return
 			}
 		}
@@ -429,11 +435,13 @@ func (w *WriterReconnector) startWriteStream(ctx, streamCtx context.Context, att
 	}
 
 	w.queue.ResetSentProgress()
+
 	return NewSingleStreamWriter(ctx, w.createWriterStreamConfig(stream))
 }
 
 func (w *WriterReconnector) needReceiveLastSeqNo() bool {
 	res := !w.firstConnectionHandled.Load()
+
 	return res
 }
 
@@ -467,11 +475,13 @@ func (w *WriterReconnector) connectWithTimeout(streamLifetimeContext context.Con
 	select {
 	case <-timer.C:
 		connectCancel()
+
 		return nil, xerrors.WithStackTrace(errConnTimeout)
 	case res := <-resCh:
 		// force no cancel connect context - because it will break stream
 		// context will cancel by cancel streamLifetimeContext while reconnect or stop connection
 		_ = connectCancel
+
 		return res.stream, res.err
 	}
 }
@@ -485,6 +495,7 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 	w.m.WithLock(func() {
 		if writerStream == nil {
 			w.sessionID = ""
+
 			return
 		}
 		w.sessionID = writerStream.SessionID
@@ -566,6 +577,7 @@ func (w *WriterReconnector) createWriterStreamConfig(stream RawTopicWriterStream
 		w.needReceiveLastSeqNo(),
 		w.writerInstanceID,
 	)
+
 	return cfg
 }
 
@@ -586,6 +598,7 @@ func sendMessagesToStream(
 	if err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: failed send write request: %w", err))
 	}
+
 	return nil
 }
 
@@ -619,6 +632,7 @@ func splitMessagesByBufCodec(messages []messageWithDataContent) (res [][]message
 		}
 	}
 	res = append(res, messages[currentGroupStart:len(messages):len(messages)])
+
 	return res
 }
 
@@ -679,6 +693,7 @@ func calculateAllowedCodecs(forceCodec rawtopiccommon.Codec, encoderMap *Encoder
 		if serverCodecs.AllowedByCodecsList(forceCodec) && encoderMap.IsSupported(forceCodec) {
 			return rawtopiccommon.SupportedCodecs{forceCodec}
 		}
+
 		return nil
 	}
 
@@ -697,6 +712,7 @@ func calculateAllowedCodecs(forceCodec rawtopiccommon.Codec, encoderMap *Encoder
 	if len(res) == 0 {
 		res = nil
 	}
+
 	return res
 }
 
@@ -707,5 +723,6 @@ func createPublicCodecsFromRaw(codecs rawtopiccommon.SupportedCodecs) []topictyp
 	for i, v := range codecs {
 		res[i] = topictypes.Codec(v)
 	}
+
 	return res
 }

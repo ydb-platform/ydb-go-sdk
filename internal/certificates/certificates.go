@@ -47,6 +47,7 @@ func loadFromFileCache(key string) (_ []*x509.Certificate, exists bool) {
 	if !ok {
 		panic(fmt.Sprintf("unexpected value type '%T'", value))
 	}
+
 	return certs, true
 }
 
@@ -65,6 +66,7 @@ func FromFile(file string, opts ...FromFileOption) ([]*x509.Certificate, error) 
 			if options.onHit != nil {
 				options.onHit()
 			}
+
 			return certs, nil
 		}
 	}
@@ -100,6 +102,7 @@ func loadFromPemCache(key string) (_ *x509.Certificate, exists bool) {
 	if !ok {
 		panic(fmt.Sprintf("unexpected value type '%T'", value))
 	}
+
 	return cert, true
 }
 
@@ -120,6 +123,7 @@ func parseCertificate(der []byte, opts ...FromPemOption) (*x509.Certificate, err
 			if options.onHit != nil {
 				options.onHit()
 			}
+
 			return cert, nil
 		}
 	}

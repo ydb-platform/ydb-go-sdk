@@ -61,6 +61,7 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 				if connectCalled > 1 {
 					return nil, errors.New("unexpected call test connect function")
 				}
+
 				return baseReader, nil
 			},
 			streamErr: errUnconnected,
@@ -103,6 +104,7 @@ func TestTopicReaderReconnectorReadMessageBatch(t *testing.T) {
 		reader := &readerReconnector{
 			readerConnect: func(ctx context.Context) (batchedStreamReader, error) {
 				connectCalled++
+
 				return readers[connectCalled-1], nil
 			},
 			streamErr: errUnconnected,
@@ -218,6 +220,7 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 			{
 				callback: func(ctx context.Context) (batchedStreamReader, error) {
 					close(stream1Ready)
+
 					return newStream1, nil
 				},
 			},
@@ -227,12 +230,14 @@ func TestTopicReaderReconnectorConnectionLoop(t *testing.T) {
 			{
 				callback: func(ctx context.Context) (batchedStreamReader, error) {
 					close(stream2Ready)
+
 					return newStream2, nil
 				},
 			},
 			{
 				callback: func(ctx context.Context) (batchedStreamReader, error) {
 					t.Fatal()
+
 					return nil, errors.New("unexpected call")
 				},
 			},
@@ -288,10 +293,12 @@ func TestTopicReaderReconnectorStart(t *testing.T) {
 	reconnector.readerConnect = readerConnectFuncMock([]readerConnectFuncAnswer{
 		{callback: func(ctx context.Context) (batchedStreamReader, error) {
 			close(connectionRequested)
+
 			return stream, nil
 		}},
 		{callback: func(ctx context.Context) (batchedStreamReader, error) {
 			t.Error()
+
 			return nil, errors.New("unexpected call")
 		}},
 	}...)
@@ -345,6 +352,7 @@ func TestTopicReaderReconnectorWaitInit(t *testing.T) {
 		reconnector.readerConnect = readerConnectFuncMock(readerConnectFuncAnswer{
 			callback: func(ctx context.Context) (batchedStreamReader, error) {
 				cancel()
+
 				return stream, nil
 			},
 		})

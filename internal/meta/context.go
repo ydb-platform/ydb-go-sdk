@@ -11,6 +11,7 @@ func WithTraceID(ctx context.Context, traceID string) context.Context {
 	if md, has := metadata.FromOutgoingContext(ctx); !has || len(md[HeaderTraceID]) == 0 {
 		return metadata.AppendToOutgoingContext(ctx, HeaderTraceID, traceID)
 	}
+
 	return ctx
 }
 
@@ -18,6 +19,7 @@ func traceID(ctx context.Context) (string, bool) {
 	if md, has := metadata.FromOutgoingContext(ctx); has && len(md[HeaderTraceID]) > 0 {
 		return md[HeaderTraceID][0], true
 	}
+
 	return "", false
 }
 
@@ -37,5 +39,6 @@ func WithAllowFeatures(ctx context.Context, features []string) context.Context {
 	for _, feature := range features {
 		kv = append(kv, HeaderClientCapabilities, feature)
 	}
+
 	return metadata.AppendToOutgoingContext(ctx, kv...)
 }

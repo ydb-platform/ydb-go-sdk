@@ -24,8 +24,12 @@ func TestJoin(t *testing.T) {
 		{
 			err: Join(context.Canceled, context.DeadlineExceeded, Operation()),
 			iss: []error{context.Canceled, context.DeadlineExceeded},
-			ass: []interface{}{func() interface{} { var i isYdbError; return &i }()},
-			s:   "[\"context canceled\",\"context deadline exceeded\",\"operation/STATUS_CODE_UNSPECIFIED (code = 0)\"]",
+			ass: []interface{}{func() interface{} {
+				var i isYdbError
+
+				return &i
+			}()},
+			s: "[\"context canceled\",\"context deadline exceeded\",\"operation/STATUS_CODE_UNSPECIFIED (code = 0)\"]",
 		},
 	} {
 		t.Run("", func(t *testing.T) {

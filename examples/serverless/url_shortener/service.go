@@ -45,6 +45,7 @@ func hash(s string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
 	return hex.EncodeToString(hasher.Sum(nil)), nil
 }
 
@@ -62,6 +63,7 @@ func render(t *template.Template, data interface{}) string {
 	if err != nil {
 		panic(err)
 	}
+
 	return buf.String()
 }
 
@@ -148,6 +150,7 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 		s.db, err = ydb.Open(ctx, dsn, opts...)
 		if err != nil {
 			err = fmt.Errorf("connect error: %w", err)
+
 			return
 		}
 
@@ -162,13 +165,16 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 		if err != nil {
 			_ = s.db.Close(ctx)
 			err = fmt.Errorf("error on create table: %w", err)
+
 			return
 		}
 	})
 	if err != nil {
 		once = sync.Once{}
+
 		return nil, err
 	}
+
 	return s, nil
 }
 
@@ -192,9 +198,11 @@ func (s *service) createTable(ctx context.Context) (err error) {
 			TablePathPrefix: path.Join(s.db.Name(), prefix),
 		},
 	)
+
 	return s.db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) error {
 			err := s.ExecuteSchemeQuery(ctx, query)
+
 			return err
 		},
 	)
@@ -236,9 +244,11 @@ func (s *service) insertShort(ctx context.Context, url string) (h string, err er
 				),
 				options.WithCollectStatsModeBasic(),
 			)
+
 			return
 		},
 	)
+
 	return h, err
 }
 
@@ -275,6 +285,7 @@ func (s *service) selectLong(ctx context.Context, hash string) (url string, err 
 				),
 				options.WithCollectStatsModeBasic(),
 			)
+
 			return err
 		},
 	)
@@ -290,9 +301,11 @@ func (s *service) selectLong(ctx context.Context, hash string) (url string, err 
 			err = res.ScanNamed(
 				named.OptionalWithDefault("src", &src),
 			)
+
 			return src, err
 		}
 	}
+
 	return "", fmt.Errorf("hash '%s' is not found", hash)
 }
 
@@ -305,6 +318,7 @@ func successToString(b bool) string {
 	if b {
 		return "true"
 	}
+
 	return "false"
 }
 
@@ -332,6 +346,7 @@ func (s *service) handleIndex(w http.ResponseWriter, r *http.Request) {
 	tpl, err = template.ParseFS(static, "static/index.html")
 	if err != nil {
 		writeResponse(w, http.StatusInternalServerError, err.Error())
+
 		return
 	}
 	w.Header().Set("Content-Type", "text/html")
@@ -341,6 +356,7 @@ func (s *service) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	if err = tpl.Execute(w, data); err != nil {
 		writeResponse(w, http.StatusInternalServerError, err.Error())
+
 		return
 	}
 }
@@ -370,16 +386,19 @@ func (s *service) handleShorten(w http.ResponseWriter, r *http.Request) {
 	url, err = io.ReadAll(r.Body)
 	if err != nil {
 		writeResponse(w, http.StatusInternalServerError, err.Error())
+
 		return
 	}
 	if !isLongCorrect(string(url)) {
 		err = fmt.Errorf("'%s' is not a valid URL", url)
 		writeResponse(w, http.StatusBadRequest, err.Error())
+
 		return
 	}
 	hash, err = s.insertShort(r.Context(), string(url))
 	if err != nil {
 		writeResponse(w, http.StatusInternalServerError, err.Error())
+
 		return
 	}
 	w.Header().Set("Content-Type", "application/text")
@@ -411,11 +430,13 @@ func (s *service) handleLonger(w http.ResponseWriter, r *http.Request) {
 	if !isShortCorrect(path[len(path)-1]) {
 		err = fmt.Errorf("'%s' is not a valid short path", path[len(path)-1])
 		writeResponse(w, http.StatusBadRequest, err.Error())
+
 		return
 	}
 	url, err = s.selectLong(r.Context(), path[len(path)-1])
 	if err != nil {
 		writeResponse(w, http.StatusInternalServerError, err.Error())
+
 		return
 	}
 	http.Redirect(w, r, url, http.StatusSeeOther)
@@ -432,6 +453,7 @@ func Serverless(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		writeResponse(w, http.StatusInternalServerError, err.Error())
+
 		return
 	}
 	defer s.Close(r.Context())

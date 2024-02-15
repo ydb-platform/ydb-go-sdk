@@ -33,6 +33,7 @@ func (lhs version) Less(rhs version) bool {
 	if lhs.Patch > rhs.Patch {
 		return false
 	}
+
 	return lhs.Suffix < rhs.Suffix
 }
 
@@ -46,6 +47,7 @@ func Lt(lhs, rhs string) bool {
 	if err != nil {
 		return false
 	}
+
 	return v1.Less(v2)
 }
 
@@ -62,6 +64,7 @@ func Gte(lhs, rhs string) bool {
 	if v1.Less(v2) {
 		return false
 	}
+
 	return true
 }
 
@@ -90,5 +93,6 @@ func parse(s string) (v version, err error) {
 			return version{}, xerrors.WithStackTrace(err)
 		}
 	}
+
 	return v, nil
 }

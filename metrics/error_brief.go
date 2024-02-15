@@ -34,6 +34,7 @@ func errorBrief(err error) string {
 			buffer.WriteString(errorBrief(netErr.Err))
 			buffer.WriteByte(')')
 		}
+
 		return buffer.String()
 	}
 	if xerrors.Is(err, context.DeadlineExceeded) {
@@ -54,5 +55,6 @@ func errorBrief(err error) string {
 	if ydbErr := xerrors.Error(nil); xerrors.As(err, &ydbErr) {
 		return ydbErr.Name()
 	}
+
 	return "unknown"
 }

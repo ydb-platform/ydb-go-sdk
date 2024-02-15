@@ -77,6 +77,7 @@ func (b *Worker) Close(ctx context.Context, err error) error {
 	b.m.WithLock(func() {
 		if b.closed {
 			resErr = xerrors.WithStackTrace(ErrAlreadyClosed)
+
 			return
 		}
 

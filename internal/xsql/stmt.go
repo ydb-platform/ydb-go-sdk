@@ -76,6 +76,7 @@ func (s *stmt) Close() (finalErr error) {
 	defer func() {
 		onDone(finalErr)
 	}()
+
 	return nil
 }
 

@@ -32,6 +32,7 @@ func createTables(ctx context.Context, db *ydb.Driver) error {
 		if ydb.IsOperationErrorSchemeError(err) {
 			err = nil
 		}
+
 		return err
 	})
 	if err != nil {
@@ -59,6 +60,7 @@ UPSERT INTO bus (id, freeSeats) VALUES ("bus1", 40), ("bus2", 60);
 	if err != nil {
 		return fmt.Errorf("failed insert rows: %w", err)
 	}
+
 	return nil
 }
 
@@ -104,6 +106,7 @@ func connect() *ydb.Driver {
 		panic(fmt.Errorf("failed to create to ydb: %w", err))
 	}
 	log.Printf("connected to database")
+
 	return db
 }
 

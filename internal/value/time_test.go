@@ -20,6 +20,7 @@ func TestTzSomeToTime(t *testing.T) {
 			time.Date(2020, time.May, 29, 0, 0, 0, 0,
 				func() *time.Location {
 					l, _ := time.LoadLocation("Europe/Berlin")
+
 					return l
 				}(),
 			),
@@ -31,6 +32,7 @@ func TestTzSomeToTime(t *testing.T) {
 			time.Date(2020, time.May, 29, 11, 22, 54, 0,
 				func() *time.Location {
 					l, _ := time.LoadLocation("Europe/Berlin")
+
 					return l
 				}(),
 			),
@@ -42,6 +44,7 @@ func TestTzSomeToTime(t *testing.T) {
 			time.Date(2020, time.May, 29, 11, 22, 54, 123456000,
 				func() *time.Location {
 					l, _ := time.LoadLocation("Europe/Berlin")
+
 					return l
 				}(),
 			),
@@ -53,6 +56,7 @@ func TestTzSomeToTime(t *testing.T) {
 			time.Date(2020, time.May, 29, 11, 22, 54, 0,
 				func() *time.Location {
 					l, _ := time.LoadLocation("Europe/Berlin")
+
 					return l
 				}(),
 			),

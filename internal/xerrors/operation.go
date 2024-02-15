@@ -105,6 +105,7 @@ func Operation(opts ...oeOpt) error {
 			opt.applyToOperationError(oe)
 		}
 	}
+
 	return oe
 }
 
@@ -126,6 +127,7 @@ func (e *operationError) Error() string {
 		b.WriteString(e.issues.String())
 	}
 	b.WriteString(")")
+
 	return b.String()
 }
 
@@ -143,6 +145,7 @@ func IsOperationError(err error, codes ...Ydb.StatusIds_StatusCode) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -154,6 +157,7 @@ func IsOperationErrorTransactionLocksInvalidated(err error) (isTLI bool) {
 			isTLI = isTLI || (code == issueCodeTransactionLocksInvalidated)
 		})
 	}
+
 	return isTLI
 }
 
@@ -208,5 +212,6 @@ func OperationError(err error) Error {
 	if errors.As(err, &o) {
 		return o
 	}
+
 	return nil
 }

@@ -143,6 +143,7 @@ func (m *PublicBatch) append(b *PublicBatch) (*PublicBatch, error) {
 
 	res.Messages = append(res.Messages, b.Messages...)
 	res.commitRange.commitOffsetEnd = b.commitRange.commitOffsetEnd
+
 	return res, nil
 }
 
@@ -157,6 +158,7 @@ func (m *PublicBatch) cutMessages(count int) (head, rest *PublicBatch) {
 		// explicit 0 need for prevent typos, when type slice[count:count] instead of slice[:count:count]
 		head, _ = newBatch(m.commitRange.partitionSession, m.Messages[0:count:count])
 		rest, _ = newBatch(m.commitRange.partitionSession, m.Messages[count:])
+
 		return head, rest
 	}
 }
@@ -175,9 +177,11 @@ func splitBytesByMessagesInBatches(batches []*PublicBatch, totalBytesCount int) 
 		case want >= restBytes:
 			res := restBytes
 			restBytes = 0
+
 			return res
 		default:
 			restBytes -= want
+
 			return want
 		}
 	}

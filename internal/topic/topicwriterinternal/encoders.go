@@ -42,6 +42,7 @@ func (e *EncoderMap) CreateLazyEncodeWriter(codec rawtopiccommon.Codec, target i
 	if encoderCreator, ok := e.m[codec]; ok {
 		return encoderCreator(target)
 	}
+
 	return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected codec '%v' for encode message", codec)))
 }
 
@@ -50,11 +51,13 @@ func (e *EncoderMap) GetSupportedCodecs() rawtopiccommon.SupportedCodecs {
 	for codec := range e.m {
 		res = append(res, codec)
 	}
+
 	return res
 }
 
 func (e *EncoderMap) IsSupported(codec rawtopiccommon.Codec) bool {
 	_, ok := e.m[codec]
+
 	return ok
 }
 
@@ -122,6 +125,7 @@ func (s *EncoderSelector) CompressMessages(messages []messageWithDataContent) (r
 		err = cacheMessages(messages, codec, s.parallelCompressors)
 		onCompressDone(err)
 	}
+
 	return codec, err
 }
 
@@ -257,6 +261,7 @@ func cacheMessages(messages []messageWithDataContent, codec rawtopiccommon.Codec
 				resErrMutex.WithLock(func() {
 					resErr = localErr
 				})
+
 				return
 			}
 		}

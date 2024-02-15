@@ -93,6 +93,7 @@ func main() {
 	if err != nil {
 		fmt.Println()
 		fmt.Println("Create service failed. Re-run with flag '-log-level=warn' and see logs")
+
 		return
 	}
 	defer s.Close(ctx)

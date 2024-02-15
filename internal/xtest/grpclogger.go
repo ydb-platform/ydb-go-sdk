@@ -42,6 +42,7 @@ func (l GrpcLogger) UnaryClientInterceptor(
 		req,
 		reply,
 	)
+
 	return err
 }
 
@@ -64,6 +65,7 @@ func (l GrpcLogger) StreamClientInterceptor(
 		err,
 		streamWrapper.streamID,
 	)
+
 	return stream, err
 }
 
@@ -80,17 +82,20 @@ func newGrpcLoggerStream(stream grpc.ClientStream, t testing.TB) grpcLoggerStrea
 func (g grpcLoggerStream) CloseSend() error {
 	err := g.ClientStream.CloseSend()
 	g.t.Logf("CloseSend: %v (streamID: %v)", err, g.streamID)
+
 	return err
 }
 
 func (g grpcLoggerStream) SendMsg(m interface{}) error {
 	err := g.ClientStream.SendMsg(m)
 	g.t.Logf("SendMsg (streamID: %v) with err '%v':\n%v ", g.streamID, err, m)
+
 	return err
 }
 
 func (g grpcLoggerStream) RecvMsg(m interface{}) error {
 	err := g.ClientStream.RecvMsg(m)
 	g.t.Logf("RecvMsg (streamID: %v) with err '%v':\n%v ", g.streamID, err, m)
+
 	return err
 }

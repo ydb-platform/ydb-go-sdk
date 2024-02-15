@@ -63,6 +63,7 @@ func newClient(
 		waitChPool: sync.Pool{
 			New: func() interface{} {
 				ch := make(chan *session)
+
 				return &ch
 			},
 		},
@@ -217,6 +218,7 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 		if r.err != nil {
 			return nil, xerrors.WithStackTrace(r.err)
 		}
+
 		return r.s, nil
 	}
 }
@@ -234,6 +236,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
+
 		return s, nil
 	}
 	if !c.config.AutoRetry() {
@@ -241,6 +244,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
+
 		return s, nil
 	}
 	err = retry.Retry(ctx,
@@ -249,6 +253,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 			if err != nil {
 				return xerrors.WithStackTrace(err)
 			}
+
 			return nil
 		},
 		append(
@@ -257,8 +262,10 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 				retry.WithTrace(&trace.Retry{
 					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 						onIntermediate := trace.TableOnCreateSession(c.config.Trace(), info.Context, stack.FunctionID(""))
+
 						return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
 							onDone := onIntermediate(info.Error)
+
 							return func(info trace.RetryLoopDoneInfo) {
 								onDone(s, info.Attempts, info.Error)
 							}
@@ -268,6 +275,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 			}, c.retryOptions(opts...).RetryOptions...,
 		)...,
 	)
+
 	return s, xerrors.WithStackTrace(err)
 }
 
@@ -389,6 +397,7 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 			if c.nodeChecker != nil && !c.nodeChecker.HasNode(s.NodeID()) {
 				_ = s.Close(ctx)
 				s = nil
+
 				continue
 			}
 
@@ -437,6 +446,7 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 			idle = c.idle.Len()
 			createInProgress = c.createInProgress
 		})
+
 		return s, xerrors.WithStackTrace(
 			fmt.Errorf("failed to get session from pool ("+
 				"attempts: %d, latency: %v, pool have %d sessions (%d busy, %d idle, %d create_in_progress): %w",
@@ -444,6 +454,7 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 			),
 		)
 	}
+
 	return s, nil
 }
 
@@ -481,6 +492,7 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s 
 		c.mu.WithLock(func() {
 			c.waitQ.Remove(el)
 		})
+
 		return nil, xerrors.WithStackTrace(errClosedClient)
 
 	case s, ok = <-*ch:
@@ -496,18 +508,21 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s 
 			// for the next waiter – session could be lost for a long time.
 			c.internalPoolPutWaitCh(ch)
 		}
+
 		return s, nil
 
 	case <-createSessionTimeoutCh:
 		c.mu.WithLock(func() {
 			c.waitQ.Remove(el)
 		})
+
 		return nil, nil //nolint:nilnil
 
 	case <-ctx.Done():
 		c.mu.WithLock(func() {
 			c.waitQ.Remove(el)
 		})
+
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	}
 }
@@ -700,6 +715,7 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 						}
 					}()
 				}
+
 				return op(xcontext.MarkRetryCall(ctx), tx)
 			}()
 
@@ -779,6 +795,7 @@ func (c *Client) internalPoolGetWaitCh() *chan *session { //nolint:gocritic
 	if !ok {
 		panic(fmt.Sprintf("%T is not a chan of sessions", ch))
 	}
+
 	return s
 }
 
@@ -801,6 +818,7 @@ func (c *Client) internalPoolPeekFirstIdle() (s *session, touched time.Time) {
 	if !has || el != info.idle {
 		panic("inconsistent session client index")
 	}
+
 	return s, info.touched
 }
 
@@ -814,6 +832,7 @@ func (c *Client) internalPoolRemoveFirstIdle() *session {
 		info := c.internalPoolRemoveIdle(s)
 		c.index[s] = info
 	}
+
 	return s
 }
 
@@ -848,6 +867,7 @@ func (c *Client) internalPoolNotify(s *session) (notified bool) {
 			close(*ch)
 		}
 	}
+
 	return false
 }
 
@@ -869,6 +889,7 @@ func (c *Client) internalPoolRemoveIdle(s *session) sessionInfo {
 	c.idle.Remove(info.idle)
 	info.idle = nil
 	c.index[s] = info
+
 	return info
 }
 

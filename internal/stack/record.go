@@ -72,6 +72,7 @@ type call struct {
 
 func Call(depth int) (c call) {
 	c.function, c.file, c.line, _ = runtime.Caller(depth + 1)
+
 	return c
 }
 
@@ -166,6 +167,7 @@ func (c call) Record(opts ...recordOption) string {
 			buffer.WriteByte(')')
 		}
 	}
+
 	return buffer.String()
 }
 

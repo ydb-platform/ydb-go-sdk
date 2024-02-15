@@ -41,6 +41,7 @@ func New() (*Config, error) {
 
 	if len(os.Args) < 2 {
 		fmt.Print(mainHelp)
+
 		return nil, ErrWrongArgs
 	}
 
@@ -50,6 +51,7 @@ func New() (*Config, error) {
 	case "create":
 		if len(os.Args) < 4 {
 			fmt.Print(createHelp)
+
 			return nil, ErrWrongArgs
 		}
 
@@ -70,6 +72,7 @@ func New() (*Config, error) {
 	case "cleanup":
 		if len(os.Args) < 4 {
 			fmt.Print(cleanupHelp)
+
 			return nil, ErrWrongArgs
 		}
 
@@ -78,6 +81,7 @@ func New() (*Config, error) {
 	case "run":
 		if len(os.Args) < 4 {
 			fmt.Print(runHelp)
+
 			return nil, ErrWrongArgs
 		}
 
@@ -99,6 +103,7 @@ func New() (*Config, error) {
 		fs.IntVar(&cfg.ShutdownTime, "shutdown-time", 30, "time to wait before force kill workers")
 	default:
 		fmt.Print(mainHelp)
+
 		return nil, ErrWrongArgs
 	}
 

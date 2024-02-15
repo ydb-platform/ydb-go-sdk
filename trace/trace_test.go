@@ -69,6 +69,7 @@ func stubEachFunc(x reflect.Value) map[string]bool {
 			fs[name] = true
 		},
 	}).Stub(x)
+
 	return fs
 }
 

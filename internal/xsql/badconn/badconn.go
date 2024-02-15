@@ -24,6 +24,7 @@ func (e Error) Is(err error) bool {
 	if err == driver.ErrBadConn { //nolint:errorlint
 		return true
 	}
+
 	return xerrors.Is(e.err, err)
 }
 

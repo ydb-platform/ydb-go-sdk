@@ -31,6 +31,7 @@ func dropTableIfExists(ctx context.Context, c table.Client, path string) (err er
 	if !ydb.IsOperationErrorSchemeError(err) {
 		return err
 	}
+
 	return nil
 }
 
@@ -76,6 +77,7 @@ func render(t *template.Template, data interface{}) string {
 	if err != nil {
 		panic(err)
 	}
+
 	return buf.String()
 }
 
@@ -116,6 +118,7 @@ func fillTable(ctx context.Context, c table.Client, prefix string) (err error) {
 					),
 				),
 			)
+
 			return err
 		},
 	)
@@ -126,6 +129,7 @@ func order(customerID, orderID uint64, description, date string) types.Value {
 	if err != nil {
 		panic(err)
 	}
+
 	return types.StructValue(
 		types.StructFieldValue("customer_id", types.Uint64Value(customerID)),
 		types.StructFieldValue("order_id", types.Uint64Value(orderID)),
@@ -173,8 +177,10 @@ func readTable(ctx context.Context, c table.Client, path string, opts ...options
 					}
 				}
 			}
+
 			return res.Err()
 		},
 	)
+
 	return err
 }

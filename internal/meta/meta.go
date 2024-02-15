@@ -29,6 +29,7 @@ func New(
 			o(m)
 		}
 	}
+
 	return m
 }
 
@@ -118,6 +119,7 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		if stringer, ok := m.credentials.(fmt.Stringer); ok {
 			return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %s", err, stringer.String()))
 		}
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -131,5 +133,6 @@ func (m *Meta) Context(ctx context.Context) (_ context.Context, err error) {
 	if err != nil {
 		return ctx, xerrors.WithStackTrace(err)
 	}
+
 	return metadata.NewOutgoingContext(ctx, md), nil
 }

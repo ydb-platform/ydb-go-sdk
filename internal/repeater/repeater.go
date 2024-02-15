@@ -78,6 +78,7 @@ func EventType(ctx context.Context) Event {
 	if eventType, ok := ctx.Value(ctxEventTypeKey{}).(Event); ok {
 		return eventType
 	}
+
 	return EventUnknown
 }
 

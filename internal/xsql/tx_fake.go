@@ -29,6 +29,7 @@ func (tx *txFake) PrepareContext(ctx context.Context, query string) (_ driver.St
 	if !tx.conn.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
+
 	return &stmt{
 		conn:      tx.conn,
 		processor: tx,
@@ -70,6 +71,7 @@ func (tx *txFake) Commit() (err error) {
 	if !tx.conn.isReady() {
 		return badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
+
 	return nil
 }
 
@@ -87,6 +89,7 @@ func (tx *txFake) Rollback() (err error) {
 	if !tx.conn.isReady() {
 		return badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
+
 	return err
 }
 
@@ -105,6 +108,7 @@ func (tx *txFake) QueryContext(ctx context.Context, query string, args []driver.
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	return rows, nil
 }
 
@@ -123,5 +127,6 @@ func (tx *txFake) ExecContext(ctx context.Context, query string, args []driver.N
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	return result, nil
 }

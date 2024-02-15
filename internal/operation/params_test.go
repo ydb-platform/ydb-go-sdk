@@ -224,6 +224,7 @@ func TestParams(t *testing.T) {
 					),
 					time.Second*5,
 				), time.Second*10)
+
 				return ctx
 			}(),
 			timeout:     time.Second * 2,
@@ -244,6 +245,7 @@ func TestParams(t *testing.T) {
 					),
 					time.Second*5,
 				), time.Second*1)
+
 				return ctx
 			}(),
 			timeout:     time.Second * 2,
@@ -264,6 +266,7 @@ func TestParams(t *testing.T) {
 					),
 					time.Second*5,
 				), time.Second*1)
+
 				return ctx
 			}(),
 			preferContextTimeout: true,
@@ -279,6 +282,7 @@ func TestParams(t *testing.T) {
 		{
 			ctx: func() context.Context {
 				ctx, _ := xcontext.WithTimeout(context.Background(), time.Second*1)
+
 				return ctx
 			}(),
 			preferContextTimeout: true,
@@ -306,6 +310,7 @@ func TestParams(t *testing.T) {
 						tt.exp,
 					)
 				}
+
 				return
 			}
 			if !reflect.DeepEqual(got.OperationMode, tt.exp.OperationMode) {

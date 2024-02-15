@@ -48,11 +48,13 @@ func TestField_String(t *testing.T) {
 			// Known fieldType, but String() panics with it.
 			if tt.panic {
 				require.Panics(t, func() { _ = tt.f.String() })
+
 				return
 			}
 			// Unknown fieldType, maybe a new one has been added
 			if tt.fail {
 				t.Fail()
+
 				return
 			}
 			require.Equal(t, tt.want, tt.f.String())

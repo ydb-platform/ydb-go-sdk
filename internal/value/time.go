@@ -72,6 +72,7 @@ func TzDateToTime(s string) (t time.Time, err error) {
 	if err != nil {
 		return t, xerrors.WithStackTrace(fmt.Errorf("parse '%s' failed: %w", s, err))
 	}
+
 	return t, nil
 }
 
@@ -88,6 +89,7 @@ func TzDatetimeToTime(s string) (t time.Time, err error) {
 	if err != nil {
 		return t, xerrors.WithStackTrace(fmt.Errorf("parse '%s' failed: %w", s, err))
 	}
+
 	return t, nil
 }
 
@@ -108,5 +110,6 @@ func TzTimestampToTime(s string) (t time.Time, err error) {
 	if err != nil {
 		return t, xerrors.WithStackTrace(fmt.Errorf("parse '%s' failed: %w", s, err))
 	}
+
 	return t, nil
 }

@@ -48,6 +48,7 @@ func Example_consumedUnitsCount() {
 				}
 				log.Printf("id=%v, myStr='%s'\n", id, myStr)
 			}
+
 			return res.Err() // return finally result error for auto-retry with driver
 		},
 		table.WithIdempotent(),
