@@ -20,7 +20,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
@@ -517,7 +516,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			},
 		}
 
-		var connectionAttempt xatomic.Int64
+		var connectionAttempt atomic.Int64
 		w.cfg.Connect = func(ctx context.Context) (RawTopicWriterStream, error) {
 			attemptIndex := int(connectionAttempt.Add(1)) - 1
 			t.Logf("connect with attempt index: %v", attemptIndex)

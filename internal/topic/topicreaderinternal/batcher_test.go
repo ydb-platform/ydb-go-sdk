@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -11,7 +12,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
@@ -283,7 +283,7 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 			},
 		}}))
 
-		var IgnoreMinRestrictionsOnNextPopDone xatomic.Int64
+		var IgnoreMinRestrictionsOnNextPopDone atomic.Int64
 		go func() {
 			defer IgnoreMinRestrictionsOnNextPopDone.Add(1)
 

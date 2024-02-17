@@ -6,6 +6,7 @@ package integration
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -13,7 +14,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -38,8 +38,8 @@ func TestTopicPartitionsBalanced(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	var connectedPartitions xatomic.Int64
-	var handled xatomic.Int64
+	var connectedPartitions atomic.Int64
+	var handled atomic.Int64
 
 	var sessionsMutex sync.Mutex
 	sessions := map[int64]bool{}
