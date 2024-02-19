@@ -51,6 +51,7 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 						testutil.BackoffFunc(func(n int) <-chan time.Time {
 							ch := make(chan time.Time)
 							backoff <- ch
+
 							return ch
 						}),
 					),
@@ -58,6 +59,7 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 						testutil.BackoffFunc(func(n int) <-chan time.Time {
 							ch := make(chan time.Time)
 							backoff <- ch
+
 							return ch
 						}),
 					),
@@ -84,12 +86,14 @@ func TestRetryerBadSession(t *testing.T) {
 			s.onClose = append(s.onClose, func(s *session) {
 				closed[s] = true
 			})
+
 			return s, nil
 		},
 		OnPut: func(ctx context.Context, s *session) error {
 			if s.isClosing() {
 				return s.Close(ctx)
 			}
+
 			return nil
 		},
 	}
@@ -106,6 +110,7 @@ func TestRetryerBadSession(t *testing.T) {
 			if i > maxRetryes {
 				cancel()
 			}
+
 			return xerrors.Operation(
 				xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
 			)
@@ -136,12 +141,14 @@ func TestRetryerSessionClosing(t *testing.T) {
 			s.onClose = append(s.onClose, func(s *session) {
 				closed[s] = true
 			})
+
 			return s, nil
 		},
 		OnPut: func(ctx context.Context, s *session) error {
 			if s.isClosing() {
 				return s.Close(ctx)
 			}
+
 			return nil
 		},
 	}
@@ -154,6 +161,7 @@ func TestRetryerSessionClosing(t *testing.T) {
 			func(ctx context.Context, s table.Session) error {
 				sessions = append(sessions, s)
 				s.(*session).SetStatus(table.SessionClosing)
+
 				return nil
 			},
 			nil,
@@ -444,6 +452,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 					if i < limit {
 						return test.error
 					}
+
 					return nil
 				},
 				nil,
@@ -486,6 +495,7 @@ func (f SessionProviderFunc) Get(ctx context.Context) (*session, error) {
 	if f.OnGet == nil {
 		return nil, xerrors.WithStackTrace(errNoSession)
 	}
+
 	return f.OnGet(ctx)
 }
 
@@ -493,6 +503,7 @@ func (f SessionProviderFunc) Put(ctx context.Context, s *session) error {
 	if f.OnPut == nil {
 		return xerrors.WithStackTrace(testutil.ErrNotImplemented)
 	}
+
 	return f.OnPut(ctx, s)
 }
 
@@ -512,6 +523,7 @@ func (s *singleSession) Get(context.Context) (*session, error) {
 		return nil, xerrors.WithStackTrace(errNoSession)
 	}
 	s.empty = true
+
 	return s.s, nil
 }
 
@@ -523,6 +535,7 @@ func (s *singleSession) Put(_ context.Context, x *session) error {
 		return xerrors.WithStackTrace(errSessionOverflow)
 	}
 	s.empty = false
+
 	return nil
 }
 

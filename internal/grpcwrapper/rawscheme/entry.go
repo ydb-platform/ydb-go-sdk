@@ -45,6 +45,7 @@ func (e *Entry) FromProto(proto *Ydb_Scheme.Entry) error {
 	}
 
 	e.SizeBytes = proto.GetSizeBytes()
+
 	return nil
 }
 
@@ -75,5 +76,6 @@ func (p *Permissions) FromProto(proto *Ydb_Scheme.Permissions) error {
 	}
 	p.Subject = proto.GetSubject()
 	p.PermissionNames = proto.GetPermissionNames()
+
 	return nil
 }

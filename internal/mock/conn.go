@@ -67,11 +67,13 @@ func (c *Conn) GetState() conn.State {
 
 func (c *Conn) SetState(ctx context.Context, state conn.State) conn.State {
 	c.State = state
+
 	return c.State
 }
 
 func (c *Conn) Unban(ctx context.Context) conn.State {
 	c.SetState(ctx, conn.Online)
+
 	return conn.Online
 }
 
@@ -115,6 +117,7 @@ func (e *Endpoint) String() string {
 
 func (e *Endpoint) Copy() endpoint.Endpoint {
 	c := *e
+
 	return &c
 }
 

@@ -33,6 +33,7 @@ func (c isDirectoryExistsSchemeClient) ListDirectory(ctx context.Context, path s
 	}
 	if strings.HasPrefix(c.existingPath, path) {
 		children := strings.Split(strings.TrimLeft(c.existingPath, path), "/")
+
 		return scheme.Directory{
 			Entry: scheme.Entry{
 				Name: path,
@@ -46,6 +47,7 @@ func (c isDirectoryExistsSchemeClient) ListDirectory(ctx context.Context, path s
 			},
 		}, nil
 	}
+
 	return d, fmt.Errorf("path '%s' not found in '%s'", path, c)
 }
 
@@ -173,6 +175,7 @@ func (c isTableExistsSchemeClient) ListDirectory(ctx context.Context, path strin
 			}, nil
 		}
 	}
+
 	return d, fmt.Errorf("path '%s' not found in '%s'", path, c)
 }
 

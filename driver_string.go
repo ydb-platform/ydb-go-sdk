@@ -18,5 +18,6 @@ func (d *Driver) String() string {
 		fmt.Fprintf(buffer, ",Credentials:%v", c.String())
 	}
 	buffer.WriteByte('}')
+
 	return buffer.String()
 }

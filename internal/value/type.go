@@ -34,6 +34,7 @@ func TypeFromYDB(x *Ydb.Type) Type {
 
 	case *Ydb.Type_DecimalType:
 		d := v.DecimalType
+
 		return Decimal(d.GetPrecision(), d.GetScale())
 
 	case *Ydb.Type_TupleType:
@@ -49,6 +50,7 @@ func TypeFromYDB(x *Ydb.Type) Type {
 		if valueType.equalsTo(Void()) {
 			return Set(keyType)
 		}
+
 		return Dict(keyType, valueType)
 
 	case *Ydb.Type_VariantType:
@@ -135,6 +137,7 @@ func TypesFromYDB(es []*Ydb.Type) []Type {
 	for i, el := range es {
 		ts[i] = TypeFromYDB(el)
 	}
+
 	return ts
 }
 
@@ -161,6 +164,7 @@ func (v *DecimalType) Yql() string {
 
 func (v *DecimalType) equalsTo(rhs Type) bool {
 	vv, ok := rhs.(*DecimalType)
+
 	return ok && *v == *vv
 }
 
@@ -203,6 +207,7 @@ func (v *dictType) Yql() string {
 	buffer.WriteByte(',')
 	buffer.WriteString(v.valueType.Yql())
 	buffer.WriteByte('>')
+
 	return buffer.String()
 }
 
@@ -217,6 +222,7 @@ func (v *dictType) equalsTo(rhs Type) bool {
 	if !v.valueType.equalsTo(vv.valueType) {
 		return false
 	}
+
 	return true
 }
 
@@ -254,6 +260,7 @@ func (v emptyListType) String() string {
 
 func (emptyListType) equalsTo(rhs Type) bool {
 	_, ok := rhs.(emptyListType)
+
 	return ok
 }
 
@@ -281,6 +288,7 @@ func (v emptyDictType) Yql() string {
 
 func (emptyDictType) equalsTo(rhs Type) bool {
 	_, ok := rhs.(emptyDictType)
+
 	return ok
 }
 
@@ -317,6 +325,7 @@ func (v *listType) equalsTo(rhs Type) bool {
 	if !ok {
 		return false
 	}
+
 	return v.itemType.equalsTo(vv.itemType)
 }
 
@@ -358,6 +367,7 @@ func (v *setType) equalsTo(rhs Type) bool {
 	if !ok {
 		return false
 	}
+
 	return v.itemType.equalsTo(vv.itemType)
 }
 
@@ -405,6 +415,7 @@ func (v optionalType) equalsTo(rhs Type) bool {
 	if !ok {
 		return false
 	}
+
 	return v.innerType.equalsTo(vv.innerType)
 }
 
@@ -529,6 +540,7 @@ func (v PrimitiveType) equalsTo(rhs Type) bool {
 	if !ok {
 		return false
 	}
+
 	return v == vv
 }
 
@@ -563,6 +575,7 @@ func (v *StructType) Yql() string {
 		buffer.WriteString(v.fields[i].T.Yql())
 	}
 	buffer.WriteByte('>')
+
 	return buffer.String()
 }
 
@@ -582,6 +595,7 @@ func (v *StructType) equalsTo(rhs Type) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -621,6 +635,7 @@ func StructFields(ms []*Ydb.StructMember) []StructField {
 			T:    TypeFromYDB(m.GetType()),
 		}
 	}
+
 	return fs
 }
 
@@ -643,6 +658,7 @@ func (v *TupleType) Yql() string {
 		buffer.WriteString(t.Yql())
 	}
 	buffer.WriteByte('>')
+
 	return buffer.String()
 }
 
@@ -659,6 +675,7 @@ func (v *TupleType) equalsTo(rhs Type) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -705,6 +722,7 @@ func (v *variantStructType) Yql() string {
 		buffer.WriteString(v.fields[i].T.Yql())
 	}
 	buffer.WriteByte('>')
+
 	return buffer.String()
 }
 
@@ -757,6 +775,7 @@ func (v *variantTupleType) Yql() string {
 		buffer.WriteString(t.Yql())
 	}
 	buffer.WriteByte('>')
+
 	return buffer.String()
 }
 
@@ -810,6 +829,7 @@ var _voidType = &Ydb.Type{
 
 func (v voidType) equalsTo(rhs Type) bool {
 	_, ok := rhs.(voidType)
+
 	return ok
 }
 
@@ -837,6 +857,7 @@ var _nullType = &Ydb.Type{
 
 func (v nullType) equalsTo(rhs Type) bool {
 	_, ok := rhs.(nullType)
+
 	return ok
 }
 

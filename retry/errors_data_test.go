@@ -19,6 +19,7 @@ func (t idempotency) String() string {
 	if t {
 		return "idempotent"
 	}
+
 	return "non-idempotent"
 }
 
@@ -408,7 +409,7 @@ var errsToCheck = []struct {
 		backoff:       backoff.TypeNoBackoff,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
-			idempotent:    false,
+			idempotent:    true,
 			nonIdempotent: false,
 		},
 	},

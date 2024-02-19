@@ -24,6 +24,7 @@ func (d Details) String() string {
 		}
 	}
 	sort.Strings(ss)
+
 	return strings.Join(ss, "|")
 }
 
@@ -211,5 +212,6 @@ func MatchDetails(pattern string, opts ...matchDetailsOption) (d Details) {
 	if d == 0 {
 		return h.defaultDetails
 	}
+
 	return d
 }

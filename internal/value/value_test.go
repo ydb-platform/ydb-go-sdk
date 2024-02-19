@@ -290,6 +290,7 @@ func TestValueYql(t *testing.T) {
 		{
 			value: DateValue(func() uint32 {
 				v, _ := time.Parse("2006-01-02", "2022-06-17")
+
 				return uint32(v.Sub(time.Unix(0, 0)) / time.Hour / 24)
 			}()),
 			literal: `Date("2022-06-17")`,
@@ -297,6 +298,7 @@ func TestValueYql(t *testing.T) {
 		{
 			value: DatetimeValue(func() uint32 {
 				v, _ := time.Parse("2006-01-02 15:04:05", "2022-06-17 05:19:20")
+
 				return uint32(v.UTC().Sub(time.Unix(0, 0)).Seconds())
 			}()),
 			literal: `Datetime("2022-06-17T05:19:20Z")`,
@@ -317,6 +319,7 @@ func TestValueYql(t *testing.T) {
 			value: TimestampValueFromTime(func() time.Time {
 				tt, err := time.Parse(LayoutTimestamp, "1997-12-14T03:09:42.123456Z")
 				require.NoError(t, err)
+
 				return tt.UTC()
 			}()),
 			literal: `Timestamp("1997-12-14T03:09:42.123456Z")`,

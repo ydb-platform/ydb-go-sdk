@@ -72,8 +72,10 @@ func (offset OptionalOffset) ToInt64() int64 {
 func (offset OptionalOffset) ToInt64Pointer() *int64 {
 	if offset.HasValue {
 		v := offset.Offset.ToInt64()
+
 		return &v
 	}
+
 	return nil
 }
 
@@ -137,6 +139,7 @@ func (r *InitRequest) GetTopics() []string {
 	for i := range res {
 		res[i] = r.TopicsReadSettings[i].Path
 	}
+
 	return res
 }
 
@@ -198,6 +201,7 @@ func (r *ReadResponse) GetPartitionBatchMessagesCounts() (partitionDataCount, ba
 			messagesCount += len(partitionData.Batches[batchIndex].MessageData)
 		}
 	}
+
 	return partitionDataCount, batchCount, messagesCount
 }
 
@@ -257,6 +261,7 @@ func (r *ReadResponse) fromProto(p *Ydb_Topic.StreamReadMessage_ReadResponse) er
 			}
 		}
 	}
+
 	return nil
 }
 
@@ -314,6 +319,7 @@ func (r *CommitOffsetRequest) toProto() *Ydb_Topic.StreamReadMessage_CommitOffse
 			dstCommitOffset.Offsets[offsetIndex] = srcPartitionCommitOffset.Offsets[offsetIndex].ToProto()
 		}
 	}
+
 	return res
 }
 
@@ -334,6 +340,7 @@ func (r *OffsetRange) FromProto(p *Ydb_Topic.OffsetsRange) error {
 
 	r.Start.FromInt64(p.GetStart())
 	r.End.FromInt64(p.GetEnd())
+
 	return nil
 }
 
@@ -407,6 +414,7 @@ func (r *PartitionSessionStatusResponse) fromProto(
 		return err
 	}
 	r.WriteTimeHighWatermark = p.GetWriteTimeHighWatermark().AsTime()
+
 	return nil
 }
 
@@ -461,6 +469,7 @@ func (r *StartPartitionSessionResponse) toProto() *Ydb_Topic.StreamReadMessage_S
 		ReadOffset:         r.ReadOffset.ToInt64Pointer(),
 		CommitOffset:       r.CommitOffset.ToInt64Pointer(),
 	}
+
 	return res
 }
 
@@ -485,6 +494,7 @@ func (r *StopPartitionSessionRequest) fromProto(proto *Ydb_Topic.StreamReadMessa
 	r.PartitionSessionID.FromInt64(proto.GetPartitionSessionId())
 	r.Graceful = proto.GetGraceful()
 	r.CommittedOffset.FromInt64(proto.GetCommittedOffset())
+
 	return nil
 }
 

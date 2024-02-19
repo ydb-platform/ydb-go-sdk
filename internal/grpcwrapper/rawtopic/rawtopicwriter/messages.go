@@ -217,6 +217,7 @@ func (r *WriteResult) fromProto(response *Ydb_Topic.StreamWriteMessage_WriteResp
 		}
 	}
 	r.PartitionID = response.GetPartitionId()
+  
 	return r.WriteStatistics.fromProto(response.GetWriteStatistics())
 }
 
@@ -230,7 +231,9 @@ func (wa *WriteAck) fromProto(pb *Ydb_Topic.StreamWriteMessage_WriteResponse_Wri
 		return xerrors.WithStackTrace(errWriteResultResponseWriteAckIsNil)
 	}
 	wa.SeqNo = pb.GetSeqNo()
+  
 	return wa.MessageWriteStatus.fromProto(pb.GetMessageWriteStatus())
+
 }
 
 // MessageWriteStatus is struct because it included in per-message structure and
@@ -247,10 +250,12 @@ func (s *MessageWriteStatus) fromProto(status interface{}) error {
 	case *Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Written_:
 		s.Type = WriteStatusTypeWritten
 		s.WrittenOffset = v.Written.GetOffset()
+    
 		return nil
 	case *Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Skipped_:
 		s.Type = WriteStatusTypeSkipped
 		s.SkippedReason = WriteStatusSkipReason(v.Skipped.GetReason())
+
 		return nil
 	default:
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected write status type: %v", reflect.TypeOf(v))))
@@ -288,6 +293,7 @@ func (s *WriteStatistics) fromProto(statistics *Ydb_Topic.StreamWriteMessage_Wri
 	s.MinQueueWaitTime = statistics.GetMinQueueWaitTime().AsDuration()
 	s.MaxQueueWaitTime = statistics.GetMaxQueueWaitTime().AsDuration()
 	s.TopicQuotaWaitTime = statistics.GetTopicQuotaWaitTime().AsDuration()
+
 	return nil
 }
 

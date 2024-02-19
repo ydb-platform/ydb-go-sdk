@@ -12,5 +12,6 @@ func ExtractLocalDC(ctx context.Context) string {
 	if val := ctx.Value(localDcKey{}); val != nil {
 		return val.(string)
 	}
+
 	return ""
 }

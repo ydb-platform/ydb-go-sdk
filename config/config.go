@@ -292,5 +292,6 @@ func (c *Config) With(opts ...Option) *Config {
 		c.trace,
 		c.metaOptions...,
 	)
+
 	return c
 }

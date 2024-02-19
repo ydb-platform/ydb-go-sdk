@@ -100,6 +100,7 @@ func AccessError(msg string, err error, opts ...authErrorOption) error {
 		opt.applyAuthErrorOption(buffer)
 	}
 	buffer.WriteString("): %w")
+
 	return xerrors.WithStackTrace(fmt.Errorf(buffer.String(), err), xerrors.WithSkipDepth(1))
 }
 
@@ -115,5 +116,6 @@ func IsAccessError(err error) bool {
 	) {
 		return true
 	}
+
 	return false
 }

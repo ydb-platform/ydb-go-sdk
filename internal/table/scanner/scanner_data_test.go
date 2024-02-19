@@ -29,6 +29,7 @@ func (s *intIncScanner) Scan(src interface{}) error {
 		return fmt.Errorf("wrong type: %T, exp: int64", src)
 	}
 	*s = intIncScanner(v + 10)
+
 	return nil
 }
 
@@ -40,6 +41,7 @@ func (s *dateScanner) Scan(src interface{}) error {
 		return fmt.Errorf("wrong type: %T, exp: time.Time", src)
 	}
 	*s = dateScanner(v)
+
 	return nil
 }
 
@@ -485,6 +487,7 @@ func initScanner() *scanner {
 		columnIndexes: nil,
 		err:           nil,
 	}
+
 	return &res
 }
 
@@ -543,5 +546,6 @@ func PrepareScannerPerformanceTest(count int) *scanner {
 		})
 	}
 	res.converter = &rawConverter{res}
+
 	return res
 }

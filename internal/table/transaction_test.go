@@ -31,6 +31,7 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 							t.Fatalf("cannot cast request '%T' to *Ydb_Table.BeginTransactionRequest", request)
 						}
 						begin++
+
 						return &Ydb_Table.BeginTransactionResult{
 							TxMeta: &Ydb_Table.TransactionMeta{
 								Id: "",
@@ -43,6 +44,7 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 							t.Fatalf("cannot cast request '%T' to *Ydb_Table.CommitTransactionRequest", request)
 						}
 						commit++
+
 						return &Ydb_Table.CommitTransactionResult{}, nil
 					},
 					testutil.TableRollbackTransaction: func(request interface{}) (proto.Message, error) {
@@ -51,6 +53,7 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 							t.Fatalf("cannot cast request '%T' to *Ydb_Table.RollbackTransactionRequest", request)
 						}
 						rollback++
+
 						return &Ydb_Table.RollbackTransactionResponse{
 							Operation: &Ydb_Operations.Operation{
 								Ready:  true,

@@ -11,7 +11,7 @@ func Discovery(l Logger, d trace.Detailer, opts ...Option) (t trace.Discovery) {
 	return internalDiscovery(wrapLogger(l, opts...), d)
 }
 
-func internalDiscovery(l *wrapper, d trace.Detailer) (t trace.Discovery) {
+func internalDiscovery(l Logger, d trace.Detailer) (t trace.Discovery) {
 	t.OnDiscover = func(info trace.DiscoveryDiscoverStartInfo) func(trace.DiscoveryDiscoverDoneInfo) {
 		if d.Details()&trace.DiscoveryEvents == 0 {
 			return nil
@@ -22,6 +22,7 @@ func internalDiscovery(l *wrapper, d trace.Detailer) (t trace.Discovery) {
 			String("database", info.Database),
 		)
 		start := time.Now()
+
 		return func(info trace.DiscoveryDiscoverDoneInfo) {
 			if info.Error == nil {
 				l.Log(WithLevel(ctx, INFO), "done",
@@ -44,6 +45,7 @@ func internalDiscovery(l *wrapper, d trace.Detailer) (t trace.Discovery) {
 		ctx := with(*info.Context, TRACE, "ydb", "discovery", "whoAmI")
 		l.Log(ctx, "start")
 		start := time.Now()
+
 		return func(info trace.DiscoveryWhoAmIDoneInfo) {
 			if info.Error == nil {
 				l.Log(ctx, "done",
@@ -60,5 +62,6 @@ func internalDiscovery(l *wrapper, d trace.Detailer) (t trace.Discovery) {
 			}
 		}
 	}
+
 	return t
 }

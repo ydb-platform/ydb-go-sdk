@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -24,7 +25,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
@@ -163,8 +163,6 @@ func TestMessageMetadata(t *testing.T) {
 }
 
 func TestManyConcurentReadersWriters(t *testing.T) {
-	xtest.AllowByFlag(t, "ISSUE-389")
-
 	const partitionCount = 3
 	const writersCount = 5
 	const readersCount = 10
@@ -351,8 +349,6 @@ func TestCommitUnexpectedRange(t *testing.T) {
 }
 
 func TestUpdateToken(t *testing.T) {
-	xtest.AllowByFlag(t, "LOGBROKER-7960")
-
 	ctx := context.Background()
 	db := connect(t)
 	dbLogging := connectWithGrpcLogging(t)
@@ -376,7 +372,7 @@ func TestUpdateToken(t *testing.T) {
 	var wg sync.WaitGroup
 
 	wg.Add(1)
-	stopTopicActivity := xatomic.Bool{}
+	stopTopicActivity := atomic.Bool{}
 	go func() {
 		defer wg.Done()
 
@@ -391,7 +387,7 @@ func TestUpdateToken(t *testing.T) {
 		}
 	}()
 
-	hasMessages := xatomic.Bool{}
+	hasMessages := atomic.Bool{}
 
 	wg.Add(1)
 	go func() {

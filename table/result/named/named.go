@@ -24,6 +24,7 @@ func Optional(columnName string, destination interface{}) Value {
 	if columnName == "" {
 		panic("columnName must be not empty")
 	}
+
 	return Value{
 		Name:  columnName,
 		Value: destination,
@@ -38,6 +39,7 @@ func Required(columnName string, destinationValueReference interface{}) Value {
 	if columnName == "" {
 		panic("columnName must be not empty")
 	}
+
 	return Value{
 		Name:  columnName,
 		Value: destinationValueReference,
@@ -53,6 +55,7 @@ func OptionalWithDefault(columnName string, destinationValueReference interface{
 	if columnName == "" {
 		panic("columnName must be not empty")
 	}
+
 	return Value{
 		Name:  columnName,
 		Value: destinationValueReference,

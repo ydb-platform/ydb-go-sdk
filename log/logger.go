@@ -36,6 +36,7 @@ func Default(w io.Writer, opts ...simpleLoggerOption) *defaultLogger {
 	for _, o := range opts {
 		o.applySimpleOption(l)
 	}
+
 	return l
 }
 
@@ -77,6 +78,7 @@ func (l *defaultLogger) format(namespace []string, msg string, logLevel Level) s
 	if l.coloring {
 		b.WriteString(colorReset)
 	}
+
 	return b.String()
 }
 
@@ -107,6 +109,7 @@ func wrapLogger(l Logger, opts ...Option) *wrapper {
 			o.applyHolderOption(ll)
 		}
 	}
+
 	return ll
 }
 
@@ -125,6 +128,7 @@ func (l *defaultLogger) appendFields(msg string, fields ...Field) string {
 		fmt.Fprintf(b, `%q:%q`, fields[i].Key(), fields[i].String())
 	}
 	b.WriteByte('}')
+
 	return b.String()
 }
 

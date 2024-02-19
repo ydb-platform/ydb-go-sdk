@@ -23,6 +23,7 @@ func (s *queryStats) Compilation() (c *stats.CompilationStats) {
 	if s.stats == nil || s.stats.GetCompilation() == nil {
 		return nil
 	}
+
 	return &stats.CompilationStats{
 		FromCache: s.stats.GetCompilation().GetFromCache(),
 		Duration:  time.Microsecond * time.Duration(s.stats.GetCompilation().GetDurationUs()),
@@ -57,6 +58,7 @@ func (s *queryStats) NextPhase() (p stats.QueryPhase, ok bool) {
 		return
 	}
 	s.pos++
+
 	return &queryPhase{
 		tables:         x.GetTableAccess(),
 		pos:            0,
@@ -87,6 +89,7 @@ func (q *queryPhase) NextTableAccess() (t *stats.TableAccess, ok bool) {
 	}
 	x := q.tables[q.pos]
 	q.pos++
+
 	return &stats.TableAccess{
 		Name:    x.GetName(),
 		Reads:   initOperationStats(x.GetReads()),
@@ -115,6 +118,7 @@ func initOperationStats(x *Ydb_TableStats.OperationStats) stats.OperationStats {
 	if x == nil {
 		return stats.OperationStats{}
 	}
+
 	return stats.OperationStats{
 		Rows:  x.GetRows(),
 		Bytes: x.GetBytes(),

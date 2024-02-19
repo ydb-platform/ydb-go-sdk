@@ -19,5 +19,6 @@ func Password(password string) string {
 			bytes[i] = '*'
 		}
 	}
+
 	return xstring.FromBytes(bytes)
 }

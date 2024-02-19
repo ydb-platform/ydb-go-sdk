@@ -201,6 +201,7 @@ func NewResultSet(a *allocator.Allocator, opts ...ResultSetOption) *Ydb.ResultSe
 			opt(&d, a)
 		}
 	}
+
 	return (*Ydb.ResultSet)(&d)
 }
 
@@ -218,6 +219,7 @@ func TestNewStreamWithRecvFirstResultSet(t *testing.T) {
 			ctx: func() context.Context {
 				ctx, cancel := context.WithCancel(context.Background())
 				cancel()
+
 				return ctx
 			}(),
 			err: context.Canceled,
@@ -226,6 +228,7 @@ func TestNewStreamWithRecvFirstResultSet(t *testing.T) {
 			ctx: func() context.Context {
 				ctx, cancel := context.WithTimeout(context.Background(), 0)
 				cancel()
+
 				return ctx
 			}(),
 			err: context.DeadlineExceeded,
@@ -234,6 +237,7 @@ func TestNewStreamWithRecvFirstResultSet(t *testing.T) {
 			ctx: func() context.Context {
 				ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
 				cancel()
+
 				return ctx
 			}(),
 			err: context.Canceled,
@@ -246,6 +250,7 @@ func TestNewStreamWithRecvFirstResultSet(t *testing.T) {
 					if tt.recvCounter > 1000 {
 						return nil, nil, io.EOF
 					}
+
 					return &Ydb.ResultSet{}, nil, ctx.Err()
 				},
 				func(err error) error {

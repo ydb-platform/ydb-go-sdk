@@ -26,6 +26,7 @@ func NewTimeToLiveSettings(settings *Ydb_Table.TtlSettings) *options.TimeToLiveS
 			Mode:               options.TimeToLiveModeValueSinceUnixEpoch,
 		}
 	}
+
 	return nil
 }
 
@@ -45,5 +46,6 @@ func timeToLiveUnit(unit Ydb_Table.ValueSinceUnixEpochModeSettings_Unit) *option
 	default:
 		panic("ydb: unknown Ydb unit for value since epoch")
 	}
+
 	return &res
 }
