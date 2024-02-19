@@ -8,11 +8,11 @@ import (
 	"io"
 	"path"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/helpers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
@@ -75,8 +75,8 @@ type conn struct {
 
 	beginTxFuncs map[QueryMode]beginTxFunc
 
-	closed           xatomic.Bool
-	lastUsage        xatomic.Int64
+	closed           atomic.Bool
+	lastUsage        atomic.Int64
 	defaultQueryMode QueryMode
 
 	defaultTxControl *table.TransactionControl
