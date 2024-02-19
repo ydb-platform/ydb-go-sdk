@@ -604,8 +604,8 @@ func (s *rawConverter) unwrapVariantType(typ *Ydb.Type_VariantType, index uint32
 
 			return
 		}
-		return "", x.TupleItems.GetElements()[i]
 
+		return "", x.TupleItems.GetElements()[i]
 
 	case *Ydb.VariantType_StructItems:
 		if i >= len(x.StructItems.GetMembers()) {
@@ -614,7 +614,7 @@ func (s *rawConverter) unwrapVariantType(typ *Ydb.Type_VariantType, index uint32
 			return
 		}
 		m := x.StructItems.GetMembers()[i]
-    
+
 		return m.GetName(), m.GetType()
 
 	default:
@@ -657,6 +657,7 @@ func (s *rawConverter) pairsIn() int {
 		return -1
 	}
 	s.stack.enter()
+
 	return len(x.v.GetPairs())
 }
 

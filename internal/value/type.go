@@ -39,10 +39,12 @@ func TypeFromYDB(x *Ydb.Type) Type {
 
 	case *Ydb.Type_TupleType:
 		t := v.TupleType
+
 		return Tuple(TypesFromYDB(t.GetElements())...)
 
 	case *Ydb.Type_StructType:
 		s := v.StructType
+
 		return Struct(StructFields(s.GetMembers())...)
 
 	case *Ydb.Type_DictType:

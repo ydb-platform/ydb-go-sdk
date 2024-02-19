@@ -43,8 +43,7 @@ type DescribeTopicResult struct {
 
 func (res *DescribeTopicResult) FromProto(protoResponse *Ydb_Topic.DescribeTopicResponse) error {
 	if err := res.Operation.FromProtoWithStatusCheck(protoResponse.GetOperation()); err != nil {
-		return nil
-
+		return err
 	}
 
 	protoResult := &Ydb_Topic.DescribeTopicResult{}

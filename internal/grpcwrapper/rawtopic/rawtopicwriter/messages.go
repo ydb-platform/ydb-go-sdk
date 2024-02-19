@@ -217,7 +217,7 @@ func (r *WriteResult) fromProto(response *Ydb_Topic.StreamWriteMessage_WriteResp
 		}
 	}
 	r.PartitionID = response.GetPartitionId()
-  
+
 	return r.WriteStatistics.fromProto(response.GetWriteStatistics())
 }
 
@@ -231,9 +231,8 @@ func (wa *WriteAck) fromProto(pb *Ydb_Topic.StreamWriteMessage_WriteResponse_Wri
 		return xerrors.WithStackTrace(errWriteResultResponseWriteAckIsNil)
 	}
 	wa.SeqNo = pb.GetSeqNo()
-  
-	return wa.MessageWriteStatus.fromProto(pb.GetMessageWriteStatus())
 
+	return wa.MessageWriteStatus.fromProto(pb.GetMessageWriteStatus())
 }
 
 // MessageWriteStatus is struct because it included in per-message structure and
@@ -250,7 +249,7 @@ func (s *MessageWriteStatus) fromProto(status interface{}) error {
 	case *Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Written_:
 		s.Type = WriteStatusTypeWritten
 		s.WrittenOffset = v.Written.GetOffset()
-    
+
 		return nil
 	case *Ydb_Topic.StreamWriteMessage_WriteResponse_WriteAck_Skipped_:
 		s.Type = WriteStatusTypeSkipped
