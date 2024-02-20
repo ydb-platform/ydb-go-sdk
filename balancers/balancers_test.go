@@ -60,7 +60,9 @@ func applyPreferFilter(info balancerConfig.Info, b *balancerConfig.Config, conns
 	if b.Filter == nil {
 		b.Filter = filterFunc(func(info balancerConfig.Info, c conn.Conn) bool { return true })
 	}
+
 	res := make([]conn.Conn, 0, len(conns))
+
 	for _, c := range conns {
 		if b.Filter.Allow(info, c) {
 			res = append(res, c)

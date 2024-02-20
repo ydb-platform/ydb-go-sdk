@@ -25,15 +25,18 @@ import (
 func Example_table() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close(ctx) // cleanup resources
+
 	var (
 		query = `SELECT 42 as id, "my string" as myStr`
 		id    int32  // required value
 		myStr string // optional value
 	)
+
 	err = db.Table().Do( // Do retry operation on errors with best effort
 		ctx, // context manage exiting from Do
 		func(ctx context.Context, s table.Session) (err error) { // retry operation
@@ -60,6 +63,7 @@ func Example_table() {
 		},
 		table.WithIdempotent(),
 	)
+
 	if err != nil {
 		log.Printf("unexpected error: %v", err)
 	}
@@ -71,6 +75,7 @@ func Example_databaseSQL() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	defer func() { _ = db.Close() }() // cleanup resources
 
 	db.SetMaxOpenConns(100)
@@ -104,6 +109,7 @@ func Example_databaseSQLBindNumericArgs() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	defer func() { _ = db.Close() }() // cleanup resources
 
 	var (
@@ -132,6 +138,7 @@ func Example_databaseSQLBindNumericArgsOverConnector() {
 			),
 		)
 	)
+
 	defer nativeDriver.Close(ctx) // cleanup resources
 	defer db.Close()
 
@@ -145,6 +152,7 @@ func Example_databaseSQLBindNumericArgsOverConnector() {
 		id    int32  // required value
 		myStr string // optional value
 	)
+
 	if err := row.Scan(&myStr, &id); err != nil {
 		log.Printf("query failed: %v", err)
 	} else {
@@ -160,6 +168,7 @@ func Example_databaseSQLBindPositionalArgs() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	defer func() { _ = db.Close() }() // cleanup resources
 
 	var (
@@ -188,6 +197,7 @@ func Example_databaseSQLBindPositionalArgsOverConnector() {
 			),
 		)
 	)
+
 	defer nativeDriver.Close(ctx) // cleanup resources
 	defer db.Close()
 
@@ -198,6 +208,7 @@ func Example_databaseSQLBindPositionalArgsOverConnector() {
 		id    int32  // required value
 		myStr string // optional value
 	)
+
 	if err := row.Scan(&id, &myStr); err != nil {
 		log.Printf("query failed: %v", err)
 	} else {
@@ -213,6 +224,7 @@ func Example_databaseSQLBindTablePathPrefix() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	defer func() { _ = db.Close() }() // cleanup resources
 
 	var (
@@ -246,6 +258,7 @@ func Example_databaseSQLBindTablePathPrefixOverConnector() {
 		id    int32  // required value
 		title string // optional value
 	)
+
 	if err := row.Scan(&id, &title); err != nil {
 		log.Printf("query failed: %v", err)
 	} else {
@@ -261,6 +274,7 @@ func Example_databaseSQLBindAutoDeclare() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	defer func() { _ = db.Close() }() // cleanup resources
 
 	var (
@@ -298,6 +312,7 @@ func Example_databaseSQLBindAutoDeclareOverConnector() {
 		id    int32  // required value
 		title string // optional value
 	)
+
 	if err := row.Scan(&id, &title); err != nil {
 		log.Printf("query failed: %v", err)
 	} else {
@@ -309,6 +324,7 @@ func Example_databaseSQLBindAutoDeclareOverConnector() {
 func Example_topic() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 
@@ -337,6 +353,7 @@ func Example_topic() {
 
 			return
 		}
+
 		fmt.Println(string(content))
 	}
 }
@@ -345,12 +362,14 @@ func Example_topic() {
 func Example_scripting() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 
 		return
 	}
-	defer db.Close(ctx)                                               // cleanup resources
+	defer db.Close(ctx) // cleanup resources
+
 	if err = retry.Retry(ctx, func(ctx context.Context) (err error) { //nolint:nonamedreturns
 		res, err := db.Scripting().Execute(
 			ctx,
@@ -391,6 +410,7 @@ func Example_scripting() {
 func Example_discovery() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 
@@ -398,12 +418,15 @@ func Example_discovery() {
 	}
 	defer db.Close(ctx) // cleanup resources
 	endpoints, err := db.Discovery().Discover(ctx)
+
 	if err != nil {
 		fmt.Printf("discover failed: %v", err)
 
 		return
 	}
+
 	fmt.Printf("%s endpoints:\n", db.Name())
+
 	for i, e := range endpoints {
 		fmt.Printf("%d) %s\n", i, e.String())
 	}
@@ -422,6 +445,7 @@ func Example_enableGzipCompressionForAllRequests() {
 			),
 		)),
 	)
+
 	if err != nil {
 		fmt.Printf("Driver failed: %v", err)
 	}
@@ -433,6 +457,7 @@ func Example_enableGzipCompressionForAllRequests() {
 func ExampleOpen() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2135/local")
+
 	if err != nil {
 		fmt.Printf("Driver failed: %v", err)
 	}
@@ -454,6 +479,7 @@ func ExampleOpen_advanced() {
 		),
 		ydb.WithSessionPoolSizeLimit(100),
 	)
+
 	if err != nil {
 		fmt.Printf("Driver failed: %v", err)
 	}

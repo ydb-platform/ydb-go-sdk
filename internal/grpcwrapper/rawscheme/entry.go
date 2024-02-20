@@ -26,6 +26,7 @@ func (e *Entry) FromProto(proto *Ydb_Scheme.Entry) error {
 	if proto == nil {
 		return xerrors.WithStackTrace(errUnexpectedNilForSchemeEntry)
 	}
+
 	e.Name = proto.Name
 	e.Owner = proto.Owner
 	e.Type = EntryType(proto.Type)
@@ -74,6 +75,7 @@ func (p *Permissions) FromProto(proto *Ydb_Scheme.Permissions) error {
 	if proto == nil {
 		return xerrors.WithStackTrace(errUnexpectedNilForSchemePermissions)
 	}
+
 	p.Subject = proto.Subject
 	p.PermissionNames = proto.PermissionNames
 

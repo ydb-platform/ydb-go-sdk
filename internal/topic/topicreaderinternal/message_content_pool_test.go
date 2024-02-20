@@ -14,14 +14,18 @@ import (
 
 func BenchmarkConsumeContent(b *testing.B) {
 	b.ReportAllocs()
+
 	content := []byte("asd")
 	reader := bytes.NewReader(content)
 	msg := PublicMessage{data: newOneTimeReader(reader)}
+
 	for i := 0; i < b.N; i++ {
 		reader.Reset(content)
+
 		msg.dataConsumed = false
 		msg.data = newOneTimeReader(reader)
 		err := msg.UnmarshalTo(emptyConsumer{})
+
 		if err != nil {
 			b.Fatal()
 		}

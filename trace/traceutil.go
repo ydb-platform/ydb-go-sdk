@@ -16,6 +16,7 @@ func ClearContext(x interface{}) interface{} {
 	p := reflect.ValueOf(x).Index(0)
 	t := p.Elem().Type()
 	f, has := t.FieldByName("Context")
+
 	if has && f.Type.Kind() == reflect.Interface {
 		x := reflect.New(t)
 		x.Elem().Set(p.Elem())
@@ -44,23 +45,29 @@ func (f FieldStubber) Stub(x reflect.Value) {
 		v = x.Elem()
 		t = v.Type()
 	)
+
 	for i := 0; i < t.NumField(); i++ {
 		var (
 			fx = v.Field(i)
 			ft = fx.Type()
 		)
+
 		if ft.Kind() != reflect.Func {
 			continue
 		}
+
 		name := t.Field(i).Name
 		if f.OnStub != nil {
 			f.OnStub(name)
 		}
+
 		out := []reflect.Value{}
+
 		for i := 0; i < ft.NumOut(); i++ {
 			ti := reflect.New(ft.Out(i)).Elem()
 			out = append(out, ti)
 		}
+
 		fn := reflect.MakeFunc(ft, func(args []reflect.Value) []reflect.Value {
 			if f.OnCall == nil {
 				return out

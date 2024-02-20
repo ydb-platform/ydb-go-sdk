@@ -119,6 +119,7 @@ func (a *boolAllocator) free() {
 		*v = Ydb.Value_BoolValue{}
 		boolPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -138,6 +139,7 @@ func (a *bytesAllocator) free() {
 		*v = Ydb.Value_BytesValue{}
 		bytesPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -157,6 +159,7 @@ func (a *decimalAllocator) free() {
 		v.Reset()
 		decimalPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -176,6 +179,7 @@ func (a *dictAllocator) free() {
 		v.Reset()
 		dictPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -195,6 +199,7 @@ func (a *doubleAllocator) free() {
 		*v = Ydb.Value_DoubleValue{}
 		doublePool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -214,6 +219,7 @@ func (a *floatAllocator) free() {
 		*v = Ydb.Value_FloatValue{}
 		floatPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -233,6 +239,7 @@ func (a *int32Allocator) free() {
 		*v = Ydb.Value_Int32Value{}
 		int32Pool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -252,6 +259,7 @@ func (a *int64Allocator) free() {
 		*v = Ydb.Value_Int64Value{}
 		int64Pool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -271,6 +279,7 @@ func (a *listAllocator) free() {
 		v.Reset()
 		listPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -290,6 +299,7 @@ func (a *low128Allocator) free() {
 		*v = Ydb.Value_Low_128{}
 		low128Pool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -309,6 +319,7 @@ func (a *nestedAllocator) free() {
 		*v = Ydb.Value_NestedValue{}
 		nestedPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -328,6 +339,7 @@ func (a *nullFlagAllocator) free() {
 		*v = Ydb.Value_NullFlagValue{}
 		nullFlagPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -347,6 +359,7 @@ func (a *optionalAllocator) free() {
 		v.Reset()
 		optionalPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -366,6 +379,7 @@ func (a *pairAllocator) free() {
 		*v = Ydb.ValuePair{}
 		pairPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -378,6 +392,7 @@ func (a *structAllocator) Struct() (v *Ydb.StructType) {
 	if cap(v.Members) <= 0 {
 		v.Members = make([]*Ydb.StructMember, 0, 10)
 	}
+
 	a.allocations = append(a.allocations, v)
 
 	return v
@@ -389,10 +404,12 @@ func (a *structAllocator) free() {
 		for i := range members {
 			members[i] = nil
 		}
+
 		v.Reset()
 		v.Members = members[:0]
 		structPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -412,6 +429,7 @@ func (a *structMemberAllocator) free() {
 		v.Reset()
 		structMemberPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -431,6 +449,7 @@ func (a *textAllocator) free() {
 		*v = Ydb.Value_TextValue{}
 		textPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -451,10 +470,12 @@ func (a *tupleAllocator) free() {
 		for i := range elements {
 			elements[i] = nil
 		}
+
 		v.Reset()
 		v.Elements = elements[:0]
 		tuplePool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -474,6 +495,7 @@ func (a *typeDecimalAllocator) free() {
 		*v = Ydb.Type_DecimalType{}
 		typeDecimalPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -493,6 +515,7 @@ func (a *typeDictAllocator) free() {
 		*v = Ydb.Type_DictType{}
 		typeDictPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -512,6 +535,7 @@ func (a *typeEmptyListAllocator) free() {
 		*v = Ydb.Type_EmptyListType{}
 		typeEmptyListPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -531,6 +555,7 @@ func (a *typeEmptyDictAllocator) free() {
 		*v = Ydb.Type_EmptyDictType{}
 		typeEmptyDictPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -550,6 +575,7 @@ func (a *typeAllocator) free() {
 		v.Reset()
 		typePool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -569,6 +595,7 @@ func (a *typeListAllocator) free() {
 		*v = Ydb.Type_ListType{}
 		typeListPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -588,6 +615,7 @@ func (a *typeOptionalAllocator) free() {
 		*v = Ydb.Type_OptionalType{}
 		typeOptionalPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -607,6 +635,7 @@ func (a *typeStructAllocator) free() {
 		*v = Ydb.Type_StructType{}
 		typeStructPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -626,6 +655,7 @@ func (a *typeTupleAllocator) free() {
 		*v = Ydb.Type_TupleType{}
 		typeTuplePool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -645,6 +675,7 @@ func (a *typeVariantAllocator) free() {
 		*v = Ydb.Type_VariantType{}
 		typeVariantPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -664,6 +695,7 @@ func (a *typedValueAllocator) free() {
 		v.Reset()
 		typedValuePool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -683,6 +715,7 @@ func (a *uint32Allocator) free() {
 		*v = Ydb.Value_Uint32Value{}
 		uint32Pool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -702,6 +735,7 @@ func (a *uint64Allocator) free() {
 		*v = Ydb.Value_Uint64Value{}
 		uint64Pool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -720,17 +754,21 @@ func (a *valueAllocator) free() {
 	for _, v := range a.allocations {
 		items := v.Items
 		pairs := v.Pairs
+
 		for i := range items {
 			items[i] = nil
 		}
+
 		for i := range pairs {
 			pairs[i] = nil
 		}
+
 		v.Reset()
 		v.Items = items[:0]
 		v.Pairs = pairs[:0]
 		valuePool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -749,6 +787,7 @@ func (a *variantAllocator) free() {
 	for _, v := range a.allocations {
 		variantPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -767,6 +806,7 @@ func (a *variantStructItemsAllocator) free() {
 	for _, v := range a.allocations {
 		variantStructItemsPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -785,6 +825,7 @@ func (a *variantTupleItemsAllocator) free() {
 	for _, v := range a.allocations {
 		variantTupleItemsPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -804,6 +845,7 @@ func (a *tableExecuteQueryResultAllocator) free() {
 		v.Reset()
 		tableExecuteQueryResultPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -823,6 +865,7 @@ func (a *tableExecuteQueryRequestAllocator) free() {
 		v.Reset()
 		tableExecuteDataQueryRequestPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -842,6 +885,7 @@ func (a *tableQueryCachePolicyAllocator) free() {
 		v.Reset()
 		tableQueryCachePolicyPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -861,6 +905,7 @@ func (a *tableQueryAllocator) free() {
 		v.Reset()
 		tableQueryPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -880,6 +925,7 @@ func (a *tableQueryYqlTextAllocator) free() {
 	for _, v := range a.allocations {
 		tableQueryYqlTextPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 
@@ -899,6 +945,7 @@ func (a *tableQueryIDAllocator) free() {
 	for _, v := range a.allocations {
 		tableQueryIDPool.Put(v)
 	}
+
 	a.allocations = a.allocations[:0]
 }
 

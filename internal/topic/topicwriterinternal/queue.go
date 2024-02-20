@@ -114,6 +114,7 @@ func (q *messageQueue) checkNewMessagesBeforeAddNeedLock(messages []messageWithD
 		if messages[i].SeqNo <= checkedSeqNo {
 			return xerrors.WithStackTrace(errAddUnorderedMessages)
 		}
+
 		checkedSeqNo = messages[i].SeqNo
 	}
 
@@ -143,6 +144,7 @@ func (q *messageQueue) addMessageNeedLock(
 
 func (q *messageQueue) AcksReceived(acks []rawtopicwriter.WriteAck) error {
 	ackReceivedCounter := 0
+
 	q.m.Lock()
 	defer func() {
 		q.m.Unlock()
@@ -178,6 +180,7 @@ func (q *messageQueue) ackReceivedNeedLock(seqNo int64) error {
 
 func (q *messageQueue) Close(err error) error {
 	isFirstTimeClosed := false
+
 	q.m.Lock()
 	defer func() {
 		q.m.Unlock()
@@ -191,6 +194,7 @@ func (q *messageQueue) Close(err error) error {
 	if q.closed {
 		return xerrors.WithStackTrace(errCloseClosedMessageQueue)
 	}
+
 	isFirstTimeClosed = true
 
 	q.closed = true
@@ -214,10 +218,13 @@ func (q *messageQueue) GetMessagesForSend(ctx context.Context) ([]messageWithDat
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+
 	var closed bool
+
 	q.m.WithLock(func() {
 		closed = q.closed
 	})
+
 	if closed {
 		return nil, xerrors.WithStackTrace(errGetMessageFromClosedQueue)
 	}
@@ -284,10 +291,12 @@ func (q *messageQueue) Wait(ctx context.Context, waiter MessageQueueAckWaiter) e
 	}
 
 	ctxDone := ctx.Done()
+
 	for {
 		ackReceived := q.acksReceivedEvent.Waiter()
 
 		hasWaited := false
+
 		q.m.WithRLock(func() {
 			for len(waiter.sequenseNumbers) > 0 {
 				checkMessageIndex := waiter.sequenseNumbers[0]

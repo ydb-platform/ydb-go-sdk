@@ -25,20 +25,26 @@ func LoadCertificatesFromPem(bytes []byte) (certs []*x509.Certificate) {
 		cert *x509.Certificate
 		err  error
 	)
+
 	for len(bytes) > 0 {
 		var block *pem.Block
+
 		block, bytes = pem.Decode(bytes)
 		if block == nil {
 			break
 		}
+
 		if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
 			continue
 		}
+
 		certBytes := block.Bytes
+
 		cert, err = x509.ParseCertificate(certBytes)
 		if err != nil {
 			continue
 		}
+
 		certs = append(certs, cert)
 	}
 

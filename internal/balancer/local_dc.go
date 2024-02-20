@@ -27,10 +27,13 @@ func checkFastestAddress(ctx context.Context, addresses []string) string {
 		address string
 		err     error
 	}
+
 	results := make(chan result, len(addresses))
+
 	defer close(results)
 
 	startDial := make(chan struct{})
+
 	var dialer net.Dialer
 
 	var wg sync.WaitGroup
@@ -38,12 +41,16 @@ func checkFastestAddress(ctx context.Context, addresses []string) string {
 
 	for _, addr := range addresses {
 		wg.Add(1)
+
 		go func(address string) {
 			defer wg.Done()
 			<-startDial
+
 			conn, err := dialer.DialContext(ctx, "tcp", address)
+
 			if err == nil {
 				cancel()
+
 				_ = conn.Close()
 			}
 			results <- result{address: address, err: err}
@@ -71,6 +78,7 @@ func detectFastestEndpoint(ctx context.Context, endpoints []endpoint.Endpoint) (
 	// common is 2 ip address for every fqdn: ipv4 + ipv6
 	initialAddressToEndpointCapacity := len(endpoints) * 2
 	addressToEndpoint := make(map[string]endpoint.Endpoint, initialAddressToEndpointCapacity)
+
 	for _, ep := range endpoints {
 		host, port, err := extractHostPort(ep.Address())
 		if err != nil {
@@ -85,6 +93,7 @@ func detectFastestEndpoint(ctx context.Context, endpoints []endpoint.Endpoint) (
 
 			continue
 		}
+
 		if len(addresses) == 0 {
 			lastErr = xerrors.WithStackTrace(fmt.Errorf("no ips for fqdn: %q", host))
 
@@ -96,9 +105,11 @@ func detectFastestEndpoint(ctx context.Context, endpoints []endpoint.Endpoint) (
 			addressToEndpoint[address] = ep
 		}
 	}
+
 	if len(addressToEndpoint) == 0 {
 		return nil, xerrors.WithStackTrace(lastErr)
 	}
+
 	addressesToPing := make([]string, 0, len(addressToEndpoint))
 	for ip := range addressToEndpoint {
 		addressesToPing = append(addressesToPing, ip)
@@ -116,6 +127,7 @@ func detectLocalDC(ctx context.Context, endpoints []endpoint.Endpoint) (string, 
 	if len(endpoints) == 0 {
 		return "", xerrors.WithStackTrace(ErrNoEndpoints)
 	}
+
 	endpointsByDc := splitEndpointsByLocation(endpoints)
 
 	if len(endpointsByDc) == 1 {
@@ -144,6 +156,7 @@ func extractHostPort(address string) (host, port string, _ error) {
 	if err != nil {
 		return "", "", xerrors.WithStackTrace(err)
 	}
+
 	host, port, err = net.SplitHostPort(u.Host)
 	if err != nil {
 		return "", "", xerrors.WithStackTrace(err)
@@ -160,6 +173,7 @@ func getRandomEndpoints(endpoints []endpoint.Endpoint, count int) []endpoint.End
 	got := make(map[int]bool, maxEndpointsCheckPerLocation)
 
 	res := make([]endpoint.Endpoint, 0, maxEndpointsCheckPerLocation)
+
 	for len(got) < count {
 		//nolint:gosec
 		index := rand.Intn(len(endpoints))
@@ -168,6 +182,7 @@ func getRandomEndpoints(endpoints []endpoint.Endpoint, count int) []endpoint.End
 		}
 
 		got[index] = true
+
 		res = append(res, endpoints[index])
 	}
 
@@ -176,6 +191,7 @@ func getRandomEndpoints(endpoints []endpoint.Endpoint, count int) []endpoint.End
 
 func splitEndpointsByLocation(endpoints []endpoint.Endpoint) map[string][]endpoint.Endpoint {
 	res := make(map[string][]endpoint.Endpoint)
+
 	for _, ep := range endpoints {
 		location := ep.Location()
 		res[location] = append(res[location], ep)

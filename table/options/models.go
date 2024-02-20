@@ -200,6 +200,7 @@ func (rr ReadReplicasSettings) ToYDB() *Ydb_Table.ReadReplicasSettings {
 
 func NewReadReplicasSettings(rr *Ydb_Table.ReadReplicasSettings) ReadReplicasSettings {
 	t := ReadReplicasPerAzReadReplicas
+
 	var c uint64
 
 	if c = rr.GetPerAzReadReplicasCount(); c != 0 {
@@ -412,18 +413,23 @@ type KeyRange struct {
 
 func (kr KeyRange) String() string {
 	var buf bytes.Buffer
+
 	buf.WriteString("[")
+
 	if kr.From == nil {
 		buf.WriteString("NULL")
 	} else {
 		buf.WriteString(kr.From.Yql())
 	}
+
 	buf.WriteString(",")
+
 	if kr.To == nil {
 		buf.WriteString("NULL")
 	} else {
 		buf.WriteString(kr.To.Yql())
 	}
+
 	buf.WriteString("]")
 
 	return buf.String()
@@ -515,6 +521,7 @@ func (ttl *TimeToLiveSettings) ToYDB() *Ydb_Table.TtlSettings {
 	if ttl == nil {
 		return nil
 	}
+
 	switch ttl.Mode {
 	case TimeToLiveModeValueSinceUnixEpoch:
 		return &Ydb_Table.TtlSettings{
@@ -552,6 +559,7 @@ func (unit *TimeToLiveUnit) ToYDB() Ydb_Table.ValueSinceUnixEpochModeSettings_Un
 	if unit == nil {
 		return Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_UNSPECIFIED
 	}
+
 	switch *unit {
 	case TimeToLiveUnitSeconds:
 		return Ydb_Table.ValueSinceUnixEpochModeSettings_UNIT_SECONDS

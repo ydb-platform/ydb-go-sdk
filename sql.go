@@ -34,15 +34,19 @@ var (
 
 func (d *sqlDriver) Close() error {
 	var connectors map[*xsql.Connector]*Driver
+
 	d.connectorsMtx.WithRLock(func() {
 		connectors = d.connectors
 	})
+
 	var errs []error
+
 	for c := range connectors {
 		if err := c.Close(); err != nil {
 			errs = append(errs, err)
 		}
 	}
+
 	if len(errs) > 0 {
 		return xerrors.NewWithIssues("ydb legacy driver close failed", errs...)
 	}
@@ -60,7 +64,9 @@ func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, erro
 	if err != nil {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("data source name '%s' wrong: %w", dataSourceName, err))
 	}
+
 	db, err := Open(context.Background(), "", With(opts...))
+
 	if err != nil {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("failed to connect by data source name '%s': %w", dataSourceName, err))
 	}
@@ -172,6 +178,7 @@ func Connector(parent *Driver, opts ...ConnectorOption) (SQLConnector, error) {
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	d.attach(c, parent)
 
 	return c, nil

@@ -16,6 +16,7 @@ func retry(config Config) (t trace.Retry) {
 		if label == "" {
 			return nil
 		}
+
 		start := time.Now()
 
 		return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {

@@ -43,6 +43,7 @@ func loadFromFileCache(key string) (_ []*x509.Certificate, exists bool) {
 	if !exists {
 		return nil, false
 	}
+
 	certs, ok := value.([]*x509.Certificate)
 	if !ok {
 		panic(fmt.Sprintf("unexpected value type '%T'", value))
@@ -54,6 +55,7 @@ func loadFromFileCache(key string) (_ []*x509.Certificate, exists bool) {
 // FromFile reads and parses pem-encoded certificate(s) from file.
 func FromFile(file string, opts ...FromFileOption) ([]*x509.Certificate, error) {
 	options := fromFileOptions{}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt(&options)
@@ -85,6 +87,7 @@ func FromFile(file string, opts ...FromFileOption) ([]*x509.Certificate, error) 
 
 	if !options.noCache {
 		fileCache.Store(file, certs)
+
 		if options.onMiss != nil {
 			options.onMiss()
 		}
@@ -95,10 +98,13 @@ func FromFile(file string, opts ...FromFileOption) ([]*x509.Certificate, error) 
 
 func loadFromPemCache(key string) (_ *x509.Certificate, exists bool) {
 	value, exists := pemCache.Load(key)
+
 	if !exists {
 		return nil, false
 	}
+
 	cert, ok := value.(*x509.Certificate)
+
 	if !ok {
 		panic(fmt.Sprintf("unexpected value type '%T'", value))
 	}
@@ -109,6 +115,7 @@ func loadFromPemCache(key string) (_ *x509.Certificate, exists bool) {
 // parseCertificate is a cached version of x509.ParseCertificate. Cache key is string(der)
 func parseCertificate(der []byte, opts ...FromPemOption) (*x509.Certificate, error) {
 	options := fromPemOptions{}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt(&options)
@@ -135,6 +142,7 @@ func parseCertificate(der []byte, opts ...FromPemOption) (*x509.Certificate, err
 
 	if !options.noCache {
 		pemCache.Store(key, cert)
+
 		if options.onMiss != nil {
 			options.onMiss()
 		}
@@ -181,14 +189,18 @@ func FromPem(bytes []byte, opts ...FromPemOption) (certs []*x509.Certificate, er
 		if block == nil {
 			break
 		}
+
 		if block.Type != "CERTIFICATE" || len(block.Headers) != 0 {
 			continue
 		}
+
 		var cert *x509.Certificate
 		cert, err = parseCertificate(block.Bytes, opts...)
+
 		if err != nil {
 			continue
 		}
+
 		certs = append(certs, cert)
 	}
 

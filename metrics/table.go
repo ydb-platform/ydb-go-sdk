@@ -51,13 +51,17 @@ func table(config Config) (t trace.Table) {
 			size.With(nil).Add(-1)
 		}
 	}
+
 	var inflightStarts sync.Map
+
 	t.OnPoolGet = func(info trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
 		wait.With(nil).Add(1)
+
 		start := time.Now()
 
 		return func(info trace.TablePoolGetDoneInfo) {
 			wait.With(nil).Add(-1)
+
 			if info.Error == nil && config.Details()&trace.TablePoolEvents != 0 {
 				inflight.With(nil).Add(1)
 				inflightStarts.Store(info.Session.ID(), time.Now())
@@ -68,10 +72,13 @@ func table(config Config) (t trace.Table) {
 	t.OnPoolPut = func(info trace.TablePoolPutStartInfo) func(trace.TablePoolPutDoneInfo) {
 		if config.Details()&trace.TablePoolEvents != 0 {
 			inflight.With(nil).Add(-1)
+
 			start, ok := inflightStarts.LoadAndDelete(info.Session.ID())
+
 			if !ok {
 				panic(fmt.Sprintf("unknown session '%s'", info.Session.ID()))
 			}
+
 			inflightLatency.With(nil).Record(time.Since(start.(time.Time)))
 		}
 

@@ -66,6 +66,7 @@ func FromBytes(bts []byte, precision, scale uint32) *big.Int {
 		v.Add(v, one)
 		v.Neg(v)
 	}
+
 	if v.CmpAbs(pow(ten, precision)) >= 0 {
 		if neg {
 			v.Set(neginf)
@@ -99,6 +100,7 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 	if neg || s[0] == '+' {
 		s = s[1:]
 	}
+
 	if isInf(s) {
 		if neg {
 			return v.Set(neginf), nil
@@ -106,6 +108,7 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 
 		return v.Set(inf), nil
 	}
+
 	if isNaN(s) {
 		if neg {
 			return v.Set(negnan), nil
@@ -117,16 +120,19 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 	integral := precision - scale
 
 	var dot bool
+
 	for ; len(s) > 0; s = s[1:] {
 		c := s[0]
 		if c == '.' {
 			if dot {
 				return nil, syntaxError(s)
 			}
+
 			dot = true
 
 			continue
 		}
+
 		if dot {
 			if scale > 0 {
 				scale--
@@ -157,27 +163,36 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 		if !isDigit(c) {
 			return nil, syntaxError(s)
 		}
+
 		plus := c > '5'
+
 		if !plus && c == '5' {
 			var x big.Int
+
 			plus = x.And(v, one).Cmp(zero) != 0 // Last digit is not a zero.
 			for !plus && len(s) > 1 {
 				s = s[1:]
 				c := s[0]
+
 				if !isDigit(c) {
 					return nil, syntaxError(s)
 				}
+
 				plus = c != '0'
 			}
 		}
+
 		if plus {
 			v.Add(v, one)
+
 			if v.Cmp(pow(ten, precision)) >= 0 {
 				v.Set(inf)
 			}
 		}
 	}
+
 	v.Mul(v, pow(ten, scale))
+
 	if neg {
 		v.Neg(v)
 	}
@@ -209,6 +224,7 @@ func Format(x *big.Int, precision, scale uint32) string {
 
 	v := big.NewInt(0).Set(x)
 	neg := x.Sign() < 0
+
 	if neg {
 		// Convert negative to positive.
 		v.Neg(x)
@@ -220,6 +236,7 @@ func Format(x *big.Int, precision, scale uint32) string {
 	pos := len(bts)
 
 	var digit big.Int
+
 	for ; v.Cmp(zero) > 0; v.Div(v, ten) {
 		if precision == 0 {
 			return errorTag
@@ -227,39 +244,51 @@ func Format(x *big.Int, precision, scale uint32) string {
 		precision--
 
 		digit.Mod(v, ten)
+
 		d := int(digit.Int64())
 		if d != 0 || scale == 0 || pos > 0 {
 			const numbers = "0123456789"
 			pos--
+
 			bts[pos] = numbers[d]
 		}
+
 		if scale > 0 {
 			scale--
 			if scale == 0 && pos > 0 {
 				pos--
+
 				bts[pos] = '.'
 			}
 		}
 	}
+
 	if scale > 0 {
 		for ; scale > 0; scale-- {
 			if precision == 0 {
 				return errorTag
 			}
 			precision--
+
 			pos--
+
 			bts[pos] = '0'
 		}
 
 		pos--
+
 		bts[pos] = '.'
 	}
+
 	if bts[pos] == '.' {
 		pos--
+
 		bts[pos] = '0'
 	}
+
 	if neg {
 		pos--
+
 		bts[pos] = '-'
 	}
 
@@ -278,6 +307,7 @@ func BigIntToByte(x *big.Int, precision, scale uint32) (p [16]byte) {
 			x = inf
 		}
 	}
+
 	put(x, p[:])
 
 	return p
@@ -288,20 +318,26 @@ func put(x *big.Int, p []byte) {
 	if neg {
 		x = complement(x)
 	}
+
 	i := len(p)
+
 	for _, d := range x.Bits() {
 		for j := 0; j < wordSize; j++ {
 			i--
+
 			p[i] = byte(d)
 			d >>= 8
 		}
 	}
+
 	var pad byte
 	if neg {
 		pad = 0xff
 	}
+
 	for 0 < i && i < len(p) {
 		i--
+
 		p[i] = pad
 	}
 }
@@ -327,6 +363,7 @@ func ensure(p []byte, n int) []byte {
 		l = len(p)
 		c = cap(p)
 	)
+
 	if c-l < n {
 		cp := make([]byte, l+n)
 		copy(cp, p)
@@ -351,11 +388,14 @@ func pow(x *big.Int, n uint32) *big.Int {
 		v = big.NewInt(1)
 		m = big.NewInt(0).Set(x)
 	)
+
 	for n > 0 {
 		if n&1 != 0 {
 			v.Mul(v, m)
 		}
+
 		n >>= 1
+
 		m.Mul(m, m)
 	}
 

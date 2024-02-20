@@ -17,6 +17,7 @@ func WithAddEncoder(codec rawtopiccommon.Codec, encoderFunc PublicCreateEncoderF
 		if cfg.AdditionalEncoders == nil {
 			cfg.AdditionalEncoders = map[rawtopiccommon.Codec]PublicCreateEncoderFunc{}
 		}
+
 		cfg.AdditionalEncoders[codec] = encoderFunc
 	}
 }
@@ -67,6 +68,7 @@ func WithCredentials(cred credentials.Credentials) PublicWriterOption {
 		if cred == nil {
 			cred = credentials.NewAnonymousCredentials()
 		}
+
 		cfg.cred = cred
 	}
 }
@@ -111,6 +113,7 @@ func WithProducerID(producerID string) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.producerID = producerID
 		oldPartitioningType := cfg.defaultPartitioning.Type
+
 		if oldPartitioningType == rawtopicwriter.PartitioningUndefined ||
 			oldPartitioningType == rawtopicwriter.PartitioningMessageGroupID {
 			WithPartitioning(NewPartitioningWithMessageGroupID(producerID))(cfg)

@@ -218,9 +218,11 @@ func (v *dictType) equalsTo(rhs Type) bool {
 	if !ok {
 		return false
 	}
+
 	if !v.keyType.equalsTo(vv.keyType) {
 		return false
 	}
+
 	if !v.valueType.equalsTo(vv.valueType) {
 		return false
 	}
@@ -568,14 +570,17 @@ func (v *StructType) Yql() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
 	buffer.WriteString("Struct<")
+
 	for i := range v.fields {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString("'" + v.fields[i].Name + "'")
 		buffer.WriteByte(':')
 		buffer.WriteString(v.fields[i].T.Yql())
 	}
+
 	buffer.WriteByte('>')
 
 	return buffer.String()
@@ -586,13 +591,16 @@ func (v *StructType) equalsTo(rhs Type) bool {
 	if !ok {
 		return false
 	}
+
 	if len(v.fields) != len(vv.fields) {
 		return false
 	}
+
 	for i := range v.fields {
 		if v.fields[i].Name != vv.fields[i].Name {
 			return false
 		}
+
 		if !v.fields[i].T.equalsTo(vv.fields[i].T) {
 			return false
 		}
@@ -653,12 +661,15 @@ func (v *TupleType) Yql() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
 	buffer.WriteString("Tuple<")
+
 	for i, t := range v.items {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString(t.Yql())
 	}
+
 	buffer.WriteByte('>')
 
 	return buffer.String()
@@ -669,9 +680,11 @@ func (v *TupleType) equalsTo(rhs Type) bool {
 	if !ok {
 		return false
 	}
+
 	if len(v.items) != len(vv.items) {
 		return false
 	}
+
 	for i := range v.items {
 		if !v.items[i].equalsTo(vv.items[i]) {
 			return false
@@ -686,6 +699,7 @@ func (v *TupleType) toYDB(a *allocator.Allocator) *Ydb.Type {
 	if v != nil {
 		items = v.items
 	}
+
 	t := a.Type()
 
 	typeTuple := a.TypeTuple()
@@ -715,14 +729,17 @@ func (v *variantStructType) Yql() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
 	buffer.WriteString("Variant<")
+
 	for i := range v.fields {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString("'" + v.fields[i].Name + "'")
 		buffer.WriteByte(':')
 		buffer.WriteString(v.fields[i].T.Yql())
 	}
+
 	buffer.WriteByte('>')
 
 	return buffer.String()
@@ -770,12 +787,15 @@ func (v *variantTupleType) Yql() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
 	buffer.WriteString("Variant<")
+
 	for i, t := range v.items {
 		if i > 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString(t.Yql())
 	}
+
 	buffer.WriteByte('>')
 
 	return buffer.String()

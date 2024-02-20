@@ -24,9 +24,11 @@ func IsDirectoryExists(ctx context.Context, c schemeClient, directory string) (
 			directory, c.Database(),
 		))
 	}
+
 	if directory == c.Database() {
 		return true, nil
 	}
+
 	parentDirectory, childDirectory := path.Split(directory)
 	parentDirectory = strings.TrimRight(parentDirectory, "/")
 
@@ -40,10 +42,12 @@ func IsDirectoryExists(ctx context.Context, c schemeClient, directory string) (
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
+
 	for i := range d.Children {
 		if d.Children[i].Name != childDirectory {
 			continue
 		}
+
 		if t := d.Children[i].Type; t != scheme.EntryDirectory {
 			return false, xerrors.WithStackTrace(fmt.Errorf(
 				"entry '%s' in path '%s' is not a directory: %s",
@@ -71,23 +75,29 @@ func IsEntryExists(ctx context.Context, c schemeClient, absPath string, entryTyp
 			absPath, c.Database(),
 		))
 	}
+
 	directory, entryName := path.Split(absPath)
+
 	if exists, err := IsDirectoryExists(ctx, c, strings.TrimRight(directory, "/")); err != nil {
 		return false, xerrors.WithStackTrace(err)
 	} else if !exists {
 		return false, nil
 	}
+
 	d, err := c.ListDirectory(ctx, directory)
+
 	if err != nil {
 		return false, xerrors.WithStackTrace(fmt.Errorf(
 			"list directory '%s' failed: %w",
 			directory, err,
 		))
 	}
+
 	for i := range d.Children {
 		if d.Children[i].Name != entryName {
 			continue
 		}
+
 		childrenType := d.Children[i].Type
 		for _, entryType := range entryTypes {
 			if childrenType == entryType {

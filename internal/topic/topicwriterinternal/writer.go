@@ -28,6 +28,7 @@ func NewWriter(cred credentials.Credentials, options []PublicWriterOption) (*Wri
 		WithCredentials(cred),
 	)
 	cfg := newWriterReconnectorConfig(options...)
+
 	if err := cfg.validate(); err != nil {
 		return nil, err
 	}

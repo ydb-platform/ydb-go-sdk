@@ -203,9 +203,11 @@ func (r *Reader) CommitRanges(ctx context.Context, ranges []PublicCommitRange) e
 	}
 
 	wg.Add(commitRanges.len())
+
 	for _, cr := range commitRanges.ranges {
 		go commit(cr)
 	}
+
 	wg.Wait()
 	close(commitErrors)
 
@@ -234,6 +236,7 @@ func WithCredentials(cred credentials.Credentials) PublicReaderOption {
 		if cred == nil {
 			cred = credentials.NewAnonymousCredentials()
 		}
+
 		cfg.Cred = cred
 	}
 }

@@ -12,6 +12,7 @@ import (
 func Example() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 
@@ -32,12 +33,15 @@ func Example() {
 
 		return
 	}
+
 	defer db.Coordination().DropNode(ctx, "/local/test")
 	e, c, err := db.Coordination().DescribeNode(ctx, "/local/test")
+
 	if err != nil {
 		fmt.Printf("failed to describe node: %v", err)
 
 		return
 	}
+
 	fmt.Printf("node description: %+v\nnode config: %+v\n", e, c)
 }

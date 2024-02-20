@@ -43,6 +43,7 @@ func NewCommitRangesWithCapacity(capacity int) CommitRanges {
 func NewCommitRangesFromPublicCommits(ranges []PublicCommitRange) CommitRanges {
 	res := CommitRanges{}
 	res.ranges = make([]commitRange, len(ranges))
+
 	for i := 0; i < len(res.ranges); i++ {
 		res.ranges[i] = ranges[i].priv
 	}
@@ -111,6 +112,7 @@ func (r *CommitRanges) optimize() {
 
 	newCommits := r.ranges[:1]
 	lastCommit := &newCommits[0]
+
 	for i := 1; i < len(r.ranges); i++ {
 		commit := &r.ranges[i]
 		if lastCommit.partitionSession.partitionSessionID == commit.partitionSession.partitionSessionID &&
@@ -146,10 +148,12 @@ func (r *CommitRanges) toRawPartitionCommitOffset() []rawtopicreader.PartitionCo
 			Start: commit.commitOffsetStart,
 			End:   commit.commitOffsetEnd,
 		}
+
 		if partition.PartitionSessionID != commit.partitionSession.partitionSessionID {
 			partitionOffsets = append(partitionOffsets, newPartition(commit.partitionSession.partitionSessionID))
 			partition = &partitionOffsets[len(partitionOffsets)-1]
 		}
+
 		partition.Offsets = append(partition.Offsets, offsetsRange)
 	}
 

@@ -49,10 +49,12 @@ func (c AccessToken) String() string {
 	defer buffer.Free()
 	buffer.WriteString("AccessToken{Token:")
 	fmt.Fprintf(buffer, "%q", secret.Token(c.token))
+
 	if c.sourceInfo != "" {
 		buffer.WriteString(",From:")
 		fmt.Fprintf(buffer, "%q", c.sourceInfo)
 	}
+
 	buffer.WriteByte('}')
 
 	return buffer.String()

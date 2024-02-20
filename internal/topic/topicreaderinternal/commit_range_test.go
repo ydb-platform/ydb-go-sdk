@@ -161,6 +161,7 @@ func TestCompressCommitsInplace(t *testing.T) {
 			},
 		},
 	}
+
 	for _, test := range table {
 		t.Run(test.name, func(t *testing.T) {
 			var v CommitRanges
@@ -283,6 +284,7 @@ func TestCommitsToRawPartitionCommitOffset(t *testing.T) {
 
 func testNewCommitRanges(commitable ...PublicCommitRangeGetter) *CommitRanges {
 	var res CommitRanges
+
 	res.Append(commitable...)
 
 	return &res

@@ -121,9 +121,11 @@ func New(
 
 func (r *repeater) stop(onCancel func()) {
 	r.cancel()
+
 	if onCancel != nil {
 		onCancel()
 	}
+
 	<-r.stopped
 }
 
@@ -203,6 +205,7 @@ func (r *repeater) worker(ctx context.Context, tick clockwork.Ticker) {
 		if event == EventCancel {
 			return
 		}
+
 		if err := r.wakeUp(ctx, event); err != nil {
 			forceIndex++
 		} else {

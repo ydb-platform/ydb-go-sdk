@@ -21,20 +21,25 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
+
 	opts = append(opts, info.Options...)
+
 	if token := info.Params.Get("token"); token != "" {
 		opts = append(opts, config.WithCredentials(credentials.NewAccessTokenCredentials(token)))
 	}
+
 	if balancer := info.Params.Get("go_balancer"); balancer != "" {
 		opts = append(opts, config.WithBalancer(balancers.FromConfig(balancer)))
 	} else if balancer := info.Params.Get("balancer"); balancer != "" {
 		opts = append(opts, config.WithBalancer(balancers.FromConfig(balancer)))
 	}
+
 	if queryMode := info.Params.Get("go_query_mode"); queryMode != "" {
 		mode := QueryModeFromString(queryMode)
 		if mode == UnknownQueryMode {
 			return nil, nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
 		}
+
 		connectorOpts = append(connectorOpts, WithDefaultQueryMode(mode))
 	} else if queryMode := info.Params.Get("query_mode"); queryMode != "" {
 		mode := QueryModeFromString(queryMode)
@@ -43,18 +48,23 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 		}
 		connectorOpts = append(connectorOpts, WithDefaultQueryMode(mode))
 	}
+
 	if fakeTx := info.Params.Get("go_fake_tx"); fakeTx != "" {
 		for _, queryMode := range strings.Split(fakeTx, ",") {
 			mode := QueryModeFromString(queryMode)
 			if mode == UnknownQueryMode {
 				return nil, nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
 			}
+
 			connectorOpts = append(connectorOpts, WithFakeTx(mode))
 		}
 	}
+
 	if info.Params.Has("go_query_bind") {
 		var binders []ConnectorOption
+
 		queryTransformers := strings.Split(info.Params.Get("go_query_bind"), ",")
+
 		for _, transformer := range queryTransformers {
 			switch transformer {
 			case "declare":
@@ -69,6 +79,7 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 					if err != nil {
 						return nil, nil, xerrors.WithStackTrace(err)
 					}
+
 					binders = append(binders, WithTablePathPrefix(prefix))
 				} else {
 					return nil, nil, xerrors.WithStackTrace(
@@ -77,6 +88,7 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 				}
 			}
 		}
+
 		connectorOpts = append(connectorOpts, binders...)
 	}
 

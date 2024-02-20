@@ -127,6 +127,7 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 	}()
 
 	closes := make([]func(context.Context) error, 0)
+
 	d.childrenMtx.WithLock(func() {
 		for _, child := range d.children {
 			closes = append(closes, child.Close)
@@ -147,6 +148,7 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 	)
 
 	var issues []error
+
 	for _, f := range closes {
 		if err := f(ctx); err != nil {
 			issues = append(issues, err)
@@ -285,6 +287,7 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 //nolint:cyclop, nonamedreturns
 func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 	ctx, driverCtxCancel := xcontext.WithCancel(xcontext.WithoutDeadline(ctx))
+
 	defer func() {
 		if err != nil {
 			driverCtxCancel()
@@ -302,6 +305,7 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, e
 			WithCertificatesFromFile(caFile),
 		)
 	}
+
 	if logLevel, has := os.LookupEnv("YDB_LOG_SEVERITY_LEVEL"); has {
 		if l := log.FromString(logLevel); l < log.QUIET {
 			d.opts = append(d.opts,
@@ -319,6 +323,7 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, e
 			)
 		}
 	}
+
 	d.opts = append(d.opts, opts...)
 	for _, opt := range d.opts {
 		if opt != nil {
@@ -328,6 +333,7 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, e
 			}
 		}
 	}
+
 	if d.logger != nil {
 		for _, opt := range []Option{
 			WithTraceDriver(log.Driver(d.logger, d.loggerDetails, d.loggerOpts...)),       //nolint:contextcheck
@@ -343,12 +349,14 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, e
 		} {
 			if opt != nil {
 				err = opt(ctx, d)
+
 				if err != nil {
 					return nil, xerrors.WithStackTrace(err)
 				}
 			}
 		}
 	}
+
 	d.config = config.New(d.options...)
 
 	return d, nil

@@ -39,6 +39,7 @@ func TestSessionKeepAlive(t *testing.T) {
 		status Ydb_Table.KeepAliveResult_SessionStatus
 		e      error
 	)
+
 	b := StubBuilder{
 		T: t,
 		cc: testutil.NewBalancer(
@@ -57,29 +58,36 @@ func TestSessionKeepAlive(t *testing.T) {
 		),
 	}
 	s, err := b.createSession(ctx)
+
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	e = fmt.Errorf("any error")
 	err = s.KeepAlive(ctx)
+
 	if err == nil {
 		t.Fatal(err)
 	}
 
 	status, e = Ydb_Table.KeepAliveResult_SESSION_STATUS_READY, nil
 	err = s.KeepAlive(ctx)
+
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if s.Status() != table.SessionReady {
 		t.Fatalf("Result %v differ from, expectd %v", s.Status(), table.SessionReady)
 	}
 
 	status, e = Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY, nil
 	err = s.KeepAlive(ctx)
+
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	if s.Status() != table.SessionBusy {
 		t.Fatalf("Result %v differ from, expectd %v", s.Status(), table.SessionBusy)
 	}
@@ -93,6 +101,7 @@ func TestSessionDescribeTable(t *testing.T) {
 		result *Ydb_Table.DescribeTableResult
 		e      error
 	)
+
 	b := StubBuilder{
 		T: t,
 		cc: testutil.NewBalancer(
@@ -114,6 +123,7 @@ func TestSessionDescribeTable(t *testing.T) {
 		),
 	}
 	s, err := b.createSession(ctx)
+
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,6 +242,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			dstMode: operation.ModeAsync,
 		},
 	}
+
 	for _, test := range []struct {
 		method testutil.MethodCode
 		do     func(t *testing.T, ctx context.Context, c *Client)
@@ -646,6 +657,7 @@ func (mock *copyTablesMock) CopyTables(
 
 func Test_copyTables(t *testing.T) {
 	ctx := xtest.Context(t)
+
 	for _, tt := range []struct {
 		sessionID            string
 		operationTimeout     time.Duration

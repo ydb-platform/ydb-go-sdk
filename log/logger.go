@@ -51,30 +51,41 @@ type defaultLogger struct {
 func (l *defaultLogger) format(namespace []string, msg string, logLevel Level) string {
 	b := xstring.Buffer()
 	defer b.Free()
+
 	if l.coloring {
 		b.WriteString(logLevel.Color())
 	}
+
 	b.WriteString(l.clock.Now().Format(dateLayout))
 	b.WriteByte(' ')
+
 	lvl := logLevel.String()
+
 	if l.coloring {
 		b.WriteString(colorReset)
 		b.WriteString(logLevel.BoldColor())
 	}
+
 	b.WriteString(lvl)
+
 	if l.coloring {
 		b.WriteString(colorReset)
 		b.WriteString(logLevel.Color())
 	}
+
 	b.WriteString(" '")
+
 	for i, name := range namespace {
 		if i != 0 {
 			b.WriteByte('.')
 		}
+
 		b.WriteString(name)
 	}
+
 	b.WriteString("' => ")
 	b.WriteString(msg)
+
 	if l.coloring {
 		b.WriteString(colorReset)
 	}
@@ -104,6 +115,7 @@ func wrapLogger(l Logger, opts ...Option) *wrapper {
 	ll := &wrapper{
 		logger: l,
 	}
+
 	for _, o := range opts {
 		if o != nil {
 			o.applyHolderOption(ll)
@@ -117,16 +129,21 @@ func (l *defaultLogger) appendFields(msg string, fields ...Field) string {
 	if len(fields) == 0 {
 		return msg
 	}
+
 	b := xstring.Buffer()
+
 	defer b.Free()
 	b.WriteString(msg)
 	b.WriteString(" {")
+
 	for i := range fields {
 		if i != 0 {
 			b.WriteByte(',')
 		}
+
 		fmt.Fprintf(b, `%q:%q`, fields[i].Key(), fields[i].String())
 	}
+
 	b.WriteByte('}')
 
 	return b.String()

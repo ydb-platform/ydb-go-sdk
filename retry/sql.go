@@ -47,6 +47,7 @@ func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Co
 		}
 		attempts = 0
 	)
+
 	if tracer, has := db.Driver().(interface {
 		TraceRetry() *trace.Retry
 	}); has {
@@ -54,11 +55,13 @@ func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Co
 		copy(options.retryOptions[1:], options.retryOptions)
 		options.retryOptions[0] = WithTrace(tracer.TraceRetry())
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyDoOption(&options)
 		}
 	}
+
 	err := Retry(ctx, func(ctx context.Context) error {
 		attempts++
 		cc, err := db.Conn(ctx)
@@ -74,6 +77,7 @@ func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Co
 
 		return nil
 	}, options.retryOptions...)
+
 	if err != nil {
 		return xerrors.WithStackTrace(
 			fmt.Errorf("operation failed with %d attempts: %w", attempts, err),
@@ -138,6 +142,7 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 		}
 		attempts = 0
 	)
+
 	if tracer, has := db.Driver().(interface {
 		TraceRetry() *trace.Retry
 	}); has {
@@ -145,11 +150,13 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 		copy(options.retryOptions[1:], options.retryOptions)
 		options.retryOptions[0] = WithTrace(tracer.TraceRetry())
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyDoTxOption(&options)
 		}
 	}
+
 	err := Retry(ctx, func(ctx context.Context) (finalErr error) {
 		attempts++
 		tx, err := db.BeginTx(ctx, options.txOptions)
@@ -178,6 +185,7 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 
 		return nil
 	}, options.retryOptions...)
+
 	if err != nil {
 		return xerrors.WithStackTrace(
 			fmt.Errorf("tx operation failed with %d attempts: %w", attempts, err),

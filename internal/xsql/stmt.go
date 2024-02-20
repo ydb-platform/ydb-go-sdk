@@ -37,9 +37,11 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ dr
 	defer func() {
 		onDone(finalErr)
 	}()
+
 	if !s.conn.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
+
 	switch m := queryModeFromContext(ctx, s.conn.defaultQueryMode); m {
 	case DataQueryMode:
 		return s.processor.QueryContext(s.conn.withKeepInCache(ctx), s.query, args)
@@ -56,9 +58,11 @@ func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ dri
 	defer func() {
 		onDone(finalErr)
 	}()
+
 	if !s.conn.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
+
 	switch m := queryModeFromContext(ctx, s.conn.defaultQueryMode); m {
 	case DataQueryMode:
 		return s.processor.ExecContext(s.conn.withKeepInCache(ctx), s.query, args)

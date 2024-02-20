@@ -66,7 +66,9 @@ func nodeID(sessionID string) (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
+
 	id, err := strconv.ParseUint(u.Query().Get("node_id"), 10, 32)
+
 	if err != nil {
 		return 0, err
 	}
@@ -78,13 +80,16 @@ func (s *session) NodeID() uint32 {
 	if s == nil {
 		return 0
 	}
+
 	if id := s.nodeID.Load(); id != 0 {
 		return id
 	}
+
 	id, err := nodeID(s.id)
 	if err != nil {
 		return 0
 	}
+
 	s.nodeID.Store(id)
 
 	return id
@@ -94,6 +99,7 @@ func (s *session) Status() table.SessionStatus {
 	if s == nil {
 		return table.SessionStatusUnknown
 	}
+
 	s.statusMtx.RLock()
 	defer s.statusMtx.RUnlock()
 
@@ -121,11 +127,13 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config
 	defer func() {
 		onDone(s, err)
 	}()
+
 	var (
 		response *Ydb_Table.CreateSessionResponse
 		result   Ydb_Table.CreateSessionResult
 		c        = Ydb_Table_V1.NewTableServiceClient(cc)
 	)
+
 	response, err = c.CreateSession(ctx,
 		&Ydb_Table.CreateSessionRequest{
 			OperationParams: operation.Params(
@@ -136,10 +144,13 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config
 			),
 		},
 	)
+
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	err = response.GetOperation().GetResult().UnmarshalTo(&result)
+
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -218,6 +229,7 @@ func (s *session) checkCloseHint(md metadata.MD) {
 		if header != meta.HeaderServerHints {
 			continue
 		}
+
 		for _, hint := range values {
 			if hint == meta.HintSessionClose {
 				s.SetStatus(table.SessionClosing)
@@ -236,6 +248,7 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 			s,
 		)
 	)
+
 	defer func() {
 		onDone(err)
 	}()
@@ -289,13 +302,17 @@ func (s *session) CreateTable(
 		}
 		a = allocator.New()
 	)
+
 	defer a.Free()
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyCreateTableOption((*options.CreateTableDesc)(&request), a)
 		}
 	}
+
 	_, err = s.tableService.CreateTable(ctx, &request)
+
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -313,6 +330,7 @@ func (s *session) DescribeTable(
 		response *Ydb_Table.DescribeTableResponse
 		result   Ydb_Table.DescribeTableResult
 	)
+
 	request := Ydb_Table.DescribeTableRequest{
 		SessionId: s.id,
 		Path:      path,
@@ -323,16 +341,21 @@ func (s *session) DescribeTable(
 			operation.ModeSync,
 		),
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt((*options.DescribeTableDesc)(&request))
 		}
 	}
+
 	response, err = s.tableService.DescribeTable(ctx, &request)
+
 	if err != nil {
 		return desc, xerrors.WithStackTrace(err)
 	}
+
 	err = response.GetOperation().GetResult().UnmarshalTo(&result)
+
 	if err != nil {
 		return desc, xerrors.WithStackTrace(err)
 	}
@@ -353,6 +376,7 @@ func (s *session) DescribeTable(
 		[]options.KeyRange,
 		len(result.GetShardKeyBounds())+1,
 	)
+
 	var last types.Value
 	for i, b := range result.GetShardKeyBounds() {
 		if last != nil {
@@ -364,22 +388,26 @@ func (s *session) DescribeTable(
 
 		last = bound
 	}
+
 	if last != nil {
 		i := len(rs) - 1
 		rs[i].From = last
 	}
 
 	var stats *options.TableStats
+
 	if result.GetTableStats() != nil {
 		resStats := result.GetTableStats()
 		partStats := make(
 			[]options.PartitionStats,
 			len(result.GetTableStats().GetPartitionStats()),
 		)
+
 		for i, v := range result.TableStats.PartitionStats {
 			partStats[i].RowsEstimate = v.GetRowsEstimate()
 			partStats[i].StoreSize = v.GetStoreSize()
 		}
+
 		var creationTime, modificationTime time.Time
 		if resStats.CreationTime.GetSeconds() != 0 {
 			creationTime = time.Unix(
@@ -387,6 +415,7 @@ func (s *session) DescribeTable(
 				int64(resStats.GetCreationTime().GetNanos()),
 			)
 		}
+
 		if resStats.ModificationTime.GetSeconds() != 0 {
 			modificationTime = time.Unix(
 				resStats.GetModificationTime().GetSeconds(),
@@ -415,6 +444,7 @@ func (s *session) DescribeTable(
 	}
 
 	indexes := make([]options.IndexDescription, len(result.Indexes))
+
 	for i, idx := range result.GetIndexes() {
 		var typ options.IndexType
 		switch idx.Type.(type) {
@@ -423,6 +453,7 @@ func (s *session) DescribeTable(
 		case *Ydb_Table.TableIndexDescription_GlobalIndex:
 			typ = options.IndexTypeGlobal
 		}
+
 		indexes[i] = options.IndexDescription{
 			Name:         idx.GetName(),
 			IndexColumns: idx.GetIndexColumns(),
@@ -472,11 +503,13 @@ func (s *session) DropTable(
 			operation.ModeSync,
 		),
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyDropTableOption((*options.DropTableDesc)(&request))
 		}
 	}
+
 	_, err = s.tableService.DropTable(ctx, &request)
 
 	return xerrors.WithStackTrace(err)
@@ -486,6 +519,7 @@ func (s *session) checkError(err error) {
 	if err == nil {
 		return
 	}
+
 	if m := retry.Check(err); m.MustDeleteSession() {
 		s.SetStatus(table.SessionClosing)
 	}
@@ -510,12 +544,15 @@ func (s *session) AlterTable(
 		}
 		a = allocator.New()
 	)
+
 	defer a.Free()
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyAlterTableOption((*options.AlterTableDesc)(&request), a)
 		}
 	}
+
 	_, err = s.tableService.AlterTable(ctx, &request)
 
 	return xerrors.WithStackTrace(err)
@@ -538,12 +575,15 @@ func (s *session) CopyTable(
 			operation.ModeSync,
 		),
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt((*options.CopyTableDesc)(&request))
 		}
 	}
+
 	_, err = s.tableService.CopyTable(ctx, &request)
+
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -572,15 +612,19 @@ func copyTables(
 			operation.ModeSync,
 		),
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt((*options.CopyTablesDesc)(&request))
 		}
 	}
+
 	if len(request.Tables) == 0 {
 		return xerrors.WithStackTrace(fmt.Errorf("no CopyTablesItem: %w", errParamsRequired))
 	}
+
 	_, err = service.CopyTables(ctx, &request)
+
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -618,6 +662,7 @@ func (s *session) Explain(
 			s, query,
 		)
 	)
+
 	defer func() {
 		if err != nil {
 			onDone("", "", err)
@@ -667,6 +712,7 @@ func (s *session) Prepare(ctx context.Context, queryText string) (_ table.Statem
 			s, queryText,
 		)
 	)
+
 	defer func() {
 		if err != nil {
 			onDone(nil, err)
@@ -724,6 +770,7 @@ func (s *session) Execute(
 		}
 		callOptions []grpc.CallOption
 	)
+
 	defer a.Free()
 
 	request.SessionId = s.id
@@ -831,11 +878,13 @@ func (s *session) ExecuteSchemeQuery(
 			operation.ModeSync,
 		),
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt((*options.ExecuteSchemeQueryDesc)(&request))
 		}
 	}
+
 	_, err = s.tableService.ExecuteSchemeQuery(ctx, &request)
 
 	return xerrors.WithStackTrace(err)
@@ -850,6 +899,7 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 		response *Ydb_Table.DescribeTableOptionsResponse
 		result   Ydb_Table.DescribeTableOptionsResult
 	)
+
 	request := Ydb_Table.DescribeTableOptionsRequest{
 		OperationParams: operation.Params(
 			ctx,
@@ -859,6 +909,7 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 		),
 	}
 	response, err = s.tableService.DescribeTableOptions(ctx, &request)
+
 	if err != nil {
 		return desc, xerrors.WithStackTrace(err)
 	}
@@ -996,8 +1047,10 @@ func (s *session) StreamReadTable(
 		stream Ydb_Table_V1.TableService_StreamReadTableClient
 		a      = allocator.New()
 	)
+
 	defer func() {
 		a.Free()
+
 		if err != nil {
 			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 		}
@@ -1066,6 +1119,7 @@ func (s *session) ReadRows(
 		}
 		response *Ydb_Table.ReadRowsResponse
 	)
+
 	defer func() {
 		a.Free()
 	}()
@@ -1121,8 +1175,10 @@ func (s *session) StreamExecuteScanQuery(
 		stream      Ydb_Table_V1.TableService_StreamExecuteScanQueryClient
 		callOptions []grpc.CallOption
 	)
+
 	defer func() {
 		a.Free()
+
 		if err != nil {
 			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 		}
@@ -1190,6 +1246,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value
 			s,
 		)
 	)
+
 	defer func() {
 		defer a.Free()
 		onDone(err)
@@ -1234,6 +1291,7 @@ func (s *session) BeginTransaction(
 			s,
 		)
 	)
+
 	defer func() {
 		onDone(x, err)
 	}()
@@ -1253,10 +1311,13 @@ func (s *session) BeginTransaction(
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	err = response.GetOperation().GetResult().UnmarshalTo(&result)
+
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	tx := &transaction{
 		id:      result.GetTxMeta().GetId(),
 		s:       s,

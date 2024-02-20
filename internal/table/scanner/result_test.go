@@ -163,31 +163,39 @@ func WithValues(vs ...types.Value) ResultSetOption {
 		if n == 0 {
 			panic("empty columns")
 		}
+
 		if len(vs)%n != 0 {
 			panic("malformed values set")
 		}
+
 		var row *Ydb.Value
+
 		for i, v := range vs {
 			j := i % n
 			if j == 0 && i > 0 {
 				r.Rows = append(r.Rows, row)
 			}
+
 			if j == 0 {
 				row = &Ydb.Value{
 					Items: make([]*Ydb.Value, n),
 				}
 			}
+
 			tv := value.ToYDB(v, a)
 			act := value.TypeFromYDB(tv.Type)
 			exp := value.TypeFromYDB(r.Columns[j].Type)
+
 			if !value.TypesEqual(act, exp) {
 				panic(fmt.Sprintf(
 					"unexpected types for #%d column: %s; want %s",
 					j, act, exp,
 				))
 			}
+
 			row.Items[j] = tv.Value
 		}
+
 		if row != nil {
 			r.Rows = append(r.Rows, row)
 		}
@@ -196,6 +204,7 @@ func WithValues(vs ...types.Value) ResultSetOption {
 
 func NewResultSet(a *allocator.Allocator, opts ...ResultSetOption) *Ydb.ResultSet {
 	var d resultSetDesc
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt(&d, a)

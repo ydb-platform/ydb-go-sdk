@@ -23,6 +23,7 @@ func driver(config Config) (t trace.Driver) {
 		localDC bool
 		az      string
 	}
+
 	knownEndpoints := make(map[endpointKey]struct{})
 
 	t.OnConnInvoke = func(info trace.DriverConnInvokeStartInfo) func(trace.DriverConnInvokeDoneInfo) {
@@ -40,6 +41,7 @@ func driver(config Config) (t trace.Driver) {
 					"endpoint": endpoint,
 					"node_id":  strconv.FormatUint(uint64(nodeID), 10),
 				}).Inc()
+
 				if xerrors.IsOperationErrorTransactionLocksInvalidated(info.Error) {
 					tli.With(nil).Inc()
 				}
@@ -101,7 +103,9 @@ func driver(config Config) (t trace.Driver) {
 				balancerUpdates.With(map[string]string{
 					"cause": eventType,
 				}).Inc()
+
 				newEndpoints := make(map[endpointKey]int, len(info.Endpoints))
+
 				for _, e := range info.Endpoints {
 					e := endpointKey{
 						localDC: e.LocalDC(),
@@ -109,6 +113,7 @@ func driver(config Config) (t trace.Driver) {
 					}
 					newEndpoints[e]++
 				}
+
 				for e := range knownEndpoints {
 					if _, has := newEndpoints[e]; !has {
 						delete(knownEndpoints, e)
@@ -118,8 +123,10 @@ func driver(config Config) (t trace.Driver) {
 						}).Set(0)
 					}
 				}
+
 				for e, count := range newEndpoints {
 					knownEndpoints[e] = struct{}{}
+
 					endpoints.With(map[string]string{
 						"local_dc": strconv.FormatBool(e.localDC),
 						"az":       e.az,

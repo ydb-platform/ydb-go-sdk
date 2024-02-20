@@ -61,6 +61,7 @@ func (res *DescribeTopicResult) FromProto(protoResponse *Ydb_Topic.DescribeTopic
 
 	protoPartitions := protoResult.GetPartitions()
 	res.Partitions = make([]PartitionInfo, len(protoPartitions))
+
 	for i, protoPartition := range protoPartitions {
 		res.Partitions[i].mustFromProto(protoPartition)
 	}

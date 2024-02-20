@@ -38,6 +38,7 @@ func New(
 	cfg := newTopicConfig(opts...)
 
 	var defaultOperationParams rawydb.OperationParams
+
 	topic.OperationParamsFromConfig(&defaultOperationParams, &cfg.Common)
 
 	return &Client{
@@ -52,6 +53,7 @@ func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
 	c := topic.Config{
 		Trace: &trace.Topic{},
 	}
+
 	for _, o := range opts {
 		if o != nil {
 			o(&c)
@@ -70,7 +72,9 @@ func (c *Client) Close(_ context.Context) error {
 func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.AlterOption) error {
 	req := &rawtopic.AlterTopicRequest{}
 	req.OperationParams = c.defaultOperationParams
+
 	req.Path = path
+
 	for _, o := range opts {
 		if o != nil {
 			o.ApplyAlterOption(req)

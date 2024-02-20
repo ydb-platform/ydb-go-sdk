@@ -16,12 +16,15 @@ func Params(
 	if d, ok := Timeout(ctx); ok {
 		timeout = d
 	}
+
 	if d, ok := CancelAfter(ctx); ok {
 		cancelAfter = d
 	}
+
 	if d, ok := untilDeadline(ctx); mode == ModeSync && ok && d < timeout {
 		timeout = d
 	}
+
 	if timeout == 0 && cancelAfter == 0 && mode == 0 {
 		return nil
 	}

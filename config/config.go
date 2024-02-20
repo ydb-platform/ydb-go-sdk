@@ -286,6 +286,7 @@ func (c *Config) With(opts ...Option) *Config {
 			o(c)
 		}
 	}
+
 	c.meta = meta.New(
 		c.database,
 		c.credentials,

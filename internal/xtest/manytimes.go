@@ -38,6 +38,7 @@ func TestManyTimes(t testing.TB, test TestFunc, opts ...TestManyTimesOption) {
 	}
 
 	start := time.Now()
+
 	for {
 		testCounter++
 		// run test, then check stopAfter for guarantee run test least once

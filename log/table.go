@@ -26,6 +26,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TablePoolAPIEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "table", "do")
 		idempotent := info.Idempotent
 		label := info.Label
@@ -33,6 +34,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			Bool("idempotent", idempotent),
 			String("label", label),
 		)
+
 		start := time.Now()
 
 		return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
@@ -99,6 +101,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TablePoolAPIEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "table", "do", "tx")
 		idempotent := info.Idempotent
 		label := info.Label
@@ -106,6 +109,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			Bool("idempotent", idempotent),
 			String("label", label),
 		)
+
 		start := time.Now()
 
 		return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
@@ -172,8 +176,10 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TablePoolAPIEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "table", "create", "session")
 		l.Log(ctx, "start")
+
 		start := time.Now()
 
 		return func(info trace.TableCreateSessionIntermediateInfo) func(trace.TableCreateSessionDoneInfo) {
@@ -212,8 +218,10 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TableSessionEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "table", "session", "new")
 		l.Log(ctx, "start")
+
 		start := time.Now()
 
 		return func(info trace.TableSessionNewDoneInfo) {
@@ -242,12 +250,14 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TableSessionEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "table", "session", "delete")
 		session := info.Session
 		l.Log(ctx, "start",
 			String("id", info.Session.ID()),
 			String("status", info.Session.Status()),
 		)
+
 		start := time.Now()
 
 		return func(info trace.TableSessionDeleteDoneInfo) {
@@ -272,12 +282,14 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TableSessionEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "table", "session", "keep", "alive")
 		session := info.Session
 		l.Log(ctx, "start",
 			String("id", session.ID()),
 			String("status", session.Status()),
 		)
+
 		start := time.Now()
 
 		return func(info trace.TableKeepAliveDoneInfo) {
@@ -306,6 +318,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TableSessionQueryInvokeEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "table", "session", "query", "prepare")
 		session := info.Session
 		query := info.Query
@@ -316,6 +329,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 				String("status", session.Status()),
 			)...,
 		)
+
 		start := time.Now()
 
 		return func(info trace.TablePrepareDataQueryDoneInfo) {
@@ -353,6 +367,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TableSessionQueryInvokeEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "table", "session", "query", "execute")
 		session := info.Session
 		query := info.Query
@@ -363,6 +378,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 				String("status", session.Status()),
 			)...,
 		)
+
 		start := time.Now()
 
 		return func(info trace.TableExecuteDataQueryDoneInfo) {
@@ -404,6 +420,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TableSessionQueryStreamEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "table", "session", "query", "stream", "execute")
 		session := info.Session
 		query := info.Query
@@ -414,6 +431,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 				String("status", session.Status()),
 			)...,
 		)
+
 		start := time.Now()
 
 		return func(
@@ -466,12 +484,14 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TableSessionQueryStreamEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "table", "session", "query", "stream", "read")
 		session := info.Session
 		l.Log(ctx, "start",
 			String("id", session.ID()),
 			String("status", session.Status()),
 		)
+
 		start := time.Now()
 
 		return func(
@@ -515,12 +535,14 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TableSessionTransactionEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "table", "session", "tx", "begin")
 		session := info.Session
 		l.Log(ctx, "start",
 			String("id", session.ID()),
 			String("status", session.Status()),
 		)
+
 		start := time.Now()
 
 		return func(info trace.TableSessionTransactionBeginDoneInfo) {
@@ -550,6 +572,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TableSessionTransactionEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "table", "session", "tx", "commit")
 		session := info.Session
 		tx := info.Tx
@@ -558,6 +581,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			String("status", session.Status()),
 			String("tx", info.Tx.ID()),
 		)
+
 		start := time.Now()
 
 		return func(info trace.TableSessionTransactionCommitDoneInfo) {
@@ -588,6 +612,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TableSessionTransactionEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "table", "session", "tx", "rollback")
 		session := info.Session
 		tx := info.Tx
@@ -596,6 +621,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 			String("status", session.Status()),
 			String("tx", tx.ID()),
 		)
+
 		start := time.Now()
 
 		return func(info trace.TableSessionTransactionRollbackDoneInfo) {
@@ -622,8 +648,10 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TableEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "table", "init")
 		l.Log(ctx, "start")
+
 		start := time.Now()
 
 		return func(info trace.TableInitDoneInfo) {
@@ -637,8 +665,10 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TableEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "table", "close")
 		l.Log(ctx, "start")
+
 		start := time.Now()
 
 		return func(info trace.TableCloseDoneInfo) {
@@ -659,6 +689,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TablePoolLifeCycleEvents == 0 {
 			return
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "table", "pool", "state", "change")
 		l.Log(WithLevel(ctx, DEBUG), "",
 			Int("size", info.Size),
@@ -669,6 +700,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TablePoolLifeCycleEvents == 0 {
 			return
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "table", "pool", "session", "add")
 		l.Log(ctx, "start",
 			String("id", info.Session.ID()),
@@ -679,6 +711,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TablePoolLifeCycleEvents == 0 {
 			return
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "table", "pool", "session", "remove")
 		l.Log(ctx, "start",
 			String("id", info.Session.ID()),
@@ -689,12 +722,14 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TablePoolAPIEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "table", "pool", "put")
 		session := info.Session
 		l.Log(ctx, "start",
 			String("id", session.ID()),
 			String("status", session.Status()),
 		)
+
 		start := time.Now()
 
 		return func(info trace.TablePoolPutDoneInfo) {
@@ -719,8 +754,10 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TablePoolAPIEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "table", "pool", "get")
 		l.Log(ctx, "start")
+
 		start := time.Now()
 
 		return func(info trace.TablePoolGetDoneInfo) {
@@ -746,8 +783,10 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 		if d.Details()&trace.TablePoolAPIEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "table", "pool", "wait")
 		l.Log(ctx, "start")
+
 		start := time.Now()
 
 		return func(info trace.TablePoolWaitDoneInfo) {
@@ -760,6 +799,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 					String("status", info.Session.Status()),
 				)
 			}
+
 			if info.Error == nil {
 				l.Log(ctx, "done", fields...)
 			} else {

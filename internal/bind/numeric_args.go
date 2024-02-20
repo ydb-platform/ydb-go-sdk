@@ -33,6 +33,7 @@ func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (
 		buffer = xstring.Buffer()
 		param  table.ParameterOption
 	)
+
 	defer buffer.Free()
 
 	if len(args) > 0 {
@@ -47,17 +48,21 @@ func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (
 			if p == 0 {
 				return "", nil, xerrors.WithStackTrace(ErrUnexpectedNumericArgZero)
 			}
+
 			if int(p) > len(args) {
 				return "", nil, xerrors.WithStackTrace(
 					fmt.Errorf("%w: $p%d, len(args) = %d", ErrInconsistentArgs, p, len(args)),
 				)
 			}
+
 			paramName := "$p" + strconv.Itoa(int(p-1)) //nolint:goconst
+
 			if newArgs[p-1] == nil {
 				param, err = toYdbParam(paramName, args[p-1])
 				if err != nil {
 					return "", nil, xerrors.WithStackTrace(err)
 				}
+
 				newArgs[p-1] = param
 				buffer.WriteString(param.Name())
 			} else {
@@ -101,6 +106,7 @@ func numericArgsStateFn(l *sqlLexer) stateFn {
 				if l.pos-l.start > 0 {
 					l.parts = append(l.parts, l.src[l.start:l.pos-width])
 				}
+
 				l.start = l.pos
 
 				return numericArgState
@@ -138,6 +144,7 @@ func numericArgState(l *sqlLexer) stateFn {
 			if err != nil {
 				panic(err)
 			}
+
 			l.parts = append(l.parts, numericArg(i))
 			l.start = l.pos
 		} else {
@@ -145,6 +152,7 @@ func numericArgState(l *sqlLexer) stateFn {
 			l.start = l.pos
 		}
 	}()
+
 	for {
 		r, width := utf8.DecodeRuneInString(l.src[l.pos:])
 		l.pos += width

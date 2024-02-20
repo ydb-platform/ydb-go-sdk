@@ -19,8 +19,10 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicReaderStreamLifeCycleEvents == 0 {
 			return nil
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "reconnect")
 		start := time.Now()
+
 		l.Log(ctx, "start")
 
 		return func(doneInfo trace.TopicReaderReconnectDoneInfo) {
@@ -34,6 +36,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicReaderStreamLifeCycleEvents == 0 {
 			return
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "reconnect", "request")
 		l.Log(ctx, "start",
 			NamedError("reason", info.Reason),
@@ -46,8 +49,10 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicReaderPartitionEvents == 0 {
 			return nil
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "partition", "read", "start", "response")
 		start := time.Now()
+
 		l.Log(ctx, "start",
 			String("topic", info.Topic),
 			String("reader_connection_id", info.ReaderConnectionID),
@@ -68,11 +73,13 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 					Int64("commit_offset", *doneInfo.CommitOffset),
 				)
 			}
+
 			if doneInfo.ReadOffset != nil {
 				fields = append(fields,
 					Int64("read_offset", *doneInfo.ReadOffset),
 				)
 			}
+
 			if doneInfo.Error == nil {
 				l.Log(WithLevel(ctx, INFO), "read partition response completed", fields...)
 			} else {
@@ -91,8 +98,10 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicReaderPartitionEvents == 0 {
 			return nil
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "partition", "read", "stop", "response")
 		start := time.Now()
+
 		l.Log(ctx, "start",
 			String("reader_connection_id", info.ReaderConnectionID),
 			String("topic", info.Topic),
@@ -127,8 +136,10 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "commit")
 		start := time.Now()
+
 		l.Log(ctx, "start",
 			String("topic", info.Topic),
 			Int64("partition_id", info.PartitionID),
@@ -164,6 +175,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "send", "commit", "message")
 		start := time.Now()
 
@@ -205,6 +217,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "committed", "notify")
 		l.Log(ctx, "ack",
 			String("reader_connection_id", info.ReaderConnectionID),
@@ -218,8 +231,10 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "close")
 		start := time.Now()
+
 		l.Log(ctx, "done",
 			String("reader_connection_id", info.ReaderConnectionID),
 			NamedError("close_reason", info.CloseReason),
@@ -247,8 +262,10 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "init")
 		start := time.Now()
+
 		l.Log(ctx, "start",
 			String("pre_init_reader_connection_id", info.PreInitReaderConnectionID),
 			String("consumer", info.InitRequestInfo.GetConsumer()),
@@ -278,6 +295,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "error")
 		l.Log(WithLevel(ctx, INFO), "stream error",
 			Error(info.Error),
@@ -293,8 +311,10 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicReaderStreamEvents == 0 {
 			return nil
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "update", "token")
 		start := time.Now()
+
 		l.Log(ctx, "token updating...",
 			String("reader_connection_id", info.ReaderConnectionID),
 		)
@@ -341,6 +361,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicReaderMessageEvents == 0 {
 			return
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "sent", "data", "request")
 		l.Log(ctx, "sent data request",
 			String("reader_connection_id", info.ReaderConnectionID),
@@ -354,6 +375,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicReaderMessageEvents == 0 {
 			return nil
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "receive", "data", "response")
 		start := time.Now()
 		partitionsCount, batchesCount, messagesCount := info.DataResponse.GetPartitionBatchMessagesCounts()
@@ -398,8 +420,10 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicReaderMessageEvents == 0 {
 			return nil
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "read", "messages")
 		start := time.Now()
+
 		l.Log(ctx, "read messages called, waiting...",
 			Int("min_count", info.MinCount),
 			Int("max_count", info.MaxCount),
@@ -430,6 +454,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicReaderMessageEvents == 0 {
 			return
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "reader", "unknown", "grpc", "message")
 		l.Log(WithLevel(ctx, INFO), "received unknown message",
 			Error(info.Error),
@@ -446,8 +471,10 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicWriterStreamLifeCycleEvents == 0 {
 			return nil
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "reconnect")
 		start := time.Now()
+
 		l.Log(ctx, "connect to topic writer stream starting...",
 			String("topic", info.Topic),
 			String("producer_id", info.ProducerID),
@@ -482,8 +509,10 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicWriterStreamLifeCycleEvents == 0 {
 			return nil
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "stream", "init")
 		start := time.Now()
+
 		l.Log(ctx, "start",
 			String("topic", info.Topic),
 			String("producer_id", info.ProducerID),
@@ -516,8 +545,10 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicWriterStreamLifeCycleEvents == 0 {
 			return nil
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "close")
 		start := time.Now()
+
 		l.Log(ctx, "start",
 			String("writer_instance_id", info.WriterInstanceID),
 			NamedError("reason", info.Reason),
@@ -547,8 +578,10 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicWriterStreamEvents == 0 {
 			return nil
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "compress", "messages")
 		start := time.Now()
+
 		l.Log(ctx, "start",
 			String("writer_instance_id", info.WriterInstanceID),
 			String("session_id", info.SessionID),
@@ -590,8 +623,10 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicWriterStreamEvents == 0 {
 			return nil
 		}
+
 		ctx := with(context.Background(), TRACE, "ydb", "topic", "writer", "send", "messages")
 		start := time.Now()
+
 		l.Log(ctx, "start",
 			String("writer_instance_id", info.WriterInstanceID),
 			String("session_id", info.SessionID),
@@ -627,6 +662,7 @@ func internalTopic(l Logger, d trace.Detailer) (t trace.Topic) { //nolint:gocycl
 		if d.Details()&trace.TopicWriterStreamEvents == 0 {
 			return
 		}
+
 		ctx := with(context.Background(), DEBUG, "ydb", "topic", "writer", "read", "unknown", "grpc", "message")
 		l.Log(ctx, "topic writer receive unknown message from server",
 			Error(info.Error),

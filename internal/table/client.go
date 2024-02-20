@@ -50,6 +50,7 @@ func newClient(
 	defer func() {
 		onDone(config.SizeLimit(), finalErr)
 	}()
+
 	c = &Client{
 		clock:       config.Clock(),
 		config:      config,
@@ -69,6 +70,7 @@ func newClient(
 		},
 		done: make(chan struct{}),
 	}
+
 	if idleThreshold := config.IdleThreshold(); idleThreshold > 0 {
 		c.wg.Add(1)
 		go c.internalPoolGC(ctx, idleThreshold)
@@ -121,6 +123,7 @@ func withCreateSessionOnClose(onClose func(s *session)) createSessionOption {
 
 func (c *Client) createSession(ctx context.Context, opts ...createSessionOption) (s *session, err error) {
 	options := createSessionOptions{}
+
 	for _, o := range opts {
 		if o != nil {
 			o(&options)
@@ -131,9 +134,11 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 		if s == nil {
 			return
 		}
+
 		for _, onCreate := range options.onCreate {
 			onCreate(s)
 		}
+
 		s.onClose = append(s.onClose, options.onClose...)
 	}()
 
@@ -227,10 +232,13 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 	if c == nil {
 		return nil, xerrors.WithStackTrace(errNilClient)
 	}
+
 	if c.isClosed() {
 		return nil, xerrors.WithStackTrace(errClosedClient)
 	}
+
 	var s *session
+
 	createSession := func(ctx context.Context) (*session, error) {
 		s, err = c.createSession(ctx)
 		if err != nil {
@@ -247,6 +255,7 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 
 		return s, nil
 	}
+
 	err = retry.Retry(ctx,
 		func(ctx context.Context) (err error) {
 			s, err = createSession(ctx)
@@ -295,6 +304,7 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 	}
 	// pre-check the Client size
 	var enoughSpace bool
+
 	c.mu.WithLock(func() {
 		enoughSpace = c.createInProgress+len(c.index) < c.limit
 		if enoughSpace {
@@ -374,6 +384,7 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 		i     = 0
 		o     = getOptions{t: c.config.Trace()}
 	)
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt(&o)
@@ -410,6 +421,7 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 			if err = ctx.Err(); err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
+
 			panic("both of session and err are nil")
 		}
 		// got session or err is not recoverable
@@ -428,6 +440,7 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 			err = xerrors.WithStackTrace(err)
 		}
 	}
+
 	if s == nil && err == nil {
 		if c.isClosed() {
 			err = xerrors.WithStackTrace(errClosedClient)
@@ -435,12 +448,14 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 			err = xerrors.WithStackTrace(errNoProgress)
 		}
 	}
+
 	if err != nil {
 		var (
 			index            int
 			idle             int
 			createInProgress int
 		)
+
 		c.mu.WithLock(func() {
 			index = len(c.index)
 			idle = c.idle.Len()
@@ -790,8 +805,10 @@ func (c *Client) internalPoolGetWaitCh() *chan *session { //nolint:gocritic
 	if c.testHookGetWaitCh != nil {
 		c.testHookGetWaitCh()
 	}
+
 	ch := c.waitChPool.Get()
 	s, ok := ch.(*chan *session)
+
 	if !ok {
 		panic(fmt.Sprintf("%T is not a chan of sessions", ch))
 	}
@@ -813,8 +830,10 @@ func (c *Client) internalPoolPeekFirstIdle() (s *session, touched time.Time) {
 	if el == nil {
 		return
 	}
+
 	s = el.Value.(*session)
 	info, has := c.index[s]
+
 	if !has || el != info.idle {
 		panic("inconsistent session client index")
 	}
@@ -874,6 +893,7 @@ func (c *Client) internalPoolNotify(s *session) (notified bool) {
 func (c *Client) internalPoolSyncCloseSession(ctx context.Context, s *session) {
 	var cancel context.CancelFunc
 	ctx, cancel = xcontext.WithTimeout(ctx, c.config.DeleteTimeout())
+
 	defer cancel()
 
 	_ = s.Close(ctx)
@@ -904,6 +924,7 @@ func (c *Client) internalPoolHandlePushIdle(s *session, now time.Time, el *list.
 	if !has {
 		panic("trying to store session created outside of the client")
 	}
+
 	if info.idle != nil {
 		panic("inconsistent session client index")
 	}

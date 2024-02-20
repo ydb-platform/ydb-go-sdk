@@ -26,6 +26,7 @@ func (tx *txFake) PrepareContext(ctx context.Context, query string) (_ driver.St
 	defer func() {
 		onDone(finalErr)
 	}()
+
 	if !tx.conn.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
@@ -68,6 +69,7 @@ func (tx *txFake) Commit() (err error) {
 	defer func() {
 		tx.conn.currentTx = nil
 	}()
+
 	if !tx.conn.isReady() {
 		return badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
@@ -86,6 +88,7 @@ func (tx *txFake) Rollback() (err error) {
 	defer func() {
 		tx.conn.currentTx = nil
 	}()
+
 	if !tx.conn.isReady() {
 		return badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
@@ -104,7 +107,9 @@ func (tx *txFake) QueryContext(ctx context.Context, query string, args []driver.
 	defer func() {
 		onDone(err)
 	}()
+
 	rows, err = tx.conn.QueryContext(ctx, query, args)
+
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -123,7 +128,9 @@ func (tx *txFake) ExecContext(ctx context.Context, query string, args []driver.N
 	defer func() {
 		onDone(err)
 	}()
+
 	result, err = tx.conn.ExecContext(ctx, query, args)
+
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

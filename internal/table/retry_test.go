@@ -97,11 +97,13 @@ func TestRetryerBadSession(t *testing.T) {
 			return nil
 		},
 	}
+
 	var (
 		i          int
 		maxRetryes = 100
 		sessions   []table.Session
 	)
+
 	ctx, cancel := xcontext.WithCancel(context.Background())
 	err := do(ctx, p, config.New(),
 		func(ctx context.Context, s table.Session) error {
@@ -117,16 +119,20 @@ func TestRetryerBadSession(t *testing.T) {
 		},
 		func(err error) {},
 	)
+
 	if !xerrors.Is(err, context.Canceled) {
 		t.Errorf("unexpected error: %v", err)
 	}
+
 	seen := make(map[table.Session]bool, len(sessions))
+
 	for _, s := range sessions {
 		if seen[s] {
 			t.Errorf("session used twice")
 		} else {
 			seen[s] = true
 		}
+
 		if !closed[s] {
 			t.Errorf("bad session was not closed")
 		}
@@ -152,7 +158,9 @@ func TestRetryerSessionClosing(t *testing.T) {
 			return nil
 		},
 	}
+
 	var sessions []table.Session
+
 	for i := 0; i < 1000; i++ {
 		err := do(
 			context.Background(),
@@ -170,13 +178,16 @@ func TestRetryerSessionClosing(t *testing.T) {
 			t.Errorf("unexpected error: %v", err)
 		}
 	}
+
 	seen := make(map[table.Session]bool, len(sessions))
+
 	for _, s := range sessions {
 		if seen[s] {
 			t.Errorf("session used twice")
 		} else {
 			seen[s] = true
 		}
+
 		if !closed[s] {
 			t.Errorf("bad session was not closed")
 		}
@@ -334,6 +345,7 @@ func TestRetryContextDeadline(t *testing.T) {
 		OnGet: client.internalPoolCreateSession,
 	}
 	r := xrand.New(xrand.WithLock())
+
 	for i := range timeouts {
 		for j := range sleeps {
 			timeout := timeouts[i]
@@ -382,6 +394,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 			},
 		}
 	)
+
 	for _, test := range []struct {
 		error         error
 		retriable     bool
@@ -522,6 +535,7 @@ func (s *singleSession) Get(context.Context) (*session, error) {
 	if s.empty {
 		return nil, xerrors.WithStackTrace(errNoSession)
 	}
+
 	s.empty = true
 
 	return s.s, nil
@@ -531,9 +545,11 @@ func (s *singleSession) Put(_ context.Context, x *session) error {
 	if x != s.s {
 		return xerrors.WithStackTrace(errUnexpectedSession)
 	}
+
 	if !s.empty {
 		return xerrors.WithStackTrace(errSessionOverflow)
 	}
+
 	s.empty = false
 
 	return nil

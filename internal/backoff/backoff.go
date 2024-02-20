@@ -86,6 +86,7 @@ func New(opts ...option) logBackoff {
 	b := logBackoff{
 		r: xrand.New(xrand.WithLock()),
 	}
+
 	for _, o := range opts {
 		if o != nil {
 			o(&b)
@@ -101,9 +102,11 @@ func (b logBackoff) Delay(i int) time.Duration {
 	if s <= 0 {
 		s = time.Second
 	}
+
 	n := 1 << min(uint(i), max(1, b.ceiling))
 	d := s * time.Duration(n)
 	f := time.Duration(math.Min(1, math.Abs(b.jitterLimit)) * float64(d))
+
 	if f == d {
 		return f
 	}

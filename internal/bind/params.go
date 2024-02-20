@@ -45,6 +45,7 @@ func toValue(v interface{}) (_ types.Value, err error) {
 		if x == nil {
 			return types.NullValue(types.TypeInt32), nil
 		}
+
 		xx := int32(*x)
 
 		return types.NullableInt32Value(&xx), nil
@@ -54,6 +55,7 @@ func toValue(v interface{}) (_ types.Value, err error) {
 		if x == nil {
 			return types.NullValue(types.TypeUint32), nil
 		}
+
 		xx := uint32(*x)
 
 		return types.NullableUint32Value(&xx), nil
@@ -148,25 +150,32 @@ func toYdbParam(name string, value interface{}) (table.ParameterOption, error) {
 		if n != "" {
 			name = n
 		}
+
 		value = v
 	}
+
 	if na, ok := value.(sql.NamedArg); ok {
 		n, v := na.Name, na.Value
 		if n != "" {
 			name = n
 		}
+
 		value = v
 	}
+
 	if v, ok := value.(table.ParameterOption); ok {
 		return v, nil
 	}
+
 	v, err := toValue(value)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	if name == "" {
 		return nil, xerrors.WithStackTrace(errUnnamedParam)
 	}
+
 	if name[0] != '$' {
 		name = "$" + name
 	}
@@ -176,6 +185,7 @@ func toYdbParam(name string, value interface{}) (table.ParameterOption, error) {
 
 func Params(args ...interface{}) (params []table.ParameterOption, _ error) {
 	params = make([]table.ParameterOption, 0, len(args))
+
 	for i, arg := range args {
 		switch x := arg.(type) {
 		case driver.NamedValue:
@@ -185,6 +195,7 @@ func Params(args ...interface{}) (params []table.ParameterOption, _ error) {
 					if len(args) > 1 {
 						return nil, xerrors.WithStackTrace(errMultipleQueryParameters)
 					}
+
 					xx.Each(func(name string, v types.Value) {
 						params = append(params, table.ValueParam(name, v))
 					})
@@ -192,10 +203,12 @@ func Params(args ...interface{}) (params []table.ParameterOption, _ error) {
 					params = append(params, xx)
 				default:
 					x.Name = fmt.Sprintf("$p%d", i)
+
 					param, err := toYdbParam(x.Name, x.Value)
 					if err != nil {
 						return nil, xerrors.WithStackTrace(err)
 					}
+
 					params = append(params, param)
 				}
 			} else {
@@ -209,15 +222,18 @@ func Params(args ...interface{}) (params []table.ParameterOption, _ error) {
 			if x.Name == "" {
 				return nil, xerrors.WithStackTrace(errUnnamedParam)
 			}
+
 			param, err := toYdbParam(x.Name, x.Value)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
+
 			params = append(params, param)
 		case *table.QueryParameters:
 			if len(args) > 1 {
 				return nil, xerrors.WithStackTrace(errMultipleQueryParameters)
 			}
+
 			x.Each(func(name string, v types.Value) {
 				params = append(params, table.ValueParam(name, v))
 			})
@@ -228,9 +244,11 @@ func Params(args ...interface{}) (params []table.ParameterOption, _ error) {
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
+
 			params = append(params, param)
 		}
 	}
+
 	sort.Slice(params, func(i, j int) bool {
 		return params[i].Name() < params[j].Name()
 	})

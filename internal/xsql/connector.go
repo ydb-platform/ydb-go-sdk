@@ -205,6 +205,7 @@ func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
 		pathNormalizer:   bind.TablePathPrefix(parent.Name()),
 		trace:            &trace.DatabaseSQL{},
 	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			if err = opt.Apply(c); err != nil {
@@ -212,6 +213,7 @@ func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
 			}
 		}
 	}
+
 	if c.idleThreshold > 0 {
 		c.idleStopper = c.idleCloser()
 	}
@@ -260,6 +262,7 @@ var (
 func (c *Connector) idleCloser() (idleStopper func()) {
 	var ctx context.Context
 	ctx, idleStopper = xcontext.WithCancel(context.Background())
+
 	go func() {
 		for {
 			select {
@@ -267,11 +270,14 @@ func (c *Connector) idleCloser() (idleStopper func()) {
 				return
 			case <-c.clock.After(c.idleThreshold):
 				c.connsMtx.RLock()
+
 				conns := make([]*conn, 0, len(c.conns))
 				for cc := range c.conns {
 					conns = append(conns, cc)
 				}
+
 				c.connsMtx.RUnlock()
+
 				for _, cc := range conns {
 					if cc.sinceLastUsage() > c.idleThreshold {
 						cc.session.Close(context.Background())
@@ -290,6 +296,7 @@ func (c *Connector) Close() (err error) {
 			onClose(c)
 		}
 	}()
+
 	if c.idleStopper != nil {
 		c.idleStopper()
 	}
@@ -317,13 +324,16 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 		)
 		session table.ClosableSession
 	)
+
 	defer func() {
 		onDone(err, session)
 	}()
+
 	if !c.disableServerBalancer {
 		ctx = meta.WithAllowFeatures(ctx, metaHeaders.HintSessionBalancer)
 	}
 	session, err = c.parent.Table().CreateSession(ctx) //nolint
+
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

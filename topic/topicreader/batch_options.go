@@ -33,6 +33,7 @@ func (count WithBatchPreferMinCount) Apply(
 	if count < 1 {
 		panic("ydb: min batch size must be 1 or greater")
 	}
+
 	options.MinCount = int(count)
 
 	return options

@@ -69,6 +69,7 @@ func (m *mockConn) Prepare(query string) (driver.Stmt, error) {
 
 func (m *mockConn) PrepareContext(ctx context.Context, query string) (driver.Stmt, error) {
 	m.t.Log(stack.Record(0))
+
 	if m.closed {
 		return nil, driver.ErrBadConn
 	}
@@ -95,6 +96,7 @@ func (m *mockConn) Begin() (driver.Tx, error) {
 
 func (m *mockConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.Tx, error) {
 	m.t.Log(stack.Record(0))
+
 	if m.closed {
 		return nil, driver.ErrBadConn
 	}
@@ -104,6 +106,7 @@ func (m *mockConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.T
 
 func (m *mockConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	m.t.Log(stack.Record(0))
+
 	if xerrors.MustDeleteSession(m.execErr) {
 		m.closed = true
 	}
@@ -113,6 +116,7 @@ func (m *mockConn) QueryContext(ctx context.Context, query string, args []driver
 
 func (m *mockConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	m.t.Log(stack.Record(0))
+
 	if xerrors.MustDeleteSession(m.execErr) {
 		m.closed = true
 	}

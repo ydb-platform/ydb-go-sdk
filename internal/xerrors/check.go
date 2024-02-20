@@ -17,7 +17,9 @@ func Check(err error) (
 			backoff.TypeNoBackoff,
 			false
 	}
+
 	var e Error
+
 	if As(err, &e) {
 		return int64(e.Code()), e.Type(), e.BackoffType(), e.MustDeleteSession()
 	}

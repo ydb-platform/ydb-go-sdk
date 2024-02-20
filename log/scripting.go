@@ -16,8 +16,10 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		if d.Details()&trace.ScriptingEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "scripting", "execute")
 		l.Log(ctx, "start")
+
 		start := time.Now()
 
 		return func(info trace.ScriptingExecuteDoneInfo) {
@@ -40,8 +42,10 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		if d.Details()&trace.ScriptingEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "scripting", "explain")
 		l.Log(ctx, "start")
+
 		start := time.Now()
 
 		return func(info trace.ScriptingExplainDoneInfo) {
@@ -69,6 +73,7 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		if d.Details()&trace.ScriptingEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "scripting", "stream", "execute")
 		query := info.Query
 		l.Log(ctx, "start",
@@ -76,6 +81,7 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 				String("query", query),
 			)...,
 		)
+
 		start := time.Now()
 
 		return func(
@@ -117,8 +123,10 @@ func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 		if d.Details()&trace.ScriptingEvents == 0 {
 			return nil
 		}
+
 		ctx := with(*info.Context, TRACE, "ydb", "scripting", "close")
 		l.Log(ctx, "start")
+
 		start := time.Now()
 
 		return func(info trace.ScriptingCloseDoneInfo) {

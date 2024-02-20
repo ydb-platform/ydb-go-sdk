@@ -8,6 +8,7 @@ func WithTraces(config Config) ydb.Option {
 	if config == nil {
 		return nil
 	}
+
 	config = config.WithSystem("ydb")
 
 	return ydb.MergeOptions(

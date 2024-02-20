@@ -53,6 +53,7 @@ func (s *queryStats) NextPhase() (p stats.QueryPhase, ok bool) {
 	if s.pos >= len(s.stats.QueryPhases) {
 		return
 	}
+
 	x := s.stats.QueryPhases[s.pos]
 	if x == nil {
 		return
@@ -87,6 +88,7 @@ func (q *queryPhase) NextTableAccess() (t *stats.TableAccess, ok bool) {
 	if q.pos >= len(q.tables) {
 		return
 	}
+
 	x := q.tables[q.pos]
 	q.pos++
 

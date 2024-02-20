@@ -88,6 +88,7 @@ func TestMessageQueue_Close(t *testing.T) {
 
 func TestMessageQueue_GetMessages(t *testing.T) {
 	ctx := context.Background()
+
 	t.Run("Simple", func(t *testing.T) {
 		q := newMessageQueue()
 		require.NoError(t, q.AddMessages(newTestMessagesWithContent(1, 2)))
@@ -481,6 +482,7 @@ func TestQueue_Ack(t *testing.T) {
 
 func waitGetMessageStarted(q *messageQueue) {
 	q.notifyNewMessages()
+
 	for len(q.hasNewMessages) != 0 {
 		runtime.Gosched()
 	}

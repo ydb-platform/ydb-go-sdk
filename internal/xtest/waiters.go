@@ -69,6 +69,7 @@ func SpinWaitConditionWithTimeout(tb testing.TB, l sync.Locker, condWaitTimeout 
 	}
 
 	start := time.Now()
+
 	for {
 		if checkConditin() {
 			return

@@ -28,9 +28,12 @@ func CallTrailerCallback(ctx context.Context, md metadata.MD) {
 	if len(md) == 0 {
 		return
 	}
+
 	callback, has := ctx.Value(metadataCallbackKey{}).(MetadataCallback)
+
 	if !has {
 		return
 	}
+
 	callback(md)
 }

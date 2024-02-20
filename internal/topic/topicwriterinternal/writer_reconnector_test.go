@@ -883,6 +883,7 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 	}).Return(nil)
 
 	streamClosed := make(empty.Chan)
+
 	res.stream.EXPECT().CloseSend().Do(func() {
 		close(streamClosed)
 	})

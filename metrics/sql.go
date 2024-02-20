@@ -51,6 +51,7 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 	}
 	t.OnConnBegin = func(info trace.DatabaseSQLConnBeginStartInfo) func(trace.DatabaseSQLConnBeginDoneInfo) {
 		start := time.Now()
+
 		if config.Details()&trace.DatabaseSQLTxEvents != 0 {
 			return func(info trace.DatabaseSQLConnBeginDoneInfo) {
 				txBegin.With(map[string]string{
@@ -116,6 +117,7 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 		if config.Details()&trace.DatabaseSQLEvents != 0 {
 			inflight.With(nil).Add(1)
 		}
+
 		var (
 			mode  = info.Mode
 			start = time.Now()
@@ -125,6 +127,7 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 			if config.Details()&trace.DatabaseSQLEvents != 0 {
 				inflight.With(nil).Add(-1)
 			}
+
 			if config.Details()&trace.DatabaseSQLConnEvents != 0 {
 				status := errorBrief(info.Error)
 				exec.With(map[string]string{
@@ -141,6 +144,7 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 		if config.Details()&trace.DatabaseSQLEvents != 0 {
 			inflight.With(nil).Add(1)
 		}
+
 		var (
 			mode  = info.Mode
 			start = time.Now()
@@ -150,6 +154,7 @@ func databaseSQL(config Config) (t trace.DatabaseSQL) {
 			if config.Details()&trace.DatabaseSQLEvents != 0 {
 				inflight.With(nil).Add(-1)
 			}
+
 			if config.Details()&trace.DatabaseSQLConnEvents != 0 {
 				status := errorBrief(info.Error)
 				query.With(map[string]string{

@@ -82,6 +82,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 
 	defer func() {
 		onDone := s.recv(xerrors.HideEOF(err))
+
 		if err != nil {
 			md := s.ClientStream.Trailer()
 			onDone(xerrors.HideEOF(err), s.c.GetState(), md)
@@ -142,10 +143,14 @@ func (s *grpcClientStream) wrapError(err error) error {
 
 func createPinger(c *conn) context.CancelFunc {
 	c.touchLastUsage()
+
 	ctx, cancel := xcontext.WithCancel(context.Background())
+
 	go func() {
 		ticker := time.NewTicker(time.Second)
+
 		ctxDone := ctx.Done()
+
 		for {
 			select {
 			case <-ctxDone:

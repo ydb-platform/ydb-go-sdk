@@ -48,6 +48,7 @@ func TestWriterWrite(t *testing.T) {
 
 func TestWriterWriteMessage(t *testing.T) {
 	ctx := context.Background()
+
 	t.Run("OK", func(t *testing.T) {
 		mc := gomock.NewController(t)
 

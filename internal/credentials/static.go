@@ -74,15 +74,19 @@ type Static struct {
 func (c *Static) Token(ctx context.Context) (token string, err error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
 	if time.Until(c.requestAt) > 0 {
 		return c.token, nil
 	}
+
 	cc, err := grpc.DialContext(ctx, c.endpoint, c.opts...)
+
 	if err != nil {
 		return "", xerrors.WithStackTrace(
 			fmt.Errorf("dial failed: %w", err),
 		)
 	}
+
 	defer func() {
 		_ = cc.Close()
 	}()
@@ -121,7 +125,9 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 			),
 		)
 	}
+
 	var result Ydb_Auth.LoginResult
+
 	if err = response.GetOperation().GetResult().UnmarshalTo(&result); err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
@@ -155,10 +161,12 @@ func (c *Static) String() string {
 	fmt.Fprintf(buffer, "%q", secret.Password(c.password))
 	buffer.WriteString(",Token:")
 	fmt.Fprintf(buffer, "%q", secret.Token(c.token))
+
 	if c.sourceInfo != "" {
 		buffer.WriteString(",From:")
 		fmt.Fprintf(buffer, "%q", c.sourceInfo)
 	}
+
 	buffer.WriteByte('}')
 
 	return buffer.String()

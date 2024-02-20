@@ -45,8 +45,10 @@ func (w *Writer) Write(p Package) error {
 		if i == 0 {
 			w.line()
 		}
+
 		w.line(line)
 	}
+
 	w.line()
 	w.line(`package `, p.Name())
 	w.line()
@@ -55,6 +57,7 @@ func (w *Writer) Write(p Package) error {
 	for _, trace := range p.Traces {
 		deps = w.traceImports(deps, trace)
 	}
+
 	w.importDeps(deps)
 
 	w.newScope(func() {
@@ -100,18 +103,23 @@ func (w *Writer) declare(name string) string {
 	if isPredeclared(name) {
 		name = firstChar(name)
 	}
+
 	s := w.scope.Back().Value.(*scope)
+
 	for i := 0; ; i++ {
 		v := name
 		if i > 0 {
 			v += strconv.Itoa(i)
 		}
+
 		if token.IsKeyword(v) {
 			continue
 		}
+
 		if w.isGlobalScope() && w.pkg.Scope().Lookup(v) != nil {
 			continue
 		}
+
 		if s.set(v) {
 			return v
 		}
@@ -145,14 +153,18 @@ func (w *Writer) typeImports(dst []dep, t types.Type) []dep {
 	if p, ok := t.(*types.Pointer); ok {
 		return w.typeImports(dst, p.Elem())
 	}
+
 	n, ok := t.(*types.Named)
+
 	if !ok {
 		return dst
 	}
+
 	var (
 		obj = n.Obj()
 		pkg = obj.Pkg()
 	)
+
 	if pkg != nil && pkg.Path() != w.pkg.Path() {
 		return append(dst, dep{
 			pkgPath: pkg.Path(),
@@ -173,6 +185,7 @@ func forEachField(s *types.Struct, fn func(*types.Var)) {
 func unwrapStruct(t types.Type) (n *types.Named, s *types.Struct) {
 	var ok bool
 	n, ok = t.(*types.Named)
+
 	if ok {
 		s, _ = n.Underlying().(*types.Struct)
 	}
@@ -183,6 +196,7 @@ func unwrapStruct(t types.Type) (n *types.Named, s *types.Struct) {
 func (w *Writer) funcImports(dst []dep, fn *Func) []dep {
 	for i := range fn.Params {
 		dst = w.typeImports(dst, fn.Params[i].Type)
+
 		if _, s := unwrapStruct(fn.Params[i].Type); s != nil {
 			forEachField(s, func(v *types.Var) {
 				if v.Exported() {
@@ -191,6 +205,7 @@ func (w *Writer) funcImports(dst []dep, fn *Func) []dep {
 			})
 		}
 	}
+
 	for _, x := range fn.Result {
 		if fn, ok := x.(*Func); ok {
 			dst = w.funcImports(dst, fn)
@@ -210,6 +225,7 @@ func (w *Writer) traceImports(dst []dep, t *Trace) []dep {
 
 func (w *Writer) importDeps(deps []dep) {
 	seen := map[string]bool{}
+
 	for i := 0; i < len(deps); {
 		d := deps[i]
 		if seen[d.pkgPath] {
@@ -219,12 +235,15 @@ func (w *Writer) importDeps(deps []dep) {
 
 			continue
 		}
+
 		seen[d.pkgPath] = true
 		i++
 	}
+
 	if len(deps) == 0 {
 		return
 	}
+
 	sort.Slice(deps, func(i, j int) bool {
 		var (
 			d0   = deps[i]
@@ -239,7 +258,9 @@ func (w *Writer) importDeps(deps []dep) {
 		return d0.pkgPath < d1.pkgPath
 	})
 	w.line(`import (`)
+
 	var lastStd bool
+
 	for i := range deps {
 		if w.isStdLib(deps[i].pkgPath) {
 			lastStd = true
@@ -247,14 +268,17 @@ func (w *Writer) importDeps(deps []dep) {
 			lastStd = false
 			w.line()
 		}
+
 		w.line("\t", `"`, deps[i].pkgPath, `"`)
 	}
+
 	w.line(`)`)
 	w.line()
 }
 
 func (w *Writer) isStdLib(pkg string) bool {
 	w.ensureStdLibMapping()
+
 	s := strings.Split(pkg, "/")[0]
 
 	return w.std[s]
@@ -264,18 +288,23 @@ func (w *Writer) ensureStdLibMapping() {
 	if w.std != nil {
 		return
 	}
+
 	w.std = make(map[string]bool)
 
 	src := filepath.Join(w.Context.GOROOT, "src")
 	files, err := os.ReadDir(src)
+
 	if err != nil {
 		panic(fmt.Sprintf("can't list GOROOT's src: %v", err))
 	}
+
 	for _, file := range files {
 		if !file.IsDir() {
 			continue
 		}
+
 		name := filepath.Base(file.Name())
+
 		switch name {
 		case "cmd", "internal":
 			// Ignored.
@@ -288,12 +317,15 @@ func (w *Writer) ensureStdLibMapping() {
 
 func (w *Writer) call(args []string) {
 	w.code(`(`)
+
 	for i, name := range args {
 		if i > 0 {
 			w.code(`, `)
 		}
+
 		w.code(name)
 	}
+
 	w.line(`)`)
 }
 
@@ -561,6 +593,7 @@ func flattenParams(params []Param) (dst []Param) {
 
 			continue
 		}
+
 		dst = append(dst, params[i])
 	}
 
@@ -609,8 +642,10 @@ func (w *Writer) constructParams(params []Param, names []string) (res []string) 
 
 			continue
 		}
+
 		name := names[0]
 		names = names[1:]
+
 		res = append(res, name)
 	}
 
@@ -621,13 +656,17 @@ func (w *Writer) constructStruct(n types.Type, s *types.Struct, vars []string) (
 	p := w.declare("p")
 	// maybe skip pointers from flattening to not allocate anyhing during trace.
 	w.line(`var `, p, ` `, w.typeString(n))
+
 	for i := 0; i < s.NumFields(); i++ {
 		v := s.Field(i)
 		if !v.Exported() {
 			continue
 		}
+
 		name := vars[0]
+
 		vars = vars[1:]
+
 		w.line(p, `.`, v.Name(), ` = `, name)
 	}
 
@@ -746,7 +785,9 @@ func (w *Writer) zeroReturn(fn *Func) {
 
 		return
 	}
+
 	w.code(`return `)
+
 	switch x := fn.Result[0].(type) {
 	case *Func:
 		w.funcSignature(x)
@@ -764,12 +805,15 @@ func (w *Writer) zeroReturn(fn *Func) {
 
 func (w *Writer) funcParams(params []Param) (vars []string) {
 	w.code(`(`)
+
 	for i := range params {
 		if i > 0 {
 			w.code(`, `)
 		}
+
 		vars = append(vars, w.funcParam(&params[i]))
 	}
+
 	w.code(`)`)
 
 	return
@@ -788,6 +832,7 @@ func (w *Writer) funcParamSign(p *Param) {
 	if len(name) == 1 || isPredeclared(name) {
 		name = "_"
 	}
+
 	w.code(name, ` `)
 	w.code(w.typeString(p.Type))
 }
@@ -822,22 +867,28 @@ func (w *Writer) funcResults(fn *Func) {
 
 func (w *Writer) funcSignatureFlags(fn *Func, flags flags) {
 	haveNames := haveNames(fn.Params)
+
 	w.code(`func(`)
+
 	for i := range fn.Params {
 		if i > 0 {
 			w.code(`, `)
 		}
+
 		if flags.has(docs) && haveNames {
 			w.funcParamSign(&fn.Params[i])
 		} else {
 			w.code(w.typeString(fn.Params[i].Type))
 		}
 	}
+
 	w.code(`)`)
+
 	if fn.HasResult() {
 		if fn.isFuncResult() {
 			w.code(` `)
 		}
+
 		w.funcResultsFlags(fn, flags)
 	}
 }
@@ -851,22 +902,28 @@ func (w *Writer) shortcutFuncSignFlags(fn *Func, flags flags) {
 		params    = flattenParams(fn.Params)
 		haveNames = haveNames(params)
 	)
+
 	w.code(`func(`)
+
 	for i := range params {
 		if i > 0 {
 			w.code(`, `)
 		}
+
 		if flags.has(docs) && haveNames {
 			w.funcParamSign(&params[i])
 		} else {
 			w.code(w.typeString(params[i].Type))
 		}
 	}
+
 	w.code(`)`)
+
 	if fn.HasResult() {
 		if fn.isFuncResult() {
 			w.code(` `)
 		}
+
 		w.shortcutFuncResultsFlags(fn, flags)
 	}
 }
@@ -932,8 +989,10 @@ func (w *Writer) code(args ...string) {
 		for i := 0; i < w.depth; i++ {
 			_ = w.bw.WriteByte('\t')
 		}
+
 		w.atEOL = false
 	}
+
 	for _, arg := range args {
 		_, _ = w.bw.WriteString(arg)
 	}
@@ -973,9 +1032,11 @@ func ident(s string) string {
 		if r == utf8.RuneError {
 			panic("invalid string")
 		}
+
 		if !unicode.IsNumber(r) {
 			break
 		}
+
 		s = s[size:]
 	}
 
@@ -1001,12 +1062,14 @@ func ident(s string) string {
 
 func tempName(names ...string) string {
 	var sb strings.Builder
+
 	for i, name := range names {
 		if i == 0 {
 			name = unexported(name)
 		} else {
 			name = exported(name)
 		}
+
 		sb.WriteString(name)
 	}
 
@@ -1025,9 +1088,11 @@ func (s *scope) set(v string) bool {
 	if s.vars == nil {
 		s.vars = make(map[string]decl)
 	}
+
 	if _, has := s.vars[v]; has {
 		return false
 	}
+
 	_, file, line, _ := runtime.Caller(2)
 	s.vars[v] = decl{
 		where: fmt.Sprintf("%s:%d", file, line),

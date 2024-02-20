@@ -16,12 +16,15 @@ func (errs joinError) Error() string {
 	b := xstring.Buffer()
 	defer b.Free()
 	b.WriteByte('[')
+
 	for i, err := range errs {
 		if i > 0 {
 			_ = b.WriteByte(',')
 		}
+
 		_, _ = fmt.Fprintf(b, "%q", err.Error())
 	}
+
 	b.WriteByte(']')
 
 	return b.String()

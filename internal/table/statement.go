@@ -39,6 +39,7 @@ func (s *statement) Execute(
 		}
 		callOptions []grpc.CallOption
 	)
+
 	defer a.Free()
 
 	request.SessionId = s.session.id

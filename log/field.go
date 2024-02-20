@@ -86,6 +86,7 @@ func (f Field) DurationValue() time.Duration {
 // StringsValue is a value getter for fields with StringsType type
 func (f Field) StringsValue() []string {
 	f.checkType(StringsType)
+
 	if f.vany == nil {
 		return nil
 	}
@@ -96,6 +97,7 @@ func (f Field) StringsValue() []string {
 // ErrorValue is a value getter for fields with ErrorType type
 func (f Field) ErrorValue() error {
 	f.checkType(ErrorType)
+
 	if f.vany == nil {
 		return nil
 	}
@@ -132,6 +134,7 @@ func (f Field) AnyValue() interface{} {
 // Stringer is a value getter for fields with StringerType type
 func (f Field) Stringer() fmt.Stringer {
 	f.checkType(StringerType)
+
 	if f.vany == nil {
 		return nil
 	}
@@ -170,6 +173,7 @@ func (f Field) String() string {
 		if f.vany == nil {
 			return nilPtr
 		}
+
 		if v := reflect.ValueOf(f.vany); v.Type().Kind() == reflect.Ptr {
 			if v.IsNil() {
 				return nilPtr
@@ -360,12 +364,15 @@ func (ee endpoints) String() string {
 	b := xstring.Buffer()
 	defer b.Free()
 	b.WriteByte('[')
+
 	for i, e := range ee {
 		if i != 0 {
 			b.WriteByte(',')
 		}
+
 		b.WriteString(e.String())
 	}
+
 	b.WriteByte(']')
 
 	return b.String()

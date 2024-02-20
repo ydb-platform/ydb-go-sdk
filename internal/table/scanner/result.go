@@ -116,11 +116,13 @@ func NewStream(
 		recv:  recv,
 		close: onClose,
 	}
+
 	for _, o := range opts {
 		if o != nil {
 			o(&r.baseResult)
 		}
 	}
+
 	if err := r.nextResultSetErr(ctx); err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -135,6 +137,7 @@ func NewUnary(sets []*Ydb.ResultSet, stats *Ydb_TableStats.QueryStats, opts ...o
 		},
 		sets: sets,
 	}
+
 	for _, o := range opts {
 		if o != nil {
 			o(&r.baseResult)
@@ -146,6 +149,7 @@ func NewUnary(sets []*Ydb.ResultSet, stats *Ydb_TableStats.QueryStats, opts ...o
 
 func (r *baseResult) Reset(set *Ydb.ResultSet, columnNames ...string) {
 	r.reset(set)
+
 	if set != nil {
 		r.setColumnIndexes(columnNames)
 	}
@@ -155,9 +159,11 @@ func (r *unaryResult) NextResultSetErr(ctx context.Context, columns ...string) (
 	if r.isClosed() {
 		return xerrors.WithStackTrace(errAlreadyClosed)
 	}
+
 	if !r.HasNextResultSet() {
 		return io.EOF
 	}
+
 	r.Reset(r.sets[r.nextSet], columns...)
 	r.nextSet++
 
@@ -175,16 +181,21 @@ func (r *streamResult) nextResultSetErr(ctx context.Context, columns ...string) 
 
 		return ctx.Err()
 	}
+
 	s, stats, err := r.recv(ctx)
+
 	if err != nil {
 		r.Reset(nil)
+
 		if xerrors.Is(err, io.EOF) {
 			return err
 		}
 
 		return r.errorf(1, "streamResult.NextResultSetErr(): %w", err)
 	}
+
 	r.Reset(s, columns...)
+
 	if stats != nil {
 		r.statsMtx.WithLock(func() {
 			r.stats = stats
@@ -198,9 +209,11 @@ func (r *streamResult) NextResultSetErr(ctx context.Context, columns ...string) 
 	if r.isClosed() {
 		return xerrors.WithStackTrace(errAlreadyClosed)
 	}
+
 	if err = r.Err(); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
+
 	if err := r.nextResultSetErr(ctx, columns...); err != nil {
 		if xerrors.Is(err, io.EOF) {
 			return io.EOF
@@ -224,6 +237,7 @@ func (r *baseResult) CurrentResultSet() result.Set {
 // Stats returns query execution queryStats.
 func (r *baseResult) Stats() stats.QueryStats {
 	var s queryStats
+
 	r.statsMtx.WithRLock(func() {
 		s.stats = r.stats
 	})

@@ -34,6 +34,7 @@ func (req *CreateTopicRequest) ToProto() *Ydb_Topic.CreateTopicRequest {
 	if req.RetentionPeriod != 0 {
 		proto.RetentionPeriod = durationpb.New(req.RetentionPeriod)
 	}
+
 	proto.RetentionStorageMb = req.RetentionStorageMB
 	proto.SupportedCodecs = req.SupportedCodecs.ToProto()
 	proto.PartitionWriteSpeedBytesPerSecond = req.PartitionWriteSpeedBytesPerSecond

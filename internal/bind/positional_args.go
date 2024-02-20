@@ -34,6 +34,7 @@ func (m PositionalArgs) RewriteQuery(sql string, args ...interface{}) (
 		position = 0
 		param    table.ParameterOption
 	)
+
 	defer buffer.Free()
 
 	for _, p := range l.parts {
@@ -46,12 +47,16 @@ func (m PositionalArgs) RewriteQuery(sql string, args ...interface{}) (
 					fmt.Errorf("%w: position %d, len(args) = %d", ErrInconsistentArgs, position, len(args)),
 				)
 			}
+
 			paramName := "$p" + strconv.Itoa(position)
 			param, err = toYdbParam(paramName, args[position])
+
 			if err != nil {
 				return "", nil, xerrors.WithStackTrace(err)
 			}
+
 			newArgs = append(newArgs, param)
+
 			buffer.WriteString(paramName)
 			position++
 		}

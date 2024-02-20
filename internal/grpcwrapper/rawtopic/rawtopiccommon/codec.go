@@ -88,6 +88,7 @@ func (c *SupportedCodecs) ToProto() *Ydb_Topic.SupportedCodecs {
 	proto := &Ydb_Topic.SupportedCodecs{
 		Codecs: make([]int32, len(codecs)),
 	}
+
 	for i := range codecs {
 		proto.Codecs[i] = int32(codecs[i].ToProto().Number())
 	}
@@ -100,5 +101,6 @@ func (c *SupportedCodecs) MustFromProto(proto *Ydb_Topic.SupportedCodecs) {
 	for i := range proto.GetCodecs() {
 		res[i].MustFromProto(Ydb_Topic.Codec(proto.Codecs[i]))
 	}
+
 	*c = res
 }

@@ -50,8 +50,10 @@ func (b *Balancer) HasNode(id uint32) bool {
 	if b.config.SingleConn {
 		return true
 	}
+
 	b.mu.RLock()
 	defer b.mu.RUnlock()
+
 	if _, has := b.connectionsState.connByNodeID[id]; has {
 		return true
 	}
@@ -104,6 +106,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 		localDC   string
 		cancel    context.CancelFunc
 	)
+
 	defer func() {
 		onDone(err)
 	}()
@@ -113,6 +116,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 	} else {
 		ctx, cancel = xcontext.WithCancel(ctx)
 	}
+
 	defer cancel()
 
 	endpoints, err = b.discoveryClient.Discover(ctx)
@@ -140,26 +144,33 @@ func endpointsDiff(newestEndpoints []endpoint.Endpoint, previousConns []conn.Con
 	nodes = make([]trace.EndpointInfo, 0, len(newestEndpoints))
 	added = make([]trace.EndpointInfo, 0, len(previousConns))
 	dropped = make([]trace.EndpointInfo, 0, len(previousConns))
+
 	var (
 		newestMap   = make(map[string]struct{}, len(newestEndpoints))
 		previousMap = make(map[string]struct{}, len(previousConns))
 	)
+
 	sort.Slice(newestEndpoints, func(i, j int) bool {
 		return newestEndpoints[i].Address() < newestEndpoints[j].Address()
 	})
 	sort.Slice(previousConns, func(i, j int) bool {
 		return previousConns[i].Endpoint().Address() < previousConns[j].Endpoint().Address()
 	})
+
 	for _, e := range previousConns {
 		previousMap[e.Endpoint().Address()] = struct{}{}
 	}
+
 	for _, e := range newestEndpoints {
 		nodes = append(nodes, e.Copy())
+
 		newestMap[e.Address()] = struct{}{}
+
 		if _, has := previousMap[e.Address()]; !has {
 			added = append(added, e.Copy())
 		}
 	}
+
 	for _, c := range previousConns {
 		if _, has := newestMap[c.Endpoint().Address()]; !has {
 			dropped = append(dropped, c.Endpoint().Copy())
@@ -178,6 +189,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 		)
 		previousConns []conn.Conn
 	)
+
 	defer func() {
 		nodes, added, dropped := endpointsDiff(endpoints, previousConns)
 		onDone(nodes, added, dropped, localDC, nil)
@@ -248,6 +260,7 @@ func New(
 			discoveryConfig.WithMeta(driverConfig.Meta()),
 		)...)
 	)
+
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -260,6 +273,7 @@ func New(
 	d, err := internalDiscovery.New(ctx, pool.Get(
 		endpoint.New(driverConfig.Endpoint()),
 	), discoveryConfig)
+
 	if err != nil {
 		return nil, err
 	}
@@ -313,6 +327,7 @@ func (b *Balancer) NewStream(
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, err error) {
 	var client grpc.ClientStream
+
 	err = b.wrapCall(ctx, func(ctx context.Context, cc conn.Conn) error {
 		client, err = cc.NewStream(ctx, desc, method, opts...)
 
@@ -376,6 +391,7 @@ func (b *Balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
 		b.driverConfig.Trace(), &ctx,
 		stack.FunctionID(""),
 	)
+
 	defer func() {
 		if err == nil {
 			onDone(c.Endpoint(), nil)

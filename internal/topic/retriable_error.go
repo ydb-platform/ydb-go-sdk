@@ -46,6 +46,7 @@ var (
 
 func CheckResetReconnectionCounters(lastTry, now time.Time, connectionTimeout time.Duration) bool {
 	const resetAttemptEmpiricalCoefficient = 10
+
 	if connectionTimeout == value.InfiniteDuration {
 		return now.Sub(lastTry) > connectionEstablishedTimeout
 	}

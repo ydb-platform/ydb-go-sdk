@@ -35,10 +35,12 @@ func main() {
 		workDir string
 		err     error
 	)
+
 	if gofile = os.Getenv("GOFILE"); gofile != "" {
 		// NOTE: GOFILE is always a filename without path.
 		isGoGenerate = true
 		workDir, err = os.Getwd()
+
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -54,8 +56,10 @@ func main() {
 		prefix := filepath.Join(filepath.Base(workDir), gofile)
 		log.SetPrefix("[" + prefix + "] ")
 	}
+
 	buildCtx := build.Default
 	buildPkg, err := buildCtx.ImportDir(workDir, build.IgnoreVendor)
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -63,6 +67,7 @@ func main() {
 	srcFilePath := filepath.Join(workDir, gofile)
 
 	var writers []*Writer
+
 	if isGoGenerate {
 		// We should respect Go suffixes like `_linux.go`.
 		name, tags, ext := splitOSArchTags(&buildCtx, gofile)
@@ -82,8 +87,11 @@ func main() {
 
 			return f, func() { f.Close() }
 		}
+
 		f, clean := openFile(name + "_gtrace" + tags + ext)
+
 		defer clean()
+
 		writers = append(writers, &Writer{
 			Context: buildCtx,
 			Output:  f,
@@ -101,13 +109,17 @@ func main() {
 
 		buildConstraints []string
 	)
+
 	fset := token.NewFileSet()
+
 	for _, name := range buildPkg.GoFiles {
 		base, _, _ := splitOSArchTags(&buildCtx, name)
 		if isGenerated(base, "_gtrace") {
 			continue
 		}
+
 		var file *os.File
+
 		file, err = os.Open(filepath.Join(workDir, name))
 		if err != nil {
 			panic(err)
@@ -115,6 +127,7 @@ func main() {
 		defer file.Close() //nolint:gocritic
 
 		var ast *ast.File
+
 		ast, err = parser.ParseFile(fset, file.Name(), file, parser.ParseComments)
 		if err != nil {
 			panic(fmt.Sprintf("parse %q error: %v", file.Name(), err))
@@ -127,12 +140,14 @@ func main() {
 			if _, err = file.Seek(0, io.SeekStart); err != nil {
 				panic(err)
 			}
+
 			buildConstraints, err = scanBuildConstraints(file)
 			if err != nil {
 				panic(err)
 			}
 		}
 	}
+
 	info := &types.Info{
 		Types: make(map[ast.Expr]types.TypeAndValue),
 		Defs:  make(map[*ast.Ident]types.Object),
@@ -144,18 +159,23 @@ func main() {
 		Importer:                 importer.ForCompiler(fset, "source", nil),
 	}
 	pkg, err := conf.Check(".", fset, astFiles, info)
+
 	if err != nil {
 		panic(fmt.Sprintf("type error: %v", err))
 	}
+
 	var items []*GenItem
+
 	for i, astFile := range astFiles {
 		if pkgFiles[i].Name() != srcFilePath {
 			continue
 		}
+
 		var (
 			depth int
 			item  *GenItem
 		)
+
 		ast.Inspect(astFile, func(n ast.Node) (next bool) {
 			if n == nil {
 				item = nil
@@ -204,11 +224,13 @@ func main() {
 			return true
 		})
 	}
+
 	p := Package{
 		Package:          pkg,
 		BuildConstraints: buildConstraints,
 	}
 	traces := make(map[string]*Trace)
+
 	for _, item := range items {
 		t := &Trace{
 			Name: item.Ident.Name,
@@ -216,18 +238,24 @@ func main() {
 		p.Traces = append(p.Traces, t)
 		traces[item.Ident.Name] = t
 	}
+
 	for i, item := range items {
 		t := p.Traces[i]
+
 		for _, field := range item.StructType.Fields.List {
 			if _, ok := field.Type.(*ast.FuncType); !ok {
 				continue
 			}
+
 			name := field.Names[0].Name
+
 			fn, ok := field.Type.(*ast.FuncType)
 			if !ok {
 				continue
 			}
+
 			f, err := buildFunc(info, traces, fn)
+
 			if err != nil {
 				log.Printf(
 					"skipping hook %s due to error: %v",
@@ -236,12 +264,14 @@ func main() {
 
 				continue
 			}
+
 			t.Hooks = append(t.Hooks, Hook{
 				Name: name,
 				Func: f,
 			})
 		}
 	}
+
 	for _, w := range writers {
 		if err := w.Write(p); err != nil {
 			panic(err)
@@ -253,23 +283,29 @@ func main() {
 
 func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (ret *Func, err error) {
 	ret = new(Func)
+
 	for _, p := range fn.Params.List {
 		t := info.TypeOf(p.Type)
 		if t == nil {
 			log.Fatalf("unknown type: %s", p.Type)
 		}
+
 		var names []string
+
 		for _, n := range p.Names {
 			name := n.Name
 			if name == "_" {
 				name = ""
 			}
+
 			names = append(names, name)
 		}
+
 		if len(names) == 0 {
 			// Case where arg is not named.
 			names = []string{""}
 		}
+
 		for _, name := range names {
 			ret.Params = append(ret.Params, Param{
 				Name: name,
@@ -277,9 +313,11 @@ func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (re
 			})
 		}
 	}
+
 	if fn.Results == nil {
 		return ret, nil
 	}
+
 	if len(fn.Results.List) > 1 {
 		return nil, fmt.Errorf(
 			"unsupported number of function results",
@@ -294,6 +332,7 @@ func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (re
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
+
 		ret.Result = append(ret.Result, result)
 
 		return ret, nil
@@ -317,6 +356,7 @@ func splitOSArchTags(ctx *build.Context, name string) (base, tags, ext string) {
 	fileTags := make(map[string]bool)
 	build_goodOSArchFile(ctx, name, fileTags)
 	ext = filepath.Ext(name)
+
 	switch len(fileTags) {
 	case 0: // *
 		base = strings.TrimSuffix(name, ext)
@@ -342,7 +382,7 @@ func splitOSArchTags(ctx *build.Context, name string) (base, tags, ext string) {
 		))
 	}
 
-	return
+	return base, tags, ext
 }
 
 type Package struct {
@@ -411,11 +451,13 @@ func rsplit(s string, c byte) (s1, s2 string) {
 
 func scanBuildConstraints(r io.Reader) (cs []string, err error) {
 	br := bufio.NewReader(r)
+
 	for {
 		line, err := br.ReadBytes('\n')
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
+
 		line = bytes.TrimSpace(line)
 		if comm := bytes.TrimPrefix(line, []byte("//")); !bytes.Equal(comm, line) {
 			comm = bytes.TrimSpace(comm)
@@ -425,6 +467,7 @@ func scanBuildConstraints(r io.Reader) (cs []string, err error) {
 				continue
 			}
 		}
+
 		if bytes.HasPrefix(line, []byte("package ")) {
 			break
 		}
@@ -438,6 +481,7 @@ func isGenerated(base, suffix string) bool {
 	if i == -1 {
 		return false
 	}
+
 	n := len(base)
 	m := i + len(suffix)
 

@@ -43,6 +43,7 @@ func TestWithCertificatesCached(t *testing.T) { //nolint:funlen
 	require.NoError(t, err)
 	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, &caPrivKey.PublicKey, caPrivKey)
 	require.NoError(t, err)
+
 	caPEM := new(bytes.Buffer)
 	err = pem.Encode(caPEM, &pem.Block{
 		Type:  "CERTIFICATE",
@@ -53,6 +54,7 @@ func TestWithCertificatesCached(t *testing.T) { //nolint:funlen
 	require.NoError(t, err)
 	_, err = f.Write(caPEM.Bytes())
 	require.NoError(t, err)
+
 	defer os.Remove(f.Name())
 
 	var (
@@ -61,6 +63,7 @@ func TestWithCertificatesCached(t *testing.T) { //nolint:funlen
 		missCounter uint64
 		ctx         = context.TODO()
 	)
+
 	for _, test := range []struct {
 		name    string
 		options []Option

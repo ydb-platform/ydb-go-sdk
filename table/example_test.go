@@ -3,34 +3,35 @@ package table_test
 import (
 	"context"
 	"fmt"
-	"path"
-	"time"
-
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/encoding/gzip"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/encoding/gzip"
+	"path"
+	"time"
 )
 
 func Example_select() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
+
 	var (
 		query = `SELECT 42 as id, "my string" as myStr`
 		id    int32  // required value
 		myStr string // optional value
 	)
+
 	err = db.Table().Do( // Do retry operation on errors with best effort
 		ctx, // context manage exiting from Do
 		func(ctx context.Context, s table.Session) (err error) { // retry operation
@@ -57,6 +58,7 @@ func Example_select() {
 		},
 		table.WithIdempotent(),
 	)
+
 	if err != nil {
 		fmt.Printf("unexpected error: %v", err)
 	}
@@ -65,6 +67,7 @@ func Example_select() {
 func Example_createTable() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 
@@ -92,6 +95,7 @@ func Example_createTable() {
 		},
 		table.WithIdempotent(),
 	)
+
 	if err != nil {
 		fmt.Printf("unexpected error: %v", err)
 	}
@@ -100,12 +104,14 @@ func Example_createTable() {
 func Example_bulkUpsert() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
+
 	type logMessage struct {
 		App       string
 		Host      string
@@ -116,6 +122,7 @@ func Example_bulkUpsert() {
 	// prepare native go data
 	const batchSize = 10000
 	logs := make([]logMessage, 0, batchSize)
+
 	for i := 0; i < batchSize; i++ {
 		logs = append(logs, logMessage{
 			App:       fmt.Sprintf("App_%d", i/256),
@@ -152,6 +159,7 @@ func Example_bulkUpsert() {
 func Example_alterTable() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 
@@ -180,6 +188,7 @@ func Example_alterTable() {
 		},
 		table.WithIdempotent(),
 	)
+
 	if err != nil {
 		fmt.Printf("unexpected error: %v", err)
 	}
@@ -188,6 +197,7 @@ func Example_alterTable() {
 func Example_lazyTransaction() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 
@@ -252,6 +262,7 @@ func Example_lazyTransaction() {
 		},
 		table.WithIdempotent(),
 	)
+
 	if err != nil {
 		fmt.Printf("unexpected error: %v", err)
 	}
@@ -260,12 +271,14 @@ func Example_lazyTransaction() {
 func Example_bulkUpsertWithCompression() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
+
 	type logMessage struct {
 		App       string
 		Host      string
@@ -276,6 +289,7 @@ func Example_bulkUpsertWithCompression() {
 	// prepare native go data
 	const batchSize = 10000
 	logs := make([]logMessage, 0, batchSize)
+
 	for i := 0; i < batchSize; i++ {
 		logs = append(logs, logMessage{
 			App:       fmt.Sprintf("App_%d", i/256),
@@ -314,17 +328,20 @@ func Example_bulkUpsertWithCompression() {
 func Example_dataQueryWithCompression() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
+
 	var (
 		query = `SELECT 42 as id, "my string" as myStr`
 		id    int32  // required value
 		myStr string // optional value
 	)
+
 	err = db.Table().Do( // Do retry operation on errors with best effort
 		ctx, // context manage exiting from Do
 		func(ctx context.Context, s table.Session) (err error) { // retry operation
@@ -355,6 +372,7 @@ func Example_dataQueryWithCompression() {
 		},
 		table.WithIdempotent(),
 	)
+
 	if err != nil {
 		fmt.Printf("unexpected error: %v", err)
 	}
@@ -363,17 +381,20 @@ func Example_dataQueryWithCompression() {
 func Example_scanQueryWithCompression() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
+
 	var (
 		query = `SELECT 42 as id, "my string" as myStr`
 		id    int32  // required value
 		myStr string // optional value
 	)
+
 	err = db.Table().Do( // Do retry operation on errors with best effort
 		ctx, // context manage exiting from Do
 		func(ctx context.Context, s table.Session) (err error) { // retry operation
@@ -404,6 +425,7 @@ func Example_scanQueryWithCompression() {
 		},
 		table.WithIdempotent(),
 	)
+
 	if err != nil {
 		fmt.Printf("unexpected error: %v", err)
 	}
@@ -412,6 +434,7 @@ func Example_scanQueryWithCompression() {
 func Example_copyTables() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 
@@ -430,6 +453,7 @@ func Example_copyTables() {
 		},
 		table.WithIdempotent(),
 	)
+
 	if err != nil {
 		fmt.Printf("unexpected error: %v", err)
 	}

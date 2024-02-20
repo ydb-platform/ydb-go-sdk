@@ -74,6 +74,7 @@ func (b *Worker) Close(ctx context.Context, err error) error {
 	b.init()
 
 	var resErr error
+
 	b.m.WithLock(func() {
 		if b.closed {
 			resErr = xerrors.WithStackTrace(ErrAlreadyClosed)
@@ -91,6 +92,7 @@ func (b *Worker) Close(ctx context.Context, err error) error {
 
 		b.stop()
 	})
+
 	if resErr != nil {
 		return resErr
 	}

@@ -100,6 +100,7 @@ func (s *connectionsState) selectRandomConnection(conns []conn.Conn, allowBanned
 	for index := range indexes {
 		indexes[index] = index
 	}
+
 	s.rand.Shuffle(connCount, func(i, j int) {
 		indexes[i], indexes[j] = indexes[j], indexes[i]
 	})
@@ -119,7 +120,9 @@ func connsToNodeIDMap(conns []conn.Conn) (nodes map[uint32]conn.Conn) {
 	if len(conns) == 0 {
 		return nil
 	}
+
 	nodes = make(map[uint32]conn.Conn, len(conns))
+
 	for _, c := range conns {
 		nodes[c.Endpoint().NodeID()] = c
 	}
@@ -138,6 +141,7 @@ func sortPreferConnections(
 	}
 
 	prefer = make([]conn.Conn, 0, len(conns))
+
 	if allowFallback {
 		fallback = make([]conn.Conn, 0, len(conns))
 	}

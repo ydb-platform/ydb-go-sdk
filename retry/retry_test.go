@@ -75,6 +75,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 		limit = 10
 		ctx   = context.Background()
 	)
+
 	for _, tt := range []struct {
 		error     error
 		retriable bool
@@ -144,6 +145,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 
 func TestRetryTransportDeadlineExceeded(t *testing.T) {
 	cancelCounterValue := 5
+
 	for _, code := range []grpcCodes.Code{
 		grpcCodes.DeadlineExceeded,
 		grpcCodes.Canceled,
@@ -165,6 +167,7 @@ func TestRetryTransportDeadlineExceeded(t *testing.T) {
 
 func TestRetryTransportCancelled(t *testing.T) {
 	cancelCounterValue := 5
+
 	for _, code := range []grpcCodes.Code{
 		grpcCodes.DeadlineExceeded,
 		grpcCodes.Canceled,

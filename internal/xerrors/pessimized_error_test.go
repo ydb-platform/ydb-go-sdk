@@ -96,6 +96,7 @@ func TestMustPessimizeEndpoint(t *testing.T) {
 		if err == nil {
 			err = test.error
 		}
+
 		t.Run(err.Error(), func(t *testing.T) {
 			pessimize := MustPessimizeEndpoint(test.error)
 			if pessimize != test.pessimize {

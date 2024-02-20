@@ -466,6 +466,7 @@ func (v *decimalValue) Yql() string {
 	buffer.WriteString(v.innerType.Name())
 	buffer.WriteByte('(')
 	buffer.WriteByte('"')
+
 	s := decimal.FromBytes(v.value[:], v.innerType.Precision, v.innerType.Scale).String()
 	buffer.WriteString(s[:len(s)-int(v.innerType.Scale)] + "." + s[len(s)-int(v.innerType.Scale):])
 	buffer.WriteByte('"')
@@ -487,6 +488,7 @@ func (v *decimalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	if v != nil {
 		bytes = v.value
 	}
+
 	vv := a.Low128()
 	vv.Low_128 = binary.BigEndian.Uint64(bytes[8:16])
 
@@ -541,14 +543,17 @@ func (v *dictValue) Yql() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
 	buffer.WriteByte('{')
+
 	for i := range v.values {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString(v.values[i].K.Yql())
 		buffer.WriteByte(':')
 		buffer.WriteString(v.values[i].V.Yql())
 	}
+
 	buffer.WriteByte('}')
 
 	return buffer.String()
@@ -563,6 +568,7 @@ func (v *dictValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	if v != nil {
 		values = v.values
 	}
+
 	vvv := a.Value()
 
 	for i := range values {
@@ -581,7 +587,9 @@ func DictValue(values ...DictValueField) *dictValue {
 	sort.Slice(values, func(i, j int) bool {
 		return values[i].K.Yql() < values[j].K.Yql()
 	})
+
 	var t Type
+
 	switch {
 	case len(values) > 0:
 		t = Dict(values[0].K.Type(), values[0].V.Type())
@@ -983,35 +991,45 @@ func (v intervalValue) Yql() string {
 	buffer.WriteString(v.Type().Yql())
 	buffer.WriteByte('(')
 	buffer.WriteByte('"')
+
 	d := IntervalToDuration(int64(v))
+
 	if d < 0 {
 		buffer.WriteByte('-')
+
 		d = -d
 	}
+
 	buffer.WriteByte('P')
+
 	if days := d / time.Hour / 24; days > 0 {
 		d -= days * time.Hour * 24 //nolint:durationcheck
 		buffer.WriteString(strconv.FormatInt(int64(days), 10))
 		buffer.WriteByte('D')
 	}
+
 	if d > 0 {
 		buffer.WriteByte('T')
 	}
+
 	if hours := d / time.Hour; hours > 0 {
 		d -= hours * time.Hour //nolint:durationcheck
 		buffer.WriteString(strconv.FormatInt(int64(hours), 10))
 		buffer.WriteByte('H')
 	}
+
 	if minutes := d / time.Minute; minutes > 0 {
 		d -= minutes * time.Minute //nolint:durationcheck
 		buffer.WriteString(strconv.FormatInt(int64(minutes), 10))
 		buffer.WriteByte('M')
 	}
+
 	if d > 0 {
 		seconds := float64(d) / float64(time.Second)
 		fmt.Fprintf(buffer, "%0.6f", seconds)
 		buffer.WriteByte('S')
 	}
+
 	buffer.WriteByte('"')
 	buffer.WriteByte(')')
 
@@ -1136,12 +1154,15 @@ func (v *listValue) Yql() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
 	buffer.WriteByte('[')
+
 	for i, item := range v.items {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString(item.Yql())
 	}
+
 	buffer.WriteByte(']')
 
 	return buffer.String()
@@ -1156,6 +1177,7 @@ func (v *listValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	if v != nil {
 		items = v.items
 	}
+
 	vvv := a.Value()
 
 	for _, vv := range items {
@@ -1167,6 +1189,7 @@ func (v *listValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 
 func ListValue(items ...Value) *listValue {
 	var t Type
+
 	switch {
 	case len(items) > 0:
 		t = List(items[0].Type())
@@ -1193,12 +1216,15 @@ func (v *setValue) Yql() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
 	buffer.WriteByte('{')
+
 	for i, item := range v.items {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString(item.Yql())
 	}
+
 	buffer.WriteByte('}')
 
 	return buffer.String()
@@ -1229,6 +1255,7 @@ func SetValue(items ...Value) *setValue {
 	})
 
 	var t Type
+
 	switch {
 	case len(items) > 0:
 		t = Set(items[0].Type())
@@ -1278,6 +1305,7 @@ func (v *optionalValue) Type() Type {
 
 func (v *optionalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	vv := a.Value()
+
 	if _, opt := v.value.(*optionalValue); opt {
 		vvv := a.Nested()
 		vvv.NestedValue = v.value.toYDB(a)
@@ -1328,13 +1356,16 @@ func (v *structValue) Yql() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
 	buffer.WriteString("<|")
+
 	for i := range v.fields {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString("`" + v.fields[i].Name + "`:")
 		buffer.WriteString(v.fields[i].V.Yql())
 	}
+
 	buffer.WriteString("|>")
 
 	return buffer.String()
@@ -1358,6 +1389,7 @@ func StructValue(fields ...StructValueField) *structValue {
 	sort.Slice(fields, func(i, j int) bool {
 		return fields[i].Name < fields[j].Name
 	})
+
 	structFields := make([]StructField, 0, len(fields))
 	for i := range fields {
 		structFields = append(structFields, StructField{fields[i].Name, fields[i].V.Type()})
@@ -1434,12 +1466,15 @@ func (v *tupleValue) Yql() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
 	buffer.WriteByte('(')
+
 	for i, item := range v.items {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
+
 		buffer.WriteString(item.Yql())
 	}
+
 	buffer.WriteByte(')')
 
 	return buffer.String()
@@ -1454,6 +1489,7 @@ func (v *tupleValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	if v != nil {
 		items = v.items
 	}
+
 	vvv := a.Value()
 
 	for _, vv := range items {
@@ -1928,6 +1964,7 @@ func (v *uuidValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	if v != nil {
 		bytes = v.value
 	}
+
 	vv := a.Low128()
 	vv.Low_128 = binary.BigEndian.Uint64(bytes[8:16])
 
@@ -1971,6 +2008,7 @@ func (v *variantValue) Yql() string {
 	buffer.WriteString("Variant(")
 	buffer.WriteString(v.value.Yql())
 	buffer.WriteByte(',')
+
 	switch t := v.innerType.(type) {
 	case *variantStructType:
 		fmt.Fprintf(buffer, "%q", t.fields[v.idx].Name)
@@ -2014,11 +2052,13 @@ func VariantValueTuple(v Value, idx uint32, t Type) *variantValue {
 
 func VariantValueStruct(v Value, name string, t Type) *variantValue {
 	var idx int
+
 	switch tt := t.(type) {
 	case *StructType:
 		sort.Slice(tt.fields, func(i, j int) bool {
 			return tt.fields[i].Name < tt.fields[j].Name
 		})
+
 		idx = sort.Search(len(tt.fields), func(i int) bool {
 			return tt.fields[i].Name >= name
 		})
@@ -2027,6 +2067,7 @@ func VariantValueStruct(v Value, name string, t Type) *variantValue {
 		sort.Slice(tt.fields, func(i, j int) bool {
 			return tt.fields[i].Name < tt.fields[j].Name
 		})
+
 		idx = sort.Search(len(tt.fields), func(i int) bool {
 			return tt.fields[i].Name >= name
 		})

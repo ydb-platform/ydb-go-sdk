@@ -21,6 +21,7 @@ func GenerateDeclareSection(params *table.QueryParameters) (string, error) {
 		names    []string
 		declares = make(map[string]string, len(params.Params()))
 	)
+
 	params.Each(func(name string, v types.Value) {
 		names = append(names, name)
 		declares[name] = fmt.Sprintf(
@@ -30,10 +31,12 @@ func GenerateDeclareSection(params *table.QueryParameters) (string, error) {
 		)
 	})
 	sort.Strings(names)
+
 	for _, name := range names {
 		if name == "" {
 			return "", xerrors.WithStackTrace(ErrNameRequired)
 		}
+
 		buf.WriteString(declares[name])
 	}
 

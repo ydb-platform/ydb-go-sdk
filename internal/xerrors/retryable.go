@@ -71,12 +71,14 @@ func Retryable(err error, opts ...RetryableErrorOption) error {
 			code: -1,
 		}
 	)
+
 	if As(err, &e) {
 		re.backoffType = e.BackoffType()
 		re.mustDeleteSession = e.MustDeleteSession()
 		re.code = e.Code()
 		re.name = e.Name()
 	}
+
 	for _, o := range opts {
 		if o != nil {
 			o(re)

@@ -83,6 +83,8 @@ linters-settings:
     locale: US
     ignore-words:
       - cancelled
+  wsl:
+    allow-trailing-comment: true
   revive:
     rules:
       - name: blank-imports
@@ -251,7 +253,10 @@ linters:
     - thelper
     - varnamelen
     - wrapcheck
-    - wsl
+    - goimports
+    - gofmt
+    - gofumpt
+    - gci
 
 issues:
   # List of regexps of issue texts to exclude, empty list by default.
@@ -276,6 +281,10 @@ issues:
   # Default value for this option is true.
   exclude-use-default: true
 
+  # Maximum issues count per one linter.
+  # Set to 0 to disable.
+  # Default: 50
+  max-issues-per-linter: 0
   # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
   max-same-issues: 0
 

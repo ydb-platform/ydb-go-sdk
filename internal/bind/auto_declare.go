@@ -29,6 +29,7 @@ func (m AutoDeclare) RewriteQuery(query string, args ...interface{}) (
 		declares = make([]string, 0, len(params))
 		buffer   = xstring.Buffer()
 	)
+
 	defer buffer.Free()
 
 	buffer.WriteString("-- bind declares\n")

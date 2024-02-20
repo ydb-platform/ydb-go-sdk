@@ -110,7 +110,6 @@ type ReadBatchOption = topicreaderinternal.PublicReadBatchOption
 // or when ctx cancelled
 func (r *Reader) Close(ctx context.Context) error {
 	// close must be non-concurrent with read and commit
-
 	if err := r.inCall(&r.readInFlyght); err != nil {
 		return err
 	}

@@ -15,6 +15,7 @@ import (
 
 func BenchmarkMemory(b *testing.B) {
 	b.ReportAllocs()
+
 	v := TupleValue(
 		VoidValue(),
 		BoolValue(true),
@@ -87,6 +88,7 @@ func BenchmarkMemory(b *testing.B) {
 		ZeroValue(Struct()),
 		ZeroValue(Tuple()),
 	)
+
 	for i := 0; i < b.N; i++ {
 		a := allocator.New()
 		_ = ToYDB(v, a)
