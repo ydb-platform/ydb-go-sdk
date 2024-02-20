@@ -397,6 +397,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 			require.NoError(tb, info.PartitionContext.Err())
 
 			readMessagesCtxCancel()
+
 			return nil
 		}
 
@@ -441,6 +442,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 			require.Error(tb, info.PartitionContext.Err())
 
 			readMessagesCtxCancel()
+
 			return nil
 		}
 
@@ -588,6 +590,7 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 			_, err := writer.Write([]byte(msg))
 			require.NoError(tb, writer.Close())
 			require.NoError(tb, err)
+
 			return b.Bytes()
 		}
 
@@ -853,6 +856,7 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 					},
 				},
 			})
+
 		return nextDataRequested
 	}
 
@@ -948,6 +952,7 @@ func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
 		sleep()
 
 		require.False(t, e.reader.closed)
+
 		return commitErr
 	}
 	t.Run("CommitModeNone", func(t *testing.T) {
@@ -1123,6 +1128,7 @@ readMessages:
 			e.m.WithLock(func() {
 				e.nextMessageNeedCallback = res.nextMessageCallback
 			})
+
 			return res.msg, res.err
 		}
 	}

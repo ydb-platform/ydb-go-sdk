@@ -63,6 +63,7 @@ func TestReader_Close(t *testing.T) {
 				callCompleted: make(empty.Chan),
 			}
 			allStates = append(allStates, state)
+
 			return state
 		}
 

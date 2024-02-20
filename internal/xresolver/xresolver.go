@@ -27,6 +27,7 @@ func (c *clientConn) Endpoint() string {
 	if endpoint == "" {
 		endpoint = c.target.URL.Opaque
 	}
+
 	return strings.TrimPrefix(endpoint, "/")
 }
 
@@ -37,6 +38,7 @@ func (c *clientConn) UpdateState(state resolver.State) (err error) {
 			for i := range state.Addresses {
 				addrs = append(addrs, state.Addresses[i].Addr)
 			}
+
 			return
 		}(),
 	)

@@ -13,6 +13,7 @@ func seriesData(id uint64, released time.Time, title, info, comment string) type
 	} else {
 		commentv = types.OptionalValue(types.TextValue(comment))
 	}
+
 	return types.StructValue(
 		types.StructFieldValue("series_id", types.Uint64Value(id)),
 		types.StructFieldValue("release_date", types.DateValueFromTime(released)),
@@ -155,5 +156,6 @@ func days(date string) time.Time {
 	if err != nil {
 		panic(err)
 	}
+
 	return t
 }

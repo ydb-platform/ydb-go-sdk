@@ -18,6 +18,7 @@ func Context(tb testing.TB) context.Context {
 		pprof.SetGoroutineLabels(ctx)
 		cancel()
 	})
+
 	return ctx
 }
 
@@ -29,5 +30,6 @@ func ContextWithCommonTimeout(ctx context.Context, tb testing.TB) context.Contex
 
 	ctx, ctxCancel := xcontext.WithTimeout(ctx, commonWaitTimeout)
 	_ = ctxCancel // suppress linters, it is ok for leak for small amount of time: it will cancel by parent context
+
 	return ctx
 }

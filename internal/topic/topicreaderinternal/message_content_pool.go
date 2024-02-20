@@ -63,5 +63,6 @@ func callbackOnReaderContent(
 	if err := consumer.UnmarshalYDBTopicMessage(buf.Bytes()); err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: error unmarshal data: %w", err))
 	}
+
 	return nil
 }

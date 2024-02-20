@@ -112,6 +112,10 @@ linters-settings:
     # if it's called for subdir of a project it can't find external interfaces. All text editor integrations
     # with golangci-lint call it on a directory with the changed file.
     check-exported: false
+  gomoddirectives:
+    replace-local: true
+    replace-allow-list:
+      - xorm.io/xorm
   gocritic:
     disabled-checks:
       - whyNoLint # https://github.com/go-critic/go-critic/issues/1063
@@ -232,13 +236,11 @@ linters:
     - goerr113
     - golint
     - gomnd
-    - gomoddirectives
     - ifshort
     - interfacebloat
     - ireturn
     - maintidx
     - maligned
-    - nlreturn
     - nonamedreturns
     - paralleltest
     - protogetter

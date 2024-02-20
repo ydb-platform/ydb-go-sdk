@@ -30,6 +30,7 @@ func NewAnonymousCredentials(opts ...AnonymousCredentialsOption) *Anonymous {
 	for _, opt := range opts {
 		opt.ApplyAnonymousCredentialsOption(c)
 	}
+
 	return c
 }
 
@@ -48,5 +49,6 @@ func (c Anonymous) String() string {
 		fmt.Fprintf(buffer, "%q", c.sourceInfo)
 	}
 	buffer.WriteByte('}')
+
 	return buffer.String()
 }

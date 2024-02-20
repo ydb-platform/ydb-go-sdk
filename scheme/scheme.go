@@ -149,6 +149,7 @@ func makePermissions(src []*Ydb_Scheme.Permissions) (dst []Permissions) {
 	for _, p := range src {
 		dst = append(dst, from(p))
 	}
+
 	return dst
 }
 
@@ -172,5 +173,6 @@ func (p Permissions) To(y *Ydb_Scheme.Permissions) {
 func InnerConvertEntry(y *Ydb_Scheme.Entry) *Entry {
 	res := &Entry{}
 	res.From(y)
+
 	return res
 }

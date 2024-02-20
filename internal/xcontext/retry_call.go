@@ -14,5 +14,6 @@ func IsNestedCall(ctx context.Context) bool {
 	if _, has := ctx.Value(markRetryCallKey{}).(bool); has {
 		return true
 	}
+
 	return false
 }

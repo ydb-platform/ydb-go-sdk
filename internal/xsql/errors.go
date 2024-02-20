@@ -26,6 +26,7 @@ func (err *ErrConnAlreadyHaveTx) As(target interface{}) bool {
 	switch t := target.(type) {
 	case *ErrConnAlreadyHaveTx:
 		t.currentTx = err.currentTx
+
 		return true
 	default:
 		return false

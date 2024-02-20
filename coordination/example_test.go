@@ -14,6 +14,7 @@ func Example() {
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
+
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
@@ -28,12 +29,14 @@ func Example() {
 	})
 	if err != nil {
 		fmt.Printf("failed to create node: %v", err)
+
 		return
 	}
 	defer db.Coordination().DropNode(ctx, "/local/test")
 	e, c, err := db.Coordination().DescribeNode(ctx, "/local/test")
 	if err != nil {
 		fmt.Printf("failed to describe node: %v", err)
+
 		return
 	}
 	fmt.Printf("node description: %+v\nnode config: %+v\n", e, c)

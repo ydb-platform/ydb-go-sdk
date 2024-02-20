@@ -35,6 +35,7 @@ func (c *Cache) Get(key string) (int64, bool) {
 
 	if time.Now().After(item.ExpiresAt) {
 		delete(c.values, key)
+
 		return 0, false
 	}
 

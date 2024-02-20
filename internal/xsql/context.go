@@ -31,6 +31,7 @@ func queryModeFromContext(ctx context.Context, defaultQueryMode QueryMode) Query
 	if m, ok := ctx.Value(ctxModeTypeKey{}).(QueryMode); ok {
 		return m
 	}
+
 	return defaultQueryMode
 }
 
@@ -47,6 +48,7 @@ func txControl(ctx context.Context, defaultTxControl *table.TransactionControl) 
 	if txc, ok := ctx.Value(ctxTransactionControlKey{}).(*table.TransactionControl); ok {
 		return txc
 	}
+
 	return defaultTxControl
 }
 
@@ -64,6 +66,7 @@ func (c *conn) scanQueryOptions(ctx context.Context) []options.ExecuteScanQueryO
 	if opts, ok := ctx.Value(ctxScanQueryOptionsKey{}).([]options.ExecuteScanQueryOption); ok {
 		return append(c.scanOpts, opts...)
 	}
+
 	return c.scanOpts
 }
 
@@ -81,6 +84,7 @@ func (c *conn) dataQueryOptions(ctx context.Context) []options.ExecuteDataQueryO
 	if opts, ok := ctx.Value(ctxDataQueryOptionsKey{}).([]options.ExecuteDataQueryOption); ok {
 		return append(c.dataOpts, opts...)
 	}
+
 	return c.dataOpts
 }
 

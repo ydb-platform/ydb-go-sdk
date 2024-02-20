@@ -20,7 +20,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
@@ -284,6 +283,7 @@ func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
 		waitStartQueueWait := func(targetWaiters int) {
 			xtest.SpinWaitCondition(tb, nil, func() bool {
 				res := getWaitersCount(w.semaphore) == targetWaiters
+
 				return res
 			})
 		}
@@ -410,6 +410,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			close(connectCalledChan)
 			connectCalled = true
 			require.NotEqual(t, ctx, streamCtxArg)
+
 			return strm, nil
 		}
 
@@ -474,6 +475,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 				xtest.WaitChannelClosed(tb, streamClosed)
 				tb.Logf("channel closed: %v", name)
 			}).Return(nil, errors.New("test stream closed")).MaxTimes(1)
+
 			return strm
 		}
 
@@ -515,7 +517,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			},
 		}
 
-		var connectionAttempt xatomic.Int64
+		var connectionAttempt atomic.Int64
 		w.cfg.Connect = func(ctx context.Context) (RawTopicWriterStream, error) {
 			attemptIndex := int(connectionAttempt.Add(1)) - 1
 			tb.Helper()
@@ -536,7 +538,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		err := w.Write(ctx, newTestMessages(1))
 		require.NoError(tb, err)
 
-		xtest.WaitChannelClosed(tb, connectionLoopStopped)
+		xtest.WaitChannelClosedWithTimeout(tb, connectionLoopStopped, 4*time.Second)
 	})
 }
 
@@ -770,6 +772,7 @@ func TestCalculateAllowedCodecs(t *testing.T) {
 
 func newTestMessageWithDataContent(num int) messageWithDataContent {
 	res := newMessageDataWithContent(PublicMessage{SeqNo: int64(num)}, testCommonEncoders)
+
 	return res
 }
 
@@ -778,6 +781,7 @@ func newTestMessages(numbers ...int) []PublicMessage {
 	for i, num := range numbers {
 		messages[i].SeqNo = int64(num)
 	}
+
 	return messages
 }
 
@@ -786,6 +790,7 @@ func newTestMessagesWithContent(numbers ...int) []messageWithDataContent {
 	for _, num := range numbers {
 		messages = append(messages, newTestMessageWithDataContent(num))
 	}
+
 	return messages
 }
 
@@ -820,6 +825,7 @@ func isClosed(ch <-chan struct{}) bool {
 		if existVal {
 			panic("value, when not expected")
 		}
+
 		return true
 	default:
 		return false
@@ -864,6 +870,7 @@ func newTestEnv(tb testing.TB, options *testEnvOptions) *testEnv { //nolint:thel
 		if connectNum > 1 {
 			tb.Fatalf("test: default env support most one connection")
 		}
+
 		return res.stream, nil
 	}))
 	writerOptions = append(writerOptions, options.writerOptions...)
@@ -901,6 +908,7 @@ func newTestEnv(tb testing.TB, options *testEnvOptions) *testEnv { //nolint:thel
 		close(res.stopReadEvents)
 		<-streamClosed
 	})
+
 	return res
 }
 
@@ -928,5 +936,6 @@ type sendFromServerResponse struct {
 
 func testCreateInitRequest(w *WriterReconnector) rawtopicwriter.InitRequest {
 	req := newSingleStreamWriterStopped(context.Background(), w.createWriterStreamConfig(nil)).createInitRequest()
+
 	return req
 }

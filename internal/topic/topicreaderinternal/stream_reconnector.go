@@ -115,6 +115,7 @@ func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessa
 		case r.isRetriableError(err):
 			r.fireReconnectOnRetryableError(stream, err)
 			runtime.Gosched()
+
 			continue
 		case err != nil:
 			return nil, err
@@ -126,8 +127,10 @@ func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessa
 		if r.isRetriableError(err) {
 			r.fireReconnectOnRetryableError(stream, err)
 			runtime.Gosched()
+
 			continue
 		}
+
 		return res, err
 	}
 }
@@ -140,6 +143,7 @@ func (r *readerReconnector) Commit(ctx context.Context, commitRange commitRange)
 
 	err = stream.Commit(ctx, commitRange)
 	r.fireReconnectOnRetryableError(stream, err)
+
 	return err
 }
 
@@ -166,6 +170,7 @@ func (r *readerReconnector) CloseWithError(ctx context.Context, err error) error
 			}
 		})
 	})
+
 	return closeErr
 }
 
@@ -296,11 +301,13 @@ func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldRead
 			}
 		}
 	})
+
 	return err
 }
 
 func (r *readerReconnector) isRetriableError(err error) bool {
 	_, res := topic.CheckRetryMode(err, r.retrySettings, 0)
+
 	return res
 }
 
@@ -345,6 +352,7 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 	if res.err == nil {
 		return res.stream, nil
 	}
+
 	return nil, res.err
 }
 
@@ -387,6 +395,7 @@ func (r *readerReconnector) stream(ctx context.Context) (batchedStreamReader, er
 		connectionChan = r.streamConnectionInProgress
 		if r.closedErr != nil {
 			err = r.closedErr
+
 			return
 		}
 	})
@@ -406,6 +415,7 @@ func (r *readerReconnector) stream(ctx context.Context) (batchedStreamReader, er
 			err = r.streamErr
 		})
 		r.fireReconnectOnRetryableError(reader, err)
+
 		return reader, err
 	}
 }

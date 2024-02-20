@@ -18,5 +18,6 @@ func ContextEndpoint(ctx context.Context) (e Endpoint, ok bool) {
 	if e, ok = ctx.Value(ctxEndpointKey{}).(Endpoint); ok {
 		return e, true
 	}
+
 	return nil, false
 }

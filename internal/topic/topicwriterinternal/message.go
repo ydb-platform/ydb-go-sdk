@@ -9,7 +9,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xbytes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -38,6 +37,7 @@ func (p PublicFuturePartitioning) ToRaw() rawtopicwriter.Partitioning {
 	if p.hasPartitionID {
 		return rawtopicwriter.NewPartitioningPartitionID(p.partitionID)
 	}
+
 	return rawtopicwriter.NewPartitioningMessageGroup(p.messageGroupID)
 }
 
@@ -85,7 +85,7 @@ func (m *messageWithDataContent) cacheMetadata() {
 	if len(m.Metadata) > 0 {
 		ownCopy := make(map[string][]byte, len(m.Metadata))
 		for key, val := range m.Metadata {
-			ownCopy[key] = xbytes.Clone(val)
+			ownCopy[key] = bytes.Clone(val)
 		}
 		m.Metadata = ownCopy
 	} else {
@@ -97,6 +97,7 @@ func (m *messageWithDataContent) cacheMetadata() {
 func (m *messageWithDataContent) CacheMessageData(codec rawtopiccommon.Codec) error {
 	m.cacheMetadata()
 	_, err := m.GetEncodedBytes(codec)
+
 	return err
 }
 
@@ -128,6 +129,7 @@ func (m *messageWithDataContent) encodeRawContent(codec rawtopiccommon.Codec) ([
 	}
 
 	m.bufCodec = codec
+
 	return m.bufEncoded.Bytes(), nil
 }
 
@@ -142,6 +144,7 @@ func (m *messageWithDataContent) readDataToRawBuf() error {
 		m.BufUncompressedSize = int(writtenBytes)
 		m.Data = nil
 	}
+
 	return nil
 }
 
@@ -173,6 +176,7 @@ func (m *messageWithDataContent) readDataToTargetCodec(codec rawtopiccommon.Code
 	}
 	m.BufUncompressedSize = int(bytesCount)
 	m.Data = nil
+
 	return nil
 }
 
@@ -188,6 +192,7 @@ func (m *messageWithDataContent) getRawBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return m.rawBuf.Bytes(), nil
 }
 
@@ -204,6 +209,7 @@ func (m *messageWithDataContent) getEncodedBytes(codec rawtopiccommon.Codec) ([]
 		if err != nil {
 			return nil, err
 		}
+
 		return m.bufEncoded.Bytes(), nil
 	}
 }

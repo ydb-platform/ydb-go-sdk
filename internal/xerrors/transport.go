@@ -58,6 +58,7 @@ func (e *transportError) Error() string {
 		b.WriteString(fmt.Sprintf(", traceID: %q", e.traceID))
 	}
 	b.WriteString(")")
+
 	return b.String()
 }
 
@@ -129,6 +130,7 @@ func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 			}
 		}
 	}
+
 	return false
 }
 
@@ -157,6 +159,7 @@ func Transport(err error, opts ...teOpt) error {
 			opt.applyToTransportError(te)
 		}
 	}
+
 	return te
 }
 
@@ -195,5 +198,6 @@ func TransportError(err error) Error {
 			err:    err,
 		}
 	}
+
 	return nil
 }

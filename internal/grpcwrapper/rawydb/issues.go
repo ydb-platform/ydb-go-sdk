@@ -20,6 +20,7 @@ func (issuesPointer *Issues) FromProto(p []*Ydb_Issue.IssueMessage) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -29,6 +30,7 @@ func (issuesPointer *Issues) String() string {
 	for i := range issues {
 		issuesStrings[i] = issues[i].String()
 	}
+
 	return strings.Join(issuesStrings, ", ")
 }
 

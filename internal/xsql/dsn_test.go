@@ -17,6 +17,7 @@ func TestParse(t *testing.T) {
 				t.Error(err)
 			}
 		}
+
 		return c
 	}
 	compareConfigs := func(t *testing.T, lhs, rhs *config.Config) {
