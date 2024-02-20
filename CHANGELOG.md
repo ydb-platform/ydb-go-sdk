@@ -1,6 +1,3 @@
-
-* Refactored internal packages by `protogetter` linter issues
-
 ## v3.56.1
 * Fixed fixenv usage (related to tests only)
 
