@@ -31,7 +31,7 @@ var (
 )
 
 func defaultGrpcOptions(t *trace.Driver, secure bool, tlsConfig *tls.Config) []grpc.DialOption {
-	var opts []grpc.DialOption
+	opts := make([]grpc.DialOption, 0, 5) // capacity is 5 because later will be append 5 objects
 	opts = append(opts,
 		// keep-aliving all connections
 		grpc.WithKeepaliveParams(

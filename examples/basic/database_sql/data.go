@@ -48,12 +48,8 @@ func episodeData(seriesID, seasonID, episodeID, title string, date time.Time) ty
 	)
 }
 
-func getData() ([]types.Value, []types.Value, []types.Value) {
-	var (
-		series   = make([]types.Value, 0)
-		seasons  = make([]types.Value, 0)
-		episodes = make([]types.Value, 0)
-	)
+//nolint:nonamedreturns
+func getData() (series, seasons, episodes []types.Value) {
 	for seriesID, fill := range map[string]func(seriesID string) (
 		seriesData types.Value, seasons []types.Value, episodes []types.Value,
 	){
@@ -69,16 +65,13 @@ func getData() ([]types.Value, []types.Value, []types.Value) {
 	return series, seasons, episodes
 }
 
-func getDataForITCrowd(seriesID string) (types.Value, []types.Value, []types.Value) {
-	var (
-		series = seriesData(
-			seriesID, date("2006-02-03"), "IT Crowd", ""+
-				"The IT Crowd is a British sitcom produced by Channel 4, written by Graham Linehan, produced by "+
-				"Ash Atalla and starring Chris O'Dowd, Richard Ayoade, Katherine Parkinson, and Matt Berry.",
-			"", // NULL comment.
-		)
-		seasons  = make([]types.Value, 0)
-		episodes = make([]types.Value, 0)
+//nolint:nonamedreturns
+func getDataForITCrowd(seriesID string) (series types.Value, seasons, episodes []types.Value) {
+	series = seriesData(
+		seriesID, date("2006-02-03"), "IT Crowd", ""+
+			"The IT Crowd is a British sitcom produced by Channel 4, written by Graham Linehan, produced by "+
+			"Ash Atalla and starring Chris O'Dowd, Richard Ayoade, Katherine Parkinson, and Matt Berry.",
+		"", // NULL comment.
 	)
 	for _, season := range []struct { //nolint:gocritic
 		title    string
@@ -129,16 +122,13 @@ func getDataForITCrowd(seriesID string) (types.Value, []types.Value, []types.Val
 	return series, seasons, episodes
 }
 
-func getDataForSiliconValley(seriesID string) (types.Value, []types.Value, []types.Value) {
-	var (
-		series = seriesData(
-			seriesID, date("2014-04-06"), "Silicon Valley", ""+
-				"Silicon Valley is an American comedy television series created by Mike Judge, John Altschuler and "+
-				"Dave Krinsky. The series focuses on five young men who founded a startup company in Silicon Valley.",
-			"Some comment here",
-		)
-		seasons  = make([]types.Value, 0)
-		episodes = make([]types.Value, 0)
+//nolint:nonamedreturns
+func getDataForSiliconValley(seriesID string) (series types.Value, seasons, episodes []types.Value) {
+	series = seriesData(
+		seriesID, date("2014-04-06"), "Silicon Valley", ""+
+			"Silicon Valley is an American comedy television series created by Mike Judge, John Altschuler and "+
+			"Dave Krinsky. The series focuses on five young men who founded a startup company in Silicon Valley.",
+		"Some comment here",
 	)
 	for _, season := range []struct { //nolint:gocritic
 		title    string
