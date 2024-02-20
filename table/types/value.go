@@ -174,21 +174,7 @@ func ZeroValue(t Type) Value { return value.ZeroValue(t) }
 func OptionalValue(v Value) Value { return value.OptionalValue(v) }
 
 // Decimal supported in scanner API
-type Decimal struct {
-	Bytes     [16]byte
-	Precision uint32
-	Scale     uint32
-}
-
-func (d *Decimal) String() string {
-	v := decimal.FromInt128(d.Bytes, d.Precision, d.Scale)
-
-	return decimal.Format(v, d.Precision, d.Scale)
-}
-
-func (d *Decimal) BigInt() *big.Int {
-	return decimal.FromInt128(d.Bytes, d.Precision, d.Scale)
-}
+type Decimal = decimal.Decimal
 
 // DecimalValue creates decimal value of given types t and value v.
 // Note that Decimal.Bytes interpreted as big-endian int128.
