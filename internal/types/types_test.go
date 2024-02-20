@@ -1,4 +1,4 @@
-package value
+package types
 
 import (
 	"testing"
@@ -10,231 +10,231 @@ func TestTypeToString(t *testing.T) {
 		s string
 	}{
 		{
-			t: Void(),
+			t: NewVoid(),
 			s: "Void",
 		},
 		{
-			t: Null(),
+			t: NewNull(),
 			s: "Null",
 		},
 		{
-			t: TypeBool,
+			t: Bool,
 			s: "Bool",
 		},
 		{
-			t: TypeInt8,
+			t: Int8,
 			s: "Int8",
 		},
 		{
-			t: TypeUint8,
+			t: Uint8,
 			s: "Uint8",
 		},
 		{
-			t: TypeInt16,
+			t: Int16,
 			s: "Int16",
 		},
 		{
-			t: TypeUint16,
+			t: Uint16,
 			s: "Uint16",
 		},
 		{
-			t: TypeInt32,
+			t: Int32,
 			s: "Int32",
 		},
 		{
-			t: TypeUint32,
+			t: Uint32,
 			s: "Uint32",
 		},
 		{
-			t: TypeInt64,
+			t: Int64,
 			s: "Int64",
 		},
 		{
-			t: TypeUint64,
+			t: Uint64,
 			s: "Uint64",
 		},
 		{
-			t: TypeFloat,
+			t: Float,
 			s: "Float",
 		},
 		{
-			t: TypeDouble,
+			t: Double,
 			s: "Double",
 		},
 		{
-			t: TypeDate,
+			t: Date,
 			s: "Date",
 		},
 		{
-			t: TypeDatetime,
+			t: Datetime,
 			s: "Datetime",
 		},
 		{
-			t: TypeTimestamp,
+			t: Timestamp,
 			s: "Timestamp",
 		},
 		{
-			t: TypeInterval,
+			t: Interval,
 			s: "Interval",
 		},
 		{
-			t: TypeTzDate,
+			t: TzDate,
 			s: "TzDate",
 		},
 		{
-			t: TypeTzDatetime,
+			t: TzDatetime,
 			s: "TzDatetime",
 		},
 		{
-			t: TypeTzTimestamp,
+			t: TzTimestamp,
 			s: "TzTimestamp",
 		},
 		{
-			t: TypeBytes,
+			t: Bytes,
 			s: "String",
 		},
 		{
-			t: TypeText,
+			t: Text,
 			s: "Utf8",
 		},
 		{
-			t: TypeYSON,
+			t: YSON,
 			s: "Yson",
 		},
 		{
-			t: TypeJSON,
+			t: JSON,
 			s: "Json",
 		},
 		{
-			t: TypeUUID,
+			t: UUID,
 			s: "Uuid",
 		},
 		{
-			t: TypeJSONDocument,
+			t: JSONDocument,
 			s: "JsonDocument",
 		},
 		{
-			t: TypeDyNumber,
+			t: DyNumber,
 			s: "DyNumber",
 		},
 		{
-			t: Optional(TypeBool),
+			t: NewOptional(Bool),
 			s: "Optional<Bool>",
 		},
 		{
-			t: Optional(TypeInt8),
+			t: NewOptional(Int8),
 			s: "Optional<Int8>",
 		},
 		{
-			t: Optional(TypeUint8),
+			t: NewOptional(Uint8),
 			s: "Optional<Uint8>",
 		},
 		{
-			t: Optional(TypeInt16),
+			t: NewOptional(Int16),
 			s: "Optional<Int16>",
 		},
 		{
-			t: Optional(TypeUint16),
+			t: NewOptional(Uint16),
 			s: "Optional<Uint16>",
 		},
 		{
-			t: Optional(TypeInt32),
+			t: NewOptional(Int32),
 			s: "Optional<Int32>",
 		},
 		{
-			t: Optional(TypeUint32),
+			t: NewOptional(Uint32),
 			s: "Optional<Uint32>",
 		},
 		{
-			t: Optional(TypeInt64),
+			t: NewOptional(Int64),
 			s: "Optional<Int64>",
 		},
 		{
-			t: Optional(TypeUint64),
+			t: NewOptional(Uint64),
 			s: "Optional<Uint64>",
 		},
 		{
-			t: Optional(TypeFloat),
+			t: NewOptional(Float),
 			s: "Optional<Float>",
 		},
 		{
-			t: Optional(TypeDouble),
+			t: NewOptional(Double),
 			s: "Optional<Double>",
 		},
 		{
-			t: Optional(TypeDate),
+			t: NewOptional(Date),
 			s: "Optional<Date>",
 		},
 		{
-			t: Optional(TypeDatetime),
+			t: NewOptional(Datetime),
 			s: "Optional<Datetime>",
 		},
 		{
-			t: Optional(TypeTimestamp),
+			t: NewOptional(Timestamp),
 			s: "Optional<Timestamp>",
 		},
 		{
-			t: Optional(TypeInterval),
+			t: NewOptional(Interval),
 			s: "Optional<Interval>",
 		},
 		{
-			t: Optional(TypeTzDate),
+			t: NewOptional(TzDate),
 			s: "Optional<TzDate>",
 		},
 		{
-			t: Optional(TypeTzDatetime),
+			t: NewOptional(TzDatetime),
 			s: "Optional<TzDatetime>",
 		},
 		{
-			t: Optional(TypeTzTimestamp),
+			t: NewOptional(TzTimestamp),
 			s: "Optional<TzTimestamp>",
 		},
 		{
-			t: Optional(TypeBytes),
+			t: NewOptional(Bytes),
 			s: "Optional<String>",
 		},
 		{
-			t: Optional(TypeText),
+			t: NewOptional(Text),
 			s: "Optional<Utf8>",
 		},
 		{
-			t: Optional(TypeYSON),
+			t: NewOptional(YSON),
 			s: "Optional<Yson>",
 		},
 		{
-			t: Optional(TypeJSON),
+			t: NewOptional(JSON),
 			s: "Optional<Json>",
 		},
 		{
-			t: Optional(TypeUUID),
+			t: NewOptional(UUID),
 			s: "Optional<Uuid>",
 		},
 		{
-			t: Optional(TypeJSONDocument),
+			t: NewOptional(JSONDocument),
 			s: "Optional<JsonDocument>",
 		},
 		{
-			t: Optional(TypeDyNumber),
+			t: NewOptional(DyNumber),
 			s: "Optional<DyNumber>",
 		},
 		{
-			t: Decimal(22, 9),
+			t: NewDecimal(22, 9),
 			s: "Decimal(22,9)",
 		},
 		{
-			t: Dict(TypeText, TypeTimestamp),
+			t: NewDict(Text, Timestamp),
 			s: "Dict<Utf8,Timestamp>",
 		},
 		{
-			t: EmptyList(),
+			t: NewEmptyList(),
 			s: "EmptyList",
 		},
 		{
-			t: List(TypeUint32),
+			t: NewList(Uint32),
 			s: "List<Uint32>",
 		},
 		{
-			t: Set(TypeUint32),
+			t: NewSet(Uint32),
 			s: "Set<Uint32>",
 		},
 		{
@@ -242,26 +242,26 @@ func TestTypeToString(t *testing.T) {
 			s: "EmptyDict",
 		},
 		{
-			t: EmptyDict(),
+			t: NewEmptyDict(),
 			s: "EmptyDict",
 		},
 		{
-			t: VariantStruct(
+			t: NewVariantStruct(
 				StructField{
 					Name: "a",
-					T:    TypeBool,
+					T:    Bool,
 				},
 				StructField{
 					Name: "b",
-					T:    TypeFloat,
+					T:    Float,
 				},
 			),
 			s: "Variant<'a':Bool,'b':Float>",
 		},
 		{
-			t: VariantTuple(
-				TypeBool,
-				TypeFloat,
+			t: NewVariantTuple(
+				Bool,
+				Float,
 			),
 			s: "Variant<Bool,Float>",
 		},

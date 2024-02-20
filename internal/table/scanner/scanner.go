@@ -11,6 +11,9 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
+	scanner2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/scanner"
+	internalTypes "github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
@@ -19,7 +22,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 type scanner struct {
@@ -55,7 +57,7 @@ func (s *scanner) Columns(it func(options.Column)) {
 	for _, m := range s.set.Columns {
 		it(options.Column{
 			Name: m.Name,
-			Type: value.TypeFromYDB(m.Type),
+			Type: internalTypes.TypeFromYDB(m.Type),
 		})
 	}
 }
@@ -198,7 +200,7 @@ func (s *scanner) ScanNamed(namedValues ...named.Value) error {
 		case named.TypeOptionalWithUseDefault:
 			s.scanOptional(namedValues[i].Value, true)
 		default:
-			panic(fmt.Sprintf("unknown type of named.Value: %d", t))
+			panic(fmt.Sprintf("unknown type of named.valueType: %d", t))
 		}
 	}
 	s.nextItem += len(namedValues)
@@ -281,13 +283,13 @@ func (s *scanner) writePathTo(w io.Writer) (n int64, err error) {
 	return n, nil
 }
 
-func (s *scanner) getType() types.Type {
+func (s *scanner) getType() internalTypes.Type {
 	x := s.stack.current()
 	if x.isEmpty() {
 		return nil
 	}
 
-	return value.TypeFromYDB(x.t)
+	return internalTypes.TypeFromYDB(x.t)
 }
 
 func (s *scanner) hasItems() bool {
@@ -383,74 +385,74 @@ func (s *scanner) any() interface{} {
 		x = s.stack.current()
 	}
 
-	t := value.TypeFromYDB(x.t)
-	p, primitive := t.(value.PrimitiveType)
+	t := internalTypes.TypeFromYDB(x.t)
+	p, primitive := t.(internalTypes.Primitive)
 	if !primitive {
 		return s.value()
 	}
 
 	switch p {
-	case value.TypeBool:
+	case internalTypes.Bool:
 		return s.bool()
-	case value.TypeInt8:
+	case internalTypes.Int8:
 		return s.int8()
-	case value.TypeUint8:
+	case internalTypes.Uint8:
 		return s.uint8()
-	case value.TypeInt16:
+	case internalTypes.Int16:
 		return s.int16()
-	case value.TypeUint16:
+	case internalTypes.Uint16:
 		return s.uint16()
-	case value.TypeInt32:
+	case internalTypes.Int32:
 		return s.int32()
-	case value.TypeFloat:
+	case internalTypes.Float:
 		return s.float()
-	case value.TypeDouble:
+	case internalTypes.Double:
 		return s.double()
-	case value.TypeBytes:
+	case internalTypes.Bytes:
 		return s.bytes()
-	case value.TypeUUID:
+	case internalTypes.UUID:
 		return s.uint128()
-	case value.TypeUint32:
+	case internalTypes.Uint32:
 		return s.uint32()
-	case value.TypeDate:
+	case internalTypes.Date:
 		return value.DateToTime(s.uint32())
-	case value.TypeDatetime:
+	case internalTypes.Datetime:
 		return value.DatetimeToTime(s.uint32())
-	case value.TypeUint64:
+	case internalTypes.Uint64:
 		return s.uint64()
-	case value.TypeTimestamp:
+	case internalTypes.Timestamp:
 		return value.TimestampToTime(s.uint64())
-	case value.TypeInt64:
+	case internalTypes.Int64:
 		return s.int64()
-	case value.TypeInterval:
+	case internalTypes.Interval:
 		return value.IntervalToDuration(s.int64())
-	case value.TypeTzDate:
+	case internalTypes.TzDate:
 		src, err := value.TzDateToTime(s.text())
 		if err != nil {
 			_ = s.errorf(0, "scanner.any(): %w", err)
 		}
 
 		return src
-	case value.TypeTzDatetime:
+	case internalTypes.TzDatetime:
 		src, err := value.TzDatetimeToTime(s.text())
 		if err != nil {
 			_ = s.errorf(0, "scanner.any(): %w", err)
 		}
 
 		return src
-	case value.TypeTzTimestamp:
+	case internalTypes.TzTimestamp:
 		src, err := value.TzTimestampToTime(s.text())
 		if err != nil {
 			_ = s.errorf(0, "scanner.any(): %w", err)
 		}
 
 		return src
-	case value.TypeText, value.TypeDyNumber:
+	case internalTypes.Text, internalTypes.DyNumber:
 		return s.text()
 	case
-		value.TypeYSON,
-		value.TypeJSON,
-		value.TypeJSONDocument:
+		internalTypes.YSON,
+		internalTypes.JSON,
+		internalTypes.JSONDocument:
 		return xstring.ToBytes(s.text())
 	default:
 		_ = s.errorf(0, "unknown primitive types")
@@ -459,8 +461,8 @@ func (s *scanner) any() interface{} {
 	}
 }
 
-// Value returns current item under scan as ydb.Value types.
-func (s *scanner) value() types.Value {
+// valueType returns current item under scan as ydb.valueType types
+func (s *scanner) value() value.Value {
 	x := s.stack.current()
 
 	return value.FromYDB(x.t, x.v)
@@ -478,7 +480,7 @@ func (s *scanner) isNull() bool {
 	return yes
 }
 
-// unwrap current item under scan interpreting it as Optional<Type> types.
+// unwrap current item under scan interpreting it as Optional<Type> types
 // ignores if type is not optional
 func (s *scanner) unwrap() {
 	if s.Err() != nil {
@@ -507,17 +509,17 @@ func (s *scanner) unwrapValue() (v *Ydb.Value) {
 	return x.NestedValue
 }
 
-func (s *scanner) unwrapDecimal() (v types.Decimal) {
+func (s *scanner) unwrapDecimal() decimal.Decimal {
 	if s.Err() != nil {
-		return
+		return decimal.Decimal{}
 	}
 	s.unwrap()
 	d := s.assertTypeDecimal(s.stack.current().t)
 	if d == nil {
-		return
+		return decimal.Decimal{}
 	}
 
-	return types.Decimal{
+	return decimal.Decimal{
 		Bytes:     s.uint128(),
 		Precision: d.DecimalType.Precision,
 		Scale:     d.DecimalType.Scale,
@@ -848,11 +850,11 @@ func (s *scanner) scanRequired(v interface{}) {
 		*v = s.uint128()
 	case *interface{}:
 		*v = s.any()
-	case *types.Value:
+	case *value.Value:
 		*v = s.value()
-	case *types.Decimal:
+	case *decimal.Decimal:
 		*v = s.unwrapDecimal()
-	case types.Scanner:
+	case scanner2.Scanner:
 		err := v.UnmarshalYDB(s.converter)
 		if err != nil {
 			_ = s.errorf(0, "ydb.Scanner error: %w", err)
@@ -865,9 +867,9 @@ func (s *scanner) scanRequired(v interface{}) {
 	case json.Unmarshaler:
 		var err error
 		switch s.getType() {
-		case types.TypeJSON:
+		case internalTypes.JSON:
 			err = v.UnmarshalJSON(s.converter.JSON())
-		case types.TypeJSONDocument:
+		case internalTypes.JSONDocument:
 			err = v.UnmarshalJSON(s.converter.JSONDocument())
 		default:
 			_ = s.errorf(0, "ydb required type %T not unsupported for applying to json.Unmarshaler", s.getType())
@@ -1035,16 +1037,16 @@ func (s *scanner) scanOptional(v interface{}, defaultValueForOptional bool) {
 			src := s.any()
 			*v = &src
 		}
-	case *types.Value:
+	case *value.Value:
 		*v = s.value()
-	case **types.Decimal:
+	case **decimal.Decimal:
 		if s.isNull() {
 			*v = nil
 		} else {
 			src := s.unwrapDecimal()
 			*v = &src
 		}
-	case types.Scanner:
+	case scanner2.Scanner:
 		err := v.UnmarshalYDB(s.converter)
 		if err != nil {
 			_ = s.errorf(0, "ydb.Scanner error: %w", err)
@@ -1058,13 +1060,13 @@ func (s *scanner) scanOptional(v interface{}, defaultValueForOptional bool) {
 		s.unwrap()
 		var err error
 		switch s.getType() {
-		case types.TypeJSON:
+		case internalTypes.JSON:
 			if s.isNull() {
 				err = v.UnmarshalJSON(nil)
 			} else {
 				err = v.UnmarshalJSON(s.converter.JSON())
 			}
-		case types.TypeJSONDocument:
+		case internalTypes.JSONDocument:
 			if s.isNull() {
 				err = v.UnmarshalJSON(nil)
 			} else {
@@ -1126,16 +1128,16 @@ func (s *scanner) setDefaultValue(dst interface{}) {
 		*v = [16]byte{}
 	case *interface{}:
 		*v = nil
-	case *types.Value:
+	case *value.Value:
 		*v = s.value()
-	case *types.Decimal:
-		*v = types.Decimal{}
+	case *decimal.Decimal:
+		*v = decimal.Decimal{}
 	case sql.Scanner:
 		err := v.Scan(nil)
 		if err != nil {
 			_ = s.errorf(0, "sql.Scanner error: %w", err)
 		}
-	case types.Scanner:
+	case scanner2.Scanner:
 		err := v.UnmarshalYDB(s.converter)
 		if err != nil {
 			_ = s.errorf(0, "ydb.Scanner error: %w", err)
@@ -1230,7 +1232,7 @@ var emptyItem item
 
 type item struct {
 	name string
-	i    int // Index in listing types.
+	i    int // Index in listing types
 	t    *Ydb.Type
 	v    *Ydb.Value
 }

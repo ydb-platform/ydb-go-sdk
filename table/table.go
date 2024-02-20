@@ -10,12 +10,12 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -174,14 +174,14 @@ type Session interface {
 	BulkUpsert(
 		ctx context.Context,
 		table string,
-		rows types.Value,
+		rows value.Value,
 		opts ...options.BulkUpsertOption,
 	) (err error)
 
 	ReadRows(
 		ctx context.Context,
 		path string,
-		keys types.Value,
+		keys value.Value,
 		opts ...options.ReadRowsOption,
 	) (_ result.Result, err error)
 
@@ -455,14 +455,14 @@ func SnapshotReadOnlyTxControl() *TransactionControl {
 
 // QueryParameters
 type (
-	queryParams     map[string]types.Value
+	queryParams     map[string]value.Value
 	ParameterOption interface {
 		Name() string
-		Value() types.Value
+		Value() value.Value
 	}
 	parameterOption struct {
 		name  string
-		value types.Value
+		value value.Value
 	}
 	QueryParameters struct {
 		m queryParams
@@ -473,7 +473,7 @@ func (p parameterOption) Name() string {
 	return p.name
 }
 
-func (p parameterOption) Value() types.Value {
+func (p parameterOption) Value() value.Value {
 	return p.value
 }
 
@@ -505,7 +505,7 @@ func (q *QueryParameters) Count() int {
 	return len(q.m)
 }
 
-func (q *QueryParameters) Each(it func(name string, v types.Value)) {
+func (q *QueryParameters) Each(it func(name string, v value.Value)) {
 	if q == nil {
 		return
 	}
@@ -561,7 +561,7 @@ func (q *QueryParameters) Add(params ...ParameterOption) {
 	}
 }
 
-func ValueParam(name string, v types.Value) ParameterOption {
+func ValueParam(name string, v value.Value) ParameterOption {
 	switch len(name) {
 	case 0:
 		panic("empty name")

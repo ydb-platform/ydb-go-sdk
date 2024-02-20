@@ -208,7 +208,7 @@ var scannerData = []struct {
 		setColumnIndexes: []int{0, 2, 1},
 	},
 	{
-		name:  "Scan int64, float, json as ydb.Value",
+		name:  "Scan int64, float, json as ydb.valueType",
 		count: 100,
 		columns: []*column{{
 			name:     "valueint64",
