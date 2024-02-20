@@ -235,7 +235,6 @@ linters:
     - godot
     - goerr113
     - golint
-    - gomoddirectives
     - ifshort
     - interfacebloat
     - ireturn
