@@ -1083,9 +1083,7 @@ func (s *session) ReadRows(
 
 	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
 		return nil, xerrors.WithStackTrace(
-			xerrors.Operation(
-				xerrors.FromOperation(response),
-			),
+			xerrors.FromOperation(response),
 		)
 	}
 
