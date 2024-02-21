@@ -90,7 +90,7 @@ func main() {
 	err = addDocument(ctx, db.Table(), prefix,
 		"https://ya.ru/",
 		"<html><body><h1>Ya</h1></body></html>",
-		2) //nolint:gomnd
+		2)
 	if err != nil {
 		panic(fmt.Errorf("add document failed: %w", err))
 	}
@@ -118,7 +118,7 @@ func main() {
 	err = addDocument(ctx, db.Table(), prefix,
 		"https://yandex.ru/",
 		"<html><body><h1>Yandex</h1></body></html>",
-		2) //nolint:gomnd
+		2)
 	if err != nil {
 		panic(fmt.Errorf("add document failed: %w", err))
 	}
@@ -126,13 +126,13 @@ func main() {
 	err = addDocument(ctx, db.Table(), prefix,
 		"https://yandex.ru/",
 		"<html><body><h1>Yandex</h1></body></html>",
-		3) //nolint:gomnd
+		3)
 	if err != nil {
 		panic(fmt.Errorf("add document failed: %w", err))
 	}
 
 	for i := uint64(0); i < expirationQueueCount; i++ {
-		if err = deleteExpired(ctx, db.Table(), prefix, i, 2); err != nil { //nolint:gomnd
+		if err = deleteExpired(ctx, db.Table(), prefix, i, 2); err != nil {
 			panic(fmt.Errorf("delete expired failed: %w", err))
 		}
 	}

@@ -90,7 +90,7 @@ func main() {
 	err = addDocument(ctx, db.Table(), prefix,
 		"https://ya.ru/",
 		"<html><body><h1>Ya</h1></body></html>",
-		2) //nolint:gomnd
+		2)
 	if err != nil {
 		panic(fmt.Errorf("add document failed: %w", err))
 	}
@@ -98,7 +98,7 @@ func main() {
 	err = addDocument(ctx, db.Table(), prefix,
 		"https://mail.yandex.ru/",
 		"<html><body><h1>Mail</h1></body></html>",
-		3) //nolint:gomnd
+		3)
 	if err != nil {
 		panic(fmt.Errorf("add document failed: %w", err))
 	}
@@ -106,7 +106,7 @@ func main() {
 	err = addDocument(ctx, db.Table(), prefix,
 		"https://zen.yandex.ru/",
 		"<html><body><h1>Zen</h1></body></html>",
-		4) //nolint:gomnd
+		4)
 	if err != nil {
 		panic(fmt.Errorf("add document failed: %w", err))
 	}
@@ -131,7 +131,7 @@ func main() {
 		panic(fmt.Errorf("read document failed: %w", err))
 	}
 
-	err = deleteExpired(ctx, db.Table(), prefix, 2) //nolint:gomnd
+	err = deleteExpired(ctx, db.Table(), prefix, 2)
 	if err != nil {
 		panic(fmt.Errorf("delete expired failed: %w", err))
 	}
@@ -159,7 +159,7 @@ func main() {
 	err = addDocument(ctx, db.Table(), prefix,
 		"https://yandex.ru/",
 		"<html><body><h1>Yandex</h1></body></html>",
-		3) //nolint:gomnd
+		3)
 	if err != nil {
 		panic(fmt.Errorf("add document failed: %w", err))
 	}
@@ -167,12 +167,12 @@ func main() {
 	err = addDocument(ctx, db.Table(), prefix,
 		"https://ya.ru/",
 		"<html><body><h1>Ya</h1></body></html>",
-		4) //nolint:gomnd
+		4)
 	if err != nil {
 		panic(fmt.Errorf("add document failed: %w", err))
 	}
 
-	err = deleteExpired(ctx, db.Table(), prefix, 3) //nolint:gomnd
+	err = deleteExpired(ctx, db.Table(), prefix, 3)
 	if err != nil {
 		panic(fmt.Errorf("delete expired failed: %w", err))
 	}

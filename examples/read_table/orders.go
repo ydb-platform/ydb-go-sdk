@@ -104,16 +104,16 @@ func fillTable(ctx context.Context, c table.Client, prefix string) (err error) {
 						"$ordersData",
 						types.ListValue(
 							order(1, 1, "Order 1", "2006-02-03"),
-							order(1, 2, "Order 2", "2007-08-24"), //nolint:gomnd
-							order(1, 3, "Order 3", "2008-11-21"), //nolint:gomnd
-							order(1, 4, "Order 4", "2010-06-25"), //nolint:gomnd
-							order(2, 1, "Order 1", "2014-04-06"), //nolint:gomnd
-							order(2, 2, "Order 2", "2015-04-12"), //nolint:gomnd
-							order(2, 3, "Order 3", "2016-04-24"), //nolint:gomnd
-							order(2, 4, "Order 4", "2017-04-23"), //nolint:gomnd
-							order(2, 5, "Order 5", "2018-03-25"), //nolint:gomnd
-							order(3, 1, "Order 1", "2019-04-23"), //nolint:gomnd
-							order(3, 2, "Order 3", "2020-03-25"), //nolint:gomnd
+							order(1, 2, "Order 2", "2007-08-24"),
+							order(1, 3, "Order 3", "2008-11-21"),
+							order(1, 4, "Order 4", "2010-06-25"),
+							order(2, 1, "Order 1", "2014-04-06"),
+							order(2, 2, "Order 2", "2015-04-12"),
+							order(2, 3, "Order 3", "2016-04-24"),
+							order(2, 4, "Order 4", "2017-04-23"),
+							order(2, 5, "Order 5", "2018-03-25"),
+							order(3, 1, "Order 1", "2019-04-23"),
+							order(3, 2, "Order 3", "2020-03-25"),
 						),
 					),
 				),
@@ -151,7 +151,7 @@ func readTable(ctx context.Context, c table.Client, path string, opts ...options
 			r := row{}
 			for res.NextResultSet(ctx) {
 				for res.NextRow() {
-					if res.CurrentResultSet().ColumnCount() == 4 { //nolint:gomnd
+					if res.CurrentResultSet().ColumnCount() == 4 {
 						err = res.ScanNamed(
 							named.OptionalWithDefault("customer_id", &r.id),
 							named.OptionalWithDefault("order_id", &r.orderID),

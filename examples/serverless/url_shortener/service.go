@@ -101,14 +101,14 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 				Help:      "application calls latencies",
 				Buckets: []float64{
 					(1 * time.Millisecond).Seconds(),
-					(5 * time.Millisecond).Seconds(),     //nolint:gomnd
-					(10 * time.Millisecond).Seconds(),    //nolint:gomnd
-					(50 * time.Millisecond).Seconds(),    //nolint:gomnd
-					(100 * time.Millisecond).Seconds(),   //nolint:gomnd
-					(500 * time.Millisecond).Seconds(),   //nolint:gomnd
-					(1000 * time.Millisecond).Seconds(),  //nolint:gomnd
-					(5000 * time.Millisecond).Seconds(),  //nolint:gomnd
-					(10000 * time.Millisecond).Seconds(), //nolint:gomnd
+					(5 * time.Millisecond).Seconds(),
+					(10 * time.Millisecond).Seconds(),
+					(50 * time.Millisecond).Seconds(),
+					(100 * time.Millisecond).Seconds(),
+					(500 * time.Millisecond).Seconds(),
+					(1000 * time.Millisecond).Seconds(),
+					(5000 * time.Millisecond).Seconds(),
+					(10000 * time.Millisecond).Seconds(),
 				},
 			}, []string{
 				"success",

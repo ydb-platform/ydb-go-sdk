@@ -23,7 +23,7 @@ SQLITE_CONNECTION_STRING
 YDB_CONNECTION_STRING`
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) //nolint:gomnd
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	cfg := &gorm.Config{
