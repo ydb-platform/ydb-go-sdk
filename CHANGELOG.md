@@ -1,3 +1,5 @@
+* Fixed sometime panic on topic writer closing
+
 ## v3.56.1
 * Fixed fixenv usage (related to tests only)
 
