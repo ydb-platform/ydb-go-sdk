@@ -728,10 +728,10 @@ func (s *session) Execute(
 
 	request.SessionId = s.id
 	request.TxControl = txControl.Desc()
-	request.Parameters = params.Params().ToYDB(a)
+	request.Parameters = params.ToYDB(a)
 	request.Query = q.toYDB(a)
 	request.QueryCachePolicy = a.TableQueryCachePolicy()
-	request.QueryCachePolicy.KeepInCache = len(params.Params()) > 0
+	request.QueryCachePolicy.KeepInCache = len(request.Parameters) > 0
 	request.OperationParams = operation.Params(ctx,
 		s.config.OperationTimeout(),
 		s.config.OperationCancelAfter(),
@@ -1115,7 +1115,7 @@ func (s *session) StreamExecuteScanQuery(
 		)
 		request = Ydb_Table.ExecuteScanQueryRequest{
 			Query:      q.toYDB(a),
-			Parameters: params.Params().ToYDB(a),
+			Parameters: params.ToYDB(a),
 			Mode:       Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC, // set default
 		}
 		stream      Ydb_Table_V1.TableService_StreamExecuteScanQueryClient

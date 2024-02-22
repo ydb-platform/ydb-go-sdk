@@ -469,6 +469,13 @@ type (
 	}
 )
 
+func (qp *QueryParameters) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
+	if qp == nil || qp.m == nil {
+		return nil
+	}
+	return qp.ToYDB(a)
+}
+
 func (p parameterOption) Name() string {
 	return p.name
 }

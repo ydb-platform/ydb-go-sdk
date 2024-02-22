@@ -43,10 +43,10 @@ func (s *statement) Execute(
 
 	request.SessionId = s.session.id
 	request.TxControl = txControl.Desc()
-	request.Parameters = params.Params().ToYDB(a)
+	request.Parameters = params.ToYDB(a)
 	request.Query = s.query.toYDB(a)
 	request.QueryCachePolicy = a.TableQueryCachePolicy()
-	request.QueryCachePolicy.KeepInCache = len(params.Params()) > 0
+	request.QueryCachePolicy.KeepInCache = len(request.Parameters) > 0
 	request.OperationParams = operation.Params(ctx,
 		s.session.config.OperationTimeout(),
 		s.session.config.OperationCancelAfter(),

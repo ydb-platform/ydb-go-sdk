@@ -19,7 +19,7 @@ func GenerateDeclareSection(params *table.QueryParameters) (string, error) {
 	var (
 		buf      bytes.Buffer
 		names    []string
-		declares = make(map[string]string, len(params.Params()))
+		declares = make(map[string]string, params.Count())
 	)
 	params.Each(func(name string, v types.Value) {
 		names = append(names, name)

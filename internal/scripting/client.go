@@ -75,7 +75,7 @@ func (c *Client) execute(
 		a       = allocator.New()
 		request = &Ydb_Scripting.ExecuteYqlRequest{
 			Script:     query,
-			Parameters: params.Params().ToYDB(a),
+			Parameters: params.ToYDB(a),
 			OperationParams: operation.Params(
 				ctx,
 				c.config.OperationTimeout(),
@@ -228,7 +228,7 @@ func (c *Client) streamExecute(
 		a       = allocator.New()
 		request = &Ydb_Scripting.ExecuteYqlRequest{
 			Script:     query,
-			Parameters: params.Params().ToYDB(a),
+			Parameters: params.ToYDB(a),
 			OperationParams: operation.Params(
 				ctx,
 				c.config.OperationTimeout(),
