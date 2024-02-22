@@ -8,8 +8,8 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 func TestUnwrapOptionalValue(t *testing.T) {
@@ -47,7 +47,7 @@ func TestUnwrapPrimitiveValue(t *testing.T) {
 func TestUnwrapNullValue(t *testing.T) {
 	a := allocator.New()
 	defer a.Free()
-	v := value.NullValue(value.TypeText)
+	v := value.NullValue(types.Text)
 	val := unwrapTypedValue(value.ToYDB(v, a))
 	typeID := val.Type.GetTypeId()
 	if typeID != Ydb.Type_UTF8 {
@@ -60,8 +60,8 @@ func TestUnwrapNullValue(t *testing.T) {
 }
 
 func TestUint8(t *testing.T) {
-	l := types.Uint8Value(byte(1))
-	r := types.Uint8Value(byte(10))
+	l := value.Uint8Value(byte(1))
+	r := value.Uint8Value(byte(10))
 	c, err := Compare(l, r)
 	requireNoError(t, err)
 	requireEqualValues(t, -1, c)
@@ -76,8 +76,8 @@ func TestUint8(t *testing.T) {
 }
 
 func TestInt8(t *testing.T) {
-	l := types.Int8Value(int8(1))
-	r := types.Int8Value(int8(10))
+	l := value.Int8Value(int8(1))
+	r := value.Int8Value(int8(10))
 	c, err := Compare(l, r)
 	requireNoError(t, err)
 	requireEqualValues(t, -1, c)
@@ -92,8 +92,8 @@ func TestInt8(t *testing.T) {
 }
 
 func TestTimestamp(t *testing.T) {
-	l := types.TimestampValue(1)
-	r := types.TimestampValue(10)
+	l := value.TimestampValue(1)
+	r := value.TimestampValue(10)
 	c, err := Compare(l, r)
 	requireNoError(t, err)
 	requireEqualValues(t, -1, c)
@@ -108,8 +108,8 @@ func TestTimestamp(t *testing.T) {
 }
 
 func TestDateTime(t *testing.T) {
-	l := types.DatetimeValue(1)
-	r := types.DatetimeValue(10)
+	l := value.DatetimeValue(1)
+	r := value.DatetimeValue(10)
 	c, err := Compare(l, r)
 	requireNoError(t, err)
 	requireEqualValues(t, -1, c)
@@ -124,8 +124,8 @@ func TestDateTime(t *testing.T) {
 }
 
 func TestUint64(t *testing.T) {
-	l := types.Uint64Value(uint64(1))
-	r := types.Uint64Value(uint64(10))
+	l := value.Uint64Value(uint64(1))
+	r := value.Uint64Value(uint64(10))
 	c, err := Compare(l, r)
 	requireNoError(t, err)
 	requireEqualValues(t, -1, c)
@@ -140,8 +140,8 @@ func TestUint64(t *testing.T) {
 }
 
 func TestInt64(t *testing.T) {
-	l := types.Int64Value(int64(1))
-	r := types.Int64Value(int64(10))
+	l := value.Int64Value(int64(1))
+	r := value.Int64Value(int64(10))
 	c, err := Compare(l, r)
 	requireNoError(t, err)
 	requireEqualValues(t, -1, c)
@@ -156,8 +156,8 @@ func TestInt64(t *testing.T) {
 }
 
 func TestDouble(t *testing.T) {
-	l := types.DoubleValue(1.0)
-	r := types.DoubleValue(2.0)
+	l := value.DoubleValue(1.0)
+	r := value.DoubleValue(2.0)
 	c, err := Compare(l, r)
 	requireNoError(t, err)
 	requireEqualValues(t, -1, c)
@@ -172,8 +172,8 @@ func TestDouble(t *testing.T) {
 }
 
 func TestFloat(t *testing.T) {
-	l := types.FloatValue(1.0)
-	r := types.FloatValue(2.0)
+	l := value.FloatValue(1.0)
+	r := value.FloatValue(2.0)
 	c, err := Compare(l, r)
 	requireNoError(t, err)
 	requireEqualValues(t, -1, c)
@@ -188,8 +188,8 @@ func TestFloat(t *testing.T) {
 }
 
 func TestUTF8(t *testing.T) {
-	l := types.TextValue("abc")
-	r := types.TextValue("abx")
+	l := value.TextValue("abc")
+	r := value.TextValue("abx")
 	c, err := Compare(l, r)
 	requireNoError(t, err)
 	requireEqualValues(t, -1, c)
@@ -204,8 +204,8 @@ func TestUTF8(t *testing.T) {
 }
 
 func TestOptionalUTF8(t *testing.T) {
-	l := types.OptionalValue(types.OptionalValue(types.TextValue("abc")))
-	r := types.TextValue("abx")
+	l := value.OptionalValue(value.OptionalValue(value.TextValue("abc")))
+	r := value.TextValue("abx")
 	c, err := Compare(l, r)
 	requireNoError(t, err)
 	requireEqualValues(t, -1, c)
@@ -220,8 +220,8 @@ func TestOptionalUTF8(t *testing.T) {
 }
 
 func TestBytes(t *testing.T) {
-	l := types.BytesValue([]byte{1, 2, 3})
-	r := types.BytesValue([]byte{1, 2, 5})
+	l := value.BytesValue([]byte{1, 2, 3})
+	r := value.BytesValue([]byte{1, 2, 5})
 	c, err := Compare(l, r)
 	requireNoError(t, err)
 	requireEqualValues(t, -1, c)
@@ -236,8 +236,8 @@ func TestBytes(t *testing.T) {
 }
 
 func TestNull(t *testing.T) {
-	l := types.NullValue(types.TypeText)
-	r := types.TextValue("abc")
+	l := value.NullValue(types.Text)
+	r := value.TextValue("abc")
 
 	c, err := Compare(l, r)
 	requireNoError(t, err)
@@ -253,10 +253,10 @@ func TestNull(t *testing.T) {
 }
 
 func TestTuple(t *testing.T) {
-	withNull := types.TupleValue(types.Uint64Value(1), types.NullValue(types.TypeText))
-	least := types.TupleValue(types.Uint64Value(1), types.TextValue("abc"))
-	medium := types.TupleValue(types.Uint64Value(1), types.TextValue("def"))
-	largest := types.TupleValue(types.Uint64Value(2), types.TextValue("abc"))
+	withNull := value.TupleValue(value.Uint64Value(1), value.NullValue(types.Text))
+	least := value.TupleValue(value.Uint64Value(1), value.TextValue("abc"))
+	medium := value.TupleValue(value.Uint64Value(1), value.TextValue("def"))
+	largest := value.TupleValue(value.Uint64Value(2), value.TextValue("abc"))
 
 	c, err := Compare(least, medium)
 	requireNoError(t, err)
@@ -280,9 +280,9 @@ func TestTuple(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
-	least := types.ListValue(types.Uint64Value(1), types.Uint64Value(1))
-	medium := types.ListValue(types.Uint64Value(1), types.Uint64Value(2))
-	largest := types.ListValue(types.Uint64Value(2), types.Uint64Value(1))
+	least := value.ListValue(value.Uint64Value(1), value.Uint64Value(1))
+	medium := value.ListValue(value.Uint64Value(1), value.Uint64Value(2))
+	largest := value.ListValue(value.Uint64Value(2), value.Uint64Value(1))
 
 	c, err := Compare(least, medium)
 	requireNoError(t, err)
@@ -298,8 +298,8 @@ func TestList(t *testing.T) {
 }
 
 func TestDyNumber(t *testing.T) {
-	l := types.DyNumberValue("2")
-	r := types.DyNumberValue("12")
+	l := value.DyNumberValue("2")
+	r := value.DyNumberValue("12")
 	c, err := Compare(l, r)
 	requireNoError(t, err)
 	requireEqualValues(t, -1, c)
@@ -314,9 +314,9 @@ func TestDyNumber(t *testing.T) {
 }
 
 func TestUUID(t *testing.T) {
-	l := types.UUIDValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
-	r := types.UUIDValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17})
-	g := types.UUIDValue([16]byte{100, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17})
+	l := value.UUIDValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16})
+	r := value.UUIDValue([16]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17})
+	g := value.UUIDValue([16]byte{100, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17})
 	c, err := Compare(l, r)
 	requireNoError(t, err)
 	requireEqualValues(t, -1, c)
@@ -335,8 +335,8 @@ func TestUUID(t *testing.T) {
 }
 
 func TestIncompatiblePrimitives(t *testing.T) {
-	l := types.Uint64Value(1)
-	r := types.TimestampValue(2)
+	l := value.Uint64Value(1)
+	r := value.TimestampValue(2)
 	_, err := Compare(l, r)
 	if err == nil {
 		t.Errorf("WithStackTrace expected")
@@ -347,8 +347,8 @@ func TestIncompatiblePrimitives(t *testing.T) {
 }
 
 func TestIncompatibleTuples(t *testing.T) {
-	l := types.TupleValue(types.Uint64Value(1), types.TextValue("abc"))
-	r := types.TupleValue(types.Uint64Value(1), types.BytesValue([]byte("abc")))
+	l := value.TupleValue(value.Uint64Value(1), value.TextValue("abc"))
+	r := value.TupleValue(value.Uint64Value(1), value.BytesValue([]byte("abc")))
 	_, err := Compare(l, r)
 	if err == nil {
 		t.Error("WithStackTrace expected")
@@ -358,8 +358,8 @@ func TestIncompatibleTuples(t *testing.T) {
 }
 
 func TestTupleOfDifferentLength(t *testing.T) {
-	l := types.TupleValue(types.Uint64Value(1), types.TextValue("abc"))
-	r := types.TupleValue(types.Uint64Value(1), types.TextValue("abc"), types.TextValue("def"))
+	l := value.TupleValue(value.Uint64Value(1), value.TextValue("abc"))
+	r := value.TupleValue(value.Uint64Value(1), value.TextValue("abc"), value.TextValue("def"))
 
 	cmp, err := Compare(l, r)
 	requireNoError(t, err)
@@ -371,8 +371,8 @@ func TestTupleOfDifferentLength(t *testing.T) {
 }
 
 func TestTupleInTuple(t *testing.T) {
-	l := types.TupleValue(types.Uint64Value(1), types.TupleValue(types.TextValue("abc"), types.BytesValue([]byte("xyz"))))
-	r := types.TupleValue(types.Uint64Value(1), types.TupleValue(types.TextValue("def"), types.BytesValue([]byte("xyz"))))
+	l := value.TupleValue(value.Uint64Value(1), value.TupleValue(value.TextValue("abc"), value.BytesValue([]byte("xyz"))))
+	r := value.TupleValue(value.Uint64Value(1), value.TupleValue(value.TextValue("def"), value.BytesValue([]byte("xyz"))))
 
 	cmp, err := Compare(l, r)
 	requireNoError(t, err)
@@ -388,18 +388,18 @@ func TestTupleInTuple(t *testing.T) {
 }
 
 func TestListInList(t *testing.T) {
-	l := types.ListValue(
-		types.ListValue(
-			types.TextValue("abc"), types.TextValue("def"),
-		), types.ListValue(
-			types.TextValue("uvw"), types.TextValue("xyz"),
+	l := value.ListValue(
+		value.ListValue(
+			value.TextValue("abc"), value.TextValue("def"),
+		), value.ListValue(
+			value.TextValue("uvw"), value.TextValue("xyz"),
 		),
 	)
-	r := types.ListValue(
-		types.ListValue(
-			types.TextValue("abc"), types.TextValue("deg"),
-		), types.ListValue(
-			types.TextValue("uvw"), types.TextValue("xyz"),
+	r := value.ListValue(
+		value.ListValue(
+			value.TextValue("abc"), value.TextValue("deg"),
+		), value.ListValue(
+			value.TextValue("uvw"), value.TextValue("xyz"),
 		),
 	)
 

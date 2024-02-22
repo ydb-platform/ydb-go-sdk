@@ -9,8 +9,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 var abc = "abc"
@@ -65,7 +65,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 	{
 		opt := WithPartitions(
 			WithExplicitPartitions(
-				types.Int64Value(1),
+				value.Int64Value(1),
 			),
 		)
 		req := Ydb_Table.CreateTableRequest{}
@@ -76,7 +76,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 		} else {
 			require.Equal(
 				t,
-				[]*Ydb.TypedValue{value.ToYDB(types.Int64Value(1), a)},
+				[]*Ydb.TypedValue{value.ToYDB(value.Int64Value(1), a)},
 				p.PartitionAtKeys.SplitPoints,
 			)
 		}
@@ -154,7 +154,7 @@ func TestAlterTableOptions(t *testing.T) {
 	a := allocator.New()
 	defer a.Free()
 	{
-		opt := WithAddColumn("a", types.TypeBool)
+		opt := WithAddColumn("a", types.Bool)
 		req := Ydb_Table.AlterTableRequest{}
 		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
 		if len(req.AddColumns) != 1 ||
@@ -165,7 +165,7 @@ func TestAlterTableOptions(t *testing.T) {
 	{
 		column := Column{
 			Name:   "a",
-			Type:   types.TypeBool,
+			Type:   types.Bool,
 			Family: "b",
 		}
 		opt := WithAddColumnMeta(column)
@@ -173,7 +173,7 @@ func TestAlterTableOptions(t *testing.T) {
 		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
 		if len(req.AddColumns) != 1 ||
 			req.AddColumns[0].Name != column.Name ||
-			req.AddColumns[0].Type != value.TypeToYDB(column.Type, a) ||
+			req.AddColumns[0].Type != types.TypeToYDB(column.Type, a) ||
 			req.AddColumns[0].Family != column.Family {
 			t.Errorf("Alter table options is not as expected")
 		}
