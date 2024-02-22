@@ -16,7 +16,7 @@ import (
 var errMessageWasReadEarly = xerrors.Wrap(errors.New("ydb: message was read early"))
 
 // ErrPublicUnexpectedCodec return when try to read message content with unknown codec
-var ErrPublicUnexpectedCodec = errors.New("unexpected codec") //nolint:revive,stylecheck
+var ErrPublicUnexpectedCodec = errors.New("unexpected codec")
 
 // PublicMessage is representation of topic message
 type PublicMessage struct {
