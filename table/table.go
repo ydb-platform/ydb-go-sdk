@@ -478,7 +478,7 @@ func (qp *QueryParameters) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedVa
 		return nil
 	}
 
-	return qp.ToYDB(a)
+	return qp.m.ToYDB(a)
 }
 
 func (p parameterOption) Name() string {
