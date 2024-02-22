@@ -9,7 +9,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xbytes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -145,7 +144,7 @@ func (pmb *PublicMessageBuilder) CreatedAt(createdAt time.Time) *PublicMessageBu
 func (pmb *PublicMessageBuilder) Metadata(metadata map[string][]byte) *PublicMessageBuilder {
 	pmb.mess.Metadata = make(map[string][]byte, len(metadata))
 	for key, val := range metadata {
-		pmb.mess.Metadata[key] = xbytes.Clone(val)
+		pmb.mess.Metadata[key] = bytes.Clone(val)
 	}
 
 	return pmb

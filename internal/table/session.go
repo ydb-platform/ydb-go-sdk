@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
@@ -25,7 +26,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -50,8 +50,8 @@ type session struct {
 
 	status    table.SessionStatus
 	statusMtx sync.RWMutex
-	nodeID    xatomic.Uint32
-	lastUsage xatomic.Int64
+	nodeID    atomic.Uint32
+	lastUsage atomic.Int64
 
 	onClose   []func(s *session)
 	closeOnce sync.Once
@@ -1083,9 +1083,7 @@ func (s *session) ReadRows(
 
 	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
 		return nil, xerrors.WithStackTrace(
-			xerrors.Operation(
-				xerrors.FromOperation(response),
-			),
+			xerrors.FromOperation(response),
 		)
 	}
 

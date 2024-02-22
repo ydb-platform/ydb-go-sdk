@@ -8,6 +8,7 @@ import (
 	"path"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -20,7 +21,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
@@ -678,7 +678,7 @@ func TestSessionPoolCloseIdleSessions(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		var (
 			idleThreshold = 4 * time.Second
-			closedCount   xatomic.Int64
+			closedCount   atomic.Int64
 			fakeClock     = clockwork.NewFakeClock()
 		)
 		p := newClientWithStubBuilder(
