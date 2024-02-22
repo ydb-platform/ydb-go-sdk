@@ -56,6 +56,7 @@ func DatetimeToTime(n uint32) time.Time {
 func TimestampToTime(n uint64) time.Time {
 	sec := n / microsecondsPerSecond
 	nsec := (n - (sec * microsecondsPerSecond)) * nanosecondsPerMicrosecond
+
 	return time.Unix(int64(sec), int64(nsec))
 }
 
