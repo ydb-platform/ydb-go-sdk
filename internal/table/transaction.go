@@ -57,7 +57,7 @@ func (tx *transaction) ID() string {
 // Execute executes query represented by text within transaction tx.
 func (tx *transaction) Execute(
 	ctx context.Context,
-	query string, params *table.QueryParameters,
+	query string, params table.Parameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
 	onDone := trace.TableOnSessionTransactionExecute(
@@ -91,7 +91,7 @@ func (tx *transaction) Execute(
 // ExecuteStatement executes prepared statement stmt within transaction tx.
 func (tx *transaction) ExecuteStatement(
 	ctx context.Context,
-	stmt table.Statement, params *table.QueryParameters,
+	stmt table.Statement, params table.Parameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
 	if params == nil {

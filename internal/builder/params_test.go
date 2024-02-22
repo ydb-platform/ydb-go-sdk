@@ -11,8 +11,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
-func paramsToJson(params map[string]*Ydb.TypedValue) string {
-	b, _ := json.MarshalIndent(params, "", "\t")
+func paramsToJSON(params map[string]*Ydb.TypedValue) string {
+	b, _ := json.MarshalIndent(params, "", "\t") //nolint:errchkjson
+
 	return string(b)
 }
 
@@ -92,7 +93,7 @@ func TestParams(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			a := allocator.New()
 			defer a.Free()
-			require.Equal(t, paramsToJson(tt.params), paramsToJson(tt.builder.ToYDB(a)))
+			require.Equal(t, paramsToJSON(tt.params), paramsToJSON(tt.builder.ToYDB(a)))
 		})
 	}
 }

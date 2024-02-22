@@ -13,16 +13,16 @@ type (
 		name   string
 		value  value.Value
 	}
-	ParamsBuilder []parameter
+	ParamsBuilder []*parameter
 	Parameters    interface {
 		ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue
 	}
-	parameters []parameter
+	parameters []*parameter
 )
 
-func (qp parameters) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
-	params := make(map[string]*Ydb.TypedValue, len(qp))
-	for _, param := range qp {
+func (parameters parameters) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
+	params := make(map[string]*Ydb.TypedValue, len(parameters))
+	for _, param := range parameters {
 		params[param.name] = value.ToYDB(param.value, a)
 	}
 
@@ -37,22 +37,24 @@ func (b ParamsBuilder) Build() Parameters {
 	return parameters(b)
 }
 
-func (b ParamsBuilder) Param(name string) parameter {
-	return parameter{
+func (b ParamsBuilder) Param(name string) *parameter {
+	return &parameter{
 		parent: b,
 		name:   name,
 		value:  nil,
 	}
 }
 
-func (p parameter) Text(v string) ParamsBuilder {
-	p.value = value.TextValue(v)
-	p.parent = append(p.parent, p)
-	return p.parent
+func (param *parameter) Text(v string) ParamsBuilder {
+	param.value = value.TextValue(v)
+	param.parent = append(param.parent, param)
+
+	return param.parent
 }
 
-func (p parameter) Uint64(v uint64) ParamsBuilder {
-	p.value = value.Uint64Value(v)
-	p.parent = append(p.parent, p)
-	return p.parent
+func (param *parameter) Uint64(v uint64) ParamsBuilder {
+	param.value = value.Uint64Value(v)
+	param.parent = append(param.parent, param)
+
+	return param.parent
 }

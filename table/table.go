@@ -144,7 +144,7 @@ type Session interface {
 		ctx context.Context,
 		tx *TransactionControl,
 		query string,
-		params *QueryParameters,
+		params Parameters,
 		opts ...options.ExecuteDataQueryOption,
 	) (txr Transaction, r result.Result, err error)
 
@@ -167,7 +167,7 @@ type Session interface {
 	StreamExecuteScanQuery(
 		ctx context.Context,
 		query string,
-		params *QueryParameters,
+		params Parameters,
 		opts ...options.ExecuteScanQueryOption,
 	) (_ result.StreamResult, err error)
 
@@ -243,13 +243,13 @@ type TransactionActor interface {
 	Execute(
 		ctx context.Context,
 		query string,
-		params *QueryParameters,
+		params Parameters,
 		opts ...options.ExecuteDataQueryOption,
 	) (result.Result, error)
 	ExecuteStatement(
 		ctx context.Context,
 		stmt Statement,
-		params *QueryParameters,
+		params Parameters,
 		opts ...options.ExecuteDataQueryOption,
 	) (result.Result, error)
 }
@@ -270,7 +270,7 @@ type Statement interface {
 	Execute(
 		ctx context.Context,
 		tx *TransactionControl,
-		params *QueryParameters,
+		params Parameters,
 		opts ...options.ExecuteDataQueryOption,
 	) (txr Transaction, r result.Result, err error)
 	NumInput() int
@@ -464,6 +464,10 @@ type (
 		name  string
 		value value.Value
 	}
+	Parameters interface {
+		ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue
+		String() string
+	}
 	QueryParameters struct {
 		m queryParams
 	}
@@ -473,6 +477,7 @@ func (qp *QueryParameters) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedVa
 	if qp == nil || qp.m == nil {
 		return nil
 	}
+
 	return qp.ToYDB(a)
 }
 
@@ -496,37 +501,21 @@ func (qp queryParams) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
 	return params
 }
 
-func (q *QueryParameters) Params() queryParams {
-	if q == nil {
-		return nil
-	}
-
-	return q.m
-}
-
-func (q *QueryParameters) Count() int {
-	if q == nil {
-		return 0
-	}
-
-	return len(q.m)
-}
-
-func (q *QueryParameters) Each(it func(name string, v value.Value)) {
-	if q == nil {
+func (qp *QueryParameters) Each(it func(name string, v value.Value)) {
+	if qp == nil {
 		return
 	}
-	for key, v := range q.m {
+	for key, v := range qp.m {
 		it(key, v)
 	}
 }
 
-func (q *QueryParameters) names() []string {
-	if q == nil {
+func (qp *QueryParameters) names() []string {
+	if qp == nil {
 		return nil
 	}
-	names := make([]string, 0, len(q.m))
-	for k := range q.m {
+	names := make([]string, 0, len(qp.m))
+	for k := range qp.m {
 		names = append(names, k)
 	}
 	sort.Strings(names)
@@ -534,19 +523,27 @@ func (q *QueryParameters) names() []string {
 	return names
 }
 
-func (q *QueryParameters) String() string {
+func (qp *QueryParameters) Count() int {
+	if qp == nil || qp.m == nil {
+		return 0
+	}
+
+	return len(qp.m)
+}
+
+func (qp *QueryParameters) String() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
 
 	buffer.WriteByte('{')
-	for i, name := range q.names() {
+	for i, name := range qp.names() {
 		if i != 0 {
 			buffer.WriteByte(',')
 		}
 		buffer.WriteByte('"')
 		buffer.WriteString(name)
 		buffer.WriteString("\":")
-		buffer.WriteString(q.m[name].Yql())
+		buffer.WriteString(qp.m[name].Yql())
 	}
 	buffer.WriteByte('}')
 
@@ -562,9 +559,9 @@ func NewQueryParameters(opts ...ParameterOption) *QueryParameters {
 	return q
 }
 
-func (q *QueryParameters) Add(params ...ParameterOption) {
+func (qp *QueryParameters) Add(params ...ParameterOption) {
 	for _, param := range params {
-		q.m[param.Name()] = param.Value()
+		qp.m[param.Name()] = param.Value()
 	}
 }
 

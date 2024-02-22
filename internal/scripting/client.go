@@ -31,15 +31,17 @@ var (
 	errNilClient = xerrors.Wrap(errors.New("scripting client is not initialized"))
 )
 
-type Client struct {
-	config  config.Config
-	service Ydb_Scripting_V1.ScriptingServiceClient
-}
+type (
+	Client struct {
+		config  config.Config
+		service Ydb_Scripting_V1.ScriptingServiceClient
+	}
+)
 
 func (c *Client) Execute(
 	ctx context.Context,
 	query string,
-	params *table.QueryParameters,
+	params table.Parameters,
 ) (r result.Result, err error) {
 	if c == nil {
 		return r, xerrors.WithStackTrace(errNilClient)
@@ -65,7 +67,7 @@ func (c *Client) Execute(
 func (c *Client) execute(
 	ctx context.Context,
 	query string,
-	params *table.QueryParameters,
+	params table.Parameters,
 ) (r result.Result, err error) {
 	var (
 		onDone = trace.ScriptingOnExecute(c.config.Trace(), &ctx,
@@ -192,7 +194,7 @@ func (c *Client) explain(
 func (c *Client) StreamExecute(
 	ctx context.Context,
 	query string,
-	params *table.QueryParameters,
+	params table.Parameters,
 ) (r result.StreamResult, err error) {
 	if c == nil {
 		return r, xerrors.WithStackTrace(errNilClient)
@@ -218,7 +220,7 @@ func (c *Client) StreamExecute(
 func (c *Client) streamExecute(
 	ctx context.Context,
 	query string,
-	params *table.QueryParameters,
+	params table.Parameters,
 ) (r result.StreamResult, err error) {
 	var (
 		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx,

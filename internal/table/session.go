@@ -710,7 +710,7 @@ func (s *session) Execute(
 	ctx context.Context,
 	txControl *table.TransactionControl,
 	query string,
-	params *table.QueryParameters,
+	params table.Parameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
 	txr table.Transaction, r result.Result, err error,
@@ -1102,7 +1102,7 @@ func (s *session) ReadRows(
 func (s *session) StreamExecuteScanQuery(
 	ctx context.Context,
 	query string,
-	params *table.QueryParameters,
+	params table.Parameters,
 	opts ...options.ExecuteScanQueryOption,
 ) (_ result.StreamResult, err error) {
 	var (
