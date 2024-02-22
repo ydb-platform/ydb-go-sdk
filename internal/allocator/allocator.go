@@ -376,7 +376,7 @@ type structAllocator struct {
 func (a *structAllocator) Struct() (v *Ydb.StructType) {
 	v = structPool.Get()
 	if cap(v.Members) <= 0 {
-		v.Members = make([]*Ydb.StructMember, 0, 10)
+		v.Members = make([]*Ydb.StructMember, 0, 10) //nolint:gomnd
 	}
 	a.allocations = append(a.allocations, v)
 

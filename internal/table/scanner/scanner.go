@@ -1172,7 +1172,7 @@ func (s *scanner) errorf(depth int, f string, args ...interface{}) error {
 
 func (s *scanner) typeError(act, exp interface{}) {
 	_ = s.errorf(
-		2,
+		2, //nolint:gomnd
 		"unexpected types during scan at %q %s: %s; want %s",
 		s.path(),
 		s.getType(),
@@ -1184,7 +1184,7 @@ func (s *scanner) typeError(act, exp interface{}) {
 func (s *scanner) valueTypeError(act, exp interface{}) {
 	// unexpected value during scan at \"migration_status\" Int64: NullFlag; want Int64
 	_ = s.errorf(
-		2,
+		2, //nolint:gomnd
 		"unexpected value during scan at %q %s: %s; want %s",
 		s.path(),
 		s.getType(),
@@ -1195,7 +1195,7 @@ func (s *scanner) valueTypeError(act, exp interface{}) {
 
 func (s *scanner) notFoundColumnByIndex(idx int) error {
 	return s.errorf(
-		2,
+		2, //nolint:gomnd
 		"not found %d column",
 		idx,
 	)
@@ -1203,7 +1203,7 @@ func (s *scanner) notFoundColumnByIndex(idx int) error {
 
 func (s *scanner) notFoundColumnName(name string) error {
 	return s.errorf(
-		2,
+		2, //nolint:gomnd
 		"not found column '%s'",
 		name,
 	)
@@ -1211,7 +1211,7 @@ func (s *scanner) notFoundColumnName(name string) error {
 
 func (s *scanner) noColumnError(name string) error {
 	return s.errorf(
-		2,
+		2, //nolint:gomnd
 		"no column %q",
 		name,
 	)
@@ -1219,7 +1219,7 @@ func (s *scanner) noColumnError(name string) error {
 
 func (s *scanner) overflowError(i, n interface{}) error {
 	return s.errorf(
-		2,
+		2, //nolint:gomnd
 		"overflow error: %d overflows capacity of %t",
 		i,
 		n,

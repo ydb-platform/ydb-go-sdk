@@ -77,7 +77,7 @@ type Storage struct {
 }
 
 func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Storage, err error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:gomnd
 	defer cancel()
 
 	s = &Storage{

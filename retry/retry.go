@@ -245,8 +245,10 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 	if options.idempotent {
 		ctx = xcontext.WithIdempotent(ctx, options.idempotent)
 	}
+
 	defer func() {
 		if finalErr != nil && options.stackTrace {
+			//nolint:gomnd
 			finalErr = xerrors.WithStackTrace(finalErr,
 				xerrors.WithSkipDepth(2), // 1 - exit from defer, 1 - exit from Retry call
 			)

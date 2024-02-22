@@ -177,6 +177,7 @@ func sendWriteRequest(send sendFunc, req *Ydb_Topic.StreamWriteMessage_FromClien
 		return sendErr
 	}
 
+	//nolint:gomnd
 	splitIndex := len(grpcMessages) / 2
 	firstMessages, lastMessages := grpcMessages[:splitIndex], grpcMessages[splitIndex:]
 	defer func() {

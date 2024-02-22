@@ -22,11 +22,11 @@ const (
 var (
 	Fast = New(
 		WithSlotDuration(fastSlot),
-		WithCeiling(6),
+		WithCeiling(6), //nolint:gomnd
 	)
 	Slow = New(
 		WithSlotDuration(slowSlot),
-		WithCeiling(6),
+		WithCeiling(6), //nolint:gomnd
 	)
 )
 

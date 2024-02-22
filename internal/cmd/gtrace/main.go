@@ -21,6 +21,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
+const (
+	noTags  = 0
+	oneTag  = 1
+	twoTags = 2
+)
+
 //go:linkname build_goodOSArchFile go/build.(*Context).goodOSArchFile
 //nolint:revive
 func build_goodOSArchFile(*build.Context, string, map[string]bool) bool
@@ -74,7 +80,7 @@ func main() {
 			f, err = os.OpenFile(
 				filepath.Join(workDir, filepath.Clean(name)),
 				os.O_WRONLY|os.O_CREATE|os.O_TRUNC,
-				0o600,
+				0o600, //nolint:gomnd
 			)
 			if err != nil {
 				log.Fatal(err)
@@ -318,16 +324,16 @@ func splitOSArchTags(ctx *build.Context, name string) (base, tags, ext string) {
 	build_goodOSArchFile(ctx, name, fileTags)
 	ext = filepath.Ext(name)
 	switch len(fileTags) {
-	case 0: // *
+	case noTags: // *
 		base = strings.TrimSuffix(name, ext)
 
-	case 1: // *_GOOS or *_GOARCH
+	case oneTag: // *_GOOS or *_GOARCH
 		i := strings.LastIndexByte(name, '_')
 
 		base = name[:i]
 		tags = strings.TrimSuffix(name[i:], ext)
 
-	case 2: // *_GOOS_GOARCH
+	case twoTags: // *_GOOS_GOARCH
 		var i int
 		i = strings.LastIndexByte(name, '_')
 		i = strings.LastIndexByte(name[:i], '_')
