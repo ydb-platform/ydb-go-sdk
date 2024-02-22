@@ -1,4 +1,4 @@
-* Fixed unhandled EOF in topic service
+* Stopped wrapping err error as transport error at topic streams (internals)
 
 ## v3.56.1
 * Fixed fixenv usage (related to tests only)
