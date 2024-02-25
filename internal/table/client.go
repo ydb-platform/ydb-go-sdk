@@ -546,13 +546,11 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (*s
 // Note that Put() must be called only once after being created or received by
 // Get() or Take() calls. In other way it will produce unexpected behavior or
 // panic.
-func (c *Client) Put(ctx context.Context, s *session) error {
-	var (
-		err    error
-		onDone = trace.TableOnPoolPut(c.config.Trace(), &ctx,
-			stack.FunctionID(""),
-			s,
-		)
+func (c *Client) Put(ctx context.Context, s *session) (err error) { //nolint:nonamedreturns
+	// because FAIL TestSessionPoolClose
+	onDone := trace.TableOnPoolPut(c.config.Trace(), &ctx,
+		stack.FunctionID(""),
+		s,
 	)
 	defer func() {
 		onDone(err)

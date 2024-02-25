@@ -176,11 +176,8 @@ func (r *topicStreamReaderImpl) WaitInit(_ context.Context) error {
 func (r *topicStreamReaderImpl) ReadMessageBatch(
 	ctx context.Context,
 	opts ReadMessageBatchOptions,
-) (*PublicBatch, error) {
-	var (
-		batch *PublicBatch
-		err   error
-	)
+) (batch *PublicBatch, err error) {
+	// FAIL TestTopicStreamReaderImpl_BufferCounterOnStopPartition
 	onDone := trace.TopicOnReaderReadMessages(
 		r.cfg.Trace,
 		ctx,

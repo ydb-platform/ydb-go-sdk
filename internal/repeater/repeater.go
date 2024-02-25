@@ -139,8 +139,8 @@ func (r *repeater) Force() {
 	}
 }
 
-func (r *repeater) wakeUp(ctx context.Context, e Event) error {
-	var err error
+func (r *repeater) wakeUp(ctx context.Context, e Event) (err error) {
+	// FAIL TestRepeaterForceLogBackoff by timeout (10m)
 	if err = ctx.Err(); err != nil {
 		return err
 	}
