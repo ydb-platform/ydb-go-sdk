@@ -122,11 +122,9 @@ func withCreateSessionOnClose(onClose func(s *session)) createSessionOption {
 	}
 }
 
-func (c *Client) createSession(ctx context.Context, opts ...createSessionOption) (*session, error) {
-	var (
-		s       *session
-		options = createSessionOptions{}
-	)
+//nolint:nonamedreturns //because FAIL native example test
+func (c *Client) createSession(ctx context.Context, opts ...createSessionOption) (s *session, _ error) {
+	options := createSessionOptions{}
 	for _, o := range opts {
 		if o != nil {
 			o(&options)
@@ -373,7 +371,8 @@ func withTrace(t *trace.Table) getOption {
 	}
 }
 
-func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (*session, error) {
+//nolint:nonamedreturns //because FAIL native example test
+func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *session, err error) {
 	if c.isClosed() {
 		return nil, xerrors.WithStackTrace(errClosedClient)
 	}
@@ -389,11 +388,7 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (*sessi
 		}
 	}
 
-	var (
-		s      *session
-		err    error
-		onDone = trace.TableOnPoolGet(o.t, &ctx, stack.FunctionID(""))
-	)
+	onDone := trace.TableOnPoolGet(o.t, &ctx, stack.FunctionID(""))
 	defer func() {
 		onDone(s, i, err)
 	}()
@@ -832,6 +827,7 @@ func (c *Client) internalPoolPutWaitCh(ch *chan *session) { //nolint:gocritic
 	c.waitChPool.Put(ch)
 }
 
+// FAIL native
 // c.mu must be held.
 func (c *Client) internalPoolPeekFirstIdle() (*session, time.Time) {
 	var (
