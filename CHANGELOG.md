@@ -1,3 +1,4 @@
+* Fixed return private error for commit to stopped partition in topic reader.
 * Stopped wrapping err error as transport error at topic streams (internals)
 
 ## v3.56.1
