@@ -717,14 +717,14 @@ func (s *session) Prepare(ctx context.Context, queryText string) (table.Statemen
 }
 
 // Execute executes given data query represented by text.
-func (s *session) Execute(
+func (s *session) Execute( //nolint:nonamedreturns //because FAIL: TestBasicExampleNative
 	ctx context.Context,
 	txControl *table.TransactionControl,
 	query string,
 	params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
-	table.Transaction, result.Result, error,
+	txr table.Transaction, r result.Result, err error,
 ) {
 	var (
 		a       = allocator.New()
@@ -734,9 +734,6 @@ func (s *session) Execute(
 			IgnoreTruncated:         s.config.IgnoreTruncated(),
 		}
 		callOptions []grpc.CallOption
-		txr         table.Transaction
-		r           result.Result
-		err         error
 	)
 	defer a.Free()
 
@@ -1243,10 +1240,10 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows value.Value
 
 // BeginTransaction begins new transaction within given session with given
 // settings.
-func (s *session) BeginTransaction(
+func (s *session) BeginTransaction( //nolint:nonamedreturns //because FAIL: TestBasicExampleNative
 	ctx context.Context,
 	txSettings *table.TransactionSettings,
-) (table.Transaction, error) {
+) (x table.Transaction, err error) {
 	var (
 		result   Ydb_Table.BeginTransactionResult
 		response *Ydb_Table.BeginTransactionResponse
@@ -1255,8 +1252,6 @@ func (s *session) BeginTransaction(
 			stack.FunctionID(""),
 			s,
 		)
-		x   table.Transaction
-		err error
 	)
 	defer func() {
 		onDone(x, err)

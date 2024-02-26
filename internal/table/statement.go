@@ -24,12 +24,12 @@ type statement struct {
 }
 
 // Execute executes prepared data query.
-func (s *statement) Execute(
+func (s *statement) Execute( //nolint:nonamedreturns //because FAIL: TestBasicExampleNative
 	ctx context.Context, txControl *table.TransactionControl,
 	params *table.QueryParameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
-	table.Transaction, result.Result, error,
+	txr table.Transaction, r result.Result, err error,
 ) {
 	var (
 		a       = allocator.New()
@@ -38,9 +38,6 @@ func (s *statement) Execute(
 			IgnoreTruncated:         s.session.config.IgnoreTruncated(),
 		}
 		callOptions []grpc.CallOption
-		txr         table.Transaction
-		r           result.Result
-		err         error
 	)
 	defer a.Free()
 

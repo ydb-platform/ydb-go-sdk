@@ -173,7 +173,7 @@ func (r *topicStreamReaderImpl) WaitInit(_ context.Context) error {
 	return nil
 }
 
-func (r *topicStreamReaderImpl) ReadMessageBatch(
+func (r *topicStreamReaderImpl) ReadMessageBatch( //nolint:nonamedreturns
 	ctx context.Context,
 	opts ReadMessageBatchOptions,
 ) (batch *PublicBatch, err error) {

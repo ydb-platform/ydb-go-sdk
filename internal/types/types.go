@@ -259,7 +259,7 @@ func (v *Dict) ToYDB(a *allocator.Allocator) *Ydb.Type {
 	return t
 }
 
-func NewDict(key, value Type) (v *Dict) {
+func NewDict(key, value Type) *Dict {
 	return &Dict{
 		keyType:   key,
 		valueType: value,
@@ -655,7 +655,7 @@ func (v *Struct) ToYDB(a *allocator.Allocator) *Ydb.Type {
 	return t
 }
 
-func NewStruct(fields ...StructField) (v *Struct) {
+func NewStruct(fields ...StructField) *Struct {
 	return &Struct{
 		fields: fields,
 	}
@@ -741,7 +741,7 @@ func (v *Tuple) ToYDB(a *allocator.Allocator) *Ydb.Type {
 	return t
 }
 
-func NewTuple(items ...Type) (v *Tuple) {
+func NewTuple(items ...Type) *Tuple {
 	return &Tuple{
 		innerTypes: items,
 	}

@@ -139,7 +139,7 @@ func (r *repeater) Force() {
 	}
 }
 
-func (r *repeater) wakeUp(ctx context.Context, e Event) (err error) {
+func (r *repeater) wakeUp(ctx context.Context, e Event) (err error) { //nolint:nonamedreturns
 	// FAIL TestRepeaterForceLogBackoff by timeout (10m)
 	if err = ctx.Err(); err != nil {
 		return err
