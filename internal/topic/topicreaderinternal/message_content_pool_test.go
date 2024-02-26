@@ -25,7 +25,6 @@ func BenchmarkConsumeContent(b *testing.B) {
 		msg.dataConsumed = false
 		msg.data = newOneTimeReader(reader)
 		err := msg.UnmarshalTo(emptyConsumer{})
-
 		if err != nil {
 			b.Fatal()
 		}

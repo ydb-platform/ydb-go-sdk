@@ -50,7 +50,6 @@ func Lt(lhs, rhs string) bool {
 	}
 
 	v2, err := parse(rhs)
-
 	if err != nil {
 		return false
 	}
@@ -66,7 +65,6 @@ func Gte(lhs, rhs string) bool {
 	}
 
 	v2, err := parse(rhs)
-
 	if err != nil {
 		return false
 	}

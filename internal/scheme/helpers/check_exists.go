@@ -85,7 +85,6 @@ func IsEntryExists(ctx context.Context, c schemeClient, absPath string, entryTyp
 	}
 
 	d, err := c.ListDirectory(ctx, directory)
-
 	if err != nil {
 		return false, xerrors.WithStackTrace(fmt.Errorf(
 			"list directory '%s' failed: %w",

@@ -235,7 +235,6 @@ func (s *rawConverter) TzDatetime() (v time.Time) {
 	}
 
 	src, err := value.TzDatetimeToTime(s.text())
-
 	if err != nil {
 		_ = s.errorf(0, "rawConverter.TzDatetime(): %w", err)
 	}
@@ -251,7 +250,6 @@ func (s *rawConverter) TzTimestamp() (v time.Time) {
 	}
 
 	src, err := value.TzTimestampToTime(s.text())
-
 	if err != nil {
 		_ = s.errorf(0, "rawConverter.TzTimestamp(): %w", err)
 	}

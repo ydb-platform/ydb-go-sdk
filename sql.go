@@ -66,7 +66,6 @@ func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, erro
 	}
 
 	db, err := Open(context.Background(), "", With(opts...))
-
 	if err != nil {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("failed to connect by data source name '%s': %w", dataSourceName, err))
 	}

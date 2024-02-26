@@ -58,7 +58,6 @@ func TestSessionKeepAlive(t *testing.T) {
 		),
 	}
 	s, err := b.createSession(ctx)
-
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +122,6 @@ func TestSessionDescribeTable(t *testing.T) {
 		),
 	}
 	s, err := b.createSession(ctx)
-
 	if err != nil {
 		t.Fatal(err)
 	}

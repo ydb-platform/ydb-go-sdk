@@ -119,7 +119,6 @@ func (tx *tx) Rollback() (finalErr error) {
 	}()
 
 	err := tx.tx.Rollback(tx.txCtx)
-
 	if err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
@@ -153,7 +152,6 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 	}
 
 	query, params, err := tx.conn.normalize(query, args...)
-
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -161,7 +159,6 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 	res, err := tx.tx.Execute(ctx,
 		query, params, tx.conn.dataQueryOptions(ctx)...,
 	)
-
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
@@ -202,7 +199,6 @@ func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.Named
 	}
 
 	query, params, err := tx.conn.normalize(query, args...)
-
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

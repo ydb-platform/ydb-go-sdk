@@ -98,7 +98,6 @@ func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
 func (r *rows) NextResultSet() (finalErr error) {
 	r.nextSet.Do(func() {})
 	err := r.result.NextResultSetErr(context.Background())
-
 	if err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}

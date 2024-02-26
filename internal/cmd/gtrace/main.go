@@ -59,7 +59,6 @@ func main() {
 
 	buildCtx := build.Default
 	buildPkg, err := buildCtx.ImportDir(workDir, build.IgnoreVendor)
-
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -159,7 +158,6 @@ func main() {
 		Importer:                 importer.ForCompiler(fset, "source", nil),
 	}
 	pkg, err := conf.Check(".", fset, astFiles, info)
-
 	if err != nil {
 		panic(fmt.Sprintf("type error: %v", err))
 	}
@@ -255,7 +253,6 @@ func main() {
 			}
 
 			f, err := buildFunc(info, traces, fn)
-
 			if err != nil {
 				log.Printf(
 					"skipping hook %s due to error: %v",

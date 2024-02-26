@@ -25,7 +25,6 @@ import (
 func Example_table() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
-
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -324,7 +323,6 @@ func Example_databaseSQLBindAutoDeclareOverConnector() {
 func Example_topic() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
-
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
 
@@ -362,7 +360,6 @@ func Example_topic() {
 func Example_scripting() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
-
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 
@@ -410,7 +407,6 @@ func Example_scripting() {
 func Example_discovery() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
-
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 
@@ -418,7 +414,6 @@ func Example_discovery() {
 	}
 	defer db.Close(ctx) // cleanup resources
 	endpoints, err := db.Discovery().Discover(ctx)
-
 	if err != nil {
 		fmt.Printf("discover failed: %v", err)
 
@@ -445,7 +440,6 @@ func Example_enableGzipCompressionForAllRequests() {
 			),
 		)),
 	)
-
 	if err != nil {
 		fmt.Printf("Driver failed: %v", err)
 	}
@@ -457,7 +451,6 @@ func Example_enableGzipCompressionForAllRequests() {
 func ExampleOpen() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2135/local")
-
 	if err != nil {
 		fmt.Printf("Driver failed: %v", err)
 	}
@@ -479,7 +472,6 @@ func ExampleOpen_advanced() {
 		),
 		ydb.WithSessionPoolSizeLimit(100),
 	)
-
 	if err != nil {
 		fmt.Printf("Driver failed: %v", err)
 	}

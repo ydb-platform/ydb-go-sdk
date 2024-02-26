@@ -293,7 +293,6 @@ func (s *scanner) writePathTo(w io.Writer) (n int64, err error) {
 	x := s.stack.current()
 	st := x.name
 	m, err := io.WriteString(w, st)
-
 	if err != nil {
 		return n, xerrors.WithStackTrace(err)
 	}

@@ -68,7 +68,6 @@ func nodeID(sessionID string) (uint32, error) {
 	}
 
 	id, err := strconv.ParseUint(u.Query().Get("node_id"), 10, 32)
-
 	if err != nil {
 		return 0, err
 	}

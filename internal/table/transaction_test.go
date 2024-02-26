@@ -72,7 +72,6 @@ func TestTxSkipRollbackForCommitted(t *testing.T) {
 		),
 	}
 	s, err := b.createSession(context.Background())
-
 	if err != nil {
 		t.Fatal(err)
 	}

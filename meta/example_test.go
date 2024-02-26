@@ -15,7 +15,6 @@ import (
 func Example_consumedUnitsCount() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
-
 	if err != nil {
 		log.Fatal(err)
 	}

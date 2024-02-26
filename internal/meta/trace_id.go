@@ -25,7 +25,6 @@ func TraceID(ctx context.Context, opts ...func(opts *newTraceIDOpts)) (context.C
 	}
 
 	uuid, err := options.newRandom()
-
 	if err != nil {
 		return ctx, "", xerrors.WithStackTrace(err)
 	}

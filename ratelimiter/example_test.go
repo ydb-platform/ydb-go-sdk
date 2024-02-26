@@ -3,6 +3,7 @@ package ratelimiter_test
 import (
 	"context"
 	"fmt"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
@@ -11,7 +12,6 @@ import (
 func Example() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
-
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 

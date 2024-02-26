@@ -183,7 +183,6 @@ func (d *MessageData) ToProto() (*Ydb_Topic.StreamWriteMessage_WriteRequest_Mess
 		UncompressedSize: d.UncompressedSize,
 	}
 	err := d.Partitioning.setToProtoMessage(res)
-
 	if err != nil {
 		return nil, err
 	}

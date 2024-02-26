@@ -3,12 +3,13 @@ package topic_test
 import (
 	"context"
 	"fmt"
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
-	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 	"io"
 	"log"
 	"os"
+
+	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
 func Example_createTopic() {
@@ -20,7 +21,6 @@ func Example_createTopic() {
 	}
 
 	db, err := ydb.Open(ctx, connectionString)
-
 	if err != nil {
 		log.Printf("failed connect: %v", err)
 
@@ -52,7 +52,6 @@ func Example_alterTopic() {
 	}
 
 	db, err := ydb.Open(ctx, connectionString)
-
 	if err != nil {
 		log.Printf("failed connect: %v", err)
 
@@ -82,7 +81,6 @@ func Example_describeTopic() {
 	}
 
 	db, err := ydb.Open(ctx, connectionString)
-
 	if err != nil {
 		log.Printf("failed connect: %v", err)
 
@@ -109,7 +107,6 @@ func Example_dropTopic() {
 	}
 
 	db, err := ydb.Open(ctx, connectionString)
-
 	if err != nil {
 		log.Printf("failed connect: %v", err)
 
@@ -134,7 +131,6 @@ func Example_readMessage() {
 	}
 
 	db, err := ydb.Open(ctx, connectionString)
-
 	if err != nil {
 		log.Printf("failed connect: %v", err)
 

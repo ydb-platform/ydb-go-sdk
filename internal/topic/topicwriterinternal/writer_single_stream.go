@@ -68,7 +68,6 @@ func NewSingleStreamWriter(
 ) (*SingleStreamWriter, error) {
 	res := newSingleStreamWriterStopped(ctxForPProfLabelsOnly, cfg)
 	err := res.initStream()
-
 	if err != nil {
 		_ = res.close(context.Background(), err)
 
@@ -134,7 +133,6 @@ func (w *SingleStreamWriter) initStream() (err error) {
 	}
 
 	recvMessage, err := w.cfg.stream.Recv()
-
 	if err != nil {
 		return err
 	}

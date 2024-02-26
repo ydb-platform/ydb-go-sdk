@@ -80,7 +80,6 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 	}
 
 	cc, err := grpc.DialContext(ctx, c.endpoint, c.opts...)
-
 	if err != nil {
 		return "", xerrors.WithStackTrace(
 			fmt.Errorf("dial failed: %w", err),

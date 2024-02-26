@@ -144,7 +144,6 @@ func compareTuplesOrLists(lhs, rhs []*Ydb.TypedValue) (int, error) {
 
 		rval := rhs[i]
 		cmp, err := compare(lval, rval)
-
 		if err != nil {
 			return 0, xerrors.WithStackTrace(err)
 		}
@@ -170,7 +169,6 @@ func compareStructs(lhs, rhs []*Ydb.TypedValue) (int, error) {
 
 		rval := rhs[i]
 		cmp, err := compare(lval, rval)
-
 		if err != nil {
 			return 0, xerrors.WithStackTrace(err)
 		}
@@ -331,13 +329,11 @@ func compareDyNumber(l, r *Ydb.Value) (int, error) {
 	ll := l.GetTextValue()
 	rr := r.GetTextValue()
 	lf, _, err := big.ParseFloat(ll, 10, 127, big.ToNearestEven)
-
 	if err != nil {
 		return 0, xerrors.WithStackTrace(err)
 	}
 
 	rf, _, err := big.ParseFloat(rr, 10, 127, big.ToNearestEven)
-
 	if err != nil {
 		return 0, err
 	}

@@ -273,7 +273,6 @@ func New(
 	d, err := internalDiscovery.New(ctx, pool.Get(
 		endpoint.New(driverConfig.Endpoint()),
 	), discoveryConfig)
-
 	if err != nil {
 		return nil, err
 	}

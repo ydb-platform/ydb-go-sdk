@@ -3,13 +3,13 @@ package scheme_test
 import (
 	"context"
 	"fmt"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 )
 
 func Example() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
-
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 
@@ -23,7 +23,6 @@ func Example() {
 	}
 
 	d, err := db.Scheme().ListDirectory(ctx, "/local/test")
-
 	if err != nil {
 		fmt.Printf("failed to list directory: %v", err)
 	}

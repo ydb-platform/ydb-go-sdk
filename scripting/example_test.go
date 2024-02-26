@@ -3,6 +3,7 @@ package scripting_test
 import (
 	"context"
 	"fmt"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
@@ -12,7 +13,6 @@ import (
 func Example_execute() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
-
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 
@@ -59,7 +59,6 @@ func Example_execute() {
 func Example_streamExecute() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
-
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 
@@ -107,7 +106,6 @@ func Example_streamExecute() {
 func Example_explainPlan() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
-
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 
@@ -119,7 +117,6 @@ func Example_explainPlan() {
 		"SELECT 1+1",
 		scripting.ExplainModePlan,
 	)
-
 	if err != nil {
 		fmt.Printf("Explain failed: %v", err)
 
@@ -138,7 +135,6 @@ func Example_explainPlan() {
 func Example_explainValidate() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
-
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 

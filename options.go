@@ -84,7 +84,6 @@ func WithConnectionString(connectionString string) Option {
 		}
 
 		info, err := dsn.Parse(connectionString)
-
 		if err != nil {
 			return xerrors.WithStackTrace(
 				fmt.Errorf("parse connection string '%s' failed: %w", connectionString, err),

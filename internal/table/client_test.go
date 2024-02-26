@@ -784,7 +784,6 @@ func mustGetSession(t testing.TB, p *Client) *session {
 	defer wg.Wait()
 
 	s, err := p.Get(context.Background())
-
 	if err != nil {
 		t.Helper()
 		t.Fatalf("%s: %v", caller(), err)

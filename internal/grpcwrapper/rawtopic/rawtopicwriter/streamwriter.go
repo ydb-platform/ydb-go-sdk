@@ -190,7 +190,6 @@ func sendWriteRequest(send sendFunc, req *Ydb_Topic.StreamWriteMessage_FromClien
 
 	req.WriteRequest.Messages = firstMessages
 	err := sendWriteRequest(send, req)
-
 	if err != nil {
 		return err
 	}

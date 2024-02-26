@@ -2,9 +2,10 @@ package metrics_test
 
 import (
 	"context"
+	"os"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/metrics"
-	"os"
 )
 
 func ExampleConfig() {
@@ -14,7 +15,6 @@ func ExampleConfig() {
 		os.Getenv("YDB_CONNECTION_STRING"),
 		metrics.WithTraces(registryConfig),
 	)
-
 	if err != nil {
 		panic(err)
 	}

@@ -65,7 +65,6 @@ func TzDateToTime(s string) (t time.Time, err error) {
 	}
 
 	location, err := time.LoadLocation(ss[1])
-
 	if err != nil {
 		return t, xerrors.WithStackTrace(err)
 	}
