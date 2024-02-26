@@ -25,6 +25,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -32,7 +33,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -352,7 +352,7 @@ func (s *session) DescribeTable(
 	for i, c := range result.Columns {
 		cs[i] = options.Column{
 			Name:   c.GetName(),
-			Type:   value.TypeFromYDB(c.GetType()),
+			Type:   types.TypeFromYDB(c.GetType()),
 			Family: c.GetFamily(),
 		}
 	}
@@ -361,7 +361,7 @@ func (s *session) DescribeTable(
 		[]options.KeyRange,
 		len(result.GetShardKeyBounds())+1,
 	)
-	var last types.Value
+	var last value.Value
 	for i, b := range result.GetShardKeyBounds() {
 		if last != nil {
 			rs[i].From = last
@@ -1073,7 +1073,7 @@ func (s *session) StreamReadTable(
 func (s *session) ReadRows(
 	ctx context.Context,
 	path string,
-	keys types.Value,
+	keys value.Value,
 	opts ...options.ReadRowsOption,
 ) (result.Result, error) {
 	var (
@@ -1199,7 +1199,7 @@ func (s *session) StreamExecuteScanQuery(
 }
 
 // BulkUpsert uploads given list of ydb struct values to the table.
-func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value,
+func (s *session) BulkUpsert(ctx context.Context, table string, rows value.Value,
 	opts ...options.BulkUpsertOption,
 ) error {
 	var (

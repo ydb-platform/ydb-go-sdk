@@ -14,12 +14,13 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 type Value interface {
-	Type() Type
+	Type() types.Type
 	Yql() string
 
 	castTo(dst interface{}) error
@@ -29,7 +30,7 @@ type Value interface {
 func ToYDB(v Value, a *allocator.Allocator) *Ydb.TypedValue {
 	tv := a.TypedValue()
 
-	tv.Type = v.Type().toYDB(a)
+	tv.Type = v.Type().ToYDB(a)
 	tv.Value = v.toYDB(a)
 
 	return tv
@@ -53,16 +54,16 @@ func FromYDB(t *Ydb.Type, v *Ydb.Value) Value {
 	return vv
 }
 
-func nullValueFromYDB(x *Ydb.Value, t Type) (Value, bool) {
+func nullValueFromYDB(x *Ydb.Value, t types.Type) (Value, bool) {
 	for {
 		switch xx := x.Value.(type) {
 		case *Ydb.Value_NestedValue:
 			x = xx.NestedValue
 		case *Ydb.Value_NullFlagValue:
 			switch tt := t.(type) {
-			case optionalType:
-				return NullValue(tt.innerType), true
-			case voidType:
+			case types.Optional:
+				return NullValue(tt.InnerType()), true
+			case types.Void:
 				return VoidValue(), true
 			default:
 				return nil, false
@@ -73,57 +74,57 @@ func nullValueFromYDB(x *Ydb.Value, t Type) (Value, bool) {
 	}
 }
 
-func primitiveValueFromYDB(t PrimitiveType, v *Ydb.Value) (Value, error) {
+func primitiveValueFromYDB(t types.Primitive, v *Ydb.Value) (Value, error) {
 	switch t {
-	case TypeBool:
+	case types.Bool:
 		return BoolValue(v.GetBoolValue()), nil
 
-	case TypeInt8:
+	case types.Int8:
 		return Int8Value(int8(v.GetInt32Value())), nil
 
-	case TypeInt16:
+	case types.Int16:
 		return Int16Value(int16(v.GetInt32Value())), nil
 
-	case TypeInt32:
+	case types.Int32:
 		return Int32Value(v.GetInt32Value()), nil
 
-	case TypeInt64:
+	case types.Int64:
 		return Int64Value(v.GetInt64Value()), nil
 
-	case TypeUint8:
+	case types.Uint8:
 		return Uint8Value(uint8(v.GetUint32Value())), nil
 
-	case TypeUint16:
+	case types.Uint16:
 		return Uint16Value(uint16(v.GetUint32Value())), nil
 
-	case TypeUint32:
+	case types.Uint32:
 		return Uint32Value(v.GetUint32Value()), nil
 
-	case TypeUint64:
+	case types.Uint64:
 		return Uint64Value(v.GetUint64Value()), nil
 
-	case TypeDate:
+	case types.Date:
 		return DateValue(v.GetUint32Value()), nil
 
-	case TypeDatetime:
+	case types.Datetime:
 		return DatetimeValue(v.GetUint32Value()), nil
 
-	case TypeInterval:
+	case types.Interval:
 		return IntervalValue(v.GetInt64Value()), nil
 
-	case TypeTimestamp:
+	case types.Timestamp:
 		return TimestampValue(v.GetUint64Value()), nil
 
-	case TypeFloat:
+	case types.Float:
 		return FloatValue(v.GetFloatValue()), nil
 
-	case TypeDouble:
+	case types.Double:
 		return DoubleValue(v.GetDoubleValue()), nil
 
-	case TypeText:
+	case types.Text:
 		return TextValue(v.GetTextValue()), nil
 
-	case TypeYSON:
+	case types.YSON:
 		switch vv := v.GetValue().(type) {
 		case *Ydb.Value_TextValue:
 			return YSONValue(xstring.ToBytes(vv.TextValue)), nil
@@ -133,28 +134,28 @@ func primitiveValueFromYDB(t PrimitiveType, v *Ydb.Value) (Value, error) {
 			return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered YSON internal type: %T", vv))
 		}
 
-	case TypeJSON:
+	case types.JSON:
 		return JSONValue(v.GetTextValue()), nil
 
-	case TypeJSONDocument:
+	case types.JSONDocument:
 		return JSONDocumentValue(v.GetTextValue()), nil
 
-	case TypeDyNumber:
+	case types.DyNumber:
 		return DyNumberValue(v.GetTextValue()), nil
 
-	case TypeTzDate:
+	case types.TzDate:
 		return TzDateValue(v.GetTextValue()), nil
 
-	case TypeTzDatetime:
+	case types.TzDatetime:
 		return TzDatetimeValue(v.GetTextValue()), nil
 
-	case TypeTzTimestamp:
+	case types.TzTimestamp:
 		return TzTimestampValue(v.GetTextValue()), nil
 
-	case TypeBytes:
+	case types.Bytes:
 		return BytesValue(v.GetBytesValue()), nil
 
-	case TypeUUID:
+	case types.UUID:
 		return UUIDValue(BigEndianUint128(v.High_128, v.GetLow_128())), nil
 
 	default:
@@ -163,26 +164,26 @@ func primitiveValueFromYDB(t PrimitiveType, v *Ydb.Value) (Value, error) {
 }
 
 func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
-	tt := TypeFromYDB(t)
+	tt := types.TypeFromYDB(t)
 
 	if vv, ok := nullValueFromYDB(v, tt); ok {
 		return vv, nil
 	}
 
 	switch ttt := tt.(type) {
-	case PrimitiveType:
+	case types.Primitive:
 		return primitiveValueFromYDB(ttt, v)
 
-	case voidType:
+	case types.Void:
 		return VoidValue(), nil
 
-	case nullType:
+	case types.Null:
 		return NullValue(tt), nil
 
-	case *DecimalType:
-		return DecimalValue(BigEndianUint128(v.High_128, v.GetLow_128()), ttt.Precision, ttt.Scale), nil
+	case *types.Decimal:
+		return DecimalValue(BigEndianUint128(v.High_128, v.GetLow_128()), ttt.Precision(), ttt.Scale()), nil
 
-	case optionalType:
+	case types.Optional:
 		t = t.Type.(*Ydb.Type_OptionalType).OptionalType.Item
 		if nestedValue, ok := v.Value.(*Ydb.Value_NestedValue); ok {
 			return OptionalValue(FromYDB(t, nestedValue.NestedValue)), nil
@@ -190,96 +191,96 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 
 		return OptionalValue(FromYDB(t, v)), nil
 
-	case *listType:
+	case *types.List:
 		return ListValue(func() []Value {
 			vv := make([]Value, len(v.GetItems()))
 			a := allocator.New()
 			defer a.Free()
 			for i, vvv := range v.GetItems() {
-				vv[i] = FromYDB(ttt.itemType.toYDB(a), vvv)
+				vv[i] = FromYDB(ttt.ItemType().ToYDB(a), vvv)
 			}
 
 			return vv
 		}()...), nil
 
-	case *TupleType:
+	case *types.Tuple:
 		return TupleValue(func() []Value {
 			vv := make([]Value, len(v.GetItems()))
 			a := allocator.New()
 			defer a.Free()
 			for i, vvv := range v.GetItems() {
-				vv[i] = FromYDB(ttt.items[i].toYDB(a), vvv)
+				vv[i] = FromYDB(ttt.ItemType(i).ToYDB(a), vvv)
 			}
 
 			return vv
 		}()...), nil
 
-	case *StructType:
+	case *types.Struct:
 		return StructValue(func() []StructValueField {
 			vv := make([]StructValueField, len(v.GetItems()))
 			a := allocator.New()
 			defer a.Free()
 			for i, vvv := range v.GetItems() {
 				vv[i] = StructValueField{
-					Name: ttt.fields[i].Name,
-					V:    FromYDB(ttt.fields[i].T.toYDB(a), vvv),
+					Name: ttt.Field(i).Name,
+					V:    FromYDB(ttt.Field(i).T.ToYDB(a), vvv),
 				}
 			}
 
 			return vv
 		}()...), nil
 
-	case *dictType:
+	case *types.Dict:
 		return DictValue(func() []DictValueField {
 			vv := make([]DictValueField, len(v.GetPairs()))
 			a := allocator.New()
 			defer a.Free()
 			for i, vvv := range v.GetPairs() {
 				vv[i] = DictValueField{
-					K: FromYDB(ttt.keyType.toYDB(a), vvv.Key),
-					V: FromYDB(ttt.valueType.toYDB(a), vvv.Payload),
+					K: FromYDB(ttt.KeyType().ToYDB(a), vvv.Key),
+					V: FromYDB(ttt.ValueType().ToYDB(a), vvv.Payload),
 				}
 			}
 
 			return vv
 		}()...), nil
 
-	case *setType:
+	case *types.Set:
 		return SetValue(func() []Value {
 			vv := make([]Value, len(v.GetPairs()))
 			a := allocator.New()
 			defer a.Free()
 			for i, vvv := range v.GetPairs() {
-				vv[i] = FromYDB(ttt.itemType.toYDB(a), vvv.Key)
+				vv[i] = FromYDB(ttt.ItemType().ToYDB(a), vvv.Key)
 			}
 
 			return vv
 		}()...), nil
 
-	case *variantStructType:
+	case *types.VariantStruct:
 		a := allocator.New()
 		defer a.Free()
 
 		return VariantValueStruct(
 			FromYDB(
-				ttt.StructType.fields[v.VariantIndex].T.toYDB(a),
+				ttt.Struct.Field(int(v.VariantIndex)).T.ToYDB(a),
 				v.Value.(*Ydb.Value_NestedValue).NestedValue,
 			),
-			ttt.StructType.fields[v.VariantIndex].Name,
-			ttt.StructType,
+			ttt.Struct.Field(int(v.VariantIndex)).Name,
+			ttt.Struct,
 		), nil
 
-	case *variantTupleType:
+	case *types.VariantTuple:
 		a := allocator.New()
 		defer a.Free()
 
 		return VariantValueTuple(
 			FromYDB(
-				ttt.TupleType.items[v.VariantIndex].toYDB(a),
+				ttt.Tuple.ItemType(int(v.VariantIndex)).ToYDB(a),
 				v.Value.(*Ydb.Value_NestedValue).NestedValue,
 			),
 			v.VariantIndex,
-			ttt.TupleType,
+			ttt.Tuple,
 		), nil
 
 	default:
@@ -308,8 +309,8 @@ func (v boolValue) Yql() string {
 	return strconv.FormatBool(bool(v))
 }
 
-func (boolValue) Type() Type {
-	return TypeBool
+func (boolValue) Type() types.Type {
+	return types.Bool
 }
 
 func (v boolValue) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -356,8 +357,8 @@ func (v dateValue) Yql() string {
 	return fmt.Sprintf("%s(%q)", v.Type().Yql(), DateToTime(uint32(v)).UTC().Format(LayoutDate))
 }
 
-func (dateValue) Type() Type {
-	return TypeDate
+func (dateValue) Type() types.Type {
+	return types.Date
 }
 
 func (v dateValue) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -409,8 +410,8 @@ func (v datetimeValue) Yql() string {
 	return fmt.Sprintf("%s(%q)", v.Type().Yql(), DatetimeToTime(uint32(v)).UTC().Format(LayoutDatetime))
 }
 
-func (datetimeValue) Type() Type {
-	return TypeDatetime
+func (datetimeValue) Type() types.Type {
+	return types.Datetime
 }
 
 func (v datetimeValue) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -436,7 +437,7 @@ var _ DecimalValuer = (*decimalValue)(nil)
 
 type decimalValue struct {
 	value     [16]byte
-	innerType *DecimalType
+	innerType *types.Decimal
 }
 
 func (v *decimalValue) Value() [16]byte {
@@ -444,11 +445,11 @@ func (v *decimalValue) Value() [16]byte {
 }
 
 func (v *decimalValue) Precision() uint32 {
-	return v.innerType.Precision
+	return v.innerType.Precision()
 }
 
 func (v *decimalValue) Scale() uint32 {
-	return v.innerType.Scale
+	return v.innerType.Scale()
 }
 
 type DecimalValuer interface {
@@ -467,19 +468,19 @@ func (v *decimalValue) Yql() string {
 	buffer.WriteString(v.innerType.Name())
 	buffer.WriteByte('(')
 	buffer.WriteByte('"')
-	s := decimal.FromBytes(v.value[:], v.innerType.Precision, v.innerType.Scale).String()
-	buffer.WriteString(s[:len(s)-int(v.innerType.Scale)] + "." + s[len(s)-int(v.innerType.Scale):])
+	s := decimal.FromBytes(v.value[:], v.innerType.Precision(), v.innerType.Scale()).String()
+	buffer.WriteString(s[:len(s)-int(v.innerType.Scale())] + "." + s[len(s)-int(v.innerType.Scale()):])
 	buffer.WriteByte('"')
 	buffer.WriteByte(',')
-	buffer.WriteString(strconv.FormatUint(uint64(v.innerType.Precision), 10))
+	buffer.WriteString(strconv.FormatUint(uint64(v.innerType.Precision()), 10))
 	buffer.WriteByte(',')
-	buffer.WriteString(strconv.FormatUint(uint64(v.innerType.Scale), 10))
+	buffer.WriteString(strconv.FormatUint(uint64(v.innerType.Scale()), 10))
 	buffer.WriteByte(')')
 
 	return buffer.String()
 }
 
-func (v *decimalValue) Type() Type {
+func (v *decimalValue) Type() types.Type {
 	return v.innerType
 }
 
@@ -507,10 +508,10 @@ func DecimalValueFromBigInt(v *big.Int, precision, scale uint32) *decimalValue {
 func DecimalValue(v [16]byte, precision, scale uint32) *decimalValue {
 	return &decimalValue{
 		value: v,
-		innerType: &DecimalType{
-			Precision: precision,
-			Scale:     scale,
-		},
+		innerType: types.NewDecimal(
+			precision,
+			scale,
+		),
 	}
 }
 
@@ -520,7 +521,7 @@ type (
 		V Value
 	}
 	dictValue struct {
-		t      Type
+		t      types.Type
 		values []DictValueField
 	}
 )
@@ -555,7 +556,7 @@ func (v *dictValue) Yql() string {
 	return buffer.String()
 }
 
-func (v *dictValue) Type() Type {
+func (v *dictValue) Type() types.Type {
 	return v.t
 }
 
@@ -582,12 +583,12 @@ func DictValue(values ...DictValueField) *dictValue {
 	sort.Slice(values, func(i, j int) bool {
 		return values[i].K.Yql() < values[j].K.Yql()
 	})
-	var t Type
+	var t types.Type
 	switch {
 	case len(values) > 0:
-		t = Dict(values[0].K.Type(), values[0].V.Type())
+		t = types.NewDict(values[0].K.Type(), values[0].V.Type())
 	default:
-		t = EmptyDict()
+		t = types.NewEmptyDict()
 	}
 
 	return &dictValue{
@@ -623,8 +624,8 @@ func (v *doubleValue) Yql() string {
 	return fmt.Sprintf("%s(\"%v\")", v.Type().Yql(), v.value)
 }
 
-func (*doubleValue) Type() Type {
-	return TypeDouble
+func (*doubleValue) Type() types.Type {
+	return types.Double
 }
 
 func (v *doubleValue) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -664,8 +665,8 @@ func (v dyNumberValue) Yql() string {
 	return fmt.Sprintf("%s(%q)", v.Type().Yql(), string(v))
 }
 
-func (dyNumberValue) Type() Type {
-	return TypeDyNumber
+func (dyNumberValue) Type() types.Type {
+	return types.DyNumber
 }
 
 func (v dyNumberValue) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -713,8 +714,8 @@ func (v *floatValue) Yql() string {
 	return fmt.Sprintf("%s(\"%v\")", v.Type().Yql(), v.value)
 }
 
-func (*floatValue) Type() Type {
-	return TypeFloat
+func (*floatValue) Type() types.Type {
+	return types.Float
 }
 
 func (v *floatValue) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -778,8 +779,8 @@ func (v int8Value) Yql() string {
 	return strconv.FormatUint(uint64(v), 10) + "t"
 }
 
-func (int8Value) Type() Type {
-	return TypeInt8
+func (int8Value) Type() types.Type {
+	return types.Int8
 }
 
 func (v int8Value) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -837,8 +838,8 @@ func (v int16Value) Yql() string {
 	return strconv.FormatUint(uint64(v), 10) + "s"
 }
 
-func (int16Value) Type() Type {
-	return TypeInt16
+func (int16Value) Type() types.Type {
+	return types.Int16
 }
 
 func (v int16Value) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -896,8 +897,8 @@ func (v int32Value) Yql() string {
 	return strconv.FormatInt(int64(v), 10)
 }
 
-func (int32Value) Type() Type {
-	return TypeInt32
+func (int32Value) Type() types.Type {
+	return types.Int32
 }
 
 func (v int32Value) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -943,8 +944,8 @@ func (v int64Value) Yql() string {
 	return strconv.FormatUint(uint64(v), 10) + "l"
 }
 
-func (int64Value) Type() Type {
-	return TypeInt64
+func (int64Value) Type() types.Type {
+	return types.Int64
 }
 
 func (v int64Value) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -1019,8 +1020,8 @@ func (v intervalValue) Yql() string {
 	return buffer.String()
 }
 
-func (intervalValue) Type() Type {
-	return TypeInterval
+func (intervalValue) Type() types.Type {
+	return types.Interval
 }
 
 func (v intervalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -1063,8 +1064,8 @@ func (v jsonValue) Yql() string {
 	return fmt.Sprintf("%s(@@%s@@)", v.Type().Yql(), string(v))
 }
 
-func (jsonValue) Type() Type {
-	return TypeJSON
+func (jsonValue) Type() types.Type {
+	return types.JSON
 }
 
 func (v jsonValue) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -1102,8 +1103,8 @@ func (v jsonDocumentValue) Yql() string {
 	return fmt.Sprintf("%s(@@%s@@)", v.Type().Yql(), string(v))
 }
 
-func (jsonDocumentValue) Type() Type {
-	return TypeJSONDocument
+func (jsonDocumentValue) Type() types.Type {
+	return types.JSONDocument
 }
 
 func (v jsonDocumentValue) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -1121,7 +1122,7 @@ func JSONDocumentValue(v string) jsonDocumentValue {
 }
 
 type listValue struct {
-	t     Type
+	t     types.Type
 	items []Value
 }
 
@@ -1148,7 +1149,7 @@ func (v *listValue) Yql() string {
 	return buffer.String()
 }
 
-func (v *listValue) Type() Type {
+func (v *listValue) Type() types.Type {
 	return v.t
 }
 
@@ -1167,12 +1168,12 @@ func (v *listValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 }
 
 func ListValue(items ...Value) *listValue {
-	var t Type
+	var t types.Type
 	switch {
 	case len(items) > 0:
-		t = List(items[0].Type())
+		t = types.NewList(items[0].Type())
 	default:
-		t = EmptyList()
+		t = types.NewEmptyList()
 	}
 
 	return &listValue{
@@ -1182,7 +1183,7 @@ func ListValue(items ...Value) *listValue {
 }
 
 type setValue struct {
-	t     Type
+	t     types.Type
 	items []Value
 }
 
@@ -1205,7 +1206,7 @@ func (v *setValue) Yql() string {
 	return buffer.String()
 }
 
-func (v *setValue) Type() Type {
+func (v *setValue) Type() types.Type {
 	return v.t
 }
 
@@ -1229,12 +1230,12 @@ func SetValue(items ...Value) *setValue {
 		return items[i].Yql() < items[j].Yql()
 	})
 
-	var t Type
+	var t types.Type
 	switch {
 	case len(items) > 0:
-		t = Set(items[0].Type())
+		t = types.NewSet(items[0].Type())
 	default:
-		t = EmptySet()
+		t = types.EmptySet()
 	}
 
 	return &setValue{
@@ -1243,15 +1244,15 @@ func SetValue(items ...Value) *setValue {
 	}
 }
 
-func NullValue(t Type) *optionalValue {
+func NullValue(t types.Type) *optionalValue {
 	return &optionalValue{
-		innerType: Optional(t),
+		innerType: types.NewOptional(t),
 		value:     nil,
 	}
 }
 
 type optionalValue struct {
-	innerType Type
+	innerType types.Type
 	value     Value
 }
 
@@ -1273,7 +1274,7 @@ func (v *optionalValue) Yql() string {
 	return fmt.Sprintf("Just(%s)", v.value.Yql())
 }
 
-func (v *optionalValue) Type() Type {
+func (v *optionalValue) Type() types.Type {
 	return v.innerType
 }
 
@@ -1296,7 +1297,7 @@ func (v *optionalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 
 func OptionalValue(v Value) *optionalValue {
 	return &optionalValue{
-		innerType: Optional(v.Type()),
+		innerType: types.NewOptional(v.Type()),
 		value:     v,
 	}
 }
@@ -1307,7 +1308,7 @@ type (
 		V    Value
 	}
 	structValue struct {
-		t      Type
+		t      types.Type
 		fields []StructValueField
 	}
 )
@@ -1341,7 +1342,7 @@ func (v *structValue) Yql() string {
 	return buffer.String()
 }
 
-func (v *structValue) Type() Type {
+func (v *structValue) Type() types.Type {
 	return v.t
 }
 
@@ -1359,13 +1360,16 @@ func StructValue(fields ...StructValueField) *structValue {
 	sort.Slice(fields, func(i, j int) bool {
 		return fields[i].Name < fields[j].Name
 	})
-	structFields := make([]StructField, 0, len(fields))
+	structFields := make([]types.StructField, 0, len(fields))
 	for i := range fields {
-		structFields = append(structFields, StructField{fields[i].Name, fields[i].V.Type()})
+		structFields = append(structFields, types.StructField{
+			Name: fields[i].Name,
+			T:    fields[i].V.Type(),
+		})
 	}
 
 	return &structValue{
-		t:      Struct(structFields...),
+		t:      types.NewStruct(structFields...),
 		fields: fields,
 	}
 }
@@ -1391,8 +1395,8 @@ func (v timestampValue) Yql() string {
 	return fmt.Sprintf("%s(%q)", v.Type().Yql(), TimestampToTime(uint64(v)).UTC().Format(LayoutTimestamp))
 }
 
-func (timestampValue) Type() Type {
-	return TypeTimestamp
+func (timestampValue) Type() types.Type {
+	return types.Timestamp
 }
 
 func (v timestampValue) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -1415,7 +1419,7 @@ func TimestampValueFromTime(t time.Time) timestampValue {
 }
 
 type tupleValue struct {
-	t     Type
+	t     types.Type
 	items []Value
 }
 
@@ -1446,7 +1450,7 @@ func (v *tupleValue) Yql() string {
 	return buffer.String()
 }
 
-func (v *tupleValue) Type() Type {
+func (v *tupleValue) Type() types.Type {
 	return v.t
 }
 
@@ -1465,13 +1469,13 @@ func (v *tupleValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 }
 
 func TupleValue(values ...Value) *tupleValue {
-	tupleItems := make([]Type, 0, len(values))
+	tupleItems := make([]types.Type, 0, len(values))
 	for _, v := range values {
 		tupleItems = append(tupleItems, v.Type())
 	}
 
 	return &tupleValue{
-		t:     Tuple(tupleItems...),
+		t:     types.NewTuple(tupleItems...),
 		items: values,
 	}
 }
@@ -1497,8 +1501,8 @@ func (v tzDateValue) Yql() string {
 	return fmt.Sprintf("%s(%q)", v.Type().Yql(), string(v))
 }
 
-func (tzDateValue) Type() Type {
-	return TypeTzDate
+func (tzDateValue) Type() types.Type {
+	return types.TzDate
 }
 
 func (v tzDateValue) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -1540,8 +1544,8 @@ func (v tzDatetimeValue) Yql() string {
 	return fmt.Sprintf("%s(%q)", v.Type().Yql(), string(v))
 }
 
-func (tzDatetimeValue) Type() Type {
-	return TypeTzDatetime
+func (tzDatetimeValue) Type() types.Type {
+	return types.TzDatetime
 }
 
 func (v tzDatetimeValue) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -1583,8 +1587,8 @@ func (v tzTimestampValue) Yql() string {
 	return fmt.Sprintf("%s(%q)", v.Type().Yql(), string(v))
 }
 
-func (tzTimestampValue) Type() Type {
-	return TypeTzTimestamp
+func (tzTimestampValue) Type() types.Type {
+	return types.TzTimestamp
 }
 
 func (v tzTimestampValue) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -1662,8 +1666,8 @@ func (v uint8Value) Yql() string {
 	return strconv.FormatUint(uint64(v), 10) + "ut"
 }
 
-func (uint8Value) Type() Type {
-	return TypeUint8
+func (uint8Value) Type() types.Type {
+	return types.Uint8
 }
 
 func (v uint8Value) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -1729,8 +1733,8 @@ func (v uint16Value) Yql() string {
 	return strconv.FormatUint(uint64(v), 10) + "us"
 }
 
-func (uint16Value) Type() Type {
-	return TypeUint16
+func (uint16Value) Type() types.Type {
+	return types.Uint16
 }
 
 func (v uint16Value) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -1784,8 +1788,8 @@ func (v uint32Value) Yql() string {
 	return strconv.FormatUint(uint64(v), 10) + "u"
 }
 
-func (uint32Value) Type() Type {
-	return TypeUint32
+func (uint32Value) Type() types.Type {
+	return types.Uint32
 }
 
 func (v uint32Value) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -1827,8 +1831,8 @@ func (v uint64Value) Yql() string {
 	return strconv.FormatUint(uint64(v), 10) + "ul"
 }
 
-func (uint64Value) Type() Type {
-	return TypeUint64
+func (uint64Value) Type() types.Type {
+	return types.Uint64
 }
 
 func (v uint64Value) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -1866,8 +1870,8 @@ func (v textValue) Yql() string {
 	return fmt.Sprintf("%qu", string(v))
 }
 
-func (textValue) Type() Type {
-	return TypeText
+func (textValue) Type() types.Type {
+	return types.Text
 }
 
 func (v textValue) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -1920,8 +1924,8 @@ func (v *uuidValue) Yql() string {
 	return buffer.String()
 }
 
-func (*uuidValue) Type() Type {
-	return TypeUUID
+func (*uuidValue) Type() types.Type {
+	return types.UUID
 }
 
 func (v *uuidValue) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -1944,15 +1948,15 @@ func UUIDValue(v [16]byte) *uuidValue {
 }
 
 type variantValue struct {
-	innerType Type
+	innerType types.Type
 	value     Value
 	idx       uint32
 }
 
 func (v *variantValue) Variant() (name string, index uint32) { //nolint:nonamedreturns //gocritic more important
 	switch t := v.innerType.(type) {
-	case *variantStructType:
-		return t.fields[v.idx].Name, v.idx
+	case *types.VariantStruct:
+		return t.Field(int(v.idx)).Name, v.idx
 	default:
 		return "", v.idx
 	}
@@ -1973,9 +1977,9 @@ func (v *variantValue) Yql() string {
 	buffer.WriteString(v.value.Yql())
 	buffer.WriteByte(',')
 	switch t := v.innerType.(type) {
-	case *variantStructType:
-		fmt.Fprintf(buffer, "%q", t.fields[v.idx].Name)
-	case *variantTupleType:
+	case *types.VariantStruct:
+		fmt.Fprintf(buffer, "%q", t.Field(int(v.idx)).Name)
+	case *types.VariantTuple:
 		fmt.Fprintf(buffer, "\""+strconv.FormatUint(uint64(v.idx), 10)+"\"")
 	}
 	buffer.WriteByte(',')
@@ -1985,7 +1989,7 @@ func (v *variantValue) Yql() string {
 	return buffer.String()
 }
 
-func (v *variantValue) Type() Type {
+func (v *variantValue) Type() types.Type {
 	return v.innerType
 }
 
@@ -2001,9 +2005,9 @@ func (v *variantValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func VariantValueTuple(v Value, idx uint32, t Type) *variantValue {
-	if tt, has := t.(*TupleType); has {
-		t = VariantTuple(tt.items...)
+func VariantValueTuple(v Value, idx uint32, t types.Type) *variantValue {
+	if tt, has := t.(*types.Tuple); has {
+		t = types.NewVariantTuple(tt.InnerTypes()...)
 	}
 
 	return &variantValue{
@@ -2013,23 +2017,25 @@ func VariantValueTuple(v Value, idx uint32, t Type) *variantValue {
 	}
 }
 
-func VariantValueStruct(v Value, name string, t Type) *variantValue {
+func VariantValueStruct(v Value, name string, t types.Type) *variantValue {
 	var idx int
 	switch tt := t.(type) {
-	case *StructType:
-		sort.Slice(tt.fields, func(i, j int) bool {
-			return tt.fields[i].Name < tt.fields[j].Name
+	case *types.Struct:
+		fields := tt.Fields()
+		sort.Slice(fields, func(i, j int) bool {
+			return fields[i].Name < fields[j].Name
 		})
-		idx = sort.Search(len(tt.fields), func(i int) bool {
-			return tt.fields[i].Name >= name
+		idx = sort.Search(len(fields), func(i int) bool {
+			return fields[i].Name >= name
 		})
-		t = VariantStruct(tt.fields...)
-	case *variantStructType:
-		sort.Slice(tt.fields, func(i, j int) bool {
-			return tt.fields[i].Name < tt.fields[j].Name
+		t = types.NewVariantStruct(fields...)
+	case *types.VariantStruct:
+		fields := tt.Fields()
+		sort.Slice(fields, func(i, j int) bool {
+			return fields[i].Name < fields[j].Name
 		})
-		idx = sort.Search(len(tt.fields), func(i int) bool {
-			return tt.fields[i].Name >= name
+		idx = sort.Search(len(fields), func(i int) bool {
+			return fields[i].Name >= name
 		})
 	}
 
@@ -2051,13 +2057,13 @@ func (v voidValue) Yql() string {
 }
 
 var (
-	_voidValueType = voidType{}
+	_voidValueType = types.Void{}
 	_voidValue     = &Ydb.Value{
 		Value: new(Ydb.Value_NullFlagValue),
 	}
 )
 
-func (voidValue) Type() Type {
+func (voidValue) Type() types.Type {
 	return _voidValueType
 }
 
@@ -2090,8 +2096,8 @@ func (v ysonValue) Yql() string {
 	return fmt.Sprintf("%s(%q)", v.Type().Yql(), string(v))
 }
 
-func (ysonValue) Type() Type {
-	return TypeYSON
+func (ysonValue) Type() types.Type {
+	return types.YSON
 }
 
 func (v ysonValue) toYDB(a *allocator.Allocator) *Ydb.Value {
@@ -2110,81 +2116,81 @@ func YSONValue(v []byte) ysonValue {
 	return v
 }
 
-func zeroPrimitiveValue(t PrimitiveType) Value {
+func zeroPrimitiveValue(t types.Primitive) Value {
 	switch t {
-	case TypeBool:
+	case types.Bool:
 		return BoolValue(false)
 
-	case TypeInt8:
+	case types.Int8:
 		return Int8Value(0)
 
-	case TypeUint8:
+	case types.Uint8:
 		return Uint8Value(0)
 
-	case TypeInt16:
+	case types.Int16:
 		return Int16Value(0)
 
-	case TypeUint16:
+	case types.Uint16:
 		return Uint16Value(0)
 
-	case TypeInt32:
+	case types.Int32:
 		return Int32Value(0)
 
-	case TypeUint32:
+	case types.Uint32:
 		return Uint32Value(0)
 
-	case TypeInt64:
+	case types.Int64:
 		return Int64Value(0)
 
-	case TypeUint64:
+	case types.Uint64:
 		return Uint64Value(0)
 
-	case TypeFloat:
+	case types.Float:
 		return FloatValue(0)
 
-	case TypeDouble:
+	case types.Double:
 		return DoubleValue(0)
 
-	case TypeDate:
+	case types.Date:
 		return DateValue(0)
 
-	case TypeDatetime:
+	case types.Datetime:
 		return DatetimeValue(0)
 
-	case TypeTimestamp:
+	case types.Timestamp:
 		return TimestampValue(0)
 
-	case TypeInterval:
+	case types.Interval:
 		return IntervalValue(0)
 
-	case TypeText:
+	case types.Text:
 		return TextValue("")
 
-	case TypeYSON:
+	case types.YSON:
 		return YSONValue([]byte(""))
 
-	case TypeJSON:
+	case types.JSON:
 		return JSONValue("")
 
-	case TypeJSONDocument:
+	case types.JSONDocument:
 		return JSONDocumentValue("")
 
-	case TypeDyNumber:
+	case types.DyNumber:
 		return DyNumberValue("")
 
-	case TypeTzDate:
+	case types.TzDate:
 		return TzDateValue("")
 
-	case TypeTzDatetime:
+	case types.TzDatetime:
 		return TzDatetimeValue("")
 
-	case TypeTzTimestamp:
+	case types.TzTimestamp:
 		return TzTimestampValue("")
 
-	case TypeBytes:
+	case types.Bytes:
 		return BytesValue([]byte{})
 
-	case TypeUUID:
+	case types.UUID:
 		return UUIDValue([16]byte{})
 
 	default:
@@ -2192,55 +2198,57 @@ func zeroPrimitiveValue(t PrimitiveType) Value {
 	}
 }
 
-func ZeroValue(t Type) Value {
+func ZeroValue(t types.Type) Value {
 	switch t := t.(type) {
-	case PrimitiveType:
+	case types.Primitive:
 		return zeroPrimitiveValue(t)
 
-	case optionalType:
-		return NullValue(t.innerType)
+	case types.Optional:
+		return NullValue(t.InnerType())
 
-	case *voidType:
+	case *types.Void:
 		return VoidValue()
 
-	case *listType, *emptyListType:
+	case *types.List, *types.EmptyList:
 		return &listValue{
 			t: t,
 		}
-	case *setType:
+	case *types.Set:
 		return &setValue{
 			t: t,
 		}
-	case *dictType:
+	case *types.Dict:
 		return &dictValue{
-			t: t.valueType,
+			t: t.ValueType(),
 		}
-	case *emptyDictType:
+	case *types.EmptyDict:
 		return &dictValue{
 			t: t,
 		}
-	case *TupleType:
+	case *types.Tuple:
 		return TupleValue(func() []Value {
-			values := make([]Value, len(t.items))
-			for i, tt := range t.items {
+			innerTypes := t.InnerTypes()
+			values := make([]Value, len(innerTypes))
+			for i, tt := range innerTypes {
 				values[i] = ZeroValue(tt)
 			}
 
 			return values
 		}()...)
-	case *StructType:
+	case *types.Struct:
 		return StructValue(func() []StructValueField {
-			fields := make([]StructValueField, len(t.fields))
-			for i := range t.fields {
-				fields[i] = StructValueField{
-					Name: t.fields[i].Name,
-					V:    ZeroValue(t.fields[i].T),
+			fields := t.Fields()
+			values := make([]StructValueField, len(fields))
+			for i := range fields {
+				values[i] = StructValueField{
+					Name: fields[i].Name,
+					V:    ZeroValue(fields[i].T),
 				}
 			}
 
-			return fields
+			return values
 		}()...)
-	case *DecimalType:
+	case *types.Decimal:
 		return DecimalValue([16]byte{}, 22, 9)
 
 	default:
@@ -2269,8 +2277,8 @@ func (v bytesValue) Yql() string {
 	return fmt.Sprintf("%q", string(v))
 }
 
-func (bytesValue) Type() Type {
-	return TypeBytes
+func (bytesValue) Type() types.Type {
+	return types.Bytes
 }
 
 func (v bytesValue) toYDB(a *allocator.Allocator) *Ydb.Value {
