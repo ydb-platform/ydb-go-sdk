@@ -149,7 +149,7 @@ func (s *testDatabaseSqlContainersExampleStruct) Scan(res interface{}) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("type '%T' is not a `types.Value` type", res)
+	return fmt.Errorf("type '%T' is not a `types.value` type", res)
 }
 
 type testDatabaseSqlContainersExampleList []string

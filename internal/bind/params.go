@@ -9,9 +9,9 @@ import (
 	"sort"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -142,7 +142,7 @@ func supportNewTypeLink(x interface{}) string {
 	return "https://github.com/ydb-platform/ydb-go-sdk/issues/new?" + v.Encode()
 }
 
-func toYdbParam(name string, value interface{}) (table.ParameterOption, error) {
+func toYdbParam(name string, value interface{}) (*params.Parameter, error) {
 	if na, ok := value.(driver.NamedValue); ok {
 		n, v := na.Name, na.Value
 		if n != "" {
@@ -157,7 +157,7 @@ func toYdbParam(name string, value interface{}) (table.ParameterOption, error) {
 		}
 		value = v
 	}
-	if v, ok := value.(table.ParameterOption); ok {
+	if v, ok := value.(*params.Parameter); ok {
 		return v, nil
 	}
 	v, err := toValue(value)
@@ -171,39 +171,37 @@ func toYdbParam(name string, value interface{}) (table.ParameterOption, error) {
 		name = "$" + name
 	}
 
-	return table.ValueParam(name, v), nil
+	return params.Named(name, v), nil
 }
 
-func Params(args ...interface{}) (params []table.ParameterOption, _ error) {
-	params = make([]table.ParameterOption, 0, len(args))
+func Params(args ...interface{}) (parameters []*params.Parameter, _ error) {
+	parameters = make([]*params.Parameter, 0, len(args))
 	for i, arg := range args {
 		switch x := arg.(type) {
 		case driver.NamedValue:
 			if x.Name == "" {
 				switch xx := x.Value.(type) {
-				case *table.QueryParameters:
+				case *params.Parameters:
 					if len(args) > 1 {
 						return nil, xerrors.WithStackTrace(errMultipleQueryParameters)
 					}
-					xx.Each(func(name string, v types.Value) {
-						params = append(params, table.ValueParam(name, v))
-					})
-				case table.ParameterOption:
-					params = append(params, xx)
+					parameters = *xx
+				case *params.Parameter:
+					parameters = append(parameters, xx)
 				default:
 					x.Name = fmt.Sprintf("$p%d", i)
 					param, err := toYdbParam(x.Name, x.Value)
 					if err != nil {
 						return nil, xerrors.WithStackTrace(err)
 					}
-					params = append(params, param)
+					parameters = append(parameters, param)
 				}
 			} else {
 				param, err := toYdbParam(x.Name, x.Value)
 				if err != nil {
 					return nil, xerrors.WithStackTrace(err)
 				}
-				params = append(params, param)
+				parameters = append(parameters, param)
 			}
 		case sql.NamedArg:
 			if x.Name == "" {
@@ -213,27 +211,25 @@ func Params(args ...interface{}) (params []table.ParameterOption, _ error) {
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
-			params = append(params, param)
-		case *table.QueryParameters:
+			parameters = append(parameters, param)
+		case *params.Parameters:
 			if len(args) > 1 {
 				return nil, xerrors.WithStackTrace(errMultipleQueryParameters)
 			}
-			x.Each(func(name string, v types.Value) {
-				params = append(params, table.ValueParam(name, v))
-			})
-		case table.ParameterOption:
-			params = append(params, x)
+			parameters = *x
+		case *params.Parameter:
+			parameters = append(parameters, x)
 		default:
 			param, err := toYdbParam(fmt.Sprintf("$p%d", i), x)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
-			params = append(params, param)
+			parameters = append(parameters, param)
 		}
 	}
-	sort.Slice(params, func(i, j int) bool {
-		return params[i].Name() < params[j].Name()
+	sort.Slice(parameters, func(i, j int) bool {
+		return parameters[i].Name() < parameters[j].Name()
 	})
 
-	return params, nil
+	return parameters, nil
 }

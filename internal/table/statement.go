@@ -27,7 +27,7 @@ type statement struct {
 // Execute executes prepared data query.
 func (s *statement) Execute(
 	ctx context.Context, txControl *table.TransactionControl,
-	parameters table.Parameters,
+	parameters *params.Parameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
 	txr table.Transaction, r result.Result, err error,

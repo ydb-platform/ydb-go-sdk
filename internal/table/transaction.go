@@ -58,13 +58,13 @@ func (tx *transaction) ID() string {
 // Execute executes query represented by text within transaction tx.
 func (tx *transaction) Execute(
 	ctx context.Context,
-	query string, params table.Parameters,
+	query string, parameters *params.Parameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
 	onDone := trace.TableOnSessionTransactionExecute(
 		tx.s.config.Trace(), &ctx,
 		stack.FunctionID(""),
-		tx.s, tx, queryFromText(query), params,
+		tx.s, tx, queryFromText(query), parameters,
 	)
 	defer func() {
 		onDone(r, err)
@@ -76,7 +76,7 @@ func (tx *transaction) Execute(
 	case txStateRollbacked:
 		return nil, xerrors.WithStackTrace(errTxRollbackedEarly)
 	default:
-		_, r, err = tx.s.Execute(ctx, tx.control, query, params, opts...)
+		_, r, err = tx.s.Execute(ctx, tx.control, query, parameters, opts...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -92,7 +92,7 @@ func (tx *transaction) Execute(
 // ExecuteStatement executes prepared statement stmt within transaction tx.
 func (tx *transaction) ExecuteStatement(
 	ctx context.Context,
-	stmt table.Statement, parameters table.Parameters,
+	stmt table.Statement, parameters *params.Parameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
 	if parameters == nil {

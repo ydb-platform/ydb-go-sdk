@@ -7,7 +7,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 var ErrNameRequired = xerrors.Wrap(fmt.Errorf("only named parameters are supported"))
@@ -21,14 +20,15 @@ func GenerateDeclareSection(params *table.QueryParameters) (string, error) {
 		names    []string
 		declares = make(map[string]string, params.Count())
 	)
-	params.Each(func(name string, v types.Value) {
+	for _, p := range *params {
+		name := p.Name()
 		names = append(names, name)
 		declares[name] = fmt.Sprintf(
 			"DECLARE %s AS %s;\n",
 			name,
-			v.Type().Yql(),
+			p.Value().Type().Yql(),
 		)
-	})
+	}
 	sort.Strings(names)
 	for _, name := range names {
 		if name == "" {

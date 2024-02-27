@@ -9,73 +9,91 @@ import (
 )
 
 type (
-	parameter struct {
-		parent Builder
-		name   string
-		value  value.Value
+	Builder struct {
+		params Parameters
 	}
-	Builder    []*parameter
-	Parameters interface {
-		ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue
-		String() string
-	}
-	parameters []*parameter
+	Parameters []*Parameter
 )
 
-func (parameters parameters) String() string {
+func (p *Parameters) String() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
 
 	buffer.WriteByte('{')
-	for i := range parameters {
-		if i != 0 {
-			buffer.WriteByte(',')
+	if p != nil {
+		for i, param := range *p {
+			if i != 0 {
+				buffer.WriteByte(',')
+			}
+			buffer.WriteByte('"')
+			buffer.WriteString(param.name)
+			buffer.WriteString("\":")
+			buffer.WriteString(param.value.Yql())
 		}
-		buffer.WriteByte('"')
-		buffer.WriteString(parameters[i].name)
-		buffer.WriteString("\":")
-		buffer.WriteString(parameters[i].value.Yql())
 	}
 	buffer.WriteByte('}')
 
 	return buffer.String()
 }
 
-func (parameters parameters) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
-	params := make(map[string]*Ydb.TypedValue, len(parameters))
-	for _, param := range parameters {
-		params[param.name] = value.ToYDB(param.value, a)
+func (p *Parameters) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
+	parameters := make(map[string]*Ydb.TypedValue, len(*p))
+	for _, param := range *p {
+		parameters[param.name] = value.ToYDB(param.value, a)
 	}
 
-	return params
+	return parameters
 }
 
-func Nil() Parameters {
-	return parameters{}
+func (p *Parameters) Each(it func(name string, v value.Value)) {
+	if p == nil {
+		return
+	}
+	for _, p := range *p {
+		it(p.name, p.value)
+	}
 }
 
-func (b Builder) Build() Parameters {
-	return parameters(b)
+func (p *Parameters) Count() int {
+	if p == nil {
+		return 0
+	}
+
+	return len(*p)
 }
 
-func (b Builder) Param(name string) *parameter {
-	return &parameter{
+func (p *Parameters) Add(params ...*Parameter) {
+	for _, param := range params {
+		*p = append(*p, param)
+	}
+}
+
+func Nil() *Parameters {
+	return &Parameters{}
+}
+
+func (b Builder) Build() *Parameters {
+	return &b.params
+}
+
+func (b Builder) Param(name string) *Parameter {
+	return &Parameter{
 		parent: b,
 		name:   name,
 		value:  nil,
 	}
 }
 
-func (param *parameter) Text(v string) Builder {
-	param.value = value.TextValue(v)
-	param.parent = append(param.parent, param)
+func (p *Parameter) Text(v string) Builder {
+	p.value = value.TextValue(v)
+	p.parent.params = append(p.parent.params, p)
 
-	return param.parent
+	return p.parent
 }
 
-func (param *parameter) Uint64(v uint64) Builder {
-	param.value = value.Uint64Value(v)
-	param.parent = append(param.parent, param)
+func (p *Parameter) Uint64(v uint64) Builder {
+	p.value = value.Uint64Value(v)
+	p.parent.params = append(p.parent.params, p)
 
-	return param.parent
+	return p.parent
 }

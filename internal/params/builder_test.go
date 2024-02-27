@@ -20,7 +20,7 @@ func paramsToJSON(params map[string]*Ydb.TypedValue) string {
 func TestParams(t *testing.T) {
 	for _, tt := range []struct {
 		name    string
-		builder Parameters
+		builder *Parameters
 		params  map[string]*Ydb.TypedValue
 	}{
 		{

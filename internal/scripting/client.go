@@ -42,7 +42,7 @@ type (
 func (c *Client) Execute(
 	ctx context.Context,
 	query string,
-	parameters table.Parameters,
+	parameters *params.Parameters,
 ) (r result.Result, err error) {
 	if c == nil {
 		return r, xerrors.WithStackTrace(errNilClient)
@@ -68,7 +68,7 @@ func (c *Client) Execute(
 func (c *Client) execute(
 	ctx context.Context,
 	query string,
-	parameters table.Parameters,
+	parameters *params.Parameters,
 ) (r result.Result, err error) {
 	if parameters == nil {
 		parameters = params.Nil()
@@ -199,7 +199,7 @@ func (c *Client) explain(
 func (c *Client) StreamExecute(
 	ctx context.Context,
 	query string,
-	params table.Parameters,
+	params *params.Parameters,
 ) (r result.StreamResult, err error) {
 	if c == nil {
 		return r, xerrors.WithStackTrace(errNilClient)
@@ -225,7 +225,7 @@ func (c *Client) StreamExecute(
 func (c *Client) streamExecute(
 	ctx context.Context,
 	query string,
-	parameters table.Parameters,
+	parameters *params.Parameters,
 ) (r result.StreamResult, err error) {
 	if parameters == nil {
 		parameters = params.Nil()

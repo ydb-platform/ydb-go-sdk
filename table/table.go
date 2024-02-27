@@ -2,17 +2,14 @@ package table
 
 import (
 	"context"
-	"sort"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -144,7 +141,7 @@ type Session interface {
 		ctx context.Context,
 		tx *TransactionControl,
 		query string,
-		params Parameters,
+		params *params.Parameters,
 		opts ...options.ExecuteDataQueryOption,
 	) (txr Transaction, r result.Result, err error)
 
@@ -167,7 +164,7 @@ type Session interface {
 	StreamExecuteScanQuery(
 		ctx context.Context,
 		query string,
-		params Parameters,
+		params *params.Parameters,
 		opts ...options.ExecuteScanQueryOption,
 	) (_ result.StreamResult, err error)
 
@@ -243,13 +240,13 @@ type TransactionActor interface {
 	Execute(
 		ctx context.Context,
 		query string,
-		params Parameters,
+		params *params.Parameters,
 		opts ...options.ExecuteDataQueryOption,
 	) (result.Result, error)
 	ExecuteStatement(
 		ctx context.Context,
 		stmt Statement,
-		params Parameters,
+		params *params.Parameters,
 		opts ...options.ExecuteDataQueryOption,
 	) (result.Result, error)
 }
@@ -270,7 +267,7 @@ type Statement interface {
 	Execute(
 		ctx context.Context,
 		tx *TransactionControl,
-		params Parameters,
+		params *params.Parameters,
 		opts ...options.ExecuteDataQueryOption,
 	) (txr Transaction, r result.Result, err error)
 	NumInput() int
@@ -455,114 +452,19 @@ func SnapshotReadOnlyTxControl() *TransactionControl {
 
 // QueryParameters
 type (
-	queryParams     map[string]value.Value
 	ParameterOption interface {
 		Name() string
 		Value() value.Value
 	}
-	parameterOption struct {
-		name  string
-		value value.Value
-	}
-	Parameters interface {
-		ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue
-		String() string
-	}
-	QueryParameters struct {
-		m queryParams
-	}
+	QueryParameters = params.Parameters
 )
 
-func (qp *QueryParameters) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
-	if qp == nil || qp.m == nil {
-		return nil
-	}
-
-	return qp.m.ToYDB(a)
-}
-
-func (p parameterOption) Name() string {
-	return p.name
-}
-
-func (p parameterOption) Value() value.Value {
-	return p.value
-}
-
-func (qp queryParams) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
-	if qp == nil {
-		return nil
-	}
-	params := make(map[string]*Ydb.TypedValue, len(qp))
-	for k, v := range qp {
-		params[k] = value.ToYDB(v, a)
-	}
-
-	return params
-}
-
-func (qp *QueryParameters) Each(it func(name string, v value.Value)) {
-	if qp == nil {
-		return
-	}
-	for key, v := range qp.m {
-		it(key, v)
-	}
-}
-
-func (qp *QueryParameters) names() []string {
-	if qp == nil {
-		return nil
-	}
-	names := make([]string, 0, len(qp.m))
-	for k := range qp.m {
-		names = append(names, k)
-	}
-	sort.Strings(names)
-
-	return names
-}
-
-func (qp *QueryParameters) Count() int {
-	if qp == nil || qp.m == nil {
-		return 0
-	}
-
-	return len(qp.m)
-}
-
-func (qp *QueryParameters) String() string {
-	buffer := xstring.Buffer()
-	defer buffer.Free()
-
-	buffer.WriteByte('{')
-	for i, name := range qp.names() {
-		if i != 0 {
-			buffer.WriteByte(',')
-		}
-		buffer.WriteByte('"')
-		buffer.WriteString(name)
-		buffer.WriteString("\":")
-		buffer.WriteString(qp.m[name].Yql())
-	}
-	buffer.WriteByte('}')
-
-	return buffer.String()
-}
-
 func NewQueryParameters(opts ...ParameterOption) *QueryParameters {
-	q := &QueryParameters{
-		m: make(queryParams, len(opts)),
+	qp := QueryParameters(make([]*params.Parameter, len(opts)))
+	for i, opt := range opts {
+		qp[i] = params.Named(opt.Name(), opt.Value())
 	}
-	q.Add(opts...)
-
-	return q
-}
-
-func (qp *QueryParameters) Add(params ...ParameterOption) {
-	for _, param := range params {
-		qp.m[param.Name()] = param.Value()
-	}
+	return &qp
 }
 
 func ValueParam(name string, v value.Value) ParameterOption {
@@ -575,10 +477,7 @@ func ValueParam(name string, v value.Value) ParameterOption {
 		}
 	}
 
-	return &parameterOption{
-		name:  name,
-		value: v,
-	}
+	return params.Named(name, v)
 }
 
 type Options struct {

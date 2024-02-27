@@ -3,6 +3,7 @@ package scripting
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 )
@@ -21,7 +22,7 @@ type Client interface {
 	Execute(
 		ctx context.Context,
 		query string,
-		params table.Parameters,
+		params *params.Parameters,
 	) (result.Result, error)
 	Explain(
 		ctx context.Context,
@@ -31,6 +32,6 @@ type Client interface {
 	StreamExecute(
 		ctx context.Context,
 		query string,
-		params table.Parameters,
+		params *params.Parameters,
 	) (result.StreamResult, error)
 }
