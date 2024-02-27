@@ -715,6 +715,10 @@ func (s *session) Execute(
 ) (
 	txr table.Transaction, r result.Result, err error,
 ) {
+	if params == nil {
+		params = nilParams{}
+	}
+
 	var (
 		a       = allocator.New()
 		q       = queryFromText(query)
@@ -1105,6 +1109,10 @@ func (s *session) StreamExecuteScanQuery(
 	params table.Parameters,
 	opts ...options.ExecuteScanQueryOption,
 ) (_ result.StreamResult, err error) {
+	if params == nil {
+		params = nilParams{}
+	}
+
 	var (
 		a              = allocator.New()
 		q              = queryFromText(query)

@@ -31,6 +31,10 @@ func (s *statement) Execute(
 ) (
 	txr table.Transaction, r result.Result, err error,
 ) {
+	if params == nil {
+		params = nilParams{}
+	}
+
 	var (
 		a       = allocator.New()
 		request = options.ExecuteDataQueryDesc{

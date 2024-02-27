@@ -5,10 +5,25 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
+
+var _ table.Parameters = nilParams{}
+
+type nilParams struct{}
+
+func (n nilParams) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
+	return nil
+}
+
+func (n nilParams) String() string {
+	return ""
+}
 
 var ErrNameRequired = xerrors.Wrap(fmt.Errorf("only named parameters are supported"))
 

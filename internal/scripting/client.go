@@ -36,7 +36,18 @@ type (
 		config  config.Config
 		service Ydb_Scripting_V1.ScriptingServiceClient
 	}
+	nilParams struct{}
 )
+
+var _ table.Parameters = nilParams{}
+
+func (n nilParams) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
+	return nil
+}
+
+func (n nilParams) String() string {
+	return ""
+}
 
 func (c *Client) Execute(
 	ctx context.Context,
@@ -69,6 +80,10 @@ func (c *Client) execute(
 	query string,
 	params table.Parameters,
 ) (r result.Result, err error) {
+	if params == nil {
+		params = nilParams{}
+	}
+
 	var (
 		onDone = trace.ScriptingOnExecute(c.config.Trace(), &ctx,
 			stack.FunctionID(""),
@@ -222,6 +237,10 @@ func (c *Client) streamExecute(
 	query string,
 	params table.Parameters,
 ) (r result.StreamResult, err error) {
+	if params == nil {
+		params = nilParams{}
+	}
+
 	var (
 		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx,
 			stack.FunctionID(""),
