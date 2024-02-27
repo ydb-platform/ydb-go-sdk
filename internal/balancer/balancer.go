@@ -378,11 +378,8 @@ func (b *Balancer) connections() *connectionsState {
 	return b.connectionsState
 }
 
-func (b *Balancer) getConn(ctx context.Context) (conn.Conn, error) {
-	var (
-		c   conn.Conn
-		err error
-	)
+//nolint:nonamedreturns // FAIL integration test TestDatabaseSqlWithTxControl
+func (b *Balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
 	onDone := trace.DriverOnBalancerChooseEndpoint(
 		b.driverConfig.Trace(), &ctx,
 		stack.FunctionID(""),

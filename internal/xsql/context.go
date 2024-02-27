@@ -39,8 +39,8 @@ func WithTxControl(ctx context.Context, txc *table.TransactionControl) context.C
 	return context.WithValue(ctx, ctxTransactionControlKey{}, txc)
 }
 
-func txControl(ctx context.Context, defaultTxControl *table.TransactionControl) *table.TransactionControl {
-	var txControl *table.TransactionControl
+//nolint:nonamedreturns // FAIL integration test TestDatabaseSqlWithTxControl
+func txControl(ctx context.Context, defaultTxControl *table.TransactionControl) (txControl *table.TransactionControl) {
 	defer func() {
 		if hook, has := ctx.Value(ctxTxControlHookKey{}).(txControlHook); has && hook != nil {
 			hook(txControl)
