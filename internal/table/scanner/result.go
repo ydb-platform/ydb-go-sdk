@@ -18,7 +18,7 @@ import (
 var errAlreadyClosed = xerrors.Wrap(errors.New("result closed early"))
 
 type baseResult struct {
-	scanner
+	valueScanner
 
 	nextResultSetCounter atomic.Uint64
 	statsMtx             xsync.RWMutex
@@ -36,7 +36,7 @@ type streamResult struct {
 
 // Err returns error caused Scanner to be broken.
 func (r *streamResult) Err() error {
-	err := r.scanner.Err()
+	err := r.valueScanner.Err()
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -53,7 +53,7 @@ type unaryResult struct {
 
 // Err returns error caused Scanner to be broken.
 func (r *unaryResult) Err() error {
-	err := r.scanner.Err()
+	err := r.valueScanner.Err()
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -96,13 +96,13 @@ type option func(r *baseResult)
 
 func WithIgnoreTruncated(ignoreTruncated bool) option {
 	return func(r *baseResult) {
-		r.scanner.ignoreTruncated = ignoreTruncated
+		r.valueScanner.ignoreTruncated = ignoreTruncated
 	}
 }
 
 func WithMarkTruncatedAsRetryable() option {
 	return func(r *baseResult) {
-		r.scanner.markTruncatedAsRetryable = true
+		r.valueScanner.markTruncatedAsRetryable = true
 	}
 }
 

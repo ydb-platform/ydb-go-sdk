@@ -3,6 +3,7 @@ package rawtopicreader
 import (
 	"errors"
 	"fmt"
+	"io"
 	"reflect"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Topic"
@@ -30,6 +31,9 @@ func (s StreamReader) CloseSend() error {
 
 func (s StreamReader) Recv() (ServerMessage, error) {
 	grpcMess, err := s.Stream.Recv()
+	if xerrors.Is(err, io.EOF) {
+		return nil, err
+	}
 	if err != nil {
 		if !xerrors.IsErrorFromServer(err) {
 			err = xerrors.Transport(err)

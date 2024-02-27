@@ -10,14 +10,15 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 type rawConverter struct {
-	*scanner
+	*valueScanner
 }
 
 func (s *rawConverter) String() (v []byte) {
@@ -282,8 +283,8 @@ func (s *rawConverter) Any() interface{} {
 	return s.any()
 }
 
-// Value returns current item under scan as ydb.Value types.
-func (s *rawConverter) Value() types.Value {
+// Value returns current item under scan as value
+func (s *rawConverter) Value() value.Value {
 	if s.Err() != nil {
 		return nil
 	}
@@ -557,17 +558,17 @@ func (s *rawConverter) Decimal(t types.Type) (v [16]byte) {
 	return s.uint128()
 }
 
-func (s *rawConverter) UnwrapDecimal() (v types.Decimal) {
+func (s *rawConverter) UnwrapDecimal() decimal.Decimal {
 	if s.Err() != nil {
-		return
+		return decimal.Decimal{}
 	}
 	s.unwrap()
 	d := s.assertTypeDecimal(s.stack.current().t)
 	if d == nil {
-		return
+		return decimal.Decimal{}
 	}
 
-	return types.Decimal{
+	return decimal.Decimal{
 		Bytes:     s.uint128(),
 		Precision: d.DecimalType.GetPrecision(),
 		Scale:     d.DecimalType.GetScale(),
@@ -583,9 +584,9 @@ func (s *rawConverter) IsDecimal() bool {
 }
 
 func isEqualDecimal(d *Ydb.DecimalType, t types.Type) bool {
-	w := t.(*value.DecimalType)
+	w := t.(*types.Decimal)
 
-	return d.GetPrecision() == w.Precision && d.GetScale() == w.Scale
+	return d.GetPrecision() == w.Precision() && d.GetScale() == w.Scale()
 }
 
 func (s *rawConverter) isCurrentTypeDecimal() bool {
@@ -679,7 +680,7 @@ func (s *rawConverter) boundsCheck(n, i int) bool {
 	return true
 }
 
-func (s *scanner) assertTypeOptional(typ *Ydb.Type) (t *Ydb.Type_OptionalType) {
+func (s *valueScanner) assertTypeOptional(typ *Ydb.Type) (t *Ydb.Type_OptionalType) {
 	x := typ.GetType()
 	if t, _ = x.(*Ydb.Type_OptionalType); t == nil {
 		s.typeError(x, t)
@@ -712,8 +713,8 @@ func (s *rawConverter) assertCurrentTypeNullable() bool {
 
 func (s *rawConverter) assertCurrentTypeIs(t types.Type) bool {
 	c := s.stack.current()
-	act := value.TypeFromYDB(c.t)
-	if !value.TypesEqual(act, t) {
+	act := types.TypeFromYDB(c.t)
+	if !types.Equal(act, t) {
 		_ = s.errorf(
 			1,
 			"unexpected types at %q %s: %s; want %s",
@@ -818,7 +819,7 @@ func nameIface(v interface{}) string {
 	t := reflect.TypeOf(v)
 	s := t.String()
 	s = strings.TrimPrefix(s, "*Ydb.Value_")
-	s = strings.TrimSuffix(s, "Value")
+	s = strings.TrimSuffix(s, "valueType")
 	s = strings.TrimPrefix(s, "*Ydb.Type_")
 	s = strings.TrimSuffix(s, "Type")
 

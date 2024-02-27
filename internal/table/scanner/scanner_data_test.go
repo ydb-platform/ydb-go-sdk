@@ -208,7 +208,7 @@ var scannerData = []struct {
 		setColumnIndexes: []int{0, 2, 1},
 	},
 	{
-		name:  "Scan int64, float, json as ydb.Value",
+		name:  "Scan int64, float, json as ydb.valueType",
 		count: 100,
 		columns: []*column{{
 			name:     "valueint64",
@@ -470,8 +470,8 @@ var scannerData = []struct {
 	},
 }
 
-func initScanner() *scanner {
-	res := scanner{
+func initScanner() *valueScanner {
+	res := valueScanner{
 		set: &Ydb.ResultSet{
 			Columns:   nil,
 			Rows:      nil,
@@ -491,7 +491,7 @@ func initScanner() *scanner {
 	return &res
 }
 
-func PrepareScannerPerformanceTest(count int) *scanner {
+func PrepareScannerPerformanceTest(count int) *valueScanner {
 	res := initScanner()
 	res.set.Columns = []*Ydb.Column{{
 		Name: "series_id",

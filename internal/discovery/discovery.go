@@ -70,9 +70,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 
 	if response.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS {
 		return nil, xerrors.WithStackTrace(
-			xerrors.Operation(
-				xerrors.FromOperation(response.GetOperation()),
-			),
+			xerrors.FromOperation(response.GetOperation()),
 		)
 	}
 
@@ -126,10 +124,8 @@ func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 
 	if response.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS {
 		return nil, xerrors.WithStackTrace(
-			xerrors.Operation(
-				xerrors.FromOperation(
-					response.GetOperation(),
-				),
+			xerrors.FromOperation(
+				response.GetOperation(),
 			),
 		)
 	}
