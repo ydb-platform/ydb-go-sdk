@@ -1,6 +1,10 @@
 package params
 
-import "github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+import (
+	"fmt"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+)
 
 type (
 	Parameter struct {
@@ -23,4 +27,12 @@ func (p *Parameter) Name() string {
 
 func (p *Parameter) Value() value.Value {
 	return p.value
+}
+
+func Declare(p *Parameter) string {
+	return fmt.Sprintf(
+		"DECLARE %s AS %s",
+		p.name,
+		p.value.Type().Yql(),
+	)
 }

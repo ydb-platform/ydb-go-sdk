@@ -464,6 +464,7 @@ func NewQueryParameters(opts ...ParameterOption) *QueryParameters {
 	for i, opt := range opts {
 		qp[i] = params.Named(opt.Name(), opt.Value())
 	}
+
 	return &qp
 }
 
