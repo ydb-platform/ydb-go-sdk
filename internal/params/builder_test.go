@@ -3,6 +3,7 @@ package params
 import (
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -17,7 +18,7 @@ func paramsToJSON(params map[string]*Ydb.TypedValue) string {
 	return string(b)
 }
 
-func TestParams(t *testing.T) {
+func TestBuilder(t *testing.T) {
 	for _, tt := range []struct {
 		name    string
 		builder *Parameters
@@ -25,27 +26,14 @@ func TestParams(t *testing.T) {
 	}{
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$a").Text("A").Build(),
-			params: map[string]*Ydb.TypedValue{
-				"$a": {
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_UTF8,
-						},
-					},
-					Value: &Ydb.Value{
-						Value: &Ydb.Value_TextValue{
-							TextValue: "A",
-						},
-					},
-				},
-			},
+			builder: Builder{}.Build(),
+			params:  map[string]*Ydb.TypedValue{},
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$a").Uint64(123).Build(),
+			builder: Builder{}.Param("$x").Uint64(123).Build(),
 			params: map[string]*Ydb.TypedValue{
-				"$a": {
+				"$x": {
 					Type: &Ydb.Type{
 						Type: &Ydb.Type_TypeId{
 							TypeId: Ydb.Type_UINT64,
@@ -61,9 +49,153 @@ func TestParams(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$a").Uint64(123).Param("$b").Text("B").Build(),
+			builder: Builder{}.Param("$x").Int64(123).Build(),
 			params: map[string]*Ydb.TypedValue{
-				"$b": {
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_INT64,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_Int64Value{
+							Int64Value: 123,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Uint32(123).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_UINT32,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_Uint32Value{
+							Uint32Value: 123,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Int32(123).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_INT32,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_Int32Value{
+							Int32Value: 123,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Uint16(123).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_UINT16,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_Uint32Value{
+							Uint32Value: 123,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Int16(123).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_INT16,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_Int32Value{
+							Int32Value: 123,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Uint8(123).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_UINT8,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_Uint32Value{
+							Uint32Value: 123,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Int8(123).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_INT8,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_Int32Value{
+							Int32Value: 123,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Bool(true).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_BOOL,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_BoolValue{
+							BoolValue: true,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Text("test").Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
 					Type: &Ydb.Type{
 						Type: &Ydb.Type_TypeId{
 							TypeId: Ydb.Type_UTF8,
@@ -71,21 +203,171 @@ func TestParams(t *testing.T) {
 					},
 					Value: &Ydb.Value{
 						Value: &Ydb.Value_TextValue{
-							TextValue: "B",
+							TextValue: "test",
 						},
 					},
 				},
-				"$a": {
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Bytes([]byte("test")).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
 					Type: &Ydb.Type{
 						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_UINT64,
+							TypeId: Ydb.Type_STRING,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_BytesValue{
+							BytesValue: []byte("test"),
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Float(123).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_FLOAT,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_FloatValue{
+							FloatValue: 123,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Double(123).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_DOUBLE,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_DoubleValue{
+							DoubleValue: 123,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Interval(time.Second).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_INTERVAL,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_Int64Value{
+							Int64Value: 1000000,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Datetime(time.Unix(123456789, 456)).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_DATETIME,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_Uint32Value{
+							Uint32Value: 123456789,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Date(time.Unix(123456789, 456)).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_DATE,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_Uint32Value{
+							Uint32Value: 1428,
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Timestamp(time.Unix(123456789, 456)).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_TIMESTAMP,
 						},
 					},
 					Value: &Ydb.Value{
 						Value: &Ydb.Value_Uint64Value{
-							Uint64Value: 123,
+							Uint64Value: 123456789000000,
 						},
 					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Decimal([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, 22, 9).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_DecimalType{
+							DecimalType: &Ydb.DecimalType{
+								Precision: 22,
+								Scale:     9,
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						High_128: 72623859790382856,
+						Value: &Ydb.Value_Low_128{
+							Low_128: 648519454493508870,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			builder: Builder{}.
+				Param("$x").List().Build().
+				Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_EmptyListType{},
+					},
+					Value: &Ydb.Value{},
 				},
 			},
 		},

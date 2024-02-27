@@ -70,10 +70,6 @@ func (c *Client) execute(
 	query string,
 	parameters *params.Parameters,
 ) (r result.Result, err error) {
-	if parameters == nil {
-		parameters = params.Nil()
-	}
-
 	var (
 		onDone = trace.ScriptingOnExecute(c.config.Trace(), &ctx,
 			stack.FunctionID(""),
@@ -227,10 +223,6 @@ func (c *Client) streamExecute(
 	query string,
 	parameters *params.Parameters,
 ) (r result.StreamResult, err error) {
-	if parameters == nil {
-		parameters = params.Nil()
-	}
-
 	var (
 		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx,
 			stack.FunctionID(""),

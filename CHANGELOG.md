@@ -1,4 +1,5 @@
 * Added experimental query parameters builder `ydb.ParamsBuilder()`
+* Fixed bug with optional decimal serialization 
 
 ## v3.56.2
 * Fixed return private error for commit to stopped partition in topic reader.

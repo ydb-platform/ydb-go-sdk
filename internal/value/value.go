@@ -1285,7 +1285,7 @@ func (v *optionalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 		vv.Value = vvv
 	} else {
 		if v.value != nil {
-			vv.Value = v.value.toYDB(a).GetValue()
+			vv = v.value.toYDB(a)
 		} else {
 			vv.Value = a.NullFlag()
 		}

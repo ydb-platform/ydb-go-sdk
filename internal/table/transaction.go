@@ -95,9 +95,6 @@ func (tx *transaction) ExecuteStatement(
 	stmt table.Statement, parameters *params.Parameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
-	if parameters == nil {
-		parameters = params.Nil()
-	}
 	a := allocator.New()
 	defer a.Free()
 
