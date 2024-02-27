@@ -265,7 +265,7 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 				ttt.Struct.Field(int(v.GetVariantIndex())).T.ToYDB(a),
 				v.GetValue().(*Ydb.Value_NestedValue).NestedValue,
 			),
-			ttt.Struct.Field(int(v.VariantIndex)).Name,
+			ttt.Struct.Field(int(v.GetVariantIndex())).Name,
 			ttt.Struct,
 		), nil
 
@@ -276,7 +276,7 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		return VariantValueTuple(
 			FromYDB(
 				ttt.Tuple.ItemType(int(v.GetVariantIndex())).ToYDB(a),
-				v.Value.(*Ydb.Value_NestedValue).NestedValue,
+				v.GetValue().(*Ydb.Value_NestedValue).NestedValue,
 			),
 			v.GetVariantIndex(),
 			ttt.Tuple,

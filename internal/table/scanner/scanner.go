@@ -297,7 +297,7 @@ func (s *valueScanner) hasItems() bool {
 }
 
 func (s *valueScanner) seekItemByID(id int) error {
-	if !s.hasItems() || id >= len(s.set.Columns) {
+	if !s.hasItems() || id >= len(s.set.GetColumns()) {
 		return s.notFoundColumnByIndex(id)
 	}
 	col := s.set.GetColumns()[id]

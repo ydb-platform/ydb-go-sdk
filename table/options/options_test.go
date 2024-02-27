@@ -77,7 +77,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 			require.Equal(
 				t,
 				[]*Ydb.TypedValue{value.ToYDB(value.Int64Value(1), a)},
-				p.PartitionAtKeys.SplitPoints,
+				p.PartitionAtKeys.GetSplitPoints(),
 			)
 		}
 	}
@@ -171,10 +171,10 @@ func TestAlterTableOptions(t *testing.T) {
 		opt := WithAddColumnMeta(column)
 		req := Ydb_Table.AlterTableRequest{}
 		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
-		if len(req.AddColumns) != 1 ||
-			req.AddColumns[0].GetName() != column.Name ||
-			req.AddColumns[0].GetType() != types.TypeToYDB(column.Type, a) ||
-			req.AddColumns[0].GetFamily() != column.Family {
+		if len(req.GetAddColumns()) != 1 ||
+			req.GetAddColumns()[0].GetName() != column.Name ||
+			req.GetAddColumns()[0].GetType() != types.TypeToYDB(column.Type, a) ||
+			req.GetAddColumns()[0].GetFamily() != column.Family {
 			t.Errorf("Alter table options is not as expected")
 		}
 	}
