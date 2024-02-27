@@ -12,6 +12,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
@@ -36,29 +37,18 @@ type (
 		config  config.Config
 		service Ydb_Scripting_V1.ScriptingServiceClient
 	}
-	nilParams struct{}
 )
-
-var _ table.Parameters = nilParams{}
-
-func (n nilParams) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
-	return nil
-}
-
-func (n nilParams) String() string {
-	return ""
-}
 
 func (c *Client) Execute(
 	ctx context.Context,
 	query string,
-	params table.Parameters,
+	parameters table.Parameters,
 ) (r result.Result, err error) {
 	if c == nil {
 		return r, xerrors.WithStackTrace(errNilClient)
 	}
 	call := func(ctx context.Context) error {
-		r, err = c.execute(ctx, query, params)
+		r, err = c.execute(ctx, query, parameters)
 
 		return xerrors.WithStackTrace(err)
 	}
@@ -78,21 +68,21 @@ func (c *Client) Execute(
 func (c *Client) execute(
 	ctx context.Context,
 	query string,
-	params table.Parameters,
+	parameters table.Parameters,
 ) (r result.Result, err error) {
-	if params == nil {
-		params = nilParams{}
+	if parameters == nil {
+		parameters = params.Nil()
 	}
 
 	var (
 		onDone = trace.ScriptingOnExecute(c.config.Trace(), &ctx,
 			stack.FunctionID(""),
-			query, params,
+			query, parameters,
 		)
 		a       = allocator.New()
 		request = &Ydb_Scripting.ExecuteYqlRequest{
 			Script:     query,
-			Parameters: params.ToYDB(a),
+			Parameters: parameters.ToYDB(a),
 			OperationParams: operation.Params(
 				ctx,
 				c.config.OperationTimeout(),
@@ -235,21 +225,21 @@ func (c *Client) StreamExecute(
 func (c *Client) streamExecute(
 	ctx context.Context,
 	query string,
-	params table.Parameters,
+	parameters table.Parameters,
 ) (r result.StreamResult, err error) {
-	if params == nil {
-		params = nilParams{}
+	if parameters == nil {
+		parameters = params.Nil()
 	}
 
 	var (
 		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx,
 			stack.FunctionID(""),
-			query, params,
+			query, parameters,
 		)
 		a       = allocator.New()
 		request = &Ydb_Scripting.ExecuteYqlRequest{
 			Script:     query,
-			Parameters: params.ToYDB(a),
+			Parameters: parameters.ToYDB(a),
 			OperationParams: operation.Params(
 				ctx,
 				c.config.OperationTimeout(),

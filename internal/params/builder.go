@@ -1,24 +1,45 @@
-package builder
+package params
 
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 type (
 	parameter struct {
-		parent ParamsBuilder
+		parent Builder
 		name   string
 		value  value.Value
 	}
-	ParamsBuilder []*parameter
-	Parameters    interface {
+	Builder    []*parameter
+	Parameters interface {
 		ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue
+		String() string
 	}
 	parameters []*parameter
 )
+
+func (parameters parameters) String() string {
+	buffer := xstring.Buffer()
+	defer buffer.Free()
+
+	buffer.WriteByte('{')
+	for i := range parameters {
+		if i != 0 {
+			buffer.WriteByte(',')
+		}
+		buffer.WriteByte('"')
+		buffer.WriteString(parameters[i].name)
+		buffer.WriteString("\":")
+		buffer.WriteString(parameters[i].value.Yql())
+	}
+	buffer.WriteByte('}')
+
+	return buffer.String()
+}
 
 func (parameters parameters) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
 	params := make(map[string]*Ydb.TypedValue, len(parameters))
@@ -29,15 +50,15 @@ func (parameters parameters) ToYDB(a *allocator.Allocator) map[string]*Ydb.Typed
 	return params
 }
 
-func Params() ParamsBuilder {
-	return ParamsBuilder{}
+func Nil() Parameters {
+	return parameters{}
 }
 
-func (b ParamsBuilder) Build() Parameters {
+func (b Builder) Build() Parameters {
 	return parameters(b)
 }
 
-func (b ParamsBuilder) Param(name string) *parameter {
+func (b Builder) Param(name string) *parameter {
 	return &parameter{
 		parent: b,
 		name:   name,
@@ -45,14 +66,14 @@ func (b ParamsBuilder) Param(name string) *parameter {
 	}
 }
 
-func (param *parameter) Text(v string) ParamsBuilder {
+func (param *parameter) Text(v string) Builder {
 	param.value = value.TextValue(v)
 	param.parent = append(param.parent, param)
 
 	return param.parent
 }
 
-func (param *parameter) Uint64(v uint64) ParamsBuilder {
+func (param *parameter) Uint64(v uint64) Builder {
 	param.value = value.Uint64Value(v)
 	param.parent = append(param.parent, param)
 

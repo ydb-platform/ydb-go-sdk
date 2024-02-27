@@ -1,7 +1,7 @@
 package ydb
 
-import "github.com/ydb-platform/ydb-go-sdk/v3/internal/builder"
+import "github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 
-func ParamsBuilder() builder.ParamsBuilder {
-	return builder.Params()
+func ParamsBuilder() params.Builder {
+	return params.Builder{}
 }

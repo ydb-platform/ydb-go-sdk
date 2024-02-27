@@ -22,6 +22,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
@@ -710,13 +711,13 @@ func (s *session) Execute(
 	ctx context.Context,
 	txControl *table.TransactionControl,
 	query string,
-	params table.Parameters,
+	parameters table.Parameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
 	txr table.Transaction, r result.Result, err error,
 ) {
-	if params == nil {
-		params = nilParams{}
+	if parameters == nil {
+		parameters = params.Nil()
 	}
 
 	var (
@@ -732,7 +733,7 @@ func (s *session) Execute(
 
 	request.SessionId = s.id
 	request.TxControl = txControl.Desc()
-	request.Parameters = params.ToYDB(a)
+	request.Parameters = parameters.ToYDB(a)
 	request.Query = q.toYDB(a)
 	request.QueryCachePolicy = a.TableQueryCachePolicy()
 	request.QueryCachePolicy.KeepInCache = len(request.Parameters) > 0
@@ -751,7 +752,7 @@ func (s *session) Execute(
 	onDone := trace.TableOnSessionQueryExecute(
 		s.config.Trace(), &ctx,
 		stack.FunctionID(""),
-		s, q, params,
+		s, q, parameters,
 		request.QueryCachePolicy.GetKeepInCache(),
 	)
 	defer func() {
@@ -1106,11 +1107,11 @@ func (s *session) ReadRows(
 func (s *session) StreamExecuteScanQuery(
 	ctx context.Context,
 	query string,
-	params table.Parameters,
+	parameters table.Parameters,
 	opts ...options.ExecuteScanQueryOption,
 ) (_ result.StreamResult, err error) {
-	if params == nil {
-		params = nilParams{}
+	if parameters == nil {
+		parameters = params.Nil()
 	}
 
 	var (
@@ -1119,11 +1120,11 @@ func (s *session) StreamExecuteScanQuery(
 		onIntermediate = trace.TableOnSessionQueryStreamExecute(
 			s.config.Trace(), &ctx,
 			stack.FunctionID(""),
-			s, q, params,
+			s, q, parameters,
 		)
 		request = Ydb_Table.ExecuteScanQueryRequest{
 			Query:      q.toYDB(a),
-			Parameters: params.ToYDB(a),
+			Parameters: parameters.ToYDB(a),
 			Mode:       Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC, // set default
 		}
 		stream      Ydb_Table_V1.TableService_StreamExecuteScanQueryClient

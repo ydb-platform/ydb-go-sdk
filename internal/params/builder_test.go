@@ -1,4 +1,4 @@
-package builder
+package params
 
 import (
 	"encoding/json"
@@ -25,7 +25,7 @@ func TestParams(t *testing.T) {
 	}{
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Params().Param("$a").Text("A").Build(),
+			builder: Builder{}.Param("$a").Text("A").Build(),
 			params: map[string]*Ydb.TypedValue{
 				"$a": {
 					Type: &Ydb.Type{
@@ -43,7 +43,7 @@ func TestParams(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Params().Param("$a").Uint64(123).Build(),
+			builder: Builder{}.Param("$a").Uint64(123).Build(),
 			params: map[string]*Ydb.TypedValue{
 				"$a": {
 					Type: &Ydb.Type{
@@ -61,7 +61,7 @@ func TestParams(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Params().Param("$a").Uint64(123).Param("$b").Text("B").Build(),
+			builder: Builder{}.Param("$a").Uint64(123).Param("$b").Text("B").Build(),
 			params: map[string]*Ydb.TypedValue{
 				"$b": {
 					Type: &Ydb.Type{
