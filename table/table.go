@@ -452,10 +452,7 @@ func SnapshotReadOnlyTxControl() *TransactionControl {
 
 // QueryParameters
 type (
-	ParameterOption interface {
-		Name() string
-		Value() value.Value
-	}
+	ParameterOption = params.NamedValue
 	QueryParameters = params.Parameters
 )
 

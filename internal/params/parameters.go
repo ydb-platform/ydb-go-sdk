@@ -12,6 +12,10 @@ import (
 )
 
 type (
+	NamedValue interface {
+		Name() string
+		Value() value.Value
+	}
 	Parameter struct {
 		parent Builder
 		name   string
@@ -85,9 +89,9 @@ func (p *Parameters) Count() int {
 	return len(*p)
 }
 
-func (p *Parameters) Add(params ...*Parameter) {
+func (p *Parameters) Add(params ...NamedValue) {
 	for _, param := range params {
-		*p = append(*p, param)
+		*p = append(*p, Named(param.Name(), param.Value()))
 	}
 }
 
