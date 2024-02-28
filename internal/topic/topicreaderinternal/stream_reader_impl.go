@@ -25,8 +25,7 @@ import (
 var (
 	PublicErrCommitSessionToExpiredSession = xerrors.Wrap(errors.New("ydb: commit to expired session"))
 
-	errPartitionSessionStoppedByServer = xerrors.Wrap(errors.New("ydb: topic partition session stopped by server"))
-	errCommitWithNilPartitionSession   = xerrors.Wrap(errors.New("ydb: commit with nil partition session"))
+	errCommitWithNilPartitionSession = xerrors.Wrap(errors.New("ydb: commit with nil partition session"))
 )
 
 type partitionSessionID = rawtopicreader.PartitionSessionID
@@ -385,7 +384,7 @@ func (r *topicStreamReaderImpl) checkCommitRange(commitRange commitRange) error 
 	}
 
 	if session.Context().Err() != nil {
-		return xerrors.WithStackTrace(fmt.Errorf("ydb: commit error: %w", errPartitionSessionStoppedByServer))
+		return xerrors.WithStackTrace(PublicErrCommitSessionToExpiredSession)
 	}
 
 	ownSession, err := r.sessionController.Get(session.partitionSessionID)

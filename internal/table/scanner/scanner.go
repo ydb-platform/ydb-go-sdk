@@ -11,7 +11,9 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
-	types2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/decimal"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scanner"
+	internalTypes "github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
@@ -20,10 +22,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-type scanner struct {
+type valueScanner struct {
 	set                      *Ydb.ResultSet
 	row                      *Ydb.Value
 	converter                *rawConverter
@@ -40,59 +41,59 @@ type scanner struct {
 }
 
 // ColumnCount returns number of columns in the current result set.
-func (s *scanner) ColumnCount() int {
+func (s *valueScanner) ColumnCount() int {
 	if s.set == nil {
 		return 0
 	}
 
-	return len(s.set.Columns)
+	return len(s.set.GetColumns())
 }
 
 // Columns allows to iterate over all columns of the current result set.
-func (s *scanner) Columns(it func(options.Column)) {
+func (s *valueScanner) Columns(it func(options.Column)) {
 	if s.set == nil {
 		return
 	}
-	for _, m := range s.set.Columns {
+	for _, m := range s.set.GetColumns() {
 		it(options.Column{
-			Name: m.Name,
-			Type: types2.TypeFromYDB(m.Type),
+			Name: m.GetName(),
+			Type: internalTypes.TypeFromYDB(m.GetType()),
 		})
 	}
 }
 
 // RowCount returns number of rows in the result set.
-func (s *scanner) RowCount() int {
+func (s *valueScanner) RowCount() int {
 	if s.set == nil {
 		return 0
 	}
 
-	return len(s.set.Rows)
+	return len(s.set.GetRows())
 }
 
 // ItemCount returns number of items in the current row.
-func (s *scanner) ItemCount() int {
+func (s *valueScanner) ItemCount() int {
 	if s.row == nil {
 		return 0
 	}
 
-	return len(s.row.Items)
+	return len(s.row.GetItems())
 }
 
 // HasNextRow reports whether result row may be advanced.
 // It may be useful to call HasNextRow() instead of NextRow() to look ahead
 // without advancing the result rows.
-func (s *scanner) HasNextRow() bool {
-	return s.err == nil && s.set != nil && s.nextRow < len(s.set.Rows)
+func (s *valueScanner) HasNextRow() bool {
+	return s.err == nil && s.set != nil && s.nextRow < len(s.set.GetRows())
 }
 
 // NextRow selects next row in the current result set.
 // It returns false if there are no more rows in the result set.
-func (s *scanner) NextRow() bool {
+func (s *valueScanner) NextRow() bool {
 	if !s.HasNextRow() {
 		return false
 	}
-	s.row = s.set.Rows[s.nextRow]
+	s.row = s.set.GetRows()[s.nextRow]
 	s.nextRow++
 	s.nextItem = 0
 	s.stack.reset()
@@ -100,7 +101,7 @@ func (s *scanner) NextRow() bool {
 	return true
 }
 
-func (s *scanner) preScanChecks(lenValues int) (err error) {
+func (s *valueScanner) preScanChecks(lenValues int) (err error) {
 	if s.columnIndexes != nil {
 		if len(s.columnIndexes) != lenValues {
 			return s.errorf(
@@ -121,7 +122,7 @@ func (s *scanner) preScanChecks(lenValues int) (err error) {
 	return s.Err()
 }
 
-func (s *scanner) ScanWithDefaults(values ...indexed.Required) (err error) {
+func (s *valueScanner) ScanWithDefaults(values ...indexed.Required) (err error) {
 	if err = s.preScanChecks(len(values)); err != nil {
 		return
 	}
@@ -149,7 +150,7 @@ func (s *scanner) ScanWithDefaults(values ...indexed.Required) (err error) {
 	return s.Err()
 }
 
-func (s *scanner) Scan(values ...indexed.RequiredOrOptional) (err error) {
+func (s *valueScanner) Scan(values ...indexed.RequiredOrOptional) (err error) {
 	if err = s.preScanChecks(len(values)); err != nil {
 		return
 	}
@@ -177,7 +178,7 @@ func (s *scanner) Scan(values ...indexed.RequiredOrOptional) (err error) {
 	return s.Err()
 }
 
-func (s *scanner) ScanNamed(namedValues ...named.Value) error {
+func (s *valueScanner) ScanNamed(namedValues ...named.Value) error {
 	if err := s.Err(); err != nil {
 		return err
 	}
@@ -199,7 +200,7 @@ func (s *scanner) ScanNamed(namedValues ...named.Value) error {
 		case named.TypeOptionalWithUseDefault:
 			s.scanOptional(namedValues[i].Value, true)
 		default:
-			panic(fmt.Sprintf("unknown type of named.Value: %d", t))
+			panic(fmt.Sprintf("unknown type of named.valueType: %d", t))
 		}
 	}
 	s.nextItem += len(namedValues)
@@ -208,27 +209,27 @@ func (s *scanner) ScanNamed(namedValues ...named.Value) error {
 }
 
 // Truncated returns true if current result set has been truncated by server
-func (s *scanner) Truncated() bool {
+func (s *valueScanner) Truncated() bool {
 	if s.set == nil {
 		_ = s.errorf(0, "there are no sets in the scanner")
 
 		return false
 	}
 
-	return s.set.Truncated
+	return s.set.GetTruncated()
 }
 
 // Truncated returns true if current result set has been truncated by server
-func (s *scanner) truncated() bool {
+func (s *valueScanner) truncated() bool {
 	if s.set == nil {
 		return false
 	}
 
-	return s.set.Truncated
+	return s.set.GetTruncated()
 }
 
 // Err returns error caused Scanner to be broken.
-func (s *scanner) Err() error {
+func (s *valueScanner) Err() error {
 	s.errMtx.RLock()
 	defer s.errMtx.RUnlock()
 	if s.err != nil {
@@ -249,7 +250,7 @@ func (s *scanner) Err() error {
 }
 
 // Must not be exported.
-func (s *scanner) reset(set *Ydb.ResultSet, columnNames ...string) {
+func (s *valueScanner) reset(set *Ydb.ResultSet, columnNames ...string) {
 	s.set = set
 	s.row = nil
 	s.nextRow = 0
@@ -258,11 +259,11 @@ func (s *scanner) reset(set *Ydb.ResultSet, columnNames ...string) {
 	s.setColumnIndexes(columnNames)
 	s.stack.reset()
 	s.converter = &rawConverter{
-		scanner: s,
+		valueScanner: s,
 	}
 }
 
-func (s *scanner) path() string {
+func (s *valueScanner) path() string {
 	buf := xstring.Buffer()
 	defer buf.Free()
 	_, _ = s.writePathTo(buf)
@@ -270,7 +271,7 @@ func (s *scanner) path() string {
 	return buf.String()
 }
 
-func (s *scanner) writePathTo(w io.Writer) (n int64, err error) {
+func (s *valueScanner) writePathTo(w io.Writer) (n int64, err error) {
 	x := s.stack.current()
 	st := x.name
 	m, err := io.WriteString(w, st)
@@ -282,42 +283,42 @@ func (s *scanner) writePathTo(w io.Writer) (n int64, err error) {
 	return n, nil
 }
 
-func (s *scanner) getType() types.Type {
+func (s *valueScanner) getType() internalTypes.Type {
 	x := s.stack.current()
 	if x.isEmpty() {
 		return nil
 	}
 
-	return types2.TypeFromYDB(x.t)
+	return internalTypes.TypeFromYDB(x.t)
 }
 
-func (s *scanner) hasItems() bool {
+func (s *valueScanner) hasItems() bool {
 	return s.err == nil && s.set != nil && s.row != nil
 }
 
-func (s *scanner) seekItemByID(id int) error {
-	if !s.hasItems() || id >= len(s.set.Columns) {
+func (s *valueScanner) seekItemByID(id int) error {
+	if !s.hasItems() || id >= len(s.set.GetColumns()) {
 		return s.notFoundColumnByIndex(id)
 	}
-	col := s.set.Columns[id]
-	s.stack.scanItem.name = col.Name
-	s.stack.scanItem.t = col.Type
-	s.stack.scanItem.v = s.row.Items[id]
+	col := s.set.GetColumns()[id]
+	s.stack.scanItem.name = col.GetName()
+	s.stack.scanItem.t = col.GetType()
+	s.stack.scanItem.v = s.row.GetItems()[id]
 
 	return nil
 }
 
-func (s *scanner) seekItemByName(name string) error {
+func (s *valueScanner) seekItemByName(name string) error {
 	if !s.hasItems() {
 		return s.notFoundColumnName(name)
 	}
-	for i, c := range s.set.Columns {
-		if name != c.Name {
+	for i, c := range s.set.GetColumns() {
+		if name != c.GetName() {
 			continue
 		}
-		s.stack.scanItem.name = c.Name
-		s.stack.scanItem.t = c.Type
-		s.stack.scanItem.v = s.row.Items[i]
+		s.stack.scanItem.name = c.GetName()
+		s.stack.scanItem.t = c.GetType()
+		s.stack.scanItem.v = s.row.GetItems()[i]
 
 		return s.Err()
 	}
@@ -325,7 +326,7 @@ func (s *scanner) seekItemByName(name string) error {
 	return s.notFoundColumnName(name)
 }
 
-func (s *scanner) setColumnIndexes(columns []string) {
+func (s *valueScanner) setColumnIndexes(columns []string) {
 	if columns == nil {
 		s.columnIndexes = nil
 
@@ -334,8 +335,8 @@ func (s *scanner) setColumnIndexes(columns []string) {
 	s.columnIndexes = make([]int, len(columns))
 	for i, col := range columns {
 		found := false
-		for j, c := range s.set.Columns {
-			if c.Name == col {
+		for j, c := range s.set.GetColumns() {
+			if c.GetName() == col {
 				s.columnIndexes[i] = j
 				found = true
 
@@ -369,7 +370,7 @@ func (s *scanner) setColumnIndexes(columns []string) {
 //	[16]byte
 //
 //nolint:gocyclo
-func (s *scanner) any() interface{} {
+func (s *valueScanner) any() interface{} {
 	x := s.stack.current()
 	if s.Err() != nil || x.isEmpty() {
 		return nil
@@ -384,74 +385,74 @@ func (s *scanner) any() interface{} {
 		x = s.stack.current()
 	}
 
-	t := types2.TypeFromYDB(x.t)
-	p, primitive := t.(types2.PrimitiveType)
+	t := internalTypes.TypeFromYDB(x.t)
+	p, primitive := t.(internalTypes.Primitive)
 	if !primitive {
 		return s.value()
 	}
 
 	switch p {
-	case types2.TypeBool:
+	case internalTypes.Bool:
 		return s.bool()
-	case types2.TypeInt8:
+	case internalTypes.Int8:
 		return s.int8()
-	case types2.TypeUint8:
+	case internalTypes.Uint8:
 		return s.uint8()
-	case types2.TypeInt16:
+	case internalTypes.Int16:
 		return s.int16()
-	case types2.TypeUint16:
+	case internalTypes.Uint16:
 		return s.uint16()
-	case types2.TypeInt32:
+	case internalTypes.Int32:
 		return s.int32()
-	case types2.TypeFloat:
+	case internalTypes.Float:
 		return s.float()
-	case types2.TypeDouble:
+	case internalTypes.Double:
 		return s.double()
-	case types2.TypeBytes:
+	case internalTypes.Bytes:
 		return s.bytes()
-	case types2.TypeUUID:
+	case internalTypes.UUID:
 		return s.uint128()
-	case types2.TypeUint32:
+	case internalTypes.Uint32:
 		return s.uint32()
-	case types2.TypeDate:
+	case internalTypes.Date:
 		return value.DateToTime(s.uint32())
-	case types2.TypeDatetime:
+	case internalTypes.Datetime:
 		return value.DatetimeToTime(s.uint32())
-	case types2.TypeUint64:
+	case internalTypes.Uint64:
 		return s.uint64()
-	case types2.TypeTimestamp:
+	case internalTypes.Timestamp:
 		return value.TimestampToTime(s.uint64())
-	case types2.TypeInt64:
+	case internalTypes.Int64:
 		return s.int64()
-	case types2.TypeInterval:
+	case internalTypes.Interval:
 		return value.IntervalToDuration(s.int64())
-	case types2.TypeTzDate:
+	case internalTypes.TzDate:
 		src, err := value.TzDateToTime(s.text())
 		if err != nil {
-			_ = s.errorf(0, "scanner.any(): %w", err)
+			_ = s.errorf(0, "valueScanner.any(): %w", err)
 		}
 
 		return src
-	case types2.TypeTzDatetime:
+	case internalTypes.TzDatetime:
 		src, err := value.TzDatetimeToTime(s.text())
 		if err != nil {
-			_ = s.errorf(0, "scanner.any(): %w", err)
+			_ = s.errorf(0, "valueScanner.any(): %w", err)
 		}
 
 		return src
-	case types2.TypeTzTimestamp:
+	case internalTypes.TzTimestamp:
 		src, err := value.TzTimestampToTime(s.text())
 		if err != nil {
-			_ = s.errorf(0, "scanner.any(): %w", err)
+			_ = s.errorf(0, "valueScanner.any(): %w", err)
 		}
 
 		return src
-	case types2.TypeText, types2.TypeDyNumber:
+	case internalTypes.Text, internalTypes.DyNumber:
 		return s.text()
 	case
-		types2.TypeYSON,
-		types2.TypeJSON,
-		types2.TypeJSONDocument:
+		internalTypes.YSON,
+		internalTypes.JSON,
+		internalTypes.JSONDocument:
 		return xstring.ToBytes(s.text())
 	default:
 		_ = s.errorf(0, "unknown primitive types")
@@ -460,28 +461,28 @@ func (s *scanner) any() interface{} {
 	}
 }
 
-// Value returns current item under scan as ydb.Value types.
-func (s *scanner) value() types.Value {
+// valueType returns current item under scan as ydb.valueType types
+func (s *valueScanner) value() value.Value {
 	x := s.stack.current()
 
 	return value.FromYDB(x.t, x.v)
 }
 
-func (s *scanner) isCurrentTypeOptional() bool {
+func (s *valueScanner) isCurrentTypeOptional() bool {
 	c := s.stack.current()
 
 	return isOptional(c.t)
 }
 
-func (s *scanner) isNull() bool {
+func (s *valueScanner) isNull() bool {
 	_, yes := s.stack.currentValue().(*Ydb.Value_NullFlagValue)
 
 	return yes
 }
 
-// unwrap current item under scan interpreting it as Optional<Type> types.
+// unwrap current item under scan interpreting it as Optional<Type> types
 // ignores if type is not optional
-func (s *scanner) unwrap() {
+func (s *valueScanner) unwrap() {
 	if s.Err() != nil {
 		return
 	}
@@ -491,13 +492,13 @@ func (s *scanner) unwrap() {
 		return
 	}
 
-	if isOptional(t.OptionalType.Item) {
+	if isOptional(t.OptionalType.GetItem()) {
 		s.stack.scanItem.v = s.unwrapValue()
 	}
-	s.stack.scanItem.t = t.OptionalType.Item
+	s.stack.scanItem.t = t.OptionalType.GetItem()
 }
 
-func (s *scanner) unwrapValue() (v *Ydb.Value) {
+func (s *valueScanner) unwrapValue() (v *Ydb.Value) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_NestedValue)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
@@ -508,25 +509,25 @@ func (s *scanner) unwrapValue() (v *Ydb.Value) {
 	return x.NestedValue
 }
 
-func (s *scanner) unwrapDecimal() (v types.Decimal) {
+func (s *valueScanner) unwrapDecimal() decimal.Decimal {
 	if s.Err() != nil {
-		return
+		return decimal.Decimal{}
 	}
 	s.unwrap()
 	d := s.assertTypeDecimal(s.stack.current().t)
 	if d == nil {
-		return
+		return decimal.Decimal{}
 	}
 
-	return types.Decimal{
+	return decimal.Decimal{
 		Bytes:     s.uint128(),
-		Precision: d.DecimalType.Precision,
-		Scale:     d.DecimalType.Scale,
+		Precision: d.DecimalType.GetPrecision(),
+		Scale:     d.DecimalType.GetScale(),
 	}
 }
 
-func (s *scanner) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.Type_DecimalType) {
-	x := typ.Type
+func (s *valueScanner) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.Type_DecimalType) {
+	x := typ.GetType()
 	if t, _ = x.(*Ydb.Type_DecimalType); t == nil {
 		s.typeError(x, t)
 	}
@@ -534,7 +535,7 @@ func (s *scanner) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.Type_DecimalType) {
 	return
 }
 
-func (s *scanner) bool() (v bool) {
+func (s *valueScanner) bool() (v bool) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_BoolValue)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
@@ -545,7 +546,7 @@ func (s *scanner) bool() (v bool) {
 	return x.BoolValue
 }
 
-func (s *scanner) int8() (v int8) {
+func (s *valueScanner) int8() (v int8) {
 	d := s.int32()
 	if d < math.MinInt8 || math.MaxInt8 < d {
 		_ = s.overflowError(d, v)
@@ -556,7 +557,7 @@ func (s *scanner) int8() (v int8) {
 	return int8(d)
 }
 
-func (s *scanner) uint8() (v uint8) {
+func (s *valueScanner) uint8() (v uint8) {
 	d := s.uint32()
 	if d > math.MaxUint8 {
 		_ = s.overflowError(d, v)
@@ -567,7 +568,7 @@ func (s *scanner) uint8() (v uint8) {
 	return uint8(d)
 }
 
-func (s *scanner) int16() (v int16) {
+func (s *valueScanner) int16() (v int16) {
 	d := s.int32()
 	if d < math.MinInt16 || math.MaxInt16 < d {
 		_ = s.overflowError(d, v)
@@ -578,7 +579,7 @@ func (s *scanner) int16() (v int16) {
 	return int16(d)
 }
 
-func (s *scanner) uint16() (v uint16) {
+func (s *valueScanner) uint16() (v uint16) {
 	d := s.uint32()
 	if d > math.MaxUint16 {
 		_ = s.overflowError(d, v)
@@ -589,7 +590,7 @@ func (s *scanner) uint16() (v uint16) {
 	return uint16(d)
 }
 
-func (s *scanner) int32() (v int32) {
+func (s *valueScanner) int32() (v int32) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_Int32Value)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
@@ -600,7 +601,7 @@ func (s *scanner) int32() (v int32) {
 	return x.Int32Value
 }
 
-func (s *scanner) uint32() (v uint32) {
+func (s *valueScanner) uint32() (v uint32) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_Uint32Value)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
@@ -611,7 +612,7 @@ func (s *scanner) uint32() (v uint32) {
 	return x.Uint32Value
 }
 
-func (s *scanner) int64() (v int64) {
+func (s *valueScanner) int64() (v int64) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_Int64Value)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
@@ -622,7 +623,7 @@ func (s *scanner) int64() (v int64) {
 	return x.Int64Value
 }
 
-func (s *scanner) uint64() (v uint64) {
+func (s *valueScanner) uint64() (v uint64) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_Uint64Value)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
@@ -633,7 +634,7 @@ func (s *scanner) uint64() (v uint64) {
 	return x.Uint64Value
 }
 
-func (s *scanner) float() (v float32) {
+func (s *valueScanner) float() (v float32) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_FloatValue)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
@@ -644,7 +645,7 @@ func (s *scanner) float() (v float32) {
 	return x.FloatValue
 }
 
-func (s *scanner) double() (v float64) {
+func (s *valueScanner) double() (v float64) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_DoubleValue)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
@@ -655,7 +656,7 @@ func (s *scanner) double() (v float64) {
 	return x.DoubleValue
 }
 
-func (s *scanner) bytes() (v []byte) {
+func (s *valueScanner) bytes() (v []byte) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_BytesValue)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
@@ -666,7 +667,7 @@ func (s *scanner) bytes() (v []byte) {
 	return x.BytesValue
 }
 
-func (s *scanner) text() (v string) {
+func (s *valueScanner) text() (v string) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_TextValue)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
@@ -677,7 +678,7 @@ func (s *scanner) text() (v string) {
 	return x.TextValue
 }
 
-func (s *scanner) low128() (v uint64) {
+func (s *valueScanner) low128() (v uint64) {
 	x, _ := s.stack.currentValue().(*Ydb.Value_Low_128)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
@@ -688,7 +689,7 @@ func (s *scanner) low128() (v uint64) {
 	return x.Low_128
 }
 
-func (s *scanner) uint128() (v [16]byte) {
+func (s *valueScanner) uint128() (v [16]byte) {
 	c := s.stack.current()
 	if c.isEmpty() {
 		_ = s.errorf(0, "not implemented convert to [16]byte")
@@ -696,19 +697,19 @@ func (s *scanner) uint128() (v [16]byte) {
 		return
 	}
 	lo := s.low128()
-	hi := c.v.High_128
+	hi := c.v.GetHigh_128()
 
 	return value.BigEndianUint128(hi, lo)
 }
 
-func (s *scanner) null() {
+func (s *valueScanner) null() {
 	x, _ := s.stack.currentValue().(*Ydb.Value_NullFlagValue)
 	if x == nil {
 		s.valueTypeError(s.stack.currentValue(), x)
 	}
 }
 
-func (s *scanner) setTime(dst *time.Time) {
+func (s *valueScanner) setTime(dst *time.Time) {
 	switch t := s.stack.current().t.GetTypeId(); t {
 	case Ydb.Type_DATE:
 		*dst = value.DateToTime(s.uint32())
@@ -719,27 +720,27 @@ func (s *scanner) setTime(dst *time.Time) {
 	case Ydb.Type_TZ_DATE:
 		src, err := value.TzDateToTime(s.text())
 		if err != nil {
-			_ = s.errorf(0, "scanner.setTime(): %w", err)
+			_ = s.errorf(0, "valueScanner.setTime(): %w", err)
 		}
 		*dst = src
 	case Ydb.Type_TZ_DATETIME:
 		src, err := value.TzDatetimeToTime(s.text())
 		if err != nil {
-			_ = s.errorf(0, "scanner.setTime(): %w", err)
+			_ = s.errorf(0, "valueScanner.setTime(): %w", err)
 		}
 		*dst = src
 	case Ydb.Type_TZ_TIMESTAMP:
 		src, err := value.TzTimestampToTime(s.text())
 		if err != nil {
-			_ = s.errorf(0, "scanner.setTime(): %w", err)
+			_ = s.errorf(0, "valueScanner.setTime(): %w", err)
 		}
 		*dst = src
 	default:
-		_ = s.errorf(0, "scanner.setTime(): incorrect source types %s", t)
+		_ = s.errorf(0, "valueScanner.setTime(): incorrect source types %s", t)
 	}
 }
 
-func (s *scanner) setString(dst *string) {
+func (s *valueScanner) setString(dst *string) {
 	switch t := s.stack.current().t.GetTypeId(); t {
 	case Ydb.Type_UUID:
 		src := s.uint128()
@@ -753,7 +754,7 @@ func (s *scanner) setString(dst *string) {
 	}
 }
 
-func (s *scanner) setByte(dst *[]byte) {
+func (s *valueScanner) setByte(dst *[]byte) {
 	switch t := s.stack.current().t.GetTypeId(); t {
 	case Ydb.Type_UUID:
 		src := s.uint128()
@@ -767,7 +768,7 @@ func (s *scanner) setByte(dst *[]byte) {
 	}
 }
 
-func (s *scanner) trySetByteArray(v interface{}, optional, def bool) bool {
+func (s *valueScanner) trySetByteArray(v interface{}, optional, def bool) bool {
 	rv := reflect.ValueOf(v)
 	if rv.Kind() == reflect.Ptr {
 		rv = rv.Elem()
@@ -809,7 +810,7 @@ func (s *scanner) trySetByteArray(v interface{}, optional, def bool) bool {
 }
 
 //nolint:gocyclo
-func (s *scanner) scanRequired(v interface{}) {
+func (s *valueScanner) scanRequired(v interface{}) {
 	switch v := v.(type) {
 	case *bool:
 		*v = s.bool()
@@ -849,11 +850,11 @@ func (s *scanner) scanRequired(v interface{}) {
 		*v = s.uint128()
 	case *interface{}:
 		*v = s.any()
-	case *types.Value:
+	case *value.Value:
 		*v = s.value()
-	case *types.Decimal:
+	case *decimal.Decimal:
 		*v = s.unwrapDecimal()
-	case types.Scanner:
+	case scanner.Scanner:
 		err := v.UnmarshalYDB(s.converter)
 		if err != nil {
 			_ = s.errorf(0, "ydb.Scanner error: %w", err)
@@ -866,9 +867,9 @@ func (s *scanner) scanRequired(v interface{}) {
 	case json.Unmarshaler:
 		var err error
 		switch s.getType() {
-		case types.TypeJSON:
+		case internalTypes.JSON:
 			err = v.UnmarshalJSON(s.converter.JSON())
-		case types.TypeJSONDocument:
+		case internalTypes.JSONDocument:
 			err = v.UnmarshalJSON(s.converter.JSONDocument())
 		default:
 			_ = s.errorf(0, "ydb required type %T not unsupported for applying to json.Unmarshaler", s.getType())
@@ -885,7 +886,7 @@ func (s *scanner) scanRequired(v interface{}) {
 }
 
 //nolint:gocyclo
-func (s *scanner) scanOptional(v interface{}, defaultValueForOptional bool) {
+func (s *valueScanner) scanOptional(v interface{}, defaultValueForOptional bool) {
 	if defaultValueForOptional {
 		if s.isNull() {
 			s.setDefaultValue(v)
@@ -1036,16 +1037,16 @@ func (s *scanner) scanOptional(v interface{}, defaultValueForOptional bool) {
 			src := s.any()
 			*v = &src
 		}
-	case *types.Value:
+	case *value.Value:
 		*v = s.value()
-	case **types.Decimal:
+	case **decimal.Decimal:
 		if s.isNull() {
 			*v = nil
 		} else {
 			src := s.unwrapDecimal()
 			*v = &src
 		}
-	case types.Scanner:
+	case scanner.Scanner:
 		err := v.UnmarshalYDB(s.converter)
 		if err != nil {
 			_ = s.errorf(0, "ydb.Scanner error: %w", err)
@@ -1059,13 +1060,13 @@ func (s *scanner) scanOptional(v interface{}, defaultValueForOptional bool) {
 		s.unwrap()
 		var err error
 		switch s.getType() {
-		case types.TypeJSON:
+		case internalTypes.JSON:
 			if s.isNull() {
 				err = v.UnmarshalJSON(nil)
 			} else {
 				err = v.UnmarshalJSON(s.converter.JSON())
 			}
-		case types.TypeJSONDocument:
+		case internalTypes.JSONDocument:
 			if s.isNull() {
 				err = v.UnmarshalJSON(nil)
 			} else {
@@ -1091,7 +1092,7 @@ func (s *scanner) scanOptional(v interface{}, defaultValueForOptional bool) {
 	}
 }
 
-func (s *scanner) setDefaultValue(dst interface{}) {
+func (s *valueScanner) setDefaultValue(dst interface{}) {
 	switch v := dst.(type) {
 	case *bool:
 		*v = false
@@ -1127,16 +1128,16 @@ func (s *scanner) setDefaultValue(dst interface{}) {
 		*v = [16]byte{}
 	case *interface{}:
 		*v = nil
-	case *types.Value:
+	case *value.Value:
 		*v = s.value()
-	case *types.Decimal:
-		*v = types.Decimal{}
+	case *decimal.Decimal:
+		*v = decimal.Decimal{}
 	case sql.Scanner:
 		err := v.Scan(nil)
 		if err != nil {
 			_ = s.errorf(0, "sql.Scanner error: %w", err)
 		}
-	case types.Scanner:
+	case scanner.Scanner:
 		err := v.UnmarshalYDB(s.converter)
 		if err != nil {
 			_ = s.errorf(0, "ydb.Scanner error: %w", err)
@@ -1160,7 +1161,7 @@ func (r *baseResult) SetErr(err error) {
 	})
 }
 
-func (s *scanner) errorf(depth int, f string, args ...interface{}) error {
+func (s *valueScanner) errorf(depth int, f string, args ...interface{}) error {
 	s.errMtx.Lock()
 	defer s.errMtx.Unlock()
 	if s.err != nil {
@@ -1171,7 +1172,7 @@ func (s *scanner) errorf(depth int, f string, args ...interface{}) error {
 	return s.err
 }
 
-func (s *scanner) typeError(act, exp interface{}) {
+func (s *valueScanner) typeError(act, exp interface{}) {
 	_ = s.errorf(
 		2,
 		"unexpected types during scan at %q %s: %s; want %s",
@@ -1182,7 +1183,7 @@ func (s *scanner) typeError(act, exp interface{}) {
 	)
 }
 
-func (s *scanner) valueTypeError(act, exp interface{}) {
+func (s *valueScanner) valueTypeError(act, exp interface{}) {
 	// unexpected value during scan at \"migration_status\" Int64: NullFlag; want Int64
 	_ = s.errorf(
 		2,
@@ -1194,7 +1195,7 @@ func (s *scanner) valueTypeError(act, exp interface{}) {
 	)
 }
 
-func (s *scanner) notFoundColumnByIndex(idx int) error {
+func (s *valueScanner) notFoundColumnByIndex(idx int) error {
 	return s.errorf(
 		2,
 		"not found %d column",
@@ -1202,7 +1203,7 @@ func (s *scanner) notFoundColumnByIndex(idx int) error {
 	)
 }
 
-func (s *scanner) notFoundColumnName(name string) error {
+func (s *valueScanner) notFoundColumnName(name string) error {
 	return s.errorf(
 		2,
 		"not found column '%s'",
@@ -1210,7 +1211,7 @@ func (s *scanner) notFoundColumnName(name string) error {
 	)
 }
 
-func (s *scanner) noColumnError(name string) error {
+func (s *valueScanner) noColumnError(name string) error {
 	return s.errorf(
 		2,
 		"no column %q",
@@ -1218,7 +1219,7 @@ func (s *scanner) noColumnError(name string) error {
 	)
 }
 
-func (s *scanner) overflowError(i, n interface{}) error {
+func (s *valueScanner) overflowError(i, n interface{}) error {
 	return s.errorf(
 		2,
 		"overflow error: %d overflows capacity of %t",
@@ -1231,7 +1232,7 @@ var emptyItem item
 
 type item struct {
 	name string
-	i    int // Index in listing types.
+	i    int // Index in listing types
 	t    *Ydb.Type
 	v    *Ydb.Value
 }
@@ -1308,7 +1309,7 @@ func (s *scanStack) current() item {
 
 func (s *scanStack) currentValue() interface{} {
 	if v := s.current().v; v != nil {
-		return v.Value
+		return v.GetValue()
 	}
 
 	return nil
@@ -1316,7 +1317,7 @@ func (s *scanStack) currentValue() interface{} {
 
 func (s *scanStack) currentType() interface{} {
 	if t := s.current().t; t != nil {
-		return t.Type
+		return t.GetType()
 	}
 
 	return nil
@@ -1326,7 +1327,7 @@ func isOptional(typ *Ydb.Type) bool {
 	if typ == nil {
 		return false
 	}
-	_, yes := typ.Type.(*Ydb.Type_OptionalType)
+	_, yes := typ.GetType().(*Ydb.Type_OptionalType)
 
 	return yes
 }

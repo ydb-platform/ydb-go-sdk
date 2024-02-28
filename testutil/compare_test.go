@@ -17,11 +17,11 @@ func TestUnwrapOptionalValue(t *testing.T) {
 	defer a.Free()
 	v := value.OptionalValue(value.OptionalValue(value.TextValue("a")))
 	val := unwrapTypedValue(value.ToYDB(v, a))
-	typeID := val.Type.GetTypeId()
+	typeID := val.GetType().GetTypeId()
 	if typeID != Ydb.Type_UTF8 {
 		t.Errorf("Types are different: expected %d, actual %d", Ydb.Type_UTF8, typeID)
 	}
-	textValue := val.Value.Value.(*Ydb.Value_TextValue)
+	textValue := val.GetValue().GetValue().(*Ydb.Value_TextValue)
 	text := textValue.TextValue
 	if text != "a" {
 		t.Errorf("Values are different: expected %q, actual %q", "a", text)
@@ -33,11 +33,11 @@ func TestUnwrapPrimitiveValue(t *testing.T) {
 	defer a.Free()
 	v := value.TextValue("a")
 	val := unwrapTypedValue(value.ToYDB(v, a))
-	typeID := val.Type.GetTypeId()
+	typeID := val.GetType().GetTypeId()
 	if typeID != Ydb.Type_UTF8 {
 		t.Errorf("Types are different: expected %d, actual %d", Ydb.Type_UTF8, typeID)
 	}
-	textValue := val.Value.Value.(*Ydb.Value_TextValue)
+	textValue := val.GetValue().GetValue().(*Ydb.Value_TextValue)
 	text := textValue.TextValue
 	if text != "a" {
 		t.Errorf("Values are different: expected %q, actual %q", "a", text)
@@ -47,13 +47,13 @@ func TestUnwrapPrimitiveValue(t *testing.T) {
 func TestUnwrapNullValue(t *testing.T) {
 	a := allocator.New()
 	defer a.Free()
-	v := value.NullValue(types.TypeText)
+	v := value.NullValue(types.Text)
 	val := unwrapTypedValue(value.ToYDB(v, a))
-	typeID := val.Type.GetTypeId()
+	typeID := val.GetType().GetTypeId()
 	if typeID != Ydb.Type_UTF8 {
 		t.Errorf("Types are different: expected %d, actual %d", Ydb.Type_UTF8, typeID)
 	}
-	nullFlagValue := val.Value.Value.(*Ydb.Value_NullFlagValue)
+	nullFlagValue := val.GetValue().GetValue().(*Ydb.Value_NullFlagValue)
 	if nullFlagValue.NullFlagValue != structpb.NullValue_NULL_VALUE {
 		t.Errorf("Values are different: expected %d, actual %d", structpb.NullValue_NULL_VALUE, nullFlagValue.NullFlagValue)
 	}
@@ -236,7 +236,7 @@ func TestBytes(t *testing.T) {
 }
 
 func TestNull(t *testing.T) {
-	l := value.NullValue(types.TypeText)
+	l := value.NullValue(types.Text)
 	r := value.TextValue("abc")
 
 	c, err := Compare(l, r)
@@ -253,7 +253,7 @@ func TestNull(t *testing.T) {
 }
 
 func TestTuple(t *testing.T) {
-	withNull := value.TupleValue(value.Uint64Value(1), value.NullValue(types.TypeText))
+	withNull := value.TupleValue(value.Uint64Value(1), value.NullValue(types.Text))
 	least := value.TupleValue(value.Uint64Value(1), value.TextValue("abc"))
 	medium := value.TupleValue(value.Uint64Value(1), value.TextValue("def"))
 	largest := value.TupleValue(value.Uint64Value(2), value.TextValue("abc"))
