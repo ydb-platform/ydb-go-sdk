@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
@@ -21,18 +22,18 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -50,8 +51,8 @@ type session struct {
 
 	status    table.SessionStatus
 	statusMtx sync.RWMutex
-	nodeID    xatomic.Uint32
-	lastUsage xatomic.Int64
+	nodeID    atomic.Uint32
+	lastUsage atomic.Int64
 
 	onClose   []func(s *session)
 	closeOnce sync.Once
@@ -260,7 +261,7 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	switch result.SessionStatus {
+	switch result.GetSessionStatus() {
 	case Ydb_Table.KeepAliveResult_SESSION_STATUS_READY:
 		s.SetStatus(table.SessionReady)
 	case Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY:
@@ -341,10 +342,10 @@ func (s *session) DescribeTable(
 		[]options.Column,
 		len(result.GetColumns()),
 	)
-	for i, c := range result.Columns {
+	for i, c := range result.GetColumns() {
 		cs[i] = options.Column{
 			Name:   c.GetName(),
-			Type:   value.TypeFromYDB(c.GetType()),
+			Type:   types.TypeFromYDB(c.GetType()),
 			Family: c.GetFamily(),
 		}
 	}
@@ -353,7 +354,7 @@ func (s *session) DescribeTable(
 		[]options.KeyRange,
 		len(result.GetShardKeyBounds())+1,
 	)
-	var last types.Value
+	var last value.Value
 	for i, b := range result.GetShardKeyBounds() {
 		if last != nil {
 			rs[i].From = last
@@ -376,18 +377,18 @@ func (s *session) DescribeTable(
 			[]options.PartitionStats,
 			len(result.GetTableStats().GetPartitionStats()),
 		)
-		for i, v := range result.TableStats.PartitionStats {
+		for i, v := range result.GetTableStats().GetPartitionStats() {
 			partStats[i].RowsEstimate = v.GetRowsEstimate()
 			partStats[i].StoreSize = v.GetStoreSize()
 		}
 		var creationTime, modificationTime time.Time
-		if resStats.CreationTime.GetSeconds() != 0 {
+		if resStats.GetCreationTime().GetSeconds() != 0 {
 			creationTime = time.Unix(
 				resStats.GetCreationTime().GetSeconds(),
 				int64(resStats.GetCreationTime().GetNanos()),
 			)
 		}
-		if resStats.ModificationTime.GetSeconds() != 0 {
+		if resStats.GetModificationTime().GetSeconds() != 0 {
 			modificationTime = time.Unix(
 				resStats.GetModificationTime().GetSeconds(),
 				int64(resStats.GetModificationTime().GetNanos()),
@@ -414,10 +415,10 @@ func (s *session) DescribeTable(
 		attrs[k] = v
 	}
 
-	indexes := make([]options.IndexDescription, len(result.Indexes))
+	indexes := make([]options.IndexDescription, len(result.GetIndexes()))
 	for i, idx := range result.GetIndexes() {
 		var typ options.IndexType
-		switch idx.Type.(type) {
+		switch idx.GetType().(type) {
 		case *Ydb_Table.TableIndexDescription_GlobalAsyncIndex:
 			typ = options.IndexTypeGlobalAsync
 		case *Ydb_Table.TableIndexDescription_GlobalIndex:
@@ -432,7 +433,7 @@ func (s *session) DescribeTable(
 		}
 	}
 
-	changeFeeds := make([]options.ChangefeedDescription, len(result.Changefeeds))
+	changeFeeds := make([]options.ChangefeedDescription, len(result.GetChangefeeds()))
 	for i, proto := range result.GetChangefeeds() {
 		changeFeeds[i] = options.NewChangefeedDescription(proto)
 	}
@@ -577,7 +578,7 @@ func copyTables(
 			opt((*options.CopyTablesDesc)(&request))
 		}
 	}
-	if len(request.Tables) == 0 {
+	if len(request.GetTables()) == 0 {
 		return xerrors.WithStackTrace(fmt.Errorf("no CopyTablesItem: %w", errParamsRequired))
 	}
 	_, err = service.CopyTables(ctx, &request)
@@ -651,7 +652,7 @@ func (s *session) Explain(
 		Explanation: table.Explanation{
 			Plan: result.GetQueryPlan(),
 		},
-		AST: result.QueryAst,
+		AST: result.GetQueryAst(),
 	}, nil
 }
 
@@ -699,7 +700,7 @@ func (s *session) Prepare(ctx context.Context, queryText string) (_ table.Statem
 	stmt = &statement{
 		session: s,
 		query:   queryPrepared(result.GetQueryId(), queryText),
-		params:  result.ParametersTypes,
+		params:  result.GetParametersTypes(),
 	}
 
 	return stmt, nil
@@ -710,7 +711,7 @@ func (s *session) Execute(
 	ctx context.Context,
 	txControl *table.TransactionControl,
 	query string,
-	params *table.QueryParameters,
+	parameters *params.Parameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
 	txr table.Transaction, r result.Result, err error,
@@ -728,10 +729,10 @@ func (s *session) Execute(
 
 	request.SessionId = s.id
 	request.TxControl = txControl.Desc()
-	request.Parameters = params.Params().ToYDB(a)
+	request.Parameters = parameters.ToYDB(a)
 	request.Query = q.toYDB(a)
 	request.QueryCachePolicy = a.TableQueryCachePolicy()
-	request.QueryCachePolicy.KeepInCache = len(params.Params()) > 0
+	request.QueryCachePolicy.KeepInCache = len(request.Parameters) > 0
 	request.OperationParams = operation.Params(ctx,
 		s.config.OperationTimeout(),
 		s.config.OperationCancelAfter(),
@@ -747,7 +748,7 @@ func (s *session) Execute(
 	onDone := trace.TableOnSessionQueryExecute(
 		s.config.Trace(), &ctx,
 		stack.FunctionID(""),
-		s, q, params,
+		s, q, parameters,
 		request.QueryCachePolicy.GetKeepInCache(),
 	)
 	defer func() {
@@ -775,7 +776,7 @@ func (s *session) executeQueryResult(
 		id: res.GetTxMeta().GetId(),
 		s:  s,
 	}
-	if txControl.CommitTx {
+	if txControl.GetCommitTx() {
 		tx.state.Store(txStateCommitted)
 	} else {
 		tx.state.Store(txStateInitialized)
@@ -1054,7 +1055,7 @@ func (s *session) StreamReadTable(
 func (s *session) ReadRows(
 	ctx context.Context,
 	path string,
-	keys types.Value,
+	keys value.Value,
 	opts ...options.ReadRowsOption,
 ) (_ result.Result, err error) {
 	var (
@@ -1083,9 +1084,7 @@ func (s *session) ReadRows(
 
 	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
 		return nil, xerrors.WithStackTrace(
-			xerrors.Operation(
-				xerrors.FromOperation(response),
-			),
+			xerrors.FromOperation(response),
 		)
 	}
 
@@ -1104,7 +1103,7 @@ func (s *session) ReadRows(
 func (s *session) StreamExecuteScanQuery(
 	ctx context.Context,
 	query string,
-	params *table.QueryParameters,
+	parameters *params.Parameters,
 	opts ...options.ExecuteScanQueryOption,
 ) (_ result.StreamResult, err error) {
 	var (
@@ -1113,11 +1112,11 @@ func (s *session) StreamExecuteScanQuery(
 		onIntermediate = trace.TableOnSessionQueryStreamExecute(
 			s.config.Trace(), &ctx,
 			stack.FunctionID(""),
-			s, q, params,
+			s, q, parameters,
 		)
 		request = Ydb_Table.ExecuteScanQueryRequest{
 			Query:      q.toYDB(a),
-			Parameters: params.Params().ToYDB(a),
+			Parameters: parameters.ToYDB(a),
 			Mode:       Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC, // set default
 		}
 		stream      Ydb_Table_V1.TableService_StreamExecuteScanQueryClient
@@ -1180,7 +1179,7 @@ func (s *session) StreamExecuteScanQuery(
 }
 
 // BulkUpsert uploads given list of ydb struct values to the table.
-func (s *session) BulkUpsert(ctx context.Context, table string, rows types.Value,
+func (s *session) BulkUpsert(ctx context.Context, table string, rows value.Value,
 	opts ...options.BulkUpsertOption,
 ) (err error) {
 	var (

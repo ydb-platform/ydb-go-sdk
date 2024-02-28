@@ -1,6 +1,25 @@
+* Added experimental implementation of query service client
+* Fixed sometime panic on topic writer closing
+* Added experimental query parameters builder `ydb.ParamsBuilder()`
+* Changed types of `table/table.{QueryParameters,ParameterOption}` to aliases on `internal/params.{Parameters,NamedValue}`
+* Fixed bug with optional decimal serialization 
+
+## v3.56.2
+* Fixed return private error for commit to stopped partition in topic reader.
+* Stopped wrapping err error as transport error at topic streams (internals)
+
+## v3.56.1
+* Fixed fixenv usage (related to tests only)
+
+## v3.56.0
+* Fixed handle of operational errors in topic streams
+* The minimum version of Go in `ydb-go-sdk` has been raised to `go1.21`
 * Fixed topic writer infinite reconnections in some cases
 * Refactored nil on err `internal/grpcwrapper/rawydb/issues.go`, when golangci-lint nilerr enabled
 * Refactored nil on err `internal/grpcwrapper/rawtopic/describe_topic.go`, when golangci-lint nilerr enabled
+
+## v3.55.3
+* Fixed handle of operational errors in topic streams (backported fix only)
 
 ## v3.55.2
 * Fixed init info in topic writer, when autoseq num turned off.

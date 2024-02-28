@@ -42,7 +42,7 @@ type DescribeTopicResult struct {
 }
 
 func (res *DescribeTopicResult) FromProto(protoResponse *Ydb_Topic.DescribeTopicResponse) error {
-	if err := res.Operation.FromProtoWithStatusCheck(protoResponse.Operation); err != nil {
+	if err := res.Operation.FromProtoWithStatusCheck(protoResponse.GetOperation()); err != nil {
 		return err
 	}
 
@@ -51,11 +51,11 @@ func (res *DescribeTopicResult) FromProto(protoResponse *Ydb_Topic.DescribeTopic
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: describe topic result failed on unmarshal grpc result: %w", err))
 	}
 
-	if err := res.Self.FromProto(protoResult.Self); err != nil {
+	if err := res.Self.FromProto(protoResult.GetSelf()); err != nil {
 		return err
 	}
 
-	if err := res.PartitioningSettings.FromProto(protoResult.PartitioningSettings); err != nil {
+	if err := res.PartitioningSettings.FromProto(protoResult.GetPartitioningSettings()); err != nil {
 		return err
 	}
 
@@ -72,17 +72,17 @@ func (res *DescribeTopicResult) FromProto(protoResponse *Ydb_Topic.DescribeTopic
 		res.SupportedCodecs = append(res.SupportedCodecs, rawtopiccommon.Codec(v))
 	}
 
-	res.PartitionWriteSpeedBytesPerSecond = protoResult.PartitionWriteSpeedBytesPerSecond
-	res.PartitionWriteBurstBytes = protoResult.PartitionWriteBurstBytes
+	res.PartitionWriteSpeedBytesPerSecond = protoResult.GetPartitionWriteSpeedBytesPerSecond()
+	res.PartitionWriteBurstBytes = protoResult.GetPartitionWriteBurstBytes()
 
-	res.Attributes = protoResult.Attributes
+	res.Attributes = protoResult.GetAttributes()
 
-	res.Consumers = make([]Consumer, len(protoResult.Consumers))
+	res.Consumers = make([]Consumer, len(protoResult.GetConsumers()))
 	for i := range res.Consumers {
-		res.Consumers[i].MustFromProto(protoResult.Consumers[i])
+		res.Consumers[i].MustFromProto(protoResult.GetConsumers()[i])
 	}
 
-	res.MeteringMode = MeteringMode(protoResult.MeteringMode)
+	res.MeteringMode = MeteringMode(protoResult.GetMeteringMode())
 
 	return nil
 }
