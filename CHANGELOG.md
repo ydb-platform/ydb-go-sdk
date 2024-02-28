@@ -1,4 +1,5 @@
 * Added experimental query parameters builder `ydb.ParamsBuilder()`
+* Changed types of `table/table.{QueryParameters,ParameterOption}` to aliases on `internal/params.{Parameters,NamedValue}`
 * Fixed bug with optional decimal serialization 
 
 ## v3.56.2
