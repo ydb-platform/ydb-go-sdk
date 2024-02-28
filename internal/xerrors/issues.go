@@ -44,9 +44,9 @@ func (ii issues) String() string {
 		b.WriteByte('\'')
 		b.WriteString(strings.TrimSuffix(m.GetMessage(), "."))
 		b.WriteByte('\'')
-		if len(m.Issues) > 0 {
+		if len(m.GetIssues()) > 0 {
 			b.WriteByte(' ')
-			b.WriteString(issues(m.Issues).String())
+			b.WriteString(issues(m.GetIssues()).String())
 		}
 		b.WriteByte('}')
 	}
@@ -133,7 +133,7 @@ func (it IssueIterator) Get(i int) (Issue, IssueIterator) {
 		x      = it[i]
 		nested IssueIterator
 	)
-	if xs := x.Issues; len(xs) > 0 {
+	if xs := x.GetIssues(); len(xs) > 0 {
 		nested = IssueIterator(xs)
 	}
 

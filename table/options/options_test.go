@@ -24,7 +24,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
-		if req.Profile.PresetName != abc {
+		if req.GetProfile().GetPresetName() != abc {
 			t.Errorf("Preset is not as expected")
 		}
 	}
@@ -34,7 +34,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
-		if req.Profile.CompactionPolicy.PresetName != abc {
+		if req.GetProfile().GetCompactionPolicy().GetPresetName() != abc {
 			t.Errorf("Compaction policy is not as expected")
 		}
 	}
@@ -47,8 +47,8 @@ func TestSessionOptionsProfile(t *testing.T) {
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
-		p := req.Profile.PartitioningPolicy
-		if p.PresetName != abc || p.AutoPartitioning != Ydb_Table.PartitioningPolicy_AUTO_SPLIT {
+		p := req.GetProfile().GetPartitioningPolicy()
+		if p.GetPresetName() != abc || p.GetAutoPartitioning() != Ydb_Table.PartitioningPolicy_AUTO_SPLIT {
 			t.Errorf("Partitioning policy is not as expected")
 		}
 	}
@@ -58,7 +58,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
-		if p, ok := req.Partitions.(*Ydb_Table.CreateTableRequest_UniformPartitions); !ok || p.UniformPartitions != 3 {
+		if p, ok := req.GetPartitions().(*Ydb_Table.CreateTableRequest_UniformPartitions); !ok || p.UniformPartitions != 3 {
 			t.Errorf("Uniform partitioning policy is not as expected")
 		}
 	}
@@ -70,14 +70,14 @@ func TestSessionOptionsProfile(t *testing.T) {
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
-		p, ok := req.Partitions.(*Ydb_Table.CreateTableRequest_PartitionAtKeys)
+		p, ok := req.GetPartitions().(*Ydb_Table.CreateTableRequest_PartitionAtKeys)
 		if !ok {
 			t.Errorf("Explicitly partitioning policy is not as expected")
 		} else {
 			require.Equal(
 				t,
 				[]*Ydb.TypedValue{value.ToYDB(value.Int64Value(1), a)},
-				p.PartitionAtKeys.SplitPoints,
+				p.PartitionAtKeys.GetSplitPoints(),
 			)
 		}
 	}
@@ -87,7 +87,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
-		if req.Profile.ExecutionPolicy.PresetName != abc {
+		if req.GetProfile().GetExecutionPolicy().GetPresetName() != abc {
 			t.Errorf("Execution policy is not as expected")
 		}
 	}
@@ -102,11 +102,11 @@ func TestSessionOptionsProfile(t *testing.T) {
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
-		p := req.Profile.ReplicationPolicy
-		if p.PresetName != abc ||
-			p.ReplicasCount != 3 ||
-			p.CreatePerAvailabilityZone != Ydb.FeatureFlag_ENABLED ||
-			p.AllowPromotion != Ydb.FeatureFlag_DISABLED {
+		p := req.GetProfile().GetReplicationPolicy()
+		if p.GetPresetName() != abc ||
+			p.GetReplicasCount() != 3 ||
+			p.GetCreatePerAvailabilityZone() != Ydb.FeatureFlag_ENABLED ||
+			p.GetAllowPromotion() != Ydb.FeatureFlag_DISABLED {
 			t.Errorf("Replication policy is not as expected")
 		}
 	}
@@ -116,7 +116,7 @@ func TestSessionOptionsProfile(t *testing.T) {
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
-		if req.Profile.CachingPolicy.PresetName != abc {
+		if req.GetProfile().GetCachingPolicy().GetPresetName() != abc {
 			t.Errorf("Caching policy is not as expected")
 		}
 	}
@@ -138,13 +138,13 @@ func TestStoragePolicyOptions(t *testing.T) {
 		)
 		req := Ydb_Table.CreateTableRequest{}
 		opt.ApplyCreateTableOption((*CreateTableDesc)(&req), a)
-		p := req.Profile.StoragePolicy
-		if p.PresetName != abc ||
-			p.Syslog.Media != "any1" ||
-			p.Log.Media != "any2" ||
-			p.Data.Media != "any3" ||
-			p.External.Media != "any4" ||
-			p.KeepInMemory != Ydb.FeatureFlag_ENABLED {
+		p := req.GetProfile().GetStoragePolicy()
+		if p.GetPresetName() != abc ||
+			p.GetSyslog().GetMedia() != "any1" ||
+			p.GetLog().GetMedia() != "any2" ||
+			p.GetData().GetMedia() != "any3" ||
+			p.GetExternal().GetMedia() != "any4" ||
+			p.GetKeepInMemory() != Ydb.FeatureFlag_ENABLED {
 			t.Errorf("Storage policy is not as expected")
 		}
 	}
@@ -157,8 +157,8 @@ func TestAlterTableOptions(t *testing.T) {
 		opt := WithAddColumn("a", types.Bool)
 		req := Ydb_Table.AlterTableRequest{}
 		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
-		if len(req.AddColumns) != 1 ||
-			req.AddColumns[0].Name != "a" {
+		if len(req.GetAddColumns()) != 1 ||
+			req.GetAddColumns()[0].GetName() != "a" {
 			t.Errorf("Alter table options is not as expected")
 		}
 	}
@@ -171,10 +171,10 @@ func TestAlterTableOptions(t *testing.T) {
 		opt := WithAddColumnMeta(column)
 		req := Ydb_Table.AlterTableRequest{}
 		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
-		if len(req.AddColumns) != 1 ||
-			req.AddColumns[0].Name != column.Name ||
-			req.AddColumns[0].Type != types.TypeToYDB(column.Type, a) ||
-			req.AddColumns[0].Family != column.Family {
+		if len(req.GetAddColumns()) != 1 ||
+			req.GetAddColumns()[0].GetName() != column.Name ||
+			req.GetAddColumns()[0].GetType() != types.TypeToYDB(column.Type, a) ||
+			req.GetAddColumns()[0].GetFamily() != column.Family {
 			t.Errorf("Alter table options is not as expected")
 		}
 	}
@@ -182,8 +182,8 @@ func TestAlterTableOptions(t *testing.T) {
 		opt := WithDropColumn("a")
 		req := Ydb_Table.AlterTableRequest{}
 		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
-		if len(req.DropColumns) != 1 ||
-			req.DropColumns[0] != "a" {
+		if len(req.GetDropColumns()) != 1 ||
+			req.GetDropColumns()[0] != "a" {
 			t.Errorf("Alter table options is not as expected")
 		}
 	}
@@ -199,11 +199,11 @@ func TestAlterTableOptions(t *testing.T) {
 		opt := WithAlterColumnFamilies(cf)
 		req := Ydb_Table.AlterTableRequest{}
 		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
-		if len(req.AddColumnFamilies) != 1 ||
-			req.AddColumnFamilies[0].Name != cf.Name ||
-			req.AddColumnFamilies[0].Data.Media != cf.Data.Media ||
-			req.AddColumnFamilies[0].Compression != cf.Compression.toYDB() ||
-			req.AddColumnFamilies[0].KeepInMemory != cf.KeepInMemory.ToYDB() {
+		if len(req.GetAddColumnFamilies()) != 1 ||
+			req.GetAddColumnFamilies()[0].GetName() != cf.Name ||
+			req.GetAddColumnFamilies()[0].GetData().GetMedia() != cf.Data.Media ||
+			req.GetAddColumnFamilies()[0].GetCompression() != cf.Compression.toYDB() ||
+			req.GetAddColumnFamilies()[0].GetKeepInMemory() != cf.KeepInMemory.ToYDB() {
 			t.Errorf("Alter table options is not as expected")
 		}
 	}
@@ -215,11 +215,11 @@ func TestAlterTableOptions(t *testing.T) {
 		opt := WithAlterColumnFamilies(cf)
 		req := Ydb_Table.AlterTableRequest{}
 		opt.ApplyAlterTableOption((*AlterTableDesc)(&req), a)
-		if len(req.AddColumnFamilies) != 1 ||
-			req.AddColumnFamilies[0].Name != cf.Name ||
-			req.AddColumnFamilies[0].Data != nil ||
-			req.AddColumnFamilies[0].Compression != cf.Compression.toYDB() ||
-			req.AddColumnFamilies[0].KeepInMemory != Ydb.FeatureFlag_STATUS_UNSPECIFIED {
+		if len(req.GetAddColumnFamilies()) != 1 ||
+			req.GetAddColumnFamilies()[0].GetName() != cf.Name ||
+			req.GetAddColumnFamilies()[0].GetData() != nil ||
+			req.GetAddColumnFamilies()[0].GetCompression() != cf.Compression.toYDB() ||
+			req.GetAddColumnFamilies()[0].GetKeepInMemory() != Ydb.FeatureFlag_STATUS_UNSPECIFIED {
 			t.Errorf("Alter table options is not as expected")
 		}
 	}

@@ -1,3 +1,9 @@
+* Added experimental implementation of query service client
+* Fixed sometime panic on topic writer closing
+* Added experimental query parameters builder `ydb.ParamsBuilder()`
+* Changed types of `table/table.{QueryParameters,ParameterOption}` to aliases on `internal/params.{Parameters,NamedValue}`
+* Fixed bug with optional decimal serialization 
+
 ## v3.56.2
 * Fixed return private error for commit to stopped partition in topic reader.
 * Stopped wrapping err error as transport error at topic streams (internals)

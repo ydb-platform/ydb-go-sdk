@@ -242,7 +242,6 @@ linters:
     - maintidx
     - maligned
     - paralleltest
-    - protogetter
     - scopelint
     - structcheck
     - testableexamples

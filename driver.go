@@ -20,6 +20,8 @@ import (
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	internalQuery "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
+	queryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	internalRatelimiter "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
 	internalScheme "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme"
@@ -35,6 +37,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
@@ -67,6 +70,9 @@ type Driver struct { //nolint:maligned
 
 	table        *internalTable.Client
 	tableOptions []tableConfig.Option
+
+	query        *internalQuery.Client
+	queryOptions []queryConfig.Option
 
 	scripting        *internalScripting.Client
 	scriptingOptions []scriptingConfig.Option
@@ -141,6 +147,7 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 		d.scheme.Close,
 		d.scripting.Close,
 		d.table.Close,
+		d.query.Close,
 		d.topic.Close,
 		d.balancer.Close,
 		d.pool.Release,
@@ -178,6 +185,11 @@ func (d *Driver) Secure() bool {
 // Table returns table client
 func (d *Driver) Table() table.Client {
 	return d.table
+}
+
+// Query returns query client
+func (d *Driver) Query() query.Client {
+	return d.query
 }
 
 // Scheme returns scheme client
@@ -392,6 +404,22 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 					tableConfig.With(d.config.Common),
 				},
 				d.tableOptions...,
+			)...,
+		),
+	)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	d.query, err = internalQuery.New(ctx,
+		d.balancer,
+		queryConfig.New(
+			append(
+				// prepend common params from root config
+				[]queryConfig.Option{
+					queryConfig.With(d.config.Common),
+				},
+				d.queryOptions...,
 			)...,
 		),
 	)

@@ -3,38 +3,32 @@ package sugar
 import (
 	"database/sql"
 	"fmt"
+	"sort"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
-	internal "github.com/ydb-platform/ydb-go-sdk/v3/internal/table"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
+
+type constraint interface {
+	params.Parameters | []*params.Parameter | *table.QueryParameters | []table.ParameterOption | []sql.NamedArg
+}
 
 // GenerateDeclareSection generates DECLARE section text in YQL query by params
 //
 // Deprecated: use testutil.QueryBind(ydb.WithAutoDeclare()) helper
-func GenerateDeclareSection[T *table.QueryParameters | []table.ParameterOption | []sql.NamedArg](
-	params T,
-) (string, error) {
-	switch v := any(params).(type) {
-	case *table.QueryParameters:
-		return internal.GenerateDeclareSection(v)
+func GenerateDeclareSection[T constraint](parameters T) (string, error) {
+	switch v := any(parameters).(type) {
+	case *params.Parameters:
+		return parametersToDeclares(*v), nil
+	case []*params.Parameter:
+		return parametersToDeclares(v), nil
 	case []table.ParameterOption:
-		return internal.GenerateDeclareSection(table.NewQueryParameters(v...))
+		return parameterOptionsToDeclares(v), nil
 	case []sql.NamedArg:
-		values, err := bind.Params(func() []interface{} {
-			var newArgs []interface{}
-			for i := range v {
-				newArgs = append(newArgs, v[i])
-			}
-
-			return newArgs
-		}()...)
-		if err != nil {
-			return "", xerrors.WithStackTrace(err)
-		}
-
-		return internal.GenerateDeclareSection(table.NewQueryParameters(values...))
+		return namedArgsToDeclares(v)
 	default:
 		return "", xerrors.WithStackTrace(fmt.Errorf("unsupported type: %T", v))
 	}
@@ -43,7 +37,7 @@ func GenerateDeclareSection[T *table.QueryParameters | []table.ParameterOption |
 // ToYdbParam converts
 //
 // Deprecated: use testutil/QueryBind helper
-func ToYdbParam(param sql.NamedArg) (table.ParameterOption, error) {
+func ToYdbParam(param sql.NamedArg) (*params.Parameter, error) {
 	params, err := bind.Params(param)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -53,4 +47,52 @@ func ToYdbParam(param sql.NamedArg) (table.ParameterOption, error) {
 	}
 
 	return params[0], nil
+}
+
+func parametersToDeclares(v []*params.Parameter) string {
+	var (
+		buf      = xstring.Buffer()
+		names    = make([]string, 0, len(v))
+		declares = make(map[string]string, len(v))
+	)
+	defer buf.Free()
+
+	for _, p := range v {
+		name := p.Name()
+		names = append(names, name)
+		declares[name] = params.Declare(p)
+	}
+
+	sort.Strings(names)
+
+	for _, name := range names {
+		buf.WriteString(declares[name])
+		buf.WriteString(";\n")
+	}
+
+	return buf.String()
+}
+
+func parameterOptionsToDeclares(v []table.ParameterOption) string {
+	parameters := make([]*params.Parameter, len(v))
+	for i, p := range v {
+		parameters[i] = params.Named(p.Name(), p.Value())
+	}
+
+	return parametersToDeclares(parameters)
+}
+
+func namedArgsToDeclares(v []sql.NamedArg) (string, error) {
+	vv, err := bind.Params(func() (newArgs []interface{}) {
+		for i := range v {
+			newArgs = append(newArgs, v[i])
+		}
+
+		return newArgs
+	}()...)
+	if err != nil {
+		return "", xerrors.WithStackTrace(err)
+	}
+
+	return parametersToDeclares(vv), nil
 }

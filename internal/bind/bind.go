@@ -3,9 +3,9 @@ package bind
 import (
 	"sort"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 type blockID int
@@ -27,37 +27,38 @@ type Bind interface {
 type Bindings []Bind
 
 func (bindings Bindings) RewriteQuery(query string, args ...interface{}) (
-	string, *table.QueryParameters, error,
+	string, []*params.Parameter, error,
 ) {
 	if len(bindings) == 0 {
-		var params []table.ParameterOption
-		params, err := Params(args...)
+		parameters, err := Params(args...)
 		if err != nil {
 			return "", nil, xerrors.WithStackTrace(err)
 		}
 
-		return query, table.NewQueryParameters(params...), nil
+		return query, parameters, nil
 	}
 
 	var (
-		err    error
-		buffer = xstring.Buffer()
+		parameters []*params.Parameter
+		err        error
+		buffer     = xstring.Buffer()
 	)
 	defer buffer.Free()
 
 	for i := range bindings {
-		query, args, err = bindings[len(bindings)-1-i].RewriteQuery(query, args...)
-		if err != nil {
-			return "", nil, xerrors.WithStackTrace(err)
+		var e error
+		query, args, e = bindings[len(bindings)-1-i].RewriteQuery(query, args...)
+		if e != nil {
+			return "", nil, xerrors.WithStackTrace(e)
 		}
 	}
 
-	params, err := Params(args...)
+	parameters, err = Params(args...)
 	if err != nil {
 		return "", nil, xerrors.WithStackTrace(err)
 	}
 
-	return query, table.NewQueryParameters(params...), nil
+	return query, parameters, nil
 }
 
 func Sort(bindings []Bind) []Bind {

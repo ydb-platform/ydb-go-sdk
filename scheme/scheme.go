@@ -110,11 +110,11 @@ func (e *Entry) IsTopic() bool {
 
 func (e *Entry) From(y *Ydb_Scheme.Entry) {
 	*e = Entry{
-		Name:                 y.Name,
-		Owner:                y.Owner,
-		Type:                 entryType(y.Type),
-		Permissions:          makePermissions(y.Permissions),
-		EffectivePermissions: makePermissions(y.EffectivePermissions),
+		Name:                 y.GetName(),
+		Owner:                y.GetOwner(),
+		Type:                 entryType(y.GetType()),
+		Permissions:          makePermissions(y.GetPermissions()),
+		EffectivePermissions: makePermissions(y.GetEffectivePermissions()),
 	}
 }
 
@@ -156,8 +156,8 @@ func makePermissions(src []*Ydb_Scheme.Permissions) []Permissions {
 
 func from(y *Ydb_Scheme.Permissions) Permissions {
 	return Permissions{
-		Subject:         y.Subject,
-		PermissionNames: y.PermissionNames,
+		Subject:         y.GetSubject(),
+		PermissionNames: y.GetPermissionNames(),
 	}
 }
 
