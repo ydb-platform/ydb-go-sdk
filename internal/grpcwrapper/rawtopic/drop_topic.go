@@ -23,5 +23,5 @@ type DropTopicResult struct {
 }
 
 func (r *DropTopicResult) FromProto(proto *Ydb_Topic.DropTopicResponse) error {
-	return r.Operation.FromProtoWithStatusCheck(proto.Operation)
+	return r.Operation.FromProtoWithStatusCheck(proto.GetOperation())
 }

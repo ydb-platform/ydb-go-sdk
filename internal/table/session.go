@@ -260,7 +260,7 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	switch result.SessionStatus {
+	switch result.GetSessionStatus() {
 	case Ydb_Table.KeepAliveResult_SESSION_STATUS_READY:
 		s.SetStatus(table.SessionReady)
 	case Ydb_Table.KeepAliveResult_SESSION_STATUS_BUSY:
@@ -341,7 +341,7 @@ func (s *session) DescribeTable(
 		[]options.Column,
 		len(result.GetColumns()),
 	)
-	for i, c := range result.Columns {
+	for i, c := range result.GetColumns() {
 		cs[i] = options.Column{
 			Name:   c.GetName(),
 			Type:   types.TypeFromYDB(c.GetType()),
@@ -376,18 +376,18 @@ func (s *session) DescribeTable(
 			[]options.PartitionStats,
 			len(result.GetTableStats().GetPartitionStats()),
 		)
-		for i, v := range result.TableStats.PartitionStats {
+		for i, v := range result.GetTableStats().GetPartitionStats() {
 			partStats[i].RowsEstimate = v.GetRowsEstimate()
 			partStats[i].StoreSize = v.GetStoreSize()
 		}
 		var creationTime, modificationTime time.Time
-		if resStats.CreationTime.GetSeconds() != 0 {
+		if resStats.GetCreationTime().GetSeconds() != 0 {
 			creationTime = time.Unix(
 				resStats.GetCreationTime().GetSeconds(),
 				int64(resStats.GetCreationTime().GetNanos()),
 			)
 		}
-		if resStats.ModificationTime.GetSeconds() != 0 {
+		if resStats.GetModificationTime().GetSeconds() != 0 {
 			modificationTime = time.Unix(
 				resStats.GetModificationTime().GetSeconds(),
 				int64(resStats.GetModificationTime().GetNanos()),
@@ -414,10 +414,10 @@ func (s *session) DescribeTable(
 		attrs[k] = v
 	}
 
-	indexes := make([]options.IndexDescription, len(result.Indexes))
+	indexes := make([]options.IndexDescription, len(result.GetIndexes()))
 	for i, idx := range result.GetIndexes() {
 		var typ options.IndexType
-		switch idx.Type.(type) {
+		switch idx.GetType().(type) {
 		case *Ydb_Table.TableIndexDescription_GlobalAsyncIndex:
 			typ = options.IndexTypeGlobalAsync
 		case *Ydb_Table.TableIndexDescription_GlobalIndex:
@@ -432,7 +432,7 @@ func (s *session) DescribeTable(
 		}
 	}
 
-	changeFeeds := make([]options.ChangefeedDescription, len(result.Changefeeds))
+	changeFeeds := make([]options.ChangefeedDescription, len(result.GetChangefeeds()))
 	for i, proto := range result.GetChangefeeds() {
 		changeFeeds[i] = options.NewChangefeedDescription(proto)
 	}
@@ -577,7 +577,7 @@ func copyTables(
 			opt((*options.CopyTablesDesc)(&request))
 		}
 	}
-	if len(request.Tables) == 0 {
+	if len(request.GetTables()) == 0 {
 		return xerrors.WithStackTrace(fmt.Errorf("no CopyTablesItem: %w", errParamsRequired))
 	}
 	_, err = service.CopyTables(ctx, &request)
@@ -651,7 +651,7 @@ func (s *session) Explain(
 		Explanation: table.Explanation{
 			Plan: result.GetQueryPlan(),
 		},
-		AST: result.QueryAst,
+		AST: result.GetQueryAst(),
 	}, nil
 }
 
@@ -699,7 +699,7 @@ func (s *session) Prepare(ctx context.Context, queryText string) (_ table.Statem
 	stmt = &statement{
 		session: s,
 		query:   queryPrepared(result.GetQueryId(), queryText),
-		params:  result.ParametersTypes,
+		params:  result.GetParametersTypes(),
 	}
 
 	return stmt, nil
@@ -775,7 +775,7 @@ func (s *session) executeQueryResult(
 		id: res.GetTxMeta().GetId(),
 		s:  s,
 	}
-	if txControl.CommitTx {
+	if txControl.GetCommitTx() {
 		tx.state.Store(txStateCommitted)
 	} else {
 		tx.state.Store(txStateInitialized)

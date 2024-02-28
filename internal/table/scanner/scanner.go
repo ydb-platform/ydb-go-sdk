@@ -46,7 +46,7 @@ func (s *valueScanner) ColumnCount() int {
 		return 0
 	}
 
-	return len(s.set.Columns)
+	return len(s.set.GetColumns())
 }
 
 // Columns allows to iterate over all columns of the current result set.
@@ -54,10 +54,10 @@ func (s *valueScanner) Columns(it func(options.Column)) {
 	if s.set == nil {
 		return
 	}
-	for _, m := range s.set.Columns {
+	for _, m := range s.set.GetColumns() {
 		it(options.Column{
-			Name: m.Name,
-			Type: internalTypes.TypeFromYDB(m.Type),
+			Name: m.GetName(),
+			Type: internalTypes.TypeFromYDB(m.GetType()),
 		})
 	}
 }
@@ -68,7 +68,7 @@ func (s *valueScanner) RowCount() int {
 		return 0
 	}
 
-	return len(s.set.Rows)
+	return len(s.set.GetRows())
 }
 
 // ItemCount returns number of items in the current row.
@@ -77,14 +77,14 @@ func (s *valueScanner) ItemCount() int {
 		return 0
 	}
 
-	return len(s.row.Items)
+	return len(s.row.GetItems())
 }
 
 // HasNextRow reports whether result row may be advanced.
 // It may be useful to call HasNextRow() instead of NextRow() to look ahead
 // without advancing the result rows.
 func (s *valueScanner) HasNextRow() bool {
-	return s.err == nil && s.set != nil && s.nextRow < len(s.set.Rows)
+	return s.err == nil && s.set != nil && s.nextRow < len(s.set.GetRows())
 }
 
 // NextRow selects next row in the current result set.
@@ -93,7 +93,7 @@ func (s *valueScanner) NextRow() bool {
 	if !s.HasNextRow() {
 		return false
 	}
-	s.row = s.set.Rows[s.nextRow]
+	s.row = s.set.GetRows()[s.nextRow]
 	s.nextRow++
 	s.nextItem = 0
 	s.stack.reset()
@@ -216,7 +216,7 @@ func (s *valueScanner) Truncated() bool {
 		return false
 	}
 
-	return s.set.Truncated
+	return s.set.GetTruncated()
 }
 
 // Truncated returns true if current result set has been truncated by server
@@ -225,7 +225,7 @@ func (s *valueScanner) truncated() bool {
 		return false
 	}
 
-	return s.set.Truncated
+	return s.set.GetTruncated()
 }
 
 // Err returns error caused Scanner to be broken.
@@ -297,13 +297,13 @@ func (s *valueScanner) hasItems() bool {
 }
 
 func (s *valueScanner) seekItemByID(id int) error {
-	if !s.hasItems() || id >= len(s.set.Columns) {
+	if !s.hasItems() || id >= len(s.set.GetColumns()) {
 		return s.notFoundColumnByIndex(id)
 	}
-	col := s.set.Columns[id]
-	s.stack.scanItem.name = col.Name
-	s.stack.scanItem.t = col.Type
-	s.stack.scanItem.v = s.row.Items[id]
+	col := s.set.GetColumns()[id]
+	s.stack.scanItem.name = col.GetName()
+	s.stack.scanItem.t = col.GetType()
+	s.stack.scanItem.v = s.row.GetItems()[id]
 
 	return nil
 }
@@ -312,13 +312,13 @@ func (s *valueScanner) seekItemByName(name string) error {
 	if !s.hasItems() {
 		return s.notFoundColumnName(name)
 	}
-	for i, c := range s.set.Columns {
-		if name != c.Name {
+	for i, c := range s.set.GetColumns() {
+		if name != c.GetName() {
 			continue
 		}
-		s.stack.scanItem.name = c.Name
-		s.stack.scanItem.t = c.Type
-		s.stack.scanItem.v = s.row.Items[i]
+		s.stack.scanItem.name = c.GetName()
+		s.stack.scanItem.t = c.GetType()
+		s.stack.scanItem.v = s.row.GetItems()[i]
 
 		return s.Err()
 	}
@@ -335,8 +335,8 @@ func (s *valueScanner) setColumnIndexes(columns []string) {
 	s.columnIndexes = make([]int, len(columns))
 	for i, col := range columns {
 		found := false
-		for j, c := range s.set.Columns {
-			if c.Name == col {
+		for j, c := range s.set.GetColumns() {
+			if c.GetName() == col {
 				s.columnIndexes[i] = j
 				found = true
 
@@ -492,10 +492,10 @@ func (s *valueScanner) unwrap() {
 		return
 	}
 
-	if isOptional(t.OptionalType.Item) {
+	if isOptional(t.OptionalType.GetItem()) {
 		s.stack.scanItem.v = s.unwrapValue()
 	}
-	s.stack.scanItem.t = t.OptionalType.Item
+	s.stack.scanItem.t = t.OptionalType.GetItem()
 }
 
 func (s *valueScanner) unwrapValue() (v *Ydb.Value) {
@@ -521,13 +521,13 @@ func (s *valueScanner) unwrapDecimal() decimal.Decimal {
 
 	return decimal.Decimal{
 		Bytes:     s.uint128(),
-		Precision: d.DecimalType.Precision,
-		Scale:     d.DecimalType.Scale,
+		Precision: d.DecimalType.GetPrecision(),
+		Scale:     d.DecimalType.GetScale(),
 	}
 }
 
 func (s *valueScanner) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.Type_DecimalType) {
-	x := typ.Type
+	x := typ.GetType()
 	if t, _ = x.(*Ydb.Type_DecimalType); t == nil {
 		s.typeError(x, t)
 	}
@@ -697,7 +697,7 @@ func (s *valueScanner) uint128() (v [16]byte) {
 		return
 	}
 	lo := s.low128()
-	hi := c.v.High_128
+	hi := c.v.GetHigh_128()
 
 	return value.BigEndianUint128(hi, lo)
 }
@@ -1309,7 +1309,7 @@ func (s *scanStack) current() item {
 
 func (s *scanStack) currentValue() interface{} {
 	if v := s.current().v; v != nil {
-		return v.Value
+		return v.GetValue()
 	}
 
 	return nil
@@ -1317,7 +1317,7 @@ func (s *scanStack) currentValue() interface{} {
 
 func (s *scanStack) currentType() interface{} {
 	if t := s.current().t; t != nil {
-		return t.Type
+		return t.GetType()
 	}
 
 	return nil
@@ -1327,7 +1327,7 @@ func isOptional(typ *Ydb.Type) bool {
 	if typ == nil {
 		return false
 	}
-	_, yes := typ.Type.(*Ydb.Type_OptionalType)
+	_, yes := typ.GetType().(*Ydb.Type_OptionalType)
 
 	return yes
 }

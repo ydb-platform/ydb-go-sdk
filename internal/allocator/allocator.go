@@ -375,7 +375,7 @@ type structAllocator struct {
 
 func (a *structAllocator) Struct() (v *Ydb.StructType) {
 	v = structPool.Get()
-	if cap(v.Members) <= 0 {
+	if cap(v.GetMembers()) <= 0 {
 		v.Members = make([]*Ydb.StructMember, 0, 10)
 	}
 	a.allocations = append(a.allocations, v)
@@ -385,7 +385,7 @@ func (a *structAllocator) Struct() (v *Ydb.StructType) {
 
 func (a *structAllocator) free() {
 	for _, v := range a.allocations {
-		members := v.Members
+		members := v.GetMembers()
 		for i := range members {
 			members[i] = nil
 		}
@@ -447,7 +447,7 @@ func (a *tupleAllocator) Tuple() (v *Ydb.TupleType) {
 
 func (a *tupleAllocator) free() {
 	for _, v := range a.allocations {
-		elements := v.Elements
+		elements := v.GetElements()
 		for i := range elements {
 			elements[i] = nil
 		}
@@ -718,8 +718,8 @@ func (a *valueAllocator) Value() (v *Ydb.Value) {
 
 func (a *valueAllocator) free() {
 	for _, v := range a.allocations {
-		items := v.Items
-		pairs := v.Pairs
+		items := v.GetItems()
+		pairs := v.GetPairs()
 		for i := range items {
 			items[i] = nil
 		}

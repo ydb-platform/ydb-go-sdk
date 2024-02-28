@@ -80,9 +80,9 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	}
 
 	location = result.GetSelfLocation()
-	endpoints = make([]endpoint.Endpoint, 0, len(result.Endpoints))
-	for _, e := range result.Endpoints {
-		if e.Ssl == c.config.Secure() {
+	endpoints = make([]endpoint.Endpoint, 0, len(result.GetEndpoints()))
+	for _, e := range result.GetEndpoints() {
+		if e.GetSsl() == c.config.Secure() {
 			endpoints = append(endpoints, endpoint.New(
 				net.JoinHostPort(e.GetAddress(), strconv.Itoa(int(e.GetPort()))),
 				endpoint.WithLocation(e.GetLocation()),

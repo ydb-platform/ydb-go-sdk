@@ -243,7 +243,6 @@ linters:
     - maligned
     - nonamedreturns
     - paralleltest
-    - protogetter
     - scopelint
     - structcheck
     - testableexamples
