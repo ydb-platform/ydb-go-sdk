@@ -9,6 +9,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -57,13 +58,13 @@ func (tx *transaction) ID() string {
 // Execute executes query represented by text within transaction tx.
 func (tx *transaction) Execute(
 	ctx context.Context,
-	query string, params *table.QueryParameters,
+	query string, parameters *params.Parameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
 	onDone := trace.TableOnSessionTransactionExecute(
 		tx.s.config.Trace(), &ctx,
 		stack.FunctionID(""),
-		tx.s, tx, queryFromText(query), params,
+		tx.s, tx, queryFromText(query), parameters,
 	)
 	defer func() {
 		onDone(r, err)
@@ -75,7 +76,7 @@ func (tx *transaction) Execute(
 	case txStateRollbacked:
 		return nil, xerrors.WithStackTrace(errTxRollbackedEarly)
 	default:
-		_, r, err = tx.s.Execute(ctx, tx.control, query, params, opts...)
+		_, r, err = tx.s.Execute(ctx, tx.control, query, parameters, opts...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -91,19 +92,16 @@ func (tx *transaction) Execute(
 // ExecuteStatement executes prepared statement stmt within transaction tx.
 func (tx *transaction) ExecuteStatement(
 	ctx context.Context,
-	stmt table.Statement, params *table.QueryParameters,
+	stmt table.Statement, parameters *params.Parameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
-	if params == nil {
-		params = table.NewQueryParameters()
-	}
 	a := allocator.New()
 	defer a.Free()
 
 	onDone := trace.TableOnSessionTransactionExecuteStatement(
 		tx.s.config.Trace(), &ctx,
 		stack.FunctionID(""),
-		tx.s, tx, stmt.(*statement).query, params,
+		tx.s, tx, stmt.(*statement).query, parameters,
 	)
 	defer func() {
 		onDone(r, err)
@@ -115,7 +113,7 @@ func (tx *transaction) ExecuteStatement(
 	case txStateRollbacked:
 		return nil, xerrors.WithStackTrace(errTxRollbackedEarly)
 	default:
-		_, r, err = stmt.Execute(ctx, tx.control, params, opts...)
+		_, r, err = stmt.Execute(ctx, tx.control, parameters, opts...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
