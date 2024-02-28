@@ -1,3 +1,4 @@
+* Added experimental implementation of query service client
 * Fixed sometime panic on topic writer closing
 * Added experimental query parameters builder `ydb.ParamsBuilder()`
 * Changed types of `table/table.{QueryParameters,ParameterOption}` to aliases on `internal/params.{Parameters,NamedValue}`
