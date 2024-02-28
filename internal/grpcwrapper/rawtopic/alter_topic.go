@@ -64,7 +64,7 @@ type AlterTopicResult struct {
 }
 
 func (r *AlterTopicResult) FromProto(proto *Ydb_Topic.AlterTopicResponse) error {
-	return r.Operation.FromProtoWithStatusCheck(proto.Operation)
+	return r.Operation.FromProtoWithStatusCheck(proto.GetOperation())
 }
 
 type AlterConsumer struct {

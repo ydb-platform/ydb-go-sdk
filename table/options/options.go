@@ -6,8 +6,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 func WithShardKeyBounds() DescribeTableOption {
@@ -59,14 +59,14 @@ type column struct {
 func (c column) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) {
 	d.AddColumns = append(d.AddColumns, &Ydb_Table.ColumnMeta{
 		Name: c.name,
-		Type: value.TypeToYDB(c.typ, a),
+		Type: types.TypeToYDB(c.typ, a),
 	})
 }
 
 func (c column) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
 	d.Columns = append(d.Columns, &Ydb_Table.ColumnMeta{
 		Name: c.name,
-		Type: value.TypeToYDB(c.typ, a),
+		Type: types.TypeToYDB(c.typ, a),
 	})
 }
 
@@ -304,7 +304,7 @@ func WithUniformPartitions(n uint64) Partitions {
 	return uniformPartitions(n)
 }
 
-type explicitPartitions []types.Value
+type explicitPartitions []value.Value
 
 func (e explicitPartitions) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
 	values := make([]*Ydb.TypedValue, len(e))
@@ -320,7 +320,7 @@ func (e explicitPartitions) ApplyCreateTableOption(d *CreateTableDesc, a *alloca
 
 func (e explicitPartitions) isPartitions() {}
 
-func WithExplicitPartitions(splitPoints ...types.Value) Partitions {
+func WithExplicitPartitions(splitPoints ...value.Value) Partitions {
 	return explicitPartitions(splitPoints)
 }
 
@@ -524,7 +524,7 @@ func WithPartitioningPolicyUniformPartitions(n uint64) PartitioningPolicyOption 
 }
 
 // Deprecated: use WithExplicitPartitions instead
-func WithPartitioningPolicyExplicitPartitions(splitPoints ...types.Value) PartitioningPolicyOption {
+func WithPartitioningPolicyExplicitPartitions(splitPoints ...value.Value) PartitioningPolicyOption {
 	return func(p *partitioningPolicy, a *allocator.Allocator) {
 		values := make([]*Ydb.TypedValue, len(splitPoints))
 		for i := range values {
@@ -1036,10 +1036,10 @@ type (
 	readOrderedOption        struct{}
 	readSnapshotOption       bool
 	readKeyRangeOption       KeyRange
-	readGreaterOrEqualOption struct{ types.Value }
-	readLessOrEqualOption    struct{ types.Value }
-	readLessOption           struct{ types.Value }
-	readGreaterOption        struct{ types.Value }
+	readGreaterOrEqualOption struct{ value.Value }
+	readLessOrEqualOption    struct{ value.Value }
+	readLessOption           struct{ value.Value }
+	readGreaterOption        struct{ value.Value }
 	readRowLimitOption       uint64
 )
 
@@ -1133,19 +1133,19 @@ func ReadKeyRange(x KeyRange) ReadTableOption {
 	return readKeyRangeOption(x)
 }
 
-func ReadGreater(x types.Value) ReadTableOption {
+func ReadGreater(x value.Value) ReadTableOption {
 	return readGreaterOption{x}
 }
 
-func ReadGreaterOrEqual(x types.Value) ReadTableOption {
+func ReadGreaterOrEqual(x value.Value) ReadTableOption {
 	return readGreaterOrEqualOption{x}
 }
 
-func ReadLess(x types.Value) ReadTableOption {
+func ReadLess(x value.Value) ReadTableOption {
 	return readLessOption{x}
 }
 
-func ReadLessOrEqual(x types.Value) ReadTableOption {
+func ReadLessOrEqual(x value.Value) ReadTableOption {
 	return readLessOrEqualOption{x}
 }
 
