@@ -2,7 +2,9 @@ package query_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -13,6 +15,7 @@ func Example_selectWithoutParameters() {
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
+
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
@@ -33,11 +36,19 @@ func Example_selectWithoutParameters() {
 			for {                                 // iterate over result sets
 				rs, err := res.NextResultSet(ctx)
 				if err != nil {
+					if errors.Is(err, io.EOF) {
+						break
+					}
+
 					return err
 				}
 				for { // iterate over rows
 					row, err := rs.NextRow(ctx)
 					if err != nil {
+						if errors.Is(err, io.EOF) {
+							break
+						}
+
 						return err
 					}
 					if err = row.Scan(&id, &myStr); err != nil {
@@ -45,6 +56,7 @@ func Example_selectWithoutParameters() {
 					}
 				}
 			}
+
 			return res.Err() // return finally result error for auto-retry with driver
 		},
 		query.WithIdempotent(),
@@ -60,6 +72,7 @@ func Example_selectWithParameters() {
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
+
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
@@ -73,8 +86,10 @@ func Example_selectWithParameters() {
 			_, res, err := s.Execute(ctx,
 				`SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr`,
 				query.WithParameters(
-					query.Param("$id", query.Uint64Value(123)),
-					query.Param("$myStr", query.TextValue("test")),
+					ydb.ParamsBuilder().
+						Param("$id").Uint64(123).
+						Param("$myStr").Text("123").
+						Build(),
 				),
 			)
 			if err != nil {
@@ -84,11 +99,19 @@ func Example_selectWithParameters() {
 			for {                                 // iterate over result sets
 				rs, err := res.NextResultSet(ctx)
 				if err != nil {
+					if errors.Is(err, io.EOF) {
+						break
+					}
+
 					return err
 				}
 				for { // iterate over rows
 					row, err := rs.NextRow(ctx)
 					if err != nil {
+						if errors.Is(err, io.EOF) {
+							break
+						}
+
 						return err
 					}
 					if err = row.ScanNamed(
@@ -99,6 +122,7 @@ func Example_selectWithParameters() {
 					}
 				}
 			}
+
 			return res.Err() // return finally result error for auto-retry with driver
 		},
 		query.WithIdempotent(),
@@ -114,6 +138,7 @@ func Example_txSelect() {
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
 		fmt.Printf("failed connect: %v", err)
+
 		return
 	}
 	defer db.Close(ctx) // cleanup resources
@@ -134,11 +159,19 @@ func Example_txSelect() {
 			for {                                 // iterate over result sets
 				rs, err := res.NextResultSet(ctx)
 				if err != nil {
+					if errors.Is(err, io.EOF) {
+						break
+					}
+
 					return err
 				}
 				for { // iterate over rows
 					row, err := rs.NextRow(ctx)
 					if err != nil {
+						if errors.Is(err, io.EOF) {
+							break
+						}
+
 						return err
 					}
 					if err = row.ScanNamed(
@@ -149,6 +182,7 @@ func Example_txSelect() {
 					}
 				}
 			}
+
 			return res.Err() // return finally result error for auto-retry with driver
 		},
 		query.WithIdempotent(),

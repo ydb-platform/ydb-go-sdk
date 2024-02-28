@@ -30,18 +30,22 @@ func fromTxOptions(txID string, txOpts ...query.TxExecuteOption) executeSettings
 		}
 	}
 	opts = append(opts, query.WithTxControl(query.TxControl(query.WithTxID(txID))))
+
 	return query.ExecuteSettings(opts...)
 }
 
-func (tx transaction) Execute(ctx context.Context, q string, opts ...query.TxExecuteOption) (r query.Result, err error) {
+func (tx transaction) Execute(ctx context.Context, q string, opts ...query.TxExecuteOption) (
+	r query.Result, err error,
+) {
 	_, res, err := execute(ctx, tx.s, tx.s.queryClient, q, fromTxOptions(tx.id, opts...))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	return res, nil
 }
 
-func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID string, txID string) error {
+func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID, txID string) error {
 	response, err := client.CommitTransaction(ctx, &Ydb_Query.CommitTransactionRequest{
 		SessionId: sessionID,
 		TxId:      txID,
@@ -52,6 +56,7 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
 		return xerrors.WithStackTrace(xerrors.FromOperation(response))
 	}
+
 	return nil
 }
 
@@ -59,7 +64,7 @@ func (tx transaction) CommitTx(ctx context.Context) (err error) {
 	return commitTx(ctx, tx.s.queryClient, tx.s.id, tx.id)
 }
 
-func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID string, txID string) error {
+func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID, txID string) error {
 	response, err := client.RollbackTransaction(ctx, &Ydb_Query.RollbackTransactionRequest{
 		SessionId: sessionID,
 		TxId:      txID,
@@ -70,6 +75,7 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
 		return xerrors.WithStackTrace(xerrors.FromOperation(response))
 	}
+
 	return nil
 }
 

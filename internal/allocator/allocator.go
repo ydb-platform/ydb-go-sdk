@@ -57,7 +57,7 @@ type (
 		queryQueryContentAllocator
 		queryTransactionControlAllocator
 		queryTransactionControlBeginTxAllocator
-		queryTransactionControlTxIdAllocator
+		queryTransactionControlTxIDAllocator
 		queryTransactionSettingsAllocator
 		queryTransactionSettingsSerializableReadWriteAllocator
 	}
@@ -115,7 +115,7 @@ func (a *Allocator) Free() {
 	a.queryQueryContentAllocator.free()
 	a.queryTransactionControlAllocator.free()
 	a.queryTransactionControlBeginTxAllocator.free()
-	a.queryTransactionControlTxIdAllocator.free()
+	a.queryTransactionControlTxIDAllocator.free()
 	a.queryTransactionSettingsAllocator.free()
 	a.queryTransactionSettingsSerializableReadWriteAllocator.free()
 
@@ -925,9 +925,12 @@ type queryExecuteQueryRequestAllocator struct {
 	allocations []*Ydb_Query.ExecuteQueryRequest
 }
 
-func (a *queryExecuteQueryRequestAllocator) QueryExecuteQueryRequest() (v *Ydb_Query.ExecuteQueryRequest) {
+func (a *queryExecuteQueryRequestAllocator) QueryExecuteQueryRequest() (
+	v *Ydb_Query.ExecuteQueryRequest,
+) {
 	v = queryExecuteQueryRequestPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -943,9 +946,12 @@ type queryExecuteQueryResponsePartAllocator struct {
 	allocations []*Ydb_Query.ExecuteQueryResponsePart
 }
 
-func (a *queryExecuteQueryResponsePartAllocator) QueryExecuteQueryResponsePart() (v *Ydb_Query.ExecuteQueryResponsePart) {
+func (a *queryExecuteQueryResponsePartAllocator) QueryExecuteQueryResponsePart() (
+	v *Ydb_Query.ExecuteQueryResponsePart,
+) {
 	v = queryExecuteQueryResponsePartPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -961,9 +967,12 @@ type queryExecuteQueryRequestQueryContentAllocator struct {
 	allocations []*Ydb_Query.ExecuteQueryRequest_QueryContent
 }
 
-func (a *queryExecuteQueryRequestQueryContentAllocator) QueryExecuteQueryRequestQueryContent() (v *Ydb_Query.ExecuteQueryRequest_QueryContent) {
+func (a *queryExecuteQueryRequestQueryContentAllocator) QueryExecuteQueryRequestQueryContent() (
+	v *Ydb_Query.ExecuteQueryRequest_QueryContent,
+) {
 	v = queryExecuteQueryRequestQueryContentPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -981,6 +990,7 @@ type queryTransactionControlAllocator struct {
 func (a *queryTransactionControlAllocator) QueryTransactionControl() (v *Ydb_Query.TransactionControl) {
 	v = queryTransactionControlPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -996,9 +1006,12 @@ type queryTransactionControlBeginTxAllocator struct {
 	allocations []*Ydb_Query.TransactionControl_BeginTx
 }
 
-func (a *queryTransactionControlBeginTxAllocator) QueryTransactionControlBeginTx() (v *Ydb_Query.TransactionControl_BeginTx) {
+func (a *queryTransactionControlBeginTxAllocator) QueryTransactionControlBeginTx() (
+	v *Ydb_Query.TransactionControl_BeginTx,
+) {
 	v = queryTransactionControlBeginTxPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -1009,19 +1022,20 @@ func (a *queryTransactionControlBeginTxAllocator) free() {
 	a.allocations = a.allocations[:0]
 }
 
-type queryTransactionControlTxIdAllocator struct {
+type queryTransactionControlTxIDAllocator struct {
 	allocations []*Ydb_Query.TransactionControl_TxId
 }
 
-func (a *queryTransactionControlTxIdAllocator) QueryTransactionControlTxId() (v *Ydb_Query.TransactionControl_TxId) {
-	v = queryTransactionControlTxIdPool.Get()
+func (a *queryTransactionControlTxIDAllocator) QueryTransactionControlTxID() (v *Ydb_Query.TransactionControl_TxId) {
+	v = queryTransactionControlTxIDPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
-func (a *queryTransactionControlTxIdAllocator) free() {
+func (a *queryTransactionControlTxIDAllocator) free() {
 	for _, v := range a.allocations {
-		queryTransactionControlTxIdPool.Put(v)
+		queryTransactionControlTxIDPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
 }
@@ -1033,6 +1047,7 @@ type queryTransactionSettingsAllocator struct {
 func (a *queryTransactionSettingsAllocator) QueryTransactionSettings() (v *Ydb_Query.TransactionSettings) {
 	v = queryTransactionSettingsPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -1048,9 +1063,12 @@ type queryTransactionSettingsSerializableReadWriteAllocator struct {
 	allocations []*Ydb_Query.TransactionSettings_SerializableReadWrite
 }
 
-func (a *queryTransactionSettingsSerializableReadWriteAllocator) QueryTransactionSettingsSerializableReadWrite() (v *Ydb_Query.TransactionSettings_SerializableReadWrite) {
+func (a *queryTransactionSettingsSerializableReadWriteAllocator) QueryTransactionSettingsSerializableReadWrite() (
+	v *Ydb_Query.TransactionSettings_SerializableReadWrite,
+) {
 	v = queryTransactionSettingsSerializableReadWritePool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -1068,6 +1086,7 @@ type queryQueryContentAllocator struct {
 func (a *queryQueryContentAllocator) QueryQueryContent() (v *Ydb_Query.QueryContent) {
 	v = queryQueryContentPool.Get()
 	a.allocations = append(a.allocations, v)
+
 	return v
 }
 
@@ -1144,7 +1163,7 @@ var (
 	queryQueryContentPool                             Pool[Ydb_Query.QueryContent]
 	queryTransactionControlPool                       Pool[Ydb_Query.TransactionControl]
 	queryTransactionControlBeginTxPool                Pool[Ydb_Query.TransactionControl_BeginTx]
-	queryTransactionControlTxIdPool                   Pool[Ydb_Query.TransactionControl_TxId]
+	queryTransactionControlTxIDPool                   Pool[Ydb_Query.TransactionControl_TxId]
 	queryTransactionSettingsPool                      Pool[Ydb_Query.TransactionSettings]
 	queryTransactionSettingsSerializableReadWritePool Pool[Ydb_Query.TransactionSettings_SerializableReadWrite]
 )

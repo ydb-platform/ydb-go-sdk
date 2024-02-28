@@ -12,6 +12,7 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -22,9 +23,11 @@ func TestCommitTx(t *testing.T) {
 		ctx := xtest.Context(t)
 		ctrl := gomock.NewController(t)
 		service := NewMockQueryServiceClient(ctrl)
-		service.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
-			Status: Ydb.StatusIds_SUCCESS,
-		}, nil)
+		service.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(
+			&Ydb_Query.CommitTransactionResponse{
+				Status: Ydb.StatusIds_SUCCESS,
+			}, nil,
+		)
 		t.Log("commit")
 		err := commitTx(ctx, service, "123", "456")
 		require.NoError(t, err)
@@ -33,7 +36,9 @@ func TestCommitTx(t *testing.T) {
 		ctx := xtest.Context(t)
 		ctrl := gomock.NewController(t)
 		service := NewMockQueryServiceClient(ctrl)
-		service.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
+		service.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(
+			nil, grpcStatus.Error(grpcCodes.Unavailable, ""),
+		)
 		t.Log("commit")
 		err := commitTx(ctx, service, "123", "456")
 		require.Error(t, err)
@@ -43,9 +48,11 @@ func TestCommitTx(t *testing.T) {
 		ctx := xtest.Context(t)
 		ctrl := gomock.NewController(t)
 		service := NewMockQueryServiceClient(ctrl)
-		service.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
-			Status: Ydb.StatusIds_UNAVAILABLE,
-		}, nil)
+		service.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(
+			&Ydb_Query.CommitTransactionResponse{
+				Status: Ydb.StatusIds_UNAVAILABLE,
+			}, nil,
+		)
 		t.Log("commit")
 		err := commitTx(ctx, service, "123", "456")
 		require.Error(t, err)
@@ -58,9 +65,11 @@ func TestRollback(t *testing.T) {
 		ctx := xtest.Context(t)
 		ctrl := gomock.NewController(t)
 		service := NewMockQueryServiceClient(ctrl)
-		service.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.RollbackTransactionResponse{
-			Status: Ydb.StatusIds_SUCCESS,
-		}, nil)
+		service.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).Return(
+			&Ydb_Query.RollbackTransactionResponse{
+				Status: Ydb.StatusIds_SUCCESS,
+			}, nil,
+		)
 		t.Log("rollback")
 		err := rollback(ctx, service, "123", "456")
 		require.NoError(t, err)
@@ -69,7 +78,9 @@ func TestRollback(t *testing.T) {
 		ctx := xtest.Context(t)
 		ctrl := gomock.NewController(t)
 		service := NewMockQueryServiceClient(ctrl)
-		service.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
+		service.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).Return(
+			nil, grpcStatus.Error(grpcCodes.Unavailable, ""),
+		)
 		t.Log("rollback")
 		err := rollback(ctx, service, "123", "456")
 		require.Error(t, err)
@@ -79,9 +90,11 @@ func TestRollback(t *testing.T) {
 		ctx := xtest.Context(t)
 		ctrl := gomock.NewController(t)
 		service := NewMockQueryServiceClient(ctrl)
-		service.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.RollbackTransactionResponse{
-			Status: Ydb.StatusIds_UNAVAILABLE,
-		}, nil)
+		service.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).Return(
+			&Ydb_Query.RollbackTransactionResponse{
+				Status: Ydb.StatusIds_UNAVAILABLE,
+			}, nil,
+		)
 		t.Log("rollback")
 		err := rollback(ctx, service, "123", "456")
 		require.Error(t, err)
@@ -94,7 +107,7 @@ type testExecuteSettings struct {
 	statsMode   query.StatsMode
 	txControl   *query.TransactionControl
 	syntax      query.Syntax
-	params      *query.Parameters
+	params      *params.Parameters
 	callOptions []grpc.CallOption
 }
 
@@ -114,7 +127,7 @@ func (s testExecuteSettings) Syntax() query.Syntax {
 	return s.syntax
 }
 
-func (s testExecuteSettings) Params() *query.Parameters {
+func (s testExecuteSettings) Params() *params.Parameters {
 	return s.params
 }
 
@@ -185,7 +198,7 @@ func TestFromTxOptions(t *testing.T) {
 			name: "WithParams",
 			txOpts: []query.TxExecuteOption{
 				query.WithParameters(
-					query.Param("$a", query.TextValue("A")),
+					params.Builder{}.Param("$a").Text("A").Build(),
 				),
 			},
 			settings: testExecuteSettings{
@@ -193,9 +206,7 @@ func TestFromTxOptions(t *testing.T) {
 				statsMode: query.StatsModeNone,
 				txControl: query.TxControl(query.WithTxID("")),
 				syntax:    Ydb_Query.Syntax_SYNTAX_YQL_V1,
-				params: query.Params(
-					query.Param("$a", query.TextValue("A")),
-				),
+				params:    params.Builder{}.Param("$a").Text("A").Build(),
 			},
 		},
 	} {

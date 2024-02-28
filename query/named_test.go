@@ -44,12 +44,14 @@ func TestNamed(t *testing.T) {
 			name: "int_dbl_ptr",
 			ref: func(v int) **int {
 				vv := &v
+
 				return &vv
 			}(123),
 			dst: namedDestination{
 				name: "int_dbl_ptr",
 				ref: func(v int) **int {
 					vv := &v
+
 					return &vv
 				}(123),
 			},

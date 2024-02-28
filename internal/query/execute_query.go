@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -18,11 +19,11 @@ type executeSettings interface {
 	StatsMode() query.StatsMode
 	TxControl() *query.TransactionControl
 	Syntax() query.Syntax
-	Params() *query.Parameters
+	Params() *params.Parameters
 	CallOptions() []grpc.CallOption
 }
 
-func executeQueryRequest(a *allocator.Allocator, sessionID string, q string, settings executeSettings) (
+func executeQueryRequest(a *allocator.Allocator, sessionID, q string, settings executeSettings) (
 	*Ydb_Query.ExecuteQueryRequest,
 	[]grpc.CallOption,
 ) {
@@ -39,11 +40,14 @@ func executeQueryRequest(a *allocator.Allocator, sessionID string, q string, set
 	return request, settings.CallOptions()
 }
 
-func queryFromText(a *allocator.Allocator, q string, syntax Ydb_Query.Syntax) *Ydb_Query.ExecuteQueryRequest_QueryContent {
+func queryFromText(
+	a *allocator.Allocator, q string, syntax Ydb_Query.Syntax,
+) *Ydb_Query.ExecuteQueryRequest_QueryContent {
 	content := a.QueryExecuteQueryRequestQueryContent()
 	content.QueryContent = a.QueryQueryContent()
 	content.QueryContent.Syntax = syntax
 	content.QueryContent.Text = q
+
 	return content
 }
 
@@ -61,13 +65,16 @@ func execute(
 	stream, err := client.ExecuteQuery(ctx, request, callOptions...)
 	if err != nil {
 		cancel()
+
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 	r, txID, err := newResult(ctx, stream, cancel)
 	if err != nil {
 		cancel()
+
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
+
 	return &transaction{
 		id: txID,
 		s:  session,

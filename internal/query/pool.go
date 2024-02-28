@@ -16,17 +16,17 @@ type Pool interface {
 var _ Pool = (*stubPool)(nil)
 
 type stubPool struct {
-	create func(ctx context.Context) (*Session, error)
-	close  func(ctx context.Context, s *Session) error
+	createFunc func(ctx context.Context) (*Session, error)
+	closeFunc  func(ctx context.Context, s *Session) error
 }
 
 func newStubPool(
-	create func(ctx context.Context) (*Session, error),
-	close func(ctx context.Context, s *Session) error,
+	createFunc func(ctx context.Context) (*Session, error),
+	closeFunc func(ctx context.Context, s *Session) error,
 ) *stubPool {
 	return &stubPool{
-		create: create,
-		close:  close,
+		createFunc: createFunc,
+		closeFunc:  closeFunc,
 	}
 }
 
@@ -39,16 +39,17 @@ func (pool *stubPool) get(ctx context.Context) (*Session, error) {
 	case <-ctx.Done():
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	default:
-		s, err := pool.create(ctx)
+		s, err := pool.createFunc(ctx)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
+
 		return s, nil
 	}
 }
 
 func (pool *stubPool) put(ctx context.Context, s *Session) {
-	pool.close(ctx, s)
+	_ = pool.closeFunc(ctx, s)
 }
 
 func (pool *stubPool) With(ctx context.Context, f func(ctx context.Context, s *Session) error) error {
@@ -63,5 +64,6 @@ func (pool *stubPool) With(ctx context.Context, f func(ctx context.Context, s *S
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
+
 	return nil
 }

@@ -11,7 +11,7 @@ var _ query.Column = (*column)(nil)
 
 type column struct {
 	n string
-	t query.Type
+	t types.Type
 }
 
 func newColumn(c *Ydb.Column) *column {
@@ -26,6 +26,7 @@ func newColumns(cc []*Ydb.Column) (columns []query.Column) {
 	for i := range cc {
 		columns[i] = newColumn(cc[i])
 	}
+
 	return columns
 }
 
@@ -33,6 +34,6 @@ func (c *column) Name() string {
 	return c.n
 }
 
-func (c *column) Type() query.Type {
+func (c *column) Type() types.Type {
 	return c.t
 }

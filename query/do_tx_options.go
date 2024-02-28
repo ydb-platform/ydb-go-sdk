@@ -30,5 +30,6 @@ func NewDoTxOptions(opts ...DoTxOption) (doTxOptions DoTxOptions) {
 	for _, opt := range opts {
 		opt.applyDoTxOption(&doTxOptions)
 	}
+
 	return doTxOptions
 }

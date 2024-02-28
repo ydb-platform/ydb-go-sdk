@@ -36,7 +36,7 @@ func TestCreateSession(t *testing.T) {
 			}, nil)
 			service.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(attachStream, nil)
 			t.Log("execute")
-			var attached = 0
+			attached := 0
 			s, err := createSession(ctx, service, createSessionSettings{
 				onAttach: func(id string) {
 					attached++
@@ -176,7 +176,7 @@ func TestDo(t *testing.T) {
 			return newTestSession()
 		}), func(ctx context.Context, s query.Session) error {
 			return nil
-		}, query.DoOptions{})
+		}, &query.DoOptions{})
 		require.NoError(t, err)
 	})
 	t.Run("RetryableError", func(t *testing.T) {
@@ -188,8 +188,9 @@ func TestDo(t *testing.T) {
 			if counter < 10 {
 				return xerrors.Retryable(errors.New(""))
 			}
+
 			return nil
-		}, query.DoOptions{})
+		}, &query.DoOptions{})
 		require.NoError(t, err)
 		require.Equal(t, 10, counter)
 	})
@@ -210,7 +211,7 @@ func TestDoTx(t *testing.T) {
 			return newTestSessionWithClient(client)
 		}), func(ctx context.Context, tx query.TxActor) error {
 			return nil
-		}, query.DoTxOptions{})
+		}, &query.DoTxOptions{})
 		require.NoError(t, err)
 	})
 	t.Run("RetryableError", func(t *testing.T) {
@@ -233,8 +234,9 @@ func TestDoTx(t *testing.T) {
 			if counter < 10 {
 				return xerrors.Retryable(errors.New(""))
 			}
+
 			return nil
-		}, query.DoTxOptions{})
+		}, &query.DoTxOptions{})
 		require.NoError(t, err)
 		require.Equal(t, 10, counter)
 	})

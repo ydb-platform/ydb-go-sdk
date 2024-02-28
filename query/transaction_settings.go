@@ -27,7 +27,7 @@ var (
 // Transaction settings options
 type (
 	txSettingsOption interface {
-		applyTxSettingsOption(*allocator.Allocator, *Ydb_Query.TransactionSettings)
+		applyTxSettingsOption(a *allocator.Allocator, txSettings *Ydb_Query.TransactionSettings)
 	}
 	TransactionSettings []txSettingsOption
 )
@@ -46,6 +46,7 @@ func (opts TransactionSettings) ToYDB(a *allocator.Allocator) *Ydb_Query.Transac
 	for _, opt := range opts {
 		opt.applyTxSettingsOption(a, txSettings)
 	}
+
 	return txSettings
 }
 
@@ -62,7 +63,9 @@ var _ txSettingsOption = serializableReadWriteTxSettingsOption{}
 
 type serializableReadWriteTxSettingsOption struct{}
 
-func (o serializableReadWriteTxSettingsOption) applyTxSettingsOption(a *allocator.Allocator, txSettings *Ydb_Query.TransactionSettings) {
+func (o serializableReadWriteTxSettingsOption) applyTxSettingsOption(
+	a *allocator.Allocator, txSettings *Ydb_Query.TransactionSettings,
+) {
 	txSettings.TxMode = serializableReadWrite
 }
 
@@ -74,7 +77,9 @@ var _ txSettingsOption = snapshotReadOnlyTxSettingsOption{}
 
 type snapshotReadOnlyTxSettingsOption struct{}
 
-func (snapshotReadOnlyTxSettingsOption) applyTxSettingsOption(a *allocator.Allocator, settings *Ydb_Query.TransactionSettings) {
+func (snapshotReadOnlyTxSettingsOption) applyTxSettingsOption(
+	a *allocator.Allocator, settings *Ydb_Query.TransactionSettings,
+) {
 	settings.TxMode = snapshotReadOnly
 }
 
@@ -86,7 +91,9 @@ var _ txSettingsOption = staleReadOnlySettingsOption{}
 
 type staleReadOnlySettingsOption struct{}
 
-func (staleReadOnlySettingsOption) applyTxSettingsOption(a *allocator.Allocator, settings *Ydb_Query.TransactionSettings) {
+func (staleReadOnlySettingsOption) applyTxSettingsOption(
+	a *allocator.Allocator, settings *Ydb_Query.TransactionSettings,
+) {
 	settings.TxMode = staleReadOnly
 }
 
@@ -97,7 +104,7 @@ func WithStaleReadOnly() txSettingsOption {
 type (
 	txOnlineReadOnly       bool
 	TxOnlineReadOnlyOption interface {
-		applyTxOnlineReadOnlyOption(*txOnlineReadOnly)
+		applyTxOnlineReadOnlyOption(opt *txOnlineReadOnly)
 	}
 )
 
@@ -117,7 +124,9 @@ var _ txSettingsOption = onlineReadOnlySettingsOption{}
 
 type onlineReadOnlySettingsOption []TxOnlineReadOnlyOption
 
-func (opts onlineReadOnlySettingsOption) applyTxSettingsOption(a *allocator.Allocator, settings *Ydb_Query.TransactionSettings) {
+func (opts onlineReadOnlySettingsOption) applyTxSettingsOption(
+	a *allocator.Allocator, settings *Ydb_Query.TransactionSettings,
+) {
 	var ro txOnlineReadOnly
 	for _, opt := range opts {
 		if opt != nil {

@@ -18,5 +18,6 @@ func NewDoOptions(opts ...DoOption) (doOptions DoOptions) {
 	for _, opt := range opts {
 		opt.applyDoOption(&doOptions)
 	}
+
 	return doOptions
 }

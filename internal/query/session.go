@@ -25,10 +25,13 @@ type Session struct {
 
 func (s *Session) Close(ctx context.Context) error {
 	s.close()
+
 	return nil
 }
 
-func begin(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID string, txSettings query.TransactionSettings) (*transaction, error) {
+func begin(
+	ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID string, txSettings query.TransactionSettings,
+) (*transaction, error) {
 	a := allocator.New()
 	defer a.Free()
 	response, err := client.BeginTransaction(ctx,
@@ -43,6 +46,7 @@ func begin(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionI
 	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
 		return nil, xerrors.WithStackTrace(xerrors.FromOperation(response))
 	}
+
 	return &transaction{
 		id: response.GetTxMeta().GetId(),
 	}, nil
@@ -54,6 +58,7 @@ func (s *Session) Begin(ctx context.Context, txSettings query.TransactionSetting
 		return nil, xerrors.WithStackTrace(err)
 	}
 	tx.s = s
+
 	return tx, nil
 }
 
@@ -66,8 +71,7 @@ func (s *Session) NodeID() int64 {
 }
 
 func (s *Session) Status() query.SessionStatus {
-	status := query.SessionStatus(atomic.LoadUint32((*uint32)(&s.status)))
-	return status
+	return query.SessionStatus(atomic.LoadUint32((*uint32)(&s.status)))
 }
 
 func (s *Session) Execute(

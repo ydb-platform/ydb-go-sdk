@@ -28,5 +28,6 @@ func Named(columnName string, destinationValueReference interface{}) (dst namedD
 		panic(fmt.Errorf("%T is not reference type", destinationValueReference))
 	}
 	dst.ref = destinationValueReference
+
 	return dst
 }

@@ -37,6 +37,7 @@ func (ctrl *TransactionControl) ToYDB(a *allocator.Allocator) *Ydb_Query.Transac
 	txControl := a.QueryTransactionControl()
 	ctrl.selector.applyTxSelector(a, txControl)
 	txControl.CommitTx = ctrl.commit
+
 	return txControl
 }
 
@@ -66,28 +67,28 @@ func BeginTx(opts ...txSettingsOption) beginTxOptions {
 }
 
 var (
-	_ txControlOption = txIdTxControlOption("")
-	_ txSelector      = txIdTxControlOption("")
+	_ txControlOption = txIDTxControlOption("")
+	_ txSelector      = txIDTxControlOption("")
 )
 
-type txIdTxControlOption string
+type txIDTxControlOption string
 
-func (id txIdTxControlOption) applyTxControlOption(txControl *TransactionControl) {
+func (id txIDTxControlOption) applyTxControlOption(txControl *TransactionControl) {
 	txControl.selector = id
 }
 
-func (id txIdTxControlOption) applyTxSelector(a *allocator.Allocator, txControl *Ydb_Query.TransactionControl) {
-	selector := a.QueryTransactionControlTxId()
+func (id txIDTxControlOption) applyTxSelector(a *allocator.Allocator, txControl *Ydb_Query.TransactionControl) {
+	selector := a.QueryTransactionControlTxID()
 	selector.TxId = string(id)
 	txControl.TxSelector = selector
 }
 
-func WithTx(t TxIdentifier) txIdTxControlOption {
-	return txIdTxControlOption(t.ID())
+func WithTx(t TxIdentifier) txIDTxControlOption {
+	return txIDTxControlOption(t.ID())
 }
 
-func WithTxID(txID string) txIdTxControlOption {
-	return txIdTxControlOption(txID)
+func WithTxID(txID string) txIDTxControlOption {
+	return txIDTxControlOption(txID)
 }
 
 type commitTxOption struct{}
@@ -112,6 +113,7 @@ func TxControl(opts ...txControlOption) *TransactionControl {
 			opt.applyTxControlOption(txControl)
 		}
 	}
+
 	return txControl
 }
 

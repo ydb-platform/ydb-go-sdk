@@ -56,6 +56,7 @@ func newResult(
 			r.interrupt()
 			close(r.closed)
 		})
+
 		return &r, part.GetTxMeta().GetId(), nil
 	}
 }
@@ -66,6 +67,7 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (*Ydb_Query.E
 		if xerrors.Is(err, io.EOF) {
 			return nil, xerrors.WithStackTrace(err)
 		}
+
 		return nil, xerrors.WithStackTrace(xerrors.Transport(err))
 	}
 	if status := part.GetStatus(); status != Ydb.StatusIds_SUCCESS {
@@ -73,11 +75,13 @@ func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (*Ydb_Query.E
 			xerrors.FromOperation(part),
 		)
 	}
+
 	return part, nil
 }
 
 func (r *result) Close(ctx context.Context) error {
 	r.close()
+
 	return nil
 }
 
@@ -101,8 +105,9 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 			case <-r.interrupted:
 				return nil, xerrors.WithStackTrace(errInterruptedStream)
 			default:
-				if r.lastPart.GetResultSetIndex() >= nextResultSetIndex {
-					r.resultSetIndex = r.lastPart.GetResultSetIndex()
+				if resultSetIndex := r.lastPart.GetResultSetIndex(); resultSetIndex >= nextResultSetIndex { //nolint:nestif
+					r.resultSetIndex = resultSetIndex
+
 					return newResultSet(func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
 						defer func() {
 							if err != nil && !xerrors.Is(err,
@@ -122,15 +127,17 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 								if xerrors.Is(err, io.EOF) {
 									r.close()
 								}
+
 								return nil, xerrors.WithStackTrace(err)
 							}
 							r.lastPart = part
 							if part.GetResultSetIndex() > nextResultSetIndex {
 								return nil, xerrors.WithStackTrace(fmt.Errorf(
-									"result set (index=%d) recieve part (index=%d) for next result set: %w",
+									"result set (index=%d) receive part (index=%d) for next result set: %w",
 									nextResultSetIndex, part.GetResultSetIndex(), io.EOF,
 								))
 							}
+
 							return part, nil
 						}
 					}, r.lastPart), nil

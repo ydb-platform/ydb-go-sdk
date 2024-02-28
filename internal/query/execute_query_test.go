@@ -15,6 +15,7 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -792,9 +793,11 @@ func TestExecuteQueryRequest(t *testing.T) {
 			name: "WithParams",
 			opts: []query.ExecuteOption{
 				query.WithParameters(
-					query.Param("$a", query.TextValue("A")),
-					query.Param("$b", query.TextValue("B")),
-					query.Param("$c", query.TextValue("C")),
+					params.Builder{}.
+						Param("$a").Text("A").
+						Param("$b").Text("B").
+						Param("$c").Text("C").
+						Build(),
 				),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{

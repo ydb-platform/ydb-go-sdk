@@ -112,15 +112,16 @@ func TestResultSetNext(t *testing.T) {
 			},
 		}, nil)
 		stream.EXPECT().Recv().Return(nil, io.EOF)
-		part, err := stream.Recv()
+		recv, err := stream.Recv()
 		require.NoError(t, err)
 		rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 			part, err := stream.Recv()
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
+
 			return part, nil
-		}, part)
+		}, recv)
 		require.EqualValues(t, 0, rs.index)
 		{
 			_, err := rs.next(ctx)
@@ -215,15 +216,16 @@ func TestResultSetNext(t *testing.T) {
 				},
 			},
 		}, nil)
-		part, err := stream.Recv()
+		recv, err := stream.Recv()
 		require.NoError(t, err)
 		rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 			part, err := stream.Recv()
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
+
 			return part, nil
-		}, part)
+		}, recv)
 		require.EqualValues(t, 0, rs.index)
 		{
 			_, err := rs.next(ctx)
@@ -303,21 +305,22 @@ func TestResultSetNext(t *testing.T) {
 			Status:         Ydb.StatusIds_OVERLOADED,
 			ResultSetIndex: 0,
 		}, nil)
-		part, err := stream.Recv()
+		recv, err := stream.Recv()
 		require.NoError(t, err)
 		rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 			part, err := nextPart(stream)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
-			if part.ResultSetIndex != 0 {
+			if resultSetIndex := part.GetResultSetIndex(); resultSetIndex != 0 {
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
 					"critical violation of the logic: wrong result set index: %d != %d",
-					part.ResultSetIndex, 0,
+					resultSetIndex, 0,
 				))
 			}
+
 			return part, nil
-		}, part)
+		}, recv)
 		require.EqualValues(t, 0, rs.index)
 		{
 			_, err := rs.next(ctx)
@@ -403,21 +406,22 @@ func TestResultSetNext(t *testing.T) {
 			},
 		}, nil)
 		stream.EXPECT().Recv().Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
-		part, err := stream.Recv()
+		recv, err := stream.Recv()
 		require.NoError(t, err)
 		rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 			part, err := nextPart(stream)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
-			if part.ResultSetIndex != 0 {
+			if resultSetIndex := part.GetResultSetIndex(); resultSetIndex != 0 {
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
 					"critical violation of the logic: wrong result set index: %d != %d",
-					part.ResultSetIndex, 0,
+					resultSetIndex, 0,
 				))
 			}
+
 			return part, nil
-		}, part)
+		}, recv)
 		require.EqualValues(t, 0, rs.index)
 		{
 			_, err := rs.next(ctx)
@@ -561,15 +565,16 @@ func TestResultSetNext(t *testing.T) {
 				},
 			},
 		}, nil)
-		part, err := stream.Recv()
+		recv, err := stream.Recv()
 		require.NoError(t, err)
 		rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 			part, err := nextPart(stream)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
+
 			return part, nil
-		}, part)
+		}, recv)
 		require.EqualValues(t, 0, rs.index)
 		{
 			_, err := rs.next(ctx)

@@ -22,9 +22,14 @@ type resultSet struct {
 	done        chan struct{}
 }
 
-func newResultSet(recv func() (*Ydb_Query.ExecuteQueryResponsePart, error), part *Ydb_Query.ExecuteQueryResponsePart) *resultSet {
+func newResultSet(
+	recv func() (
+		*Ydb_Query.ExecuteQueryResponsePart, error,
+	),
+	part *Ydb_Query.ExecuteQueryResponsePart,
+) *resultSet {
 	return &resultSet{
-		index:       part.ResultSetIndex,
+		index:       part.GetResultSetIndex(),
 		recv:        recv,
 		currentPart: part,
 		rowIndex:    -1,
@@ -47,6 +52,7 @@ func (rs *resultSet) next(ctx context.Context) (*row, error) {
 				if xerrors.Is(err, io.EOF) {
 					close(rs.done)
 				}
+
 				return nil, xerrors.WithStackTrace(err)
 			}
 			rs.rowIndex = 0
@@ -54,11 +60,13 @@ func (rs *resultSet) next(ctx context.Context) (*row, error) {
 		}
 		if rs.index != rs.currentPart.GetResultSetIndex() {
 			close(rs.done)
+
 			return nil, xerrors.WithStackTrace(fmt.Errorf(
 				"received part with result set index = %d, current result set index = %d: %w",
 				rs.index, rs.currentPart.GetResultSetIndex(), errWrongResultSetIndex,
 			))
 		}
+
 		return newRow(rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex])
 	}
 }
