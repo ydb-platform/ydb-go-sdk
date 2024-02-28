@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/helpers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -207,13 +208,13 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 
 	switch m {
 	case DataQueryMode:
-		normalizedQuery, params, err := c.normalize(query, args...)
+		normalizedQuery, parameters, err := c.normalize(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
 		_, res, err := c.session.Execute(ctx,
 			txControl(ctx, c.defaultTxControl),
-			normalizedQuery, params, c.dataQueryOptions(ctx)...,
+			normalizedQuery, &parameters, c.dataQueryOptions(ctx)...,
 		)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -241,15 +242,12 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 
 		return resultNoRows{}, nil
 	case ScriptingQueryMode:
-		var (
-			res    result.StreamResult
-			params *table.QueryParameters
-		)
-		normalizedQuery, params, err := c.normalize(query, args...)
+		var res result.StreamResult
+		normalizedQuery, parameters, err := c.normalize(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
-		res, err = c.connector.parent.Scripting().StreamExecute(ctx, normalizedQuery, params)
+		res, err = c.connector.parent.Scripting().StreamExecute(ctx, normalizedQuery, &parameters)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -320,13 +318,13 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 
 	switch m {
 	case DataQueryMode:
-		normalizedQuery, params, err := c.normalize(query, args...)
+		normalizedQuery, parameters, err := c.normalize(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
 		_, res, err := c.session.Execute(ctx,
 			txControl(ctx, c.defaultTxControl),
-			normalizedQuery, params, c.dataQueryOptions(ctx)...,
+			normalizedQuery, &parameters, c.dataQueryOptions(ctx)...,
 		)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -340,12 +338,12 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 			result: res,
 		}, nil
 	case ScanQueryMode:
-		normalizedQuery, params, err := c.normalize(query, args...)
+		normalizedQuery, parameters, err := c.normalize(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
 		res, err := c.session.StreamExecuteScanQuery(ctx,
-			normalizedQuery, params, c.scanQueryOptions(ctx)...,
+			normalizedQuery, &parameters, c.scanQueryOptions(ctx)...,
 		)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -375,11 +373,11 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 			},
 		}, nil
 	case ScriptingQueryMode:
-		normalizedQuery, params, err := c.normalize(query, args...)
+		normalizedQuery, parameters, err := c.normalize(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
-		res, err := c.connector.parent.Scripting().StreamExecute(ctx, normalizedQuery, params)
+		res, err := c.connector.parent.Scripting().StreamExecute(ctx, normalizedQuery, &parameters)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -443,7 +441,7 @@ func (c *conn) Begin() (driver.Tx, error) {
 	return nil, errDeprecated
 }
 
-func (c *conn) normalize(q string, args ...driver.NamedValue) (query string, _ *table.QueryParameters, _ error) {
+func (c *conn) normalize(q string, args ...driver.NamedValue) (query string, _ params.Parameters, _ error) {
 	return c.connector.Bindings.RewriteQuery(q, func() (ii []interface{}) {
 		for i := range args {
 			ii = append(ii, args[i])
