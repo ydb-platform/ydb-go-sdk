@@ -50,7 +50,7 @@ import (
 var _ Connection = (*Driver)(nil)
 
 // Driver type provide access to YDB service clients
-type Driver struct { //nolint:maligned
+type Driver struct {
 	ctx       context.Context // cancel while Driver.Close called.
 	ctxCancel context.CancelFunc
 

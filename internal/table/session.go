@@ -45,17 +45,15 @@ import (
 // Note that after session is no longer needed it should be destroyed by
 // Close() call.
 type session struct {
+	onClose      []func(s *session)
 	id           string
 	tableService Ydb_Table_V1.TableServiceClient
+	status       table.SessionStatus
 	config       *config.Config
-
-	status    table.SessionStatus
-	statusMtx sync.RWMutex
-	nodeID    atomic.Uint32
-	lastUsage atomic.Int64
-
-	onClose   []func(s *session)
-	closeOnce sync.Once
+	lastUsage    atomic.Int64
+	statusMtx    sync.RWMutex
+	closeOnce    sync.Once
+	nodeID       atomic.Uint32
 }
 
 func (s *session) LastUsage() time.Time {
