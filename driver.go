@@ -188,6 +188,10 @@ func (d *Driver) Table() table.Client {
 }
 
 // Query returns query client
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (d *Driver) Query() query.Client {
 	return d.query
 }
