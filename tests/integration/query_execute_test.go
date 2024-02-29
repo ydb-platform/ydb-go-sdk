@@ -35,13 +35,16 @@ func TestQueryExecute(t *testing.T) {
 		p3 time.Duration
 	)
 	err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) (err error) {
-		_, res, err := s.Execute(ctx, "SELECT $p1, $p2, $p3", query.WithParameters(
-			ydb.ParamsBuilder().
-				Param("$p1").Text("test").
-				Param("$p2").Uint64(100500000000).
-				Param("$p3").Interval(time.Duration(100500000000)).
-				Build(),
-		))
+		_, res, err := s.Execute(ctx, "SELECT $p1, $p2, $p3",
+			query.WithParameters(
+				ydb.ParamsBuilder().
+					Param("$p1").Text("test").
+					Param("$p2").Uint64(100500000000).
+					Param("$p3").Interval(time.Duration(100500000000)).
+					Build(),
+			),
+			query.WithSyntax(query.SyntaxYQL),
+		)
 		if err != nil {
 			return err
 		}

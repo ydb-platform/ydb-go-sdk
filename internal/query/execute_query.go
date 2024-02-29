@@ -32,7 +32,7 @@ func executeQueryRequest(a *allocator.Allocator, sessionID, q string, settings e
 	request.SessionId = sessionID
 	request.ExecMode = Ydb_Query.ExecMode(settings.ExecMode())
 	request.TxControl = settings.TxControl().ToYDB(a)
-	request.Query = queryFromText(a, q, settings.Syntax())
+	request.Query = queryFromText(a, q, Ydb_Query.Syntax(settings.Syntax()))
 	request.Parameters = settings.Params().ToYDB(a)
 	request.StatsMode = Ydb_Query.StatsMode(settings.StatsMode())
 	request.ConcurrentResultSets = false
