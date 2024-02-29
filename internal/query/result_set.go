@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -16,7 +17,7 @@ var _ query.ResultSet = (*resultSet)(nil)
 type resultSet struct {
 	index       int64
 	recv        func() (*Ydb_Query.ExecuteQueryResponsePart, error)
-	columns     []query.Column
+	columns     []*Ydb.Column
 	currentPart *Ydb_Query.ExecuteQueryResponsePart
 	rowIndex    int
 	done        chan struct{}
@@ -33,7 +34,7 @@ func newResultSet(
 		recv:        recv,
 		currentPart: part,
 		rowIndex:    -1,
-		columns:     newColumns(part.GetResultSet().GetColumns()),
+		columns:     part.GetResultSet().GetColumns(),
 		done:        make(chan struct{}),
 	}
 }

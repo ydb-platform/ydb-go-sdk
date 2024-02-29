@@ -5,14 +5,13 @@ package integration
 
 import (
 	"context"
-	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	internalQuery "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
@@ -30,8 +29,19 @@ func TestQueryExecute(t *testing.T) {
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
 	)
 	require.NoError(t, err)
+	var (
+		p1 string
+		p2 uint64
+		p3 time.Duration
+	)
 	err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) (err error) {
-		_, res, err := s.Execute(ctx, "SELECT 1")
+		_, res, err := s.Execute(ctx, "SELECT $p1, $p2, $p3", query.WithParameters(
+			ydb.ParamsBuilder().
+				Param("$p1").Text("test").
+				Param("$p2").Uint64(100500000000).
+				Param("$p3").Interval(time.Duration(100500000000)).
+				Build(),
+		))
 		if err != nil {
 			return err
 		}
@@ -43,11 +53,14 @@ func TestQueryExecute(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		err = row.Scan(nil)
-		if err != nil && !errors.Is(err, internalQuery.ErrNotImplemented) {
+		err = row.Scan(&p1, &p2, &p3)
+		if err != nil {
 			return err
 		}
 		return res.Err()
 	}, query.WithIdempotent())
 	require.NoError(t, err)
+	require.EqualValues(t, "test", p1)
+	require.EqualValues(t, 100500000000, p2)
+	require.EqualValues(t, time.Duration(100500000000), p3)
 }

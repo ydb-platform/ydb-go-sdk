@@ -14,7 +14,7 @@ type row struct {
 	scannerStruct
 }
 
-func newRow(columns []query.Column, v *Ydb.Value) (*row, error) {
+func newRow(columns []*Ydb.Column, v *Ydb.Value) (*row, error) {
 	data := newScannerData(columns, v.GetItems())
 
 	return &row{
