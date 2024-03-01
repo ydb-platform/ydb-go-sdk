@@ -35,7 +35,12 @@ func TestQueryExecute(t *testing.T) {
 		p3 time.Duration
 	)
 	err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) (err error) {
-		_, res, err := s.Execute(ctx, "SELECT $p1, $p2, $p3",
+		_, res, err := s.Execute(ctx, `
+			DECLARE $p1 AS Text;
+			DECLARE $p2 AS Uint64;
+			DECLARE $p3 AS Interval;
+			SELECT $p1, $p2, $p3;
+			`,
 			query.WithParameters(
 				ydb.ParamsBuilder().
 					Param("$p1").Text("test").
