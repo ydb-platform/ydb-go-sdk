@@ -230,12 +230,13 @@ func (b *Balancer) Close(ctx context.Context) error {
 	return nil
 }
 
+//nolint:nonamedreturns // potential error
 func New(
 	ctx context.Context,
 	driverConfig *config.Config,
 	pool *conn.Pool,
 	opts ...discoveryConfig.Option,
-) (*Balancer, error) {
+) (b *Balancer, finalErr error) {
 	var (
 		onDone = trace.DriverOnBalancerInit(
 			driverConfig.Trace(), &ctx,
@@ -249,8 +250,6 @@ func New(
 			discoveryConfig.WithSecure(driverConfig.Secure()),
 			discoveryConfig.WithMeta(driverConfig.Meta()),
 		)...)
-		b        *Balancer
-		finalErr error
 	)
 	defer func() {
 		onDone(finalErr)

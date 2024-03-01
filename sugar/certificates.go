@@ -23,7 +23,7 @@ func LoadCertificatesFromFile(caFile string) ([]*x509.Certificate, error) {
 func LoadCertificatesFromPem(bytes []byte) []*x509.Certificate {
 	var (
 		cert  *x509.Certificate
-		certs []*x509.Certificate
+		certs = make([]*x509.Certificate, 0)
 		err   error
 	)
 	for len(bytes) > 0 {

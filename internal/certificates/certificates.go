@@ -173,12 +173,9 @@ func FromPemNoCache(noCache bool) FromPemOption {
 // FromPem parses one or more certificate from pem blocks in bytes.
 // It returns nil error if at least one certificate was successfully parsed.
 // This function uses cached parseCertificate.
-func FromPem(bytes []byte, opts ...FromPemOption) ([]*x509.Certificate, error) {
-	var (
-		block *pem.Block
-		certs []*x509.Certificate
-		err   error
-	)
+func FromPem(bytes []byte, opts ...FromPemOption) (certs []*x509.Certificate, err error) { //nolint:nonamedreturns
+	// potential error without named return
+	var block *pem.Block
 
 	for len(bytes) > 0 {
 		block, bytes = pem.Decode(bytes)

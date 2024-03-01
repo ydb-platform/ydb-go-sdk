@@ -170,12 +170,10 @@ func forEachField(s *types.Struct, fn func(*types.Var)) {
 	}
 }
 
-func unwrapStruct(t types.Type) (*types.Named, *types.Struct) {
-	var (
-		ok bool
-		s  *types.Struct
-	)
-	n, ok := t.(*types.Named)
+//nolint:nonamedreturns // potential error
+func unwrapStruct(t types.Type) (n *types.Named, s *types.Struct) {
+	var ok bool
+	n, ok = t.(*types.Named)
 	if ok {
 		s, _ = n.Underlying().(*types.Struct)
 	}

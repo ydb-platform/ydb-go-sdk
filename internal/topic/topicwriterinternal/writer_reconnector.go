@@ -618,12 +618,12 @@ func allMessagesHasSameBufCodec(messages []messageWithDataContent) bool {
 	return true
 }
 
-func splitMessagesByBufCodec(messages []messageWithDataContent) [][]messageWithDataContent {
+//nolint:nonamedreturns // potential error
+func splitMessagesByBufCodec(messages []messageWithDataContent) (res [][]messageWithDataContent) {
 	if len(messages) == 0 {
 		return nil
 	}
 
-	var res [][]messageWithDataContent
 	currentGroupStart := 0
 	currentCodec := messages[0].bufCodec
 	for i := range messages {
@@ -635,7 +635,7 @@ func splitMessagesByBufCodec(messages []messageWithDataContent) [][]messageWithD
 	}
 	res = append(res, messages[currentGroupStart:len(messages):len(messages)])
 
-	return res
+	return
 }
 
 func createWriteRequest(messages []messageWithDataContent, targetCodec rawtopiccommon.Codec) (

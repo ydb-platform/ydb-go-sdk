@@ -576,8 +576,8 @@ func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string)
 	return columnExists, nil
 }
 
-func (c *conn) GetColumns(ctx context.Context, tableName string) ([]string, error) {
-	var columns []string
+//nolint:nonamedreturns // potential error
+func (c *conn) GetColumns(ctx context.Context, tableName string) (columns []string, _ error) {
 	tableName = c.normalizePath(tableName)
 	tableExists, err := helpers.IsEntryExists(ctx,
 		c.connector.parent.Scheme(), tableName,
@@ -652,7 +652,8 @@ func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) 
 	return dataType, nil
 }
 
-func (c *conn) GetPrimaryKeys(ctx context.Context, tableName string) ([]string, error) {
+//nolint:nonamedreturns // potential error
+func (c *conn) GetPrimaryKeys(ctx context.Context, tableName string) (pkCols []string, _ error) {
 	tableName = c.normalizePath(tableName)
 	tableExists, err := helpers.IsEntryExists(ctx,
 		c.connector.parent.Scheme(), tableName,
@@ -665,7 +666,6 @@ func (c *conn) GetPrimaryKeys(ctx context.Context, tableName string) ([]string, 
 		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
 
-	var pkCols []string
 	err = retry.Retry(ctx, func(ctx context.Context) error {
 		desc, errIn := c.session.DescribeTable(ctx, tableName)
 		if errIn != nil {
@@ -736,8 +736,9 @@ func isSysDir(databaseName, dirAbsPath string) bool {
 	return false
 }
 
+//nolint:nonamedreturns // potential error
 func (c *conn) getTables(ctx context.Context, absPath string, recursive, excludeSysDirs bool) (
-	[]string, error,
+	tables []string, _ error,
 ) {
 	if excludeSysDirs && isSysDir(c.connector.parent.Name(), absPath) {
 		return nil, nil
@@ -760,7 +761,6 @@ func (c *conn) getTables(ctx context.Context, absPath string, recursive, exclude
 		return nil, xerrors.WithStackTrace(fmt.Errorf("'%s' is not a folder", absPath))
 	}
 
-	var tables []string
 	for i := range d.Children {
 		switch d.Children[i].Type {
 		case scheme.EntryTable, scheme.EntryColumnTable:
@@ -779,15 +779,15 @@ func (c *conn) getTables(ctx context.Context, absPath string, recursive, exclude
 	return tables, nil
 }
 
+//nolint:nonamedreturns // potential error
 func (c *conn) GetTables(ctx context.Context, folder string, recursive, excludeSysDirs bool) (
-	[]string, error,
+	tables []string, _ error,
 ) {
 	absPath := c.normalizePath(folder)
 
 	var (
-		e      scheme.Entry
-		err    error
-		tables []string
+		e   scheme.Entry
+		err error
 	)
 	err = retry.Retry(ctx, func(ctx context.Context) error {
 		e, err = c.connector.parent.Scheme().DescribePath(ctx, absPath)
@@ -819,7 +819,8 @@ func (c *conn) GetTables(ctx context.Context, folder string, recursive, excludeS
 	}
 }
 
-func (c *conn) GetIndexes(ctx context.Context, tableName string) ([]string, error) {
+//nolint:nonamedreturns // potential error
+func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []string, _ error) {
 	tableName = c.normalizePath(tableName)
 	tableExists, err := helpers.IsEntryExists(ctx,
 		c.connector.parent.Scheme(), tableName,
@@ -832,7 +833,6 @@ func (c *conn) GetIndexes(ctx context.Context, tableName string) ([]string, erro
 		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
 
-	var indexes []string
 	err = retry.Retry(ctx, func(ctx context.Context) error {
 		desc, errIn := c.session.DescribeTable(ctx, tableName)
 		if errIn != nil {

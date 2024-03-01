@@ -39,15 +39,12 @@ type (
 	}
 )
 
+//nolint:nonamedreturns // FAIL integration tests
 func (c *Client) Execute(
 	ctx context.Context,
 	query string,
 	parameters *params.Parameters,
-) (result.Result, error) {
-	var (
-		r   result.Result
-		err error
-	)
+) (r result.Result, err error) {
 	if c == nil {
 		return r, xerrors.WithStackTrace(errNilClient)
 	}
@@ -59,7 +56,7 @@ func (c *Client) Execute(
 	if !c.config.AutoRetry() {
 		err = call(ctx)
 
-		return r, err
+		return
 	}
 	err = retry.Retry(ctx, call,
 		retry.WithStackTrace(),
@@ -69,14 +66,13 @@ func (c *Client) Execute(
 	return r, xerrors.WithStackTrace(err)
 }
 
+//nolint:nonamedreturns // FAIL integration tests
 func (c *Client) execute(
 	ctx context.Context,
 	query string,
 	parameters *params.Parameters,
-) (result.Result, error) {
+) (r result.Result, err error) {
 	var (
-		r      result.Result
-		err    error
 		onDone = trace.ScriptingOnExecute(c.config.Trace(), &ctx,
 			stack.FunctionID(""),
 			query, parameters,
@@ -240,6 +236,7 @@ func (c *Client) streamExecute(
 	parameters *params.Parameters,
 ) (result.StreamResult, error) {
 	var (
+		err            error
 		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx,
 			stack.FunctionID(""),
 			query, parameters,
@@ -255,7 +252,6 @@ func (c *Client) streamExecute(
 				operation.ModeSync,
 			),
 		}
-		err error
 	)
 	defer func() {
 		a.Free()

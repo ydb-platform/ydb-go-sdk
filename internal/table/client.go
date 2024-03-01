@@ -472,13 +472,12 @@ func (c *Client) Get(ctx context.Context) (*session, error) {
 	return c.internalPoolGet(ctx)
 }
 
-func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (*session, error) {
+//nolint:nonamedreturns //because FAIL native example test
+func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s *session, err error) {
 	var (
-		ch  *chan *session
-		el  *list.Element // Element in the wait queue.
-		ok  bool
-		s   *session
-		err error
+		ch *chan *session
+		el *list.Element // Element in the wait queue.
+		ok bool
 	)
 
 	c.mu.WithLock(func() {
@@ -825,13 +824,9 @@ func (c *Client) internalPoolPutWaitCh(ch *chan *session) { //nolint:gocritic
 	c.waitChPool.Put(ch)
 }
 
-// FAIL native
 // c.mu must be held.
-func (c *Client) internalPoolPeekFirstIdle() (*session, time.Time) {
-	var (
-		s       *session
-		touched time.Time
-	)
+func (c *Client) internalPoolPeekFirstIdle() (s *session, touched time.Time) { //nolint:nonamedreturns
+	// FAIL native
 	el := c.idle.Front()
 	if el == nil {
 		return s, touched

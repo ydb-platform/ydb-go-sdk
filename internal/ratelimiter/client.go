@@ -183,13 +183,13 @@ func (c *Client) dropResource(
 	return err
 }
 
+//nolint:nonamedreturns // potential errors
 func (c *Client) ListResource(
 	ctx context.Context,
 	coordinationNodePath string,
 	resourcePath string,
 	recursive bool,
-) ([]string, error) {
-	var list []string
+) (list []string, _ error) {
 	if c == nil {
 		return list, xerrors.WithStackTrace(errNilClient)
 	}
@@ -249,11 +249,7 @@ func (c *Client) DescribeResource(
 	ctx context.Context,
 	coordinationNodePath string,
 	resourcePath string,
-) (*ratelimiter.Resource, error) {
-	var (
-		resource *ratelimiter.Resource
-		err      error
-	)
+) (resource *ratelimiter.Resource, err error) {
 	if c == nil {
 		return resource, xerrors.WithStackTrace(errNilClient)
 	}
@@ -265,7 +261,7 @@ func (c *Client) DescribeResource(
 	if !c.config.AutoRetry() {
 		err = call(ctx)
 
-		return resource, err
+		return
 	}
 	err = retry.Retry(ctx, call,
 		retry.WithIdempotent(true),
@@ -273,7 +269,7 @@ func (c *Client) DescribeResource(
 		retry.WithTrace(c.config.TraceRetry()),
 	)
 
-	return resource, err
+	return
 }
 
 func (c *Client) describeResource(

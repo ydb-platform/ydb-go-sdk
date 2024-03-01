@@ -140,12 +140,10 @@ func (r *Reader) ReadMessage(ctx context.Context) (*PublicMessage, error) {
 
 // ReadMessageBatch read batch of messages.
 // Batch is collection of messages, which can be atomically committed
-func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOption) (*PublicBatch, error) {
-	var (
-		readOptions = r.defaultBatchConfig.clone()
-		batch       *PublicBatch
-		err         error
-	)
+//
+//nolint:nonamedreturns // potential error
+func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOption) (batch *PublicBatch, err error) {
+	readOptions := r.defaultBatchConfig.clone()
 
 	for _, opt := range opts {
 		if opt != nil {

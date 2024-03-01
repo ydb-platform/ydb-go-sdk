@@ -115,14 +115,11 @@ func (s *session) isClosing() bool {
 	return s.Status() == table.SessionClosing
 }
 
+//nolint:nonamedreturns // potential error
 func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (
-	*session, error,
+	s *session, err error,
 ) {
-	var (
-		s      *session
-		err    error
-		onDone = trace.TableOnSessionNew(config.Trace(), &ctx, stack.FunctionID(""))
-	)
+	onDone := trace.TableOnSessionNew(config.Trace(), &ctx, stack.FunctionID(""))
 	defer func() {
 		onDone(s, err)
 	}()

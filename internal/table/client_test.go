@@ -887,11 +887,8 @@ func newClientWithStubBuilder(
 	return c
 }
 
-func (s *StubBuilder) createSession(ctx context.Context) (*session, error) {
-	var (
-		session *session
-		err     error
-	)
+//nolint:nonamedreturns //potential error
+func (s *StubBuilder) createSession(ctx context.Context) (session *session, err error) {
 	defer s.mu.WithLock(func() {
 		if session != nil {
 			s.actual++

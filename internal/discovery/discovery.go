@@ -36,7 +36,8 @@ type Client struct {
 }
 
 // Discover cluster endpoints
-func (c *Client) Discover(ctx context.Context) ([]endpoint.Endpoint, error) {
+func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) { //nolint:nonamedreturns
+	// FAIL integration tests
 	var (
 		onDone = trace.DiscoveryOnDiscover(
 			c.config.Trace(), &ctx,
@@ -46,11 +47,9 @@ func (c *Client) Discover(ctx context.Context) ([]endpoint.Endpoint, error) {
 		request = Ydb_Discovery.ListEndpointsRequest{
 			Database: c.config.Database(),
 		}
-		response  *Ydb_Discovery.ListEndpointsResponse
-		result    Ydb_Discovery.ListEndpointsResult
-		location  string
-		endpoints = make([]endpoint.Endpoint, 0, len(result.Endpoints))
-		err       error
+		response *Ydb_Discovery.ListEndpointsResponse
+		result   Ydb_Discovery.ListEndpointsResult
+		location string
 	)
 	defer func() {
 		nodes := make([]trace.EndpointInfo, 0, len(endpoints))
@@ -99,14 +98,13 @@ func (c *Client) Discover(ctx context.Context) ([]endpoint.Endpoint, error) {
 	return endpoints, nil
 }
 
-func (c *Client) WhoAmI(ctx context.Context) (*discovery.WhoAmI, error) {
+//nolint:nonamedreturns // FAIL integration tests
+func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err error) {
 	var (
 		onDone             = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx, stack.FunctionID(""))
 		request            = Ydb_Discovery.WhoAmIRequest{}
 		response           *Ydb_Discovery.WhoAmIResponse
 		whoAmIResultResult Ydb_Discovery.WhoAmIResult
-		whoAmI             *discovery.WhoAmI
-		err                error
 	)
 	defer func() {
 		if err != nil {

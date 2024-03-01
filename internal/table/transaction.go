@@ -56,19 +56,15 @@ func (tx *transaction) ID() string {
 }
 
 // Execute executes query represented by text within transaction tx.
-func (tx *transaction) Execute(
+func (tx *transaction) Execute( //nolint:nonamedreturns // potential error
 	ctx context.Context,
 	query string, parameters *params.Parameters,
 	opts ...options.ExecuteDataQueryOption,
-) (result.Result, error) {
-	var (
-		r      result.Result
-		err    error
-		onDone = trace.TableOnSessionTransactionExecute(
-			tx.s.config.Trace(), &ctx,
-			stack.FunctionID(""),
-			tx.s, tx, queryFromText(query), parameters,
-		)
+) (r result.Result, err error) {
+	onDone := trace.TableOnSessionTransactionExecute(
+		tx.s.config.Trace(), &ctx,
+		stack.FunctionID(""),
+		tx.s, tx, queryFromText(query), parameters,
 	)
 	defer func() {
 		onDone(r, err)
@@ -94,22 +90,18 @@ func (tx *transaction) Execute(
 }
 
 // ExecuteStatement executes prepared statement stmt within transaction tx.
-func (tx *transaction) ExecuteStatement(
+func (tx *transaction) ExecuteStatement( //nolint:nonamedreturns // potential error
 	ctx context.Context,
 	stmt table.Statement, parameters *params.Parameters,
 	opts ...options.ExecuteDataQueryOption,
-) (result.Result, error) {
+) (r result.Result, err error) {
 	a := allocator.New()
 	defer a.Free()
 
-	var (
-		r      result.Result
-		err    error
-		onDone = trace.TableOnSessionTransactionExecuteStatement(
-			tx.s.config.Trace(), &ctx,
-			stack.FunctionID(""),
-			tx.s, tx, stmt.(*statement).query, parameters,
-		)
+	onDone := trace.TableOnSessionTransactionExecuteStatement(
+		tx.s.config.Trace(), &ctx,
+		stack.FunctionID(""),
+		tx.s, tx, stmt.(*statement).query, parameters,
 	)
 	defer func() {
 		onDone(r, err)

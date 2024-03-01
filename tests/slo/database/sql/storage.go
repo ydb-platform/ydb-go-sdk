@@ -80,12 +80,9 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
-	var (
-		s   *Storage
-		err error
-	)
+	var err error
 
-	s = &Storage{
+	s := &Storage{
 		cfg: cfg,
 		createQuery: fmt.Sprintf(createTemplate, cfg.Table,
 			cfg.PartitionSize, cfg.MinPartitionsCount, cfg.MaxPartitionsCount, cfg.MinPartitionsCount),

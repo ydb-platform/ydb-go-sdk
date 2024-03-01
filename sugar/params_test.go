@@ -18,7 +18,7 @@ import (
 
 func TestGenerateDeclareSection(t *testing.T) {
 	splitDeclares := func(declaresSection string) []string {
-		var declares []string
+		declares := make([]string, 0)
 		for _, s := range strings.Split(declaresSection, ";") {
 			s = strings.TrimSpace(s)
 			if s != "" {
@@ -119,7 +119,7 @@ func TestGenerateDeclareSection(t *testing.T) {
 func TestGenerateDeclareSection_ParameterOption(t *testing.T) {
 	b := testutil.QueryBind(bind.AutoDeclare{})
 	getDeclares := func(declaresSection string) []string {
-		var declares []string
+		declares := make([]string, 0)
 		for _, s := range strings.Split(declaresSection, "\n") {
 			s = strings.TrimSpace(s)
 			if s != "" && !strings.HasPrefix(s, "--") {
@@ -227,7 +227,7 @@ func TestGenerateDeclareSection_ParameterOption(t *testing.T) {
 func TestGenerateDeclareSection_NamedArg(t *testing.T) {
 	b := testutil.QueryBind(bind.AutoDeclare{})
 	getDeclares := func(declaresSection string) []string {
-		var declares []string
+		declares := make([]string, 0)
 		for _, s := range strings.Split(declaresSection, "\n") {
 			s = strings.TrimSpace(s)
 			if s != "" && !strings.HasPrefix(s, "--") {

@@ -117,8 +117,8 @@ func (s *connectionsState) selectRandomConnection(conns []conn.Conn, allowBanned
 	return nil, failedConns
 }
 
-func connsToNodeIDMap(conns []conn.Conn) map[uint32]conn.Conn {
-	var nodes map[uint32]conn.Conn
+//nolint:nonamedreturns // potential error
+func connsToNodeIDMap(conns []conn.Conn) (nodes map[uint32]conn.Conn) {
 	if len(conns) == 0 {
 		return nil
 	}
@@ -130,13 +130,13 @@ func connsToNodeIDMap(conns []conn.Conn) map[uint32]conn.Conn {
 	return nodes
 }
 
+//nolint:nonamedreturns // potential error
 func sortPreferConnections(
 	conns []conn.Conn,
 	filter balancerConfig.Filter,
 	info balancerConfig.Info,
 	allowFallback bool,
-) ([]conn.Conn, []conn.Conn) {
-	var prefer, fallback []conn.Conn
+) (prefer, fallback []conn.Conn) {
 	if filter == nil {
 		return conns, nil
 	}

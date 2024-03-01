@@ -156,19 +156,15 @@ func (c *Client) dropNode(ctx context.Context, path string) error {
 	return xerrors.WithStackTrace(err)
 }
 
+//nolint:nonamedreturns // potential error
 func (c *Client) DescribeNode(
 	ctx context.Context,
 	path string,
 ) (
-	*scheme.Entry,
-	*coordination.NodeConfig,
-	error,
+	entry *scheme.Entry,
+	config *coordination.NodeConfig,
+	err error,
 ) {
-	var (
-		entry  *scheme.Entry
-		config *coordination.NodeConfig
-		err    error
-	)
 	if c == nil {
 		return nil, nil, xerrors.WithStackTrace(errNilClient)
 	}

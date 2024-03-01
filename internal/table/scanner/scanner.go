@@ -527,14 +527,14 @@ func (s *valueScanner) unwrapDecimal() decimal.Decimal {
 	}
 }
 
-func (s *valueScanner) assertTypeDecimal(typ *Ydb.Type) *Ydb.Type_DecimalType {
-	var t *Ydb.Type_DecimalType
+//nolint:nonamedreturns // FAIL integration tests
+func (s *valueScanner) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.Type_DecimalType) {
 	x := typ.GetType()
 	if t, _ = x.(*Ydb.Type_DecimalType); t == nil {
 		s.typeError(x, t)
 	}
 
-	return t
+	return
 }
 
 func (s *valueScanner) bool() bool {
