@@ -31,8 +31,9 @@ func newResult(
 	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
 	stop func(),
-) (_ *result, txID string, _ error) {
+) (*result, string, error) {
 	interrupted := make(chan struct{})
+	var txID string
 	r := result{
 		stream:         stream,
 		resultSetIndex: -1,
@@ -85,7 +86,8 @@ func (r *result) Close(ctx context.Context) error {
 	return nil
 }
 
-func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
+func (r *result) nextResultSet(ctx context.Context) (*resultSet, error) {
+	var err error
 	defer func() {
 		if err != nil && !xerrors.Is(err,
 			io.EOF, errClosedResult, context.Canceled,
@@ -108,7 +110,7 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 				if resultSetIndex := r.lastPart.GetResultSetIndex(); resultSetIndex >= nextResultSetIndex { //nolint:nestif
 					r.resultSetIndex = resultSetIndex
 
-					return newResultSet(func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
+					return newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
 						defer func() {
 							if err != nil && !xerrors.Is(err,
 								io.EOF, context.Canceled,

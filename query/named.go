@@ -18,7 +18,8 @@ func (dst namedDestination) Destination() interface{} {
 	return dst.ref
 }
 
-func Named(columnName string, destinationValueReference interface{}) (dst namedDestination) {
+func Named(columnName string, destinationValueReference interface{}) namedDestination {
+	dst := namedDestination{}
 	if columnName == "" {
 		panic("columnName must be not empty")
 	}

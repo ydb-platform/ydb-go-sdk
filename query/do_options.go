@@ -14,7 +14,8 @@ func (idempotentOption) applyDoOption(opts *DoOptions) {
 	opts.RetryOptions = append(opts.RetryOptions, retry.WithIdempotent(true))
 }
 
-func NewDoOptions(opts ...DoOption) (doOptions DoOptions) {
+func NewDoOptions(opts ...DoOption) DoOptions {
+	doOptions := DoOptions{}
 	for _, opt := range opts {
 		opt.applyDoOption(&doOptions)
 	}

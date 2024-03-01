@@ -245,6 +245,7 @@ func (c *Client) listResource(
 	return result.GetResourcePaths(), nil
 }
 
+//nolint:nonamedreturns //potential error
 func (c *Client) DescribeResource(
 	ctx context.Context,
 	coordinationNodePath string,

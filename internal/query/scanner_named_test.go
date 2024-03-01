@@ -645,7 +645,8 @@ func TestScannerNamed(t *testing.T) {
 	} {
 		for i := range tt.dst {
 			t.Run(tt.name+"→"+reflect.TypeOf(tt.dst[i][0]).Elem().String(), func(t *testing.T) {
-				err := tt.s.ScanNamed(func() (dst []query.NamedDestination) {
+				err := tt.s.ScanNamed(func() []query.NamedDestination {
+					dst := make([]query.NamedDestination, 0)
 					for j := range tt.dst[i] {
 						dst = append(dst, query.Named("a", tt.dst[i][j]))
 					}

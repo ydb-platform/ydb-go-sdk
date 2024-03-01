@@ -103,8 +103,8 @@ func defaultCommonExecuteSettings() commonExecuteSettings {
 	}
 }
 
-func ExecuteSettings(opts ...ExecuteOption) (settings *executeSettings) {
-	settings = &executeSettings{
+func ExecuteSettings(opts ...ExecuteOption) *executeSettings {
+	settings := &executeSettings{
 		commonExecuteSettings: defaultCommonExecuteSettings(),
 	}
 	settings.commonExecuteSettings = defaultCommonExecuteSettings()
@@ -144,8 +144,8 @@ func (s *commonExecuteSettings) Params() *params.Parameters {
 	return &s.params
 }
 
-func TxExecuteSettings(opts ...TxExecuteOption) (settings *txExecuteSettings) {
-	settings = &txExecuteSettings{
+func TxExecuteSettings(opts ...TxExecuteOption) *txExecuteSettings {
+	settings := &txExecuteSettings{
 		commonExecuteSettings: defaultCommonExecuteSettings(),
 	}
 	for _, opt := range opts {

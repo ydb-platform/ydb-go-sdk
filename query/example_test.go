@@ -25,34 +25,35 @@ func Example_selectWithoutParameters() {
 	)
 	// Do retry operation on errors with best effort
 	err = db.Query().Do(ctx, // context manage exiting from Do
-		func(ctx context.Context, s query.Session) (err error) { // retry operation
-			_, res, err := s.Execute(ctx,
+		func(ctx context.Context, s query.Session) error { // retry operation
+			var errIn error
+			_, res, errIn := s.Execute(ctx,
 				`SELECT 42 as id, "my string" as myStr`,
 			)
-			if err != nil {
-				return err // for auto-retry with driver
+			if errIn != nil {
+				return errIn // for auto-retry with driver
 			}
 			defer func() { _ = res.Close(ctx) }() // cleanup resources
 			for {                                 // iterate over result sets
-				rs, err := res.NextResultSet(ctx)
-				if err != nil {
-					if errors.Is(err, io.EOF) {
+				rs, errIn := res.NextResultSet(ctx)
+				if errIn != nil {
+					if errors.Is(errIn, io.EOF) {
 						break
 					}
 
-					return err
+					return errIn
 				}
 				for { // iterate over rows
-					row, err := rs.NextRow(ctx)
-					if err != nil {
-						if errors.Is(err, io.EOF) {
+					row, errIn := rs.NextRow(ctx)
+					if errIn != nil {
+						if errors.Is(errIn, io.EOF) {
 							break
 						}
 
-						return err
+						return errIn
 					}
-					if err = row.Scan(&id, &myStr); err != nil {
-						return err // generally scan error not retryable, return it for driver check error
+					if errIn = row.Scan(&id, &myStr); err != nil {
+						return errIn // generally scan error not retryable, return it for driver check error
 					}
 				}
 			}
@@ -82,8 +83,8 @@ func Example_selectWithParameters() {
 	)
 	// Do retry operation on errors with best effort
 	err = db.Query().Do(ctx, // context manage exiting from Do
-		func(ctx context.Context, s query.Session) (err error) { // retry operation
-			_, res, err := s.Execute(ctx,
+		func(ctx context.Context, s query.Session) error { // retry operation
+			_, res, errIn := s.Execute(ctx,
 				`SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr`,
 				query.WithParameters(
 					ydb.ParamsBuilder().
@@ -92,33 +93,33 @@ func Example_selectWithParameters() {
 						Build(),
 				),
 			)
-			if err != nil {
-				return err // for auto-retry with driver
+			if errIn != nil {
+				return errIn // for auto-retry with driver
 			}
 			defer func() { _ = res.Close(ctx) }() // cleanup resources
 			for {                                 // iterate over result sets
-				rs, err := res.NextResultSet(ctx)
-				if err != nil {
-					if errors.Is(err, io.EOF) {
+				rs, errIn := res.NextResultSet(ctx)
+				if errIn != nil {
+					if errors.Is(errIn, io.EOF) {
 						break
 					}
 
-					return err
+					return errIn
 				}
 				for { // iterate over rows
-					row, err := rs.NextRow(ctx)
-					if err != nil {
-						if errors.Is(err, io.EOF) {
+					row, errIn := rs.NextRow(ctx)
+					if errIn != nil {
+						if errors.Is(errIn, io.EOF) {
 							break
 						}
 
-						return err
+						return errIn
 					}
-					if err = row.ScanNamed(
+					if errIn = row.ScanNamed(
 						query.Named("id", &id),
 						query.Named("myStr", &myStr),
-					); err != nil {
-						return err // generally scan error not retryable, return it for driver check error
+					); errIn != nil {
+						return errIn // generally scan error not retryable, return it for driver check error
 					}
 				}
 			}
@@ -148,37 +149,37 @@ func Example_txSelect() {
 	)
 	// Do retry operation on errors with best effort
 	err = db.Query().DoTx(ctx, // context manage exiting from Do
-		func(ctx context.Context, tx query.TxActor) (err error) { // retry operation
-			res, err := tx.Execute(ctx,
+		func(ctx context.Context, tx query.TxActor) error { // retry operation
+			res, errIn := tx.Execute(ctx,
 				`SELECT 42 as id, "my string" as myStr`,
 			)
-			if err != nil {
-				return err // for auto-retry with driver
+			if errIn != nil {
+				return errIn // for auto-retry with driver
 			}
 			defer func() { _ = res.Close(ctx) }() // cleanup resources
 			for {                                 // iterate over result sets
-				rs, err := res.NextResultSet(ctx)
-				if err != nil {
-					if errors.Is(err, io.EOF) {
+				rs, errIn := res.NextResultSet(ctx)
+				if errIn != nil {
+					if errors.Is(errIn, io.EOF) {
 						break
 					}
 
-					return err
+					return errIn
 				}
 				for { // iterate over rows
-					row, err := rs.NextRow(ctx)
-					if err != nil {
-						if errors.Is(err, io.EOF) {
+					row, errIn := rs.NextRow(ctx)
+					if errIn != nil {
+						if errors.Is(errIn, io.EOF) {
 							break
 						}
 
-						return err
+						return errIn
 					}
-					if err = row.ScanNamed(
+					if errIn = row.ScanNamed(
 						query.Named("id", &id),
 						query.Named("myStr", &myStr),
-					); err != nil {
-						return err // generally scan error not retryable, return it for driver check error
+					); errIn != nil {
+						return errIn // generally scan error not retryable, return it for driver check error
 					}
 				}
 			}
