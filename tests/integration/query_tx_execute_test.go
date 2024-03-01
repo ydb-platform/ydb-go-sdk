@@ -5,14 +5,12 @@ package integration
 
 import (
 	"context"
-	"errors"
 	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	internalQuery "github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
@@ -45,7 +43,7 @@ func TestQueryTxExecute(t *testing.T) {
 		}
 		var col1 int
 		err = row.ScanNamed(query.Named("col1", &col1))
-		if err != nil && !errors.Is(err, internalQuery.ErrNotImplemented) {
+		if err != nil {
 			return err
 		}
 		return res.Err()

@@ -34,6 +34,10 @@ func (opt *transactionControlOption) applyExecuteOption(s *executeSettings) {
 }
 
 func (ctrl *TransactionControl) ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionControl {
+	if ctrl == nil {
+		return nil
+	}
+
 	txControl := a.QueryTransactionControl()
 	ctrl.selector.applyTxSelector(a, txControl)
 	txControl.CommitTx = ctrl.commit
@@ -115,6 +119,10 @@ func TxControl(opts ...txControlOption) *TransactionControl {
 	}
 
 	return txControl
+}
+
+func NoTx() *TransactionControl {
+	return nil
 }
 
 // DefaultTxControl returns default transaction control with serializable read-write isolation mode and auto-commit
