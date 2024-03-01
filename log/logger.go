@@ -42,9 +42,9 @@ func Default(w io.Writer, opts ...simpleLoggerOption) *defaultLogger {
 
 type defaultLogger struct {
 	coloring bool
-	clock    clockwork.Clock
 	logQuery bool
 	minLevel Level
+	clock    clockwork.Clock
 	w        io.Writer
 }
 

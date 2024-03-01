@@ -31,7 +31,7 @@ func TestQueryTxExecute(t *testing.T) {
 	)
 	require.NoError(t, err)
 	err = db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) (err error) {
-		res, err := tx.Execute(ctx, "SELECT 1")
+		res, err := tx.Execute(ctx, "SELECT 1 AS col1")
 		if err != nil {
 			return err
 		}
@@ -43,7 +43,8 @@ func TestQueryTxExecute(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		err = row.Scan(nil)
+		var col1 int
+		err = row.ScanNamed(query.Named("col1", &col1))
 		if err != nil && !errors.Is(err, internalQuery.ErrNotImplemented) {
 			return err
 		}

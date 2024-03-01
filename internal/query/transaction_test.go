@@ -152,7 +152,7 @@ func TestFromTxOptions(t *testing.T) {
 				execMode:  query.ExecModeExecute,
 				statsMode: query.StatsModeNone,
 				txControl: query.TxControl(query.WithTxID("test")),
-				syntax:    Ydb_Query.Syntax_SYNTAX_YQL_V1,
+				syntax:    query.SyntaxYQL,
 			},
 		},
 		{
@@ -164,7 +164,7 @@ func TestFromTxOptions(t *testing.T) {
 				execMode:  query.ExecModeExecute,
 				statsMode: query.StatsModeFull,
 				txControl: query.TxControl(query.WithTxID("")),
-				syntax:    Ydb_Query.Syntax_SYNTAX_YQL_V1,
+				syntax:    query.SyntaxYQL,
 			},
 		},
 		{
@@ -176,7 +176,19 @@ func TestFromTxOptions(t *testing.T) {
 				execMode:  query.ExecModeExplain,
 				statsMode: query.StatsModeNone,
 				txControl: query.TxControl(query.WithTxID("")),
-				syntax:    Ydb_Query.Syntax_SYNTAX_YQL_V1,
+				syntax:    query.SyntaxYQL,
+			},
+		},
+		{
+			name: "WithSyntax",
+			txOpts: []query.TxExecuteOption{
+				query.WithSyntax(query.SyntaxPostgreSQL),
+			},
+			settings: testExecuteSettings{
+				execMode:  query.ExecModeExecute,
+				statsMode: query.StatsModeNone,
+				txControl: query.TxControl(query.WithTxID("")),
+				syntax:    query.SyntaxPostgreSQL,
 			},
 		},
 		{
@@ -188,7 +200,7 @@ func TestFromTxOptions(t *testing.T) {
 				execMode:  query.ExecModeExecute,
 				statsMode: query.StatsModeNone,
 				txControl: query.TxControl(query.WithTxID("")),
-				syntax:    Ydb_Query.Syntax_SYNTAX_YQL_V1,
+				syntax:    query.SyntaxYQL,
 				callOptions: []grpc.CallOption{
 					grpc.CallContentSubtype("test"),
 				},
@@ -205,7 +217,7 @@ func TestFromTxOptions(t *testing.T) {
 				execMode:  query.ExecModeExecute,
 				statsMode: query.StatsModeNone,
 				txControl: query.TxControl(query.WithTxID("")),
-				syntax:    Ydb_Query.Syntax_SYNTAX_YQL_V1,
+				syntax:    query.SyntaxYQL,
 				params:    params.Builder{}.Param("$a").Text("A").Build(),
 			},
 		},

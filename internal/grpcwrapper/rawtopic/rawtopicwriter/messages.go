@@ -306,9 +306,9 @@ type UpdateTokenRequest struct {
 }
 
 type UpdateTokenResponse struct {
+	rawtopiccommon.UpdateTokenResponse
+
 	serverMessageImpl
 
 	rawtopiccommon.ServerMessageMetadata
-
-	rawtopiccommon.UpdateTokenResponse
 }

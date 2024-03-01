@@ -8,7 +8,7 @@ import (
 )
 
 type (
-	Syntax                = Ydb_Query.Syntax
+	Syntax                Ydb_Query.Syntax
 	ExecMode              Ydb_Query.ExecMode
 	StatsMode             Ydb_Query.StatsMode
 	callOptions           []grpc.CallOption
@@ -34,6 +34,19 @@ type (
 		applyTxExecuteOption(s *txExecuteSettings)
 	}
 	parametersOption params.Parameters
+)
+
+func (syntax Syntax) applyTxExecuteOption(s *txExecuteSettings) {
+	s.syntax = syntax
+}
+
+func (syntax Syntax) applyExecuteOption(s *executeSettings) {
+	s.syntax = syntax
+}
+
+const (
+	SyntaxYQL        = Syntax(Ydb_Query.Syntax_SYNTAX_YQL_V1)
+	SyntaxPostgreSQL = Syntax(Ydb_Query.Syntax_SYNTAX_PG)
 )
 
 func (params parametersOption) applyTxExecuteOption(s *txExecuteSettings) {
@@ -84,7 +97,7 @@ const (
 
 func defaultCommonExecuteSettings() commonExecuteSettings {
 	return commonExecuteSettings{
-		syntax:    Ydb_Query.Syntax_SYNTAX_YQL_V1,
+		syntax:    SyntaxYQL,
 		execMode:  ExecModeExecute,
 		statsMode: StatsModeNone,
 	}
@@ -159,6 +172,10 @@ var (
 
 func WithExecMode(mode ExecMode) ExecMode {
 	return mode
+}
+
+func WithSyntax(syntax Syntax) Syntax {
+	return syntax
 }
 
 func WithStatsMode(mode StatsMode) StatsMode {

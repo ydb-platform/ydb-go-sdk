@@ -50,7 +50,7 @@ import (
 var _ Connection = (*Driver)(nil)
 
 // Driver type provide access to YDB service clients
-type Driver struct { //nolint:maligned
+type Driver struct {
 	ctx       context.Context // cancel while Driver.Close called.
 	ctxCancel context.CancelFunc
 
@@ -188,6 +188,10 @@ func (d *Driver) Table() table.Client {
 }
 
 // Query returns query client
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (d *Driver) Query() query.Client {
 	return d.query
 }
