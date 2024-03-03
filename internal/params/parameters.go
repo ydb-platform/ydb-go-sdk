@@ -109,6 +109,14 @@ func (p *Parameter) List() *list {
 	}
 }
 
+func (p *Parameter) Set() *set {
+	return &set{
+		parent: p.parent,
+		name:   p.name,
+		values: make(map[value.Value]struct{}),
+	}
+}
+
 func (p *Parameter) Text(v string) Builder {
 	p.value = value.TextValue(v)
 	p.parent.params = append(p.parent.params, p)
