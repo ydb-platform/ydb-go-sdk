@@ -2,13 +2,21 @@ package query
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var _ DoTxOption = idempotentOption{}
+var (
+	_ DoTxOption = idempotentOption{}
+	_ DoTxOption = traceOption{}
+)
 
 func (idempotentOption) applyDoTxOption(opts *DoTxOptions) {
 	opts.Idempotent = true
 	opts.RetryOptions = append(opts.RetryOptions, retry.WithIdempotent(true))
+}
+
+func (opt traceOption) applyDoTxOption(o *DoTxOptions) {
+	o.Trace = o.Trace.Compose(opt.t)
 }
 
 var _ DoTxOption = doTxSettingsOption{}
@@ -27,6 +35,8 @@ func WithTxSettings(txSettings TransactionSettings) doTxSettingsOption {
 
 func NewDoTxOptions(opts ...DoTxOption) (doTxOptions DoTxOptions) {
 	doTxOptions.TxSettings = TxSettings(WithDefaultTxMode())
+	doTxOptions.Trace = &trace.Query{}
+
 	for _, opt := range opts {
 		opt.applyDoTxOption(&doTxOptions)
 	}

@@ -15,8 +15,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ydb-version: [ 22.5, 23.1, 23.2 ]
-        application: [ native, database_sql, gorm, xorm ]
+        ydb-version: [ 22.5, 23.1, 23.2, 23.3, 24.1 ]
+        application: [ native/table, native/query, database_sql, gorm, xorm ]
     services:
       ydb:
         image: cr.yandex/crpsjg1coh47p81vh2lc/yandex-docker-local-ydb:${{ matrix.ydb-version }}
