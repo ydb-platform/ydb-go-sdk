@@ -113,7 +113,6 @@ func (p *Parameter) Set() *set {
 	return &set{
 		parent: p.parent,
 		name:   p.name,
-		values: make(map[value.Value]struct{}),
 	}
 }
 
