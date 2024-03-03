@@ -46,12 +46,6 @@ func (s *setItem) Text(v string) *set {
 	return s.parent
 }
 
-func (s *setItem) Bytes(v []byte) *set {
-	s.parent.values[value.BytesValue(v)] = struct{}{}
-
-	return s.parent
-}
-
 func (s *setItem) Bool(v bool) *set {
 	s.parent.values[value.BoolValue(v)] = struct{}{}
 
