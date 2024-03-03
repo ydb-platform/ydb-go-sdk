@@ -223,7 +223,6 @@ linters:
     - cyclop
     - depguard
     - dupl
-    - errname
     - exhaustive
     - exhaustivestruct
     - exhaustruct
