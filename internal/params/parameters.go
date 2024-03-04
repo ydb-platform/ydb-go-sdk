@@ -242,28 +242,28 @@ func (p *Parameter) Interval(v time.Duration) Builder {
 	return p.parent
 }
 
-func (p *Parameter) Json(v string) Builder {
+func (p *Parameter) JSON(v string) Builder {
 	p.value = value.JSONValue(v)
 	p.parent.params = append(p.parent.params, p)
 
 	return p.parent
 }
 
-func (p *Parameter) JsonDocument(v string) Builder {
+func (p *Parameter) JSONDocument(v string) Builder {
 	p.value = value.JSONDocumentValue(v)
 	p.parent.params = append(p.parent.params, p)
 
 	return p.parent
 }
 
-func (p *Parameter) Yson(v []byte) Builder {
+func (p *Parameter) YSON(v []byte) Builder {
 	p.value = value.YSONValue(v)
 	p.parent.params = append(p.parent.params, p)
 
 	return p.parent
 }
 
-func (p *Parameter) Uuid(v [16]byte) Builder {
+func (p *Parameter) UUID(v [16]byte) Builder {
 	p.value = value.UUIDValue(v)
 	p.parent.params = append(p.parent.params, p)
 

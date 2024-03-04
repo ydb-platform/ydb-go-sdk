@@ -374,7 +374,7 @@ func TestBuilder(t *testing.T) {
 		{
 			name: xtest.CurrentFileLine(),
 			builder: Builder{}.
-				Param("$x").Json(`{"a": 1,"b": "B"}`).Build(),
+				Param("$x").JSON(`{"a": 1,"b": "B"}`).Build(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -393,7 +393,7 @@ func TestBuilder(t *testing.T) {
 		{
 			name: xtest.CurrentFileLine(),
 			builder: Builder{}.
-				Param("$x").JsonDocument(`{"a": 1,"b": "B"}`).Build(),
+				Param("$x").JSONDocument(`{"a": 1,"b": "B"}`).Build(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -412,7 +412,7 @@ func TestBuilder(t *testing.T) {
 		{
 			name: xtest.CurrentFileLine(),
 			builder: Builder{}.
-				Param("$x").Yson([]byte(`[ 1; 2; 3; 4; 5 ]`)).Build(),
+				Param("$x").YSON([]byte(`[ 1; 2; 3; 4; 5 ]`)).Build(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -432,7 +432,7 @@ func TestBuilder(t *testing.T) {
 			name: xtest.CurrentFileLine(),
 			builder: Builder{}.
 				Param("$x").
-				Uuid([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}).
+				UUID([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}).
 				Build(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {

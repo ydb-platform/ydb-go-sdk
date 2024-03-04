@@ -135,25 +135,25 @@ func (p *optional) Interval(v time.Duration) *optionalBuilder {
 	return &optionalBuilder{opt: p}
 }
 
-func (p *optional) Json(v string) *optionalBuilder {
+func (p *optional) JSON(v string) *optionalBuilder {
 	p.value = value.JSONValue(v)
 
 	return &optionalBuilder{opt: p}
 }
 
-func (p *optional) JsonDocument(v string) *optionalBuilder {
+func (p *optional) JSONDocument(v string) *optionalBuilder {
 	p.value = value.JSONDocumentValue(v)
 
 	return &optionalBuilder{opt: p}
 }
 
-func (p *optional) Yson(v []byte) *optionalBuilder {
+func (p *optional) YSON(v []byte) *optionalBuilder {
 	p.value = value.YSONValue(v)
 
 	return &optionalBuilder{opt: p}
 }
 
-func (p *optional) Uuid(v [16]byte) *optionalBuilder {
+func (p *optional) UUID(v [16]byte) *optionalBuilder {
 	p.value = value.UUIDValue(v)
 
 	return &optionalBuilder{opt: p}
