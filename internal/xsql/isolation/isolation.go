@@ -13,7 +13,7 @@ import (
 // This caused by ydb logic that prevents start actual transaction with OnlineReadOnly mode and ReadCommitted
 // and ReadUncommitted isolation levels should use tx_control in every query request.
 // It returns error on unsupported options.
-func ToYDB(opts driver.TxOptions) (txcControl table.TxOption, err error) {
+func ToYDB(opts driver.TxOptions) (table.TxOption, error) {
 	level := sql.IsolationLevel(opts.Isolation)
 	switch level {
 	case sql.LevelDefault, sql.LevelSerializable:

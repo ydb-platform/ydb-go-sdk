@@ -25,7 +25,7 @@ type statement struct {
 }
 
 // Execute executes prepared data query.
-func (s *statement) Execute(
+func (s *statement) Execute( //nolint:nonamedreturns //because FAIL: TestBasicExampleNative
 	ctx context.Context, txControl *table.TransactionControl,
 	parameters *params.Parameters,
 	opts ...options.ExecuteDataQueryOption,
@@ -79,7 +79,7 @@ func (s *statement) execute(
 	request *options.ExecuteDataQueryDesc, txControl *Ydb_Table.TransactionControl,
 	callOptions ...grpc.CallOption,
 ) (
-	txr table.Transaction, r result.Result, err error,
+	table.Transaction, result.Result, error,
 ) {
 	res, err := s.session.executeDataQuery(ctx, a, request.ExecuteDataQueryRequest, callOptions...)
 	if err != nil {

@@ -48,6 +48,7 @@ func episodeData(seriesID, seasonID, episodeID, title string, date time.Time) ty
 	)
 }
 
+//nolint:nonamedreturns
 func getData() (series, seasons, episodes []types.Value) {
 	for seriesID, fill := range map[string]func(seriesID string) (
 		seriesData types.Value, seasons []types.Value, episodes []types.Value,
@@ -61,9 +62,10 @@ func getData() (series, seasons, episodes []types.Value) {
 		episodes = append(episodes, episodesData...)
 	}
 
-	return
+	return series, seasons, episodes
 }
 
+//nolint:nonamedreturns
 func getDataForITCrowd(seriesID string) (series types.Value, seasons, episodes []types.Value) {
 	series = seriesData(
 		seriesID, date("2006-02-03"), "IT Crowd", ""+
@@ -120,6 +122,7 @@ func getDataForITCrowd(seriesID string) (series types.Value, seasons, episodes [
 	return series, seasons, episodes
 }
 
+//nolint:nonamedreturns
 func getDataForSiliconValley(seriesID string) (series types.Value, seasons, episodes []types.Value) {
 	series = seriesData(
 		seriesID, date("2014-04-06"), "Silicon Valley", ""+

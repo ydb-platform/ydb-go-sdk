@@ -94,11 +94,14 @@ func (c *conn) IsState(states ...State) bool {
 	return false
 }
 
-func (c *conn) park(ctx context.Context) (err error) {
-	onDone := trace.DriverOnConnPark(
-		c.config.Trace(), &ctx,
-		stack.FunctionID(""),
-		c.Endpoint(),
+func (c *conn) park(ctx context.Context) error {
+	var (
+		err    error
+		onDone = trace.DriverOnConnPark(
+			c.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			c.Endpoint(),
+		)
 	)
 	defer func() {
 		onDone(err)
@@ -172,11 +175,11 @@ func (c *conn) Unban(ctx context.Context) State {
 	return newState
 }
 
-func (c *conn) GetState() (s State) {
+func (c *conn) GetState() State {
 	return State(c.state.Load())
 }
 
-func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
+func (c *conn) realConn(ctx context.Context) (*grpc.ClientConn, error) {
 	if c.isClosed() {
 		return nil, c.wrapError(errClosedConnection)
 	}
@@ -194,10 +197,13 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 		defer cancel()
 	}
 
-	onDone := trace.DriverOnConnDial(
-		c.config.Trace(), &ctx,
-		stack.FunctionID(""),
-		c.endpoint.Copy(),
+	var (
+		err    error
+		onDone = trace.DriverOnConnDial(
+			c.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			c.endpoint.Copy(),
+		)
 	)
 	defer func() {
 		onDone(err)
@@ -207,7 +213,7 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	// three slashes in "ydb:///" is ok. It needs for good parse scheme in grpc resolver.
 	address := "ydb:///" + c.endpoint.Address()
 
-	cc, err = grpc.DialContext(ctx, address, append(
+	cc, err := grpc.DialContext(ctx, address, append(
 		[]grpc.DialOption{
 			grpc.WithStatsHandler(statsHandler{}),
 		}, c.config.GrpcDialOptions()...,
@@ -251,11 +257,11 @@ func isAvailable(raw *grpc.ClientConn) bool {
 }
 
 // conn must be locked
-func (c *conn) close(ctx context.Context) (err error) {
+func (c *conn) close(ctx context.Context) error {
 	if c.cc == nil {
 		return nil
 	}
-	err = c.cc.Close()
+	err := c.cc.Close()
 	c.cc = nil
 	c.setState(ctx, Offline)
 
@@ -269,7 +275,7 @@ func (c *conn) isClosed() bool {
 	return c.closed
 }
 
-func (c *conn) Close(ctx context.Context) (err error) {
+func (c *conn) Close(ctx context.Context) error {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
@@ -277,10 +283,13 @@ func (c *conn) Close(ctx context.Context) (err error) {
 		return nil
 	}
 
-	onDone := trace.DriverOnConnClose(
-		c.config.Trace(), &ctx,
-		stack.FunctionID(""),
-		c.Endpoint(),
+	var (
+		err    error
+		onDone = trace.DriverOnConnClose(
+			c.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			c.Endpoint(),
+		)
 	)
 	defer func() {
 		onDone(err)
@@ -305,7 +314,7 @@ func (c *conn) Invoke(
 	req interface{},
 	res interface{},
 	opts ...grpc.CallOption,
-) (err error) {
+) error {
 	var (
 		opID        string
 		issues      []trace.Issue
@@ -315,8 +324,9 @@ func (c *conn) Invoke(
 			stack.FunctionID(""),
 			c.endpoint, trace.Method(method),
 		)
-		cc *grpc.ClientConn
-		md = metadata.MD{}
+		cc  *grpc.ClientConn
+		md  = metadata.MD{}
+		err error
 	)
 	defer func() {
 		meta.CallTrailerCallback(ctx, md)
@@ -389,7 +399,7 @@ func (c *conn) NewStream(
 	desc *grpc.StreamDesc,
 	method string,
 	opts ...grpc.CallOption,
-) (_ grpc.ClientStream, err error) {
+) (grpc.ClientStream, error) {
 	var (
 		streamRecv = trace.DriverOnConnNewStream(
 			c.config.Trace(), &ctx,
@@ -399,6 +409,7 @@ func (c *conn) NewStream(
 		useWrapping = UseWrapping(ctx)
 		cc          *grpc.ClientConn
 		s           grpc.ClientStream
+		err         error
 	)
 
 	defer func() {

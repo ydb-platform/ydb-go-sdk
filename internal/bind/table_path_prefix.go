@@ -24,7 +24,8 @@ func (tablePathPrefix TablePathPrefix) NormalizePath(folderOrTable string) strin
 	}
 }
 
-func (tablePathPrefix TablePathPrefix) RewriteQuery(query string, args ...interface{}) (
+func (tablePathPrefix TablePathPrefix) RewriteQuery(query string, args ...interface{}) ( //nolint:nonamedreturns
+	// gocritic more important
 	yql string, newArgs []interface{}, err error,
 ) {
 	buffer := xstring.Buffer()

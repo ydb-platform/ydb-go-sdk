@@ -147,7 +147,7 @@ func (m *PublicBatch) append(b *PublicBatch) (*PublicBatch, error) {
 	return res, nil
 }
 
-func (m *PublicBatch) cutMessages(count int) (head, rest *PublicBatch) {
+func (m *PublicBatch) cutMessages(count int) (*PublicBatch, *PublicBatch) {
 	switch {
 	case count == 0:
 		return nil, m
@@ -156,8 +156,8 @@ func (m *PublicBatch) cutMessages(count int) (head, rest *PublicBatch) {
 	default:
 		// slice[0:count:count] - limit slice capacity and prevent overwrite rest by append messages to head
 		// explicit 0 need for prevent typos, when type slice[count:count] instead of slice[:count:count]
-		head, _ = newBatch(m.commitRange.partitionSession, m.Messages[0:count:count])
-		rest, _ = newBatch(m.commitRange.partitionSession, m.Messages[count:])
+		head, _ := newBatch(m.commitRange.partitionSession, m.Messages[0:count:count])
+		rest, _ := newBatch(m.commitRange.partitionSession, m.Messages[count:])
 
 		return head, rest
 	}

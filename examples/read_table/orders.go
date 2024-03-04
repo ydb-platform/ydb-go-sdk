@@ -21,8 +21,8 @@ type row struct {
 	description string
 }
 
-func dropTableIfExists(ctx context.Context, c table.Client, path string) (err error) {
-	err = c.Do(ctx,
+func dropTableIfExists(ctx context.Context, c table.Client, path string) error {
+	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) error {
 			return s.DropTable(ctx, path)
 		},
@@ -35,7 +35,7 @@ func dropTableIfExists(ctx context.Context, c table.Client, path string) (err er
 	return nil
 }
 
-func createTable(ctx context.Context, c table.Client, path string) (err error) {
+func createTable(ctx context.Context, c table.Client, path string) error {
 	return c.Do(ctx,
 		func(ctx context.Context, s table.Session) error {
 			return s.CreateTable(ctx, path,
@@ -85,10 +85,10 @@ type templateConfig struct {
 	TablePathPrefix string
 }
 
-func fillTable(ctx context.Context, c table.Client, prefix string) (err error) {
+func fillTable(ctx context.Context, c table.Client, prefix string) error {
 	return c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
-			_, _, err = s.Execute(
+		func(ctx context.Context, s table.Session) error {
+			_, _, err := s.Execute(
 				ctx,
 				table.TxControl(
 					table.BeginTx(
@@ -138,9 +138,9 @@ func order(customerID, orderID uint64, description, date string) types.Value {
 	)
 }
 
-func readTable(ctx context.Context, c table.Client, path string, opts ...options.ReadTableOption) (err error) {
-	err = c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+func readTable(ctx context.Context, c table.Client, path string, opts ...options.ReadTableOption) error {
+	err := c.Do(ctx,
+		func(ctx context.Context, s table.Session) error {
 			res, err := s.StreamReadTable(ctx, path, opts...)
 			if err != nil {
 				return err

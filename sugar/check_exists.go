@@ -8,7 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
-func IsTableExists(ctx context.Context, c scheme.Client, absTablePath string) (exists bool, _ error) {
+func IsTableExists(ctx context.Context, c scheme.Client, absTablePath string) (bool, error) {
 	exists, err := helpers.IsEntryExists(ctx, c, absTablePath, scheme.EntryTable)
 	if err != nil {
 		return exists, xerrors.WithStackTrace(err)
@@ -17,7 +17,7 @@ func IsTableExists(ctx context.Context, c scheme.Client, absTablePath string) (e
 	return exists, nil
 }
 
-func IsColumnTableExists(ctx context.Context, c scheme.Client, absTablePath string) (exists bool, _ error) {
+func IsColumnTableExists(ctx context.Context, c scheme.Client, absTablePath string) (bool, error) {
 	exists, err := helpers.IsEntryExists(ctx, c, absTablePath, scheme.EntryColumnTable)
 	if err != nil {
 		return exists, xerrors.WithStackTrace(err)
@@ -27,7 +27,7 @@ func IsColumnTableExists(ctx context.Context, c scheme.Client, absTablePath stri
 }
 
 func IsEntryExists(ctx context.Context, c scheme.Client, absPath string, entryTypes ...scheme.EntryType) (
-	exists bool, _ error,
+	bool, error,
 ) {
 	exists, err := helpers.IsEntryExists(ctx, c, absPath, entryTypes...)
 	if err != nil {
@@ -37,7 +37,7 @@ func IsEntryExists(ctx context.Context, c scheme.Client, absPath string, entryTy
 	return exists, nil
 }
 
-func IsDirectoryExists(ctx context.Context, c scheme.Client, absTablePath string) (exists bool, _ error) {
+func IsDirectoryExists(ctx context.Context, c scheme.Client, absTablePath string) (bool, error) {
 	exists, err := helpers.IsDirectoryExists(ctx, c, absTablePath)
 	if err != nil {
 		return exists, xerrors.WithStackTrace(err)

@@ -62,12 +62,14 @@ type Storage struct {
 	cfg *config.Config
 }
 
-func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (_ *Storage, err error) {
+func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage, error) {
 	s := &Storage{
 		cfg: cfg,
 	}
 
 	dsn := s.cfg.Endpoint + s.cfg.DB
+
+	var err error
 
 	s.cc, err = ydb.Open(
 		ctx,
@@ -116,7 +118,12 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (_ *Stora
 	return s, nil
 }
 
-func (s *Storage) Read(ctx context.Context, id generator.RowID) (row generator.Row, attempts int, err error) {
+func (s *Storage) Read(ctx context.Context, id generator.RowID) (generator.Row, int, error) {
+	var (
+		row      generator.Row
+		attempts int
+		err      error
+	)
 	if err = ctx.Err(); err != nil {
 		return generator.Row{}, attempts, err
 	}
@@ -127,8 +134,9 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (row generator.R
 	row.ID = id
 
 	err = retry.Do(ydb.WithTxControl(ctx, readTx), s.x.DB().DB,
-		func(ctx context.Context, _ *sql.Conn) (err error) {
-			has, err := s.x.Context(ctx).Where("hash = Digest::NumericHash(?)", id).Get(&row)
+		func(ctx context.Context, _ *sql.Conn) error {
+			var has bool
+			has, err = s.x.Context(ctx).Where("hash = Digest::NumericHash(?)", id).Get(&row)
 			if err != nil {
 				return fmt.Errorf("get entry error: %w", err)
 			}
@@ -155,7 +163,11 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (row generator.R
 	return row, attempts, err
 }
 
-func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, err error) {
+func (s *Storage) Write(ctx context.Context, row generator.Row) (int, error) {
+	var (
+		attempts int
+		err      error
+	)
 	if err = ctx.Err(); err != nil {
 		return attempts, err
 	}
@@ -164,7 +176,7 @@ func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, e
 	defer cancel()
 
 	err = retry.Do(ydb.WithTxControl(ctx, writeTx), s.x.DB().DB,
-		func(ctx context.Context, _ *sql.Conn) (err error) {
+		func(ctx context.Context, _ *sql.Conn) error {
 			if err = ctx.Err(); err != nil {
 				return err
 			}

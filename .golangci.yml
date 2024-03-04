@@ -239,7 +239,6 @@ linters:
     - interfacebloat
     - ireturn
     - maintidx
-    - nonamedreturns
     - paralleltest
     - scopelint
     - structcheck

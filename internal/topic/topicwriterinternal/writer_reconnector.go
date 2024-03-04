@@ -329,8 +329,11 @@ func (w *WriterReconnector) Close(ctx context.Context) error {
 	return w.close(ctx, xerrors.WithStackTrace(errStopWriterReconnector))
 }
 
-func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr error) {
-	onDone := trace.TopicOnWriterClose(w.cfg.tracer, w.writerInstanceID, reason)
+func (w *WriterReconnector) close(ctx context.Context, reason error) error {
+	var (
+		resErr error
+		onDone = trace.TopicOnWriterClose(w.cfg.tracer, w.writerInstanceID, reason)
+	)
 	defer func() {
 		onDone(resErr)
 	}()
@@ -407,15 +410,18 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 }
 
 func (w *WriterReconnector) startWriteStream(ctx, streamCtx context.Context, attempt int) (
-	writer *SingleStreamWriter,
-	err error,
+	*SingleStreamWriter,
+	error,
 ) {
-	traceOnDone := trace.TopicOnWriterReconnect(
-		w.cfg.tracer,
-		w.writerInstanceID,
-		w.cfg.topic,
-		w.cfg.producerID,
-		attempt,
+	var (
+		err         error
+		traceOnDone = trace.TopicOnWriterReconnect(
+			w.cfg.tracer,
+			w.writerInstanceID,
+			w.cfg.topic,
+			w.cfg.producerID,
+			attempt,
+		)
 	)
 	defer func() {
 		traceOnDone(err)
@@ -513,7 +519,7 @@ func (w *WriterReconnector) onWriterChange(writerStream *SingleStreamWriter) {
 	}
 }
 
-func (w *WriterReconnector) WaitInit(ctx context.Context) (info InitialInfo, err error) {
+func (w *WriterReconnector) WaitInit(ctx context.Context) (InitialInfo, error) {
 	if ctx.Err() != nil {
 		return InitialInfo{}, ctx.Err()
 	}
@@ -609,6 +615,7 @@ func allMessagesHasSameBufCodec(messages []messageWithDataContent) bool {
 	return true
 }
 
+//nolint:nonamedreturns // potential error
 func splitMessagesByBufCodec(messages []messageWithDataContent) (res [][]messageWithDataContent) {
 	if len(messages) == 0 {
 		return nil
@@ -625,13 +632,17 @@ func splitMessagesByBufCodec(messages []messageWithDataContent) (res [][]message
 	}
 	res = append(res, messages[currentGroupStart:len(messages):len(messages)])
 
-	return res
+	return
 }
 
 func createWriteRequest(messages []messageWithDataContent, targetCodec rawtopiccommon.Codec) (
-	res rawtopicwriter.WriteRequest,
-	err error,
+	rawtopicwriter.WriteRequest,
+	error,
 ) {
+	var (
+		res rawtopicwriter.WriteRequest
+		err error
+	)
 	res.Codec = targetCodec
 	res.Messages = make([]rawtopicwriter.MessageData, len(messages))
 	for i := range messages {
@@ -647,7 +658,12 @@ func createWriteRequest(messages []messageWithDataContent, targetCodec rawtopicc
 func createRawMessageData(
 	codec rawtopiccommon.Codec,
 	mess *messageWithDataContent,
-) (res rawtopicwriter.MessageData, err error) {
+) (rawtopicwriter.MessageData, error) {
+	var (
+		res rawtopicwriter.MessageData
+		err error
+	)
+
 	res.CreatedAt = mess.CreatedAt
 	res.SeqNo = mess.SeqNo
 

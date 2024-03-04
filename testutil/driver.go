@@ -148,7 +148,7 @@ func (b *balancerStub) Invoke(
 	args interface{},
 	reply interface{},
 	opts ...grpc.CallOption,
-) (err error) {
+) error {
 	if b.onInvoke == nil {
 		return fmt.Errorf("database.onInvoke() not defined")
 	}
@@ -161,7 +161,7 @@ func (b *balancerStub) NewStream(
 	desc *grpc.StreamDesc,
 	method string,
 	opts ...grpc.CallOption,
-) (_ grpc.ClientStream, err error) {
+) (grpc.ClientStream, error) {
 	if b.onNewStream == nil {
 		return nil, fmt.Errorf("database.onNewStream() not defined")
 	}
@@ -169,7 +169,7 @@ func (b *balancerStub) NewStream(
 	return b.onNewStream(ctx, desc, method, opts...)
 }
 
-func (b *balancerStub) Get(context.Context) (conn grpc.ClientConnInterface, err error) {
+func (b *balancerStub) Get(context.Context) (grpc.ClientConnInterface, error) {
 	cc := &clientConn{
 		onInvoke:    b.onInvoke,
 		onNewStream: b.onNewStream,
@@ -201,10 +201,10 @@ func WithInvokeHandlers(invokeHandlers InvokeHandlers) balancerOption {
 			args interface{},
 			reply interface{},
 			opts ...grpc.CallOption,
-		) (err error) {
+		) error {
 			if handler, ok := invokeHandlers[Method(method).Code()]; ok {
 				var result proto.Message
-				result, err = handler(args)
+				result, err := handler(args)
 				if err != nil {
 					return xerrors.WithStackTrace(err)
 				}
@@ -236,7 +236,7 @@ func WithNewStreamHandlers(newStreamHandlers NewStreamHandlers) balancerOption {
 			desc *grpc.StreamDesc,
 			method string,
 			opts ...grpc.CallOption,
-		) (_ grpc.ClientStream, err error) {
+		) (grpc.ClientStream, error) {
 			if handler, ok := newStreamHandlers[Method(method).Code()]; ok {
 				return handler(desc)
 			}

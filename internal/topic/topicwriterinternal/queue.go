@@ -63,16 +63,17 @@ func (q *messageQueue) AddMessages(messages []messageWithDataContent) error {
 }
 
 func (q *messageQueue) AddMessagesWithWaiter(messages []messageWithDataContent) (
-	waiter MessageQueueAckWaiter,
-	err error,
+	MessageQueueAckWaiter,
+	error,
 ) {
 	return q.addMessages(messages, true)
 }
 
 func (q *messageQueue) addMessages(messages []messageWithDataContent, needWaiter bool) (
-	waiter MessageQueueAckWaiter,
-	err error,
+	MessageQueueAckWaiter,
+	error,
 ) {
+	var waiter MessageQueueAckWaiter
 	q.m.Lock()
 	defer q.m.Unlock()
 
@@ -123,9 +124,9 @@ func (q *messageQueue) checkNewMessagesBeforeAddNeedLock(messages []messageWithD
 
 func (q *messageQueue) addMessageNeedLock(
 	mess messageWithDataContent, //nolint:gocritic
-) (messageIndex int) {
+) int {
 	q.lastWrittenIndex++
-	messageIndex = q.lastWrittenIndex
+	messageIndex := q.lastWrittenIndex
 
 	if messageIndex == minInt {
 		q.ensureNoSmallIntIndexes()

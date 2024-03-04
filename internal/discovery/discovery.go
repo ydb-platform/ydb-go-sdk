@@ -36,7 +36,8 @@ type Client struct {
 }
 
 // Discover cluster endpoints
-func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
+func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) { //nolint:nonamedreturns
+	// FAIL integration tests
 	var (
 		onDone = trace.DiscoveryOnDiscover(
 			c.config.Trace(), &ctx,
@@ -97,6 +98,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	return endpoints, nil
 }
 
+//nolint:nonamedreturns // FAIL integration tests
 func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err error) {
 	var (
 		onDone             = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx, stack.FunctionID(""))

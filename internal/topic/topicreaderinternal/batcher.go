@@ -103,9 +103,9 @@ type batcherGetOptions struct {
 }
 
 func (o batcherGetOptions) cutBatchItemsHead(items batcherMessageOrderItems) (
-	head batcherMessageOrderItem,
-	rest batcherMessageOrderItems,
-	ok bool,
+	batcherMessageOrderItem,
+	batcherMessageOrderItems,
+	bool,
 ) {
 	notFound := func() (batcherMessageOrderItem, batcherMessageOrderItems, bool) {
 		return batcherMessageOrderItem{}, batcherMessageOrderItems{}, false
@@ -125,8 +125,8 @@ func (o batcherGetOptions) cutBatchItemsHead(items batcherMessageOrderItems) (
 			return notFound()
 		}
 
-		head = newBatcherItemBatch(batchHead)
-		rest = items.ReplaceHeadItem(newBatcherItemBatch(batchRest))
+		head := newBatcherItemBatch(batchHead)
+		rest := items.ReplaceHeadItem(newBatcherItemBatch(batchRest))
 
 		return head, rest, true
 	}
@@ -134,7 +134,7 @@ func (o batcherGetOptions) cutBatchItemsHead(items batcherMessageOrderItems) (
 	return items[0], items[1:], true
 }
 
-func (o batcherGetOptions) splitBatch(batch *PublicBatch) (head, rest *PublicBatch, ok bool) {
+func (o batcherGetOptions) splitBatch(batch *PublicBatch) (*PublicBatch, *PublicBatch, bool) {
 	notFound := func() (*PublicBatch, *PublicBatch, bool) {
 		return nil, nil, false
 	}
@@ -147,12 +147,12 @@ func (o batcherGetOptions) splitBatch(batch *PublicBatch) (head, rest *PublicBat
 		return batch, nil, true
 	}
 
-	head, rest = batch.cutMessages(o.MaxCount)
+	head, rest := batch.cutMessages(o.MaxCount)
 
 	return head, rest, true
 }
 
-func (b *batcher) Pop(ctx context.Context, opts batcherGetOptions) (_ batcherMessageOrderItem, err error) {
+func (b *batcher) Pop(ctx context.Context, opts batcherGetOptions) (batcherMessageOrderItem, error) {
 	counter := atomic.AddInt64(&b.popInFlight, 1)
 	defer atomic.AddInt64(&b.popInFlight, -1)
 
@@ -160,7 +160,7 @@ func (b *batcher) Pop(ctx context.Context, opts batcherGetOptions) (_ batcherMes
 		return batcherMessageOrderItem{}, xerrors.WithStackTrace(errBatcherPopConcurency)
 	}
 
-	if err = ctx.Err(); err != nil {
+	if err := ctx.Err(); err != nil {
 		return batcherMessageOrderItem{}, err
 	}
 

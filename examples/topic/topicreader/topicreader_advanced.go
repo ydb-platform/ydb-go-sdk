@@ -72,9 +72,10 @@ func OwnReadProgressStorage(ctx context.Context, db *ydb.Driver) {
 				ctx context.Context,
 				req topicoptions.GetPartitionStartOffsetRequest,
 			) (
-				res topicoptions.GetPartitionStartOffsetResponse,
-				err error,
+				topicoptions.GetPartitionStartOffsetResponse,
+				error,
 			) {
+				var res topicoptions.GetPartitionStartOffsetResponse
 				offset, err := readLastOffsetFromDB(ctx, req.Topic, req.PartitionID)
 				res.StartFrom(offset)
 

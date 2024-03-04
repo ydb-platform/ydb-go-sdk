@@ -128,6 +128,7 @@ func (it IssueIterator) Len() int {
 	return len(it)
 }
 
+//nolint:nonamedreturns // potential error
 func (it IssueIterator) Get(i int) (issue Issue, nested IssueIterator) {
 	x := it[i]
 	if xs := x.GetIssues(); len(xs) > 0 {

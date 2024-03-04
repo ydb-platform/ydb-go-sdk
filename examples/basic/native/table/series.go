@@ -70,10 +70,13 @@ SELECT
 FROM AS_TABLE($episodesData);
 `))
 
-func readTable(ctx context.Context, c table.Client, path string) (err error) {
-	var res result.StreamResult
+func readTable(ctx context.Context, c table.Client, path string) error {
+	var (
+		res result.StreamResult
+		err error
+	)
 	err = c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s table.Session) error {
 			res, err = s.StreamReadTable(ctx, path,
 				options.ReadOrdered(),
 				options.ReadColumn("series_id"),
@@ -81,7 +84,7 @@ func readTable(ctx context.Context, c table.Client, path string) (err error) {
 				options.ReadColumn("release_date"),
 			)
 
-			return
+			return err
 		},
 	)
 	if err != nil {
@@ -138,13 +141,16 @@ func readTable(ctx context.Context, c table.Client, path string) (err error) {
 	return res.Err()
 }
 
-func describeTableOptions(ctx context.Context, c table.Client) (err error) {
-	var desc options.TableOptionsDescription
+func describeTableOptions(ctx context.Context, c table.Client) error {
+	var (
+		desc options.TableOptionsDescription
+		err  error
+	)
 	err = c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s table.Session) error {
 			desc, err = s.DescribeTableOptions(ctx)
 
-			return
+			return err
 		},
 	)
 	if err != nil {
@@ -191,7 +197,7 @@ func describeTableOptions(ctx context.Context, c table.Client) (err error) {
 	return nil
 }
 
-func selectSimple(ctx context.Context, c table.Client, prefix string) (err error) {
+func selectSimple(ctx context.Context, c table.Client, prefix string) error {
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -220,9 +226,12 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) (err error
 		),
 		table.CommitTx(),
 	)
-	var res result.Result
+	var (
+		res result.Result
+		err error
+	)
 	err = c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s table.Session) error {
 			_, res, err = s.Execute(ctx, readTx, query,
 				table.NewQueryParameters(
 					table.ValueParam("$seriesID", types.Uint64Value(1)),
@@ -230,7 +239,7 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) (err error
 				options.WithCollectStatsModeBasic(),
 			)
 
-			return
+			return err
 		},
 	)
 	if err != nil {
@@ -266,7 +275,7 @@ func selectSimple(ctx context.Context, c table.Client, prefix string) (err error
 	return res.Err()
 }
 
-func scanQuerySelect(ctx context.Context, c table.Client, prefix string) (err error) {
+func scanQuerySelect(ctx context.Context, c table.Client, prefix string) error {
 	query := render(
 		template.Must(template.New("").Parse(`
 			PRAGMA TablePathPrefix("{{ .TablePathPrefix }}");
@@ -327,7 +336,8 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) (err er
 	)
 }
 
-func fillTablesWithData(ctx context.Context, c table.Client, prefix string) (err error) {
+func fillTablesWithData(ctx context.Context, c table.Client, prefix string) error {
+	var err error
 	writeTx := table.TxControl(
 		table.BeginTx(
 			table.WithSerializableReadWrite(),
@@ -335,7 +345,7 @@ func fillTablesWithData(ctx context.Context, c table.Client, prefix string) (err
 		table.CommitTx(),
 	)
 	err = c.Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s table.Session) error {
 			_, _, err = s.Execute(ctx, writeTx, render(fill, templateConfig{
 				TablePathPrefix: prefix,
 			}), table.NewQueryParameters(
@@ -351,8 +361,8 @@ func fillTablesWithData(ctx context.Context, c table.Client, prefix string) (err
 	return err
 }
 
-func createTables(ctx context.Context, c table.Client, prefix string) (err error) {
-	err = c.Do(ctx,
+func createTables(ctx context.Context, c table.Client, prefix string) error {
+	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) error {
 			return s.CreateTable(ctx, path.Join(prefix, "series"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
@@ -403,8 +413,8 @@ func createTables(ctx context.Context, c table.Client, prefix string) (err error
 	return nil
 }
 
-func describeTable(ctx context.Context, c table.Client, path string) (err error) {
-	err = c.Do(ctx,
+func describeTable(ctx context.Context, c table.Client, path string) error {
+	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) error {
 			desc, err := s.DescribeTable(ctx, path)
 			if err != nil {
@@ -419,7 +429,7 @@ func describeTable(ctx context.Context, c table.Client, path string) (err error)
 		},
 	)
 
-	return
+	return err
 }
 
 func render(t *template.Template, data interface{}) string {

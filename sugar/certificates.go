@@ -20,10 +20,11 @@ func LoadCertificatesFromFile(caFile string) ([]*x509.Certificate, error) {
 }
 
 // LoadCertificatesFromPem parse bytes and returns certificates
-func LoadCertificatesFromPem(bytes []byte) (certs []*x509.Certificate) {
+func LoadCertificatesFromPem(bytes []byte) []*x509.Certificate {
 	var (
-		cert *x509.Certificate
-		err  error
+		cert  *x509.Certificate
+		certs = make([]*x509.Certificate, 0)
+		err   error
 	)
 	for len(bytes) > 0 {
 		var block *pem.Block
@@ -42,5 +43,5 @@ func LoadCertificatesFromPem(bytes []byte) (certs []*x509.Certificate) {
 		certs = append(certs, cert)
 	}
 
-	return
+	return certs
 }

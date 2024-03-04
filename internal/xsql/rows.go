@@ -75,7 +75,7 @@ func (r *rows) ColumnTypeDatabaseTypeName(index int) string {
 // TODO: Need to store column nullables to internal rows cache.
 //
 //nolint:godox
-func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
+func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) { //nolint:nonamedreturns //gocritic more important
 	r.nextSet.Do(func() {
 		r.result.NextResultSet(context.Background())
 	})
@@ -92,7 +92,7 @@ func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
 	return nullables[index], true
 }
 
-func (r *rows) NextResultSet() (finalErr error) {
+func (r *rows) NextResultSet() error {
 	r.nextSet.Do(func() {})
 	err := r.result.NextResultSetErr(context.Background())
 	if err != nil {
@@ -146,7 +146,8 @@ type single struct {
 	readAll bool
 }
 
-func (r *single) Columns() (columns []string) {
+func (r *single) Columns() []string {
+	columns := make([]string, 0, len(r.values))
 	for i := range r.values {
 		columns = append(columns, r.values[i].Name)
 	}

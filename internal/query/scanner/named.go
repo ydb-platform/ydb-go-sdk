@@ -18,7 +18,8 @@ type (
 	}
 )
 
-func NamedRef(columnName string, destinationValueReference interface{}) (dst NamedDestination) {
+func NamedRef(columnName string, destinationValueReference interface{}) NamedDestination {
+	var dst NamedDestination
 	if columnName == "" {
 		panic("columnName must be not empty")
 	}

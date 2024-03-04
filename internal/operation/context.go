@@ -35,18 +35,18 @@ func WithCancelAfter(ctx context.Context, operationCancelAfter time.Duration) co
 
 // Timeout returns the timeout within given context after which
 // YDB should try to cancel operation and return result regardless of the cancelation.
-func Timeout(ctx context.Context) (d time.Duration, ok bool) {
-	d, ok = ctx.Value(ctxOperationTimeoutKey{}).(time.Duration)
+func Timeout(ctx context.Context) (time.Duration, bool) {
+	d, ok := ctx.Value(ctxOperationTimeoutKey{}).(time.Duration)
 
-	return
+	return d, ok
 }
 
 // CancelAfter returns the timeout within given context after which
 // YDB should try to cancel operation and return result regardless of the cancellation.
-func CancelAfter(ctx context.Context) (d time.Duration, ok bool) {
-	d, ok = ctx.Value(ctxOperationCancelAfterKey{}).(time.Duration)
+func CancelAfter(ctx context.Context) (time.Duration, bool) {
+	d, ok := ctx.Value(ctxOperationCancelAfterKey{}).(time.Duration)
 
-	return
+	return d, ok
 }
 
 func untilDeadline(ctx context.Context) (time.Duration, bool) {

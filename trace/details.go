@@ -182,8 +182,9 @@ func WithPOSIXMatch() matchDetailsOption {
 	}
 }
 
-func MatchDetails(pattern string, opts ...matchDetailsOption) (d Details) {
+func MatchDetails(pattern string, opts ...matchDetailsOption) Details {
 	var (
+		d Details
 		h = &matchDetailsOptionsHolder{
 			defaultDetails: defaultDetails,
 		}

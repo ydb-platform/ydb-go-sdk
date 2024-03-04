@@ -156,28 +156,29 @@ func (c *Client) dropNode(ctx context.Context, path string) error {
 	return xerrors.WithStackTrace(err)
 }
 
+//nolint:nonamedreturns // potential error
 func (c *Client) DescribeNode(
 	ctx context.Context,
 	path string,
 ) (
 	entry *scheme.Entry,
 	config *coordination.NodeConfig,
-	_ error,
+	err error,
 ) {
 	if c == nil {
 		return nil, nil, xerrors.WithStackTrace(errNilClient)
 	}
-	call := func(ctx context.Context) (err error) {
+	call := func(ctx context.Context) error {
 		entry, config, err = c.describeNode(ctx, path)
 
 		return xerrors.WithStackTrace(err)
 	}
 	if !c.config.AutoRetry() {
-		err := call(ctx)
+		err = call(ctx)
 
 		return entry, config, xerrors.WithStackTrace(err)
 	}
-	err := retry.Retry(ctx, call,
+	err = retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
@@ -191,13 +192,14 @@ func (c *Client) describeNode(
 	ctx context.Context,
 	path string,
 ) (
-	_ *scheme.Entry,
-	_ *coordination.NodeConfig,
-	err error,
+	*scheme.Entry,
+	*coordination.NodeConfig,
+	error,
 ) {
 	var (
 		response *Ydb_Coordination.DescribeNodeResponse
 		result   Ydb_Coordination.DescribeNodeResult
+		err      error
 	)
 	response, err = c.service.DescribeNode(
 		ctx,

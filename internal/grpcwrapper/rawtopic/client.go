@@ -19,7 +19,8 @@ func NewClient(service Ydb_Topic_V1.TopicServiceClient) Client {
 	return Client{service: service}
 }
 
-func (c *Client) AlterTopic(ctx context.Context, req *AlterTopicRequest) (res AlterTopicResult, err error) {
+func (c *Client) AlterTopic(ctx context.Context, req *AlterTopicRequest) (AlterTopicResult, error) {
+	var res AlterTopicResult
 	resp, err := c.service.AlterTopic(ctx, req.ToProto())
 	if err != nil {
 		return res, xerrors.WithStackTrace(fmt.Errorf("ydb: alter topic grpc failed: %w", err))
@@ -32,7 +33,8 @@ func (c *Client) AlterTopic(ctx context.Context, req *AlterTopicRequest) (res Al
 func (c *Client) CreateTopic(
 	ctx context.Context,
 	req *CreateTopicRequest,
-) (res CreateTopicResult, err error) {
+) (CreateTopicResult, error) {
+	var res CreateTopicResult
 	resp, err := c.service.CreateTopic(ctx, req.ToProto())
 	if err != nil {
 		return res, xerrors.WithStackTrace(fmt.Errorf("ydb: create topic grpc failed: %w", err))
@@ -42,7 +44,8 @@ func (c *Client) CreateTopic(
 	return res, err
 }
 
-func (c *Client) DescribeTopic(ctx context.Context, req DescribeTopicRequest) (res DescribeTopicResult, err error) {
+func (c *Client) DescribeTopic(ctx context.Context, req DescribeTopicRequest) (DescribeTopicResult, error) {
+	var res DescribeTopicResult
 	resp, err := c.service.DescribeTopic(ctx, req.ToProto())
 	if err != nil {
 		return DescribeTopicResult{}, xerrors.WithStackTrace(xerrors.Wrap(
@@ -57,7 +60,8 @@ func (c *Client) DescribeTopic(ctx context.Context, req DescribeTopicRequest) (r
 func (c *Client) DropTopic(
 	ctx context.Context,
 	req DropTopicRequest,
-) (res DropTopicResult, err error) {
+) (DropTopicResult, error) {
+	var res DropTopicResult
 	resp, err := c.service.DropTopic(ctx, req.ToProto())
 	if err != nil {
 		return res, xerrors.WithStackTrace(fmt.Errorf("ydb: drop topic grpc failed: %w", err))

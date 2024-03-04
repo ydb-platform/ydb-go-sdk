@@ -16,6 +16,7 @@ import (
 
 const tablePathPrefixTransformer = "table_path_prefix"
 
+//nolint:nonamedreturns // potential error
 func Parse(dataSourceName string) (opts []config.Option, connectorOpts []ConnectorOption, _ error) {
 	info, err := dsn.Parse(dataSourceName)
 	if err != nil {

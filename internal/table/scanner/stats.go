@@ -19,7 +19,7 @@ func (s *queryStats) ProcessCPUTime() time.Duration {
 	return s.processCPUTime
 }
 
-func (s *queryStats) Compilation() (c *stats.CompilationStats) {
+func (s *queryStats) Compilation() *stats.CompilationStats {
 	if s.stats == nil || s.stats.GetCompilation() == nil {
 		return nil
 	}
@@ -49,13 +49,17 @@ func (s *queryStats) TotalDuration() time.Duration {
 
 // NextPhase returns next execution phase within query.
 // If ok flag is false, then there are no more phases and p is invalid.
-func (s *queryStats) NextPhase() (p stats.QueryPhase, ok bool) {
+func (s *queryStats) NextPhase() (stats.QueryPhase, bool) {
+	var (
+		qPhase stats.QueryPhase
+		ok     bool
+	)
 	if s.pos >= len(s.stats.GetQueryPhases()) {
-		return
+		return qPhase, ok
 	}
 	x := s.stats.GetQueryPhases()[s.pos]
 	if x == nil {
-		return
+		return qPhase, ok
 	}
 	s.pos++
 
@@ -83,9 +87,9 @@ type queryPhase struct {
 //
 // If ok flag is false, then there are no more accessed tables and t is
 // invalid.
-func (q *queryPhase) NextTableAccess() (t *stats.TableAccess, ok bool) {
+func (q *queryPhase) NextTableAccess() (*stats.TableAccess, bool) {
 	if q.pos >= len(q.tables) {
-		return
+		return &stats.TableAccess{}, false
 	}
 	x := q.tables[q.pos]
 	q.pos++

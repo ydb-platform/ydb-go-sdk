@@ -65,11 +65,11 @@ func (b *Balancer) OnUpdate(onApplyDiscoveredEndpoints func(ctx context.Context,
 	})
 }
 
-func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
+func (b *Balancer) clusterDiscovery(ctx context.Context) error {
 	return retry.Retry(
 		repeater.WithEvent(ctx, repeater.EventInit),
-		func(childCtx context.Context) (err error) {
-			if err = b.clusterDiscoveryAttempt(childCtx); err != nil {
+		func(childCtx context.Context) error {
+			if err := b.clusterDiscoveryAttempt(childCtx); err != nil {
 				if credentials.IsAccessError(err) {
 					return credentials.AccessError("cluster discovery failed", err,
 						credentials.WithEndpoint(b.driverConfig.Endpoint()),
@@ -92,7 +92,7 @@ func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
 	)
 }
 
-func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
+func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) error {
 	var (
 		address = "ydb:///" + b.driverConfig.Endpoint()
 		onDone  = trace.DriverOnBalancerClusterDiscoveryAttempt(
@@ -103,6 +103,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 		endpoints []endpoint.Endpoint
 		localDC   string
 		cancel    context.CancelFunc
+		err       error
 	)
 	defer func() {
 		onDone(err)
@@ -133,14 +134,14 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 }
 
 func endpointsDiff(newestEndpoints []endpoint.Endpoint, previousConns []conn.Conn) (
-	nodes []trace.EndpointInfo,
-	added []trace.EndpointInfo,
-	dropped []trace.EndpointInfo,
+	[]trace.EndpointInfo,
+	[]trace.EndpointInfo,
+	[]trace.EndpointInfo,
 ) {
-	nodes = make([]trace.EndpointInfo, 0, len(newestEndpoints))
-	added = make([]trace.EndpointInfo, 0, len(previousConns))
-	dropped = make([]trace.EndpointInfo, 0, len(previousConns))
 	var (
+		nodes       = make([]trace.EndpointInfo, 0, len(newestEndpoints))
+		added       = make([]trace.EndpointInfo, 0, len(previousConns))
+		dropped     = make([]trace.EndpointInfo, 0, len(previousConns))
 		newestMap   = make(map[string]struct{}, len(newestEndpoints))
 		previousMap = make(map[string]struct{}, len(previousConns))
 	)
@@ -208,7 +209,8 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	})
 }
 
-func (b *Balancer) Close(ctx context.Context) (err error) {
+func (b *Balancer) Close(ctx context.Context) error {
+	var err error
 	onDone := trace.DriverOnBalancerClose(
 		b.driverConfig.Trace(), &ctx,
 		stack.FunctionID(""),
@@ -228,6 +230,7 @@ func (b *Balancer) Close(ctx context.Context) (err error) {
 	return nil
 }
 
+//nolint:nonamedreturns // potential error
 func New(
 	ctx context.Context,
 	driverConfig *config.Config,
@@ -306,6 +309,7 @@ func (b *Balancer) Invoke(
 	})
 }
 
+//nolint:nonamedreturns //FAIL integration tests
 func (b *Balancer) NewStream(
 	ctx context.Context,
 	desc *grpc.StreamDesc,
@@ -325,7 +329,7 @@ func (b *Balancer) NewStream(
 	return nil, err
 }
 
-func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc conn.Conn) error) (err error) {
+func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc conn.Conn) error) error {
 	cc, err := b.getConn(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -371,6 +375,7 @@ func (b *Balancer) connections() *connectionsState {
 	return b.connectionsState
 }
 
+//nolint:nonamedreturns // FAIL integration test TestDatabaseSqlWithTxControl
 func (b *Balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
 	onDone := trace.DriverOnBalancerChooseEndpoint(
 		b.driverConfig.Trace(), &ctx,

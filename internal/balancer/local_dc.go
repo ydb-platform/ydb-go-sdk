@@ -135,7 +135,7 @@ func detectLocalDC(ctx context.Context, endpoints []endpoint.Endpoint) (string, 
 	return "", err
 }
 
-func extractHostPort(address string) (host, port string, _ error) {
+func extractHostPort(address string) (string, string, error) {
 	if !strings.Contains(address, "://") {
 		address = "stub://" + address
 	}
@@ -144,7 +144,7 @@ func extractHostPort(address string) (host, port string, _ error) {
 	if err != nil {
 		return "", "", xerrors.WithStackTrace(err)
 	}
-	host, port, err = net.SplitHostPort(u.Host)
+	host, port, err := net.SplitHostPort(u.Host)
 	if err != nil {
 		return "", "", xerrors.WithStackTrace(err)
 	}

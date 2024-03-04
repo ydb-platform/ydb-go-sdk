@@ -29,10 +29,13 @@ var (
 	_ driver.StmtExecContext  = &stmt{}
 )
 
-func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ driver.Rows, finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtQuery(s.trace, &ctx,
-		stack.FunctionID(""),
-		s.stmtCtx, s.query,
+func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (driver.Rows, error) {
+	var (
+		finalErr error
+		onDone   = trace.DatabaseSQLOnStmtQuery(s.trace, &ctx,
+			stack.FunctionID(""),
+			s.stmtCtx, s.query,
+		)
 	)
 	defer func() {
 		onDone(finalErr)
@@ -48,10 +51,13 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ dr
 	}
 }
 
-func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ driver.Result, finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtExec(s.trace, &ctx,
-		stack.FunctionID(""),
-		s.stmtCtx, s.query,
+func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (driver.Result, error) {
+	var (
+		finalErr error
+		onDone   = trace.DatabaseSQLOnStmtExec(s.trace, &ctx,
+			stack.FunctionID(""),
+			s.stmtCtx, s.query,
+		)
 	)
 	defer func() {
 		onDone(finalErr)
@@ -71,8 +77,11 @@ func (s *stmt) NumInput() int {
 	return -1
 }
 
-func (s *stmt) Close() (finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtClose(s.trace, &s.stmtCtx, stack.FunctionID(""))
+func (s *stmt) Close() error {
+	var (
+		finalErr error
+		onDone   = trace.DatabaseSQLOnStmtClose(s.trace, &s.stmtCtx, stack.FunctionID(""))
+	)
 	defer func() {
 		onDone(finalErr)
 	}()

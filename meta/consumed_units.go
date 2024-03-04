@@ -8,7 +8,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 )
 
-func ConsumedUnits(md metadata.MD) (consumedUnits uint64) {
+func ConsumedUnits(md metadata.MD) uint64 {
+	var consumedUnits uint64
 	for header, values := range md {
 		if header != meta.HeaderConsumedUnits {
 			continue

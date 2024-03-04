@@ -5,7 +5,7 @@ import (
 )
 
 // Check returns retry mode for err.
-func Check(err error) (
+func Check(err error) ( //nolint:nonamedreturns //gocritic more important
 	code int64,
 	errType Type,
 	backoffType backoff.Type,

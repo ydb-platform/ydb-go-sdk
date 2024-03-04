@@ -24,7 +24,7 @@ type cancelCtx struct {
 	err error
 }
 
-func (ctx *cancelCtx) Deadline() (deadline time.Time, ok bool) {
+func (ctx *cancelCtx) Deadline() (time.Time, bool) {
 	return ctx.ctx.Deadline()
 }
 

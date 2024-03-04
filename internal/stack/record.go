@@ -70,7 +70,8 @@ type call struct {
 	line     int
 }
 
-func Call(depth int) (c call) {
+func Call(depth int) call {
+	var c call
 	c.function, c.file, c.line, _ = runtime.Caller(depth + 1)
 
 	return c

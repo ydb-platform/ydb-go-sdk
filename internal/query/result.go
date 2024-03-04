@@ -31,8 +31,9 @@ func newResult(
 	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
 	stop func(),
-) (_ *result, txID string, _ error) {
+) (*result, string, error) {
 	interrupted := make(chan struct{})
+	var txID string
 	r := result{
 		stream:         stream,
 		resultSetIndex: -1,
@@ -85,6 +86,7 @@ func (r *result) Close(ctx context.Context) error {
 	return nil
 }
 
+//nolint:nonamedreturns //FAIL TestExecute and TestResultNextResultSet
 func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 	defer func() {
 		if err != nil && !xerrors.Is(err,

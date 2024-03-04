@@ -19,7 +19,8 @@ func (opt traceOption) applyDoOption(o *DoOptions) {
 	o.Trace = o.Trace.Compose(opt.t)
 }
 
-func NewDoOptions(opts ...DoOption) (doOptions DoOptions) {
+func NewDoOptions(opts ...DoOption) DoOptions {
+	doOptions := DoOptions{}
 	doOptions.Trace = &trace.Query{}
 
 	for _, opt := range opts {

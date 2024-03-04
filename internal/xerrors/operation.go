@@ -148,7 +148,8 @@ func IsOperationError(err error, codes ...Ydb.StatusIds_StatusCode) bool {
 
 const issueCodeTransactionLocksInvalidated = 2001
 
-func IsOperationErrorTransactionLocksInvalidated(err error) (isTLI bool) {
+func IsOperationErrorTransactionLocksInvalidated(err error) bool {
+	var isTLI bool
 	if IsOperationError(err, Ydb.StatusIds_ABORTED) {
 		IterateByIssues(err, func(_ string, code Ydb.StatusIds_StatusCode, severity uint32) {
 			isTLI = isTLI || (code == issueCodeTransactionLocksInvalidated)

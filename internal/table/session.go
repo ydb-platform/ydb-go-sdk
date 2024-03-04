@@ -113,6 +113,7 @@ func (s *session) isClosing() bool {
 	return s.Status() == table.SessionClosing
 }
 
+//nolint:nonamedreturns // potential error
 func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (
 	s *session, err error,
 ) {
@@ -172,11 +173,12 @@ func (s *session) ID() string {
 	return s.id
 }
 
-func (s *session) Close(ctx context.Context) (err error) {
+func (s *session) Close(ctx context.Context) error {
 	if s.isClosed() {
 		return xerrors.WithStackTrace(errSessionClosed)
 	}
 
+	var err error
 	s.closeOnce.Do(func() {
 		onDone := trace.TableOnSessionDelete(s.config.Trace(), &ctx,
 			stack.FunctionID(""),
@@ -226,8 +228,9 @@ func (s *session) checkCloseHint(md metadata.MD) {
 }
 
 // KeepAlive keeps idle session alive.
-func (s *session) KeepAlive(ctx context.Context) (err error) {
+func (s *session) KeepAlive(ctx context.Context) error {
 	var (
+		err    error
 		result Ydb_Table.KeepAliveResult
 		onDone = trace.TableOnSessionKeepAlive(
 			s.config.Trace(), &ctx,
@@ -274,7 +277,7 @@ func (s *session) CreateTable(
 	ctx context.Context,
 	path string,
 	opts ...options.CreateTableOption,
-) (err error) {
+) error {
 	var (
 		request = Ydb_Table.CreateTableRequest{
 			SessionId: s.id,
@@ -294,7 +297,7 @@ func (s *session) CreateTable(
 			opt.ApplyCreateTableOption((*options.CreateTableDesc)(&request), a)
 		}
 	}
-	_, err = s.tableService.CreateTable(ctx, &request)
+	_, err := s.tableService.CreateTable(ctx, &request)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -307,10 +310,12 @@ func (s *session) DescribeTable(
 	ctx context.Context,
 	path string,
 	opts ...options.DescribeTableOption,
-) (desc options.Description, err error) {
+) (options.Description, error) {
 	var (
 		response *Ydb_Table.DescribeTableResponse
 		result   Ydb_Table.DescribeTableResult
+		desc     options.Description
+		err      error
 	)
 	request := Ydb_Table.DescribeTableRequest{
 		SessionId: s.id,
@@ -460,7 +465,7 @@ func (s *session) DropTable(
 	ctx context.Context,
 	path string,
 	opts ...options.DropTableOption,
-) (err error) {
+) error {
 	request := Ydb_Table.DropTableRequest{
 		SessionId: s.id,
 		Path:      path,
@@ -476,7 +481,7 @@ func (s *session) DropTable(
 			opt.ApplyDropTableOption((*options.DropTableDesc)(&request))
 		}
 	}
-	_, err = s.tableService.DropTable(ctx, &request)
+	_, err := s.tableService.DropTable(ctx, &request)
 
 	return xerrors.WithStackTrace(err)
 }
@@ -495,7 +500,7 @@ func (s *session) AlterTable(
 	ctx context.Context,
 	path string,
 	opts ...options.AlterTableOption,
-) (err error) {
+) error {
 	var (
 		request = Ydb_Table.AlterTableRequest{
 			SessionId: s.id,
@@ -515,7 +520,7 @@ func (s *session) AlterTable(
 			opt.ApplyAlterTableOption((*options.AlterTableDesc)(&request), a)
 		}
 	}
-	_, err = s.tableService.AlterTable(ctx, &request)
+	_, err := s.tableService.AlterTable(ctx, &request)
 
 	return xerrors.WithStackTrace(err)
 }
@@ -525,7 +530,7 @@ func (s *session) CopyTable(
 	ctx context.Context,
 	dst, src string,
 	opts ...options.CopyTableOption,
-) (err error) {
+) error {
 	request := Ydb_Table.CopyTableRequest{
 		SessionId:       s.id,
 		SourcePath:      src,
@@ -542,7 +547,7 @@ func (s *session) CopyTable(
 			opt((*options.CopyTableDesc)(&request))
 		}
 	}
-	_, err = s.tableService.CopyTable(ctx, &request)
+	_, err := s.tableService.CopyTable(ctx, &request)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -561,7 +566,7 @@ func copyTables(
 		) (*Ydb_Table.CopyTablesResponse, error)
 	},
 	opts ...options.CopyTablesOption,
-) (err error) {
+) error {
 	request := Ydb_Table.CopyTablesRequest{
 		SessionId: sessionID,
 		OperationParams: operation.Params(
@@ -579,7 +584,7 @@ func copyTables(
 	if len(request.GetTables()) == 0 {
 		return xerrors.WithStackTrace(fmt.Errorf("no CopyTablesItem: %w", errParamsRequired))
 	}
-	_, err = service.CopyTables(ctx, &request)
+	_, err := service.CopyTables(ctx, &request)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -591,8 +596,8 @@ func copyTables(
 func (s *session) CopyTables(
 	ctx context.Context,
 	opts ...options.CopyTablesOption,
-) (err error) {
-	err = copyTables(ctx, s.id, s.config.OperationTimeout(), s.config.OperationCancelAfter(), s.tableService, opts...)
+) error {
+	err := copyTables(ctx, s.id, s.config.OperationTimeout(), s.config.OperationCancelAfter(), s.tableService, opts...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -605,12 +610,14 @@ func (s *session) Explain(
 	ctx context.Context,
 	query string,
 ) (
-	exp table.DataQueryExplanation,
-	err error,
+	table.DataQueryExplanation,
+	error,
 ) {
 	var (
 		result   Ydb_Table.ExplainQueryResult
 		response *Ydb_Table.ExplainDataQueryResponse
+		exp      table.DataQueryExplanation
+		err      error
 		onDone   = trace.TableOnSessionQueryExplain(
 			s.config.Trace(), &ctx,
 			stack.FunctionID(""),
@@ -655,11 +662,12 @@ func (s *session) Explain(
 }
 
 // Prepare prepares data query within session s.
-func (s *session) Prepare(ctx context.Context, queryText string) (_ table.Statement, err error) {
+func (s *session) Prepare(ctx context.Context, queryText string) (table.Statement, error) {
 	var (
 		stmt     *statement
 		response *Ydb_Table.PrepareDataQueryResponse
 		result   Ydb_Table.PrepareQueryResult
+		err      error
 		onDone   = trace.TableOnSessionQueryPrepare(
 			s.config.Trace(), &ctx,
 			stack.FunctionID(""),
@@ -705,7 +713,7 @@ func (s *session) Prepare(ctx context.Context, queryText string) (_ table.Statem
 }
 
 // Execute executes given data query represented by text.
-func (s *session) Execute(
+func (s *session) Execute( //nolint:nonamedreturns //because FAIL: TestBasicExampleNative
 	ctx context.Context,
 	txControl *table.TransactionControl,
 	query string,
@@ -793,12 +801,13 @@ func (s *session) executeDataQuery(
 	ctx context.Context, a *allocator.Allocator, request *Ydb_Table.ExecuteDataQueryRequest,
 	callOptions ...grpc.CallOption,
 ) (
-	_ *Ydb_Table.ExecuteQueryResult,
-	err error,
+	*Ydb_Table.ExecuteQueryResult,
+	error,
 ) {
 	var (
 		result   = a.TableExecuteQueryResult()
 		response *Ydb_Table.ExecuteDataQueryResponse
+		err      error
 	)
 
 	response, err = s.tableService.ExecuteDataQuery(ctx, request, callOptions...)
@@ -819,7 +828,7 @@ func (s *session) ExecuteSchemeQuery(
 	ctx context.Context,
 	query string,
 	opts ...options.ExecuteSchemeQueryOption,
-) (err error) {
+) error {
 	request := Ydb_Table.ExecuteSchemeQueryRequest{
 		SessionId: s.id,
 		YqlText:   query,
@@ -835,19 +844,21 @@ func (s *session) ExecuteSchemeQuery(
 			opt((*options.ExecuteSchemeQueryDesc)(&request))
 		}
 	}
-	_, err = s.tableService.ExecuteSchemeQuery(ctx, &request)
+	_, err := s.tableService.ExecuteSchemeQuery(ctx, &request)
 
 	return xerrors.WithStackTrace(err)
 }
 
 // DescribeTableOptions describes supported table options.
 func (s *session) DescribeTableOptions(ctx context.Context) (
-	desc options.TableOptionsDescription,
-	err error,
+	options.TableOptionsDescription,
+	error,
 ) {
 	var (
 		response *Ydb_Table.DescribeTableOptionsResponse
 		result   Ydb_Table.DescribeTableOptionsResult
+		desc     options.TableOptionsDescription
+		err      error
 	)
 	request := Ydb_Table.DescribeTableOptionsRequest{
 		OperationParams: operation.Params(
@@ -982,7 +993,7 @@ func (s *session) StreamReadTable(
 	ctx context.Context,
 	path string,
 	opts ...options.ReadTableOption,
-) (_ result.StreamResult, err error) {
+) (result.StreamResult, error) {
 	var (
 		onIntermediate = trace.TableOnSessionQueryStreamRead(s.config.Trace(), &ctx,
 			stack.FunctionID(""),
@@ -994,6 +1005,7 @@ func (s *session) StreamReadTable(
 		}
 		stream Ydb_Table_V1.TableService_StreamReadTableClient
 		a      = allocator.New()
+		err    error
 	)
 	defer func() {
 		a.Free()
@@ -1019,10 +1031,11 @@ func (s *session) StreamReadTable(
 
 	return scanner.NewStream(ctx,
 		func(ctx context.Context) (
-			set *Ydb.ResultSet,
-			stats *Ydb_TableStats.QueryStats,
-			err error,
+			*Ydb.ResultSet,
+			*Ydb_TableStats.QueryStats,
+			error,
 		) {
+			var err error
 			defer func() {
 				onIntermediate(xerrors.HideEOF(err))
 			}()
@@ -1055,7 +1068,7 @@ func (s *session) ReadRows(
 	path string,
 	keys value.Value,
 	opts ...options.ReadRowsOption,
-) (_ result.Result, err error) {
+) (result.Result, error) {
 	var (
 		a       = allocator.New()
 		request = Ydb_Table.ReadRowsRequest{
@@ -1075,7 +1088,7 @@ func (s *session) ReadRows(
 		}
 	}
 
-	response, err = s.tableService.ReadRows(ctx, &request)
+	response, err := s.tableService.ReadRows(ctx, &request)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -1103,7 +1116,7 @@ func (s *session) StreamExecuteScanQuery(
 	query string,
 	parameters *params.Parameters,
 	opts ...options.ExecuteScanQueryOption,
-) (_ result.StreamResult, err error) {
+) (result.StreamResult, error) {
 	var (
 		a              = allocator.New()
 		q              = queryFromText(query)
@@ -1119,6 +1132,7 @@ func (s *session) StreamExecuteScanQuery(
 		}
 		stream      Ydb_Table_V1.TableService_StreamExecuteScanQueryClient
 		callOptions []grpc.CallOption
+		err         error
 	)
 	defer func() {
 		a.Free()
@@ -1144,10 +1158,11 @@ func (s *session) StreamExecuteScanQuery(
 
 	return scanner.NewStream(ctx,
 		func(ctx context.Context) (
-			set *Ydb.ResultSet,
-			stats *Ydb_TableStats.QueryStats,
-			err error,
+			*Ydb.ResultSet,
+			*Ydb_TableStats.QueryStats,
+			error,
 		) {
+			var err error
 			defer func() {
 				onIntermediate(xerrors.HideEOF(err))
 			}()
@@ -1179,7 +1194,7 @@ func (s *session) StreamExecuteScanQuery(
 // BulkUpsert uploads given list of ydb struct values to the table.
 func (s *session) BulkUpsert(ctx context.Context, table string, rows value.Value,
 	opts ...options.BulkUpsertOption,
-) (err error) {
+) error {
 	var (
 		a           = allocator.New()
 		callOptions []grpc.CallOption
@@ -1188,6 +1203,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows value.Value
 			stack.FunctionID(""),
 			s,
 		)
+		err error
 	)
 	defer func() {
 		defer a.Free()
@@ -1220,7 +1236,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows value.Value
 
 // BeginTransaction begins new transaction within given session with given
 // settings.
-func (s *session) BeginTransaction(
+func (s *session) BeginTransaction( //nolint:nonamedreturns //because FAIL: TestBasicExampleNative
 	ctx context.Context,
 	txSettings *table.TransactionSettings,
 ) (x table.Transaction, err error) {

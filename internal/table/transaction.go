@@ -56,7 +56,7 @@ func (tx *transaction) ID() string {
 }
 
 // Execute executes query represented by text within transaction tx.
-func (tx *transaction) Execute(
+func (tx *transaction) Execute( //nolint:nonamedreturns // potential error
 	ctx context.Context,
 	query string, parameters *params.Parameters,
 	opts ...options.ExecuteDataQueryOption,
@@ -90,7 +90,7 @@ func (tx *transaction) Execute(
 }
 
 // ExecuteStatement executes prepared statement stmt within transaction tx.
-func (tx *transaction) ExecuteStatement(
+func (tx *transaction) ExecuteStatement( //nolint:nonamedreturns // potential error
 	ctx context.Context,
 	stmt table.Statement, parameters *params.Parameters,
 	opts ...options.ExecuteDataQueryOption,
@@ -130,11 +130,14 @@ func (tx *transaction) ExecuteStatement(
 func (tx *transaction) CommitTx(
 	ctx context.Context,
 	opts ...options.CommitTransactionOption,
-) (r result.Result, err error) {
-	onDone := trace.TableOnSessionTransactionCommit(
-		tx.s.config.Trace(), &ctx,
-		stack.FunctionID(""),
-		tx.s, tx,
+) (result.Result, error) {
+	var (
+		err    error
+		onDone = trace.TableOnSessionTransactionCommit(
+			tx.s.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			tx.s, tx,
+		)
 	)
 	defer func() {
 		onDone(err)
@@ -188,11 +191,14 @@ func (tx *transaction) CommitTx(
 }
 
 // Rollback performs a rollback of the specified active transaction.
-func (tx *transaction) Rollback(ctx context.Context) (err error) {
-	onDone := trace.TableOnSessionTransactionRollback(
-		tx.s.config.Trace(), &ctx,
-		stack.FunctionID(""),
-		tx.s, tx,
+func (tx *transaction) Rollback(ctx context.Context) error {
+	var (
+		err    error
+		onDone = trace.TableOnSessionTransactionRollback(
+			tx.s.config.Trace(), &ctx,
+			stack.FunctionID(""),
+			tx.s, tx,
+		)
 	)
 	defer func() {
 		onDone(err)

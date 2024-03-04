@@ -133,6 +133,7 @@ type createSessionSettings struct {
 	onAttach             func(id string)
 }
 
+//nolint:nonamedreturns //FAIL TestCreateSession
 func createSession(
 	ctx context.Context, client Ydb_Query_V1.QueryServiceClient, settings createSessionSettings,
 ) (_ *Session, finalErr error) {
@@ -233,7 +234,7 @@ func New(ctx context.Context, balancer balancer, config *config.Config) (*Client
 	return &Client{
 		grpcClient: grpcClient,
 		pool: newStubPool(
-			func(ctx context.Context) (_ *Session, err error) {
+			func(ctx context.Context) (*Session, error) {
 				s, err := createSession(ctx, grpcClient, createSessionSettings{
 					createSessionTimeout: config.CreateSessionTimeout(),
 				})

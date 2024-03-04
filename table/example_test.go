@@ -33,10 +33,10 @@ func Example_select() {
 	)
 	err = db.Table().Do( // Do retry operation on errors with best effort
 		ctx, // context manage exiting from Do
-		func(ctx context.Context, s table.Session) (err error) { // retry operation
-			_, res, err := s.Execute(ctx, table.DefaultTxControl(), query, nil)
-			if err != nil {
-				return err // for auto-retry with driver
+		func(ctx context.Context, s table.Session) error { // retry operation
+			_, res, errIn := s.Execute(ctx, table.DefaultTxControl(), query, nil)
+			if errIn != nil {
+				return errIn // for auto-retry with driver
 			}
 			defer res.Close()                                // cleanup resources
 			if err = res.NextResultSetErr(ctx); err != nil { // check single result set and switch to it
@@ -72,7 +72,7 @@ func Example_createTable() {
 	}
 	defer db.Close(ctx) // cleanup resources
 	err = db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s table.Session) error {
 			return s.CreateTable(ctx, path.Join(db.Name(), "series"),
 				options.WithColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithColumn("title", types.Optional(types.TypeText)),
@@ -128,7 +128,7 @@ func Example_bulkUpsert() {
 	// execute bulk upsert with native ydb data
 	err = db.Table().Do( // Do retry operation on errors with best effort
 		ctx, // context manage exiting from Do
-		func(ctx context.Context, s table.Session) (err error) { // retry operation
+		func(ctx context.Context, s table.Session) error { // retry operation
 			rows := make([]types.Value, 0, len(logs))
 			for _, msg := range logs {
 				rows = append(rows, types.StructValue(
@@ -159,7 +159,7 @@ func Example_alterTable() {
 	}
 	defer db.Close(ctx) // cleanup resources
 	err = db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s table.Session) error {
 			return s.AlterTable(ctx, path.Join(db.Name(), "series"),
 				options.WithAddColumn("series_id", types.Optional(types.TypeUint64)),
 				options.WithAddColumn("title", types.Optional(types.TypeText)),
@@ -195,9 +195,9 @@ func Example_lazyTransaction() {
 	}
 	defer db.Close(ctx)
 	err = db.Table().Do(ctx,
-		func(ctx context.Context, session table.Session) (err error) {
+		func(ctx context.Context, session table.Session) error {
 			// execute query with opening lazy transaction
-			tx, result, err := session.Execute(ctx,
+			tx, result, errIn := session.Execute(ctx,
 				table.SerializableReadWriteTxControl(),
 				"DECLARE $id AS Uint64; "+
 					"SELECT `title`, `description` FROM `path/to/mytable` WHERE id = $id",
@@ -205,8 +205,8 @@ func Example_lazyTransaction() {
 					table.ValueParam("$id", types.Uint64Value(1)),
 				),
 			)
-			if err != nil {
-				return err
+			if errIn != nil {
+				return errIn
 			}
 			defer func() {
 				_ = tx.Rollback(ctx)
@@ -288,7 +288,7 @@ func Example_bulkUpsertWithCompression() {
 	// execute bulk upsert with native ydb data
 	err = db.Table().Do( // Do retry operation on errors with best effort
 		ctx, // context manage exiting from Do
-		func(ctx context.Context, s table.Session) (err error) { // retry operation
+		func(ctx context.Context, s table.Session) error { // retry operation
 			rows := make([]types.Value, 0, len(logs))
 			for _, msg := range logs {
 				rows = append(rows, types.StructValue(
@@ -327,14 +327,14 @@ func Example_dataQueryWithCompression() {
 	)
 	err = db.Table().Do( // Do retry operation on errors with best effort
 		ctx, // context manage exiting from Do
-		func(ctx context.Context, s table.Session) (err error) { // retry operation
-			_, res, err := s.Execute(ctx, table.DefaultTxControl(), query, nil,
+		func(ctx context.Context, s table.Session) error { // retry operation
+			_, res, errIn := s.Execute(ctx, table.DefaultTxControl(), query, nil,
 				options.WithCallOptions(
 					grpc.UseCompressor(gzip.Name),
 				),
 			)
-			if err != nil {
-				return err // for auto-retry with driver
+			if errIn != nil {
+				return errIn // for auto-retry with driver
 			}
 			defer res.Close()                                // cleanup resources
 			if err = res.NextResultSetErr(ctx); err != nil { // check single result set and switch to it
@@ -376,14 +376,14 @@ func Example_scanQueryWithCompression() {
 	)
 	err = db.Table().Do( // Do retry operation on errors with best effort
 		ctx, // context manage exiting from Do
-		func(ctx context.Context, s table.Session) (err error) { // retry operation
-			res, err := s.StreamExecuteScanQuery(ctx, query, nil,
+		func(ctx context.Context, s table.Session) error { // retry operation
+			res, errIn := s.StreamExecuteScanQuery(ctx, query, nil,
 				options.WithCallOptions(
 					grpc.UseCompressor(gzip.Name),
 				),
 			)
-			if err != nil {
-				return err // for auto-retry with driver
+			if errIn != nil {
+				return errIn // for auto-retry with driver
 			}
 			defer res.Close()                                // cleanup resources
 			if err = res.NextResultSetErr(ctx); err != nil { // check single result set and switch to it
@@ -419,7 +419,7 @@ func Example_copyTables() {
 	}
 	defer db.Close(ctx) // cleanup resources
 	err = db.Table().Do(ctx,
-		func(ctx context.Context, s table.Session) (err error) {
+		func(ctx context.Context, s table.Session) error {
 			return s.CopyTables(ctx,
 				options.CopyTablesItem(
 					path.Join(db.Name(), "from", "series"),

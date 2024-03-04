@@ -28,7 +28,8 @@ func WithDeleteSession() retryableErrorOption {
 func RetryableError(err error, opts ...retryableErrorOption) error {
 	return xerrors.Retryable(
 		err,
-		func() (retryableErrorOptions []xerrors.RetryableErrorOption) {
+		func() []xerrors.RetryableErrorOption {
+			var retryableErrorOptions []xerrors.RetryableErrorOption
 			for _, o := range opts {
 				if o != nil {
 					retryableErrorOptions = append(retryableErrorOptions, xerrors.RetryableErrorOption(o))

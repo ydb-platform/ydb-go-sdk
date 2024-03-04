@@ -37,7 +37,8 @@ func ToYDB(v Value, a *allocator.Allocator) *Ydb.TypedValue {
 }
 
 // BigEndianUint128 builds a big-endian uint128 value.
-func BigEndianUint128(hi, lo uint64) (v [16]byte) {
+func BigEndianUint128(hi, lo uint64) [16]byte {
+	var v [16]byte
 	binary.BigEndian.PutUint64(v[0:8], hi)
 	binary.BigEndian.PutUint64(v[8:16], lo)
 
@@ -53,7 +54,7 @@ func FromYDB(t *Ydb.Type, v *Ydb.Value) Value {
 	return vv
 }
 
-func nullValueFromYDB(x *Ydb.Value, t types.Type) (_ Value, ok bool) {
+func nullValueFromYDB(x *Ydb.Value, t types.Type) (Value, bool) {
 	for {
 		switch xx := x.GetValue().(type) {
 		case *Ydb.Value_NestedValue:
@@ -2039,7 +2040,7 @@ type variantValue struct {
 	idx       uint32
 }
 
-func (v *variantValue) Variant() (name string, index uint32) {
+func (v *variantValue) Variant() (name string, index uint32) { //nolint:nonamedreturns //gocritic more important
 	switch t := v.innerType.(type) {
 	case *types.VariantStruct:
 		return t.Field(int(v.idx)).Name, v.idx

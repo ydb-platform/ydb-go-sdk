@@ -39,6 +39,7 @@ type (
 	}
 )
 
+//nolint:nonamedreturns // FAIL integration tests
 func (c *Client) Execute(
 	ctx context.Context,
 	query string,
@@ -65,6 +66,7 @@ func (c *Client) Execute(
 	return r, xerrors.WithStackTrace(err)
 }
 
+//nolint:nonamedreturns // FAIL integration tests
 func (c *Client) execute(
 	ctx context.Context,
 	query string,
@@ -121,7 +123,11 @@ func (c *Client) Explain(
 	ctx context.Context,
 	query string,
 	mode scripting.ExplainMode,
-) (e table.ScriptingYQLExplanation, err error) {
+) (table.ScriptingYQLExplanation, error) {
+	var (
+		e   table.ScriptingYQLExplanation
+		err error
+	)
 	if c == nil {
 		return e, xerrors.WithStackTrace(errNilClient)
 	}
@@ -133,7 +139,7 @@ func (c *Client) Explain(
 	if !c.config.AutoRetry() {
 		err = call(ctx)
 
-		return
+		return e, err
 	}
 	err = retry.Retry(ctx, call,
 		retry.WithStackTrace(),
@@ -148,8 +154,10 @@ func (c *Client) explain(
 	ctx context.Context,
 	query string,
 	mode scripting.ExplainMode,
-) (e table.ScriptingYQLExplanation, err error) {
+) (table.ScriptingYQLExplanation, error) {
 	var (
+		e      table.ScriptingYQLExplanation
+		err    error
 		onDone = trace.ScriptingOnExplain(c.config.Trace(), &ctx,
 			stack.FunctionID(""),
 			query,
@@ -196,7 +204,11 @@ func (c *Client) StreamExecute(
 	ctx context.Context,
 	query string,
 	params *params.Parameters,
-) (r result.StreamResult, err error) {
+) (result.StreamResult, error) {
+	var (
+		r   result.StreamResult
+		err error
+	)
 	if c == nil {
 		return r, xerrors.WithStackTrace(errNilClient)
 	}
@@ -208,7 +220,7 @@ func (c *Client) StreamExecute(
 	if !c.config.AutoRetry() {
 		err = call(ctx)
 
-		return
+		return r, err
 	}
 	err = retry.Retry(ctx, call,
 		retry.WithStackTrace(),
@@ -222,8 +234,9 @@ func (c *Client) streamExecute(
 	ctx context.Context,
 	query string,
 	parameters *params.Parameters,
-) (r result.StreamResult, err error) {
+) (result.StreamResult, error) {
 	var (
+		err            error
 		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx,
 			stack.FunctionID(""),
 			query, parameters,
@@ -258,9 +271,9 @@ func (c *Client) streamExecute(
 
 	return scanner.NewStream(ctx,
 		func(ctx context.Context) (
-			set *Ydb.ResultSet,
-			stats *Ydb_TableStats.QueryStats,
-			err error,
+			*Ydb.ResultSet,
+			*Ydb_TableStats.QueryStats,
+			error,
 		) {
 			defer func() {
 				onIntermediate(xerrors.HideEOF(err))
@@ -288,7 +301,8 @@ func (c *Client) streamExecute(
 	)
 }
 
-func (c *Client) Close(ctx context.Context) (err error) {
+func (c *Client) Close(ctx context.Context) error {
+	var err error
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}

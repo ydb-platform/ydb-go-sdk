@@ -237,7 +237,8 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 	}
 }
 
-func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldReader batchedStreamReader) (err error) {
+func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldReader batchedStreamReader) error {
+	var err error
 	onDone := trace.TopicOnReaderReconnect(r.tracer, reason)
 	defer func() {
 		onDone(err)
@@ -302,16 +303,16 @@ func (r *readerReconnector) isRetriableError(err error) bool {
 }
 
 func (r *readerReconnector) checkErrRetryMode(err error, retriesDuration time.Duration) (
-	backoffType backoff.Backoff,
-	isRetriableErr bool,
+	backoff.Backoff,
+	bool,
 ) {
 	return topic.CheckRetryMode(err, r.retrySettings, retriesDuration)
 }
 
-func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err error) {
+func (r *readerReconnector) connectWithTimeout() (batchedStreamReader, error) {
 	bgContext := r.background.Context()
 
-	if err = bgContext.Err(); err != nil {
+	if err := bgContext.Err(); err != nil {
 		return nil, err
 	}
 

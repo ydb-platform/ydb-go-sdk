@@ -26,6 +26,7 @@ type Bind interface {
 
 type Bindings []Bind
 
+//nolint:nonamedreturns // potential error
 func (bindings Bindings) RewriteQuery(query string, args ...interface{}) (
 	yql string, parameters []*params.Parameter, err error,
 ) {

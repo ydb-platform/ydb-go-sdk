@@ -34,6 +34,7 @@ func fromTxOptions(txID string, txOpts ...query.TxExecuteOption) executeSettings
 	return query.ExecuteSettings(opts...)
 }
 
+//nolint:nonamedreturns //potential error
 func (tx transaction) Execute(ctx context.Context, q string, opts ...query.TxExecuteOption) (
 	r query.Result, err error,
 ) {
@@ -60,7 +61,7 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 	return nil
 }
 
-func (tx transaction) CommitTx(ctx context.Context) (err error) {
+func (tx transaction) CommitTx(ctx context.Context) error {
 	return commitTx(ctx, tx.s.queryClient, tx.s.id, tx.id)
 }
 
@@ -79,6 +80,6 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 	return nil
 }
 
-func (tx transaction) Rollback(ctx context.Context) (err error) {
+func (tx transaction) Rollback(ctx context.Context) error {
 	return rollback(ctx, tx.s.queryClient, tx.s.id, tx.id)
 }

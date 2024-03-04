@@ -63,15 +63,15 @@ func main() {
 		g := errgroup.Group{}
 
 		for i := uint64(0); i < cfg.InitialDataCount; i++ {
-			g.Go(func() (err error) {
-				e, err := gen.Generate()
-				if err != nil {
-					return err
+			g.Go(func() error {
+				e, errIn := gen.Generate()
+				if errIn != nil {
+					return errIn
 				}
 
-				_, err = s.Write(ctx, e)
-				if err != nil {
-					return err
+				_, errIn = s.Write(ctx, e)
+				if errIn != nil {
+					return errIn
 				}
 
 				return nil

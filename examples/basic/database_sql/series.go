@@ -16,9 +16,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-func selectDefault(ctx context.Context, db *sql.DB) (err error) {
+func selectDefault(ctx context.Context, db *sql.DB) error {
 	// explain of query
-	err = retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) (err error) {
+	err := retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
 		row := cc.QueryRowContext(ydb.WithQueryMode(ctx, ydb.ExplainQueryMode),
 			`SELECT series_id, title, release_date FROM series;`,
 		)
@@ -26,7 +26,7 @@ func selectDefault(ctx context.Context, db *sql.DB) (err error) {
 			ast  string
 			plan string
 		)
-		if err = row.Scan(&ast, &plan); err != nil {
+		if err := row.Scan(&ast, &plan); err != nil {
 			return err
 		}
 		log.Printf("AST = %s\n\nPlan = %s", ast, plan)
@@ -39,10 +39,10 @@ func selectDefault(ctx context.Context, db *sql.DB) (err error) {
 	err = retry.Do(
 		ydb.WithTxControl(ctx, table.OnlineReadOnlyTxControl()),
 		db,
-		func(ctx context.Context, cc *sql.Conn) (err error) {
-			rows, err := cc.QueryContext(ctx, `SELECT series_id, title, release_date FROM series;`)
-			if err != nil {
-				return err
+		func(ctx context.Context, cc *sql.Conn) error {
+			rows, errIn := cc.QueryContext(ctx, `SELECT series_id, title, release_date FROM series;`)
+			if errIn != nil {
+				return errIn
 			}
 			defer func() {
 				_ = rows.Close()
@@ -72,12 +72,12 @@ func selectDefault(ctx context.Context, db *sql.DB) (err error) {
 	return nil
 }
 
-func selectScan(ctx context.Context, db *sql.DB) (err error) {
+func selectScan(ctx context.Context, db *sql.DB) error {
 	// scan query
-	err = retry.Do(
+	err := retry.Do(
 		ydb.WithTxControl(ctx, table.StaleReadOnlyTxControl()),
 		db,
-		func(ctx context.Context, cc *sql.Conn) (err error) {
+		func(ctx context.Context, cc *sql.Conn) error {
 			var (
 				id        string
 				seriesIDs []types.Value
@@ -92,11 +92,11 @@ func selectScan(ctx context.Context, db *sql.DB) (err error) {
 					table.ValueParam("$seriesTitle", types.TextValue("%IT Crowd%")),
 				),
 			)
-			if err = row.Scan(&id); err != nil {
+			if err := row.Scan(&id); err != nil {
 				return err
 			}
 			seriesIDs = append(seriesIDs, types.BytesValueFromString(id))
-			if err = row.Err(); err != nil {
+			if err := row.Err(); err != nil {
 				return err
 			}
 
@@ -167,15 +167,15 @@ func selectScan(ctx context.Context, db *sql.DB) (err error) {
 	return nil
 }
 
-func fillTablesWithData(ctx context.Context, db *sql.DB) (err error) {
+func fillTablesWithData(ctx context.Context, db *sql.DB) error {
 	series, seasonsData, episodesData := getData()
 	args := []interface{}{
 		sql.Named("seriesData", types.ListValue(series...)),
 		sql.Named("seasonsData", types.ListValue(seasonsData...)),
 		sql.Named("episodesData", types.ListValue(episodesData...)),
 	}
-	err = retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) error {
-		if _, err = tx.ExecContext(ctx, `
+	err := retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) error {
+		if _, err := tx.ExecContext(ctx, `
 			REPLACE INTO series
 			SELECT
 				series_id,
@@ -216,9 +216,9 @@ func fillTablesWithData(ctx context.Context, db *sql.DB) (err error) {
 	return nil
 }
 
-func prepareSchema(ctx context.Context, db *sql.DB) (err error) {
-	err = retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
-		err = dropTableIfExists(ctx, cc, "series")
+func prepareSchema(ctx context.Context, db *sql.DB) error {
+	err := retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) error {
+		err := dropTableIfExists(ctx, cc, "series")
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stdout, "warn: drop series table failed: %v\n", err)
 		}

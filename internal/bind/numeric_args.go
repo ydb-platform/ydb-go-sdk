@@ -16,7 +16,7 @@ func (m NumericArgs) blockID() blockID {
 	return blockYQL
 }
 
-func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (
+func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) ( //nolint:nonamedreturns // gocritic more important
 	yql string, newArgs []interface{}, err error,
 ) {
 	l := &sqlLexer{
@@ -29,10 +29,8 @@ func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (
 		l.stateFn = l.stateFn(l)
 	}
 
-	var (
-		buffer = xstring.Buffer()
-		param  table.ParameterOption
-	)
+	buffer := xstring.Buffer()
+
 	defer buffer.Free()
 
 	if len(args) > 0 {
@@ -54,7 +52,7 @@ func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (
 			}
 			paramName := "$p" + strconv.Itoa(int(p-1)) //nolint:goconst
 			if newArgs[p-1] == nil {
-				param, err = toYdbParam(paramName, args[p-1])
+				param, err := toYdbParam(paramName, args[p-1])
 				if err != nil {
 					return "", nil, xerrors.WithStackTrace(err)
 				}

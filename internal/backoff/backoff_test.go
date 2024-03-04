@@ -10,7 +10,7 @@ import (
 )
 
 func TestDelays(t *testing.T) {
-	duration := func(s string) (d time.Duration) {
+	duration := func(s string) time.Duration {
 		d, err := time.ParseDuration(s)
 		if err != nil {
 			panic(err)
@@ -171,8 +171,8 @@ func TestFastSlowDelaysWithoutJitter(t *testing.T) {
 	}{
 		{
 			name: "FastBackoff",
-			backoff: func() (backoff logBackoff) {
-				backoff = Fast
+			backoff: func() logBackoff {
+				backoff := Fast
 				backoff.jitterLimit = 1
 
 				return backoff
@@ -193,8 +193,8 @@ func TestFastSlowDelaysWithoutJitter(t *testing.T) {
 		},
 		{
 			name: "SlowBackoff",
-			backoff: func() (backoff logBackoff) {
-				backoff = Slow
+			backoff: func() logBackoff {
+				backoff := Slow
 				backoff.jitterLimit = 1
 
 				return backoff

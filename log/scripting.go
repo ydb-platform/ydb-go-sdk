@@ -7,11 +7,12 @@ import (
 )
 
 // Scripting returns trace.Scripting with logging events from details
-func Scripting(l Logger, d trace.Detailer, opts ...Option) (t trace.Scripting) {
+func Scripting(l Logger, d trace.Detailer, opts ...Option) trace.Scripting {
 	return internalScripting(wrapLogger(l, opts...), d)
 }
 
-func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
+func internalScripting(l *wrapper, d trace.Detailer) trace.Scripting {
+	var t trace.Scripting
 	t.OnExecute = func(info trace.ScriptingExecuteStartInfo) func(trace.ScriptingExecuteDoneInfo) {
 		if d.Details()&trace.ScriptingEvents == 0 {
 			return nil

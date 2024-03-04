@@ -9,11 +9,12 @@ import (
 )
 
 // Retry returns trace.Retry with logging events from details
-func Retry(l Logger, d trace.Detailer, opts ...Option) (t trace.Retry) {
+func Retry(l Logger, d trace.Detailer, opts ...Option) trace.Retry {
 	return internalRetry(wrapLogger(l, opts...), d)
 }
 
-func internalRetry(l Logger, d trace.Detailer) (t trace.Retry) {
+func internalRetry(l *wrapper, d trace.Detailer) trace.Retry { //nolint:interfacer //deprecated
+	var t trace.Retry
 	t.OnRetry = func(
 		info trace.RetryLoopStartInfo,
 	) func(

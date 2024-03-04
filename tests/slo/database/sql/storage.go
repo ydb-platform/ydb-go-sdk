@@ -76,11 +76,13 @@ type Storage struct {
 	selectQuery string
 }
 
-func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Storage, err error) {
+func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
-	s = &Storage{
+	var err error
+
+	s := &Storage{
 		cfg: cfg,
 		createQuery: fmt.Sprintf(createTemplate, cfg.Table,
 			cfg.PartitionSize, cfg.MinPartitionsCount, cfg.MaxPartitionsCount, cfg.MinPartitionsCount),
@@ -114,7 +116,12 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Stora
 	return s, nil
 }
 
-func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (res generator.Row, attempts int, err error) {
+func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (generator.Row, int, error) {
+	var (
+		res      generator.Row
+		attempts int
+		err      error
+	)
 	if err = ctx.Err(); err != nil {
 		return generator.Row{}, attempts, err
 	}
@@ -123,7 +130,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (res genera
 	defer cancel()
 
 	err = retry.Do(ydb.WithTxControl(ctx, readTx), s.db,
-		func(ctx context.Context, cc *sql.Conn) (err error) {
+		func(ctx context.Context, cc *sql.Conn) error {
 			if err = ctx.Err(); err != nil {
 				return err
 			}
@@ -153,7 +160,12 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (res genera
 	return res, attempts, err
 }
 
-func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err error) {
+func (s *Storage) Write(ctx context.Context, e generator.Row) (int, error) {
+	var (
+		attempts int
+		err      error
+	)
+
 	if err = ctx.Err(); err != nil {
 		return attempts, err
 	}
@@ -162,7 +174,7 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err
 	defer cancel()
 
 	err = retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
-		func(ctx context.Context, cc *sql.Conn) (err error) {
+		func(ctx context.Context, cc *sql.Conn) error {
 			if err = ctx.Err(); err != nil {
 				return err
 			}

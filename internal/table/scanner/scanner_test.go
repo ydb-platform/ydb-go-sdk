@@ -512,6 +512,7 @@ func valueFromPrimitiveTypeID(c *column, r xrand.Rand) (*Ydb.Value, interface{})
 	}
 }
 
+//nolint:nonamedreturns // potential error
 func getResultSet(count int, col []*column) (result *Ydb.ResultSet, testValues [][]indexed.RequiredOrOptional) {
 	result = &Ydb.ResultSet{}
 	for _, c := range col {
@@ -565,7 +566,7 @@ func TestScanSqlTypes(t *testing.T) {
 			s.reset(set, test.setColumns...)
 			for s.NextRow() {
 				if test.columns[0].testDefault {
-					if err := s.ScanWithDefaults(func() (values []indexed.Required) {
+					if err := s.ScanWithDefaults(func() (values []indexed.Required) { //nolint:nonamedreturns
 						for _, v := range test.values {
 							values = append(values, v)
 						}

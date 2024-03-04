@@ -33,7 +33,8 @@ func WithTxSettings(txSettings TransactionSettings) doTxSettingsOption {
 	return doTxSettingsOption{txSettings: txSettings}
 }
 
-func NewDoTxOptions(opts ...DoTxOption) (doTxOptions DoTxOptions) {
+func NewDoTxOptions(opts ...DoTxOption) DoTxOptions {
+	doTxOptions := DoTxOptions{}
 	doTxOptions.TxSettings = TxSettings(WithDefaultTxMode())
 	doTxOptions.Trace = &trace.Query{}
 

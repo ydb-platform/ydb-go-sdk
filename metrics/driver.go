@@ -9,7 +9,7 @@ import (
 )
 
 // driver makes driver with New publishing
-func driver(config Config) (t trace.Driver) {
+func driver(config Config) trace.Driver {
 	config = config.WithSystem("driver")
 	endpoints := config.WithSystem("balancer").GaugeVec("endpoints", "local_dc", "az")
 	balancersDiscoveries := config.WithSystem("balancer").CounterVec("discoveries", "status", "cause")
@@ -18,6 +18,7 @@ func driver(config Config) (t trace.Driver) {
 	banned := config.WithSystem("conn").GaugeVec("banned", "endpoint", "node_id", "cause")
 	requests := config.WithSystem("conn").CounterVec("requests", "status", "method", "endpoint", "node_id")
 	tli := config.CounterVec("transaction_locks_invalidated")
+	var t trace.Driver
 
 	type endpointKey struct {
 		localDC bool

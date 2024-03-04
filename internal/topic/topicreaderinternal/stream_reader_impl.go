@@ -110,7 +110,8 @@ func newTopicStreamReader(
 	readerID int64,
 	stream RawTopicReaderStream,
 	cfg topicStreamReaderConfig, //nolint:gocritic
-) (_ *topicStreamReaderImpl, err error) {
+) (*topicStreamReaderImpl, error) {
+	var err error
 	defer func() {
 		if err != nil {
 			_ = stream.CloseSend()
@@ -171,10 +172,11 @@ func (r *topicStreamReaderImpl) WaitInit(_ context.Context) error {
 	return nil
 }
 
-func (r *topicStreamReaderImpl) ReadMessageBatch(
+func (r *topicStreamReaderImpl) ReadMessageBatch( //nolint:nonamedreturns
 	ctx context.Context,
 	opts ReadMessageBatchOptions,
 ) (batch *PublicBatch, err error) {
+	// FAIL TestTopicStreamReaderImpl_BufferCounterOnStopPartition
 	onDone := trace.TopicOnReaderReadMessages(
 		r.cfg.Trace,
 		ctx,
@@ -287,7 +289,7 @@ func (r *topicStreamReaderImpl) consumeRawMessageFromBuffer(ctx context.Context)
 
 func (r *topicStreamReaderImpl) onStopPartitionSessionRequestFromBuffer(
 	msg *rawtopicreader.StopPartitionSessionRequest,
-) (err error) {
+) error {
 	session, err := r.sessionController.Get(msg.PartitionSessionID)
 	if err != nil {
 		return err
@@ -435,7 +437,8 @@ func (r *topicStreamReaderImpl) setStarted() error {
 	return nil
 }
 
-func (r *topicStreamReaderImpl) initSession() (err error) {
+func (r *topicStreamReaderImpl) initSession() error {
+	var err error
 	initMessage := r.cfg.initMessage()
 
 	onDone := trace.TopicOnReaderInit(r.cfg.Trace, r.readConnectionID, initMessage)
@@ -613,7 +616,8 @@ func (r *topicStreamReaderImpl) updateTokenLoop(ctx context.Context) {
 	}
 }
 
-func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse) (err error) {
+func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse) error {
+	var err error
 	resCapacity := r.addRestBufferBytes(-msg.BytesSize)
 	onDone := trace.TopicOnReaderReceiveDataResponse(r.cfg.Trace, r.readConnectionID, resCapacity, msg)
 	defer func() {
@@ -661,7 +665,8 @@ func (r *topicStreamReaderImpl) onReadResponse(msg *rawtopicreader.ReadResponse)
 	return nil
 }
 
-func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error) (closeErr error) {
+func (r *topicStreamReaderImpl) CloseWithError(ctx context.Context, reason error) error {
+	var closeErr error
 	onDone := trace.TopicOnReaderClose(r.cfg.Trace, r.readConnectionID, reason)
 	defer onDone(closeErr)
 
@@ -760,7 +765,7 @@ func (r *topicStreamReaderImpl) onStartPartitionSessionRequest(m *rawtopicreader
 
 func (r *topicStreamReaderImpl) onStartPartitionSessionRequestFromBuffer(
 	m *rawtopicreader.StartPartitionSessionRequest,
-) (err error) {
+) error {
 	session, err := r.sessionController.Get(m.PartitionSession.PartitionSessionID)
 	if err != nil {
 		return err
