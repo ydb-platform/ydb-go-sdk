@@ -87,8 +87,9 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	return s, nil
 }
 
-func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generator.Row, attempts int, err error) {
-	if err = ctx.Err(); err != nil {
+func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (generator.Row, int, error) {
+	var attempts int
+	if err := ctx.Err(); err != nil {
 		return generator.Row{}, attempts, err
 	}
 
@@ -97,9 +98,9 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 
 	e := generator.Row{}
 
-	err = s.db.Query().Do(ctx,
-		func(ctx context.Context, session query.Session) (err error) {
-			if err = ctx.Err(); err != nil {
+	err := s.db.Query().Do(ctx,
+		func(ctx context.Context, session query.Session) error {
+			if err := ctx.Err(); err != nil {
 				return err
 			}
 
@@ -155,7 +156,8 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 	return e, attempts, err
 }
 
-func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, _ error) {
+func (s *Storage) Write(ctx context.Context, e generator.Row) (int, error) {
+	var attempts int
 	if err := ctx.Err(); err != nil {
 		return attempts, err
 	}

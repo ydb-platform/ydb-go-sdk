@@ -86,8 +86,8 @@ func (r *result) Close(ctx context.Context) error {
 	return nil
 }
 
-func (r *result) nextResultSet(ctx context.Context) (*resultSet, error) {
-	var err error
+//nolint:nonamedreturns //FAIL TestExecute and TestResultNextResultSet
+func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 	defer func() {
 		if err != nil && !xerrors.Is(err,
 			io.EOF, errClosedResult, context.Canceled,
@@ -110,7 +110,7 @@ func (r *result) nextResultSet(ctx context.Context) (*resultSet, error) {
 				if resultSetIndex := r.lastPart.GetResultSetIndex(); resultSetIndex >= nextResultSetIndex { //nolint:nestif
 					r.resultSetIndex = resultSetIndex
 
-					return newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+					return newResultSet(func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
 						defer func() {
 							if err != nil && !xerrors.Is(err,
 								io.EOF, context.Canceled,

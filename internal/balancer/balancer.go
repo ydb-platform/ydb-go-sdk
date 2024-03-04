@@ -309,16 +309,14 @@ func (b *Balancer) Invoke(
 	})
 }
 
+//nolint:nonamedreturns //FAIL integration tests
 func (b *Balancer) NewStream(
 	ctx context.Context,
 	desc *grpc.StreamDesc,
 	method string,
 	opts ...grpc.CallOption,
-) (grpc.ClientStream, error) {
-	var (
-		client grpc.ClientStream
-		err    error
-	)
+) (_ grpc.ClientStream, err error) {
+	var client grpc.ClientStream
 	err = b.wrapCall(ctx, func(ctx context.Context, cc conn.Conn) error {
 		client, err = cc.NewStream(ctx, desc, method, opts...)
 

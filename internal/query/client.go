@@ -133,11 +133,11 @@ type createSessionSettings struct {
 	onAttach             func(id string)
 }
 
+//nolint:nonamedreturns //FAIL TestCreateSession
 func createSession(
 	ctx context.Context, client Ydb_Query_V1.QueryServiceClient, settings createSessionSettings,
-) (*Session, error) {
+) (_ *Session, finalErr error) {
 	var (
-		finalErr            error
 		createSessionCtx    context.Context
 		cancelCreateSession context.CancelFunc
 	)
