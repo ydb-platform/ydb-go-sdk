@@ -134,3 +134,9 @@ func (p *optional) Interval(v time.Duration) *optionalBuilder {
 
 	return &optionalBuilder{opt: p}
 }
+
+func (p *optional) Json(v string) *optionalBuilder {
+	p.value = value.JSONValue(v)
+
+	return &optionalBuilder{opt: p}
+}

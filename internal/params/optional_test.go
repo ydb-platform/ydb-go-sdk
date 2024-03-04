@@ -453,6 +453,30 @@ func TestOptional(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Optional().Json(`{"a": 1,"b": "B"}`).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_OptionalType{
+							OptionalType: &Ydb.OptionalType{
+								Item: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_JSON,
+									},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_TextValue{
+							TextValue: `{"a": 1,"b": "B"}`,
+						},
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			a := allocator.New()

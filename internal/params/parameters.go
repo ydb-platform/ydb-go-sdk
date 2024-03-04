@@ -242,6 +242,13 @@ func (p *Parameter) Interval(v time.Duration) Builder {
 	return p.parent
 }
 
+func (p *Parameter) Json(v string) Builder {
+	p.value = value.JSONValue(v)
+	p.parent.params = append(p.parent.params, p)
+
+	return p.parent
+}
+
 func Declare(p *Parameter) string {
 	return fmt.Sprintf(
 		"DECLARE %s AS %s",
