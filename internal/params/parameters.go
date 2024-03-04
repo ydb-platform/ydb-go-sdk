@@ -263,6 +263,13 @@ func (p *Parameter) Yson(v []byte) Builder {
 	return p.parent
 }
 
+func (p *Parameter) Uuid(v [16]byte) Builder {
+	p.value = value.UUIDValue(v)
+	p.parent.params = append(p.parent.params, p)
+
+	return p.parent
+}
+
 func Declare(p *Parameter) string {
 	return fmt.Sprintf(
 		"DECLARE %s AS %s",

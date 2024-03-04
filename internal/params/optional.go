@@ -152,3 +152,9 @@ func (p *optional) Yson(v []byte) *optionalBuilder {
 
 	return &optionalBuilder{opt: p}
 }
+
+func (p *optional) Uuid(v [16]byte) *optionalBuilder {
+	p.value = value.UUIDValue(v)
+
+	return &optionalBuilder{opt: p}
+}
