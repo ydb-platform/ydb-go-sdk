@@ -409,6 +409,25 @@ func TestBuilder(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: xtest.CurrentFileLine(),
+			builder: Builder{}.
+				Param("$x").Yson([]byte(`[ 1; 2; 3; 4; 5 ]`)).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_YSON,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_BytesValue{
+							BytesValue: []byte(`[ 1; 2; 3; 4; 5 ]`),
+						},
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			a := allocator.New()

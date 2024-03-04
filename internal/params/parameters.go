@@ -256,6 +256,13 @@ func (p *Parameter) JsonDocument(v string) Builder {
 	return p.parent
 }
 
+func (p *Parameter) Yson(v []byte) Builder {
+	p.value = value.YSONValue(v)
+	p.parent.params = append(p.parent.params, p)
+
+	return p.parent
+}
+
 func Declare(p *Parameter) string {
 	return fmt.Sprintf(
 		"DECLARE %s AS %s",

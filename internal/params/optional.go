@@ -146,3 +146,9 @@ func (p *optional) JsonDocument(v string) *optionalBuilder {
 
 	return &optionalBuilder{opt: p}
 }
+
+func (p *optional) Yson(v []byte) *optionalBuilder {
+	p.value = value.YSONValue(v)
+
+	return &optionalBuilder{opt: p}
+}
