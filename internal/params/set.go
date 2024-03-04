@@ -141,3 +141,27 @@ func (s *setItem) Interval(v time.Duration) *set {
 
 	return s.parent
 }
+
+func (s *setItem) JSON(v string) *set {
+	s.parent.values = append(s.parent.values, value.JSONValue(v))
+
+	return s.parent
+}
+
+func (s *setItem) JSONDocument(v string) *set {
+	s.parent.values = append(s.parent.values, value.JSONDocumentValue(v))
+
+	return s.parent
+}
+
+func (s *setItem) YSON(v []byte) *set {
+	s.parent.values = append(s.parent.values, value.YSONValue(v))
+
+	return s.parent
+}
+
+func (s *setItem) UUID(v [16]byte) *set {
+	s.parent.values = append(s.parent.values, value.UUIDValue(v))
+
+	return s.parent
+}

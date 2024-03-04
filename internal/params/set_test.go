@@ -669,6 +669,153 @@ func TestSet(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Set().AddItem().JSON(`{"a": 1,"b": "B"}`).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_DictType{
+							DictType: &Ydb.DictType{
+								Key: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_JSON,
+									},
+								},
+								Payload: &Ydb.Type{
+									Type: &Ydb.Type_VoidType{},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Pairs: []*Ydb.ValuePair{
+							{
+								Key: &Ydb.Value{
+									Value: &Ydb.Value_TextValue{
+										TextValue: `{"a": 1,"b": "B"}`,
+									},
+								},
+								Payload: &Ydb.Value{
+									Value: &Ydb.Value_NullFlagValue{},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Set().AddItem().JSONDocument(`{"a": 1,"b": "B"}`).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_DictType{
+							DictType: &Ydb.DictType{
+								Key: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_JSON_DOCUMENT,
+									},
+								},
+								Payload: &Ydb.Type{
+									Type: &Ydb.Type_VoidType{},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Pairs: []*Ydb.ValuePair{
+							{
+								Key: &Ydb.Value{
+									Value: &Ydb.Value_TextValue{
+										TextValue: `{"a": 1,"b": "B"}`,
+									},
+								},
+								Payload: &Ydb.Value{
+									Value: &Ydb.Value_NullFlagValue{},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Set().AddItem().YSON([]byte(`[ 1; 2; 3; 4; 5 ]`)).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_DictType{
+							DictType: &Ydb.DictType{
+								Key: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_YSON,
+									},
+								},
+								Payload: &Ydb.Type{
+									Type: &Ydb.Type_VoidType{},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Pairs: []*Ydb.ValuePair{
+							{
+								Key: &Ydb.Value{
+									Value: &Ydb.Value_BytesValue{
+										BytesValue: []byte(`[ 1; 2; 3; 4; 5 ]`),
+									},
+								},
+								Payload: &Ydb.Value{
+									Value: &Ydb.Value_NullFlagValue{},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Set().AddItem().
+				UUID([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}).
+				Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_DictType{
+							DictType: &Ydb.DictType{
+								Key: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UUID,
+									},
+								},
+								Payload: &Ydb.Type{
+									Type: &Ydb.Type_VoidType{},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Pairs: []*Ydb.ValuePair{
+							{
+								Key: &Ydb.Value{
+									Value: &Ydb.Value_Low_128{
+										Low_128: 651345242494996240,
+									},
+									High_128: 72623859790382856,
+								},
+								Payload: &Ydb.Value{
+									Value: &Ydb.Value_NullFlagValue{},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			a := allocator.New()

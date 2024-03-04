@@ -140,3 +140,27 @@ func (l *listItem) Interval(v time.Duration) *list {
 
 	return l.parent
 }
+
+func (l *listItem) JSON(v string) *list {
+	l.parent.values = append(l.parent.values, value.JSONValue(v))
+
+	return l.parent
+}
+
+func (l *listItem) JSONDocument(v string) *list {
+	l.parent.values = append(l.parent.values, value.JSONDocumentValue(v))
+
+	return l.parent
+}
+
+func (l *listItem) YSON(v []byte) *list {
+	l.parent.values = append(l.parent.values, value.YSONValue(v))
+
+	return l.parent
+}
+
+func (l *listItem) UUID(v [16]byte) *list {
+	l.parent.values = append(l.parent.values, value.UUIDValue(v))
+
+	return l.parent
+}

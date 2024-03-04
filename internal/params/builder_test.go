@@ -371,6 +371,85 @@ func TestBuilder(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: xtest.CurrentFileLine(),
+			builder: Builder{}.
+				Param("$x").JSON(`{"a": 1,"b": "B"}`).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_JSON,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_TextValue{
+							TextValue: `{"a": 1,"b": "B"}`,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			builder: Builder{}.
+				Param("$x").JSONDocument(`{"a": 1,"b": "B"}`).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_JSON_DOCUMENT,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_TextValue{
+							TextValue: `{"a": 1,"b": "B"}`,
+						},
+					},
+				},
+			},
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			builder: Builder{}.
+				Param("$x").YSON([]byte(`[ 1; 2; 3; 4; 5 ]`)).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_YSON,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_BytesValue{
+							BytesValue: []byte(`[ 1; 2; 3; 4; 5 ]`),
+						},
+					},
+				},
+			},
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			builder: Builder{}.
+				Param("$x").
+				UUID([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}).
+				Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_TypeId{
+							TypeId: Ydb.Type_UUID,
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_Low_128{
+							Low_128: 651345242494996240,
+						},
+						High_128: 72623859790382856,
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			a := allocator.New()
