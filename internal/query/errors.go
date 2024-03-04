@@ -7,9 +7,7 @@ import (
 var (
 	ErrNotImplemented          = errors.New("not implemented yet")
 	errWrongNextResultSetIndex = errors.New("wrong result set index")
-	errColumnNotFoundByName    = errors.New("column not found by name")
 	errInterruptedStream       = errors.New("interrupted stream")
 	errClosedResult            = errors.New("result closed early")
 	errWrongResultSetIndex     = errors.New("critical violation of the logic - wrong result set index")
-	errWrongArgumentsCount     = errors.New("wrong arguments count")
 )
