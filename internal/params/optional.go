@@ -140,3 +140,9 @@ func (p *optional) Json(v string) *optionalBuilder {
 
 	return &optionalBuilder{opt: p}
 }
+
+func (p *optional) JsonDocument(v string) *optionalBuilder {
+	p.value = value.JSONDocumentValue(v)
+
+	return &optionalBuilder{opt: p}
+}

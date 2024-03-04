@@ -249,6 +249,13 @@ func (p *Parameter) Json(v string) Builder {
 	return p.parent
 }
 
+func (p *Parameter) JsonDocument(v string) Builder {
+	p.value = value.JSONDocumentValue(v)
+	p.parent.params = append(p.parent.params, p)
+
+	return p.parent
+}
+
 func Declare(p *Parameter) string {
 	return fmt.Sprintf(
 		"DECLARE %s AS %s",
