@@ -1315,6 +1315,14 @@ func (v *optionalValue) castTo(dst interface{}) error {
 	inner := reflect.Indirect(ptr)
 
 	if inner.Kind() != reflect.Pointer {
+		if v.value == nil {
+			if ptr.CanAddr() {
+				ptr.SetZero()
+			}
+
+			return nil
+		}
+
 		if err := v.value.castTo(ptr.Interface()); err != nil {
 			return xerrors.WithStackTrace(err)
 		}
