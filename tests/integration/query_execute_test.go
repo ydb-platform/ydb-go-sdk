@@ -123,16 +123,17 @@ func TestQueryExecute(t *testing.T) {
 	})
 	t.Run("ScanStruct", func(t *testing.T) {
 		var data struct {
-			P1 string        `sql:"p1"`
+			P1 *string       `sql:"p1"`
 			P2 uint64        `sql:"p2"`
 			P3 time.Duration `sql:"p3"`
+			P4 *string       `sql:"p4"`
 		}
 		err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) (err error) {
 			_, res, err := s.Execute(ctx, `
 				DECLARE $p1 AS Text;
 				DECLARE $p2 AS Uint64;
 				DECLARE $p3 AS Interval;
-				SELECT $p1 AS p1, $p2 AS p2, $p3 AS p3;
+				SELECT CAST($p1 AS Optional<Text>) AS p1, $p2 AS p2, $p3 AS p3, CAST(NULL AS Optional<Text>) AS p4;
 				`,
 				query.WithParameters(
 					ydb.ParamsBuilder().
@@ -161,8 +162,10 @@ func TestQueryExecute(t *testing.T) {
 			return res.Err()
 		}, query.WithIdempotent())
 		require.NoError(t, err)
-		require.EqualValues(t, "test", data.P1)
+		require.NotNil(t, data.P1)
+		require.EqualValues(t, "test", *data.P1)
 		require.EqualValues(t, 100500000000, data.P2)
 		require.EqualValues(t, time.Duration(100500000000), data.P3)
+		require.Nil(t, data.P4)
 	})
 }
