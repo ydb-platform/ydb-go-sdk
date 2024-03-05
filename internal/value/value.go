@@ -2,9 +2,9 @@ package value
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"math/big"
+	"reflect"
 	"sort"
 	"strconv"
 	"time"
@@ -1306,14 +1306,35 @@ type optionalValue struct {
 	value     Value
 }
 
-var errOptionalNilValue = errors.New("optional contains nil value")
-
 func (v *optionalValue) castTo(dst interface{}) error {
-	if v.value == nil {
-		return xerrors.WithStackTrace(errOptionalNilValue)
+	ptr := reflect.ValueOf(dst)
+	if ptr.Kind() != reflect.Pointer {
+		return xerrors.WithStackTrace(fmt.Errorf("%w: '%s'", errDestinationTypeIsNotAPointer, ptr.Kind().String()))
 	}
 
-	return v.value.castTo(dst)
+	inner := reflect.Indirect(ptr)
+
+	if inner.Kind() != reflect.Pointer {
+		if err := v.value.castTo(ptr.Interface()); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		return nil
+	}
+
+	if v.value == nil {
+		inner.SetZero()
+
+		return nil
+	}
+
+	inner.Set(reflect.New(inner.Type().Elem()))
+
+	if err := v.value.castTo(inner.Interface()); err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
 }
 
 func (v *optionalValue) Yql() string {
