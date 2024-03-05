@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"path"
-	"strconv"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
@@ -17,50 +16,10 @@ import (
 	"slo/internal/generator"
 )
 
-//nolint:goconst
-const (
-	upsertTemplate = `
-PRAGMA TablePathPrefix("%s");
-
-DECLARE $id AS Uint64;
-DECLARE $payload_str AS Utf8;
-DECLARE $payload_double AS Double;
-DECLARE $payload_timestamp AS Timestamp;
-
-UPSERT INTO ` + "`%s`" + ` (
-	id, hash, payload_str, payload_double, payload_timestamp
-) VALUES (
-	$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp
-);
-`
-	selectTemplate = `
-PRAGMA TablePathPrefix("%s");
-
-DECLARE $id AS Uint64;
-SELECT id, payload_str, payload_double, payload_timestamp, payload_hash
-FROM ` + "`%s`" + ` WHERE id = $id AND hash = Digest::NumericHash($id);
-`
-)
-
-var (
-	readTx = query.TxControl(
-		query.BeginTx(
-			query.WithOnlineReadOnly(),
-		),
-		query.CommitTx(),
-	)
-
-	writeTx = query.SerializableReadWriteTxControl(
-		query.CommitTx(),
-	)
-)
-
 type Storage struct {
-	db          *ydb.Driver
-	cfg         *config.Config
-	prefix      string
-	upsertQuery string
-	selectQuery string
+	db        *ydb.Driver
+	cfg       *config.Config
+	tablePath string
 }
 
 func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage, error) {
@@ -79,11 +38,9 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	prefix := path.Join(db.Name(), label)
 
 	s := &Storage{
-		db:          db,
-		cfg:         cfg,
-		prefix:      prefix,
-		upsertQuery: fmt.Sprintf(upsertTemplate, prefix, cfg.Table),
-		selectQuery: fmt.Sprintf(selectTemplate, prefix, cfg.Table),
+		db:        db,
+		cfg:       cfg,
+		tablePath: "`" + path.Join(prefix, cfg.Table) + "`",
 	}
 
 	return s, nil
@@ -105,13 +62,28 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 				return err
 			}
 
-			_, res, err := session.Execute(ctx, s.selectQuery,
+			_, res, err := session.Execute(ctx,
+				fmt.Sprintf(`
+					DECLARE $id AS Uint64;
+					DECLARE $payload_str AS Utf8;
+					DECLARE $payload_double AS Double;
+					DECLARE $payload_timestamp AS Timestamp;
+					
+					UPSERT INTO %s (
+						id, hash, payload_str, payload_double, payload_timestamp
+					) VALUES (
+						$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp
+					);
+				`, s.tablePath),
 				query.WithParameters(
 					ydb.ParamsBuilder().
 						Param("$id").Uint64(entryID).
 						Build(),
 				),
-				query.WithTxControl(readTx),
+				query.WithTxControl(query.TxControl(
+					query.BeginTx(query.WithOnlineReadOnly()),
+					query.CommitTx(),
+				)),
 			)
 			if err != nil {
 				return err
@@ -174,7 +146,12 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, _ e
 				return err
 			}
 
-			_, res, err := session.Execute(ctx, s.upsertQuery,
+			_, res, err := session.Execute(ctx,
+				fmt.Sprintf(`
+					DECLARE $id AS Uint64;
+					SELECT id, payload_str, payload_double, payload_timestamp, payload_hash
+					FROM %s WHERE id = $id AND hash = Digest::NumericHash($id);
+				`, s.tablePath),
 				query.WithParameters(
 					ydb.ParamsBuilder().
 						Param("$id").Uint64(e.ID).
@@ -183,7 +160,6 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, _ e
 						Param("$payload_timestamp").Timestamp(*e.PayloadTimestamp).
 						Build(),
 				),
-				query.WithTxControl(writeTx),
 			)
 			if err != nil {
 				return err
@@ -216,8 +192,9 @@ func (s *Storage) createTable(ctx context.Context) error {
 	defer cancel()
 
 	return s.db.Query().Do(ctx, func(ctx context.Context, session query.Session) error {
-		_, _, err := session.Execute(ctx, `
-				CREATE TABLE `+"`"+path.Join(s.prefix, s.cfg.Table)+"`"+` (
+		_, _, err := session.Execute(ctx,
+			fmt.Sprintf(`
+				CREATE TABLE %s (
 					hash Uint64?,
 					id Uint64?,
 					payload_str Text?,
@@ -226,13 +203,15 @@ func (s *Storage) createTable(ctx context.Context) error {
 					payload_hash Uint64?,
 					PRIMARY KEY (hash, id)
 				) WITH (
-					UNIFORM_PARTITIONS = `+strconv.FormatUint(s.cfg.MinPartitionsCount, 10)+`,
+					UNIFORM_PARTITIONS = %d,
 					AUTO_PARTITIONING_BY_SIZE = ENABLED,
-					AUTO_PARTITIONING_PARTITION_SIZE_MB = `+strconv.FormatUint(s.cfg.PartitionSize, 10)+`,
-					AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = `+strconv.FormatUint(s.cfg.MinPartitionsCount, 10)+`,
-					AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = `+strconv.FormatUint(s.cfg.MaxPartitionsCount, 10)+`
-				)
-			`, query.WithTxControl(query.NoTx()))
+					AUTO_PARTITIONING_PARTITION_SIZE_MB = %d,
+					AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = %d,
+					AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = %d
+				)`, s.tablePath, s.cfg.MinPartitionsCount, s.cfg.PartitionSize,
+				s.cfg.MinPartitionsCount, s.cfg.MaxPartitionsCount,
+			),
+			query.WithTxControl(query.NoTx()))
 
 		return err
 	}, query.WithIdempotent())
@@ -250,7 +229,7 @@ func (s *Storage) dropTable(ctx context.Context) error {
 	return s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
 			_, _, err := session.Execute(ctx,
-				fmt.Sprintf("DROP TABLE `%s`", path.Join(s.prefix, s.cfg.Table)),
+				fmt.Sprintf(`DROP TABLE %s`, s.tablePath),
 				query.WithTxControl(query.NoTx()),
 			)
 
