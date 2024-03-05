@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"path"
 	"strconv"
 	"time"
@@ -120,20 +122,23 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 
 			rs, err := res.NextResultSet(ctx)
 			if err != nil {
+				if errors.Is(err, io.EOF) {
+					return nil
+				}
+
 				return err
 			}
 
 			row, err := rs.NextRow(ctx)
 			if err != nil {
+				if errors.Is(err, io.EOF) {
+					return nil
+				}
+
 				return err
 			}
 
-			err = row.ScanNamed(
-				query.Named("id", &e.ID),
-				query.Named("payload_str", &e.PayloadStr),
-				query.Named("payload_double", &e.PayloadDouble),
-				query.Named("payload_timestamp", &e.PayloadTimestamp),
-			)
+			err = row.ScanStruct(&e, query.WithAllowMissingColumnsFromSelect())
 			if err != nil {
 				return err
 			}
@@ -244,9 +249,10 @@ func (s *Storage) dropTable(ctx context.Context) error {
 
 	return s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
-			_, _, err := session.Execute(ctx, `
-				DROP TABLE `+"`"+path.Join(s.prefix, s.cfg.Table)+"`"+`
-			`)
+			_, _, err := session.Execute(ctx,
+				fmt.Sprintf("DROP TABLE `%s`", path.Join(s.prefix, s.cfg.Table)),
+				query.WithTxControl(query.NoTx()),
+			)
 
 			return err
 		},

@@ -49,7 +49,7 @@ jobs:
           workload_build_context0: ../..
           workload_build_options0: -f Dockerfile --build-arg SRC_PATH=native/table --build-arg JOB_NAME=workload-native-table
 
-          language_id1: 'query'
+          language_id1: 'native/query'
           workload_path1: 'tests/slo'
           language1: 'Go SDK native over query-service'
           workload_build_context1: ../..
