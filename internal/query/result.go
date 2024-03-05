@@ -30,7 +30,7 @@ type result struct {
 func newResult(
 	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
-	stop func(),
+	streamCancel func(),
 ) (_ *result, txID string, _ error) {
 	interrupted := make(chan struct{})
 	r := result{
@@ -40,7 +40,7 @@ func newResult(
 		closed:         make(chan struct{}),
 		interrupt: sync.OnceFunc(func() {
 			close(interrupted)
-			stop()
+			streamCancel()
 		}),
 	}
 	select {

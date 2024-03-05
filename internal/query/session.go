@@ -77,5 +77,10 @@ func (s *Session) Status() query.SessionStatus {
 func (s *Session) Execute(
 	ctx context.Context, q string, opts ...query.ExecuteOption,
 ) (query.Transaction, query.Result, error) {
-	return execute(ctx, s, s.queryClient, q, query.ExecuteSettings(opts...))
+	tx, r, err := execute(ctx, s, s.queryClient, q, query.ExecuteSettings(opts...))
+	if err != nil {
+		return nil, nil, xerrors.WithStackTrace(err)
+	}
+
+	return tx, r, nil
 }

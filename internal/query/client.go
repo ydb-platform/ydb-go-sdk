@@ -128,8 +128,7 @@ func deleteSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 }
 
 type createSessionConfig struct {
-	onDetach func(id string)
-	onAttach func(id string)
+	onAttach func(s *Session)
 	onClose  func(s *Session)
 }
 
@@ -142,22 +141,26 @@ func createSession(
 			xerrors.Transport(err),
 		)
 	}
+
 	if s.GetStatus() != Ydb.StatusIds_SUCCESS {
 		return nil, xerrors.WithStackTrace(
 			xerrors.FromOperation(s),
 		)
 	}
+
 	defer func() {
 		if finalErr != nil {
 			_ = deleteSession(ctx, client, s.GetSessionId())
 		}
 	}()
+
 	attachCtx, cancelAttach := xcontext.WithCancel(context.Background())
 	defer func() {
 		if finalErr != nil {
 			cancelAttach()
 		}
 	}()
+
 	attach, err := client.AttachSession(attachCtx, &Ydb_Query.AttachSessionRequest{
 		SessionId: s.GetSessionId(),
 	})
@@ -166,33 +169,42 @@ func createSession(
 			xerrors.Transport(err),
 		)
 	}
+
 	defer func() {
 		if finalErr != nil {
 			_ = attach.CloseSend()
 		}
 	}()
+
 	state, err := attach.Recv()
 	if err != nil {
 		return nil, xerrors.WithStackTrace(xerrors.Transport(err))
 	}
+
 	if state.GetStatus() != Ydb.StatusIds_SUCCESS {
 		return nil, xerrors.WithStackTrace(xerrors.FromOperation(state))
 	}
-	if cfg.onAttach != nil {
-		cfg.onAttach(s.GetSessionId())
-	}
+
 	session := &Session{
 		id:          s.GetSessionId(),
 		nodeID:      s.GetNodeId(),
 		queryClient: client,
 		status:      query.SessionStatusReady,
 	}
+
+	if cfg.onAttach != nil {
+		cfg.onAttach(session)
+	}
+
 	session.close = sync.OnceFunc(func() {
-		if cfg.onDetach != nil {
-			cfg.onDetach(session.id)
+		if cfg.onClose != nil {
+			cfg.onClose(session)
 		}
+
 		_ = attach.CloseSend()
+
 		cancelAttach()
+
 		atomic.StoreUint32(
 			(*uint32)(&session.status),
 			uint32(query.SessionStatusClosed),
@@ -204,15 +216,11 @@ func createSession(
 		for {
 			switch session.Status() {
 			case query.SessionStatusReady, query.SessionStatusInUse:
-				state, err := attach.Recv()
-				if err != nil || state.GetStatus() != Ydb.StatusIds_SUCCESS {
+				sessionState, recvErr := attach.Recv()
+				if recvErr != nil || sessionState.GetStatus() != Ydb.StatusIds_SUCCESS {
 					return
 				}
 			default:
-				if cfg.onClose != nil {
-					cfg.onClose(session)
-				}
-
 				return
 			}
 		}
@@ -262,6 +270,7 @@ func New(ctx context.Context, balancer balancer, config *config.Config) (*Client
 
 			return nil
 		},
+		xerrors.MustDeleteSession,
 	)
 
 	return client, ctx.Err()
