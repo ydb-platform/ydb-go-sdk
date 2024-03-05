@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
@@ -12,7 +13,39 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 )
 
+func isYdbVersionHaveQueryService() error {
+	minYdbVersion := strings.Split("24.1", ".")
+	ydbVersion := strings.Split(os.Getenv("YDB_VERSION"), ".")
+	for i, component := range ydbVersion {
+		if i < len(minYdbVersion) {
+			if r := strings.Compare(component, minYdbVersion[i]); r < 0 {
+				return fmt.Errorf("example '%s' run on minimal YDB version '%v', but current version is '%s'",
+					os.Args[0],
+					strings.Join(minYdbVersion, "."),
+					func() string {
+						if len(ydbVersion) > 0 && ydbVersion[0] != "" {
+							return strings.Join(ydbVersion, ".")
+						}
+
+						return "undefined"
+					}(),
+				)
+			} else if r > 0 {
+				return nil
+			}
+		}
+	}
+
+	return nil
+}
+
 func main() {
+	if err := isYdbVersionHaveQueryService(); err != nil {
+		fmt.Println(err.Error())
+
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -30,45 +63,25 @@ func main() {
 	}
 	defer func() { _ = db.Close(ctx) }()
 
-	prefix := path.Join(db.Name(), "native")
+	prefix := path.Join(db.Name(), "native/query")
 
 	err = sugar.RemoveRecursive(ctx, db, prefix)
 	if err != nil {
 		panic(err)
 	}
 
-	err = describeTableOptions(ctx, db.Table())
-	if err != nil {
-		panic(fmt.Errorf("describe table options error: %w", err))
-	}
-
-	err = createTables(ctx, db.Table(), prefix)
+	err = createTables(ctx, db.Query(), prefix)
 	if err != nil {
 		panic(fmt.Errorf("create tables error: %w", err))
 	}
 
-	err = describeTable(ctx, db.Table(), path.Join(prefix, "series"))
-	if err != nil {
-		panic(fmt.Errorf("describe table error: %w", err))
-	}
-
-	err = fillTablesWithData(ctx, db.Table(), prefix)
+	err = fillTablesWithData(ctx, db.Query(), prefix)
 	if err != nil {
 		panic(fmt.Errorf("fill tables with data error: %w", err))
 	}
 
-	err = selectSimple(ctx, db.Table(), prefix)
+	err = read(ctx, db.Query(), prefix)
 	if err != nil {
 		panic(fmt.Errorf("select simple error: %w", err))
-	}
-
-	err = scanQuerySelect(ctx, db.Table(), prefix)
-	if err != nil {
-		panic(fmt.Errorf("scan query select error: %w", err))
-	}
-
-	err = readTable(ctx, db.Table(), path.Join(prefix, "series"))
-	if err != nil {
-		panic(fmt.Errorf("read table error: %w", err))
 	}
 }

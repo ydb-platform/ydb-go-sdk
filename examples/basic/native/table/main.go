@@ -30,7 +30,7 @@ func main() {
 	}
 	defer func() { _ = db.Close(ctx) }()
 
-	prefix := path.Join(db.Name(), "native")
+	prefix := path.Join(db.Name(), "native/table")
 
 	err = sugar.RemoveRecursive(ctx, db, prefix)
 	if err != nil {

@@ -15,11 +15,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ydb-version: [ 22.5, 23.1, 23.2, 23.3, 24.1 ]
+        ydb-version: [ 23.3, 24.1 ]
         application: [ native/table, native/query, database_sql, gorm, xorm ]
     services:
       ydb:
-        image: cr.yandex/crpsjg1coh47p81vh2lc/yandex-docker-local-ydb:${{ matrix.ydb-version }}
+        image: ydbplatform/local-ydb:${{ matrix.ydb-version }}
         ports:
           - 2135:2135
           - 2136:2136
@@ -34,6 +34,7 @@ jobs:
       OS: ubuntu-latest
       YDB_CONNECTION_STRING: grpc://localhost:2136/local
       YDB_ANONYMOUS_CREDENTIALS: 1
+      YDB_VERSION: ${{ matrix.ydb-version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3

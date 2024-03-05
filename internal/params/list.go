@@ -23,6 +23,12 @@ func (l *list) AddItem() *listItem {
 	}
 }
 
+func (l *list) AddItems(items ...value.Value) *list {
+	l.values = append(l.values, items...)
+
+	return l
+}
+
 func (l *list) Build() Builder {
 	l.parent.params = append(l.parent.params, &Parameter{
 		parent: l.parent,

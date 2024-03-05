@@ -45,13 +45,13 @@ jobs:
 
           language_id0: 'native-table'
           workload_path0: 'tests/slo'
-          language0: 'Go SDK native over table-service'
+          language0: 'Native ydb-go-sdk/v3 over table-service'
           workload_build_context0: ../..
           workload_build_options0: -f Dockerfile --build-arg SRC_PATH=native/table --build-arg JOB_NAME=workload-native-table
 
           language_id1: 'native-query'
           workload_path1: 'tests/slo'
-          language1: 'Go SDK native over query-service'
+          language1: 'Native ydb-go-sdk/v3 over query-service'
           workload_build_context1: ../..
           workload_build_options1: -f Dockerfile --build-arg SRC_PATH=native/query --build-arg JOB_NAME=workload-native-query
 
