@@ -3,10 +3,11 @@ package main
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-func seriesData(id uint64, released time.Time, title, info, comment string) types.Value {
+func seriesData(id string, released time.Time, title, info, comment string) types.Value {
 	var commentv types.Value
 	if comment == "" {
 		commentv = types.NullValue(types.TypeUTF8)
@@ -15,7 +16,7 @@ func seriesData(id uint64, released time.Time, title, info, comment string) type
 	}
 
 	return types.StructValue(
-		types.StructFieldValue("series_id", types.Uint64Value(id)),
+		types.StructFieldValue("series_id", types.BytesValueFromString(id)),
 		types.StructFieldValue("release_date", types.DateValueFromTime(released)),
 		types.StructFieldValue("title", types.TextValue(title)),
 		types.StructFieldValue("series_info", types.TextValue(info)),
@@ -23,135 +24,181 @@ func seriesData(id uint64, released time.Time, title, info, comment string) type
 	)
 }
 
-func seasonData(seriesID, seasonID uint64, title string, first, last time.Time) types.Value {
+func seasonData(seriesID, seasonID, title string, first, last time.Time) types.Value {
 	return types.StructValue(
-		types.StructFieldValue("series_id", types.Uint64Value(seriesID)),
-		types.StructFieldValue("season_id", types.Uint64Value(seasonID)),
+		types.StructFieldValue("series_id", types.BytesValueFromString(seriesID)),
+		types.StructFieldValue("season_id", types.BytesValueFromString(seasonID)),
 		types.StructFieldValue("title", types.TextValue(title)),
 		types.StructFieldValue("first_aired", types.DateValueFromTime(first)),
 		types.StructFieldValue("last_aired", types.DateValueFromTime(last)),
 	)
 }
 
-func episodeData(seriesID, seasonID, episodeID uint64, title string, date time.Time) types.Value {
+func episodeData(seriesID, seasonID, episodeID, title string, date time.Time) types.Value {
 	return types.StructValue(
-		types.StructFieldValue("series_id", types.Uint64Value(seriesID)),
-		types.StructFieldValue("season_id", types.Uint64Value(seasonID)),
-		types.StructFieldValue("episode_id", types.Uint64Value(episodeID)),
+		types.StructFieldValue("series_id", types.BytesValueFromString(seriesID)),
+		types.StructFieldValue("season_id", types.BytesValueFromString(seasonID)),
+		types.StructFieldValue("episode_id", types.BytesValueFromString(episodeID)),
 		types.StructFieldValue("title", types.TextValue(title)),
 		types.StructFieldValue("air_date", types.DateValueFromTime(date)),
 	)
 }
 
-func getSeriesData() types.Value {
-	return types.ListValue(
-		seriesData(
-			1, days("2006-02-03"), "IT Crowd", ""+
-				"The IT Crowd is a British sitcom produced by Channel 4, written by Graham Linehan, produced by "+
-				"Ash Atalla and starring Chris O'Dowd, Richard Ayoade, Katherine Parkinson, and Matt Berry.",
-			"", // NULL comment.
-		),
-		seriesData(
-			2, days("2014-04-06"), "Silicon Valley", ""+
-				"Silicon Valley is an American comedy television series created by Mike Judge, John Altschuler and "+
-				"Dave Krinsky. The series focuses on five young men who founded a startup company in Silicon Valley.",
-			"Some comment here",
-		),
-	)
+func getData() (series, seasons, episodes []types.Value) {
+	for seriesID, fill := range map[string]func(seriesID string) (
+		seriesData types.Value, seasons []types.Value, episodes []types.Value,
+	){
+		uuid.New().String(): getDataForITCrowd,
+		uuid.New().String(): getDataForSiliconValley,
+	} {
+		seriesData, seasonsData, episodesData := fill(seriesID)
+		series = append(series, seriesData)
+		seasons = append(seasons, seasonsData...)
+		episodes = append(episodes, episodesData...)
+	}
+
+	return
 }
 
-func getSeasonsData() types.Value {
-	return types.ListValue(
-		seasonData(1, 1, "Season 1", days("2006-02-03"), days("2006-03-03")),
-		seasonData(1, 2, "Season 2", days("2007-08-24"), days("2007-09-28")),
-		seasonData(1, 3, "Season 3", days("2008-11-21"), days("2008-12-26")),
-		seasonData(1, 4, "Season 4", days("2010-06-25"), days("2010-07-30")),
-		seasonData(2, 1, "Season 1", days("2014-04-06"), days("2014-06-01")),
-		seasonData(2, 2, "Season 2", days("2015-04-12"), days("2015-06-14")),
-		seasonData(2, 3, "Season 3", days("2016-04-24"), days("2016-06-26")),
-		seasonData(2, 4, "Season 4", days("2017-04-23"), days("2017-06-25")),
-		seasonData(2, 5, "Season 5", days("2018-03-25"), days("2018-05-13")),
+func getDataForITCrowd(seriesID string) (series types.Value, seasons, episodes []types.Value) {
+	series = seriesData(
+		seriesID, date("2006-02-03"), "IT Crowd", ""+
+			"The IT Crowd is a British sitcom produced by Channel 4, written by Graham Linehan, produced by "+
+			"Ash Atalla and starring Chris O'Dowd, Richard Ayoade, Katherine Parkinson, and Matt Berry.",
+		"", // NULL comment.
 	)
+	for _, season := range []struct { //nolint:gocritic
+		title    string
+		first    time.Time
+		last     time.Time
+		episodes map[string]time.Time
+	}{
+		{"Season 1", date("2006-02-03"), date("2006-03-03"), map[string]time.Time{
+			"Yesterday's Jam":             date("2006-02-03"),
+			"Calamity Jen":                date("2006-02-03"),
+			"Fifty-Fifty":                 date("2006-02-10"),
+			"The Red Door":                date("2006-02-17"),
+			"The Haunting of Bill Crouse": date("2006-02-24"),
+			"Aunt Irma Visits":            date("2006-03-03"),
+		}},
+		{"Season 2", date("2007-08-24"), date("2007-09-28"), map[string]time.Time{
+			"The Work Outing":            date("2006-08-24"),
+			"Return of the Golden Child": date("2007-08-31"),
+			"Moss and the German":        date("2007-09-07"),
+			"The Dinner Party":           date("2007-09-14"),
+			"Smoke and Mirrors":          date("2007-09-21"),
+			"Men Without Women":          date("2007-09-28"),
+		}},
+		{"Season 3", date("2008-11-21"), date("2008-12-26"), map[string]time.Time{
+			"From Hell":       date("2008-11-21"),
+			"Are We Not Men?": date("2008-11-28"),
+			"Tramps Like Us":  date("2008-12-05"),
+			"The Speech":      date("2008-12-12"),
+			"Friendface":      date("2008-12-19"),
+			"Calendar Geeks":  date("2008-12-26"),
+		}},
+		{"Season 4", date("2010-06-25"), date("2010-07-30"), map[string]time.Time{
+			"Jen The Fredo":         date("2010-06-25"),
+			"The Final Countdown":   date("2010-07-02"),
+			"Something Happened":    date("2010-07-09"),
+			"Italian For Beginners": date("2010-07-16"),
+			"Bad Boys":              date("2010-07-23"),
+			"Reynholm vs Reynholm":  date("2010-07-30"),
+		}},
+	} {
+		seasonID := uuid.New().String()
+		seasons = append(seasons, seasonData(seriesID, seasonID, season.title, season.first, season.last))
+		for title, date := range season.episodes {
+			episodes = append(episodes, episodeData(seriesID, seasonID, uuid.New().String(), title, date))
+		}
+	}
+
+	return series, seasons, episodes
 }
 
-func getEpisodesData() types.Value {
-	return types.ListValue(
-		episodeData(1, 1, 1, "Yesterday's Jam", days("2006-02-03")),
-		episodeData(1, 1, 2, "Calamity Jen", days("2006-02-03")),
-		episodeData(1, 1, 3, "Fifty-Fifty", days("2006-02-10")),
-		episodeData(1, 1, 4, "The Red Door", days("2006-02-17")),
-		episodeData(1, 1, 5, "The Haunting of Bill Crouse", days("2006-02-24")),
-		episodeData(1, 1, 6, "Aunt Irma Visits", days("2006-03-03")),
-		episodeData(1, 2, 1, "The Work Outing", days("2006-08-24")),
-		episodeData(1, 2, 2, "Return of the Golden Child", days("2007-08-31")),
-		episodeData(1, 2, 3, "Moss and the German", days("2007-09-07")),
-		episodeData(1, 2, 4, "The Dinner Party", days("2007-09-14")),
-		episodeData(1, 2, 5, "Smoke and Mirrors", days("2007-09-21")),
-		episodeData(1, 2, 6, "Men Without Women", days("2007-09-28")),
-		episodeData(1, 3, 1, "From Hell", days("2008-11-21")),
-		episodeData(1, 3, 2, "Are We Not Men?", days("2008-11-28")),
-		episodeData(1, 3, 3, "Tramps Like Us", days("2008-12-05")),
-		episodeData(1, 3, 4, "The Speech", days("2008-12-12")),
-		episodeData(1, 3, 5, "Friendface", days("2008-12-19")),
-		episodeData(1, 3, 6, "Calendar Geeks", days("2008-12-26")),
-		episodeData(1, 4, 1, "Jen The Fredo", days("2010-06-25")),
-		episodeData(1, 4, 2, "The Final Countdown", days("2010-07-02")),
-		episodeData(1, 4, 3, "Something Happened", days("2010-07-09")),
-		episodeData(1, 4, 4, "Italian For Beginners", days("2010-07-16")),
-		episodeData(1, 4, 5, "Bad Boys", days("2010-07-23")),
-		episodeData(1, 4, 6, "Reynholm vs Reynholm", days("2010-07-30")),
-		episodeData(2, 1, 1, "Minimum Viable Product", days("2014-04-06")),
-		episodeData(2, 1, 2, "The Cap Table", days("2014-04-13")),
-		episodeData(2, 1, 3, "Articles of Incorporation", days("2014-04-20")),
-		episodeData(2, 1, 4, "Fiduciary Duties", days("2014-04-27")),
-		episodeData(2, 1, 5, "Signaling Risk", days("2014-05-04")),
-		episodeData(2, 1, 6, "Third Party Insourcing", days("2014-05-11")),
-		episodeData(2, 1, 7, "Proof of Concept", days("2014-05-18")),
-		episodeData(2, 1, 8, "Optimal Tip-to-Tip Efficiency", days("2014-06-01")),
-		episodeData(2, 2, 1, "Sand Hill Shuffle", days("2015-04-12")),
-		episodeData(2, 2, 2, "Runaway Devaluation", days("2015-04-19")),
-		episodeData(2, 2, 3, "Bad Money", days("2015-04-26")),
-		episodeData(2, 2, 4, "The Lady", days("2015-05-03")),
-		episodeData(2, 2, 5, "Server Space", days("2015-05-10")),
-		episodeData(2, 2, 6, "Homicide", days("2015-05-17")),
-		episodeData(2, 2, 7, "Adult Content", days("2015-05-24")),
-		episodeData(2, 2, 8, "White Hat/Black Hat", days("2015-05-31")),
-		episodeData(2, 2, 9, "Binding Arbitration", days("2015-06-07")),
-		episodeData(2, 2, 10, "Two Days of the Condor", days("2015-06-14")),
-		episodeData(2, 3, 1, "Founder Friendly", days("2016-04-24")),
-		episodeData(2, 3, 2, "Two in the Box", days("2016-05-01")),
-		episodeData(2, 3, 3, "Meinertzhagen's Haversack", days("2016-05-08")),
-		episodeData(2, 3, 4, "Maleant Data Systems Solutions", days("2016-05-15")),
-		episodeData(2, 3, 5, "The Empty Chair", days("2016-05-22")),
-		episodeData(2, 3, 6, "Bachmanity Insanity", days("2016-05-29")),
-		episodeData(2, 3, 7, "To Build a Better Beta", days("2016-06-05")),
-		episodeData(2, 3, 8, "Bachman's Earnings Over-Ride", days("2016-06-12")),
-		episodeData(2, 3, 9, "Daily Active Users", days("2016-06-19")),
-		episodeData(2, 3, 10, "The Uptick", days("2016-06-26")),
-		episodeData(2, 4, 1, "Success Failure", days("2017-04-23")),
-		episodeData(2, 4, 2, "Terms of Service", days("2017-04-30")),
-		episodeData(2, 4, 3, "Intellectual Property", days("2017-05-07")),
-		episodeData(2, 4, 4, "Teambuilding Exercise", days("2017-05-14")),
-		episodeData(2, 4, 5, "The Blood Boy", days("2017-05-21")),
-		episodeData(2, 4, 6, "Customer Service", days("2017-05-28")),
-		episodeData(2, 4, 7, "The Patent Troll", days("2017-06-04")),
-		episodeData(2, 4, 8, "The Keenan Vortex", days("2017-06-11")),
-		episodeData(2, 4, 9, "Hooli-Con", days("2017-06-18")),
-		episodeData(2, 4, 10, "Server Error", days("2017-06-25")),
-		episodeData(2, 5, 1, "Grow Fast or Die Slow", days("2018-03-25")),
-		episodeData(2, 5, 2, "Reorientation", days("2018-04-01")),
-		episodeData(2, 5, 3, "Chief Operating Officer", days("2018-04-08")),
-		episodeData(2, 5, 4, "Tech Evangelist", days("2018-04-15")),
-		episodeData(2, 5, 5, "Facial Recognition", days("2018-04-22")),
-		episodeData(2, 5, 6, "Artificial Emotional Intelligence", days("2018-04-29")),
-		episodeData(2, 5, 7, "Initial Coin Offering", days("2018-05-06")),
-		episodeData(2, 5, 8, "Fifty-One Percent", days("2018-05-13")),
+func getDataForSiliconValley(seriesID string) (series types.Value, seasons, episodes []types.Value) {
+	series = seriesData(
+		seriesID, date("2014-04-06"), "Silicon Valley", ""+
+			"Silicon Valley is an American comedy television series created by Mike Judge, John Altschuler and "+
+			"Dave Krinsky. The series focuses on five young men who founded a startup company in Silicon Valley.",
+		"Some comment here",
 	)
+	for _, season := range []struct { //nolint:gocritic
+		title    string
+		first    time.Time
+		last     time.Time
+		episodes map[string]time.Time
+	}{
+		{"Season 1", date("2006-02-03"), date("2006-03-03"), map[string]time.Time{
+			"Minimum Viable Product":        date("2014-04-06"),
+			"The Cap Table":                 date("2014-04-13"),
+			"Articles of Incorporation":     date("2014-04-20"),
+			"Fiduciary Duties":              date("2014-04-27"),
+			"Signaling Risk":                date("2014-05-04"),
+			"Third Party Insourcing":        date("2014-05-11"),
+			"Proof of Concept":              date("2014-05-18"),
+			"Optimal Tip-to-Tip Efficiency": date("2014-06-01"),
+		}},
+		{"Season 2", date("2007-08-24"), date("2007-09-28"), map[string]time.Time{
+			"Sand Hill Shuffle":      date("2015-04-12"),
+			"Runaway Devaluation":    date("2015-04-19"),
+			"Bad Money":              date("2015-04-26"),
+			"The Lady":               date("2015-05-03"),
+			"Server Space":           date("2015-05-10"),
+			"Homicide":               date("2015-05-17"),
+			"Adult Content":          date("2015-05-24"),
+			"White Hat/Black Hat":    date("2015-05-31"),
+			"Binding Arbitration":    date("2015-06-07"),
+			"Two Days of the Condor": date("2015-06-14"),
+		}},
+		{"Season 3", date("2008-11-21"), date("2008-12-26"), map[string]time.Time{
+			"Founder Friendly":               date("2016-04-24"),
+			"Two in the Box":                 date("2016-05-01"),
+			"Meinertzhagen's Haversack":      date("2016-05-08"),
+			"Maleant Data Systems Solutions": date("2016-05-15"),
+			"The Empty Chair":                date("2016-05-22"),
+			"Bachmanity Insanity":            date("2016-05-29"),
+			"To Build a Better Beta":         date("2016-06-05"),
+			"Bachman's Earnings Over-Ride":   date("2016-06-12"),
+			"Daily Active Users":             date("2016-06-19"),
+			"The Uptick":                     date("2016-06-26"),
+		}},
+		{"Season 4", date("2010-06-25"), date("2010-07-30"), map[string]time.Time{
+			"Success Failure":       date("2017-04-23"),
+			"Terms of Service":      date("2017-04-30"),
+			"Intellectual Property": date("2017-05-07"),
+			"Teambuilding Exercise": date("2017-05-14"),
+			"The Blood Boy":         date("2017-05-21"),
+			"Customer Service":      date("2017-05-28"),
+			"The Patent Troll":      date("2017-06-04"),
+			"The Keenan Vortex":     date("2017-06-11"),
+			"Hooli-Con":             date("2017-06-18"),
+			"Server Error":          date("2017-06-25"),
+		}},
+		{"Season 5", date("2018-03-25"), date("2018-05-13"), map[string]time.Time{
+			"Grow Fast or Die Slow":             date("2018-03-25"),
+			"Reorientation":                     date("2018-04-01"),
+			"Chief Operating Officer":           date("2018-04-08"),
+			"Tech Evangelist":                   date("2018-04-15"),
+			"Facial Recognition":                date("2018-04-22"),
+			"Artificial Emotional Intelligence": date("2018-04-29"),
+			"Initial Coin Offering":             date("2018-05-06"),
+			"Fifty-One Percent":                 date("2018-05-13"),
+		}},
+	} {
+		seasonID := uuid.New().String()
+		seasons = append(seasons, seasonData(seriesID, seasonID, season.title, season.first, season.last))
+		for title, date := range season.episodes {
+			episodes = append(episodes, episodeData(seriesID, seasonID, uuid.New().String(), title, date))
+		}
+	}
+
+	return series, seasons, episodes
 }
 
 const dateISO8601 = "2006-01-02"
 
-func days(date string) time.Time {
+func date(date string) time.Time {
 	t, err := time.Parse(dateISO8601, date)
 	if err != nil {
 		panic(err)
