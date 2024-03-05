@@ -4,13 +4,13 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -28,7 +28,7 @@ var _ query.Client = (*Client)(nil)
 
 type Client struct {
 	grpcClient Ydb_Query_V1.QueryServiceClient
-	pool       Pool
+	pool       *pool.Pool[Session]
 }
 
 func (c Client) Close(ctx context.Context) error {
@@ -40,7 +40,7 @@ func (c Client) Close(ctx context.Context) error {
 	return nil
 }
 
-func do(ctx context.Context, pool Pool, op query.Operation, opts *query.DoOptions) error {
+func do(ctx context.Context, pool *pool.Pool[Session], op query.Operation, opts *query.DoOptions) error {
 	return retry.Retry(ctx, func(ctx context.Context) error {
 		err := pool.With(ctx, func(ctx context.Context, s *Session) error {
 			err := op(ctx, s)
@@ -70,7 +70,7 @@ func (c Client) Do(ctx context.Context, op query.Operation, opts ...query.DoOpti
 	return do(ctx, c.pool, op, &doOptions)
 }
 
-func doTx(ctx context.Context, pool Pool, op query.TxOperation, opts *query.DoTxOptions) error {
+func doTx(ctx context.Context, pool *pool.Pool[Session], op query.TxOperation, opts *query.DoTxOptions) error {
 	return do(ctx, pool, func(ctx context.Context, s query.Session) error {
 		tx, err := s.Begin(ctx, opts.TxSettings)
 		if err != nil {
@@ -127,26 +127,16 @@ func deleteSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 	return nil
 }
 
-type createSessionSettings struct {
-	createSessionTimeout time.Duration
-	onDetach             func(id string)
-	onAttach             func(id string)
+type createSessionConfig struct {
+	onDetach func(id string)
+	onAttach func(id string)
+	onClose  func(s *Session)
 }
 
 func createSession(
-	ctx context.Context, client Ydb_Query_V1.QueryServiceClient, settings createSessionSettings,
+	ctx context.Context, client Ydb_Query_V1.QueryServiceClient, cfg createSessionConfig,
 ) (_ *Session, finalErr error) {
-	var (
-		createSessionCtx    context.Context
-		cancelCreateSession context.CancelFunc
-	)
-	if settings.createSessionTimeout > 0 {
-		createSessionCtx, cancelCreateSession = xcontext.WithTimeout(ctx, settings.createSessionTimeout)
-	} else {
-		createSessionCtx, cancelCreateSession = xcontext.WithCancel(ctx)
-	}
-	defer cancelCreateSession()
-	s, err := client.CreateSession(createSessionCtx, &Ydb_Query.CreateSessionRequest{})
+	s, err := client.CreateSession(ctx, &Ydb_Query.CreateSessionRequest{})
 	if err != nil {
 		return nil, xerrors.WithStackTrace(
 			xerrors.Transport(err),
@@ -188,8 +178,8 @@ func createSession(
 	if state.GetStatus() != Ydb.StatusIds_SUCCESS {
 		return nil, xerrors.WithStackTrace(xerrors.FromOperation(state))
 	}
-	if settings.onAttach != nil {
-		settings.onAttach(s.GetSessionId())
+	if cfg.onAttach != nil {
+		cfg.onAttach(s.GetSessionId())
 	}
 	session := &Session{
 		id:          s.GetSessionId(),
@@ -198,8 +188,8 @@ func createSession(
 		status:      query.SessionStatusReady,
 	}
 	session.close = sync.OnceFunc(func() {
-		if settings.onDetach != nil {
-			settings.onDetach(session.id)
+		if cfg.onDetach != nil {
+			cfg.onDetach(session.id)
 		}
 		_ = attach.CloseSend()
 		cancelAttach()
@@ -219,6 +209,10 @@ func createSession(
 					return
 				}
 			default:
+				if cfg.onClose != nil {
+					cfg.onClose(session)
+				}
+
 				return
 			}
 		}
@@ -228,29 +222,47 @@ func createSession(
 }
 
 func New(ctx context.Context, balancer balancer, config *config.Config) (*Client, error) {
-	grpcClient := Ydb_Query_V1.NewQueryServiceClient(balancer)
+	client := &Client{
+		grpcClient: Ydb_Query_V1.NewQueryServiceClient(balancer),
+	}
 
-	return &Client{
-		grpcClient: grpcClient,
-		pool: newStubPool(
-			func(ctx context.Context) (_ *Session, err error) {
-				s, err := createSession(ctx, grpcClient, createSessionSettings{
-					createSessionTimeout: config.CreateSessionTimeout(),
-				})
-				if err != nil {
-					return nil, xerrors.WithStackTrace(err)
-				}
+	client.pool = pool.New(
+		config.PoolMaxSize(),
+		func(ctx context.Context, onClose func(s *Session)) (*Session, error) {
+			var cancel context.CancelFunc
+			if d := config.CreateSessionTimeout(); d > 0 {
+				ctx, cancel = xcontext.WithTimeout(ctx, d)
+			} else {
+				ctx, cancel = xcontext.WithCancel(ctx)
+			}
+			defer cancel()
 
-				return s, nil
-			},
-			func(ctx context.Context, s *Session) error {
-				err := deleteSession(ctx, s.queryClient, s.id)
-				if err != nil {
-					return xerrors.WithStackTrace(err)
-				}
+			s, err := createSession(ctx, client.grpcClient, createSessionConfig{
+				onClose: onClose,
+			})
+			if err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
 
-				return nil
-			},
-		),
-	}, nil
+			return s, nil
+		},
+		func(ctx context.Context, s *Session) error {
+			var cancel context.CancelFunc
+			if d := config.CreateSessionTimeout(); d > 0 {
+				ctx, cancel = xcontext.WithTimeout(ctx, d)
+			} else {
+				ctx, cancel = xcontext.WithCancel(ctx)
+			}
+			defer cancel()
+
+			err := deleteSession(ctx, client.grpcClient, s.id)
+			if err != nil {
+				return xerrors.WithStackTrace(err)
+			}
+
+			return nil
+		},
+	)
+
+	return client, ctx.Err()
 }
