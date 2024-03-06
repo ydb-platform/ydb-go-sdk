@@ -5,6 +5,7 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -167,5 +168,90 @@ func TestQueryExecute(t *testing.T) {
 		require.EqualValues(t, 100500000000, data.P2)
 		require.EqualValues(t, time.Duration(100500000000), data.P3)
 		require.Nil(t, data.P4)
+	})
+	t.Run("Transaction", func(t *testing.T) {
+		t.Run("Explicit", func(t *testing.T) {
+			err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) (err error) {
+				tx, err := s.Begin(ctx, query.TxSettings(query.WithSerializableReadWrite()))
+				if err != nil {
+					return err
+				}
+				res, err := tx.Execute(ctx, `SELECT 1`)
+				if err != nil {
+					return err
+				}
+				rs, err := res.NextResultSet(ctx)
+				if err != nil {
+					return err
+				}
+				row, err := rs.NextRow(ctx)
+				if err != nil {
+					return err
+				}
+				var v int32
+				err = row.Scan(&v)
+				if err != nil {
+					return err
+				}
+				if v != 1 {
+					return fmt.Errorf("unexpected value from database: %d", v)
+				}
+				if err = res.Err(); err != nil {
+					return err
+				}
+				return tx.CommitTx(ctx)
+			}, query.WithIdempotent())
+			require.NoError(t, err)
+		})
+		t.Run("Lazy", func(t *testing.T) {
+			err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) (err error) {
+				tx, res, err := s.Execute(ctx, `SELECT 1`,
+					query.WithTxControl(query.TxControl(query.BeginTx(query.WithSerializableReadWrite()))),
+				)
+				if err != nil {
+					return err
+				}
+				rs, err := res.NextResultSet(ctx)
+				if err != nil {
+					return err
+				}
+				row, err := rs.NextRow(ctx)
+				if err != nil {
+					return err
+				}
+				var v int32
+				err = row.Scan(&v)
+				if err != nil {
+					return err
+				}
+				if v != 1 {
+					return fmt.Errorf("unexpected value from database: %d", v)
+				}
+				if err = res.Err(); err != nil {
+					return err
+				}
+				res, err = tx.Execute(ctx, `SELECT 2`, query.WithCommit())
+				if err != nil {
+					return err
+				}
+				rs, err = res.NextResultSet(ctx)
+				if err != nil {
+					return err
+				}
+				row, err = rs.NextRow(ctx)
+				if err != nil {
+					return err
+				}
+				err = row.Scan(&v)
+				if err != nil {
+					return err
+				}
+				if v != 2 {
+					return fmt.Errorf("unexpected value from database: %d", v)
+				}
+				return res.Err()
+			}, query.WithIdempotent())
+			require.NoError(t, err)
+		})
 	})
 }
