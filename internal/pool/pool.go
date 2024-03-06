@@ -22,8 +22,9 @@ type (
 	Pool[T any] struct {
 		clock clockwork.Clock
 
-		create func(ctx context.Context, onClose func(item *T)) (*T, error)
-		close  func(ctx context.Context, item *T) error
+		createItem func(ctx context.Context, onClose func(item *T)) (*T, error)
+		deleteItem func(ctx context.Context, item *T) error
+		checkErr   func(err error) bool
 
 		mu                xsync.Mutex
 		index             map[*T]itemInfo
@@ -42,17 +43,19 @@ type (
 func New[T any](
 	limit int,
 	createItem func(ctx context.Context, onClose func(item *T)) (*T, error),
-	closeItem func(ctx context.Context, item *T) error,
+	deleteItem func(ctx context.Context, item *T) error,
+	checkErr func(err error) bool,
 	opts ...option[T],
 ) *Pool[T] {
 	p := &Pool[T]{
-		clock:  clockwork.NewRealClock(),
-		create: createItem,
-		close:  closeItem,
-		index:  make(map[*T]itemInfo),
-		idle:   list.New(),
-		waitQ:  list.New(),
-		limit:  limit,
+		clock:      clockwork.NewRealClock(),
+		createItem: createItem,
+		deleteItem: deleteItem,
+		checkErr:   checkErr,
+		index:      make(map[*T]itemInfo),
+		idle:       list.New(),
+		waitQ:      list.New(),
+		limit:      limit,
 		waitChPool: sync.Pool{
 			New: func() interface{} {
 				ch := make(chan *T)
@@ -70,7 +73,7 @@ func New[T any](
 }
 
 func (p *Pool[T]) try(ctx context.Context, f func(ctx context.Context, item *T) error) error {
-	t, err := p.get(ctx)
+	item, err := p.get(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -78,22 +81,26 @@ func (p *Pool[T]) try(ctx context.Context, f func(ctx context.Context, item *T) 
 	defer func() {
 		select {
 		case <-p.done:
-			_ = p.close(ctx, t)
+			_ = p.deleteItem(ctx, item)
 		default:
 			p.mu.Lock()
 			defer p.mu.Unlock()
 
 			if p.idle.Len() >= p.limit {
-				_ = p.close(ctx, t)
+				_ = p.deleteItem(ctx, item)
 			}
 
-			if !p.notify(t) {
-				p.pushIdle(t, p.clock.Now())
+			if !p.notify(item) {
+				p.pushIdle(item, p.clock.Now())
 			}
 		}
 	}()
 
-	if err = f(ctx, t); err != nil {
+	if err = f(ctx, item); err != nil {
+		if p.checkErr(err) {
+			_ = p.deleteItem(ctx, item)
+		}
+
 		return xerrors.WithStackTrace(err)
 	}
 
@@ -116,7 +123,7 @@ func (p *Pool[T]) With(ctx context.Context, f func(ctx context.Context, item *T)
 	return nil
 }
 
-func (p *Pool[T]) createItem(ctx context.Context) (item *T, err error) {
+func (p *Pool[T]) newItem(ctx context.Context) (item *T, err error) {
 	select {
 	case <-p.done:
 		return nil, xerrors.WithStackTrace(errClosedPool)
@@ -140,7 +147,7 @@ func (p *Pool[T]) createItem(ctx context.Context) (item *T, err error) {
 			})
 		}()
 
-		item, err = p.create(ctx, p.removeItem)
+		item, err = p.createItem(ctx, p.removeItem)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -153,7 +160,7 @@ func (p *Pool[T]) removeItem(item *T) {
 	p.mu.WithLock(func() {
 		info, has := p.index[item]
 		if !has {
-			panic("item not found in pool")
+			return
 		}
 
 		delete(p.index, item)
@@ -187,7 +194,7 @@ func (p *Pool[T]) get(ctx context.Context) (item *T, err error) {
 			}
 
 			// Second, we try to create item.
-			item, _ = p.createItem(ctx)
+			item, _ = p.newItem(ctx)
 			if item != nil {
 				return item, nil
 			}
@@ -276,7 +283,7 @@ func (p *Pool[T]) Close(ctx context.Context) (err error) {
 				p.wg.Add(1)
 				go func() {
 					defer p.wg.Done()
-					_ = p.close(ctx, item)
+					_ = p.deleteItem(ctx, item)
 				}()
 			}
 		}

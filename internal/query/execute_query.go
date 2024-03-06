@@ -14,7 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
-type executeSettings interface {
+type executeConfig interface {
 	ExecMode() query.ExecMode
 	StatsMode() query.StatsMode
 	TxControl() *query.TransactionControl
@@ -23,21 +23,21 @@ type executeSettings interface {
 	CallOptions() []grpc.CallOption
 }
 
-func executeQueryRequest(a *allocator.Allocator, sessionID, q string, settings executeSettings) (
+func executeQueryRequest(a *allocator.Allocator, sessionID, q string, cfg executeConfig) (
 	*Ydb_Query.ExecuteQueryRequest,
 	[]grpc.CallOption,
 ) {
 	request := a.QueryExecuteQueryRequest()
 
 	request.SessionId = sessionID
-	request.ExecMode = Ydb_Query.ExecMode(settings.ExecMode())
-	request.TxControl = settings.TxControl().ToYDB(a)
-	request.Query = queryFromText(a, q, Ydb_Query.Syntax(settings.Syntax()))
-	request.Parameters = settings.Params().ToYDB(a)
-	request.StatsMode = Ydb_Query.StatsMode(settings.StatsMode())
+	request.ExecMode = Ydb_Query.ExecMode(cfg.ExecMode())
+	request.TxControl = cfg.TxControl().ToYDB(a)
+	request.Query = queryFromText(a, q, Ydb_Query.Syntax(cfg.Syntax()))
+	request.Parameters = cfg.Params().ToYDB(a)
+	request.StatsMode = Ydb_Query.StatsMode(cfg.StatsMode())
 	request.ConcurrentResultSets = false
 
-	return request, settings.CallOptions()
+	return request, cfg.CallOptions()
 }
 
 func queryFromText(
@@ -51,32 +51,33 @@ func queryFromText(
 	return content
 }
 
-func execute(
-	ctx context.Context, session *Session, client Ydb_Query_V1.QueryServiceClient, q string, settings executeSettings,
-) (*transaction, *result, error) {
+func execute(ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient, q string, cfg executeConfig) (
+	_ *transaction, _ *result, finalErr error,
+) {
 	a := allocator.New()
-	request, callOptions := executeQueryRequest(a, session.id, q, settings)
+	defer a.Free()
+
+	request, callOptions := executeQueryRequest(a, s.id, q, cfg)
+
+	streamCtx, streamCancel := xcontext.WithCancel(context.Background())
 	defer func() {
-		a.Free()
+		if finalErr != nil {
+			streamCancel()
+		}
 	}()
 
-	ctx, cancel := xcontext.WithCancel(ctx)
-
-	stream, err := client.ExecuteQuery(ctx, request, callOptions...)
+	stream, err := c.ExecuteQuery(streamCtx, request, callOptions...)
 	if err != nil {
-		cancel()
-
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
-	r, txID, err := newResult(ctx, stream, cancel)
-	if err != nil {
-		cancel()
 
+	r, txID, err := newResult(ctx, stream, streamCancel)
+	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
 	return &transaction{
 		id: txID,
-		s:  session,
+		s:  s,
 	}, r, nil
 }

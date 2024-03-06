@@ -39,10 +39,10 @@ func TestCreateSession(t *testing.T) {
 			t.Log("execute")
 			attached := 0
 			s, err := createSession(ctx, service, createSessionConfig{
-				onAttach: func(id string) {
+				onAttach: func(s *Session) {
 					attached++
 				},
-				onDetach: func(id string) {
+				onClose: func(s *Session) {
 					attached--
 				},
 			})
@@ -168,6 +168,9 @@ func newTestPool(createSession func(ctx context.Context) (*Session, error)) *poo
 		},
 		func(ctx context.Context, s *Session) error {
 			return s.Close(ctx)
+		},
+		func(err error) bool {
+			return true
 		},
 	)
 }

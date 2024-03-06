@@ -135,14 +135,14 @@ func (s testExecuteSettings) CallOptions() []grpc.CallOption {
 	return s.callOptions
 }
 
-var _ executeSettings = testExecuteSettings{}
+var _ executeConfig = testExecuteSettings{}
 
 func TestTxExecuteSettings(t *testing.T) {
 	for _, tt := range []struct {
 		name     string
 		txID     string
 		txOpts   []query.TxExecuteOption
-		settings executeSettings
+		settings executeConfig
 	}{
 		{
 			name:   "WithTxID",
