@@ -411,18 +411,18 @@ func TestArgsToParams(t *testing.T) {
 		},
 		{
 			args: []interface{}{
-        &params.Parameters{
-					params.Named("$p0", types.Int32Value(1)),
-					params.Named("$p1", types.Uint64Value(2)),
-					params.Named("$p2", types.TextValue("3")),
-        },
 				&params.Parameters{
 					params.Named("$p0", types.Int32Value(1)),
 					params.Named("$p1", types.Uint64Value(2)),
 					params.Named("$p2", types.TextValue("3")),
-        },
+				},
+				&params.Parameters{
+					params.Named("$p0", types.Int32Value(1)),
+					params.Named("$p1", types.Uint64Value(2)),
+					params.Named("$p2", types.TextValue("3")),
+				},
 			},
-			params: []*params.Parameter,
+			params: []*params.Parameter{},
 			err:    errMultipleQueryParameters,
 		},
 		{
@@ -492,11 +492,11 @@ func TestArgsToParams(t *testing.T) {
 		},
 		{
 			args: []interface{}{
-        driver.NamedValue{Name: "", Ordinal: 0, Value: &params.Parameters{
+				driver.NamedValue{Name: "", Ordinal: 0, Value: &params.Parameters{
 					params.Named("$p0", types.Int32Value(1)),
 					params.Named("$p1", types.Uint64Value(2)),
 					params.Named("$p2", types.TextValue("3")),
-        }},
+				}},
 			},
 			params: []*params.Parameter{
 				params.Named("$p0", types.Int32Value(1)),
@@ -511,11 +511,11 @@ func TestArgsToParams(t *testing.T) {
 					params.Named("$p0", types.Int32Value(1)),
 					params.Named("$p1", types.Uint64Value(2)),
 					params.Named("$p2", types.TextValue("3")),
-        }},
+				}},
 				driver.NamedValue{Name: "$p1", Ordinal: 0, Value: params.Named("$p1", types.Uint64Value(2))},
 				driver.NamedValue{Name: "$p2", Ordinal: 0, Value: params.Named("$p2", types.TextValue("3"))},
 			},
-			params: []*params.Parameter,
+			params: []*params.Parameter{},
 			err:    errMultipleQueryParameters,
 		},
 	} {

@@ -2,11 +2,12 @@ package allocator
 
 import (
 	"sync"
+	
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
-	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type (
