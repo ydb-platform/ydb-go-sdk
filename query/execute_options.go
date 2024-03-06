@@ -28,16 +28,23 @@ type (
 		applyExecuteOption(s *executeSettings)
 	}
 	txExecuteSettings struct {
-		commonExecuteSettings
+		ExecuteSettings *executeSettings
+
+		commitTx bool
 	}
 	TxExecuteOption interface {
 		applyTxExecuteOption(s *txExecuteSettings)
 	}
+	txCommitOption   struct{}
 	parametersOption params.Parameters
 )
 
+func (t txCommitOption) applyTxExecuteOption(s *txExecuteSettings) {
+	s.commitTx = true
+}
+
 func (syntax Syntax) applyTxExecuteOption(s *txExecuteSettings) {
-	s.syntax = syntax
+	syntax.applyExecuteOption(s.ExecuteSettings)
 }
 
 func (syntax Syntax) applyExecuteOption(s *executeSettings) {
@@ -50,7 +57,7 @@ const (
 )
 
 func (params parametersOption) applyTxExecuteOption(s *txExecuteSettings) {
-	s.params = append(s.params, params...)
+	params.applyExecuteOption(s.ExecuteSettings)
 }
 
 func (params parametersOption) applyExecuteOption(s *executeSettings) {
@@ -62,11 +69,11 @@ func (opts callOptions) applyExecuteOption(s *executeSettings) {
 }
 
 func (opts callOptions) applyTxExecuteOption(s *txExecuteSettings) {
-	s.callOptions = append(s.callOptions, opts...)
+	opts.applyExecuteOption(s.ExecuteSettings)
 }
 
 func (mode StatsMode) applyTxExecuteOption(s *txExecuteSettings) {
-	s.statsMode = mode
+	mode.applyExecuteOption(s.ExecuteSettings)
 }
 
 func (mode StatsMode) applyExecuteOption(s *executeSettings) {
@@ -74,7 +81,7 @@ func (mode StatsMode) applyExecuteOption(s *executeSettings) {
 }
 
 func (mode ExecMode) applyTxExecuteOption(s *txExecuteSettings) {
-	s.execMode = mode
+	mode.applyExecuteOption(s.ExecuteSettings)
 }
 
 func (mode ExecMode) applyExecuteOption(s *executeSettings) {
@@ -144,9 +151,9 @@ func (s *commonExecuteSettings) Params() *params.Parameters {
 	return &s.params
 }
 
-func TxExecuteSettings(opts ...TxExecuteOption) (settings *txExecuteSettings) {
+func TxExecuteSettings(id string, opts ...TxExecuteOption) (settings *txExecuteSettings) {
 	settings = &txExecuteSettings{
-		commonExecuteSettings: defaultCommonExecuteSettings(),
+		ExecuteSettings: ExecuteSettings(WithTxControl(TxControl(WithTxID(id)))),
 	}
 	for _, opt := range opts {
 		opt.applyTxExecuteOption(settings)
@@ -168,7 +175,12 @@ var (
 	_ ExecuteOption   = StatsMode(0)
 	_ TxExecuteOption = ExecMode(0)
 	_ TxExecuteOption = StatsMode(0)
+	_ TxExecuteOption = txCommitOption{}
 )
+
+func WithCommit() txCommitOption {
+	return txCommitOption{}
+}
 
 func WithExecMode(mode ExecMode) ExecMode {
 	return mode

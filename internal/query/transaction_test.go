@@ -137,7 +137,7 @@ func (s testExecuteSettings) CallOptions() []grpc.CallOption {
 
 var _ executeSettings = testExecuteSettings{}
 
-func TestFromTxOptions(t *testing.T) {
+func TestTxExecuteSettings(t *testing.T) {
 	for _, tt := range []struct {
 		name     string
 		txID     string
@@ -224,7 +224,7 @@ func TestFromTxOptions(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			a := allocator.New()
-			settings := fromTxOptions(tt.txID, tt.txOpts...)
+			settings := query.TxExecuteSettings(tt.txID, tt.txOpts...).ExecuteSettings
 			require.Equal(t, tt.settings.Syntax(), settings.Syntax())
 			require.Equal(t, tt.settings.ExecMode(), settings.ExecMode())
 			require.Equal(t, tt.settings.StatsMode(), settings.StatsMode())
