@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
@@ -806,6 +807,52 @@ func TestSet(t *testing.T) {
 										Low_128: 651345242494996240,
 									},
 									High_128: 72623859790382856,
+								},
+								Payload: &Ydb.Value{
+									Value: &Ydb.Value_NullFlagValue{},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").Set().AddItems(value.Uint64Value(123), value.Uint64Value(321)).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_DictType{
+							DictType: &Ydb.DictType{
+								Key: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UINT64,
+									},
+								},
+								Payload: &Ydb.Type{
+									Type: &Ydb.Type_VoidType{},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Pairs: []*Ydb.ValuePair{
+							{
+								Key: &Ydb.Value{
+									Value: &Ydb.Value_Uint64Value{
+										Uint64Value: 123,
+									},
+								},
+								Payload: &Ydb.Value{
+									Value: &Ydb.Value_NullFlagValue{},
+								},
+							},
+							{
+								Key: &Ydb.Value{
+									Value: &Ydb.Value_Uint64Value{
+										Uint64Value: 321,
+									},
 								},
 								Payload: &Ydb.Value{
 									Value: &Ydb.Value_NullFlagValue{},

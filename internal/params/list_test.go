@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
@@ -633,6 +634,39 @@ func TestList(t *testing.T) {
 									Low_128: 651345242494996240,
 								},
 								High_128: 72623859790382856,
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").List().AddItems(value.Uint64Value(123), value.Uint64Value(321)).Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_ListType{
+							ListType: &Ydb.ListType{
+								Item: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_UINT64,
+									},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Items: []*Ydb.Value{
+							{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 123,
+								},
+							},
+							{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 321,
+								},
 							},
 						},
 					},
