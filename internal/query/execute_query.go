@@ -76,6 +76,10 @@ func execute(ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient,
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
+	if txID == "" {
+		return nil, r, nil
+	}
+
 	return &transaction{
 		id: txID,
 		s:  s,
