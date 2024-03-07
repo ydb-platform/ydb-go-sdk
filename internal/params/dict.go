@@ -209,10 +209,199 @@ func (d *dictPair) UUID(v [16]byte) *dictValue {
 	}
 }
 
+func (d *dictValue) Text(v string) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.TextValue(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) Bytes(v []byte) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.BytesValue(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) Bool(v bool) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.BoolValue(v),
+	})
+
+	return d.pair.parent
+}
+
 func (d *dictValue) Uint64(v uint64) *dict {
 	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
 		K: d.pair.keyValue,
 		V: value.Uint64Value(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) Int64(v int64) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.Int64Value(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) Uint32(v uint32) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.Uint32Value(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) Int32(v int32) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.Int32Value(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) Uint16(v uint16) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.Uint16Value(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) Int16(v int16) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.Int16Value(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) Uint8(v uint8) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.Uint8Value(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) Int8(v int8) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.Int8Value(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) Float(v float32) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.FloatValue(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) Double(v float64) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.DoubleValue(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) Decimal(v [16]byte, precision, scale uint32) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.DecimalValue(v, precision, scale),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) Timestamp(v time.Time) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.TimestampValueFromTime(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) Date(v time.Time) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.DateValueFromTime(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) Datetime(v time.Time) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.DatetimeValueFromTime(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) Interval(v time.Duration) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.IntervalValueFromDuration(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) JSON(v string) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.JSONValue(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) JSONDocument(v string) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.JSONDocumentValue(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) YSON(v []byte) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.YSONValue(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) UUID(v [16]byte) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.UUIDValue(v),
 	})
 
 	return d.pair.parent
