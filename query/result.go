@@ -18,30 +18,24 @@ type (
 		NextRow(ctx context.Context) (Row, error)
 	}
 	Row interface {
-		IndexedScanner
-		NamedScanner
-		StructScanner
-	}
-	IndexedScanner interface {
 		Scan(dst ...interface{}) error
-	}
-	NamedScanner interface {
 		ScanNamed(dst ...scanner.NamedDestination) error
+		ScanStruct(dst interface{}, opts ...scanner.ScanStructOption) error
 	}
-	StructScanner interface {
-		ScanStruct(dst interface{}, opts ...scanStructOption) error
-	}
-	scanStructOption = scanner.ScanStructOption
 )
 
-func WithTagName(name string) scanStructOption {
+func Named(columnName string, destinationValueReference interface{}) (dst scanner.NamedDestination) {
+	return scanner.NamedRef(columnName, destinationValueReference)
+}
+
+func WithScanStructTagName(name string) scanner.ScanStructOption {
 	return scanner.WithTagName(name)
 }
 
-func WithAllowMissingColumnsFromSelect() scanStructOption {
+func WithScanStructAllowMissingColumnsFromSelect() scanner.ScanStructOption {
 	return scanner.WithAllowMissingColumnsFromSelect()
 }
 
-func WithAllowMissingFieldsInStruct() scanStructOption {
+func WithScanStructAllowMissingFieldsInStruct() scanner.ScanStructOption {
 	return scanner.WithAllowMissingFieldsInStruct()
 }

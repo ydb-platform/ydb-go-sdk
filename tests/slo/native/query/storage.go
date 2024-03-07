@@ -110,7 +110,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 				return err
 			}
 
-			err = row.ScanStruct(&e, query.WithAllowMissingColumnsFromSelect())
+			err = row.ScanStruct(&e, query.WithScanStructAllowMissingColumnsFromSelect())
 			if err != nil {
 				return err
 			}
