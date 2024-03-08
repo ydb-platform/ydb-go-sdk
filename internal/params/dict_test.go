@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
@@ -402,4 +403,72 @@ func TestDict(t *testing.T) {
 			})
 		}
 	}
+}
+
+func TestDict_AddPairs(t *testing.T) {
+	a := allocator.New()
+	defer a.Free()
+
+	pairs := []value.DictValueField{
+		{
+			K: value.Int64Value(123),
+			V: value.BoolValue(true),
+		},
+		{
+			K: value.Int64Value(321),
+			V: value.BoolValue(false),
+		},
+	}
+
+	params := Builder{}.Param("$x").Dict().AddPairs(pairs...).Build().Build().ToYDB(a)
+
+	require.Equal(t, paramsToJSON(
+		map[string]*Ydb.TypedValue{
+			"$x": {
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_DictType{
+						DictType: &Ydb.DictType{
+							Key: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_INT64,
+								},
+							},
+							Payload: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_BOOL,
+								},
+							},
+						},
+					},
+				},
+				Value: &Ydb.Value{
+					Pairs: []*Ydb.ValuePair{
+						{
+							Key: &Ydb.Value{
+								Value: &Ydb.Value_Int64Value{
+									Int64Value: 123,
+								},
+							},
+							Payload: &Ydb.Value{
+								Value: &Ydb.Value_BoolValue{
+									BoolValue: true,
+								},
+							},
+						},
+						{
+							Key: &Ydb.Value{
+								Value: &Ydb.Value_Int64Value{
+									Int64Value: 321,
+								},
+							},
+							Payload: &Ydb.Value{
+								Value: &Ydb.Value_BoolValue{
+									BoolValue: false,
+								},
+							},
+						},
+					},
+				},
+			},
+		}), paramsToJSON(params))
 }

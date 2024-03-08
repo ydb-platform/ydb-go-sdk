@@ -33,6 +33,7 @@ func TestCallMethod(t *testing.T) {
 	})
 
 	require.Panics(t, func() {
-		CallMethod(object, "String", 123)
+		// Wrong argument type.
+		CallMethod(object, "WriteString", 123)
 	})
 }
