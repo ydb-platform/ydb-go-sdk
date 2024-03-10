@@ -18,7 +18,7 @@ func TestMetaRequiredHeaders(t *testing.T) {
 	m := internal.New(
 		"database",
 		credentials.NewAccessTokenCredentials("token"),
-		&trace.Driver{},
+		new(trace.Driver),
 		internal.WithRequestTypeOption("requestType"),
 		internal.WithUserAgentOption("user-agent"),
 	)

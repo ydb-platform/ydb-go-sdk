@@ -20,9 +20,12 @@ func New(
 	opts ...Option,
 ) *Meta {
 	m := &Meta{
-		trace:       trace,
-		credentials: credentials,
-		database:    database,
+		trace:        trace,
+		credentials:  credentials,
+		database:     database,
+		requestsType: "",
+		userAgents:   []string{},
+		capabilities: []string{},
 	}
 	for _, o := range opts {
 		if o != nil {
