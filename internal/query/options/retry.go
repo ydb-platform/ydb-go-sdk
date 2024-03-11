@@ -1,6 +1,7 @@
-package query
+package options
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -32,7 +33,7 @@ type (
 
 	doTxSettings struct {
 		doOpts     []DoOption
-		txSettings TransactionSettings
+		txSettings tx.Settings
 	}
 
 	idempotentOption struct{}
@@ -41,7 +42,7 @@ type (
 		t *trace.Query
 	}
 	doTxSettingsOption struct {
-		txSettings TransactionSettings
+		txSettings tx.Settings
 	}
 )
 
@@ -57,7 +58,7 @@ func (s *doTxSettings) DoOpts() []DoOption {
 	return s.doOpts
 }
 
-func (s *doTxSettings) TxSettings() TransactionSettings {
+func (s *doTxSettings) TxSettings() tx.Settings {
 	return s.txSettings
 }
 
@@ -89,7 +90,7 @@ func (opt doTxSettingsOption) applyDoTxOption(opts *doTxSettings) {
 	opts.txSettings = opt.txSettings
 }
 
-func WithTxSettings(txSettings TransactionSettings) doTxSettingsOption {
+func WithTxSettings(txSettings tx.Settings) doTxSettingsOption {
 	return doTxSettingsOption{txSettings: txSettings}
 }
 
@@ -119,7 +120,7 @@ func ParseDoOpts(t *trace.Query, opts ...DoOption) (s *doSettings) {
 
 func ParseDoTxOpts(t *trace.Query, opts ...DoTxOption) (s *doTxSettings) {
 	s = &doTxSettings{
-		txSettings: TxSettings(WithDefaultTxMode()),
+		txSettings: tx.NewSettings(tx.WithDefaultTxMode()),
 		doOpts: []DoOption{
 			WithTrace(t),
 		},

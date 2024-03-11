@@ -59,6 +59,6 @@ func TestQueryTxExecute(t *testing.T) {
 			return err
 		}
 		return res.Err()
-	}, query.WithIdempotent())
+	}, query.WithIdempotent(), query.WithTxSettings(query.TxSettings(query.WithSerializableReadWrite())))
 	require.NoError(t, err)
 }

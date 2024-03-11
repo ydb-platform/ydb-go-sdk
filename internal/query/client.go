@@ -12,6 +12,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -48,9 +49,9 @@ func do(
 	pool *pool.Pool[Session],
 	op query.Operation,
 	t *trace.Query,
-	opts ...query.DoOption,
+	opts ...options.DoOption,
 ) (finalErr error) {
-	doOpts := query.ParseDoOpts(t, opts...)
+	doOpts := options.ParseDoOpts(t, opts...)
 
 	err := pool.With(ctx, func(ctx context.Context, s *Session) error {
 		err := op(ctx, s)
@@ -85,7 +86,7 @@ func do(
 	return nil
 }
 
-func (c Client) Do(ctx context.Context, op query.Operation, opts ...query.DoOption) error {
+func (c Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) error {
 	return do(ctx, c.pool, op, c.config.Trace(), opts...)
 }
 
@@ -94,9 +95,9 @@ func doTx(
 	pool *pool.Pool[Session],
 	op query.TxOperation,
 	t *trace.Query,
-	opts ...query.DoTxOption,
+	opts ...options.DoTxOption,
 ) error {
-	doTxOpts := query.ParseDoTxOpts(t, opts...)
+	doTxOpts := options.ParseDoTxOpts(t, opts...)
 
 	err := do(ctx, pool, func(ctx context.Context, s query.Session) error {
 		tx, err := s.Begin(ctx, doTxOpts.TxSettings())
@@ -131,7 +132,7 @@ func doTx(
 	return nil
 }
 
-func (c Client) DoTx(ctx context.Context, op query.TxOperation, opts ...query.DoTxOption) error {
+func (c Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) error {
 	return doTx(ctx, c.pool, op, c.config.Trace(), opts...)
 }
 

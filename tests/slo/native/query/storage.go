@@ -120,6 +120,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 				}
 			},
 		}),
+		query.WithLabel("READ"),
 	)
 
 	return e, attempts, err
@@ -181,6 +182,7 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, _ e
 				}
 			},
 		}),
+		query.WithLabel("WRITE"),
 	)
 
 	return attempts, err
@@ -190,9 +192,10 @@ func (s *Storage) createTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return s.db.Query().Do(ctx, func(ctx context.Context, session query.Session) error {
-		_, _, err := session.Execute(ctx,
-			fmt.Sprintf(`
+	return s.db.Query().Do(ctx,
+		func(ctx context.Context, session query.Session) error {
+			_, _, err := session.Execute(ctx,
+				fmt.Sprintf(`
 				CREATE TABLE %s (
 					hash Uint64?,
 					id Uint64?,
@@ -208,12 +211,14 @@ func (s *Storage) createTable(ctx context.Context) error {
 					AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = %d,
 					AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = %d
 				)`, s.tablePath, s.cfg.MinPartitionsCount, s.cfg.PartitionSize,
-				s.cfg.MinPartitionsCount, s.cfg.MaxPartitionsCount,
-			),
-			query.WithTxControl(query.NoTx()))
+					s.cfg.MinPartitionsCount, s.cfg.MaxPartitionsCount,
+				),
+				query.WithTxControl(query.NoTx()))
 
-		return err
-	}, query.WithIdempotent())
+			return err
+		}, query.WithIdempotent(),
+		query.WithLabel("CREATE TABLE"),
+	)
 }
 
 func (s *Storage) dropTable(ctx context.Context) error {
@@ -235,6 +240,7 @@ func (s *Storage) dropTable(ctx context.Context) error {
 			return err
 		},
 		query.WithIdempotent(),
+		query.WithLabel("DROP TABLE"),
 	)
 }
 

@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
@@ -22,10 +23,10 @@ func (tx transaction) ID() string {
 	return tx.id
 }
 
-func (tx transaction) Execute(ctx context.Context, q string, opts ...query.TxExecuteOption) (
+func (tx transaction) Execute(ctx context.Context, q string, opts ...options.TxExecuteOption) (
 	r query.Result, err error,
 ) {
-	_, res, err := execute(ctx, tx.s, tx.s.queryClient, q, query.TxExecuteSettings(tx.id, opts...).ExecuteSettings)
+	_, res, err := execute(ctx, tx.s, tx.s.queryClient, q, options.TxExecuteSettings(tx.id, opts...).ExecuteSettings)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
