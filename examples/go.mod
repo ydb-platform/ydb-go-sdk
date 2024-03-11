@@ -10,7 +10,7 @@ require (
 	github.com/ydb-platform/gorm-driver v0.0.5
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.1.2
 	github.com/ydb-platform/ydb-go-sdk-prometheus v0.11.10
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.47.3
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.57.0
 	github.com/ydb-platform/ydb-go-yc v0.10.1
 	google.golang.org/genproto v0.0.0-20230526161137-0005af68ea54
 	gorm.io/driver/postgres v1.5.0
@@ -73,7 +73,5 @@ require (
 	modernc.org/strutil v1.1.3 // indirect
 	modernc.org/token v1.0.0 // indirect
 )
-
-replace github.com/ydb-platform/ydb-go-sdk/v3 => ../
 
 replace xorm.io/xorm => github.com/ydb-platform/xorm v0.0.3
