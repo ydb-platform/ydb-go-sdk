@@ -1,3 +1,4 @@
+## v3.57.1
 * Added logs over query service internals
 * Changed `trace.Query` events
 * Changed visibility of `query.{Do,DoTx}Options` from public to private
