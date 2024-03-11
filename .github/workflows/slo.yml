@@ -39,7 +39,7 @@ jobs:
           s3_images_folder: ${{ vars.SLO_S3_IMAGES_FOLDER }}
           grafana_domain: ${{ vars.SLO_GRAFANA_DOMAIN }}
           grafana_dashboard: ${{ vars.SLO_GRAFANA_DASHBOARD }}
-          ydb_version: 'newest'
+          ydb_version: '24.1.7'
           timeBetweenPhases: 30
           shutdownTime: 30
 
