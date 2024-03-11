@@ -45,10 +45,10 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.21.x, 1.22.x]
-        ydb-version: [22.5, 23.1, 23.2, 23.3, 24.1]
+        ydb-version: [23.3, 24.1]
     services:
       ydb:
-        image: cr.yandex/yc/yandex-docker-local-ydb:${{ matrix.ydb-version }}
+        image: ydbplatform/local-ydb:${{ matrix.ydb-version }}
         ports:
           - 2135:2135
           - 2136:2136
@@ -58,6 +58,7 @@ jobs:
         env:
           YDB_LOCAL_SURVIVE_RESTART: true
           YDB_USE_IN_MEMORY_PDISKS: true
+          YDB_TABLE_ENABLE_PREPARED_DDL: true
         options: '-h localhost'
     env:
       OS: ubuntu-latest

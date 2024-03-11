@@ -1,3 +1,14 @@
+## v3.57.0
+* Added experimental implementation of query service client
+* Fixed sometime panic on topic writer closing
+* Added experimental query parameters builder `ydb.ParamsBuilder()`
+* Changed types of `table/table.{QueryParameters,ParameterOption}` to aliases on `internal/params.{Parameters,NamedValue}`
+* Fixed bug with optional decimal serialization 
+
+## v3.56.2
+* Fixed return private error for commit to stopped partition in topic reader.
+* Stopped wrapping err error as transport error at topic streams (internals)
+
 ## v3.56.1
 * Fixed fixenv usage (related to tests only)
 
@@ -32,14 +43,14 @@
 
 ## v3.54.2
 * Added context to some internal methods for better tracing
-* Added `trace.FunctionID` helper and `FunctionID` field to trace start info's 
+* Added `trace.FunctionID` helper and `FunctionID` field to trace start info's
 * Replaced lazy initialization of ydb clients (table, topic, etc.) to explicit initialization on `ydb.Open` step
 
 ## v3.54.1
-* Fixed inconsistent labels in `metrics` 
+* Fixed inconsistent labels in `metrics`
 
 ## v3.54.0
-* Allowed `sql.LevelSerializable` isolation level in read-write mode in `database/sql` transactions 
+* Allowed `sql.LevelSerializable` isolation level in read-write mode in `database/sql` transactions
 * Refactored traces and metrics
 * Added `{retry,table}.WithLabel` options for mark retriers calls
 * Added `ydb.WithTraceRetry` option
@@ -63,7 +74,7 @@
 * Fixed stringification of credentials object
 
 ## v3.53.2
-* Fixed panic when try to unwrap values with more than 127 columns with custom ydb unmarshaler 
+* Fixed panic when try to unwrap values with more than 127 columns with custom ydb unmarshaler
 
 ## v3.53.1
 * Bumps `github.com/ydb-platform/ydb-go-genproto` for support `query` service
@@ -212,7 +223,7 @@
 * Added `table/options.WithCallOptions` options for append custom grpc call options into `session.{BulkUpsert,Execute,StreamExecuteScanQuery}`
 * Supported fake transactions in `database/sql` driver over connector option `ydb.WithFakeTx(queryMode)` and connection string param `go_fake_tx`
 * Removed `testutil/timeutil` package (all usages replaced with `clockwork` package)
-* Changed behaviour of retryer on transport errors `cancelled` and `deadline exceeded` - will retry idempotent operation if context is not done  
+* Changed behaviour of retryer on transport errors `cancelled` and `deadline exceeded` - will retry idempotent operation if context is not done
 * Added address of node to operation error description as optional
 * Fixed bug with put session from unknown node
 * Fixed bug with parsing of `TzTimestamp` without microseconds

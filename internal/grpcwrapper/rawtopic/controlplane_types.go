@@ -25,7 +25,7 @@ func (c *Consumer) MustFromProto(consumer *Ydb_Topic.Consumer) {
 	c.Important = consumer.GetImportant()
 	c.Attributes = consumer.GetAttributes()
 	c.ReadFrom.MustFromProto(consumer.GetReadFrom())
-	c.SupportedCodecs.MustFromProto(consumer.SupportedCodecs)
+	c.SupportedCodecs.MustFromProto(consumer.GetSupportedCodecs())
 }
 
 func (c *Consumer) ToProto() *Ydb_Topic.Consumer {
@@ -56,8 +56,8 @@ func (s *PartitioningSettings) FromProto(proto *Ydb_Topic.PartitioningSettings) 
 		return xerrors.WithStackTrace(errUnexpectedNilPartitioningSettings)
 	}
 
-	s.MinActivePartitions = proto.MinActivePartitions
-	s.PartitionCountLimit = proto.PartitionCountLimit
+	s.MinActivePartitions = proto.GetMinActivePartitions()
+	s.PartitionCountLimit = proto.GetPartitionCountLimit()
 
 	return nil
 }

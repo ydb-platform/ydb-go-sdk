@@ -407,6 +407,26 @@ func TestQueuePanicOnOverflow(t *testing.T) {
 	})
 }
 
+func TestRegressionIssue1038_ReceiveAckAfterCloseQueue(t *testing.T) {
+	counter := 0
+
+	q := newMessageQueue()
+	q.OnAckReceived = func(count int) {
+		counter -= count
+	}
+	require.NoError(t, q.AddMessages(newTestMessagesWithContent(1)))
+	counter++
+
+	require.NoError(t, q.Close(errors.New("test err")))
+	require.ErrorIs(t, q.AcksReceived([]rawtopicwriter.WriteAck{
+		{
+			SeqNo:              1,
+			MessageWriteStatus: rawtopicwriter.MessageWriteStatus{},
+		},
+	}), errAckOnClosedMessageQueue)
+	require.Zero(t, counter)
+}
+
 func TestQueue_Ack(t *testing.T) {
 	t.Run("First", func(t *testing.T) {
 		q := newMessageQueue()

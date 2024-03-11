@@ -6,8 +6,6 @@ import (
 )
 
 // Config is an configuration of coordination client
-//
-//nolint:maligned
 type Config struct {
 	config.Common
 

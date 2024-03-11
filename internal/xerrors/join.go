@@ -6,13 +6,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
-func Join(errs ...error) joinError {
+func Join(errs ...error) joinErrors {
 	return errs
 }
 
-type joinError []error
+type joinErrors []error
 
-func (errs joinError) Error() string {
+func (errs joinErrors) Error() string {
 	b := xstring.Buffer()
 	defer b.Free()
 	b.WriteByte('[')
@@ -27,7 +27,7 @@ func (errs joinError) Error() string {
 	return b.String()
 }
 
-func (errs joinError) As(target interface{}) bool {
+func (errs joinErrors) As(target interface{}) bool {
 	for _, err := range errs {
 		if As(err, target) {
 			return true
@@ -37,7 +37,7 @@ func (errs joinError) As(target interface{}) bool {
 	return false
 }
 
-func (errs joinError) Is(target error) bool {
+func (errs joinErrors) Is(target error) bool {
 	for _, err := range errs {
 		if Is(err, target) {
 			return true
@@ -47,6 +47,6 @@ func (errs joinError) Is(target error) bool {
 	return false
 }
 
-func (errs joinError) Unwrap() []error {
+func (errs joinErrors) Unwrap() []error {
 	return errs
 }

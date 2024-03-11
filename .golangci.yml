@@ -223,7 +223,6 @@ linters:
     - cyclop
     - depguard
     - dupl
-    - errname
     - exhaustive
     - exhaustivestruct
     - exhaustruct
@@ -240,10 +239,8 @@ linters:
     - interfacebloat
     - ireturn
     - maintidx
-    - maligned
     - nonamedreturns
     - paralleltest
-    - protogetter
     - scopelint
     - structcheck
     - testableexamples
