@@ -21,23 +21,24 @@ import (
 )
 
 func TestRegressionOperationUnavailableIssue1007(t *testing.T) {
-	xtest.TestManyTimes(t, func(t testing.TB) {
-		e := fixenv.New(t)
+	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
+		e := fixenv.New(tb)
 
 		mock := newTopicWriterOperationUnavailable()
 		connString := xtest.GrpcMockTopicConnString(e, mock)
 
 		db, err := ydb.Open(sf.Context(e), connString)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 
 		writer, err := db.Topic().StartWriter("test", topicoptions.WithWriterWaitServerAck(true))
-		require.NoError(t, err)
+		require.NoError(tb, err)
 
 		err = writer.Write(sf.Context(e), topicwriter.Message{
 			Data: strings.NewReader("asd"),
 		})
-		require.NoError(t, err)
-		require.True(t, mock.UnavailableResponsed)
+		require.NoError(tb, err)
+		require.True(tb, mock.UnavailableResponsed)
 	})
 }
 
