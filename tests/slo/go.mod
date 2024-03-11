@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/prometheus/client_golang v1.14.0
 	github.com/ydb-platform/gorm-driver v0.1.1
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.57.0
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.49.0
 	golang.org/x/sync v0.3.0
 	golang.org/x/time v0.3.0
 	gorm.io/gorm v1.25.1
@@ -48,5 +48,7 @@ require (
 	modernc.org/sqlite v1.24.0 // indirect
 	xorm.io/builder v0.3.11-0.20220531020008-1bd24a7dc978 // indirect
 )
+
+replace github.com/ydb-platform/ydb-go-sdk/v3 => ../../.
 
 replace xorm.io/xorm => github.com/ydb-platform/xorm v0.0.6
