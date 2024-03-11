@@ -208,7 +208,7 @@ func (s *valueScanner) ScanNamed(namedValues ...named.Value) error {
 	return s.Err()
 }
 
-// Truncated returns true if current result set has been truncated by server
+// Truncated returns true if current result set has been truncated by server.
 func (s *valueScanner) Truncated() bool {
 	if s.set == nil {
 		_ = s.errorf(0, "there are no sets in the scanner")
@@ -219,7 +219,7 @@ func (s *valueScanner) Truncated() bool {
 	return s.set.GetTruncated()
 }
 
-// Truncated returns true if current result set has been truncated by server
+// Truncated returns true if current result set has been truncated by server.
 func (s *valueScanner) truncated() bool {
 	if s.set == nil {
 		return false
@@ -461,7 +461,7 @@ func (s *valueScanner) any() interface{} {
 	}
 }
 
-// valueType returns current item under scan as ydb.valueType types
+// valueType returns current item under scan as ydb.valueType types.
 func (s *valueScanner) value() value.Value {
 	x := s.stack.current()
 
@@ -481,7 +481,7 @@ func (s *valueScanner) isNull() bool {
 }
 
 // unwrap current item under scan interpreting it as Optional<Type> types
-// ignores if type is not optional
+// ignores if type is not optional.
 func (s *valueScanner) unwrap() {
 	if s.Err() != nil {
 		return

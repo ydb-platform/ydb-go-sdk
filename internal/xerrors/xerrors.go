@@ -62,7 +62,7 @@ func HideEOF(err error) error {
 }
 
 // As is a proxy to errors.As
-// This need to single import errors
+// This need to single import errors.
 func As(err error, targets ...interface{}) bool {
 	if err == nil {
 		panic("nil err")
@@ -80,13 +80,13 @@ func As(err error, targets ...interface{}) bool {
 }
 
 // IsErrorFromServer return true if err returned from server
-// (opposite to raised internally in sdk)
+// (opposite to raised internally in sdk).
 func IsErrorFromServer(err error) bool {
 	return IsTransportError(err) || IsOperationError(err)
 }
 
 // Is is a improved proxy to errors.Is
-// This need to single import errors
+// This need to single import errors.
 func Is(err error, targets ...error) bool {
 	if len(targets) == 0 {
 		panic("empty targets")

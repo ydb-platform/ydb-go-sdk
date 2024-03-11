@@ -2,7 +2,7 @@ package xerrors
 
 import "fmt"
 
-// Type reports which error type
+// Type reports which error type.
 type Type uint8
 
 const (

@@ -2,15 +2,15 @@
 
 package trace
 
-// ratelimiterComposeOptions is a holder of options
+// ratelimiterComposeOptions is a holder of options.
 type ratelimiterComposeOptions struct {
 	panicCallback func(e interface{})
 }
 
-// RatelimiterOption specified Ratelimiter compose option
+// RatelimiterOption specified Ratelimiter compose option.
 type RatelimiterComposeOption func(o *ratelimiterComposeOptions)
 
-// WithRatelimiterPanicCallback specified behavior on panic
+// WithRatelimiterPanicCallback specified behavior on panic.
 func WithRatelimiterPanicCallback(cb func(e interface{})) RatelimiterComposeOption {
 	return func(o *ratelimiterComposeOptions) {
 		o.panicCallback = cb

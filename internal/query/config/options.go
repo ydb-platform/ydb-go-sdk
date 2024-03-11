@@ -9,14 +9,14 @@ import (
 
 type Option func(*Config)
 
-// With applies common configuration params
+// With applies common configuration params.
 func With(config config.Common) Option {
 	return func(c *Config) {
 		c.Common = config
 	}
 }
 
-// WithTrace appends table trace to early defined traces
+// WithTrace appends table trace to early defined traces.
 func WithTrace(trace *trace.Query, opts ...trace.QueryComposeOption) Option {
 	return func(c *Config) {
 		c.trace = c.trace.Compose(trace, opts...)
@@ -35,7 +35,7 @@ func WithSizeLimit(sizeLimit int) Option {
 }
 
 // WithCreateSessionTimeout limits maximum time spent on Create session request
-// If createSessionTimeout is less than or equal to zero then no used timeout on create session request
+// If createSessionTimeout is less than or equal to zero then no used timeout on create session request.
 func WithCreateSessionTimeout(createSessionTimeout time.Duration) Option {
 	return func(c *Config) {
 		if createSessionTimeout > 0 {

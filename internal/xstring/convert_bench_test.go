@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-// Test the performance of the standard conversion string()
+// Test the performance of the standard conversion string().
 func Benchmark_StdFromBytes(b *testing.B) {
 	b.ReportAllocs()
 	x := []byte("Hello world! Hello world! Hello world!")
@@ -13,7 +13,7 @@ func Benchmark_StdFromBytes(b *testing.B) {
 	}
 }
 
-// Test the performance of strong conversion []byte to string
+// Test the performance of strong conversion []byte to string.
 func Benchmark_FromBytes(b *testing.B) {
 	b.ReportAllocs()
 	x := []byte("Hello world! Hello world! Hello world!")
@@ -22,7 +22,7 @@ func Benchmark_FromBytes(b *testing.B) {
 	}
 }
 
-// Test the performance of standard conversion []byte
+// Test the performance of standard conversion []byte.
 func Benchmark_StdToBytes(b *testing.B) {
 	b.ReportAllocs()
 	x := "Hello world! Hello world! Hello world!"
@@ -31,7 +31,7 @@ func Benchmark_StdToBytes(b *testing.B) {
 	}
 }
 
-// Test the performance of strong conversion string to []byte
+// Test the performance of strong conversion string to []byte.
 func Benchmark_ToBytes(b *testing.B) {
 	b.ReportAllocs()
 	x := "Hello world! Hello world! Hello world!"

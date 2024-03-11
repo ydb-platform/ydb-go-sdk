@@ -9,7 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
 
-// RawValue scanning non-primitive yql types or for own implementation scanner native API
+// RawValue scanning non-primitive yql types or for own implementation scanner native API.
 type RawValue interface {
 	Path() string
 	WritePathTo(w io.Writer) (n int64, err error)
@@ -138,7 +138,7 @@ type RawValue interface {
 	Err() error
 }
 
-// Scanner scanning raw ydb types
+// Scanner scanning raw ydb types.
 type Scanner interface {
 	// UnmarshalYDB must be implemented on client-side for unmarshal raw ydb value.
 	UnmarshalYDB(raw RawValue) error

@@ -55,7 +55,7 @@ func (ii issues) String() string {
 	return b.String()
 }
 
-// NewWithIssues returns error which contains child issues
+// NewWithIssues returns error which contains child issues.
 func NewWithIssues(text string, issues ...error) error {
 	err := &withIssuesError{
 		reason: text,
@@ -115,7 +115,7 @@ func (e *withIssuesError) Is(target error) bool {
 	return false
 }
 
-// Issue struct
+// Issue struct.
 type Issue struct {
 	Message  string
 	Code     uint32

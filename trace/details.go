@@ -78,7 +78,7 @@ const (
 
 	CoordinationEvents
 
-	// Deprecated: has no effect now
+	// Deprecated: has no effect now.
 	DriverClusterEvents
 
 	DriverEvents = DriverConnEvents |

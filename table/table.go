@@ -18,12 +18,12 @@ import (
 
 // Operation is the interface that holds an operation for retry.
 // if Operation returns not nil - operation will retry
-// if Operation returns nil - retry loop will break
+// if Operation returns nil - retry loop will break.
 type Operation func(ctx context.Context, s Session) error
 
 // TxOperation is the interface that holds an operation for retry.
 // if TxOperation returns not nil - operation will retry
-// if TxOperation returns nil - retry loop will break
+// if TxOperation returns nil - retry loop will break.
 type TxOperation func(ctx context.Context, tx TransactionActor) error
 
 type ClosableSession interface {
@@ -223,7 +223,7 @@ type DataQueryExplanation struct {
 	AST string
 }
 
-// DataQuery only for tracers
+// DataQuery only for tracers.
 type DataQuery interface {
 	String() string
 	ID() string
@@ -286,13 +286,13 @@ var (
 	}
 )
 
-// Transaction control options
+// Transaction control options.
 type (
 	txDesc   Ydb_Table.TransactionSettings
 	TxOption func(*txDesc)
 )
 
-// TxSettings returns transaction settings
+// TxSettings returns transaction settings.
 func TxSettings(opts ...TxOption) *TransactionSettings {
 	s := new(TransactionSettings)
 	for _, opt := range opts {
@@ -304,7 +304,7 @@ func TxSettings(opts ...TxOption) *TransactionSettings {
 	return s
 }
 
-// BeginTx returns begin transaction control option
+// BeginTx returns begin transaction control option.
 func BeginTx(opts ...TxOption) TxControlOption {
 	return func(d *txControlDesc) {
 		s := TxSettings(opts...)
@@ -330,7 +330,7 @@ func WithTxID(txID string) TxControlOption {
 	}
 }
 
-// CommitTx returns commit transaction control option
+// CommitTx returns commit transaction control option.
 func CommitTx() TxControlOption {
 	return func(d *txControlDesc) {
 		d.CommitTx = true
@@ -397,7 +397,7 @@ func (t *TransactionControl) Desc() *Ydb_Table.TransactionControl {
 	return &t.desc
 }
 
-// TxControl makes transaction control from given options
+// TxControl makes transaction control from given options.
 func TxControl(opts ...TxControlOption) *TransactionControl {
 	c := new(TransactionControl)
 	for _, opt := range opts {
@@ -409,7 +409,7 @@ func TxControl(opts ...TxControlOption) *TransactionControl {
 	return c
 }
 
-// DefaultTxControl returns default transaction control with serializable read-write isolation mode and auto-commit
+// DefaultTxControl returns default transaction control with serializable read-write isolation mode and auto-commit.
 func DefaultTxControl() *TransactionControl {
 	return TxControl(
 		BeginTx(WithSerializableReadWrite()),
@@ -417,7 +417,7 @@ func DefaultTxControl() *TransactionControl {
 	)
 }
 
-// SerializableReadWriteTxControl returns transaction control with serializable read-write isolation mode
+// SerializableReadWriteTxControl returns transaction control with serializable read-write isolation mode.
 func SerializableReadWriteTxControl(opts ...TxControlOption) *TransactionControl {
 	return TxControl(
 		append([]TxControlOption{
@@ -426,7 +426,7 @@ func SerializableReadWriteTxControl(opts ...TxControlOption) *TransactionControl
 	)
 }
 
-// OnlineReadOnlyTxControl returns online read-only transaction control
+// OnlineReadOnlyTxControl returns online read-only transaction control.
 func OnlineReadOnlyTxControl(opts ...TxOnlineReadOnlyOption) *TransactionControl {
 	return TxControl(
 		BeginTx(WithOnlineReadOnly(opts...)),
@@ -434,7 +434,7 @@ func OnlineReadOnlyTxControl(opts ...TxOnlineReadOnlyOption) *TransactionControl
 	)
 }
 
-// StaleReadOnlyTxControl returns stale read-only transaction control
+// StaleReadOnlyTxControl returns stale read-only transaction control.
 func StaleReadOnlyTxControl() *TransactionControl {
 	return TxControl(
 		BeginTx(WithStaleReadOnly()),
@@ -442,7 +442,7 @@ func StaleReadOnlyTxControl() *TransactionControl {
 	)
 }
 
-// SnapshotReadOnlyTxControl returns snapshot read-only transaction control
+// SnapshotReadOnlyTxControl returns snapshot read-only transaction control.
 func SnapshotReadOnlyTxControl() *TransactionControl {
 	return TxControl(
 		BeginTx(WithSnapshotReadOnly()),
@@ -450,7 +450,7 @@ func SnapshotReadOnlyTxControl() *TransactionControl {
 	)
 }
 
-// QueryParameters
+// QueryParameters.
 type (
 	ParameterOption = params.NamedValue
 	QueryParameters = params.Parameters

@@ -6,15 +6,15 @@ import (
 	"context"
 )
 
-// queryComposeOptions is a holder of options
+// queryComposeOptions is a holder of options.
 type queryComposeOptions struct {
 	panicCallback func(e interface{})
 }
 
-// QueryOption specified Query compose option
+// QueryOption specified Query compose option.
 type QueryComposeOption func(o *queryComposeOptions)
 
-// WithQueryPanicCallback specified behavior on panic
+// WithQueryPanicCallback specified behavior on panic.
 func WithQueryPanicCallback(cb func(e interface{})) QueryComposeOption {
 	return func(o *queryComposeOptions) {
 		o.panicCallback = cb

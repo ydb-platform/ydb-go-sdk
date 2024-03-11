@@ -363,7 +363,7 @@ type (
 	}
 	// TablePoolWaitDoneInfo means a wait iteration inside Get call is done
 	// Warning: Session and Error may be nil at the same time. This means
-	// that a wait iteration donned without any significant tableResultErr
+	// that a wait iteration donned without any significant tableResultErr.
 	TablePoolWaitDoneInfo struct {
 		Session tableSessionInfo
 		Error   error

@@ -19,7 +19,7 @@ type Pool interface {
 
 // CallbackWithMessageContentFunc is callback function for work with message content
 // data bytes MUST NOT be used after f returned
-// if you need content longer - copy content to other slice
+// if you need content longer - copy content to other slice.
 type CallbackWithMessageContentFunc func(data []byte) error
 
 const (

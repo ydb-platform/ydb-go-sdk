@@ -2,7 +2,7 @@ package metrics
 
 import "github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
-// Config is experimental interface for metrics registry config
+// Config is experimental interface for metrics registry config.
 type Config interface {
 	Registry
 

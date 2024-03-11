@@ -243,9 +243,7 @@ type (
 		Error error
 	}
 
-	////////////
-	//////////// TopicWriter
-	////////////
+	// TopicWriter.
 
 	TopicWriterReconnectStartInfo struct {
 		WriterInstanceID string

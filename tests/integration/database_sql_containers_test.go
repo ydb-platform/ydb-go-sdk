@@ -18,7 +18,7 @@ import (
 )
 
 // https://github.com/ydb-platform/ydb-go-sdk/issues/757
-// Containers example demonstrates how to work with YDB container values such as `List`, `Tuple`, `Dict`, `Struct` and `Variant`
+// Containers example demonstrates how to work with YDB container values such as `List`, `Tuple`, `Dict`, `Struct` and `Variant`.
 func TestDatabaseSqlContainers(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

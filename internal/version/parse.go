@@ -37,7 +37,7 @@ func (lhs version) Less(rhs version) bool {
 	return lhs.Suffix < rhs.Suffix
 }
 
-// Lt compare lhs and rhs as (lhs < rhs)
+// Lt compare lhs and rhs as (lhs < rhs).
 func Lt(lhs, rhs string) bool {
 	v1, err := parse(lhs)
 	if err != nil {
@@ -51,7 +51,7 @@ func Lt(lhs, rhs string) bool {
 	return v1.Less(v2)
 }
 
-// Gte compare lhs and rhs as (lhs >= rhs)
+// Gte compare lhs and rhs as (lhs >= rhs).
 func Gte(lhs, rhs string) bool {
 	v1, err := parse(lhs)
 	if err != nil {

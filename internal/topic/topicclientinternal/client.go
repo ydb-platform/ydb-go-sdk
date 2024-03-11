@@ -61,12 +61,12 @@ func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
 	return c
 }
 
-// Close the client
+// Close the client.
 func (c *Client) Close(_ context.Context) error {
 	return nil
 }
 
-// Alter topic options
+// Alter topic options.
 func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.AlterOption) error {
 	req := &rawtopic.AlterTopicRequest{}
 	req.OperationParams = c.defaultOperationParams
@@ -93,7 +93,7 @@ func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.Al
 	return call(ctx)
 }
 
-// Create new topic
+// Create new topic.
 func (c *Client) Create(
 	ctx context.Context,
 	path string,
@@ -125,7 +125,7 @@ func (c *Client) Create(
 	return call(ctx)
 }
 
-// Describe topic
+// Describe topic.
 func (c *Client) Describe(
 	ctx context.Context,
 	path string,
@@ -170,7 +170,7 @@ func (c *Client) Describe(
 	return res, nil
 }
 
-// Drop topic
+// Drop topic.
 func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.DropOption) error {
 	req := rawtopic.DropTopicRequest{}
 	req.OperationParams = c.defaultOperationParams
@@ -199,7 +199,7 @@ func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.Dro
 }
 
 // StartReader create new topic reader and start pull messages from server
-// it is fast non block call, connection will start in background
+// it is fast non block call, connection will start in background.
 func (c *Client) StartReader(
 	consumer string,
 	readSelectors topicoptions.ReadSelectors,
@@ -225,7 +225,7 @@ func (c *Client) StartReader(
 	return topicreader.NewReader(internalReader), nil
 }
 
-// StartWriter create new topic writer wrapper
+// StartWriter create new topic writer wrapper.
 func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error) {
 	var connector topicwriterinternal.ConnectFunc = func(ctx context.Context) (
 		topicwriterinternal.RawTopicWriterStream,

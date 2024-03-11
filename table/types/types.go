@@ -10,7 +10,7 @@ import (
 // Type describes YDB data types.
 type Type = types.Type
 
-// Equal checks for type equivalence
+// Equal checks for type equivalence.
 func Equal(lhs, rhs Type) bool {
 	return types.Equal(lhs, rhs)
 }
@@ -120,7 +120,7 @@ const (
 
 // WriteTypeStringTo writes ydb type string representation into buffer
 //
-// Deprecated: use types.Type.Yql() instead
+// Deprecated: use types.Type.Yql() instead.
 func WriteTypeStringTo(buf *bytes.Buffer, t Type) { //nolint: interfacer
 	buf.WriteString(t.Yql())
 }

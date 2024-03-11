@@ -186,7 +186,7 @@ func (c *Client) DescribeNode(
 	return entry, config, xerrors.WithStackTrace(err)
 }
 
-// DescribeNode describes a coordination node
+// DescribeNode describes a coordination node.
 func (c *Client) describeNode(
 	ctx context.Context,
 	path string,

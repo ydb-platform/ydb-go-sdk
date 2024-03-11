@@ -14,7 +14,7 @@ import (
 
 // retryOperation is the interface that holds an operation for retry.
 // if retryOperation returns not nil - operation will retry
-// if retryOperation returns nil - retry loop will break
+// if retryOperation returns nil - retry loop will break.
 type retryOperation func(context.Context) (err error)
 
 type retryOptions struct {
@@ -49,7 +49,7 @@ func (label labelOption) ApplyRetryOption(opts *retryOptions) {
 	opts.label = string(label)
 }
 
-// WithLabel applies label for identification call Retry in trace.Retry.OnRetry
+// WithLabel applies label for identification call Retry in trace.Retry.OnRetry.
 func WithLabel(label string) labelOption {
 	return labelOption(label)
 }
@@ -96,7 +96,7 @@ func (stackTraceOption) ApplyDoTxOption(opts *doTxOptions) {
 	opts.retryOptions = append(opts.retryOptions, WithStackTrace())
 }
 
-// WithStackTrace wraps errors with stacktrace from Retry call
+// WithStackTrace wraps errors with stacktrace from Retry call.
 func WithStackTrace() stackTraceOption {
 	return stackTraceOption{}
 }
@@ -119,7 +119,7 @@ func (t traceOption) ApplyDoTxOption(opts *doTxOptions) {
 	opts.retryOptions = append(opts.retryOptions, WithTrace(t.t))
 }
 
-// WithTrace returns trace option
+// WithTrace returns trace option.
 func WithTrace(t *trace.Retry) traceOption {
 	return traceOption{t: t}
 }
@@ -140,7 +140,7 @@ func (idempotent idempotentOption) ApplyDoTxOption(opts *doTxOptions) {
 	opts.retryOptions = append(opts.retryOptions, WithIdempotent(bool(idempotent)))
 }
 
-// WithIdempotent applies idempotent flag to retry operation
+// WithIdempotent applies idempotent flag to retry operation.
 func WithIdempotent(idempotent bool) idempotentOption {
 	return idempotentOption(idempotent)
 }
@@ -165,7 +165,7 @@ func (o fastBackoffOption) ApplyDoTxOption(opts *doTxOptions) {
 	opts.retryOptions = append(opts.retryOptions, WithFastBackoff(o.backoff))
 }
 
-// WithFastBackoff replaces default fast backoff
+// WithFastBackoff replaces default fast backoff.
 func WithFastBackoff(b backoff.Backoff) fastBackoffOption {
 	return fastBackoffOption{backoff: b}
 }
@@ -190,7 +190,7 @@ func (o slowBackoffOption) ApplyDoTxOption(opts *doTxOptions) {
 	opts.retryOptions = append(opts.retryOptions, WithSlowBackoff(o.backoff))
 }
 
-// WithSlowBackoff replaces default slow backoff
+// WithSlowBackoff replaces default slow backoff.
 func WithSlowBackoff(b backoff.Backoff) slowBackoffOption {
 	return slowBackoffOption{backoff: b}
 }
@@ -214,7 +214,7 @@ func (o panicCallbackOption) ApplyDoTxOption(opts *doTxOptions) {
 }
 
 // WithPanicCallback returns panic callback option
-// If not defined - panic would not intercept with driver
+// If not defined - panic would not intercept with driver.
 func WithPanicCallback(panicCallback func(e interface{})) panicCallbackOption {
 	return panicCallbackOption{callback: panicCallback}
 }
@@ -229,7 +229,7 @@ func WithPanicCallback(panicCallback func(e interface{})) panicCallbackOption {
 //
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 //
-// If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
+// If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation.
 func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr error) {
 	options := &retryOptions{
 		call:        stack.FunctionID(""),

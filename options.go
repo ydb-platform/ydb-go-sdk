@@ -29,7 +29,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// Option contains configuration values for Driver
+// Option contains configuration values for Driver.
 type Option func(ctx context.Context, c *Driver) error
 
 func WithStaticCredentials(user, password string) Option {
@@ -54,7 +54,7 @@ func WithAccessTokenCredentials(accessToken string) Option {
 	)
 }
 
-// WithUserAgent add provided user agent value to all api requests
+// WithUserAgent add provided user agent value to all api requests.
 func WithUserAgent(userAgent string) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithUserAgent(userAgent))
@@ -77,7 +77,7 @@ func WithRequestsType(requestsType string) Option {
 //
 // Warning: WithConnectionString will be removed at next major release
 //
-// (Driver string will be required string param of ydb.Open)
+// (Driver string will be required string param of ydb.Open).
 func WithConnectionString(connectionString string) Option {
 	return func(ctx context.Context, c *Driver) error {
 		if connectionString == "" {
@@ -96,7 +96,7 @@ func WithConnectionString(connectionString string) Option {
 	}
 }
 
-// WithConnectionTTL defines duration for parking idle connections
+// WithConnectionTTL defines duration for parking idle connections.
 func WithConnectionTTL(ttl time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithConnectionTTL(ttl))
@@ -109,7 +109,7 @@ func WithConnectionTTL(ttl time.Duration) Option {
 //
 // Warning: use ydb.Open with required Driver string parameter instead
 //
-// For making Driver string from endpoint+database+secure - use sugar.DSN()
+// For making Driver string from endpoint+database+secure - use sugar.DSN().
 func WithEndpoint(endpoint string) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithEndpoint(endpoint))
@@ -122,7 +122,7 @@ func WithEndpoint(endpoint string) Option {
 //
 // Warning: use ydb.Open with required Driver string parameter instead
 //
-// For making Driver string from endpoint+database+secure - use sugar.DSN()
+// For making Driver string from endpoint+database+secure - use sugar.DSN().
 func WithDatabase(database string) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithDatabase(database))
@@ -135,7 +135,7 @@ func WithDatabase(database string) Option {
 //
 // Warning: use ydb.Open with required Driver string parameter instead
 //
-// For making Driver string from endpoint+database+secure - use sugar.DSN()
+// For making Driver string from endpoint+database+secure - use sugar.DSN().
 func WithSecure(secure bool) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithSecure(secure))
@@ -155,7 +155,7 @@ func WithInsecure() Option {
 	}
 }
 
-// WithMinTLSVersion set minimum TLS version acceptable for connections
+// WithMinTLSVersion set minimum TLS version acceptable for connections.
 func WithMinTLSVersion(minVersion uint16) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithMinTLSVersion(minVersion))
@@ -164,7 +164,7 @@ func WithMinTLSVersion(minVersion uint16) Option {
 	}
 }
 
-// WithTLSSInsecureSkipVerify applies InsecureSkipVerify flag to TLS config
+// WithTLSSInsecureSkipVerify applies InsecureSkipVerify flag to TLS config.
 func WithTLSSInsecureSkipVerify() Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithTLSSInsecureSkipVerify())
@@ -193,7 +193,7 @@ func WithAnonymousCredentials() Option {
 	)
 }
 
-// WithCreateCredentialsFunc add callback funcion to provide requests credentials
+// WithCreateCredentialsFunc add callback funcion to provide requests credentials.
 func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (credentials.Credentials, error)) Option {
 	return func(ctx context.Context, c *Driver) error {
 		creds, err := createCredentials(ctx)
@@ -224,7 +224,7 @@ func WithBalancer(balancer *balancerConfig.Config) Option {
 
 // WithDialTimeout sets timeout for establishing new Driver to cluster
 //
-// Default dial timeout is config.DefaultDialTimeout
+// Default dial timeout is config.DefaultDialTimeout.
 func WithDialTimeout(timeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithDialTimeout(timeout))
@@ -268,7 +268,7 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	}
 }
 
-// WithTraceDriver appends trace.Driver into driver traces
+// WithTraceDriver appends trace.Driver into driver traces.
 func WithTraceDriver(t trace.Driver, opts ...trace.DriverComposeOption) Option { //nolint:gocritic
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithTrace(t, opts...))
@@ -277,7 +277,7 @@ func WithTraceDriver(t trace.Driver, opts ...trace.DriverComposeOption) Option {
 	}
 }
 
-// WithTraceRetry appends trace.Retry into retry traces
+// WithTraceRetry appends trace.Retry into retry traces.
 func WithTraceRetry(t trace.Retry, opts ...trace.RetryComposeOption) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options,
@@ -293,7 +293,7 @@ func WithTraceRetry(t trace.Retry, opts ...trace.RetryComposeOption) Option {
 	}
 }
 
-// WithCertificate appends certificate to TLS config root certificates
+// WithCertificate appends certificate to TLS config root certificates.
 func WithCertificate(cert *x509.Certificate) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithCertificate(cert))
@@ -302,7 +302,7 @@ func WithCertificate(cert *x509.Certificate) Option {
 	}
 }
 
-// WithCertificatesFromFile appends certificates by filepath to TLS config root certificates
+// WithCertificatesFromFile appends certificates by filepath to TLS config root certificates.
 func WithCertificatesFromFile(caFile string, opts ...certificates.FromFileOption) Option {
 	if len(caFile) > 0 && caFile[0] == '~' {
 		if home, err := os.UserHomeDir(); err == nil {
@@ -334,7 +334,7 @@ func WithCertificatesFromFile(caFile string, opts ...certificates.FromFileOption
 // WithTLSConfig replaces older TLS config
 //
 // Warning: all early TLS config changes (such as WithCertificate, WithCertificatesFromFile, WithCertificatesFromPem,
-// WithMinTLSVersion, WithTLSSInsecureSkipVerify) will be lost
+// WithMinTLSVersion, WithTLSSInsecureSkipVerify) will be lost.
 func WithTLSConfig(tlsConfig *tls.Config) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithTLSConfig(tlsConfig))
@@ -343,7 +343,7 @@ func WithTLSConfig(tlsConfig *tls.Config) Option {
 	}
 }
 
-// WithCertificatesFromPem appends certificates from pem-encoded data to TLS config root certificates
+// WithCertificatesFromPem appends certificates from pem-encoded data to TLS config root certificates.
 func WithCertificatesFromPem(bytes []byte, opts ...certificates.FromPemOption) Option {
 	return func(ctx context.Context, c *Driver) error {
 		certs, err := certificates.FromPem(bytes, opts...)
@@ -378,7 +378,7 @@ func WithQueryConfigOption(option queryConfig.Option) Option {
 	}
 }
 
-// WithSessionPoolSizeLimit set max size of internal sessions pool in table.Client
+// WithSessionPoolSizeLimit set max size of internal sessions pool in table.Client.
 func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
@@ -390,12 +390,12 @@ func WithSessionPoolSizeLimit(sizeLimit int) Option {
 
 // WithSessionPoolKeepAliveMinSize set minimum sessions should be keeped alive in table.Client
 //
-// Deprecated: table client do not supports background session keep-aliving now
+// Deprecated: table client do not supports background session keep-aliving now.
 func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
 	return func(ctx context.Context, c *Driver) error { return nil }
 }
 
-// WithSessionPoolIdleThreshold defines interval for idle sessions
+// WithSessionPoolIdleThreshold defines interval for idle sessions.
 func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithIdleThreshold(idleThreshold))
@@ -408,12 +408,12 @@ func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 	}
 }
 
-// WithSessionPoolKeepAliveTimeout set timeout of keep alive requests for session in table.Client
+// WithSessionPoolKeepAliveTimeout set timeout of keep alive requests for session in table.Client.
 func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error { return nil }
 }
 
-// WithSessionPoolCreateSessionTimeout set timeout for new session creation process in table.Client
+// WithSessionPoolCreateSessionTimeout set timeout for new session creation process in table.Client.
 func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithCreateSessionTimeout(createSessionTimeout))
@@ -423,7 +423,7 @@ func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Opt
 	}
 }
 
-// WithSessionPoolDeleteTimeout set timeout to gracefully close deleting session in table.Client
+// WithSessionPoolDeleteTimeout set timeout to gracefully close deleting session in table.Client.
 func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithDeleteTimeout(deleteTimeout))
@@ -433,7 +433,7 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	}
 }
 
-// WithIgnoreTruncated disables errors on truncated flag
+// WithIgnoreTruncated disables errors on truncated flag.
 func WithIgnoreTruncated() Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithIgnoreTruncated())
@@ -445,7 +445,7 @@ func WithIgnoreTruncated() Option {
 // WithPanicCallback specified behavior on panic
 // Warning: WithPanicCallback must be defined on start of all options
 // (before `WithTrace{Driver,Table,Scheme,Scripting,Coordination,Ratelimiter}` and other options)
-// If not defined - panic would not intercept with driver
+// If not defined - panic would not intercept with driver.
 func WithPanicCallback(panicCallback func(e interface{})) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.panicCallback = panicCallback
@@ -455,7 +455,7 @@ func WithPanicCallback(panicCallback func(e interface{})) Option {
 	}
 }
 
-// WithTraceTable appends trace.Table into table traces
+// WithTraceTable appends trace.Table into table traces.
 func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option { //nolint:gocritic
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(
@@ -475,7 +475,7 @@ func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option { //
 	}
 }
 
-// WithTraceQuery appends trace.Query into query traces
+// WithTraceQuery appends trace.Query into query traces.
 func WithTraceQuery(t trace.Query, opts ...trace.QueryComposeOption) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.queryOptions = append(
@@ -494,7 +494,7 @@ func WithTraceQuery(t trace.Query, opts ...trace.QueryComposeOption) Option {
 	}
 }
 
-// WithTraceScripting scripting trace option
+// WithTraceScripting scripting trace option.
 func WithTraceScripting(t trace.Scripting, opts ...trace.ScriptingComposeOption) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.scriptingOptions = append(
@@ -514,7 +514,7 @@ func WithTraceScripting(t trace.Scripting, opts ...trace.ScriptingComposeOption)
 	}
 }
 
-// WithTraceScheme returns scheme trace option
+// WithTraceScheme returns scheme trace option.
 func WithTraceScheme(t trace.Scheme, opts ...trace.SchemeComposeOption) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.schemeOptions = append(
@@ -534,7 +534,7 @@ func WithTraceScheme(t trace.Scheme, opts ...trace.SchemeComposeOption) Option {
 	}
 }
 
-// WithTraceCoordination returns coordination trace option
+// WithTraceCoordination returns coordination trace option.
 func WithTraceCoordination(t trace.Coordination, opts ...trace.CoordinationComposeOption) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.coordinationOptions = append(
@@ -554,7 +554,7 @@ func WithTraceCoordination(t trace.Coordination, opts ...trace.CoordinationCompo
 	}
 }
 
-// WithTraceRatelimiter returns ratelimiter trace option
+// WithTraceRatelimiter returns ratelimiter trace option.
 func WithTraceRatelimiter(t trace.Ratelimiter, opts ...trace.RatelimiterComposeOption) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.ratelimiterOptions = append(
@@ -574,7 +574,7 @@ func WithTraceRatelimiter(t trace.Ratelimiter, opts ...trace.RatelimiterComposeO
 	}
 }
 
-// WithRatelimiterOptions returns reatelimiter option
+// WithRatelimiterOptions returns reatelimiter option.
 func WithRatelimiterOptions(opts ...ratelimiterConfig.Option) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.ratelimiterOptions = append(c.ratelimiterOptions, opts...)
@@ -583,7 +583,7 @@ func WithRatelimiterOptions(opts ...ratelimiterConfig.Option) Option {
 	}
 }
 
-// WithTraceDiscovery adds configured discovery tracer to Driver
+// WithTraceDiscovery adds configured discovery tracer to Driver.
 func WithTraceDiscovery(t trace.Discovery, opts ...trace.DiscoveryComposeOption) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.discoveryOptions = append(
@@ -603,7 +603,7 @@ func WithTraceDiscovery(t trace.Discovery, opts ...trace.DiscoveryComposeOption)
 	}
 }
 
-// WithTraceTopic adds configured discovery tracer to Driver
+// WithTraceTopic adds configured discovery tracer to Driver.
 func WithTraceTopic(t trace.Topic, opts ...trace.TopicComposeOption) Option { //nolint:gocritic
 	return func(ctx context.Context, c *Driver) error {
 		c.topicOptions = append(
@@ -623,7 +623,7 @@ func WithTraceTopic(t trace.Topic, opts ...trace.TopicComposeOption) Option { //
 	}
 }
 
-// WithTraceDatabaseSQL adds configured discovery tracer to Driver
+// WithTraceDatabaseSQL adds configured discovery tracer to Driver.
 func WithTraceDatabaseSQL(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeOption) Option { //nolint:gocritic
 	return func(ctx context.Context, c *Driver) error {
 		c.databaseSQLOptions = append(

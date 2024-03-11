@@ -7,7 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// PublicCommitRangeGetter return data piece for commit messages range
+// PublicCommitRangeGetter return data piece for commit messages range.
 type PublicCommitRangeGetter interface {
 	getCommitRange() PublicCommitRange
 }
@@ -20,7 +20,7 @@ func (r *CommitRanges) len() int {
 	return len(r.ranges)
 }
 
-// GetCommitsInfo implements trace.TopicReaderStreamSendCommitMessageStartMessageInfo
+// GetCommitsInfo implements trace.TopicReaderStreamSendCommitMessageStartMessageInfo.
 func (r *CommitRanges) GetCommitsInfo() []trace.TopicReaderStreamCommitInfo {
 	res := make([]trace.TopicReaderStreamCommitInfo, len(r.ranges))
 	for i := range res {

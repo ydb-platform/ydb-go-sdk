@@ -377,7 +377,7 @@ func (v dateValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-// DateValue returns ydb date value by given days since Epoch
+// DateValue returns ydb date value by given days since Epoch.
 func DateValue(v uint32) dateValue {
 	return dateValue(v)
 }
@@ -432,7 +432,7 @@ func (v datetimeValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-// DatetimeValue makes ydb datetime value from seconds since Epoch
+// DatetimeValue makes ydb datetime value from seconds since Epoch.
 func DatetimeValue(v uint32) datetimeValue {
 	return datetimeValue(v)
 }
@@ -1072,7 +1072,7 @@ func (v intervalValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-// IntervalValue makes Value from given microseconds value
+// IntervalValue makes Value from given microseconds value.
 func IntervalValue(v int64) intervalValue {
 	return intervalValue(v)
 }
@@ -1494,7 +1494,7 @@ func (v timestampValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-// TimestampValue makes ydb timestamp value by given microseconds since Epoch
+// TimestampValue makes ydb timestamp value by given microseconds since Epoch.
 func TimestampValue(v uint64) timestampValue {
 	return timestampValue(v)
 }

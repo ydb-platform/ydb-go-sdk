@@ -213,7 +213,7 @@ func (q *messageQueue) ensureNoSmallIntIndexes() {
 }
 
 // GetMessagesForSend one or more messages for send
-// it blocked until context cancelled of have least one message for send
+// it blocked until context cancelled of have least one message for send.
 func (q *messageQueue) GetMessagesForSend(ctx context.Context) ([]messageWithDataContent, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -327,7 +327,7 @@ func (m *MessageQueueAckWaiter) AddWaitIndex(index int) {
 	m.sequenseNumbers = append(m.sequenseNumbers, index)
 }
 
-// sortMessageQueueIndexes deprecated
+// sortMessageQueueIndexes deprecated.
 func sortMessageQueueIndexes(keys []int) {
 	sort.Ints(keys)
 	// check index overflow

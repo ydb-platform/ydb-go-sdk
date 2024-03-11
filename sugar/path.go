@@ -47,7 +47,7 @@ type dbFoRemoveRecursive interface {
 // MakeRecursive creates path inside database
 // pathToCreate is a database root relative path
 // MakeRecursive method equal bash command `mkdir -p ~/path/to/create`
-// where `~` - is a root of database
+// where `~` - is a root of database.
 func MakeRecursive(ctx context.Context, db dbForMakeRecursive, pathToCreate string) error {
 	if strings.HasPrefix(pathToCreate, sysDirectory+"/") {
 		return xerrors.WithStackTrace(
@@ -88,7 +88,7 @@ func MakeRecursive(ctx context.Context, db dbForMakeRecursive, pathToCreate stri
 // All database entities in prefix path will remove if names list is empty.
 // Empty prefix means than use root of database.
 // RemoveRecursive method equal bash command `rm -rf ~/path/to/remove`
-// where `~` - is a root of database
+// where `~` - is a root of database.
 func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove string) error {
 	fullSysTablePath := path.Join(db.Name(), sysDirectory)
 	var rmPath func(int, string) error

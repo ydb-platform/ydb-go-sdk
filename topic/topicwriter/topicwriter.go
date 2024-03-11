@@ -13,12 +13,12 @@ type (
 var ErrQueueLimitExceed = topicwriterinternal.PublicErrQueueIsFull
 
 // Writer represent write session to topic
-// It handles connection problems, reconnect to server when need and resend buffered messages
+// It handles connection problems, reconnect to server when need and resend buffered messages.
 type Writer struct {
 	inner *topicwriterinternal.Writer
 }
 
-// PublicInitialInfo is an information about writer after initialize
+// PublicInitialInfo is an information about writer after initialize.
 type PublicInitialInfo struct {
 	LastSeqNum int64
 }
@@ -38,13 +38,13 @@ func NewWriter(writer *topicwriterinternal.Writer) *Writer {
 // especially when connection has problems.
 //
 // It returns ErrQueueLimitExceed (must be checked by errors.Is)
-// if ctx cancelled before messages put to internal buffer or try to add more messages, that can be put to queue
+// if ctx cancelled before messages put to internal buffer or try to add more messages, that can be put to queue.
 func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 	return w.inner.Write(ctx, messages...)
 }
 
 // WaitInit waits until the reader is initialized
-// or an error occurs, return PublicInitialInfo and err
+// or an error occurs, return PublicInitialInfo and err.
 func (w *Writer) WaitInit(ctx context.Context) (err error) {
 	_, err = w.inner.WaitInit(ctx)
 	if err != nil {
@@ -55,7 +55,7 @@ func (w *Writer) WaitInit(ctx context.Context) (err error) {
 }
 
 // WaitInitInfo waits until the reader is initialized
-// or an error occurs, return PublicInitialInfo and err
+// or an error occurs, return PublicInitialInfo and err.
 func (w *Writer) WaitInitInfo(ctx context.Context) (info PublicInitialInfo, err error) {
 	privateInfo, err := w.inner.WaitInit(ctx)
 	if err != nil {

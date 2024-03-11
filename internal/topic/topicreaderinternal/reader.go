@@ -40,7 +40,7 @@ type RawTopicReaderStream interface {
 }
 
 // TopicSteamReaderConnect connect to grpc stream
-// when connectionCtx closed stream must stop work and return errors for all methods
+// when connectionCtx closed stream must stop work and return errors for all methods.
 type TopicSteamReaderConnect func(connectionCtx context.Context) (RawTopicReaderStream, error)
 
 type Reader struct {
@@ -62,14 +62,14 @@ func newReadMessageBatchOptions() ReadMessageBatchOptions {
 	return ReadMessageBatchOptions{}
 }
 
-// PublicReadBatchOption для различных пожеланий к батчу вроде WithMaxMessages(int)
+// PublicReadBatchOption для различных пожеланий к батчу вроде WithMaxMessages(int).
 type PublicReadBatchOption interface {
 	Apply(options ReadMessageBatchOptions) ReadMessageBatchOptions
 }
 
 type readExplicitMessagesCount int
 
-// Apply implements PublicReadBatchOption
+// Apply implements PublicReadBatchOption.
 func (count readExplicitMessagesCount) Apply(options ReadMessageBatchOptions) ReadMessageBatchOptions {
 	options.MinCount = int(count)
 	options.MaxCount = int(count)
@@ -128,7 +128,7 @@ func (r *Reader) Close(ctx context.Context) error {
 	return r.reader.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
 }
 
-// ReadMessage read exactly one message
+// ReadMessage read exactly one message.
 func (r *Reader) ReadMessage(ctx context.Context) (*PublicMessage, error) {
 	res, err := r.ReadMessageBatch(ctx, readExplicitMessagesCount(1))
 	if err != nil {
@@ -139,7 +139,7 @@ func (r *Reader) ReadMessage(ctx context.Context) (*PublicMessage, error) {
 }
 
 // ReadMessageBatch read batch of messages.
-// Batch is collection of messages, which can be atomically committed
+// Batch is collection of messages, which can be atomically committed.
 func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...PublicReadBatchOption) (batch *PublicBatch, err error) {
 	readOptions := r.defaultBatchConfig.clone()
 
@@ -274,7 +274,7 @@ type PublicReadSelector struct {
 	MaxTimeLag time.Duration // 0 mean skip time lag filter
 }
 
-// Clone create deep clone of the selector
+// Clone create deep clone of the selector.
 func (s PublicReadSelector) Clone() *PublicReadSelector { //nolint:gocritic
 	s.Partitions = clone.Int64Slice(s.Partitions)
 

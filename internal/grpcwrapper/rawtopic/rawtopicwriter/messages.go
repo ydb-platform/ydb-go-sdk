@@ -49,7 +49,7 @@ func (r *InitRequest) toProto() (*Ydb_Topic.StreamWriteMessage_InitRequest, erro
 
 // Partitioning is struct because it included in per-message structure and
 // places on hot-path for write messages
-// structure will work and compile-optimization better then interface
+// structure will work and compile-optimization better then interface.
 type Partitioning struct {
 	Type           PartitioningType
 	MessageGroupID string
@@ -237,7 +237,7 @@ func (wa *WriteAck) fromProto(pb *Ydb_Topic.StreamWriteMessage_WriteResponse_Wri
 
 // MessageWriteStatus is struct because it included in per-message structure and
 // places on hot-path for write messages
-// structure will work and compile-optimization better then interface
+// structure will work and compile-optimization better then interface.
 type MessageWriteStatus struct {
 	Type          WriteStatusType
 	WrittenOffset int64

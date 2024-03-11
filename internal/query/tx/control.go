@@ -61,7 +61,7 @@ func (opts beginTxOptions) applyTxSelector(a *allocator.Allocator, txControl *Yd
 	txControl.TxSelector = selector
 }
 
-// BeginTx returns selector transaction control option
+// BeginTx returns selector transaction control option.
 func BeginTx(opts ...Option) beginTxOptions {
 	return opts
 }
@@ -97,12 +97,12 @@ func (c commitTxOption) applyTxControlOption(txControl *Control) {
 	txControl.commit = true
 }
 
-// CommitTx returns commit transaction control option
+// CommitTx returns commit transaction control option.
 func CommitTx() ControlOption {
 	return commitTxOption{}
 }
 
-// NewControl makes transaction control from given options
+// NewControl makes transaction control from given options.
 func NewControl(opts ...ControlOption) *Control {
 	txControl := &Control{
 		selector: BeginTx(WithSerializableReadWrite()),
@@ -121,7 +121,7 @@ func NoTx() *Control {
 	return nil
 }
 
-// DefaultTxControl returns default transaction control with serializable read-write isolation mode and auto-commit
+// DefaultTxControl returns default transaction control with serializable read-write isolation mode and auto-commit.
 func DefaultTxControl() *Control {
 	return NewControl(
 		BeginTx(WithSerializableReadWrite()),
@@ -129,7 +129,7 @@ func DefaultTxControl() *Control {
 	)
 }
 
-// SerializableReadWriteTxControl returns transaction control with serializable read-write isolation mode
+// SerializableReadWriteTxControl returns transaction control with serializable read-write isolation mode.
 func SerializableReadWriteTxControl(opts ...ControlOption) *Control {
 	return NewControl(
 		append([]ControlOption{
@@ -138,7 +138,7 @@ func SerializableReadWriteTxControl(opts ...ControlOption) *Control {
 	)
 }
 
-// OnlineReadOnlyTxControl returns online read-only transaction control
+// OnlineReadOnlyTxControl returns online read-only transaction control.
 func OnlineReadOnlyTxControl(opts ...OnlineReadOnlyOption) *Control {
 	return NewControl(
 		BeginTx(WithOnlineReadOnly(opts...)),
@@ -146,7 +146,7 @@ func OnlineReadOnlyTxControl(opts ...OnlineReadOnlyOption) *Control {
 	)
 }
 
-// StaleReadOnlyTxControl returns stale read-only transaction control
+// StaleReadOnlyTxControl returns stale read-only transaction control.
 func StaleReadOnlyTxControl() *Control {
 	return NewControl(
 		BeginTx(WithStaleReadOnly()),
@@ -154,7 +154,7 @@ func StaleReadOnlyTxControl() *Control {
 	)
 }
 
-// SnapshotReadOnlyTxControl returns snapshot read-only transaction control
+// SnapshotReadOnlyTxControl returns snapshot read-only transaction control.
 func SnapshotReadOnlyTxControl() *Control {
 	return NewControl(
 		BeginTx(WithSnapshotReadOnly()),

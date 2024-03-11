@@ -8,7 +8,7 @@ import "net/url"
 //   sugar.DSN("endpoint", "database", false),
 // )
 
-// DSN makes connection string (data source name) by endpoint, database and secure
+// DSN makes connection string (data source name) by endpoint, database and secure.
 func DSN(endpoint, database string, secure bool) (s string) {
 	qp := url.Values{}
 

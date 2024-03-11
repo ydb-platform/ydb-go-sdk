@@ -283,7 +283,7 @@ func (s *rawConverter) Any() interface{} {
 	return s.any()
 }
 
-// Value returns current item under scan as value
+// Value returns current item under scan as value.
 func (s *rawConverter) Value() value.Value {
 	if s.Err() != nil {
 		return nil

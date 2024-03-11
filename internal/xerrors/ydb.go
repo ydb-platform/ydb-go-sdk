@@ -28,7 +28,7 @@ func (e *ydbError) Unwrap() error {
 	return e.err
 }
 
-// Wrap makes internal ydb error
+// Wrap makes internal ydb error.
 func Wrap(err error) error {
 	return &ydbError{err: err}
 }

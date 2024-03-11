@@ -14,10 +14,10 @@ import (
 
 var errMessageWasReadEarly = xerrors.Wrap(errors.New("ydb: message was read early"))
 
-// ErrPublicUnexpectedCodec return when try to read message content with unknown codec
+// ErrPublicUnexpectedCodec return when try to read message content with unknown codec.
 var ErrPublicUnexpectedCodec = errors.New("unexpected codec")
 
-// PublicMessage is representation of topic message
+// PublicMessage is representation of topic message.
 type PublicMessage struct {
 	empty.DoNotCopy
 
@@ -55,7 +55,7 @@ func (m *PublicMessage) getCommitRange() PublicCommitRange {
 }
 
 // UnmarshalTo can call most once per message, it read all data from internal reader and
-// call PublicMessageContentUnmarshaler.UnmarshalYDBTopicMessage with uncompressed content
+// call PublicMessageContentUnmarshaler.UnmarshalYDBTopicMessage with uncompressed content.
 func (m *PublicMessage) UnmarshalTo(dst PublicMessageContentUnmarshaler) error {
 	if m.dataConsumed {
 		return xerrors.WithStackTrace(errMessageWasReadEarly)
@@ -68,14 +68,14 @@ func (m *PublicMessage) UnmarshalTo(dst PublicMessageContentUnmarshaler) error {
 
 // Read implements io.Reader
 // Read uncompressed message content
-// return topicreader.UnexpectedCodec if message compressed with unknown codec
+// return topicreader.UnexpectedCodec if message compressed with unknown codec.
 func (m *PublicMessage) Read(p []byte) (n int, err error) {
 	m.dataConsumed = true
 
 	return m.data.Read(p)
 }
 
-// PublicMessageContentUnmarshaler is interface for unmarshal message content
+// PublicMessageContentUnmarshaler is interface for unmarshal message content.
 type PublicMessageContentUnmarshaler interface {
 	// UnmarshalYDBTopicMessage MUST NOT use data after return.
 	// If you need content after return from Consume - copy data content to
@@ -127,14 +127,14 @@ func (pmb *PublicMessageBuilder) initMessage() {
 	}
 }
 
-// Seqno set message Seqno
+// Seqno set message Seqno.
 func (pmb *PublicMessageBuilder) Seqno(seqNo int64) *PublicMessageBuilder {
 	pmb.mess.SeqNo = seqNo
 
 	return pmb
 }
 
-// CreatedAt set message CreatedAt
+// CreatedAt set message CreatedAt.
 func (pmb *PublicMessageBuilder) CreatedAt(createdAt time.Time) *PublicMessageBuilder {
 	pmb.mess.CreatedAt = createdAt
 
@@ -150,42 +150,42 @@ func (pmb *PublicMessageBuilder) Metadata(metadata map[string][]byte) *PublicMes
 	return pmb
 }
 
-// MessageGroupID set message MessageGroupID
+// MessageGroupID set message MessageGroupID.
 func (pmb *PublicMessageBuilder) MessageGroupID(messageGroupID string) *PublicMessageBuilder {
 	pmb.mess.MessageGroupID = messageGroupID
 
 	return pmb
 }
 
-// WriteSessionMetadata set message WriteSessionMetadata
+// WriteSessionMetadata set message WriteSessionMetadata.
 func (pmb *PublicMessageBuilder) WriteSessionMetadata(writeSessionMetadata map[string]string) *PublicMessageBuilder {
 	pmb.mess.WriteSessionMetadata = writeSessionMetadata
 
 	return pmb
 }
 
-// Offset set message Offset
+// Offset set message Offset.
 func (pmb *PublicMessageBuilder) Offset(offset int64) *PublicMessageBuilder {
 	pmb.mess.Offset = offset
 
 	return pmb
 }
 
-// WrittenAt set message WrittenAt
+// WrittenAt set message WrittenAt.
 func (pmb *PublicMessageBuilder) WrittenAt(writtenAt time.Time) *PublicMessageBuilder {
 	pmb.mess.WrittenAt = writtenAt
 
 	return pmb
 }
 
-// ProducerID set message ProducerID
+// ProducerID set message ProducerID.
 func (pmb *PublicMessageBuilder) ProducerID(producerID string) *PublicMessageBuilder {
 	pmb.mess.ProducerID = producerID
 
 	return pmb
 }
 
-// DataAndUncompressedSize set message uncompressed content and field UncompressedSize
+// DataAndUncompressedSize set message uncompressed content and field UncompressedSize.
 func (pmb *PublicMessageBuilder) DataAndUncompressedSize(data []byte) *PublicMessageBuilder {
 	copyData := make([]byte, len(data))
 	copy(copyData, data)
@@ -197,29 +197,29 @@ func (pmb *PublicMessageBuilder) DataAndUncompressedSize(data []byte) *PublicMes
 	return pmb
 }
 
-// UncompressedSize set message UncompressedSize
+// UncompressedSize set message UncompressedSize.
 func (pmb *PublicMessageBuilder) UncompressedSize(uncompressedSize int) *PublicMessageBuilder {
 	pmb.mess.UncompressedSize = uncompressedSize
 
 	return pmb
 }
 
-// Context set message Context
+// Context set message Context.
 func (pmb *PublicMessageBuilder) Context(ctx context.Context) {
 	pmb.mess.commitRange.partitionSession.ctx = ctx
 }
 
-// Topic set message Topic
+// Topic set message Topic.
 func (pmb *PublicMessageBuilder) Topic(topic string) {
 	pmb.mess.commitRange.partitionSession.Topic = topic
 }
 
-// PartitionID set message PartitionID
+// PartitionID set message PartitionID.
 func (pmb *PublicMessageBuilder) PartitionID(partitionID int64) {
 	pmb.mess.commitRange.partitionSession.PartitionID = partitionID
 }
 
-// Build return builded message and reset internal state for create new message
+// Build return builded message and reset internal state for create new message.
 func (pmb *PublicMessageBuilder) Build() *PublicMessage {
 	mess := pmb.mess
 	pmb.initMessage()

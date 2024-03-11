@@ -13,7 +13,7 @@ import (
 // ReadSelector set rules for reader: set of topic, partitions, start time filted, etc.
 type ReadSelector = topicreaderinternal.PublicReadSelector
 
-// ReadSelectors slice of rules for topic reader
+// ReadSelectors slice of rules for topic reader.
 type ReadSelectors []ReadSelector
 
 // ReadTopic create simple selector for read topics, if no need special settings.
@@ -21,7 +21,7 @@ func ReadTopic(path string) ReadSelectors {
 	return ReadSelectors{{Path: path}}
 }
 
-// ReaderOption options for topic reader
+// ReaderOption options for topic reader.
 type ReaderOption = topicreaderinternal.PublicReaderOption
 
 // WithReaderOperationTimeout
@@ -49,7 +49,7 @@ func WithReaderStartTimeout(timeout time.Duration) ReaderOption {
 // WithReaderCheckRetryErrorFunction can override default error retry policy
 // use CheckErrorRetryDecisionDefault for use default behavior for the error
 // callback func must be fast and deterministic: always result same result for same error - it can be called
-// few times for every error
+// few times for every error.
 func WithReaderCheckRetryErrorFunction(callback CheckErrorRetryFunction) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.RetrySettings.CheckError = callback
@@ -80,7 +80,7 @@ func WithCommonConfig(common config.Common) ReaderOption {
 
 // WithCommitTimeLagTrigger
 // Deprecated: (was experimental) will be removed soon.
-// Use WithReaderCommitTimeLagTrigger instead
+// Use WithReaderCommitTimeLagTrigger instead.
 func WithCommitTimeLagTrigger(lag time.Duration) ReaderOption {
 	return WithReaderCommitTimeLagTrigger(lag)
 }
@@ -88,7 +88,7 @@ func WithCommitTimeLagTrigger(lag time.Duration) ReaderOption {
 // WithReaderCommitTimeLagTrigger set time lag from first commit message before send commit to server
 // for accumulate many similar-time commits to one server request
 // 0 mean no additional lag and send commit soon as possible
-// Default value: 1 second
+// Default value: 1 second.
 func WithReaderCommitTimeLagTrigger(lag time.Duration) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.CommitterBatchTimeLag = lag
@@ -97,14 +97,14 @@ func WithReaderCommitTimeLagTrigger(lag time.Duration) ReaderOption {
 
 // WithCommitCountTrigger
 // Deprecated: (was experimental) will be removed soon.
-// Use WithReaderCommitCountTrigger instead
+// Use WithReaderCommitCountTrigger instead.
 func WithCommitCountTrigger(count int) ReaderOption {
 	return WithReaderCommitCountTrigger(count)
 }
 
 // WithReaderCommitCountTrigger set count trigger for send batch to server
 // if count > 0 and sdk count of buffered commits >= count - send commit request to server
-// 0 mean no count limit and use timer lag trigger only
+// 0 mean no count limit and use timer lag trigger only.
 func WithReaderCommitCountTrigger(count int) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.CommitterBatchCounterTrigger = count
@@ -117,7 +117,7 @@ func WithReaderCommitCountTrigger(count int) ReaderOption {
 //
 // Deprecated: (was experimental) the method will be removed soon.
 //
-// The option will be removed for simplify code internals
+// The option will be removed for simplify code internals.
 func WithBatchReadMinCount(count int) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.DefaultBatchConfig.MinCount = count
@@ -133,7 +133,7 @@ func WithBatchReadMaxCount(count int) ReaderOption {
 	}
 }
 
-// WithReaderBatchMaxCount set max messages count, returned by topic.TopicReader.ReadBatch method
+// WithReaderBatchMaxCount set max messages count, returned by topic.TopicReader.ReadBatch method.
 func WithReaderBatchMaxCount(count int) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.DefaultBatchConfig.MaxCount = count
@@ -154,7 +154,7 @@ func WithReaderBufferSizeBytes(size int) ReaderOption {
 	}
 }
 
-// CreateDecoderFunc interface for fabric of message decoders
+// CreateDecoderFunc interface for fabric of message decoders.
 type CreateDecoderFunc = topicreaderinternal.PublicCreateDecoderFunc
 
 // WithAddDecoder add decoder for a codec.
@@ -165,15 +165,15 @@ func WithAddDecoder(codec topictypes.Codec, decoderCreate CreateDecoderFunc) Rea
 	}
 }
 
-// CommitMode variants of commit mode of the reader
+// CommitMode variants of commit mode of the reader.
 type CommitMode = topicreaderinternal.PublicCommitMode
 
 const (
 	// CommitModeAsync - commit return true if commit success add to internal send buffer (but not sent to server)
-	// now it is grpc buffer, in feature it may be internal sdk buffer
+	// now it is grpc buffer, in feature it may be internal sdk buffer.
 	CommitModeAsync = topicreaderinternal.CommitModeAsync // default
 
-	// CommitModeNone - reader will not be commit operation
+	// CommitModeNone - reader will not be commit operation.
 	CommitModeNone = topicreaderinternal.CommitModeNone
 
 	// CommitModeSync - commit return true when sdk receive ack of commit from server
@@ -197,7 +197,7 @@ func WithCommitMode(mode CommitMode) ReaderOption {
 	return WithReaderCommitMode(mode)
 }
 
-// WithReaderCommitMode set commit mode to the reader
+// WithReaderCommitMode set commit mode to the reader.
 func WithReaderCommitMode(mode CommitMode) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.CommitMode = mode
@@ -209,22 +209,22 @@ type (
 	// at own side. It can call multiply times in parallel.
 	GetPartitionStartOffsetFunc = topicreaderinternal.PublicGetPartitionStartOffsetFunc
 
-	// GetPartitionStartOffsetRequest info about the partition
+	// GetPartitionStartOffsetRequest info about the partition.
 	GetPartitionStartOffsetRequest = topicreaderinternal.PublicGetPartitionStartOffsetRequest
 
-	// GetPartitionStartOffsetResponse optional set offset for start reade messages for the partition
+	// GetPartitionStartOffsetResponse optional set offset for start reade messages for the partition.
 	GetPartitionStartOffsetResponse = topicreaderinternal.PublicGetPartitionStartOffsetResponse
 )
 
 // WithGetPartitionStartOffset
 // Deprecated: (was experimental) will be removed soon.
-// Use WithReaderGetPartitionStartOffset instead
+// Use WithReaderGetPartitionStartOffset instead.
 func WithGetPartitionStartOffset(f GetPartitionStartOffsetFunc) ReaderOption {
 	return WithReaderGetPartitionStartOffset(f)
 }
 
 // WithReaderGetPartitionStartOffset set optional handler for own manage progress of read partitions
-// instead of/additional to commit messages
+// instead of/additional to commit messages.
 func WithReaderGetPartitionStartOffset(f GetPartitionStartOffsetFunc) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.GetPartitionStartOffsetCallback = f
@@ -242,7 +242,7 @@ func WithReaderTrace(t trace.Topic) ReaderOption { //nolint:gocritic
 	}
 }
 
-// WithReaderUpdateTokenInterval set custom interval for send update token message to the server
+// WithReaderUpdateTokenInterval set custom interval for send update token message to the server.
 func WithReaderUpdateTokenInterval(interval time.Duration) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.CredUpdateInterval = interval

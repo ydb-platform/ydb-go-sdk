@@ -1,6 +1,6 @@
 package metrics
 
-// Registry is experimental interface for metrics registry
+// Registry is experimental interface for metrics registry.
 type Registry interface {
 	// CounterVec returns CounterVec by name, subsystem and labels
 	// If counter by args already created - return counter from cache

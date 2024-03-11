@@ -11,7 +11,7 @@ import (
 )
 
 // PrintMessageContent is simple example for easy start read messages
-// it is not recommend way for heavy-load processing, batch processing usually will faster
+// it is not recommend way for heavy-load processing, batch processing usually will faster.
 func PrintMessageContent(ctx context.Context, reader *topicreader.Reader) {
 	for {
 		msg, _ := reader.ReadMessage(ctx)
@@ -21,7 +21,7 @@ func PrintMessageContent(ctx context.Context, reader *topicreader.Reader) {
 	}
 }
 
-// ReadMessagesByBatch it is recommended way for process messages
+// ReadMessagesByBatch it is recommended way for process messages.
 func ReadMessagesByBatch(ctx context.Context, reader *topicreader.Reader) {
 	for {
 		batch, _ := reader.ReadMessageBatch(ctx)
@@ -30,7 +30,7 @@ func ReadMessagesByBatch(ctx context.Context, reader *topicreader.Reader) {
 	}
 }
 
-// UnmarshalMessageContentToJSONStruct is example for effective way for unmarshal json message content to value
+// UnmarshalMessageContentToJSONStruct is example for effective way for unmarshal json message content to value.
 func UnmarshalMessageContentToJSONStruct(msg *topicreader.Message) {
 	//nolint:tagliatelle
 	type S struct {
@@ -42,7 +42,7 @@ func UnmarshalMessageContentToJSONStruct(msg *topicreader.Message) {
 	_ = topicsugar.JSONUnmarshal(msg, &v)
 }
 
-// UnmarshalMessageContentToProtobufStruct is example for effective way for unmarshal protobuf message content to value
+// UnmarshalMessageContentToProtobufStruct is example for effective way for unmarshal protobuf message content to value.
 func UnmarshalMessageContentToProtobufStruct(msg *topicreader.Message) {
 	v := &firestore.BundledDocumentMetadata{} // protobuf type
 

@@ -48,42 +48,42 @@ func (f Field) Key() string {
 	return f.key
 }
 
-// StringValue is a value getter for fields with StringType type
+// StringValue is a value getter for fields with StringType type.
 func (f Field) StringValue() string {
 	f.checkType(StringType)
 
 	return f.vstr
 }
 
-// IntValue is a value getter for fields with IntType type
+// IntValue is a value getter for fields with IntType type.
 func (f Field) IntValue() int {
 	f.checkType(IntType)
 
 	return int(f.vint)
 }
 
-// Int64Value is a value getter for fields with Int64Type type
+// Int64Value is a value getter for fields with Int64Type type.
 func (f Field) Int64Value() int64 {
 	f.checkType(Int64Type)
 
 	return f.vint
 }
 
-// BoolValue is a value getter for fields with BoolType type
+// BoolValue is a value getter for fields with BoolType type.
 func (f Field) BoolValue() bool {
 	f.checkType(BoolType)
 
 	return f.vint != 0
 }
 
-// DurationValue is a value getter for fields with DurationType type
+// DurationValue is a value getter for fields with DurationType type.
 func (f Field) DurationValue() time.Duration {
 	f.checkType(DurationType)
 
 	return time.Nanosecond * time.Duration(f.vint)
 }
 
-// StringsValue is a value getter for fields with StringsType type
+// StringsValue is a value getter for fields with StringsType type.
 func (f Field) StringsValue() []string {
 	f.checkType(StringsType)
 	if f.vany == nil {
@@ -93,7 +93,7 @@ func (f Field) StringsValue() []string {
 	return f.vany.([]string)
 }
 
-// ErrorValue is a value getter for fields with ErrorType type
+// ErrorValue is a value getter for fields with ErrorType type.
 func (f Field) ErrorValue() error {
 	f.checkType(ErrorType)
 	if f.vany == nil {
@@ -103,7 +103,7 @@ func (f Field) ErrorValue() error {
 	return f.vany.(error)
 }
 
-// AnyValue is a value getter for fields with AnyType type
+// AnyValue is a value getter for fields with AnyType type.
 func (f Field) AnyValue() interface{} {
 	switch f.ftype {
 	case AnyType:
@@ -129,7 +129,7 @@ func (f Field) AnyValue() interface{} {
 	}
 }
 
-// Stringer is a value getter for fields with StringerType type
+// Stringer is a value getter for fields with StringerType type.
 func (f Field) Stringer() fmt.Stringer {
 	f.checkType(StringerType)
 	if f.vany == nil {
@@ -139,7 +139,7 @@ func (f Field) Stringer() fmt.Stringer {
 	return f.vany.(fmt.Stringer)
 }
 
-// Panics on type mismatch
+// Panics on type mismatch.
 func (f Field) checkType(want FieldType) {
 	if f.ftype != want {
 		panic(fmt.Sprintf("bad type. have: %s, want: %s", f.ftype, want))
@@ -186,7 +186,7 @@ func (f Field) String() string {
 	}
 }
 
-// String constructs Field with StringType
+// String constructs Field with StringType.
 func String(k, v string) Field {
 	return Field{
 		ftype: StringType,
@@ -195,7 +195,7 @@ func String(k, v string) Field {
 	}
 }
 
-// Int constructs Field with IntType
+// Int constructs Field with IntType.
 func Int(k string, v int) Field {
 	return Field{
 		ftype: IntType,
@@ -212,7 +212,7 @@ func Int64(k string, v int64) Field {
 	}
 }
 
-// Bool constructs Field with BoolType
+// Bool constructs Field with BoolType.
 func Bool(key string, value bool) Field {
 	var vint int64
 	if value {
@@ -228,7 +228,7 @@ func Bool(key string, value bool) Field {
 	}
 }
 
-// Duration constructs Field with DurationType
+// Duration constructs Field with DurationType.
 func Duration(key string, value time.Duration) Field {
 	return Field{
 		ftype: DurationType,
@@ -237,7 +237,7 @@ func Duration(key string, value time.Duration) Field {
 	}
 }
 
-// Strings constructs Field with StringsType
+// Strings constructs Field with StringsType.
 func Strings(key string, value []string) Field {
 	return Field{
 		ftype: StringsType,
@@ -246,7 +246,7 @@ func Strings(key string, value []string) Field {
 	}
 }
 
-// NamedError constructs Field with ErrorType
+// NamedError constructs Field with ErrorType.
 func NamedError(key string, value error) Field {
 	return Field{
 		ftype: ErrorType,
@@ -255,7 +255,7 @@ func NamedError(key string, value error) Field {
 	}
 }
 
-// Error is the same as NamedError("error", value)
+// Error is the same as NamedError("error", value).
 func Error(value error) Field {
 	return NamedError("error", value)
 }
@@ -299,7 +299,7 @@ const (
 	BoolType
 	DurationType
 
-	// StringsType corresponds to []string
+	// StringsType corresponds to []string.
 	StringsType
 
 	ErrorType
@@ -307,7 +307,7 @@ const (
 	// reflection-based approached to marshal this field.
 	AnyType
 
-	// StringerType corresponds to fmt.Stringer
+	// StringerType corresponds to fmt.Stringer.
 	StringerType
 
 	endType
@@ -344,12 +344,12 @@ func (ft FieldType) String() (typeName string) {
 	return typeName
 }
 
-// latencyField creates Field "latency": time.Since(start)
+// latencyField creates Field "latency": time.Since(start).
 func latencyField(start time.Time) Field {
 	return Duration("latency", time.Since(start))
 }
 
-// versionField creates Field "version": version.Version
+// versionField creates Field "version": version.Version.
 func versionField() Field {
 	return String("version", version.Version)
 }

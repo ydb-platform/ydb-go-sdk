@@ -7,7 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 )
 
-// PartitionStopHandled is example of sdk handle server signal about stop partition
+// PartitionStopHandled is example of sdk handle server signal about stop partition.
 func PartitionStopHandled(ctx context.Context, reader *topicreader.Reader) {
 	batch, _ := reader.ReadMessagesBatch(ctx)
 	if len(batch.Messages) == 0 {
@@ -18,7 +18,7 @@ func PartitionStopHandled(ctx context.Context, reader *topicreader.Reader) {
 	processBatch(batchContext, batch)
 }
 
-// PartitionGracefulStopHandled is example of sdk handle server signal about graceful stop partition
+// PartitionGracefulStopHandled is example of sdk handle server signal about graceful stop partition.
 func PartitionGracefulStopHandled(ctx context.Context, db *ydb.Driver) {
 	reader, _ := db.Topic().StartReader("consumer", nil)
 

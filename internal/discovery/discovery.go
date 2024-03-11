@@ -35,7 +35,7 @@ type Client struct {
 	client Ydb_Discovery_V1.DiscoveryServiceClient
 }
 
-// Discover cluster endpoints
+// Discover cluster endpoints.
 func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
 	var (
 		onDone = trace.DiscoveryOnDiscover(

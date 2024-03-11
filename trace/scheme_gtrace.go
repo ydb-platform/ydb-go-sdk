@@ -6,15 +6,15 @@ import (
 	"context"
 )
 
-// schemeComposeOptions is a holder of options
+// schemeComposeOptions is a holder of options.
 type schemeComposeOptions struct {
 	panicCallback func(e interface{})
 }
 
-// SchemeOption specified Scheme compose option
+// SchemeOption specified Scheme compose option.
 type SchemeComposeOption func(o *schemeComposeOptions)
 
-// WithSchemePanicCallback specified behavior on panic
+// WithSchemePanicCallback specified behavior on panic.
 func WithSchemePanicCallback(cb func(e interface{})) SchemeComposeOption {
 	return func(o *schemeComposeOptions) {
 		o.panicCallback = cb

@@ -6,15 +6,15 @@ import (
 	"context"
 )
 
-// retryComposeOptions is a holder of options
+// retryComposeOptions is a holder of options.
 type retryComposeOptions struct {
 	panicCallback func(e interface{})
 }
 
-// RetryOption specified Retry compose option
+// RetryOption specified Retry compose option.
 type RetryComposeOption func(o *retryComposeOptions)
 
-// WithRetryPanicCallback specified behavior on panic
+// WithRetryPanicCallback specified behavior on panic.
 func WithRetryPanicCallback(cb func(e interface{})) RetryComposeOption {
 	return func(o *retryComposeOptions) {
 		o.panicCallback = cb

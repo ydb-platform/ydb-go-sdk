@@ -6,15 +6,15 @@ import (
 	"context"
 )
 
-// discoveryComposeOptions is a holder of options
+// discoveryComposeOptions is a holder of options.
 type discoveryComposeOptions struct {
 	panicCallback func(e interface{})
 }
 
-// DiscoveryOption specified Discovery compose option
+// DiscoveryOption specified Discovery compose option.
 type DiscoveryComposeOption func(o *discoveryComposeOptions)
 
-// WithDiscoveryPanicCallback specified behavior on panic
+// WithDiscoveryPanicCallback specified behavior on panic.
 func WithDiscoveryPanicCallback(cb func(e interface{})) DiscoveryComposeOption {
 	return func(o *discoveryComposeOptions) {
 		o.panicCallback = cb

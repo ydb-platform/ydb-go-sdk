@@ -8,7 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// driver makes driver with New publishing
+// driver makes driver with New publishing.
 func driver(config Config) (t trace.Driver) {
 	config = config.WithSystem("driver")
 	endpoints := config.WithSystem("balancer").GaugeVec("endpoints", "local_dc", "az")

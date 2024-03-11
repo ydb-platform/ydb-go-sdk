@@ -23,13 +23,13 @@ import (
 )
 
 var (
-	// errOperationNotReady specified error when operation is not ready
+	// errOperationNotReady specified error when operation is not ready.
 	errOperationNotReady = xerrors.Wrap(fmt.Errorf("operation is not ready yet"))
 
-	// errClosedConnection specified error when connection are closed early
+	// errClosedConnection specified error when connection are closed early.
 	errClosedConnection = xerrors.Wrap(fmt.Errorf("connection closed early"))
 
-	// errUnavailableConnection specified error when connection are closed early
+	// errUnavailableConnection specified error when connection are closed early.
 	errUnavailableConnection = xerrors.Wrap(fmt.Errorf("connection unavailable"))
 )
 
@@ -250,7 +250,7 @@ func isAvailable(raw *grpc.ClientConn) bool {
 	return raw != nil && raw.GetState() == connectivity.Ready
 }
 
-// conn must be locked
+// conn must be locked.
 func (c *conn) close(ctx context.Context) (err error) {
 	if c.cc == nil {
 		return nil

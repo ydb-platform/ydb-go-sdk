@@ -37,7 +37,7 @@ func (issues issuesOption) applyToOperationError(oe *operationError) {
 }
 
 // WithIssues is an option for construct operation error with issues list
-// WithIssues must use as `Operation(WithIssues(issues))`
+// WithIssues must use as `Operation(WithIssues(issues))`.
 func WithIssues(issues []*Ydb_Issue.IssueMessage) issuesOption {
 	return issues
 }
@@ -49,7 +49,7 @@ func (code statusCodeOption) applyToOperationError(oe *operationError) {
 }
 
 // WithStatusCode is an option for construct operation error with reason code
-// WithStatusCode must use as `Operation(WithStatusCode(reason))`
+// WithStatusCode must use as `Operation(WithStatusCode(reason))`.
 func WithStatusCode(code Ydb.StatusIds_StatusCode) statusCodeOption {
 	return statusCodeOption(code)
 }
@@ -68,7 +68,7 @@ func (traceID traceIDOption) applyToOperationError(oe *operationError) {
 	oe.traceID = string(traceID)
 }
 
-// WithTraceID is an option for construct operation error with traceID
+// WithTraceID is an option for construct operation error with traceID.
 func WithTraceID(traceID string) traceIDOption {
 	return traceIDOption(traceID)
 }
@@ -81,7 +81,7 @@ func (e *operationOption) applyToOperationError(oe *operationError) {
 }
 
 // FromOperation is an option for construct operation error from operation.Status
-// FromOperation must use as `Operation(FromOperation(operation.Status))`
+// FromOperation must use as `Operation(FromOperation(operation.Status))`.
 func FromOperation(operation operation.Status) *operationOption {
 	return &operationOption{
 		code:   operation.GetStatus(),

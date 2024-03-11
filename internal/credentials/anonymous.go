@@ -18,7 +18,7 @@ type AnonymousCredentialsOption interface {
 	ApplyAnonymousCredentialsOption(c *Anonymous)
 }
 
-// Anonymous implements Credentials interface with Anonymous access
+// Anonymous implements Credentials interface with Anonymous access.
 type Anonymous struct {
 	sourceInfo string
 }

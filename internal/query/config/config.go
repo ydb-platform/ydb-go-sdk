@@ -49,12 +49,12 @@ func defaults() *Config {
 	}
 }
 
-// Trace defines trace over table client calls
+// Trace defines trace over table client calls.
 func (c *Config) Trace() *trace.Query {
 	return c.trace
 }
 
-// Clock defines clock
+// Clock defines clock.
 func (c *Config) Clock() clockwork.Clock {
 	return c.clock
 }
@@ -66,7 +66,7 @@ func (c *Config) PoolMaxSize() int {
 	return c.sizeLimit
 }
 
-// CreateSessionTimeout limits maximum time spent on Create session request
+// CreateSessionTimeout limits maximum time spent on Create session request.
 func (c *Config) CreateSessionTimeout() time.Duration {
 	return c.createSessionTimeout
 }

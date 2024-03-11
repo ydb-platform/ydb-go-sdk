@@ -216,7 +216,7 @@ func (r *streamResult) NextResultSet(ctx context.Context, columns ...string) boo
 	return r.NextResultSetErr(ctx, columns...) == nil
 }
 
-// CurrentResultSet get current result set
+// CurrentResultSet get current result set.
 func (r *baseResult) CurrentResultSet() result.Set {
 	return r
 }

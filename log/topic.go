@@ -7,7 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// Topic returns trace.Topic with logging events from details
+// Topic returns trace.Topic with logging events from details.
 func Topic(l Logger, d trace.Detailer, opts ...Option) (t trace.Topic) {
 	return internalTopic(wrapLogger(l, opts...), d)
 }

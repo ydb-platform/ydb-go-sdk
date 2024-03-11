@@ -7,7 +7,7 @@ import (
 )
 
 // EventBroadcast is implementation of broadcast notify about event
-// Zero value is usable, must not copy after first call any method
+// Zero value is usable, must not copy after first call any method.
 type EventBroadcast struct {
 	m sync.Mutex
 
@@ -22,7 +22,7 @@ func (b *EventBroadcast) initNeedLock() {
 
 // Waiter return channel, that will close when next event will be broadcast.
 // For prevent race between subscribe and event client code must subscribe at first, then check condition
-// if false - wait closing channed and check condition again
+// if false - wait closing channed and check condition again.
 func (b *EventBroadcast) Waiter() OneTimeWaiter {
 	b.m.Lock()
 	defer b.m.Unlock()

@@ -11,9 +11,9 @@ import (
 )
 
 var (
-	// fileCache stores certificates by file name
+	// fileCache stores certificates by file name.
 	fileCache sync.Map
-	// pemCache stores certificates by pem cache
+	// pemCache stores certificates by pem cache.
 	pemCache sync.Map
 )
 
@@ -106,7 +106,7 @@ func loadFromPemCache(key string) (_ *x509.Certificate, exists bool) {
 	return cert, true
 }
 
-// parseCertificate is a cached version of x509.ParseCertificate. Cache key is string(der)
+// parseCertificate is a cached version of x509.ParseCertificate. Cache key is string(der).
 func parseCertificate(der []byte, opts ...FromPemOption) (*x509.Certificate, error) {
 	options := fromPemOptions{}
 	for _, opt := range opts {

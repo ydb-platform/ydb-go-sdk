@@ -21,12 +21,12 @@ func WithTxControlHook(ctx context.Context, hook txControlHook) context.Context 
 	return context.WithValue(ctx, ctxTxControlHookKey{}, hook)
 }
 
-// WithQueryMode returns a copy of context with given QueryMode
+// WithQueryMode returns a copy of context with given QueryMode.
 func WithQueryMode(ctx context.Context, m QueryMode) context.Context {
 	return context.WithValue(ctx, ctxModeTypeKey{}, m)
 }
 
-// queryModeFromContext returns defined QueryMode or DefaultQueryMode
+// queryModeFromContext returns defined QueryMode or DefaultQueryMode.
 func queryModeFromContext(ctx context.Context, defaultQueryMode QueryMode) QueryMode {
 	if m, ok := ctx.Value(ctxModeTypeKey{}).(QueryMode); ok {
 		return m

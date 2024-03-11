@@ -64,14 +64,14 @@ func (c *Config) Trace() *trace.Discovery {
 
 type Option func(c *Config)
 
-// With applies common configuration params
+// With applies common configuration params.
 func With(config config.Common) Option {
 	return func(c *Config) {
 		c.Common = config
 	}
 }
 
-// WithEndpoint set a required starting endpoint for connect
+// WithEndpoint set a required starting endpoint for connect.
 func WithEndpoint(endpoint string) Option {
 	return func(c *Config) {
 		c.endpoint = endpoint
@@ -85,7 +85,7 @@ func WithDatabase(database string) Option {
 	}
 }
 
-// WithSecure set flag for secure connection
+// WithSecure set flag for secure connection.
 func WithSecure(ssl bool) Option {
 	return func(c *Config) {
 		c.secure = ssl
@@ -94,14 +94,14 @@ func WithSecure(ssl bool) Option {
 
 // WithMeta is not for user.
 //
-// This option add meta information about database connection
+// This option add meta information about database connection.
 func WithMeta(meta *meta.Meta) Option {
 	return func(c *Config) {
 		c.meta = meta
 	}
 }
 
-// WithTrace configures discovery client calls tracing
+// WithTrace configures discovery client calls tracing.
 func WithTrace(trace trace.Discovery, opts ...trace.DiscoveryComposeOption) Option {
 	return func(c *Config) {
 		c.trace = c.trace.Compose(&trace, opts...)

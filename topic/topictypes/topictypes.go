@@ -9,17 +9,17 @@ import (
 )
 
 // Codec code for use in topics
-// Allow to use custom values in interval [10000,20000)
+// Allow to use custom values in interval [10000,20000).
 type Codec int32
 
 const (
 	CodecRaw  = Codec(rawtopiccommon.CodecRaw)
 	CodecGzip = Codec(rawtopiccommon.CodecGzip)
 
-	// CodecLzop not supported by default, customer need provide own codec library
+	// CodecLzop not supported by default, customer need provide own codec library.
 	CodecLzop = Codec(rawtopiccommon.CodecLzop)
 
-	// CodecZstd not supported by default, customer need provide own codec library
+	// CodecZstd not supported by default, customer need provide own codec library.
 	CodecZstd = Codec(rawtopiccommon.CodecZstd)
 
 	CodecCustomerFirst = Codec(rawtopiccommon.CodecCustomerFirst)
@@ -30,7 +30,7 @@ func (c Codec) ToRaw(r *rawtopiccommon.Codec) {
 	*r = rawtopiccommon.Codec(c)
 }
 
-// Consumer contains info about topic consumer
+// Consumer contains info about topic consumer.
 type Consumer struct {
 	Name            string
 	Important       bool
@@ -92,7 +92,7 @@ func (m *MeteringMode) ToRaw(raw *rawtopic.MeteringMode) {
 	*raw = rawtopic.MeteringMode(*m)
 }
 
-// PartitionSettings settings of partitions
+// PartitionSettings settings of partitions.
 type PartitionSettings struct {
 	MinActivePartitions int64
 	PartitionCountLimit int64

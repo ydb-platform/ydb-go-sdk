@@ -15,13 +15,13 @@ type Common struct {
 	panicCallback func(e interface{})
 }
 
-// AutoRetry defines auto-retry flag
+// AutoRetry defines auto-retry flag.
 func (c *Common) AutoRetry() bool {
 	return !c.disableAutoRetry
 }
 
 // PanicCallback returns user-defined panic callback
-// If nil - panic callback not defined
+// If nil - panic callback not defined.
 func (c *Common) PanicCallback() func(e interface{}) {
 	return c.panicCallback
 }
@@ -68,12 +68,12 @@ func SetOperationCancelAfter(c *Common, operationCancelAfter time.Duration) {
 	c.operationCancelAfter = operationCancelAfter
 }
 
-// SetPanicCallback applies panic callback to config
+// SetPanicCallback applies panic callback to config.
 func SetPanicCallback(c *Common, panicCallback func(e interface{})) {
 	c.panicCallback = panicCallback
 }
 
-// SetAutoRetry affects on AutoRetry() flag
+// SetAutoRetry affects on AutoRetry() flag.
 func SetAutoRetry(c *Common, autoRetry bool) {
 	c.disableAutoRetry = !autoRetry
 }

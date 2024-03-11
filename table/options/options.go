@@ -113,7 +113,7 @@ func (settings timeToLiveSettings) ApplyCreateTableOption(d *CreateTableDesc, a 
 	d.TtlSettings = (*TimeToLiveSettings)(&settings).ToYDB()
 }
 
-// WithTimeToLiveSettings defines TTL settings in CreateTable request
+// WithTimeToLiveSettings defines TTL settings in CreateTable request.
 func WithTimeToLiveSettings(settings TimeToLiveSettings) CreateTableOption {
 	return timeToLiveSettings(settings)
 }
@@ -514,7 +514,7 @@ func WithPartitioningPolicyMode(mode PartitioningMode) PartitioningPolicyOption 
 	}
 }
 
-// Deprecated: use WithUniformPartitions instead
+// Deprecated: use WithUniformPartitions instead.
 func WithPartitioningPolicyUniformPartitions(n uint64) PartitioningPolicyOption {
 	return func(p *partitioningPolicy, a *allocator.Allocator) {
 		p.Partitions = &Ydb_Table.PartitioningPolicy_UniformPartitions{
@@ -523,7 +523,7 @@ func WithPartitioningPolicyUniformPartitions(n uint64) PartitioningPolicyOption 
 	}
 }
 
-// Deprecated: use WithExplicitPartitions instead
+// Deprecated: use WithExplicitPartitions instead.
 func WithPartitioningPolicyExplicitPartitions(splitPoints ...value.Value) PartitioningPolicyOption {
 	return func(p *partitioningPolicy, a *allocator.Allocator) {
 		values := make([]*Ydb.TypedValue, len(splitPoints))
@@ -697,7 +697,7 @@ type (
 	}
 )
 
-// WithAddColumn adds column in AlterTable request
+// WithAddColumn adds column in AlterTable request.
 func WithAddColumn(name string, typ types.Type) AlterTableOption {
 	return column{
 		name: name,
@@ -705,7 +705,7 @@ func WithAddColumn(name string, typ types.Type) AlterTableOption {
 	}
 }
 
-// WithAlterAttribute changes attribute in AlterTable request
+// WithAlterAttribute changes attribute in AlterTable request.
 func WithAlterAttribute(key, value string) AlterTableOption {
 	return attribute{
 		key:   key,
@@ -713,7 +713,7 @@ func WithAlterAttribute(key, value string) AlterTableOption {
 	}
 }
 
-// WithAddAttribute adds attribute to table in AlterTable request
+// WithAddAttribute adds attribute to table in AlterTable request.
 func WithAddAttribute(key, value string) AlterTableOption {
 	return attribute{
 		key:   key,
@@ -721,7 +721,7 @@ func WithAddAttribute(key, value string) AlterTableOption {
 	}
 }
 
-// WithDropAttribute drops attribute from table in AlterTable request
+// WithDropAttribute drops attribute from table in AlterTable request.
 func WithDropAttribute(key string) AlterTableOption {
 	return attribute{
 		key: key,
@@ -766,7 +766,7 @@ func WithAlterPartitionSettingsObject(ps PartitioningSettings) AlterTableOption 
 	return partitioningSettingsObject(ps)
 }
 
-// WithSetTimeToLiveSettings appends TTL settings in AlterTable request
+// WithSetTimeToLiveSettings appends TTL settings in AlterTable request.
 func WithSetTimeToLiveSettings(settings TimeToLiveSettings) AlterTableOption {
 	return timeToLiveSettings(settings)
 }
@@ -777,7 +777,7 @@ func (dropTimeToLive) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allo
 	d.TtlAction = &Ydb_Table.AlterTableRequest_DropTtlSettings{}
 }
 
-// WithDropTimeToLive drops TTL settings in AlterTable request
+// WithDropTimeToLive drops TTL settings in AlterTable request.
 func WithDropTimeToLive() AlterTableOption {
 	return dropTimeToLive{}
 }
@@ -839,7 +839,7 @@ type (
 
 // WithKeepInCache manages keep-in-cache flag in query cache policy
 //
-// By default all data queries executes with keep-in-cache policy
+// By default all data queries executes with keep-in-cache policy.
 func WithKeepInCache(keepInCache bool) ExecuteDataQueryOption {
 	return withQueryCachePolicy(
 		withQueryCachePolicyKeepInCache(keepInCache),
@@ -862,12 +862,12 @@ func (opts withCallOptions) ApplyExecuteDataQueryOption(
 	return opts
 }
 
-// WithCallOptions appends flag of commit transaction with executing query
+// WithCallOptions appends flag of commit transaction with executing query.
 func WithCallOptions(opts ...grpc.CallOption) withCallOptions {
 	return opts
 }
 
-// WithCommit appends flag of commit transaction with executing query
+// WithCommit appends flag of commit transaction with executing query.
 func WithCommit() ExecuteDataQueryOption {
 	return executeDataQueryOptionFunc(func(desc *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
 		desc.TxControl.CommitTx = true
@@ -876,7 +876,7 @@ func WithCommit() ExecuteDataQueryOption {
 	})
 }
 
-// WithIgnoreTruncated mark truncated result as good (without error)
+// WithIgnoreTruncated mark truncated result as good (without error).
 func WithIgnoreTruncated() ExecuteDataQueryOption {
 	return executeDataQueryOptionFunc(func(desc *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
 		desc.IgnoreTruncated = true
@@ -888,7 +888,7 @@ func WithIgnoreTruncated() ExecuteDataQueryOption {
 // WithQueryCachePolicyKeepInCache manages keep-in-cache policy
 //
 // Deprecated: data queries always executes with enabled keep-in-cache policy.
-// Use WithKeepInCache for disabling keep-in-cache policy
+// Use WithKeepInCache for disabling keep-in-cache policy.
 func WithQueryCachePolicyKeepInCache() QueryCachePolicyOption {
 	return withQueryCachePolicyKeepInCache(true)
 }
@@ -901,7 +901,7 @@ func withQueryCachePolicyKeepInCache(keepInCache bool) QueryCachePolicyOption {
 
 // WithQueryCachePolicy manages query cache policy
 //
-// Deprecated: use WithKeepInCache for disabling keep-in-cache policy
+// Deprecated: use WithKeepInCache for disabling keep-in-cache policy.
 func WithQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption {
 	return withQueryCachePolicy(opts...)
 }
@@ -970,7 +970,7 @@ func (f executeScanQueryOptionFunc) ApplyExecuteScanQueryOption(d *ExecuteScanQu
 
 var _ ExecuteScanQueryOption = executeScanQueryOptionFunc(nil)
 
-// WithExecuteScanQueryMode defines scan query mode: execute or explain
+// WithExecuteScanQueryMode defines scan query mode: execute or explain.
 func WithExecuteScanQueryMode(m ExecuteScanQueryRequestMode) ExecuteScanQueryOption {
 	return executeScanQueryOptionFunc(func(desc *ExecuteScanQueryDesc) []grpc.CallOption {
 		desc.Mode = m.toYDB()
@@ -979,7 +979,7 @@ func WithExecuteScanQueryMode(m ExecuteScanQueryRequestMode) ExecuteScanQueryOpt
 	})
 }
 
-// ExecuteScanQueryStatsType specified scan query mode
+// ExecuteScanQueryStatsType specified scan query mode.
 type ExecuteScanQueryStatsType uint32
 
 const (
@@ -1001,7 +1001,7 @@ func (stats ExecuteScanQueryStatsType) toYDB() Ydb_Table.QueryStatsCollection_Mo
 	}
 }
 
-// WithExecuteScanQueryStats defines query statistics mode
+// WithExecuteScanQueryStats defines query statistics mode.
 func WithExecuteScanQueryStats(stats ExecuteScanQueryStatsType) ExecuteScanQueryOption {
 	return executeScanQueryOptionFunc(func(desc *ExecuteScanQueryDesc) []grpc.CallOption {
 		desc.CollectStats = stats.toYDB()
