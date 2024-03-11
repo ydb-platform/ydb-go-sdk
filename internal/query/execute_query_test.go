@@ -631,9 +631,9 @@ func TestExecute(t *testing.T) {
 			ctx := xtest.Context(t)
 			ctrl := gomock.NewController(t)
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
-				Status: Ydb.StatusIds_UNAVAILABLE,
-			}, nil)
+			stream.EXPECT().Recv().Return(nil, xerrors.Operation(xerrors.WithStatusCode(
+				Ydb.StatusIds_UNAVAILABLE,
+			)))
 			service := NewMockQueryServiceClient(ctrl)
 			service.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 			t.Log("execute")
@@ -707,9 +707,9 @@ func TestExecute(t *testing.T) {
 					},
 				},
 			}, nil)
-			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
-				Status: Ydb.StatusIds_UNAVAILABLE,
-			}, nil)
+			stream.EXPECT().Recv().Return(nil, xerrors.Operation(xerrors.WithStatusCode(
+				Ydb.StatusIds_UNAVAILABLE,
+			)))
 			service := NewMockQueryServiceClient(ctrl)
 			service.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 			t.Log("execute")

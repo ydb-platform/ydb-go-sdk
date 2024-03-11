@@ -135,9 +135,10 @@ func (s *grpcClientStream) wrapError(err error) error {
 		return nil
 	}
 
-	nodeErr := newConnError(s.c.endpoint.NodeID(), s.c.endpoint.Address(), err)
-
-	return xerrors.WithStackTrace(nodeErr, xerrors.WithSkipDepth(1))
+	return xerrors.WithStackTrace(
+		newConnError(s.c.endpoint.NodeID(), s.c.endpoint.Address(), err),
+		xerrors.WithSkipDepth(1),
+	)
 }
 
 func createPinger(c *conn) context.CancelFunc {

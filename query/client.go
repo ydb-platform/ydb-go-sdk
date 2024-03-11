@@ -4,8 +4,6 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type Client interface {
@@ -48,26 +46,5 @@ type (
 		closer.Closer
 
 		Session
-	}
-
-	DoOption interface {
-		applyDoOption(o *DoOptions)
-	}
-
-	DoOptions struct {
-		Label        string
-		Idempotent   bool
-		RetryOptions []retry.Option
-		Trace        *trace.Query
-	}
-
-	DoTxOption interface {
-		applyDoTxOption(o *DoTxOptions)
-	}
-
-	DoTxOptions struct {
-		DoOptions
-
-		TxSettings TransactionSettings
 	}
 )

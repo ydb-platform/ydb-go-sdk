@@ -188,13 +188,10 @@ func (t *Query) onDoTx(q QueryDoTxStartInfo) func(info QueryDoTxIntermediateInfo
 		return res
 	}
 }
-func QueryOnDo(t *Query, c *context.Context, call call, label string, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
+func QueryOnDo(t *Query, c *context.Context, call call) func(error) func(attempts int, _ error) {
 	var p QueryDoStartInfo
 	p.Context = c
 	p.Call = call
-	p.Label = label
-	p.Idempotent = idempotent
-	p.NestedCall = nestedCall
 	res := t.onDo(p)
 	return func(e error) func(int, error) {
 		var p QueryDoIntermediateInfo
@@ -208,13 +205,10 @@ func QueryOnDo(t *Query, c *context.Context, call call, label string, idempotent
 		}
 	}
 }
-func QueryOnDoTx(t *Query, c *context.Context, call call, label string, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
+func QueryOnDoTx(t *Query, c *context.Context, call call) func(error) func(attempts int, _ error) {
 	var p QueryDoTxStartInfo
 	p.Context = c
 	p.Call = call
-	p.Label = label
-	p.Idempotent = idempotent
-	p.NestedCall = nestedCall
 	res := t.onDoTx(p)
 	return func(e error) func(int, error) {
 		var p QueryDoTxIntermediateInfo

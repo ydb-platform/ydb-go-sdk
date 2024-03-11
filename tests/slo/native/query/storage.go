@@ -65,15 +65,8 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 			_, res, err := session.Execute(ctx,
 				fmt.Sprintf(`
 					DECLARE $id AS Uint64;
-					DECLARE $payload_str AS Utf8;
-					DECLARE $payload_double AS Double;
-					DECLARE $payload_timestamp AS Timestamp;
-					
-					UPSERT INTO %s (
-						id, hash, payload_str, payload_double, payload_timestamp
-					) VALUES (
-						$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp
-					);
+					SELECT id, payload_str, payload_double, payload_timestamp, payload_hash
+					FROM %s WHERE id = $id AND hash = Digest::NumericHash($id);
 				`, s.tablePath),
 				query.WithParameters(
 					ydb.ParamsBuilder().
@@ -118,7 +111,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 			return res.Err()
 		},
 		query.WithIdempotent(),
-		query.WithTrace(trace.Query{
+		query.WithTrace(&trace.Query{
 			OnDo: func(info trace.QueryDoStartInfo) func(info trace.QueryDoIntermediateInfo) func(trace.QueryDoDoneInfo) {
 				return func(info trace.QueryDoIntermediateInfo) func(trace.QueryDoDoneInfo) {
 					return func(info trace.QueryDoDoneInfo) {
@@ -149,8 +142,15 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, _ e
 			_, res, err := session.Execute(ctx,
 				fmt.Sprintf(`
 					DECLARE $id AS Uint64;
-					SELECT id, payload_str, payload_double, payload_timestamp, payload_hash
-					FROM %s WHERE id = $id AND hash = Digest::NumericHash($id);
+					DECLARE $payload_str AS Utf8;
+					DECLARE $payload_double AS Double;
+					DECLARE $payload_timestamp AS Timestamp;
+					
+					UPSERT INTO %s (
+						id, hash, payload_str, payload_double, payload_timestamp
+					) VALUES (
+						$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp
+					);
 				`, s.tablePath),
 				query.WithParameters(
 					ydb.ParamsBuilder().
@@ -165,15 +165,14 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, _ e
 				return err
 			}
 
-			err = res.Err()
-			if err != nil {
-				return err
-			}
+			defer func() {
+				_ = res.Close(ctx)
+			}()
 
-			return res.Close(ctx)
+			return res.Err()
 		},
 		query.WithIdempotent(),
-		query.WithTrace(trace.Query{
+		query.WithTrace(&trace.Query{
 			OnDo: func(info trace.QueryDoStartInfo) func(info trace.QueryDoIntermediateInfo) func(trace.QueryDoDoneInfo) {
 				return func(info trace.QueryDoIntermediateInfo) func(trace.QueryDoDoneInfo) {
 					return func(info trace.QueryDoDoneInfo) {

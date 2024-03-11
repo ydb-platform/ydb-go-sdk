@@ -535,7 +535,7 @@ func TestResultNextResultSet(t *testing.T) {
 					require.EqualValues(t, 1, rs.rowIndex)
 				}
 				t.Log("explicit interrupt stream")
-				r.interrupt()
+				r.closeOnce()
 				{
 					t.Log("next (row=3)")
 					_, err := rs.next(context.Background())
@@ -545,16 +545,16 @@ func TestResultNextResultSet(t *testing.T) {
 				{
 					t.Log("next (row=4)")
 					_, err := rs.next(context.Background())
-					require.ErrorIs(t, err, errInterruptedStream)
+					require.ErrorIs(t, err, errClosedResult)
 				}
 			}
 			{
 				t.Log("nextResultSet")
 				_, err := r.nextResultSet(context.Background())
-				require.ErrorIs(t, err, errInterruptedStream)
+				require.ErrorIs(t, err, errClosedResult)
 			}
 			t.Log("check final error")
-			require.ErrorIs(t, r.Err(), errInterruptedStream)
+			require.ErrorIs(t, r.Err(), errClosedResult)
 		}, xtest.StopAfter(time.Second))
 	})
 	t.Run("WrongResultSetIndex", func(t *testing.T) {

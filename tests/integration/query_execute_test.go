@@ -14,7 +14,9 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestQueryExecute(t *testing.T) {
@@ -28,6 +30,16 @@ func TestQueryExecute(t *testing.T) {
 	db, err := ydb.Open(ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+		ydb.WithTraceQuery(
+			log.Query(
+				log.Default(os.Stdout,
+					log.WithLogQuery(),
+					log.WithColoring(),
+					log.WithMinLevel(log.TRACE),
+				),
+				trace.QueryEvents,
+			),
+		),
 	)
 	require.NoError(t, err)
 	t.Run("Scan", func(t *testing.T) {
