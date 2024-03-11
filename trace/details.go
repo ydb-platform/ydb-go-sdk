@@ -44,6 +44,11 @@ const (
 	TablePoolSessionLifeCycleEvents
 	TablePoolAPIEvents
 
+	QuerySessionEvents
+	QueryExecuteEvents
+	QueryTransactionEvents
+	QueryPoolEvents
+
 	TopicControlPlaneEvents
 
 	TopicReaderCustomerEvents
@@ -89,6 +94,11 @@ const (
 		TablePoolLifeCycleEvents |
 		TablePoolSessionLifeCycleEvents |
 		TablePoolAPIEvents
+
+	QueryEvents = QuerySessionEvents |
+		QueryPoolEvents |
+		QueryExecuteEvents |
+		QueryTransactionEvents
 
 	TablePoolEvents = TablePoolLifeCycleEvents |
 		TablePoolSessionLifeCycleEvents |
@@ -143,6 +153,12 @@ var (
 		TablePoolLifeCycleEvents:        "ydb.table.pool",
 		TablePoolSessionLifeCycleEvents: "ydb.table.pool.session",
 		TablePoolAPIEvents:              "ydb.table.pool.api",
+
+		QueryEvents:            "ydb.query",
+		QueryPoolEvents:        "ydb.query.pool",
+		QuerySessionEvents:     "ydb.query.session",
+		QueryExecuteEvents:     "ydb.query.execute",
+		QueryTransactionEvents: "ydb.query.tx",
 
 		DatabaseSQLEvents:          "ydb.database.sql",
 		DatabaseSQLConnectorEvents: "ydb.database.sql.connector",

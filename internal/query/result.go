@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -18,12 +17,10 @@ var _ query.Result = (*result)(nil)
 
 type result struct {
 	stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
-	interrupt      func()
-	close          func()
+	closeOnce      func()
 	lastPart       *Ydb_Query.ExecuteQueryResponsePart
 	resultSetIndex int64
 	errs           []error
-	interrupted    chan struct{}
 	closed         chan struct{}
 }
 
@@ -31,56 +28,50 @@ func newResult(
 	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
 	streamCancel func(),
-) (_ *result, txID string, _ error) {
-	interrupted := make(chan struct{})
-	r := result{
-		stream:         stream,
-		resultSetIndex: -1,
-		interrupted:    interrupted,
-		closed:         make(chan struct{}),
-		interrupt: sync.OnceFunc(func() {
-			close(interrupted)
-			streamCancel()
-		}),
-	}
+) (_ *result, txID string, err error) {
 	select {
 	case <-ctx.Done():
 		return nil, txID, xerrors.WithStackTrace(ctx.Err())
 	default:
 		part, err := nextPart(stream)
 		if err != nil {
+			streamCancel()
+
 			return nil, txID, xerrors.WithStackTrace(err)
 		}
-		r.lastPart = part
-		r.close = sync.OnceFunc(func() {
-			r.interrupt()
-			close(r.closed)
-		})
+		var (
+			interrupted = make(chan struct{})
+			closed      = make(chan struct{})
+			closeOnce   = sync.OnceFunc(func() {
+				close(interrupted)
+				close(closed)
+				streamCancel()
+			})
+		)
 
-		return &r, part.GetTxMeta().GetId(), nil
+		return &result{
+			stream:         stream,
+			resultSetIndex: -1,
+			lastPart:       part,
+			closed:         closed,
+			closeOnce:      closeOnce,
+		}, part.GetTxMeta().GetId(), nil
 	}
 }
 
-func nextPart(stream Ydb_Query_V1.QueryService_ExecuteQueryClient) (*Ydb_Query.ExecuteQueryResponsePart, error) {
+func nextPart(
+	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
+) (_ *Ydb_Query.ExecuteQueryResponsePart, finalErr error) {
 	part, err := stream.Recv()
 	if err != nil {
-		if xerrors.Is(err, io.EOF) {
-			return nil, xerrors.WithStackTrace(err)
-		}
-
-		return nil, xerrors.WithStackTrace(xerrors.Transport(err))
-	}
-	if status := part.GetStatus(); status != Ydb.StatusIds_SUCCESS {
-		return nil, xerrors.WithStackTrace(
-			xerrors.FromOperation(part),
-		)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return part, nil
 }
 
 func (r *result) Close(ctx context.Context) error {
-	r.close()
+	r.closeOnce()
 
 	return nil
 }
@@ -101,60 +92,53 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		default:
-			select {
-			case <-r.interrupted:
-				return nil, xerrors.WithStackTrace(errInterruptedStream)
-			default:
-				if resultSetIndex := r.lastPart.GetResultSetIndex(); resultSetIndex >= nextResultSetIndex { //nolint:nestif
-					r.resultSetIndex = resultSetIndex
+			if resultSetIndex := r.lastPart.GetResultSetIndex(); resultSetIndex >= nextResultSetIndex { //nolint:nestif
+				r.resultSetIndex = resultSetIndex
 
-					return newResultSet(func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
-						defer func() {
-							if err != nil && !xerrors.Is(err,
-								io.EOF, context.Canceled,
-							) {
-								r.errs = append(r.errs, err)
-							}
-						}()
-						select {
-						case <-r.closed:
-							return nil, errClosedResult
-						case <-r.interrupted:
-							return nil, errInterruptedStream
-						default:
-							part, err := nextPart(r.stream)
-							if err != nil {
-								if xerrors.Is(err, io.EOF) {
-									r.close()
-								}
-
-								return nil, xerrors.WithStackTrace(err)
-							}
-							r.lastPart = part
-							if part.GetResultSetIndex() > nextResultSetIndex {
-								return nil, xerrors.WithStackTrace(fmt.Errorf(
-									"result set (index=%d) receive part (index=%d) for next result set: %w",
-									nextResultSetIndex, part.GetResultSetIndex(), io.EOF,
-								))
-							}
-
-							return part, nil
+				return newResultSet(func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
+					defer func() {
+						if err != nil && !xerrors.Is(err,
+							io.EOF, context.Canceled,
+						) {
+							r.errs = append(r.errs, err)
 						}
-					}, r.lastPart), nil
-				}
-				part, err := nextPart(r.stream)
-				if err != nil {
-					return nil, xerrors.WithStackTrace(err)
-				}
-				if part.GetResultSetIndex() < r.resultSetIndex {
-					return nil, xerrors.WithStackTrace(fmt.Errorf(
-						"next result set index %d less than last result set index %d: %w",
-						part.GetResultSetIndex(), r.resultSetIndex, errWrongNextResultSetIndex,
-					))
-				}
-				r.lastPart = part
-				r.resultSetIndex = part.GetResultSetIndex()
+					}()
+					select {
+					case <-r.closed:
+						return nil, errClosedResult
+					default:
+						part, err := nextPart(r.stream)
+						if err != nil {
+							if xerrors.Is(err, io.EOF) {
+								r.closeOnce()
+							}
+
+							return nil, xerrors.WithStackTrace(err)
+						}
+						r.lastPart = part
+						if part.GetResultSetIndex() > nextResultSetIndex {
+							return nil, xerrors.WithStackTrace(fmt.Errorf(
+								"result set (index=%d) receive part (index=%d) for next result set: %w",
+								nextResultSetIndex, part.GetResultSetIndex(), io.EOF,
+							))
+						}
+
+						return part, nil
+					}
+				}, r.lastPart), nil
 			}
+			part, err := nextPart(r.stream)
+			if err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
+			if part.GetResultSetIndex() < r.resultSetIndex {
+				return nil, xerrors.WithStackTrace(fmt.Errorf(
+					"next result set index %d less than last result set index %d: %w",
+					part.GetResultSetIndex(), r.resultSetIndex, errWrongNextResultSetIndex,
+				))
+			}
+			r.lastPart = part
+			r.resultSetIndex = part.GetResultSetIndex()
 		}
 	}
 }

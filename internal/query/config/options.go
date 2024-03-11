@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type Option func(*Config)
@@ -12,6 +13,13 @@ type Option func(*Config)
 func With(config config.Common) Option {
 	return func(c *Config) {
 		c.Common = config
+	}
+}
+
+// WithTrace appends table trace to early defined traces
+func WithTrace(trace *trace.Query, opts ...trace.QueryComposeOption) Option {
+	return func(c *Config) {
+		c.trace = c.trace.Compose(trace, opts...)
 	}
 }
 
