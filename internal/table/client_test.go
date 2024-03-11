@@ -787,7 +787,8 @@ func mustPutSession(tb testing.TB, p *Client, s *session) {
 	}
 }
 
-func mustClose(tb testing.TB, p *Client) {
+func mustClose(tb testing.TB, p closer.Closer) {
+	tb.Helper()
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	if err := p.Close(context.Background()); err != nil {
