@@ -16,10 +16,11 @@ import (
 
 func TestResultNextResultSet(t *testing.T) {
 	t.Run("HappyWay", func(t *testing.T) {
-		xtest.TestManyTimes(t, func(t testing.TB) {
-			ctx, cancel := context.WithCancel(xtest.Context(t))
+		xtest.TestManyTimes(t, func(tb testing.TB) {
+			tb.Helper()
+			ctx, cancel := context.WithCancel(xtest.Context(tb))
 			defer cancel()
-			ctrl := gomock.NewController(t)
+			ctrl := gomock.NewController(tb)
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status:         Ydb.StatusIds_SUCCESS,
@@ -346,114 +347,115 @@ func TestResultNextResultSet(t *testing.T) {
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
 			r, _, err := newResult(ctx, stream, cancel)
-			require.NoError(t, err)
+			require.NoError(tb, err)
 			defer r.Close(ctx)
 			{
-				t.Log("nextResultSet")
+				tb.Log("nextResultSet")
 				rs, err := r.nextResultSet(ctx)
-				require.NoError(t, err)
-				require.EqualValues(t, 0, rs.index)
+				require.NoError(tb, err)
+				require.EqualValues(tb, 0, rs.index)
 				{
-					t.Log("next (row=1)")
+					tb.Log("next (row=1)")
 					_, err := rs.next(ctx)
-					require.NoError(t, err)
-					require.EqualValues(t, 0, rs.rowIndex)
+					require.NoError(tb, err)
+					require.EqualValues(tb, 0, rs.rowIndex)
 				}
 				{
-					t.Log("next (row=2)")
+					tb.Log("next (row=2)")
 					_, err := rs.next(ctx)
-					require.NoError(t, err)
-					require.EqualValues(t, 1, rs.rowIndex)
+					require.NoError(tb, err)
+					require.EqualValues(tb, 1, rs.rowIndex)
 				}
 				{
-					t.Log("next (row=3)")
+					tb.Log("next (row=3)")
 					_, err := rs.next(ctx)
-					require.NoError(t, err)
-					require.EqualValues(t, 2, rs.rowIndex)
+					require.NoError(tb, err)
+					require.EqualValues(tb, 2, rs.rowIndex)
 				}
 				{
-					t.Log("next (row=4)")
+					tb.Log("next (row=4)")
 					_, err := rs.next(ctx)
-					require.NoError(t, err)
-					require.EqualValues(t, 0, rs.rowIndex)
+					require.NoError(tb, err)
+					require.EqualValues(tb, 0, rs.rowIndex)
 				}
 				{
-					t.Log("next (row=5)")
+					tb.Log("next (row=5)")
 					_, err := rs.next(ctx)
-					require.NoError(t, err)
-					require.EqualValues(t, 1, rs.rowIndex)
+					require.NoError(tb, err)
+					require.EqualValues(tb, 1, rs.rowIndex)
 				}
 				{
-					t.Log("next (row=6)")
+					tb.Log("next (row=6)")
 					_, err := rs.next(ctx)
-					require.ErrorIs(t, err, io.EOF)
+					require.ErrorIs(tb, err, io.EOF)
 				}
 			}
 			{
-				t.Log("nextResultSet")
+				tb.Log("nextResultSet")
 				rs, err := r.nextResultSet(ctx)
-				require.NoError(t, err)
-				require.EqualValues(t, 1, rs.index)
+				require.NoError(tb, err)
+				require.EqualValues(tb, 1, rs.index)
 			}
 			{
-				t.Log("nextResultSet")
+				tb.Log("nextResultSet")
 				rs, err := r.nextResultSet(ctx)
-				require.NoError(t, err)
-				require.EqualValues(t, 2, rs.index)
+				require.NoError(tb, err)
+				require.EqualValues(tb, 2, rs.index)
 				{
-					t.Log("next (row=1)")
+					tb.Log("next (row=1)")
 					_, err := rs.next(ctx)
-					require.NoError(t, err)
-					require.EqualValues(t, 0, rs.rowIndex)
+					require.NoError(tb, err)
+					require.EqualValues(tb, 0, rs.rowIndex)
 				}
 				{
-					t.Log("next (row=2)")
+					tb.Log("next (row=2)")
 					_, err := rs.next(ctx)
-					require.NoError(t, err)
-					require.EqualValues(t, 1, rs.rowIndex)
+					require.NoError(tb, err)
+					require.EqualValues(tb, 1, rs.rowIndex)
 				}
 				{
-					t.Log("next (row=3)")
+					tb.Log("next (row=3)")
 					_, err := rs.next(ctx)
-					require.NoError(t, err)
-					require.EqualValues(t, 0, rs.rowIndex)
+					require.NoError(tb, err)
+					require.EqualValues(tb, 0, rs.rowIndex)
 				}
 				{
-					t.Log("next (row=4)")
+					tb.Log("next (row=4)")
 					_, err := rs.next(ctx)
-					require.NoError(t, err)
-					require.EqualValues(t, 1, rs.rowIndex)
+					require.NoError(tb, err)
+					require.EqualValues(tb, 1, rs.rowIndex)
 				}
 				{
-					t.Log("next (row=5)")
+					tb.Log("next (row=5)")
 					_, err := rs.next(ctx)
-					require.NoError(t, err)
-					require.EqualValues(t, 2, rs.rowIndex)
+					require.NoError(tb, err)
+					require.EqualValues(tb, 2, rs.rowIndex)
 				}
 				{
-					t.Log("next (row=6)")
+					tb.Log("next (row=6)")
 					_, err := rs.next(ctx)
-					require.ErrorIs(t, err, io.EOF)
+					require.ErrorIs(tb, err, io.EOF)
 				}
 			}
 			{
-				t.Log("close result")
+				tb.Log("close result")
 				r.Close(context.Background())
 			}
 			{
-				t.Log("nextResultSet")
+				tb.Log("nextResultSet")
 				_, err := r.nextResultSet(context.Background())
-				require.ErrorIs(t, err, errClosedResult)
+				require.ErrorIs(tb, err, errClosedResult)
 			}
-			t.Log("check final error")
-			require.NoError(t, r.Err())
+			tb.Log("check final error")
+			require.NoError(tb, r.Err())
 		}, xtest.StopAfter(time.Second))
 	})
 	t.Run("InterruptStream", func(t *testing.T) {
-		xtest.TestManyTimes(t, func(t testing.TB) {
-			ctx, cancel := context.WithCancel(xtest.Context(t))
+		xtest.TestManyTimes(t, func(tb testing.TB) {
+			tb.Helper()
+			ctx, cancel := context.WithCancel(xtest.Context(tb))
 			defer cancel()
-			ctrl := gomock.NewController(t)
+			ctrl := gomock.NewController(tb)
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status:         Ydb.StatusIds_SUCCESS,
@@ -515,53 +517,54 @@ func TestResultNextResultSet(t *testing.T) {
 				},
 			}, nil)
 			r, _, err := newResult(ctx, stream, cancel)
-			require.NoError(t, err)
+			require.NoError(tb, err)
 			defer r.Close(ctx)
 			{
-				t.Log("nextResultSet")
+				tb.Log("nextResultSet")
 				rs, err := r.nextResultSet(ctx)
-				require.NoError(t, err)
-				require.EqualValues(t, 0, rs.index)
+				require.NoError(tb, err)
+				require.EqualValues(tb, 0, rs.index)
 				{
-					t.Log("next (row=1)")
+					tb.Log("next (row=1)")
 					_, err := rs.next(ctx)
-					require.NoError(t, err)
-					require.EqualValues(t, 0, rs.rowIndex)
+					require.NoError(tb, err)
+					require.EqualValues(tb, 0, rs.rowIndex)
 				}
 				{
-					t.Log("next (row=2)")
+					tb.Log("next (row=2)")
 					_, err := rs.next(ctx)
-					require.NoError(t, err)
-					require.EqualValues(t, 1, rs.rowIndex)
+					require.NoError(tb, err)
+					require.EqualValues(tb, 1, rs.rowIndex)
 				}
-				t.Log("explicit interrupt stream")
+				tb.Log("explicit interrupt stream")
 				r.interrupt()
 				{
-					t.Log("next (row=3)")
+					tb.Log("next (row=3)")
 					_, err := rs.next(context.Background())
-					require.NoError(t, err)
-					require.EqualValues(t, 2, rs.rowIndex)
+					require.NoError(tb, err)
+					require.EqualValues(tb, 2, rs.rowIndex)
 				}
 				{
-					t.Log("next (row=4)")
+					tb.Log("next (row=4)")
 					_, err := rs.next(context.Background())
-					require.ErrorIs(t, err, errInterruptedStream)
+					require.ErrorIs(tb, err, errInterruptedStream)
 				}
 			}
 			{
-				t.Log("nextResultSet")
+				tb.Log("nextResultSet")
 				_, err := r.nextResultSet(context.Background())
-				require.ErrorIs(t, err, errInterruptedStream)
+				require.ErrorIs(tb, err, errInterruptedStream)
 			}
-			t.Log("check final error")
-			require.ErrorIs(t, r.Err(), errInterruptedStream)
+			tb.Log("check final error")
+			require.ErrorIs(tb, r.Err(), errInterruptedStream)
 		}, xtest.StopAfter(time.Second))
 	})
 	t.Run("WrongResultSetIndex", func(t *testing.T) {
-		xtest.TestManyTimes(t, func(t testing.TB) {
-			ctx, cancel := context.WithCancel(xtest.Context(t))
+		xtest.TestManyTimes(t, func(tb testing.TB) {
+			tb.Helper()
+			ctx, cancel := context.WithCancel(xtest.Context(tb))
 			defer cancel()
-			ctrl := gomock.NewController(t)
+			ctrl := gomock.NewController(tb)
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
 				Status:         Ydb.StatusIds_SUCCESS,
@@ -834,62 +837,62 @@ func TestResultNextResultSet(t *testing.T) {
 				},
 			}, nil)
 			r, _, err := newResult(ctx, stream, cancel)
-			require.NoError(t, err)
+			require.NoError(tb, err)
 			defer r.Close(ctx)
 			{
-				t.Log("nextResultSet")
+				tb.Log("nextResultSet")
 				rs, err := r.nextResultSet(ctx)
-				require.NoError(t, err)
-				require.EqualValues(t, 0, rs.index)
+				require.NoError(tb, err)
+				require.EqualValues(tb, 0, rs.index)
 				{
-					t.Log("next (row=1)")
+					tb.Log("next (row=1)")
 					_, err := rs.next(ctx)
-					require.NoError(t, err)
-					require.EqualValues(t, 0, rs.rowIndex)
+					require.NoError(tb, err)
+					require.EqualValues(tb, 0, rs.rowIndex)
 				}
 				{
-					t.Log("next (row=2)")
+					tb.Log("next (row=2)")
 					_, err := rs.next(ctx)
-					require.NoError(t, err)
-					require.EqualValues(t, 1, rs.rowIndex)
+					require.NoError(tb, err)
+					require.EqualValues(tb, 1, rs.rowIndex)
 				}
 				{
-					t.Log("next (row=3)")
+					tb.Log("next (row=3)")
 					_, err := rs.next(ctx)
-					require.NoError(t, err)
-					require.EqualValues(t, 2, rs.rowIndex)
+					require.NoError(tb, err)
+					require.EqualValues(tb, 2, rs.rowIndex)
 				}
 				{
-					t.Log("next (row=4)")
+					tb.Log("next (row=4)")
 					_, err := rs.next(ctx)
-					require.NoError(t, err)
-					require.EqualValues(t, 0, rs.rowIndex)
+					require.NoError(tb, err)
+					require.EqualValues(tb, 0, rs.rowIndex)
 				}
 				{
-					t.Log("next (row=5)")
+					tb.Log("next (row=5)")
 					_, err := rs.next(ctx)
-					require.NoError(t, err)
-					require.EqualValues(t, 1, rs.rowIndex)
+					require.NoError(tb, err)
+					require.EqualValues(tb, 1, rs.rowIndex)
 				}
 				{
-					t.Log("next (row=6)")
+					tb.Log("next (row=6)")
 					_, err := rs.next(ctx)
-					require.ErrorIs(t, err, io.EOF)
+					require.ErrorIs(tb, err, io.EOF)
 				}
 			}
 			{
-				t.Log("nextResultSet")
+				tb.Log("nextResultSet")
 				rs, err := r.nextResultSet(ctx)
-				require.NoError(t, err)
-				require.EqualValues(t, 2, rs.index)
+				require.NoError(tb, err)
+				require.EqualValues(tb, 2, rs.index)
 			}
 			{
-				t.Log("nextResultSet")
+				tb.Log("nextResultSet")
 				_, err := r.nextResultSet(ctx)
-				require.ErrorIs(t, err, errWrongNextResultSetIndex)
+				require.ErrorIs(tb, err, errWrongNextResultSetIndex)
 			}
-			t.Log("check final error")
-			require.ErrorIs(t, r.Err(), errWrongNextResultSetIndex)
+			tb.Log("check final error")
+			require.ErrorIs(tb, r.Err(), errWrongNextResultSetIndex)
 		}, xtest.StopAfter(time.Second))
 	})
 }
