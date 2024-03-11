@@ -22,9 +22,10 @@ import (
 
 func TestCreateSession(t *testing.T) {
 	t.Run("HappyWay", func(t *testing.T) {
-		xtest.TestManyTimes(t, func(t testing.TB) {
-			ctx := xtest.Context(t)
-			ctrl := gomock.NewController(t)
+		xtest.TestManyTimes(t, func(tb testing.TB) {
+			tb.Helper()
+			ctx := xtest.Context(tb)
+			ctrl := gomock.NewController(tb)
 			attachStream := NewMockQueryService_AttachSessionClient(ctrl)
 			attachStream.EXPECT().Recv().Return(&Ydb_Query.SessionState{
 				Status: Ydb.StatusIds_SUCCESS,
@@ -36,7 +37,7 @@ func TestCreateSession(t *testing.T) {
 				SessionId: "test",
 			}, nil)
 			service.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(attachStream, nil)
-			t.Log("execute")
+			tb.Log("execute")
 			attached := 0
 			s, err := createSession(ctx, service, createSessionConfig{
 				onAttach: func(s *Session) {
@@ -46,30 +47,32 @@ func TestCreateSession(t *testing.T) {
 					attached--
 				},
 			})
-			require.NoError(t, err)
-			require.EqualValues(t, "test", s.id)
-			require.EqualValues(t, 1, attached)
+			require.NoError(tb, err)
+			require.EqualValues(tb, "test", s.id)
+			require.EqualValues(tb, 1, attached)
 			s.close()
-			require.EqualValues(t, 0, attached)
+			require.EqualValues(tb, 0, attached)
 		}, xtest.StopAfter(time.Second))
 	})
 	t.Run("TransportError", func(t *testing.T) {
 		t.Run("OnCall", func(t *testing.T) {
-			xtest.TestManyTimes(t, func(t testing.TB) {
-				ctx := xtest.Context(t)
-				ctrl := gomock.NewController(t)
+			xtest.TestManyTimes(t, func(tb testing.TB) {
+				tb.Helper()
+				ctx := xtest.Context(tb)
+				ctrl := gomock.NewController(tb)
 				service := NewMockQueryServiceClient(ctrl)
 				service.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
-				t.Log("execute")
+				tb.Log("execute")
 				_, err := createSession(ctx, service, createSessionConfig{})
-				require.Error(t, err)
-				require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
+				require.Error(tb, err)
+				require.True(tb, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 			}, xtest.StopAfter(time.Second))
 		})
 		t.Run("OnAttach", func(t *testing.T) {
-			xtest.TestManyTimes(t, func(t testing.TB) {
-				ctx := xtest.Context(t)
-				ctrl := gomock.NewController(t)
+			xtest.TestManyTimes(t, func(tb testing.TB) {
+				tb.Helper()
+				ctx := xtest.Context(tb)
+				ctrl := gomock.NewController(tb)
 				service := NewMockQueryServiceClient(ctrl)
 				service.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
 					Status:    Ydb.StatusIds_SUCCESS,
@@ -77,16 +80,17 @@ func TestCreateSession(t *testing.T) {
 				}, nil)
 				service.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
 				service.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
-				t.Log("execute")
+				tb.Log("execute")
 				_, err := createSession(ctx, service, createSessionConfig{})
-				require.Error(t, err)
-				require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
+				require.Error(tb, err)
+				require.True(tb, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 			}, xtest.StopAfter(time.Second))
 		})
 		t.Run("OnRecv", func(t *testing.T) {
-			xtest.TestManyTimes(t, func(t testing.TB) {
-				ctx := xtest.Context(t)
-				ctrl := gomock.NewController(t)
+			xtest.TestManyTimes(t, func(tb testing.TB) {
+				tb.Helper()
+				ctx := xtest.Context(tb)
+				ctrl := gomock.NewController(tb)
 				attachStream := NewMockQueryService_AttachSessionClient(ctrl)
 				attachStream.EXPECT().Recv().Return(nil, grpcStatus.Error(grpcCodes.Unavailable, "")).AnyTimes()
 				attachStream.EXPECT().CloseSend().Return(nil)
@@ -99,32 +103,34 @@ func TestCreateSession(t *testing.T) {
 				service.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
 					Status: Ydb.StatusIds_SUCCESS,
 				}, nil)
-				t.Log("execute")
+				tb.Log("execute")
 				_, err := createSession(ctx, service, createSessionConfig{})
-				require.Error(t, err)
-				require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
+				require.Error(tb, err)
+				require.True(tb, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 			}, xtest.StopAfter(time.Second))
 		})
 	})
 	t.Run("OperationError", func(t *testing.T) {
 		t.Run("OnCall", func(t *testing.T) {
-			xtest.TestManyTimes(t, func(t testing.TB) {
-				ctx := xtest.Context(t)
-				ctrl := gomock.NewController(t)
+			xtest.TestManyTimes(t, func(tb testing.TB) {
+				tb.Helper()
+				ctx := xtest.Context(tb)
+				ctrl := gomock.NewController(tb)
 				service := NewMockQueryServiceClient(ctrl)
 				service.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
 					Status: Ydb.StatusIds_UNAVAILABLE,
 				}, nil)
-				t.Log("execute")
+				tb.Log("execute")
 				_, err := createSession(ctx, service, createSessionConfig{})
-				require.Error(t, err)
-				require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
+				require.Error(tb, err)
+				require.True(tb, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 			}, xtest.StopAfter(time.Second))
 		})
 		t.Run("OnRecv", func(t *testing.T) {
-			xtest.TestManyTimes(t, func(t testing.TB) {
-				ctx := xtest.Context(t)
-				ctrl := gomock.NewController(t)
+			xtest.TestManyTimes(t, func(tb testing.TB) {
+				tb.Helper()
+				ctx := xtest.Context(tb)
+				ctrl := gomock.NewController(tb)
 				attachStream := NewMockQueryService_AttachSessionClient(ctrl)
 				attachStream.EXPECT().Recv().Return(&Ydb_Query.SessionState{
 					Status: Ydb.StatusIds_UNAVAILABLE,
@@ -139,10 +145,10 @@ func TestCreateSession(t *testing.T) {
 				service.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
 					Status: Ydb.StatusIds_SUCCESS,
 				}, nil)
-				t.Log("execute")
+				tb.Log("execute")
 				_, err := createSession(ctx, service, createSessionConfig{})
-				require.Error(t, err)
-				require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
+				require.Error(tb, err)
+				require.True(tb, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 			}, xtest.StopAfter(time.Second))
 		})
 	})
