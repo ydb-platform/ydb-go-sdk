@@ -214,7 +214,7 @@ func createSession(
 		id:          s.GetSessionId(),
 		nodeID:      s.GetNodeId(),
 		queryClient: client,
-		status:      query.SessionStatusReady,
+		status:      SessionStatusReady,
 	}
 
 	if cfg.onAttach != nil {
@@ -232,15 +232,15 @@ func createSession(
 
 		atomic.StoreUint32(
 			(*uint32)(&session.status),
-			uint32(query.SessionStatusClosed),
+			uint32(SessionStatusClosed),
 		)
 	})
 
 	go func() {
 		defer session.close()
 		for {
-			switch session.Status() {
-			case query.SessionStatusReady, query.SessionStatusInUse:
+			switch session.sessionStatus() {
+			case SessionStatusReady, SessionStatusInUse:
 				sessionState, recvErr := attach.Recv()
 				if recvErr != nil || sessionState.GetStatus() != Ydb.StatusIds_SUCCESS {
 					return
@@ -262,7 +262,11 @@ func New(ctx context.Context, balancer balancer, config *config.Config) (*Client
 
 	client.pool = pool.New(
 		config.PoolMaxSize(),
-		func(ctx context.Context, onClose func(s *Session)) (*Session, error) {
+		func(ctx context.Context, onClose func(s *Session)) (s *Session, err error) {
+			onDone := trace.QueryOnCreateSession(config.Trace(), &ctx, stack.FunctionID(""))
+			defer func() {
+				onDone(s, err)
+			}()
 			var cancel context.CancelFunc
 			if d := config.CreateSessionTimeout(); d > 0 {
 				ctx, cancel = xcontext.WithTimeout(ctx, d)
@@ -271,7 +275,7 @@ func New(ctx context.Context, balancer balancer, config *config.Config) (*Client
 			}
 			defer cancel()
 
-			s, err := createSession(ctx, client.grpcClient, createSessionConfig{
+			s, err = createSession(ctx, client.grpcClient, createSessionConfig{
 				onClose: onClose,
 			})
 			if err != nil {
@@ -280,7 +284,11 @@ func New(ctx context.Context, balancer balancer, config *config.Config) (*Client
 
 			return s, nil
 		},
-		func(ctx context.Context, s *Session) error {
+		func(ctx context.Context, s *Session) (err error) {
+			onDone := trace.QueryOnDeleteSession(config.Trace(), &ctx, stack.FunctionID(""), s)
+			defer func() {
+				onDone(err)
+			}()
 			var cancel context.CancelFunc
 			if d := config.CreateSessionTimeout(); d > 0 {
 				ctx, cancel = xcontext.WithTimeout(ctx, d)
@@ -289,7 +297,7 @@ func New(ctx context.Context, balancer balancer, config *config.Config) (*Client
 			}
 			defer cancel()
 
-			err := deleteSession(ctx, client.grpcClient, s.id)
+			err = deleteSession(ctx, client.grpcClient, s.id)
 			if err != nil {
 				return xerrors.WithStackTrace(err)
 			}

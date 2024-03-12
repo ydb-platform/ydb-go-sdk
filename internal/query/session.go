@@ -20,7 +20,7 @@ type Session struct {
 	id          string
 	nodeID      int64
 	queryClient Ydb_Query_V1.QueryServiceClient
-	status      query.SessionStatus
+	status      sessionStatus
 	close       func()
 }
 
@@ -71,8 +71,12 @@ func (s *Session) NodeID() int64 {
 	return s.nodeID
 }
 
-func (s *Session) Status() query.SessionStatus {
-	return query.SessionStatus(atomic.LoadUint32((*uint32)(&s.status)))
+func (s *Session) sessionStatus() sessionStatus {
+	return sessionStatus(atomic.LoadUint32((*uint32)(&s.status)))
+}
+
+func (s *Session) Status() string {
+	return s.sessionStatus().String()
 }
 
 func (s *Session) Execute(
