@@ -1229,6 +1229,36 @@ func ListValue(items ...Value) *listValue {
 	}
 }
 
+type pgValue struct {
+	t   types.PgType
+	val string
+}
+
+func (v *pgValue) castTo(dst interface{}) error {
+	return xerrors.WithStackTrace(fmt.Errorf(
+		"%w  PgType to '%T' destination",
+		ErrCannotCast, dst,
+	))
+}
+
+func (v *pgValue) Type() types.Type {
+	return v.t
+}
+
+func (v *pgValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+	// TODO: make allocator
+	return &Ydb.Value{
+		Value: &Ydb.Value_TextValue{
+			TextValue: v.val,
+		},
+	}
+}
+
+func (v *pgValue) Yql() string {
+	// TODO: check real pg literal
+	return fmt.Sprintf("PgType(%q)", v.val)
+}
+
 type setValue struct {
 	t     types.Type
 	items []Value
@@ -1273,6 +1303,15 @@ func (v *setValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	}
 
 	return vvv
+}
+
+func PgTextValue(val string) *pgValue {
+	return &pgValue{
+		t: types.PgType{
+			OID: 705, // unknown type https://github.com/postgres/postgres/blob/master/src/include/catalog/pg_type.dat
+		},
+		val: val,
+	}
 }
 
 func SetValue(items ...Value) *setValue {

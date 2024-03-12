@@ -109,6 +109,12 @@ func (p *Parameter) List() *list {
 	}
 }
 
+func (p *Parameter) PgTextValue(v string) Builder {
+	p.value = value.PgTextValue(v)
+	p.parent.params = append(p.parent.params, p)
+	return p.parent
+}
+
 func (p *Parameter) Set() *set {
 	return &set{
 		parent: p.parent,

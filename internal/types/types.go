@@ -465,6 +465,36 @@ func NewOptional(t Type) Optional {
 	}
 }
 
+type PgType struct {
+	OID uint32
+}
+
+func (v PgType) String() string {
+	return v.Yql()
+}
+
+func (v PgType) Yql() string {
+	return "PgType"
+}
+
+func (v PgType) ToYDB(a *allocator.Allocator) *Ydb.Type {
+	// TODO: make allocator
+	return &Ydb.Type{Type: &Ydb.Type_PgType{
+		PgType: &Ydb.PgType{
+			Oid: v.OID,
+		},
+	}}
+}
+
+func (v PgType) equalsTo(rhs Type) bool {
+	vv, ok := rhs.(PgType)
+	if !ok {
+		return false
+	}
+
+	return v.OID == vv.OID
+}
+
 type Primitive uint
 
 func (v Primitive) String() string {
