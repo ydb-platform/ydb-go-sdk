@@ -30,9 +30,9 @@ type Config struct {
 
 func New(opts ...Option) *Config {
 	c := defaults()
-	for _, o := range opts {
-		if o != nil {
-			o(c)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(c)
 		}
 	}
 

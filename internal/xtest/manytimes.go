@@ -31,9 +31,9 @@ func TestManyTimes(t testing.TB, test TestFunc, opts ...TestManyTimesOption) {
 		stopAfter: time.Second,
 	}
 
-	for _, o := range opts {
-		if o != nil {
-			o(&options)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&options)
 		}
 	}
 

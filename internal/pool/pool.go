@@ -66,7 +66,9 @@ func New[T any](
 		done: make(chan struct{}),
 	}
 	for _, opt := range opts {
-		opt(p)
+		if opt != nil {
+			opt(p)
+		}
 	}
 
 	return p

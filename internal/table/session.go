@@ -1195,7 +1195,9 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows value.Value
 	}()
 
 	for _, opt := range opts {
-		callOptions = append(callOptions, opt.ApplyBulkUpsertOption()...)
+		if opt != nil {
+			callOptions = append(callOptions, opt.ApplyBulkUpsertOption()...)
+		}
 	}
 
 	_, err = s.tableService.BulkUpsert(ctx,

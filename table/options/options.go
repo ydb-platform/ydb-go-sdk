@@ -161,7 +161,9 @@ func (i index) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) 
 		Name: i.name,
 	}
 	for _, opt := range i.opts {
-		opt.ApplyIndexOption((*indexDesc)(x))
+		if opt != nil {
+			opt.ApplyIndexOption((*indexDesc)(x))
+		}
 	}
 	d.AddIndexes = append(d.AddIndexes, x)
 }
@@ -171,7 +173,9 @@ func (i index) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator
 		Name: i.name,
 	}
 	for _, opt := range i.opts {
-		opt.ApplyIndexOption((*indexDesc)(x))
+		if opt != nil {
+			opt.ApplyIndexOption((*indexDesc)(x))
+		}
 	}
 	d.Indexes = append(d.Indexes, x)
 }

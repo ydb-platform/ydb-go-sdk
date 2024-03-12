@@ -247,9 +247,9 @@ func With(options ...config.Option) Option {
 // MergeOptions concatentaes provided options to one cumulative value.
 func MergeOptions(opts ...Option) Option {
 	return func(ctx context.Context, c *Driver) error {
-		for _, o := range opts {
-			if o != nil {
-				if err := o(ctx, c); err != nil {
+		for _, opt := range opts {
+			if opt != nil {
+				if err := opt(ctx, c); err != nil {
 					return xerrors.WithStackTrace(err)
 				}
 			}

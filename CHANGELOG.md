@@ -1,3 +1,5 @@
+* Fixed cases when some option is nil
+
 ## v3.57.1
 * Added logs over query service internals
 * Changed `trace.Query` events
