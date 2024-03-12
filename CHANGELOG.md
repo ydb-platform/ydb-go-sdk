@@ -1,3 +1,4 @@
+* Added `Dict` support for `ydb.ParamsBuilder()`
 * Added experimental implementation of query service client
 * Fixed sometime panic on topic writer closing
 * Added experimental query parameters builder `ydb.ParamsBuilder()`
