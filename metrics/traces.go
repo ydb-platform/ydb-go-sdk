@@ -20,5 +20,6 @@ func WithTraces(config Config) ydb.Option {
 		ydb.WithTraceDiscovery(discovery(config)),
 		ydb.WithTraceDatabaseSQL(databaseSQL(config)),
 		ydb.WithTraceRetry(retry(config)),
+		ydb.WithTraceQuery(query(config)),
 	)
 }

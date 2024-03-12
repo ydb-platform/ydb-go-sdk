@@ -132,6 +132,76 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 			}
 		}
 	}
+	{
+		h1 := t.OnCreateSession
+		h2 := x.OnCreateSession
+		ret.OnCreateSession = func(q QueryCreateSessionStartInfo) func(QueryCreateSessionDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryCreateSessionDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QueryCreateSessionDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnDeleteSession
+		h2 := x.OnDeleteSession
+		ret.OnDeleteSession = func(q QueryDeleteSessionStartInfo) func(QueryDeleteSessionDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryDeleteSessionDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QueryDeleteSessionDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
 	return &ret
 }
 func (t *Query) onDo(q QueryDoStartInfo) func(info QueryDoIntermediateInfo) func(QueryDoDoneInfo) {
@@ -188,6 +258,36 @@ func (t *Query) onDoTx(q QueryDoTxStartInfo) func(info QueryDoTxIntermediateInfo
 		return res
 	}
 }
+func (t *Query) onCreateSession(q QueryCreateSessionStartInfo) func(info QueryCreateSessionDoneInfo) {
+	fn := t.OnCreateSession
+	if fn == nil {
+		return func(QueryCreateSessionDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryCreateSessionDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onDeleteSession(q QueryDeleteSessionStartInfo) func(info QueryDeleteSessionDoneInfo) {
+	fn := t.OnDeleteSession
+	if fn == nil {
+		return func(QueryDeleteSessionDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryDeleteSessionDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func QueryOnDo(t *Query, c *context.Context, call call) func(error) func(attempts int, _ error) {
 	var p QueryDoStartInfo
 	p.Context = c
@@ -220,5 +320,29 @@ func QueryOnDoTx(t *Query, c *context.Context, call call) func(error) func(attem
 			p.Error = e
 			res(p)
 		}
+	}
+}
+func QueryOnCreateSession(t *Query, c *context.Context, call call) func(session querySessionInfo, _ error) {
+	var p QueryCreateSessionStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onCreateSession(p)
+	return func(session querySessionInfo, e error) {
+		var p QueryCreateSessionDoneInfo
+		p.Session = session
+		p.Error = e
+		res(p)
+	}
+}
+func QueryOnDeleteSession(t *Query, c *context.Context, call call, session querySessionInfo) func(error) {
+	var p QueryDeleteSessionStartInfo
+	p.Context = c
+	p.Call = call
+	p.Session = session
+	res := t.onDeleteSession(p)
+	return func(e error) {
+		var p QueryDeleteSessionDoneInfo
+		p.Error = e
+		res(p)
 	}
 }

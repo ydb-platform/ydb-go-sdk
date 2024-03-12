@@ -6,16 +6,16 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/session"
 )
 
-type SessionStatus uint32
+type sessionStatus uint32
 
 const (
-	SessionStatusUnknown = SessionStatus(iota)
+	SessionStatusUnknown = sessionStatus(iota)
 	SessionStatusReady
 	SessionStatusInUse
 	SessionStatusClosed
 )
 
-func (s SessionStatus) String() string {
+func (s sessionStatus) String() string {
 	switch s {
 	case 0:
 		return session.StatusUnknown
