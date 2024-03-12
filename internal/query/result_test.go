@@ -537,7 +537,6 @@ func TestResultNextResultSet(t *testing.T) {
 					require.EqualValues(tb, 1, rs.rowIndex)
 				}
 				tb.Log("explicit interrupt stream")
-				r.interrupt()
 				r.closeOnce()
 				{
 					tb.Log("next (row=3)")
