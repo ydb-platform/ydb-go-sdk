@@ -22,6 +22,18 @@ func TestContext(t *testing.T) {
 			values: []string{"test"},
 		},
 		{
+			name: "WithApplicationName",
+			ctx: WithApplicationName(
+				WithApplicationName(
+					context.Background(),
+					"test1",
+				),
+				"test2",
+			),
+			header: HeaderApplicationName,
+			values: []string{"test2"},
+		},
+		{
 			name:   "WithTraceID",
 			ctx:    WithTraceID(context.Background(), "my-trace-id"),
 			header: HeaderTraceID,

@@ -3,6 +3,8 @@ package meta
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 
 	"google.golang.org/grpc/metadata"
 
@@ -20,6 +22,7 @@ func New(
 	opts ...Option,
 ) *Meta {
 	m := &Meta{
+		pid:         strconv.Itoa(os.Getpid()),
 		trace:       trace,
 		credentials: credentials,
 		database:    database,
@@ -67,6 +70,7 @@ func ForbidOption(feature string) Option {
 }
 
 type Meta struct {
+	pid             string
 	trace           *trace.Driver
 	credentials     credentials.Credentials
 	database        string
@@ -80,6 +84,8 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	if !has {
 		md = metadata.MD{}
 	}
+
+	md.Set(HeaderClientPid, m.pid)
 
 	if len(md.Get(HeaderDatabase)) == 0 {
 		md.Set(HeaderDatabase, m.database)

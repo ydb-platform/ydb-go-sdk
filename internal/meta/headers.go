@@ -9,6 +9,7 @@ const (
 	HeaderTraceID            = "x-ydb-trace-id"
 	HeaderApplicationName    = "x-ydb-application-name"
 	HeaderClientCapabilities = "x-ydb-client-capabilities"
+	HeaderClientPid          = "x-ydb-client-pid"
 
 	// outgoing hints
 	HintSessionBalancer = "session-balancer"
