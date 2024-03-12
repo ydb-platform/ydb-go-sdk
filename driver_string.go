@@ -6,7 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
-// String returns string representation of Driver
+// String returns string representation of Driver.
 func (d *Driver) String() string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()

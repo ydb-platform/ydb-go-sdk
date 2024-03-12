@@ -6,15 +6,15 @@ import (
 	"context"
 )
 
-// tableComposeOptions is a holder of options
+// tableComposeOptions is a holder of options.
 type tableComposeOptions struct {
 	panicCallback func(e interface{})
 }
 
-// TableOption specified Table compose option
+// TableOption specified Table compose option.
 type TableComposeOption func(o *tableComposeOptions)
 
-// WithTablePanicCallback specified behavior on panic
+// WithTablePanicCallback specified behavior on panic.
 func WithTablePanicCallback(cb func(e interface{})) TableComposeOption {
 	return func(o *tableComposeOptions) {
 		o.panicCallback = cb

@@ -6,15 +6,15 @@ import (
 	"context"
 )
 
-// driverComposeOptions is a holder of options
+// driverComposeOptions is a holder of options.
 type driverComposeOptions struct {
 	panicCallback func(e interface{})
 }
 
-// DriverOption specified Driver compose option
+// DriverOption specified Driver compose option.
 type DriverComposeOption func(o *driverComposeOptions)
 
-// WithDriverPanicCallback specified behavior on panic
+// WithDriverPanicCallback specified behavior on panic.
 func WithDriverPanicCallback(cb func(e interface{})) DriverComposeOption {
 	return func(o *driverComposeOptions) {
 		o.panicCallback = cb

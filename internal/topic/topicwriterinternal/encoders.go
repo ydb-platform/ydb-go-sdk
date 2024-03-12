@@ -71,7 +71,7 @@ func (nopWriteCloser) Close() error {
 	return nil
 }
 
-// EncoderSelector not thread safe
+// EncoderSelector not thread safe.
 type EncoderSelector struct {
 	m *EncoderMap
 

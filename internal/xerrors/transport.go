@@ -109,7 +109,7 @@ func (e *transportError) MustDeleteSession() bool {
 	}
 }
 
-// IsTransportError reports whether err is transportError with given grpc codes
+// IsTransportError reports whether err is transportError with given grpc codes.
 func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 	if err == nil {
 		return false
@@ -134,7 +134,7 @@ func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 	return false
 }
 
-// Transport returns a new transport error with given options
+// Transport returns a new transport error with given options.
 func Transport(err error, opts ...teOpt) error {
 	if err == nil {
 		return nil

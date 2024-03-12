@@ -26,7 +26,6 @@ run:
   #    - ".*\\.my\\.go$"
   #    - lib/bad.go
 
-
 # output configuration options
 output:
   # colored-line-number|line-number|json|tab|checkstyle, default is "colored-line-number"
@@ -37,7 +36,6 @@ output:
 
   # print linter name in the end of issue text, default is true
   print-linter-name: true
-
 
 # all available settings of specific linters
 linters-settings:
@@ -179,7 +177,7 @@ linters-settings:
         #
         # The flag is passed to the ruleguard 'debug-group' argument.
         # Default: ""
-        debug: 'emptyDecl'
+        debug: "emptyDecl"
         # Deprecated, use 'failOn' param.
         # If set to true, identical to failOn='all', otherwise failOn=''
         failOnError: false
@@ -231,7 +229,6 @@ linters:
     - funlen
     - gochecknoglobals
     - gocognit
-    - godot
     - goerr113
     - golint
     - gomnd
@@ -308,4 +305,4 @@ issues:
       # Examples: Type_PRIMITIVE_TYPE_ID_UNSPECIFIED, Ydb_Discovery_V1, _voidValue
     - linters:
         - nosnakecase
-      text : "(?:_[a-z]+(?:[A-Z](?:[a-z\\d]+|[A-Z\\d]+))+|(?:[A-Z][a-z\\d]+|[A-Z][A-Z\\d]+)+_(?:(?:[A-Z][a-z\\d]+|[A-Z\\d][A-Z\\d]+)_?)+)"
+      text: "(?:_[a-z]+(?:[A-Z](?:[a-z\\d]+|[A-Z\\d]+))+|(?:[A-Z][a-z\\d]+|[A-Z][A-Z\\d]+)+_(?:(?:[A-Z][a-z\\d]+|[A-Z\\d][A-Z\\d]+)_?)+)"

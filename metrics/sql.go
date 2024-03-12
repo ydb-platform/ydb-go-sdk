@@ -6,7 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// databaseSQL makes trace.DatabaseSQL with measuring `database/sql` events
+// databaseSQL makes trace.DatabaseSQL with measuring `database/sql` events.
 func databaseSQL(config Config) (t trace.DatabaseSQL) {
 	config = config.WithSystem("database").WithSystem("sql")
 	conns := config.GaugeVec("conns")

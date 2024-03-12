@@ -630,7 +630,7 @@ func (c *Client) Close(ctx context.Context) (err error) {
 // Do implements internal busy loop until one of the following conditions is met:
 // - deadline was canceled or deadlined
 // - retry operation returned nil as error
-// Warning: if deadline without deadline or cancellation func Retry will be worked infinite
+// Warning: if deadline without deadline or cancellation func Retry will be worked infinite.
 func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Option) (finalErr error) {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)

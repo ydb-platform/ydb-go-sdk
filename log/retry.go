@@ -8,7 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// Retry returns trace.Retry with logging events from details
+// Retry returns trace.Retry with logging events from details.
 func Retry(l Logger, d trace.Detailer, opts ...Option) (t trace.Retry) {
 	return internalRetry(wrapLogger(l, opts...), d)
 }

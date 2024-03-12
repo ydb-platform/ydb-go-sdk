@@ -40,7 +40,7 @@ func (d *Driver) with(ctx context.Context, opts ...Option) (*Driver, uint64, err
 	return child, id, nil
 }
 
-// With makes child Driver with the same options and another options
+// With makes child Driver with the same options and another options.
 func (d *Driver) With(ctx context.Context, opts ...Option) (*Driver, error) {
 	child, id, err := d.with(ctx, opts...)
 	if err != nil {

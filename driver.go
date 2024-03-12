@@ -49,7 +49,7 @@ import (
 
 var _ Connection = (*Driver)(nil)
 
-// Driver type provide access to YDB service clients
+// Driver type provide access to YDB service clients.
 type Driver struct {
 	ctx       context.Context // cancel while Driver.Close called.
 	ctxCancel context.CancelFunc
@@ -167,22 +167,22 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 	return nil
 }
 
-// Endpoint returns initial endpoint
+// Endpoint returns initial endpoint.
 func (d *Driver) Endpoint() string {
 	return d.config.Endpoint()
 }
 
-// Name returns database name
+// Name returns database name.
 func (d *Driver) Name() string {
 	return d.config.Database()
 }
 
-// Secure returns true if database Driver is secure
+// Secure returns true if database Driver is secure.
 func (d *Driver) Secure() bool {
 	return d.config.Secure()
 }
 
-// Table returns table client
+// Table returns table client.
 func (d *Driver) Table() table.Client {
 	return d.table
 }
@@ -196,32 +196,32 @@ func (d *Driver) Query() query.Client {
 	return d.query
 }
 
-// Scheme returns scheme client
+// Scheme returns scheme client.
 func (d *Driver) Scheme() scheme.Client {
 	return d.scheme
 }
 
-// Coordination returns coordination client
+// Coordination returns coordination client.
 func (d *Driver) Coordination() coordination.Client {
 	return d.coordination
 }
 
-// Ratelimiter returns ratelimiter client
+// Ratelimiter returns ratelimiter client.
 func (d *Driver) Ratelimiter() ratelimiter.Client {
 	return d.ratelimiter
 }
 
-// Discovery returns discovery client
+// Discovery returns discovery client.
 func (d *Driver) Discovery() discovery.Client {
 	return d.discovery
 }
 
-// Scripting returns scripting client
+// Scripting returns scripting client.
 func (d *Driver) Scripting() scripting.Client {
 	return d.scripting
 }
 
-// Topic returns topic client
+// Topic returns topic client.
 func (d *Driver) Topic() topic.Client {
 	return d.topic
 }
@@ -538,7 +538,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 // GRPCConn casts *ydb.Driver to grpc.ClientConnInterface for executing
 // unary and streaming RPC over internal driver balancer.
 //
-// Warning: for connect to driver-unsupported YDB services
+// Warning: for connect to driver-unsupported YDB services.
 func GRPCConn(cc *Driver) grpc.ClientConnInterface {
 	return conn.WithContextModifier(cc.balancer, conn.WithoutWrapping)
 }

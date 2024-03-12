@@ -18,7 +18,7 @@ import (
 )
 
 var (
-	// DefaultKeepaliveInterval contains default duration between grpc keepalive
+	// DefaultKeepaliveInterval contains default duration between grpc keepalive.
 	DefaultKeepaliveInterval    = 10 * time.Second
 	MinKeepaliveInterval        = 10 * time.Second
 	DefaultDialTimeout          = 5 * time.Second

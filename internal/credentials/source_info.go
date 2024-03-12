@@ -14,7 +14,7 @@ func (sourceInfo SourceInfoOption) ApplyAccessTokenCredentialsOption(h *AccessTo
 	h.sourceInfo = string(sourceInfo)
 }
 
-// WithSourceInfo option append to credentials object the source info for reporting source info details on error case
+// WithSourceInfo option append to credentials object the source info for reporting source info details on error case.
 func WithSourceInfo(sourceInfo string) SourceInfoOption {
 	return SourceInfoOption(sourceInfo)
 }

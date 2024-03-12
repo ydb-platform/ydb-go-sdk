@@ -7,7 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// Query makes trace.Query with logging events from details
+// Query makes trace.Query with logging events from details.
 func Query(l Logger, d trace.Detailer, opts ...Option) (t trace.Query) {
 	return internalQuery(wrapLogger(l, opts...), d)
 }

@@ -128,12 +128,12 @@ func (r *InitRequest) toProto() *Ydb_Topic.StreamReadMessage_InitRequest {
 	return p
 }
 
-// GetConsumer for implement trace.TopicReadStreamInitRequestInfo
+// GetConsumer for implement trace.TopicReadStreamInitRequestInfo.
 func (r *InitRequest) GetConsumer() string {
 	return r.Consumer
 }
 
-// GetTopics for implement trace.TopicReadStreamInitRequestInfo
+// GetTopics for implement trace.TopicReadStreamInitRequestInfo.
 func (r *InitRequest) GetTopics() []string {
 	res := make([]string, len(r.TopicsReadSettings))
 	for i := range res {
@@ -186,12 +186,12 @@ type ReadResponse struct {
 	PartitionData []PartitionData
 }
 
-// GetBytesSize implements trace.TopicReaderDataResponseInfo
+// GetBytesSize implements trace.TopicReaderDataResponseInfo.
 func (r *ReadResponse) GetBytesSize() int {
 	return r.BytesSize
 }
 
-// GetPartitionBatchMessagesCounts implements trace.TopicReaderDataResponseInfo
+// GetPartitionBatchMessagesCounts implements trace.TopicReaderDataResponseInfo.
 func (r *ReadResponse) GetPartitionBatchMessagesCounts() (partitionDataCount, batchCount, messagesCount int) {
 	partitionDataCount = len(r.PartitionData)
 	for partitionIndex := range r.PartitionData {

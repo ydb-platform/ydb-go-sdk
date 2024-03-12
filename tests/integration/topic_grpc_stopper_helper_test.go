@@ -25,7 +25,7 @@ import (
 //
 //		grpcStopper.Stop(errors.New("test error"))
 //
-// )
+// ).
 type GrpcStopper struct {
 	stopChannel empty.Chan
 	stopError   error

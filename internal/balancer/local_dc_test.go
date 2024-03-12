@@ -21,7 +21,7 @@ type discoveryMock struct {
 	endpoints []endpoint.Endpoint
 }
 
-// implement discovery.Client
+// implement discovery.Client.
 func (d discoveryMock) Close(ctx context.Context) error {
 	return nil
 }

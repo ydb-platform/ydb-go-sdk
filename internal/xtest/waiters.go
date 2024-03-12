@@ -47,7 +47,7 @@ func WaitChannelClosedWithTimeout(t testing.TB, ch <-chan struct{}, timeout time
 }
 
 // SpinWaitCondition wait while cond return true with check it in loop
-// l can be nil - then locker use for check conditions
+// l can be nil - then locker use for check conditions.
 func SpinWaitCondition(tb testing.TB, l sync.Locker, cond func() bool) {
 	tb.Helper()
 
@@ -55,7 +55,7 @@ func SpinWaitCondition(tb testing.TB, l sync.Locker, cond func() bool) {
 }
 
 // SpinWaitConditionWithTimeout wait while cond return true with check it in loop
-// l can be nil - then locker use for check conditions
+// l can be nil - then locker use for check conditions.
 func SpinWaitConditionWithTimeout(tb testing.TB, l sync.Locker, condWaitTimeout time.Duration, cond func() bool) {
 	tb.Helper()
 
@@ -82,7 +82,7 @@ func SpinWaitConditionWithTimeout(tb testing.TB, l sync.Locker, condWaitTimeout 
 	}
 }
 
-// SpinWaitProgress failed if result of progress func no changes without timeout
+// SpinWaitProgress failed if result of progress func no changes without timeout.
 func SpinWaitProgress(tb testing.TB, progress func() (progressValue interface{}, finished bool)) {
 	tb.Helper()
 	SpinWaitProgressWithTimeout(tb, commonWaitTimeout, progress)

@@ -61,7 +61,7 @@ func WithCommonConfig(common config.Common) PublicWriterOption {
 }
 
 // WithCredentials for internal usage only
-// no proxy to public interface
+// no proxy to public interface.
 func WithCredentials(cred credentials.Credentials) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		if cred == nil {

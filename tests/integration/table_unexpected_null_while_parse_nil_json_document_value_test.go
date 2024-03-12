@@ -17,7 +17,7 @@ import (
 
 type issue229Struct struct{}
 
-// UnmarshalJSON implements json.Unmarshaler
+// UnmarshalJSON implements json.Unmarshaler.
 func (i *issue229Struct) UnmarshalJSON(_ []byte) error {
 	return nil
 }

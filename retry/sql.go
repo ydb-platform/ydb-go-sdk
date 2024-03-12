@@ -15,7 +15,7 @@ type doOptions struct {
 	retryOptions []Option
 }
 
-// doTxOption defines option for redefine default Retry behavior
+// doTxOption defines option for redefine default Retry behavior.
 type doOption interface {
 	ApplyDoOption(opts *doOptions)
 }
@@ -32,12 +32,12 @@ func (retryOptions doRetryOptionsOption) ApplyDoOption(opts *doOptions) {
 }
 
 // WithDoRetryOptions specified retry options
-// Deprecated: use implicit options instead
+// Deprecated: use implicit options instead.
 func WithDoRetryOptions(opts ...Option) doRetryOptionsOption {
 	return opts
 }
 
-// Do is a retryer of database/sql Conn with fallbacks on errors
+// Do is a retryer of database/sql Conn with fallbacks on errors.
 func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Conn) error, opts ...doOption) error {
 	var (
 		options = doOptions{
@@ -88,7 +88,7 @@ type doTxOptions struct {
 	retryOptions []Option
 }
 
-// doTxOption defines option for redefine default Retry behavior
+// doTxOption defines option for redefine default Retry behavior.
 type doTxOption interface {
 	ApplyDoTxOption(o *doTxOptions)
 }
@@ -102,7 +102,7 @@ func (doTxRetryOptions doTxRetryOptionsOption) ApplyDoTxOption(o *doTxOptions) {
 }
 
 // WithDoTxRetryOptions specified retry options
-// Deprecated: use implicit options instead
+// Deprecated: use implicit options instead.
 func WithDoTxRetryOptions(opts ...Option) doTxRetryOptionsOption {
 	return opts
 }
@@ -117,14 +117,14 @@ func (txOptions txOptionsOption) ApplyDoTxOption(o *doTxOptions) {
 	o.txOptions = txOptions.txOptions
 }
 
-// WithTxOptions specified transaction options
+// WithTxOptions specified transaction options.
 func WithTxOptions(txOptions *sql.TxOptions) txOptionsOption {
 	return txOptionsOption{
 		txOptions: txOptions,
 	}
 }
 
-// DoTx is a retryer of database/sql transactions with fallbacks on errors
+// DoTx is a retryer of database/sql transactions with fallbacks on errors.
 func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) error, opts ...doTxOption) error {
 	var (
 		options = doTxOptions{

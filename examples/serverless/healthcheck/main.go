@@ -19,17 +19,17 @@ var (
 	urls     = URLs{}
 )
 
-// URLs is a flag.Value implementation which holds URL's as string slice
+// URLs is a flag.Value implementation which holds URL's as string slice.
 type URLs struct {
 	urls []string
 }
 
-// String returns string representation of URLs
+// String returns string representation of URLs.
 func (u *URLs) String() string {
 	return fmt.Sprintf("%v", u.urls)
 }
 
-// Set appends new value to URLs holder
+// Set appends new value to URLs holder.
 func (u *URLs) Set(s string) error {
 	u.urls = append(u.urls, s)
 

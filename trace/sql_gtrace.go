@@ -7,15 +7,15 @@ import (
 	"time"
 )
 
-// databaseSQLComposeOptions is a holder of options
+// databaseSQLComposeOptions is a holder of options.
 type databaseSQLComposeOptions struct {
 	panicCallback func(e interface{})
 }
 
-// DatabaseSQLOption specified DatabaseSQL compose option
+// DatabaseSQLOption specified DatabaseSQL compose option.
 type DatabaseSQLComposeOption func(o *databaseSQLComposeOptions)
 
-// WithDatabaseSQLPanicCallback specified behavior on panic
+// WithDatabaseSQLPanicCallback specified behavior on panic.
 func WithDatabaseSQLPanicCallback(cb func(e interface{})) DatabaseSQLComposeOption {
 	return func(o *databaseSQLComposeOptions) {
 		o.panicCallback = cb

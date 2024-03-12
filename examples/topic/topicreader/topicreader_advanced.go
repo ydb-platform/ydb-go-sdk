@@ -10,7 +10,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 )
 
-// ReadMessagesWithCustomBatching example of custom of readed message batch
+// ReadMessagesWithCustomBatching example of custom of readed message batch.
 func ReadMessagesWithCustomBatching(ctx context.Context, db *ydb.Driver) {
 	reader, _ := db.Topic().StartReader("consumer", nil)
 
@@ -21,14 +21,14 @@ func ReadMessagesWithCustomBatching(ctx context.Context, db *ydb.Driver) {
 	}
 }
 
-// MyMessage example type with own serialization
+// MyMessage example type with own serialization.
 type MyMessage struct {
 	ID         byte
 	ChangeType byte
 	Delta      uint32
 }
 
-// UnmarshalYDBTopicMessage implements topicreader.MessageContentUnmarshaler interface
+// UnmarshalYDBTopicMessage implements topicreader.MessageContentUnmarshaler interface.
 func (m *MyMessage) UnmarshalYDBTopicMessage(data []byte) error {
 	if len(data) != 6 {
 		return errors.New("bad data len")
@@ -40,14 +40,14 @@ func (m *MyMessage) UnmarshalYDBTopicMessage(data []byte) error {
 	return nil
 }
 
-// UnmarshalMessageContentToOwnType is example about effective unmarshal own format from message content
+// UnmarshalMessageContentToOwnType is example about effective unmarshal own format from message content.
 func UnmarshalMessageContentToOwnType(ctx context.Context, reader *topicreader.Reader) {
 	var v MyMessage
 	mess, _ := reader.ReadMessage(ctx)
 	_ = mess.UnmarshalTo(&v)
 }
 
-// ProcessMessagesWithSyncCommit example about guarantee wait for commit accepted by server
+// ProcessMessagesWithSyncCommit example about guarantee wait for commit accepted by server.
 func ProcessMessagesWithSyncCommit(ctx context.Context, db *ydb.Driver) {
 	reader, _ := db.Topic().StartReader("consumer", nil,
 		topicoptions.WithCommitMode(topicoptions.CommitModeSync),
@@ -64,7 +64,7 @@ func ProcessMessagesWithSyncCommit(ctx context.Context, db *ydb.Driver) {
 }
 
 // OwnReadProgressStorage example about store reading progress in external system and don't use
-// commit messages to YDB
+// commit messages to YDB.
 func OwnReadProgressStorage(ctx context.Context, db *ydb.Driver) {
 	reader, _ := db.Topic().StartReader("consumer", topicoptions.ReadTopic("asd"),
 		topicoptions.WithGetPartitionStartOffset(

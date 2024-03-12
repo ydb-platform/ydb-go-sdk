@@ -40,7 +40,7 @@ func TransportError(err error) Error {
 	return xerrors.TransportError(err)
 }
 
-// IsYdbError reports when given error is and ydb error (transport, operation or internal driver error)
+// IsYdbError reports when given error is and ydb error (transport, operation or internal driver error).
 func IsYdbError(err error) bool {
 	return xerrors.IsYdb(err)
 }
@@ -57,27 +57,27 @@ func OperationError(err error) Error {
 	return xerrors.OperationError(err)
 }
 
-// IsOperationErrorOverloaded checks whether given err is an operation error with code Overloaded
+// IsOperationErrorOverloaded checks whether given err is an operation error with code Overloaded.
 func IsOperationErrorOverloaded(err error) bool {
 	return IsOperationError(err, Ydb.StatusIds_OVERLOADED)
 }
 
-// IsOperationErrorUnavailable checks whether given err is an operation error with code Unavailable
+// IsOperationErrorUnavailable checks whether given err is an operation error with code Unavailable.
 func IsOperationErrorUnavailable(err error) bool {
 	return IsOperationError(err, Ydb.StatusIds_UNAVAILABLE)
 }
 
-// IsOperationErrorAlreadyExistsError checks whether given err is an operation error with code AlreadyExistsError
+// IsOperationErrorAlreadyExistsError checks whether given err is an operation error with code AlreadyExistsError.
 func IsOperationErrorAlreadyExistsError(err error) bool {
 	return IsOperationError(err, Ydb.StatusIds_ALREADY_EXISTS)
 }
 
-// IsOperationErrorNotFoundError checks whether given err is an operation error with code NotFoundError
+// IsOperationErrorNotFoundError checks whether given err is an operation error with code NotFoundError.
 func IsOperationErrorNotFoundError(err error) bool {
 	return IsOperationError(err, Ydb.StatusIds_NOT_FOUND)
 }
 
-// IsOperationErrorSchemeError checks whether given err is an operation error with code SchemeError
+// IsOperationErrorSchemeError checks whether given err is an operation error with code SchemeError.
 func IsOperationErrorSchemeError(err error) bool {
 	return IsOperationError(err, Ydb.StatusIds_SCHEME_ERROR)
 }
@@ -89,13 +89,13 @@ func IsOperationErrorTransactionLocksInvalidated(err error) (isTLI bool) {
 	return xerrors.IsOperationErrorTransactionLocksInvalidated(err)
 }
 
-// IsRatelimiterAcquireError checks whether given err is an ratelimiter acquire error
+// IsRatelimiterAcquireError checks whether given err is an ratelimiter acquire error.
 func IsRatelimiterAcquireError(err error) bool {
 	return ratelimiterErrors.IsAcquireError(err)
 }
 
 // ToRatelimiterAcquireError casts given err to ratelimiter.AcquireError.
-// If given err is not ratelimiter acquire error - returns nil
+// If given err is not ratelimiter acquire error - returns nil.
 func ToRatelimiterAcquireError(err error) ratelimiter.AcquireError {
 	return ratelimiterErrors.ToAcquireError(err)
 }

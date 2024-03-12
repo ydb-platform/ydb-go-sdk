@@ -28,12 +28,12 @@ const (
 
 var epoch = time.Unix(0, 0)
 
-// IntervalToDuration returns time.Duration from given microseconds
+// IntervalToDuration returns time.Duration from given microseconds.
 func IntervalToDuration(n int64) time.Duration {
 	return time.Duration(n) * time.Microsecond
 }
 
-// durationToMicroseconds returns microseconds from given time.Duration
+// durationToMicroseconds returns microseconds from given time.Duration.
 func durationToMicroseconds(d time.Duration) int64 {
 	return int64(d / time.Microsecond)
 }

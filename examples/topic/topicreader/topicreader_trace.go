@@ -9,7 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// CommitNotify is example for receive commit notifications with async commit mode
+// CommitNotify is example for receive commit notifications with async commit mode.
 func CommitNotify(ctx context.Context, db *ydb.Driver) {
 	reader, _ := db.Topic().StartReader("consumer", topicoptions.ReadTopic("asd"),
 		topicoptions.WithReaderTrace(trace.Topic{
@@ -27,7 +27,7 @@ func CommitNotify(ctx context.Context, db *ydb.Driver) {
 	}
 }
 
-// ExplicitPartitionStartStopHandler is example for create own handler for stop partition event from server
+// ExplicitPartitionStartStopHandler is example for create own handler for stop partition event from server.
 func ExplicitPartitionStartStopHandler(ctx context.Context, db *ydb.Driver) {
 	readContext, stopReader := context.WithCancel(context.Background())
 	defer stopReader()
@@ -84,7 +84,7 @@ func ExplicitPartitionStartStopHandler(ctx context.Context, db *ydb.Driver) {
 }
 
 // PartitionStartStopHandlerAndOwnReadProgressStorage example of complex use explicit start/stop partition handler
-// and own progress storage in external system
+// and own progress storage in external system.
 func PartitionStartStopHandlerAndOwnReadProgressStorage(ctx context.Context, db *ydb.Driver) {
 	readContext, stopReader := context.WithCancel(context.Background())
 	defer stopReader()

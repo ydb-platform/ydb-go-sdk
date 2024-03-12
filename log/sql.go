@@ -8,7 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// DatabaseSQL makes trace.DatabaseSQL with logging events from details
+// DatabaseSQL makes trace.DatabaseSQL with logging events from details.
 func DatabaseSQL(l Logger, d trace.Detailer, opts ...Option) (t trace.DatabaseSQL) {
 	return internalDatabaseSQL(wrapLogger(l, opts...), d)
 }

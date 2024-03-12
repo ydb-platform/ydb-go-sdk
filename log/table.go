@@ -9,7 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// Table makes trace.Table with logging events from details
+// Table makes trace.Table with logging events from details.
 func Table(l Logger, d trace.Detailer, opts ...Option) (t trace.Table) {
 	return internalTable(wrapLogger(l, opts...), d)
 }

@@ -261,7 +261,7 @@ func withCreateTableQueryTemplate(createTableQueryTemplate string) func(t *table
 
 // TableName return name (without path) to example table with struct:
 // id Int64 NOT NULL,
-// val Text
+// val Text.
 func (scope *scopeT) TableName(opts ...func(t *tableNameParams)) string {
 	params := tableNameParams{
 		tableName: "table",
@@ -310,12 +310,12 @@ func (scope *scopeT) TableName(opts ...func(t *tableNameParams)) string {
 
 // TablePath return path to example table with struct:
 // id Int64 NOT NULL,
-// val Text
+// val Text.
 func (scope *scopeT) TablePath(opts ...func(t *tableNameParams)) string {
 	return path.Join(scope.Folder(), scope.TableName(opts...))
 }
 
-// logger for tests
+// logger for tests.
 type testLogger struct {
 	test     testing.TB
 	testName string

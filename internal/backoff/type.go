@@ -2,10 +2,10 @@ package backoff
 
 import "fmt"
 
-// Type reports how to Backoff operation
+// Type reports how to Backoff operation.
 type Type uint8
 
-// Binary flags that used as Type
+// Binary flags that used as Type.
 const (
 	TypeNoBackoff Type = 1 << iota >> 1
 

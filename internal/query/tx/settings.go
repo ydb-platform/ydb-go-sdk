@@ -24,7 +24,7 @@ var (
 	}
 )
 
-// Transaction settings options
+// Transaction settings options.
 type (
 	Option interface {
 		ApplyTxSettingsOption(a *allocator.Allocator, txSettings *Ydb_Query.TransactionSettings)
@@ -54,7 +54,7 @@ func (opts Settings) ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionSetting
 	return txSettings
 }
 
-// NewSettings returns transaction settings
+// NewSettings returns transaction settings.
 func NewSettings(opts ...Option) Settings {
 	return opts
 }

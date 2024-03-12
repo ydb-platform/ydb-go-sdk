@@ -2,12 +2,12 @@ package topicreader
 
 import "github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 
-// WithBatchMaxCount max messages within batch
+// WithBatchMaxCount max messages within batch.
 type WithBatchMaxCount int
 
 var _ ReadBatchOption = WithBatchMaxCount(0)
 
-// Apply implements ReadBatchOption interface
+// Apply implements ReadBatchOption interface.
 func (count WithBatchMaxCount) Apply(
 	options topicreaderinternal.ReadMessageBatchOptions,
 ) topicreaderinternal.ReadMessageBatchOptions {
@@ -23,10 +23,10 @@ func (count WithBatchMaxCount) Apply(
 // it will panic if count < 1
 //
 // Deprecated: (was experimental) will be removed soon.
-// The option will be removed for simplify code internals
+// The option will be removed for simplify code internals.
 type WithBatchPreferMinCount int
 
-// Apply implements ReadBatchOption interface
+// Apply implements ReadBatchOption interface.
 func (count WithBatchPreferMinCount) Apply(
 	options topicreaderinternal.ReadMessageBatchOptions,
 ) topicreaderinternal.ReadMessageBatchOptions {

@@ -17,7 +17,7 @@ var (
 	errClosedWithNilReason = xerrors.Wrap(errors.New("ydb: background worker closed with nil reason"))
 )
 
-// A Worker must not be copied after first use
+// A Worker must not be copied after first use.
 type Worker struct {
 	ctx            context.Context
 	workers        sync.WaitGroup

@@ -13,18 +13,18 @@ const (
 	TypeSlowBackoff = backoff.TypeSlow
 )
 
-// WithBackoff makes retryable error option with custom backoff type
+// WithBackoff makes retryable error option with custom backoff type.
 func WithBackoff(t backoff.Type) retryableErrorOption {
 	return retryableErrorOption(xerrors.WithBackoff(t))
 }
 
-// WithDeleteSession makes retryable error option with delete session flag
+// WithDeleteSession makes retryable error option with delete session flag.
 func WithDeleteSession() retryableErrorOption {
 	return retryableErrorOption(xerrors.WithDeleteSession())
 }
 
 // RetryableError makes retryable error from options
-// RetryableError provides retrying on custom errors
+// RetryableError provides retrying on custom errors.
 func RetryableError(err error, opts ...retryableErrorOption) error {
 	return xerrors.Retryable(
 		err,

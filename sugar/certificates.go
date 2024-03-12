@@ -9,7 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-// LoadCertificatesFromFile read and parse caFile and returns certificates
+// LoadCertificatesFromFile read and parse caFile and returns certificates.
 func LoadCertificatesFromFile(caFile string) ([]*x509.Certificate, error) {
 	bytes, err := os.ReadFile(filepath.Clean(caFile))
 	if err != nil {
@@ -19,7 +19,7 @@ func LoadCertificatesFromFile(caFile string) ([]*x509.Certificate, error) {
 	return LoadCertificatesFromPem(bytes), nil
 }
 
-// LoadCertificatesFromPem parse bytes and returns certificates
+// LoadCertificatesFromPem parse bytes and returns certificates.
 func LoadCertificatesFromPem(bytes []byte) (certs []*x509.Certificate) {
 	var (
 		cert *x509.Certificate

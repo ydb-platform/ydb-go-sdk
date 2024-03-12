@@ -82,7 +82,7 @@ func (c *counter) Value() string {
 	return fmt.Sprintf("%d", c.value)
 }
 
-// define custom counterVec
+// define custom counterVec.
 type counterVec struct {
 	name       string
 	labelNames []string
@@ -145,7 +145,7 @@ func (t *timer) Value() string {
 	return fmt.Sprintf("%v", t.value)
 }
 
-// define custom timerVec
+// define custom timerVec.
 type timerVec struct {
 	name       string
 	labelNames []string
@@ -233,7 +233,7 @@ func (h *histogram) Value() string {
 	return buffer.String()
 }
 
-// define custom histogramVec
+// define custom histogramVec.
 type histogramVec struct {
 	name       string
 	labelNames []string
@@ -278,7 +278,7 @@ func (vec *histogramVec) Values() (values []string) {
 	return values
 }
 
-// define custom gaugeVec
+// define custom gaugeVec.
 type gaugeVec struct {
 	name       string
 	labelNames []string
@@ -373,7 +373,7 @@ func (v *vec[T]) iterate(f func(element *T)) {
 	}
 }
 
-// define custom registryConfig
+// define custom registryConfig.
 type registryConfig struct {
 	prefix     string
 	details    trace.Details

@@ -18,7 +18,7 @@ type constraint interface {
 
 // GenerateDeclareSection generates DECLARE section text in YQL query by params
 //
-// Deprecated: use testutil.QueryBind(ydb.WithAutoDeclare()) helper
+// Deprecated: use testutil.QueryBind(ydb.WithAutoDeclare()) helper.
 func GenerateDeclareSection[T constraint](parameters T) (string, error) {
 	switch v := any(parameters).(type) {
 	case *params.Parameters:
@@ -36,7 +36,7 @@ func GenerateDeclareSection[T constraint](parameters T) (string, error) {
 
 // ToYdbParam converts
 //
-// Deprecated: use testutil/QueryBind helper
+// Deprecated: use testutil/QueryBind helper.
 func ToYdbParam(param sql.NamedArg) (*params.Parameter, error) {
 	params, err := bind.Params(param)
 	if err != nil {

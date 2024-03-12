@@ -15,13 +15,13 @@ const (
 	DefaultSessionPoolSizeLimit            = 50
 	DefaultSessionPoolIdleThreshold        = 5 * time.Minute
 
-	// Deprecated: table client do not supports background session keep-aliving now
+	// Deprecated: table client do not supports background session keep-aliving now.
 	DefaultKeepAliveMinSize = 10
 
-	// Deprecated: table client do not supports background session keep-aliving now
+	// Deprecated: table client do not supports background session keep-aliving now.
 	DefaultIdleKeepAliveThreshold = 2
 
-	// Deprecated: table client do not supports background session keep-aliving now
+	// Deprecated: table client do not supports background session keep-aliving now.
 	DefaultSessionPoolKeepAliveTimeout = 500 * time.Millisecond
 )
 
@@ -38,7 +38,7 @@ func New(opts ...Option) *Config {
 
 type Option func(*Config)
 
-// With applies common configuration params
+// With applies common configuration params.
 func With(config config.Common) Option {
 	return func(c *Config) {
 		c.Common = config
@@ -61,7 +61,7 @@ func WithSizeLimit(sizeLimit int) Option {
 // If keepAliveMinSize is less than zero, then no sessions will be preserved
 // If keepAliveMinSize is zero, the DefaultKeepAliveMinSize is used
 //
-// Deprecated: table client do not supports background session keep-aliving now
+// Deprecated: table client do not supports background session keep-aliving now.
 func WithKeepAliveMinSize(keepAliveMinSize int) Option {
 	return func(c *Config) {}
 }
@@ -73,7 +73,7 @@ func WithKeepAliveMinSize(keepAliveMinSize int) Option {
 // be removed ever.
 // If IdleKeepAliveThreshold is equal to zero, it will be set to DefaultIdleKeepAliveThreshold
 //
-// Deprecated: table client do not support background session keep-aliving now
+// Deprecated: table client do not support background session keep-aliving now.
 func WithIdleKeepAliveThreshold(idleKeepAliveThreshold int) Option {
 	return func(c *Config) {}
 }
@@ -95,13 +95,13 @@ func WithIdleThreshold(idleThreshold time.Duration) Option {
 // WithKeepAliveTimeout limits maximum time spent on KeepAlive request
 // If keepAliveTimeout is less than or equal to zero then the DefaultSessionPoolKeepAliveTimeout is used.
 //
-// Deprecated: table client do not support background session keep-aliving now
+// Deprecated: table client do not support background session keep-aliving now.
 func WithKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
 	return func(c *Config) {}
 }
 
 // WithCreateSessionTimeout limits maximum time spent on Create session request
-// If createSessionTimeout is less than or equal to zero then no used timeout on create session request
+// If createSessionTimeout is less than or equal to zero then no used timeout on create session request.
 func WithCreateSessionTimeout(createSessionTimeout time.Duration) Option {
 	return func(c *Config) {
 		if createSessionTimeout > 0 {
@@ -122,28 +122,28 @@ func WithDeleteTimeout(deleteTimeout time.Duration) Option {
 	}
 }
 
-// WithTrace appends table trace to early defined traces
+// WithTrace appends table trace to early defined traces.
 func WithTrace(trace *trace.Table, opts ...trace.TableComposeOption) Option {
 	return func(c *Config) {
 		c.trace = c.trace.Compose(trace, opts...)
 	}
 }
 
-// WithIgnoreTruncated disables errors on truncated flag
+// WithIgnoreTruncated disables errors on truncated flag.
 func WithIgnoreTruncated() Option {
 	return func(c *Config) {
 		c.ignoreTruncated = true
 	}
 }
 
-// WithClock replaces default clock
+// WithClock replaces default clock.
 func WithClock(clock clockwork.Clock) Option {
 	return func(c *Config) {
 		c.clock = clock
 	}
 }
 
-// Config is a configuration of table client
+// Config is a configuration of table client.
 type Config struct {
 	config.Common
 
@@ -160,12 +160,12 @@ type Config struct {
 	clock clockwork.Clock
 }
 
-// Trace defines trace over table client calls
+// Trace defines trace over table client calls.
 func (c *Config) Trace() *trace.Table {
 	return c.trace
 }
 
-// Clock defines clock
+// Clock defines clock.
 func (c *Config) Clock() clockwork.Clock {
 	return c.clock
 }
@@ -182,12 +182,12 @@ func (c *Config) SizeLimit() int {
 // If KeepAliveMinSize is less than zero, then no sessions will be preserved
 // If KeepAliveMinSize is zero, the DefaultKeepAliveMinSize is used
 //
-// Deprecated: table client do not support background session keep-aliving now
+// Deprecated: table client do not support background session keep-aliving now.
 func (c *Config) KeepAliveMinSize() int {
 	return DefaultKeepAliveMinSize
 }
 
-// IgnoreTruncated specifies behavior on truncated flag
+// IgnoreTruncated specifies behavior on truncated flag.
 func (c *Config) IgnoreTruncated() bool {
 	return c.ignoreTruncated
 }
@@ -199,7 +199,7 @@ func (c *Config) IgnoreTruncated() bool {
 // be removed ever.
 // If IdleKeepAliveThreshold is equal to zero, it will be set to DefaultIdleKeepAliveThreshold
 //
-// Deprecated: table client do not support background session keep-aliving now
+// Deprecated: table client do not support background session keep-aliving now.
 func (c *Config) IdleKeepAliveThreshold() int {
 	return DefaultIdleKeepAliveThreshold
 }
@@ -216,12 +216,12 @@ func (c *Config) IdleThreshold() time.Duration {
 // KeepAliveTimeout limits maximum time spent on KeepAlive request
 // If KeepAliveTimeout is less than or equal to zero then the DefaultSessionPoolKeepAliveTimeout is used.
 //
-// Deprecated: table client do not support background session keep-aliving now
+// Deprecated: table client do not support background session keep-aliving now.
 func (c *Config) KeepAliveTimeout() time.Duration {
 	return DefaultSessionPoolKeepAliveTimeout
 }
 
-// CreateSessionTimeout limits maximum time spent on Create session request
+// CreateSessionTimeout limits maximum time spent on Create session request.
 func (c *Config) CreateSessionTimeout() time.Duration {
 	return c.createSessionTimeout
 }

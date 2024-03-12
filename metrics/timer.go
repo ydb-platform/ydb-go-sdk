@@ -2,7 +2,7 @@ package metrics
 
 import "time"
 
-// TimerVec stores multiple dynamically created timers
+// TimerVec stores multiple dynamically created timers.
 type TimerVec interface {
 	With(labels map[string]string) Timer
 }

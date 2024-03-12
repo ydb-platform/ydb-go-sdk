@@ -18,7 +18,7 @@ import (
 // | ReadMessage      |      -      |         -        |   +    | -     |
 // | ReadMessageBatch |      -      |         -        |   +    | -     |
 // | Commit           |      +      |         +        |   -    | -     |
-// | Close            |      -      |         -        |   -    | -     |
+// | Close            |      -      |         -        |   -    | -     |.
 type Reader struct {
 	reader         topicreaderinternal.Reader
 	readInFlyght   atomic.Bool
@@ -32,13 +32,13 @@ func NewReader(internalReader topicreaderinternal.Reader) *Reader {
 }
 
 // WaitInit waits until the reader is initialized
-// or an error occurs
+// or an error occurs.
 func (r *Reader) WaitInit(ctx context.Context) error {
 	return r.reader.WaitInit(ctx)
 }
 
 // ReadMessage read exactly one message
-// exactly one of message, error is nil
+// exactly one of message, error is nil.
 func (r *Reader) ReadMessage(ctx context.Context) (*Message, error) {
 	if err := r.inCall(&r.readInFlyght); err != nil {
 		return nil, err
@@ -48,10 +48,10 @@ func (r *Reader) ReadMessage(ctx context.Context) (*Message, error) {
 	return r.reader.ReadMessage(ctx)
 }
 
-// Message contains data and metadata, readed from the server
+// Message contains data and metadata, readed from the server.
 type Message = topicreaderinternal.PublicMessage
 
-// MessageContentUnmarshaler is interface for unmarshal message content to own struct
+// MessageContentUnmarshaler is interface for unmarshal message content to own struct.
 type MessageContentUnmarshaler = topicreaderinternal.PublicMessageContentUnmarshaler
 
 // Commit receive Message, Batch of single offset
@@ -61,7 +61,7 @@ type MessageContentUnmarshaler = topicreaderinternal.PublicMessageContentUnmarsh
 // for topicoptions.CommitModeSync mode sync the method can return ErrCommitToExpiredSession
 // it means about the message/batch was not committed because connection broken or partition routed to
 // other reader by server.
-// Client code should continue work normally
+// Client code should continue work normally.
 func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
 	if err := r.inCall(&r.commitInFlyght); err != nil {
 		return err
@@ -71,7 +71,7 @@ func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
 	return r.reader.Commit(ctx, obj)
 }
 
-// CommitRangeGetter interface for get commit offsets
+// CommitRangeGetter interface for get commit offsets.
 type CommitRangeGetter = topicreaderinternal.PublicCommitRangeGetter
 
 // ReadMessageBatch
@@ -89,7 +89,7 @@ func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...ReadBatchOption) 
 // ReadMessagesBatch read batch of messages
 // Batch is ordered message group from one partition
 // exactly one of Batch, err is nil
-// if Batch is not nil - reader guarantee about all Batch.Messages are not nil
+// if Batch is not nil - reader guarantee about all Batch.Messages are not nil.
 func (r *Reader) ReadMessagesBatch(ctx context.Context, opts ...ReadBatchOption) (*Batch, error) {
 	if err := r.inCall(&r.readInFlyght); err != nil {
 		return nil, err
@@ -99,15 +99,15 @@ func (r *Reader) ReadMessagesBatch(ctx context.Context, opts ...ReadBatchOption)
 	return r.reader.ReadMessageBatch(ctx, opts...)
 }
 
-// Batch is ordered group of messages from one partition
+// Batch is ordered group of messages from one partition.
 type Batch = topicreaderinternal.PublicBatch
 
-// ReadBatchOption is type for options of read batch
+// ReadBatchOption is type for options of read batch.
 type ReadBatchOption = topicreaderinternal.PublicReadBatchOption
 
 // Close stop work with reader
 // return when reader complete internal works, flush commit buffer, ets
-// or when ctx cancelled
+// or when ctx cancelled.
 func (r *Reader) Close(ctx context.Context) error {
 	// close must be non-concurrent with read and commit
 

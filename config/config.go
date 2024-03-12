@@ -39,12 +39,12 @@ func (c *Config) Credentials() credentials.Credentials {
 	return c.credentials
 }
 
-// ExcludeGRPCCodesForPessimization defines grpc codes for exclude its from pessimization trigger
+// ExcludeGRPCCodesForPessimization defines grpc codes for exclude its from pessimization trigger.
 func (c *Config) ExcludeGRPCCodesForPessimization() []grpcCodes.Code {
 	return c.excludeGRPCCodesForPessimization
 }
 
-// GrpcDialOptions reports about used grpc dialing options
+// GrpcDialOptions reports about used grpc dialing options.
 func (c *Config) GrpcDialOptions() []grpc.DialOption {
 	return append(
 		defaultGrpcOptions(c.trace, c.secure, c.tlsConfig),
@@ -52,7 +52,7 @@ func (c *Config) GrpcDialOptions() []grpc.DialOption {
 	)
 }
 
-// Meta reports meta information about database connection
+// Meta reports meta information about database connection.
 func (c *Config) Meta() *meta.Meta {
 	return c.meta
 }
@@ -64,17 +64,17 @@ func (c *Config) ConnectionTTL() time.Duration {
 	return c.connectionTTL
 }
 
-// Secure is a flag for secure connection
+// Secure is a flag for secure connection.
 func (c *Config) Secure() bool {
 	return c.secure
 }
 
-// Endpoint is a required starting endpoint for connect
+// Endpoint is a required starting endpoint for connect.
 func (c *Config) Endpoint() string {
 	return c.endpoint
 }
 
-// TLSConfig reports about TLS configuration
+// TLSConfig reports about TLS configuration.
 func (c *Config) TLSConfig() *tls.Config {
 	return c.tlsConfig
 }
@@ -107,7 +107,7 @@ type Option func(c *Config)
 
 // WithInternalDNSResolver
 //
-// Deprecated: always used internal dns-resolver
+// Deprecated: always used internal dns-resolver.
 func WithInternalDNSResolver() Option {
 	return func(c *Config) {}
 }
@@ -133,7 +133,7 @@ func WithDatabase(database string) Option {
 	}
 }
 
-// WithCertificate appends certificate to TLS config root certificates
+// WithCertificate appends certificate to TLS config root certificates.
 func WithCertificate(certificate *x509.Certificate) Option {
 	return func(c *Config) {
 		c.tlsConfig.RootCAs.AddCert(certificate)
@@ -142,7 +142,7 @@ func WithCertificate(certificate *x509.Certificate) Option {
 
 // WithTLSConfig replaces older TLS config
 //
-// Warning: all early changes of TLS config will be lost
+// Warning: all early changes of TLS config will be lost.
 func WithTLSConfig(tlsConfig *tls.Config) Option {
 	return func(c *Config) {
 		c.tlsConfig = tlsConfig
@@ -203,14 +203,14 @@ func WithOperationCancelAfter(operationCancelAfter time.Duration) Option {
 	}
 }
 
-// WithNoAutoRetry disable auto-retry calls from YDB sub-clients
+// WithNoAutoRetry disable auto-retry calls from YDB sub-clients.
 func WithNoAutoRetry() Option {
 	return func(c *Config) {
 		config.SetAutoRetry(&c.Common, false)
 	}
 }
 
-// WithPanicCallback applies panic callback to config
+// WithPanicCallback applies panic callback to config.
 func WithPanicCallback(panicCallback func(e interface{})) Option {
 	return func(c *Config) {
 		config.SetPanicCallback(&c.Common, panicCallback)
@@ -242,14 +242,14 @@ func WithMinTLSVersion(minVersion uint16) Option {
 	}
 }
 
-// WithTLSSInsecureSkipVerify applies InsecureSkipVerify flag to TLS config
+// WithTLSSInsecureSkipVerify applies InsecureSkipVerify flag to TLS config.
 func WithTLSSInsecureSkipVerify() Option {
 	return func(c *Config) {
 		c.tlsConfig.InsecureSkipVerify = true
 	}
 }
 
-// WithGrpcOptions appends custom grpc dial options to defaults
+// WithGrpcOptions appends custom grpc dial options to defaults.
 func WithGrpcOptions(option ...grpc.DialOption) Option {
 	return func(c *Config) {
 		c.grpcOptions = append(c.grpcOptions, option...)
@@ -279,7 +279,7 @@ func New(opts ...Option) *Config {
 	return c
 }
 
-// With makes copy of current Config with specified options
+// With makes copy of current Config with specified options.
 func (c *Config) With(opts ...Option) *Config {
 	for _, opt := range opts {
 		if opt != nil {

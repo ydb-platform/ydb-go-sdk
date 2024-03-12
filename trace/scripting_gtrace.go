@@ -6,15 +6,15 @@ import (
 	"context"
 )
 
-// scriptingComposeOptions is a holder of options
+// scriptingComposeOptions is a holder of options.
 type scriptingComposeOptions struct {
 	panicCallback func(e interface{})
 }
 
-// ScriptingOption specified Scripting compose option
+// ScriptingOption specified Scripting compose option.
 type ScriptingComposeOption func(o *scriptingComposeOptions)
 
-// WithScriptingPanicCallback specified behavior on panic
+// WithScriptingPanicCallback specified behavior on panic.
 func WithScriptingPanicCallback(cb func(e interface{})) ScriptingComposeOption {
 	return func(o *scriptingComposeOptions) {
 		o.panicCallback = cb

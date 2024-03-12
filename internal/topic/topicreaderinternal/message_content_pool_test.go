@@ -165,7 +165,7 @@ func (c testFuncConsumer) UnmarshalYDBTopicMessage(data []byte) error {
 }
 
 // ErrReader returns an io.Reader that returns 0, err from all Read calls.
-// copy for use with go pre 1.16
+// copy for use with go pre 1.16.
 func ErrReader(err error) io.Reader {
 	return &errReader{err: err}
 }

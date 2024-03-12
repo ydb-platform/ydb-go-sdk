@@ -6,7 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-// Scripting returns trace.Scripting with logging events from details
+// Scripting returns trace.Scripting with logging events from details.
 func Scripting(l Logger, d trace.Detailer, opts ...Option) (t trace.Scripting) {
 	return internalScripting(wrapLogger(l, opts...), d)
 }

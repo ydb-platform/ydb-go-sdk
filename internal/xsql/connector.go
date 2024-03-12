@@ -183,7 +183,7 @@ func (m fakeTxConnectorOption) Apply(c *Connector) error {
 	return nil
 }
 
-// WithFakeTx returns a copy of context with given QueryMode
+// WithFakeTx returns a copy of context with given QueryMode.
 func WithFakeTx(m QueryMode) ConnectorOption {
 	return fakeTxConnectorOption(m)
 }
@@ -223,7 +223,7 @@ type pathNormalizer interface {
 	NormalizePath(folderOrTable string) string
 }
 
-// Connector is a producer of database/sql connections
+// Connector is a producer of database/sql connections.
 type Connector struct {
 	parent ydbDriver
 
