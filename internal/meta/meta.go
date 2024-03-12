@@ -24,9 +24,9 @@ func New(
 		credentials: credentials,
 		database:    database,
 	}
-	for _, o := range opts {
-		if o != nil {
-			o(m)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(m)
 		}
 	}
 

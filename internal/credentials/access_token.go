@@ -32,7 +32,9 @@ func NewAccessTokenCredentials(token string, opts ...AccessTokenCredentialsOptio
 		sourceInfo: stack.Record(1),
 	}
 	for _, opt := range opts {
-		opt.ApplyAccessTokenCredentialsOption(c)
+		if opt != nil {
+			opt.ApplyAccessTokenCredentialsOption(c)
+		}
 	}
 
 	return c

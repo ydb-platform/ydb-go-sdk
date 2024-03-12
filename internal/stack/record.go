@@ -87,7 +87,9 @@ func (c call) Record(opts ...recordOption) string {
 		lambdas:      true,
 	}
 	for _, opt := range opts {
-		opt(&optionsHolder)
+		if opt != nil {
+			opt(&optionsHolder)
+		}
 	}
 	name := runtime.FuncForPC(c.function).Name()
 	var (

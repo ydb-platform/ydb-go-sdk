@@ -12,10 +12,13 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 //go:generate mockgen -destination grpc_client_mock_test.go -package query -write_package_comment=false github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1 QueryServiceClient,QueryService_AttachSessionClient,QueryService_ExecuteQueryClient
@@ -27,6 +30,7 @@ type balancer interface {
 var _ query.Client = (*Client)(nil)
 
 type Client struct {
+	config     *config.Config
 	grpcClient Ydb_Query_V1.QueryServiceClient
 	pool       *pool.Pool[Session]
 }
@@ -40,39 +44,63 @@ func (c Client) Close(ctx context.Context) error {
 	return nil
 }
 
-func do(ctx context.Context, pool *pool.Pool[Session], op query.Operation, opts *query.DoOptions) error {
-	return retry.Retry(ctx, func(ctx context.Context) error {
-		err := pool.With(ctx, func(ctx context.Context, s *Session) error {
-			err := op(ctx, s)
-			if err != nil {
-				return xerrors.WithStackTrace(err)
-			}
+func do(
+	ctx context.Context,
+	pool *pool.Pool[Session],
+	op query.Operation,
+	t *trace.Query,
+	opts ...options.DoOption,
+) (finalErr error) {
+	doOpts := options.ParseDoOpts(t, opts...)
 
-			return nil
-		})
+	err := pool.With(ctx, func(ctx context.Context, s *Session) error {
+		err := op(ctx, s)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
 
 		return nil
-	}, opts.RetryOptions...)
+	}, append(doOpts.RetryOpts(), retry.WithTrace(&trace.Retry{
+		OnRetry: func(
+			info trace.RetryLoopStartInfo,
+		) func(
+			trace.RetryLoopIntermediateInfo,
+		) func(
+			trace.RetryLoopDoneInfo,
+		) {
+			onIntermediate := trace.QueryOnDo(doOpts.Trace(), &ctx, stack.FunctionID(""))
+
+			return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+				onDone := onIntermediate(info.Error)
+
+				return func(info trace.RetryLoopDoneInfo) {
+					onDone(info.Attempts, info.Error)
+				}
+			}
+		},
+	}))...)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
 }
 
-func (c Client) Do(ctx context.Context, op query.Operation, opts ...query.DoOption) error {
-	doOptions := query.NewDoOptions(opts...)
-	if doOptions.Label != "" {
-		doOptions.RetryOptions = append(doOptions.RetryOptions, retry.WithLabel(doOptions.Label))
-	}
-	if doOptions.Idempotent {
-		doOptions.RetryOptions = append(doOptions.RetryOptions, retry.WithIdempotent(doOptions.Idempotent))
-	}
-
-	return do(ctx, c.pool, op, &doOptions)
+func (c Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) error {
+	return do(ctx, c.pool, op, c.config.Trace(), opts...)
 }
 
-func doTx(ctx context.Context, pool *pool.Pool[Session], op query.TxOperation, opts *query.DoTxOptions) error {
-	return do(ctx, pool, func(ctx context.Context, s query.Session) error {
-		tx, err := s.Begin(ctx, opts.TxSettings)
+func doTx(
+	ctx context.Context,
+	pool *pool.Pool[Session],
+	op query.TxOperation,
+	t *trace.Query,
+	opts ...options.DoTxOption,
+) error {
+	doTxOpts := options.ParseDoTxOpts(t, opts...)
+
+	err := do(ctx, pool, func(ctx context.Context, s query.Session) error {
+		tx, err := s.Begin(ctx, doTxOpts.TxSettings())
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
@@ -96,19 +124,16 @@ func doTx(ctx context.Context, pool *pool.Pool[Session], op query.TxOperation, o
 		}
 
 		return nil
-	}, &opts.DoOptions)
+	}, t, doTxOpts.DoOpts()...)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
 }
 
-func (c Client) DoTx(ctx context.Context, op query.TxOperation, opts ...query.DoTxOption) error {
-	doTxOptions := query.NewDoTxOptions(opts...)
-	if doTxOptions.Label != "" {
-		doTxOptions.RetryOptions = append(doTxOptions.RetryOptions, retry.WithLabel(doTxOptions.Label))
-	}
-	if doTxOptions.Idempotent {
-		doTxOptions.RetryOptions = append(doTxOptions.RetryOptions, retry.WithIdempotent(doTxOptions.Idempotent))
-	}
-
-	return doTx(ctx, c.pool, op, &doTxOptions)
+func (c Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) error {
+	return doTx(ctx, c.pool, op, c.config.Trace(), opts...)
 }
 
 func deleteSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID string) error {
@@ -189,7 +214,7 @@ func createSession(
 		id:          s.GetSessionId(),
 		nodeID:      s.GetNodeId(),
 		queryClient: client,
-		status:      query.SessionStatusReady,
+		status:      SessionStatusReady,
 	}
 
 	if cfg.onAttach != nil {
@@ -207,15 +232,15 @@ func createSession(
 
 		atomic.StoreUint32(
 			(*uint32)(&session.status),
-			uint32(query.SessionStatusClosed),
+			uint32(SessionStatusClosed),
 		)
 	})
 
 	go func() {
 		defer session.close()
 		for {
-			switch session.Status() {
-			case query.SessionStatusReady, query.SessionStatusInUse:
+			switch session.sessionStatus() {
+			case SessionStatusReady, SessionStatusInUse:
 				sessionState, recvErr := attach.Recv()
 				if recvErr != nil || sessionState.GetStatus() != Ydb.StatusIds_SUCCESS {
 					return
@@ -231,12 +256,17 @@ func createSession(
 
 func New(ctx context.Context, balancer balancer, config *config.Config) (*Client, error) {
 	client := &Client{
+		config:     config,
 		grpcClient: Ydb_Query_V1.NewQueryServiceClient(balancer),
 	}
 
 	client.pool = pool.New(
 		config.PoolMaxSize(),
-		func(ctx context.Context, onClose func(s *Session)) (*Session, error) {
+		func(ctx context.Context, onClose func(s *Session)) (s *Session, err error) {
+			onDone := trace.QueryOnCreateSession(config.Trace(), &ctx, stack.FunctionID(""))
+			defer func() {
+				onDone(s, err)
+			}()
 			var cancel context.CancelFunc
 			if d := config.CreateSessionTimeout(); d > 0 {
 				ctx, cancel = xcontext.WithTimeout(ctx, d)
@@ -245,7 +275,7 @@ func New(ctx context.Context, balancer balancer, config *config.Config) (*Client
 			}
 			defer cancel()
 
-			s, err := createSession(ctx, client.grpcClient, createSessionConfig{
+			s, err = createSession(ctx, client.grpcClient, createSessionConfig{
 				onClose: onClose,
 			})
 			if err != nil {
@@ -254,7 +284,11 @@ func New(ctx context.Context, balancer balancer, config *config.Config) (*Client
 
 			return s, nil
 		},
-		func(ctx context.Context, s *Session) error {
+		func(ctx context.Context, s *Session) (err error) {
+			onDone := trace.QueryOnDeleteSession(config.Trace(), &ctx, stack.FunctionID(""), s)
+			defer func() {
+				onDone(err)
+			}()
 			var cancel context.CancelFunc
 			if d := config.CreateSessionTimeout(); d > 0 {
 				ctx, cancel = xcontext.WithTimeout(ctx, d)
@@ -263,7 +297,7 @@ func New(ctx context.Context, balancer balancer, config *config.Config) (*Client
 			}
 			defer cancel()
 
-			err := deleteSession(ctx, client.grpcClient, s.id)
+			err = deleteSession(ctx, client.grpcClient, s.id)
 			if err != nil {
 				return xerrors.WithStackTrace(err)
 			}

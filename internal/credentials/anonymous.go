@@ -28,7 +28,9 @@ func NewAnonymousCredentials(opts ...AnonymousCredentialsOption) *Anonymous {
 		sourceInfo: stack.Record(1),
 	}
 	for _, opt := range opts {
-		opt.ApplyAnonymousCredentialsOption(c)
+		if opt != nil {
+			opt.ApplyAnonymousCredentialsOption(c)
+		}
 	}
 
 	return c

@@ -77,9 +77,9 @@ func Retryable(err error, opts ...RetryableErrorOption) error {
 		re.code = e.Code()
 		re.name = e.Name()
 	}
-	for _, o := range opts {
-		if o != nil {
-			o(re)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(re)
 		}
 	}
 

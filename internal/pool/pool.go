@@ -66,7 +66,9 @@ func New[T any](
 		done: make(chan struct{}),
 	}
 	for _, opt := range opts {
-		opt(p)
+		if opt != nil {
+			opt(p)
+		}
 	}
 
 	return p
@@ -107,7 +109,7 @@ func (p *Pool[T]) try(ctx context.Context, f func(ctx context.Context, item *T) 
 	return nil
 }
 
-func (p *Pool[T]) With(ctx context.Context, f func(ctx context.Context, item *T) error) error {
+func (p *Pool[T]) With(ctx context.Context, f func(ctx context.Context, item *T) error, opts ...retry.Option) error {
 	err := retry.Retry(ctx, func(ctx context.Context) error {
 		err := p.try(ctx, f)
 		if err != nil {
@@ -115,7 +117,7 @@ func (p *Pool[T]) With(ctx context.Context, f func(ctx context.Context, item *T)
 		}
 
 		return nil
-	})
+	}, opts...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}

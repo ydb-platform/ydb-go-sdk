@@ -24,6 +24,12 @@ func (s *set) AddItem() *setItem {
 	}
 }
 
+func (s *set) AddItems(items ...value.Value) *set {
+	s.values = append(s.values, items...)
+
+	return s
+}
+
 func (s *set) Build() Builder {
 	s.parent.params = append(s.parent.params, &Parameter{
 		parent: s.parent,

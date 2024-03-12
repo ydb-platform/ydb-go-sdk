@@ -1,4 +1,4 @@
-package query
+package tx
 
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
@@ -26,108 +26,112 @@ var (
 
 // Transaction settings options
 type (
-	txSettingsOption interface {
-		applyTxSettingsOption(a *allocator.Allocator, txSettings *Ydb_Query.TransactionSettings)
+	Option interface {
+		ApplyTxSettingsOption(a *allocator.Allocator, txSettings *Ydb_Query.TransactionSettings)
 	}
-	TransactionSettings []txSettingsOption
+	Settings []Option
 )
 
-func (opts TransactionSettings) applyTxSelector(a *allocator.Allocator, txControl *Ydb_Query.TransactionControl) {
+func (opts Settings) applyTxSelector(a *allocator.Allocator, txControl *Ydb_Query.TransactionControl) {
 	beginTx := a.QueryTransactionControlBeginTx()
 	beginTx.BeginTx = a.QueryTransactionSettings()
 	for _, opt := range opts {
-		opt.applyTxSettingsOption(a, beginTx.BeginTx)
+		if opt != nil {
+			opt.ApplyTxSettingsOption(a, beginTx.BeginTx)
+		}
 	}
 	txControl.TxSelector = beginTx
 }
 
-func (opts TransactionSettings) ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionSettings {
+func (opts Settings) ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionSettings {
 	txSettings := a.QueryTransactionSettings()
 	for _, opt := range opts {
-		opt.applyTxSettingsOption(a, txSettings)
+		if opt != nil {
+			opt.ApplyTxSettingsOption(a, txSettings)
+		}
 	}
 
 	return txSettings
 }
 
-// TxSettings returns transaction settings
-func TxSettings(opts ...txSettingsOption) TransactionSettings {
+// NewSettings returns transaction settings
+func NewSettings(opts ...Option) Settings {
 	return opts
 }
 
-func WithDefaultTxMode() txSettingsOption {
+func WithDefaultTxMode() Option {
 	return WithSerializableReadWrite()
 }
 
-var _ txSettingsOption = serializableReadWriteTxSettingsOption{}
+var _ Option = serializableReadWriteTxSettingsOption{}
 
 type serializableReadWriteTxSettingsOption struct{}
 
-func (o serializableReadWriteTxSettingsOption) applyTxSettingsOption(
+func (o serializableReadWriteTxSettingsOption) ApplyTxSettingsOption(
 	a *allocator.Allocator, txSettings *Ydb_Query.TransactionSettings,
 ) {
 	txSettings.TxMode = serializableReadWrite
 }
 
-func WithSerializableReadWrite() txSettingsOption {
+func WithSerializableReadWrite() Option {
 	return serializableReadWriteTxSettingsOption{}
 }
 
-var _ txSettingsOption = snapshotReadOnlyTxSettingsOption{}
+var _ Option = snapshotReadOnlyTxSettingsOption{}
 
 type snapshotReadOnlyTxSettingsOption struct{}
 
-func (snapshotReadOnlyTxSettingsOption) applyTxSettingsOption(
+func (snapshotReadOnlyTxSettingsOption) ApplyTxSettingsOption(
 	a *allocator.Allocator, settings *Ydb_Query.TransactionSettings,
 ) {
 	settings.TxMode = snapshotReadOnly
 }
 
-func WithSnapshotReadOnly() txSettingsOption {
+func WithSnapshotReadOnly() Option {
 	return snapshotReadOnlyTxSettingsOption{}
 }
 
-var _ txSettingsOption = staleReadOnlySettingsOption{}
+var _ Option = staleReadOnlySettingsOption{}
 
 type staleReadOnlySettingsOption struct{}
 
-func (staleReadOnlySettingsOption) applyTxSettingsOption(
+func (staleReadOnlySettingsOption) ApplyTxSettingsOption(
 	a *allocator.Allocator, settings *Ydb_Query.TransactionSettings,
 ) {
 	settings.TxMode = staleReadOnly
 }
 
-func WithStaleReadOnly() txSettingsOption {
+func WithStaleReadOnly() Option {
 	return staleReadOnlySettingsOption{}
 }
 
 type (
-	txOnlineReadOnly       bool
-	TxOnlineReadOnlyOption interface {
-		applyTxOnlineReadOnlyOption(opt *txOnlineReadOnly)
+	onlineReadOnly       bool
+	OnlineReadOnlyOption interface {
+		applyTxOnlineReadOnlyOption(opt *onlineReadOnly)
 	}
 )
 
-var _ TxOnlineReadOnlyOption = inconsistentReadsTxOnlineReadOnlyOption{}
+var _ OnlineReadOnlyOption = inconsistentReadsTxOnlineReadOnlyOption{}
 
 type inconsistentReadsTxOnlineReadOnlyOption struct{}
 
-func (i inconsistentReadsTxOnlineReadOnlyOption) applyTxOnlineReadOnlyOption(b *txOnlineReadOnly) {
+func (i inconsistentReadsTxOnlineReadOnlyOption) applyTxOnlineReadOnlyOption(b *onlineReadOnly) {
 	*b = true
 }
 
-func WithInconsistentReads() TxOnlineReadOnlyOption {
+func WithInconsistentReads() OnlineReadOnlyOption {
 	return inconsistentReadsTxOnlineReadOnlyOption{}
 }
 
-var _ txSettingsOption = onlineReadOnlySettingsOption{}
+var _ Option = onlineReadOnlySettingsOption{}
 
-type onlineReadOnlySettingsOption []TxOnlineReadOnlyOption
+type onlineReadOnlySettingsOption []OnlineReadOnlyOption
 
-func (opts onlineReadOnlySettingsOption) applyTxSettingsOption(
+func (opts onlineReadOnlySettingsOption) ApplyTxSettingsOption(
 	a *allocator.Allocator, settings *Ydb_Query.TransactionSettings,
 ) {
-	var ro txOnlineReadOnly
+	var ro onlineReadOnly
 	for _, opt := range opts {
 		if opt != nil {
 			opt.applyTxOnlineReadOnlyOption(&ro)
@@ -140,6 +144,6 @@ func (opts onlineReadOnlySettingsOption) applyTxSettingsOption(
 	}
 }
 
-func WithOnlineReadOnly(opts ...TxOnlineReadOnlyOption) onlineReadOnlySettingsOption {
+func WithOnlineReadOnly(opts ...OnlineReadOnlyOption) onlineReadOnlySettingsOption {
 	return opts
 }

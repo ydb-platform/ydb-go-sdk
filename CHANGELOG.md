@@ -1,4 +1,19 @@
 * Added `Dict` support for `ydb.ParamsBuilder()`
+
+## v3.57.3
+* Added metrics over query service internals
+* Added session create and delete events into `trace.Query`
+* Moved public type `query.SessionStatus` into `internal/query` package
+
+## v3.57.2
+* Fixed cases when some option is nil
+
+## v3.57.1
+* Added logs over query service internals
+* Changed `trace.Query` events
+* Changed visibility of `query.{Do,DoTx}Options` from public to private
+
+## v3.57.0
 * Added experimental implementation of query service client
 * Fixed sometime panic on topic writer closing
 * Added experimental query parameters builder `ydb.ParamsBuilder()`

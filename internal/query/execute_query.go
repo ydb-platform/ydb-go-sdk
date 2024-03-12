@@ -9,16 +9,17 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
 type executeConfig interface {
-	ExecMode() query.ExecMode
-	StatsMode() query.StatsMode
+	ExecMode() options.ExecMode
+	StatsMode() options.StatsMode
 	TxControl() *query.TransactionControl
-	Syntax() query.Syntax
+	Syntax() options.Syntax
 	Params() *params.Parameters
 	CallOptions() []grpc.CallOption
 }
@@ -74,6 +75,10 @@ func execute(ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient,
 	r, txID, err := newResult(ctx, stream, streamCancel)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
+	}
+
+	if txID == "" {
+		return nil, r, nil
 	}
 
 	return &transaction{
