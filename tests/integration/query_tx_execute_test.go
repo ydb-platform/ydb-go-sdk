@@ -12,7 +12,9 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestQueryTxExecute(t *testing.T) {
@@ -26,6 +28,16 @@ func TestQueryTxExecute(t *testing.T) {
 	db, err := ydb.Open(ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+		ydb.WithTraceQuery(
+			log.Query(
+				log.Default(os.Stdout,
+					log.WithLogQuery(),
+					log.WithColoring(),
+					log.WithMinLevel(log.TRACE),
+				),
+				trace.QueryEvents,
+			),
+		),
 	)
 	require.NoError(t, err)
 	err = db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) (err error) {
@@ -47,6 +59,6 @@ func TestQueryTxExecute(t *testing.T) {
 			return err
 		}
 		return res.Err()
-	}, query.WithIdempotent())
+	}, query.WithIdempotent(), query.WithTxSettings(query.TxSettings(query.WithSerializableReadWrite())))
 	require.NoError(t, err)
 }

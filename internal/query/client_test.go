@@ -18,6 +18,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 func TestCreateSession(t *testing.T) {
@@ -188,7 +189,7 @@ func TestDo(t *testing.T) {
 			return newTestSession()
 		}), func(ctx context.Context, s query.Session) error {
 			return nil
-		}, &query.DoOptions{})
+		}, &trace.Query{})
 		require.NoError(t, err)
 	})
 	t.Run("RetryableError", func(t *testing.T) {
@@ -202,7 +203,7 @@ func TestDo(t *testing.T) {
 			}
 
 			return nil
-		}, &query.DoOptions{})
+		}, &trace.Query{})
 		require.NoError(t, err)
 		require.Equal(t, 10, counter)
 	})
@@ -223,7 +224,7 @@ func TestDoTx(t *testing.T) {
 			return newTestSessionWithClient(client)
 		}), func(ctx context.Context, tx query.TxActor) error {
 			return nil
-		}, &query.DoTxOptions{})
+		}, &trace.Query{})
 		require.NoError(t, err)
 	})
 	t.Run("RetryableError", func(t *testing.T) {
@@ -248,7 +249,7 @@ func TestDoTx(t *testing.T) {
 			}
 
 			return nil
-		}, &query.DoTxOptions{})
+		}, &trace.Query{})
 		require.NoError(t, err)
 		require.Equal(t, 10, counter)
 	})

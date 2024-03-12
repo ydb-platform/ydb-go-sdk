@@ -16,9 +16,9 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
 func TestExecute(t *testing.T) {
@@ -356,7 +356,7 @@ func TestExecute(t *testing.T) {
 		service := NewMockQueryServiceClient(ctrl)
 		service.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 		t.Log("execute")
-		tx, r, err := execute(ctx, &Session{id: "123"}, service, "", query.ExecuteSettings())
+		tx, r, err := execute(ctx, &Session{id: "123"}, service, "", options.ExecuteSettings())
 		require.NoError(t, err)
 		defer r.Close(ctx)
 		require.EqualValues(t, "456", tx.id)
@@ -469,7 +469,7 @@ func TestExecute(t *testing.T) {
 			service := NewMockQueryServiceClient(ctrl)
 			service.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
 			t.Log("execute")
-			_, _, err := execute(ctx, &Session{id: "123"}, service, "", query.ExecuteSettings())
+			_, _, err := execute(ctx, &Session{id: "123"}, service, "", options.ExecuteSettings())
 			require.Error(t, err)
 			require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 		})
@@ -573,7 +573,7 @@ func TestExecute(t *testing.T) {
 			service := NewMockQueryServiceClient(ctrl)
 			service.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 			t.Log("execute")
-			tx, r, err := execute(ctx, &Session{id: "123"}, service, "", query.ExecuteSettings())
+			tx, r, err := execute(ctx, &Session{id: "123"}, service, "", options.ExecuteSettings())
 			require.NoError(t, err)
 			defer r.Close(ctx)
 			require.EqualValues(t, "456", tx.id)
@@ -631,13 +631,13 @@ func TestExecute(t *testing.T) {
 			ctx := xtest.Context(t)
 			ctrl := gomock.NewController(t)
 			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
-			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
-				Status: Ydb.StatusIds_UNAVAILABLE,
-			}, nil)
+			stream.EXPECT().Recv().Return(nil, xerrors.Operation(xerrors.WithStatusCode(
+				Ydb.StatusIds_UNAVAILABLE,
+			)))
 			service := NewMockQueryServiceClient(ctrl)
 			service.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 			t.Log("execute")
-			_, _, err := execute(ctx, &Session{id: "123"}, service, "", query.ExecuteSettings())
+			_, _, err := execute(ctx, &Session{id: "123"}, service, "", options.ExecuteSettings())
 			require.Error(t, err)
 			require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 		})
@@ -707,13 +707,13 @@ func TestExecute(t *testing.T) {
 					},
 				},
 			}, nil)
-			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
-				Status: Ydb.StatusIds_UNAVAILABLE,
-			}, nil)
+			stream.EXPECT().Recv().Return(nil, xerrors.Operation(xerrors.WithStatusCode(
+				Ydb.StatusIds_UNAVAILABLE,
+			)))
 			service := NewMockQueryServiceClient(ctrl)
 			service.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 			t.Log("execute")
-			tx, r, err := execute(ctx, &Session{id: "123"}, service, "", query.ExecuteSettings())
+			tx, r, err := execute(ctx, &Session{id: "123"}, service, "", options.ExecuteSettings())
 			require.NoError(t, err)
 			defer r.Close(ctx)
 			require.EqualValues(t, "456", tx.id)
@@ -760,7 +760,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 	a := allocator.New()
 	for _, tt := range []struct {
 		name        string
-		opts        []query.ExecuteOption
+		opts        []options.ExecuteOption
 		request     *Ydb_Query.ExecuteQueryRequest
 		callOptions []grpc.CallOption
 	}{
@@ -791,8 +791,8 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithParams",
-			opts: []query.ExecuteOption{
-				query.WithParameters(
+			opts: []options.ExecuteOption{
+				options.WithParameters(
 					params.Builder{}.
 						Param("$a").Text("A").
 						Param("$b").Text("B").
@@ -863,8 +863,8 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithExplain",
-			opts: []query.ExecuteOption{
-				query.WithExecMode(query.ExecModeExplain),
+			opts: []options.ExecuteOption{
+				options.WithExecMode(options.ExecModeExplain),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
 				SessionId: "WithExplain",
@@ -891,8 +891,8 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithValidate",
-			opts: []query.ExecuteOption{
-				query.WithExecMode(query.ExecModeValidate),
+			opts: []options.ExecuteOption{
+				options.WithExecMode(options.ExecModeValidate),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
 				SessionId: "WithValidate",
@@ -919,8 +919,8 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithValidate",
-			opts: []query.ExecuteOption{
-				query.WithExecMode(query.ExecModeParse),
+			opts: []options.ExecuteOption{
+				options.WithExecMode(options.ExecModeParse),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
 				SessionId: "WithValidate",
@@ -947,8 +947,8 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithStatsFull",
-			opts: []query.ExecuteOption{
-				query.WithStatsMode(query.StatsModeFull),
+			opts: []options.ExecuteOption{
+				options.WithStatsMode(options.StatsModeFull),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
 				SessionId: "WithStatsFull",
@@ -975,8 +975,8 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithStatsBasic",
-			opts: []query.ExecuteOption{
-				query.WithStatsMode(query.StatsModeBasic),
+			opts: []options.ExecuteOption{
+				options.WithStatsMode(options.StatsModeBasic),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
 				SessionId: "WithStatsBasic",
@@ -1003,8 +1003,8 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithStatsProfile",
-			opts: []query.ExecuteOption{
-				query.WithStatsMode(query.StatsModeProfile),
+			opts: []options.ExecuteOption{
+				options.WithStatsMode(options.StatsModeProfile),
 			},
 			request: &Ydb_Query.ExecuteQueryRequest{
 				SessionId: "WithStatsProfile",
@@ -1031,8 +1031,8 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 		{
 			name: "WithGrpcCallOptions",
-			opts: []query.ExecuteOption{
-				query.WithCallOptions(grpc.Header(&metadata.MD{
+			opts: []options.ExecuteOption{
+				options.WithCallOptions(grpc.Header(&metadata.MD{
 					"ext-header": []string{"test"},
 				})),
 			},
@@ -1066,7 +1066,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			request, callOptions := executeQueryRequest(a, tt.name, tt.name, query.ExecuteSettings(tt.opts...))
+			request, callOptions := executeQueryRequest(a, tt.name, tt.name, options.ExecuteSettings(tt.opts...))
 			require.Equal(t, request.String(), tt.request.String())
 			require.Equal(t, tt.callOptions, callOptions)
 		})

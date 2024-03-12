@@ -1,4 +1,4 @@
-package query
+package tx
 
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
@@ -9,31 +9,27 @@ import (
 var (
 	_ interface {
 		ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionControl
-	} = (*TransactionControl)(nil)
-	_ txSelector = (*TransactionSettings)(nil)
+	} = (*Control)(nil)
+	_ Selector = (*Settings)(nil)
 )
 
 type (
-	txSelector interface {
+	Selector interface {
 		applyTxSelector(a *allocator.Allocator, txControl *Ydb_Query.TransactionControl)
 	}
-	txControlOption interface {
-		applyTxControlOption(txControl *TransactionControl)
+	ControlOption interface {
+		applyTxControlOption(txControl *Control)
 	}
-	TransactionControl struct {
-		selector txSelector
+	Control struct {
+		selector Selector
 		commit   bool
 	}
-	transactionControlOption struct {
-		txControl *TransactionControl
+	Identifier interface {
+		ID() string
 	}
 )
 
-func (opt *transactionControlOption) applyExecuteOption(s *executeSettings) {
-	s.txControl = opt.txControl
-}
-
-func (ctrl *TransactionControl) ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionControl {
+func (ctrl *Control) ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionControl {
 	if ctrl == nil {
 		return nil
 	}
@@ -46,13 +42,13 @@ func (ctrl *TransactionControl) ToYDB(a *allocator.Allocator) *Ydb_Query.Transac
 }
 
 var (
-	_ txControlOption = beginTxOptions{}
-	_ txSelector      = beginTxOptions{}
+	_ ControlOption = beginTxOptions{}
+	_ Selector      = beginTxOptions{}
 )
 
-type beginTxOptions []txSettingsOption
+type beginTxOptions []Option
 
-func (opts beginTxOptions) applyTxControlOption(txControl *TransactionControl) {
+func (opts beginTxOptions) applyTxControlOption(txControl *Control) {
 	txControl.selector = opts
 }
 
@@ -60,24 +56,24 @@ func (opts beginTxOptions) applyTxSelector(a *allocator.Allocator, txControl *Yd
 	selector := a.QueryTransactionControlBeginTx()
 	selector.BeginTx = a.QueryTransactionSettings()
 	for _, opt := range opts {
-		opt.applyTxSettingsOption(a, selector.BeginTx)
+		opt.ApplyTxSettingsOption(a, selector.BeginTx)
 	}
 	txControl.TxSelector = selector
 }
 
 // BeginTx returns selector transaction control option
-func BeginTx(opts ...txSettingsOption) beginTxOptions {
+func BeginTx(opts ...Option) beginTxOptions {
 	return opts
 }
 
 var (
-	_ txControlOption = txIDTxControlOption("")
-	_ txSelector      = txIDTxControlOption("")
+	_ ControlOption = txIDTxControlOption("")
+	_ Selector      = txIDTxControlOption("")
 )
 
 type txIDTxControlOption string
 
-func (id txIDTxControlOption) applyTxControlOption(txControl *TransactionControl) {
+func (id txIDTxControlOption) applyTxControlOption(txControl *Control) {
 	txControl.selector = id
 }
 
@@ -87,7 +83,7 @@ func (id txIDTxControlOption) applyTxSelector(a *allocator.Allocator, txControl 
 	txControl.TxSelector = selector
 }
 
-func WithTx(t TxIdentifier) txIDTxControlOption {
+func WithTx(t Identifier) txIDTxControlOption {
 	return txIDTxControlOption(t.ID())
 }
 
@@ -97,18 +93,18 @@ func WithTxID(txID string) txIDTxControlOption {
 
 type commitTxOption struct{}
 
-func (c commitTxOption) applyTxControlOption(txControl *TransactionControl) {
+func (c commitTxOption) applyTxControlOption(txControl *Control) {
 	txControl.commit = true
 }
 
 // CommitTx returns commit transaction control option
-func CommitTx() txControlOption {
+func CommitTx() ControlOption {
 	return commitTxOption{}
 }
 
-// TxControl makes transaction control from given options
-func TxControl(opts ...txControlOption) *TransactionControl {
-	txControl := &TransactionControl{
+// NewControl makes transaction control from given options
+func NewControl(opts ...ControlOption) *Control {
+	txControl := &Control{
 		selector: BeginTx(WithSerializableReadWrite()),
 		commit:   false,
 	}
@@ -121,46 +117,46 @@ func TxControl(opts ...txControlOption) *TransactionControl {
 	return txControl
 }
 
-func NoTx() *TransactionControl {
+func NoTx() *Control {
 	return nil
 }
 
 // DefaultTxControl returns default transaction control with serializable read-write isolation mode and auto-commit
-func DefaultTxControl() *TransactionControl {
-	return TxControl(
+func DefaultTxControl() *Control {
+	return NewControl(
 		BeginTx(WithSerializableReadWrite()),
 		CommitTx(),
 	)
 }
 
 // SerializableReadWriteTxControl returns transaction control with serializable read-write isolation mode
-func SerializableReadWriteTxControl(opts ...txControlOption) *TransactionControl {
-	return TxControl(
-		append([]txControlOption{
+func SerializableReadWriteTxControl(opts ...ControlOption) *Control {
+	return NewControl(
+		append([]ControlOption{
 			BeginTx(WithSerializableReadWrite()),
 		}, opts...)...,
 	)
 }
 
 // OnlineReadOnlyTxControl returns online read-only transaction control
-func OnlineReadOnlyTxControl(opts ...TxOnlineReadOnlyOption) *TransactionControl {
-	return TxControl(
+func OnlineReadOnlyTxControl(opts ...OnlineReadOnlyOption) *Control {
+	return NewControl(
 		BeginTx(WithOnlineReadOnly(opts...)),
 		CommitTx(), // open transactions not supported for OnlineReadOnly
 	)
 }
 
 // StaleReadOnlyTxControl returns stale read-only transaction control
-func StaleReadOnlyTxControl() *TransactionControl {
-	return TxControl(
+func StaleReadOnlyTxControl() *Control {
+	return NewControl(
 		BeginTx(WithStaleReadOnly()),
 		CommitTx(), // open transactions not supported for StaleReadOnly
 	)
 }
 
 // SnapshotReadOnlyTxControl returns snapshot read-only transaction control
-func SnapshotReadOnlyTxControl() *TransactionControl {
-	return TxControl(
+func SnapshotReadOnlyTxControl() *Control {
+	return NewControl(
 		BeginTx(WithSnapshotReadOnly()),
 		CommitTx(), // open transactions not supported for StaleReadOnly
 	)

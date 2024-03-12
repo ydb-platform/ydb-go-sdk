@@ -301,10 +301,9 @@ func TestResultSetNext(t *testing.T) {
 				},
 			},
 		}, nil)
-		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
-			Status:         Ydb.StatusIds_OVERLOADED,
-			ResultSetIndex: 0,
-		}, nil)
+		stream.EXPECT().Recv().Return(nil, xerrors.Operation(xerrors.WithStatusCode(
+			Ydb.StatusIds_OVERLOADED,
+		)))
 		recv, err := stream.Recv()
 		require.NoError(t, err)
 		rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {

@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
@@ -75,9 +76,9 @@ func (s *Session) Status() query.SessionStatus {
 }
 
 func (s *Session) Execute(
-	ctx context.Context, q string, opts ...query.ExecuteOption,
+	ctx context.Context, q string, opts ...options.ExecuteOption,
 ) (query.Transaction, query.Result, error) {
-	tx, r, err := execute(ctx, s, s.queryClient, q, query.ExecuteSettings(opts...))
+	tx, r, err := execute(ctx, s, s.queryClient, q, options.ExecuteSettings(opts...))
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}

@@ -475,6 +475,25 @@ func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option { //
 	}
 }
 
+// WithTraceQuery appends trace.Query into query traces
+func WithTraceQuery(t trace.Query, opts ...trace.QueryComposeOption) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.queryOptions = append(
+			c.queryOptions,
+			queryConfig.WithTrace(&t,
+				append(
+					[]trace.QueryComposeOption{
+						trace.WithQueryPanicCallback(c.panicCallback),
+					},
+					opts...,
+				)...,
+			),
+		)
+
+		return nil
+	}
+}
+
 // WithTraceScripting scripting trace option
 func WithTraceScripting(t trace.Scripting, opts ...trace.ScriptingComposeOption) Option {
 	return func(ctx context.Context, c *Driver) error {

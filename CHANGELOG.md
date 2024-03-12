@@ -1,3 +1,8 @@
+## v3.57.1
+* Added logs over query service internals
+* Changed `trace.Query` events
+* Changed visibility of `query.{Do,DoTx}Options` from public to private
+
 ## v3.57.0
 * Added experimental implementation of query service client
 * Fixed sometime panic on topic writer closing
