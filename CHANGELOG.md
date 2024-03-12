@@ -1,3 +1,5 @@
+* Added `Dict` support for `ydb.ParamsBuilder()`
+
 ## v3.57.3
 * Added metrics over query service internals
 * Added session create and delete events into `trace.Query`
