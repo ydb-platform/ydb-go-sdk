@@ -47,7 +47,9 @@ func NewStaticCredentials(user, password, endpoint string, opts ...StaticCredent
 		sourceInfo: stack.Record(1),
 	}
 	for _, opt := range opts {
-		opt.ApplyStaticCredentialsOption(c)
+		if opt != nil {
+			opt.ApplyStaticCredentialsOption(c)
+		}
 	}
 
 	return c

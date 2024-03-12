@@ -136,9 +136,9 @@ func newConn(ctx context.Context, c *Connector, s table.ClosableSession, opts ..
 	cc.beginTxFuncs = map[QueryMode]beginTxFunc{
 		DataQueryMode: cc.beginTx,
 	}
-	for _, o := range opts {
-		if o != nil {
-			o(cc)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(cc)
 		}
 	}
 	c.attach(cc)

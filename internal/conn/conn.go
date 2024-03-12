@@ -500,9 +500,9 @@ func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 		done:     make(chan struct{}),
 	}
 	c.state.Store(uint32(Created))
-	for _, o := range opts {
-		if o != nil {
-			o(c)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(c)
 		}
 	}
 

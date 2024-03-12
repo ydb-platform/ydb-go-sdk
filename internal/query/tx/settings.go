@@ -36,7 +36,9 @@ func (opts Settings) applyTxSelector(a *allocator.Allocator, txControl *Ydb_Quer
 	beginTx := a.QueryTransactionControlBeginTx()
 	beginTx.BeginTx = a.QueryTransactionSettings()
 	for _, opt := range opts {
-		opt.ApplyTxSettingsOption(a, beginTx.BeginTx)
+		if opt != nil {
+			opt.ApplyTxSettingsOption(a, beginTx.BeginTx)
+		}
 	}
 	txControl.TxSelector = beginTx
 }
@@ -44,7 +46,9 @@ func (opts Settings) applyTxSelector(a *allocator.Allocator, txControl *Ydb_Quer
 func (opts Settings) ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionSettings {
 	txSettings := a.QueryTransactionSettings()
 	for _, opt := range opts {
-		opt.ApplyTxSettingsOption(a, txSettings)
+		if opt != nil {
+			opt.ApplyTxSettingsOption(a, txSettings)
+		}
 	}
 
 	return txSettings

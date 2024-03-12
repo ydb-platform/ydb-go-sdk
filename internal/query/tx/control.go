@@ -56,7 +56,9 @@ func (opts beginTxOptions) applyTxSelector(a *allocator.Allocator, txControl *Yd
 	selector := a.QueryTransactionControlBeginTx()
 	selector.BeginTx = a.QueryTransactionSettings()
 	for _, opt := range opts {
-		opt.ApplyTxSettingsOption(a, selector.BeginTx)
+		if opt != nil {
+			opt.ApplyTxSettingsOption(a, selector.BeginTx)
+		}
 	}
 	txControl.TxSelector = selector
 }

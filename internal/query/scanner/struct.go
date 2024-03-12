@@ -40,7 +40,9 @@ func (s StructScanner) ScanStruct(dst interface{}, opts ...ScanStructOption) err
 		AllowMissingFieldsInStruct:    false,
 	}
 	for _, opt := range opts {
-		opt.applyScanStructOption(&settings)
+		if opt != nil {
+			opt.applyScanStructOption(&settings)
+		}
 	}
 	ptr := reflect.ValueOf(dst)
 	if ptr.Kind() != reflect.Pointer {

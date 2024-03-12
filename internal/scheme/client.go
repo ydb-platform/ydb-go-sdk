@@ -250,9 +250,9 @@ func (c *Client) ModifyPermissions(
 		onDone(finalErr)
 	}()
 	var desc permissionsDesc
-	for _, o := range opts {
-		if o != nil {
-			o(&desc)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&desc)
 		}
 	}
 	call := func(ctx context.Context) error {

@@ -125,7 +125,9 @@ func ExecuteSettings(opts ...ExecuteOption) (settings *Execute) {
 	settings.commonExecuteSettings = defaultCommonExecuteSettings()
 	settings.txControl = tx.DefaultTxControl()
 	for _, opt := range opts {
-		opt.applyExecuteOption(settings)
+		if opt != nil {
+			opt.applyExecuteOption(settings)
+		}
 	}
 
 	return settings
@@ -168,7 +170,9 @@ func TxExecuteSettings(id string, opts ...TxExecuteOption) (settings *txExecuteS
 		ExecuteSettings: ExecuteSettings(WithTxControl(tx.NewControl(tx.WithTxID(id)))),
 	}
 	for _, opt := range opts {
-		opt.applyTxExecuteOption(settings)
+		if opt != nil {
+			opt.applyTxExecuteOption(settings)
+		}
 	}
 
 	return settings
