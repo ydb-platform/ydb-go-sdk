@@ -35,9 +35,9 @@ func New(
 
 type Option func(m *Meta)
 
-func WithUserAgentOption(userAgent string) Option {
+func WithApplicationNameOption(applicationName string) Option {
 	return func(m *Meta) {
-		m.userAgents = append(m.userAgents, userAgent)
+		m.applicationName = applicationName
 	}
 }
 
@@ -67,12 +67,12 @@ func ForbidOption(feature string) Option {
 }
 
 type Meta struct {
-	trace        *trace.Driver
-	credentials  credentials.Credentials
-	database     string
-	requestsType string
-	userAgents   []string
-	capabilities []string
+	trace           *trace.Driver
+	credentials     credentials.Credentials
+	database        string
+	requestsType    string
+	applicationName string
+	capabilities    []string
 }
 
 func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
@@ -95,8 +95,8 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		}
 	}
 
-	if len(m.userAgents) != 0 {
-		md.Append(HeaderUserAgent, m.userAgents...)
+	if m.applicationName != "" {
+		md.Append(HeaderApplicationName, m.applicationName)
 	}
 
 	if len(m.capabilities) > 0 {
