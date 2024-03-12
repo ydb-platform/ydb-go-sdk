@@ -1,3 +1,5 @@
+* Added support PgUnknown type as argument and result type
+
 ## v3.57.4
 * Added client pid to each gRPC requests to YDB over header `x-ydb-client-pid`
 * Added `ydb.WithApplicationName` option

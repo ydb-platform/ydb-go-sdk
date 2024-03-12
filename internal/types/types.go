@@ -478,6 +478,7 @@ func (v PgType) Yql() string {
 }
 
 func (v PgType) ToYDB(a *allocator.Allocator) *Ydb.Type {
+	//nolint:godox
 	// TODO: make allocator
 	return &Ydb.Type{Type: &Ydb.Type_PgType{
 		PgType: &Ydb.PgType{

@@ -1245,7 +1245,8 @@ func (v *pgValue) Type() types.Type {
 	return v.t
 }
 
-func (v *pgValue) toYDB(a *allocator.Allocator) *Ydb.Value {
+func (v *pgValue) toYDB(_ *allocator.Allocator) *Ydb.Value {
+	//nolint:godox
 	// TODO: make allocator
 	return &Ydb.Value{
 		Value: &Ydb.Value_TextValue{
@@ -1255,6 +1256,7 @@ func (v *pgValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 }
 
 func (v *pgValue) Yql() string {
+	//nolint:godox
 	// TODO: check real pg literal
 	return fmt.Sprintf("PgType(%q)", v.val)
 }
