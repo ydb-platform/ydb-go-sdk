@@ -1,3 +1,4 @@
+## v3.57.3
 * Added metrics over query service internals
 * Added session create and delete events into `trace.Query`
 * Moved public type `query.SessionStatus` into `internal/query` package
