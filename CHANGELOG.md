@@ -1,3 +1,4 @@
+* Added client pid to each gRPC requests to YDB over header `x-ydb-client-pid`
 * Added `ydb.WithApplicationName` option
 * Added `Dict` support for `ydb.ParamsBuilder()`
 

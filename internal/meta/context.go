@@ -25,7 +25,13 @@ func traceID(ctx context.Context) (string, bool) {
 
 // WithApplicationName returns a copy of parent context with custom user-agent info
 func WithApplicationName(ctx context.Context, applicationName string) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, HeaderApplicationName, applicationName)
+	md, has := metadata.FromOutgoingContext(ctx)
+	if !has {
+		md = metadata.MD{}
+	}
+	md.Set(HeaderApplicationName, applicationName)
+
+	return metadata.NewOutgoingContext(ctx, md)
 }
 
 // WithRequestType returns a copy of parent context with custom request type

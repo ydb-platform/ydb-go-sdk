@@ -41,6 +41,8 @@ func TestMetaRequiredHeaders(t *testing.T) {
 	require.Equal(t, []string{"database"}, md.Get(internal.HeaderDatabase))
 	require.Equal(t, []string{"requestType"}, md.Get(internal.HeaderRequestType))
 	require.Equal(t, []string{"token"}, md.Get(internal.HeaderTicket))
+	require.NotEmpty(t, md.Get(internal.HeaderClientPid))
+	require.NotEmpty(t, md.Get(internal.HeaderClientPid)[0])
 	require.Equal(t, []string{"test app"}, md.Get(internal.HeaderApplicationName))
 	require.Equal(t, []string{"traceID"}, md.Get(internal.HeaderTraceID))
 	require.Equal(t, []string{
