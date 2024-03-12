@@ -1,3 +1,4 @@
+## v3.57.2
 * Fixed cases when some option is nil
 
 ## v3.57.1
