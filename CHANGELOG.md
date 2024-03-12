@@ -1,3 +1,4 @@
+* Added `ydb.WithApplicationName` option
 * Added `Dict` support for `ydb.ParamsBuilder()`
 
 ## v3.57.3

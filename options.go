@@ -54,10 +54,21 @@ func WithAccessTokenCredentials(accessToken string) Option {
 	)
 }
 
+// WithApplicationName add provided application name to all api requests
+func WithApplicationName(applicationName string) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.options = append(c.options, config.WithApplicationName(applicationName))
+
+		return nil
+	}
+}
+
 // WithUserAgent add provided user agent value to all api requests
+//
+// Deprecated: use WithApplicationName instead
 func WithUserAgent(userAgent string) Option {
 	return func(ctx context.Context, c *Driver) error {
-		c.options = append(c.options, config.WithUserAgent(userAgent))
+		c.options = append(c.options, config.WithApplicationName(userAgent))
 
 		return nil
 	}

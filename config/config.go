@@ -161,9 +161,19 @@ func WithTraceRetry(t *trace.Retry, opts ...trace.RetryComposeOption) Option {
 	}
 }
 
+// WithApplicationName add provided application name to all api requests
+func WithApplicationName(applicationName string) Option {
+	return func(c *Config) {
+		c.metaOptions = append(c.metaOptions, meta.WithApplicationNameOption(applicationName))
+	}
+}
+
+// WithUserAgent add provided user agent to all api requests
+//
+// Deprecated: use WithApplicationName instead
 func WithUserAgent(userAgent string) Option {
 	return func(c *Config) {
-		c.metaOptions = append(c.metaOptions, meta.WithUserAgentOption(userAgent))
+		c.metaOptions = append(c.metaOptions, meta.WithApplicationNameOption(userAgent))
 	}
 }
 
