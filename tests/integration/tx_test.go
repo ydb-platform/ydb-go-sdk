@@ -138,14 +138,14 @@ func TestNoEffectsIfForgetCommitTx(t *testing.T) {
 
 		// check row for NO write
 		var (
-			value                string
-			errConnAlreadyHaveTx *xsql.ErrConnAlreadyHaveTx
+			value                  string
+			connAlreadyHaveTxError *xsql.ConnAlreadyHaveTxError
 		)
 		err = db.QueryRowContext(ctx, `SELECT val FROM table WHERE id = $1`, id).Scan(&value)
 		require.ErrorIs(t, err, sql.ErrNoRows)
 
 		// second tx on existing conn === session
 		_, err = cc.BeginTx(ctx, &sql.TxOptions{})
-		require.ErrorAs(t, err, &errConnAlreadyHaveTx)
+		require.ErrorAs(t, err, &connAlreadyHaveTxError)
 	})
 }

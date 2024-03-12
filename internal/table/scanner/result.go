@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -18,13 +18,13 @@ import (
 var errAlreadyClosed = xerrors.Wrap(errors.New("result closed early"))
 
 type baseResult struct {
-	scanner
+	valueScanner
 
-	nextResultSetCounter xatomic.Uint64
+	nextResultSetCounter atomic.Uint64
 	statsMtx             xsync.RWMutex
 	stats                *Ydb_TableStats.QueryStats
 
-	closed xatomic.Bool
+	closed atomic.Bool
 }
 
 type streamResult struct {
@@ -36,7 +36,7 @@ type streamResult struct {
 
 // Err returns error caused Scanner to be broken.
 func (r *streamResult) Err() error {
-	err := r.scanner.Err()
+	err := r.valueScanner.Err()
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -53,7 +53,7 @@ type unaryResult struct {
 
 // Err returns error caused Scanner to be broken.
 func (r *unaryResult) Err() error {
-	err := r.scanner.Err()
+	err := r.valueScanner.Err()
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -96,13 +96,13 @@ type option func(r *baseResult)
 
 func WithIgnoreTruncated(ignoreTruncated bool) option {
 	return func(r *baseResult) {
-		r.scanner.ignoreTruncated = ignoreTruncated
+		r.valueScanner.ignoreTruncated = ignoreTruncated
 	}
 }
 
 func WithMarkTruncatedAsRetryable() option {
 	return func(r *baseResult) {
-		r.scanner.markTruncatedAsRetryable = true
+		r.valueScanner.markTruncatedAsRetryable = true
 	}
 }
 

@@ -9,14 +9,13 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xbytes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 var errMessageWasReadEarly = xerrors.Wrap(errors.New("ydb: message was read early"))
 
-// PublicErrUnexpectedCodec return when try to read message content with unknown codec
-var PublicErrUnexpectedCodec = errors.New("unexpected codec") //nolint:revive,stylecheck
+// ErrPublicUnexpectedCodec return when try to read message content with unknown codec
+var ErrPublicUnexpectedCodec = errors.New("unexpected codec")
 
 // PublicMessage is representation of topic message
 type PublicMessage struct {
@@ -145,7 +144,7 @@ func (pmb *PublicMessageBuilder) CreatedAt(createdAt time.Time) *PublicMessageBu
 func (pmb *PublicMessageBuilder) Metadata(metadata map[string][]byte) *PublicMessageBuilder {
 	pmb.mess.Metadata = make(map[string][]byte, len(metadata))
 	for key, val := range metadata {
-		pmb.mess.Metadata[key] = xbytes.Clone(val)
+		pmb.mess.Metadata[key] = bytes.Clone(val)
 	}
 
 	return pmb

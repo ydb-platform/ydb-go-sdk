@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -47,19 +47,18 @@ func newSingleStreamWriterConfig(
 }
 
 type SingleStreamWriter struct {
-	ReceivedLastSeqNum  int64
-	LastSeqNumRequested bool
-	SessionID           string
-	PartitionID         int64
-	CodecsFromServer    rawtopiccommon.SupportedCodecs
+	cfg                 SingleStreamWriterConfig
 	Encoder             EncoderSelector
-
-	cfg            SingleStreamWriterConfig
-	allowedCodecs  rawtopiccommon.SupportedCodecs
-	background     background.Worker
-	closed         xatomic.Bool
-	closeReason    error
-	closeCompleted empty.Chan
+	background          background.Worker
+	CodecsFromServer    rawtopiccommon.SupportedCodecs
+	allowedCodecs       rawtopiccommon.SupportedCodecs
+	SessionID           string
+	closeReason         error
+	ReceivedLastSeqNum  int64
+	PartitionID         int64
+	closeCompleted      empty.Chan
+	closed              atomic.Bool
+	LastSeqNumRequested bool
 }
 
 func NewSingleStreamWriter(
@@ -189,7 +188,7 @@ func (w *SingleStreamWriter) receiveMessagesLoop(ctx context.Context) {
 
 		switch m := mess.(type) {
 		case *rawtopicwriter.WriteResult:
-			if err = w.cfg.queue.AcksReceived(m.Acks); err != nil {
+			if err = w.cfg.queue.AcksReceived(m.Acks); err != nil && !errors.Is(err, errCloseClosedMessageQueue) {
 				reason := xerrors.WithStackTrace(err)
 				closeCtx, closeCtxCancel := xcontext.WithCancel(ctx)
 				closeCtxCancel()

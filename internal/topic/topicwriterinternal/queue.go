@@ -14,6 +14,7 @@ import (
 
 var (
 	errCloseClosedMessageQueue   = xerrors.Wrap(errors.New("ydb: close closed message queue"))
+	errAckOnClosedMessageQueue   = xerrors.Wrap(errors.New("ydb: ack on closed message queue"))
 	errGetMessageFromClosedQueue = xerrors.Wrap(errors.New("ydb: get message from closed message queue"))
 	errAddUnorderedMessages      = xerrors.Wrap(errors.New("ydb: add unordered messages"))
 	errAckUnexpectedMessage      = xerrors.Wrap(errors.New("ydb: ack unexpected message"))
@@ -151,6 +152,9 @@ func (q *messageQueue) AcksReceived(acks []rawtopicwriter.WriteAck) error {
 			q.OnAckReceived(ackReceivedCounter)
 		}
 	}()
+	if q.closed {
+		return xerrors.WithStackTrace(errAckOnClosedMessageQueue)
+	}
 
 	for i := range acks {
 		if err := q.ackReceivedNeedLock(acks[i].SeqNo); err != nil {

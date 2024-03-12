@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 )
 
@@ -50,6 +51,15 @@ type (
 		tableQueryAllocator
 		tableQueryYqlTextAllocator
 		tableQueryIDAllocator
+		queryExecuteQueryRequestAllocator
+		queryExecuteQueryRequestQueryContentAllocator
+		queryExecuteQueryResponsePartAllocator
+		queryQueryContentAllocator
+		queryTransactionControlAllocator
+		queryTransactionControlBeginTxAllocator
+		queryTransactionControlTxIDAllocator
+		queryTransactionSettingsAllocator
+		queryTransactionSettingsSerializableReadWriteAllocator
 	}
 )
 
@@ -99,6 +109,15 @@ func (a *Allocator) Free() {
 	a.tableQueryAllocator.free()
 	a.tableQueryYqlTextAllocator.free()
 	a.tableQueryIDAllocator.free()
+	a.queryExecuteQueryRequestAllocator.free()
+	a.queryExecuteQueryRequestQueryContentAllocator.free()
+	a.queryExecuteQueryResponsePartAllocator.free()
+	a.queryQueryContentAllocator.free()
+	a.queryTransactionControlAllocator.free()
+	a.queryTransactionControlBeginTxAllocator.free()
+	a.queryTransactionControlTxIDAllocator.free()
+	a.queryTransactionSettingsAllocator.free()
+	a.queryTransactionSettingsSerializableReadWriteAllocator.free()
 
 	allocatorPool.Put(a)
 }
@@ -375,7 +394,7 @@ type structAllocator struct {
 
 func (a *structAllocator) Struct() (v *Ydb.StructType) {
 	v = structPool.Get()
-	if cap(v.Members) <= 0 {
+	if cap(v.GetMembers()) <= 0 {
 		v.Members = make([]*Ydb.StructMember, 0, 10)
 	}
 	a.allocations = append(a.allocations, v)
@@ -385,7 +404,7 @@ func (a *structAllocator) Struct() (v *Ydb.StructType) {
 
 func (a *structAllocator) free() {
 	for _, v := range a.allocations {
-		members := v.Members
+		members := v.GetMembers()
 		for i := range members {
 			members[i] = nil
 		}
@@ -447,7 +466,7 @@ func (a *tupleAllocator) Tuple() (v *Ydb.TupleType) {
 
 func (a *tupleAllocator) free() {
 	for _, v := range a.allocations {
-		elements := v.Elements
+		elements := v.GetElements()
 		for i := range elements {
 			elements[i] = nil
 		}
@@ -718,8 +737,8 @@ func (a *valueAllocator) Value() (v *Ydb.Value) {
 
 func (a *valueAllocator) free() {
 	for _, v := range a.allocations {
-		items := v.Items
-		pairs := v.Pairs
+		items := v.GetItems()
+		pairs := v.GetPairs()
 		for i := range items {
 			items[i] = nil
 		}
@@ -902,6 +921,183 @@ func (a *tableQueryIDAllocator) free() {
 	a.allocations = a.allocations[:0]
 }
 
+type queryExecuteQueryRequestAllocator struct {
+	allocations []*Ydb_Query.ExecuteQueryRequest
+}
+
+func (a *queryExecuteQueryRequestAllocator) QueryExecuteQueryRequest() (
+	v *Ydb_Query.ExecuteQueryRequest,
+) {
+	v = queryExecuteQueryRequestPool.Get()
+	a.allocations = append(a.allocations, v)
+
+	return v
+}
+
+func (a *queryExecuteQueryRequestAllocator) free() {
+	for _, v := range a.allocations {
+		v.Reset()
+		queryExecuteQueryRequestPool.Put(v)
+	}
+	a.allocations = a.allocations[:0]
+}
+
+type queryExecuteQueryResponsePartAllocator struct {
+	allocations []*Ydb_Query.ExecuteQueryResponsePart
+}
+
+func (a *queryExecuteQueryResponsePartAllocator) QueryExecuteQueryResponsePart() (
+	v *Ydb_Query.ExecuteQueryResponsePart,
+) {
+	v = queryExecuteQueryResponsePartPool.Get()
+	a.allocations = append(a.allocations, v)
+
+	return v
+}
+
+func (a *queryExecuteQueryResponsePartAllocator) free() {
+	for _, v := range a.allocations {
+		v.Reset()
+		queryExecuteQueryResponsePartPool.Put(v)
+	}
+	a.allocations = a.allocations[:0]
+}
+
+type queryExecuteQueryRequestQueryContentAllocator struct {
+	allocations []*Ydb_Query.ExecuteQueryRequest_QueryContent
+}
+
+func (a *queryExecuteQueryRequestQueryContentAllocator) QueryExecuteQueryRequestQueryContent() (
+	v *Ydb_Query.ExecuteQueryRequest_QueryContent,
+) {
+	v = queryExecuteQueryRequestQueryContentPool.Get()
+	a.allocations = append(a.allocations, v)
+
+	return v
+}
+
+func (a *queryExecuteQueryRequestQueryContentAllocator) free() {
+	for _, v := range a.allocations {
+		queryExecuteQueryRequestQueryContentPool.Put(v)
+	}
+	a.allocations = a.allocations[:0]
+}
+
+type queryTransactionControlAllocator struct {
+	allocations []*Ydb_Query.TransactionControl
+}
+
+func (a *queryTransactionControlAllocator) QueryTransactionControl() (v *Ydb_Query.TransactionControl) {
+	v = queryTransactionControlPool.Get()
+	a.allocations = append(a.allocations, v)
+
+	return v
+}
+
+func (a *queryTransactionControlAllocator) free() {
+	for _, v := range a.allocations {
+		v.Reset()
+		queryTransactionControlPool.Put(v)
+	}
+	a.allocations = a.allocations[:0]
+}
+
+type queryTransactionControlBeginTxAllocator struct {
+	allocations []*Ydb_Query.TransactionControl_BeginTx
+}
+
+func (a *queryTransactionControlBeginTxAllocator) QueryTransactionControlBeginTx() (
+	v *Ydb_Query.TransactionControl_BeginTx,
+) {
+	v = queryTransactionControlBeginTxPool.Get()
+	a.allocations = append(a.allocations, v)
+
+	return v
+}
+
+func (a *queryTransactionControlBeginTxAllocator) free() {
+	for _, v := range a.allocations {
+		queryTransactionControlBeginTxPool.Put(v)
+	}
+	a.allocations = a.allocations[:0]
+}
+
+type queryTransactionControlTxIDAllocator struct {
+	allocations []*Ydb_Query.TransactionControl_TxId
+}
+
+func (a *queryTransactionControlTxIDAllocator) QueryTransactionControlTxID() (v *Ydb_Query.TransactionControl_TxId) {
+	v = queryTransactionControlTxIDPool.Get()
+	a.allocations = append(a.allocations, v)
+
+	return v
+}
+
+func (a *queryTransactionControlTxIDAllocator) free() {
+	for _, v := range a.allocations {
+		queryTransactionControlTxIDPool.Put(v)
+	}
+	a.allocations = a.allocations[:0]
+}
+
+type queryTransactionSettingsAllocator struct {
+	allocations []*Ydb_Query.TransactionSettings
+}
+
+func (a *queryTransactionSettingsAllocator) QueryTransactionSettings() (v *Ydb_Query.TransactionSettings) {
+	v = queryTransactionSettingsPool.Get()
+	a.allocations = append(a.allocations, v)
+
+	return v
+}
+
+func (a *queryTransactionSettingsAllocator) free() {
+	for _, v := range a.allocations {
+		v.Reset()
+		queryTransactionSettingsPool.Put(v)
+	}
+	a.allocations = a.allocations[:0]
+}
+
+type queryTransactionSettingsSerializableReadWriteAllocator struct {
+	allocations []*Ydb_Query.TransactionSettings_SerializableReadWrite
+}
+
+func (a *queryTransactionSettingsSerializableReadWriteAllocator) QueryTransactionSettingsSerializableReadWrite() (
+	v *Ydb_Query.TransactionSettings_SerializableReadWrite,
+) {
+	v = queryTransactionSettingsSerializableReadWritePool.Get()
+	a.allocations = append(a.allocations, v)
+
+	return v
+}
+
+func (a *queryTransactionSettingsSerializableReadWriteAllocator) free() {
+	for _, v := range a.allocations {
+		queryTransactionSettingsSerializableReadWritePool.Put(v)
+	}
+	a.allocations = a.allocations[:0]
+}
+
+type queryQueryContentAllocator struct {
+	allocations []*Ydb_Query.QueryContent
+}
+
+func (a *queryQueryContentAllocator) QueryQueryContent() (v *Ydb_Query.QueryContent) {
+	v = queryQueryContentPool.Get()
+	a.allocations = append(a.allocations, v)
+
+	return v
+}
+
+func (a *queryQueryContentAllocator) free() {
+	for _, v := range a.allocations {
+		v.Reset()
+		queryQueryContentPool.Put(v)
+	}
+	a.allocations = a.allocations[:0]
+}
+
 type Pool[T any] sync.Pool
 
 func (p *Pool[T]) Get() *T {
@@ -919,46 +1115,55 @@ func (p *Pool[T]) Put(t *T) {
 }
 
 var (
-	allocatorPool                    Pool[Allocator]
-	valuePool                        Pool[Ydb.Value]
-	typePool                         Pool[Ydb.Type]
-	typeDecimalPool                  Pool[Ydb.Type_DecimalType]
-	typeListPool                     Pool[Ydb.Type_ListType]
-	typeEmptyListPool                Pool[Ydb.Type_EmptyListType]
-	typeEmptyDictPool                Pool[Ydb.Type_EmptyDictType]
-	typeTuplePool                    Pool[Ydb.Type_TupleType]
-	typeStructPool                   Pool[Ydb.Type_StructType]
-	typeDictPool                     Pool[Ydb.Type_DictType]
-	typeVariantPool                  Pool[Ydb.Type_VariantType]
-	decimalPool                      Pool[Ydb.DecimalType]
-	listPool                         Pool[Ydb.ListType]
-	tuplePool                        Pool[Ydb.TupleType]
-	structPool                       Pool[Ydb.StructType]
-	dictPool                         Pool[Ydb.DictType]
-	variantPool                      Pool[Ydb.VariantType]
-	variantTupleItemsPool            Pool[Ydb.VariantType_TupleItems]
-	variantStructItemsPool           Pool[Ydb.VariantType_StructItems]
-	structMemberPool                 Pool[Ydb.StructMember]
-	typeOptionalPool                 Pool[Ydb.Type_OptionalType]
-	optionalPool                     Pool[Ydb.OptionalType]
-	typedValuePool                   Pool[Ydb.TypedValue]
-	boolPool                         Pool[Ydb.Value_BoolValue]
-	bytesPool                        Pool[Ydb.Value_BytesValue]
-	textPool                         Pool[Ydb.Value_TextValue]
-	int32Pool                        Pool[Ydb.Value_Int32Value]
-	uint32Pool                       Pool[Ydb.Value_Uint32Value]
-	low128Pool                       Pool[Ydb.Value_Low_128]
-	int64Pool                        Pool[Ydb.Value_Int64Value]
-	uint64Pool                       Pool[Ydb.Value_Uint64Value]
-	floatPool                        Pool[Ydb.Value_FloatValue]
-	doublePool                       Pool[Ydb.Value_DoubleValue]
-	nestedPool                       Pool[Ydb.Value_NestedValue]
-	nullFlagPool                     Pool[Ydb.Value_NullFlagValue]
-	pairPool                         Pool[Ydb.ValuePair]
-	tableExecuteQueryResultPool      Pool[Ydb_Table.ExecuteQueryResult]
-	tableExecuteDataQueryRequestPool Pool[Ydb_Table.ExecuteDataQueryRequest]
-	tableQueryCachePolicyPool        Pool[Ydb_Table.QueryCachePolicy]
-	tableQueryPool                   Pool[Ydb_Table.Query]
-	tableQueryYqlTextPool            Pool[Ydb_Table.Query_YqlText]
-	tableQueryIDPool                 Pool[Ydb_Table.Query_Id]
+	allocatorPool                                     Pool[Allocator]
+	valuePool                                         Pool[Ydb.Value]
+	typePool                                          Pool[Ydb.Type]
+	typeDecimalPool                                   Pool[Ydb.Type_DecimalType]
+	typeListPool                                      Pool[Ydb.Type_ListType]
+	typeEmptyListPool                                 Pool[Ydb.Type_EmptyListType]
+	typeEmptyDictPool                                 Pool[Ydb.Type_EmptyDictType]
+	typeTuplePool                                     Pool[Ydb.Type_TupleType]
+	typeStructPool                                    Pool[Ydb.Type_StructType]
+	typeDictPool                                      Pool[Ydb.Type_DictType]
+	typeVariantPool                                   Pool[Ydb.Type_VariantType]
+	decimalPool                                       Pool[Ydb.DecimalType]
+	listPool                                          Pool[Ydb.ListType]
+	tuplePool                                         Pool[Ydb.TupleType]
+	structPool                                        Pool[Ydb.StructType]
+	dictPool                                          Pool[Ydb.DictType]
+	variantPool                                       Pool[Ydb.VariantType]
+	variantTupleItemsPool                             Pool[Ydb.VariantType_TupleItems]
+	variantStructItemsPool                            Pool[Ydb.VariantType_StructItems]
+	structMemberPool                                  Pool[Ydb.StructMember]
+	typeOptionalPool                                  Pool[Ydb.Type_OptionalType]
+	optionalPool                                      Pool[Ydb.OptionalType]
+	typedValuePool                                    Pool[Ydb.TypedValue]
+	boolPool                                          Pool[Ydb.Value_BoolValue]
+	bytesPool                                         Pool[Ydb.Value_BytesValue]
+	textPool                                          Pool[Ydb.Value_TextValue]
+	int32Pool                                         Pool[Ydb.Value_Int32Value]
+	uint32Pool                                        Pool[Ydb.Value_Uint32Value]
+	low128Pool                                        Pool[Ydb.Value_Low_128]
+	int64Pool                                         Pool[Ydb.Value_Int64Value]
+	uint64Pool                                        Pool[Ydb.Value_Uint64Value]
+	floatPool                                         Pool[Ydb.Value_FloatValue]
+	doublePool                                        Pool[Ydb.Value_DoubleValue]
+	nestedPool                                        Pool[Ydb.Value_NestedValue]
+	nullFlagPool                                      Pool[Ydb.Value_NullFlagValue]
+	pairPool                                          Pool[Ydb.ValuePair]
+	tableExecuteQueryResultPool                       Pool[Ydb_Table.ExecuteQueryResult]
+	tableExecuteDataQueryRequestPool                  Pool[Ydb_Table.ExecuteDataQueryRequest]
+	tableQueryCachePolicyPool                         Pool[Ydb_Table.QueryCachePolicy]
+	tableQueryPool                                    Pool[Ydb_Table.Query]
+	tableQueryYqlTextPool                             Pool[Ydb_Table.Query_YqlText]
+	tableQueryIDPool                                  Pool[Ydb_Table.Query_Id]
+	queryExecuteQueryRequestPool                      Pool[Ydb_Query.ExecuteQueryRequest]
+	queryExecuteQueryRequestQueryContentPool          Pool[Ydb_Query.ExecuteQueryRequest_QueryContent]
+	queryExecuteQueryResponsePartPool                 Pool[Ydb_Query.ExecuteQueryResponsePart]
+	queryQueryContentPool                             Pool[Ydb_Query.QueryContent]
+	queryTransactionControlPool                       Pool[Ydb_Query.TransactionControl]
+	queryTransactionControlBeginTxPool                Pool[Ydb_Query.TransactionControl_BeginTx]
+	queryTransactionControlTxIDPool                   Pool[Ydb_Query.TransactionControl_TxId]
+	queryTransactionSettingsPool                      Pool[Ydb_Query.TransactionSettings]
+	queryTransactionSettingsSerializableReadWritePool Pool[Ydb_Query.TransactionSettings_SerializableReadWrite]
 )

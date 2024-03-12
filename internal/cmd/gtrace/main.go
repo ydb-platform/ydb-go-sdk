@@ -16,15 +16,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	_ "unsafe" // For go:linkname.
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-//go:linkname build_goodOSArchFile go/build.(*Context).goodOSArchFile
-//nolint:revive
-func build_goodOSArchFile(*build.Context, string, map[string]bool) bool
-
+//nolint:gocyclo
 func main() {
 	var (
 		// Reports whether we were called from go:generate.
@@ -63,8 +59,6 @@ func main() {
 
 	var writers []*Writer
 	if isGoGenerate {
-		// We should respect Go suffixes like `_linux.go`.
-		name, tags, ext := splitOSArchTags(&buildCtx, gofile)
 		openFile := func(name string) (*os.File, func()) {
 			var f *os.File
 			//nolint:gofumpt
@@ -81,7 +75,9 @@ func main() {
 
 			return f, func() { f.Close() }
 		}
-		f, clean := openFile(name + "_gtrace" + tags + ext)
+		ext := filepath.Ext(gofile)
+		name := strings.TrimSuffix(gofile, ext)
+		f, clean := openFile(name + "_gtrace" + ext)
 		defer clean()
 		writers = append(writers, &Writer{
 			Context: buildCtx,
@@ -102,7 +98,7 @@ func main() {
 	)
 	fset := token.NewFileSet()
 	for _, name := range buildPkg.GoFiles {
-		base, _, _ := splitOSArchTags(&buildCtx, name)
+		base := strings.TrimSuffix(name, filepath.Ext(name))
 		if isGenerated(base, "_gtrace") {
 			continue
 		}
@@ -333,38 +329,6 @@ func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (re
 		"unsupported function result type %s",
 		info.TypeOf(r.Type),
 	)
-}
-
-func splitOSArchTags(ctx *build.Context, name string) (base, tags, ext string) {
-	fileTags := make(map[string]bool)
-	build_goodOSArchFile(ctx, name, fileTags)
-	ext = filepath.Ext(name)
-	switch len(fileTags) {
-	case 0: // *
-		base = strings.TrimSuffix(name, ext)
-
-	case 1: // *_GOOS or *_GOARCH
-		i := strings.LastIndexByte(name, '_')
-
-		base = name[:i]
-		tags = strings.TrimSuffix(name[i:], ext)
-
-	case 2: // *_GOOS_GOARCH
-		var i int
-		i = strings.LastIndexByte(name, '_')
-		i = strings.LastIndexByte(name[:i], '_')
-
-		base = name[:i]
-		tags = strings.TrimSuffix(name[i:], ext)
-
-	default:
-		panic(fmt.Sprintf(
-			"gtrace: internal error: unexpected number of OS/arch tags: %d",
-			len(fileTags),
-		))
-	}
-
-	return
 }
 
 type Package struct {

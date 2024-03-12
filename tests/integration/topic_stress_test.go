@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,7 +19,6 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
@@ -90,7 +90,7 @@ func stressTestInATopic(
 	writeStatusWriterSeqno := map[string]int64{}
 	readStatusWriterMaxSeqNo := map[string]int64{}
 
-	var stopWrite xatomic.Bool
+	var stopWrite atomic.Bool
 
 	writeToTopic := func(ctx context.Context, producerID string, wg *sync.WaitGroup) (resErr error) {
 		var writer *topicwriter.Writer

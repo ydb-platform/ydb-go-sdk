@@ -44,9 +44,9 @@ func (ii issues) String() string {
 		b.WriteByte('\'')
 		b.WriteString(strings.TrimSuffix(m.GetMessage(), "."))
 		b.WriteByte('\'')
-		if len(m.Issues) > 0 {
+		if len(m.GetIssues()) > 0 {
 			b.WriteByte(' ')
-			b.WriteString(issues(m.Issues).String())
+			b.WriteString(issues(m.GetIssues()).String())
 		}
 		b.WriteByte('}')
 	}
@@ -57,7 +57,7 @@ func (ii issues) String() string {
 
 // NewWithIssues returns error which contains child issues
 func NewWithIssues(text string, issues ...error) error {
-	err := &errorWithIssues{
+	err := &withIssuesError{
 		reason: text,
 	}
 	for i := range issues {
@@ -69,14 +69,14 @@ func NewWithIssues(text string, issues ...error) error {
 	return err
 }
 
-type errorWithIssues struct {
+type withIssuesError struct {
 	reason string
 	issues []error
 }
 
-func (e *errorWithIssues) isYdbError() {}
+func (e *withIssuesError) isYdbError() {}
 
-func (e *errorWithIssues) Error() string {
+func (e *withIssuesError) Error() string {
 	var b bytes.Buffer
 	if len(e.reason) > 0 {
 		b.WriteString(e.reason)
@@ -95,7 +95,7 @@ func (e *errorWithIssues) Error() string {
 	return b.String()
 }
 
-func (e *errorWithIssues) As(target interface{}) bool {
+func (e *withIssuesError) As(target interface{}) bool {
 	for _, err := range e.issues {
 		if As(err, target) {
 			return true
@@ -105,7 +105,7 @@ func (e *errorWithIssues) As(target interface{}) bool {
 	return false
 }
 
-func (e *errorWithIssues) Is(target error) bool {
+func (e *withIssuesError) Is(target error) bool {
 	for _, err := range e.issues {
 		if Is(err, target) {
 			return true
@@ -130,7 +130,7 @@ func (it IssueIterator) Len() int {
 
 func (it IssueIterator) Get(i int) (issue Issue, nested IssueIterator) {
 	x := it[i]
-	if xs := x.Issues; len(xs) > 0 {
+	if xs := x.GetIssues(); len(xs) > 0 {
 		nested = IssueIterator(xs)
 	}
 

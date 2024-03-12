@@ -173,9 +173,9 @@ func (c *Client) listDirectory(ctx context.Context, path string) (scheme.Directo
 	if err != nil {
 		return d, xerrors.WithStackTrace(err)
 	}
-	d.From(result.Self)
-	d.Children = make([]scheme.Entry, len(result.Children))
-	putEntry(d.Children, result.Children)
+	d.From(result.GetSelf())
+	d.Children = make([]scheme.Entry, len(result.GetChildren()))
+	putEntry(d.Children, result.GetChildren())
 
 	return d, nil
 }
@@ -234,7 +234,7 @@ func (c *Client) describePath(ctx context.Context, path string) (e scheme.Entry,
 	if err != nil {
 		return e, xerrors.WithStackTrace(err)
 	}
-	e.From(result.Self)
+	e.From(result.GetSelf())
 
 	return e, nil
 }
