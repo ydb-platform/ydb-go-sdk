@@ -84,7 +84,10 @@ func WithSeed(seed int64) option {
 
 func New(opts ...option) logBackoff {
 	b := logBackoff{
-		r: xrand.New(xrand.WithLock()),
+		slotDuration: time.Duration(0),
+		ceiling:      0,
+		jitterLimit:  0,
+		r:            xrand.New(xrand.WithLock()),
 	}
 	for _, o := range opts {
 		if o != nil {

@@ -19,6 +19,7 @@ func TestSendWriteRequest(t *testing.T) {
 						SeqNo: 1,
 					},
 				},
+				Tx: new(Ydb_Topic.TransactionIdentity),
 			},
 		}
 
@@ -48,6 +49,7 @@ func TestSendWriteRequest(t *testing.T) {
 					SeqNo: 3,
 				},
 			},
+			Tx: new(Ydb_Topic.TransactionIdentity),
 		}
 
 		split1 := &Ydb_Topic.StreamWriteMessage_WriteRequest{
@@ -57,6 +59,7 @@ func TestSendWriteRequest(t *testing.T) {
 					SeqNo: 1,
 				},
 			},
+			Tx: new(Ydb_Topic.TransactionIdentity),
 		}
 
 		split2 := &Ydb_Topic.StreamWriteMessage_WriteRequest{
@@ -69,6 +72,7 @@ func TestSendWriteRequest(t *testing.T) {
 					SeqNo: 3,
 				},
 			},
+			Tx: new(Ydb_Topic.TransactionIdentity),
 		}
 
 		getWriteRequest := func(req *Ydb_Topic.StreamWriteMessage_FromClient) *Ydb_Topic.StreamWriteMessage_WriteRequest {

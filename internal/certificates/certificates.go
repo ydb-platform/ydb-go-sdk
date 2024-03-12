@@ -53,7 +53,11 @@ func loadFromFileCache(key string) (_ []*x509.Certificate, exists bool) {
 
 // FromFile reads and parses pem-encoded certificate(s) from file.
 func FromFile(file string, opts ...FromFileOption) ([]*x509.Certificate, error) {
-	options := fromFileOptions{}
+	options := fromFileOptions{
+		onHit:   nil,
+		onMiss:  nil,
+		noCache: false,
+	}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(&options)
@@ -108,7 +112,11 @@ func loadFromPemCache(key string) (_ *x509.Certificate, exists bool) {
 
 // parseCertificate is a cached version of x509.ParseCertificate. Cache key is string(der)
 func parseCertificate(der []byte, opts ...FromPemOption) (*x509.Certificate, error) {
-	options := fromPemOptions{}
+	options := fromPemOptions{
+		onHit:   nil,
+		onMiss:  nil,
+		noCache: false,
+	}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(&options)

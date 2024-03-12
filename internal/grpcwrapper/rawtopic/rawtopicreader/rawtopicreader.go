@@ -52,13 +52,13 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 
 	switch m := grpcMess.GetServerMessage().(type) {
 	case *Ydb_Topic.StreamReadMessage_FromServer_InitResponse:
-		resp := &InitResponse{}
+		resp := new(InitResponse)
 		resp.ServerMessageMetadata = meta
 		resp.fromProto(m.InitResponse)
 
 		return resp, nil
 	case *Ydb_Topic.StreamReadMessage_FromServer_ReadResponse:
-		resp := &ReadResponse{}
+		resp := new(ReadResponse)
 		resp.ServerMessageMetadata = meta
 		if err = resp.fromProto(m.ReadResponse); err != nil {
 			return nil, err
@@ -66,7 +66,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 
 		return resp, nil
 	case *Ydb_Topic.StreamReadMessage_FromServer_StartPartitionSessionRequest:
-		resp := &StartPartitionSessionRequest{}
+		resp := new(StartPartitionSessionRequest)
 		resp.ServerMessageMetadata = meta
 		if err = resp.fromProto(m.StartPartitionSessionRequest); err != nil {
 			return nil, err
@@ -74,7 +74,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 
 		return resp, nil
 	case *Ydb_Topic.StreamReadMessage_FromServer_StopPartitionSessionRequest:
-		req := &StopPartitionSessionRequest{}
+		req := new(StopPartitionSessionRequest)
 		req.ServerMessageMetadata = meta
 		if err = req.fromProto(m.StopPartitionSessionRequest); err != nil {
 			return nil, err
@@ -82,7 +82,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 
 		return req, nil
 	case *Ydb_Topic.StreamReadMessage_FromServer_CommitOffsetResponse:
-		resp := &CommitOffsetResponse{}
+		resp := new(CommitOffsetResponse)
 		resp.ServerMessageMetadata = meta
 		if err = resp.fromProto(m.CommitOffsetResponse); err != nil {
 			return nil, err
@@ -90,7 +90,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 
 		return resp, nil
 	case *Ydb_Topic.StreamReadMessage_FromServer_PartitionSessionStatusResponse:
-		resp := &PartitionSessionStatusResponse{}
+		resp := new(PartitionSessionStatusResponse)
 		resp.ServerMessageMetadata = meta
 		if err = resp.fromProto(m.PartitionSessionStatusResponse); err != nil {
 			return nil, err
@@ -98,7 +98,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 
 		return resp, nil
 	case *Ydb_Topic.StreamReadMessage_FromServer_UpdateTokenResponse:
-		resp := &UpdateTokenResponse{}
+		resp := new(UpdateTokenResponse)
 		resp.ServerMessageMetadata = meta
 		resp.MustFromProto(m.UpdateTokenResponse)
 

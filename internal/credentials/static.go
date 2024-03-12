@@ -44,6 +44,10 @@ func NewStaticCredentials(user, password, endpoint string, opts ...StaticCredent
 		user:       user,
 		password:   password,
 		endpoint:   endpoint,
+		opts:       []grpc.DialOption{},
+		token:      "",
+		requestAt:  time.Time{},
+		mu:         sync.Mutex{},
 		sourceInfo: stack.Record(1),
 	}
 	for _, opt := range opts {

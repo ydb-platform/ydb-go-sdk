@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
@@ -339,8 +338,9 @@ func TestToValue(t *testing.T) {
 
 func named(name string, value interface{}) driver.NamedValue {
 	return driver.NamedValue{
-		Name:  name,
-		Value: value,
+		Name:    name,
+		Ordinal: 0,
+		Value:   value,
 	}
 }
 
@@ -371,7 +371,7 @@ func TestYdbParam(t *testing.T) {
 			err: nil,
 		},
 		{
-			src: driver.NamedValue{Value: uint(42)},
+			src: driver.NamedValue{Name: "", Ordinal: 0, Value: uint(42)},
 			dst: nil,
 			err: errUnnamedParam,
 		},
@@ -411,18 +411,19 @@ func TestArgsToParams(t *testing.T) {
 		},
 		{
 			args: []interface{}{
-				table.NewQueryParameters(
+				&params.Parameters{
 					params.Named("$p0", types.Int32Value(1)),
 					params.Named("$p1", types.Uint64Value(2)),
 					params.Named("$p2", types.TextValue("3")),
-				),
-				table.NewQueryParameters(
+				},
+				&params.Parameters{
 					params.Named("$p0", types.Int32Value(1)),
 					params.Named("$p1", types.Uint64Value(2)),
 					params.Named("$p2", types.TextValue("3")),
-				),
+				},
 			},
-			err: errMultipleQueryParameters,
+			params: []*params.Parameter{},
+			err:    errMultipleQueryParameters,
 		},
 		{
 			args: []interface{}{
@@ -452,9 +453,9 @@ func TestArgsToParams(t *testing.T) {
 		},
 		{
 			args: []interface{}{
-				driver.NamedValue{Name: "$p0", Value: types.Int32Value(1)},
-				driver.NamedValue{Name: "$p1", Value: types.Uint64Value(2)},
-				driver.NamedValue{Name: "$p2", Value: types.TextValue("3")},
+				driver.NamedValue{Name: "$p0", Ordinal: 0, Value: types.Int32Value(1)},
+				driver.NamedValue{Name: "$p1", Ordinal: 0, Value: types.Uint64Value(2)},
+				driver.NamedValue{Name: "$p2", Ordinal: 0, Value: types.TextValue("3")},
 			},
 			params: []*params.Parameter{
 				params.Named("$p0", types.Int32Value(1)),
@@ -465,9 +466,9 @@ func TestArgsToParams(t *testing.T) {
 		},
 		{
 			args: []interface{}{
-				driver.NamedValue{Value: params.Named("$p0", types.Int32Value(1))},
-				driver.NamedValue{Value: params.Named("$p1", types.Uint64Value(2))},
-				driver.NamedValue{Value: params.Named("$p2", types.TextValue("3"))},
+				driver.NamedValue{Name: "$p0", Ordinal: 0, Value: params.Named("$p0", types.Int32Value(1))},
+				driver.NamedValue{Name: "$p1", Ordinal: 0, Value: params.Named("$p1", types.Uint64Value(2))},
+				driver.NamedValue{Name: "$p2", Ordinal: 0, Value: params.Named("$p2", types.TextValue("3"))},
 			},
 			params: []*params.Parameter{
 				params.Named("$p0", types.Int32Value(1)),
@@ -478,9 +479,9 @@ func TestArgsToParams(t *testing.T) {
 		},
 		{
 			args: []interface{}{
-				driver.NamedValue{Value: 1},
-				driver.NamedValue{Value: uint64(2)},
-				driver.NamedValue{Value: "3"},
+				driver.NamedValue{Name: "$p0", Ordinal: 0, Value: 1},
+				driver.NamedValue{Name: "$p1", Ordinal: 0, Value: uint64(2)},
+				driver.NamedValue{Name: "$p2", Ordinal: 0, Value: "3"},
 			},
 			params: []*params.Parameter{
 				params.Named("$p0", types.Int32Value(1)),
@@ -491,11 +492,11 @@ func TestArgsToParams(t *testing.T) {
 		},
 		{
 			args: []interface{}{
-				driver.NamedValue{Value: table.NewQueryParameters(
+				driver.NamedValue{Name: "", Ordinal: 0, Value: &params.Parameters{
 					params.Named("$p0", types.Int32Value(1)),
 					params.Named("$p1", types.Uint64Value(2)),
 					params.Named("$p2", types.TextValue("3")),
-				)},
+				}},
 			},
 			params: []*params.Parameter{
 				params.Named("$p0", types.Int32Value(1)),
@@ -506,15 +507,16 @@ func TestArgsToParams(t *testing.T) {
 		},
 		{
 			args: []interface{}{
-				driver.NamedValue{Value: table.NewQueryParameters(
+				driver.NamedValue{Name: "", Ordinal: 0, Value: &params.Parameters{
 					params.Named("$p0", types.Int32Value(1)),
 					params.Named("$p1", types.Uint64Value(2)),
 					params.Named("$p2", types.TextValue("3")),
-				)},
-				driver.NamedValue{Value: params.Named("$p1", types.Uint64Value(2))},
-				driver.NamedValue{Value: params.Named("$p2", types.TextValue("3"))},
+				}},
+				driver.NamedValue{Name: "$p1", Ordinal: 0, Value: params.Named("$p1", types.Uint64Value(2))},
+				driver.NamedValue{Name: "$p2", Ordinal: 0, Value: params.Named("$p2", types.TextValue("3"))},
 			},
-			err: errMultipleQueryParameters,
+			params: []*params.Parameter{},
+			err:    errMultipleQueryParameters,
 		},
 	} {
 		t.Run("", func(t *testing.T) {

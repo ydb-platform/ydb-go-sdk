@@ -34,9 +34,13 @@ func (req *AlterTopicRequest) ToProto() *Ydb_Topic.AlterTopicRequest {
 		AlterPartitioningSettings:            req.AlterPartitionSettings.ToProto(),
 		SetRetentionPeriod:                   req.SetRetentionPeriod.ToProto(),
 		SetRetentionStorageMb:                req.SetRetentionStorageMB.ToProto(),
+		SetSupportedCodecs:                   req.SetSupportedCodecsValue.ToProto(),
 		SetPartitionWriteSpeedBytesPerSecond: req.SetPartitionWriteSpeedBytesPerSecond.ToProto(),
 		SetPartitionWriteBurstBytes:          req.SetPartitionWriteBurstBytes.ToProto(),
 		AlterAttributes:                      req.AlterAttributes,
+		AddConsumers:                         []*Ydb_Topic.Consumer{},
+		DropConsumers:                        []string{},
+		AlterConsumers:                       []*Ydb_Topic.AlterConsumer{},
 		SetMeteringMode:                      Ydb_Topic.MeteringMode(req.SetMeteringMode),
 	}
 

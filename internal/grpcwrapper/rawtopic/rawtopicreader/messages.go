@@ -111,13 +111,14 @@ type InitRequest struct {
 
 func (r *InitRequest) toProto() *Ydb_Topic.StreamReadMessage_InitRequest {
 	p := &Ydb_Topic.StreamReadMessage_InitRequest{
-		Consumer: r.Consumer,
+		Consumer:           r.Consumer,
+		TopicsReadSettings: make([]*Ydb_Topic.StreamReadMessage_InitRequest_TopicReadSettings, len(r.TopicsReadSettings)),
+		ReaderName:         "",
 	}
 
-	p.TopicsReadSettings = make([]*Ydb_Topic.StreamReadMessage_InitRequest_TopicReadSettings, len(r.TopicsReadSettings))
 	for topicSettingsIndex := range r.TopicsReadSettings {
 		srcTopicSettings := &r.TopicsReadSettings[topicSettingsIndex]
-		dstTopicSettings := &Ydb_Topic.StreamReadMessage_InitRequest_TopicReadSettings{}
+		dstTopicSettings := new(Ydb_Topic.StreamReadMessage_InitRequest_TopicReadSettings)
 		p.TopicsReadSettings[topicSettingsIndex] = dstTopicSettings
 
 		dstTopicSettings.Path = srcTopicSettings.Path
@@ -301,20 +302,21 @@ type CommitOffsetRequest struct {
 }
 
 func (r *CommitOffsetRequest) toProto() *Ydb_Topic.StreamReadMessage_CommitOffsetRequest {
-	res := &Ydb_Topic.StreamReadMessage_CommitOffsetRequest{}
-	res.CommitOffsets = make(
-		[]*Ydb_Topic.StreamReadMessage_CommitOffsetRequest_PartitionCommitOffset,
-		len(r.CommitOffsets),
-	)
+	res := &Ydb_Topic.StreamReadMessage_CommitOffsetRequest{
+		CommitOffsets: make(
+			[]*Ydb_Topic.StreamReadMessage_CommitOffsetRequest_PartitionCommitOffset,
+			len(r.CommitOffsets),
+		),
+	}
 
 	for sessionIndex := range r.CommitOffsets {
 		srcPartitionCommitOffset := &r.CommitOffsets[sessionIndex]
 		dstCommitOffset := &Ydb_Topic.StreamReadMessage_CommitOffsetRequest_PartitionCommitOffset{
 			PartitionSessionId: srcPartitionCommitOffset.PartitionSessionID.ToInt64(),
+			Offsets:            make([]*Ydb_Topic.OffsetsRange, len(srcPartitionCommitOffset.Offsets)),
 		}
 		res.CommitOffsets[sessionIndex] = dstCommitOffset
 
-		dstCommitOffset.Offsets = make([]*Ydb_Topic.OffsetsRange, len(srcPartitionCommitOffset.Offsets))
 		for offsetIndex := range srcPartitionCommitOffset.Offsets {
 			dstCommitOffset.Offsets[offsetIndex] = srcPartitionCommitOffset.Offsets[offsetIndex].ToProto()
 		}

@@ -1,6 +1,7 @@
 package rawydb
 
 import (
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawoptional"
@@ -15,10 +16,12 @@ type OperationParams struct {
 
 func (p *OperationParams) ToProto() *Ydb_Operations.OperationParams {
 	res := &Ydb_Operations.OperationParams{
-		OperationMode: p.OperationMode.ToProto(),
+		OperationMode:    p.OperationMode.ToProto(),
+		OperationTimeout: p.OperationTimeout.ToProto(),
+		CancelAfter:      p.CancelAfter.ToProto(),
+		Labels:           make(map[string]string),
+		ReportCostInfo:   Ydb.FeatureFlag_STATUS_UNSPECIFIED,
 	}
-	res.OperationTimeout = p.OperationTimeout.ToProto()
-	res.CancelAfter = p.CancelAfter.ToProto()
 
 	return res
 }

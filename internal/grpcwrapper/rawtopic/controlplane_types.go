@@ -35,6 +35,7 @@ func (c *Consumer) ToProto() *Ydb_Topic.Consumer {
 		ReadFrom:        c.ReadFrom.ToProto(),
 		SupportedCodecs: c.SupportedCodecs.ToProto(),
 		Attributes:      c.Attributes,
+		ConsumerStats:   new(Ydb_Topic.Consumer_ConsumerStats),
 	}
 }
 

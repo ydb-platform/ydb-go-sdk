@@ -37,6 +37,7 @@ func (r *InitRequest) toProto() (*Ydb_Topic.StreamWriteMessage_InitRequest, erro
 		ProducerId:       r.ProducerID,
 		WriteSessionMeta: r.WriteSessionMeta,
 		GetLastSeqNo:     r.GetLastSeqNo,
+		Partitioning:     nil,
 	}
 
 	err := r.Partitioning.setToProtoInitRequest(res)
@@ -60,13 +61,15 @@ func NewPartitioningMessageGroup(messageGroupID string) Partitioning {
 	return Partitioning{
 		Type:           PartitioningMessageGroupID,
 		MessageGroupID: messageGroupID,
+		PartitionID:    0,
 	}
 }
 
 func NewPartitioningPartitionID(partitionID int64) Partitioning {
 	return Partitioning{
-		Type:        PartitioningPartitionID,
-		PartitionID: partitionID,
+		Type:           PartitioningPartitionID,
+		MessageGroupID: "",
+		PartitionID:    partitionID,
 	}
 }
 
@@ -160,6 +163,7 @@ func (r *WriteRequest) toProto() (p *Ydb_Topic.StreamWriteMessage_FromClient_Wri
 		WriteRequest: &Ydb_Topic.StreamWriteMessage_WriteRequest{
 			Messages: messages,
 			Codec:    int32(r.Codec.ToProto()),
+			Tx:       new(Ydb_Topic.TransactionIdentity),
 		},
 	}
 
@@ -181,6 +185,8 @@ func (d *MessageData) ToProto() (*Ydb_Topic.StreamWriteMessage_WriteRequest_Mess
 		CreatedAt:        timestamppb.New(d.CreatedAt),
 		Data:             d.Data,
 		UncompressedSize: d.UncompressedSize,
+		Partitioning:     nil,
+		MetadataItems:    []*Ydb_Topic.MetadataItem{},
 	}
 	err := d.Partitioning.setToProtoMessage(res)
 	if err != nil {
