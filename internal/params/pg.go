@@ -6,7 +6,7 @@ type pg struct {
 	param *Parameter
 }
 
-func (p *pg) Unknown(val string) Builder {
+func (p pg) Unknown(val string) Builder {
 	p.param.value = value.PgUnknownValue(val)
 	p.param.parent.params = append(p.param.parent.params, p.param)
 
