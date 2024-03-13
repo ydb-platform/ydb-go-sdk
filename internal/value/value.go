@@ -1266,6 +1266,7 @@ func (v pgValue) toYDB(_ *allocator.Allocator) *Ydb.Value {
 func (v pgValue) Yql() string {
 	//nolint:godox
 	// TODO: call special function for unknown oids
+	// https://github.com/ydb-platform/ydb/issues/2706
 	return fmt.Sprintf("PgUnknown(%q)", v.val)
 }
 
