@@ -1257,8 +1257,7 @@ func (v *pgValue) toYDB(_ *allocator.Allocator) *Ydb.Value {
 
 func (v *pgValue) Yql() string {
 	//nolint:godox
-	// TODO: check real pg literal
-	return fmt.Sprintf("PgType(%q)", v.val)
+	return fmt.Sprintf("PgUnknown(%q)", v.val)
 }
 
 type setValue struct {
