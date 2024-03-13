@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"unicode/utf8"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -16,9 +17,7 @@ func (m NumericArgs) blockID() blockID {
 	return blockYQL
 }
 
-func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (
-	yql string, newArgs []interface{}, err error,
-) {
+func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (yql string, newArgs []interface{}, err error) {
 	l := &sqlLexer{
 		src:        sql,
 		stateFn:    numericArgsStateFn,
@@ -29,14 +28,18 @@ func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (
 		l.stateFn = l.stateFn(l)
 	}
 
-	var (
-		buffer = xstring.Buffer()
-		param  table.ParameterOption
-	)
+	buffer := xstring.Buffer()
 	defer buffer.Free()
 
 	if len(args) > 0 {
-		newArgs = make([]interface{}, len(args))
+		parameters, err := parsePositionalParameters(args)
+		if err != nil {
+			return "", nil, err
+		}
+		newArgs = make([]interface{}, len(parameters))
+		for i, param := range parameters {
+			newArgs[i] = param
+		}
 	}
 
 	for _, p := range l.parts {
@@ -49,38 +52,23 @@ func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (
 			}
 			if int(p) > len(args) {
 				return "", nil, xerrors.WithStackTrace(
-					fmt.Errorf("%w: $p%d, len(args) = %d", ErrInconsistentArgs, p, len(args)),
+					fmt.Errorf("%w: $%d, len(args) = %d", ErrInconsistentArgs, p, len(args)),
 				)
 			}
-			paramName := "$p" + strconv.Itoa(int(p-1)) //nolint:goconst
-			if newArgs[p-1] == nil {
-				param, err = toYdbParam(paramName, args[p-1])
-				if err != nil {
-					return "", nil, xerrors.WithStackTrace(err)
-				}
-				newArgs[p-1] = param
-				buffer.WriteString(param.Name())
-			} else {
-				buffer.WriteString(newArgs[p-1].(table.ParameterOption).Name())
+			paramIndex := int(p - 1)
+			if newArgs[paramIndex] == nil {
+				return "", nil, xerrors.WithStackTrace(ErrInconsistentArgs)
 			}
+			buffer.WriteString(newArgs[paramIndex].(table.ParameterOption).Name())
 		}
 	}
 
-	for i, p := range newArgs {
-		if p == nil {
-			return "", nil, xerrors.WithStackTrace(
-				fmt.Errorf("%w: $p%d, len(args) = %d", ErrInconsistentArgs, i+1, len(args)),
-			)
-		}
-	}
-
+	yql = buffer.String()
 	if len(newArgs) > 0 {
-		const prefix = "-- origin query with numeric args replacement\n"
-
-		return prefix + buffer.String(), newArgs, nil
+		yql = "-- origin query with numeric args replacement\n" + yql
 	}
 
-	return buffer.String(), newArgs, nil
+	return yql, newArgs, nil
 }
 
 func numericArgsStateFn(l *sqlLexer) stateFn {
@@ -128,6 +116,20 @@ func numericArgsStateFn(l *sqlLexer) stateFn {
 			return nil
 		}
 	}
+}
+
+func parsePositionalParameters(args []interface{}) ([]*params.Parameter, error) {
+	newArgs := make([]*params.Parameter, len(args))
+	for i, arg := range args {
+		paramName := fmt.Sprintf("$p%d", i)
+		param, err := toYdbParam(paramName, arg)
+		if err != nil {
+			return nil, err
+		}
+		newArgs[i] = param
+	}
+
+	return newArgs, nil
 }
 
 func numericArgState(l *sqlLexer) stateFn {

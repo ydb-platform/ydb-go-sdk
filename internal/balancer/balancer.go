@@ -234,19 +234,10 @@ func New(
 	pool *conn.Pool,
 	opts ...discoveryConfig.Option,
 ) (b *Balancer, finalErr error) {
-	var (
-		onDone = trace.DriverOnBalancerInit(
-			driverConfig.Trace(), &ctx,
-			stack.FunctionID(""),
-			driverConfig.Balancer().String(),
-		)
-		discoveryConfig = discoveryConfig.New(append(opts,
-			discoveryConfig.With(driverConfig.Common),
-			discoveryConfig.WithEndpoint(driverConfig.Endpoint()),
-			discoveryConfig.WithDatabase(driverConfig.Database()),
-			discoveryConfig.WithSecure(driverConfig.Secure()),
-			discoveryConfig.WithMeta(driverConfig.Meta()),
-		)...)
+	onDone := trace.DriverOnBalancerInit(
+		driverConfig.Trace(), &ctx,
+		stack.FunctionID(""),
+		driverConfig.Balancer().String(),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -257,14 +248,6 @@ func New(
 		pool:            pool,
 		localDCDetector: detectLocalDC,
 	}
-	d, err := internalDiscovery.New(ctx, pool.Get(
-		endpoint.New(driverConfig.Endpoint()),
-	), discoveryConfig)
-	if err != nil {
-		return nil, err
-	}
-
-	b.discoveryClient = d
 
 	if config := driverConfig.Balancer(); config == nil {
 		b.config = balancerConfig.Config{}
@@ -272,23 +255,9 @@ func New(
 		b.config = *config
 	}
 
-	if b.config.SingleConn {
-		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
-			endpoint.New(driverConfig.Endpoint()),
-		}, "")
-	} else {
-		// initialization of balancer state
-		if err := b.clusterDiscovery(ctx); err != nil {
-			return nil, xerrors.WithStackTrace(err)
-		}
-		// run background discovering
-		if d := discoveryConfig.Interval(); d > 0 {
-			b.discoveryRepeater = repeater.New(xcontext.WithoutDeadline(ctx),
-				d, b.clusterDiscoveryAttempt,
-				repeater.WithName("discovery"),
-				repeater.WithTrace(b.driverConfig.Trace()),
-			)
-		}
+	err := setupDiscoveryConfigAndClusterDiscovery(ctx, b, opts)
+	if err != nil {
+		return nil, err
 	}
 
 	return b, nil
@@ -407,6 +376,43 @@ func (b *Balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
 	}
 
 	return c, nil
+}
+
+func setupDiscoveryConfigAndClusterDiscovery(ctx context.Context, b *Balancer, opts []discoveryConfig.Option) error {
+	discoveryConfig := discoveryConfig.New(append(opts,
+		discoveryConfig.With(b.driverConfig.Common),
+		discoveryConfig.WithEndpoint(b.driverConfig.Endpoint()),
+		discoveryConfig.WithDatabase(b.driverConfig.Database()),
+		discoveryConfig.WithSecure(b.driverConfig.Secure()),
+		discoveryConfig.WithMeta(b.driverConfig.Meta()),
+	)...)
+	d, err := internalDiscovery.New(ctx, b.pool.Get(
+		endpoint.New(b.driverConfig.Endpoint()),
+	), discoveryConfig)
+	if err != nil {
+		return err
+	}
+
+	b.discoveryClient = d
+
+	if b.config.SingleConn {
+		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
+			endpoint.New(b.driverConfig.Endpoint()),
+		}, "")
+	} else {
+		if err := b.clusterDiscovery(ctx); err != nil {
+			return err
+		}
+		if d := discoveryConfig.Interval(); d > 0 {
+			b.discoveryRepeater = repeater.New(xcontext.WithoutDeadline(ctx),
+				d, b.clusterDiscoveryAttempt,
+				repeater.WithName("discovery"),
+				repeater.WithTrace(b.driverConfig.Trace()),
+			)
+		}
+	}
+
+	return nil
 }
 
 func endpointsToConnections(p *conn.Pool, endpoints []endpoint.Endpoint) []conn.Conn {

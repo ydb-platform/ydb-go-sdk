@@ -116,7 +116,6 @@ func (c *conn) park(ctx context.Context) (err error) {
 	}
 
 	err = c.close(ctx)
-
 	if err != nil {
 		return c.wrapError(err)
 	}
@@ -392,13 +391,13 @@ func (c *conn) NewStream(
 ) (_ grpc.ClientStream, err error) {
 	var (
 		streamRecv = trace.DriverOnConnNewStream(
-			c.config.Trace(), &ctx,
+			c.config.Trace(),
+			&ctx,
 			stack.FunctionID(""),
-			c.endpoint.Copy(), trace.Method(method),
+			c.endpoint.Copy(),
+			trace.Method(method),
 		)
 		useWrapping = UseWrapping(ctx)
-		cc          *grpc.ClientConn
-		s           grpc.ClientStream
 	)
 
 	defer func() {
@@ -407,36 +406,18 @@ func (c *conn) NewStream(
 		}
 	}()
 
-	var cancel context.CancelFunc
-	ctx, cancel = xcontext.WithCancel(ctx)
-
+	ctx, cancel := xcontext.WithCancel(ctx)
 	defer func() {
 		if err != nil {
 			cancel()
 		}
 	}()
 
-	cc, err = c.realConn(ctx)
-	if err != nil {
-		return nil, c.wrapError(err)
-	}
-
-	c.touchLastUsage()
-	defer c.touchLastUsage()
-
-	ctx, traceID, err := meta.TraceID(ctx)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID))
-
-	s, err = cc.NewStream(ctx, desc, method, opts...)
+	s, sentMark, traceID, err := createStream(ctx, c, desc, method, opts...)
 	if err != nil {
 		defer func() {
 			c.onTransportError(ctx, err)
 		}()
-
 		if useWrapping {
 			err = xerrors.Transport(err,
 				xerrors.WithAddress(c.Address()),
@@ -464,6 +445,33 @@ func (c *conn) NewStream(
 		},
 		recv: streamRecv,
 	}, nil
+}
+
+func createStream(
+	ctx context.Context,
+	c *conn,
+	desc *grpc.StreamDesc,
+	method string,
+	opts ...grpc.CallOption,
+) (grpc.ClientStream, *modificationMark, string, error) {
+	cc, err := c.realConn(ctx)
+	if err != nil {
+		return nil, nil, "", c.wrapError(err)
+	}
+
+	ctx, traceID, err := meta.TraceID(ctx)
+	if err != nil {
+		return nil, nil, "", xerrors.WithStackTrace(err)
+	}
+
+	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID))
+
+	s, err := cc.NewStream(ctx, desc, method, opts...)
+	if err != nil {
+		return nil, sentMark, traceID, err
+	}
+
+	return s, sentMark, traceID, nil
 }
 
 func (c *conn) wrapError(err error) error {

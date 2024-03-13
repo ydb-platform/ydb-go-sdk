@@ -218,26 +218,53 @@ func (c *Client) StreamExecute(
 	return r, xerrors.WithStackTrace(err)
 }
 
+func receiveStreamResult(
+	stream Ydb_Scripting_V1.ScriptingService_StreamExecuteYqlClient,
+	onIntermediate func(error) func(error),
+) func(ctx context.Context) (*Ydb.ResultSet, *Ydb_TableStats.QueryStats, error) {
+	return func(ctx context.Context) (*Ydb.ResultSet, *Ydb_TableStats.QueryStats, error) {
+		defer func() {
+			err := recover()
+			if err != nil {
+				errError := err.(error)
+				onIntermediate(xerrors.HideEOF(errError))
+			}
+		}()
+		select {
+		case <-ctx.Done():
+			return nil, nil, xerrors.WithStackTrace(ctx.Err())
+		default:
+			var response *Ydb_Scripting.ExecuteYqlPartialResponse
+			response, err := stream.Recv()
+			if err != nil {
+				return nil, nil, xerrors.WithStackTrace(err)
+			}
+
+			result := response.GetResult()
+			if result == nil {
+				return nil, nil, xerrors.WithStackTrace(errors.New("no result set"))
+			}
+
+			return result.GetResultSet(), result.GetQueryStats(), nil
+		}
+	}
+}
+
 func (c *Client) streamExecute(
 	ctx context.Context,
 	query string,
 	parameters *params.Parameters,
-) (r result.StreamResult, err error) {
+) (r scanner.StreamResult, err error) {
 	var (
-		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx,
-			stack.FunctionID(""),
-			query, parameters,
-		)
-		a       = allocator.New()
-		request = &Ydb_Scripting.ExecuteYqlRequest{
+		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx, stack.FunctionID(""), query, parameters)
+		a              = allocator.New()
+		request        = &Ydb_Scripting.ExecuteYqlRequest{
 			Script:     query,
 			Parameters: parameters.ToYDB(a),
 			OperationParams: operation.Params(
-				ctx,
-				c.config.OperationTimeout(),
+				ctx, c.config.OperationTimeout(),
 				c.config.OperationCancelAfter(),
-				operation.ModeSync,
-			),
+				operation.ModeSync),
 		}
 	)
 	defer func() {
@@ -248,44 +275,26 @@ func (c *Client) streamExecute(
 	}()
 
 	ctx, cancel := xcontext.WithCancel(ctx)
+	defer cancel()
 
 	stream, err := c.service.StreamExecuteYql(ctx, request)
 	if err != nil {
-		cancel()
-
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return scanner.NewStream(ctx,
-		func(ctx context.Context) (
-			set *Ydb.ResultSet,
-			stats *Ydb_TableStats.QueryStats,
-			err error,
-		) {
-			defer func() {
-				onIntermediate(xerrors.HideEOF(err))
-			}()
-			select {
-			case <-ctx.Done():
-				return nil, nil, xerrors.WithStackTrace(ctx.Err())
-			default:
-				var response *Ydb_Scripting.ExecuteYqlPartialResponse
-				response, err = stream.Recv()
-				result := response.GetResult()
-				if result == nil || err != nil {
-					return nil, nil, xerrors.WithStackTrace(err)
-				}
+	recvFunc := receiveStreamResult(stream, onIntermediate)
+	onCloseFunc := func(err error) error {
+		onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 
-				return result.GetResultSet(), result.GetQueryStats(), nil
-			}
-		},
-		func(err error) error {
-			cancel()
-			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
+		return err
+	}
 
-			return err
-		},
-	)
+	result, err := scanner.NewStream(ctx, recvFunc, onCloseFunc)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return result, nil
 }
 
 func (c *Client) Close(ctx context.Context) (err error) {
