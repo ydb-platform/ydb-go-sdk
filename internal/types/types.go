@@ -465,6 +465,8 @@ func NewOptional(t Type) Optional {
 	}
 }
 
+const PgUnknownOID = 705 // unknown type https://github.com/postgres/postgres/blob/master/src/include/catalog/pg_type.dat
+
 type PgType struct {
 	OID uint32
 }

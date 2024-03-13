@@ -267,6 +267,10 @@ func TestTypeToString(t *testing.T) {
 			),
 			s: "Variant<Bool,Float>",
 		},
+		{
+			t: PgType{OID: PgUnknownOID},
+			s: "pgunknown",
+		},
 	} {
 		t.Run(tt.s, func(t *testing.T) {
 			if got := tt.t.Yql(); got != tt.s {

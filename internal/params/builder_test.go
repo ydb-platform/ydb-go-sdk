@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
@@ -461,7 +462,7 @@ func TestBuilder(t *testing.T) {
 					Type: &Ydb.Type{
 						Type: &Ydb.Type_PgType{
 							PgType: &Ydb.PgType{
-								Oid:    705, // unknown type https://github.com/postgres/postgres/blob/master/src/include/catalog/pg_type.dat
+								Oid:    types.PgUnknownOID,
 								Typlen: 0,
 								Typmod: 0,
 							},
