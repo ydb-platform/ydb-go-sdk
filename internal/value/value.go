@@ -282,6 +282,14 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 			ttt.Tuple,
 		), nil
 
+	case *types.PgType:
+		return &pgValue{
+			t: types.PgType{
+				OID: ttt.OID,
+			},
+			val: v.GetTextValue(),
+		}, nil
+
 	default:
 		return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered type: %T", ttt))
 	}
@@ -1229,6 +1237,39 @@ func ListValue(items ...Value) *listValue {
 	}
 }
 
+type pgValue struct {
+	t   types.PgType
+	val string
+}
+
+func (v pgValue) castTo(dst interface{}) error {
+	return xerrors.WithStackTrace(fmt.Errorf(
+		"%w  PgType to '%T' destination",
+		ErrCannotCast, dst,
+	))
+}
+
+func (v pgValue) Type() types.Type {
+	return v.t
+}
+
+func (v pgValue) toYDB(_ *allocator.Allocator) *Ydb.Value {
+	//nolint:godox
+	// TODO: make allocator
+	return &Ydb.Value{
+		Value: &Ydb.Value_TextValue{
+			TextValue: v.val,
+		},
+	}
+}
+
+func (v pgValue) Yql() string {
+	//nolint:godox
+	// TODO: call special function for unknown oids
+	// https://github.com/ydb-platform/ydb/issues/2706
+	return fmt.Sprintf("PgUnknown(%q)", v.val)
+}
+
 type setValue struct {
 	t     types.Type
 	items []Value
@@ -1273,6 +1314,15 @@ func (v *setValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	}
 
 	return vvv
+}
+
+func PgValue(oid uint32, val string) pgValue {
+	return pgValue{
+		t: types.PgType{
+			OID: oid,
+		},
+		val: val,
+	}
 }
 
 func SetValue(items ...Value) *setValue {

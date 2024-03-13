@@ -109,6 +109,10 @@ func (p *Parameter) List() *list {
 	}
 }
 
+func (p *Parameter) Pg() pgParam {
+	return pgParam{p}
+}
+
 func (p *Parameter) Set() *set {
 	return &set{
 		parent: p.parent,

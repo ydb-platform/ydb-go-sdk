@@ -1,3 +1,5 @@
+* Added `ydb.ParamsBuilder().Pg().{Value,Int4,Int8,Unknown}` for postgres arguments
+
 ## v3.57.4
 * Added client pid to each gRPC requests to YDB over header `x-ydb-client-pid`
 * Added `ydb.WithApplicationName` option

@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pg"
 )
 
 func TestTypeToString(t *testing.T) {
@@ -266,6 +268,10 @@ func TestTypeToString(t *testing.T) {
 				Float,
 			),
 			s: "Variant<Bool,Float>",
+		},
+		{
+			t: PgType{OID: pg.OIDUnknown},
+			s: "pgunknown",
 		},
 	} {
 		t.Run(tt.s, func(t *testing.T) {
