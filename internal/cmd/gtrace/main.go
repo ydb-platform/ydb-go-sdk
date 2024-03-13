@@ -142,63 +142,7 @@ func main() {
 	if err != nil {
 		panic(fmt.Sprintf("type error: %v", err))
 	}
-	var items []*GenItem
-	for i, astFile := range astFiles {
-		if pkgFiles[i].Name() != srcFilePath {
-			continue
-		}
-		var (
-			depth int
-			item  *GenItem
-		)
-		ast.Inspect(astFile, func(n ast.Node) (next bool) {
-			if n == nil {
-				item = nil
-				depth--
-
-				return true
-			}
-			defer func() {
-				if next {
-					depth++
-				}
-			}()
-
-			switch v := n.(type) {
-			case *ast.FuncDecl, *ast.ValueSpec:
-				return false
-
-			case *ast.Ident:
-				if item != nil {
-					item.Ident = v
-				}
-
-				return false
-
-			case *ast.CommentGroup:
-				for _, c := range v.List {
-					if strings.Contains(strings.TrimPrefix(c.Text, "//"), "gtrace:gen") {
-						if item == nil {
-							item = &GenItem{}
-						}
-					}
-				}
-
-				return false
-
-			case *ast.StructType:
-				if item != nil {
-					item.StructType = v
-					items = append(items, item)
-					item = nil
-				}
-
-				return false
-			}
-
-			return true
-		})
-	}
+	items := findGtraceGen(astFiles, pkgFiles, srcFilePath)
 	p := Package{
 		Package:          pkg,
 		BuildConstraints: buildConstraints,
@@ -211,6 +155,92 @@ func main() {
 		p.Traces = append(p.Traces, t)
 		traces[item.Ident.Name] = t
 	}
+	extractNameAndDetails(items, &p, info, traces)
+	checkErrsInWriters(writers, p)
+
+	log.Println("OK")
+}
+
+// findGtraceGen iterates over the astFiles and pkgFiles to find elements marked with a comment containing "gtrace:gen"
+// and collects them into GenItems.
+//
+//nolint:gocognit
+func findGtraceGen(astFiles []*ast.File, pkgFiles []*os.File, srcFilePath string) []*GenItem {
+	var items []*GenItem
+	for i, astFile := range astFiles {
+		if pkgFiles[i].Name() != srcFilePath {
+			continue
+		}
+		var (
+			depth int
+			item  *GenItem
+		)
+		ast.Inspect(astFile,
+			func(n ast.Node) (next bool) {
+				if n == nil {
+					item = nil
+					depth--
+
+					return true
+				}
+				defer func() {
+					if next {
+						depth++
+					}
+				}()
+
+				switch v := n.(type) {
+				case *ast.FuncDecl, *ast.ValueSpec:
+					return false
+
+				case *ast.Ident:
+					if item != nil {
+						item.Ident = v
+					}
+
+					return false
+
+				case *ast.CommentGroup:
+					for _, c := range v.List {
+						if strings.Contains(strings.TrimPrefix(c.Text, "//"), "gtrace:gen") {
+							if item == nil {
+								item = &GenItem{}
+							}
+						}
+					}
+
+					return false
+
+				case *ast.StructType:
+					if item != nil {
+						item.StructType = v
+						items = append(items, item)
+						item = nil
+					}
+
+					return false
+				}
+
+				return true
+			},
+		)
+	}
+
+	return items
+}
+
+// checkErrsInWriters iterate over each Writer in the writers slice and checks errors
+func checkErrsInWriters(writers []*Writer, p Package) {
+	for _, w := range writers {
+		if err := w.Write(p); err != nil {
+			panic(err)
+		}
+	}
+}
+
+// extractNameAndDetails extracts the name and details of functions from the given items, and populates the traces
+// in the package with hooks based on the extracted functions.
+func extractNameAndDetails(items []*GenItem, p *Package, info *types.Info, traces map[string]*Trace) {
 	for i, item := range items {
 		t := p.Traces[i]
 		for _, field := range item.StructType.Fields.List {
@@ -237,13 +267,6 @@ func main() {
 			})
 		}
 	}
-	for _, w := range writers {
-		if err := w.Write(p); err != nil {
-			panic(err)
-		}
-	}
-
-	log.Println("OK")
 }
 
 func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (ret *Func, err error) {

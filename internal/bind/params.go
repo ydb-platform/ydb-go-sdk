@@ -179,30 +179,11 @@ func Params(args ...interface{}) (parameters []*params.Parameter, _ error) {
 	for i, arg := range args {
 		switch x := arg.(type) {
 		case driver.NamedValue:
-			if x.Name == "" {
-				switch xx := x.Value.(type) {
-				case *params.Parameters:
-					if len(args) > 1 {
-						return nil, xerrors.WithStackTrace(errMultipleQueryParameters)
-					}
-					parameters = *xx
-				case *params.Parameter:
-					parameters = append(parameters, xx)
-				default:
-					x.Name = fmt.Sprintf("$p%d", i)
-					param, err := toYdbParam(x.Name, x.Value)
-					if err != nil {
-						return nil, xerrors.WithStackTrace(err)
-					}
-					parameters = append(parameters, param)
-				}
-			} else {
-				param, err := toYdbParam(x.Name, x.Value)
-				if err != nil {
-					return nil, xerrors.WithStackTrace(err)
-				}
-				parameters = append(parameters, param)
+			driverNamedParams, err := checkDriverNamedValue(i, params, x, args)
+			if err != nil {
+				return nil, err
 			}
+			params = driverNamedParams
 		case sql.NamedArg:
 			if x.Name == "" {
 				return nil, xerrors.WithStackTrace(errUnnamedParam)
@@ -232,4 +213,41 @@ func Params(args ...interface{}) (parameters []*params.Parameter, _ error) {
 	})
 
 	return parameters, nil
+}
+
+// checkDriverNamedValue checks the driver.NamedValue and adds it to the params slice.
+func checkDriverNamedValue(
+	i int,
+	params []table.ParameterOption,
+	x driver.NamedValue,
+	args []interface{},
+) ([]table.ParameterOption, error) {
+	if x.Name == "" {
+		switch xx := x.Value.(type) {
+		case *table.QueryParameters:
+			if len(args) > 1 {
+				return nil, xerrors.WithStackTrace(errMultipleQueryParameters)
+			}
+			xx.Each(func(name string, v types.Value) {
+				params = append(params, table.ValueParam(name, v))
+			})
+		case table.ParameterOption:
+			params = append(params, xx)
+		default:
+			x.Name = fmt.Sprintf("$p%d", i)
+			param, err := toYdbParam(x.Name, x.Value)
+			if err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
+			params = append(params, param)
+		}
+	} else {
+		param, err := toYdbParam(x.Name, x.Value)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+		params = append(params, param)
+	}
+
+	return params, nil
 }

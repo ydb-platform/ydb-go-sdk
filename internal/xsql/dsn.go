@@ -53,29 +53,10 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 		}
 	}
 	if info.Params.Has("go_query_bind") {
-		var binders []ConnectorOption
 		queryTransformers := strings.Split(info.Params.Get("go_query_bind"), ",")
-		for _, transformer := range queryTransformers {
-			switch transformer {
-			case "declare":
-				binders = append(binders, WithQueryBind(bind.AutoDeclare{}))
-			case "positional":
-				binders = append(binders, WithQueryBind(bind.PositionalArgs{}))
-			case "numeric":
-				binders = append(binders, WithQueryBind(bind.NumericArgs{}))
-			default:
-				if strings.HasPrefix(transformer, tablePathPrefixTransformer) {
-					prefix, err := extractTablePathPrefixFromBinderName(transformer)
-					if err != nil {
-						return nil, nil, xerrors.WithStackTrace(err)
-					}
-					binders = append(binders, WithTablePathPrefix(prefix))
-				} else {
-					return nil, nil, xerrors.WithStackTrace(
-						fmt.Errorf("unknown query rewriter: %s", transformer),
-					)
-				}
-			}
+		binders, err := bindTablePathPrefixInConnectorOptions(queryTransformers)
+		if err != nil {
+			return nil, nil, err
 		}
 		connectorOpts = append(connectorOpts, binders...)
 	}
@@ -95,4 +76,31 @@ func extractTablePathPrefixFromBinderName(binderName string) (string, error) {
 	}
 
 	return ss[0][1], nil
+}
+
+// bindTablePathPrefixInConnectorOptions binds table path prefix query transformers to a list of ConnectorOptions.
+func bindTablePathPrefixInConnectorOptions(queryTransformers []string) ([]ConnectorOption, error) {
+	var binders []ConnectorOption
+	for _, transformer := range queryTransformers {
+		switch transformer {
+		case "declare":
+			binders = append(binders, WithQueryBind(bind.AutoDeclare{}))
+		case "positional":
+			binders = append(binders, WithQueryBind(bind.PositionalArgs{}))
+		case "numeric":
+			binders = append(binders, WithQueryBind(bind.NumericArgs{}))
+		default:
+			if strings.HasPrefix(transformer, tablePathPrefixTransformer) {
+				prefix, err := extractTablePathPrefixFromBinderName(transformer)
+				if err != nil {
+					return nil, xerrors.WithStackTrace(err)
+				}
+				binders = append(binders, WithTablePathPrefix(prefix))
+			} else {
+				return nil, xerrors.WithStackTrace(fmt.Errorf("unknown query rewriter: %s", transformer))
+			}
+		}
+	}
+
+	return binders, nil
 }

@@ -173,21 +173,7 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 					defer cancel()
 				}
 
-				closeSession := func(s *session) {
-					if s == nil {
-						return
-					}
-
-					closeSessionCtx := xcontext.WithoutDeadline(ctx)
-
-					if timeout := c.config.DeleteTimeout(); timeout > 0 {
-						var cancel context.CancelFunc
-						createSessionCtx, cancel = xcontext.WithTimeout(closeSessionCtx, timeout)
-						defer cancel()
-					}
-
-					_ = s.Close(closeSessionCtx)
-				}
+				closeSession := onCloseSession(ctx, createSessionCtx, c)
 
 				s, err = c.build(createSessionCtx)
 
@@ -220,6 +206,25 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 		}
 
 		return r.s, nil
+	}
+}
+
+// onCloseSession is a closure function that takes a session and performs the actions to close it.
+func onCloseSession(ctx, createSessionCtx context.Context, c *Client) func(s *session) {
+	return func(s *session) {
+		if s == nil {
+			return
+		}
+
+		closeSessionCtx := xcontext.WithoutDeadline(ctx)
+
+		if timeout := c.config.DeleteTimeout(); timeout > 0 {
+			var cancel context.CancelFunc
+			createSessionCtx, cancel = xcontext.WithTimeout(closeSessionCtx, timeout)
+			defer cancel()
+		}
+
+		_ = s.Close(closeSessionCtx)
 	}
 }
 

@@ -899,153 +899,47 @@ func (s *valueScanner) scanOptional(v interface{}, defaultValueForOptional bool)
 	}
 	switch v := v.(type) {
 	case **bool:
-		if s.isNull() {
-			*v = nil
-		} else {
-			src := s.bool()
-			*v = &src
-		}
+		handleBoolCase(s, v)
 	case **int8:
-		if s.isNull() {
-			*v = nil
-		} else {
-			src := s.int8()
-			*v = &src
-		}
+		handleInt8Case(s, v)
 	case **int16:
-		if s.isNull() {
-			*v = nil
-		} else {
-			src := s.int16()
-			*v = &src
-		}
+		handleInt16Case(s, v)
 	case **int32:
-		if s.isNull() {
-			*v = nil
-		} else {
-			src := s.int32()
-			*v = &src
-		}
+		handleInt32Case(s, v)
 	case **int:
-		if s.isNull() {
-			*v = nil
-		} else {
-			src := int(s.int32())
-			*v = &src
-		}
+		handleIntCase(s, v)
 	case **int64:
-		if s.isNull() {
-			*v = nil
-		} else {
-			src := s.int64()
-			*v = &src
-		}
+		handleInt64Case(s, v)
 	case **uint8:
-		if s.isNull() {
-			*v = nil
-		} else {
-			src := s.uint8()
-			*v = &src
-		}
+		handleUint8Case(s, v)
 	case **uint16:
-		if s.isNull() {
-			*v = nil
-		} else {
-			src := s.uint16()
-			*v = &src
-		}
+		handleUint16Case(s, v)
 	case **uint32:
-		if s.isNull() {
-			*v = nil
-		} else {
-			src := s.uint32()
-			*v = &src
-		}
+		handleUint32Case(s, v)
 	case **uint:
-		if s.isNull() {
-			*v = nil
-		} else {
-			src := uint(s.uint32())
-			*v = &src
-		}
+		handleUintCase(s, v)
 	case **uint64:
-		if s.isNull() {
-			*v = nil
-		} else {
-			src := s.uint64()
-			*v = &src
-		}
+		handleUint64Case(s, v)
 	case **float32:
-		if s.isNull() {
-			*v = nil
-		} else {
-			src := s.float()
-			*v = &src
-		}
+		handleFloat32Case(s, v)
 	case **float64:
-		if s.isNull() {
-			*v = nil
-		} else {
-			src := s.double()
-			*v = &src
-		}
+		handleFloat64Case(s, v)
 	case **time.Time:
-		if s.isNull() {
-			*v = nil
-		} else {
-			s.unwrap()
-			var src time.Time
-			s.setTime(&src)
-			*v = &src
-		}
+		handleTimeCase(s, v)
 	case **time.Duration:
-		if s.isNull() {
-			*v = nil
-		} else {
-			src := value.IntervalToDuration(s.int64())
-			*v = &src
-		}
+		handleDurationCase(s, v)
 	case **string:
-		if s.isNull() {
-			*v = nil
-		} else {
-			s.unwrap()
-			var src string
-			s.setString(&src)
-			*v = &src
-		}
+		handleStringCase(s, v)
 	case **[]byte:
-		if s.isNull() {
-			*v = nil
-		} else {
-			s.unwrap()
-			var src []byte
-			s.setByte(&src)
-			*v = &src
-		}
+		handleSliceByteCase(s, v)
 	case **[16]byte:
-		if s.isNull() {
-			*v = nil
-		} else {
-			src := s.uint128()
-			*v = &src
-		}
+		handleArrByte16Case(s, v)
 	case **interface{}:
-		if s.isNull() {
-			*v = nil
-		} else {
-			src := s.any()
-			*v = &src
-		}
+		handleInterfaceCase(s, v)
 	case *value.Value:
 		*v = s.value()
-	case **decimal.Decimal:
-		if s.isNull() {
-			*v = nil
-		} else {
-			src := s.unwrapDecimal()
-			*v = &src
-		}
+	case **types.Decimal:
+		handleDecimalCase(s, v)
 	case scanner.Scanner:
 		err := v.UnmarshalYDB(s.converter)
 		if err != nil {
@@ -1089,6 +983,212 @@ func (s *valueScanner) scanOptional(v interface{}, defaultValueForOptional bool)
 				_ = s.errorf(0, "scan row failed: type %T is not optional! use double pointer or sql.Scanner.", v)
 			}
 		}
+	}
+}
+
+// handleBoolCase handles the special case for handling boolean values in the scanner.
+func handleBoolCase(s *valueScanner, v **bool) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		src := s.bool()
+		*v = &src
+	}
+}
+
+// handleInt8Case handles the special case for handling int8 values in the scanner.
+func handleInt8Case(s *valueScanner, v **int8) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		src := s.int8()
+		*v = &src
+	}
+}
+
+// handleInt16Case handles the special case for handling int16 values in the scanner.
+func handleInt16Case(s *valueScanner, v **int16) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		src := s.int16()
+		*v = &src
+	}
+}
+
+// handleInt32Case handles the special case for handling int32 values in the scanner.
+func handleInt32Case(s *valueScanner, v **int32) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		src := s.int32()
+		*v = &src
+	}
+}
+
+// handleIntCase handles the special case for handling int values in the scanner.
+func handleIntCase(s *valueScanner, v **int) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		src := int(s.int32())
+		*v = &src
+	}
+}
+
+// handleInt64Case handles the special case for handling int64 values in the scanner.
+func handleInt64Case(s *valueScanner, v **int64) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		src := s.int64()
+		*v = &src
+	}
+}
+
+// handleUint8Case handles the special case for handling uint8 values in the scanner.
+func handleUint8Case(s *valueScanner, v **uint8) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		src := s.uint8()
+		*v = &src
+	}
+}
+
+// handleUint16Case handles the special case for handling uint16 values in the scanner.
+func handleUint16Case(s *valueScanner, v **uint16) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		src := s.uint16()
+		*v = &src
+	}
+}
+
+// handleUint32Case handles the special case for handling uint32 values in the scanner.
+func handleUint32Case(s *valueScanner, v **uint32) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		src := s.uint32()
+		*v = &src
+	}
+}
+
+// handleUintCase handles the special case for handling uint values in the scanner.
+func handleUintCase(s *valueScanner, v **uint) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		src := uint(s.uint32())
+		*v = &src
+	}
+}
+
+// handleUint64Case handles the special case for handling uint64 values in the scanner.
+func handleUint64Case(s *valueScanner, v **uint64) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		src := s.uint64()
+		*v = &src
+	}
+}
+
+// handleFloat32Case handles the special case for handling float32 values in the scanner.
+func handleFloat32Case(s *valueScanner, v **float32) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		src := s.float()
+		*v = &src
+	}
+}
+
+// handleFloat64Case handles the special case for handling float64 values in the scanner.
+func handleFloat64Case(s *valueScanner, v **float64) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		src := s.double()
+		*v = &src
+	}
+}
+
+// handleTimeCase handles the special case for handling time.Time values in the scanner.
+func handleTimeCase(s *valueScanner, v **time.Time) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		s.unwrap()
+		var src time.Time
+		s.setTime(&src)
+		*v = &src
+	}
+}
+
+// handleDurationCase handles the special case for handling time.Duration values in the scanner.
+func handleDurationCase(s *valueScanner, v **time.Duration) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		src := value.IntervalToDuration(s.int64())
+		*v = &src
+	}
+}
+
+// handleStringCase handles the special case for handling string values in the scanner.
+func handleStringCase(s *valueScanner, v **string) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		s.unwrap()
+		var src string
+		s.setString(&src)
+		*v = &src
+	}
+}
+
+// handleSliceByteCase handles the special case for handling []byte values in the scanner.
+func handleSliceByteCase(s *valueScanner, v **[]byte) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		s.unwrap()
+		var src []byte
+		s.setByte(&src)
+		*v = &src
+	}
+}
+
+// handleArrByte16Case handles the special case for handling [16]byte values in the scanner.
+func handleArrByte16Case(s *valueScanner, v **[16]byte) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		src := s.uint128()
+		*v = &src
+	}
+}
+
+// handleInterfaceCase handles the special case for handling interface{} values in the scanner.
+func handleInterfaceCase(s *valueScanner, v **interface{}) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		src := s.any()
+		*v = &src
+	}
+}
+
+// handleDecimalCase handles the special case for handling types.Decimal values in the scanner.
+func handleDecimalCase(s *valueScanner, v **types.Decimal) {
+	if s.isNull() {
+		*v = nil
+	} else {
+		src := s.unwrapDecimal()
+		*v = &src
 	}
 }
 

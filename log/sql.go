@@ -14,7 +14,30 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...Option) (t trace.DatabaseSQ
 }
 
 func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
-	t.OnConnectorConnect = func(
+	logger := l.logger
+	loggerQuery := l.logQuery
+
+	t.OnConnectorConnect = connectorConnect(logger, d)
+	t.OnConnPing = connPing(logger, d)
+	t.OnConnClose = connClose(logger, d)
+	t.OnConnBegin = connBegin(logger, d)
+	t.OnConnPrepare = connPrepare(logger, loggerQuery, d)
+	t.OnConnExec = connExec(logger, loggerQuery, d)
+	t.OnConnQuery = connQuery(logger, loggerQuery, d)
+	t.OnTxCommit = txCommit(logger, d)
+	t.OnTxRollback = txRollback(logger, d)
+	t.OnStmtClose = stmtClose(logger, d)
+	t.OnStmtExec = stmtExec(logger, loggerQuery, d)
+	t.OnStmtQuery = stmtQuery(logger, loggerQuery, d)
+
+	return t
+}
+
+func connectorConnect(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DatabaseSQLConnectorConnectStartInfo) func(trace.DatabaseSQLConnectorConnectDoneInfo) {
+	return func(
 		info trace.DatabaseSQLConnectorConnectStartInfo,
 	) func(
 		trace.DatabaseSQLConnectorConnectDoneInfo,
@@ -42,8 +65,13 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 			}
 		}
 	}
+}
 
-	t.OnConnPing = func(info trace.DatabaseSQLConnPingStartInfo) func(trace.DatabaseSQLConnPingDoneInfo) {
+func connPing(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DatabaseSQLConnPingStartInfo) func(trace.DatabaseSQLConnPingDoneInfo) {
+	return func(info trace.DatabaseSQLConnPingStartInfo) func(trace.DatabaseSQLConnPingDoneInfo) {
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
@@ -65,7 +93,13 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 			}
 		}
 	}
-	t.OnConnClose = func(info trace.DatabaseSQLConnCloseStartInfo) func(trace.DatabaseSQLConnCloseDoneInfo) {
+}
+
+func connClose(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DatabaseSQLConnCloseStartInfo) func(trace.DatabaseSQLConnCloseDoneInfo) {
+	return func(info trace.DatabaseSQLConnCloseStartInfo) func(trace.DatabaseSQLConnCloseDoneInfo) {
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
@@ -87,7 +121,13 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 			}
 		}
 	}
-	t.OnConnBegin = func(info trace.DatabaseSQLConnBeginStartInfo) func(trace.DatabaseSQLConnBeginDoneInfo) {
+}
+
+func connBegin(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DatabaseSQLConnBeginStartInfo) func(trace.DatabaseSQLConnBeginDoneInfo) {
+	return func(info trace.DatabaseSQLConnBeginStartInfo) func(trace.DatabaseSQLConnBeginDoneInfo) {
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
@@ -109,13 +149,20 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 			}
 		}
 	}
-	t.OnConnPrepare = func(info trace.DatabaseSQLConnPrepareStartInfo) func(trace.DatabaseSQLConnPrepareDoneInfo) {
+}
+
+func connPrepare(
+	l Logger,
+	loggerQuery bool,
+	d trace.Detailer,
+) func(info trace.DatabaseSQLConnPrepareStartInfo) func(trace.DatabaseSQLConnPrepareDoneInfo) {
+	return func(info trace.DatabaseSQLConnPrepareStartInfo) func(trace.DatabaseSQLConnPrepareDoneInfo) {
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "conn", "prepare", "stmt")
 		l.Log(ctx, "start",
-			appendFieldByCondition(l.logQuery,
+			appendFieldByCondition(loggerQuery,
 				String("query", info.Query),
 			)...,
 		)
@@ -129,7 +176,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
-					appendFieldByCondition(l.logQuery,
+					appendFieldByCondition(loggerQuery,
 						String("query", query),
 						Error(info.Error),
 						latencyField(start),
@@ -139,13 +186,20 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 			}
 		}
 	}
-	t.OnConnExec = func(info trace.DatabaseSQLConnExecStartInfo) func(trace.DatabaseSQLConnExecDoneInfo) {
+}
+
+func connExec(
+	l Logger,
+	loggerQuery bool,
+	d trace.Detailer,
+) func(info trace.DatabaseSQLConnExecStartInfo) func(trace.DatabaseSQLConnExecDoneInfo) {
+	return func(info trace.DatabaseSQLConnExecStartInfo) func(trace.DatabaseSQLConnExecDoneInfo) {
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "conn", "exec")
 		l.Log(ctx, "start",
-			appendFieldByCondition(l.logQuery,
+			appendFieldByCondition(loggerQuery,
 				String("query", info.Query),
 			)...,
 		)
@@ -161,7 +215,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 			} else {
 				m := retry.Check(info.Error)
 				l.Log(WithLevel(ctx, ERROR), "failed",
-					appendFieldByCondition(l.logQuery,
+					appendFieldByCondition(loggerQuery,
 						String("query", query),
 						Bool("retryable", m.MustRetry(idempotent)),
 						Int64("code", m.StatusCode()),
@@ -174,13 +228,20 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 			}
 		}
 	}
-	t.OnConnQuery = func(info trace.DatabaseSQLConnQueryStartInfo) func(trace.DatabaseSQLConnQueryDoneInfo) {
+}
+
+func connQuery(
+	l Logger,
+	loggerQuery bool,
+	d trace.Detailer,
+) func(info trace.DatabaseSQLConnQueryStartInfo) func(trace.DatabaseSQLConnQueryDoneInfo) {
+	return func(info trace.DatabaseSQLConnQueryStartInfo) func(trace.DatabaseSQLConnQueryDoneInfo) {
 		if d.Details()&trace.DatabaseSQLConnEvents == 0 {
 			return nil
 		}
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "conn", "query")
 		l.Log(ctx, "start",
-			appendFieldByCondition(l.logQuery,
+			appendFieldByCondition(loggerQuery,
 				String("query", info.Query),
 			)...,
 		)
@@ -196,7 +257,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 			} else {
 				m := retry.Check(info.Error)
 				l.Log(WithLevel(ctx, ERROR), "failed",
-					appendFieldByCondition(l.logQuery,
+					appendFieldByCondition(loggerQuery,
 						String("query", query),
 						Bool("retryable", m.MustRetry(idempotent)),
 						Int64("code", m.StatusCode()),
@@ -209,7 +270,13 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 			}
 		}
 	}
-	t.OnTxCommit = func(info trace.DatabaseSQLTxCommitStartInfo) func(trace.DatabaseSQLTxCommitDoneInfo) {
+}
+
+func txCommit(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DatabaseSQLTxCommitStartInfo) func(trace.DatabaseSQLTxCommitDoneInfo) {
+	return func(info trace.DatabaseSQLTxCommitStartInfo) func(trace.DatabaseSQLTxCommitDoneInfo) {
 		if d.Details()&trace.DatabaseSQLTxEvents == 0 {
 			return nil
 		}
@@ -231,7 +298,13 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 			}
 		}
 	}
-	t.OnTxRollback = func(info trace.DatabaseSQLTxRollbackStartInfo) func(trace.DatabaseSQLTxRollbackDoneInfo) {
+}
+
+func txRollback(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DatabaseSQLTxRollbackStartInfo) func(trace.DatabaseSQLTxRollbackDoneInfo) {
+	return func(info trace.DatabaseSQLTxRollbackStartInfo) func(trace.DatabaseSQLTxRollbackDoneInfo) {
 		if d.Details()&trace.DatabaseSQLTxEvents == 0 {
 			return nil
 		}
@@ -253,7 +326,13 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 			}
 		}
 	}
-	t.OnStmtClose = func(info trace.DatabaseSQLStmtCloseStartInfo) func(trace.DatabaseSQLStmtCloseDoneInfo) {
+}
+
+func stmtClose(
+	l Logger,
+	d trace.Detailer,
+) func(info trace.DatabaseSQLStmtCloseStartInfo) func(trace.DatabaseSQLStmtCloseDoneInfo) {
+	return func(info trace.DatabaseSQLStmtCloseStartInfo) func(trace.DatabaseSQLStmtCloseDoneInfo) {
 		if d.Details()&trace.DatabaseSQLStmtEvents == 0 {
 			return nil
 		}
@@ -275,13 +354,20 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 			}
 		}
 	}
-	t.OnStmtExec = func(info trace.DatabaseSQLStmtExecStartInfo) func(trace.DatabaseSQLStmtExecDoneInfo) {
+}
+
+func stmtExec(
+	l Logger,
+	loggerQuery bool,
+	d trace.Detailer,
+) func(info trace.DatabaseSQLStmtExecStartInfo) func(trace.DatabaseSQLStmtExecDoneInfo) {
+	return func(info trace.DatabaseSQLStmtExecStartInfo) func(trace.DatabaseSQLStmtExecDoneInfo) {
 		if d.Details()&trace.DatabaseSQLStmtEvents == 0 {
 			return nil
 		}
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "stmt", "exec")
 		l.Log(ctx, "start",
-			appendFieldByCondition(l.logQuery,
+			appendFieldByCondition(loggerQuery,
 				String("query", info.Query),
 			)...,
 		)
@@ -296,7 +382,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
-					appendFieldByCondition(l.logQuery,
+					appendFieldByCondition(loggerQuery,
 						String("query", query),
 						Error(info.Error),
 						latencyField(start),
@@ -306,13 +392,20 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 			}
 		}
 	}
-	t.OnStmtQuery = func(info trace.DatabaseSQLStmtQueryStartInfo) func(trace.DatabaseSQLStmtQueryDoneInfo) {
+}
+
+func stmtQuery(
+	l Logger,
+	loggerQuery bool,
+	d trace.Detailer,
+) func(info trace.DatabaseSQLStmtQueryStartInfo) func(trace.DatabaseSQLStmtQueryDoneInfo) {
+	return func(info trace.DatabaseSQLStmtQueryStartInfo) func(trace.DatabaseSQLStmtQueryDoneInfo) {
 		if d.Details()&trace.DatabaseSQLStmtEvents == 0 {
 			return nil
 		}
 		ctx := with(*info.Context, TRACE, "ydb", "database", "sql", "stmt", "query")
 		l.Log(ctx, "start",
-			appendFieldByCondition(l.logQuery,
+			appendFieldByCondition(loggerQuery,
 				String("query", info.Query),
 			)...,
 		)
@@ -326,7 +419,7 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 				)
 			} else {
 				l.Log(WithLevel(ctx, ERROR), "failed",
-					appendFieldByCondition(l.logQuery,
+					appendFieldByCondition(loggerQuery,
 						String("query", query),
 						Error(info.Error),
 						latencyField(start),
@@ -336,6 +429,4 @@ func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 			}
 		}
 	}
-
-	return t
 }

@@ -9,6 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type exp struct {
+	eq  time.Duration
+	gte time.Duration
+	lte time.Duration
+}
+
 func TestDelays(t *testing.T) {
 	duration := func(s string) (d time.Duration) {
 		d, err := time.ParseDuration(s)
@@ -42,11 +48,6 @@ func TestDelays(t *testing.T) {
 }
 
 func TestLogBackoff(t *testing.T) {
-	type exp struct {
-		eq  time.Duration
-		gte time.Duration
-		lte time.Duration
-	}
 	for _, tt := range []struct {
 		backoff Backoff
 		exp     []exp
@@ -145,21 +146,25 @@ func TestLogBackoff(t *testing.T) {
 
 						continue
 					}
-					if gte := exp.gte; act <= gte {
-						t.Errorf(
-							"unexpected Backoff delay: %s; want >= %s",
-							act, gte,
-						)
-					}
-					if lte := exp.lte; act >= lte {
-						t.Errorf(
-							"unexpected Backoff delay: %s; want <= %s",
-							act, lte,
-						)
-					}
+					checkExpWithAct(t, exp, act)
 				}
 			}
 		})
+	}
+}
+
+func checkExpWithAct(t *testing.T, exp exp, act time.Duration) {
+	if gte := exp.gte; act <= gte {
+		t.Errorf(
+			"unexpected Backoff delay: %s; want >= %s",
+			act, gte,
+		)
+	}
+	if lte := exp.lte; act >= lte {
+		t.Errorf(
+			"unexpected Backoff delay: %s; want <= %s",
+			act, lte,
+		)
 	}
 }
 
