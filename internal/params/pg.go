@@ -1,14 +1,31 @@
 package params
 
-import "github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+import (
+	"strconv"
 
-type pg struct {
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pg"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+)
+
+type pgParam struct {
 	param *Parameter
 }
 
-func (p pg) Unknown(val string) Builder {
-	p.param.value = value.PgUnknownValue(val)
+func (p pgParam) Unknown(val string) Builder {
+	return p.Value(pg.UnknownOID, val)
+}
+
+func (p pgParam) Value(oid uint32, val string) Builder {
+	p.param.value = value.PgValue(oid, val)
 	p.param.parent.params = append(p.param.parent.params, p.param)
 
 	return p.param.parent
+}
+
+func (p pgParam) Int4(val int32) Builder {
+	return p.Value(pg.Int4OID, strconv.FormatInt(int64(val), 10))
+}
+
+func (p pgParam) Int8(val int64) Builder {
+	return p.Value(pg.Int8OID, strconv.FormatInt(val, 10))
 }

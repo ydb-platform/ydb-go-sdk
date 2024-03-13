@@ -109,8 +109,8 @@ func (p *Parameter) List() *list {
 	}
 }
 
-func (p *Parameter) Pg() pg {
-	return pg{p}
+func (p *Parameter) Pg() pgParam {
+	return pgParam{p}
 }
 
 func (p *Parameter) Set() *set {

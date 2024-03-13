@@ -283,16 +283,12 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		), nil
 
 	case *types.PgType:
-		if ttt.OID == types.PgUnknownOID {
-			return &pgValue{
-				t: types.PgType{
-					OID: ttt.OID,
-				},
-				val: v.GetTextValue(),
-			}, nil
-		}
-
-		return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered pg type with oid: %v", ttt.OID))
+		return &pgValue{
+			t: types.PgType{
+				OID: ttt.OID,
+			},
+			val: v.GetTextValue(),
+		}, nil
 
 	default:
 		return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered type: %T", ttt))
@@ -1246,18 +1242,18 @@ type pgValue struct {
 	val string
 }
 
-func (v *pgValue) castTo(dst interface{}) error {
+func (v pgValue) castTo(dst interface{}) error {
 	return xerrors.WithStackTrace(fmt.Errorf(
 		"%w  PgType to '%T' destination",
 		ErrCannotCast, dst,
 	))
 }
 
-func (v *pgValue) Type() types.Type {
+func (v pgValue) Type() types.Type {
 	return v.t
 }
 
-func (v *pgValue) toYDB(_ *allocator.Allocator) *Ydb.Value {
+func (v pgValue) toYDB(_ *allocator.Allocator) *Ydb.Value {
 	//nolint:godox
 	// TODO: make allocator
 	return &Ydb.Value{
@@ -1267,7 +1263,9 @@ func (v *pgValue) toYDB(_ *allocator.Allocator) *Ydb.Value {
 	}
 }
 
-func (v *pgValue) Yql() string {
+func (v pgValue) Yql() string {
+	//nolint:godox
+	// TODO: call special function for unknown oids
 	return fmt.Sprintf("PgUnknown(%q)", v.val)
 }
 
@@ -1317,10 +1315,10 @@ func (v *setValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func PgUnknownValue(val string) *pgValue {
-	return &pgValue{
+func PgValue(oid uint32, val string) pgValue {
+	return pgValue{
 		t: types.PgType{
-			OID: types.PgUnknownOID,
+			OID: oid,
 		},
 		val: val,
 	}
