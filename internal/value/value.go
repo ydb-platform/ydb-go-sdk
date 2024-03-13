@@ -286,11 +286,12 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		if ttt.OID == types.PgUnknownOID {
 			return &pgValue{
 				t: types.PgType{
-					ttt.OID,
+					OID: ttt.OID,
 				},
 				val: v.GetTextValue(),
 			}, nil
 		}
+
 		return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered pg type with oid: %v", ttt.OID))
 
 	default:
@@ -1267,7 +1268,6 @@ func (v *pgValue) toYDB(_ *allocator.Allocator) *Ydb.Value {
 }
 
 func (v *pgValue) Yql() string {
-	//nolint:godox
 	return fmt.Sprintf("PgUnknown(%q)", v.val)
 }
 
