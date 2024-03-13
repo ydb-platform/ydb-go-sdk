@@ -270,7 +270,7 @@ func TestTypeToString(t *testing.T) {
 			s: "Variant<Bool,Float>",
 		},
 		{
-			t: PgType{OID: pg.UnknownOID},
+			t: PgType{OID: pg.OIDUnknown},
 			s: "pgunknown",
 		},
 	} {

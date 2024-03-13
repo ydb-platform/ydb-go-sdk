@@ -462,7 +462,7 @@ func TestBuilder(t *testing.T) {
 					Type: &Ydb.Type{
 						Type: &Ydb.Type_PgType{
 							PgType: &Ydb.PgType{
-								Oid: pg.UnknownOID,
+								Oid: pg.OIDUnknown,
 							},
 						},
 					},
@@ -483,7 +483,7 @@ func TestBuilder(t *testing.T) {
 					Type: &Ydb.Type{
 						Type: &Ydb.Type_PgType{
 							PgType: &Ydb.PgType{
-								Oid: pg.Int4OID,
+								Oid: pg.OIDInt4,
 							},
 						},
 					},
@@ -504,7 +504,7 @@ func TestBuilder(t *testing.T) {
 					Type: &Ydb.Type{
 						Type: &Ydb.Type_PgType{
 							PgType: &Ydb.PgType{
-								Oid: pg.Int8OID,
+								Oid: pg.OIDInt8,
 							},
 						},
 					},

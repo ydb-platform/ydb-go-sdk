@@ -12,7 +12,7 @@ type pgParam struct {
 }
 
 func (p pgParam) Unknown(val string) Builder {
-	return p.Value(pg.UnknownOID, val)
+	return p.Value(pg.OIDUnknown, val)
 }
 
 func (p pgParam) Value(oid uint32, val string) Builder {
@@ -23,9 +23,9 @@ func (p pgParam) Value(oid uint32, val string) Builder {
 }
 
 func (p pgParam) Int4(val int32) Builder {
-	return p.Value(pg.Int4OID, strconv.FormatInt(int64(val), 10))
+	return p.Value(pg.OIDInt4, strconv.FormatInt(int64(val), 10))
 }
 
 func (p pgParam) Int8(val int64) Builder {
-	return p.Value(pg.Int8OID, strconv.FormatInt(val, 10))
+	return p.Value(pg.OIDInt8, strconv.FormatInt(val, 10))
 }

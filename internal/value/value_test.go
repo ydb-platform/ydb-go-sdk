@@ -177,7 +177,7 @@ func TestToYDBFromYDB(t *testing.T) {
 		ZeroValue(types.Text),
 		ZeroValue(types.NewStruct()),
 		ZeroValue(types.NewTuple()),
-		PgValue(pg.Int4OID, "123"),
+		PgValue(pg.OIDInt4, "123"),
 	} {
 		t.Run(strconv.Itoa(i)+"."+v.Yql(), func(t *testing.T) {
 			a := allocator.New()
@@ -501,7 +501,7 @@ func TestValueYql(t *testing.T) {
 			literal: `Yson("<a=1>[3;%false]")`,
 		},
 		{
-			value:   PgValue(pg.UnknownOID, "123"),
+			value:   PgValue(pg.OIDUnknown, "123"),
 			literal: `PgUnknown("123")`,
 		},
 	} {
