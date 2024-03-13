@@ -9,7 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
-	pg2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/pg"
+	pg "github.com/ydb-platform/ydb-go-sdk/v3/internal/pg"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
@@ -462,7 +462,7 @@ func TestBuilder(t *testing.T) {
 					Type: &Ydb.Type{
 						Type: &Ydb.Type_PgType{
 							PgType: &Ydb.PgType{
-								Oid: pg2.UnknownOID,
+								Oid: pg.UnknownOID,
 							},
 						},
 					},
@@ -483,7 +483,7 @@ func TestBuilder(t *testing.T) {
 					Type: &Ydb.Type{
 						Type: &Ydb.Type_PgType{
 							PgType: &Ydb.PgType{
-								Oid: pg2.Int4OID,
+								Oid: pg.Int4OID,
 							},
 						},
 					},
@@ -504,7 +504,7 @@ func TestBuilder(t *testing.T) {
 					Type: &Ydb.Type{
 						Type: &Ydb.Type_PgType{
 							PgType: &Ydb.PgType{
-								Oid: pg2.Int8OID,
+								Oid: pg.Int8OID,
 							},
 						},
 					},
