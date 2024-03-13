@@ -450,6 +450,29 @@ func TestBuilder(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: xtest.CurrentFileLine(),
+			builder: Builder{}.
+				Param("$x").
+				Pg().Unknown("123").
+				Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_PgType{
+							PgType: &Ydb.PgType{
+								Oid:    705, // unknown type https://github.com/postgres/postgres/blob/master/src/include/catalog/pg_type.dat
+								Typlen: 0,
+								Typmod: 0,
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_TextValue{TextValue: "123"},
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			a := allocator.New()

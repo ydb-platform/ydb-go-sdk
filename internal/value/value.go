@@ -1307,7 +1307,7 @@ func (v *setValue) toYDB(a *allocator.Allocator) *Ydb.Value {
 	return vvv
 }
 
-func PgTextValue(val string) *pgValue {
+func PgUnknownValue(val string) *pgValue {
 	return &pgValue{
 		t: types.PgType{
 			OID: 705, // unknown type https://github.com/postgres/postgres/blob/master/src/include/catalog/pg_type.dat

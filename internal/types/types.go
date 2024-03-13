@@ -474,7 +474,7 @@ func (v PgType) String() string {
 }
 
 func (v PgType) Yql() string {
-	return "PgType"
+	return "pgunknown"
 }
 
 func (v PgType) ToYDB(a *allocator.Allocator) *Ydb.Type {
