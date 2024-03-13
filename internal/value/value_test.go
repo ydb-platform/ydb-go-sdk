@@ -499,6 +499,10 @@ func TestValueYql(t *testing.T) {
 			value:   YSONValue([]byte("<a=1>[3;%false]")),
 			literal: `Yson("<a=1>[3;%false]")`,
 		},
+		{
+			value:   PgUnknownValue("123"),
+			literal: `PgUnknown("123")`,
+		},
 	} {
 		t.Run(strconv.Itoa(i)+"."+tt.literal, func(t *testing.T) {
 			require.Equal(t, tt.literal, tt.value.Yql())
