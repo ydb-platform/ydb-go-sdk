@@ -176,6 +176,7 @@ func TestToYDBFromYDB(t *testing.T) {
 		ZeroValue(types.Text),
 		ZeroValue(types.NewStruct()),
 		ZeroValue(types.NewTuple()),
+		PgUnknownValue("123"),
 	} {
 		t.Run(strconv.Itoa(i)+"."+v.Yql(), func(t *testing.T) {
 			a := allocator.New()

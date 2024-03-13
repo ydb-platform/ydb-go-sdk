@@ -72,6 +72,11 @@ func TypeFromYDB(x *Ydb.Type) Type {
 	case *Ydb.Type_NullType:
 		return NewNull()
 
+	case *Ydb.Type_PgType:
+		return &PgType{
+			OID: x.GetPgType().GetOid(),
+		}
+
 	default:
 		panic("ydb: unknown type")
 	}
@@ -465,7 +470,9 @@ func NewOptional(t Type) Optional {
 	}
 }
 
-const PgUnknownOID = 705 // unknown type https://github.com/postgres/postgres/blob/master/src/include/catalog/pg_type.dat
+const (
+	PgUnknownOID = 705 // unknown type https://github.com/postgres/postgres/blob/master/src/include/catalog/pg_type.dat
+)
 
 type PgType struct {
 	OID uint32

@@ -282,6 +282,17 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 			ttt.Tuple,
 		), nil
 
+	case *types.PgType:
+		if ttt.OID == types.PgUnknownOID {
+			return &pgValue{
+				t: types.PgType{
+					ttt.OID,
+				},
+				val: v.GetTextValue(),
+			}, nil
+		}
+		return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered pg type with oid: %v", ttt.OID))
+
 	default:
 		return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered type: %T", ttt))
 	}
