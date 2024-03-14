@@ -9,7 +9,7 @@ import (
 	"path"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3"
+	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
@@ -130,9 +130,9 @@ func fillTablesWithData(ctx context.Context, c query.Client, prefix string) erro
 					FROM AS_TABLE($episodesData);
 				`, prefix),
 				query.WithParameters(ydb.ParamsBuilder().
-					Param("$seriesData").List().AddItems(series...).Build().
-					Param("$seasonsData").List().AddItems(seasons...).Build().
-					Param("$episodesData").List().AddItems(episodes...).Build().
+					Param("$seriesData").BeginList().AddItems(series...).EndList().
+					Param("$seasonsData").BeginList().AddItems(seasons...).EndList().
+					Param("$episodesData").BeginList().AddItems(episodes...).EndList().
 					Build(),
 				),
 			)
