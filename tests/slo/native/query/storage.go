@@ -26,10 +26,11 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
 
-	db, err := ydb.Open(
-		ctx,
+	db, err := ydb.Open(ctx,
 		cfg.Endpoint+cfg.DB,
-		ydb.WithSessionPoolSizeLimit(poolSize),
+		ydb.WithSessionPoolMaxSize(poolSize),
+		ydb.WithSessionPoolMinSize(poolSize/10),
+		ydb.WithSessionPoolProducersCount(poolSize/10),
 	)
 	if err != nil {
 		return nil, err

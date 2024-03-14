@@ -31,6 +31,391 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 		}
 	}
 	{
+		h1 := t.OnNew
+		h2 := x.OnNew
+		ret.OnNew = func(q QueryNewStartInfo) func(QueryNewDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryNewDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QueryNewDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnClose
+		h2 := x.OnClose
+		ret.OnClose = func(q QueryCloseStartInfo) func(QueryCloseDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryCloseDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QueryCloseDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnPoolNew
+		h2 := x.OnPoolNew
+		ret.OnPoolNew = func(q QueryPoolNewStartInfo) func(QueryPoolNewDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryPoolNewDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(q QueryPoolNewDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(q)
+				}
+				if r1 != nil {
+					r1(q)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnPoolClose
+		h2 := x.OnPoolClose
+		ret.OnPoolClose = func(q QueryPoolCloseStartInfo) func(QueryPoolCloseDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryPoolCloseDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(q QueryPoolCloseDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(q)
+				}
+				if r1 != nil {
+					r1(q)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnPoolProduce
+		h2 := x.OnPoolProduce
+		ret.OnPoolProduce = func(q QueryPoolProduceStartInfo) func(QueryPoolProduceDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryPoolProduceDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(q QueryPoolProduceDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(q)
+				}
+				if r1 != nil {
+					r1(q)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnPoolTry
+		h2 := x.OnPoolTry
+		ret.OnPoolTry = func(q QueryPoolTryStartInfo) func(QueryPoolTryDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryPoolTryDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(q QueryPoolTryDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(q)
+				}
+				if r1 != nil {
+					r1(q)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnPoolWith
+		h2 := x.OnPoolWith
+		ret.OnPoolWith = func(q QueryPoolWithStartInfo) func(QueryPoolWithDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryPoolWithDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(q QueryPoolWithDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(q)
+				}
+				if r1 != nil {
+					r1(q)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnPoolPut
+		h2 := x.OnPoolPut
+		ret.OnPoolPut = func(q QueryPoolPutStartInfo) func(QueryPoolPutDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryPoolPutDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(q QueryPoolPutDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(q)
+				}
+				if r1 != nil {
+					r1(q)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnPoolGet
+		h2 := x.OnPoolGet
+		ret.OnPoolGet = func(q QueryPoolGetStartInfo) func(QueryPoolGetDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryPoolGetDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(q QueryPoolGetDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(q)
+				}
+				if r1 != nil {
+					r1(q)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnPoolSpawn
+		h2 := x.OnPoolSpawn
+		ret.OnPoolSpawn = func(q QueryPoolSpawnStartInfo) func(QueryPoolSpawnDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryPoolSpawnDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(q QueryPoolSpawnDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(q)
+				}
+				if r1 != nil {
+					r1(q)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnPoolWant
+		h2 := x.OnPoolWant
+		ret.OnPoolWant = func(q QueryPoolWantStartInfo) func(QueryPoolWantDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryPoolWantDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(q QueryPoolWantDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(q)
+				}
+				if r1 != nil {
+					r1(q)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnDo
 		h2 := x.OnDo
 		ret.OnDo = func(q QueryDoStartInfo) func(QueryDoIntermediateInfo) func(QueryDoDoneInfo) {
@@ -133,9 +518,9 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 		}
 	}
 	{
-		h1 := t.OnCreateSession
-		h2 := x.OnCreateSession
-		ret.OnCreateSession = func(q QueryCreateSessionStartInfo) func(QueryCreateSessionDoneInfo) {
+		h1 := t.OnSessionCreate
+		h2 := x.OnSessionCreate
+		ret.OnSessionCreate = func(q QuerySessionCreateStartInfo) func(QuerySessionCreateDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -143,14 +528,14 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 					}
 				}()
 			}
-			var r, r1 func(QueryCreateSessionDoneInfo)
+			var r, r1 func(QuerySessionCreateDoneInfo)
 			if h1 != nil {
 				r = h1(q)
 			}
 			if h2 != nil {
 				r1 = h2(q)
 			}
-			return func(info QueryCreateSessionDoneInfo) {
+			return func(info QuerySessionCreateDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -168,9 +553,9 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 		}
 	}
 	{
-		h1 := t.OnDeleteSession
-		h2 := x.OnDeleteSession
-		ret.OnDeleteSession = func(q QueryDeleteSessionStartInfo) func(QueryDeleteSessionDoneInfo) {
+		h1 := t.OnSessionAttach
+		h2 := x.OnSessionAttach
+		ret.OnSessionAttach = func(q QuerySessionAttachStartInfo) func(QuerySessionAttachDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -178,14 +563,49 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 					}
 				}()
 			}
-			var r, r1 func(QueryDeleteSessionDoneInfo)
+			var r, r1 func(QuerySessionAttachDoneInfo)
 			if h1 != nil {
 				r = h1(q)
 			}
 			if h2 != nil {
 				r1 = h2(q)
 			}
-			return func(info QueryDeleteSessionDoneInfo) {
+			return func(info QuerySessionAttachDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnSessionDelete
+		h2 := x.OnSessionDelete
+		ret.OnSessionDelete = func(q QuerySessionDeleteStartInfo) func(QuerySessionDeleteDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QuerySessionDeleteDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QuerySessionDeleteDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -203,6 +623,171 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 		}
 	}
 	return &ret
+}
+func (t *Query) onNew(q QueryNewStartInfo) func(info QueryNewDoneInfo) {
+	fn := t.OnNew
+	if fn == nil {
+		return func(QueryNewDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryNewDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onClose(q QueryCloseStartInfo) func(info QueryCloseDoneInfo) {
+	fn := t.OnClose
+	if fn == nil {
+		return func(QueryCloseDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryCloseDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onPoolNew(q QueryPoolNewStartInfo) func(QueryPoolNewDoneInfo) {
+	fn := t.OnPoolNew
+	if fn == nil {
+		return func(QueryPoolNewDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryPoolNewDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onPoolClose(q QueryPoolCloseStartInfo) func(QueryPoolCloseDoneInfo) {
+	fn := t.OnPoolClose
+	if fn == nil {
+		return func(QueryPoolCloseDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryPoolCloseDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onPoolProduce(q QueryPoolProduceStartInfo) func(QueryPoolProduceDoneInfo) {
+	fn := t.OnPoolProduce
+	if fn == nil {
+		return func(QueryPoolProduceDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryPoolProduceDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onPoolTry(q QueryPoolTryStartInfo) func(QueryPoolTryDoneInfo) {
+	fn := t.OnPoolTry
+	if fn == nil {
+		return func(QueryPoolTryDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryPoolTryDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onPoolWith(q QueryPoolWithStartInfo) func(QueryPoolWithDoneInfo) {
+	fn := t.OnPoolWith
+	if fn == nil {
+		return func(QueryPoolWithDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryPoolWithDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onPoolPut(q QueryPoolPutStartInfo) func(QueryPoolPutDoneInfo) {
+	fn := t.OnPoolPut
+	if fn == nil {
+		return func(QueryPoolPutDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryPoolPutDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onPoolGet(q QueryPoolGetStartInfo) func(QueryPoolGetDoneInfo) {
+	fn := t.OnPoolGet
+	if fn == nil {
+		return func(QueryPoolGetDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryPoolGetDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onPoolSpawn(q QueryPoolSpawnStartInfo) func(QueryPoolSpawnDoneInfo) {
+	fn := t.OnPoolSpawn
+	if fn == nil {
+		return func(QueryPoolSpawnDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryPoolSpawnDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onPoolWant(q QueryPoolWantStartInfo) func(QueryPoolWantDoneInfo) {
+	fn := t.OnPoolWant
+	if fn == nil {
+		return func(QueryPoolWantDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryPoolWantDoneInfo) {
+			return
+		}
+	}
+	return res
 }
 func (t *Query) onDo(q QueryDoStartInfo) func(info QueryDoIntermediateInfo) func(QueryDoDoneInfo) {
 	fn := t.OnDo
@@ -258,35 +843,178 @@ func (t *Query) onDoTx(q QueryDoTxStartInfo) func(info QueryDoTxIntermediateInfo
 		return res
 	}
 }
-func (t *Query) onCreateSession(q QueryCreateSessionStartInfo) func(info QueryCreateSessionDoneInfo) {
-	fn := t.OnCreateSession
+func (t *Query) onSessionCreate(q QuerySessionCreateStartInfo) func(info QuerySessionCreateDoneInfo) {
+	fn := t.OnSessionCreate
 	if fn == nil {
-		return func(QueryCreateSessionDoneInfo) {
+		return func(QuerySessionCreateDoneInfo) {
 			return
 		}
 	}
 	res := fn(q)
 	if res == nil {
-		return func(QueryCreateSessionDoneInfo) {
+		return func(QuerySessionCreateDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t *Query) onDeleteSession(q QueryDeleteSessionStartInfo) func(info QueryDeleteSessionDoneInfo) {
-	fn := t.OnDeleteSession
+func (t *Query) onSessionAttach(q QuerySessionAttachStartInfo) func(info QuerySessionAttachDoneInfo) {
+	fn := t.OnSessionAttach
 	if fn == nil {
-		return func(QueryDeleteSessionDoneInfo) {
+		return func(QuerySessionAttachDoneInfo) {
 			return
 		}
 	}
 	res := fn(q)
 	if res == nil {
-		return func(QueryDeleteSessionDoneInfo) {
+		return func(QuerySessionAttachDoneInfo) {
 			return
 		}
 	}
 	return res
+}
+func (t *Query) onSessionDelete(q QuerySessionDeleteStartInfo) func(info QuerySessionDeleteDoneInfo) {
+	fn := t.OnSessionDelete
+	if fn == nil {
+		return func(QuerySessionDeleteDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QuerySessionDeleteDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func QueryOnNew(t *Query, c *context.Context, call call) func(error) {
+	var p QueryNewStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onNew(p)
+	return func(e error) {
+		var p QueryNewDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func QueryOnClose(t *Query, c *context.Context, call call) func(error) {
+	var p QueryCloseStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onClose(p)
+	return func(e error) {
+		var p QueryCloseDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func QueryOnPoolNew(t *Query, c *context.Context, call call, minSize int, maxSize int, producersCount int) func(_ error, minSize int, maxSize int, producersCount int) {
+	var p QueryPoolNewStartInfo
+	p.Context = c
+	p.Call = call
+	p.MinSize = minSize
+	p.MaxSize = maxSize
+	p.ProducersCount = producersCount
+	res := t.onPoolNew(p)
+	return func(e error, minSize int, maxSize int, producersCount int) {
+		var p QueryPoolNewDoneInfo
+		p.Error = e
+		p.MinSize = minSize
+		p.MaxSize = maxSize
+		p.ProducersCount = producersCount
+		res(p)
+	}
+}
+func QueryOnPoolClose(t *Query, c *context.Context, call call) func(error) {
+	var p QueryPoolCloseStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onPoolClose(p)
+	return func(e error) {
+		var p QueryPoolCloseDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func QueryOnPoolProduce(t *Query, c *context.Context, call call, concurrency int) func() {
+	var p QueryPoolProduceStartInfo
+	p.Context = c
+	p.Call = call
+	p.Concurrency = concurrency
+	res := t.onPoolProduce(p)
+	return func() {
+		var p QueryPoolProduceDoneInfo
+		res(p)
+	}
+}
+func QueryOnPoolTry(t *Query, c *context.Context, call call) func(error) {
+	var p QueryPoolTryStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onPoolTry(p)
+	return func(e error) {
+		var p QueryPoolTryDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func QueryOnPoolWith(t *Query, c *context.Context, call call) func(_ error, attempts int) {
+	var p QueryPoolWithStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onPoolWith(p)
+	return func(e error, attempts int) {
+		var p QueryPoolWithDoneInfo
+		p.Error = e
+		p.Attempts = attempts
+		res(p)
+	}
+}
+func QueryOnPoolPut(t *Query, c *context.Context, call call) func(error) {
+	var p QueryPoolPutStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onPoolPut(p)
+	return func(e error) {
+		var p QueryPoolPutDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func QueryOnPoolGet(t *Query, c *context.Context, call call) func(error) {
+	var p QueryPoolGetStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onPoolGet(p)
+	return func(e error) {
+		var p QueryPoolGetDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func QueryOnPoolSpawn(t *Query, c *context.Context, call call) func(error) {
+	var p QueryPoolSpawnStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onPoolSpawn(p)
+	return func(e error) {
+		var p QueryPoolSpawnDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func QueryOnPoolWant(t *Query, c *context.Context, call call) func(error) {
+	var p QueryPoolWantStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onPoolWant(p)
+	return func(e error) {
+		var p QueryPoolWantDoneInfo
+		p.Error = e
+		res(p)
+	}
 }
 func QueryOnDo(t *Query, c *context.Context, call call) func(error) func(attempts int, _ error) {
 	var p QueryDoStartInfo
@@ -322,26 +1050,38 @@ func QueryOnDoTx(t *Query, c *context.Context, call call) func(error) func(attem
 		}
 	}
 }
-func QueryOnCreateSession(t *Query, c *context.Context, call call) func(session querySessionInfo, _ error) {
-	var p QueryCreateSessionStartInfo
+func QueryOnSessionCreate(t *Query, c *context.Context, call call) func(session querySessionInfo, _ error) {
+	var p QuerySessionCreateStartInfo
 	p.Context = c
 	p.Call = call
-	res := t.onCreateSession(p)
+	res := t.onSessionCreate(p)
 	return func(session querySessionInfo, e error) {
-		var p QueryCreateSessionDoneInfo
+		var p QuerySessionCreateDoneInfo
 		p.Session = session
 		p.Error = e
 		res(p)
 	}
 }
-func QueryOnDeleteSession(t *Query, c *context.Context, call call, session querySessionInfo) func(error) {
-	var p QueryDeleteSessionStartInfo
+func QueryOnSessionAttach(t *Query, c *context.Context, call call, session querySessionInfo) func(error) {
+	var p QuerySessionAttachStartInfo
 	p.Context = c
 	p.Call = call
 	p.Session = session
-	res := t.onDeleteSession(p)
+	res := t.onSessionAttach(p)
 	return func(e error) {
-		var p QueryDeleteSessionDoneInfo
+		var p QuerySessionAttachDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func QueryOnSessionDelete(t *Query, c *context.Context, call call, session querySessionInfo) func(error) {
+	var p QuerySessionDeleteStartInfo
+	p.Context = c
+	p.Call = call
+	p.Session = session
+	res := t.onSessionDelete(p)
+	return func(e error) {
+		var p QuerySessionDeleteDoneInfo
 		p.Error = e
 		res(p)
 	}

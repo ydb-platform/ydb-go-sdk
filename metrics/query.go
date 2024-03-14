@@ -9,6 +9,34 @@ import (
 func query(config Config) (t trace.Query) {
 	queryConfig := config.WithSystem("query")
 	{
+		poolConfig := queryConfig.WithSystem("pool")
+		{
+			withConfig := poolConfig.WithSystem("with")
+			errs := withConfig.CounterVec("errs", "status")
+			latency := withConfig.TimerVec("latency")
+			attempts := withConfig.HistogramVec("attempts", []float64{0, 1, 2, 3, 4, 5, 7, 10})
+			t.OnPoolWith = func(
+				info trace.QueryPoolWithStartInfo,
+			) func(
+				info trace.QueryPoolWithDoneInfo,
+			) {
+				start := time.Now()
+
+				return func(info trace.QueryPoolWithDoneInfo) {
+					if withConfig.Details()&trace.QueryPoolEvents != 0 {
+						attempts.With(nil).Record(float64(info.Attempts))
+						if info.Error != nil {
+							errs.With(map[string]string{
+								"status": errorBrief(info.Error),
+							}).Inc()
+						}
+						latency.With(nil).Record(time.Since(start))
+					}
+				}
+			}
+		}
+	}
+	{
 		doConfig := queryConfig.WithSystem("do")
 		{
 			intermediateErrs := doConfig.WithSystem("intermediate").CounterVec("errs", "status")
@@ -84,14 +112,14 @@ func query(config Config) (t trace.Query) {
 			createConfig := sessionConfig.WithSystem("create")
 			errs := createConfig.CounterVec("errs", "status")
 			latency := createConfig.TimerVec("latency")
-			t.OnCreateSession = func(
-				info trace.QueryCreateSessionStartInfo,
+			t.OnSessionCreate = func(
+				info trace.QuerySessionCreateStartInfo,
 			) func(
-				info trace.QueryCreateSessionDoneInfo,
+				info trace.QuerySessionCreateDoneInfo,
 			) {
 				start := time.Now()
 
-				return func(info trace.QueryCreateSessionDoneInfo) {
+				return func(info trace.QuerySessionCreateDoneInfo) {
 					if info.Error != nil && createConfig.Details()&trace.QuerySessionEvents != 0 {
 						errs.With(map[string]string{
 							"status": errorBrief(info.Error),
@@ -105,14 +133,14 @@ func query(config Config) (t trace.Query) {
 			deleteConfig := sessionConfig.WithSystem("delete")
 			errs := deleteConfig.CounterVec("errs", "status")
 			latency := deleteConfig.TimerVec("latency")
-			t.OnCreateSession = func(
-				info trace.QueryCreateSessionStartInfo,
+			t.OnSessionCreate = func(
+				info trace.QuerySessionCreateStartInfo,
 			) func(
-				info trace.QueryCreateSessionDoneInfo,
+				info trace.QuerySessionCreateDoneInfo,
 			) {
 				start := time.Now()
 
-				return func(info trace.QueryCreateSessionDoneInfo) {
+				return func(info trace.QuerySessionCreateDoneInfo) {
 					if info.Error != nil && deleteConfig.Details()&trace.QuerySessionEvents != 0 {
 						errs.With(map[string]string{
 							"status": errorBrief(info.Error),

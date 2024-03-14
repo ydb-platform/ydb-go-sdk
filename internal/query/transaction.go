@@ -26,7 +26,7 @@ func (tx transaction) ID() string {
 func (tx transaction) Execute(ctx context.Context, q string, opts ...options.TxExecuteOption) (
 	r query.Result, err error,
 ) {
-	_, res, err := execute(ctx, tx.s, tx.s.queryClient, q, options.TxExecuteSettings(tx.id, opts...).ExecuteSettings)
+	_, res, err := execute(ctx, tx.s, tx.s.grpcClient, q, options.TxExecuteSettings(tx.id, opts...).ExecuteSettings)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -50,7 +50,7 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 }
 
 func (tx transaction) CommitTx(ctx context.Context) (err error) {
-	return commitTx(ctx, tx.s.queryClient, tx.s.id, tx.id)
+	return commitTx(ctx, tx.s.grpcClient, tx.s.id, tx.id)
 }
 
 func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID, txID string) error {
@@ -69,5 +69,5 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 }
 
 func (tx transaction) Rollback(ctx context.Context) (err error) {
-	return rollback(ctx, tx.s.queryClient, tx.s.id, tx.id)
+	return rollback(ctx, tx.s.grpcClient, tx.s.id, tx.id)
 }

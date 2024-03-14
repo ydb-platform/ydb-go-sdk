@@ -1,3 +1,8 @@
+* Added events into `trace.Query` trace
+* Rewrote `internal/pool` to buffered channel
+* Added `internal/xcontext.WithDone()`
+* Added `internal/xsync.{OnceFunc,OnceValue}`
+* Updated `google.golang.org/protobuf` from `v1.31.0` to `v.33.0`
 * Added `ydb.ParamsBuilder().Pg().{Value,Int4,Int8,Unknown}` for postgres arguments
 
 ## v3.57.4

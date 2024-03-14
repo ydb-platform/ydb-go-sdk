@@ -1,123 +1,252 @@
 package pool
 
 import (
-	"container/list"
 	"context"
-	"fmt"
 	"sync"
-	"time"
 
-	"github.com/jonboulle/clockwork"
-
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type (
-	itemInfo struct {
-		idle    *list.Element
-		touched time.Time
+	Item[T any] interface {
+		*T
+		IsAlive() bool
+		Close(ctx context.Context) error
 	}
-	Pool[T any] struct {
-		clock clockwork.Clock
+	Pool[PT Item[T], T any] struct {
+		trace          *Trace
+		maxSize        int
+		minSize        int
+		producersCount int
 
-		createItem func(ctx context.Context, onClose func(item *T)) (*T, error)
-		deleteItem func(ctx context.Context, item *T) error
-		checkErr   func(err error) bool
+		create func(ctx context.Context) (PT, error)
 
-		mu                xsync.Mutex
-		index             map[*T]itemInfo
-		createInProgress  int
-		limit             int        // Upper bound for Pool size.
-		idle              *list.List // list<*T>
-		waitQ             *list.List // list<*chan *T>
-		waitChPool        sync.Pool
-		testHookGetWaitCh func() // nil except some tests.
-		wg                sync.WaitGroup
-		done              chan struct{}
+		idle  chan PT
+		spawn chan PT
+		stop  chan struct{}
 	}
-	option[T any] func(p *Pool[T])
+	option[PT Item[T], T any] func(p *Pool[PT, T])
 )
 
-func New[T any](
-	limit int,
-	createItem func(ctx context.Context, onClose func(item *T)) (*T, error),
-	deleteItem func(ctx context.Context, item *T) error,
-	checkErr func(err error) bool,
-	opts ...option[T],
-) *Pool[T] {
-	p := &Pool[T]{
-		clock:      clockwork.NewRealClock(),
-		createItem: createItem,
-		deleteItem: deleteItem,
-		checkErr:   checkErr,
-		index:      make(map[*T]itemInfo),
-		idle:       list.New(),
-		waitQ:      list.New(),
-		limit:      limit,
-		waitChPool: sync.Pool{
-			New: func() interface{} {
-				ch := make(chan *T)
-
-				return &ch
-			},
-		},
-		done: make(chan struct{}),
+func WithCreateFunc[PT Item[T], T any](f func(ctx context.Context) (PT, error)) option[PT, T] {
+	return func(p *Pool[PT, T]) {
+		p.create = f
 	}
+}
+
+func WithMinSize[PT Item[T], T any](size int) option[PT, T] {
+	return func(p *Pool[PT, T]) {
+		p.minSize = size
+	}
+}
+
+func WithMaxSize[PT Item[T], T any](size int) option[PT, T] {
+	return func(p *Pool[PT, T]) {
+		p.maxSize = size
+	}
+}
+
+func WithProducersCount[PT Item[T], T any](count int) option[PT, T] {
+	return func(p *Pool[PT, T]) {
+		p.producersCount = count
+	}
+}
+
+func WithTrace[PT Item[T], T any](t *Trace) option[PT, T] {
+	return func(p *Pool[PT, T]) {
+		p.trace = t
+	}
+}
+
+func New[PT Item[T], T any](
+	ctx context.Context,
+	opts ...option[PT, T],
+) (p *Pool[PT, T], finalErr error) {
+	p = &Pool[PT, T]{
+		trace:          defaultTrace,
+		maxSize:        DefaultMaxSize,
+		minSize:        DefaultMinSize,
+		producersCount: DefaultProducersCount,
+		create: func(ctx context.Context) (PT, error) {
+			var item T
+
+			return &item, nil
+		},
+		stop: make(chan struct{}),
+	}
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt(p)
 		}
 	}
 
-	return p
+	onDone := p.trace.OnNew(&NewStartInfo{
+		Context:        &ctx,
+		Call:           stack.FunctionID(""),
+		MinSize:        p.minSize,
+		MaxSize:        p.maxSize,
+		ProducersCount: p.producersCount,
+	})
+
+	defer func() {
+		onDone(&NewDoneInfo{
+			Error:          finalErr,
+			MinSize:        p.minSize,
+			MaxSize:        p.maxSize,
+			ProducersCount: p.producersCount,
+		})
+	}()
+
+	if p.minSize > p.maxSize {
+		p.minSize = p.maxSize / 10
+	}
+
+	if p.producersCount > p.maxSize {
+		p.producersCount = p.maxSize
+	}
+
+	if p.producersCount <= 0 {
+		p.producersCount = 1
+	}
+
+	p.idle = make(chan PT, p.maxSize)
+
+	p.produce(ctx)
+
+	return p, nil
 }
 
-func (p *Pool[T]) try(ctx context.Context, f func(ctx context.Context, item *T) error) error {
+func (p *Pool[PT, T]) want(ctx context.Context) (err error) {
+	onDone := p.trace.OnWant(&WantStartInfo{
+		Context: &ctx,
+		Call:    stack.FunctionID(""),
+	})
+	defer func() {
+		onDone(&WantDoneInfo{
+			Error: err,
+		})
+	}()
+
+	select {
+	case <-ctx.Done():
+		return xerrors.WithStackTrace(ctx.Err())
+	case p.spawn <- nil:
+		return nil
+	}
+}
+
+func (p *Pool[PT, T]) put(ctx context.Context, item PT) (err error) {
+	onDone := p.trace.OnPut(&PutStartInfo{
+		Context: &ctx,
+		Call:    stack.FunctionID(""),
+	})
+	defer func() {
+		onDone(&PutDoneInfo{
+			Error: err,
+		})
+	}()
+
+	select {
+	case <-ctx.Done():
+		// context is done
+		return xerrors.WithStackTrace(ctx.Err())
+	case <-p.stop:
+		// pool closed early
+		return item.Close(ctx)
+	case p.spawn <- item:
+		// return item into pool
+		return nil
+	default:
+		// not enough space in pool
+		return item.Close(ctx)
+	}
+}
+
+func (p *Pool[PT, T]) produce(ctx context.Context) {
+	onDone := p.trace.OnProduce(&ProduceStartInfo{
+		Context:     &ctx,
+		Call:        stack.FunctionID(""),
+		Concurrency: p.producersCount,
+	})
+	defer func() {
+		onDone(&ProduceDoneInfo{})
+	}()
+
+	p.spawn = make(chan PT, p.producersCount)
+
+	var wg, started sync.WaitGroup
+	wg.Add(p.producersCount)
+	started.Add(p.producersCount + 1)
+
+	for range make([]struct{}, p.producersCount) {
+		go func() {
+			defer wg.Done()
+			started.Done()
+
+			for {
+				select {
+				case <-p.stop:
+					return
+
+				case msg := <-p.spawn:
+					if msg != nil {
+						p.idle <- msg
+					} else {
+						item, err := p.create(context.Background())
+						if err == nil {
+							p.idle <- item
+						}
+					}
+				}
+			}
+		}()
+	}
+
+	for i := 0; i < p.maxSize && len(p.idle) < p.minSize; i++ {
+		_ = p.want(ctx)
+	}
+
+	go func() {
+		started.Done()
+		defer func() {
+			close(p.idle)
+		}()
+		wg.Wait()
+	}()
+
+	started.Wait()
+}
+
+func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item PT) error) (finalErr error) {
+	onDone := p.trace.OnTry(&TryStartInfo{
+		Context: &ctx,
+		Call:    stack.FunctionID(""),
+	})
+	defer func() {
+		onDone(&TryDoneInfo{
+			Error: finalErr,
+		})
+	}()
+
 	item, err := p.get(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
 	defer func() {
-		select {
-		case <-p.done:
-			_ = p.deleteItem(ctx, item)
-		default:
-			p.mu.Lock()
-			defer p.mu.Unlock()
-
-			if p.idle.Len() >= p.limit {
-				_ = p.deleteItem(ctx, item)
-			}
-
-			if !p.notify(item) {
-				p.pushIdle(item, p.clock.Now())
-			}
+		if !item.IsAlive() {
+			_ = item.Close(ctx)
+		} else {
+			_ = p.put(ctx, item)
 		}
 	}()
 
-	if err = f(ctx, item); err != nil {
-		if p.checkErr(err) {
-			_ = p.deleteItem(ctx, item)
-		}
-
-		return xerrors.WithStackTrace(err)
-	}
-
-	return nil
-}
-
-func (p *Pool[T]) With(ctx context.Context, f func(ctx context.Context, item *T) error, opts ...retry.Option) error {
-	err := retry.Retry(ctx, func(ctx context.Context) error {
-		err := p.try(ctx, f)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-
-		return nil
-	}, opts...)
+	err = f(ctx, item)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -125,285 +254,115 @@ func (p *Pool[T]) With(ctx context.Context, f func(ctx context.Context, item *T)
 	return nil
 }
 
-func (p *Pool[T]) newItem(ctx context.Context) (item *T, err error) {
-	select {
-	case <-p.done:
-		return nil, xerrors.WithStackTrace(errClosedPool)
-	default:
-		// pre-check the Client size
-		var enoughSpace bool
-		p.mu.WithLock(func() {
-			enoughSpace = p.createInProgress+len(p.index) < p.limit
-			if enoughSpace {
-				p.createInProgress++
-			}
-		})
-
-		if !enoughSpace {
-			return nil, xerrors.WithStackTrace(errPoolOverflow)
-		}
-
-		defer func() {
-			p.mu.WithLock(func() {
-				p.createInProgress--
-			})
-		}()
-
-		item, err = p.createItem(ctx, p.removeItem)
-		if err != nil {
-			return nil, xerrors.WithStackTrace(err)
-		}
-
-		return item, nil
-	}
-}
-
-func (p *Pool[T]) removeItem(item *T) {
-	p.mu.WithLock(func() {
-		info, has := p.index[item]
-		if !has {
-			return
-		}
-
-		delete(p.index, item)
-
-		select {
-		case <-p.done:
-		default:
-			p.notify(nil)
-		}
-
-		if info.idle != nil {
-			p.idle.Remove(info.idle)
-		}
-	})
-}
-
-func (p *Pool[T]) get(ctx context.Context) (item *T, err error) {
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, xerrors.WithStackTrace(ctx.Err())
-		case <-p.done:
-			return nil, xerrors.WithStackTrace(errClosedPool)
-		default:
-			// First, we try to get item from idle
-			p.mu.WithLock(func() {
-				item = p.removeFirstIdle()
-			})
-			if item != nil {
-				return item, nil
-			}
-
-			// Second, we try to create item.
-			item, _ = p.newItem(ctx)
-			if item != nil {
-				return item, nil
-			}
-
-			// Third, we try to wait for a touched item - Pool is full.
-			//
-			// This should be done only if number of currently waiting goroutines
-			// are less than maximum amount of touched item. That is, we want to
-			// be fair here and not to lock more goroutines than we could ship
-			// item to.
-			item, _ = p.waitFromCh(ctx)
-			if item != nil {
-				return item, nil
-			}
-		}
-	}
-}
-
-func (p *Pool[T]) waitFromCh(ctx context.Context) (item *T, err error) {
+func (p *Pool[PT, T]) With(
+	ctx context.Context,
+	f func(ctx context.Context, item PT) error,
+	opts ...retry.Option,
+) (finalErr error) {
 	var (
-		ch      *chan *T
-		element *list.Element // Element in the wait queue.
-		ok      bool
+		onDone = p.trace.OnWith(&WithStartInfo{
+			Context: &ctx,
+			Call:    stack.FunctionID(""),
+		})
+		attempts int
 	)
-
-	p.mu.WithLock(func() {
-		ch = p.getWaitCh()
-		element = p.waitQ.PushBack(ch)
-	})
-
-	select {
-	case <-ctx.Done():
-		p.mu.WithLock(func() {
-			p.waitQ.Remove(element)
+	defer func() {
+		onDone(&WithDoneInfo{
+			Error:    finalErr,
+			Attempts: attempts,
 		})
+	}()
 
-		return nil, xerrors.WithStackTrace(ctx.Err())
+	retryCtx, cancelRetry := xcontext.WithDone(ctx, p.stop)
+	defer cancelRetry()
 
-	case <-p.done:
-		p.mu.WithLock(func() {
-			p.waitQ.Remove(element)
-		})
-
-		return nil, xerrors.WithStackTrace(errClosedPool)
-
-	case item, ok = <-*ch:
-		// Note that race may occur and some goroutine may try to write
-		// item into channel after it was enqueued but before it being
-		// read here. In that case we will receive nil here and will retry.
-		//
-		// The same way will work when some item become deleted - the
-		// nil value will be sent into the channel.
-		if ok {
-			// Put only filled and not closed channel back to the Pool.
-			// That is, we need to avoid races on filling reused channel
-			// for the next waiter – item could be lost for a long time.
-			p.putWaitCh(ch)
+	err := retry.Retry(retryCtx, func(ctx context.Context) error {
+		err := p.try(ctx, f)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
 		}
 
-		return item, nil
+		return nil
+	}, append(opts, retry.WithTrace(&trace.Retry{
+		OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+			return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+				return func(info trace.RetryLoopDoneInfo) {
+					attempts = info.Attempts
+				}
+			}
+		},
+	}))...)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
 	}
-}
-
-// Close deletes all stored items inside Pool.
-// It also stops all underlying timers and goroutines.
-// It returns first error occurred during stale items' deletion.
-// Note that even on error it calls Close() on each item.
-func (p *Pool[T]) Close(ctx context.Context) (err error) {
-	p.mu.WithLock(func() {
-		select {
-		case <-p.done:
-			return
-
-		default:
-			close(p.done)
-
-			p.limit = 0
-
-			for element := p.waitQ.Front(); element != nil; element = element.Next() {
-				ch := element.Value.(*chan *T)
-				close(*ch)
-			}
-
-			for element := p.idle.Front(); element != nil; element = element.Next() {
-				item := element.Value.(*T)
-				p.wg.Add(1)
-				go func() {
-					defer p.wg.Done()
-					_ = p.deleteItem(ctx, item)
-				}()
-			}
-		}
-	})
-
-	p.wg.Wait()
 
 	return nil
 }
 
-// getWaitCh returns pointer to a channel of items.
-//
-// Note that returning a pointer reduces allocations on sync.Pool usage –
-// sync.Pool.Get() returns empty interface, which leads to allocation for
-// non-pointer values.
-func (p *Pool[T]) getWaitCh() *chan *T { //nolint:gocritic
-	if p.testHookGetWaitCh != nil {
-		p.testHookGetWaitCh()
-	}
-	ch := p.waitChPool.Get()
-	s, ok := ch.(*chan *T)
-	if !ok {
-		panic(fmt.Sprintf("%T is not a chan of items", ch))
-	}
+func (p *Pool[PT, T]) get(ctx context.Context) (_ PT, finalErr error) {
+	onDone := p.trace.OnGet(&GetStartInfo{
+		Context: &ctx,
+		Call:    stack.FunctionID(""),
+	})
+	defer func() {
+		onDone(&GetDoneInfo{
+			Error: finalErr,
+		})
+	}()
 
-	return s
-}
-
-// putWaitCh receives pointer to a channel and makes it available for further
-// use.
-// Note that ch MUST NOT be owned by any goroutine at the call moment and ch
-// MUST NOT contain any value.
-func (p *Pool[T]) putWaitCh(ch *chan *T) { //nolint:gocritic
-	p.waitChPool.Put(ch)
-}
-
-// c.mu must be held.
-func (p *Pool[T]) peekFirstIdle() (item *T, touched time.Time) {
-	element := p.idle.Front()
-	if element == nil {
-		return
-	}
-	item = element.Value.(*T)
-	info, has := p.index[item]
-	if !has || element != info.idle {
-		panic("inconsistent item in pool index")
-	}
-
-	return item, info.touched
-}
-
-// removes first item from idle and resets the keepAliveCount
-// to prevent item from dying in the internalPoolGC after it was returned
-// to be used only in outgoing functions that make item busy.
-// c.mu must be held.
-func (p *Pool[T]) removeFirstIdle() *T {
-	item, _ := p.peekFirstIdle()
-	if item != nil {
-		p.index[item] = p.removeIdle(item)
-	}
-
-	return item
-}
-
-// c.mu must be held.
-func (p *Pool[T]) notify(item *T) (notified bool) {
-	for element := p.waitQ.Front(); element != nil; element = p.waitQ.Front() {
-		// Some goroutine is waiting for a item.
-		//
-		// It could be in this states:
-		//   1) Reached the select code and awaiting for a value in channel.
-		//   2) Reached the select code but already in branch of deadline
-		//   cancellation. In this case it is locked on p.mu.Lock().
-		//   3) Not reached the select code and thus not reading yet from the
-		//   channel.
-		//
-		// For cases (2) and (3) we close the channel to signal that goroutine
-		// missed something and may want to retry (especially for case (3)).
-		//
-		// After that we taking a next waiter and repeat the same.
-		ch := p.waitQ.Remove(element).(*chan *T)
+	for {
 		select {
-		case *ch <- item:
-			// Case (1).
-			return true
+		case <-p.stop:
+			return nil, xerrors.WithStackTrace(errClosedPool)
+		case item, has := <-p.idle:
+			if !has {
+				return nil, xerrors.WithStackTrace(errClosedPool)
+			}
+			if item.IsAlive() {
+				return item, nil
+			}
+			_ = item.Close(ctx)
+		case p.spawn <- nil:
+			continue
+		}
+	}
+}
 
-		case <-p.done:
-			// Case (2) or (3).
-			close(*ch)
+func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
+	onDone := p.trace.OnClose(&CloseStartInfo{
+		Context: &ctx,
+		Call:    stack.FunctionID(""),
+	})
+	defer func() {
+		onDone(&CloseDoneInfo{
+			Error: finalErr,
+		})
+	}()
 
-		default:
-			// Case (2) or (3).
-			close(*ch)
+	close(p.stop)
+
+	errs := make([]error, 0, len(p.idle)+len(p.spawn))
+
+	for item := range p.idle {
+		if err := item.Close(ctx); err != nil {
+			errs = append(errs, err)
 		}
 	}
 
-	return false
-}
+	for len(p.spawn) > 0 {
+		if msg := <-p.spawn; msg != nil {
+			if err := msg.Close(ctx); err != nil {
+				errs = append(errs, err)
+			}
+		}
+	}
 
-// c.mu must be held.
-func (p *Pool[T]) removeIdle(item *T) itemInfo {
-	info := p.index[item]
-	p.idle.Remove(info.idle)
-	info.idle = nil
-	p.index[item] = info
-
-	return info
-}
-
-// c.mu must be held.
-func (p *Pool[T]) pushIdle(item *T, now time.Time) {
-	p.handlePushIdle(item, now, p.idle.PushBack(item))
-}
-
-// c.mu must be held.
-func (p *Pool[T]) handlePushIdle(item *T, now time.Time, element *list.Element) {
-	info := p.index[item]
-	info.touched = now
-	info.idle = element
-	p.index[item] = info
+	switch len(errs) {
+	case 0:
+		return nil
+	case 1:
+		return errs[0]
+	default:
+		return xerrors.Join(errs...)
+	}
 }
