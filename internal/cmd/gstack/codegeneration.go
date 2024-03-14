@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack/codegen/utils"
 	"go/ast"
 	"go/parser"
 	"go/token"
 	"io/fs"
 	"os"
 	"path/filepath"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/cmd/gstack/utils"
 )
 
 func usage() {
@@ -41,6 +42,8 @@ func getCallExpressionsFromExpr(expr ast.Expr) (listOfCalls []*ast.CallExpr) {
 		}
 	case *ast.UnaryExpr:
 		listOfCalls = append(listOfCalls, getCallExpressionsFromExpr(expr.X)...)
+	case *ast.KeyValueExpr:
+		listOfCalls = append(listOfCalls, getCallExpressionsFromExpr(expr.Value)...)
 	case *ast.FuncLit:
 		listOfCalls = append(listOfCalls, getListOfCallExpressionsFromBlockStmt(expr.Body)...)
 	}
@@ -169,9 +172,6 @@ func main() {
 			return err
 		}
 		if d.IsDir() {
-			return nil
-		}
-		if path != "example.go" {
 			return nil
 		}
 		if filepath.Ext(path) == ".go" {

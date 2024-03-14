@@ -175,6 +175,10 @@ func (c call) FunctionID() string {
 	return c.Record(Lambda(false), FileName(false))
 }
 
+func (c call) File() string {
+	return c.file
+}
+
 func Record(depth int, opts ...recordOption) string {
 	return Call(depth + 1).Record(opts...)
 }

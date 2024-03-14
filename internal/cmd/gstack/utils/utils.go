@@ -2,10 +2,11 @@ package utils
 
 import (
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"io"
 	"io/fs"
 	"os"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 )
 
 type FunctionIDArg struct {
@@ -41,7 +42,7 @@ func FixSource(src []byte, listOfArgs []FunctionIDArg) ([]byte, error) {
 	var fixed []byte
 	var previousArgEnd int
 	for _, args := range listOfArgs {
-		argument := stack.Call(1)
+		argument := stack.Call(1).File()
 		fixed = append(fixed, src[previousArgEnd:args.ArgPos]...)
 		fixed = append(fixed, fmt.Sprintf("\"%s\"", argument)...)
 		previousArgEnd = args.ArgEnd
