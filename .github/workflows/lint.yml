@@ -32,6 +32,8 @@ jobs:
       - uses: actions/checkout@v3
       - name: generate examples golangci-lint config
         run: sed 's/github.com\/ydb-platform\/ydb-go-sdk\/v3/examples/g' .golangci.yml > examples/.golangci.yml
+      - name: disable specified linter in examples folder
+        run: sed -i 's/#disable:examples//g' examples/.golangci.yml
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
@@ -48,6 +50,8 @@ jobs:
       - uses: actions/checkout@v3
       - name: generate slo golangci-lint config
         run: sed 's/github.com\/ydb-platform\/ydb-go-sdk\/v3/slo/g' .golangci.yml > tests/slo/.golangci.yml
+      - name: disable specified linter in slo folder
+        run: sed -i 's/#disable:slo//g' tests/slo/.golangci.yml
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
