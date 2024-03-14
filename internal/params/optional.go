@@ -17,7 +17,7 @@ type (
 	}
 )
 
-func (b *optionalBuilder) Build() Builder {
+func (b *optionalBuilder) EndOptional() Builder {
 	b.opt.parent.params = append(b.opt.parent.params, &Parameter{
 		parent: b.opt.parent,
 		name:   b.opt.name,

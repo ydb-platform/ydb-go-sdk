@@ -21,7 +21,7 @@ type (
 	}
 )
 
-func (d *dict) Pair() *dictPair {
+func (d *dict) Add() *dictPair {
 	return &dictPair{
 		parent: d,
 	}
@@ -407,7 +407,7 @@ func (d *dictValue) UUID(v [16]byte) *dict {
 	return d.pair.parent
 }
 
-func (d *dict) Build() Builder {
+func (d *dict) EndDict() Builder {
 	d.parent.params = append(d.parent.params, &Parameter{
 		parent: d.parent,
 		name:   d.name,

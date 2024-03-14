@@ -17,7 +17,7 @@ type (
 	}
 )
 
-func (l *list) AddItem() *listItem {
+func (l *list) Add() *listItem {
 	return &listItem{
 		parent: l,
 	}
@@ -29,7 +29,7 @@ func (l *list) AddItems(items ...value.Value) *list {
 	return l
 }
 
-func (l *list) Build() Builder {
+func (l *list) EndList() Builder {
 	l.parent.params = append(l.parent.params, &Parameter{
 		parent: l.parent,
 		name:   l.name,
