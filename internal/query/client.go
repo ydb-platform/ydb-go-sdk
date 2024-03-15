@@ -4,8 +4,6 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
@@ -140,22 +138,6 @@ func doTx(
 
 func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) error {
 	return doTx(ctx, c.pool, op, c.config.Trace(), opts...)
-}
-
-func deleteSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID string) error {
-	response, err := client.DeleteSession(ctx,
-		&Ydb_Query.DeleteSessionRequest{
-			SessionId: sessionID,
-		},
-	)
-	if err != nil {
-		return xerrors.WithStackTrace(xerrors.Transport(err))
-	}
-	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
-		return xerrors.WithStackTrace(xerrors.FromOperation(response))
-	}
-
-	return nil
 }
 
 func New(ctx context.Context, balancer balancer, cfg *config.Config) (_ *Client, err error) {

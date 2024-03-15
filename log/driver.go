@@ -264,7 +264,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 					latencyField(start),
 				)
 			} else {
-				l.Log(WithLevel(ctx, WARN), "intermediate fail",
+				l.Log(WithLevel(ctx, DEBUG), "intermediate fail",
 					Error(info.Error),
 					Stringer("endpoint", endpoint),
 					String("method", method),
@@ -300,10 +300,10 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 		}
 		ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "ban")
 		endpoint := info.Endpoint
+		cause := info.Cause
 		l.Log(ctx, "start",
 			Stringer("endpoint", endpoint),
-			NamedError("cause", info.Cause),
-			versionField(),
+			NamedError("cause", cause),
 		)
 		start := time.Now()
 
@@ -312,6 +312,7 @@ func internalDriver(l Logger, d trace.Detailer) (t trace.Driver) { //nolint:gocy
 				Stringer("endpoint", endpoint),
 				latencyField(start),
 				Stringer("state", info.State),
+				NamedError("cause", cause),
 				versionField(),
 			)
 		}

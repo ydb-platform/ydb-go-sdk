@@ -197,7 +197,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 		func(ctx context.Context, session query.Session) error {
 			_, _, err := session.Execute(ctx,
 				fmt.Sprintf(`
-				CREATE TABLE %s (
+				CREATE TABLE IF NOT EXISTS %s (
 					hash Uint64?,
 					id Uint64?,
 					payload_str Text?,

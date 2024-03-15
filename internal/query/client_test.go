@@ -31,13 +31,15 @@ func TestCreateSession(t *testing.T) {
 			attachStream.EXPECT().Recv().Return(&Ydb_Query.SessionState{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil).AnyTimes()
-			attachStream.EXPECT().CloseSend().Return(nil)
 			service := NewMockQueryServiceClient(ctrl)
 			service.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
 				Status:    Ydb.StatusIds_SUCCESS,
 				SessionId: "test",
 			}, nil)
 			service.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(attachStream, nil)
+			service.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
+				Status: Ydb.StatusIds_SUCCESS,
+			}, nil)
 			t.Log("execute")
 			attached := 0
 			s, err := createSession(ctx, service, withSessionTrace(
@@ -101,7 +103,6 @@ func TestCreateSession(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				attachStream := NewMockQueryService_AttachSessionClient(ctrl)
 				attachStream.EXPECT().Recv().Return(nil, grpcStatus.Error(grpcCodes.Unavailable, "")).AnyTimes()
-				attachStream.EXPECT().CloseSend().Return(nil)
 				service := NewMockQueryServiceClient(ctrl)
 				service.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
 					Status:    Ydb.StatusIds_SUCCESS,
@@ -141,7 +142,6 @@ func TestCreateSession(t *testing.T) {
 				attachStream.EXPECT().Recv().Return(&Ydb_Query.SessionState{
 					Status: Ydb.StatusIds_UNAVAILABLE,
 				}, nil).AnyTimes()
-				attachStream.EXPECT().CloseSend().Return(nil)
 				service := NewMockQueryServiceClient(ctrl)
 				service.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
 					Status:    Ydb.StatusIds_SUCCESS,

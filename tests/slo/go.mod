@@ -25,6 +25,7 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/jonboulle/clockwork v0.4.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/mattn/go-sqlite3 v1.14.16 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
@@ -51,4 +52,4 @@ require (
 
 replace github.com/ydb-platform/ydb-go-sdk/v3 => ../../.
 
-replace xorm.io/xorm => github.com/ydb-platform/xorm v0.0.6
+replace xorm.io/xorm => github.com/ydb-platform/xorm v0.0.3
