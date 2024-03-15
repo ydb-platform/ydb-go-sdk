@@ -1,7 +1,6 @@
 package params
 
 import (
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"testing"
 	"time"
 
@@ -9,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
@@ -443,7 +443,9 @@ func TestList(t *testing.T) {
 func TestList_AddItems(t *testing.T) {
 	a := allocator.New()
 	defer a.Free()
-	params := Builder{}.Param("$x").BeginList().AddItems(value.Uint64Value(123), value.Uint64Value(321)).EndList().Build().ToYDB(a)
+	params := Builder{}.Param("$x").BeginList().
+		AddItems(value.Uint64Value(123), value.Uint64Value(321)).
+		EndList().Build().ToYDB(a)
 	require.Equal(t, paramsToJSON(
 		map[string]*Ydb.TypedValue{
 			"$x": {

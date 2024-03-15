@@ -1,12 +1,14 @@
 package params
 
 import (
+	"testing"
+
 	"github.com/stretchr/testify/require"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pg"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
-	"testing"
 )
 
 func TestPg(t *testing.T) {
