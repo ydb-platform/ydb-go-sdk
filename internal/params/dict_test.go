@@ -362,6 +362,51 @@ func TestDict(t *testing.T) {
 				},
 			},
 		},
+		{
+			method: "TzDatetime",
+			args:   []any{time.Unix(123456789, 456).UTC()},
+
+			expected: expected{
+				kind: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATETIME},
+				},
+				value: &Ydb.Value{
+					Value: &Ydb.Value_TextValue{
+						TextValue: "1973-11-29T21:33:09Z",
+					},
+				},
+			},
+		},
+		{
+			method: "TzDate",
+			args:   []any{time.Unix(123456789, 456).UTC()},
+
+			expected: expected{
+				kind: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATE},
+				},
+				value: &Ydb.Value{
+					Value: &Ydb.Value_TextValue{
+						TextValue: "1973-11-29",
+					},
+				},
+			},
+		},
+		{
+			method: "TzTimestamp",
+			args:   []any{time.Unix(123456789, 456).UTC()},
+
+			expected: expected{
+				kind: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_TIMESTAMP},
+				},
+				value: &Ydb.Value{
+					Value: &Ydb.Value_TextValue{
+						TextValue: "1973-11-29T21:33:09.000000Z",
+					},
+				},
+			},
+		},
 	}
 
 	for _, key := range tests {

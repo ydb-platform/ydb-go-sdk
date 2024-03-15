@@ -553,6 +553,78 @@ func TestOptional(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").BeginOptional().TzDatetime(time.Unix(123456789, 456).UTC()).EndOptional(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_OptionalType{
+							OptionalType: &Ydb.OptionalType{
+								Item: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_TZ_DATETIME,
+									},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_TextValue{
+							TextValue: "1973-11-29T21:33:09Z",
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").BeginOptional().TzDate(time.Unix(123456789, 456).UTC()).EndOptional(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_OptionalType{
+							OptionalType: &Ydb.OptionalType{
+								Item: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_TZ_DATE,
+									},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_TextValue{
+							TextValue: "1973-11-29",
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").BeginOptional().TzTimestamp(time.Unix(123456789, 456).UTC()).EndOptional(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_OptionalType{
+							OptionalType: &Ydb.OptionalType{
+								Item: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_TZ_TIMESTAMP,
+									},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_TextValue{
+							TextValue: "1973-11-29T21:33:09.000000Z",
+						},
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			a := allocator.New()

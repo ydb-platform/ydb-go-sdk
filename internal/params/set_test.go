@@ -863,6 +863,114 @@ func TestSet(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").BeginSet().Add().TzDatetime(time.Unix(123456789, 456).UTC()).EndSet(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_DictType{
+							DictType: &Ydb.DictType{
+								Key: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_TZ_DATETIME,
+									},
+								},
+								Payload: &Ydb.Type{
+									Type: &Ydb.Type_VoidType{},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Pairs: []*Ydb.ValuePair{
+							{
+								Key: &Ydb.Value{
+									Value: &Ydb.Value_TextValue{
+										TextValue: "1973-11-29T21:33:09Z",
+									},
+								},
+								Payload: &Ydb.Value{
+									Value: &Ydb.Value_NullFlagValue{},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").BeginSet().Add().TzDate(time.Unix(123456789, 456).UTC()).EndSet(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_DictType{
+							DictType: &Ydb.DictType{
+								Key: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_TZ_DATE,
+									},
+								},
+								Payload: &Ydb.Type{
+									Type: &Ydb.Type_VoidType{},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Pairs: []*Ydb.ValuePair{
+							{
+								Key: &Ydb.Value{
+									Value: &Ydb.Value_TextValue{
+										TextValue: "1973-11-29",
+									},
+								},
+								Payload: &Ydb.Value{
+									Value: &Ydb.Value_NullFlagValue{},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").BeginSet().Add().TzTimestamp(time.Unix(123456789, 456).UTC()).EndSet(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_DictType{
+							DictType: &Ydb.DictType{
+								Key: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_TZ_TIMESTAMP,
+									},
+								},
+								Payload: &Ydb.Type{
+									Type: &Ydb.Type_VoidType{},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Pairs: []*Ydb.ValuePair{
+							{
+								Key: &Ydb.Value{
+									Value: &Ydb.Value_TextValue{
+										TextValue: "1973-11-29T21:33:09.000000Z",
+									},
+								},
+								Payload: &Ydb.Value{
+									Value: &Ydb.Value_NullFlagValue{},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			a := allocator.New()

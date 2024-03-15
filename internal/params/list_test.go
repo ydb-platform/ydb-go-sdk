@@ -673,6 +673,90 @@ func TestList(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").BeginList().Add().TzDatetime(time.Unix(123456789, 456).UTC()).EndList(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_ListType{
+							ListType: &Ydb.ListType{
+								Item: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_TZ_DATETIME,
+									},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Items: []*Ydb.Value{
+							{
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1973-11-29T21:33:09Z",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").BeginList().Add().TzDate(time.Unix(123456789, 456).UTC()).EndList(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_ListType{
+							ListType: &Ydb.ListType{
+								Item: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_TZ_DATE,
+									},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Items: []*Ydb.Value{
+							{
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1973-11-29",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").BeginList().Add().TzTimestamp(time.Unix(123456789, 456).UTC()).EndList(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_ListType{
+							ListType: &Ydb.ListType{
+								Item: &Ydb.Type{
+									Type: &Ydb.Type_TypeId{
+										TypeId: Ydb.Type_TZ_TIMESTAMP,
+									},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Items: []*Ydb.Value{
+							{
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1973-11-29T21:33:09.000000Z",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			a := allocator.New()
