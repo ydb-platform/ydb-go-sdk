@@ -361,7 +361,7 @@ func TestBuilder(t *testing.T) {
 		{
 			name: xtest.CurrentFileLine(),
 			builder: Builder{}.
-				Param("$x").List().Build().
+				Param("$x").BeginList().EndList().
 				Build(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
