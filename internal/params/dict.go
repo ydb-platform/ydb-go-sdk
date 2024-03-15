@@ -209,6 +209,30 @@ func (d *dictPair) UUID(v [16]byte) *dictValue {
 	}
 }
 
+func (d *dictPair) TzDate(v time.Time) *dictValue {
+	d.keyValue = value.TzDateValueFromTime(v)
+
+	return &dictValue{
+		pair: d,
+	}
+}
+
+func (d *dictPair) TzTimestamp(v time.Time) *dictValue {
+	d.keyValue = value.TzTimestampValueFromTime(v)
+
+	return &dictValue{
+		pair: d,
+	}
+}
+
+func (d *dictPair) TzDatetime(v time.Time) *dictValue {
+	d.keyValue = value.TzDatetimeValueFromTime(v)
+
+	return &dictValue{
+		pair: d,
+	}
+}
+
 func (d *dictValue) Text(v string) *dict {
 	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
 		K: d.pair.keyValue,
@@ -402,6 +426,33 @@ func (d *dictValue) UUID(v [16]byte) *dict {
 	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
 		K: d.pair.keyValue,
 		V: value.UUIDValue(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) TzDate(v time.Time) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.TzDateValueFromTime(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) TzTimestamp(v time.Time) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.TzTimestampValueFromTime(v),
+	})
+
+	return d.pair.parent
+}
+
+func (d *dictValue) TzDatetime(v time.Time) *dict {
+	d.pair.parent.values = append(d.pair.parent.values, value.DictValueField{
+		K: d.pair.keyValue,
+		V: value.TzDatetimeValueFromTime(v),
 	})
 
 	return d.pair.parent

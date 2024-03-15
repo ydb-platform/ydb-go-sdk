@@ -158,3 +158,21 @@ func (p *optional) UUID(v [16]byte) *optionalBuilder {
 
 	return &optionalBuilder{opt: p}
 }
+
+func (p *optional) TzDate(v time.Time) *optionalBuilder {
+	p.value = value.TzDateValueFromTime(v)
+
+	return &optionalBuilder{opt: p}
+}
+
+func (p *optional) TzTimestamp(v time.Time) *optionalBuilder {
+	p.value = value.TzTimestampValueFromTime(v)
+
+	return &optionalBuilder{opt: p}
+}
+
+func (p *optional) TzDatetime(v time.Time) *optionalBuilder {
+	p.value = value.TzDatetimeValueFromTime(v)
+
+	return &optionalBuilder{opt: p}
+}
