@@ -48,6 +48,44 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").BeginList().BeginList().BeginList().Add().Uint64(123).EndList().EndList().EndList(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_ListType{
+							ListType: &Ydb.ListType{
+								Item: &Ydb.Type{
+									Type: &Ydb.Type_ListType{
+										ListType: &Ydb.ListType{
+											Item: &Ydb.Type{
+												Type: &Ydb.Type_TypeId{
+													TypeId: Ydb.Type_UINT64,
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Items: []*Ydb.Value{
+							{
+								Items: []*Ydb.Value{
+									{
+										Value: &Ydb.Value_Uint64Value{
+											Uint64Value: 123,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").BeginList().Add().Int64(123).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
