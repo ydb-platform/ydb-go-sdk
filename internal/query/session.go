@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"io"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
@@ -11,7 +12,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -170,14 +170,7 @@ func (s *Session) attach(ctx context.Context) (finalErr error) {
 		onDone(finalErr)
 	}()
 
-	attachCtx, cancelAttach := xcontext.WithCancel(context.Background())
-	defer func() {
-		if finalErr != nil {
-			cancelAttach()
-		}
-	}()
-
-	attach, err := s.grpcClient.AttachSession(attachCtx, &Ydb_Query.AttachSessionRequest{
+	attach, err := s.grpcClient.AttachSession(context.Background(), &Ydb_Query.AttachSessionRequest{
 		SessionId: s.id,
 	})
 	if err != nil {
@@ -185,13 +178,6 @@ func (s *Session) attach(ctx context.Context) (finalErr error) {
 			xerrors.Transport(err),
 		)
 	}
-
-	defer func() {
-		if finalErr != nil {
-			_ = attach.CloseSend()
-		}
-	}()
-
 	state, err := attach.Recv()
 	if err != nil {
 		return xerrors.WithStackTrace(xerrors.Transport(err))
@@ -202,13 +188,21 @@ func (s *Session) attach(ctx context.Context) (finalErr error) {
 	}
 
 	go func() {
-		defer func() {
-			_ = s.closeOnce(ctx)
-		}()
-
 		for {
+			if !s.IsAlive() {
+				return
+			}
 			recv, recvErr := attach.Recv()
-			if recvErr != nil || recv.GetStatus() != Ydb.StatusIds_SUCCESS {
+			if recvErr != nil {
+				if xerrors.Is(recvErr, io.EOF) {
+					s.setStatus(statusClosed)
+				} else {
+					s.setStatus(statusError)
+				}
+
+				return
+			}
+			if recv.GetStatus() != Ydb.StatusIds_SUCCESS {
 				s.setStatus(statusError)
 
 				return
@@ -227,12 +221,28 @@ func (s *Session) attach(ctx context.Context) (finalErr error) {
 			}()
 		}
 
-		err = attach.CloseSend()
+		if err = deleteSession(ctx, s.grpcClient, s.id); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
 
-		cancelAttach()
-
-		return err
+		return nil
 	})
+
+	return nil
+}
+
+func deleteSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID string) error {
+	response, err := client.DeleteSession(ctx,
+		&Ydb_Query.DeleteSessionRequest{
+			SessionId: sessionID,
+		},
+	)
+	if err != nil {
+		return xerrors.WithStackTrace(xerrors.Transport(err))
+	}
+	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
+		return xerrors.WithStackTrace(xerrors.FromOperation(response))
+	}
 
 	return nil
 }

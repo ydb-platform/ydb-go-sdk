@@ -177,7 +177,7 @@ func (p *Pool[PT, T]) produce(ctx context.Context) {
 		onDone(&ProduceDoneInfo{})
 	}()
 
-	p.spawn = make(chan PT, p.producersCount)
+	p.spawn = make(chan PT, p.maxSize)
 
 	var wg, started sync.WaitGroup
 	wg.Add(p.producersCount)

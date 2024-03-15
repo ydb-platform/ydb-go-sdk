@@ -27,13 +27,13 @@ func internalQuery(
 
 		return func(info trace.QueryNewDoneInfo) {
 			if info.Error == nil {
-				l.Log(ctx, "done",
+				l.Log(WithLevel(ctx, INFO), "done",
 					latencyField(start),
 				)
 			} else {
 				lvl := FATAL
 				if !xerrors.IsYdb(info.Error) {
-					lvl = DEBUG
+					lvl = ERROR
 				}
 				l.Log(WithLevel(ctx, lvl), "failed",
 					latencyField(start),
@@ -83,7 +83,7 @@ func internalQuery(
 
 		return func(info trace.QueryPoolNewDoneInfo) {
 			if info.Error == nil {
-				l.Log(ctx, "done",
+				l.Log(WithLevel(ctx, INFO), "done",
 					latencyField(start),
 					Int("MinSize", info.MinSize),
 					Int("MaxSize", info.MaxSize),
@@ -92,7 +92,7 @@ func internalQuery(
 			} else {
 				lvl := FATAL
 				if !xerrors.IsYdb(info.Error) {
-					lvl = DEBUG
+					lvl = ERROR
 				}
 				l.Log(WithLevel(ctx, lvl), "failed",
 					latencyField(start),
