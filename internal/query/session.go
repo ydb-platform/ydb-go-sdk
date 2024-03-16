@@ -27,6 +27,7 @@ type (
 		statusCode statusCode
 		trace      *traceSession
 		closeOnce  func(ctx context.Context) error
+		checks     []func(s *Session) bool
 	}
 	traceSession struct {
 		onCreate func(ctx context.Context, functionID stack.Caller) func(*Session, error)
@@ -36,74 +37,15 @@ type (
 	sessionOption func(session *Session)
 )
 
+func withSessionCheck(f func(*Session) bool) sessionOption {
+	return func(s *Session) {
+		s.checks = append(s.checks, f)
+	}
+}
+
 func withSessionTrace(t *traceSession) sessionOption {
 	return func(s *Session) {
-		if t.onCreate != nil {
-			h1 := s.trace.onCreate
-			h2 := t.onCreate
-			s.trace.onCreate = func(ctx context.Context, functionID stack.Caller) func(*Session, error) {
-				var r, r1 func(*Session, error)
-				if h1 != nil {
-					r = h1(ctx, functionID)
-				}
-				if h2 != nil {
-					r1 = h2(ctx, functionID)
-				}
-
-				return func(session *Session, err error) {
-					if r != nil {
-						r(session, err)
-					}
-					if r1 != nil {
-						r1(session, err)
-					}
-				}
-			}
-		}
-		if t.onAttach != nil {
-			h1 := s.trace.onAttach
-			h2 := t.onAttach
-			s.trace.onAttach = func(ctx context.Context, functionID stack.Caller, session *Session) func(error) {
-				var r, r1 func(error)
-				if h1 != nil {
-					r = h1(ctx, functionID, session)
-				}
-				if h2 != nil {
-					r1 = h2(ctx, functionID, session)
-				}
-
-				return func(err error) {
-					if r != nil {
-						r(err)
-					}
-					if r1 != nil {
-						r1(err)
-					}
-				}
-			}
-		}
-		if t.onClose != nil {
-			h1 := s.trace.onClose
-			h2 := t.onClose
-			s.trace.onClose = func(ctx context.Context, functionID stack.Caller, session *Session) func(error) {
-				var r, r1 func(error)
-				if h1 != nil {
-					r = h1(ctx, functionID, session)
-				}
-				if h2 != nil {
-					r1 = h2(ctx, functionID, session)
-				}
-
-				return func(err error) {
-					if r != nil {
-						r(err)
-					}
-					if r1 != nil {
-						r1(err)
-					}
-				}
-			}
-		}
+		s.trace = t
 	}
 }
 
@@ -114,6 +56,16 @@ func createSession(
 		grpcClient: client,
 		statusCode: statusUnknown,
 		trace:      defaultSessionTrace,
+		checks: []func(*Session) bool{
+			func(s *Session) bool {
+				switch s.status() {
+				case statusIdle, statusInUse:
+					return true
+				default:
+					return false
+				}
+			},
+		},
 	}
 	defer func() {
 		if finalErr != nil {
@@ -214,12 +166,10 @@ func (s *Session) attach(ctx context.Context) (finalErr error) {
 		s.setStatus(statusClosing)
 		defer s.setStatus(statusClosed)
 
-		if s.trace.onClose != nil {
-			onClose := s.trace.onClose(ctx, stack.FunctionID(""), s)
-			defer func() {
-				onClose(err)
-			}()
-		}
+		onClose := s.trace.onClose(ctx, stack.FunctionID(""), s)
+		defer func() {
+			onClose(err)
+		}()
 
 		if err = deleteSession(ctx, s.grpcClient, s.id); err != nil {
 			return xerrors.WithStackTrace(err)
@@ -248,12 +198,13 @@ func deleteSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 }
 
 func (s *Session) IsAlive() bool {
-	switch s.status() {
-	case statusIdle, statusInUse:
-		return true
-	default:
-		return false
+	for _, check := range s.checks {
+		if !check(s) {
+			return false
+		}
 	}
+
+	return true
 }
 
 func (s *Session) Close(ctx context.Context) error {

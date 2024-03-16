@@ -19,8 +19,13 @@ import (
 
 //go:generate mockgen -destination grpc_client_mock_test.go -package query -write_package_comment=false github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1 QueryServiceClient,QueryService_AttachSessionClient,QueryService_ExecuteQueryClient
 
+type nodeChecker interface {
+	HasNode(id uint32) bool
+}
+
 type balancer interface {
 	grpc.ClientConnInterface
+	nodeChecker
 }
 
 var _ query.Client = (*Client)(nil)
@@ -157,7 +162,7 @@ func New(ctx context.Context, balancer balancer, cfg *config.Config) (_ *Client,
 		pool.WithMaxSize[*Session, Session](cfg.PoolMaxSize()),
 		pool.WithProducersCount[*Session, Session](cfg.PoolProducersCount()),
 		pool.WithTrace[*Session, Session](poolTrace(cfg.Trace())),
-		pool.WithCreateFunc(func(ctx context.Context) (s *Session, err error) {
+		pool.WithCreateFunc(func(ctx context.Context) (_ *Session, err error) {
 			var cancel context.CancelFunc
 			if d := cfg.SessionCreateTimeout(); d > 0 {
 				ctx, cancel = xcontext.WithTimeout(ctx, d)
@@ -166,7 +171,13 @@ func New(ctx context.Context, balancer balancer, cfg *config.Config) (_ *Client,
 			}
 			defer cancel()
 
-			s, err = createSession(ctx, client.grpcClient, withSessionTrace(t))
+			s, err := createSession(ctx,
+				client.grpcClient,
+				withSessionTrace(t),
+				withSessionCheck(func(s *Session) bool {
+					return balancer.HasNode(uint32(s.nodeID))
+				}),
+			)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
