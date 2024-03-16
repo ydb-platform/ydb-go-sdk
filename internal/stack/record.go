@@ -105,6 +105,7 @@ func (c call) Record(opts ...recordOption) string {
 	if i := strings.LastIndex(name, "/"); i > -1 {
 		pkgPath, name = name[:i], name[i+1:]
 	}
+	name = strings.ReplaceAll(name, "[...]", "")
 	split := strings.Split(name, ".")
 	lambdas := make([]string, 0, len(split))
 	for i := range split {
