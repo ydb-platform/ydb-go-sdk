@@ -15,7 +15,6 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -40,33 +39,28 @@ func TestCreateSession(t *testing.T) {
 			service.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil)
-			t.Log("execute")
+			t.Log("createSession")
 			attached := 0
 			s, err := createSession(ctx, service, withSessionTrace(
-				&traceSession{
-					onCreate: func(ctx context.Context, functionID stack.Caller) func(*Session, error) {
-						return func(session *Session, err error) {
-						}
-					},
-					onAttach: func(ctx context.Context, functionID stack.Caller, s *Session) func(err error) {
-						return func(err error) {
-							if err == nil {
+				&trace.Query{
+					OnSessionAttach: func(info trace.QuerySessionAttachStartInfo) func(info trace.QuerySessionAttachDoneInfo) {
+						return func(info trace.QuerySessionAttachDoneInfo) {
+							if info.Error == nil {
 								attached++
 							}
 						}
 					},
-					onClose: func(ctx context.Context, functionID stack.Caller, s *Session) func(err error) {
+					OnSessionDelete: func(info trace.QuerySessionDeleteStartInfo) func(info trace.QuerySessionDeleteDoneInfo) {
 						attached--
 
-						return func(err error) {
-						}
+						return nil
 					},
 				},
 			))
 			require.NoError(t, err)
 			require.EqualValues(t, "test", s.id)
 			require.EqualValues(t, 1, attached)
-			err = s.closeOnce(ctx)
+			err = s.Close(ctx)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, attached)
 		}, xtest.StopAfter(time.Second))
@@ -167,6 +161,7 @@ func TestCreateSession(t *testing.T) {
 func newTestSession() (*Session, error) {
 	return &Session{
 		statusCode: statusIdle,
+		trace:      &trace.Query{},
 	}, nil
 }
 
@@ -174,6 +169,7 @@ func newTestSessionWithClient(client Ydb_Query_V1.QueryServiceClient) (*Session,
 	return &Session{
 		grpcClient: client,
 		statusCode: statusIdle,
+		trace:      &trace.Query{},
 	}, nil
 }
 
@@ -195,16 +191,17 @@ func mustTestPool(
 func TestDo(t *testing.T) {
 	ctx := xtest.Context(t)
 	t.Run("HappyWay", func(t *testing.T) {
-		err := do(ctx, mustTestPool(ctx, func(ctx context.Context) (*Session, error) {
+		attempts, err := do(ctx, mustTestPool(ctx, func(ctx context.Context) (*Session, error) {
 			return newTestSession()
 		}), func(ctx context.Context, s query.Session) error {
 			return nil
 		}, &trace.Query{})
 		require.NoError(t, err)
+		require.EqualValues(t, 1, attempts)
 	})
 	t.Run("RetryableError", func(t *testing.T) {
 		counter := 0
-		err := do(ctx, mustTestPool(ctx, func(ctx context.Context) (*Session, error) {
+		attempts, err := do(ctx, mustTestPool(ctx, func(ctx context.Context) (*Session, error) {
 			return newTestSession()
 		}), func(ctx context.Context, s query.Session) error {
 			counter++
@@ -215,6 +212,7 @@ func TestDo(t *testing.T) {
 			return nil
 		}, &trace.Query{})
 		require.NoError(t, err)
+		require.EqualValues(t, 10, attempts)
 		require.Equal(t, 10, counter)
 	})
 }
@@ -230,12 +228,13 @@ func TestDoTx(t *testing.T) {
 		client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
 			Status: Ydb.StatusIds_SUCCESS,
 		}, nil)
-		err := doTx(ctx, mustTestPool(ctx, func(ctx context.Context) (*Session, error) {
+		attempts, err := doTx(ctx, mustTestPool(ctx, func(ctx context.Context) (*Session, error) {
 			return newTestSessionWithClient(client)
 		}), func(ctx context.Context, tx query.TxActor) error {
 			return nil
 		}, &trace.Query{})
 		require.NoError(t, err)
+		require.EqualValues(t, 1, attempts)
 	})
 	t.Run("RetryableError", func(t *testing.T) {
 		counter := 0
@@ -250,7 +249,7 @@ func TestDoTx(t *testing.T) {
 		client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
 			Status: Ydb.StatusIds_SUCCESS,
 		}, nil).AnyTimes()
-		err := doTx(ctx, mustTestPool(ctx, func(ctx context.Context) (*Session, error) {
+		attempts, err := doTx(ctx, mustTestPool(ctx, func(ctx context.Context) (*Session, error) {
 			return newTestSessionWithClient(client)
 		}), func(ctx context.Context, tx query.TxActor) error {
 			counter++
@@ -261,6 +260,7 @@ func TestDoTx(t *testing.T) {
 			return nil
 		}, &trace.Query{})
 		require.NoError(t, err)
+		require.EqualValues(t, 10, attempts)
 		require.Equal(t, 10, counter)
 	})
 }

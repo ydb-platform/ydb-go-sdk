@@ -1,5 +1,3 @@
-* Fixed function id stringification for generic type function calls
-
 ## v3.58.0
 * Changed `List` constructor from `ydb.ParamsBuilder().List().Build().Build()` to `ydb.ParamsBuilder().BeginList().EndList().Build()`
 * Changed `Set` constructor from `ydb.ParamsBuilder().Set().Build().Build()` to `ydb.ParamsBuilder().BeginSet().EndSet().Build()`

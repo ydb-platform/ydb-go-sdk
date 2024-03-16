@@ -37,15 +37,12 @@ type (
 		OnResolve func(DriverResolveStartInfo) func(DriverResolveDoneInfo)
 
 		// Conn events
-		OnConnStateChange func(DriverConnStateChangeStartInfo) func(DriverConnStateChangeDoneInfo)
-		OnConnInvoke      func(DriverConnInvokeStartInfo) func(DriverConnInvokeDoneInfo)
-		OnConnNewStream   func(
-			DriverConnNewStreamStartInfo,
-		) func(
-			DriverConnNewStreamRecvInfo,
-		) func(
-			DriverConnNewStreamDoneInfo,
-		)
+		OnConnStateChange     func(DriverConnStateChangeStartInfo) func(DriverConnStateChangeDoneInfo)
+		OnConnInvoke          func(DriverConnInvokeStartInfo) func(DriverConnInvokeDoneInfo)
+		OnConnNewStream       func(DriverConnNewStreamStartInfo) func(DriverConnNewStreamDoneInfo)
+		OnConnStreamRecvMsg   func(DriverConnStreamRecvMsgStartInfo) func(DriverConnStreamRecvMsgDoneInfo)
+		OnConnStreamSendMsg   func(DriverConnStreamSendMsgStartInfo) func(DriverConnStreamSendMsgDoneInfo)
+		OnConnStreamCloseSend func(DriverConnStreamCloseSendStartInfo) func(DriverConnStreamCloseSendDoneInfo)
 		// Deprecated: driver not notificate about this event
 		OnConnTake  func(DriverConnTakeStartInfo) func(DriverConnTakeDoneInfo)
 		OnConnDial  func(DriverConnDialStartInfo) func(DriverConnDialDoneInfo)
@@ -326,13 +323,42 @@ type (
 		Endpoint EndpointInfo
 		Method   Method
 	}
-	DriverConnNewStreamRecvInfo struct {
+	DriverConnNewStreamDoneInfo struct {
+		Error error
+		State ConnState
+	}
+	DriverConnStreamRecvMsgStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	DriverConnStreamRecvMsgDoneInfo struct {
 		Error error
 	}
-	DriverConnNewStreamDoneInfo struct {
-		Error    error
-		State    ConnState
-		Metadata map[string][]string
+	DriverConnStreamSendMsgStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	DriverConnStreamSendMsgDoneInfo struct {
+		Error error
+	}
+	DriverConnStreamCloseSendStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	DriverConnStreamCloseSendDoneInfo struct {
+		Error error
 	}
 	DriverBalancerInitStartInfo struct {
 		// Context make available context in trace callback function.

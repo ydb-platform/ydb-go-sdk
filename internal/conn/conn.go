@@ -391,7 +391,7 @@ func (c *conn) NewStream(
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, err error) {
 	var (
-		streamRecv = trace.DriverOnConnNewStream(
+		onDone = trace.DriverOnConnNewStream(
 			c.config.Trace(), &ctx,
 			stack.FunctionID(""),
 			c.endpoint.Copy(), trace.Method(method),
@@ -402,18 +402,7 @@ func (c *conn) NewStream(
 	)
 
 	defer func() {
-		if err != nil {
-			streamRecv(err)(err, c.GetState(), metadata.MD{})
-		}
-	}()
-
-	var cancel context.CancelFunc
-	ctx, cancel = xcontext.WithCancel(ctx)
-
-	defer func() {
-		if err != nil {
-			cancel()
-		}
+		onDone(err, c.GetState())
 	}()
 
 	cc, err = c.realConn(ctx)
@@ -454,15 +443,14 @@ func (c *conn) NewStream(
 
 	return &grpcClientStream{
 		ClientStream: s,
+		ctx:          ctx,
 		c:            c,
 		wrapping:     useWrapping,
 		traceID:      traceID,
 		sentMark:     sentMark,
 		onDone: func(ctx context.Context, md metadata.MD) {
-			cancel()
 			meta.CallTrailerCallback(ctx, md)
 		},
-		recv: streamRecv,
 	}, nil
 }
 

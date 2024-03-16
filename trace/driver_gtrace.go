@@ -453,7 +453,7 @@ func (t *Driver) Compose(x *Driver, opts ...DriverComposeOption) *Driver {
 	{
 		h1 := t.OnConnNewStream
 		h2 := x.OnConnNewStream
-		ret.OnConnNewStream = func(d DriverConnNewStreamStartInfo) func(DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
+		ret.OnConnNewStream = func(d DriverConnNewStreamStartInfo) func(DriverConnNewStreamDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -461,14 +461,14 @@ func (t *Driver) Compose(x *Driver, opts ...DriverComposeOption) *Driver {
 					}
 				}()
 			}
-			var r, r1 func(DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo)
+			var r, r1 func(DriverConnNewStreamDoneInfo)
 			if h1 != nil {
 				r = h1(d)
 			}
 			if h2 != nil {
 				r1 = h2(d)
 			}
-			return func(d DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
+			return func(d DriverConnNewStreamDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -476,27 +476,116 @@ func (t *Driver) Compose(x *Driver, opts ...DriverComposeOption) *Driver {
 						}
 					}()
 				}
-				var r2, r3 func(DriverConnNewStreamDoneInfo)
 				if r != nil {
-					r2 = r(d)
+					r(d)
 				}
 				if r1 != nil {
-					r3 = r1(d)
+					r1(d)
 				}
-				return func(d DriverConnNewStreamDoneInfo) {
-					if options.panicCallback != nil {
-						defer func() {
-							if e := recover(); e != nil {
-								options.panicCallback(e)
-							}
-						}()
+			}
+		}
+	}
+	{
+		h1 := t.OnConnStreamRecvMsg
+		h2 := x.OnConnStreamRecvMsg
+		ret.OnConnStreamRecvMsg = func(d DriverConnStreamRecvMsgStartInfo) func(DriverConnStreamRecvMsgDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
 					}
-					if r2 != nil {
-						r2(d)
+				}()
+			}
+			var r, r1 func(DriverConnStreamRecvMsgDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverConnStreamRecvMsgDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
+					r1(d)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnConnStreamSendMsg
+		h2 := x.OnConnStreamSendMsg
+		ret.OnConnStreamSendMsg = func(d DriverConnStreamSendMsgStartInfo) func(DriverConnStreamSendMsgDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
 					}
-					if r3 != nil {
-						r3(d)
+				}()
+			}
+			var r, r1 func(DriverConnStreamSendMsgDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverConnStreamSendMsgDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
+					r1(d)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnConnStreamCloseSend
+		h2 := x.OnConnStreamCloseSend
+		ret.OnConnStreamCloseSend = func(d DriverConnStreamCloseSendStartInfo) func(DriverConnStreamCloseSendDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
 					}
+				}()
+			}
+			var r, r1 func(DriverConnStreamCloseSendDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverConnStreamCloseSendDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
+					r1(d)
 				}
 			}
 		}
@@ -1173,32 +1262,65 @@ func (t *Driver) onConnInvoke(d DriverConnInvokeStartInfo) func(DriverConnInvoke
 	}
 	return res
 }
-func (t *Driver) onConnNewStream(d DriverConnNewStreamStartInfo) func(DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
+func (t *Driver) onConnNewStream(d DriverConnNewStreamStartInfo) func(DriverConnNewStreamDoneInfo) {
 	fn := t.OnConnNewStream
 	if fn == nil {
-		return func(DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
-			return func(DriverConnNewStreamDoneInfo) {
-				return
-			}
+		return func(DriverConnNewStreamDoneInfo) {
+			return
 		}
 	}
 	res := fn(d)
 	if res == nil {
-		return func(DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
-			return func(DriverConnNewStreamDoneInfo) {
-				return
-			}
+		return func(DriverConnNewStreamDoneInfo) {
+			return
 		}
 	}
-	return func(d DriverConnNewStreamRecvInfo) func(DriverConnNewStreamDoneInfo) {
-		res := res(d)
-		if res == nil {
-			return func(DriverConnNewStreamDoneInfo) {
-				return
-			}
+	return res
+}
+func (t *Driver) onConnStreamRecvMsg(d DriverConnStreamRecvMsgStartInfo) func(DriverConnStreamRecvMsgDoneInfo) {
+	fn := t.OnConnStreamRecvMsg
+	if fn == nil {
+		return func(DriverConnStreamRecvMsgDoneInfo) {
+			return
 		}
-		return res
 	}
+	res := fn(d)
+	if res == nil {
+		return func(DriverConnStreamRecvMsgDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Driver) onConnStreamSendMsg(d DriverConnStreamSendMsgStartInfo) func(DriverConnStreamSendMsgDoneInfo) {
+	fn := t.OnConnStreamSendMsg
+	if fn == nil {
+		return func(DriverConnStreamSendMsgDoneInfo) {
+			return
+		}
+	}
+	res := fn(d)
+	if res == nil {
+		return func(DriverConnStreamSendMsgDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Driver) onConnStreamCloseSend(d DriverConnStreamCloseSendStartInfo) func(DriverConnStreamCloseSendDoneInfo) {
+	fn := t.OnConnStreamCloseSend
+	if fn == nil {
+		return func(DriverConnStreamCloseSendDoneInfo) {
+			return
+		}
+	}
+	res := fn(d)
+	if res == nil {
+		return func(DriverConnStreamCloseSendDoneInfo) {
+			return
+		}
+	}
+	return res
 }
 func (t *Driver) onConnTake(d DriverConnTakeStartInfo) func(DriverConnTakeDoneInfo) {
 	fn := t.OnConnTake
@@ -1561,24 +1683,51 @@ func DriverOnConnInvoke(t *Driver, c *context.Context, call call, endpoint Endpo
 		res(p)
 	}
 }
-func DriverOnConnNewStream(t *Driver, c *context.Context, call call, endpoint EndpointInfo, m Method) func(error) func(_ error, state ConnState, metadata map[string][]string) {
+func DriverOnConnNewStream(t *Driver, c *context.Context, call call, endpoint EndpointInfo, m Method) func(_ error, state ConnState) {
 	var p DriverConnNewStreamStartInfo
 	p.Context = c
 	p.Call = call
 	p.Endpoint = endpoint
 	p.Method = m
 	res := t.onConnNewStream(p)
-	return func(e error) func(error, ConnState, map[string][]string) {
-		var p DriverConnNewStreamRecvInfo
+	return func(e error, state ConnState) {
+		var p DriverConnNewStreamDoneInfo
 		p.Error = e
-		res := res(p)
-		return func(e error, state ConnState, metadata map[string][]string) {
-			var p DriverConnNewStreamDoneInfo
-			p.Error = e
-			p.State = state
-			p.Metadata = metadata
-			res(p)
-		}
+		p.State = state
+		res(p)
+	}
+}
+func DriverOnConnStreamRecvMsg(t *Driver, c *context.Context, call call) func(error) {
+	var p DriverConnStreamRecvMsgStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onConnStreamRecvMsg(p)
+	return func(e error) {
+		var p DriverConnStreamRecvMsgDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func DriverOnConnStreamSendMsg(t *Driver, c *context.Context, call call) func(error) {
+	var p DriverConnStreamSendMsgStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onConnStreamSendMsg(p)
+	return func(e error) {
+		var p DriverConnStreamSendMsgDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func DriverOnConnStreamCloseSend(t *Driver, c *context.Context, call call) func(error) {
+	var p DriverConnStreamCloseSendStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onConnStreamCloseSend(p)
+	return func(e error) {
+		var p DriverConnStreamCloseSendDoneInfo
+		p.Error = e
+		res(p)
 	}
 }
 func DriverOnConnTake(t *Driver, c *context.Context, call call, endpoint EndpointInfo) func(error) {

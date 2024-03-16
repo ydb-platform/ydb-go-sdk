@@ -16,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -30,6 +31,47 @@ type Storage struct {
 	cfg       *config.Config
 	tablePath string
 }
+
+const writeQuery = `
+DECLARE $id AS Uint64;
+DECLARE $payload_str AS Utf8;
+DECLARE $payload_double AS Double;
+DECLARE $payload_timestamp AS Timestamp;
+
+UPSERT INTO %s (
+	id, hash, payload_str, payload_double, payload_timestamp
+) VALUES (
+	$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp
+);
+`
+
+const readQuery = `
+DECLARE $id AS Uint64;
+SELECT id, payload_str, payload_double, payload_timestamp, payload_hash
+FROM %s WHERE id = $id AND hash = Digest::NumericHash($id);
+`
+
+const createTableQuery = `
+CREATE TABLE IF NOT EXISTS %s (
+	hash Uint64?,
+	id Uint64?,
+	payload_str Text?,
+	payload_double Double?,
+	payload_timestamp Timestamp?,
+	payload_hash Uint64?,
+	PRIMARY KEY (hash, id)
+) WITH (
+	UNIFORM_PARTITIONS = %d,
+	AUTO_PARTITIONING_BY_SIZE = ENABLED,
+	AUTO_PARTITIONING_PARTITION_SIZE_MB = %d,
+	AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = %d,
+	AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = %d
+)
+`
+
+const dropTableQuery = `
+DROP TABLE %s
+`
 
 func initTracer() func(context.Context) error {
 	exporter, err := otlptrace.New(
@@ -46,7 +88,7 @@ func initTracer() func(context.Context) error {
 	resources, err := resource.New(
 		context.Background(),
 		resource.WithAttributes(
-			attribute.String("service.name", "main"),
+			attribute.String("service.name", "slo-native-query"),
 		),
 	)
 	if err != nil {
@@ -97,6 +139,16 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 		return generator.Row{}, attempts, err
 	}
 
+	ctx, start := otel.GetTracerProvider().Tracer("SLO").Start(ctx,
+		"Read",
+	)
+	defer func() {
+		if err != nil {
+			start.SetStatus(codes.Error, "")
+		}
+		start.End()
+	}()
+
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ReadTimeout)*time.Millisecond)
 	defer cancel()
 
@@ -109,11 +161,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 			}
 
 			_, res, err := session.Execute(ctx,
-				fmt.Sprintf(`
-					DECLARE $id AS Uint64;
-					SELECT id, payload_str, payload_double, payload_timestamp, payload_hash
-					FROM %s WHERE id = $id AND hash = Digest::NumericHash($id);
-				`, s.tablePath),
+				fmt.Sprintf(readQuery, s.tablePath),
 				query.WithParameters(
 					ydb.ParamsBuilder().
 						Param("$id").Uint64(entryID).
@@ -158,11 +206,9 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 		},
 		query.WithIdempotent(),
 		query.WithTrace(&trace.Query{
-			OnDo: func(info trace.QueryDoStartInfo) func(info trace.QueryDoIntermediateInfo) func(trace.QueryDoDoneInfo) {
-				return func(info trace.QueryDoIntermediateInfo) func(trace.QueryDoDoneInfo) {
-					return func(info trace.QueryDoDoneInfo) {
-						attempts = info.Attempts
-					}
+			OnDo: func(info trace.QueryDoStartInfo) func(trace.QueryDoDoneInfo) {
+				return func(info trace.QueryDoDoneInfo) {
+					attempts = info.Attempts
 				}
 			},
 		}),
@@ -172,33 +218,32 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 	return e, attempts, err
 }
 
-func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, _ error) {
+func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err error) {
 	if err := ctx.Err(); err != nil {
 		return attempts, err
 	}
 
+	ctx, start := otel.GetTracerProvider().Tracer("SLO").Start(ctx,
+		"Write",
+	)
+	defer func() {
+		if err != nil {
+			start.SetStatus(codes.Error, "")
+		}
+		start.End()
+	}()
+
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	err := s.db.Query().Do(ctx,
+	err = s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
 
 			_, res, err := session.Execute(ctx,
-				fmt.Sprintf(`
-					DECLARE $id AS Uint64;
-					DECLARE $payload_str AS Utf8;
-					DECLARE $payload_double AS Double;
-					DECLARE $payload_timestamp AS Timestamp;
-					
-					UPSERT INTO %s (
-						id, hash, payload_str, payload_double, payload_timestamp
-					) VALUES (
-						$id, Digest::NumericHash($id), $payload_str, $payload_double, $payload_timestamp
-					);
-				`, s.tablePath),
+				fmt.Sprintf(writeQuery, s.tablePath),
 				query.WithParameters(
 					ydb.ParamsBuilder().
 						Param("$id").Uint64(e.ID).
@@ -220,11 +265,9 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, _ e
 		},
 		query.WithIdempotent(),
 		query.WithTrace(&trace.Query{
-			OnDo: func(info trace.QueryDoStartInfo) func(info trace.QueryDoIntermediateInfo) func(trace.QueryDoDoneInfo) {
-				return func(info trace.QueryDoIntermediateInfo) func(trace.QueryDoDoneInfo) {
-					return func(info trace.QueryDoDoneInfo) {
-						attempts = info.Attempts
-					}
+			OnDo: func(info trace.QueryDoStartInfo) func(trace.QueryDoDoneInfo) {
+				return func(info trace.QueryDoDoneInfo) {
+					attempts = info.Attempts
 				}
 			},
 		}),
@@ -241,22 +284,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 	return s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
 			_, _, err := session.Execute(ctx,
-				fmt.Sprintf(`
-				CREATE TABLE IF NOT EXISTS %s (
-					hash Uint64?,
-					id Uint64?,
-					payload_str Text?,
-					payload_double Double?,
-					payload_timestamp Timestamp?,
-					payload_hash Uint64?,
-					PRIMARY KEY (hash, id)
-				) WITH (
-					UNIFORM_PARTITIONS = %d,
-					AUTO_PARTITIONING_BY_SIZE = ENABLED,
-					AUTO_PARTITIONING_PARTITION_SIZE_MB = %d,
-					AUTO_PARTITIONING_MIN_PARTITIONS_COUNT = %d,
-					AUTO_PARTITIONING_MAX_PARTITIONS_COUNT = %d
-				)`, s.tablePath, s.cfg.MinPartitionsCount, s.cfg.PartitionSize,
+				fmt.Sprintf(createTableQuery, s.tablePath, s.cfg.MinPartitionsCount, s.cfg.PartitionSize,
 					s.cfg.MinPartitionsCount, s.cfg.MaxPartitionsCount,
 				),
 				query.WithTxControl(query.NoTx()))
@@ -279,7 +307,7 @@ func (s *Storage) dropTable(ctx context.Context) error {
 	return s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) error {
 			_, _, err := session.Execute(ctx,
-				fmt.Sprintf(`DROP TABLE %s`, s.tablePath),
+				fmt.Sprintf(dropTableQuery, s.tablePath),
 				query.WithTxControl(query.NoTx()),
 			)
 
