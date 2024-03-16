@@ -58,6 +58,11 @@ func (rs *resultSet) next(ctx context.Context) (*row, error) {
 			}
 			rs.rowIndex = 0
 			rs.currentPart = part
+			if part == nil {
+				close(rs.done)
+
+				return nil, xerrors.WithStackTrace(io.EOF)
+			}
 		}
 		if rs.index != rs.currentPart.GetResultSetIndex() {
 			close(rs.done)

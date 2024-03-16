@@ -44,6 +44,10 @@ func TestCreateSession(t *testing.T) {
 			attached := 0
 			s, err := createSession(ctx, service, withSessionTrace(
 				&traceSession{
+					onCreate: func(ctx context.Context, functionID stack.Caller) func(*Session, error) {
+						return func(session *Session, err error) {
+						}
+					},
 					onAttach: func(ctx context.Context, functionID stack.Caller, s *Session) func(err error) {
 						return func(err error) {
 							if err == nil {
