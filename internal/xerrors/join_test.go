@@ -2,6 +2,7 @@ package xerrors
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -50,7 +51,10 @@ func TestUnwrapJoined(t *testing.T) {
 
 	var joined error = Join(err1, err2)
 
-	unwrappable := joined.(interface{ Unwrap() []error }) //nolint:errorlint
+	unwrappable, ok := joined.(interface{ Unwrap() []error }) //nolint:errorlint
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to string", unwrappable))
+	}
 	inners := unwrappable.Unwrap()
 	assert.Contains(t, inners, err1)
 	assert.Contains(t, inners, err2)
