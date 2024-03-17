@@ -1012,14 +1012,13 @@ func DatabaseSQLOnConnIsTableExists(t *DatabaseSQL, c *context.Context, call cal
 		res(p)
 	}
 }
-func DatabaseSQLOnTxQuery(t *DatabaseSQL, c *context.Context, call call, txContext context.Context, tx tableTransactionInfo, query string, idempotent bool) func(error) {
+func DatabaseSQLOnTxQuery(t *DatabaseSQL, c *context.Context, call call, txContext context.Context, tx tableTransactionInfo, query string) func(error) {
 	var p DatabaseSQLTxQueryStartInfo
 	p.Context = c
 	p.Call = call
 	p.TxContext = txContext
 	p.Tx = tx
 	p.Query = query
-	p.Idempotent = idempotent
 	res := t.onTxQuery(p)
 	return func(e error) {
 		var p DatabaseSQLTxQueryDoneInfo
@@ -1027,14 +1026,13 @@ func DatabaseSQLOnTxQuery(t *DatabaseSQL, c *context.Context, call call, txConte
 		res(p)
 	}
 }
-func DatabaseSQLOnTxExec(t *DatabaseSQL, c *context.Context, call call, txContext context.Context, tx tableTransactionInfo, query string, idempotent bool) func(error) {
+func DatabaseSQLOnTxExec(t *DatabaseSQL, c *context.Context, call call, txContext context.Context, tx tableTransactionInfo, query string) func(error) {
 	var p DatabaseSQLTxExecStartInfo
 	p.Context = c
 	p.Call = call
 	p.TxContext = txContext
 	p.Tx = tx
 	p.Query = query
-	p.Idempotent = idempotent
 	res := t.onTxExec(p)
 	return func(e error) {
 		var p DatabaseSQLTxExecDoneInfo

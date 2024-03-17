@@ -206,146 +206,6 @@ func (t *Driver) Compose(x *Driver, opts ...DriverComposeOption) *Driver {
 		}
 	}
 	{
-		h1 := t.OnNetRead
-		h2 := x.OnNetRead
-		ret.OnNetRead = func(d DriverNetReadStartInfo) func(DriverNetReadDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(DriverNetReadDoneInfo)
-			if h1 != nil {
-				r = h1(d)
-			}
-			if h2 != nil {
-				r1 = h2(d)
-			}
-			return func(d DriverNetReadDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(d)
-				}
-				if r1 != nil {
-					r1(d)
-				}
-			}
-		}
-	}
-	{
-		h1 := t.OnNetWrite
-		h2 := x.OnNetWrite
-		ret.OnNetWrite = func(d DriverNetWriteStartInfo) func(DriverNetWriteDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(DriverNetWriteDoneInfo)
-			if h1 != nil {
-				r = h1(d)
-			}
-			if h2 != nil {
-				r1 = h2(d)
-			}
-			return func(d DriverNetWriteDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(d)
-				}
-				if r1 != nil {
-					r1(d)
-				}
-			}
-		}
-	}
-	{
-		h1 := t.OnNetDial
-		h2 := x.OnNetDial
-		ret.OnNetDial = func(d DriverNetDialStartInfo) func(DriverNetDialDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(DriverNetDialDoneInfo)
-			if h1 != nil {
-				r = h1(d)
-			}
-			if h2 != nil {
-				r1 = h2(d)
-			}
-			return func(d DriverNetDialDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(d)
-				}
-				if r1 != nil {
-					r1(d)
-				}
-			}
-		}
-	}
-	{
-		h1 := t.OnNetClose
-		h2 := x.OnNetClose
-		ret.OnNetClose = func(d DriverNetCloseStartInfo) func(DriverNetCloseDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(DriverNetCloseDoneInfo)
-			if h1 != nil {
-				r = h1(d)
-			}
-			if h2 != nil {
-				r1 = h2(d)
-			}
-			return func(d DriverNetCloseDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(d)
-				}
-				if r1 != nil {
-					r1(d)
-				}
-			}
-		}
-	}
-	{
 		h1 := t.OnResolve
 		h2 := x.OnResolve
 		ret.OnResolve = func(d DriverResolveStartInfo) func(DriverResolveDoneInfo) {
@@ -591,41 +451,6 @@ func (t *Driver) Compose(x *Driver, opts ...DriverComposeOption) *Driver {
 		}
 	}
 	{
-		h1 := t.OnConnTake
-		h2 := x.OnConnTake
-		ret.OnConnTake = func(d DriverConnTakeStartInfo) func(DriverConnTakeDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(DriverConnTakeDoneInfo)
-			if h1 != nil {
-				r = h1(d)
-			}
-			if h2 != nil {
-				r1 = h2(d)
-			}
-			return func(d DriverConnTakeDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(d)
-				}
-				if r1 != nil {
-					r1(d)
-				}
-			}
-		}
-	}
-	{
 		h1 := t.OnConnDial
 		h2 := x.OnConnDial
 		ret.OnConnDial = func(d DriverConnDialStartInfo) func(DriverConnDialDoneInfo) {
@@ -854,41 +679,6 @@ func (t *Driver) Compose(x *Driver, opts ...DriverComposeOption) *Driver {
 				r1 = h2(d)
 			}
 			return func(d DriverBalancerInitDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(d)
-				}
-				if r1 != nil {
-					r1(d)
-				}
-			}
-		}
-	}
-	{
-		h1 := t.OnBalancerDialEntrypoint
-		h2 := x.OnBalancerDialEntrypoint
-		ret.OnBalancerDialEntrypoint = func(d DriverBalancerDialEntrypointStartInfo) func(DriverBalancerDialEntrypointDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(DriverBalancerDialEntrypointDoneInfo)
-			if h1 != nil {
-				r = h1(d)
-			}
-			if h2 != nil {
-				r1 = h2(d)
-			}
-			return func(d DriverBalancerDialEntrypointDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -1157,66 +947,6 @@ func (t *Driver) onPoolRelease(d DriverConnPoolReleaseStartInfo) func(DriverConn
 	}
 	return res
 }
-func (t *Driver) onNetRead(d DriverNetReadStartInfo) func(DriverNetReadDoneInfo) {
-	fn := t.OnNetRead
-	if fn == nil {
-		return func(DriverNetReadDoneInfo) {
-			return
-		}
-	}
-	res := fn(d)
-	if res == nil {
-		return func(DriverNetReadDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t *Driver) onNetWrite(d DriverNetWriteStartInfo) func(DriverNetWriteDoneInfo) {
-	fn := t.OnNetWrite
-	if fn == nil {
-		return func(DriverNetWriteDoneInfo) {
-			return
-		}
-	}
-	res := fn(d)
-	if res == nil {
-		return func(DriverNetWriteDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t *Driver) onNetDial(d DriverNetDialStartInfo) func(DriverNetDialDoneInfo) {
-	fn := t.OnNetDial
-	if fn == nil {
-		return func(DriverNetDialDoneInfo) {
-			return
-		}
-	}
-	res := fn(d)
-	if res == nil {
-		return func(DriverNetDialDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t *Driver) onNetClose(d DriverNetCloseStartInfo) func(DriverNetCloseDoneInfo) {
-	fn := t.OnNetClose
-	if fn == nil {
-		return func(DriverNetCloseDoneInfo) {
-			return
-		}
-	}
-	res := fn(d)
-	if res == nil {
-		return func(DriverNetCloseDoneInfo) {
-			return
-		}
-	}
-	return res
-}
 func (t *Driver) onResolve(d DriverResolveStartInfo) func(DriverResolveDoneInfo) {
 	fn := t.OnResolve
 	if fn == nil {
@@ -1322,21 +1052,6 @@ func (t *Driver) onConnStreamCloseSend(d DriverConnStreamCloseSendStartInfo) fun
 	}
 	return res
 }
-func (t *Driver) onConnTake(d DriverConnTakeStartInfo) func(DriverConnTakeDoneInfo) {
-	fn := t.OnConnTake
-	if fn == nil {
-		return func(DriverConnTakeDoneInfo) {
-			return
-		}
-	}
-	res := fn(d)
-	if res == nil {
-		return func(DriverConnTakeDoneInfo) {
-			return
-		}
-	}
-	return res
-}
 func (t *Driver) onConnDial(d DriverConnDialStartInfo) func(DriverConnDialDoneInfo) {
 	fn := t.OnConnDial
 	if fn == nil {
@@ -1437,21 +1152,6 @@ func (t *Driver) onBalancerInit(d DriverBalancerInitStartInfo) func(DriverBalanc
 	res := fn(d)
 	if res == nil {
 		return func(DriverBalancerInitDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t *Driver) onBalancerDialEntrypoint(d DriverBalancerDialEntrypointStartInfo) func(DriverBalancerDialEntrypointDoneInfo) {
-	fn := t.OnBalancerDialEntrypoint
-	if fn == nil {
-		return func(DriverBalancerDialEntrypointDoneInfo) {
-			return
-		}
-	}
-	res := fn(d)
-	if res == nil {
-		return func(DriverBalancerDialEntrypointDoneInfo) {
 			return
 		}
 	}
@@ -1592,55 +1292,6 @@ func DriverOnPoolRelease(t *Driver, c *context.Context, call call) func(error) {
 		res(p)
 	}
 }
-func DriverOnNetRead(t *Driver, call call, address string, buffer int) func(received int, _ error) {
-	var p DriverNetReadStartInfo
-	p.Call = call
-	p.Address = address
-	p.Buffer = buffer
-	res := t.onNetRead(p)
-	return func(received int, e error) {
-		var p DriverNetReadDoneInfo
-		p.Received = received
-		p.Error = e
-		res(p)
-	}
-}
-func DriverOnNetWrite(t *Driver, call call, address string, bytes int) func(sent int, _ error) {
-	var p DriverNetWriteStartInfo
-	p.Call = call
-	p.Address = address
-	p.Bytes = bytes
-	res := t.onNetWrite(p)
-	return func(sent int, e error) {
-		var p DriverNetWriteDoneInfo
-		p.Sent = sent
-		p.Error = e
-		res(p)
-	}
-}
-func DriverOnNetDial(t *Driver, c *context.Context, call call, address string) func(error) {
-	var p DriverNetDialStartInfo
-	p.Context = c
-	p.Call = call
-	p.Address = address
-	res := t.onNetDial(p)
-	return func(e error) {
-		var p DriverNetDialDoneInfo
-		p.Error = e
-		res(p)
-	}
-}
-func DriverOnNetClose(t *Driver, call call, address string) func(error) {
-	var p DriverNetCloseStartInfo
-	p.Call = call
-	p.Address = address
-	res := t.onNetClose(p)
-	return func(e error) {
-		var p DriverNetCloseDoneInfo
-		p.Error = e
-		res(p)
-	}
-}
 func DriverOnResolve(t *Driver, call call, target string, resolved []string) func(error) {
 	var p DriverResolveStartInfo
 	p.Call = call
@@ -1726,18 +1377,6 @@ func DriverOnConnStreamCloseSend(t *Driver, c *context.Context, call call) func(
 	res := t.onConnStreamCloseSend(p)
 	return func(e error) {
 		var p DriverConnStreamCloseSendDoneInfo
-		p.Error = e
-		res(p)
-	}
-}
-func DriverOnConnTake(t *Driver, c *context.Context, call call, endpoint EndpointInfo) func(error) {
-	var p DriverConnTakeStartInfo
-	p.Context = c
-	p.Call = call
-	p.Endpoint = endpoint
-	res := t.onConnTake(p)
-	return func(e error) {
-		var p DriverConnTakeDoneInfo
 		p.Error = e
 		res(p)
 	}
@@ -1830,18 +1469,6 @@ func DriverOnBalancerInit(t *Driver, c *context.Context, call call, name string)
 		res(p)
 	}
 }
-func DriverOnBalancerDialEntrypoint(t *Driver, c *context.Context, call call, address string) func(error) {
-	var p DriverBalancerDialEntrypointStartInfo
-	p.Context = c
-	p.Call = call
-	p.Address = address
-	res := t.onBalancerDialEntrypoint(p)
-	return func(e error) {
-		var p DriverBalancerDialEntrypointDoneInfo
-		p.Error = e
-		res(p)
-	}
-}
 func DriverOnBalancerClose(t *Driver, c *context.Context, call call) func(error) {
 	var p DriverBalancerCloseStartInfo
 	p.Context = c
@@ -1877,19 +1504,18 @@ func DriverOnBalancerClusterDiscoveryAttempt(t *Driver, c *context.Context, call
 		res(p)
 	}
 }
-func DriverOnBalancerUpdate(t *Driver, c *context.Context, call call, needLocalDC bool) func(endpoints []EndpointInfo, added []EndpointInfo, dropped []EndpointInfo, localDC string, _ error) {
+func DriverOnBalancerUpdate(t *Driver, c *context.Context, call call, needLocalDC bool) func(endpoints []EndpointInfo, added []EndpointInfo, dropped []EndpointInfo, localDC string) {
 	var p DriverBalancerUpdateStartInfo
 	p.Context = c
 	p.Call = call
 	p.NeedLocalDC = needLocalDC
 	res := t.onBalancerUpdate(p)
-	return func(endpoints []EndpointInfo, added []EndpointInfo, dropped []EndpointInfo, localDC string, e error) {
+	return func(endpoints []EndpointInfo, added []EndpointInfo, dropped []EndpointInfo, localDC string) {
 		var p DriverBalancerUpdateDoneInfo
 		p.Endpoints = endpoints
 		p.Added = added
 		p.Dropped = dropped
 		p.LocalDC = localDC
-		p.Error = e
 		res(p)
 	}
 }
