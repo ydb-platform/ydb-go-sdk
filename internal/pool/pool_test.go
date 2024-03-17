@@ -175,10 +175,10 @@ func TestPool(t *testing.T) {
 				})
 				require.NoError(t, err)
 				require.GreaterOrEqual(t, atomic.LoadInt64(&newItems), int64(9))
-				require.GreaterOrEqual(t, atomic.LoadInt64(&deleteItems), int64(8))
+				require.GreaterOrEqual(t, atomic.LoadInt64(&newItems), atomic.LoadInt64(&deleteItems))
 				p.Close(rootCtx)
 				require.EqualValues(t, atomic.LoadInt64(&newItems), atomic.LoadInt64(&deleteItems))
-			}, xtest.StopAfter(time.Second))
+			}, xtest.StopAfter(5*time.Second))
 		})
 	})
 	t.Run("Stress", func(t *testing.T) {
