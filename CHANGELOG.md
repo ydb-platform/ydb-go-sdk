@@ -1,3 +1,7 @@
+* Dropped all deprecated callbacks and events from traces
+* Added `trace.Driver.OnConnStream{SendMsg,RecvMsg,CloseSend}` events
+* Added `trace.Query.OnSessionExecute` event
+
 ## v3.58.0
 * Changed `List` constructor from `ydb.ParamsBuilder().List().Build().Build()` to `ydb.ParamsBuilder().BeginList().EndList().Build()`
 * Changed `Set` constructor from `ydb.ParamsBuilder().Set().Build().Build()` to `ydb.ParamsBuilder().BeginSet().EndSet().Build()`
