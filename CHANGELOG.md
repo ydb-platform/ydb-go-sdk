@@ -1,3 +1,4 @@
+## v3.58.1
 * Dropped all deprecated callbacks and events from traces
 * Added `trace.Driver.OnConnStream{SendMsg,RecvMsg,CloseSend}` events
 * Added `trace.Query.OnSessionExecute` event
