@@ -101,8 +101,12 @@ func (t *topicWriterOperationUnavailable) StreamWrite(server Ydb_Topic_V1.TopicS
 		return errors.New("failed to read messages block")
 	}
 
-	if len(messagesMsg.GetClientMessage().(*Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest).
-		WriteRequest.GetMessages()) == 0 {
+	tt, ok := messagesMsg.GetClientMessage().(*Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest", tt))
+	}
+
+	if len(tt.WriteRequest.GetMessages()) == 0 {
 		return errors.New("received zero messages block")
 	}
 
