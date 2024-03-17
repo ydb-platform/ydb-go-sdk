@@ -1,3 +1,7 @@
+* Added `trace.Query.OnSessionBegin` event
+* Added `trace.Query.OnResult{New,NextPart,NextResultSet,Close}` events
+* Added `trace.Query.OnRow{Scan,ScanNamed,ScanStruct}` events
+
 ## v3.58.1
 * Dropped all deprecated callbacks and events from traces
 * Added `trace.Driver.OnConnStream{SendMsg,RecvMsg,CloseSend}` events

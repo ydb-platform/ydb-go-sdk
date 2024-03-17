@@ -478,5 +478,247 @@ func internalQuery(
 				}
 			}
 		},
+		OnSessionBegin: func(info trace.QuerySessionBeginStartInfo) func(info trace.QuerySessionBeginDoneInfo) {
+			if d.Details()&trace.QuerySessionEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "session", "begin")
+			l.Log(ctx, "start",
+				String("SessionID", info.Session.ID()),
+				String("SessionStatus", info.Session.Status()),
+			)
+			start := time.Now()
+
+			return func(info trace.QuerySessionBeginDoneInfo) {
+				if info.Error == nil {
+					l.Log(WithLevel(ctx, DEBUG), "done",
+						latencyField(start),
+						String("TransactionID", info.Tx.ID()),
+					)
+				} else {
+					lvl := WARN
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "failed",
+						latencyField(start),
+						Error(info.Error),
+						versionField(),
+					)
+				}
+			}
+		},
+		OnResultNew: func(info trace.QueryResultNewStartInfo) func(info trace.QueryResultNewDoneInfo) {
+			if d.Details()&trace.QueryResultEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "result", "new")
+			l.Log(ctx, "start")
+			start := time.Now()
+
+			return func(info trace.QueryResultNewDoneInfo) {
+				if info.Error == nil {
+					l.Log(ctx, "done",
+						latencyField(start),
+					)
+				} else {
+					lvl := WARN
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "failed",
+						latencyField(start),
+						Error(info.Error),
+						versionField(),
+					)
+				}
+			}
+		},
+		OnResultNextPart: func(info trace.QueryResultNextPartStartInfo) func(info trace.QueryResultNextPartDoneInfo) {
+			if d.Details()&trace.QueryResultEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "result", "next", "part")
+			l.Log(ctx, "start")
+			start := time.Now()
+
+			return func(info trace.QueryResultNextPartDoneInfo) {
+				if info.Error == nil {
+					l.Log(ctx, "done",
+						latencyField(start),
+					)
+				} else {
+					lvl := WARN
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "failed",
+						latencyField(start),
+						Error(info.Error),
+						versionField(),
+					)
+				}
+			}
+		},
+		OnResultNextResultSet: func(
+			info trace.QueryResultNextResultSetStartInfo,
+		) func(
+			info trace.QueryResultNextResultSetDoneInfo,
+		) {
+			if d.Details()&trace.QueryResultEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "result", "next", "result", "set")
+			l.Log(ctx, "start")
+			start := time.Now()
+
+			return func(info trace.QueryResultNextResultSetDoneInfo) {
+				if info.Error == nil {
+					l.Log(ctx, "done",
+						latencyField(start),
+					)
+				} else {
+					lvl := WARN
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "failed",
+						latencyField(start),
+						Error(info.Error),
+						versionField(),
+					)
+				}
+			}
+		},
+		OnResultClose: func(info trace.QueryResultCloseStartInfo) func(info trace.QueryResultCloseDoneInfo) {
+			if d.Details()&trace.QueryResultEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "result", "close")
+			l.Log(ctx, "start")
+			start := time.Now()
+
+			return func(info trace.QueryResultCloseDoneInfo) {
+				if info.Error == nil {
+					l.Log(ctx, "done",
+						latencyField(start),
+					)
+				} else {
+					lvl := WARN
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "failed",
+						latencyField(start),
+						Error(info.Error),
+						versionField(),
+					)
+				}
+			}
+		},
+		OnResultSetNextRow: func(info trace.QueryResultSetNextRowStartInfo) func(info trace.QueryResultSetNextRowDoneInfo) {
+			if d.Details()&trace.QueryResultEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "result", "set", "next", "row")
+			l.Log(ctx, "start")
+			start := time.Now()
+
+			return func(info trace.QueryResultSetNextRowDoneInfo) {
+				if info.Error == nil {
+					l.Log(ctx, "done",
+						latencyField(start),
+					)
+				} else {
+					lvl := WARN
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "failed",
+						latencyField(start),
+						Error(info.Error),
+						versionField(),
+					)
+				}
+			}
+		},
+		OnRowScan: func(info trace.QueryRowScanStartInfo) func(info trace.QueryRowScanDoneInfo) {
+			if d.Details()&trace.QueryResultEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "row", "scan")
+			l.Log(ctx, "start")
+			start := time.Now()
+
+			return func(info trace.QueryRowScanDoneInfo) {
+				if info.Error == nil {
+					l.Log(ctx, "done",
+						latencyField(start),
+					)
+				} else {
+					lvl := WARN
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "failed",
+						latencyField(start),
+						Error(info.Error),
+						versionField(),
+					)
+				}
+			}
+		},
+		OnRowScanNamed: func(info trace.QueryRowScanNamedStartInfo) func(info trace.QueryRowScanNamedDoneInfo) {
+			if d.Details()&trace.QueryResultEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "row", "scan", "named")
+			l.Log(ctx, "start")
+			start := time.Now()
+
+			return func(info trace.QueryRowScanNamedDoneInfo) {
+				if info.Error == nil {
+					l.Log(ctx, "done",
+						latencyField(start),
+					)
+				} else {
+					lvl := WARN
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "failed",
+						latencyField(start),
+						Error(info.Error),
+						versionField(),
+					)
+				}
+			}
+		},
+		OnRowScanStruct: func(info trace.QueryRowScanStructStartInfo) func(info trace.QueryRowScanStructDoneInfo) {
+			if d.Details()&trace.QueryResultEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "row", "scan", "struct")
+			l.Log(ctx, "start")
+			start := time.Now()
+
+			return func(info trace.QueryRowScanStructDoneInfo) {
+				if info.Error == nil {
+					l.Log(ctx, "done",
+						latencyField(start),
+					)
+				} else {
+					lvl := WARN
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "failed",
+						latencyField(start),
+						Error(info.Error),
+						versionField(),
+					)
+				}
+			}
+		},
 	}
 }

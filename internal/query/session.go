@@ -203,9 +203,9 @@ func (s *Session) IsAlive() bool {
 }
 
 func (s *Session) Close(ctx context.Context) (err error) {
-	onClose := trace.QueryOnSessionDelete(s.trace, &ctx, stack.FunctionID(""), s)
+	onDone := trace.QueryOnSessionDelete(s.trace, &ctx, stack.FunctionID(""), s)
 	defer func() {
-		onClose(err)
+		onDone(err)
 	}()
 
 	if s.closeOnce != nil {
@@ -247,9 +247,16 @@ func (s *Session) Begin(
 	ctx context.Context,
 	txSettings query.TransactionSettings,
 ) (
-	query.Transaction, error,
+	_ query.Transaction, err error,
 ) {
-	tx, err := begin(ctx, s.grpcClient, s.id, txSettings)
+	var tx *transaction
+
+	onDone := trace.QueryOnSessionBegin(s.trace, &ctx, stack.FunctionID(""), s)
+	defer func() {
+		onDone(err, tx)
+	}()
+
+	tx, err = begin(ctx, s.grpcClient, s.id, txSettings)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

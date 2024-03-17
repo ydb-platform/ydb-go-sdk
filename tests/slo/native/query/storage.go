@@ -11,8 +11,6 @@ import (
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/codes"
 
 	"slo/internal/config"
 	"slo/internal/generator"
@@ -95,16 +93,6 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 		return generator.Row{}, attempts, err
 	}
 
-	ctx, start := otel.GetTracerProvider().Tracer("SLO").Start(ctx,
-		"Read",
-	)
-	defer func() {
-		if finalErr != nil {
-			start.SetStatus(codes.Error, "")
-		}
-		start.End()
-	}()
-
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ReadTimeout)*time.Millisecond)
 	defer cancel()
 
@@ -178,16 +166,6 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, fin
 	if err := ctx.Err(); err != nil {
 		return attempts, err
 	}
-
-	ctx, start := otel.GetTracerProvider().Tracer("SLO").Start(ctx,
-		"Write",
-	)
-	defer func() {
-		if finalErr != nil {
-			start.SetStatus(codes.Error, "")
-		}
-		start.End()
-	}()
 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()

@@ -68,8 +68,8 @@ func TestDetailsMatch(t *testing.T) {
 			details: TablePoolSessionLifeCycleEvents | TablePoolAPIEvents | TableSessionEvents,
 		},
 		{
-			pattern: `^ydb\.query\.(pool|session|tx|execute).*$`,
-			details: QueryPoolEvents | QuerySessionEvents | QueryTransactionEvents | QueryExecuteEvents,
+			pattern: `^ydb\.query\.(pool|session|tx|result).*$`,
+			details: QueryPoolEvents | QuerySessionEvents | QueryTransactionEvents | QueryResultEvents,
 		},
 		{
 			pattern: `^ydb\.((database.sql.tx)|driver.(balancer|conn)|(table\.pool)|retry)$`,

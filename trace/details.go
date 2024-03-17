@@ -45,7 +45,7 @@ const (
 	TablePoolAPIEvents
 
 	QuerySessionEvents
-	QueryExecuteEvents
+	QueryResultEvents
 	QueryTransactionEvents
 	QueryPoolEvents
 
@@ -94,7 +94,7 @@ const (
 
 	QueryEvents = QuerySessionEvents |
 		QueryPoolEvents |
-		QueryExecuteEvents |
+		QueryResultEvents |
 		QueryTransactionEvents
 
 	TablePoolEvents = TablePoolLifeCycleEvents |
@@ -154,7 +154,7 @@ var (
 		QueryEvents:            "ydb.query",
 		QueryPoolEvents:        "ydb.query.pool",
 		QuerySessionEvents:     "ydb.query.session",
-		QueryExecuteEvents:     "ydb.query.execute",
+		QueryResultEvents:      "ydb.query.result",
 		QueryTransactionEvents: "ydb.query.tx",
 
 		DatabaseSQLEvents:          "ydb.database.sql",

@@ -65,7 +65,7 @@ func execute(ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient,
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	r, txID, err := newResult(ctx, stream)
+	r, txID, err := newResult(ctx, stream, s.trace)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
