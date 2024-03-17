@@ -5,22 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
-	"os"
 	"path"
 	"time"
 
-	ydbOtel "github.com/ydb-platform/ydb-go-sdk-otel"
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
-	"go.opentelemetry.io/otel/sdk/resource"
-	otelTrace "go.opentelemetry.io/otel/sdk/trace"
 
 	"slo/internal/config"
 	"slo/internal/generator"
@@ -73,38 +65,6 @@ const dropTableQuery = `
 DROP TABLE %s
 `
 
-func initTracer() func(context.Context) error {
-	exporter, err := otlptrace.New(
-		context.Background(),
-		otlptracehttp.NewClient(
-			otlptracehttp.WithInsecure(),
-			otlptracehttp.WithEndpoint(os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")),
-		),
-	)
-	if err != nil {
-		log.Fatalf("Failed to create exporter: %v", err)
-	}
-
-	resources, err := resource.New(
-		context.Background(),
-		resource.WithAttributes(
-			attribute.String("service.name", "slo-native-query"),
-		),
-	)
-	if err != nil {
-		log.Fatalf("Could not set resources: %v", err)
-	}
-
-	otel.SetTracerProvider(
-		otelTrace.NewTracerProvider(
-			otelTrace.WithSampler(otelTrace.AlwaysSample()),
-			otelTrace.WithBatcher(exporter),
-			otelTrace.WithResource(resources),
-		),
-	)
-	return exporter.Shutdown
-}
-
 func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
 	defer cancel()
@@ -114,10 +74,6 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 		ydb.WithSessionPoolMaxSize(poolSize),
 		ydb.WithSessionPoolMinSize(poolSize/10),
 		ydb.WithSessionPoolProducersCount(poolSize/10),
-		ydbOtel.WithTraces(
-			ydbOtel.WithTracer(otel.Tracer("slo-native-query")),
-			ydbOtel.WithDetails(trace.DetailsAll),
-		),
 	)
 	if err != nil {
 		return nil, err
@@ -134,8 +90,8 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	return s, nil
 }
 
-func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generator.Row, attempts int, err error) {
-	if err = ctx.Err(); err != nil {
+func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generator.Row, attempts int, finalErr error) {
+	if err := ctx.Err(); err != nil {
 		return generator.Row{}, attempts, err
 	}
 
@@ -143,7 +99,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 		"Read",
 	)
 	defer func() {
-		if err != nil {
+		if finalErr != nil {
 			start.SetStatus(codes.Error, "")
 		}
 		start.End()
@@ -154,7 +110,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 
 	e := generator.Row{}
 
-	err = s.db.Query().Do(ctx,
+	err := s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) (err error) {
 			if err = ctx.Err(); err != nil {
 				return err
@@ -218,7 +174,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 	return e, attempts, err
 }
 
-func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err error) {
+func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, finalErr error) {
 	if err := ctx.Err(); err != nil {
 		return attempts, err
 	}
@@ -227,7 +183,7 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err
 		"Write",
 	)
 	defer func() {
-		if err != nil {
+		if finalErr != nil {
 			start.SetStatus(codes.Error, "")
 		}
 		start.End()
@@ -236,9 +192,9 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	err = s.db.Query().Do(ctx,
-		func(ctx context.Context, session query.Session) error {
-			if err := ctx.Err(); err != nil {
+	err := s.db.Query().Do(ctx,
+		func(ctx context.Context, session query.Session) (err error) {
+			if err = ctx.Err(); err != nil {
 				return err
 			}
 
