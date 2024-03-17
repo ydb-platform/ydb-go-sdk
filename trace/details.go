@@ -78,9 +78,6 @@ const (
 
 	CoordinationEvents
 
-	// Deprecated: has no effect now
-	DriverClusterEvents
-
 	DriverEvents = DriverConnEvents |
 		DriverBalancerEvents |
 		DriverResolverEvents |

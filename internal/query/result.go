@@ -27,7 +27,6 @@ type result struct {
 func newResult(
 	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
-	streamCancel func(),
 ) (_ *result, txID string, err error) {
 	select {
 	case <-ctx.Done():
@@ -35,8 +34,6 @@ func newResult(
 	default:
 		part, err := nextPart(stream)
 		if err != nil {
-			streamCancel()
-
 			return nil, txID, xerrors.WithStackTrace(err)
 		}
 		var (
@@ -45,7 +42,6 @@ func newResult(
 			closeOnce   = sync.OnceFunc(func() {
 				close(interrupted)
 				close(closed)
-				streamCancel()
 			})
 		)
 

@@ -47,8 +47,6 @@ func driver(config Config) (t trace.Driver) {
 		}
 	}
 	t.OnConnNewStream = func(info trace.DriverConnNewStreamStartInfo) func(
-		trace.DriverConnNewStreamRecvInfo,
-	) func(
 		trace.DriverConnNewStreamDoneInfo,
 	) {
 		var (
@@ -57,16 +55,14 @@ func driver(config Config) (t trace.Driver) {
 			nodeID   = info.Endpoint.NodeID()
 		)
 
-		return func(info trace.DriverConnNewStreamRecvInfo) func(trace.DriverConnNewStreamDoneInfo) {
-			return func(info trace.DriverConnNewStreamDoneInfo) {
-				if config.Details()&trace.DriverConnEvents != 0 {
-					requests.With(map[string]string{
-						"status":   errorBrief(info.Error),
-						"method":   string(method),
-						"endpoint": endpoint,
-						"node_id":  strconv.FormatUint(uint64(nodeID), 10),
-					}).Inc()
-				}
+		return func(info trace.DriverConnNewStreamDoneInfo) {
+			if config.Details()&trace.DriverConnEvents != 0 {
+				requests.With(map[string]string{
+					"status":   errorBrief(info.Error),
+					"method":   string(method),
+					"endpoint": endpoint,
+					"node_id":  strconv.FormatUint(uint64(nodeID), 10),
+				}).Inc()
 			}
 		}
 	}

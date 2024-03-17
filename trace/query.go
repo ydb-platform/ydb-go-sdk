@@ -31,12 +31,13 @@ type (
 		OnPoolSpawn   func(QueryPoolSpawnStartInfo) func(QueryPoolSpawnDoneInfo)
 		OnPoolWant    func(QueryPoolWantStartInfo) func(QueryPoolWantDoneInfo)
 
-		OnDo   func(QueryDoStartInfo) func(info QueryDoIntermediateInfo) func(QueryDoDoneInfo)
-		OnDoTx func(QueryDoTxStartInfo) func(info QueryDoTxIntermediateInfo) func(QueryDoTxDoneInfo)
+		OnDo   func(QueryDoStartInfo) func(QueryDoDoneInfo)
+		OnDoTx func(QueryDoTxStartInfo) func(QueryDoTxDoneInfo)
 
-		OnSessionCreate func(QuerySessionCreateStartInfo) func(info QuerySessionCreateDoneInfo)
-		OnSessionAttach func(QuerySessionAttachStartInfo) func(info QuerySessionAttachDoneInfo)
-		OnSessionDelete func(QuerySessionDeleteStartInfo) func(info QuerySessionDeleteDoneInfo)
+		OnSessionCreate  func(QuerySessionCreateStartInfo) func(info QuerySessionCreateDoneInfo)
+		OnSessionAttach  func(QuerySessionAttachStartInfo) func(info QuerySessionAttachDoneInfo)
+		OnSessionDelete  func(QuerySessionDeleteStartInfo) func(info QuerySessionDeleteDoneInfo)
+		OnSessionExecute func(QuerySessionExecuteStartInfo) func(info QuerySessionExecuteDoneInfo)
 	}
 
 	QueryDoStartInfo struct {
@@ -46,9 +47,6 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-	}
-	QueryDoIntermediateInfo struct {
-		Error error
 	}
 	QueryDoDoneInfo struct {
 		Attempts int
@@ -61,9 +59,6 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-	}
-	QueryDoTxIntermediateInfo struct {
-		Error error
 	}
 	QueryDoTxDoneInfo struct {
 		Attempts int
@@ -80,6 +75,20 @@ type (
 	QuerySessionCreateDoneInfo struct {
 		Session querySessionInfo
 		Error   error
+	}
+	QuerySessionExecuteStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+
+		Session querySessionInfo
+		Query   string
+	}
+	QuerySessionExecuteDoneInfo struct {
+		Error error
 	}
 	QuerySessionAttachStartInfo struct {
 		// Context make available context in trace callback function.

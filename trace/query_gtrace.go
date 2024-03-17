@@ -418,7 +418,7 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 	{
 		h1 := t.OnDo
 		h2 := x.OnDo
-		ret.OnDo = func(q QueryDoStartInfo) func(QueryDoIntermediateInfo) func(QueryDoDoneInfo) {
+		ret.OnDo = func(q QueryDoStartInfo) func(QueryDoDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -426,14 +426,14 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 					}
 				}()
 			}
-			var r, r1 func(QueryDoIntermediateInfo) func(QueryDoDoneInfo)
+			var r, r1 func(QueryDoDoneInfo)
 			if h1 != nil {
 				r = h1(q)
 			}
 			if h2 != nil {
 				r1 = h2(q)
 			}
-			return func(info QueryDoIntermediateInfo) func(QueryDoDoneInfo) {
+			return func(q QueryDoDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -441,27 +441,11 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 						}
 					}()
 				}
-				var r2, r3 func(QueryDoDoneInfo)
 				if r != nil {
-					r2 = r(info)
+					r(q)
 				}
 				if r1 != nil {
-					r3 = r1(info)
-				}
-				return func(q QueryDoDoneInfo) {
-					if options.panicCallback != nil {
-						defer func() {
-							if e := recover(); e != nil {
-								options.panicCallback(e)
-							}
-						}()
-					}
-					if r2 != nil {
-						r2(q)
-					}
-					if r3 != nil {
-						r3(q)
-					}
+					r1(q)
 				}
 			}
 		}
@@ -469,7 +453,7 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 	{
 		h1 := t.OnDoTx
 		h2 := x.OnDoTx
-		ret.OnDoTx = func(q QueryDoTxStartInfo) func(QueryDoTxIntermediateInfo) func(QueryDoTxDoneInfo) {
+		ret.OnDoTx = func(q QueryDoTxStartInfo) func(QueryDoTxDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -477,14 +461,14 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 					}
 				}()
 			}
-			var r, r1 func(QueryDoTxIntermediateInfo) func(QueryDoTxDoneInfo)
+			var r, r1 func(QueryDoTxDoneInfo)
 			if h1 != nil {
 				r = h1(q)
 			}
 			if h2 != nil {
 				r1 = h2(q)
 			}
-			return func(info QueryDoTxIntermediateInfo) func(QueryDoTxDoneInfo) {
+			return func(q QueryDoTxDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -492,27 +476,11 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 						}
 					}()
 				}
-				var r2, r3 func(QueryDoTxDoneInfo)
 				if r != nil {
-					r2 = r(info)
+					r(q)
 				}
 				if r1 != nil {
-					r3 = r1(info)
-				}
-				return func(q QueryDoTxDoneInfo) {
-					if options.panicCallback != nil {
-						defer func() {
-							if e := recover(); e != nil {
-								options.panicCallback(e)
-							}
-						}()
-					}
-					if r2 != nil {
-						r2(q)
-					}
-					if r3 != nil {
-						r3(q)
-					}
+					r1(q)
 				}
 			}
 		}
@@ -606,6 +574,41 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 				r1 = h2(q)
 			}
 			return func(info QuerySessionDeleteDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnSessionExecute
+		h2 := x.OnSessionExecute
+		ret.OnSessionExecute = func(q QuerySessionExecuteStartInfo) func(QuerySessionExecuteDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QuerySessionExecuteDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QuerySessionExecuteDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -789,59 +792,35 @@ func (t *Query) onPoolWant(q QueryPoolWantStartInfo) func(QueryPoolWantDoneInfo)
 	}
 	return res
 }
-func (t *Query) onDo(q QueryDoStartInfo) func(info QueryDoIntermediateInfo) func(QueryDoDoneInfo) {
+func (t *Query) onDo(q QueryDoStartInfo) func(QueryDoDoneInfo) {
 	fn := t.OnDo
 	if fn == nil {
-		return func(QueryDoIntermediateInfo) func(QueryDoDoneInfo) {
-			return func(QueryDoDoneInfo) {
-				return
-			}
+		return func(QueryDoDoneInfo) {
+			return
 		}
 	}
 	res := fn(q)
 	if res == nil {
-		return func(QueryDoIntermediateInfo) func(QueryDoDoneInfo) {
-			return func(QueryDoDoneInfo) {
-				return
-			}
+		return func(QueryDoDoneInfo) {
+			return
 		}
 	}
-	return func(info QueryDoIntermediateInfo) func(QueryDoDoneInfo) {
-		res := res(info)
-		if res == nil {
-			return func(QueryDoDoneInfo) {
-				return
-			}
-		}
-		return res
-	}
+	return res
 }
-func (t *Query) onDoTx(q QueryDoTxStartInfo) func(info QueryDoTxIntermediateInfo) func(QueryDoTxDoneInfo) {
+func (t *Query) onDoTx(q QueryDoTxStartInfo) func(QueryDoTxDoneInfo) {
 	fn := t.OnDoTx
 	if fn == nil {
-		return func(QueryDoTxIntermediateInfo) func(QueryDoTxDoneInfo) {
-			return func(QueryDoTxDoneInfo) {
-				return
-			}
+		return func(QueryDoTxDoneInfo) {
+			return
 		}
 	}
 	res := fn(q)
 	if res == nil {
-		return func(QueryDoTxIntermediateInfo) func(QueryDoTxDoneInfo) {
-			return func(QueryDoTxDoneInfo) {
-				return
-			}
+		return func(QueryDoTxDoneInfo) {
+			return
 		}
 	}
-	return func(info QueryDoTxIntermediateInfo) func(QueryDoTxDoneInfo) {
-		res := res(info)
-		if res == nil {
-			return func(QueryDoTxDoneInfo) {
-				return
-			}
-		}
-		return res
-	}
+	return res
 }
 func (t *Query) onSessionCreate(q QuerySessionCreateStartInfo) func(info QuerySessionCreateDoneInfo) {
 	fn := t.OnSessionCreate
@@ -883,6 +862,21 @@ func (t *Query) onSessionDelete(q QuerySessionDeleteStartInfo) func(info QuerySe
 	res := fn(q)
 	if res == nil {
 		return func(QuerySessionDeleteDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onSessionExecute(q QuerySessionExecuteStartInfo) func(info QuerySessionExecuteDoneInfo) {
+	fn := t.OnSessionExecute
+	if fn == nil {
+		return func(QuerySessionExecuteDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QuerySessionExecuteDoneInfo) {
 			return
 		}
 	}
@@ -1016,38 +1010,28 @@ func QueryOnPoolWant(t *Query, c *context.Context, call call) func(error) {
 		res(p)
 	}
 }
-func QueryOnDo(t *Query, c *context.Context, call call) func(error) func(attempts int, _ error) {
+func QueryOnDo(t *Query, c *context.Context, call call) func(attempts int, _ error) {
 	var p QueryDoStartInfo
 	p.Context = c
 	p.Call = call
 	res := t.onDo(p)
-	return func(e error) func(int, error) {
-		var p QueryDoIntermediateInfo
+	return func(attempts int, e error) {
+		var p QueryDoDoneInfo
+		p.Attempts = attempts
 		p.Error = e
-		res := res(p)
-		return func(attempts int, e error) {
-			var p QueryDoDoneInfo
-			p.Attempts = attempts
-			p.Error = e
-			res(p)
-		}
+		res(p)
 	}
 }
-func QueryOnDoTx(t *Query, c *context.Context, call call) func(error) func(attempts int, _ error) {
+func QueryOnDoTx(t *Query, c *context.Context, call call) func(attempts int, _ error) {
 	var p QueryDoTxStartInfo
 	p.Context = c
 	p.Call = call
 	res := t.onDoTx(p)
-	return func(e error) func(int, error) {
-		var p QueryDoTxIntermediateInfo
+	return func(attempts int, e error) {
+		var p QueryDoTxDoneInfo
+		p.Attempts = attempts
 		p.Error = e
-		res := res(p)
-		return func(attempts int, e error) {
-			var p QueryDoTxDoneInfo
-			p.Attempts = attempts
-			p.Error = e
-			res(p)
-		}
+		res(p)
 	}
 }
 func QueryOnSessionCreate(t *Query, c *context.Context, call call) func(session querySessionInfo, _ error) {
@@ -1082,6 +1066,19 @@ func QueryOnSessionDelete(t *Query, c *context.Context, call call, session query
 	res := t.onSessionDelete(p)
 	return func(e error) {
 		var p QuerySessionDeleteDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func QueryOnSessionExecute(t *Query, c *context.Context, call call, session querySessionInfo, query string) func(error) {
+	var p QuerySessionExecuteStartInfo
+	p.Context = c
+	p.Call = call
+	p.Session = session
+	p.Query = query
+	res := t.onSessionExecute(p)
+	return func(e error) {
+		var p QuerySessionExecuteDoneInfo
 		p.Error = e
 		res(p)
 	}
