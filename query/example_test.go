@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
@@ -85,7 +86,7 @@ func Example_selectWithParameters() {
 		func(ctx context.Context, s query.Session) (err error) { // retry operation
 			_, res, err := s.Execute(ctx,
 				`SELECT CAST($id AS Uint64) AS id, CAST($myStr AS Text) AS myStr`,
-				query.WithParameters(
+				options.WithParameters(
 					ydb.ParamsBuilder().
 						Param("$id").Uint64(123).
 						Param("$myStr").Text("123").
@@ -125,7 +126,7 @@ func Example_selectWithParameters() {
 
 			return res.Err() // return finally result error for auto-retry with driver
 		},
-		query.WithIdempotent(),
+		options.WithIdempotent(),
 	)
 	if err != nil {
 		fmt.Printf("unexpected error: %v", err)
@@ -185,8 +186,8 @@ func Example_txSelect() {
 
 			return res.Err() // return finally result error for auto-retry with driver
 		},
-		query.WithIdempotent(),
-		query.WithTxSettings(query.TxSettings(
+		options.WithIdempotent(),
+		options.WithTxSettings(query.TxSettings(
 			query.WithSnapshotReadOnly(),
 		)),
 	)

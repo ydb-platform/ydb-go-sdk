@@ -29,7 +29,12 @@ func Check(err error) (
 }
 
 func MustDeleteSession(err error) bool {
+	if err == nil {
+		return false
+	}
+
 	var e Error
+
 	if As(err, &e) {
 		return e.MustDeleteSession()
 	}

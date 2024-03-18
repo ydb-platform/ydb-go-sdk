@@ -4,7 +4,4 @@ import (
 	"errors"
 )
 
-var (
-	errClosedPool   = errors.New("closed Pool")
-	errPoolOverflow = errors.New("Pool overflow")
-)
+var errClosedPool = errors.New("closed pool")

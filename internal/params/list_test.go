@@ -20,7 +20,7 @@ func TestList(t *testing.T) {
 	}{
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().Uint64(123).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().Uint64(123).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -48,7 +48,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().Int64(123).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().Int64(123).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -76,7 +76,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().Uint32(123).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().Uint32(123).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -104,7 +104,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().Int32(123).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().Int32(123).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -132,7 +132,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().Uint16(123).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().Uint16(123).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -160,7 +160,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().Int16(123).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().Int16(123).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -188,7 +188,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().Uint8(123).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().Uint8(123).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -216,7 +216,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().Int8(123).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().Int8(123).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -244,7 +244,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().Bool(true).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().Bool(true).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -272,7 +272,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().Text("test").Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().Text("test").EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -300,7 +300,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().Bytes([]byte("test")).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().Bytes([]byte("test")).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -328,7 +328,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().Float(123).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().Float(123).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -356,7 +356,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().Double(123).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().Double(123).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -384,7 +384,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().Interval(time.Second).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().Interval(time.Second).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -412,7 +412,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().Datetime(time.Unix(123456789, 456)).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().Datetime(time.Unix(123456789, 456)).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -440,7 +440,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().Date(time.Unix(123456789, 456)).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().Date(time.Unix(123456789, 456)).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -468,7 +468,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().Timestamp(time.Unix(123456789, 456)).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().Timestamp(time.Unix(123456789, 456)).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -496,7 +496,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().Decimal([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, 22, 9).Build(), //nolint:lll
+			builder: Builder{}.Param("$x").BeginList().Add().Decimal([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, 22, 9).EndList(), //nolint:lll
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -528,7 +528,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().JSON(`{"a": 1,"b": "B"}`).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().JSON(`{"a": 1,"b": "B"}`).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -556,7 +556,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().JSONDocument(`{"a": 1,"b": "B"}`).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().JSONDocument(`{"a": 1,"b": "B"}`).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -584,7 +584,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().YSON([]byte(`[ 1; 2; 3; 4; 5 ]`)).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().YSON([]byte(`[ 1; 2; 3; 4; 5 ]`)).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -612,8 +612,8 @@ func TestList(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItem().
-				UUID([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}).Build(),
+			builder: Builder{}.Param("$x").BeginList().Add().
+				UUID([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -642,7 +642,7 @@ func TestList(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").List().AddItems(value.Uint64Value(123), value.Uint64Value(321)).Build(),
+			builder: Builder{}.Param("$x").BeginList().AddItems(value.Uint64Value(123), value.Uint64Value(321)).EndList(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{

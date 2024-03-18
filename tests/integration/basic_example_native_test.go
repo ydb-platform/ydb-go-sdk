@@ -232,7 +232,7 @@ func TestBasicExampleNative(t *testing.T) { //nolint:gocyclo
 	db, err := ydb.Open(ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
-		ydb.WithUserAgent("table/e2e"),
+		ydb.WithApplicationName("table/e2e"),
 		withMetrics(t, trace.DetailsAll, time.Second),
 		ydb.With(
 			config.WithOperationTimeout(time.Second*5),

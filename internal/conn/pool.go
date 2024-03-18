@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
@@ -76,6 +77,15 @@ func (p *Pool) isClosed() bool {
 
 func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 	if p.isClosed() {
+		return
+	}
+
+	if xerrors.IsTransportError(cause,
+		grpcCodes.OK,
+		grpcCodes.Canceled,
+		grpcCodes.ResourceExhausted,
+		grpcCodes.OutOfRange,
+	) {
 		return
 	}
 

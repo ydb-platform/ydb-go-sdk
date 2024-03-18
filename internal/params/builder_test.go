@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pg"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
@@ -360,7 +361,7 @@ func TestBuilder(t *testing.T) {
 		{
 			name: xtest.CurrentFileLine(),
 			builder: Builder{}.
-				Param("$x").List().Build().
+				Param("$x").BeginList().EndList().
 				Build(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
@@ -446,6 +447,69 @@ func TestBuilder(t *testing.T) {
 							Low_128: 651345242494996240,
 						},
 						High_128: 72623859790382856,
+					},
+				},
+			},
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			builder: Builder{}.
+				Param("$x").
+				Pg().Unknown("123").
+				Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_PgType{
+							PgType: &Ydb.PgType{
+								Oid: pg.OIDUnknown,
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_TextValue{TextValue: "123"},
+					},
+				},
+			},
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			builder: Builder{}.
+				Param("$x").
+				Pg().Int4(123).
+				Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_PgType{
+							PgType: &Ydb.PgType{
+								Oid: pg.OIDInt4,
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_TextValue{TextValue: "123"},
+					},
+				},
+			},
+		},
+		{
+			name: xtest.CurrentFileLine(),
+			builder: Builder{}.
+				Param("$x").
+				Pg().Int8(123).
+				Build(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_PgType{
+							PgType: &Ydb.PgType{
+								Oid: pg.OIDInt8,
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Value: &Ydb.Value_TextValue{TextValue: "123"},
 					},
 				},
 			},

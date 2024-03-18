@@ -95,22 +95,33 @@ func (p *Parameters) Add(params ...NamedValue) {
 	}
 }
 
-func (p *Parameter) Optional() *optional {
+func (p *Parameter) BeginOptional() *optional {
 	return &optional{
 		parent: p.parent,
 		name:   p.name,
 	}
 }
 
-func (p *Parameter) List() *list {
+func (p *Parameter) BeginList() *list {
 	return &list{
 		parent: p.parent,
 		name:   p.name,
 	}
 }
 
-func (p *Parameter) Set() *set {
+func (p *Parameter) Pg() pgParam {
+	return pgParam{p}
+}
+
+func (p *Parameter) BeginSet() *set {
 	return &set{
+		parent: p.parent,
+		name:   p.name,
+	}
+}
+
+func (p *Parameter) BeginDict() *dict {
+	return &dict{
 		parent: p.parent,
 		name:   p.name,
 	}

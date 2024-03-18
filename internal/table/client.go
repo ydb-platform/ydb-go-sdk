@@ -121,9 +121,9 @@ func withCreateSessionOnClose(onClose func(s *session)) createSessionOption {
 
 func (c *Client) createSession(ctx context.Context, opts ...createSessionOption) (s *session, err error) {
 	options := createSessionOptions{}
-	for _, o := range opts {
-		if o != nil {
-			o(&options)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&options)
 		}
 	}
 
@@ -644,7 +644,7 @@ func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 
 	attempts, onIntermediate := 0, trace.TableOnDo(config.Trace, &ctx,
 		stack.FunctionID(""),
-		config.Label, config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
+		config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
 	)
 	defer func() {
 		onIntermediate(finalErr)(attempts, finalErr)
@@ -674,7 +674,7 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 
 	attempts, onIntermediate := 0, trace.TableOnDoTx(config.Trace, &ctx,
 		stack.FunctionID(""),
-		config.Label, config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
+		config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
 	)
 	defer func() {
 		onIntermediate(finalErr)(attempts, finalErr)

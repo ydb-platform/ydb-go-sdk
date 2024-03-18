@@ -54,10 +54,21 @@ func WithAccessTokenCredentials(accessToken string) Option {
 	)
 }
 
+// WithApplicationName add provided application name to all api requests
+func WithApplicationName(applicationName string) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.options = append(c.options, config.WithApplicationName(applicationName))
+
+		return nil
+	}
+}
+
 // WithUserAgent add provided user agent value to all api requests
+//
+// Deprecated: use WithApplicationName instead
 func WithUserAgent(userAgent string) Option {
 	return func(ctx context.Context, c *Driver) error {
-		c.options = append(c.options, config.WithUserAgent(userAgent))
+		c.options = append(c.options, config.WithApplicationName(userAgent))
 
 		return nil
 	}
@@ -247,9 +258,9 @@ func With(options ...config.Option) Option {
 // MergeOptions concatentaes provided options to one cumulative value.
 func MergeOptions(opts ...Option) Option {
 	return func(ctx context.Context, c *Driver) error {
-		for _, o := range opts {
-			if o != nil {
-				if err := o(ctx, c); err != nil {
+		for _, opt := range opts {
+			if opt != nil {
+				if err := opt(ctx, c); err != nil {
 					return xerrors.WithStackTrace(err)
 				}
 			}
@@ -382,7 +393,33 @@ func WithQueryConfigOption(option queryConfig.Option) Option {
 func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
-		c.queryOptions = append(c.queryOptions, queryConfig.WithSizeLimit(sizeLimit))
+
+		return nil
+	}
+}
+
+// WithSessionPoolMinSize set min size of internal sessions pool in query.Client
+func WithSessionPoolMinSize(size int) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.queryOptions = append(c.queryOptions, queryConfig.WithPoolMinSize(size))
+
+		return nil
+	}
+}
+
+// WithSessionPoolMaxSize set min size of internal sessions pool in query.Client
+func WithSessionPoolMaxSize(size int) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.queryOptions = append(c.queryOptions, queryConfig.WithPoolMaxSize(size))
+
+		return nil
+	}
+}
+
+// WithSessionPoolProducersCount set min size of internal sessions pool in query.Client
+func WithSessionPoolProducersCount(count int) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.queryOptions = append(c.queryOptions, queryConfig.WithPoolProducersCount(count))
 
 		return nil
 	}
@@ -417,7 +454,7 @@ func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
 func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithCreateSessionTimeout(createSessionTimeout))
-		c.queryOptions = append(c.queryOptions, queryConfig.WithCreateSessionTimeout(createSessionTimeout))
+		c.queryOptions = append(c.queryOptions, queryConfig.WithSessionCreateTimeout(createSessionTimeout))
 
 		return nil
 	}
@@ -427,7 +464,7 @@ func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Opt
 func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithDeleteTimeout(deleteTimeout))
-		c.queryOptions = append(c.queryOptions, queryConfig.WithDeleteTimeout(deleteTimeout))
+		c.queryOptions = append(c.queryOptions, queryConfig.WithSessionDeleteTimeout(deleteTimeout))
 
 		return nil
 	}
@@ -465,6 +502,25 @@ func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option { //
 				append(
 					[]trace.TableComposeOption{
 						trace.WithTablePanicCallback(c.panicCallback),
+					},
+					opts...,
+				)...,
+			),
+		)
+
+		return nil
+	}
+}
+
+// WithTraceQuery appends trace.Query into query traces
+func WithTraceQuery(t trace.Query, opts ...trace.QueryComposeOption) Option { //nolint:gocritic
+	return func(ctx context.Context, c *Driver) error {
+		c.queryOptions = append(
+			c.queryOptions,
+			queryConfig.WithTrace(&t,
+				append(
+					[]trace.QueryComposeOption{
+						trace.WithQueryPanicCallback(c.panicCallback),
 					},
 					opts...,
 				)...,

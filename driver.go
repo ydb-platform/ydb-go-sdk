@@ -348,6 +348,7 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, e
 		for _, opt := range []Option{
 			WithTraceDriver(log.Driver(d.logger, d.loggerDetails, d.loggerOpts...)),       //nolint:contextcheck
 			WithTraceTable(log.Table(d.logger, d.loggerDetails, d.loggerOpts...)),         //nolint:contextcheck
+			WithTraceQuery(log.Query(d.logger, d.loggerDetails, d.loggerOpts...)),         //nolint:contextcheck
 			WithTraceScripting(log.Scripting(d.logger, d.loggerDetails, d.loggerOpts...)), //nolint:contextcheck
 			WithTraceScheme(log.Scheme(d.logger, d.loggerDetails, d.loggerOpts...)),
 			WithTraceCoordination(log.Coordination(d.logger, d.loggerDetails, d.loggerOpts...)),

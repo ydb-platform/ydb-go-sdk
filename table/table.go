@@ -459,7 +459,9 @@ type (
 func NewQueryParameters(opts ...ParameterOption) *QueryParameters {
 	qp := QueryParameters(make([]*params.Parameter, len(opts)))
 	for i, opt := range opts {
-		qp[i] = params.Named(opt.Name(), opt.Value())
+		if opt != nil {
+			qp[i] = params.Named(opt.Name(), opt.Value())
+		}
 	}
 
 	return &qp

@@ -19,7 +19,7 @@ func TestOptional(t *testing.T) {
 	}{
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().Uint64(123).Build(),
+			builder: Builder{}.Param("$x").BeginOptional().Uint64(123).EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -43,7 +43,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().Int64(123).Build(),
+			builder: Builder{}.Param("$x").BeginOptional().Int64(123).EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -67,7 +67,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().Uint32(123).Build(),
+			builder: Builder{}.Param("$x").BeginOptional().Uint32(123).EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -91,7 +91,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().Int32(123).Build(),
+			builder: Builder{}.Param("$x").BeginOptional().Int32(123).EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -115,7 +115,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().Uint16(123).Build(),
+			builder: Builder{}.Param("$x").BeginOptional().Uint16(123).EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -139,7 +139,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().Int16(123).Build(),
+			builder: Builder{}.Param("$x").BeginOptional().Int16(123).EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -163,7 +163,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().Uint8(123).Build(),
+			builder: Builder{}.Param("$x").BeginOptional().Uint8(123).EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -187,7 +187,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().Int8(123).Build(),
+			builder: Builder{}.Param("$x").BeginOptional().Int8(123).EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -211,7 +211,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().Bool(true).Build(),
+			builder: Builder{}.Param("$x").BeginOptional().Bool(true).EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -235,7 +235,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().Text("test").Build(),
+			builder: Builder{}.Param("$x").BeginOptional().Text("test").EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -259,7 +259,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().Bytes([]byte("test")).Build(),
+			builder: Builder{}.Param("$x").BeginOptional().Bytes([]byte("test")).EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -283,7 +283,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().Float(123).Build(),
+			builder: Builder{}.Param("$x").BeginOptional().Float(123).EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -307,7 +307,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().Double(123).Build(),
+			builder: Builder{}.Param("$x").BeginOptional().Double(123).EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -331,7 +331,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().Interval(time.Second).Build(),
+			builder: Builder{}.Param("$x").BeginOptional().Interval(time.Second).EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -355,7 +355,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().Datetime(time.Unix(123456789, 456)).Build(),
+			builder: Builder{}.Param("$x").BeginOptional().Datetime(time.Unix(123456789, 456)).EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -379,7 +379,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().Date(time.Unix(123456789, 456)).Build(),
+			builder: Builder{}.Param("$x").BeginOptional().Date(time.Unix(123456789, 456)).EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -403,7 +403,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().Timestamp(time.Unix(123456789, 456)).Build(),
+			builder: Builder{}.Param("$x").BeginOptional().Timestamp(time.Unix(123456789, 456)).EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -427,7 +427,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().Decimal([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, 22, 9).Build(), //nolint:lll
+			builder: Builder{}.Param("$x").BeginOptional().Decimal([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, 22, 9).EndOptional(), //nolint:lll
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -455,7 +455,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().JSON(`{"a": 1,"b": "B"}`).Build(),
+			builder: Builder{}.Param("$x").BeginOptional().JSON(`{"a": 1,"b": "B"}`).EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -479,7 +479,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().JSONDocument(`{"a": 1,"b": "B"}`).Build(),
+			builder: Builder{}.Param("$x").BeginOptional().JSONDocument(`{"a": 1,"b": "B"}`).EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -503,7 +503,7 @@ func TestOptional(t *testing.T) {
 		},
 		{
 			name:    xtest.CurrentFileLine(),
-			builder: Builder{}.Param("$x").Optional().YSON([]byte(`[ 1; 2; 3; 4; 5 ]`)).Build(),
+			builder: Builder{}.Param("$x").BeginOptional().YSON([]byte(`[ 1; 2; 3; 4; 5 ]`)).EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{
@@ -528,9 +528,9 @@ func TestOptional(t *testing.T) {
 		{
 			name: xtest.CurrentFileLine(),
 			builder: Builder{}.Param("$x").
-				Optional().
+				BeginOptional().
 				UUID([...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}).
-				Build(),
+				EndOptional(),
 			params: map[string]*Ydb.TypedValue{
 				"$x": {
 					Type: &Ydb.Type{

@@ -46,7 +46,7 @@ func TestConnection(t *testing.T) {
 			if !has {
 				t.Fatalf("no medatada")
 			}
-			userAgents := md.Get(meta.HeaderUserAgent)
+			userAgents := md.Get(meta.HeaderApplicationName)
 			if len(userAgents) == 0 {
 				t.Fatalf("no user agent")
 			}
@@ -87,7 +87,7 @@ func TestConnection(t *testing.T) {
 			newLoggerWithMinLevel(t, log.WARN),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
 		),
-		ydb.WithUserAgent(userAgent),
+		ydb.WithApplicationName(userAgent),
 		ydb.WithRequestsType(requestType),
 		ydb.With(
 			config.WithGrpcOptions(
