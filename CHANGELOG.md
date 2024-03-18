@@ -1,3 +1,4 @@
+## v3.58.2
 * Added `trace.Query.OnSessionBegin` event
 * Added `trace.Query.OnResult{New,NextPart,NextResultSet,Close}` events
 * Added `trace.Query.OnRow{Scan,ScanNamed,ScanStruct}` events
