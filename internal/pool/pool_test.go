@@ -107,7 +107,8 @@ func TestPool(t *testing.T) {
 	})
 	t.Run("Item", func(t *testing.T) {
 		t.Run("Close", func(t *testing.T) {
-			xtest.TestManyTimes(t, func(t testing.TB) {
+			xtest.TestManyTimes(t, func(tb testing.TB) {
+				tb.Helper()
 				var (
 					createCounter int64
 					closeCounter  int64
@@ -129,18 +130,19 @@ func TestPool(t *testing.T) {
 						return v, nil
 					}),
 				)
-				require.NoError(t, err)
+				require.NoError(tb, err)
 				err = p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
 					return nil
 				})
-				require.NoError(t, err)
-				require.GreaterOrEqual(t, atomic.LoadInt64(&createCounter), atomic.LoadInt64(&closeCounter))
+				require.NoError(tb, err)
+				require.GreaterOrEqual(tb, atomic.LoadInt64(&createCounter), atomic.LoadInt64(&closeCounter))
 				p.Close(rootCtx)
-				require.EqualValues(t, atomic.LoadInt64(&createCounter), atomic.LoadInt64(&closeCounter))
+				require.EqualValues(tb, atomic.LoadInt64(&createCounter), atomic.LoadInt64(&closeCounter))
 			}, xtest.StopAfter(time.Second))
 		})
 		t.Run("IsAlive", func(t *testing.T) {
-			xtest.TestManyTimes(t, func(t testing.TB) {
+			xtest.TestManyTimes(t, func(tb testing.TB) {
+				tb.Helper()
 				var (
 					newItems    int64
 					deleteItems int64
@@ -165,7 +167,7 @@ func TestPool(t *testing.T) {
 						return v, nil
 					}),
 				)
-				require.NoError(t, err)
+				require.NoError(tb, err)
 				err = p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
 					if atomic.LoadInt64(&newItems) < 10 {
 						return expErr
@@ -173,18 +175,19 @@ func TestPool(t *testing.T) {
 
 					return nil
 				})
-				require.NoError(t, err)
-				require.GreaterOrEqual(t, atomic.LoadInt64(&newItems), int64(9))
-				require.GreaterOrEqual(t, atomic.LoadInt64(&newItems), atomic.LoadInt64(&deleteItems))
+				require.NoError(tb, err)
+				require.GreaterOrEqual(tb, atomic.LoadInt64(&newItems), int64(9))
+				require.GreaterOrEqual(tb, atomic.LoadInt64(&newItems), atomic.LoadInt64(&deleteItems))
 				p.Close(rootCtx)
-				require.EqualValues(t, atomic.LoadInt64(&newItems), atomic.LoadInt64(&deleteItems))
+				require.EqualValues(tb, atomic.LoadInt64(&newItems), atomic.LoadInt64(&deleteItems))
 			}, xtest.StopAfter(5*time.Second))
 		})
 	})
 	t.Run("Stress", func(t *testing.T) {
-		xtest.TestManyTimes(t, func(t testing.TB) {
+		xtest.TestManyTimes(t, func(tb testing.TB) {
+			tb.Helper()
 			p, err := New[*testItem, testItem](rootCtx, WithMinSize[*testItem, testItem](DefaultMaxSize/2))
-			require.NoError(t, err)
+			require.NoError(tb, err)
 			var wg sync.WaitGroup
 			wg.Add(DefaultMaxSize*2 + 1)
 			for range make([]struct{}, DefaultMaxSize*2) {
@@ -194,7 +197,7 @@ func TestPool(t *testing.T) {
 						return nil
 					})
 					if err != nil && !xerrors.Is(err, errClosedPool, context.Canceled) {
-						t.Failed()
+						tb.Failed()
 					}
 				}()
 			}
@@ -202,7 +205,7 @@ func TestPool(t *testing.T) {
 				defer wg.Done()
 				time.Sleep(time.Millisecond)
 				err := p.Close(rootCtx)
-				require.NoError(t, err)
+				require.NoError(tb, err)
 			}()
 			wg.Wait()
 		}, xtest.StopAfter(42*time.Second))
