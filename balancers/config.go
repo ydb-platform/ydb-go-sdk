@@ -116,9 +116,9 @@ func FromConfig(config string, opts ...fromConfigOption) *balancerConfig.Config 
 		b   *balancerConfig.Config
 		err error
 	)
-	for _, o := range opts {
-		if o != nil {
-			o(&h)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&h)
 		}
 	}
 

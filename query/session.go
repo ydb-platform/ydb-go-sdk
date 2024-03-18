@@ -14,7 +14,7 @@ type (
 	SessionInfo interface {
 		ID() string
 		NodeID() int64
-		Status() SessionStatus
+		Status() string
 	}
 
 	Session interface {

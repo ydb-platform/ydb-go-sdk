@@ -180,7 +180,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	)
 	defer func() {
 		nodes, added, dropped := endpointsDiff(endpoints, previousConns)
-		onDone(nodes, added, dropped, localDC, nil)
+		onDone(nodes, added, dropped, localDC)
 	}()
 
 	connections := endpointsToConnections(b.pool, endpoints)

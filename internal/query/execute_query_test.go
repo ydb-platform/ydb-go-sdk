@@ -369,37 +369,37 @@ func TestExecute(t *testing.T) {
 			require.EqualValues(t, 0, rs.index)
 			{
 				t.Log("next (row=1)")
-				_, err := rs.next(ctx)
+				_, err := rs.nextRow(ctx)
 				require.NoError(t, err)
 				require.EqualValues(t, 0, rs.rowIndex)
 			}
 			{
 				t.Log("next (row=2)")
-				_, err := rs.next(ctx)
+				_, err := rs.nextRow(ctx)
 				require.NoError(t, err)
 				require.EqualValues(t, 1, rs.rowIndex)
 			}
 			{
 				t.Log("next (row=3)")
-				_, err := rs.next(ctx)
+				_, err := rs.nextRow(ctx)
 				require.NoError(t, err)
 				require.EqualValues(t, 2, rs.rowIndex)
 			}
 			{
 				t.Log("next (row=4)")
-				_, err := rs.next(ctx)
+				_, err := rs.nextRow(ctx)
 				require.NoError(t, err)
 				require.EqualValues(t, 0, rs.rowIndex)
 			}
 			{
 				t.Log("next (row=5)")
-				_, err := rs.next(ctx)
+				_, err := rs.nextRow(ctx)
 				require.NoError(t, err)
 				require.EqualValues(t, 1, rs.rowIndex)
 			}
 			{
 				t.Log("next (row=6)")
-				_, err := rs.next(ctx)
+				_, err := rs.nextRow(ctx)
 				require.ErrorIs(t, err, io.EOF)
 			}
 		}
@@ -416,37 +416,37 @@ func TestExecute(t *testing.T) {
 			require.EqualValues(t, 2, rs.index)
 			{
 				t.Log("next (row=1)")
-				_, err := rs.next(ctx)
+				_, err := rs.nextRow(ctx)
 				require.NoError(t, err)
 				require.EqualValues(t, 0, rs.rowIndex)
 			}
 			{
 				t.Log("next (row=2)")
-				_, err := rs.next(ctx)
+				_, err := rs.nextRow(ctx)
 				require.NoError(t, err)
 				require.EqualValues(t, 1, rs.rowIndex)
 			}
 			{
 				t.Log("next (row=3)")
-				_, err := rs.next(ctx)
+				_, err := rs.nextRow(ctx)
 				require.NoError(t, err)
 				require.EqualValues(t, 0, rs.rowIndex)
 			}
 			{
 				t.Log("next (row=4)")
-				_, err := rs.next(ctx)
+				_, err := rs.nextRow(ctx)
 				require.NoError(t, err)
 				require.EqualValues(t, 1, rs.rowIndex)
 			}
 			{
 				t.Log("next (row=5)")
-				_, err := rs.next(ctx)
+				_, err := rs.nextRow(ctx)
 				require.NoError(t, err)
 				require.EqualValues(t, 2, rs.rowIndex)
 			}
 			{
 				t.Log("next (row=6)")
-				_, err := rs.next(ctx)
+				_, err := rs.nextRow(ctx)
 				require.ErrorIs(t, err, io.EOF)
 			}
 		}
@@ -586,37 +586,37 @@ func TestExecute(t *testing.T) {
 				require.EqualValues(t, 0, rs.index)
 				{
 					t.Log("next (row=1)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 0, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=2)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 1, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=3)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 2, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=4)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 0, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=5)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 1, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=6)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.Error(t, err)
 					require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 				}
@@ -726,25 +726,25 @@ func TestExecute(t *testing.T) {
 				require.EqualValues(t, 0, rs.index)
 				{
 					t.Log("next (row=1)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 0, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=2)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 1, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=3)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 2, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=4)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.Error(t, err)
 					require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 				}

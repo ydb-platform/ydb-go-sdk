@@ -28,9 +28,9 @@ func TestSchemeOptions(t *testing.T) {
 		}
 
 		var desc permissionsDesc
-		for _, o := range opts {
-			if o != nil {
-				o(&desc)
+		for _, opt := range opts {
+			if opt != nil {
+				opt(&desc)
 			}
 		}
 

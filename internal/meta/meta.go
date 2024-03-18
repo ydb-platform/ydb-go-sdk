@@ -3,6 +3,8 @@ package meta
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 
 	"google.golang.org/grpc/metadata"
 
@@ -20,13 +22,14 @@ func New(
 	opts ...Option,
 ) *Meta {
 	m := &Meta{
+		pid:         strconv.Itoa(os.Getpid()),
 		trace:       trace,
 		credentials: credentials,
 		database:    database,
 	}
-	for _, o := range opts {
-		if o != nil {
-			o(m)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(m)
 		}
 	}
 
@@ -35,9 +38,9 @@ func New(
 
 type Option func(m *Meta)
 
-func WithUserAgentOption(userAgent string) Option {
+func WithApplicationNameOption(applicationName string) Option {
 	return func(m *Meta) {
-		m.userAgents = append(m.userAgents, userAgent)
+		m.applicationName = applicationName
 	}
 }
 
@@ -67,12 +70,13 @@ func ForbidOption(feature string) Option {
 }
 
 type Meta struct {
-	trace        *trace.Driver
-	credentials  credentials.Credentials
-	database     string
-	requestsType string
-	userAgents   []string
-	capabilities []string
+	pid             string
+	trace           *trace.Driver
+	credentials     credentials.Credentials
+	database        string
+	requestsType    string
+	applicationName string
+	capabilities    []string
 }
 
 func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
@@ -80,6 +84,8 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	if !has {
 		md = metadata.MD{}
 	}
+
+	md.Set(HeaderClientPid, m.pid)
 
 	if len(md.Get(HeaderDatabase)) == 0 {
 		md.Set(HeaderDatabase, m.database)
@@ -95,8 +101,8 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		}
 	}
 
-	if len(m.userAgents) != 0 {
-		md.Append(HeaderUserAgent, m.userAgents...)
+	if m.applicationName != "" {
+		md.Append(HeaderApplicationName, m.applicationName)
 	}
 
 	if len(m.capabilities) > 0 {

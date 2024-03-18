@@ -33,14 +33,16 @@ func fieldName(f reflect.StructField, tagName string) string { //nolint:gocritic
 	return f.Name
 }
 
-func (s StructScanner) ScanStruct(dst interface{}, opts ...ScanStructOption) error {
+func (s StructScanner) ScanStruct(dst interface{}, opts ...ScanStructOption) (err error) {
 	settings := scanStructSettings{
 		TagName:                       "sql",
 		AllowMissingColumnsFromSelect: false,
 		AllowMissingFieldsInStruct:    false,
 	}
 	for _, opt := range opts {
-		opt.applyScanStructOption(&settings)
+		if opt != nil {
+			opt.applyScanStructOption(&settings)
+		}
 	}
 	ptr := reflect.ValueOf(dst)
 	if ptr.Kind() != reflect.Pointer {

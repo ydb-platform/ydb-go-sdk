@@ -60,7 +60,7 @@ func Example_selectWithoutParameters() {
 
 			return res.Err() // return finally result error for auto-retry with driver
 		},
-		options.WithIdempotent(),
+		query.WithIdempotent(),
 	)
 	if err != nil {
 		fmt.Printf("unexpected error: %v", err)

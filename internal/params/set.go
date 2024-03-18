@@ -18,7 +18,7 @@ type (
 	}
 )
 
-func (s *set) AddItem() *setItem {
+func (s *set) Add() *setItem {
 	return &setItem{
 		parent: s,
 	}
@@ -30,7 +30,7 @@ func (s *set) AddItems(items ...value.Value) *set {
 	return s
 }
 
-func (s *set) Build() Builder {
+func (s *set) EndSet() Builder {
 	s.parent.params = append(s.parent.params, &Parameter{
 		parent: s.parent,
 		name:   s.name,

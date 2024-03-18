@@ -112,7 +112,9 @@ func ParseDoOpts(t *trace.Query, opts ...DoOption) (s *doSettings) {
 	}
 
 	for _, opt := range opts {
-		opt.applyDoOption(s)
+		if opt != nil {
+			opt.applyDoOption(s)
+		}
 	}
 
 	return s
@@ -127,7 +129,9 @@ func ParseDoTxOpts(t *trace.Query, opts ...DoTxOption) (s *doTxSettings) {
 	}
 
 	for _, opt := range opts {
-		opt.applyDoTxOption(s)
+		if opt != nil {
+			opt.applyDoTxOption(s)
+		}
 	}
 
 	return s

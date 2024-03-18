@@ -258,7 +258,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 
 		code           = int64(0)
 		onIntermediate = trace.RetryOnRetry(options.trace, &ctx,
-			options.label, options.call, options.label, options.idempotent, xcontext.IsNestedCall(ctx),
+			options.call, options.label, options.idempotent, xcontext.IsNestedCall(ctx),
 		)
 	)
 	defer func() {

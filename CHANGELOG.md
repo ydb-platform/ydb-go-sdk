@@ -1,3 +1,38 @@
+## v3.58.2
+* Added `trace.Query.OnSessionBegin` event
+* Added `trace.Query.OnResult{New,NextPart,NextResultSet,Close}` events
+* Added `trace.Query.OnRow{Scan,ScanNamed,ScanStruct}` events
+
+## v3.58.1
+* Dropped all deprecated callbacks and events from traces
+* Added `trace.Driver.OnConnStream{SendMsg,RecvMsg,CloseSend}` events
+* Added `trace.Query.OnSessionExecute` event
+
+## v3.58.0
+* Changed `List` constructor from `ydb.ParamsBuilder().List().Build().Build()` to `ydb.ParamsBuilder().BeginList().EndList().Build()`
+* Changed `Set` constructor from `ydb.ParamsBuilder().Set().Build().Build()` to `ydb.ParamsBuilder().BeginSet().EndSet().Build()`
+* Changed `Dict` constructor from `ydb.ParamsBuilder().Dict().Build().Build()` to `ydb.ParamsBuilder().BeginDict().EndDict().Build()`
+* Changed `Optional` constructor from `ydb.ParamsBuilder().Set().Build().Build()` to `ydb.ParamsBuilder().BeginOptional().EndOptional().Build()`
+* Added events into `trace.Query` trace
+* Rewrote `internal/pool` to buffered channel
+* Added `internal/xcontext.WithDone()`
+* Added `internal/xsync.{OnceFunc,OnceValue}`
+* Updated `google.golang.org/protobuf` from `v1.31.0` to `v.33.0`
+* Added `ydb.ParamsBuilder().Pg().{Value,Int4,Int8,Unknown}` for postgres arguments
+
+## v3.57.4
+* Added client pid to each gRPC requests to YDB over header `x-ydb-client-pid`
+* Added `ydb.WithApplicationName` option
+* Added `Dict` support for `ydb.ParamsBuilder()`
+
+## v3.57.3
+* Added metrics over query service internals
+* Added session create and delete events into `trace.Query`
+* Moved public type `query.SessionStatus` into `internal/query` package
+
+## v3.57.2
+* Fixed cases when some option is nil
+
 ## v3.57.1
 * Added logs over query service internals
 * Changed `trace.Query` events

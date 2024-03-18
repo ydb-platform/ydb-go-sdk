@@ -60,19 +60,12 @@ func execute(ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient,
 
 	request, callOptions := executeQueryRequest(a, s.id, q, cfg)
 
-	streamCtx, streamCancel := xcontext.WithCancel(context.Background())
-	defer func() {
-		if finalErr != nil {
-			streamCancel()
-		}
-	}()
-
-	stream, err := c.ExecuteQuery(streamCtx, request, callOptions...)
+	stream, err := c.ExecuteQuery(xcontext.WithoutDeadline(ctx), request, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	r, txID, err := newResult(ctx, stream, streamCancel)
+	r, txID, err := newResult(ctx, stream, s.trace)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
