@@ -102,8 +102,8 @@ func (p *Parameter) BeginOptional() *optional {
 	}
 }
 
-func (p *Parameter) BeginList() *list {
-	return &list{
+func (p *Parameter) BeginList() *list[Builder] {
+	return &list[Builder]{
 		parent: p.parent,
 		name:   p.name,
 	}
