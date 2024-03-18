@@ -145,6 +145,23 @@ func query(config Config) (t trace.Query) {
 				}
 			}
 		}
+		{
+			beginConfig := sessionConfig.WithSystem("begin")
+			errs := beginConfig.CounterVec("errs", "status")
+			latency := beginConfig.TimerVec("latency")
+			t.OnSessionBegin = func(info trace.QuerySessionBeginStartInfo) func(info trace.QuerySessionBeginDoneInfo) {
+				start := time.Now()
+
+				return func(info trace.QuerySessionBeginDoneInfo) {
+					if beginConfig.Details()&trace.QuerySessionEvents != 0 {
+						errs.With(map[string]string{
+							"status": errorBrief(info.Error),
+						}).Inc()
+						latency.With(nil).Record(time.Since(start))
+					}
+				}
+			}
+		}
 	}
 
 	return t

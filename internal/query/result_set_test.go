@@ -121,35 +121,35 @@ func TestResultSetNext(t *testing.T) {
 			}
 
 			return part, nil
-		}, recv)
+		}, recv, nil)
 		require.EqualValues(t, 0, rs.index)
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, rs.rowIndex)
 		}
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.NoError(t, err)
 			require.EqualValues(t, 1, rs.rowIndex)
 		}
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.NoError(t, err)
 			require.EqualValues(t, 2, rs.rowIndex)
 		}
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, rs.rowIndex)
 		}
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.NoError(t, err)
 			require.EqualValues(t, 1, rs.rowIndex)
 		}
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.ErrorIs(t, err, io.EOF)
 		}
 	})
@@ -225,16 +225,16 @@ func TestResultSetNext(t *testing.T) {
 			}
 
 			return part, nil
-		}, recv)
+		}, recv, nil)
 		require.EqualValues(t, 0, rs.index)
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, rs.rowIndex)
 		}
 		cancel()
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.ErrorIs(t, err, context.Canceled)
 		}
 	})
@@ -307,7 +307,7 @@ func TestResultSetNext(t *testing.T) {
 		recv, err := stream.Recv()
 		require.NoError(t, err)
 		rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-			part, err := nextPart(stream)
+			part, err := nextPart(ctx, stream, nil)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
@@ -319,25 +319,25 @@ func TestResultSetNext(t *testing.T) {
 			}
 
 			return part, nil
-		}, recv)
+		}, recv, nil)
 		require.EqualValues(t, 0, rs.index)
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, rs.rowIndex)
 		}
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.NoError(t, err)
 			require.EqualValues(t, 1, rs.rowIndex)
 		}
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.NoError(t, err)
 			require.EqualValues(t, 2, rs.rowIndex)
 		}
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_OVERLOADED))
 		}
 	})
@@ -408,7 +408,7 @@ func TestResultSetNext(t *testing.T) {
 		recv, err := stream.Recv()
 		require.NoError(t, err)
 		rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-			part, err := nextPart(stream)
+			part, err := nextPart(ctx, stream, nil)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
@@ -420,25 +420,25 @@ func TestResultSetNext(t *testing.T) {
 			}
 
 			return part, nil
-		}, recv)
+		}, recv, nil)
 		require.EqualValues(t, 0, rs.index)
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, rs.rowIndex)
 		}
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.NoError(t, err)
 			require.EqualValues(t, 1, rs.rowIndex)
 		}
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.NoError(t, err)
 			require.EqualValues(t, 2, rs.rowIndex)
 		}
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 		}
 	})
@@ -567,35 +567,35 @@ func TestResultSetNext(t *testing.T) {
 		recv, err := stream.Recv()
 		require.NoError(t, err)
 		rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
-			part, err := nextPart(stream)
+			part, err := nextPart(ctx, stream, nil)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
 
 			return part, nil
-		}, recv)
+		}, recv, nil)
 		require.EqualValues(t, 0, rs.index)
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.NoError(t, err)
 			require.EqualValues(t, 0, rs.rowIndex)
 		}
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.NoError(t, err)
 			require.EqualValues(t, 1, rs.rowIndex)
 		}
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.NoError(t, err)
 			require.EqualValues(t, 2, rs.rowIndex)
 		}
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.ErrorIs(t, err, errWrongResultSetIndex)
 		}
 		{
-			_, err := rs.next(ctx)
+			_, err := rs.nextRow(ctx)
 			require.ErrorIs(t, err, io.EOF)
 		}
 	})

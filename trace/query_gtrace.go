@@ -625,6 +625,321 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 			}
 		}
 	}
+	{
+		h1 := t.OnSessionBegin
+		h2 := x.OnSessionBegin
+		ret.OnSessionBegin = func(q QuerySessionBeginStartInfo) func(QuerySessionBeginDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QuerySessionBeginDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QuerySessionBeginDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnResultNew
+		h2 := x.OnResultNew
+		ret.OnResultNew = func(q QueryResultNewStartInfo) func(QueryResultNewDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryResultNewDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QueryResultNewDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnResultNextPart
+		h2 := x.OnResultNextPart
+		ret.OnResultNextPart = func(q QueryResultNextPartStartInfo) func(QueryResultNextPartDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryResultNextPartDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QueryResultNextPartDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnResultNextResultSet
+		h2 := x.OnResultNextResultSet
+		ret.OnResultNextResultSet = func(q QueryResultNextResultSetStartInfo) func(QueryResultNextResultSetDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryResultNextResultSetDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QueryResultNextResultSetDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnResultClose
+		h2 := x.OnResultClose
+		ret.OnResultClose = func(q QueryResultCloseStartInfo) func(QueryResultCloseDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryResultCloseDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QueryResultCloseDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnResultSetNextRow
+		h2 := x.OnResultSetNextRow
+		ret.OnResultSetNextRow = func(q QueryResultSetNextRowStartInfo) func(QueryResultSetNextRowDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryResultSetNextRowDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QueryResultSetNextRowDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnRowScan
+		h2 := x.OnRowScan
+		ret.OnRowScan = func(q QueryRowScanStartInfo) func(QueryRowScanDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryRowScanDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QueryRowScanDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnRowScanNamed
+		h2 := x.OnRowScanNamed
+		ret.OnRowScanNamed = func(q QueryRowScanNamedStartInfo) func(QueryRowScanNamedDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryRowScanNamedDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QueryRowScanNamedDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnRowScanStruct
+		h2 := x.OnRowScanStruct
+		ret.OnRowScanStruct = func(q QueryRowScanStructStartInfo) func(QueryRowScanStructDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryRowScanStructDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QueryRowScanStructDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
 	return &ret
 }
 func (t *Query) onNew(q QueryNewStartInfo) func(info QueryNewDoneInfo) {
@@ -882,6 +1197,141 @@ func (t *Query) onSessionExecute(q QuerySessionExecuteStartInfo) func(info Query
 	}
 	return res
 }
+func (t *Query) onSessionBegin(q QuerySessionBeginStartInfo) func(info QuerySessionBeginDoneInfo) {
+	fn := t.OnSessionBegin
+	if fn == nil {
+		return func(QuerySessionBeginDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QuerySessionBeginDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onResultNew(q QueryResultNewStartInfo) func(info QueryResultNewDoneInfo) {
+	fn := t.OnResultNew
+	if fn == nil {
+		return func(QueryResultNewDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryResultNewDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onResultNextPart(q QueryResultNextPartStartInfo) func(info QueryResultNextPartDoneInfo) {
+	fn := t.OnResultNextPart
+	if fn == nil {
+		return func(QueryResultNextPartDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryResultNextPartDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onResultNextResultSet(q QueryResultNextResultSetStartInfo) func(info QueryResultNextResultSetDoneInfo) {
+	fn := t.OnResultNextResultSet
+	if fn == nil {
+		return func(QueryResultNextResultSetDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryResultNextResultSetDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onResultClose(q QueryResultCloseStartInfo) func(info QueryResultCloseDoneInfo) {
+	fn := t.OnResultClose
+	if fn == nil {
+		return func(QueryResultCloseDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryResultCloseDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onResultSetNextRow(q QueryResultSetNextRowStartInfo) func(info QueryResultSetNextRowDoneInfo) {
+	fn := t.OnResultSetNextRow
+	if fn == nil {
+		return func(QueryResultSetNextRowDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryResultSetNextRowDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onRowScan(q QueryRowScanStartInfo) func(info QueryRowScanDoneInfo) {
+	fn := t.OnRowScan
+	if fn == nil {
+		return func(QueryRowScanDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryRowScanDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onRowScanNamed(q QueryRowScanNamedStartInfo) func(info QueryRowScanNamedDoneInfo) {
+	fn := t.OnRowScanNamed
+	if fn == nil {
+		return func(QueryRowScanNamedDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryRowScanNamedDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onRowScanStruct(q QueryRowScanStructStartInfo) func(info QueryRowScanStructDoneInfo) {
+	fn := t.OnRowScanStruct
+	if fn == nil {
+		return func(QueryRowScanStructDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryRowScanStructDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func QueryOnNew(t *Query, c *context.Context, call call) func(error) {
 	var p QueryNewStartInfo
 	p.Context = c
@@ -1079,6 +1529,107 @@ func QueryOnSessionExecute(t *Query, c *context.Context, call call, session quer
 	res := t.onSessionExecute(p)
 	return func(e error) {
 		var p QuerySessionExecuteDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func QueryOnSessionBegin(t *Query, c *context.Context, call call, session querySessionInfo) func(_ error, tx queryTransactionInfo) {
+	var p QuerySessionBeginStartInfo
+	p.Context = c
+	p.Call = call
+	p.Session = session
+	res := t.onSessionBegin(p)
+	return func(e error, tx queryTransactionInfo) {
+		var p QuerySessionBeginDoneInfo
+		p.Error = e
+		p.Tx = tx
+		res(p)
+	}
+}
+func QueryOnResultNew(t *Query, c *context.Context, call call) func(error) {
+	var p QueryResultNewStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onResultNew(p)
+	return func(e error) {
+		var p QueryResultNewDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func QueryOnResultNextPart(t *Query, c *context.Context, call call) func(error) {
+	var p QueryResultNextPartStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onResultNextPart(p)
+	return func(e error) {
+		var p QueryResultNextPartDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func QueryOnResultNextResultSet(t *Query, c *context.Context, call call) func(error) {
+	var p QueryResultNextResultSetStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onResultNextResultSet(p)
+	return func(e error) {
+		var p QueryResultNextResultSetDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func QueryOnResultClose(t *Query, c *context.Context, call call) func(error) {
+	var p QueryResultCloseStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onResultClose(p)
+	return func(e error) {
+		var p QueryResultCloseDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func QueryOnResultSetNextRow(t *Query, c *context.Context, call call) func(error) {
+	var p QueryResultSetNextRowStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onResultSetNextRow(p)
+	return func(e error) {
+		var p QueryResultSetNextRowDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func QueryOnRowScan(t *Query, c *context.Context, call call) func(error) {
+	var p QueryRowScanStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onRowScan(p)
+	return func(e error) {
+		var p QueryRowScanDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func QueryOnRowScanNamed(t *Query, c *context.Context, call call) func(error) {
+	var p QueryRowScanNamedStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onRowScanNamed(p)
+	return func(e error) {
+		var p QueryRowScanNamedDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func QueryOnRowScanStruct(t *Query, c *context.Context, call call) func(error) {
+	var p QueryRowScanStructStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onRowScanStruct(p)
+	return func(e error) {
+		var p QueryRowScanStructDoneInfo
 		p.Error = e
 		res(p)
 	}

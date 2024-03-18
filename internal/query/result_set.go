@@ -8,8 +8,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var _ query.ResultSet = (*resultSet)(nil)
@@ -20,26 +22,31 @@ type resultSet struct {
 	columns     []*Ydb.Column
 	currentPart *Ydb_Query.ExecuteQueryResponsePart
 	rowIndex    int
+	trace       *trace.Query
 	done        chan struct{}
 }
 
 func newResultSet(
-	recv func() (
-		*Ydb_Query.ExecuteQueryResponsePart, error,
-	),
+	recv func() (*Ydb_Query.ExecuteQueryResponsePart, error),
 	part *Ydb_Query.ExecuteQueryResponsePart,
+	t *trace.Query,
 ) *resultSet {
+	if t == nil {
+		t = &trace.Query{}
+	}
+
 	return &resultSet{
 		index:       part.GetResultSetIndex(),
 		recv:        recv,
 		currentPart: part,
 		rowIndex:    -1,
 		columns:     part.GetResultSet().GetColumns(),
+		trace:       t,
 		done:        make(chan struct{}),
 	}
 }
 
-func (rs *resultSet) next(ctx context.Context) (*row, error) {
+func (rs *resultSet) nextRow(ctx context.Context) (*row, error) {
 	rs.rowIndex++
 	select {
 	case <-rs.done:
@@ -73,10 +80,15 @@ func (rs *resultSet) next(ctx context.Context) (*row, error) {
 			))
 		}
 
-		return newRow(rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex])
+		return newRow(ctx, rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex], rs.trace)
 	}
 }
 
-func (rs *resultSet) NextRow(ctx context.Context) (query.Row, error) {
-	return rs.next(ctx)
+func (rs *resultSet) NextRow(ctx context.Context) (_ query.Row, err error) {
+	onDone := trace.QueryOnResultSetNextRow(rs.trace, &ctx, stack.FunctionID(""))
+	defer func() {
+		onDone(err)
+	}()
+
+	return rs.nextRow(ctx)
 }
