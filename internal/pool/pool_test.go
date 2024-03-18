@@ -29,6 +29,10 @@ func (t testItem) IsAlive() bool {
 	return true
 }
 
+func (t testItem) ID() string {
+	return ""
+}
+
 func (t testItem) Close(context.Context) error {
 	if t.onClose != nil {
 		return t.onClose()
@@ -41,35 +45,20 @@ func TestPool(t *testing.T) {
 	rootCtx := xtest.Context(t)
 	t.Run("New", func(t *testing.T) {
 		t.Run("Default", func(t *testing.T) {
-			p, err := New[*testItem, testItem](rootCtx)
-			require.NoError(t, err)
-			err = p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
+			p := New[*testItem, testItem](rootCtx)
+			err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
 				return nil
 			})
 			require.NoError(t, err)
 		})
-		t.Run("WithMaxSize", func(t *testing.T) {
-			p, err := New[*testItem, testItem](rootCtx, WithMaxSize[*testItem, testItem](1))
-			require.NoError(t, err)
-			require.EqualValues(t, 1, p.maxSize)
-		})
-		t.Run("WithMinSize", func(t *testing.T) {
-			t.Run("LessOrEqualMaxSize", func(t *testing.T) {
-				p, err := New[*testItem, testItem](rootCtx,
-					WithMinSize[*testItem, testItem](1),
-				)
-				require.NoError(t, err)
-				require.EqualValues(t, p.minSize, 1)
-			})
-			t.Run("GreatThenMaxSize", func(t *testing.T) {
-				p, err := New[*testItem, testItem](rootCtx, WithMinSize[*testItem, testItem](100))
-				require.NoError(t, err)
-				require.EqualValues(t, DefaultMaxSize/10, p.minSize)
-			})
+		t.Run("WithLimit", func(t *testing.T) {
+			p := New[*testItem, testItem](rootCtx, WithLimit[*testItem, testItem](1))
+			require.EqualValues(t, 1, p.limit)
 		})
 		t.Run("WithCreateFunc", func(t *testing.T) {
 			var newCounter int64
-			p, err := New(rootCtx,
+			p := New(rootCtx,
+				WithLimit[*testItem, testItem](1),
 				WithCreateFunc(func(context.Context) (*testItem, error) {
 					atomic.AddInt64(&newCounter, 1)
 					var v testItem
@@ -77,18 +66,20 @@ func TestPool(t *testing.T) {
 					return &v, nil
 				}),
 			)
+			err := p.With(rootCtx, func(ctx context.Context, item *testItem) error {
+				return nil
+			})
 			require.NoError(t, err)
-			require.EqualValues(t, p.minSize, atomic.LoadInt64(&newCounter))
+			require.EqualValues(t, p.limit, atomic.LoadInt64(&newCounter))
 		})
 	})
-	t.Run("With", func(t *testing.T) {
+	t.Run("Change", func(t *testing.T) {
 		t.Run("Context", func(t *testing.T) {
 			t.Run("Canceled", func(t *testing.T) {
 				ctx, cancel := context.WithCancel(rootCtx)
 				cancel()
-				p, err := New[*testItem, testItem](ctx, WithMaxSize[*testItem, testItem](1))
-				require.NoError(t, err)
-				err = p.With(ctx, func(ctx context.Context, testItem *testItem) error {
+				p := New[*testItem, testItem](ctx, WithLimit[*testItem, testItem](1))
+				err := p.With(ctx, func(ctx context.Context, testItem *testItem) error {
 					return nil
 				})
 				require.ErrorIs(t, err, context.Canceled)
@@ -96,9 +87,8 @@ func TestPool(t *testing.T) {
 			t.Run("DeadlineExceeded", func(t *testing.T) {
 				ctx, cancel := context.WithTimeout(rootCtx, 0)
 				cancel()
-				p, err := New[*testItem, testItem](ctx, WithMaxSize[*testItem, testItem](1))
-				require.NoError(t, err)
-				err = p.With(ctx, func(ctx context.Context, testItem *testItem) error {
+				p := New[*testItem, testItem](ctx, WithLimit[*testItem, testItem](1))
+				err := p.With(ctx, func(ctx context.Context, testItem *testItem) error {
 					return nil
 				})
 				require.ErrorIs(t, err, context.DeadlineExceeded)
@@ -112,9 +102,8 @@ func TestPool(t *testing.T) {
 					createCounter int64
 					closeCounter  int64
 				)
-				p, err := New(rootCtx,
-					WithMinSize[*testItem, testItem](0),
-					WithMaxSize[*testItem, testItem](1),
+				p := New(rootCtx,
+					WithLimit[*testItem, testItem](1),
 					WithCreateFunc(func(context.Context) (*testItem, error) {
 						atomic.AddInt64(&createCounter, 1)
 
@@ -129,13 +118,13 @@ func TestPool(t *testing.T) {
 						return v, nil
 					}),
 				)
-				require.NoError(t, err)
-				err = p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
+				err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
 					return nil
 				})
 				require.NoError(t, err)
 				require.GreaterOrEqual(t, atomic.LoadInt64(&createCounter), atomic.LoadInt64(&closeCounter))
-				p.Close(rootCtx)
+				err = p.Close(rootCtx)
+				require.NoError(t, err)
 				require.EqualValues(t, atomic.LoadInt64(&createCounter), atomic.LoadInt64(&closeCounter))
 			}, xtest.StopAfter(time.Second))
 		})
@@ -146,8 +135,8 @@ func TestPool(t *testing.T) {
 					deleteItems int64
 					expErr      = xerrors.Retryable(errors.New("expected error"), xerrors.WithDeleteSession())
 				)
-				p, err := New(rootCtx,
-					WithMaxSize[*testItem, testItem](1),
+				p := New(rootCtx,
+					WithLimit[*testItem, testItem](1),
 					WithCreateFunc(func(context.Context) (*testItem, error) {
 						atomic.AddInt64(&newItems, 1)
 
@@ -165,8 +154,7 @@ func TestPool(t *testing.T) {
 						return v, nil
 					}),
 				)
-				require.NoError(t, err)
-				err = p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
+				err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
 					if atomic.LoadInt64(&newItems) < 10 {
 						return expErr
 					}
@@ -176,18 +164,18 @@ func TestPool(t *testing.T) {
 				require.NoError(t, err)
 				require.GreaterOrEqual(t, atomic.LoadInt64(&newItems), int64(9))
 				require.GreaterOrEqual(t, atomic.LoadInt64(&newItems), atomic.LoadInt64(&deleteItems))
-				p.Close(rootCtx)
+				err = p.Close(rootCtx)
+				require.NoError(t, err)
 				require.EqualValues(t, atomic.LoadInt64(&newItems), atomic.LoadInt64(&deleteItems))
 			}, xtest.StopAfter(5*time.Second))
 		})
 	})
 	t.Run("Stress", func(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
-			p, err := New[*testItem, testItem](rootCtx, WithMinSize[*testItem, testItem](DefaultMaxSize/2))
-			require.NoError(t, err)
+			p := New[*testItem, testItem](rootCtx)
 			var wg sync.WaitGroup
-			wg.Add(DefaultMaxSize*2 + 1)
-			for range make([]struct{}, DefaultMaxSize*2) {
+			wg.Add(DefaultLimit*2 + 1)
+			for range make([]struct{}, DefaultLimit*2) {
 				go func() {
 					defer wg.Done()
 					err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {

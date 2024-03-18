@@ -63,16 +63,6 @@ func createSession(
 				}
 			},
 		},
-		closeOnce: xsync.OnceFunc(func(ctx context.Context) (err error) {
-			s.setStatus(statusClosing)
-			defer s.setStatus(statusClosed)
-
-			if err = deleteSession(ctx, s.grpcClient, s.id); err != nil {
-				return xerrors.WithStackTrace(err)
-			}
-
-			return nil
-		}),
 	}
 	defer func() {
 		if finalErr != nil && s != nil {
@@ -129,7 +119,9 @@ func (s *Session) attach(ctx context.Context) (finalErr error) {
 		onDone(finalErr)
 	}()
 
-	attach, err := s.grpcClient.AttachSession(xcontext.WithoutDeadline(ctx), &Ydb_Query.AttachSessionRequest{
+	attachCtx, cancelAttach := xcontext.WithCancel(xcontext.WithoutDeadline(ctx))
+
+	attach, err := s.grpcClient.AttachSession(attachCtx, &Ydb_Query.AttachSessionRequest{
 		SessionId: s.id,
 	})
 	if err != nil {
@@ -137,14 +129,32 @@ func (s *Session) attach(ctx context.Context) (finalErr error) {
 			xerrors.Transport(err),
 		)
 	}
+
 	state, err := attach.Recv()
 	if err != nil {
+		cancelAttach()
+
 		return xerrors.WithStackTrace(xerrors.Transport(err))
 	}
 
 	if state.GetStatus() != Ydb.StatusIds_SUCCESS {
+		cancelAttach()
+
 		return xerrors.WithStackTrace(xerrors.FromOperation(state))
 	}
+
+	s.closeOnce = xsync.OnceFunc(func(ctx context.Context) (err error) {
+		cancelAttach()
+
+		s.setStatus(statusClosing)
+		defer s.setStatus(statusClosed)
+
+		if err = deleteSession(ctx, s.grpcClient, s.id); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		return nil
+	})
 
 	go func() {
 		defer func() {
@@ -218,16 +228,14 @@ func (s *Session) Close(ctx context.Context) (err error) {
 func begin(
 	ctx context.Context,
 	client Ydb_Query_V1.QueryServiceClient,
-	sessionID string,
+	s *Session,
 	txSettings query.TransactionSettings,
-) (
-	*transaction, error,
-) {
+) (*transaction, error) {
 	a := allocator.New()
 	defer a.Free()
 	response, err := client.BeginTransaction(ctx,
 		&Ydb_Query.BeginTransactionRequest{
-			SessionId:  sessionID,
+			SessionId:  s.id,
 			TxSettings: txSettings.ToYDB(a),
 		},
 	)
@@ -238,9 +246,7 @@ func begin(
 		return nil, xerrors.WithStackTrace(xerrors.FromOperation(response))
 	}
 
-	return &transaction{
-		id: response.GetTxMeta().GetId(),
-	}, nil
+	return newTransaction(response.GetTxMeta().GetId(), s, s.trace), nil
 }
 
 func (s *Session) Begin(
@@ -256,7 +262,7 @@ func (s *Session) Begin(
 		onDone(err, tx)
 	}()
 
-	tx, err = begin(ctx, s.grpcClient, s.id, txSettings)
+	tx, err = begin(ctx, s.grpcClient, s, txSettings)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

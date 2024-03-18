@@ -108,10 +108,10 @@ func WithConnectionString(connectionString string) Option {
 }
 
 // WithConnectionTTL defines duration for parking idle connections
-func WithConnectionTTL(ttl time.Duration) Option {
+//
+// Deprecated: background connection parking not available
+func WithConnectionTTL(time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
-		c.options = append(c.options, config.WithConnectionTTL(ttl))
-
 		return nil
 	}
 }
@@ -398,38 +398,13 @@ func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	}
 }
 
-// WithSessionPoolMinSize set min size of internal sessions pool in query.Client
-func WithSessionPoolMinSize(size int) Option {
+// WithSessionPoolLimit set min size of internal sessions pool in query.Client
+func WithSessionPoolLimit(size int) Option {
 	return func(ctx context.Context, c *Driver) error {
-		c.queryOptions = append(c.queryOptions, queryConfig.WithPoolMinSize(size))
+		c.queryOptions = append(c.queryOptions, queryConfig.WithPoolLimit(size))
 
 		return nil
 	}
-}
-
-// WithSessionPoolMaxSize set min size of internal sessions pool in query.Client
-func WithSessionPoolMaxSize(size int) Option {
-	return func(ctx context.Context, c *Driver) error {
-		c.queryOptions = append(c.queryOptions, queryConfig.WithPoolMaxSize(size))
-
-		return nil
-	}
-}
-
-// WithSessionPoolProducersCount set min size of internal sessions pool in query.Client
-func WithSessionPoolProducersCount(count int) Option {
-	return func(ctx context.Context, c *Driver) error {
-		c.queryOptions = append(c.queryOptions, queryConfig.WithPoolProducersCount(count))
-
-		return nil
-	}
-}
-
-// WithSessionPoolKeepAliveMinSize set minimum sessions should be keeped alive in table.Client
-//
-// Deprecated: table client do not supports background session keep-aliving now
-func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
-	return func(ctx context.Context, c *Driver) error { return nil }
 }
 
 // WithSessionPoolIdleThreshold defines interval for idle sessions
@@ -443,11 +418,6 @@ func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 
 		return nil
 	}
-}
-
-// WithSessionPoolKeepAliveTimeout set timeout of keep alive requests for session in table.Client
-func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
-	return func(ctx context.Context, c *Driver) error { return nil }
 }
 
 // WithSessionPoolCreateSessionTimeout set timeout for new session creation process in table.Client

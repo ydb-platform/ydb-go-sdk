@@ -27,11 +27,11 @@ type Client struct {
 	service Ydb_Coordination_V1.CoordinationServiceClient
 }
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) (*Client, error) {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) *Client {
 	return &Client{
 		config:  config,
 		service: Ydb_Coordination_V1.NewCoordinationServiceClient(cc),
-	}, nil
+	}
 }
 
 func (c *Client) CreateNode(ctx context.Context, path string, config coordination.NodeConfig) error {

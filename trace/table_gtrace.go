@@ -1350,15 +1350,14 @@ func (t *Table) onPoolWait(t1 TablePoolWaitStartInfo) func(TablePoolWaitDoneInfo
 	}
 	return res
 }
-func TableOnInit(t *Table, c *context.Context, call call) func(limit int, _ error) {
+func TableOnInit(t *Table, c *context.Context, call call) func(limit int) {
 	var p TableInitStartInfo
 	p.Context = c
 	p.Call = call
 	res := t.onInit(p)
-	return func(limit int, e error) {
+	return func(limit int) {
 		var p TableInitDoneInfo
 		p.Limit = limit
-		p.Error = e
 		res(p)
 	}
 }

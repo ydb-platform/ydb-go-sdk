@@ -31,9 +31,13 @@ func newResult(
 	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
 	t *trace.Query,
+	closeResult context.CancelFunc,
 ) (_ *result, txID string, err error) {
 	if t == nil {
 		t = &trace.Query{}
+	}
+	if closeResult == nil {
+		closeResult = func() {}
 	}
 
 	onDone := trace.QueryOnResultNew(t, &ctx, stack.FunctionID(""))
@@ -53,6 +57,8 @@ func newResult(
 			interrupted = make(chan struct{})
 			closed      = make(chan struct{})
 			closeOnce   = xsync.OnceFunc(func(ctx context.Context) error {
+				closeResult()
+
 				close(interrupted)
 				close(closed)
 

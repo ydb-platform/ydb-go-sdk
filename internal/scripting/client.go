@@ -300,9 +300,9 @@ func (c *Client) Close(ctx context.Context) (err error) {
 	return nil
 }
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) (*Client, error) {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) *Client {
 	return &Client{
 		config:  config,
 		service: Ydb_Scripting_V1.NewScriptingServiceClient(cc),
-	}, nil
+	}
 }

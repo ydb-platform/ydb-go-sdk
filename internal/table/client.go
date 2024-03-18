@@ -34,7 +34,12 @@ type balancer interface {
 	nodeChecker
 }
 
-func New(ctx context.Context, balancer balancer, config *config.Config) (*Client, error) {
+func New(ctx context.Context, balancer balancer, config *config.Config) *Client {
+	onDone := trace.TableOnInit(config.Trace(), &ctx, stack.FunctionID(""))
+	defer func() {
+		onDone(config.SizeLimit())
+	}()
+
 	return newClient(ctx, balancer, func(ctx context.Context) (s *session, err error) {
 		return newSession(ctx, balancer, config)
 	}, config)
@@ -45,12 +50,8 @@ func newClient(
 	balancer balancer,
 	builder sessionBuilder,
 	config *config.Config,
-) (c *Client, finalErr error) {
-	onDone := trace.TableOnInit(config.Trace(), &ctx, stack.FunctionID(""))
-	defer func() {
-		onDone(config.SizeLimit(), finalErr)
-	}()
-	c = &Client{
+) *Client {
+	c := &Client{
 		clock:       config.Clock(),
 		config:      config,
 		cc:          balancer,
@@ -74,7 +75,7 @@ func newClient(
 		go c.internalPoolGC(ctx, idleThreshold)
 	}
 
-	return c, nil
+	return c
 }
 
 // Client is a set of session instances that may be reused.

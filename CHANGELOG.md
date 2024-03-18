@@ -1,4 +1,9 @@
 * Added support of `TzDate`,`TzDateTime`,`TzTimestamp` types in `ydb.ParamsBuilder()`
+* Added `trace.Query.OnTransactionExecute` event
+* Added query pool metrics
+* Fixed logic of query session pool
+* Changed initialization of internal driver clients to lazy
+* Disabled the logic of background grpc-connection parking 
 
 ## v3.58.2
 * Added `trace.Query.OnSessionBegin` event

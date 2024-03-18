@@ -3,7 +3,6 @@ package conn
 import (
 	"context"
 	"io"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
@@ -11,7 +10,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wrap"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -57,9 +55,6 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 		onDone(err)
 	}()
 
-	cancel := createPinger(s.c)
-	defer cancel()
-
 	err = s.ClientStream.SendMsg(m)
 
 	if err != nil {
@@ -92,9 +87,6 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	defer func() {
 		onDone(err)
 	}()
-
-	cancel := createPinger(s.c)
-	defer cancel()
 
 	defer func() {
 		if err != nil {
@@ -153,25 +145,4 @@ func (s *grpcClientStream) wrapError(err error) error {
 		newConnError(s.c.endpoint.NodeID(), s.c.endpoint.Address(), err),
 		xerrors.WithSkipDepth(1),
 	)
-}
-
-func createPinger(c *conn) context.CancelFunc {
-	c.touchLastUsage()
-	ctx, cancel := xcontext.WithCancel(context.Background())
-	go func() {
-		ticker := time.NewTicker(time.Second)
-		ctxDone := ctx.Done()
-		for {
-			select {
-			case <-ctxDone:
-				ticker.Stop()
-
-				return
-			case <-ticker.C:
-				c.touchLastUsage()
-			}
-		}
-	}()
-
-	return cancel
 }

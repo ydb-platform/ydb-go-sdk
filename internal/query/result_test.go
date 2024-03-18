@@ -345,7 +345,7 @@ func TestResultNextResultSet(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			r, _, err := newResult(ctx, stream, nil)
+			r, _, err := newResult(ctx, stream, nil, nil)
 			require.NoError(t, err)
 			defer r.Close(ctx)
 			{
@@ -514,7 +514,7 @@ func TestResultNextResultSet(t *testing.T) {
 					},
 				},
 			}, nil)
-			r, _, err := newResult(ctx, stream, nil)
+			r, _, err := newResult(ctx, stream, nil, nil)
 			require.NoError(t, err)
 			defer r.Close(ctx)
 			{
@@ -833,7 +833,7 @@ func TestResultNextResultSet(t *testing.T) {
 					},
 				},
 			}, nil)
-			r, _, err := newResult(ctx, stream, nil)
+			r, _, err := newResult(ctx, stream, nil, nil)
 			require.NoError(t, err)
 			defer r.Close(ctx)
 			{

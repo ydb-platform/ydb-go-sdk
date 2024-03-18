@@ -27,7 +27,7 @@ func TestBegin(t *testing.T) {
 			},
 		}, nil)
 		t.Log("begin")
-		tx, err := begin(ctx, service, "123", query.TxSettings())
+		tx, err := begin(ctx, service, &Session{id: "123"}, query.TxSettings())
 		require.NoError(t, err)
 		require.Equal(t, "123", tx.id)
 	})
@@ -37,7 +37,7 @@ func TestBegin(t *testing.T) {
 		service := NewMockQueryServiceClient(ctrl)
 		service.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
 		t.Log("begin")
-		_, err := begin(ctx, service, "123", query.TxSettings())
+		_, err := begin(ctx, service, &Session{id: "123"}, query.TxSettings())
 		require.Error(t, err)
 		require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 	})
@@ -49,7 +49,7 @@ func TestBegin(t *testing.T) {
 			Status: Ydb.StatusIds_UNAVAILABLE,
 		}, nil)
 		t.Log("begin")
-		_, err := begin(ctx, service, "123", query.TxSettings())
+		_, err := begin(ctx, service, &Session{id: "123"}, query.TxSettings())
 		require.Error(t, err)
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 	})

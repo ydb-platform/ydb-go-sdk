@@ -7,6 +7,7 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -34,9 +35,19 @@ type Client struct {
 	config     *config.Config
 	grpcClient Ydb_Query_V1.QueryServiceClient
 	pool       *pool.Pool[*Session, Session]
+
+	done chan struct{}
+}
+
+func (c *Client) Stats() *stats.Stats {
+	s := c.pool.Stats()
+
+	return &s
 }
 
 func (c *Client) Close(ctx context.Context) error {
+	close(c.done)
+
 	err := c.pool.Close(ctx)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -92,11 +103,16 @@ func do(
 }
 
 func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) error {
-	onDone := trace.QueryOnDo(c.config.Trace(), &ctx, stack.FunctionID(""))
-	attempts, err := do(ctx, c.pool, op, c.config.Trace(), opts...)
-	onDone(attempts, err)
+	select {
+	case <-c.done:
+		return xerrors.WithStackTrace(errClosedClient)
+	default:
+		onDone := trace.QueryOnDo(c.config.Trace(), &ctx, stack.FunctionID(""))
+		attempts, err := do(ctx, c.pool, op, c.config.Trace(), opts...)
+		onDone(attempts, err)
 
-	return err
+		return err
+	}
 }
 
 func doTx(
@@ -142,27 +158,30 @@ func doTx(
 }
 
 func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) error {
-	onDone := trace.QueryOnDoTx(c.config.Trace(), &ctx, stack.FunctionID(""))
-	attempts, err := doTx(ctx, c.pool, op, c.config.Trace(), opts...)
-	onDone(attempts, err)
+	select {
+	case <-c.done:
+		return xerrors.WithStackTrace(errClosedClient)
+	default:
+		onDone := trace.QueryOnDoTx(c.config.Trace(), &ctx, stack.FunctionID(""))
+		attempts, err := doTx(ctx, c.pool, op, c.config.Trace(), opts...)
+		onDone(attempts, err)
 
-	return err
+		return err
+	}
 }
 
-func New(ctx context.Context, balancer balancer, cfg *config.Config) (_ *Client, err error) {
+func New(ctx context.Context, balancer balancer, cfg *config.Config) *Client {
 	onDone := trace.QueryOnNew(cfg.Trace(), &ctx, stack.FunctionID(""))
-	defer func() {
-		onDone(err)
-	}()
+	defer onDone()
 
 	client := &Client{
 		config:     cfg,
 		grpcClient: Ydb_Query_V1.NewQueryServiceClient(balancer),
+		done:       make(chan struct{}),
 	}
 
-	client.pool, err = pool.New(ctx,
-		pool.WithMaxSize[*Session, Session](cfg.PoolMaxSize()),
-		pool.WithProducersCount[*Session, Session](cfg.PoolProducersCount()),
+	client.pool = pool.New(ctx,
+		pool.WithLimit[*Session, Session](cfg.PoolLimit()),
 		pool.WithTrace[*Session, Session](poolTrace(cfg.Trace())),
 		pool.WithCreateFunc(func(ctx context.Context) (_ *Session, err error) {
 			var cancel context.CancelFunc
@@ -187,20 +206,17 @@ func New(ctx context.Context, balancer balancer, cfg *config.Config) (_ *Client,
 			return s, nil
 		}),
 	)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
 
-	return client, xerrors.WithStackTrace(ctx.Err())
+	return client
 }
 
 func poolTrace(t *trace.Query) *pool.Trace {
 	return &pool.Trace{
 		OnNew: func(info *pool.NewStartInfo) func(*pool.NewDoneInfo) {
-			onDone := trace.QueryOnPoolNew(t, info.Context, info.Call, info.MinSize, info.MaxSize, info.ProducersCount)
+			onDone := trace.QueryOnPoolNew(t, info.Context, info.Call)
 
 			return func(info *pool.NewDoneInfo) {
-				onDone(info.Error, info.MinSize, info.MaxSize, info.ProducersCount)
+				onDone(info.Limit)
 			}
 		},
 		OnClose: func(info *pool.CloseStartInfo) func(*pool.CloseDoneInfo) {
@@ -208,13 +224,6 @@ func poolTrace(t *trace.Query) *pool.Trace {
 
 			return func(info *pool.CloseDoneInfo) {
 				onDone(info.Error)
-			}
-		},
-		OnProduce: func(info *pool.ProduceStartInfo) func(*pool.ProduceDoneInfo) {
-			onDone := trace.QueryOnPoolProduce(t, info.Context, info.Call, info.Concurrency)
-
-			return func(info *pool.ProduceDoneInfo) {
-				onDone()
 			}
 		},
 		OnTry: func(info *pool.TryStartInfo) func(*pool.TryDoneInfo) {
@@ -245,19 +254,8 @@ func poolTrace(t *trace.Query) *pool.Trace {
 				onDone(info.Error)
 			}
 		},
-		OnSpawn: func(info *pool.SpawnStartInfo) func(*pool.SpawnDoneInfo) {
-			onDone := trace.QueryOnPoolSpawn(t, info.Context, info.Call)
-
-			return func(info *pool.SpawnDoneInfo) {
-				onDone(info.Error)
-			}
-		},
-		OnWant: func(info *pool.WantStartInfo) func(*pool.WantDoneInfo) {
-			onDone := trace.QueryOnPoolWant(t, info.Context, info.Call)
-
-			return func(info *pool.WantDoneInfo) {
-				onDone(info.Error)
-			}
+		OnChange: func(info pool.ChangeInfo) {
+			trace.QueryOnPoolChange(t, info.Limit, info.Index, info.Idle, info.InUse)
 		},
 	}
 }
