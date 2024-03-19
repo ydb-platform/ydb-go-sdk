@@ -426,7 +426,8 @@ func TestBuilder(t *testing.T) {
 
 			params := result.Build().ToYDB(a)
 
-			require.Equal(t, paramsToJSON(
+			require.Equal(t, 
+				paramsToJSON(
 				map[string]*Ydb.TypedValue{
 					"$x": {
 						Type:  tc.expected.kind,
