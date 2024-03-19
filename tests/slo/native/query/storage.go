@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path"
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
@@ -70,6 +72,7 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	db, err := ydb.Open(ctx,
 		cfg.Endpoint+cfg.DB,
 		ydb.WithSessionPoolLimit(poolSize),
+		ydb.WithLogger(log.Default(os.Stderr, log.WithMinLevel(log.WARN)), trace.DetailsAll),
 	)
 	if err != nil {
 		return nil, err
