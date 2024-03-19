@@ -3,7 +3,8 @@
 * Added query pool metrics
 * Fixed logic of query session pool
 * Changed initialization of internal driver clients to lazy
-* Disabled the logic of background grpc-connection parking 
+* Disabled the logic of background grpc-connection parking
+* Added codegarator for filling FunctionID with value from call stack
 
 ## v3.58.2
 * Added `trace.Query.OnSessionBegin` event

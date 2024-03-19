@@ -47,6 +47,7 @@ func getCallExpressionsFromExpr(expr ast.Expr) (listOfCalls []*ast.CallExpr) {
 	case *ast.FuncLit:
 		listOfCalls = append(listOfCalls, getListOfCallExpressionsFromBlockStmt(expr.Body)...)
 	}
+
 	return listOfCalls
 }
 
@@ -57,11 +58,10 @@ func getExprFromDeclStmt(statement *ast.DeclStmt) (listOfExpressions []ast.Expr)
 	}
 	for _, spec := range decl.Specs {
 		if spec, ok := spec.(*ast.ValueSpec); ok {
-			for _, expr := range spec.Values {
-				listOfExpressions = append(listOfExpressions, expr)
-			}
+			listOfExpressions = append(listOfExpressions, spec.Values...)
 		}
 	}
+
 	return listOfExpressions
 }
 
@@ -93,6 +93,7 @@ func getCallExpressionsFromStmt(statement ast.Stmt) (listOfCallExpressions []*as
 			getListOfCallExpressionsFromBlockStmt(body)...,
 		)
 	}
+
 	return listOfCallExpressions
 }
 
@@ -113,6 +114,7 @@ func getListOfCallExpressionsFromBlockStmt(block *ast.BlockStmt) (listOfCallExpr
 			listOfCallExpressions = append(listOfCallExpressions, getCallExpressionsFromStmt(statement)...)
 		}
 	}
+
 	return listOfCallExpressions
 }
 
@@ -145,8 +147,10 @@ func format(src []byte, fset *token.FileSet, file ast.File) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		return fixed, nil
 	}
+
 	return src, nil
 }
 
@@ -157,6 +161,7 @@ func main() {
 
 	if len(args) != 1 {
 		flag.Usage()
+
 		return
 	}
 	_, err := os.Stat(args[0])
@@ -197,8 +202,10 @@ func main() {
 			if err != nil {
 				return err
 			}
+
 			return nil
 		}
+
 		return nil
 	})
 	if err != nil {

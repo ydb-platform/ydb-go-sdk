@@ -35,6 +35,7 @@ func ReadFile(filename string, info fs.FileInfo) ([]byte, error) {
 	} else if n > size {
 		return nil, fmt.Errorf("error: size of %s changed during reading (from %d to >=%d bytes)", filename, size, len(src))
 	}
+
 	return src, nil
 }
 
@@ -48,6 +49,7 @@ func FixSource(src []byte, listOfArgs []FunctionIDArg) ([]byte, error) {
 		previousArgEnd = args.ArgEnd
 	}
 	fixed = append(fixed, src[previousArgEnd:]...)
+
 	return fixed, nil
 }
 
@@ -63,5 +65,6 @@ func WriteFile(filename string, formatted []byte, perm fs.FileMode) error {
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
