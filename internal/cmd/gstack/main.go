@@ -58,11 +58,10 @@ func getExprFromDeclStmt(statement *ast.DeclStmt) (listOfExpressions []ast.Expr)
 	}
 	for _, spec := range decl.Specs {
 		if spec, ok := spec.(*ast.ValueSpec); ok {
-			for _, expr := range spec.Values {
-				listOfExpressions = append(listOfExpressions, expr)
-			}
+			listOfExpressions = append(listOfExpressions, spec.Values...)
 		}
 	}
+
 	return listOfExpressions
 }
 

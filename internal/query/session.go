@@ -119,7 +119,7 @@ func (s *Session) attach(ctx context.Context) (finalErr error) {
 		onDone(finalErr)
 	}()
 
-	attachCtx, cancelAttach := xcontext.WithCancel(xcontext.WithoutDeadline(ctx))
+	attachCtx, cancelAttach := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 
 	attach, err := s.grpcClient.AttachSession(attachCtx, &Ydb_Query.AttachSessionRequest{
 		SessionId: s.id,
