@@ -14,8 +14,8 @@ import (
 
 func TestSet(t *testing.T) {
 	type expected struct {
-		kind  *Ydb.Type
-		value *Ydb.Value
+		Type  *Ydb.Type
+		Value *Ydb.Value
 	}
 
 	tests := []struct {
@@ -29,10 +29,10 @@ func TestSet(t *testing.T) {
 			args:   []any{uint64(123)},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT64},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_Uint64Value{
 						Uint64Value: 123,
 					},
@@ -44,10 +44,10 @@ func TestSet(t *testing.T) {
 			args:   []any{int64(123)},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT64},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_Int64Value{
 						Int64Value: 123,
 					},
@@ -59,10 +59,10 @@ func TestSet(t *testing.T) {
 			args:   []any{uint32(123)},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT32},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_Uint32Value{
 						Uint32Value: 123,
 					},
@@ -74,10 +74,10 @@ func TestSet(t *testing.T) {
 			args:   []any{int32(123)},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT32},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_Int32Value{
 						Int32Value: 123,
 					},
@@ -89,10 +89,10 @@ func TestSet(t *testing.T) {
 			args:   []any{uint16(123)},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT16},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_Uint32Value{
 						Uint32Value: 123,
 					},
@@ -104,10 +104,10 @@ func TestSet(t *testing.T) {
 			args:   []any{int16(123)},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT16},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_Int32Value{
 						Int32Value: 123,
 					},
@@ -119,10 +119,10 @@ func TestSet(t *testing.T) {
 			args:   []any{uint8(123)},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UINT8},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_Uint32Value{
 						Uint32Value: 123,
 					},
@@ -134,10 +134,10 @@ func TestSet(t *testing.T) {
 			args:   []any{int8(123)},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INT8},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_Int32Value{
 						Int32Value: 123,
 					},
@@ -149,10 +149,10 @@ func TestSet(t *testing.T) {
 			args:   []any{true},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_BOOL},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_BoolValue{
 						BoolValue: true,
 					},
@@ -164,10 +164,10 @@ func TestSet(t *testing.T) {
 			args:   []any{"test"},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UTF8},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_TextValue{
 						TextValue: "test",
 					},
@@ -179,10 +179,10 @@ func TestSet(t *testing.T) {
 			args:   []any{[]byte("test")},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_STRING},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_BytesValue{
 						BytesValue: []byte("test"),
 					},
@@ -194,10 +194,10 @@ func TestSet(t *testing.T) {
 			args:   []any{float32(123)},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_FLOAT},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_FloatValue{
 						FloatValue: float32(123),
 					},
@@ -209,10 +209,10 @@ func TestSet(t *testing.T) {
 			args:   []any{float64(123)},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DOUBLE},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_DoubleValue{
 						DoubleValue: float64(123),
 					},
@@ -224,10 +224,10 @@ func TestSet(t *testing.T) {
 			args:   []any{time.Second},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_INTERVAL},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_Int64Value{
 						Int64Value: 1000000,
 					},
@@ -239,10 +239,10 @@ func TestSet(t *testing.T) {
 			args:   []any{time.Unix(123456789, 456)},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATETIME},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_Uint32Value{
 						Uint32Value: 123456789,
 					},
@@ -254,10 +254,10 @@ func TestSet(t *testing.T) {
 			args:   []any{time.Unix(123456789, 456)},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_DATE},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_Uint32Value{
 						Uint32Value: 1428,
 					},
@@ -269,10 +269,10 @@ func TestSet(t *testing.T) {
 			args:   []any{time.Unix(123456789, 456)},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TIMESTAMP},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_Uint64Value{
 						Uint64Value: 123456789000000,
 					},
@@ -284,7 +284,7 @@ func TestSet(t *testing.T) {
 			args:   []any{[...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, uint32(22), uint32(9)},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_DecimalType{
 						DecimalType: &Ydb.DecimalType{
 							Precision: 22,
@@ -292,7 +292,7 @@ func TestSet(t *testing.T) {
 						},
 					},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					High_128: 72623859790382856,
 					Value: &Ydb.Value_Low_128{
 						Low_128: 648519454493508870,
@@ -305,10 +305,10 @@ func TestSet(t *testing.T) {
 			args:   []any{`{"a": 1,"b": "B"}`},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_TextValue{
 						TextValue: `{"a": 1,"b": "B"}`,
 					},
@@ -320,10 +320,10 @@ func TestSet(t *testing.T) {
 			args:   []any{`{"a": 1,"b": "B"}`},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_JSON_DOCUMENT},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_TextValue{
 						TextValue: `{"a": 1,"b": "B"}`,
 					},
@@ -335,10 +335,10 @@ func TestSet(t *testing.T) {
 			args:   []any{[]byte(`{"a": 1,"b": "B"}`)},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_YSON},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_BytesValue{
 						BytesValue: []byte(`{"a": 1,"b": "B"}`),
 					},
@@ -350,10 +350,10 @@ func TestSet(t *testing.T) {
 			args:   []any{[...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_UUID},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_Low_128{
 						Low_128: 651345242494996240,
 					},
@@ -366,10 +366,10 @@ func TestSet(t *testing.T) {
 			args:   []any{time.Unix(123456789, 456).UTC()},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATETIME},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_TextValue{
 						TextValue: "1973-11-29T21:33:09Z",
 					},
@@ -381,10 +381,10 @@ func TestSet(t *testing.T) {
 			args:   []any{time.Unix(123456789, 456).UTC()},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_DATE},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_TextValue{
 						TextValue: "1973-11-29",
 					},
@@ -396,10 +396,10 @@ func TestSet(t *testing.T) {
 			args:   []any{time.Unix(123456789, 456).UTC()},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_TypeId{TypeId: Ydb.Type_TZ_TIMESTAMP},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_TextValue{
 						TextValue: "1973-11-29T21:33:09.000000Z",
 					},
@@ -425,7 +425,7 @@ func TestSet(t *testing.T) {
 						Type: &Ydb.Type{
 							Type: &Ydb.Type_DictType{
 								DictType: &Ydb.DictType{
-									Key: tc.expected.kind,
+									Key: tc.expected.Type,
 									Payload: &Ydb.Type{
 										Type: &Ydb.Type_VoidType{},
 									},
@@ -435,7 +435,7 @@ func TestSet(t *testing.T) {
 						Value: &Ydb.Value{
 							Pairs: []*Ydb.ValuePair{
 								{
-									Key: tc.expected.value,
+									Key: tc.expected.Value,
 									Payload: &Ydb.Value{
 										Value: &Ydb.Value_NullFlagValue{},
 									},

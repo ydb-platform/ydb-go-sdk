@@ -13,8 +13,8 @@ import (
 
 func TestPg(t *testing.T) {
 	type expected struct {
-		kind  *Ydb.Type
-		value *Ydb.Value
+		Type  *Ydb.Type
+		Value *Ydb.Value
 	}
 
 	tests := []struct {
@@ -28,14 +28,14 @@ func TestPg(t *testing.T) {
 			args:   []any{"123"},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_PgType{
 						PgType: &Ydb.PgType{
 							Oid: pg.OIDUnknown,
 						},
 					},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_TextValue{TextValue: "123"},
 				},
 			},
@@ -45,14 +45,14 @@ func TestPg(t *testing.T) {
 			args:   []any{int32(123)},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_PgType{
 						PgType: &Ydb.PgType{
 							Oid: pg.OIDInt4,
 						},
 					},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_TextValue{TextValue: "123"},
 				},
 			},
@@ -62,14 +62,14 @@ func TestPg(t *testing.T) {
 			args:   []any{int64(123)},
 
 			expected: expected{
-				kind: &Ydb.Type{
+				Type: &Ydb.Type{
 					Type: &Ydb.Type_PgType{
 						PgType: &Ydb.PgType{
 							Oid: pg.OIDInt8,
 						},
 					},
 				},
-				value: &Ydb.Value{
+				Value: &Ydb.Value{
 					Value: &Ydb.Value_TextValue{TextValue: "123"},
 				},
 			},
@@ -91,8 +91,8 @@ func TestPg(t *testing.T) {
 			require.Equal(t, paramsToJSON(
 				map[string]*Ydb.TypedValue{
 					"$x": {
-						Type:  tc.expected.kind,
-						Value: tc.expected.value,
+						Type:  tc.expected.Type,
+						Value: tc.expected.Value,
 					},
 				}), paramsToJSON(params))
 		})
