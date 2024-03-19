@@ -433,7 +433,9 @@ func TestBuilder(t *testing.T) {
 						Type:  tc.expected.kind,
 						Value: tc.expected.value,
 					},
-				}), paramsToJSON(params))
+				}), 
+				paramsToJSON(params),
+			)
 		})
 	}
 }
