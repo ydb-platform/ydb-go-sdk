@@ -1,3 +1,5 @@
+* Added support of `TzDate`,`TzDateTime`,`TzTimestamp` types in `ydb.ParamsBuilder()`
+
 ## v3.58.2
 * Added `trace.Query.OnSessionBegin` event
 * Added `trace.Query.OnResult{New,NextPart,NextResultSet,Close}` events
