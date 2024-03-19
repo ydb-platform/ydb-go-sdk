@@ -1,10 +1,6 @@
 package pool
 
-const (
-	DefaultMaxSize        = 50
-	DefaultMinSize        = 0
-	DefaultProducersCount = 1
-)
+const DefaultLimit = 50
 
 var defaultTrace = &Trace{
 	OnNew: func(info *NewStartInfo) func(info *NewDoneInfo) {
@@ -13,10 +9,6 @@ var defaultTrace = &Trace{
 	},
 	OnClose: func(info *CloseStartInfo) func(info *CloseDoneInfo) {
 		return func(info *CloseDoneInfo) {
-		}
-	},
-	OnProduce: func(info *ProduceStartInfo) func(info *ProduceDoneInfo) {
-		return func(info *ProduceDoneInfo) {
 		}
 	},
 	OnTry: func(info *TryStartInfo) func(info *TryDoneInfo) {
@@ -35,12 +27,5 @@ var defaultTrace = &Trace{
 		return func(info *GetDoneInfo) {
 		}
 	},
-	OnSpawn: func(info *SpawnStartInfo) func(info *SpawnDoneInfo) {
-		return func(info *SpawnDoneInfo) {
-		}
-	},
-	OnWant: func(info *WantStartInfo) func(info *WantDoneInfo) {
-		return func(info *WantDoneInfo) {
-		}
-	},
+	OnChange: func(info ChangeInfo) {},
 }

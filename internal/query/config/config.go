@@ -3,8 +3,6 @@ package config
 import (
 	"time"
 
-	"github.com/jonboulle/clockwork"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -13,24 +11,18 @@ import (
 const (
 	DefaultSessionDeleteTimeout = 500 * time.Millisecond
 	DefaultSessionCreateTimeout = 5 * time.Second
-	DefaultPoolMinSize          = pool.DefaultMinSize
-	DefaultPoolMaxSize          = pool.DefaultMaxSize
-	DefaultPoolProducersCount   = pool.DefaultProducersCount
+	DefaultPoolMaxSize          = pool.DefaultLimit
 )
 
 type Config struct {
 	config.Common
 
-	minSize        int
-	maxSize        int
-	producersCount int
+	poolLimit int
 
 	sessionCreateTimeout time.Duration
 	sessionDeleteTimeout time.Duration
 
 	trace *trace.Query
-
-	clock clockwork.Clock
 }
 
 func New(opts ...Option) *Config {
@@ -46,12 +38,9 @@ func New(opts ...Option) *Config {
 
 func defaults() *Config {
 	return &Config{
-		minSize:              DefaultPoolMinSize,
-		maxSize:              DefaultPoolMaxSize,
-		producersCount:       DefaultPoolProducersCount,
+		poolLimit:            DefaultPoolMaxSize,
 		sessionCreateTimeout: DefaultSessionCreateTimeout,
 		sessionDeleteTimeout: DefaultSessionDeleteTimeout,
-		clock:                clockwork.NewRealClock(),
 		trace:                &trace.Query{},
 	}
 }
@@ -61,24 +50,11 @@ func (c *Config) Trace() *trace.Query {
 	return c.trace
 }
 
-// Clock defines clock
-func (c *Config) Clock() clockwork.Clock {
-	return c.clock
-}
-
-func (c *Config) PoolMinSize() int {
-	return c.minSize
-}
-
-// PoolMaxSize is an upper bound of pooled sessions.
-// If PoolMaxSize is less than or equal to zero then the
-// DefaultPoolMaxSize variable is used as a limit.
-func (c *Config) PoolMaxSize() int {
-	return c.maxSize
-}
-
-func (c *Config) PoolProducersCount() int {
-	return c.producersCount
+// PoolLimit is an upper bound of pooled sessions.
+// If PoolLimit is less than or equal to zero then the
+// DefaultPoolMaxSize variable is used as a pool limit.
+func (c *Config) PoolLimit() int {
+	return c.poolLimit
 }
 
 // SessionCreateTimeout limits maximum time spent on Create session request

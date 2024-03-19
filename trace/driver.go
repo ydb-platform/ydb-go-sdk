@@ -35,7 +35,6 @@ type (
 		OnConnStreamSendMsg   func(DriverConnStreamSendMsgStartInfo) func(DriverConnStreamSendMsgDoneInfo)
 		OnConnStreamCloseSend func(DriverConnStreamCloseSendStartInfo) func(DriverConnStreamCloseSendDoneInfo)
 		OnConnDial            func(DriverConnDialStartInfo) func(DriverConnDialDoneInfo)
-		OnConnPark            func(DriverConnParkStartInfo) func(DriverConnParkDoneInfo)
 		OnConnBan             func(DriverConnBanStartInfo) func(DriverConnBanDoneInfo)
 		OnConnAllow           func(DriverConnAllowStartInfo) func(DriverConnAllowDoneInfo)
 		OnConnClose           func(DriverConnCloseStartInfo) func(DriverConnCloseDoneInfo)
@@ -224,18 +223,6 @@ type (
 		Endpoint EndpointInfo
 	}
 	DriverConnDialDoneInfo struct {
-		Error error
-	}
-	DriverConnParkStartInfo struct {
-		// Context make available context in trace callback function.
-		// Pointer to context provide replacement of context in trace callback function.
-		// Warning: concurrent access to pointer on client side must be excluded.
-		// Safe replacement of context are provided only inside callback function
-		Context  *context.Context
-		Call     call
-		Endpoint EndpointInfo
-	}
-	DriverConnParkDoneInfo struct {
 		Error error
 	}
 	DriverConnCloseStartInfo struct {

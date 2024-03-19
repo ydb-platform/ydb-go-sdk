@@ -94,36 +94,6 @@ func (c *conn) IsState(states ...State) bool {
 	return false
 }
 
-func (c *conn) park(ctx context.Context) (err error) {
-	onDone := trace.DriverOnConnPark(
-		c.config.Trace(), &ctx,
-		stack.FunctionID(""),
-		c.Endpoint(),
-	)
-	defer func() {
-		onDone(err)
-	}()
-
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
-
-	if c.closed {
-		return nil
-	}
-
-	if c.cc == nil {
-		return nil
-	}
-
-	err = c.close(ctx)
-
-	if err != nil {
-		return c.wrapError(err)
-	}
-
-	return nil
-}
-
 func (c *conn) NodeID() uint32 {
 	if c != nil {
 		return c.endpoint.NodeID()

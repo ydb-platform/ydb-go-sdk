@@ -27,21 +27,9 @@ func internalQuery(
 			start := time.Now()
 
 			return func(info trace.QueryNewDoneInfo) {
-				if info.Error == nil {
-					l.Log(WithLevel(ctx, INFO), "done",
-						latencyField(start),
-					)
-				} else {
-					lvl := FATAL
-					if !xerrors.IsYdb(info.Error) {
-						lvl = ERROR
-					}
-					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
-					)
-				}
+				l.Log(WithLevel(ctx, INFO), "done",
+					latencyField(start),
+				)
 			}
 		},
 		OnClose: func(info trace.QueryCloseStartInfo) func(info trace.QueryCloseDoneInfo) {
@@ -75,35 +63,14 @@ func internalQuery(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "pool", "new")
-			l.Log(ctx, "start",
-				Int("MinSize", info.MinSize),
-				Int("MaxSize", info.MaxSize),
-				Int("ProducersCount", info.ProducersCount),
-			)
+			l.Log(ctx, "start")
 			start := time.Now()
 
 			return func(info trace.QueryPoolNewDoneInfo) {
-				if info.Error == nil {
-					l.Log(WithLevel(ctx, INFO), "done",
-						latencyField(start),
-						Int("MinSize", info.MinSize),
-						Int("MaxSize", info.MaxSize),
-						Int("ProducersCount", info.ProducersCount),
-					)
-				} else {
-					lvl := FATAL
-					if !xerrors.IsYdb(info.Error) {
-						lvl = ERROR
-					}
-					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						Int("MinSize", info.MinSize),
-						Int("MaxSize", info.MaxSize),
-						Int("ProducersCount", info.ProducersCount),
-						versionField(),
-					)
-				}
+				l.Log(WithLevel(ctx, INFO), "done",
+					latencyField(start),
+					Int("Limit", info.Limit),
+				)
 			}
 		},
 		OnPoolClose: func(info trace.QueryPoolCloseStartInfo) func(trace.QueryPoolCloseDoneInfo) {
@@ -130,22 +97,6 @@ func internalQuery(
 						versionField(),
 					)
 				}
-			}
-		},
-		OnPoolProduce: func(info trace.QueryPoolProduceStartInfo) func(trace.QueryPoolProduceDoneInfo) {
-			if d.Details()&trace.QueryPoolEvents == 0 {
-				return nil
-			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "pool", "produce")
-			l.Log(ctx, "start",
-				Int("Concurrency", info.Concurrency),
-			)
-			start := time.Now()
-
-			return func(info trace.QueryPoolProduceDoneInfo) {
-				l.Log(ctx, "done",
-					latencyField(start),
-				)
 			}
 		},
 		OnPoolTry: func(info trace.QueryPoolTryStartInfo) func(trace.QueryPoolTryDoneInfo) {
@@ -237,58 +188,6 @@ func internalQuery(
 			start := time.Now()
 
 			return func(info trace.QueryPoolGetDoneInfo) {
-				if info.Error == nil {
-					l.Log(ctx, "done",
-						latencyField(start),
-					)
-				} else {
-					lvl := WARN
-					if !xerrors.IsYdb(info.Error) {
-						lvl = DEBUG
-					}
-					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
-					)
-				}
-			}
-		},
-		OnPoolSpawn: func(info trace.QueryPoolSpawnStartInfo) func(trace.QueryPoolSpawnDoneInfo) {
-			if d.Details()&trace.QueryPoolEvents == 0 {
-				return nil
-			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "pool", "spawn")
-			l.Log(ctx, "start")
-			start := time.Now()
-
-			return func(info trace.QueryPoolSpawnDoneInfo) {
-				if info.Error == nil {
-					l.Log(ctx, "done",
-						latencyField(start),
-					)
-				} else {
-					lvl := WARN
-					if !xerrors.IsYdb(info.Error) {
-						lvl = DEBUG
-					}
-					l.Log(WithLevel(ctx, lvl), "failed",
-						latencyField(start),
-						Error(info.Error),
-						versionField(),
-					)
-				}
-			}
-		},
-		OnPoolWant: func(info trace.QueryPoolWantStartInfo) func(trace.QueryPoolWantDoneInfo) {
-			if d.Details()&trace.QueryPoolEvents == 0 {
-				return nil
-			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "pool", "want")
-			l.Log(ctx, "start")
-			start := time.Now()
-
-			return func(info trace.QueryPoolWantDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
 						latencyField(start),
@@ -494,6 +393,36 @@ func internalQuery(
 					l.Log(WithLevel(ctx, DEBUG), "done",
 						latencyField(start),
 						String("TransactionID", info.Tx.ID()),
+					)
+				} else {
+					lvl := WARN
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "failed",
+						latencyField(start),
+						Error(info.Error),
+						versionField(),
+					)
+				}
+			}
+		},
+		OnTxExecute: func(info trace.QueryTxExecuteStartInfo) func(info trace.QueryTxExecuteDoneInfo) {
+			if d.Details()&trace.QueryTransactionEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "transaction", "execute")
+			l.Log(ctx, "start",
+				String("SessionID", info.Session.ID()),
+				String("TransactionID", info.Tx.ID()),
+				String("SessionStatus", info.Session.Status()),
+			)
+			start := time.Now()
+
+			return func(info trace.QueryTxExecuteDoneInfo) {
+				if info.Error == nil {
+					l.Log(WithLevel(ctx, DEBUG), "done",
+						latencyField(start),
 					)
 				} else {
 					lvl := WARN

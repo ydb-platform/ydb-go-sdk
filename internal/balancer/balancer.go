@@ -257,12 +257,9 @@ func New(
 		pool:            pool,
 		localDCDetector: detectLocalDC,
 	}
-	d, err := internalDiscovery.New(ctx, pool.Get(
+	d := internalDiscovery.New(ctx, pool.Get(
 		endpoint.New(driverConfig.Endpoint()),
 	), discoveryConfig)
-	if err != nil {
-		return nil, err
-	}
 
 	b.discoveryClient = d
 

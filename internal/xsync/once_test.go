@@ -2,6 +2,7 @@ package xsync
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"testing"
 
@@ -27,26 +28,66 @@ func TestOnceFunc(t *testing.T) {
 	require.Equal(t, 1, cnt)
 }
 
-func TestOnceValue(t *testing.T) {
-	var (
-		ctx = xtest.Context(t)
-		cnt = 0
-	)
-	f := OnceValue(func(ctx context.Context) (int, error) {
-		cnt++
+type testCloser struct {
+	value    int
+	inited   bool
+	closed   bool
+	closeErr error
+}
 
-		return cnt, nil
+func (c *testCloser) Close(ctx context.Context) error {
+	c.closed = true
+
+	return c.closeErr
+}
+
+func TestOnceValue(t *testing.T) {
+	ctx := xtest.Context(t)
+	t.Run("Race", func(t *testing.T) {
+		counter := 0
+		once := OnceValue(func() *testCloser {
+			counter++
+
+			return &testCloser{value: counter}
+		})
+		var wg sync.WaitGroup
+		wg.Add(1000)
+		for range make([]struct{}, 1000) {
+			go func() {
+				defer wg.Done()
+				v := once.Get()
+				require.Equal(t, 1, v.value)
+			}()
+		}
+		wg.Wait()
 	})
-	require.Equal(t, 0, cnt)
-	var wg sync.WaitGroup
-	wg.Add(1000)
-	for range make([]struct{}, 1000) {
-		go func() {
-			defer wg.Done()
-			v, err := f(ctx)
-			require.NoError(t, err)
-			require.Equal(t, 1, v)
-		}()
-	}
-	wg.Wait()
+	t.Run("GetBeforeClose", func(t *testing.T) {
+		constCloseErr := errors.New("")
+		once := OnceValue(func() *testCloser {
+			return &testCloser{
+				inited:   true,
+				closeErr: constCloseErr,
+			}
+		})
+		v := once.Get()
+		require.True(t, v.inited)
+		require.False(t, v.closed)
+		err := once.Close(ctx)
+		require.ErrorIs(t, err, constCloseErr)
+		require.True(t, v.inited)
+		require.True(t, v.closed)
+	})
+	t.Run("CloseBeforeGet", func(t *testing.T) {
+		constCloseErr := errors.New("")
+		once := OnceValue(func() *testCloser {
+			return &testCloser{
+				inited:   true,
+				closeErr: constCloseErr,
+			}
+		})
+		err := once.Close(ctx)
+		require.NoError(t, err)
+		v := once.Get()
+		require.Nil(t, v)
+	})
 }

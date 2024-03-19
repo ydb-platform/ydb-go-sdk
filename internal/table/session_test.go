@@ -339,7 +339,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			func(t *testing.T) {
 				for _, srcDst := range fromTo {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
-						client, err := New(context.Background(), testutil.NewBalancer(
+						client := New(context.Background(), testutil.NewBalancer(
 							testutil.WithInvokeHandlers(
 								testutil.InvokeHandlers{
 									testutil.TableExecuteDataQuery: func(interface{}) (proto.Message, error) {
@@ -382,7 +382,6 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 								},
 							),
 						), config.New())
-						require.NoError(t, err)
 						ctx, cancel := xcontext.WithTimeout(
 							context.Background(),
 							time.Second,
@@ -397,7 +396,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 }
 
 func TestCreateTableRegression(t *testing.T) {
-	client, err := New(context.Background(), testutil.NewBalancer(
+	client := New(context.Background(), testutil.NewBalancer(
 		testutil.WithInvokeHandlers(
 			testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(request interface{}) (proto.Message, error) {
@@ -474,15 +473,13 @@ func TestCreateTableRegression(t *testing.T) {
 		),
 	), config.New())
 
-	require.NoError(t, err)
-
 	ctx, cancel := xcontext.WithTimeout(
 		context.Background(),
 		time.Second,
 	)
 	defer cancel()
 
-	err = client.Do(ctx, func(ctx context.Context, s table.Session) error {
+	err := client.Do(ctx, func(ctx context.Context, s table.Session) error {
 		return s.CreateTable(ctx, "episodes",
 			options.WithColumn("series_id", types.NewOptional(types.Uint64)),
 			options.WithColumn("season_id", types.NewOptional(types.Uint64)),
@@ -498,7 +495,7 @@ func TestCreateTableRegression(t *testing.T) {
 }
 
 func TestDescribeTableRegression(t *testing.T) {
-	client, err := New(context.Background(), testutil.NewBalancer(
+	client := New(context.Background(), testutil.NewBalancer(
 		testutil.WithInvokeHandlers(
 			testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(request interface{}) (proto.Message, error) {
@@ -567,8 +564,6 @@ func TestDescribeTableRegression(t *testing.T) {
 		),
 	), config.New())
 
-	require.NoError(t, err)
-
 	ctx, cancel := xcontext.WithTimeout(
 		context.Background(),
 		time.Second,
@@ -577,7 +572,7 @@ func TestDescribeTableRegression(t *testing.T) {
 
 	var act options.Description
 
-	err = client.Do(ctx, func(ctx context.Context, s table.Session) (err error) {
+	err := client.Do(ctx, func(ctx context.Context, s table.Session) (err error) {
 		act, err = s.DescribeTable(ctx, "episodes")
 
 		return err

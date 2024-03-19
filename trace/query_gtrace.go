@@ -171,41 +171,6 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 		}
 	}
 	{
-		h1 := t.OnPoolProduce
-		h2 := x.OnPoolProduce
-		ret.OnPoolProduce = func(q QueryPoolProduceStartInfo) func(QueryPoolProduceDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(QueryPoolProduceDoneInfo)
-			if h1 != nil {
-				r = h1(q)
-			}
-			if h2 != nil {
-				r1 = h2(q)
-			}
-			return func(q QueryPoolProduceDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(q)
-				}
-				if r1 != nil {
-					r1(q)
-				}
-			}
-		}
-	}
-	{
 		h1 := t.OnPoolTry
 		h2 := x.OnPoolTry
 		ret.OnPoolTry = func(q QueryPoolTryStartInfo) func(QueryPoolTryDoneInfo) {
@@ -346,9 +311,9 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 		}
 	}
 	{
-		h1 := t.OnPoolSpawn
-		h2 := x.OnPoolSpawn
-		ret.OnPoolSpawn = func(q QueryPoolSpawnStartInfo) func(QueryPoolSpawnDoneInfo) {
+		h1 := t.OnPoolChange
+		h2 := x.OnPoolChange
+		ret.OnPoolChange = func(q QueryPoolChange) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -356,62 +321,11 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 					}
 				}()
 			}
-			var r, r1 func(QueryPoolSpawnDoneInfo)
 			if h1 != nil {
-				r = h1(q)
+				h1(q)
 			}
 			if h2 != nil {
-				r1 = h2(q)
-			}
-			return func(q QueryPoolSpawnDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(q)
-				}
-				if r1 != nil {
-					r1(q)
-				}
-			}
-		}
-	}
-	{
-		h1 := t.OnPoolWant
-		h2 := x.OnPoolWant
-		ret.OnPoolWant = func(q QueryPoolWantStartInfo) func(QueryPoolWantDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(QueryPoolWantDoneInfo)
-			if h1 != nil {
-				r = h1(q)
-			}
-			if h2 != nil {
-				r1 = h2(q)
-			}
-			return func(q QueryPoolWantDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(q)
-				}
-				if r1 != nil {
-					r1(q)
-				}
+				h2(q)
 			}
 		}
 	}
@@ -644,6 +558,41 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 				r1 = h2(q)
 			}
 			return func(info QuerySessionBeginDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(info)
+				}
+				if r1 != nil {
+					r1(info)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnTxExecute
+		h2 := x.OnTxExecute
+		ret.OnTxExecute = func(q QueryTxExecuteStartInfo) func(QueryTxExecuteDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryTxExecuteDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(info QueryTxExecuteDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -1002,21 +951,6 @@ func (t *Query) onPoolClose(q QueryPoolCloseStartInfo) func(QueryPoolCloseDoneIn
 	}
 	return res
 }
-func (t *Query) onPoolProduce(q QueryPoolProduceStartInfo) func(QueryPoolProduceDoneInfo) {
-	fn := t.OnPoolProduce
-	if fn == nil {
-		return func(QueryPoolProduceDoneInfo) {
-			return
-		}
-	}
-	res := fn(q)
-	if res == nil {
-		return func(QueryPoolProduceDoneInfo) {
-			return
-		}
-	}
-	return res
-}
 func (t *Query) onPoolTry(q QueryPoolTryStartInfo) func(QueryPoolTryDoneInfo) {
 	fn := t.OnPoolTry
 	if fn == nil {
@@ -1077,35 +1011,12 @@ func (t *Query) onPoolGet(q QueryPoolGetStartInfo) func(QueryPoolGetDoneInfo) {
 	}
 	return res
 }
-func (t *Query) onPoolSpawn(q QueryPoolSpawnStartInfo) func(QueryPoolSpawnDoneInfo) {
-	fn := t.OnPoolSpawn
+func (t *Query) onPoolChange(q QueryPoolChange) {
+	fn := t.OnPoolChange
 	if fn == nil {
-		return func(QueryPoolSpawnDoneInfo) {
-			return
-		}
+		return
 	}
-	res := fn(q)
-	if res == nil {
-		return func(QueryPoolSpawnDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t *Query) onPoolWant(q QueryPoolWantStartInfo) func(QueryPoolWantDoneInfo) {
-	fn := t.OnPoolWant
-	if fn == nil {
-		return func(QueryPoolWantDoneInfo) {
-			return
-		}
-	}
-	res := fn(q)
-	if res == nil {
-		return func(QueryPoolWantDoneInfo) {
-			return
-		}
-	}
-	return res
+	fn(q)
 }
 func (t *Query) onDo(q QueryDoStartInfo) func(QueryDoDoneInfo) {
 	fn := t.OnDo
@@ -1207,6 +1118,21 @@ func (t *Query) onSessionBegin(q QuerySessionBeginStartInfo) func(info QuerySess
 	res := fn(q)
 	if res == nil {
 		return func(QuerySessionBeginDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Query) onTxExecute(q QueryTxExecuteStartInfo) func(info QueryTxExecuteDoneInfo) {
+	fn := t.OnTxExecute
+	if fn == nil {
+		return func(QueryTxExecuteDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryTxExecuteDoneInfo) {
 			return
 		}
 	}
@@ -1332,14 +1258,13 @@ func (t *Query) onRowScanStruct(q QueryRowScanStructStartInfo) func(info QueryRo
 	}
 	return res
 }
-func QueryOnNew(t *Query, c *context.Context, call call) func(error) {
+func QueryOnNew(t *Query, c *context.Context, call call) func() {
 	var p QueryNewStartInfo
 	p.Context = c
 	p.Call = call
 	res := t.onNew(p)
-	return func(e error) {
+	return func() {
 		var p QueryNewDoneInfo
-		p.Error = e
 		res(p)
 	}
 }
@@ -1354,20 +1279,14 @@ func QueryOnClose(t *Query, c *context.Context, call call) func(error) {
 		res(p)
 	}
 }
-func QueryOnPoolNew(t *Query, c *context.Context, call call, minSize int, maxSize int, producersCount int) func(_ error, minSize int, maxSize int, producersCount int) {
+func QueryOnPoolNew(t *Query, c *context.Context, call call) func(limit int) {
 	var p QueryPoolNewStartInfo
 	p.Context = c
 	p.Call = call
-	p.MinSize = minSize
-	p.MaxSize = maxSize
-	p.ProducersCount = producersCount
 	res := t.onPoolNew(p)
-	return func(e error, minSize int, maxSize int, producersCount int) {
+	return func(limit int) {
 		var p QueryPoolNewDoneInfo
-		p.Error = e
-		p.MinSize = minSize
-		p.MaxSize = maxSize
-		p.ProducersCount = producersCount
+		p.Limit = limit
 		res(p)
 	}
 }
@@ -1379,17 +1298,6 @@ func QueryOnPoolClose(t *Query, c *context.Context, call call) func(error) {
 	return func(e error) {
 		var p QueryPoolCloseDoneInfo
 		p.Error = e
-		res(p)
-	}
-}
-func QueryOnPoolProduce(t *Query, c *context.Context, call call, concurrency int) func() {
-	var p QueryPoolProduceStartInfo
-	p.Context = c
-	p.Call = call
-	p.Concurrency = concurrency
-	res := t.onPoolProduce(p)
-	return func() {
-		var p QueryPoolProduceDoneInfo
 		res(p)
 	}
 }
@@ -1438,27 +1346,13 @@ func QueryOnPoolGet(t *Query, c *context.Context, call call) func(error) {
 		res(p)
 	}
 }
-func QueryOnPoolSpawn(t *Query, c *context.Context, call call) func(error) {
-	var p QueryPoolSpawnStartInfo
-	p.Context = c
-	p.Call = call
-	res := t.onPoolSpawn(p)
-	return func(e error) {
-		var p QueryPoolSpawnDoneInfo
-		p.Error = e
-		res(p)
-	}
-}
-func QueryOnPoolWant(t *Query, c *context.Context, call call) func(error) {
-	var p QueryPoolWantStartInfo
-	p.Context = c
-	p.Call = call
-	res := t.onPoolWant(p)
-	return func(e error) {
-		var p QueryPoolWantDoneInfo
-		p.Error = e
-		res(p)
-	}
+func QueryOnPoolChange(t *Query, limit int, index int, idle int, inUse int) {
+	var p QueryPoolChange
+	p.Limit = limit
+	p.Index = index
+	p.Idle = idle
+	p.InUse = inUse
+	t.onPoolChange(p)
 }
 func QueryOnDo(t *Query, c *context.Context, call call) func(attempts int, _ error) {
 	var p QueryDoStartInfo
@@ -1543,6 +1437,20 @@ func QueryOnSessionBegin(t *Query, c *context.Context, call call, session queryS
 		var p QuerySessionBeginDoneInfo
 		p.Error = e
 		p.Tx = tx
+		res(p)
+	}
+}
+func QueryOnTxExecute(t *Query, c *context.Context, call call, session querySessionInfo, tx queryTransactionInfo, query string) func(error) {
+	var p QueryTxExecuteStartInfo
+	p.Context = c
+	p.Call = call
+	p.Session = session
+	p.Tx = tx
+	p.Query = query
+	res := t.onTxExecute(p)
+	return func(e error) {
+		var p QueryTxExecuteDoneInfo
+		p.Error = e
 		res(p)
 	}
 }

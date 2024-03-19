@@ -4,7 +4,6 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
@@ -12,7 +11,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -183,39 +181,6 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 	return nil
 }
 
-func (p *Pool) connParker(ctx context.Context, ttl, interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-p.done:
-			return
-		case <-ticker.C:
-			for _, c := range p.collectConns() {
-				if time.Since(c.LastUsage()) > ttl {
-					switch c.GetState() {
-					case Online, Banned:
-						_ = c.park(ctx)
-					default:
-						// nop
-					}
-				}
-			}
-		}
-	}
-}
-
-func (p *Pool) collectConns() []*conn {
-	p.mtx.RLock()
-	defer p.mtx.RUnlock()
-	conns := make([]*conn, 0, len(p.conns))
-	for _, c := range p.conns {
-		conns = append(conns, c)
-	}
-
-	return conns
-}
-
 func NewPool(ctx context.Context, config Config) *Pool {
 	onDone := trace.DriverOnPoolNew(config.Trace(), &ctx, stack.FunctionID(""))
 	defer onDone()
@@ -226,9 +191,6 @@ func NewPool(ctx context.Context, config Config) *Pool {
 		opts:   config.GrpcDialOptions(),
 		conns:  make(map[connsKey]*conn),
 		done:   make(chan struct{}),
-	}
-	if ttl := config.ConnectionTTL(); ttl > 0 {
-		go p.connParker(xcontext.WithoutDeadline(ctx), ttl, ttl/2)
 	}
 
 	return p

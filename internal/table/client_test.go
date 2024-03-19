@@ -408,7 +408,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 		session *session
 	}
 	create := make(chan createReq)
-	p, err := newClient(
+	p := newClient(
 		context.Background(),
 		nil,
 		(&StubBuilder{
@@ -429,10 +429,10 @@ func TestSessionPoolRacyGet(t *testing.T) {
 			config.WithIdleThreshold(-1),
 		),
 	)
-	require.NoError(t, err)
 	var (
 		expSession *session
 		done       = make(chan struct{}, 2)
+		err        error
 	)
 	for i := 0; i < 2; i++ {
 		go func() {
@@ -872,7 +872,7 @@ func newClientWithStubBuilder(
 	stubLimit int,
 	options ...config.Option,
 ) *Client {
-	c, err := newClient(
+	c := newClient(
 		context.Background(),
 		balancer,
 		(&StubBuilder{
@@ -882,7 +882,6 @@ func newClientWithStubBuilder(
 		}).createSession,
 		config.New(options...),
 	)
-	require.NoError(t, err)
 
 	return c
 }

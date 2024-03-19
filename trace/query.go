@@ -24,15 +24,13 @@ type (
 		OnNew   func(QueryNewStartInfo) func(info QueryNewDoneInfo)
 		OnClose func(QueryCloseStartInfo) func(info QueryCloseDoneInfo)
 
-		OnPoolNew     func(QueryPoolNewStartInfo) func(QueryPoolNewDoneInfo)
-		OnPoolClose   func(QueryPoolCloseStartInfo) func(QueryPoolCloseDoneInfo)
-		OnPoolProduce func(QueryPoolProduceStartInfo) func(QueryPoolProduceDoneInfo)
-		OnPoolTry     func(QueryPoolTryStartInfo) func(QueryPoolTryDoneInfo)
-		OnPoolWith    func(QueryPoolWithStartInfo) func(QueryPoolWithDoneInfo)
-		OnPoolPut     func(QueryPoolPutStartInfo) func(QueryPoolPutDoneInfo)
-		OnPoolGet     func(QueryPoolGetStartInfo) func(QueryPoolGetDoneInfo)
-		OnPoolSpawn   func(QueryPoolSpawnStartInfo) func(QueryPoolSpawnDoneInfo)
-		OnPoolWant    func(QueryPoolWantStartInfo) func(QueryPoolWantDoneInfo)
+		OnPoolNew    func(QueryPoolNewStartInfo) func(QueryPoolNewDoneInfo)
+		OnPoolClose  func(QueryPoolCloseStartInfo) func(QueryPoolCloseDoneInfo)
+		OnPoolTry    func(QueryPoolTryStartInfo) func(QueryPoolTryDoneInfo)
+		OnPoolWith   func(QueryPoolWithStartInfo) func(QueryPoolWithDoneInfo)
+		OnPoolPut    func(QueryPoolPutStartInfo) func(QueryPoolPutDoneInfo)
+		OnPoolGet    func(QueryPoolGetStartInfo) func(QueryPoolGetDoneInfo)
+		OnPoolChange func(QueryPoolChange)
 
 		OnDo   func(QueryDoStartInfo) func(QueryDoDoneInfo)
 		OnDoTx func(QueryDoTxStartInfo) func(QueryDoTxDoneInfo)
@@ -42,6 +40,7 @@ type (
 		OnSessionDelete       func(QuerySessionDeleteStartInfo) func(info QuerySessionDeleteDoneInfo)
 		OnSessionExecute      func(QuerySessionExecuteStartInfo) func(info QuerySessionExecuteDoneInfo)
 		OnSessionBegin        func(QuerySessionBeginStartInfo) func(info QuerySessionBeginDoneInfo)
+		OnTxExecute           func(QueryTxExecuteStartInfo) func(info QueryTxExecuteDoneInfo)
 		OnResultNew           func(QueryResultNewStartInfo) func(info QueryResultNewDoneInfo)
 		OnResultNextPart      func(QueryResultNextPartStartInfo) func(info QueryResultNextPartDoneInfo)
 		OnResultNextResultSet func(QueryResultNextResultSetStartInfo) func(info QueryResultNextResultSetDoneInfo)
@@ -100,6 +99,21 @@ type (
 		Query   string
 	}
 	QuerySessionExecuteDoneInfo struct {
+		Error error
+	}
+	QueryTxExecuteStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+
+		Session querySessionInfo
+		Tx      queryTransactionInfo
+		Query   string
+	}
+	QueryTxExecuteDoneInfo struct {
 		Error error
 	}
 	QuerySessionAttachStartInfo struct {
@@ -235,9 +249,7 @@ type (
 		Context *context.Context
 		Call    call
 	}
-	QueryNewDoneInfo struct {
-		Error error
-	}
+	QueryNewDoneInfo    struct{}
 	QueryCloseStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -256,19 +268,9 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-
-		// input settings
-		MinSize        int
-		MaxSize        int
-		ProducersCount int
 	}
 	QueryPoolNewDoneInfo struct {
-		Error error
-
-		// actual settings
-		MinSize        int
-		MaxSize        int
-		ProducersCount int
+		Limit int
 	}
 	QueryPoolCloseStartInfo struct {
 		// Context make available context in trace callback function.
@@ -281,18 +283,7 @@ type (
 	QueryPoolCloseDoneInfo struct {
 		Error error
 	}
-	QueryPoolProduceStartInfo struct {
-		// Context make available context in trace callback function.
-		// Pointer to context provide replacement of context in trace callback function.
-		// Warning: concurrent access to pointer on client side must be excluded.
-		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Call    call
-
-		Concurrency int
-	}
-	QueryPoolProduceDoneInfo struct{}
-	QueryPoolTryStartInfo    struct {
+	QueryPoolTryStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -338,26 +329,10 @@ type (
 	QueryPoolGetDoneInfo struct {
 		Error error
 	}
-	QueryPoolSpawnStartInfo struct {
-		// Context make available context in trace callback function.
-		// Pointer to context provide replacement of context in trace callback function.
-		// Warning: concurrent access to pointer on client side must be excluded.
-		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Call    call
-	}
-	QueryPoolSpawnDoneInfo struct {
-		Error error
-	}
-	QueryPoolWantStartInfo struct {
-		// Context make available context in trace callback function.
-		// Pointer to context provide replacement of context in trace callback function.
-		// Warning: concurrent access to pointer on client side must be excluded.
-		// Safe replacement of context are provided only inside callback function
-		Context *context.Context
-		Call    call
-	}
-	QueryPoolWantDoneInfo struct {
-		Error error
+	QueryPoolChange struct {
+		Limit int
+		Index int
+		Idle  int
+		InUse int
 	}
 )

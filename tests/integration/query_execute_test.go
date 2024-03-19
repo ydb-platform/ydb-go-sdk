@@ -182,7 +182,7 @@ func TestQueryExecute(t *testing.T) {
 		require.EqualValues(t, time.Duration(100500000000), data.P3)
 		require.Nil(t, data.P4)
 	})
-	t.Run("Transaction", func(t *testing.T) {
+	t.Run("Tx", func(t *testing.T) {
 		t.Run("Explicit", func(t *testing.T) {
 			err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) (err error) {
 				tx, err := s.Begin(ctx, query.TxSettings(query.WithSerializableReadWrite()))
