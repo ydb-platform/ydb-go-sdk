@@ -5,7 +5,6 @@ import (
 	"database/sql/driver"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -99,7 +98,7 @@ func (tx *txFake) QueryContext(ctx context.Context, query string, args []driver.
 	onDone := trace.DatabaseSQLOnTxQuery(
 		tx.conn.trace, &ctx,
 		stack.FunctionID(""),
-		tx.ctx, tx, query, xcontext.IsIdempotent(ctx),
+		tx.ctx, tx, query,
 	)
 	defer func() {
 		onDone(err)
@@ -118,7 +117,7 @@ func (tx *txFake) ExecContext(ctx context.Context, query string, args []driver.N
 	onDone := trace.DatabaseSQLOnTxExec(
 		tx.conn.trace, &ctx,
 		stack.FunctionID(""),
-		tx.ctx, tx, query, xcontext.IsIdempotent(ctx),
+		tx.ctx, tx, query,
 	)
 	defer func() {
 		onDone(err)

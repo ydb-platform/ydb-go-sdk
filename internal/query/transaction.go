@@ -7,25 +7,46 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var _ query.Transaction = (*transaction)(nil)
 
 type transaction struct {
-	id string
-	s  *Session
+	id    string
+	s     *Session
+	trace *trace.Query
+}
+
+func newTransaction(id string, s *Session, t *trace.Query) *transaction {
+	if t == nil {
+		t = &trace.Query{}
+	}
+
+	return &transaction{
+		id:    id,
+		s:     s,
+		trace: t,
+	}
 }
 
 func (tx transaction) ID() string {
 	return tx.id
 }
 
-func (tx transaction) Execute(ctx context.Context, q string, opts ...query.TxExecuteOption) (
-	r query.Result, err error,
+func (tx transaction) Execute(ctx context.Context, q string, opts ...options.TxExecuteOption) (
+	r query.Result, finalErr error,
 ) {
-	_, res, err := execute(ctx, tx.s, tx.s.queryClient, q, query.TxExecuteSettings(tx.id, opts...).ExecuteSettings)
+	onDone := trace.QueryOnTxExecute(tx.trace, &ctx, stack.FunctionID(""), tx.s, tx, q)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	_, res, err := execute(ctx, tx.s, tx.s.grpcClient, q, options.TxExecuteSettings(tx.id, opts...).ExecuteSettings)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -49,7 +70,7 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 }
 
 func (tx transaction) CommitTx(ctx context.Context) (err error) {
-	return commitTx(ctx, tx.s.queryClient, tx.s.id, tx.id)
+	return commitTx(ctx, tx.s.grpcClient, tx.s.id, tx.id)
 }
 
 func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID, txID string) error {
@@ -68,5 +89,5 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 }
 
 func (tx transaction) Rollback(ctx context.Context) (err error) {
-	return rollback(ctx, tx.s.queryClient, tx.s.id, tx.id)
+	return rollback(ctx, tx.s.grpcClient, tx.s.id, tx.id)
 }

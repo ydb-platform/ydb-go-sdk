@@ -9,16 +9,17 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
 type executeConfig interface {
-	ExecMode() query.ExecMode
-	StatsMode() query.StatsMode
+	ExecMode() options.ExecMode
+	StatsMode() options.StatsMode
 	TxControl() *query.TransactionControl
-	Syntax() query.Syntax
+	Syntax() options.Syntax
 	Params() *params.Parameters
 	CallOptions() []grpc.CallOption
 }
@@ -59,20 +60,17 @@ func execute(ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient,
 
 	request, callOptions := executeQueryRequest(a, s.id, q, cfg)
 
-	streamCtx, streamCancel := xcontext.WithCancel(context.Background())
-	defer func() {
-		if finalErr != nil {
-			streamCancel()
-		}
-	}()
+	executeCtx, cancelExecute := xcontext.WithCancel(xcontext.WithoutDeadline(ctx))
 
-	stream, err := c.ExecuteQuery(streamCtx, request, callOptions...)
+	stream, err := c.ExecuteQuery(executeCtx, request, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	r, txID, err := newResult(ctx, stream, streamCancel)
+	r, txID, err := newResult(ctx, stream, s.trace, cancelExecute)
 	if err != nil {
+		cancelExecute()
+
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
@@ -80,8 +78,5 @@ func execute(ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient,
 		return nil, r, nil
 	}
 
-	return &transaction{
-		id: txID,
-		s:  s,
-	}, r, nil
+	return newTransaction(txID, s, s.trace), r, nil
 }

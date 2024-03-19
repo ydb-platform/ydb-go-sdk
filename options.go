@@ -54,10 +54,21 @@ func WithAccessTokenCredentials(accessToken string) Option {
 	)
 }
 
+// WithApplicationName add provided application name to all api requests
+func WithApplicationName(applicationName string) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.options = append(c.options, config.WithApplicationName(applicationName))
+
+		return nil
+	}
+}
+
 // WithUserAgent add provided user agent value to all api requests
+//
+// Deprecated: use WithApplicationName instead
 func WithUserAgent(userAgent string) Option {
 	return func(ctx context.Context, c *Driver) error {
-		c.options = append(c.options, config.WithUserAgent(userAgent))
+		c.options = append(c.options, config.WithApplicationName(userAgent))
 
 		return nil
 	}
@@ -97,10 +108,10 @@ func WithConnectionString(connectionString string) Option {
 }
 
 // WithConnectionTTL defines duration for parking idle connections
-func WithConnectionTTL(ttl time.Duration) Option {
+//
+// Deprecated: background connection parking not available
+func WithConnectionTTL(time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
-		c.options = append(c.options, config.WithConnectionTTL(ttl))
-
 		return nil
 	}
 }
@@ -247,9 +258,9 @@ func With(options ...config.Option) Option {
 // MergeOptions concatentaes provided options to one cumulative value.
 func MergeOptions(opts ...Option) Option {
 	return func(ctx context.Context, c *Driver) error {
-		for _, o := range opts {
-			if o != nil {
-				if err := o(ctx, c); err != nil {
+		for _, opt := range opts {
+			if opt != nil {
+				if err := opt(ctx, c); err != nil {
 					return xerrors.WithStackTrace(err)
 				}
 			}
@@ -382,17 +393,18 @@ func WithQueryConfigOption(option queryConfig.Option) Option {
 func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
-		c.queryOptions = append(c.queryOptions, queryConfig.WithSizeLimit(sizeLimit))
 
 		return nil
 	}
 }
 
-// WithSessionPoolKeepAliveMinSize set minimum sessions should be keeped alive in table.Client
-//
-// Deprecated: table client do not supports background session keep-aliving now
-func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
-	return func(ctx context.Context, c *Driver) error { return nil }
+// WithSessionPoolLimit set min size of internal sessions pool in query.Client
+func WithSessionPoolLimit(size int) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.queryOptions = append(c.queryOptions, queryConfig.WithPoolLimit(size))
+
+		return nil
+	}
 }
 
 // WithSessionPoolIdleThreshold defines interval for idle sessions
@@ -408,16 +420,11 @@ func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 	}
 }
 
-// WithSessionPoolKeepAliveTimeout set timeout of keep alive requests for session in table.Client
-func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
-	return func(ctx context.Context, c *Driver) error { return nil }
-}
-
 // WithSessionPoolCreateSessionTimeout set timeout for new session creation process in table.Client
 func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithCreateSessionTimeout(createSessionTimeout))
-		c.queryOptions = append(c.queryOptions, queryConfig.WithCreateSessionTimeout(createSessionTimeout))
+		c.queryOptions = append(c.queryOptions, queryConfig.WithSessionCreateTimeout(createSessionTimeout))
 
 		return nil
 	}
@@ -427,7 +434,7 @@ func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Opt
 func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithDeleteTimeout(deleteTimeout))
-		c.queryOptions = append(c.queryOptions, queryConfig.WithDeleteTimeout(deleteTimeout))
+		c.queryOptions = append(c.queryOptions, queryConfig.WithSessionDeleteTimeout(deleteTimeout))
 
 		return nil
 	}
@@ -465,6 +472,25 @@ func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option { //
 				append(
 					[]trace.TableComposeOption{
 						trace.WithTablePanicCallback(c.panicCallback),
+					},
+					opts...,
+				)...,
+			),
+		)
+
+		return nil
+	}
+}
+
+// WithTraceQuery appends trace.Query into query traces
+func WithTraceQuery(t trace.Query, opts ...trace.QueryComposeOption) Option { //nolint:gocritic
+	return func(ctx context.Context, c *Driver) error {
+		c.queryOptions = append(
+			c.queryOptions,
+			queryConfig.WithTrace(&t,
+				append(
+					[]trace.QueryComposeOption{
+						trace.WithQueryPanicCallback(c.panicCallback),
 					},
 					opts...,
 				)...,

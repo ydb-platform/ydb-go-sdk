@@ -34,7 +34,12 @@ type balancer interface {
 	nodeChecker
 }
 
-func New(ctx context.Context, balancer balancer, config *config.Config) (*Client, error) {
+func New(ctx context.Context, balancer balancer, config *config.Config) *Client {
+	onDone := trace.TableOnInit(config.Trace(), &ctx, stack.FunctionID(""))
+	defer func() {
+		onDone(config.SizeLimit())
+	}()
+
 	return newClient(ctx, balancer, func(ctx context.Context) (s *session, err error) {
 		return newSession(ctx, balancer, config)
 	}, config)
@@ -45,12 +50,8 @@ func newClient(
 	balancer balancer,
 	builder sessionBuilder,
 	config *config.Config,
-) (c *Client, finalErr error) {
-	onDone := trace.TableOnInit(config.Trace(), &ctx, stack.FunctionID(""))
-	defer func() {
-		onDone(config.SizeLimit(), finalErr)
-	}()
-	c = &Client{
+) *Client {
+	c := &Client{
 		clock:       config.Clock(),
 		config:      config,
 		cc:          balancer,
@@ -74,7 +75,7 @@ func newClient(
 		go c.internalPoolGC(ctx, idleThreshold)
 	}
 
-	return c, nil
+	return c
 }
 
 // Client is a set of session instances that may be reused.
@@ -121,9 +122,9 @@ func withCreateSessionOnClose(onClose func(s *session)) createSessionOption {
 
 func (c *Client) createSession(ctx context.Context, opts ...createSessionOption) (s *session, err error) {
 	options := createSessionOptions{}
-	for _, o := range opts {
-		if o != nil {
-			o(&options)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&options)
 		}
 	}
 
@@ -644,7 +645,7 @@ func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 
 	attempts, onIntermediate := 0, trace.TableOnDo(config.Trace, &ctx,
 		stack.FunctionID(""),
-		config.Label, config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
+		config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
 	)
 	defer func() {
 		onIntermediate(finalErr)(attempts, finalErr)
@@ -674,7 +675,7 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 
 	attempts, onIntermediate := 0, trace.TableOnDoTx(config.Trace, &ctx,
 		stack.FunctionID(""),
-		config.Label, config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
+		config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
 	)
 	defer func() {
 		onIntermediate(finalErr)(attempts, finalErr)

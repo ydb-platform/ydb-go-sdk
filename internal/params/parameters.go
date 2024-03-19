@@ -95,22 +95,40 @@ func (p *Parameters) Add(params ...NamedValue) {
 	}
 }
 
-func (p *Parameter) Optional() *optional {
+func (p *Parameter) BeginOptional() *optional {
 	return &optional{
 		parent: p.parent,
 		name:   p.name,
 	}
 }
 
-func (p *Parameter) List() *list {
+func (p *Parameter) BeginList() *list {
 	return &list{
 		parent: p.parent,
 		name:   p.name,
 	}
 }
 
-func (p *Parameter) Set() *set {
+func (p *Parameter) Pg() pgParam {
+	return pgParam{p}
+}
+
+func (p *Parameter) BeginSet() *set {
 	return &set{
+		parent: p.parent,
+		name:   p.name,
+	}
+}
+
+func (p *Parameter) BeginDict() *dict {
+	return &dict{
+		parent: p.parent,
+		name:   p.name,
+	}
+}
+
+func (p *Parameter) BeginTuple() *tuple {
+	return &tuple{
 		parent: p.parent,
 		name:   p.name,
 	}
@@ -265,6 +283,27 @@ func (p *Parameter) YSON(v []byte) Builder {
 
 func (p *Parameter) UUID(v [16]byte) Builder {
 	p.value = value.UUIDValue(v)
+	p.parent.params = append(p.parent.params, p)
+
+	return p.parent
+}
+
+func (p *Parameter) TzDate(v time.Time) Builder {
+	p.value = value.TzDateValueFromTime(v)
+	p.parent.params = append(p.parent.params, p)
+
+	return p.parent
+}
+
+func (p *Parameter) TzTimestamp(v time.Time) Builder {
+	p.value = value.TzTimestampValueFromTime(v)
+	p.parent.params = append(p.parent.params, p)
+
+	return p.parent
+}
+
+func (p *Parameter) TzDatetime(v time.Time) Builder {
+	p.value = value.TzDatetimeValueFromTime(v)
 	p.parent.params = append(p.parent.params, p)
 
 	return p.parent

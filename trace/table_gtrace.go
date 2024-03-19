@@ -833,76 +833,6 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 		}
 	}
 	{
-		h1 := t.OnPoolSessionNew
-		h2 := x.OnPoolSessionNew
-		ret.OnPoolSessionNew = func(t TablePoolSessionNewStartInfo) func(TablePoolSessionNewDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(TablePoolSessionNewDoneInfo)
-			if h1 != nil {
-				r = h1(t)
-			}
-			if h2 != nil {
-				r1 = h2(t)
-			}
-			return func(t TablePoolSessionNewDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(t)
-				}
-				if r1 != nil {
-					r1(t)
-				}
-			}
-		}
-	}
-	{
-		h1 := t.OnPoolSessionClose
-		h2 := x.OnPoolSessionClose
-		ret.OnPoolSessionClose = func(t TablePoolSessionCloseStartInfo) func(TablePoolSessionCloseDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(TablePoolSessionCloseDoneInfo)
-			if h1 != nil {
-				r = h1(t)
-			}
-			if h2 != nil {
-				r1 = h2(t)
-			}
-			return func(t TablePoolSessionCloseDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(t)
-				}
-				if r1 != nil {
-					r1(t)
-				}
-			}
-		}
-	}
-	{
 		h1 := t.OnPoolPut
 		h2 := x.OnPoolPut
 		ret.OnPoolPut = func(t TablePoolPutStartInfo) func(TablePoolPutDoneInfo) {
@@ -1375,36 +1305,6 @@ func (t *Table) onPoolSessionRemove(info TablePoolSessionRemoveInfo) {
 	}
 	fn(info)
 }
-func (t *Table) onPoolSessionNew(t1 TablePoolSessionNewStartInfo) func(TablePoolSessionNewDoneInfo) {
-	fn := t.OnPoolSessionNew
-	if fn == nil {
-		return func(TablePoolSessionNewDoneInfo) {
-			return
-		}
-	}
-	res := fn(t1)
-	if res == nil {
-		return func(TablePoolSessionNewDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t *Table) onPoolSessionClose(t1 TablePoolSessionCloseStartInfo) func(TablePoolSessionCloseDoneInfo) {
-	fn := t.OnPoolSessionClose
-	if fn == nil {
-		return func(TablePoolSessionCloseDoneInfo) {
-			return
-		}
-	}
-	res := fn(t1)
-	if res == nil {
-		return func(TablePoolSessionCloseDoneInfo) {
-			return
-		}
-	}
-	return res
-}
 func (t *Table) onPoolPut(t1 TablePoolPutStartInfo) func(TablePoolPutDoneInfo) {
 	fn := t.OnPoolPut
 	if fn == nil {
@@ -1450,15 +1350,14 @@ func (t *Table) onPoolWait(t1 TablePoolWaitStartInfo) func(TablePoolWaitDoneInfo
 	}
 	return res
 }
-func TableOnInit(t *Table, c *context.Context, call call) func(limit int, _ error) {
+func TableOnInit(t *Table, c *context.Context, call call) func(limit int) {
 	var p TableInitStartInfo
 	p.Context = c
 	p.Call = call
 	res := t.onInit(p)
-	return func(limit int, e error) {
+	return func(limit int) {
 		var p TableInitDoneInfo
 		p.Limit = limit
-		p.Error = e
 		res(p)
 	}
 }
@@ -1473,11 +1372,10 @@ func TableOnClose(t *Table, c *context.Context, call call) func(error) {
 		res(p)
 	}
 }
-func TableOnDo(t *Table, c *context.Context, call call, iD string, label string, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
+func TableOnDo(t *Table, c *context.Context, call call, label string, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
 	var p TableDoStartInfo
 	p.Context = c
 	p.Call = call
-	p.ID = iD
 	p.Label = label
 	p.Idempotent = idempotent
 	p.NestedCall = nestedCall
@@ -1494,11 +1392,10 @@ func TableOnDo(t *Table, c *context.Context, call call, iD string, label string,
 		}
 	}
 }
-func TableOnDoTx(t *Table, c *context.Context, call call, iD string, label string, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
+func TableOnDoTx(t *Table, c *context.Context, call call, label string, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
 	var p TableDoTxStartInfo
 	p.Context = c
 	p.Call = call
-	p.ID = iD
 	p.Label = label
 	p.Idempotent = idempotent
 	p.NestedCall = nestedCall
@@ -1750,29 +1647,6 @@ func TableOnPoolSessionRemove(t *Table, session tableSessionInfo) {
 	var p TablePoolSessionRemoveInfo
 	p.Session = session
 	t.onPoolSessionRemove(p)
-}
-func TableOnPoolSessionNew(t *Table, c *context.Context, call call) func(session tableSessionInfo, _ error) {
-	var p TablePoolSessionNewStartInfo
-	p.Context = c
-	p.Call = call
-	res := t.onPoolSessionNew(p)
-	return func(session tableSessionInfo, e error) {
-		var p TablePoolSessionNewDoneInfo
-		p.Session = session
-		p.Error = e
-		res(p)
-	}
-}
-func TableOnPoolSessionClose(t *Table, c *context.Context, call call, session tableSessionInfo) func() {
-	var p TablePoolSessionCloseStartInfo
-	p.Context = c
-	p.Call = call
-	p.Session = session
-	res := t.onPoolSessionClose(p)
-	return func() {
-		var p TablePoolSessionCloseDoneInfo
-		res(p)
-	}
 }
 func TableOnPoolPut(t *Table, c *context.Context, call call, session tableSessionInfo) func(error) {
 	var p TablePoolPutStartInfo

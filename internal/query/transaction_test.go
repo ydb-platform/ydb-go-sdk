@@ -13,6 +13,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -103,19 +104,19 @@ func TestRollback(t *testing.T) {
 }
 
 type testExecuteSettings struct {
-	execMode    query.ExecMode
-	statsMode   query.StatsMode
+	execMode    options.ExecMode
+	statsMode   options.StatsMode
 	txControl   *query.TransactionControl
-	syntax      query.Syntax
+	syntax      options.Syntax
 	params      *params.Parameters
 	callOptions []grpc.CallOption
 }
 
-func (s testExecuteSettings) ExecMode() query.ExecMode {
+func (s testExecuteSettings) ExecMode() options.ExecMode {
 	return s.execMode
 }
 
-func (s testExecuteSettings) StatsMode() query.StatsMode {
+func (s testExecuteSettings) StatsMode() options.StatsMode {
 	return s.statsMode
 }
 
@@ -123,7 +124,7 @@ func (s testExecuteSettings) TxControl() *query.TransactionControl {
 	return s.txControl
 }
 
-func (s testExecuteSettings) Syntax() query.Syntax {
+func (s testExecuteSettings) Syntax() options.Syntax {
 	return s.syntax
 }
 
@@ -141,7 +142,7 @@ func TestTxExecuteSettings(t *testing.T) {
 	for _, tt := range []struct {
 		name     string
 		txID     string
-		txOpts   []query.TxExecuteOption
+		txOpts   []options.TxExecuteOption
 		settings executeConfig
 	}{
 		{
@@ -149,58 +150,58 @@ func TestTxExecuteSettings(t *testing.T) {
 			txID:   "test",
 			txOpts: nil,
 			settings: testExecuteSettings{
-				execMode:  query.ExecModeExecute,
-				statsMode: query.StatsModeNone,
+				execMode:  options.ExecModeExecute,
+				statsMode: options.StatsModeNone,
 				txControl: query.TxControl(query.WithTxID("test")),
-				syntax:    query.SyntaxYQL,
+				syntax:    options.SyntaxYQL,
 			},
 		},
 		{
 			name: "WithStats",
-			txOpts: []query.TxExecuteOption{
-				query.WithStatsMode(query.StatsModeFull),
+			txOpts: []options.TxExecuteOption{
+				options.WithStatsMode(options.StatsModeFull),
 			},
 			settings: testExecuteSettings{
-				execMode:  query.ExecModeExecute,
-				statsMode: query.StatsModeFull,
+				execMode:  options.ExecModeExecute,
+				statsMode: options.StatsModeFull,
 				txControl: query.TxControl(query.WithTxID("")),
-				syntax:    query.SyntaxYQL,
+				syntax:    options.SyntaxYQL,
 			},
 		},
 		{
 			name: "WithExecMode",
-			txOpts: []query.TxExecuteOption{
-				query.WithExecMode(query.ExecModeExplain),
+			txOpts: []options.TxExecuteOption{
+				options.WithExecMode(options.ExecModeExplain),
 			},
 			settings: testExecuteSettings{
-				execMode:  query.ExecModeExplain,
-				statsMode: query.StatsModeNone,
+				execMode:  options.ExecModeExplain,
+				statsMode: options.StatsModeNone,
 				txControl: query.TxControl(query.WithTxID("")),
-				syntax:    query.SyntaxYQL,
+				syntax:    options.SyntaxYQL,
 			},
 		},
 		{
 			name: "WithSyntax",
-			txOpts: []query.TxExecuteOption{
-				query.WithSyntax(query.SyntaxPostgreSQL),
+			txOpts: []options.TxExecuteOption{
+				options.WithSyntax(options.SyntaxPostgreSQL),
 			},
 			settings: testExecuteSettings{
-				execMode:  query.ExecModeExecute,
-				statsMode: query.StatsModeNone,
+				execMode:  options.ExecModeExecute,
+				statsMode: options.StatsModeNone,
 				txControl: query.TxControl(query.WithTxID("")),
-				syntax:    query.SyntaxPostgreSQL,
+				syntax:    options.SyntaxPostgreSQL,
 			},
 		},
 		{
 			name: "WithGrpcOptions",
-			txOpts: []query.TxExecuteOption{
-				query.WithCallOptions(grpc.CallContentSubtype("test")),
+			txOpts: []options.TxExecuteOption{
+				options.WithCallOptions(grpc.CallContentSubtype("test")),
 			},
 			settings: testExecuteSettings{
-				execMode:  query.ExecModeExecute,
-				statsMode: query.StatsModeNone,
+				execMode:  options.ExecModeExecute,
+				statsMode: options.StatsModeNone,
 				txControl: query.TxControl(query.WithTxID("")),
-				syntax:    query.SyntaxYQL,
+				syntax:    options.SyntaxYQL,
 				callOptions: []grpc.CallOption{
 					grpc.CallContentSubtype("test"),
 				},
@@ -208,23 +209,23 @@ func TestTxExecuteSettings(t *testing.T) {
 		},
 		{
 			name: "WithParams",
-			txOpts: []query.TxExecuteOption{
-				query.WithParameters(
+			txOpts: []options.TxExecuteOption{
+				options.WithParameters(
 					params.Builder{}.Param("$a").Text("A").Build(),
 				),
 			},
 			settings: testExecuteSettings{
-				execMode:  query.ExecModeExecute,
-				statsMode: query.StatsModeNone,
+				execMode:  options.ExecModeExecute,
+				statsMode: options.StatsModeNone,
 				txControl: query.TxControl(query.WithTxID("")),
-				syntax:    query.SyntaxYQL,
+				syntax:    options.SyntaxYQL,
 				params:    params.Builder{}.Param("$a").Text("A").Build(),
 			},
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			a := allocator.New()
-			settings := query.TxExecuteSettings(tt.txID, tt.txOpts...).ExecuteSettings
+			settings := options.TxExecuteSettings(tt.txID, tt.txOpts...).ExecuteSettings
 			require.Equal(t, tt.settings.Syntax(), settings.Syntax())
 			require.Equal(t, tt.settings.ExecMode(), settings.ExecMode())
 			require.Equal(t, tt.settings.StatsMode(), settings.StatsMode())

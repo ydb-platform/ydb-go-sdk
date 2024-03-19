@@ -18,7 +18,7 @@ type (
 	}
 )
 
-func (s *set) AddItem() *setItem {
+func (s *set) Add() *setItem {
 	return &setItem{
 		parent: s,
 	}
@@ -30,7 +30,7 @@ func (s *set) AddItems(items ...value.Value) *set {
 	return s
 }
 
-func (s *set) Build() Builder {
+func (s *set) EndSet() Builder {
 	s.parent.params = append(s.parent.params, &Parameter{
 		parent: s.parent,
 		name:   s.name,
@@ -168,6 +168,24 @@ func (s *setItem) YSON(v []byte) *set {
 
 func (s *setItem) UUID(v [16]byte) *set {
 	s.parent.values = append(s.parent.values, value.UUIDValue(v))
+
+	return s.parent
+}
+
+func (s *setItem) TzDate(v time.Time) *set {
+	s.parent.values = append(s.parent.values, value.TzDateValueFromTime(v))
+
+	return s.parent
+}
+
+func (s *setItem) TzTimestamp(v time.Time) *set {
+	s.parent.values = append(s.parent.values, value.TzTimestampValueFromTime(v))
+
+	return s.parent
+}
+
+func (s *setItem) TzDatetime(v time.Time) *set {
+	s.parent.values = append(s.parent.values, value.TzDatetimeValueFromTime(v))
 
 	return s.parent
 }

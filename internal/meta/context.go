@@ -23,9 +23,15 @@ func traceID(ctx context.Context) (string, bool) {
 	return "", false
 }
 
-// WithUserAgent returns a copy of parent context with custom user-agent info
-func WithUserAgent(ctx context.Context, userAgent string) context.Context {
-	return metadata.AppendToOutgoingContext(ctx, HeaderUserAgent, userAgent)
+// WithApplicationName returns a copy of parent context with custom user-agent info
+func WithApplicationName(ctx context.Context, applicationName string) context.Context {
+	md, has := metadata.FromOutgoingContext(ctx)
+	if !has {
+		md = metadata.MD{}
+	}
+	md.Set(HeaderApplicationName, applicationName)
+
+	return metadata.NewOutgoingContext(ctx, md)
 }
 
 // WithRequestType returns a copy of parent context with custom request type
@@ -34,7 +40,7 @@ func WithRequestType(ctx context.Context, requestType string) context.Context {
 }
 
 // WithAllowFeatures returns a copy of parent context with allowed client feature
-func WithAllowFeatures(ctx context.Context, features []string) context.Context {
+func WithAllowFeatures(ctx context.Context, features ...string) context.Context {
 	kv := make([]string, 0, len(features)*2)
 	for _, feature := range features {
 		kv = append(kv, HeaderClientCapabilities, feature)

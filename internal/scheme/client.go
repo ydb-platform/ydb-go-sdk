@@ -38,11 +38,11 @@ func (c *Client) Close(_ context.Context) error {
 	return nil
 }
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) (*Client, error) {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) *Client {
 	return &Client{
 		config:  config,
 		service: Ydb_Scheme_V1.NewSchemeServiceClient(cc),
-	}, nil
+	}
 }
 
 func (c *Client) MakeDirectory(ctx context.Context, path string) (finalErr error) {
@@ -250,9 +250,9 @@ func (c *Client) ModifyPermissions(
 		onDone(finalErr)
 	}()
 	var desc permissionsDesc
-	for _, o := range opts {
-		if o != nil {
-			o(&desc)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&desc)
 		}
 	}
 	call := func(ctx context.Context) error {

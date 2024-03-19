@@ -1,17 +1,18 @@
-package query
+package options
 
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
 )
 
 type (
 	Syntax                Ydb_Query.Syntax
 	ExecMode              Ydb_Query.ExecMode
 	StatsMode             Ydb_Query.StatsMode
-	callOptions           []grpc.CallOption
+	CallOptions           []grpc.CallOption
 	commonExecuteSettings struct {
 		syntax      Syntax
 		params      params.Parameters
@@ -19,16 +20,16 @@ type (
 		statsMode   StatsMode
 		callOptions []grpc.CallOption
 	}
-	executeSettings struct {
+	Execute struct {
 		commonExecuteSettings
 
-		txControl *TransactionControl
+		txControl *tx.Control
 	}
 	ExecuteOption interface {
-		applyExecuteOption(s *executeSettings)
+		applyExecuteOption(s *Execute)
 	}
 	txExecuteSettings struct {
-		ExecuteSettings *executeSettings
+		ExecuteSettings *Execute
 
 		commitTx bool
 	}
@@ -36,8 +37,15 @@ type (
 		applyTxExecuteOption(s *txExecuteSettings)
 	}
 	txCommitOption   struct{}
-	parametersOption params.Parameters
+	ParametersOption params.Parameters
+	TxControlOption  struct {
+		txControl *tx.Control
+	}
 )
+
+func (opt TxControlOption) applyExecuteOption(s *Execute) {
+	s.txControl = opt.txControl
+}
 
 func (t txCommitOption) applyTxExecuteOption(s *txExecuteSettings) {
 	s.commitTx = true
@@ -47,7 +55,7 @@ func (syntax Syntax) applyTxExecuteOption(s *txExecuteSettings) {
 	syntax.applyExecuteOption(s.ExecuteSettings)
 }
 
-func (syntax Syntax) applyExecuteOption(s *executeSettings) {
+func (syntax Syntax) applyExecuteOption(s *Execute) {
 	s.syntax = syntax
 }
 
@@ -56,19 +64,19 @@ const (
 	SyntaxPostgreSQL = Syntax(Ydb_Query.Syntax_SYNTAX_PG)
 )
 
-func (params parametersOption) applyTxExecuteOption(s *txExecuteSettings) {
+func (params ParametersOption) applyTxExecuteOption(s *txExecuteSettings) {
 	params.applyExecuteOption(s.ExecuteSettings)
 }
 
-func (params parametersOption) applyExecuteOption(s *executeSettings) {
+func (params ParametersOption) applyExecuteOption(s *Execute) {
 	s.params = append(s.params, params...)
 }
 
-func (opts callOptions) applyExecuteOption(s *executeSettings) {
+func (opts CallOptions) applyExecuteOption(s *Execute) {
 	s.callOptions = append(s.callOptions, opts...)
 }
 
-func (opts callOptions) applyTxExecuteOption(s *txExecuteSettings) {
+func (opts CallOptions) applyTxExecuteOption(s *txExecuteSettings) {
 	opts.applyExecuteOption(s.ExecuteSettings)
 }
 
@@ -76,7 +84,7 @@ func (mode StatsMode) applyTxExecuteOption(s *txExecuteSettings) {
 	mode.applyExecuteOption(s.ExecuteSettings)
 }
 
-func (mode StatsMode) applyExecuteOption(s *executeSettings) {
+func (mode StatsMode) applyExecuteOption(s *Execute) {
 	s.statsMode = mode
 }
 
@@ -84,7 +92,7 @@ func (mode ExecMode) applyTxExecuteOption(s *txExecuteSettings) {
 	mode.applyExecuteOption(s.ExecuteSettings)
 }
 
-func (mode ExecMode) applyExecuteOption(s *executeSettings) {
+func (mode ExecMode) applyExecuteOption(s *Execute) {
 	s.execMode = mode
 }
 
@@ -110,21 +118,27 @@ func defaultCommonExecuteSettings() commonExecuteSettings {
 	}
 }
 
-func ExecuteSettings(opts ...ExecuteOption) (settings *executeSettings) {
-	settings = &executeSettings{
+func ExecuteSettings(opts ...ExecuteOption) (settings *Execute) {
+	settings = &Execute{
 		commonExecuteSettings: defaultCommonExecuteSettings(),
 	}
 	settings.commonExecuteSettings = defaultCommonExecuteSettings()
-	settings.txControl = DefaultTxControl()
+	settings.txControl = tx.DefaultTxControl()
 	for _, opt := range opts {
-		opt.applyExecuteOption(settings)
+		if opt != nil {
+			opt.applyExecuteOption(settings)
+		}
 	}
 
 	return settings
 }
 
-func (s *executeSettings) TxControl() *TransactionControl {
+func (s *Execute) TxControl() *tx.Control {
 	return s.txControl
+}
+
+func (s *Execute) SetTxControl(ctrl *tx.Control) {
+	s.txControl = ctrl
 }
 
 func (s *commonExecuteSettings) CallOptions() []grpc.CallOption {
@@ -153,21 +167,21 @@ func (s *commonExecuteSettings) Params() *params.Parameters {
 
 func TxExecuteSettings(id string, opts ...TxExecuteOption) (settings *txExecuteSettings) {
 	settings = &txExecuteSettings{
-		ExecuteSettings: ExecuteSettings(WithTxControl(TxControl(WithTxID(id)))),
+		ExecuteSettings: ExecuteSettings(WithTxControl(tx.NewControl(tx.WithTxID(id)))),
 	}
 	for _, opt := range opts {
-		opt.applyTxExecuteOption(settings)
+		if opt != nil {
+			opt.applyTxExecuteOption(settings)
+		}
 	}
 
 	return settings
 }
 
-var _ ExecuteOption = (*parametersOption)(nil)
+var _ ExecuteOption = ParametersOption{}
 
-func WithParameters(parameters *params.Parameters) *parametersOption {
-	params := parametersOption(*parameters)
-
-	return &params
+func WithParameters(parameters *params.Parameters) ParametersOption {
+	return ParametersOption(*parameters)
 }
 
 var (
@@ -176,30 +190,35 @@ var (
 	_ TxExecuteOption = ExecMode(0)
 	_ TxExecuteOption = StatsMode(0)
 	_ TxExecuteOption = txCommitOption{}
+	_ ExecuteOption   = TxControlOption{}
 )
 
 func WithCommit() txCommitOption {
 	return txCommitOption{}
 }
 
+type ExecModeOption = ExecMode
+
 func WithExecMode(mode ExecMode) ExecMode {
 	return mode
 }
 
-func WithSyntax(syntax Syntax) Syntax {
+type SyntaxOption = Syntax
+
+func WithSyntax(syntax Syntax) SyntaxOption {
 	return syntax
 }
+
+type StatsModeOption = StatsMode
 
 func WithStatsMode(mode StatsMode) StatsMode {
 	return mode
 }
 
-func WithCallOptions(opts ...grpc.CallOption) callOptions {
+func WithCallOptions(opts ...grpc.CallOption) CallOptions {
 	return opts
 }
 
-func WithTxControl(txControl *TransactionControl) *transactionControlOption {
-	return &transactionControlOption{
-		txControl: txControl,
-	}
+func WithTxControl(txControl *tx.Control) TxControlOption {
+	return TxControlOption{txControl}
 }

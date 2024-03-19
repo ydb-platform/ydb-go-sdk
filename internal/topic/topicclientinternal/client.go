@@ -32,7 +32,7 @@ func New(
 	conn grpc.ClientConnInterface,
 	cred credentials.Credentials,
 	opts ...topicoptions.TopicOption,
-) (*Client, error) {
+) *Client {
 	rawClient := rawtopic.NewClient(Ydb_Topic_V1.NewTopicServiceClient(conn))
 
 	cfg := newTopicConfig(opts...)
@@ -45,16 +45,16 @@ func New(
 		cred:                   cred,
 		defaultOperationParams: defaultOperationParams,
 		rawClient:              rawClient,
-	}, nil
+	}
 }
 
 func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
 	c := topic.Config{
 		Trace: &trace.Topic{},
 	}
-	for _, o := range opts {
-		if o != nil {
-			o(&c)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&c)
 		}
 	}
 
@@ -71,9 +71,9 @@ func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.Al
 	req := &rawtopic.AlterTopicRequest{}
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
-	for _, o := range opts {
-		if o != nil {
-			o.ApplyAlterOption(req)
+	for _, opt := range opts {
+		if opt != nil {
+			opt.ApplyAlterOption(req)
 		}
 	}
 
@@ -103,9 +103,9 @@ func (c *Client) Create(
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
 
-	for _, o := range opts {
-		if o != nil {
-			o.ApplyCreateOption(req)
+	for _, opt := range opts {
+		if opt != nil {
+			opt.ApplyCreateOption(req)
 		}
 	}
 
@@ -136,9 +136,9 @@ func (c *Client) Describe(
 		Path:            path,
 	}
 
-	for _, o := range opts {
-		if o != nil {
-			o(&req)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&req)
 		}
 	}
 
@@ -176,9 +176,9 @@ func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.Dro
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
 
-	for _, o := range opts {
-		if o != nil {
-			o.ApplyDropOption(&req)
+	for _, opt := range opts {
+		if opt != nil {
+			opt.ApplyDropOption(&req)
 		}
 	}
 

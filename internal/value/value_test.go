@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pg"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
@@ -176,6 +177,7 @@ func TestToYDBFromYDB(t *testing.T) {
 		ZeroValue(types.Text),
 		ZeroValue(types.NewStruct()),
 		ZeroValue(types.NewTuple()),
+		PgValue(pg.OIDInt4, "123"),
 	} {
 		t.Run(strconv.Itoa(i)+"."+v.Yql(), func(t *testing.T) {
 			a := allocator.New()
@@ -497,6 +499,10 @@ func TestValueYql(t *testing.T) {
 		{
 			value:   YSONValue([]byte("<a=1>[3;%false]")),
 			literal: `Yson("<a=1>[3;%false]")`,
+		},
+		{
+			value:   PgValue(pg.OIDUnknown, "123"),
+			literal: `PgUnknown("123")`,
 		},
 	} {
 		t.Run(strconv.Itoa(i)+"."+tt.literal, func(t *testing.T) {

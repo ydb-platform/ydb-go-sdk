@@ -3,36 +3,33 @@ package config
 import (
 	"time"
 
-	"github.com/jonboulle/clockwork"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 const (
-	DefaultPoolDeleteTimeout        = 500 * time.Millisecond
-	DefaultPoolCreateSessionTimeout = 5 * time.Second
-	DefaultPoolMaxSize              = 50
+	DefaultSessionDeleteTimeout = 500 * time.Millisecond
+	DefaultSessionCreateTimeout = 5 * time.Second
+	DefaultPoolMaxSize          = pool.DefaultLimit
 )
 
 type Config struct {
 	config.Common
 
-	sizeLimit int
+	poolLimit int
 
-	createSessionTimeout time.Duration
-	deleteTimeout        time.Duration
+	sessionCreateTimeout time.Duration
+	sessionDeleteTimeout time.Duration
 
 	trace *trace.Query
-
-	clock clockwork.Clock
 }
 
 func New(opts ...Option) *Config {
 	c := defaults()
-	for _, o := range opts {
-		if o != nil {
-			o(c)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(c)
 		}
 	}
 
@@ -41,10 +38,9 @@ func New(opts ...Option) *Config {
 
 func defaults() *Config {
 	return &Config{
-		sizeLimit:            DefaultPoolMaxSize,
-		createSessionTimeout: DefaultPoolCreateSessionTimeout,
-		deleteTimeout:        DefaultPoolDeleteTimeout,
-		clock:                clockwork.NewRealClock(),
+		poolLimit:            DefaultPoolMaxSize,
+		sessionCreateTimeout: DefaultSessionCreateTimeout,
+		sessionDeleteTimeout: DefaultSessionDeleteTimeout,
 		trace:                &trace.Query{},
 	}
 }
@@ -54,26 +50,21 @@ func (c *Config) Trace() *trace.Query {
 	return c.trace
 }
 
-// Clock defines clock
-func (c *Config) Clock() clockwork.Clock {
-	return c.clock
+// PoolLimit is an upper bound of pooled sessions.
+// If PoolLimit is less than or equal to zero then the
+// DefaultPoolMaxSize variable is used as a pool limit.
+func (c *Config) PoolLimit() int {
+	return c.poolLimit
 }
 
-// PoolMaxSize is an upper bound of pooled sessions.
-// If PoolMaxSize is less than or equal to zero then the
-// DefaultPoolMaxSize variable is used as a limit.
-func (c *Config) PoolMaxSize() int {
-	return c.sizeLimit
-}
-
-// CreateSessionTimeout limits maximum time spent on Create session request
-func (c *Config) CreateSessionTimeout() time.Duration {
-	return c.createSessionTimeout
+// SessionCreateTimeout limits maximum time spent on Create session request
+func (c *Config) SessionCreateTimeout() time.Duration {
+	return c.sessionCreateTimeout
 }
 
 // DeleteTimeout limits maximum time spent on Delete request
 //
-// If DeleteTimeout is less than or equal to zero then the DefaultPoolDeleteTimeout is used.
+// If DeleteTimeout is less than or equal to zero then the DefaultSessionDeleteTimeout is used.
 func (c *Config) DeleteTimeout() time.Duration {
-	return c.deleteTimeout
+	return c.sessionDeleteTimeout
 }

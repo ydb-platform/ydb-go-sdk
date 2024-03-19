@@ -17,7 +17,7 @@ type (
 	}
 )
 
-func (b *optionalBuilder) Build() Builder {
+func (b *optionalBuilder) EndOptional() Builder {
 	b.opt.parent.params = append(b.opt.parent.params, &Parameter{
 		parent: b.opt.parent,
 		name:   b.opt.name,
@@ -155,6 +155,24 @@ func (p *optional) YSON(v []byte) *optionalBuilder {
 
 func (p *optional) UUID(v [16]byte) *optionalBuilder {
 	p.value = value.UUIDValue(v)
+
+	return &optionalBuilder{opt: p}
+}
+
+func (p *optional) TzDate(v time.Time) *optionalBuilder {
+	p.value = value.TzDateValueFromTime(v)
+
+	return &optionalBuilder{opt: p}
+}
+
+func (p *optional) TzTimestamp(v time.Time) *optionalBuilder {
+	p.value = value.TzTimestampValueFromTime(v)
+
+	return &optionalBuilder{opt: p}
+}
+
+func (p *optional) TzDatetime(v time.Time) *optionalBuilder {
+	p.value = value.TzDatetimeValueFromTime(v)
 
 	return &optionalBuilder{opt: p}
 }

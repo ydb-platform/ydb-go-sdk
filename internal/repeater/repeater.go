@@ -108,9 +108,9 @@ func New(
 		trace:    &trace.Driver{},
 	}
 
-	for _, o := range opts {
-		if o != nil {
-			o(r)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(r)
 		}
 	}
 
