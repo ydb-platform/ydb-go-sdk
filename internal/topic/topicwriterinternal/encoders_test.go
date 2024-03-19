@@ -40,7 +40,8 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 			largeSize = 100
 		)
 
-		testSelectCodec := func(t testing.TB, targetCodec rawtopiccommon.Codec, smallCount, largeCount int) {
+		testSelectCodec := func(tb testing.TB, targetCodec rawtopiccommon.Codec, smallCount, largeCount int) {
+			tb.Helper()
 			s := NewEncoderSelector(testCommonEncoders, rawtopiccommon.SupportedCodecs{
 				rawtopiccommon.CodecRaw,
 				rawtopiccommon.CodecGzip,
@@ -62,8 +63,8 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 			}
 
 			codec, err := s.measureCodecs(messages)
-			require.NoError(t, err)
-			require.Equal(t, targetCodec, codec)
+			require.NoError(tb, err)
+			require.Equal(tb, targetCodec, codec)
 
 			// reverse
 			{
@@ -74,16 +75,16 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 				messages = reverseMessages
 			}
 			codec, err = s.measureCodecs(messages)
-			require.NoError(t, err)
-			require.Equal(t, targetCodec, codec)
+			require.NoError(tb, err)
+			require.Equal(tb, targetCodec, codec)
 
 			// shuffle
 			r.Shuffle(len(messages), func(i, k int) {
 				messages[i], messages[k] = messages[k], messages[i]
 			})
 			codec, err = s.measureCodecs(messages)
-			require.NoError(t, err)
-			require.Equal(t, targetCodec, codec)
+			require.NoError(tb, err)
+			require.Equal(tb, targetCodec, codec)
 		}
 
 		table := []struct {

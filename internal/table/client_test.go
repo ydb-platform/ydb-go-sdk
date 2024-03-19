@@ -32,7 +32,8 @@ import (
 )
 
 func TestSessionPoolCreateAbnormalResult(t *testing.T) {
-	xtest.TestManyTimes(t, func(t testing.TB) {
+	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
 		limit := 100
 		ctx, cancel := xcontext.WithTimeout(
 			context.Background(),
@@ -40,7 +41,7 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 		)
 		defer cancel()
 		p := newClientWithStubBuilder(
-			t,
+			tb,
 			testutil.NewBalancer(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
@@ -83,7 +84,7 @@ func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 			close(errCh)
 		}()
 		for e := range errCh {
-			t.Fatal(e)
+			tb.Fatal(e)
 		}
 	}, xtest.StopAfter(17*time.Second))
 }
@@ -187,16 +188,17 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 
 func TestSessionPoolClose(t *testing.T) {
 	counter := 0
-	xtest.TestManyTimes(t, func(t testing.TB) {
+	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
 		counter++
 		defer func() {
 			if counter%1000 == 0 {
-				t.Logf("%d times test passed", counter)
+				tb.Logf("%d times test passed", counter)
 			}
 		}()
 
 		p := newClientWithStubBuilder(
-			t,
+			tb,
 			testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 					return &Ydb_Table.CreateSessionResult{
@@ -216,9 +218,9 @@ func TestSessionPoolClose(t *testing.T) {
 		}()
 
 		var (
-			s1      = mustGetSession(t, p)
-			s2      = mustGetSession(t, p)
-			s3      = mustGetSession(t, p)
+			s1      = mustGetSession(tb, p)
+			s2      = mustGetSession(tb, p)
+			s3      = mustGetSession(tb, p)
 			closed1 = false
 			closed2 = false
 			closed3 = false
@@ -228,28 +230,28 @@ func TestSessionPoolClose(t *testing.T) {
 		s2.onClose = append(s2.onClose, func(s *session) { closed2 = true })
 		s3.onClose = append(s3.onClose, func(s *session) { closed3 = true })
 
-		mustPutSession(t, p, s1)
-		mustPutSession(t, p, s2)
-		mustClose(t, p)
+		mustPutSession(tb, p, s1)
+		mustPutSession(tb, p, s2)
+		mustClose(tb, p)
 
 		if !closed1 {
-			t.Errorf("session1 was not closed")
+			tb.Errorf("session1 was not closed")
 		}
 		if !closed2 {
-			t.Errorf("session2 was not closed")
+			tb.Errorf("session2 was not closed")
 		}
 		if closed3 {
-			t.Fatalf("unexpected session close")
+			tb.Fatalf("unexpected session close")
 		}
 
 		if err := p.Put(context.Background(), s3); !xerrors.Is(err, errClosedClient) {
-			t.Errorf(
+			tb.Errorf(
 				"unexpected Put() error: %v; want %v",
 				err, errClosedClient,
 			)
 		}
 		if !closed3 {
-			t.Fatalf("session was not closed")
+			tb.Fatalf("session was not closed")
 		}
 	}, xtest.StopAfter(17*time.Second))
 }
@@ -267,11 +269,12 @@ func TestRaceWgClosed(t *testing.T) {
 		counter int
 	)
 
-	xtest.TestManyTimes(t, func(t testing.TB) {
+	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
 		counter++
 		defer func() {
 			if counter%1000 == 0 {
-				t.Logf("%0.1fs: %d times test passed", time.Since(start).Seconds(), counter)
+				tb.Logf("%0.1fs: %d times test passed", time.Since(start).Seconds(), counter)
 			}
 		}()
 		ctx, cancel := xcontext.WithTimeout(context.Background(),
@@ -281,7 +284,7 @@ func TestRaceWgClosed(t *testing.T) {
 		defer cancel()
 
 		wg := sync.WaitGroup{}
-		p := newClientWithStubBuilder(t,
+		p := newClientWithStubBuilder(tb,
 			testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 					return &Ydb_Table.CreateSessionResult{
@@ -675,14 +678,15 @@ func TestSessionPoolGetPut(t *testing.T) {
 }
 
 func TestSessionPoolCloseIdleSessions(t *testing.T) {
-	xtest.TestManyTimes(t, func(t testing.TB) {
+	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
 		var (
 			idleThreshold = 4 * time.Second
 			closedCount   atomic.Int64
 			fakeClock     = clockwork.NewFakeClock()
 		)
 		p := newClientWithStubBuilder(
-			t,
+			tb,
 			testutil.NewBalancer(
 				testutil.WithInvokeHandlers(
 					testutil.InvokeHandlers{
@@ -703,28 +707,28 @@ func TestSessionPoolCloseIdleSessions(t *testing.T) {
 			config.WithClock(fakeClock),
 		)
 
-		s1 := mustGetSession(t, p)
-		s2 := mustGetSession(t, p)
+		s1 := mustGetSession(tb, p)
+		s2 := mustGetSession(tb, p)
 
 		// Put both sessions at the absolutely same time.
 		// That is, both sessions must be keepalived by a single tick.
-		mustPutSession(t, p, s1)
-		mustPutSession(t, p, s2)
+		mustPutSession(tb, p, s1)
+		mustPutSession(tb, p, s2)
 
 		// Emulate first simple tick event. We expect two sessions be keepalived.
 		fakeClock.Advance(idleThreshold / 2)
 		if !closedCount.CompareAndSwap(2, 0) {
-			t.Fatal("unexpected number of keepalives")
+			tb.Fatal("unexpected number of keepalives")
 		}
 
 		// Now internalPoolGet first session and "spent" some time working within it.
-		x := mustGetSession(t, p)
+		x := mustGetSession(tb, p)
 
 		// Move time to idleThreshold / 2
 		fakeClock.Advance(idleThreshold / 2)
 
 		// Now put that session back and emulate keepalive moment.
-		mustPutSession(t, p, x)
+		mustPutSession(tb, p, x)
 
 		// Move time to idleThreshold / 2
 		fakeClock.Advance(idleThreshold / 2)
@@ -762,33 +766,33 @@ func TestSessionPoolDoublePut(t *testing.T) {
 	_ = p.Put(context.Background(), s)
 }
 
-func mustGetSession(t testing.TB, p *Client) *session {
+func mustGetSession(tb testing.TB, p *Client) *session {
+	tb.Helper()
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	s, err := p.Get(context.Background())
 	if err != nil {
-		t.Helper()
-		t.Fatalf("%s: %v", caller(), err)
+		tb.Fatalf("%s: %v", caller(), err)
 	}
 
 	return s
 }
 
-func mustPutSession(t testing.TB, p *Client, s *session) {
+func mustPutSession(tb testing.TB, p *Client, s *session) {
+	tb.Helper()
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	if err := p.Put(context.Background(), s); err != nil {
-		t.Helper()
-		t.Fatalf("%s: %v", caller(), err)
+		tb.Fatalf("%s: %v", caller(), err)
 	}
 }
 
-func mustClose(t testing.TB, p closer.Closer) {
+func mustClose(tb testing.TB, p closer.Closer) {
+	tb.Helper()
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	if err := p.Close(context.Background()); err != nil {
-		t.Helper()
-		t.Fatalf("%s: %v", caller(), err)
+		tb.Fatalf("%s: %v", caller(), err)
 	}
 }
 
@@ -846,7 +850,7 @@ var simpleCluster = testutil.NewBalancer(
 	),
 )
 
-func simpleSession(t *testing.T) *session {
+func simpleSession(t *testing.T) *session { //nolint:thelper
 	s, err := newSession(context.Background(), simpleCluster, config.New())
 	if err != nil {
 		t.Fatalf("newSession unexpected error: %v", err)
@@ -866,8 +870,8 @@ type StubBuilder struct {
 	actual int
 }
 
-func newClientWithStubBuilder(
-	t testing.TB,
+func newClientWithStubBuilder( //nolint:thelper
+	tb testing.TB,
 	balancer balancer,
 	stubLimit int,
 	options ...config.Option,
@@ -876,13 +880,13 @@ func newClientWithStubBuilder(
 		context.Background(),
 		balancer,
 		(&StubBuilder{
-			T:     t,
+			T:     tb,
 			Limit: stubLimit,
 			cc:    balancer,
 		}).createSession,
 		config.New(options...),
 	)
-	require.NoError(t, err)
+	require.NoError(tb, err)
 
 	return c
 }
@@ -934,7 +938,8 @@ func whenWantWaitCh(p *Client) <-chan struct{} {
 }
 
 func TestDeadlockOnUpdateNodes(t *testing.T) {
-	xtest.TestManyTimes(t, func(t testing.TB) {
+	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
 		ctx, cancel := xcontext.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 		var (
@@ -956,28 +961,29 @@ func TestDeadlockOnUpdateNodes(t *testing.T) {
 				}, nil
 			},
 		}))
-		c := newClientWithStubBuilder(t, balancer, 3)
+		c := newClientWithStubBuilder(tb, balancer, 3)
 		defer func() {
 			_ = c.Close(ctx)
 		}()
 		s1, err := c.Get(ctx)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 		s2, err := c.Get(ctx)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 		s3, err := c.Get(ctx)
-		require.NoError(t, err)
-		require.Len(t, nodes, 3)
+		require.NoError(tb, err)
+		require.Len(tb, nodes, 3)
 		err = c.Put(ctx, s1)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 		err = c.Put(ctx, s2)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 		err = c.Put(ctx, s3)
-		require.NoError(t, err)
+		require.NoError(tb, err)
 	}, xtest.StopAfter(12*time.Second))
 }
 
 func TestDeadlockOnInternalPoolGCTick(t *testing.T) {
-	xtest.TestManyTimes(t, func(t testing.TB) {
+	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
 		ctx, cancel := xcontext.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 		var (
@@ -999,7 +1005,7 @@ func TestDeadlockOnInternalPoolGCTick(t *testing.T) {
 				}, nil
 			},
 		}))
-		c := newClientWithStubBuilder(t, balancer, 3)
+		c := newClientWithStubBuilder(tb, balancer, 3)
 		defer func() {
 			_ = c.Close(ctx)
 		}()
@@ -1007,33 +1013,33 @@ func TestDeadlockOnInternalPoolGCTick(t *testing.T) {
 		if err != nil && errors.Is(err, context.DeadlineExceeded) {
 			return
 		}
-		require.NoError(t, err)
+		require.NoError(tb, err)
 		s2, err := c.Get(ctx)
 		if err != nil && errors.Is(err, context.DeadlineExceeded) {
 			return
 		}
-		require.NoError(t, err)
+		require.NoError(tb, err)
 		s3, err := c.Get(ctx)
 		if err != nil && errors.Is(err, context.DeadlineExceeded) {
 			return
 		}
-		require.NoError(t, err)
-		require.Len(t, nodes, 3)
+		require.NoError(tb, err)
+		require.Len(tb, nodes, 3)
 		err = c.Put(ctx, s1)
 		if err != nil && errors.Is(err, context.DeadlineExceeded) {
 			return
 		}
-		require.NoError(t, err)
+		require.NoError(tb, err)
 		err = c.Put(ctx, s2)
 		if err != nil && errors.Is(err, context.DeadlineExceeded) {
 			return
 		}
-		require.NoError(t, err)
+		require.NoError(tb, err)
 		err = c.Put(ctx, s3)
 		if err != nil && errors.Is(err, context.DeadlineExceeded) {
 			return
 		}
-		require.NoError(t, err)
+		require.NoError(tb, err)
 		c.internalPoolGCTick(ctx, 0)
 	}, xtest.StopAfter(12*time.Second))
 }

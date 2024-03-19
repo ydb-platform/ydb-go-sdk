@@ -96,14 +96,15 @@ func TestWorkerClose(t *testing.T) {
 }
 
 func TestWorkerConcurrentStartAndClose(t *testing.T) {
-	xtest.TestManyTimes(t, func(t testing.TB) {
+	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
 		targetClose := int64(10)
 
 		parallel := runtime.GOMAXPROCS(0)
 
 		var counter atomic.Int64
 
-		ctx := xtest.Context(t)
+		ctx := xtest.Context(tb)
 		w := NewWorker(ctx)
 
 		stopNewStarts := atomic.Bool{}
@@ -126,24 +127,25 @@ func TestWorkerConcurrentStartAndClose(t *testing.T) {
 		}
 
 		// wait start some backgrounds - for ensure about process worked
-		xtest.SpinWaitCondition(t, nil, func() bool {
+		xtest.SpinWaitCondition(tb, nil, func() bool {
 			return counter.Load() > targetClose
 		})
 
-		require.NoError(t, w.Close(xtest.ContextWithCommonTimeout(ctx, t), nil))
+		require.NoError(tb, w.Close(xtest.ContextWithCommonTimeout(ctx, tb), nil))
 
 		stopNewStarts.Store(true)
-		xtest.WaitGroup(t, &wgStarters)
+		xtest.WaitGroup(tb, &wgStarters)
 
 		_, ok := <-w.tasks
-		require.False(t, ok)
-		require.True(t, w.closed)
+		require.False(tb, ok)
+		require.True(tb, w.closed)
 	})
 }
 
 func TestWorkerStartCompletedWhileLongWait(t *testing.T) {
-	xtest.TestManyTimes(t, func(t testing.TB) {
-		ctx := xtest.Context(t)
+	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
+		ctx := xtest.Context(tb)
 		w := NewWorker(ctx)
 
 		allowStop := make(empty.Chan)
@@ -175,17 +177,17 @@ func TestWorkerStartCompletedWhileLongWait(t *testing.T) {
 			_ = w.Close(ctx, nil)
 		}()
 
-		xtest.WaitChannelClosed(t, callStartFinished)
+		xtest.WaitChannelClosed(tb, callStartFinished)
 		runtime.Gosched()
 
 		select {
 		case <-closed:
-			t.Fatal()
+			tb.Fatal()
 		default:
 			// pass
 		}
 
 		close(allowStop)
-		xtest.WaitChannelClosed(t, closed)
+		xtest.WaitChannelClosed(tb, closed)
 	})
 }

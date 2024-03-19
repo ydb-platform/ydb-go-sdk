@@ -143,6 +143,7 @@ func TestBatch_Extend(t *testing.T) {
 
 func TestSplitBytesByBatches(t *testing.T) {
 	checkTotalBytes := func(t *testing.T, totalBytes int, batches ...*PublicBatch) {
+		t.Helper()
 		sum := 0
 		for _, batch := range batches {
 			for _, msg := range batch.Messages {

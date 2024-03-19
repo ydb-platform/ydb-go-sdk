@@ -22,8 +22,8 @@ type GrpcLogger struct {
 	t testing.TB
 }
 
-func NewGrpcLogger(t testing.TB) GrpcLogger {
-	return GrpcLogger{t: t}
+func NewGrpcLogger(tb testing.TB) GrpcLogger { //nolint:thelper
+	return GrpcLogger{t: tb}
 }
 
 func (l GrpcLogger) UnaryClientInterceptor(
@@ -55,7 +55,7 @@ func (l GrpcLogger) StreamClientInterceptor(
 	opts ...grpc.CallOption,
 ) (grpc.ClientStream, error) {
 	stream, err := streamer(ctx, desc, cc, method, opts...)
-	streamWrapper := newGrpcLoggerStream(stream, l.t)
+	streamWrapper := newGrpcLoggerStream(l.t, stream)
 	if stream != nil {
 		stream = streamWrapper
 	}
@@ -75,8 +75,8 @@ type grpcLoggerStream struct {
 	t        testing.TB
 }
 
-func newGrpcLoggerStream(stream grpc.ClientStream, t testing.TB) grpcLoggerStream {
-	return grpcLoggerStream{stream, atomic.AddInt64(&globalLastStreamID, 1), t}
+func newGrpcLoggerStream(tb testing.TB, stream grpc.ClientStream) grpcLoggerStream { //nolint:thelper
+	return grpcLoggerStream{stream, atomic.AddInt64(&globalLastStreamID, 1), tb}
 }
 
 func (g grpcLoggerStream) CloseSend() error {

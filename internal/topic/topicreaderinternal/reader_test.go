@@ -15,8 +15,9 @@ import (
 )
 
 func TestReader_Close(t *testing.T) {
-	xtest.TestManyTimes(t, func(t testing.TB) {
-		mc := gomock.NewController(t)
+	xtest.TestManyTimes(t, func(tb testing.TB) {
+		tb.Helper()
+		mc := gomock.NewController(tb)
 		defer mc.Finish()
 
 		testErr := errors.New("test error")
@@ -93,14 +94,14 @@ func TestReader_Close(t *testing.T) {
 
 		// check about no methods finished before close
 		for i := range allStates {
-			require.False(t, isCallCompleted(allStates[i]))
+			require.False(tb, isCallCompleted(allStates[i]))
 		}
-		require.NoError(t, reader.Close(context.Background()))
+		require.NoError(tb, reader.Close(context.Background()))
 
 		// check about all methods stop work after close
 		for i := range allStates {
 			<-allStates[i].callCompleted
-			require.Error(t, allStates[i].err, i)
+			require.Error(tb, allStates[i].err, i)
 		}
 	})
 }

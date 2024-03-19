@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-func MakeSyncedTest(t testing.TB) *SyncedTest {
+func MakeSyncedTest(tb testing.TB) *SyncedTest { //nolint:thelper
 	return &SyncedTest{
-		TB: t,
+		TB: tb,
 	}
 }
 

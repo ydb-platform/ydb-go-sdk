@@ -20,7 +20,8 @@ func TestEventBroadcast(t *testing.T) {
 		xtest.WaitChannelClosed(t, waiter.Done())
 	})
 
-	xtest.TestManyTimesWithName(t, "SubscribeAndEventsInRace", func(t testing.TB) {
+	xtest.TestManyTimesWithName(t, "SubscribeAndEventsInRace", func(tb testing.TB) {
+		tb.Helper()
 		testDuration := time.Second / 100
 
 		b := &EventBroadcast{}
@@ -66,7 +67,7 @@ func TestEventBroadcast(t *testing.T) {
 			}
 		}()
 
-		xtest.SpinWaitCondition(t, nil, firstWaiterStarted.Load)
+		xtest.SpinWaitCondition(tb, nil, firstWaiterStarted.Load)
 
 		<-time.After(testDuration)
 
@@ -79,14 +80,14 @@ func TestEventBroadcast(t *testing.T) {
 				break
 			}
 
-			t.Log("background counter", oldCounter)
-			xtest.SpinWaitCondition(t, nil, func() bool {
+			tb.Log("background counter", oldCounter)
+			xtest.SpinWaitCondition(tb, nil, func() bool {
 				return backgroundCounter.Load() < oldCounter
 			})
 		}
 		stopBroadcast.Store(true)
 		<-broadcastStopped
 
-		require.Greater(t, events.Load(), int64(0))
+		require.Greater(tb, events.Load(), int64(0))
 	})
 }
