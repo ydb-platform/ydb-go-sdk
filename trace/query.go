@@ -14,6 +14,9 @@ type (
 		NodeID() int64
 		Status() string
 	}
+	queryTransactionInfo interface {
+		ID() string
+	}
 
 	// Query specified trace of retry call activity.
 	// gtrace:gen
@@ -31,12 +34,22 @@ type (
 		OnPoolSpawn   func(QueryPoolSpawnStartInfo) func(QueryPoolSpawnDoneInfo)
 		OnPoolWant    func(QueryPoolWantStartInfo) func(QueryPoolWantDoneInfo)
 
-		OnDo   func(QueryDoStartInfo) func(info QueryDoIntermediateInfo) func(QueryDoDoneInfo)
-		OnDoTx func(QueryDoTxStartInfo) func(info QueryDoTxIntermediateInfo) func(QueryDoTxDoneInfo)
+		OnDo   func(QueryDoStartInfo) func(QueryDoDoneInfo)
+		OnDoTx func(QueryDoTxStartInfo) func(QueryDoTxDoneInfo)
 
-		OnSessionCreate func(QuerySessionCreateStartInfo) func(info QuerySessionCreateDoneInfo)
-		OnSessionAttach func(QuerySessionAttachStartInfo) func(info QuerySessionAttachDoneInfo)
-		OnSessionDelete func(QuerySessionDeleteStartInfo) func(info QuerySessionDeleteDoneInfo)
+		OnSessionCreate       func(QuerySessionCreateStartInfo) func(info QuerySessionCreateDoneInfo)
+		OnSessionAttach       func(QuerySessionAttachStartInfo) func(info QuerySessionAttachDoneInfo)
+		OnSessionDelete       func(QuerySessionDeleteStartInfo) func(info QuerySessionDeleteDoneInfo)
+		OnSessionExecute      func(QuerySessionExecuteStartInfo) func(info QuerySessionExecuteDoneInfo)
+		OnSessionBegin        func(QuerySessionBeginStartInfo) func(info QuerySessionBeginDoneInfo)
+		OnResultNew           func(QueryResultNewStartInfo) func(info QueryResultNewDoneInfo)
+		OnResultNextPart      func(QueryResultNextPartStartInfo) func(info QueryResultNextPartDoneInfo)
+		OnResultNextResultSet func(QueryResultNextResultSetStartInfo) func(info QueryResultNextResultSetDoneInfo)
+		OnResultClose         func(QueryResultCloseStartInfo) func(info QueryResultCloseDoneInfo)
+		OnResultSetNextRow    func(QueryResultSetNextRowStartInfo) func(info QueryResultSetNextRowDoneInfo)
+		OnRowScan             func(QueryRowScanStartInfo) func(info QueryRowScanDoneInfo)
+		OnRowScanNamed        func(QueryRowScanNamedStartInfo) func(info QueryRowScanNamedDoneInfo)
+		OnRowScanStruct       func(QueryRowScanStructStartInfo) func(info QueryRowScanStructDoneInfo)
 	}
 
 	QueryDoStartInfo struct {
@@ -46,9 +59,6 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-	}
-	QueryDoIntermediateInfo struct {
-		Error error
 	}
 	QueryDoDoneInfo struct {
 		Attempts int
@@ -61,9 +71,6 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-	}
-	QueryDoTxIntermediateInfo struct {
-		Error error
 	}
 	QueryDoTxDoneInfo struct {
 		Attempts int
@@ -81,6 +88,20 @@ type (
 		Session querySessionInfo
 		Error   error
 	}
+	QuerySessionExecuteStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+
+		Session querySessionInfo
+		Query   string
+	}
+	QuerySessionExecuteDoneInfo struct {
+		Error error
+	}
 	QuerySessionAttachStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -91,6 +112,107 @@ type (
 		Session querySessionInfo
 	}
 	QuerySessionAttachDoneInfo struct {
+		Error error
+	}
+	QuerySessionBeginStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+		Session querySessionInfo
+	}
+	QuerySessionBeginDoneInfo struct {
+		Error error
+		Tx    queryTransactionInfo
+	}
+	QueryResultNewStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	QueryResultNewDoneInfo struct {
+		Error error
+	}
+	QueryResultCloseStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	QueryResultCloseDoneInfo struct {
+		Error error
+	}
+	QueryResultNextPartStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	QueryResultNextPartDoneInfo struct {
+		Error error
+	}
+	QueryResultNextResultSetStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	QueryResultNextResultSetDoneInfo struct {
+		Error error
+	}
+	QueryResultSetNextRowStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	QueryResultSetNextRowDoneInfo struct {
+		Error error
+	}
+	QueryRowScanStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	QueryRowScanDoneInfo struct {
+		Error error
+	}
+	QueryRowScanNamedStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	QueryRowScanNamedDoneInfo struct {
+		Error error
+	}
+	QueryRowScanStructStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	QueryRowScanStructDoneInfo struct {
 		Error error
 	}
 	QuerySessionDeleteStartInfo struct {

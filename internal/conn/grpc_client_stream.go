@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wrap"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -17,15 +18,20 @@ import (
 
 type grpcClientStream struct {
 	grpc.ClientStream
+	ctx      context.Context
 	c        *conn
 	wrapping bool
 	traceID  string
 	sentMark *modificationMark
 	onDone   func(ctx context.Context, md metadata.MD)
-	recv     func(error) func(error, trace.ConnState, map[string][]string)
 }
 
 func (s *grpcClientStream) CloseSend() (err error) {
+	onDone := trace.DriverOnConnStreamCloseSend(s.c.config.Trace(), &s.ctx, stack.FunctionID(""))
+	defer func() {
+		onDone(err)
+	}()
+
 	err = s.ClientStream.CloseSend()
 
 	if err != nil {
@@ -46,6 +52,11 @@ func (s *grpcClientStream) CloseSend() (err error) {
 }
 
 func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
+	onDone := trace.DriverOnConnStreamSendMsg(s.c.config.Trace(), &s.ctx, stack.FunctionID(""))
+	defer func() {
+		onDone(err)
+	}()
+
 	cancel := createPinger(s.c)
 	defer cancel()
 
@@ -77,15 +88,18 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 }
 
 func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
+	onDone := trace.DriverOnConnStreamRecvMsg(s.c.config.Trace(), &s.ctx, stack.FunctionID(""))
+	defer func() {
+		onDone(err)
+	}()
+
 	cancel := createPinger(s.c)
 	defer cancel()
 
 	defer func() {
-		onDone := s.recv(xerrors.HideEOF(err))
 		if err != nil {
 			md := s.ClientStream.Trailer()
-			onDone(xerrors.HideEOF(err), s.c.GetState(), md)
-			s.onDone(s.ClientStream.Context(), md)
+			s.onDone(s.ctx, md)
 		}
 	}()
 

@@ -72,16 +72,6 @@ type (
 		OnPoolSessionAdd    func(info TablePoolSessionAddInfo)
 		OnPoolSessionRemove func(info TablePoolSessionRemoveInfo)
 
-		// OnPoolSessionNew is user-defined callback for listening events about creating sessions with
-		// internal session pool calls
-		//
-		// Deprecated: use OnPoolSessionAdd callback
-		OnPoolSessionNew func(TablePoolSessionNewStartInfo) func(TablePoolSessionNewDoneInfo)
-
-		// OnPoolSessionClose is user-defined callback for listening sessionClose calls
-		//
-		// Deprecated: use OnPoolSessionRemove callback
-		OnPoolSessionClose func(TablePoolSessionCloseStartInfo) func(TablePoolSessionCloseDoneInfo)
 		// Pool common API events
 		OnPoolPut  func(TablePoolPutStartInfo) func(TablePoolPutDoneInfo)
 		OnPoolGet  func(TablePoolGetStartInfo) func(TablePoolGetDoneInfo)
@@ -415,9 +405,6 @@ type (
 		Context *context.Context
 		Call    call
 
-		// Deprecated: use Label field instead
-		ID string
-
 		Label      string
 		Idempotent bool
 		NestedCall bool // flag when Retry called inside head Retry
@@ -436,9 +423,6 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-
-		// Deprecated: use Label field instead
-		ID string
 
 		Label      string
 		Idempotent bool

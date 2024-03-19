@@ -140,43 +140,45 @@ func TestPool(t *testing.T) {
 			}, xtest.StopAfter(time.Second))
 		})
 		t.Run("IsAlive", func(t *testing.T) {
-			var (
-				newItems    int64
-				deleteItems int64
-				expErr      = xerrors.Retryable(errors.New("expected error"), xerrors.WithDeleteSession())
-			)
-			p, err := New(rootCtx,
-				WithMaxSize[*testItem, testItem](1),
-				WithCreateFunc(func(context.Context) (*testItem, error) {
-					atomic.AddInt64(&newItems, 1)
+			xtest.TestManyTimes(t, func(t testing.TB) {
+				var (
+					newItems    int64
+					deleteItems int64
+					expErr      = xerrors.Retryable(errors.New("expected error"), xerrors.WithDeleteSession())
+				)
+				p, err := New(rootCtx,
+					WithMaxSize[*testItem, testItem](1),
+					WithCreateFunc(func(context.Context) (*testItem, error) {
+						atomic.AddInt64(&newItems, 1)
 
-					v := &testItem{
-						onClose: func() error {
-							atomic.AddInt64(&deleteItems, 1)
+						v := &testItem{
+							onClose: func() error {
+								atomic.AddInt64(&deleteItems, 1)
 
-							return nil
-						},
-						onIsAlive: func() bool {
-							return atomic.LoadInt64(&newItems) >= 10
-						},
+								return nil
+							},
+							onIsAlive: func() bool {
+								return atomic.LoadInt64(&newItems) >= 10
+							},
+						}
+
+						return v, nil
+					}),
+				)
+				require.NoError(t, err)
+				err = p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
+					if atomic.LoadInt64(&newItems) < 10 {
+						return expErr
 					}
 
-					return v, nil
-				}),
-			)
-			require.NoError(t, err)
-			err = p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
-				if atomic.LoadInt64(&newItems) < 10 {
-					return expErr
-				}
-
-				return nil
-			})
-			require.NoError(t, err)
-			require.EqualValues(t, 10, atomic.LoadInt64(&newItems))
-			require.GreaterOrEqual(t, int64(9), atomic.LoadInt64(&deleteItems))
-			p.Close(rootCtx)
-			require.EqualValues(t, atomic.LoadInt64(&newItems), atomic.LoadInt64(&deleteItems))
+					return nil
+				})
+				require.NoError(t, err)
+				require.GreaterOrEqual(t, atomic.LoadInt64(&newItems), int64(9))
+				require.GreaterOrEqual(t, atomic.LoadInt64(&newItems), atomic.LoadInt64(&deleteItems))
+				p.Close(rootCtx)
+				require.EqualValues(t, atomic.LoadInt64(&newItems), atomic.LoadInt64(&deleteItems))
+			}, xtest.StopAfter(5*time.Second))
 		})
 	})
 	t.Run("Stress", func(t *testing.T) {

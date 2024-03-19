@@ -1,4 +1,16 @@
 * Added `TzDate`,`TzDateTime`,`TzTimestamp`  support for `ydb.ParamsBuilder()`
+
+## v3.58.2
+* Added `trace.Query.OnSessionBegin` event
+* Added `trace.Query.OnResult{New,NextPart,NextResultSet,Close}` events
+* Added `trace.Query.OnRow{Scan,ScanNamed,ScanStruct}` events
+
+## v3.58.1
+* Dropped all deprecated callbacks and events from traces
+* Added `trace.Driver.OnConnStream{SendMsg,RecvMsg,CloseSend}` events
+* Added `trace.Query.OnSessionExecute` event
+
+## v3.58.0
 * Changed `List` constructor from `ydb.ParamsBuilder().List().Build().Build()` to `ydb.ParamsBuilder().BeginList().EndList().Build()`
 * Changed `Set` constructor from `ydb.ParamsBuilder().Set().Build().Build()` to `ydb.ParamsBuilder().BeginSet().EndSet().Build()`
 * Changed `Dict` constructor from `ydb.ParamsBuilder().Dict().Build().Build()` to `ydb.ParamsBuilder().BeginDict().EndDict().Build()`

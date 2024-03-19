@@ -121,7 +121,7 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 ) {
 	onDone := trace.DatabaseSQLOnTxQuery(tx.conn.trace, &ctx,
 		stack.FunctionID(""),
-		tx.txCtx, tx, query, true,
+		tx.txCtx, tx, query,
 	)
 	defer func() {
 		onDone(finalErr)
@@ -163,7 +163,7 @@ func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.Named
 ) {
 	onDone := trace.DatabaseSQLOnTxExec(tx.conn.trace, &ctx,
 		stack.FunctionID(""),
-		tx.txCtx, tx, query, true,
+		tx.txCtx, tx, query,
 	)
 	defer func() {
 		onDone(finalErr)

@@ -168,6 +168,8 @@ func (p *Pool[PT, T]) put(ctx context.Context, item PT) (err error) {
 }
 
 func (p *Pool[PT, T]) produce(ctx context.Context) {
+	ctx = xcontext.WithoutDeadline(ctx)
+
 	onDone := p.trace.OnProduce(&ProduceStartInfo{
 		Context:     &ctx,
 		Call:        stack.FunctionID(""),
@@ -177,7 +179,7 @@ func (p *Pool[PT, T]) produce(ctx context.Context) {
 		onDone(&ProduceDoneInfo{})
 	}()
 
-	p.spawn = make(chan PT, p.producersCount)
+	p.spawn = make(chan PT, p.maxSize)
 
 	var wg, started sync.WaitGroup
 	wg.Add(p.producersCount)
@@ -197,7 +199,7 @@ func (p *Pool[PT, T]) produce(ctx context.Context) {
 					if msg != nil {
 						p.idle <- msg
 					} else {
-						item, err := p.create(context.Background())
+						item, err := p.create(ctx)
 						if err == nil {
 							p.idle <- item
 						}

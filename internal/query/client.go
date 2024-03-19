@@ -4,8 +4,6 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
@@ -21,8 +19,13 @@ import (
 
 //go:generate mockgen -destination grpc_client_mock_test.go -package query -write_package_comment=false github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1 QueryServiceClient,QueryService_AttachSessionClient,QueryService_ExecuteQueryClient
 
+type nodeChecker interface {
+	HasNode(id uint32) bool
+}
+
 type balancer interface {
 	grpc.ClientConnInterface
+	nodeChecker
 }
 
 var _ query.Client = (*Client)(nil)
@@ -48,7 +51,7 @@ func do(
 	op query.Operation,
 	t *trace.Query,
 	opts ...options.DoOption,
-) (finalErr error) {
+) (attempts int, finalErr error) {
 	doOpts := options.ParseDoOpts(t, opts...)
 
 	err := pool.With(ctx, func(ctx context.Context, s *Session) error {
@@ -74,26 +77,26 @@ func do(
 		) func(
 			trace.RetryLoopDoneInfo,
 		) {
-			onIntermediate := trace.QueryOnDo(doOpts.Trace(), &ctx, stack.FunctionID(""))
-
 			return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-				onDone := onIntermediate(info.Error)
-
 				return func(info trace.RetryLoopDoneInfo) {
-					onDone(info.Attempts, info.Error)
+					attempts = info.Attempts
 				}
 			}
 		},
 	}))...)
 	if err != nil {
-		return xerrors.WithStackTrace(err)
+		return attempts, xerrors.WithStackTrace(err)
 	}
 
-	return nil
+	return attempts, nil
 }
 
 func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) error {
-	return do(ctx, c.pool, op, c.config.Trace(), opts...)
+	onDone := trace.QueryOnDo(c.config.Trace(), &ctx, stack.FunctionID(""))
+	attempts, err := do(ctx, c.pool, op, c.config.Trace(), opts...)
+	onDone(attempts, err)
+
+	return err
 }
 
 func doTx(
@@ -102,10 +105,10 @@ func doTx(
 	op query.TxOperation,
 	t *trace.Query,
 	opts ...options.DoTxOption,
-) error {
+) (attempts int, err error) {
 	doTxOpts := options.ParseDoTxOpts(t, opts...)
 
-	err := do(ctx, pool, func(ctx context.Context, s query.Session) error {
+	attempts, err = do(ctx, pool, func(ctx context.Context, s query.Session) (err error) {
 		tx, err := s.Begin(ctx, doTxOpts.TxSettings())
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -132,30 +135,18 @@ func doTx(
 		return nil
 	}, t, doTxOpts.DoOpts()...)
 	if err != nil {
-		return xerrors.WithStackTrace(err)
+		return attempts, xerrors.WithStackTrace(err)
 	}
 
-	return nil
+	return attempts, nil
 }
 
 func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) error {
-	return doTx(ctx, c.pool, op, c.config.Trace(), opts...)
-}
+	onDone := trace.QueryOnDoTx(c.config.Trace(), &ctx, stack.FunctionID(""))
+	attempts, err := doTx(ctx, c.pool, op, c.config.Trace(), opts...)
+	onDone(attempts, err)
 
-func deleteSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID string) error {
-	response, err := client.DeleteSession(ctx,
-		&Ydb_Query.DeleteSessionRequest{
-			SessionId: sessionID,
-		},
-	)
-	if err != nil {
-		return xerrors.WithStackTrace(xerrors.Transport(err))
-	}
-	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
-		return xerrors.WithStackTrace(xerrors.FromOperation(response))
-	}
-
-	return nil
+	return err
 }
 
 func New(ctx context.Context, balancer balancer, cfg *config.Config) (_ *Client, err error) {
@@ -169,13 +160,11 @@ func New(ctx context.Context, balancer balancer, cfg *config.Config) (_ *Client,
 		grpcClient: Ydb_Query_V1.NewQueryServiceClient(balancer),
 	}
 
-	t := sessionTrace(cfg.Trace())
-
 	client.pool, err = pool.New(ctx,
 		pool.WithMaxSize[*Session, Session](cfg.PoolMaxSize()),
 		pool.WithProducersCount[*Session, Session](cfg.PoolProducersCount()),
 		pool.WithTrace[*Session, Session](poolTrace(cfg.Trace())),
-		pool.WithCreateFunc(func(ctx context.Context) (s *Session, err error) {
+		pool.WithCreateFunc(func(ctx context.Context) (_ *Session, err error) {
 			var cancel context.CancelFunc
 			if d := cfg.SessionCreateTimeout(); d > 0 {
 				ctx, cancel = xcontext.WithTimeout(ctx, d)
@@ -184,7 +173,13 @@ func New(ctx context.Context, balancer balancer, cfg *config.Config) (_ *Client,
 			}
 			defer cancel()
 
-			s, err = createSession(ctx, client.grpcClient, withSessionTrace(t))
+			s, err := createSession(ctx,
+				client.grpcClient,
+				withSessionTrace(cfg.Trace()),
+				withSessionCheck(func(s *Session) bool {
+					return balancer.HasNode(uint32(s.nodeID))
+				}),
+			)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
@@ -197,32 +192,6 @@ func New(ctx context.Context, balancer balancer, cfg *config.Config) (_ *Client,
 	}
 
 	return client, xerrors.WithStackTrace(ctx.Err())
-}
-
-func sessionTrace(t *trace.Query) *traceSession {
-	return &traceSession{
-		onCreate: func(ctx context.Context, functionID stack.Caller) func(*Session, error) {
-			onDone := trace.QueryOnSessionCreate(t, &ctx, functionID)
-
-			return func(s *Session, err error) {
-				onDone(s, err)
-			}
-		},
-		onClose: func(ctx context.Context, functionID stack.Caller, s *Session) func(err error) {
-			onDone := trace.QueryOnSessionDelete(t, &ctx, functionID, s)
-
-			return func(err error) {
-				onDone(err)
-			}
-		},
-		onAttach: func(ctx context.Context, functionID stack.Caller, s *Session) func(err error) {
-			onDone := trace.QueryOnSessionAttach(t, &ctx, functionID, s)
-
-			return func(err error) {
-				onDone(err)
-			}
-		},
-	}
 }
 
 func poolTrace(t *trace.Query) *pool.Trace {
