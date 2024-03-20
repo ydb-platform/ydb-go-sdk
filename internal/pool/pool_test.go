@@ -142,7 +142,6 @@ func TestPool(t *testing.T) {
 				})
 				require.NoError(t, err)
 				require.GreaterOrEqual(t, atomic.LoadInt64(&counter), int64(10))
-
 			})
 			t.Run("OnOperationError", func(t *testing.T) {
 				var counter int64

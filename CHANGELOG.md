@@ -6,6 +6,8 @@
 * Disabled the logic of background grpc-connection parking 
 * Removed `ydb.WithSessionPoolSizeLimit()` option
 * Added async put session into pool if external context is done
+* Dropped intermediate callbacks from `trace.{Table,Retry,Query}` events
+* Wrapped errors from `internal/pool.Pool.getItem` as retryable
 
 ## v3.58.2
 * Added `trace.Query.OnSessionBegin` event

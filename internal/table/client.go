@@ -261,15 +261,11 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 			[]retry.Option{
 				retry.WithIdempotent(true),
 				retry.WithTrace(&trace.Retry{
-					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-						onIntermediate := trace.TableOnCreateSession(c.config.Trace(), info.Context, stack.FunctionID(""))
+					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+						onDone := trace.TableOnCreateSession(c.config.Trace(), info.Context, stack.FunctionID(""))
 
-						return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-							onDone := onIntermediate(info.Error)
-
-							return func(info trace.RetryLoopDoneInfo) {
-								onDone(s, info.Attempts, info.Error)
-							}
+						return func(info trace.RetryLoopDoneInfo) {
+							onDone(s, info.Attempts, info.Error)
 						}
 					},
 				}),
@@ -643,17 +639,16 @@ func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 
 	config := c.retryOptions(opts...)
 
-	attempts, onIntermediate := 0, trace.TableOnDo(config.Trace, &ctx,
+	attempts, onDone := 0, trace.TableOnDo(config.Trace, &ctx,
 		stack.FunctionID(""),
 		config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
 	)
 	defer func() {
-		onIntermediate(finalErr)(attempts, finalErr)
+		onDone(attempts, finalErr)
 	}()
 
 	err := do(ctx, c, c.config, op, func(err error) {
 		attempts++
-		onIntermediate(err)
 	}, config.RetryOptions...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -673,21 +668,17 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 
 	config := c.retryOptions(opts...)
 
-	attempts, onIntermediate := 0, trace.TableOnDoTx(config.Trace, &ctx,
+	attempts, onDone := 0, trace.TableOnDoTx(config.Trace, &ctx,
 		stack.FunctionID(""),
 		config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
 	)
 	defer func() {
-		onIntermediate(finalErr)(attempts, finalErr)
+		onDone(attempts, finalErr)
 	}()
 
 	return retryBackoff(ctx, c,
 		func(ctx context.Context, s table.Session) (err error) {
 			attempts++
-
-			defer func() {
-				onIntermediate(err)
-			}()
 
 			tx, err := s.BeginTransaction(ctx, config.TxSettings)
 			if err != nil {

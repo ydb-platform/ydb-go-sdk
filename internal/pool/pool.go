@@ -32,7 +32,7 @@ type (
 		trace *Trace
 		limit int
 
-		create        func(ctx context.Context) (PT, error)
+		createItem    func(ctx context.Context) (PT, error)
 		createTimeout time.Duration
 		closeTimeout  time.Duration
 
@@ -97,7 +97,7 @@ func (s *safeStats) InUse() statsItemAddr {
 
 func WithCreateFunc[PT Item[T], T any](f func(ctx context.Context) (PT, error)) option[PT, T] {
 	return func(p *Pool[PT, T]) {
-		p.create = f
+		p.createItem = f
 	}
 }
 
@@ -132,7 +132,7 @@ func New[PT Item[T], T any](
 	p := &Pool[PT, T]{
 		trace: defaultTrace,
 		limit: DefaultLimit,
-		create: func(ctx context.Context) (PT, error) {
+		createItem: func(ctx context.Context) (PT, error) {
 			var item T
 
 			return &item, nil
@@ -157,9 +157,9 @@ func New[PT Item[T], T any](
 		})
 	}()
 
-	create := p.create
+	createItem := p.createItem
 
-	p.create = func(ctx context.Context) (PT, error) {
+	p.createItem = func(ctx context.Context) (PT, error) {
 		var (
 			ch        = make(chan PT)
 			createErr error
@@ -178,7 +178,7 @@ func New[PT Item[T], T any](
 				}
 				defer cancelCreate()
 
-				newItem, err := create(createCtx)
+				newItem, err := createItem(createCtx)
 				if err != nil {
 					return xerrors.WithStackTrace(err)
 				}
@@ -222,6 +222,10 @@ func New[PT Item[T], T any](
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		case item, has := <-ch:
 			if !has {
+				if ctxErr := ctx.Err(); ctxErr == nil && xerrors.IsContextError(createErr) {
+					return nil, xerrors.WithStackTrace(xerrors.Retryable(createErr))
+				}
+
 				return nil, xerrors.WithStackTrace(createErr)
 			}
 
@@ -282,7 +286,7 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (_ PT, finalErr error) {
 			p.stats.Index().Dec()
 		}
 
-		item, err := p.create(ctx)
+		item, err := p.createItem(ctx)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -417,11 +421,9 @@ func (p *Pool[PT, T]) With(
 
 		return nil
 	}, append(opts, retry.WithTrace(&trace.Retry{
-		OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-			return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-				return func(info trace.RetryLoopDoneInfo) {
-					attempts = info.Attempts
-				}
+		OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+			return func(info trace.RetryLoopDoneInfo) {
+				attempts = info.Attempts
 			}
 		},
 	}))...)

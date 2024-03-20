@@ -80,17 +80,9 @@ func do(
 
 		return nil
 	}, append(doOpts.RetryOpts(), retry.WithTrace(&trace.Retry{
-		OnRetry: func(
-			info trace.RetryLoopStartInfo,
-		) func(
-			trace.RetryLoopIntermediateInfo,
-		) func(
-			trace.RetryLoopDoneInfo,
-		) {
-			return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-				return func(info trace.RetryLoopDoneInfo) {
-					attempts = info.Attempts
-				}
+		OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+			return func(info trace.RetryLoopDoneInfo) {
+				attempts = info.Attempts
 			}
 		},
 	}))...)
