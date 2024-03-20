@@ -64,7 +64,13 @@ func execute(ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient,
 
 	stream, err := c.ExecuteQuery(executeCtx, request, callOptions...)
 	if err != nil {
-		return nil, nil, xerrors.WithStackTrace(err)
+		if xerrors.IsContextError(err) {
+			return nil, nil, xerrors.WithStackTrace(err)
+		}
+
+		return nil, nil, xerrors.WithStackTrace(
+			xerrors.Transport(err),
+		)
 	}
 
 	r, txID, err := newResult(ctx, stream, s.trace, cancelExecute)

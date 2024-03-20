@@ -99,3 +99,7 @@ func Is(err error, targets ...error) bool {
 
 	return false
 }
+
+func IsContextError(err error) bool {
+	return Is(err, context.Canceled, context.DeadlineExceeded)
+}

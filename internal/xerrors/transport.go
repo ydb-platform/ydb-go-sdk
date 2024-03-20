@@ -141,7 +141,7 @@ func Transport(err error, opts ...teOpt) error {
 	}
 	var te *transportError
 	if errors.As(err, &te) {
-		return err
+		return te
 	}
 	if s, ok := grpcStatus.FromError(err); ok {
 		te = &transportError{

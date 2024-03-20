@@ -81,6 +81,10 @@ func createSession(
 
 	response, err := client.CreateSession(ctx, &Ydb_Query.CreateSessionRequest{})
 	if err != nil {
+		if xerrors.IsContextError(err) {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
 		return nil, xerrors.WithStackTrace(
 			xerrors.Transport(err),
 		)
@@ -125,6 +129,10 @@ func (s *Session) attach(ctx context.Context) (finalErr error) {
 		SessionId: s.id,
 	})
 	if err != nil {
+		if xerrors.IsContextError(err) {
+			return xerrors.WithStackTrace(err)
+		}
+
 		return xerrors.WithStackTrace(
 			xerrors.Transport(err),
 		)
@@ -193,6 +201,10 @@ func deleteSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 		},
 	)
 	if err != nil {
+		if xerrors.IsContextError(err) {
+			return xerrors.WithStackTrace(err)
+		}
+
 		return xerrors.WithStackTrace(xerrors.Transport(err))
 	}
 	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
@@ -240,7 +252,13 @@ func begin(
 		},
 	)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(xerrors.Transport(err))
+		if xerrors.IsContextError(err) {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		return nil, xerrors.WithStackTrace(
+			xerrors.Transport(err),
+		)
 	}
 	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
 		return nil, xerrors.WithStackTrace(xerrors.FromOperation(response))

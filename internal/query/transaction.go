@@ -60,7 +60,13 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 		TxId:      txID,
 	})
 	if err != nil {
-		return xerrors.WithStackTrace(xerrors.Transport(err))
+		if xerrors.IsContextError(err) {
+			return xerrors.WithStackTrace(err)
+		}
+
+		return xerrors.WithStackTrace(
+			xerrors.Transport(err),
+		)
 	}
 	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
 		return xerrors.WithStackTrace(xerrors.FromOperation(response))
@@ -79,7 +85,13 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 		TxId:      txID,
 	})
 	if err != nil {
-		return xerrors.WithStackTrace(xerrors.Transport(err))
+		if xerrors.IsContextError(err) {
+			return xerrors.WithStackTrace(err)
+		}
+
+		return xerrors.WithStackTrace(
+			xerrors.Transport(err),
+		)
 	}
 	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
 		return xerrors.WithStackTrace(xerrors.FromOperation(response))

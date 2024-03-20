@@ -78,11 +78,24 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 		return
 	}
 
-	if xerrors.IsTransportError(cause,
-		grpcCodes.OK,
-		grpcCodes.Canceled,
+	if !xerrors.IsTransportError(cause,
 		grpcCodes.ResourceExhausted,
-		grpcCodes.OutOfRange,
+		grpcCodes.Unavailable,
+		//grpcCodes.OK,
+		//grpcCodes.Canceled,
+		//grpcCodes.Unknown,
+		//grpcCodes.InvalidArgument,
+		//grpcCodes.DeadlineExceeded,
+		//grpcCodes.NotFound,
+		//grpcCodes.AlreadyExists,
+		//grpcCodes.PermissionDenied,
+		//grpcCodes.FailedPrecondition,
+		//grpcCodes.Aborted,
+		//grpcCodes.OutOfRange,
+		//grpcCodes.Unimplemented,
+		//grpcCodes.Internal,
+		//grpcCodes.DataLoss,
+		//grpcCodes.Unauthenticated,
 	) {
 		return
 	}

@@ -93,7 +93,13 @@ func nextPart(
 
 	part, err := stream.Recv()
 	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
+		if xerrors.IsContextError(err) {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		return nil, xerrors.WithStackTrace(
+			xerrors.Transport(err),
+		)
 	}
 
 	return part, nil
