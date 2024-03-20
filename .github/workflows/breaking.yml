@@ -11,6 +11,7 @@ jobs:
       group: broken-changes-${{ github.ref }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
+    if: (!contains(github.event.pull_request.labels.*.name, 'slo only'))
     steps:
       - name: Install Go
         uses: actions/setup-go@v3

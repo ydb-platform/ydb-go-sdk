@@ -11,6 +11,7 @@ jobs:
     concurrency:
       group: unit-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
       cancel-in-progress: true
+    if: (!contains(github.event.pull_request.labels.*.name, 'slo only'))
     strategy:
       fail-fast: false
       matrix:
@@ -40,6 +41,7 @@ jobs:
     concurrency:
       group: integration-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
       cancel-in-progress: true
+    if: (!contains(github.event.pull_request.labels.*.name, 'slo only'))
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

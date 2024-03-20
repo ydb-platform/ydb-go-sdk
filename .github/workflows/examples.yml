@@ -11,6 +11,7 @@ jobs:
     concurrency:
       group: basic-ydb-${{ github.ref }}-${{ matrix.ydb-version }}-${{ matrix.application }}
       cancel-in-progress: true
+    if: (!contains(github.event.pull_request.labels.*.name, 'slo only'))
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -50,6 +51,7 @@ jobs:
     concurrency:
       group: basic-postgres-${{ matrix.application }}-${{ github.ref }}
       cancel-in-progress: true
+    if: (!contains(github.event.pull_request.labels.*.name, 'slo only'))
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -86,6 +88,7 @@ jobs:
     concurrency:
       group: basic-sqlite-${{ matrix.application }}-${{ github.ref }}
       cancel-in-progress: true
+    if: (!contains(github.event.pull_request.labels.*.name, 'slo only'))
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

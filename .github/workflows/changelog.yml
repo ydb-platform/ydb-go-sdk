@@ -7,6 +7,7 @@ jobs:
     concurrency:
       group: changelog-${{ github.ref }}
       cancel-in-progress: true
+    if: (!contains(github.event.pull_request.labels.*.name, 'slo only'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
