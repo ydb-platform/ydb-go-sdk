@@ -55,7 +55,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 					Error(info.Error),
 					Bool("retryable", m.MustRetry(idempotent)),
 					Int64("code", m.StatusCode()),
-					Bool("deleteSession", m.MustDeleteSession()),
+					Bool("deleteSession", m.IsRetryObjectValid()),
 					versionField(),
 				)
 			}
@@ -82,7 +82,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 						Error(info.Error),
 						Bool("retryable", m.MustRetry(idempotent)),
 						Int64("code", m.StatusCode()),
-						Bool("deleteSession", m.MustDeleteSession()),
+						Bool("deleteSession", m.IsRetryObjectValid()),
 						versionField(),
 					)
 				}
@@ -128,7 +128,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 					Error(info.Error),
 					Bool("retryable", m.MustRetry(idempotent)),
 					Int64("code", m.StatusCode()),
-					Bool("deleteSession", m.MustDeleteSession()),
+					Bool("deleteSession", m.IsRetryObjectValid()),
 					versionField(),
 				)
 			}
@@ -155,7 +155,7 @@ func internalTable(l *wrapper, d trace.Detailer) (t trace.Table) {
 						Error(info.Error),
 						Bool("retryable", m.MustRetry(idempotent)),
 						Int64("code", m.StatusCode()),
-						Bool("deleteSession", m.MustDeleteSession()),
+						Bool("deleteSession", m.IsRetryObjectValid()),
 						versionField(),
 					)
 				}

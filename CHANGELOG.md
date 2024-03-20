@@ -4,6 +4,8 @@
 * Fixed logic of query session pool
 * Changed initialization of internal driver clients to lazy
 * Disabled the logic of background grpc-connection parking 
+* Removed `ydb.WithSessionPoolSizeLimit()` option
+* Added async put session into pool if external context is done
 
 ## v3.58.2
 * Added `trace.Query.OnSessionBegin` event

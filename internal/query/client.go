@@ -11,7 +11,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -70,7 +69,7 @@ func do(
 
 		err := op(ctx, s)
 		if err != nil {
-			if xerrors.MustDeleteSession(err) {
+			if !xerrors.IsRetryObjectValid(err) {
 				s.setStatus(statusError)
 			}
 
@@ -183,15 +182,9 @@ func New(ctx context.Context, balancer balancer, cfg *config.Config) *Client {
 	client.pool = pool.New(ctx,
 		pool.WithLimit[*Session, Session](cfg.PoolLimit()),
 		pool.WithTrace[*Session, Session](poolTrace(cfg.Trace())),
+		pool.WithCreateItemTimeout[*Session, Session](cfg.SessionCreateTimeout()),
+		pool.WithCloseItemTimeout[*Session, Session](cfg.SessionDeleteTimeout()),
 		pool.WithCreateFunc(func(ctx context.Context) (_ *Session, err error) {
-			var cancel context.CancelFunc
-			if d := cfg.SessionCreateTimeout(); d > 0 {
-				ctx, cancel = xcontext.WithTimeout(ctx, d)
-			} else {
-				ctx, cancel = xcontext.WithCancel(ctx)
-			}
-			defer cancel()
-
 			s, err := createSession(ctx,
 				client.grpcClient,
 				withSessionTrace(cfg.Trace()),

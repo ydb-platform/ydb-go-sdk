@@ -51,7 +51,7 @@ func internalRetry(l Logger, d trace.Detailer) (t trace.Retry) {
 					latencyField(start),
 					Bool("retryable", m.MustRetry(idempotent)),
 					Int64("code", m.StatusCode()),
-					Bool("deleteSession", m.MustDeleteSession()),
+					Bool("deleteSession", m.IsRetryObjectValid()),
 					versionField(),
 				)
 			}
@@ -76,7 +76,7 @@ func internalRetry(l Logger, d trace.Detailer) (t trace.Retry) {
 						Int("attempts", info.Attempts),
 						Bool("retryable", m.MustRetry(idempotent)),
 						Int64("code", m.StatusCode()),
-						Bool("deleteSession", m.MustDeleteSession()),
+						Bool("deleteSession", m.IsRetryObjectValid()),
 						versionField(),
 					)
 				}

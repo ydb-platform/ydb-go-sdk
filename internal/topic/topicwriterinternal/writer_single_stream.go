@@ -83,7 +83,7 @@ func newSingleStreamWriterStopped(
 ) *SingleStreamWriter {
 	return &SingleStreamWriter{
 		cfg:            cfg,
-		background:     *background.NewWorker(xcontext.WithoutDeadline(ctxForPProfLabelsOnly)),
+		background:     *background.NewWorker(xcontext.ValueOnly(ctxForPProfLabelsOnly)),
 		closeCompleted: make(empty.Chan),
 	}
 }

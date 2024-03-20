@@ -43,7 +43,7 @@ func Map(err error) error {
 		return nil
 	case xerrors.Is(err, io.EOF):
 		return io.EOF
-	case xerrors.MustDeleteSession(err):
+	case !xerrors.IsRetryObjectValid(err):
 		return Error{err: err}
 	default:
 		return err

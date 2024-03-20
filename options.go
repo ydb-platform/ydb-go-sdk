@@ -393,15 +393,7 @@ func WithQueryConfigOption(option queryConfig.Option) Option {
 func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
-
-		return nil
-	}
-}
-
-// WithSessionPoolLimit set min size of internal sessions pool in query.Client
-func WithSessionPoolLimit(size int) Option {
-	return func(ctx context.Context, c *Driver) error {
-		c.queryOptions = append(c.queryOptions, queryConfig.WithPoolLimit(size))
+		c.queryOptions = append(c.queryOptions, queryConfig.WithPoolLimit(sizeLimit))
 
 		return nil
 	}

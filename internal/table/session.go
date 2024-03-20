@@ -485,7 +485,7 @@ func (s *session) checkError(err error) {
 	if err == nil {
 		return
 	}
-	if m := retry.Check(err); m.MustDeleteSession() {
+	if m := retry.Check(err); m.IsRetryObjectValid() {
 		s.SetStatus(table.SessionClosing)
 	}
 }

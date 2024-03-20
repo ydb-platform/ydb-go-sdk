@@ -302,35 +302,38 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 						ctxErr, err,
 					),
 				)
+			} else if xerrors.IsContextError(err) {
+				onIntermediate(err)
+			} else {
+				m := Check(err)
+
+				if m.StatusCode() != code {
+					i = 0
+				}
+
+				if !m.MustRetry(options.idempotent) {
+					return xerrors.WithStackTrace(
+						fmt.Errorf("non-retryable error occurred on attempt No.%d (idempotent=%v): %w",
+							attempts, options.idempotent, err,
+						),
+					)
+				}
+
+				if e := wait.Wait(ctx, options.fastBackoff, options.slowBackoff, m.BackoffType(), i); e != nil {
+					return xerrors.WithStackTrace(
+						xerrors.Join(
+							fmt.Errorf("wait exit on attempt No.%d",
+								attempts,
+							), e, err,
+						),
+					)
+				}
+
+				code = m.StatusCode()
+
+				onIntermediate(err)
 			}
 
-			m := Check(err)
-
-			if m.StatusCode() != code {
-				i = 0
-			}
-
-			if !m.MustRetry(options.idempotent) {
-				return xerrors.WithStackTrace(
-					fmt.Errorf("non-retryable error occurred on attempt No.%d (idempotent=%v): %w",
-						attempts, options.idempotent, err,
-					),
-				)
-			}
-
-			if e := wait.Wait(ctx, options.fastBackoff, options.slowBackoff, m.BackoffType(), i); e != nil {
-				return xerrors.WithStackTrace(
-					xerrors.Join(
-						fmt.Errorf("wait exit on attempt No.%d",
-							attempts,
-						), e, err,
-					),
-				)
-			}
-
-			code = m.StatusCode()
-
-			onIntermediate(err)
 		}
 	}
 }
@@ -340,9 +343,9 @@ func Check(err error) (m retryMode) {
 	code, errType, backoffType, deleteSession := xerrors.Check(err)
 
 	return retryMode{
-		code:          code,
-		errType:       errType,
-		backoff:       backoffType,
-		deleteSession: deleteSession,
+		code:               code,
+		errType:            errType,
+		backoff:            backoffType,
+		isRetryObjectValid: deleteSession,
 	}
 }

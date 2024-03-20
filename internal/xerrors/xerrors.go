@@ -19,7 +19,7 @@ type Error interface {
 	Name() string
 	Type() Type
 	BackoffType() backoff.Type
-	MustDeleteSession() bool
+	IsRetryObjectValid() bool
 }
 
 func IsTimeoutError(err error) bool {

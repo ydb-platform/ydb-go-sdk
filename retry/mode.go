@@ -7,10 +7,10 @@ import (
 
 // retryMode reports whether operation is able retried and with which properties.
 type retryMode struct {
-	code          int64
-	errType       xerrors.Type
-	backoff       backoff.Type
-	deleteSession bool
+	code               int64
+	errType            xerrors.Type
+	backoff            backoff.Type
+	isRetryObjectValid bool
 }
 
 func (m retryMode) MustRetry(isOperationIdempotent bool) bool {
@@ -33,4 +33,4 @@ func (m retryMode) MustBackoff() bool { return m.backoff&backoff.TypeAny != 0 }
 
 func (m retryMode) BackoffType() backoff.Type { return m.backoff }
 
-func (m retryMode) MustDeleteSession() bool { return m.deleteSession }
+func (m retryMode) IsRetryObjectValid() bool { return m.isRetryObjectValid }

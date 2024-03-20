@@ -166,7 +166,7 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 					err error
 				)
 
-				createSessionCtx := xcontext.WithoutDeadline(ctx)
+				createSessionCtx := xcontext.ValueOnly(ctx)
 
 				if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
 					var cancel context.CancelFunc
@@ -179,7 +179,7 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 						return
 					}
 
-					closeSessionCtx := xcontext.WithoutDeadline(ctx)
+					closeSessionCtx := xcontext.ValueOnly(ctx)
 
 					if timeout := c.config.DeleteTimeout(); timeout > 0 {
 						var cancel context.CancelFunc

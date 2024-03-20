@@ -13,7 +13,7 @@ func (valueOnlyContext) Done() <-chan struct{} { return nil }
 
 func (valueOnlyContext) Err() error { return nil }
 
-// WithoutDeadline helps to clear derived deadline from deadline
-func WithoutDeadline(ctx context.Context) context.Context {
+// ValueOnly helps to clear parent context from deadlines/cancels
+func ValueOnly(ctx context.Context) context.Context {
 	return valueOnlyContext{ctx}
 }

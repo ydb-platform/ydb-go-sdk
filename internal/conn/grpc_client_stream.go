@@ -105,7 +105,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 
 	err = s.ClientStream.RecvMsg(m)
 
-	if err != nil {
+	if err != nil { //nolint:nestif
 		if xerrors.IsContextError(err) {
 			return xerrors.WithStackTrace(err)
 		}

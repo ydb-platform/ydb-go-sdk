@@ -132,7 +132,7 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 			xerrors.WithStackTrace(
 				xerrors.Retryable(
 					fmt.Errorf("wrong query mode: %s", m.String()),
-					xerrors.WithDeleteSession(),
+					xerrors.InvalidObject(),
 					xerrors.WithName("WRONG_QUERY_MODE"),
 				),
 			),
@@ -174,7 +174,7 @@ func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.Named
 			xerrors.WithStackTrace(
 				xerrors.Retryable(
 					fmt.Errorf("wrong query mode: %s", m.String()),
-					xerrors.WithDeleteSession(),
+					xerrors.InvalidObject(),
 					xerrors.WithName("WRONG_QUERY_MODE"),
 				),
 			),

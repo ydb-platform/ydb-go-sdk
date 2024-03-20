@@ -104,7 +104,7 @@ func (m *mockConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.T
 
 func (m *mockConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	m.t.Log(stack.Record(0))
-	if xerrors.MustDeleteSession(m.execErr) {
+	if !xerrors.IsRetryObjectValid(m.execErr) {
 		m.closed = true
 	}
 
@@ -113,7 +113,7 @@ func (m *mockConn) QueryContext(ctx context.Context, query string, args []driver
 
 func (m *mockConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	m.t.Log(stack.Record(0))
-	if xerrors.MustDeleteSession(m.execErr) {
+	if !xerrors.IsRetryObjectValid(m.execErr) {
 		m.closed = true
 	}
 
