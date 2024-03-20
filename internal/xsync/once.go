@@ -3,6 +3,8 @@ package xsync
 import (
 	"context"
 	"sync"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 )
 
 func OnceFunc(f func(ctx context.Context) error) func(ctx context.Context) error {
@@ -17,25 +19,43 @@ func OnceFunc(f func(ctx context.Context) error) func(ctx context.Context) error
 	}
 }
 
-func OnceValue[T any](f func(ctx context.Context) (T, error)) func(ctx context.Context) (T, error) {
-	var (
-		once  sync.Once
-		mutex sync.RWMutex
-		t     T
-		err   error
-	)
+type Once[T closer.Closer] struct {
+	f     func() T
+	once  sync.Once
+	mutex sync.RWMutex
+	t     T
+}
 
-	return func(ctx context.Context) (T, error) {
-		once.Do(func() {
-			mutex.Lock()
-			defer mutex.Unlock()
+func OnceValue[T closer.Closer](f func() T) *Once[T] {
+	return &Once[T]{f: f}
+}
 
-			t, err = f(ctx)
-		})
+func (v *Once[T]) Close(ctx context.Context) (err error) {
+	has := true
+	v.once.Do(func() {
+		has = false
+	})
 
-		mutex.RLock()
-		defer mutex.RUnlock()
+	if has {
+		v.mutex.RLock()
+		defer v.mutex.RUnlock()
 
-		return t, err
+		return v.t.Close(ctx)
 	}
+
+	return nil
+}
+
+func (v *Once[T]) Get() T {
+	v.once.Do(func() {
+		v.mutex.Lock()
+		defer v.mutex.Unlock()
+
+		v.t = v.f()
+	})
+
+	v.mutex.RLock()
+	defer v.mutex.RUnlock()
+
+	return v.t
 }

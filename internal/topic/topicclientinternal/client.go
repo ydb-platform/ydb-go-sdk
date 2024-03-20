@@ -32,7 +32,7 @@ func New(
 	conn grpc.ClientConnInterface,
 	cred credentials.Credentials,
 	opts ...topicoptions.TopicOption,
-) (*Client, error) {
+) *Client {
 	rawClient := rawtopic.NewClient(Ydb_Topic_V1.NewTopicServiceClient(conn))
 
 	cfg := newTopicConfig(opts...)
@@ -45,7 +45,7 @@ func New(
 		cred:                   cred,
 		defaultOperationParams: defaultOperationParams,
 		rawClient:              rawClient,
-	}, nil
+	}
 }
 
 func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {

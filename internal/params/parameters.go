@@ -127,6 +127,13 @@ func (p *Parameter) BeginDict() *dict {
 	}
 }
 
+func (p *Parameter) BeginTuple() *tuple {
+	return &tuple{
+		parent: p.parent,
+		name:   p.name,
+	}
+}
+
 func (p *Parameter) Text(v string) Builder {
 	p.value = value.TextValue(v)
 	p.parent.params = append(p.parent.params, p)
@@ -276,6 +283,27 @@ func (p *Parameter) YSON(v []byte) Builder {
 
 func (p *Parameter) UUID(v [16]byte) Builder {
 	p.value = value.UUIDValue(v)
+	p.parent.params = append(p.parent.params, p)
+
+	return p.parent
+}
+
+func (p *Parameter) TzDate(v time.Time) Builder {
+	p.value = value.TzDateValueFromTime(v)
+	p.parent.params = append(p.parent.params, p)
+
+	return p.parent
+}
+
+func (p *Parameter) TzTimestamp(v time.Time) Builder {
+	p.value = value.TzTimestampValueFromTime(v)
+	p.parent.params = append(p.parent.params, p)
+
+	return p.parent
+}
+
+func (p *Parameter) TzDatetime(v time.Time) Builder {
+	p.value = value.TzDatetimeValueFromTime(v)
 	p.parent.params = append(p.parent.params, p)
 
 	return p.parent

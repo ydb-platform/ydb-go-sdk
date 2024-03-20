@@ -1,3 +1,10 @@
+* Added support of `TzDate`,`TzDateTime`,`TzTimestamp` types in `ydb.ParamsBuilder()`
+* Added `trace.Query.OnTransactionExecute` event
+* Added query pool metrics
+* Fixed logic of query session pool
+* Changed initialization of internal driver clients to lazy
+* Disabled the logic of background grpc-connection parking 
+
 ## v3.58.2
 * Added `trace.Query.OnSessionBegin` event
 * Added `trace.Query.OnResult{New,NextPart,NextResultSet,Close}` events
@@ -19,6 +26,7 @@
 * Added `internal/xsync.{OnceFunc,OnceValue}`
 * Updated `google.golang.org/protobuf` from `v1.31.0` to `v.33.0`
 * Added `ydb.ParamsBuilder().Pg().{Value,Int4,Int8,Unknown}` for postgres arguments
+* Added `Tuple` support for `ydb.ParamsBuilder()`
 
 ## v3.57.4
 * Added client pid to each gRPC requests to YDB over header `x-ydb-client-pid`

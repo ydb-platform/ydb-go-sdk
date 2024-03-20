@@ -173,25 +173,20 @@ func newTestSessionWithClient(client Ydb_Query_V1.QueryServiceClient) (*Session,
 	}, nil
 }
 
-func mustTestPool(
+func testPool(
 	ctx context.Context,
 	createSession func(ctx context.Context) (*Session, error),
 ) *pool.Pool[*Session, Session] {
-	p, err := pool.New[*Session, Session](ctx,
-		pool.WithMaxSize[*Session, Session](1),
+	return pool.New[*Session, Session](ctx,
+		pool.WithLimit[*Session, Session](1),
 		pool.WithCreateFunc(createSession),
 	)
-	if err != nil {
-		panic(err)
-	}
-
-	return p
 }
 
 func TestDo(t *testing.T) {
 	ctx := xtest.Context(t)
 	t.Run("HappyWay", func(t *testing.T) {
-		attempts, err := do(ctx, mustTestPool(ctx, func(ctx context.Context) (*Session, error) {
+		attempts, err := do(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
 			return newTestSession()
 		}), func(ctx context.Context, s query.Session) error {
 			return nil
@@ -201,7 +196,7 @@ func TestDo(t *testing.T) {
 	})
 	t.Run("RetryableError", func(t *testing.T) {
 		counter := 0
-		attempts, err := do(ctx, mustTestPool(ctx, func(ctx context.Context) (*Session, error) {
+		attempts, err := do(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
 			return newTestSession()
 		}), func(ctx context.Context, s query.Session) error {
 			counter++
@@ -228,7 +223,7 @@ func TestDoTx(t *testing.T) {
 		client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
 			Status: Ydb.StatusIds_SUCCESS,
 		}, nil)
-		attempts, err := doTx(ctx, mustTestPool(ctx, func(ctx context.Context) (*Session, error) {
+		attempts, err := doTx(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
 			return newTestSessionWithClient(client)
 		}), func(ctx context.Context, tx query.TxActor) error {
 			return nil
@@ -249,7 +244,7 @@ func TestDoTx(t *testing.T) {
 		client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
 			Status: Ydb.StatusIds_SUCCESS,
 		}, nil).AnyTimes()
-		attempts, err := doTx(ctx, mustTestPool(ctx, func(ctx context.Context) (*Session, error) {
+		attempts, err := doTx(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
 			return newTestSessionWithClient(client)
 		}), func(ctx context.Context, tx query.TxActor) error {
 			counter++

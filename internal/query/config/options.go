@@ -23,29 +23,13 @@ func WithTrace(trace *trace.Query, opts ...trace.QueryComposeOption) Option {
 	}
 }
 
-// WithPoolMaxSize defines upper bound of pooled sessions.
-// If maxSize is less than or equal to zero then the
-// DefaultPoolMaxSize variable is used as a limit.
-func WithPoolMaxSize(size int) Option {
+// WithPoolLimit defines upper bound of pooled sessions.
+// If poolLimit is less than or equal to zero then the
+// DefaultPoolMaxSize variable is used as a poolLimit.
+func WithPoolLimit(size int) Option {
 	return func(c *Config) {
 		if size > 0 {
-			c.maxSize = size
-		}
-	}
-}
-
-func WithPoolMinSize(size int) Option {
-	return func(c *Config) {
-		if size > 0 {
-			c.minSize = size
-		}
-	}
-}
-
-func WithPoolProducersCount(count int) Option {
-	return func(c *Config) {
-		if count > 0 {
-			c.producersCount = count
+			c.poolLimit = size
 		}
 	}
 }

@@ -151,33 +151,6 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
 				)
 			}
 		},
-		OnConnPark: func(info trace.DriverConnParkStartInfo) func(trace.DriverConnParkDoneInfo) {
-			if d.Details()&trace.DriverConnEvents == 0 {
-				return nil
-			}
-			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "park")
-			endpoint := info.Endpoint
-			l.Log(ctx, "start",
-				Stringer("endpoint", endpoint),
-			)
-			start := time.Now()
-
-			return func(info trace.DriverConnParkDoneInfo) {
-				if info.Error == nil {
-					l.Log(ctx, "done",
-						Stringer("endpoint", endpoint),
-						latencyField(start),
-					)
-				} else {
-					l.Log(WithLevel(ctx, WARN), "failed",
-						Error(info.Error),
-						Stringer("endpoint", endpoint),
-						latencyField(start),
-						versionField(),
-					)
-				}
-			}
-		},
 		OnConnClose: func(info trace.DriverConnCloseStartInfo) func(trace.DriverConnCloseDoneInfo) {
 			if d.Details()&trace.DriverConnEvents == 0 {
 				return nil

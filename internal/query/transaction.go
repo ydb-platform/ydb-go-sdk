@@ -8,15 +8,30 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var _ query.Transaction = (*transaction)(nil)
 
 type transaction struct {
-	id string
-	s  *Session
+	id    string
+	s     *Session
+	trace *trace.Query
+}
+
+func newTransaction(id string, s *Session, t *trace.Query) *transaction {
+	if t == nil {
+		t = &trace.Query{}
+	}
+
+	return &transaction{
+		id:    id,
+		s:     s,
+		trace: t,
+	}
 }
 
 func (tx transaction) ID() string {
@@ -24,8 +39,13 @@ func (tx transaction) ID() string {
 }
 
 func (tx transaction) Execute(ctx context.Context, q string, opts ...options.TxExecuteOption) (
-	r query.Result, err error,
+	r query.Result, finalErr error,
 ) {
+	onDone := trace.QueryOnTxExecute(tx.trace, &ctx, stack.FunctionID(""), tx.s, tx, q)
+	defer func() {
+		onDone(finalErr)
+	}()
+
 	_, res, err := execute(ctx, tx.s, tx.s.grpcClient, q, options.TxExecuteSettings(tx.id, opts...).ExecuteSettings)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

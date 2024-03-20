@@ -12,7 +12,7 @@ type (
 	Syntax                Ydb_Query.Syntax
 	ExecMode              Ydb_Query.ExecMode
 	StatsMode             Ydb_Query.StatsMode
-	callOptions           []grpc.CallOption
+	CallOptions           []grpc.CallOption
 	commonExecuteSettings struct {
 		syntax      Syntax
 		params      params.Parameters
@@ -37,13 +37,13 @@ type (
 		applyTxExecuteOption(s *txExecuteSettings)
 	}
 	txCommitOption   struct{}
-	parametersOption params.Parameters
-	txControlOption  struct {
+	ParametersOption params.Parameters
+	TxControlOption  struct {
 		txControl *tx.Control
 	}
 )
 
-func (opt txControlOption) applyExecuteOption(s *Execute) {
+func (opt TxControlOption) applyExecuteOption(s *Execute) {
 	s.txControl = opt.txControl
 }
 
@@ -64,19 +64,19 @@ const (
 	SyntaxPostgreSQL = Syntax(Ydb_Query.Syntax_SYNTAX_PG)
 )
 
-func (params parametersOption) applyTxExecuteOption(s *txExecuteSettings) {
+func (params ParametersOption) applyTxExecuteOption(s *txExecuteSettings) {
 	params.applyExecuteOption(s.ExecuteSettings)
 }
 
-func (params parametersOption) applyExecuteOption(s *Execute) {
+func (params ParametersOption) applyExecuteOption(s *Execute) {
 	s.params = append(s.params, params...)
 }
 
-func (opts callOptions) applyExecuteOption(s *Execute) {
+func (opts CallOptions) applyExecuteOption(s *Execute) {
 	s.callOptions = append(s.callOptions, opts...)
 }
 
-func (opts callOptions) applyTxExecuteOption(s *txExecuteSettings) {
+func (opts CallOptions) applyTxExecuteOption(s *txExecuteSettings) {
 	opts.applyExecuteOption(s.ExecuteSettings)
 }
 
@@ -178,12 +178,10 @@ func TxExecuteSettings(id string, opts ...TxExecuteOption) (settings *txExecuteS
 	return settings
 }
 
-var _ ExecuteOption = (*parametersOption)(nil)
+var _ ExecuteOption = ParametersOption{}
 
-func WithParameters(parameters *params.Parameters) *parametersOption {
-	params := parametersOption(*parameters)
-
-	return &params
+func WithParameters(parameters *params.Parameters) ParametersOption {
+	return ParametersOption(*parameters)
 }
 
 var (
@@ -192,29 +190,35 @@ var (
 	_ TxExecuteOption = ExecMode(0)
 	_ TxExecuteOption = StatsMode(0)
 	_ TxExecuteOption = txCommitOption{}
-	_ ExecuteOption   = txControlOption{}
+	_ ExecuteOption   = TxControlOption{}
 )
 
 func WithCommit() txCommitOption {
 	return txCommitOption{}
 }
 
+type ExecModeOption = ExecMode
+
 func WithExecMode(mode ExecMode) ExecMode {
 	return mode
 }
 
-func WithSyntax(syntax Syntax) Syntax {
+type SyntaxOption = Syntax
+
+func WithSyntax(syntax Syntax) SyntaxOption {
 	return syntax
 }
+
+type StatsModeOption = StatsMode
 
 func WithStatsMode(mode StatsMode) StatsMode {
 	return mode
 }
 
-func WithCallOptions(opts ...grpc.CallOption) callOptions {
+func WithCallOptions(opts ...grpc.CallOption) CallOptions {
 	return opts
 }
 
-func WithTxControl(txControl *tx.Control) txControlOption {
-	return txControlOption{txControl}
+func WithTxControl(txControl *tx.Control) TxControlOption {
+	return TxControlOption{txControl}
 }

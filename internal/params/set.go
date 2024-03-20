@@ -171,3 +171,21 @@ func (s *setItem) UUID(v [16]byte) *set {
 
 	return s.parent
 }
+
+func (s *setItem) TzDate(v time.Time) *set {
+	s.parent.values = append(s.parent.values, value.TzDateValueFromTime(v))
+
+	return s.parent
+}
+
+func (s *setItem) TzTimestamp(v time.Time) *set {
+	s.parent.values = append(s.parent.values, value.TzTimestampValueFromTime(v))
+
+	return s.parent
+}
+
+func (s *setItem) TzDatetime(v time.Time) *set {
+	s.parent.values = append(s.parent.values, value.TzDatetimeValueFromTime(v))
+
+	return s.parent
+}

@@ -20,19 +20,39 @@ func query(config Config) (t trace.Query) {
 			) func(
 				info trace.QueryPoolWithDoneInfo,
 			) {
+				if withConfig.Details()&trace.QueryPoolEvents == 0 {
+					return nil
+				}
+
 				start := time.Now()
 
 				return func(info trace.QueryPoolWithDoneInfo) {
-					if withConfig.Details()&trace.QueryPoolEvents != 0 {
-						attempts.With(nil).Record(float64(info.Attempts))
-						if info.Error != nil {
-							errs.With(map[string]string{
-								"status": errorBrief(info.Error),
-							}).Inc()
-						}
-						latency.With(nil).Record(time.Since(start))
+					attempts.With(nil).Record(float64(info.Attempts))
+					if info.Error != nil {
+						errs.With(map[string]string{
+							"status": errorBrief(info.Error),
+						}).Inc()
 					}
+					latency.With(nil).Record(time.Since(start))
 				}
+			}
+		}
+		{
+			sizeConfig := poolConfig.WithSystem("size")
+			limit := sizeConfig.GaugeVec("limit")
+			idle := sizeConfig.GaugeVec("idle")
+			index := sizeConfig.GaugeVec("index")
+			inUse := sizeConfig.WithSystem("in").GaugeVec("use")
+
+			t.OnPoolChange = func(stats trace.QueryPoolChange) {
+				if sizeConfig.Details()&trace.QueryPoolEvents == 0 {
+					return
+				}
+
+				limit.With(nil).Set(float64(stats.Limit))
+				idle.With(nil).Set(float64(stats.Idle))
+				inUse.With(nil).Set(float64(stats.InUse))
+				index.With(nil).Set(float64(stats.Index))
 			}
 		}
 	}
@@ -86,6 +106,7 @@ func query(config Config) (t trace.Query) {
 	}
 	{
 		sessionConfig := queryConfig.WithSystem("session")
+		count := sessionConfig.GaugeVec("count")
 		{
 			createConfig := sessionConfig.WithSystem("create")
 			errs := createConfig.CounterVec("errs", "status")
@@ -99,6 +120,9 @@ func query(config Config) (t trace.Query) {
 
 				return func(info trace.QuerySessionCreateDoneInfo) {
 					if createConfig.Details()&trace.QuerySessionEvents != 0 {
+						if info.Error == nil {
+							count.With(nil).Add(1)
+						}
 						errs.With(map[string]string{
 							"status": errorBrief(info.Error),
 						}).Inc()
@@ -111,14 +135,12 @@ func query(config Config) (t trace.Query) {
 			deleteConfig := sessionConfig.WithSystem("delete")
 			errs := deleteConfig.CounterVec("errs", "status")
 			latency := deleteConfig.TimerVec("latency")
-			t.OnSessionCreate = func(
-				info trace.QuerySessionCreateStartInfo,
-			) func(
-				info trace.QuerySessionCreateDoneInfo,
-			) {
+			t.OnSessionDelete = func(info trace.QuerySessionDeleteStartInfo) func(info trace.QuerySessionDeleteDoneInfo) {
+				count.With(nil).Add(-1)
+
 				start := time.Now()
 
-				return func(info trace.QuerySessionCreateDoneInfo) {
+				return func(info trace.QuerySessionDeleteDoneInfo) {
 					if deleteConfig.Details()&trace.QuerySessionEvents != 0 {
 						errs.With(map[string]string{
 							"status": errorBrief(info.Error),
@@ -154,6 +176,26 @@ func query(config Config) (t trace.Query) {
 
 				return func(info trace.QuerySessionBeginDoneInfo) {
 					if beginConfig.Details()&trace.QuerySessionEvents != 0 {
+						errs.With(map[string]string{
+							"status": errorBrief(info.Error),
+						}).Inc()
+						latency.With(nil).Record(time.Since(start))
+					}
+				}
+			}
+		}
+	}
+	{
+		txConfig := queryConfig.WithSystem("tx")
+		{
+			executeConfig := txConfig.WithSystem("execute")
+			errs := executeConfig.CounterVec("errs", "status")
+			latency := executeConfig.TimerVec("latency")
+			t.OnTxExecute = func(info trace.QueryTxExecuteStartInfo) func(info trace.QueryTxExecuteDoneInfo) {
+				start := time.Now()
+
+				return func(info trace.QueryTxExecuteDoneInfo) {
+					if executeConfig.Details()&trace.QuerySessionEvents != 0 {
 						errs.With(map[string]string{
 							"status": errorBrief(info.Error),
 						}).Inc()
