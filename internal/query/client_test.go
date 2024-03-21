@@ -123,9 +123,9 @@ func TestCreateSession(t *testing.T) {
 				ctx := xtest.Context(t)
 				ctrl := gomock.NewController(t)
 				service := NewMockQueryServiceClient(ctrl)
-				service.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
-					Status: Ydb.StatusIds_UNAVAILABLE,
-				}, nil)
+				service.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil,
+					xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
+				)
 				t.Log("execute")
 				_, err := createSession(ctx, service)
 				require.Error(t, err)

@@ -81,19 +81,7 @@ func createSession(
 
 	response, err := client.CreateSession(ctx, &Ydb_Query.CreateSessionRequest{})
 	if err != nil {
-		if xerrors.IsContextError(err) {
-			return nil, xerrors.WithStackTrace(err)
-		}
-
-		return nil, xerrors.WithStackTrace(
-			xerrors.Transport(err),
-		)
-	}
-
-	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
-		return nil, xerrors.WithStackTrace(
-			xerrors.FromOperation(response),
-		)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	defer func() {
@@ -107,9 +95,7 @@ func createSession(
 
 	err = s.attach(ctx)
 	if err != nil {
-		return nil, xerrors.WithStackTrace(
-			xerrors.Transport(err),
-		)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	s.setStatus(statusIdle)
@@ -129,20 +115,14 @@ func (s *Session) attach(ctx context.Context) (finalErr error) {
 		SessionId: s.id,
 	})
 	if err != nil {
-		if xerrors.IsContextError(err) {
-			return xerrors.WithStackTrace(err)
-		}
-
-		return xerrors.WithStackTrace(
-			xerrors.Transport(err),
-		)
+		return xerrors.WithStackTrace(err)
 	}
 
 	state, err := attach.Recv()
 	if err != nil {
 		cancelAttach()
 
-		return xerrors.WithStackTrace(xerrors.Transport(err))
+		return xerrors.WithStackTrace(err)
 	}
 
 	if state.GetStatus() != Ydb.StatusIds_SUCCESS {
@@ -173,18 +153,13 @@ func (s *Session) attach(ctx context.Context) (finalErr error) {
 			if !s.IsAlive() {
 				return
 			}
-			recv, recvErr := attach.Recv()
+			_, recvErr := attach.Recv()
 			if recvErr != nil {
 				if xerrors.Is(recvErr, io.EOF) {
 					s.setStatus(statusClosed)
 				} else {
 					s.setStatus(statusError)
 				}
-
-				return
-			}
-			if recv.GetStatus() != Ydb.StatusIds_SUCCESS {
-				s.setStatus(statusError)
 
 				return
 			}
@@ -201,11 +176,7 @@ func deleteSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 		},
 	)
 	if err != nil {
-		if xerrors.IsContextError(err) {
-			return xerrors.WithStackTrace(err)
-		}
-
-		return xerrors.WithStackTrace(xerrors.Transport(err))
+		return xerrors.WithStackTrace(err)
 	}
 	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
 		return xerrors.WithStackTrace(xerrors.FromOperation(response))
@@ -252,16 +223,7 @@ func begin(
 		},
 	)
 	if err != nil {
-		if xerrors.IsContextError(err) {
-			return nil, xerrors.WithStackTrace(err)
-		}
-
-		return nil, xerrors.WithStackTrace(
-			xerrors.Transport(err),
-		)
-	}
-	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
-		return nil, xerrors.WithStackTrace(xerrors.FromOperation(response))
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return newTransaction(response.GetTxMeta().GetId(), s, s.trace), nil

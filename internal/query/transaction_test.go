@@ -49,10 +49,8 @@ func TestCommitTx(t *testing.T) {
 		ctx := xtest.Context(t)
 		ctrl := gomock.NewController(t)
 		service := NewMockQueryServiceClient(ctrl)
-		service.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(
-			&Ydb_Query.CommitTransactionResponse{
-				Status: Ydb.StatusIds_UNAVAILABLE,
-			}, nil,
+		service.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(nil,
+			xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
 		)
 		t.Log("commit")
 		err := commitTx(ctx, service, "123", "456")

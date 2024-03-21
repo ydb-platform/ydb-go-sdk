@@ -55,21 +55,12 @@ func (tx transaction) Execute(ctx context.Context, q string, opts ...options.TxE
 }
 
 func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID, txID string) error {
-	response, err := client.CommitTransaction(ctx, &Ydb_Query.CommitTransactionRequest{
+	_, err := client.CommitTransaction(ctx, &Ydb_Query.CommitTransactionRequest{
 		SessionId: sessionID,
 		TxId:      txID,
 	})
 	if err != nil {
-		if xerrors.IsContextError(err) {
-			return xerrors.WithStackTrace(err)
-		}
-
-		return xerrors.WithStackTrace(
-			xerrors.Transport(err),
-		)
-	}
-	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
-		return xerrors.WithStackTrace(xerrors.FromOperation(response))
+		return xerrors.WithStackTrace(err)
 	}
 
 	return nil
@@ -85,13 +76,7 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 		TxId:      txID,
 	})
 	if err != nil {
-		if xerrors.IsContextError(err) {
-			return xerrors.WithStackTrace(err)
-		}
-
-		return xerrors.WithStackTrace(
-			xerrors.Transport(err),
-		)
+		return xerrors.WithStackTrace(err)
 	}
 	if response.GetStatus() != Ydb.StatusIds_SUCCESS {
 		return xerrors.WithStackTrace(xerrors.FromOperation(response))
