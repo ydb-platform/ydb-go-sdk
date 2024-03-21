@@ -67,7 +67,7 @@ func execute(ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient,
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	r, txID, err := newResult(ctx, stream, s.trace, cancelExecute)
+	r, txID, err := newResult(ctx, stream, s.cfg.Trace(), cancelExecute)
 	if err != nil {
 		cancelExecute()
 
@@ -78,5 +78,5 @@ func execute(ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient,
 		return nil, r, nil
 	}
 
-	return newTransaction(txID, s, s.trace), r, nil
+	return newTransaction(txID, s), r, nil
 }

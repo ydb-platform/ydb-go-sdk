@@ -89,10 +89,8 @@ func TestRollback(t *testing.T) {
 		ctx := xtest.Context(t)
 		ctrl := gomock.NewController(t)
 		service := NewMockQueryServiceClient(ctrl)
-		service.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).Return(
-			&Ydb_Query.RollbackTransactionResponse{
-				Status: Ydb.StatusIds_UNAVAILABLE,
-			}, nil,
+		service.EXPECT().RollbackTransaction(gomock.Any(), gomock.Any()).Return(nil,
+			xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
 		)
 		t.Log("rollback")
 		err := rollback(ctx, service, "123", "456")

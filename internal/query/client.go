@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -177,9 +178,18 @@ func New(ctx context.Context, balancer balancer, cfg *config.Config) *Client {
 		pool.WithCreateItemTimeout[*Session, Session](cfg.SessionCreateTimeout()),
 		pool.WithCloseItemTimeout[*Session, Session](cfg.SessionDeleteTimeout()),
 		pool.WithCreateFunc(func(ctx context.Context) (_ *Session, err error) {
-			s, err := createSession(ctx,
-				client.grpcClient,
-				withSessionTrace(cfg.Trace()),
+			var (
+				createCtx    context.Context
+				cancelCreate context.CancelFunc
+			)
+			if d := cfg.SessionCreateTimeout(); d > 0 {
+				createCtx, cancelCreate = xcontext.WithTimeout(ctx, d)
+			} else {
+				createCtx, cancelCreate = xcontext.WithCancel(ctx)
+			}
+			defer cancelCreate()
+
+			s, err := createSession(createCtx, client.grpcClient, cfg,
 				withSessionCheck(func(s *Session) bool {
 					return balancer.HasNode(uint32(s.nodeID))
 				}),
