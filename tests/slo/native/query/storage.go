@@ -72,7 +72,7 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	db, err := ydb.Open(ctx,
 		cfg.Endpoint+cfg.DB,
 		ydb.WithSessionPoolSizeLimit(poolSize),
-		ydb.WithLogger(log.Default(os.Stderr, log.WithMinLevel(log.WARN)), trace.DetailsAll),
+		ydb.WithLogger(log.Default(os.Stderr, log.WithMinLevel(log.ERROR)), trace.DetailsAll),
 	)
 	if err != nil {
 		return nil, err
