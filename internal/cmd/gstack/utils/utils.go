@@ -2,16 +2,21 @@ package utils
 
 import (
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"io"
 	"io/fs"
 	"os"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"path/filepath"
+	"strings"
 )
 
 type FunctionIDArg struct {
-	ArgPos int
-	ArgEnd int
+	FuncDecl *ast.FuncDecl
+	ArgPos   token.Pos
+	ArgEnd   token.Pos
 }
 
 func ReadFile(filename string, info fs.FileInfo) ([]byte, error) {
@@ -39,14 +44,19 @@ func ReadFile(filename string, info fs.FileInfo) ([]byte, error) {
 	return src, nil
 }
 
-func FixSource(src []byte, listOfArgs []FunctionIDArg) ([]byte, error) {
+func FixSource(fset *token.FileSet, path string, src []byte, listOfArgs []FunctionIDArg) ([]byte, error) {
 	var fixed []byte
 	var previousArgEnd int
-	for _, args := range listOfArgs {
-		argument := stack.Call(1).File()
-		fixed = append(fixed, src[previousArgEnd:args.ArgPos]...)
+	for _, arg := range listOfArgs {
+		argPosOffset := fset.Position(arg.ArgPos).Offset
+		argEndOffset := fset.Position(arg.ArgEnd).Offset
+		argument, err := makeCall(fset, path, arg)
+		if err != nil {
+			return nil, err
+		}
+		fixed = append(fixed, src[previousArgEnd:argPosOffset]...)
 		fixed = append(fixed, fmt.Sprintf("\"%s\"", argument)...)
-		previousArgEnd = args.ArgEnd
+		previousArgEnd = argEndOffset
 	}
 	fixed = append(fixed, src[previousArgEnd:]...)
 
@@ -67,4 +77,58 @@ func WriteFile(filename string, formatted []byte, perm fs.FileMode) error {
 	}
 
 	return nil
+}
+
+func makeCall(fset *token.FileSet, path string, arg FunctionIDArg) (string, error) {
+	basePath := filepath.Join("github.com/ydb-platform/", version.Prefix, version.Major, "")
+	packageName, err := getPackageName(fset, arg)
+	if err != nil {
+		return "", err
+	}
+	filePath := filepath.Dir(filepath.Dir(path))
+	funcName, err := getFuncName(arg.FuncDecl)
+	if err != nil {
+		return "", err
+	}
+	return strings.Join([]string{filepath.Join(basePath, filePath, packageName), funcName}, "."), nil
+}
+
+func getFuncName(funcDecl *ast.FuncDecl) (string, error) {
+	if funcDecl.Recv != nil {
+		recvType := funcDecl.Recv.List[0].Type
+		prefix, err := getIdentNameFromExpr(recvType)
+		if err != nil {
+			return "", err
+		}
+		return strings.Join([]string{prefix, funcDecl.Name.Name}, "."), nil
+	}
+	return funcDecl.Name.Name, nil
+}
+
+func getIdentNameFromExpr(expr ast.Expr) (string, error) {
+	switch expr := expr.(type) {
+	case *ast.Ident:
+		return expr.Name, nil
+	case *ast.StarExpr:
+		prefix, err := getIdentNameFromExpr(expr.X)
+		if err != nil {
+			return "", err
+		}
+		return "(*" + prefix + ")", nil
+	case *ast.IndexExpr:
+		return getIdentNameFromExpr(expr.X)
+	case *ast.IndexListExpr:
+		return getIdentNameFromExpr(expr.X)
+	default:
+		return "", fmt.Errorf("error during getting ident from expr")
+	}
+}
+
+func getPackageName(fset *token.FileSet, arg FunctionIDArg) (string, error) {
+	file := fset.File(arg.ArgPos)
+	parsedFile, err := parser.ParseFile(fset, file.Name(), nil, parser.PackageClauseOnly)
+	if err != nil {
+		return "", fmt.Errorf("error during get package name function")
+	}
+	return parsedFile.Name.Name, nil
 }

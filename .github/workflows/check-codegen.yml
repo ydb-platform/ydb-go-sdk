@@ -43,7 +43,7 @@ jobs:
 
     - name: Re-generate stack.FunctionID calls
       run: |
-        go run ./gstack .
+        ./gstack .
         rm ./gstack
 
     - name: Check repository diff

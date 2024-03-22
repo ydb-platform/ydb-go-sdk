@@ -58,10 +58,11 @@ func getExprFromDeclStmt(statement *ast.DeclStmt) (listOfExpressions []ast.Expr)
 	}
 	for _, spec := range decl.Specs {
 		if spec, ok := spec.(*ast.ValueSpec); ok {
-			listOfExpressions = append(listOfExpressions, spec.Values...)
+			for _, expr := range spec.Values {
+				listOfExpressions = append(listOfExpressions, expr)
+			}
 		}
 	}
-
 	return listOfExpressions
 }
 
@@ -86,6 +87,13 @@ func getCallExpressionsFromStmt(statement ast.Stmt) (listOfCallExpressions []*as
 		for _, expr := range listOfExpressions {
 			listOfCallExpressions = append(listOfCallExpressions, getCallExpressionsFromExpr(expr)...)
 		}
+	case *ast.CommClause:
+		stmts := statement.(*ast.CommClause).Body
+		for _, stmt := range stmts {
+			listOfCallExpressions = append(listOfCallExpressions, getCallExpressionsFromStmt(stmt)...)
+		}
+	case *ast.ExprStmt:
+		listOfCallExpressions = append(listOfCallExpressions, getCallExpressionsFromExpr(statement.(*ast.ExprStmt).X)...)
 	}
 	if body != nil {
 		listOfCallExpressions = append(
@@ -118,7 +126,7 @@ func getListOfCallExpressionsFromBlockStmt(block *ast.BlockStmt) (listOfCallExpr
 	return listOfCallExpressions
 }
 
-func format(src []byte, fset *token.FileSet, file ast.File) ([]byte, error) {
+func format(src []byte, path string, fset *token.FileSet, file ast.File) ([]byte, error) {
 	var listOfArgs []utils.FunctionIDArg
 	for _, f := range file.Decls {
 		var listOfCalls []*ast.CallExpr
@@ -135,15 +143,16 @@ func format(src []byte, fset *token.FileSet, file ast.File) ([]byte, error) {
 				}
 				if pack.Name == "stack" && len(call.Args) == 1 {
 					listOfArgs = append(listOfArgs, utils.FunctionIDArg{
-						ArgPos: fset.Position(call.Args[0].Pos()).Offset,
-						ArgEnd: fset.Position(call.Args[0].End()).Offset,
+						FuncDecl: fn,
+						ArgPos:   call.Args[0].Pos(),
+						ArgEnd:   call.Args[0].End(),
 					})
 				}
 			}
 		}
 	}
 	if len(listOfArgs) != 0 {
-		fixed, err := utils.FixSource(src, listOfArgs)
+		fixed, err := utils.FixSource(fset, path, src, listOfArgs)
 		if err != nil {
 			return nil, err
 		}
@@ -192,15 +201,15 @@ func main() {
 			if err != nil {
 				return err
 			}
-			formatted, err := format(src, fset, *file)
+			formatted, err := format(src, path, fset, *file)
+			if err != nil {
+				return err
+			}
 			if !bytes.Equal(src, formatted) {
 				err = utils.WriteFile(path, formatted, info.Mode().Perm())
 				if err != nil {
 					return err
 				}
-			}
-			if err != nil {
-				return err
 			}
 
 			return nil
