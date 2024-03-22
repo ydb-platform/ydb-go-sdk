@@ -1267,7 +1267,7 @@ func (v pgValue) Yql() string {
 	//nolint:godox
 	// TODO: call special function for unknown oids
 	// https://github.com/ydb-platform/ydb/issues/2706
-	return fmt.Sprintf("PgUnknown(%q)", v.val)
+	return fmt.Sprintf(`PgConst("%v", PgType(%v))`, v.val, v.t.OID)
 }
 
 type setValue struct {
