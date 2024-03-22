@@ -810,6 +810,105 @@ func TestStruct(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").BeginStruct().Field("col1").TzDatetime(time.Unix(123456789, 456).UTC()).EndStruct(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_StructType{
+							StructType: &Ydb.StructType{
+								Members: []*Ydb.StructMember{
+									{
+										Name: "col1",
+										Type: &Ydb.Type{
+											Type: &Ydb.Type_TypeId{
+												TypeId: Ydb.Type_TZ_DATETIME,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Items: []*Ydb.Value{
+							{
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1973-11-29T21:33:09Z",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").BeginStruct().Field("col1").TzDate(time.Unix(123456789, 456).UTC()).EndStruct(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_StructType{
+							StructType: &Ydb.StructType{
+								Members: []*Ydb.StructMember{
+									{
+										Name: "col1",
+										Type: &Ydb.Type{
+											Type: &Ydb.Type_TypeId{
+												TypeId: Ydb.Type_TZ_DATE,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Items: []*Ydb.Value{
+							{
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1973-11-29",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name:    xtest.CurrentFileLine(),
+			builder: Builder{}.Param("$x").BeginStruct().Field("col1").TzTimestamp(time.Unix(123456789, 456).UTC()).EndStruct(),
+			params: map[string]*Ydb.TypedValue{
+				"$x": {
+					Type: &Ydb.Type{
+						Type: &Ydb.Type_StructType{
+							StructType: &Ydb.StructType{
+								Members: []*Ydb.StructMember{
+									{
+										Name: "col1",
+										Type: &Ydb.Type{
+											Type: &Ydb.Type_TypeId{
+												TypeId: Ydb.Type_TZ_TIMESTAMP,
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+					Value: &Ydb.Value{
+						Items: []*Ydb.Value{
+							{
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1973-11-29T21:33:09.000000Z",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			a := allocator.New()
