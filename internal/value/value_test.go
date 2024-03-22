@@ -502,7 +502,7 @@ func TestValueYql(t *testing.T) {
 		},
 		{
 			value:   PgValue(pg.OIDUnknown, "123"),
-			literal: `PgUnknown("123")`,
+			literal: `PgConst("123", PgType(705))`,
 		},
 	} {
 		t.Run(strconv.Itoa(i)+"."+tt.literal, func(t *testing.T) {
