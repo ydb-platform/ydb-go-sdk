@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path"
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
@@ -69,7 +71,8 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 
 	db, err := ydb.Open(ctx,
 		cfg.Endpoint+cfg.DB,
-		ydb.WithSessionPoolLimit(poolSize),
+		ydb.WithSessionPoolSizeLimit(poolSize),
+		ydb.WithLogger(log.Default(os.Stderr, log.WithMinLevel(log.ERROR)), trace.DetailsAll),
 	)
 	if err != nil {
 		return nil, err
@@ -251,8 +254,16 @@ func (s *Storage) dropTable(ctx context.Context) error {
 }
 
 func (s *Storage) close(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ShutdownTime)*time.Second)
-	defer cancel()
+	var (
+		shutdownCtx    context.Context
+		shutdownCancel context.CancelFunc
+	)
+	if s.cfg.ShutdownTime > 0 {
+		shutdownCtx, shutdownCancel = context.WithTimeout(ctx, time.Duration(s.cfg.ShutdownTime)*time.Second)
+	} else {
+		shutdownCtx, shutdownCancel = context.WithCancel(ctx)
+	}
+	defer shutdownCancel()
 
-	return s.db.Close(ctx)
+	return s.db.Close(shutdownCtx)
 }

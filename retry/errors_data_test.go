@@ -208,7 +208,7 @@ var errsToCheck = []struct {
 		err: xerrors.Retryable(
 			xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "")),
 			xerrors.WithBackoff(backoff.TypeFast),
-			xerrors.WithDeleteSession(),
+			xerrors.InvalidObject(),
 		),
 		backoff:       backoff.TypeFast,
 		deleteSession: true,
@@ -221,7 +221,7 @@ var errsToCheck = []struct {
 		err: xerrors.Retryable(
 			grpcStatus.Error(grpcCodes.Unavailable, ""),
 			xerrors.WithBackoff(backoff.TypeFast),
-			xerrors.WithDeleteSession(),
+			xerrors.InvalidObject(),
 		),
 		backoff:       backoff.TypeFast,
 		deleteSession: true,

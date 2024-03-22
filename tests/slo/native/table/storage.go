@@ -142,11 +142,9 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 		},
 		table.WithIdempotent(),
 		table.WithTrace(trace.Table{
-			OnDo: func(info trace.TableDoStartInfo) func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
-				return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
-					return func(info trace.TableDoDoneInfo) {
-						attempts = info.Attempts
-					}
+			OnDo: func(info trace.TableDoStartInfo) func(trace.TableDoDoneInfo) {
+				return func(info trace.TableDoDoneInfo) {
+					attempts = info.Attempts
 				}
 			},
 		}),
@@ -190,11 +188,9 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, _ e
 		},
 		table.WithIdempotent(),
 		table.WithTrace(trace.Table{
-			OnDo: func(info trace.TableDoStartInfo) func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
-				return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
-					return func(info trace.TableDoDoneInfo) {
-						attempts = info.Attempts
-					}
+			OnDo: func(info trace.TableDoStartInfo) func(trace.TableDoDoneInfo) {
+				return func(info trace.TableDoDoneInfo) {
+					attempts = info.Attempts
 				}
 			},
 		}),

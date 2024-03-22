@@ -108,10 +108,10 @@ func WithConnectionString(connectionString string) Option {
 }
 
 // WithConnectionTTL defines duration for parking idle connections
-//
-// Deprecated: background connection parking not available
-func WithConnectionTTL(time.Duration) Option {
+func WithConnectionTTL(ttl time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
+		c.options = append(c.options, config.WithConnectionTTL(ttl))
+
 		return nil
 	}
 }
@@ -393,15 +393,7 @@ func WithQueryConfigOption(option queryConfig.Option) Option {
 func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
-
-		return nil
-	}
-}
-
-// WithSessionPoolLimit set min size of internal sessions pool in query.Client
-func WithSessionPoolLimit(size int) Option {
-	return func(ctx context.Context, c *Driver) error {
-		c.queryOptions = append(c.queryOptions, queryConfig.WithPoolLimit(size))
+		c.queryOptions = append(c.queryOptions, queryConfig.WithPoolLimit(sizeLimit))
 
 		return nil
 	}

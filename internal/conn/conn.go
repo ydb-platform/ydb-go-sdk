@@ -102,6 +102,36 @@ func (c *conn) NodeID() uint32 {
 	return 0
 }
 
+func (c *conn) park(ctx context.Context) (err error) {
+	onDone := trace.DriverOnConnPark(
+		c.config.Trace(), &ctx,
+		stack.FunctionID(""),
+		c.Endpoint(),
+	)
+	defer func() {
+		onDone(err)
+	}()
+
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+
+	if c.closed {
+		return nil
+	}
+
+	if c.cc == nil {
+		return nil
+	}
+
+	err = c.close(ctx)
+
+	if err != nil {
+		return c.wrapError(err)
+	}
+
+	return nil
+}
+
 func (c *conn) Endpoint() endpoint.Endpoint {
 	if c != nil {
 		return c.endpoint
@@ -183,6 +213,10 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 		}, c.config.GrpcDialOptions()...,
 	)...)
 	if err != nil {
+		if xerrors.IsContextError(err) {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
 		defer func() {
 			c.onTransportError(ctx, err)
 		}()
@@ -310,6 +344,10 @@ func (c *conn) Invoke(
 
 	err = cc.Invoke(ctx, method, req, res, append(opts, grpc.Trailer(&md))...)
 	if err != nil {
+		if xerrors.IsContextError(err) {
+			return xerrors.WithStackTrace(err)
+		}
+
 		defer func() {
 			c.onTransportError(ctx, err)
 		}()
@@ -392,6 +430,10 @@ func (c *conn) NewStream(
 
 	s, err = cc.NewStream(ctx, desc, method, opts...)
 	if err != nil {
+		if xerrors.IsContextError(err) {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
 		defer func() {
 			c.onTransportError(ctx, err)
 		}()

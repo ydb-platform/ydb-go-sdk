@@ -98,7 +98,7 @@ func (e *transportError) BackoffType() backoff.Type {
 	}
 }
 
-func (e *transportError) MustDeleteSession() bool {
+func (e *transportError) IsRetryObjectValid() bool {
 	switch e.status.Code() {
 	case
 		grpcCodes.ResourceExhausted,
@@ -141,7 +141,7 @@ func Transport(err error, opts ...teOpt) error {
 	}
 	var te *transportError
 	if errors.As(err, &te) {
-		return err
+		return te
 	}
 	if s, ok := grpcStatus.FromError(err); ok {
 		te = &transportError{

@@ -280,7 +280,7 @@ func New(
 		}
 		// run background discovering
 		if d := discoveryConfig.Interval(); d > 0 {
-			b.discoveryRepeater = repeater.New(xcontext.WithoutDeadline(ctx),
+			b.discoveryRepeater = repeater.New(xcontext.ValueOnly(ctx),
 				d, b.clusterDiscoveryAttempt,
 				repeater.WithName("discovery"),
 				repeater.WithTrace(b.driverConfig.Trace()),

@@ -407,7 +407,7 @@ func TestBatcher_Apply(t *testing.T) {
 			Key:  session,
 			Rest: batcherMessageOrderItems{newBatcherItemBatch(batch)},
 		}
-		b.applyNeedLock(foundRes)
+		b.applyNeedLock(&foundRes)
 
 		expectedMap := batcherMessagesMap{session: batcherMessageOrderItems{newBatcherItemBatch(batch)}}
 		require.Equal(t, expectedMap, b.messages)
@@ -426,7 +426,7 @@ func TestBatcher_Apply(t *testing.T) {
 
 		b.messages = batcherMessagesMap{session: batcherMessageOrderItems{newBatcherItemBatch(batch)}}
 
-		b.applyNeedLock(foundRes)
+		b.applyNeedLock(&foundRes)
 
 		require.Empty(t, b.messages)
 	})

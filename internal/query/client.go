@@ -70,7 +70,7 @@ func do(
 
 		err := op(ctx, s)
 		if err != nil {
-			if xerrors.MustDeleteSession(err) {
+			if !xerrors.IsRetryObjectValid(err) {
 				s.setStatus(statusError)
 			}
 
@@ -81,17 +81,9 @@ func do(
 
 		return nil
 	}, append(doOpts.RetryOpts(), retry.WithTrace(&trace.Retry{
-		OnRetry: func(
-			info trace.RetryLoopStartInfo,
-		) func(
-			trace.RetryLoopIntermediateInfo,
-		) func(
-			trace.RetryLoopDoneInfo,
-		) {
-			return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-				return func(info trace.RetryLoopDoneInfo) {
-					attempts = info.Attempts
-				}
+		OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+			return func(info trace.RetryLoopDoneInfo) {
+				attempts = info.Attempts
 			}
 		},
 	}))...)
@@ -183,18 +175,21 @@ func New(ctx context.Context, balancer balancer, cfg *config.Config) *Client {
 	client.pool = pool.New(ctx,
 		pool.WithLimit[*Session, Session](cfg.PoolLimit()),
 		pool.WithTrace[*Session, Session](poolTrace(cfg.Trace())),
+		pool.WithCreateItemTimeout[*Session, Session](cfg.SessionCreateTimeout()),
+		pool.WithCloseItemTimeout[*Session, Session](cfg.SessionDeleteTimeout()),
 		pool.WithCreateFunc(func(ctx context.Context) (_ *Session, err error) {
-			var cancel context.CancelFunc
+			var (
+				createCtx    context.Context
+				cancelCreate context.CancelFunc
+			)
 			if d := cfg.SessionCreateTimeout(); d > 0 {
-				ctx, cancel = xcontext.WithTimeout(ctx, d)
+				createCtx, cancelCreate = xcontext.WithTimeout(ctx, d)
 			} else {
-				ctx, cancel = xcontext.WithCancel(ctx)
+				createCtx, cancelCreate = xcontext.WithCancel(ctx)
 			}
-			defer cancel()
+			defer cancelCreate()
 
-			s, err := createSession(ctx,
-				client.grpcClient,
-				withSessionTrace(cfg.Trace()),
+			s, err := createSession(createCtx, client.grpcClient, cfg,
 				withSessionCheck(func(s *Session) bool {
 					return balancer.HasNode(uint32(s.nodeID))
 				}),

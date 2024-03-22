@@ -10,7 +10,7 @@ import (
 
 const (
 	DefaultSessionDeleteTimeout = 500 * time.Millisecond
-	DefaultSessionCreateTimeout = 5 * time.Second
+	DefaultSessionCreateTimeout = 500 * time.Millisecond
 	DefaultPoolMaxSize          = pool.DefaultLimit
 )
 
@@ -62,9 +62,9 @@ func (c *Config) SessionCreateTimeout() time.Duration {
 	return c.sessionCreateTimeout
 }
 
-// DeleteTimeout limits maximum time spent on Delete request
+// SessionDeleteTimeout limits maximum time spent on Delete request
 //
-// If DeleteTimeout is less than or equal to zero then the DefaultSessionDeleteTimeout is used.
-func (c *Config) DeleteTimeout() time.Duration {
+// If SessionDeleteTimeout is less than or equal to zero then the DefaultSessionDeleteTimeout is used.
+func (c *Config) SessionDeleteTimeout() time.Duration {
 	return c.sessionDeleteTimeout
 }

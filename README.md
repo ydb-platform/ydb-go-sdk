@@ -31,19 +31,20 @@ go get -u github.com/ydb-platform/ydb-go-sdk/v3
 ## Example Usage <a name="example"></a>
 
 * connect to YDB
-```golang
+```go
 db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 if err != nil {
     log.Fatal(err)
 }
 ```
-* execute `SELECT` query
- ```golang
-const query = `SELECT 42 as id, "myStr" as myStr;`
-
+* execute `SELECT` query over `Table` service client
+ ```go
 // Do retry operation on errors with best effort
-queryErr := db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
-    _, res, err := s.Execute(ctx, table.DefaultTxControl(), query, nil)
+err := db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err error) {
+    _, res, err := s.Execute(ctx, table.DefaultTxControl(), 
+		`SELECT 42 as id, "myStr" as myStr;`, 
+		nil, // empty parameters
+	)
     if err != nil {
         return err
     }
@@ -62,12 +63,61 @@ queryErr := db.Table().Do(ctx, func(ctx context.Context, s table.Session) (err e
     }
     return res.Err() // for driver retry if not nil
 })
-if queryErr != nil {
-    log.Fatal(queryErr)
+if err != nil {
+    log.Fatal(err)
 }
 ```
+* execute `SELECT` query over `Query` service client
+ ```go
+// Do retry operation on errors with best effort
+err := db.Query().Do( // Do retry operation on errors with best effort
+	ctx, // context manage exiting from Do
+	func(ctx context.Context, s query.Session) (err error) { // retry operation
+		_, res, err := s.Execute(ctx, `SELECT 42 as id, "myStr" as myStr;`))
+		if err != nil {
+			return err // for auto-retry with driver
+		}
+		defer func() { _ = res.Close(ctx) }() // cleanup resources
+		for {                                 // iterate over result sets
+			rs, err := res.NextResultSet(ctx)
+			if err != nil {
+				if errors.Is(err, io.EOF) {
+					break
+				}
+
+				return err
+			}
+			for { // iterate over rows
+				row, err := rs.NextRow(ctx)
+				if err != nil {
+					if errors.Is(err, io.EOF) {
+						break
+					}
+
+					return err
+				}
+				type myStruct struct {
+					id  uint64 `sql:"id"`
+					str string `sql:"myStr"`
+				}
+				var s myStruct
+				if err = row.ScanStruct(&s); err != nil {
+					return err // generally scan error not retryable, return it for driver check error
+				}
+			}
+		}
+
+		return res.Err() // return finally result error for auto-retry with driver
+	},
+	query.WithIdempotent(),
+)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
 * usage with `database/sql` (see additional docs in [SQL.md](SQL.md) )
-```golang
+```go
 import (
     "context"
     "database/sql"
@@ -96,7 +146,7 @@ log.Printf("id = %d, myStr = \"%s\"", id, myStr)
 ```
 
 
-More examples of usage placed in [examples](https://github.com/ydb-platform/ydb-go-examples) repository.
+More examples of usage placed in [examples](./examples) directory.
 
 ## Credentials <a name="credentials"></a>
 

@@ -43,15 +43,6 @@ type IndexDescription struct {
 	Type         IndexType
 }
 
-//nolint:unused
-func (i IndexDescription) toYDB() *Ydb_Table.TableIndexDescription {
-	return &Ydb_Table.TableIndexDescription{
-		Name:         i.Name,
-		IndexColumns: i.IndexColumns,
-		Status:       i.Status,
-	}
-}
-
 type Description struct {
 	Name                 string
 	Columns              []Column

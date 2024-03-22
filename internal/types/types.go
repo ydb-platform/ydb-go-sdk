@@ -479,7 +479,7 @@ func (v PgType) String() string {
 }
 
 func (v PgType) Yql() string {
-	return "pgunknown"
+	return fmt.Sprintf("PgType(%v)", v.OID)
 }
 
 func (v PgType) ToYDB(a *allocator.Allocator) *Ydb.Type {

@@ -45,9 +45,9 @@ func TestBegin(t *testing.T) {
 		ctx := xtest.Context(t)
 		ctrl := gomock.NewController(t)
 		service := NewMockQueryServiceClient(ctrl)
-		service.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.BeginTransactionResponse{
-			Status: Ydb.StatusIds_UNAVAILABLE,
-		}, nil)
+		service.EXPECT().BeginTransaction(gomock.Any(), gomock.Any()).Return(nil,
+			xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
+		)
 		t.Log("begin")
 		_, err := begin(ctx, service, &Session{id: "123"}, query.TxSettings())
 		require.Error(t, err)

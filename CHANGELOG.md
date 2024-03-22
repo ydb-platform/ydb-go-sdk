@@ -1,10 +1,18 @@
+* Added internal gstack codegen for filling `stack.FunctionID` with value from call stack
+
+## v3.59.0
+* Added `Struct` support for `ydb.ParamsBuilder()`
 * Added support of `TzDate`,`TzDateTime`,`TzTimestamp` types in `ydb.ParamsBuilder()`
 * Added `trace.Query.OnTransactionExecute` event
 * Added query pool metrics
 * Fixed logic of query session pool
 * Changed initialization of internal driver clients to lazy
+* Removed `ydb.WithSessionPoolSizeLimit()` option
+* Added async put session into pool if external context is done
+* Dropped intermediate callbacks from `trace.{Table,Retry,Query}` events
+* Wrapped errors from `internal/pool.Pool.getItem` as retryable
 * Disabled the logic of background grpc-connection parking
-* Added internal gstack codegen for filling `stack.FunctionID` with value from call stack
+* Improved stringification for postgres types
 
 ## v3.58.2
 * Added `trace.Query.OnSessionBegin` event

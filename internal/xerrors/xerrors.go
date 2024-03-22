@@ -19,7 +19,7 @@ type Error interface {
 	Name() string
 	Type() Type
 	BackoffType() backoff.Type
-	MustDeleteSession() bool
+	IsRetryObjectValid() bool
 }
 
 func IsTimeoutError(err error) bool {
@@ -98,4 +98,8 @@ func Is(err error, targets ...error) bool {
 	}
 
 	return false
+}
+
+func IsContextError(err error) bool {
+	return Is(err, context.Canceled, context.DeadlineExceeded)
 }

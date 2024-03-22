@@ -33,6 +33,10 @@ func (s *grpcClientStream) CloseSend() (err error) {
 	err = s.ClientStream.CloseSend()
 
 	if err != nil {
+		if xerrors.IsContextError(err) {
+			return xerrors.WithStackTrace(err)
+		}
+
 		if s.wrapping {
 			return s.wrapError(
 				xerrors.Transport(
@@ -58,6 +62,10 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 	err = s.ClientStream.SendMsg(m)
 
 	if err != nil {
+		if xerrors.IsContextError(err) {
+			return xerrors.WithStackTrace(err)
+		}
+
 		defer func() {
 			s.c.onTransportError(s.Context(), err)
 		}()
@@ -97,7 +105,11 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 
 	err = s.ClientStream.RecvMsg(m)
 
-	if err != nil {
+	if err != nil { //nolint:nestif
+		if xerrors.IsContextError(err) {
+			return xerrors.WithStackTrace(err)
+		}
+
 		defer func() {
 			if !xerrors.Is(err, io.EOF) {
 				s.c.onTransportError(s.Context(), err)

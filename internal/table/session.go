@@ -485,7 +485,7 @@ func (s *session) checkError(err error) {
 	if err == nil {
 		return
 	}
-	if m := retry.Check(err); m.MustDeleteSession() {
+	if m := retry.Check(err); m.IsRetryObjectValid() {
 		s.SetStatus(table.SessionClosing)
 	}
 }
@@ -984,7 +984,7 @@ func (s *session) StreamReadTable(
 	opts ...options.ReadTableOption,
 ) (_ result.StreamResult, err error) {
 	var (
-		onIntermediate = trace.TableOnSessionQueryStreamRead(s.config.Trace(), &ctx,
+		onDone = trace.TableOnSessionQueryStreamRead(s.config.Trace(), &ctx,
 			stack.FunctionID(""),
 			s,
 		)
@@ -997,9 +997,7 @@ func (s *session) StreamReadTable(
 	)
 	defer func() {
 		a.Free()
-		if err != nil {
-			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
-		}
+		onDone(xerrors.HideEOF(err))
 	}()
 
 	for _, opt := range opts {
@@ -1023,9 +1021,6 @@ func (s *session) StreamReadTable(
 			stats *Ydb_TableStats.QueryStats,
 			err error,
 		) {
-			defer func() {
-				onIntermediate(xerrors.HideEOF(err))
-			}()
 			select {
 			case <-ctx.Done():
 				return nil, nil, xerrors.WithStackTrace(ctx.Err())
@@ -1042,7 +1037,7 @@ func (s *session) StreamReadTable(
 		},
 		func(err error) error {
 			cancel()
-			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
+			onDone(xerrors.HideEOF(err))
 
 			return err
 		},
@@ -1105,9 +1100,9 @@ func (s *session) StreamExecuteScanQuery(
 	opts ...options.ExecuteScanQueryOption,
 ) (_ result.StreamResult, err error) {
 	var (
-		a              = allocator.New()
-		q              = queryFromText(query)
-		onIntermediate = trace.TableOnSessionQueryStreamExecute(
+		a      = allocator.New()
+		q      = queryFromText(query)
+		onDone = trace.TableOnSessionQueryStreamExecute(
 			s.config.Trace(), &ctx,
 			stack.FunctionID(""),
 			s, q, parameters,
@@ -1122,9 +1117,7 @@ func (s *session) StreamExecuteScanQuery(
 	)
 	defer func() {
 		a.Free()
-		if err != nil {
-			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
-		}
+		onDone(xerrors.HideEOF(err))
 	}()
 
 	for _, opt := range opts {
@@ -1148,9 +1141,6 @@ func (s *session) StreamExecuteScanQuery(
 			stats *Ydb_TableStats.QueryStats,
 			err error,
 		) {
-			defer func() {
-				onIntermediate(xerrors.HideEOF(err))
-			}()
 			select {
 			case <-ctx.Done():
 				return nil, nil, xerrors.WithStackTrace(ctx.Err())
@@ -1167,7 +1157,7 @@ func (s *session) StreamExecuteScanQuery(
 		},
 		func(err error) error {
 			cancel()
-			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
+			onDone(xerrors.HideEOF(err))
 
 			return err
 		},
@@ -1229,7 +1219,7 @@ func (s *session) BeginTransaction(
 	var (
 		result   Ydb_Table.BeginTransactionResult
 		response *Ydb_Table.BeginTransactionResponse
-		onDone   = trace.TableOnSessionTransactionBegin(
+		onDone   = trace.TableOnTxBegin(
 			s.config.Trace(), &ctx,
 			stack.FunctionID(""),
 			s,
