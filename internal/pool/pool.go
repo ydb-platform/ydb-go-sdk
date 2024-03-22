@@ -66,31 +66,46 @@ func (s *safeStats) Get() stats.Stats {
 }
 
 func (s *safeStats) Index() statsItemAddr {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	return statsItemAddr{
 		v: &s.v.Index,
 		onChange: func(f func()) {
 			s.mu.WithLock(f)
-			s.onChange(s.v)
+			if s.onChange != nil {
+				s.onChange(s.Get())
+			}
 		},
 	}
 }
 
 func (s *safeStats) Idle() statsItemAddr {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	return statsItemAddr{
 		v: &s.v.Idle,
 		onChange: func(f func()) {
 			s.mu.WithLock(f)
-			s.onChange(s.v)
+			if s.onChange != nil {
+				s.onChange(s.Get())
+			}
 		},
 	}
 }
 
 func (s *safeStats) InUse() statsItemAddr {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	return statsItemAddr{
 		v: &s.v.InUse,
 		onChange: func(f func()) {
 			s.mu.WithLock(f)
-			s.onChange(s.v)
+			if s.onChange != nil {
+				s.onChange(s.Get())
+			}
 		},
 	}
 }
