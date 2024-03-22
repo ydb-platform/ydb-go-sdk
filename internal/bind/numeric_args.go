@@ -56,9 +56,6 @@ func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (yql string, 
 				)
 			}
 			paramIndex := int(p - 1)
-			if newArgs[paramIndex] == nil {
-				return "", nil, xerrors.WithStackTrace(ErrInconsistentArgs)
-			}
 			buffer.WriteString(newArgs[paramIndex].(table.ParameterOption).Name())
 		}
 	}
