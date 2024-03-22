@@ -11,7 +11,6 @@ jobs:
     concurrency:
       group: codegen-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}
       cancel-in-progress: true
-    if: (!contains(github.event.pull_request.labels.*.name, 'slo only'))
     strategy:
       matrix:
         os: [ ubuntu-latest ]

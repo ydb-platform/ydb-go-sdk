@@ -30,7 +30,6 @@ jobs:
     concurrency:
       group: codeql-${{ github.ref }}
       cancel-in-progress: true
-    if: (!contains(github.event.pull_request.labels.*.name, 'slo only'))
     runs-on: ubuntu-latest
     permissions:
       actions: read
