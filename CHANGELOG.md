@@ -1,3 +1,4 @@
+## v3.59.1
 * Fixed updating last usage timestamp for smart parking of the conns
 
 ## v3.59.0
