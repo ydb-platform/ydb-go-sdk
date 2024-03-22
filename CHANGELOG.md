@@ -1,4 +1,5 @@
-* Added internal gstack codegen for filling `stack.FunctionID` with value from call stack
+* Added internal `gstack` codegen tool for filling `stack.FunctionID` with value from call stack
+* Fixed updating last usage timestamp for smart parking of the conns
 
 ## v3.59.0
 * Added `Struct` support for `ydb.ParamsBuilder()`
