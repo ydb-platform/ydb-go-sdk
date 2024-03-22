@@ -12,7 +12,8 @@ jobs:
       cancel-in-progress: true
     runs-on: ubuntu-latest
     permissions: 
-      pull-requests: write 
+      pull-requests: write
+      contents: read
     steps:
       - name: Install Go
         uses: actions/setup-go@v3
