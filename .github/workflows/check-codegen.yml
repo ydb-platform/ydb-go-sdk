@@ -44,7 +44,6 @@ jobs:
     - name: Re-generate stack.FunctionID calls
       run: |
         gstack .
-        rm ./gstack
 
     - name: Check repository diff
       run: bash ./.github/scripts/check-work-copy-equals-to-committed.sh "code-generation not equal with committed"
