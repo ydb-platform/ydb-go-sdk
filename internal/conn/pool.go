@@ -2,7 +2,6 @@ package conn
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
