@@ -16,7 +16,7 @@ var globalLastStreamID = int64(0)
 //
 //		db, err := ydb.Open(context.Background(), connectionString,
 //	     ...
-//			ydb.With(config.WithGrpcOptions(grpc.WithChainUnaryInterceptor(xtest.NewGrpcLogger(t).UnaryClientInterceptor))),
+//			ydb.Change(config.WithGrpcOptions(grpc.WithChainUnaryInterceptor(xtest.NewGrpcLogger(t).UnaryClientInterceptor))),
 //		)
 type GrpcLogger struct {
 	t testing.TB

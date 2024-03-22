@@ -9,8 +9,8 @@ require (
 	github.com/prometheus/client_golang v1.13.0
 	github.com/ydb-platform/gorm-driver v0.0.5
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.1.2
-	github.com/ydb-platform/ydb-go-sdk-prometheus v0.11.10
-	github.com/ydb-platform/ydb-go-sdk/v3 v3.47.3
+	github.com/ydb-platform/ydb-go-sdk-prometheus/v2 v2.0.1
+	github.com/ydb-platform/ydb-go-sdk/v3 v3.54.0
 	github.com/ydb-platform/ydb-go-yc v0.10.1
 	google.golang.org/genproto v0.0.0-20230526161137-0005af68ea54
 	gorm.io/driver/postgres v1.5.0
@@ -51,7 +51,6 @@ require (
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/yandex-cloud/go-genproto v0.0.0-20220815090733-4c139c0154e2 // indirect
 	github.com/ydb-platform/ydb-go-genproto v0.0.0-20240126124512-dbb0e1720dbf // indirect
-	github.com/ydb-platform/ydb-go-sdk-metrics v0.16.3 // indirect
 	github.com/ydb-platform/ydb-go-yc-metadata v0.5.4 // indirect
 	golang.org/x/crypto v0.17.0 // indirect
 	golang.org/x/mod v0.11.0 // indirect

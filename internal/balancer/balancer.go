@@ -180,7 +180,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	)
 	defer func() {
 		nodes, added, dropped := endpointsDiff(endpoints, previousConns)
-		onDone(nodes, added, dropped, localDC, nil)
+		onDone(nodes, added, dropped, localDC)
 	}()
 
 	connections := endpointsToConnections(b.pool, endpoints)
@@ -257,12 +257,9 @@ func New(
 		pool:            pool,
 		localDCDetector: detectLocalDC,
 	}
-	d, err := internalDiscovery.New(ctx, pool.Get(
+	d := internalDiscovery.New(ctx, pool.Get(
 		endpoint.New(driverConfig.Endpoint()),
 	), discoveryConfig)
-	if err != nil {
-		return nil, err
-	}
 
 	b.discoveryClient = d
 

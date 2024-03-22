@@ -3,29 +3,33 @@ package conn
 import (
 	"context"
 	"io"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wrap"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type grpcClientStream struct {
 	grpc.ClientStream
+	ctx      context.Context
 	c        *conn
 	wrapping bool
 	traceID  string
 	sentMark *modificationMark
 	onDone   func(ctx context.Context, md metadata.MD)
-	recv     func(error) func(error, trace.ConnState, map[string][]string)
 }
 
 func (s *grpcClientStream) CloseSend() (err error) {
+	onDone := trace.DriverOnConnStreamCloseSend(s.c.config.Trace(), &s.ctx, stack.FunctionID(""))
+	defer func() {
+		onDone(err)
+	}()
+
 	err = s.ClientStream.CloseSend()
 
 	if err != nil {
@@ -46,8 +50,10 @@ func (s *grpcClientStream) CloseSend() (err error) {
 }
 
 func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
-	cancel := createPinger(s.c)
-	defer cancel()
+	onDone := trace.DriverOnConnStreamSendMsg(s.c.config.Trace(), &s.ctx, stack.FunctionID(""))
+	defer func() {
+		onDone(err)
+	}()
 
 	err = s.ClientStream.SendMsg(m)
 
@@ -77,15 +83,15 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 }
 
 func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
-	cancel := createPinger(s.c)
-	defer cancel()
+	onDone := trace.DriverOnConnStreamRecvMsg(s.c.config.Trace(), &s.ctx, stack.FunctionID(""))
+	defer func() {
+		onDone(err)
+	}()
 
 	defer func() {
-		onDone := s.recv(xerrors.HideEOF(err))
 		if err != nil {
 			md := s.ClientStream.Trailer()
-			onDone(xerrors.HideEOF(err), s.c.GetState(), md)
-			s.onDone(s.ClientStream.Context(), md)
+			s.onDone(s.ctx, md)
 		}
 	}()
 
@@ -139,25 +145,4 @@ func (s *grpcClientStream) wrapError(err error) error {
 		newConnError(s.c.endpoint.NodeID(), s.c.endpoint.Address(), err),
 		xerrors.WithSkipDepth(1),
 	)
-}
-
-func createPinger(c *conn) context.CancelFunc {
-	c.touchLastUsage()
-	ctx, cancel := xcontext.WithCancel(context.Background())
-	go func() {
-		ticker := time.NewTicker(time.Second)
-		ctxDone := ctx.Done()
-		for {
-			select {
-			case <-ctxDone:
-				ticker.Stop()
-
-				return
-			case <-ticker.C:
-				c.touchLastUsage()
-			}
-		}
-	}()
-
-	return cancel
 }

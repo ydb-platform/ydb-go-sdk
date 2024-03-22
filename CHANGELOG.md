@@ -1,3 +1,21 @@
+* Added support of `TzDate`,`TzDateTime`,`TzTimestamp` types in `ydb.ParamsBuilder()`
+* Added `trace.Query.OnTransactionExecute` event
+* Added query pool metrics
+* Fixed logic of query session pool
+* Changed initialization of internal driver clients to lazy
+* Disabled the logic of background grpc-connection parking 
+
+## v3.58.2
+* Added `trace.Query.OnSessionBegin` event
+* Added `trace.Query.OnResult{New,NextPart,NextResultSet,Close}` events
+* Added `trace.Query.OnRow{Scan,ScanNamed,ScanStruct}` events
+
+## v3.58.1
+* Dropped all deprecated callbacks and events from traces
+* Added `trace.Driver.OnConnStream{SendMsg,RecvMsg,CloseSend}` events
+* Added `trace.Query.OnSessionExecute` event
+
+## v3.58.0
 * Changed `List` constructor from `ydb.ParamsBuilder().List().Build().Build()` to `ydb.ParamsBuilder().BeginList().EndList().Build()`
 * Changed `Set` constructor from `ydb.ParamsBuilder().Set().Build().Build()` to `ydb.ParamsBuilder().BeginSet().EndSet().Build()`
 * Changed `Dict` constructor from `ydb.ParamsBuilder().Dict().Build().Build()` to `ydb.ParamsBuilder().BeginDict().EndDict().Build()`
@@ -8,7 +26,7 @@
 * Added `internal/xsync.{OnceFunc,OnceValue}`
 * Updated `google.golang.org/protobuf` from `v1.31.0` to `v.33.0`
 * Added `ydb.ParamsBuilder().Pg().{Value,Int4,Int8,Unknown}` for postgres arguments
-* Added type assertion checks to enhance type safety and prevent unexpected panics in critical sections of the codebase
+* Added `Tuple` support for `ydb.ParamsBuilder()`
 
 ## v3.57.4
 * Added client pid to each gRPC requests to YDB over header `x-ydb-client-pid`

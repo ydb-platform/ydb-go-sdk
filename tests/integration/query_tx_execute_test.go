@@ -33,7 +33,7 @@ func TestQueryTxExecute(t *testing.T) {
 				log.Default(os.Stdout,
 					log.WithLogQuery(),
 					log.WithColoring(),
-					log.WithMinLevel(log.TRACE),
+					log.WithMinLevel(log.INFO),
 				),
 				trace.QueryEvents,
 			),

@@ -50,11 +50,11 @@ const (
 	StatsModeProfile = options.StatsModeProfile
 )
 
-func WithParameters(parameters *params.Parameters) options.ExecuteOption {
+func WithParameters(parameters *params.Parameters) options.ParametersOption {
 	return options.WithParameters(parameters)
 }
 
-func WithTxControl(txControl *tx.Control) options.ExecuteOption {
+func WithTxControl(txControl *tx.Control) options.TxControlOption {
 	return options.WithTxControl(txControl)
 }
 
@@ -66,18 +66,18 @@ func WithCommit() options.TxExecuteOption {
 	return options.WithCommit()
 }
 
-func WithExecMode(mode options.ExecMode) options.ExecuteOption {
+func WithExecMode(mode options.ExecMode) options.ExecModeOption {
 	return options.WithExecMode(mode)
 }
 
-func WithSyntax(syntax options.Syntax) options.ExecuteOption {
+func WithSyntax(syntax options.Syntax) options.SyntaxOption {
 	return options.WithSyntax(syntax)
 }
 
-func WithStatsMode(mode options.StatsMode) options.ExecuteOption {
+func WithStatsMode(mode options.StatsMode) options.StatsModeOption {
 	return options.WithStatsMode(mode)
 }
 
-func WithCallOptions(opts ...grpc.CallOption) options.ExecuteOption {
+func WithCallOptions(opts ...grpc.CallOption) options.CallOptions {
 	return options.WithCallOptions(opts...)
 }

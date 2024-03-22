@@ -2,11 +2,12 @@ package pool
 
 import (
 	"context"
-	"sync"
+	"sync/atomic"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -17,20 +18,34 @@ type (
 		IsAlive() bool
 		Close(ctx context.Context) error
 	}
+	Stats struct {
+		locked   *xsync.Locked[stats.Stats]
+		onChange func(stats.Stats)
+	}
 	Pool[PT Item[T], T any] struct {
-		trace          *Trace
-		maxSize        int
-		minSize        int
-		producersCount int
+		trace *Trace
+		limit int
 
 		create func(ctx context.Context) (PT, error)
 
-		idle  chan PT
-		spawn chan PT
-		stop  chan struct{}
+		mu    xsync.Mutex
+		idle  []PT
+		index map[PT]struct{}
+
+		done atomic.Bool
+
+		stats *Stats
 	}
 	option[PT Item[T], T any] func(p *Pool[PT, T])
 )
+
+func (stats *Stats) Change(f func(s stats.Stats) stats.Stats) {
+	stats.onChange(stats.locked.Change(f))
+}
+
+func (stats *Stats) Get() stats.Stats {
+	return stats.locked.Get()
+}
 
 func WithCreateFunc[PT Item[T], T any](f func(ctx context.Context) (PT, error)) option[PT, T] {
 	return func(p *Pool[PT, T]) {
@@ -38,21 +53,9 @@ func WithCreateFunc[PT Item[T], T any](f func(ctx context.Context) (PT, error)) 
 	}
 }
 
-func WithMinSize[PT Item[T], T any](size int) option[PT, T] {
+func WithLimit[PT Item[T], T any](size int) option[PT, T] {
 	return func(p *Pool[PT, T]) {
-		p.minSize = size
-	}
-}
-
-func WithMaxSize[PT Item[T], T any](size int) option[PT, T] {
-	return func(p *Pool[PT, T]) {
-		p.maxSize = size
-	}
-}
-
-func WithProducersCount[PT Item[T], T any](count int) option[PT, T] {
-	return func(p *Pool[PT, T]) {
-		p.producersCount = count
+		p.limit = size
 	}
 }
 
@@ -65,18 +68,15 @@ func WithTrace[PT Item[T], T any](t *Trace) option[PT, T] {
 func New[PT Item[T], T any](
 	ctx context.Context,
 	opts ...option[PT, T],
-) (p *Pool[PT, T], finalErr error) {
-	p = &Pool[PT, T]{
-		trace:          defaultTrace,
-		maxSize:        DefaultMaxSize,
-		minSize:        DefaultMinSize,
-		producersCount: DefaultProducersCount,
+) *Pool[PT, T] {
+	p := &Pool[PT, T]{
+		trace: defaultTrace,
+		limit: DefaultLimit,
 		create: func(ctx context.Context) (PT, error) {
 			var item T
 
 			return &item, nil
 		},
-		stop: make(chan struct{}),
 	}
 
 	for _, opt := range opts {
@@ -86,140 +86,144 @@ func New[PT Item[T], T any](
 	}
 
 	onDone := p.trace.OnNew(&NewStartInfo{
-		Context:        &ctx,
-		Call:           stack.FunctionID(""),
-		MinSize:        p.minSize,
-		MaxSize:        p.maxSize,
-		ProducersCount: p.producersCount,
+		Context: &ctx,
+		Call:    stack.FunctionID(""),
 	})
 
 	defer func() {
 		onDone(&NewDoneInfo{
-			Error:          finalErr,
-			MinSize:        p.minSize,
-			MaxSize:        p.maxSize,
-			ProducersCount: p.producersCount,
+			Limit: p.limit,
 		})
 	}()
 
-	if p.minSize > p.maxSize {
-		p.minSize = p.maxSize / 10
+	p.idle = make([]PT, 0, p.limit)
+	p.index = make(map[PT]struct{}, p.limit)
+	p.stats = &Stats{
+		locked: xsync.NewLocked[stats.Stats](stats.Stats{
+			Limit: p.limit,
+		}),
+		onChange: p.trace.OnChange,
 	}
 
-	if p.producersCount > p.maxSize {
-		p.producersCount = p.maxSize
-	}
-
-	if p.producersCount <= 0 {
-		p.producersCount = 1
-	}
-
-	p.idle = make(chan PT, p.maxSize)
-
-	p.produce(ctx)
-
-	return p, nil
+	return p
 }
 
-func (p *Pool[PT, T]) want(ctx context.Context) (err error) {
-	onDone := p.trace.OnWant(&WantStartInfo{
+func (p *Pool[PT, T]) Stats() stats.Stats {
+	return p.stats.Get()
+}
+
+func (p *Pool[PT, T]) get(ctx context.Context) (_ PT, finalErr error) {
+	onDone := p.trace.OnGet(&GetStartInfo{
 		Context: &ctx,
 		Call:    stack.FunctionID(""),
 	})
 	defer func() {
-		onDone(&WantDoneInfo{
-			Error: err,
+		onDone(&GetDoneInfo{
+			Error: finalErr,
 		})
 	}()
 
-	select {
-	case <-ctx.Done():
-		return xerrors.WithStackTrace(ctx.Err())
-	case p.spawn <- nil:
-		return nil
+	if err := ctx.Err(); err != nil {
+		return nil, xerrors.WithStackTrace(err)
 	}
+
+	if p.done.Load() {
+		return nil, xerrors.WithStackTrace(errClosedPool)
+	}
+
+	var item PT
+	p.mu.WithLock(func() {
+		if len(p.idle) > 0 {
+			item, p.idle = p.idle[0], p.idle[1:]
+			p.stats.Change(func(v stats.Stats) stats.Stats {
+				v.Idle--
+
+				return v
+			})
+		}
+	})
+
+	if item != nil {
+		if item.IsAlive() {
+			return item, nil
+		}
+		_ = item.Close(ctx)
+		p.mu.WithLock(func() {
+			delete(p.index, item)
+		})
+		p.stats.Change(func(v stats.Stats) stats.Stats {
+			v.Index--
+
+			return v
+		})
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if len(p.index) == p.limit {
+		return nil, xerrors.WithStackTrace(errPoolOverflow)
+	}
+
+	item, err := p.create(ctx)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	p.index[item] = struct{}{}
+	p.stats.Change(func(v stats.Stats) stats.Stats {
+		v.Index++
+
+		return v
+	})
+
+	return item, nil
 }
 
-func (p *Pool[PT, T]) put(ctx context.Context, item PT) (err error) {
+func (p *Pool[PT, T]) put(ctx context.Context, item PT) (finalErr error) {
 	onDone := p.trace.OnPut(&PutStartInfo{
 		Context: &ctx,
 		Call:    stack.FunctionID(""),
 	})
 	defer func() {
 		onDone(&PutDoneInfo{
-			Error: err,
+			Error: finalErr,
 		})
 	}()
 
-	select {
-	case <-ctx.Done():
-		// context is done
-		return xerrors.WithStackTrace(ctx.Err())
-	case <-p.stop:
-		// pool closed early
-		return item.Close(ctx)
-	case p.spawn <- item:
-		// return item into pool
-		return nil
-	default:
-		// not enough space in pool
-		return item.Close(ctx)
+	if err := ctx.Err(); err != nil {
+		return xerrors.WithStackTrace(err)
 	}
-}
 
-func (p *Pool[PT, T]) produce(ctx context.Context) {
-	onDone := p.trace.OnProduce(&ProduceStartInfo{
-		Context:     &ctx,
-		Call:        stack.FunctionID(""),
-		Concurrency: p.producersCount,
+	if p.done.Load() {
+		return xerrors.WithStackTrace(errClosedPool)
+	}
+
+	if !item.IsAlive() {
+		_ = item.Close(ctx)
+
+		p.mu.WithLock(func() {
+			delete(p.index, item)
+		})
+		p.stats.Change(func(v stats.Stats) stats.Stats {
+			v.Index--
+
+			return v
+		})
+
+		return xerrors.WithStackTrace(errItemIsNotAlive)
+	}
+
+	p.mu.WithLock(func() {
+		p.idle = append(p.idle, item)
 	})
-	defer func() {
-		onDone(&ProduceDoneInfo{})
-	}()
+	p.stats.Change(func(v stats.Stats) stats.Stats {
+		v.Idle++
 
-	p.spawn = make(chan PT, p.maxSize)
+		return v
+	})
 
-	var wg, started sync.WaitGroup
-	wg.Add(p.producersCount)
-	started.Add(p.producersCount + 1)
-
-	for range make([]struct{}, p.producersCount) {
-		go func() {
-			defer wg.Done()
-			started.Done()
-
-			for {
-				select {
-				case <-p.stop:
-					return
-
-				case msg := <-p.spawn:
-					if msg != nil {
-						p.idle <- msg
-					} else {
-						item, err := p.create(context.Background())
-						if err == nil {
-							p.idle <- item
-						}
-					}
-				}
-			}
-		}()
-	}
-
-	for i := 0; i < p.maxSize && len(p.idle) < p.minSize; i++ {
-		_ = p.want(ctx)
-	}
-
-	go func() {
-		started.Done()
-		defer func() {
-			close(p.idle)
-		}()
-		wg.Wait()
-	}()
-
-	started.Wait()
+	return nil
 }
 
 func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item PT) error) (finalErr error) {
@@ -239,11 +243,20 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 	}
 
 	defer func() {
-		if !item.IsAlive() {
-			_ = item.Close(ctx)
-		} else {
-			_ = p.put(ctx, item)
-		}
+		_ = p.put(ctx, item)
+	}()
+
+	p.stats.Change(func(v stats.Stats) stats.Stats {
+		v.InUse++
+
+		return v
+	})
+	defer func() {
+		p.stats.Change(func(v stats.Stats) stats.Stats {
+			v.InUse--
+
+			return v
+		})
 	}()
 
 	err = f(ctx, item)
@@ -273,10 +286,7 @@ func (p *Pool[PT, T]) With(
 		})
 	}()
 
-	retryCtx, cancelRetry := xcontext.WithDone(ctx, p.stop)
-	defer cancelRetry()
-
-	err := retry.Retry(retryCtx, func(ctx context.Context) error {
+	err := retry.Retry(ctx, func(ctx context.Context) error {
 		err := p.try(ctx, f)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -299,35 +309,6 @@ func (p *Pool[PT, T]) With(
 	return nil
 }
 
-func (p *Pool[PT, T]) get(ctx context.Context) (_ PT, finalErr error) {
-	onDone := p.trace.OnGet(&GetStartInfo{
-		Context: &ctx,
-		Call:    stack.FunctionID(""),
-	})
-	defer func() {
-		onDone(&GetDoneInfo{
-			Error: finalErr,
-		})
-	}()
-
-	for {
-		select {
-		case <-p.stop:
-			return nil, xerrors.WithStackTrace(errClosedPool)
-		case item, has := <-p.idle:
-			if !has {
-				return nil, xerrors.WithStackTrace(errClosedPool)
-			}
-			if item.IsAlive() {
-				return item, nil
-			}
-			_ = item.Close(ctx)
-		case p.spawn <- nil:
-			continue
-		}
-	}
-}
-
 func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 	onDone := p.trace.OnClose(&CloseStartInfo{
 		Context: &ctx,
@@ -339,21 +320,16 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 		})
 	}()
 
-	close(p.stop)
+	p.done.Store(true)
 
-	errs := make([]error, 0, len(p.idle)+len(p.spawn))
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-	for item := range p.idle {
+	errs := make([]error, 0, len(p.index))
+
+	for item := range p.index {
 		if err := item.Close(ctx); err != nil {
 			errs = append(errs, err)
-		}
-	}
-
-	for len(p.spawn) > 0 {
-		if msg := <-p.spawn; msg != nil {
-			if err := msg.Close(ctx); err != nil {
-				errs = append(errs, err)
-			}
 		}
 	}
 

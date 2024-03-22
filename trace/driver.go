@@ -24,35 +24,20 @@ type (
 		OnPoolNew     func(DriverConnPoolNewStartInfo) func(DriverConnPoolNewDoneInfo)
 		OnPoolRelease func(DriverConnPoolReleaseStartInfo) func(DriverConnPoolReleaseDoneInfo)
 
-		// Deprecated: driver not notificate about this event
-		OnNetRead func(DriverNetReadStartInfo) func(DriverNetReadDoneInfo)
-		// Deprecated: driver not notificate about this event
-		OnNetWrite func(DriverNetWriteStartInfo) func(DriverNetWriteDoneInfo)
-		// Deprecated: driver not notificate about this event
-		OnNetDial func(DriverNetDialStartInfo) func(DriverNetDialDoneInfo)
-		// Deprecated: driver not notificate about this event
-		OnNetClose func(DriverNetCloseStartInfo) func(DriverNetCloseDoneInfo)
-
 		// Resolver events
 		OnResolve func(DriverResolveStartInfo) func(DriverResolveDoneInfo)
 
 		// Conn events
-		OnConnStateChange func(DriverConnStateChangeStartInfo) func(DriverConnStateChangeDoneInfo)
-		OnConnInvoke      func(DriverConnInvokeStartInfo) func(DriverConnInvokeDoneInfo)
-		OnConnNewStream   func(
-			DriverConnNewStreamStartInfo,
-		) func(
-			DriverConnNewStreamRecvInfo,
-		) func(
-			DriverConnNewStreamDoneInfo,
-		)
-		// Deprecated: driver not notificate about this event
-		OnConnTake  func(DriverConnTakeStartInfo) func(DriverConnTakeDoneInfo)
-		OnConnDial  func(DriverConnDialStartInfo) func(DriverConnDialDoneInfo)
-		OnConnPark  func(DriverConnParkStartInfo) func(DriverConnParkDoneInfo)
-		OnConnBan   func(DriverConnBanStartInfo) func(DriverConnBanDoneInfo)
-		OnConnAllow func(DriverConnAllowStartInfo) func(DriverConnAllowDoneInfo)
-		OnConnClose func(DriverConnCloseStartInfo) func(DriverConnCloseDoneInfo)
+		OnConnStateChange     func(DriverConnStateChangeStartInfo) func(DriverConnStateChangeDoneInfo)
+		OnConnInvoke          func(DriverConnInvokeStartInfo) func(DriverConnInvokeDoneInfo)
+		OnConnNewStream       func(DriverConnNewStreamStartInfo) func(DriverConnNewStreamDoneInfo)
+		OnConnStreamRecvMsg   func(DriverConnStreamRecvMsgStartInfo) func(DriverConnStreamRecvMsgDoneInfo)
+		OnConnStreamSendMsg   func(DriverConnStreamSendMsgStartInfo) func(DriverConnStreamSendMsgDoneInfo)
+		OnConnStreamCloseSend func(DriverConnStreamCloseSendStartInfo) func(DriverConnStreamCloseSendDoneInfo)
+		OnConnDial            func(DriverConnDialStartInfo) func(DriverConnDialDoneInfo)
+		OnConnBan             func(DriverConnBanStartInfo) func(DriverConnBanDoneInfo)
+		OnConnAllow           func(DriverConnAllowStartInfo) func(DriverConnAllowDoneInfo)
+		OnConnClose           func(DriverConnCloseStartInfo) func(DriverConnCloseDoneInfo)
 
 		// Repeater events
 		OnRepeaterWakeUp func(DriverRepeaterWakeUpStartInfo) func(DriverRepeaterWakeUpDoneInfo)
@@ -60,12 +45,6 @@ type (
 		// Balancer events
 		OnBalancerInit func(DriverBalancerInitStartInfo) func(DriverBalancerInitDoneInfo)
 
-		// Deprecated: driver not notificate about this event
-		OnBalancerDialEntrypoint func(
-			DriverBalancerDialEntrypointStartInfo,
-		) func(
-			DriverBalancerDialEntrypointDoneInfo,
-		)
 		OnBalancerClose          func(DriverBalancerCloseStartInfo) func(DriverBalancerCloseDoneInfo)
 		OnBalancerChooseEndpoint func(
 			DriverBalancerChooseEndpointStartInfo,
@@ -172,8 +151,6 @@ type (
 		Added     []EndpointInfo
 		Dropped   []EndpointInfo
 		LocalDC   string
-		// Deprecated: this field always nil
-		Error error
 	}
 	DriverBalancerClusterDiscoveryAttemptStartInfo struct {
 		// Context make available context in trace callback function.
@@ -248,18 +225,6 @@ type (
 	DriverConnDialDoneInfo struct {
 		Error error
 	}
-	DriverConnParkStartInfo struct {
-		// Context make available context in trace callback function.
-		// Pointer to context provide replacement of context in trace callback function.
-		// Warning: concurrent access to pointer on client side must be excluded.
-		// Safe replacement of context are provided only inside callback function
-		Context  *context.Context
-		Call     call
-		Endpoint EndpointInfo
-	}
-	DriverConnParkDoneInfo struct {
-		Error error
-	}
 	DriverConnCloseStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -326,13 +291,42 @@ type (
 		Endpoint EndpointInfo
 		Method   Method
 	}
-	DriverConnNewStreamRecvInfo struct {
+	DriverConnNewStreamDoneInfo struct {
+		Error error
+		State ConnState
+	}
+	DriverConnStreamRecvMsgStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	DriverConnStreamRecvMsgDoneInfo struct {
 		Error error
 	}
-	DriverConnNewStreamDoneInfo struct {
-		Error    error
-		State    ConnState
-		Metadata map[string][]string
+	DriverConnStreamSendMsgStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	DriverConnStreamSendMsgDoneInfo struct {
+		Error error
+	}
+	DriverConnStreamCloseSendStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	DriverConnStreamCloseSendDoneInfo struct {
+		Error error
 	}
 	DriverBalancerInitStartInfo struct {
 		// Context make available context in trace callback function.

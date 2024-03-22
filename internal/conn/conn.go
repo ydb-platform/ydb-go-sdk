@@ -94,36 +94,6 @@ func (c *conn) IsState(states ...State) bool {
 	return false
 }
 
-func (c *conn) park(ctx context.Context) (err error) {
-	onDone := trace.DriverOnConnPark(
-		c.config.Trace(), &ctx,
-		stack.FunctionID(""),
-		c.Endpoint(),
-	)
-	defer func() {
-		onDone(err)
-	}()
-
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
-
-	if c.closed {
-		return nil
-	}
-
-	if c.cc == nil {
-		return nil
-	}
-
-	err = c.close(ctx)
-
-	if err != nil {
-		return c.wrapError(err)
-	}
-
-	return nil
-}
-
 func (c *conn) NodeID() uint32 {
 	if c != nil {
 		return c.endpoint.NodeID()
@@ -391,7 +361,7 @@ func (c *conn) NewStream(
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, err error) {
 	var (
-		streamRecv = trace.DriverOnConnNewStream(
+		onDone = trace.DriverOnConnNewStream(
 			c.config.Trace(), &ctx,
 			stack.FunctionID(""),
 			c.endpoint.Copy(), trace.Method(method),
@@ -402,18 +372,7 @@ func (c *conn) NewStream(
 	)
 
 	defer func() {
-		if err != nil {
-			streamRecv(err)(err, c.GetState(), metadata.MD{})
-		}
-	}()
-
-	var cancel context.CancelFunc
-	ctx, cancel = xcontext.WithCancel(ctx)
-
-	defer func() {
-		if err != nil {
-			cancel()
-		}
+		onDone(err, c.GetState())
 	}()
 
 	cc, err = c.realConn(ctx)
@@ -454,15 +413,14 @@ func (c *conn) NewStream(
 
 	return &grpcClientStream{
 		ClientStream: s,
+		ctx:          ctx,
 		c:            c,
 		wrapping:     useWrapping,
 		traceID:      traceID,
 		sentMark:     sentMark,
 		onDone: func(ctx context.Context, md metadata.MD) {
-			cancel()
 			meta.CallTrailerCallback(ctx, md)
 		},
-		recv: streamRecv,
 	}, nil
 }
 

@@ -14,6 +14,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -24,7 +25,7 @@ func TestQueryExecute(t *testing.T) {
 		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(xtest.Context(t))
 	defer cancel()
 
 	db, err := ydb.Open(ctx,
@@ -35,7 +36,7 @@ func TestQueryExecute(t *testing.T) {
 				log.Default(os.Stdout,
 					log.WithLogQuery(),
 					log.WithColoring(),
-					log.WithMinLevel(log.TRACE),
+					log.WithMinLevel(log.INFO),
 				),
 				trace.QueryEvents,
 			),
@@ -181,7 +182,7 @@ func TestQueryExecute(t *testing.T) {
 		require.EqualValues(t, time.Duration(100500000000), data.P3)
 		require.Nil(t, data.P4)
 	})
-	t.Run("Transaction", func(t *testing.T) {
+	t.Run("Tx", func(t *testing.T) {
 		t.Run("Explicit", func(t *testing.T) {
 			err = db.Query().Do(ctx, func(ctx context.Context, s query.Session) (err error) {
 				tx, err := s.Begin(ctx, query.TxSettings(query.WithSerializableReadWrite()))

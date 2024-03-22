@@ -4,48 +4,65 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sync"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var _ query.Result = (*result)(nil)
 
 type result struct {
 	stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
-	closeOnce      func()
+	closeOnce      func(ctx context.Context) error
 	lastPart       *Ydb_Query.ExecuteQueryResponsePart
 	resultSetIndex int64
 	errs           []error
 	closed         chan struct{}
+	trace          *trace.Query
 }
 
 func newResult(
 	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
-	streamCancel func(),
+	t *trace.Query,
+	closeResult context.CancelFunc,
 ) (_ *result, txID string, err error) {
+	if t == nil {
+		t = &trace.Query{}
+	}
+	if closeResult == nil {
+		closeResult = func() {}
+	}
+
+	onDone := trace.QueryOnResultNew(t, &ctx, stack.FunctionID(""))
+	defer func() {
+		onDone(err)
+	}()
+
 	select {
 	case <-ctx.Done():
 		return nil, txID, xerrors.WithStackTrace(ctx.Err())
 	default:
-		part, err := nextPart(stream)
+		part, err := nextPart(ctx, stream, t)
 		if err != nil {
-			streamCancel()
-
 			return nil, txID, xerrors.WithStackTrace(err)
 		}
 		var (
 			interrupted = make(chan struct{})
 			closed      = make(chan struct{})
-			closeOnce   = sync.OnceFunc(func() {
+			closeOnce   = xsync.OnceFunc(func(ctx context.Context) error {
+				closeResult()
+
 				close(interrupted)
 				close(closed)
-				streamCancel()
+
+				return nil
 			})
 		)
 
@@ -55,13 +72,25 @@ func newResult(
 			lastPart:       part,
 			closed:         closed,
 			closeOnce:      closeOnce,
+			trace:          t,
 		}, part.GetTxMeta().GetId(), nil
 	}
 }
 
 func nextPart(
+	ctx context.Context,
 	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
+	t *trace.Query,
 ) (_ *Ydb_Query.ExecuteQueryResponsePart, finalErr error) {
+	if t == nil {
+		t = &trace.Query{}
+	}
+
+	onDone := trace.QueryOnResultNextPart(t, &ctx, stack.FunctionID(""))
+	defer func() {
+		onDone(finalErr)
+	}()
+
 	part, err := stream.Recv()
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -70,10 +99,13 @@ func nextPart(
 	return part, nil
 }
 
-func (r *result) Close(ctx context.Context) error {
-	r.closeOnce()
+func (r *result) Close(ctx context.Context) (err error) {
+	onDone := trace.QueryOnResultClose(r.trace, &ctx, stack.FunctionID(""))
+	defer func() {
+		onDone(err)
+	}()
 
-	return nil
+	return r.closeOnce(ctx)
 }
 
 func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
@@ -107,10 +139,10 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 					case <-r.closed:
 						return nil, errClosedResult
 					default:
-						part, err := nextPart(r.stream)
+						part, err := nextPart(ctx, r.stream, r.trace)
 						if err != nil {
 							if xerrors.Is(err, io.EOF) {
-								r.closeOnce()
+								_ = r.closeOnce(ctx)
 							}
 
 							return nil, xerrors.WithStackTrace(err)
@@ -125,9 +157,9 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 
 						return part, nil
 					}
-				}, r.lastPart), nil
+				}, r.lastPart, r.trace), nil
 			}
-			part, err := nextPart(r.stream)
+			part, err := nextPart(ctx, r.stream, r.trace)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
@@ -143,7 +175,12 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 	}
 }
 
-func (r *result) NextResultSet(ctx context.Context) (query.ResultSet, error) {
+func (r *result) NextResultSet(ctx context.Context) (_ query.ResultSet, err error) {
+	onDone := trace.QueryOnResultNextResultSet(r.trace, &ctx, stack.FunctionID(""))
+	defer func() {
+		onDone(err)
+	}()
+
 	return r.nextResultSet(ctx)
 }
 

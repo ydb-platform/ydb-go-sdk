@@ -1100,7 +1100,6 @@ github.com/prometheus/client_golang v1.3.0/go.mod h1:hJaj2vgQTGQmVCsAACORcieXFeD
 github.com/prometheus/client_golang v1.7.1/go.mod h1:PY5Wy2awLA44sXw4AOSfFBetzPP4j5+D6mVACh+pe2M=
 github.com/prometheus/client_golang v1.11.0/go.mod h1:Z6t4BnS23TR94PD6BsDNk8yVqroYurpAkEiz0P2BEV0=
 github.com/prometheus/client_golang v1.12.1/go.mod h1:3Z9XVyYiZYEO+YQWt3RD2R3jrbd179Rt297l4aS6nDY=
-github.com/prometheus/client_golang v1.12.2/go.mod h1:3Z9XVyYiZYEO+YQWt3RD2R3jrbd179Rt297l4aS6nDY=
 github.com/prometheus/client_golang v1.13.0 h1:b71QUfeo5M8gq2+evJdTPfZhYMAU0uKPkyPJ7TPsloU=
 github.com/prometheus/client_golang v1.13.0/go.mod h1:vTeo+zgvILHsnnj/39Ou/1fPN5nJFOEMgftOUOmlvYQ=
 github.com/prometheus/client_model v0.0.0-20180712105110-5c3871d89910/go.mod h1:MbSGuTsp3dbXC40dX6PRTWyKYBIrTGTE9sqQNg2J8bo=
@@ -1202,10 +1201,8 @@ github.com/ydb-platform/ydb-go-genproto v0.0.0-20240126124512-dbb0e1720dbf h1:ck
 github.com/ydb-platform/ydb-go-genproto v0.0.0-20240126124512-dbb0e1720dbf/go.mod h1:Er+FePu1dNUieD+XTMDduGpQuCPssK5Q4BjF+IIXJ3I=
 github.com/ydb-platform/ydb-go-sdk-auth-environ v0.1.2 h1:EYSI1kulnHb0H0zt3yOw4cRj4ABMSMGwNe43D+fX7e4=
 github.com/ydb-platform/ydb-go-sdk-auth-environ v0.1.2/go.mod h1:Xfjce+VMU9yJVr1lj60yK2fFPWjB4jr/4cp3K7cjzi4=
-github.com/ydb-platform/ydb-go-sdk-metrics v0.16.3 h1:30D5jErLAiGjchVG2D9JiCLbST5LpAiyS7DoUtHkWsU=
-github.com/ydb-platform/ydb-go-sdk-metrics v0.16.3/go.mod h1:bqOjIBSt5LtA8fcTprRPGLvlQGkNlqBSRqnL+yZUJh4=
-github.com/ydb-platform/ydb-go-sdk-prometheus v0.11.10 h1:eXRJ8nKGv5Dyz7qTDFraahyqlSmOf1/8JqUtlxGlA4o=
-github.com/ydb-platform/ydb-go-sdk-prometheus v0.11.10/go.mod h1:7OffPa+OmsJgIP5G+2Cg5oP9+xB5UJSLm5AUpLxi5Uc=
+github.com/ydb-platform/ydb-go-sdk-prometheus/v2 v2.0.1 h1:Lsir3AC2VQOTlp8UjZY9zQdCVfWvBNHT3hZn+jSGoo0=
+github.com/ydb-platform/ydb-go-sdk-prometheus/v2 v2.0.1/go.mod h1:vofSH6XG0Cr04RV+V3fLp5apOhwDqj1kSoYD9/lmzmE=
 github.com/ydb-platform/ydb-go-yc v0.8.3/go.mod h1:zUolAFGzJ5XG8uwiseTLr9Lapm7L7hdVdZgLSuv9FXE=
 github.com/ydb-platform/ydb-go-yc v0.10.1 h1:9SBUpR94tzasEzqYSbBuuEp9mY/jV6xbwPMy3muvV7U=
 github.com/ydb-platform/ydb-go-yc v0.10.1/go.mod h1:9HaZmOHUWy2MpJ4GZw9j9gR2I82/kb6H8fjsu8b2lxQ=

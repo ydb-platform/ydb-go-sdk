@@ -21,9 +21,6 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 
-		// Deprecated: use Label field instead
-		ID string
-
 		Call       call
 		Label      string
 		Idempotent bool

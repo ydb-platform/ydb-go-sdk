@@ -38,7 +38,7 @@ func Named(data *data) NamedScanner {
 	}
 }
 
-func (s NamedScanner) ScanNamed(dst ...NamedDestination) error {
+func (s NamedScanner) ScanNamed(dst ...NamedDestination) (err error) {
 	for i := range dst {
 		v, err := s.data.seekByName(dst[i].name)
 		if err != nil {

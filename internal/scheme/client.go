@@ -38,11 +38,11 @@ func (c *Client) Close(_ context.Context) error {
 	return nil
 }
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) (*Client, error) {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) *Client {
 	return &Client{
 		config:  config,
 		service: Ydb_Scheme_V1.NewSchemeServiceClient(cc),
-	}, nil
+	}
 }
 
 func (c *Client) MakeDirectory(ctx context.Context, path string) (finalErr error) {

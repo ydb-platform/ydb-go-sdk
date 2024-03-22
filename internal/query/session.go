@@ -12,9 +12,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 var _ query.Session = (*Session)(nil)
@@ -25,98 +27,45 @@ type (
 		nodeID     int64
 		grpcClient Ydb_Query_V1.QueryServiceClient
 		statusCode statusCode
-		trace      *traceSession
+		trace      *trace.Query
 		closeOnce  func(ctx context.Context) error
-	}
-	traceSession struct {
-		onCreate func(ctx context.Context, functionID stack.Caller) func(*Session, error)
-		onAttach func(ctx context.Context, functionID stack.Caller, s *Session) func(err error)
-		onClose  func(ctx context.Context, functionID stack.Caller, s *Session) func(err error)
+		checks     []func(s *Session) bool
 	}
 	sessionOption func(session *Session)
 )
 
-func withSessionTrace(t *traceSession) sessionOption {
+func withSessionCheck(f func(*Session) bool) sessionOption {
 	return func(s *Session) {
-		if t.onCreate != nil {
-			h1 := s.trace.onCreate
-			h2 := t.onCreate
-			s.trace.onCreate = func(ctx context.Context, functionID stack.Caller) func(*Session, error) {
-				var r, r1 func(*Session, error)
-				if h1 != nil {
-					r = h1(ctx, functionID)
-				}
-				if h2 != nil {
-					r1 = h2(ctx, functionID)
-				}
+		s.checks = append(s.checks, f)
+	}
+}
 
-				return func(session *Session, err error) {
-					if r != nil {
-						r(session, err)
-					}
-					if r1 != nil {
-						r1(session, err)
-					}
-				}
-			}
-		}
-		if t.onAttach != nil {
-			h1 := s.trace.onAttach
-			h2 := t.onAttach
-			s.trace.onAttach = func(ctx context.Context, functionID stack.Caller, session *Session) func(error) {
-				var r, r1 func(error)
-				if h1 != nil {
-					r = h1(ctx, functionID, session)
-				}
-				if h2 != nil {
-					r1 = h2(ctx, functionID, session)
-				}
-
-				return func(err error) {
-					if r != nil {
-						r(err)
-					}
-					if r1 != nil {
-						r1(err)
-					}
-				}
-			}
-		}
-		if t.onClose != nil {
-			h1 := s.trace.onClose
-			h2 := t.onClose
-			s.trace.onClose = func(ctx context.Context, functionID stack.Caller, session *Session) func(error) {
-				var r, r1 func(error)
-				if h1 != nil {
-					r = h1(ctx, functionID, session)
-				}
-				if h2 != nil {
-					r1 = h2(ctx, functionID, session)
-				}
-
-				return func(err error) {
-					if r != nil {
-						r(err)
-					}
-					if r1 != nil {
-						r1(err)
-					}
-				}
-			}
-		}
+func withSessionTrace(t *trace.Query) sessionOption {
+	return func(s *Session) {
+		s.trace = s.trace.Compose(t)
 	}
 }
 
 func createSession(
 	ctx context.Context, client Ydb_Query_V1.QueryServiceClient, opts ...sessionOption,
-) (_ *Session, finalErr error) {
-	s := &Session{
+) (s *Session, finalErr error) {
+	s = &Session{
 		grpcClient: client,
 		statusCode: statusUnknown,
-		trace:      defaultSessionTrace,
+		trace:      &trace.Query{},
+		checks: []func(*Session) bool{
+			func(s *Session) bool {
+				switch s.status() {
+				case statusIdle, statusInUse:
+					return true
+				default:
+					return false
+				}
+			},
+		},
 	}
 	defer func() {
-		if finalErr != nil {
+		if finalErr != nil && s != nil {
 			s.setStatus(statusError)
 		}
 	}()
@@ -125,7 +74,7 @@ func createSession(
 		opt(s)
 	}
 
-	onDone := s.trace.onCreate(ctx, stack.FunctionID(""))
+	onDone := trace.QueryOnSessionCreate(s.trace, &ctx, stack.FunctionID(""))
 	defer func() {
 		onDone(s, finalErr)
 	}()
@@ -165,12 +114,14 @@ func createSession(
 }
 
 func (s *Session) attach(ctx context.Context) (finalErr error) {
-	onDone := s.trace.onAttach(ctx, stack.FunctionID(""), s)
+	onDone := trace.QueryOnSessionAttach(s.trace, &ctx, stack.FunctionID(""), s)
 	defer func() {
 		onDone(finalErr)
 	}()
 
-	attach, err := s.grpcClient.AttachSession(context.Background(), &Ydb_Query.AttachSessionRequest{
+	attachCtx, cancelAttach := xcontext.WithCancel(xcontext.WithoutDeadline(ctx))
+
+	attach, err := s.grpcClient.AttachSession(attachCtx, &Ydb_Query.AttachSessionRequest{
 		SessionId: s.id,
 	})
 	if err != nil {
@@ -178,16 +129,38 @@ func (s *Session) attach(ctx context.Context) (finalErr error) {
 			xerrors.Transport(err),
 		)
 	}
+
 	state, err := attach.Recv()
 	if err != nil {
+		cancelAttach()
+
 		return xerrors.WithStackTrace(xerrors.Transport(err))
 	}
 
 	if state.GetStatus() != Ydb.StatusIds_SUCCESS {
+		cancelAttach()
+
 		return xerrors.WithStackTrace(xerrors.FromOperation(state))
 	}
 
+	s.closeOnce = xsync.OnceFunc(func(ctx context.Context) (err error) {
+		cancelAttach()
+
+		s.setStatus(statusClosing)
+		defer s.setStatus(statusClosed)
+
+		if err = deleteSession(ctx, s.grpcClient, s.id); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		return nil
+	})
+
 	go func() {
+		defer func() {
+			_ = s.closeOnce(ctx)
+		}()
+
 		for {
 			if !s.IsAlive() {
 				return
@@ -210,24 +183,6 @@ func (s *Session) attach(ctx context.Context) (finalErr error) {
 		}
 	}()
 
-	s.closeOnce = xsync.OnceFunc(func(ctx context.Context) (err error) {
-		s.setStatus(statusClosing)
-		defer s.setStatus(statusClosed)
-
-		if s.trace.onClose != nil {
-			onClose := s.trace.onClose(ctx, stack.FunctionID(""), s)
-			defer func() {
-				onClose(err)
-			}()
-		}
-
-		if err = deleteSession(ctx, s.grpcClient, s.id); err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-
-		return nil
-	})
-
 	return nil
 }
 
@@ -248,15 +203,21 @@ func deleteSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 }
 
 func (s *Session) IsAlive() bool {
-	switch s.status() {
-	case statusIdle, statusInUse:
-		return true
-	default:
-		return false
+	for _, check := range s.checks {
+		if !check(s) {
+			return false
+		}
 	}
+
+	return true
 }
 
-func (s *Session) Close(ctx context.Context) error {
+func (s *Session) Close(ctx context.Context) (err error) {
+	onDone := trace.QueryOnSessionDelete(s.trace, &ctx, stack.FunctionID(""), s)
+	defer func() {
+		onDone(err)
+	}()
+
 	if s.closeOnce != nil {
 		return s.closeOnce(ctx)
 	}
@@ -267,16 +228,14 @@ func (s *Session) Close(ctx context.Context) error {
 func begin(
 	ctx context.Context,
 	client Ydb_Query_V1.QueryServiceClient,
-	sessionID string,
+	s *Session,
 	txSettings query.TransactionSettings,
-) (
-	*transaction, error,
-) {
+) (*transaction, error) {
 	a := allocator.New()
 	defer a.Free()
 	response, err := client.BeginTransaction(ctx,
 		&Ydb_Query.BeginTransactionRequest{
-			SessionId:  sessionID,
+			SessionId:  s.id,
 			TxSettings: txSettings.ToYDB(a),
 		},
 	)
@@ -287,18 +246,23 @@ func begin(
 		return nil, xerrors.WithStackTrace(xerrors.FromOperation(response))
 	}
 
-	return &transaction{
-		id: response.GetTxMeta().GetId(),
-	}, nil
+	return newTransaction(response.GetTxMeta().GetId(), s, s.trace), nil
 }
 
 func (s *Session) Begin(
 	ctx context.Context,
 	txSettings query.TransactionSettings,
 ) (
-	query.Transaction, error,
+	_ query.Transaction, err error,
 ) {
-	tx, err := begin(ctx, s.grpcClient, s.id, txSettings)
+	var tx *transaction
+
+	onDone := trace.QueryOnSessionBegin(s.trace, &ctx, stack.FunctionID(""), s)
+	defer func() {
+		onDone(err, tx)
+	}()
+
+	tx, err = begin(ctx, s.grpcClient, s, txSettings)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -329,7 +293,12 @@ func (s *Session) Status() string {
 
 func (s *Session) Execute(
 	ctx context.Context, q string, opts ...options.ExecuteOption,
-) (query.Transaction, query.Result, error) {
+) (_ query.Transaction, _ query.Result, err error) {
+	onDone := trace.QueryOnSessionExecute(s.trace, &ctx, stack.FunctionID(""), s, q)
+	defer func() {
+		onDone(err)
+	}()
+
 	tx, r, err := execute(ctx, s, s.grpcClient, q, options.ExecuteSettings(opts...))
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)

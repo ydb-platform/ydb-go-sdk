@@ -345,7 +345,7 @@ func TestResultNextResultSet(t *testing.T) {
 				},
 			}, nil)
 			stream.EXPECT().Recv().Return(nil, io.EOF)
-			r, _, err := newResult(ctx, stream, cancel)
+			r, _, err := newResult(ctx, stream, nil, nil)
 			require.NoError(t, err)
 			defer r.Close(ctx)
 			{
@@ -355,37 +355,37 @@ func TestResultNextResultSet(t *testing.T) {
 				require.EqualValues(t, 0, rs.index)
 				{
 					t.Log("next (row=1)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 0, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=2)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 1, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=3)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 2, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=4)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 0, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=5)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 1, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=6)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.ErrorIs(t, err, io.EOF)
 				}
 			}
@@ -402,37 +402,37 @@ func TestResultNextResultSet(t *testing.T) {
 				require.EqualValues(t, 2, rs.index)
 				{
 					t.Log("next (row=1)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 0, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=2)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 1, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=3)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 0, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=4)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 1, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=5)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 2, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=6)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.ErrorIs(t, err, io.EOF)
 				}
 			}
@@ -514,7 +514,7 @@ func TestResultNextResultSet(t *testing.T) {
 					},
 				},
 			}, nil)
-			r, _, err := newResult(ctx, stream, cancel)
+			r, _, err := newResult(ctx, stream, nil, nil)
 			require.NoError(t, err)
 			defer r.Close(ctx)
 			{
@@ -524,27 +524,27 @@ func TestResultNextResultSet(t *testing.T) {
 				require.EqualValues(t, 0, rs.index)
 				{
 					t.Log("next (row=1)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 0, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=2)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 1, rs.rowIndex)
 				}
 				t.Log("explicit interrupt stream")
-				r.closeOnce()
+				require.NoError(t, r.closeOnce(ctx))
 				{
 					t.Log("next (row=3)")
-					_, err := rs.next(context.Background())
+					_, err := rs.nextRow(context.Background())
 					require.NoError(t, err)
 					require.EqualValues(t, 2, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=4)")
-					_, err := rs.next(context.Background())
+					_, err := rs.nextRow(context.Background())
 					require.ErrorIs(t, err, errClosedResult)
 				}
 			}
@@ -833,7 +833,7 @@ func TestResultNextResultSet(t *testing.T) {
 					},
 				},
 			}, nil)
-			r, _, err := newResult(ctx, stream, cancel)
+			r, _, err := newResult(ctx, stream, nil, nil)
 			require.NoError(t, err)
 			defer r.Close(ctx)
 			{
@@ -843,37 +843,37 @@ func TestResultNextResultSet(t *testing.T) {
 				require.EqualValues(t, 0, rs.index)
 				{
 					t.Log("next (row=1)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 0, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=2)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 1, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=3)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 2, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=4)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 0, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=5)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.NoError(t, err)
 					require.EqualValues(t, 1, rs.rowIndex)
 				}
 				{
 					t.Log("next (row=6)")
-					_, err := rs.next(ctx)
+					_, err := rs.nextRow(ctx)
 					require.ErrorIs(t, err, io.EOF)
 				}
 			}
