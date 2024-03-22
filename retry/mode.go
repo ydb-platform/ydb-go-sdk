@@ -33,4 +33,6 @@ func (m retryMode) MustBackoff() bool { return m.backoff&backoff.TypeAny != 0 }
 
 func (m retryMode) BackoffType() backoff.Type { return m.backoff }
 
+func (m retryMode) MustDeleteSession() bool { return !m.isRetryObjectValid }
+
 func (m retryMode) IsRetryObjectValid() bool { return m.isRetryObjectValid }
