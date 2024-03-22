@@ -256,13 +256,13 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 		i        int
 		attempts int
 
-		code           = int64(0)
-		onIntermediate = trace.RetryOnRetry(options.trace, &ctx,
+		code   = int64(0)
+		onDone = trace.RetryOnRetry(options.trace, &ctx,
 			options.call, options.label, options.idempotent, xcontext.IsNestedCall(ctx),
 		)
 	)
 	defer func() {
-		onIntermediate(finalErr)(attempts, finalErr)
+		onDone(attempts, finalErr)
 	}()
 	for {
 		i++
@@ -329,8 +329,6 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 			}
 
 			code = m.StatusCode()
-
-			onIntermediate(err)
 		}
 	}
 }
@@ -340,9 +338,9 @@ func Check(err error) (m retryMode) {
 	code, errType, backoffType, deleteSession := xerrors.Check(err)
 
 	return retryMode{
-		code:          code,
-		errType:       errType,
-		backoff:       backoffType,
-		deleteSession: deleteSession,
+		code:               code,
+		errType:            errType,
+		backoff:            backoffType,
+		isRetryObjectValid: deleteSession,
 	}
 }

@@ -422,7 +422,7 @@ func (c *conn) Close() (finalErr error) {
 		if c.currentTx != nil {
 			_ = c.currentTx.Rollback()
 		}
-		err := c.session.Close(xcontext.WithoutDeadline(c.openConnCtx))
+		err := c.session.Close(xcontext.ValueOnly(c.openConnCtx))
 		if err != nil {
 			return badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -468,7 +468,7 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 				&ConnAlreadyHaveTxError{
 					currentTx: c.currentTx.ID(),
 				},
-				xerrors.WithDeleteSession(),
+				xerrors.InvalidObject(),
 			),
 		)
 	}
@@ -481,7 +481,7 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 			xerrors.WithStackTrace(
 				xerrors.Retryable(
 					fmt.Errorf("wrong query mode: %s", m.String()),
-					xerrors.WithDeleteSession(),
+					xerrors.InvalidObject(),
 					xerrors.WithName("WRONG_QUERY_MODE"),
 				),
 			),

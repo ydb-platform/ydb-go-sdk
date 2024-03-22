@@ -183,6 +183,10 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 		}, c.config.GrpcDialOptions()...,
 	)...)
 	if err != nil {
+		if xerrors.IsContextError(err) {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
 		defer func() {
 			c.onTransportError(ctx, err)
 		}()
@@ -310,6 +314,10 @@ func (c *conn) Invoke(
 
 	err = cc.Invoke(ctx, method, req, res, append(opts, grpc.Trailer(&md))...)
 	if err != nil {
+		if xerrors.IsContextError(err) {
+			return xerrors.WithStackTrace(err)
+		}
+
 		defer func() {
 			c.onTransportError(ctx, err)
 		}()
@@ -392,6 +400,10 @@ func (c *conn) NewStream(
 
 	s, err = cc.NewStream(ctx, desc, method, opts...)
 	if err != nil {
+		if xerrors.IsContextError(err) {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
 		defer func() {
 			c.onTransportError(ctx, err)
 		}()

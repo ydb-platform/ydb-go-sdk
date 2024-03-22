@@ -2,10 +2,11 @@ package pool
 
 import (
 	"context"
-	"sync/atomic"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -18,38 +19,112 @@ type (
 		IsAlive() bool
 		Close(ctx context.Context) error
 	}
-	Stats struct {
-		locked   *xsync.Locked[stats.Stats]
+	safeStats struct {
+		mu       xsync.RWMutex
+		v        stats.Stats
 		onChange func(stats.Stats)
+	}
+	statsItemAddr struct {
+		v        *int
+		onChange func(func())
 	}
 	Pool[PT Item[T], T any] struct {
 		trace *Trace
 		limit int
 
-		create func(ctx context.Context) (PT, error)
+		createItem    func(ctx context.Context) (PT, error)
+		createTimeout time.Duration
+		closeTimeout  time.Duration
 
 		mu    xsync.Mutex
 		idle  []PT
 		index map[PT]struct{}
+		done  chan struct{}
 
-		done atomic.Bool
-
-		stats *Stats
+		stats *safeStats
 	}
 	option[PT Item[T], T any] func(p *Pool[PT, T])
 )
 
-func (stats *Stats) Change(f func(s stats.Stats) stats.Stats) {
-	stats.onChange(stats.locked.Change(f))
+func (field statsItemAddr) Inc() {
+	field.onChange(func() {
+		*field.v++
+	})
 }
 
-func (stats *Stats) Get() stats.Stats {
-	return stats.locked.Get()
+func (field statsItemAddr) Dec() {
+	field.onChange(func() {
+		*field.v--
+	})
+}
+
+func (s *safeStats) Get() stats.Stats {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return s.v
+}
+
+func (s *safeStats) Index() statsItemAddr {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return statsItemAddr{
+		v: &s.v.Index,
+		onChange: func(f func()) {
+			s.mu.WithLock(f)
+			if s.onChange != nil {
+				s.onChange(s.Get())
+			}
+		},
+	}
+}
+
+func (s *safeStats) Idle() statsItemAddr {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return statsItemAddr{
+		v: &s.v.Idle,
+		onChange: func(f func()) {
+			s.mu.WithLock(f)
+			if s.onChange != nil {
+				s.onChange(s.Get())
+			}
+		},
+	}
+}
+
+func (s *safeStats) InUse() statsItemAddr {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return statsItemAddr{
+		v: &s.v.InUse,
+		onChange: func(f func()) {
+			s.mu.WithLock(f)
+			if s.onChange != nil {
+				s.onChange(s.Get())
+			}
+		},
+	}
 }
 
 func WithCreateFunc[PT Item[T], T any](f func(ctx context.Context) (PT, error)) option[PT, T] {
 	return func(p *Pool[PT, T]) {
-		p.create = f
+		p.createItem = f
+	}
+}
+
+func WithCreateItemTimeout[PT Item[T], T any](t time.Duration) option[PT, T] {
+	return func(p *Pool[PT, T]) {
+		p.createTimeout = t
+	}
+}
+
+func WithCloseItemTimeout[PT Item[T], T any](t time.Duration) option[PT, T] {
+	return func(p *Pool[PT, T]) {
+		p.closeTimeout = t
 	}
 }
 
@@ -72,11 +147,12 @@ func New[PT Item[T], T any](
 	p := &Pool[PT, T]{
 		trace: defaultTrace,
 		limit: DefaultLimit,
-		create: func(ctx context.Context) (PT, error) {
+		createItem: func(ctx context.Context) (PT, error) {
 			var item T
 
 			return &item, nil
 		},
+		done: make(chan struct{}),
 	}
 
 	for _, opt := range opts {
@@ -96,12 +172,85 @@ func New[PT Item[T], T any](
 		})
 	}()
 
+	createItem := p.createItem
+
+	p.createItem = func(ctx context.Context) (PT, error) {
+		var (
+			ch        = make(chan PT)
+			createErr error
+		)
+		go func() {
+			defer close(ch)
+			createErr = func() error {
+				var (
+					createCtx    = xcontext.ValueOnly(ctx)
+					cancelCreate context.CancelFunc
+				)
+				if d := p.createTimeout; d > 0 {
+					createCtx, cancelCreate = xcontext.WithTimeout(createCtx, d)
+				} else {
+					createCtx, cancelCreate = xcontext.WithCancel(createCtx)
+				}
+				defer cancelCreate()
+
+				newItem, err := createItem(createCtx)
+				if err != nil {
+					return xerrors.WithStackTrace(err)
+				}
+
+				needCloseItem := true
+				defer func() {
+					if needCloseItem {
+						_ = p.closeItem(ctx, newItem)
+					}
+				}()
+
+				select {
+				case <-p.done:
+					return xerrors.WithStackTrace(errClosedPool)
+
+				case <-ctx.Done():
+					p.mu.Lock()
+					defer p.mu.Unlock()
+
+					if len(p.index) < p.limit {
+						p.idle = append(p.idle, newItem)
+						p.index[newItem] = struct{}{}
+						p.stats.Index().Inc()
+						needCloseItem = false
+					}
+
+					return xerrors.WithStackTrace(ctx.Err())
+
+				case ch <- newItem:
+					needCloseItem = false
+
+					return nil
+				}
+			}()
+		}()
+
+		select {
+		case <-p.done:
+			return nil, xerrors.WithStackTrace(errClosedPool)
+		case <-ctx.Done():
+			return nil, xerrors.WithStackTrace(ctx.Err())
+		case item, has := <-ch:
+			if !has {
+				if ctxErr := ctx.Err(); ctxErr == nil && xerrors.IsContextError(createErr) {
+					return nil, xerrors.WithStackTrace(xerrors.Retryable(createErr))
+				}
+
+				return nil, xerrors.WithStackTrace(createErr)
+			}
+
+			return item, nil
+		}
+	}
 	p.idle = make([]PT, 0, p.limit)
 	p.index = make(map[PT]struct{}, p.limit)
-	p.stats = &Stats{
-		locked: xsync.NewLocked[stats.Stats](stats.Stats{
-			Limit: p.limit,
-		}),
+	p.stats = &safeStats{
+		v:        stats.Stats{Limit: p.limit},
 		onChange: p.trace.OnChange,
 	}
 
@@ -112,7 +261,7 @@ func (p *Pool[PT, T]) Stats() stats.Stats {
 	return p.stats.Get()
 }
 
-func (p *Pool[PT, T]) get(ctx context.Context) (_ PT, finalErr error) {
+func (p *Pool[PT, T]) getItem(ctx context.Context) (_ PT, finalErr error) {
 	onDone := p.trace.OnGet(&GetStartInfo{
 		Context: &ctx,
 		Call:    stack.FunctionID(""),
@@ -127,60 +276,52 @@ func (p *Pool[PT, T]) get(ctx context.Context) (_ PT, finalErr error) {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	if p.done.Load() {
+	select {
+	case <-p.done:
 		return nil, xerrors.WithStackTrace(errClosedPool)
-	}
-
-	var item PT
-	p.mu.WithLock(func() {
-		if len(p.idle) > 0 {
-			item, p.idle = p.idle[0], p.idle[1:]
-			p.stats.Change(func(v stats.Stats) stats.Stats {
-				v.Idle--
-
-				return v
-			})
-		}
-	})
-
-	if item != nil {
-		if item.IsAlive() {
-			return item, nil
-		}
-		_ = item.Close(ctx)
+	case <-ctx.Done():
+		return nil, xerrors.WithStackTrace(ctx.Err())
+	default:
+		var item PT
 		p.mu.WithLock(func() {
-			delete(p.index, item)
+			if len(p.idle) > 0 {
+				item, p.idle = p.idle[0], p.idle[1:]
+				p.stats.Idle().Dec()
+			}
 		})
-		p.stats.Change(func(v stats.Stats) stats.Stats {
-			v.Index--
 
-			return v
+		if item != nil {
+			if item.IsAlive() {
+				return item, nil
+			}
+			_ = p.closeItem(ctx, item)
+			p.mu.WithLock(func() {
+				delete(p.index, item)
+			})
+			p.stats.Index().Dec()
+		}
+
+		item, err := p.createItem(ctx)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		addedToIndex := false
+		p.mu.WithLock(func() {
+			if len(p.index) < p.limit {
+				p.index[item] = struct{}{}
+				addedToIndex = true
+			}
 		})
+		if addedToIndex {
+			p.stats.Index().Inc()
+		}
+
+		return item, nil
 	}
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	if len(p.index) == p.limit {
-		return nil, xerrors.WithStackTrace(errPoolOverflow)
-	}
-
-	item, err := p.create(ctx)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	p.index[item] = struct{}{}
-	p.stats.Change(func(v stats.Stats) stats.Stats {
-		v.Index++
-
-		return v
-	})
-
-	return item, nil
 }
 
-func (p *Pool[PT, T]) put(ctx context.Context, item PT) (finalErr error) {
+func (p *Pool[PT, T]) putItem(ctx context.Context, item PT) (finalErr error) {
 	onDone := p.trace.OnPut(&PutStartInfo{
 		Context: &ctx,
 		Call:    stack.FunctionID(""),
@@ -195,35 +336,42 @@ func (p *Pool[PT, T]) put(ctx context.Context, item PT) (finalErr error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	if p.done.Load() {
+	select {
+	case <-p.done:
 		return xerrors.WithStackTrace(errClosedPool)
-	}
+	default:
+		if !item.IsAlive() {
+			_ = p.closeItem(ctx, item)
 
-	if !item.IsAlive() {
-		_ = item.Close(ctx)
+			p.mu.WithLock(func() {
+				delete(p.index, item)
+			})
+			p.stats.Index().Dec()
+
+			return xerrors.WithStackTrace(errItemIsNotAlive)
+		}
 
 		p.mu.WithLock(func() {
-			delete(p.index, item)
+			p.idle = append(p.idle, item)
 		})
-		p.stats.Change(func(v stats.Stats) stats.Stats {
-			v.Index--
+		p.stats.Idle().Inc()
 
-			return v
-		})
-
-		return xerrors.WithStackTrace(errItemIsNotAlive)
+		return nil
 	}
+}
 
-	p.mu.WithLock(func() {
-		p.idle = append(p.idle, item)
-	})
-	p.stats.Change(func(v stats.Stats) stats.Stats {
-		v.Idle++
+func (p *Pool[PT, T]) closeItem(ctx context.Context, item PT) error {
+	ctx = xcontext.ValueOnly(ctx)
 
-		return v
-	})
+	var cancel context.CancelFunc
+	if d := p.closeTimeout; d > 0 {
+		ctx, cancel = xcontext.WithTimeout(ctx, d)
+	} else {
+		ctx, cancel = xcontext.WithCancel(ctx)
+	}
+	defer cancel()
 
-	return nil
+	return item.Close(ctx)
 }
 
 func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item PT) error) (finalErr error) {
@@ -237,27 +385,21 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 		})
 	}()
 
-	item, err := p.get(ctx)
+	item, err := p.getItem(ctx)
 	if err != nil {
+		if xerrors.IsYdb(err) {
+			return xerrors.WithStackTrace(xerrors.Retryable(err))
+		}
+
 		return xerrors.WithStackTrace(err)
 	}
 
 	defer func() {
-		_ = p.put(ctx, item)
+		_ = p.putItem(ctx, item)
 	}()
 
-	p.stats.Change(func(v stats.Stats) stats.Stats {
-		v.InUse++
-
-		return v
-	})
-	defer func() {
-		p.stats.Change(func(v stats.Stats) stats.Stats {
-			v.InUse--
-
-			return v
-		})
-	}()
+	p.stats.InUse().Inc()
+	defer p.stats.InUse().Dec()
 
 	err = f(ctx, item)
 	if err != nil {
@@ -294,11 +436,9 @@ func (p *Pool[PT, T]) With(
 
 		return nil
 	}, append(opts, retry.WithTrace(&trace.Retry{
-		OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-			return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-				return func(info trace.RetryLoopDoneInfo) {
-					attempts = info.Attempts
-				}
+		OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+			return func(info trace.RetryLoopDoneInfo) {
+				attempts = info.Attempts
 			}
 		},
 	}))...)
@@ -320,7 +460,7 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 		})
 	}()
 
-	p.done.Store(true)
+	close(p.done)
 
 	p.mu.Lock()
 	defer p.mu.Unlock()

@@ -3,6 +3,11 @@
 * Added query pool metrics
 * Fixed logic of query session pool
 * Changed initialization of internal driver clients to lazy
+* Disabled the logic of background grpc-connection parking 
+* Removed `ydb.WithSessionPoolSizeLimit()` option
+* Added async put session into pool if external context is done
+* Dropped intermediate callbacks from `trace.{Table,Retry,Query}` events
+* Wrapped errors from `internal/pool.Pool.getItem` as retryable
 * Disabled the logic of background grpc-connection parking
 * Improved stringification for postgres types
 

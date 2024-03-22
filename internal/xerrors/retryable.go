@@ -7,11 +7,11 @@ import (
 )
 
 type retryableError struct {
-	name              string
-	err               error
-	backoffType       backoff.Type
-	mustDeleteSession bool
-	code              int32
+	name               string
+	err                error
+	backoffType        backoff.Type
+	isRetryObjectValid bool
+	code               int32
 }
 
 func (e *retryableError) Code() int32 {
@@ -30,8 +30,8 @@ func (e *retryableError) BackoffType() backoff.Type {
 	return e.backoffType
 }
 
-func (e *retryableError) MustDeleteSession() bool {
-	return e.mustDeleteSession
+func (e *retryableError) IsRetryObjectValid() bool {
+	return e.isRetryObjectValid
 }
 
 func (e *retryableError) Error() string {
@@ -56,9 +56,9 @@ func WithName(name string) RetryableErrorOption {
 	}
 }
 
-func WithDeleteSession() RetryableErrorOption {
+func InvalidObject() RetryableErrorOption {
 	return func(e *retryableError) {
-		e.mustDeleteSession = true
+		e.isRetryObjectValid = true
 	}
 }
 
@@ -66,14 +66,15 @@ func Retryable(err error, opts ...RetryableErrorOption) error {
 	var (
 		e  Error
 		re = &retryableError{
-			err:  err,
-			name: "CUSTOM",
-			code: -1,
+			err:                err,
+			name:               "CUSTOM",
+			code:               -1,
+			isRetryObjectValid: true,
 		}
 	)
 	if As(err, &e) {
 		re.backoffType = e.BackoffType()
-		re.mustDeleteSession = e.MustDeleteSession()
+		re.isRetryObjectValid = e.IsRetryObjectValid()
 		re.code = e.Code()
 		re.name = e.Name()
 	}

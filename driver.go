@@ -300,7 +300,7 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 
 //nolint:cyclop, nonamedreturns
 func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, err error) {
-	ctx, driverCtxCancel := xcontext.WithCancel(xcontext.WithoutDeadline(ctx))
+	ctx, driverCtxCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 	defer func() {
 		if err != nil {
 			driverCtxCancel()
@@ -401,7 +401,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 	}
 
 	d.table = xsync.OnceValue(func() *internalTable.Client {
-		return internalTable.New(xcontext.WithoutDeadline(ctx),
+		return internalTable.New(xcontext.ValueOnly(ctx),
 			d.balancer,
 			tableConfig.New(
 				append(
@@ -416,7 +416,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 	})
 
 	d.query = xsync.OnceValue(func() *internalQuery.Client {
-		return internalQuery.New(xcontext.WithoutDeadline(ctx),
+		return internalQuery.New(xcontext.ValueOnly(ctx),
 			d.balancer,
 			queryConfig.New(
 				append(
@@ -434,7 +434,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 	}
 
 	d.scheme = xsync.OnceValue(func() *internalScheme.Client {
-		return internalScheme.New(xcontext.WithoutDeadline(ctx),
+		return internalScheme.New(xcontext.ValueOnly(ctx),
 			d.balancer,
 			schemeConfig.New(
 				append(
@@ -450,7 +450,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 	})
 
 	d.coordination = xsync.OnceValue(func() *internalCoordination.Client {
-		return internalCoordination.New(xcontext.WithoutDeadline(ctx),
+		return internalCoordination.New(xcontext.ValueOnly(ctx),
 			d.balancer,
 			coordinationConfig.New(
 				append(
@@ -465,7 +465,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 	})
 
 	d.ratelimiter = xsync.OnceValue(func() *internalRatelimiter.Client {
-		return internalRatelimiter.New(xcontext.WithoutDeadline(ctx),
+		return internalRatelimiter.New(xcontext.ValueOnly(ctx),
 			d.balancer,
 			ratelimiterConfig.New(
 				append(
@@ -480,7 +480,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 	})
 
 	d.discovery = xsync.OnceValue(func() *internalDiscovery.Client {
-		return internalDiscovery.New(xcontext.WithoutDeadline(ctx),
+		return internalDiscovery.New(xcontext.ValueOnly(ctx),
 			d.pool.Get(endpoint.New(d.config.Endpoint())),
 			discoveryConfig.New(
 				append(
@@ -499,7 +499,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 	})
 
 	d.scripting = xsync.OnceValue(func() *internalScripting.Client {
-		return internalScripting.New(xcontext.WithoutDeadline(ctx),
+		return internalScripting.New(xcontext.ValueOnly(ctx),
 			d.balancer,
 			scriptingConfig.New(
 				append(
@@ -514,7 +514,7 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 	})
 
 	d.topic = xsync.OnceValue(func() *topicclientinternal.Client {
-		return topicclientinternal.New(xcontext.WithoutDeadline(ctx),
+		return topicclientinternal.New(xcontext.ValueOnly(ctx),
 			d.balancer,
 			d.config.Credentials(),
 			append(
