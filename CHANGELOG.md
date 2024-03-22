@@ -8,6 +8,8 @@
 * Added async put session into pool if external context is done
 * Dropped intermediate callbacks from `trace.{Table,Retry,Query}` events
 * Wrapped errors from `internal/pool.Pool.getItem` as retryable
+* Disabled the logic of background grpc-connection parking
+* Improved stringification for postgres types
 
 ## v3.58.2
 * Added `trace.Query.OnSessionBegin` event
