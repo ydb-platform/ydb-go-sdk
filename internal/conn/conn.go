@@ -102,6 +102,36 @@ func (c *conn) NodeID() uint32 {
 	return 0
 }
 
+func (c *conn) park(ctx context.Context) (err error) {
+	onDone := trace.DriverOnConnPark(
+		c.config.Trace(), &ctx,
+		stack.FunctionID(""),
+		c.Endpoint(),
+	)
+	defer func() {
+		onDone(err)
+	}()
+
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+
+	if c.closed {
+		return nil
+	}
+
+	if c.cc == nil {
+		return nil
+	}
+
+	err = c.close(ctx)
+
+	if err != nil {
+		return c.wrapError(err)
+	}
+
+	return nil
+}
+
 func (c *conn) Endpoint() endpoint.Endpoint {
 	if c != nil {
 		return c.endpoint
