@@ -26,7 +26,6 @@ func (s *structure) AddItems(items ...value.StructValueField) *structure {
 }
 
 func (s *structure) Field(v string) *structValue {
-
 	return &structValue{
 		parent: s,
 		name:   v,
