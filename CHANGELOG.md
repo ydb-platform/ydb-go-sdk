@@ -1,3 +1,4 @@
+* Added `Struct` support for `ydb.ParamsBuilder()`
 * Added support of `TzDate`,`TzDateTime`,`TzTimestamp` types in `ydb.ParamsBuilder()`
 * Added `trace.Query.OnTransactionExecute` event
 * Added query pool metrics
