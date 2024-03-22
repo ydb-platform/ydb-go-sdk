@@ -1,3 +1,5 @@
+* Fixed updating last usage timestamp for smart parking of the conns
+
 ## v3.59.0
 * Added `Struct` support for `ydb.ParamsBuilder()`
 * Added support of `TzDate`,`TzDateTime`,`TzTimestamp` types in `ydb.ParamsBuilder()`

@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/jonboulle/clockwork"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
@@ -55,7 +56,7 @@ type conn struct {
 	endpoint          endpoint.Endpoint // ro access
 	closed            bool
 	state             atomic.Uint32
-	lastUsage         time.Time
+	lastUsage         *lastUsage
 	onClose           []func(*conn)
 	onTransportErrors []func(ctx context.Context, cc Conn, cause error)
 }
@@ -80,7 +81,7 @@ func (c *conn) LastUsage() time.Time {
 	c.mtx.RLock()
 	defer c.mtx.RUnlock()
 
-	return c.lastUsage
+	return c.lastUsage.Get()
 }
 
 func (c *conn) IsState(states ...State) bool {
@@ -244,12 +245,6 @@ func (c *conn) onTransportError(ctx context.Context, cause error) {
 	}
 }
 
-func (c *conn) touchLastUsage() {
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
-	c.lastUsage = time.Now()
-}
-
 func isAvailable(raw *grpc.ClientConn) bool {
 	return raw != nil && raw.GetState() == connectivity.Ready
 }
@@ -332,8 +327,7 @@ func (c *conn) Invoke(
 		return c.wrapError(err)
 	}
 
-	c.touchLastUsage()
-	defer c.touchLastUsage()
+	defer c.lastUsage.Lock()()
 
 	ctx, traceID, err := meta.TraceID(ctx)
 	if err != nil {
@@ -418,8 +412,7 @@ func (c *conn) NewStream(
 		return nil, c.wrapError(err)
 	}
 
-	c.touchLastUsage()
-	defer c.touchLastUsage()
+	defer c.lastUsage.Lock()()
 
 	ctx, traceID, err := meta.TraceID(ctx)
 	if err != nil {
@@ -494,10 +487,15 @@ func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, ca
 }
 
 func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
+	clock := clockwork.NewRealClock()
 	c := &conn{
 		endpoint: e,
 		config:   config,
 		done:     make(chan struct{}),
+		lastUsage: &lastUsage{
+			t:     clock.Now(),
+			clock: clock,
+		},
 	}
 	c.state.Store(uint32(Created))
 	for _, opt := range opts {
