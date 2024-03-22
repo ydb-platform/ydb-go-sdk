@@ -108,10 +108,10 @@ func WithConnectionString(connectionString string) Option {
 }
 
 // WithConnectionTTL defines duration for parking idle connections
-//
-// Deprecated: background connection parking not available
-func WithConnectionTTL(time.Duration) Option {
+func WithConnectionTTL(ttl time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
+		c.options = append(c.options, config.WithConnectionTTL(ttl))
+
 		return nil
 	}
 }
