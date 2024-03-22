@@ -240,7 +240,7 @@ func (s *structValue) UUID(v [16]byte) *structure {
 	return s.parent
 }
 
-func (s *structValue) TzDate(v time.Time) *structure {
+func (s *structValue) TzDatetime(v time.Time) *structure {
 	s.parent.values = append(s.parent.values, value.StructValueField{
 		Name: s.name,
 		V:    value.TzDatetimeValueFromTime(v),
@@ -258,7 +258,7 @@ func (s *structValue) TzTimestamp(v time.Time) *structure {
 	return s.parent
 }
 
-func (s *structValue) TzDatetime(v time.Time) *structure {
+func (s *structValue) TzDate(v time.Time) *structure {
 	s.parent.values = append(s.parent.values, value.StructValueField{
 		Name: s.name,
 		V:    value.TzDateValueFromTime(v),
