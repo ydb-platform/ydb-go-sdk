@@ -303,27 +303,71 @@ func NullableDyNumberValue(v *string) Value {
 func Nullable(t types.Type, v interface{}) Value {
 	switch t {
 	case types.Bool:
-		return NullableBoolValue(v.(*bool))
+		tt, ok := v.(*bool)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeBool", tt))
+		}
+		return NullableBoolValue(tt)
 	case types.Int8:
-		return NullableInt8Value(v.(*int8))
+		tt, ok := v.(*int8)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeBool", tt))
+		}
+		return NullableInt8Value(tt)
 	case types.Uint8:
-		return NullableUint8Value(v.(*uint8))
+		tt, ok := v.(*uint8)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeUint8", tt))
+		}
+		return NullableUint8Value(tt)
 	case types.Int16:
-		return NullableInt16Value(v.(*int16))
+		tt, ok := v.(*int16)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeInt16", tt))
+		}
+		return NullableInt16Value(tt)
 	case types.Uint16:
-		return NullableUint16Value(v.(*uint16))
+		tt, ok := v.(*uint16)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeUint16", tt))
+		}
+		return NullableUint16Value(tt)
 	case types.Int32:
-		return NullableInt32Value(v.(*int32))
+		tt, ok := v.(*int32)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeInt32", tt))
+		}
+		return NullableInt32Value(tt)
 	case types.Uint32:
-		return NullableUint32Value(v.(*uint32))
+		tt, ok := v.(*uint32)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to Uint32", tt))
+		}
+		return NullableUint32Value(tt)
 	case types.Int64:
-		return NullableInt64Value(v.(*int64))
+		tt, ok := v.(*int64)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeInt64", tt))
+		}
+		return NullableInt64Value(tt)
 	case types.Uint64:
-		return NullableUint64Value(v.(*uint64))
+		tt, ok := v.(*uint64)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeUint64", tt))
+		}
+		return NullableUint64Value(tt)
 	case types.Float:
-		return NullableFloatValue(v.(*float32))
+		tt, ok := v.(*float32)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeFloat", tt))
+		}
+		return NullableFloatValue(tt)
 	case types.Double:
-		return NullableDoubleValue(v.(*float64))
+		tt, ok := v.(*float64)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to TypeDouble", tt))
+		}
+		return NullableDoubleValue(tt)
 	case types.Date:
 		switch tt := v.(type) {
 		case *uint32:

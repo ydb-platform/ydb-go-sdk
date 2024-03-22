@@ -86,7 +86,10 @@ func (w *Writer) init() {
 }
 
 func (w *Writer) mustDeclare(name string) {
-	s := w.scope.Back().Value.(*scope)
+	s, ok := w.scope.Back().Value.(*scope)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to w.scope.Back()", s))
+	}
 	if !s.set(name) {
 		where := s.where(name)
 		panic(fmt.Sprintf(
@@ -100,7 +103,10 @@ func (w *Writer) declare(name string) string {
 	if isPredeclared(name) {
 		name = firstChar(name)
 	}
-	s := w.scope.Back().Value.(*scope)
+	s, ok := w.scope.Back().Value.(*scope)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to *scope", s))
+	}
 	for i := 0; ; i++ {
 		v := name
 		if i > 0 {
@@ -127,7 +133,10 @@ func (w *Writer) isGlobalScope() bool {
 }
 
 func (w *Writer) capture(vars ...string) {
-	s := w.scope.Back().Value.(*scope)
+	s, ok := w.scope.Back().Value.(*scope)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to *scope", s))
+	}
 	for _, v := range vars {
 		if !s.set(v) {
 			panic(fmt.Sprintf("can't capture variable %q", v))

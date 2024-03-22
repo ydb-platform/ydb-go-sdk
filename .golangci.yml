@@ -227,7 +227,6 @@ linters:
     - exhaustivestruct
     - exhaustruct
     - forbidigo
-    - forcetypeassert
     - funlen
     - gochecknoglobals
     - gocognit
