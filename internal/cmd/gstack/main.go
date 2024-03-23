@@ -15,7 +15,7 @@ import (
 )
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: codegenerate [path]\n")
+	fmt.Fprintf(os.Stderr, "usage: gstack [path]\n")
 	flag.PrintDefaults()
 }
 
@@ -69,31 +69,31 @@ func getExprFromDeclStmt(statement *ast.DeclStmt) (listOfExpressions []ast.Expr)
 func getCallExpressionsFromStmt(statement ast.Stmt) (listOfCallExpressions []*ast.CallExpr) {
 	var body *ast.BlockStmt
 	var listOfExpressions []ast.Expr
-	switch statement.(type) {
+	switch stmt := statement.(type) {
 	case *ast.IfStmt:
-		body = statement.(*ast.IfStmt).Body
+		body = stmt.Body
 	case *ast.SwitchStmt:
-		body = statement.(*ast.SwitchStmt).Body
+		body = stmt.Body
 	case *ast.TypeSwitchStmt:
-		body = statement.(*ast.TypeSwitchStmt).Body
+		body = stmt.Body
 	case *ast.SelectStmt:
-		body = statement.(*ast.SelectStmt).Body
+		body = stmt.Body
 	case *ast.ForStmt:
-		body = statement.(*ast.ForStmt).Body
+		body = stmt.Body
 	case *ast.RangeStmt:
-		body = statement.(*ast.RangeStmt).Body
+		body = stmt.Body
 	case *ast.DeclStmt:
-		listOfExpressions = append(listOfExpressions, getExprFromDeclStmt(statement.(*ast.DeclStmt))...)
+		listOfExpressions = append(listOfExpressions, getExprFromDeclStmt(stmt)...)
 		for _, expr := range listOfExpressions {
 			listOfCallExpressions = append(listOfCallExpressions, getCallExpressionsFromExpr(expr)...)
 		}
 	case *ast.CommClause:
-		stmts := statement.(*ast.CommClause).Body
+		stmts := stmt.Body
 		for _, stmt := range stmts {
 			listOfCallExpressions = append(listOfCallExpressions, getCallExpressionsFromStmt(stmt)...)
 		}
 	case *ast.ExprStmt:
-		listOfCallExpressions = append(listOfCallExpressions, getCallExpressionsFromExpr(statement.(*ast.ExprStmt).X)...)
+		listOfCallExpressions = append(listOfCallExpressions, getCallExpressionsFromExpr(stmt.X)...)
 	}
 	if body != nil {
 		listOfCallExpressions = append(
@@ -126,7 +126,7 @@ func getListOfCallExpressionsFromBlockStmt(block *ast.BlockStmt) (listOfCallExpr
 	return listOfCallExpressions
 }
 
-func format(src []byte, path string, fset *token.FileSet, file ast.File) ([]byte, error) {
+func format(src []byte, path string, fset *token.FileSet, file *ast.File) ([]byte, error) {
 	var listOfArgs []utils.FunctionIDArg
 	for _, f := range file.Decls {
 		var listOfCalls []*ast.CallExpr
@@ -161,6 +161,20 @@ func format(src []byte, path string, fset *token.FileSet, file ast.File) ([]byte
 	}
 
 	return src, nil
+}
+
+func processFile(src []byte, path string, fset *token.FileSet, file *ast.File, info os.FileInfo) error {
+	formatted, err := format(src, path, fset, file)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(src, formatted) {
+		err = utils.WriteFile(path, formatted, info.Mode().Perm())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func main() {
@@ -201,18 +215,8 @@ func main() {
 			if err != nil {
 				return err
 			}
-			formatted, err := format(src, path, fset, *file)
-			if err != nil {
-				return err
-			}
-			if !bytes.Equal(src, formatted) {
-				err = utils.WriteFile(path, formatted, info.Mode().Perm())
-				if err != nil {
-					return err
-				}
-			}
 
-			return nil
+			return processFile(src, path, fset, file, info)
 		}
 
 		return nil

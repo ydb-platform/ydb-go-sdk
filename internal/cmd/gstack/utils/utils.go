@@ -10,7 +10,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 type FunctionIDArg struct {
@@ -24,11 +23,7 @@ func ReadFile(filename string, info fs.FileInfo) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer func(f *os.File) {
-		err := f.Close()
-		if err != nil {
-		}
-	}(f)
+	defer f.Close()
 	size := int(info.Size())
 	src := make([]byte, size)
 	n, err := io.ReadFull(f, src)
@@ -36,9 +31,9 @@ func ReadFile(filename string, info fs.FileInfo) ([]byte, error) {
 		return nil, err
 	}
 	if n < size {
-		return nil, fmt.Errorf("error: size of %s changed during reading (from %d to %d bytes)", filename, size, n)
+		return nil, fmt.Errorf("error: size of %q changed during reading (from %d to %d bytes)", filename, size, n)
 	} else if n > size {
-		return nil, fmt.Errorf("error: size of %s changed during reading (from %d to >=%d bytes)", filename, size, len(src))
+		return nil, fmt.Errorf("error: size of %q changed during reading (from %d to >=%d bytes)", filename, size, len(src))
 	}
 
 	return src, nil
@@ -55,7 +50,7 @@ func FixSource(fset *token.FileSet, path string, src []byte, listOfArgs []Functi
 			return nil, err
 		}
 		fixed = append(fixed, src[previousArgEnd:argPosOffset]...)
-		fixed = append(fixed, fmt.Sprintf("\"%s\"", argument)...)
+		fixed = append(fixed, fmt.Sprintf("\"%q\"", argument)...)
 		previousArgEnd = argEndOffset
 	}
 	fixed = append(fixed, src[previousArgEnd:]...)
@@ -80,7 +75,7 @@ func WriteFile(filename string, formatted []byte, perm fs.FileMode) error {
 }
 
 func makeCall(fset *token.FileSet, path string, arg FunctionIDArg) (string, error) {
-	basePath := filepath.Join("github.com/ydb-platform/", version.Prefix, version.Major, "")
+	basePath := filepath.Join("github.com", "ydb-platform", version.Prefix, version.Major, "")
 	packageName, err := getPackageName(fset, arg)
 	if err != nil {
 		return "", err
@@ -90,7 +85,7 @@ func makeCall(fset *token.FileSet, path string, arg FunctionIDArg) (string, erro
 	if err != nil {
 		return "", err
 	}
-	return strings.Join([]string{filepath.Join(basePath, filePath, packageName), funcName}, "."), nil
+	return filepath.Join(basePath, filePath, packageName) + "." + funcName, nil
 }
 
 func getFuncName(funcDecl *ast.FuncDecl) (string, error) {
@@ -100,7 +95,7 @@ func getFuncName(funcDecl *ast.FuncDecl) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return strings.Join([]string{prefix, funcDecl.Name.Name}, "."), nil
+		return prefix + "." + funcDecl.Name.Name, nil
 	}
 	return funcDecl.Name.Name, nil
 }
