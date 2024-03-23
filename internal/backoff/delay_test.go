@@ -32,7 +32,7 @@ func TestDelay(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			act: Delay(TypeFast, 0, WithFastBackof(New(
+			act: Delay(TypeFast, 0, WithFastBackoff(New(
 				WithSlotDuration(fastSlot),
 				WithCeiling(6),
 				WithJitterLimit(1),
@@ -41,7 +41,7 @@ func TestDelay(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			act: Delay(TypeFast, 1, WithFastBackof(New(
+			act: Delay(TypeFast, 1, WithFastBackoff(New(
 				WithSlotDuration(fastSlot),
 				WithCeiling(6),
 				WithJitterLimit(1),
@@ -50,7 +50,7 @@ func TestDelay(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			act: Delay(TypeFast, 3, WithFastBackof(New(
+			act: Delay(TypeFast, 3, WithFastBackoff(New(
 				WithSlotDuration(fastSlot),
 				WithCeiling(6),
 				WithJitterLimit(1),
@@ -59,7 +59,7 @@ func TestDelay(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			act: Delay(TypeSlow, 0, WithSlowBackof(New(
+			act: Delay(TypeSlow, 0, WithSlowBackoff(New(
 				WithSlotDuration(slowSlot),
 				WithCeiling(6),
 				WithJitterLimit(1),
@@ -68,7 +68,7 @@ func TestDelay(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			act: Delay(TypeSlow, 1, WithSlowBackof(New(
+			act: Delay(TypeSlow, 1, WithSlowBackoff(New(
 				WithSlotDuration(slowSlot),
 				WithCeiling(6),
 				WithJitterLimit(1),
@@ -77,7 +77,7 @@ func TestDelay(t *testing.T) {
 		},
 		{
 			name: xtest.CurrentFileLine(),
-			act: Delay(TypeSlow, 3, WithSlowBackof(New(
+			act: Delay(TypeSlow, 3, WithSlowBackoff(New(
 				WithSlotDuration(slowSlot),
 				WithCeiling(6),
 				WithJitterLimit(1),

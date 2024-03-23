@@ -341,8 +341,8 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 			}
 
 			t := time.NewTimer(backoff.Delay(m.BackoffType(), i,
-				backoff.WithFastBackof(options.fastBackoff),
-				backoff.WithSlowBackof(options.slowBackoff),
+				backoff.WithFastBackoff(options.fastBackoff),
+				backoff.WithSlowBackoff(options.slowBackoff),
 			))
 
 			select {

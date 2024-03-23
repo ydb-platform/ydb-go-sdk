@@ -12,13 +12,13 @@ type (
 	delayOption func(o *delayOptions)
 )
 
-func WithFastBackof(fast Backoff) delayOption {
+func WithFastBackoff(fast Backoff) delayOption {
 	return func(o *delayOptions) {
 		o.fast = fast
 	}
 }
 
-func WithSlowBackof(slow Backoff) delayOption {
+func WithSlowBackoff(slow Backoff) delayOption {
 	return func(o *delayOptions) {
 		o.slow = slow
 	}
