@@ -174,6 +174,7 @@ func processFile(src []byte, path string, fset *token.FileSet, file *ast.File, i
 			return err
 		}
 	}
+
 	return nil
 }
 

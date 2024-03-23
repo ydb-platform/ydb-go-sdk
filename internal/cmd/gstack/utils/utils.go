@@ -50,7 +50,7 @@ func FixSource(fset *token.FileSet, path string, src []byte, listOfArgs []Functi
 			return nil, err
 		}
 		fixed = append(fixed, src[previousArgEnd:argPosOffset]...)
-		fixed = append(fixed, fmt.Sprintf("\"%q\"", argument)...)
+		fixed = append(fixed, fmt.Sprintf("%q", argument)...)
 		previousArgEnd = argEndOffset
 	}
 	fixed = append(fixed, src[previousArgEnd:]...)
@@ -85,6 +85,7 @@ func makeCall(fset *token.FileSet, path string, arg FunctionIDArg) (string, erro
 	if err != nil {
 		return "", err
 	}
+
 	return filepath.Join(basePath, filePath, packageName) + "." + funcName, nil
 }
 

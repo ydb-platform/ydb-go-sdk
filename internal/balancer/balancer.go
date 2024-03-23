@@ -97,7 +97,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 		address = "ydb:///" + b.driverConfig.Endpoint()
 		onDone  = trace.DriverOnBalancerClusterDiscoveryAttempt(
 			b.driverConfig.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/balancer.(*Balancer).clusterDiscoveryAttempt"),
 			address,
 		)
 		endpoints []endpoint.Endpoint
@@ -173,7 +173,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	var (
 		onDone = trace.DriverOnBalancerUpdate(
 			b.driverConfig.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
 			b.config.DetectLocalDC,
 		)
 		previousConns []conn.Conn
@@ -211,7 +211,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 func (b *Balancer) Close(ctx context.Context) (err error) {
 	onDone := trace.DriverOnBalancerClose(
 		b.driverConfig.Trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/balancer.(*Balancer).Close"),
 	)
 	defer func() {
 		onDone(err)
@@ -237,7 +237,7 @@ func New(
 	var (
 		onDone = trace.DriverOnBalancerInit(
 			driverConfig.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/balancer.New"),
 			driverConfig.Balancer().String(),
 		)
 		discoveryConfig = discoveryConfig.New(append(opts,
@@ -371,7 +371,7 @@ func (b *Balancer) connections() *connectionsState {
 func (b *Balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
 	onDone := trace.DriverOnBalancerChooseEndpoint(
 		b.driverConfig.Trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/balancer.(*Balancer).getConn"),
 	)
 	defer func() {
 		if err == nil {
