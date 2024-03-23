@@ -1,4 +1,6 @@
 * Added internal `gstack` codegen tool for filling `stack.FunctionID` with value from call stack
+
+## v3.59.1
 * Fixed updating last usage timestamp for smart parking of the conns
 
 ## v3.59.0
