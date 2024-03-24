@@ -2,7 +2,6 @@ package utils
 
 import (
 	"fmt"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -10,6 +9,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 )
 
 type FunctionIDArg struct {

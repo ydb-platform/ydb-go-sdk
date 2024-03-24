@@ -124,7 +124,8 @@ func (c *Client) removeDirectory(ctx context.Context, path string) (err error) {
 }
 
 func (c *Client) ListDirectory(ctx context.Context, path string) (d scheme.Directory, finalErr error) {
-	onDone := trace.SchemeOnListDirectory(c.config.Trace(), &ctx, stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scheme.(*Client).ListDirectory"))
+	onDone := trace.SchemeOnListDirectory(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scheme.(*Client).ListDirectory"))
 	defer func() {
 		onDone(finalErr)
 	}()

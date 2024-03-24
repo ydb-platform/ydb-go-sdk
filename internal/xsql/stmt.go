@@ -72,7 +72,8 @@ func (s *stmt) NumInput() int {
 }
 
 func (s *stmt) Close() (finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtClose(s.trace, &s.stmtCtx, stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*stmt).Close"))
+	onDone := trace.DatabaseSQLOnStmtClose(s.trace, &s.stmtCtx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*stmt).Close"))
 	defer func() {
 		onDone(finalErr)
 	}()

@@ -97,7 +97,8 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 		address = "ydb:///" + b.driverConfig.Endpoint()
 		onDone  = trace.DriverOnBalancerClusterDiscoveryAttempt(
 			b.driverConfig.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/balancer.(*Balancer).clusterDiscoveryAttempt"),
+			stack.FunctionID(
+				"github.com/ydb-platform/ydb-go-sdk/3/internal/balancer.(*Balancer).clusterDiscoveryAttempt"),
 			address,
 		)
 		endpoints []endpoint.Endpoint
@@ -173,7 +174,8 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	var (
 		onDone = trace.DriverOnBalancerUpdate(
 			b.driverConfig.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
+			stack.FunctionID(
+				"github.com/ydb-platform/ydb-go-sdk/3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
 			b.config.DetectLocalDC,
 		)
 		previousConns []conn.Conn

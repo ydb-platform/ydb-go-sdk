@@ -85,7 +85,8 @@ func (rs *resultSet) nextRow(ctx context.Context) (*row, error) {
 }
 
 func (rs *resultSet) NextRow(ctx context.Context) (_ query.Row, err error) {
-	onDone := trace.QueryOnResultSetNextRow(rs.trace, &ctx, stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*resultSet).NextRow"))
+	onDone := trace.QueryOnResultSetNextRow(rs.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*resultSet).NextRow"))
 	defer func() {
 		onDone(err)
 	}()
