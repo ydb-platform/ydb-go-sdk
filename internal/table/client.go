@@ -594,6 +594,13 @@ func (c *Client) Close(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(errNilClient)
 	}
 
+	onDone := trace.TableOnClose(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).Close"),
+	)
+	defer func() {
+		onDone(err)
+	}()
+
 	c.mu.WithLock(func() {
 		select {
 		case <-c.done:
@@ -601,13 +608,6 @@ func (c *Client) Close(ctx context.Context) (err error) {
 
 		default:
 			close(c.done)
-
-			onDone := trace.TableOnClose(c.config.Trace(), &ctx,
-				stack.FunctionID(""),
-			)
-			defer func() {
-				onDone(err)
-			}()
 
 			c.limit = 0
 

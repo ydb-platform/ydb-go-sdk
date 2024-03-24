@@ -94,16 +94,22 @@ func do(
 	return attempts, nil
 }
 
-func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) error {
+func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) (err error) {
+	var (
+		onDone = trace.QueryOnDo(c.config.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).Do"),
+		)
+		attempts int
+	)
+	defer func() {
+		onDone(attempts, err)
+	}()
+
 	select {
 	case <-c.done:
 		return xerrors.WithStackTrace(errClosedClient)
 	default:
-		onDone := trace.QueryOnDo(c.config.Trace(), &ctx,
-			stack.FunctionID(""),
-		)
-		attempts, err := do(ctx, c.pool, op, c.config.Trace(), opts...)
-		onDone(attempts, err)
+		attempts, err = do(ctx, c.pool, op, c.config.Trace(), opts...)
 
 		return err
 	}
@@ -151,16 +157,22 @@ func doTx(
 	return attempts, nil
 }
 
-func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) error {
+func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) (err error) {
+	var (
+		onDone = trace.QueryOnDoTx(c.config.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).DoTx"),
+		)
+		attempts int
+	)
+	defer func() {
+		onDone(attempts, err)
+	}()
+
 	select {
 	case <-c.done:
 		return xerrors.WithStackTrace(errClosedClient)
 	default:
-		onDone := trace.QueryOnDoTx(c.config.Trace(), &ctx,
-			stack.FunctionID(""),
-		)
-		attempts, err := doTx(ctx, c.pool, op, c.config.Trace(), opts...)
-		onDone(attempts, err)
+		attempts, err = doTx(ctx, c.pool, op, c.config.Trace(), opts...)
 
 		return err
 	}
