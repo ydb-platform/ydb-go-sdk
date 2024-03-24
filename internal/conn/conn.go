@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/jonboulle/clockwork"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
@@ -327,7 +326,7 @@ func (c *conn) Invoke(
 		return c.wrapError(err)
 	}
 
-	defer c.lastUsage.Lock()()
+	defer c.lastUsage.Touch()()
 
 	ctx, traceID, err := meta.TraceID(ctx)
 	if err != nil {
@@ -412,7 +411,7 @@ func (c *conn) NewStream(
 		return nil, c.wrapError(err)
 	}
 
-	defer c.lastUsage.Lock()()
+	defer c.lastUsage.Touch()()
 
 	ctx, traceID, err := meta.TraceID(ctx)
 	if err != nil {
@@ -487,15 +486,11 @@ func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, ca
 }
 
 func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
-	clock := clockwork.NewRealClock()
 	c := &conn{
-		endpoint: e,
-		config:   config,
-		done:     make(chan struct{}),
-		lastUsage: &lastUsage{
-			t:     clock.Now(),
-			clock: clock,
-		},
+		endpoint:  e,
+		config:    config,
+		done:      make(chan struct{}),
+		lastUsage: newLastUsage(nil),
 	}
 	c.state.Store(uint32(Created))
 	for _, opt := range opts {

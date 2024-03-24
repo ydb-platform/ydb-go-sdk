@@ -13,12 +13,12 @@ func Test_lastUsage_Lock(t *testing.T) {
 		start := time.Unix(0, 0)
 		clock := clockwork.NewFakeClockAt(start)
 		lu := &lastUsage{
-			t:     start,
 			clock: clock,
 		}
+		lu.t.Store(&start)
 		t1 := lu.Get()
 		require.Equal(t, start, t1)
-		f := lu.Lock()
+		f := lu.Touch()
 		clock.Advance(time.Hour)
 		t2 := lu.Get()
 		require.Equal(t, start.Add(time.Hour), t2)
@@ -34,19 +34,19 @@ func Test_lastUsage_Lock(t *testing.T) {
 		start := time.Unix(0, 0)
 		clock := clockwork.NewFakeClockAt(start)
 		lu := &lastUsage{
-			t:     start,
 			clock: clock,
 		}
+		lu.t.Store(&start)
 		t1 := lu.Get()
 		require.Equal(t, start, t1)
-		f1 := lu.Lock()
+		f1 := lu.Touch()
 		clock.Advance(time.Hour)
 		t2 := lu.Get()
 		require.Equal(t, start.Add(time.Hour), t2)
-		f2 := lu.Lock()
+		f2 := lu.Touch()
 		clock.Advance(time.Hour)
 		f1()
-		f3 := lu.Lock()
+		f3 := lu.Touch()
 		clock.Advance(time.Hour)
 		t3 := lu.Get()
 		require.Equal(t, start.Add(3*time.Hour), t3)
@@ -72,9 +72,10 @@ func Test_lastUsage_Lock(t *testing.T) {
 		start := time.Unix(0, 0)
 		clock := clockwork.NewFakeClockAt(start)
 		lu := &lastUsage{
-			t:     start,
 			clock: clock,
 		}
+		lu.t.Store(&start)
+
 		func() {
 			t1 := lu.Get()
 			require.Equal(t, start, t1)
@@ -82,7 +83,7 @@ func Test_lastUsage_Lock(t *testing.T) {
 			t2 := lu.Get()
 			require.Equal(t, start, t2)
 			clock.Advance(time.Hour)
-			defer lu.Lock()()
+			defer lu.Touch()()
 			t3 := lu.Get()
 			require.Equal(t, start.Add(2*time.Hour), t3)
 			clock.Advance(time.Hour)

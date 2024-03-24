@@ -6,40 +6,42 @@ import (
 	"time"
 
 	"github.com/jonboulle/clockwork"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
 type lastUsage struct {
 	locks atomic.Int64
-	mu    xsync.RWMutex
-	t     time.Time
+	t     atomic.Pointer[time.Time]
 	clock clockwork.Clock
 }
 
+func newLastUsage(clock clockwork.Clock) *lastUsage {
+	if clock == nil {
+		clock = clockwork.NewRealClock()
+	}
+	now := clock.Now()
+	usage := &lastUsage{
+		clock: clock,
+	}
+	usage.t.Store(&now)
+
+	return usage
+}
+
 func (l *lastUsage) Get() time.Time {
-	if l.locks.CompareAndSwap(0, 1) {
-		defer func() {
-			l.locks.Add(-1)
-		}()
-
-		l.mu.RLock()
-		defer l.mu.RUnlock()
-
-		return l.t
+	if l.locks.Load() == 0 {
+		return *l.t.Load()
 	}
 
 	return l.clock.Now()
 }
 
-func (l *lastUsage) Lock() (releaseFunc func()) {
+func (l *lastUsage) Touch() (releaseFunc func()) {
 	l.locks.Add(1)
 
 	return sync.OnceFunc(func() {
 		if l.locks.Add(-1) == 0 {
-			l.mu.WithLock(func() {
-				l.t = l.clock.Now()
-			})
+			now := l.clock.Now()
+			l.t.Store(&now)
 		}
 	})
 }
