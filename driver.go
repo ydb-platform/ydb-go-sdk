@@ -116,7 +116,8 @@ func (d *Driver) trace() *trace.Driver {
 //nolint:nonamedreturns
 func (d *Driver) Close(ctx context.Context) (finalErr error) {
 	onDone := trace.DriverOnClose(d.trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/ydb.(*Driver).Close"))
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/ydb.(*Driver).Close"),
+	)
 	defer func() {
 		onDone(finalErr)
 	}()

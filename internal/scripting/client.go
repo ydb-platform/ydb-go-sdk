@@ -293,7 +293,8 @@ func (c *Client) Close(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(errNilClient)
 	}
 	onDone := trace.ScriptingOnClose(c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scripting.(*Client).Close"))
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scripting.(*Client).Close"),
+	)
 	defer func() {
 		onDone(err)
 	}()
