@@ -15,6 +15,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+var pid = os.Getpid()
+
 func New(
 	database string,
 	credentials credentials.Credentials,
@@ -22,7 +24,7 @@ func New(
 	opts ...Option,
 ) *Meta {
 	m := &Meta{
-		pid:         strconv.Itoa(os.Getpid()),
+		pid:         strconv.Itoa(pid),
 		trace:       trace,
 		credentials: credentials,
 		database:    database,
