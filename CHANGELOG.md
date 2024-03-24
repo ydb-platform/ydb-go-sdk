@@ -1,3 +1,5 @@
+* Fixed `gstack` logic for parsing `ast.BlockStmt`
+
 ## v3.59.2
 * Added internal `gstack` codegen tool for filling `stack.FunctionID` with value from call stack
 
