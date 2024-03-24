@@ -1,3 +1,4 @@
+## v3.59.3
 * Fixed `gstack` logic for parsing `ast.BlockStmt`
 
 ## v3.59.2
