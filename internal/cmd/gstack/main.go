@@ -93,6 +93,14 @@ func getCallExpressionsFromStmt(statement ast.Stmt) (listOfCallExpressions []*as
 		}
 	case *ast.ExprStmt:
 		listOfCallExpressions = append(listOfCallExpressions, getCallExpressionsFromExpr(stmt.X)...)
+	case *ast.AssignStmt:
+		for _, rh := range stmt.Rhs {
+			listOfCallExpressions = append(listOfCallExpressions, getCallExpressionsFromExpr(rh)...)
+		}
+	case *ast.ReturnStmt:
+		for _, result := range stmt.Results {
+			listOfCallExpressions = append(listOfCallExpressions, getCallExpressionsFromExpr(result)...)
+		}
 	}
 	if body != nil {
 		listOfCallExpressions = append(
@@ -106,20 +114,7 @@ func getCallExpressionsFromStmt(statement ast.Stmt) (listOfCallExpressions []*as
 
 func getListOfCallExpressionsFromBlockStmt(block *ast.BlockStmt) (listOfCallExpressions []*ast.CallExpr) {
 	for _, statement := range block.List {
-		switch expr := statement.(type) {
-		case *ast.ExprStmt:
-			listOfCallExpressions = append(listOfCallExpressions, getCallExpressionsFromExpr(expr.X)...)
-		case *ast.ReturnStmt:
-			for _, result := range expr.Results {
-				listOfCallExpressions = append(listOfCallExpressions, getCallExpressionsFromExpr(result)...)
-			}
-		case *ast.AssignStmt:
-			for _, rh := range expr.Rhs {
-				listOfCallExpressions = append(listOfCallExpressions, getCallExpressionsFromExpr(rh)...)
-			}
-		default:
-			listOfCallExpressions = append(listOfCallExpressions, getCallExpressionsFromStmt(statement)...)
-		}
+		listOfCallExpressions = append(listOfCallExpressions, getCallExpressionsFromStmt(statement)...)
 	}
 
 	return listOfCallExpressions
