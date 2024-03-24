@@ -97,8 +97,10 @@ func getFuncName(funcDecl *ast.FuncDecl) (string, error) {
 		if err != nil {
 			return "", err
 		}
+
 		return prefix + "." + funcDecl.Name.Name, nil
 	}
+
 	return funcDecl.Name.Name, nil
 }
 
@@ -111,6 +113,7 @@ func getIdentNameFromExpr(expr ast.Expr) (string, error) {
 		if err != nil {
 			return "", err
 		}
+
 		return "(*" + prefix + ")", nil
 	case *ast.IndexExpr:
 		return getIdentNameFromExpr(expr.X)
@@ -127,5 +130,6 @@ func getPackageName(fset *token.FileSet, arg FunctionIDArg) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("error during get package name function")
 	}
+
 	return parsedFile.Name.Name, nil
 }
