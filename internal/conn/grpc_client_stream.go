@@ -30,7 +30,7 @@ func (s *grpcClientStream) CloseSend() (err error) {
 		onDone(err)
 	}()
 
-	defer s.c.lastUsage.Lock()()
+	defer s.c.lastUsage.SharedLock()()
 
 	err = s.ClientStream.CloseSend()
 
@@ -61,7 +61,7 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 		onDone(err)
 	}()
 
-	defer s.c.lastUsage.Lock()()
+	defer s.c.lastUsage.SharedLock()()
 
 	err = s.ClientStream.SendMsg(m)
 
@@ -100,7 +100,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 		onDone(err)
 	}()
 
-	defer s.c.lastUsage.Lock()()
+	defer s.c.lastUsage.SharedLock()()
 
 	defer func() {
 		if err != nil {
