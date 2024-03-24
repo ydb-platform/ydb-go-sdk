@@ -163,7 +163,8 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 }
 
 func New(ctx context.Context, balancer balancer, cfg *config.Config) *Client {
-	onDone := trace.QueryOnNew(cfg.Trace(), &ctx, stack.FunctionID(""))
+	onDone := trace.QueryOnNew(cfg.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.New"))
 	defer onDone()
 
 	client := &Client{

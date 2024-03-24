@@ -232,7 +232,7 @@ func WithPanicCallback(panicCallback func(e interface{})) panicCallbackOption {
 // If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
 func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr error) {
 	options := &retryOptions{
-		call:        stack.FunctionID(""),
+		call:        stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.Retry"),
 		trace:       &trace.Retry{},
 		fastBackoff: backoff.Fast,
 		slowBackoff: backoff.Slow,

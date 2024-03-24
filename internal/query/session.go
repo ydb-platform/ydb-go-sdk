@@ -68,7 +68,8 @@ func createSession(
 		opt(s)
 	}
 
-	onDone := trace.QueryOnSessionCreate(s.cfg.Trace(), &ctx, stack.FunctionID(""))
+	onDone := trace.QueryOnSessionCreate(s.cfg.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.createSession"))
 	defer func() {
 		onDone(s, finalErr)
 	}()
@@ -98,7 +99,8 @@ func createSession(
 }
 
 func (s *Session) attach(ctx context.Context) (finalErr error) {
-	onDone := trace.QueryOnSessionAttach(s.cfg.Trace(), &ctx, stack.FunctionID(""), s)
+	onDone := trace.QueryOnSessionAttach(s.cfg.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Session).attach"), s)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -189,7 +191,8 @@ func (s *Session) IsAlive() bool {
 }
 
 func (s *Session) Close(ctx context.Context) (err error) {
-	onDone := trace.QueryOnSessionDelete(s.cfg.Trace(), &ctx, stack.FunctionID(""), s)
+	onDone := trace.QueryOnSessionDelete(s.cfg.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Session).Close"), s)
 	defer func() {
 		onDone(err)
 	}()
@@ -230,7 +233,8 @@ func (s *Session) Begin(
 ) {
 	var tx *transaction
 
-	onDone := trace.QueryOnSessionBegin(s.cfg.Trace(), &ctx, stack.FunctionID(""), s)
+	onDone := trace.QueryOnSessionBegin(s.cfg.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Session).Begin"), s)
 	defer func() {
 		onDone(err, tx)
 	}()
@@ -267,7 +271,8 @@ func (s *Session) Status() string {
 func (s *Session) Execute(
 	ctx context.Context, q string, opts ...options.ExecuteOption,
 ) (_ query.Transaction, _ query.Result, err error) {
-	onDone := trace.QueryOnSessionExecute(s.cfg.Trace(), &ctx, stack.FunctionID(""), s, q)
+	onDone := trace.QueryOnSessionExecute(s.cfg.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Session).Execute"), s, q)
 	defer func() {
 		onDone(err)
 	}()

@@ -31,7 +31,7 @@ var (
 
 func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ driver.Rows, finalErr error) {
 	onDone := trace.DatabaseSQLOnStmtQuery(s.trace, &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*stmt).QueryContext"),
 		s.stmtCtx, s.query,
 	)
 	defer func() {
@@ -50,7 +50,7 @@ func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ dr
 
 func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ driver.Result, finalErr error) {
 	onDone := trace.DatabaseSQLOnStmtExec(s.trace, &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*stmt).ExecContext"),
 		s.stmtCtx, s.query,
 	)
 	defer func() {
@@ -72,7 +72,8 @@ func (s *stmt) NumInput() int {
 }
 
 func (s *stmt) Close() (finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtClose(s.trace, &s.stmtCtx, stack.FunctionID(""))
+	onDone := trace.DatabaseSQLOnStmtClose(s.trace, &s.stmtCtx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*stmt).Close"))
 	defer func() {
 		onDone(finalErr)
 	}()

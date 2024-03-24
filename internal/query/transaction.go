@@ -34,7 +34,8 @@ func (tx transaction) ID() string {
 func (tx transaction) Execute(ctx context.Context, q string, opts ...options.TxExecuteOption) (
 	r query.Result, finalErr error,
 ) {
-	onDone := trace.QueryOnTxExecute(tx.s.cfg.Trace(), &ctx, stack.FunctionID(""), tx.s, tx, q)
+	onDone := trace.QueryOnTxExecute(tx.s.cfg.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.transaction.Execute"), tx.s, tx, q)
 	defer func() {
 		onDone(finalErr)
 	}()

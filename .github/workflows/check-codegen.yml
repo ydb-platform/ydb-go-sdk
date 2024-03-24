@@ -32,6 +32,7 @@ jobs:
     - name: Build
       run: |
         go install ./internal/cmd/gtrace
+        go install ./internal/cmd/gstack
         go install go.uber.org/mock/mockgen@v0.4.0
 
     - name: Clean and re-generate *_gtrace.go files
@@ -39,6 +40,10 @@ jobs:
         rm -f ./trace/*_gtrace.go
         go generate ./trace
         go generate ./...
+
+    - name: Re-generate stack.FunctionID calls
+      run: |
+        gstack .
 
     - name: Check repository diff
       run: bash ./.github/scripts/check-work-copy-equals-to-committed.sh "code-generation not equal with committed"

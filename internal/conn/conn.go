@@ -105,7 +105,7 @@ func (c *conn) NodeID() uint32 {
 func (c *conn) park(ctx context.Context) (err error) {
 	onDone := trace.DriverOnConnPark(
 		c.config.Trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).park"),
 		c.Endpoint(),
 	)
 	defer func() {
@@ -148,7 +148,7 @@ func (c *conn) setState(ctx context.Context, s State) State {
 	if state := State(c.state.Swap(uint32(s))); state != s {
 		trace.DriverOnConnStateChange(
 			c.config.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).setState"),
 			c.endpoint.Copy(), state,
 		)(s)
 	}
@@ -196,7 +196,7 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 
 	onDone := trace.DriverOnConnDial(
 		c.config.Trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).realConn"),
 		c.endpoint.Copy(),
 	)
 	defer func() {
@@ -277,7 +277,7 @@ func (c *conn) Close(ctx context.Context) (err error) {
 
 	onDone := trace.DriverOnConnClose(
 		c.config.Trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).Close"),
 		c.Endpoint(),
 	)
 	defer func() {
@@ -310,7 +310,7 @@ func (c *conn) Invoke(
 		useWrapping = UseWrapping(ctx)
 		onDone      = trace.DriverOnConnInvoke(
 			c.config.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).Invoke"),
 			c.endpoint, trace.Method(method),
 		)
 		cc *grpc.ClientConn
@@ -394,7 +394,7 @@ func (c *conn) NewStream(
 	var (
 		onDone = trace.DriverOnConnNewStream(
 			c.config.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).NewStream"),
 			c.endpoint.Copy(), trace.Method(method),
 		)
 		useWrapping = UseWrapping(ctx)

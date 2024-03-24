@@ -116,7 +116,8 @@ func (s *session) isClosing() bool {
 func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (
 	s *session, err error,
 ) {
-	onDone := trace.TableOnSessionNew(config.Trace(), &ctx, stack.FunctionID(""))
+	onDone := trace.TableOnSessionNew(config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.newSession"))
 	defer func() {
 		onDone(s, err)
 	}()
@@ -179,7 +180,7 @@ func (s *session) Close(ctx context.Context) (err error) {
 
 	s.closeOnce.Do(func() {
 		onDone := trace.TableOnSessionDelete(s.config.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*session).Close"),
 			s,
 		)
 		defer func() {
@@ -231,7 +232,7 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 		result Ydb_Table.KeepAliveResult
 		onDone = trace.TableOnSessionKeepAlive(
 			s.config.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*session).KeepAlive"),
 			s,
 		)
 	)
@@ -613,7 +614,7 @@ func (s *session) Explain(
 		response *Ydb_Table.ExplainDataQueryResponse
 		onDone   = trace.TableOnSessionQueryExplain(
 			s.config.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*session).Explain"),
 			s, query,
 		)
 	)
@@ -662,7 +663,7 @@ func (s *session) Prepare(ctx context.Context, queryText string) (_ table.Statem
 		result   Ydb_Table.PrepareQueryResult
 		onDone   = trace.TableOnSessionQueryPrepare(
 			s.config.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*session).Prepare"),
 			s, queryText,
 		)
 	)
@@ -745,7 +746,7 @@ func (s *session) Execute(
 
 	onDone := trace.TableOnSessionQueryExecute(
 		s.config.Trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*session).Execute"),
 		s, q, parameters,
 		request.QueryCachePolicy.GetKeepInCache(),
 	)
@@ -985,7 +986,7 @@ func (s *session) StreamReadTable(
 ) (_ result.StreamResult, err error) {
 	var (
 		onDone = trace.TableOnSessionQueryStreamRead(s.config.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*session).StreamReadTable"),
 			s,
 		)
 		request = Ydb_Table.ReadTableRequest{
@@ -1104,7 +1105,7 @@ func (s *session) StreamExecuteScanQuery(
 		q      = queryFromText(query)
 		onDone = trace.TableOnSessionQueryStreamExecute(
 			s.config.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*session).StreamExecuteScanQuery"),
 			s, q, parameters,
 		)
 		request = Ydb_Table.ExecuteScanQueryRequest{
@@ -1175,7 +1176,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows value.Value
 		callOptions []grpc.CallOption
 		onDone      = trace.TableOnSessionBulkUpsert(
 			s.config.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*session).BulkUpsert"),
 			s,
 		)
 	)
@@ -1221,7 +1222,7 @@ func (s *session) BeginTransaction(
 		response *Ydb_Table.BeginTransactionResponse
 		onDone   = trace.TableOnTxBegin(
 			s.config.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*session).BeginTransaction"),
 			s,
 		)
 	)

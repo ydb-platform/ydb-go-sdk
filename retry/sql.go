@@ -42,7 +42,7 @@ func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Co
 	var (
 		options = doOptions{
 			retryOptions: []Option{
-				withCaller(stack.FunctionID("")),
+				withCaller(stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.Do")),
 			},
 		}
 		attempts = 0
@@ -129,7 +129,7 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 	var (
 		options = doTxOptions{
 			retryOptions: []Option{
-				withCaller(stack.FunctionID("")),
+				withCaller(stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.DoTx")),
 			},
 			txOptions: &sql.TxOptions{
 				Isolation: sql.LevelDefault,
