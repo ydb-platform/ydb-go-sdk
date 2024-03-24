@@ -69,7 +69,8 @@ func createSession(
 	}
 
 	onDone := trace.QueryOnSessionCreate(s.cfg.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.createSession"))
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.createSession"),
+	)
 	defer func() {
 		onDone(s, finalErr)
 	}()

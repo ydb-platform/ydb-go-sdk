@@ -117,7 +117,8 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config
 	s *session, err error,
 ) {
 	onDone := trace.TableOnSessionNew(config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.newSession"))
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.newSession"),
+	)
 	defer func() {
 		onDone(s, err)
 	}()

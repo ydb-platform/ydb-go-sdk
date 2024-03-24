@@ -396,7 +396,8 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 
 func (c *conn) Ping(ctx context.Context) (finalErr error) {
 	onDone := trace.DatabaseSQLOnConnPing(c.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).Ping"))
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).Ping"),
+	)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -459,7 +460,8 @@ func (c *conn) ID() string {
 func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ driver.Tx, finalErr error) {
 	var tx currentTx
 	onDone := trace.DatabaseSQLOnConnBegin(c.trace, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).BeginTx"))
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).BeginTx"),
+	)
 	defer func() {
 		onDone(tx, finalErr)
 	}()

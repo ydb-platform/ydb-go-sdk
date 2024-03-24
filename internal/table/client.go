@@ -36,7 +36,8 @@ type balancer interface {
 
 func New(ctx context.Context, balancer balancer, config *config.Config) *Client {
 	onDone := trace.TableOnInit(config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.New"))
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.New"),
+	)
 	defer func() {
 		onDone(config.SizeLimit())
 	}()
@@ -381,7 +382,8 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 	}
 
 	onDone := trace.TableOnPoolGet(o.t, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).internalPoolGet"))
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).internalPoolGet"),
+	)
 	defer func() {
 		onDone(s, i, err)
 	}()
@@ -478,7 +480,8 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s 
 	})
 
 	waitDone := trace.TableOnPoolWait(t, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).internalPoolWaitFromCh"))
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).internalPoolWaitFromCh"),
+	)
 
 	defer func() {
 		waitDone(s, err)
@@ -599,7 +602,9 @@ func (c *Client) Close(ctx context.Context) (err error) {
 		default:
 			close(c.done)
 
-			onDone := trace.TableOnClose(c.config.Trace(), &ctx, stack.FunctionID(""))
+			onDone := trace.TableOnClose(c.config.Trace(), &ctx,
+				stack.FunctionID(""),
+			)
 			defer func() {
 				onDone(err)
 			}()

@@ -149,7 +149,8 @@ func (p *Pool) Take(context.Context) error {
 
 func (p *Pool) Release(ctx context.Context) (finalErr error) {
 	onDone := trace.DriverOnPoolRelease(p.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*Pool).Release"))
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*Pool).Release"),
+	)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -232,7 +233,8 @@ func (p *Pool) collectConns() []*conn {
 
 func NewPool(ctx context.Context, config Config) *Pool {
 	onDone := trace.DriverOnPoolNew(config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.NewPool"))
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.NewPool"),
+	)
 	defer onDone()
 
 	p := &Pool{
