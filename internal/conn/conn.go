@@ -326,7 +326,7 @@ func (c *conn) Invoke(
 		return c.wrapError(err)
 	}
 
-	defer c.lastUsage.SharedLock()()
+	defer c.lastUsage.Touch()()
 
 	ctx, traceID, err := meta.TraceID(ctx)
 	if err != nil {
@@ -411,7 +411,7 @@ func (c *conn) NewStream(
 		return nil, c.wrapError(err)
 	}
 
-	defer c.lastUsage.SharedLock()()
+	defer c.lastUsage.Touch()()
 
 	ctx, traceID, err := meta.TraceID(ctx)
 	if err != nil {

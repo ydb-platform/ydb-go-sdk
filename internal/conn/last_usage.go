@@ -35,7 +35,7 @@ func (l *lastUsage) Get() time.Time {
 	return l.clock.Now()
 }
 
-func (l *lastUsage) SharedLock() (releaseFunc func()) {
+func (l *lastUsage) Touch() (releaseFunc func()) {
 	l.locks.Add(1)
 
 	return sync.OnceFunc(func() {
