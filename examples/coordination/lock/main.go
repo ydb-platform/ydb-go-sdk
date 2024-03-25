@@ -121,20 +121,18 @@ func main() {
 }
 
 func doWork(ctx context.Context, wg *sync.WaitGroup) {
-	fmt.Println("starting work")
+	defer wg.Done()
 
-loop:
+	fmt.Println("starting work")
 	for {
 		fmt.Println("work is in progress...")
 
 		select {
 		case <-ctx.Done():
-			break loop
+			return
 		case <-time.After(time.Second):
 		}
 	}
 
 	fmt.Println("suspending work")
-
-	wg.Done()
 }
