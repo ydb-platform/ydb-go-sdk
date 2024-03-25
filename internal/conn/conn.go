@@ -326,7 +326,8 @@ func (c *conn) Invoke(
 		return c.wrapError(err)
 	}
 
-	defer c.lastUsage.Touch()()
+	stop := c.lastUsage.Start()
+	defer stop()
 
 	ctx, traceID, err := meta.TraceID(ctx)
 	if err != nil {
@@ -411,7 +412,8 @@ func (c *conn) NewStream(
 		return nil, c.wrapError(err)
 	}
 
-	defer c.lastUsage.Touch()()
+	stop := c.lastUsage.Start()
+	defer stop()
 
 	ctx, traceID, err := meta.TraceID(ctx)
 	if err != nil {
