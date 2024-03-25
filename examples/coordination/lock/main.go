@@ -10,7 +10,6 @@ import (
 	"time"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
-
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination/options"
@@ -62,13 +61,9 @@ func init() {
 }
 
 func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	defer func() {
-		signal.Stop(c)
-		cancel()
-	}()
+	context.WithCancel(context.Background())
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
 
 	db, err := ydb.Open(ctx, dsn,
 		environ.WithEnvironCredentials(ctx),
@@ -114,7 +109,7 @@ func main() {
 		go doWork(lease.Context(), &wg)
 
 		select {
-		case <-c:
+		case <-ctx.Done():
 			fmt.Println("exiting")
 			return
 		case <-lease.Context().Done():
