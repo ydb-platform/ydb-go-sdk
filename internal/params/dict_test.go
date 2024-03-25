@@ -424,7 +424,7 @@ func TestDict(t *testing.T) {
 				require.True(t, ok)
 
 				params := d.EndDict().Build().ToYDB(a)
-				require.Equal(t, paramsToJSON(
+				require.Equal(t, xtest.ToJSON(
 					map[string]*Ydb.TypedValue{
 						"$x": {
 							Type: &Ydb.Type{
@@ -444,7 +444,7 @@ func TestDict(t *testing.T) {
 								},
 							},
 						},
-					}), paramsToJSON(params))
+					}), xtest.ToJSON(params))
 			})
 		}
 	}
@@ -467,7 +467,7 @@ func TestDict_AddPairs(t *testing.T) {
 
 	params := Builder{}.Param("$x").BeginDict().AddPairs(pairs...).EndDict().Build().ToYDB(a)
 
-	require.Equal(t, paramsToJSON(
+	require.Equal(t, xtest.ToJSON(
 		map[string]*Ydb.TypedValue{
 			"$x": {
 				Type: &Ydb.Type{
@@ -515,5 +515,5 @@ func TestDict_AddPairs(t *testing.T) {
 					},
 				},
 			},
-		}), paramsToJSON(params))
+		}), xtest.ToJSON(params))
 }

@@ -419,7 +419,7 @@ func TestList(t *testing.T) {
 			require.True(t, ok)
 
 			params := result.EndList().Build().ToYDB(a)
-			require.Equal(t, paramsToJSON(
+			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
 					"$x": {
 						Type: &Ydb.Type{
@@ -435,7 +435,7 @@ func TestList(t *testing.T) {
 							},
 						},
 					},
-				}), paramsToJSON(params))
+				}), xtest.ToJSON(params))
 		})
 	}
 }
@@ -446,7 +446,7 @@ func TestList_AddItems(t *testing.T) {
 	params := Builder{}.Param("$x").BeginList().
 		AddItems(value.Uint64Value(123), value.Uint64Value(321)).
 		EndList().Build().ToYDB(a)
-	require.Equal(t, paramsToJSON(
+	require.Equal(t, xtest.ToJSON(
 		map[string]*Ydb.TypedValue{
 			"$x": {
 				Type: &Ydb.Type{
@@ -471,5 +471,5 @@ func TestList_AddItems(t *testing.T) {
 					},
 				},
 			},
-		}), paramsToJSON(params))
+		}), xtest.ToJSON(params))
 }

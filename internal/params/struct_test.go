@@ -916,7 +916,7 @@ func TestStruct(t *testing.T) {
 			a := allocator.New()
 			defer a.Free()
 			params := tt.builder.Build().ToYDB(a)
-			require.Equal(t, paramsToJSON(tt.params), paramsToJSON(params))
+			require.Equal(t, xtest.ToJSON(tt.params), xtest.ToJSON(params))
 		})
 	}
 }
