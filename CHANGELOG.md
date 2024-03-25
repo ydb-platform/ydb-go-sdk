@@ -1,3 +1,5 @@
+* Added experimental support of semaphores over coordination service client
+
 ## v3.59.3
 * Fixed `gstack` logic for parsing `ast.BlockStmt`
 

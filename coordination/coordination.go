@@ -25,6 +25,10 @@ type Client interface {
 	// - call Close on the Session,
 	// - close the Client which the session was created with,
 	// - call any method of the Session until the ErrSessionClosed is returned.
+	//
+	// # Experimental
+	//
+	// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 	OpenSession(ctx context.Context, path string, opts ...options.OpenSessionOption) (Session, error)
 }
 
