@@ -40,7 +40,9 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config)
 	}
 }
 
-func createNodeRequest(path string, config coordination.NodeConfig, operationParams *Ydb_Operations.OperationParams) *Ydb_Coordination.CreateNodeRequest {
+func createNodeRequest(
+	path string, config coordination.NodeConfig, operationParams *Ydb_Operations.OperationParams,
+) *Ydb_Coordination.CreateNodeRequest {
 	return &Ydb_Coordination.CreateNodeRequest{
 		Path: path,
 		Config: &Ydb_Coordination.Config{
@@ -55,7 +57,9 @@ func createNodeRequest(path string, config coordination.NodeConfig, operationPar
 	}
 }
 
-func createNode(ctx context.Context, client Ydb_Coordination_V1.CoordinationServiceClient, request *Ydb_Coordination.CreateNodeRequest) error {
+func createNode(
+	ctx context.Context, client Ydb_Coordination_V1.CoordinationServiceClient, request *Ydb_Coordination.CreateNodeRequest,
+) error {
 	_, err := client.CreateNode(ctx, request)
 	if err != nil {
 		return xerrors.WithStackTrace(err)

@@ -1,6 +1,7 @@
 package coordination
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -11,7 +12,10 @@ import (
 	"go.uber.org/mock/gomock"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/durationpb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
@@ -37,10 +41,11 @@ func TestClient_CreateNode(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		client := NewMockCoordinationServiceClient(ctrl)
 		client.EXPECT().CreateNode(gomock.Any(), gomock.Any()).Return(nil,
-			xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "")),
+			xerrors.Transport(grpcStatus.Error(grpcCodes.ResourceExhausted, "")),
 		)
 		err := createNode(ctx, client, &Ydb_Coordination.CreateNodeRequest{})
-		require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
+		require.True(t, xerrors.IsTransportError(err, grpcCodes.ResourceExhausted))
+		require.True(t, xerrors.IsRetryObjectValid(err))
 	})
 	t.Run("OperationError", func(t *testing.T) {
 		ctx := xtest.Context(t)
@@ -51,5 +56,41 @@ func TestClient_CreateNode(t *testing.T) {
 		)
 		err := createNode(ctx, client, &Ydb_Coordination.CreateNodeRequest{})
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
+		require.True(t, xerrors.IsRetryObjectValid(err))
 	})
+}
+
+func TestCreateNodeRequest(t *testing.T) {
+	for _, tt := range []struct {
+		name            string
+		path            string
+		config          coordination.NodeConfig
+		operationParams *Ydb_Operations.OperationParams
+		request         *Ydb_Coordination.CreateNodeRequest
+	}{
+		{
+			name: xtest.CurrentFileLine(),
+			path: "/abc",
+			config: coordination.NodeConfig{
+				Path: "/cde",
+			},
+			operationParams: operation.Params(context.Background(), time.Second, time.Second, operation.ModeSync),
+			request: &Ydb_Coordination.CreateNodeRequest{
+				Path: "/abc",
+				Config: &Ydb_Coordination.Config{
+					Path: "/cde",
+				},
+				OperationParams: &Ydb_Operations.OperationParams{
+					OperationMode:    Ydb_Operations.OperationParams_SYNC,
+					OperationTimeout: durationpb.New(time.Second),
+					CancelAfter:      durationpb.New(time.Second),
+				},
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			request := createNodeRequest(tt.path, tt.config, tt.operationParams)
+			require.EqualValues(t, xtest.ToJSON(tt.request), xtest.ToJSON(request))
+		})
+	}
 }
