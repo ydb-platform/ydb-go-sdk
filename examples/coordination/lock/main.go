@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
@@ -62,7 +63,7 @@ func init() {
 }
 
 func main() {
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
 	db, err := ydb.Open(ctx, dsn,
@@ -90,7 +91,7 @@ func main() {
 	for {
 		fmt.Println("waiting for a lock...")
 
-		session, err := db.Coordination().OpenSession(ctx, path)
+		session, err := db.Coordination().CreateSession(ctx, path)
 		if err != nil {
 			fmt.Println("failed to open session", err)
 

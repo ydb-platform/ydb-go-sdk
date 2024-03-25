@@ -81,14 +81,14 @@ func Example_semaphore() {
 	}
 	fmt.Printf("node description: %+v\nnode config: %+v\n", e, c)
 
-	s, err := db.Coordination().OpenSession(ctx, "/local/test")
+	s, err := db.Coordination().CreateSession(ctx, "/local/test")
 	if err != nil {
-		fmt.Printf("failed to open session: %v\n", err)
+		fmt.Printf("failed to create session: %v\n", err)
 
 		return
 	}
 	defer s.Close(ctx)
-	fmt.Printf("session 1 opened, id: %d\n", s.SessionID())
+	fmt.Printf("session 1 created, id: %d\n", s.SessionID())
 
 	err = s.CreateSemaphore(ctx, "my-semaphore", 20, options.WithCreateData([]byte{1, 2, 3}))
 	if err != nil {

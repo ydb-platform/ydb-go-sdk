@@ -249,8 +249,8 @@ func (c *Client) describeNode(
 	}, nil
 }
 
-func newOpenSessionConfig(opts ...options.OpenSessionOption) *options.OpenSessionOptions {
-	c := defaultOpenSessionConfig()
+func newCreateSessionConfig(opts ...options.CreateSessionOption) *options.CreateSessionOptions {
+	c := defaultCreateSessionConfig()
 	for _, o := range opts {
 		if o != nil {
 			o(c)
@@ -260,7 +260,7 @@ func newOpenSessionConfig(opts ...options.OpenSessionOption) *options.OpenSessio
 	return c
 }
 
-func (c *Client) sessionOpened(s *session) {
+func (c *Client) sessionCreated(s *session) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -283,8 +283,8 @@ func (c *Client) closeSessions(ctx context.Context) {
 	}
 }
 
-func defaultOpenSessionConfig() *options.OpenSessionOptions {
-	return &options.OpenSessionOptions{
+func defaultCreateSessionConfig() *options.CreateSessionOptions {
+	return &options.CreateSessionOptions{
 		Description:             "YDB Go SDK",
 		SessionTimeout:          time.Second * 5,
 		SessionStartTimeout:     time.Second * 1,
@@ -294,16 +294,16 @@ func defaultOpenSessionConfig() *options.OpenSessionOptions {
 	}
 }
 
-func (c *Client) OpenSession(
+func (c *Client) CreateSession(
 	ctx context.Context,
 	path string,
-	opts ...options.OpenSessionOption,
+	opts ...options.CreateSessionOption,
 ) (coordination.Session, error) {
 	if c == nil {
 		return nil, xerrors.WithStackTrace(errNilClient)
 	}
 
-	return openSession(ctx, c, path, newOpenSessionConfig(opts...))
+	return createSession(ctx, c, path, newCreateSessionConfig(opts...))
 }
 
 func (c *Client) Close(ctx context.Context) error {

@@ -19,7 +19,7 @@ import (
 )
 
 type session struct {
-	options *options.OpenSessionOptions
+	options *options.CreateSessionOptions
 	client  *Client
 
 	ctx               context.Context
@@ -40,13 +40,13 @@ type lease struct {
 	cancel  context.CancelFunc
 }
 
-func openSession(
+func createSession(
 	ctx context.Context,
 	client *Client,
 	path string,
-	opts *options.OpenSessionOptions,
+	opts *options.CreateSessionOptions,
 ) (*session, error) {
-	sessionCtx, cancel := context.WithCancel(ctx)
+	sessionCtx, cancel := context.WithCancel(context.Background())
 	s := session{
 		options:           opts,
 		client:            client,
@@ -55,15 +55,17 @@ func openSession(
 		sessionClosedChan: make(chan struct{}),
 		controller:        conversation.NewController(),
 	}
-	client.sessionOpened(&s)
+	client.sessionCreated(&s)
 
 	sessionStartedChan := make(chan struct{})
 	go s.mainLoop(path, sessionStartedChan)
 
 	select {
-	case <-sessionStartedChan:
-	case <-sessionCtx.Done():
+	case <-ctx.Done():
+		cancel()
+
 		return nil, ctx.Err()
+	case <-sessionStartedChan:
 	}
 
 	return &s, nil
@@ -111,7 +113,7 @@ func (s *session) newStream(
 	cancelStream context.CancelFunc,
 ) (Ydb_Coordination_V1.CoordinationService_SessionClient, error) {
 	// This deadline if final. If we have not got a session before it, the session is either expired or has never been
-	// opened.
+	// created.
 	var deadline time.Time
 	if s.sessionID != 0 {
 		deadline = s.getLastGoodResponseTime().Add(s.options.SessionTimeout)
@@ -201,7 +203,7 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 	closing := false
 
 	for {
-		// Open a new grpc stream and start the receiver and sender loops.
+		// Create a new grpc stream and start the receiver and sender loops.
 		//
 		// We use the stream context as a way to inform the main loop that the session must be reconnected if an
 		// unrecoverable error occurs in the receiver or sender loop. This also helps stop the other loop if an error
@@ -260,6 +262,7 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 			trace.CoordinationOnSessionStartTimeout(s.client.config.Trace(), s.options.SessionStartTimeout)
 			cancelStream()
 		case <-streamCtx.Done():
+		case <-s.ctx.Done():
 		}
 
 		for {
@@ -329,6 +332,10 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 				// Reconnect if no response was received before the timeout occurred.
 				trace.CoordinationOnSessionStopTimeout(s.client.config.Trace(), s.options.SessionStopTimeout)
 				cancelStream()
+			case <-s.ctx.Done():
+				cancelStream()
+
+				return
 			case <-streamCtx.Done():
 			}
 		}

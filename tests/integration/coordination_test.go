@@ -28,8 +28,7 @@ func TestCoordinationSemaphore(t *testing.T) {
 		),
 	)
 	if err != nil {
-		fmt.Printf("failed to connect: %v", err)
-		return
+		t.Fatalf("failed to connect: %v", err)
 	}
 	defer db.Close(ctx) // cleanup resources
 	// create node
@@ -42,36 +41,31 @@ func TestCoordinationSemaphore(t *testing.T) {
 		RatelimiterCountersMode:  coordination.RatelimiterCountersModeDetailed,
 	})
 	if err != nil {
-		fmt.Printf("failed to create node: %v", err)
-		return
+		t.Fatalf("failed to create node: %v", err)
 	}
 	defer db.Coordination().DropNode(ctx, "/local/test")
 	e, c, err := db.Coordination().DescribeNode(ctx, "/local/test")
 	if err != nil {
-		fmt.Printf("failed to describe node: %v\n", err)
-		return
+		t.Fatalf("failed to describe node: %v\n", err)
 	}
 	fmt.Printf("node description: %+v\nnode config: %+v\n", e, c)
 
-	s, err := db.Coordination().OpenSession(ctx, "/local/test")
+	s, err := db.Coordination().CreateSession(ctx, "/local/test")
 	if err != nil {
-		fmt.Printf("failed to open session: %v\n", err)
-		return
+		t.Fatalf("failed to create session: %v\n", err)
 	}
 	defer s.Close(ctx)
-	fmt.Printf("session 1 opened, id: %d\n", s.SessionID())
+	fmt.Printf("session 1 created, id: %d\n", s.SessionID())
 
 	err = s.CreateSemaphore(ctx, "my-semaphore", 20, options.WithCreateData([]byte{1, 2, 3}))
 	if err != nil {
-		fmt.Printf("failed to create semaphore: %v", err)
-		return
+		t.Fatalf("failed to create semaphore: %v", err)
 	}
 	fmt.Printf("semaphore my-semaphore created\n")
 
 	lease, err := s.AcquireSemaphore(ctx, "my-semaphore", 10)
 	if err != nil {
-		fmt.Printf("failed to acquire semaphore: %v", err)
-		return
+		t.Fatalf("failed to acquire semaphore: %v", err)
 	}
 	defer lease.Release()
 	fmt.Printf("session 1 acquired semaphore 10\n")
@@ -86,22 +80,20 @@ func TestCoordinationSemaphore(t *testing.T) {
 		options.WithDescribeWaiters(true),
 	)
 	if err != nil {
-		fmt.Printf("failed to describe semaphore: %v", err)
-		return
+		t.Fatalf("failed to describe semaphore: %v", err)
 	}
 	fmt.Printf("session 1 described semaphore %v\n", desc)
 
 	err = lease.Release()
 	if err != nil {
-		fmt.Printf("failed to release semaphore: %v", err)
-		return
+		t.Fatalf("failed to release semaphore: %v", err)
 	}
 	fmt.Printf("session 1 released semaphore my-semaphore\n")
 
 	err = s.DeleteSemaphore(ctx, "my-semaphore", options.WithForceDelete(true))
 	if err != nil {
-		fmt.Printf("failed to delete semaphore: %v", err)
-		return
+		t.Fatalf("failed to delete semaphore: %v", err)
 	}
+
 	fmt.Printf("deleted semaphore my-semaphore\n")
 }

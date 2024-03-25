@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
@@ -74,13 +75,8 @@ func init() {
 }
 
 func main() {
-	ctx, cancel := context.WithCancel(context.Background())
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	defer func() {
-		signal.Stop(c)
-		cancel()
-	}()
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
 
 	db, err := ydb.Open(ctx, dsn,
 		environ.WithEnvironCredentials(ctx),
@@ -114,7 +110,7 @@ func main() {
 
 	fmt.Println("starting tasks")
 	for {
-		session, err := db.Coordination().OpenSession(ctx, path)
+		session, err := db.Coordination().CreateSession(ctx, path)
 		if err != nil {
 			fmt.Println("failed to open session", err)
 
@@ -137,16 +133,16 @@ func main() {
 			select {
 			case <-semaphoreCtx.Done():
 				break loop
-			case <-c:
-				fmt.Println("exiting")
-
-				return
 			case lease := <-leaseChan:
 				go doWork(lease.lease, lease.semaphoreName)
 				tasksStarted++
 				if tasksStarted == capacity {
 					break loop
 				}
+			case <-ctx.Done():
+				fmt.Println("exiting")
+
+				return
 			}
 		}
 
@@ -156,11 +152,11 @@ func main() {
 		wg.Wait()
 
 		select {
-		case <-session.Context().Done():
-		case <-c:
+		case <-ctx.Done():
 			fmt.Println("exiting")
 
 			return
+		case <-session.Context().Done():
 		}
 	}
 }

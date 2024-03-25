@@ -16,12 +16,12 @@ type Client interface {
 	DropNode(ctx context.Context, path string) (err error)
 	DescribeNode(ctx context.Context, path string) (_ *scheme.Entry, _ *NodeConfig, err error)
 
-	// OpenSession starts a new session. This method blocks until the server session is created. The context provided is
-	// used for the lifetime of the session.
+	// CreateSession starts a new session. This method blocks until the server session is created. The context provided
+	// may be used to cancel the invocation. If the method completes successfully, the session remains alive even if
+	// the context is canceled.
 	//
 	// To ensure resources are not leaked, one of the following actions must be performed:
 	//
-	// - cancel the provided context,
 	// - call Close on the Session,
 	// - close the Client which the session was created with,
 	// - call any method of the Session until the ErrSessionClosed is returned.
@@ -29,7 +29,7 @@ type Client interface {
 	// # Experimental
 	//
 	// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-	OpenSession(ctx context.Context, path string, opts ...options.OpenSessionOption) (Session, error)
+	CreateSession(ctx context.Context, path string, opts ...options.CreateSessionOption) (Session, error)
 }
 
 const (
@@ -81,7 +81,8 @@ type Session interface {
 	// UpdateSemaphore changes semaphore data. This method waits until the server successfully updates the semaphore or
 	// returns an error.
 	//
-	// This method is idempotent. The client will automatically retry in the case of network or server failure.
+	// This method is not idempotent. The client will automatically retry in the case of network or server failure
+	// unless it leaves the client state inconsistent.
 	UpdateSemaphore(ctx context.Context, name string, opts ...options.UpdateSemaphoreOption) error
 
 	// DeleteSemaphore deletes an existing semaphore. This method waits until the server successfully deletes the
