@@ -40,6 +40,22 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config)
 	}
 }
 
+func operationParams(
+	ctx context.Context,
+	config interface {
+		OperationTimeout() time.Duration
+		OperationCancelAfter() time.Duration
+	},
+	mode operation.Mode,
+) *Ydb_Operations.OperationParams {
+	return operation.Params(
+		ctx,
+		config.OperationTimeout(),
+		config.OperationCancelAfter(),
+		mode,
+	)
+}
+
 func createNodeRequest(
 	path string, config coordination.NodeConfig, operationParams *Ydb_Operations.OperationParams,
 ) *Ydb_Coordination.CreateNodeRequest {
@@ -72,28 +88,15 @@ func (c *Client) CreateNode(ctx context.Context, path string, config coordinatio
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
-	request := createNodeRequest(path, config, operation.Params(
-		ctx,
-		c.config.OperationTimeout(),
-		c.config.OperationCancelAfter(),
-		operation.ModeSync,
-	))
-	if !c.config.AutoRetry() {
-		err := createNode(ctx, c.service, request)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
 
-		return nil
+	request := createNodeRequest(path, config, operationParams(ctx, &c.config, operation.ModeSync))
+
+	if !c.config.AutoRetry() {
+		return createNode(ctx, c.service, request)
 	}
 
 	return retry.Retry(ctx, func(ctx context.Context) error {
-		err := createNode(ctx, c.service, request)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-
-		return nil
+		return createNode(ctx, c.service, request)
 	}, retry.WithStackTrace(), retry.WithIdempotent(true), retry.WithTrace(c.config.TraceRetry()))
 }
 
@@ -187,29 +190,47 @@ func (c *Client) DescribeNode(
 	if c == nil {
 		return nil, nil, xerrors.WithStackTrace(errNilClient)
 	}
-	call := func(ctx context.Context) (err error) {
-		entry, config, err = c.describeNode(ctx, path)
 
-		return xerrors.WithStackTrace(err)
-	}
+	request := describeNodeRequest(path, operationParams(ctx, &c.config, operation.ModeSync))
+
 	if !c.config.AutoRetry() {
-		err := call(ctx)
-
-		return entry, config, xerrors.WithStackTrace(err)
+		return describeNode(ctx, c.service, request)
 	}
-	err := retry.Retry(ctx, call,
+
+	err := retry.Retry(ctx,
+		func(ctx context.Context) (err error) {
+			entry, config, err = describeNode(ctx, c.service, request)
+			if err != nil {
+				return xerrors.WithStackTrace(err)
+			}
+
+			return nil
+		},
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
 	)
+	if err != nil {
+		return nil, nil, xerrors.WithStackTrace(err)
+	}
 
-	return entry, config, xerrors.WithStackTrace(err)
+	return entry, config, nil
+}
+
+func describeNodeRequest(
+	path string, operationParams *Ydb_Operations.OperationParams,
+) *Ydb_Coordination.DescribeNodeRequest {
+	return &Ydb_Coordination.DescribeNodeRequest{
+		Path:            path,
+		OperationParams: operationParams,
+	}
 }
 
 // DescribeNode describes a coordination node
-func (c *Client) describeNode(
+func describeNode(
 	ctx context.Context,
-	path string,
+	client Ydb_Coordination_V1.CoordinationServiceClient,
+	request *Ydb_Coordination.DescribeNodeRequest,
 ) (
 	_ *scheme.Entry,
 	_ *coordination.NodeConfig,
@@ -219,21 +240,11 @@ func (c *Client) describeNode(
 		response *Ydb_Coordination.DescribeNodeResponse
 		result   Ydb_Coordination.DescribeNodeResult
 	)
-	response, err = c.service.DescribeNode(
-		ctx,
-		&Ydb_Coordination.DescribeNodeRequest{
-			Path: path,
-			OperationParams: operation.Params(
-				ctx,
-				c.config.OperationTimeout(),
-				c.config.OperationCancelAfter(),
-				operation.ModeSync,
-			),
-		},
-	)
+	response, err = client.DescribeNode(ctx, request)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
+
 	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
