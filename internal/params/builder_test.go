@@ -1,7 +1,6 @@
 package params
 
 import (
-	"encoding/json"
 	"testing"
 	"time"
 
@@ -11,12 +10,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
-
-func paramsToJSON(params map[string]*Ydb.TypedValue) string {
-	b, _ := json.MarshalIndent(params, "", "\t") //nolint:errchkjson
-
-	return string(b)
-}
 
 func TestBuilder(t *testing.T) {
 	type expected struct {
@@ -427,14 +420,14 @@ func TestBuilder(t *testing.T) {
 			params := result.Build().ToYDB(a)
 
 			require.Equal(t,
-				paramsToJSON(
+				xtest.ToJSON(
 					map[string]*Ydb.TypedValue{
 						"$x": {
 							Type:  tc.expected.Type,
 							Value: tc.expected.Value,
 						},
 					}),
-				paramsToJSON(params),
+				xtest.ToJSON(params),
 			)
 		})
 	}
