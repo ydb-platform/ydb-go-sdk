@@ -123,13 +123,13 @@ type Conversation struct {
 	cancelMessage     func(req *Ydb_Coordination.SessionRequest) *Ydb_Coordination.SessionRequest
 	cancelFilter      ResponseFilter
 	conflictKey       string
-	idempotent        bool
 	requestSent       *Ydb_Coordination.SessionRequest
 	cancelRequestSent *Ydb_Coordination.SessionRequest
 	response          *Ydb_Coordination.SessionResponse
 	responseErr       error
-	canceled          bool
 	done              chan struct{}
+	idempotent        bool
+	canceled          bool
 }
 
 // NewController creates a new conversation controller. You usually have one controller per one session.
@@ -201,6 +201,7 @@ func NewConversation(request func() *Ydb_Coordination.SessionRequest, opts ...Op
 			o(&conversation)
 		}
 	}
+
 	return &conversation
 }
 
@@ -258,6 +259,7 @@ func (c *Controller) sendFront() *Ydb_Coordination.SessionRequest {
 		if req.canceled && req.cancelRequestSent == nil {
 			req.sendCancel()
 			c.notify()
+
 			return req.cancelRequestSent
 		}
 
@@ -278,6 +280,7 @@ func (c *Controller) sendFront() *Ydb_Coordination.SessionRequest {
 			c.queue = append(c.queue[:i], c.queue[i+1:]...)
 		}
 		c.notify()
+
 		return req.requestSent
 	}
 
@@ -455,6 +458,7 @@ func (c *Controller) cancel(conversation *Conversation) bool {
 			req := c.queue[i]
 			if req == conversation {
 				c.queue = append(c.queue[:i], c.queue[i+1:]...)
+
 				break
 			}
 		}

@@ -243,6 +243,7 @@ func newOpenSessionConfig(opts ...options.OpenSessionOption) *options.OpenSessio
 			o(c)
 		}
 	}
+
 	return c
 }
 

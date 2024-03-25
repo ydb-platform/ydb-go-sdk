@@ -13,7 +13,10 @@ func Coordination(l Logger, d trace.Detailer, opts ...Option) (t trace.Coordinat
 	return internalCoordination(wrapLogger(l, opts...), d)
 }
 
-func internalCoordination(l *wrapper, d trace.Detailer) (t trace.Coordination) {
+func internalCoordination(
+	l *wrapper, //nolint:interfacer
+	d trace.Detailer,
+) (t trace.Coordination) {
 	t.OnStreamNew = func(
 		info trace.CoordinationStreamNewStartInfo,
 	) func(
@@ -25,6 +28,7 @@ func internalCoordination(l *wrapper, d trace.Detailer) (t trace.Coordination) {
 		ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "stream", "new")
 		l.Log(ctx, "stream")
 		start := time.Now()
+
 		return func(info trace.CoordinationStreamNewDoneInfo) {
 			l.Log(ctx, "done",
 				latencyField(start),
@@ -128,6 +132,7 @@ func internalCoordination(l *wrapper, d trace.Detailer) (t trace.Coordination) {
 		ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "receive")
 		l.Log(ctx, "receive")
 		start := time.Now()
+
 		return func(info trace.CoordinationSessionReceiveDoneInfo) {
 			l.Log(ctx, "done",
 				latencyField(start),
@@ -168,6 +173,7 @@ func internalCoordination(l *wrapper, d trace.Detailer) (t trace.Coordination) {
 		ctx := with(context.Background(), TRACE, "ydb", "coordination", "session", "start")
 		l.Log(ctx, "start")
 		start := time.Now()
+
 		return func(info trace.CoordinationSessionStartDoneInfo) {
 			l.Log(ctx, "done",
 				latencyField(start),
@@ -189,6 +195,7 @@ func internalCoordination(l *wrapper, d trace.Detailer) (t trace.Coordination) {
 			Stringer("request", info.Request),
 		)
 		start := time.Now()
+
 		return func(info trace.CoordinationSessionSendDoneInfo) {
 			l.Log(ctx, "done",
 				latencyField(start),

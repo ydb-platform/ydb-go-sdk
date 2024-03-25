@@ -2,7 +2,6 @@ package coordination
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -28,19 +27,6 @@ type Client interface {
 	// - call any method of the Session until the ErrSessionClosed is returned.
 	OpenSession(ctx context.Context, path string, opts ...options.OpenSessionOption) (Session, error)
 }
-
-// ErrOperationStatusUnknown indicates that the request has been sent to the server but no reply has been received.
-// The client usually automatically retries calls of that kind, but there are cases when it is not possible:
-// - the request is not idempotent, non-idempotent requests are never retried,
-// - the session was lost and its context is canceled.
-var ErrOperationStatusUnknown = errors.New("operation status is unknown")
-
-// ErrSessionClosed indicates that the Session object is closed.
-var ErrSessionClosed = errors.New("session is closed")
-
-// ErrAcquireTimeout indicates that the Session.AcquireSemaphore method could not acquire the semaphore before the
-// operation timeout (see options.WithAcquireTimeout).
-var ErrAcquireTimeout = errors.New("acquire semaphore timeout")
 
 const (
 	// MaxSemaphoreLimit defines the maximum value of the limit parameter in the Session.CreateSemaphore method.

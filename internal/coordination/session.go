@@ -74,6 +74,7 @@ func openSession(
 func newProtectionKey() []byte {
 	key := make([]byte, 8)
 	binary.LittleEndian.PutUint64(key, rand.Uint64()) //nolint:gosec
+
 	return key
 }
 
@@ -86,6 +87,7 @@ func (s *session) updateLastGoodResponseTime() {
 	defer s.mutex.Unlock()
 
 	now := time.Now()
+
 	if now.After(s.lastGoodResponseTime) {
 		s.lastGoodResponseTime = now
 	}
@@ -146,6 +148,7 @@ func (s *session) newStream(
 			}
 
 			cancelStream()
+
 			return nil, s.ctx.Err()
 		}
 
@@ -161,6 +164,7 @@ func (s *session) newStream(
 				s.options.SessionTimeout,
 			)
 			cancelStream()
+
 			return nil, coordination.ErrSessionClosed
 		}
 		timer.Stop()
@@ -181,6 +185,7 @@ func (s *session) newStream(
 				lastChance = true
 			} else {
 				cancelStream()
+
 				return nil, s.ctx.Err()
 			}
 		}
@@ -212,6 +217,7 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 		if err != nil {
 			// Giving up, we can do nothing without a stream.
 			s.controller.Close(nil)
+
 			return
 		}
 
@@ -263,6 +269,7 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 			// though the stream context may also be canceled.
 			if s.ctx.Err() != nil {
 				closing = true
+
 				break
 			}
 			if streamCtx.Err() != nil {
@@ -293,6 +300,7 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 			if s.sessionID == 0 {
 				s.controller.Close(nil)
 				cancelStream()
+
 				return
 			}
 
@@ -313,6 +321,7 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 				trace.CoordinationOnSessionStopped(s.client.config.Trace(), stop.GetSessionId(), s.sessionID)
 				if stop.GetSessionId() == s.sessionID {
 					cancelStream()
+
 					return
 				}
 
@@ -352,6 +361,7 @@ func (s *session) receiveLoop(
 		if err != nil {
 			// Any stream error is unrecoverable, try to reconnect.
 			onDone(nil, err)
+
 			return
 		}
 		onDone(message, nil)
@@ -363,10 +373,12 @@ func (s *session) receiveLoop(
 				message.GetFailure().GetStatus() == Ydb.StatusIds_NOT_FOUND {
 				// Consider the session expired if we got an unrecoverable status.
 				trace.CoordinationOnSessionServerExpire(s.client.config.Trace(), message.GetFailure())
+
 				return
 			}
 
 			trace.CoordinationOnSessionServerError(s.client.config.Trace(), message.GetFailure())
+
 			return
 		case *Ydb_Coordination.SessionResponse_SessionStarted_:
 			sessionStarted <- message.GetSessionStarted()
@@ -374,6 +386,7 @@ func (s *session) receiveLoop(
 		case *Ydb_Coordination.SessionResponse_SessionStopped_:
 			sessionStopped <- message.GetSessionStopped()
 			s.cancel()
+
 			return
 		case *Ydb_Coordination.SessionResponse_Ping:
 			opaque := message.GetPing().GetOpaque()
@@ -399,6 +412,7 @@ func (s *session) receiveLoop(
 			if !s.controller.OnRecv(message) {
 				// Reconnect if the message is not from any known conversation.
 				trace.CoordinationOnSessionReceiveUnexpected(s.client.config.Trace(), message)
+
 				return
 			}
 
@@ -442,6 +456,7 @@ func (s *session) sendLoop(
 	if err != nil {
 		// Reconnect if a session cannot be started in this stream.
 		onDone(err)
+
 		return
 	}
 	onDone(nil)
@@ -465,6 +480,7 @@ func (s *session) sendLoop(
 		if err != nil {
 			// Any stream error is unrecoverable, try to reconnect.
 			onSendDone(err)
+
 			return
 		}
 		onSendDone(nil)
@@ -526,6 +542,7 @@ func (s *session) CreateSemaphore(
 					o(&createSemaphore)
 				}
 			}
+
 			return &Ydb_Coordination.SessionRequest{
 				Request: &Ydb_Coordination.SessionRequest_CreateSemaphore_{
 					CreateSemaphore: &createSemaphore,
@@ -570,6 +587,7 @@ func (s *session) UpdateSemaphore(
 					o(&updateSemaphore)
 				}
 			}
+
 			return &Ydb_Coordination.SessionRequest{
 				Request: &Ydb_Coordination.SessionRequest_UpdateSemaphore_{
 					UpdateSemaphore: &updateSemaphore,
@@ -616,6 +634,7 @@ func (s *session) DeleteSemaphore(
 					o(&deleteSemaphore)
 				}
 			}
+
 			return &Ydb_Coordination.SessionRequest{
 				Request: &Ydb_Coordination.SessionRequest_DeleteSemaphore_{
 					DeleteSemaphore: &deleteSemaphore,
@@ -661,6 +680,7 @@ func (s *session) DescribeSemaphore(
 					o(&describeSemaphore)
 				}
 			}
+
 			return &Ydb_Coordination.SessionRequest{
 				Request: &Ydb_Coordination.SessionRequest_DescribeSemaphore_{
 					DescribeSemaphore: &describeSemaphore,
@@ -769,6 +789,7 @@ func (s *session) AcquireSemaphore(
 					o(&acquireSemaphore)
 				}
 			}
+
 			return &Ydb_Coordination.SessionRequest{
 				Request: &Ydb_Coordination.SessionRequest_AcquireSemaphore_{
 					AcquireSemaphore: &acquireSemaphore,
@@ -825,7 +846,7 @@ func (s *session) AcquireSemaphore(
 		return nil, err
 	}
 
-	if !resp.GetAcquireSemaphoreResult().Acquired {
+	if !resp.GetAcquireSemaphoreResult().GetAcquired() {
 		return nil, coordination.ErrAcquireTimeout
 	}
 
