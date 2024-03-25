@@ -32,7 +32,8 @@ func (s *grpcClientStream) CloseSend() (err error) {
 		onDone(err)
 	}()
 
-	defer s.c.lastUsage.Touch()()
+	stop := s.c.lastUsage.Start()
+	defer stop()
 
 	err = s.ClientStream.CloseSend()
 
@@ -65,7 +66,8 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 		onDone(err)
 	}()
 
-	defer s.c.lastUsage.Touch()()
+	stop := s.c.lastUsage.Start()
+	defer stop()
 
 	err = s.ClientStream.SendMsg(m)
 
@@ -106,7 +108,8 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 		onDone(err)
 	}()
 
-	defer s.c.lastUsage.Touch()()
+	stop := s.c.lastUsage.Start()
+	defer stop()
 
 	defer func() {
 		if err != nil {
