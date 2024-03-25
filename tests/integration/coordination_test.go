@@ -17,13 +17,16 @@ import (
 )
 
 //nolint:errcheck
-func TestExample(t *testing.T) {
+func TestCoordinationSemaphore(t *testing.T) {
 	ctx := context.TODO()
-	db, err := ydb.Open(ctx, "grpc://localhost:2136/local", ydb.WithLogger(
-		log.Default(os.Stderr,
-			log.WithMinLevel(log.TRACE),
+	db, err := ydb.Open(ctx,
+		os.Getenv("YDB_CONNECTION_STRING"),
+		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
+		ydb.WithLogger(
+			log.Default(os.Stderr, log.WithMinLevel(log.TRACE)),
+			trace.MatchDetails(`ydb\.(coordination).*`),
 		),
-		trace.MatchDetails(`ydb\.(coordination).*`)))
+	)
 	if err != nil {
 		fmt.Printf("failed to connect: %v", err)
 		return
