@@ -25,6 +25,7 @@ var (
 	capacity        int
 )
 
+//nolint:gochecknoinits
 func init() {
 	required := []string{"ydb", "path"}
 	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
@@ -99,6 +100,7 @@ func main() {
 	})
 	if err != nil {
 		fmt.Printf("failed to create coordination node: %v\n", err)
+
 		return
 	}
 
@@ -115,6 +117,7 @@ func main() {
 		session, err := db.Coordination().OpenSession(ctx, path)
 		if err != nil {
 			fmt.Println("failed to open session", err)
+
 			return
 		}
 
@@ -136,6 +139,7 @@ func main() {
 				break loop
 			case <-c:
 				fmt.Println("exiting")
+
 				return
 			case lease := <-leaseChan:
 				go doWork(lease.lease, lease.semaphoreName)
@@ -155,6 +159,7 @@ func main() {
 		case <-session.Context().Done():
 		case <-c:
 			fmt.Println("exiting")
+
 			return
 		}
 	}
@@ -189,6 +194,7 @@ func awaitSemaphore(
 
 		fmt.Println("failed to acquire semaphore", err)
 		cancel()
+
 		return
 	}
 
@@ -217,6 +223,7 @@ func doWork(
 			if err != nil {
 				fmt.Println("failed to release semaphore", err)
 			}
+
 			return
 		case <-time.After(time.Second):
 		}

@@ -21,6 +21,7 @@ var (
 	semaphore string
 )
 
+//nolint:gochecknoinits
 func init() {
 	required := []string{"ydb", "path", "semaphore"}
 	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
@@ -61,7 +62,6 @@ func init() {
 }
 
 func main() {
-	context.WithCancel(context.Background())
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
@@ -83,6 +83,7 @@ func main() {
 	})
 	if err != nil {
 		fmt.Printf("failed to create coordination node: %v\n", err)
+
 		return
 	}
 
@@ -92,6 +93,7 @@ func main() {
 		session, err := db.Coordination().OpenSession(ctx, path)
 		if err != nil {
 			fmt.Println("failed to open session", err)
+
 			return
 		}
 
@@ -99,6 +101,7 @@ func main() {
 		if err != nil {
 			fmt.Printf("failed to acquire semaphore: %v\n", err)
 			_ = session.Close(ctx)
+
 			continue
 		}
 
@@ -111,6 +114,7 @@ func main() {
 		select {
 		case <-ctx.Done():
 			fmt.Println("exiting")
+
 			return
 		case <-lease.Context().Done():
 		}
@@ -121,7 +125,10 @@ func main() {
 }
 
 func doWork(ctx context.Context, wg *sync.WaitGroup) {
-	defer wg.Done()
+	defer func() {
+		fmt.Println("suspending work")
+		wg.Done()
+	}()
 
 	fmt.Println("starting work")
 	for {
@@ -133,6 +140,4 @@ func doWork(ctx context.Context, wg *sync.WaitGroup) {
 		case <-time.After(time.Second):
 		}
 	}
-
-	fmt.Println("suspending work")
 }
