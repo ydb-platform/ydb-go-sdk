@@ -20,7 +20,7 @@ func TestWriterImpl_CreateInitMessage(t *testing.T) {
 				defaultPartitioning: rawtopicwriter.NewPartitioningPartitionID(5),
 				compressorCount:     1,
 			},
-			getAutoSeq: true,
+			getLastSeqNum: true,
 		}
 		w := newSingleStreamWriterStopped(ctx, cfg)
 		expected := rawtopicwriter.InitRequest{
@@ -36,7 +36,7 @@ func TestWriterImpl_CreateInitMessage(t *testing.T) {
 	t.Run("WithoutGetLastSeq", func(t *testing.T) {
 		ctx := xtest.Context(t)
 		w := newSingleStreamWriterStopped(ctx,
-			SingleStreamWriterConfig{getAutoSeq: false},
+			SingleStreamWriterConfig{getLastSeqNum: false},
 		)
 		require.False(t, w.createInitRequest().GetLastSeqNo)
 	})

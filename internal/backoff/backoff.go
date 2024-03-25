@@ -86,11 +86,12 @@ func New(opts ...option) logBackoff {
 	b := logBackoff{
 		r: xrand.New(xrand.WithLock()),
 	}
-	for _, o := range opts {
-		if o != nil {
-			o(&b)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&b)
 		}
 	}
+
 	return b
 }
 
@@ -106,6 +107,7 @@ func (b logBackoff) Delay(i int) time.Duration {
 	if f == d {
 		return f
 	}
+
 	return f + time.Duration(b.r.Int64(int64(d-f)+1))
 }
 
@@ -113,6 +115,7 @@ func min(a, b uint) uint {
 	if a < b {
 		return a
 	}
+
 	return b
 }
 
@@ -120,5 +123,6 @@ func max(a, b uint) uint {
 	if a > b {
 		return a
 	}
+
 	return b
 }

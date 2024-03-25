@@ -19,7 +19,7 @@ type Error interface {
 	Name() string
 	Type() Type
 	BackoffType() backoff.Type
-	MustDeleteSession() bool
+	IsRetryObjectValid() bool
 }
 
 func IsTimeoutError(err error) bool {
@@ -46,6 +46,7 @@ func ErrIf(cond bool, err error) error {
 	if cond {
 		return err
 	}
+
 	return nil
 }
 
@@ -56,6 +57,7 @@ func HideEOF(err error) error {
 	if errors.Is(err, io.EOF) {
 		return nil
 	}
+
 	return err
 }
 
@@ -73,7 +75,14 @@ func As(err error, targets ...interface{}) bool {
 			return true
 		}
 	}
+
 	return false
+}
+
+// IsErrorFromServer return true if err returned from server
+// (opposite to raised internally in sdk)
+func IsErrorFromServer(err error) bool {
+	return IsTransportError(err) || IsOperationError(err)
 }
 
 // Is is a improved proxy to errors.Is
@@ -87,5 +96,10 @@ func Is(err error, targets ...error) bool {
 			return true
 		}
 	}
+
 	return false
+}
+
+func IsContextError(err error) bool {
+	return Is(err, context.Canceled, context.DeadlineExceeded)
 }

@@ -10,6 +10,7 @@ type isYdbError interface {
 
 func IsYdb(err error) bool {
 	var e isYdbError
+
 	return errors.As(err, &e)
 }
 

@@ -34,5 +34,6 @@ func render(t *template.Template, data interface{}) string {
 	if err != nil {
 		panic(err)
 	}
+
 	return buf.String()
 }

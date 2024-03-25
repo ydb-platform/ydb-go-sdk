@@ -9,8 +9,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 type Column struct {
@@ -22,7 +22,7 @@ type Column struct {
 func (c Column) toYDB(a *allocator.Allocator) *Ydb_Table.ColumnMeta {
 	return &Ydb_Table.ColumnMeta{
 		Name:   c.Name,
-		Type:   value.TypeToYDB(c.Type, a),
+		Type:   types.TypeToYDB(c.Type, a),
 		Family: c.Family,
 	}
 }
@@ -41,15 +41,6 @@ type IndexDescription struct {
 	DataColumns  []string
 	Status       Ydb_Table.TableIndexDescription_Status
 	Type         IndexType
-}
-
-//nolint:unused
-func (i IndexDescription) toYDB() *Ydb_Table.TableIndexDescription {
-	return &Ydb_Table.TableIndexDescription{
-		Name:         i.Name,
-		IndexColumns: i.IndexColumns,
-		Status:       i.Status,
-	}
 }
 
 type Description struct {
@@ -117,6 +108,7 @@ func (s StoragePool) toYDB() *Ydb_Table.StoragePool {
 	if s.Media == "" {
 		return nil
 	}
+
 	return &Ydb_Table.StoragePool{
 		Media: s.Media,
 	}
@@ -405,8 +397,8 @@ type (
 )
 
 type KeyRange struct {
-	From types.Value
-	To   types.Value
+	From value.Value
+	To   value.Value
 }
 
 func (kr KeyRange) String() string {
@@ -424,6 +416,7 @@ func (kr KeyRange) String() string {
 		buf.WriteString(kr.To.Yql())
 	}
 	buf.WriteString("]")
+
 	return buf.String()
 }
 
@@ -463,6 +456,7 @@ func NewTTLSettings() TimeToLiveSettings {
 func (ttl TimeToLiveSettings) ColumnDateType(columnName string) TimeToLiveSettings {
 	ttl.Mode = TimeToLiveModeDateType
 	ttl.ColumnName = columnName
+
 	return ttl
 }
 
@@ -474,6 +468,7 @@ func (ttl TimeToLiveSettings) ColumnSeconds(columnName string) TimeToLiveSetting
 	ttl.Mode = TimeToLiveModeValueSinceUnixEpoch
 	ttl.ColumnName = columnName
 	ttl.ColumnUnit = unitToPointer(TimeToLiveUnitSeconds)
+
 	return ttl
 }
 
@@ -481,6 +476,7 @@ func (ttl TimeToLiveSettings) ColumnMilliseconds(columnName string) TimeToLiveSe
 	ttl.Mode = TimeToLiveModeValueSinceUnixEpoch
 	ttl.ColumnName = columnName
 	ttl.ColumnUnit = unitToPointer(TimeToLiveUnitMilliseconds)
+
 	return ttl
 }
 
@@ -488,6 +484,7 @@ func (ttl TimeToLiveSettings) ColumnMicroseconds(columnName string) TimeToLiveSe
 	ttl.Mode = TimeToLiveModeValueSinceUnixEpoch
 	ttl.ColumnName = columnName
 	ttl.ColumnUnit = unitToPointer(TimeToLiveUnitMicroseconds)
+
 	return ttl
 }
 
@@ -495,11 +492,13 @@ func (ttl TimeToLiveSettings) ColumnNanoseconds(columnName string) TimeToLiveSet
 	ttl.Mode = TimeToLiveModeValueSinceUnixEpoch
 	ttl.ColumnName = columnName
 	ttl.ColumnUnit = unitToPointer(TimeToLiveUnitNanoseconds)
+
 	return ttl
 }
 
 func (ttl TimeToLiveSettings) ExpireAfter(expireAfter time.Duration) TimeToLiveSettings {
 	ttl.ExpireAfterSeconds = uint32(expireAfter.Seconds())
+
 	return ttl
 }
 

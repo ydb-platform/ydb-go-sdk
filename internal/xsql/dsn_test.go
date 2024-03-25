@@ -13,10 +13,13 @@ func TestParse(t *testing.T) {
 	newConnector := func(opts ...ConnectorOption) *Connector {
 		c := &Connector{}
 		for _, opt := range opts {
-			if err := opt.Apply(c); err != nil {
-				t.Error(err)
+			if opt != nil {
+				if err := opt.Apply(c); err != nil {
+					t.Error(err)
+				}
 			}
 		}
+
 		return c
 	}
 	compareConfigs := func(t *testing.T, lhs, rhs *config.Config) {

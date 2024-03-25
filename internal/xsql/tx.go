@@ -49,6 +49,7 @@ func (c *conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (current
 		txCtx: ctx,
 		tx:    transaction,
 	}
+
 	return c.currentTx, nil
 }
 
@@ -65,6 +66,7 @@ func (tx *tx) checkTxState() error {
 			tx.ID(), tx.conn.ID(),
 		)
 	}
+
 	return fmt.Errorf("broken conn state: tx=%s not related to conn=%q (conn have current tx=%q)",
 		tx.conn.currentTx.ID(), tx.conn.ID(), tx.ID(),
 	)
@@ -72,7 +74,7 @@ func (tx *tx) checkTxState() error {
 
 func (tx *tx) Commit() (finalErr error) {
 	onDone := trace.DatabaseSQLOnTxCommit(tx.conn.trace, &tx.txCtx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*tx).Commit"),
 		tx,
 	)
 	defer func() {
@@ -88,12 +90,13 @@ func (tx *tx) Commit() (finalErr error) {
 	if err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	return nil
 }
 
 func (tx *tx) Rollback() (finalErr error) {
 	onDone := trace.DatabaseSQLOnTxRollback(tx.conn.trace, &tx.txCtx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*tx).Rollback"),
 		tx,
 	)
 	defer func() {
@@ -109,6 +112,7 @@ func (tx *tx) Rollback() (finalErr error) {
 	if err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	return err
 }
 
@@ -116,8 +120,8 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 	_ driver.Rows, finalErr error,
 ) {
 	onDone := trace.DatabaseSQLOnTxQuery(tx.conn.trace, &ctx,
-		stack.FunctionID(""),
-		tx.txCtx, tx, query, true,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*tx).QueryContext"),
+		tx.txCtx, tx, query,
 	)
 	defer func() {
 		onDone(finalErr)
@@ -128,18 +132,18 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 			xerrors.WithStackTrace(
 				xerrors.Retryable(
 					fmt.Errorf("wrong query mode: %s", m.String()),
-					xerrors.WithDeleteSession(),
+					xerrors.InvalidObject(),
 					xerrors.WithName("WRONG_QUERY_MODE"),
 				),
 			),
 		)
 	}
-	query, params, err := tx.conn.normalize(query, args...)
+	query, parameters, err := tx.conn.normalize(query, args...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 	res, err := tx.tx.Execute(ctx,
-		query, params, tx.conn.dataQueryOptions(ctx)...,
+		query, &parameters, tx.conn.dataQueryOptions(ctx)...,
 	)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -147,6 +151,7 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 	if err = res.Err(); err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	return &rows{
 		conn:   tx.conn,
 		result: res,
@@ -157,8 +162,8 @@ func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.Named
 	_ driver.Result, finalErr error,
 ) {
 	onDone := trace.DatabaseSQLOnTxExec(tx.conn.trace, &ctx,
-		stack.FunctionID(""),
-		tx.txCtx, tx, query, true,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*tx).ExecContext"),
+		tx.txCtx, tx, query,
 	)
 	defer func() {
 		onDone(finalErr)
@@ -169,28 +174,29 @@ func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.Named
 			xerrors.WithStackTrace(
 				xerrors.Retryable(
 					fmt.Errorf("wrong query mode: %s", m.String()),
-					xerrors.WithDeleteSession(),
+					xerrors.InvalidObject(),
 					xerrors.WithName("WRONG_QUERY_MODE"),
 				),
 			),
 		)
 	}
-	query, params, err := tx.conn.normalize(query, args...)
+	query, parameters, err := tx.conn.normalize(query, args...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 	_, err = tx.tx.Execute(ctx,
-		query, params, tx.conn.dataQueryOptions(ctx)...,
+		query, &parameters, tx.conn.dataQueryOptions(ctx)...,
 	)
 	if err != nil {
 		return nil, badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	return resultNoRows{}, nil
 }
 
 func (tx *tx) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, finalErr error) {
 	onDone := trace.DatabaseSQLOnTxPrepare(tx.conn.trace, &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*tx).PrepareContext"),
 		&tx.txCtx, tx, query,
 	)
 	defer func() {
@@ -199,6 +205,7 @@ func (tx *tx) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, 
 	if !tx.conn.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
+
 	return &stmt{
 		conn:      tx.conn,
 		processor: tx,

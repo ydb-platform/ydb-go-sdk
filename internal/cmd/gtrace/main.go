@@ -16,14 +16,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	_ "unsafe" // For go:linkname.
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
-
-//go:linkname build_goodOSArchFile go/build.(*Context).goodOSArchFile
-//nolint:revive
-func build_goodOSArchFile(*build.Context, string, map[string]bool) bool
 
 //nolint:gocyclo
 func main() {
@@ -64,8 +59,6 @@ func main() {
 
 	var writers []*Writer
 	if isGoGenerate {
-		// We should respect Go suffixes like `_linux.go`.
-		name, tags, ext := splitOSArchTags(&buildCtx, gofile)
 		openFile := func(name string) (*os.File, func()) {
 			var f *os.File
 			//nolint:gofumpt
@@ -79,9 +72,12 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
+
 			return f, func() { f.Close() }
 		}
-		f, clean := openFile(name + "_gtrace" + tags + ext)
+		ext := filepath.Ext(gofile)
+		name := strings.TrimSuffix(gofile, ext)
+		f, clean := openFile(name + "_gtrace" + ext)
 		defer clean()
 		writers = append(writers, &Writer{
 			Context: buildCtx,
@@ -102,7 +98,7 @@ func main() {
 	)
 	fset := token.NewFileSet()
 	for _, name := range buildPkg.GoFiles {
-		base, _, _ := splitOSArchTags(&buildCtx, name)
+		base := strings.TrimSuffix(name, filepath.Ext(name))
 		if isGenerated(base, "_gtrace") {
 			continue
 		}
@@ -159,6 +155,7 @@ func main() {
 			if n == nil {
 				item = nil
 				depth--
+
 				return true
 			}
 			defer func() {
@@ -175,6 +172,7 @@ func main() {
 				if item != nil {
 					item.Ident = v
 				}
+
 				return false
 
 			case *ast.CommentGroup:
@@ -185,6 +183,7 @@ func main() {
 						}
 					}
 				}
+
 				return false
 
 			case *ast.StructType:
@@ -193,6 +192,7 @@ func main() {
 					items = append(items, item)
 					item = nil
 				}
+
 				return false
 			}
 
@@ -228,6 +228,7 @@ func main() {
 					"skipping hook %s due to error: %v",
 					name, err,
 				)
+
 				continue
 			}
 			t.Hooks = append(t.Hooks, Hook{
@@ -289,12 +290,14 @@ func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (re
 			return nil, xerrors.WithStackTrace(err)
 		}
 		ret.Result = append(ret.Result, result)
+
 		return ret, nil
 
 	case *ast.Ident:
 		if t, ok := traces[x.Name]; ok {
 			t.Nested = true
 			ret.Result = append(ret.Result, t)
+
 			return ret, nil
 		}
 	}
@@ -303,37 +306,6 @@ func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (re
 		"unsupported function result type %s",
 		info.TypeOf(r.Type),
 	)
-}
-
-func splitOSArchTags(ctx *build.Context, name string) (base, tags, ext string) {
-	fileTags := make(map[string]bool)
-	build_goodOSArchFile(ctx, name, fileTags)
-	ext = filepath.Ext(name)
-	switch len(fileTags) {
-	case 0: // *
-		base = strings.TrimSuffix(name, ext)
-
-	case 1: // *_GOOS or *_GOARCH
-		i := strings.LastIndexByte(name, '_')
-
-		base = name[:i]
-		tags = strings.TrimSuffix(name[i:], ext)
-
-	case 2: // *_GOOS_GOARCH
-		var i int
-		i = strings.LastIndexByte(name, '_')
-		i = strings.LastIndexByte(name[:i], '_')
-
-		base = name[:i]
-		tags = strings.TrimSuffix(name[i:], ext)
-
-	default:
-		panic(fmt.Sprintf(
-			"gtrace: internal error: unexpected number of OS/arch tags: %d",
-			len(fileTags),
-		))
-	}
-	return
 }
 
 type Package struct {
@@ -396,6 +368,7 @@ func rsplit(s string, c byte) (s1, s2 string) {
 	if i == -1 {
 		return s, ""
 	}
+
 	return s[:i], s[i+1:]
 }
 
@@ -411,6 +384,7 @@ func scanBuildConstraints(r io.Reader) (cs []string, err error) {
 			comm = bytes.TrimSpace(comm)
 			if bytes.HasPrefix(comm, []byte("+build")) {
 				cs = append(cs, string(line))
+
 				continue
 			}
 		}
@@ -418,6 +392,7 @@ func scanBuildConstraints(r io.Reader) (cs []string, err error) {
 			break
 		}
 	}
+
 	return cs, nil
 }
 
@@ -428,5 +403,6 @@ func isGenerated(base, suffix string) bool {
 	}
 	n := len(base)
 	m := i + len(suffix)
+
 	return m == n || base[m] == '_'
 }

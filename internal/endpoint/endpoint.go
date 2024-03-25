@@ -39,6 +39,7 @@ type endpoint struct {
 func (e *endpoint) Copy() Endpoint {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
+
 	return &endpoint{
 		id:          e.id,
 		address:     e.address,
@@ -53,6 +54,7 @@ func (e *endpoint) Copy() Endpoint {
 func (e *endpoint) String() string {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
+
 	return fmt.Sprintf(`{id:%d,address:%q,local:%t,location:%q,loadFactor:%f,lastUpdated:%q}`,
 		e.id,
 		e.address,
@@ -66,49 +68,52 @@ func (e *endpoint) String() string {
 func (e *endpoint) NodeID() uint32 {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
+
 	return e.id
 }
 
 func (e *endpoint) Address() (address string) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
+
 	return e.address
 }
 
 func (e *endpoint) Location() string {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
+
 	return e.location
 }
 
 func (e *endpoint) LocalDC() bool {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
+
 	return e.local
 }
 
 func (e *endpoint) LoadFactor() float32 {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
+
 	return e.loadFactor
 }
 
 func (e *endpoint) LastUpdated() time.Time {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
+
 	return e.lastUpdated
 }
 
 func (e *endpoint) Touch(opts ...Option) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	for _, o := range append(
-		[]Option{
-			withLastUpdated(time.Now()),
-		},
-		opts...,
-	) {
-		o(e)
+	for _, opt := range append([]Option{withLastUpdated(time.Now())}, opts...) {
+		if opt != nil {
+			opt(e)
+		}
 	}
 }
 
@@ -155,10 +160,11 @@ func New(address string, opts ...Option) *endpoint {
 		address:     address,
 		lastUpdated: time.Now(),
 	}
-	for _, o := range opts {
-		if o != nil {
-			o(e)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(e)
 		}
 	}
+
 	return e
 }

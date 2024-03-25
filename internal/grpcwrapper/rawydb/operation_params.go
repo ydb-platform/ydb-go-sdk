@@ -19,6 +19,7 @@ func (p *OperationParams) ToProto() *Ydb_Operations.OperationParams {
 	}
 	res.OperationTimeout = p.OperationTimeout.ToProto()
 	res.CancelAfter = p.CancelAfter.ToProto()
+
 	return res
 }
 

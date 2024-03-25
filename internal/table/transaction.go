@@ -3,14 +3,15 @@ package table
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -24,7 +25,7 @@ var (
 )
 
 type txState struct {
-	rawVal xatomic.Uint32
+	rawVal atomic.Uint32
 }
 
 func (s *txState) Load() txStateEnum {
@@ -57,13 +58,13 @@ func (tx *transaction) ID() string {
 // Execute executes query represented by text within transaction tx.
 func (tx *transaction) Execute(
 	ctx context.Context,
-	query string, params *table.QueryParameters,
+	query string, parameters *params.Parameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
-	onDone := trace.TableOnSessionTransactionExecute(
+	onDone := trace.TableOnTxExecute(
 		tx.s.config.Trace(), &ctx,
-		stack.FunctionID(""),
-		tx.s, tx, queryFromText(query), params,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*transaction).Execute"),
+		tx.s, tx, queryFromText(query), parameters,
 	)
 	defer func() {
 		onDone(r, err)
@@ -75,12 +76,12 @@ func (tx *transaction) Execute(
 	case txStateRollbacked:
 		return nil, xerrors.WithStackTrace(errTxRollbackedEarly)
 	default:
-		_, r, err = tx.s.Execute(ctx, tx.control, query, params, opts...)
+		_, r, err = tx.s.Execute(ctx, tx.control, query, parameters, opts...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		if tx.control.Desc().CommitTx {
+		if tx.control.Desc().GetCommitTx() {
 			tx.state.Store(txStateCommitted)
 		}
 
@@ -91,19 +92,16 @@ func (tx *transaction) Execute(
 // ExecuteStatement executes prepared statement stmt within transaction tx.
 func (tx *transaction) ExecuteStatement(
 	ctx context.Context,
-	stmt table.Statement, params *table.QueryParameters,
+	stmt table.Statement, parameters *params.Parameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (r result.Result, err error) {
-	if params == nil {
-		params = table.NewQueryParameters()
-	}
 	a := allocator.New()
 	defer a.Free()
 
-	onDone := trace.TableOnSessionTransactionExecuteStatement(
+	onDone := trace.TableOnTxExecuteStatement(
 		tx.s.config.Trace(), &ctx,
-		stack.FunctionID(""),
-		tx.s, tx, stmt.(*statement).query, params,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*transaction).ExecuteStatement"),
+		tx.s, tx, stmt.(*statement).query, parameters,
 	)
 	defer func() {
 		onDone(r, err)
@@ -115,12 +113,12 @@ func (tx *transaction) ExecuteStatement(
 	case txStateRollbacked:
 		return nil, xerrors.WithStackTrace(errTxRollbackedEarly)
 	default:
-		_, r, err = stmt.Execute(ctx, tx.control, params, opts...)
+		_, r, err = stmt.Execute(ctx, tx.control, parameters, opts...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		if tx.control.Desc().CommitTx {
+		if tx.control.Desc().GetCommitTx() {
 			tx.state.Store(txStateCommitted)
 		}
 
@@ -133,9 +131,9 @@ func (tx *transaction) CommitTx(
 	ctx context.Context,
 	opts ...options.CommitTransactionOption,
 ) (r result.Result, err error) {
-	onDone := trace.TableOnSessionTransactionCommit(
+	onDone := trace.TableOnTxCommit(
 		tx.s.config.Trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*transaction).CommitTx"),
 		tx.s, tx,
 	)
 	defer func() {
@@ -191,9 +189,9 @@ func (tx *transaction) CommitTx(
 
 // Rollback performs a rollback of the specified active transaction.
 func (tx *transaction) Rollback(ctx context.Context) (err error) {
-	onDone := trace.TableOnSessionTransactionRollback(
+	onDone := trace.TableOnTxRollback(
 		tx.s.config.Trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*transaction).Rollback"),
 		tx.s, tx,
 	)
 	defer func() {

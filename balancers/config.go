@@ -92,6 +92,7 @@ func CreateFromConfig(s string) (*balancerConfig.Config, error) {
 		if c.Fallback {
 			return PreferLocalDCWithFallBack(b), nil
 		}
+
 		return PreferLocalDC(b), nil
 	case preferTypeLocations:
 		if len(c.Locations) == 0 {
@@ -100,6 +101,7 @@ func CreateFromConfig(s string) (*balancerConfig.Config, error) {
 		if c.Fallback {
 			return PreferLocationsWithFallback(b, c.Locations...), nil
 		}
+
 		return PreferLocations(b, c.Locations...), nil
 	default:
 		return b, nil
@@ -114,9 +116,9 @@ func FromConfig(config string, opts ...fromConfigOption) *balancerConfig.Config 
 		b   *balancerConfig.Config
 		err error
 	)
-	for _, o := range opts {
-		if o != nil {
-			o(&h)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&h)
 		}
 	}
 
@@ -125,6 +127,7 @@ func FromConfig(config string, opts ...fromConfigOption) *balancerConfig.Config 
 		if h.errorHandler != nil {
 			h.errorHandler(err)
 		}
+
 		return h.fallbackBalancer
 	}
 

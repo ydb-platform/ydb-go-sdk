@@ -139,11 +139,9 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (res genera
 		retry.WithIdempotent(true),
 		retry.WithTrace(
 			&trace.Retry{
-				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-					return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-						return func(info trace.RetryLoopDoneInfo) {
-							attempts = info.Attempts
-						}
+				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+					return func(info trace.RetryLoopDoneInfo) {
+						attempts = info.Attempts
 					}
 				},
 			},
@@ -179,11 +177,9 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err
 		retry.WithIdempotent(true),
 		retry.WithTrace(
 			&trace.Retry{
-				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-					return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-						return func(info trace.RetryLoopDoneInfo) {
-							attempts = info.Attempts
-						}
+				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+					return func(info trace.RetryLoopDoneInfo) {
+						attempts = info.Attempts
 					}
 				},
 			},
@@ -204,6 +200,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 	return retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
 		func(ctx context.Context, cc *sql.Conn) error {
 			_, err := s.db.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), s.createQuery)
+
 			return err
 		}, retry.WithIdempotent(true),
 	)
@@ -220,6 +217,7 @@ func (s *Storage) dropTable(ctx context.Context) error {
 	return retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
 		func(ctx context.Context, cc *sql.Conn) error {
 			_, err := s.db.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), s.dropQuery)
+
 			return err
 		}, retry.WithIdempotent(true),
 	)

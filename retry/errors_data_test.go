@@ -19,6 +19,7 @@ func (t idempotency) String() string {
 	if t {
 		return "idempotent"
 	}
+
 	return "non-idempotent"
 }
 
@@ -207,7 +208,7 @@ var errsToCheck = []struct {
 		err: xerrors.Retryable(
 			xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "")),
 			xerrors.WithBackoff(backoff.TypeFast),
-			xerrors.WithDeleteSession(),
+			xerrors.InvalidObject(),
 		),
 		backoff:       backoff.TypeFast,
 		deleteSession: true,
@@ -220,7 +221,7 @@ var errsToCheck = []struct {
 		err: xerrors.Retryable(
 			grpcStatus.Error(grpcCodes.Unavailable, ""),
 			xerrors.WithBackoff(backoff.TypeFast),
-			xerrors.WithDeleteSession(),
+			xerrors.InvalidObject(),
 		),
 		backoff:       backoff.TypeFast,
 		deleteSession: true,
@@ -408,7 +409,7 @@ var errsToCheck = []struct {
 		backoff:       backoff.TypeNoBackoff,
 		deleteSession: true,
 		canRetry: map[idempotency]bool{
-			idempotent:    false,
+			idempotent:    true,
 			nonIdempotent: false,
 		},
 	},

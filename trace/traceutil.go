@@ -23,6 +23,7 @@ func ClearContext(x interface{}) interface{} {
 		c.Set(reflect.Zero(c.Type()))
 		p.Set(x)
 	}
+
 	return p.Interface()
 }
 
@@ -69,6 +70,7 @@ func (f FieldStubber) Stub(x reflect.Value) {
 				params[i] = arg.Interface()
 			}
 			f.OnCall(name, params...)
+
 			return out
 		})
 		fx.Set(fn)

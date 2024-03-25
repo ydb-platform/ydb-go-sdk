@@ -10,7 +10,7 @@ import (
 
 type Config interface {
 	DialTimeout() time.Duration
-	Trace() *trace.Driver
 	ConnectionTTL() time.Duration
+	Trace() *trace.Driver
 	GrpcDialOptions() []grpc.DialOption
 }

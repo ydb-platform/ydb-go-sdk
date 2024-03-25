@@ -32,6 +32,7 @@ func (u *URLs) String() string {
 // Set appends new value to URLs holder
 func (u *URLs) Set(s string) error {
 	u.urls = append(u.urls, s)
+
 	return nil
 }
 

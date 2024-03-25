@@ -62,7 +62,7 @@ func PackagePath(b bool) recordOption {
 	}
 }
 
-var _ caller = call{}
+var _ Caller = call{}
 
 type call struct {
 	function uintptr
@@ -72,6 +72,7 @@ type call struct {
 
 func Call(depth int) (c call) {
 	c.function, c.file, c.line, _ = runtime.Caller(depth + 1)
+
 	return c
 }
 
@@ -86,7 +87,9 @@ func (c call) Record(opts ...recordOption) string {
 		lambdas:      true,
 	}
 	for _, opt := range opts {
-		opt(&optionsHolder)
+		if opt != nil {
+			opt(&optionsHolder)
+		}
 	}
 	name := runtime.FuncForPC(c.function).Name()
 	var (
@@ -102,6 +105,7 @@ func (c call) Record(opts ...recordOption) string {
 	if i := strings.LastIndex(name, "/"); i > -1 {
 		pkgPath, name = name[:i], name[i+1:]
 	}
+	name = strings.ReplaceAll(name, "[...]", "")
 	split := strings.Split(name, ".")
 	lambdas := make([]string, 0, len(split))
 	for i := range split {
@@ -166,6 +170,7 @@ func (c call) Record(opts ...recordOption) string {
 			buffer.WriteByte(')')
 		}
 	}
+
 	return buffer.String()
 }
 

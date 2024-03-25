@@ -33,12 +33,12 @@ type Client struct {
 	sessions map[*session]struct{}
 }
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) (*Client, error) {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) *Client {
 	return &Client{
 		config:   config,
 		service:  Ydb_Coordination_V1.NewCoordinationServiceClient(cc),
 		sessions: make(map[*session]struct{}),
-	}, nil
+	}
 }
 
 func (c *Client) CreateNode(ctx context.Context, path string, config coordination.NodeConfig) error {
@@ -51,6 +51,7 @@ func (c *Client) CreateNode(ctx context.Context, path string, config coordinatio
 	if !c.config.AutoRetry() {
 		return xerrors.WithStackTrace(call(ctx))
 	}
+
 	return retry.Retry(ctx,
 		call, retry.WithStackTrace(),
 		retry.WithIdempotent(true),
@@ -79,6 +80,7 @@ func (c *Client) createNode(ctx context.Context, path string, config coordinatio
 			),
 		},
 	)
+
 	return xerrors.WithStackTrace(err)
 }
 
@@ -92,6 +94,7 @@ func (c *Client) AlterNode(ctx context.Context, path string, config coordination
 	if !c.config.AutoRetry() {
 		return xerrors.WithStackTrace(call(ctx))
 	}
+
 	return retry.Retry(ctx,
 		call,
 		retry.WithStackTrace(),
@@ -121,6 +124,7 @@ func (c *Client) alterNode(ctx context.Context, path string, config coordination
 			),
 		},
 	)
+
 	return xerrors.WithStackTrace(err)
 }
 
@@ -134,6 +138,7 @@ func (c *Client) DropNode(ctx context.Context, path string) error {
 	if !c.config.AutoRetry() {
 		return xerrors.WithStackTrace(call(ctx))
 	}
+
 	return retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
@@ -154,6 +159,7 @@ func (c *Client) dropNode(ctx context.Context, path string) error {
 			),
 		},
 	)
+
 	return xerrors.WithStackTrace(err)
 }
 
@@ -170,10 +176,12 @@ func (c *Client) DescribeNode(
 	}
 	call := func(ctx context.Context) (err error) {
 		entry, config, err = c.describeNode(ctx, path)
+
 		return xerrors.WithStackTrace(err)
 	}
 	if !c.config.AutoRetry() {
 		err := call(ctx)
+
 		return entry, config, xerrors.WithStackTrace(err)
 	}
 	err := retry.Retry(ctx, call,
@@ -181,6 +189,7 @@ func (c *Client) DescribeNode(
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
 	)
+
 	return entry, config, xerrors.WithStackTrace(err)
 }
 
@@ -216,6 +225,7 @@ func (c *Client) describeNode(
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
+
 	return scheme.InnerConvertEntry(result.GetSelf()), &coordination.NodeConfig{
 		Path:                     result.GetConfig().GetPath(),
 		SelfCheckPeriodMillis:    result.GetConfig().GetSelfCheckPeriodMillis(),

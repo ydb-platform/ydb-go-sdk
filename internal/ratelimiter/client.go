@@ -33,14 +33,15 @@ func (c *Client) Close(ctx context.Context) error {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
+
 	return nil
 }
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) (*Client, error) {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) *Client {
 	return &Client{
 		config:  config,
 		service: Ydb_RateLimiter_V1.NewRateLimiterServiceClient(cc),
-	}, nil
+	}
 }
 
 func (c *Client) CreateResource(
@@ -57,6 +58,7 @@ func (c *Client) CreateResource(
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
+
 	return retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
@@ -87,6 +89,7 @@ func (c *Client) createResource(
 			operation.ModeSync,
 		),
 	})
+
 	return
 }
 
@@ -104,6 +107,7 @@ func (c *Client) AlterResource(
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
+
 	return retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
@@ -134,6 +138,7 @@ func (c *Client) alterResource(
 			operation.ModeSync,
 		),
 	})
+
 	return
 }
 
@@ -151,6 +156,7 @@ func (c *Client) DropResource(
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
+
 	return retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
@@ -173,6 +179,7 @@ func (c *Client) dropResource(
 			operation.ModeSync,
 		),
 	})
+
 	return
 }
 
@@ -187,10 +194,12 @@ func (c *Client) ListResource(
 	}
 	call := func(ctx context.Context) (err error) {
 		list, err = c.listResource(ctx, coordinationNodePath, resourcePath, recursive)
+
 		return xerrors.WithStackTrace(err)
 	}
 	if !c.config.AutoRetry() {
 		err := call(ctx)
+
 		return list, err
 	}
 	err := retry.Retry(ctx, call,
@@ -198,6 +207,7 @@ func (c *Client) ListResource(
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
 	)
+
 	return list, err
 }
 
@@ -229,6 +239,7 @@ func (c *Client) listResource(
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	return result.GetResourcePaths(), nil
 }
 
@@ -242,10 +253,12 @@ func (c *Client) DescribeResource(
 	}
 	call := func(ctx context.Context) error {
 		resource, err = c.describeResource(ctx, coordinationNodePath, resourcePath)
+
 		return xerrors.WithStackTrace(err)
 	}
 	if !c.config.AutoRetry() {
 		err = call(ctx)
+
 		return
 	}
 	err = retry.Retry(ctx, call,
@@ -253,6 +266,7 @@ func (c *Client) DescribeResource(
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
 	)
+
 	return
 }
 
@@ -315,6 +329,7 @@ func (c *Client) AcquireResource(
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
+
 	return retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),

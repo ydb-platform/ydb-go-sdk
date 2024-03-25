@@ -20,7 +20,7 @@ func WithBackoff(t backoff.Type) retryableErrorOption {
 
 // WithDeleteSession makes retryable error option with delete session flag
 func WithDeleteSession() retryableErrorOption {
-	return retryableErrorOption(xerrors.WithDeleteSession())
+	return retryableErrorOption(xerrors.InvalidObject())
 }
 
 // RetryableError makes retryable error from options
@@ -29,11 +29,12 @@ func RetryableError(err error, opts ...retryableErrorOption) error {
 	return xerrors.Retryable(
 		err,
 		func() (retryableErrorOptions []xerrors.RetryableErrorOption) {
-			for _, o := range opts {
-				if o != nil {
-					retryableErrorOptions = append(retryableErrorOptions, xerrors.RetryableErrorOption(o))
+			for _, opt := range opts {
+				if opt != nil {
+					retryableErrorOptions = append(retryableErrorOptions, xerrors.RetryableErrorOption(opt))
 				}
 			}
+
 			return retryableErrorOptions
 		}()...,
 	)

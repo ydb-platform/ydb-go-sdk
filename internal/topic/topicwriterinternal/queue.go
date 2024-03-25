@@ -14,6 +14,7 @@ import (
 
 var (
 	errCloseClosedMessageQueue   = xerrors.Wrap(errors.New("ydb: close closed message queue"))
+	errAckOnClosedMessageQueue   = xerrors.Wrap(errors.New("ydb: ack on closed message queue"))
 	errGetMessageFromClosedQueue = xerrors.Wrap(errors.New("ydb: get message from closed message queue"))
 	errAddUnorderedMessages      = xerrors.Wrap(errors.New("ydb: add unordered messages"))
 	errAckUnexpectedMessage      = xerrors.Wrap(errors.New("ydb: ack unexpected message"))
@@ -57,6 +58,7 @@ func newMessageQueue() messageQueue {
 
 func (q *messageQueue) AddMessages(messages []messageWithDataContent) error {
 	_, err := q.addMessages(messages, false)
+
 	return err
 }
 
@@ -136,6 +138,7 @@ func (q *messageQueue) addMessageNeedLock(
 	q.messagesByOrder[messageIndex] = mess
 	q.seqNoToOrderID[mess.SeqNo] = messageIndex
 	q.lastSeqNo = mess.SeqNo
+
 	return messageIndex
 }
 
@@ -149,6 +152,9 @@ func (q *messageQueue) AcksReceived(acks []rawtopicwriter.WriteAck) error {
 			q.OnAckReceived(ackReceivedCounter)
 		}
 	}()
+	if q.closed {
+		return xerrors.WithStackTrace(errAckOnClosedMessageQueue)
+	}
 
 	for i := range acks {
 		if err := q.ackReceivedNeedLock(acks[i].SeqNo); err != nil {
@@ -158,6 +164,7 @@ func (q *messageQueue) AcksReceived(acks []rawtopicwriter.WriteAck) error {
 	}
 
 	q.acksReceivedEvent.Broadcast()
+
 	return nil
 }
 
@@ -169,6 +176,7 @@ func (q *messageQueue) ackReceivedNeedLock(seqNo int64) error {
 
 	delete(q.seqNoToOrderID, seqNo)
 	delete(q.messagesByOrder, orderID)
+
 	return nil
 }
 
@@ -270,6 +278,7 @@ func (q *messageQueue) getMessagesForSendWithLock() []messageWithDataContent {
 			res = append(res, msg)
 		}
 	}
+
 	return res
 }
 
@@ -288,6 +297,7 @@ func (q *messageQueue) Wait(ctx context.Context, waiter MessageQueueAckWaiter) e
 				checkMessageIndex := waiter.sequenseNumbers[0]
 				if _, ok := q.messagesByOrder[checkMessageIndex]; ok {
 					hasWaited = true
+
 					return
 				}
 				waiter.sequenseNumbers = waiter.sequenseNumbers[1:]

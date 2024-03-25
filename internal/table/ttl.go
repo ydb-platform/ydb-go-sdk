@@ -10,22 +10,23 @@ func NewTimeToLiveSettings(settings *Ydb_Table.TtlSettings) *options.TimeToLiveS
 	if settings == nil {
 		return nil
 	}
-	switch mode := settings.Mode.(type) {
+	switch mode := settings.GetMode().(type) {
 	case *Ydb_Table.TtlSettings_DateTypeColumn:
 		return &options.TimeToLiveSettings{
-			ColumnName:         mode.DateTypeColumn.ColumnName,
-			ExpireAfterSeconds: mode.DateTypeColumn.ExpireAfterSeconds,
+			ColumnName:         mode.DateTypeColumn.GetColumnName(),
+			ExpireAfterSeconds: mode.DateTypeColumn.GetExpireAfterSeconds(),
 			Mode:               options.TimeToLiveModeDateType,
 		}
 
 	case *Ydb_Table.TtlSettings_ValueSinceUnixEpoch:
 		return &options.TimeToLiveSettings{
-			ColumnName:         mode.ValueSinceUnixEpoch.ColumnName,
-			ColumnUnit:         timeToLiveUnit(mode.ValueSinceUnixEpoch.ColumnUnit),
-			ExpireAfterSeconds: mode.ValueSinceUnixEpoch.ExpireAfterSeconds,
+			ColumnName:         mode.ValueSinceUnixEpoch.GetColumnName(),
+			ColumnUnit:         timeToLiveUnit(mode.ValueSinceUnixEpoch.GetColumnUnit()),
+			ExpireAfterSeconds: mode.ValueSinceUnixEpoch.GetExpireAfterSeconds(),
 			Mode:               options.TimeToLiveModeValueSinceUnixEpoch,
 		}
 	}
+
 	return nil
 }
 
@@ -45,5 +46,6 @@ func timeToLiveUnit(unit Ydb_Table.ValueSinceUnixEpochModeSettings_Unit) *option
 	default:
 		panic("ydb: unknown Ydb unit for value since epoch")
 	}
+
 	return &res
 }

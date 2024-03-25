@@ -46,6 +46,7 @@ func (b *batcher) Close(err error) error {
 	b.closed = true
 	b.closeErr = err
 	close(b.closeChan)
+
 	return nil
 }
 
@@ -126,6 +127,7 @@ func (o batcherGetOptions) cutBatchItemsHead(items batcherMessageOrderItems) (
 
 		head = newBatcherItemBatch(batchHead)
 		rest = items.ReplaceHeadItem(newBatcherItemBatch(batchRest))
+
 		return head, rest, true
 	}
 
@@ -146,6 +148,7 @@ func (o batcherGetOptions) splitBatch(batch *PublicBatch) (head, rest *PublicBat
 	}
 
 	head, rest = batch.cutMessages(o.MaxCount)
+
 	return head, rest, true
 }
 
@@ -173,7 +176,8 @@ func (b *batcher) Pop(ctx context.Context, opts batcherGetOptions) (_ batcherMes
 
 			findRes = b.findNeedLock(opts)
 			if findRes.Ok {
-				b.applyNeedLock(findRes)
+				b.applyNeedLock(&findRes)
+
 				return
 			}
 		})
@@ -271,10 +275,11 @@ func (b *batcher) applyForceFlagToOptions(options batcherGetOptions) batcherGetO
 
 	res := options
 	res.MinCount = 1
+
 	return res
 }
 
-func (b *batcher) applyNeedLock(res batcherResultCandidate) {
+func (b *batcher) applyNeedLock(res *batcherResultCandidate) {
 	if res.Rest.IsEmpty() && res.WaiterIndex >= 0 {
 		delete(b.messages, res.Key)
 	} else {
@@ -310,6 +315,7 @@ func (items batcherMessageOrderItems) Append(item batcherMessageOrderItem) (batc
 		} else {
 			return nil, err
 		}
+
 		return items, nil
 	}
 
@@ -328,6 +334,7 @@ func (items batcherMessageOrderItems) ReplaceHeadItem(item batcherMessageOrderIt
 	res := make(batcherMessageOrderItems, len(items))
 	res[0] = item
 	copy(res[1:], items[1:])
+
 	return res
 }
 

@@ -76,6 +76,7 @@ func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (
 
 	if len(newArgs) > 0 {
 		const prefix = "-- origin query with numeric args replacement\n"
+
 		return prefix + buffer.String(), newArgs, nil
 	}
 
@@ -101,18 +102,21 @@ func numericArgsStateFn(l *sqlLexer) stateFn {
 					l.parts = append(l.parts, l.src[l.start:l.pos-width])
 				}
 				l.start = l.pos
+
 				return numericArgState
 			}
 		case '-':
 			nextRune, width := utf8.DecodeRuneInString(l.src[l.pos:])
 			if nextRune == '-' {
 				l.pos += width
+
 				return oneLineCommentState
 			}
 		case '/':
 			nextRune, width := utf8.DecodeRuneInString(l.src[l.pos:])
 			if nextRune == '*' {
 				l.pos += width
+
 				return multilineCommentState
 			}
 		case utf8.RuneError:
@@ -120,6 +124,7 @@ func numericArgsStateFn(l *sqlLexer) stateFn {
 				l.parts = append(l.parts, l.src[l.start:l.pos])
 				l.start = l.pos
 			}
+
 			return nil
 		}
 	}
@@ -149,9 +154,11 @@ func numericArgState(l *sqlLexer) stateFn {
 			numbers += string(r)
 		case isLetter(r):
 			numbers = ""
+
 			return l.rawStateFn
 		default:
 			l.pos -= width
+
 			return l.rawStateFn
 		}
 	}

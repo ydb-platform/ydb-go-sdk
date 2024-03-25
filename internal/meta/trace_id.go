@@ -19,12 +19,15 @@ func TraceID(ctx context.Context, opts ...func(opts *newTraceIDOpts)) (context.C
 	}
 	options := newTraceIDOpts{newRandom: uuid.NewRandom}
 	for _, opt := range opts {
-		opt(&options)
+		if opt != nil {
+			opt(&options)
+		}
 	}
 	uuid, err := options.newRandom()
 	if err != nil {
 		return ctx, "", xerrors.WithStackTrace(err)
 	}
 	id := uuid.String()
+
 	return metadata.AppendToOutgoingContext(ctx, HeaderTraceID, id), id, nil
 }

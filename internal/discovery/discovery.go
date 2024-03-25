@@ -19,12 +19,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (*Client, error) {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) *Client {
 	return &Client{
 		config: config,
 		cc:     cc,
 		client: Ydb_Discovery_V1.NewDiscoveryServiceClient(cc),
-	}, nil
+	}
 }
 
 var _ discovery.Client = &Client{}
@@ -40,7 +40,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	var (
 		onDone = trace.DiscoveryOnDiscover(
 			c.config.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/discovery.(*Client).Discover"),
 			c.config.Endpoint(), c.config.Database(),
 		)
 		request = Ydb_Discovery.ListEndpointsRequest{
@@ -70,9 +70,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 
 	if response.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS {
 		return nil, xerrors.WithStackTrace(
-			xerrors.Operation(
-				xerrors.FromOperation(response.GetOperation()),
-			),
+			xerrors.FromOperation(response.GetOperation()),
 		)
 	}
 
@@ -82,9 +80,9 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	}
 
 	location = result.GetSelfLocation()
-	endpoints = make([]endpoint.Endpoint, 0, len(result.Endpoints))
-	for _, e := range result.Endpoints {
-		if e.Ssl == c.config.Secure() {
+	endpoints = make([]endpoint.Endpoint, 0, len(result.GetEndpoints()))
+	for _, e := range result.GetEndpoints() {
+		if e.GetSsl() == c.config.Secure() {
 			endpoints = append(endpoints, endpoint.New(
 				net.JoinHostPort(e.GetAddress(), strconv.Itoa(int(e.GetPort()))),
 				endpoint.WithLocation(e.GetLocation()),
@@ -101,7 +99,9 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 
 func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err error) {
 	var (
-		onDone             = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx, stack.FunctionID(""))
+		onDone = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/discovery.(*Client).WhoAmI"),
+		)
 		request            = Ydb_Discovery.WhoAmIRequest{}
 		response           *Ydb_Discovery.WhoAmIResponse
 		whoAmIResultResult Ydb_Discovery.WhoAmIResult
@@ -126,10 +126,8 @@ func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 
 	if response.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS {
 		return nil, xerrors.WithStackTrace(
-			xerrors.Operation(
-				xerrors.FromOperation(
-					response.GetOperation(),
-				),
+			xerrors.FromOperation(
+				response.GetOperation(),
 			),
 		)
 	}
@@ -154,5 +152,6 @@ func (c *Client) Close(context.Context) error {
 	if cc, has := c.cc.(io.Closer); has {
 		return cc.Close()
 	}
+
 	return nil
 }

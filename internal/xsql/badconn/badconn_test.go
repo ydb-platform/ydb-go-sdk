@@ -45,12 +45,12 @@ var errsToCheck = []error{
 	xerrors.Retryable(
 		xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "")),
 		xerrors.WithBackoff(backoff.TypeFast),
-		xerrors.WithDeleteSession(),
+		xerrors.InvalidObject(),
 	),
 	xerrors.Retryable(
 		grpcStatus.Error(grpcCodes.Unavailable, ""),
 		xerrors.WithBackoff(backoff.TypeFast),
-		xerrors.WithDeleteSession(),
+		xerrors.InvalidObject(),
 	),
 	xerrors.Transport(grpcStatus.Error(grpcCodes.DataLoss, "")),
 	xerrors.Transport(grpcStatus.Error(grpcCodes.Unauthenticated, "")),
@@ -112,7 +112,7 @@ var errsToCheck = []error{
 		xerrors.WithStatusCode(Ydb.StatusIds_SESSION_BUSY),
 	),
 	xerrors.Retryable(errors.New("retryable error")),
-	xerrors.Retryable(errors.New("retryable error"), xerrors.WithDeleteSession()),
+	xerrors.Retryable(errors.New("retryable error"), xerrors.InvalidObject()),
 	io.EOF,
 	xerrors.WithStackTrace(io.EOF),
 }
@@ -122,7 +122,7 @@ func Test_badConnError_Is(t *testing.T) {
 		t.Run(err.Error(), func(t *testing.T) {
 			err = Map(err)
 			require.Equal(t,
-				xerrors.MustDeleteSession(err),
+				!xerrors.IsRetryObjectValid(err),
 				xerrors.Is(err, driver.ErrBadConn),
 			)
 		})

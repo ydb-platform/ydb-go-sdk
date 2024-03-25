@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
@@ -28,8 +28,8 @@ type partitionSession struct {
 	ctxCancel          context.CancelFunc
 	partitionSessionID rawtopicreader.PartitionSessionID
 
-	lastReceivedOffsetEndVal xatomic.Int64
-	committedOffsetVal       xatomic.Int64
+	lastReceivedOffsetEndVal atomic.Int64
+	committedOffsetVal       atomic.Int64
 }
 
 func newPartitionSession(
@@ -54,6 +54,7 @@ func newPartitionSession(
 	}
 	res.committedOffsetVal.Store(committedOffset.ToInt64())
 	res.lastReceivedOffsetEndVal.Store(committedOffset.ToInt64() - 1)
+
 	return res
 }
 
@@ -70,6 +71,7 @@ func (s *partitionSession) committedOffset() rawtopicreader.Offset {
 
 	var res rawtopicreader.Offset
 	res.FromInt64(v)
+
 	return res
 }
 
@@ -82,6 +84,7 @@ func (s *partitionSession) lastReceivedMessageOffset() rawtopicreader.Offset {
 
 	var res rawtopicreader.Offset
 	res.FromInt64(v)
+
 	return res
 }
 
@@ -112,6 +115,7 @@ func (c *partitionSessionStorage) Add(session *partitionSession) error {
 		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.partitionSessionID))
 	}
 	c.sessions[session.partitionSessionID] = &sessionInfo{Session: session}
+
 	return nil
 }
 
@@ -135,6 +139,7 @@ func (c *partitionSessionStorage) Remove(id partitionSessionID) (*partitionSessi
 	c.removeIndex++
 	if partitionInfo, ok := c.sessions[id]; ok {
 		partitionInfo.RemoveTime = now
+
 		return partitionInfo.Session, nil
 	}
 

@@ -12,7 +12,7 @@ type (
 	// Retry specified trace of retry call activity.
 	// gtrace:gen
 	Retry struct {
-		OnRetry func(RetryLoopStartInfo) func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo)
+		OnRetry func(RetryLoopStartInfo) func(RetryLoopDoneInfo)
 	}
 	RetryLoopStartInfo struct {
 		// Context make available context in trace callback function.
@@ -21,17 +21,11 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 
-		// Deprecated: use Label field instead
-		ID string
-
 		Call       call
 		Label      string
 		Idempotent bool
 
 		NestedCall bool // a sign for detect Retry calls inside head Retry
-	}
-	RetryLoopIntermediateInfo struct {
-		Error error
 	}
 	RetryLoopDoneInfo struct {
 		Attempts int

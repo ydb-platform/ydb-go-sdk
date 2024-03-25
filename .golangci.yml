@@ -64,6 +64,12 @@ linters-settings:
     # put imports beginning with prefix after 3rd-party packages;
     # it's a comma-separated list of prefixes
     local-prefixes: github.com/ydb-platform/ydb-go-sdk/v3
+  gci:
+    sections:
+      - standard # Standard section: captures all standard packages.
+      - default # Default section: contains all imports that could not be matched to another section type.
+      - prefix(github.com/ydb-platform/ydb-go-sdk/v3) # Custom section: groups all imports with the specified Prefix.
+    skip-generated: true
   goconst:
     # minimal length of string constant, 3 by default
     min-len: 2
@@ -106,6 +112,10 @@ linters-settings:
     # if it's called for subdir of a project it can't find external interfaces. All text editor integrations
     # with golangci-lint call it on a directory with the changed file.
     check-exported: false
+  gomoddirectives:
+    replace-local: true
+    replace-allow-list:
+      - xorm.io/xorm
   gocritic:
     disabled-checks:
       - whyNoLint # https://github.com/go-critic/go-critic/issues/1063
@@ -213,32 +223,24 @@ linters:
     - cyclop
     - depguard
     - dupl
-    - errname
     - exhaustive
     - exhaustivestruct
     - exhaustruct
     - forbidigo
     - forcetypeassert
     - funlen
-    - gci
     - gochecknoglobals
     - gocognit
     - godot
     - goerr113
     - golint
     - gomnd
-    - gomoddirectives
     - ifshort
     - interfacebloat
-    - interfacer
     - ireturn
     - maintidx
-    - maligned
-    - nilerr
-    - nlreturn
     - nonamedreturns
     - paralleltest
-    - protogetter
     - scopelint
     - structcheck
     - testableexamples

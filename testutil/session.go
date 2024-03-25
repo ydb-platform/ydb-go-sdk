@@ -35,10 +35,11 @@ func SessionID(opts ...sessionIDOption) string {
 		nodeID:    uint32(xrand.New().Int64(math.MaxUint32)),
 		hash:      strconv.FormatInt(xrand.New().Int64(math.MaxInt64), 16),
 	}
-	for _, o := range opts {
-		if o != nil {
-			o(h)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(h)
 		}
 	}
+
 	return fmt.Sprintf("ydb://session/%d?node_id=%d&id=%s==", h.serviceID, h.nodeID, h.hash)
 }

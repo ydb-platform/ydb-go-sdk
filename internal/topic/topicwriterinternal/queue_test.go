@@ -14,7 +14,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 )
 
@@ -142,7 +141,7 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 		}()
 
 		readFinished := make(empty.Chan)
-		var lastReadSeqNo xatomic.Int64
+		var lastReadSeqNo atomic.Int64
 
 		readCtx, readCancel := xcontext.WithCancel(ctx)
 		defer readCancel()
@@ -159,6 +158,7 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 				for _, mess := range messages {
 					if lastReadSeqNo.Load()+1 != mess.SeqNo {
 						fatalChan <- string(debug.Stack())
+
 						return
 					}
 					lastReadSeqNo.Store(mess.SeqNo)
@@ -407,6 +407,26 @@ func TestQueuePanicOnOverflow(t *testing.T) {
 	})
 }
 
+func TestRegressionIssue1038_ReceiveAckAfterCloseQueue(t *testing.T) {
+	counter := 0
+
+	q := newMessageQueue()
+	q.OnAckReceived = func(count int) {
+		counter -= count
+	}
+	require.NoError(t, q.AddMessages(newTestMessagesWithContent(1)))
+	counter++
+
+	require.NoError(t, q.Close(errors.New("test err")))
+	require.ErrorIs(t, q.AcksReceived([]rawtopicwriter.WriteAck{
+		{
+			SeqNo:              1,
+			MessageWriteStatus: rawtopicwriter.MessageWriteStatus{},
+		},
+	}), errAckOnClosedMessageQueue)
+	require.Zero(t, counter)
+}
+
 func TestQueue_Ack(t *testing.T) {
 	t.Run("First", func(t *testing.T) {
 		q := newMessageQueue()
@@ -491,5 +511,6 @@ func getSeqNumbers(messages []messageWithDataContent) []int64 {
 	for i := range messages {
 		res = append(res, messages[i].SeqNo)
 	}
+
 	return res
 }

@@ -1,10 +1,10 @@
 package stack
 
-type caller interface {
+type Caller interface {
 	FunctionID() string
 }
 
-var _ caller = functionID("")
+var _ Caller = functionID("")
 
 type functionID string
 
@@ -12,9 +12,10 @@ func (id functionID) FunctionID() string {
 	return string(id)
 }
 
-func FunctionID(id string) caller {
+func FunctionID(id string) Caller {
 	if id != "" {
 		return functionID(id)
 	}
+
 	return Call(1)
 }

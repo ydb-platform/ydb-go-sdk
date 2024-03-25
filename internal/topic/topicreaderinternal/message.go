@@ -9,14 +9,13 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xbytes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 var errMessageWasReadEarly = xerrors.Wrap(errors.New("ydb: message was read early"))
 
-// PublicErrUnexpectedCodec return when try to read message content with unknown codec
-var PublicErrUnexpectedCodec = errors.New("unexpected codec") //nolint:revive,stylecheck
+// ErrPublicUnexpectedCodec return when try to read message content with unknown codec
+var ErrPublicUnexpectedCodec = errors.New("unexpected codec")
 
 // PublicMessage is representation of topic message
 type PublicMessage struct {
@@ -63,6 +62,7 @@ func (m *PublicMessage) UnmarshalTo(dst PublicMessageContentUnmarshaler) error {
 	}
 
 	m.dataConsumed = true
+
 	return callbackOnReaderContent(globalReadMessagePool, m, m.UncompressedSize, dst)
 }
 
@@ -71,6 +71,7 @@ func (m *PublicMessage) UnmarshalTo(dst PublicMessageContentUnmarshaler) error {
 // return topicreader.UnexpectedCodec if message compressed with unknown codec
 func (m *PublicMessage) Read(p []byte) (n int, err error) {
 	m.dataConsumed = true
+
 	return m.data.Read(p)
 }
 
@@ -108,6 +109,7 @@ type PublicMessageBuilder struct {
 func NewPublicMessageBuilder() *PublicMessageBuilder {
 	res := &PublicMessageBuilder{}
 	res.initMessage()
+
 	return res
 }
 
@@ -128,50 +130,58 @@ func (pmb *PublicMessageBuilder) initMessage() {
 // Seqno set message Seqno
 func (pmb *PublicMessageBuilder) Seqno(seqNo int64) *PublicMessageBuilder {
 	pmb.mess.SeqNo = seqNo
+
 	return pmb
 }
 
 // CreatedAt set message CreatedAt
 func (pmb *PublicMessageBuilder) CreatedAt(createdAt time.Time) *PublicMessageBuilder {
 	pmb.mess.CreatedAt = createdAt
+
 	return pmb
 }
 
 func (pmb *PublicMessageBuilder) Metadata(metadata map[string][]byte) *PublicMessageBuilder {
 	pmb.mess.Metadata = make(map[string][]byte, len(metadata))
 	for key, val := range metadata {
-		pmb.mess.Metadata[key] = xbytes.Clone(val)
+		pmb.mess.Metadata[key] = bytes.Clone(val)
 	}
+
 	return pmb
 }
 
 // MessageGroupID set message MessageGroupID
 func (pmb *PublicMessageBuilder) MessageGroupID(messageGroupID string) *PublicMessageBuilder {
 	pmb.mess.MessageGroupID = messageGroupID
+
 	return pmb
 }
 
 // WriteSessionMetadata set message WriteSessionMetadata
 func (pmb *PublicMessageBuilder) WriteSessionMetadata(writeSessionMetadata map[string]string) *PublicMessageBuilder {
 	pmb.mess.WriteSessionMetadata = writeSessionMetadata
+
 	return pmb
 }
 
 // Offset set message Offset
 func (pmb *PublicMessageBuilder) Offset(offset int64) *PublicMessageBuilder {
 	pmb.mess.Offset = offset
+
 	return pmb
 }
 
 // WrittenAt set message WrittenAt
 func (pmb *PublicMessageBuilder) WrittenAt(writtenAt time.Time) *PublicMessageBuilder {
 	pmb.mess.WrittenAt = writtenAt
+
 	return pmb
 }
 
 // ProducerID set message ProducerID
 func (pmb *PublicMessageBuilder) ProducerID(producerID string) *PublicMessageBuilder {
 	pmb.mess.ProducerID = producerID
+
 	return pmb
 }
 
@@ -183,12 +193,14 @@ func (pmb *PublicMessageBuilder) DataAndUncompressedSize(data []byte) *PublicMes
 	pmb.mess.dataConsumed = false
 	pmb.mess.rawDataLen = len(copyData)
 	pmb.mess.UncompressedSize = len(copyData)
+
 	return pmb
 }
 
 // UncompressedSize set message UncompressedSize
 func (pmb *PublicMessageBuilder) UncompressedSize(uncompressedSize int) *PublicMessageBuilder {
 	pmb.mess.UncompressedSize = uncompressedSize
+
 	return pmb
 }
 
@@ -211,5 +223,6 @@ func (pmb *PublicMessageBuilder) PartitionID(partitionID int64) {
 func (pmb *PublicMessageBuilder) Build() *PublicMessage {
 	mess := pmb.mess
 	pmb.initMessage()
+
 	return mess
 }

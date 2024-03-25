@@ -29,6 +29,7 @@ func (s *intIncScanner) Scan(src interface{}) error {
 		return fmt.Errorf("wrong type: %T, exp: int64", src)
 	}
 	*s = intIncScanner(v + 10)
+
 	return nil
 }
 
@@ -40,6 +41,7 @@ func (s *dateScanner) Scan(src interface{}) error {
 		return fmt.Errorf("wrong type: %T, exp: time.Time", src)
 	}
 	*s = dateScanner(v)
+
 	return nil
 }
 
@@ -206,7 +208,7 @@ var scannerData = []struct {
 		setColumnIndexes: []int{0, 2, 1},
 	},
 	{
-		name:  "Scan int64, float, json as ydb.Value",
+		name:  "Scan int64, float, json as ydb.valueType",
 		count: 100,
 		columns: []*column{{
 			name:     "valueint64",
@@ -468,8 +470,8 @@ var scannerData = []struct {
 	},
 }
 
-func initScanner() *scanner {
-	res := scanner{
+func initScanner() *valueScanner {
+	res := valueScanner{
 		set: &Ydb.ResultSet{
 			Columns:   nil,
 			Rows:      nil,
@@ -485,10 +487,11 @@ func initScanner() *scanner {
 		columnIndexes: nil,
 		err:           nil,
 	}
+
 	return &res
 }
 
-func PrepareScannerPerformanceTest(count int) *scanner {
+func PrepareScannerPerformanceTest(count int) *valueScanner {
 	res := initScanner()
 	res.set.Columns = []*Ydb.Column{{
 		Name: "series_id",
@@ -526,7 +529,7 @@ func PrepareScannerPerformanceTest(count int) *scanner {
 	}}
 	res.set.Rows = []*Ydb.Value{}
 	for i := 0; i < count; i++ {
-		res.set.Rows = append(res.set.Rows, &Ydb.Value{
+		res.set.Rows = append(res.set.GetRows(), &Ydb.Value{
 			Items: []*Ydb.Value{{
 				Value: &Ydb.Value_Uint64Value{
 					Uint64Value: uint64(i),
@@ -543,5 +546,6 @@ func PrepareScannerPerformanceTest(count int) *scanner {
 		})
 	}
 	res.converter = &rawConverter{res}
+
 	return res
 }

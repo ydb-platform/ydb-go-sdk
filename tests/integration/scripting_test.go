@@ -40,7 +40,7 @@ func TestScripting(t *testing.T) {
 			newLogger(t),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
 		),
-		ydb.WithUserAgent("scripting"),
+		ydb.WithApplicationName("scripting"),
 	)
 	if err != nil {
 		t.Fatal(err)

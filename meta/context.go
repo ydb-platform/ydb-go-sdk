@@ -14,8 +14,15 @@ func WithTraceID(ctx context.Context, traceID string) context.Context {
 }
 
 // WithUserAgent returns a copy of parent context with custom user-agent info
-func WithUserAgent(ctx context.Context, userAgent string) context.Context {
-	return meta.WithUserAgent(ctx, userAgent)
+//
+// Deprecated: use WithApplicationName instead
+func WithUserAgent(ctx context.Context, _ string) context.Context {
+	return ctx
+}
+
+// WithApplicationName returns a copy of parent context with application name
+func WithApplicationName(ctx context.Context, applicationName string) context.Context {
+	return meta.WithApplicationName(ctx, applicationName)
 }
 
 // WithRequestType returns a copy of parent context with custom request type
@@ -25,7 +32,7 @@ func WithRequestType(ctx context.Context, requestType string) context.Context {
 
 // WithAllowFeatures returns a copy of parent context with allowed client feature
 func WithAllowFeatures(ctx context.Context, features ...string) context.Context {
-	return meta.WithAllowFeatures(ctx, features)
+	return meta.WithAllowFeatures(ctx, features...)
 }
 
 // WithTrailerCallback attaches callback to context for listening incoming metadata

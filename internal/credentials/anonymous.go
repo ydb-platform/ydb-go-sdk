@@ -28,8 +28,11 @@ func NewAnonymousCredentials(opts ...AnonymousCredentialsOption) *Anonymous {
 		sourceInfo: stack.Record(1),
 	}
 	for _, opt := range opts {
-		opt.ApplyAnonymousCredentialsOption(c)
+		if opt != nil {
+			opt.ApplyAnonymousCredentialsOption(c)
+		}
 	}
+
 	return c
 }
 
@@ -48,5 +51,6 @@ func (c Anonymous) String() string {
 		fmt.Fprintf(buffer, "%q", c.sourceInfo)
 	}
 	buffer.WriteByte('}')
+
 	return buffer.String()
 }

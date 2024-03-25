@@ -27,16 +27,18 @@ func (c *clientConn) Endpoint() string {
 	if endpoint == "" {
 		endpoint = c.target.URL.Opaque
 	}
+
 	return strings.TrimPrefix(endpoint, "/")
 }
 
 func (c *clientConn) UpdateState(state resolver.State) (err error) {
 	onDone := trace.DriverOnResolve(c.trace,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xresolver.(*clientConn).UpdateState"),
 		c.Endpoint(), func() (addrs []string) {
 			for i := range state.Addresses {
 				addrs = append(addrs, state.Addresses[i].Addr)
 			}
+
 			return
 		}(),
 	)

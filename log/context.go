@@ -13,6 +13,7 @@ func WithLevel(ctx context.Context, lvl Level) context.Context {
 
 func LevelFromContext(ctx context.Context) Level {
 	v, _ := ctx.Value(ctxLevelKey{}).(Level)
+
 	return v
 }
 
@@ -25,6 +26,7 @@ func NamesFromContext(ctx context.Context) []string {
 	if v == nil {
 		return []string{}
 	}
+
 	return v
 }
 

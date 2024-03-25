@@ -28,6 +28,7 @@ func (w *Workers) write(ctx context.Context, gen *generator.Generator) (err erro
 	row, err = gen.Generate()
 	if err != nil {
 		fmt.Printf("generate error: %v\n", err)
+
 		return err
 	}
 

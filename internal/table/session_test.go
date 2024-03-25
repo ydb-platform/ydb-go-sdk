@@ -22,12 +22,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
@@ -106,6 +106,7 @@ func TestSessionDescribeTable(t *testing.T) {
 					testutil.TableDescribeTable: func(interface{}) (proto.Message, error) {
 						r := &Ydb_Table.DescribeTableResult{}
 						proto.Merge(r, result)
+
 						return r, e
 					},
 				},
@@ -132,17 +133,17 @@ func TestSessionDescribeTable(t *testing.T) {
 			Columns: []options.Column{
 				{
 					Name:   "testColumn",
-					Type:   types.Void(),
+					Type:   types.NewVoid(),
 					Family: "testFamily",
 				},
 			},
 			KeyRanges: []options.KeyRange{
 				{
 					From: nil,
-					To:   types.Int64Value(100500),
+					To:   value.Int64Value(100500),
 				},
 				{
-					From: types.Int64Value(100500),
+					From: value.Int64Value(100500),
 					To:   nil,
 				},
 			},
@@ -181,7 +182,7 @@ func TestSessionDescribeTable(t *testing.T) {
 			Columns: []*Ydb_Table.ColumnMeta{
 				{
 					Name:   expect.Columns[0].Name,
-					Type:   value.TypeToYDB(expect.Columns[0].Type, a),
+					Type:   types.TypeToYDB(expect.Columns[0].Type, a),
 					Family: "testFamily",
 				},
 			},
@@ -338,7 +339,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			func(t *testing.T) {
 				for _, srcDst := range fromTo {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
-						client, err := New(context.Background(), testutil.NewBalancer(
+						client := New(context.Background(), testutil.NewBalancer(
 							testutil.WithInvokeHandlers(
 								testutil.InvokeHandlers{
 									testutil.TableExecuteDataQuery: func(interface{}) (proto.Message, error) {
@@ -381,7 +382,6 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 								},
 							),
 						), config.New())
-						require.NoError(t, err)
 						ctx, cancel := xcontext.WithTimeout(
 							context.Background(),
 							time.Second,
@@ -396,7 +396,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 }
 
 func TestCreateTableRegression(t *testing.T) {
-	client, err := New(context.Background(), testutil.NewBalancer(
+	client := New(context.Background(), testutil.NewBalancer(
 		testutil.WithInvokeHandlers(
 			testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(request interface{}) (proto.Message, error) {
@@ -466,13 +466,12 @@ func TestCreateTableRegression(t *testing.T) {
 						//nolint:revive
 						return nil, fmt.Errorf("proto's not equal: \n\nact: %v\n\nexp: %s\n\n", act, exp)
 					}
+
 					return &Ydb_Table.CreateTableResponse{}, nil
 				},
 			},
 		),
 	), config.New())
-
-	require.NoError(t, err)
 
 	ctx, cancel := xcontext.WithTimeout(
 		context.Background(),
@@ -480,13 +479,13 @@ func TestCreateTableRegression(t *testing.T) {
 	)
 	defer cancel()
 
-	err = client.Do(ctx, func(ctx context.Context, s table.Session) error {
+	err := client.Do(ctx, func(ctx context.Context, s table.Session) error {
 		return s.CreateTable(ctx, "episodes",
-			options.WithColumn("series_id", types.Optional(types.TypeUint64)),
-			options.WithColumn("season_id", types.Optional(types.TypeUint64)),
-			options.WithColumn("episode_id", types.Optional(types.TypeUint64)),
-			options.WithColumn("title", types.Optional(types.TypeText)),
-			options.WithColumn("air_date", types.Optional(types.TypeUint64)),
+			options.WithColumn("series_id", types.NewOptional(types.Uint64)),
+			options.WithColumn("season_id", types.NewOptional(types.Uint64)),
+			options.WithColumn("episode_id", types.NewOptional(types.Uint64)),
+			options.WithColumn("title", types.NewOptional(types.Text)),
+			options.WithColumn("air_date", types.NewOptional(types.Uint64)),
 			options.WithPrimaryKeyColumn("series_id", "season_id", "episode_id"),
 			options.WithAttribute("attr", "attr_value"),
 		)
@@ -496,7 +495,7 @@ func TestCreateTableRegression(t *testing.T) {
 }
 
 func TestDescribeTableRegression(t *testing.T) {
-	client, err := New(context.Background(), testutil.NewBalancer(
+	client := New(context.Background(), testutil.NewBalancer(
 		testutil.WithInvokeHandlers(
 			testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(request interface{}) (proto.Message, error) {
@@ -565,8 +564,6 @@ func TestDescribeTableRegression(t *testing.T) {
 		),
 	), config.New())
 
-	require.NoError(t, err)
-
 	ctx, cancel := xcontext.WithTimeout(
 		context.Background(),
 		time.Second,
@@ -575,8 +572,9 @@ func TestDescribeTableRegression(t *testing.T) {
 
 	var act options.Description
 
-	err = client.Do(ctx, func(ctx context.Context, s table.Session) (err error) {
+	err := client.Do(ctx, func(ctx context.Context, s table.Session) (err error) {
 		act, err = s.DescribeTable(ctx, "episodes")
+
 		return err
 	})
 
@@ -587,23 +585,23 @@ func TestDescribeTableRegression(t *testing.T) {
 		Columns: []options.Column{
 			{
 				Name: "series_id",
-				Type: types.Optional(types.TypeUint64),
+				Type: types.NewOptional(types.Uint64),
 			},
 			{
 				Name: "season_id",
-				Type: types.Optional(types.TypeUint64),
+				Type: types.NewOptional(types.Uint64),
 			},
 			{
 				Name: "episode_id",
-				Type: types.Optional(types.TypeUint64),
+				Type: types.NewOptional(types.Uint64),
 			},
 			{
 				Name: "title",
-				Type: types.Optional(types.TypeText),
+				Type: types.NewOptional(types.Text),
 			},
 			{
 				Name: "air_date",
-				Type: types.Optional(types.TypeUint64),
+				Type: types.NewOptional(types.Uint64),
 			},
 		},
 		KeyRanges: []options.KeyRange{
@@ -637,6 +635,7 @@ func (mock *copyTablesMock) CopyTables(
 	if in.String() == mock.String() {
 		return &Ydb_Table.CopyTablesResponse{}, nil
 	}
+
 	return nil, fmt.Errorf("%w: %s, exp: %s", errUnexpectedRequest, in, mock.String())
 }
 
