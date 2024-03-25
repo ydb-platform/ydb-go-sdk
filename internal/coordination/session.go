@@ -11,12 +11,10 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Coordination_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Coordination"
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/conversation"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -516,14 +514,6 @@ func (s *session) SessionID() uint64 {
 	return s.sessionID
 }
 
-func errorFromResponse(code Ydb.StatusIds_StatusCode, issues []*Ydb_Issue.IssueMessage) error {
-	if code == Ydb.StatusIds_SUCCESS {
-		return nil
-	}
-
-	return xerrors.Operation(xerrors.WithStatusCode(code), xerrors.WithIssues(issues))
-}
-
 func (s *session) CreateSemaphore(
 	ctx context.Context,
 	name string,
@@ -560,15 +550,12 @@ func (s *session) CreateSemaphore(
 		return err
 	}
 
-	resp, err := s.controller.Await(ctx, req)
+	_, err := s.controller.Await(ctx, req)
 	if err != nil {
 		return err
 	}
 
-	return errorFromResponse(
-		resp.GetCreateSemaphoreResult().GetStatus(),
-		resp.GetCreateSemaphoreResult().GetIssues(),
-	)
+	return nil
 }
 
 func (s *session) UpdateSemaphore(
@@ -607,15 +594,12 @@ func (s *session) UpdateSemaphore(
 		return err
 	}
 
-	resp, err := s.controller.Await(ctx, req)
+	_, err := s.controller.Await(ctx, req)
 	if err != nil {
 		return err
 	}
 
-	return errorFromResponse(
-		resp.GetUpdateSemaphoreResult().GetStatus(),
-		resp.GetUpdateSemaphoreResult().GetIssues(),
-	)
+	return nil
 }
 
 func (s *session) DeleteSemaphore(
@@ -653,15 +637,12 @@ func (s *session) DeleteSemaphore(
 		return err
 	}
 
-	resp, err := s.controller.Await(ctx, req)
+	_, err := s.controller.Await(ctx, req)
 	if err != nil {
 		return err
 	}
 
-	return errorFromResponse(
-		resp.GetDeleteSemaphoreResult().GetStatus(),
-		resp.GetDeleteSemaphoreResult().GetIssues(),
-	)
+	return nil
 }
 
 func (s *session) DescribeSemaphore(
@@ -701,14 +682,6 @@ func (s *session) DescribeSemaphore(
 	}
 
 	resp, err := s.controller.Await(ctx, req)
-	if err != nil {
-		return nil, err
-	}
-
-	err = errorFromResponse(
-		resp.GetDescribeSemaphoreResult().GetStatus(),
-		resp.GetDescribeSemaphoreResult().GetIssues(),
-	)
 	if err != nil {
 		return nil, err
 	}
@@ -838,14 +811,6 @@ func (s *session) AcquireSemaphore(
 		return nil, err
 	}
 
-	err = errorFromResponse(
-		resp.GetAcquireSemaphoreResult().GetStatus(),
-		resp.GetAcquireSemaphoreResult().GetIssues(),
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	if !resp.GetAcquireSemaphoreResult().GetAcquired() {
 		return nil, coordination.ErrAcquireTimeout
 	}
@@ -889,15 +854,7 @@ func (l *lease) Release() error {
 		return err
 	}
 
-	resp, err := l.session.controller.Await(l.session.ctx, req)
-	if err != nil {
-		return err
-	}
-
-	err = errorFromResponse(
-		resp.GetReleaseSemaphoreResult().GetStatus(),
-		resp.GetReleaseSemaphoreResult().GetIssues(),
-	)
+	_, err := l.session.controller.Await(l.session.ctx, req)
 	if err != nil {
 		return err
 	}
