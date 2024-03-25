@@ -3,7 +3,6 @@ package coordination_test
 import (
 	"context"
 	"fmt"
-	"testing"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
@@ -44,7 +43,7 @@ func Example_createDropNode() {
 	fmt.Printf("node description: %+v\nnode config: %+v\n", e, c)
 }
 
-func Test_semaphore(t *testing.T) {
+func Example_semaphore() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
