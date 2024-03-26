@@ -170,3 +170,21 @@ func (t *tupleItem) UUID(v [16]byte) *tuple {
 
 	return t.parent
 }
+
+func (t *tupleItem) TzDate(v time.Time) *tuple {
+	t.parent.values = append(t.parent.values, value.TzDateValueFromTime(v))
+
+	return t.parent
+}
+
+func (t *tupleItem) TzTimestamp(v time.Time) *tuple {
+	t.parent.values = append(t.parent.values, value.TzTimestampValueFromTime(v))
+
+	return t.parent
+}
+
+func (t *tupleItem) TzDatetime(v time.Time) *tuple {
+	t.parent.values = append(t.parent.values, value.TzDatetimeValueFromTime(v))
+
+	return t.parent
+}

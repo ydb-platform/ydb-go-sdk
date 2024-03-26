@@ -8,11 +8,11 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
-func TestTuple(t *testing.T) {
+func TestVariantTuple(t *testing.T) {
 	type expected struct {
 		Type  *Ydb.Type
 		Value *Ydb.Value
@@ -20,13 +20,15 @@ func TestTuple(t *testing.T) {
 
 	tests := []struct {
 		method string
-		args   []any
+
+		typeArgs []any
+		itemArgs []any
 
 		expected expected
 	}{
 		{
-			method: "Uint64",
-			args:   []any{uint64(123)},
+			method:   "Uint64",
+			itemArgs: []any{uint64(123)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -36,12 +38,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_Uint64Value{
 						Uint64Value: 123,
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "Int64",
-			args:   []any{int64(123)},
+			method:   "Int64",
+			itemArgs: []any{int64(123)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -51,12 +54,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_Int64Value{
 						Int64Value: 123,
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "Uint32",
-			args:   []any{uint32(123)},
+			method:   "Uint32",
+			itemArgs: []any{uint32(123)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -66,12 +70,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_Uint32Value{
 						Uint32Value: 123,
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "Int32",
-			args:   []any{int32(123)},
+			method:   "Int32",
+			itemArgs: []any{int32(123)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -81,12 +86,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_Int32Value{
 						Int32Value: 123,
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "Uint16",
-			args:   []any{uint16(123)},
+			method:   "Uint16",
+			itemArgs: []any{uint16(123)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -96,12 +102,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_Uint32Value{
 						Uint32Value: 123,
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "Int16",
-			args:   []any{int16(123)},
+			method:   "Int16",
+			itemArgs: []any{int16(123)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -111,12 +118,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_Int32Value{
 						Int32Value: 123,
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "Uint8",
-			args:   []any{uint8(123)},
+			method:   "Uint8",
+			itemArgs: []any{uint8(123)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -126,12 +134,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_Uint32Value{
 						Uint32Value: 123,
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "Int8",
-			args:   []any{int8(123)},
+			method:   "Int8",
+			itemArgs: []any{int8(123)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -141,12 +150,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_Int32Value{
 						Int32Value: 123,
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "Bool",
-			args:   []any{true},
+			method:   "Bool",
+			itemArgs: []any{true},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -156,12 +166,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_BoolValue{
 						BoolValue: true,
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "Text",
-			args:   []any{"test"},
+			method:   "Text",
+			itemArgs: []any{"test"},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -171,12 +182,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_TextValue{
 						TextValue: "test",
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "Bytes",
-			args:   []any{[]byte("test")},
+			method:   "Bytes",
+			itemArgs: []any{[]byte("test")},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -186,12 +198,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_BytesValue{
 						BytesValue: []byte("test"),
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "Float",
-			args:   []any{float32(123)},
+			method:   "Float",
+			itemArgs: []any{float32(123)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -201,12 +214,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_FloatValue{
 						FloatValue: float32(123),
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "Double",
-			args:   []any{float64(123)},
+			method:   "Double",
+			itemArgs: []any{float64(123)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -216,12 +230,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_DoubleValue{
 						DoubleValue: float64(123),
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "Interval",
-			args:   []any{time.Second},
+			method:   "Interval",
+			itemArgs: []any{time.Second},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -231,12 +246,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_Int64Value{
 						Int64Value: 1000000,
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "Datetime",
-			args:   []any{time.Unix(123456789, 456)},
+			method:   "Datetime",
+			itemArgs: []any{time.Unix(123456789, 456)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -246,12 +262,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_Uint32Value{
 						Uint32Value: 123456789,
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "Date",
-			args:   []any{time.Unix(123456789, 456)},
+			method:   "Date",
+			itemArgs: []any{time.Unix(123456789, 456)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -261,12 +278,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_Uint32Value{
 						Uint32Value: 1428,
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "Timestamp",
-			args:   []any{time.Unix(123456789, 456)},
+			method:   "Timestamp",
+			itemArgs: []any{time.Unix(123456789, 456)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -276,12 +294,14 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_Uint64Value{
 						Uint64Value: 123456789000000,
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "Decimal",
-			args:   []any{[...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, uint32(22), uint32(9)},
+			method:   "Decimal",
+			typeArgs: []any{uint32(22), uint32(9)},
+			itemArgs: []any{[...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6}, uint32(22), uint32(9)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -297,12 +317,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_Low_128{
 						Low_128: 648519454493508870,
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "JSON",
-			args:   []any{`{"a": 1,"b": "B"}`},
+			method:   "JSON",
+			itemArgs: []any{`{"a": 1,"b": "B"}`},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -312,12 +333,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_TextValue{
 						TextValue: `{"a": 1,"b": "B"}`,
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "JSONDocument",
-			args:   []any{`{"a": 1,"b": "B"}`},
+			method:   "JSONDocument",
+			itemArgs: []any{`{"a": 1,"b": "B"}`},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -327,12 +349,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_TextValue{
 						TextValue: `{"a": 1,"b": "B"}`,
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "YSON",
-			args:   []any{[]byte(`{"a": 1,"b": "B"}`)},
+			method:   "YSON",
+			itemArgs: []any{[]byte(`{"a": 1,"b": "B"}`)},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -342,12 +365,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_BytesValue{
 						BytesValue: []byte(`{"a": 1,"b": "B"}`),
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "UUID",
-			args:   []any{[...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}},
+			method:   "UUID",
+			itemArgs: []any{[...]byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -357,13 +381,14 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_Low_128{
 						Low_128: 651345242494996240,
 					},
-					High_128: 72623859790382856,
+					High_128:     72623859790382856,
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "TzDatetime",
-			args:   []any{time.Unix(123456789, 456).UTC()},
+			method:   "TzDatetime",
+			itemArgs: []any{time.Unix(123456789, 456).UTC()},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -373,12 +398,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_TextValue{
 						TextValue: "1973-11-29T21:33:09Z",
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "TzDate",
-			args:   []any{time.Unix(123456789, 456).UTC()},
+			method:   "TzDate",
+			itemArgs: []any{time.Unix(123456789, 456).UTC()},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -388,12 +414,13 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_TextValue{
 						TextValue: "1973-11-29",
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
 		{
-			method: "TzTimestamp",
-			args:   []any{time.Unix(123456789, 456).UTC()},
+			method:   "TzTimestamp",
+			itemArgs: []any{time.Unix(123456789, 456).UTC()},
 
 			expected: expected{
 				Type: &Ydb.Type{
@@ -403,6 +430,7 @@ func TestTuple(t *testing.T) {
 					Value: &Ydb.Value_TextValue{
 						TextValue: "1973-11-29T21:33:09.000000Z",
 					},
+					VariantIndex: 0,
 				},
 			},
 		},
@@ -413,27 +441,35 @@ func TestTuple(t *testing.T) {
 			a := allocator.New()
 			defer a.Free()
 
-			item := Builder{}.Param("$x").BeginTuple().Add()
+			item := Builder{}.Param("$x").BeginVariant().Tuple().Types()
 
-			result, ok := xtest.CallMethod(item, tc.method, tc.args...)[0].(*tuple)
+			types, ok := xtest.CallMethod(item, tc.method, tc.typeArgs...)[0].(*variantTupleTypes)
 			require.True(t, ok)
 
-			params := result.EndTuple().Build().ToYDB(a)
+			builder, ok := xtest.CallMethod(types.Index(0), tc.method, tc.itemArgs...)[0].(*variantTupleBuilder)
+			require.True(t, ok)
+
+			params := builder.EndTuple().EndVariant().Build().ToYDB(a)
+
 			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
 					"$x": {
 						Type: &Ydb.Type{
-							Type: &Ydb.Type_TupleType{
-								TupleType: &Ydb.TupleType{
-									Elements: []*Ydb.Type{
-										tc.expected.Type,
+							Type: &Ydb.Type_VariantType{
+								VariantType: &Ydb.VariantType{
+									Type: &Ydb.VariantType_TupleItems{
+										TupleItems: &Ydb.TupleType{
+											Elements: []*Ydb.Type{
+												tc.expected.Type,
+											},
+										},
 									},
 								},
 							},
 						},
 						Value: &Ydb.Value{
-							Items: []*Ydb.Value{
-								tc.expected.Value,
+							Value: &Ydb.Value_NestedValue{
+								NestedValue: tc.expected.Value,
 							},
 						},
 					},
@@ -442,27 +478,35 @@ func TestTuple(t *testing.T) {
 	}
 }
 
-func TestTuple_AddItems(t *testing.T) {
+func TestVariantTuple_AddTypes(t *testing.T) {
 	a := allocator.New()
 	defer a.Free()
-	params := Builder{}.Param("$x").BeginTuple().
-		AddItems(value.Uint64Value(123), value.Uint64Value(321)).
-		EndTuple().Build().ToYDB(a)
+
+	params := Builder{}.Param("$x").BeginVariant().Tuple().
+		Types().AddTypes(types.Int64, types.Bool).
+		Index(1).
+		Bool(true).
+		EndTuple().EndVariant().Build().ToYDB(a)
+
 	require.Equal(t, xtest.ToJSON(
 		map[string]*Ydb.TypedValue{
 			"$x": {
 				Type: &Ydb.Type{
-					Type: &Ydb.Type_TupleType{
-						TupleType: &Ydb.TupleType{
-							Elements: []*Ydb.Type{
-								{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
-									},
-								},
-								{
-									Type: &Ydb.Type_TypeId{
-										TypeId: Ydb.Type_UINT64,
+					Type: &Ydb.Type_VariantType{
+						VariantType: &Ydb.VariantType{
+							Type: &Ydb.VariantType_TupleItems{
+								TupleItems: &Ydb.TupleType{
+									Elements: []*Ydb.Type{
+										{
+											Type: &Ydb.Type_TypeId{
+												TypeId: Ydb.Type_INT64,
+											},
+										},
+										{
+											Type: &Ydb.Type_TypeId{
+												TypeId: Ydb.Type_BOOL,
+											},
+										},
 									},
 								},
 							},
@@ -470,18 +514,14 @@ func TestTuple_AddItems(t *testing.T) {
 					},
 				},
 				Value: &Ydb.Value{
-					Items: []*Ydb.Value{
-						{
-							Value: &Ydb.Value_Uint64Value{
-								Uint64Value: 123,
-							},
-						},
-						{
-							Value: &Ydb.Value_Uint64Value{
-								Uint64Value: 321,
+					Value: &Ydb.Value_NestedValue{
+						NestedValue: &Ydb.Value{
+							Value: &Ydb.Value_BoolValue{
+								BoolValue: true,
 							},
 						},
 					},
+					VariantIndex: 1,
 				},
 			},
 		}), xtest.ToJSON(params))

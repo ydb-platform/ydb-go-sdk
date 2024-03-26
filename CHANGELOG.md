@@ -1,3 +1,5 @@
+* Added `Tuple` support for `Variant` in `ydb.ParamsBuilder()`
+
 ## v3.60.1
 * Added additional traces for coordination service client internals
 
