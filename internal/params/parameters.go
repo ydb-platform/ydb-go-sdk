@@ -134,6 +134,13 @@ func (p *Parameter) BeginTuple() *tuple {
 	}
 }
 
+func (p *Parameter) BeginStruct() *structure {
+	return &structure{
+		parent: p.parent,
+		name:   p.name,
+	}
+}
+
 func (p *Parameter) Text(v string) Builder {
 	p.value = value.TextValue(v)
 	p.parent.params = append(p.parent.params, p)

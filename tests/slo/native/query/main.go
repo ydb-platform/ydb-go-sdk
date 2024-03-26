@@ -41,8 +41,16 @@ func main() {
 		panic(fmt.Errorf("create storage failed: %w", err))
 	}
 	defer func() {
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(),
-			time.Duration(cfg.ShutdownTime)*time.Second)
+		var (
+			shutdownCtx    context.Context
+			shutdownCancel context.CancelFunc
+		)
+		if cfg.ShutdownTime > 0 {
+			shutdownCtx, shutdownCancel = context.WithTimeout(context.Background(),
+				time.Duration(cfg.ShutdownTime)*time.Second)
+		} else {
+			shutdownCtx, shutdownCancel = context.WithCancel(context.Background())
+		}
 		defer shutdownCancel()
 
 		_ = s.close(shutdownCtx)

@@ -55,7 +55,7 @@ type conn struct {
 	endpoint          endpoint.Endpoint // ro access
 	closed            bool
 	state             atomic.Uint32
-	lastUsage         time.Time
+	lastUsage         *lastUsage
 	onClose           []func(*conn)
 	onTransportErrors []func(ctx context.Context, cc Conn, cause error)
 }
@@ -80,7 +80,7 @@ func (c *conn) LastUsage() time.Time {
 	c.mtx.RLock()
 	defer c.mtx.RUnlock()
 
-	return c.lastUsage
+	return c.lastUsage.Get()
 }
 
 func (c *conn) IsState(states ...State) bool {
@@ -102,6 +102,36 @@ func (c *conn) NodeID() uint32 {
 	return 0
 }
 
+func (c *conn) park(ctx context.Context) (err error) {
+	onDone := trace.DriverOnConnPark(
+		c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).park"),
+		c.Endpoint(),
+	)
+	defer func() {
+		onDone(err)
+	}()
+
+	c.mtx.Lock()
+	defer c.mtx.Unlock()
+
+	if c.closed {
+		return nil
+	}
+
+	if c.cc == nil {
+		return nil
+	}
+
+	err = c.close(ctx)
+
+	if err != nil {
+		return c.wrapError(err)
+	}
+
+	return nil
+}
+
 func (c *conn) Endpoint() endpoint.Endpoint {
 	if c != nil {
 		return c.endpoint
@@ -118,7 +148,7 @@ func (c *conn) setState(ctx context.Context, s State) State {
 	if state := State(c.state.Swap(uint32(s))); state != s {
 		trace.DriverOnConnStateChange(
 			c.config.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).setState"),
 			c.endpoint.Copy(), state,
 		)(s)
 	}
@@ -166,7 +196,7 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 
 	onDone := trace.DriverOnConnDial(
 		c.config.Trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).realConn"),
 		c.endpoint.Copy(),
 	)
 	defer func() {
@@ -183,6 +213,10 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 		}, c.config.GrpcDialOptions()...,
 	)...)
 	if err != nil {
+		if xerrors.IsContextError(err) {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
 		defer func() {
 			c.onTransportError(ctx, err)
 		}()
@@ -208,12 +242,6 @@ func (c *conn) onTransportError(ctx context.Context, cause error) {
 	for _, onTransportError := range c.onTransportErrors {
 		onTransportError(ctx, c, cause)
 	}
-}
-
-func (c *conn) touchLastUsage() {
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
-	c.lastUsage = time.Now()
 }
 
 func isAvailable(raw *grpc.ClientConn) bool {
@@ -249,7 +277,7 @@ func (c *conn) Close(ctx context.Context) (err error) {
 
 	onDone := trace.DriverOnConnClose(
 		c.config.Trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).Close"),
 		c.Endpoint(),
 	)
 	defer func() {
@@ -282,7 +310,7 @@ func (c *conn) Invoke(
 		useWrapping = UseWrapping(ctx)
 		onDone      = trace.DriverOnConnInvoke(
 			c.config.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).Invoke"),
 			c.endpoint, trace.Method(method),
 		)
 		cc *grpc.ClientConn
@@ -298,8 +326,8 @@ func (c *conn) Invoke(
 		return c.wrapError(err)
 	}
 
-	c.touchLastUsage()
-	defer c.touchLastUsage()
+	stop := c.lastUsage.Start()
+	defer stop()
 
 	ctx, traceID, err := meta.TraceID(ctx)
 	if err != nil {
@@ -310,6 +338,10 @@ func (c *conn) Invoke(
 
 	err = cc.Invoke(ctx, method, req, res, append(opts, grpc.Trailer(&md))...)
 	if err != nil {
+		if xerrors.IsContextError(err) {
+			return xerrors.WithStackTrace(err)
+		}
+
 		defer func() {
 			c.onTransportError(ctx, err)
 		}()
@@ -363,7 +395,7 @@ func (c *conn) NewStream(
 	var (
 		onDone = trace.DriverOnConnNewStream(
 			c.config.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).NewStream"),
 			c.endpoint.Copy(), trace.Method(method),
 		)
 		useWrapping = UseWrapping(ctx)
@@ -380,8 +412,8 @@ func (c *conn) NewStream(
 		return nil, c.wrapError(err)
 	}
 
-	c.touchLastUsage()
-	defer c.touchLastUsage()
+	stop := c.lastUsage.Start()
+	defer stop()
 
 	ctx, traceID, err := meta.TraceID(ctx)
 	if err != nil {
@@ -392,6 +424,10 @@ func (c *conn) NewStream(
 
 	s, err = cc.NewStream(ctx, desc, method, opts...)
 	if err != nil {
+		if xerrors.IsContextError(err) {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
 		defer func() {
 			c.onTransportError(ctx, err)
 		}()
@@ -453,9 +489,10 @@ func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, ca
 
 func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	c := &conn{
-		endpoint: e,
-		config:   config,
-		done:     make(chan struct{}),
+		endpoint:  e,
+		config:    config,
+		done:      make(chan struct{}),
+		lastUsage: newLastUsage(nil),
 	}
 	c.state.Store(uint32(Created))
 	for _, opt := range opts {

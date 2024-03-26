@@ -21,6 +21,7 @@ type Config struct {
 
 	trace          *trace.Driver
 	dialTimeout    time.Duration
+	connectionTTL  time.Duration
 	balancerConfig *balancerConfig.Config
 	secure         bool
 	endpoint       string
@@ -54,6 +55,13 @@ func (c *Config) GrpcDialOptions() []grpc.DialOption {
 // Meta reports meta information about database connection
 func (c *Config) Meta() *meta.Meta {
 	return c.meta
+}
+
+// ConnectionTTL defines interval for parking grpc connections.
+//
+// If ConnectionTTL is zero - connections are not park.
+func (c *Config) ConnectionTTL() time.Duration {
+	return c.connectionTTL
 }
 
 // Secure is a flag for secure connection
@@ -166,6 +174,12 @@ func WithApplicationName(applicationName string) Option {
 func WithUserAgent(userAgent string) Option {
 	return func(c *Config) {
 		c.metaOptions = append(c.metaOptions, meta.WithApplicationNameOption(userAgent))
+	}
+}
+
+func WithConnectionTTL(ttl time.Duration) Option {
+	return func(c *Config) {
+		c.connectionTTL = ttl
 	}
 }
 

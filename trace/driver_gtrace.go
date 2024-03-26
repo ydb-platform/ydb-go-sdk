@@ -556,6 +556,41 @@ func (t *Driver) Compose(x *Driver, opts ...DriverComposeOption) *Driver {
 		}
 	}
 	{
+		h1 := t.OnConnPark
+		h2 := x.OnConnPark
+		ret.OnConnPark = func(d DriverConnParkStartInfo) func(DriverConnParkDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverConnParkDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverConnParkDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
+					r1(d)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnConnClose
 		h2 := x.OnConnClose
 		ret.OnConnClose = func(d DriverConnCloseStartInfo) func(DriverConnCloseDoneInfo) {
@@ -1062,6 +1097,21 @@ func (t *Driver) onConnAllow(d DriverConnAllowStartInfo) func(DriverConnAllowDon
 	}
 	return res
 }
+func (t *Driver) onConnPark(d DriverConnParkStartInfo) func(DriverConnParkDoneInfo) {
+	fn := t.OnConnPark
+	if fn == nil {
+		return func(DriverConnParkDoneInfo) {
+			return
+		}
+	}
+	res := fn(d)
+	if res == nil {
+		return func(DriverConnParkDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Driver) onConnClose(d DriverConnCloseStartInfo) func(DriverConnCloseDoneInfo) {
 	fn := t.OnConnClose
 	if fn == nil {
@@ -1367,6 +1417,18 @@ func DriverOnConnAllow(t *Driver, c *context.Context, call call, endpoint Endpoi
 	return func(state ConnState) {
 		var p DriverConnAllowDoneInfo
 		p.State = state
+		res(p)
+	}
+}
+func DriverOnConnPark(t *Driver, c *context.Context, call call, endpoint EndpointInfo) func(error) {
+	var p DriverConnParkStartInfo
+	p.Context = c
+	p.Call = call
+	p.Endpoint = endpoint
+	res := t.onConnPark(p)
+	return func(e error) {
+		var p DriverConnParkDoneInfo
+		p.Error = e
 		res(p)
 	}
 }

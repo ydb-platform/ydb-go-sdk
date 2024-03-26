@@ -9,7 +9,7 @@ func Check(err error) (
 	code int64,
 	errType Type,
 	backoffType backoff.Type,
-	deleteSession bool,
+	invalidObject bool,
 ) {
 	if err == nil {
 		return -1,
@@ -19,7 +19,7 @@ func Check(err error) (
 	}
 	var e Error
 	if As(err, &e) {
-		return int64(e.Code()), e.Type(), e.BackoffType(), e.MustDeleteSession()
+		return int64(e.Code()), e.Type(), e.BackoffType(), e.IsRetryObjectValid()
 	}
 
 	return -1,
@@ -28,16 +28,15 @@ func Check(err error) (
 		false
 }
 
-func MustDeleteSession(err error) bool {
+func IsRetryObjectValid(err error) bool {
 	if err == nil {
-		return false
+		return true
 	}
 
 	var e Error
-
 	if As(err, &e) {
-		return e.MustDeleteSession()
+		return !e.IsRetryObjectValid()
 	}
 
-	return false
+	return true
 }

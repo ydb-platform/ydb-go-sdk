@@ -40,7 +40,9 @@ func newResult(
 		closeResult = func() {}
 	}
 
-	onDone := trace.QueryOnResultNew(t, &ctx, stack.FunctionID(""))
+	onDone := trace.QueryOnResultNew(t, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.newResult"),
+	)
 	defer func() {
 		onDone(err)
 	}()
@@ -86,7 +88,9 @@ func nextPart(
 		t = &trace.Query{}
 	}
 
-	onDone := trace.QueryOnResultNextPart(t, &ctx, stack.FunctionID(""))
+	onDone := trace.QueryOnResultNextPart(t, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.nextPart"),
+	)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -100,7 +104,9 @@ func nextPart(
 }
 
 func (r *result) Close(ctx context.Context) (err error) {
-	onDone := trace.QueryOnResultClose(r.trace, &ctx, stack.FunctionID(""))
+	onDone := trace.QueryOnResultClose(r.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*result).Close"),
+	)
 	defer func() {
 		onDone(err)
 	}()
@@ -176,7 +182,9 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 }
 
 func (r *result) NextResultSet(ctx context.Context) (_ query.ResultSet, err error) {
-	onDone := trace.QueryOnResultNextResultSet(r.trace, &ctx, stack.FunctionID(""))
+	onDone := trace.QueryOnResultNextResultSet(r.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*result).NextResultSet"),
+	)
 	defer func() {
 		onDone(err)
 	}()

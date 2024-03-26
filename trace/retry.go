@@ -12,7 +12,7 @@ type (
 	// Retry specified trace of retry call activity.
 	// gtrace:gen
 	Retry struct {
-		OnRetry func(RetryLoopStartInfo) func(RetryLoopIntermediateInfo) func(RetryLoopDoneInfo)
+		OnRetry func(RetryLoopStartInfo) func(RetryLoopDoneInfo)
 	}
 	RetryLoopStartInfo struct {
 		// Context make available context in trace callback function.
@@ -26,9 +26,6 @@ type (
 		Idempotent bool
 
 		NestedCall bool // a sign for detect Retry calls inside head Retry
-	}
-	RetryLoopIntermediateInfo struct {
-		Error error
 	}
 	RetryLoopDoneInfo struct {
 		Attempts int

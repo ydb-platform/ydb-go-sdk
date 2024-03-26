@@ -88,13 +88,13 @@ func TestPg(t *testing.T) {
 
 			params := result.Build().ToYDB(a)
 
-			require.Equal(t, paramsToJSON(
+			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
 					"$x": {
 						Type:  tc.expected.Type,
 						Value: tc.expected.Value,
 					},
-				}), paramsToJSON(params))
+				}), xtest.ToJSON(params))
 		})
 	}
 }

@@ -15,6 +15,7 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -39,9 +40,8 @@ func TestCreateSession(t *testing.T) {
 			service.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil)
-			t.Log("createSession")
 			attached := 0
-			s, err := createSession(ctx, service, withSessionTrace(
+			s, err := createSession(ctx, service, config.New(config.WithTrace(
 				&trace.Query{
 					OnSessionAttach: func(info trace.QuerySessionAttachStartInfo) func(info trace.QuerySessionAttachDoneInfo) {
 						return func(info trace.QuerySessionAttachDoneInfo) {
@@ -56,7 +56,7 @@ func TestCreateSession(t *testing.T) {
 						return nil
 					},
 				},
-			))
+			)))
 			require.NoError(t, err)
 			require.EqualValues(t, "test", s.id)
 			require.EqualValues(t, 1, attached)
@@ -72,8 +72,7 @@ func TestCreateSession(t *testing.T) {
 				ctrl := gomock.NewController(t)
 				service := NewMockQueryServiceClient(ctrl)
 				service.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
-				t.Log("execute")
-				_, err := createSession(ctx, service)
+				_, err := createSession(ctx, service, config.New())
 				require.Error(t, err)
 				require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 			}, xtest.StopAfter(time.Second))
@@ -89,8 +88,7 @@ func TestCreateSession(t *testing.T) {
 				}, nil)
 				service.EXPECT().AttachSession(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
 				service.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
-				t.Log("execute")
-				_, err := createSession(ctx, service)
+				_, err := createSession(ctx, service, config.New())
 				require.Error(t, err)
 				require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 			}, xtest.StopAfter(time.Second))
@@ -110,8 +108,7 @@ func TestCreateSession(t *testing.T) {
 				service.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
 					Status: Ydb.StatusIds_SUCCESS,
 				}, nil)
-				t.Log("execute")
-				_, err := createSession(ctx, service)
+				_, err := createSession(ctx, service, config.New())
 				require.Error(t, err)
 				require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 			}, xtest.StopAfter(time.Second))
@@ -123,11 +120,10 @@ func TestCreateSession(t *testing.T) {
 				ctx := xtest.Context(t)
 				ctrl := gomock.NewController(t)
 				service := NewMockQueryServiceClient(ctrl)
-				service.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
-					Status: Ydb.StatusIds_UNAVAILABLE,
-				}, nil)
-				t.Log("execute")
-				_, err := createSession(ctx, service)
+				service.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(nil,
+					xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
+				)
+				_, err := createSession(ctx, service, config.New())
 				require.Error(t, err)
 				require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 			}, xtest.StopAfter(time.Second))
@@ -137,9 +133,9 @@ func TestCreateSession(t *testing.T) {
 				ctx := xtest.Context(t)
 				ctrl := gomock.NewController(t)
 				attachStream := NewMockQueryService_AttachSessionClient(ctrl)
-				attachStream.EXPECT().Recv().Return(&Ydb_Query.SessionState{
-					Status: Ydb.StatusIds_UNAVAILABLE,
-				}, nil).AnyTimes()
+				attachStream.EXPECT().Recv().Return(nil,
+					xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
+				)
 				service := NewMockQueryServiceClient(ctrl)
 				service.EXPECT().CreateSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CreateSessionResponse{
 					Status:    Ydb.StatusIds_SUCCESS,
@@ -149,8 +145,7 @@ func TestCreateSession(t *testing.T) {
 				service.EXPECT().DeleteSession(gomock.Any(), gomock.Any()).Return(&Ydb_Query.DeleteSessionResponse{
 					Status: Ydb.StatusIds_SUCCESS,
 				}, nil)
-				t.Log("execute")
-				_, err := createSession(ctx, service)
+				_, err := createSession(ctx, service, config.New())
 				require.Error(t, err)
 				require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 			}, xtest.StopAfter(time.Second))
@@ -158,19 +153,21 @@ func TestCreateSession(t *testing.T) {
 	})
 }
 
-func newTestSession() (*Session, error) {
+func newTestSession(id string) *Session {
 	return &Session{
+		id:         id,
 		statusCode: statusIdle,
-		trace:      &trace.Query{},
-	}, nil
+		cfg:        config.New(),
+	}
 }
 
-func newTestSessionWithClient(client Ydb_Query_V1.QueryServiceClient) (*Session, error) {
+func newTestSessionWithClient(id string, client Ydb_Query_V1.QueryServiceClient) *Session {
 	return &Session{
+		id:         id,
 		grpcClient: client,
 		statusCode: statusIdle,
-		trace:      &trace.Query{},
-	}, nil
+		cfg:        config.New(),
+	}
 }
 
 func testPool(
@@ -187,7 +184,7 @@ func TestDo(t *testing.T) {
 	ctx := xtest.Context(t)
 	t.Run("HappyWay", func(t *testing.T) {
 		attempts, err := do(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
-			return newTestSession()
+			return newTestSession("123"), nil
 		}), func(ctx context.Context, s query.Session) error {
 			return nil
 		}, &trace.Query{})
@@ -197,7 +194,7 @@ func TestDo(t *testing.T) {
 	t.Run("RetryableError", func(t *testing.T) {
 		counter := 0
 		attempts, err := do(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
-			return newTestSession()
+			return newTestSession("123"), nil
 		}), func(ctx context.Context, s query.Session) error {
 			counter++
 			if counter < 10 {
@@ -224,7 +221,7 @@ func TestDoTx(t *testing.T) {
 			Status: Ydb.StatusIds_SUCCESS,
 		}, nil)
 		attempts, err := doTx(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
-			return newTestSessionWithClient(client)
+			return newTestSessionWithClient("123", client), nil
 		}), func(ctx context.Context, tx query.TxActor) error {
 			return nil
 		}, &trace.Query{})
@@ -245,7 +242,7 @@ func TestDoTx(t *testing.T) {
 			Status: Ydb.StatusIds_SUCCESS,
 		}, nil).AnyTimes()
 		attempts, err := doTx(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
-			return newTestSessionWithClient(client)
+			return newTestSessionWithClient("123", client), nil
 		}), func(ctx context.Context, tx query.TxActor) error {
 			counter++
 			if counter < 10 {

@@ -60,14 +60,14 @@ func execute(ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient,
 
 	request, callOptions := executeQueryRequest(a, s.id, q, cfg)
 
-	executeCtx, cancelExecute := xcontext.WithCancel(xcontext.WithoutDeadline(ctx))
+	executeCtx, cancelExecute := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 
 	stream, err := c.ExecuteQuery(executeCtx, request, callOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	r, txID, err := newResult(ctx, stream, s.trace, cancelExecute)
+	r, txID, err := newResult(ctx, stream, s.cfg.Trace(), cancelExecute)
 	if err != nil {
 		cancelExecute()
 
@@ -78,5 +78,5 @@ func execute(ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient,
 		return nil, r, nil
 	}
 
-	return newTransaction(txID, s, s.trace), r, nil
+	return newTransaction(txID, s), r, nil
 }

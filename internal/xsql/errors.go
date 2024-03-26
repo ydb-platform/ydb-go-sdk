@@ -10,8 +10,8 @@ import (
 var (
 	ErrUnsupported     = driver.ErrSkip
 	errDeprecated      = driver.ErrSkip
-	errConnClosedEarly = xerrors.Retryable(errors.New("conn closed early"), xerrors.WithDeleteSession())
-	errNotReadyConn    = xerrors.Retryable(errors.New("conn not ready"), xerrors.WithDeleteSession())
+	errConnClosedEarly = xerrors.Retryable(errors.New("conn closed early"), xerrors.InvalidObject())
+	errNotReadyConn    = xerrors.Retryable(errors.New("conn not ready"), xerrors.InvalidObject())
 )
 
 type ConnAlreadyHaveTxError struct {

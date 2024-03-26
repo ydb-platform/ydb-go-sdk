@@ -12,6 +12,7 @@ require (
 	github.com/ydb-platform/ydb-go-sdk-prometheus/v2 v2.0.1
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.54.0
 	github.com/ydb-platform/ydb-go-yc v0.10.1
+	golang.org/x/sync v0.3.0
 	google.golang.org/genproto v0.0.0-20230526161137-0005af68ea54
 	gorm.io/driver/postgres v1.5.0
 	gorm.io/driver/sqlite v1.5.0
@@ -55,7 +56,6 @@ require (
 	golang.org/x/crypto v0.17.0 // indirect
 	golang.org/x/mod v0.11.0 // indirect
 	golang.org/x/net v0.15.0 // indirect
-	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.7.0 // indirect

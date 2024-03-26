@@ -85,9 +85,9 @@ func (scope *scopeT) Driver(opts ...ydb.Option) *ydb.Driver {
 
 		token := scope.AuthToken()
 		if token == "" {
-			scope.Logf("Change empty auth token")
+			scope.Logf("With empty auth token")
 		} else {
-			scope.Logf("Change auth token")
+			scope.Logf("With auth token")
 		}
 
 		connectionContext, cancel := context.WithTimeout(scope.Ctx, time.Second*10)
