@@ -1,3 +1,4 @@
+## v3.60.1
 * Added additional traces for coordination service client internals
 
 ## v3.60.0
