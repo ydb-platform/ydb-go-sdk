@@ -3,6 +3,8 @@ package coordination
 import (
 	"context"
 	"errors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 	"sync"
 	"time"
 
@@ -33,6 +35,10 @@ type Client struct {
 }
 
 func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) *Client {
+	onDone := trace.CoordinationOnNew(config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.New"),
+	)
+	defer onDone()
 	return &Client{
 		config:   config,
 		service:  Ydb_Coordination_V1.NewCoordinationServiceClient(cc),

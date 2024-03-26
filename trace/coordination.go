@@ -1,6 +1,7 @@
 package trace
 
 import (
+	"context"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Coordination"
@@ -14,6 +15,8 @@ type (
 	// Coordination specified trace of coordination client activity.
 	// gtrace:gen
 	Coordination struct {
+		OnNew func(CoordinationNewStartInfo) func(CoordinationNewDoneInfo)
+
 		OnStreamNew               func(CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo)
 		OnSessionStarted          func(CoordinationSessionStartedInfo)
 		OnSessionStartTimeout     func(CoordinationSessionStartTimeoutInfo)
@@ -31,6 +34,15 @@ type (
 		OnSessionStart func(CoordinationSessionStartStartInfo) func(CoordinationSessionStartDoneInfo)
 		OnSessionSend  func(CoordinationSessionSendStartInfo) func(CoordinationSessionSendDoneInfo)
 	}
+	CoordinationNewStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	CoordinationNewDoneInfo        struct{}
 	CoordinationStreamNewStartInfo struct{}
 	CoordinationStreamNewDoneInfo  struct {
 		Error error

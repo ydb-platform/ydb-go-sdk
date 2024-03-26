@@ -3,6 +3,7 @@
 package trace
 
 import (
+	"context"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Coordination"
@@ -30,6 +31,41 @@ func (t *Coordination) Compose(x *Coordination, opts ...CoordinationComposeOptio
 	for _, opt := range opts {
 		if opt != nil {
 			opt(&options)
+		}
+	}
+	{
+		h1 := t.OnNew
+		h2 := x.OnNew
+		ret.OnNew = func(c CoordinationNewStartInfo) func(CoordinationNewDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(CoordinationNewDoneInfo)
+			if h1 != nil {
+				r = h1(c)
+			}
+			if h2 != nil {
+				r1 = h2(c)
+			}
+			return func(c CoordinationNewDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(c)
+				}
+				if r1 != nil {
+					r1(c)
+				}
+			}
 		}
 	}
 	{
@@ -364,6 +400,21 @@ func (t *Coordination) Compose(x *Coordination, opts ...CoordinationComposeOptio
 	}
 	return &ret
 }
+func (t *Coordination) onNew(c CoordinationNewStartInfo) func(CoordinationNewDoneInfo) {
+	fn := t.OnNew
+	if fn == nil {
+		return func(CoordinationNewDoneInfo) {
+			return
+		}
+	}
+	res := fn(c)
+	if res == nil {
+		return func(CoordinationNewDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Coordination) onStreamNew(c CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo) {
 	fn := t.OnStreamNew
 	if fn == nil {
@@ -493,6 +544,16 @@ func (t *Coordination) onSessionSend(c CoordinationSessionSendStartInfo) func(Co
 		}
 	}
 	return res
+}
+func CoordinationOnNew(t *Coordination, c *context.Context, call call) func() {
+	var p CoordinationNewStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onNew(p)
+	return func() {
+		var p CoordinationNewDoneInfo
+		res(p)
+	}
 }
 func CoordinationOnStreamNew(t *Coordination) func(error) {
 	var p CoordinationStreamNewStartInfo
