@@ -1,3 +1,5 @@
+* Changed default transaction control to `NoTx` for execute query through query service client 
+
 ## v3.61.1
 * Renamed `db.Coordination().CreateSession()` to `db.Coordination().Session()` for compatibility with protos
 
