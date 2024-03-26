@@ -419,7 +419,7 @@ func TestTuple(t *testing.T) {
 			require.True(t, ok)
 
 			params := result.EndTuple().Build().ToYDB(a)
-			require.Equal(t, paramsToJSON(
+			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
 					"$x": {
 						Type: &Ydb.Type{
@@ -437,7 +437,7 @@ func TestTuple(t *testing.T) {
 							},
 						},
 					},
-				}), paramsToJSON(params))
+				}), xtest.ToJSON(params))
 		})
 	}
 }
@@ -448,7 +448,7 @@ func TestTuple_AddItems(t *testing.T) {
 	params := Builder{}.Param("$x").BeginTuple().
 		AddItems(value.Uint64Value(123), value.Uint64Value(321)).
 		EndTuple().Build().ToYDB(a)
-	require.Equal(t, paramsToJSON(
+	require.Equal(t, xtest.ToJSON(
 		map[string]*Ydb.TypedValue{
 			"$x": {
 				Type: &Ydb.Type{
@@ -484,5 +484,5 @@ func TestTuple_AddItems(t *testing.T) {
 					},
 				},
 			},
-		}), paramsToJSON(params))
+		}), xtest.ToJSON(params))
 }

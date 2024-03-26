@@ -451,7 +451,7 @@ func TestVariantTuple(t *testing.T) {
 
 			params := builder.EndTuple().EndVariant().Build().ToYDB(a)
 
-			require.Equal(t, paramsToJSON(
+			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
 					"$x": {
 						Type: &Ydb.Type{
@@ -473,7 +473,7 @@ func TestVariantTuple(t *testing.T) {
 							},
 						},
 					},
-				}), paramsToJSON(params))
+				}), xtest.ToJSON(params))
 		})
 	}
 }
@@ -488,7 +488,7 @@ func TestVariantTuple_AddTypes(t *testing.T) {
 		Bool(true).
 		EndTuple().EndVariant().Build().ToYDB(a)
 
-	require.Equal(t, paramsToJSON(
+	require.Equal(t, xtest.ToJSON(
 		map[string]*Ydb.TypedValue{
 			"$x": {
 				Type: &Ydb.Type{
@@ -524,5 +524,5 @@ func TestVariantTuple_AddTypes(t *testing.T) {
 					VariantIndex: 1,
 				},
 			},
-		}), paramsToJSON(params))
+		}), xtest.ToJSON(params))
 }
