@@ -209,9 +209,9 @@ func (t *Coordination) Compose(x *Coordination, opts ...CoordinationComposeOptio
 		}
 	}
 	{
-		h1 := t.OnCreateSession
-		h2 := x.OnCreateSession
-		ret.OnCreateSession = func(c CoordinationCreateSessionStartInfo) func(CoordinationCreateSessionDoneInfo) {
+		h1 := t.OnSession
+		h2 := x.OnSession
+		ret.OnSession = func(c CoordinationSessionStartInfo) func(CoordinationSessionDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -219,14 +219,49 @@ func (t *Coordination) Compose(x *Coordination, opts ...CoordinationComposeOptio
 					}
 				}()
 			}
-			var r, r1 func(CoordinationCreateSessionDoneInfo)
+			var r, r1 func(CoordinationSessionDoneInfo)
 			if h1 != nil {
 				r = h1(c)
 			}
 			if h2 != nil {
 				r1 = h2(c)
 			}
-			return func(c CoordinationCreateSessionDoneInfo) {
+			return func(c CoordinationSessionDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(c)
+				}
+				if r1 != nil {
+					r1(c)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnClose
+		h2 := x.OnClose
+		ret.OnClose = func(c CoordinationCloseStartInfo) func(CoordinationCloseDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(CoordinationCloseDoneInfo)
+			if h1 != nil {
+				r = h1(c)
+			}
+			if h2 != nil {
+				r1 = h2(c)
+			}
+			return func(c CoordinationCloseDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -650,16 +685,31 @@ func (t *Coordination) onDescribeNode(c CoordinationDescribeNodeStartInfo) func(
 	}
 	return res
 }
-func (t *Coordination) onCreateSession(c CoordinationCreateSessionStartInfo) func(CoordinationCreateSessionDoneInfo) {
-	fn := t.OnCreateSession
+func (t *Coordination) onSession(c CoordinationSessionStartInfo) func(CoordinationSessionDoneInfo) {
+	fn := t.OnSession
 	if fn == nil {
-		return func(CoordinationCreateSessionDoneInfo) {
+		return func(CoordinationSessionDoneInfo) {
 			return
 		}
 	}
 	res := fn(c)
 	if res == nil {
-		return func(CoordinationCreateSessionDoneInfo) {
+		return func(CoordinationSessionDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Coordination) onClose(c CoordinationCloseStartInfo) func(CoordinationCloseDoneInfo) {
+	fn := t.OnClose
+	if fn == nil {
+		return func(CoordinationCloseDoneInfo) {
+			return
+		}
+	}
+	res := fn(c)
+	if res == nil {
+		return func(CoordinationCloseDoneInfo) {
 			return
 		}
 	}
@@ -853,14 +903,25 @@ func CoordinationOnDescribeNode(t *Coordination, c *context.Context, call call, 
 		res(p)
 	}
 }
-func CoordinationOnCreateSession(t *Coordination, c *context.Context, call call, path string) func(error) {
-	var p CoordinationCreateSessionStartInfo
+func CoordinationOnSession(t *Coordination, c *context.Context, call call, path string) func(error) {
+	var p CoordinationSessionStartInfo
 	p.Context = c
 	p.Call = call
 	p.Path = path
-	res := t.onCreateSession(p)
+	res := t.onSession(p)
 	return func(e error) {
-		var p CoordinationCreateSessionDoneInfo
+		var p CoordinationSessionDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func CoordinationOnClose(t *Coordination, c *context.Context, call call) func(error) {
+	var p CoordinationCloseStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onClose(p)
+	return func(e error) {
+		var p CoordinationCloseDoneInfo
 		p.Error = e
 		res(p)
 	}

@@ -91,7 +91,7 @@ func main() {
 	for {
 		fmt.Println("waiting for a lock...")
 
-		session, err := db.Coordination().CreateSession(ctx, path)
+		session, err := db.Coordination().Session(ctx, path)
 		if err != nil {
 			fmt.Println("failed to open session", err)
 

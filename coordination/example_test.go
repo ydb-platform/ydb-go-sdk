@@ -81,7 +81,7 @@ func Example_semaphore() {
 	}
 	fmt.Printf("node description: %+v\nnode config: %+v\n", e, c)
 
-	s, err := db.Coordination().CreateSession(ctx, "/local/test")
+	s, err := db.Coordination().Session(ctx, "/local/test")
 	if err != nil {
 		fmt.Printf("failed to create session: %v\n", err)
 

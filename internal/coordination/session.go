@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/conversation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -46,7 +47,7 @@ func createSession(
 	path string,
 	opts *options.CreateSessionOptions,
 ) (*session, error) {
-	sessionCtx, cancel := context.WithCancel(context.Background())
+	sessionCtx, cancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 	s := session{
 		options:           opts,
 		client:            client,

@@ -125,7 +125,7 @@ func internalCoordination(
 				}
 			}
 		},
-		OnCreateSession: func(info trace.CoordinationCreateSessionStartInfo) func(trace.CoordinationCreateSessionDoneInfo) {
+		OnSession: func(info trace.CoordinationSessionStartInfo) func(trace.CoordinationSessionDoneInfo) {
 			if d.Details()&trace.CoordinationEvents == 0 {
 				return nil
 			}
@@ -133,7 +133,28 @@ func internalCoordination(
 			l.Log(ctx, "start")
 			start := time.Now()
 
-			return func(info trace.CoordinationCreateSessionDoneInfo) {
+			return func(info trace.CoordinationSessionDoneInfo) {
+				if info.Error == nil {
+					l.Log(WithLevel(ctx, INFO), "done",
+						latencyField(start),
+					)
+				} else {
+					l.Log(WithLevel(ctx, ERROR), "fail",
+						latencyField(start),
+						versionField(),
+					)
+				}
+			}
+		},
+		OnClose: func(info trace.CoordinationCloseStartInfo) func(trace.CoordinationCloseDoneInfo) {
+			if d.Details()&trace.CoordinationEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "coordination", "close")
+			l.Log(ctx, "start")
+			start := time.Now()
+
+			return func(info trace.CoordinationCloseDoneInfo) {
 				if info.Error == nil {
 					l.Log(WithLevel(ctx, INFO), "done",
 						latencyField(start),

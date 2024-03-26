@@ -299,7 +299,7 @@ func describeNode(
 	}, nil
 }
 
-func newCreateSessionConfig(opts ...options.CreateSessionOption) *options.CreateSessionOptions {
+func newCreateSessionConfig(opts ...options.SessionOption) *options.CreateSessionOptions {
 	c := defaultCreateSessionConfig()
 	for _, o := range opts {
 		if o != nil {
@@ -344,17 +344,17 @@ func defaultCreateSessionConfig() *options.CreateSessionOptions {
 	}
 }
 
-func (c *Client) CreateSession(
+func (c *Client) Session(
 	ctx context.Context,
 	path string,
-	opts ...options.CreateSessionOption,
+	opts ...options.SessionOption,
 ) (_ coordination.Session, finalErr error) {
 	if c == nil {
 		return nil, xerrors.WithStackTrace(errNilClient)
 	}
 
-	onDone := trace.CoordinationOnCreateSession(c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.(*Client).CreateSession"),
+	onDone := trace.CoordinationOnSession(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.(*Client).Session"),
 		path,
 	)
 	defer func() {
@@ -364,17 +364,20 @@ func (c *Client) CreateSession(
 	return createSession(ctx, c, path, newCreateSessionConfig(opts...))
 }
 
-func (c *Client) Close(ctx context.Context) error {
+func (c *Client) Close(ctx context.Context) (finalErr error) {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
 
+	onDone := trace.CoordinationOnClose(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.(*Client).Close"),
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
 	c.closeSessions(ctx)
 
-	return c.close(ctx)
-}
-
-func (c *Client) close(context.Context) error {
 	return nil
 }
 

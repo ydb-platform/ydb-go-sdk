@@ -15,12 +15,13 @@ type (
 	// Coordination specified trace of coordination client activity.
 	// gtrace:gen
 	Coordination struct {
-		OnNew           func(CoordinationNewStartInfo) func(CoordinationNewDoneInfo)
-		OnCreateNode    func(CoordinationCreateNodeStartInfo) func(CoordinationCreateNodeDoneInfo)
-		OnAlterNode     func(CoordinationAlterNodeStartInfo) func(CoordinationAlterNodeDoneInfo)
-		OnDropNode      func(CoordinationDropNodeStartInfo) func(CoordinationDropNodeDoneInfo)
-		OnDescribeNode  func(CoordinationDescribeNodeStartInfo) func(CoordinationDescribeNodeDoneInfo)
-		OnCreateSession func(CoordinationCreateSessionStartInfo) func(CoordinationCreateSessionDoneInfo)
+		OnNew          func(CoordinationNewStartInfo) func(CoordinationNewDoneInfo)
+		OnCreateNode   func(CoordinationCreateNodeStartInfo) func(CoordinationCreateNodeDoneInfo)
+		OnAlterNode    func(CoordinationAlterNodeStartInfo) func(CoordinationAlterNodeDoneInfo)
+		OnDropNode     func(CoordinationDropNodeStartInfo) func(CoordinationDropNodeDoneInfo)
+		OnDescribeNode func(CoordinationDescribeNodeStartInfo) func(CoordinationDescribeNodeDoneInfo)
+		OnSession      func(CoordinationSessionStartInfo) func(CoordinationSessionDoneInfo)
+		OnClose        func(CoordinationCloseStartInfo) func(CoordinationCloseDoneInfo)
 
 		OnStreamNew               func(CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo)
 		OnSessionStarted          func(CoordinationSessionStartedInfo)
@@ -47,7 +48,18 @@ type (
 		Context *context.Context
 		Call    call
 	}
-	CoordinationNewDoneInfo         struct{}
+	CoordinationNewDoneInfo    struct{}
+	CoordinationCloseStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	CoordinationCloseDoneInfo struct {
+		Error error
+	}
 	CoordinationCreateNodeStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -100,7 +112,7 @@ type (
 	CoordinationDescribeNodeDoneInfo struct {
 		Error error
 	}
-	CoordinationCreateSessionStartInfo struct {
+	CoordinationSessionStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -110,7 +122,7 @@ type (
 
 		Path string
 	}
-	CoordinationCreateSessionDoneInfo struct {
+	CoordinationSessionDoneInfo struct {
 		Error error
 	}
 	CoordinationStreamNewStartInfo struct{}
