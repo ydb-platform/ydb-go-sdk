@@ -38,7 +38,9 @@ func internalCoordination(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "coordination", "node", "create")
-			l.Log(ctx, "start")
+			l.Log(ctx, "start",
+				String("path", info.Path),
+			)
 			start := time.Now()
 
 			return func(info trace.CoordinationCreateNodeDoneInfo) {
@@ -59,7 +61,9 @@ func internalCoordination(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "coordination", "node", "alter")
-			l.Log(ctx, "start")
+			l.Log(ctx, "start",
+				String("path", info.Path),
+			)
 			start := time.Now()
 
 			return func(info trace.CoordinationAlterNodeDoneInfo) {
@@ -80,7 +84,9 @@ func internalCoordination(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "coordination", "node", "drop")
-			l.Log(ctx, "start")
+			l.Log(ctx, "start",
+				String("path", info.Path),
+			)
 			start := time.Now()
 
 			return func(info trace.CoordinationDropNodeDoneInfo) {
@@ -101,10 +107,33 @@ func internalCoordination(
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "coordination", "node", "describe")
-			l.Log(ctx, "start")
+			l.Log(ctx, "start",
+				String("path", info.Path),
+			)
 			start := time.Now()
 
 			return func(info trace.CoordinationDescribeNodeDoneInfo) {
+				if info.Error == nil {
+					l.Log(WithLevel(ctx, INFO), "done",
+						latencyField(start),
+					)
+				} else {
+					l.Log(WithLevel(ctx, ERROR), "fail",
+						latencyField(start),
+						versionField(),
+					)
+				}
+			}
+		},
+		OnCreateSession: func(info trace.CoordinationCreateSessionStartInfo) func(trace.CoordinationCreateSessionDoneInfo) {
+			if d.Details()&trace.CoordinationEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "coordination", "node", "describe")
+			l.Log(ctx, "start")
+			start := time.Now()
+
+			return func(info trace.CoordinationCreateSessionDoneInfo) {
 				if info.Error == nil {
 					l.Log(WithLevel(ctx, INFO), "done",
 						latencyField(start),

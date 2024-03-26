@@ -209,6 +209,41 @@ func (t *Coordination) Compose(x *Coordination, opts ...CoordinationComposeOptio
 		}
 	}
 	{
+		h1 := t.OnCreateSession
+		h2 := x.OnCreateSession
+		ret.OnCreateSession = func(c CoordinationCreateSessionStartInfo) func(CoordinationCreateSessionDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(CoordinationCreateSessionDoneInfo)
+			if h1 != nil {
+				r = h1(c)
+			}
+			if h2 != nil {
+				r1 = h2(c)
+			}
+			return func(c CoordinationCreateSessionDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(c)
+				}
+				if r1 != nil {
+					r1(c)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnStreamNew
 		h2 := x.OnStreamNew
 		ret.OnStreamNew = func(c CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo) {
@@ -615,6 +650,21 @@ func (t *Coordination) onDescribeNode(c CoordinationDescribeNodeStartInfo) func(
 	}
 	return res
 }
+func (t *Coordination) onCreateSession(c CoordinationCreateSessionStartInfo) func(CoordinationCreateSessionDoneInfo) {
+	fn := t.OnCreateSession
+	if fn == nil {
+		return func(CoordinationCreateSessionDoneInfo) {
+			return
+		}
+	}
+	res := fn(c)
+	if res == nil {
+		return func(CoordinationCreateSessionDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Coordination) onStreamNew(c CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo) {
 	fn := t.OnStreamNew
 	if fn == nil {
@@ -799,6 +849,18 @@ func CoordinationOnDescribeNode(t *Coordination, c *context.Context, call call, 
 	res := t.onDescribeNode(p)
 	return func(e error) {
 		var p CoordinationDescribeNodeDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func CoordinationOnCreateSession(t *Coordination, c *context.Context, call call, path string) func(error) {
+	var p CoordinationCreateSessionStartInfo
+	p.Context = c
+	p.Call = call
+	p.Path = path
+	res := t.onCreateSession(p)
+	return func(e error) {
+		var p CoordinationCreateSessionDoneInfo
 		p.Error = e
 		res(p)
 	}

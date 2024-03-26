@@ -348,10 +348,18 @@ func (c *Client) CreateSession(
 	ctx context.Context,
 	path string,
 	opts ...options.CreateSessionOption,
-) (coordination.Session, error) {
+) (_ coordination.Session, finalErr error) {
 	if c == nil {
 		return nil, xerrors.WithStackTrace(errNilClient)
 	}
+
+	onDone := trace.CoordinationOnCreateSession(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.(*Client).CreateSession"),
+		path,
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
 
 	return createSession(ctx, c, path, newCreateSessionConfig(opts...))
 }
