@@ -1,3 +1,4 @@
+## v3.61.0
 * Added `Tuple` support for `Variant` in `ydb.ParamsBuilder()`
 
 ## v3.60.1
