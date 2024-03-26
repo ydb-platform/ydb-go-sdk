@@ -2,7 +2,6 @@ package balancers
 
 import (
 	"encoding/json"
-	"fmt"
 
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -61,7 +60,10 @@ func createByType(t balancerType) (*balancerConfig.Config, error) {
 	case typeRoundRobin:
 		return RoundRobin(), nil
 	default:
-		return nil, xerrors.WithStackTrace(fmt.Errorf("unknown type of balancer: %s", t))
+		return nil, xerrors.WithStackTrace(&balancerTypeError{
+			message: "unknown type of balancer: %s",
+			bType:   t,
+		})
 	}
 }
 
@@ -96,7 +98,10 @@ func CreateFromConfig(s string) (*balancerConfig.Config, error) {
 		return PreferLocalDC(b), nil
 	case preferTypeLocations:
 		if len(c.Locations) == 0 {
-			return nil, xerrors.WithStackTrace(fmt.Errorf("empty locations list in balancer '%s' config", c.Type))
+			return nil, xerrors.WithStackTrace(&balancerTypeError{
+				message: "empty locations list in balancer '%s' config",
+				bType:   c.Type,
+			})
 		}
 		if c.Fallback {
 			return PreferLocationsWithFallback(b, c.Locations...), nil
