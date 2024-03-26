@@ -97,7 +97,8 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 		address = "ydb:///" + b.driverConfig.Endpoint()
 		onDone  = trace.DriverOnBalancerClusterDiscoveryAttempt(
 			b.driverConfig.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID(
+				"github.com/ydb-platform/ydb-go-sdk/3/internal/balancer.(*Balancer).clusterDiscoveryAttempt"),
 			address,
 		)
 		endpoints []endpoint.Endpoint
@@ -173,7 +174,8 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	var (
 		onDone = trace.DriverOnBalancerUpdate(
 			b.driverConfig.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID(
+				"github.com/ydb-platform/ydb-go-sdk/3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
 			b.config.DetectLocalDC,
 		)
 		previousConns []conn.Conn
@@ -211,7 +213,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 func (b *Balancer) Close(ctx context.Context) (err error) {
 	onDone := trace.DriverOnBalancerClose(
 		b.driverConfig.Trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/balancer.(*Balancer).Close"),
 	)
 	defer func() {
 		onDone(err)
@@ -234,10 +236,19 @@ func New(
 	pool *conn.Pool,
 	opts ...discoveryConfig.Option,
 ) (b *Balancer, finalErr error) {
-	onDone := trace.DriverOnBalancerInit(
-		driverConfig.Trace(), &ctx,
-		stack.FunctionID(""),
-		driverConfig.Balancer().String(),
+	var (
+		onDone = trace.DriverOnBalancerInit(
+			driverConfig.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/balancer.New"),
+			driverConfig.Balancer().String(),
+		)
+		discoveryConfig = discoveryConfig.New(append(opts,
+			discoveryConfig.With(driverConfig.Common),
+			discoveryConfig.WithEndpoint(driverConfig.Endpoint()),
+			discoveryConfig.WithDatabase(driverConfig.Database()),
+			discoveryConfig.WithSecure(driverConfig.Secure()),
+			discoveryConfig.WithMeta(driverConfig.Meta()),
+		)...)
 	)
 	defer func() {
 		onDone(finalErr)
@@ -248,6 +259,11 @@ func New(
 		pool:            pool,
 		localDCDetector: detectLocalDC,
 	}
+	d := internalDiscovery.New(ctx, pool.Get(
+		endpoint.New(driverConfig.Endpoint()),
+	), discoveryConfig)
+
+	b.discoveryClient = d
 
 	if config := driverConfig.Balancer(); config == nil {
 		b.config = balancerConfig.Config{}
@@ -255,36 +271,16 @@ func New(
 		b.config = *config
 	}
 
-	err := startDiscovery(ctx, b, opts)
-	if err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-func startDiscovery(ctx context.Context, b *Balancer, opts []discoveryConfig.Option) error {
-	discoveryConfig := discoveryConfig.New(append(opts,
-		discoveryConfig.With(b.driverConfig.Common),
-		discoveryConfig.WithEndpoint(b.driverConfig.Endpoint()),
-		discoveryConfig.WithDatabase(b.driverConfig.Database()),
-		discoveryConfig.WithSecure(b.driverConfig.Secure()),
-		discoveryConfig.WithMeta(b.driverConfig.Meta()),
-	)...)
-	d := internalDiscovery.New(ctx, b.pool.Get(
-		endpoint.New(b.driverConfig.Endpoint()),
-	), discoveryConfig)
-
-	b.discoveryClient = d
-
 	if b.config.SingleConn {
 		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
-			endpoint.New(b.driverConfig.Endpoint()),
+			endpoint.New(driverConfig.Endpoint()),
 		}, "")
 	} else {
+		// initialization of balancer state
 		if err := b.clusterDiscovery(ctx); err != nil {
-			return err
+			return nil, xerrors.WithStackTrace(err)
 		}
+		// run background discovering
 		if d := discoveryConfig.Interval(); d > 0 {
 			b.discoveryRepeater = repeater.New(xcontext.ValueOnly(ctx),
 				d, b.clusterDiscoveryAttempt,
@@ -294,7 +290,7 @@ func startDiscovery(ctx context.Context, b *Balancer, opts []discoveryConfig.Opt
 		}
 	}
 
-	return nil
+	return b, nil
 }
 
 func (b *Balancer) Invoke(
@@ -377,7 +373,7 @@ func (b *Balancer) connections() *connectionsState {
 func (b *Balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
 	onDone := trace.DriverOnBalancerChooseEndpoint(
 		b.driverConfig.Trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/balancer.(*Balancer).getConn"),
 	)
 	defer func() {
 		if err == nil {

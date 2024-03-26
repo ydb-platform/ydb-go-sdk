@@ -72,7 +72,7 @@ func (c *Client) execute(
 ) (r result.Result, err error) {
 	var (
 		onDone = trace.ScriptingOnExecute(c.config.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scripting.(*Client).execute"),
 			query, parameters,
 		)
 		a       = allocator.New()
@@ -151,7 +151,7 @@ func (c *Client) explain(
 ) (e table.ScriptingYQLExplanation, err error) {
 	var (
 		onDone = trace.ScriptingOnExplain(c.config.Trace(), &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scripting.(*Client).explain"),
 			query,
 		)
 		request = &Ydb_Scripting.ExplainYqlRequest{
@@ -218,53 +218,26 @@ func (c *Client) StreamExecute(
 	return r, xerrors.WithStackTrace(err)
 }
 
-func newReceiveStreamResultFunc(
-	stream Ydb_Scripting_V1.ScriptingService_StreamExecuteYqlClient,
-	traceErr func(error) func(error),
-) func(ctx context.Context) (*Ydb.ResultSet, *Ydb_TableStats.QueryStats, error) {
-	return func(ctx context.Context) (*Ydb.ResultSet, *Ydb_TableStats.QueryStats, error) {
-		defer func() {
-			err := recover()
-			if err != nil {
-				errError := err.(error)
-				traceErr(xerrors.HideEOF(errError))
-			}
-		}()
-		select {
-		case <-ctx.Done():
-			return nil, nil, xerrors.WithStackTrace(ctx.Err())
-		default:
-			var response *Ydb_Scripting.ExecuteYqlPartialResponse
-			response, err := stream.Recv()
-			if err != nil {
-				return nil, nil, xerrors.WithStackTrace(err)
-			}
-
-			result := response.GetResult()
-			if result == nil {
-				return nil, nil, xerrors.WithStackTrace(errors.New("no result set"))
-			}
-
-			return result.GetResultSet(), result.GetQueryStats(), nil
-		}
-	}
-}
-
 func (c *Client) streamExecute(
 	ctx context.Context,
 	query string,
 	parameters *params.Parameters,
-) (r scanner.StreamResult, err error) {
+) (r result.StreamResult, err error) {
 	var (
-		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx, stack.FunctionID(""), query, parameters)
-		a              = allocator.New()
-		request        = &Ydb_Scripting.ExecuteYqlRequest{
+		onIntermediate = trace.ScriptingOnStreamExecute(c.config.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scripting.(*Client).streamExecute"),
+			query, parameters,
+		)
+		a       = allocator.New()
+		request = &Ydb_Scripting.ExecuteYqlRequest{
 			Script:     query,
 			Parameters: parameters.ToYDB(a),
 			OperationParams: operation.Params(
-				ctx, c.config.OperationTimeout(),
+				ctx,
+				c.config.OperationTimeout(),
 				c.config.OperationCancelAfter(),
-				operation.ModeSync),
+				operation.ModeSync,
+			),
 		}
 	)
 	defer func() {
@@ -275,33 +248,53 @@ func (c *Client) streamExecute(
 	}()
 
 	ctx, cancel := xcontext.WithCancel(ctx)
-	defer cancel()
 
 	stream, err := c.service.StreamExecuteYql(ctx, request)
 	if err != nil {
+		cancel()
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	recvFunc := newReceiveStreamResultFunc(stream, onIntermediate)
-	onCloseFunc := func(err error) error {
-		onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
+	return scanner.NewStream(ctx,
+		func(ctx context.Context) (
+			set *Ydb.ResultSet,
+			stats *Ydb_TableStats.QueryStats,
+			err error,
+		) {
+			defer func() {
+				onIntermediate(xerrors.HideEOF(err))
+			}()
+			select {
+			case <-ctx.Done():
+				return nil, nil, xerrors.WithStackTrace(ctx.Err())
+			default:
+				var response *Ydb_Scripting.ExecuteYqlPartialResponse
+				response, err = stream.Recv()
+				result := response.GetResult()
+				if result == nil || err != nil {
+					return nil, nil, xerrors.WithStackTrace(err)
+				}
 
-		return err
-	}
+				return result.GetResultSet(), result.GetQueryStats(), nil
+			}
+		},
+		func(err error) error {
+			cancel()
+			onIntermediate(xerrors.HideEOF(err))(xerrors.HideEOF(err))
 
-	result, err := scanner.NewStream(ctx, recvFunc, onCloseFunc)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	return result, nil
+			return err
+		},
+	)
 }
 
 func (c *Client) Close(ctx context.Context) (err error) {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
-	onDone := trace.ScriptingOnClose(c.config.Trace(), &ctx, stack.FunctionID(""))
+	onDone := trace.ScriptingOnClose(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scripting.(*Client).Close"),
+	)
 	defer func() {
 		onDone(err)
 	}()
