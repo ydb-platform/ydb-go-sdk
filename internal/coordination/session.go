@@ -3,6 +3,7 @@ package coordination
 import (
 	"context"
 	"encoding/binary"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"math"
 	"math/rand"
 	"sync"
@@ -46,7 +47,7 @@ func createSession(
 	path string,
 	opts *options.CreateSessionOptions,
 ) (*session, error) {
-	sessionCtx, cancel := context.WithCancel(context.Background())
+	sessionCtx, cancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 	s := session{
 		options:           opts,
 		client:            client,
