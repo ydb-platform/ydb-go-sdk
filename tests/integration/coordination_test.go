@@ -53,7 +53,7 @@ func TestCoordinationSemaphore(t *testing.T) {
 	}
 	fmt.Printf("node description: %+v\nnode config: %+v\n", e, c)
 
-	s, err := db.Coordination().CreateSession(ctx, nodePath)
+	s, err := db.Coordination().Session(ctx, nodePath)
 	if err != nil {
 		t.Fatalf("failed to create session: %v\n", err)
 	}

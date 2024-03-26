@@ -3,7 +3,6 @@ package coordination
 import (
 	"context"
 	"encoding/binary"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"math"
 	"math/rand"
 	"sync"
@@ -16,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/conversation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 

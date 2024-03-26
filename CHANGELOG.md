@@ -1,3 +1,5 @@
+* Renamed `db.Coordination().CreateSession()` to `db.Coordination().Session()` for compatibility with protos
+
 ## v3.61.0
 * Added `Tuple` support for `Variant` in `ydb.ParamsBuilder()`
 
