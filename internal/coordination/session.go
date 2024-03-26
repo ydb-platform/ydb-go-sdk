@@ -132,7 +132,7 @@ func (s *session) newStream(
 				onDone(err)
 			}()
 
-			client, err := s.client.service.Session(streamCtx)
+			client, err := s.client.client.Session(streamCtx)
 			result <- client
 		}()
 

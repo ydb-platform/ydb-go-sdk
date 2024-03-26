@@ -3,6 +3,7 @@
 package trace
 
 import (
+	"context"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Coordination"
@@ -30,6 +31,216 @@ func (t *Coordination) Compose(x *Coordination, opts ...CoordinationComposeOptio
 	for _, opt := range opts {
 		if opt != nil {
 			opt(&options)
+		}
+	}
+	{
+		h1 := t.OnNew
+		h2 := x.OnNew
+		ret.OnNew = func(c CoordinationNewStartInfo) func(CoordinationNewDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(CoordinationNewDoneInfo)
+			if h1 != nil {
+				r = h1(c)
+			}
+			if h2 != nil {
+				r1 = h2(c)
+			}
+			return func(c CoordinationNewDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(c)
+				}
+				if r1 != nil {
+					r1(c)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnCreateNode
+		h2 := x.OnCreateNode
+		ret.OnCreateNode = func(c CoordinationCreateNodeStartInfo) func(CoordinationCreateNodeDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(CoordinationCreateNodeDoneInfo)
+			if h1 != nil {
+				r = h1(c)
+			}
+			if h2 != nil {
+				r1 = h2(c)
+			}
+			return func(c CoordinationCreateNodeDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(c)
+				}
+				if r1 != nil {
+					r1(c)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnAlterNode
+		h2 := x.OnAlterNode
+		ret.OnAlterNode = func(c CoordinationAlterNodeStartInfo) func(CoordinationAlterNodeDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(CoordinationAlterNodeDoneInfo)
+			if h1 != nil {
+				r = h1(c)
+			}
+			if h2 != nil {
+				r1 = h2(c)
+			}
+			return func(c CoordinationAlterNodeDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(c)
+				}
+				if r1 != nil {
+					r1(c)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnDropNode
+		h2 := x.OnDropNode
+		ret.OnDropNode = func(c CoordinationDropNodeStartInfo) func(CoordinationDropNodeDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(CoordinationDropNodeDoneInfo)
+			if h1 != nil {
+				r = h1(c)
+			}
+			if h2 != nil {
+				r1 = h2(c)
+			}
+			return func(c CoordinationDropNodeDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(c)
+				}
+				if r1 != nil {
+					r1(c)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnDescribeNode
+		h2 := x.OnDescribeNode
+		ret.OnDescribeNode = func(c CoordinationDescribeNodeStartInfo) func(CoordinationDescribeNodeDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(CoordinationDescribeNodeDoneInfo)
+			if h1 != nil {
+				r = h1(c)
+			}
+			if h2 != nil {
+				r1 = h2(c)
+			}
+			return func(c CoordinationDescribeNodeDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(c)
+				}
+				if r1 != nil {
+					r1(c)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnCreateSession
+		h2 := x.OnCreateSession
+		ret.OnCreateSession = func(c CoordinationCreateSessionStartInfo) func(CoordinationCreateSessionDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(CoordinationCreateSessionDoneInfo)
+			if h1 != nil {
+				r = h1(c)
+			}
+			if h2 != nil {
+				r1 = h2(c)
+			}
+			return func(c CoordinationCreateSessionDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(c)
+				}
+				if r1 != nil {
+					r1(c)
+				}
+			}
 		}
 	}
 	{
@@ -364,6 +575,96 @@ func (t *Coordination) Compose(x *Coordination, opts ...CoordinationComposeOptio
 	}
 	return &ret
 }
+func (t *Coordination) onNew(c CoordinationNewStartInfo) func(CoordinationNewDoneInfo) {
+	fn := t.OnNew
+	if fn == nil {
+		return func(CoordinationNewDoneInfo) {
+			return
+		}
+	}
+	res := fn(c)
+	if res == nil {
+		return func(CoordinationNewDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Coordination) onCreateNode(c CoordinationCreateNodeStartInfo) func(CoordinationCreateNodeDoneInfo) {
+	fn := t.OnCreateNode
+	if fn == nil {
+		return func(CoordinationCreateNodeDoneInfo) {
+			return
+		}
+	}
+	res := fn(c)
+	if res == nil {
+		return func(CoordinationCreateNodeDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Coordination) onAlterNode(c CoordinationAlterNodeStartInfo) func(CoordinationAlterNodeDoneInfo) {
+	fn := t.OnAlterNode
+	if fn == nil {
+		return func(CoordinationAlterNodeDoneInfo) {
+			return
+		}
+	}
+	res := fn(c)
+	if res == nil {
+		return func(CoordinationAlterNodeDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Coordination) onDropNode(c CoordinationDropNodeStartInfo) func(CoordinationDropNodeDoneInfo) {
+	fn := t.OnDropNode
+	if fn == nil {
+		return func(CoordinationDropNodeDoneInfo) {
+			return
+		}
+	}
+	res := fn(c)
+	if res == nil {
+		return func(CoordinationDropNodeDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Coordination) onDescribeNode(c CoordinationDescribeNodeStartInfo) func(CoordinationDescribeNodeDoneInfo) {
+	fn := t.OnDescribeNode
+	if fn == nil {
+		return func(CoordinationDescribeNodeDoneInfo) {
+			return
+		}
+	}
+	res := fn(c)
+	if res == nil {
+		return func(CoordinationDescribeNodeDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Coordination) onCreateSession(c CoordinationCreateSessionStartInfo) func(CoordinationCreateSessionDoneInfo) {
+	fn := t.OnCreateSession
+	if fn == nil {
+		return func(CoordinationCreateSessionDoneInfo) {
+			return
+		}
+	}
+	res := fn(c)
+	if res == nil {
+		return func(CoordinationCreateSessionDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Coordination) onStreamNew(c CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo) {
 	fn := t.OnStreamNew
 	if fn == nil {
@@ -493,6 +794,76 @@ func (t *Coordination) onSessionSend(c CoordinationSessionSendStartInfo) func(Co
 		}
 	}
 	return res
+}
+func CoordinationOnNew(t *Coordination, c *context.Context, call call) func() {
+	var p CoordinationNewStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onNew(p)
+	return func() {
+		var p CoordinationNewDoneInfo
+		res(p)
+	}
+}
+func CoordinationOnCreateNode(t *Coordination, c *context.Context, call call, path string) func(error) {
+	var p CoordinationCreateNodeStartInfo
+	p.Context = c
+	p.Call = call
+	p.Path = path
+	res := t.onCreateNode(p)
+	return func(e error) {
+		var p CoordinationCreateNodeDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func CoordinationOnAlterNode(t *Coordination, c *context.Context, call call, path string) func(error) {
+	var p CoordinationAlterNodeStartInfo
+	p.Context = c
+	p.Call = call
+	p.Path = path
+	res := t.onAlterNode(p)
+	return func(e error) {
+		var p CoordinationAlterNodeDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func CoordinationOnDropNode(t *Coordination, c *context.Context, call call, path string) func(error) {
+	var p CoordinationDropNodeStartInfo
+	p.Context = c
+	p.Call = call
+	p.Path = path
+	res := t.onDropNode(p)
+	return func(e error) {
+		var p CoordinationDropNodeDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func CoordinationOnDescribeNode(t *Coordination, c *context.Context, call call, path string) func(error) {
+	var p CoordinationDescribeNodeStartInfo
+	p.Context = c
+	p.Call = call
+	p.Path = path
+	res := t.onDescribeNode(p)
+	return func(e error) {
+		var p CoordinationDescribeNodeDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func CoordinationOnCreateSession(t *Coordination, c *context.Context, call call, path string) func(error) {
+	var p CoordinationCreateSessionStartInfo
+	p.Context = c
+	p.Call = call
+	p.Path = path
+	res := t.onCreateSession(p)
+	return func(e error) {
+		var p CoordinationCreateSessionDoneInfo
+		p.Error = e
+		res(p)
+	}
 }
 func CoordinationOnStreamNew(t *Coordination) func(error) {
 	var p CoordinationStreamNewStartInfo

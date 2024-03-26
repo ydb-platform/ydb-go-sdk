@@ -31,8 +31,11 @@ func TestCoordinationSemaphore(t *testing.T) {
 		t.Fatalf("failed to connect: %v", err)
 	}
 	defer db.Close(ctx) // cleanup resources
+
+	const nodePath = "/local/coordination/node/test"
+
 	// create node
-	err = db.Coordination().CreateNode(ctx, "/local/test", coordination.NodeConfig{
+	err = db.Coordination().CreateNode(ctx, nodePath, coordination.NodeConfig{
 		Path:                     "",
 		SelfCheckPeriodMillis:    1000,
 		SessionGracePeriodMillis: 1000,
@@ -43,14 +46,14 @@ func TestCoordinationSemaphore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create node: %v", err)
 	}
-	defer db.Coordination().DropNode(ctx, "/local/test")
-	e, c, err := db.Coordination().DescribeNode(ctx, "/local/test")
+	defer db.Coordination().DropNode(ctx, nodePath)
+	e, c, err := db.Coordination().DescribeNode(ctx, nodePath)
 	if err != nil {
 		t.Fatalf("failed to describe node: %v\n", err)
 	}
 	fmt.Printf("node description: %+v\nnode config: %+v\n", e, c)
 
-	s, err := db.Coordination().CreateSession(ctx, "/local/test")
+	s, err := db.Coordination().CreateSession(ctx, nodePath)
 	if err != nil {
 		t.Fatalf("failed to create session: %v\n", err)
 	}

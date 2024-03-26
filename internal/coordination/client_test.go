@@ -24,21 +24,19 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 )
 
-func TestClient_CreateNode(t *testing.T) {
+func TestCreateNode(t *testing.T) {
 	t.Run("HappyWay", func(t *testing.T) {
-		xtest.TestManyTimes(t, func(t testing.TB) {
-			ctx := xtest.Context(t)
-			ctrl := gomock.NewController(t)
-			client := NewMockCoordinationServiceClient(ctrl)
-			client.EXPECT().CreateNode(gomock.Any(), gomock.Any()).Return(&Ydb_Coordination.CreateNodeResponse{
-				Operation: &Ydb_Operations.Operation{
-					Ready:  true,
-					Status: Ydb.StatusIds_SUCCESS,
-				},
-			}, nil)
-			err := createNode(ctx, client, &Ydb_Coordination.CreateNodeRequest{})
-			require.NoError(t, err)
-		}, xtest.StopAfter(time.Second))
+		ctx := xtest.Context(t)
+		ctrl := gomock.NewController(t)
+		client := NewMockCoordinationServiceClient(ctrl)
+		client.EXPECT().CreateNode(gomock.Any(), gomock.Any()).Return(&Ydb_Coordination.CreateNodeResponse{
+			Operation: &Ydb_Operations.Operation{
+				Ready:  true,
+				Status: Ydb.StatusIds_SUCCESS,
+			},
+		}, nil)
+		err := createNode(ctx, client, &Ydb_Coordination.CreateNodeRequest{})
+		require.NoError(t, err)
 	})
 	t.Run("TransportError", func(t *testing.T) {
 		ctx := xtest.Context(t)
@@ -170,72 +168,68 @@ func TestOperationParams(t *testing.T) {
 
 func TestDescribeNode(t *testing.T) {
 	t.Run("HappyWay", func(t *testing.T) {
-		xtest.TestManyTimes(t, func(t testing.TB) {
-			ctx := xtest.Context(t)
-			ctrl := gomock.NewController(t)
-			client := NewMockCoordinationServiceClient(ctrl)
-			client.EXPECT().DescribeNode(gomock.Any(), gomock.Any()).Return(&Ydb_Coordination.DescribeNodeResponse{
-				Operation: &Ydb_Operations.Operation{
-					Ready:  true,
-					Status: Ydb.StatusIds_SUCCESS,
-					Result: func() *anypb.Any {
-						result, err := anypb.New(&Ydb_Coordination.DescribeNodeResult{
-							Self: &Ydb_Scheme.Entry{
-								Name:  "/a/b/c",
-								Owner: "root",
-								Type:  Ydb_Scheme.Entry_COORDINATION_NODE,
-							},
-							Config: &Ydb_Coordination.Config{
-								Path:                     "/a/b/c",
-								SelfCheckPeriodMillis:    100,
-								SessionGracePeriodMillis: 1000,
-								ReadConsistencyMode:      Ydb_Coordination.ConsistencyMode_CONSISTENCY_MODE_STRICT,
-								AttachConsistencyMode:    Ydb_Coordination.ConsistencyMode_CONSISTENCY_MODE_STRICT,
-								RateLimiterCountersMode:  Ydb_Coordination.RateLimiterCountersMode_RATE_LIMITER_COUNTERS_MODE_AGGREGATED,
-							},
-						})
-						require.NoError(t, err)
+		ctx := xtest.Context(t)
+		ctrl := gomock.NewController(t)
+		client := NewMockCoordinationServiceClient(ctrl)
+		client.EXPECT().DescribeNode(gomock.Any(), gomock.Any()).Return(&Ydb_Coordination.DescribeNodeResponse{
+			Operation: &Ydb_Operations.Operation{
+				Ready:  true,
+				Status: Ydb.StatusIds_SUCCESS,
+				Result: func() *anypb.Any {
+					result, err := anypb.New(&Ydb_Coordination.DescribeNodeResult{
+						Self: &Ydb_Scheme.Entry{
+							Name:  "/a/b/c",
+							Owner: "root",
+							Type:  Ydb_Scheme.Entry_COORDINATION_NODE,
+						},
+						Config: &Ydb_Coordination.Config{
+							Path:                     "/a/b/c",
+							SelfCheckPeriodMillis:    100,
+							SessionGracePeriodMillis: 1000,
+							ReadConsistencyMode:      Ydb_Coordination.ConsistencyMode_CONSISTENCY_MODE_STRICT,
+							AttachConsistencyMode:    Ydb_Coordination.ConsistencyMode_CONSISTENCY_MODE_STRICT,
+							RateLimiterCountersMode:  Ydb_Coordination.RateLimiterCountersMode_RATE_LIMITER_COUNTERS_MODE_AGGREGATED,
+						},
+					})
+					require.NoError(t, err)
 
-						return result
-					}(),
-				},
-			}, nil)
-			nodeScheme, nodeConfig, err := describeNode(ctx, client, &Ydb_Coordination.DescribeNodeRequest{
-				Path:            "/a/b/c",
-				OperationParams: nil,
-			})
-			require.NoError(t, err)
-			require.Equal(t, xtest.ToJSON(&scheme.Entry{
-				Name:  "/a/b/c",
-				Owner: "root",
-				Type:  scheme.EntryCoordinationNode,
-			}), xtest.ToJSON(nodeScheme))
-			require.Equal(t, xtest.ToJSON(coordination.NodeConfig{
-				Path:                     "/a/b/c",
-				SelfCheckPeriodMillis:    100,
-				SessionGracePeriodMillis: 1000,
-				ReadConsistencyMode:      coordination.ConsistencyModeStrict,
-				AttachConsistencyMode:    coordination.ConsistencyModeStrict,
-				RatelimiterCountersMode:  coordination.RatelimiterCountersModeAggregated,
-			}), xtest.ToJSON(nodeConfig))
-		}, xtest.StopAfter(time.Second))
+					return result
+				}(),
+			},
+		}, nil)
+		nodeScheme, nodeConfig, err := describeNode(ctx, client, &Ydb_Coordination.DescribeNodeRequest{
+			Path:            "/a/b/c",
+			OperationParams: nil,
+		})
+		require.NoError(t, err)
+		require.Equal(t, xtest.ToJSON(&scheme.Entry{
+			Name:  "/a/b/c",
+			Owner: "root",
+			Type:  scheme.EntryCoordinationNode,
+		}), xtest.ToJSON(nodeScheme))
+		require.Equal(t, xtest.ToJSON(coordination.NodeConfig{
+			Path:                     "/a/b/c",
+			SelfCheckPeriodMillis:    100,
+			SessionGracePeriodMillis: 1000,
+			ReadConsistencyMode:      coordination.ConsistencyModeStrict,
+			AttachConsistencyMode:    coordination.ConsistencyModeStrict,
+			RatelimiterCountersMode:  coordination.RatelimiterCountersModeAggregated,
+		}), xtest.ToJSON(nodeConfig))
 	})
 	t.Run("TransportError", func(t *testing.T) {
-		xtest.TestManyTimes(t, func(t testing.TB) {
-			ctx := xtest.Context(t)
-			ctrl := gomock.NewController(t)
-			client := NewMockCoordinationServiceClient(ctrl)
-			client.EXPECT().DescribeNode(gomock.Any(), gomock.Any()).Return(nil,
-				xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "")),
-			)
-			nodeScheme, nodeConfig, err := describeNode(ctx, client, &Ydb_Coordination.DescribeNodeRequest{
-				Path:            "/a/b/c",
-				OperationParams: nil,
-			})
-			require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
-			require.Nil(t, nodeScheme)
-			require.Nil(t, nodeConfig)
-		}, xtest.StopAfter(time.Second))
+		ctx := xtest.Context(t)
+		ctrl := gomock.NewController(t)
+		client := NewMockCoordinationServiceClient(ctrl)
+		client.EXPECT().DescribeNode(gomock.Any(), gomock.Any()).Return(nil,
+			xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, "")),
+		)
+		nodeScheme, nodeConfig, err := describeNode(ctx, client, &Ydb_Coordination.DescribeNodeRequest{
+			Path:            "/a/b/c",
+			OperationParams: nil,
+		})
+		require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
+		require.Nil(t, nodeScheme)
+		require.Nil(t, nodeConfig)
 	})
 	t.Run("OperationError", func(t *testing.T) {
 		ctx := xtest.Context(t)
@@ -251,5 +245,144 @@ func TestDescribeNode(t *testing.T) {
 		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 		require.Nil(t, nodeScheme)
 		require.Nil(t, nodeConfig)
+	})
+}
+
+func TestAlterNodeRequest(t *testing.T) {
+	for _, tt := range []struct {
+		name            string
+		path            string
+		config          coordination.NodeConfig
+		operationParams *Ydb_Operations.OperationParams
+		request         *Ydb_Coordination.AlterNodeRequest
+	}{
+		{
+			name: xtest.CurrentFileLine(),
+			path: "/a/b/c",
+			config: coordination.NodeConfig{
+				Path: "/a/b/c",
+			},
+			operationParams: &Ydb_Operations.OperationParams{
+				OperationMode: Ydb_Operations.OperationParams_SYNC,
+			},
+			request: &Ydb_Coordination.AlterNodeRequest{
+				Path: "/a/b/c",
+				Config: &Ydb_Coordination.Config{
+					Path: "/a/b/c",
+				},
+				OperationParams: &Ydb_Operations.OperationParams{
+					OperationMode: Ydb_Operations.OperationParams_SYNC,
+				},
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			request := alterNodeRequest(tt.path, tt.config, tt.operationParams)
+			require.Equal(t, xtest.ToJSON(tt.request), xtest.ToJSON(request))
+		})
+	}
+}
+
+func TestAlterNode(t *testing.T) {
+	t.Run("HappyWay", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		ctrl := gomock.NewController(t)
+		client := NewMockCoordinationServiceClient(ctrl)
+		client.EXPECT().AlterNode(gomock.Any(), gomock.Any()).Return(&Ydb_Coordination.AlterNodeResponse{
+			Operation: &Ydb_Operations.Operation{
+				Ready:  true,
+				Status: Ydb.StatusIds_SUCCESS,
+			},
+		}, nil)
+		err := alterNode(ctx, client, &Ydb_Coordination.AlterNodeRequest{})
+		require.NoError(t, err)
+	})
+	t.Run("TransportError", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		ctrl := gomock.NewController(t)
+		client := NewMockCoordinationServiceClient(ctrl)
+		client.EXPECT().AlterNode(gomock.Any(), gomock.Any()).Return(nil,
+			xerrors.Transport(grpcStatus.Error(grpcCodes.ResourceExhausted, "")),
+		)
+		err := alterNode(ctx, client, &Ydb_Coordination.AlterNodeRequest{})
+		require.True(t, xerrors.IsTransportError(err, grpcCodes.ResourceExhausted))
+		require.True(t, xerrors.IsRetryObjectValid(err))
+	})
+	t.Run("OperationError", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		ctrl := gomock.NewController(t)
+		client := NewMockCoordinationServiceClient(ctrl)
+		client.EXPECT().AlterNode(gomock.Any(), gomock.Any()).Return(nil,
+			xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
+		)
+		err := alterNode(ctx, client, &Ydb_Coordination.AlterNodeRequest{})
+		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
+		require.True(t, xerrors.IsRetryObjectValid(err))
+	})
+}
+
+func TestDropNodeRequest(t *testing.T) {
+	for _, tt := range []struct {
+		name            string
+		path            string
+		operationParams *Ydb_Operations.OperationParams
+		request         *Ydb_Coordination.DropNodeRequest
+	}{
+		{
+			name: xtest.CurrentFileLine(),
+			path: "/a/b/c",
+			operationParams: &Ydb_Operations.OperationParams{
+				OperationMode: Ydb_Operations.OperationParams_SYNC,
+			},
+			request: &Ydb_Coordination.DropNodeRequest{
+				Path: "/a/b/c",
+				OperationParams: &Ydb_Operations.OperationParams{
+					OperationMode: Ydb_Operations.OperationParams_SYNC,
+				},
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			request := dropNodeRequest(tt.path, tt.operationParams)
+			require.Equal(t, xtest.ToJSON(tt.request), xtest.ToJSON(request))
+		})
+	}
+}
+
+func TestDropNode(t *testing.T) {
+	t.Run("HappyWay", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		ctrl := gomock.NewController(t)
+		client := NewMockCoordinationServiceClient(ctrl)
+		client.EXPECT().DropNode(gomock.Any(), gomock.Any()).Return(&Ydb_Coordination.DropNodeResponse{
+			Operation: &Ydb_Operations.Operation{
+				Ready:  true,
+				Status: Ydb.StatusIds_SUCCESS,
+			},
+		}, nil)
+		err := dropNode(ctx, client, &Ydb_Coordination.DropNodeRequest{})
+		require.NoError(t, err)
+	})
+	t.Run("TransportError", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		ctrl := gomock.NewController(t)
+		client := NewMockCoordinationServiceClient(ctrl)
+		client.EXPECT().DropNode(gomock.Any(), gomock.Any()).Return(nil,
+			xerrors.Transport(grpcStatus.Error(grpcCodes.ResourceExhausted, "")),
+		)
+		err := dropNode(ctx, client, &Ydb_Coordination.DropNodeRequest{})
+		require.True(t, xerrors.IsTransportError(err, grpcCodes.ResourceExhausted))
+		require.True(t, xerrors.IsRetryObjectValid(err))
+	})
+	t.Run("OperationError", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		ctrl := gomock.NewController(t)
+		client := NewMockCoordinationServiceClient(ctrl)
+		client.EXPECT().DropNode(gomock.Any(), gomock.Any()).Return(nil,
+			xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
+		)
+		err := dropNode(ctx, client, &Ydb_Coordination.DropNodeRequest{})
+		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
+		require.True(t, xerrors.IsRetryObjectValid(err))
 	})
 }
