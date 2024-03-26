@@ -20,9 +20,9 @@ func (c Config) Trace() *trace.Coordination {
 type Option func(c *Config)
 
 // WithTrace appends coordination trace to early defined traces
-func WithTrace(trace trace.Coordination, opts ...trace.CoordinationComposeOption) Option {
+func WithTrace(trace *trace.Coordination, opts ...trace.CoordinationComposeOption) Option {
 	return func(c *Config) {
-		c.trace = c.trace.Compose(&trace, opts...)
+		c.trace = c.trace.Compose(trace, opts...)
 	}
 }
 

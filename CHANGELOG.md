@@ -1,9 +1,31 @@
+## v3.60.1
+* Added additional traces for coordination service client internals
+
+## v3.60.0
+* Added experimental support of semaphores over coordination service client
+
+## v3.59.3
+* Fixed `gstack` logic for parsing `ast.BlockStmt`
+
+## v3.59.2
+* Added internal `gstack` codegen tool for filling `stack.FunctionID` with value from call stack
+
+## v3.59.1
+* Fixed updating last usage timestamp for smart parking of the conns
+
+## v3.59.0
+* Added `Struct` support for `ydb.ParamsBuilder()`
 * Added support of `TzDate`,`TzDateTime`,`TzTimestamp` types in `ydb.ParamsBuilder()`
 * Added `trace.Query.OnTransactionExecute` event
 * Added query pool metrics
 * Fixed logic of query session pool
 * Changed initialization of internal driver clients to lazy
-* Disabled the logic of background grpc-connection parking 
+* Removed `ydb.WithSessionPoolSizeLimit()` option
+* Added async put session into pool if external context is done
+* Dropped intermediate callbacks from `trace.{Table,Retry,Query}` events
+* Wrapped errors from `internal/pool.Pool.getItem` as retryable
+* Disabled the logic of background grpc-connection parking
+* Improved stringification for postgres types
 
 ## v3.58.2
 * Added `trace.Query.OnSessionBegin` event

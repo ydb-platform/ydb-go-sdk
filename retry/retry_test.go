@@ -45,10 +45,10 @@ func TestRetryModes(t *testing.T) {
 							tt.backoff,
 						)
 					}
-					if m.MustDeleteSession() != tt.deleteSession {
+					if m.IsRetryObjectValid() != tt.deleteSession {
 						t.Errorf(
 							"unexpected delete session status: %v, want: %v",
-							m.MustDeleteSession(),
+							m.IsRetryObjectValid(),
 							tt.deleteSession,
 						)
 					}

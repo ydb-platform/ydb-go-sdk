@@ -19,8 +19,8 @@ import (
 //
 //		db, err := ydb.Open(context.Background(), connectionString,
 //	     ...
-//			ydb.Change(config.WithGrpcOptions(grpc.WithChainUnaryInterceptor(grpcStopper.UnaryClientInterceptor)),
-//			ydb.Change(config.WithGrpcOptions(grpc.WithStreamInterceptor(grpcStopper.StreamClientInterceptor)),
+//			ydb.With(config.WithGrpcOptions(grpc.WithChainUnaryInterceptor(grpcStopper.UnaryClientInterceptor)),
+//			ydb.With(config.WithGrpcOptions(grpc.WithStreamInterceptor(grpcStopper.StreamClientInterceptor)),
 //		),
 //
 //		grpcStopper.Stop(errors.New("test error"))

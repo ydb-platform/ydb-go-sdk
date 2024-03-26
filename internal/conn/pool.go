@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
@@ -11,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -78,11 +80,24 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 		return
 	}
 
-	if xerrors.IsTransportError(cause,
-		grpcCodes.OK,
-		grpcCodes.Canceled,
+	if !xerrors.IsTransportError(cause,
 		grpcCodes.ResourceExhausted,
-		grpcCodes.OutOfRange,
+		grpcCodes.Unavailable,
+		// grpcCodes.OK,
+		// grpcCodes.Canceled,
+		// grpcCodes.Unknown,
+		// grpcCodes.InvalidArgument,
+		// grpcCodes.DeadlineExceeded,
+		// grpcCodes.NotFound,
+		// grpcCodes.AlreadyExists,
+		// grpcCodes.PermissionDenied,
+		// grpcCodes.FailedPrecondition,
+		// grpcCodes.Aborted,
+		// grpcCodes.OutOfRange,
+		// grpcCodes.Unimplemented,
+		// grpcCodes.Internal,
+		// grpcCodes.DataLoss,
+		// grpcCodes.Unauthenticated,
 	) {
 		return
 	}
@@ -99,7 +114,7 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 
 	trace.DriverOnConnBan(
 		p.config.Trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*Pool).Ban"),
 		e, cc.GetState(), cause,
 	)(cc.SetState(ctx, Banned))
 }
@@ -121,7 +136,7 @@ func (p *Pool) Allow(ctx context.Context, cc Conn) {
 
 	trace.DriverOnConnAllow(
 		p.config.Trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*Pool).Allow"),
 		e, cc.GetState(),
 	)(cc.Unban(ctx))
 }
@@ -133,7 +148,9 @@ func (p *Pool) Take(context.Context) error {
 }
 
 func (p *Pool) Release(ctx context.Context) (finalErr error) {
-	onDone := trace.DriverOnPoolRelease(p.config.Trace(), &ctx, stack.FunctionID(""))
+	onDone := trace.DriverOnPoolRelease(p.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*Pool).Release"),
+	)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -181,8 +198,43 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 	return nil
 }
 
+func (p *Pool) connParker(ctx context.Context, ttl, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-p.done:
+			return
+		case <-ticker.C:
+			for _, c := range p.collectConns() {
+				if time.Since(c.LastUsage()) > ttl {
+					switch c.GetState() {
+					case Online, Banned:
+						_ = c.park(ctx)
+					default:
+						// nop
+					}
+				}
+			}
+		}
+	}
+}
+
+func (p *Pool) collectConns() []*conn {
+	p.mtx.RLock()
+	defer p.mtx.RUnlock()
+	conns := make([]*conn, 0, len(p.conns))
+	for _, c := range p.conns {
+		conns = append(conns, c)
+	}
+
+	return conns
+}
+
 func NewPool(ctx context.Context, config Config) *Pool {
-	onDone := trace.DriverOnPoolNew(config.Trace(), &ctx, stack.FunctionID(""))
+	onDone := trace.DriverOnPoolNew(config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.NewPool"),
+	)
 	defer onDone()
 
 	p := &Pool{
@@ -191,6 +243,10 @@ func NewPool(ctx context.Context, config Config) *Pool {
 		opts:   config.GrpcDialOptions(),
 		conns:  make(map[connsKey]*conn),
 		done:   make(chan struct{}),
+	}
+
+	if ttl := config.ConnectionTTL(); ttl > 0 {
+		go p.connParker(xcontext.ValueOnly(ctx), ttl, ttl/2)
 	}
 
 	return p

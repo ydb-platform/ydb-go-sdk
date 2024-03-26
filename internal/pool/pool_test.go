@@ -3,12 +3,16 @@ package pool
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	grpcCodes "google.golang.org/grpc/codes"
+	grpcStatus "google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
@@ -73,7 +77,97 @@ func TestPool(t *testing.T) {
 			require.EqualValues(t, p.limit, atomic.LoadInt64(&newCounter))
 		})
 	})
-	t.Run("Change", func(t *testing.T) {
+	t.Run("Retry", func(t *testing.T) {
+		t.Run("CreateItem", func(t *testing.T) {
+			t.Run("context", func(t *testing.T) {
+				t.Run("Cancelled", func(t *testing.T) {
+					var counter int64
+					p := New(rootCtx,
+						WithCreateFunc(func(context.Context) (*testItem, error) {
+							atomic.AddInt64(&counter, 1)
+
+							if atomic.LoadInt64(&counter) < 10 {
+								return nil, context.Canceled
+							}
+
+							var v testItem
+
+							return &v, nil
+						}),
+					)
+					err := p.With(rootCtx, func(ctx context.Context, item *testItem) error {
+						return nil
+					})
+					require.NoError(t, err)
+					require.GreaterOrEqual(t, atomic.LoadInt64(&counter), int64(10))
+				})
+				t.Run("DeadlineExceeded", func(t *testing.T) {
+					var counter int64
+					p := New(rootCtx,
+						WithCreateFunc(func(context.Context) (*testItem, error) {
+							atomic.AddInt64(&counter, 1)
+
+							if atomic.LoadInt64(&counter) < 10 {
+								return nil, context.DeadlineExceeded
+							}
+
+							var v testItem
+
+							return &v, nil
+						}),
+					)
+					err := p.With(rootCtx, func(ctx context.Context, item *testItem) error {
+						return nil
+					})
+					require.NoError(t, err)
+					require.GreaterOrEqual(t, atomic.LoadInt64(&counter), int64(10))
+				})
+			})
+			t.Run("OnTransportError", func(t *testing.T) {
+				var counter int64
+				p := New(rootCtx,
+					WithCreateFunc(func(context.Context) (*testItem, error) {
+						atomic.AddInt64(&counter, 1)
+
+						if atomic.LoadInt64(&counter) < 10 {
+							return nil, xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, ""))
+						}
+
+						var v testItem
+
+						return &v, nil
+					}),
+				)
+				err := p.With(rootCtx, func(ctx context.Context, item *testItem) error {
+					return nil
+				})
+				require.NoError(t, err)
+				require.GreaterOrEqual(t, atomic.LoadInt64(&counter), int64(10))
+			})
+			t.Run("OnOperationError", func(t *testing.T) {
+				var counter int64
+				p := New(rootCtx,
+					WithCreateFunc(func(context.Context) (*testItem, error) {
+						atomic.AddInt64(&counter, 1)
+
+						if atomic.LoadInt64(&counter) < 10 {
+							return nil, xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE))
+						}
+
+						var v testItem
+
+						return &v, nil
+					}),
+				)
+				err := p.With(rootCtx, func(ctx context.Context, item *testItem) error {
+					return nil
+				})
+				require.NoError(t, err)
+				require.GreaterOrEqual(t, atomic.LoadInt64(&counter), int64(10))
+			})
+		})
+	})
+	t.Run("On", func(t *testing.T) {
 		t.Run("Context", func(t *testing.T) {
 			t.Run("Canceled", func(t *testing.T) {
 				ctx, cancel := context.WithCancel(rootCtx)
@@ -133,7 +227,7 @@ func TestPool(t *testing.T) {
 				var (
 					newItems    int64
 					deleteItems int64
-					expErr      = xerrors.Retryable(errors.New("expected error"), xerrors.WithDeleteSession())
+					expErr      = xerrors.Retryable(errors.New("expected error"), xerrors.InvalidObject())
 				)
 				p := New(rootCtx,
 					WithLimit[*testItem, testItem](1),
@@ -195,4 +289,32 @@ func TestPool(t *testing.T) {
 			wg.Wait()
 		}, xtest.StopAfter(42*time.Second))
 	})
+}
+
+func TestSafeStatsRace(t *testing.T) {
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		var (
+			wg sync.WaitGroup
+			s  = &safeStats{}
+		)
+		wg.Add(10000)
+		for range make([]struct{}, 10000) {
+			go func() {
+				defer wg.Done()
+				require.NotPanics(t, func() {
+					switch rand.Int31n(4) { //nolint:gosec
+					case 0:
+						s.Index().Inc()
+					case 1:
+						s.InUse().Inc()
+					case 2:
+						s.Idle().Inc()
+					default:
+						s.Get()
+					}
+				})
+			}()
+		}
+		wg.Wait()
+	}, xtest.StopAfter(5*time.Second))
 }

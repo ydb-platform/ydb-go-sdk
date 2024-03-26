@@ -418,7 +418,7 @@ func TestOptional(t *testing.T) {
 			require.True(t, ok)
 
 			params := result.EndOptional().Build().ToYDB(a)
-			require.Equal(t, paramsToJSON(
+			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
 					"$x": {
 						Type: &Ydb.Type{
@@ -430,7 +430,7 @@ func TestOptional(t *testing.T) {
 						},
 						Value: tc.expected.Value,
 					},
-				}), paramsToJSON(params))
+				}), xtest.ToJSON(params))
 		})
 	}
 }

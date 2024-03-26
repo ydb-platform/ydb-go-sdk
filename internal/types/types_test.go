@@ -271,7 +271,7 @@ func TestTypeToString(t *testing.T) {
 		},
 		{
 			t: PgType{OID: pg.OIDUnknown},
-			s: "pgunknown",
+			s: "PgType(705)",
 		},
 	} {
 		t.Run(tt.s, func(t *testing.T) {

@@ -155,7 +155,7 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt,
 		return c.currentTx.PrepareContext(ctx, query)
 	}
 	onDone := trace.DatabaseSQLOnConnPrepare(c.trace, &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).PrepareContext"),
 		query,
 	)
 	defer func() {
@@ -198,7 +198,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		m      = queryModeFromContext(ctx, c.defaultQueryMode)
 		onDone = trace.DatabaseSQLOnConnExec(
 			c.trace, &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).execContext"),
 			query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage(),
 		)
 	)
@@ -308,7 +308,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		m      = queryModeFromContext(ctx, c.defaultQueryMode)
 		onDone = trace.DatabaseSQLOnConnQuery(
 			c.trace, &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).queryContext"),
 			query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage(),
 		)
 	)
@@ -395,7 +395,9 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 }
 
 func (c *conn) Ping(ctx context.Context) (finalErr error) {
-	onDone := trace.DatabaseSQLOnConnPing(c.trace, &ctx, stack.FunctionID(""))
+	onDone := trace.DatabaseSQLOnConnPing(c.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).Ping"),
+	)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -414,7 +416,7 @@ func (c *conn) Close() (finalErr error) {
 		c.connector.detach(c)
 		onDone := trace.DatabaseSQLOnConnClose(
 			c.trace, &c.openConnCtx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).Close"),
 		)
 		defer func() {
 			onDone(finalErr)
@@ -422,7 +424,7 @@ func (c *conn) Close() (finalErr error) {
 		if c.currentTx != nil {
 			_ = c.currentTx.Rollback()
 		}
-		err := c.session.Close(xcontext.WithoutDeadline(c.openConnCtx))
+		err := c.session.Close(xcontext.ValueOnly(c.openConnCtx))
 		if err != nil {
 			return badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -457,7 +459,9 @@ func (c *conn) ID() string {
 
 func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ driver.Tx, finalErr error) {
 	var tx currentTx
-	onDone := trace.DatabaseSQLOnConnBegin(c.trace, &ctx, stack.FunctionID(""))
+	onDone := trace.DatabaseSQLOnConnBegin(c.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).BeginTx"),
+	)
 	defer func() {
 		onDone(tx, finalErr)
 	}()
@@ -468,7 +472,7 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 				&ConnAlreadyHaveTxError{
 					currentTx: c.currentTx.ID(),
 				},
-				xerrors.WithDeleteSession(),
+				xerrors.InvalidObject(),
 			),
 		)
 	}
@@ -481,7 +485,7 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 			xerrors.WithStackTrace(
 				xerrors.Retryable(
 					fmt.Errorf("wrong query mode: %s", m.String()),
-					xerrors.WithDeleteSession(),
+					xerrors.InvalidObject(),
 					xerrors.WithName("WRONG_QUERY_MODE"),
 				),
 			),
@@ -506,7 +510,7 @@ func (c *conn) Version(_ context.Context) (_ string, _ error) {
 func (c *conn) IsTableExists(ctx context.Context, tableName string) (tableExists bool, finalErr error) {
 	tableName = c.normalizePath(tableName)
 	onDone := trace.DatabaseSQLOnConnIsTableExists(c.trace, &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).IsTableExists"),
 		tableName,
 	)
 	defer func() {

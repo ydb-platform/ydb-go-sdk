@@ -192,7 +192,7 @@ func (e *operationError) BackoffType() backoff.Type {
 	}
 }
 
-func (e *operationError) MustDeleteSession() bool {
+func (e *operationError) IsRetryObjectValid() bool {
 	switch e.code {
 	case
 		Ydb.StatusIds_BAD_SESSION,

@@ -15,6 +15,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+var pid = os.Getpid()
+
 func New(
 	database string,
 	credentials credentials.Credentials,
@@ -22,7 +24,7 @@ func New(
 	opts ...Option,
 ) *Meta {
 	m := &Meta{
-		pid:         strconv.Itoa(os.Getpid()),
+		pid:         strconv.Itoa(pid),
 		trace:       trace,
 		credentials: credentials,
 		database:    database,
@@ -115,7 +117,9 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 
 	var token string
 
-	done := trace.DriverOnGetCredentials(m.trace, &ctx, stack.FunctionID(""))
+	done := trace.DriverOnGetCredentials(m.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/meta.(*Meta).meta"),
+	)
 	defer func() {
 		done(token, err)
 	}()

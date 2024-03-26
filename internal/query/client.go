@@ -70,7 +70,7 @@ func do(
 
 		err := op(ctx, s)
 		if err != nil {
-			if xerrors.MustDeleteSession(err) {
+			if !xerrors.IsRetryObjectValid(err) {
 				s.setStatus(statusError)
 			}
 
@@ -81,17 +81,9 @@ func do(
 
 		return nil
 	}, append(doOpts.RetryOpts(), retry.WithTrace(&trace.Retry{
-		OnRetry: func(
-			info trace.RetryLoopStartInfo,
-		) func(
-			trace.RetryLoopIntermediateInfo,
-		) func(
-			trace.RetryLoopDoneInfo,
-		) {
-			return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-				return func(info trace.RetryLoopDoneInfo) {
-					attempts = info.Attempts
-				}
+		OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+			return func(info trace.RetryLoopDoneInfo) {
+				attempts = info.Attempts
 			}
 		},
 	}))...)
@@ -107,7 +99,9 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 	case <-c.done:
 		return xerrors.WithStackTrace(errClosedClient)
 	default:
-		onDone := trace.QueryOnDo(c.config.Trace(), &ctx, stack.FunctionID(""))
+		onDone := trace.QueryOnDo(c.config.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).Do"),
+		)
 		attempts, err := do(ctx, c.pool, op, c.config.Trace(), opts...)
 		onDone(attempts, err)
 
@@ -157,12 +151,14 @@ func doTx(
 	return attempts, nil
 }
 
-func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) error {
+func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) (err error) {
 	select {
 	case <-c.done:
 		return xerrors.WithStackTrace(errClosedClient)
 	default:
-		onDone := trace.QueryOnDoTx(c.config.Trace(), &ctx, stack.FunctionID(""))
+		onDone := trace.QueryOnDoTx(c.config.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).DoTx"),
+		)
 		attempts, err := doTx(ctx, c.pool, op, c.config.Trace(), opts...)
 		onDone(attempts, err)
 
@@ -171,7 +167,9 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 }
 
 func New(ctx context.Context, balancer balancer, cfg *config.Config) *Client {
-	onDone := trace.QueryOnNew(cfg.Trace(), &ctx, stack.FunctionID(""))
+	onDone := trace.QueryOnNew(cfg.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.New"),
+	)
 	defer onDone()
 
 	client := &Client{
@@ -183,18 +181,21 @@ func New(ctx context.Context, balancer balancer, cfg *config.Config) *Client {
 	client.pool = pool.New(ctx,
 		pool.WithLimit[*Session, Session](cfg.PoolLimit()),
 		pool.WithTrace[*Session, Session](poolTrace(cfg.Trace())),
+		pool.WithCreateItemTimeout[*Session, Session](cfg.SessionCreateTimeout()),
+		pool.WithCloseItemTimeout[*Session, Session](cfg.SessionDeleteTimeout()),
 		pool.WithCreateFunc(func(ctx context.Context) (_ *Session, err error) {
-			var cancel context.CancelFunc
+			var (
+				createCtx    context.Context
+				cancelCreate context.CancelFunc
+			)
 			if d := cfg.SessionCreateTimeout(); d > 0 {
-				ctx, cancel = xcontext.WithTimeout(ctx, d)
+				createCtx, cancelCreate = xcontext.WithTimeout(ctx, d)
 			} else {
-				ctx, cancel = xcontext.WithCancel(ctx)
+				createCtx, cancelCreate = xcontext.WithCancel(ctx)
 			}
-			defer cancel()
+			defer cancelCreate()
 
-			s, err := createSession(ctx,
-				client.grpcClient,
-				withSessionTrace(cfg.Trace()),
+			s, err := createSession(createCtx, client.grpcClient, cfg,
 				withSessionCheck(func(s *Session) bool {
 					return balancer.HasNode(uint32(s.nodeID))
 				}),
