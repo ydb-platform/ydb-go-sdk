@@ -1,5 +1,11 @@
 * Added `Tuple` support for `Variant` in `ydb.ParamsBuilder()`
 
+## v3.60.1
+* Added additional traces for coordination service client internals
+
+## v3.60.0
+* Added experimental support of semaphores over coordination service client
+
 ## v3.59.3
 * Fixed `gstack` logic for parsing `ast.BlockStmt`
 
