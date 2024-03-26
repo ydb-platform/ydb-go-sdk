@@ -1,3 +1,4 @@
+## v3.61.1
 * Renamed `db.Coordination().CreateSession()` to `db.Coordination().Session()` for compatibility with protos
 
 ## v3.61.0
