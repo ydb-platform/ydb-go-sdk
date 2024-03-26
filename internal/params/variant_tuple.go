@@ -1,9 +1,10 @@
 package params
 
 import (
+	"time"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"time"
 )
 
 type (
@@ -399,7 +400,11 @@ func (vti *variantTupleItem) TzDatetime(v time.Time) *variantTupleBuilder {
 }
 
 func (vtb *variantTupleBuilder) EndTuple() *variantBuilder {
-	vtb.tuple.parent.value = value.VariantValueTuple(vtb.tuple.value, vtb.tuple.index, types.NewVariantTuple(vtb.tuple.types...))
+	vtb.tuple.parent.value = value.VariantValueTuple(
+		vtb.tuple.value,
+		vtb.tuple.index,
+		types.NewVariantTuple(vtb.tuple.types...),
+	)
 
 	return &variantBuilder{
 		variant: vtb.tuple.parent,
