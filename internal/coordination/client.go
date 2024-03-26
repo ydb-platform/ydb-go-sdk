@@ -39,6 +39,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config)
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.New"),
 	)
 	defer onDone()
+
 	return &Client{
 		config:   config,
 		client:   Ydb_Coordination_V1.NewCoordinationServiceClient(cc),
@@ -158,7 +159,9 @@ func alterNodeRequest(
 	}
 }
 
-func alterNode(ctx context.Context, client Ydb_Coordination_V1.CoordinationServiceClient, request *Ydb_Coordination.AlterNodeRequest) error {
+func alterNode(
+	ctx context.Context, client Ydb_Coordination_V1.CoordinationServiceClient, request *Ydb_Coordination.AlterNodeRequest,
+) error {
 	_, err := client.AlterNode(ctx, request)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -201,7 +204,9 @@ func dropNodeRequest(path string, operationParams *Ydb_Operations.OperationParam
 	}
 }
 
-func dropNode(ctx context.Context, client Ydb_Coordination_V1.CoordinationServiceClient, request *Ydb_Coordination.DropNodeRequest) error {
+func dropNode(
+	ctx context.Context, client Ydb_Coordination_V1.CoordinationServiceClient, request *Ydb_Coordination.DropNodeRequest,
+) error {
 	_, err := client.DropNode(ctx, request)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
