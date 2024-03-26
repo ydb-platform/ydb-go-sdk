@@ -8,6 +8,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var (
+	errNamed = errors.New("named error")
+	errError = errors.New("error")
+)
+
 type stringerTest string
 
 func (s stringerTest) String() string {
@@ -27,15 +32,15 @@ func TestField_String(t *testing.T) {
 		{f: Bool("bool", true), want: "true"},
 		{f: Duration("duration", time.Hour), want: time.Hour.String()},
 		{f: Strings("strings", []string{"Abc", "Def", "Ghi"}), want: "[Abc Def Ghi]"},
-		{f: NamedError("named_error", errors.New("named error")), want: "named error"},
-		{f: Error(errors.New("error")), want: "error"},
+		{f: NamedError("named_error", errNamed), want: "named error"},
+		{f: Error(errError), want: "error"},
 		{f: Error(nil), want: "<nil>"},
 		{f: Any("any_int", 1), want: "1"},
 		{f: Any("any_int64", 9223372036854775807), want: "9223372036854775807"},
 		{f: Any("any_string", "any string"), want: "any string"},
 		{f: Any("any_bool", true), want: "true"},
 		{f: Any("any_strings", []string{"Abc", "Def", "Ghi"}), want: "[Abc Def Ghi]"},
-		{f: Any("any_error", errors.New("error")), want: "*errors.errorString({error})"},
+		{f: Any("any_error", errError), want: "*errors.errorString({error})"},
 		{f: Any("any_nil", nil), want: "<nil>"},
 		{f: Any("any_in64_ptr", func(v int64) *int64 { return &v }(9223372036854775807)), want: "*int64(9223372036854775807)"}, //nolint:lll
 		{f: Any("any_in64_nil", (*int64)(nil)), want: "<nil>"},
@@ -73,7 +78,7 @@ func TestField_AnyValue(t *testing.T) {
 		{name: "string", f: String("any", "any string"), want: "any string"},
 		{name: "bool", f: Bool("any", true), want: true},
 		{name: "[]string", f: Strings("any", []string{"Abc", "Def", "Ghi"}), want: []string{"Abc", "Def", "Ghi"}},
-		{name: "error", f: Error(errors.New("error")), want: errors.New("error")},
+		{name: "error", f: Error(errError), want: errError},
 		{name: "namedError", f: NamedError("any", nil), want: nil},
 		{name: "stringer", f: Stringer("any", stringerTest("stringerTest")), want: stringerTest("stringerTest")},
 
@@ -86,7 +91,7 @@ func TestField_AnyValue(t *testing.T) {
 		{name: "any_string_nil", f: Any("any", (*string)(nil)), want: (*string)(nil)},
 		{name: "any_bool", f: Any("any", true), want: true},
 		{name: "any_[]string", f: Any("any", []string{"Abc", "Def", "Ghi"}), want: []string{"Abc", "Def", "Ghi"}},
-		{name: "any_error", f: Any("any", errors.New("error")), want: errors.New("error")},
+		{name: "any_error", f: Any("any", errError), want: errError},
 		{name: "struct", f: Any("any", struct{ str string }{str: "test"}), want: struct{ str string }{str: "test"}},
 		{name: "any_nil", f: Any("any", nil), want: nil},
 	} {
