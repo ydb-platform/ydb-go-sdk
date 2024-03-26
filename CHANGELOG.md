@@ -1,3 +1,5 @@
+* Added `Tuple` support for `Variant` in `ydb.ParamsBuilder()`
+
 ## v3.59.3
 * Fixed `gstack` logic for parsing `ast.BlockStmt`
 
