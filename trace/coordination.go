@@ -17,6 +17,7 @@ type (
 	Coordination struct {
 		OnNew        func(CoordinationNewStartInfo) func(CoordinationNewDoneInfo)
 		OnCreateNode func(CoordinationCreateNodeStartInfo) func(CoordinationCreateNodeDoneInfo)
+		OnAlterNode  func(CoordinationAlterNodeStartInfo) func(CoordinationAlterNodeDoneInfo)
 
 		OnStreamNew               func(CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo)
 		OnSessionStarted          func(CoordinationSessionStartedInfo)
@@ -51,8 +52,23 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
+
+		Path string
 	}
 	CoordinationCreateNodeDoneInfo struct {
+		Error error
+	}
+	CoordinationAlterNodeStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+
+		Path string
+	}
+	CoordinationAlterNodeDoneInfo struct {
 		Error error
 	}
 	CoordinationStreamNewStartInfo struct{}

@@ -104,6 +104,41 @@ func (t *Coordination) Compose(x *Coordination, opts ...CoordinationComposeOptio
 		}
 	}
 	{
+		h1 := t.OnAlterNode
+		h2 := x.OnAlterNode
+		ret.OnAlterNode = func(c CoordinationAlterNodeStartInfo) func(CoordinationAlterNodeDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(CoordinationAlterNodeDoneInfo)
+			if h1 != nil {
+				r = h1(c)
+			}
+			if h2 != nil {
+				r1 = h2(c)
+			}
+			return func(c CoordinationAlterNodeDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(c)
+				}
+				if r1 != nil {
+					r1(c)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnStreamNew
 		h2 := x.OnStreamNew
 		ret.OnStreamNew = func(c CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo) {
@@ -465,6 +500,21 @@ func (t *Coordination) onCreateNode(c CoordinationCreateNodeStartInfo) func(Coor
 	}
 	return res
 }
+func (t *Coordination) onAlterNode(c CoordinationAlterNodeStartInfo) func(CoordinationAlterNodeDoneInfo) {
+	fn := t.OnAlterNode
+	if fn == nil {
+		return func(CoordinationAlterNodeDoneInfo) {
+			return
+		}
+	}
+	res := fn(c)
+	if res == nil {
+		return func(CoordinationAlterNodeDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Coordination) onStreamNew(c CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo) {
 	fn := t.OnStreamNew
 	if fn == nil {
@@ -605,13 +655,26 @@ func CoordinationOnNew(t *Coordination, c *context.Context, call call) func() {
 		res(p)
 	}
 }
-func CoordinationOnCreateNode(t *Coordination, c *context.Context, call call) func(error) {
+func CoordinationOnCreateNode(t *Coordination, c *context.Context, call call, path string) func(error) {
 	var p CoordinationCreateNodeStartInfo
 	p.Context = c
 	p.Call = call
+	p.Path = path
 	res := t.onCreateNode(p)
 	return func(e error) {
 		var p CoordinationCreateNodeDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func CoordinationOnAlterNode(t *Coordination, c *context.Context, call call, path string) func(error) {
+	var p CoordinationAlterNodeStartInfo
+	p.Context = c
+	p.Call = call
+	p.Path = path
+	res := t.onAlterNode(p)
+	return func(e error) {
+		var p CoordinationAlterNodeDoneInfo
 		p.Error = e
 		res(p)
 	}
