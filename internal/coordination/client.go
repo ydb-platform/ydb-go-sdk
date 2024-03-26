@@ -90,10 +90,17 @@ func createNode(
 	return nil
 }
 
-func (c *Client) CreateNode(ctx context.Context, path string, config coordination.NodeConfig) error {
+func (c *Client) CreateNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
+
+	onDone := trace.CoordinationOnCreateNode(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.(*Client).CreateNode"),
+	)
+	defer func() {
+		onDone(err)
+	}()
 
 	request := createNodeRequest(path, config, operationParams(ctx, &c.config, operation.ModeSync))
 

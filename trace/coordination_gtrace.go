@@ -69,6 +69,41 @@ func (t *Coordination) Compose(x *Coordination, opts ...CoordinationComposeOptio
 		}
 	}
 	{
+		h1 := t.OnCreateNode
+		h2 := x.OnCreateNode
+		ret.OnCreateNode = func(c CoordinationCreateNodeStartInfo) func(CoordinationCreateNodeDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(CoordinationCreateNodeDoneInfo)
+			if h1 != nil {
+				r = h1(c)
+			}
+			if h2 != nil {
+				r1 = h2(c)
+			}
+			return func(c CoordinationCreateNodeDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(c)
+				}
+				if r1 != nil {
+					r1(c)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnStreamNew
 		h2 := x.OnStreamNew
 		ret.OnStreamNew = func(c CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo) {
@@ -415,6 +450,21 @@ func (t *Coordination) onNew(c CoordinationNewStartInfo) func(CoordinationNewDon
 	}
 	return res
 }
+func (t *Coordination) onCreateNode(c CoordinationCreateNodeStartInfo) func(CoordinationCreateNodeDoneInfo) {
+	fn := t.OnCreateNode
+	if fn == nil {
+		return func(CoordinationCreateNodeDoneInfo) {
+			return
+		}
+	}
+	res := fn(c)
+	if res == nil {
+		return func(CoordinationCreateNodeDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Coordination) onStreamNew(c CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo) {
 	fn := t.OnStreamNew
 	if fn == nil {
@@ -552,6 +602,17 @@ func CoordinationOnNew(t *Coordination, c *context.Context, call call) func() {
 	res := t.onNew(p)
 	return func() {
 		var p CoordinationNewDoneInfo
+		res(p)
+	}
+}
+func CoordinationOnCreateNode(t *Coordination, c *context.Context, call call) func(error) {
+	var p CoordinationCreateNodeStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onCreateNode(p)
+	return func(e error) {
+		var p CoordinationCreateNodeDoneInfo
+		p.Error = e
 		res(p)
 	}
 }
