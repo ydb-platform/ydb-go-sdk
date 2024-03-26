@@ -174,6 +174,41 @@ func (t *Coordination) Compose(x *Coordination, opts ...CoordinationComposeOptio
 		}
 	}
 	{
+		h1 := t.OnDescribeNode
+		h2 := x.OnDescribeNode
+		ret.OnDescribeNode = func(c CoordinationDescribeNodeStartInfo) func(CoordinationDescribeNodeDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(CoordinationDescribeNodeDoneInfo)
+			if h1 != nil {
+				r = h1(c)
+			}
+			if h2 != nil {
+				r1 = h2(c)
+			}
+			return func(c CoordinationDescribeNodeDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(c)
+				}
+				if r1 != nil {
+					r1(c)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnStreamNew
 		h2 := x.OnStreamNew
 		ret.OnStreamNew = func(c CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo) {
@@ -565,6 +600,21 @@ func (t *Coordination) onDropNode(c CoordinationDropNodeStartInfo) func(Coordina
 	}
 	return res
 }
+func (t *Coordination) onDescribeNode(c CoordinationDescribeNodeStartInfo) func(CoordinationDescribeNodeDoneInfo) {
+	fn := t.OnDescribeNode
+	if fn == nil {
+		return func(CoordinationDescribeNodeDoneInfo) {
+			return
+		}
+	}
+	res := fn(c)
+	if res == nil {
+		return func(CoordinationDescribeNodeDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Coordination) onStreamNew(c CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo) {
 	fn := t.OnStreamNew
 	if fn == nil {
@@ -737,6 +787,18 @@ func CoordinationOnDropNode(t *Coordination, c *context.Context, call call, path
 	res := t.onDropNode(p)
 	return func(e error) {
 		var p CoordinationDropNodeDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func CoordinationOnDescribeNode(t *Coordination, c *context.Context, call call, path string) func(error) {
+	var p CoordinationDescribeNodeStartInfo
+	p.Context = c
+	p.Call = call
+	p.Path = path
+	res := t.onDescribeNode(p)
+	return func(e error) {
+		var p CoordinationDescribeNodeDoneInfo
 		p.Error = e
 		res(p)
 	}

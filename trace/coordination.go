@@ -15,10 +15,11 @@ type (
 	// Coordination specified trace of coordination client activity.
 	// gtrace:gen
 	Coordination struct {
-		OnNew        func(CoordinationNewStartInfo) func(CoordinationNewDoneInfo)
-		OnCreateNode func(CoordinationCreateNodeStartInfo) func(CoordinationCreateNodeDoneInfo)
-		OnAlterNode  func(CoordinationAlterNodeStartInfo) func(CoordinationAlterNodeDoneInfo)
-		OnDropNode   func(CoordinationDropNodeStartInfo) func(CoordinationDropNodeDoneInfo)
+		OnNew          func(CoordinationNewStartInfo) func(CoordinationNewDoneInfo)
+		OnCreateNode   func(CoordinationCreateNodeStartInfo) func(CoordinationCreateNodeDoneInfo)
+		OnAlterNode    func(CoordinationAlterNodeStartInfo) func(CoordinationAlterNodeDoneInfo)
+		OnDropNode     func(CoordinationDropNodeStartInfo) func(CoordinationDropNodeDoneInfo)
+		OnDescribeNode func(CoordinationDescribeNodeStartInfo) func(CoordinationDescribeNodeDoneInfo)
 
 		OnStreamNew               func(CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo)
 		OnSessionStarted          func(CoordinationSessionStartedInfo)
@@ -83,6 +84,19 @@ type (
 		Path string
 	}
 	CoordinationDropNodeDoneInfo struct {
+		Error error
+	}
+	CoordinationDescribeNodeStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+
+		Path string
+	}
+	CoordinationDescribeNodeDoneInfo struct {
 		Error error
 	}
 	CoordinationStreamNewStartInfo struct{}

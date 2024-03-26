@@ -222,25 +222,28 @@ func (c *Client) DescribeNode(
 		return nil, nil, xerrors.WithStackTrace(errNilClient)
 	}
 
+	onDone := trace.CoordinationOnDescribeNode(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.(*Client).DescribeNode"),
+		path,
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
 	request := describeNodeRequest(path, operationParams(ctx, &c.config, operation.ModeSync))
 
 	if !c.config.AutoRetry() {
 		return describeNode(ctx, c.client, request)
 	}
 
-	err := retry.Retry(ctx,
-		func(ctx context.Context) (err error) {
-			entry, config, err = describeNode(ctx, c.client, request)
-			if err != nil {
-				return xerrors.WithStackTrace(err)
-			}
+	err := retry.Retry(ctx, func(ctx context.Context) (err error) {
+		entry, config, err = describeNode(ctx, c.client, request)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
 
-			return nil
-		},
-		retry.WithStackTrace(),
-		retry.WithIdempotent(true),
-		retry.WithTrace(c.config.TraceRetry()),
-	)
+		return nil
+	}, retry.WithStackTrace(), retry.WithIdempotent(true), retry.WithTrace(c.config.TraceRetry()))
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
