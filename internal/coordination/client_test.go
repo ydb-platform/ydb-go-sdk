@@ -320,3 +320,69 @@ func TestAlterNode(t *testing.T) {
 		require.True(t, xerrors.IsRetryObjectValid(err))
 	})
 }
+
+func TestDropNodeRequest(t *testing.T) {
+	for _, tt := range []struct {
+		name            string
+		path            string
+		operationParams *Ydb_Operations.OperationParams
+		request         *Ydb_Coordination.DropNodeRequest
+	}{
+		{
+			name: xtest.CurrentFileLine(),
+			path: "/a/b/c",
+			operationParams: &Ydb_Operations.OperationParams{
+				OperationMode: Ydb_Operations.OperationParams_SYNC,
+			},
+			request: &Ydb_Coordination.DropNodeRequest{
+				Path: "/a/b/c",
+				OperationParams: &Ydb_Operations.OperationParams{
+					OperationMode: Ydb_Operations.OperationParams_SYNC,
+				},
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			request := dropNodeRequest(tt.path, tt.operationParams)
+			require.Equal(t, xtest.ToJSON(tt.request), xtest.ToJSON(request))
+		})
+	}
+}
+
+func TestDropNode(t *testing.T) {
+	t.Run("HappyWay", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		ctrl := gomock.NewController(t)
+		client := NewMockCoordinationServiceClient(ctrl)
+		client.EXPECT().DropNode(gomock.Any(), gomock.Any()).Return(&Ydb_Coordination.DropNodeResponse{
+			Operation: &Ydb_Operations.Operation{
+				Ready:  true,
+				Status: Ydb.StatusIds_SUCCESS,
+			},
+		}, nil)
+		err := dropNode(ctx, client, &Ydb_Coordination.DropNodeRequest{})
+		require.NoError(t, err)
+	})
+	t.Run("TransportError", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		ctrl := gomock.NewController(t)
+		client := NewMockCoordinationServiceClient(ctrl)
+		client.EXPECT().DropNode(gomock.Any(), gomock.Any()).Return(nil,
+			xerrors.Transport(grpcStatus.Error(grpcCodes.ResourceExhausted, "")),
+		)
+		err := dropNode(ctx, client, &Ydb_Coordination.DropNodeRequest{})
+		require.True(t, xerrors.IsTransportError(err, grpcCodes.ResourceExhausted))
+		require.True(t, xerrors.IsRetryObjectValid(err))
+	})
+	t.Run("OperationError", func(t *testing.T) {
+		ctx := xtest.Context(t)
+		ctrl := gomock.NewController(t)
+		client := NewMockCoordinationServiceClient(ctrl)
+		client.EXPECT().DropNode(gomock.Any(), gomock.Any()).Return(nil,
+			xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_UNAVAILABLE)),
+		)
+		err := dropNode(ctx, client, &Ydb_Coordination.DropNodeRequest{})
+		require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
+		require.True(t, xerrors.IsRetryObjectValid(err))
+	})
+}

@@ -136,14 +136,9 @@ func (c *Client) AlterNode(ctx context.Context, path string, config coordination
 		return xerrors.WithStackTrace(call(ctx))
 	}
 
-	return retry.Retry(ctx,
-		func(ctx context.Context) (err error) {
-			return alterNode(ctx, c.client, request)
-		},
-		retry.WithStackTrace(),
-		retry.WithIdempotent(true),
-		retry.WithTrace(c.config.TraceRetry()),
-	)
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
+		return alterNode(ctx, c.client, request)
+	}, retry.WithStackTrace(), retry.WithIdempotent(true), retry.WithTrace(c.config.TraceRetry()))
 }
 
 func alterNodeRequest(
@@ -176,35 +171,43 @@ func (c *Client) DropNode(ctx context.Context, path string) (finalErr error) {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
+
+	onDone := trace.CoordinationOnDropNode(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.(*Client).DropNode"),
+		path,
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	request := dropNodeRequest(path, operationParams(ctx, &c.config, operation.ModeSync))
+
 	call := func(ctx context.Context) error {
-		return xerrors.WithStackTrace(c.dropNode(ctx, path))
+		return dropNode(ctx, c.client, request)
 	}
 	if !c.config.AutoRetry() {
 		return xerrors.WithStackTrace(call(ctx))
 	}
 
-	return retry.Retry(ctx, call,
-		retry.WithStackTrace(),
-		retry.WithIdempotent(true),
-		retry.WithTrace(c.config.TraceRetry()),
-	)
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
+		return dropNode(ctx, c.client, request)
+	}, retry.WithStackTrace(), retry.WithIdempotent(true), retry.WithTrace(c.config.TraceRetry()))
 }
 
-func (c *Client) dropNode(ctx context.Context, path string) error {
-	_, err := c.client.DropNode(
-		ctx,
-		&Ydb_Coordination.DropNodeRequest{
-			Path: path,
-			OperationParams: operation.Params(
-				ctx,
-				c.config.OperationTimeout(),
-				c.config.OperationCancelAfter(),
-				operation.ModeSync,
-			),
-		},
-	)
+func dropNodeRequest(path string, operationParams *Ydb_Operations.OperationParams) *Ydb_Coordination.DropNodeRequest {
+	return &Ydb_Coordination.DropNodeRequest{
+		Path:            path,
+		OperationParams: operationParams,
+	}
+}
 
-	return xerrors.WithStackTrace(err)
+func dropNode(ctx context.Context, client Ydb_Coordination_V1.CoordinationServiceClient, request *Ydb_Coordination.DropNodeRequest) error {
+	_, err := client.DropNode(ctx, request)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
 }
 
 func (c *Client) DescribeNode(

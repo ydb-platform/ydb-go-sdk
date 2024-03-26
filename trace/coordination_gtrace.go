@@ -139,6 +139,41 @@ func (t *Coordination) Compose(x *Coordination, opts ...CoordinationComposeOptio
 		}
 	}
 	{
+		h1 := t.OnDropNode
+		h2 := x.OnDropNode
+		ret.OnDropNode = func(c CoordinationDropNodeStartInfo) func(CoordinationDropNodeDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(CoordinationDropNodeDoneInfo)
+			if h1 != nil {
+				r = h1(c)
+			}
+			if h2 != nil {
+				r1 = h2(c)
+			}
+			return func(c CoordinationDropNodeDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(c)
+				}
+				if r1 != nil {
+					r1(c)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnStreamNew
 		h2 := x.OnStreamNew
 		ret.OnStreamNew = func(c CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo) {
@@ -515,6 +550,21 @@ func (t *Coordination) onAlterNode(c CoordinationAlterNodeStartInfo) func(Coordi
 	}
 	return res
 }
+func (t *Coordination) onDropNode(c CoordinationDropNodeStartInfo) func(CoordinationDropNodeDoneInfo) {
+	fn := t.OnDropNode
+	if fn == nil {
+		return func(CoordinationDropNodeDoneInfo) {
+			return
+		}
+	}
+	res := fn(c)
+	if res == nil {
+		return func(CoordinationDropNodeDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Coordination) onStreamNew(c CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo) {
 	fn := t.OnStreamNew
 	if fn == nil {
@@ -675,6 +725,18 @@ func CoordinationOnAlterNode(t *Coordination, c *context.Context, call call, pat
 	res := t.onAlterNode(p)
 	return func(e error) {
 		var p CoordinationAlterNodeDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func CoordinationOnDropNode(t *Coordination, c *context.Context, call call, path string) func(error) {
+	var p CoordinationDropNodeStartInfo
+	p.Context = c
+	p.Call = call
+	p.Path = path
+	res := t.onDropNode(p)
+	return func(e error) {
+		var p CoordinationDropNodeDoneInfo
 		p.Error = e
 		res(p)
 	}
