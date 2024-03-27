@@ -3,6 +3,7 @@ package coordination
 import (
 	"context"
 	"encoding/binary"
+	"fmt"
 	"math"
 	"math/rand"
 	"sync"
@@ -110,28 +111,55 @@ func (s *session) updateCancelStream(cancel context.CancelFunc) {
 	s.cancelStream = cancel
 }
 
-func newSessionClient(
-	ctx context.Context, client Ydb_Coordination_V1.CoordinationServiceClient, t *trace.Coordination,
+type sessionStream struct {
+	sessionID    uint64
+	stream       Ydb_Coordination_V1.CoordinationService_SessionClient
+	cancelStream context.CancelFunc
+}
+
+func newSessionStream(
+	ctx context.Context,
+	client Ydb_Coordination_V1.CoordinationServiceClient,
+	t *trace.Coordination,
 ) (
-	_ Ydb_Coordination_V1.CoordinationService_SessionClient, cancel context.CancelFunc, finalErr error,
+	_ *sessionStream, finalErr error,
 ) {
 	streamCtx, streamCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
+	defer func() {
+		if finalErr != nil {
+			streamCancel()
+		}
+	}()
 
 	onDone := trace.CoordinationOnNewSessionClient(t, &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.newSessionClient"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.newSessionStream"),
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
 
-	sessionClient, err := client.Session(streamCtx)
+	stream, err := client.Session(streamCtx)
 	if err != nil {
-		streamCancel()
-
-		return nil, nil, xerrors.WithStackTrace(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return sessionClient, streamCancel, nil
+	msg, err := stream.Recv()
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	switch t := msg.GetResponse().(type) {
+	case *Ydb_Coordination.SessionResponse_SessionStarted_:
+		return &sessionStream{
+			sessionID:    t.SessionStarted.GetSessionId(),
+			stream:       stream,
+			cancelStream: streamCancel,
+		}, nil
+	case *Ydb_Coordination.SessionResponse_Failure_:
+		return nil, xerrors.WithStackTrace(xerrors.FromOperation(t.Failure))
+	default:
+		return nil, xerrors.WithStackTrace(fmt.Errorf("unexpected first message: %+v", msg))
+	}
 }
 
 // Create a new gRPC stream using an independent context.
@@ -155,14 +183,19 @@ func (s *session) newStream(
 	for {
 		result := make(chan Ydb_Coordination_V1.CoordinationService_SessionClient, 1)
 		go func() {
-			client, cancel, err := newSessionClient(streamCtx, s.client.client, s.client.config.Trace())
-			if err == nil {
-				select {
-				case result <- client:
-				default:
-					cancel()
-				}
-			}
+			var (
+				sessionClient Ydb_Coordination_V1.CoordinationService_SessionClient
+				err           error
+			)
+			onDone := trace.CoordinationOnNewSessionClient(s.client.config.Trace(), &streamCtx,
+				stack.FunctionID(""),
+			)
+			defer func() {
+				onDone(err)
+			}()
+
+			sessionClient, err = s.client.client.Session(streamCtx)
+			result <- sessionClient
 		}()
 
 		var client Ydb_Coordination_V1.CoordinationService_SessionClient
@@ -246,7 +279,7 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 		// We intentionally place a stream context outside the scope of any existing contexts to make an attempt to
 		// close the session gracefully at the end of the main loop.
 
-		streamCtx, cancelStream := context.WithCancel(ctx)
+		streamCtx, cancelStream := xcontext.WithCancel(ctx)
 		sessionClient, err := s.newStream(streamCtx, cancelStream)
 		if err != nil {
 			// Giving up, we can do nothing without a stream.
@@ -415,6 +448,8 @@ func (s *session) receiveLoop(
 			return
 		}
 		onDone(message, nil)
+
+		fmt.Printf("---RECV: %+v (%T)\n", message.GetResponse(), message.GetResponse())
 
 		switch message.GetResponse().(type) {
 		case *Ydb_Coordination.SessionResponse_Failure_:
