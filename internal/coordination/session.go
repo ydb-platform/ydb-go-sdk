@@ -15,7 +15,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/conversation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -59,13 +61,13 @@ func createSession(
 	client.sessionCreated(&s)
 
 	sessionStartedChan := make(chan struct{})
-	go s.mainLoop(path, sessionStartedChan)
+	go s.mainLoop(xcontext.ValueOnly(ctx), path, sessionStartedChan)
 
 	select {
 	case <-ctx.Done():
 		cancel()
 
-		return nil, ctx.Err()
+		return nil, xerrors.WithStackTrace(ctx.Err())
 	case <-sessionStartedChan:
 	}
 
@@ -108,6 +110,30 @@ func (s *session) updateCancelStream(cancel context.CancelFunc) {
 	s.cancelStream = cancel
 }
 
+func newSessionClient(
+	ctx context.Context, client Ydb_Coordination_V1.CoordinationServiceClient, t *trace.Coordination,
+) (
+	_ Ydb_Coordination_V1.CoordinationService_SessionClient, cancel context.CancelFunc, finalErr error,
+) {
+	streamCtx, streamCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
+
+	onDone := trace.CoordinationOnNewSessionClient(t, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.newSessionClient"),
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	sessionClient, err := client.Session(streamCtx)
+	if err != nil {
+		streamCancel()
+
+		return nil, nil, xerrors.WithStackTrace(err)
+	}
+
+	return sessionClient, streamCancel, nil
+}
+
 // Create a new gRPC stream using an independent context.
 //
 //nolint:funlen
@@ -129,14 +155,14 @@ func (s *session) newStream(
 	for {
 		result := make(chan Ydb_Coordination_V1.CoordinationService_SessionClient, 1)
 		go func() {
-			var err error
-			onDone := trace.CoordinationOnStreamNew(s.client.config.Trace())
-			defer func() {
-				onDone(err)
-			}()
-
-			client, err := s.client.client.Session(streamCtx)
-			result <- client
+			client, cancel, err := newSessionClient(streamCtx, s.client.client, s.client.config.Trace())
+			if err == nil {
+				select {
+				case result <- client:
+				default:
+					cancel()
+				}
+			}
 		}()
 
 		var client Ydb_Coordination_V1.CoordinationService_SessionClient
@@ -220,7 +246,7 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 		// We intentionally place a stream context outside the scope of any existing contexts to make an attempt to
 		// close the session gracefully at the end of the main loop.
 
-		streamCtx, cancelStream := context.WithCancel(context.Background())
+		streamCtx, cancelStream := context.WithCancel(ctx)
 		sessionClient, err := s.newStream(streamCtx, cancelStream)
 		if err != nil {
 			// Giving up, we can do nothing without a stream.
