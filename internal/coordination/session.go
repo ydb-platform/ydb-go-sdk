@@ -22,44 +22,61 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type session struct {
-	options *options.CreateSessionOptions
-	client  *Client
+var protectionKey = newProtectionKey()
 
-	ctx               context.Context //nolint:containedctx
-	cancel            context.CancelFunc
-	sessionClosedChan chan struct{}
-	controller        *conversation.Controller
-	sessionID         uint64
+type (
+	session struct {
+		client                  Ydb_Coordination_V1.CoordinationServiceClient
+		description             string
+		sessionTimeout          time.Duration
+		sessionStartTimeout     time.Duration
+		sessionStopTimeout      time.Duration
+		sessionKeepAliveTimeout time.Duration
+		sessionReconnectDelay   time.Duration
+		trace                   *trace.Coordination
 
-	mutex                sync.Mutex // guards the field below
-	lastGoodResponseTime time.Time
-	cancelStream         context.CancelFunc
-}
+		ctx               context.Context
+		cancel            context.CancelFunc
+		sessionClosedChan chan struct{}
+		controller        *conversation.Controller
+		sessionID         uint64
+
+		mutex                sync.Mutex // guards the field below
+		lastGoodResponseTime time.Time
+		cancelStream         context.CancelFunc
+
+		onCreate []func(s *session)
+		onClose  []func(s *session)
+	}
+	sessionOption func(s *session)
+)
 
 type lease struct {
 	session *session
 	name    string
-	ctx     context.Context //nolint:containedctx
+	ctx     context.Context
 	cancel  context.CancelFunc
 }
 
 func createSession(
 	ctx context.Context,
-	client *Client,
+	client Ydb_Coordination_V1.CoordinationServiceClient,
 	path string,
-	opts *options.CreateSessionOptions,
+	opts ...sessionOption,
 ) (*session, error) {
 	sessionCtx, cancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
-	s := session{
-		options:           opts,
+	s := &session{
 		client:            client,
+		trace:             &trace.Coordination{},
 		ctx:               sessionCtx,
 		cancel:            cancel,
 		sessionClosedChan: make(chan struct{}),
 		controller:        conversation.NewController(),
 	}
-	client.sessionCreated(&s)
+
+	for _, opt := range opts {
+		opt(s)
+	}
 
 	sessionStartedChan := make(chan struct{})
 	go s.mainLoop(xcontext.ValueOnly(ctx), path, sessionStartedChan)
@@ -70,13 +87,16 @@ func createSession(
 
 		return nil, xerrors.WithStackTrace(ctx.Err())
 	case <-sessionStartedChan:
+		for _, f := range s.onCreate {
+			f(s)
+		}
 	}
 
-	return &s, nil
+	return s, nil
 }
 
 func newProtectionKey() []byte {
-	key := make([]byte, 8)                            //nolint:gomnd
+	key := make([]byte, 8)
 	binary.LittleEndian.PutUint64(key, rand.Uint64()) //nolint:gosec
 
 	return key
@@ -143,28 +163,51 @@ func newSessionStream(
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	msg, err := stream.Recv()
+	err = stream.Send(&Ydb_Coordination.SessionRequest{
+		Request: &Ydb_Coordination.SessionRequest_SessionStart_{
+			SessionStart: &Ydb_Coordination.SessionRequest_SessionStart{
+				Path:          "/a/b/c",
+				ProtectionKey: protectionKey,
+			},
+		},
+	})
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	switch t := msg.GetResponse().(type) {
-	case *Ydb_Coordination.SessionResponse_SessionStarted_:
-		return &sessionStream{
-			sessionID:    t.SessionStarted.GetSessionId(),
-			stream:       stream,
-			cancelStream: streamCancel,
-		}, nil
-	case *Ydb_Coordination.SessionResponse_Failure_:
-		return nil, xerrors.WithStackTrace(xerrors.FromOperation(t.Failure))
-	default:
-		return nil, xerrors.WithStackTrace(fmt.Errorf("unexpected first message: %+v", msg))
+	for {
+		msg, err := stream.Recv()
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		switch t := msg.GetResponse().(type) {
+		case *Ydb_Coordination.SessionResponse_SessionStarted_:
+			return &sessionStream{
+				sessionID:    t.SessionStarted.GetSessionId(),
+				stream:       stream,
+				cancelStream: streamCancel,
+			}, nil
+		case *Ydb_Coordination.SessionResponse_Failure_:
+			return nil, xerrors.WithStackTrace(xerrors.FromOperation(t.Failure))
+		case *Ydb_Coordination.SessionResponse_Ping:
+			err := stream.Send(&Ydb_Coordination.SessionRequest{
+				Request: &Ydb_Coordination.SessionRequest_Pong{
+					Pong: &Ydb_Coordination.SessionRequest_PingPong{
+						Opaque: t.Ping.GetOpaque(),
+					},
+				},
+			})
+			if err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
+		default:
+			return nil, xerrors.WithStackTrace(fmt.Errorf("unexpected first message: %+v", msg))
+		}
 	}
 }
 
 // Create a new gRPC stream using an independent context.
-//
-//nolint:funlen
 func (s *session) newStream(
 	streamCtx context.Context,
 	cancelStream context.CancelFunc,
@@ -173,10 +216,10 @@ func (s *session) newStream(
 	// created.
 	var deadline time.Time
 	if s.sessionID != 0 {
-		deadline = s.getLastGoodResponseTime().Add(s.options.SessionTimeout)
+		deadline = s.getLastGoodResponseTime().Add(s.sessionTimeout)
 	} else {
 		// Large enough to make the loop infinite, small enough to allow the maximum duration value (~290 years).
-		deadline = time.Now().Add(time.Hour * 24 * 365 * 100) //nolint:gomnd
+		deadline = time.Now().Add(time.Hour * 24 * 365 * 100)
 	}
 
 	lastChance := false
@@ -187,25 +230,20 @@ func (s *session) newStream(
 				sessionClient Ydb_Coordination_V1.CoordinationService_SessionClient
 				err           error
 			)
-			onDone := trace.CoordinationOnNewSessionClient(s.client.config.Trace(), &streamCtx,
+			onDone := trace.CoordinationOnNewSessionClient(s.trace, &streamCtx,
 				stack.FunctionID(""),
 			)
-			defer func() {
-				onDone(err)
-			}()
-
-			sessionClient, err = s.client.client.Session(streamCtx)
+			sessionClient, err = s.client.Session(streamCtx)
+			onDone(err)
 			result <- sessionClient
 		}()
 
 		var client Ydb_Coordination_V1.CoordinationService_SessionClient
 		if lastChance {
-			timer := time.NewTimer(s.options.SessionKeepAliveTimeout)
 			select {
-			case <-timer.C:
+			case <-time.After(s.sessionKeepAliveTimeout):
 			case client = <-result:
 			}
-			timer.Stop()
 
 			if client != nil {
 				return client, nil
@@ -223,9 +261,9 @@ func (s *session) newStream(
 		case client = <-result:
 		case <-timer.C:
 			trace.CoordinationOnSessionClientTimeout(
-				s.client.config.Trace(),
+				s.trace,
 				s.getLastGoodResponseTime(),
-				s.options.SessionTimeout,
+				s.sessionTimeout,
 			)
 			cancelStream()
 
@@ -238,12 +276,10 @@ func (s *session) newStream(
 		}
 
 		// Waiting for some time before trying to reconnect.
-		sessionReconnectDelay := time.NewTimer(s.options.SessionReconnectDelay)
 		select {
-		case <-sessionReconnectDelay.C:
+		case <-time.After(s.sessionReconnectDelay):
 		case <-s.ctx.Done():
 		}
-		sessionReconnectDelay.Stop()
 
 		if s.ctx.Err() != nil {
 			// Give this session the last chance to stop gracefully if the session is canceled in the reconnect cycle.
@@ -258,15 +294,17 @@ func (s *session) newStream(
 	}
 }
 
-//nolint:funlen
-func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
-	defer s.client.sessionClosed(s)
+func (s *session) mainLoop(ctx context.Context, path string, sessionStartedChan chan struct{}) {
+	defer func() {
+		for _, f := range s.onClose {
+			f(s)
+		}
+	}()
 	defer close(s.sessionClosedChan)
 	defer s.cancel()
 
 	var seqNo uint64
 
-	protectionKey := newProtectionKey()
 	closing := false
 
 	for {
@@ -292,31 +330,59 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 
 		// Start the loops.
 		wg := sync.WaitGroup{}
-		wg.Add(2) //nolint:gomnd
+		wg.Add(2)
 		sessionStarted := make(chan *Ydb_Coordination.SessionResponse_SessionStarted, 1)
 		sessionStopped := make(chan *Ydb_Coordination.SessionResponse_SessionStopped, 1)
 		startSending := make(chan struct{})
 		s.controller.OnAttach()
 
-		go s.receiveLoop(&wg, sessionClient, cancelStream, sessionStarted, sessionStopped)
+		// Start a new session.
+		onStart := trace.CoordinationOnSessionStart(s.trace)
+		startSession := Ydb_Coordination.SessionRequest{
+			Request: &Ydb_Coordination.SessionRequest_SessionStart_{
+				SessionStart: &Ydb_Coordination.SessionRequest_SessionStart{
+					Path:          path,
+					SessionId:     s.sessionID,
+					TimeoutMillis: uint64(s.sessionTimeout.Milliseconds()),
+					ProtectionKey: protectionKey,
+					SeqNo:         seqNo,
+					Description:   s.description,
+				},
+			},
+		}
+
+		fmt.Printf("[SEND]: %+v (%T)\n", startSession.GetRequest(), startSession.GetRequest())
+
+		err = sessionClient.Send(&startSession)
+		if err != nil {
+			// Reconnect if a session cannot be started in this stream.
+			onStart(err)
+
+			return
+		}
+		onStart(nil)
+
+		go s.receiveLoop(
+			&wg,
+			sessionClient,
+			cancelStream,
+			sessionStarted,
+			sessionStopped,
+		)
+
 		go s.sendLoop(
 			&wg,
 			sessionClient,
 			streamCtx,
 			cancelStream,
 			startSending,
-			path,
-			protectionKey,
-			s.sessionID,
-			seqNo,
 		)
 
 		// Wait for the session started response unless the stream context is done. We intentionally do not take into
 		// account stream context cancellation in order to proceed with the graceful shutdown if it requires reconnect.
-		sessionStartTimer := time.NewTimer(s.options.SessionStartTimeout)
 		select {
 		case start := <-sessionStarted:
-			trace.CoordinationOnSessionStarted(s.client.config.Trace(), start.GetSessionId(), s.sessionID)
+			trace.CoordinationOnSessionStarted(s.trace, start.GetSessionId(), s.sessionID)
 			if s.sessionID == 0 {
 				s.sessionID = start.GetSessionId()
 				close(sessionStartedChan)
@@ -325,14 +391,13 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 				cancelStream()
 			}
 			close(startSending)
-		case <-sessionStartTimer.C:
+		case <-time.After(s.sessionStartTimeout):
 			// Reconnect if no response was received before the timeout occurred.
-			trace.CoordinationOnSessionStartTimeout(s.client.config.Trace(), s.options.SessionStartTimeout)
+			trace.CoordinationOnSessionStartTimeout(s.trace, s.sessionStartTimeout)
 			cancelStream()
 		case <-streamCtx.Done():
 		case <-s.ctx.Done():
 		}
-		sessionStartTimer.Stop()
 
 		for {
 			// Respect the failure reason priority: if the session context is done, we must stop the session, even
@@ -347,24 +412,22 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 				break
 			}
 
-			keepAliveTime := time.Until(s.getLastGoodResponseTime().Add(s.options.SessionKeepAliveTimeout))
-			keepAliveTimeTimer := time.NewTimer(keepAliveTime)
+			keepAliveTime := time.Until(s.getLastGoodResponseTime().Add(s.sessionKeepAliveTimeout))
 			select {
-			case <-keepAliveTimeTimer.C:
+			case <-time.After(keepAliveTime):
 				last := s.getLastGoodResponseTime()
-				if time.Since(last) > s.options.SessionKeepAliveTimeout {
+				if time.Since(last) > s.sessionKeepAliveTimeout {
 					// Reconnect if the underlying stream is likely to be dead.
 					trace.CoordinationOnSessionKeepAliveTimeout(
-						s.client.config.Trace(),
+						s.trace,
 						last,
-						s.options.SessionKeepAliveTimeout,
+						s.sessionKeepAliveTimeout,
 					)
 					cancelStream()
 				}
 			case <-streamCtx.Done():
 			case <-s.ctx.Done():
 			}
-			keepAliveTimeTimer.Stop()
 		}
 
 		if closing {
@@ -376,7 +439,7 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 				return
 			}
 
-			trace.CoordinationOnSessionStop(s.client.config.Trace(), s.sessionID)
+			trace.CoordinationOnSessionStop(s.trace, s.sessionID)
 			s.controller.Close(conversation.NewConversation(
 				func() *Ydb_Coordination.SessionRequest {
 					return &Ydb_Coordination.SessionRequest{
@@ -388,11 +451,9 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 			)
 
 			// Wait for the session stopped response unless the stream context is done.
-			sessionStopTimeout := time.NewTimer(s.options.SessionStopTimeout)
 			select {
 			case stop := <-sessionStopped:
-				sessionStopTimeout.Stop()
-				trace.CoordinationOnSessionStopped(s.client.config.Trace(), stop.GetSessionId(), s.sessionID)
+				trace.CoordinationOnSessionStopped(s.trace, stop.GetSessionId(), s.sessionID)
 				if stop.GetSessionId() == s.sessionID {
 					cancelStream()
 
@@ -401,19 +462,15 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 
 				// Reconnect if the server response is invalid.
 				cancelStream()
-			case <-sessionStopTimeout.C:
-				sessionStopTimeout.Stop() // no really need, call stop for common style only
-
+			case <-time.After(s.sessionStopTimeout):
 				// Reconnect if no response was received before the timeout occurred.
-				trace.CoordinationOnSessionStopTimeout(s.client.config.Trace(), s.options.SessionStopTimeout)
+				trace.CoordinationOnSessionStopTimeout(s.trace, s.sessionStopTimeout)
 				cancelStream()
 			case <-s.ctx.Done():
-				sessionStopTimeout.Stop()
 				cancelStream()
 
 				return
 			case <-streamCtx.Done():
-				sessionStopTimeout.Stop()
 			}
 		}
 
@@ -425,7 +482,6 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 	}
 }
 
-//nolint:funlen
 func (s *session) receiveLoop(
 	wg *sync.WaitGroup,
 	sessionClient Ydb_Coordination_V1.CoordinationService_SessionClient,
@@ -439,7 +495,7 @@ func (s *session) receiveLoop(
 	defer cancelStream()
 
 	for {
-		onDone := trace.CoordinationOnSessionReceive(s.client.config.Trace())
+		onDone := trace.CoordinationOnSessionReceive(s.trace)
 		message, err := sessionClient.Recv()
 		if err != nil {
 			// Any stream error is unrecoverable, try to reconnect.
@@ -449,7 +505,7 @@ func (s *session) receiveLoop(
 		}
 		onDone(message, nil)
 
-		fmt.Printf("---RECV: %+v (%T)\n", message.GetResponse(), message.GetResponse())
+		fmt.Printf("[RECV]: %+v (%T)\n", message.GetResponse(), message.GetResponse())
 
 		switch message.GetResponse().(type) {
 		case *Ydb_Coordination.SessionResponse_Failure_:
@@ -457,12 +513,12 @@ func (s *session) receiveLoop(
 				message.GetFailure().GetStatus() == Ydb.StatusIds_UNAUTHORIZED ||
 				message.GetFailure().GetStatus() == Ydb.StatusIds_NOT_FOUND {
 				// Consider the session expired if we got an unrecoverable status.
-				trace.CoordinationOnSessionServerExpire(s.client.config.Trace(), message.GetFailure())
+				trace.CoordinationOnSessionServerExpire(s.trace, message.GetFailure())
 
 				return
 			}
 
-			trace.CoordinationOnSessionServerError(s.client.config.Trace(), message.GetFailure())
+			trace.CoordinationOnSessionServerError(s.trace, message.GetFailure())
 
 			return
 		case *Ydb_Coordination.SessionResponse_SessionStarted_:
@@ -496,7 +552,7 @@ func (s *session) receiveLoop(
 		default:
 			if !s.controller.OnRecv(message) {
 				// Reconnect if the message is not from any known conversation.
-				trace.CoordinationOnSessionReceiveUnexpected(s.client.config.Trace(), message)
+				trace.CoordinationOnSessionReceiveUnexpected(s.trace, message)
 
 				return
 			}
@@ -506,45 +562,18 @@ func (s *session) receiveLoop(
 	}
 }
 
-//nolint:revive,funlen
+//nolint:revive
 func (s *session) sendLoop(
 	wg *sync.WaitGroup,
 	sessionClient Ydb_Coordination_V1.CoordinationService_SessionClient,
 	streamCtx context.Context,
 	cancelStream context.CancelFunc,
 	startSending chan struct{},
-	path string,
-	protectionKey []byte,
-	sessionID uint64,
-	seqNo uint64,
 ) {
 	// If the sendLoop is done, make sure the stream is also canceled to make the receiveLoop finish its work and cause
 	// reconnect.
 	defer wg.Done()
 	defer cancelStream()
-
-	// Start a new session.
-	onDone := trace.CoordinationOnSessionStart(s.client.config.Trace())
-	startSession := Ydb_Coordination.SessionRequest{
-		Request: &Ydb_Coordination.SessionRequest_SessionStart_{
-			SessionStart: &Ydb_Coordination.SessionRequest_SessionStart{
-				Path:          path,
-				SessionId:     sessionID,
-				TimeoutMillis: uint64(s.options.SessionTimeout.Milliseconds()),
-				ProtectionKey: protectionKey,
-				SeqNo:         seqNo,
-				Description:   s.options.Description,
-			},
-		},
-	}
-	err := sessionClient.Send(&startSession)
-	if err != nil {
-		// Reconnect if a session cannot be started in this stream.
-		onDone(err)
-
-		return
-	}
-	onDone(nil)
 
 	// Wait for a response to the session start request in order to carry over the accumulated conversations until the
 	// server confirms that the session is running. This is not absolutely necessary but helps the client to not fail
@@ -560,7 +589,9 @@ func (s *session) sendLoop(
 			return
 		}
 
-		onSendDone := trace.CoordinationOnSessionSend(s.client.config.Trace(), message)
+		fmt.Printf("[SEND]: %+v (%T)\n", message.GetRequest(), message.GetRequest())
+
+		onSendDone := trace.CoordinationOnSessionSend(s.trace, message)
 		err = sessionClient.Send(message)
 		if err != nil {
 			// Any stream error is unrecoverable, try to reconnect.
@@ -830,7 +861,6 @@ func convertSemaphoreSession(
 	return &result
 }
 
-//nolint:funlen
 func (s *session) AcquireSemaphore(
 	ctx context.Context,
 	name string,
