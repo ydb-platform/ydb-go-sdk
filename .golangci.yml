@@ -232,7 +232,6 @@ linters:
     - gochecknoglobals
     - gocognit
     - godot
-    - goerr113
     - golint
     - gomnd
     - ifshort
