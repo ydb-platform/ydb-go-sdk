@@ -1,3 +1,5 @@
+* Refactored coordination traces
+
 ## v3.61.2
 * Changed default transaction control to `NoTx` for execute query through query service client 
 

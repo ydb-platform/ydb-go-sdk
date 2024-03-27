@@ -167,10 +167,10 @@ func internalCoordination(
 				}
 			}
 		},
-		OnStreamNew: func(
-			info trace.CoordinationStreamNewStartInfo,
+		OnNewSessionClient: func(
+			info trace.CoordinationNewSessionClientStartInfo,
 		) func(
-			info trace.CoordinationStreamNewDoneInfo,
+			info trace.CoordinationNewSessionClientDoneInfo,
 		) {
 			if d.Details()&trace.CoordinationEvents == 0 {
 				return nil
@@ -179,7 +179,7 @@ func internalCoordination(
 			l.Log(ctx, "stream")
 			start := time.Now()
 
-			return func(info trace.CoordinationStreamNewDoneInfo) {
+			return func(info trace.CoordinationNewSessionClientDoneInfo) {
 				l.Log(ctx, "done",
 					latencyField(start),
 					Error(info.Error),

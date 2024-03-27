@@ -279,9 +279,9 @@ func (t *Coordination) Compose(x *Coordination, opts ...CoordinationComposeOptio
 		}
 	}
 	{
-		h1 := t.OnStreamNew
-		h2 := x.OnStreamNew
-		ret.OnStreamNew = func(c CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo) {
+		h1 := t.OnNewSessionClient
+		h2 := x.OnNewSessionClient
+		ret.OnNewSessionClient = func(c CoordinationNewSessionClientStartInfo) func(CoordinationNewSessionClientDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -289,14 +289,14 @@ func (t *Coordination) Compose(x *Coordination, opts ...CoordinationComposeOptio
 					}
 				}()
 			}
-			var r, r1 func(CoordinationStreamNewDoneInfo)
+			var r, r1 func(CoordinationNewSessionClientDoneInfo)
 			if h1 != nil {
 				r = h1(c)
 			}
 			if h2 != nil {
 				r1 = h2(c)
 			}
-			return func(c CoordinationStreamNewDoneInfo) {
+			return func(c CoordinationNewSessionClientDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -715,16 +715,16 @@ func (t *Coordination) onClose(c CoordinationCloseStartInfo) func(CoordinationCl
 	}
 	return res
 }
-func (t *Coordination) onStreamNew(c CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo) {
-	fn := t.OnStreamNew
+func (t *Coordination) onNewSessionClient(c CoordinationNewSessionClientStartInfo) func(CoordinationNewSessionClientDoneInfo) {
+	fn := t.OnNewSessionClient
 	if fn == nil {
-		return func(CoordinationStreamNewDoneInfo) {
+		return func(CoordinationNewSessionClientDoneInfo) {
 			return
 		}
 	}
 	res := fn(c)
 	if res == nil {
-		return func(CoordinationStreamNewDoneInfo) {
+		return func(CoordinationNewSessionClientDoneInfo) {
 			return
 		}
 	}
@@ -926,11 +926,13 @@ func CoordinationOnClose(t *Coordination, c *context.Context, call call) func(er
 		res(p)
 	}
 }
-func CoordinationOnStreamNew(t *Coordination) func(error) {
-	var p CoordinationStreamNewStartInfo
-	res := t.onStreamNew(p)
+func CoordinationOnNewSessionClient(t *Coordination, c *context.Context, call call) func(error) {
+	var p CoordinationNewSessionClientStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onNewSessionClient(p)
 	return func(e error) {
-		var p CoordinationStreamNewDoneInfo
+		var p CoordinationNewSessionClientDoneInfo
 		p.Error = e
 		res(p)
 	}

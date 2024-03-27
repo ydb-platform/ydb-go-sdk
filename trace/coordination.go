@@ -23,7 +23,7 @@ type (
 		OnSession      func(CoordinationSessionStartInfo) func(CoordinationSessionDoneInfo)
 		OnClose        func(CoordinationCloseStartInfo) func(CoordinationCloseDoneInfo)
 
-		OnStreamNew               func(CoordinationStreamNewStartInfo) func(CoordinationStreamNewDoneInfo)
+		OnNewSessionClient        func(CoordinationNewSessionClientStartInfo) func(CoordinationNewSessionClientDoneInfo)
 		OnSessionStarted          func(CoordinationSessionStartedInfo)
 		OnSessionStartTimeout     func(CoordinationSessionStartTimeoutInfo)
 		OnSessionKeepAliveTimeout func(CoordinationSessionKeepAliveTimeoutInfo)
@@ -125,8 +125,15 @@ type (
 	CoordinationSessionDoneInfo struct {
 		Error error
 	}
-	CoordinationStreamNewStartInfo struct{}
-	CoordinationStreamNewDoneInfo  struct {
+	CoordinationNewSessionClientStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+	}
+	CoordinationNewSessionClientDoneInfo struct {
 		Error error
 	}
 	CoordinationSessionStartedInfo struct {
