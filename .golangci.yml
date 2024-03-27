@@ -295,6 +295,7 @@ issues:
         - predeclared
     - path: _test\.go
       linters:
+        - funlen
         - unused
         - unparam
         - gocritic

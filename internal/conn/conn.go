@@ -386,6 +386,7 @@ func (c *conn) Invoke(
 	return err
 }
 
+//nolint:funlen
 func (c *conn) NewStream(
 	ctx context.Context,
 	desc *grpc.StreamDesc,
