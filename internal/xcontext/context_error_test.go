@@ -24,6 +24,7 @@ func TestCtxErrError(t *testing.T) {
 			str: "'context deadline exceeded' from `some.go`",
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.str, tt.err.Error())
 		})
@@ -60,6 +61,7 @@ func TestCtxErrIs(t *testing.T) {
 			target: context.DeadlineExceeded,
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			require.ErrorIs(t, tt.err, tt.target)
 		})

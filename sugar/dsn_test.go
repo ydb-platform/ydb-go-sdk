@@ -41,6 +41,7 @@ func TestDSN(t *testing.T) {
 			"grpcs://lb.etn03r9df42nb631unbv.ydb.mdb.yandexcloud.net:2135/ru-central1/b1g8skpblkos03malf3s/etn03r9df42nb631unbv",
 		},
 	} {
+		tt := tt
 		t.Run(tt.dsn, func(t *testing.T) {
 			s := DSN(tt.endpoint, tt.database, tt.secure)
 			if s != tt.dsn {

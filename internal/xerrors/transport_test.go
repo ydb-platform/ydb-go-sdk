@@ -119,6 +119,7 @@ func TestIsTransportError(t *testing.T) {
 			match: false,
 		},
 	} {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.match, IsTransportError(tt.err, tt.codes...))
 		})
@@ -134,6 +135,7 @@ func TestGrpcError(t *testing.T) {
 		WithStackTrace(Transport(WithStackTrace(grpcStatus.Error(grpcCodes.Aborted, "")))),
 		WithStackTrace(Transport(WithStackTrace(WithStackTrace(grpcStatus.Error(grpcCodes.Aborted, ""))))),
 	} {
+		err := err
 		t.Run(err.Error(), func(t *testing.T) {
 			require.True(t, IsTransportError(err))
 			s, has := grpcStatus.FromError(err)
@@ -157,6 +159,7 @@ func Test_transportError_Error(t *testing.T) {
 			text: "transport/Unavailable (code = 14, source error = \"rpc error: code = Unavailable desc = \", address: \"localhost:2135\")", //nolint:lll
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.text, tt.err.Error())
 		})
@@ -189,6 +192,7 @@ func TestTransportErrorName(t *testing.T) {
 			name: "transport/Aborted",
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			if tt.err == nil {
 				require.Nil(t, TransportError(tt.err)) //nolint:testifylint

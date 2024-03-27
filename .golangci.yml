@@ -241,7 +241,6 @@ linters:
     - maintidx
     - nonamedreturns
     - paralleltest
-    - scopelint
     - structcheck
     - testableexamples
     - testpackage

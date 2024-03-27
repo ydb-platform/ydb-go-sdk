@@ -44,6 +44,7 @@ func TestRetryableCode(t *testing.T) {
 			code: int32(Ydb.StatusIds_BAD_REQUEST),
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			var err Error
 			require.ErrorAs(t, tt.err, &err)

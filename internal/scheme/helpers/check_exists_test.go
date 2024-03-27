@@ -113,6 +113,7 @@ func TestIsDirectoryExists(t *testing.T) {
 			err:       false,
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			exists, err := IsDirectoryExists(context.Background(), tt.client, tt.checkPath)
 			if tt.err {
@@ -217,6 +218,7 @@ func TestIsTableExists(t *testing.T) {
 			err:       true,
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			exists, err := IsEntryExists(context.Background(),
 				tt.client, tt.checkPath,

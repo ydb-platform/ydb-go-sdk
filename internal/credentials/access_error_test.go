@@ -158,6 +158,7 @@ func TestAccessError(t *testing.T) {
 				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessError(access_error_test.go:146)`", //nolint:lll
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.errorString, tt.err.Error())
 		})
@@ -198,6 +199,7 @@ func TestIsAccessError(t *testing.T) {
 			is:    false,
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.is, IsAccessError(tt.error), tt.error)
 		})

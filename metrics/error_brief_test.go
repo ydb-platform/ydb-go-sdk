@@ -306,6 +306,7 @@ func TestErrorBrief(t *testing.T) {
 			brief: "transport/Unavailable",
 		},
 	} {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.brief, errorBrief(tt.err))
 		})

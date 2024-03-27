@@ -132,6 +132,7 @@ func TestFromConfig(t *testing.T) {
 			},
 		},
 	} {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			var (
 				actErr   error

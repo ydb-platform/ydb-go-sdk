@@ -73,6 +73,7 @@ func TestIsOperationError(t *testing.T) {
 			match: false,
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.match, IsOperationError(tt.err, tt.codes...))
 		})
@@ -120,6 +121,7 @@ func TestIsOperationErrorTransactionLocksInvalidated(t *testing.T) {
 			isTLI: true,
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.isTLI, IsOperationErrorTransactionLocksInvalidated(tt.err))
 		})
@@ -177,6 +179,7 @@ func Test_operationError_Error(t *testing.T) {
 			text: "operation/PRECONDITION_FAILED (code = 400120, issues = [{15:3 => #1 'issue one'},{#2 'issue two' [{test.yql:16:4 => #3 'issue three'},{#4 'issue four'}]}])", //nolint:lll
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.text, tt.err.Error())
 		})

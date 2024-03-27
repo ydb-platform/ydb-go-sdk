@@ -57,6 +57,7 @@ func TestQueryParameters_String(t *testing.T) {
 			s: "{\"$a\":\"test\"u,\"$b\":\"test\",\"$c\":123456ul,\"$d\":<|`$a`:\"test\"u,`$b`:\"test\",`$c`:123456ul|>}",
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.s, tt.p.String())
 		})

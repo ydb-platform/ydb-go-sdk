@@ -20,6 +20,7 @@ func TestPassword(t *testing.T) {
 			exp:      "tes*************rd",
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.exp, Password(tt.password))
 		})

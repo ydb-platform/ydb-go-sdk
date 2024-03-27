@@ -22,6 +22,7 @@ func TestRetryModes(t *testing.T) {
 	} {
 		t.Run(idempotentType.String(), func(t *testing.T) {
 			for _, tt := range errsToCheck {
+				tt := tt
 				t.Run(tt.err.Error(), func(t *testing.T) {
 					m := Check(tt.err)
 					if m.MustRetry(true) != tt.canRetry[idempotent] {
@@ -119,6 +120,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 			retriable: false,
 		},
 	} {
+		tt := tt
 		t.Run(tt.error.Error(), func(t *testing.T) {
 			i := 0
 			err := Retry(ctx, func(ctx context.Context) error {
@@ -148,6 +150,7 @@ func TestRetryTransportDeadlineExceeded(t *testing.T) {
 		grpcCodes.DeadlineExceeded,
 		grpcCodes.Canceled,
 	} {
+		code := code
 		t.Run(code.String(), func(t *testing.T) {
 			counter := 0
 			ctx, cancel := xcontext.WithTimeout(context.Background(), time.Hour)
@@ -171,6 +174,7 @@ func TestRetryTransportCancelled(t *testing.T) {
 		grpcCodes.DeadlineExceeded,
 		grpcCodes.Canceled,
 	} {
+		code := code
 		t.Run(code.String(), func(t *testing.T) {
 			counter := 0
 			ctx, cancel := xcontext.WithCancel(context.Background())

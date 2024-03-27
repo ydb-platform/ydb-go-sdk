@@ -402,6 +402,7 @@ func (w *Writer) composeHookCall(fn *Func, h1, h2 string) {
 				w.atEOL = true
 			}
 			for i, h := range []string{h1, h2} {
+				i, h := i, h
 				w.line("if " + h + " != nil {")
 				w.block(func() {
 					if fn.HasResult() {

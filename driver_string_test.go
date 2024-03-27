@@ -65,6 +65,7 @@ func TestDriver_String(t *testing.T) {
 			s: `Driver{Endpoint:"localhost",Database:"local",Secure:true,Credentials:AccessToken{Token:"****(CRC-32c: 9F26E847)",From:"github.com/ydb-platform/ydb-go-sdk/v3/credentials.NewAccessTokenCredentials(credentials.go:20)"}}`, //nolint:lll
 		},
 	} {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.s, tt.d.String())
 		})

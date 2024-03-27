@@ -59,6 +59,7 @@ func TestConnsToNodeIDMap(t *testing.T) {
 	}
 
 	for _, test := range table {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			require.Equal(t, test.res, connsToNodeIDMap(test.source))
 		})
@@ -148,6 +149,7 @@ func TestSortPreferConnections(t *testing.T) {
 	}
 
 	for _, test := range table {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			prefer, fallback := sortPreferConnections(test.source, test.filter, balancerConfig.Info{}, test.allowFallback)
 			require.Equal(t, test.prefer, prefer)
@@ -376,6 +378,7 @@ func TestNewState(t *testing.T) {
 	}
 
 	for _, test := range table {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			require.NotNil(t, test.state.rand)
 			test.state.rand = nil

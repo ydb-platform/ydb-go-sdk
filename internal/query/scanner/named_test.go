@@ -509,7 +509,9 @@ func TestNamed(t *testing.T) {
 			},
 		},
 	} {
+		tt := tt
 		for i := range tt.dst {
+			i := i
 			t.Run(tt.name+"→"+reflect.TypeOf(tt.dst[i][0]).Elem().String(), func(t *testing.T) {
 				err := tt.s.ScanNamed(func() (dst []NamedDestination) {
 					for j := range tt.dst[i] {
@@ -660,6 +662,7 @@ func TestNamedRef(t *testing.T) {
 			panic: false,
 		},
 	} {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.panic {
 				defer func() {

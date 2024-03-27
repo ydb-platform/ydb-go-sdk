@@ -179,6 +179,7 @@ func TestToYDBFromYDB(t *testing.T) {
 		ZeroValue(types.NewTuple()),
 		PgValue(pg.OIDInt4, "123"),
 	} {
+		v := v
 		t.Run(strconv.Itoa(i)+"."+v.Yql(), func(t *testing.T) {
 			a := allocator.New()
 			defer a.Free()
@@ -505,6 +506,7 @@ func TestValueYql(t *testing.T) {
 			literal: `PgConst("123", PgType(705))`,
 		},
 	} {
+		tt := tt
 		t.Run(strconv.Itoa(i)+"."+tt.literal, func(t *testing.T) {
 			require.Equal(t, tt.literal, tt.value.Yql())
 		})
@@ -548,6 +550,7 @@ func TestOptionalValueCastTo(t *testing.T) {
 			err:  nil,
 		},
 	} {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.v.castTo(tt.dst)
 			if tt.err != nil {
@@ -928,6 +931,7 @@ func TestNullable(t *testing.T) {
 			exp:  NullValue(types.DyNumber),
 		},
 	} {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			a := allocator.New()
 			defer a.Free()
@@ -1043,7 +1047,9 @@ func TestCastNumbers(t *testing.T) {
 		},
 	}
 	for _, dst := range numberDestinations {
+		dst := dst
 		for _, src := range numberValues {
+			src := src
 			t.Run(fmt.Sprintf("%s→%s",
 				src.value.Yql(), reflect.ValueOf(dst.destination).Type().Elem().String(),
 			), func(t *testing.T) {
@@ -1150,6 +1156,7 @@ func TestCastOtherTypes(t *testing.T) {
 			error:  false,
 		},
 	} {
+		tt := tt
 		t.Run(fmt.Sprintf("%s→%v", tt.v.Type().Yql(), reflect.ValueOf(tt.dst).Type().Elem()),
 			func(t *testing.T) {
 				if err := CastTo(tt.v, tt.dst); (err != nil) != tt.error {

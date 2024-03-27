@@ -34,6 +34,7 @@ func TestIsOptional(t *testing.T) {
 			innerType:  Optional(TypeBool),
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			isOptional, innerType := IsOptional(tt.t)
 			require.Equal(t, tt.isOptional, isOptional)
@@ -76,6 +77,7 @@ func TestToDecimal(t *testing.T) {
 			err: true,
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			d, err := ToDecimal(tt.v)
 			if tt.err {

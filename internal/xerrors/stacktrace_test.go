@@ -33,6 +33,7 @@ func TestStackTraceError(t *testing.T) {
 			text: "errors.New at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestStackTraceError(stacktrace_test.go:30)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestStackTraceError(stacktrace_test.go:29)`",
 		},
 	} {
+		test := test
 		t.Run(test.text, func(t *testing.T) {
 			require.Equal(t, test.text, test.error.Error())
 		})
@@ -79,6 +80,7 @@ func TestTransportStackTraceError(t *testing.T) {
 			text: "transport/Aborted (code = 10, source error = \"rpc error: code = Aborted desc = some error\") at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestTransportStackTraceError(stacktrace_test.go:71)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestTransportStackTraceError(stacktrace_test.go:70)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestTransportStackTraceError(stacktrace_test.go:69)`",
 		},
 	} {
+		test := test
 		t.Run(test.text, func(t *testing.T) {
 			require.Equal(t, test.text, test.error.Error())
 		})

@@ -567,6 +567,7 @@ SELECT $param1, $param2`,
 			),
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			yql, parameters, err := tt.b.RewriteQuery(tt.sql, tt.args...)
 			if tt.err != nil {

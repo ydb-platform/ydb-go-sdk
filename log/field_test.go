@@ -44,6 +44,7 @@ func TestField_String(t *testing.T) {
 		{f: Stringer("stringer", stringerTest("stringerTest")), want: "stringerTest"},
 		{f: Field{ftype: InvalidType, key: "invalid"}, want: "", panic: true},
 	} {
+		tt := tt
 		t.Run(tt.f.key, func(t *testing.T) {
 			// Known fieldType, but String() panics with it.
 			if tt.panic {
@@ -90,6 +91,7 @@ func TestField_AnyValue(t *testing.T) {
 		{name: "struct", f: Any("any", struct{ str string }{str: "test"}), want: struct{ str string }{str: "test"}},
 		{name: "any_nil", f: Any("any", nil), want: nil},
 	} {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.want, tt.f.AnyValue())
 		})

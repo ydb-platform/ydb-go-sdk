@@ -153,6 +153,7 @@ func TestToYDB(t *testing.T) {
 			err: true,
 		},
 	} {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			toYDB, err := ToYDB(tt.txOptions)
 			if !tt.err {
