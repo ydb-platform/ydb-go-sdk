@@ -386,6 +386,25 @@ func TestTopicReaderReconnectorWaitInit(t *testing.T) {
 
 		require.ErrorIs(t, err, ctx.Err())
 	})
+
+	t.Run("UnretriableError", func(t *testing.T) {
+		reconnector := &readerReconnector{
+			tracer: &trace.Topic{},
+		}
+		reconnector.initChannelsAndClock()
+
+		testErr := errors.New("test error")
+		ctx := context.Background()
+		reconnector.readerConnect = readerConnectFuncMock(readerConnectFuncAnswer{
+			callback: func(ctx context.Context) (batchedStreamReader, error) {
+				return nil, testErr
+			},
+		})
+		reconnector.start()
+
+		err := reconnector.WaitInit(ctx)
+		require.ErrorIs(t, err, testErr)
+	})
 }
 
 func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {

@@ -521,6 +521,8 @@ func (w *WriterReconnector) WaitInit(ctx context.Context) (info InitialInfo, err
 	select {
 	case <-ctx.Done():
 		return InitialInfo{}, ctx.Err()
+	case <-w.background.Done():
+		return InitialInfo{}, w.background.CloseReason()
 	case <-w.initDoneCh:
 		return w.initInfo, nil
 	}

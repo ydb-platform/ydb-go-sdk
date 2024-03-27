@@ -279,6 +279,8 @@ func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldRead
 			r.reconnectFromBadStream <- newReconnectRequest(oldReader, reason)
 			trace.TopicOnReaderReconnectRequest(r.tracer, err, true)
 		}(err)
+	} else {
+		_ = r.CloseWithError(ctx, err)
 	}
 
 	r.m.WithLock(func() {
@@ -356,6 +358,8 @@ func (r *readerReconnector) WaitInit(ctx context.Context) error {
 		return ctx.Err()
 	case <-r.initDoneCh:
 		return r.initErr
+	case <-r.background.Done():
+		return r.background.CloseReason()
 	}
 }
 
