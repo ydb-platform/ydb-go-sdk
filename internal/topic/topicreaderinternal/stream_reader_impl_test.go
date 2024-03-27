@@ -39,6 +39,7 @@ func TestTopicStreamReaderImpl_BufferCounterOnStopPartition(t *testing.T) {
 	}
 
 	for _, test := range table {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			e := newTopicReaderTestEnv(t)
 			e.Start()

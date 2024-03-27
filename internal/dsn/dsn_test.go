@@ -105,6 +105,7 @@ func TestParseConnectionString(t *testing.T) {
 			"",
 		},
 	} {
+		test := test
 		t.Run(test.connectionString, func(t *testing.T) {
 			info, err := Parse(test.connectionString)
 			if err != nil {

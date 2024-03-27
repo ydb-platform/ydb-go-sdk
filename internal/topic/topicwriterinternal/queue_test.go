@@ -350,6 +350,7 @@ func TestIsFirstCycledIndexLess(t *testing.T) {
 	}
 
 	for _, test := range table {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			require.Equal(t, test.result, isFirstCycledIndexLess(test.first, test.second))
 		})
@@ -391,6 +392,7 @@ func TestSortIndexes(t *testing.T) {
 	}
 
 	for _, test := range table {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			sortMessageQueueIndexes(test.source)
 			require.Equal(t, test.expected, test.source)

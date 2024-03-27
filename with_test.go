@@ -127,6 +127,7 @@ func TestWithCertificatesCached(t *testing.T) { //nolint:funlen
 			uint64(n * 2),
 		},
 	} {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			db, err := newConnectionFromOptions(ctx,
 				append(

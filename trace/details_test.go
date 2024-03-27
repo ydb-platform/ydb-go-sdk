@@ -76,6 +76,7 @@ func TestDetailsMatch(t *testing.T) {
 			details: DriverBalancerEvents | DriverConnEvents | TablePoolLifeCycleEvents | DatabaseSQLTxEvents | RetryEvents,
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			details := MatchDetails(tt.pattern)
 			require.Equal(t, tt.details.String(), details.String())

@@ -274,6 +274,7 @@ func TestTypeToString(t *testing.T) {
 			s: "PgType(705)",
 		},
 	} {
+		tt := tt
 		t.Run(tt.s, func(t *testing.T) {
 			if got := tt.t.Yql(); got != tt.s {
 				t.Errorf("s representations not equals:\n\n -  got: %s\n\n - want: %s", got, tt.s)
@@ -320,6 +321,7 @@ func TestEqual(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			if equal := Equal(tt.lhs, tt.rhs); equal != tt.equal {
 				t.Errorf("Equal(%s, %s) = %v, want %v", tt.lhs, tt.rhs, equal, tt.equal)
@@ -361,6 +363,7 @@ func TestOptionalInnerType(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			optional, isOptional := tt.src.(interface {
 				IsOptional()

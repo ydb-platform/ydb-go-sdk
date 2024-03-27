@@ -25,6 +25,7 @@ func TestLevelFromContext(t *testing.T) {
 			lvl: INFO,
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.lvl, LevelFromContext(tt.ctx))
 		})
@@ -49,6 +50,7 @@ func TestNamesFromContext(t *testing.T) {
 			names: []string{"a", "b", "c", "d"},
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.names, NamesFromContext(tt.ctx))
 		})

@@ -51,6 +51,7 @@ func TestToJSON(t *testing.T) {
 			s: "{\n\t\"abc\": {\n\t\t\"A\": \"123\",\n\t\t\"B\": 123,\n\t\t\"C\": true\n\t},\n\t\"def\": {\n\t\t\"A\": \"456\",\n\t\t\"B\": 456,\n\t\t\"C\": false\n\t}\n}", //nolint:lll
 		},
 	} {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.s, ToJSON(tt.v))
 		})

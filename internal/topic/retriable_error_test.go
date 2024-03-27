@@ -226,6 +226,7 @@ func TestCheckRetryMode(t *testing.T) {
 	}
 
 	for _, test := range table {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			resBackoff, retriable := CheckRetryMode(test.err, test.settings, test.duration)
 			require.Equal(t, test.resBackoff, resBackoff)
@@ -269,6 +270,7 @@ func TestCheckResetReconnectionCounters(t *testing.T) {
 	}
 
 	for _, test := range table {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			shouldReset := CheckResetReconnectionCounters(test.lastTry, now, test.connectionTimeout)
 			require.Equal(t, test.shouldReset, shouldReset)

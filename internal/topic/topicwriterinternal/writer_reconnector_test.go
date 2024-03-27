@@ -637,9 +637,11 @@ func TestSplitMessagesByBufCodec(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		test := test
 		t.Run(fmt.Sprint(test), func(t *testing.T) {
 			var messages []messageWithDataContent
 			for index, codec := range test {
+				index, codec := index, codec
 				mess := newTestMessageWithDataContent(index)
 				mess.bufCodec = codec
 				messages = append(messages, mess)
@@ -648,10 +650,12 @@ func TestSplitMessagesByBufCodec(t *testing.T) {
 			groups := splitMessagesByBufCodec(messages)
 			expectedNum := int64(-1)
 			for _, group := range groups {
+				group := group
 				require.NotEmpty(t, group)
 				require.True(t, allMessagesHasSameBufCodec(group))
 				require.Len(t, group, cap(group))
 				for _, mess := range group {
+					mess := mess
 					expectedNum++
 					require.Equal(t, test[int(expectedNum)], mess.bufCodec)
 					mess.SeqNo = expectedNum
@@ -751,6 +755,7 @@ func TestCalculateAllowedCodecs(t *testing.T) {
 	}
 
 	for _, test := range table {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
 			res := calculateAllowedCodecs(test.force, encoders, test.serverCodecs)
 			require.Equal(t, test.expectedResult, res)

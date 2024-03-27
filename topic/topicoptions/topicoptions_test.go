@@ -69,6 +69,7 @@ func TestEqualAlterOptions(t *testing.T) {
 			},
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			assert.ElementsMatch(t, tt.lhs, tt.rhs) // compare slices with ignore ordering
 		})
@@ -93,6 +94,7 @@ func TestEqualCreateOptions(t *testing.T) {
 			},
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			assert.ElementsMatch(t, tt.lhs, tt.rhs) // compare slices with ignore ordering
 		})

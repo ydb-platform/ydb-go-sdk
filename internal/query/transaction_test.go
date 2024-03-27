@@ -219,6 +219,7 @@ func TestTxExecuteSettings(t *testing.T) {
 			},
 		},
 	} {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			a := allocator.New()
 			settings := options.TxExecuteSettings(tt.txID, tt.txOpts...).ExecuteSettings

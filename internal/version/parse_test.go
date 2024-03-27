@@ -55,6 +55,7 @@ func TestParse(t *testing.T) {
 			err: true,
 		},
 	} {
+		tt := tt
 		t.Run(tt.s, func(t *testing.T) {
 			v, err := parse(tt.s)
 			if tt.err {
@@ -141,6 +142,7 @@ var cases = []struct {
 
 func TestLt(t *testing.T) {
 	for _, tt := range cases {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.lt, Lt(tt.lhs, tt.rhs))
 		})
@@ -149,6 +151,7 @@ func TestLt(t *testing.T) {
 
 func TestGte(t *testing.T) {
 	for _, tt := range cases {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.gte, Gte(tt.lhs, tt.rhs))
 		})

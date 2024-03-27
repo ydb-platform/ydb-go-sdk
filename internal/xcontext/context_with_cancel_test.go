@@ -81,6 +81,7 @@ func TestContextWithCancelError(t *testing.T) {
 			str: "context deadline exceeded",
 		},
 	} {
+		tt := tt
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.str, tt.err.Error())
 		})

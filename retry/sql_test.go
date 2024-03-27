@@ -185,8 +185,10 @@ func TestDoTx(t *testing.T) {
 		idempotent,
 		nonIdempotent,
 	} {
+		idempotentType := idempotentType
 		t.Run(idempotentType.String(), func(t *testing.T) {
 			for _, tt := range errsToCheck {
+				tt := tt
 				t.Run(tt.err.Error(), func(t *testing.T) {
 					m := &mockConnector{
 						t:        t,

@@ -92,6 +92,7 @@ func TestMustPessimizeEndpoint(t *testing.T) {
 			pessimize: false,
 		},
 	} {
+		test := test
 		err := errors.Unwrap(test.error)
 		if err == nil {
 			err = test.error
