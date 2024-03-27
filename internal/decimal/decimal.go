@@ -95,94 +95,113 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 		return v, nil
 	}
 
-	neg := s[0] == '-'
-	if neg || s[0] == '+' {
-		s = s[1:]
-	}
+	neg, s := parseSign(s)
 	if isInf(s) {
-		if neg {
-			return v.Set(neginf), nil
-		}
-
-		return v.Set(inf), nil
+		return handleSpecialValues(v, neg, inf, neginf)
 	}
 	if isNaN(s) {
-		if neg {
-			return v.Set(negnan), nil
-		}
-
-		return v.Set(nan), nil
+		return handleSpecialValues(v, neg, nan, negnan)
 	}
 
 	integral := precision - scale
-
-	var dot bool
-	for ; len(s) > 0; s = s[1:] {
-		c := s[0]
-		if c == '.' {
-			if dot {
-				return nil, syntaxError(s)
-			}
-			dot = true
-
-			continue
-		}
-		if dot {
-			if scale > 0 {
-				scale--
-			} else {
-				break
-			}
-		}
-
-		if !isDigit(c) {
-			return nil, syntaxError(s)
-		}
-
-		v.Mul(v, ten)
-		v.Add(v, big.NewInt(int64(c-'0')))
-
-		if !dot && v.Cmp(zero) > 0 && integral == 0 {
-			if neg {
-				return neginf, nil
-			}
-
-			return inf, nil
-		}
-		integral--
+	s, err := parseNumber(s, v, &integral, &scale)
+	if err != nil {
+		return nil, err
 	}
-	//nolint:nestif
-	if len(s) > 0 { // Characters remaining.
-		c := s[0]
-		if !isDigit(c) {
-			return nil, syntaxError(s)
-		}
-		plus := c > '5'
-		if !plus && c == '5' {
-			var x big.Int
-			plus = x.And(v, one).Cmp(zero) != 0 // Last digit is not a zero.
-			for !plus && len(s) > 1 {
-				s = s[1:]
-				c := s[0]
-				if !isDigit(c) {
-					return nil, syntaxError(s)
-				}
-				plus = c != '0'
-			}
-		}
-		if plus {
-			v.Add(v, one)
-			if v.Cmp(pow(ten, precision)) >= 0 {
-				v.Set(inf)
-			}
+
+	if len(s) > 0 {
+		if err := handleRemainingDigits(s, v, precision); err != nil {
+			return nil, err
 		}
 	}
+
 	v.Mul(v, pow(ten, scale))
 	if neg {
 		v.Neg(v)
 	}
 
 	return v, nil
+}
+
+func handleRemainingDigits(s string, v *big.Int, precision uint32) error {
+	c := s[0]
+	if !isDigit(c) {
+		return syntaxError(s)
+	}
+	plus := c > '5'
+	if !plus && c == '5' {
+		plus = shouldRoundUp(v, s)
+	}
+	if plus {
+		v.Add(v, one)
+		if v.Cmp(pow(ten, precision)) >= 0 {
+			v.Set(inf)
+		}
+	}
+
+	return nil
+}
+
+func shouldRoundUp(v *big.Int, s string) bool {
+	var x big.Int
+	plus := x.And(v, one).Cmp(zero) != 0 // Last digit is not a zero.
+	for !plus && len(s) > 1 {
+		s = s[1:]
+		c := s[0]
+		if !isDigit(c) {
+			break
+		}
+		plus = c != '0'
+	}
+
+	return plus
+}
+
+func parseSign(s string) (neg bool, remaining string) {
+	neg = s[0] == '-'
+	if neg || s[0] == '+' {
+		s = s[1:]
+	}
+
+	return neg, s
+}
+
+func handleSpecialValues(v *big.Int, neg bool, pos, negVal *big.Int) (*big.Int, error) {
+	if neg {
+		return v.Set(negVal), nil
+	}
+
+	return v.Set(pos), nil
+}
+
+func parseNumber(s string, v *big.Int, integral, scale *uint32) (remaining string, err error) {
+	var dot bool
+	for ; len(s) > 0; s = s[1:] {
+		c := s[0]
+		if c == '.' {
+			if dot {
+				return "", syntaxError(s)
+			}
+			dot = true
+
+			continue
+		}
+		if dot && *scale > 0 {
+			(*scale)--
+		} else if !dot {
+			if !isDigit(c) {
+				return "", syntaxError(s)
+			}
+			v.Mul(v, ten)
+			v.Add(v, big.NewInt(int64(c-'0')))
+			if *integral == 0 {
+				return s, nil
+			}
+			(*integral)--
+		}
+	}
+
+	return s, nil
 }
 
 // Format returns the string representation of x with the given precision and
@@ -207,17 +226,8 @@ func Format(x *big.Int, precision, scale uint32) string {
 		return "0"
 	}
 
-	v := big.NewInt(0).Set(x)
-	neg := x.Sign() < 0
-	if neg {
-		// Convert negative to positive.
-		v.Neg(x)
-	}
-
-	// log_{10}(2^120) ~= 36.12, 37 decimal places
-	// plus dot, zero before dot, sign.
-	bts := make([]byte, 40)
-	pos := len(bts)
+	v, neg := prepareValue(x)
+	bts, pos := initializeBuffer()
 
 	var digit big.Int
 	for ; v.Cmp(zero) > 0; v.Div(v, ten) {
@@ -229,9 +239,7 @@ func Format(x *big.Int, precision, scale uint32) string {
 		digit.Mod(v, ten)
 		d := int(digit.Int64())
 		if d != 0 || scale == 0 || pos > 0 {
-			const numbers = "0123456789"
-			pos--
-			bts[pos] = numbers[d]
+			pos = appendDigit(bts, pos, d)
 		}
 		if scale > 0 {
 			scale--
@@ -241,12 +249,51 @@ func Format(x *big.Int, precision, scale uint32) string {
 			}
 		}
 	}
-	if scale > 0 {
-		for ; scale > 0; scale-- {
-			if precision == 0 {
-				return errorTag
+
+	pos = appendLeadingZeros(bts, pos, &precision, &scale)
+	if neg {
+		pos--
+		bts[pos] = '-'
+	}
+
+	return xstring.FromBytes(bts[pos:])
+}
+
+func prepareValue(x *big.Int) (*big.Int, bool) {
+	v := big.NewInt(0).Set(x)
+	neg := x.Sign() < 0
+	if neg {
+		// Convert negative to positive.
+		v.Neg(x)
+	}
+
+	return v, neg
+}
+
+func initializeBuffer() ([]byte, int) {
+	// log_{10}(2^120) ~= 36.12, 37 decimal places
+	// plus dot, zero before dot, sign.
+	bts := make([]byte, 40)
+	pos := len(bts)
+
+	return bts, pos
+}
+
+func appendDigit(bts []byte, pos, digit int) int {
+	const numbers = "0123456789"
+	pos--
+	bts[pos] = numbers[digit]
+
+	return pos
+}
+
+func appendLeadingZeros(bts []byte, pos int, precision, scale *uint32) int {
+	if *scale > 0 {
+		for ; *scale > 0; (*scale)-- {
+			if *precision == 0 {
+				return len(bts) // Return the full buffer length on precision error.
 			}
-			precision--
+			(*precision)--
 			pos--
 			bts[pos] = '0'
 		}
@@ -258,12 +305,8 @@ func Format(x *big.Int, precision, scale uint32) string {
 		pos--
 		bts[pos] = '0'
 	}
-	if neg {
-		pos--
-		bts[pos] = '-'
-	}
 
-	return xstring.FromBytes(bts[pos:])
+	return pos
 }
 
 // BigIntToByte returns the 16-byte array representation of x.

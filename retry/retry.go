@@ -269,39 +269,17 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 		attempts++
 		select {
 		case <-ctx.Done():
-			return xerrors.WithStackTrace(
-				fmt.Errorf("retry failed on attempt No.%d: %w",
-					attempts, ctx.Err(),
-				),
-			)
+			return handleContextDone(ctx, attempts)
 
 		default:
-			err := func() (err error) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-							err = xerrors.WithStackTrace(
-								fmt.Errorf("panic recovered: %v", e),
-							)
-						}
-					}()
-				}
-
-				return op(ctx)
-			}()
+			err := opWithRecover(ctx, options, op)
 
 			if err == nil {
 				return nil
 			}
 
 			if ctxErr := ctx.Err(); ctxErr != nil {
-				return xerrors.WithStackTrace(
-					xerrors.Join(
-						fmt.Errorf("context error occurred on attempt No.%d", attempts),
-						ctxErr, err,
-					),
-				)
+				return handleContextError(attempts, ctxErr, err)
 			}
 
 			m := Check(err)
@@ -311,26 +289,66 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 			}
 
 			if !m.MustRetry(options.idempotent) {
-				return xerrors.WithStackTrace(
-					fmt.Errorf("non-retryable error occurred on attempt No.%d (idempotent=%v): %w",
-						attempts, options.idempotent, err,
-					),
-				)
+				return handleNonRetryableError(attempts, options.idempotent, err)
 			}
 
 			if e := wait.Wait(ctx, options.fastBackoff, options.slowBackoff, m.BackoffType(), i); e != nil {
-				return xerrors.WithStackTrace(
-					xerrors.Join(
-						fmt.Errorf("wait exit on attempt No.%d",
-							attempts,
-						), e, err,
-					),
-				)
+				return handleWaitError(attempts, e, err)
 			}
 
 			code = m.StatusCode()
 		}
 	}
+}
+
+func opWithRecover(ctx context.Context, options *retryOptions, op retryOperation) (err error) {
+	if options.panicCallback != nil {
+		defer func() {
+			if e := recover(); e != nil {
+				options.panicCallback(e)
+				err = xerrors.WithStackTrace(
+					fmt.Errorf("panic recovered: %v", e),
+				)
+			}
+		}()
+	}
+
+	return op(ctx)
+}
+
+func handleContextDone(ctx context.Context, attempts int) error {
+	return xerrors.WithStackTrace(
+		fmt.Errorf("retry failed on attempt No.%d: %w",
+			attempts, ctx.Err(),
+		),
+	)
+}
+
+func handleContextError(attempts int, ctxErr, err error) error {
+	return xerrors.WithStackTrace(
+		xerrors.Join(
+			fmt.Errorf("context error occurred on attempt No.%d", attempts),
+			ctxErr, err,
+		),
+	)
+}
+
+func handleNonRetryableError(attempts int, idempotent bool, err error) error {
+	return xerrors.WithStackTrace(
+		fmt.Errorf("non-retryable error occurred on attempt No.%d (idempotent=%v): %w",
+			attempts, idempotent, err,
+		),
+	)
+}
+
+func handleWaitError(attempts int, e, err error) error {
+	return xerrors.WithStackTrace(
+		xerrors.Join(
+			fmt.Errorf("wait exit on attempt No.%d",
+				attempts,
+			), e, err,
+		),
+	)
 }
 
 // Check returns retry mode for queryErr.

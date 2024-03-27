@@ -91,30 +91,30 @@ func (c call) Record(opts ...recordOption) string {
 			opt(&optionsHolder)
 		}
 	}
-	name := runtime.FuncForPC(c.function).Name()
-	var (
-		pkgPath    string
-		pkgName    string
-		structName string
-		funcName   string
-		file       = c.file
-	)
+	name, file := extractNames(c.function, c.file)
+	pkgPath, pkgName, structName, funcName, lambdas := parseFunctionName(name)
+
+	return buildRecordString(optionsHolder, pkgPath, pkgName, structName, funcName, file, c.line, lambdas)
+}
+
+func extractNames(function uintptr, file string) (name, fileName string) {
+	name = runtime.FuncForPC(function).Name()
 	if i := strings.LastIndex(file, "/"); i > -1 {
-		file = file[i+1:]
+		fileName = file[i+1:]
+	} else {
+		fileName = file
 	}
+	name = strings.ReplaceAll(name, "[...]", "")
+
+	return name, fileName
+}
+
+func parseFunctionName(name string) (pkgPath, pkgName, structName, funcName string, lambdas []string) {
 	if i := strings.LastIndex(name, "/"); i > -1 {
 		pkgPath, name = name[:i], name[i+1:]
 	}
-	name = strings.ReplaceAll(name, "[...]", "")
 	split := strings.Split(name, ".")
-	lambdas := make([]string, 0, len(split))
-	for i := range split {
-		elem := split[len(split)-i-1]
-		if !strings.HasPrefix(elem, "func") {
-			break
-		}
-		lambdas = append(lambdas, elem)
-	}
+	lambdas = extractLambdas(split)
 	split = split[:len(split)-len(lambdas)]
 	if len(split) > 0 {
 		pkgName = split[0]
@@ -126,6 +126,28 @@ func (c call) Record(opts ...recordOption) string {
 		structName = split[1]
 	}
 
+	return pkgPath, pkgName, structName, funcName, lambdas
+}
+
+func extractLambdas(split []string) (lambdas []string) {
+	lambdas = make([]string, 0, len(split))
+	for i := range split {
+		elem := split[len(split)-i-1]
+		if !strings.HasPrefix(elem, "func") {
+			break
+		}
+		lambdas = append(lambdas, elem)
+	}
+
+	return lambdas
+}
+
+func buildRecordString(
+	optionsHolder recordOptions,
+	pkgPath, pkgName, structName, funcName, file string,
+	line int,
+	lambdas []string,
+) string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
 	if optionsHolder.packagePath {
@@ -164,7 +186,7 @@ func (c call) Record(opts ...recordOption) string {
 		buffer.WriteString(file)
 		if optionsHolder.line {
 			buffer.WriteByte(':')
-			fmt.Fprintf(buffer, "%d", c.line)
+			fmt.Fprintf(buffer, "%d", line)
 		}
 		if closeBrace {
 			buffer.WriteByte(')')
