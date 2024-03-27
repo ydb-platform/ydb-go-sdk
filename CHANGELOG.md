@@ -1,3 +1,5 @@
+* Fixed topic reader and writer WaitInit hunging on unretriable connection error   
+
 ## v3.61.2
 * Changed default transaction control to `NoTx` for execute query through query service client 
 

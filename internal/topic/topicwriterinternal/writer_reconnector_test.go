@@ -388,6 +388,22 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 		w.onWriterChange(&SingleStreamWriter{})
 		require.True(t, isClosed(w.firstInitResponseProcessedChan))
 	})
+
+	t.Run("CloseWriter", func(t *testing.T) {
+		ctx := context.Background()
+		w := newTestWriterStopped(WithAutoSetSeqNo(true))
+
+		testErr := errors.New("test error")
+		go func() {
+			_ = w.close(ctx, testErr)
+		}()
+
+		_, err := w.WaitInit(ctx)
+		require.ErrorIs(t, err, testErr)
+
+		w.onWriterChange(&SingleStreamWriter{})
+		require.True(t, isClosed(w.firstInitResponseProcessedChan))
+	})
 }
 
 func TestWriterImpl_Reconnect(t *testing.T) {
