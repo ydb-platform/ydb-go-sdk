@@ -1,6 +1,9 @@
 package stack
 
 import (
+	"reflect"
+	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -30,13 +33,13 @@ func TestRecord(t *testing.T) {
 	}{
 		{
 			act: Record(0),
-			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.TestRecord(record_test.go:32)",
+			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.TestRecord(record_test.go:35)",
 		},
 		{
 			act: func() string {
 				return Record(1)
 			}(),
-			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.TestRecord(record_test.go:38)",
+			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.TestRecord(record_test.go:41)",
 		},
 		{
 			act: func() string {
@@ -44,7 +47,7 @@ func TestRecord(t *testing.T) {
 					return Record(2)
 				}()
 			}(),
-			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.TestRecord(record_test.go:46)",
+			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.TestRecord(record_test.go:49)",
 		},
 		{
 			act: testStruct{depth: 0, opts: []recordOption{
@@ -164,7 +167,7 @@ func TestRecord(t *testing.T) {
 				// FileName(false),
 				// Line(false),
 			}}.TestFunc(),
-			exp: "record_test.go:16",
+			exp: "record_test.go:19",
 		},
 		{
 			act: testStruct{depth: 0, opts: []recordOption{
@@ -236,7 +239,7 @@ func TestRecord(t *testing.T) {
 				// FileName(false),
 				// Line(false),
 			}}.TestFunc(),
-			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.testStruct.TestFunc.func1(record_test.go:16)",
+			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.testStruct.TestFunc.func1(record_test.go:19)",
 		},
 		{
 			act: (&testStruct{depth: 0, opts: []recordOption{
@@ -248,13 +251,74 @@ func TestRecord(t *testing.T) {
 				// FileName(false),
 				// Line(false),
 			}}).TestPointerFunc(),
-			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.(*testStruct).TestPointerFunc.func1(record_test.go:22)",
+			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.(*testStruct).TestPointerFunc.func1(record_test.go:25)",
 		},
 	} {
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.exp, tt.act)
 		})
 	}
+}
+
+func TestExtractNames(t *testing.T) {
+	testFunc := func() {}
+	funcPtr := reflect.ValueOf(testFunc).Pointer()
+
+	funcNameExpected := runtime.FuncForPC(funcPtr).Name()
+
+	_, file, _, ok := runtime.Caller(0)
+	require.True(t, ok, "runtime.Caller should return true indicating success")
+
+	fileParts := strings.Split(file, "/")
+	fileNameExpected := fileParts[len(fileParts)-1]
+
+	name, fileName := extractNames(funcPtr, file)
+
+	require.Equal(t, funcNameExpected, name, "Function name should match expected value")
+	require.Equal(t, fileNameExpected, fileName, "File name should match expected value")
+}
+
+func TestParseFunctionName(t *testing.T) {
+	name := "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.TestParseFunctionName.func1"
+	pkgPath, pkgName, structName, funcName, lambdas := parseFunctionName(name)
+
+	require.Equal(t, "github.com/ydb-platform/ydb-go-sdk/v3/internal", pkgPath)
+	require.Equal(t, "stack", pkgName)
+	require.Empty(t, structName, "Struct name should be empty for standalone functions")
+	require.Equal(t, "TestParseFunctionName", funcName)
+	require.Contains(t, lambdas, "func1", "Lambdas should include 'func1'")
+}
+
+func TestExtractLambdas(t *testing.T) {
+	split := []string{"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack", "TestExtractLambdas", "func1", "func2"}
+	lambdas := extractLambdas(split)
+
+	require.Len(t, lambdas, 2, "There should be two lambda functions extracted")
+	require.Contains(t, lambdas, "func1")
+	require.Contains(t, lambdas, "func2")
+}
+
+func TestBuildRecordString(t *testing.T) {
+	optionsHolder := recordOptions{
+		packagePath:  true,
+		packageName:  false,
+		structName:   true,
+		functionName: true,
+		fileName:     true,
+		line:         true,
+		lambdas:      true,
+	}
+	pkgPath := "github.com/ydb-platform/ydb-go-sdk/v3/internal"
+	pkgName := ""
+	structName := "testStruct"
+	funcName := "TestFunc"
+	file := "record_test.go"
+	line := 319
+	lambdas := []string{"func1"}
+
+	result := buildRecordString(optionsHolder, pkgPath, pkgName, structName, funcName, file, line, lambdas)
+	expected := "github.com/ydb-platform/ydb-go-sdk/v3/internal.testStruct.TestFunc.func1(record_test.go:319)"
+	require.Equal(t, expected, result)
 }
 
 func BenchmarkCall(b *testing.B) {

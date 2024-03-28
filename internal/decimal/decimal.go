@@ -1,6 +1,7 @@
 package decimal
 
 import (
+	"errors"
 	"math/big"
 	"math/bits"
 
@@ -144,11 +145,11 @@ func handleRemainingDigits(s string, v *big.Int, precision uint32) error {
 
 func shouldRoundUp(v *big.Int, s string) bool {
 	var x big.Int
-	plus := x.And(v, one).Cmp(zero) != 0 // Last digit is not a zero.
-	for !plus && len(s) > 1 {
-		s = s[1:]
+	plus := x.And(v, big.NewInt(1)).Cmp(big.NewInt(0)) != 0
+	for !plus && len(s) > 0 {
 		c := s[0]
-		if !isDigit(c) {
+		s = s[1:]
+		if c < '0' || c > '9' {
 			break
 		}
 		plus = c != '0'
@@ -158,6 +159,10 @@ func shouldRoundUp(v *big.Int, s string) bool {
 }
 
 func parseSign(s string) (neg bool, remaining string) {
+	if s == "" {
+		return false, s
+	}
+
 	neg = s[0] == '-'
 	if neg || s[0] == '+' {
 		s = s[1:]
@@ -176,32 +181,49 @@ func handleSpecialValues(v *big.Int, neg bool, pos, negVal *big.Int) (*big.Int, 
 
 func parseNumber(s string, v *big.Int, integral, scale *uint32) (remaining string, err error) {
 	var dot bool
-	for ; len(s) > 0; s = s[1:] {
-		c := s[0]
+	var processed bool
+
+	for _, c := range s {
 		if c == '.' {
 			if dot {
-				return "", syntaxError(s)
+				return "", errors.New("syntax error: unexpected '.'")
 			}
 			dot = true
 
 			continue
 		}
+
+		if !isDigit(byte(c)) {
+			return "", errors.New("syntax error: non-digit characters")
+		}
+
 		if dot && *scale > 0 {
-			(*scale)--
+			*scale--
 		} else if !dot {
-			if !isDigit(c) {
-				return "", syntaxError(s)
-			}
-			v.Mul(v, ten)
-			v.Add(v, big.NewInt(int64(c-'0')))
 			if *integral == 0 {
-				return s, nil
+				remaining += string(c)
+				processed = true
+
+				continue
 			}
-			(*integral)--
+			*integral--
+		}
+
+		if !processed {
+			digitVal := big.NewInt(int64(c - '0'))
+			v.Mul(v, big.NewInt(10))
+			v.Add(v, digitVal)
 		}
 	}
 
-	return s, nil
+	if !dot && *scale > 0 {
+		for *scale > 0 {
+			v.Mul(v, big.NewInt(10))
+			*scale--
+		}
+	}
+
+	return remaining, nil
 }
 
 // Format returns the string representation of x with the given precision and
@@ -250,7 +272,23 @@ func Format(x *big.Int, precision, scale uint32) string {
 		}
 	}
 
-	pos = appendLeadingZeros(bts, pos, &precision, &scale)
+	if scale > 0 {
+		for ; scale > 0; (scale)-- {
+			if precision == 0 {
+				pos = len(bts) // Return the full buffer length on precision error.
+			}
+			precision--
+			pos--
+			bts[pos] = '0'
+		}
+
+		pos--
+		bts[pos] = '.'
+	}
+	if bts[pos] == '.' {
+		pos--
+		bts[pos] = '0'
+	}
 	if neg {
 		pos--
 		bts[pos] = '-'
@@ -283,28 +321,6 @@ func appendDigit(bts []byte, pos, digit int) int {
 	const numbers = "0123456789"
 	pos--
 	bts[pos] = numbers[digit]
-
-	return pos
-}
-
-func appendLeadingZeros(bts []byte, pos int, precision, scale *uint32) int {
-	if *scale > 0 {
-		for ; *scale > 0; (*scale)-- {
-			if *precision == 0 {
-				return len(bts) // Return the full buffer length on precision error.
-			}
-			(*precision)--
-			pos--
-			bts[pos] = '0'
-		}
-
-		pos--
-		bts[pos] = '.'
-	}
-	if bts[pos] == '.' {
-		pos--
-		bts[pos] = '0'
-	}
 
 	return pos
 }
