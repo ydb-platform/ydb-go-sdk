@@ -13,7 +13,6 @@ func TestIsAcquireError(t *testing.T) {
 		xerrors.WithStackTrace(&acquireError{}),
 		xerrors.WithStackTrace(fmt.Errorf("%w", &acquireError{})),
 	} {
-		err := err
 		t.Run("", func(t *testing.T) {
 			if !IsAcquireError(err) {
 				t.Errorf("not acquire error: %v", err)
@@ -28,7 +27,6 @@ func TestToAcquireError(t *testing.T) {
 		xerrors.WithStackTrace(&acquireError{}),
 		xerrors.WithStackTrace(fmt.Errorf("%w", &acquireError{})),
 	} {
-		err := err
 		t.Run("", func(t *testing.T) {
 			ae := ToAcquireError(err)
 			if ae == nil {

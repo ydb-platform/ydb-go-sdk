@@ -912,7 +912,6 @@ func TestStruct(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			a := allocator.New()
 			defer a.Free()

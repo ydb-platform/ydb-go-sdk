@@ -35,7 +35,6 @@ func TestDelays(t *testing.T) {
 		7: duration("32s"),
 		8: duration("32s"),
 	} {
-		i, d := i, d
 		t.Run(fmt.Sprintf("%v -> %v", i, d), func(t *testing.T) {
 			require.Equal(t, d, b.Delay(i))
 		})
@@ -129,7 +128,6 @@ func TestLogBackoff(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run("", func(t *testing.T) {
 			if tt.seeds == 0 {
 				tt.seeds = 1
@@ -216,7 +214,6 @@ func TestFastSlowDelaysWithoutJitter(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			for n, exp := range tt.exp {
 				n, exp := n, exp

@@ -1003,7 +1003,6 @@ func TestExecuteQueryRequest(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			request, callOptions := executeQueryRequest(a, tt.name, tt.name, options.ExecuteSettings(tt.opts...))
 			require.Equal(t, request.String(), tt.request.String())

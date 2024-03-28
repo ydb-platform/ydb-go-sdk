@@ -38,7 +38,6 @@ func TestFromBytes(t *testing.T) {
 			scale:     9,
 		},
 	} {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			x := FromBytes(test.bts, test.precision, test.scale)
 			p := Append(nil, x)

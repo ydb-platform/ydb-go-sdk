@@ -52,7 +52,6 @@ func TestContext(t *testing.T) {
 			values: []string{"feature-1", "feature-2", "feature-3"},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			md, has := metadata.FromOutgoingContext(tt.ctx)
 			require.True(t, has)

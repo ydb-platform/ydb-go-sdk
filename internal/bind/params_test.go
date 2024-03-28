@@ -326,7 +326,6 @@ func TestToValue(t *testing.T) {
 			err: nil,
 		},
 	} {
-		tt := tt
 		t.Run(fmt.Sprintf("%T(%v)", tt.src, tt.src), func(t *testing.T) {
 			dst, err := toValue(tt.src)
 			if tt.err != nil {
@@ -377,7 +376,6 @@ func TestYdbParam(t *testing.T) {
 			err: errUnnamedParam,
 		},
 	} {
-		tt := tt
 		t.Run("", func(t *testing.T) {
 			dst, err := toYdbParam("", tt.src)
 			if tt.err != nil {
@@ -519,7 +517,6 @@ func TestArgsToParams(t *testing.T) {
 			err: errMultipleQueryParameters,
 		},
 	} {
-		tt := tt
 		t.Run("", func(t *testing.T) {
 			params, err := Params(tt.args...)
 			if tt.err != nil {

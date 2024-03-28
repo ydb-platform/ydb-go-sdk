@@ -33,7 +33,6 @@ func TestFieldName(t *testing.T) {
 			out: "col0",
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, tt.out, fieldName(reflect.ValueOf(tt.in).Type().Field(0), "sql"))
 		})

@@ -54,7 +54,6 @@ func TestNil(t *testing.T) {
 			p:    Builder{}.Build(),
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			require.Equal(t, "{}", tt.p.String())
 			require.Equal(t, 0, tt.p.Count())

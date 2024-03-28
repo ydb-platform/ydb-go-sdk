@@ -408,7 +408,6 @@ func TestOptional(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		tc := tc
 		t.Run(tc.method, func(t *testing.T) {
 			a := allocator.New()
 			defer a.Free()

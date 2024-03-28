@@ -237,7 +237,6 @@ SELECT $p0, $p1`,
 			},
 		},
 	} {
-		tt := tt
 		t.Run("", func(t *testing.T) {
 			yql, params, err := b.RewriteQuery(tt.sql, tt.args...)
 			if tt.err != nil {

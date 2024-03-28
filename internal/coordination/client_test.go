@@ -90,7 +90,6 @@ func TestCreateNodeRequest(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			request := createNodeRequest(tt.path, tt.config, tt.operationParams)
 			require.EqualValues(t, xtest.ToJSON(tt.request), xtest.ToJSON(request))
@@ -119,7 +118,6 @@ func TestDescribeNodeRequest(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			request := describeNodeRequest(tt.path, tt.operationParams)
 			require.Equal(t, xtest.ToJSON(tt.request), xtest.ToJSON(request))
@@ -161,7 +159,6 @@ func TestOperationParams(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			params := operationParams(tt.ctx, tt.config, tt.mode)
 			require.Equal(t, xtest.ToJSON(tt.operationParams), xtest.ToJSON(params))
@@ -279,7 +276,6 @@ func TestAlterNodeRequest(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			request := alterNodeRequest(tt.path, tt.config, tt.operationParams)
 			require.Equal(t, xtest.ToJSON(tt.request), xtest.ToJSON(request))
@@ -346,7 +342,6 @@ func TestDropNodeRequest(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			request := dropNodeRequest(tt.path, tt.operationParams)
 			require.Equal(t, xtest.ToJSON(tt.request), xtest.ToJSON(request))

@@ -63,7 +63,6 @@ func TestTzSomeToTime(t *testing.T) {
 			TzTimestampToTime,
 		},
 	} {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			v, err := tt.converter(tt.src)
 			require.NoError(t, err)

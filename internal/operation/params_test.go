@@ -295,7 +295,6 @@ func TestParams(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run("", func(t *testing.T) {
 			got := Params(tt.ctx, tt.timeout, tt.cancelAfter, tt.mode)
 			t.Logf(

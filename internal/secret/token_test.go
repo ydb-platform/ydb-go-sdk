@@ -16,7 +16,6 @@ func TestToken(t *testing.T) {
 			exp:   "t1.9****i5AQ(CRC-32c: B83EA6E4)",
 		},
 	} {
-		tt := tt
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.exp, Token(tt.token))
 		})

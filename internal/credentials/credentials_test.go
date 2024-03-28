@@ -29,7 +29,6 @@ func TestCredentialsString(t *testing.T) {
 			"AccessToken{Token:\"1234****WXYZ(CRC-32c: 81993EA5)\",From:\"test\"}",
 		},
 	} {
-		test := test
 		t.Run(test.s, func(t *testing.T) {
 			if stringer, ok := test.c.(fmt.Stringer); ok {
 				require.Equal(t, test.s, stringer.String())

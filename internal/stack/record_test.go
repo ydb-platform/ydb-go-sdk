@@ -251,7 +251,6 @@ func TestRecord(t *testing.T) {
 			exp: "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.(*testStruct).TestPointerFunc.func1(record_test.go:22)",
 		},
 	} {
-		tt := tt
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.exp, tt.act)
 		})

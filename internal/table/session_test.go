@@ -334,7 +334,6 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(
 			test.method.String(),
 			func(t *testing.T) {
@@ -749,7 +748,6 @@ func Test_copyTables(t *testing.T) {
 			err:                  errParamsRequired,
 		},
 	} {
-		tt := tt
 		t.Run("", func(t *testing.T) {
 			err := copyTables(ctx, tt.sessionID, tt.operationTimeout, tt.operationCancelAfter, tt.service, tt.opts...)
 			if tt.err != nil {

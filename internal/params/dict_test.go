@@ -410,9 +410,7 @@ func TestDict(t *testing.T) {
 	}
 
 	for _, key := range tests {
-		key := key
 		for _, val := range tests {
-			val := val
 			t.Run(fmt.Sprintf("%s:%s", key.method, val.method), func(t *testing.T) {
 				a := allocator.New()
 				defer a.Free()

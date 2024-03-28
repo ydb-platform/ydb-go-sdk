@@ -603,7 +603,6 @@ func TestScanNamed(t *testing.T) {
 		return columns[i]
 	}
 	for _, test := range scannerData {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			set, expected := getResultSet(test.count, test.columns)
 			s.reset(set)
@@ -612,7 +611,6 @@ func TestScanNamed(t *testing.T) {
 				//nolint:nestif
 				if test.columns[0].testDefault {
 					for i := range test.values {
-						i := i
 						values = append(
 							values,
 							named.OptionalWithDefault(
@@ -626,7 +624,6 @@ func TestScanNamed(t *testing.T) {
 					}
 				} else {
 					for i := range test.values {
-						i := i
 						if test.columns[i].optional {
 							if test.columns[i].testDefault {
 								values = append(

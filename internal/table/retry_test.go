@@ -32,7 +32,6 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 		xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED)),
 		fmt.Errorf("wrap op error: %w", xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_OVERLOADED))),
 	} {
-		testErr := testErr
 		t.Run("", func(t *testing.T) {
 			backoff := make(chan chan time.Time)
 			p := SingleSession(
@@ -200,7 +199,6 @@ func TestRetryerImmediateReturn(t *testing.T) {
 		)),
 		fmt.Errorf("whoa"),
 	} {
-		testErr := testErr
 		t.Run("", func(t *testing.T) {
 			defer func() {
 				if e := recover(); e != nil {
@@ -439,7 +437,6 @@ func TestRetryWithCustomErrors(t *testing.T) {
 			deleteSession: false,
 		},
 	} {
-		test := test
 		t.Run(test.error.Error(), func(t *testing.T) {
 			var (
 				i        = 0

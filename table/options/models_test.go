@@ -67,7 +67,6 @@ func TestTimeToLiveSettingsFluentModifiers(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.expectedSettings, tt.fluentSettings)
 		})

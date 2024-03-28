@@ -119,7 +119,6 @@ var errsToCheck = []error{
 
 func Test_badConnError_Is(t *testing.T) {
 	for _, err := range errsToCheck {
-		err := err
 		t.Run(err.Error(), func(t *testing.T) {
 			err = Map(err)
 			require.Equal(t,
@@ -132,9 +131,8 @@ func Test_badConnError_Is(t *testing.T) {
 
 func Test_badConnError_As_Error(t *testing.T) {
 	for _, err := range errsToCheck {
-		err := err
 		t.Run(err.Error(), func(t *testing.T) {
-			require.ErrorAs(t, Map(err), &err)
+			require.ErrorAs(t, Map(err), &err) //nolint:gosec
 		})
 	}
 }

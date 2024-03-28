@@ -43,7 +43,6 @@ func TestResultAny(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			a := allocator.New()
 			defer a.Free()
@@ -110,7 +109,6 @@ func TestResultOUint32(t *testing.T) {
 			},
 		},
 	} {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			a := allocator.New()
 			defer a.Free()
@@ -245,7 +243,6 @@ func TestNewStreamWithRecvFirstResultSet(t *testing.T) {
 			err: context.Canceled,
 		},
 	} {
-		tt := tt
 		t.Run("", func(t *testing.T) {
 			result, err := NewStream(tt.ctx,
 				func(ctx context.Context) (*Ydb.ResultSet, *Ydb_TableStats.QueryStats, error) {

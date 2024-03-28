@@ -32,7 +32,6 @@ func TestJoin(t *testing.T) {
 			s: "[\"context canceled\",\"context deadline exceeded\",\"operation/STATUS_CODE_UNSPECIFIED (code = 0)\"]",
 		},
 	} {
-		tt := tt
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, tt.s, tt.err.Error())
 			if len(tt.iss) > 0 {

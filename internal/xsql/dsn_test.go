@@ -162,7 +162,6 @@ func TestParse(t *testing.T) {
 			err: nil,
 		},
 	} {
-		tt := tt
 		t.Run("", func(t *testing.T) {
 			opts, connectorOpts, err := Parse(tt.dsn)
 			if tt.err != nil {
@@ -202,7 +201,6 @@ func TestExtractTablePathPrefixFromBinderName(t *testing.T) {
 			err:             errWrongTablePathPrefix,
 		},
 	} {
-		tt := tt
 		t.Run("", func(t *testing.T) {
 			tablePathPrefix, err := extractTablePathPrefixFromBinderName(tt.binderName)
 			if tt.err != nil {

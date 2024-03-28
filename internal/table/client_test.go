@@ -102,7 +102,6 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 			racy: true,
 		},
 	} {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				get  = make(chan struct{})
@@ -328,7 +327,6 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 			racy: true,
 		},
 	} {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				get  = make(chan struct{}, 1)
@@ -525,7 +523,6 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 			racy: true,
 		},
 	} {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			var (
 				get  = make(chan struct{})

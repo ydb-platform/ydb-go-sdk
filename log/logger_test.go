@@ -34,7 +34,6 @@ func TestColoring(t *testing.T) {
 			exp: "1984-04-04 00:00:00.000 ERROR 'test.scope' => message",
 		},
 	} {
-		tt := tt
 		t.Run("", func(t *testing.T) {
 			act := tt.l.format([]string{"test", "scope"}, "message", ERROR)
 			require.Equal(t, tt.exp, act)

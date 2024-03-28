@@ -494,9 +494,7 @@ func TestIndexed(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		for i := range tt.dst {
-			i := i
 			t.Run(tt.name+"→"+reflect.TypeOf(tt.dst[i][0]).Elem().String(), func(t *testing.T) {
 				err := tt.s.Scan(tt.dst[i]...)
 				require.NoError(t, err)

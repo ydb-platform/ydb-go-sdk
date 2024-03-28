@@ -72,7 +72,6 @@ func TestIsYdb(t *testing.T) {
 			isYdbError: true,
 		},
 	} {
-		test := test
 		t.Run("", func(t *testing.T) {
 			if IsYdb(test.error) != test.isYdbError {
 				t.Fatalf("unexpected check ydb error: %v, want: %v", IsYdb(test.error), test.isYdbError)

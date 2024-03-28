@@ -115,7 +115,6 @@ func TestEndpointsDiff(t *testing.T) {
 			},
 		},
 	} {
-		tt := tt
 		t.Run(xtest.CurrentFileLine(), func(t *testing.T) {
 			nodes, added, dropped := endpointsDiff(tt.newestEndpoints, tt.previousConns)
 			require.Equal(t, tt.nodes, nodes)

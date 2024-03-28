@@ -44,7 +44,6 @@ func TestSupportedCodecsEquals(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run("", func(t *testing.T) {
 			require.Equal(t, test.result, test.first.IsEqualsTo(test.second))
 			require.Equal(t, test.result, test.second.IsEqualsTo(test.first))
