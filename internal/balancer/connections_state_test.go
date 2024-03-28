@@ -376,7 +376,6 @@ func TestNewState(t *testing.T) {
 	}
 
 	for _, test := range table {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			require.NotNil(t, test.state.rand)
 			test.state.rand = nil

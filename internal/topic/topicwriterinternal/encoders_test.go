@@ -143,7 +143,6 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 		}
 
 		for _, test := range table {
-			test := test
 			t.Run(test.name, func(t *testing.T) {
 				testSelectCodec(t, test.targetCodec, test.smallCount, test.largeCount)
 			})

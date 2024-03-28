@@ -560,7 +560,6 @@ func getResultSet(count int, col []*column) (result *Ydb.ResultSet, testValues [
 func TestScanSqlTypes(t *testing.T) {
 	s := initScanner()
 	for _, test := range scannerData {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			set, expected := getResultSet(test.count, test.columns)
 			s.reset(set, test.setColumns...)

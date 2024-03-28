@@ -216,7 +216,6 @@ func TestFastSlowDelaysWithoutJitter(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			for n, exp := range tt.exp {
-				n, exp := n, exp
 				t.Run("delay#"+strconv.Itoa(n), func(t *testing.T) {
 					act := tt.backoff.Delay(n)
 					require.Equal(t, exp, act)
