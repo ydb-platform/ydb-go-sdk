@@ -12,7 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
-func TestVariantTuple(t *testing.T) {
+func TestVariantStruct(t *testing.T) {
 	type expected struct {
 		Type  *Ydb.Type
 		Value *Ydb.Value
@@ -441,15 +441,15 @@ func TestVariantTuple(t *testing.T) {
 			a := allocator.New()
 			defer a.Free()
 
-			item := Builder{}.Param("$x").BeginVariant().BeginTuple().Types()
+			item := Builder{}.Param("$x").BeginVariant().BeginStruct().Field("key")
 
-			types, ok := xtest.CallMethod(item, tc.method, tc.typeArgs...)[0].(*variantTupleTypes)
+			vs, ok := xtest.CallMethod(item, tc.method, tc.typeArgs...)[0].(*variantStruct)
 			require.True(t, ok)
 
-			builder, ok := xtest.CallMethod(types.Index(0), tc.method, tc.itemArgs...)[0].(*variantTupleBuilder)
+			builder, ok := xtest.CallMethod(vs.Name("key"), tc.method, tc.itemArgs...)[0].(*variantStructBuilder)
 			require.True(t, ok)
 
-			params := builder.EndTuple().EndVariant().Build().ToYDB(a)
+			params := builder.EndStruct().EndVariant().Build().ToYDB(a)
 
 			require.Equal(t, xtest.ToJSON(
 				map[string]*Ydb.TypedValue{
@@ -457,10 +457,13 @@ func TestVariantTuple(t *testing.T) {
 						Type: &Ydb.Type{
 							Type: &Ydb.Type_VariantType{
 								VariantType: &Ydb.VariantType{
-									Type: &Ydb.VariantType_TupleItems{
-										TupleItems: &Ydb.TupleType{
-											Elements: []*Ydb.Type{
-												tc.expected.Type,
+									Type: &Ydb.VariantType_StructItems{
+										StructItems: &Ydb.StructType{
+											Members: []*Ydb.StructMember{
+												{
+													Name: "key",
+													Type: tc.expected.Type,
+												},
 											},
 										},
 									},
@@ -471,6 +474,7 @@ func TestVariantTuple(t *testing.T) {
 							Value: &Ydb.Value_NestedValue{
 								NestedValue: tc.expected.Value,
 							},
+							VariantIndex: 0,
 						},
 					},
 				}), xtest.ToJSON(params))
@@ -478,15 +482,26 @@ func TestVariantTuple(t *testing.T) {
 	}
 }
 
-func TestVariantTuple_AddTypes(t *testing.T) {
+func TestVariantStruct_AddFields(t *testing.T) {
 	a := allocator.New()
 	defer a.Free()
 
-	params := Builder{}.Param("$x").BeginVariant().BeginTuple().
-		Types().AddTypes(types.Int64, types.Bool).
-		Index(1).
-		Bool(true).
-		EndTuple().EndVariant().Build().ToYDB(a)
+	params := Builder{}.Param("$x").BeginVariant().BeginStruct().
+		AddFields([]types.StructField{
+			{
+				Name: "key1",
+				T:    types.Bool,
+			},
+			{
+				Name: "key2",
+				T:    types.Uint64,
+			},
+			{
+				Name: "key3",
+				T:    types.Text,
+			},
+		}...).Name("key3").Text("Hello, World!").EndStruct().
+		EndVariant().Build().ToYDB(a)
 
 	require.Equal(t, xtest.ToJSON(
 		map[string]*Ydb.TypedValue{
@@ -494,17 +509,31 @@ func TestVariantTuple_AddTypes(t *testing.T) {
 				Type: &Ydb.Type{
 					Type: &Ydb.Type_VariantType{
 						VariantType: &Ydb.VariantType{
-							Type: &Ydb.VariantType_TupleItems{
-								TupleItems: &Ydb.TupleType{
-									Elements: []*Ydb.Type{
+							Type: &Ydb.VariantType_StructItems{
+								StructItems: &Ydb.StructType{
+									Members: []*Ydb.StructMember{
 										{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_INT64,
+											Name: "key1",
+											Type: &Ydb.Type{
+												Type: &Ydb.Type_TypeId{
+													TypeId: Ydb.Type_BOOL,
+												},
 											},
 										},
 										{
-											Type: &Ydb.Type_TypeId{
-												TypeId: Ydb.Type_BOOL,
+											Name: "key2",
+											Type: &Ydb.Type{
+												Type: &Ydb.Type_TypeId{
+													TypeId: Ydb.Type_UINT64,
+												},
+											},
+										},
+										{
+											Name: "key3",
+											Type: &Ydb.Type{
+												Type: &Ydb.Type_TypeId{
+													TypeId: Ydb.Type_UTF8,
+												},
 											},
 										},
 									},
@@ -516,12 +545,12 @@ func TestVariantTuple_AddTypes(t *testing.T) {
 				Value: &Ydb.Value{
 					Value: &Ydb.Value_NestedValue{
 						NestedValue: &Ydb.Value{
-							Value: &Ydb.Value_BoolValue{
-								BoolValue: true,
+							Value: &Ydb.Value_TextValue{
+								TextValue: "Hello, World!",
 							},
 						},
 					},
-					VariantIndex: 1,
+					VariantIndex: 2,
 				},
 			},
 		}), xtest.ToJSON(params))
