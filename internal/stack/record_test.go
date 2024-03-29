@@ -272,7 +272,7 @@ func TestExtractNames(t *testing.T) {
 	fileParts := strings.Split(file, "/")
 	fileNameExpected := fileParts[len(fileParts)-1]
 
-	name, fileName := extractNames(funcPtr, file)
+	name, fileName := extractName(funcPtr, file)
 
 	require.Equal(t, funcNameExpected, name, "Function name should match expected value")
 	require.Equal(t, fileNameExpected, fileName, "File name should match expected value")
@@ -280,13 +280,13 @@ func TestExtractNames(t *testing.T) {
 
 func TestParseFunctionName(t *testing.T) {
 	name := "github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.TestParseFunctionName.func1"
-	pkgPath, pkgName, structName, funcName, lambdas := parseFunctionName(name)
+	fnDetails := parseFunctionName(name)
 
-	require.Equal(t, "github.com/ydb-platform/ydb-go-sdk/v3/internal", pkgPath)
-	require.Equal(t, "stack", pkgName)
-	require.Empty(t, structName, "Struct name should be empty for standalone functions")
-	require.Equal(t, "TestParseFunctionName", funcName)
-	require.Contains(t, lambdas, "func1", "Lambdas should include 'func1'")
+	require.Equal(t, "github.com/ydb-platform/ydb-go-sdk/v3/internal", fnDetails.pkgPath)
+	require.Equal(t, "stack", fnDetails.pkgName)
+	require.Empty(t, fnDetails.structName, "Struct name should be empty for standalone functions")
+	require.Equal(t, "TestParseFunctionName", fnDetails.funcName)
+	require.Contains(t, fnDetails.lambdas, "func1", "Lambdas should include 'func1'")
 }
 
 func TestExtractLambdas(t *testing.T) {
@@ -308,15 +308,18 @@ func TestBuildRecordString(t *testing.T) {
 		line:         true,
 		lambdas:      true,
 	}
-	pkgPath := "github.com/ydb-platform/ydb-go-sdk/v3/internal"
-	pkgName := ""
-	structName := "testStruct"
-	funcName := "TestFunc"
+	fnDetails := functionDetails{
+		pkgPath:    "github.com/ydb-platform/ydb-go-sdk/v3/internal",
+		pkgName:    "",
+		structName: "testStruct",
+		funcName:   "TestFunc",
+
+		lambdas: []string{"func1"},
+	}
 	file := "record_test.go"
 	line := 319
-	lambdas := []string{"func1"}
 
-	result := buildRecordString(optionsHolder, pkgPath, pkgName, structName, funcName, file, line, lambdas)
+	result := buildRecordString(optionsHolder, &fnDetails, file, line)
 	expected := "github.com/ydb-platform/ydb-go-sdk/v3/internal.testStruct.TestFunc.func1(record_test.go:319)"
 	require.Equal(t, expected, result)
 }

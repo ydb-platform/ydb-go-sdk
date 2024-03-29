@@ -155,43 +155,6 @@ func TestParseSign(t *testing.T) {
 	}
 }
 
-func TestHandleSpecialValues(t *testing.T) {
-	tests := []struct {
-		name           string
-		neg            bool
-		initialValue   *big.Int
-		posValue       *big.Int
-		negValue       *big.Int
-		expectedResult *big.Int
-	}{
-		{
-			name:           "Handle positive special value",
-			neg:            false,
-			initialValue:   big.NewInt(0),
-			posValue:       big.NewInt(123),
-			negValue:       big.NewInt(-123),
-			expectedResult: big.NewInt(123),
-		},
-		{
-			name:           "Handle negative special value",
-			neg:            true,
-			initialValue:   big.NewInt(0),
-			posValue:       big.NewInt(123),
-			negValue:       big.NewInt(-123),
-			expectedResult: big.NewInt(-123),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result, err := handleSpecialValues(tt.initialValue, tt.neg, tt.posValue, tt.negValue)
-			require.NoError(t, err)
-			require.NotNil(t, result)
-			require.Equal(t, tt.expectedResult, result, "The result should match the expected value")
-		})
-	}
-}
-
 func TestParseNumber(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -259,7 +222,7 @@ func TestParseNumber(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			integral := tt.initialIntegral
 			scale := tt.initialScale
-			remain, err := parseNumber(tt.s, tt.initialValue, &integral, &scale)
+			remain, err := parseNumber(tt.s, tt.initialValue, integral, scale)
 
 			if tt.expectError {
 				require.Error(t, err)
@@ -370,7 +333,7 @@ func TestPrepareValue(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			value, neg := prepareValue(tt.input)
+			value, neg := abs(tt.input)
 			require.Equal(t, tt.expectedValue, value)
 			require.Equal(t, tt.expectedNeg, neg)
 		})
@@ -378,20 +341,9 @@ func TestPrepareValue(t *testing.T) {
 }
 
 func TestInitializeBuffer(t *testing.T) {
-	bts, pos := initializeBuffer()
+	bts, pos := newStringBuffer()
 	require.Len(t, bts, 40)
 	require.Equal(t, 40, pos)
-}
-
-func TestAppendDigit(t *testing.T) {
-	bts, _ := initializeBuffer()
-	pos := len(bts)
-	pos = appendDigit(bts, pos, 5)
-
-	expectedByte := byte('5') // '5' as a byte, equivalent to 0x35 in hexadecimal
-	actualByte := bts[pos]    // This should now correctly point to the appended '5'
-
-	require.Equal(t, expectedByte, actualByte, "The appended byte should match '5'")
 }
 
 func uint128(hi, lo uint64) []byte {

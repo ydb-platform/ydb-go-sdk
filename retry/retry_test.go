@@ -2,7 +2,6 @@ package retry
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -229,59 +228,4 @@ func TestOpWithRecover_WithPanic(t *testing.T) {
 	require.Contains(t, err.Error(), "panic recovered: test panic")
 	require.True(t, mockCallback.called)
 	require.Equal(t, "test panic", mockCallback.received)
-}
-
-func TestHandleContextDone(t *testing.T) {
-	attempts := 5
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel() // immediately cancel to simulate a done context
-
-	err := handleContextDone(ctx, attempts)
-	require.Error(t, err)
-
-	expectedMsg := fmt.Sprintf("retry failed on attempt No.%d: %s", attempts, context.Canceled.Error())
-	require.Contains(t, err.Error(), expectedMsg)
-}
-
-func TestHandleContextError(t *testing.T) {
-	attempts := 3
-	ctxErr := context.DeadlineExceeded
-	opErr := errors.New("operation failed")
-
-	err := handleContextError(attempts, ctxErr, opErr)
-	require.Error(t, err)
-
-	expectedMsg := fmt.Sprintf("context error occurred on attempt No.%d", attempts)
-	require.Contains(t, err.Error(), expectedMsg)
-	require.Contains(t, err.Error(), ctxErr.Error())
-	require.Contains(t, err.Error(), opErr.Error())
-}
-
-func TestHandleNonRetryableError(t *testing.T) {
-	attempts := 2
-	idempotent := false
-	opErr := errors.New("non-retryable error")
-
-	err := handleNonRetryableError(attempts, idempotent, opErr)
-	require.Error(t, err)
-
-	expectedMsg := fmt.Sprintf(
-		"non-retryable error occurred on attempt No.%d (idempotent=%v): %s",
-		attempts, idempotent, opErr.Error(),
-	)
-	require.Contains(t, err.Error(), expectedMsg)
-}
-
-func TestHandleWaitError(t *testing.T) {
-	attempts := 4
-	waitErr := errors.New("wait error")
-	opErr := errors.New("operation during wait error")
-
-	err := handleWaitError(attempts, waitErr, opErr)
-	require.Error(t, err)
-
-	expectedMsg := fmt.Sprintf("wait exit on attempt No.%d", attempts)
-	require.Contains(t, err.Error(), expectedMsg)
-	require.Contains(t, err.Error(), waitErr.Error())
-	require.Contains(t, err.Error(), opErr.Error())
 }

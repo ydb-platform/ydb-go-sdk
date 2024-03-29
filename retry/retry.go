@@ -230,6 +230,8 @@ func WithPanicCallback(panicCallback func(e interface{})) panicCallbackOption {
 // Warning: if deadline without deadline or cancellation func Retry will be worked infinite
 //
 // If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
+//
+//nolint:funlen
 func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr error) {
 	options := &retryOptions{
 		call:        stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.Retry"),
@@ -269,7 +271,9 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 		attempts++
 		select {
 		case <-ctx.Done():
-			return handleContextDone(ctx, attempts)
+			return xerrors.WithStackTrace(
+				fmt.Errorf("retry failed on attempt No.%d: %w", attempts, ctx.Err()),
+			)
 
 		default:
 			err := opWithRecover(ctx, options, op)
@@ -279,7 +283,12 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 			}
 
 			if ctxErr := ctx.Err(); ctxErr != nil {
-				return handleContextError(attempts, ctxErr, err)
+				return xerrors.WithStackTrace(
+					xerrors.Join(
+						fmt.Errorf("context error occurred on attempt No.%d", attempts),
+						ctxErr, err,
+					),
+				)
 			}
 
 			m := Check(err)
@@ -289,11 +298,17 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 			}
 
 			if !m.MustRetry(options.idempotent) {
-				return handleNonRetryableError(attempts, options.idempotent, err)
+				return xerrors.WithStackTrace(
+					fmt.Errorf("non-retryable error occurred on attempt No.%d (idempotent=%v): %w",
+						attempts, options.idempotent, err),
+				)
 			}
 
 			if e := wait.Wait(ctx, options.fastBackoff, options.slowBackoff, m.BackoffType(), i); e != nil {
-				return handleWaitError(attempts, e, err)
+				return xerrors.WithStackTrace(
+					xerrors.Join(
+						fmt.Errorf("wait exit on attempt No.%d", attempts), e, err),
+				)
 			}
 
 			code = m.StatusCode()
@@ -314,41 +329,6 @@ func opWithRecover(ctx context.Context, options *retryOptions, op retryOperation
 	}
 
 	return op(ctx)
-}
-
-func handleContextDone(ctx context.Context, attempts int) error {
-	return xerrors.WithStackTrace(
-		fmt.Errorf("retry failed on attempt No.%d: %w",
-			attempts, ctx.Err(),
-		),
-	)
-}
-
-func handleContextError(attempts int, ctxErr, err error) error {
-	return xerrors.WithStackTrace(
-		xerrors.Join(
-			fmt.Errorf("context error occurred on attempt No.%d", attempts),
-			ctxErr, err,
-		),
-	)
-}
-
-func handleNonRetryableError(attempts int, idempotent bool, err error) error {
-	return xerrors.WithStackTrace(
-		fmt.Errorf("non-retryable error occurred on attempt No.%d (idempotent=%v): %w",
-			attempts, idempotent, err,
-		),
-	)
-}
-
-func handleWaitError(attempts int, e, err error) error {
-	return xerrors.WithStackTrace(
-		xerrors.Join(
-			fmt.Errorf("wait exit on attempt No.%d",
-				attempts,
-			), e, err,
-		),
-	)
 }
 
 // Check returns retry mode for queryErr.
