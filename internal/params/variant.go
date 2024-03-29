@@ -24,8 +24,14 @@ func (vb *variantBuilder) EndVariant() Builder {
 	return vb.variant.parent
 }
 
-func (v *variant) Tuple() *variantTuple {
+func (v *variant) BeginTuple() *variantTuple {
 	return &variantTuple{
+		parent: v,
+	}
+}
+
+func (v *variant) BeginStruct() *variantStruct {
+	return &variantStruct{
 		parent: v,
 	}
 }

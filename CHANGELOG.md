@@ -1,4 +1,5 @@
-* Fixed topic reader and writer WaitInit hunging on unretriable connection error   
+* Fixed topic reader and writer WaitInit hunging on unretriable connection error
+* Added `Struct` support for `Variant` in `ydb.ParamsBuilder()`
 
 ## v3.61.2
 * Changed default transaction control to `NoTx` for execute query through query service client 
