@@ -1,3 +1,4 @@
+* Fixed topic reader and writer WaitInit hunging on unretriable connection error
 * Added `Struct` support for `Variant` in `ydb.ParamsBuilder()`
 
 ## v3.61.2
