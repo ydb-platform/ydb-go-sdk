@@ -112,7 +112,7 @@ func detectFastestEndpoint(ctx context.Context, endpoints []endpoint.Endpoint) (
 	return addressToEndpoint[fastestAddress], nil
 }
 
-func detectLocalDC(ctx context.Context, endpoints []endpoint.Endpoint) (string, error) {
+func detectLocalDC(ctx context.Context, endpoints []endpoint.Info) (string, error) {
 	if len(endpoints) == 0 {
 		return "", xerrors.WithStackTrace(ErrNoEndpoints)
 	}
@@ -174,7 +174,7 @@ func getRandomEndpoints(endpoints []endpoint.Endpoint, count int) []endpoint.End
 	return res
 }
 
-func splitEndpointsByLocation(endpoints []endpoint.Endpoint) map[string][]endpoint.Endpoint {
+func splitEndpointsByLocation(endpoints []endpoint.Info) map[string][]endpoint.Endpoint {
 	res := make(map[string][]endpoint.Endpoint)
 	for _, ep := range endpoints {
 		location := ep.Location()

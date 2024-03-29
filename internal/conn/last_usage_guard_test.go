@@ -12,7 +12,7 @@ func Test_lastUsage_Lock(t *testing.T) {
 	t.Run("NowFromLocked", func(t *testing.T) {
 		start := time.Unix(0, 0)
 		clock := clockwork.NewFakeClockAt(start)
-		lu := &lastUsage{
+		lu := &lastUsageGuard{
 			clock: clock,
 		}
 		lu.t.Store(&start)
@@ -33,7 +33,7 @@ func Test_lastUsage_Lock(t *testing.T) {
 	t.Run("UpdateAfterLastUnlock", func(t *testing.T) {
 		start := time.Unix(0, 0)
 		clock := clockwork.NewFakeClockAt(start)
-		lu := &lastUsage{
+		lu := &lastUsageGuard{
 			clock: clock,
 		}
 		lu.t.Store(&start)
@@ -71,7 +71,7 @@ func Test_lastUsage_Lock(t *testing.T) {
 	t.Run("DeferRelease", func(t *testing.T) {
 		start := time.Unix(0, 0)
 		clock := clockwork.NewFakeClockAt(start)
-		lu := &lastUsage{
+		lu := &lastUsageGuard{
 			clock: clock,
 		}
 		lu.t.Store(&start)

@@ -18,7 +18,7 @@ import (
 var localIP = net.IPv4(127, 0, 0, 1)
 
 type discoveryMock struct {
-	endpoints []endpoint.Endpoint
+	endpoints []endpoint.Info
 }
 
 // implement discovery.Client
@@ -26,7 +26,7 @@ func (d discoveryMock) Close(ctx context.Context) error {
 	return nil
 }
 
-func (d discoveryMock) Discover(ctx context.Context) ([]endpoint.Endpoint, error) {
+func (d discoveryMock) Discover(ctx context.Context) ([]endpoint.Info, error) {
 	return d.endpoints, nil
 }
 
@@ -106,9 +106,9 @@ func TestDetectLocalDC(t *testing.T) {
 		listen2Addr := listen2.Addr().String()
 		_ = listen2.Close() // force close, for not accept tcp connections
 
-		dc, err := detectLocalDC(ctx, []endpoint.Endpoint{
-			&mock.Endpoint{LocationField: "a", AddrField: "grpc://" + listen1.Addr().String()},
-			&mock.Endpoint{LocationField: "b", AddrField: "grpc://" + listen2Addr},
+		dc, err := detectLocalDC(ctx, []endpoint.Info{
+			&mock.Endpoint{LocationField: "a", AddressField: "grpc://" + listen1.Addr().String()},
+			&mock.Endpoint{LocationField: "b", AddressField: "grpc://" + listen2Addr},
 		})
 		require.NoError(t, err)
 		require.Equal(t, "a", dc)
@@ -119,7 +119,7 @@ func TestDetectLocalDC(t *testing.T) {
 		require.Error(t, err)
 	})
 	t.Run("OneDC", func(t *testing.T) {
-		res, err := detectLocalDC(ctx, []endpoint.Endpoint{
+		res, err := detectLocalDC(ctx, []endpoint.Info{
 			&mock.Endpoint{LocationField: "a"},
 			&mock.Endpoint{LocationField: "a"},
 		})
@@ -134,15 +134,14 @@ func TestLocalDCDiscovery(t *testing.T) {
 		config.WithBalancer(balancers.PreferLocalDC(balancers.Default())),
 	)
 	r := &Balancer{
-		driverConfig: cfg,
-		config:       *cfg.Balancer(),
-		pool:         conn.NewPool(context.Background(), cfg),
-		discoveryClient: discoveryMock{endpoints: []endpoint.Endpoint{
-			&mock.Endpoint{AddrField: "a:123", LocationField: "a"},
-			&mock.Endpoint{AddrField: "b:234", LocationField: "b"},
-			&mock.Endpoint{AddrField: "c:456", LocationField: "c"},
+		config: cfg.Balancer(),
+		pool:   conn.NewPool(context.Background(), cfg),
+		discoveryClient: discoveryMock{endpoints: []endpoint.Info{
+			&mock.Endpoint{AddressField: "a:123", LocationField: "a"},
+			&mock.Endpoint{AddressField: "b:234", LocationField: "b"},
+			&mock.Endpoint{AddressField: "c:456", LocationField: "c"},
 		}},
-		localDCDetector: func(ctx context.Context, endpoints []endpoint.Endpoint) (string, error) {
+		localDCDetector: func(ctx context.Context, endpoints []endpoint.Info) (string, error) {
 			return "b", nil
 		},
 	}
@@ -151,7 +150,7 @@ func TestLocalDCDiscovery(t *testing.T) {
 	require.NoError(t, err)
 
 	for i := 0; i < 100; i++ {
-		conn, _ := r.connections().GetConnection(ctx)
+		conn, _ := r.connections.Load().GetConn(ctx)
 		require.Equal(t, "b:234", conn.Endpoint().Address())
 		require.Equal(t, "b", conn.Endpoint().Location())
 	}
@@ -210,9 +209,9 @@ func TestExtractHostPort(t *testing.T) {
 
 func TestGetRandomEndpoints(t *testing.T) {
 	source := []endpoint.Endpoint{
-		&mock.Endpoint{AddrField: "a"},
-		&mock.Endpoint{AddrField: "b"},
-		&mock.Endpoint{AddrField: "c"},
+		&mock.Endpoint{AddressField: "a"},
+		&mock.Endpoint{AddressField: "b"},
+		&mock.Endpoint{AddressField: "c"},
 	}
 
 	t.Run("ReturnSource", func(t *testing.T) {

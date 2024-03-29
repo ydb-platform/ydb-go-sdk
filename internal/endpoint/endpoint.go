@@ -2,119 +2,91 @@ package endpoint
 
 import (
 	"fmt"
-	"sync"
+	"sync/atomic"
 	"time"
 )
 
-type Info interface {
-	NodeID() uint32
-	Address() string
-	LocalDC() bool
-	Location() string
-	LastUpdated() time.Time
-	LoadFactor() float32
+type (
+	Key struct {
+		NodeID  uint32
+		Address string
+	}
+	Info interface {
+		fmt.Stringer
+
+		Key() Key
+		NodeID() uint32
+		Address() string
+		Location() string
+		LastUpdated() time.Time
+		LoadFactor() float32
+	}
+)
+
+func Equals(rhs, lhs Info) bool {
+	if rhs.Address() != lhs.Address() {
+		return false
+	}
+	if rhs.NodeID() != lhs.NodeID() {
+		return false
+	}
+	if rhs.Location() != lhs.Location() {
+		return false
+	}
+
+	return true
 }
 
 type Endpoint interface {
 	Info
-
-	String() string
-	Copy() Endpoint
-	Touch(opts ...Option)
 }
 
 type endpoint struct {
-	mu       sync.RWMutex
 	id       uint32
 	address  string
 	location string
 	services []string
 
-	loadFactor float32
-	local      bool
+	loadFactor atomic.Pointer[float32]
 
-	lastUpdated time.Time
-}
-
-func (e *endpoint) Copy() Endpoint {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	return &endpoint{
-		id:          e.id,
-		address:     e.address,
-		location:    e.location,
-		services:    append(make([]string, 0, len(e.services)), e.services...),
-		loadFactor:  e.loadFactor,
-		local:       e.local,
-		lastUpdated: e.lastUpdated,
-	}
+	lastUpdated atomic.Pointer[time.Time]
 }
 
 func (e *endpoint) String() string {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	return fmt.Sprintf(`{id:%d,address:%q,local:%t,location:%q,loadFactor:%f,lastUpdated:%q}`,
+	return fmt.Sprintf(`{id:%d,address:%q,location:%q,loadFactor:%f,lastUpdated:%q}`,
 		e.id,
 		e.address,
-		e.local,
 		e.location,
-		e.loadFactor,
-		e.lastUpdated.Format(time.RFC3339),
+		*e.loadFactor.Load(),
+		e.lastUpdated.Load().Format(time.RFC3339),
 	)
 }
 
-func (e *endpoint) NodeID() uint32 {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
+func (e *endpoint) Key() Key {
+	return Key{
+		NodeID:  e.id,
+		Address: e.address,
+	}
+}
 
+func (e *endpoint) NodeID() uint32 {
 	return e.id
 }
 
 func (e *endpoint) Address() (address string) {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
 	return e.address
 }
 
 func (e *endpoint) Location() string {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
 	return e.location
 }
 
-func (e *endpoint) LocalDC() bool {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	return e.local
-}
-
 func (e *endpoint) LoadFactor() float32 {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	return e.loadFactor
+	return *e.loadFactor.Load()
 }
 
 func (e *endpoint) LastUpdated() time.Time {
-	e.mu.RLock()
-	defer e.mu.RUnlock()
-
-	return e.lastUpdated
-}
-
-func (e *endpoint) Touch(opts ...Option) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	for _, opt := range append([]Option{withLastUpdated(time.Now())}, opts...) {
-		if opt != nil {
-			opt(e)
-		}
-	}
+	return *e.lastUpdated.Load()
 }
 
 type Option func(e *endpoint)
@@ -131,15 +103,15 @@ func WithLocation(location string) Option {
 	}
 }
 
-func WithLocalDC(local bool) Option {
+func WithLoadFactor(loadFactor float32) Option {
 	return func(e *endpoint) {
-		e.local = local
+		e.loadFactor.Store(&loadFactor)
 	}
 }
 
-func WithLoadFactor(loadFactor float32) Option {
+func WithLastUpdated(lastUpdated time.Time) Option {
 	return func(e *endpoint) {
-		e.loadFactor = loadFactor
+		e.lastUpdated.Store(&lastUpdated)
 	}
 }
 
@@ -149,17 +121,12 @@ func WithServices(services []string) Option {
 	}
 }
 
-func withLastUpdated(ts time.Time) Option {
-	return func(e *endpoint) {
-		e.lastUpdated = ts
-	}
-}
-
 func New(address string, opts ...Option) *endpoint {
 	e := &endpoint{
-		address:     address,
-		lastUpdated: time.Now(),
+		address: address,
 	}
+	t := time.Now()
+	e.lastUpdated.Store(&t)
 	for _, opt := range opts {
 		if opt != nil {
 			opt(e)

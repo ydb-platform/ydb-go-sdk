@@ -13,55 +13,55 @@ func TestFromConfig(t *testing.T) {
 	for _, tt := range []struct {
 		name   string
 		config string
-		res    balancerConfig.Config
+		res    *balancerConfig.Config
 		fail   bool
 	}{
 		{
 			name:   "empty",
 			config: ``,
-			res:    balancerConfig.Config{},
+			res:    balancerConfig.New(),
 			fail:   true,
 		},
 		{
 			name:   "disable",
 			config: `disable`,
-			res:    balancerConfig.Config{SingleConn: true},
+			res:    balancerConfig.New(balancerConfig.UseSingleConn()),
 		},
 		{
 			name:   "single",
 			config: `single`,
-			res:    balancerConfig.Config{SingleConn: true},
+			res:    balancerConfig.New(balancerConfig.UseSingleConn()),
 		},
 		{
 			name: "single/JSON",
 			config: `{
 				"type": "single"
 			}`,
-			res: balancerConfig.Config{SingleConn: true},
+			res: balancerConfig.New(balancerConfig.UseSingleConn()),
 		},
 		{
 			name:   "round_robin",
 			config: `round_robin`,
-			res:    balancerConfig.Config{},
+			res:    balancerConfig.New(),
 		},
 		{
 			name: "round_robin/JSON",
 			config: `{
 				"type": "round_robin"
 			}`,
-			res: balancerConfig.Config{},
+			res: balancerConfig.New(),
 		},
 		{
 			name:   "random_choice",
 			config: `random_choice`,
-			res:    balancerConfig.Config{},
+			res:    balancerConfig.New(),
 		},
 		{
 			name: "random_choice/JSON",
 			config: `{
 				"type": "random_choice"
 			}`,
-			res: balancerConfig.Config{},
+			res: balancerConfig.New(),
 		},
 		{
 			name: "prefer_local_dc",
@@ -69,13 +69,13 @@ func TestFromConfig(t *testing.T) {
 				"type": "random_choice",
 				"prefer": "local_dc"
 			}`,
-			res: balancerConfig.Config{
-				DetectLocalDC: true,
-				Filter: filterFunc(func(info balancerConfig.Info, c conn.Conn) bool {
+			res: balancerConfig.New(
+				balancerConfig.DetectLocalDC(),
+				balancerConfig.FilterFunc(func(info balancerConfig.Info, c conn.Info) bool {
 					// some non nil func
 					return false
 				}),
-			},
+			),
 		},
 		{
 			name: "prefer_unknown_type",
@@ -92,14 +92,14 @@ func TestFromConfig(t *testing.T) {
 				"prefer": "local_dc",
 				"fallback": true
 			}`,
-			res: balancerConfig.Config{
-				AllowFallback: true,
-				DetectLocalDC: true,
-				Filter: filterFunc(func(info balancerConfig.Info, c conn.Conn) bool {
+			res: balancerConfig.New(
+				balancerConfig.AllowFallback(),
+				balancerConfig.DetectLocalDC(),
+				balancerConfig.FilterFunc(func(info balancerConfig.Info, c conn.Info) bool {
 					// some non nil func
 					return false
 				}),
-			},
+			),
 		},
 		{
 			name: "prefer_locations",
@@ -108,12 +108,12 @@ func TestFromConfig(t *testing.T) {
 				"prefer": "locations",
 				"locations": ["AAA", "BBB", "CCC"]
 			}`,
-			res: balancerConfig.Config{
-				Filter: filterFunc(func(info balancerConfig.Info, c conn.Conn) bool {
+			res: balancerConfig.New(
+				balancerConfig.FilterFunc(func(info balancerConfig.Info, c conn.Info) bool {
 					// some non nil func
 					return false
 				}),
-			},
+			),
 		},
 		{
 			name: "prefer_locations_with_fallback",
@@ -123,19 +123,19 @@ func TestFromConfig(t *testing.T) {
 				"locations": ["AAA", "BBB", "CCC"],
 				"fallback": true
 			}`,
-			res: balancerConfig.Config{
-				AllowFallback: true,
-				Filter: filterFunc(func(info balancerConfig.Info, c conn.Conn) bool {
+			res: balancerConfig.New(
+				balancerConfig.AllowFallback(),
+				balancerConfig.FilterFunc(func(info balancerConfig.Info, c conn.Info) bool {
 					// some non nil func
 					return false
 				}),
-			},
+			),
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var (
 				actErr   error
-				fallback = &balancerConfig.Config{}
+				fallback = balancerConfig.New()
 			)
 			b := FromConfig(
 				tt.config,
@@ -155,13 +155,13 @@ func TestFromConfig(t *testing.T) {
 			}
 
 			// function pointers can check equal to nil only
-			if tt.res.Filter != nil {
-				require.NotNil(t, b.Filter)
-				b.Filter = nil
-				tt.res.Filter = nil
+			if tt.res.Filter() != nil {
+				require.NotNil(t, b.Filter())
+				b = b.With(balancerConfig.FilterFunc(nil))
+				tt.res = tt.res.With(balancerConfig.FilterFunc(nil))
 			}
 
-			require.Equal(t, tt.res, *b)
+			require.Equal(t, tt.res, b)
 		})
 	}
 }

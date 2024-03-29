@@ -3,13 +3,10 @@ package conn
 import (
 	"context"
 	"fmt"
-	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/stats"
 
@@ -28,73 +25,40 @@ var (
 
 	// errClosedConnection specified error when connection are closed early
 	errClosedConnection = xerrors.Wrap(fmt.Errorf("connection closed early"))
-
-	// errUnavailableConnection specified error when connection are closed early
-	errUnavailableConnection = xerrors.Wrap(fmt.Errorf("connection unavailable"))
 )
 
-type Conn interface {
-	grpc.ClientConnInterface
+type (
+	Info interface {
+		Endpoint() endpoint.Info
+		State() State
+		Ready() bool
+	}
+	Conn interface {
+		grpc.ClientConnInterface
+		Info
+	}
+)
 
-	Endpoint() endpoint.Endpoint
+type lazyConn struct {
+	config   Config        // ro access
+	endpoint endpoint.Info // ro access
 
-	LastUsage() time.Time
+	cc *ccGuard
 
-	Ping(ctx context.Context) error
-	IsState(states ...State) bool
-	GetState() State
-	SetState(ctx context.Context, state State) State
-	Unban(ctx context.Context) State
+	inUse inUseGuard
+
+	childStreams *xcontext.CancelsGuard
+
+	lastUsage *lastUsageGuard
+
+	onClose []func(*lazyConn)
 }
 
-type conn struct {
-	mtx               sync.RWMutex
-	config            Config // ro access
-	cc                *grpc.ClientConn
-	done              chan struct{}
-	endpoint          endpoint.Endpoint // ro access
-	closed            bool
-	state             atomic.Uint32
-	lastUsage         *lastUsage
-	onClose           []func(*conn)
-	onTransportErrors []func(ctx context.Context, cc Conn, cause error)
-}
-
-func (c *conn) Address() string {
+func (c *lazyConn) Address() string {
 	return c.endpoint.Address()
 }
 
-func (c *conn) Ping(ctx context.Context) error {
-	cc, err := c.realConn(ctx)
-	if err != nil {
-		return c.wrapError(err)
-	}
-	if !isAvailable(cc) {
-		return c.wrapError(errUnavailableConnection)
-	}
-
-	return nil
-}
-
-func (c *conn) LastUsage() time.Time {
-	c.mtx.RLock()
-	defer c.mtx.RUnlock()
-
-	return c.lastUsage.Get()
-}
-
-func (c *conn) IsState(states ...State) bool {
-	state := State(c.state.Load())
-	for _, s := range states {
-		if s == state {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (c *conn) NodeID() uint32 {
+func (c *lazyConn) NodeID() uint32 {
 	if c != nil {
 		return c.endpoint.NodeID()
 	}
@@ -102,37 +66,31 @@ func (c *conn) NodeID() uint32 {
 	return 0
 }
 
-func (c *conn) park(ctx context.Context) (err error) {
+func (c *lazyConn) park(ctx context.Context) (finalErr error) {
 	onDone := trace.DriverOnConnPark(
 		c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).park"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*lazyConn).park"),
 		c.Endpoint(),
 	)
 	defer func() {
-		onDone(err)
+		onDone(finalErr)
 	}()
 
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
-
-	if c.closed {
+	locked, unlock := c.inUse.TryLock()
+	if !locked {
 		return nil
 	}
+	defer unlock()
 
-	if c.cc == nil {
-		return nil
-	}
-
-	err = c.close(ctx)
-
+	err := c.cc.Close(ctx)
 	if err != nil {
-		return c.wrapError(err)
+		return xerrors.WithStackTrace(err)
 	}
 
 	return nil
 }
 
-func (c *conn) Endpoint() endpoint.Endpoint {
+func (c *lazyConn) Endpoint() endpoint.Info {
 	if c != nil {
 		return c.endpoint
 	}
@@ -140,164 +98,40 @@ func (c *conn) Endpoint() endpoint.Endpoint {
 	return nil
 }
 
-func (c *conn) SetState(ctx context.Context, s State) State {
-	return c.setState(ctx, s)
+func (c *lazyConn) Ready() bool {
+	return Ready(c.cc.State())
 }
 
-func (c *conn) setState(ctx context.Context, s State) State {
-	if state := State(c.state.Swap(uint32(s))); state != s {
-		trace.DriverOnConnStateChange(
-			c.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).setState"),
-			c.endpoint.Copy(), state,
-		)(s)
-	}
-
-	return s
+func (c *lazyConn) State() State {
+	return c.cc.State()
 }
 
-func (c *conn) Unban(ctx context.Context) State {
-	var newState State
-	c.mtx.RLock()
-	cc := c.cc
-	c.mtx.RUnlock()
-	if isAvailable(cc) {
-		newState = Online
-	} else {
-		newState = Offline
-	}
-
-	c.setState(ctx, newState)
-
-	return newState
-}
-
-func (c *conn) GetState() (s State) {
-	return State(c.state.Load())
-}
-
-func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
-	if c.isClosed() {
-		return nil, c.wrapError(errClosedConnection)
-	}
-
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
-
-	if c.cc != nil {
-		return c.cc, nil
-	}
-
-	if dialTimeout := c.config.DialTimeout(); dialTimeout > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = xcontext.WithTimeout(ctx, dialTimeout)
-		defer cancel()
-	}
-
-	onDone := trace.DriverOnConnDial(
-		c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).realConn"),
-		c.endpoint.Copy(),
-	)
-	defer func() {
-		onDone(err)
-	}()
-
-	// prepend "ydb" scheme for grpc dns-resolver to find the proper scheme
-	// three slashes in "ydb:///" is ok. It needs for good parse scheme in grpc resolver.
-	address := "ydb:///" + c.endpoint.Address()
-
-	cc, err = grpc.DialContext(ctx, address, append(
-		[]grpc.DialOption{
-			grpc.WithStatsHandler(statsHandler{}),
-		}, c.config.GrpcDialOptions()...,
-	)...)
-	if err != nil {
-		if xerrors.IsContextError(err) {
-			return nil, xerrors.WithStackTrace(err)
-		}
-
-		defer func() {
-			c.onTransportError(ctx, err)
-		}()
-
-		err = xerrors.Transport(err,
-			xerrors.WithAddress(address),
-		)
-
-		return nil, c.wrapError(
-			xerrors.Retryable(err,
-				xerrors.WithName("realConn"),
-			),
-		)
-	}
-
-	c.cc = cc
-	c.setState(ctx, Online)
-
-	return c.cc, nil
-}
-
-func (c *conn) onTransportError(ctx context.Context, cause error) {
-	for _, onTransportError := range c.onTransportErrors {
-		onTransportError(ctx, c, cause)
-	}
-}
-
-func isAvailable(raw *grpc.ClientConn) bool {
-	return raw != nil && raw.GetState() == connectivity.Ready
-}
-
-// conn must be locked
-func (c *conn) close(ctx context.Context) (err error) {
-	if c.cc == nil {
-		return nil
-	}
-	err = c.cc.Close()
-	c.cc = nil
-	c.setState(ctx, Offline)
-
-	return c.wrapError(err)
-}
-
-func (c *conn) isClosed() bool {
-	c.mtx.RLock()
-	defer c.mtx.RUnlock()
-
-	return c.closed
-}
-
-func (c *conn) Close(ctx context.Context) (err error) {
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
-
-	if c.closed {
-		return nil
-	}
-
+func (c *lazyConn) Close(ctx context.Context) (finalErr error) {
 	onDone := trace.DriverOnConnClose(
 		c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).Close"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*lazyConn).Close"),
 		c.Endpoint(),
 	)
 	defer func() {
-		onDone(err)
+		onDone(finalErr)
 	}()
 
-	c.closed = true
+	defer func() {
+		for _, onClose := range c.onClose {
+			onClose(c)
+		}
+		c.inUse.Stop()
+	}()
 
-	err = c.close(ctx)
-
-	c.setState(ctx, Destroyed)
-
-	for _, onClose := range c.onClose {
-		onClose(c)
+	err := c.cc.Close(ctx)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
 	}
 
-	return c.wrapError(err)
+	return nil
 }
 
-func (c *conn) Invoke(
+func (c *lazyConn) Invoke(
 	ctx context.Context,
 	method string,
 	req interface{},
@@ -310,7 +144,7 @@ func (c *conn) Invoke(
 		useWrapping = UseWrapping(ctx)
 		onDone      = trace.DriverOnConnInvoke(
 			c.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).Invoke"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*lazyConn).Invoke"),
 			c.endpoint, trace.Method(method),
 		)
 		cc *grpc.ClientConn
@@ -318,10 +152,16 @@ func (c *conn) Invoke(
 	)
 	defer func() {
 		meta.CallTrailerCallback(ctx, md)
-		onDone(err, issues, opID, c.GetState(), md)
+		onDone(err, issues, opID, c.State(), md)
 	}()
 
-	cc, err = c.realConn(ctx)
+	locked, unlock := c.inUse.TryLock()
+	if !locked {
+		return xerrors.WithStackTrace(errClosedConnection)
+	}
+	defer unlock()
+
+	cc, err = c.cc.Get(ctx)
 	if err != nil {
 		return c.wrapError(err)
 	}
@@ -338,15 +178,7 @@ func (c *conn) Invoke(
 
 	err = cc.Invoke(ctx, method, req, res, append(opts, grpc.Trailer(&md))...)
 	if err != nil {
-		if xerrors.IsContextError(err) {
-			return xerrors.WithStackTrace(err)
-		}
-
-		defer func() {
-			c.onTransportError(ctx, err)
-		}()
-
-		if useWrapping {
+		if xerrors.IsTransportError(err) && useWrapping {
 			err = xerrors.Transport(err,
 				xerrors.WithAddress(c.Address()),
 				xerrors.WithTraceID(traceID),
@@ -358,7 +190,7 @@ func (c *conn) Invoke(
 			return c.wrapError(err)
 		}
 
-		return err
+		return xerrors.WithStackTrace(err)
 	}
 
 	if o, ok := res.(response.Response); ok {
@@ -387,28 +219,32 @@ func (c *conn) Invoke(
 }
 
 //nolint:funlen
-func (c *conn) NewStream(
+func (c *lazyConn) NewStream(
 	ctx context.Context,
 	desc *grpc.StreamDesc,
 	method string,
 	opts ...grpc.CallOption,
-) (_ grpc.ClientStream, err error) {
+) (_ grpc.ClientStream, finalErr error) {
 	var (
 		onDone = trace.DriverOnConnNewStream(
 			c.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).NewStream"),
-			c.endpoint.Copy(), trace.Method(method),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*lazyConn).NewStream"),
+			c.endpoint, trace.Method(method),
 		)
 		useWrapping = UseWrapping(ctx)
-		cc          *grpc.ClientConn
-		s           grpc.ClientStream
 	)
 
 	defer func() {
-		onDone(err, c.GetState())
+		onDone(finalErr, c.State())
 	}()
 
-	cc, err = c.realConn(ctx)
+	locked, unlock := c.inUse.TryLock()
+	if !locked {
+		return nil, xerrors.WithStackTrace(errClosedConnection)
+	}
+	defer unlock()
+
+	cc, err := c.cc.Get(ctx)
 	if err != nil {
 		return nil, c.wrapError(err)
 	}
@@ -423,17 +259,21 @@ func (c *conn) NewStream(
 
 	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID))
 
-	s, err = cc.NewStream(ctx, desc, method, opts...)
-	if err != nil {
-		if xerrors.IsContextError(err) {
-			return nil, xerrors.WithStackTrace(err)
+	ctx, cancel := xcontext.WithCancel(ctx)
+	defer func() {
+		if finalErr != nil {
+			cancel()
+		} else {
+			c.childStreams.Remember(&cancel)
 		}
+	}()
 
-		defer func() {
-			c.onTransportError(ctx, err)
-		}()
-
-		if useWrapping {
+	s, err := cc.NewStream(ctx, desc, method, append(opts, grpc.OnFinish(func(err error) {
+		cancel()
+		c.childStreams.Forget(&cancel)
+	}))...)
+	if err != nil {
+		if xerrors.IsTransportError(err) && useWrapping {
 			err = xerrors.Transport(err,
 				xerrors.WithAddress(c.Address()),
 				xerrors.WithTraceID(traceID),
@@ -445,7 +285,7 @@ func (c *conn) NewStream(
 			return s, c.wrapError(err)
 		}
 
-		return s, err
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	return &grpcClientStream{
@@ -461,7 +301,7 @@ func (c *conn) NewStream(
 	}, nil
 }
 
-func (c *conn) wrapError(err error) error {
+func (c *lazyConn) wrapError(err error) error {
 	if err == nil {
 		return nil
 	}
@@ -470,43 +310,93 @@ func (c *conn) wrapError(err error) error {
 	return xerrors.WithStackTrace(nodeErr, xerrors.WithSkipDepth(1))
 }
 
-type option func(c *conn)
+type option func(c *lazyConn)
 
-func withOnClose(onClose func(*conn)) option {
-	return func(c *conn) {
+func withOnClose(onClose func(*lazyConn)) option {
+	return func(c *lazyConn) {
 		if onClose != nil {
 			c.onClose = append(c.onClose, onClose)
 		}
 	}
 }
 
-func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, cause error)) option {
-	return func(c *conn) {
-		if onTransportError != nil {
-			c.onTransportErrors = append(c.onTransportErrors, onTransportError)
-		}
+func dial(
+	ctx context.Context,
+	t *trace.Driver,
+	e endpoint.Info,
+	opts ...grpc.DialOption,
+) (_ *grpc.ClientConn, finalErr error) {
+	onDone := trace.DriverOnConnDial(
+		t, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.dial"),
+		e,
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	// prepend "ydb" scheme for grpc dns-resolver to find the proper scheme
+	// three slashes in "ydb:///" is ok. It needs for good parse scheme in grpc resolver.
+	address := "ydb:///" + e.Address()
+
+	cc, err := grpc.DialContext(ctx, address, append(
+		[]grpc.DialOption{
+			grpc.WithStatsHandler(statsHandler{}),
+		}, opts...,
+	)...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
 	}
+
+	return cc, nil
 }
 
-func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
-	c := &conn{
-		endpoint:  e,
-		config:    config,
-		done:      make(chan struct{}),
-		lastUsage: newLastUsage(nil),
+func newConn(e endpoint.Info, config Config, opts ...option) *lazyConn {
+	c := &lazyConn{
+		endpoint:     e,
+		config:       config,
+		lastUsage:    newLastUsage(nil),
+		childStreams: xcontext.NewCancelsGuard(),
+		onClose: []func(*lazyConn){
+			func(c *lazyConn) {
+				c.childStreams.Cancel()
+				c.inUse.Stop()
+			},
+		},
 	}
-	c.state.Store(uint32(Created))
 	for _, opt := range opts {
 		if opt != nil {
 			opt(c)
 		}
 	}
+	c.cc = newCcGuard(func(ctx context.Context) (*grpc.ClientConn, error) {
+		if dialTimeout := c.config.DialTimeout(); dialTimeout > 0 {
+			var cancel context.CancelFunc
+			ctx, cancel = xcontext.WithTimeout(ctx, dialTimeout)
+			defer cancel()
+		}
+
+		cc, err := dial(ctx, c.config.Trace(), c.endpoint, c.config.GrpcDialOptions()...)
+		if err != nil {
+			if xerrors.IsTransportError(err) {
+				return nil, xerrors.WithStackTrace(
+					xerrors.Retryable(
+						xerrors.Transport(err,
+							xerrors.WithAddress(c.endpoint.Address()),
+						),
+					),
+				)
+			}
+
+			return nil, xerrors.WithStackTrace(
+				xerrors.Retryable(err, xerrors.WithName("dial")),
+			)
+		}
+
+		return cc, nil
+	})
 
 	return c
-}
-
-func New(e endpoint.Endpoint, config Config, opts ...option) Conn {
-	return newConn(e, config, opts...)
 }
 
 var _ stats.Handler = statsHandler{}

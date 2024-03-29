@@ -5,7 +5,8 @@ SLO is the type of test where app based on ydb-sdk is tested against falling YDB
 
 ### Implementations:
 
-- `native`       - over `./native` driver
+- `native/table` - over `./native` driver using `table` service client
+- `native/query` - over `./native` driver using `query` service client
 - `database/sql` - over `./database/sql` driver
 - `gorm` - over `gorm` driver
 - `xorm` - over `xorm` driver

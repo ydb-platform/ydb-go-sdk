@@ -2,14 +2,13 @@ package conn
 
 import (
 	"context"
-	"sync"
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
-	grpcCodes "google.golang.org/grpc/codes"
+	"google.golang.org/grpc/connectivity"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -18,138 +17,60 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type connsKey struct {
-	address string
-	nodeID  uint32
-}
-
 type Pool struct {
 	usages int64
 	config Config
 	mtx    xsync.RWMutex
 	opts   []grpc.DialOption
-	conns  map[connsKey]*conn
+	conns  map[endpoint.Key]*lazyConn
 	done   chan struct{}
 }
 
-func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
+func (p *Pool) Get(endpoint endpoint.Info) Conn {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 
 	var (
 		address = endpoint.Address()
-		cc      *conn
+		cc      *lazyConn
 		has     bool
 	)
 
-	key := connsKey{address, endpoint.NodeID()}
+	key := endpoint.Key()
 
 	if cc, has = p.conns[key]; has {
 		return cc
 	}
 
-	cc = newConn(
-		endpoint,
-		p.config,
-		withOnClose(p.remove),
-		withOnTransportError(p.Ban),
-	)
+	cc = newConn(endpoint, p.config, withOnClose(p.remove))
 
 	p.conns[key] = cc
 
 	return cc
 }
 
-func (p *Pool) remove(c *conn) {
+func (p *Pool) remove(c *lazyConn) {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
-	delete(p.conns, connsKey{c.Endpoint().Address(), c.Endpoint().NodeID()})
+	delete(p.conns, c.Endpoint().Key())
 }
 
-func (p *Pool) isClosed() bool {
-	select {
-	case <-p.done:
-		return true
-	default:
-		return false
-	}
-}
+func (p *Pool) Attach(ctx context.Context) (finalErr error) {
+	onDone := trace.DriverOnPoolAttach(p.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*Pool).Attach"),
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
 
-func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
-	if p.isClosed() {
-		return
-	}
-
-	if !xerrors.IsTransportError(cause,
-		grpcCodes.ResourceExhausted,
-		grpcCodes.Unavailable,
-		// grpcCodes.OK,
-		// grpcCodes.Canceled,
-		// grpcCodes.Unknown,
-		// grpcCodes.InvalidArgument,
-		// grpcCodes.DeadlineExceeded,
-		// grpcCodes.NotFound,
-		// grpcCodes.AlreadyExists,
-		// grpcCodes.PermissionDenied,
-		// grpcCodes.FailedPrecondition,
-		// grpcCodes.Aborted,
-		// grpcCodes.OutOfRange,
-		// grpcCodes.Unimplemented,
-		// grpcCodes.Internal,
-		// grpcCodes.DataLoss,
-		// grpcCodes.Unauthenticated,
-	) {
-		return
-	}
-
-	e := cc.Endpoint().Copy()
-
-	p.mtx.RLock()
-	defer p.mtx.RUnlock()
-
-	cc, ok := p.conns[connsKey{e.Address(), e.NodeID()}]
-	if !ok {
-		return
-	}
-
-	trace.DriverOnConnBan(
-		p.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*Pool).Ban"),
-		e, cc.GetState(), cause,
-	)(cc.SetState(ctx, Banned))
-}
-
-func (p *Pool) Allow(ctx context.Context, cc Conn) {
-	if p.isClosed() {
-		return
-	}
-
-	e := cc.Endpoint().Copy()
-
-	p.mtx.RLock()
-	defer p.mtx.RUnlock()
-
-	cc, ok := p.conns[connsKey{e.Address(), e.NodeID()}]
-	if !ok {
-		return
-	}
-
-	trace.DriverOnConnAllow(
-		p.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*Pool).Allow"),
-		e, cc.GetState(),
-	)(cc.Unban(ctx))
-}
-
-func (p *Pool) Take(context.Context) error {
 	atomic.AddInt64(&p.usages, 1)
 
 	return nil
 }
 
-func (p *Pool) Release(ctx context.Context) (finalErr error) {
+func (p *Pool) Detach(ctx context.Context) (finalErr error) {
 	onDone := trace.DriverOnPoolRelease(p.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*Pool).Release"),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*Pool).Detach"),
 	)
 	defer func() {
 		onDone(finalErr)
@@ -161,38 +82,18 @@ func (p *Pool) Release(ctx context.Context) (finalErr error) {
 
 	close(p.done)
 
-	var conns []closer.Closer
+	var g errgroup.Group
 	p.mtx.WithRLock(func() {
-		conns = make([]closer.Closer, 0, len(p.conns))
-		for _, c := range p.conns {
-			conns = append(conns, c)
+		for key := range p.conns {
+			conn := p.conns[key]
+			g.Go(func() error {
+				return conn.Close(ctx)
+			})
 		}
 	})
 
-	var (
-		errCh = make(chan error, len(conns))
-		wg    sync.WaitGroup
-	)
-
-	wg.Add(len(conns))
-	for _, c := range conns {
-		go func(c closer.Closer) {
-			defer wg.Done()
-			if err := c.Close(ctx); err != nil {
-				errCh <- err
-			}
-		}(c)
-	}
-	wg.Wait()
-	close(errCh)
-
-	issues := make([]error, 0, len(conns))
-	for err := range errCh {
-		issues = append(issues, err)
-	}
-
-	if len(issues) > 0 {
-		return xerrors.WithStackTrace(xerrors.NewWithIssues("connection pool close failed", issues...))
+	if err := g.Wait(); err != nil {
+		return xerrors.WithStackTrace(err)
 	}
 
 	return nil
@@ -207,9 +108,9 @@ func (p *Pool) connParker(ctx context.Context, ttl, interval time.Duration) {
 			return
 		case <-ticker.C:
 			for _, c := range p.collectConns() {
-				if time.Since(c.LastUsage()) > ttl {
-					switch c.GetState() {
-					case Online, Banned:
+				if time.Since(c.lastUsage.Get()) > ttl {
+					switch c.State() {
+					case connectivity.TransientFailure:
 						_ = c.park(ctx)
 					default:
 						// nop
@@ -220,10 +121,10 @@ func (p *Pool) connParker(ctx context.Context, ttl, interval time.Duration) {
 	}
 }
 
-func (p *Pool) collectConns() []*conn {
+func (p *Pool) collectConns() []*lazyConn {
 	p.mtx.RLock()
 	defer p.mtx.RUnlock()
-	conns := make([]*conn, 0, len(p.conns))
+	conns := make([]*lazyConn, 0, len(p.conns))
 	for _, c := range p.conns {
 		conns = append(conns, c)
 	}
@@ -241,7 +142,7 @@ func NewPool(ctx context.Context, config Config) *Pool {
 		usages: 1,
 		config: config,
 		opts:   config.GrpcDialOptions(),
-		conns:  make(map[connsKey]*conn),
+		conns:  make(map[endpoint.Key]*lazyConn),
 		done:   make(chan struct{}),
 	}
 

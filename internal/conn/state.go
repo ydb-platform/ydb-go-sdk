@@ -1,40 +1,12 @@
 package conn
 
-type State int8
+import "google.golang.org/grpc/connectivity"
 
-const (
-	Unknown = State(iota)
-	Created
-	Online
-	Banned
-	Offline
-	Destroyed
-)
+type State = connectivity.State
 
-func (s State) Code() int {
-	return int(s)
-}
-
-func (s State) String() string {
+func Ready(s State) bool {
 	switch s {
-	case Created:
-		return "created"
-	case Online:
-		return "online"
-	case Banned:
-		return "banned"
-	case Offline:
-		return "offline"
-	case Destroyed:
-		return "destroyed"
-	default:
-		return "unknown"
-	}
-}
-
-func (s State) IsValid() bool {
-	switch s {
-	case Online, Offline, Banned:
+	case connectivity.Idle, connectivity.Ready:
 		return true
 	default:
 		return false

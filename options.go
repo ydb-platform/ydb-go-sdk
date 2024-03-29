@@ -670,6 +670,6 @@ func withConnPool(pool *conn.Pool) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.pool = pool
 
-		return pool.Take(ctx)
+		return pool.Attach(ctx)
 	}
 }

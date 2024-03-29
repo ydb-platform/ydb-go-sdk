@@ -119,6 +119,7 @@ func NewControl(opts ...ControlOption) *Control {
 	return txControl
 }
 
+// NoTx returns implicit transaction control
 func NoTx() *Control {
 	return nil
 }

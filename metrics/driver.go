@@ -20,8 +20,7 @@ func driver(config Config) (t trace.Driver) {
 	tli := config.CounterVec("transaction_locks_invalidated")
 
 	type endpointKey struct {
-		localDC bool
-		az      string
+		az string
 	}
 	knownEndpoints := make(map[endpointKey]struct{})
 
@@ -100,8 +99,7 @@ func driver(config Config) (t trace.Driver) {
 				newEndpoints := make(map[endpointKey]int, len(info.Endpoints))
 				for _, e := range info.Endpoints {
 					e := endpointKey{
-						localDC: e.LocalDC(),
-						az:      e.Location(),
+						az: e.Location(),
 					}
 					newEndpoints[e]++
 				}
@@ -109,16 +107,14 @@ func driver(config Config) (t trace.Driver) {
 					if _, has := newEndpoints[e]; !has {
 						delete(knownEndpoints, e)
 						endpoints.With(map[string]string{
-							"local_dc": strconv.FormatBool(e.localDC),
-							"az":       e.az,
+							"az": e.az,
 						}).Set(0)
 					}
 				}
 				for e, count := range newEndpoints {
 					knownEndpoints[e] = struct{}{}
 					endpoints.With(map[string]string{
-						"local_dc": strconv.FormatBool(e.localDC),
-						"az":       e.az,
+						"az": e.az,
 					}).Set(float64(count))
 				}
 			}
