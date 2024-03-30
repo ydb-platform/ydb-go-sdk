@@ -1,4 +1,5 @@
 * Added `Struct` support for `Variant` in `ydb.ParamsBuilder()`
+* Added `go` with anonymous function case in `gstack`
 
 ## v3.61.2
 * Changed default transaction control to `NoTx` for execute query through query service client 
