@@ -1,6 +1,7 @@
 package stack
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -25,10 +26,17 @@ func (e *starType) starredCall() string {
 
 func anonymousFunctionCall() string {
 	var result string
+	var mu sync.Mutex
 	go func() {
+		mu.Lock()
+		defer mu.Unlock()
 		result = FunctionID("").FunctionID()
 	}()
 	time.Sleep(time.Second)
+
+	mu.Lock()
+	defer mu.Unlock()
+
 	return result
 }
 
