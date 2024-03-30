@@ -2,6 +2,7 @@ package stack
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -22,6 +23,15 @@ func (e *starType) starredCall() string {
 	return FunctionID("").FunctionID()
 }
 
+func anonymousFunctionCall() string {
+	var result string
+	go func() {
+		result = FunctionID("").FunctionID()
+	}()
+	time.Sleep(time.Second)
+	return result
+}
+
 func TestFunctionIDForGenericType(t *testing.T) {
 	t.Run("StaticFunc", func(t *testing.T) {
 		require.Equal(t,
@@ -40,6 +50,12 @@ func TestFunctionIDForGenericType(t *testing.T) {
 		require.Equal(t,
 			"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.(*starType).starredCall",
 			x.starredCall(),
+		)
+	})
+	t.Run("AnonymousFunctionCall", func(t *testing.T) {
+		require.Equal(t,
+			"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack.anonymousFunctionCall",
+			anonymousFunctionCall(),
 		)
 	})
 }
