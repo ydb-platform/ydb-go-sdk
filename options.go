@@ -432,6 +432,20 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	}
 }
 
+// WithSessionPoolKeepAliveMinSize set minimum sessions should be keeped alive in table.Client
+//
+// Deprecated: table client do not support background session keep-aliving now
+func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
+	return func(ctx context.Context, c *Driver) error { return nil }
+}
+
+// WithSessionPoolKeepAliveTimeout set timeout of keep alive requests for session in table.Client
+//
+// Deprecated: table client do not support background session keep-aliving now
+func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
+	return func(ctx context.Context, c *Driver) error { return nil }
+}
+
 // WithIgnoreTruncated disables errors on truncated flag
 func WithIgnoreTruncated() Option {
 	return func(ctx context.Context, c *Driver) error {
