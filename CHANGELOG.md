@@ -1,3 +1,4 @@
+* Changed default StartTime (time of retries for connect to server) for topic writer from 1 minute to infinite (can be overrided by WithWriterStartTimeout topic option)
 * Added `Struct` support for `Variant` in `ydb.ParamsBuilder()`
 
 ## v3.61.2

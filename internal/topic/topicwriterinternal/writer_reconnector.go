@@ -380,7 +380,8 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		prevAttemptTime = now
 
 		if reconnectReason != nil {
-			if backoff, retry := topic.CheckRetryMode(reconnectReason, w.retrySettings, w.clock.Since(startOfRetries)); retry {
+			retryDuration := w.clock.Since(startOfRetries)
+			if backoff, retry := topic.CheckRetryMode(reconnectReason, w.retrySettings, retryDuration); retry {
 				delay := backoff.Delay(attempt)
 				select {
 				case <-doneCtx:
@@ -389,7 +390,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 					// pass
 				}
 			} else {
-				_ = w.close(ctx, reconnectReason)
+				_ = w.close(ctx, fmt.Errorf("%w, was retried (%v)", reconnectReason, retryDuration))
 
 				return
 			}
