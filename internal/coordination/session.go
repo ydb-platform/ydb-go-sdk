@@ -139,10 +139,12 @@ func (s *session) newStream(
 
 		var client Ydb_Coordination_V1.CoordinationService_SessionClient
 		if lastChance {
+			timer := time.NewTimer(s.options.SessionKeepAliveTimeout)
 			select {
-			case <-time.After(s.options.SessionKeepAliveTimeout):
+			case <-timer.C:
 			case client = <-result:
 			}
+			timer.Stop()
 
 			if client != nil {
 				return client, nil
@@ -175,10 +177,12 @@ func (s *session) newStream(
 		}
 
 		// Waiting for some time before trying to reconnect.
+		sessionReconnectDelay := time.NewTimer(s.options.SessionReconnectDelay)
 		select {
-		case <-time.After(s.options.SessionReconnectDelay):
+		case <-sessionReconnectDelay.C:
 		case <-s.ctx.Done():
 		}
+		sessionReconnectDelay.Stop()
 
 		if s.ctx.Err() != nil {
 			// Give this session the last chance to stop gracefully if the session is canceled in the reconnect cycle.
@@ -247,6 +251,7 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 
 		// Wait for the session started response unless the stream context is done. We intentionally do not take into
 		// account stream context cancellation in order to proceed with the graceful shutdown if it requires reconnect.
+		sessionStartTimer := time.NewTimer(s.options.SessionStartTimeout)
 		select {
 		case start := <-sessionStarted:
 			trace.CoordinationOnSessionStarted(s.client.config.Trace(), start.GetSessionId(), s.sessionID)
@@ -258,13 +263,14 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 				cancelStream()
 			}
 			close(startSending)
-		case <-time.After(s.options.SessionStartTimeout):
+		case <-sessionStartTimer.C:
 			// Reconnect if no response was received before the timeout occurred.
 			trace.CoordinationOnSessionStartTimeout(s.client.config.Trace(), s.options.SessionStartTimeout)
 			cancelStream()
 		case <-streamCtx.Done():
 		case <-s.ctx.Done():
 		}
+		sessionStartTimer.Stop()
 
 		for {
 			// Respect the failure reason priority: if the session context is done, we must stop the session, even
@@ -280,8 +286,9 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 			}
 
 			keepAliveTime := time.Until(s.getLastGoodResponseTime().Add(s.options.SessionKeepAliveTimeout))
+			keepAliveTimeTimer := time.NewTimer(keepAliveTime)
 			select {
-			case <-time.After(keepAliveTime):
+			case <-keepAliveTimeTimer.C:
 				last := s.getLastGoodResponseTime()
 				if time.Since(last) > s.options.SessionKeepAliveTimeout {
 					// Reconnect if the underlying stream is likely to be dead.
@@ -295,6 +302,7 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 			case <-streamCtx.Done():
 			case <-s.ctx.Done():
 			}
+			keepAliveTimeTimer.Stop()
 		}
 
 		if closing {
@@ -318,8 +326,10 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 			)
 
 			// Wait for the session stopped response unless the stream context is done.
+			sessionStopTimeout := time.NewTimer(s.options.SessionStopTimeout)
 			select {
 			case stop := <-sessionStopped:
+				sessionStopTimeout.Stop()
 				trace.CoordinationOnSessionStopped(s.client.config.Trace(), stop.GetSessionId(), s.sessionID)
 				if stop.GetSessionId() == s.sessionID {
 					cancelStream()
@@ -329,15 +339,19 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 
 				// Reconnect if the server response is invalid.
 				cancelStream()
-			case <-time.After(s.options.SessionStopTimeout):
+			case <-sessionStopTimeout.C:
+				sessionStopTimeout.Stop() // no really need, call stop for common style only
+
 				// Reconnect if no response was received before the timeout occurred.
 				trace.CoordinationOnSessionStopTimeout(s.client.config.Trace(), s.options.SessionStopTimeout)
 				cancelStream()
 			case <-s.ctx.Done():
+				sessionStopTimeout.Stop()
 				cancelStream()
 
 				return
 			case <-streamCtx.Done():
+				sessionStopTimeout.Stop()
 			}
 		}
 
