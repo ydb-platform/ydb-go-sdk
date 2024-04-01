@@ -328,9 +328,12 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 		result <- connectResult{stream: stream, err: err}
 	}()
 
+	connectionTimoutTimer := r.clock.NewTimer(r.connectTimeout)
+	defer connectionTimoutTimer.Stop()
+
 	var res connectResult
 	select {
-	case <-r.clock.After(r.connectTimeout):
+	case <-connectionTimoutTimer.Chan():
 		// cancel connection context only if timeout exceed while connection
 		// because if cancel context after connect - it will break
 		cancel()
