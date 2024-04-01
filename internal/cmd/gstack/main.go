@@ -79,6 +79,12 @@ func getCallExpressionsFromStmt(statement ast.Stmt) (listOfCallExpressions []*as
 		body = stmt.Body
 	case *ast.ForStmt:
 		body = stmt.Body
+	case *ast.GoStmt:
+		if fun, ok := stmt.Call.Fun.(*ast.FuncLit); ok {
+			listOfCallExpressions = append(listOfCallExpressions, getListOfCallExpressionsFromBlockStmt(fun.Body)...)
+		} else {
+			listOfCallExpressions = append(listOfCallExpressions, stmt.Call)
+		}
 	case *ast.RangeStmt:
 		body = stmt.Body
 	case *ast.DeclStmt:
