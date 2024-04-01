@@ -1,3 +1,4 @@
+* Restored `WithSessionPoolKeepAliveMinSize` and `WithSessionPoolKeepAliveTimeout` for backward compatibility.
 * Fixed leak timers
 * Changed default StartTime (time of retries for connect to server) for topic writer from 1 minute to infinite (can be overrided by WithWriterStartTimeout topic option)
 * Added `Struct` support for `Variant` in `ydb.ParamsBuilder()`
