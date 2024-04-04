@@ -19,19 +19,15 @@ var (
 
 // A Worker must not be copied after first use
 type Worker struct {
-	ctx      context.Context
-	workers  sync.WaitGroup
-	onceInit sync.Once
-
+	ctx            context.Context
+	workers        sync.WaitGroup
+	closeReason    error
 	tasksCompleted empty.Chan
-
-	m xsync.Mutex
-
-	tasks chan backgroundTask
-
-	closed      bool
-	stop        context.CancelFunc
-	closeReason error
+	tasks          chan backgroundTask
+	stop           context.CancelFunc
+	onceInit       sync.Once
+	m              xsync.Mutex
+	closed         bool
 }
 
 type CallbackFunc func(ctx context.Context)

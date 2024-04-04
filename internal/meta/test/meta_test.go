@@ -20,12 +20,10 @@ func TestMetaRequiredHeaders(t *testing.T) {
 		credentials.NewAccessTokenCredentials("token"),
 		&trace.Driver{},
 		internal.WithRequestTypeOption("requestType"),
-		internal.WithUserAgentOption("user-agent"),
+		internal.WithApplicationNameOption("test app"),
 	)
 
 	ctx := context.Background()
-
-	ctx = meta.WithUserAgent(ctx, "userAgent")
 
 	ctx = meta.WithTraceID(ctx, "traceID")
 
@@ -43,7 +41,9 @@ func TestMetaRequiredHeaders(t *testing.T) {
 	require.Equal(t, []string{"database"}, md.Get(internal.HeaderDatabase))
 	require.Equal(t, []string{"requestType"}, md.Get(internal.HeaderRequestType))
 	require.Equal(t, []string{"token"}, md.Get(internal.HeaderTicket))
-	require.Equal(t, []string{"userAgent", "user-agent"}, md.Get(internal.HeaderUserAgent))
+	require.NotEmpty(t, md.Get(internal.HeaderClientPid))
+	require.NotEmpty(t, md.Get(internal.HeaderClientPid)[0])
+	require.Equal(t, []string{"test app"}, md.Get(internal.HeaderApplicationName))
 	require.Equal(t, []string{"traceID"}, md.Get(internal.HeaderTraceID))
 	require.Equal(t, []string{
 		"ydb-go-sdk/" + version.Major + "." + version.Minor + "." + version.Patch,

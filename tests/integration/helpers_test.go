@@ -275,7 +275,9 @@ func (scope *scopeT) TableName(opts ...func(t *tableNameParams)) string {
 		`,
 	}
 	for _, opt := range opts {
-		opt(&params)
+		if opt != nil {
+			opt(&params)
+		}
 	}
 	return scope.Cache(params.tableName, nil, func() (res interface{}, err error) {
 		err = scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) (err error) {

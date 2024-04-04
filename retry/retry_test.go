@@ -45,10 +45,10 @@ func TestRetryModes(t *testing.T) {
 							tt.backoff,
 						)
 					}
-					if m.MustDeleteSession() != tt.deleteSession {
+					if m.IsRetryObjectValid() != tt.deleteSession {
 						t.Errorf(
 							"unexpected delete session status: %v, want: %v",
-							m.MustDeleteSession(),
+							m.IsRetryObjectValid(),
 							tt.deleteSession,
 						)
 					}
@@ -148,18 +148,20 @@ func TestRetryTransportDeadlineExceeded(t *testing.T) {
 		grpcCodes.DeadlineExceeded,
 		grpcCodes.Canceled,
 	} {
-		counter := 0
-		ctx, cancel := xcontext.WithTimeout(context.Background(), time.Hour)
-		err := Retry(ctx, func(ctx context.Context) error {
-			counter++
-			if !(counter < cancelCounterValue) {
-				cancel()
-			}
+		t.Run(code.String(), func(t *testing.T) {
+			counter := 0
+			ctx, cancel := xcontext.WithTimeout(context.Background(), time.Hour)
+			err := Retry(ctx, func(ctx context.Context) error {
+				counter++
+				if !(counter < cancelCounterValue) {
+					cancel()
+				}
 
-			return xerrors.Transport(grpcStatus.Error(code, ""))
-		}, WithIdempotent(true))
-		require.ErrorIs(t, err, context.Canceled)
-		require.Equal(t, cancelCounterValue, counter)
+				return xerrors.Transport(grpcStatus.Error(code, ""))
+			}, WithIdempotent(true))
+			require.ErrorIs(t, err, context.Canceled)
+			require.Equal(t, cancelCounterValue, counter)
+		})
 	}
 }
 
@@ -169,17 +171,19 @@ func TestRetryTransportCancelled(t *testing.T) {
 		grpcCodes.DeadlineExceeded,
 		grpcCodes.Canceled,
 	} {
-		counter := 0
-		ctx, cancel := xcontext.WithCancel(context.Background())
-		err := Retry(ctx, func(ctx context.Context) error {
-			counter++
-			if !(counter < cancelCounterValue) {
-				cancel()
-			}
+		t.Run(code.String(), func(t *testing.T) {
+			counter := 0
+			ctx, cancel := xcontext.WithCancel(context.Background())
+			err := Retry(ctx, func(ctx context.Context) error {
+				counter++
+				if !(counter < cancelCounterValue) {
+					cancel()
+				}
 
-			return xerrors.Transport(grpcStatus.Error(code, ""))
-		}, WithIdempotent(true))
-		require.ErrorIs(t, err, context.Canceled)
-		require.Equal(t, cancelCounterValue, counter)
+				return xerrors.Transport(grpcStatus.Error(code, ""))
+			}, WithIdempotent(true))
+			require.ErrorIs(t, err, context.Canceled)
+			require.Equal(t, cancelCounterValue, counter)
+		})
 	}
 }

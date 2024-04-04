@@ -24,9 +24,9 @@ func WithStackTrace(err error, opts ...withStackTraceOption) error {
 		return nil
 	}
 	options := withStackTraceOptions{}
-	for _, o := range opts {
-		if o != nil {
-			o(&options)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&options)
 		}
 	}
 	if s, has := grpcStatus.FromError(err); has {

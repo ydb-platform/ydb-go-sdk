@@ -110,13 +110,10 @@ func (e *endpoint) LastUpdated() time.Time {
 func (e *endpoint) Touch(opts ...Option) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	for _, o := range append(
-		[]Option{
-			withLastUpdated(time.Now()),
-		},
-		opts...,
-	) {
-		o(e)
+	for _, opt := range append([]Option{withLastUpdated(time.Now())}, opts...) {
+		if opt != nil {
+			opt(e)
+		}
 	}
 }
 
@@ -163,9 +160,9 @@ func New(address string, opts ...Option) *endpoint {
 		address:     address,
 		lastUpdated: time.Now(),
 	}
-	for _, o := range opts {
-		if o != nil {
-			o(e)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(e)
 		}
 	}
 

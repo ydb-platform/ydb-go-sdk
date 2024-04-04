@@ -36,7 +36,7 @@ func (m *decoderMap) Decode(codec rawtopiccommon.Codec, input io.Reader) (io.Rea
 	}
 
 	return nil, xerrors.WithStackTrace(xerrors.Wrap(
-		fmt.Errorf("ydb: failed decompress message with codec %v: %w", codec, PublicErrUnexpectedCodec),
+		fmt.Errorf("ydb: failed decompress message with codec %v: %w", codec, ErrPublicUnexpectedCodec),
 	))
 }
 

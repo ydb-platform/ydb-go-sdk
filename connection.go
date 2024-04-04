@@ -5,6 +5,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
@@ -33,6 +34,13 @@ type Connection interface {
 
 	// Table returns table client
 	Table() table.Client
+
+	// Query returns query client
+	//
+	// # Experimental
+	//
+	// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+	Query() query.Client
 
 	// Scheme returns scheme client
 	Scheme() scheme.Client

@@ -34,7 +34,14 @@ type balancer interface {
 	nodeChecker
 }
 
-func New(ctx context.Context, balancer balancer, config *config.Config) (*Client, error) {
+func New(ctx context.Context, balancer balancer, config *config.Config) *Client {
+	onDone := trace.TableOnInit(config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.New"),
+	)
+	defer func() {
+		onDone(config.SizeLimit())
+	}()
+
 	return newClient(ctx, balancer, func(ctx context.Context) (s *session, err error) {
 		return newSession(ctx, balancer, config)
 	}, config)
@@ -45,12 +52,8 @@ func newClient(
 	balancer balancer,
 	builder sessionBuilder,
 	config *config.Config,
-) (c *Client, finalErr error) {
-	onDone := trace.TableOnInit(config.Trace(), &ctx, stack.FunctionID(""))
-	defer func() {
-		onDone(config.SizeLimit(), finalErr)
-	}()
-	c = &Client{
+) *Client {
+	c := &Client{
 		clock:       config.Clock(),
 		config:      config,
 		cc:          balancer,
@@ -74,7 +77,7 @@ func newClient(
 		go c.internalPoolGC(ctx, idleThreshold)
 	}
 
-	return c, nil
+	return c
 }
 
 // Client is a set of session instances that may be reused.
@@ -121,9 +124,9 @@ func withCreateSessionOnClose(onClose func(s *session)) createSessionOption {
 
 func (c *Client) createSession(ctx context.Context, opts ...createSessionOption) (s *session, err error) {
 	options := createSessionOptions{}
-	for _, o := range opts {
-		if o != nil {
-			o(&options)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&options)
 		}
 	}
 
@@ -165,7 +168,7 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 					err error
 				)
 
-				createSessionCtx := xcontext.WithoutDeadline(ctx)
+				createSessionCtx := xcontext.ValueOnly(ctx)
 
 				if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
 					var cancel context.CancelFunc
@@ -178,7 +181,7 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 						return
 					}
 
-					closeSessionCtx := xcontext.WithoutDeadline(ctx)
+					closeSessionCtx := xcontext.ValueOnly(ctx)
 
 					if timeout := c.config.DeleteTimeout(); timeout > 0 {
 						var cancel context.CancelFunc
@@ -260,15 +263,13 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 			[]retry.Option{
 				retry.WithIdempotent(true),
 				retry.WithTrace(&trace.Retry{
-					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-						onIntermediate := trace.TableOnCreateSession(c.config.Trace(), info.Context, stack.FunctionID(""))
+					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+						onDone := trace.TableOnCreateSession(c.config.Trace(), info.Context,
+							stack.FunctionID(
+								"github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).CreateSession"))
 
-						return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-							onDone := onIntermediate(info.Error)
-
-							return func(info trace.RetryLoopDoneInfo) {
-								onDone(s, info.Attempts, info.Error)
-							}
+						return func(info trace.RetryLoopDoneInfo) {
+							onDone(s, info.Attempts, info.Error)
 						}
 					},
 				}),
@@ -380,7 +381,9 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 		}
 	}
 
-	onDone := trace.TableOnPoolGet(o.t, &ctx, stack.FunctionID(""))
+	onDone := trace.TableOnPoolGet(o.t, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).internalPoolGet"),
+	)
 	defer func() {
 		onDone(s, i, err)
 	}()
@@ -476,7 +479,9 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s 
 		el = c.waitQ.PushBack(ch)
 	})
 
-	waitDone := trace.TableOnPoolWait(t, &ctx, stack.FunctionID(""))
+	waitDone := trace.TableOnPoolWait(t, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).internalPoolWaitFromCh"),
+	)
 
 	defer func() {
 		waitDone(s, err)
@@ -484,7 +489,10 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s 
 
 	var createSessionTimeoutCh <-chan time.Time
 	if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
-		createSessionTimeoutCh = c.clock.After(timeout)
+		createSessionTimeoutChTimer := c.clock.NewTimer(timeout)
+		defer createSessionTimeoutChTimer.Stop()
+
+		createSessionTimeoutCh = createSessionTimeoutChTimer.Chan()
 	}
 
 	select {
@@ -538,7 +546,7 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s 
 // panic.
 func (c *Client) Put(ctx context.Context, s *session) (err error) {
 	onDone := trace.TableOnPoolPut(c.config.Trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).Put"),
 		s,
 	)
 	defer func() {
@@ -597,7 +605,9 @@ func (c *Client) Close(ctx context.Context) (err error) {
 		default:
 			close(c.done)
 
-			onDone := trace.TableOnClose(c.config.Trace(), &ctx, stack.FunctionID(""))
+			onDone := trace.TableOnClose(c.config.Trace(), &ctx,
+				stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).Close"),
+			)
 			defer func() {
 				onDone(err)
 			}()
@@ -642,17 +652,16 @@ func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 
 	config := c.retryOptions(opts...)
 
-	attempts, onIntermediate := 0, trace.TableOnDo(config.Trace, &ctx,
-		stack.FunctionID(""),
-		config.Label, config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
+	attempts, onDone := 0, trace.TableOnDo(config.Trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).Do"),
+		config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
 	)
 	defer func() {
-		onIntermediate(finalErr)(attempts, finalErr)
+		onDone(attempts, finalErr)
 	}()
 
 	err := do(ctx, c, c.config, op, func(err error) {
 		attempts++
-		onIntermediate(err)
 	}, config.RetryOptions...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
@@ -672,21 +681,17 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 
 	config := c.retryOptions(opts...)
 
-	attempts, onIntermediate := 0, trace.TableOnDoTx(config.Trace, &ctx,
-		stack.FunctionID(""),
-		config.Label, config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
+	attempts, onDone := 0, trace.TableOnDoTx(config.Trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).DoTx"),
+		config.Label, config.Idempotent, xcontext.IsNestedCall(ctx),
 	)
 	defer func() {
-		onIntermediate(finalErr)(attempts, finalErr)
+		onDone(attempts, finalErr)
 	}()
 
 	return retryBackoff(ctx, c,
 		func(ctx context.Context, s table.Session) (err error) {
 			attempts++
-
-			defer func() {
-				onIntermediate(err)
-			}()
 
 			tx, err := s.BeginTransaction(ctx, config.TxSettings)
 			if err != nil {

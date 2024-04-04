@@ -1,3 +1,99 @@
+* Restored `WithSessionPoolKeepAliveMinSize` and `WithSessionPoolKeepAliveTimeout` for backward compatibility.
+* Fixed leak timers
+* Changed default StartTime (time of retries for connect to server) for topic writer from 1 minute to infinite (can be overrided by WithWriterStartTimeout topic option)
+* Added `Struct` support for `Variant` in `ydb.ParamsBuilder()`
+* Added `go` with anonymous function case in `gstack`
+
+## v3.61.2
+* Changed default transaction control to `NoTx` for execute query through query service client 
+
+## v3.61.1
+* Renamed `db.Coordination().CreateSession()` to `db.Coordination().Session()` for compatibility with protos
+
+## v3.61.0
+* Added `Tuple` support for `Variant` in `ydb.ParamsBuilder()`
+
+## v3.60.1
+* Added additional traces for coordination service client internals
+
+## v3.60.0
+* Added experimental support of semaphores over coordination service client
+
+## v3.59.3
+* Fixed `gstack` logic for parsing `ast.BlockStmt`
+
+## v3.59.2
+* Added internal `gstack` codegen tool for filling `stack.FunctionID` with value from call stack
+
+## v3.59.1
+* Fixed updating last usage timestamp for smart parking of the conns
+
+## v3.59.0
+* Added `Struct` support for `ydb.ParamsBuilder()`
+* Added support of `TzDate`,`TzDateTime`,`TzTimestamp` types in `ydb.ParamsBuilder()`
+* Added `trace.Query.OnTransactionExecute` event
+* Added query pool metrics
+* Fixed logic of query session pool
+* Changed initialization of internal driver clients to lazy
+* Removed `ydb.WithSessionPoolSizeLimit()` option
+* Added async put session into pool if external context is done
+* Dropped intermediate callbacks from `trace.{Table,Retry,Query}` events
+* Wrapped errors from `internal/pool.Pool.getItem` as retryable
+* Disabled the logic of background grpc-connection parking
+* Improved stringification for postgres types
+
+## v3.58.2
+* Added `trace.Query.OnSessionBegin` event
+* Added `trace.Query.OnResult{New,NextPart,NextResultSet,Close}` events
+* Added `trace.Query.OnRow{Scan,ScanNamed,ScanStruct}` events
+
+## v3.58.1
+* Dropped all deprecated callbacks and events from traces
+* Added `trace.Driver.OnConnStream{SendMsg,RecvMsg,CloseSend}` events
+* Added `trace.Query.OnSessionExecute` event
+
+## v3.58.0
+* Changed `List` constructor from `ydb.ParamsBuilder().List().Build().Build()` to `ydb.ParamsBuilder().BeginList().EndList().Build()`
+* Changed `Set` constructor from `ydb.ParamsBuilder().Set().Build().Build()` to `ydb.ParamsBuilder().BeginSet().EndSet().Build()`
+* Changed `Dict` constructor from `ydb.ParamsBuilder().Dict().Build().Build()` to `ydb.ParamsBuilder().BeginDict().EndDict().Build()`
+* Changed `Optional` constructor from `ydb.ParamsBuilder().Set().Build().Build()` to `ydb.ParamsBuilder().BeginOptional().EndOptional().Build()`
+* Added events into `trace.Query` trace
+* Rewrote `internal/pool` to buffered channel
+* Added `internal/xcontext.WithDone()`
+* Added `internal/xsync.{OnceFunc,OnceValue}`
+* Updated `google.golang.org/protobuf` from `v1.31.0` to `v.33.0`
+* Added `ydb.ParamsBuilder().Pg().{Value,Int4,Int8,Unknown}` for postgres arguments
+* Added `Tuple` support for `ydb.ParamsBuilder()`
+
+## v3.57.4
+* Added client pid to each gRPC requests to YDB over header `x-ydb-client-pid`
+* Added `ydb.WithApplicationName` option
+* Added `Dict` support for `ydb.ParamsBuilder()`
+
+## v3.57.3
+* Added metrics over query service internals
+* Added session create and delete events into `trace.Query`
+* Moved public type `query.SessionStatus` into `internal/query` package
+
+## v3.57.2
+* Fixed cases when some option is nil
+
+## v3.57.1
+* Added logs over query service internals
+* Changed `trace.Query` events
+* Changed visibility of `query.{Do,DoTx}Options` from public to private
+
+## v3.57.0
+* Added experimental implementation of query service client
+* Fixed sometime panic on topic writer closing
+* Added experimental query parameters builder `ydb.ParamsBuilder()`
+* Changed types of `table/table.{QueryParameters,ParameterOption}` to aliases on `internal/params.{Parameters,NamedValue}`
+* Fixed bug with optional decimal serialization 
+
+## v3.56.2
+* Fixed return private error for commit to stopped partition in topic reader.
+* Stopped wrapping err error as transport error at topic streams (internals)
+
 ## v3.56.1
 * Fixed fixenv usage (related to tests only)
 
@@ -32,14 +128,14 @@
 
 ## v3.54.2
 * Added context to some internal methods for better tracing
-* Added `trace.FunctionID` helper and `FunctionID` field to trace start info's 
+* Added `trace.FunctionID` helper and `FunctionID` field to trace start info's
 * Replaced lazy initialization of ydb clients (table, topic, etc.) to explicit initialization on `ydb.Open` step
 
 ## v3.54.1
-* Fixed inconsistent labels in `metrics` 
+* Fixed inconsistent labels in `metrics`
 
 ## v3.54.0
-* Allowed `sql.LevelSerializable` isolation level in read-write mode in `database/sql` transactions 
+* Allowed `sql.LevelSerializable` isolation level in read-write mode in `database/sql` transactions
 * Refactored traces and metrics
 * Added `{retry,table}.WithLabel` options for mark retriers calls
 * Added `ydb.WithTraceRetry` option
@@ -63,7 +159,7 @@
 * Fixed stringification of credentials object
 
 ## v3.53.2
-* Fixed panic when try to unwrap values with more than 127 columns with custom ydb unmarshaler 
+* Fixed panic when try to unwrap values with more than 127 columns with custom ydb unmarshaler
 
 ## v3.53.1
 * Bumps `github.com/ydb-platform/ydb-go-genproto` for support `query` service
@@ -212,7 +308,7 @@
 * Added `table/options.WithCallOptions` options for append custom grpc call options into `session.{BulkUpsert,Execute,StreamExecuteScanQuery}`
 * Supported fake transactions in `database/sql` driver over connector option `ydb.WithFakeTx(queryMode)` and connection string param `go_fake_tx`
 * Removed `testutil/timeutil` package (all usages replaced with `clockwork` package)
-* Changed behaviour of retryer on transport errors `cancelled` and `deadline exceeded` - will retry idempotent operation if context is not done  
+* Changed behaviour of retryer on transport errors `cancelled` and `deadline exceeded` - will retry idempotent operation if context is not done
 * Added address of node to operation error description as optional
 * Fixed bug with put session from unknown node
 * Fixed bug with parsing of `TzTimestamp` without microseconds

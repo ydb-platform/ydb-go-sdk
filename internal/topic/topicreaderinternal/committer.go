@@ -166,7 +166,10 @@ func (c *committer) waitSendTrigger(ctx context.Context) {
 		return
 	}
 
-	finish := c.clock.After(c.BufferTimeLagTrigger)
+	bufferTimeLagTriggerTimer := c.clock.NewTimer(c.BufferTimeLagTrigger)
+	defer bufferTimeLagTriggerTimer.Stop()
+
+	finish := bufferTimeLagTriggerTimer.Chan()
 	if c.BufferCountTrigger == 0 {
 		select {
 		case <-ctxDone:

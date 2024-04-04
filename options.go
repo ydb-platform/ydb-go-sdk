@@ -17,6 +17,7 @@ import (
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
+	queryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
 	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
 	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
@@ -53,10 +54,21 @@ func WithAccessTokenCredentials(accessToken string) Option {
 	)
 }
 
+// WithApplicationName add provided application name to all api requests
+func WithApplicationName(applicationName string) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.options = append(c.options, config.WithApplicationName(applicationName))
+
+		return nil
+	}
+}
+
 // WithUserAgent add provided user agent value to all api requests
+//
+// Deprecated: use WithApplicationName instead
 func WithUserAgent(userAgent string) Option {
 	return func(ctx context.Context, c *Driver) error {
-		c.options = append(c.options, config.WithUserAgent(userAgent))
+		c.options = append(c.options, config.WithApplicationName(userAgent))
 
 		return nil
 	}
@@ -246,9 +258,9 @@ func With(options ...config.Option) Option {
 // MergeOptions concatentaes provided options to one cumulative value.
 func MergeOptions(opts ...Option) Option {
 	return func(ctx context.Context, c *Driver) error {
-		for _, o := range opts {
-			if o != nil {
-				if err := o(ctx, c); err != nil {
+		for _, opt := range opts {
+			if opt != nil {
+				if err := opt(ctx, c); err != nil {
 					return xerrors.WithStackTrace(err)
 				}
 			}
@@ -367,20 +379,24 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 	}
 }
 
-// WithSessionPoolSizeLimit set max size of internal sessions pool in table.Client
-func WithSessionPoolSizeLimit(sizeLimit int) Option {
+// WithQueryConfigOption collects additional configuration options for query.Client.
+// This option does not replace collected option, instead it will appen provided options.
+func WithQueryConfigOption(option queryConfig.Option) Option {
 	return func(ctx context.Context, c *Driver) error {
-		c.tableOptions = append(c.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
+		c.queryOptions = append(c.queryOptions, option)
 
 		return nil
 	}
 }
 
-// WithSessionPoolKeepAliveMinSize set minimum sessions should be keeped alive in table.Client
-//
-// Deprecated: table client do not supports background session keep-aliving now
-func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
-	return func(ctx context.Context, c *Driver) error { return nil }
+// WithSessionPoolSizeLimit set max size of internal sessions pool in table.Client
+func WithSessionPoolSizeLimit(sizeLimit int) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.tableOptions = append(c.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
+		c.queryOptions = append(c.queryOptions, queryConfig.WithPoolLimit(sizeLimit))
+
+		return nil
+	}
 }
 
 // WithSessionPoolIdleThreshold defines interval for idle sessions
@@ -396,15 +412,11 @@ func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 	}
 }
 
-// WithSessionPoolKeepAliveTimeout set timeout of keep alive requests for session in table.Client
-func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
-	return func(ctx context.Context, c *Driver) error { return nil }
-}
-
 // WithSessionPoolCreateSessionTimeout set timeout for new session creation process in table.Client
 func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithCreateSessionTimeout(createSessionTimeout))
+		c.queryOptions = append(c.queryOptions, queryConfig.WithSessionCreateTimeout(createSessionTimeout))
 
 		return nil
 	}
@@ -414,9 +426,24 @@ func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Opt
 func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithDeleteTimeout(deleteTimeout))
+		c.queryOptions = append(c.queryOptions, queryConfig.WithSessionDeleteTimeout(deleteTimeout))
 
 		return nil
 	}
+}
+
+// WithSessionPoolKeepAliveMinSize set minimum sessions should be keeped alive in table.Client
+//
+// Deprecated: table client do not support background session keep-aliving now
+func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
+	return func(ctx context.Context, c *Driver) error { return nil }
+}
+
+// WithSessionPoolKeepAliveTimeout set timeout of keep alive requests for session in table.Client
+//
+// Deprecated: table client do not support background session keep-aliving now
+func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
+	return func(ctx context.Context, c *Driver) error { return nil }
 }
 
 // WithIgnoreTruncated disables errors on truncated flag
@@ -451,6 +478,25 @@ func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option { //
 				append(
 					[]trace.TableComposeOption{
 						trace.WithTablePanicCallback(c.panicCallback),
+					},
+					opts...,
+				)...,
+			),
+		)
+
+		return nil
+	}
+}
+
+// WithTraceQuery appends trace.Query into query traces
+func WithTraceQuery(t trace.Query, opts ...trace.QueryComposeOption) Option { //nolint:gocritic
+	return func(ctx context.Context, c *Driver) error {
+		c.queryOptions = append(
+			c.queryOptions,
+			queryConfig.WithTrace(&t,
+				append(
+					[]trace.QueryComposeOption{
+						trace.WithQueryPanicCallback(c.panicCallback),
 					},
 					opts...,
 				)...,
@@ -502,12 +548,12 @@ func WithTraceScheme(t trace.Scheme, opts ...trace.SchemeComposeOption) Option {
 }
 
 // WithTraceCoordination returns coordination trace option
-func WithTraceCoordination(t trace.Coordination, opts ...trace.CoordinationComposeOption) Option {
+func WithTraceCoordination(t trace.Coordination, opts ...trace.CoordinationComposeOption) Option { //nolint:gocritic
 	return func(ctx context.Context, c *Driver) error {
 		c.coordinationOptions = append(
 			c.coordinationOptions,
 			coordinationConfig.WithTrace(
-				t,
+				&t,
 				append(
 					[]trace.CoordinationComposeOption{
 						trace.WithCoordinationPanicCallback(c.panicCallback),

@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	DefaultStartTimeout          = time.Minute
+	DefaultStartTimeout          = value.InfiniteDuration
 	connectionEstablishedTimeout = time.Minute
 )
 

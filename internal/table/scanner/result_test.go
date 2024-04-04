@@ -13,29 +13,29 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 func TestResultAny(t *testing.T) {
 	for _, test := range []struct {
 		name    string
 		columns []options.Column
-		values  []types.Value
+		values  []value.Value
 		exp     []interface{}
 	}{
 		{
 			columns: []options.Column{
 				{
 					Name:   "column0",
-					Type:   types.Optional(types.TypeUint32),
+					Type:   types.NewOptional(types.Uint32),
 					Family: "family0",
 				},
 			},
-			values: []types.Value{
-				types.OptionalValue(types.Uint32Value(43)),
-				types.NullValue(types.TypeUint32),
+			values: []value.Value{
+				value.OptionalValue(value.Uint32Value(43)),
+				value.NullValue(types.Uint32),
 			},
 			exp: []interface{}{
 				uint32(43),
@@ -83,25 +83,25 @@ func TestResultOUint32(t *testing.T) {
 	for _, test := range []struct {
 		name    string
 		columns []options.Column
-		values  []types.Value
+		values  []value.Value
 		exp     []uint32
 	}{
 		{
 			columns: []options.Column{
 				{
 					Name:   "column0",
-					Type:   types.Optional(types.TypeUint32),
+					Type:   types.NewOptional(types.Uint32),
 					Family: "family0",
 				},
 				{
 					Name:   "column1",
-					Type:   types.TypeUint32,
+					Type:   types.Uint32,
 					Family: "family0",
 				},
 			},
-			values: []types.Value{
-				types.OptionalValue(types.Uint32Value(43)),
-				types.Uint32Value(43),
+			values: []value.Value{
+				value.OptionalValue(value.Uint32Value(43)),
+				value.Uint32Value(43),
 			},
 			exp: []uint32{
 				43,
@@ -151,13 +151,13 @@ func WithColumns(cs ...options.Column) ResultSetOption {
 		for _, c := range cs {
 			r.Columns = append(r.Columns, &Ydb.Column{
 				Name: c.Name,
-				Type: value.TypeToYDB(c.Type, a),
+				Type: types.TypeToYDB(c.Type, a),
 			})
 		}
 	}
 }
 
-func WithValues(vs ...types.Value) ResultSetOption {
+func WithValues(vs ...value.Value) ResultSetOption {
 	return func(r *resultSetDesc, a *allocator.Allocator) {
 		n := len(r.Columns)
 		if n == 0 {
@@ -178,15 +178,15 @@ func WithValues(vs ...types.Value) ResultSetOption {
 				}
 			}
 			tv := value.ToYDB(v, a)
-			act := value.TypeFromYDB(tv.Type)
-			exp := value.TypeFromYDB(r.Columns[j].Type)
-			if !value.TypesEqual(act, exp) {
+			act := types.TypeFromYDB(tv.GetType())
+			exp := types.TypeFromYDB(r.Columns[j].GetType())
+			if !types.Equal(act, exp) {
 				panic(fmt.Sprintf(
 					"unexpected types for #%d column: %s; want %s",
 					j, act, exp,
 				))
 			}
-			row.Items[j] = tv.Value
+			row.Items[j] = tv.GetValue()
 		}
 		if row != nil {
 			r.Rows = append(r.Rows, row)

@@ -16,7 +16,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	_ "unsafe" // For go:linkname.
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
@@ -70,8 +69,6 @@ func main() {
 
 	var writers []*Writer
 	if isGoGenerate {
-		// We should respect Go suffixes like `_linux.go`.
-		name, tags, ext := splitOSArchTags(&buildCtx, gofile)
 		openFile := func(name string) (*os.File, func()) {
 			var f *os.File
 			//nolint:gofumpt
@@ -88,7 +85,9 @@ func main() {
 
 			return f, func() { f.Close() }
 		}
-		f, clean := openFile(name + "_gtrace" + tags + ext)
+		ext := filepath.Ext(gofile)
+		name := strings.TrimSuffix(gofile, ext)
+		f, clean := openFile(name + "_gtrace" + ext)
 		defer clean()
 		writers = append(writers, &Writer{
 			Context: buildCtx,
@@ -109,7 +108,7 @@ func main() {
 	)
 	fset := token.NewFileSet()
 	for _, name := range buildPkg.GoFiles {
-		base, _, _ := splitOSArchTags(&buildCtx, name)
+		base := strings.TrimSuffix(name, filepath.Ext(name))
 		if isGenerated(base, "_gtrace") {
 			continue
 		}

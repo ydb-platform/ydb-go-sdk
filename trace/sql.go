@@ -159,9 +159,6 @@ type (
 		TxContext context.Context
 		Tx        tableTransactionInfo
 		Query     string
-
-		// Deprecated: all transactions are idempotent
-		Idempotent bool
 	}
 	DatabaseSQLTxQueryDoneInfo struct {
 		Error error
@@ -176,9 +173,6 @@ type (
 		TxContext context.Context
 		Tx        tableTransactionInfo
 		Query     string
-
-		// Deprecated: all transactions are idempotent
-		Idempotent bool
 	}
 	DatabaseSQLTxExecDoneInfo struct {
 		Error error

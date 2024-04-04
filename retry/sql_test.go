@@ -11,7 +11,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
-	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 type mockConnector struct {
@@ -104,7 +103,7 @@ func (m *mockConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver.T
 
 func (m *mockConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	m.t.Log(stack.Record(0))
-	if xerrors.MustDeleteSession(m.execErr) {
+	if !xerrors.IsRetryObjectValid(m.execErr) {
 		m.closed = true
 	}
 
@@ -113,7 +112,7 @@ func (m *mockConn) QueryContext(ctx context.Context, query string, args []driver
 
 func (m *mockConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	m.t.Log(stack.Record(0))
-	if xerrors.MustDeleteSession(m.execErr) {
+	if !xerrors.IsRetryObjectValid(m.execErr) {
 		m.closed = true
 	}
 
@@ -215,18 +214,6 @@ func TestDoTx(t *testing.T) {
 						WithIdempotent(bool(idempotentType)),
 						WithFastBackoff(backoff.New(backoff.WithSlotDuration(time.Nanosecond))),
 						WithSlowBackoff(backoff.New(backoff.WithSlotDuration(time.Nanosecond))),
-						WithTrace(&trace.Retry{
-							//nolint:lll
-							OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-								t.Logf("attempt %d, conn %d, mode: %+v", attempts, m.conns, Check(m.queryErr))
-
-								return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-									t.Logf("attempt %d, conn %d, mode: %+v", attempts, m.conns, Check(m.queryErr))
-
-									return nil
-								}
-							},
-						}),
 					)
 					if tt.canRetry[idempotentType] {
 						if err != nil {

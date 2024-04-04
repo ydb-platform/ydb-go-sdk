@@ -258,9 +258,9 @@ func convertNewParamsToStreamConfig(
 		cfg.ReadSelectors[i] = readSelectors[i].Clone()
 	}
 
-	for _, f := range opts {
-		if f != nil {
-			f(&cfg)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&cfg)
 		}
 	}
 

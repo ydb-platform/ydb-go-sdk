@@ -7,16 +7,20 @@ import (
 )
 
 func Join(errs ...error) joinError {
-	return errs
+	return joinError{
+		errs: errs,
+	}
 }
 
-type joinError []error
+type joinError struct {
+	errs []error
+}
 
-func (errs joinError) Error() string {
+func (e joinError) Error() string {
 	b := xstring.Buffer()
 	defer b.Free()
 	b.WriteByte('[')
-	for i, err := range errs {
+	for i, err := range e.errs {
 		if i > 0 {
 			_ = b.WriteByte(',')
 		}
@@ -27,8 +31,8 @@ func (errs joinError) Error() string {
 	return b.String()
 }
 
-func (errs joinError) As(target interface{}) bool {
-	for _, err := range errs {
+func (e joinError) As(target interface{}) bool {
+	for _, err := range e.errs {
 		if As(err, target) {
 			return true
 		}
@@ -37,8 +41,8 @@ func (errs joinError) As(target interface{}) bool {
 	return false
 }
 
-func (errs joinError) Is(target error) bool {
-	for _, err := range errs {
+func (e joinError) Is(target error) bool {
+	for _, err := range e.errs {
 		if Is(err, target) {
 			return true
 		}
@@ -47,6 +51,6 @@ func (errs joinError) Is(target error) bool {
 	return false
 }
 
-func (errs joinError) Unwrap() []error {
-	return errs
+func (e joinError) Unwrap() []error {
+	return e.errs
 }
