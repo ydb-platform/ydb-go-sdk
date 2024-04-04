@@ -20,16 +20,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-const (
-	noTags  = 0
-	oneTag  = 1
-	twoTags = 2
-)
-
-//go:linkname build_goodOSArchFile go/build.(*Context).goodOSArchFile
-//nolint:revive
-func build_goodOSArchFile(*build.Context, string, map[string]bool) bool
-
 //nolint:gocyclo
 func main() {
 	var (
@@ -316,38 +306,6 @@ func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (re
 		"unsupported function result type %s",
 		info.TypeOf(r.Type),
 	)
-}
-
-func splitOSArchTags(ctx *build.Context, name string) (base, tags, ext string) {
-	fileTags := make(map[string]bool)
-	build_goodOSArchFile(ctx, name, fileTags)
-	ext = filepath.Ext(name)
-	switch len(fileTags) {
-	case noTags: // *
-		base = strings.TrimSuffix(name, ext)
-
-	case oneTag: // *_GOOS or *_GOARCH
-		i := strings.LastIndexByte(name, '_')
-
-		base = name[:i]
-		tags = strings.TrimSuffix(name[i:], ext)
-
-	case twoTags: // *_GOOS_GOARCH
-		var i int
-		i = strings.LastIndexByte(name, '_')
-		i = strings.LastIndexByte(name[:i], '_')
-
-		base = name[:i]
-		tags = strings.TrimSuffix(name[i:], ext)
-
-	default:
-		panic(fmt.Sprintf(
-			"gtrace: internal error: unexpected number of OS/arch tags: %d",
-			len(fileTags),
-		))
-	}
-
-	return
 }
 
 type Package struct {

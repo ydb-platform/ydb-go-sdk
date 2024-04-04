@@ -2425,7 +2425,7 @@ func ZeroValue(t types.Type) Value {
 
 			return values
 		}()...)
-	case *DecimalType:
+	case *types.Decimal:
 		return DecimalValue([16]byte{}, decimalPrecision, decimalScale)
 
 	default:

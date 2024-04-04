@@ -30,11 +30,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-const (
-	defaultMaxMessageSize = 50 * 1024 * 1024
-	defaultMaxQueueLen    = 1000
-)
-
 var (
 	errConnTimeout           = xerrors.Wrap(errors.New("ydb: connection timeout"))
 	errStopWriterReconnector = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
@@ -89,8 +84,8 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		},
 		AutoSetSeqNo:       true,
 		AutoSetCreatedTime: true,
-		MaxMessageSize:     defaultMaxMessageSize,
-		MaxQueueLen:        defaultMaxQueueLen,
+		MaxMessageSize:     50 * 1024 * 1024, //nolint:gomnd
+		MaxQueueLen:        1000,             //nolint:gomnd
 		RetrySettings: topic.RetrySettings{
 			StartTimeout: topic.DefaultStartTimeout,
 		},
