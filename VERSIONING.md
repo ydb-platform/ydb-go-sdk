@@ -3,7 +3,8 @@
 By adhering to these guidelines and exceptions, we aim to provide a stable and reliable development experience for our users while still allowing for innovation and improvement.
 
 We endeavor to adhere to versioning guidelines as defined by [SemVer2.0.0](https://semver.org/).
-Also making the following exceptions to those guidelines:
+
+We making the following exceptions to those guidelines:
 1) **Experimental**
    - We use the `// Experimental` comment for new features in the `ydb-go-sdk`. 
    - Early adopters of newest feature can report bugs and imperfections in functionality. 
