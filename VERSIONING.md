@@ -16,11 +16,8 @@ We making the following exceptions to those guidelines:
    - This helps to our users to soft decline to use the deprecated feature without any impact on their code.
    - Deprecated features will not be removed or changed for a minimum period of **six months** since the mark added.
    - We reserve the right to remove or modify these deprecated features without increase to major part of version.
-3) **Public internals**
+3) **Internals**
    - Some public packages of `ydb-go-sdk` relate to the internals.
+   - We use the `// Internals` comment for public internals in the `ydb-go-sdk`.
    - `ydb-go-sdk` internals can be changed at any time.
-   - That's why versioning rules of [SemVer2.0.0](https://semver.org/) does not apply to the next packages:
-     - [trace](https://github.com/ydb-platform/ydb-go-sdk/tree/master/trace)
-     - [log](https://github.com/ydb-platform/ydb-go-sdk/tree/master/log)
-     - [metrics](https://github.com/ydb-platform/ydb-go-sdk/tree/master/metrics)
-   - List of stable supported metrics are stored in [metrics/README.md](https://github.com/ydb-platform/ydb-go-sdk/tree/master/metrics) and cover with tests
+   - That's why versioning rules of [SemVer2.0.0](https://semver.org/) does not apply to internals.
