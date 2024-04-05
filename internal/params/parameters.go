@@ -26,6 +26,9 @@ type (
 
 func Named(name string, value value.Value) *Parameter {
 	return &Parameter{
+		parent: Builder{
+			params: nil,
+		},
 		name:  name,
 		value: value,
 	}
@@ -99,6 +102,7 @@ func (p *Parameter) BeginOptional() *optional {
 	return &optional{
 		parent: p.parent,
 		name:   p.name,
+		value:  p.value,
 	}
 }
 
@@ -106,6 +110,7 @@ func (p *Parameter) BeginList() *list {
 	return &list{
 		parent: p.parent,
 		name:   p.name,
+		values: nil,
 	}
 }
 
@@ -117,6 +122,7 @@ func (p *Parameter) BeginSet() *set {
 	return &set{
 		parent: p.parent,
 		name:   p.name,
+		values: nil,
 	}
 }
 
@@ -124,6 +130,7 @@ func (p *Parameter) BeginDict() *dict {
 	return &dict{
 		parent: p.parent,
 		name:   p.name,
+		values: nil,
 	}
 }
 
@@ -131,6 +138,7 @@ func (p *Parameter) BeginTuple() *tuple {
 	return &tuple{
 		parent: p.parent,
 		name:   p.name,
+		values: nil,
 	}
 }
 
@@ -138,6 +146,7 @@ func (p *Parameter) BeginStruct() *structure {
 	return &structure{
 		parent: p.parent,
 		name:   p.name,
+		values: nil,
 	}
 }
 
@@ -145,6 +154,7 @@ func (p *Parameter) BeginVariant() *variant {
 	return &variant{
 		parent: p.parent,
 		name:   p.name,
+		value:  p.value,
 	}
 }
 
