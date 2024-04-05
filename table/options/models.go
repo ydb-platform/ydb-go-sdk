@@ -420,8 +420,7 @@ func (kr KeyRange) String() string {
 	return buf.String()
 }
 
-// Deprecated: use TimeToLiveSettings instead.
-// Will be removed after Jan 2022.
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
 type TTLSettings struct {
 	DateTimeColumn string
 	TTLSeconds     uint32

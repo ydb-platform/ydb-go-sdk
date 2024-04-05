@@ -26,9 +26,7 @@ type ReaderOption = topicreaderinternal.PublicReaderOption
 
 // WithReaderOperationTimeout
 //
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#experimental
 func WithReaderOperationTimeout(timeout time.Duration) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		config.SetOperationTimeout(&cfg.Common, timeout)
@@ -37,9 +35,7 @@ func WithReaderOperationTimeout(timeout time.Duration) ReaderOption {
 
 // WithReaderStartTimeout mean timeout for connect to reader stream and work some time without errors
 //
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#experimental
 func WithReaderStartTimeout(timeout time.Duration) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.RetrySettings.StartTimeout = timeout
@@ -58,9 +54,7 @@ func WithReaderCheckRetryErrorFunction(callback CheckErrorRetryFunction) ReaderO
 
 // WithReaderOperationCancelAfter
 //
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#experimental
 func WithReaderOperationCancelAfter(cancelAfter time.Duration) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		config.SetOperationCancelAfter(&cfg.Common, cancelAfter)
@@ -69,9 +63,7 @@ func WithReaderOperationCancelAfter(cancelAfter time.Duration) ReaderOption {
 
 // WithCommonConfig
 //
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#experimental
 func WithCommonConfig(common config.Common) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.Common = common
@@ -79,8 +71,7 @@ func WithCommonConfig(common config.Common) ReaderOption {
 }
 
 // WithCommitTimeLagTrigger
-// Deprecated: (was experimental) will be removed soon.
-// Use WithReaderCommitTimeLagTrigger instead
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
 func WithCommitTimeLagTrigger(lag time.Duration) ReaderOption {
 	return WithReaderCommitTimeLagTrigger(lag)
 }
@@ -96,8 +87,7 @@ func WithReaderCommitTimeLagTrigger(lag time.Duration) ReaderOption {
 }
 
 // WithCommitCountTrigger
-// Deprecated: (was experimental) will be removed soon.
-// Use WithReaderCommitCountTrigger instead
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
 func WithCommitCountTrigger(count int) ReaderOption {
 	return WithReaderCommitCountTrigger(count)
 }
@@ -115,9 +105,7 @@ func WithReaderCommitCountTrigger(count int) ReaderOption {
 // prefer min count messages in batch
 // sometimes batch can contain fewer messages, for example if local buffer is full and SDK can't receive more messages
 //
-// Deprecated: (was experimental) the method will be removed soon.
-//
-// The option will be removed for simplify code internals
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
 func WithBatchReadMinCount(count int) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.DefaultBatchConfig.MinCount = count
@@ -125,8 +113,7 @@ func WithBatchReadMinCount(count int) ReaderOption {
 }
 
 // WithBatchReadMaxCount
-// Deprecated: (was experimental) will be removed soon.
-// Use WithReaderBatchMaxCount instead.
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
 func WithBatchReadMaxCount(count int) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.DefaultBatchConfig.MaxCount = count
@@ -141,8 +128,7 @@ func WithReaderBatchMaxCount(count int) ReaderOption {
 }
 
 // WithMessagesBufferSize
-// Deprecated: (was experimental) will be removed soon
-// Use WithReaderBufferSizeBytes instead.
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
 func WithMessagesBufferSize(size int) ReaderOption {
 	return WithReaderBufferSizeBytes(size)
 }
@@ -191,8 +177,7 @@ const (
 )
 
 // WithCommitMode
-// Deprecated: (was experimental) will be removed soon.
-// Use WithReaderCommitMode instead.
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
 func WithCommitMode(mode CommitMode) ReaderOption {
 	return WithReaderCommitMode(mode)
 }
@@ -217,8 +202,7 @@ type (
 )
 
 // WithGetPartitionStartOffset
-// Deprecated: (was experimental) will be removed soon.
-// Use WithReaderGetPartitionStartOffset instead
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
 func WithGetPartitionStartOffset(f GetPartitionStartOffsetFunc) ReaderOption {
 	return WithReaderGetPartitionStartOffset(f)
 }
@@ -233,9 +217,7 @@ func WithReaderGetPartitionStartOffset(f GetPartitionStartOffsetFunc) ReaderOpti
 
 // WithReaderTrace set tracer for the topic reader
 //
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#experimental
 func WithReaderTrace(t trace.Topic) ReaderOption { //nolint:gocritic
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.Trace = cfg.Trace.Compose(&t)

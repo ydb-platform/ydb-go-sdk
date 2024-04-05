@@ -120,7 +120,7 @@ const (
 
 // WriteTypeStringTo writes ydb type string representation into buffer
 //
-// Deprecated: use types.Type.Yql() instead
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
 func WriteTypeStringTo(buf *bytes.Buffer, t Type) { //nolint: interfacer
 	buf.WriteString(t.Yql())
 }

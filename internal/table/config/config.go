@@ -15,13 +15,13 @@ const (
 	DefaultSessionPoolSizeLimit            = 50
 	DefaultSessionPoolIdleThreshold        = 5 * time.Minute
 
-	// Deprecated: table client do not supports background session keep-aliving now
+	// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
 	DefaultKeepAliveMinSize = 10
 
-	// Deprecated: table client do not supports background session keep-aliving now
+	// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
 	DefaultIdleKeepAliveThreshold = 2
 
-	// Deprecated: table client do not supports background session keep-aliving now
+	// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
 	DefaultSessionPoolKeepAliveTimeout = 500 * time.Millisecond
 )
 
@@ -61,7 +61,7 @@ func WithSizeLimit(sizeLimit int) Option {
 // If keepAliveMinSize is less than zero, then no sessions will be preserved
 // If keepAliveMinSize is zero, the DefaultKeepAliveMinSize is used
 //
-// Deprecated: table client do not supports background session keep-aliving now
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
 func WithKeepAliveMinSize(keepAliveMinSize int) Option {
 	return func(c *Config) {}
 }
@@ -73,7 +73,7 @@ func WithKeepAliveMinSize(keepAliveMinSize int) Option {
 // be removed ever.
 // If IdleKeepAliveThreshold is equal to zero, it will be set to DefaultIdleKeepAliveThreshold
 //
-// Deprecated: table client do not support background session keep-aliving now
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
 func WithIdleKeepAliveThreshold(idleKeepAliveThreshold int) Option {
 	return func(c *Config) {}
 }
@@ -95,7 +95,7 @@ func WithIdleThreshold(idleThreshold time.Duration) Option {
 // WithKeepAliveTimeout limits maximum time spent on KeepAlive request
 // If keepAliveTimeout is less than or equal to zero then the DefaultSessionPoolKeepAliveTimeout is used.
 //
-// Deprecated: table client do not support background session keep-aliving now
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
 func WithKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
 	return func(c *Config) {}
 }
@@ -182,7 +182,7 @@ func (c *Config) SizeLimit() int {
 // If KeepAliveMinSize is less than zero, then no sessions will be preserved
 // If KeepAliveMinSize is zero, the DefaultKeepAliveMinSize is used
 //
-// Deprecated: table client do not support background session keep-aliving now
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
 func (c *Config) KeepAliveMinSize() int {
 	return DefaultKeepAliveMinSize
 }
@@ -199,7 +199,7 @@ func (c *Config) IgnoreTruncated() bool {
 // be removed ever.
 // If IdleKeepAliveThreshold is equal to zero, it will be set to DefaultIdleKeepAliveThreshold
 //
-// Deprecated: table client do not support background session keep-aliving now
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
 func (c *Config) IdleKeepAliveThreshold() int {
 	return DefaultIdleKeepAliveThreshold
 }
@@ -216,7 +216,7 @@ func (c *Config) IdleThreshold() time.Duration {
 // KeepAliveTimeout limits maximum time spent on KeepAlive request
 // If KeepAliveTimeout is less than or equal to zero then the DefaultSessionPoolKeepAliveTimeout is used.
 //
-// Deprecated: table client do not support background session keep-aliving now
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
 func (c *Config) KeepAliveTimeout() time.Duration {
 	return DefaultSessionPoolKeepAliveTimeout
 }

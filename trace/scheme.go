@@ -11,14 +11,21 @@ import (
 type (
 	// Scheme specified trace of scheme client activity.
 	// gtrace:gen
+	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
 	Scheme struct {
-		OnListDirectory     func(SchemeListDirectoryStartInfo) func(SchemeListDirectoryDoneInfo)
-		OnDescribePath      func(SchemeDescribePathStartInfo) func(SchemeDescribePathDoneInfo)
-		OnMakeDirectory     func(SchemeMakeDirectoryStartInfo) func(SchemeMakeDirectoryDoneInfo)
-		OnRemoveDirectory   func(SchemeRemoveDirectoryStartInfo) func(SchemeRemoveDirectoryDoneInfo)
+		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
+		OnListDirectory func(SchemeListDirectoryStartInfo) func(SchemeListDirectoryDoneInfo)
+		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
+		OnDescribePath func(SchemeDescribePathStartInfo) func(SchemeDescribePathDoneInfo)
+		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
+		OnMakeDirectory func(SchemeMakeDirectoryStartInfo) func(SchemeMakeDirectoryDoneInfo)
+		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
+		OnRemoveDirectory func(SchemeRemoveDirectoryStartInfo) func(SchemeRemoveDirectoryDoneInfo)
+		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
 		OnModifyPermissions func(SchemeModifyPermissionsStartInfo) func(SchemeModifyPermissionsDoneInfo)
 	}
 
+	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
 	SchemeListDirectoryStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -27,9 +34,11 @@ type (
 		Context *context.Context
 		Call    call
 	}
+	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
 	SchemeListDirectoryDoneInfo struct {
 		Error error
 	}
+	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
 	SchemeDescribePathStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -39,10 +48,12 @@ type (
 		Call    call
 		Path    string
 	}
+	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
 	SchemeDescribePathDoneInfo struct {
 		EntryType string
 		Error     error
 	}
+	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
 	SchemeMakeDirectoryStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -52,9 +63,11 @@ type (
 		Call    call
 		Path    string
 	}
+	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
 	SchemeMakeDirectoryDoneInfo struct {
 		Error error
 	}
+	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
 	SchemeRemoveDirectoryStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -64,9 +77,11 @@ type (
 		Call    call
 		Path    string
 	}
+	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
 	SchemeRemoveDirectoryDoneInfo struct {
 		Error error
 	}
+	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
 	SchemeModifyPermissionsStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -76,6 +91,7 @@ type (
 		Call    call
 		Path    string
 	}
+	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
 	SchemeModifyPermissionsDoneInfo struct {
 		Error error
 	}

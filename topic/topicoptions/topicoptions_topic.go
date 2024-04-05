@@ -10,16 +10,12 @@ import (
 
 // TopicOption
 //
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#experimental
 type TopicOption func(c *topic.Config)
 
 // WithTrace defines trace over persqueue client calls
 //
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#experimental
 func WithTrace(trace trace.Topic, opts ...trace.TopicComposeOption) TopicOption { //nolint:gocritic
 	return func(c *topic.Config) {
 		c.Trace = c.Trace.Compose(&trace, opts...)
@@ -32,9 +28,7 @@ func WithTrace(trace trace.Topic, opts ...trace.TopicComposeOption) TopicOption 
 // the client.
 // If OperationTimeout is zero then no timeout is used.
 //
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#experimental
 func WithOperationTimeout(operationTimeout time.Duration) TopicOption {
 	return func(c *topic.Config) {
 		config.SetOperationTimeout(&c.Common, operationTimeout)
@@ -47,9 +41,7 @@ func WithOperationTimeout(operationTimeout time.Duration) TopicOption {
 // processing will be continued.
 // If OperationCancelAfter is zero then no timeout is used.
 //
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#experimental
 func WithOperationCancelAfter(operationCancelAfter time.Duration) TopicOption {
 	return func(c *topic.Config) {
 		config.SetOperationCancelAfter(&c.Common, operationCancelAfter)
