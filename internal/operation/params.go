@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 )
 
@@ -30,5 +31,7 @@ func Params(
 		OperationMode:    mode.toYDB(),
 		OperationTimeout: timeoutParam(timeout),
 		CancelAfter:      timeoutParam(cancelAfter),
+		Labels:           nil,
+		ReportCostInfo:   Ydb.FeatureFlag_STATUS_UNSPECIFIED,
 	}
 }
