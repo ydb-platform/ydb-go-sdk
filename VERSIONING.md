@@ -20,4 +20,3 @@ We making the following exceptions to those guidelines:
    - Some public API of `ydb-go-sdk` relate to the internals.
    - We use the `// Internals` comment for public internals in the `ydb-go-sdk`.
    - `ydb-go-sdk` internals can be changed at any time without increase of major part of version.
-   - That's why versioning rules of [SemVer2.0.0](https://semver.org/) does not apply to internals.
