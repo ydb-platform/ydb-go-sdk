@@ -12,7 +12,7 @@ We making the following exceptions to those guidelines:
    - We reserve the right to remove or modify these experimental features at any time, until the removal of the "Experimental" comment.
 2) **Deprecated**
    - We use the `// Deprecated` comment for deprecated features in the `ydb-go-sdk`. 
-   - This helps to owr users to soft decline to use the deprecated feature without any impact on their code.
+   - This helps to our users to soft decline to use the deprecated feature without any impact on their code.
    - Deprecated features will not be removed or changed for a minimum period of **six months**.
 3) **Public internals**
    - Some public packages of `ydb-go-sdk` relate to the internals.
