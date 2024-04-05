@@ -12,7 +12,7 @@ We making the following exceptions to those guidelines:
    - We reserve the right to remove or modify these experimental features at any time, until the removal of the "Experimental" comment without increase of major part of version.
 2) **Deprecated**
    - We use the `// Deprecated` comment for deprecated features in the `ydb-go-sdk`.
-   - Usage of some entity marked with `// Deprecated` can be detected with linters such as [check-deprecated](https://github.com/black-06/check-deprecated). [staticcheck](https://github.com/dominikh/go-tools/tree/master/cmd/staticcheck) or [go-critic](https://github.com/go-critic/go-critic).
+   - Usage of some entity marked with `// Deprecated` can be detected with linters such as [check-deprecated](https://github.com/black-06/check-deprecated), [staticcheck](https://github.com/dominikh/go-tools/tree/master/cmd/staticcheck) or [go-critic](https://github.com/go-critic/go-critic).
    - This helps to our users to soft decline to use the deprecated feature without any impact on their code.
    - Deprecated features will not be removed or changed for a minimum period of **six months** since the mark added.
    - We reserve the right to remove or modify these deprecated features without increase to major part of version.
