@@ -223,7 +223,6 @@ linters:
     - cyclop
     - depguard
     - dupl
-    - errname
     - exhaustive
     - exhaustivestruct
     - forbidigo
@@ -239,7 +238,6 @@ linters:
     - interfacebloat
     - ireturn
     - maintidx
-    - maligned
     - nonamedreturns
     - paralleltest
     - scopelint
@@ -296,6 +294,7 @@ issues:
         - predeclared
     - path: _test\.go
       linters:
+        - funlen
         - unused
         - unparam
         - gocritic

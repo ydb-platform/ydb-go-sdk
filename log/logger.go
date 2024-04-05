@@ -33,8 +33,10 @@ func Default(w io.Writer, opts ...simpleLoggerOption) *defaultLogger {
 		clock:    clockwork.NewRealClock(),
 		w:        w,
 	}
-	for _, o := range opts {
-		o.applySimpleOption(l)
+	for _, opt := range opts {
+		if opt != nil {
+			opt.applySimpleOption(l)
+		}
 	}
 
 	return l
@@ -42,9 +44,9 @@ func Default(w io.Writer, opts ...simpleLoggerOption) *defaultLogger {
 
 type defaultLogger struct {
 	coloring bool
-	clock    clockwork.Clock
 	logQuery bool
 	minLevel Level
+	clock    clockwork.Clock
 	w        io.Writer
 }
 
@@ -104,9 +106,9 @@ func wrapLogger(l Logger, opts ...Option) *wrapper {
 	ll := &wrapper{
 		logger: l,
 	}
-	for _, o := range opts {
-		if o != nil {
-			o.applyHolderOption(ll)
+	for _, opt := range opts {
+		if opt != nil {
+			opt.applyHolderOption(ll)
 		}
 	}
 

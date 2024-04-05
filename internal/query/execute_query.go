@@ -9,35 +9,36 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
-type executeSettings interface {
-	ExecMode() query.ExecMode
-	StatsMode() query.StatsMode
+type executeConfig interface {
+	ExecMode() options.ExecMode
+	StatsMode() options.StatsMode
 	TxControl() *query.TransactionControl
-	Syntax() query.Syntax
+	Syntax() options.Syntax
 	Params() *params.Parameters
 	CallOptions() []grpc.CallOption
 }
 
-func executeQueryRequest(a *allocator.Allocator, sessionID, q string, settings executeSettings) (
+func executeQueryRequest(a *allocator.Allocator, sessionID, q string, cfg executeConfig) (
 	*Ydb_Query.ExecuteQueryRequest,
 	[]grpc.CallOption,
 ) {
 	request := a.QueryExecuteQueryRequest()
 
 	request.SessionId = sessionID
-	request.ExecMode = Ydb_Query.ExecMode(settings.ExecMode())
-	request.TxControl = settings.TxControl().ToYDB(a)
-	request.Query = queryFromText(a, q, settings.Syntax())
-	request.Parameters = settings.Params().ToYDB(a)
-	request.StatsMode = Ydb_Query.StatsMode(settings.StatsMode())
+	request.ExecMode = Ydb_Query.ExecMode(cfg.ExecMode())
+	request.TxControl = cfg.TxControl().ToYDB(a)
+	request.Query = queryFromText(a, q, Ydb_Query.Syntax(cfg.Syntax()))
+	request.Parameters = cfg.Params().ToYDB(a)
+	request.StatsMode = Ydb_Query.StatsMode(cfg.StatsMode())
 	request.ConcurrentResultSets = false
 
-	return request, settings.CallOptions()
+	return request, cfg.CallOptions()
 }
 
 func queryFromText(
@@ -51,32 +52,31 @@ func queryFromText(
 	return content
 }
 
-func execute(
-	ctx context.Context, session *Session, client Ydb_Query_V1.QueryServiceClient, q string, settings executeSettings,
-) (*transaction, *result, error) {
+func execute(ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient, q string, cfg executeConfig) (
+	_ *transaction, _ *result, finalErr error,
+) {
 	a := allocator.New()
-	request, callOptions := executeQueryRequest(a, session.id, q, settings)
-	defer func() {
-		a.Free()
-	}()
+	defer a.Free()
 
-	ctx, cancel := xcontext.WithCancel(ctx)
+	request, callOptions := executeQueryRequest(a, s.id, q, cfg)
 
-	stream, err := client.ExecuteQuery(ctx, request, callOptions...)
+	executeCtx, cancelExecute := xcontext.WithCancel(xcontext.ValueOnly(ctx))
+
+	stream, err := c.ExecuteQuery(executeCtx, request, callOptions...)
 	if err != nil {
-		cancel()
-
-		return nil, nil, xerrors.WithStackTrace(err)
-	}
-	r, txID, err := newResult(ctx, stream, cancel)
-	if err != nil {
-		cancel()
-
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	return &transaction{
-		id: txID,
-		s:  session,
-	}, r, nil
+	r, txID, err := newResult(ctx, stream, s.cfg.Trace(), cancelExecute)
+	if err != nil {
+		cancelExecute()
+
+		return nil, nil, xerrors.WithStackTrace(err)
+	}
+
+	if txID == "" {
+		return nil, r, nil
+	}
+
+	return newTransaction(txID, s), r, nil
 }

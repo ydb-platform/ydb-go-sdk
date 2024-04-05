@@ -114,25 +114,22 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 }
 
 type WriterReconnector struct {
-	cfg           WriterReconnectorConfig
-	retrySettings topic.RetrySettings
-
-	semaphore                      *semaphore.Weighted
+	cfg                            WriterReconnectorConfig
 	queue                          messageQueue
 	background                     background.Worker
+	retrySettings                  topic.RetrySettings
 	clock                          clockwork.Clock
-	firstConnectionHandled         atomic.Bool
-	firstInitResponseProcessedChan empty.Chan
 	writerInstanceID               string
-
-	m           xsync.RWMutex
-	sessionID   string
-	lastSeqNo   int64
-	encodersMap *EncoderMap
-
-	initDone   bool
-	initDoneCh empty.Chan
-	initInfo   InitialInfo
+	sessionID                      string
+	semaphore                      *semaphore.Weighted
+	firstInitResponseProcessedChan empty.Chan
+	lastSeqNo                      int64
+	encodersMap                    *EncoderMap
+	initDoneCh                     empty.Chan
+	initInfo                       InitialInfo
+	m                              xsync.RWMutex
+	firstConnectionHandled         atomic.Bool
+	initDone                       bool
 }
 
 func newWriterReconnector(
@@ -353,7 +350,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 
 	createStreamContext := func() (context.Context, context.CancelFunc) {
 		// need suppress parent context cancelation for flush buffer while close writer
-		return xcontext.WithCancel(xcontext.WithoutDeadline(ctx))
+		return xcontext.WithCancel(xcontext.ValueOnly(ctx))
 	}
 
 	//nolint:ineffassign,staticcheck,wastedassign
@@ -383,16 +380,21 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		prevAttemptTime = now
 
 		if reconnectReason != nil {
-			if backoff, retry := topic.CheckRetryMode(reconnectReason, w.retrySettings, w.clock.Since(startOfRetries)); retry {
+			retryDuration := w.clock.Since(startOfRetries)
+			if backoff, retry := topic.CheckRetryMode(reconnectReason, w.retrySettings, retryDuration); retry {
 				delay := backoff.Delay(attempt)
+				delayTimer := w.clock.NewTimer(delay)
 				select {
 				case <-doneCtx:
+					delayTimer.Stop()
+
 					return
-				case <-w.clock.After(delay):
+				case <-delayTimer.Chan():
+					delayTimer.Stop() // no really need, stop for common style only
 					// pass
 				}
 			} else {
-				_ = w.close(ctx, reconnectReason)
+				_ = w.close(ctx, fmt.Errorf("%w, was retried (%v)", reconnectReason, retryDuration))
 
 				return
 			}

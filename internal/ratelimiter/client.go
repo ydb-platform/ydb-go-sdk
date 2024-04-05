@@ -37,11 +37,11 @@ func (c *Client) Close(ctx context.Context) error {
 	return nil
 }
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) (*Client, error) {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) *Client {
 	return &Client{
 		config:  config,
 		service: Ydb_RateLimiter_V1.NewRateLimiterServiceClient(cc),
-	}, nil
+	}
 }
 
 func (c *Client) CreateResource(

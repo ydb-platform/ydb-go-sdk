@@ -50,7 +50,7 @@ import (
 var _ Connection = (*Driver)(nil)
 
 // Driver type provide access to YDB service clients
-type Driver struct { //nolint:maligned
+type Driver struct {
 	ctx       context.Context // cancel while Driver.Close called.
 	ctxCancel context.CancelFunc
 
@@ -65,28 +65,28 @@ type Driver struct { //nolint:maligned
 	config  *config.Config
 	options []config.Option
 
-	discovery        *internalDiscovery.Client
+	discovery        *xsync.Once[*internalDiscovery.Client]
 	discoveryOptions []discoveryConfig.Option
 
-	table        *internalTable.Client
+	table        *xsync.Once[*internalTable.Client]
 	tableOptions []tableConfig.Option
 
-	query        *internalQuery.Client
+	query        *xsync.Once[*internalQuery.Client]
 	queryOptions []queryConfig.Option
 
-	scripting        *internalScripting.Client
+	scripting        *xsync.Once[*internalScripting.Client]
 	scriptingOptions []scriptingConfig.Option
 
-	scheme        *internalScheme.Client
+	scheme        *xsync.Once[*internalScheme.Client]
 	schemeOptions []schemeConfig.Option
 
-	coordination        *internalCoordination.Client
+	coordination        *xsync.Once[*internalCoordination.Client]
 	coordinationOptions []coordinationConfig.Option
 
-	ratelimiter        *internalRatelimiter.Client
+	ratelimiter        *xsync.Once[*internalRatelimiter.Client]
 	ratelimiterOptions []ratelimiterConfig.Option
 
-	topic        *topicclientinternal.Client
+	topic        *xsync.Once[*topicclientinternal.Client]
 	topicOptions []topicoptions.TopicOption
 
 	databaseSQLOptions []xsql.ConnectorOption
@@ -115,7 +115,9 @@ func (d *Driver) trace() *trace.Driver {
 //
 //nolint:nonamedreturns
 func (d *Driver) Close(ctx context.Context) (finalErr error) {
-	onDone := trace.DriverOnClose(d.trace(), &ctx, stack.FunctionID(""))
+	onDone := trace.DriverOnClose(d.trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/ydb.(*Driver).Close"),
+	)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -184,42 +186,46 @@ func (d *Driver) Secure() bool {
 
 // Table returns table client
 func (d *Driver) Table() table.Client {
-	return d.table
+	return d.table.Get()
 }
 
 // Query returns query client
+//
+// # Experimental
+//
+// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func (d *Driver) Query() query.Client {
-	return d.query
+	return d.query.Get()
 }
 
 // Scheme returns scheme client
 func (d *Driver) Scheme() scheme.Client {
-	return d.scheme
+	return d.scheme.Get()
 }
 
 // Coordination returns coordination client
 func (d *Driver) Coordination() coordination.Client {
-	return d.coordination
+	return d.coordination.Get()
 }
 
 // Ratelimiter returns ratelimiter client
 func (d *Driver) Ratelimiter() ratelimiter.Client {
-	return d.ratelimiter
+	return d.ratelimiter.Get()
 }
 
 // Discovery returns discovery client
 func (d *Driver) Discovery() discovery.Client {
-	return d.discovery
+	return d.discovery.Get()
 }
 
 // Scripting returns scripting client
 func (d *Driver) Scripting() scripting.Client {
-	return d.scripting
+	return d.scripting.Get()
 }
 
 // Topic returns topic client
 func (d *Driver) Topic() topic.Client {
-	return d.topic
+	return d.topic.Get()
 }
 
 // Open connects to database by DSN and return driver runtime holder
@@ -244,7 +250,7 @@ func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, err error
 
 	onDone := trace.DriverOnInit(
 		d.trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/ydb.Open"),
 		d.config.Endpoint(), d.config.Database(), d.config.Secure(),
 	)
 	defer func() {
@@ -280,7 +286,7 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 
 	onDone := trace.DriverOnInit(
 		d.trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/ydb.New"),
 		d.config.Endpoint(), d.config.Database(), d.config.Secure(),
 	)
 	defer func() {
@@ -296,7 +302,7 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 
 //nolint:cyclop, nonamedreturns
 func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, err error) {
-	ctx, driverCtxCancel := xcontext.WithCancel(xcontext.WithoutDeadline(ctx))
+	ctx, driverCtxCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 	defer func() {
 		if err != nil {
 			driverCtxCancel()
@@ -344,6 +350,7 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, e
 		for _, opt := range []Option{
 			WithTraceDriver(log.Driver(d.logger, d.loggerDetails, d.loggerOpts...)),       //nolint:contextcheck
 			WithTraceTable(log.Table(d.logger, d.loggerDetails, d.loggerOpts...)),         //nolint:contextcheck
+			WithTraceQuery(log.Query(d.logger, d.loggerDetails, d.loggerOpts...)),         //nolint:contextcheck
 			WithTraceScripting(log.Scripting(d.logger, d.loggerDetails, d.loggerOpts...)), //nolint:contextcheck
 			WithTraceScheme(log.Scheme(d.logger, d.loggerDetails, d.loggerOpts...)),
 			WithTraceCoordination(log.Coordination(d.logger, d.loggerDetails, d.loggerOpts...)),
@@ -395,138 +402,133 @@ func (d *Driver) connect(ctx context.Context) (err error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	d.table, err = internalTable.New(ctx,
-		d.balancer,
-		tableConfig.New(
-			append(
-				// prepend common params from root config
-				[]tableConfig.Option{
-					tableConfig.With(d.config.Common),
-				},
-				d.tableOptions...,
-			)...,
-		),
-	)
+	d.table = xsync.OnceValue(func() *internalTable.Client {
+		return internalTable.New(xcontext.ValueOnly(ctx),
+			d.balancer,
+			tableConfig.New(
+				append(
+					// prepend common params from root config
+					[]tableConfig.Option{
+						tableConfig.With(d.config.Common),
+					},
+					d.tableOptions...,
+				)...,
+			),
+		)
+	})
+
+	d.query = xsync.OnceValue(func() *internalQuery.Client {
+		return internalQuery.New(xcontext.ValueOnly(ctx),
+			d.balancer,
+			queryConfig.New(
+				append(
+					// prepend common params from root config
+					[]queryConfig.Option{
+						queryConfig.With(d.config.Common),
+					},
+					d.queryOptions...,
+				)...,
+			),
+		)
+	})
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 
-	d.query, err = internalQuery.New(ctx,
-		d.balancer,
-		queryConfig.New(
+	d.scheme = xsync.OnceValue(func() *internalScheme.Client {
+		return internalScheme.New(xcontext.ValueOnly(ctx),
+			d.balancer,
+			schemeConfig.New(
+				append(
+					// prepend common params from root config
+					[]schemeConfig.Option{
+						schemeConfig.WithDatabaseName(d.Name()),
+						schemeConfig.With(d.config.Common),
+					},
+					d.schemeOptions...,
+				)...,
+			),
+		)
+	})
+
+	d.coordination = xsync.OnceValue(func() *internalCoordination.Client {
+		return internalCoordination.New(xcontext.ValueOnly(ctx),
+			d.balancer,
+			coordinationConfig.New(
+				append(
+					// prepend common params from root config
+					[]coordinationConfig.Option{
+						coordinationConfig.With(d.config.Common),
+					},
+					d.coordinationOptions...,
+				)...,
+			),
+		)
+	})
+
+	d.ratelimiter = xsync.OnceValue(func() *internalRatelimiter.Client {
+		return internalRatelimiter.New(xcontext.ValueOnly(ctx),
+			d.balancer,
+			ratelimiterConfig.New(
+				append(
+					// prepend common params from root config
+					[]ratelimiterConfig.Option{
+						ratelimiterConfig.With(d.config.Common),
+					},
+					d.ratelimiterOptions...,
+				)...,
+			),
+		)
+	})
+
+	d.discovery = xsync.OnceValue(func() *internalDiscovery.Client {
+		return internalDiscovery.New(xcontext.ValueOnly(ctx),
+			d.pool.Get(endpoint.New(d.config.Endpoint())),
+			discoveryConfig.New(
+				append(
+					// prepend common params from root config
+					[]discoveryConfig.Option{
+						discoveryConfig.With(d.config.Common),
+						discoveryConfig.WithEndpoint(d.Endpoint()),
+						discoveryConfig.WithDatabase(d.Name()),
+						discoveryConfig.WithSecure(d.Secure()),
+						discoveryConfig.WithMeta(d.config.Meta()),
+					},
+					d.discoveryOptions...,
+				)...,
+			),
+		)
+	})
+
+	d.scripting = xsync.OnceValue(func() *internalScripting.Client {
+		return internalScripting.New(xcontext.ValueOnly(ctx),
+			d.balancer,
+			scriptingConfig.New(
+				append(
+					// prepend common params from root config
+					[]scriptingConfig.Option{
+						scriptingConfig.With(d.config.Common),
+					},
+					d.scriptingOptions...,
+				)...,
+			),
+		)
+	})
+
+	d.topic = xsync.OnceValue(func() *topicclientinternal.Client {
+		return topicclientinternal.New(xcontext.ValueOnly(ctx),
+			d.balancer,
+			d.config.Credentials(),
 			append(
 				// prepend common params from root config
-				[]queryConfig.Option{
-					queryConfig.With(d.config.Common),
+				[]topicoptions.TopicOption{
+					topicoptions.WithOperationTimeout(d.config.OperationTimeout()),
+					topicoptions.WithOperationCancelAfter(d.config.OperationCancelAfter()),
 				},
-				d.queryOptions...,
+				d.topicOptions...,
 			)...,
-		),
-	)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
-	d.scheme, err = internalScheme.New(ctx,
-		d.balancer,
-		schemeConfig.New(
-			append(
-				// prepend common params from root config
-				[]schemeConfig.Option{
-					schemeConfig.WithDatabaseName(d.Name()),
-					schemeConfig.With(d.config.Common),
-				},
-				d.schemeOptions...,
-			)...,
-		),
-	)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
-	d.coordination, err = internalCoordination.New(ctx,
-		d.balancer,
-		coordinationConfig.New(
-			append(
-				// prepend common params from root config
-				[]coordinationConfig.Option{
-					coordinationConfig.With(d.config.Common),
-				},
-				d.coordinationOptions...,
-			)...,
-		),
-	)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
-	d.ratelimiter, err = internalRatelimiter.New(ctx,
-		d.balancer,
-		ratelimiterConfig.New(
-			append(
-				// prepend common params from root config
-				[]ratelimiterConfig.Option{
-					ratelimiterConfig.With(d.config.Common),
-				},
-				d.ratelimiterOptions...,
-			)...,
-		),
-	)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
-	d.discovery, err = internalDiscovery.New(ctx,
-		d.pool.Get(endpoint.New(d.config.Endpoint())),
-		discoveryConfig.New(
-			append(
-				// prepend common params from root config
-				[]discoveryConfig.Option{
-					discoveryConfig.With(d.config.Common),
-					discoveryConfig.WithEndpoint(d.Endpoint()),
-					discoveryConfig.WithDatabase(d.Name()),
-					discoveryConfig.WithSecure(d.Secure()),
-					discoveryConfig.WithMeta(d.config.Meta()),
-				},
-				d.discoveryOptions...,
-			)...,
-		),
-	)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
-	d.scripting, err = internalScripting.New(ctx,
-		d.balancer,
-		scriptingConfig.New(
-			append(
-				// prepend common params from root config
-				[]scriptingConfig.Option{
-					scriptingConfig.With(d.config.Common),
-				},
-				d.scriptingOptions...,
-			)...,
-		),
-	)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-
-	d.topic, err = topicclientinternal.New(ctx,
-		d.balancer,
-		d.config.Credentials(),
-		append(
-			// prepend common params from root config
-			[]topicoptions.TopicOption{
-				topicoptions.WithOperationTimeout(d.config.OperationTimeout()),
-				topicoptions.WithOperationCancelAfter(d.config.OperationCancelAfter()),
-			},
-			d.topicOptions...,
-		)...,
-	)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
+		)
+	})
 
 	return nil
 }

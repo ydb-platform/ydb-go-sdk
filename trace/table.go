@@ -16,15 +16,9 @@ type (
 		// Client events
 		OnInit          func(TableInitStartInfo) func(TableInitDoneInfo)
 		OnClose         func(TableCloseStartInfo) func(TableCloseDoneInfo)
-		OnDo            func(TableDoStartInfo) func(info TableDoIntermediateInfo) func(TableDoDoneInfo)
-		OnDoTx          func(TableDoTxStartInfo) func(info TableDoTxIntermediateInfo) func(TableDoTxDoneInfo)
-		OnCreateSession func(
-			TableCreateSessionStartInfo,
-		) func(
-			info TableCreateSessionIntermediateInfo,
-		) func(
-			TableCreateSessionDoneInfo,
-		)
+		OnDo            func(TableDoStartInfo) func(TableDoDoneInfo)
+		OnDoTx          func(TableDoTxStartInfo) func(TableDoTxDoneInfo)
+		OnCreateSession func(TableCreateSessionStartInfo) func(TableCreateSessionDoneInfo)
 		// Session events
 		OnSessionNew       func(TableSessionNewStartInfo) func(TableSessionNewDoneInfo)
 		OnSessionDelete    func(TableSessionDeleteStartInfo) func(TableSessionDeleteDoneInfo)
@@ -35,36 +29,22 @@ type (
 		OnSessionQueryExecute func(TableExecuteDataQueryStartInfo) func(TableExecuteDataQueryDoneInfo)
 		OnSessionQueryExplain func(TableExplainQueryStartInfo) func(TableExplainQueryDoneInfo)
 		// Stream events
-		OnSessionQueryStreamExecute func(
-			TableSessionQueryStreamExecuteStartInfo,
-		) func(
-			TableSessionQueryStreamExecuteIntermediateInfo,
-		) func(
-			TableSessionQueryStreamExecuteDoneInfo,
-		)
-		OnSessionQueryStreamRead func(
-			TableSessionQueryStreamReadStartInfo,
-		) func(
-			TableSessionQueryStreamReadIntermediateInfo,
-		) func(
-			TableSessionQueryStreamReadDoneInfo,
-		)
+		OnSessionQueryStreamExecute func(TableSessionQueryStreamExecuteStartInfo) func(TableSessionQueryStreamExecuteDoneInfo)
+		OnSessionQueryStreamRead    func(TableSessionQueryStreamReadStartInfo) func(TableSessionQueryStreamReadDoneInfo)
 		// Transaction events
-		OnSessionTransactionBegin func(TableSessionTransactionBeginStartInfo) func(
-			TableSessionTransactionBeginDoneInfo,
+		OnTxBegin func(TableTxBeginStartInfo) func(
+			TableTxBeginDoneInfo,
 		)
-		OnSessionTransactionExecute func(TableTransactionExecuteStartInfo) func(
+		OnTxExecute func(TableTransactionExecuteStartInfo) func(
 			TableTransactionExecuteDoneInfo,
 		)
-		OnSessionTransactionExecuteStatement func(TableTransactionExecuteStatementStartInfo) func(
+		OnTxExecuteStatement func(TableTransactionExecuteStatementStartInfo) func(
 			TableTransactionExecuteStatementDoneInfo,
 		)
-		OnSessionTransactionCommit func(TableSessionTransactionCommitStartInfo) func(
-			TableSessionTransactionCommitDoneInfo,
+		OnTxCommit func(TableTxCommitStartInfo) func(
+			TableTxCommitDoneInfo,
 		)
-		OnSessionTransactionRollback func(TableSessionTransactionRollbackStartInfo) func(
-			TableSessionTransactionRollbackDoneInfo,
-		)
+		OnTxRollback func(TableTxRollbackStartInfo) func(TableTxRollbackDoneInfo)
 		// Pool state event
 		OnPoolStateChange func(TablePoolStateChangeInfo)
 
@@ -72,16 +52,6 @@ type (
 		OnPoolSessionAdd    func(info TablePoolSessionAddInfo)
 		OnPoolSessionRemove func(info TablePoolSessionRemoveInfo)
 
-		// OnPoolSessionNew is user-defined callback for listening events about creating sessions with
-		// internal session pool calls
-		//
-		// Deprecated: use OnPoolSessionAdd callback
-		OnPoolSessionNew func(TablePoolSessionNewStartInfo) func(TablePoolSessionNewDoneInfo)
-
-		// OnPoolSessionClose is user-defined callback for listening sessionClose calls
-		//
-		// Deprecated: use OnPoolSessionRemove callback
-		OnPoolSessionClose func(TablePoolSessionCloseStartInfo) func(TablePoolSessionCloseDoneInfo)
 		// Pool common API events
 		OnPoolPut  func(TablePoolPutStartInfo) func(TablePoolPutDoneInfo)
 		OnPoolGet  func(TablePoolGetStartInfo) func(TablePoolGetDoneInfo)
@@ -250,9 +220,6 @@ type (
 		Call    call
 		Session tableSessionInfo
 	}
-	TableSessionQueryStreamReadIntermediateInfo struct {
-		Error error
-	}
 	TableSessionQueryStreamReadDoneInfo struct {
 		Error error
 	}
@@ -267,13 +234,10 @@ type (
 		Query      tableDataQuery
 		Parameters tableQueryParameters
 	}
-	TableSessionQueryStreamExecuteIntermediateInfo struct {
-		Error error
-	}
 	TableSessionQueryStreamExecuteDoneInfo struct {
 		Error error
 	}
-	TableSessionTransactionBeginStartInfo struct {
+	TableTxBeginStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -282,11 +246,11 @@ type (
 		Call    call
 		Session tableSessionInfo
 	}
-	TableSessionTransactionBeginDoneInfo struct {
+	TableTxBeginDoneInfo struct {
 		Tx    tableTransactionInfo
 		Error error
 	}
-	TableSessionTransactionCommitStartInfo struct {
+	TableTxCommitStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -296,10 +260,10 @@ type (
 		Session tableSessionInfo
 		Tx      tableTransactionInfo
 	}
-	TableSessionTransactionCommitDoneInfo struct {
+	TableTxCommitDoneInfo struct {
 		Error error
 	}
-	TableSessionTransactionRollbackStartInfo struct {
+	TableTxRollbackStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
@@ -309,7 +273,7 @@ type (
 		Session tableSessionInfo
 		Tx      tableTransactionInfo
 	}
-	TableSessionTransactionRollbackDoneInfo struct {
+	TableTxRollbackDoneInfo struct {
 		Error error
 	}
 	TableInitStartInfo struct {
@@ -322,7 +286,6 @@ type (
 	}
 	TableInitDoneInfo struct {
 		Limit int
-		Error error
 	}
 	TablePoolStateChangeInfo struct {
 		Size  int
@@ -415,15 +378,9 @@ type (
 		Context *context.Context
 		Call    call
 
-		// Deprecated: use Label field instead
-		ID string
-
 		Label      string
 		Idempotent bool
 		NestedCall bool // flag when Retry called inside head Retry
-	}
-	TableDoIntermediateInfo struct {
-		Error error
 	}
 	TableDoDoneInfo struct {
 		Attempts int
@@ -437,15 +394,9 @@ type (
 		Context *context.Context
 		Call    call
 
-		// Deprecated: use Label field instead
-		ID string
-
 		Label      string
 		Idempotent bool
 		NestedCall bool // flag when Retry called inside head Retry
-	}
-	TableDoTxIntermediateInfo struct {
-		Error error
 	}
 	TableDoTxDoneInfo struct {
 		Attempts int
@@ -458,9 +409,6 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context *context.Context
 		Call    call
-	}
-	TableCreateSessionIntermediateInfo struct {
-		Error error
 	}
 	TableCreateSessionDoneInfo struct {
 		Session  tableSessionInfo

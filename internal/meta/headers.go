@@ -7,8 +7,9 @@ const (
 	HeaderVersion            = "x-ydb-sdk-build-info"
 	HeaderRequestType        = "x-ydb-request-type"
 	HeaderTraceID            = "x-ydb-trace-id"
-	HeaderUserAgent          = "x-ydb-user-agent"
+	HeaderApplicationName    = "x-ydb-application-name"
 	HeaderClientCapabilities = "x-ydb-client-capabilities"
+	HeaderClientPid          = "x-ydb-client-pid"
 
 	// outgoing hints
 	HintSessionBalancer = "session-balancer"

@@ -9,7 +9,7 @@ import (
 
 // ErrUnexpectedCodec will return if topicreader receive message with unknown codec.
 // client side must check error with errors.Is
-var ErrUnexpectedCodec = topicreaderinternal.PublicErrUnexpectedCodec
+var ErrUnexpectedCodec = topicreaderinternal.ErrPublicUnexpectedCodec
 
 // ErrConcurrencyCall return if method on reader called in concurrency
 // client side must check error with errors.Is

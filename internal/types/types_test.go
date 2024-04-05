@@ -2,6 +2,10 @@ package types
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pg"
 )
 
 func TestTypeToString(t *testing.T) {
@@ -265,10 +269,112 @@ func TestTypeToString(t *testing.T) {
 			),
 			s: "Variant<Bool,Float>",
 		},
+		{
+			t: PgType{OID: pg.OIDUnknown},
+			s: "PgType(705)",
+		},
 	} {
 		t.Run(tt.s, func(t *testing.T) {
 			if got := tt.t.Yql(); got != tt.s {
 				t.Errorf("s representations not equals:\n\n -  got: %s\n\n - want: %s", got, tt.s)
+			}
+		})
+	}
+}
+
+func TestEqual(t *testing.T) {
+	tests := []struct {
+		lhs   Type
+		rhs   Type
+		equal bool
+	}{
+		{
+			Bool,
+			Bool,
+			true,
+		},
+		{
+			Bool,
+			Text,
+			false,
+		},
+		{
+			Text,
+			Text,
+			true,
+		},
+		{
+			NewOptional(Bool),
+			NewOptional(Bool),
+			true,
+		},
+		{
+			NewOptional(Bool),
+			NewOptional(Text),
+			false,
+		},
+		{
+			NewOptional(Text),
+			NewOptional(Text),
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run("", func(t *testing.T) {
+			if equal := Equal(tt.lhs, tt.rhs); equal != tt.equal {
+				t.Errorf("Equal(%s, %s) = %v, want %v", tt.lhs, tt.rhs, equal, tt.equal)
+			}
+		})
+	}
+}
+
+func TestOptionalInnerType(t *testing.T) {
+	tests := []struct {
+		src        Type
+		innerType  Type
+		isOptional bool
+	}{
+		{
+			Bool,
+			nil,
+			false,
+		},
+		{
+			Text,
+			nil,
+			false,
+		},
+		{
+			NewOptional(Bool),
+			Bool,
+			true,
+		},
+		{
+			NewOptional(Text),
+			Text,
+			true,
+		},
+		{
+			NewOptional(NewTuple(Text, Bool, Uint64, NewOptional(Int64))),
+			NewTuple(Text, Bool, Uint64, NewOptional(Int64)),
+			true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run("", func(t *testing.T) {
+			optional, isOptional := tt.src.(interface {
+				IsOptional()
+				InnerType() Type
+			})
+			require.Equal(t, tt.isOptional, isOptional)
+			var innerType Type
+			if isOptional {
+				innerType = optional.InnerType()
+			}
+			if tt.innerType == nil {
+				require.Nil(t, innerType)
+			} else {
+				require.True(t, Equal(tt.innerType, innerType))
 			}
 		})
 	}

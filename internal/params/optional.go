@@ -17,7 +17,7 @@ type (
 	}
 )
 
-func (b *optionalBuilder) Build() Builder {
+func (b *optionalBuilder) EndOptional() Builder {
 	b.opt.parent.params = append(b.opt.parent.params, &Parameter{
 		parent: b.opt.parent,
 		name:   b.opt.name,
@@ -131,6 +131,48 @@ func (p *optional) Datetime(v time.Time) *optionalBuilder {
 
 func (p *optional) Interval(v time.Duration) *optionalBuilder {
 	p.value = value.IntervalValueFromDuration(v)
+
+	return &optionalBuilder{opt: p}
+}
+
+func (p *optional) JSON(v string) *optionalBuilder {
+	p.value = value.JSONValue(v)
+
+	return &optionalBuilder{opt: p}
+}
+
+func (p *optional) JSONDocument(v string) *optionalBuilder {
+	p.value = value.JSONDocumentValue(v)
+
+	return &optionalBuilder{opt: p}
+}
+
+func (p *optional) YSON(v []byte) *optionalBuilder {
+	p.value = value.YSONValue(v)
+
+	return &optionalBuilder{opt: p}
+}
+
+func (p *optional) UUID(v [16]byte) *optionalBuilder {
+	p.value = value.UUIDValue(v)
+
+	return &optionalBuilder{opt: p}
+}
+
+func (p *optional) TzDate(v time.Time) *optionalBuilder {
+	p.value = value.TzDateValueFromTime(v)
+
+	return &optionalBuilder{opt: p}
+}
+
+func (p *optional) TzTimestamp(v time.Time) *optionalBuilder {
+	p.value = value.TzTimestampValueFromTime(v)
+
+	return &optionalBuilder{opt: p}
+}
+
+func (p *optional) TzDatetime(v time.Time) *optionalBuilder {
+	p.value = value.TzDatetimeValueFromTime(v)
 
 	return &optionalBuilder{opt: p}
 }

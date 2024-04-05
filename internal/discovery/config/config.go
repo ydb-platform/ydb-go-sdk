@@ -29,9 +29,9 @@ func New(opts ...Option) *Config {
 		interval: DefaultInterval,
 		trace:    &trace.Discovery{},
 	}
-	for _, o := range opts {
-		if o != nil {
-			o(c)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(c)
 		}
 	}
 

@@ -38,16 +38,16 @@ func (c *Client) Close(_ context.Context) error {
 	return nil
 }
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) (*Client, error) {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) *Client {
 	return &Client{
 		config:  config,
 		service: Ydb_Scheme_V1.NewSchemeServiceClient(cc),
-	}, nil
+	}
 }
 
 func (c *Client) MakeDirectory(ctx context.Context, path string) (finalErr error) {
 	onDone := trace.SchemeOnMakeDirectory(c.config.Trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scheme.(*Client).MakeDirectory"),
 		path,
 	)
 	defer func() {
@@ -86,7 +86,7 @@ func (c *Client) makeDirectory(ctx context.Context, path string) (err error) {
 
 func (c *Client) RemoveDirectory(ctx context.Context, path string) (finalErr error) {
 	onDone := trace.SchemeOnRemoveDirectory(c.config.Trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scheme.(*Client).RemoveDirectory"),
 		path,
 	)
 	defer func() {
@@ -124,7 +124,9 @@ func (c *Client) removeDirectory(ctx context.Context, path string) (err error) {
 }
 
 func (c *Client) ListDirectory(ctx context.Context, path string) (d scheme.Directory, finalErr error) {
-	onDone := trace.SchemeOnListDirectory(c.config.Trace(), &ctx, stack.FunctionID(""))
+	onDone := trace.SchemeOnListDirectory(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scheme.(*Client).ListDirectory"),
+	)
 	defer func() {
 		onDone(finalErr)
 	}()
@@ -182,7 +184,7 @@ func (c *Client) listDirectory(ctx context.Context, path string) (scheme.Directo
 
 func (c *Client) DescribePath(ctx context.Context, path string) (e scheme.Entry, finalErr error) {
 	onDone := trace.SchemeOnDescribePath(c.config.Trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scheme.(*Client).DescribePath"),
 		path,
 	)
 	defer func() {
@@ -243,16 +245,16 @@ func (c *Client) ModifyPermissions(
 	ctx context.Context, path string, opts ...scheme.PermissionsOption,
 ) (finalErr error) {
 	onDone := trace.SchemeOnModifyPermissions(c.config.Trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scheme.(*Client).ModifyPermissions"),
 		path,
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
 	var desc permissionsDesc
-	for _, o := range opts {
-		if o != nil {
-			o(&desc)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&desc)
 		}
 	}
 	call := func(ctx context.Context) error {

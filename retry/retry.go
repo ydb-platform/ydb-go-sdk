@@ -232,7 +232,7 @@ func WithPanicCallback(panicCallback func(e interface{})) panicCallbackOption {
 // If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
 func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr error) {
 	options := &retryOptions{
-		call:        stack.FunctionID(""),
+		call:        stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.Retry"),
 		trace:       &trace.Retry{},
 		fastBackoff: backoff.Fast,
 		slowBackoff: backoff.Slow,
@@ -256,13 +256,13 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 		i        int
 		attempts int
 
-		code           = int64(0)
-		onIntermediate = trace.RetryOnRetry(options.trace, &ctx,
-			options.label, options.call, options.label, options.idempotent, xcontext.IsNestedCall(ctx),
+		code   = int64(0)
+		onDone = trace.RetryOnRetry(options.trace, &ctx,
+			options.call, options.label, options.idempotent, xcontext.IsNestedCall(ctx),
 		)
 	)
 	defer func() {
-		onIntermediate(finalErr)(attempts, finalErr)
+		onDone(attempts, finalErr)
 	}()
 	for {
 		i++
@@ -329,8 +329,6 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 			}
 
 			code = m.StatusCode()
-
-			onIntermediate(err)
 		}
 	}
 }
@@ -340,9 +338,9 @@ func Check(err error) (m retryMode) {
 	code, errType, backoffType, deleteSession := xerrors.Check(err)
 
 	return retryMode{
-		code:          code,
-		errType:       errType,
-		backoff:       backoffType,
-		deleteSession: deleteSession,
+		code:               code,
+		errType:            errType,
+		backoff:            backoffType,
+		isRetryObjectValid: deleteSession,
 	}
 }

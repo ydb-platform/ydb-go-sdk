@@ -72,6 +72,11 @@ func TypeFromYDB(x *Ydb.Type) Type {
 	case *Ydb.Type_NullType:
 		return NewNull()
 
+	case *Ydb.Type_PgType:
+		return &PgType{
+			OID: x.GetPgType().GetOid(),
+		}
+
 	default:
 		panic("ydb: unknown type")
 	}
@@ -463,6 +468,37 @@ func NewOptional(t Type) Optional {
 	return Optional{
 		innerType: t,
 	}
+}
+
+type PgType struct {
+	OID uint32
+}
+
+func (v PgType) String() string {
+	return v.Yql()
+}
+
+func (v PgType) Yql() string {
+	return fmt.Sprintf("PgType(%v)", v.OID)
+}
+
+func (v PgType) ToYDB(a *allocator.Allocator) *Ydb.Type {
+	//nolint:godox
+	// TODO: make allocator
+	return &Ydb.Type{Type: &Ydb.Type_PgType{
+		PgType: &Ydb.PgType{
+			Oid: v.OID,
+		},
+	}}
+}
+
+func (v PgType) equalsTo(rhs Type) bool {
+	vv, ok := rhs.(PgType)
+	if !ok {
+		return false
+	}
+
+	return v.OID == vv.OID
 }
 
 type Primitive uint

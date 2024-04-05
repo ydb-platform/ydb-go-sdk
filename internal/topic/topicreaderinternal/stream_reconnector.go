@@ -29,30 +29,24 @@ var (
 type readerConnectFunc func(ctx context.Context) (batchedStreamReader, error)
 
 type readerReconnector struct {
-	clock      clockwork.Clock
-	background background.Worker
-
-	tracer        *trace.Topic
-	baseContext   context.Context
-	retrySettings topic.RetrySettings
-
-	readerConnect readerConnectFunc
-
-	reconnectFromBadStream chan reconnectRequest
-	connectTimeout         time.Duration
-
-	closeOnce sync.Once
-	readerID  int64
-
-	m                          xsync.RWMutex
-	streamConnectionInProgress empty.Chan // opened if connection in progress, closed if connection established
+	background                 background.Worker
+	clock                      clockwork.Clock
+	baseContext                context.Context
+	retrySettings              topic.RetrySettings
 	streamVal                  batchedStreamReader
 	streamErr                  error
 	closedErr                  error
-
-	initErr    error
-	initDone   bool
-	initDoneCh empty.Chan
+	initErr                    error
+	tracer                     *trace.Topic
+	readerConnect              readerConnectFunc
+	reconnectFromBadStream     chan reconnectRequest
+	connectTimeout             time.Duration
+	readerID                   int64
+	streamConnectionInProgress empty.Chan // opened if connection in progress, closed if connection established
+	initDoneCh                 empty.Chan
+	m                          xsync.RWMutex
+	closeOnce                  sync.Once
+	initDone                   bool
 }
 
 //nolint:revive
@@ -334,9 +328,12 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 		result <- connectResult{stream: stream, err: err}
 	}()
 
+	connectionTimoutTimer := r.clock.NewTimer(r.connectTimeout)
+	defer connectionTimoutTimer.Stop()
+
 	var res connectResult
 	select {
-	case <-r.clock.After(r.connectTimeout):
+	case <-connectionTimoutTimer.Chan():
 		// cancel connection context only if timeout exceed while connection
 		// because if cancel context after connect - it will break
 		cancel()

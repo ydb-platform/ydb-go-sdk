@@ -17,13 +17,19 @@ type (
 	}
 )
 
-func (l *list) AddItem() *listItem {
+func (l *list) Add() *listItem {
 	return &listItem{
 		parent: l,
 	}
 }
 
-func (l *list) Build() Builder {
+func (l *list) AddItems(items ...value.Value) *list {
+	l.values = append(l.values, items...)
+
+	return l
+}
+
+func (l *list) EndList() Builder {
 	l.parent.params = append(l.parent.params, &Parameter{
 		parent: l.parent,
 		name:   l.name,
@@ -137,6 +143,48 @@ func (l *listItem) Datetime(v time.Time) *list {
 
 func (l *listItem) Interval(v time.Duration) *list {
 	l.parent.values = append(l.parent.values, value.IntervalValueFromDuration(v))
+
+	return l.parent
+}
+
+func (l *listItem) JSON(v string) *list {
+	l.parent.values = append(l.parent.values, value.JSONValue(v))
+
+	return l.parent
+}
+
+func (l *listItem) JSONDocument(v string) *list {
+	l.parent.values = append(l.parent.values, value.JSONDocumentValue(v))
+
+	return l.parent
+}
+
+func (l *listItem) YSON(v []byte) *list {
+	l.parent.values = append(l.parent.values, value.YSONValue(v))
+
+	return l.parent
+}
+
+func (l *listItem) UUID(v [16]byte) *list {
+	l.parent.values = append(l.parent.values, value.UUIDValue(v))
+
+	return l.parent
+}
+
+func (l *listItem) TzDate(v time.Time) *list {
+	l.parent.values = append(l.parent.values, value.TzDateValueFromTime(v))
+
+	return l.parent
+}
+
+func (l *listItem) TzTimestamp(v time.Time) *list {
+	l.parent.values = append(l.parent.values, value.TzTimestampValueFromTime(v))
+
+	return l.parent
+}
+
+func (l *listItem) TzDatetime(v time.Time) *list {
+	l.parent.values = append(l.parent.values, value.TzDatetimeValueFromTime(v))
 
 	return l.parent
 }
