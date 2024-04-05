@@ -17,7 +17,7 @@ We making the following exceptions to those guidelines:
    - Deprecated features will not be removed or changed for a minimum period of **six months** since the mark added.
    - We reserve the right to remove or modify these deprecated features without increase to major part of version.
 3) **Internals**
-   - Some public packages of `ydb-go-sdk` relate to the internals.
+   - Some public API of `ydb-go-sdk` relate to the internals.
    - We use the `// Internals` comment for public internals in the `ydb-go-sdk`.
    - `ydb-go-sdk` internals can be changed at any time.
    - That's why versioning rules of [SemVer2.0.0](https://semver.org/) does not apply to internals.
