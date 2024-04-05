@@ -22,6 +22,10 @@ Supports `table`, `query`, `discovery`, `coordination`, `ratelimiter`, `scheme`,
 `ydb-go-sdk` supports all Go versions supported by the official [Go Release Policy](https://go.dev/doc/devel/release#policy). 
 That is, the two most recent releases of Go.
 
+## Versioning Policy
+
+`ydb-go-sdk` comply to guidelines as defined by [SemVer2.0.0](https://semver.org/) with an several [exceptions](VERSIONING.md).
+
 ## Installation
 
 ```sh
