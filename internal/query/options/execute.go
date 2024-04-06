@@ -112,15 +112,18 @@ const (
 
 func defaultCommonExecuteSettings() commonExecuteSettings {
 	return commonExecuteSettings{
-		syntax:    SyntaxYQL,
-		execMode:  ExecModeExecute,
-		statsMode: StatsModeNone,
+		syntax:      SyntaxYQL,
+		params:      params.Parameters{},
+		execMode:    ExecModeExecute,
+		statsMode:   StatsModeNone,
+		callOptions: nil,
 	}
 }
 
 func ExecuteSettings(opts ...ExecuteOption) (settings *Execute) {
 	settings = &Execute{
 		commonExecuteSettings: defaultCommonExecuteSettings(),
+		txControl:             nil,
 	}
 	settings.commonExecuteSettings = defaultCommonExecuteSettings()
 	settings.txControl = tx.DefaultTxControl()
@@ -168,6 +171,7 @@ func (s *commonExecuteSettings) Params() *params.Parameters {
 func TxExecuteSettings(id string, opts ...TxExecuteOption) (settings *txExecuteSettings) {
 	settings = &txExecuteSettings{
 		ExecuteSettings: ExecuteSettings(WithTxControl(tx.NewControl(tx.WithTxID(id)))),
+		commitTx:        false,
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -190,7 +194,7 @@ var (
 	_ TxExecuteOption = ExecMode(0)
 	_ TxExecuteOption = StatsMode(0)
 	_ TxExecuteOption = txCommitOption{}
-	_ ExecuteOption   = TxControlOption{}
+	_ ExecuteOption   = TxControlOption{txControl: nil}
 )
 
 func WithCommit() txCommitOption {

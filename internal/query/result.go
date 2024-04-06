@@ -34,7 +34,7 @@ func newResult(
 	closeResult context.CancelFunc,
 ) (_ *result, txID string, err error) {
 	if t == nil {
-		t = &trace.Query{}
+		t = new(trace.Query)
 	}
 	if closeResult == nil {
 		closeResult = func() {}
@@ -74,6 +74,7 @@ func newResult(
 			lastPart:       part,
 			closed:         closed,
 			closeOnce:      closeOnce,
+			errs:           nil,
 			trace:          t,
 		}, part.GetTxMeta().GetId(), nil
 	}
@@ -85,7 +86,7 @@ func nextPart(
 	t *trace.Query,
 ) (_ *Ydb_Query.ExecuteQueryResponsePart, finalErr error) {
 	if t == nil {
-		t = &trace.Query{}
+		t = new(trace.Query)
 	}
 
 	onDone := trace.QueryOnResultNextPart(t, &ctx,

@@ -9,12 +9,12 @@ import (
 var (
 	_ DoOption = idempotentOption{}
 	_ DoOption = labelOption("")
-	_ DoOption = traceOption{}
+	_ DoOption = traceOption{t: nil}
 
 	_ DoTxOption = idempotentOption{}
 	_ DoTxOption = labelOption("")
-	_ DoTxOption = traceOption{}
-	_ DoTxOption = doTxSettingsOption{}
+	_ DoTxOption = traceOption{t: nil}
+	_ DoTxOption = doTxSettingsOption{txSettings: tx.Settings{}}
 )
 
 type (
@@ -108,7 +108,8 @@ func WithTrace(t *trace.Query) traceOption {
 
 func ParseDoOpts(t *trace.Query, opts ...DoOption) (s *doSettings) {
 	s = &doSettings{
-		trace: t,
+		retryOpts: nil,
+		trace:     t,
 	}
 
 	for _, opt := range opts {

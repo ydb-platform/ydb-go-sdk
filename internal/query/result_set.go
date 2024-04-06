@@ -32,7 +32,7 @@ func newResultSet(
 	t *trace.Query,
 ) *resultSet {
 	if t == nil {
-		t = &trace.Query{}
+		t = new(trace.Query)
 	}
 
 	return &resultSet{
