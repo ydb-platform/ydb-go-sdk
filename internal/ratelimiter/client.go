@@ -299,6 +299,10 @@ func (c *Client) describeResource(
 
 	resource := &ratelimiter.Resource{
 		ResourcePath: result.GetResource().GetResourcePath(),
+		HierarchicalDrr: ratelimiter.HierarchicalDrrSettings{
+			MaxUnitsPerSecond: 0, MaxBurstSizeCoefficient: 0,
+			PrefetchCoefficient: 0, PrefetchWatermark: 0,
+		},
 	}
 
 	if result.GetResource().GetHierarchicalDrr() != nil {
