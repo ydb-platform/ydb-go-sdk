@@ -3,10 +3,10 @@ package retry
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wait"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -25,6 +25,7 @@ type retryOptions struct {
 	stackTrace  bool
 	fastBackoff backoff.Backoff
 	slowBackoff backoff.Backoff
+	limiter     Limiter
 
 	panicCallback func(e interface{})
 }
@@ -122,6 +123,29 @@ func (t traceOption) ApplyDoTxOption(opts *doTxOptions) {
 // WithTrace returns trace option
 func WithTrace(t *trace.Retry) traceOption {
 	return traceOption{t: t}
+}
+
+var _ Option = limiterOption{}
+
+type limiterOption struct {
+	l Limiter
+}
+
+func (l limiterOption) ApplyRetryOption(opts *retryOptions) {
+	opts.limiter = l.l
+}
+
+func (l limiterOption) ApplyDoOption(opts *doOptions) {
+	opts.retryOptions = append(opts.retryOptions, WithLimiter(l.l))
+}
+
+func (l limiterOption) ApplyDoTxOption(opts *doTxOptions) {
+	opts.retryOptions = append(opts.retryOptions, WithLimiter(l.l))
+}
+
+// WithLimiter returns limiter option
+func WithLimiter(l Limiter) limiterOption {
+	return limiterOption{l: l}
 }
 
 var _ Option = idempotentOption(false)
@@ -234,6 +258,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 	options := &retryOptions{
 		call:        stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.Retry"),
 		trace:       &trace.Retry{},
+		limiter:     Quoter(-1),
 		fastBackoff: backoff.Fast,
 		slowBackoff: backoff.Slow,
 	}
@@ -297,20 +322,13 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 				return nil
 			}
 
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				return xerrors.WithStackTrace(
-					xerrors.Join(
-						fmt.Errorf("context error occurred on attempt No.%d", attempts),
-						ctxErr, err,
-					),
-				)
-			}
-
 			m := Check(err)
 
 			if m.StatusCode() != code {
 				i = 0
 			}
+
+			code = m.StatusCode()
 
 			if !m.MustRetry(options.idempotent) {
 				return xerrors.WithStackTrace(
@@ -320,17 +338,33 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 				)
 			}
 
-			if e := wait.Wait(ctx, options.fastBackoff, options.slowBackoff, m.BackoffType(), i); e != nil {
+			t := time.NewTimer(backoff.Delay(m.BackoffType(), i,
+				backoff.WithFastBackof(options.fastBackoff),
+				backoff.WithSlowBackof(options.slowBackoff),
+			))
+
+			select {
+			case <-ctx.Done():
+				t.Stop()
+
 				return xerrors.WithStackTrace(
 					xerrors.Join(
-						fmt.Errorf("wait exit on attempt No.%d",
-							attempts,
-						), e, err,
+						fmt.Errorf("attempt No.%d: %w", attempts, ctx.Err()),
+						err,
 					),
 				)
-			}
+			case <-t.C:
+				t.Stop()
 
-			code = m.StatusCode()
+				if e := options.limiter.Acquire(ctx); e != nil {
+					return xerrors.WithStackTrace(
+						xerrors.Join(
+							fmt.Errorf("attempt No.%d: %w", attempts, ErrNoQuota),
+							err,
+						),
+					)
+				}
+			}
 		}
 	}
 }

@@ -520,10 +520,10 @@ var _ Option = retryOptionsOption{}
 type retryOptionsOption []retry.Option
 
 func (retryOptions retryOptionsOption) ApplyTableOption(opts *Options) {
-	opts.RetryOptions = append(opts.RetryOptions, retry.WithIdempotent(true))
+	opts.RetryOptions = append(opts.RetryOptions, retryOptions...)
 }
 
-func WithRetryOptions(retryOptions []retry.Option) retryOptionsOption {
+func WithRetryOptions(retryOptions ...retry.Option) retryOptionsOption {
 	return retryOptions
 }
 

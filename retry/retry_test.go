@@ -2,6 +2,7 @@ package retry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
 func TestRetryModes(t *testing.T) {
@@ -186,4 +188,17 @@ func TestRetryTransportCancelled(t *testing.T) {
 			require.Equal(t, cancelCounterValue, counter)
 		})
 	}
+}
+
+func TestRetryWithLimiter(t *testing.T) {
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		l := Quoter(10)
+		defer l.Stop()
+		ctx, cancel := context.WithTimeout(xtest.Context(t), 5*time.Millisecond)
+		defer cancel()
+		err := Retry(ctx, func(ctx context.Context) (err error) {
+			return RetryableError(errors.New("custom error"))
+		}, WithLimiter(l))
+		require.ErrorIs(t, err, ErrNoQuota)
+	})
 }

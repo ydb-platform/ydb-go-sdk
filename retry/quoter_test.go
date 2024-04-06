@@ -13,11 +13,13 @@ import (
 )
 
 func TestUnlimitedLimiter(t *testing.T) {
-	ctx, cancel := xcontext.WithCancel(xtest.Context(t))
-	q := unlimitedLimiter{}
-	require.NoError(t, q.Acquire(ctx))
-	cancel()
-	require.ErrorIs(t, q.Acquire(ctx), context.Canceled)
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		ctx, cancel := xcontext.WithCancel(xtest.Context(t))
+		q := Quoter(-1)
+		require.NoError(t, q.Acquire(ctx))
+		cancel()
+		require.ErrorIs(t, q.Acquire(ctx), context.Canceled)
+	})
 }
 
 func TestQuoter(t *testing.T) {

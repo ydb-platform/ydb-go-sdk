@@ -2,9 +2,18 @@ package retry
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/jonboulle/clockwork"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+)
+
+var (
+	ErrNoQuota = xerrors.Wrap(errors.New("no retry quota"))
+
+	_ Limiter = (*rateLimiter)(nil)
 )
 
 type (
@@ -17,57 +26,54 @@ type (
 		quota  chan struct{}
 	}
 	rateLimiterOption func(q *rateLimiter)
-	unlimitedLimiter  struct{}
 )
 
-func (unlimitedLimiter) Acquire(ctx context.Context) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-		return nil
-	}
-}
-
-var (
-	_ Limiter = (*rateLimiter)(nil)
-	_ Limiter = (*unlimitedLimiter)(nil)
-)
-
-func Quoter(rate uint, opts ...rateLimiterOption) *rateLimiter {
+func Quoter(attemptsPerSecond int, opts ...rateLimiterOption) *rateLimiter {
 	q := &rateLimiter{
 		clock: clockwork.NewRealClock(),
-		quota: make(chan struct{}, rate),
-	}
-	for range make([]struct{}, rate) {
-		q.quota <- struct{}{}
 	}
 	for _, opt := range opts {
 		opt(q)
 	}
-	q.ticker = q.clock.NewTicker(time.Second / time.Duration(rate))
-	go func() {
-		defer close(q.quota)
-		for range q.ticker.Chan() {
-			select {
-			case q.quota <- struct{}{}:
-			default:
-			}
+	if attemptsPerSecond <= 0 {
+		q.quota = make(chan struct{})
+		close(q.quota)
+	} else {
+		q.quota = make(chan struct{}, attemptsPerSecond)
+		for range make([]struct{}, attemptsPerSecond) {
+			q.quota <- struct{}{}
 		}
-	}()
+		q.ticker = q.clock.NewTicker(time.Second / time.Duration(attemptsPerSecond))
+		go func() {
+			defer close(q.quota)
+			for range q.ticker.Chan() {
+				select {
+				case q.quota <- struct{}{}:
+				default:
+				}
+			}
+		}()
+	}
 
 	return q
 }
 
 func (q *rateLimiter) Stop() {
-	q.ticker.Stop()
+	if q.ticker != nil {
+		q.ticker.Stop()
+	}
 }
 
 func (q *rateLimiter) Acquire(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
-	case <-q.quota:
-		return nil
+	default:
+		select {
+		case <-q.quota:
+			return nil
+		case <-ctx.Done():
+			return xerrors.WithStackTrace(ctx.Err())
+		}
 	}
 }

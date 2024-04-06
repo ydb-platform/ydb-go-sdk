@@ -44,6 +44,7 @@ type (
 	doTxSettingsOption struct {
 		txSettings tx.Settings
 	}
+	retryOptionsOption []retry.Option
 )
 
 func (s *doSettings) Trace() *trace.Query {
@@ -104,6 +105,18 @@ func WithLabel(lbl string) labelOption {
 
 func WithTrace(t *trace.Query) traceOption {
 	return traceOption{t: t}
+}
+
+func (opts retryOptionsOption) applyDoOption(s *doSettings) {
+	s.retryOpts = append(s.retryOpts, opts...)
+}
+
+func (opts retryOptionsOption) applyDoTxOption(s *doTxSettings) {
+	s.doOpts = append(s.doOpts, opts)
+}
+
+func WithRetryOptions(retryOptions ...retry.Option) retryOptionsOption {
+	return retryOptions
 }
 
 func ParseDoOpts(t *trace.Query, opts ...DoOption) (s *doSettings) {

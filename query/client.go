@@ -5,6 +5,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -65,4 +66,8 @@ func WithTrace(t *trace.Query) bothDoAndDoTxOption {
 
 func WithLabel(lbl string) bothDoAndDoTxOption {
 	return options.WithLabel(lbl)
+}
+
+func WithRetryOptions(retryOptions ...retry.Option) bothDoAndDoTxOption {
+	return options.WithRetryOptions(retryOptions...)
 }
