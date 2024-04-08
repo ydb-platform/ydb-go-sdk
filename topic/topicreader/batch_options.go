@@ -22,7 +22,10 @@ func (count WithBatchMaxCount) Apply(
 // count must be 1 or greater
 // it will panic if count < 1
 //
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+// Deprecated: was experimental and not actual now.
+// The option will be removed for simplify code internals.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 type WithBatchPreferMinCount int
 
 // Apply implements ReadBatchOption interface

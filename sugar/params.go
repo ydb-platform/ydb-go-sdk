@@ -18,7 +18,10 @@ type constraint interface {
 
 // GenerateDeclareSection generates DECLARE section text in YQL query by params
 //
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+// Deprecated: use testutil.QueryBind(ydb.WithAutoDeclare()) helper.
+// In YDB since version 24.1 declare sections not requires.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func GenerateDeclareSection[T constraint](parameters T) (string, error) {
 	switch v := any(parameters).(type) {
 	case *params.Parameters:
@@ -36,7 +39,7 @@ func GenerateDeclareSection[T constraint](parameters T) (string, error) {
 
 // ToYdbParam converts
 //
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func ToYdbParam(param sql.NamedArg) (*params.Parameter, error) {
 	params, err := bind.Params(param)
 	if err != nil {

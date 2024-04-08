@@ -13,7 +13,10 @@ type Info interface {
 	LastUpdated() time.Time
 	LoadFactor() float32
 
-	// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+	// Deprecated: LocalDC check "local" by compare endpoint location with discovery "selflocation" field.
+	// It work good only if connection url always point to local dc.
+	// Will be removed after Oct 2024.
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	LocalDC() bool
 }
 
@@ -35,7 +38,6 @@ type endpoint struct { //nolint:maligned
 	loadFactor  float32
 	lastUpdated time.Time
 
-	// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	local bool
 }
 
@@ -89,7 +91,10 @@ func (e *endpoint) Location() string {
 	return e.location
 }
 
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+// Deprecated: LocalDC check "local" by compare endpoint location with discovery "selflocation" field.
+// It work good only if connection url always point to local dc.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func (e *endpoint) LocalDC() bool {
 	e.mu.RLock()
 	defer e.mu.RUnlock()

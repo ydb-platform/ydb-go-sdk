@@ -71,7 +71,11 @@ func WithCommonConfig(common config.Common) ReaderOption {
 }
 
 // WithCommitTimeLagTrigger
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+//
+// Deprecated: was experimental and not actual now.
+// Use WithReaderCommitTimeLagTrigger instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithCommitTimeLagTrigger(lag time.Duration) ReaderOption {
 	return WithReaderCommitTimeLagTrigger(lag)
 }
@@ -87,7 +91,11 @@ func WithReaderCommitTimeLagTrigger(lag time.Duration) ReaderOption {
 }
 
 // WithCommitCountTrigger
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+//
+// Deprecated: was experimental and not actual now.
+// Use WithReaderCommitCountTrigger instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithCommitCountTrigger(count int) ReaderOption {
 	return WithReaderCommitCountTrigger(count)
 }
@@ -105,7 +113,10 @@ func WithReaderCommitCountTrigger(count int) ReaderOption {
 // prefer min count messages in batch
 // sometimes batch can contain fewer messages, for example if local buffer is full and SDK can't receive more messages
 //
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+// Deprecated: was experimental and not actual now.
+// The option will be removed for simplify code internals.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithBatchReadMinCount(count int) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.DefaultBatchConfig.MinCount = count
@@ -113,7 +124,11 @@ func WithBatchReadMinCount(count int) ReaderOption {
 }
 
 // WithBatchReadMaxCount
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+//
+// Deprecated: was experimental and not actual now.
+// Use WithReaderBatchMaxCount instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithBatchReadMaxCount(count int) ReaderOption {
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.DefaultBatchConfig.MaxCount = count
@@ -128,7 +143,11 @@ func WithReaderBatchMaxCount(count int) ReaderOption {
 }
 
 // WithMessagesBufferSize
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+//
+// Deprecated: was experimental and not actual now.
+// Use WithReaderBufferSizeBytes instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithMessagesBufferSize(size int) ReaderOption {
 	return WithReaderBufferSizeBytes(size)
 }
@@ -177,7 +196,11 @@ const (
 )
 
 // WithCommitMode
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+//
+// Deprecated: was experimental and not actual now.
+// Use WithReaderCommitMode instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithCommitMode(mode CommitMode) ReaderOption {
 	return WithReaderCommitMode(mode)
 }
@@ -202,7 +225,11 @@ type (
 )
 
 // WithGetPartitionStartOffset
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+//
+// Deprecated: was experimental and not actual now.
+// Use WithReaderGetPartitionStartOffset instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithGetPartitionStartOffset(f GetPartitionStartOffsetFunc) ReaderOption {
 	return WithReaderGetPartitionStartOffset(f)
 }

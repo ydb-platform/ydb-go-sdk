@@ -47,7 +47,9 @@ func IntervalValueFromMicroseconds(v int64) Value { return value.IntervalValue(v
 
 // IntervalValue makes Value from given microseconds value
 //
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+// Deprecated: use IntervalValueFromMicroseconds instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func IntervalValue(v int64) Value { return value.IntervalValue(v) }
 
 // TzDateValue makes TzDate value from string
@@ -117,7 +119,9 @@ func TzTimestampValueFromTime(t time.Time) Value {
 
 // StringValue returns bytes value
 //
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+// Deprecated: use BytesValue instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func StringValue(v []byte) Value { return value.BytesValue(v) }
 
 func BytesValue(v []byte) Value { return value.BytesValue(v) }
@@ -345,7 +349,9 @@ func NullableTzTimestampValueFromTime(v *time.Time) Value {
 
 // NullableIntervalValue makes Value which maybe nil or valued
 //
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+// Deprecated: use NullableIntervalValueFromMicroseconds instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func NullableIntervalValue(v *int64) Value {
 	return value.NullableIntervalValueFromMicroseconds(v)
 }
@@ -360,7 +366,9 @@ func NullableIntervalValueFromDuration(v *time.Duration) Value {
 
 // NullableStringValue
 //
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+// Deprecated: use NullableBytesValue instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func NullableStringValue(v *[]byte) Value {
 	return value.NullableBytesValue(v)
 }
