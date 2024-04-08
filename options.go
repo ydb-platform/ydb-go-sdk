@@ -296,6 +296,8 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 }
 
 // WithRetryLimiter sets retry limiter for all calls of all retryers.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithRetryLimiter(l retry.Limiter) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithRetryLimiter(l))

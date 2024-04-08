@@ -158,6 +158,7 @@ func WithTrace(t trace.Driver, opts ...trace.DriverComposeOption) Option { //nol
 	}
 }
 
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithRetryLimiter(l retry.Limiter) Option {
 	return func(c *Config) {
 		config.SetRetryLimiter(&c.Common, l)

@@ -144,6 +144,8 @@ func (l limiterOption) ApplyDoTxOption(opts *doTxOptions) {
 }
 
 // WithLimiter returns limiter option
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithLimiter(l Limiter) limiterOption {
 	return limiterOption{l: l}
 }

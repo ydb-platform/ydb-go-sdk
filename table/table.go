@@ -523,21 +523,20 @@ func (retryOptions retryOptionsOption) ApplyTableOption(opts *Options) {
 	opts.RetryOptions = append(opts.RetryOptions, retryOptions...)
 }
 
-func WithRetryOptions(retryOptions ...retry.Option) retryOptionsOption {
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithLimiter(l retry.Limiter) retryOptionsOption {
+	return []retry.Option{retry.WithLimiter(l)}
+}
+
+// Deprecated: redundant option
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+func WithRetryOptions(retryOptions []retry.Option) retryOptionsOption {
 	return retryOptions
 }
 
-var _ Option = idempotentOption{}
-
-type idempotentOption struct{}
-
-func (idempotentOption) ApplyTableOption(opts *Options) {
-	opts.Idempotent = true
-	opts.RetryOptions = append(opts.RetryOptions, retry.WithIdempotent(true))
-}
-
-func WithIdempotent() idempotentOption {
-	return idempotentOption{}
+func WithIdempotent() retryOptionsOption {
+	return []retry.Option{retry.WithIdempotent(true)}
 }
 
 var _ Option = txSettingsOption{}

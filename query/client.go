@@ -68,6 +68,7 @@ func WithLabel(lbl string) bothDoAndDoTxOption {
 	return options.WithLabel(lbl)
 }
 
-func WithRetryOptions(retryOptions ...retry.Option) bothDoAndDoTxOption {
-	return options.WithRetryOptions(retryOptions...)
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithLimiter(l retry.Limiter) bothDoAndDoTxOption {
+	return options.WithLimiter(l)
 }

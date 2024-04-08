@@ -11,12 +11,14 @@ import (
 )
 
 var (
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	ErrNoQuota = xerrors.Wrap(errors.New("no retry quota"))
 
 	_ Limiter = (*rateLimiter)(nil)
 )
 
 type (
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	Limiter interface {
 		Acquire(ctx context.Context) error
 	}
@@ -29,6 +31,7 @@ type (
 	rateLimiterOption func(q *rateLimiter)
 )
 
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func Quoter(attemptsPerSecond int, opts ...rateLimiterOption) *rateLimiter {
 	q := &rateLimiter{
 		clock: clockwork.NewRealClock(),
@@ -66,6 +69,7 @@ func Quoter(attemptsPerSecond int, opts ...rateLimiterOption) *rateLimiter {
 	return q
 }
 
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (q *rateLimiter) Stop() {
 	if q.ticker != nil {
 		q.ticker.Stop()
@@ -73,6 +77,7 @@ func (q *rateLimiter) Stop() {
 	close(q.done)
 }
 
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (q *rateLimiter) Acquire(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
