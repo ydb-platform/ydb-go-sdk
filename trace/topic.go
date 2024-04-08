@@ -11,29 +11,29 @@ import (
 type (
 	// Topic specified trace of topic reader client activity.
 	// gtrace:gen
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	Topic struct {
 		// TopicReaderCustomerEvents - upper level, on bridge with customer code
 
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderStart func(info TopicReaderStartInfo)
 
 		// TopicReaderStreamLifeCycleEvents
 
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderReconnect func(TopicReaderReconnectStartInfo) func(TopicReaderReconnectDoneInfo)
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderReconnectRequest func(TopicReaderReconnectRequestInfo)
 
 		// TopicReaderPartitionEvents
 
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderPartitionReadStartResponse func(
 			TopicReaderPartitionReadStartResponseStartInfo,
 		) func(
 			TopicReaderPartitionReadStartResponseDoneInfo,
 		)
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderPartitionReadStopResponse func(
 			TopicReaderPartitionReadStopResponseStartInfo,
 		) func(
@@ -42,19 +42,19 @@ type (
 
 		// TopicReaderStreamEvents
 
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderCommit func(TopicReaderCommitStartInfo) func(TopicReaderCommitDoneInfo)
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderSendCommitMessage func(TopicReaderSendCommitMessageStartInfo) func(TopicReaderSendCommitMessageDoneInfo)
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderCommittedNotify func(TopicReaderCommittedNotifyInfo)
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderClose func(TopicReaderCloseStartInfo) func(TopicReaderCloseDoneInfo)
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderInit func(TopicReaderInitStartInfo) func(TopicReaderInitDoneInfo)
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderError func(TopicReaderErrorInfo)
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderUpdateToken func(
 			OnReadUpdateTokenStartInfo,
 		) func(
@@ -65,22 +65,22 @@ type (
 
 		// TopicReaderMessageEvents
 
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderSentDataRequest func(TopicReaderSentDataRequestInfo)
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderReceiveDataResponse func(TopicReaderReceiveDataResponseStartInfo) func(TopicReaderReceiveDataResponseDoneInfo)
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderReadMessages func(TopicReaderReadMessagesStartInfo) func(TopicReaderReadMessagesDoneInfo)
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReaderUnknownGrpcMessage func(OnReadUnknownGrpcMessageInfo)
 
 		// TopicWriterStreamLifeCycleEvents
 
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnWriterReconnect func(TopicWriterReconnectStartInfo) func(TopicWriterReconnectDoneInfo)
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnWriterInitStream func(TopicWriterInitStreamStartInfo) func(TopicWriterInitStreamDoneInfo)
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnWriterClose func(TopicWriterCloseStartInfo) func(TopicWriterCloseDoneInfo)
 
 		// TopicWriterStreamEvents
@@ -90,7 +90,7 @@ type (
 		OnWriterReadUnknownGrpcMessage func(TopicOnWriterReadUnknownGrpcMessageInfo)
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderPartitionReadStartResponseStartInfo struct {
 		ReaderConnectionID string
 		PartitionContext   context.Context
@@ -99,20 +99,20 @@ type (
 		PartitionSessionID int64
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderStartInfo struct {
 		ReaderID int64
 		Consumer string
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderPartitionReadStartResponseDoneInfo struct {
 		ReadOffset   *int64
 		CommitOffset *int64
 		Error        error
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderPartitionReadStopResponseStartInfo struct {
 		ReaderConnectionID string
 		PartitionContext   context.Context
@@ -123,17 +123,17 @@ type (
 		Graceful           bool
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderPartitionReadStopResponseDoneInfo struct {
 		Error error
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderSendCommitMessageStartInfo struct {
 		CommitsInfo TopicReaderStreamSendCommitMessageStartMessageInfo
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderStreamCommitInfo struct {
 		Topic              string
 		PartitionID        int64
@@ -146,12 +146,12 @@ type (
 		GetCommitsInfo() []TopicReaderStreamCommitInfo
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderSendCommitMessageDoneInfo struct {
 		Error error
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderCommittedNotifyInfo struct {
 		ReaderConnectionID string
 		Topic              string
@@ -160,20 +160,20 @@ type (
 		CommittedOffset    int64
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderErrorInfo struct {
 		ReaderConnectionID string
 		Error              error
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderSentDataRequestInfo struct {
 		ReaderConnectionID       string
 		RequestBytes             int
 		LocalBufferSizeAfterSent int
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderReceiveDataResponseStartInfo struct {
 		ReaderConnectionID          string
 		LocalBufferSizeAfterReceive int
@@ -185,12 +185,12 @@ type (
 		GetPartitionBatchMessagesCounts() (partitionCount, batchCount, messagesCount int)
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderReceiveDataResponseDoneInfo struct {
 		Error error
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderReadMessagesStartInfo struct {
 		RequestContext     context.Context
 		MinCount           int
@@ -198,7 +198,7 @@ type (
 		FreeBufferCapacity int
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderReadMessagesDoneInfo struct {
 		MessagesCount      int
 		Topic              string
@@ -210,29 +210,29 @@ type (
 		Error              error
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	OnReadUnknownGrpcMessageInfo struct {
 		ReaderConnectionID string
 		Error              error
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderReconnectStartInfo struct {
 		Reason error
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderReconnectDoneInfo struct {
 		Error error
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderReconnectRequestInfo struct {
 		Reason  error
 		WasSent bool
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderCommitStartInfo struct {
 		RequestContext     context.Context
 		Topic              string
@@ -242,23 +242,23 @@ type (
 		EndOffset          int64
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderCommitDoneInfo struct {
 		Error error
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderCloseStartInfo struct {
 		ReaderConnectionID string
 		CloseReason        error
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderCloseDoneInfo struct {
 		CloseError error
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderInitStartInfo struct {
 		PreInitReaderConnectionID string
 		InitRequestInfo           TopicReadStreamInitRequestInfo
@@ -269,24 +269,24 @@ type (
 		GetTopics() []string
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderInitDoneInfo struct {
 		ReaderConnectionID string
 		Error              error
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	OnReadUpdateTokenStartInfo struct {
 		ReaderConnectionID string
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	OnReadUpdateTokenMiddleTokenReceivedInfo struct {
 		TokenLen int
 		Error    error
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	OnReadStreamUpdateTokenDoneInfo struct {
 		Error error
 	}
@@ -295,7 +295,7 @@ type (
 	//////////// TopicWriter
 	////////////
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicWriterReconnectStartInfo struct {
 		WriterInstanceID string
 		Topic            string
@@ -303,31 +303,31 @@ type (
 		Attempt          int
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicWriterReconnectDoneInfo struct {
 		Error error
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicWriterInitStreamStartInfo struct {
 		WriterInstanceID string
 		Topic            string
 		ProducerID       string
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicWriterInitStreamDoneInfo struct {
 		SessionID string
 		Error     error
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicWriterCloseStartInfo struct {
 		WriterInstanceID string
 		Reason           error
 	}
 
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicWriterCloseDoneInfo struct {
 		Error error
 	}

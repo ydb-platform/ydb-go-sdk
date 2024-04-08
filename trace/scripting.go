@@ -11,11 +11,11 @@ import (
 type (
 	// Scripting specified trace of scripting client activity.
 	// gtrace:gen
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	Scripting struct {
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnExecute func(ScriptingExecuteStartInfo) func(ScriptingExecuteDoneInfo)
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnStreamExecute func(
 			ScriptingStreamExecuteStartInfo,
 		) func(
@@ -23,9 +23,9 @@ type (
 		) func(
 			ScriptingStreamExecuteDoneInfo,
 		)
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnExplain func(ScriptingExplainStartInfo) func(ScriptingExplainDoneInfo)
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnClose func(ScriptingCloseStartInfo) func(ScriptingCloseDoneInfo)
 	}
 	scriptingQueryParameters interface {
@@ -38,7 +38,7 @@ type (
 		scriptingResultErr
 		ResultSetCount() int
 	}
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	ScriptingExecuteStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -49,12 +49,12 @@ type (
 		Query      string
 		Parameters scriptingQueryParameters
 	}
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	ScriptingExecuteDoneInfo struct {
 		Result scriptingResult
 		Error  error
 	}
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	ScriptingStreamExecuteStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -65,15 +65,15 @@ type (
 		Query      string
 		Parameters scriptingQueryParameters
 	}
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	ScriptingStreamExecuteIntermediateInfo struct {
 		Error error
 	}
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	ScriptingStreamExecuteDoneInfo struct {
 		Error error
 	}
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	ScriptingExplainStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -83,12 +83,12 @@ type (
 		Call    call
 		Query   string
 	}
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	ScriptingExplainDoneInfo struct {
 		Plan  string
 		Error error
 	}
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	ScriptingCloseStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -97,7 +97,7 @@ type (
 		Context *context.Context
 		Call    call
 	}
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	ScriptingCloseDoneInfo struct {
 		Error error
 	}

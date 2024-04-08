@@ -112,6 +112,9 @@ type Endpoint interface {
 	NodeID() uint32
 	Address() string
 	Location() string
+
+	// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+	LocalDC() bool
 }
 
 type filterFunc func(info balancerConfig.Info, c conn.Conn) bool

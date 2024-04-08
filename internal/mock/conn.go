@@ -95,6 +95,7 @@ func (e *Endpoint) Address() string {
 	return e.AddrField
 }
 
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func (e *Endpoint) LocalDC() bool {
 	return e.LocalDCField
 }
