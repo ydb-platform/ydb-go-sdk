@@ -66,32 +66,40 @@ var (
 )
 
 type Storage struct {
-	cc          *ydb.Driver
-	c           ydb.SQLConnector
-	db          *sql.DB
-	cfg         *config.Config
-	createQuery string
-	dropQuery   string
-	upsertQuery string
-	selectQuery string
+	cc           *ydb.Driver
+	c            ydb.SQLConnector
+	db           *sql.DB
+	cfg          *config.Config
+	createQuery  string
+	dropQuery    string
+	upsertQuery  string
+	selectQuery  string
+	retryLimiter interface {
+		retry.Limiter
+		Stop()
+	}
 }
 
 func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Storage, err error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:gomnd
 	defer cancel()
 
+	retryLimiter := retry.Quoter(int(float64(poolSize) * (1.0 + 0.20)))
+
 	s = &Storage{
 		cfg: cfg,
 		createQuery: fmt.Sprintf(createTemplate, cfg.Table,
 			cfg.PartitionSize, cfg.MinPartitionsCount, cfg.MaxPartitionsCount, cfg.MinPartitionsCount),
-		dropQuery:   fmt.Sprintf(dropTemplate, cfg.Table),
-		upsertQuery: fmt.Sprintf(upsertTemplate, cfg.Table),
-		selectQuery: fmt.Sprintf(selectTemplate, cfg.Table),
+		dropQuery:    fmt.Sprintf(dropTemplate, cfg.Table),
+		upsertQuery:  fmt.Sprintf(upsertTemplate, cfg.Table),
+		selectQuery:  fmt.Sprintf(selectTemplate, cfg.Table),
+		retryLimiter: retryLimiter,
 	}
 
 	s.cc, err = ydb.Open(
 		ctx,
 		s.cfg.Endpoint+s.cfg.DB,
+		ydb.WithRetryLimiter(retryLimiter),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("ydb.Open error: %w", err)
@@ -224,6 +232,8 @@ func (s *Storage) dropTable(ctx context.Context) error {
 }
 
 func (s *Storage) close(ctx context.Context) error {
+	s.retryLimiter.Stop()
+
 	if err := ctx.Err(); err != nil {
 		return err
 	}

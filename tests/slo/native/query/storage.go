@@ -5,13 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"path"
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
-	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 	"slo/internal/config"
@@ -19,9 +18,13 @@ import (
 )
 
 type Storage struct {
-	db        *ydb.Driver
-	cfg       *config.Config
-	tablePath string
+	db           *ydb.Driver
+	cfg          *config.Config
+	tablePath    string
+	retryLimiter interface {
+		retry.Limiter
+		Stop()
+	}
 }
 
 const writeQuery = `
@@ -69,10 +72,12 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:gomnd
 	defer cancel()
 
+	retryLimiter := retry.Quoter(int(float64(poolSize) * (1.0 + 0.20)))
+
 	db, err := ydb.Open(ctx,
 		cfg.Endpoint+cfg.DB,
 		ydb.WithSessionPoolSizeLimit(poolSize),
-		ydb.WithLogger(log.Default(os.Stderr, log.WithMinLevel(log.ERROR)), trace.DetailsAll),
+		ydb.WithRetryLimiter(retryLimiter),
 	)
 	if err != nil {
 		return nil, err
@@ -81,9 +86,10 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	prefix := path.Join(db.Name(), label)
 
 	s := &Storage{
-		db:        db,
-		cfg:       cfg,
-		tablePath: "`" + path.Join(prefix, cfg.Table) + "`",
+		db:           db,
+		cfg:          cfg,
+		tablePath:    "`" + path.Join(prefix, cfg.Table) + "`",
+		retryLimiter: retryLimiter,
 	}
 
 	return s, nil
@@ -254,6 +260,8 @@ func (s *Storage) dropTable(ctx context.Context) error {
 }
 
 func (s *Storage) close(ctx context.Context) error {
+	s.retryLimiter.Stop()
+
 	var (
 		shutdownCtx    context.Context
 		shutdownCancel context.CancelFunc
