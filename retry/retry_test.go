@@ -190,11 +190,16 @@ func TestRetryTransportCancelled(t *testing.T) {
 	}
 }
 
+type noQuota struct{}
+
+func (noQuota) Acquire(ctx context.Context) error {
+	return errors.New("no quota")
+}
+
 func TestRetryWithLimiter(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
-		l := Quoter(10)
-		defer l.Stop()
-		ctx, cancel := context.WithTimeout(xtest.Context(t), 5*time.Millisecond)
+		l := noQuota{}
+		ctx, cancel := context.WithCancel(xtest.Context(t))
 		defer cancel()
 		err := Retry(ctx, func(ctx context.Context) (err error) {
 			return RetryableError(errors.New("custom error"))
