@@ -12,6 +12,7 @@ import (
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -154,6 +155,12 @@ func WithTLSConfig(tlsConfig *tls.Config) Option {
 func WithTrace(t trace.Driver, opts ...trace.DriverComposeOption) Option { //nolint:gocritic
 	return func(c *Config) {
 		c.trace = c.trace.Compose(&t, opts...)
+	}
+}
+
+func WithRetryLimiter(l retry.Limiter) Option {
+	return func(c *Config) {
+		config.SetRetryLimiter(&c.Common, l)
 	}
 }
 

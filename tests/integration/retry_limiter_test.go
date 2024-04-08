@@ -30,8 +30,12 @@ func (n noQuota) Acquire(ctx context.Context) error {
 func TestRetryLimiter(t *testing.T) {
 	ctx := xtest.Context(t)
 
+	defaultLimiter := retry.Quoter(1)
+	defer defaultLimiter.Stop()
+
 	nativeDriver, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithDiscoveryInterval(time.Second),
+		ydb.WithRetryLimiter(defaultLimiter),
 	)
 	require.NoError(t, err)
 
@@ -54,49 +58,49 @@ func TestRetryLimiter(t *testing.T) {
 		_ = db.Close()
 	}()
 
-	l := noQuota{}
+	retryLimiter := noQuota{}
 
 	t.Run("retry.Retry", func(t *testing.T) {
 		err := retry.Retry(ctx, func(ctx context.Context) (err error) {
 			return retry.RetryableError(errors.New("custom error"))
-		}, retry.WithLimiter(l))
+		}, retry.WithLimiter(retryLimiter))
 		require.ErrorIs(t, err, retry.ErrNoQuota)
 	})
 	t.Run("retry.Do", func(t *testing.T) {
 		err := retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) (err error) {
 			return retry.RetryableError(errors.New("custom error"))
-		}, retry.WithLimiter(l))
+		}, retry.WithLimiter(retryLimiter))
 		require.ErrorIs(t, err, retry.ErrNoQuota)
 	})
 	t.Run("retry.DoTx", func(t *testing.T) {
 		err := retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) (err error) {
 			return retry.RetryableError(errors.New("custom error"))
-		}, retry.WithLimiter(l))
+		}, retry.WithLimiter(retryLimiter))
 		require.ErrorIs(t, err, retry.ErrNoQuota)
 	})
 	t.Run("db.Table().Do", func(t *testing.T) {
 		err := nativeDriver.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
 			return retry.RetryableError(errors.New("custom error"))
-		}, table.WithRetryOptions(retry.WithLimiter(l)))
+		}, table.WithRetryOptions(retry.WithLimiter(retryLimiter)))
 		require.ErrorIs(t, err, retry.ErrNoQuota)
 	})
 	t.Run("db.Table().DoTx", func(t *testing.T) {
 		err := nativeDriver.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 			return retry.RetryableError(errors.New("custom error"))
-		}, table.WithRetryOptions(retry.WithLimiter(l)))
+		}, table.WithRetryOptions(retry.WithLimiter(retryLimiter)))
 		require.ErrorIs(t, err, retry.ErrNoQuota)
 	})
 	if version.Gte(os.Getenv("YDB_VERSION"), "24.1") {
 		t.Run("db.Query().Do", func(t *testing.T) {
 			err := nativeDriver.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
 				return retry.RetryableError(errors.New("custom error"))
-			}, query.WithRetryOptions(retry.WithLimiter(l)))
+			}, query.WithRetryOptions(retry.WithLimiter(retryLimiter)))
 			require.ErrorIs(t, err, retry.ErrNoQuota)
 		})
 		t.Run("db.Query().DoTx", func(t *testing.T) {
 			err := nativeDriver.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
 				return retry.RetryableError(errors.New("custom error"))
-			}, query.WithRetryOptions(retry.WithLimiter(l)))
+			}, query.WithRetryOptions(retry.WithLimiter(retryLimiter)))
 			require.ErrorIs(t, err, retry.ErrNoQuota)
 		})
 	}

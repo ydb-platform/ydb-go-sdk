@@ -89,6 +89,7 @@ func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
 		},
 		retry.WithIdempotent(true),
 		retry.WithTrace(b.driverConfig.TraceRetry()),
+		retry.WithLimiter(b.driverConfig.RetryLimiter()),
 	)
 }
 

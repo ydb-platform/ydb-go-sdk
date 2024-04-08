@@ -110,9 +110,15 @@ func (c *Client) CreateNode(ctx context.Context, path string, config coordinatio
 		return createNode(ctx, c.client, request)
 	}
 
-	return retry.Retry(ctx, func(ctx context.Context) error {
-		return createNode(ctx, c.client, request)
-	}, retry.WithStackTrace(), retry.WithIdempotent(true), retry.WithTrace(c.config.TraceRetry()))
+	return retry.Retry(ctx,
+		func(ctx context.Context) error {
+			return createNode(ctx, c.client, request)
+		},
+		retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithLimiter(c.config.RetryLimiter()),
+	)
 }
 
 func (c *Client) AlterNode(ctx context.Context, path string, config coordination.NodeConfig) (finalErr error) {
@@ -137,9 +143,15 @@ func (c *Client) AlterNode(ctx context.Context, path string, config coordination
 		return xerrors.WithStackTrace(call(ctx))
 	}
 
-	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return alterNode(ctx, c.client, request)
-	}, retry.WithStackTrace(), retry.WithIdempotent(true), retry.WithTrace(c.config.TraceRetry()))
+	return retry.Retry(ctx,
+		func(ctx context.Context) (err error) {
+			return alterNode(ctx, c.client, request)
+		},
+		retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithLimiter(c.config.RetryLimiter()),
+	)
 }
 
 func alterNodeRequest(
@@ -192,9 +204,15 @@ func (c *Client) DropNode(ctx context.Context, path string) (finalErr error) {
 		return xerrors.WithStackTrace(call(ctx))
 	}
 
-	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		return dropNode(ctx, c.client, request)
-	}, retry.WithStackTrace(), retry.WithIdempotent(true), retry.WithTrace(c.config.TraceRetry()))
+	return retry.Retry(ctx,
+		func(ctx context.Context) (err error) {
+			return dropNode(ctx, c.client, request)
+		},
+		retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithLimiter(c.config.RetryLimiter()),
+	)
 }
 
 func dropNodeRequest(path string, operationParams *Ydb_Operations.OperationParams) *Ydb_Coordination.DropNodeRequest {
@@ -241,14 +259,20 @@ func (c *Client) DescribeNode(
 		return describeNode(ctx, c.client, request)
 	}
 
-	err := retry.Retry(ctx, func(ctx context.Context) (err error) {
-		entry, config, err = describeNode(ctx, c.client, request)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
+	err := retry.Retry(ctx,
+		func(ctx context.Context) (err error) {
+			entry, config, err = describeNode(ctx, c.client, request)
+			if err != nil {
+				return xerrors.WithStackTrace(err)
+			}
 
-		return nil
-	}, retry.WithStackTrace(), retry.WithIdempotent(true), retry.WithTrace(c.config.TraceRetry()))
+			return nil
+		},
+		retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithLimiter(c.config.RetryLimiter()),
+	)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}

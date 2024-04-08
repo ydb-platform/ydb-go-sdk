@@ -99,6 +99,7 @@ func (c *Client) retryOptions(opts ...table.Option) *table.Options {
 		),
 		RetryOptions: []retry.Option{
 			retry.WithTrace(c.config.TraceRetry()),
+			retry.WithLimiter(c.config.RetryLimiter()),
 		},
 	}
 	for _, opt := range opts {

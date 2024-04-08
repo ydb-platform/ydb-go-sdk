@@ -25,6 +25,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -289,6 +290,15 @@ func MergeOptions(opts ...Option) Option {
 func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.discoveryOptions = append(c.discoveryOptions, discoveryConfig.WithInterval(discoveryInterval))
+
+		return nil
+	}
+}
+
+// WithRetryLimiter sets retry limiter for all calls of all retryers.
+func WithRetryLimiter(l retry.Limiter) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.options = append(c.options, config.WithRetryLimiter(l))
 
 		return nil
 	}
