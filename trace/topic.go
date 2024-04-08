@@ -85,8 +85,11 @@ type (
 
 		// TopicWriterStreamEvents
 
-		OnWriterCompressMessages       func(TopicWriterCompressMessagesStartInfo) func(TopicWriterCompressMessagesDoneInfo)
-		OnWriterSendMessages           func(TopicWriterSendMessagesStartInfo) func(TopicWriterSendMessagesDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnWriterCompressMessages func(TopicWriterCompressMessagesStartInfo) func(TopicWriterCompressMessagesDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnWriterSendMessages func(TopicWriterSendMessagesStartInfo) func(TopicWriterSendMessagesDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnWriterReadUnknownGrpcMessage func(TopicOnWriterReadUnknownGrpcMessageInfo)
 	}
 
@@ -142,6 +145,7 @@ type (
 		EndOffset          int64
 	}
 
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderStreamSendCommitMessageStartMessageInfo interface {
 		GetCommitsInfo() []TopicReaderStreamCommitInfo
 	}
@@ -180,6 +184,7 @@ type (
 		DataResponse                TopicReaderDataResponseInfo
 	}
 
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderDataResponseInfo interface {
 		GetBytesSize() int
 		GetPartitionBatchMessagesCounts() (partitionCount, batchCount, messagesCount int)
@@ -264,6 +269,7 @@ type (
 		InitRequestInfo           TopicReadStreamInitRequestInfo
 	}
 
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReadStreamInitRequestInfo interface {
 		GetConsumer() string
 		GetTopics() []string
@@ -332,6 +338,7 @@ type (
 		Error error
 	}
 
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicWriterCompressMessagesStartInfo struct {
 		WriterInstanceID string
 		SessionID        string
@@ -341,10 +348,12 @@ type (
 		Reason           TopicWriterCompressMessagesReason
 	}
 
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicWriterCompressMessagesDoneInfo struct {
 		Error error
 	}
 
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicWriterSendMessagesStartInfo struct {
 		WriterInstanceID string
 		SessionID        string
@@ -353,10 +362,12 @@ type (
 		MessagesCount    int
 	}
 
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicWriterSendMessagesDoneInfo struct {
 		Error error
 	}
 
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicOnWriterReadUnknownGrpcMessageInfo struct {
 		WriterInstanceID string
 		SessionID        string
@@ -364,14 +375,19 @@ type (
 	}
 )
 
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 type TopicWriterCompressMessagesReason string
 
 const (
-	TopicWriterCompressMessagesReasonCompressData                = TopicWriterCompressMessagesReason("compress-on-send")           //nolint:lll
-	TopicWriterCompressMessagesReasonCompressDataOnWriteReadData = TopicWriterCompressMessagesReason("compress-on-call-write")     //nolint:lll
-	TopicWriterCompressMessagesReasonCodecsMeasure               = TopicWriterCompressMessagesReason("compress-on-codecs-measure") //nolint:lll
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicWriterCompressMessagesReasonCompressData = TopicWriterCompressMessagesReason("compress-on-send") //nolint:lll
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicWriterCompressMessagesReasonCompressDataOnWriteReadData = TopicWriterCompressMessagesReason("compress-on-call-write") //nolint:lll
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TopicWriterCompressMessagesReasonCodecsMeasure = TopicWriterCompressMessagesReason("compress-on-codecs-measure") //nolint:lll
 )
 
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (r TopicWriterCompressMessagesReason) String() string {
 	return string(r)
 }

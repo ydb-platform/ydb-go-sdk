@@ -44,31 +44,43 @@ type (
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnConnStreamRecvMsg func(DriverConnStreamRecvMsgStartInfo) func(DriverConnStreamRecvMsgDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-		OnConnStreamSendMsg   func(DriverConnStreamSendMsgStartInfo) func(DriverConnStreamSendMsgDoneInfo)
+		OnConnStreamSendMsg func(DriverConnStreamSendMsgStartInfo) func(DriverConnStreamSendMsgDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnConnStreamCloseSend func(DriverConnStreamCloseSendStartInfo) func(DriverConnStreamCloseSendDoneInfo)
-		OnConnDial            func(DriverConnDialStartInfo) func(DriverConnDialDoneInfo)
-		OnConnBan             func(DriverConnBanStartInfo) func(DriverConnBanDoneInfo)
-		OnConnAllow           func(DriverConnAllowStartInfo) func(DriverConnAllowDoneInfo)
-		OnConnPark            func(DriverConnParkStartInfo) func(DriverConnParkDoneInfo)
-		OnConnClose           func(DriverConnCloseStartInfo) func(DriverConnCloseDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnConnDial func(DriverConnDialStartInfo) func(DriverConnDialDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnConnBan func(DriverConnBanStartInfo) func(DriverConnBanDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnConnAllow func(DriverConnAllowStartInfo) func(DriverConnAllowDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnConnPark func(DriverConnParkStartInfo) func(DriverConnParkDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnConnClose func(DriverConnCloseStartInfo) func(DriverConnCloseDoneInfo)
 
 		// Repeater events
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnRepeaterWakeUp func(DriverRepeaterWakeUpStartInfo) func(DriverRepeaterWakeUpDoneInfo)
 
 		// Balancer events
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnBalancerInit func(DriverBalancerInitStartInfo) func(DriverBalancerInitDoneInfo)
 
-		OnBalancerClose          func(DriverBalancerCloseStartInfo) func(DriverBalancerCloseDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnBalancerClose func(DriverBalancerCloseStartInfo) func(DriverBalancerCloseDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnBalancerChooseEndpoint func(
 			DriverBalancerChooseEndpointStartInfo,
 		) func(
 			DriverBalancerChooseEndpointDoneInfo,
 		)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnBalancerClusterDiscoveryAttempt func(
 			DriverBalancerClusterDiscoveryAttemptStartInfo,
 		) func(
 			DriverBalancerClusterDiscoveryAttemptDoneInfo,
 		)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnBalancerUpdate func(DriverBalancerUpdateStartInfo) func(DriverBalancerUpdateDoneInfo)
 
 		// Credentials events
@@ -77,9 +89,11 @@ type (
 )
 
 // Method represents rpc method.
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 type Method string
 
 // Name returns the rpc method name.
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (m Method) Name() (s string) {
 	_, s = m.Split()
 
@@ -87,6 +101,7 @@ func (m Method) Name() (s string) {
 }
 
 // Service returns the rpc service name.
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (m Method) Service() (s string) {
 	s, _ = m.Split()
 
@@ -94,6 +109,7 @@ func (m Method) Service() (s string) {
 }
 
 // Issue declare interface of operation error issues
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 type Issue interface {
 	GetMessage() string
 	GetIssueCode() uint32
@@ -101,6 +117,7 @@ type Issue interface {
 }
 
 // Split returns service name and method.
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (m Method) Split() (service, method string) {
 	i := strings.LastIndex(string(m), "/")
 	if i == -1 {
@@ -110,6 +127,7 @@ func (m Method) Split() (service, method string) {
 	return strings.TrimPrefix(string(m[:i]), "/"), string(m[i+1:])
 }
 
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 type ConnState interface {
 	fmt.Stringer
 
@@ -117,6 +135,7 @@ type ConnState interface {
 	Code() int
 }
 
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 type EndpointInfo interface {
 	fmt.Stringer
 
@@ -263,6 +282,7 @@ type (
 	DriverConnDialDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnParkStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -272,9 +292,11 @@ type (
 		Call     call
 		Endpoint EndpointInfo
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnParkDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnCloseStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -284,9 +306,11 @@ type (
 		Call     call
 		Endpoint EndpointInfo
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnCloseDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnBanStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -298,9 +322,11 @@ type (
 		State    ConnState
 		Cause    error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnBanDoneInfo struct {
 		State ConnState
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnAllowStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -311,9 +337,11 @@ type (
 		Endpoint EndpointInfo
 		State    ConnState
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnAllowDoneInfo struct {
 		State ConnState
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnInvokeStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -324,6 +352,7 @@ type (
 		Endpoint EndpointInfo
 		Method   Method
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnInvokeDoneInfo struct {
 		Error    error
 		Issues   []Issue
@@ -331,6 +360,7 @@ type (
 		State    ConnState
 		Metadata map[string][]string
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnNewStreamStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -341,10 +371,12 @@ type (
 		Endpoint EndpointInfo
 		Method   Method
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnNewStreamDoneInfo struct {
 		Error error
 		State ConnState
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnStreamRecvMsgStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -353,9 +385,11 @@ type (
 		Context *context.Context
 		Call    call
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnStreamRecvMsgDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnStreamSendMsgStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -364,9 +398,11 @@ type (
 		Context *context.Context
 		Call    call
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnStreamSendMsgDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnStreamCloseSendStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -375,9 +411,11 @@ type (
 		Context *context.Context
 		Call    call
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnStreamCloseSendDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverBalancerInitStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -387,9 +425,11 @@ type (
 		Call    call
 		Name    string
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverBalancerInitDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverBalancerDialEntrypointStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -399,9 +439,11 @@ type (
 		Call    call
 		Address string
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverBalancerDialEntrypointDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverBalancerCloseStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -410,9 +452,11 @@ type (
 		Context *context.Context
 		Call    call
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverBalancerCloseDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverBalancerChooseEndpointStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -421,10 +465,12 @@ type (
 		Context *context.Context
 		Call    call
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverBalancerChooseEndpointDoneInfo struct {
 		Endpoint EndpointInfo
 		Error    error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverRepeaterWakeUpStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -435,9 +481,11 @@ type (
 		Name    string
 		Event   string
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverRepeaterWakeUpDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverGetCredentialsStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -446,10 +494,12 @@ type (
 		Context *context.Context
 		Call    call
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverGetCredentialsDoneInfo struct {
 		Token string
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverInitStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -461,9 +511,11 @@ type (
 		Database string
 		Secure   bool
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverInitDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverWithStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -475,9 +527,11 @@ type (
 		Database string
 		Secure   bool
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverWithDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnPoolNewStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -486,7 +540,9 @@ type (
 		Context *context.Context
 		Call    call
 	}
-	DriverConnPoolNewDoneInfo      struct{}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	DriverConnPoolNewDoneInfo struct{}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnPoolReleaseStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -495,9 +551,11 @@ type (
 		Context *context.Context
 		Call    call
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnPoolReleaseDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverCloseStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -506,6 +564,7 @@ type (
 		Context *context.Context
 		Call    call
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverCloseDoneInfo struct {
 		Error error
 	}

@@ -51,26 +51,36 @@ type (
 		OnTxBegin func(TableTxBeginStartInfo) func(
 			TableTxBeginDoneInfo,
 		)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnTxExecute func(TableTransactionExecuteStartInfo) func(
 			TableTransactionExecuteDoneInfo,
 		)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnTxExecuteStatement func(TableTransactionExecuteStatementStartInfo) func(
 			TableTransactionExecuteStatementDoneInfo,
 		)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnTxCommit func(TableTxCommitStartInfo) func(
 			TableTxCommitDoneInfo,
 		)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnTxRollback func(TableTxRollbackStartInfo) func(TableTxRollbackDoneInfo)
 		// Pool state event
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnPoolStateChange func(TablePoolStateChangeInfo)
 
 		// Pool session lifecycle events
-		OnPoolSessionAdd    func(info TablePoolSessionAddInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnPoolSessionAdd func(info TablePoolSessionAddInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnPoolSessionRemove func(info TablePoolSessionRemoveInfo)
 
 		// Pool common API events
-		OnPoolPut  func(TablePoolPutStartInfo) func(TablePoolPutDoneInfo)
-		OnPoolGet  func(TablePoolGetStartInfo) func(TablePoolGetDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnPoolPut func(TablePoolPutStartInfo) func(TablePoolPutDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnPoolGet func(TablePoolGetStartInfo) func(TablePoolGetDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnPoolWait func(TablePoolWaitStartInfo) func(TablePoolWaitDoneInfo)
 	}
 )
