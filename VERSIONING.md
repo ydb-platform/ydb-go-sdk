@@ -1,6 +1,6 @@
 # YDB-Go-SDK Versioning Policy
 
-By adhering to these guidelines and exceptions, we aim to provide a stable and reliable development experience for our users while still allowing for innovation and improvement.
+By adhering to these guidelines and exceptions, we aim to provide a stable and reliable development experience for our users (aka [LTS](https://en.wikipedia.org/wiki/Long-term_support)) while still allowing for innovation and improvement.
 
 We endeavor to adhere to versioning guidelines as defined by [SemVer2.0.0](https://semver.org/).
 

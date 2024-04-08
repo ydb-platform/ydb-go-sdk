@@ -124,9 +124,11 @@ type (
 		Call    call
 		Session tableSessionInfo
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableKeepAliveDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableBulkUpsertStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -136,9 +138,11 @@ type (
 		Call    call
 		Session tableSessionInfo
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableBulkUpsertDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableSessionDeleteStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -148,9 +152,11 @@ type (
 		Call    call
 		Session tableSessionInfo
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableSessionDeleteDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePrepareDataQueryStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -161,10 +167,12 @@ type (
 		Session tableSessionInfo
 		Query   string
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePrepareDataQueryDoneInfo struct {
 		Result tableDataQuery
 		Error  error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableExecuteDataQueryStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -177,6 +185,7 @@ type (
 		Parameters  tableQueryParameters
 		KeepInCache bool
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableTransactionExecuteStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -189,6 +198,7 @@ type (
 		Query      tableDataQuery
 		Parameters tableQueryParameters
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableTransactionExecuteStatementStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -201,6 +211,7 @@ type (
 		StatementQuery tableDataQuery
 		Parameters     tableQueryParameters
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableExplainQueryStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -211,25 +222,30 @@ type (
 		Session tableSessionInfo
 		Query   string
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableExplainQueryDoneInfo struct {
 		AST   string
 		Plan  string
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableExecuteDataQueryDoneInfo struct {
 		Tx       tableTransactionInfo
 		Prepared bool
 		Result   tableResult
 		Error    error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableTransactionExecuteDoneInfo struct {
 		Result tableResult
 		Error  error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableTransactionExecuteStatementDoneInfo struct {
 		Result tableResult
 		Error  error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableSessionQueryStreamReadStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -239,9 +255,11 @@ type (
 		Call    call
 		Session tableSessionInfo
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableSessionQueryStreamReadDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableSessionQueryStreamExecuteStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -253,9 +271,11 @@ type (
 		Query      tableDataQuery
 		Parameters tableQueryParameters
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableSessionQueryStreamExecuteDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableTxBeginStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -265,10 +285,12 @@ type (
 		Call    call
 		Session tableSessionInfo
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableTxBeginDoneInfo struct {
 		Tx    tableTransactionInfo
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableTxCommitStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -279,9 +301,11 @@ type (
 		Session tableSessionInfo
 		Tx      tableTransactionInfo
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableTxCommitDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableTxRollbackStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -292,9 +316,11 @@ type (
 		Session tableSessionInfo
 		Tx      tableTransactionInfo
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableTxRollbackDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableInitStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -303,13 +329,16 @@ type (
 		Context *context.Context
 		Call    call
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableInitDoneInfo struct {
 		Limit int
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolStateChangeInfo struct {
 		Size  int
 		Event string
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolSessionNewStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -318,10 +347,12 @@ type (
 		Context *context.Context
 		Call    call
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolSessionNewDoneInfo struct {
 		Session tableSessionInfo
 		Error   error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolGetStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -330,11 +361,13 @@ type (
 		Context *context.Context
 		Call    call
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolGetDoneInfo struct {
 		Session  tableSessionInfo
 		Attempts int
 		Error    error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolWaitStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -346,10 +379,12 @@ type (
 	// TablePoolWaitDoneInfo means a wait iteration inside Get call is done
 	// Warning: Session and Error may be nil at the same time. This means
 	// that a wait iteration donned without any significant tableResultErr
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolWaitDoneInfo struct {
 		Session tableSessionInfo
 		Error   error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolPutStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -359,9 +394,11 @@ type (
 		Call    call
 		Session tableSessionInfo
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolPutDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolSessionCloseStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -373,12 +410,15 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolSessionCloseDoneInfo struct{}
-	TablePoolSessionAddInfo       struct {
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	TablePoolSessionAddInfo struct {
 		Session tableSessionInfo
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TablePoolSessionRemoveInfo struct {
 		Session tableSessionInfo
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableCloseStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -387,9 +427,11 @@ type (
 		Context *context.Context
 		Call    call
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableCloseDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableDoStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -402,10 +444,12 @@ type (
 		Idempotent bool
 		NestedCall bool // flag when Retry called inside head Retry
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableDoDoneInfo struct {
 		Attempts int
 		Error    error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableDoTxStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -418,10 +462,12 @@ type (
 		Idempotent bool
 		NestedCall bool // flag when Retry called inside head Retry
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableDoTxDoneInfo struct {
 		Attempts int
 		Error    error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableCreateSessionStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -430,6 +476,7 @@ type (
 		Context *context.Context
 		Call    call
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TableCreateSessionDoneInfo struct {
 		Session  tableSessionInfo
 		Attempts int

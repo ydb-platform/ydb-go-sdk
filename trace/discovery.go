@@ -42,6 +42,7 @@ type (
 		Context *context.Context
 		Call    call
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DiscoveryWhoAmIDoneInfo struct {
 		User   string
 		Groups []string

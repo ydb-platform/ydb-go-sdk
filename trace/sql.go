@@ -153,6 +153,7 @@ type (
 	DatabaseSQLConnQueryDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLConnExecStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -165,9 +166,11 @@ type (
 		Idempotent bool
 		IdleTime   time.Duration
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLConnExecDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLConnIsTableExistsStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -177,10 +180,12 @@ type (
 		Call      call
 		TableName string
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLConnIsTableExistsDoneInfo struct {
 		Exists bool
 		Error  error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLTxQueryStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -192,9 +197,11 @@ type (
 		Tx        tableTransactionInfo
 		Query     string
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLTxQueryDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLTxExecStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -206,9 +213,11 @@ type (
 		Tx        tableTransactionInfo
 		Query     string
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLTxExecDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLTxCommitStartInfo struct {
 		// TxContext make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -218,9 +227,11 @@ type (
 		Call    call
 		Tx      tableTransactionInfo
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLTxCommitDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLTxRollbackStartInfo struct {
 		// TxContext make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -230,16 +241,20 @@ type (
 		Call    call
 		Tx      tableTransactionInfo
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLTxRollbackDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLStmtCloseStartInfo struct {
 		StmtContext *context.Context
 		Call        call
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLStmtCloseDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLStmtQueryStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -250,9 +265,11 @@ type (
 		StmtContext context.Context
 		Query       string
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLStmtQueryDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLStmtExecStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -263,9 +280,11 @@ type (
 		StmtContext context.Context
 		Query       string
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLStmtExecDoneInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLDoTxStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -276,9 +295,11 @@ type (
 		ID         string
 		Idempotent bool
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLDoTxIntermediateInfo struct {
 		Error error
 	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DatabaseSQLDoTxDoneInfo struct {
 		Attempts int
 		Error    error
