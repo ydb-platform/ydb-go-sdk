@@ -75,7 +75,7 @@ func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
 type CommitRangeGetter = topicreaderinternal.PublicCommitRangeGetter
 
 // ReadMessageBatch
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...ReadBatchOption) (*Batch, error) {
 	if err := r.inCall(&r.readInFlyght); err != nil {
 		return nil, err

@@ -16,7 +16,7 @@ import (
 // Connection interface provide access to YDB service clients
 // Interface and list of clients may be changed in the future
 //
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 type Connection interface { //nolint:interfacebloat
 	// Endpoint returns initial endpoint
 	Endpoint() string
@@ -35,7 +35,7 @@ type Connection interface { //nolint:interfacebloat
 
 	// Query returns query client
 	//
-	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#experimental
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	Query() query.Client
 
 	// Scheme returns scheme client

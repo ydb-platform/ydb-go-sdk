@@ -45,7 +45,7 @@ func WithWriterCompressorCount(num int) WriterOption {
 
 // WithWriterMaxQueueLen set max len of queue for wait ack
 //
-// Experimental: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#experimental
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithWriterMaxQueueLen(num int) WriterOption {
 	return topicwriterinternal.WithMaxQueueLen(num)
 }
@@ -59,7 +59,7 @@ func WithWriterMessageMaxBytesSize(size int) WriterOption {
 }
 
 // WithWriteSessionMeta
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithWriteSessionMeta(meta map[string]string) WriterOption {
 	return WithWriterSessionMeta(meta)
 }
@@ -70,7 +70,7 @@ func WithWriterSessionMeta(meta map[string]string) WriterOption {
 }
 
 // WithProducerID
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithProducerID(producerID string) WriterOption {
 	return WithWriterProducerID(producerID)
 }
@@ -81,7 +81,7 @@ func WithWriterProducerID(producerID string) WriterOption {
 }
 
 // WithPartitionID
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithPartitionID(partitionID int64) WriterOption {
 	return WithWriterPartitionID(partitionID)
 }
@@ -92,7 +92,7 @@ func WithWriterPartitionID(partitionID int64) WriterOption {
 }
 
 // WithSyncWrite
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithSyncWrite(sync bool) WriterOption {
 	return WithWriterWaitServerAck(sync)
 }
@@ -105,16 +105,16 @@ func WithWriterWaitServerAck(wait bool) WriterOption {
 
 type (
 	// WithOnWriterConnectedInfo present information, received from server
-	// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
+	// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	WithOnWriterConnectedInfo = topicwriterinternal.PublicWithOnWriterConnectedInfo
 
 	// OnWriterInitResponseCallback
-	// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
+	// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	OnWriterInitResponseCallback = topicwriterinternal.PublicOnWriterInitResponseCallback
 )
 
 // WithOnWriterFirstConnected set callback f, which will called once - after first successfully init topic writer stream
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithOnWriterFirstConnected(f OnWriterInitResponseCallback) WriterOption {
 	return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
 		cfg.OnWriterInitResponseCallback = f
@@ -122,7 +122,7 @@ func WithOnWriterFirstConnected(f OnWriterInitResponseCallback) WriterOption {
 }
 
 // WithCodec
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithCodec(codec topictypes.Codec) WriterOption {
 	return WithWriterCodec(codec)
 }
@@ -133,7 +133,7 @@ func WithWriterCodec(codec topictypes.Codec) WriterOption {
 }
 
 // WithCodecAutoSelect
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithCodecAutoSelect() WriterOption {
 	return topicwriterinternal.WithAutoCodec()
 }

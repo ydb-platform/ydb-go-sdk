@@ -11,12 +11,12 @@ import (
 type (
 	// Retry specified trace of retry call activity.
 	// gtrace:gen
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
+	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
 	Retry struct {
-		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
+		// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
 		OnRetry func(RetryLoopStartInfo) func(RetryLoopDoneInfo)
 	}
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
+	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
 	RetryLoopStartInfo struct {
 		// Context make available context in trace callback function.
 		// Pointer to context provide replacement of context in trace callback function.
@@ -30,7 +30,7 @@ type (
 
 		NestedCall bool // a sign for detect Retry calls inside head Retry
 	}
-	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#unstable
+	// Unstable: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#unstable
 	RetryLoopDoneInfo struct {
 		Attempts int
 		Error    error

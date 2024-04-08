@@ -2,7 +2,7 @@ package metrics
 
 // Registry is interface for metrics registry
 //
-// Experimental: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#experimental
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 type Registry interface {
 	// CounterVec returns CounterVec by name, subsystem and labels
 	// If counter by args already created - return counter from cache

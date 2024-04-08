@@ -26,7 +26,7 @@ type Client interface {
 	// - close the Client which the session was created with,
 	// - call any method of the Session until the ErrSessionClosed is returned.
 	//
-	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#experimental
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	Session(ctx context.Context, path string, opts ...options.SessionOption) (Session, error)
 }
 

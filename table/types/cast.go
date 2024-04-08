@@ -93,7 +93,7 @@ func VariantValue(v Value) (name string, idx uint32, _ Value, _ error) {
 
 // DictFields returns dict values from abstract Value
 //
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func DictFields(v Value) (map[Value]Value, error) {
 	return DictValues(v)
 }

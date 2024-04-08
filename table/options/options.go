@@ -518,7 +518,7 @@ func WithPartitioningPolicyMode(mode PartitioningMode) PartitioningPolicyOption 
 	}
 }
 
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithPartitioningPolicyUniformPartitions(n uint64) PartitioningPolicyOption {
 	return func(p *partitioningPolicy, a *allocator.Allocator) {
 		p.Partitions = &Ydb_Table.PartitioningPolicy_UniformPartitions{
@@ -527,7 +527,7 @@ func WithPartitioningPolicyUniformPartitions(n uint64) PartitioningPolicyOption 
 	}
 }
 
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithPartitioningPolicyExplicitPartitions(splitPoints ...value.Value) PartitioningPolicyOption {
 	return func(p *partitioningPolicy, a *allocator.Allocator) {
 		values := make([]*Ydb.TypedValue, len(splitPoints))
@@ -891,7 +891,7 @@ func WithIgnoreTruncated() ExecuteDataQueryOption {
 
 // WithQueryCachePolicyKeepInCache manages keep-in-cache policy
 //
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 // Use WithKeepInCache for disabling keep-in-cache policy
 func WithQueryCachePolicyKeepInCache() QueryCachePolicyOption {
 	return withQueryCachePolicyKeepInCache(true)
@@ -905,7 +905,7 @@ func withQueryCachePolicyKeepInCache(keepInCache bool) QueryCachePolicyOption {
 
 // WithQueryCachePolicy manages query cache policy
 //
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption {
 	return withQueryCachePolicy(opts...)
 }

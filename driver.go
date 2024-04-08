@@ -191,7 +191,7 @@ func (d *Driver) Table() table.Client {
 
 // Query returns query client
 //
-// Experimental: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#experimental
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (d *Driver) Query() query.Client {
 	return d.query.Get()
 }
@@ -273,7 +273,7 @@ func MustOpen(ctx context.Context, dsn string, opts ...Option) *Driver {
 
 // New connects to database and return driver runtime holder
 //
-// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#deprecated
+// Deprecated: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func New(ctx context.Context, opts ...Option) (_ *Driver, err error) { //nolint:nonamedreturns
 	d, err := newConnectionFromOptions(ctx, opts...)
 	if err != nil {

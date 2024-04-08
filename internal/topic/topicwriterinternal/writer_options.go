@@ -51,7 +51,7 @@ func WithTokenUpdateInterval(interval time.Duration) PublicWriterOption {
 
 // WithCommonConfig
 //
-// Experimental: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#experimental
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithCommonConfig(common config.Common) PublicWriterOption {
 	return func(cfg *WriterReconnectorConfig) {
 		cfg.Common = common

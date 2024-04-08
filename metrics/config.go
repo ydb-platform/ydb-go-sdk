@@ -4,7 +4,7 @@ import "github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 // Config is interface for metrics registry config
 //
-// Experimental: https://github.com/ydb-platform/ydb-go-sdk/master/VERSIONING.md#experimental
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 type Config interface {
 	Registry
 
