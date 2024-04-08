@@ -24,7 +24,7 @@ import (
 type noQuota struct{}
 
 func (n noQuota) Acquire(ctx context.Context) error {
-	return retry.ErrNoQuota
+	return errors.New("no quota")
 }
 
 func TestRetryLimiter(t *testing.T) {

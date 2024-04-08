@@ -356,10 +356,11 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 			case <-t.C:
 				t.Stop()
 
-				if e := options.limiter.Acquire(ctx); e != nil {
+				if acquireErr := options.limiter.Acquire(ctx); acquireErr != nil {
 					return xerrors.WithStackTrace(
 						xerrors.Join(
 							fmt.Errorf("attempt No.%d: %w", attempts, ErrNoQuota),
+							acquireErr,
 							err,
 						),
 					)
