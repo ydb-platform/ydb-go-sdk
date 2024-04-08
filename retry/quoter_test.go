@@ -29,6 +29,7 @@ func TestQuoter(t *testing.T) {
 		q := Quoter(1, func(q *rateLimiter) {
 			q.clock = clock
 		})
+		defer q.Stop()
 		require.NoError(t, q.Acquire(ctx))
 		acquireCh := make(chan struct{})
 		go func() {
