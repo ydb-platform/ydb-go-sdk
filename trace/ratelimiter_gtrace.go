@@ -8,9 +8,11 @@ type ratelimiterComposeOptions struct {
 }
 
 // RatelimiterOption specified Ratelimiter compose option
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 type RatelimiterComposeOption func(o *ratelimiterComposeOptions)
 
 // WithRatelimiterPanicCallback specified behavior on panic
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func WithRatelimiterPanicCallback(cb func(e interface{})) RatelimiterComposeOption {
 	return func(o *ratelimiterComposeOptions) {
 		o.panicCallback = cb
@@ -18,6 +20,7 @@ func WithRatelimiterPanicCallback(cb func(e interface{})) RatelimiterComposeOpti
 }
 
 // Compose returns a new Ratelimiter which has functional fields composed both from t and x.
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (t *Ratelimiter) Compose(x *Ratelimiter, opts ...RatelimiterComposeOption) *Ratelimiter {
 	var ret Ratelimiter
 	return &ret
