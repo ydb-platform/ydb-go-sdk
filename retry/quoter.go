@@ -24,6 +24,7 @@ type (
 		clock  clockwork.Clock
 		ticker clockwork.Ticker
 		quota  chan struct{}
+		done   chan struct{}
 	}
 	rateLimiterOption func(q *rateLimiter)
 )
@@ -31,6 +32,7 @@ type (
 func Quoter(attemptsPerSecond int, opts ...rateLimiterOption) *rateLimiter {
 	q := &rateLimiter{
 		clock: clockwork.NewRealClock(),
+		done:  make(chan struct{}),
 	}
 	for _, opt := range opts {
 		opt(q)
@@ -46,10 +48,16 @@ func Quoter(attemptsPerSecond int, opts ...rateLimiterOption) *rateLimiter {
 		q.ticker = q.clock.NewTicker(time.Second / time.Duration(attemptsPerSecond))
 		go func() {
 			defer close(q.quota)
-			for range q.ticker.Chan() {
+			for {
 				select {
-				case q.quota <- struct{}{}:
-				default:
+				case <-q.ticker.Chan():
+					select {
+					case q.quota <- struct{}{}:
+					case <-q.done:
+						return
+					}
+				case <-q.done:
+					return
 				}
 			}
 		}()
@@ -62,6 +70,7 @@ func (q *rateLimiter) Stop() {
 	if q.ticker != nil {
 		q.ticker.Stop()
 	}
+	close(q.done)
 }
 
 func (q *rateLimiter) Acquire(ctx context.Context) error {
