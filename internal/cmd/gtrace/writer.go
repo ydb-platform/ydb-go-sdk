@@ -324,6 +324,7 @@ func (w *Writer) compose(trace *Trace) {
 		w.line(`// Compose returns a new `, trace.Name, ` which has functional fields composed both from `,
 			t, ` and `, x, `.`,
 		)
+		w.line(`// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals`)
 		w.code(`func (`, t, ` *`, trace.Name, `) Compose(`, x, ` *`, trace.Name, `, opts ...`+trace.Name+`ComposeOption) `)
 		w.line(`*`, trace.Name, ` {`)
 		w.block(func() {
@@ -440,11 +441,13 @@ func (w *Writer) options(trace *Trace) {
 	})
 	w.newScope(func() {
 		w.line(fmt.Sprintf(`// %sOption specified %s compose option`, trace.Name, trace.Name))
+		w.line(`// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals`)
 		w.line(fmt.Sprintf(`type %sComposeOption func(o *%sComposeOptions)`, trace.Name, unexported(trace.Name)))
 		_ = w.bw.WriteByte('\n')
 	})
 	w.newScope(func() {
 		w.line(fmt.Sprintf(`// With%sPanicCallback specified behavior on panic`, trace.Name))
+		w.line(`// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals`)
 		w.line(fmt.Sprintf(`func With%sPanicCallback(cb func(e interface{})) %sComposeOption {`, trace.Name, trace.Name))
 		w.block(func() {
 			w.line(fmt.Sprintf(`return func(o *%sComposeOptions) {`, unexported(trace.Name)))
@@ -641,6 +644,7 @@ func (w *Writer) hookShortcut(trace *Trace, hook Hook) {
 
 	w.newScope(func() {
 		t := w.declare("t")
+		w.line(`// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals`)
 		w.code(`func `, name)
 		w.code(`(`)
 		var ctx string

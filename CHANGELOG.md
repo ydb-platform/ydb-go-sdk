@@ -1,3 +1,5 @@
+* Added versioning policy
+
 ## v3.62.0
 * Restored `WithSessionPoolKeepAliveMinSize` and `WithSessionPoolKeepAliveTimeout` for backward compatibility.
 * Fixed leak timers

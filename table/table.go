@@ -39,8 +39,9 @@ type Client interface {
 	// - context was canceled or deadlined
 	// - session was created
 	//
-	// Deprecated: don't use CreateSession explicitly. This method only for ORM's compatibility.
-	// Use Do for queries with session
+	// Deprecated: not for public usage. Because explicit session often leaked on server-side due to bad client-side usage.
+	// Will be removed after Oct 2024.
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	CreateSession(ctx context.Context, opts ...Option) (s ClosableSession, err error)
 
 	// Do provide the best effort for execute operation.

@@ -12,9 +12,11 @@ type scriptingComposeOptions struct {
 }
 
 // ScriptingOption specified Scripting compose option
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 type ScriptingComposeOption func(o *scriptingComposeOptions)
 
 // WithScriptingPanicCallback specified behavior on panic
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func WithScriptingPanicCallback(cb func(e interface{})) ScriptingComposeOption {
 	return func(o *scriptingComposeOptions) {
 		o.panicCallback = cb
@@ -22,6 +24,7 @@ func WithScriptingPanicCallback(cb func(e interface{})) ScriptingComposeOption {
 }
 
 // Compose returns a new Scripting which has functional fields composed both from t and x.
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (t *Scripting) Compose(x *Scripting, opts ...ScriptingComposeOption) *Scripting {
 	var ret Scripting
 	options := scriptingComposeOptions{}
@@ -260,6 +263,7 @@ func (t *Scripting) onClose(s ScriptingCloseStartInfo) func(ScriptingCloseDoneIn
 	}
 	return res
 }
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func ScriptingOnExecute(t *Scripting, c *context.Context, call call, query string, parameters scriptingQueryParameters) func(result scriptingResult, _ error) {
 	var p ScriptingExecuteStartInfo
 	p.Context = c
@@ -274,6 +278,7 @@ func ScriptingOnExecute(t *Scripting, c *context.Context, call call, query strin
 		res(p)
 	}
 }
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func ScriptingOnStreamExecute(t *Scripting, c *context.Context, call call, query string, parameters scriptingQueryParameters) func(error) func(error) {
 	var p ScriptingStreamExecuteStartInfo
 	p.Context = c
@@ -292,6 +297,7 @@ func ScriptingOnStreamExecute(t *Scripting, c *context.Context, call call, query
 		}
 	}
 }
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func ScriptingOnExplain(t *Scripting, c *context.Context, call call, query string) func(plan string, _ error) {
 	var p ScriptingExplainStartInfo
 	p.Context = c
@@ -305,6 +311,7 @@ func ScriptingOnExplain(t *Scripting, c *context.Context, call call, query strin
 		res(p)
 	}
 }
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func ScriptingOnClose(t *Scripting, c *context.Context, call call) func(error) {
 	var p ScriptingCloseStartInfo
 	p.Context = c

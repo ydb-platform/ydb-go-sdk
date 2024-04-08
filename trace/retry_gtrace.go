@@ -12,9 +12,11 @@ type retryComposeOptions struct {
 }
 
 // RetryOption specified Retry compose option
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 type RetryComposeOption func(o *retryComposeOptions)
 
 // WithRetryPanicCallback specified behavior on panic
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func WithRetryPanicCallback(cb func(e interface{})) RetryComposeOption {
 	return func(o *retryComposeOptions) {
 		o.panicCallback = cb
@@ -22,6 +24,7 @@ func WithRetryPanicCallback(cb func(e interface{})) RetryComposeOption {
 }
 
 // Compose returns a new Retry which has functional fields composed both from t and x.
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (t *Retry) Compose(x *Retry, opts ...RetryComposeOption) *Retry {
 	var ret Retry
 	options := retryComposeOptions{}
@@ -82,6 +85,7 @@ func (t *Retry) onRetry(r RetryLoopStartInfo) func(RetryLoopDoneInfo) {
 	}
 	return res
 }
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func RetryOnRetry(t *Retry, c *context.Context, call call, label string, idempotent bool, nestedCall bool) func(attempts int, _ error) {
 	var p RetryLoopStartInfo
 	p.Context = c

@@ -50,14 +50,14 @@ func UnmarshalMessageContentToOwnType(ctx context.Context, reader *topicreader.R
 // ProcessMessagesWithSyncCommit example about guarantee wait for commit accepted by server
 func ProcessMessagesWithSyncCommit(ctx context.Context, db *ydb.Driver) {
 	reader, _ := db.Topic().StartReader("consumer", nil,
-		topicoptions.WithCommitMode(topicoptions.CommitModeSync),
+		topicoptions.WithReaderCommitMode(topicoptions.CommitModeSync),
 	)
 	defer func() {
 		_ = reader.Close(ctx)
 	}()
 
 	for {
-		batch, _ := reader.ReadMessageBatch(ctx)
+		batch, _ := reader.ReadMessagesBatch(ctx)
 		processBatch(batch.Context(), batch)
 		_ = reader.Commit(ctx, batch) // will wait response about commit from server
 	}
@@ -67,7 +67,7 @@ func ProcessMessagesWithSyncCommit(ctx context.Context, db *ydb.Driver) {
 // commit messages to YDB
 func OwnReadProgressStorage(ctx context.Context, db *ydb.Driver) {
 	reader, _ := db.Topic().StartReader("consumer", topicoptions.ReadTopic("asd"),
-		topicoptions.WithGetPartitionStartOffset(
+		topicoptions.WithReaderGetPartitionStartOffset(
 			func(
 				ctx context.Context,
 				req topicoptions.GetPartitionStartOffsetRequest,
@@ -84,7 +84,7 @@ func OwnReadProgressStorage(ctx context.Context, db *ydb.Driver) {
 	)
 
 	for {
-		batch, _ := reader.ReadMessageBatch(ctx)
+		batch, _ := reader.ReadMessagesBatch(ctx)
 
 		processBatch(batch.Context(), batch)
 		_ = externalSystemCommit(
