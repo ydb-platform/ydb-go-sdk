@@ -19,6 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -55,8 +56,8 @@ type conn struct {
 	endpoint          endpoint.Endpoint // ro access
 	closed            bool
 	state             atomic.Uint32
-	lastUsage         *lastUsage
 	childStreams      *xcontext.CancelsGuard
+	lastUsage         xsync.LastUsage
 	onClose           []func(*conn)
 	onTransportErrors []func(ctx context.Context, cc Conn, cause error)
 }
@@ -504,7 +505,7 @@ func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 		endpoint:     e,
 		config:       config,
 		done:         make(chan struct{}),
-		lastUsage:    newLastUsage(nil),
+		lastUsage:    xsync.NewLastUsage(),
 		childStreams: xcontext.NewCancelsGuard(),
 		onClose: []func(*conn){
 			func(c *conn) {
