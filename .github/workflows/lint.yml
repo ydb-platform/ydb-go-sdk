@@ -18,7 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v4
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: --timeout=5m
@@ -33,7 +33,7 @@ jobs:
       - name: generate examples golangci-lint config
         run: sed 's/github.com\/ydb-platform\/ydb-go-sdk\/v3/examples/g' .golangci.yml > examples/.golangci.yml
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v4
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: --timeout=5m
@@ -49,7 +49,7 @@ jobs:
       - name: generate slo golangci-lint config
         run: sed 's/github.com\/ydb-platform\/ydb-go-sdk\/v3/slo/g' .golangci.yml > tests/slo/.golangci.yml
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v4
         with:
           version: ${{ env.GOLANGCI_LINT_VERSION }}
           args: --timeout=5m
