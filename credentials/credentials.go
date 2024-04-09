@@ -34,3 +34,10 @@ func NewStaticCredentials(
 ) *credentials.Static {
 	return credentials.NewStaticCredentials(user, password, authEndpoint, opts...)
 }
+
+// NewOauth2TokenExchangeCredentials makes OAuth 2.0 token exchange protocol credentials object
+func NewOauth2TokenExchangeCredentials(
+	opts ...credentials.Oauth2TokenExchangeCredentialsOption,
+) (*credentials.Oauth2TokenExchange, error) {
+	return credentials.NewOauth2TokenExchangeCredentials(opts...)
+}
