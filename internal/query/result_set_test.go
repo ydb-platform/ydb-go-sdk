@@ -20,6 +20,324 @@ import (
 func TestResultSetNext(t *testing.T) {
 	ctx := xtest.Context(t)
 	ctrl := gomock.NewController(t)
+	t.Run("EmptyResultSet", func(t *testing.T) {
+		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status:         Ydb.StatusIds_SUCCESS,
+			ResultSetIndex: 0,
+			ResultSet: &Ydb.ResultSet{
+				Columns: []*Ydb.Column{
+					{
+						Name: "a",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UINT64,
+							},
+						},
+					},
+					{
+						Name: "b",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UTF8,
+							},
+						},
+					},
+				},
+				Rows: []*Ydb.Value{},
+			},
+		}, nil)
+		stream.EXPECT().Recv().Return(nil, io.EOF)
+		recv, err := stream.Recv()
+		require.NoError(t, err)
+		rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+			part, err := stream.Recv()
+			if err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
+
+			return part, nil
+		}, recv, nil)
+		require.EqualValues(t, 0, rs.index)
+		{
+			_, err := rs.nextRow(ctx)
+			require.ErrorIs(t, err, io.EOF)
+		}
+	})
+	t.Run("SecondResultSetEmpty", func(t *testing.T) {
+		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status:         Ydb.StatusIds_SUCCESS,
+			ResultSetIndex: 0,
+			ResultSet: &Ydb.ResultSet{
+				Columns: []*Ydb.Column{
+					{
+						Name: "a",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UINT64,
+							},
+						},
+					},
+					{
+						Name: "b",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UTF8,
+							},
+						},
+					},
+				},
+				Rows: []*Ydb.Value{
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 1,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "1",
+							},
+						}},
+					},
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 2,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "2",
+							},
+						}},
+					},
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 3,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "3",
+							},
+						}},
+					},
+				},
+			},
+		}, nil)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status:         Ydb.StatusIds_SUCCESS,
+			ResultSetIndex: 0,
+			ResultSet: &Ydb.ResultSet{
+				Rows: []*Ydb.Value{},
+			},
+		}, nil)
+		stream.EXPECT().Recv().Return(nil, io.EOF)
+		recv, err := stream.Recv()
+		require.NoError(t, err)
+		rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+			part, err := stream.Recv()
+			if err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
+
+			return part, nil
+		}, recv, nil)
+		require.EqualValues(t, 0, rs.index)
+		{
+			_, err := rs.nextRow(ctx)
+			require.NoError(t, err)
+			require.EqualValues(t, 0, rs.rowIndex)
+		}
+		{
+			_, err := rs.nextRow(ctx)
+			require.NoError(t, err)
+			require.EqualValues(t, 1, rs.rowIndex)
+		}
+		{
+			_, err := rs.nextRow(ctx)
+			require.NoError(t, err)
+			require.EqualValues(t, 2, rs.rowIndex)
+		}
+		{
+			_, err := rs.nextRow(ctx)
+			require.ErrorIs(t, err, io.EOF)
+		}
+	})
+	t.Run("IntermediateResultSetEmpty", func(t *testing.T) {
+		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status:         Ydb.StatusIds_SUCCESS,
+			ResultSetIndex: 0,
+			ResultSet: &Ydb.ResultSet{
+				Columns: []*Ydb.Column{
+					{
+						Name: "a",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UINT64,
+							},
+						},
+					},
+					{
+						Name: "b",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UTF8,
+							},
+						},
+					},
+				},
+				Rows: []*Ydb.Value{
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 1,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "1",
+							},
+						}},
+					},
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 2,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "2",
+							},
+						}},
+					},
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 3,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "3",
+							},
+						}},
+					},
+				},
+			},
+		}, nil)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status:         Ydb.StatusIds_SUCCESS,
+			ResultSetIndex: 0,
+			ResultSet: &Ydb.ResultSet{
+				Rows: []*Ydb.Value{},
+			},
+		}, nil)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status:         Ydb.StatusIds_SUCCESS,
+			ResultSetIndex: 0,
+			ResultSet: &Ydb.ResultSet{
+				Columns: []*Ydb.Column{
+					{
+						Name: "a",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UINT64,
+							},
+						},
+					},
+					{
+						Name: "b",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UTF8,
+							},
+						},
+					},
+				},
+				Rows: []*Ydb.Value{
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 1,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "1",
+							},
+						}},
+					},
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 2,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "2",
+							},
+						}},
+					},
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 3,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "3",
+							},
+						}},
+					},
+				},
+			},
+		}, nil)
+		stream.EXPECT().Recv().Return(nil, io.EOF)
+		recv, err := stream.Recv()
+		require.NoError(t, err)
+		rs := newResultSet(func() (*Ydb_Query.ExecuteQueryResponsePart, error) {
+			part, err := stream.Recv()
+			if err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
+
+			return part, nil
+		}, recv, nil)
+		require.EqualValues(t, 0, rs.index)
+		{
+			_, err := rs.nextRow(ctx)
+			require.NoError(t, err)
+			require.EqualValues(t, 0, rs.rowIndex)
+		}
+		{
+			_, err := rs.nextRow(ctx)
+			require.NoError(t, err)
+			require.EqualValues(t, 1, rs.rowIndex)
+		}
+		{
+			_, err := rs.nextRow(ctx)
+			require.NoError(t, err)
+			require.EqualValues(t, 2, rs.rowIndex)
+		}
+		{
+			_, err := rs.nextRow(ctx)
+			require.NoError(t, err)
+			require.EqualValues(t, 0, rs.rowIndex)
+		}
+		{
+			_, err := rs.nextRow(ctx)
+			require.NoError(t, err)
+			require.EqualValues(t, 1, rs.rowIndex)
+		}
+		{
+			_, err := rs.nextRow(ctx)
+			require.NoError(t, err)
+			require.EqualValues(t, 2, rs.rowIndex)
+		}
+		{
+			_, err := rs.nextRow(ctx)
+			require.ErrorIs(t, err, io.EOF)
+		}
+	})
 	t.Run("OverTwoParts", func(t *testing.T) {
 		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
 		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
