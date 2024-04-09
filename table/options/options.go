@@ -811,6 +811,21 @@ func CopyTablesItem(src, dst string, omitIndexes bool) CopyTablesOption {
 }
 
 type (
+	RenameTablesDesc   Ydb_Table.RenameTablesRequest
+	RenameTablesOption func(desc *RenameTablesDesc)
+)
+
+func RenameTablesItem(src, dst string, replaceDestination bool) RenameTablesOption {
+	return func(desc *RenameTablesDesc) {
+		desc.Tables = append(desc.Tables, &Ydb_Table.RenameTableItem{
+			SourcePath:         src,
+			DestinationPath:    dst,
+			ReplaceDestination: replaceDestination,
+		})
+	}
+}
+
+type (
 	ExecuteSchemeQueryDesc   Ydb_Table.ExecuteSchemeQueryRequest
 	ExecuteSchemeQueryOption func(*ExecuteSchemeQueryDesc)
 )

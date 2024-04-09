@@ -112,6 +112,9 @@ type Session interface {
 		opts ...options.AlterTableOption,
 	) (err error)
 
+	// Deprecated: use CopyTables method instead
+	// Will be removed after Oct 2024.
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	CopyTable(
 		ctx context.Context,
 		dst, src string,
@@ -121,6 +124,11 @@ type Session interface {
 	CopyTables(
 		ctx context.Context,
 		opts ...options.CopyTablesOption,
+	) (err error)
+
+	RenameTables(
+		ctx context.Context,
+		opts ...options.RenameTablesOption,
 	) (err error)
 
 	Explain(
