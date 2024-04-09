@@ -21,10 +21,7 @@ type Storage struct {
 	db           *ydb.Driver
 	cfg          *config.Config
 	tablePath    string
-	retryLimiter interface {
-		retry.Limiter
-		Stop()
-	}
+	retryLimiter retry.LimiterStoper
 }
 
 const writeQuery = `

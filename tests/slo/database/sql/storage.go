@@ -74,10 +74,7 @@ type Storage struct {
 	dropQuery    string
 	upsertQuery  string
 	selectQuery  string
-	retryLimiter interface {
-		retry.Limiter
-		Stop()
-	}
+	retryLimiter retry.LimiterStoper
 }
 
 func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Storage, err error) {

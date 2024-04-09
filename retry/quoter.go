@@ -22,6 +22,11 @@ type (
 	Limiter interface {
 		Acquire(ctx context.Context) error
 	}
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+	LimiterStoper interface {
+		Limiter
+		Stop()
+	}
 	rateLimiter struct {
 		clock  clockwork.Clock
 		ticker clockwork.Ticker
