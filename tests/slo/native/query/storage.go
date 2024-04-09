@@ -72,7 +72,7 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:gomnd
 	defer cancel()
 
-	retryLimiter := retry.Quoter(int(float64(poolSize) * (1.0 + 0.20)))
+	retryLimiter := retry.Quoter(int(float64(poolSize) * 0.1))
 
 	db, err := ydb.Open(ctx,
 		cfg.Endpoint+cfg.DB,
