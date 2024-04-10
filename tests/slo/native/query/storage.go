@@ -66,7 +66,7 @@ DROP TABLE %s
 `
 
 func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:gomnd
 	defer cancel()
 
 	db, err := ydb.Open(ctx,

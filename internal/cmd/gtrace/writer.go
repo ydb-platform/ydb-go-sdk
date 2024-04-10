@@ -1032,7 +1032,7 @@ func (s *scope) set(v string) bool {
 	if _, has := s.vars[v]; has {
 		return false
 	}
-	_, file, line, _ := runtime.Caller(2)
+	_, file, line, _ := runtime.Caller(2) //nolint:gomnd
 	s.vars[v] = decl{
 		where: fmt.Sprintf("%s:%d", file, line),
 	}

@@ -73,7 +73,7 @@ func createSession(
 }
 
 func newProtectionKey() []byte {
-	key := make([]byte, 8)
+	key := make([]byte, 8)                            //nolint:gomnd
 	binary.LittleEndian.PutUint64(key, rand.Uint64()) //nolint:gosec
 
 	return key
@@ -120,7 +120,7 @@ func (s *session) newStream(
 		deadline = s.getLastGoodResponseTime().Add(s.options.SessionTimeout)
 	} else {
 		// Large enough to make the loop infinite, small enough to allow the maximum duration value (~290 years).
-		deadline = time.Now().Add(time.Hour * 24 * 365 * 100)
+		deadline = time.Now().Add(time.Hour * 24 * 365 * 100) //nolint:gomnd
 	}
 
 	lastChance := false
@@ -230,7 +230,7 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 
 		// Start the loops.
 		wg := sync.WaitGroup{}
-		wg.Add(2)
+		wg.Add(2) //nolint:gomnd
 		sessionStarted := make(chan *Ydb_Coordination.SessionResponse_SessionStarted, 1)
 		sessionStopped := make(chan *Ydb_Coordination.SessionResponse_SessionStopped, 1)
 		startSending := make(chan struct{})

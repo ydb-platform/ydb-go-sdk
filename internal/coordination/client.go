@@ -336,11 +336,11 @@ func (c *Client) closeSessions(ctx context.Context) {
 func defaultCreateSessionConfig() *options.CreateSessionOptions {
 	return &options.CreateSessionOptions{
 		Description:             "YDB Go SDK",
-		SessionTimeout:          time.Second * 5,
+		SessionTimeout:          time.Second * 5, //nolint:gomnd
 		SessionStartTimeout:     time.Second * 1,
 		SessionStopTimeout:      time.Second * 1,
-		SessionKeepAliveTimeout: time.Second * 10,
-		SessionReconnectDelay:   time.Millisecond * 500,
+		SessionKeepAliveTimeout: time.Second * 10,       //nolint:gomnd
+		SessionReconnectDelay:   time.Millisecond * 500, //nolint:gomnd
 	}
 }
 
