@@ -117,6 +117,7 @@ func WithInternalDNSResolver() Option {
 func WithEndpoint(endpoint string) Option {
 	return func(c *Config) {
 		c.endpoint = endpoint
+		c.balancerConfig = c.balancerConfig.With(balancerConfig.WithEndpoint(endpoint))
 	}
 }
 
@@ -132,6 +133,7 @@ func WithSecure(secure bool) Option {
 func WithDatabase(database string) Option {
 	return func(c *Config) {
 		c.database = database
+		c.balancerConfig = c.balancerConfig.With(balancerConfig.WithDatabase(database))
 	}
 }
 
@@ -154,6 +156,7 @@ func WithTLSConfig(tlsConfig *tls.Config) Option {
 func WithTrace(t trace.Driver, opts ...trace.DriverComposeOption) Option { //nolint:gocritic
 	return func(c *Config) {
 		c.trace = c.trace.Compose(&t, opts...)
+		c.balancerConfig = c.balancerConfig.With(balancerConfig.WithTrace(c.trace))
 	}
 }
 
@@ -190,6 +193,7 @@ func WithConnectionTTL(ttl time.Duration) Option {
 func WithCredentials(credentials credentials.Credentials) Option {
 	return func(c *Config) {
 		c.credentials = credentials
+		c.balancerConfig = c.balancerConfig.With(balancerConfig.WithCredentials(credentials))
 	}
 }
 
@@ -234,6 +238,7 @@ func WithPanicCallback(panicCallback func(e interface{})) Option {
 func WithDialTimeout(timeout time.Duration) Option {
 	return func(c *Config) {
 		c.dialTimeout = timeout
+		c.balancerConfig = c.balancerConfig.With(balancerConfig.WithDialTimeout(timeout))
 	}
 }
 
@@ -289,6 +294,7 @@ func New(opts ...Option) *Config {
 	}
 
 	c.meta = meta.New(c.database, c.credentials, c.trace, c.metaOptions...)
+	c.balancerConfig = c.balancerConfig.With(balancerConfig.WithMeta(c.meta))
 
 	return c
 }
@@ -306,6 +312,7 @@ func (c *Config) With(opts ...Option) *Config {
 		c.trace,
 		c.metaOptions...,
 	)
+	c.balancerConfig = c.balancerConfig.With(balancerConfig.WithMeta(c.meta))
 
 	return c
 }

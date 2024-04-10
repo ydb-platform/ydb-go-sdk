@@ -1,0 +1,62 @@
+version: "3"
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:1.51.0
+    ports:
+      - "16686:16686" # Jaeger UI frontend
+      - "4317:4317"   # gRPC port for accepts traces in OpenTelemetry OTLP format
+      - "4318:4318"   # HTTP port for accepts traces in OpenTelemetry OTLP format
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+
+  prometheus:
+    image: prom/prometheus:v2.37.9
+    container_name: prometheus
+    ports:
+      - 9090:9090
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  grafana:
+    image: grafana/grafana:9.5.13
+    depends_on:
+      - prometheus
+    ports:
+      - 3000:3000
+    restart: always
+
+  prometheus-pushgateway:
+    image: prom/pushgateway
+    ports:
+      - 9091:9091
+
+  ydb:
+    # image: cr.yandex/yc/yandex-docker-local-ydb:trunk
+    # image: cr.yandex/yc/yandex-docker-local-ydb:23.1
+    # image: cr.yandex/yc/yandex-docker-local-ydb:stable-22-5
+    # image: cr.yandex/yc/yandex-docker-local-ydb:latest
+    # image: registry.yandex.net/yandex-docker-local-ydb:latest
+    # image: ghcr.io/ydb-platform/local-ydb:nightly
+    image: ydbplatform/local-ydb:24.1
+    hostname: localhost
+    # volumes:
+    #  - ./ydb_data:/ydb_data
+    #  - ./ydb_certs:/ydb_certs
+    environment:
+      #      - "YDB_DEFAULT_LOG_LEVEL=DEBUG"
+      - "GRPC_TLS_PORT=2135"
+      - "GRPC_PORT=2136"
+      - "MON_PORT=8765"
+      - "YDB_USE_IN_MEMORY_PDISKS=true"
+      - "YDB_LOCAL_SURVIVE_RESTART=true"
+      - "POSTGRES_USER=root"
+      - "POSTGRES_PASSWORD=1234"
+      - "YDB_FEATURE_FLAGS=enable_temp_tables"
+      - "YDB_TABLE_ENABLE_PREPARED_DDL=true"
+    ports:
+      - "2135:2135" # TLS
+      - "2136:2136" # Simple
+      - "5432:5432" # Postgres port
+      - "8765:8765" # Monitor

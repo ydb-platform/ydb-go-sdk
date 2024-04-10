@@ -10,8 +10,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -89,7 +89,7 @@ func defaultConfig() (c *Config) {
 		credentials: credentials.NewAnonymousCredentials(
 			credentials.WithSourceInfo(stack.Record(0)),
 		),
-		balancerConfig: balancers.Default(),
+		balancerConfig: balancerConfig.New(),
 		tlsConfig:      defaultTLSConfig(),
 		dialTimeout:    DefaultDialTimeout,
 		trace:          &trace.Driver{},

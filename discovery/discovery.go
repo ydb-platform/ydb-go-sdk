@@ -18,6 +18,6 @@ func (w WhoAmI) String() string {
 }
 
 type Client interface {
-	Discover(ctx context.Context) ([]endpoint.Endpoint, error)
+	Discover(ctx context.Context) ([]endpoint.Info, error)
 	WhoAmI(ctx context.Context) (*WhoAmI, error)
 }

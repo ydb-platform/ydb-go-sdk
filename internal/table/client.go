@@ -25,16 +25,7 @@ import (
 // sessionBuilder is the interface that holds logic of creating sessions.
 type sessionBuilder func(ctx context.Context) (*session, error)
 
-type nodeChecker interface {
-	HasNode(id uint32) bool
-}
-
-type balancer interface {
-	grpc.ClientConnInterface
-	nodeChecker
-}
-
-func New(ctx context.Context, balancer balancer, config *config.Config) *Client {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) *Client {
 	onDone := trace.TableOnInit(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.New"),
 	)
@@ -42,27 +33,26 @@ func New(ctx context.Context, balancer balancer, config *config.Config) *Client 
 		onDone(config.SizeLimit())
 	}()
 
-	return newClient(ctx, balancer, func(ctx context.Context) (s *session, err error) {
-		return newSession(ctx, balancer, config)
+	return newClient(ctx, cc, func(ctx context.Context) (s *session, err error) {
+		return newSession(ctx, cc, config)
 	}, config)
 }
 
 func newClient(
 	ctx context.Context,
-	balancer balancer,
+	cc grpc.ClientConnInterface,
 	builder sessionBuilder,
 	config *config.Config,
 ) *Client {
 	c := &Client{
-		clock:       config.Clock(),
-		config:      config,
-		cc:          balancer,
-		nodeChecker: balancer,
-		build:       builder,
-		index:       make(map[*session]sessionInfo),
-		idle:        list.New(),
-		waitQ:       list.New(),
-		limit:       config.SizeLimit(),
+		clock:  config.Clock(),
+		config: config,
+		cc:     cc,
+		build:  builder,
+		index:  make(map[*session]sessionInfo),
+		idle:   list.New(),
+		waitQ:  list.New(),
+		limit:  config.SizeLimit(),
 		waitChPool: sync.Pool{
 			New: func() interface{} {
 				ch := make(chan *session)
@@ -84,11 +74,10 @@ func newClient(
 // A Client is safe for use by multiple goroutines simultaneously.
 type Client struct {
 	// read-only fields
-	config      *config.Config
-	build       sessionBuilder
-	cc          grpc.ClientConnInterface
-	nodeChecker nodeChecker
-	clock       clockwork.Clock
+	config *config.Config
+	build  sessionBuilder
+	cc     grpc.ClientConnInterface
+	clock  clockwork.Clock
 
 	// read-write fields
 	mu                xsync.Mutex
@@ -397,13 +386,6 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 		})
 
 		if s != nil {
-			if c.nodeChecker != nil && !c.nodeChecker.HasNode(s.NodeID()) {
-				_ = s.Close(ctx)
-				s = nil
-
-				continue
-			}
-
 			return s, nil
 		}
 
@@ -540,10 +522,6 @@ func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s 
 // errClosedClient.
 // If Client is overflow calls s.Close(ctx) and returns
 // errSessionPoolOverflow.
-//
-// Note that Put() must be called only once after being created or received by
-// Get() or Take() calls. In other way it will produce unexpected behavior or
-// panic.
 func (c *Client) Put(ctx context.Context, s *session) (err error) {
 	onDone := trace.TableOnPoolPut(c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).Put"),
@@ -568,9 +546,6 @@ func (c *Client) Put(ctx context.Context, s *session) (err error) {
 
 	case s.isClosed():
 		return xerrors.WithStackTrace(errSessionClosed)
-
-	case c.nodeChecker != nil && !c.nodeChecker.HasNode(s.NodeID()):
-		return xerrors.WithStackTrace(errNodeIsNotObservable)
 
 	default:
 		c.mu.Lock()

@@ -163,7 +163,7 @@ func Transport(err error, opts ...teOpt) error {
 	return te
 }
 
-func MustPessimizeEndpoint(err error, codes ...grpcCodes.Code) bool {
+func MustBanConn(err error, codes ...grpcCodes.Code) bool {
 	switch {
 	case err == nil:
 		return false

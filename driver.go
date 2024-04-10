@@ -152,7 +152,7 @@ func (d *Driver) Close(ctx context.Context) (finalErr error) {
 		d.query.Close,
 		d.topic.Close,
 		d.balancer.Close,
-		d.pool.Release,
+		d.pool.Detach,
 	)
 
 	var issues []error

@@ -337,7 +337,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
 				)
 			}
 		},
-		OnConnAllow: func(info trace.DriverConnAllowStartInfo) func(trace.DriverConnAllowDoneInfo) {
+		OnConnUnban: func(info trace.DriverConnUnbanStartInfo) func(trace.DriverConnUnbanDoneInfo) {
 			if d.Details()&trace.DriverConnEvents == 0 {
 				return nil
 			}
@@ -348,7 +348,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
 			)
 			start := time.Now()
 
-			return func(info trace.DriverConnAllowDoneInfo) {
+			return func(info trace.DriverConnUnbanDoneInfo) {
 				l.Log(ctx, "done",
 					Stringer("endpoint", endpoint),
 					latencyField(start),

@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
@@ -26,7 +27,7 @@ func TestDiscovery(t *testing.T) {
 	var (
 		userAgent     = "connection user agent"
 		requestType   = "connection request type"
-		checkMedatada = func(ctx context.Context) {
+		checkMetadata = func(ctx context.Context) {
 			md, has := metadata.FromOutgoingContext(ctx)
 			if !has {
 				t.Fatalf("no medatada")
@@ -78,7 +79,7 @@ func TestDiscovery(t *testing.T) {
 					invoker grpc.UnaryInvoker,
 					opts ...grpc.CallOption,
 				) error {
-					checkMedatada(ctx)
+					checkMetadata(ctx)
 					return invoker(ctx, method, req, reply, cc, opts...)
 				}),
 				grpc.WithStreamInterceptor(func(
@@ -89,7 +90,7 @@ func TestDiscovery(t *testing.T) {
 					streamer grpc.Streamer,
 					opts ...grpc.CallOption,
 				) (grpc.ClientStream, error) {
-					checkMedatada(ctx)
+					checkMetadata(ctx)
 					return streamer(ctx, desc, cc, method, opts...)
 				}),
 			),
@@ -105,29 +106,13 @@ func TestDiscovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() {
-		// cleanup connection
-		if e := db.Close(ctx); e != nil {
-			t.Fatalf("db close failed: %+v", e)
-		}
-	}()
-	t.Run("discovery.Discover", func(t *testing.T) {
-		if endpoints, err := db.Discovery().Discover(ctx); err != nil {
-			t.Fatal(err)
-		} else {
-			t.Log(endpoints)
-		}
-		t.Run("wait", func(t *testing.T) {
-			t.Run("parking", func(t *testing.T) {
-				<-parking // wait for parking conn
-				t.Run("re-discover", func(t *testing.T) {
-					if endpoints, err := db.Discovery().Discover(ctx); err != nil {
-						t.Fatal(err)
-					} else {
-						t.Log(endpoints)
-					}
-				})
-			})
-		})
-	})
+	endpoints, err := db.Discovery().Discover(ctx)
+	require.NoError(t, err)
+	require.NotEmpty(t, endpoints)
+	<-parking // wait for parking conn
+	endpoints, err = db.Discovery().Discover(ctx)
+	require.NoError(t, err)
+	require.NotEmpty(t, endpoints)
+	err = db.Close(ctx)
+	require.NoError(t, err)
 }

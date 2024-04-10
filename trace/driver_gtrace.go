@@ -12,11 +12,9 @@ type driverComposeOptions struct {
 }
 
 // DriverOption specified Driver compose option
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 type DriverComposeOption func(o *driverComposeOptions)
 
 // WithDriverPanicCallback specified behavior on panic
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func WithDriverPanicCallback(cb func(e interface{})) DriverComposeOption {
 	return func(o *driverComposeOptions) {
 		o.panicCallback = cb
@@ -24,7 +22,6 @@ func WithDriverPanicCallback(cb func(e interface{})) DriverComposeOption {
 }
 
 // Compose returns a new Driver which has functional fields composed both from t and x.
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (t *Driver) Compose(x *Driver, opts ...DriverComposeOption) *Driver {
 	var ret Driver
 	options := driverComposeOptions{}
@@ -157,6 +154,76 @@ func (t *Driver) Compose(x *Driver, opts ...DriverComposeOption) *Driver {
 				r1 = h2(d)
 			}
 			return func(d DriverConnPoolNewDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
+					r1(d)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnPoolAttach
+		h2 := x.OnPoolAttach
+		ret.OnPoolAttach = func(d DriverConnPoolAttachStartInfo) func(DriverConnPoolAttachDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverConnPoolAttachDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverConnPoolAttachDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
+					r1(d)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnPoolDetach
+		h2 := x.OnPoolDetach
+		ret.OnPoolDetach = func(d DriverConnPoolDetachStartInfo) func(DriverConnPoolDetachDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverConnPoolDetachDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverConnPoolDetachDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -524,9 +591,9 @@ func (t *Driver) Compose(x *Driver, opts ...DriverComposeOption) *Driver {
 		}
 	}
 	{
-		h1 := t.OnConnAllow
-		h2 := x.OnConnAllow
-		ret.OnConnAllow = func(d DriverConnAllowStartInfo) func(DriverConnAllowDoneInfo) {
+		h1 := t.OnConnUnban
+		h2 := x.OnConnUnban
+		ret.OnConnUnban = func(d DriverConnUnbanStartInfo) func(DriverConnUnbanDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -534,14 +601,14 @@ func (t *Driver) Compose(x *Driver, opts ...DriverComposeOption) *Driver {
 					}
 				}()
 			}
-			var r, r1 func(DriverConnAllowDoneInfo)
+			var r, r1 func(DriverConnUnbanDoneInfo)
 			if h1 != nil {
 				r = h1(d)
 			}
 			if h2 != nil {
 				r1 = h2(d)
 			}
-			return func(d DriverConnAllowDoneInfo) {
+			return func(d DriverConnUnbanDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -734,6 +801,41 @@ func (t *Driver) Compose(x *Driver, opts ...DriverComposeOption) *Driver {
 		}
 	}
 	{
+		h1 := t.OnBalancerGetConn
+		h2 := x.OnBalancerGetConn
+		ret.OnBalancerGetConn = func(d DriverBalancerGetConnStartInfo) func(DriverBalancerGetConnDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverBalancerGetConnDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverBalancerGetConnDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
+					r1(d)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnBalancerChooseEndpoint
 		h2 := x.OnBalancerChooseEndpoint
 		ret.OnBalancerChooseEndpoint = func(d DriverBalancerChooseEndpointStartInfo) func(DriverBalancerChooseEndpointDoneInfo) {
@@ -822,6 +924,41 @@ func (t *Driver) Compose(x *Driver, opts ...DriverComposeOption) *Driver {
 				r1 = h2(d)
 			}
 			return func(d DriverBalancerUpdateDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(d)
+				}
+				if r1 != nil {
+					r1(d)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnBalancerMarkConnAsBad
+		h2 := x.OnBalancerMarkConnAsBad
+		ret.OnBalancerMarkConnAsBad = func(d DriverBalancerMarkConnAsBadStartInfo) func(DriverBalancerMarkConnAsBadDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(DriverBalancerMarkConnAsBadDoneInfo)
+			if h1 != nil {
+				r = h1(d)
+			}
+			if h2 != nil {
+				r1 = h2(d)
+			}
+			return func(d DriverBalancerMarkConnAsBadDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -930,6 +1067,36 @@ func (t *Driver) onPoolNew(d DriverConnPoolNewStartInfo) func(DriverConnPoolNewD
 	res := fn(d)
 	if res == nil {
 		return func(DriverConnPoolNewDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Driver) onPoolAttach(d DriverConnPoolAttachStartInfo) func(DriverConnPoolAttachDoneInfo) {
+	fn := t.OnPoolAttach
+	if fn == nil {
+		return func(DriverConnPoolAttachDoneInfo) {
+			return
+		}
+	}
+	res := fn(d)
+	if res == nil {
+		return func(DriverConnPoolAttachDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Driver) onPoolDetach(d DriverConnPoolDetachStartInfo) func(DriverConnPoolDetachDoneInfo) {
+	fn := t.OnPoolDetach
+	if fn == nil {
+		return func(DriverConnPoolDetachDoneInfo) {
+			return
+		}
+	}
+	res := fn(d)
+	if res == nil {
+		return func(DriverConnPoolDetachDoneInfo) {
 			return
 		}
 	}
@@ -1085,16 +1252,16 @@ func (t *Driver) onConnBan(d DriverConnBanStartInfo) func(DriverConnBanDoneInfo)
 	}
 	return res
 }
-func (t *Driver) onConnAllow(d DriverConnAllowStartInfo) func(DriverConnAllowDoneInfo) {
-	fn := t.OnConnAllow
+func (t *Driver) onConnUnban(d DriverConnUnbanStartInfo) func(DriverConnUnbanDoneInfo) {
+	fn := t.OnConnUnban
 	if fn == nil {
-		return func(DriverConnAllowDoneInfo) {
+		return func(DriverConnUnbanDoneInfo) {
 			return
 		}
 	}
 	res := fn(d)
 	if res == nil {
-		return func(DriverConnAllowDoneInfo) {
+		return func(DriverConnUnbanDoneInfo) {
 			return
 		}
 	}
@@ -1175,6 +1342,21 @@ func (t *Driver) onBalancerClose(d DriverBalancerCloseStartInfo) func(DriverBala
 	}
 	return res
 }
+func (t *Driver) onBalancerGetConn(d DriverBalancerGetConnStartInfo) func(DriverBalancerGetConnDoneInfo) {
+	fn := t.OnBalancerGetConn
+	if fn == nil {
+		return func(DriverBalancerGetConnDoneInfo) {
+			return
+		}
+	}
+	res := fn(d)
+	if res == nil {
+		return func(DriverBalancerGetConnDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Driver) onBalancerChooseEndpoint(d DriverBalancerChooseEndpointStartInfo) func(DriverBalancerChooseEndpointDoneInfo) {
 	fn := t.OnBalancerChooseEndpoint
 	if fn == nil {
@@ -1220,6 +1402,21 @@ func (t *Driver) onBalancerUpdate(d DriverBalancerUpdateStartInfo) func(DriverBa
 	}
 	return res
 }
+func (t *Driver) onBalancerMarkConnAsBad(d DriverBalancerMarkConnAsBadStartInfo) func(DriverBalancerMarkConnAsBadDoneInfo) {
+	fn := t.OnBalancerMarkConnAsBad
+	if fn == nil {
+		return func(DriverBalancerMarkConnAsBadDoneInfo) {
+			return
+		}
+	}
+	res := fn(d)
+	if res == nil {
+		return func(DriverBalancerMarkConnAsBadDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Driver) onGetCredentials(d DriverGetCredentialsStartInfo) func(DriverGetCredentialsDoneInfo) {
 	fn := t.OnGetCredentials
 	if fn == nil {
@@ -1235,7 +1432,6 @@ func (t *Driver) onGetCredentials(d DriverGetCredentialsStartInfo) func(DriverGe
 	}
 	return res
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnInit(t *Driver, c *context.Context, call call, endpoint string, database string, secure bool) func(error) {
 	var p DriverInitStartInfo
 	p.Context = c
@@ -1250,7 +1446,6 @@ func DriverOnInit(t *Driver, c *context.Context, call call, endpoint string, dat
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnWith(t *Driver, c *context.Context, call call, endpoint string, database string, secure bool) func(error) {
 	var p DriverWithStartInfo
 	p.Context = c
@@ -1265,7 +1460,6 @@ func DriverOnWith(t *Driver, c *context.Context, call call, endpoint string, dat
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnClose(t *Driver, c *context.Context, call call) func(error) {
 	var p DriverCloseStartInfo
 	p.Context = c
@@ -1277,7 +1471,6 @@ func DriverOnClose(t *Driver, c *context.Context, call call) func(error) {
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnPoolNew(t *Driver, c *context.Context, call call) func() {
 	var p DriverConnPoolNewStartInfo
 	p.Context = c
@@ -1288,7 +1481,28 @@ func DriverOnPoolNew(t *Driver, c *context.Context, call call) func() {
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func DriverOnPoolAttach(t *Driver, c *context.Context, call call) func(error) {
+	var p DriverConnPoolAttachStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onPoolAttach(p)
+	return func(e error) {
+		var p DriverConnPoolAttachDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+func DriverOnPoolDetach(t *Driver, c *context.Context, call call) func(error) {
+	var p DriverConnPoolDetachStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onPoolDetach(p)
+	return func(e error) {
+		var p DriverConnPoolDetachDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
 func DriverOnPoolRelease(t *Driver, c *context.Context, call call) func(error) {
 	var p DriverConnPoolReleaseStartInfo
 	p.Context = c
@@ -1300,7 +1514,6 @@ func DriverOnPoolRelease(t *Driver, c *context.Context, call call) func(error) {
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnResolve(t *Driver, call call, target string, resolved []string) func(error) {
 	var p DriverResolveStartInfo
 	p.Call = call
@@ -1313,7 +1526,6 @@ func DriverOnResolve(t *Driver, call call, target string, resolved []string) fun
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnStateChange(t *Driver, c *context.Context, call call, endpoint EndpointInfo, state ConnState) func(state ConnState) {
 	var p DriverConnStateChangeStartInfo
 	p.Context = c
@@ -1327,7 +1539,6 @@ func DriverOnConnStateChange(t *Driver, c *context.Context, call call, endpoint 
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnInvoke(t *Driver, c *context.Context, call call, endpoint EndpointInfo, m Method) func(_ error, issues []Issue, opID string, state ConnState, metadata map[string][]string) {
 	var p DriverConnInvokeStartInfo
 	p.Context = c
@@ -1345,7 +1556,6 @@ func DriverOnConnInvoke(t *Driver, c *context.Context, call call, endpoint Endpo
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnNewStream(t *Driver, c *context.Context, call call, endpoint EndpointInfo, m Method) func(_ error, state ConnState) {
 	var p DriverConnNewStreamStartInfo
 	p.Context = c
@@ -1360,7 +1570,6 @@ func DriverOnConnNewStream(t *Driver, c *context.Context, call call, endpoint En
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnStreamRecvMsg(t *Driver, c *context.Context, call call) func(error) {
 	var p DriverConnStreamRecvMsgStartInfo
 	p.Context = c
@@ -1372,7 +1581,6 @@ func DriverOnConnStreamRecvMsg(t *Driver, c *context.Context, call call) func(er
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnStreamSendMsg(t *Driver, c *context.Context, call call) func(error) {
 	var p DriverConnStreamSendMsgStartInfo
 	p.Context = c
@@ -1384,7 +1592,6 @@ func DriverOnConnStreamSendMsg(t *Driver, c *context.Context, call call) func(er
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnStreamCloseSend(t *Driver, c *context.Context, call call) func(error) {
 	var p DriverConnStreamCloseSendStartInfo
 	p.Context = c
@@ -1396,7 +1603,6 @@ func DriverOnConnStreamCloseSend(t *Driver, c *context.Context, call call) func(
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnDial(t *Driver, c *context.Context, call call, endpoint EndpointInfo) func(error) {
 	var p DriverConnDialStartInfo
 	p.Context = c
@@ -1409,7 +1615,6 @@ func DriverOnConnDial(t *Driver, c *context.Context, call call, endpoint Endpoin
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnBan(t *Driver, c *context.Context, call call, endpoint EndpointInfo, state ConnState, cause error) func(state ConnState) {
 	var p DriverConnBanStartInfo
 	p.Context = c
@@ -1424,21 +1629,19 @@ func DriverOnConnBan(t *Driver, c *context.Context, call call, endpoint Endpoint
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func DriverOnConnAllow(t *Driver, c *context.Context, call call, endpoint EndpointInfo, state ConnState) func(state ConnState) {
-	var p DriverConnAllowStartInfo
+func DriverOnConnUnban(t *Driver, c *context.Context, call call, endpoint EndpointInfo, state ConnState) func(state ConnState) {
+	var p DriverConnUnbanStartInfo
 	p.Context = c
 	p.Call = call
 	p.Endpoint = endpoint
 	p.State = state
-	res := t.onConnAllow(p)
+	res := t.onConnUnban(p)
 	return func(state ConnState) {
-		var p DriverConnAllowDoneInfo
+		var p DriverConnUnbanDoneInfo
 		p.State = state
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnPark(t *Driver, c *context.Context, call call, endpoint EndpointInfo) func(error) {
 	var p DriverConnParkStartInfo
 	p.Context = c
@@ -1451,7 +1654,6 @@ func DriverOnConnPark(t *Driver, c *context.Context, call call, endpoint Endpoin
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnClose(t *Driver, c *context.Context, call call, endpoint EndpointInfo) func(error) {
 	var p DriverConnCloseStartInfo
 	p.Context = c
@@ -1464,7 +1666,6 @@ func DriverOnConnClose(t *Driver, c *context.Context, call call, endpoint Endpoi
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnRepeaterWakeUp(t *Driver, c *context.Context, call call, name string, event string) func(error) {
 	var p DriverRepeaterWakeUpStartInfo
 	p.Context = c
@@ -1478,7 +1679,6 @@ func DriverOnRepeaterWakeUp(t *Driver, c *context.Context, call call, name strin
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnBalancerInit(t *Driver, c *context.Context, call call, name string) func(error) {
 	var p DriverBalancerInitStartInfo
 	p.Context = c
@@ -1491,7 +1691,6 @@ func DriverOnBalancerInit(t *Driver, c *context.Context, call call, name string)
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnBalancerClose(t *Driver, c *context.Context, call call) func(error) {
 	var p DriverBalancerCloseStartInfo
 	p.Context = c
@@ -1503,7 +1702,18 @@ func DriverOnBalancerClose(t *Driver, c *context.Context, call call) func(error)
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func DriverOnBalancerGetConn(t *Driver, c *context.Context, call call) func(endpoint EndpointInfo, _ error) {
+	var p DriverBalancerGetConnStartInfo
+	p.Context = c
+	p.Call = call
+	res := t.onBalancerGetConn(p)
+	return func(endpoint EndpointInfo, e error) {
+		var p DriverBalancerGetConnDoneInfo
+		p.Endpoint = endpoint
+		p.Error = e
+		res(p)
+	}
+}
 func DriverOnBalancerChooseEndpoint(t *Driver, c *context.Context, call call) func(endpoint EndpointInfo, _ error) {
 	var p DriverBalancerChooseEndpointStartInfo
 	p.Context = c
@@ -1516,7 +1726,6 @@ func DriverOnBalancerChooseEndpoint(t *Driver, c *context.Context, call call) fu
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnBalancerClusterDiscoveryAttempt(t *Driver, c *context.Context, call call, address string) func(error) {
 	var p DriverBalancerClusterDiscoveryAttemptStartInfo
 	p.Context = c
@@ -1529,7 +1738,6 @@ func DriverOnBalancerClusterDiscoveryAttempt(t *Driver, c *context.Context, call
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnBalancerUpdate(t *Driver, c *context.Context, call call, needLocalDC bool) func(endpoints []EndpointInfo, added []EndpointInfo, dropped []EndpointInfo, localDC string) {
 	var p DriverBalancerUpdateStartInfo
 	p.Context = c
@@ -1545,7 +1753,20 @@ func DriverOnBalancerUpdate(t *Driver, c *context.Context, call call, needLocalD
 		res(p)
 	}
 }
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func DriverOnBalancerMarkConnAsBad(t *Driver, c *context.Context, call call, endpoint EndpointInfo, cause error) func(prefer []EndpointInfo, fallback []EndpointInfo) {
+	var p DriverBalancerMarkConnAsBadStartInfo
+	p.Context = c
+	p.Call = call
+	p.Endpoint = endpoint
+	p.Cause = cause
+	res := t.onBalancerMarkConnAsBad(p)
+	return func(prefer []EndpointInfo, fallback []EndpointInfo) {
+		var p DriverBalancerMarkConnAsBadDoneInfo
+		p.Prefer = prefer
+		p.Fallback = fallback
+		res(p)
+	}
+}
 func DriverOnGetCredentials(t *Driver, c *context.Context, call call) func(token string, _ error) {
 	var p DriverGetCredentialsStartInfo
 	p.Context = c

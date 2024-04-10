@@ -1,0 +1,184 @@
+{{- if and .Values.webhook.enabled }}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ template "ydb.fullname" . }}-webhook
+  {{- if .Values.webhook.certManager.enabled }}
+  {{- if .Values.webhook.certManager.injectCA }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ template "ydb.fullname" . }}-webhook
+  {{- end }}
+  {{- end }}
+webhooks:
+  {{- $webhookFqdn := .Values.webhook.service.fqdn -}}
+  {{- $webhookPort := .Values.webhook.service.port -}}
+  {{- if eq .Values.webhook.service.type "NodePort" }}
+    {{- $webhookPort = coalesce .Values.webhook.service.nodePort 9443 -}}
+  {{- end }}
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      {{- if not (empty $webhookFqdn) }}
+      url: https://{{ $webhookFqdn }}:{{ $webhookPort }}{{ template "ydb.webhookPathPrefix" . }}/validate-ydb-tech-v1alpha1-storage
+      {{- else}}
+      service:
+        name: {{ template "ydb.fullname" . }}-webhook
+        namespace: {{ .Release.Namespace }}
+        port: {{ $webhookPort }}
+        path: /validate-ydb-tech-v1alpha1-storage
+      {{- end}}
+    failurePolicy: Fail
+    name: validate-storage.ydb.tech
+    rules:
+      - apiGroups:
+          - ydb.tech
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - storages
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      {{- if not (empty $webhookFqdn) }}
+      url: https://{{ $webhookFqdn }}:{{ $webhookPort }}{{ template "ydb.webhookPathPrefix" . }}/validate-ydb-tech-v1alpha1-database
+      {{- else}}
+      service:
+        name: {{ template "ydb.fullname" . }}-webhook
+        namespace: {{ .Release.Namespace }}
+        port: {{ $webhookPort }}
+        path: /validate-ydb-tech-v1alpha1-database
+      {{- end}}
+    failurePolicy: Fail
+    name: validate-database.ydb.tech
+    rules:
+      - apiGroups:
+          - ydb.tech
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - databases
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      {{- if not (empty $webhookFqdn) }}
+      url: https://{{ $webhookFqdn }}:{{ $webhookPort }}{{ template "ydb.webhookPathPrefix" . }}/validate-ydb-tech-v1alpha1-databasemonitoring
+      {{- else}}
+      service:
+        name: {{ template "ydb.fullname" . }}-webhook
+        namespace: {{ .Release.Namespace }}
+        port: {{ $webhookPort }}
+        path: /validate-ydb-tech-v1alpha1-databasemonitoring
+      {{- end}}
+    failurePolicy: Fail
+    name: validate-databasemonitoring.ydb.tech
+    rules:
+      - apiGroups:
+          - ydb.tech
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+        resources:
+          - databasemonitorings
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      {{- if not (empty $webhookFqdn) }}
+      url: https://{{ $webhookFqdn }}:{{ $webhookPort }}{{ template "ydb.webhookPathPrefix" . }}/validate-ydb-tech-v1alpha1-storagemonitoring
+      {{- else}}
+      service:
+        name: {{ template "ydb.fullname" . }}-webhook
+        namespace: {{ .Release.Namespace }}
+        port: {{ $webhookPort }}
+        path: /validate-ydb-tech-v1alpha1-storagemonitoring
+      {{- end}}
+    failurePolicy: Fail
+    name: validate-storagemonitoring.ydb.tech
+    rules:
+      - apiGroups:
+          - ydb.tech
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+        resources:
+          - storagemonitorings
+    sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: {{ template "ydb.fullname" . }}-webhook
+  {{- if .Values.webhook.certManager.enabled }}
+  {{- if .Values.webhook.certManager.injectCA }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}{{ template "ydb.webhookPathPrefix" . }}/{{ template "ydb.fullname" . }}-webhook
+  {{- end }}
+  {{- end }}
+webhooks:
+  {{- $webhookFqdn := .Values.webhook.service.fqdn -}}
+  {{- $webhookPort := .Values.webhook.service.port -}}
+  {{- if eq .Values.webhook.service.type "NodePort" }}
+    {{- $webhookPort = coalesce .Values.webhook.service.nodePort 9443 -}}
+  {{- end }}
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      {{- if not (empty $webhookFqdn) }}
+      url: https://{{ $webhookFqdn }}:{{ $webhookPort }}{{ template "ydb.webhookPathPrefix" . }}/mutate-ydb-tech-v1alpha1-storage
+      {{- else}}
+      service:
+        name: {{ template "ydb.fullname" . }}-webhook
+        namespace: {{ .Release.Namespace }}
+        port: {{ $webhookPort }}
+        path: /mutate-ydb-tech-v1alpha1-storage
+      {{- end}}
+    failurePolicy: Fail
+    name: mutate-storage.ydb.tech
+    rules:
+      - apiGroups:
+          - ydb.tech
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - storages
+    sideEffects: None
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      {{- if not (empty $webhookFqdn) }}
+      url: https://{{ $webhookFqdn }}:{{ $webhookPort }}{{ template "ydb.webhookPathPrefix" . }}/mutate-ydb-tech-v1alpha1-database
+      {{- else}}
+      service:
+        name: {{ template "ydb.fullname" . }}-webhook
+        namespace: {{ .Release.Namespace }}
+        port: {{ $webhookPort }}
+        path: /mutate-ydb-tech-v1alpha1-database
+      {{- end}}
+    failurePolicy: Fail
+    name: mutate-database.ydb.tech
+    rules:
+      - apiGroups:
+          - ydb.tech
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - databases
+    sideEffects: None
+{{- end }}

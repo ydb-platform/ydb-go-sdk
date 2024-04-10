@@ -1,6 +1,8 @@
 package balancer
 
-import "context"
+import (
+	"context"
+)
 
 type (
 	ctxEndpointKey struct{}

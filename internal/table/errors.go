@@ -32,9 +32,6 @@ var (
 	// operation could not be completed.
 	errNoProgress = xerrors.Wrap(errors.New("no progress"))
 
-	// errNodeIsNotObservable returned by a Client instance to indicate that required node is not observable
-	errNodeIsNotObservable = xerrors.Wrap(errors.New("node is not observable"))
-
 	// errParamsRequired returned by a Client instance to indicate that required params is not defined
 	errParamsRequired = xerrors.Wrap(errors.New("params required"))
 )

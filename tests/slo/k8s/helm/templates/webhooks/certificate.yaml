@@ -1,0 +1,57 @@
+{{- if .Values.webhook.certManager.enabled -}}
+{{- if not .Values.webhook.certManager.issuerRef -}}
+# Create a selfsigned Issuer, in order to create a root CA certificate for
+# signing webhook serving certificates
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ template "ydb.fullname" . }}-self-signed-issuer
+  namespace: {{ .Release.Namespace }}
+spec:
+  selfSigned: {}
+---
+# Generate a CA Certificate used to sign certificates for the webhook
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ template "ydb.fullname" . }}-root-cert
+spec:
+  secretName: {{ template "ydb.fullname" . }}-root-cert
+  duration: {{ .Values.webhook.certManager.rootCert.duration | default "43800h0m0s" | quote }}
+  issuerRef:
+    name: {{ template "ydb.fullname" . }}-self-signed-issuer
+  commonName: "ca.webhook.ydb"
+  isCA: true
+---
+# Create an Issuer that uses the above generated CA certificate to issue certs
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ template "ydb.fullname" . }}-root-issuer
+spec:
+  ca:
+    secretName: {{ template "ydb.fullname" . }}-root-cert
+{{- end }}
+---
+# generate a server certificate for the apiservices to use
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ template "ydb.fullname" . }}-webhook
+spec:
+  secretName: {{ template "ydb.fullname" . }}-webhook
+  duration: {{ .Values.webhook.certManager.admissionCert.duration | default "8760h0m0s" | quote }}
+  issuerRef:
+    {{- if .Values.webhook.certManager.issuerRef }}
+    {{- toYaml .Values.webhook.certManager.issuerRef | nindent 4 }}
+    {{- else }}
+    name: {{ template "ydb.fullname" . }}-root-issuer
+    {{- end }}
+  dnsNames:
+  {{- if .Values.webhook.service.fqdn }}
+  - {{ .Values.webhook.service.fqdn }}
+  {{- end}}
+  - {{ template "ydb.fullname" . }}-webhook
+  - {{ template "ydb.fullname" . }}-webhook.{{ .Release.Namespace }}
+  - {{ template "ydb.fullname" . }}-webhook.{{ .Release.Namespace }}.svc
+{{- end -}}

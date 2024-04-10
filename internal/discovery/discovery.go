@@ -36,7 +36,7 @@ type Client struct {
 }
 
 // Discover cluster endpoints
-func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
+func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Info, err error) {
 	var (
 		onDone = trace.DiscoveryOnDiscover(
 			c.config.Trace(), &ctx,
@@ -53,7 +53,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	defer func() {
 		nodes := make([]trace.EndpointInfo, 0, len(endpoints))
 		for _, e := range endpoints {
-			nodes = append(nodes, e.Copy())
+			nodes = append(nodes, e)
 		}
 		onDone(location, nodes, err)
 	}()
@@ -79,8 +79,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	location = result.GetSelfLocation()
-	endpoints = make([]endpoint.Endpoint, 0, len(result.GetEndpoints()))
+	endpoints = make([]endpoint.Info, 0, len(result.GetEndpoints()))
 	for _, e := range result.GetEndpoints() {
 		if e.GetSsl() == c.config.Secure() {
 			endpoints = append(endpoints, endpoint.New(
@@ -88,7 +87,6 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 				endpoint.WithLocation(e.GetLocation()),
 				endpoint.WithID(e.GetNodeId()),
 				endpoint.WithLoadFactor(e.GetLoadFactor()),
-				endpoint.WithLocalDC(e.GetLocation() == location),
 				endpoint.WithServices(e.GetService()),
 			))
 		}

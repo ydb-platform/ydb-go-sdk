@@ -1,0 +1,18 @@
+{{- if and .Values.webhook.enabled (not .Values.webhook.certManager.enabled) }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ template "ydb.fullname" . }}-webhook
+  labels: {{ include "ydb.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade,post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ template "ydb.fullname" . }}-webhook
+subjects:
+  - kind: ServiceAccount
+    name: {{ template "ydb.fullname" . }}-webhook
+    namespace: {{ .Release.Namespace }}
+{{- end }}

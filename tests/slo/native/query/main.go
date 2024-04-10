@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/signal"
 	"sync"
 	"syscall"
@@ -32,6 +33,12 @@ func main() {
 
 	fmt.Println("program started")
 	defer fmt.Println("program finished")
+
+	go func() {
+		time.Sleep(time.Duration(cfg.Time+5) * time.Second)
+		fmt.Println("force exit")
+		os.Exit(1)
+	}()
 
 	ctx, cancel = context.WithTimeout(ctx, time.Duration(cfg.Time)*time.Second)
 	defer cancel()
