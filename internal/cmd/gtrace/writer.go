@@ -405,9 +405,9 @@ func (w *Writer) composeHookCall(fn *Func, h1, h2 string) {
 				w.line("if " + h + " != nil {")
 				w.block(func() {
 					if fn.HasResult() {
-						w.code(rs[i], ` = `)
+						w.code(rs[i], ` = `) //nolint:scopelint
 					}
-					w.code(h)
+					w.code(h) //nolint:scopelint
 					w.call(args)
 				})
 				w.line("}")
