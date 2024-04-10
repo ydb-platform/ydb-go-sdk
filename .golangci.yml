@@ -240,7 +240,6 @@ linters:
     - maintidx
     - nonamedreturns
     - paralleltest
-    - scopelint
     - structcheck
     - testableexamples
     - testpackage
@@ -294,6 +293,7 @@ issues:
         - predeclared
     - path: _test\.go
       linters:
+        - scopelint
         - funlen
         - unused
         - unparam
