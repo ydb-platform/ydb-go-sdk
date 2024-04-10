@@ -357,3 +357,115 @@ func uint128(hi, lo uint64) []byte {
 func uint128s(lo uint64) []byte {
 	return uint128(0, lo)
 }
+
+func FuzzParse(f *testing.F) {
+	f.Fuzz(func(t *testing.T, s string, precision, scale uint32) {
+		expectedRes, expectedErr := oldParse(s, precision, scale)
+		res, err := Parse(s, precision, scale)
+		if expectedErr == nil {
+			require.Equal(t, expectedRes, res)
+		} else {
+			require.Error(t, err)
+		}
+	})
+}
+
+func oldParse(s string, precision, scale uint32) (*big.Int, error) {
+	if scale > precision {
+		return nil, precisionError(s, precision, scale)
+	}
+
+	v := big.NewInt(0)
+	if s == "" {
+		return v, nil
+	}
+
+	neg := s[0] == '-'
+	if neg || s[0] == '+' {
+		s = s[1:]
+	}
+	if isInf(s) {
+		if neg {
+			return v.Set(neginf), nil
+		}
+
+		return v.Set(inf), nil
+	}
+	if isNaN(s) {
+		if neg {
+			return v.Set(negnan), nil
+		}
+
+		return v.Set(nan), nil
+	}
+
+	integral := precision - scale
+
+	var dot bool
+	for ; len(s) > 0; s = s[1:] {
+		c := s[0]
+		if c == '.' {
+			if dot {
+				return nil, syntaxError(s)
+			}
+			dot = true
+
+			continue
+		}
+		if dot {
+			if scale > 0 {
+				scale--
+			} else {
+				break
+			}
+		}
+
+		if !isDigit(c) {
+			return nil, syntaxError(s)
+		}
+
+		v.Mul(v, ten)
+		v.Add(v, big.NewInt(int64(c-'0')))
+
+		if !dot && v.Cmp(zero) > 0 && integral == 0 {
+			if neg {
+				return neginf, nil
+			}
+
+			return inf, nil
+		}
+		integral--
+	}
+	//nolint:nestif
+	if len(s) > 0 { // Characters remaining.
+		c := s[0]
+		if !isDigit(c) {
+			return nil, syntaxError(s)
+		}
+		plus := c > '5'
+		if !plus && c == '5' {
+			var x big.Int
+			plus = x.And(v, one).Cmp(zero) != 0 // Last digit is not a zero.
+			for !plus && len(s) > 1 {
+				s = s[1:]
+				c := s[0]
+				if !isDigit(c) {
+					return nil, syntaxError(s)
+				}
+				plus = c != '0'
+			}
+		}
+		if plus {
+			v.Add(v, one)
+			if v.Cmp(pow(ten, precision)) >= 0 {
+				v.Set(inf)
+			}
+		}
+	}
+	v.Mul(v, pow(ten, scale))
+	if neg {
+		v.Neg(v)
+	}
+
+	return v, nil
+}

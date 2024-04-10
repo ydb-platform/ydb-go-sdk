@@ -121,10 +121,8 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 }
 
 func SetSpecialValue(v *big.Int, s string) bool {
-	neg := s[0] == '-'
-	if neg || s[0] == '+' {
-		s = s[1:]
-	}
+	neg, s := parseSign(s)
+
 	if isInf(s) {
 		if neg {
 			v.Set(neginf)
@@ -154,7 +152,7 @@ func handleRemainingDigits(s string, v *big.Int, precision uint32) error {
 	}
 
 	if c >= '5' {
-		if c > '5' || shouldRoundUp(v, s[1:]) {
+		if c > '5' || shouldRoundUp(v, s) {
 			v.Add(v, one)
 			if v.Cmp(pow(ten, precision)) >= 0 {
 				v.Set(inf)
