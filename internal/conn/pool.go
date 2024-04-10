@@ -17,34 +17,35 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type Pool struct {
-	usages int64
-	config Config
-	mtx    xsync.RWMutex
-	opts   []grpc.DialOption
-	conns  map[endpoint.Key]*lazyConn
-	done   chan struct{}
-}
+type (
+	Pool struct {
+		usages int64
+		config Config
+		mtx    xsync.RWMutex
+		opts   []grpc.DialOption
+		conns  map[string]*lazyConn
+		done   chan struct{}
+	}
+)
 
 func (p *Pool) Get(endpoint endpoint.Info) Conn {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 
 	var (
-		address = endpoint.Address()
-		cc      *lazyConn
-		has     bool
+		cc  *lazyConn
+		has bool
 	)
 
-	key := endpoint.Key()
+	address := endpoint.Address()
 
-	if cc, has = p.conns[key]; has {
+	if cc, has = p.conns[address]; has {
 		return cc
 	}
 
 	cc = newConn(endpoint, p.config, withOnClose(p.remove))
 
-	p.conns[key] = cc
+	p.conns[address] = cc
 
 	return cc
 }
@@ -52,7 +53,7 @@ func (p *Pool) Get(endpoint endpoint.Info) Conn {
 func (p *Pool) remove(c *lazyConn) {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
-	delete(p.conns, c.Endpoint().Key())
+	delete(p.conns, c.Endpoint().Address())
 }
 
 func (p *Pool) Attach(ctx context.Context) (finalErr error) {
@@ -142,12 +143,12 @@ func NewPool(ctx context.Context, config Config) *Pool {
 		usages: 1,
 		config: config,
 		opts:   config.GrpcDialOptions(),
-		conns:  make(map[endpoint.Key]*lazyConn),
+		conns:  make(map[string]*lazyConn),
 		done:   make(chan struct{}),
 	}
 
 	if ttl := config.ConnectionTTL(); ttl > 0 {
-		go p.connParker(xcontext.ValueOnly(ctx), ttl, ttl/2)
+		go p.connParker(xcontext.ValueOnly(ctx), ttl, ttl/2) //nolint:gomnd
 	}
 
 	return p

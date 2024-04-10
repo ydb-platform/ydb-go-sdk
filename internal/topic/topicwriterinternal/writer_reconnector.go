@@ -84,8 +84,8 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		},
 		AutoSetSeqNo:       true,
 		AutoSetCreatedTime: true,
-		MaxMessageSize:     50 * 1024 * 1024,
-		MaxQueueLen:        1000,
+		MaxMessageSize:     50 * 1024 * 1024, //nolint:gomnd
+		MaxQueueLen:        1000,             //nolint:gomnd
 		RetrySettings: topic.RetrySettings{
 			StartTimeout: topic.DefaultStartTimeout,
 		},

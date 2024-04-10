@@ -22,16 +22,16 @@ jobs:
     runs-on: ${{ matrix.os }}-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
           cache: true
       - name: Test
         run: go test -race -coverprofile unit.txt -covermode atomic ./...
       - name: Upload coverage report to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           file: ./unit.txt
           flags: unit,${{ matrix.os }},go-${{ matrix.go-version }}
@@ -71,16 +71,16 @@ jobs:
       HIDE_APPLICATION_OUTPUT: 1
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
           cache: true
       - name: Integration test
         run: go test -race -tags integration -coverpkg=./... -coverprofile integration-secure.txt -covermode atomic ./tests/integration
       - name: Upload Test secure connection coverage report to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
           file: ./integration-secure.txt
           flags: integration,${{ matrix.os }},go-${{ matrix.go-version }},ydb-${{ matrix.ydb-version }}

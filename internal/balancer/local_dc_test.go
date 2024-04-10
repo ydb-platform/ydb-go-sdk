@@ -151,8 +151,8 @@ func TestLocalDCDiscovery(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		conn, _ := r.connections.Load().GetConn(ctx)
-		require.Equal(t, "b:234", conn.Endpoint().Address())
-		require.Equal(t, "b", conn.Endpoint().Location())
+		require.Equal(t, "b:234", conn.Address())
+		require.Equal(t, "b", conn.Location())
 	}
 }
 

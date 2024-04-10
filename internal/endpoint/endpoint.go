@@ -7,14 +7,9 @@ import (
 )
 
 type (
-	Key struct {
-		NodeID  uint32
-		Address string
-	}
 	Info interface {
 		fmt.Stringer
 
-		Key() Key
 		NodeID() uint32
 		Address() string
 		Location() string
@@ -60,13 +55,6 @@ func (e *endpoint) String() string {
 		*e.loadFactor.Load(),
 		e.lastUpdated.Load().Format(time.RFC3339),
 	)
-}
-
-func (e *endpoint) Key() Key {
-	return Key{
-		NodeID:  e.id,
-		Address: e.address,
-	}
 }
 
 func (e *endpoint) NodeID() uint32 {

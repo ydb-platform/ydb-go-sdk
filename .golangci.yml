@@ -234,14 +234,12 @@ linters:
     - godot
     - goerr113
     - golint
-    - gomnd
     - ifshort
     - interfacebloat
     - ireturn
     - maintidx
     - nonamedreturns
     - paralleltest
-    - scopelint
     - structcheck
     - testableexamples
     - testpackage
@@ -295,6 +293,7 @@ issues:
         - predeclared
     - path: _test\.go
       linters:
+        - scopelint
         - funlen
         - unused
         - unparam
@@ -304,6 +303,9 @@ issues:
         - staticcheck
     - path: _test\.go
       text: "ydb.Connection is deprecated"
+    - path: examples
+      linters:
+        - gomnd
 
       # Allow underscore and capital camel case for readability
       # Examples: Type_PRIMITIVE_TYPE_ID_UNSPECIFIED, Ydb_Discovery_V1, _voidValue

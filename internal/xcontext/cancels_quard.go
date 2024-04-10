@@ -2,18 +2,16 @@ package xcontext
 
 import (
 	"context"
-
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"sync"
 )
 
 type CancelsGuard struct {
-	mu      xsync.Mutex
+	mu      sync.Mutex
 	cancels map[*context.CancelFunc]struct{}
 }
 
 func NewCancelsGuard() *CancelsGuard {
 	return &CancelsGuard{
-		mu:      xsync.Mutex{},
 		cancels: make(map[*context.CancelFunc]struct{}),
 	}
 }

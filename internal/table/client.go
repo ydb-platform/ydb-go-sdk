@@ -756,7 +756,7 @@ func (c *Client) internalPoolGC(ctx context.Context, idleThreshold time.Duration
 
 		case <-timer.Chan():
 			c.internalPoolGCTick(ctx, idleThreshold)
-			timer.Reset(idleThreshold / 2)
+			timer.Reset(idleThreshold / 2) //nolint:gomnd
 		}
 	}
 }

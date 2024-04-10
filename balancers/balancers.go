@@ -5,7 +5,9 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 )
 
-// Deprecated: RoundRobin is RandomChoice now
+// Deprecated: RoundRobin is an alias to RandomChoice now
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func RoundRobin() *balancerConfig.Config {
 	return balancerConfig.New()
 }
@@ -62,7 +64,7 @@ type Endpoint interface {
 func Prefer(balancer *balancerConfig.Config, filter func(endpoint Endpoint) bool) *balancerConfig.Config {
 	return balancer.With(
 		balancerConfig.FilterFunc(func(_ balancerConfig.Info, c conn.Info) bool {
-			return filter(c.Endpoint())
+			return filter(c)
 		}),
 	)
 }
@@ -70,10 +72,10 @@ func Prefer(balancer *balancerConfig.Config, filter func(endpoint Endpoint) bool
 // PreferWithFallback creates balancer which use endpoints by filter
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter
 // If filter returned zero endpoints from all discovery endpoints list - used all endpoint instead
-func PreferWithFallback(balancer *balancerConfig.Config, filter func(endpoint Endpoint) bool) *balancerConfig.Config {
+func PreferWithFallback(balancer *balancerConfig.Config, filter func(endpoint conn.Info) bool) *balancerConfig.Config {
 	return balancer.With(
 		balancerConfig.FilterFunc(func(_ balancerConfig.Info, c conn.Info) bool {
-			return filter(c.Endpoint())
+			return filter(c)
 		}),
 		balancerConfig.AllowFallback(),
 	)

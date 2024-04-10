@@ -191,9 +191,7 @@ func (d *Driver) Table() table.Client {
 
 // Query returns query client
 //
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (d *Driver) Query() query.Client {
 	return d.query.Get()
 }
@@ -275,10 +273,12 @@ func MustOpen(ctx context.Context, dsn string, opts ...Option) *Driver {
 
 // New connects to database and return driver runtime holder
 //
-// Deprecated: use Open with required param connectionString instead
-//
-//nolint:nonamedreturns
-func New(ctx context.Context, opts ...Option) (_ *Driver, err error) {
+// Deprecated: use ydb.Open instead.
+// New func have no required arguments, such as connection string.
+// Thats why we recognize that New have wrong signature.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+func New(ctx context.Context, opts ...Option) (_ *Driver, err error) { //nolint:nonamedreturns
 	d, err := newConnectionFromOptions(ctx, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)

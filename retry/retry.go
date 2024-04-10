@@ -227,7 +227,7 @@ func WithPanicCallback(panicCallback func(e interface{})) panicCallbackOption {
 //
 // - retry operation returned nil as error
 //
-// Warning: if deadline without deadline or cancellation func Retry will be worked infinite
+// Warning: if context without deadline or cancellation func was passed, Retry will work infinitely.
 //
 // If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
 func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr error) {
@@ -245,8 +245,10 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 	if options.idempotent {
 		ctx = xcontext.WithIdempotent(ctx, options.idempotent)
 	}
+
 	defer func() {
 		if finalErr != nil && options.stackTrace {
+			//nolint:gomnd
 			finalErr = xerrors.WithStackTrace(finalErr,
 				xerrors.WithSkipDepth(2), // 1 - exit from defer, 1 - exit from Retry call
 			)

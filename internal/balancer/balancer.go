@@ -40,7 +40,7 @@ type (
 		discoveryRepeater repeater.Repeater
 		localDCDetector   func(ctx context.Context, endpoints []endpoint.Info) (string, error)
 
-		connChilds map[endpoint.Key]*xcontext.CancelsGuard
+		connChilds map[string]*xcontext.CancelsGuard
 
 		connections atomic.Pointer[connections[conn.Conn]]
 
@@ -115,44 +115,45 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 	return nil
 }
 
-func endpointsDiff(newestConns, previousConns []conn.Conn) (nodes, added, dropped []endpoint.Info) {
-	nodes = make([]endpoint.Info, 0, len(newestConns))
-	added = make([]endpoint.Info, 0, len(previousConns))
-	dropped = make([]endpoint.Info, 0, len(previousConns))
+func endpointsDiff[T endpoint.Info](newest, previous []T) (nodes, added, dropped []T) {
+	nodes = make([]T, 0, len(newest))
+	added = make([]T, 0, len(previous))
+	dropped = make([]T, 0, len(previous))
 	var (
-		newestMap   = make(map[endpoint.Key]struct{}, len(newestConns))
-		previousMap = make(map[endpoint.Key]struct{}, len(previousConns))
+		newestMap   = make(map[string]struct{}, len(newest))
+		previousMap = make(map[string]struct{}, len(previous))
 	)
-	sort.Slice(newestConns, func(i, j int) bool {
-		return newestConns[i].Endpoint().Address() < newestConns[j].Endpoint().Address()
+	sort.Slice(newest, func(i, j int) bool {
+		return newest[i].Address() < newest[j].Address()
 	})
-	sort.Slice(previousConns, func(i, j int) bool {
-		return previousConns[i].Endpoint().Address() < previousConns[j].Endpoint().Address()
+	sort.Slice(previous, func(i, j int) bool {
+		return previous[i].Address() < previous[j].Address()
 	})
-	for _, c := range previousConns {
-		previousMap[c.Endpoint().Key()] = struct{}{}
+	for _, c := range previous {
+		previousMap[c.Address()] = struct{}{}
 	}
-	for _, c := range newestConns {
-		nodes = append(nodes, c.Endpoint())
-		newestMap[c.Endpoint().Key()] = struct{}{}
-		if _, has := previousMap[c.Endpoint().Key()]; !has {
-			added = append(added, c.Endpoint())
+	for _, c := range newest {
+		nodes = append(nodes, c)
+		newestMap[c.Address()] = struct{}{}
+		if _, has := previousMap[c.Address()]; !has {
+			added = append(added, c)
 		}
 	}
-	for _, c := range previousConns {
-		if _, has := newestMap[c.Endpoint().Key()]; !has {
-			dropped = append(dropped, c.Endpoint())
+	for _, c := range previous {
+		if _, has := newestMap[c.Address()]; !has {
+			dropped = append(dropped, c)
 		}
 	}
 
 	return nodes, added, dropped
 }
 
-func endpointInfoToTraceEndpointInfo(in []endpoint.Info) (out []trace.EndpointInfo) {
+func toTraceEndpointInfo[T endpoint.Info](in []T) (out []trace.EndpointInfo) {
 	out = make([]trace.EndpointInfo, 0, len(in))
 	for _, e := range in {
 		out = append(out, e)
 	}
+
 	return out
 }
 
@@ -167,7 +168,7 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	conns := endpointsToConnections(b.pool, endpoints)
 
 	info := balancerConfig.Info{SelfLocation: localDC}
-	newestConnections := newConnections(conns, b.config.Filter(), info, b.config.AllowFallback())
+	newestConnections := newConnections(conns, b.config.Filter, info, b.config.AllowFallback())
 	previousConnections := b.connections.Swap(newestConnections)
 	defer func() {
 		nodes, added, dropped := endpointsDiff(
@@ -181,13 +182,13 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 			}(),
 		)
 		for _, e := range dropped {
-			b.connChilds[e.Key()].Cancel()
-			delete(b.connChilds, e.Key())
+			b.connChilds[e.Address()].Cancel()
+			delete(b.connChilds, e.Address())
 		}
 		onDone(
-			endpointInfoToTraceEndpointInfo(nodes),
-			endpointInfoToTraceEndpointInfo(added),
-			endpointInfoToTraceEndpointInfo(dropped),
+			toTraceEndpointInfo(nodes),
+			toTraceEndpointInfo(added),
+			toTraceEndpointInfo(dropped),
 			localDC,
 		)
 	}()
@@ -249,12 +250,12 @@ func (b *Balancer) markConnAsBad(ctx context.Context, cc conn.Conn, cause error)
 		onDone := trace.DriverOnBalancerMarkConnAsBad(
 			b.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/balancer.(*Balancer).markConnAsBad"),
-			cc.Endpoint(), cause,
+			cc, cause,
 		)
 
 		b.connections.Store(newestConnections)
 
-		onDone(newestConnections.prefer.ToTraceEndpointInfo(), newestConnections.fallback.ToTraceEndpointInfo())
+		onDone(toTraceEndpointInfo(newestConnections.prefer), toTraceEndpointInfo(newestConnections.fallback))
 	}
 }
 
@@ -269,7 +270,7 @@ func newBalancer(
 		config:          config,
 		pool:            pool,
 		localDCDetector: detectLocalDC,
-		connChilds:      make(map[connsKey]*xcontext.CancelsGuard),
+		connChilds:      make(map[string]*xcontext.CancelsGuard),
 		closed:          make(chan struct{}),
 	}
 	for _, opt := range opts {
@@ -393,8 +394,6 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 		return xerrors.WithStackTrace(err)
 	}
 
-	g := childCloser(ctx)
-
 	defer func() {
 		if finalErr != nil {
 			b.markConnAsBad(ctx, cc, err)
@@ -409,8 +408,8 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 		if conn.UseWrapping(ctx) {
 			if credentials.IsAccessError(err) {
 				err = credentials.AccessError("no access", err,
-					credentials.WithAddress(cc.Endpoint().String()),
-					credentials.WithNodeID(cc.Endpoint().NodeID()),
+					credentials.WithAddress(cc.Address()),
+					credentials.WithNodeID(cc.NodeID()),
 					credentials.WithCredentials(b.config.Credentials()),
 				)
 			}
@@ -431,16 +430,10 @@ func (b *Balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
 	)
 	defer func() {
 		if err == nil {
-			if _, has := b.connChilds[connsKey{
-				address: c.Endpoint().Address(),
-				nodeID:  c.Endpoint().NodeID(),
-			}]; !has {
-				b.connChilds[connsKey{
-					address: c.Endpoint().Address(),
-					nodeID:  c.Endpoint().NodeID(),
-				}] = xcontext.NewCancelsGuard()
+			if _, has := b.connChilds[c.Address()]; !has {
+				b.connChilds[c.Address()] = xcontext.NewCancelsGuard()
 			}
-			onDone(c.Endpoint(), nil)
+			onDone(c, nil)
 		} else {
 			onDone(nil, err)
 		}

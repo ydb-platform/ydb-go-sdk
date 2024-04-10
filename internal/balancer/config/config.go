@@ -29,57 +29,8 @@ type Config struct {
 	meta        meta.Meta
 }
 
-type filterFunc func(info Info, c conn.Info) bool
-
-func (p filterFunc) Allow(info Info, c conn.Info) bool {
-	return p(info, c)
-}
-
-func (p filterFunc) String() string {
-	return "Custom"
-}
-
-type filterLocalDC struct{}
-
-func (filterLocalDC) Allow(info Info, c conn.Info) bool {
-	return c.Endpoint().Location() == info.SelfLocation
-}
-
-func (filterLocalDC) String() string {
-	return "LocalDC"
-}
-
-type filterLocations []string
-
-func (locations filterLocations) Allow(_ Info, c conn.Info) bool {
-	location := strings.ToUpper(c.Endpoint().Location())
-	for _, l := range locations {
-		if location == l {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (locations filterLocations) String() string {
-	buffer := xstring.Buffer()
-	defer buffer.Free()
-
-	buffer.WriteString("Locations{")
-	for i, l := range locations {
-		if i != 0 {
-			buffer.WriteByte(',')
-		}
-		buffer.WriteString(l)
-	}
-	buffer.WriteByte('}')
-
-	return buffer.String()
-}
-
 var defaultConfig = &Config{
-	filter:        filterFunc(func(info Info, c conn.Info) bool { return true }),
+	filter:        func(info Info, c conn.Info) bool { return true },
 	allowFallback: false,
 	singleConn:    false,
 	detectLocalDC: false,
@@ -126,12 +77,12 @@ func (c *Config) Credentials() credentials.Credentials {
 	return c.credentials
 }
 
-func (c *Config) Filter() Filter {
-	if c == nil {
-		return defaultConfig.filter
+func (c *Config) Filter(info Info, cc conn.Info) bool {
+	if c == nil || c.filter == nil {
+		return true
 	}
 
-	return c.filter
+	return c.filter(info, cc)
 }
 
 func (c *Config) SingleConn() bool {
@@ -208,9 +159,6 @@ func (c *Config) String() string {
 	buffer.WriteString(",AllowFallback=")
 	fmt.Fprintf(buffer, "%t", c.AllowFallback())
 
-	buffer.WriteString(",Filter=")
-	fmt.Fprint(buffer, c.Filter().String())
-
 	buffer.WriteByte('}')
 
 	return buffer.String()
@@ -226,13 +174,15 @@ func WithEndpoint(endpoint string) Option {
 
 func FilterFunc(f func(info Info, c conn.Info) bool) Option {
 	return func(c *Config) {
-		c.filter = filterFunc(f)
+		c.filter = f
 	}
 }
 
 func FilterLocalDC() Option {
 	return func(c *Config) {
-		c.filter = filterLocalDC{}
+		c.filter = func(info Info, c conn.Info) bool {
+			return c.Location() == info.SelfLocation
+		}
 	}
 }
 
@@ -240,13 +190,24 @@ func FilterLocations(locations ...string) Option {
 	if len(locations) == 0 {
 		panic("empty list of locations")
 	}
+
 	for i := range locations {
 		locations[i] = strings.ToUpper(locations[i])
 	}
+
 	sort.Strings(locations)
 
 	return func(c *Config) {
-		c.filter = filterLocations(locations)
+		c.filter = func(_ Info, c conn.Info) bool {
+			location := strings.ToUpper(c.Location())
+			for _, l := range locations {
+				if location == l {
+					return true
+				}
+			}
+
+			return false
+		}
 	}
 }
 
@@ -314,8 +275,5 @@ type (
 	Info struct {
 		SelfLocation string
 	}
-	Filter interface {
-		Allow(info Info, c conn.Info) bool
-		String() string
-	}
+	Filter func(info Info, c conn.Info) bool
 )

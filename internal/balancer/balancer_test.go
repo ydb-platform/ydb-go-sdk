@@ -2,12 +2,12 @@ package balancer
 
 import (
 	"context"
-	"google.golang.org/grpc/connectivity"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	grpcCodes "google.golang.org/grpc/codes"
+	"google.golang.org/grpc/connectivity"
 	grpcStatus "google.golang.org/grpc/status"
 
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
@@ -171,21 +171,27 @@ func TestBalancerWrapCall(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err)
-	require.Equal(t, []endpoint.Info{
-		&mock.Endpoint{AddressField: "1", LocationField: "a", NodeIDField: 1},
-		&mock.Endpoint{AddressField: "2", LocationField: "b", NodeIDField: 2},
-		&mock.Endpoint{AddressField: "3", LocationField: "c", NodeIDField: 3},
-	}, b.connections.Load().prefer.ToEndpointInfo())
+	require.Equal(t, []conn.Conn{
+		&connMock{mock.Conn{
+			EndpointField: &mock.Endpoint{AddressField: "1", LocationField: "a", NodeIDField: 1},
+		}},
+		&connMock{mock.Conn{
+			EndpointField: &mock.Endpoint{AddressField: "2", LocationField: "b", NodeIDField: 2},
+		}},
+		&connMock{mock.Conn{
+			EndpointField: &mock.Endpoint{AddressField: "3", LocationField: "c", NodeIDField: 3},
+		}},
+	}, b.connections.Load().prefer)
 	for i := range make([]struct{}, 3) {
 		err = b.wrapCall(ctx, func(ctx context.Context, cc conn.Conn) error {
 			return xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, ""))
 		})
 		require.Error(t, err)
 		require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
-		require.Len(t, b.connections.Load().prefer.ToEndpointInfo(), 2-i)
-		require.Len(t, b.connections.Load().fallback.ToEndpointInfo(), i+1)
+		require.Len(t, b.connections.Load().prefer, 2-i)
+		require.Len(t, b.connections.Load().fallback, i+1)
 	}
-	require.Empty(t, b.connections.Load().prefer.ToEndpointInfo())
+	require.Empty(t, b.connections.Load().prefer)
 	err = b.wrapCall(ctx, func(ctx context.Context, cc conn.Conn) error {
 		return xerrors.Transport(grpcStatus.Error(grpcCodes.Unavailable, ""))
 	})
@@ -225,5 +231,5 @@ func TestEndpointsToConnections(t *testing.T) {
 	}
 	conns := endpointsToConnections(p, endpoints)
 	require.Len(t, conns, len(endpoints))
-	require.True(t, endpoint.Equals(conns[0].Endpoint(), endpoints[0]))
+	require.True(t, endpoint.Equals(conns[0], endpoints[0]))
 }

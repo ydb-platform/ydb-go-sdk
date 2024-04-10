@@ -11,7 +11,7 @@ import (
 // driver makes driver with New publishing
 func driver(config Config) (t trace.Driver) {
 	config = config.WithSystem("driver")
-	endpoints := config.WithSystem("balancer").GaugeVec("endpoints", "local_dc", "az")
+	endpoints := config.WithSystem("balancer").GaugeVec("endpoints", "az")
 	balancersDiscoveries := config.WithSystem("balancer").CounterVec("discoveries", "status", "cause")
 	balancerUpdates := config.WithSystem("balancer").CounterVec("updates", "cause")
 	conns := config.GaugeVec("conns", "endpoint", "node_id")

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync/atomic"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"google.golang.org/grpc"
@@ -16,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -29,7 +31,8 @@ var (
 
 type (
 	Info interface {
-		Endpoint() endpoint.Info
+		endpoint.Info
+
 		State() State
 		Ready() bool
 	}
@@ -49,9 +52,25 @@ type lazyConn struct {
 
 	childStreams *xcontext.CancelsGuard
 
-	lastUsage *lastUsageGuard
+	lastUsage xsync.LastUsage
 
 	onClose []func(*lazyConn)
+}
+
+func (c *lazyConn) String() string {
+	return c.endpoint.String()
+}
+
+func (c *lazyConn) Location() string {
+	return c.endpoint.Location()
+}
+
+func (c *lazyConn) LastUpdated() time.Time {
+	return c.endpoint.LastUpdated()
+}
+
+func (c *lazyConn) LoadFactor() float32 {
+	return c.endpoint.LoadFactor()
 }
 
 func (c *lazyConn) Address() string {
@@ -59,11 +78,7 @@ func (c *lazyConn) Address() string {
 }
 
 func (c *lazyConn) NodeID() uint32 {
-	if c != nil {
-		return c.endpoint.NodeID()
-	}
-
-	return 0
+	return c.endpoint.NodeID()
 }
 
 func (c *lazyConn) park(ctx context.Context) (finalErr error) {
@@ -355,7 +370,7 @@ func newConn(e endpoint.Info, config Config, opts ...option) *lazyConn {
 	c := &lazyConn{
 		endpoint:     e,
 		config:       config,
-		lastUsage:    newLastUsage(nil),
+		lastUsage:    xsync.NewLastUsage(),
 		childStreams: xcontext.NewCancelsGuard(),
 		onClose: []func(*lazyConn){
 			func(c *lazyConn) {

@@ -60,7 +60,7 @@ func TestPreferLocationsWithFallback(t *testing.T) {
 func applyPreferFilter(info balancerConfig.Info, b *balancerConfig.Config, conns []conn.Info) []conn.Info {
 	res := make([]conn.Info, 0, len(conns))
 	for _, c := range conns {
-		if b.Filter().Allow(info, c) {
+		if b.Filter(info, c) {
 			res = append(res, c)
 		}
 	}

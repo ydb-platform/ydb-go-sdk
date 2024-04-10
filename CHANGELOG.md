@@ -1,3 +1,11 @@
+## v3.64.0
+* Supported `table.Session.RenameTables` method
+* Fixed out of range panic if next query result set part is empty 
+* Updated the indirect dependencies `golang.org/x/net` to `v0.17.0` and `golang.org/x/sys` to `v0.13.0` due to vulnerability issue 
+
+## v3.63.0
+* Added versioning policy
+
 ## v3.62.0
 * Restored `WithSessionPoolKeepAliveMinSize` and `WithSessionPoolKeepAliveTimeout` for backward compatibility.
 * Fixed leak timers

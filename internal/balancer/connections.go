@@ -10,8 +10,7 @@ import (
 )
 
 type (
-	connectionsSlice[T conn.Info] []T
-	connections[T conn.Info]      struct {
+	connections[T conn.Info] struct {
 		connByNodeID map[uint32]T
 
 		prefer   []T
@@ -43,21 +42,21 @@ func newConnections[T conn.Info](
 	return s
 }
 
-func (s *connections[T]) withBadConn(c T) (ss *connections[T], changed bool) {
+func (s *connections[T]) withBadConn(badConn T) (ss *connections[T], changed bool) {
 	ss = &connections[T]{
 		connByNodeID: s.connByNodeID,
 		rand:         s.rand,
-		prefer:       make(connectionsSlice[T], 0, len(s.prefer)),
-		fallback:     make(connectionsSlice[T], 0, len(s.fallback)+1),
+		prefer:       make([]T, 0, len(s.prefer)),
+		fallback:     make([]T, 0, len(s.fallback)+1),
 		all:          s.all,
 	}
 
-	for _, cc := range s.prefer {
-		if !endpoint.Equals(c.Endpoint(), cc.Endpoint()) {
-			ss.prefer = append(ss.prefer, cc)
+	for _, rhs := range s.prefer {
+		if !endpoint.Equals(badConn, rhs) {
+			ss.prefer = append(ss.prefer, rhs)
 		} else {
 			changed = true
-			ss.fallback = append(ss.fallback, c)
+			ss.fallback = append(ss.fallback, badConn)
 		}
 	}
 	ss.fallback = append(ss.fallback, s.fallback...)
@@ -149,7 +148,7 @@ func connsToNodeIDMap[T conn.Info](conns []T) (nodes map[uint32]T) {
 	}
 	nodes = make(map[uint32]T, len(conns))
 	for _, c := range conns {
-		nodes[c.Endpoint().NodeID()] = c
+		nodes[c.NodeID()] = c
 	}
 
 	return nodes
@@ -171,7 +170,7 @@ func sortPreferConnections[T conn.Info](
 	}
 
 	for _, c := range conns {
-		if filter.Allow(info, c) {
+		if filter(info, c) {
 			prefer = append(prefer, c)
 		} else if allowFallback {
 			fallback = append(fallback, c)

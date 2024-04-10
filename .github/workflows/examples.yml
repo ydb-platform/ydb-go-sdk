@@ -38,9 +38,9 @@ jobs:
       YDB_VERSION: ${{ matrix.ydb-version }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           cache: true
       - name: Run basic example ${{ matrix.application }}
@@ -74,9 +74,9 @@ jobs:
       POSTGRES_CONNECTION_STRING: postgres://postgres:postgres@localhost:5432/basic?sslmode=disable
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           cache: true
       - name: Run basic example ${{ matrix.application }} with postgres
@@ -97,9 +97,9 @@ jobs:
       SQLITE_CONNECTION_STRING: ${{ matrix.application }}.db
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           cache: true
       - name: Run basic example ${{ matrix.application }} with sqlite

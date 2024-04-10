@@ -155,11 +155,8 @@ func TestFromConfig(t *testing.T) {
 			}
 
 			// function pointers can check equal to nil only
-			if tt.res.Filter() != nil {
-				require.NotNil(t, b.Filter())
-				b = b.With(balancerConfig.FilterFunc(nil))
-				tt.res = tt.res.With(balancerConfig.FilterFunc(nil))
-			}
+			b = b.With(balancerConfig.FilterFunc(nil))
+			tt.res = tt.res.With(balancerConfig.FilterFunc(nil))
 
 			require.Equal(t, tt.res, b)
 		})

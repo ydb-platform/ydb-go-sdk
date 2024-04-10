@@ -122,7 +122,7 @@ func (c call) Record(opts ...recordOption) string {
 	if len(split) > 1 {
 		funcName = split[len(split)-1]
 	}
-	if len(split) > 2 {
+	if len(split) > 2 { //nolint:gomnd
 		structName = split[1]
 	}
 

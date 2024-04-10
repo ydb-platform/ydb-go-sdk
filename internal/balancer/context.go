@@ -2,12 +2,10 @@ package balancer
 
 import (
 	"context"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 )
 
 type (
 	ctxEndpointKey struct{}
-	ctxCancelGuard struct{}
 )
 
 type Endpoint interface {
@@ -24,25 +22,4 @@ func ContextEndpoint(ctx context.Context) (e Endpoint, ok bool) {
 	}
 
 	return nil, false
-}
-
-func childCloser(ctx context.Context) *xcontext.CancelsGuard {
-	if g, ok := ctx.Value(ctxCancelGuard{}).(*xcontext.CancelsGuard); ok {
-		return g
-	}
-
-	return nil
-}
-
-func OnDropConn(ctx context.Context, closeChild func()) context.Context {
-	g := childCloser(ctx)
-	if g == nil {
-		g = xcontext.NewCancelsGuard()
-		ctx = context.WithValue(ctx, ctxCancelGuard{}, g)
-	}
-	cancel := context.CancelFunc(func() {
-		closeChild()
-	})
-	g.Remember(&cancel)
-	return ctx
 }
