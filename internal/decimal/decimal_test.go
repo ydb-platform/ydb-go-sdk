@@ -246,6 +246,35 @@ func uint128(hi, lo uint64) []byte {
 func uint128s(lo uint64) []byte {
 	return uint128(0, lo)
 }
+func TestParse(t *testing.T) {
+
+	tests := []struct {
+		name      string
+		s         string
+		precision uint32
+		scale     uint32
+	}{
+		{
+			name:      "Specific Parse test",
+			s:         "100",
+			precision: 0,
+			scale:     0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expectedRes, expectedErr := oldParse(tt.s, tt.precision, tt.scale)
+			res, err := Parse(tt.s, tt.precision, tt.scale)
+			if expectedErr == nil {
+				require.Equal(t, expectedRes, res)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+
+}
 
 func FuzzParse(f *testing.F) {
 	f.Fuzz(func(t *testing.T, s string, precision, scale uint32) {
