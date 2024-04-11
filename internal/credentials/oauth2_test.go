@@ -7,6 +7,8 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -19,15 +21,25 @@ var (
 	testPublicKeyContent  = "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu+fyUt6zHCycbxYKTsxe\nftoB/mIoN0RNjE5fbsAtAWSgL+n6GK+8csEMliCvltXAYc/EeC3xZmaNozNGgr3U\nZjQXVtBA0k5xy8QrBYaEFi1avmyOX+Y85HKIoqFLWhKQAz6sIFVC1bTf55zyYmev\n3VN9At45kevi1IBJ7VLVrd3qt8UCJ+ZRt8wtZJQWPx8bXx+R7vMQb8EUEyZ4d1KT\ny4/F8Epq4g4Ha4Ue6OrplslbhqzCpSx5nor5X842LX8ztTDiDBvLdv88RkfsW+Fc\nJLO97B9Sq7h/9PyTF1Pe56cKXvlJvrl4aZXT8oBhKxImu2m8mQdoDKV6q1mCjKNN\njQIDAQAB\n-----END PUBLIC KEY-----\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         //nolint:lll
 )
 
-const keyServerAddr = "test_server"
+type httpServerKey int
+
+const (
+	keyServerAddr httpServerKey = 42
+)
 
 func WriteErr(w http.ResponseWriter, err error) {
-	w.WriteHeader(http.StatusInternalServerError)
-	w.Write([]byte(err.Error()))
+	WriteResponse(w, http.StatusInternalServerError, err.Error(), "text/html")
 }
 
-func runTokenExchangeServer(t *testing.T,
-	ctx context.Context, //nolint:revive
+func WriteResponse(w http.ResponseWriter, code int, body string, bodyType string) {
+	w.Header().Add("Content-Type", bodyType)
+	w.Header().Add("Content-Length", strconv.Itoa(len(body)))
+	w.WriteHeader(code)
+	_, _ = w.Write([]byte(body))
+}
+
+func runTokenExchangeServer(
+	ctx context.Context,
 	cancel context.CancelFunc,
 	port int,
 	currentTestParams *Oauth2TokenExchangeTestParams,
@@ -53,21 +65,28 @@ func runTokenExchangeServer(t *testing.T,
 		expectedParams.Set("requested_token_type", "urn:ietf:params:oauth:token-type:access_token")
 		expectedParams.Set("subject_token", "test_source_token")
 		expectedParams.Set("subject_token_type", "urn:ietf:params:oauth:token-type:test_jwt")
-		require.Equal(t, expectedParams, params)
 
-		w.Header().Add("Content-Type", "application/json")
-		w.WriteHeader(currentTestParams.Status)
-		w.Write([]byte(currentTestParams.Response))
+		if !reflect.DeepEqual(expectedParams, params) {
+			WriteResponse(w, 555, fmt.Sprintf("Params are not as expected: \"%s\" != \"%s\"",
+				expectedParams.Encode(), body), "text/html") // error will be checked in test thread
+		} else {
+			WriteResponse(w, currentTestParams.Status, currentTestParams.Response, "application/json")
+		}
 	})
 	server := http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
 		Handler: mux,
 		BaseContext: func(l net.Listener) context.Context {
-			return context.WithValue(ctx, keyServerAddr, l.Addr().String())
+			ctx = context.WithValue(ctx, keyServerAddr, l.Addr().String())
+
+			return ctx
 		},
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 	err := server.ListenAndServe()
-	require.NoError(t, err)
+	if err != nil {
+		fmt.Printf("Failed to run http server: %s", err.Error())
+	}
 }
 
 type Oauth2TokenExchangeTestParams struct {
@@ -83,7 +102,7 @@ func TestOauth2TokenExchange(t *testing.T) {
 	defer cancel()
 
 	runCtx, runCancel := context.WithCancel(ctx)
-	go runTokenExchangeServer(t, runCtx, runCancel, 14321, &currentTestParams)
+	go runTokenExchangeServer(runCtx, runCancel, 14321, &currentTestParams)
 
 	testsParams := []Oauth2TokenExchangeTestParams{
 		{
@@ -120,13 +139,13 @@ func TestOauth2TokenExchange(t *testing.T) {
 			Response:          `{"error":"unauthorized_client","error_description":"something went bad"}`,
 			Status:            http.StatusInternalServerError,
 			ExpectedToken:     "",
-			ExpectedErrorPart: "OAuth2 token exchange: could not exchange token: 500 Internal Server Error, error: unauthorized_client, description: \"something went bad\"",
+			ExpectedErrorPart: "OAuth2 token exchange: could not exchange token: 500 Internal Server Error, error: unauthorized_client, description: \"something went bad\"", //nolint:lll
 		},
 		{
 			Response:          `{"error_description":"something went bad","error_uri":"my_error_uri"}`,
 			Status:            http.StatusForbidden,
 			ExpectedToken:     "",
-			ExpectedErrorPart: "OAuth2 token exchange: could not exchange token: 403 Forbidden, description: \"something went bad\", error_uri: my_error_uri",
+			ExpectedErrorPart: "OAuth2 token exchange: could not exchange token: 403 Forbidden, description: \"something went bad\", error_uri: my_error_uri", //nolint:lll
 		},
 		{
 			Response:          `{"access_token":"test_token","token_type":"","expires_in":42,"some_other_field":"x"}`,
@@ -181,7 +200,7 @@ func TestOauth2TokenUpdate(t *testing.T) {
 	defer cancel()
 
 	runCtx, runCancel := context.WithCancel(ctx)
-	go runTokenExchangeServer(t, runCtx, runCancel, 14322, &currentTestParams)
+	go runTokenExchangeServer(runCtx, runCancel, 14322, &currentTestParams)
 
 	// First exchange
 	currentTestParams = Oauth2TokenExchangeTestParams{
@@ -222,21 +241,19 @@ func TestOauth2TokenUpdate(t *testing.T) {
 		require.NoError(t, err)
 		if t3.Sub(t1) >= 2*time.Second {
 			require.Equal(t, "Bearer test_token_2", token) // Must update at least sync
-
-			break
-		} else {
-			if token == "Bearer test_token_2" { // already updated
-				break
-			}
-			require.Equal(t, "Bearer test_token_1", token)
 		}
+		if token == "Bearer test_token_2" { // already updated
+			break
+		}
+		require.Equal(t, "Bearer test_token_1", token)
+
 		time.Sleep(10 * time.Millisecond)
 	}
 
 	// Third exchange (never got, because token will be expired later)
 	currentTestParams = Oauth2TokenExchangeTestParams{
 		Response: `{}`,
-		Status:   500,
+		Status:   http.StatusInternalServerError,
 	}
 
 	for i := 1; i <= 5; i++ {
