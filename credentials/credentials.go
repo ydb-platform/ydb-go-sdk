@@ -41,3 +41,13 @@ func NewOauth2TokenExchangeCredentials(
 ) (Credentials, error) {
 	return credentials.NewOauth2TokenExchangeCredentials(opts...)
 }
+
+// NewJWTTokenSource makes JWT token source for OAuth 2.0 token exchange credentials
+func NewJWTTokenSource(opts ...credentials.JWTTokenSourceOption) (credentials.TokenSource, error) {
+	return credentials.NewJWTTokenSource(opts...)
+}
+
+// NewFixedTokenSource makes fixed token source for OAuth 2.0 token exchange credentials
+func NewFixedTokenSource(token, tokenType string) credentials.TokenSource {
+	return credentials.NewFixedTokenSource(token, tokenType)
+}
