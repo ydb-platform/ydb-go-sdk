@@ -8,6 +8,9 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"os/user"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"testing"
@@ -222,7 +225,7 @@ func TestOauth2TokenUpdate(t *testing.T) {
 		WithTokenEndpoint("http://localhost:14322/exchange"),
 		WithAudience("test_audience"),
 		WithScope("test_scope1", "test_scope2"),
-		WithSubjectToken(NewFixedTokenSource("test_source_token", "urn:ietf:params:oauth:token-type:test_jwt")),
+		WithFixedSubjectToken("test_source_token", "urn:ietf:params:oauth:token-type:test_jwt"),
 	)
 	require.NoError(t, err)
 
@@ -276,7 +279,7 @@ func TestOauth2TokenUpdate(t *testing.T) {
 func TestWrongParameters(t *testing.T) {
 	_, err := NewOauth2TokenExchangeCredentials(
 		// No endpoint
-		WithSubjectToken(NewFixedTokenSource("test_source_token", "urn:ietf:params:oauth:token-type:test_jwt")),
+		WithFixedActorToken("test_source_token", "urn:ietf:params:oauth:token-type:test_jwt"),
 		WithRequestedTokenType("access_token"),
 	)
 	require.ErrorIs(t, err, errEmptyTokenEndpointError)
@@ -291,14 +294,34 @@ func (s *errorTokenSource) Token() (Token, error) {
 }
 
 func TestErrorInSourceToken(t *testing.T) {
+	// Create
+	_, err := NewOauth2TokenExchangeCredentials(
+		WithTokenEndpoint("http:trololo"),
+		WithJWTSubjectToken(
+			WithRSAPrivateKeyPEMContent([]byte("invalid")),
+			WithKeyID("key_id"),
+			WithSigningMethod(jwt.SigningMethodRS256),
+			WithIssuer("test_issuer"),
+			WithAudience("test_audience"),
+		),
+	)
+	require.ErrorIs(t, err, errCouldNotCreateTokenSource)
+
+	// Use
 	client, err := NewOauth2TokenExchangeCredentials(
 		WithTokenEndpoint("http:trololo"),
 		WithGrantType("grant_type"),
 		WithRequestTimeout(time.Second),
 		WithResource("res"),
+		WithFixedSubjectToken("t", "tt"),
 		WithActorToken(&errorTokenSource{}),
+		WithSourceInfo("TestErrorInSourceToken"),
 	)
 	require.NoError(t, err)
+
+	// Check that token prints well
+	formatted := fmt.Sprint(client)
+	require.Equal(t, `OAuth2TokenExchange{Endpoint:"http:trololo",GrantType:grant_type,Resource:res,Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:FixedTokenSource{Token:"****(CRC-32c: 856A5AA8)",Type:tt},ActorToken:&{},From:"TestErrorInSourceToken"}`, formatted) //nolint:lll
 
 	token, err := client.Token(context.Background())
 	require.ErrorIs(t, err, errTokenSource)
@@ -321,19 +344,34 @@ func TestErrorInSourceToken(t *testing.T) {
 func TestErrorInHTTPRequest(t *testing.T) {
 	client, err := NewOauth2TokenExchangeCredentials(
 		WithTokenEndpoint("http://invalid_host:42/exchange"),
-		WithSubjectToken(NewFixedTokenSource("test_source_token", "test_token_type")),
+		WithJWTSubjectToken(
+			WithRSAPrivateKeyPEMContent([]byte(testPrivateKeyContent)),
+			WithKeyID("key_id"),
+			WithSigningMethod(jwt.SigningMethodRS256),
+			WithIssuer("test_issuer"),
+			WithAudience("test_audience"),
+		),
+		WithJWTActorToken(
+			WithRSAPrivateKeyPEMContent([]byte(testPrivateKeyContent)),
+			WithKeyID("key_id"),
+			WithSigningMethod(jwt.SigningMethodRS256),
+			WithIssuer("test_issuer"),
+		),
+		WithScope("1", "2", "3"),
+		WithSourceInfo("TestErrorInHTTPRequest"),
 	)
 	require.NoError(t, err)
 
 	token, err := client.Token(context.Background())
 	require.ErrorIs(t, err, errCouldNotExchangeToken)
 	require.Equal(t, "", token)
+
+	// check format:
+	formatted := fmt.Sprint(client)
+	require.Equal(t, `OAuth2TokenExchange{Endpoint:"http://invalid_host:42/exchange",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:,Audience:[],Scope:[1 2 3],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:JWTTokenSource{Method:RS256,KeyID:key_id,Issuer:"test_issuer",Subject:"",Audience:[test_audience],ID:,TokenTTL:1h0m0s},ActorToken:JWTTokenSource{Method:RS256,KeyID:key_id,Issuer:"test_issuer",Subject:"",Audience:[],ID:,TokenTTL:1h0m0s},From:"TestErrorInHTTPRequest"}`, formatted) //nolint:lll
 }
 
 func TestJWTTokenSource(t *testing.T) {
-	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(testPrivateKeyContent))
-	require.NoError(t, err)
-
 	publicKey, err := jwt.ParseRSAPublicKeyFromPEM([]byte(testPublicKeyContent))
 	require.NoError(t, err)
 	getPublicKey := func(*jwt.Token) (interface{}, error) {
@@ -342,7 +380,7 @@ func TestJWTTokenSource(t *testing.T) {
 
 	var src TokenSource
 	src, err = NewJWTTokenSource(
-		WithPrivateKey(privateKey),
+		WithRSAPrivateKeyPEMContent([]byte(testPrivateKeyContent)),
 		WithKeyID("key_id"),
 		WithSigningMethod(jwt.SigningMethodRS256),
 		WithIssuer("test_issuer"),
@@ -389,4 +427,44 @@ func TestJWTTokenBadParams(t *testing.T) {
 		WithAudience("test_audience"),
 	)
 	require.ErrorIs(t, err, errNoSigningMethodError)
+}
+
+func TestJWTTokenSourceReadPrivateKeyFromFile(t *testing.T) {
+	const perm = 0o600
+	usr, err := user.Current()
+	require.NoError(t, err)
+	fileName := strconv.Itoa(time.Now().Second())
+	filePath := filepath.Join(usr.HomeDir, fileName)
+	beautifulFilePath := filepath.Join("~", fileName)
+	err = os.WriteFile(
+		filePath,
+		[]byte(testPrivateKeyContent),
+		perm,
+	)
+	require.NoError(t, err)
+	defer os.Remove(filePath)
+
+	var src TokenSource
+	src, err = NewJWTTokenSource(
+		WithRSAPrivateKeyPEMFile(beautifulFilePath),
+		WithKeyID("key_id"),
+		WithSigningMethod(jwt.SigningMethodRS256),
+		WithIssuer("test_issuer"),
+		WithAudience("test_audience"),
+	)
+	require.NoError(t, err)
+
+	token, err := src.Token()
+	require.NoError(t, err)
+
+	// parse token
+	publicKey, err := jwt.ParseRSAPublicKeyFromPEM([]byte(testPublicKeyContent))
+	require.NoError(t, err)
+	getPublicKey := func(*jwt.Token) (interface{}, error) {
+		return publicKey, nil
+	}
+
+	claims := jwt.RegisteredClaims{}
+	_, err = jwt.ParseWithClaims(token.Token, &claims, getPublicKey)
+	require.NoError(t, err)
 }

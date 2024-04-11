@@ -8,6 +8,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
+	"os/user"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -16,7 +19,10 @@ import (
 
 	"github.com/golang-jwt/jwt/v4"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 const (
@@ -26,27 +32,35 @@ const (
 )
 
 var (
-	errEmptyTokenEndpointError = errors.New("OAuth2 token exchange: empty token endpoint")
-	errCouldNotParseResponse   = errors.New("OAuth2 token exchange: could not parse response")
-	errCouldNotExchangeToken   = errors.New("OAuth2 token exchange: could not exchange token")
-	errUnsupportedTokenType    = errors.New("OAuth2 token exchange: unsupported token type")
-	errIncorrectExpirationTime = errors.New("OAuth2 token exchange: incorrect expiration time")
-	errDifferentScope          = errors.New("OAuth2 token exchange: got different scope")
-	errCouldNotMakeHTTPRequest = errors.New("OAuth2 token exchange: could not make http request")
-	errNoSigningMethodError    = errors.New("JWT token source: no signing method")
-	errNoPrivateKeyError       = errors.New("JWT token source: no private key")
-	errCouldNotSignJWTToken    = errors.New("JWT token source: could not sign jwt token")
+	errEmptyTokenEndpointError    = errors.New("OAuth2 token exchange: empty token endpoint")
+	errCouldNotParseResponse      = errors.New("OAuth2 token exchange: could not parse response")
+	errCouldNotExchangeToken      = errors.New("OAuth2 token exchange: could not exchange token")
+	errUnsupportedTokenType       = errors.New("OAuth2 token exchange: unsupported token type")
+	errIncorrectExpirationTime    = errors.New("OAuth2 token exchange: incorrect expiration time")
+	errDifferentScope             = errors.New("OAuth2 token exchange: got different scope")
+	errCouldNotMakeHTTPRequest    = errors.New("OAuth2 token exchange: could not make http request")
+	errCouldNotApplyOption        = errors.New("OAuth2 token exchange: could not apply option")
+	errCouldNotCreateTokenSource  = errors.New("OAuth2 token exchange: could not createTokenSource")
+	errNoSigningMethodError       = errors.New("JWT token source: no signing method")
+	errNoPrivateKeyError          = errors.New("JWT token source: no private key")
+	errCouldNotSignJWTToken       = errors.New("JWT token source: could not sign jwt token")
+	errCouldNotApplyJWTOption     = errors.New("JWT token source: could not apply option")
+	errCouldNotparseRSAPrivateKey = errors.New("JWT token source: could not parse RSA private key from PEM")
+	errCouldNotParseHomeDir       = errors.New("JWT token source: could not parse home dir for private key")
+	errCouldNotReadPrivateKeyFile = errors.New("JWT token source: could not read from private key file")
 )
 
 type Oauth2TokenExchangeCredentialsOption interface {
-	ApplyOauth2CredentialsOption(c *oauth2TokenExchange)
+	ApplyOauth2CredentialsOption(c *oauth2TokenExchange) error
 }
 
 // TokenEndpoint
 type tokenEndpointOption string
 
-func (endpoint tokenEndpointOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) {
+func (endpoint tokenEndpointOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) error {
 	c.tokenEndpoint = string(endpoint)
+
+	return nil
 }
 
 func WithTokenEndpoint(endpoint string) tokenEndpointOption {
@@ -56,8 +70,10 @@ func WithTokenEndpoint(endpoint string) tokenEndpointOption {
 // GrantType
 type grantTypeOption string
 
-func (grantType grantTypeOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) {
+func (grantType grantTypeOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) error {
 	c.grantType = string(grantType)
+
+	return nil
 }
 
 func WithGrantType(grantType string) grantTypeOption {
@@ -67,8 +83,10 @@ func WithGrantType(grantType string) grantTypeOption {
 // Resource
 type resourceOption string
 
-func (resource resourceOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) {
+func (resource resourceOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) error {
 	c.resource = string(resource)
+
+	return nil
 }
 
 func WithResource(resource string) resourceOption {
@@ -78,8 +96,10 @@ func WithResource(resource string) resourceOption {
 // RequestedTokenType
 type requestedTokenTypeOption string
 
-func (requestedTokenType requestedTokenTypeOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) {
+func (requestedTokenType requestedTokenTypeOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) error {
 	c.requestedTokenType = string(requestedTokenType)
+
+	return nil
 }
 
 func WithRequestedTokenType(requestedTokenType string) requestedTokenTypeOption {
@@ -89,8 +109,10 @@ func WithRequestedTokenType(requestedTokenType string) requestedTokenTypeOption 
 // Audience
 type audienceOption []string
 
-func (audience audienceOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) {
+func (audience audienceOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) error {
 	c.audience = audience
+
+	return nil
 }
 
 func WithAudience(audience ...string) audienceOption {
@@ -100,8 +122,10 @@ func WithAudience(audience ...string) audienceOption {
 // Scope
 type scopeOption []string
 
-func (scope scopeOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) {
+func (scope scopeOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) error {
 	c.scope = scope
+
+	return nil
 }
 
 func WithScope(scope ...string) scopeOption {
@@ -111,38 +135,96 @@ func WithScope(scope ...string) scopeOption {
 // RequestTimeout
 type requestTimeoutOption time.Duration
 
-func (timeout requestTimeoutOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) {
+func (timeout requestTimeoutOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) error {
 	c.requestTimeout = time.Duration(timeout)
+
+	return nil
 }
 
 func WithRequestTimeout(timeout time.Duration) requestTimeoutOption {
 	return requestTimeoutOption(timeout)
 }
 
-// SubjectTokenSource
-type subjectTokenSourceOption struct {
-	source TokenSource
+const (
+	SubjectTokenSourceType = 1
+	ActorTokenSourceType   = 2
+)
+
+// SubjectTokenSource/ActorTokenSource
+type tokenSourceOption struct {
+	source          TokenSource
+	createFunc      func() (TokenSource, error)
+	tokenSourceType int
 }
 
-func (subjectToken *subjectTokenSourceOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) {
-	c.subjectTokenSource = subjectToken.source
+func (tokenSource *tokenSourceOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) error {
+	src := tokenSource.source
+	var err error
+	if src == nil {
+		src, err = tokenSource.createFunc()
+		if err != nil {
+			return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotCreateTokenSource, err))
+		}
+	}
+	switch tokenSource.tokenSourceType {
+	case SubjectTokenSourceType:
+		c.subjectTokenSource = src
+	case ActorTokenSourceType:
+		c.actorTokenSource = src
+	}
+
+	return nil
 }
 
-func WithSubjectToken(subjectToken TokenSource) *subjectTokenSourceOption {
-	return &subjectTokenSourceOption{subjectToken}
+func WithSubjectToken(subjectToken TokenSource) *tokenSourceOption {
+	return &tokenSourceOption{
+		source:          subjectToken,
+		tokenSourceType: SubjectTokenSourceType,
+	}
+}
+
+func WithFixedSubjectToken(token, tokenType string) *tokenSourceOption {
+	return &tokenSourceOption{
+		createFunc: func() (TokenSource, error) {
+			return NewFixedTokenSource(token, tokenType), nil
+		},
+		tokenSourceType: SubjectTokenSourceType,
+	}
+}
+
+func WithJWTSubjectToken(opts ...JWTTokenSourceOption) *tokenSourceOption {
+	return &tokenSourceOption{
+		createFunc: func() (TokenSource, error) {
+			return NewJWTTokenSource(opts...)
+		},
+		tokenSourceType: SubjectTokenSourceType,
+	}
 }
 
 // ActorTokenSource
-type actorTokenSourceOption struct {
-	source TokenSource
+func WithActorToken(actorToken TokenSource) *tokenSourceOption {
+	return &tokenSourceOption{
+		source:          actorToken,
+		tokenSourceType: ActorTokenSourceType,
+	}
 }
 
-func (actorToken *actorTokenSourceOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) {
-	c.actorTokenSource = actorToken.source
+func WithFixedActorToken(token, tokenType string) *tokenSourceOption {
+	return &tokenSourceOption{
+		createFunc: func() (TokenSource, error) {
+			return NewFixedTokenSource(token, tokenType), nil
+		},
+		tokenSourceType: ActorTokenSourceType,
+	}
 }
 
-func WithActorToken(actorToken TokenSource) *actorTokenSourceOption {
-	return &actorTokenSourceOption{actorToken}
+func WithJWTActorToken(opts ...JWTTokenSourceOption) *tokenSourceOption {
+	return &tokenSourceOption{
+		createFunc: func() (TokenSource, error) {
+			return NewJWTTokenSource(opts...)
+		},
+		tokenSourceType: ActorTokenSourceType,
+	}
 }
 
 type oauth2TokenExchange struct {
@@ -175,6 +257,8 @@ type oauth2TokenExchange struct {
 
 	mutex    sync.RWMutex
 	updating atomic.Bool // true if separate goroutine is run and updates token in background
+
+	sourceInfo string
 }
 
 func NewOauth2TokenExchangeCredentials(
@@ -184,11 +268,16 @@ func NewOauth2TokenExchangeCredentials(
 		grantType:          "urn:ietf:params:oauth:grant-type:token-exchange",
 		requestedTokenType: "urn:ietf:params:oauth:token-type:access_token",
 		requestTimeout:     defaultRequestTimeout,
+		sourceInfo:         stack.Record(1),
 	}
 
+	var err error
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyOauth2CredentialsOption(c)
+			err = opt.ApplyOauth2CredentialsOption(c)
+			if err != nil {
+				return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotApplyOption, err))
+			}
 		}
 	}
 
@@ -443,6 +532,33 @@ func (provider *oauth2TokenExchange) Token(ctx context.Context) (string, error) 
 	return provider.receivedToken, nil
 }
 
+func (provider *oauth2TokenExchange) String() string {
+	buffer := xstring.Buffer()
+	defer buffer.Free()
+	fmt.Fprintf(
+		buffer,
+		"OAuth2TokenExchange{Endpoint:%q,GrantType:%s,Resource:%s,Audience:%v,Scope:%v,RequestedTokenType:%s",
+		provider.tokenEndpoint,
+		provider.grantType,
+		provider.resource,
+		provider.audience,
+		provider.scope,
+		provider.requestedTokenType,
+	)
+	if provider.subjectTokenSource != nil {
+		fmt.Fprintf(buffer, ",SubjectToken:%s", provider.subjectTokenSource)
+	}
+	if provider.actorTokenSource != nil {
+		fmt.Fprintf(buffer, ",ActorToken:%s", provider.actorTokenSource)
+	}
+	if provider.sourceInfo != "" {
+		fmt.Fprintf(buffer, ",From:%q", provider.sourceInfo)
+	}
+	buffer.WriteByte('}')
+
+	return buffer.String()
+}
+
 type Token struct {
 	Token string
 
@@ -464,6 +580,19 @@ func (s *fixedTokenSource) Token() (Token, error) {
 	return s.fixedToken, nil
 }
 
+func (s *fixedTokenSource) String() string {
+	buffer := xstring.Buffer()
+	defer buffer.Free()
+	fmt.Fprintf(
+		buffer,
+		"FixedTokenSource{Token:%q,Type:%s}",
+		secret.Token(s.fixedToken.Token),
+		s.fixedToken.TokenType,
+	)
+
+	return buffer.String()
+}
+
 func NewFixedTokenSource(token, tokenType string) *fixedTokenSource {
 	return &fixedTokenSource{
 		fixedToken: Token{
@@ -474,14 +603,16 @@ func NewFixedTokenSource(token, tokenType string) *fixedTokenSource {
 }
 
 type JWTTokenSourceOption interface {
-	ApplyJWTTokenSourceOption(s *jwtTokenSource)
+	ApplyJWTTokenSourceOption(s *jwtTokenSource) error
 }
 
 // Issuer
 type issuerOption string
 
-func (issuer issuerOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) {
+func (issuer issuerOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
 	s.issuer = string(issuer)
+
+	return nil
 }
 
 func WithIssuer(issuer string) issuerOption {
@@ -491,8 +622,10 @@ func WithIssuer(issuer string) issuerOption {
 // Subject
 type subjectOption string
 
-func (subject subjectOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) {
+func (subject subjectOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
 	s.subject = string(subject)
+
+	return nil
 }
 
 func WithSubject(subject string) subjectOption {
@@ -500,15 +633,19 @@ func WithSubject(subject string) subjectOption {
 }
 
 // Audience
-func (audience audienceOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) {
+func (audience audienceOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
 	s.audience = audience
+
+	return nil
 }
 
 // ID
 type idOption string
 
-func (id idOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) {
+func (id idOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
 	s.id = string(id)
+
+	return nil
 }
 
 func WithID(id string) idOption {
@@ -518,8 +655,10 @@ func WithID(id string) idOption {
 // TokenTTL
 type tokenTTLOption time.Duration
 
-func (ttl tokenTTLOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) {
+func (ttl tokenTTLOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
 	s.tokenTTL = time.Duration(ttl)
+
+	return nil
 }
 
 func WithTokenTTL(ttl time.Duration) tokenTTLOption {
@@ -531,8 +670,10 @@ type signingMethodOption struct {
 	method jwt.SigningMethod
 }
 
-func (method *signingMethodOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) {
+func (method *signingMethodOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
 	s.signingMethod = method.method
+
+	return nil
 }
 
 func WithSigningMethod(method jwt.SigningMethod) *signingMethodOption {
@@ -542,8 +683,10 @@ func WithSigningMethod(method jwt.SigningMethod) *signingMethodOption {
 // KeyID
 type keyIDOption string
 
-func (id keyIDOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) {
+func (id keyIDOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
 	s.keyID = string(id)
+
+	return nil
 }
 
 func WithKeyID(id string) keyIDOption {
@@ -555,12 +698,60 @@ type privateKeyOption struct {
 	key interface{}
 }
 
-func (key *privateKeyOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) {
+func (key *privateKeyOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
 	s.privateKey = key.key
+
+	return nil
 }
 
 func WithPrivateKey(key interface{}) *privateKeyOption {
 	return &privateKeyOption{key}
+}
+
+// PrivateKey
+type rsaPrivateKeyPemContentOption struct {
+	keyContent []byte
+}
+
+func (key *rsaPrivateKeyPemContentOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
+	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM(key.keyContent)
+	if err != nil {
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotparseRSAPrivateKey, err))
+	}
+	s.privateKey = privateKey
+
+	return nil
+}
+
+func WithRSAPrivateKeyPEMContent(key []byte) *rsaPrivateKeyPemContentOption {
+	return &rsaPrivateKeyPemContentOption{key}
+}
+
+// PrivateKey
+type rsaPrivateKeyPemFileOption struct {
+	path string
+}
+
+func (key *rsaPrivateKeyPemFileOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) error {
+	if len(key.path) > 0 && key.path[0] == '~' {
+		usr, err := user.Current()
+		if err != nil {
+			return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotParseHomeDir, err))
+		}
+		key.path = filepath.Join(usr.HomeDir, key.path[1:])
+	}
+	bytes, err := os.ReadFile(key.path)
+	if err != nil {
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotReadPrivateKeyFile, err))
+	}
+
+	o := rsaPrivateKeyPemContentOption{bytes}
+
+	return o.ApplyJWTTokenSourceOption(s)
+}
+
+func WithRSAPrivateKeyPEMFile(path string) *rsaPrivateKeyPemFileOption {
+	return &rsaPrivateKeyPemFileOption{path}
 }
 
 func NewJWTTokenSource(opts ...JWTTokenSourceOption) (*jwtTokenSource, error) {
@@ -568,9 +759,13 @@ func NewJWTTokenSource(opts ...JWTTokenSourceOption) (*jwtTokenSource, error) {
 		tokenTTL: defaultJWTTokenTTL,
 	}
 
+	var err error
 	for _, opt := range opts {
 		if opt != nil {
-			opt.ApplyJWTTokenSourceOption(s)
+			err = opt.ApplyJWTTokenSourceOption(s)
+			if err != nil {
+				return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotApplyJWTOption, err))
+			}
 		}
 	}
 
@@ -630,4 +825,22 @@ func (s *jwtTokenSource) Token() (Token, error) {
 	token.TokenType = "urn:ietf:params:oauth:token-type:jwt"
 
 	return token, nil
+}
+
+func (s *jwtTokenSource) String() string {
+	buffer := xstring.Buffer()
+	defer buffer.Free()
+	fmt.Fprintf(
+		buffer,
+		"JWTTokenSource{Method:%s,KeyID:%s,Issuer:%q,Subject:%q,Audience:%v,ID:%s,TokenTTL:%s}",
+		s.signingMethod.Alg(),
+		s.keyID,
+		s.issuer,
+		s.subject,
+		s.audience,
+		s.id,
+		s.tokenTTL,
+	)
+
+	return buffer.String()
 }

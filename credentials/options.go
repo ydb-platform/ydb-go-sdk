@@ -9,6 +9,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
 )
 
+type Oauth2TokenExchangeCredentialsOption = credentials.Oauth2TokenExchangeCredentialsOption
+
+type TokenSource = credentials.TokenSource
+
+type Token = credentials.Token
+
 // WithSourceInfo option append to credentials object the source info for reporting source info details on error case
 func WithSourceInfo(sourceInfo string) credentials.SourceInfoOption {
 	return credentials.WithSourceInfo(sourceInfo)
@@ -20,43 +26,63 @@ func WithGrpcDialOptions(opts ...grpc.DialOption) credentials.StaticCredentialsO
 }
 
 // TokenEndpoint
-func WithTokenEndpoint(endpoint string) credentials.Oauth2TokenExchangeCredentialsOption {
+func WithTokenEndpoint(endpoint string) Oauth2TokenExchangeCredentialsOption {
 	return credentials.WithTokenEndpoint(endpoint)
 }
 
 // GrantType
-func WithGrantType(grantType string) credentials.Oauth2TokenExchangeCredentialsOption {
+func WithGrantType(grantType string) Oauth2TokenExchangeCredentialsOption {
 	return credentials.WithGrantType(grantType)
 }
 
 // Resource
-func WithResource(resource string) credentials.Oauth2TokenExchangeCredentialsOption {
+func WithResource(resource string) Oauth2TokenExchangeCredentialsOption {
 	return credentials.WithResource(resource)
 }
 
 // RequestedTokenType
-func WithRequestedTokenType(requestedTokenType string) credentials.Oauth2TokenExchangeCredentialsOption {
+func WithRequestedTokenType(requestedTokenType string) Oauth2TokenExchangeCredentialsOption {
 	return credentials.WithRequestedTokenType(requestedTokenType)
 }
 
 // Scope
-func WithScope(scope ...string) credentials.Oauth2TokenExchangeCredentialsOption {
+func WithScope(scope ...string) Oauth2TokenExchangeCredentialsOption {
 	return credentials.WithScope(scope...)
 }
 
 // RequestTimeout
-func WithRequestTimeout(timeout time.Duration) credentials.Oauth2TokenExchangeCredentialsOption {
+func WithRequestTimeout(timeout time.Duration) Oauth2TokenExchangeCredentialsOption {
 	return credentials.WithRequestTimeout(timeout)
 }
 
 // SubjectTokenSource
-func WithSubjectToken(subjectToken credentials.TokenSource) credentials.Oauth2TokenExchangeCredentialsOption {
+func WithSubjectToken(subjectToken credentials.TokenSource) Oauth2TokenExchangeCredentialsOption {
 	return credentials.WithSubjectToken(subjectToken)
 }
 
+// SubjectTokenSource
+func WithFixedSubjectToken(token, tokenType string) Oauth2TokenExchangeCredentialsOption {
+	return credentials.WithFixedSubjectToken(token, tokenType)
+}
+
+// SubjectTokenSource
+func WithJWTSubjectToken(opts ...credentials.JWTTokenSourceOption) Oauth2TokenExchangeCredentialsOption {
+	return credentials.WithJWTSubjectToken(opts...)
+}
+
 // ActorTokenSource
-func WithActorToken(actorToken credentials.TokenSource) credentials.Oauth2TokenExchangeCredentialsOption {
+func WithActorToken(actorToken credentials.TokenSource) Oauth2TokenExchangeCredentialsOption {
 	return credentials.WithActorToken(actorToken)
+}
+
+// ActorTokenSource
+func WithFixedActorToken(token, tokenType string) Oauth2TokenExchangeCredentialsOption {
+	return credentials.WithFixedActorToken(token, tokenType)
+}
+
+// ActorTokenSource
+func WithJWTActorToken(opts ...credentials.JWTTokenSourceOption) Oauth2TokenExchangeCredentialsOption {
+	return credentials.WithJWTActorToken(opts...)
 }
 
 // Audience
@@ -102,4 +128,14 @@ func WithKeyID(id string) credentials.JWTTokenSourceOption {
 // PrivateKey
 func WithPrivateKey(key interface{}) credentials.JWTTokenSourceOption {
 	return credentials.WithPrivateKey(key)
+}
+
+// PrivateKey
+func WithRSAPrivateKeyPEMContent(key []byte) credentials.JWTTokenSourceOption {
+	return credentials.WithRSAPrivateKeyPEMContent(key)
+}
+
+// PrivateKey
+func WithRSAPrivateKeyPEMFile(path string) credentials.JWTTokenSourceOption {
+	return credentials.WithRSAPrivateKeyPEMFile(path)
 }

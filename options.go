@@ -54,6 +54,16 @@ func WithAccessTokenCredentials(accessToken string) Option {
 	)
 }
 
+func WithOauth2TokenExchangeCredentials(
+	opts ...credentials.Oauth2TokenExchangeCredentialsOption,
+) Option {
+	opts = append(opts, credentials.WithSourceInfo("ydb.WithOauth2TokenExchangeCredentials(opts)"))
+
+	return WithCreateCredentialsFunc(func(context.Context) (credentials.Credentials, error) {
+		return credentials.NewOauth2TokenExchangeCredentials(opts...)
+	})
+}
+
 // WithApplicationName add provided application name to all api requests
 func WithApplicationName(applicationName string) Option {
 	return func(ctx context.Context, c *Driver) error {
