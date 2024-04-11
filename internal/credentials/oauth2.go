@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 type Oauth2TokenExchangeCredentialsOption interface {
@@ -69,22 +71,22 @@ func WithRequestedTokenType(requestedTokenType string) requestedTokenTypeOption 
 type audienceOption []string
 
 func (audience audienceOption) ApplyOauth2CredentialsOption(c *Oauth2TokenExchange) {
-	c.audience = []string(audience)
+	c.audience = audience
 }
 
 func WithAudience(audience ...string) audienceOption {
-	return audienceOption(audience)
+	return audience
 }
 
 // Scope
 type scopeOption []string
 
 func (scope scopeOption) ApplyOauth2CredentialsOption(c *Oauth2TokenExchange) {
-	c.scope = []string(scope)
+	c.scope = scope
 }
 
 func WithScope(scope ...string) scopeOption {
-	return scopeOption(scope)
+	return scope
 }
 
 // RequestTimeout
@@ -124,10 +126,16 @@ func WithActorToken(actorToken TokenSource) *actorTokenSourceOption {
 	return &actorTokenSourceOption{actorToken}
 }
 
+const defaultRequestTimeout = time.Second * 10
+
 func NewOauth2TokenExchangeCredentials(
 	opts ...Oauth2TokenExchangeCredentialsOption,
 ) (*Oauth2TokenExchange, error) {
-	c := &Oauth2TokenExchange{}
+	c := &Oauth2TokenExchange{
+		grantType:          "urn:ietf:params:oauth:grant-type:token-exchange",
+		requestedTokenType: "urn:ietf:params:oauth:token-type:access_token",
+		requestTimeout:     defaultRequestTimeout,
+	}
 
 	for _, opt := range opts {
 		if opt != nil {
@@ -135,32 +143,11 @@ func NewOauth2TokenExchangeCredentials(
 		}
 	}
 
-	err := c.init()
-	if err != nil {
-		return nil, err
+	if c.tokenEndpoint == "" {
+		return nil, xerrors.WithStackTrace(errors.New("OAuth2 token exchange: empty token endpoint"))
 	}
 
 	return c, nil
-}
-
-func (provider *Oauth2TokenExchange) init() error {
-	if provider.tokenEndpoint == "" {
-		return fmt.Errorf("OAuth2 token exchange: empty token endpoint")
-	}
-
-	if provider.grantType == "" {
-		provider.grantType = "urn:ietf:params:oauth:grant-type:token-exchange"
-	}
-
-	if provider.requestedTokenType == "" {
-		provider.requestedTokenType = "urn:ietf:params:oauth:token-type:access_token"
-	}
-
-	if provider.requestTimeout == 0 {
-		provider.requestTimeout = time.Second * 10
-	}
-
-	return nil
 }
 
 func (provider *Oauth2TokenExchange) getScopeParam() string {
@@ -175,6 +162,7 @@ func (provider *Oauth2TokenExchange) getScopeParam() string {
 			}
 		}
 	}
+
 	return scope
 }
 
@@ -198,7 +186,7 @@ func (provider *Oauth2TokenExchange) getRequestParams() (string, error) {
 	if provider.subjectTokenSource != nil {
 		token, err := provider.subjectTokenSource.Token()
 		if err != nil {
-			return "", err
+			return "", xerrors.WithStackTrace(err)
 		}
 		params.Set("subject_token", token.Token)
 		params.Set("subject_token_type", token.TokenType)
@@ -206,11 +194,12 @@ func (provider *Oauth2TokenExchange) getRequestParams() (string, error) {
 	if provider.actorTokenSource != nil {
 		token, err := provider.actorTokenSource.Token()
 		if err != nil {
-			return "", err
+			return "", xerrors.WithStackTrace(err)
 		}
 		params.Set("actor_token", token.Token)
 		params.Set("actor_token_type", token.TokenType)
 	}
+
 	return params.Encode(), nil
 }
 
@@ -222,7 +211,7 @@ func (provider *Oauth2TokenExchange) processTokenExchangeResponse(result *http.R
 	if result.Body != nil {
 		data, err = io.ReadAll(result.Body)
 		if err != nil {
-			return err
+			return xerrors.WithStackTrace(err)
 		}
 	} else {
 		data = make([]byte, 0)
@@ -231,15 +220,17 @@ func (provider *Oauth2TokenExchange) processTokenExchangeResponse(result *http.R
 	if result.StatusCode != http.StatusOK {
 		description := fmt.Sprintf("OAuth2 token exchange: could not exchange token: %s", result.Status)
 
+		//nolint:tagliatelle
 		type errorResponse struct {
 			Error       string `json:"error"`
 			Description string `json:"error_description"`
-			ErrorUri    string `json:"error_uri"`
+			ErrorURI    string `json:"error_uri"`
 		}
 		var parsedErrorResponse errorResponse
 		if err := json.Unmarshal(data, &parsedErrorResponse); err != nil {
 			description += fmt.Sprintf(", could not parse response: %s", err.Error())
-			return errors.New(description)
+
+			return xerrors.WithStackTrace(errors.New(description))
 		}
 
 		if parsedErrorResponse.Error != "" {
@@ -250,13 +241,14 @@ func (provider *Oauth2TokenExchange) processTokenExchangeResponse(result *http.R
 			description += fmt.Sprintf(", description: \"%s\"", parsedErrorResponse.Description)
 		}
 
-		if parsedErrorResponse.ErrorUri != "" {
-			description += fmt.Sprintf(", error_uri: %s", parsedErrorResponse.ErrorUri)
+		if parsedErrorResponse.ErrorURI != "" {
+			description += fmt.Sprintf(", error_uri: %s", parsedErrorResponse.ErrorURI)
 		}
 
-		return errors.New(description)
+		return xerrors.WithStackTrace(errors.New(description))
 	}
 
+	//nolint:tagliatelle
 	type response struct {
 		AccessToken string `json:"access_token"`
 		TokenType   string `json:"token_type"`
@@ -265,32 +257,32 @@ func (provider *Oauth2TokenExchange) processTokenExchangeResponse(result *http.R
 	}
 	var parsedResponse response
 	if err := json.Unmarshal(data, &parsedResponse); err != nil {
-		return fmt.Errorf("OAuth2 token exchange: could not parse response: %w", err)
+		return xerrors.WithStackTrace(fmt.Errorf("OAuth2 token exchange: could not parse response: %w", err))
 	}
 
 	if !strings.EqualFold(parsedResponse.TokenType, "bearer") {
-		return fmt.Errorf("OAuth2 token exchange: unsupported token type: \"%s\"", parsedResponse.TokenType)
+		return xerrors.WithStackTrace(fmt.Errorf("OAuth2 token exchange: unsupported token type: \"%s\"", parsedResponse.TokenType))
 	}
 
 	if parsedResponse.ExpiresIn <= 0 {
-		return fmt.Errorf("OAuth2 token exchange: incorrect expiration time: %d", parsedResponse.ExpiresIn)
+		return xerrors.WithStackTrace(fmt.Errorf("OAuth2 token exchange: incorrect expiration time: %d", parsedResponse.ExpiresIn))
 	}
 
 	if parsedResponse.Scope != "" {
 		scope := provider.getScopeParam()
 		if parsedResponse.Scope != scope {
-			return fmt.Errorf("OAuth2 token exchange: got different scope. Expected \"%s\", but got \"%s\"", scope, parsedResponse.Scope)
+			return xerrors.WithStackTrace(fmt.Errorf("OAuth2 token exchange: got different scope. Expected \"%s\", but got \"%s\"", scope, parsedResponse.Scope))
 		}
 	}
 
 	provider.receivedToken = "Bearer " + parsedResponse.AccessToken
 
 	// Expire time
-	var expireDelta time.Duration = time.Duration(parsedResponse.ExpiresIn)
+	expireDelta := time.Duration(parsedResponse.ExpiresIn)
 	expireDelta *= time.Second
 	provider.receivedTokenExpireTime = now.Add(expireDelta)
 
-	var updateDelta time.Duration = time.Duration(parsedResponse.ExpiresIn / 2)
+	updateDelta := time.Duration(parsedResponse.ExpiresIn / 2) //nolint:gomnd
 	updateDelta *= time.Second
 	provider.updateTokenTime = now.Add(updateDelta)
 
@@ -300,12 +292,12 @@ func (provider *Oauth2TokenExchange) processTokenExchangeResponse(result *http.R
 func (provider *Oauth2TokenExchange) exchangeToken(ctx context.Context, now time.Time) error {
 	body, err := provider.getRequestParams()
 	if err != nil {
-		return fmt.Errorf("OAuth2 token exchange: could not make http request: %w", err)
+		return xerrors.WithStackTrace(fmt.Errorf("OAuth2 token exchange: could not make http request: %w", err))
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", provider.tokenEndpoint, strings.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, provider.tokenEndpoint, strings.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("OAuth2 token exchange: could not make http request: %w", err)
+		return xerrors.WithStackTrace(fmt.Errorf("OAuth2 token exchange: could not make http request: %w", err))
 	}
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Content-Length", strconv.Itoa(len(body)))
@@ -318,7 +310,7 @@ func (provider *Oauth2TokenExchange) exchangeToken(ctx context.Context, now time
 
 	result, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("iam: could not exchange token: %w", err)
+		return xerrors.WithStackTrace(fmt.Errorf("iam: could not exchange token: %w", err))
 	}
 
 	defer result.Body.Close()
@@ -326,7 +318,7 @@ func (provider *Oauth2TokenExchange) exchangeToken(ctx context.Context, now time
 	return provider.processTokenExchangeResponse(result, now)
 }
 
-func (provider *Oauth2TokenExchange) exchangeTokenInBackgroud() {
+func (provider *Oauth2TokenExchange) exchangeTokenInbackground() {
 	provider.mutex.Lock()
 	defer provider.mutex.Unlock()
 
@@ -341,10 +333,10 @@ func (provider *Oauth2TokenExchange) exchangeTokenInBackgroud() {
 	provider.updating.Store(false)
 }
 
-func (provider *Oauth2TokenExchange) checkBackgroudUpdate(now time.Time) {
+func (provider *Oauth2TokenExchange) checkbackgroundUpdate(now time.Time) {
 	if provider.needUpdate(now) && !provider.updating.Load() {
 		if provider.updating.CompareAndSwap(false, true) {
-			go provider.exchangeTokenInBackgroud()
+			go provider.exchangeTokenInbackground()
 		}
 	}
 }
@@ -362,9 +354,11 @@ func (provider *Oauth2TokenExchange) fastCheck(now time.Time) string {
 	defer provider.mutex.RUnlock()
 
 	if !provider.expired(now) {
-		provider.checkBackgroudUpdate(now)
+		provider.checkbackgroundUpdate(now)
+
 		return provider.receivedToken
 	}
+
 	return ""
 }
 
@@ -386,6 +380,7 @@ func (provider *Oauth2TokenExchange) Token(ctx context.Context) (string, error) 
 	if err := provider.exchangeToken(ctx, now); err != nil {
 		return "", err
 	}
+
 	return provider.receivedToken, nil
 }
 
@@ -418,7 +413,7 @@ type Oauth2TokenExchange struct {
 	receivedTokenExpireTime time.Time
 
 	mutex    sync.RWMutex
-	updating atomic.Bool // true if separate goroutine is run and updates token in backgroud
+	updating atomic.Bool // true if separate goroutine is run and updates token in background
 }
 
 type Token struct {
@@ -443,13 +438,12 @@ func (s *FixedTokenSource) Token() (Token, error) {
 }
 
 func NewFixedTokenSource(token, tokenType string) *FixedTokenSource {
-	s := &FixedTokenSource{
+	return &FixedTokenSource{
 		fixedToken: Token{
 			Token:     token,
 			TokenType: tokenType,
 		},
 	}
-	return s
 }
 
 type JWTTokenSourceOption interface {
@@ -543,7 +537,9 @@ func WithPrivateKey(key interface{}) *privateKeyOption {
 }
 
 func NewJWTTokenSource(opts ...JWTTokenSourceOption) (*JWTTokenSource, error) {
-	s := &JWTTokenSource{}
+	s := &JWTTokenSource{
+		tokenTTL: time.Hour,
+	}
 
 	for _, opt := range opts {
 		if opt != nil {
@@ -551,9 +547,12 @@ func NewJWTTokenSource(opts ...JWTTokenSourceOption) (*JWTTokenSource, error) {
 		}
 	}
 
-	err := s.init()
-	if err != nil {
-		return nil, err
+	if s.signingMethod == nil {
+		return nil, xerrors.WithStackTrace(fmt.Errorf("JWT token source: no signing method"))
+	}
+
+	if s.privateKey == nil {
+		return nil, xerrors.WithStackTrace(fmt.Errorf("JWT token source: no private key"))
 	}
 
 	return s, nil
@@ -570,22 +569,6 @@ type JWTTokenSource struct {
 	audience []string
 	id       string
 	tokenTTL time.Duration
-}
-
-func (s *JWTTokenSource) init() error {
-	if s.signingMethod == nil {
-		return fmt.Errorf("JWT token source: no signing method")
-	}
-
-	if s.privateKey == nil {
-		return fmt.Errorf("JWT token source: no private key")
-	}
-
-	if s.tokenTTL == 0 {
-		s.tokenTTL = time.Duration(3600 * time.Second)
-	}
-
-	return nil
 }
 
 func (s *JWTTokenSource) Token() (Token, error) {
@@ -615,8 +598,9 @@ func (s *JWTTokenSource) Token() (Token, error) {
 	var token Token
 	token.Token, err = t.SignedString(s.privateKey)
 	if err != nil {
-		return token, fmt.Errorf("JWTTokenSource: could not sign jwt token: %w", err)
+		return token, xerrors.WithStackTrace(fmt.Errorf("JWTTokenSource: could not sign jwt token: %w", err))
 	}
 	token.TokenType = "urn:ietf:params:oauth:token-type:jwt"
+
 	return token, nil
 }
