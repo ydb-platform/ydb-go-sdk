@@ -54,7 +54,7 @@ func WithAccessTokenCredentials(accessToken string) Option {
 	)
 }
 
-// WithOauth2TokenExchangeCredentials adds credentials that can exchange token using
+// WithOauth2TokenExchangeCredentials adds credentials that exchange token using
 // OAuth 2.0 token exchange protocol:
 // https://www.rfc-editor.org/rfc/rfc8693
 func WithOauth2TokenExchangeCredentials(
