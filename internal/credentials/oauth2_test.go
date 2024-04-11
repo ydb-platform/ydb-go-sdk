@@ -94,6 +94,7 @@ type Oauth2TokenExchangeTestParams struct {
 	Response          string
 	Status            int
 	ExpectedToken     string
+	ExpectedError     error
 	ExpectedErrorPart string
 }
 
@@ -107,70 +108,73 @@ func TestOauth2TokenExchange(t *testing.T) {
 
 	testsParams := []Oauth2TokenExchangeTestParams{
 		{
-			Response:          `{"access_token":"test_token","token_type":"BEARER","expires_in":42,"some_other_field":"x"}`,
-			Status:            http.StatusOK,
-			ExpectedToken:     "Bearer test_token",
-			ExpectedErrorPart: "",
+			Response:      `{"access_token":"test_token","token_type":"BEARER","expires_in":42,"some_other_field":"x"}`,
+			Status:        http.StatusOK,
+			ExpectedToken: "Bearer test_token",
 		},
 		{
-			Response:          `aaa`,
-			Status:            http.StatusOK,
-			ExpectedToken:     "",
-			ExpectedErrorPart: "OAuth2 token exchange: could not parse response:",
+			Response:      `aaa`,
+			Status:        http.StatusOK,
+			ExpectedToken: "",
+			ExpectedError: errCouldNotParseResponse,
 		},
 		{
-			Response:          `{}`,
-			Status:            http.StatusBadRequest,
-			ExpectedToken:     "",
-			ExpectedErrorPart: "OAuth2 token exchange: could not exchange token: 400 Bad Request",
+			Response:      `{}`,
+			Status:        http.StatusBadRequest,
+			ExpectedToken: "",
+			ExpectedError: errCouldNotExchangeToken,
 		},
 		{
-			Response:          `not json`,
-			Status:            http.StatusNotFound,
-			ExpectedToken:     "",
-			ExpectedErrorPart: "OAuth2 token exchange: could not exchange token: 404 Not Found",
+			Response:      `not json`,
+			Status:        http.StatusNotFound,
+			ExpectedToken: "",
+			ExpectedError: errCouldNotExchangeToken,
 		},
 		{
 			Response:          `{"error": "invalid_request"}`,
 			Status:            http.StatusBadRequest,
 			ExpectedToken:     "",
-			ExpectedErrorPart: "OAuth2 token exchange: could not exchange token: 400 Bad Request, error: invalid_request",
+			ExpectedError:     errCouldNotExchangeToken,
+			ExpectedErrorPart: "400 Bad Request, error: invalid_request",
 		},
 		{
 			Response:          `{"error":"unauthorized_client","error_description":"something went bad"}`,
 			Status:            http.StatusInternalServerError,
 			ExpectedToken:     "",
-			ExpectedErrorPart: "OAuth2 token exchange: could not exchange token: 500 Internal Server Error, error: unauthorized_client, description: \"something went bad\"", //nolint:lll
+			ExpectedError:     errCouldNotExchangeToken,
+			ExpectedErrorPart: "500 Internal Server Error, error: unauthorized_client, description: \"something went bad\"", //nolint:lll
 		},
 		{
 			Response:          `{"error_description":"something went bad","error_uri":"my_error_uri"}`,
 			Status:            http.StatusForbidden,
 			ExpectedToken:     "",
-			ExpectedErrorPart: "OAuth2 token exchange: could not exchange token: 403 Forbidden, description: \"something went bad\", error_uri: my_error_uri", //nolint:lll
+			ExpectedError:     errCouldNotExchangeToken,
+			ExpectedErrorPart: "403 Forbidden, description: \"something went bad\", error_uri: my_error_uri",
 		},
 		{
-			Response:          `{"access_token":"test_token","token_type":"","expires_in":42,"some_other_field":"x"}`,
-			Status:            http.StatusOK,
-			ExpectedToken:     "",
-			ExpectedErrorPart: "OAuth2 token exchange: unsupported token type: \"\"",
+			Response:      `{"access_token":"test_token","token_type":"","expires_in":42,"some_other_field":"x"}`,
+			Status:        http.StatusOK,
+			ExpectedToken: "",
+			ExpectedError: errUnsupportedTokenType,
 		},
 		{
-			Response:          `{"access_token":"test_token","token_type":"basic","expires_in":42,"some_other_field":"x"}`,
-			Status:            http.StatusOK,
-			ExpectedToken:     "",
-			ExpectedErrorPart: "OAuth2 token exchange: unsupported token type: \"basic\"",
+			Response:      `{"access_token":"test_token","token_type":"basic","expires_in":42,"some_other_field":"x"}`,
+			Status:        http.StatusOK,
+			ExpectedToken: "",
+			ExpectedError: errUnsupportedTokenType,
 		},
 		{
-			Response:          `{"access_token":"test_token","token_type":"Bearer","expires_in":-42,"some_other_field":"x"}`,
-			Status:            http.StatusOK,
-			ExpectedToken:     "",
-			ExpectedErrorPart: "OAuth2 token exchange: incorrect expiration time: -42",
+			Response:      `{"access_token":"test_token","token_type":"Bearer","expires_in":-42,"some_other_field":"x"}`,
+			Status:        http.StatusOK,
+			ExpectedToken: "",
+			ExpectedError: errIncorrectExpirationTime,
 		},
 		{
 			Response:          `{"access_token":"test_token","token_type":"Bearer","expires_in":42,"scope":"s"}`,
 			Status:            http.StatusOK,
 			ExpectedToken:     "",
-			ExpectedErrorPart: "OAuth2 token exchange: got different scope. Expected \"test_scope1 test_scope2\", but got \"s\"",
+			ExpectedError:     errDifferentScope,
+			ExpectedErrorPart: "Expected \"test_scope1 test_scope2\", but got \"s\"",
 		},
 	}
 
@@ -186,10 +190,15 @@ func TestOauth2TokenExchange(t *testing.T) {
 		require.NoError(t, err)
 
 		token, err := client.Token(ctx)
-		if params.ExpectedErrorPart == "" {
+		if params.ExpectedErrorPart == "" && params.ExpectedError == nil {
 			require.NoError(t, err)
 		} else {
-			require.ErrorContains(t, err, params.ExpectedErrorPart)
+			if params.ExpectedErrorPart != "" {
+				require.ErrorContains(t, err, params.ExpectedErrorPart)
+			}
+			if params.ExpectedError != nil {
+				require.ErrorIs(t, err, params.ExpectedError)
+			}
 		}
 		require.Equal(t, params.ExpectedToken, token)
 	}
@@ -270,13 +279,15 @@ func TestWrongParameters(t *testing.T) {
 		WithSubjectToken(NewFixedTokenSource("test_source_token", "urn:ietf:params:oauth:token-type:test_jwt")),
 		WithRequestedTokenType("access_token"),
 	)
-	require.Error(t, err)
+	require.ErrorIs(t, err, errEmptyTokenEndpointError)
 }
 
 type errorTokenSource struct{}
 
+var errTokenSource = errors.New("test error")
+
 func (s *errorTokenSource) Token() (Token, error) {
-	return Token{"", ""}, errors.New("Test error")
+	return Token{"", ""}, errTokenSource
 }
 
 func TestErrorInSourceToken(t *testing.T) {
@@ -290,7 +301,7 @@ func TestErrorInSourceToken(t *testing.T) {
 	require.NoError(t, err)
 
 	token, err := client.Token(context.Background())
-	require.Error(t, err)
+	require.ErrorIs(t, err, errTokenSource)
 	require.Equal(t, "", token)
 
 	client, err = NewOauth2TokenExchangeCredentials(
@@ -303,7 +314,7 @@ func TestErrorInSourceToken(t *testing.T) {
 	require.NoError(t, err)
 
 	token, err = client.Token(context.Background())
-	require.Error(t, err)
+	require.ErrorIs(t, err, errTokenSource)
 	require.Equal(t, "", token)
 }
 
@@ -315,7 +326,7 @@ func TestErrorInHTTPRequest(t *testing.T) {
 	require.NoError(t, err)
 
 	token, err := client.Token(context.Background())
-	require.Error(t, err)
+	require.ErrorIs(t, err, errCouldNotExchangeToken)
 	require.Equal(t, "", token)
 }
 
@@ -367,7 +378,7 @@ func TestJWTTokenBadParams(t *testing.T) {
 		WithAudience("test_audience"),
 		WithID("id"),
 	)
-	require.Error(t, err)
+	require.ErrorIs(t, err, errNoPrivateKeyError)
 
 	_, err = NewJWTTokenSource(
 		WithPrivateKey(privateKey),
@@ -377,5 +388,5 @@ func TestJWTTokenBadParams(t *testing.T) {
 		WithTokenTTL(time.Minute),
 		WithAudience("test_audience"),
 	)
-	require.Error(t, err)
+	require.ErrorIs(t, err, errNoSigningMethodError)
 }

@@ -27,8 +27,15 @@ const (
 
 var (
 	errEmptyTokenEndpointError = errors.New("OAuth2 token exchange: empty token endpoint")
+	errCouldNotParseResponse   = errors.New("OAuth2 token exchange: could not parse response")
+	errCouldNotExchangeToken   = errors.New("OAuth2 token exchange: could not exchange token")
+	errUnsupportedTokenType    = errors.New("OAuth2 token exchange: unsupported token type")
+	errIncorrectExpirationTime = errors.New("OAuth2 token exchange: incorrect expiration time")
+	errDifferentScope          = errors.New("OAuth2 token exchange: got different scope")
+	errCouldNotMakeHTTPRequest = errors.New("OAuth2 token exchange: could not make http request")
 	errNoSigningMethodError    = errors.New("JWT token source: no signing method")
 	errNoPrivateKeyError       = errors.New("JWT token source: no private key")
+	errCouldNotSignJWTToken    = errors.New("JWT token source: could not sign jwt token")
 )
 
 type Oauth2TokenExchangeCredentialsOption interface {
@@ -267,7 +274,7 @@ func (provider *oauth2TokenExchange) processTokenExchangeResponse(result *http.R
 	}
 
 	if result.StatusCode != http.StatusOK {
-		description := "OAuth2 token exchange: could not exchange token: " + result.Status
+		description := result.Status
 
 		//nolint:tagliatelle
 		type errorResponse struct {
@@ -279,7 +286,7 @@ func (provider *oauth2TokenExchange) processTokenExchangeResponse(result *http.R
 		if err := json.Unmarshal(data, &parsedErrorResponse); err != nil {
 			description += ", could not parse response: " + err.Error()
 
-			return xerrors.WithStackTrace(errors.New(description))
+			return xerrors.WithStackTrace(fmt.Errorf("%w: %s", errCouldNotExchangeToken, description))
 		}
 
 		if parsedErrorResponse.ErrorName != "" {
@@ -294,7 +301,7 @@ func (provider *oauth2TokenExchange) processTokenExchangeResponse(result *http.R
 			description += ", error_uri: " + parsedErrorResponse.ErrorURI
 		}
 
-		return xerrors.WithStackTrace(errors.New(description))
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %s", errCouldNotExchangeToken, description))
 	}
 
 	//nolint:tagliatelle
@@ -306,24 +313,24 @@ func (provider *oauth2TokenExchange) processTokenExchangeResponse(result *http.R
 	}
 	var parsedResponse response
 	if err := json.Unmarshal(data, &parsedResponse); err != nil {
-		return xerrors.WithStackTrace(fmt.Errorf("OAuth2 token exchange: could not parse response: %w", err))
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotParseResponse, err))
 	}
 
 	if !strings.EqualFold(parsedResponse.TokenType, "bearer") {
 		return xerrors.WithStackTrace(
-			fmt.Errorf("OAuth2 token exchange: unsupported token type: %q", parsedResponse.TokenType))
+			fmt.Errorf("%w: %q", errUnsupportedTokenType, parsedResponse.TokenType))
 	}
 
 	if parsedResponse.ExpiresIn <= 0 {
 		return xerrors.WithStackTrace(
-			fmt.Errorf("OAuth2 token exchange: incorrect expiration time: %d", parsedResponse.ExpiresIn))
+			fmt.Errorf("%w: %d", errIncorrectExpirationTime, parsedResponse.ExpiresIn))
 	}
 
 	if parsedResponse.Scope != "" {
 		scope := provider.getScopeParam()
 		if parsedResponse.Scope != scope {
 			return xerrors.WithStackTrace(
-				fmt.Errorf("OAuth2 token exchange: got different scope. Expected %q, but got %q", scope, parsedResponse.Scope))
+				fmt.Errorf("%w. Expected %q, but got %q", errDifferentScope, scope, parsedResponse.Scope))
 		}
 	}
 
@@ -344,12 +351,12 @@ func (provider *oauth2TokenExchange) processTokenExchangeResponse(result *http.R
 func (provider *oauth2TokenExchange) exchangeToken(ctx context.Context, now time.Time) error {
 	body, err := provider.getRequestParams()
 	if err != nil {
-		return xerrors.WithStackTrace(fmt.Errorf("OAuth2 token exchange: could not make http request: %w", err))
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotMakeHTTPRequest, err))
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, provider.tokenEndpoint, strings.NewReader(body))
 	if err != nil {
-		return xerrors.WithStackTrace(fmt.Errorf("OAuth2 token exchange: could not make http request: %w", err))
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotMakeHTTPRequest, err))
 	}
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Content-Length", strconv.Itoa(len(body)))
@@ -362,7 +369,7 @@ func (provider *oauth2TokenExchange) exchangeToken(ctx context.Context, now time
 
 	result, err := client.Do(req)
 	if err != nil {
-		return xerrors.WithStackTrace(fmt.Errorf("OAuth2 token exchange: could not exchange token: %w", err))
+		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotExchangeToken, err))
 	}
 
 	defer result.Body.Close()
@@ -618,7 +625,7 @@ func (s *jwtTokenSource) Token() (Token, error) {
 	var token Token
 	token.Token, err = t.SignedString(s.privateKey)
 	if err != nil {
-		return token, xerrors.WithStackTrace(fmt.Errorf("JWT token source: could not sign jwt token: %w", err))
+		return token, xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotSignJWTToken, err))
 	}
 	token.TokenType = "urn:ietf:params:oauth:token-type:jwt"
 
