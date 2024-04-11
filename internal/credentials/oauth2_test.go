@@ -2,6 +2,7 @@ package credentials
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -60,7 +61,7 @@ func runTokenExchangeServer(
 		}
 		expectedParams := url.Values{}
 		expectedParams.Set("scope", "test_scope1 test_scope2")
-		expectedParams.Set("audience", "test_audiience")
+		expectedParams.Set("audience", "test_audience")
 		expectedParams.Set("grant_type", "urn:ietf:params:oauth:grant-type:token-exchange")
 		expectedParams.Set("requested_token_type", "urn:ietf:params:oauth:token-type:access_token")
 		expectedParams.Set("subject_token", "test_source_token")
@@ -178,7 +179,7 @@ func TestOauth2TokenExchange(t *testing.T) {
 
 		client, err := NewOauth2TokenExchangeCredentials(
 			WithTokenEndpoint("http://localhost:14321/exchange"),
-			WithAudience("test_audiience"),
+			WithAudience("test_audience"),
 			WithScope("test_scope1", "test_scope2"),
 			WithSubjectToken(NewFixedTokenSource("test_source_token", "urn:ietf:params:oauth:token-type:test_jwt")),
 		)
@@ -210,7 +211,7 @@ func TestOauth2TokenUpdate(t *testing.T) {
 
 	client, err := NewOauth2TokenExchangeCredentials(
 		WithTokenEndpoint("http://localhost:14322/exchange"),
-		WithAudience("test_audiience"),
+		WithAudience("test_audience"),
 		WithScope("test_scope1", "test_scope2"),
 		WithSubjectToken(NewFixedTokenSource("test_source_token", "urn:ietf:params:oauth:token-type:test_jwt")),
 	)
@@ -263,6 +264,61 @@ func TestOauth2TokenUpdate(t *testing.T) {
 	}
 }
 
+func TestWrongParameters(t *testing.T) {
+	_, err := NewOauth2TokenExchangeCredentials(
+		// No endpoint
+		WithSubjectToken(NewFixedTokenSource("test_source_token", "urn:ietf:params:oauth:token-type:test_jwt")),
+		WithRequestedTokenType("access_token"),
+	)
+	require.Error(t, err)
+}
+
+type errorTokenSource struct{}
+
+func (s *errorTokenSource) Token() (Token, error) {
+	return Token{"", ""}, errors.New("Test error")
+}
+
+func TestErrorInSourceToken(t *testing.T) {
+	client, err := NewOauth2TokenExchangeCredentials(
+		WithTokenEndpoint("http:trololo"),
+		WithGrantType("grant_type"),
+		WithRequestTimeout(time.Second),
+		WithResource("res"),
+		WithActorToken(&errorTokenSource{}),
+	)
+	require.NoError(t, err)
+
+	token, err := client.Token(context.Background())
+	require.Error(t, err)
+	require.Equal(t, "", token)
+
+	client, err = NewOauth2TokenExchangeCredentials(
+		WithTokenEndpoint("http:trololo"),
+		WithGrantType("grant_type"),
+		WithRequestTimeout(time.Second),
+		WithResource("res"),
+		WithSubjectToken(&errorTokenSource{}),
+	)
+	require.NoError(t, err)
+
+	token, err = client.Token(context.Background())
+	require.Error(t, err)
+	require.Equal(t, "", token)
+}
+
+func TestErrorInHTTPRequest(t *testing.T) {
+	client, err := NewOauth2TokenExchangeCredentials(
+		WithTokenEndpoint("http://invalid_host:42/exchange"),
+		WithSubjectToken(NewFixedTokenSource("test_source_token", "test_token_type")),
+	)
+	require.NoError(t, err)
+
+	token, err := client.Token(context.Background())
+	require.Error(t, err)
+	require.Equal(t, "", token)
+}
+
 func TestJWTTokenSource(t *testing.T) {
 	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(testPrivateKeyContent))
 	require.NoError(t, err)
@@ -297,4 +353,29 @@ func TestJWTTokenSource(t *testing.T) {
 	require.Equal(t, "test_audience", claims.Audience[0])
 	require.Equal(t, "key_id", parsedToken.Header["kid"].(string))
 	require.Equal(t, "RS256", parsedToken.Header["alg"].(string))
+}
+
+func TestJWTTokenBadParams(t *testing.T) {
+	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(testPrivateKeyContent))
+	require.NoError(t, err)
+
+	_, err = NewJWTTokenSource(
+		// no private key
+		WithKeyID("key_id"),
+		WithSigningMethod(jwt.SigningMethodRS256),
+		WithIssuer("test_issuer"),
+		WithAudience("test_audience"),
+		WithID("id"),
+	)
+	require.Error(t, err)
+
+	_, err = NewJWTTokenSource(
+		WithPrivateKey(privateKey),
+		WithKeyID("key_id"),
+		// no signing method
+		WithSubject("s"),
+		WithTokenTTL(time.Minute),
+		WithAudience("test_audience"),
+	)
+	require.Error(t, err)
 }

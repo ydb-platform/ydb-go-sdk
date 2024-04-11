@@ -15,22 +15,30 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 const (
-	DefaultRequestTimeout = time.Second * 10
-	DefaultJWTTokenTTL    = 3600 * time.Second
-	UpdateTimeDivider     = 2
+	defaultRequestTimeout = time.Second * 10
+	defaultJWTTokenTTL    = 3600 * time.Second
+	updateTimeDivider     = 2
+)
+
+var (
+	errEmptyTokenEndpointError = errors.New("OAuth2 token exchange: empty token endpoint")
+	errNoSigningMethodError    = errors.New("JWT token source: no signing method")
+	errNoPrivateKeyError       = errors.New("JWT token source: no private key")
 )
 
 type Oauth2TokenExchangeCredentialsOption interface {
-	ApplyOauth2CredentialsOption(c *Oauth2TokenExchange)
+	ApplyOauth2CredentialsOption(c *oauth2TokenExchange)
 }
 
 // TokenEndpoint
 type tokenEndpointOption string
 
-func (endpoint tokenEndpointOption) ApplyOauth2CredentialsOption(c *Oauth2TokenExchange) {
+func (endpoint tokenEndpointOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) {
 	c.tokenEndpoint = string(endpoint)
 }
 
@@ -41,7 +49,7 @@ func WithTokenEndpoint(endpoint string) tokenEndpointOption {
 // GrantType
 type grantTypeOption string
 
-func (grantType grantTypeOption) ApplyOauth2CredentialsOption(c *Oauth2TokenExchange) {
+func (grantType grantTypeOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) {
 	c.grantType = string(grantType)
 }
 
@@ -52,7 +60,7 @@ func WithGrantType(grantType string) grantTypeOption {
 // Resource
 type resourceOption string
 
-func (resource resourceOption) ApplyOauth2CredentialsOption(c *Oauth2TokenExchange) {
+func (resource resourceOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) {
 	c.resource = string(resource)
 }
 
@@ -63,7 +71,7 @@ func WithResource(resource string) resourceOption {
 // RequestedTokenType
 type requestedTokenTypeOption string
 
-func (requestedTokenType requestedTokenTypeOption) ApplyOauth2CredentialsOption(c *Oauth2TokenExchange) {
+func (requestedTokenType requestedTokenTypeOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) {
 	c.requestedTokenType = string(requestedTokenType)
 }
 
@@ -74,29 +82,29 @@ func WithRequestedTokenType(requestedTokenType string) requestedTokenTypeOption 
 // Audience
 type audienceOption []string
 
-func (audience audienceOption) ApplyOauth2CredentialsOption(c *Oauth2TokenExchange) {
-	c.audience = []string(audience)
+func (audience audienceOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) {
+	c.audience = audience
 }
 
 func WithAudience(audience ...string) audienceOption {
-	return audienceOption(audience)
+	return audience
 }
 
 // Scope
 type scopeOption []string
 
-func (scope scopeOption) ApplyOauth2CredentialsOption(c *Oauth2TokenExchange) {
-	c.scope = []string(scope)
+func (scope scopeOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) {
+	c.scope = scope
 }
 
 func WithScope(scope ...string) scopeOption {
-	return scopeOption(scope)
+	return scope
 }
 
 // RequestTimeout
 type requestTimeoutOption time.Duration
 
-func (timeout requestTimeoutOption) ApplyOauth2CredentialsOption(c *Oauth2TokenExchange) {
+func (timeout requestTimeoutOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) {
 	c.requestTimeout = time.Duration(timeout)
 }
 
@@ -109,7 +117,7 @@ type subjectTokenSourceOption struct {
 	source TokenSource
 }
 
-func (subjectToken *subjectTokenSourceOption) ApplyOauth2CredentialsOption(c *Oauth2TokenExchange) {
+func (subjectToken *subjectTokenSourceOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) {
 	c.subjectTokenSource = subjectToken.source
 }
 
@@ -122,7 +130,7 @@ type actorTokenSourceOption struct {
 	source TokenSource
 }
 
-func (actorToken *actorTokenSourceOption) ApplyOauth2CredentialsOption(c *Oauth2TokenExchange) {
+func (actorToken *actorTokenSourceOption) ApplyOauth2CredentialsOption(c *oauth2TokenExchange) {
 	c.actorTokenSource = actorToken.source
 }
 
@@ -130,7 +138,7 @@ func WithActorToken(actorToken TokenSource) *actorTokenSourceOption {
 	return &actorTokenSourceOption{actorToken}
 }
 
-type Oauth2TokenExchange struct {
+type oauth2TokenExchange struct {
 	tokenEndpoint string
 
 	// grant_type parameter
@@ -164,8 +172,12 @@ type Oauth2TokenExchange struct {
 
 func NewOauth2TokenExchangeCredentials(
 	opts ...Oauth2TokenExchangeCredentialsOption,
-) (*Oauth2TokenExchange, error) {
-	c := &Oauth2TokenExchange{}
+) (*oauth2TokenExchange, error) {
+	c := &oauth2TokenExchange{
+		grantType:          "urn:ietf:params:oauth:grant-type:token-exchange",
+		requestedTokenType: "urn:ietf:params:oauth:token-type:access_token",
+		requestTimeout:     defaultRequestTimeout,
+	}
 
 	for _, opt := range opts {
 		if opt != nil {
@@ -173,35 +185,14 @@ func NewOauth2TokenExchangeCredentials(
 		}
 	}
 
-	err := c.init()
-	if err != nil {
-		return nil, err
+	if c.tokenEndpoint == "" {
+		return nil, xerrors.WithStackTrace(errEmptyTokenEndpointError)
 	}
 
 	return c, nil
 }
 
-func (provider *Oauth2TokenExchange) init() error {
-	if provider.tokenEndpoint == "" {
-		return errors.New("OAuth2 token exchange: empty token endpoint")
-	}
-
-	if provider.grantType == "" {
-		provider.grantType = "urn:ietf:params:oauth:grant-type:token-exchange"
-	}
-
-	if provider.requestedTokenType == "" {
-		provider.requestedTokenType = "urn:ietf:params:oauth:token-type:access_token"
-	}
-
-	if provider.requestTimeout == 0 {
-		provider.requestTimeout = DefaultRequestTimeout
-	}
-
-	return nil
-}
-
-func (provider *Oauth2TokenExchange) getScopeParam() string {
+func (provider *oauth2TokenExchange) getScopeParam() string {
 	var scope string
 	if len(provider.scope) != 0 {
 		for _, s := range provider.scope {
@@ -217,7 +208,20 @@ func (provider *Oauth2TokenExchange) getScopeParam() string {
 	return scope
 }
 
-func (provider *Oauth2TokenExchange) getRequestParams() (string, error) {
+func (provider *oauth2TokenExchange) addTokenSrc(params *url.Values, src TokenSource, tName, tTypeName string) error {
+	if src != nil {
+		token, err := src.Token()
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+		params.Set(tName, token.Token)
+		params.Set(tTypeName, token.TokenType)
+	}
+
+	return nil
+}
+
+func (provider *oauth2TokenExchange) getRequestParams() (string, error) {
 	params := url.Values{}
 	params.Set("grant_type", provider.grantType)
 	if provider.resource != "" {
@@ -234,27 +238,21 @@ func (provider *Oauth2TokenExchange) getRequestParams() (string, error) {
 	}
 
 	params.Set("requested_token_type", provider.requestedTokenType)
-	if provider.subjectTokenSource != nil {
-		token, err := provider.subjectTokenSource.Token()
-		if err != nil {
-			return "", err
-		}
-		params.Set("subject_token", token.Token)
-		params.Set("subject_token_type", token.TokenType)
+
+	err := provider.addTokenSrc(&params, provider.subjectTokenSource, "subject_token", "subject_token_type")
+	if err != nil {
+		return "", xerrors.WithStackTrace(err)
 	}
-	if provider.actorTokenSource != nil {
-		token, err := provider.actorTokenSource.Token()
-		if err != nil {
-			return "", err
-		}
-		params.Set("actor_token", token.Token)
-		params.Set("actor_token_type", token.TokenType)
+
+	err = provider.addTokenSrc(&params, provider.actorTokenSource, "actor_token", "actor_token_type")
+	if err != nil {
+		return "", xerrors.WithStackTrace(err)
 	}
 
 	return params.Encode(), nil
 }
 
-func (provider *Oauth2TokenExchange) processTokenExchangeResponse(result *http.Response, now time.Time) error {
+func (provider *oauth2TokenExchange) processTokenExchangeResponse(result *http.Response, now time.Time) error {
 	var (
 		data []byte
 		err  error
@@ -262,7 +260,7 @@ func (provider *Oauth2TokenExchange) processTokenExchangeResponse(result *http.R
 	if result.Body != nil {
 		data, err = io.ReadAll(result.Body)
 		if err != nil {
-			return err
+			return xerrors.WithStackTrace(err)
 		}
 	} else {
 		data = make([]byte, 0)
@@ -281,7 +279,7 @@ func (provider *Oauth2TokenExchange) processTokenExchangeResponse(result *http.R
 		if err := json.Unmarshal(data, &parsedErrorResponse); err != nil {
 			description += ", could not parse response: " + err.Error()
 
-			return errors.New(description)
+			return xerrors.WithStackTrace(errors.New(description))
 		}
 
 		if parsedErrorResponse.ErrorName != "" {
@@ -296,7 +294,7 @@ func (provider *Oauth2TokenExchange) processTokenExchangeResponse(result *http.R
 			description += ", error_uri: " + parsedErrorResponse.ErrorURI
 		}
 
-		return errors.New(description)
+		return xerrors.WithStackTrace(errors.New(description))
 	}
 
 	//nolint:tagliatelle
@@ -308,21 +306,24 @@ func (provider *Oauth2TokenExchange) processTokenExchangeResponse(result *http.R
 	}
 	var parsedResponse response
 	if err := json.Unmarshal(data, &parsedResponse); err != nil {
-		return fmt.Errorf("OAuth2 token exchange: could not parse response: %w", err)
+		return xerrors.WithStackTrace(fmt.Errorf("OAuth2 token exchange: could not parse response: %w", err))
 	}
 
 	if !strings.EqualFold(parsedResponse.TokenType, "bearer") {
-		return fmt.Errorf("OAuth2 token exchange: unsupported token type: %q", parsedResponse.TokenType)
+		return xerrors.WithStackTrace(
+			fmt.Errorf("OAuth2 token exchange: unsupported token type: %q", parsedResponse.TokenType))
 	}
 
 	if parsedResponse.ExpiresIn <= 0 {
-		return fmt.Errorf("OAuth2 token exchange: incorrect expiration time: %d", parsedResponse.ExpiresIn)
+		return xerrors.WithStackTrace(
+			fmt.Errorf("OAuth2 token exchange: incorrect expiration time: %d", parsedResponse.ExpiresIn))
 	}
 
 	if parsedResponse.Scope != "" {
 		scope := provider.getScopeParam()
 		if parsedResponse.Scope != scope {
-			return fmt.Errorf("OAuth2 token exchange: got different scope. Expected %q, but got %q", scope, parsedResponse.Scope)
+			return xerrors.WithStackTrace(
+				fmt.Errorf("OAuth2 token exchange: got different scope. Expected %q, but got %q", scope, parsedResponse.Scope))
 		}
 	}
 
@@ -333,22 +334,22 @@ func (provider *Oauth2TokenExchange) processTokenExchangeResponse(result *http.R
 	expireDelta *= time.Second
 	provider.receivedTokenExpireTime = now.Add(expireDelta)
 
-	updateDelta := time.Duration(parsedResponse.ExpiresIn / UpdateTimeDivider)
+	updateDelta := time.Duration(parsedResponse.ExpiresIn / updateTimeDivider)
 	updateDelta *= time.Second
 	provider.updateTokenTime = now.Add(updateDelta)
 
 	return nil
 }
 
-func (provider *Oauth2TokenExchange) exchangeToken(ctx context.Context, now time.Time) error {
+func (provider *oauth2TokenExchange) exchangeToken(ctx context.Context, now time.Time) error {
 	body, err := provider.getRequestParams()
 	if err != nil {
-		return fmt.Errorf("OAuth2 token exchange: could not make http request: %w", err)
+		return xerrors.WithStackTrace(fmt.Errorf("OAuth2 token exchange: could not make http request: %w", err))
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, provider.tokenEndpoint, strings.NewReader(body))
 	if err != nil {
-		return fmt.Errorf("OAuth2 token exchange: could not make http request: %w", err)
+		return xerrors.WithStackTrace(fmt.Errorf("OAuth2 token exchange: could not make http request: %w", err))
 	}
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Content-Length", strconv.Itoa(len(body)))
@@ -361,7 +362,7 @@ func (provider *Oauth2TokenExchange) exchangeToken(ctx context.Context, now time
 
 	result, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("iam: could not exchange token: %w", err)
+		return xerrors.WithStackTrace(fmt.Errorf("OAuth2 token exchange: could not exchange token: %w", err))
 	}
 
 	defer result.Body.Close()
@@ -369,7 +370,7 @@ func (provider *Oauth2TokenExchange) exchangeToken(ctx context.Context, now time
 	return provider.processTokenExchangeResponse(result, now)
 }
 
-func (provider *Oauth2TokenExchange) exchangeTokenInBackgroud() {
+func (provider *oauth2TokenExchange) exchangeTokenInBackground() {
 	provider.mutex.Lock()
 	defer provider.mutex.Unlock()
 
@@ -384,28 +385,28 @@ func (provider *Oauth2TokenExchange) exchangeTokenInBackgroud() {
 	provider.updating.Store(false)
 }
 
-func (provider *Oauth2TokenExchange) checkBackgroudUpdate(now time.Time) {
+func (provider *oauth2TokenExchange) checkBackgroundUpdate(now time.Time) {
 	if provider.needUpdate(now) && !provider.updating.Load() {
 		if provider.updating.CompareAndSwap(false, true) {
-			go provider.exchangeTokenInBackgroud()
+			go provider.exchangeTokenInBackground()
 		}
 	}
 }
 
-func (provider *Oauth2TokenExchange) expired(now time.Time) bool {
+func (provider *oauth2TokenExchange) expired(now time.Time) bool {
 	return now.Compare(provider.receivedTokenExpireTime) > 0
 }
 
-func (provider *Oauth2TokenExchange) needUpdate(now time.Time) bool {
+func (provider *oauth2TokenExchange) needUpdate(now time.Time) bool {
 	return now.Compare(provider.updateTokenTime) > 0
 }
 
-func (provider *Oauth2TokenExchange) fastCheck(now time.Time) string {
+func (provider *oauth2TokenExchange) fastCheck(now time.Time) string {
 	provider.mutex.RLock()
 	defer provider.mutex.RUnlock()
 
 	if !provider.expired(now) {
-		provider.checkBackgroudUpdate(now)
+		provider.checkBackgroundUpdate(now)
 
 		return provider.receivedToken
 	}
@@ -413,7 +414,7 @@ func (provider *Oauth2TokenExchange) fastCheck(now time.Time) string {
 	return ""
 }
 
-func (provider *Oauth2TokenExchange) Token(ctx context.Context) (string, error) {
+func (provider *oauth2TokenExchange) Token(ctx context.Context) (string, error) {
 	now := time.Now()
 
 	token := provider.fastCheck(now)
@@ -448,33 +449,31 @@ type TokenSource interface {
 	Token() (Token, error)
 }
 
-type FixedTokenSource struct {
+type fixedTokenSource struct {
 	fixedToken Token
 }
 
-func (s *FixedTokenSource) Token() (Token, error) {
+func (s *fixedTokenSource) Token() (Token, error) {
 	return s.fixedToken, nil
 }
 
-func NewFixedTokenSource(token, tokenType string) *FixedTokenSource {
-	s := &FixedTokenSource{
+func NewFixedTokenSource(token, tokenType string) *fixedTokenSource {
+	return &fixedTokenSource{
 		fixedToken: Token{
 			Token:     token,
 			TokenType: tokenType,
 		},
 	}
-
-	return s
 }
 
 type JWTTokenSourceOption interface {
-	ApplyJWTTokenSourceOption(s *JWTTokenSource)
+	ApplyJWTTokenSourceOption(s *jwtTokenSource)
 }
 
 // Issuer
 type issuerOption string
 
-func (issuer issuerOption) ApplyJWTTokenSourceOption(s *JWTTokenSource) {
+func (issuer issuerOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) {
 	s.issuer = string(issuer)
 }
 
@@ -485,7 +484,7 @@ func WithIssuer(issuer string) issuerOption {
 // Subject
 type subjectOption string
 
-func (subject subjectOption) ApplyJWTTokenSourceOption(s *JWTTokenSource) {
+func (subject subjectOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) {
 	s.subject = string(subject)
 }
 
@@ -494,14 +493,14 @@ func WithSubject(subject string) subjectOption {
 }
 
 // Audience
-func (audience audienceOption) ApplyJWTTokenSourceOption(s *JWTTokenSource) {
-	s.audience = []string(audience)
+func (audience audienceOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) {
+	s.audience = audience
 }
 
 // ID
 type idOption string
 
-func (id idOption) ApplyJWTTokenSourceOption(s *JWTTokenSource) {
+func (id idOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) {
 	s.id = string(id)
 }
 
@@ -512,7 +511,7 @@ func WithID(id string) idOption {
 // TokenTTL
 type tokenTTLOption time.Duration
 
-func (ttl tokenTTLOption) ApplyJWTTokenSourceOption(s *JWTTokenSource) {
+func (ttl tokenTTLOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) {
 	s.tokenTTL = time.Duration(ttl)
 }
 
@@ -525,7 +524,7 @@ type signingMethodOption struct {
 	method jwt.SigningMethod
 }
 
-func (method *signingMethodOption) ApplyJWTTokenSourceOption(s *JWTTokenSource) {
+func (method *signingMethodOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) {
 	s.signingMethod = method.method
 }
 
@@ -536,7 +535,7 @@ func WithSigningMethod(method jwt.SigningMethod) *signingMethodOption {
 // KeyID
 type keyIDOption string
 
-func (id keyIDOption) ApplyJWTTokenSourceOption(s *JWTTokenSource) {
+func (id keyIDOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) {
 	s.keyID = string(id)
 }
 
@@ -549,7 +548,7 @@ type privateKeyOption struct {
 	key interface{}
 }
 
-func (key *privateKeyOption) ApplyJWTTokenSourceOption(s *JWTTokenSource) {
+func (key *privateKeyOption) ApplyJWTTokenSourceOption(s *jwtTokenSource) {
 	s.privateKey = key.key
 }
 
@@ -557,8 +556,10 @@ func WithPrivateKey(key interface{}) *privateKeyOption {
 	return &privateKeyOption{key}
 }
 
-func NewJWTTokenSource(opts ...JWTTokenSourceOption) (*JWTTokenSource, error) {
-	s := &JWTTokenSource{}
+func NewJWTTokenSource(opts ...JWTTokenSourceOption) (*jwtTokenSource, error) {
+	s := &jwtTokenSource{
+		tokenTTL: defaultJWTTokenTTL,
+	}
 
 	for _, opt := range opts {
 		if opt != nil {
@@ -566,15 +567,18 @@ func NewJWTTokenSource(opts ...JWTTokenSourceOption) (*JWTTokenSource, error) {
 		}
 	}
 
-	err := s.init()
-	if err != nil {
-		return nil, err
+	if s.signingMethod == nil {
+		return nil, xerrors.WithStackTrace(errNoSigningMethodError)
+	}
+
+	if s.privateKey == nil {
+		return nil, xerrors.WithStackTrace(errNoPrivateKeyError)
 	}
 
 	return s, nil
 }
 
-type JWTTokenSource struct {
+type jwtTokenSource struct {
 	signingMethod jwt.SigningMethod
 	keyID         string
 	privateKey    interface{} // symmetric key in case of symmetric algorithm
@@ -587,23 +591,7 @@ type JWTTokenSource struct {
 	tokenTTL time.Duration
 }
 
-func (s *JWTTokenSource) init() error {
-	if s.signingMethod == nil {
-		return errors.New("JWT token source: no signing method")
-	}
-
-	if s.privateKey == nil {
-		return errors.New("JWT token source: no private key")
-	}
-
-	if s.tokenTTL == 0 {
-		s.tokenTTL = DefaultJWTTokenTTL
-	}
-
-	return nil
-}
-
-func (s *JWTTokenSource) Token() (Token, error) {
+func (s *jwtTokenSource) Token() (Token, error) {
 	var (
 		now    = time.Now()
 		issued = jwt.NewNumericDate(now.UTC())
@@ -630,7 +618,7 @@ func (s *JWTTokenSource) Token() (Token, error) {
 	var token Token
 	token.Token, err = t.SignedString(s.privateKey)
 	if err != nil {
-		return token, fmt.Errorf("JWTTokenSource: could not sign jwt token: %w", err)
+		return token, xerrors.WithStackTrace(fmt.Errorf("JWT token source: could not sign jwt token: %w", err))
 	}
 	token.TokenType = "urn:ietf:params:oauth:token-type:jwt"
 
