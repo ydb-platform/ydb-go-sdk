@@ -60,245 +60,68 @@ func TestFromBytes(t *testing.T) {
 	}
 }
 
-func TestShouldRoundUp(t *testing.T) {
-	tests := []struct {
-		name             string
-		number           *big.Int
-		additionalDigits string
-		expected         bool
-	}{
-		{
-			name:             "Last digit not zero, no string",
-			number:           big.NewInt(123),
-			additionalDigits: "",
-			expected:         true,
-		},
-		{
-			name:             "Last digit zero, string starts not with zero",
-			number:           big.NewInt(120),
-			additionalDigits: "1",
-			expected:         true,
-		},
-		{
-			name:             "Last digit zero, string all zeros",
-			number:           big.NewInt(120),
-			additionalDigits: "000",
-			expected:         false,
-		},
-		{
-			name:             "Last digit not zero, string irrelevant",
-			number:           big.NewInt(123),
-			additionalDigits: "004",
-			expected:         true,
-		},
-		{
-			name:             "Last digit zero, string has non-zero after zeros",
-			number:           big.NewInt(100),
-			additionalDigits: "001",
-			expected:         true,
-		},
-		{
-			name:             "Last digit zero, string has non-digit characters",
-			number:           big.NewInt(100),
-			additionalDigits: "00abc",
-			expected:         false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := shouldRoundUp(tt.number, tt.additionalDigits)
-			require.Equal(t, tt.expected, result)
-		})
-	}
-}
-
-func TestParseSign(t *testing.T) {
+func TestSetSpecialValue(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       string
+		expectedS   string
 		expectedNeg bool
-		expectedRem string
+		expectedV   *big.Int
 	}{
 		{
-			name:        "Negative sign",
-			input:       "-123",
+			name:        "Positive infinity",
+			input:       "inf",
+			expectedS:   "inf",
+			expectedNeg: false,
+			expectedV:   inf,
+		},
+		{
+			name:        "Negative infinity",
+			input:       "-inf",
+			expectedS:   "inf",
 			expectedNeg: true,
-			expectedRem: "123",
+			expectedV:   neginf,
 		},
 		{
-			name:        "Positive sign",
-			input:       "+456",
+			name:        "Positive NaN",
+			input:       "nan",
+			expectedS:   "nan",
 			expectedNeg: false,
-			expectedRem: "456",
+			expectedV:   nan,
 		},
 		{
-			name:        "No sign",
-			input:       "789",
-			expectedNeg: false,
-			expectedRem: "789",
+			name:        "Negative NaN",
+			input:       "-nan",
+			expectedS:   "nan",
+			expectedNeg: true,
+			expectedV:   negnan,
 		},
 		{
-			name:        "Empty string",
-			input:       "",
+			name:        "Regular number",
+			input:       "123",
+			expectedS:   "123",
 			expectedNeg: false,
-			expectedRem: "",
+			expectedV:   nil,
+		},
+		{
+			name:        "Negative regular number",
+			input:       "-123",
+			expectedS:   "123",
+			expectedNeg: true,
+			expectedV:   nil,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			neg, rem := parseSign(tt.input)
-			require.Equal(t, tt.expectedNeg, neg, "Neg flag does not match expected value")
-			require.Equal(t, tt.expectedRem, rem, "Remaining string does not match expected value")
-		})
-	}
-}
-
-func TestParseNumber(t *testing.T) {
-	tests := []struct {
-		name            string
-		s               string
-		initialValue    *big.Int
-		initialIntegral uint32
-		initialScale    uint32
-		expectedValue   *big.Int
-		expectedRemain  string
-		expectError     bool
-	}{
-		{
-			name:            "Parse integer",
-			s:               "123",
-			initialValue:    big.NewInt(0),
-			initialIntegral: 3,
-			initialScale:    0,
-			expectedValue:   big.NewInt(123),
-			expectedRemain:  "",
-			expectError:     false,
-		},
-		{
-			name:            "Parse floating point",
-			s:               "123.45",
-			initialValue:    big.NewInt(0),
-			initialIntegral: 3,
-			initialScale:    2,
-			expectedValue:   big.NewInt(12345),
-			expectedRemain:  "",
-			expectError:     false,
-		},
-		{
-			name:            "Non-digit character",
-			s:               "123x45",
-			initialValue:    big.NewInt(0),
-			initialIntegral: 3,
-			initialScale:    2,
-			expectedValue:   nil,
-			expectedRemain:  "",
-			expectError:     true,
-		},
-		{
-			name:            "Multiple dots",
-			s:               "123.45.67",
-			initialValue:    big.NewInt(0),
-			initialIntegral: 3,
-			initialScale:    2,
-			expectedValue:   nil,
-			expectedRemain:  "",
-			expectError:     true,
-		},
-		{
-			name:            "Early termination by integral",
-			s:               "12345",
-			initialValue:    big.NewInt(0),
-			initialIntegral: 3,
-			initialScale:    0,
-			expectedValue:   big.NewInt(123),
-			expectedRemain:  "45",
-			expectError:     false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			integral := tt.initialIntegral
-			scale := tt.initialScale
-			remain, err := parseNumber(tt.s, tt.initialValue, integral, scale)
-
-			if tt.expectError {
-				require.Error(t, err)
+			v := big.NewInt(0)
+			gotS, gotNeg, gotV := setSpecialValue(tt.input, v)
+			require.Equal(t, tt.expectedS, gotS)
+			require.Equal(t, tt.expectedNeg, gotNeg)
+			if tt.expectedV != nil {
+				require.Equal(t, 0, tt.expectedV.Cmp(gotV))
 			} else {
-				require.NoError(t, err)
-				require.Equal(t, tt.expectedValue, tt.initialValue)
-				require.Equal(t, tt.expectedRemain, remain)
-			}
-		})
-	}
-}
-
-func TestHandleRemainingDigits(t *testing.T) {
-	tests := []struct {
-		value       *big.Int
-		expected    *big.Int
-		name        string
-		inputString string
-		precision   uint32
-		expectErr   bool
-	}{
-		{
-			name:        "No rounding needed",
-			inputString: "4",
-			value:       big.NewInt(1),
-			precision:   3,
-			expected:    big.NewInt(1),
-			expectErr:   false,
-		},
-		{
-			name:        "Rounding up needed",
-			inputString: "6",
-			value:       big.NewInt(1),
-			precision:   3,
-			expected:    big.NewInt(2),
-			expectErr:   false,
-		},
-		{
-			name:        "Exactly halfway - assume round up for test",
-			inputString: "50",
-			value:       big.NewInt(1),
-			precision:   3,
-			expected:    big.NewInt(2),
-			expectErr:   false,
-		},
-		{
-			name:        "Invalid character",
-			inputString: "a",
-			value:       big.NewInt(1),
-			precision:   3,
-			expected:    nil,
-			expectErr:   true,
-		},
-		{
-			name:        "Exceeds precision limit - set to inf",
-			inputString: "9",         // Triggers rounding that should exceed precision
-			value:       pow(ten, 2), // Set v close to precision limit
-			precision:   2,           // Precision limit
-			expected:    inf,         // Expected to be set to inf
-			expectErr:   false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := handleRemainingDigits(tt.inputString, tt.value, tt.precision)
-
-			if tt.expectErr {
-				require.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				if tt.expected.Cmp(inf) == 0 {
-					require.Equal(t, 0, tt.expected.Cmp(tt.value), "v should be set to inf")
-				} else {
-					require.Equal(t, tt.expected.String(), tt.value.String(), "Expected and actual values should match")
-				}
+				require.Nil(t, gotV)
 			}
 		})
 	}
@@ -340,10 +163,76 @@ func TestPrepareValue(t *testing.T) {
 	}
 }
 
-func TestInitializeBuffer(t *testing.T) {
-	bts, pos := newStringBuffer()
-	require.Len(t, bts, 40)
-	require.Equal(t, 40, pos)
+func TestParseNumber(t *testing.T) {
+	// Mock or define these as per your actual implementation.
+	tests := []struct {
+		name      string
+		s         string
+		wantValue *big.Int
+		precision uint32
+		scale     uint32
+		neg       bool
+		wantErr   bool
+	}{
+		{
+			name:      "Valid number without decimal",
+			s:         "123",
+			precision: 3,
+			scale:     0,
+			neg:       false,
+			wantValue: big.NewInt(123),
+			wantErr:   false,
+		},
+		{
+			name:      "Valid number with decimal",
+			s:         "123.45",
+			precision: 5,
+			scale:     2,
+			neg:       false,
+			wantValue: big.NewInt(12345),
+			wantErr:   false,
+		},
+		{
+			name:      "Valid negative number",
+			s:         "123",
+			precision: 3,
+			scale:     0,
+			neg:       true,
+			wantValue: big.NewInt(-123),
+			wantErr:   false,
+		},
+		{
+			name:      "Syntax error with non-digit",
+			s:         "123a",
+			precision: 4,
+			scale:     0,
+			neg:       false,
+			wantValue: nil,
+			wantErr:   true,
+		},
+		{
+			name:      "Multiple decimal points",
+			s:         "12.3.4",
+			precision: 5,
+			scale:     2,
+			neg:       false,
+			wantValue: nil,
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := big.NewInt(0)
+			gotValue, gotErr := parseNumber(tt.s, v, tt.precision, tt.scale, tt.neg)
+			if tt.wantErr {
+				require.Error(t, gotErr)
+			} else {
+				require.NoError(t, gotErr)
+				require.Equal(t, 0, tt.wantValue.Cmp(gotValue))
+			}
+		})
+	}
 }
 
 func uint128(hi, lo uint64) []byte {
