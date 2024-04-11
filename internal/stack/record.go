@@ -99,6 +99,7 @@ func (c call) Record(opts ...recordOption) string {
 			opt(&optionsHolder)
 		}
 	}
+
 	name, file := extractName(c.function, c.file)
 	fnDetails := parseFunctionName(name)
 

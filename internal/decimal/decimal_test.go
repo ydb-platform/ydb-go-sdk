@@ -246,8 +246,8 @@ func uint128(hi, lo uint64) []byte {
 func uint128s(lo uint64) []byte {
 	return uint128(0, lo)
 }
-func TestParse(t *testing.T) {
 
+func TestParse(t *testing.T) {
 	tests := []struct {
 		name      string
 		s         string
@@ -273,7 +273,6 @@ func TestParse(t *testing.T) {
 			}
 		})
 	}
-
 }
 
 func FuzzParse(f *testing.F) {
