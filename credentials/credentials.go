@@ -36,6 +36,7 @@ func NewStaticCredentials(
 }
 
 // NewOauth2TokenExchangeCredentials makes OAuth 2.0 token exchange protocol credentials object
+// https://www.rfc-editor.org/rfc/rfc8693
 func NewOauth2TokenExchangeCredentials(
 	opts ...credentials.Oauth2TokenExchangeCredentialsOption,
 ) (Credentials, error) {
