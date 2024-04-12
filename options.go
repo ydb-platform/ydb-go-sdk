@@ -54,6 +54,19 @@ func WithAccessTokenCredentials(accessToken string) Option {
 	)
 }
 
+// WithOauth2TokenExchangeCredentials adds credentials that exchange token using
+// OAuth 2.0 token exchange protocol:
+// https://www.rfc-editor.org/rfc/rfc8693
+func WithOauth2TokenExchangeCredentials(
+	opts ...credentials.Oauth2TokenExchangeCredentialsOption,
+) Option {
+	opts = append(opts, credentials.WithSourceInfo("ydb.WithOauth2TokenExchangeCredentials(opts)"))
+
+	return WithCreateCredentialsFunc(func(context.Context) (credentials.Credentials, error) {
+		return credentials.NewOauth2TokenExchangeCredentials(opts...)
+	})
+}
+
 // WithApplicationName add provided application name to all api requests
 func WithApplicationName(applicationName string) Option {
 	return func(ctx context.Context, c *Driver) error {
