@@ -1,4 +1,3 @@
-## v3.65.0
 * Supported OAuth 2.0 Token Exchange credentials provider
 
 ## v3.64.0
