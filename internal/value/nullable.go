@@ -307,66 +307,77 @@ func Nullable(t types.Type, v interface{}) Value {
 		if !ok {
 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeBool", tt))
 		}
+
 		return NullableBoolValue(tt)
 	case types.Int8:
 		tt, ok := v.(*int8)
 		if !ok {
 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeBool", tt))
 		}
+
 		return NullableInt8Value(tt)
 	case types.Uint8:
 		tt, ok := v.(*uint8)
 		if !ok {
 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeUint8", tt))
 		}
+
 		return NullableUint8Value(tt)
 	case types.Int16:
 		tt, ok := v.(*int16)
 		if !ok {
 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeInt16", tt))
 		}
+
 		return NullableInt16Value(tt)
 	case types.Uint16:
 		tt, ok := v.(*uint16)
 		if !ok {
 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeUint16", tt))
 		}
+
 		return NullableUint16Value(tt)
 	case types.Int32:
 		tt, ok := v.(*int32)
 		if !ok {
 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeInt32", tt))
 		}
+
 		return NullableInt32Value(tt)
 	case types.Uint32:
 		tt, ok := v.(*uint32)
 		if !ok {
 			panic(fmt.Sprintf("unsupported type conversion from %T to Uint32", tt))
 		}
+
 		return NullableUint32Value(tt)
 	case types.Int64:
 		tt, ok := v.(*int64)
 		if !ok {
 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeInt64", tt))
 		}
+
 		return NullableInt64Value(tt)
 	case types.Uint64:
 		tt, ok := v.(*uint64)
 		if !ok {
 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeUint64", tt))
 		}
+
 		return NullableUint64Value(tt)
 	case types.Float:
 		tt, ok := v.(*float32)
 		if !ok {
 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeFloat", tt))
 		}
+
 		return NullableFloatValue(tt)
 	case types.Double:
 		tt, ok := v.(*float64)
 		if !ok {
 			panic(fmt.Sprintf("unsupported type conversion from %T to TypeDouble", tt))
 		}
+
 		return NullableDoubleValue(tt)
 	case types.Date:
 		switch tt := v.(type) {

@@ -24,5 +24,6 @@ func Buffer() *buffer {
 	if !ok {
 		panic(fmt.Sprintf("unsupported type conversion from %T to *buffer", val))
 	}
+
 	return val
 }

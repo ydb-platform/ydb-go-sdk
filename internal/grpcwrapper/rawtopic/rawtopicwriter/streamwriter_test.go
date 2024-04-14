@@ -73,10 +73,13 @@ func TestSendWriteRequest(t *testing.T) {
 		}
 
 		getWriteRequest := func(req *Ydb_Topic.StreamWriteMessage_FromClient) *Ydb_Topic.StreamWriteMessage_WriteRequest {
+			//nolint:protogetter
 			res, ok := req.ClientMessage.(*Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest)
 			if !ok {
-				panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest", res))
+				panic(fmt.Sprintf(`unsupported type conversion from %T to 
+				*Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest`, res))
 			}
+
 			return res.WriteRequest
 		}
 

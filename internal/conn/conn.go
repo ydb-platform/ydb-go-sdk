@@ -569,6 +569,7 @@ func getContextMark(ctx context.Context) *modificationMark {
 	if !ok {
 		panic(fmt.Sprintf("unsupported type conversion from %T to *modificationMark", val))
 	}
+
 	return val
 }
 
