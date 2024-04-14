@@ -55,8 +55,21 @@ func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (yql string, 
 					fmt.Errorf("%w: $%d, len(args) = %d", ErrInconsistentArgs, p, len(args)),
 				)
 			}
-			paramIndex := int(p - 1)
-			buffer.WriteString(newArgs[paramIndex].(table.ParameterOption).Name())
+			paramName := "$p" + strconv.Itoa(int(p-1)) //nolint:goconst
+			if newArgs[p-1] == nil {
+				param, err = toYdbParam(paramName, args[p-1])
+				if err != nil {
+					return "", nil, xerrors.WithStackTrace(err)
+				}
+				newArgs[p-1] = param
+				buffer.WriteString(param.Name())
+			} else {
+				val, ok := newArgs[p-1].(table.ParameterOption)
+				if !ok {
+					panic(fmt.Sprintf("unsupported type conversion from %T to table.ParameterOption", val))
+				}
+				buffer.WriteString(val.Name())
+			}
 		}
 	}
 
