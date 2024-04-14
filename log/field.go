@@ -93,6 +93,7 @@ func (f Field) StringsValue() []string {
 	if !ok {
 		panic(fmt.Sprintf("unsupported type conversion from %T to []string", val))
 	}
+
 	return val
 }
 
@@ -106,6 +107,7 @@ func (f Field) ErrorValue() error {
 	if !ok {
 		panic(fmt.Sprintf("unsupported type conversion from %T to error", val))
 	}
+
 	return val
 }
 
@@ -145,6 +147,7 @@ func (f Field) Stringer() fmt.Stringer {
 	if !ok {
 		panic(fmt.Sprintf("unsupported type conversion from %T to fmt.Stringer", val))
 	}
+
 	return val
 }
 
