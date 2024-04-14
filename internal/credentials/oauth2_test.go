@@ -400,8 +400,19 @@ func TestJWTTokenSource(t *testing.T) {
 	require.NoError(t, parsedToken.Claims.Valid())
 	require.Equal(t, "test_issuer", claims.Issuer)
 	require.Equal(t, "test_audience", claims.Audience[0])
-	require.Equal(t, "key_id", parsedToken.Header["kid"].(string))
-	require.Equal(t, "RS256", parsedToken.Header["alg"].(string))
+
+	val, ok := parsedToken.Header["kid"].(string)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to string", val))
+	}
+	require.Equal(t, "key_id", val)
+
+	val, ok = parsedToken.Header["alg"].(string)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to string", val))
+	}
+	require.Equal(t, "RS256", val)
+
 }
 
 func TestJWTTokenBadParams(t *testing.T) {

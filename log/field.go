@@ -89,8 +89,11 @@ func (f Field) StringsValue() []string {
 	if f.vany == nil {
 		return nil
 	}
-
-	return f.vany.([]string)
+	val, ok := f.vany.([]string)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to []string", val))
+	}
+	return val
 }
 
 // ErrorValue is a value getter for fields with ErrorType type
@@ -99,8 +102,11 @@ func (f Field) ErrorValue() error {
 	if f.vany == nil {
 		return nil
 	}
-
-	return f.vany.(error)
+	val, ok := f.vany.(error)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to error", val))
+	}
+	return val
 }
 
 // AnyValue is a value getter for fields with AnyType type
@@ -135,8 +141,11 @@ func (f Field) Stringer() fmt.Stringer {
 	if f.vany == nil {
 		return nil
 	}
-
-	return f.vany.(fmt.Stringer)
+	val, ok := f.vany.(fmt.Stringer)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to fmt.Stringer", val))
+	}
+	return val
 }
 
 // Panics on type mismatch
@@ -161,7 +170,15 @@ func (f Field) String() string {
 	case StringsType:
 		return fmt.Sprintf("%v", f.StringsValue())
 	case ErrorType:
-		if f.vany == nil || f.vany.(error) == nil {
+		val, ok := f.vany.(error)
+		if val == nil {
+			return "<nil>"
+		}
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to error", val))
+		}
+
+		if f.vany == nil {
 			return "<nil>"
 		}
 

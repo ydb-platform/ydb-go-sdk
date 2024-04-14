@@ -3,6 +3,7 @@ package topicreaderinternal
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -231,7 +232,11 @@ func TestCommitterBuffer(t *testing.T) {
 		c.clock = clock
 		c.BufferTimeLagTrigger = time.Second
 		c.send = func(msg rawtopicreader.ClientMessage) error {
-			commitMess := msg.(*rawtopicreader.CommitOffsetRequest)
+			commitMess, ok := msg.(*rawtopicreader.CommitOffsetRequest)
+			if !ok {
+				panic(fmt.Sprintf("unsupported type conversion from %T to *rawtopicreader.CommitOffsetRequest", commitMess))
+			}
+
 			require.Len(t, commitMess.CommitOffsets, 2)
 			close(sendCalled)
 
@@ -264,7 +269,10 @@ func TestCommitterBuffer(t *testing.T) {
 		c.BufferTimeLagTrigger = time.Second // for prevent send
 		c.BufferCountTrigger = 2
 		c.send = func(msg rawtopicreader.ClientMessage) error {
-			commitMess := msg.(*rawtopicreader.CommitOffsetRequest)
+			commitMess, ok := msg.(*rawtopicreader.CommitOffsetRequest)
+			if !ok {
+				panic(fmt.Sprintf("unsupported type conversion from %T to *rawtopicreader.CommitOffsetRequest", commitMess))
+			}
 			require.Len(t, commitMess.CommitOffsets, 4)
 			close(sendCalled)
 
@@ -299,7 +307,10 @@ func TestCommitterBuffer(t *testing.T) {
 		c.BufferTimeLagTrigger = time.Second // for prevent send
 		c.BufferCountTrigger = 4
 		c.send = func(msg rawtopicreader.ClientMessage) error {
-			commitMess := msg.(*rawtopicreader.CommitOffsetRequest)
+			commitMess, ok := msg.(*rawtopicreader.CommitOffsetRequest)
+			if !ok {
+				panic(fmt.Sprintf("unsupported type conversion from %T to *rawtopicreader.CommitOffsetRequest", commitMess))
+			}
 			require.Len(t, commitMess.CommitOffsets, 4)
 			close(sendCalled)
 

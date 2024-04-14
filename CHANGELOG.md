@@ -1,3 +1,5 @@
+* Added type assertion checks to enhance type safety and prevent unexpected panics in critical sections of the codebase
+
 ## v3.65.0
 * Supported OAuth 2.0 Token Exchange credentials provider
 

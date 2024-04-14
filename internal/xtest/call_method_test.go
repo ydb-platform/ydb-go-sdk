@@ -2,6 +2,7 @@ package xtest
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,7 +12,10 @@ func TestCallMethod(t *testing.T) {
 	object := bytes.NewBuffer(nil)
 
 	result := CallMethod(object, "WriteString", "Hello world!")
-	n := result[0].(int)
+	n, ok := result[0].(int)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to int", n))
+	}
 	err := result[1]
 
 	require.Equal(t, 12, n)

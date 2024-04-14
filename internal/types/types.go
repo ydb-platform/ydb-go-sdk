@@ -823,7 +823,12 @@ func (v *VariantStruct) ToYDB(a *allocator.Allocator) *Ydb.Type {
 	typeVariant.VariantType = a.Variant()
 
 	structItems := a.VariantStructItems()
-	structItems.StructItems = v.Struct.ToYDB(a).GetType().(*Ydb.Type_StructType).StructType
+
+	val, ok := v.Struct.ToYDB(a).GetType().(*Ydb.Type_StructType)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Type_StructType", val))
+	}
+	structItems.StructItems = val.StructType
 
 	typeVariant.VariantType.Type = structItems
 
@@ -876,7 +881,12 @@ func (v *VariantTuple) ToYDB(a *allocator.Allocator) *Ydb.Type {
 	typeVariant.VariantType = a.Variant()
 
 	tupleItems := a.VariantTupleItems()
-	tupleItems.TupleItems = v.Tuple.ToYDB(a).GetType().(*Ydb.Type_TupleType).TupleType
+
+	val, ok := v.Tuple.ToYDB(a).GetType().(*Ydb.Type_TupleType)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Type_TupleType", val))
+	}
+	tupleItems.TupleItems = val.TupleType
 
 	typeVariant.VariantType.Type = tupleItems
 

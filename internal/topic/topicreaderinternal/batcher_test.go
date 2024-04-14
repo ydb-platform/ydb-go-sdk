@@ -3,6 +3,7 @@ package topicreaderinternal
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -339,10 +340,15 @@ func TestBatcherConcurency(t *testing.T) {
 		for i := 0; i < count; i++ {
 			res, err := b.Pop(ctx, batcherGetOptions{MinCount: 1})
 			require.NoError(tb, err)
+
+			val, ok := res.RawMessage.(*rawtopicreader.StartPartitionSessionRequest)
+			if !ok {
+				panic(fmt.Sprintf("unsupported type conversion from %T to *rawtopicreader.StartPartitionSessionRequest", val))
+			}
 			require.Equal(
 				tb,
 				rawtopicreader.NewOffset(int64(i)),
-				res.RawMessage.(*rawtopicreader.StartPartitionSessionRequest).CommittedOffset,
+				val.CommittedOffset,
 			)
 		}
 	})
