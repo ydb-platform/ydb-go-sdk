@@ -287,11 +287,11 @@ func TestNewStreamWithRecvFirstResultSet(t *testing.T) {
 				require.True(t, err == io.EOF) //nolint:errorlint,testifylint
 				require.Equal(t, 1001, tt.recvCounter)
 
-				val, ok = result.(*streamResult)
+				valC, ok := result.(*streamResult)
 				if !ok {
-					panic(fmt.Sprintf("unsupported type conversion from %T to *streamResult", val))
+					panic(fmt.Sprintf("unsupported type conversion from %T to *streamResult", valC))
 				}
-				require.Equal(t, 1002, int(val.nextResultSetCounter.Load()))
+				require.Equal(t, 1002, int(valC.nextResultSetCounter.Load()))
 			}
 		})
 	}
