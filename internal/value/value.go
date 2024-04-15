@@ -1260,6 +1260,10 @@ func (v pgValue) toYDB(_ *allocator.Allocator) *Ydb.Value {
 		Value: &Ydb.Value_TextValue{
 			TextValue: v.val,
 		},
+		Items:        nil,
+		Pairs:        nil,
+		VariantIndex: 0,
+		High_128:     0,
 	}
 }
 
@@ -2227,7 +2231,11 @@ func (v voidValue) Yql() string {
 var (
 	_voidValueType = types.Void{}
 	_voidValue     = &Ydb.Value{
-		Value: new(Ydb.Value_NullFlagValue),
+		Value:        new(Ydb.Value_NullFlagValue),
+		Items:        nil,
+		Pairs:        nil,
+		VariantIndex: 0,
+		High_128:     0,
 	}
 )
 
@@ -2382,19 +2390,23 @@ func ZeroValue(t types.Type) Value {
 
 	case *types.List, *types.EmptyList:
 		return &listValue{
-			t: t,
+			t:     t,
+			items: nil,
 		}
 	case *types.Set:
 		return &setValue{
-			t: t,
+			t:     t,
+			items: nil,
 		}
 	case *types.Dict:
 		return &dictValue{
-			t: t.ValueType(),
+			t:      t.ValueType(),
+			values: nil,
 		}
 	case *types.EmptyDict:
 		return &dictValue{
-			t: t,
+			t:      t,
+			values: nil,
 		}
 	case *types.Tuple:
 		return TupleValue(func() []Value {
