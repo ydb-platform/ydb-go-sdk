@@ -11,7 +11,11 @@ import (
 func WithTimeout(ctx context.Context, t time.Duration) (context.Context, context.CancelFunc) {
 	childCtx := &timeoutCtx{
 		parentCtx: ctx,
+		ctx:       nil,
+		ctxCancel: nil,
 		from:      stack.Record(1),
+		m:         sync.Mutex{},
+		err:       nil,
 	}
 	childCtx.ctx, childCtx.ctxCancel = context.WithTimeout(ctx, t)
 
