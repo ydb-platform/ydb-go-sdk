@@ -235,11 +235,13 @@ func (c *Config) DeleteTimeout() time.Duration {
 
 func defaults() *Config {
 	return &Config{
+		Common:               config.Common{},
 		sizeLimit:            DefaultSessionPoolSizeLimit,
 		createSessionTimeout: DefaultSessionPoolCreateSessionTimeout,
 		deleteTimeout:        DefaultSessionPoolDeleteTimeout,
 		idleThreshold:        DefaultSessionPoolIdleThreshold,
 		clock:                clockwork.NewRealClock(),
-		trace:                &trace.Table{},
+		ignoreTruncated:      false,
+		trace:                new(trace.Table),
 	}
 }

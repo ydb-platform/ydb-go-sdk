@@ -56,8 +56,9 @@ func (s *valueScanner) Columns(it func(options.Column)) {
 	}
 	for _, m := range s.set.GetColumns() {
 		it(options.Column{
-			Name: m.GetName(),
-			Type: internalTypes.TypeFromYDB(m.GetType()),
+			Name:   m.GetName(),
+			Type:   internalTypes.TypeFromYDB(m.GetType()),
+			Family: "",
 		})
 	}
 }
@@ -511,12 +512,20 @@ func (s *valueScanner) unwrapValue() (v *Ydb.Value) {
 
 func (s *valueScanner) unwrapDecimal() decimal.Decimal {
 	if s.Err() != nil {
-		return decimal.Decimal{}
+		return decimal.Decimal{
+			Bytes:     [16]byte{},
+			Precision: 0,
+			Scale:     0,
+		}
 	}
 	s.unwrap()
 	d := s.assertTypeDecimal(s.stack.current().t)
 	if d == nil {
-		return decimal.Decimal{}
+		return decimal.Decimal{
+			Bytes:     [16]byte{},
+			Precision: 0,
+			Scale:     0,
+		}
 	}
 
 	return decimal.Decimal{
@@ -1131,7 +1140,11 @@ func (s *valueScanner) setDefaultValue(dst interface{}) {
 	case *value.Value:
 		*v = s.value()
 	case *decimal.Decimal:
-		*v = decimal.Decimal{}
+		*v = decimal.Decimal{
+			Bytes:     [16]byte{},
+			Precision: 0,
+			Scale:     0,
+		}
 	case sql.Scanner:
 		err := v.Scan(nil)
 		if err != nil {

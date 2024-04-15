@@ -344,9 +344,10 @@ func (s *rawConverter) ListItem(i int) {
 	}
 	if t := s.assertTypeList(p.t); t != nil {
 		s.stack.set(item{
-			i: i,
-			t: t.ListType.GetItem(),
-			v: p.v.GetItems()[i],
+			name: "",
+			i:    i,
+			t:    t.ListType.GetItem(),
+			v:    p.v.GetItems()[i],
 		})
 	}
 }
@@ -383,9 +384,10 @@ func (s *rawConverter) TupleItem(i int) {
 	}
 	if t := s.assertTypeTuple(p.t); t != nil {
 		s.stack.set(item{
-			i: i,
-			t: t.TupleType.GetElements()[i],
-			v: p.v.GetItems()[i],
+			name: "",
+			i:    i,
+			t:    t.TupleType.GetElements()[i],
+			v:    p.v.GetItems()[i],
 		})
 	}
 }
@@ -466,9 +468,10 @@ func (s *rawConverter) DictKey(i int) {
 	}
 	if t := s.assertTypeDict(p.t); t != nil {
 		s.stack.set(item{
-			i: i,
-			t: t.DictType.GetKey(),
-			v: p.v.GetPairs()[i].GetKey(),
+			name: "",
+			i:    i,
+			t:    t.DictType.GetKey(),
+			v:    p.v.GetPairs()[i].GetKey(),
 		})
 	}
 }
@@ -483,9 +486,10 @@ func (s *rawConverter) DictPayload(i int) {
 	}
 	if t := s.assertTypeDict(p.t); t != nil {
 		s.stack.set(item{
-			i: i,
-			t: t.DictType.GetPayload(),
-			v: p.v.GetPairs()[i].GetPayload(),
+			name: "",
+			i:    i,
+			t:    t.DictType.GetPayload(),
+			v:    p.v.GetPairs()[i].GetPayload(),
 		})
 	}
 }
@@ -541,6 +545,7 @@ func (s *rawConverter) Unwrap() {
 	s.stack.enter()
 	s.stack.set(item{
 		name: "*",
+		i:    0,
 		t:    t.OptionalType.GetItem(),
 		v:    v,
 	})
@@ -560,12 +565,20 @@ func (s *rawConverter) Decimal(t types.Type) (v [16]byte) {
 
 func (s *rawConverter) UnwrapDecimal() decimal.Decimal {
 	if s.Err() != nil {
-		return decimal.Decimal{}
+		return decimal.Decimal{
+			Bytes:     [16]byte{},
+			Precision: 0,
+			Scale:     0,
+		}
 	}
 	s.unwrap()
 	d := s.assertTypeDecimal(s.stack.current().t)
 	if d == nil {
-		return decimal.Decimal{}
+		return decimal.Decimal{
+			Bytes:     [16]byte{},
+			Precision: 0,
+			Scale:     0,
+		}
 	}
 
 	return decimal.Decimal{
