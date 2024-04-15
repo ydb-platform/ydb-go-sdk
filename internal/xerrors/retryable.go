@@ -68,6 +68,7 @@ func Retryable(err error, opts ...RetryableErrorOption) error {
 		re = &retryableError{
 			err:                err,
 			name:               "CUSTOM",
+			backoffType:        backoff.TypeNoBackoff,
 			code:               -1,
 			isRetryObjectValid: true,
 		}
