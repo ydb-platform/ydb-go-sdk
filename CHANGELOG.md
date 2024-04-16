@@ -1,4 +1,9 @@
+
 * Added type assertion checks to enhance type safety and prevent unexpected panics in critical sections of the codebase
+
+## v3.65.1
+* Updated dependency `ydb-go-genproto`
+* Added processing of `Ydb.StatusIds_EXTERNAL_ERROR` in `retry.Retry`
 
 ## v3.65.0
 * Supported OAuth 2.0 Token Exchange credentials provider
