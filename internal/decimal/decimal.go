@@ -111,10 +111,21 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 }
 
 func setSpecialValue(s string, v *big.Int) (string, bool, *big.Int) {
+	s, neg := parseSign(s)
+
+	return parseSpecialValue(s, neg, v)
+}
+
+func parseSign(s string) (string, bool) {
 	neg := s[0] == '-'
 	if neg || s[0] == '+' {
 		s = s[1:]
 	}
+
+	return s, neg
+}
+
+func parseSpecialValue(s string, neg bool, v *big.Int) (string, bool, *big.Int) {
 	if isInf(s) {
 		if neg {
 			return s, neg, v.Set(neginf)
