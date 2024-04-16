@@ -64,7 +64,10 @@ func runTest(t testing.TB, test TestFunc) {
 	t.Helper()
 
 	tw := &testWrapper{
-		TB: t,
+		TB:      t,
+		m:       sync.Mutex{},
+		logs:    nil,
+		cleanup: nil,
 	}
 
 	defer tw.doCleanup()

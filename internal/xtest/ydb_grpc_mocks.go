@@ -39,7 +39,7 @@ func GrpcMockTopicConnString(e fixenv.Env, topicServiceImpl Ydb_Topic_V1.TopicSe
 		return fixenv.NewGenericResultWithCleanup(connString, clean), nil
 	}
 
-	return fixenv.CacheResult(e, f, fixenv.CacheOptions{CacheKey: addr})
+	return fixenv.CacheResult(e, f, fixenv.CacheOptions{Scope: 0, CacheKey: addr})
 }
 
 type grpcMock struct {
@@ -95,8 +95,9 @@ type mockDiscoveryService struct {
 
 func newMockDiscoveryService(host string, port uint32) *mockDiscoveryService {
 	return &mockDiscoveryService{
-		host: host,
-		port: port,
+		UnimplementedDiscoveryServiceServer: Ydb_Discovery_V1.UnimplementedDiscoveryServiceServer{},
+		host:                                host,
+		port:                                port,
 	}
 }
 
@@ -121,10 +122,13 @@ func (m mockDiscoveryService) ListEndpoints(
 	}
 	resp := &Ydb_Discovery.ListEndpointsResponse{
 		Operation: &Ydb_Operations.Operation{
-			Id:     "test-list-operation",
-			Ready:  true,
-			Status: Ydb.StatusIds_SUCCESS,
-			Result: &anypb.Any{},
+			Id:       "test-list-operation",
+			Ready:    true,
+			Status:   Ydb.StatusIds_SUCCESS,
+			Issues:   nil,
+			Result:   &anypb.Any{TypeUrl: "", Value: nil},
+			Metadata: &anypb.Any{TypeUrl: "", Value: nil},
+			CostInfo: nil,
 		},
 	}
 	err := resp.GetOperation().GetResult().MarshalFrom(res)
