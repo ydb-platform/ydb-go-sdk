@@ -6,7 +6,8 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.4.1
 	github.com/google/uuid v1.3.0
 	github.com/jonboulle/clockwork v0.3.0
-	github.com/ydb-platform/ydb-go-genproto v0.0.0-20240126124512-dbb0e1720dbf
+	github.com/ydb-platform/ydb-go-genproto v0.0.0-20240316140903-4a47abca1cca
+	golang.org/x/net v0.17.0
 	golang.org/x/sync v0.3.0
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 	google.golang.org/grpc v1.57.1
@@ -24,7 +25,6 @@ require (
 	github.com/davecgh/go-spew v1.1.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230525234030-28d5490b6b19 // indirect
