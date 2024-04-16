@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"fmt"
+	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -20,10 +21,10 @@ type tx struct {
 }
 
 var (
-	_ driver.Tx                   = &tx{}
-	_ driver.ExecerContext        = &tx{}
-	_ driver.QueryerContext       = &tx{}
-	_ table.TransactionIdentifier = &tx{}
+	_ driver.Tx                   = &tx{conn: nil, txCtx: nil, tx: nil}
+	_ driver.ExecerContext        = &tx{conn: nil, txCtx: nil, tx: nil}
+	_ driver.QueryerContext       = &tx{conn: nil, txCtx: nil, tx: nil}
+	_ table.TransactionIdentifier = &tx{conn: nil, txCtx: nil, tx: nil}
 )
 
 func (c *conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (currentTx, error) {
@@ -153,8 +154,9 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 	}
 
 	return &rows{
-		conn:   tx.conn,
-		result: res,
+		conn:    tx.conn,
+		result:  res,
+		nextSet: sync.Once{},
 	}, nil
 }
 

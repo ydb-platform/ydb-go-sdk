@@ -39,16 +39,17 @@ func (tx *txFake) PrepareContext(ctx context.Context, query string) (_ driver.St
 }
 
 var (
-	_ driver.Tx                   = &txFake{}
-	_ driver.ExecerContext        = &txFake{}
-	_ driver.QueryerContext       = &txFake{}
-	_ table.TransactionIdentifier = &txFake{}
+	_ driver.Tx                   = &txFake{beginCtx: nil, conn: nil, ctx: nil}
+	_ driver.ExecerContext        = &txFake{beginCtx: nil, conn: nil, ctx: nil}
+	_ driver.QueryerContext       = &txFake{beginCtx: nil, conn: nil, ctx: nil}
+	_ table.TransactionIdentifier = &txFake{beginCtx: nil, conn: nil, ctx: nil}
 )
 
 func (c *conn) beginTxFake(ctx context.Context, txOptions driver.TxOptions) (currentTx, error) {
 	return &txFake{
-		conn: c,
-		ctx:  ctx,
+		beginCtx: nil,
+		conn:     c,
+		ctx:      ctx,
 	}, nil
 }
 

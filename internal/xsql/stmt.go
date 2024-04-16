@@ -24,9 +24,9 @@ type stmt struct {
 }
 
 var (
-	_ driver.Stmt             = &stmt{}
-	_ driver.StmtQueryContext = &stmt{}
-	_ driver.StmtExecContext  = &stmt{}
+	_ driver.Stmt             = &stmt{conn: nil, processor: nil, query: "", stmtCtx: nil, trace: nil}
+	_ driver.StmtQueryContext = &stmt{conn: nil, processor: nil, query: "", stmtCtx: nil, trace: nil}
+	_ driver.StmtExecContext  = &stmt{conn: nil, processor: nil, query: "", stmtCtx: nil, trace: nil}
 )
 
 func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ driver.Rows, finalErr error) {

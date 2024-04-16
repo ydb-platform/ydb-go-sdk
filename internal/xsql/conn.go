@@ -8,6 +8,7 @@ import (
 	"io"
 	"path"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -115,23 +116,32 @@ func (resultNoRows) LastInsertId() (int64, error) { return 0, ErrUnsupported }
 func (resultNoRows) RowsAffected() (int64, error) { return 0, ErrUnsupported }
 
 var (
-	_ driver.Conn               = &conn{}
-	_ driver.ConnPrepareContext = &conn{}
-	_ driver.ConnBeginTx        = &conn{}
-	_ driver.ExecerContext      = &conn{}
-	_ driver.QueryerContext     = &conn{}
-	_ driver.Pinger             = &conn{}
-	_ driver.Validator          = &conn{}
-	_ driver.NamedValueChecker  = &conn{}
+	_ driver.Conn               = new(conn)
+	_ driver.ConnPrepareContext = new(conn)
+	_ driver.ConnBeginTx        = new(conn)
+	_ driver.ExecerContext      = new(conn)
+	_ driver.QueryerContext     = new(conn)
+	_ driver.Pinger             = new(conn)
+	_ driver.Validator          = new(conn)
+	_ driver.NamedValueChecker  = new(conn)
 
 	_ driver.Result = resultNoRows{}
 )
 
 func newConn(ctx context.Context, c *Connector, s table.ClosableSession, opts ...connOption) *conn {
 	cc := &conn{
-		openConnCtx: ctx,
-		connector:   c,
-		session:     s,
+		openConnCtx:      ctx,
+		connector:        c,
+		trace:            nil,
+		session:          s,
+		beginTxFuncs:     nil,
+		closed:           atomic.Bool{},
+		lastUsage:        atomic.Int64{},
+		defaultQueryMode: DefaultQueryMode,
+		defaultTxControl: nil,
+		dataOpts:         nil,
+		scanOpts:         nil,
+		currentTx:        nil,
 	}
 	cc.beginTxFuncs = map[QueryMode]beginTxFunc{
 		DataQueryMode: cc.beginTx,
@@ -334,8 +344,9 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		}
 
 		return &rows{
-			conn:   c,
-			result: res,
+			conn:    c,
+			result:  res,
+			nextSet: sync.Once{},
 		}, nil
 	case ScanQueryMode:
 		normalizedQuery, parameters, err := c.normalize(query, args...)
@@ -353,8 +364,9 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		}
 
 		return &rows{
-			conn:   c,
-			result: res,
+			conn:    c,
+			result:  res,
+			nextSet: sync.Once{},
 		}, nil
 	case ExplainQueryMode:
 		normalizedQuery, _, err := c.normalize(query, args...)
@@ -371,6 +383,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 				sql.Named("AST", exp.AST),
 				sql.Named("Plan", exp.Plan),
 			},
+			readAll: false,
 		}, nil
 	case ScriptingQueryMode:
 		normalizedQuery, parameters, err := c.normalize(query, args...)
@@ -386,8 +399,9 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		}
 
 		return &rows{
-			conn:   c,
-			result: res,
+			conn:    c,
+			result:  res,
+			nextSet: sync.Once{},
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported query mode '%s' on conn query", m)
