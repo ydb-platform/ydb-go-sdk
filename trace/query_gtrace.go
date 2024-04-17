@@ -1460,11 +1460,10 @@ func QueryOnSessionBegin(t *Query, c *context.Context, call call, session queryS
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnTxExecute(t *Query, c *context.Context, call call, session querySessionInfo, tx queryTransactionInfo, query string) func(error) {
+func QueryOnTxExecute(t *Query, c *context.Context, call call, tx queryTransactionInfo, query string) func(error) {
 	var p QueryTxExecuteStartInfo
 	p.Context = c
 	p.Call = call
-	p.Session = session
 	p.Tx = tx
 	p.Query = query
 	res := t.onTxExecute(p)

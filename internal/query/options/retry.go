@@ -36,11 +36,8 @@ type (
 		txSettings tx.Settings
 	}
 
-	idempotentOption struct{}
-	labelOption      string
-	traceOption      struct {
-		t *trace.Query
-	}
+	idempotentOption   struct{}
+	labelOption        string
 	doTxSettingsOption struct {
 		txSettings tx.Settings
 	}
@@ -68,14 +65,6 @@ func (opt idempotentOption) applyDoTxOption(s *doTxSettings) {
 
 func (idempotentOption) applyDoOption(s *doSettings) {
 	s.retryOpts = append(s.retryOpts, retry.WithIdempotent(true))
-}
-
-func (opt traceOption) applyDoOption(s *doSettings) {
-	s.trace = s.trace.Compose(opt.t)
-}
-
-func (opt traceOption) applyDoTxOption(s *doTxSettings) {
-	s.doOpts = append(s.doOpts, opt)
 }
 
 func (opt labelOption) applyDoOption(s *doSettings) {

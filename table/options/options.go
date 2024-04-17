@@ -2,10 +2,12 @@ package options
 
 import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 )
@@ -834,21 +836,15 @@ type (
 	ExecuteDataQueryDesc struct {
 		*Ydb_Table.ExecuteDataQueryRequest
 
-		IgnoreTruncated bool
+		IgnoreTruncated  bool
+		WithQueryService bool
 	}
 	ExecuteDataQueryOption interface {
+		options.ExecuteOption
+
 		ApplyExecuteDataQueryOption(d *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption
 	}
-	executeDataQueryOptionFunc func(d *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption
 )
-
-func (f executeDataQueryOptionFunc) ApplyExecuteDataQueryOption(
-	d *ExecuteDataQueryDesc, a *allocator.Allocator,
-) []grpc.CallOption {
-	return f(d, a)
-}
-
-var _ ExecuteDataQueryOption = executeDataQueryOptionFunc(nil)
 
 type (
 	CommitTransactionDesc   Ydb_Table.CommitTransactionRequest
@@ -871,6 +867,10 @@ func WithKeepInCache(keepInCache bool) ExecuteDataQueryOption {
 
 type withCallOptions []grpc.CallOption
 
+func (opts withCallOptions) ApplyExecuteOption(s *options.Execute) {
+	s.GrpcCallOptions = append(s.GrpcCallOptions, opts...)
+}
+
 func (opts withCallOptions) ApplyExecuteScanQueryOption(d *ExecuteScanQueryDesc) []grpc.CallOption {
 	return opts
 }
@@ -890,22 +890,59 @@ func WithCallOptions(opts ...grpc.CallOption) withCallOptions {
 	return opts
 }
 
+type withCommitExecuteDataQueryOption struct{}
+
+func (withCommitExecuteDataQueryOption) ApplyExecuteOption(s *options.Execute) {
+	s.TxControl.Commit = true
+}
+
+func (withCommitExecuteDataQueryOption) ApplyExecuteDataQueryOption(
+	d *ExecuteDataQueryDesc, a *allocator.Allocator,
+) []grpc.CallOption {
+	d.TxControl.CommitTx = true
+
+	return nil
+}
+
 // WithCommit appends flag of commit transaction with executing query
 func WithCommit() ExecuteDataQueryOption {
-	return executeDataQueryOptionFunc(func(desc *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
-		desc.TxControl.CommitTx = true
+	return withCommitExecuteDataQueryOption{}
+}
 
-		return nil
-	})
+type useQueryServiceExecuteOption struct{}
+
+func (useQueryServiceExecuteOption) ApplyExecuteOption(s *options.Execute) {
+}
+
+func (u useQueryServiceExecuteOption) ApplyExecuteDataQueryOption(
+	d *ExecuteDataQueryDesc, a *allocator.Allocator,
+) []grpc.CallOption {
+	d.WithQueryService = true
+
+	return nil
+}
+
+// WithQueryService redirects request to query service client
+func WithQueryService() ExecuteDataQueryOption {
+	return useQueryServiceExecuteOption{}
+}
+
+type withIgnoreTruncatedOption struct{}
+
+func (withIgnoreTruncatedOption) ApplyExecuteOption(s *options.Execute) {
+}
+
+func (w withIgnoreTruncatedOption) ApplyExecuteDataQueryOption(
+	d *ExecuteDataQueryDesc, a *allocator.Allocator,
+) []grpc.CallOption {
+	d.IgnoreTruncated = true
+
+	return nil
 }
 
 // WithIgnoreTruncated mark truncated result as good (without error)
 func WithIgnoreTruncated() ExecuteDataQueryOption {
-	return executeDataQueryOptionFunc(func(desc *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
-		desc.IgnoreTruncated = true
-
-		return nil
-	})
+	return withIgnoreTruncatedOption{}
 }
 
 // WithQueryCachePolicyKeepInCache manages keep-in-cache policy
@@ -932,20 +969,29 @@ func WithQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption
 	return withQueryCachePolicy(opts...)
 }
 
-func withQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption {
-	return executeDataQueryOptionFunc(func(d *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
-		if d.QueryCachePolicy == nil {
-			d.QueryCachePolicy = a.TableQueryCachePolicy()
-			d.QueryCachePolicy.KeepInCache = true
-		}
-		for _, opt := range opts {
-			if opt != nil {
-				opt((*queryCachePolicy)(d.QueryCachePolicy), a)
-			}
-		}
+type withQueryCachePolicyOption []QueryCachePolicyOption
 
-		return nil
-	})
+func (opts withQueryCachePolicyOption) ApplyExecuteOption(s *options.Execute) {
+}
+
+func (opts withQueryCachePolicyOption) ApplyExecuteDataQueryOption(
+	d *ExecuteDataQueryDesc, a *allocator.Allocator,
+) []grpc.CallOption {
+	if d.QueryCachePolicy == nil {
+		d.QueryCachePolicy = a.TableQueryCachePolicy()
+		d.QueryCachePolicy.KeepInCache = true
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt((*queryCachePolicy)(d.QueryCachePolicy), a)
+		}
+	}
+
+	return nil
+}
+
+func withQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption {
+	return withQueryCachePolicyOption(opts)
 }
 
 func WithCommitCollectStatsModeNone() CommitTransactionOption {
@@ -960,20 +1006,40 @@ func WithCommitCollectStatsModeBasic() CommitTransactionOption {
 	}
 }
 
-func WithCollectStatsModeNone() ExecuteDataQueryOption {
-	return executeDataQueryOptionFunc(func(d *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
-		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE
+type withCollectStatsModeNoneOption struct{}
 
-		return nil
-	})
+func (withCollectStatsModeNoneOption) ApplyExecuteOption(s *options.Execute) {
+	s.StatsMode = options.StatsMode(Ydb_Query.StatsMode_STATS_MODE_NONE)
+}
+
+func (withCollectStatsModeNoneOption) ApplyExecuteDataQueryOption(
+	d *ExecuteDataQueryDesc, a *allocator.Allocator,
+) []grpc.CallOption {
+	d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE
+
+	return nil
+}
+
+func WithCollectStatsModeNone() ExecuteDataQueryOption {
+	return withCollectStatsModeNoneOption{}
+}
+
+type withCollectStatsModeBasicOption struct{}
+
+func (withCollectStatsModeBasicOption) ApplyExecuteOption(s *options.Execute) {
+	s.StatsMode = options.StatsMode(Ydb_Query.StatsMode_STATS_MODE_BASIC)
+}
+
+func (withCollectStatsModeBasicOption) ApplyExecuteDataQueryOption(
+	d *ExecuteDataQueryDesc, a *allocator.Allocator,
+) []grpc.CallOption {
+	d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC
+
+	return nil
 }
 
 func WithCollectStatsModeBasic() ExecuteDataQueryOption {
-	return executeDataQueryOptionFunc(func(d *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
-		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC
-
-		return nil
-	})
+	return withCollectStatsModeBasicOption{}
 }
 
 type (

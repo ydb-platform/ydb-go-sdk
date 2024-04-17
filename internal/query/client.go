@@ -21,7 +21,7 @@ import (
 //go:generate mockgen -destination grpc_client_mock_test.go -package query -write_package_comment=false github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1 QueryServiceClient,QueryService_AttachSessionClient,QueryService_ExecuteQueryClient
 
 type nodeChecker interface {
-	HasNode(id uint32) bool
+	HasNode(id int64) bool
 }
 
 type balancer interface {
@@ -197,7 +197,7 @@ func New(ctx context.Context, balancer balancer, cfg *config.Config) *Client {
 
 			s, err := createSession(createCtx, client.grpcClient, cfg,
 				withSessionCheck(func(s *Session) bool {
-					return balancer.HasNode(uint32(s.nodeID))
+					return balancer.HasNode(s.nodeID)
 				}),
 			)
 			if err != nil {

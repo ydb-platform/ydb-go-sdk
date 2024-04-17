@@ -14,7 +14,6 @@ import (
 	"google.golang.org/grpc/metadata"
 	grpcStatus "google.golang.org/grpc/status"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -355,12 +354,32 @@ func TestExecute(t *testing.T) {
 		}, nil)
 		stream.EXPECT().Recv().Return(nil, io.EOF)
 		service := NewMockQueryServiceClient(ctrl)
-		service.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
-		tx, r, err := execute(ctx, newTestSession("123"), service, "", options.ExecuteSettings())
+		service.EXPECT().ExecuteQuery(gomock.Any(), gomock.Cond(func(x any) bool {
+			request, ok := x.(*Ydb_Query.ExecuteQueryRequest)
+			if !ok {
+				return false
+			}
+			if request.GetSessionId() != "123" {
+				return false
+			}
+			query := request.GetQueryContent()
+			if query == nil {
+				return false
+			}
+			if query.GetText() != "SELECT 1" {
+				return false
+			}
+			if query.GetSyntax() != Ydb_Query.Syntax_SYNTAX_YQL_V1 {
+				return false
+			}
+
+			return true
+		})).Return(stream, nil)
+		tx, r, err := Execute[options.ExecuteOption](ctx, service, "123", "SELECT 1")
 		require.NoError(t, err)
 		defer r.Close(ctx)
 		require.EqualValues(t, "456", tx.id)
-		require.EqualValues(t, "123", tx.s.id)
+		require.EqualValues(t, "123", tx.sessionID)
 		require.EqualValues(t, -1, r.resultSetIndex)
 		{
 			t.Log("nextResultSet")
@@ -469,7 +488,7 @@ func TestExecute(t *testing.T) {
 			service := NewMockQueryServiceClient(ctrl)
 			service.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(nil, grpcStatus.Error(grpcCodes.Unavailable, ""))
 			t.Log("execute")
-			_, _, err := execute(ctx, newTestSession("123"), service, "", options.ExecuteSettings())
+			_, _, err := Execute[options.ExecuteOption](ctx, service, "123", "")
 			require.Error(t, err)
 			require.True(t, xerrors.IsTransportError(err, grpcCodes.Unavailable))
 		})
@@ -573,11 +592,11 @@ func TestExecute(t *testing.T) {
 			service := NewMockQueryServiceClient(ctrl)
 			service.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 			t.Log("execute")
-			tx, r, err := execute(ctx, newTestSession("123"), service, "", options.ExecuteSettings())
+			tx, r, err := Execute[options.ExecuteOption](ctx, service, "123", "")
 			require.NoError(t, err)
 			defer r.Close(ctx)
 			require.EqualValues(t, "456", tx.id)
-			require.EqualValues(t, "123", tx.s.id)
+			require.EqualValues(t, "123", tx.sessionID)
 			require.EqualValues(t, -1, r.resultSetIndex)
 			{
 				t.Log("nextResultSet")
@@ -637,7 +656,7 @@ func TestExecute(t *testing.T) {
 			service := NewMockQueryServiceClient(ctrl)
 			service.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 			t.Log("execute")
-			_, _, err := execute(ctx, newTestSession("123"), service, "", options.ExecuteSettings())
+			_, _, err := Execute[options.ExecuteOption](ctx, service, "123", "")
 			require.Error(t, err)
 			require.True(t, xerrors.IsOperationError(err, Ydb.StatusIds_UNAVAILABLE))
 		})
@@ -713,11 +732,11 @@ func TestExecute(t *testing.T) {
 			service := NewMockQueryServiceClient(ctrl)
 			service.EXPECT().ExecuteQuery(gomock.Any(), gomock.Any()).Return(stream, nil)
 			t.Log("execute")
-			tx, r, err := execute(ctx, newTestSession("123"), service, "", options.ExecuteSettings())
+			tx, r, err := Execute[options.ExecuteOption](ctx, service, "123", "")
 			require.NoError(t, err)
 			defer r.Close(ctx)
 			require.EqualValues(t, "456", tx.id)
-			require.EqualValues(t, "123", tx.s.id)
+			require.EqualValues(t, "123", tx.sessionID)
 			require.EqualValues(t, -1, r.resultSetIndex)
 			{
 				t.Log("nextResultSet")
@@ -757,12 +776,11 @@ func TestExecute(t *testing.T) {
 }
 
 func TestExecuteQueryRequest(t *testing.T) {
-	a := allocator.New()
 	for _, tt := range []struct {
-		name        string
-		opts        []options.ExecuteOption
-		request     *Ydb_Query.ExecuteQueryRequest
-		callOptions []grpc.CallOption
+		name            string
+		opts            []options.ExecuteOption
+		request         *Ydb_Query.ExecuteQueryRequest
+		grpcCallOptions []grpc.CallOption
 	}{
 		{
 			name: "WithoutOptions",
@@ -996,7 +1014,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 				StatsMode:            Ydb_Query.StatsMode_STATS_MODE_NONE,
 				ConcurrentResultSets: false,
 			},
-			callOptions: []grpc.CallOption{
+			grpcCallOptions: []grpc.CallOption{
 				grpc.Header(&metadata.MD{
 					"ext-header": []string{"test"},
 				}),
@@ -1004,9 +1022,90 @@ func TestExecuteQueryRequest(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			request, callOptions := executeQueryRequest(a, tt.name, tt.name, options.ExecuteSettings(tt.opts...))
-			require.Equal(t, request.String(), tt.request.String())
-			require.Equal(t, tt.callOptions, callOptions)
+			ctx := xtest.Context(t)
+			ctrl := gomock.NewController(t)
+			stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				Status: Ydb.StatusIds_SUCCESS,
+				TxMeta: &Ydb_Query.TransactionMeta{
+					Id: "456",
+				},
+				ResultSetIndex: 0,
+				ResultSet: &Ydb.ResultSet{
+					Columns: []*Ydb.Column{
+						{
+							Name: "a",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UINT64,
+								},
+							},
+						},
+						{
+							Name: "b",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+					Rows: []*Ydb.Value{
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 1,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 2,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "2",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 3,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "3",
+								},
+							}},
+						},
+					},
+				},
+			}, nil)
+			client := NewMockQueryServiceClient(ctrl)
+			var args []any
+			if len(tt.grpcCallOptions) > 0 {
+				for _, grpcOpt := range tt.grpcCallOptions {
+					args = append(args, grpcOpt)
+				}
+			}
+			client.EXPECT().ExecuteQuery(gomock.Any(), gomock.Cond(func(x any) bool {
+				request, ok := x.(*Ydb_Query.ExecuteQueryRequest)
+				if !ok {
+					return false
+				}
+
+				return tt.request.String() == request.String()
+			}), args...).Return(stream, nil)
+			tx, _, err := Execute(ctx, client, tt.name, tt.name, tt.opts...)
+			require.NoError(t, err)
+			require.Equal(t, tt.name, tx.sessionID)
+			require.Equal(t, "456", tx.id)
 		})
 	}
 }

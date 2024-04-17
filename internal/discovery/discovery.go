@@ -86,7 +86,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 			endpoints = append(endpoints, endpoint.New(
 				net.JoinHostPort(e.GetAddress(), strconv.Itoa(int(e.GetPort()))),
 				endpoint.WithLocation(e.GetLocation()),
-				endpoint.WithID(e.GetNodeId()),
+				endpoint.WithID(int64(e.GetNodeId())),
 				endpoint.WithLoadFactor(e.GetLoadFactor()),
 				endpoint.WithLocalDC(e.GetLocation() == location),
 				endpoint.WithServices(e.GetService()),

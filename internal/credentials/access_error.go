@@ -57,14 +57,14 @@ func WithDatabase(database string) databaseAuthErrorOption {
 	return databaseAuthErrorOption(database)
 }
 
-type nodeIDAuthErrorOption uint32
+type nodeIDAuthErrorOption int64
 
 func (id nodeIDAuthErrorOption) applyAuthErrorOption(w io.Writer) {
 	fmt.Fprint(w, "nodeID:")
 	fmt.Fprint(w, strconv.FormatUint(uint64(id), 10))
 }
 
-func WithNodeID(id uint32) authErrorOption {
+func WithNodeID(id int64) authErrorOption {
 	return nodeIDAuthErrorOption(id)
 }
 

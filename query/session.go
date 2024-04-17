@@ -78,6 +78,6 @@ func WithStatsMode(mode options.StatsMode) options.StatsModeOption {
 	return options.WithStatsMode(mode)
 }
 
-func WithCallOptions(opts ...grpc.CallOption) options.CallOptions {
+func WithCallOptions(opts ...grpc.CallOption) options.GrpcOpts {
 	return options.WithCallOptions(opts...)
 }

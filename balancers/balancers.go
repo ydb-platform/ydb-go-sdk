@@ -111,7 +111,7 @@ func PreferLocationsWithFallback(balancer *balancerConfig.Config, locations ...s
 }
 
 type Endpoint interface {
-	NodeID() uint32
+	NodeID() int64
 	Address() string
 	Location() string
 

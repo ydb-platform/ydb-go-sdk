@@ -164,7 +164,7 @@ func newTestSession(id string) *Session {
 func newTestSessionWithClient(id string, client Ydb_Query_V1.QueryServiceClient) *Session {
 	return &Session{
 		id:         id,
-		grpcClient: client,
+		client:     client,
 		statusCode: statusIdle,
 		cfg:        config.New(),
 	}

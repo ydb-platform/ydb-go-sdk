@@ -96,7 +96,7 @@ type (
 	}
 	tableSessionInfo interface {
 		ID() string
-		NodeID() uint32
+		NodeID() int64
 		Status() string
 		LastUsage() time.Time
 	}

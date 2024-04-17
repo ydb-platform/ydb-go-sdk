@@ -2,43 +2,29 @@ package query
 
 import (
 	"context"
+	"io"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
-	"google.golang.org/grpc"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
-type executeConfig interface {
-	ExecMode() options.ExecMode
-	StatsMode() options.StatsMode
-	TxControl() *query.TransactionControl
-	Syntax() options.Syntax
-	Params() *params.Parameters
-	CallOptions() []grpc.CallOption
+type withAllocatorOption struct {
+	a *allocator.Allocator
 }
 
-func executeQueryRequest(a *allocator.Allocator, sessionID, q string, cfg executeConfig) (
-	*Ydb_Query.ExecuteQueryRequest,
-	[]grpc.CallOption,
-) {
-	request := a.QueryExecuteQueryRequest()
+func (a withAllocatorOption) ApplyExecuteOption(s *options.Execute) {
+	s.Allocator = a.a
+}
 
-	request.SessionId = sessionID
-	request.ExecMode = Ydb_Query.ExecMode(cfg.ExecMode())
-	request.TxControl = cfg.TxControl().ToYDB(a)
-	request.Query = queryFromText(a, q, Ydb_Query.Syntax(cfg.Syntax()))
-	request.Parameters = cfg.Params().ToYDB(a)
-	request.StatsMode = Ydb_Query.StatsMode(cfg.StatsMode())
-	request.ConcurrentResultSets = false
-
-	return request, cfg.CallOptions()
+func WithAllocator(a *allocator.Allocator) options.ExecuteOption {
+	return withAllocatorOption{a: a}
 }
 
 func queryFromText(
@@ -52,22 +38,68 @@ func queryFromText(
 	return content
 }
 
-func execute(ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient, q string, cfg executeConfig) (
-	_ *transaction, _ *result, finalErr error,
-) {
-	a := allocator.New()
-	defer a.Free()
+func ReadAll(ctx context.Context, r *result) (resultSets []*Ydb.ResultSet, stats *Ydb_TableStats.QueryStats, _ error) {
+	for {
+		resultSet, err := r.nextResultSet(ctx)
+		if err != nil {
+			if xerrors.Is(err, io.EOF) {
+				return resultSets, resultSet.stats(), nil
+			}
 
-	request, callOptions := executeQueryRequest(a, s.id, q, cfg)
+			return nil, nil, xerrors.WithStackTrace(err)
+		}
+		var rows []*Ydb.Value
+		for {
+			row, err := resultSet.nextRow(ctx)
+			if err != nil {
+				if xerrors.Is(err, io.EOF) {
+					break
+				}
+
+				return nil, nil, xerrors.WithStackTrace(err)
+			}
+
+			rows = append(rows, row.v)
+		}
+
+		resultSets = append(resultSets, &Ydb.ResultSet{
+			Columns: resultSet.columns,
+			Rows:    rows,
+		})
+	}
+}
+
+func Execute[T options.ExecuteOption](
+	ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID, query string, opts ...T,
+) (_ *transaction, _ *result, finalErr error) {
+	var (
+		settings = options.ExecuteSettings(opts...)
+		a        = settings.Allocator
+	)
+
+	if a == nil {
+		a = allocator.New()
+		defer a.Free()
+	}
+
+	request := a.QueryExecuteQueryRequest()
+
+	request.SessionId = sessionID
+	request.ExecMode = Ydb_Query.ExecMode(settings.ExecMode)
+	request.TxControl = settings.TxControl.ToYDB(a)
+	request.Query = queryFromText(a, query, Ydb_Query.Syntax(settings.Syntax))
+	request.Parameters = settings.Params.ToYDB(a)
+	request.StatsMode = Ydb_Query.StatsMode(settings.StatsMode)
+	request.ConcurrentResultSets = false
 
 	executeCtx, cancelExecute := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 
-	stream, err := c.ExecuteQuery(executeCtx, request, callOptions...)
+	stream, err := client.ExecuteQuery(executeCtx, request, settings.GrpcCallOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	r, txID, err := newResult(ctx, stream, s.cfg.Trace(), cancelExecute)
+	r, txID, err := newResult(ctx, stream, settings.Trace, cancelExecute)
 	if err != nil {
 		cancelExecute()
 
@@ -78,5 +110,5 @@ func execute(ctx context.Context, s *Session, c Ydb_Query_V1.QueryServiceClient,
 		return nil, r, nil
 	}
 
-	return newTransaction(txID, s), r, nil
+	return newTx(txID, sessionID, client, settings.Trace), r, nil
 }

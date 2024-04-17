@@ -135,9 +135,8 @@ type (
 		Context *context.Context
 		Call    call
 
-		Session querySessionInfo
-		Tx      queryTransactionInfo
-		Query   string
+		Tx    queryTransactionInfo
+		Query string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryTxExecuteDoneInfo struct {

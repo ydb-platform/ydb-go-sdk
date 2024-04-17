@@ -138,7 +138,7 @@ type balancerStub struct {
 	) (grpc.ClientStream, error)
 }
 
-func (b *balancerStub) HasNode(id uint32) bool {
+func (b *balancerStub) HasNode(id int64) bool {
 	return true
 }
 

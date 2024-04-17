@@ -7,7 +7,7 @@ import (
 )
 
 type (
-	query interface {
+	queryRenameMe interface {
 		String() string
 		ID() string
 		YQL() string
@@ -59,11 +59,11 @@ func (q preparedDataQuery) toYDB(a *allocator.Allocator) *Ydb_Table.Query {
 	return query
 }
 
-func queryFromText(s string) query {
+func queryFromText(s string) queryRenameMe {
 	return textDataQuery(s)
 }
 
-func queryPrepared(id, query string) query {
+func queryPrepared(id, query string) queryRenameMe {
 	return preparedDataQuery{
 		id:    id,
 		query: query,

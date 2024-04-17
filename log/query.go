@@ -413,9 +413,7 @@ func internalQuery(
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "query", "transaction", "execute")
 			l.Log(ctx, "start",
-				String("SessionID", info.Session.ID()),
 				String("TransactionID", info.Tx.ID()),
-				String("SessionStatus", info.Session.Status()),
 			)
 			start := time.Now()
 

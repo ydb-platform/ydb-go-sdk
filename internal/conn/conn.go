@@ -96,7 +96,7 @@ func (c *conn) IsState(states ...State) bool {
 	return false
 }
 
-func (c *conn) NodeID() uint32 {
+func (c *conn) NodeID() int64 {
 	if c != nil {
 		return c.endpoint.NodeID()
 	}

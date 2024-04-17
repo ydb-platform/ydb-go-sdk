@@ -20,7 +20,7 @@ import (
 
 type connsKey struct {
 	address string
-	nodeID  uint32
+	nodeID  int64
 }
 
 type Pool struct {

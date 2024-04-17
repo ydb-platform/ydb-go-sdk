@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Table_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
@@ -23,6 +24,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query"
+	options2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/scanner"
@@ -48,32 +51,33 @@ type session struct {
 	onClose      []func(s *session)
 	id           string
 	tableService Ydb_Table_V1.TableServiceClient
+	queryService Ydb_Query_V1.QueryServiceClient
 	status       table.SessionStatus
 	config       *config.Config
 	lastUsage    atomic.Int64
 	statusMtx    sync.RWMutex
 	closeOnce    sync.Once
-	nodeID       atomic.Uint32
+	nodeID       atomic.Int64
 }
 
 func (s *session) LastUsage() time.Time {
 	return time.Unix(s.lastUsage.Load(), 0)
 }
 
-func nodeID(sessionID string) (uint32, error) {
+func nodeID(sessionID string) (int64, error) {
 	u, err := url.Parse(sessionID)
 	if err != nil {
 		return 0, err
 	}
-	id, err := strconv.ParseUint(u.Query().Get("node_id"), 10, 32)
+	id, err := strconv.ParseInt(u.Query().Get("node_id"), 10, 32)
 	if err != nil {
 		return 0, err
 	}
 
-	return uint32(id), err
+	return id, err
 }
 
-func (s *session) NodeID() uint32 {
+func (s *session) NodeID() int64 {
 	if s == nil {
 		return 0
 	}
@@ -153,6 +157,17 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config
 	s.lastUsage.Store(time.Now().Unix())
 
 	s.tableService = Ydb_Table_V1.NewTableServiceClient(
+		conn.WithBeforeFunc(
+			conn.WithContextModifier(cc, func(ctx context.Context) context.Context {
+				return meta.WithTrailerCallback(balancerContext.WithEndpoint(ctx, s), s.checkCloseHint)
+			}),
+			func() {
+				s.lastUsage.Store(time.Now().Unix())
+			},
+		),
+	)
+
+	s.queryService = Ydb_Query_V1.NewQueryServiceClient(
 		conn.WithBeforeFunc(
 			conn.WithContextModifier(cc, func(ctx context.Context) context.Context {
 				return meta.WithTrailerCallback(balancerContext.WithEndpoint(ctx, s), s.checkCloseHint)
@@ -760,15 +775,15 @@ func (s *session) Prepare(ctx context.Context, queryText string) (_ table.Statem
 func (s *session) Execute(
 	ctx context.Context,
 	txControl *table.TransactionControl,
-	query string,
+	q string,
 	parameters *params.Parameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
-	txr table.Transaction, r result.Result, err error,
+	_ table.Transaction, r result.Result, finalErr error,
 ) {
 	var (
 		a       = allocator.New()
-		q       = queryFromText(query)
+		qq      = queryFromText(q)
 		request = options.ExecuteDataQueryDesc{
 			ExecuteDataQueryRequest: a.TableExecuteDataQueryRequest(),
 			IgnoreTruncated:         s.config.IgnoreTruncated(),
@@ -780,7 +795,7 @@ func (s *session) Execute(
 	request.SessionId = s.id
 	request.TxControl = txControl.Desc()
 	request.Parameters = parameters.ToYDB(a)
-	request.Query = q.toYDB(a)
+	request.Query = qq.toYDB(a)
 	request.QueryCachePolicy = a.TableQueryCachePolicy()
 	request.QueryCachePolicy.KeepInCache = len(request.Parameters) > 0
 	request.OperationParams = operation.Params(ctx,
@@ -795,22 +810,58 @@ func (s *session) Execute(
 		}
 	}
 
-	onDone := trace.TableOnSessionQueryExecute(
-		s.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*session).Execute"),
-		s, q, parameters,
-		request.QueryCachePolicy.GetKeepInCache(),
+	var (
+		onDone = trace.TableOnSessionQueryExecute(
+			s.config.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*session).Execute"),
+			s, qq, parameters,
+			request.QueryCachePolicy.GetKeepInCache(),
+		)
+		txr *transaction
 	)
 	defer func() {
-		onDone(txr, false, r, err)
+		onDone(txr, false, r, finalErr)
 	}()
 
-	result, err := s.executeDataQuery(ctx, a, request.ExecuteDataQueryRequest, callOptions...)
+	if !request.WithQueryService {
+		result, err := s.executeDataQuery(ctx, a, request.ExecuteDataQueryRequest, callOptions...)
+		if err != nil {
+			return nil, nil, xerrors.WithStackTrace(err)
+		}
+
+		return s.executeQueryResult(result, request.TxControl, request.IgnoreTruncated)
+	}
+
+	executeOptions := make([]options2.ExecuteOption, 0, len(opts)+1)
+	executeOptions = append(executeOptions, query.WithAllocator(a))
+	for _, opt := range opts {
+		executeOptions = append(executeOptions, opt)
+	}
+	tx, res, err := query.Execute(ctx, s.queryService, s.ID(), q, executeOptions...)
+	if err != nil {
+		return nil, nil, xerrors.WithStackTrace(err)
+	}
+	if tx != nil {
+		txr = &transaction{
+			id: tx.ID(),
+			s:  s,
+		}
+		if txControl.Desc().GetCommitTx() {
+			txr.state.Set(txStateCommitted)
+		} else {
+			txr.state.Set(txStateInitialized)
+			txr.control = table.TxControl(table.WithTxID(tx.ID()))
+		}
+	}
+
+	resultSets, stats, err := query.ReadAll(ctx, res)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
-	return s.executeQueryResult(result, request.TxControl, request.IgnoreTruncated)
+	return txr, scanner.NewUnary(resultSets, stats,
+		scanner.WithIgnoreTruncated(true),
+	), nil
 }
 
 // executeQueryResult returns Transaction and result built from received
@@ -827,9 +878,9 @@ func (s *session) executeQueryResult(
 		s:  s,
 	}
 	if txControl.GetCommitTx() {
-		tx.state.Store(txStateCommitted)
+		tx.state.Set(txStateCommitted)
 	} else {
-		tx.state.Store(txStateInitialized)
+		tx.state.Set(txStateInitialized)
 		tx.control = table.TxControl(table.WithTxID(tx.id))
 	}
 
@@ -1305,7 +1356,7 @@ func (s *session) BeginTransaction(
 		s:       s,
 		control: table.TxControl(table.WithTxID(result.GetTxMeta().GetId())),
 	}
-	tx.state.Store(txStateInitialized)
+	tx.state.Set(txStateInitialized)
 
 	return tx, nil
 }

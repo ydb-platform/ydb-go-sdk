@@ -25,15 +25,15 @@ var (
 )
 
 type txState struct {
-	rawVal atomic.Uint32
+	atomic.Pointer[txStateEnum]
 }
 
-func (s *txState) Load() txStateEnum {
-	return txStateEnum(s.rawVal.Load())
+func (s *txState) Get() txStateEnum {
+	return *s.Pointer.Load()
 }
 
-func (s *txState) Store(val txStateEnum) {
-	s.rawVal.Store(uint32(val))
+func (s *txState) Set(state txStateEnum) {
+	s.Pointer.Store(&state)
 }
 
 type txStateEnum uint32
@@ -70,7 +70,7 @@ func (tx *transaction) Execute(
 		onDone(r, err)
 	}()
 
-	switch tx.state.Load() {
+	switch tx.state.Get() {
 	case txStateCommitted:
 		return nil, xerrors.WithStackTrace(errTxAlreadyCommitted)
 	case txStateRollbacked:
@@ -82,7 +82,7 @@ func (tx *transaction) Execute(
 		}
 
 		if tx.control.Desc().GetCommitTx() {
-			tx.state.Store(txStateCommitted)
+			tx.state.Set(txStateCommitted)
 		}
 
 		return r, nil
@@ -107,7 +107,7 @@ func (tx *transaction) ExecuteStatement(
 		onDone(r, err)
 	}()
 
-	switch tx.state.Load() {
+	switch tx.state.Get() {
 	case txStateCommitted:
 		return nil, xerrors.WithStackTrace(errTxAlreadyCommitted)
 	case txStateRollbacked:
@@ -119,7 +119,7 @@ func (tx *transaction) ExecuteStatement(
 		}
 
 		if tx.control.Desc().GetCommitTx() {
-			tx.state.Store(txStateCommitted)
+			tx.state.Set(txStateCommitted)
 		}
 
 		return r, nil
@@ -140,7 +140,7 @@ func (tx *transaction) CommitTx(
 		onDone(err)
 	}()
 
-	switch tx.state.Load() {
+	switch tx.state.Get() {
 	case txStateCommitted:
 		return nil, xerrors.WithStackTrace(errTxAlreadyCommitted)
 	case txStateRollbacked:
@@ -177,7 +177,7 @@ func (tx *transaction) CommitTx(
 			return nil, xerrors.WithStackTrace(err)
 		}
 
-		tx.state.Store(txStateCommitted)
+		tx.state.Set(txStateCommitted)
 
 		return scanner.NewUnary(
 			nil,
@@ -198,7 +198,7 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 		onDone(err)
 	}()
 
-	switch tx.state.Load() {
+	switch tx.state.Get() {
 	case txStateCommitted:
 		return nil // nop for committed tx
 	case txStateRollbacked:
@@ -220,7 +220,7 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 			return xerrors.WithStackTrace(err)
 		}
 
-		tx.state.Store(txStateRollbacked)
+		tx.state.Set(txStateRollbacked)
 
 		return nil
 	}

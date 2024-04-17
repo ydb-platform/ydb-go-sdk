@@ -16,7 +16,7 @@ func TestConnsToNodeIDMap(t *testing.T) {
 	table := []struct {
 		name   string
 		source []conn.Conn
-		res    map[uint32]conn.Conn
+		res    map[int64]conn.Conn
 	}{
 		{
 			name:   "Empty",
@@ -28,7 +28,7 @@ func TestConnsToNodeIDMap(t *testing.T) {
 			source: []conn.Conn{
 				&mock.Conn{NodeIDField: 0},
 			},
-			res: map[uint32]conn.Conn{
+			res: map[int64]conn.Conn{
 				0: &mock.Conn{NodeIDField: 0},
 			},
 		},
@@ -38,7 +38,7 @@ func TestConnsToNodeIDMap(t *testing.T) {
 				&mock.Conn{NodeIDField: 1},
 				&mock.Conn{NodeIDField: 10},
 			},
-			res: map[uint32]conn.Conn{
+			res: map[int64]conn.Conn{
 				1:  &mock.Conn{NodeIDField: 1},
 				10: &mock.Conn{NodeIDField: 10},
 			},
@@ -50,7 +50,7 @@ func TestConnsToNodeIDMap(t *testing.T) {
 				&mock.Conn{NodeIDField: 0},
 				&mock.Conn{NodeIDField: 10},
 			},
-			res: map[uint32]conn.Conn{
+			res: map[int64]conn.Conn{
 				0:  &mock.Conn{NodeIDField: 0},
 				1:  &mock.Conn{NodeIDField: 1},
 				10: &mock.Conn{NodeIDField: 10},
@@ -264,7 +264,7 @@ func TestNewState(t *testing.T) {
 				&mock.Conn{AddrField: "2", NodeIDField: 2},
 			}, nil, balancerConfig.Info{}, false),
 			res: &connectionsState{
-				connByNodeID: map[uint32]conn.Conn{
+				connByNodeID: map[int64]conn.Conn{
 					1: &mock.Conn{AddrField: "1", NodeIDField: 1},
 					2: &mock.Conn{AddrField: "2", NodeIDField: 2},
 				},
@@ -290,7 +290,7 @@ func TestNewState(t *testing.T) {
 				return info.SelfLocation == c.Endpoint().Location()
 			}), balancerConfig.Info{SelfLocation: "t"}, false),
 			res: &connectionsState{
-				connByNodeID: map[uint32]conn.Conn{
+				connByNodeID: map[int64]conn.Conn{
 					1: &mock.Conn{AddrField: "t1", NodeIDField: 1, LocationField: "t"},
 					2: &mock.Conn{AddrField: "f1", NodeIDField: 2, LocationField: "f"},
 					3: &mock.Conn{AddrField: "t2", NodeIDField: 3, LocationField: "t"},
@@ -318,7 +318,7 @@ func TestNewState(t *testing.T) {
 				return info.SelfLocation == c.Endpoint().Location()
 			}), balancerConfig.Info{SelfLocation: "t"}, true),
 			res: &connectionsState{
-				connByNodeID: map[uint32]conn.Conn{
+				connByNodeID: map[int64]conn.Conn{
 					1: &mock.Conn{AddrField: "t1", NodeIDField: 1, LocationField: "t"},
 					2: &mock.Conn{AddrField: "f1", NodeIDField: 2, LocationField: "f"},
 					3: &mock.Conn{AddrField: "t2", NodeIDField: 3, LocationField: "t"},
@@ -351,7 +351,7 @@ func TestNewState(t *testing.T) {
 				return info.SelfLocation == c.Endpoint().Location()
 			}), balancerConfig.Info{SelfLocation: "t"}, true),
 			res: &connectionsState{
-				connByNodeID: map[uint32]conn.Conn{
+				connByNodeID: map[int64]conn.Conn{
 					1: &mock.Conn{AddrField: "t1", NodeIDField: 1, LocationField: "t"},
 					2: &mock.Conn{AddrField: "f1", NodeIDField: 2, LocationField: "f"},
 					3: &mock.Conn{AddrField: "t2", NodeIDField: 3, LocationField: "t"},

@@ -9,7 +9,7 @@ import (
 )
 
 type connectionsState struct {
-	connByNodeID map[uint32]conn.Conn
+	connByNodeID map[int64]conn.Conn
 
 	prefer   []conn.Conn
 	fallback []conn.Conn
@@ -115,11 +115,11 @@ func (s *connectionsState) selectRandomConnection(conns []conn.Conn, allowBanned
 	return nil, failedConns
 }
 
-func connsToNodeIDMap(conns []conn.Conn) (nodes map[uint32]conn.Conn) {
+func connsToNodeIDMap(conns []conn.Conn) (nodes map[int64]conn.Conn) {
 	if len(conns) == 0 {
 		return nil
 	}
-	nodes = make(map[uint32]conn.Conn, len(conns))
+	nodes = make(map[int64]conn.Conn, len(conns))
 	for _, c := range conns {
 		nodes[c.Endpoint().NodeID()] = c
 	}
