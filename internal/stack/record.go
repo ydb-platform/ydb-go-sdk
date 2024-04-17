@@ -124,7 +124,14 @@ func parseFunctionName(name string) functionDetails {
 		details.pkgPath, name = name[:i], name[i+1:]
 	}
 	split := strings.Split(name, ".")
-	details.lambdas = extractLambdas(split)
+	details.lambdas = make([]string, 0, len(split))
+	for i := range split {
+		elem := split[len(split)-i-1]
+		if !strings.HasPrefix(elem, "func") {
+			break
+		}
+		details.lambdas = append(details.lambdas, elem)
+	}
 	split = split[:len(split)-len(details.lambdas)]
 	if len(split) > 0 {
 		details.pkgName = split[0]
@@ -137,19 +144,6 @@ func parseFunctionName(name string) functionDetails {
 	}
 
 	return details
-}
-
-func extractLambdas(split []string) (lambdas []string) {
-	lambdas = make([]string, 0, len(split))
-	for i := range split {
-		elem := split[len(split)-i-1]
-		if !strings.HasPrefix(elem, "func") {
-			break
-		}
-		lambdas = append(lambdas, elem)
-	}
-
-	return lambdas
 }
 
 func buildRecordString(

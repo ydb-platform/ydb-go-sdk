@@ -289,15 +289,6 @@ func TestParseFunctionName(t *testing.T) {
 	require.Contains(t, fnDetails.lambdas, "func1", "Lambdas should include 'func1'")
 }
 
-func TestExtractLambdas(t *testing.T) {
-	split := []string{"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack", "TestExtractLambdas", "func1", "func2"}
-	lambdas := extractLambdas(split)
-
-	require.Len(t, lambdas, 2, "There should be two lambda functions extracted")
-	require.Contains(t, lambdas, "func1")
-	require.Contains(t, lambdas, "func2")
-}
-
 func TestBuildRecordString(t *testing.T) {
 	optionsHolder := recordOptions{
 		packagePath:  true,
