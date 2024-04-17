@@ -69,7 +69,7 @@ func detectFastestEndpoint(ctx context.Context, endpoints []endpoint.Endpoint) (
 
 	var lastErr error
 	// common is 2 ip address for every fqdn: ipv4 + ipv6
-	initialAddressToEndpointCapacity := len(endpoints) * 2
+	initialAddressToEndpointCapacity := len(endpoints) * 2 //nolint:gomnd
 	addressToEndpoint := make(map[string]endpoint.Endpoint, initialAddressToEndpointCapacity)
 	for _, ep := range endpoints {
 		host, port, err := extractHostPort(ep.Address())

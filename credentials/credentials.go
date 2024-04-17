@@ -34,3 +34,21 @@ func NewStaticCredentials(
 ) *credentials.Static {
 	return credentials.NewStaticCredentials(user, password, authEndpoint, opts...)
 }
+
+// NewOauth2TokenExchangeCredentials makes OAuth 2.0 token exchange protocol credentials object
+// https://www.rfc-editor.org/rfc/rfc8693
+func NewOauth2TokenExchangeCredentials(
+	opts ...credentials.Oauth2TokenExchangeCredentialsOption,
+) (Credentials, error) {
+	return credentials.NewOauth2TokenExchangeCredentials(opts...)
+}
+
+// NewJWTTokenSource makes JWT token source for OAuth 2.0 token exchange credentials
+func NewJWTTokenSource(opts ...credentials.JWTTokenSourceOption) (credentials.TokenSource, error) {
+	return credentials.NewJWTTokenSource(opts...)
+}
+
+// NewFixedTokenSource makes fixed token source for OAuth 2.0 token exchange credentials
+func NewFixedTokenSource(token, tokenType string) credentials.TokenSource {
+	return credentials.NewFixedTokenSource(token, tokenType)
+}

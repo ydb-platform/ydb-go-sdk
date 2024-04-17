@@ -262,10 +262,14 @@ func (c *Connector) idleCloser() (idleStopper func()) {
 	ctx, idleStopper = xcontext.WithCancel(context.Background())
 	go func() {
 		for {
+			idleThresholdTimer := c.clock.NewTimer(c.idleThreshold)
 			select {
 			case <-ctx.Done():
+				idleThresholdTimer.Stop()
+
 				return
-			case <-c.clock.After(c.idleThreshold):
+			case <-idleThresholdTimer.Chan():
+				idleThresholdTimer.Stop() // no really need, stop for common style only
 				c.connsMtx.RLock()
 				conns := make([]*conn, 0, len(c.conns))
 				for cc := range c.conns {

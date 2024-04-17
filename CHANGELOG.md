@@ -1,5 +1,27 @@
+## v3.65.1
+* Updated dependency `ydb-go-genproto`
+* Added processing of `Ydb.StatusIds_EXTERNAL_ERROR` in `retry.Retry`
+
+## v3.65.0
+* Supported OAuth 2.0 Token Exchange credentials provider
+
+## v3.64.0
+* Supported `table.Session.RenameTables` method
+* Fixed out of range panic if next query result set part is empty
+* Updated the indirect dependencies `golang.org/x/net` to `v0.17.0` and `golang.org/x/sys` to `v0.13.0` due to vulnerability issue
+
+## v3.63.0
+* Added versioning policy
+
+## v3.62.0
+* Restored `WithSessionPoolKeepAliveMinSize` and `WithSessionPoolKeepAliveTimeout` for backward compatibility.
+* Fixed leak timers
+* Changed default StartTime (time of retries for connect to server) for topic writer from 1 minute to infinite (can be overrided by WithWriterStartTimeout topic option)
+* Added `Struct` support for `Variant` in `ydb.ParamsBuilder()`
+* Added `go` with anonymous function case in `gstack`
+
 ## v3.61.2
-* Changed default transaction control to `NoTx` for execute query through query service client 
+* Changed default transaction control to `NoTx` for execute query through query service client
 
 ## v3.61.1
 * Renamed `db.Coordination().CreateSession()` to `db.Coordination().Session()` for compatibility with protos
@@ -82,7 +104,7 @@
 * Fixed sometime panic on topic writer closing
 * Added experimental query parameters builder `ydb.ParamsBuilder()`
 * Changed types of `table/table.{QueryParameters,ParameterOption}` to aliases on `internal/params.{Parameters,NamedValue}`
-* Fixed bug with optional decimal serialization 
+* Fixed bug with optional decimal serialization
 
 ## v3.56.2
 * Fixed return private error for commit to stopped partition in topic reader.

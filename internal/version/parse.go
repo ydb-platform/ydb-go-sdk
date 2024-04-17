@@ -68,6 +68,7 @@ func Gte(lhs, rhs string) bool {
 	return true
 }
 
+//nolint:gomnd
 func parse(s string) (v version, err error) {
 	ss := strings.SplitN(s, "-", 2)
 	if len(ss) == 2 {

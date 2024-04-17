@@ -12,12 +12,12 @@ const (
 )
 
 var (
-	ten  = big.NewInt(10)
+	ten  = big.NewInt(10) //nolint:gomnd
 	zero = big.NewInt(0)
 	one  = big.NewInt(1)
 	inf  = big.NewInt(0).Mul(
-		big.NewInt(100000000000000000),
-		big.NewInt(1000000000000000000),
+		big.NewInt(100000000000000000),  //nolint:gomnd
+		big.NewInt(1000000000000000000), //nolint:gomnd
 	)
 	nan    = big.NewInt(0).Add(inf, one)
 	err    = big.NewInt(0).Add(nan, one)

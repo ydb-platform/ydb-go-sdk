@@ -16,10 +16,10 @@ import (
 // Connection interface provide access to YDB service clients
 // Interface and list of clients may be changed in the future
 //
-// Deprecated: use directly *Driver type from ydb.Open instead
-//
-//nolint:interfacebloat
-type Connection interface {
+// Deprecated: use Driver instance instead.
+// Will be removed at next major release.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+type Connection interface { //nolint:interfacebloat
 	// Endpoint returns initial endpoint
 	Endpoint() string
 
@@ -37,9 +37,7 @@ type Connection interface {
 
 	// Query returns query client
 	//
-	// # Experimental
-	//
-	// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	Query() query.Client
 
 	// Scheme returns scheme client

@@ -6,7 +6,6 @@ require (
 	github.com/prometheus/client_golang v1.14.0
 	github.com/ydb-platform/gorm-driver v0.1.1
 	github.com/ydb-platform/ydb-go-sdk/v3 v3.58.0
-	go.opentelemetry.io/otel v1.21.0
 	golang.org/x/sync v0.6.0
 	golang.org/x/time v0.3.0
 	gorm.io/gorm v1.25.1
@@ -16,13 +15,12 @@ require (
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/go-logr/logr v1.4.1 // indirect
-	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/goccy/go-json v0.9.11 // indirect
 	github.com/golang-jwt/jwt v3.2.2+incompatible // indirect
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/google/uuid v1.5.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
@@ -37,13 +35,11 @@ require (
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/yandex-cloud/go-genproto v0.0.0-20230403093326-123923969dc6 // indirect
-	github.com/ydb-platform/ydb-go-genproto v0.0.0-20240126124512-dbb0e1720dbf // indirect
+	github.com/ydb-platform/ydb-go-genproto v0.0.0-20240316140903-4a47abca1cca // indirect
 	github.com/ydb-platform/ydb-go-sdk-auth-environ v0.2.0 // indirect
 	github.com/ydb-platform/ydb-go-yc v0.10.2 // indirect
 	github.com/ydb-platform/ydb-go-yc-metadata v0.5.3 // indirect
-	go.opentelemetry.io/otel/metric v1.21.0 // indirect
-	go.opentelemetry.io/otel/trace v1.21.0 // indirect
-	golang.org/x/net v0.20.0 // indirect
+	golang.org/x/net v0.17.0 // indirect
 	golang.org/x/sys v0.16.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/genproto v0.0.0-20240102182953-50ed04b92917 // indirect

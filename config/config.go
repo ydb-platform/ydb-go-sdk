@@ -107,7 +107,9 @@ type Option func(c *Config)
 
 // WithInternalDNSResolver
 //
-// Deprecated: always used internal dns-resolver
+// Deprecated: always used internal dns-resolver.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithInternalDNSResolver() Option {
 	return func(c *Config) {}
 }
@@ -170,7 +172,9 @@ func WithApplicationName(applicationName string) Option {
 
 // WithUserAgent add provided user agent to all api requests
 //
-// Deprecated: use WithApplicationName instead
+// Deprecated: use WithApplicationName instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithUserAgent(userAgent string) Option {
 	return func(c *Config) {
 		c.metaOptions = append(c.metaOptions, meta.WithApplicationNameOption(userAgent))

@@ -95,6 +95,10 @@ func (e *Endpoint) Address() string {
 	return e.AddrField
 }
 
+// Deprecated: LocalDC check "local" by compare endpoint location with discovery "selflocation" field.
+// It work good only if connection url always point to local dc.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func (e *Endpoint) LocalDC() bool {
 	return e.LocalDCField
 }

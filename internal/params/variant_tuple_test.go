@@ -441,7 +441,7 @@ func TestVariantTuple(t *testing.T) {
 			a := allocator.New()
 			defer a.Free()
 
-			item := Builder{}.Param("$x").BeginVariant().Tuple().Types()
+			item := Builder{}.Param("$x").BeginVariant().BeginTuple().Types()
 
 			types, ok := xtest.CallMethod(item, tc.method, tc.typeArgs...)[0].(*variantTupleTypes)
 			require.True(t, ok)
@@ -482,7 +482,7 @@ func TestVariantTuple_AddTypes(t *testing.T) {
 	a := allocator.New()
 	defer a.Free()
 
-	params := Builder{}.Param("$x").BeginVariant().Tuple().
+	params := Builder{}.Param("$x").BeginVariant().BeginTuple().
 		Types().AddTypes(types.Int64, types.Bool).
 		Index(1).
 		Bool(true).

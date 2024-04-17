@@ -19,6 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -55,7 +56,8 @@ type conn struct {
 	endpoint          endpoint.Endpoint // ro access
 	closed            bool
 	state             atomic.Uint32
-	lastUsage         *lastUsage
+	childStreams      *xcontext.CancelsGuard
+	lastUsage         xsync.LastUsage
 	onClose           []func(*conn)
 	onTransportErrors []func(ctx context.Context, cc Conn, cause error)
 }
@@ -392,7 +394,7 @@ func (c *conn) NewStream(
 	desc *grpc.StreamDesc,
 	method string,
 	opts ...grpc.CallOption,
-) (_ grpc.ClientStream, err error) {
+) (_ grpc.ClientStream, finalErr error) {
 	var (
 		onDone = trace.DriverOnConnNewStream(
 			c.config.Trace(), &ctx,
@@ -400,15 +402,13 @@ func (c *conn) NewStream(
 			c.endpoint.Copy(), trace.Method(method),
 		)
 		useWrapping = UseWrapping(ctx)
-		cc          *grpc.ClientConn
-		s           grpc.ClientStream
 	)
 
 	defer func() {
-		onDone(err, c.GetState())
+		onDone(finalErr, c.GetState())
 	}()
 
-	cc, err = c.realConn(ctx)
+	cc, err := c.realConn(ctx)
 	if err != nil {
 		return nil, c.wrapError(err)
 	}
@@ -423,7 +423,19 @@ func (c *conn) NewStream(
 
 	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID))
 
-	s, err = cc.NewStream(ctx, desc, method, opts...)
+	ctx, cancel := xcontext.WithCancel(ctx)
+	defer func() {
+		if finalErr != nil {
+			cancel()
+		} else {
+			c.childStreams.Remember(&cancel)
+		}
+	}()
+
+	s, err := cc.NewStream(ctx, desc, method, append(opts, grpc.OnFinish(func(err error) {
+		cancel()
+		c.childStreams.Forget(&cancel)
+	}))...)
 	if err != nil {
 		if xerrors.IsContextError(err) {
 			return nil, xerrors.WithStackTrace(err)
@@ -490,10 +502,16 @@ func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, ca
 
 func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	c := &conn{
-		endpoint:  e,
-		config:    config,
-		done:      make(chan struct{}),
-		lastUsage: newLastUsage(nil),
+		endpoint:     e,
+		config:       config,
+		done:         make(chan struct{}),
+		lastUsage:    xsync.NewLastUsage(),
+		childStreams: xcontext.NewCancelsGuard(),
+		onClose: []func(*conn){
+			func(c *conn) {
+				c.childStreams.Cancel()
+			},
+		},
 	}
 	c.state.Store(uint32(Created))
 	for _, opt := range opts {
