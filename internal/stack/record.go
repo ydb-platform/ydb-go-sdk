@@ -139,7 +139,7 @@ func parseFunctionName(name string) functionDetails {
 	if len(split) > 1 {
 		details.funcName = split[len(split)-1]
 	}
-	if len(split) > 2 {
+	if len(split) > 2 { //nolint:gomnd
 		details.structName = split[1]
 	}
 
