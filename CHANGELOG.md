@@ -1,3 +1,4 @@
+## v3.65.3
 * Fixed data race in `internal/conn.grpcClientStream` 
 
 ## v3.65.2
