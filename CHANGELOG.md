@@ -1,4 +1,4 @@
-* Fixed data race in logger ydb/log/WithNames 
+* Fixed data race using `log.WithNames`
 
 ## v3.65.1
 * Updated dependency `ydb-go-genproto`
