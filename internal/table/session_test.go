@@ -240,8 +240,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableExecuteDataQuery,
 			do: func(t *testing.T, ctx context.Context, c *Client) {
 				s := &session{
-					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
-					config:       config.New(),
+					client: Ydb_Table_V1.NewTableServiceClient(c.cc),
+					config: config.New(),
 				}
 				_, _, err := s.Execute(ctx, table.TxControl(), "", table.NewQueryParameters())
 				require.NoError(t, err)
@@ -251,8 +251,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableExplainDataQuery,
 			do: func(t *testing.T, ctx context.Context, c *Client) {
 				s := &session{
-					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
-					config:       config.New(),
+					client: Ydb_Table_V1.NewTableServiceClient(c.cc),
+					config: config.New(),
 				}
 				_, err := s.Explain(ctx, "")
 				require.NoError(t, err)
@@ -262,8 +262,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TablePrepareDataQuery,
 			do: func(t *testing.T, ctx context.Context, c *Client) {
 				s := &session{
-					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
-					config:       config.New(),
+					client: Ydb_Table_V1.NewTableServiceClient(c.cc),
+					config: config.New(),
 				}
 				_, err := s.Prepare(ctx, "")
 				require.NoError(t, err)
@@ -280,8 +280,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableDeleteSession,
 			do: func(t *testing.T, ctx context.Context, c *Client) {
 				s := &session{
-					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
-					config:       config.New(),
+					client: Ydb_Table_V1.NewTableServiceClient(c.cc),
+					config: config.New(),
 				}
 				require.NoError(t, s.Close(ctx))
 			},
@@ -290,8 +290,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableBeginTransaction,
 			do: func(t *testing.T, ctx context.Context, c *Client) {
 				s := &session{
-					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
-					config:       config.New(),
+					client: Ydb_Table_V1.NewTableServiceClient(c.cc),
+					config: config.New(),
 				}
 				_, err := s.BeginTransaction(ctx, table.TxSettings())
 				require.NoError(t, err)
@@ -302,8 +302,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			do: func(t *testing.T, ctx context.Context, c *Client) {
 				tx := &transaction{
 					s: &session{
-						tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
-						config:       config.New(),
+						client: Ydb_Table_V1.NewTableServiceClient(c.cc),
+						config: config.New(),
 					},
 				}
 				_, err := tx.CommitTx(ctx)
@@ -315,8 +315,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			do: func(t *testing.T, ctx context.Context, c *Client) {
 				tx := &transaction{
 					s: &session{
-						tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
-						config:       config.New(),
+						client: Ydb_Table_V1.NewTableServiceClient(c.cc),
+						config: config.New(),
 					},
 				}
 				err := tx.Rollback(ctx)
@@ -327,8 +327,8 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			method: testutil.TableKeepAlive,
 			do: func(t *testing.T, ctx context.Context, c *Client) {
 				s := &session{
-					tableService: Ydb_Table_V1.NewTableServiceClient(c.cc),
-					config:       config.New(),
+					client: Ydb_Table_V1.NewTableServiceClient(c.cc),
+					config: config.New(),
 				}
 				require.NoError(t, s.KeepAlive(ctx))
 			},

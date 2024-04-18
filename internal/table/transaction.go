@@ -29,7 +29,12 @@ type txState struct {
 }
 
 func (s *txState) Get() txStateEnum {
-	return *s.Pointer.Load()
+	ptr := s.Pointer.Load()
+	if ptr == nil {
+		return txStateInitialized
+	}
+
+	return *ptr
 }
 
 func (s *txState) Set(state txStateEnum) {
@@ -52,6 +57,10 @@ type transaction struct {
 }
 
 func (tx *transaction) ID() string {
+	if tx == nil {
+		return ""
+	}
+
 	return tx.id
 }
 
@@ -167,7 +176,7 @@ func (tx *transaction) CommitTx(
 			}
 		}
 
-		response, err = tx.s.tableService.CommitTransaction(ctx, request)
+		response, err = tx.s.client.CommitTransaction(ctx, request)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
@@ -204,7 +213,7 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 	case txStateRollbacked:
 		return xerrors.WithStackTrace(errTxRollbackedEarly)
 	default:
-		_, err = tx.s.tableService.RollbackTransaction(ctx,
+		_, err = tx.s.client.RollbackTransaction(ctx,
 			&Ydb_Table.RollbackTransactionRequest{
 				SessionId: tx.s.id,
 				TxId:      tx.id,

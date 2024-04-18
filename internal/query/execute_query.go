@@ -39,6 +39,9 @@ func queryFromText(
 }
 
 func ReadAll(ctx context.Context, r *result) (resultSets []*Ydb.ResultSet, stats *Ydb_TableStats.QueryStats, _ error) {
+	if r == nil {
+		return nil, nil, xerrors.WithStackTrace(errNilResult)
+	}
 	for {
 		resultSet, err := r.nextResultSet(ctx)
 		if err != nil {

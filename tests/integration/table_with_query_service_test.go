@@ -18,7 +18,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 )
 
-func TestWithQueryService(t *testing.T) {
+func TestTableWithQueryService(t *testing.T) {
 	if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
 		t.Skip("query service not allowed in YDB version '" + os.Getenv("YDB_VERSION") + "'")
 	}
@@ -51,7 +51,6 @@ func TestWithQueryService(t *testing.T) {
 				}
 				return fmt.Errorf("unexpected empty result set")
 			}
-			var abc, def int32
 			err = res.ScanNamed(
 				named.Required("abc", &abc),
 				named.Required("def", &def),
@@ -67,8 +66,12 @@ func TestWithQueryService(t *testing.T) {
 		require.EqualValues(t, 456, def)
 	})
 	t.Run("table.Transaction.Execute", func(t *testing.T) {
+		var abc, def int32
 		err = db.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) (err error) {
-			res, err := tx.Execute(ctx, `SELECT 1 as abc, 2 as def;`, nil)
+			res, err := tx.Execute(ctx,
+				`SELECT 123 as abc, 456 as def;`, nil,
+				options.WithQueryService(),
+			)
 			if err != nil {
 				return err
 			}
@@ -82,10 +85,9 @@ func TestWithQueryService(t *testing.T) {
 				}
 				return fmt.Errorf("unexpected empty result set")
 			}
-			var abc, def int32
 			err = res.ScanNamed(
 				named.Required("abc", &abc),
-				named.Required("ghi", &def),
+				named.Required("def", &def),
 			)
 			if err != nil {
 				return err
@@ -93,7 +95,8 @@ func TestWithQueryService(t *testing.T) {
 			t.Log(abc, def)
 			return res.Err()
 		}, table.WithTxSettings(table.TxSettings(table.WithSnapshotReadOnly())))
-		require.Error(t, err)
-		require.ErrorContains(t, err, "not found column 'ghi'")
+		require.NoError(t, err)
+		require.EqualValues(t, 123, abc)
+		require.EqualValues(t, 456, def)
 	})
 }

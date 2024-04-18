@@ -1109,3 +1109,1041 @@ func TestExecuteQueryRequest(t *testing.T) {
 		})
 	}
 }
+
+func TestReadAll(t *testing.T) {
+	ctx := xtest.Context(t)
+	ctrl := gomock.NewController(t)
+	t.Run("NilResult", func(t *testing.T) {
+		resultSets, stats, err := ReadAll(ctx, nil)
+		require.ErrorIs(t, err, errNilResult)
+		require.Nil(t, resultSets)
+		require.Nil(t, stats)
+	})
+	t.Run("io.EOF", func(t *testing.T) {
+		stream := NewMockResultStream(ctrl)
+		stream.EXPECT().Recv().Return(nil, io.EOF)
+		r, txID, err := newResult(ctx, stream, nil, nil)
+		require.NoError(t, err)
+		require.Equal(t, "", txID)
+		resultSets, stats, err := ReadAll(ctx, r)
+		require.ErrorIs(t, err, errNilResult)
+		require.Nil(t, resultSets)
+		require.Nil(t, stats)
+	})
+	t.Run("EmptyResult", func(t *testing.T) {
+		stream := NewMockResultStream(ctrl)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status:         Ydb.StatusIds_SUCCESS,
+			ResultSetIndex: 0,
+			ResultSet:      nil,
+			ExecStats:      nil,
+			TxMeta: &Ydb_Query.TransactionMeta{
+				Id: "123",
+			},
+		}, nil)
+		stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
+		r, txID, err := newResult(ctx, stream, nil, nil)
+		require.NoError(t, err)
+		require.Equal(t, "123", txID)
+		resultSets, stats, err := ReadAll(ctx, r)
+		require.NoError(t, err)
+		require.EqualValues(t, []*Ydb.ResultSet{
+			{},
+		}, resultSets)
+		require.Nil(t, stats)
+	})
+	t.Run("SingleResultSet", func(t *testing.T) {
+		t.Run("SinglePart", func(t *testing.T) {
+			stream := NewMockResultStream(ctrl)
+			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				Status:         Ydb.StatusIds_SUCCESS,
+				ResultSetIndex: 0,
+				ResultSet: &Ydb.ResultSet{
+					Columns: []*Ydb.Column{
+						{
+							Name: "a",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UINT64,
+								},
+							},
+						},
+						{
+							Name: "b",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+					Rows: []*Ydb.Value{
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 1,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 2,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "2",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 3,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "3",
+								},
+							}},
+						},
+					},
+				},
+				ExecStats: nil,
+				TxMeta: &Ydb_Query.TransactionMeta{
+					Id: "123",
+				},
+			}, nil)
+			stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
+			r, txID, err := newResult(ctx, stream, nil, nil)
+			require.NoError(t, err)
+			require.Equal(t, "123", txID)
+			resultSets, stats, err := ReadAll(ctx, r)
+			require.NoError(t, err)
+			require.EqualValues(t, []*Ydb.ResultSet{
+				{
+					Columns: []*Ydb.Column{
+						{
+							Name: "a",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UINT64,
+								},
+							},
+						},
+						{
+							Name: "b",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+					Rows: []*Ydb.Value{
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 1,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 2,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "2",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 3,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "3",
+								},
+							}},
+						},
+					},
+				},
+			}, resultSets)
+			require.Nil(t, stats)
+		})
+		t.Run("TwoParts", func(t *testing.T) {
+			stream := NewMockResultStream(ctrl)
+			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				Status:         Ydb.StatusIds_SUCCESS,
+				ResultSetIndex: 0,
+				ResultSet: &Ydb.ResultSet{
+					Columns: []*Ydb.Column{
+						{
+							Name: "a",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UINT64,
+								},
+							},
+						},
+						{
+							Name: "b",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+					Rows: []*Ydb.Value{
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 1,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 2,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "2",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 3,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "3",
+								},
+							}},
+						},
+					},
+				},
+				ExecStats: nil,
+				TxMeta: &Ydb_Query.TransactionMeta{
+					Id: "123",
+				},
+			}, nil)
+			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				Status:         Ydb.StatusIds_SUCCESS,
+				ResultSetIndex: 0,
+				ResultSet: &Ydb.ResultSet{
+					Rows: []*Ydb.Value{
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 4,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "4",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 5,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "5",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 6,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "6",
+								},
+							}},
+						},
+					},
+				},
+				ExecStats: nil,
+				TxMeta: &Ydb_Query.TransactionMeta{
+					Id: "123",
+				},
+			}, nil)
+			stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
+			r, txID, err := newResult(ctx, stream, nil, nil)
+			require.NoError(t, err)
+			require.Equal(t, "123", txID)
+			resultSets, stats, err := ReadAll(ctx, r)
+			require.NoError(t, err)
+			require.EqualValues(t, []*Ydb.ResultSet{
+				{
+					Columns: []*Ydb.Column{
+						{
+							Name: "a",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UINT64,
+								},
+							},
+						},
+						{
+							Name: "b",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+					Rows: []*Ydb.Value{
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 1,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 2,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "2",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 3,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "3",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 4,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "4",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 5,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "5",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 6,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "6",
+								},
+							}},
+						},
+					},
+				},
+			}, resultSets)
+			require.Nil(t, stats)
+		})
+	})
+	t.Run("TwoResultSets", func(t *testing.T) {
+		t.Run("SinglePart", func(t *testing.T) {
+			stream := NewMockResultStream(ctrl)
+			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				Status:         Ydb.StatusIds_SUCCESS,
+				ResultSetIndex: 0,
+				ResultSet: &Ydb.ResultSet{
+					Columns: []*Ydb.Column{
+						{
+							Name: "a",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UINT64,
+								},
+							},
+						},
+						{
+							Name: "b",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+					Rows: []*Ydb.Value{
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 1,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 2,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "2",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 3,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "3",
+								},
+							}},
+						},
+					},
+				},
+				ExecStats: nil,
+				TxMeta: &Ydb_Query.TransactionMeta{
+					Id: "123",
+				},
+			}, nil)
+			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				Status:         Ydb.StatusIds_SUCCESS,
+				ResultSetIndex: 1,
+				ResultSet: &Ydb.ResultSet{
+					Columns: []*Ydb.Column{
+						{
+							Name: "c",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UINT64,
+								},
+							},
+						},
+						{
+							Name: "d",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+					Rows: []*Ydb.Value{
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 1,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 2,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "2",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 3,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "3",
+								},
+							}},
+						},
+					},
+				},
+				ExecStats: nil,
+				TxMeta: &Ydb_Query.TransactionMeta{
+					Id: "123",
+				},
+			}, nil)
+			stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
+			r, txID, err := newResult(ctx, stream, nil, nil)
+			require.NoError(t, err)
+			require.Equal(t, "123", txID)
+			resultSets, stats, err := ReadAll(ctx, r)
+			require.NoError(t, err)
+			require.EqualValues(t, []*Ydb.ResultSet{
+				{
+					Columns: []*Ydb.Column{
+						{
+							Name: "a",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UINT64,
+								},
+							},
+						},
+						{
+							Name: "b",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+					Rows: []*Ydb.Value{
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 1,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 2,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "2",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 3,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "3",
+								},
+							}},
+						},
+					},
+				},
+				{
+					Columns: []*Ydb.Column{
+						{
+							Name: "c",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UINT64,
+								},
+							},
+						},
+						{
+							Name: "d",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+					Rows: []*Ydb.Value{
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 1,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 2,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "2",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 3,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "3",
+								},
+							}},
+						},
+					},
+				},
+			}, resultSets)
+			require.Nil(t, stats)
+		})
+		t.Run("TwoParts", func(t *testing.T) {
+			stream := NewMockResultStream(ctrl)
+			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				Status:         Ydb.StatusIds_SUCCESS,
+				ResultSetIndex: 0,
+				ResultSet: &Ydb.ResultSet{
+					Columns: []*Ydb.Column{
+						{
+							Name: "a",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UINT64,
+								},
+							},
+						},
+						{
+							Name: "b",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+					Rows: []*Ydb.Value{
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 1,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 2,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "2",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 3,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "3",
+								},
+							}},
+						},
+					},
+				},
+				ExecStats: nil,
+				TxMeta: &Ydb_Query.TransactionMeta{
+					Id: "123",
+				},
+			}, nil)
+			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				Status:         Ydb.StatusIds_SUCCESS,
+				ResultSetIndex: 0,
+				ResultSet: &Ydb.ResultSet{
+					Rows: []*Ydb.Value{
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 4,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "4",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 5,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "5",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 6,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "6",
+								},
+							}},
+						},
+					},
+				},
+				ExecStats: nil,
+				TxMeta: &Ydb_Query.TransactionMeta{
+					Id: "123",
+				},
+			}, nil)
+			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				Status:         Ydb.StatusIds_SUCCESS,
+				ResultSetIndex: 1,
+				ResultSet: &Ydb.ResultSet{
+					Columns: []*Ydb.Column{
+						{
+							Name: "c",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UINT64,
+								},
+							},
+						},
+						{
+							Name: "d",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+					Rows: []*Ydb.Value{
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 1,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 2,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "2",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 3,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "3",
+								},
+							}},
+						},
+					},
+				},
+				ExecStats: nil,
+				TxMeta: &Ydb_Query.TransactionMeta{
+					Id: "123",
+				},
+			}, nil)
+			stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+				Status:         Ydb.StatusIds_SUCCESS,
+				ResultSetIndex: 1,
+				ResultSet: &Ydb.ResultSet{
+					Rows: []*Ydb.Value{
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 4,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "4",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 5,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "5",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 6,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "6",
+								},
+							}},
+						},
+					},
+				},
+				ExecStats: nil,
+				TxMeta: &Ydb_Query.TransactionMeta{
+					Id: "123",
+				},
+			}, nil)
+			stream.EXPECT().Recv().Return(nil, io.EOF).AnyTimes()
+			r, txID, err := newResult(ctx, stream, nil, nil)
+			require.NoError(t, err)
+			require.Equal(t, "123", txID)
+			resultSets, stats, err := ReadAll(ctx, r)
+			require.NoError(t, err)
+			require.EqualValues(t, []*Ydb.ResultSet{
+				{
+					Columns: []*Ydb.Column{
+						{
+							Name: "a",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UINT64,
+								},
+							},
+						},
+						{
+							Name: "b",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+					Rows: []*Ydb.Value{
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 1,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 2,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "2",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 3,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "3",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 4,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "4",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 5,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "5",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 6,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "6",
+								},
+							}},
+						},
+					},
+				},
+				{
+					Columns: []*Ydb.Column{
+						{
+							Name: "c",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UINT64,
+								},
+							},
+						},
+						{
+							Name: "d",
+							Type: &Ydb.Type{
+								Type: &Ydb.Type_TypeId{
+									TypeId: Ydb.Type_UTF8,
+								},
+							},
+						},
+					},
+					Rows: []*Ydb.Value{
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 1,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "1",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 2,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "2",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 3,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "3",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 4,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "4",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 5,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "5",
+								},
+							}},
+						},
+						{
+							Items: []*Ydb.Value{{
+								Value: &Ydb.Value_Uint64Value{
+									Uint64Value: 6,
+								},
+							}, {
+								Value: &Ydb.Value_TextValue{
+									TextValue: "6",
+								},
+							}},
+						},
+					},
+				},
+			}, resultSets)
+			require.Nil(t, stats)
+		})
+	})
+}

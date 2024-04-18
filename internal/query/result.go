@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -15,21 +14,28 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+//go:generate mockgen -destination result_stream_mock_test.go -package query -write_package_comment=false . ResultStream
+
 var _ query.Result = (*result)(nil)
 
-type result struct {
-	stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
-	closeOnce      func(ctx context.Context) error
-	lastPart       *Ydb_Query.ExecuteQueryResponsePart
-	resultSetIndex int64
-	errs           []error
-	closed         chan struct{}
-	trace          *trace.Query
-}
+type (
+	ResultStream interface {
+		Recv() (*Ydb_Query.ExecuteQueryResponsePart, error)
+	}
+	result struct {
+		stream         ResultStream
+		closeOnce      func(ctx context.Context) error
+		lastPart       *Ydb_Query.ExecuteQueryResponsePart
+		resultSetIndex int64
+		errs           []error
+		closed         chan struct{}
+		trace          *trace.Query
+	}
+)
 
 func newResult(
 	ctx context.Context,
-	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
+	stream ResultStream,
 	t *trace.Query,
 	closeResult context.CancelFunc,
 ) (_ *result, txID string, err error) {
@@ -53,6 +59,10 @@ func newResult(
 	default:
 		part, err := nextPart(ctx, stream, t)
 		if err != nil {
+			if xerrors.Is(err, io.EOF) {
+				return nil, txID, nil
+			}
+
 			return nil, txID, xerrors.WithStackTrace(err)
 		}
 		var (
@@ -81,7 +91,7 @@ func newResult(
 
 func nextPart(
 	ctx context.Context,
-	stream Ydb_Query_V1.QueryService_ExecuteQueryClient,
+	stream ResultStream,
 	t *trace.Query,
 ) (_ *Ydb_Query.ExecuteQueryResponsePart, finalErr error) {
 	if t == nil {
@@ -130,7 +140,7 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		default:
-			if resultSetIndex := r.lastPart.GetResultSetIndex(); resultSetIndex >= nextResultSetIndex { //nolint:nestif
+			if resultSetIndex := r.lastPart.GetResultSetIndex(); resultSetIndex >= nextResultSetIndex {
 				r.resultSetIndex = resultSetIndex
 
 				return newResultSet(func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
@@ -147,10 +157,6 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 					default:
 						part, err := nextPart(ctx, r.stream, r.trace)
 						if err != nil {
-							if xerrors.Is(err, io.EOF) {
-								_ = r.closeOnce(ctx)
-							}
-
 							return nil, xerrors.WithStackTrace(err)
 						}
 						r.lastPart = part

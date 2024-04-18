@@ -48,16 +48,16 @@ import (
 // Note that after session is no longer needed it should be destroyed by
 // Close() call.
 type session struct {
-	onClose      []func(s *session)
-	id           string
-	tableService Ydb_Table_V1.TableServiceClient
-	queryService Ydb_Query_V1.QueryServiceClient
-	status       table.SessionStatus
-	config       *config.Config
-	lastUsage    atomic.Int64
-	statusMtx    sync.RWMutex
-	closeOnce    sync.Once
-	nodeID       atomic.Int64
+	onClose     []func(s *session)
+	id          string
+	client      Ydb_Table_V1.TableServiceClient
+	queryClient Ydb_Query_V1.QueryServiceClient
+	status      table.SessionStatus
+	config      *config.Config
+	lastUsage   atomic.Int64
+	statusMtx   sync.RWMutex
+	closeOnce   sync.Once
+	nodeID      atomic.Int64
 }
 
 func (s *session) LastUsage() time.Time {
@@ -156,7 +156,7 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config
 	}
 	s.lastUsage.Store(time.Now().Unix())
 
-	s.tableService = Ydb_Table_V1.NewTableServiceClient(
+	s.client = Ydb_Table_V1.NewTableServiceClient(
 		conn.WithBeforeFunc(
 			conn.WithContextModifier(cc, func(ctx context.Context) context.Context {
 				return meta.WithTrailerCallback(balancerContext.WithEndpoint(ctx, s), s.checkCloseHint)
@@ -167,7 +167,7 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config
 		),
 	)
 
-	s.queryService = Ydb_Query_V1.NewQueryServiceClient(
+	s.queryClient = Ydb_Query_V1.NewQueryServiceClient(
 		conn.WithBeforeFunc(
 			conn.WithContextModifier(cc, func(ctx context.Context) context.Context {
 				return meta.WithTrailerCallback(balancerContext.WithEndpoint(ctx, s), s.checkCloseHint)
@@ -205,7 +205,7 @@ func (s *session) Close(ctx context.Context) (err error) {
 		}()
 
 		if time.Since(s.LastUsage()) < s.config.IdleThreshold() {
-			_, err = s.tableService.DeleteSession(ctx,
+			_, err = s.client.DeleteSession(ctx,
 				&Ydb_Table.DeleteSessionRequest{
 					SessionId: s.id,
 					OperationParams: operation.Params(ctx,
@@ -256,7 +256,7 @@ func (s *session) KeepAlive(ctx context.Context) (err error) {
 		onDone(err)
 	}()
 
-	resp, err := s.tableService.KeepAlive(ctx,
+	resp, err := s.client.KeepAlive(ctx,
 		&Ydb_Table.KeepAliveRequest{
 			SessionId: s.id,
 			OperationParams: operation.Params(
@@ -311,7 +311,7 @@ func (s *session) CreateTable(
 			opt.ApplyCreateTableOption((*options.CreateTableDesc)(&request), a)
 		}
 	}
-	_, err = s.tableService.CreateTable(ctx, &request)
+	_, err = s.client.CreateTable(ctx, &request)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -344,7 +344,7 @@ func (s *session) DescribeTable(
 			opt((*options.DescribeTableDesc)(&request))
 		}
 	}
-	response, err = s.tableService.DescribeTable(ctx, &request)
+	response, err = s.client.DescribeTable(ctx, &request)
 	if err != nil {
 		return desc, xerrors.WithStackTrace(err)
 	}
@@ -493,7 +493,7 @@ func (s *session) DropTable(
 			opt.ApplyDropTableOption((*options.DropTableDesc)(&request))
 		}
 	}
-	_, err = s.tableService.DropTable(ctx, &request)
+	_, err = s.client.DropTable(ctx, &request)
 
 	return xerrors.WithStackTrace(err)
 }
@@ -532,7 +532,7 @@ func (s *session) AlterTable(
 			opt.ApplyAlterTableOption((*options.AlterTableDesc)(&request), a)
 		}
 	}
-	_, err = s.tableService.AlterTable(ctx, &request)
+	_, err = s.client.AlterTable(ctx, &request)
 
 	return xerrors.WithStackTrace(err)
 }
@@ -559,7 +559,7 @@ func (s *session) CopyTable(
 			opt((*options.CopyTableDesc)(&request))
 		}
 	}
-	_, err = s.tableService.CopyTable(ctx, &request)
+	_, err = s.client.CopyTable(ctx, &request)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -609,7 +609,7 @@ func (s *session) CopyTables(
 	ctx context.Context,
 	opts ...options.CopyTablesOption,
 ) (err error) {
-	err = copyTables(ctx, s.id, s.config.OperationTimeout(), s.config.OperationCancelAfter(), s.tableService, opts...)
+	err = copyTables(ctx, s.id, s.config.OperationTimeout(), s.config.OperationCancelAfter(), s.client, opts...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -659,7 +659,7 @@ func (s *session) RenameTables(
 	ctx context.Context,
 	opts ...options.RenameTablesOption,
 ) (err error) {
-	err = renameTables(ctx, s.id, s.config.OperationTimeout(), s.config.OperationCancelAfter(), s.tableService, opts...)
+	err = renameTables(ctx, s.id, s.config.OperationTimeout(), s.config.OperationCancelAfter(), s.client, opts...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -692,7 +692,7 @@ func (s *session) Explain(
 		}
 	}()
 
-	response, err = s.tableService.ExplainDataQuery(ctx,
+	response, err = s.client.ExplainDataQuery(ctx,
 		&Ydb_Table.ExplainDataQueryRequest{
 			SessionId: s.id,
 			YqlText:   query,
@@ -741,7 +741,7 @@ func (s *session) Prepare(ctx context.Context, queryText string) (_ table.Statem
 		}
 	}()
 
-	response, err = s.tableService.PrepareDataQuery(ctx,
+	response, err = s.client.PrepareDataQuery(ctx,
 		&Ydb_Table.PrepareDataQueryRequest{
 			SessionId: s.id,
 			YqlText:   queryText,
@@ -837,7 +837,7 @@ func (s *session) Execute(
 	for _, opt := range opts {
 		executeOptions = append(executeOptions, opt)
 	}
-	tx, res, err := query.Execute(ctx, s.queryService, s.ID(), q, executeOptions...)
+	tx, res, err := query.Execute(ctx, s.queryClient, s.ID(), q, executeOptions...)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
@@ -904,7 +904,7 @@ func (s *session) executeDataQuery(
 		response *Ydb_Table.ExecuteDataQueryResponse
 	)
 
-	response, err = s.tableService.ExecuteDataQuery(ctx, request, callOptions...)
+	response, err = s.client.ExecuteDataQuery(ctx, request, callOptions...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -938,7 +938,7 @@ func (s *session) ExecuteSchemeQuery(
 			opt((*options.ExecuteSchemeQueryDesc)(&request))
 		}
 	}
-	_, err = s.tableService.ExecuteSchemeQuery(ctx, &request)
+	_, err = s.client.ExecuteSchemeQuery(ctx, &request)
 
 	return xerrors.WithStackTrace(err)
 }
@@ -960,7 +960,7 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 			operation.ModeSync,
 		),
 	}
-	response, err = s.tableService.DescribeTableOptions(ctx, &request)
+	response, err = s.client.DescribeTableOptions(ctx, &request)
 	if err != nil {
 		return desc, xerrors.WithStackTrace(err)
 	}
@@ -1111,7 +1111,7 @@ func (s *session) StreamReadTable(
 
 	ctx, cancel := xcontext.WithCancel(ctx)
 
-	stream, err = s.tableService.StreamReadTable(ctx, &request)
+	stream, err = s.client.StreamReadTable(ctx, &request)
 	if err != nil {
 		cancel()
 
@@ -1173,7 +1173,7 @@ func (s *session) ReadRows(
 		}
 	}
 
-	response, err = s.tableService.ReadRows(ctx, &request)
+	response, err = s.client.ReadRows(ctx, &request)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -1231,7 +1231,7 @@ func (s *session) StreamExecuteScanQuery(
 
 	ctx, cancel := xcontext.WithCancel(ctx)
 
-	stream, err = s.tableService.StreamExecuteScanQuery(ctx, &request, callOptions...)
+	stream, err = s.client.StreamExecuteScanQuery(ctx, &request, callOptions...)
 	if err != nil {
 		cancel()
 
@@ -1293,7 +1293,7 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows value.Value
 		}
 	}
 
-	_, err = s.tableService.BulkUpsert(ctx,
+	_, err = s.client.BulkUpsert(ctx,
 		&Ydb_Table.BulkUpsertRequest{
 			Table: table,
 			Rows:  value.ToYDB(rows, a),
@@ -1332,7 +1332,7 @@ func (s *session) BeginTransaction(
 		onDone(x, err)
 	}()
 
-	response, err = s.tableService.BeginTransaction(ctx,
+	response, err = s.client.BeginTransaction(ctx,
 		&Ydb_Table.BeginTransactionRequest{
 			SessionId:  s.id,
 			TxSettings: txSettings.Settings(),

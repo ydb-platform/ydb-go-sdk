@@ -1,4 +1,7 @@
-* Added `table/options.UseQueryServiceExecute()` option for redirect `table.Session.Execute` call to `query.Execute`
+* Added `table/options.WithQueryService()` option for redirect `/Ydb.Table.V1.TableService/ExecuteDataQuery` call to `/Ydb.Query.V1.QueryService/ExecuteQuery`
+
+## v3.65.2
+* Fixed data race using `log.WithNames`
 
 ## v3.65.1
 * Updated dependency `ydb-go-genproto`
