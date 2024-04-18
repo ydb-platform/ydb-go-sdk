@@ -1,3 +1,5 @@
+* Fixed data race in `internal/conn.grpcClientStream` 
+
 ## v3.65.2
 * Fixed data race using `log.WithNames`
 
