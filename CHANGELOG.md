@@ -1,3 +1,5 @@
+* Fixed data race using `log.WithNames`
+
 ## v3.65.1
 * Updated dependency `ydb-go-genproto`
 * Added processing of `Ydb.StatusIds_EXTERNAL_ERROR` in `retry.Retry`
