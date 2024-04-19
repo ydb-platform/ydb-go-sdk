@@ -243,6 +243,7 @@ func NewPool(ctx context.Context, config Config) *Pool {
 		opts:   config.GrpcDialOptions(),
 		conns:  make(map[connsKey]*conn),
 		done:   make(chan struct{}),
+		mtx:    xsync.RWMutex{RWMutex: sync.RWMutex{}},
 	}
 
 	if ttl := config.ConnectionTTL(); ttl > 0 {

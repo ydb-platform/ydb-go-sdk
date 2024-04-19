@@ -21,6 +21,8 @@ func newLastUsage(clock clockwork.Clock) *lastUsage {
 	now := clock.Now()
 	usage := &lastUsage{
 		clock: clock,
+		locks: atomic.Int64{},
+		t:     atomic.Pointer[time.Time]{},
 	}
 	usage.t.Store(&now)
 

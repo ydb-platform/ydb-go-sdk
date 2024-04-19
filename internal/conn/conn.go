@@ -490,10 +490,16 @@ func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, ca
 
 func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	c := &conn{
-		endpoint:  e,
-		config:    config,
-		done:      make(chan struct{}),
-		lastUsage: newLastUsage(nil),
+		endpoint:          e,
+		config:            config,
+		done:              make(chan struct{}),
+		lastUsage:         newLastUsage(nil),
+		mtx:               sync.RWMutex{},
+		cc:                nil,
+		closed:            false,
+		state:             atomic.Uint32{},
+		onClose:           nil,
+		onTransportErrors: nil,
 	}
 	c.state.Store(uint32(Created))
 	for _, opt := range opts {
@@ -536,7 +542,9 @@ type ctxHandleRPCKey struct{}
 var rpcKey = ctxHandleRPCKey{}
 
 func markContext(ctx context.Context) (context.Context, *modificationMark) {
-	mark := &modificationMark{}
+	mark := &modificationMark{
+		dirty: atomic.Bool{},
+	}
 
 	return context.WithValue(ctx, rpcKey, mark), mark
 }
@@ -544,7 +552,9 @@ func markContext(ctx context.Context) (context.Context, *modificationMark) {
 func getContextMark(ctx context.Context) *modificationMark {
 	v := ctx.Value(rpcKey)
 	if v == nil {
-		return &modificationMark{}
+		return &modificationMark{
+			dirty: atomic.Bool{},
+		}
 	}
 
 	return v.(*modificationMark)
