@@ -2,8 +2,8 @@ package config
 
 import (
 	"fmt"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
@@ -47,6 +47,6 @@ type Info struct {
 }
 
 type Filter interface {
-	Allow(info Info, c conn.Conn) bool
+	Allow(info Info, e endpoint.Info) bool
 	String() string
 }

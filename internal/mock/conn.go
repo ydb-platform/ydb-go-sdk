@@ -14,9 +14,13 @@ type Conn struct {
 	PingErr       error
 	AddrField     string
 	LocationField string
-	NodeIDField   int64
+	NodeIDField   uint32
 	State         conn.State
 	LocalDCField  bool
+}
+
+func (c *Conn) Address() string {
+	return c.AddrField
 }
 
 func (c *Conn) Invoke(
@@ -80,14 +84,14 @@ func (c *Conn) Unban(ctx context.Context) conn.State {
 type Endpoint struct {
 	AddrField     string
 	LocationField string
-	NodeIDField   int64
+	NodeIDField   uint32
 	LocalDCField  bool
 }
 
 func (e *Endpoint) Choose(bool) {
 }
 
-func (e *Endpoint) NodeID() int64 {
+func (e *Endpoint) NodeID() uint32 {
 	return e.NodeIDField
 }
 

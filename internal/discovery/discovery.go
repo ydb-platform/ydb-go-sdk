@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -53,7 +54,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	defer func() {
 		nodes := make([]trace.EndpointInfo, 0, len(endpoints))
 		for _, e := range endpoints {
-			nodes = append(nodes, e.Copy())
+			nodes = append(nodes, e)
 		}
 		onDone(location, nodes, err)
 	}()
@@ -84,10 +85,11 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	for _, e := range result.GetEndpoints() {
 		if e.GetSsl() == c.config.Secure() {
 			endpoints = append(endpoints, endpoint.New(
+				e.GetNodeId(),
 				net.JoinHostPort(e.GetAddress(), strconv.Itoa(int(e.GetPort()))),
-				endpoint.WithLocation(e.GetLocation()),
-				endpoint.WithID(int64(e.GetNodeId())),
+				e.GetLocation(),
 				endpoint.WithLoadFactor(e.GetLoadFactor()),
+				endpoint.WithLastUpdated(time.Now()),
 				endpoint.WithLocalDC(e.GetLocation() == location),
 				endpoint.WithServices(e.GetService()),
 			))

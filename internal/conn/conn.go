@@ -13,7 +13,6 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/stats"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
@@ -37,7 +36,7 @@ var (
 type Conn interface {
 	grpc.ClientConnInterface
 
-	Endpoint() endpoint.Endpoint
+	Address() string
 
 	LastUsage() time.Time
 
@@ -53,7 +52,7 @@ type conn struct {
 	config            Config // ro access
 	cc                *grpc.ClientConn
 	done              chan struct{}
-	endpoint          endpoint.Endpoint // ro access
+	address           string
 	closed            bool
 	state             atomic.Uint32
 	childStreams      *xcontext.CancelsGuard
@@ -63,16 +62,16 @@ type conn struct {
 }
 
 func (c *conn) Address() string {
-	return c.endpoint.Address()
+	return c.address
 }
 
 func (c *conn) Ping(ctx context.Context) error {
 	cc, err := c.realConn(ctx)
 	if err != nil {
-		return c.wrapError(err)
+		return xerrors.WithStackTrace(err)
 	}
 	if !isAvailable(cc) {
-		return c.wrapError(errUnavailableConnection)
+		return xerrors.WithStackTrace(errUnavailableConnection)
 	}
 
 	return nil
@@ -96,19 +95,11 @@ func (c *conn) IsState(states ...State) bool {
 	return false
 }
 
-func (c *conn) NodeID() int64 {
-	if c != nil {
-		return c.endpoint.NodeID()
-	}
-
-	return 0
-}
-
 func (c *conn) park(ctx context.Context) (err error) {
 	onDone := trace.DriverOnConnPark(
 		c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).park"),
-		c.Endpoint(),
+		c.address,
 	)
 	defer func() {
 		onDone(err)
@@ -128,15 +119,7 @@ func (c *conn) park(ctx context.Context) (err error) {
 	err = c.close(ctx)
 
 	if err != nil {
-		return c.wrapError(err)
-	}
-
-	return nil
-}
-
-func (c *conn) Endpoint() endpoint.Endpoint {
-	if c != nil {
-		return c.endpoint
+		return xerrors.WithStackTrace(err)
 	}
 
 	return nil
@@ -151,7 +134,7 @@ func (c *conn) setState(ctx context.Context, s State) State {
 		trace.DriverOnConnStateChange(
 			c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).setState"),
-			c.endpoint.Copy(), state,
+			c.address, state,
 		)(s)
 	}
 
@@ -180,7 +163,7 @@ func (c *conn) GetState() (s State) {
 
 func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	if c.isClosed() {
-		return nil, c.wrapError(errClosedConnection)
+		return nil, xerrors.WithStackTrace(errClosedConnection)
 	}
 
 	c.mtx.Lock()
@@ -199,7 +182,7 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	onDone := trace.DriverOnConnDial(
 		c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).realConn"),
-		c.endpoint.Copy(),
+		c.address,
 	)
 	defer func() {
 		onDone(err)
@@ -207,7 +190,7 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 
 	// prepend "ydb" scheme for grpc dns-resolver to find the proper scheme
 	// three slashes in "ydb:///" is ok. It needs for good parse scheme in grpc resolver.
-	address := "ydb:///" + c.endpoint.Address()
+	address := "ydb:///" + c.address
 
 	cc, err = grpc.DialContext(ctx, address, append(
 		[]grpc.DialOption{
@@ -227,7 +210,7 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 			xerrors.WithAddress(address),
 		)
 
-		return nil, c.wrapError(
+		return nil, xerrors.WithStackTrace(
 			xerrors.Retryable(err,
 				xerrors.WithName("realConn"),
 			),
@@ -259,7 +242,7 @@ func (c *conn) close(ctx context.Context) (err error) {
 	c.cc = nil
 	c.setState(ctx, Offline)
 
-	return c.wrapError(err)
+	return xerrors.WithStackTrace(err)
 }
 
 func (c *conn) isClosed() bool {
@@ -280,7 +263,7 @@ func (c *conn) Close(ctx context.Context) (err error) {
 	onDone := trace.DriverOnConnClose(
 		c.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).Close"),
-		c.Endpoint(),
+		c.address,
 	)
 	defer func() {
 		onDone(err)
@@ -296,7 +279,7 @@ func (c *conn) Close(ctx context.Context) (err error) {
 		onClose(c)
 	}
 
-	return c.wrapError(err)
+	return xerrors.WithStackTrace(err)
 }
 
 func (c *conn) Invoke(
@@ -313,7 +296,7 @@ func (c *conn) Invoke(
 		onDone      = trace.DriverOnConnInvoke(
 			c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).Invoke"),
-			c.endpoint, trace.Method(method),
+			c.address, trace.Method(method),
 		)
 		cc *grpc.ClientConn
 		md = metadata.MD{}
@@ -325,7 +308,7 @@ func (c *conn) Invoke(
 
 	cc, err = c.realConn(ctx)
 	if err != nil {
-		return c.wrapError(err)
+		return xerrors.WithStackTrace(err)
 	}
 
 	stop := c.lastUsage.Start()
@@ -354,10 +337,10 @@ func (c *conn) Invoke(
 				xerrors.WithTraceID(traceID),
 			)
 			if sentMark.canRetry() {
-				return c.wrapError(xerrors.Retryable(err, xerrors.WithName("Invoke")))
+				return xerrors.WithStackTrace(xerrors.Retryable(err, xerrors.WithName("Invoke")))
 			}
 
-			return c.wrapError(err)
+			return xerrors.WithStackTrace(err)
 		}
 
 		return err
@@ -371,10 +354,10 @@ func (c *conn) Invoke(
 		if useWrapping {
 			switch {
 			case !o.GetOperation().GetReady():
-				return c.wrapError(errOperationNotReady)
+				return xerrors.WithStackTrace(errOperationNotReady)
 
 			case o.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
-				return c.wrapError(
+				return xerrors.WithStackTrace(
 					xerrors.Operation(
 						xerrors.FromOperation(o.GetOperation()),
 						xerrors.WithAddress(c.Address()),
@@ -399,7 +382,7 @@ func (c *conn) NewStream(
 		onDone = trace.DriverOnConnNewStream(
 			c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).NewStream"),
-			c.endpoint.Copy(), trace.Method(method),
+			c.address, trace.Method(method),
 		)
 		useWrapping = UseWrapping(ctx)
 	)
@@ -410,7 +393,7 @@ func (c *conn) NewStream(
 
 	cc, err := c.realConn(ctx)
 	if err != nil {
-		return nil, c.wrapError(err)
+		return nil, xerrors.WithStackTrace(err)
 	}
 
 	stop := c.lastUsage.Start()
@@ -451,10 +434,10 @@ func (c *conn) NewStream(
 				xerrors.WithTraceID(traceID),
 			)
 			if sentMark.canRetry() {
-				return s, c.wrapError(xerrors.Retryable(err, xerrors.WithName("NewStream")))
+				return s, xerrors.WithStackTrace(xerrors.Retryable(err, xerrors.WithName("NewStream")))
 			}
 
-			return s, c.wrapError(err)
+			return s, xerrors.WithStackTrace(err)
 		}
 
 		return s, err
@@ -471,15 +454,6 @@ func (c *conn) NewStream(
 			meta.CallTrailerCallback(ctx, md)
 		},
 	}, nil
-}
-
-func (c *conn) wrapError(err error) error {
-	if err == nil {
-		return nil
-	}
-	nodeErr := newConnError(c.endpoint.NodeID(), c.endpoint.Address(), err)
-
-	return xerrors.WithStackTrace(nodeErr, xerrors.WithSkipDepth(1))
 }
 
 type option func(c *conn)
@@ -500,9 +474,9 @@ func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, ca
 	}
 }
 
-func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
+func newConn(address string, config Config, opts ...option) *conn {
 	c := &conn{
-		endpoint:     e,
+		address:      address,
 		config:       config,
 		done:         make(chan struct{}),
 		lastUsage:    xsync.NewLastUsage(),
@@ -523,8 +497,8 @@ func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	return c
 }
 
-func New(e endpoint.Endpoint, config Config, opts ...option) Conn {
-	return newConn(e, config, opts...)
+func New(address string, config Config, opts ...option) Conn {
+	return newConn(address, config, opts...)
 }
 
 var _ stats.Handler = statsHandler{}

@@ -10,7 +10,6 @@ import (
 	grpcCodes "google.golang.org/grpc/codes"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -18,44 +17,31 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type connsKey struct {
-	address string
-	nodeID  int64
-}
-
 type Pool struct {
 	usages int64
 	config Config
 	mtx    xsync.RWMutex
 	opts   []grpc.DialOption
-	conns  map[connsKey]*conn
+	conns  map[string]*conn
 	done   chan struct{}
 }
 
-func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
+func (p *Pool) Get(address string) Conn {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
 
 	var (
-		address = endpoint.Address()
-		cc      *conn
-		has     bool
+		cc  *conn
+		has bool
 	)
 
-	key := connsKey{address, endpoint.NodeID()}
-
-	if cc, has = p.conns[key]; has {
+	if cc, has = p.conns[address]; has {
 		return cc
 	}
 
-	cc = newConn(
-		endpoint,
-		p.config,
-		withOnClose(p.remove),
-		withOnTransportError(p.Ban),
-	)
+	cc = newConn(address, p.config, withOnClose(p.remove), withOnTransportError(p.Ban))
 
-	p.conns[key] = cc
+	p.conns[address] = cc
 
 	return cc
 }
@@ -63,7 +49,7 @@ func (p *Pool) Get(endpoint endpoint.Endpoint) Conn {
 func (p *Pool) remove(c *conn) {
 	p.mtx.Lock()
 	defer p.mtx.Unlock()
-	delete(p.conns, connsKey{c.Endpoint().Address(), c.Endpoint().NodeID()})
+	delete(p.conns, c.address)
 }
 
 func (p *Pool) isClosed() bool {
@@ -102,12 +88,10 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 		return
 	}
 
-	e := cc.Endpoint().Copy()
-
 	p.mtx.RLock()
 	defer p.mtx.RUnlock()
 
-	cc, ok := p.conns[connsKey{e.Address(), e.NodeID()}]
+	cc, ok := p.conns[cc.Address()]
 	if !ok {
 		return
 	}
@@ -115,7 +99,7 @@ func (p *Pool) Ban(ctx context.Context, cc Conn, cause error) {
 	trace.DriverOnConnBan(
 		p.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*Pool).Ban"),
-		e, cc.GetState(), cause,
+		cc.Address(), cc.GetState(), cause,
 	)(cc.SetState(ctx, Banned))
 }
 
@@ -124,12 +108,10 @@ func (p *Pool) Allow(ctx context.Context, cc Conn) {
 		return
 	}
 
-	e := cc.Endpoint().Copy()
-
 	p.mtx.RLock()
 	defer p.mtx.RUnlock()
 
-	cc, ok := p.conns[connsKey{e.Address(), e.NodeID()}]
+	cc, ok := p.conns[cc.Address()]
 	if !ok {
 		return
 	}
@@ -137,7 +119,7 @@ func (p *Pool) Allow(ctx context.Context, cc Conn) {
 	trace.DriverOnConnAllow(
 		p.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*Pool).Allow"),
-		e, cc.GetState(),
+		cc.Address(), cc.GetState(),
 	)(cc.Unban(ctx))
 }
 
@@ -241,7 +223,7 @@ func NewPool(ctx context.Context, config Config) *Pool {
 		usages: 1,
 		config: config,
 		opts:   config.GrpcDialOptions(),
-		conns:  make(map[connsKey]*conn),
+		conns:  make(map[string]*conn),
 		done:   make(chan struct{}),
 	}
 

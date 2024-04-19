@@ -46,7 +46,7 @@ type Balancer struct {
 	onApplyDiscoveredEndpoints []func(ctx context.Context, endpoints []endpoint.Info)
 }
 
-func (b *Balancer) HasNode(id int64) bool {
+func (b *Balancer) HasNode(id uint32) bool {
 	if b.config.SingleConn {
 		return true
 	}
@@ -128,7 +128,7 @@ func (b *Balancer) clusterDiscoveryAttempt(ctx context.Context) (err error) {
 		}
 	}
 
-	b.applyDiscoveredEndpoints(ctx, endpoints, localDC)
+	b.applyEndpoints(ctx, endpoints, localDC)
 
 	return nil
 }
@@ -142,40 +142,40 @@ func endpointsDiff(newestEndpoints []endpoint.Endpoint, previousConns []conn.Con
 	added = make([]trace.EndpointInfo, 0, len(previousConns))
 	dropped = make([]trace.EndpointInfo, 0, len(previousConns))
 	var (
-		newestMap   = make(map[string]struct{}, len(newestEndpoints))
+		newestMap   = make(map[string]endpoint.Endpoint, len(newestEndpoints))
 		previousMap = make(map[string]struct{}, len(previousConns))
 	)
 	sort.Slice(newestEndpoints, func(i, j int) bool {
 		return newestEndpoints[i].Address() < newestEndpoints[j].Address()
 	})
 	sort.Slice(previousConns, func(i, j int) bool {
-		return previousConns[i].Endpoint().Address() < previousConns[j].Endpoint().Address()
+		return previousConns[i].Address() < previousConns[j].Address()
 	})
 	for _, e := range previousConns {
-		previousMap[e.Endpoint().Address()] = struct{}{}
+		previousMap[e.Address()] = struct{}{}
 	}
 	for _, e := range newestEndpoints {
-		nodes = append(nodes, e.Copy())
-		newestMap[e.Address()] = struct{}{}
+		nodes = append(nodes, e)
+		newestMap[e.Address()] = e
 		if _, has := previousMap[e.Address()]; !has {
-			added = append(added, e.Copy())
+			added = append(added, e)
 		}
 	}
 	for _, c := range previousConns {
-		if _, has := newestMap[c.Endpoint().Address()]; !has {
-			dropped = append(dropped, c.Endpoint().Copy())
+		if e, has := newestMap[c.Address()]; !has {
+			dropped = append(dropped, e)
 		}
 	}
 
 	return nodes, added, dropped
 }
 
-func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
+func (b *Balancer) applyEndpoints(ctx context.Context, endpoints []endpoint.Endpoint, localDC string) {
 	var (
 		onDone = trace.DriverOnBalancerUpdate(
 			b.driverConfig.Trace(), &ctx,
 			stack.FunctionID(
-				"github.com/ydb-platform/ydb-go-sdk/3/internal/balancer.(*Balancer).applyDiscoveredEndpoints"),
+				"github.com/ydb-platform/ydb-go-sdk/3/internal/balancer.(*Balancer).applyEndpoints"),
 			b.config.DetectLocalDC,
 		)
 		previousConns []conn.Conn
@@ -186,10 +186,9 @@ func (b *Balancer) applyDiscoveredEndpoints(ctx context.Context, endpoints []end
 	}()
 
 	connections := endpointsToConnections(b.pool, endpoints)
-	for _, c := range connections {
+	connections.Each(func(c conn.Conn, e endpoint.Endpoint) {
 		b.pool.Allow(ctx, c)
-		c.Endpoint().Touch()
-	}
+	})
 
 	info := balancerConfig.Info{SelfLocation: localDC}
 	state := newConnectionsState(connections, b.config.Filter, info, b.config.AllowFallback)
@@ -260,7 +259,7 @@ func New(
 		localDCDetector: detectLocalDC,
 	}
 	d := internalDiscovery.New(ctx, pool.Get(
-		endpoint.New(driverConfig.Endpoint()),
+		driverConfig.Endpoint(),
 	), discoveryConfig)
 
 	b.discoveryClient = d
@@ -272,8 +271,8 @@ func New(
 	}
 
 	if b.config.SingleConn {
-		b.applyDiscoveredEndpoints(ctx, []endpoint.Endpoint{
-			endpoint.New(driverConfig.Endpoint()),
+		b.applyEndpoints(ctx, []endpoint.Endpoint{
+			endpoint.New(0, driverConfig.Endpoint(), ""),
 		}, "")
 	} else {
 		// initialization of balancer state
@@ -348,8 +347,7 @@ func (b *Balancer) wrapCall(ctx context.Context, f func(ctx context.Context, cc 
 		if conn.UseWrapping(ctx) {
 			if credentials.IsAccessError(err) {
 				err = credentials.AccessError("no access", err,
-					credentials.WithAddress(cc.Endpoint().String()),
-					credentials.WithNodeID(cc.Endpoint().NodeID()),
+					credentials.WithAddress(cc.Address()),
 					credentials.WithCredentials(b.driverConfig.Credentials()),
 				)
 			}
@@ -377,9 +375,9 @@ func (b *Balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
 	)
 	defer func() {
 		if err == nil {
-			onDone(c.Endpoint(), nil)
+			onDone(c.Address(), nil)
 		} else {
-			onDone(nil, err)
+			onDone("", err)
 		}
 	}()
 
@@ -408,11 +406,43 @@ func (b *Balancer) getConn(ctx context.Context) (c conn.Conn, err error) {
 	return c, nil
 }
 
-func endpointsToConnections(p *conn.Pool, endpoints []endpoint.Endpoint) []conn.Conn {
-	conns := make([]conn.Conn, 0, len(endpoints))
-	for _, e := range endpoints {
-		conns = append(conns, p.Get(e))
+type connByEndpoint struct {
+	conns     map[string]conn.Conn
+	endpoints map[string]endpoint.Endpoint
+}
+
+func (m *connByEndpoint) Get(address string) (conn.Conn, endpoint.Endpoint) {
+	return m.conns[address], m.endpoints[address]
+}
+
+func (m *connByEndpoint) Each(visitor func(c conn.Conn, e endpoint.Endpoint)) {
+	for _, e := range m.endpoints {
+		visitor(m.conns[e.Address()], e)
+	}
+}
+
+func (m *connByEndpoint) Len() int {
+	return len(m.endpoints)
+}
+
+func (m *connByEndpoint) Conns() (conns []conn.Conn) {
+	conns = make([]conn.Conn, 0, len(m.conns))
+	for _, c := range m.conns {
+		conns = append(conns, c)
+	}
+	return conns
+}
+
+func endpointsToConnections(p *conn.Pool, endpoints []endpoint.Endpoint) *connByEndpoint {
+	m := &connByEndpoint{
+		conns:     make(map[string]conn.Conn, len(endpoints)),
+		endpoints: make(map[string]endpoint.Endpoint, len(endpoints)),
 	}
 
-	return conns
+	for _, e := range endpoints {
+		m.conns[e.Address()] = p.Get(e.Address())
+		m.endpoints[e.Address()] = e
+	}
+
+	return m
 }

@@ -109,22 +109,22 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "dial")
-			endpoint := info.Endpoint
+			address := info.Address
 			l.Log(ctx, "start",
-				Stringer("endpoint", endpoint),
+				String("address", address),
 			)
 			start := time.Now()
 
 			return func(info trace.DriverConnDialDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						Stringer("endpoint", endpoint),
+						String("address", address),
 						latencyField(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
 						Error(info.Error),
-						Stringer("endpoint", endpoint),
+						String("address", address),
 						latencyField(start),
 						versionField(),
 					)
@@ -136,16 +136,16 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
 				return nil
 			}
 			ctx := with(context.Background(), TRACE, "ydb", "driver", "conn", "state", "change")
-			endpoint := info.Endpoint
+			address := info.Address
 			l.Log(ctx, "start",
-				Stringer("endpoint", endpoint),
+				String("address", address),
 				Stringer("state", info.State),
 			)
 			start := time.Now()
 
 			return func(info trace.DriverConnStateChangeDoneInfo) {
 				l.Log(ctx, "done",
-					Stringer("endpoint", endpoint),
+					String("address", address),
 					latencyField(start),
 					Stringer("state", info.State),
 				)
@@ -156,22 +156,22 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "close")
-			endpoint := info.Endpoint
+			address := info.Address
 			l.Log(ctx, "start",
-				Stringer("endpoint", endpoint),
+				String("address", address),
 			)
 			start := time.Now()
 
 			return func(info trace.DriverConnCloseDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						Stringer("endpoint", endpoint),
+						String("address", address),
 						latencyField(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
 						Error(info.Error),
-						Stringer("endpoint", endpoint),
+						String("address", address),
 						latencyField(start),
 						versionField(),
 					)
@@ -183,10 +183,10 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "invoke")
-			endpoint := info.Endpoint
+			address := info.Address
 			method := string(info.Method)
 			l.Log(ctx, "start",
-				Stringer("endpoint", endpoint),
+				String("address", address),
 				String("method", method),
 			)
 			start := time.Now()
@@ -194,7 +194,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
 			return func(info trace.DriverConnInvokeDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						Stringer("endpoint", endpoint),
+						String("address", address),
 						String("method", method),
 						latencyField(start),
 						Stringer("metadata", metadata(info.Metadata)),
@@ -202,7 +202,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
 						Error(info.Error),
-						Stringer("endpoint", endpoint),
+						String("address", address),
 						String("method", method),
 						latencyField(start),
 						Stringer("metadata", metadata(info.Metadata)),
@@ -220,10 +220,10 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "stream", "New")
-			endpoint := info.Endpoint
+			address := info.Address
 			method := string(info.Method)
 			l.Log(ctx, "start",
-				Stringer("endpoint", endpoint),
+				String("address", address),
 				String("method", method),
 			)
 			start := time.Now()
@@ -231,14 +231,14 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
 			return func(info trace.DriverConnNewStreamDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
-						Stringer("endpoint", endpoint),
+						String("address", address),
 						String("method", method),
 						latencyField(start),
 					)
 				} else {
 					l.Log(WithLevel(ctx, WARN), "failed",
 						Error(info.Error),
-						Stringer("endpoint", endpoint),
+						String("address", address),
 						String("method", method),
 						latencyField(start),
 						versionField(),
@@ -319,17 +319,17 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "ban")
-			endpoint := info.Endpoint
+			address := info.Address
 			cause := info.Cause
 			l.Log(ctx, "start",
-				Stringer("endpoint", endpoint),
+				String("address", address),
 				NamedError("cause", cause),
 			)
 			start := time.Now()
 
 			return func(info trace.DriverConnBanDoneInfo) {
 				l.Log(WithLevel(ctx, WARN), "done",
-					Stringer("endpoint", endpoint),
+					String("address", address),
 					latencyField(start),
 					Stringer("state", info.State),
 					NamedError("cause", cause),
@@ -342,15 +342,15 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "allow")
-			endpoint := info.Endpoint
+			address := info.Address
 			l.Log(ctx, "start",
-				Stringer("endpoint", endpoint),
+				String("address", address),
 			)
 			start := time.Now()
 
 			return func(info trace.DriverConnAllowDoneInfo) {
 				l.Log(ctx, "done",
-					Stringer("endpoint", endpoint),
+					String("address", address),
 					latencyField(start),
 					Stringer("state", info.State),
 				)
@@ -439,7 +439,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
 				if info.Error == nil {
 					l.Log(ctx, "done",
 						latencyField(start),
-						Stringer("endpoint", info.Endpoint),
+						String("address", info.Address),
 					)
 				} else {
 					l.Log(WithLevel(ctx, ERROR), "failed",

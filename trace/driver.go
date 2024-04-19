@@ -139,7 +139,7 @@ type ConnState interface {
 type EndpointInfo interface {
 	fmt.Stringer
 
-	NodeID() int64
+	NodeID() uint32
 	Address() string
 	Location() string
 	LoadFactor() float32
@@ -159,10 +159,10 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context  *context.Context
-		Call     call
-		Endpoint EndpointInfo
-		State    ConnState
+		Context *context.Context
+		Call    call
+		Address string
+		State   ConnState
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnStateChangeDoneInfo struct {
@@ -274,9 +274,9 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context  *context.Context
-		Call     call
-		Endpoint EndpointInfo
+		Context *context.Context
+		Call    call
+		Address string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnDialDoneInfo struct {
@@ -288,9 +288,9 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context  *context.Context
-		Call     call
-		Endpoint EndpointInfo
+		Context *context.Context
+		Call    call
+		Address string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnParkDoneInfo struct {
@@ -302,9 +302,9 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context  *context.Context
-		Call     call
-		Endpoint EndpointInfo
+		Context *context.Context
+		Call    call
+		Address string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnCloseDoneInfo struct {
@@ -316,11 +316,11 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context  *context.Context
-		Call     call
-		Endpoint EndpointInfo
-		State    ConnState
-		Cause    error
+		Context *context.Context
+		Call    call
+		Address string
+		State   ConnState
+		Cause   error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnBanDoneInfo struct {
@@ -332,10 +332,10 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context  *context.Context
-		Call     call
-		Endpoint EndpointInfo
-		State    ConnState
+		Context *context.Context
+		Call    call
+		Address string
+		State   ConnState
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnAllowDoneInfo struct {
@@ -347,10 +347,10 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context  *context.Context
-		Call     call
-		Endpoint EndpointInfo
-		Method   Method
+		Context *context.Context
+		Call    call
+		Address string
+		Method  Method
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnInvokeDoneInfo struct {
@@ -366,10 +366,10 @@ type (
 		// Pointer to context provide replacement of context in trace callback function.
 		// Warning: concurrent access to pointer on client side must be excluded.
 		// Safe replacement of context are provided only inside callback function
-		Context  *context.Context
-		Call     call
-		Endpoint EndpointInfo
-		Method   Method
+		Context *context.Context
+		Call    call
+		Address string
+		Method  Method
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnNewStreamDoneInfo struct {
@@ -467,8 +467,8 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverBalancerChooseEndpointDoneInfo struct {
-		Endpoint EndpointInfo
-		Error    error
+		Address string
+		Error   error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverRepeaterWakeUpStartInfo struct {

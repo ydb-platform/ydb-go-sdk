@@ -2,6 +2,7 @@ package balancer
 
 import (
 	"context"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
@@ -9,7 +10,7 @@ import (
 )
 
 type connectionsState struct {
-	connByNodeID map[int64]conn.Conn
+	connByNodeID map[uint32]conn.Conn
 
 	prefer   []conn.Conn
 	fallback []conn.Conn
@@ -19,7 +20,7 @@ type connectionsState struct {
 }
 
 func newConnectionsState(
-	conns []conn.Conn,
+	conns *connByEndpoint,
 	filter balancerConfig.Filter,
 	info balancerConfig.Info,
 	allowFallback bool,
@@ -31,7 +32,7 @@ func newConnectionsState(
 
 	res.prefer, res.fallback = sortPreferConnections(conns, filter, info, allowFallback)
 	if allowFallback {
-		res.all = conns
+		res.all = conns.Conns()
 	} else {
 		res.all = res.prefer
 	}
@@ -115,40 +116,40 @@ func (s *connectionsState) selectRandomConnection(conns []conn.Conn, allowBanned
 	return nil, failedConns
 }
 
-func connsToNodeIDMap(conns []conn.Conn) (nodes map[int64]conn.Conn) {
-	if len(conns) == 0 {
+func connsToNodeIDMap(conns *connByEndpoint) (nodes map[uint32]conn.Conn) {
+	if conns.Len() == 0 {
 		return nil
 	}
-	nodes = make(map[int64]conn.Conn, len(conns))
-	for _, c := range conns {
-		nodes[c.Endpoint().NodeID()] = c
-	}
+	nodes = make(map[uint32]conn.Conn, conns.Len())
+	conns.Each(func(c conn.Conn, e endpoint.Endpoint) {
+		nodes[e.NodeID()] = c
+	})
 
 	return nodes
 }
 
 func sortPreferConnections(
-	conns []conn.Conn,
+	conns *connByEndpoint,
 	filter balancerConfig.Filter,
 	info balancerConfig.Info,
 	allowFallback bool,
 ) (prefer, fallback []conn.Conn) {
 	if filter == nil {
-		return conns, nil
+		return conns.Conns(), nil
 	}
 
-	prefer = make([]conn.Conn, 0, len(conns))
+	prefer = make([]conn.Conn, 0, conns.Len())
 	if allowFallback {
-		fallback = make([]conn.Conn, 0, len(conns))
+		fallback = make([]conn.Conn, 0, conns.Len())
 	}
 
-	for _, c := range conns {
-		if filter.Allow(info, c) {
+	conns.Each(func(c conn.Conn, e endpoint.Endpoint) {
+		if filter.Allow(info, e) {
 			prefer = append(prefer, c)
 		} else if allowFallback {
 			fallback = append(fallback, c)
 		}
-	}
+	})
 
 	return prefer, fallback
 }

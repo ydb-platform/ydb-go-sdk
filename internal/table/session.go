@@ -57,40 +57,32 @@ type session struct {
 	lastUsage   atomic.Int64
 	statusMtx   sync.RWMutex
 	closeOnce   sync.Once
-	nodeID      atomic.Int64
+	nodeID      uint32
 }
 
 func (s *session) LastUsage() time.Time {
 	return time.Unix(s.lastUsage.Load(), 0)
 }
 
-func nodeID(sessionID string) (int64, error) {
+func nodeID(sessionID string) (uint32, error) {
 	u, err := url.Parse(sessionID)
 	if err != nil {
 		return 0, err
 	}
-	id, err := strconv.ParseInt(u.Query().Get("node_id"), 10, 32)
+	id, err := strconv.ParseUint(u.Query().Get("node_id"), 10, 32)
 	if err != nil {
 		return 0, err
 	}
 
-	return id, err
+	return uint32(id), err
 }
 
-func (s *session) NodeID() int64 {
+func (s *session) NodeID() uint32 {
 	if s == nil {
 		return 0
 	}
-	if id := s.nodeID.Load(); id != 0 {
-		return id
-	}
-	id, err := nodeID(s.id)
-	if err != nil {
-		return 0
-	}
-	s.nodeID.Store(id)
 
-	return id
+	return s.nodeID
 }
 
 func (s *session) Status() table.SessionStatus {
@@ -149,8 +141,14 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config
 		return nil, xerrors.WithStackTrace(err)
 	}
 
+	nodeID, err := nodeID(s.id)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
 	s = &session{
 		id:     result.GetSessionId(),
+		nodeID: nodeID,
 		config: config,
 		status: table.SessionReady,
 	}

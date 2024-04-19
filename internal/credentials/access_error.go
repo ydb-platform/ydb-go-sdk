@@ -2,12 +2,10 @@ package credentials
 
 import (
 	"fmt"
-	"io"
-	"reflect"
-	"strconv"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
+	"io"
+	"reflect"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
@@ -18,7 +16,6 @@ type authErrorOption interface {
 }
 
 var (
-	_ authErrorOption = nodeIDAuthErrorOption(0)
 	_ authErrorOption = addressAuthErrorOption("")
 	_ authErrorOption = endpointAuthErrorOption("")
 	_ authErrorOption = databaseAuthErrorOption("")
@@ -55,17 +52,6 @@ func (address databaseAuthErrorOption) applyAuthErrorOption(w io.Writer) {
 
 func WithDatabase(database string) databaseAuthErrorOption {
 	return databaseAuthErrorOption(database)
-}
-
-type nodeIDAuthErrorOption int64
-
-func (id nodeIDAuthErrorOption) applyAuthErrorOption(w io.Writer) {
-	fmt.Fprint(w, "nodeID:")
-	fmt.Fprint(w, strconv.FormatUint(uint64(id), 10))
-}
-
-func WithNodeID(id int64) authErrorOption {
-	return nodeIDAuthErrorOption(id)
 }
 
 type credentialsUnauthenticatedErrorOption struct {

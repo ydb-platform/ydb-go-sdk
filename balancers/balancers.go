@@ -1,11 +1,11 @@
 package balancers
 
 import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"sort"
 	"strings"
 
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
@@ -28,8 +28,8 @@ func SingleConn() *balancerConfig.Config {
 
 type filterLocalDC struct{}
 
-func (filterLocalDC) Allow(info balancerConfig.Info, c conn.Conn) bool {
-	return c.Endpoint().Location() == info.SelfLocation
+func (filterLocalDC) Allow(info balancerConfig.Info, e endpoint.Info) bool {
+	return e.Location() == info.SelfLocation
 }
 
 func (filterLocalDC) String() string {
@@ -58,8 +58,8 @@ func PreferLocalDCWithFallBack(balancer *balancerConfig.Config) *balancerConfig.
 
 type filterLocations []string
 
-func (locations filterLocations) Allow(_ balancerConfig.Info, c conn.Conn) bool {
-	location := strings.ToUpper(c.Endpoint().Location())
+func (locations filterLocations) Allow(_ balancerConfig.Info, e endpoint.Info) bool {
+	location := strings.ToUpper(e.Location())
 	for _, l := range locations {
 		if location == l {
 			return true
@@ -111,7 +111,7 @@ func PreferLocationsWithFallback(balancer *balancerConfig.Config, locations ...s
 }
 
 type Endpoint interface {
-	NodeID() int64
+	NodeID() uint32
 	Address() string
 	Location() string
 
@@ -122,10 +122,10 @@ type Endpoint interface {
 	LocalDC() bool
 }
 
-type filterFunc func(info balancerConfig.Info, c conn.Conn) bool
+type filterFunc func(info balancerConfig.Info, e endpoint.Info) bool
 
-func (p filterFunc) Allow(info balancerConfig.Info, c conn.Conn) bool {
-	return p(info, c)
+func (p filterFunc) Allow(info balancerConfig.Info, e endpoint.Info) bool {
+	return p(info, e)
 }
 
 func (p filterFunc) String() string {
@@ -135,8 +135,8 @@ func (p filterFunc) String() string {
 // Prefer creates balancer which use endpoints by filter
 // Balancer "balancer" defines balancing algorithm between endpoints selected with filter
 func Prefer(balancer *balancerConfig.Config, filter func(endpoint Endpoint) bool) *balancerConfig.Config {
-	balancer.Filter = filterFunc(func(_ balancerConfig.Info, c conn.Conn) bool {
-		return filter(c.Endpoint())
+	balancer.Filter = filterFunc(func(_ balancerConfig.Info, e endpoint.Info) bool {
+		return filter(e)
 	})
 
 	return balancer
