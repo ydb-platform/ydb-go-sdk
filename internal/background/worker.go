@@ -33,7 +33,17 @@ type Worker struct {
 type CallbackFunc func(ctx context.Context)
 
 func NewWorker(parent context.Context) *Worker {
-	w := Worker{}
+	w := Worker{
+		ctx:            context.Background(),
+		workers:        sync.WaitGroup{},
+		closeReason:    nil,
+		tasksCompleted: nil,
+		tasks:          nil,
+		stop:           nil,
+		onceInit:       sync.Once{},
+		m:              xsync.Mutex{Mutex: sync.Mutex{}},
+		closed:         false,
+	}
 	w.ctx, w.stop = xcontext.WithCancel(parent)
 
 	return &w
