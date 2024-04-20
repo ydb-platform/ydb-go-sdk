@@ -424,7 +424,12 @@ func (c *Controller) OnAttach() {
 				delete(c.conflicts, req.conflictKey)
 			}
 
-			req.requestSent = nil
+			// If the request has been canceled, re-send the cancellation message, otherwise re-send the original one.
+			if req.canceled {
+				req.cancelRequestSent = nil
+			} else {
+				req.requestSent = nil
+			}
 			notify = true
 		}
 	}
