@@ -27,7 +27,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config
 	}
 }
 
-var _ discovery.Client = &Client{}
+var _ discovery.Client = &Client{config: nil, cc: nil, client: nil}
 
 type Client struct {
 	config *config.Config
@@ -45,6 +45,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 		)
 		request = Ydb_Discovery.ListEndpointsRequest{
 			Database: c.config.Database(),
+			Service:  nil,
 		}
 		response *Ydb_Discovery.ListEndpointsResponse
 		result   Ydb_Discovery.ListEndpointsResult
@@ -102,7 +103,7 @@ func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 		onDone = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/discovery.(*Client).WhoAmI"),
 		)
-		request            = Ydb_Discovery.WhoAmIRequest{}
+		request            = Ydb_Discovery.WhoAmIRequest{IncludeGroups: false}
 		response           *Ydb_Discovery.WhoAmIResponse
 		whoAmIResultResult Ydb_Discovery.WhoAmIResult
 	)
@@ -134,7 +135,7 @@ func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 
 	result := response.GetOperation().GetResult()
 	if result == nil {
-		return &discovery.WhoAmI{}, nil
+		return &discovery.WhoAmI{User: "", Groups: nil}, nil
 	}
 
 	err = response.GetOperation().GetResult().UnmarshalTo(&whoAmIResultResult)

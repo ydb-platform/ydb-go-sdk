@@ -27,7 +27,12 @@ type Config struct {
 func New(opts ...Option) *Config {
 	c := &Config{
 		interval: DefaultInterval,
-		trace:    &trace.Discovery{},
+		trace:    new(trace.Discovery),
+		Common:   config.Common{},
+		endpoint: "",
+		database: "",
+		secure:   false,
+		meta:     nil,
 	}
 	for _, opt := range opts {
 		if opt != nil {
