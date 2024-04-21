@@ -3,6 +3,7 @@ package topicreaderinternal
 import (
 	"context"
 	"errors"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -54,11 +55,17 @@ type committer struct {
 
 func newCommitter(tracer *trace.Topic, lifeContext context.Context, mode PublicCommitMode, send sendMessageToServerFunc) *committer { //nolint:lll,revive
 	res := &committer{
-		mode:             mode,
-		clock:            clockwork.NewRealClock(),
-		send:             send,
-		backgroundWorker: *background.NewWorker(lifeContext),
-		tracer:           tracer,
+		mode:                 mode,
+		clock:                clockwork.NewRealClock(),
+		send:                 send,
+		backgroundWorker:     *background.NewWorker(lifeContext),
+		tracer:               tracer,
+		BufferTimeLagTrigger: time.Duration(0),
+		BufferCountTrigger:   0,
+		commitLoopSignal:     nil,
+		m:                    xsync.Mutex{Mutex: sync.Mutex{}},
+		waiters:              nil,
+		commits:              CommitRanges{ranges: nil},
 	}
 	res.initChannels()
 	res.start()

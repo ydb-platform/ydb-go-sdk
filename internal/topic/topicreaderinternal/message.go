@@ -9,6 +9,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -107,7 +108,7 @@ type PublicMessageBuilder struct {
 }
 
 func NewPublicMessageBuilder() *PublicMessageBuilder {
-	res := &PublicMessageBuilder{}
+	res := &PublicMessageBuilder{mess: nil}
 	res.initMessage()
 
 	return res
@@ -115,15 +116,33 @@ func NewPublicMessageBuilder() *PublicMessageBuilder {
 
 func (pmb *PublicMessageBuilder) initMessage() {
 	pmb.mess = &PublicMessage{
-		commitRange: commitRange{partitionSession: newPartitionSession(
-			context.Background(),
-			"",
-			0,
-			0,
-			"",
-			0,
-			0,
-		)},
+		DoNotCopy:            empty.DoNotCopy{},
+		SeqNo:                0,
+		CreatedAt:            time.Time{},
+		MessageGroupID:       "",
+		WriteSessionMetadata: nil,
+		Offset:               0,
+		WrittenAt:            time.Time{},
+		ProducerID:           "",
+		Metadata:             nil,
+		commitRange: commitRange{
+			commitOffsetStart: rawtopicreader.Offset(0),
+			commitOffsetEnd:   rawtopicreader.Offset(0),
+			partitionSession: newPartitionSession(
+				context.Background(),
+				"",
+				0,
+				0,
+				"",
+				0,
+				0,
+			),
+		},
+		data:               oneTimeReader{err: nil, reader: nil},
+		rawDataLen:         0,
+		bufferBytesAccount: 0,
+		UncompressedSize:   0,
+		dataConsumed:       false,
 	}
 }
 
@@ -189,7 +208,7 @@ func (pmb *PublicMessageBuilder) ProducerID(producerID string) *PublicMessageBui
 func (pmb *PublicMessageBuilder) DataAndUncompressedSize(data []byte) *PublicMessageBuilder {
 	copyData := make([]byte, len(data))
 	copy(copyData, data)
-	pmb.mess.data = oneTimeReader{reader: bytes.NewReader(data)}
+	pmb.mess.data = oneTimeReader{err: nil, reader: bytes.NewReader(data)}
 	pmb.mess.dataConsumed = false
 	pmb.mess.rawDataLen = len(copyData)
 	pmb.mess.UncompressedSize = len(copyData)

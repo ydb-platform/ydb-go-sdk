@@ -85,6 +85,25 @@ func newSingleStreamWriterStopped(
 		cfg:            cfg,
 		background:     *background.NewWorker(xcontext.ValueOnly(ctxForPProfLabelsOnly)),
 		closeCompleted: make(empty.Chan),
+		Encoder: EncoderSelector{
+			m:                      nil,
+			tracer:                 nil,
+			writerReconnectorID:    "",
+			sessionID:              "",
+			allowedCodecs:          rawtopiccommon.SupportedCodecs{},
+			lastSelectedCodec:      0,
+			parallelCompressors:    0,
+			batchCounter:           0,
+			measureIntervalBatches: 0,
+		},
+		CodecsFromServer:    rawtopiccommon.SupportedCodecs{},
+		allowedCodecs:       rawtopiccommon.SupportedCodecs{},
+		SessionID:           "",
+		closeReason:         nil,
+		ReceivedLastSeqNum:  0,
+		PartitionID:         0,
+		closed:              atomic.Bool{},
+		LastSeqNumRequested: false,
 	}
 }
 
@@ -279,7 +298,7 @@ func (w *SingleStreamWriter) sendUpdateToken(ctx context.Context) (err error) {
 		return nil
 	}
 
-	req := &rawtopicwriter.UpdateTokenRequest{}
+	req := new(rawtopicwriter.UpdateTokenRequest)
 	req.Token = token
 
 	return stream.Send(req)

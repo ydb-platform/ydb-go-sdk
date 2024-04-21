@@ -59,14 +59,24 @@ func newReaderReconnector(
 	baseContext context.Context,
 ) *readerReconnector {
 	res := &readerReconnector{
-		readerID:       readerID,
-		clock:          clockwork.NewRealClock(),
-		readerConnect:  connector,
-		streamErr:      errUnconnected,
-		connectTimeout: connectTimeout,
-		tracer:         tracer,
-		baseContext:    baseContext,
-		retrySettings:  retrySettings,
+		readerID:                   readerID,
+		clock:                      clockwork.NewRealClock(),
+		readerConnect:              connector,
+		streamErr:                  errUnconnected,
+		connectTimeout:             connectTimeout,
+		tracer:                     tracer,
+		baseContext:                baseContext,
+		retrySettings:              retrySettings,
+		background:                 background.Worker{},
+		streamVal:                  nil,
+		closedErr:                  nil,
+		initErr:                    nil,
+		reconnectFromBadStream:     nil,
+		streamConnectionInProgress: nil,
+		initDoneCh:                 nil,
+		m:                          xsync.RWMutex{RWMutex: sync.RWMutex{}},
+		closeOnce:                  sync.Once{},
+		initDone:                   false,
 	}
 
 	if res.connectTimeout == 0 {

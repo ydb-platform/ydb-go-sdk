@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
@@ -29,9 +30,16 @@ type batcher struct {
 
 func newBatcher() *batcher {
 	return &batcher{
-		messages:       make(batcherMessagesMap),
-		closeChan:      make(empty.Chan),
+		popInFlight:    0,
+		closeErr:       nil,
 		hasNewMessages: make(empty.Chan, 1),
+
+		m: xsync.Mutex{Mutex: sync.Mutex{}},
+
+		forceIgnoreMinRestrictionsOnNextMessagesBatch: false,
+		closed:    false,
+		closeChan: make(empty.Chan),
+		messages:  make(batcherMessagesMap),
 	}
 }
 
@@ -108,7 +116,7 @@ func (o batcherGetOptions) cutBatchItemsHead(items batcherMessageOrderItems) (
 	ok bool,
 ) {
 	notFound := func() (batcherMessageOrderItem, batcherMessageOrderItems, bool) {
-		return batcherMessageOrderItem{}, batcherMessageOrderItems{}, false
+		return batcherMessageOrderItem{Batch: nil, RawMessage: nil}, batcherMessageOrderItems{}, false
 	}
 	if len(items) == 0 {
 		return notFound()
@@ -231,19 +239,26 @@ func newBatcherResultCandidate(
 	ok bool,
 ) batcherResultCandidate {
 	return batcherResultCandidate{
-		Key:    key,
-		Result: result,
-		Rest:   rest,
-		Ok:     ok,
+		Key:         key,
+		Result:      result,
+		Rest:        rest,
+		Ok:          ok,
+		WaiterIndex: 0,
 	}
 }
 
 func (b *batcher) findNeedLock(filter batcherGetOptions) batcherResultCandidate {
 	if len(b.messages) == 0 {
-		return batcherResultCandidate{}
+		return batcherResultCandidate{
+			Key:         nil,
+			Result:      batcherMessageOrderItem{Batch: nil, RawMessage: nil},
+			Rest:        batcherMessageOrderItems{},
+			Ok:          false,
+			WaiterIndex: 0,
+		}
 	}
 
-	rawMessageOpts := batcherGetOptions{rawMessagesOnly: true}
+	rawMessageOpts := batcherGetOptions{MinCount: 0, MaxCount: 0, rawMessagesOnly: true}
 
 	var batchResult batcherResultCandidate
 	needBatchResult := true
@@ -344,11 +359,11 @@ type batcherMessageOrderItem struct {
 }
 
 func newBatcherItemBatch(b *PublicBatch) batcherMessageOrderItem {
-	return batcherMessageOrderItem{Batch: b}
+	return batcherMessageOrderItem{Batch: b, RawMessage: nil}
 }
 
 func newBatcherItemRawMessage(b rawtopicreader.ServerMessage) batcherMessageOrderItem {
-	return batcherMessageOrderItem{RawMessage: b}
+	return batcherMessageOrderItem{Batch: nil, RawMessage: b}
 }
 
 func (item *batcherMessageOrderItem) IsBatch() bool {

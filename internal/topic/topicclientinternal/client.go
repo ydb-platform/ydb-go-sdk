@@ -2,11 +2,14 @@ package topicclientinternal
 
 import (
 	"context"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Topic_V1"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawoptional"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
@@ -50,7 +53,8 @@ func New(
 
 func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
 	c := topic.Config{
-		Trace: &trace.Topic{},
+		Common: config.Common{},
+		Trace:  new(trace.Topic),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -68,7 +72,7 @@ func (c *Client) Close(_ context.Context) error {
 
 // Alter topic options
 func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.AlterOption) error {
-	req := &rawtopic.AlterTopicRequest{}
+	req := new(rawtopic.AlterTopicRequest)
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
 	for _, opt := range opts {
@@ -99,7 +103,7 @@ func (c *Client) Create(
 	path string,
 	opts ...topicoptions.CreateOption,
 ) error {
-	req := &rawtopic.CreateTopicRequest{}
+	req := new(rawtopic.CreateTopicRequest)
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
 
@@ -172,7 +176,14 @@ func (c *Client) Describe(
 
 // Drop topic
 func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.DropOption) error {
-	req := rawtopic.DropTopicRequest{}
+	req := rawtopic.DropTopicRequest{
+		OperationParams: rawydb.OperationParams{
+			OperationMode:    rawydb.OperationParamsModeUnspecified,
+			OperationTimeout: rawoptional.Duration{Value: time.Duration(0), HasValue: false},
+			CancelAfter:      rawoptional.Duration{Value: time.Duration(0), HasValue: false},
+		},
+		Path: "",
+	}
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
 

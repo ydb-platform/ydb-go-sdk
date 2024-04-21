@@ -27,7 +27,7 @@ const (
 	maxInitialBufferSize    = 1024 * 1024 * 50 // protection from bad UncompressedSize from stream
 )
 
-var globalReadMessagePool = &sync.Pool{}
+var globalReadMessagePool = new(sync.Pool)
 
 func callbackOnReaderContent(
 	p Pool,
