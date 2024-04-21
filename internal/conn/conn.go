@@ -462,7 +462,6 @@ func (c *conn) NewStream(
 
 	return &grpcClientStream{
 		ClientStream: s,
-		ctx:          ctx,
 		c:            c,
 		wrapping:     useWrapping,
 		traceID:      traceID,

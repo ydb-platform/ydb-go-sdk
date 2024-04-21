@@ -1054,7 +1054,7 @@ func DatabaseSQLOnTxExec(t *DatabaseSQL, c *context.Context, call call, txContex
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func DatabaseSQLOnTxPrepare(t *DatabaseSQL, c *context.Context, call call, txContext *context.Context, tx tableTransactionInfo, query string) func(error) {
+func DatabaseSQLOnTxPrepare(t *DatabaseSQL, c *context.Context, call call, txContext context.Context, tx tableTransactionInfo, query string) func(error) {
 	var p DatabaseSQLTxPrepareStartInfo
 	p.Context = c
 	p.Call = call

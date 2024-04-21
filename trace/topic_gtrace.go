@@ -1021,7 +1021,7 @@ func TopicOnReaderReconnectRequest(t *Topic, reason error, wasSent bool) {
 	t.onReaderReconnectRequest(p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderPartitionReadStartResponse(t *Topic, readerConnectionID string, partitionContext context.Context, topic string, partitionID int64, partitionSessionID int64) func(readOffset *int64, commitOffset *int64, _ error) {
+func TopicOnReaderPartitionReadStartResponse(t *Topic, readerConnectionID string, partitionContext *context.Context, topic string, partitionID int64, partitionSessionID int64) func(readOffset *int64, commitOffset *int64, _ error) {
 	var p TopicReaderPartitionReadStartResponseStartInfo
 	p.ReaderConnectionID = readerConnectionID
 	p.PartitionContext = partitionContext
@@ -1038,7 +1038,7 @@ func TopicOnReaderPartitionReadStartResponse(t *Topic, readerConnectionID string
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderPartitionReadStopResponse(t *Topic, readerConnectionID string, partitionContext context.Context, topic string, partitionID int64, partitionSessionID int64, committedOffset int64, graceful bool) func(error) {
+func TopicOnReaderPartitionReadStopResponse(t *Topic, readerConnectionID string, partitionContext *context.Context, topic string, partitionID int64, partitionSessionID int64, committedOffset int64, graceful bool) func(error) {
 	var p TopicReaderPartitionReadStopResponseStartInfo
 	p.ReaderConnectionID = readerConnectionID
 	p.PartitionContext = partitionContext
@@ -1055,7 +1055,7 @@ func TopicOnReaderPartitionReadStopResponse(t *Topic, readerConnectionID string,
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderCommit(t *Topic, requestContext context.Context, topic string, partitionID int64, partitionSessionID int64, startOffset int64, endOffset int64) func(error) {
+func TopicOnReaderCommit(t *Topic, requestContext *context.Context, topic string, partitionID int64, partitionSessionID int64, startOffset int64, endOffset int64) func(error) {
 	var p TopicReaderCommitStartInfo
 	p.RequestContext = requestContext
 	p.Topic = topic
@@ -1162,7 +1162,7 @@ func TopicOnReaderReceiveDataResponse(t *Topic, readerConnectionID string, local
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderReadMessages(t *Topic, requestContext context.Context, minCount int, maxCount int, freeBufferCapacity int) func(messagesCount int, topic string, partitionID int64, partitionSessionID int64, offsetStart int64, offsetEnd int64, freeBufferCapacity int, _ error) {
+func TopicOnReaderReadMessages(t *Topic, requestContext *context.Context, minCount int, maxCount int, freeBufferCapacity int) func(messagesCount int, topic string, partitionID int64, partitionSessionID int64, offsetStart int64, offsetEnd int64, freeBufferCapacity int, _ error) {
 	var p TopicReaderReadMessagesStartInfo
 	p.RequestContext = requestContext
 	p.MinCount = minCount

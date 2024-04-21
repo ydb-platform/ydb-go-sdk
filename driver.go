@@ -51,7 +51,6 @@ var _ Connection = (*Driver)(nil)
 
 // Driver type provide access to YDB service clients
 type Driver struct {
-	ctx       context.Context // cancel while Driver.Close called.
 	ctxCancel context.CancelFunc
 
 	userInfo *dsn.UserInfo
@@ -311,7 +310,6 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, e
 
 	d := &Driver{
 		children:  make(map[uint64]*Driver),
-		ctx:       ctx,
 		ctxCancel: driverCtxCancel,
 	}
 

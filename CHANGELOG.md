@@ -1,3 +1,5 @@
+* Refactored internals for enabling `containedctx` linter
+
 ## v3.65.3
 * Fixed data race in `internal/conn.grpcClientStream` 
 

@@ -40,7 +40,7 @@ func ExplicitPartitionStartStopHandler(ctx context.Context, db *ydb.Driver) {
 				) func(
 					trace.TopicReaderPartitionReadStartResponseDoneInfo,
 				) {
-					err := externalSystemLock(info.PartitionContext, info.Topic, info.PartitionID)
+					err := externalSystemLock(*info.PartitionContext, info.Topic, info.PartitionID)
 					if err != nil {
 						stopReader()
 					}
@@ -105,7 +105,7 @@ func PartitionStartStopHandlerAndOwnReadProgressStorage(ctx context.Context, db 
 	) func(
 		trace.TopicReaderPartitionReadStartResponseDoneInfo,
 	) {
-		err := externalSystemLock(info.PartitionContext, info.Topic, info.PartitionID)
+		err := externalSystemLock(*info.PartitionContext, info.Topic, info.PartitionID)
 		if err != nil {
 			stopReader()
 		}

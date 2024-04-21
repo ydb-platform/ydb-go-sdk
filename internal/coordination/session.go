@@ -23,7 +23,7 @@ type session struct {
 	options *options.CreateSessionOptions
 	client  *Client
 
-	ctx               context.Context
+	ctx               context.Context //nolint:containedctx
 	cancel            context.CancelFunc
 	sessionClosedChan chan struct{}
 	controller        *conversation.Controller
@@ -37,7 +37,7 @@ type session struct {
 type lease struct {
 	session *session
 	name    string
-	ctx     context.Context
+	ctx     context.Context //nolint:containedctx
 	cancel  context.CancelFunc
 }
 

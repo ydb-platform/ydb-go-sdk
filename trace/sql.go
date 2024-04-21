@@ -101,7 +101,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context   *context.Context
 		Call      call
-		TxContext *context.Context
+		TxContext context.Context //nolint:containedctx
 		Tx        tableTransactionInfo
 		Query     string
 	}
@@ -193,7 +193,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context   *context.Context
 		Call      call
-		TxContext context.Context
+		TxContext context.Context //nolint:containedctx
 		Tx        tableTransactionInfo
 		Query     string
 	}
@@ -209,7 +209,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context   *context.Context
 		Call      call
-		TxContext context.Context
+		TxContext context.Context //nolint:containedctx
 		Tx        tableTransactionInfo
 		Query     string
 	}
@@ -262,7 +262,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context     *context.Context
 		Call        call
-		StmtContext context.Context
+		StmtContext context.Context //nolint:containedctx
 		Query       string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -277,7 +277,7 @@ type (
 		// Safe replacement of context are provided only inside callback function
 		Context     *context.Context
 		Call        call
-		StmtContext context.Context
+		StmtContext context.Context //nolint:containedctx
 		Query       string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals

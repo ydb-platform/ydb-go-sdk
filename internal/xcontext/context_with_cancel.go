@@ -16,8 +16,8 @@ func WithCancel(ctx context.Context) (context.Context, context.CancelFunc) {
 }
 
 type cancelCtx struct {
-	parentCtx context.Context
-	ctx       context.Context
+	parentCtx context.Context //nolint:containedctx
+	ctx       context.Context //nolint:containedctx
 	ctxCancel context.CancelFunc
 
 	m   sync.Mutex
