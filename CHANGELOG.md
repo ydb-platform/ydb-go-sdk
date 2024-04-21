@@ -1,4 +1,5 @@
 * Refactored internals for enabling `containedctx` linter
+* Fixed the hanging semaphore issue on coordination session reconnect
 
 ## v3.65.3
 * Fixed data race in `internal/conn.grpcClientStream` 
