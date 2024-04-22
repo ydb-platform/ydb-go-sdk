@@ -11,16 +11,29 @@ import (
 
 // Deprecated: RoundRobin is RandomChoice now
 func RoundRobin() *balancerConfig.Config {
-	return &balancerConfig.Config{}
+	return &balancerConfig.Config{
+		Filter:        nil,
+		AllowFallback: false,
+		SingleConn:    false,
+		DetectLocalDC: false,
+	}
 }
 
 func RandomChoice() *balancerConfig.Config {
-	return &balancerConfig.Config{}
+	return &balancerConfig.Config{
+		Filter:        nil,
+		AllowFallback: false,
+		SingleConn:    false,
+		DetectLocalDC: false,
+	}
 }
 
 func SingleConn() *balancerConfig.Config {
 	return &balancerConfig.Config{
-		SingleConn: true,
+		Filter:        nil,
+		AllowFallback: false,
+		SingleConn:    true,
+		DetectLocalDC: false,
 	}
 }
 
