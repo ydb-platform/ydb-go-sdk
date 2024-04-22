@@ -86,7 +86,7 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Stora
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:gomnd
 	defer cancel()
 
-	retryBudget := budget.New(int(float64(poolSize) * 0.1))
+	retryBudget := budget.New(int(float64(poolSize) * 0.1)) //nolint:gomnd
 
 	s = &Storage{
 		cfg: cfg,
