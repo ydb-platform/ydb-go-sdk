@@ -12,6 +12,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -78,10 +79,12 @@ func certPool() *x509.CertPool {
 }
 
 func defaultTLSConfig() *tls.Config {
-	return &tls.Config{
-		MinVersion: tls.VersionTLS12,
-		RootCAs:    certPool(),
-	}
+	config := new(tls.Config)
+
+	config.MinVersion = tls.VersionTLS12
+	config.RootCAs = certPool()
+
+	return config
 }
 
 func defaultConfig() (c *Config) {
@@ -89,9 +92,18 @@ func defaultConfig() (c *Config) {
 		credentials: credentials.NewAnonymousCredentials(
 			credentials.WithSourceInfo(stack.Record(0)),
 		),
-		balancerConfig: balancers.Default(),
-		tlsConfig:      defaultTLSConfig(),
-		dialTimeout:    DefaultDialTimeout,
-		trace:          &trace.Driver{},
+		balancerConfig:                   balancers.Default(),
+		tlsConfig:                        defaultTLSConfig(),
+		dialTimeout:                      DefaultDialTimeout,
+		trace:                            new(trace.Driver),
+		Common:                           config.Common{},
+		connectionTTL:                    time.Duration(0),
+		secure:                           false,
+		endpoint:                         "",
+		database:                         "",
+		metaOptions:                      nil,
+		grpcOptions:                      nil,
+		meta:                             nil,
+		excludeGRPCCodesForPessimization: nil,
 	}
 }
