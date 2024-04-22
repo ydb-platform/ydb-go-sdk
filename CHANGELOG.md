@@ -1,4 +1,5 @@
 * Added type assertion checks to enhance type safety and prevent unexpected panics in critical sections of the codebase
+* Fixed the hanging semaphore issue on coordination session reconnect
 
 ## v3.65.3
 * Fixed data race in `internal/conn.grpcClientStream` 
