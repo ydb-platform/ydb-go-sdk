@@ -7,6 +7,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -44,6 +45,14 @@ func newResultSet(
 		trace:       t,
 		done:        make(chan struct{}),
 	}
+}
+
+func (rs *resultSet) stats() *Ydb_TableStats.QueryStats {
+	if rs == nil || rs.currentPart == nil {
+		return nil
+	}
+
+	return rs.currentPart.GetExecStats()
 }
 
 func (rs *resultSet) nextRow(ctx context.Context) (*row, error) {

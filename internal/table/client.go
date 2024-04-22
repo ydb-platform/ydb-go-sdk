@@ -26,7 +26,7 @@ import (
 type sessionBuilder func(ctx context.Context) (*session, error)
 
 type nodeChecker interface {
-	HasNode(id uint32) bool
+	HasNode(id int64) bool
 }
 
 type balancer interface {

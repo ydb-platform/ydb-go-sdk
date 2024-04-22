@@ -3,12 +3,12 @@ package conn
 import "fmt"
 
 type connError struct {
-	nodeID   uint32
+	nodeID   int64
 	endpoint string
 	err      error
 }
 
-func newConnError(id uint32, endpoint string, err error) connError {
+func newConnError(id int64, endpoint string, err error) connError {
 	return connError{
 		nodeID:   id,
 		endpoint: endpoint,

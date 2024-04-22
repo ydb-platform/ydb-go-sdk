@@ -1,3 +1,4 @@
+* Added `table/options.WithQueryService()` option for redirect `/Ydb.Table.V1.TableService/ExecuteDataQuery` call to `/Ydb.Query.V1.QueryService/ExecuteQuery`
 * Fixed the hanging semaphore issue on coordination session reconnect
 
 ## v3.65.3

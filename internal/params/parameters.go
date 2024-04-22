@@ -61,7 +61,7 @@ func (p *Parameters) String() string {
 }
 
 func (p *Parameters) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
-	if p == nil {
+	if p == nil || len(*p) == 0 {
 		return nil
 	}
 	parameters := make(map[string]*Ydb.TypedValue, len(*p))

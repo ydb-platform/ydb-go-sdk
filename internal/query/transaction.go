@@ -6,6 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -16,14 +17,19 @@ import (
 var _ query.Transaction = (*transaction)(nil)
 
 type transaction struct {
-	id string
-	s  *Session
+	id        string
+	sessionID string
+
+	client Ydb_Query_V1.QueryServiceClient
+	trace  *trace.Query
 }
 
-func newTransaction(id string, s *Session) *transaction {
+func newTx(txID, sessionID string, client Ydb_Query_V1.QueryServiceClient, trace *trace.Query) *transaction {
 	return &transaction{
-		id: id,
-		s:  s,
+		id:        txID,
+		sessionID: sessionID,
+		client:    client,
+		trace:     trace,
 	}
 }
 
@@ -34,13 +40,18 @@ func (tx transaction) ID() string {
 func (tx transaction) Execute(ctx context.Context, q string, opts ...options.TxExecuteOption) (
 	r query.Result, finalErr error,
 ) {
-	onDone := trace.QueryOnTxExecute(tx.s.cfg.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.transaction.Execute"), tx.s, tx, q)
+	onDone := trace.QueryOnTxExecute(tx.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.transaction.Execute"), tx, q)
 	defer func() {
 		onDone(finalErr)
 	}()
 
-	_, res, err := execute(ctx, tx.s, tx.s.grpcClient, q, options.TxExecuteSettings(tx.id, opts...).ExecuteSettings)
+	a := allocator.New()
+	defer a.Free()
+
+	settings := options.TxExecuteSettings(tx.id, opts...)
+
+	_, res, err := Execute(ctx, tx.client, tx.sessionID, q, settings.ExecuteOptions...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -61,7 +72,7 @@ func commitTx(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 }
 
 func (tx transaction) CommitTx(ctx context.Context) (err error) {
-	return commitTx(ctx, tx.s.grpcClient, tx.s.id, tx.id)
+	return commitTx(ctx, tx.client, tx.sessionID, tx.id)
 }
 
 func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID, txID string) error {
@@ -77,5 +88,5 @@ func rollback(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessi
 }
 
 func (tx transaction) Rollback(ctx context.Context) (err error) {
-	return rollback(ctx, tx.s.grpcClient, tx.s.id, tx.id)
+	return rollback(ctx, tx.client, tx.sessionID, tx.id)
 }

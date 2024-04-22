@@ -21,8 +21,8 @@ type (
 		applyTxControlOption(txControl *Control)
 	}
 	Control struct {
-		selector Selector
-		commit   bool
+		Selector Selector
+		Commit   bool
 	}
 	Identifier interface {
 		ID() string
@@ -35,8 +35,8 @@ func (ctrl *Control) ToYDB(a *allocator.Allocator) *Ydb_Query.TransactionControl
 	}
 
 	txControl := a.QueryTransactionControl()
-	ctrl.selector.applyTxSelector(a, txControl)
-	txControl.CommitTx = ctrl.commit
+	ctrl.Selector.applyTxSelector(a, txControl)
+	txControl.CommitTx = ctrl.Commit
 
 	return txControl
 }
@@ -49,7 +49,7 @@ var (
 type beginTxOptions []Option
 
 func (opts beginTxOptions) applyTxControlOption(txControl *Control) {
-	txControl.selector = opts
+	txControl.Selector = opts
 }
 
 func (opts beginTxOptions) applyTxSelector(a *allocator.Allocator, txControl *Ydb_Query.TransactionControl) {
@@ -76,7 +76,7 @@ var (
 type txIDTxControlOption string
 
 func (id txIDTxControlOption) applyTxControlOption(txControl *Control) {
-	txControl.selector = id
+	txControl.Selector = id
 }
 
 func (id txIDTxControlOption) applyTxSelector(a *allocator.Allocator, txControl *Ydb_Query.TransactionControl) {
@@ -96,7 +96,7 @@ func WithTxID(txID string) txIDTxControlOption {
 type commitTxOption struct{}
 
 func (c commitTxOption) applyTxControlOption(txControl *Control) {
-	txControl.commit = true
+	txControl.Commit = true
 }
 
 // CommitTx returns commit transaction control option
@@ -107,8 +107,8 @@ func CommitTx() ControlOption {
 // NewControl makes transaction control from given options
 func NewControl(opts ...ControlOption) *Control {
 	txControl := &Control{
-		selector: BeginTx(WithSerializableReadWrite()),
-		commit:   false,
+		Selector: BeginTx(WithSerializableReadWrite()),
+		Commit:   false,
 	}
 	for _, opt := range opts {
 		if opt != nil {

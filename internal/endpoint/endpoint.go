@@ -7,7 +7,7 @@ import (
 )
 
 type Info interface {
-	NodeID() uint32
+	NodeID() int64
 	Address() string
 	Location() string
 	LastUpdated() time.Time
@@ -30,7 +30,7 @@ type Endpoint interface {
 
 type endpoint struct { //nolint:maligned
 	mu       sync.RWMutex
-	id       uint32
+	id       int64
 	address  string
 	location string
 	services []string
@@ -70,7 +70,7 @@ func (e *endpoint) String() string {
 	)
 }
 
-func (e *endpoint) NodeID() uint32 {
+func (e *endpoint) NodeID() int64 {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
@@ -128,7 +128,7 @@ func (e *endpoint) Touch(opts ...Option) {
 
 type Option func(e *endpoint)
 
-func WithID(id uint32) Option {
+func WithID(id int64) Option {
 	return func(e *endpoint) {
 		e.id = id
 	}

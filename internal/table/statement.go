@@ -20,7 +20,7 @@ import (
 
 type statement struct {
 	session *session
-	query   query
+	query   queryRenameMe
 	params  map[string]*Ydb.Type
 }
 

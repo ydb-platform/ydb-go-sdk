@@ -937,7 +937,7 @@ func TestDeadlockOnUpdateNodes(t *testing.T) {
 		ctx, cancel := xcontext.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 		var (
-			nodes         = make([]uint32, 0, 3)
+			nodes         = make([]int64, 0, 3)
 			nodeIDCounter = uint32(0)
 		)
 		balancer := testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{
@@ -980,7 +980,7 @@ func TestDeadlockOnInternalPoolGCTick(t *testing.T) {
 		ctx, cancel := xcontext.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 		var (
-			nodes         = make([]uint32, 0, 3)
+			nodes         = make([]int64, 0, 3)
 			nodeIDCounter = uint32(0)
 		)
 		balancer := testutil.NewBalancer(testutil.WithInvokeHandlers(testutil.InvokeHandlers{

@@ -46,7 +46,7 @@ type Balancer struct {
 	onApplyDiscoveredEndpoints []func(ctx context.Context, endpoints []endpoint.Info)
 }
 
-func (b *Balancer) HasNode(id uint32) bool {
+func (b *Balancer) HasNode(id int64) bool {
 	if b.config.SingleConn {
 		return true
 	}

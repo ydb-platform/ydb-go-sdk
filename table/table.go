@@ -80,7 +80,7 @@ const (
 
 type SessionInfo interface {
 	ID() string
-	NodeID() uint32
+	NodeID() int64
 	Status() SessionStatus
 	LastUsage() time.Time
 }

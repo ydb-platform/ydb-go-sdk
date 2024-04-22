@@ -16,6 +16,7 @@ var _ query.Row = (*row)(nil)
 type row struct {
 	ctx   context.Context
 	trace *trace.Query
+	v     *Ydb.Value
 
 	indexedScanner scanner.IndexedScanner
 	namedScanner   scanner.NamedScanner
@@ -28,6 +29,7 @@ func newRow(ctx context.Context, columns []*Ydb.Column, v *Ydb.Value, t *trace.Q
 	return &row{
 		ctx:            ctx,
 		trace:          t,
+		v:              v,
 		indexedScanner: scanner.Indexed(data),
 		namedScanner:   scanner.Named(data),
 		structScanner:  scanner.Struct(data),

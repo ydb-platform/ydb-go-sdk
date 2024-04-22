@@ -139,7 +139,7 @@ type ConnState interface {
 type EndpointInfo interface {
 	fmt.Stringer
 
-	NodeID() uint32
+	NodeID() int64
 	Address() string
 	Location() string
 	LoadFactor() float32

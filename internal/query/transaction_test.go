@@ -132,14 +132,13 @@ func (s testExecuteSettings) CallOptions() []grpc.CallOption {
 	return s.callOptions
 }
 
-var _ executeConfig = testExecuteSettings{}
-
 func TestTxExecuteSettings(t *testing.T) {
 	for _, tt := range []struct {
 		name     string
 		txID     string
 		txOpts   []options.TxExecuteOption
-		settings executeConfig
+		settings testExecuteSettings
+		commitTx bool
 	}{
 		{
 			name:   "WithTxID",
@@ -218,16 +217,32 @@ func TestTxExecuteSettings(t *testing.T) {
 				params:    params.Builder{}.Param("$a").Text("A").Build(),
 			},
 		},
+		{
+			name: "WithCommit",
+			txID: "test",
+			txOpts: []options.TxExecuteOption{
+				options.WithCommit(),
+			},
+			settings: testExecuteSettings{
+				execMode:  options.ExecModeExecute,
+				statsMode: options.StatsModeNone,
+				txControl: query.TxControl(query.WithTxID("test")),
+				syntax:    options.SyntaxYQL,
+			},
+			commitTx: true,
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			a := allocator.New()
-			settings := options.TxExecuteSettings(tt.txID, tt.txOpts...).ExecuteSettings
-			require.Equal(t, tt.settings.Syntax(), settings.Syntax())
-			require.Equal(t, tt.settings.ExecMode(), settings.ExecMode())
-			require.Equal(t, tt.settings.StatsMode(), settings.StatsMode())
-			require.Equal(t, tt.settings.TxControl().ToYDB(a).String(), settings.TxControl().ToYDB(a).String())
-			require.Equal(t, tt.settings.Params().ToYDB(a), settings.Params().ToYDB(a))
-			require.Equal(t, tt.settings.CallOptions(), settings.CallOptions())
+			settings := options.TxExecuteSettings(tt.txID, tt.txOpts...)
+			executeSettings := options.ExecuteSettings(settings.ExecuteOptions...)
+			require.Equal(t, tt.settings.Syntax(), executeSettings.Syntax)
+			require.Equal(t, tt.settings.ExecMode(), executeSettings.ExecMode)
+			require.Equal(t, tt.settings.StatsMode(), executeSettings.StatsMode)
+			require.Equal(t, tt.settings.TxControl().ToYDB(a).String(), executeSettings.TxControl.ToYDB(a).String())
+			require.Equal(t, tt.settings.Params().ToYDB(a), executeSettings.Params.ToYDB(a))
+			require.Equal(t, tt.settings.CallOptions(), executeSettings.GrpcCallOptions)
+			require.Equal(t, tt.commitTx, settings.CommitTx)
 		})
 	}
 }
