@@ -5,7 +5,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -69,6 +69,6 @@ func WithLabel(lbl string) bothDoAndDoTxOption {
 }
 
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func WithBudget(l retry.Budget) bothDoAndDoTxOption {
-	return options.WithBudget(l)
+func WithRetryBudget(b budget.Budget) bothDoAndDoTxOption {
+	return options.WithRetryBudget(b)
 }

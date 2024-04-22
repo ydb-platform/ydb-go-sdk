@@ -1,4 +1,4 @@
-package retry
+package budget
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 func TestUnlimitedBudget(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx, cancel := xcontext.WithCancel(xtest.Context(t))
-		q := NewBudget(-1)
+		q := New(-1)
 		require.NoError(t, q.Acquire(ctx))
 		cancel()
 		require.ErrorIs(t, q.Acquire(ctx), context.Canceled)
@@ -26,7 +26,7 @@ func TestBudget(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx, cancel := xcontext.WithCancel(xtest.Context(t))
 		clock := clockwork.NewFakeClock()
-		q := NewBudget(1, WithBudgetClock(clock))
+		q := New(1, withBudgetClock(clock))
 		defer q.Stop()
 		require.NoError(t, q.Acquire(ctx))
 		acquireCh := make(chan struct{})

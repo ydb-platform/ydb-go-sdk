@@ -9,9 +9,7 @@ import (
 	"time"
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
-	retry2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
 	"slo/internal/config"
@@ -23,7 +21,7 @@ type Storage struct {
 	cfg         *config.Config
 	tablePath   string
 	retryBudget interface {
-		retry2.Budget
+		budget.Budget
 
 		Stop()
 	}
@@ -74,7 +72,7 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:gomnd
 	defer cancel()
 
-	retryBudget := retry.Budget(int(float64(poolSize) * 0.1))
+	retryBudget := budget.New(int(float64(poolSize) * 0.1))
 
 	db, err := ydb.Open(ctx,
 		cfg.Endpoint+cfg.DB,

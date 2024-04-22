@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	retry2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -65,7 +63,7 @@ type Storage struct {
 	upsertQuery string
 	selectQuery string
 	retryBudget interface {
-		retry2.Budget
+		budget.Budget
 
 		Stop()
 	}
@@ -75,7 +73,7 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:gomnd
 	defer cancel()
 
-	retryBudget := retry.Budget(int(float64(poolSize) * 0.1))
+	retryBudget := budget.New(int(float64(poolSize) * 0.1))
 
 	db, err := ydb.Open(
 		ctx,

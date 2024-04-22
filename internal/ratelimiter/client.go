@@ -63,7 +63,7 @@ func (c *Client) CreateResource(
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
-		retry.WithBudget(c.config.RetryLimiter()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
 }
 
@@ -113,7 +113,7 @@ func (c *Client) AlterResource(
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
-		retry.WithBudget(c.config.RetryLimiter()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
 }
 
@@ -163,7 +163,7 @@ func (c *Client) DropResource(
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
-		retry.WithBudget(c.config.RetryLimiter()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
 }
 
@@ -209,7 +209,7 @@ func (c *Client) ListResource(
 		retry.WithIdempotent(true),
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
-		retry.WithBudget(c.config.RetryLimiter()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
 
 	return list, err
@@ -269,7 +269,7 @@ func (c *Client) DescribeResource(
 		retry.WithIdempotent(true),
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
-		retry.WithBudget(c.config.RetryLimiter()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
 
 	return
@@ -338,7 +338,7 @@ func (c *Client) AcquireResource(
 	return retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
-		retry.WithBudget(c.config.RetryLimiter()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
 }
 

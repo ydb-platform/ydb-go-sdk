@@ -11,11 +11,11 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -176,18 +176,18 @@ func WithTraceRetry(t *trace.Retry) ConnectorOption {
 	return traceRetryConnectorOption{t: t}
 }
 
-type retryLimiterConnectorOption struct {
-	l retry.Budget
+type retryBudgetConnectorOption struct {
+	b budget.Budget
 }
 
-func (l retryLimiterConnectorOption) Apply(c *Connector) error {
-	c.retryLimiter = l.l
+func (l retryBudgetConnectorOption) Apply(c *Connector) error {
+	c.retryBudget = l.b
 
 	return nil
 }
 
-func WithRetryLimiter(l retry.Budget) ConnectorOption {
-	return retryLimiterConnectorOption{l: l}
+func WithretryBudget(b budget.Budget) ConnectorOption {
+	return retryBudgetConnectorOption{b: b}
 }
 
 type fakeTxConnectorOption QueryMode
@@ -263,9 +263,9 @@ type Connector struct {
 	disableServerBalancer bool
 	idleThreshold         time.Duration
 
-	trace        *trace.DatabaseSQL
-	traceRetry   *trace.Retry
-	retryLimiter retry.Budget
+	trace       *trace.DatabaseSQL
+	traceRetry  *trace.Retry
+	retryBudget budget.Budget
 }
 
 var (
@@ -369,8 +369,8 @@ func (d *driverWrapper) TraceRetry() *trace.Retry {
 	return d.c.traceRetry
 }
 
-func (d *driverWrapper) RetryLimiter() retry.Budget {
-	return d.c.retryLimiter
+func (d *driverWrapper) RetryBudget() budget.Budget {
+	return d.c.retryBudget
 }
 
 func (d *driverWrapper) Open(_ string) (driver.Conn, error) {

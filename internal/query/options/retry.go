@@ -2,8 +2,8 @@ package options
 
 import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/tx"
-	retry2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -96,8 +96,8 @@ func WithTrace(t *trace.Query) traceOption {
 	return traceOption{t: t}
 }
 
-func WithBudget(l retry2.Budget) retryOptionsOption {
-	return []retry.Option{retry.WithBudget(l)}
+func WithRetryBudget(b budget.Budget) retryOptionsOption {
+	return []retry.Option{retry.WithBudget(b)}
 }
 
 func ParseDoOpts(t *trace.Query, opts ...DoOption) (s *doSettings) {

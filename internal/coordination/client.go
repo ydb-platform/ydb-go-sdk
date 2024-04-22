@@ -117,7 +117,7 @@ func (c *Client) CreateNode(ctx context.Context, path string, config coordinatio
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
-		retry.WithBudget(c.config.RetryLimiter()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
 }
 
@@ -150,7 +150,7 @@ func (c *Client) AlterNode(ctx context.Context, path string, config coordination
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
-		retry.WithBudget(c.config.RetryLimiter()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
 }
 
@@ -211,7 +211,7 @@ func (c *Client) DropNode(ctx context.Context, path string) (finalErr error) {
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
-		retry.WithBudget(c.config.RetryLimiter()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
 }
 
@@ -271,7 +271,7 @@ func (c *Client) DescribeNode(
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
-		retry.WithBudget(c.config.RetryLimiter()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)

@@ -12,7 +12,7 @@ import (
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -159,9 +159,9 @@ func WithTrace(t trace.Driver, opts ...trace.DriverComposeOption) Option { //nol
 }
 
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func WithRetryLimiter(l retry.Budget) Option {
+func WithRetryBudget(b budget.Budget) Option {
 	return func(c *Config) {
-		config.SetRetryLimiter(&c.Common, l)
+		config.SetRetryBudget(&c.Common, b)
 	}
 }
 

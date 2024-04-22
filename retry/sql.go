@@ -5,10 +5,10 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	budget "github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -145,12 +145,12 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 	)
 	if d, has := db.Driver().(interface {
 		TraceRetry() *trace.Retry
-		RetryLimiter() retry.Budget
+		RetryBudget() budget.Budget
 	}); has {
 		options.retryOptions = append(options.retryOptions, nil, nil)
 		copy(options.retryOptions[2:], options.retryOptions)
 		options.retryOptions[0] = WithTrace(d.TraceRetry())
-		options.retryOptions[1] = WithBudget(d.RetryLimiter())
+		options.retryOptions[1] = WithBudget(d.RetryBudget())
 	}
 	for _, opt := range opts {
 		if opt != nil {

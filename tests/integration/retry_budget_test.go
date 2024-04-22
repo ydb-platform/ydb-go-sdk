@@ -14,11 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
-	retry2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
@@ -31,7 +31,7 @@ func (n noQuota) Acquire(ctx context.Context) error {
 func TestRetryBudget(t *testing.T) {
 	ctx := xtest.Context(t)
 
-	defaultLimiter := retry.Budget(1)
+	defaultLimiter := budget.New(1)
 	defer defaultLimiter.Stop()
 
 	nativeDriver, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"),
@@ -59,50 +59,50 @@ func TestRetryBudget(t *testing.T) {
 		_ = db.Close()
 	}()
 
-	retryLimiter := noQuota{}
+	retryBudget := noQuota{}
 
 	t.Run("retry.Retry", func(t *testing.T) {
 		err := retry.Retry(ctx, func(ctx context.Context) (err error) {
 			return retry.RetryableError(errors.New("custom error"))
-		}, retry.WithBudget(retryLimiter))
-		require.ErrorIs(t, err, retry2.ErrNoQuota)
+		}, retry.WithBudget(retryBudget))
+		require.ErrorIs(t, err, budget.ErrNoQuota)
 	})
 	t.Run("retry.Do", func(t *testing.T) {
 		err := retry.Do(ctx, db, func(ctx context.Context, cc *sql.Conn) (err error) {
 			return retry.RetryableError(errors.New("custom error"))
-		}, retry.WithBudget(retryLimiter))
-		require.ErrorIs(t, err, retry2.ErrNoQuota)
+		}, retry.WithBudget(retryBudget))
+		require.ErrorIs(t, err, budget.ErrNoQuota)
 	})
 	t.Run("retry.DoTx", func(t *testing.T) {
 		err := retry.DoTx(ctx, db, func(ctx context.Context, tx *sql.Tx) (err error) {
 			return retry.RetryableError(errors.New("custom error"))
-		}, retry.WithBudget(retryLimiter))
-		require.ErrorIs(t, err, retry2.ErrNoQuota)
+		}, retry.WithBudget(retryBudget))
+		require.ErrorIs(t, err, budget.ErrNoQuota)
 	})
 	t.Run("db.Table().Do", func(t *testing.T) {
 		err := nativeDriver.Table().Do(ctx, func(ctx context.Context, s table.Session) error {
 			return retry.RetryableError(errors.New("custom error"))
-		}, table.WithBudget(retryLimiter))
-		require.ErrorIs(t, err, retry2.ErrNoQuota)
+		}, table.WithRetryBudget(retryBudget))
+		require.ErrorIs(t, err, budget.ErrNoQuota)
 	})
 	t.Run("db.Table().DoTx", func(t *testing.T) {
 		err := nativeDriver.Table().DoTx(ctx, func(ctx context.Context, tx table.TransactionActor) error {
 			return retry.RetryableError(errors.New("custom error"))
-		}, table.WithBudget(retryLimiter))
-		require.ErrorIs(t, err, retry2.ErrNoQuota)
+		}, table.WithRetryBudget(retryBudget))
+		require.ErrorIs(t, err, budget.ErrNoQuota)
 	})
 	if version.Gte(os.Getenv("YDB_VERSION"), "24.1") {
 		t.Run("db.Query().Do", func(t *testing.T) {
 			err := nativeDriver.Query().Do(ctx, func(ctx context.Context, s query.Session) error {
 				return retry.RetryableError(errors.New("custom error"))
-			}, query.WithBudget(retryLimiter))
-			require.ErrorIs(t, err, retry2.ErrNoQuota)
+			}, query.WithRetryBudget(retryBudget))
+			require.ErrorIs(t, err, budget.ErrNoQuota)
 		})
 		t.Run("db.Query().DoTx", func(t *testing.T) {
 			err := nativeDriver.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) error {
 				return retry.RetryableError(errors.New("custom error"))
-			}, query.WithBudget(retryLimiter))
-			require.ErrorIs(t, err, retry2.ErrNoQuota)
+			}, query.WithRetryBudget(retryBudget))
+			require.ErrorIs(t, err, budget.ErrNoQuota)
 		})
 	}
 }

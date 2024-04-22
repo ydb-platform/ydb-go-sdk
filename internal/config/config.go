@@ -3,19 +3,18 @@ package config
 import (
 	"time"
 
-	retry2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var defaultRetryLimiter = retry.Budget(-1)
+var defaultRetryBudget = budget.New(-1)
 
 type Common struct {
 	operationTimeout     time.Duration
 	operationCancelAfter time.Duration
 	disableAutoRetry     bool
 	traceRetry           trace.Retry
-	retryLimiter         retry2.Budget
+	retryBudget          budget.Budget
 
 	panicCallback func(e interface{})
 }
@@ -53,12 +52,12 @@ func (c *Common) TraceRetry() *trace.Retry {
 	return &c.traceRetry
 }
 
-func (c *Common) RetryLimiter() retry2.Budget {
-	if c.retryLimiter == nil {
-		return defaultRetryLimiter
+func (c *Common) RetryBudget() budget.Budget {
+	if c.retryBudget == nil {
+		return defaultRetryBudget
 	}
 
-	return c.retryLimiter
+	return c.retryBudget
 }
 
 // SetOperationTimeout define the maximum amount of time a YDB server will process
@@ -95,6 +94,6 @@ func SetTraceRetry(c *Common, t *trace.Retry, opts ...trace.RetryComposeOption) 
 	c.traceRetry = *c.traceRetry.Compose(t, opts...)
 }
 
-func SetRetryLimiter(c *Common, l retry2.Budget) {
-	c.retryLimiter = l
+func SetRetryBudget(c *Common, b budget.Budget) {
+	c.retryBudget = b
 }

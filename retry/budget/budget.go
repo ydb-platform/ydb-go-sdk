@@ -1,4 +1,4 @@
-package retry
+package budget
 
 import (
 	"context"
@@ -20,17 +20,17 @@ type (
 		quota  chan struct{}
 		done   chan struct{}
 	}
-	BudgetOption func(q *budget)
+	option func(q *budget)
 )
 
-func WithBudgetClock(clock clockwork.Clock) BudgetOption {
+func withBudgetClock(clock clockwork.Clock) option {
 	return func(q *budget) {
 		q.clock = clock
 	}
 }
 
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func NewBudget(attemptsPerSecond int, opts ...BudgetOption) *budget {
+func New(attemptsPerSecond int, opts ...option) *budget {
 	q := &budget{
 		clock: clockwork.NewRealClock(),
 		done:  make(chan struct{}),

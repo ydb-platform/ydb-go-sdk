@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -26,7 +26,7 @@ type retryOptions struct {
 	stackTrace  bool
 	fastBackoff backoff.Backoff
 	slowBackoff backoff.Backoff
-	budget      retry.Budget
+	budget      budget.Budget
 
 	panicCallback func(e interface{})
 }
@@ -126,29 +126,29 @@ func WithTrace(t *trace.Retry) traceOption {
 	return traceOption{t: t}
 }
 
-var _ Option = limiterOption{}
+var _ Option = budgetOption{}
 
-type limiterOption struct {
-	l retry.Budget
+type budgetOption struct {
+	b budget.Budget
 }
 
-func (l limiterOption) ApplyRetryOption(opts *retryOptions) {
-	opts.budget = l.l
+func (b budgetOption) ApplyRetryOption(opts *retryOptions) {
+	opts.budget = b.b
 }
 
-func (l limiterOption) ApplyDoOption(opts *doOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithBudget(l.l))
+func (b budgetOption) ApplyDoOption(opts *doOptions) {
+	opts.retryOptions = append(opts.retryOptions, WithBudget(b.b))
 }
 
-func (l limiterOption) ApplyDoTxOption(opts *doTxOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithBudget(l.l))
+func (b budgetOption) ApplyDoTxOption(opts *doTxOptions) {
+	opts.retryOptions = append(opts.retryOptions, WithBudget(b.b))
 }
 
 //	WithBudget returns budget option
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func WithBudget(l retry.Budget) limiterOption {
-	return limiterOption{l: l}
+func WithBudget(b budget.Budget) budgetOption {
+	return budgetOption{b: b}
 }
 
 var _ Option = idempotentOption(false)
@@ -261,7 +261,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 	options := &retryOptions{
 		call:        stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.Retry"),
 		trace:       &trace.Retry{},
-		budget:      Budget(-1),
+		budget:      budget.New(-1),
 		fastBackoff: backoff.Fast,
 		slowBackoff: backoff.Slow,
 	}
@@ -362,7 +362,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 				if acquireErr := options.budget.Acquire(ctx); acquireErr != nil {
 					return xerrors.WithStackTrace(
 						xerrors.Join(
-							fmt.Errorf("attempt No.%d: %w", attempts, ErrNoQuota),
+							fmt.Errorf("attempt No.%d: %w", attempts, budget.ErrNoQuota),
 							acquireErr,
 							err,
 						),
