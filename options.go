@@ -19,13 +19,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
 	queryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
 	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
 	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
 	tableConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -295,10 +295,10 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	}
 }
 
-// WithRetryLimiter sets retry limiter for all calls of all retryers.
+// WithRetryBudget sets retry limiter for all calls of all retryers.
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func WithRetryLimiter(l retry.Limiter) Option {
+func WithRetryBudget(l retry.Budget) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithRetryLimiter(l))
 

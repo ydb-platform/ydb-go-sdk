@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -25,7 +26,7 @@ type retryOptions struct {
 	stackTrace  bool
 	fastBackoff backoff.Backoff
 	slowBackoff backoff.Backoff
-	limiter     Limiter
+	budget      retry.Budget
 
 	panicCallback func(e interface{})
 }
@@ -128,25 +129,25 @@ func WithTrace(t *trace.Retry) traceOption {
 var _ Option = limiterOption{}
 
 type limiterOption struct {
-	l Limiter
+	l retry.Budget
 }
 
 func (l limiterOption) ApplyRetryOption(opts *retryOptions) {
-	opts.limiter = l.l
+	opts.budget = l.l
 }
 
 func (l limiterOption) ApplyDoOption(opts *doOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithLimiter(l.l))
+	opts.retryOptions = append(opts.retryOptions, WithBudget(l.l))
 }
 
 func (l limiterOption) ApplyDoTxOption(opts *doTxOptions) {
-	opts.retryOptions = append(opts.retryOptions, WithLimiter(l.l))
+	opts.retryOptions = append(opts.retryOptions, WithBudget(l.l))
 }
 
-// WithLimiter returns limiter option
+//	WithBudget returns budget option
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func WithLimiter(l Limiter) limiterOption {
+func WithBudget(l retry.Budget) limiterOption {
 	return limiterOption{l: l}
 }
 
@@ -260,7 +261,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 	options := &retryOptions{
 		call:        stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.Retry"),
 		trace:       &trace.Retry{},
-		limiter:     Quoter(-1),
+		budget:      Budget(-1),
 		fastBackoff: backoff.Fast,
 		slowBackoff: backoff.Slow,
 	}
@@ -358,7 +359,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 			case <-t.C:
 				t.Stop()
 
-				if acquireErr := options.limiter.Acquire(ctx); acquireErr != nil {
+				if acquireErr := options.budget.Acquire(ctx); acquireErr != nil {
 					return xerrors.WithStackTrace(
 						xerrors.Join(
 							fmt.Errorf("attempt No.%d: %w", attempts, ErrNoQuota),

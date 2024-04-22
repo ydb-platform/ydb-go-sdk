@@ -64,7 +64,7 @@ func (c *Client) MakeDirectory(ctx context.Context, path string) (finalErr error
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
-		retry.WithLimiter(c.config.RetryLimiter()),
+		retry.WithBudget(c.config.RetryLimiter()),
 	)
 }
 
@@ -104,7 +104,7 @@ func (c *Client) RemoveDirectory(ctx context.Context, path string) (finalErr err
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
-		retry.WithLimiter(c.config.RetryLimiter()),
+		retry.WithBudget(c.config.RetryLimiter()),
 	)
 }
 
@@ -146,7 +146,7 @@ func (c *Client) ListDirectory(ctx context.Context, path string) (d scheme.Direc
 		retry.WithIdempotent(true),
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
-		retry.WithLimiter(c.config.RetryLimiter()),
+		retry.WithBudget(c.config.RetryLimiter()),
 	)
 
 	return d, xerrors.WithStackTrace(err)
@@ -210,7 +210,7 @@ func (c *Client) DescribePath(ctx context.Context, path string) (e scheme.Entry,
 		retry.WithIdempotent(true),
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
-		retry.WithLimiter(c.config.RetryLimiter()),
+		retry.WithBudget(c.config.RetryLimiter()),
 	)
 
 	return e, xerrors.WithStackTrace(err)
@@ -272,7 +272,7 @@ func (c *Client) ModifyPermissions(
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
-		retry.WithLimiter(c.config.RetryLimiter()),
+		retry.WithBudget(c.config.RetryLimiter()),
 	)
 }
 

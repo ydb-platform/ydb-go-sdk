@@ -11,11 +11,11 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	metaHeaders "github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
-	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -177,7 +177,7 @@ func WithTraceRetry(t *trace.Retry) ConnectorOption {
 }
 
 type retryLimiterConnectorOption struct {
-	l retry.Limiter
+	l retry.Budget
 }
 
 func (l retryLimiterConnectorOption) Apply(c *Connector) error {
@@ -186,7 +186,7 @@ func (l retryLimiterConnectorOption) Apply(c *Connector) error {
 	return nil
 }
 
-func WithRetryLimiter(l retry.Limiter) ConnectorOption {
+func WithRetryLimiter(l retry.Budget) ConnectorOption {
 	return retryLimiterConnectorOption{l: l}
 }
 
@@ -265,7 +265,7 @@ type Connector struct {
 
 	trace        *trace.DatabaseSQL
 	traceRetry   *trace.Retry
-	retryLimiter retry.Limiter
+	retryLimiter retry.Budget
 }
 
 var (
@@ -369,7 +369,7 @@ func (d *driverWrapper) TraceRetry() *trace.Retry {
 	return d.c.traceRetry
 }
 
-func (d *driverWrapper) RetryLimiter() retry.Limiter {
+func (d *driverWrapper) RetryLimiter() retry.Budget {
 	return d.c.retryLimiter
 }
 

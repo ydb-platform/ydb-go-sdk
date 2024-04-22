@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	retry2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -58,25 +59,29 @@ var (
 )
 
 type Storage struct {
-	db           *ydb.Driver
-	cfg          *config.Config
-	prefix       string
-	upsertQuery  string
-	selectQuery  string
-	retryLimiter retry.LimiterStoper
+	db          *ydb.Driver
+	cfg         *config.Config
+	prefix      string
+	upsertQuery string
+	selectQuery string
+	retryBudget interface {
+		retry2.Budget
+
+		Stop()
+	}
 }
 
 func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:gomnd
 	defer cancel()
 
-	retryLimiter := retry.Quoter(int(float64(poolSize) * 0.1))
+	retryBudget := retry.Budget(int(float64(poolSize) * 0.1))
 
 	db, err := ydb.Open(
 		ctx,
 		cfg.Endpoint+cfg.DB,
 		ydb.WithSessionPoolSizeLimit(poolSize),
-		ydb.WithRetryLimiter(retryLimiter),
+		ydb.WithRetryBudget(retryBudget),
 	)
 	if err != nil {
 		return nil, err
@@ -85,12 +90,12 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 	prefix := path.Join(db.Name(), label)
 
 	s := &Storage{
-		db:           db,
-		cfg:          cfg,
-		prefix:       prefix,
-		upsertQuery:  fmt.Sprintf(upsertTemplate, prefix, cfg.Table),
-		selectQuery:  fmt.Sprintf(selectTemplate, prefix, cfg.Table),
-		retryLimiter: retryLimiter,
+		db:          db,
+		cfg:         cfg,
+		prefix:      prefix,
+		upsertQuery: fmt.Sprintf(upsertTemplate, prefix, cfg.Table),
+		selectQuery: fmt.Sprintf(selectTemplate, prefix, cfg.Table),
+		retryBudget: retryBudget,
 	}
 
 	return s, nil
@@ -251,7 +256,7 @@ func (s *Storage) dropTable(ctx context.Context) error {
 }
 
 func (s *Storage) close(ctx context.Context) error {
-	s.retryLimiter.Stop()
+	s.retryBudget.Stop()
 
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ShutdownTime)*time.Second)
 	defer cancel()

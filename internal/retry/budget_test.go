@@ -12,23 +12,21 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
-func TestUnlimitedLimiter(t *testing.T) {
+func TestUnlimitedBudget(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx, cancel := xcontext.WithCancel(xtest.Context(t))
-		q := Quoter(-1)
+		q := NewBudget(-1)
 		require.NoError(t, q.Acquire(ctx))
 		cancel()
 		require.ErrorIs(t, q.Acquire(ctx), context.Canceled)
 	})
 }
 
-func TestQuoter(t *testing.T) {
+func TestBudget(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx, cancel := xcontext.WithCancel(xtest.Context(t))
 		clock := clockwork.NewFakeClock()
-		q := Quoter(1, func(q *rateLimiter) {
-			q.clock = clock
-		})
+		q := NewBudget(1, WithBudgetClock(clock))
 		defer q.Stop()
 		require.NoError(t, q.Acquire(ctx))
 		acquireCh := make(chan struct{})

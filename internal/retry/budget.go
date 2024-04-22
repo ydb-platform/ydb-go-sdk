@@ -2,7 +2,6 @@ package retry
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/jonboulle/clockwork"
@@ -10,35 +9,29 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var (
-	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-	ErrNoQuota = xerrors.Wrap(errors.New("no retry quota"))
-
-	_ Limiter = (*rateLimiter)(nil)
-)
-
 type (
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-	Limiter interface {
+	Budget interface {
 		Acquire(ctx context.Context) error
 	}
-	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-	LimiterStoper interface {
-		Limiter
-		Stop()
-	}
-	rateLimiter struct {
+	budget struct {
 		clock  clockwork.Clock
 		ticker clockwork.Ticker
 		quota  chan struct{}
 		done   chan struct{}
 	}
-	rateLimiterOption func(q *rateLimiter)
+	BudgetOption func(q *budget)
 )
 
+func WithBudgetClock(clock clockwork.Clock) BudgetOption {
+	return func(q *budget) {
+		q.clock = clock
+	}
+}
+
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func Quoter(attemptsPerSecond int, opts ...rateLimiterOption) *rateLimiter {
-	q := &rateLimiter{
+func NewBudget(attemptsPerSecond int, opts ...BudgetOption) *budget {
+	q := &budget{
 		clock: clockwork.NewRealClock(),
 		done:  make(chan struct{}),
 	}
@@ -75,7 +68,7 @@ func Quoter(attemptsPerSecond int, opts ...rateLimiterOption) *rateLimiter {
 }
 
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func (q *rateLimiter) Stop() {
+func (q *budget) Stop() {
 	if q.ticker != nil {
 		q.ticker.Stop()
 	}
@@ -83,7 +76,7 @@ func (q *rateLimiter) Stop() {
 }
 
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func (q *rateLimiter) Acquire(ctx context.Context) error {
+func (q *budget) Acquire(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()

@@ -831,7 +831,7 @@ func (c *conn) retryIdempotent(ctx context.Context, f func(ctx context.Context) 
 	err := retry.Retry(ctx, f,
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.connector.traceRetry),
-		retry.WithLimiter(c.connector.retryLimiter),
+		retry.WithBudget(c.connector.retryLimiter),
 	)
 	if err != nil {
 		return xerrors.WithStackTrace(err)

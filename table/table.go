@@ -8,6 +8,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	retry2 "github.com/ydb-platform/ydb-go-sdk/v3/internal/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -524,8 +525,8 @@ func (retryOptions retryOptionsOption) ApplyTableOption(opts *Options) {
 }
 
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func WithLimiter(l retry.Limiter) retryOptionsOption {
-	return []retry.Option{retry.WithLimiter(l)}
+func WithBudget(l retry2.Budget) retryOptionsOption {
+	return []retry.Option{retry.WithBudget(l)}
 }
 
 // Deprecated: redundant option
