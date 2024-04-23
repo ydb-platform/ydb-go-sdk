@@ -14,7 +14,7 @@ import (
 type (
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	Budget interface {
-		// Acquire called from retryer on second and subsequence attempts
+		// Acquire will called on second and subsequent retry attempts
 		Acquire(ctx context.Context) error
 	}
 	fixedBudget struct {
