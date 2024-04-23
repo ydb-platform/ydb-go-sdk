@@ -96,7 +96,7 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderPartitionReadStartResponseStartInfo struct {
 		ReaderConnectionID string
-		PartitionContext   context.Context
+		PartitionContext   *context.Context
 		Topic              string
 		PartitionID        int64
 		PartitionSessionID int64
@@ -118,7 +118,7 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderPartitionReadStopResponseStartInfo struct {
 		ReaderConnectionID string
-		PartitionContext   context.Context
+		PartitionContext   *context.Context
 		Topic              string
 		PartitionID        int64
 		PartitionSessionID int64
@@ -197,7 +197,7 @@ type (
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderReadMessagesStartInfo struct {
-		RequestContext     context.Context
+		RequestContext     *context.Context
 		MinCount           int
 		MaxCount           int
 		FreeBufferCapacity int
@@ -239,7 +239,7 @@ type (
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	TopicReaderCommitStartInfo struct {
-		RequestContext     context.Context
+		RequestContext     *context.Context
 		Topic              string
 		PartitionID        int64
 		PartitionSessionID int64

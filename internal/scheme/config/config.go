@@ -14,12 +14,12 @@ type Config struct {
 }
 
 // Trace returns trace over scheme client calls
-func (c Config) Trace() *trace.Scheme {
+func (c *Config) Trace() *trace.Scheme {
 	return c.trace
 }
 
 // Database returns database name
-func (c Config) Database() string {
+func (c *Config) Database() string {
 	return c.databaseName
 }
 
@@ -46,13 +46,13 @@ func With(config config.Common) Option {
 	}
 }
 
-func New(opts ...Option) Config {
-	c := Config{
+func New(opts ...Option) *Config {
+	c := &Config{
 		trace: &trace.Scheme{},
 	}
 	for _, opt := range opts {
 		if opt != nil {
-			opt(&c)
+			opt(c)
 		}
 	}
 

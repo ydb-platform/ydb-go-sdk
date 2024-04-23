@@ -102,7 +102,6 @@ func NewReader(
 			cfg.OperationTimeout(),
 			cfg.RetrySettings,
 			cfg.Trace,
-			cfg.BaseContext,
 		),
 		defaultBatchConfig: cfg.DefaultBatchConfig,
 		tracer:             cfg.Trace,

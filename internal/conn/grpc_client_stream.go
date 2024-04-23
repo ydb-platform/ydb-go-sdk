@@ -16,7 +16,6 @@ import (
 
 type grpcClientStream struct {
 	grpc.ClientStream
-	ctx      context.Context
 	c        *conn
 	wrapping bool
 	traceID  string
@@ -25,9 +24,11 @@ type grpcClientStream struct {
 }
 
 func (s *grpcClientStream) CloseSend() (err error) {
-	ctx := s.ctx
-	onDone := trace.DriverOnConnStreamCloseSend(s.c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*grpcClientStream).CloseSend"),
+	var (
+		ctx    = s.Context()
+		onDone = trace.DriverOnConnStreamCloseSend(s.c.config.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*grpcClientStream).CloseSend"),
+		)
 	)
 	defer func() {
 		onDone(err)
@@ -60,9 +61,11 @@ func (s *grpcClientStream) CloseSend() (err error) {
 }
 
 func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
-	ctx := s.ctx
-	onDone := trace.DriverOnConnStreamSendMsg(s.c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*grpcClientStream).SendMsg"),
+	var (
+		ctx    = s.Context()
+		onDone = trace.DriverOnConnStreamSendMsg(s.c.config.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*grpcClientStream).SendMsg"),
+		)
 	)
 	defer func() {
 		onDone(err)
@@ -79,7 +82,7 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 		}
 
 		defer func() {
-			s.c.onTransportError(s.Context(), err)
+			s.c.onTransportError(ctx, err)
 		}()
 
 		if s.wrapping {
@@ -103,9 +106,11 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 }
 
 func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
-	ctx := s.ctx
-	onDone := trace.DriverOnConnStreamRecvMsg(s.c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*grpcClientStream).RecvMsg"),
+	var (
+		ctx    = s.Context()
+		onDone = trace.DriverOnConnStreamRecvMsg(s.c.config.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*grpcClientStream).RecvMsg"),
+		)
 	)
 	defer func() {
 		onDone(err)
@@ -130,7 +135,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 
 		defer func() {
 			if !xerrors.Is(err, io.EOF) {
-				s.c.onTransportError(s.Context(), err)
+				s.c.onTransportError(ctx, err)
 			}
 		}()
 

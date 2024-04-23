@@ -207,7 +207,7 @@ func NewResultSet(a *allocator.Allocator, opts ...ResultSetOption) *Ydb.ResultSe
 
 func TestNewStreamWithRecvFirstResultSet(t *testing.T) {
 	for _, tt := range []struct {
-		ctx         context.Context
+		ctx         context.Context //nolint:containedctx
 		recvCounter int
 		err         error
 	}{

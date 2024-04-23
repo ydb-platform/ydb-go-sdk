@@ -25,6 +25,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -289,6 +290,17 @@ func MergeOptions(opts ...Option) Option {
 func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.discoveryOptions = append(c.discoveryOptions, discoveryConfig.WithInterval(discoveryInterval))
+
+		return nil
+	}
+}
+
+// WithRetryBudget sets retry budget for all calls of all retryers.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithRetryBudget(b budget.Budget) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.options = append(c.options, config.WithRetryBudget(b))
 
 		return nil
 	}

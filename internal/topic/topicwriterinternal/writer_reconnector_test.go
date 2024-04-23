@@ -830,7 +830,7 @@ func isClosed(ch <-chan struct{}) bool {
 }
 
 type testEnv struct {
-	ctx                   context.Context
+	ctx                   context.Context //nolint:containedctx
 	stream                *MockRawTopicWriterStream
 	writer                *WriterReconnector
 	sendFromServerChannel chan sendFromServerResponse

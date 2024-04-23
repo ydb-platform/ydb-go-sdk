@@ -12,6 +12,7 @@ import (
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -154,6 +155,13 @@ func WithTLSConfig(tlsConfig *tls.Config) Option {
 func WithTrace(t trace.Driver, opts ...trace.DriverComposeOption) Option { //nolint:gocritic
 	return func(c *Config) {
 		c.trace = c.trace.Compose(&t, opts...)
+	}
+}
+
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithRetryBudget(b budget.Budget) Option {
+	return func(c *Config) {
+		config.SetRetryBudget(&c.Common, b)
 	}
 }
 
