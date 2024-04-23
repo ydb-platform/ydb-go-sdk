@@ -1,3 +1,4 @@
+## v3.66.0
 * Added experimental package `retry/budget` for limit second and subsequent retry attempts 
 * Refactored internals for enabling `containedctx` linter
 * Fixed the hanging semaphore issue on coordination session reconnect
