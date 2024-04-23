@@ -171,7 +171,13 @@ func (p Permissions) To(y *Ydb_Scheme.Permissions) {
 }
 
 func InnerConvertEntry(y *Ydb_Scheme.Entry) *Entry {
-	res := &Entry{}
+	res := &Entry{
+		Name:                 "",
+		Owner:                "",
+		Type:                 EntryTypeUnknown,
+		Permissions:          nil,
+		EffectivePermissions: nil,
+	}
 	res.From(y)
 
 	return res
