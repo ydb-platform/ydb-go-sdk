@@ -34,7 +34,7 @@ type partitionSessionID = rawtopicreader.PartitionSessionID
 
 type topicStreamReaderImpl struct {
 	cfg    topicStreamReaderConfig
-	ctx    context.Context
+	ctx    context.Context //nolint:containedctx
 	cancel context.CancelFunc
 
 	freeBytes           chan int
@@ -60,7 +60,7 @@ type topicStreamReaderImpl struct {
 type topicStreamReaderConfig struct {
 	CommitterBatchTimeLag           time.Duration
 	CommitterBatchCounterTrigger    int
-	BaseContext                     context.Context
+	BaseContext                     context.Context //nolint:containedctx
 	BufferSizeProtoBytes            int
 	Cred                            credentials.Credentials
 	CredUpdateInterval              time.Duration
@@ -179,7 +179,7 @@ func (r *topicStreamReaderImpl) ReadMessageBatch(
 ) (batch *PublicBatch, err error) {
 	onDone := trace.TopicOnReaderReadMessages(
 		r.cfg.Trace,
-		ctx,
+		&ctx,
 		opts.MinCount,
 		opts.MaxCount,
 		r.getRestBufferBytes(),
@@ -295,15 +295,18 @@ func (r *topicStreamReaderImpl) onStopPartitionSessionRequestFromBuffer(
 		return err
 	}
 
-	onDone := trace.TopicOnReaderPartitionReadStopResponse(
-		r.cfg.Trace,
-		r.readConnectionID,
-		session.Context(),
-		session.Topic,
-		session.PartitionID,
-		session.partitionSessionID.ToInt64(),
-		msg.CommittedOffset.ToInt64(),
-		msg.Graceful,
+	var (
+		ctx    = session.Context()
+		onDone = trace.TopicOnReaderPartitionReadStopResponse(
+			r.cfg.Trace,
+			r.readConnectionID,
+			&ctx,
+			session.Topic,
+			session.PartitionID,
+			session.partitionSessionID.ToInt64(),
+			msg.CommittedOffset.ToInt64(),
+			msg.Graceful,
+		)
 	)
 	defer func() {
 		onDone(err)
@@ -357,7 +360,7 @@ func (r *topicStreamReaderImpl) Commit(ctx context.Context, commitRange commitRa
 	session := commitRange.partitionSession
 	onDone := trace.TopicOnReaderCommit(
 		r.cfg.Trace,
-		ctx,
+		&ctx,
 		session.Topic,
 		session.PartitionID,
 		session.partitionSessionID.ToInt64(),
@@ -768,13 +771,16 @@ func (r *topicStreamReaderImpl) onStartPartitionSessionRequestFromBuffer(
 		return err
 	}
 
-	onDone := trace.TopicOnReaderPartitionReadStartResponse(
-		r.cfg.Trace,
-		r.readConnectionID,
-		session.Context(),
-		session.Topic,
-		session.PartitionID,
-		session.partitionSessionID.ToInt64(),
+	var (
+		ctx    = session.Context()
+		onDone = trace.TopicOnReaderPartitionReadStartResponse(
+			r.cfg.Trace,
+			r.readConnectionID,
+			&ctx,
+			session.Topic,
+			session.PartitionID,
+			session.partitionSessionID.ToInt64(),
+		)
 	)
 
 	respMessage := &rawtopicreader.StartPartitionSessionResponse{

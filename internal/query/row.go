@@ -14,7 +14,7 @@ import (
 var _ query.Row = (*row)(nil)
 
 type row struct {
-	ctx   context.Context
+	ctx   context.Context //nolint:containedctx
 	trace *trace.Query
 
 	indexedScanner scanner.IndexedScanner
@@ -35,8 +35,11 @@ func newRow(ctx context.Context, columns []*Ydb.Column, v *Ydb.Value, t *trace.Q
 }
 
 func (r row) Scan(dst ...interface{}) (err error) {
-	onDone := trace.QueryOnRowScan(r.trace, &r.ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.row.Scan"),
+	var (
+		ctx    = r.ctx
+		onDone = trace.QueryOnRowScan(r.trace, &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.row.Scan"),
+		)
 	)
 	defer func() {
 		onDone(err)
@@ -46,8 +49,11 @@ func (r row) Scan(dst ...interface{}) (err error) {
 }
 
 func (r row) ScanNamed(dst ...scanner.NamedDestination) (err error) {
-	onDone := trace.QueryOnRowScanNamed(r.trace, &r.ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.row.ScanNamed"),
+	var (
+		ctx    = r.ctx
+		onDone = trace.QueryOnRowScanNamed(r.trace, &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.row.ScanNamed"),
+		)
 	)
 	defer func() {
 		onDone(err)
@@ -57,8 +63,11 @@ func (r row) ScanNamed(dst ...scanner.NamedDestination) (err error) {
 }
 
 func (r row) ScanStruct(dst interface{}, opts ...scanner.ScanStructOption) (err error) {
-	onDone := trace.QueryOnRowScanStruct(r.trace, &r.ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.row.ScanStruct"),
+	var (
+		ctx    = r.ctx
+		onDone = trace.QueryOnRowScanStruct(r.trace, &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.row.ScanStruct"),
+		)
 	)
 	defer func() {
 		onDone(err)

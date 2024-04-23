@@ -1,3 +1,14 @@
+## v3.66.0
+* Added experimental package `retry/budget` for limit second and subsequent retry attempts 
+* Refactored internals for enabling `containedctx` linter
+* Fixed the hanging semaphore issue on coordination session reconnect
+
+## v3.65.3
+* Fixed data race in `internal/conn.grpcClientStream` 
+
+## v3.65.2
+* Fixed data race using `log.WithNames`
+
 ## v3.65.1
 * Updated dependency `ydb-go-genproto`
 * Added processing of `Ydb.StatusIds_EXTERNAL_ERROR` in `retry.Retry`

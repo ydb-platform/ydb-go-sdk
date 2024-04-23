@@ -2,6 +2,7 @@ package retry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
 func TestRetryModes(t *testing.T) {
@@ -186,6 +188,26 @@ func TestRetryTransportCancelled(t *testing.T) {
 			require.Equal(t, cancelCounterValue, counter)
 		})
 	}
+}
+
+type noQuota struct{}
+
+var errNoQuota = errors.New("no quota")
+
+func (noQuota) Acquire(ctx context.Context) error {
+	return errNoQuota
+}
+
+func TestRetryWithBudget(t *testing.T) {
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		quota := noQuota{}
+		ctx, cancel := context.WithCancel(xtest.Context(t))
+		defer cancel()
+		err := Retry(ctx, func(ctx context.Context) (err error) {
+			return RetryableError(errors.New("custom error"))
+		}, WithBudget(quota))
+		require.ErrorIs(t, err, errNoQuota)
+	})
 }
 
 type MockPanicCallback struct {

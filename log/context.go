@@ -1,6 +1,8 @@
 package log
 
-import "context"
+import (
+	"context"
+)
 
 type (
 	ctxLevelKey struct{}
@@ -18,7 +20,11 @@ func LevelFromContext(ctx context.Context) Level {
 }
 
 func WithNames(ctx context.Context, names ...string) context.Context {
-	return context.WithValue(ctx, ctxNamesKey{}, append(NamesFromContext(ctx), names...))
+	// trim capacity for force allocate new memory while append and prevent data race
+	oldNames := NamesFromContext(ctx)
+	oldNames = oldNames[:len(oldNames):len(oldNames)]
+
+	return context.WithValue(ctx, ctxNamesKey{}, append(oldNames, names...))
 }
 
 func NamesFromContext(ctx context.Context) []string {
@@ -27,7 +33,7 @@ func NamesFromContext(ctx context.Context) []string {
 		return []string{}
 	}
 
-	return v
+	return v[:len(v):len(v)] // prevent re
 }
 
 func with(ctx context.Context, lvl Level, names ...string) context.Context {
