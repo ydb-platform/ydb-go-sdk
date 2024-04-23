@@ -78,6 +78,8 @@ func (r *result) Close() error {
 // Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
 func Result(r query.Result) *result {
 	return &result{
-		r: r,
+		r:   r,
+		rs:  nil,
+		row: nil,
 	}
 }
