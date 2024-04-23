@@ -102,6 +102,7 @@ func Percent(percent int) *percentBudget {
 	if percent > 100 || percent < 0 {
 		panic(fmt.Sprintf("wrong percent value: %d", percent))
 	}
+
 	return &percentBudget{
 		percent: percent,
 		rand:    xrand.New(xrand.WithLock()),
@@ -109,7 +110,7 @@ func Percent(percent int) *percentBudget {
 }
 
 func (b *percentBudget) Acquire(ctx context.Context) error {
-	if b.rand.Int(100) < b.percent {
+	if b.rand.Int(100) < b.percent { //nolint:gomnd
 		return nil
 	}
 
