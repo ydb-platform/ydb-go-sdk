@@ -7,7 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var defaultRetryBudget = budget.New(-1)
+var defaultRetryBudget = budget.Limited(-1)
 
 type Common struct {
 	operationTimeout     time.Duration

@@ -15,18 +15,18 @@ import (
 func TestUnlimitedBudget(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx, cancel := xcontext.WithCancel(xtest.Context(t))
-		q := New(-1)
+		q := Limited(-1)
 		require.NoError(t, q.Acquire(ctx))
 		cancel()
 		require.ErrorIs(t, q.Acquire(ctx), context.Canceled)
 	})
 }
 
-func TestBudget(t *testing.T) {
+func TestLimited(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx, cancel := xcontext.WithCancel(xtest.Context(t))
 		clock := clockwork.NewFakeClock()
-		q := New(1, withBudgetClock(clock))
+		q := Limited(1, withFixedBudgetClock(clock))
 		defer q.Stop()
 		require.NoError(t, q.Acquire(ctx))
 		acquireCh := make(chan struct{})
@@ -50,4 +50,23 @@ func TestBudget(t *testing.T) {
 		cancel()
 		require.ErrorIs(t, q.Acquire(ctx), context.Canceled)
 	})
+}
+
+func TestPercent(t *testing.T) {
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		var (
+			total   = 1000000
+			percent = 0.25
+			ctx     = xtest.Context(t)
+			b       = Percent(int(percent * 100))
+			success int
+		)
+		for i := 0; i < total; i++ {
+			if b.Acquire(ctx) == nil {
+				success++
+			}
+		}
+		require.GreaterOrEqual(t, success, int(float64(total)*(percent-0.1*percent)))
+		require.LessOrEqual(t, success, int(float64(total)*(percent+0.1*percent)))
+	}, xtest.StopAfter(5*time.Second))
 }

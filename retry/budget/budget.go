@@ -2,36 +2,43 @@ package budget
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jonboulle/clockwork"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
 )
 
 type (
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	Budget interface {
+		// Acquire called from retryer on second and subsequence attempts
 		Acquire(ctx context.Context) error
 	}
-	budget struct {
+	fixedBudget struct {
 		clock  clockwork.Clock
 		ticker clockwork.Ticker
 		quota  chan struct{}
 		done   chan struct{}
 	}
-	option func(q *budget)
+	fixedBudgetOption func(q *fixedBudget)
+	percentBudget     struct {
+		percent int
+		rand    xrand.Rand
+	}
 )
 
-func withBudgetClock(clock clockwork.Clock) option {
-	return func(q *budget) {
+func withFixedBudgetClock(clock clockwork.Clock) fixedBudgetOption {
+	return func(q *fixedBudget) {
 		q.clock = clock
 	}
 }
 
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func New(attemptsPerSecond int, opts ...option) *budget {
-	q := &budget{
+func Limited(attemptsPerSecond int, opts ...fixedBudgetOption) *fixedBudget {
+	q := &fixedBudget{
 		clock: clockwork.NewRealClock(),
 		done:  make(chan struct{}),
 	}
@@ -68,7 +75,7 @@ func New(attemptsPerSecond int, opts ...option) *budget {
 }
 
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func (q *budget) Stop() {
+func (q *fixedBudget) Stop() {
 	if q.ticker != nil {
 		q.ticker.Stop()
 	}
@@ -76,7 +83,7 @@ func (q *budget) Stop() {
 }
 
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func (q *budget) Acquire(ctx context.Context) error {
+func (q *fixedBudget) Acquire(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -88,4 +95,23 @@ func (q *budget) Acquire(ctx context.Context) error {
 	case <-ctx.Done():
 		return xerrors.WithStackTrace(ctx.Err())
 	}
+}
+
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func Percent(percent int) *percentBudget {
+	if percent > 100 || percent < 0 {
+		panic(fmt.Sprintf("wrong percent value: %d", percent))
+	}
+	return &percentBudget{
+		percent: percent,
+		rand:    xrand.New(xrand.WithLock()),
+	}
+}
+
+func (b *percentBudget) Acquire(ctx context.Context) error {
+	if b.rand.Int(100) < b.percent {
+		return nil
+	}
+
+	return ErrNoQuota
 }

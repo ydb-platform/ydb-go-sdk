@@ -31,7 +31,7 @@ func (n noQuota) Acquire(ctx context.Context) error {
 func TestRetryBudget(t *testing.T) {
 	ctx := xtest.Context(t)
 
-	defaultLimiter := budget.New(1)
+	defaultLimiter := budget.Limited(1)
 	defer defaultLimiter.Stop()
 
 	nativeDriver, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"),

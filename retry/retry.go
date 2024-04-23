@@ -261,7 +261,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 	options := &retryOptions{
 		call:        stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.Retry"),
 		trace:       &trace.Retry{},
-		budget:      budget.New(-1),
+		budget:      budget.Limited(-1),
 		fastBackoff: backoff.Fast,
 		slowBackoff: backoff.Slow,
 	}
