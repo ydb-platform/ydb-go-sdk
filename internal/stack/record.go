@@ -2,6 +2,7 @@ package stack
 
 import (
 	"fmt"
+	"path"
 	"runtime"
 	"strings"
 
@@ -108,11 +109,7 @@ func (c call) Record(opts ...recordOption) string {
 
 func extractName(function uintptr, file string) (name, fileName string) {
 	name = runtime.FuncForPC(function).Name()
-	if i := strings.LastIndex(file, "/"); i > -1 {
-		fileName = file[i+1:]
-	} else {
-		fileName = file
-	}
+	_, fileName = path.Split(file)
 	name = strings.ReplaceAll(name, "[...]", "")
 
 	return name, fileName
