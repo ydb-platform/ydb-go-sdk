@@ -101,7 +101,7 @@ func WithStackTrace() stackTraceOption {
 	return stackTraceOption{}
 }
 
-var _ Option = traceOption{}
+var _ Option = traceOption{t: nil}
 
 type traceOption struct {
 	t *trace.Retry
@@ -145,7 +145,7 @@ func WithIdempotent(idempotent bool) idempotentOption {
 	return idempotentOption(idempotent)
 }
 
-var _ Option = fastBackoffOption{}
+var _ Option = fastBackoffOption{backoff: nil}
 
 type fastBackoffOption struct {
 	backoff backoff.Backoff
@@ -170,7 +170,7 @@ func WithFastBackoff(b backoff.Backoff) fastBackoffOption {
 	return fastBackoffOption{backoff: b}
 }
 
-var _ Option = slowBackoffOption{}
+var _ Option = slowBackoffOption{backoff: nil}
 
 type slowBackoffOption struct {
 	backoff backoff.Backoff
@@ -195,7 +195,7 @@ func WithSlowBackoff(b backoff.Backoff) slowBackoffOption {
 	return slowBackoffOption{backoff: b}
 }
 
-var _ Option = panicCallbackOption{}
+var _ Option = panicCallbackOption{callback: nil}
 
 type panicCallbackOption struct {
 	callback func(e interface{})
@@ -232,10 +232,14 @@ func WithPanicCallback(panicCallback func(e interface{})) panicCallbackOption {
 // If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
 func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr error) {
 	options := &retryOptions{
-		call:        stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.Retry"),
-		trace:       &trace.Retry{},
-		fastBackoff: backoff.Fast,
-		slowBackoff: backoff.Slow,
+		call:          stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.Retry"),
+		trace:         new(trace.Retry),
+		fastBackoff:   backoff.Fast,
+		slowBackoff:   backoff.Slow,
+		label:         "",
+		idempotent:    false,
+		stackTrace:    false,
+		panicCallback: nil,
 	}
 	for _, opt := range opts {
 		if opt != nil {

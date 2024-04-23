@@ -107,7 +107,7 @@ func WithDoTxRetryOptions(opts ...Option) doTxRetryOptionsOption {
 	return opts
 }
 
-var _ doTxOption = txOptionsOption{}
+var _ doTxOption = txOptionsOption{txOptions: nil}
 
 type txOptionsOption struct {
 	txOptions *sql.TxOptions
