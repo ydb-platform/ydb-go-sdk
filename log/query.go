@@ -649,5 +649,6 @@ func internalQuery(
 				}
 			}
 		},
+		OnPoolChange: nil,
 	}
 }

@@ -192,6 +192,8 @@ func String(k, v string) Field {
 		ftype: StringType,
 		key:   k,
 		vstr:  v,
+		vint:  0,
+		vany:  nil,
 	}
 }
 
@@ -201,6 +203,8 @@ func Int(k string, v int) Field {
 		ftype: IntType,
 		key:   k,
 		vint:  int64(v),
+		vstr:  "",
+		vany:  nil,
 	}
 }
 
@@ -209,6 +213,8 @@ func Int64(k string, v int64) Field {
 		ftype: Int64Type,
 		key:   k,
 		vint:  v,
+		vstr:  "",
+		vany:  nil,
 	}
 }
 
@@ -225,6 +231,8 @@ func Bool(key string, value bool) Field {
 		ftype: BoolType,
 		key:   key,
 		vint:  vint,
+		vstr:  "",
+		vany:  nil,
 	}
 }
 
@@ -234,6 +242,8 @@ func Duration(key string, value time.Duration) Field {
 		ftype: DurationType,
 		key:   key,
 		vint:  value.Nanoseconds(),
+		vstr:  "",
+		vany:  nil,
 	}
 }
 
@@ -243,6 +253,8 @@ func Strings(key string, value []string) Field {
 		ftype: StringsType,
 		key:   key,
 		vany:  value,
+		vint:  0,
+		vstr:  "",
 	}
 }
 
@@ -252,6 +264,8 @@ func NamedError(key string, value error) Field {
 		ftype: ErrorType,
 		key:   key,
 		vany:  value,
+		vint:  0,
+		vstr:  "",
 	}
 }
 
@@ -266,6 +280,8 @@ func Any(key string, value interface{}) Field {
 		ftype: AnyType,
 		key:   key,
 		vany:  value,
+		vint:  0,
+		vstr:  "",
 	}
 }
 
@@ -280,6 +296,8 @@ func Stringer(key string, value fmt.Stringer) Field {
 		ftype: StringerType,
 		key:   key,
 		vany:  value,
+		vint:  0,
+		vstr:  "",
 	}
 }
 

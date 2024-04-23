@@ -29,6 +29,7 @@ type simpleLoggerOption interface {
 func Default(w io.Writer, opts ...simpleLoggerOption) *defaultLogger {
 	l := &defaultLogger{
 		coloring: false,
+		logQuery: false,
 		minLevel: INFO,
 		clock:    clockwork.NewRealClock(),
 		w:        w,
@@ -104,7 +105,8 @@ type wrapper struct {
 
 func wrapLogger(l Logger, opts ...Option) *wrapper {
 	ll := &wrapper{
-		logger: l,
+		logQuery: false,
+		logger:   l,
 	}
 	for _, opt := range opts {
 		if opt != nil {
