@@ -128,7 +128,7 @@ func TestDescribeNodeRequest(t *testing.T) {
 func TestOperationParams(t *testing.T) {
 	for _, tt := range []struct {
 		name   string
-		ctx    context.Context
+		ctx    context.Context //nolint:containedctx
 		config interface {
 			OperationTimeout() time.Duration
 			OperationCancelAfter() time.Duration

@@ -14,7 +14,7 @@ import (
 
 func TestParams(t *testing.T) {
 	for _, tt := range []struct {
-		ctx                  context.Context
+		ctx                  context.Context //nolint:containedctx
 		preferContextTimeout bool
 		timeout              time.Duration
 		cancelAfter          time.Duration

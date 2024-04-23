@@ -11,7 +11,7 @@ import (
 func TestContext(t *testing.T) {
 	for _, tt := range []struct {
 		name   string
-		ctx    context.Context
+		ctx    context.Context //nolint:containedctx
 		header string
 		values []string
 	}{

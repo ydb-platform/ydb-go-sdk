@@ -5,7 +5,9 @@ import (
 	"time"
 )
 
-type valueOnlyContext struct{ context.Context }
+type valueOnlyContext struct {
+	context.Context //nolint:containedctx
+}
 
 func (valueOnlyContext) Deadline() (deadline time.Time, ok bool) { return }
 

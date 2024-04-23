@@ -218,7 +218,6 @@ linters-settings:
 linters:
   enable-all: true
   disable:
-    - containedctx
     - contextcheck
     - cyclop
     - depguard

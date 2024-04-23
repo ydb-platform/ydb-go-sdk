@@ -13,7 +13,7 @@ import (
 
 func TestLevelFromContext(t *testing.T) {
 	for _, tt := range []struct {
-		ctx context.Context
+		ctx context.Context //nolint:containedctx
 		lvl Level
 	}{
 		{
@@ -37,7 +37,7 @@ func TestLevelFromContext(t *testing.T) {
 
 func TestNamesFromContext(t *testing.T) {
 	for _, tt := range []struct {
-		ctx   context.Context
+		ctx   context.Context //nolint:containedctx
 		names []string
 	}{
 		{

@@ -68,7 +68,7 @@ func withTrace(t *trace.DatabaseSQL) connOption {
 type beginTxFunc func(ctx context.Context, txOptions driver.TxOptions) (currentTx, error)
 
 type conn struct {
-	openConnCtx context.Context
+	ctx context.Context //nolint:containedctx
 
 	connector *Connector
 	trace     *trace.DatabaseSQL
@@ -129,9 +129,9 @@ var (
 
 func newConn(ctx context.Context, c *Connector, s table.ClosableSession, opts ...connOption) *conn {
 	cc := &conn{
-		openConnCtx: ctx,
-		connector:   c,
-		session:     s,
+		ctx:       ctx,
+		connector: c,
+		session:   s,
 	}
 	cc.beginTxFuncs = map[QueryMode]beginTxFunc{
 		DataQueryMode: cc.beginTx,
@@ -169,7 +169,7 @@ func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt,
 	return &stmt{
 		conn:      c,
 		processor: c,
-		stmtCtx:   ctx,
+		ctx:       ctx,
 		query:     query,
 		trace:     c.trace,
 	}, nil
@@ -414,9 +414,12 @@ func (c *conn) Ping(ctx context.Context) (finalErr error) {
 func (c *conn) Close() (finalErr error) {
 	if c.closed.CompareAndSwap(false, true) {
 		c.connector.detach(c)
-		onDone := trace.DatabaseSQLOnConnClose(
-			c.trace, &c.openConnCtx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).Close"),
+		var (
+			ctx    = c.ctx
+			onDone = trace.DatabaseSQLOnConnClose(
+				c.trace, &ctx,
+				stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).Close"),
+			)
 		)
 		defer func() {
 			onDone(finalErr)
@@ -424,7 +427,7 @@ func (c *conn) Close() (finalErr error) {
 		if c.currentTx != nil {
 			_ = c.currentTx.Rollback()
 		}
-		err := c.session.Close(xcontext.ValueOnly(c.openConnCtx))
+		err := c.session.Close(xcontext.ValueOnly(ctx))
 		if err != nil {
 			return badconn.Map(xerrors.WithStackTrace(err))
 		}

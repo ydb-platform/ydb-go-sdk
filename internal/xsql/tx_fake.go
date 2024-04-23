@@ -12,15 +12,15 @@ import (
 )
 
 type txFake struct {
-	beginCtx context.Context
+	beginCtx context.Context //nolint:containedctx
 	conn     *conn
-	ctx      context.Context
+	ctx      context.Context //nolint:containedctx
 }
 
 func (tx *txFake) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, finalErr error) {
 	onDone := trace.DatabaseSQLOnTxPrepare(tx.conn.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*txFake).PrepareContext"),
-		&tx.beginCtx, tx, query,
+		tx.beginCtx, tx, query,
 	)
 	defer func() {
 		onDone(finalErr)
@@ -32,7 +32,7 @@ func (tx *txFake) PrepareContext(ctx context.Context, query string) (_ driver.St
 	return &stmt{
 		conn:      tx.conn,
 		processor: tx,
-		stmtCtx:   ctx,
+		ctx:       ctx,
 		query:     query,
 		trace:     tx.conn.trace,
 	}, nil
@@ -57,9 +57,12 @@ func (tx *txFake) ID() string {
 }
 
 func (tx *txFake) Commit() (err error) {
-	onDone := trace.DatabaseSQLOnTxCommit(tx.conn.trace, &tx.ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*txFake).Commit"),
-		tx,
+	var (
+		ctx    = tx.ctx
+		onDone = trace.DatabaseSQLOnTxCommit(tx.conn.trace, &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*txFake).Commit"),
+			tx,
+		)
 	)
 	defer func() {
 		onDone(err)
@@ -75,9 +78,12 @@ func (tx *txFake) Commit() (err error) {
 }
 
 func (tx *txFake) Rollback() (err error) {
-	onDone := trace.DatabaseSQLOnTxRollback(tx.conn.trace, &tx.ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*txFake).Rollback"),
-		tx,
+	var (
+		ctx    = tx.ctx
+		onDone = trace.DatabaseSQLOnTxRollback(tx.conn.trace, &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*txFake).Rollback"),
+			tx,
+		)
 	)
 	defer func() {
 		onDone(err)
