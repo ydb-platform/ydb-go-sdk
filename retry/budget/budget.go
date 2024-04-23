@@ -77,15 +77,15 @@ func (q *budget) Stop() {
 
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func (q *budget) Acquire(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return xerrors.WithStackTrace(err)
+	}
 	select {
+	case <-q.done:
+		return xerrors.WithStackTrace(errClosedBudget)
+	case <-q.quota:
+		return nil
 	case <-ctx.Done():
-		return ctx.Err()
-	default:
-		select {
-		case <-q.quota:
-			return nil
-		case <-ctx.Done():
-			return xerrors.WithStackTrace(ctx.Err())
-		}
+		return xerrors.WithStackTrace(ctx.Err())
 	}
 }
