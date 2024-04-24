@@ -9,6 +9,7 @@ import (
 func Stub(x interface{}, f func(name string, args ...interface{})) {
 	(FieldStubber{
 		OnCall: f,
+		OnStub: nil,
 	}).Stub(reflect.ValueOf(x))
 }
 
