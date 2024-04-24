@@ -148,7 +148,7 @@ func readTable(ctx context.Context, c table.Client, path string, opts ...options
 			defer func() {
 				_ = res.Close()
 			}()
-			r := row{}
+			r := row{id: 0, orderID: 0, date: time.Time{}, description: ""}
 			for res.NextResultSet(ctx) {
 				for res.NextRow() {
 					if res.CurrentResultSet().ColumnCount() == 4 {
