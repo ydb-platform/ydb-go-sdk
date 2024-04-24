@@ -26,9 +26,8 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	cfg := &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Error),
-	}
+	cfg := new(gorm.Config)
+	cfg.Logger = logger.Default.LogMode(logger.Error)
 
 	// connect
 	var db *gorm.DB
@@ -79,17 +78,17 @@ func main() {
 
 func prepareScheme(db *gorm.DB) error {
 	if err := db.Migrator().DropTable(
-		&Series{},
-		&Season{},
-		&Episode{},
+		&Series{ID: "", Title: "", Info: "", Comment: "", ReleaseDate: time.Time{}, Seasons: nil},
+		&Season{ID: "", SeriesID: "", Title: "", FirstAired: time.Time{}, LastAired: time.Time{}, Episodes: nil},
+		&Episode{ID: "", SeasonID: "", Title: "", AirDate: time.Time{}},
 	); err != nil {
 		return err
 	}
 
 	return db.AutoMigrate(
-		&Series{},
-		&Season{},
-		&Episode{},
+		&Series{ID: "", Title: "", Info: "", Comment: "", ReleaseDate: time.Time{}, Seasons: nil},
+		&Season{ID: "", SeriesID: "", Title: "", FirstAired: time.Time{}, LastAired: time.Time{}, Episodes: nil},
+		&Episode{ID: "", SeasonID: "", Title: "", AirDate: time.Time{}},
 	)
 }
 
@@ -139,13 +138,23 @@ func findEpisodesByTitle(db *gorm.DB, fragment string) error {
 	log.Println("all episodes with title with word 'bad':")
 	for i := range episodes {
 		ss := Season{
-			ID: episodes[i].SeasonID,
+			ID:         episodes[i].SeasonID,
+			SeriesID:   "",
+			Title:      "",
+			FirstAired: time.Time{},
+			LastAired:  time.Time{},
+			Episodes:   nil,
 		}
 		if err := db.Take(&ss).Error; err != nil {
 			return err
 		}
 		s := Series{
-			ID: ss.SeriesID,
+			ID:          ss.SeriesID,
+			Title:       "",
+			Info:        "",
+			Comment:     "",
+			ReleaseDate: time.Time{},
+			Seasons:     nil,
 		}
 		if err := db.Take(&s).Error; err != nil {
 			return err

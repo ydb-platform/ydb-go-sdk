@@ -32,6 +32,7 @@ func episodeData(seasonID, episodeID, title string, date time.Time) *Episodes {
 		SeasonID: seasonID,
 		Title:    title,
 		AirDate:  date,
+		Views:    0,
 	}
 }
 
