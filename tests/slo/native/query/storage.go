@@ -97,7 +97,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ReadTimeout)*time.Millisecond)
 	defer cancel()
 
-	e := generator.Row{}
+	e := generator.Row{Hash: 0, ID: 0, PayloadStr: nil, PayloadDouble: nil, PayloadTimestamp: nil, PayloadHash: 0}
 
 	err := s.db.Query().Do(ctx,
 		func(ctx context.Context, session query.Session) (err error) {
@@ -156,6 +156,30 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 					attempts = info.Attempts
 				}
 			},
+			OnNew:                 nil,
+			OnClose:               nil,
+			OnPoolNew:             nil,
+			OnPoolClose:           nil,
+			OnPoolTry:             nil,
+			OnPoolWith:            nil,
+			OnPoolPut:             nil,
+			OnPoolGet:             nil,
+			OnPoolChange:          nil,
+			OnDoTx:                nil,
+			OnSessionCreate:       nil,
+			OnSessionAttach:       nil,
+			OnSessionDelete:       nil,
+			OnSessionExecute:      nil,
+			OnSessionBegin:        nil,
+			OnTxExecute:           nil,
+			OnResultNew:           nil,
+			OnResultNextPart:      nil,
+			OnResultNextResultSet: nil,
+			OnResultClose:         nil,
+			OnResultSetNextRow:    nil,
+			OnRowScan:             nil,
+			OnRowScanNamed:        nil,
+			OnRowScanStruct:       nil,
 		}),
 		query.WithLabel("READ"),
 	)
@@ -205,6 +229,30 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, fin
 					attempts = info.Attempts
 				}
 			},
+			OnNew:                 nil,
+			OnClose:               nil,
+			OnPoolNew:             nil,
+			OnPoolClose:           nil,
+			OnPoolTry:             nil,
+			OnPoolWith:            nil,
+			OnPoolPut:             nil,
+			OnPoolGet:             nil,
+			OnPoolChange:          nil,
+			OnDoTx:                nil,
+			OnSessionCreate:       nil,
+			OnSessionAttach:       nil,
+			OnSessionDelete:       nil,
+			OnSessionExecute:      nil,
+			OnSessionBegin:        nil,
+			OnTxExecute:           nil,
+			OnResultNew:           nil,
+			OnResultNextPart:      nil,
+			OnResultNextResultSet: nil,
+			OnResultClose:         nil,
+			OnResultSetNextRow:    nil,
+			OnRowScan:             nil,
+			OnRowScanNamed:        nil,
+			OnRowScanStruct:       nil,
 		}),
 		query.WithLabel("WRITE"),
 	)

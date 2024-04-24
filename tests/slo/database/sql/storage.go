@@ -87,6 +87,9 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Stora
 		dropQuery:   fmt.Sprintf(dropTemplate, cfg.Table),
 		upsertQuery: fmt.Sprintf(upsertTemplate, cfg.Table),
 		selectQuery: fmt.Sprintf(selectTemplate, cfg.Table),
+		cc:          nil,
+		c:           nil,
+		db:          nil,
 	}
 
 	s.cc, err = ydb.Open(

@@ -36,7 +36,7 @@ type Config struct {
 }
 
 func New() (*Config, error) {
-	cfg := &Config{}
+	cfg := new(Config)
 
 	if len(os.Args) < 2 {
 		fmt.Print(mainHelp)
@@ -44,7 +44,7 @@ func New() (*Config, error) {
 		return nil, ErrWrongArgs
 	}
 
-	fs := flag.FlagSet{}
+	fs := flag.FlagSet{Usage: nil}
 
 	switch os.Args[1] {
 	case "create":

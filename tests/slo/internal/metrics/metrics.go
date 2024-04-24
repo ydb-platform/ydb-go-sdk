@@ -30,27 +30,42 @@ type (
 
 func New(url, label, jobName string) (*Metrics, error) {
 	m := &Metrics{
-		label: label,
+		label:     label,
+		oks:       nil,
+		notOks:    nil,
+		inflight:  nil,
+		latencies: nil,
+		attempts:  nil,
+		p:         nil,
 	}
 
 	m.oks = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "oks",
-			Help: "amount of OK requests",
+			Name:        "oks",
+			Help:        "amount of OK requests",
+			Namespace:   "",
+			Subsystem:   "",
+			ConstLabels: nil,
 		},
 		[]string{"jobName"},
 	)
 	m.notOks = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "not_oks",
-			Help: "amount of not OK requests",
+			Name:        "not_oks",
+			Help:        "amount of not OK requests",
+			Namespace:   "",
+			Subsystem:   "",
+			ConstLabels: nil,
 		},
 		[]string{"jobName"},
 	)
 	m.inflight = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "inflight",
-			Help: "amount of requests in flight",
+			Name:        "inflight",
+			Help:        "amount of requests in flight",
+			Namespace:   "",
+			Subsystem:   "",
+			ConstLabels: nil,
 		},
 		[]string{"jobName"},
 	)
@@ -63,15 +78,28 @@ func New(url, label, jobName string) (*Metrics, error) {
 				0.99: 0,
 				1.0:  0,
 			},
-			MaxAge: 15 * time.Second,
+			MaxAge:      15 * time.Second,
+			Namespace:   "",
+			Subsystem:   "",
+			ConstLabels: nil,
+			AgeBuckets:  0,
+			BufCap:      0,
 		},
 		[]string{"status", "jobName"},
 	)
 	m.attempts = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:    "attempts",
-			Help:    "summary of amount for request",
-			Buckets: prometheus.LinearBuckets(1, 1, 10),
+			Name:                            "attempts",
+			Help:                            "summary of amount for request",
+			Buckets:                         prometheus.LinearBuckets(1, 1, 10),
+			Namespace:                       "",
+			Subsystem:                       "",
+			ConstLabels:                     nil,
+			NativeHistogramBucketFactor:     0,
+			NativeHistogramZeroThreshold:    0,
+			NativeHistogramMaxBucketNumber:  0,
+			NativeHistogramMinResetDuration: 0,
+			NativeHistogramMaxZeroThreshold: 0,
 		},
 		[]string{"status", "jobName"},
 	)

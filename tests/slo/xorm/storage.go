@@ -65,6 +65,10 @@ type Storage struct {
 func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (_ *Storage, err error) {
 	s := &Storage{
 		cfg: cfg,
+		cc:  nil,
+		c:   nil,
+		db:  nil,
+		x:   nil,
 	}
 
 	dsn := s.cfg.Endpoint + s.cfg.DB
@@ -195,7 +199,9 @@ func (s *Storage) createTable(ctx context.Context) error {
 	defer cancel()
 
 	return retry.Do(ctx, s.x.DB().DB, func(ctx context.Context, _ *sql.Conn) error {
-		return s.x.Context(ctx).CreateTable(generator.Row{})
+		return s.x.Context(ctx).CreateTable(generator.Row{
+			Hash: 0, ID: 0, PayloadStr: nil, PayloadDouble: nil, PayloadTimestamp: nil, PayloadHash: 0,
+		})
 	})
 }
 
@@ -208,7 +214,9 @@ func (s *Storage) dropTable(ctx context.Context) error {
 	defer cancel()
 
 	return retry.Do(ctx, s.x.DB().DB, func(ctx context.Context, _ *sql.Conn) error {
-		return s.x.Context(ctx).DropTable(generator.Row{})
+		return s.x.Context(ctx).DropTable(generator.Row{
+			Hash: 0, ID: 0, PayloadStr: nil, PayloadDouble: nil, PayloadTimestamp: nil, PayloadHash: 0,
+		})
 	})
 }
 

@@ -98,7 +98,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ReadTimeout)*time.Millisecond)
 	defer cancel()
 
-	e := generator.Row{}
+	e := generator.Row{Hash: 0, ID: 0, PayloadStr: nil, PayloadDouble: nil, PayloadTimestamp: nil, PayloadHash: 0}
 
 	err = s.db.Table().Do(ctx,
 		func(ctx context.Context, session table.Session) (err error) {
@@ -147,6 +147,30 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 					attempts = info.Attempts
 				}
 			},
+			OnInit:                      nil,
+			OnClose:                     nil,
+			OnDoTx:                      nil,
+			OnCreateSession:             nil,
+			OnSessionNew:                nil,
+			OnSessionDelete:             nil,
+			OnSessionKeepAlive:          nil,
+			OnSessionBulkUpsert:         nil,
+			OnSessionQueryPrepare:       nil,
+			OnSessionQueryExecute:       nil,
+			OnSessionQueryExplain:       nil,
+			OnSessionQueryStreamExecute: nil,
+			OnSessionQueryStreamRead:    nil,
+			OnTxBegin:                   nil,
+			OnTxExecute:                 nil,
+			OnTxExecuteStatement:        nil,
+			OnTxCommit:                  nil,
+			OnTxRollback:                nil,
+			OnPoolStateChange:           nil,
+			OnPoolSessionAdd:            nil,
+			OnPoolSessionRemove:         nil,
+			OnPoolPut:                   nil,
+			OnPoolGet:                   nil,
+			OnPoolWait:                  nil,
 		}),
 	)
 
@@ -193,6 +217,30 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, _ e
 					attempts = info.Attempts
 				}
 			},
+			OnInit:                      nil,
+			OnClose:                     nil,
+			OnDoTx:                      nil,
+			OnCreateSession:             nil,
+			OnSessionNew:                nil,
+			OnSessionDelete:             nil,
+			OnSessionKeepAlive:          nil,
+			OnSessionBulkUpsert:         nil,
+			OnSessionQueryPrepare:       nil,
+			OnSessionQueryExecute:       nil,
+			OnSessionQueryExplain:       nil,
+			OnSessionQueryStreamExecute: nil,
+			OnSessionQueryStreamRead:    nil,
+			OnTxBegin:                   nil,
+			OnTxExecute:                 nil,
+			OnTxExecuteStatement:        nil,
+			OnTxCommit:                  nil,
+			OnTxRollback:                nil,
+			OnPoolStateChange:           nil,
+			OnPoolSessionAdd:            nil,
+			OnPoolSessionRemove:         nil,
+			OnPoolPut:                   nil,
+			OnPoolGet:                   nil,
+			OnPoolWait:                  nil,
 		}),
 	)
 
