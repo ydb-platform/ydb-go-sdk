@@ -99,8 +99,20 @@ func main() {
 	defer s.Close(ctx)
 
 	server := &http.Server{ //nolint:gosec
-		Addr:    ":" + strconv.Itoa(port),
-		Handler: s.router,
+		Addr:                         ":" + strconv.Itoa(port),
+		Handler:                      s.router,
+		DisableGeneralOptionsHandler: false,
+		TLSConfig:                    nil,
+		ReadTimeout:                  time.Duration(0),
+		ReadHeaderTimeout:            time.Duration(0),
+		WriteTimeout:                 time.Duration(0),
+		IdleTimeout:                  time.Duration(0),
+		MaxHeaderBytes:               0,
+		TLSNextProto:                 nil,
+		ConnState:                    nil,
+		ErrorLog:                     nil,
+		BaseContext:                  nil,
+		ConnContext:                  nil,
 	}
 	defer func() {
 		_ = server.Shutdown(ctx)
