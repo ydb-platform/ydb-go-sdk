@@ -258,6 +258,7 @@ func (ps PartitioningSettings) toYDB() *Ydb_Table.PartitioningSettings {
 		PartitioningByLoad: ps.PartitioningByLoad.ToYDB(),
 		MinPartitionsCount: ps.MinPartitionsCount,
 		MaxPartitionsCount: ps.MaxPartitionsCount,
+		PartitionBy:        nil,
 	}
 }
 
@@ -449,7 +450,10 @@ const (
 
 func NewTTLSettings() TimeToLiveSettings {
 	return TimeToLiveSettings{
-		Mode: TimeToLiveModeDateType,
+		Mode:               TimeToLiveModeDateType,
+		ColumnName:         "",
+		ExpireAfterSeconds: 0,
+		ColumnUnit:         nil,
 	}
 }
 
@@ -516,6 +520,7 @@ func (ttl *TimeToLiveSettings) ToYDB() *Ydb_Table.TtlSettings {
 					ExpireAfterSeconds: ttl.ExpireAfterSeconds,
 				},
 			},
+			RunIntervalSeconds: 0,
 		}
 	default: // currently use TimeToLiveModeDateType mode as default
 		return &Ydb_Table.TtlSettings{
@@ -525,6 +530,7 @@ func (ttl *TimeToLiveSettings) ToYDB() *Ydb_Table.TtlSettings {
 					ExpireAfterSeconds: ttl.ExpireAfterSeconds,
 				},
 			},
+			RunIntervalSeconds: 0,
 		}
 	}
 }

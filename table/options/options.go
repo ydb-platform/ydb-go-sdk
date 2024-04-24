@@ -58,15 +58,17 @@ type column struct {
 
 func (c column) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) {
 	d.AddColumns = append(d.AddColumns, &Ydb_Table.ColumnMeta{
-		Name: c.name,
-		Type: types.TypeToYDB(c.typ, a),
+		Name:   c.name,
+		Type:   types.TypeToYDB(c.typ, a),
+		Family: "",
 	})
 }
 
 func (c column) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
 	d.Columns = append(d.Columns, &Ydb_Table.ColumnMeta{
-		Name: c.name,
-		Type: types.TypeToYDB(c.typ, a),
+		Name:   c.name,
+		Type:   types.TypeToYDB(c.typ, a),
+		Family: "",
 	})
 }
 
@@ -158,7 +160,10 @@ type index struct {
 
 func (i index) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) {
 	x := &Ydb_Table.TableIndex{
-		Name: i.name,
+		Name:         i.name,
+		IndexColumns: nil,
+		Type:         nil,
+		DataColumns:  nil,
 	}
 	for _, opt := range i.opts {
 		if opt != nil {
@@ -170,7 +175,10 @@ func (i index) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) 
 
 func (i index) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
 	x := &Ydb_Table.TableIndex{
-		Name: i.name,
+		Name:         i.name,
+		IndexColumns: nil,
+		Type:         nil,
+		DataColumns:  nil,
 	}
 	for _, opt := range i.opts {
 		if opt != nil {
@@ -595,7 +603,7 @@ func WithPartitioningSettingsObject(ps PartitioningSettings) CreateTableOption {
 type partitioningSettings []PartitioningSettingsOption
 
 func (opts partitioningSettings) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
-	settings := &ydbPartitioningSettings{}
+	settings := new(ydbPartitioningSettings)
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyPartitioningSettingsOption(settings)
@@ -728,7 +736,8 @@ func WithAddAttribute(key, value string) AlterTableOption {
 // WithDropAttribute drops attribute from table in AlterTable request
 func WithDropAttribute(key string) AlterTableOption {
 	return attribute{
-		key: key,
+		key:   key,
+		value: "",
 	}
 }
 
@@ -778,7 +787,7 @@ func WithSetTimeToLiveSettings(settings TimeToLiveSettings) AlterTableOption {
 type dropTimeToLive struct{}
 
 func (dropTimeToLive) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) {
-	d.TtlAction = &Ydb_Table.AlterTableRequest_DropTtlSettings{}
+	d.TtlAction = &Ydb_Table.AlterTableRequest_DropTtlSettings{DropTtlSettings: nil}
 }
 
 // WithDropTimeToLive drops TTL settings in AlterTable request
@@ -1017,11 +1026,11 @@ func WithExecuteScanQueryStats(stats ExecuteScanQueryStatsType) ExecuteScanQuery
 var (
 	_ ReadRowsOption  = readColumnsOption{}
 	_ ReadTableOption = readOrderedOption{}
-	_ ReadTableOption = readKeyRangeOption{}
-	_ ReadTableOption = readGreaterOrEqualOption{}
-	_ ReadTableOption = readLessOrEqualOption{}
-	_ ReadTableOption = readLessOption{}
-	_ ReadTableOption = readGreaterOption{}
+	_ ReadTableOption = readKeyRangeOption{From: nil, To: nil}
+	_ ReadTableOption = readGreaterOrEqualOption{Value: nil}
+	_ ReadTableOption = readLessOrEqualOption{Value: nil}
+	_ ReadTableOption = readLessOption{Value: nil}
+	_ ReadTableOption = readGreaterOption{Value: nil}
 	_ ReadTableOption = readRowLimitOption(0)
 )
 

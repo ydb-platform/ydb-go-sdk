@@ -531,7 +531,7 @@ func WithIdempotent() idempotentOption {
 	return idempotentOption{}
 }
 
-var _ Option = txSettingsOption{}
+var _ Option = txSettingsOption{txSettings: nil}
 
 type txSettingsOption struct {
 	txSettings *TransactionSettings
@@ -557,7 +557,7 @@ func WithTxCommitOptions(opts ...options.CommitTransactionOption) txCommitOption
 	return opts
 }
 
-var _ Option = traceOption{}
+var _ Option = traceOption{t: nil}
 
 type traceOption struct {
 	t *trace.Table
