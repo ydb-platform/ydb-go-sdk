@@ -67,7 +67,11 @@ UPSERT INTO bus (id, freeSeats) VALUES ("bus1", 40), ("bus2", 60);
 func createCosumers(ctx context.Context, db *ydb.Driver, consumersCount int) error {
 	for i := 0; i < consumersCount; i++ {
 		err := db.Topic().Alter(ctx, "bus/updates", topicoptions.AlterWithAddConsumers(topictypes.Consumer{
-			Name: consumerName(i),
+			Name:            consumerName(i),
+			Important:       false,
+			SupportedCodecs: nil,
+			ReadFrom:        time.Time{},
+			Attributes:      nil,
 		}))
 		if err != nil {
 			return err

@@ -44,7 +44,7 @@ func UnmarshalMessageContentToJSONStruct(msg *topicreader.Message) {
 
 // UnmarshalMessageContentToProtobufStruct is example for effective way for unmarshal protobuf message content to value
 func UnmarshalMessageContentToProtobufStruct(msg *topicreader.Message) {
-	v := &firestore.BundledDocumentMetadata{} // protobuf type
+	v := new(firestore.BundledDocumentMetadata) // protobuf type
 
 	_ = topicsugar.ProtoUnmarshal(msg, v)
 }

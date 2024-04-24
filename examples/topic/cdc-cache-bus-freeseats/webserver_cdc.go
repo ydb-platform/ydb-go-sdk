@@ -14,8 +14,10 @@ func (s *server) cdcLoop() {
 	consumer := consumerName(s.id)
 	reader, err := s.db.Topic().StartReader(consumer, topicoptions.ReadSelectors{
 		{
-			Path:     "bus/updates",
-			ReadFrom: time.Now(),
+			Path:       "bus/updates",
+			ReadFrom:   time.Now(),
+			Partitions: nil,
+			MaxTimeLag: time.Duration(0),
 		},
 	},
 	)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
@@ -14,7 +15,10 @@ func cdcRead(ctx context.Context, db *ydb.Driver, consumerName, topicPath string
 	// Connect to changefeed
 
 	log.Println("Start cdc read")
-	reader, err := db.Topic().StartReader(consumerName, []topicoptions.ReadSelector{{Path: topicPath}})
+	reader, err := db.Topic().StartReader(
+		consumerName,
+		[]topicoptions.ReadSelector{{Path: topicPath, Partitions: nil, ReadFrom: time.Time{}, MaxTimeLag: time.Duration(0)}},
+	)
 	if err != nil {
 		log.Fatal("failed to start read feed", err)
 	}
