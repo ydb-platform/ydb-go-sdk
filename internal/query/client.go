@@ -95,18 +95,54 @@ func do(
 }
 
 func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) error {
-	select {
-	case <-c.done:
-		return xerrors.WithStackTrace(errClosedClient)
-	default:
-		onDone := trace.QueryOnDo(c.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).Do"),
-		)
-		attempts, err := do(ctx, c.pool, op, c.config.Trace(), opts...)
-		onDone(attempts, err)
+	//select {
+	//case <-c.done:
+	//	return xerrors.WithStackTrace(errClosedClient)
+	//default:
+	//	onDone := trace.QueryOnDo(c.config.Trace(), &ctx,
+	//		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).Do"),
+	//	)
+	//	attempts, err := do(ctx, c.pool, op, c.config.Trace(), opts...)
+	//	onDone(attempts, err)
+	//
+	//	return err
+	//}
 
-		return err
-	}
+	doOpts := options.ParseDoOpts(c.config.Trace(), opts...)
+
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
+		select {
+		case <-c.done:
+			return xerrors.WithStackTrace(errClosedClient)
+		default:
+
+		}
+		var (
+			createCtx    context.Context
+			cancelCreate context.CancelFunc
+		)
+		if d := c.config.SessionCreateTimeout(); d > 0 {
+			createCtx, cancelCreate = xcontext.WithTimeout(ctx, d)
+		} else {
+			createCtx, cancelCreate = xcontext.WithCancel(ctx)
+		}
+		defer cancelCreate()
+
+		s, err := createSession(createCtx, c.grpcClient, c.config)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+		defer func() {
+			_ = s.Close(ctx)
+		}()
+
+		err = op(ctx, s)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		return nil
+	}, doOpts.RetryOpts()...)
 }
 
 func doTx(
@@ -152,18 +188,67 @@ func doTx(
 }
 
 func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) (err error) {
-	select {
-	case <-c.done:
-		return xerrors.WithStackTrace(errClosedClient)
-	default:
-		onDone := trace.QueryOnDoTx(c.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).DoTx"),
-		)
-		attempts, err := doTx(ctx, c.pool, op, c.config.Trace(), opts...)
-		onDone(attempts, err)
+	//select {
+	//case <-c.done:
+	//	return xerrors.WithStackTrace(errClosedClient)
+	//default:
+	//	onDone := trace.QueryOnDoTx(c.config.Trace(), &ctx,
+	//		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).DoTx"),
+	//	)
+	//	attempts, err := doTx(ctx, c.pool, op, c.config.Trace(), opts...)
+	//	onDone(attempts, err)
+	//
+	//	return err
+	//}
 
-		return err
-	}
+	doTxOpts := options.ParseDoTxOpts(c.config.Trace(), opts...)
+	doOpts := options.ParseDoOpts(c.config.Trace(), doTxOpts.DoOpts()...)
+
+	return retry.Retry(ctx, func(ctx context.Context) (err error) {
+		select {
+		case <-c.done:
+			return xerrors.WithStackTrace(errClosedClient)
+		default:
+
+		}
+		var (
+			createCtx    context.Context
+			cancelCreate context.CancelFunc
+		)
+		if d := c.config.SessionCreateTimeout(); d > 0 {
+			createCtx, cancelCreate = xcontext.WithTimeout(ctx, d)
+		} else {
+			createCtx, cancelCreate = xcontext.WithCancel(ctx)
+		}
+		defer cancelCreate()
+
+		s, err := createSession(createCtx, c.grpcClient, c.config)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+		defer func() {
+			_ = s.Close(ctx)
+		}()
+
+		tx, err := s.Begin(ctx, doTxOpts.TxSettings())
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+		defer func() {
+			_ = tx.Rollback(ctx)
+		}()
+
+		err = op(ctx, tx)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+		err = tx.CommitTx(ctx)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		return nil
+	}, doOpts.RetryOpts()...)
 }
 
 func New(ctx context.Context, balancer balancer, cfg *config.Config) *Client {
