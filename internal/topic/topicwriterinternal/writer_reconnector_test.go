@@ -554,7 +554,11 @@ func TestWriterImpl_CloseWithFlush(t *testing.T) {
 
 	closeCompleted := make(empty.Chan)
 	go func() {
-		err := e.writer.Write(e.ctx, []Message{{SeqNo: seqNo, CreatedAt: messageTime, Data: bytes.NewReader(messageData)}})
+		err := e.writer.Write(e.ctx, []PublicMessage{{
+			SeqNo:     seqNo,
+			CreatedAt: messageTime,
+			Data:      bytes.NewReader(messageData),
+		}})
 		close(writeCompleted)
 		require.NoError(t, err)
 	}()

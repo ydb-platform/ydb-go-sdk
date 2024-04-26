@@ -326,6 +326,7 @@ func (q *messageQueue) WaitLastWritten(ctx context.Context) error {
 	q.m.WithRLock(func() {
 		lastIndex = q.lastWrittenIndex
 	})
+
 	return q.Wait(ctx, MessageQueueAckWaiter{sequenseNumbers: []int{lastIndex}})
 }
 
