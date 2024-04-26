@@ -103,7 +103,9 @@ func (scope *scopeT) Driver(opts ...ydb.Option) *ydb.Driver {
 			)...,
 		)
 		clean := func() {
-			scope.Require.NoError(driver.Close(scope.Ctx))
+			if driver != nil {
+				scope.Require.NoError(driver.Close(scope.Ctx))
+			}
 		}
 
 		return fixenv.NewGenericResultWithCleanup(driver, clean), err

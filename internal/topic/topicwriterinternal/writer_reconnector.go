@@ -339,9 +339,17 @@ func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr err
 		onDone(resErr)
 	}()
 
-	resErr = w.queue.Close(reason)
+	w.queue.StopAddNewMessages(reason)
+
+	resErr = w.Flush(ctx)
+
+	closeErr := w.queue.Close(reason)
+	if resErr == nil && closeErr != nil {
+		resErr = closeErr
+	}
+
 	bgErr := w.background.Close(ctx, reason)
-	if resErr == nil {
+	if resErr == nil && bgErr != nil {
 		resErr = bgErr
 	}
 
