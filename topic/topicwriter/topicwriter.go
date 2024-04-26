@@ -69,3 +69,8 @@ func (w *Writer) WaitInitInfo(ctx context.Context) (info PublicInitialInfo, err 
 func (w *Writer) Close(ctx context.Context) error {
 	return w.inner.Close(ctx)
 }
+
+// Flush waits till all in-flight messages are acknowledged.
+func (w *Writer) Flush(ctx context.Context) error {
+	return w.inner.Flush(ctx)
+}

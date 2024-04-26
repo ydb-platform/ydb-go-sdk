@@ -1,3 +1,5 @@
+* Added Flush method for topic writer
+
 ## v3.66.0
 * Added experimental package `retry/budget` for limit second and subsequent retry attempts 
 * Refactored internals for enabling `containedctx` linter
