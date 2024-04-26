@@ -462,11 +462,7 @@ func TestCreateTableRegression(t *testing.T) {
 							"attr": "attr_value",
 						},
 					}
-					val, ok := act.(proto.Message)
-					if !ok {
-						panic(fmt.Sprintf("unsupported type conversion from %T to proto.Message", val))
-					}
-					if !proto.Equal(exp, val) {
+					if !proto.Equal(exp, act.(proto.Message)) {
 						//nolint:revive
 						return nil, fmt.Errorf("proto's not equal: \n\nact: %v\n\nexp: %s\n\n", act, exp)
 					}

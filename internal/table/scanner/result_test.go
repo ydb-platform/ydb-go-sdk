@@ -264,34 +264,18 @@ func TestNewStreamWithRecvFirstResultSet(t *testing.T) {
 				require.NoError(t, err)
 				require.NotNil(t, result)
 				require.EqualValues(t, 1, tt.recvCounter)
-
-				val, ok := result.(*streamResult)
-				if !ok {
-					panic(fmt.Sprintf("unsupported type conversion from %T to *streamResult", val))
-				}
-				require.EqualValues(t, 1, val.nextResultSetCounter.Load())
-
+				require.EqualValues(t, 1, result.(*streamResult).nextResultSetCounter.Load())
 				for i := range make([]struct{}, 1000) {
 					err = result.NextResultSetErr(tt.ctx)
 					require.NoError(t, err)
 					require.Equal(t, i+1, tt.recvCounter)
-
-					val, ok := result.(*streamResult)
-					if !ok {
-						panic(fmt.Sprintf("unsupported type conversion from %T to *streamResult", val))
-					}
-					require.Equal(t, i+2, int(val.nextResultSetCounter.Load()))
+					require.Equal(t, i+2, int(result.(*streamResult).nextResultSetCounter.Load()))
 				}
 				err = result.NextResultSetErr(tt.ctx)
 				require.ErrorIs(t, err, io.EOF)
 				require.True(t, err == io.EOF) //nolint:errorlint,testifylint
 				require.Equal(t, 1001, tt.recvCounter)
-
-				valC, okC := result.(*streamResult)
-				if !okC {
-					panic(fmt.Sprintf("unsupported type conversion from %T to *streamResult", valC))
-				}
-				require.Equal(t, 1002, int(valC.nextResultSetCounter.Load()))
+				require.Equal(t, 1002, int(result.(*streamResult).nextResultSetCounter.Load()))
 			}
 		})
 	}
