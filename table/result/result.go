@@ -91,7 +91,7 @@ type BaseResult interface {
 	//   string
 	//   time.Time
 	//   time.Duration
-	//   ydb.Value
+	//   ydb.valueType
 	// For custom types implement sql.Scanner or json.Unmarshaler interface.
 	// For optional types use double pointer construction.
 	// For unknown types use interface types.

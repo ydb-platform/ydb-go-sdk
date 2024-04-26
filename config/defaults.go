@@ -12,6 +12,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xresolver"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -63,6 +64,7 @@ func defaultGrpcOptions(t *trace.Driver, secure bool, tlsConfig *tls.Config) (op
 			insecure.NewCredentials(),
 		))
 	}
+
 	return opts
 }
 
@@ -71,6 +73,7 @@ func certPool() *x509.CertPool {
 	if err == nil {
 		return certPool
 	}
+
 	return x509.NewCertPool()
 }
 
@@ -84,7 +87,7 @@ func defaultTLSConfig() *tls.Config {
 func defaultConfig() (c *Config) {
 	return &Config{
 		credentials: credentials.NewAnonymousCredentials(
-			credentials.WithSourceInfo("default"),
+			credentials.WithSourceInfo(stack.Record(0)),
 		),
 		balancerConfig: balancers.Default(),
 		tlsConfig:      defaultTLSConfig(),

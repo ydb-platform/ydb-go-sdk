@@ -58,6 +58,7 @@ func (e *transportError) Error() string {
 		b.WriteString(fmt.Sprintf(", traceID: %q", e.traceID))
 	}
 	b.WriteString(")")
+
 	return b.String()
 }
 
@@ -97,7 +98,7 @@ func (e *transportError) BackoffType() backoff.Type {
 	}
 }
 
-func (e *transportError) MustDeleteSession() bool {
+func (e *transportError) IsRetryObjectValid() bool {
 	switch e.status.Code() {
 	case
 		grpcCodes.ResourceExhausted,
@@ -113,19 +114,24 @@ func IsTransportError(err error, codes ...grpcCodes.Code) bool {
 	if err == nil {
 		return false
 	}
+	var status *grpcStatus.Status
 	if t := (*transportError)(nil); errors.As(err, &t) {
+		status = t.status
+	} else if t, has := grpcStatus.FromError(err); has {
+		status = t
+	}
+	if status != nil {
 		if len(codes) == 0 {
 			return true
 		}
 		for _, code := range codes {
-			if t.status.Code() == code {
+			if status.Code() == code {
 				return true
 			}
 		}
-		return false
 	}
-	_, has := grpcStatus.FromError(err)
-	return has
+
+	return false
 }
 
 // Transport returns a new transport error with given options
@@ -135,7 +141,7 @@ func Transport(err error, opts ...teOpt) error {
 	}
 	var te *transportError
 	if errors.As(err, &te) {
-		return err
+		return te
 	}
 	if s, ok := grpcStatus.FromError(err); ok {
 		te = &transportError{
@@ -153,6 +159,7 @@ func Transport(err error, opts ...teOpt) error {
 			opt.applyToTransportError(te)
 		}
 	}
+
 	return te
 }
 
@@ -178,9 +185,19 @@ func MustPessimizeEndpoint(err error, codes ...grpcCodes.Code) bool {
 }
 
 func TransportError(err error) Error {
+	if err == nil {
+		return nil
+	}
 	var t *transportError
 	if errors.As(err, &t) {
 		return t
 	}
+	if s, ok := grpcStatus.FromError(err); ok {
+		return &transportError{
+			status: s,
+			err:    err,
+		}
+	}
+
 	return nil
 }

@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 var (
@@ -32,8 +32,11 @@ func NewAccessTokenCredentials(token string, opts ...AccessTokenCredentialsOptio
 		sourceInfo: stack.Record(1),
 	}
 	for _, opt := range opts {
-		opt.ApplyAccessTokenCredentialsOption(c)
+		if opt != nil {
+			opt.ApplyAccessTokenCredentialsOption(c)
+		}
 	}
+
 	return c
 }
 
@@ -44,14 +47,15 @@ func (c AccessToken) Token(_ context.Context) (string, error) {
 
 // Token implements Credentials.
 func (c AccessToken) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString("AccessToken(token:")
+	buffer := xstring.Buffer()
+	defer buffer.Free()
+	buffer.WriteString("AccessToken{Token:")
 	fmt.Fprintf(buffer, "%q", secret.Token(c.token))
 	if c.sourceInfo != "" {
-		buffer.WriteString(",from:")
+		buffer.WriteString(",From:")
 		fmt.Fprintf(buffer, "%q", c.sourceInfo)
 	}
-	buffer.WriteByte(')')
+	buffer.WriteByte('}')
+
 	return buffer.String()
 }

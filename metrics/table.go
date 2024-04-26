@@ -10,86 +10,17 @@ import (
 
 func table(config Config) (t trace.Table) {
 	config = config.WithSystem("table")
-	limit := config.WithSystem("pool").GaugeVec("limit")
-	size := config.WithSystem("pool").GaugeVec("size")
-	inflight := config.WithSystem("pool").GaugeVec("inflight")
-	inflightLatency := config.WithSystem("pool").WithSystem("inflight").TimerVec("latency")
-	wait := config.WithSystem("pool").GaugeVec("wait")
-	waitLatency := config.WithSystem("pool").WithSystem("wait").TimerVec("latency")
 	alive := config.GaugeVec("sessions", "node_id")
-	doAttempts := config.WithSystem("do").HistogramVec("attempts", []float64{0, 1, 2, 5, 10}, "name")
-	doErrors := config.WithSystem("do").CounterVec("errors", "status", "name")
-	doIntermediateErrors := config.WithSystem("do").WithSystem("intermediate").CounterVec("errors", "status", "name")
-	doLatency := config.WithSystem("do").TimerVec("latency", "status", "name")
-	doTxAttempts := config.WithSystem("doTx").HistogramVec("attempts", []float64{0, 1, 2, 5, 10}, "name")
-	doTxIntermediateErrors := config.WithSystem("doTx").WithSystem("intermediate").CounterVec("errors", "status", "name")
-	doTxErrors := config.WithSystem("doTx").CounterVec("errors", "status", "name")
-	doTxLatency := config.WithSystem("doTx").TimerVec("latency", "status", "name")
+	config = config.WithSystem("pool")
+	limit := config.GaugeVec("limit")
+	size := config.GaugeVec("size")
+	inflight := config.GaugeVec("inflight")
+	inflightLatency := config.WithSystem("inflight").TimerVec("latency")
+	wait := config.GaugeVec("wait")
+	waitLatency := config.WithSystem("wait").TimerVec("latency")
 	t.OnInit = func(info trace.TableInitStartInfo) func(trace.TableInitDoneInfo) {
 		return func(info trace.TableInitDoneInfo) {
 			limit.With(nil).Set(float64(info.Limit))
-		}
-	}
-	t.OnDo = func(info trace.TableDoStartInfo) func(
-		info trace.TableDoIntermediateInfo,
-	) func(
-		trace.TableDoDoneInfo,
-	) {
-		var (
-			name  = info.ID
-			start = time.Now()
-		)
-		return func(info trace.TableDoIntermediateInfo) func(trace.TableDoDoneInfo) {
-			if info.Error != nil && config.Details()&trace.TableEvents != 0 {
-				doIntermediateErrors.With(map[string]string{
-					"status": errorBrief(info.Error),
-					"name":   name,
-				}).Inc()
-			}
-			return func(info trace.TableDoDoneInfo) {
-				if config.Details()&trace.TableEvents != 0 {
-					doAttempts.With(nil).Record(float64(info.Attempts))
-					doErrors.With(map[string]string{
-						"status": errorBrief(info.Error),
-						"name":   name,
-					}).Inc()
-					doLatency.With(map[string]string{
-						"status": errorBrief(info.Error),
-						"name":   name,
-					}).Record(time.Since(start))
-				}
-			}
-		}
-	}
-	t.OnDoTx = func(info trace.TableDoTxStartInfo) func(
-		info trace.TableDoTxIntermediateInfo,
-	) func(
-		trace.TableDoTxDoneInfo,
-	) {
-		var (
-			name  = info.ID
-			start = time.Now()
-		)
-		return func(info trace.TableDoTxIntermediateInfo) func(trace.TableDoTxDoneInfo) {
-			if info.Error != nil && config.Details()&trace.TableEvents != 0 {
-				doTxIntermediateErrors.With(map[string]string{
-					"status": errorBrief(info.Error),
-					"name":   name,
-				}).Inc()
-			}
-			return func(info trace.TableDoTxDoneInfo) {
-				if config.Details()&trace.TableEvents != 0 {
-					doTxAttempts.With(nil).Record(float64(info.Attempts))
-					doTxErrors.With(map[string]string{
-						"status": errorBrief(info.Error),
-						"name":   name,
-					}).Inc()
-					doTxLatency.With(map[string]string{
-						"status": errorBrief(info.Error),
-						"name":   name,
-					}).Record(time.Since(start))
-				}
-			}
 		}
 	}
 	t.OnSessionNew = func(info trace.TableSessionNewStartInfo) func(trace.TableSessionNewDoneInfo) {
@@ -107,6 +38,7 @@ func table(config Config) (t trace.Table) {
 				"node_id": idToString(info.Session.NodeID()),
 			}).Add(-1)
 		}
+
 		return nil
 	}
 	t.OnPoolSessionAdd = func(info trace.TablePoolSessionAddInfo) {
@@ -123,6 +55,7 @@ func table(config Config) (t trace.Table) {
 	t.OnPoolGet = func(info trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
 		wait.With(nil).Add(1)
 		start := time.Now()
+
 		return func(info trace.TablePoolGetDoneInfo) {
 			wait.With(nil).Add(-1)
 			if info.Error == nil && config.Details()&trace.TablePoolEvents != 0 {
@@ -141,7 +74,9 @@ func table(config Config) (t trace.Table) {
 			}
 			inflightLatency.With(nil).Record(time.Since(start.(time.Time)))
 		}
+
 		return nil
 	}
+
 	return t
 }

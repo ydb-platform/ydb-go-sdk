@@ -7,7 +7,7 @@ import (
 
 	"github.com/jonboulle/clockwork"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 const (
@@ -33,23 +33,26 @@ func Default(w io.Writer, opts ...simpleLoggerOption) *defaultLogger {
 		clock:    clockwork.NewRealClock(),
 		w:        w,
 	}
-	for _, o := range opts {
-		o.applySimpleOption(l)
+	for _, opt := range opts {
+		if opt != nil {
+			opt.applySimpleOption(l)
+		}
 	}
+
 	return l
 }
 
 type defaultLogger struct {
 	coloring bool
-	clock    clockwork.Clock
 	logQuery bool
 	minLevel Level
+	clock    clockwork.Clock
 	w        io.Writer
 }
 
 func (l *defaultLogger) format(namespace []string, msg string, logLevel Level) string {
-	b := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(b)
+	b := xstring.Buffer()
+	defer b.Free()
 	if l.coloring {
 		b.WriteString(logLevel.Color())
 	}
@@ -77,6 +80,7 @@ func (l *defaultLogger) format(namespace []string, msg string, logLevel Level) s
 	if l.coloring {
 		b.WriteString(colorReset)
 	}
+
 	return b.String()
 }
 
@@ -102,11 +106,12 @@ func wrapLogger(l Logger, opts ...Option) *wrapper {
 	ll := &wrapper{
 		logger: l,
 	}
-	for _, o := range opts {
-		if o != nil {
-			o.applyHolderOption(ll)
+	for _, opt := range opts {
+		if opt != nil {
+			opt.applyHolderOption(ll)
 		}
 	}
+
 	return ll
 }
 
@@ -114,8 +119,8 @@ func (l *defaultLogger) appendFields(msg string, fields ...Field) string {
 	if len(fields) == 0 {
 		return msg
 	}
-	b := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(b)
+	b := xstring.Buffer()
+	defer b.Free()
 	b.WriteString(msg)
 	b.WriteString(" {")
 	for i := range fields {
@@ -125,6 +130,7 @@ func (l *defaultLogger) appendFields(msg string, fields ...Field) string {
 		fmt.Fprintf(b, `%q:%q`, fields[i].Key(), fields[i].String())
 	}
 	b.WriteByte('}')
+
 	return b.String()
 }
 

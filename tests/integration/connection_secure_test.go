@@ -25,7 +25,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
-	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -53,9 +52,7 @@ func TestConnectionSecure(t *testing.T) {
 		ydb.WithConnectionTTL(time.Millisecond*10000),
 		ydb.WithMinTLSVersion(tls.VersionTLS10),
 		ydb.WithLogger(
-			log.Default(os.Stderr,
-				log.WithMinLevel(log.WARN),
-			),
+			newLogger(t),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
 		),
 	)

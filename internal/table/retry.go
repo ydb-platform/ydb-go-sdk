@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -13,104 +14,12 @@ import (
 // SessionProvider is the interface that holds session lifecycle logic.
 type SessionProvider interface {
 	// Get returns alive idle session or creates new one.
-	Get(context.Context) (*session, error)
+	Get(ctx context.Context) (*session, error)
 
 	// Put takes no longer needed session for reuse or deletion depending
 	// on implementation.
 	// Put must be fast, if necessary must be async
-	Put(context.Context, *session) (err error)
-}
-
-type (
-	markRetryCallKey struct{}
-)
-
-func markRetryCall(ctx context.Context) context.Context {
-	return context.WithValue(ctx, markRetryCallKey{}, true)
-}
-
-func isRetryCalledAbove(ctx context.Context) bool {
-	if _, has := ctx.Value(markRetryCallKey{}).(bool); has {
-		return true
-	}
-	return false
-}
-
-func doTx(
-	ctx context.Context,
-	c SessionProvider,
-	config *config.Config,
-	op table.TxOperation,
-	opts *table.Options,
-) (err error) {
-	if opts.Trace == nil {
-		opts.Trace = &trace.Table{}
-	}
-	attempts, onIntermediate := 0, trace.TableOnDoTx(
-		opts.Trace,
-		&ctx,
-		opts.ID,
-		opts.Idempotent,
-		isRetryCalledAbove(ctx),
-	)
-	defer func() {
-		onIntermediate(err)(attempts, err)
-	}()
-	err = retryBackoff(ctx, c,
-		func(ctx context.Context, s table.Session) (err error) {
-			attempts++
-
-			defer func() {
-				onIntermediate(err)
-			}()
-
-			tx, err := s.BeginTransaction(ctx, opts.TxSettings)
-			if err != nil {
-				return xerrors.WithStackTrace(err)
-			}
-
-			defer func() {
-				if err != nil {
-					errRollback := tx.Rollback(ctx)
-					if errRollback != nil {
-						err = xerrors.NewWithIssues("",
-							xerrors.WithStackTrace(err),
-							xerrors.WithStackTrace(errRollback),
-						)
-					} else {
-						err = xerrors.WithStackTrace(err)
-					}
-				}
-			}()
-
-			err = func() error {
-				if panicCallback := config.PanicCallback(); panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							panicCallback(e)
-						}
-					}()
-				}
-				return op(ctx, tx)
-			}()
-
-			if err != nil {
-				return xerrors.WithStackTrace(err)
-			}
-
-			_, err = tx.CommitTx(ctx, opts.TxCommitOptions...)
-			if err != nil {
-				return xerrors.WithStackTrace(err)
-			}
-
-			return nil
-		},
-		opts.RetryOptions...,
-	)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-	return nil
+	Put(ctx context.Context, s *session) (err error)
 }
 
 func do(
@@ -118,21 +27,15 @@ func do(
 	c SessionProvider,
 	config *config.Config,
 	op table.Operation,
-	opts *table.Options,
+	onAttempt func(err error),
+	opts ...retry.Option,
 ) (err error) {
-	if opts.Trace == nil {
-		opts.Trace = &trace.Table{}
-	}
-	attempts, onIntermediate := 0, trace.TableOnDo(opts.Trace, &ctx, opts.ID, opts.Idempotent, isRetryCalledAbove(ctx))
-	defer func() {
-		onIntermediate(err)(attempts, err)
-	}()
 	return retryBackoff(ctx, c,
 		func(ctx context.Context, s table.Session) (err error) {
-			attempts++
-
 			defer func() {
-				onIntermediate(err)
+				if onAttempt != nil {
+					onAttempt(err)
+				}
 			}()
 
 			err = func() error {
@@ -143,7 +46,8 @@ func do(
 						}
 					}()
 				}
-				return op(ctx, s)
+
+				return op(xcontext.MarkRetryCall(ctx), s)
 			}()
 
 			if err != nil {
@@ -152,7 +56,7 @@ func do(
 
 			return nil
 		},
-		opts.RetryOptions...,
+		opts...,
 	)
 }
 
@@ -161,8 +65,8 @@ func retryBackoff(
 	p SessionProvider,
 	op table.Operation,
 	opts ...retry.Option,
-) (err error) {
-	err = retry.Retry(markRetryCall(ctx),
+) error {
+	return retry.Retry(ctx,
 		func(ctx context.Context) (err error) {
 			var s *session
 
@@ -175,9 +79,9 @@ func retryBackoff(
 				_ = p.Put(ctx, s)
 			}()
 
-			err = op(ctx, s)
-			if err != nil {
+			if err = op(ctx, s); err != nil {
 				s.checkError(err)
+
 				return xerrors.WithStackTrace(err)
 			}
 
@@ -185,23 +89,27 @@ func retryBackoff(
 		},
 		opts...,
 	)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
-	return nil
 }
 
-func retryOptions(trace *trace.Table, opts ...table.Option) *table.Options {
+func (c *Client) retryOptions(opts ...table.Option) *table.Options {
 	options := &table.Options{
-		Trace: trace,
+		Trace: c.config.Trace(),
 		TxSettings: table.TxSettings(
 			table.WithSerializableReadWrite(),
 		),
+		RetryOptions: []retry.Option{
+			retry.WithTrace(c.config.TraceRetry()),
+			retry.WithBudget(c.config.RetryBudget()),
+		},
 	}
 	for _, opt := range opts {
 		if opt != nil {
 			opt.ApplyTableOption(options)
 		}
 	}
+	if options.Trace == nil {
+		options.Trace = &trace.Table{}
+	}
+
 	return options
 }

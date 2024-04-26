@@ -5,7 +5,6 @@ package integration
 
 import (
 	"context"
-	"log"
 	"os"
 	"testing"
 
@@ -70,22 +69,22 @@ func TestContainers(t *testing.T) {
 
 		parsers := [...]func() error{
 			func() error {
-				return res.Scan(&testContainersExampleList{})
+				return res.Scan(&testContainersExampleList{test: t})
 			},
 			func() error {
-				return res.Scan(&testContainersExampleTuple{})
+				return res.Scan(&testContainersExampleTuple{test: t})
 			},
 			func() error {
-				return res.Scan(&testContainersExampleDict{})
+				return res.Scan(&testContainersExampleDict{test: t})
 			},
 			func() error {
-				return res.Scan(&testContainersExampleStruct{})
+				return res.Scan(&testContainersExampleStruct{test: t})
 			},
 			func() error {
-				return res.Scan(&testContainersVariantStruct{})
+				return res.Scan(&testContainersVariantStruct{test: t})
 			},
 			func() error {
-				return res.Scan(&testContainersVariantTuple{})
+				return res.Scan(&testContainersVariantTuple{test: t})
 			},
 		}
 
@@ -101,47 +100,53 @@ func TestContainers(t *testing.T) {
 	require.NoError(t, err)
 }
 
-type testContainersExampleStruct struct{}
+type testContainersExampleStruct struct {
+	test testing.TB
+}
 
-func (*testContainersExampleStruct) UnmarshalYDB(res types.RawValue) error {
-	log.Printf("T: %s", res.Type())
+func (s *testContainersExampleStruct) UnmarshalYDB(res types.RawValue) error {
+	s.test.Logf("T: %s", res.Type())
 	for i, n := 0, res.StructIn(); i < n; i++ {
 		name := res.StructField(i)
 		val := res.Int32()
-		log.Printf("(struct): %s: %d", name, val)
+		s.test.Logf("(struct): %s: %d", name, val)
 	}
 	res.StructOut()
 	return res.Err()
 }
 
-type testContainersExampleList struct{}
+type testContainersExampleList struct {
+	test testing.TB
+}
 
-func (*testContainersExampleList) UnmarshalYDB(res types.RawValue) error {
-	log.Printf("T: %s", res.Type())
+func (c *testContainersExampleList) UnmarshalYDB(res types.RawValue) error {
+	c.test.Logf("T: %s", res.Type())
 	for i, n := 0, res.ListIn(); i < n; i++ {
 		res.ListItem(i)
-		log.Printf("(list) %q: %s", res.Path(), res.String())
+		c.test.Logf("(list) %q: %s", res.Path(), res.String())
 	}
 	res.ListOut()
 	return res.Err()
 }
 
-type testContainersExampleTuple struct{}
+type testContainersExampleTuple struct {
+	test testing.TB
+}
 
-func (*testContainersExampleTuple) UnmarshalYDB(res types.RawValue) error {
-	log.Printf("T: %s", res.Type())
+func (c *testContainersExampleTuple) UnmarshalYDB(res types.RawValue) error {
+	c.test.Logf("T: %s", res.Type())
 	for i, n := 0, res.TupleIn(); i < n; i++ {
 		res.TupleItem(i)
 		switch i {
 		case 0:
-			log.Printf("(tuple) %q: %d", res.Path(), res.Int32())
+			c.test.Logf("(tuple) %q: %d", res.Path(), res.Int32())
 		case 1:
-			log.Printf("(tuple) %q: %s", res.Path(), res.String())
+			c.test.Logf("(tuple) %q: %s", res.Path(), res.String())
 		case 2:
 			n := res.ListIn()
 			for j := 0; j < n; j++ {
 				res.ListItem(j)
-				log.Printf("(tuple) %q: %d", res.Path(), res.Int32())
+				c.test.Logf("(tuple) %q: %d", res.Path(), res.Int32())
 			}
 			res.ListOut()
 		}
@@ -150,10 +155,12 @@ func (*testContainersExampleTuple) UnmarshalYDB(res types.RawValue) error {
 	return res.Err()
 }
 
-type testContainersExampleDict struct{}
+type testContainersExampleDict struct {
+	test testing.TB
+}
 
-func (*testContainersExampleDict) UnmarshalYDB(res types.RawValue) error {
-	log.Printf("T: %s", res.Type())
+func (c *testContainersExampleDict) UnmarshalYDB(res types.RawValue) error {
+	c.test.Logf("T: %s", res.Type())
 	for i, n := 0, res.DictIn(); i < n; i++ {
 		res.DictKey(i)
 		key := res.String()
@@ -161,16 +168,18 @@ func (*testContainersExampleDict) UnmarshalYDB(res types.RawValue) error {
 		res.DictPayload(i)
 		val := res.Int32()
 
-		log.Printf("(dict) %q: %s: %d", res.Path(), key, val)
+		c.test.Logf("(dict) %q: %s: %d", res.Path(), key, val)
 	}
 	res.DictOut()
 	return res.Err()
 }
 
-type testContainersVariantStruct struct{}
+type testContainersVariantStruct struct {
+	test testing.TB
+}
 
-func (*testContainersVariantStruct) UnmarshalYDB(res types.RawValue) error {
-	log.Printf("T: %s", res.Type())
+func (c *testContainersVariantStruct) UnmarshalYDB(res types.RawValue) error {
+	c.test.Logf("T: %s", res.Type())
 	name, index := res.Variant()
 	var x interface{}
 	switch name {
@@ -181,17 +190,19 @@ func (*testContainersVariantStruct) UnmarshalYDB(res types.RawValue) error {
 	case "baz":
 		x = res.Int64()
 	}
-	log.Printf(
+	c.test.Logf(
 		"(struct variant): %s %s %q %d = %v",
 		res.Path(), res.Type(), name, index, x,
 	)
 	return res.Err()
 }
 
-type testContainersVariantTuple struct{}
+type testContainersVariantTuple struct {
+	test testing.TB
+}
 
-func (*testContainersVariantTuple) UnmarshalYDB(res types.RawValue) error {
-	log.Printf("T: %s", res.Type())
+func (c *testContainersVariantTuple) UnmarshalYDB(res types.RawValue) error {
+	c.test.Logf("T: %s", res.Type())
 	name, index := res.Variant()
 	var x interface{}
 	switch index {
@@ -202,7 +213,7 @@ func (*testContainersVariantTuple) UnmarshalYDB(res types.RawValue) error {
 	case 2:
 		x = res.Int64()
 	}
-	log.Printf(
+	c.test.Logf(
 		"(tuple variant): %s %s %q %d = %v",
 		res.Path(), res.Type(), name, index, x,
 	)

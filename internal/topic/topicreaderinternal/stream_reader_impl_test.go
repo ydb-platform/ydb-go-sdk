@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
@@ -379,7 +379,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		e.reader.cfg.Trace.OnReaderPartitionReadStopResponse = func(info trace.TopicReaderPartitionReadStopResponseStartInfo) func(doneInfo trace.TopicReaderPartitionReadStopResponseDoneInfo) { //nolint:lll
 			expected := trace.TopicReaderPartitionReadStopResponseStartInfo{
 				ReaderConnectionID: e.reader.readConnectionID,
-				PartitionContext:   e.partitionSession.ctx,
+				PartitionContext:   &e.partitionSession.ctx,
 				Topic:              e.partitionSession.Topic,
 				PartitionID:        e.partitionSession.PartitionID,
 				PartitionSessionID: e.partitionSession.partitionSessionID.ToInt64(),
@@ -388,9 +388,10 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 			}
 			require.Equal(t, expected, info)
 
-			require.NoError(t, info.PartitionContext.Err())
+			require.NoError(t, (*info.PartitionContext).Err())
 
 			readMessagesCtxCancel()
+
 			return nil
 		}
 
@@ -423,7 +424,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		e.reader.cfg.Trace.OnReaderPartitionReadStopResponse = func(info trace.TopicReaderPartitionReadStopResponseStartInfo) func(doneInfo trace.TopicReaderPartitionReadStopResponseDoneInfo) { //nolint:lll
 			expected := trace.TopicReaderPartitionReadStopResponseStartInfo{
 				ReaderConnectionID: e.reader.readConnectionID,
-				PartitionContext:   e.partitionSession.ctx,
+				PartitionContext:   &e.partitionSession.ctx,
 				Topic:              e.partitionSession.Topic,
 				PartitionID:        e.partitionSession.PartitionID,
 				PartitionSessionID: e.partitionSession.partitionSessionID.ToInt64(),
@@ -431,9 +432,10 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 				Graceful:           false,
 			}
 			require.Equal(t, expected, info)
-			require.Error(t, info.PartitionContext.Err())
+			require.Error(t, (*info.PartitionContext).Err())
 
 			readMessagesCtxCancel()
+
 			return nil
 		}
 
@@ -577,13 +579,14 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 			_, err := writer.Write([]byte(msg))
 			require.NoError(t, writer.Close())
 			require.NoError(t, err)
+
 			return b.Bytes()
 		}
 
 		prevOffset := e.partitionSession.lastReceivedMessageOffset()
 
 		sendDataRequestCompleted := make(empty.Chan)
-		dataSize := 4
+		dataSize := 6
 		e.stream.EXPECT().Send(&rawtopicreader.ReadRequest{BytesSize: dataSize}).Do(func(_ interface{}) {
 			close(sendDataRequestCompleted)
 		})
@@ -639,17 +642,60 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 								},
 							},
 						},
+						{
+							Codec:            rawtopiccommon.CodecRaw,
+							WriteSessionMeta: map[string]string{"a": "b", "c": "d"},
+							WrittenAt:        testTime(7),
+							MessageData: []rawtopicreader.MessageData{
+								{
+									Offset:           prevOffset + 30,
+									SeqNo:            5,
+									CreatedAt:        testTime(5),
+									Data:             []byte("test"),
+									UncompressedSize: 4,
+									MessageGroupID:   "1",
+									MetadataItems: []rawtopiccommon.MetadataItem{
+										{
+											Key:   "first",
+											Value: []byte("first-value"),
+										},
+										{
+											Key:   "second",
+											Value: []byte("second-value"),
+										},
+									},
+								},
+								{
+									Offset:           prevOffset + 31,
+									SeqNo:            6,
+									CreatedAt:        testTime(5),
+									Data:             []byte("4567"),
+									UncompressedSize: 4,
+									MessageGroupID:   "1",
+									MetadataItems: []rawtopiccommon.MetadataItem{
+										{
+											Key:   "doubled-key",
+											Value: []byte("bad"),
+										},
+										{
+											Key:   "doubled-key",
+											Value: []byte("good"),
+										},
+									},
+								},
+							},
+						},
 					},
 				},
 			},
 		},
 		)
 
-		expectedData := [][]byte{[]byte("123"), []byte("4567"), []byte("098"), []byte("0987")}
+		expectedData := [][]byte{[]byte("123"), []byte("4567"), []byte("098"), []byte("0987"), []byte("test"), []byte("4567")}
 		expectedBatch := &PublicBatch{
 			commitRange: commitRange{
 				commitOffsetStart: prevOffset + 1,
-				commitOffsetEnd:   prevOffset + 21,
+				commitOffsetEnd:   prevOffset + 32,
 				partitionSession:  e.partitionSession,
 			},
 			Messages: []*PublicMessage{
@@ -713,11 +759,48 @@ func TestTopicStreamReaderImpl_ReadMessages(t *testing.T) {
 						partitionSession:  e.partitionSession,
 					},
 				},
+				{
+					SeqNo:          5,
+					CreatedAt:      testTime(5),
+					MessageGroupID: "1",
+					Metadata: map[string][]byte{
+						"first":  []byte("first-value"),
+						"second": []byte("second-value"),
+					},
+					Offset:               prevOffset.ToInt64() + 30,
+					WrittenAt:            testTime(7),
+					WriteSessionMetadata: map[string]string{"a": "b", "c": "d"},
+					UncompressedSize:     4,
+					rawDataLen:           4,
+					commitRange: commitRange{
+						commitOffsetStart: prevOffset + 21,
+						commitOffsetEnd:   prevOffset + 31,
+						partitionSession:  e.partitionSession,
+					},
+				},
+				{
+					SeqNo:          6,
+					CreatedAt:      testTime(5),
+					MessageGroupID: "1",
+					Metadata: map[string][]byte{
+						"doubled-key": []byte("good"),
+					},
+					Offset:               prevOffset.ToInt64() + 31,
+					WrittenAt:            testTime(7),
+					WriteSessionMetadata: map[string]string{"a": "b", "c": "d"},
+					UncompressedSize:     4,
+					rawDataLen:           4,
+					commitRange: commitRange{
+						commitOffsetStart: prevOffset + 31,
+						commitOffsetEnd:   prevOffset + 32,
+						partitionSession:  e.partitionSession,
+					},
+				},
 			},
 		}
 
 		opts := newReadMessageBatchOptions()
-		opts.MinCount = 4
+		opts.MinCount = 6
 		batch, err := e.reader.ReadMessageBatch(e.ctx, opts)
 		require.NoError(t, err)
 
@@ -762,6 +845,7 @@ func TestTopicStreamReadImpl_BatchReaderWantMoreMessagesThenBufferCanHold(t *tes
 					},
 				},
 			})
+
 		return nextDataRequested
 	}
 
@@ -855,6 +939,7 @@ func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
 		sleep()
 
 		require.False(t, e.reader.closed)
+
 		return commitErr
 	}
 	t.Run("CommitModeNone", func(t *testing.T) {
@@ -869,7 +954,7 @@ func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
 }
 
 type streamEnv struct {
-	ctx                    context.Context
+	ctx                    context.Context //nolint:containedctx
 	t                      testing.TB
 	reader                 *topicStreamReaderImpl
 	stopReadEvents         empty.Chan
@@ -1029,6 +1114,7 @@ readMessages:
 			e.m.WithLock(func() {
 				e.nextMessageNeedCallback = res.nextMessageCallback
 			})
+
 			return res.msg, res.err
 		}
 	}

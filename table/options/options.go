@@ -6,8 +6,8 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 func WithShardKeyBounds() DescribeTableOption {
@@ -59,14 +59,14 @@ type column struct {
 func (c column) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) {
 	d.AddColumns = append(d.AddColumns, &Ydb_Table.ColumnMeta{
 		Name: c.name,
-		Type: value.TypeToYDB(c.typ, a),
+		Type: types.TypeToYDB(c.typ, a),
 	})
 }
 
 func (c column) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
 	d.Columns = append(d.Columns, &Ydb_Table.ColumnMeta{
 		Name: c.name,
-		Type: value.TypeToYDB(c.typ, a),
+		Type: types.TypeToYDB(c.typ, a),
 	})
 }
 
@@ -161,7 +161,9 @@ func (i index) ApplyAlterTableOption(d *AlterTableDesc, a *allocator.Allocator) 
 		Name: i.name,
 	}
 	for _, opt := range i.opts {
-		opt.ApplyIndexOption((*indexDesc)(x))
+		if opt != nil {
+			opt.ApplyIndexOption((*indexDesc)(x))
+		}
 	}
 	d.AddIndexes = append(d.AddIndexes, x)
 }
@@ -171,7 +173,9 @@ func (i index) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator
 		Name: i.name,
 	}
 	for _, opt := range i.opts {
-		opt.ApplyIndexOption((*indexDesc)(x))
+		if opt != nil {
+			opt.ApplyIndexOption((*indexDesc)(x))
+		}
 	}
 	d.Indexes = append(d.Indexes, x)
 }
@@ -304,7 +308,7 @@ func WithUniformPartitions(n uint64) Partitions {
 	return uniformPartitions(n)
 }
 
-type explicitPartitions []types.Value
+type explicitPartitions []value.Value
 
 func (e explicitPartitions) ApplyCreateTableOption(d *CreateTableDesc, a *allocator.Allocator) {
 	values := make([]*Ydb.TypedValue, len(e))
@@ -320,7 +324,7 @@ func (e explicitPartitions) ApplyCreateTableOption(d *CreateTableDesc, a *alloca
 
 func (e explicitPartitions) isPartitions() {}
 
-func WithExplicitPartitions(splitPoints ...types.Value) Partitions {
+func WithExplicitPartitions(splitPoints ...value.Value) Partitions {
 	return explicitPartitions(splitPoints)
 }
 
@@ -514,7 +518,9 @@ func WithPartitioningPolicyMode(mode PartitioningMode) PartitioningPolicyOption 
 	}
 }
 
-// Deprecated: use WithUniformPartitions instead
+// Deprecated: use WithUniformPartitions instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithPartitioningPolicyUniformPartitions(n uint64) PartitioningPolicyOption {
 	return func(p *partitioningPolicy, a *allocator.Allocator) {
 		p.Partitions = &Ydb_Table.PartitioningPolicy_UniformPartitions{
@@ -523,8 +529,10 @@ func WithPartitioningPolicyUniformPartitions(n uint64) PartitioningPolicyOption 
 	}
 }
 
-// Deprecated: use WithExplicitPartitions instead
-func WithPartitioningPolicyExplicitPartitions(splitPoints ...types.Value) PartitioningPolicyOption {
+// Deprecated: use WithExplicitPartitions instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+func WithPartitioningPolicyExplicitPartitions(splitPoints ...value.Value) PartitioningPolicyOption {
 	return func(p *partitioningPolicy, a *allocator.Allocator) {
 		values := make([]*Ydb.TypedValue, len(splitPoints))
 		for i := range values {
@@ -686,14 +694,14 @@ func WithMaxPartitionsCount(maxPartitionsCount uint64) PartitioningSettingsOptio
 type (
 	DropTableDesc   Ydb_Table.DropTableRequest
 	DropTableOption interface {
-		ApplyDropTableOption(*DropTableDesc)
+		ApplyDropTableOption(desc *DropTableDesc)
 	}
 )
 
 type (
 	AlterTableDesc   Ydb_Table.AlterTableRequest
 	AlterTableOption interface {
-		ApplyAlterTableOption(*AlterTableDesc, *allocator.Allocator)
+		ApplyAlterTableOption(desc *AlterTableDesc, a *allocator.Allocator)
 	}
 )
 
@@ -803,6 +811,21 @@ func CopyTablesItem(src, dst string, omitIndexes bool) CopyTablesOption {
 }
 
 type (
+	RenameTablesDesc   Ydb_Table.RenameTablesRequest
+	RenameTablesOption func(desc *RenameTablesDesc)
+)
+
+func RenameTablesItem(src, dst string, replaceDestination bool) RenameTablesOption {
+	return func(desc *RenameTablesDesc) {
+		desc.Tables = append(desc.Tables, &Ydb_Table.RenameTableItem{
+			SourcePath:         src,
+			DestinationPath:    dst,
+			ReplaceDestination: replaceDestination,
+		})
+	}
+}
+
+type (
 	ExecuteSchemeQueryDesc   Ydb_Table.ExecuteSchemeQueryRequest
 	ExecuteSchemeQueryOption func(*ExecuteSchemeQueryDesc)
 )
@@ -871,6 +894,7 @@ func WithCallOptions(opts ...grpc.CallOption) withCallOptions {
 func WithCommit() ExecuteDataQueryOption {
 	return executeDataQueryOptionFunc(func(desc *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
 		desc.TxControl.CommitTx = true
+
 		return nil
 	})
 }
@@ -879,6 +903,7 @@ func WithCommit() ExecuteDataQueryOption {
 func WithIgnoreTruncated() ExecuteDataQueryOption {
 	return executeDataQueryOptionFunc(func(desc *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
 		desc.IgnoreTruncated = true
+
 		return nil
 	})
 }
@@ -886,7 +911,8 @@ func WithIgnoreTruncated() ExecuteDataQueryOption {
 // WithQueryCachePolicyKeepInCache manages keep-in-cache policy
 //
 // Deprecated: data queries always executes with enabled keep-in-cache policy.
-// Use WithKeepInCache for disabling keep-in-cache policy
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithQueryCachePolicyKeepInCache() QueryCachePolicyOption {
 	return withQueryCachePolicyKeepInCache(true)
 }
@@ -899,7 +925,9 @@ func withQueryCachePolicyKeepInCache(keepInCache bool) QueryCachePolicyOption {
 
 // WithQueryCachePolicy manages query cache policy
 //
-// Deprecated: use WithKeepInCache for disabling keep-in-cache policy
+// Deprecated: use WithKeepInCache for disabling keep-in-cache policy.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption {
 	return withQueryCachePolicy(opts...)
 }
@@ -915,6 +943,7 @@ func withQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption
 				opt((*queryCachePolicy)(d.QueryCachePolicy), a)
 			}
 		}
+
 		return nil
 	})
 }
@@ -934,6 +963,7 @@ func WithCommitCollectStatsModeBasic() CommitTransactionOption {
 func WithCollectStatsModeNone() ExecuteDataQueryOption {
 	return executeDataQueryOptionFunc(func(d *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
 		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_NONE
+
 		return nil
 	})
 }
@@ -941,6 +971,7 @@ func WithCollectStatsModeNone() ExecuteDataQueryOption {
 func WithCollectStatsModeBasic() ExecuteDataQueryOption {
 	return executeDataQueryOptionFunc(func(d *ExecuteDataQueryDesc, a *allocator.Allocator) []grpc.CallOption {
 		d.CollectStats = Ydb_Table.QueryStatsCollection_STATS_COLLECTION_BASIC
+
 		return nil
 	})
 }
@@ -969,6 +1000,7 @@ var _ ExecuteScanQueryOption = executeScanQueryOptionFunc(nil)
 func WithExecuteScanQueryMode(m ExecuteScanQueryRequestMode) ExecuteScanQueryOption {
 	return executeScanQueryOptionFunc(func(desc *ExecuteScanQueryDesc) []grpc.CallOption {
 		desc.Mode = m.toYDB()
+
 		return nil
 	})
 }
@@ -999,6 +1031,7 @@ func (stats ExecuteScanQueryStatsType) toYDB() Ydb_Table.QueryStatsCollection_Mo
 func WithExecuteScanQueryStats(stats ExecuteScanQueryStatsType) ExecuteScanQueryOption {
 	return executeScanQueryOptionFunc(func(desc *ExecuteScanQueryDesc) []grpc.CallOption {
 		desc.CollectStats = stats.toYDB()
+
 		return nil
 	})
 }
@@ -1017,22 +1050,22 @@ var (
 type (
 	ReadRowsDesc   Ydb_Table.ReadRowsRequest
 	ReadRowsOption interface {
-		ApplyReadRowsOption(*ReadRowsDesc, *allocator.Allocator)
+		ApplyReadRowsOption(desc *ReadRowsDesc, a *allocator.Allocator)
 	}
 
 	ReadTableDesc   Ydb_Table.ReadTableRequest
 	ReadTableOption interface {
-		ApplyReadTableOption(*ReadTableDesc, *allocator.Allocator)
+		ApplyReadTableOption(desc *ReadTableDesc, a *allocator.Allocator)
 	}
 
 	readColumnsOption        []string
 	readOrderedOption        struct{}
 	readSnapshotOption       bool
 	readKeyRangeOption       KeyRange
-	readGreaterOrEqualOption struct{ types.Value }
-	readLessOrEqualOption    struct{ types.Value }
-	readLessOption           struct{ types.Value }
-	readGreaterOption        struct{ types.Value }
+	readGreaterOrEqualOption struct{ value.Value }
+	readLessOrEqualOption    struct{ value.Value }
+	readLessOption           struct{ value.Value }
+	readGreaterOption        struct{ value.Value }
 	readRowLimitOption       uint64
 )
 
@@ -1126,19 +1159,19 @@ func ReadKeyRange(x KeyRange) ReadTableOption {
 	return readKeyRangeOption(x)
 }
 
-func ReadGreater(x types.Value) ReadTableOption {
+func ReadGreater(x value.Value) ReadTableOption {
 	return readGreaterOption{x}
 }
 
-func ReadGreaterOrEqual(x types.Value) ReadTableOption {
+func ReadGreaterOrEqual(x value.Value) ReadTableOption {
 	return readGreaterOrEqualOption{x}
 }
 
-func ReadLess(x types.Value) ReadTableOption {
+func ReadLess(x value.Value) ReadTableOption {
 	return readLessOption{x}
 }
 
-func ReadLessOrEqual(x types.Value) ReadTableOption {
+func ReadLessOrEqual(x value.Value) ReadTableOption {
 	return readLessOrEqualOption{x}
 }
 

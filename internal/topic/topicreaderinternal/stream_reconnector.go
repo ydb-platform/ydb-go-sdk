@@ -29,40 +29,31 @@ var (
 type readerConnectFunc func(ctx context.Context) (batchedStreamReader, error)
 
 type readerReconnector struct {
-	clock      clockwork.Clock
-	background background.Worker
-
-	tracer        *trace.Topic
-	baseContext   context.Context
-	retrySettings topic.RetrySettings
-
-	readerConnect readerConnectFunc
-
-	reconnectFromBadStream chan reconnectRequest
-	connectTimeout         time.Duration
-
-	closeOnce sync.Once
-	readerID  int64
-
-	m                          xsync.RWMutex
-	streamConnectionInProgress empty.Chan // opened if connection in progress, closed if connection established
+	background                 background.Worker
+	clock                      clockwork.Clock
+	retrySettings              topic.RetrySettings
 	streamVal                  batchedStreamReader
 	streamErr                  error
 	closedErr                  error
-
-	initErr    error
-	initDone   bool
-	initDoneCh empty.Chan
+	initErr                    error
+	tracer                     *trace.Topic
+	readerConnect              readerConnectFunc
+	reconnectFromBadStream     chan reconnectRequest
+	connectTimeout             time.Duration
+	readerID                   int64
+	streamConnectionInProgress empty.Chan // opened if connection in progress, closed if connection established
+	initDoneCh                 empty.Chan
+	m                          xsync.RWMutex
+	closeOnce                  sync.Once
+	initDone                   bool
 }
 
-//nolint:revive
 func newReaderReconnector(
 	readerID int64,
 	connector readerConnectFunc,
 	connectTimeout time.Duration,
 	retrySettings topic.RetrySettings,
 	tracer *trace.Topic,
-	baseContext context.Context,
 ) *readerReconnector {
 	res := &readerReconnector{
 		readerID:       readerID,
@@ -71,7 +62,6 @@ func newReaderReconnector(
 		streamErr:      errUnconnected,
 		connectTimeout: connectTimeout,
 		tracer:         tracer,
-		baseContext:    baseContext,
 		retrySettings:  retrySettings,
 	}
 
@@ -115,6 +105,7 @@ func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessa
 		case r.isRetriableError(err):
 			r.fireReconnectOnRetryableError(stream, err)
 			runtime.Gosched()
+
 			continue
 		case err != nil:
 			return nil, err
@@ -126,8 +117,10 @@ func (r *readerReconnector) ReadMessageBatch(ctx context.Context, opts ReadMessa
 		if r.isRetriableError(err) {
 			r.fireReconnectOnRetryableError(stream, err)
 			runtime.Gosched()
+
 			continue
 		}
+
 		return res, err
 	}
 }
@@ -140,6 +133,7 @@ func (r *readerReconnector) Commit(ctx context.Context, commitRange commitRange)
 
 	err = stream.Commit(ctx, commitRange)
 	r.fireReconnectOnRetryableError(stream, err)
+
 	return err
 }
 
@@ -166,6 +160,7 @@ func (r *readerReconnector) CloseWithError(ctx context.Context, err error) error
 			}
 		})
 	})
+
 	return closeErr
 }
 
@@ -292,11 +287,13 @@ func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldRead
 			}
 		}
 	})
+
 	return err
 }
 
 func (r *readerReconnector) isRetriableError(err error) bool {
 	_, res := topic.CheckRetryMode(err, r.retrySettings, 0)
+
 	return res
 }
 
@@ -327,9 +324,12 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 		result <- connectResult{stream: stream, err: err}
 	}()
 
+	connectionTimoutTimer := r.clock.NewTimer(r.connectTimeout)
+	defer connectionTimoutTimer.Stop()
+
 	var res connectResult
 	select {
-	case <-r.clock.After(r.connectTimeout):
+	case <-connectionTimoutTimer.Chan():
 		// cancel connection context only if timeout exceed while connection
 		// because if cancel context after connect - it will break
 		cancel()
@@ -341,6 +341,7 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 	if res.err == nil {
 		return res.stream, nil
 	}
+
 	return nil, res.err
 }
 
@@ -383,6 +384,7 @@ func (r *readerReconnector) stream(ctx context.Context) (batchedStreamReader, er
 		connectionChan = r.streamConnectionInProgress
 		if r.closedErr != nil {
 			err = r.closedErr
+
 			return
 		}
 	})
@@ -402,6 +404,7 @@ func (r *readerReconnector) stream(ctx context.Context) (batchedStreamReader, er
 			err = r.streamErr
 		})
 		r.fireReconnectOnRetryableError(reader, err)
+
 		return reader, err
 	}
 }

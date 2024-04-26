@@ -9,6 +9,7 @@ import (
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
@@ -16,6 +17,7 @@ import (
 	"slo/internal/generator"
 )
 
+//nolint:goconst
 const (
 	createTemplate = `
 CREATE TABLE ` + "`%s`" + ` (
@@ -73,11 +75,18 @@ type Storage struct {
 	dropQuery   string
 	upsertQuery string
 	selectQuery string
+	retryBudget interface {
+		budget.Budget
+
+		Stop()
+	}
 }
 
 func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Storage, err error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:gomnd
 	defer cancel()
+
+	retryBudget := budget.Limited(int(float64(poolSize) * 0.1)) //nolint:gomnd
 
 	s = &Storage{
 		cfg: cfg,
@@ -86,11 +95,13 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Stora
 		dropQuery:   fmt.Sprintf(dropTemplate, cfg.Table),
 		upsertQuery: fmt.Sprintf(upsertTemplate, cfg.Table),
 		selectQuery: fmt.Sprintf(selectTemplate, cfg.Table),
+		retryBudget: retryBudget,
 	}
 
 	s.cc, err = ydb.Open(
 		ctx,
 		s.cfg.Endpoint+s.cfg.DB,
+		ydb.WithRetryBudget(retryBudget),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("ydb.Open error: %w", err)
@@ -137,12 +148,10 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (res genera
 		},
 		retry.WithIdempotent(true),
 		retry.WithTrace(
-			trace.Retry{
-				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-					return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-						return func(info trace.RetryLoopDoneInfo) {
-							attempts = info.Attempts
-						}
+			&trace.Retry{
+				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+					return func(info trace.RetryLoopDoneInfo) {
+						attempts = info.Attempts
 					}
 				},
 			},
@@ -177,12 +186,10 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, err
 		},
 		retry.WithIdempotent(true),
 		retry.WithTrace(
-			trace.Retry{
-				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-					return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-						return func(info trace.RetryLoopDoneInfo) {
-							attempts = info.Attempts
-						}
+			&trace.Retry{
+				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+					return func(info trace.RetryLoopDoneInfo) {
+						attempts = info.Attempts
 					}
 				},
 			},
@@ -203,6 +210,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 	return retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
 		func(ctx context.Context, cc *sql.Conn) error {
 			_, err := s.db.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), s.createQuery)
+
 			return err
 		}, retry.WithIdempotent(true),
 	)
@@ -219,12 +227,15 @@ func (s *Storage) dropTable(ctx context.Context) error {
 	return retry.Do(ydb.WithTxControl(ctx, writeTx), s.db,
 		func(ctx context.Context, cc *sql.Conn) error {
 			_, err := s.db.ExecContext(ydb.WithQueryMode(ctx, ydb.SchemeQueryMode), s.dropQuery)
+
 			return err
 		}, retry.WithIdempotent(true),
 	)
 }
 
 func (s *Storage) close(ctx context.Context) error {
+	s.retryBudget.Stop()
+
 	if err := ctx.Err(); err != nil {
 		return err
 	}

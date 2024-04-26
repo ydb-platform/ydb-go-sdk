@@ -8,6 +8,7 @@ import (
 	"path"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,8 +19,8 @@ import (
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
@@ -122,6 +123,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 					&trace.Table{
 						OnPoolWait: func(trace.TablePoolWaitStartInfo) func(trace.TablePoolWaitDoneInfo) {
 							wait <- struct{}{}
+
 							return nil
 						},
 					},
@@ -139,6 +141,7 @@ func TestSessionPoolCloseWhenWaiting(t *testing.T) {
 					withTrace(&trace.Table{
 						OnPoolGet: func(trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
 							get <- struct{}{}
+
 							return nil
 						},
 					}),
@@ -346,10 +349,12 @@ func TestSessionPoolDeleteReleaseWait(t *testing.T) {
 					&trace.Table{
 						OnPoolGet: func(trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
 							get <- struct{}{}
+
 							return nil
 						},
 						OnPoolWait: func(trace.TablePoolWaitStartInfo) func(trace.TablePoolWaitDoneInfo) {
 							wait <- struct{}{}
+
 							return nil
 						},
 					},
@@ -404,6 +409,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 	}
 	create := make(chan createReq)
 	p := newClient(
+		context.Background(),
 		nil,
 		(&StubBuilder{
 			Limit: 1,
@@ -414,6 +420,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 				}
 				create <- req
 				<-req.release
+
 				return req.session, nil
 			},
 		}).createSession,
@@ -425,8 +432,8 @@ func TestSessionPoolRacyGet(t *testing.T) {
 	var (
 		expSession *session
 		done       = make(chan struct{}, 2)
+		err        error
 	)
-	var err error
 	for i := 0; i < 2; i++ {
 		go func() {
 			defer func() {
@@ -435,10 +442,12 @@ func TestSessionPoolRacyGet(t *testing.T) {
 			s, e := p.Get(context.Background())
 			if e != nil {
 				err = e
+
 				return
 			}
 			if s != expSession {
 				err = fmt.Errorf("unexpected session: %v; want %v", s, expSession)
+
 				return
 			}
 			mustPutSession(t, p, s)
@@ -552,10 +561,12 @@ func TestSessionPoolSizeLimitOverflow(t *testing.T) {
 					withTrace(&trace.Table{
 						OnPoolGet: func(trace.TablePoolGetStartInfo) func(trace.TablePoolGetDoneInfo) {
 							get <- struct{}{}
+
 							return nil
 						},
 						OnPoolWait: func(trace.TablePoolWaitStartInfo) func(trace.TablePoolWaitDoneInfo) {
 							wait <- struct{}{}
+
 							return nil
 						},
 					}),
@@ -627,12 +638,14 @@ func TestSessionPoolGetPut(t *testing.T) {
 				testutil.InvokeHandlers{
 					testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 						created++
+
 						return &Ydb_Table.CreateSessionResult{
 							SessionId: testutil.SessionID(),
 						}, nil
 					},
 					testutil.TableDeleteSession: func(interface{}) (proto.Message, error) {
 						deleted++
+
 						return nil, nil
 					},
 				},
@@ -665,7 +678,7 @@ func TestSessionPoolCloseIdleSessions(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		var (
 			idleThreshold = 4 * time.Second
-			closedCount   xatomic.Int64
+			closedCount   atomic.Int64
 			fakeClock     = clockwork.NewFakeClock()
 		)
 		p := newClientWithStubBuilder(
@@ -676,6 +689,7 @@ func TestSessionPoolCloseIdleSessions(t *testing.T) {
 						testutil.TableDeleteSession: okHandler,
 						testutil.TableCreateSession: func(interface{}) (proto.Message, error) {
 							closedCount.Add(1)
+
 							return &Ydb_Table.CreateSessionResult{
 								SessionId: testutil.SessionID(),
 							}, nil
@@ -756,6 +770,7 @@ func mustGetSession(t testing.TB, p *Client) *session {
 		t.Helper()
 		t.Fatalf("%s: %v", caller(), err)
 	}
+
 	return s
 }
 
@@ -768,7 +783,7 @@ func mustPutSession(t testing.TB, p *Client, s *session) {
 	}
 }
 
-func mustClose(t testing.TB, p *Client) {
+func mustClose(t testing.TB, p closer.Closer) {
 	wg := sync.WaitGroup{}
 	defer wg.Wait()
 	if err := p.Close(context.Background()); err != nil {
@@ -779,6 +794,7 @@ func mustClose(t testing.TB, p *Client) {
 
 func caller() string {
 	_, file, line, _ := runtime.Caller(2)
+
 	return fmt.Sprintf("%s:%d", path.Base(file), line)
 }
 
@@ -835,6 +851,7 @@ func simpleSession(t *testing.T) *session {
 	if err != nil {
 		t.Fatalf("newSession unexpected error: %v", err)
 	}
+
 	return s
 }
 
@@ -855,7 +872,8 @@ func newClientWithStubBuilder(
 	stubLimit int,
 	options ...config.Option,
 ) *Client {
-	return newClient(
+	c := newClient(
+		context.Background(),
 		balancer,
 		(&StubBuilder{
 			T:     t,
@@ -864,6 +882,8 @@ func newClientWithStubBuilder(
 		}).createSession,
 		config.New(options...),
 	)
+
+	return c
 }
 
 func (s *StubBuilder) createSession(ctx context.Context) (session *session, err error) {
@@ -908,6 +928,7 @@ func whenWantWaitCh(p *Client) <-chan struct{} {
 		p.testHookGetWaitCh = prev
 		close(ch)
 	}
+
 	return ch
 }
 
@@ -928,6 +949,7 @@ func TestDeadlockOnUpdateNodes(t *testing.T) {
 					return nil, err
 				}
 				nodes = append(nodes, nodeID)
+
 				return &Ydb_Table.CreateSessionResult{
 					SessionId: sessionID,
 				}, nil
@@ -943,7 +965,7 @@ func TestDeadlockOnUpdateNodes(t *testing.T) {
 		require.NoError(t, err)
 		s3, err := c.Get(ctx)
 		require.NoError(t, err)
-		require.Equal(t, 3, len(nodes))
+		require.Len(t, nodes, 3)
 		err = c.Put(ctx, s1)
 		require.NoError(t, err)
 		err = c.Put(ctx, s2)
@@ -970,6 +992,7 @@ func TestDeadlockOnInternalPoolGCTick(t *testing.T) {
 					return nil, err
 				}
 				nodes = append(nodes, nodeID)
+
 				return &Ydb_Table.CreateSessionResult{
 					SessionId: sessionID,
 				}, nil
@@ -994,7 +1017,7 @@ func TestDeadlockOnInternalPoolGCTick(t *testing.T) {
 			return
 		}
 		require.NoError(t, err)
-		require.Equal(t, 3, len(nodes))
+		require.Len(t, nodes, 3)
 		err = c.Put(ctx, s1)
 		if err != nil && errors.Is(err, context.DeadlineExceeded) {
 			return

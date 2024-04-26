@@ -7,6 +7,7 @@ import (
 	"github.com/jonboulle/clockwork"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -65,6 +66,7 @@ type Event = string
 
 const (
 	EventUnknown = Event("")
+	EventInit    = Event("init")
 	EventTick    = Event("tick")
 	EventForce   = Event("force")
 	EventCancel  = Event("cancel")
@@ -76,10 +78,11 @@ func EventType(ctx context.Context) Event {
 	if eventType, ok := ctx.Value(ctxEventTypeKey{}).(Event); ok {
 		return eventType
 	}
+
 	return EventUnknown
 }
 
-func withEvent(ctx context.Context, event Event) context.Context {
+func WithEvent(ctx context.Context, event Event) context.Context {
 	return context.WithValue(ctx,
 		ctxEventTypeKey{},
 		event,
@@ -88,11 +91,12 @@ func withEvent(ctx context.Context, event Event) context.Context {
 
 // New creates and begins to execute task periodically.
 func New(
+	ctx context.Context,
 	interval time.Duration,
 	task func(ctx context.Context) (err error),
 	opts ...option,
 ) *repeater {
-	ctx, cancel := xcontext.WithCancel(context.Background())
+	ctx, cancel := xcontext.WithCancel(ctx)
 
 	r := &repeater{
 		interval: interval,
@@ -104,9 +108,9 @@ func New(
 		trace:    &trace.Driver{},
 	}
 
-	for _, o := range opts {
-		if o != nil {
-			o(r)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(r)
 		}
 	}
 
@@ -140,9 +144,12 @@ func (r *repeater) wakeUp(ctx context.Context, e Event) (err error) {
 		return err
 	}
 
-	ctx = withEvent(ctx, e)
+	ctx = WithEvent(ctx, e)
 
-	onDone := trace.DriverOnRepeaterWakeUp(r.trace, &ctx, r.name, e)
+	onDone := trace.DriverOnRepeaterWakeUp(r.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/repeater.(*repeater).wakeUp"),
+		r.name, e,
+	)
 	defer func() {
 		onDone(err)
 
@@ -165,8 +172,8 @@ func (r *repeater) worker(ctx context.Context, tick clockwork.Ticker) {
 
 	// force returns backoff with delays [500ms...32s]
 	force := backoff.New(
-		backoff.WithSlotDuration(500*time.Millisecond),
-		backoff.WithCeiling(6),
+		backoff.WithSlotDuration(500*time.Millisecond), //nolint:gomnd
+		backoff.WithCeiling(6),                         //nolint:gomnd
 		backoff.WithJitterLimit(1),
 	)
 

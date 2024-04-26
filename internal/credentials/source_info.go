@@ -14,6 +14,12 @@ func (sourceInfo SourceInfoOption) ApplyAccessTokenCredentialsOption(h *AccessTo
 	h.sourceInfo = string(sourceInfo)
 }
 
+func (sourceInfo SourceInfoOption) ApplyOauth2CredentialsOption(h *oauth2TokenExchange) error {
+	h.sourceInfo = string(sourceInfo)
+
+	return nil
+}
+
 // WithSourceInfo option append to credentials object the source info for reporting source info details on error case
 func WithSourceInfo(sourceInfo string) SourceInfoOption {
 	return SourceInfoOption(sourceInfo)

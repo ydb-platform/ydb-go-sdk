@@ -17,6 +17,7 @@ import (
 	coordinationConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	discoveryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
+	queryConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
 	ratelimiterConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
 	schemeConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
 	scriptingConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/scripting/config"
@@ -24,6 +25,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -37,6 +39,7 @@ func WithStaticCredentials(user, password string) Option {
 			User:     user,
 			Password: password,
 		}
+
 		return nil
 	}
 }
@@ -52,10 +55,37 @@ func WithAccessTokenCredentials(accessToken string) Option {
 	)
 }
 
+// WithOauth2TokenExchangeCredentials adds credentials that exchange token using
+// OAuth 2.0 token exchange protocol:
+// https://www.rfc-editor.org/rfc/rfc8693
+func WithOauth2TokenExchangeCredentials(
+	opts ...credentials.Oauth2TokenExchangeCredentialsOption,
+) Option {
+	opts = append(opts, credentials.WithSourceInfo("ydb.WithOauth2TokenExchangeCredentials(opts)"))
+
+	return WithCreateCredentialsFunc(func(context.Context) (credentials.Credentials, error) {
+		return credentials.NewOauth2TokenExchangeCredentials(opts...)
+	})
+}
+
+// WithApplicationName add provided application name to all api requests
+func WithApplicationName(applicationName string) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.options = append(c.options, config.WithApplicationName(applicationName))
+
+		return nil
+	}
+}
+
 // WithUserAgent add provided user agent value to all api requests
+//
+// Deprecated: use WithApplicationName instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithUserAgent(userAgent string) Option {
 	return func(ctx context.Context, c *Driver) error {
-		c.options = append(c.options, config.WithUserAgent(userAgent))
+		c.options = append(c.options, config.WithApplicationName(userAgent))
+
 		return nil
 	}
 }
@@ -63,6 +93,7 @@ func WithUserAgent(userAgent string) Option {
 func WithRequestsType(requestsType string) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithRequestsType(requestsType))
+
 		return nil
 	}
 }
@@ -87,6 +118,7 @@ func WithConnectionString(connectionString string) Option {
 		}
 		c.options = append(c.options, info.Options...)
 		c.userInfo = info.UserInfo
+
 		return nil
 	}
 }
@@ -95,6 +127,7 @@ func WithConnectionString(connectionString string) Option {
 func WithConnectionTTL(ttl time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithConnectionTTL(ttl))
+
 		return nil
 	}
 }
@@ -107,6 +140,7 @@ func WithConnectionTTL(ttl time.Duration) Option {
 func WithEndpoint(endpoint string) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithEndpoint(endpoint))
+
 		return nil
 	}
 }
@@ -119,6 +153,7 @@ func WithEndpoint(endpoint string) Option {
 func WithDatabase(database string) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithDatabase(database))
+
 		return nil
 	}
 }
@@ -131,6 +166,7 @@ func WithDatabase(database string) Option {
 func WithSecure(secure bool) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithSecure(secure))
+
 		return nil
 	}
 }
@@ -141,6 +177,7 @@ func WithSecure(secure bool) Option {
 func WithInsecure() Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithSecure(false))
+
 		return nil
 	}
 }
@@ -149,6 +186,7 @@ func WithInsecure() Option {
 func WithMinTLSVersion(minVersion uint16) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithMinTLSVersion(minVersion))
+
 		return nil
 	}
 }
@@ -157,6 +195,7 @@ func WithMinTLSVersion(minVersion uint16) Option {
 func WithTLSSInsecureSkipVerify() Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithTLSSInsecureSkipVerify())
+
 		return nil
 	}
 }
@@ -169,6 +208,7 @@ func WithLogger(l log.Logger, details trace.Detailer, opts ...log.Option) Option
 		c.logger = l
 		c.loggerOpts = opts
 		c.loggerDetails = details
+
 		return nil
 	}
 }
@@ -188,6 +228,7 @@ func WithCreateCredentialsFunc(createCredentials func(ctx context.Context) (cred
 			return xerrors.WithStackTrace(err)
 		}
 		c.options = append(c.options, config.WithCredentials(creds))
+
 		return nil
 	}
 }
@@ -203,6 +244,7 @@ func WithCredentials(c credentials.Credentials) Option {
 func WithBalancer(balancer *balancerConfig.Config) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithBalancer(balancer))
+
 		return nil
 	}
 }
@@ -213,6 +255,7 @@ func WithBalancer(balancer *balancerConfig.Config) Option {
 func WithDialTimeout(timeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithDialTimeout(timeout))
+
 		return nil
 	}
 }
@@ -223,6 +266,7 @@ func WithDialTimeout(timeout time.Duration) Option {
 func With(options ...config.Option) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, options...)
+
 		return nil
 	}
 }
@@ -230,13 +274,14 @@ func With(options ...config.Option) Option {
 // MergeOptions concatentaes provided options to one cumulative value.
 func MergeOptions(opts ...Option) Option {
 	return func(ctx context.Context, c *Driver) error {
-		for _, o := range opts {
-			if o != nil {
-				if err := o(ctx, c); err != nil {
+		for _, opt := range opts {
+			if opt != nil {
+				if err := opt(ctx, c); err != nil {
 					return xerrors.WithStackTrace(err)
 				}
 			}
 		}
+
 		return nil
 	}
 }
@@ -245,14 +290,43 @@ func MergeOptions(opts ...Option) Option {
 func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.discoveryOptions = append(c.discoveryOptions, discoveryConfig.WithInterval(discoveryInterval))
+
 		return nil
 	}
 }
 
-// WithTraceDriver returns deadline which has associated Driver with it.
-func WithTraceDriver(trace trace.Driver, opts ...trace.DriverComposeOption) Option { //nolint:gocritic
+// WithRetryBudget sets retry budget for all calls of all retryers.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithRetryBudget(b budget.Budget) Option {
 	return func(ctx context.Context, c *Driver) error {
-		c.options = append(c.options, config.WithTrace(trace, opts...))
+		c.options = append(c.options, config.WithRetryBudget(b))
+
+		return nil
+	}
+}
+
+// WithTraceDriver appends trace.Driver into driver traces
+func WithTraceDriver(t trace.Driver, opts ...trace.DriverComposeOption) Option { //nolint:gocritic
+	return func(ctx context.Context, c *Driver) error {
+		c.options = append(c.options, config.WithTrace(t, opts...))
+
+		return nil
+	}
+}
+
+// WithTraceRetry appends trace.Retry into retry traces
+func WithTraceRetry(t trace.Retry, opts ...trace.RetryComposeOption) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.options = append(c.options,
+			config.WithTraceRetry(&t, append(
+				[]trace.RetryComposeOption{
+					trace.WithRetryPanicCallback(c.panicCallback),
+				},
+				opts...,
+			)...),
+		)
+
 		return nil
 	}
 }
@@ -261,6 +335,7 @@ func WithTraceDriver(trace trace.Driver, opts ...trace.DriverComposeOption) Opti
 func WithCertificate(cert *x509.Certificate) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithCertificate(cert))
+
 		return nil
 	}
 }
@@ -278,6 +353,7 @@ func WithCertificatesFromFile(caFile string, opts ...certificates.FromFileOption
 	if file, err := filepath.EvalSymlinks(caFile); err == nil {
 		caFile = file
 	}
+
 	return func(ctx context.Context, c *Driver) error {
 		certs, err := certificates.FromFile(caFile, opts...)
 		if err != nil {
@@ -288,6 +364,7 @@ func WithCertificatesFromFile(caFile string, opts ...certificates.FromFileOption
 				return xerrors.WithStackTrace(err)
 			}
 		}
+
 		return nil
 	}
 }
@@ -299,6 +376,7 @@ func WithCertificatesFromFile(caFile string, opts ...certificates.FromFileOption
 func WithTLSConfig(tlsConfig *tls.Config) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithTLSConfig(tlsConfig))
+
 		return nil
 	}
 }
@@ -313,6 +391,7 @@ func WithCertificatesFromPem(bytes []byte, opts ...certificates.FromPemOption) O
 		for _, cert := range certs {
 			_ = WithCertificate(cert)(ctx, c)
 		}
+
 		return nil
 	}
 }
@@ -322,6 +401,17 @@ func WithCertificatesFromPem(bytes []byte, opts ...certificates.FromPemOption) O
 func WithTableConfigOption(option tableConfig.Option) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, option)
+
+		return nil
+	}
+}
+
+// WithQueryConfigOption collects additional configuration options for query.Client.
+// This option does not replace collected option, instead it will appen provided options.
+func WithQueryConfigOption(option queryConfig.Option) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.queryOptions = append(c.queryOptions, option)
+
 		return nil
 	}
 }
@@ -330,15 +420,10 @@ func WithTableConfigOption(option tableConfig.Option) Option {
 func WithSessionPoolSizeLimit(sizeLimit int) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithSizeLimit(sizeLimit))
+		c.queryOptions = append(c.queryOptions, queryConfig.WithPoolLimit(sizeLimit))
+
 		return nil
 	}
-}
-
-// WithSessionPoolKeepAliveMinSize set minimum sessions should be keeped alive in table.Client
-//
-// Deprecated: table client do not supports background session keep-aliving now
-func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
-	return func(ctx context.Context, c *Driver) error { return nil }
 }
 
 // WithSessionPoolIdleThreshold defines interval for idle sessions
@@ -349,19 +434,17 @@ func WithSessionPoolIdleThreshold(idleThreshold time.Duration) Option {
 			c.databaseSQLOptions,
 			xsql.WithIdleThreshold(idleThreshold),
 		)
+
 		return nil
 	}
-}
-
-// WithSessionPoolKeepAliveTimeout set timeout of keep alive requests for session in table.Client
-func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
-	return func(ctx context.Context, c *Driver) error { return nil }
 }
 
 // WithSessionPoolCreateSessionTimeout set timeout for new session creation process in table.Client
 func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithCreateSessionTimeout(createSessionTimeout))
+		c.queryOptions = append(c.queryOptions, queryConfig.WithSessionCreateTimeout(createSessionTimeout))
+
 		return nil
 	}
 }
@@ -370,14 +453,35 @@ func WithSessionPoolCreateSessionTimeout(createSessionTimeout time.Duration) Opt
 func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithDeleteTimeout(deleteTimeout))
+		c.queryOptions = append(c.queryOptions, queryConfig.WithSessionDeleteTimeout(deleteTimeout))
+
 		return nil
 	}
+}
+
+// WithSessionPoolKeepAliveMinSize set minimum sessions should be keeped alive in table.Client
+//
+// Deprecated: use WithApplicationName instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
+	return func(ctx context.Context, c *Driver) error { return nil }
+}
+
+// WithSessionPoolKeepAliveTimeout set timeout of keep alive requests for session in table.Client
+//
+// Deprecated: use WithApplicationName instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
+	return func(ctx context.Context, c *Driver) error { return nil }
 }
 
 // WithIgnoreTruncated disables errors on truncated flag
 func WithIgnoreTruncated() Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(c.tableOptions, tableConfig.WithIgnoreTruncated())
+
 		return nil
 	}
 }
@@ -390,11 +494,12 @@ func WithPanicCallback(panicCallback func(e interface{})) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.panicCallback = panicCallback
 		c.options = append(c.options, config.WithPanicCallback(panicCallback))
+
 		return nil
 	}
 }
 
-// WithTraceTable returns table trace option
+// WithTraceTable appends trace.Table into table traces
 func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option { //nolint:gocritic
 	return func(ctx context.Context, c *Driver) error {
 		c.tableOptions = append(
@@ -409,6 +514,26 @@ func WithTraceTable(t trace.Table, opts ...trace.TableComposeOption) Option { //
 				)...,
 			),
 		)
+
+		return nil
+	}
+}
+
+// WithTraceQuery appends trace.Query into query traces
+func WithTraceQuery(t trace.Query, opts ...trace.QueryComposeOption) Option { //nolint:gocritic
+	return func(ctx context.Context, c *Driver) error {
+		c.queryOptions = append(
+			c.queryOptions,
+			queryConfig.WithTrace(&t,
+				append(
+					[]trace.QueryComposeOption{
+						trace.WithQueryPanicCallback(c.panicCallback),
+					},
+					opts...,
+				)...,
+			),
+		)
+
 		return nil
 	}
 }
@@ -428,6 +553,7 @@ func WithTraceScripting(t trace.Scripting, opts ...trace.ScriptingComposeOption)
 				)...,
 			),
 		)
+
 		return nil
 	}
 }
@@ -447,17 +573,18 @@ func WithTraceScheme(t trace.Scheme, opts ...trace.SchemeComposeOption) Option {
 				)...,
 			),
 		)
+
 		return nil
 	}
 }
 
 // WithTraceCoordination returns coordination trace option
-func WithTraceCoordination(t trace.Coordination, opts ...trace.CoordinationComposeOption) Option {
+func WithTraceCoordination(t trace.Coordination, opts ...trace.CoordinationComposeOption) Option { //nolint:gocritic
 	return func(ctx context.Context, c *Driver) error {
 		c.coordinationOptions = append(
 			c.coordinationOptions,
 			coordinationConfig.WithTrace(
-				t,
+				&t,
 				append(
 					[]trace.CoordinationComposeOption{
 						trace.WithCoordinationPanicCallback(c.panicCallback),
@@ -466,6 +593,7 @@ func WithTraceCoordination(t trace.Coordination, opts ...trace.CoordinationCompo
 				)...,
 			),
 		)
+
 		return nil
 	}
 }
@@ -485,6 +613,7 @@ func WithTraceRatelimiter(t trace.Ratelimiter, opts ...trace.RatelimiterComposeO
 				)...,
 			),
 		)
+
 		return nil
 	}
 }
@@ -493,6 +622,7 @@ func WithTraceRatelimiter(t trace.Ratelimiter, opts ...trace.RatelimiterComposeO
 func WithRatelimiterOptions(opts ...ratelimiterConfig.Option) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.ratelimiterOptions = append(c.ratelimiterOptions, opts...)
+
 		return nil
 	}
 }
@@ -512,6 +642,7 @@ func WithTraceDiscovery(t trace.Discovery, opts ...trace.DiscoveryComposeOption)
 				)...,
 			),
 		)
+
 		return nil
 	}
 }
@@ -531,6 +662,7 @@ func WithTraceTopic(t trace.Topic, opts ...trace.TopicComposeOption) Option { //
 				)...,
 			),
 		)
+
 		return nil
 	}
 }
@@ -550,6 +682,7 @@ func WithTraceDatabaseSQL(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeO
 				)...,
 			),
 		)
+
 		return nil
 	}
 }
@@ -559,6 +692,7 @@ func WithTraceDatabaseSQL(t trace.DatabaseSQL, opts ...trace.DatabaseSQLComposeO
 func withOnClose(onClose func(c *Driver)) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.onClose = append(c.onClose, onClose)
+
 		return nil
 	}
 }
@@ -566,6 +700,7 @@ func withOnClose(onClose func(c *Driver)) Option {
 func withConnPool(pool *conn.Pool) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.pool = pool
+
 		return pool.Take(ctx)
 	}
 }

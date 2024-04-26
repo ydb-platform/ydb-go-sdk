@@ -1,11 +1,5 @@
 # options for analysis running
 run:
-  # default concurrency is a available CPU number
-  concurrency: 4
-
-  # timeout for analysis, e.g. 30s, 5m, default is 1m
-  deadline: 5m
-
   # exit code when at least one issue was found, default is 1
   issues-exit-code: 1
 
@@ -58,7 +52,6 @@ linters-settings:
   govet:
     # report about shadowed variables
     check-shadowing: true
-    fieldalignment: true
   golint:
     # minimal confidence for issues, default is 0.8
     min-confidence: 0.8
@@ -71,14 +64,18 @@ linters-settings:
     # put imports beginning with prefix after 3rd-party packages;
     # it's a comma-separated list of prefixes
     local-prefixes: github.com/ydb-platform/ydb-go-sdk/v3
+  gci:
+    sections:
+      - standard # Standard section: captures all standard packages.
+      - default # Default section: contains all imports that could not be matched to another section type.
+      - prefix(github.com/ydb-platform/ydb-go-sdk/v3) # Custom section: groups all imports with the specified Prefix.
+    skip-generated: true
   goconst:
     # minimal length of string constant, 3 by default
     min-len: 2
     # minimal occurrences count to trigger, 3 by default
     min-occurrences: 2
-  fieldalignment:
-    # print struct with more effective memory layout or not, false by default
-    suggest-new: true
+    ignore-tests: true
   misspell:
     # Correct spellings using locale preferences for US or UK.
     # Default is to use a neutral variety of English.
@@ -109,28 +106,22 @@ linters-settings:
       - name: empty-block
       - name: superfluous-else
       - name: unreachable-code
-  unused:
-    # treat code as a program (not a library) and report unused exported identifiers; default is false.
-    # XXX: if you enable this setting, unused will report a lot of false-positives in text editors:
-    # if it's called for subdir of a project it can't find funcs usages. All text editor integrations
-    # with golangci-lint call it on a directory with the changed file.
-    check-exported: false
   unparam:
-    # call graph construction algorithm (cha, rta). In general, use cha for libraries,
-    # and rta for programs with main packages. Default is cha.
-    algo: cha
-
     # Inspect exported functions, default is false. Set to true if no external program/library imports your code.
     # XXX: if you enable this setting, unparam will report a lot of false-positives in text editors:
     # if it's called for subdir of a project it can't find external interfaces. All text editor integrations
     # with golangci-lint call it on a directory with the changed file.
     check-exported: false
+  gomoddirectives:
+    replace-local: true
+    replace-allow-list:
+      - xorm.io/xorm
   gocritic:
     disabled-checks:
       - whyNoLint # https://github.com/go-critic/go-critic/issues/1063
       - importShadow
       - sloppyReassign
-#      - typeDefFirst
+    #      - typeDefFirst
     # Enable multiple checks by tags, run `GL_DEBUG=gocritic golangci-lint run` to see all tags and checks.
     # See https://github.com/go-critic/go-critic#usage -> section "Tags".
     # Default: []
@@ -225,66 +216,36 @@ linters-settings:
         # Default: false
         checkExported: true
 linters:
-  disable-all: true
-  enable:
-#    - cyclop
+  enable-all: true
+  disable:
+    - contextcheck
+    - cyclop
     - depguard
-    - dogsled
-#    - dupl
-    - errcheck
-    - errorlint
-#    - exhaustive
-#    - exhaustivestruct
-#    - forbidigo
-#    - funlen
-#    - gci
-#    - gocognit
-    - goconst
-    - gocritic
-    - gocyclo
-#    - godot
-    - godox
-    - gofmt # On why gofmt when goimports is enabled - https://github.com/golang/go/issues/21476
-    - gofumpt
-    - goheader
-    - goimports
-#    - gomnd
-#    - gomoddirectives
-#    - gomodguard
-    - gosec
-    - gosimple
-    - govet
-    - depguard
-#    - ifshort
-#    - ireturn
-    - lll
-    - makezero
-    - misspell
-    - ineffassign
-    - misspell
-    - nakedret
-    - nestif
-#    - nilnil
-#    - nlreturn
-    - nolintlint
-    - prealloc
-    - predeclared
-    - rowserrcheck
-    - revive
-    - staticcheck
-    - stylecheck
-#    - tagliatelle
-#    - testpackage
-#    - thelper
-#    - tenv
-    - typecheck
-    - unconvert
-    - unparam
-    - unused
-#    - varnamelen
-    - whitespace
-#    - wrapcheck
-#    - wsl
+    - dupl
+    - exhaustive
+    - exhaustivestruct
+    - exhaustruct
+    - forbidigo
+    - forcetypeassert
+    - funlen
+    - gochecknoglobals
+    - gocognit
+    - godot
+    - goerr113
+    - golint
+    - ifshort
+    - interfacebloat
+    - ireturn
+    - maintidx
+    - nonamedreturns
+    - paralleltest
+    - structcheck
+    - testableexamples
+    - testpackage
+    - thelper
+    - varnamelen
+    - wrapcheck
+    - wsl
 
 issues:
   # List of regexps of issue texts to exclude, empty list by default.
@@ -309,9 +270,6 @@ issues:
   # Default value for this option is true.
   exclude-use-default: true
 
-  # Maximum issues count per one linter. Set to 0 to disable. Default is 50.
-  max-per-linter: 0
-
   # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
   max-same-issues: 0
 
@@ -334,6 +292,8 @@ issues:
         - predeclared
     - path: _test\.go
       linters:
+        - scopelint
+        - funlen
         - unused
         - unparam
         - gocritic
@@ -342,3 +302,12 @@ issues:
         - staticcheck
     - path: _test\.go
       text: "ydb.Connection is deprecated"
+    - path: examples
+      linters:
+        - gomnd
+
+      # Allow underscore and capital camel case for readability
+      # Examples: Type_PRIMITIVE_TYPE_ID_UNSPECIFIED, Ydb_Discovery_V1, _voidValue
+    - linters:
+        - nosnakecase
+      text : "(?:_[a-z]+(?:[A-Z](?:[a-z\\d]+|[A-Z\\d]+))+|(?:[A-Z][a-z\\d]+|[A-Z][A-Z\\d]+)+_(?:(?:[A-Z][a-z\\d]+|[A-Z\\d][A-Z\\d]+)_?)+)"

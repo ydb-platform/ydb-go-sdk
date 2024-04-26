@@ -7,12 +7,14 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 )
 
 const (
-	DefaultStartTimeout = time.Minute
+	DefaultStartTimeout          = value.InfiniteDuration
+	connectionEstablishedTimeout = time.Minute
 )
 
 type RetrySettings struct {
@@ -39,11 +41,15 @@ type PublicCheckRetryResult struct {
 var (
 	PublicRetryDecisionDefault = PublicCheckRetryResult{val: 0}
 	PublicRetryDecisionRetry   = PublicCheckRetryResult{val: 1}
-	PublicRetryDecisionStop    = PublicCheckRetryResult{val: 2}
+	PublicRetryDecisionStop    = PublicCheckRetryResult{val: 2} //nolint:gomnd
 )
 
 func CheckResetReconnectionCounters(lastTry, now time.Time, connectionTimeout time.Duration) bool {
 	const resetAttemptEmpiricalCoefficient = 10
+	if connectionTimeout == value.InfiniteDuration {
+		return now.Sub(lastTry) > connectionEstablishedTimeout
+	}
+
 	return now.Sub(lastTry) > connectionTimeout*resetAttemptEmpiricalCoefficient
 }
 
@@ -64,8 +70,6 @@ func CheckRetryMode(err error, settings RetrySettings, retriesDuration time.Dura
 	if retriesDuration > settings.StartTimeout {
 		return nil, false
 	}
-
-	isRetriable = true
 
 	mode := retry.Check(err)
 
@@ -89,9 +93,10 @@ func CheckRetryMode(err error, settings RetrySettings, retriesDuration time.Dura
 		return nil, false
 	}
 
-	if mode.BackoffType() == backoff.TypeFast {
+	switch mode.BackoffType() {
+	case backoff.TypeFast:
 		return backoff.Fast, true
+	default:
+		return backoff.Slow, true
 	}
-
-	return backoff.Slow, true
 }

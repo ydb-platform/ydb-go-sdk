@@ -10,21 +10,72 @@ import (
 )
 
 func TestIsOperationError(t *testing.T) {
-	for _, code := range [...]Ydb.StatusIds_StatusCode{
-		Ydb.StatusIds_BAD_REQUEST,
-		Ydb.StatusIds_BAD_SESSION,
+	for _, tt := range []struct {
+		err   error
+		codes []Ydb.StatusIds_StatusCode
+		match bool
+	}{
+		// check only operation error with any ydb status code
+		{
+			err:   &operationError{code: Ydb.StatusIds_BAD_REQUEST},
+			match: true,
+		},
+		{
+			err:   fmt.Errorf("wrapped: %w", &operationError{code: Ydb.StatusIds_BAD_REQUEST}),
+			match: true,
+		},
+		{
+			err: Join(
+				fmt.Errorf("test"),
+				&operationError{code: Ydb.StatusIds_BAD_REQUEST},
+				Retryable(fmt.Errorf("test")),
+			),
+			match: true,
+		},
+		// match ydb status code
+		{
+			err:   &operationError{code: Ydb.StatusIds_BAD_REQUEST},
+			codes: []Ydb.StatusIds_StatusCode{Ydb.StatusIds_BAD_REQUEST},
+			match: true,
+		},
+		{
+			err:   fmt.Errorf("wrapped: %w", &operationError{code: Ydb.StatusIds_BAD_REQUEST}),
+			codes: []Ydb.StatusIds_StatusCode{Ydb.StatusIds_BAD_REQUEST},
+			match: true,
+		},
+		{
+			err: Join(
+				fmt.Errorf("test"),
+				&operationError{code: Ydb.StatusIds_BAD_REQUEST},
+				Retryable(fmt.Errorf("test")),
+			),
+			codes: []Ydb.StatusIds_StatusCode{Ydb.StatusIds_BAD_REQUEST},
+			match: true,
+		},
+		// no match ydb status code
+		{
+			err:   &operationError{code: Ydb.StatusIds_BAD_REQUEST},
+			codes: []Ydb.StatusIds_StatusCode{Ydb.StatusIds_ABORTED},
+			match: false,
+		},
+		{
+			err:   fmt.Errorf("wrapped: %w", &operationError{code: Ydb.StatusIds_BAD_REQUEST}),
+			codes: []Ydb.StatusIds_StatusCode{Ydb.StatusIds_ABORTED},
+			match: false,
+		},
+		{
+			err: Join(
+				fmt.Errorf("test"),
+				&operationError{code: Ydb.StatusIds_BAD_REQUEST},
+				Retryable(fmt.Errorf("test")),
+			),
+			codes: []Ydb.StatusIds_StatusCode{Ydb.StatusIds_ABORTED},
+			match: false,
+		},
 	} {
-		for _, err := range []error{
-			&operationError{code: code},
-			Operation(WithStatusCode(code)),
-			fmt.Errorf("wrapped: %w", &operationError{code: code}),
-		} {
-			t.Run("", func(t *testing.T) {
-				if !IsOperationError(err, code) {
-					t.Errorf("expected %v to be operationError with code=%v", err, code)
-				}
-			})
-		}
+		t.Run("", func(t *testing.T) {
+			require.Equal(t, tt.match, IsOperationError(tt.err, tt.codes...))
+		})
 	}
 }
 

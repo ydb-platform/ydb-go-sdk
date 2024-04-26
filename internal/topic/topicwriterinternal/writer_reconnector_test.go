@@ -7,13 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
@@ -76,10 +77,10 @@ func TestWriterImpl_CheckMessages(t *testing.T) {
 		maxSize := 5
 		w.cfg.MaxMessageSize = maxSize
 
-		err := w.Write(ctx, []Message{{Data: bytes.NewReader(make([]byte, maxSize))}})
+		err := w.Write(ctx, []PublicMessage{{Data: bytes.NewReader(make([]byte, maxSize))}})
 		require.NoError(t, err)
 
-		err = w.Write(ctx, []Message{{Data: bytes.NewReader(make([]byte, maxSize+1))}})
+		err = w.Write(ctx, []PublicMessage{{Data: bytes.NewReader(make([]byte, maxSize+1))}})
 		require.Error(t, err)
 	})
 }
@@ -104,6 +105,7 @@ func TestWriterImpl_Write(t *testing.T) {
 			mess := expectedMap[k]
 			_, err = mess.GetEncodedBytes(rawtopiccommon.CodecRaw)
 			require.NoError(t, err)
+			mess.metadataCached = true
 			expectedMap[k] = mess
 		}
 
@@ -140,7 +142,11 @@ func TestWriterImpl_Write(t *testing.T) {
 
 			writeCompleted := make(empty.Chan)
 			go func() {
-				err := e.writer.Write(e.ctx, []Message{{SeqNo: seqNo, CreatedAt: messageTime, Data: bytes.NewReader(messageData)}})
+				err := e.writer.Write(e.ctx, []PublicMessage{{
+					SeqNo:     seqNo,
+					CreatedAt: messageTime,
+					Data:      bytes.NewReader(messageData),
+				}})
 				require.NoError(t, err)
 				close(writeCompleted)
 			}()
@@ -186,7 +192,7 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		require.NoError(t, e.writer.Write(e.ctx, []Message{{
+		require.NoError(t, e.writer.Write(e.ctx, []PublicMessage{{
 			Data: bytes.NewReader(messContent),
 		}}))
 
@@ -214,7 +220,7 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		require.NoError(t, e.writer.Write(e.ctx, []Message{{
+		require.NoError(t, e.writer.Write(e.ctx, []PublicMessage{{
 			Data: bytes.NewReader(messContent),
 		}}))
 
@@ -241,7 +247,7 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 		codecs := make(map[rawtopiccommon.Codec]empty.Struct)
 
 		for i := 0; i < codecMeasureIntervalBatches; i++ {
-			require.NoError(t, e.writer.Write(e.ctx, []Message{{
+			require.NoError(t, e.writer.Write(e.ctx, []PublicMessage{{
 				Data: bytes.NewReader(messContentShort),
 			}}))
 			// wait send
@@ -250,7 +256,7 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 		}
 
 		for i := 0; i < codecMeasureIntervalBatches; i++ {
-			require.NoError(t, e.writer.Write(e.ctx, []Message{{
+			require.NoError(t, e.writer.Write(e.ctx, []PublicMessage{{
 				Data: bytes.NewReader(messContentLong),
 			}}))
 			// wait send
@@ -275,6 +281,7 @@ func TestWriterReconnector_Write_QueueLimit(t *testing.T) {
 		waitStartQueueWait := func(targetWaiters int) {
 			xtest.SpinWaitCondition(t, nil, func() bool {
 				res := getWaitersCount(w.semaphore) == targetWaiters
+
 				return res
 			})
 		}
@@ -321,8 +328,9 @@ func TestWriterImpl_InitSession(t *testing.T) {
 	sessionID := "test-session-id"
 
 	w.onWriterChange(&SingleStreamWriter{
-		ReceivedLastSeqNum: lastSeqNo,
-		SessionID:          sessionID,
+		ReceivedLastSeqNum:  lastSeqNo,
+		LastSeqNumRequested: true,
+		SessionID:           sessionID,
 	})
 
 	require.Equal(t, sessionID, w.sessionID)
@@ -337,7 +345,8 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 			LastSeqNum: int64(123),
 		}
 		w.onWriterChange(&SingleStreamWriter{
-			ReceivedLastSeqNum: expectedInitData.LastSeqNum,
+			ReceivedLastSeqNum:  expectedInitData.LastSeqNum,
+			LastSeqNumRequested: true,
 		})
 
 		initData, err := w.WaitInit(context.Background())
@@ -360,14 +369,13 @@ func TestWriterImpl_WaitInit(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 
 		go func() {
+			// wait until w.WaitInit starts
+			time.Sleep(time.Millisecond)
 			cancel()
-			w.onWriterChange(&SingleStreamWriter{})
 		}()
 
 		_, err := w.WaitInit(ctx)
 		require.ErrorIs(t, err, ctx.Err())
-
-		require.True(t, isClosed(w.firstInitResponseProcessedChan))
 	})
 
 	t.Run("contextDeadlineErrorBeforeStart", func(t *testing.T) {
@@ -399,6 +407,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			close(connectCalledChan)
 			connectCalled = true
 			require.NotEqual(t, ctx, streamCtxArg)
+
 			return strm, nil
 		}
 
@@ -426,50 +435,60 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			connectionError error
 		}
 
-		newStream := func(name string, onSendInitCallback func()) *MockRawTopicWriterStream {
+		isFirstConnection := true
+		newStream := func(name string) *MockRawTopicWriterStream {
 			strm := NewMockRawTopicWriterStream(mc)
 			initReq := testCreateInitRequest(w)
+			if isFirstConnection {
+				isFirstConnection = false
+			} else {
+				initReq.GetLastSeqNo = false
+			}
 
 			streamClosed := make(empty.Chan)
 			strm.EXPECT().CloseSend().Do(func() {
+				t.Logf("closed stream: %v", name)
 				close(streamClosed)
 			})
 
 			strm.EXPECT().Send(&initReq).Do(func(_ interface{}) {
-				if onSendInitCallback != nil {
-					onSendInitCallback()
-				}
+				t.Logf("sent init request stream: %v", name)
 			})
 
-			strm.EXPECT().Recv().Return(&rawtopicwriter.InitResult{
+			strm.EXPECT().Recv().Do(func() {
+				t.Logf("receive init response stream: %v", name)
+			}).Return(&rawtopicwriter.InitResult{
 				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{Status: rawydb.StatusSuccess},
 				SessionID:             name,
 			}, nil)
 
 			strm.EXPECT().Recv().Do(func() {
+				t.Logf("waiting close channel: %v", name)
 				xtest.WaitChannelClosed(t, streamClosed)
+				t.Logf("channel closed: %v", name)
 			}).Return(nil, errors.New("test stream closed")).MaxTimes(1)
+
 			return strm
 		}
 
-		strm2InitSent := make(empty.Chan)
-
-		strm2 := newStream("strm2", func() {
-			close(strm2InitSent)
-		})
+		strm2 := newStream("strm2")
 		strm2.EXPECT().Send(&rawtopicwriter.WriteRequest{
 			Messages: []rawtopicwriter.MessageData{
 				{SeqNo: 1},
 			},
 			Codec: rawtopiccommon.CodecRaw,
+		}).Do(func(_ *rawtopicwriter.WriteRequest) {
+			t.Logf("strm2 sent message and return retriable error")
 		}).Return(xerrors.Retryable(errors.New("retriable on strm2")))
 
-		strm3 := newStream("strm3", nil)
+		strm3 := newStream("strm3")
 		strm3.EXPECT().Send(&rawtopicwriter.WriteRequest{
 			Messages: []rawtopicwriter.MessageData{
 				{SeqNo: 1},
 			},
 			Codec: rawtopiccommon.CodecRaw,
+		}).Do(func(_ *rawtopicwriter.WriteRequest) {
+			t.Logf("strm3 sent message and return unretriable error")
 		}).Return(errors.New("strm3"))
 
 		connectsResult := []connectionAttemptContext{
@@ -488,10 +507,12 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			},
 		}
 
-		connectionAttempt := 0
+		var connectionAttempt atomic.Int64
 		w.cfg.Connect = func(ctx context.Context) (RawTopicWriterStream, error) {
-			res := connectsResult[connectionAttempt]
-			connectionAttempt++
+			attemptIndex := int(connectionAttempt.Add(1)) - 1
+			t.Logf("connect with attempt index: %v", attemptIndex)
+			res := connectsResult[attemptIndex]
+
 			return res.stream, res.connectionError
 		}
 
@@ -499,12 +520,13 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		go func() {
 			defer close(connectionLoopStopped)
 			w.connectionLoop(ctx)
+			t.Log("connection loop stopped")
 		}()
 
 		err := w.Write(ctx, newTestMessages(1))
 		require.NoError(t, err)
 
-		xtest.WaitChannelClosed(t, connectionLoopStopped)
+		xtest.WaitChannelClosedWithTimeout(t, connectionLoopStopped, 4*time.Second)
 	})
 }
 
@@ -601,6 +623,38 @@ func TestCreateRawMessageData(t *testing.T) {
 			req,
 		)
 	})
+	t.Run("WithMessageMetadata", func(t *testing.T) {
+		messages := newTestMessagesWithContent(1)
+		messages[0].Metadata = map[string][]byte{
+			"a": {1, 2, 3},
+			"b": {4, 5},
+		}
+		req, err := createWriteRequest(messages, rawtopiccommon.CodecRaw)
+
+		sort.Slice(req.Messages[0].MetadataItems, func(i, j int) bool {
+			return req.Messages[0].MetadataItems[i].Key < req.Messages[0].MetadataItems[j].Key
+		})
+
+		require.NoError(t, err)
+		require.Equal(t, rawtopicwriter.WriteRequest{
+			Messages: []rawtopicwriter.MessageData{
+				{
+					SeqNo: 1,
+					MetadataItems: []rawtopiccommon.MetadataItem{
+						{
+							Key:   "a",
+							Value: []byte{1, 2, 3},
+						},
+						{
+							Key:   "b",
+							Value: []byte{4, 5},
+						},
+					},
+				},
+			},
+			Codec: rawtopiccommon.CodecRaw,
+		}, req)
+	})
 	t.Run("WithSeqno", func(t *testing.T) {
 		req, err := createWriteRequest(newTestMessagesWithContent(1, 2, 3), rawtopiccommon.CodecRaw)
 		require.NoError(t, err)
@@ -656,7 +710,7 @@ func TestSplitMessagesByBufCodec(t *testing.T) {
 			for _, group := range groups {
 				require.NotEmpty(t, group)
 				require.True(t, allMessagesHasSameBufCodec(group))
-				require.Equal(t, len(group), cap(group))
+				require.Len(t, group, cap(group))
 				for _, mess := range group {
 					expectedNum++
 					require.Equal(t, test[int(expectedNum)], mess.bufCodec)
@@ -765,15 +819,17 @@ func TestCalculateAllowedCodecs(t *testing.T) {
 }
 
 func newTestMessageWithDataContent(num int) messageWithDataContent {
-	res := newMessageDataWithContent(Message{SeqNo: int64(num)}, testCommonEncoders)
+	res := newMessageDataWithContent(PublicMessage{SeqNo: int64(num)}, testCommonEncoders)
+
 	return res
 }
 
-func newTestMessages(numbers ...int) []Message {
-	messages := make([]Message, len(numbers))
+func newTestMessages(numbers ...int) []PublicMessage {
+	messages := make([]PublicMessage, len(numbers))
 	for i, num := range numbers {
 		messages[i].SeqNo = int64(num)
 	}
+
 	return messages
 }
 
@@ -782,6 +838,7 @@ func newTestMessagesWithContent(numbers ...int) []messageWithDataContent {
 	for _, num := range numbers {
 		messages = append(messages, newTestMessageWithDataContent(num))
 	}
+
 	return messages
 }
 
@@ -816,6 +873,7 @@ func isClosed(ch <-chan struct{}) bool {
 		if existVal {
 			panic("value, when not expected")
 		}
+
 		return true
 	default:
 		return false
@@ -823,7 +881,7 @@ func isClosed(ch <-chan struct{}) bool {
 }
 
 type testEnv struct {
-	ctx                   context.Context
+	ctx                   context.Context //nolint:containedctx
 	stream                *MockRawTopicWriterStream
 	writer                *WriterReconnector
 	sendFromServerChannel chan sendFromServerResponse
@@ -859,6 +917,7 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 		if connectNum > 1 {
 			t.Fatalf("test: default env support most one connection")
 		}
+
 		return res.stream, nil
 	}))
 	writerOptions = append(writerOptions, options.writerOptions...)
@@ -896,6 +955,7 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 		close(res.stopReadEvents)
 		<-streamClosed
 	})
+
 	return res
 }
 
@@ -923,5 +983,6 @@ type sendFromServerResponse struct {
 
 func testCreateInitRequest(w *WriterReconnector) rawtopicwriter.InitRequest {
 	req := newSingleStreamWriterStopped(context.Background(), w.createWriterStreamConfig(nil)).createInitRequest()
+
 	return req
 }

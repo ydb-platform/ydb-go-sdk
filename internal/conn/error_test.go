@@ -28,35 +28,34 @@ func TestNodeErrorIs(t *testing.T) {
 	testErr2 := errors.New("test2")
 	nodeErr := newConnError(1, "localhost:1234", testErr)
 
-	require.True(t, errors.Is(nodeErr, testErr))
-	require.False(t, errors.Is(nodeErr, testErr2))
+	require.ErrorIs(t, nodeErr, testErr)
+	require.NotErrorIs(t, nodeErr, testErr2)
 }
 
-type testErrorType1 struct {
+type testType1Error struct {
 	msg string
 }
 
-func (t testErrorType1) Error() string {
+func (t testType1Error) Error() string {
 	return "1 - " + t.msg
 }
 
-type testErrorType2 struct {
+type testType2Error struct {
 	msg string
 }
 
-func (t testErrorType2) Error() string {
+func (t testType2Error) Error() string {
 	return "2 - " + t.msg
 }
 
 func TestNodeErrorAs(t *testing.T) {
-	testErr := testErrorType1{msg: "test"}
+	testErr := testType1Error{msg: "test"}
 	nodeErr := newConnError(1, "localhost:1234", testErr)
 
-	target := testErrorType1{}
-	require.True(t, errors.As(nodeErr, &target))
+	target := testType1Error{}
 	require.ErrorAs(t, nodeErr, &target)
 	require.Equal(t, testErr, target)
 
-	target2 := testErrorType2{}
+	target2 := testType2Error{}
 	require.False(t, errors.As(nodeErr, &target2))
 }

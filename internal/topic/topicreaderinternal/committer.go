@@ -62,6 +62,7 @@ func newCommitter(tracer *trace.Topic, lifeContext context.Context, mode PublicC
 	}
 	res.initChannels()
 	res.start()
+
 	return res
 }
 
@@ -100,6 +101,7 @@ func (c *committer) pushCommit(commitRange commitRange) (commitWaiter, error) {
 	c.m.WithLock(func() {
 		if err := c.backgroundWorker.Context().Err(); err != nil {
 			resErr = err
+
 			return
 		}
 
@@ -124,7 +126,7 @@ func (c *committer) pushCommitsLoop(ctx context.Context) {
 		var commits CommitRanges
 		c.m.WithLock(func() {
 			commits = c.commits
-			c.commits = NewCommitRangesWithCapacity(commits.len() * 2)
+			c.commits = NewCommitRangesWithCapacity(commits.len() * 2) //nolint:gomnd
 		})
 
 		if commits.len() == 0 && c.backgroundWorker.Context().Err() != nil {
@@ -164,12 +166,16 @@ func (c *committer) waitSendTrigger(ctx context.Context) {
 		return
 	}
 
-	finish := c.clock.After(c.BufferTimeLagTrigger)
+	bufferTimeLagTriggerTimer := c.clock.NewTimer(c.BufferTimeLagTrigger)
+	defer bufferTimeLagTriggerTimer.Stop()
+
+	finish := bufferTimeLagTriggerTimer.Chan()
 	if c.BufferCountTrigger == 0 {
 		select {
 		case <-ctxDone:
 		case <-finish:
 		}
+
 		return
 	}
 
@@ -260,6 +266,7 @@ var commitWaiterLastID int64
 
 func newCommitWaiter(session *partitionSession, endOffset rawtopicreader.Offset) commitWaiter {
 	id := atomic.AddInt64(&commitWaiterLastID, 1)
+
 	return commitWaiter{
 		ID:        id,
 		Session:   session,
@@ -272,5 +279,6 @@ func sendCommitMessage(send sendMessageToServerFunc, batch CommitRanges) error {
 	req := &rawtopicreader.CommitOffsetRequest{
 		CommitOffsets: batch.toPartitionsOffsets(),
 	}
+
 	return send(req)
 }

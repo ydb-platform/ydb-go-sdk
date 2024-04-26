@@ -32,6 +32,7 @@ func (r *CommitRanges) GetCommitsInfo() []trace.TopicReaderStreamCommitInfo {
 			EndOffset:          r.ranges[i].commitOffsetEnd.ToInt64(),
 		}
 	}
+
 	return res
 }
 
@@ -45,6 +46,7 @@ func NewCommitRangesFromPublicCommits(ranges []PublicCommitRange) CommitRanges {
 	for i := 0; i < len(res.ranges); i++ {
 		res.ranges[i] = ranges[i].priv
 	}
+
 	return res
 }
 
@@ -84,6 +86,7 @@ func (r *CommitRanges) toPartitionsOffsets() []rawtopicreader.PartitionCommitOff
 	}
 
 	r.optimize()
+
 	return r.toRawPartitionCommitOffset()
 }
 
@@ -149,14 +152,13 @@ func (r *CommitRanges) toRawPartitionCommitOffset() []rawtopicreader.PartitionCo
 		}
 		partition.Offsets = append(partition.Offsets, offsetsRange)
 	}
+
 	return partitionOffsets
 }
 
 // PublicCommitRange contains data for commit messages range
 //
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 type PublicCommitRange struct {
 	priv commitRange
 }

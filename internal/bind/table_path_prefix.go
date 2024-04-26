@@ -4,7 +4,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 type TablePathPrefix string
@@ -27,8 +27,8 @@ func (tablePathPrefix TablePathPrefix) NormalizePath(folderOrTable string) strin
 func (tablePathPrefix TablePathPrefix) RewriteQuery(query string, args ...interface{}) (
 	yql string, newArgs []interface{}, err error,
 ) {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
+	buffer := xstring.Buffer()
+	defer buffer.Free()
 
 	buffer.WriteString("-- bind TablePathPrefix\n")
 	buffer.WriteString("PRAGMA TablePathPrefix(\"")

@@ -13,8 +13,7 @@ func ProtoUnmarshal(msg *topicreader.Message, dst proto.Message) error {
 	return msg.UnmarshalTo(protobufUnmarshaler{dst: dst})
 }
 
-// JSONUnmarshal unmarshal json message content to dst
-// dst must by pointer to struct
+// JSONUnmarshal unmarshal json message content to dst must by pointer to struct
 func JSONUnmarshal(msg *topicreader.Message, dst interface{}) error {
 	return UnmarshalMessageWith(msg, json.Unmarshal, dst)
 }
@@ -25,8 +24,7 @@ func UnmarshalMessageWith(msg *topicreader.Message, unmarshaler UnmarshalFunc, v
 	return msg.UnmarshalTo(messageUnmarshaler{unmarshaler: unmarshaler, dst: v})
 }
 
-// ReadMessageDataWithCallback receive full content of message as data
-// data slice MUST not be used after return from f.
+// ReadMessageDataWithCallback receive full content of message as data slice MUST not be used after return from f.
 // if you need content after return from function - copy it with
 // copy(dst, data) to another byte slice
 func ReadMessageDataWithCallback(msg *topicreader.Message, f func(data []byte) error) error {

@@ -2,6 +2,7 @@ package xcontext
 
 import (
 	"context"
+	"errors"
 	"sync"
 	"time"
 
@@ -14,12 +15,13 @@ func WithTimeout(ctx context.Context, t time.Duration) (context.Context, context
 		from:      stack.Record(1),
 	}
 	childCtx.ctx, childCtx.ctxCancel = context.WithTimeout(ctx, t)
+
 	return childCtx, childCtx.cancel
 }
 
 type timeoutCtx struct {
-	parentCtx context.Context
-	ctx       context.Context
+	parentCtx context.Context //nolint:containedctx
+	ctx       context.Context //nolint:containedctx
 	ctxCancel context.CancelFunc
 	from      string
 
@@ -43,13 +45,15 @@ func (ctx *timeoutCtx) Err() error {
 		return ctx.err
 	}
 
-	if ctx.ctx.Err() == context.DeadlineExceeded && ctx.parentCtx.Err() == nil { //nolint:errorlint
+	if errors.Is(ctx.ctx.Err(), context.DeadlineExceeded) && ctx.parentCtx.Err() == nil {
 		ctx.err = errFrom(context.DeadlineExceeded, ctx.from)
+
 		return ctx.err
 	}
 
 	if err := ctx.parentCtx.Err(); err != nil {
 		ctx.err = err
+
 		return ctx.err
 	}
 
@@ -72,6 +76,7 @@ func (ctx *timeoutCtx) cancel() {
 
 	if err := ctx.parentCtx.Err(); err != nil {
 		ctx.err = err
+
 		return
 	}
 	ctx.err = errAt(context.Canceled, 1)

@@ -62,6 +62,7 @@ func readExpiredBatchTransaction(ctx context.Context, c table.Client, prefix str
 				table.ValueParam("$prev_timestamp", types.Uint64Value(prevTimestamp)),
 				table.ValueParam("$prev_doc_id", types.Uint64Value(prevDocID)),
 			))
+
 			return err
 		},
 	)
@@ -71,6 +72,7 @@ func readExpiredBatchTransaction(ctx context.Context, c table.Client, prefix str
 	if res.Err() != nil {
 		return nil, res.Err()
 	}
+
 	return res, nil
 }
 
@@ -97,9 +99,11 @@ func deleteDocumentWithTimestamp(ctx context.Context,
 				table.ValueParam("$doc_id", types.Uint64Value(lastDocID)),
 				table.ValueParam("$timestamp", types.Uint64Value(timestamp)),
 			))
+
 			return err
 		},
 	)
+
 	return err
 }
 
@@ -137,12 +141,14 @@ func deleteExpired(ctx context.Context, c table.Client, prefix string, queue, ti
 					return err
 				}
 			}
+
 			return res.Err()
 		}()
 		if err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -196,9 +202,11 @@ func readDocument(ctx context.Context, c table.Client, prefix, url string) error
 			} else {
 				fmt.Println("\tNot found")
 			}
+
 			return res.Err()
 		},
 	)
+
 	return err
 }
 
@@ -234,9 +242,11 @@ func addDocument(ctx context.Context, c table.Client, prefix, url, html string, 
 				table.ValueParam("$html", types.TextValue(html)),
 				table.ValueParam("$timestamp", types.Uint64Value(timestamp)),
 			))
+
 			return err
 		},
 	)
+
 	return err
 }
 
@@ -258,9 +268,10 @@ func createTables(ctx context.Context, c table.Client, prefix string) (err error
 	}
 
 	for i := 0; i < expirationQueueCount; i++ {
+		tableName := path.Join(prefix, fmt.Sprintf("expiration_queue_%v", i))
 		err = c.Do(ctx,
 			func(ctx context.Context, s table.Session) error {
-				return s.CreateTable(ctx, path.Join(prefix, fmt.Sprintf("expiration_queue_%v", i)),
+				return s.CreateTable(ctx, tableName,
 					options.WithColumn("doc_id", types.Optional(types.TypeUint64)),
 					options.WithColumn("ts", types.Optional(types.TypeUint64)),
 					options.WithPrimaryKeyColumn("ts", "doc_id"),

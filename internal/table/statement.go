@@ -9,6 +9,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
@@ -25,7 +27,7 @@ type statement struct {
 // Execute executes prepared data query.
 func (s *statement) Execute(
 	ctx context.Context, txControl *table.TransactionControl,
-	params *table.QueryParameters,
+	parameters *params.Parameters,
 	opts ...options.ExecuteDataQueryOption,
 ) (
 	txr table.Transaction, r result.Result, err error,
@@ -42,10 +44,10 @@ func (s *statement) Execute(
 
 	request.SessionId = s.session.id
 	request.TxControl = txControl.Desc()
-	request.Parameters = params.Params().ToYDB(a)
+	request.Parameters = parameters.ToYDB(a)
 	request.Query = s.query.toYDB(a)
 	request.QueryCachePolicy = a.TableQueryCachePolicy()
-	request.QueryCachePolicy.KeepInCache = len(params.Params()) > 0
+	request.QueryCachePolicy.KeepInCache = len(request.Parameters) > 0
 	request.OperationParams = operation.Params(ctx,
 		s.session.config.OperationTimeout(),
 		s.session.config.OperationCancelAfter(),
@@ -59,7 +61,9 @@ func (s *statement) Execute(
 	}
 
 	onDone := trace.TableOnSessionQueryExecute(
-		s.session.config.Trace(), &ctx, s.session, s.query, params,
+		s.session.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*statement).Execute"),
+		s.session, s.query, parameters,
 		request.QueryCachePolicy.GetKeepInCache(),
 	)
 	defer func() {
@@ -81,6 +85,7 @@ func (s *statement) execute(
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
+
 	return s.session.executeQueryResult(res, txControl, request.IgnoreTruncated)
 }
 

@@ -2,13 +2,13 @@ package xsync
 
 import (
 	"runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
@@ -24,12 +24,12 @@ func TestEventBroadcast(t *testing.T) {
 		testDuration := time.Second / 100
 
 		b := &EventBroadcast{}
-		var events xatomic.Int64
+		var events atomic.Int64
 
-		var backgroundCounter xatomic.Int64
-		firstWaiterStarted := xatomic.Bool{}
+		var backgroundCounter atomic.Int64
+		firstWaiterStarted := atomic.Bool{}
 
-		stopSubscribe := xatomic.Bool{}
+		stopSubscribe := atomic.Bool{}
 
 		subscribeStopped := make(empty.Chan)
 		broadcastStopped := make(empty.Chan)
@@ -51,7 +51,7 @@ func TestEventBroadcast(t *testing.T) {
 			}
 		}()
 
-		stopBroadcast := xatomic.Bool{}
+		stopBroadcast := atomic.Bool{}
 		go func() {
 			defer close(broadcastStopped)
 
@@ -87,6 +87,6 @@ func TestEventBroadcast(t *testing.T) {
 		stopBroadcast.Store(true)
 		<-broadcastStopped
 
-		require.True(t, events.Load() > 0)
+		require.Greater(t, events.Load(), int64(0))
 	})
 }

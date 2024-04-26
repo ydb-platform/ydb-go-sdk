@@ -7,11 +7,12 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
-// operationError reports about operationStatus fail.
+// operationError reports about operation fail.
 type operationError struct {
 	code    Ydb.StatusIds_StatusCode
 	issues  issues
@@ -29,18 +30,13 @@ func (e *operationError) Name() string {
 	return "operation/" + e.code.String()
 }
 
-type operationStatus interface {
-	GetStatus() Ydb.StatusIds_StatusCode
-	GetIssues() []*Ydb_Issue.IssueMessage
-}
-
 type issuesOption []*Ydb_Issue.IssueMessage
 
 func (issues issuesOption) applyToOperationError(oe *operationError) {
 	oe.issues = []*Ydb_Issue.IssueMessage(issues)
 }
 
-// WithIssues is an option for construct operationStatus error with issues list
+// WithIssues is an option for construct operation error with issues list
 // WithIssues must use as `Operation(WithIssues(issues))`
 func WithIssues(issues []*Ydb_Issue.IssueMessage) issuesOption {
 	return issues
@@ -52,7 +48,7 @@ func (code statusCodeOption) applyToOperationError(oe *operationError) {
 	oe.code = Ydb.StatusIds_StatusCode(code)
 }
 
-// WithStatusCode is an option for construct operationStatus error with reason code
+// WithStatusCode is an option for construct operation error with reason code
 // WithStatusCode must use as `Operation(WithStatusCode(reason))`
 func WithStatusCode(code Ydb.StatusIds_StatusCode) statusCodeOption {
 	return statusCodeOption(code)
@@ -72,24 +68,25 @@ func (traceID traceIDOption) applyToOperationError(oe *operationError) {
 	oe.traceID = string(traceID)
 }
 
-// WithTraceID is an option for construct operationStatus error with traceID
+// WithTraceID is an option for construct operation error with traceID
 func WithTraceID(traceID string) traceIDOption {
 	return traceIDOption(traceID)
 }
 
-type operationOption struct {
-	operationStatus
+type operationOption = operationError
+
+func (e *operationOption) applyToOperationError(oe *operationError) {
+	oe.code = e.code
+	oe.issues = e.issues
 }
 
-func (operation operationOption) applyToOperationError(oe *operationError) {
-	oe.code = operation.GetStatus()
-	oe.issues = operation.GetIssues()
-}
-
-// FromOperation is an option for construct operationStatus error from operationStatus
-// FromOperation must use as `Operation(FromOperation(operationStatus))`
-func FromOperation(operation operationStatus) operationOption {
-	return operationOption{operation}
+// FromOperation is an option for construct operation error from operation.Status
+// FromOperation must use as `Operation(FromOperation(operation.Status))`
+func FromOperation(operation operation.Status) *operationOption {
+	return &operationOption{
+		code:   operation.GetStatus(),
+		issues: operation.GetIssues(),
+	}
 }
 
 type oeOpt interface {
@@ -105,6 +102,7 @@ func Operation(opts ...oeOpt) error {
 			opt.applyToOperationError(oe)
 		}
 	}
+
 	return oe
 }
 
@@ -113,8 +111,8 @@ func (e *operationError) Issues() []*Ydb_Issue.IssueMessage {
 }
 
 func (e *operationError) Error() string {
-	b := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(b)
+	b := xstring.Buffer()
+	defer b.Free()
 	b.WriteString(e.Name())
 	fmt.Fprintf(b, " (code = %d", e.code)
 	if len(e.address) > 0 {
@@ -126,6 +124,7 @@ func (e *operationError) Error() string {
 		b.WriteString(e.issues.String())
 	}
 	b.WriteString(")")
+
 	return b.String()
 }
 
@@ -143,6 +142,7 @@ func IsOperationError(err error, codes ...Ydb.StatusIds_StatusCode) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -154,6 +154,7 @@ func IsOperationErrorTransactionLocksInvalidated(err error) (isTLI bool) {
 			isTLI = isTLI || (code == issueCodeTransactionLocksInvalidated)
 		})
 	}
+
 	return isTLI
 }
 
@@ -166,7 +167,9 @@ func (e *operationError) Type() Type {
 		Ydb.StatusIds_BAD_SESSION,
 		Ydb.StatusIds_SESSION_BUSY:
 		return TypeRetryable
-	case Ydb.StatusIds_UNDETERMINED:
+	case
+		Ydb.StatusIds_UNDETERMINED,
+		Ydb.StatusIds_SESSION_EXPIRED:
 		return TypeConditionallyRetryable
 	default:
 		return TypeUndefined
@@ -189,7 +192,7 @@ func (e *operationError) BackoffType() backoff.Type {
 	}
 }
 
-func (e *operationError) MustDeleteSession() bool {
+func (e *operationError) IsRetryObjectValid() bool {
 	switch e.code {
 	case
 		Ydb.StatusIds_BAD_SESSION,
@@ -206,5 +209,6 @@ func OperationError(err error) Error {
 	if errors.As(err, &o) {
 		return o
 	}
+
 	return nil
 }

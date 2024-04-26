@@ -5,14 +5,15 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"io"
+	"strings"
 	"sync"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scanner"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 var (
@@ -22,7 +23,9 @@ var (
 	_ driver.RowsColumnTypeNullable         = &rows{}
 	_ driver.Rows                           = &single{}
 
-	_ types.Scanner = &valuer{}
+	_ scanner.Scanner = &valuer{}
+
+	ignoreColumnPrefixName = "__discard_column_"
 )
 
 type rows struct {
@@ -43,8 +46,11 @@ func (r *rows) Columns() []string {
 	})
 	cs := make([]string, 0, r.result.CurrentResultSet().ColumnCount())
 	r.result.CurrentResultSet().Columns(func(m options.Column) {
-		cs = append(cs, m.Name)
+		if !strings.HasPrefix(m.Name, ignoreColumnPrefixName) {
+			cs = append(cs, m.Name)
+		}
 	})
+
 	return cs
 }
 
@@ -86,12 +92,13 @@ func (r *rows) ColumnTypeNullable(index int) (nullable, ok bool) {
 	return nullables[index], true
 }
 
-func (r *rows) NextResultSet() (err error) {
+func (r *rows) NextResultSet() (finalErr error) {
 	r.nextSet.Do(func() {})
-	err = r.result.NextResultSetErr(context.Background())
+	err := r.result.NextResultSetErr(context.Background())
 	if err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	return nil
 }
 
@@ -99,7 +106,8 @@ func (r *rows) HasNextResultSet() bool {
 	return r.result.HasNextResultSet()
 }
 
-func (r *rows) Next(dst []driver.Value) (err error) {
+func (r *rows) Next(dst []driver.Value) error {
+	var err error
 	r.nextSet.Do(func() {
 		err = r.result.NextResultSetErr(context.Background())
 	})
@@ -125,6 +133,7 @@ func (r *rows) Next(dst []driver.Value) (err error) {
 	if err = r.result.Err(); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	return nil
 }
 
@@ -141,6 +150,7 @@ func (r *single) Columns() (columns []string) {
 	for i := range r.values {
 		columns = append(columns, r.values[i].Name)
 	}
+
 	return columns
 }
 
@@ -156,5 +166,6 @@ func (r *single) Next(dst []driver.Value) error {
 		dst[i] = r.values[i].Value
 	}
 	r.readAll = true
+
 	return nil
 }

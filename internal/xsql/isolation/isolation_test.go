@@ -3,23 +3,24 @@ package isolation
 import (
 	"database/sql"
 	"database/sql/driver"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/proto"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
 func TestToYDB(t *testing.T) {
 	for _, tt := range []struct {
+		name      string
 		txOptions driver.TxOptions
 		txControl table.TxOption
 		err       bool
 	}{
 		// read-write
 		{
+			name: xtest.CurrentFileLine(),
 			txOptions: driver.TxOptions{
 				Isolation: driver.IsolationLevel(sql.LevelDefault),
 				ReadOnly:  false,
@@ -28,6 +29,7 @@ func TestToYDB(t *testing.T) {
 			err:       false,
 		},
 		{
+			name: xtest.CurrentFileLine(),
 			txOptions: driver.TxOptions{
 				Isolation: driver.IsolationLevel(sql.LevelReadUncommitted),
 				ReadOnly:  false,
@@ -35,6 +37,7 @@ func TestToYDB(t *testing.T) {
 			err: true,
 		},
 		{
+			name: xtest.CurrentFileLine(),
 			txOptions: driver.TxOptions{
 				Isolation: driver.IsolationLevel(sql.LevelReadCommitted),
 				ReadOnly:  false,
@@ -42,6 +45,7 @@ func TestToYDB(t *testing.T) {
 			err: true,
 		},
 		{
+			name: xtest.CurrentFileLine(),
 			txOptions: driver.TxOptions{
 				Isolation: driver.IsolationLevel(sql.LevelWriteCommitted),
 				ReadOnly:  false,
@@ -49,6 +53,7 @@ func TestToYDB(t *testing.T) {
 			err: true,
 		},
 		{
+			name: xtest.CurrentFileLine(),
 			txOptions: driver.TxOptions{
 				Isolation: driver.IsolationLevel(sql.LevelRepeatableRead),
 				ReadOnly:  false,
@@ -56,6 +61,7 @@ func TestToYDB(t *testing.T) {
 			err: true,
 		},
 		{
+			name: xtest.CurrentFileLine(),
 			txOptions: driver.TxOptions{
 				Isolation: driver.IsolationLevel(sql.LevelSnapshot),
 				ReadOnly:  false,
@@ -63,13 +69,16 @@ func TestToYDB(t *testing.T) {
 			err: true,
 		},
 		{
+			name: xtest.CurrentFileLine(),
 			txOptions: driver.TxOptions{
 				Isolation: driver.IsolationLevel(sql.LevelSerializable),
 				ReadOnly:  false,
 			},
-			err: true,
+			txControl: table.WithSerializableReadWrite(),
+			err:       false,
 		},
 		{
+			name: xtest.CurrentFileLine(),
 			txOptions: driver.TxOptions{
 				Isolation: driver.IsolationLevel(sql.LevelLinearizable),
 				ReadOnly:  false,
@@ -79,6 +88,7 @@ func TestToYDB(t *testing.T) {
 
 		// read-only
 		{
+			name: xtest.CurrentFileLine(),
 			txOptions: driver.TxOptions{
 				Isolation: driver.IsolationLevel(sql.LevelDefault),
 				ReadOnly:  true,
@@ -86,6 +96,7 @@ func TestToYDB(t *testing.T) {
 			err: true,
 		},
 		{
+			name: xtest.CurrentFileLine(),
 			txOptions: driver.TxOptions{
 				Isolation: driver.IsolationLevel(sql.LevelReadUncommitted),
 				ReadOnly:  true,
@@ -93,6 +104,7 @@ func TestToYDB(t *testing.T) {
 			err: true,
 		},
 		{
+			name: xtest.CurrentFileLine(),
 			txOptions: driver.TxOptions{
 				Isolation: driver.IsolationLevel(sql.LevelReadCommitted),
 				ReadOnly:  true,
@@ -100,6 +112,7 @@ func TestToYDB(t *testing.T) {
 			err: true,
 		},
 		{
+			name: xtest.CurrentFileLine(),
 			txOptions: driver.TxOptions{
 				Isolation: driver.IsolationLevel(sql.LevelWriteCommitted),
 				ReadOnly:  true,
@@ -107,6 +120,7 @@ func TestToYDB(t *testing.T) {
 			err: true,
 		},
 		{
+			name: xtest.CurrentFileLine(),
 			txOptions: driver.TxOptions{
 				Isolation: driver.IsolationLevel(sql.LevelRepeatableRead),
 				ReadOnly:  true,
@@ -114,6 +128,7 @@ func TestToYDB(t *testing.T) {
 			err: true,
 		},
 		{
+			name: xtest.CurrentFileLine(),
 			txOptions: driver.TxOptions{
 				Isolation: driver.IsolationLevel(sql.LevelSnapshot),
 				ReadOnly:  true,
@@ -122,6 +137,7 @@ func TestToYDB(t *testing.T) {
 			err:       false,
 		},
 		{
+			name: xtest.CurrentFileLine(),
 			txOptions: driver.TxOptions{
 				Isolation: driver.IsolationLevel(sql.LevelSerializable),
 				ReadOnly:  true,
@@ -129,6 +145,7 @@ func TestToYDB(t *testing.T) {
 			err: true,
 		},
 		{
+			name: xtest.CurrentFileLine(),
 			txOptions: driver.TxOptions{
 				Isolation: driver.IsolationLevel(sql.LevelLinearizable),
 				ReadOnly:  true,
@@ -136,13 +153,11 @@ func TestToYDB(t *testing.T) {
 			err: true,
 		},
 	} {
-		t.Run(fmt.Sprintf("%+v", tt.txOptions), func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			toYDB, err := ToYDB(tt.txOptions)
 			if !tt.err {
 				require.NoError(t, err)
-				if !proto.Equal(table.TxSettings(tt.txControl).Settings(), table.TxSettings(toYDB).Settings()) {
-					t.Errorf("%+v != %+v", toYDB, tt.txControl)
-				}
+				require.Equal(t, table.TxSettings(tt.txControl).Settings(), table.TxSettings(toYDB).Settings())
 			} else {
 				require.Error(t, err)
 			}

@@ -6,14 +6,13 @@ import (
 	"fmt"
 	"os"
 
-	yc "github.com/ydb-platform/ydb-go-yc"
-
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	yc "github.com/ydb-platform/ydb-go-yc"
 )
 
 var dsn string
 
-func init() {
+func init() { //nolint:gochecknoinits
 	required := []string{"ydb"}
 	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	flagSet.Usage = func() {

@@ -41,7 +41,10 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 
 	grpcMsg, err := w.Stream.Recv()
 	if err != nil {
-		err = xerrors.Transport(err)
+		if !xerrors.IsErrorFromServer(err) {
+			err = xerrors.Transport(err)
+		}
+
 		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: failed to read grpc message from writer stream: %w",
 			err,
@@ -56,11 +59,12 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: bad status from topic server: %v", meta.Status))
 	}
 
-	switch v := grpcMsg.ServerMessage.(type) {
+	switch v := grpcMsg.GetServerMessage().(type) {
 	case *Ydb_Topic.StreamWriteMessage_FromServer_InitResponse:
 		var res InitResult
 		res.ServerMessageMetadata = meta
 		res.mustFromProto(v.InitResponse)
+
 		return &res, nil
 	case *Ydb_Topic.StreamWriteMessage_FromServer_WriteResponse:
 		var res WriteResult
@@ -69,10 +73,12 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		return &res, nil
 	case *Ydb_Topic.StreamWriteMessage_FromServer_UpdateTokenResponse:
 		var res UpdateTokenResponse
 		res.MustFromProto(v.UpdateTokenResponse)
+
 		return &res, nil
 	default:
 		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
@@ -104,6 +110,7 @@ func (w *StreamWriter) Send(rawMsg ClientMessage) (err error) {
 		if writeErr != nil {
 			return writeErr
 		}
+
 		return sendWriteRequest(w.Stream.Send, writeReqProto)
 	case *UpdateTokenRequest:
 		protoMsg.ClientMessage = &Ydb_Topic.StreamWriteMessage_FromClient_UpdateTokenRequest{
@@ -120,6 +127,7 @@ func (w *StreamWriter) Send(rawMsg ClientMessage) (err error) {
 	if err != nil {
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: failed to send grpc message to writer stream: %w", err)))
 	}
+
 	return nil
 }
 
@@ -164,11 +172,12 @@ func sendWriteRequest(send sendFunc, req *Ydb_Topic.StreamWriteMessage_FromClien
 		return sendErr
 	}
 
-	grpcMessages := req.WriteRequest.Messages
+	grpcMessages := req.WriteRequest.GetMessages()
 	if grpcStatus.Code() != codes.ResourceExhausted || len(grpcMessages) < 2 {
 		return sendErr
 	}
 
+	//nolint:gomnd
 	splitIndex := len(grpcMessages) / 2
 	firstMessages, lastMessages := grpcMessages[:splitIndex], grpcMessages[splitIndex:]
 	defer func() {
@@ -182,5 +191,6 @@ func sendWriteRequest(send sendFunc, req *Ydb_Topic.StreamWriteMessage_FromClien
 	}
 
 	req.WriteRequest.Messages = lastMessages
+
 	return sendWriteRequest(send, req)
 }

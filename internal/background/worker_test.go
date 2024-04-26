@@ -4,13 +4,13 @@ import (
 	"context"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
@@ -75,7 +75,7 @@ func TestWorkerClose(t *testing.T) {
 		w := NewWorker(ctx)
 
 		started := make(empty.Chan)
-		stopped := xatomic.Bool{}
+		stopped := atomic.Bool{}
 		w.Start("test", func(innerCtx context.Context) {
 			close(started)
 			<-innerCtx.Done()
@@ -101,14 +101,12 @@ func TestWorkerConcurrentStartAndClose(t *testing.T) {
 
 		parallel := runtime.GOMAXPROCS(0)
 
-		var counter xatomic.Int64
+		var counter atomic.Int64
 
 		ctx := xtest.Context(t)
 		w := NewWorker(ctx)
 
-		closeIndex := int64(0)
-
-		stopNewStarts := xatomic.Bool{}
+		stopNewStarts := atomic.Bool{}
 		var wgStarters sync.WaitGroup
 		for i := 0; i < parallel; i++ {
 			wgStarters.Add(1)
@@ -134,11 +132,12 @@ func TestWorkerConcurrentStartAndClose(t *testing.T) {
 
 		require.NoError(t, w.Close(xtest.ContextWithCommonTimeout(ctx, t), nil))
 
-		closeIndex = counter.Load()
-		require.Equal(t, closeIndex, counter.Load())
-
 		stopNewStarts.Store(true)
 		xtest.WaitGroup(t, &wgStarters)
+
+		_, ok := <-w.tasks
+		require.False(t, ok)
+		require.True(t, w.closed)
 	})
 }
 

@@ -9,7 +9,6 @@ import (
 	"path"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
-
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -20,7 +19,7 @@ var (
 	prefix string
 )
 
-func init() {
+func init() { //nolint:gochecknoinits
 	required := []string{"ydb"}
 	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	flagSet.Usage = func() {

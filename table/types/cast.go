@@ -15,6 +15,7 @@ func CastTo(v Value, dst interface{}) error {
 	if v == nil {
 		return xerrors.WithStackTrace(errNilValue)
 	}
+
 	return value.CastTo(v, dst)
 }
 
@@ -26,6 +27,7 @@ func IsOptional(t Type) (isOptional bool, innerType Type) {
 	}); isOptional {
 		return isOptional, optionalType.InnerType()
 	}
+
 	return false, nil
 }
 
@@ -38,6 +40,7 @@ func ToDecimal(v Value) (*Decimal, error) {
 			Scale:     valuer.Scale(),
 		}, nil
 	}
+
 	return nil, xerrors.WithStackTrace(fmt.Errorf("value type '%s' is not decimal type", v.Type().Yql()))
 }
 
@@ -48,6 +51,7 @@ func ListItems(v Value) ([]Value, error) {
 	}); has {
 		return vv.ListItems(), nil
 	}
+
 	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get list items from '%s'", v.Type().Yql()))
 }
 
@@ -58,6 +62,7 @@ func TupleItems(v Value) ([]Value, error) {
 	}); has {
 		return vv.TupleItems(), nil
 	}
+
 	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get tuple items from '%s'", v.Type().Yql()))
 }
 
@@ -68,6 +73,7 @@ func StructFields(v Value) (map[string]Value, error) {
 	}); has {
 		return vv.StructFields(), nil
 	}
+
 	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get struct fields from '%s'", v.Type().Yql()))
 }
 
@@ -78,14 +84,18 @@ func VariantValue(v Value) (name string, idx uint32, _ Value, _ error) {
 		Value() Value
 	}); has {
 		name, idx := vv.Variant()
+
 		return name, idx, vv.Value(), nil
 	}
+
 	return "", 0, nil, xerrors.WithStackTrace(fmt.Errorf("cannot get variant value from '%s'", v.Type().Yql()))
 }
 
 // DictFields returns dict values from abstract Value
 //
-// Deprecated: use DictValues instead
+// Deprecated: use DictValues instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func DictFields(v Value) (map[Value]Value, error) {
 	return DictValues(v)
 }
@@ -97,5 +107,6 @@ func DictValues(v Value) (map[Value]Value, error) {
 	}); has {
 		return vv.DictValues(), nil
 	}
+
 	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get dict values from '%s'", v.Type().Yql()))
 }

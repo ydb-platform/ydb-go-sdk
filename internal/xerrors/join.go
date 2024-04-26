@@ -3,43 +3,54 @@ package xerrors
 import (
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
-func Join(errs ...error) joinError {
-	return errs
+func Join(errs ...error) *joinError {
+	return &joinError{
+		errs: errs,
+	}
 }
 
-type joinError []error
+type joinError struct {
+	errs []error
+}
 
-func (errs joinError) Error() string {
-	b := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(b)
+func (e *joinError) Error() string {
+	b := xstring.Buffer()
+	defer b.Free()
 	b.WriteByte('[')
-	for i, err := range errs {
+	for i, err := range e.errs {
 		if i > 0 {
 			_ = b.WriteByte(',')
 		}
 		_, _ = fmt.Fprintf(b, "%q", err.Error())
 	}
 	b.WriteByte(']')
+
 	return b.String()
 }
 
-func (errs joinError) As(target interface{}) bool {
-	for _, err := range errs {
+func (e *joinError) As(target interface{}) bool {
+	for _, err := range e.errs {
 		if As(err, target) {
 			return true
 		}
 	}
+
 	return false
 }
 
-func (errs joinError) Is(target error) bool {
-	for _, err := range errs {
+func (e *joinError) Is(target error) bool {
+	for _, err := range e.errs {
 		if Is(err, target) {
 			return true
 		}
 	}
+
 	return false
+}
+
+func (e *joinError) Unwrap() []error {
+	return e.errs
 }

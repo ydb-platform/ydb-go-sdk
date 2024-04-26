@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -23,9 +24,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
-	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -114,9 +114,55 @@ func TestSendSyncMessages(t *testing.T) {
 	})
 }
 
-func TestManyConcurentReadersWriters(t *testing.T) {
-	xtest.AllowByFlag(t, "ISSUE-389")
+func TestMessageMetadata(t *testing.T) {
+	t.Run("NoMetadata", func(t *testing.T) {
+		e := newScope(t)
+		err := e.TopicWriter().Write(e.Ctx, topicwriter.Message{})
+		e.Require.NoError(err)
 
+		mess, err := e.TopicReader().ReadMessage(e.Ctx)
+		e.Require.NoError(err)
+		e.Require.Nil(mess.Metadata)
+	})
+	t.Run("Meta1", func(t *testing.T) {
+		if version.Lt(os.Getenv("YDB_VERSION"), "24.0") {
+			t.Skip()
+		}
+		e := newScope(t)
+		meta := map[string][]byte{
+			"key": []byte("val"),
+		}
+		err := e.TopicWriter().Write(e.Ctx, topicwriter.Message{
+			Metadata: meta,
+		})
+		e.Require.NoError(err)
+
+		mess, err := e.TopicReader().ReadMessage(e.Ctx)
+		e.Require.NoError(err)
+		e.Require.Equal(meta, mess.Metadata)
+	})
+	t.Run("Meta2", func(t *testing.T) {
+		if version.Lt(os.Getenv("YDB_VERSION"), "24.0") {
+			t.Skip()
+		}
+		e := newScope(t)
+		meta := map[string][]byte{
+			"key1": []byte("val1"),
+			"key2": []byte("val2"),
+			"key3": []byte("val3"),
+		}
+		err := e.TopicWriter().Write(e.Ctx, topicwriter.Message{
+			Metadata: meta,
+		})
+		e.Require.NoError(err)
+
+		mess, err := e.TopicReader().ReadMessage(e.Ctx)
+		e.Require.NoError(err)
+		e.Require.Equal(meta, mess.Metadata)
+	})
+}
+
+func TestManyConcurentReadersWriters(t *testing.T) {
 	const partitionCount = 3
 	const writersCount = 5
 	const readersCount = 10
@@ -126,9 +172,7 @@ func TestManyConcurentReadersWriters(t *testing.T) {
 	tb := xtest.MakeSyncedTest(t)
 	ctx := xtest.Context(tb)
 	db := connect(tb, ydb.WithLogger(
-		log.Default(os.Stderr,
-			log.WithMinLevel(log.TRACE),
-		),
+		newLogger(t),
 		trace.DetailsAll,
 	))
 
@@ -305,8 +349,6 @@ func TestCommitUnexpectedRange(t *testing.T) {
 }
 
 func TestUpdateToken(t *testing.T) {
-	xtest.AllowByFlag(t, "LOGBROKER-7960")
-
 	ctx := context.Background()
 	db := connect(t)
 	dbLogging := connectWithGrpcLogging(t)
@@ -330,7 +372,7 @@ func TestUpdateToken(t *testing.T) {
 	var wg sync.WaitGroup
 
 	wg.Add(1)
-	stopTopicActivity := xatomic.Bool{}
+	stopTopicActivity := atomic.Bool{}
 	go func() {
 		defer wg.Done()
 
@@ -345,7 +387,7 @@ func TestUpdateToken(t *testing.T) {
 		}
 	}()
 
-	hasMessages := xatomic.Bool{}
+	hasMessages := atomic.Bool{}
 
 	wg.Add(1)
 	go func() {

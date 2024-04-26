@@ -45,7 +45,7 @@ func TestConnectionWithCompression(t *testing.T) {
 			if !has {
 				t.Fatalf("no medatada")
 			}
-			userAgents := md.Get(meta.HeaderUserAgent)
+			userAgents := md.Get(meta.HeaderApplicationName)
 			if len(userAgents) == 0 {
 				t.Fatalf("no user agent")
 			}
@@ -76,12 +76,10 @@ func TestConnectionWithCompression(t *testing.T) {
 		ydb.WithConnectionTTL(time.Millisecond*10000),
 		ydb.WithMinTLSVersion(tls.VersionTLS10),
 		ydb.WithLogger(
-			log.Default(os.Stderr,
-				log.WithMinLevel(log.WARN),
-			),
+			newLoggerWithMinLevel(t, log.WARN),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),
 		),
-		ydb.WithUserAgent(userAgent),
+		ydb.WithApplicationName(userAgent),
 		ydb.WithRequestsType(requestType),
 		ydb.With(
 			config.WithGrpcOptions(

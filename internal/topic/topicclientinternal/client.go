@@ -27,7 +27,12 @@ type Client struct {
 	rawClient              rawtopic.Client
 }
 
-func New(conn grpc.ClientConnInterface, cred credentials.Credentials, opts ...topicoptions.TopicOption) *Client {
+func New(
+	ctx context.Context,
+	conn grpc.ClientConnInterface,
+	cred credentials.Credentials,
+	opts ...topicoptions.TopicOption,
+) *Client {
 	rawClient := rawtopic.NewClient(Ydb_Topic_V1.NewTopicServiceClient(conn))
 
 	cfg := newTopicConfig(opts...)
@@ -47,11 +52,12 @@ func newTopicConfig(opts ...topicoptions.TopicOption) topic.Config {
 	c := topic.Config{
 		Trace: &trace.Topic{},
 	}
-	for _, o := range opts {
-		if o != nil {
-			o(&c)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&c)
 		}
 	}
+
 	return c
 }
 
@@ -65,20 +71,26 @@ func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.Al
 	req := &rawtopic.AlterTopicRequest{}
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
-	for _, o := range opts {
-		if o != nil {
-			o.ApplyAlterOption(req)
+	for _, opt := range opts {
+		if opt != nil {
+			opt.ApplyAlterOption(req)
 		}
 	}
 
 	call := func(ctx context.Context) error {
 		_, alterErr := c.rawClient.AlterTopic(ctx, req)
+
 		return alterErr
 	}
 
 	if c.cfg.AutoRetry() {
-		return retry.Retry(ctx, call, retry.WithIdempotent(true))
+		return retry.Retry(ctx, call,
+			retry.WithIdempotent(true),
+			retry.WithTrace(c.cfg.TraceRetry()),
+			retry.WithBudget(c.cfg.RetryBudget()),
+		)
 	}
+
 	return call(ctx)
 }
 
@@ -92,20 +104,26 @@ func (c *Client) Create(
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
 
-	for _, o := range opts {
-		if o != nil {
-			o.ApplyCreateOption(req)
+	for _, opt := range opts {
+		if opt != nil {
+			opt.ApplyCreateOption(req)
 		}
 	}
 
 	call := func(ctx context.Context) error {
 		_, createErr := c.rawClient.CreateTopic(ctx, req)
+
 		return createErr
 	}
 
 	if c.cfg.AutoRetry() {
-		return retry.Retry(ctx, call, retry.WithIdempotent(true))
+		return retry.Retry(ctx, call,
+			retry.WithIdempotent(true),
+			retry.WithTrace(c.cfg.TraceRetry()),
+			retry.WithBudget(c.cfg.RetryBudget()),
+		)
 	}
+
 	return call(ctx)
 }
 
@@ -120,9 +138,9 @@ func (c *Client) Describe(
 		Path:            path,
 	}
 
-	for _, o := range opts {
-		if o != nil {
-			o(&req)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&req)
 		}
 	}
 
@@ -130,13 +148,18 @@ func (c *Client) Describe(
 
 	call := func(ctx context.Context) (describeErr error) {
 		rawRes, describeErr = c.rawClient.DescribeTopic(ctx, req)
+
 		return describeErr
 	}
 
 	var err error
 
 	if c.cfg.AutoRetry() {
-		err = retry.Retry(ctx, call, retry.WithIdempotent(true))
+		err = retry.Retry(ctx, call,
+			retry.WithIdempotent(true),
+			retry.WithTrace(c.cfg.TraceRetry()),
+			retry.WithBudget(c.cfg.RetryBudget()),
+		)
 	} else {
 		err = call(ctx)
 	}
@@ -146,6 +169,7 @@ func (c *Client) Describe(
 	}
 
 	res.FromRaw(&rawRes)
+
 	return res, nil
 }
 
@@ -155,19 +179,24 @@ func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.Dro
 	req.OperationParams = c.defaultOperationParams
 	req.Path = path
 
-	for _, o := range opts {
-		if o != nil {
-			o.ApplyDropOption(&req)
+	for _, opt := range opts {
+		if opt != nil {
+			opt.ApplyDropOption(&req)
 		}
 	}
 
 	call := func(ctx context.Context) error {
 		_, removeErr := c.rawClient.DropTopic(ctx, req)
+
 		return removeErr
 	}
 
 	if c.cfg.AutoRetry() {
-		return retry.Retry(ctx, call, retry.WithIdempotent(true))
+		return retry.Retry(ctx, call,
+			retry.WithIdempotent(true),
+			retry.WithTrace(c.cfg.TraceRetry()),
+			retry.WithBudget(c.cfg.RetryBudget()),
+		)
 	}
 
 	return call(ctx)
@@ -196,6 +225,7 @@ func (c *Client) StartReader(
 
 	internalReader := topicreaderinternal.NewReader(connector, consumer, readSelectors, opts...)
 	trace.TopicOnReaderStart(internalReader.Tracer(), internalReader.ID(), consumer)
+
 	return topicreader.NewReader(internalReader), nil
 }
 
@@ -221,5 +251,6 @@ func (c *Client) StartWriter(topicPath string, opts ...topicoptions.WriterOption
 	if err != nil {
 		return nil, err
 	}
+
 	return topicwriter.NewWriter(writer), nil
 }

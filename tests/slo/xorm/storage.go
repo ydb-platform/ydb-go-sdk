@@ -140,12 +140,10 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (row generator.R
 		},
 		retry.WithIdempotent(true),
 		retry.WithTrace(
-			trace.Retry{
-				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-					return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-						return func(info trace.RetryLoopDoneInfo) {
-							attempts = info.Attempts
-						}
+			&trace.Retry{
+				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+					return func(info trace.RetryLoopDoneInfo) {
+						attempts = info.Attempts
 					}
 				},
 			},
@@ -170,16 +168,15 @@ func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, e
 			}
 
 			_, err = s.x.Context(ctx).SetExpr("hash", fmt.Sprintf("Digest::NumericHash(%d)", row.ID)).Insert(row)
+
 			return err
 		},
 		retry.WithIdempotent(true),
 		retry.WithTrace(
-			trace.Retry{
-				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-					return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
-						return func(info trace.RetryLoopDoneInfo) {
-							attempts = info.Attempts
-						}
+			&trace.Retry{
+				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+					return func(info trace.RetryLoopDoneInfo) {
+						attempts = info.Attempts
 					}
 				},
 			},

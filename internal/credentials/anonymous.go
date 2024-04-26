@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 var (
@@ -28,8 +28,11 @@ func NewAnonymousCredentials(opts ...AnonymousCredentialsOption) *Anonymous {
 		sourceInfo: stack.Record(1),
 	}
 	for _, opt := range opts {
-		opt.ApplyAnonymousCredentialsOption(c)
+		if opt != nil {
+			opt.ApplyAnonymousCredentialsOption(c)
+		}
 	}
+
 	return c
 }
 
@@ -40,13 +43,14 @@ func (c Anonymous) Token(_ context.Context) (string, error) {
 
 // Token implements Credentials.
 func (c Anonymous) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString("Anonymous(")
+	buffer := xstring.Buffer()
+	defer buffer.Free()
+	buffer.WriteString("Anonymous{")
 	if c.sourceInfo != "" {
-		buffer.WriteString("from:")
+		buffer.WriteString("From:")
 		fmt.Fprintf(buffer, "%q", c.sourceInfo)
 	}
-	buffer.WriteByte(')')
+	buffer.WriteByte('}')
+
 	return buffer.String()
 }

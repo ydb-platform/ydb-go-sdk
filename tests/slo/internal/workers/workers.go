@@ -10,8 +10,8 @@ import (
 )
 
 type ReadWriter interface {
-	Read(context.Context, generator.RowID) (_ generator.Row, attempts int, err error)
-	Write(context.Context, generator.Row) (attempts int, err error)
+	Read(ctx context.Context, rowID generator.RowID) (_ generator.Row, attempts int, err error)
+	Write(ctx context.Context, row generator.Row) (attempts int, err error)
 }
 
 type Workers struct {
@@ -24,6 +24,7 @@ func New(cfg *config.Config, s ReadWriter, label, jobName string) (*Workers, err
 	m, err := metrics.New(cfg.PushGateway, label, jobName)
 	if err != nil {
 		fmt.Printf("create metrics failed: %v\n", err)
+
 		return nil, err
 	}
 

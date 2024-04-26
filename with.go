@@ -2,31 +2,33 @@ package ydb
 
 import (
 	"context"
+	"sync/atomic"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var nextID xatomic.Uint64
+var nextID atomic.Uint64 //nolint:gochecknoglobals
 
-func (c *Driver) with(ctx context.Context, opts ...Option) (*Driver, uint64, error) {
+func (d *Driver) with(ctx context.Context, opts ...Option) (*Driver, uint64, error) {
 	id := nextID.Add(1)
 
 	child, err := newConnectionFromOptions(
 		ctx,
 		append(
 			append(
-				c.opts,
+				d.opts,
 				WithBalancer(
-					c.config.Balancer(),
+					d.config.Balancer(),
 				),
 				withOnClose(func(child *Driver) {
-					c.childrenMtx.Lock()
-					defer c.childrenMtx.Unlock()
+					d.childrenMtx.Lock()
+					defer d.childrenMtx.Unlock()
 
-					delete(c.children, id)
+					delete(d.children, id)
 				}),
-				withConnPool(c.pool),
+				withConnPool(d.pool),
 			),
 			opts...,
 		)...,
@@ -34,25 +36,34 @@ func (c *Driver) with(ctx context.Context, opts ...Option) (*Driver, uint64, err
 	if err != nil {
 		return nil, 0, xerrors.WithStackTrace(err)
 	}
+
 	return child, id, nil
 }
 
 // With makes child Driver with the same options and another options
-func (c *Driver) With(ctx context.Context, opts ...Option) (*Driver, error) {
-	child, id, err := c.with(ctx, opts...)
+func (d *Driver) With(ctx context.Context, opts ...Option) (*Driver, error) {
+	child, id, err := d.with(ctx, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	err = connect(ctx, child)
-	if err != nil {
+	onDone := trace.DriverOnWith(
+		d.trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/ydb.(*Driver).With"),
+		d.config.Endpoint(), d.config.Database(), d.config.Secure(),
+	)
+	defer func() {
+		onDone(err)
+	}()
+
+	if err = child.connect(ctx); err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	c.childrenMtx.Lock()
-	defer c.childrenMtx.Unlock()
+	d.childrenMtx.Lock()
+	defer d.childrenMtx.Unlock()
 
-	c.children[id] = child
+	d.children[id] = child
 
 	return child, nil
 }

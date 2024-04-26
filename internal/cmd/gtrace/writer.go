@@ -160,6 +160,7 @@ func (w *Writer) typeImports(dst []dep, t types.Type) []dep {
 			typName: obj.Name(),
 		})
 	}
+
 	return dst
 }
 
@@ -175,6 +176,7 @@ func unwrapStruct(t types.Type) (n *types.Named, s *types.Struct) {
 	if ok {
 		s, _ = n.Underlying().(*types.Struct)
 	}
+
 	return
 }
 
@@ -194,6 +196,7 @@ func (w *Writer) funcImports(dst []dep, fn *Func) []dep {
 			dst = w.funcImports(dst, fn)
 		}
 	}
+
 	return dst
 }
 
@@ -201,6 +204,7 @@ func (w *Writer) traceImports(dst []dep, t *Trace) []dep {
 	for _, h := range t.Hooks {
 		dst = w.funcImports(dst, h.Func)
 	}
+
 	return dst
 }
 
@@ -212,6 +216,7 @@ func (w *Writer) importDeps(deps []dep) {
 			n := len(deps)
 			deps[i], deps[n-1] = deps[n-1], deps[i]
 			deps = deps[:n-1]
+
 			continue
 		}
 		seen[d.pkgPath] = true
@@ -230,6 +235,7 @@ func (w *Writer) importDeps(deps []dep) {
 		if std0 != std1 {
 			return std0
 		}
+
 		return d0.pkgPath < d1.pkgPath
 	})
 	w.line(`import (`)
@@ -250,6 +256,7 @@ func (w *Writer) importDeps(deps []dep) {
 func (w *Writer) isStdLib(pkg string) bool {
 	w.ensureStdLibMapping()
 	s := strings.Split(pkg, "/")[0]
+
 	return w.std[s]
 }
 
@@ -317,6 +324,7 @@ func (w *Writer) compose(trace *Trace) {
 		w.line(`// Compose returns a new `, trace.Name, ` which has functional fields composed both from `,
 			t, ` and `, x, `.`,
 		)
+		w.line(`// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals`)
 		w.code(`func (`, t, ` *`, trace.Name, `) Compose(`, x, ` *`, trace.Name, `, opts ...`+trace.Name+`ComposeOption) `)
 		w.line(`*`, trace.Name, ` {`)
 		w.block(func() {
@@ -398,9 +406,9 @@ func (w *Writer) composeHookCall(fn *Func, h1, h2 string) {
 				w.line("if " + h + " != nil {")
 				w.block(func() {
 					if fn.HasResult() {
-						w.code(rs[i], ` = `)
+						w.code(rs[i], ` = `) //nolint:scopelint
 					}
-					w.code(h)
+					w.code(h) //nolint:scopelint
 					w.call(args)
 				})
 				w.line("}")
@@ -433,11 +441,13 @@ func (w *Writer) options(trace *Trace) {
 	})
 	w.newScope(func() {
 		w.line(fmt.Sprintf(`// %sOption specified %s compose option`, trace.Name, trace.Name))
+		w.line(`// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals`)
 		w.line(fmt.Sprintf(`type %sComposeOption func(o *%sComposeOptions)`, trace.Name, unexported(trace.Name)))
 		_ = w.bw.WriteByte('\n')
 	})
 	w.newScope(func() {
 		w.line(fmt.Sprintf(`// With%sPanicCallback specified behavior on panic`, trace.Name))
+		w.line(`// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals`)
 		w.line(fmt.Sprintf(`func With%sPanicCallback(cb func(e interface{})) %sComposeOption {`, trace.Name, trace.Name))
 		w.block(func() {
 			w.line(fmt.Sprintf(`return func(o *%sComposeOptions) {`, unexported(trace.Name)))
@@ -520,6 +530,7 @@ func (w *Writer) hookFuncCall(fn *Func, name string, args []string) {
 				})
 				w.line(`}`)
 			})
+
 			return
 		}
 	}
@@ -532,6 +543,7 @@ func nameParam(p *Param) (s string) {
 	if s == "" {
 		s = firstChar(ident(typeBasename(p.Type)))
 	}
+
 	return unexported(s)
 }
 
@@ -540,6 +552,7 @@ func (w *Writer) declareParams(src []Param) (names []string) {
 	for i := range src {
 		names[i] = w.declare(nameParam(&src[i]))
 	}
+
 	return names
 }
 
@@ -548,10 +561,12 @@ func flattenParams(params []Param) (dst []Param) {
 		_, s := unwrapStruct(params[i].Type)
 		if s != nil {
 			dst = flattenStruct(dst, s)
+
 			continue
 		}
 		dst = append(dst, params[i])
 	}
+
 	return dst
 }
 
@@ -560,6 +575,7 @@ func typeBasename(t types.Type) (name string) {
 	if name == "" {
 		name = lo
 	}
+
 	return name
 }
 
@@ -582,6 +598,7 @@ func flattenStruct(dst []Param, s *types.Struct) []Param {
 			Type: typ,
 		})
 	})
+
 	return dst
 }
 
@@ -592,16 +609,18 @@ func (w *Writer) constructParams(params []Param, names []string) (res []string) 
 			var v string
 			v, names = w.constructStruct(n, s, names)
 			res = append(res, v)
+
 			continue
 		}
 		name := names[0]
 		names = names[1:]
 		res = append(res, name)
 	}
+
 	return res
 }
 
-func (w *Writer) constructStruct(n *types.Named, s *types.Struct, vars []string) (string, []string) {
+func (w *Writer) constructStruct(n types.Type, s *types.Struct, vars []string) (string, []string) {
 	p := w.declare("p")
 	// maybe skip pointers from flattening to not allocate anyhing during trace.
 	w.line(`var `, p, ` `, w.typeString(n))
@@ -614,6 +633,7 @@ func (w *Writer) constructStruct(n *types.Named, s *types.Struct, vars []string)
 		vars = vars[1:]
 		w.line(p, `.`, v.Name(), ` = `, name)
 	}
+
 	return p, vars
 }
 
@@ -624,6 +644,7 @@ func (w *Writer) hookShortcut(trace *Trace, hook Hook) {
 
 	w.newScope(func() {
 		t := w.declare("t")
+		w.line(`// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals`)
 		w.code(`func `, name)
 		w.code(`(`)
 		var ctx string
@@ -726,6 +747,7 @@ func (w *Writer) hookFuncShortcut(fn *Func, name string) {
 func (w *Writer) zeroReturn(fn *Func) {
 	if !fn.HasResult() {
 		w.line(`return`)
+
 		return
 	}
 	w.code(`return `)
@@ -753,6 +775,7 @@ func (w *Writer) funcParams(params []Param) (vars []string) {
 		vars = append(vars, w.funcParam(&params[i]))
 	}
 	w.code(`)`)
+
 	return
 }
 
@@ -760,6 +783,7 @@ func (w *Writer) funcParam(p *Param) (name string) {
 	name = w.declare(nameParam(p))
 	w.code(name, ` `)
 	w.code(w.typeString(p.Type))
+
 	return name
 }
 
@@ -779,7 +803,7 @@ func (f flags) has(x flags) bool {
 }
 
 const (
-	zeroFlags flags = 1 << iota >> 1
+	_ flags = 1 << iota >> 1
 	docs
 )
 
@@ -875,6 +899,7 @@ func haveNames(params []Param) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -883,6 +908,7 @@ func (w *Writer) typeString(t types.Type) string {
 		if pkg.Path() == w.pkg.Path() {
 			return "" // same package; unqualified
 		}
+
 		return pkg.Name()
 	})
 }
@@ -922,6 +948,7 @@ func exported(s string) string {
 	if r == utf8.RuneError {
 		panic("invalid string")
 	}
+
 	return string(unicode.ToUpper(r)) + s[size:]
 }
 
@@ -930,6 +957,7 @@ func unexported(s string) string {
 	if r == utf8.RuneError {
 		panic("invalid string")
 	}
+
 	return string(unicode.ToLower(r)) + s[size:]
 }
 
@@ -938,6 +966,7 @@ func firstChar(s string) string {
 	if r == utf8.RuneError {
 		panic("invalid string")
 	}
+
 	return string(r)
 }
 
@@ -984,6 +1013,7 @@ func tempName(names ...string) string {
 		}
 		sb.WriteString(name)
 	}
+
 	return sb.String()
 }
 
@@ -1002,14 +1032,16 @@ func (s *scope) set(v string) bool {
 	if _, has := s.vars[v]; has {
 		return false
 	}
-	_, file, line, _ := runtime.Caller(2)
+	_, file, line, _ := runtime.Caller(2) //nolint:gomnd
 	s.vars[v] = decl{
 		where: fmt.Sprintf("%s:%d", file, line),
 	}
+
 	return true
 }
 
 func (s *scope) where(v string) string {
 	d := s.vars[v]
+
 	return d.where
 }

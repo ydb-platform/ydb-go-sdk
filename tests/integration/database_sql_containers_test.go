@@ -7,7 +7,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"os"
 	"testing"
 
@@ -101,7 +100,7 @@ func TestDatabaseSqlContainers(t *testing.T) {
 				return rows.Scan(&testDatabaseSqlContainersVariantStruct{})
 			},
 			func() error {
-				return rows.Scan(&testDatabaseSqlContainersVariantTuple{})
+				return rows.Scan(&testDatabaseSqlContainersVariantTuple{test: t})
 			},
 			func() error {
 				var v int64
@@ -150,7 +149,7 @@ func (s *testDatabaseSqlContainersExampleStruct) Scan(res interface{}) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("type '%T' is not a `types.Value` type", res)
+	return fmt.Errorf("type '%T' is not a `types.value` type", res)
 }
 
 type testDatabaseSqlContainersExampleList []string
@@ -273,9 +272,10 @@ func (s *testDatabaseSqlContainersVariantStruct) Scan(res interface{}) error {
 }
 
 type testDatabaseSqlContainersVariantTuple struct {
-	a uint32
-	b string
-	c int64
+	a    uint32
+	b    string
+	c    int64
+	test testing.TB
 }
 
 func (s *testDatabaseSqlContainersVariantTuple) Scan(res interface{}) error {
@@ -305,8 +305,8 @@ func (s *testDatabaseSqlContainersVariantTuple) Scan(res interface{}) error {
 	return fmt.Errorf("type '%T' is not a `types.Value` type", res)
 }
 
-func (*testDatabaseSqlContainersVariantTuple) UnmarshalYDB(res types.RawValue) error {
-	log.Printf("T: %s", res.Type())
+func (s *testDatabaseSqlContainersVariantTuple) UnmarshalYDB(res types.RawValue) error {
+	s.test.Logf("T: %s", res.Type())
 	name, index := res.Variant()
 	var x interface{}
 	switch index {
@@ -317,7 +317,7 @@ func (*testDatabaseSqlContainersVariantTuple) UnmarshalYDB(res types.RawValue) e
 	case 2:
 		x = res.Int64()
 	}
-	log.Printf(
+	s.test.Logf(
 		"(tuple variant): %s %s %q %d = %v",
 		res.Path(), res.Type(), name, index, x,
 	)

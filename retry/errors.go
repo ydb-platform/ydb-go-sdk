@@ -1,20 +1,15 @@
-//go:build !go1.18
-// +build !go1.18
-
 package retry
 
 import (
-	"database/sql/driver"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 )
 
 func unwrapErrBadConn(err error) error {
-	if xerrors.Is(err, driver.ErrBadConn) {
-		return xerrors.Retryable(err,
-			xerrors.WithName("unwrapErrBadConn"),
-			xerrors.WithDeleteSession(),
-		)
+	var e *badconn.Error
+	if xerrors.As(err, &e) {
+		return e.Origin()
 	}
+
 	return err
 }

@@ -47,6 +47,7 @@ func deleteExpiredDocuments(ctx context.Context, c table.Client, prefix string, 
 		for i := range ids {
 			k[i] = types.StructValue(types.StructFieldValue("doc_id", types.Uint64Value(ids[i])))
 		}
+
 		return k
 	}()...)
 
@@ -60,9 +61,11 @@ func deleteExpiredDocuments(ctx context.Context, c table.Client, prefix string, 
 					table.ValueParam("$timestamp", types.Uint64Value(timestamp)),
 				),
 			)
+
 			return err
 		},
 	)
+
 	return err
 }
 
@@ -78,6 +81,7 @@ func deleteExpiredRange(ctx context.Context, c table.Client, prefix string, time
 				options.ReadKeyRange(keyRange),
 				options.ReadColumn("doc_id"),
 				options.ReadColumn("ts"))
+
 			return err
 		},
 	)
@@ -136,6 +140,7 @@ func deleteExpired(ctx context.Context, c table.Client, prefix string, timestamp
 	err := c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
 			res, err = s.DescribeTable(ctx, path.Join(prefix, "documents"), options.WithShardKeyBounds())
+
 			return err
 		},
 	)
@@ -177,6 +182,7 @@ func readDocument(ctx context.Context, c table.Client, prefix, url string) error
 			_, res, err = s.Execute(ctx, readTx, query, table.NewQueryParameters(
 				table.ValueParam("$url", types.TextValue(url))),
 			)
+
 			return err
 		},
 	)
@@ -239,9 +245,11 @@ func addDocument(ctx context.Context, c table.Client, prefix, url, html string, 
 				table.ValueParam("$html", types.TextValue(html)),
 				table.ValueParam("$timestamp", types.Uint64Value(timestamp))),
 			)
+
 			return err
 		},
 	)
+
 	return err
 }
 

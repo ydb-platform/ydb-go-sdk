@@ -69,7 +69,8 @@ func selectPaging(
 			}()
 			if !res.NextResultSet(ctx) || !res.HasNextRow() {
 				empty = true
-				return
+
+				return res.Err()
 			}
 			var addr string
 			for res.NextRow() {
@@ -83,13 +84,12 @@ func selectPaging(
 				}
 				fmt.Printf("\t%v, School #%v, Address: %v\n", *lastCity, *lastNum, addr)
 			}
+
 			return res.Err()
 		},
 	)
-	if err != nil {
-		return
-	}
-	return empty, nil
+
+	return empty, err
 }
 
 func fillTableWithData(ctx context.Context, c table.Client, prefix string) (err error) {
@@ -115,8 +115,10 @@ func fillTableWithData(ctx context.Context, c table.Client, prefix string) (err 
 			_, _, err = s.Execute(ctx, writeTx, query, table.NewQueryParameters(
 				table.ValueParam("$schoolsData", getSchoolData()),
 			))
+
 			return err
 		})
+
 	return err
 }
 

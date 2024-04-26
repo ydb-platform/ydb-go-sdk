@@ -7,12 +7,13 @@ import (
 func permissions(p Permissions) *Ydb_Scheme.Permissions {
 	var y Ydb_Scheme.Permissions
 	p.To(&y)
+
 	return &y
 }
 
 type permissionsDesc interface {
-	SetClear(bool)
-	AppendAction(*Ydb_Scheme.PermissionsAction)
+	SetClear(clear bool)
+	AppendAction(action *Ydb_Scheme.PermissionsAction)
 }
 
 type PermissionsOption func(permissionsDesc)

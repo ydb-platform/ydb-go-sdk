@@ -28,7 +28,7 @@ jobs:
       CHANGELOG_FILE: CHANGELOG.md
       GITHUB_TOKEN: ${{ secrets.YDB_PLATFORM_BOT_TOKEN_REPO }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           token: ${{ secrets.YDB_PLATFORM_BOT_TOKEN_REPO }}
           fetch-depth: 0
@@ -70,7 +70,7 @@ jobs:
             TAG="v$MAJOR.$MINOR.$PATCH";
           fi;
           git tag $TAG
-          git push --tags && git push
+          git push && git push --tags
           CHANGELOG="$CHANGELOG
           
           Full Changelog: [$LAST_TAG...$TAG](https://github.com/ydb-platform/ydb-go-sdk/compare/$LAST_TAG...$TAG)"

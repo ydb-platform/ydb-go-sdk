@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"unicode/utf8"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 )
 
@@ -30,11 +30,11 @@ func (m PositionalArgs) RewriteQuery(sql string, args ...interface{}) (
 	}
 
 	var (
-		buffer   = allocator.Buffers.Get()
+		buffer   = xstring.Buffer()
 		position = 0
 		param    table.ParameterOption
 	)
-	defer allocator.Buffers.Put(buffer)
+	defer buffer.Free()
 
 	for _, p := range l.parts {
 		switch p := p.(type) {
@@ -65,6 +65,7 @@ func (m PositionalArgs) RewriteQuery(sql string, args ...interface{}) (
 
 	if position > 0 {
 		const prefix = "-- origin query with positional args replacement\n"
+
 		return prefix + buffer.String(), newArgs, nil
 	}
 
@@ -90,12 +91,14 @@ func positionalArgsStateFn(l *sqlLexer) stateFn {
 			nextRune, width := utf8.DecodeRuneInString(l.src[l.pos:])
 			if nextRune == '-' {
 				l.pos += width
+
 				return oneLineCommentState
 			}
 		case '/':
 			nextRune, width := utf8.DecodeRuneInString(l.src[l.pos:])
 			if nextRune == '*' {
 				l.pos += width
+
 				return multilineCommentState
 			}
 		case utf8.RuneError:
@@ -103,6 +106,7 @@ func positionalArgsStateFn(l *sqlLexer) stateFn {
 				l.parts = append(l.parts, l.src[l.start:l.pos])
 				l.start = l.pos
 			}
+
 			return nil
 		}
 	}

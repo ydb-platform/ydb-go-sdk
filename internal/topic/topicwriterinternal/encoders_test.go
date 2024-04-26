@@ -51,13 +51,13 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 			var messages []messageWithDataContent
 			for i := 0; i < smallCount; i++ {
 				data := make([]byte, smallSize)
-				message := newMessageDataWithContent(Message{Data: bytes.NewReader(data)}, testCommonEncoders)
+				message := newMessageDataWithContent(PublicMessage{Data: bytes.NewReader(data)}, testCommonEncoders)
 				messages = append(messages, message)
 			}
 
 			for i := 0; i < largeCount; i++ {
 				data := make([]byte, largeSize)
-				message := newMessageDataWithContent(Message{Data: bytes.NewReader(data)}, testCommonEncoders)
+				message := newMessageDataWithContent(PublicMessage{Data: bytes.NewReader(data)}, testCommonEncoders)
 				messages = append(messages, message)
 			}
 
@@ -152,30 +152,30 @@ func TestEncoderSelector_CodecMeasure(t *testing.T) {
 
 func TestCompressMessages(t *testing.T) {
 	t.Run("NoMessages", func(t *testing.T) {
-		require.NoError(t, readInParallelWithCodec(nil, rawtopiccommon.CodecRaw, 1))
+		require.NoError(t, cacheMessages(nil, rawtopiccommon.CodecRaw, 1))
 	})
 
 	t.Run("RawOk", func(t *testing.T) {
 		messages := newTestMessagesWithContent(1)
-		require.NoError(t, readInParallelWithCodec(messages, rawtopiccommon.CodecRaw, 1))
+		require.NoError(t, cacheMessages(messages, rawtopiccommon.CodecRaw, 1))
 	})
 	t.Run("RawError", func(t *testing.T) {
-		mess := newMessageDataWithContent(Message{}, testCommonEncoders)
+		mess := newMessageDataWithContent(PublicMessage{}, testCommonEncoders)
 		_, err := mess.GetEncodedBytes(rawtopiccommon.CodecGzip)
 		require.NoError(t, err)
 		messages := []messageWithDataContent{mess}
-		require.Error(t, readInParallelWithCodec(messages, rawtopiccommon.CodecRaw, 1))
+		require.Error(t, cacheMessages(messages, rawtopiccommon.CodecRaw, 1))
 	})
 
 	const messageCount = 10
 	t.Run("GzipOneThread", func(t *testing.T) {
 		var messages []messageWithDataContent
 		for i := 0; i < messageCount; i++ {
-			mess := newMessageDataWithContent(Message{Data: strings.NewReader("asdf")}, testCommonEncoders)
+			mess := newMessageDataWithContent(PublicMessage{Data: strings.NewReader("asdf")}, testCommonEncoders)
 			messages = append(messages, mess)
 		}
 
-		require.NoError(t, readInParallelWithCodec(messages, rawtopiccommon.CodecGzip, 1))
+		require.NoError(t, cacheMessages(messages, rawtopiccommon.CodecGzip, 1))
 		for i := 0; i < messageCount; i++ {
 			require.Equal(t, rawtopiccommon.CodecGzip, messages[i].bufCodec)
 		}
@@ -185,11 +185,11 @@ func TestCompressMessages(t *testing.T) {
 	t.Run("GzipOk", func(t *testing.T) {
 		var messages []messageWithDataContent
 		for i := 0; i < messageCount; i++ {
-			mess := newMessageDataWithContent(Message{Data: strings.NewReader("asdf")}, testCommonEncoders)
+			mess := newMessageDataWithContent(PublicMessage{Data: strings.NewReader("asdf")}, testCommonEncoders)
 			messages = append(messages, mess)
 		}
 
-		require.NoError(t, readInParallelWithCodec(messages, rawtopiccommon.CodecGzip, parallelCount))
+		require.NoError(t, cacheMessages(messages, rawtopiccommon.CodecGzip, parallelCount))
 		for i := 0; i < messageCount; i++ {
 			require.Equal(t, rawtopiccommon.CodecGzip, messages[i].bufCodec)
 		}
@@ -198,11 +198,11 @@ func TestCompressMessages(t *testing.T) {
 	t.Run("GzipErr", func(t *testing.T) {
 		var messages []messageWithDataContent
 		for i := 0; i < messageCount; i++ {
-			mess := newMessageDataWithContent(Message{Data: strings.NewReader("asdf")}, testCommonEncoders)
+			mess := newMessageDataWithContent(PublicMessage{Data: strings.NewReader("asdf")}, testCommonEncoders)
 			messages = append(messages, mess)
 		}
 		messages[0].dataWasRead = true
 
-		require.Error(t, readInParallelWithCodec(messages, rawtopiccommon.CodecGzip, parallelCount))
+		require.Error(t, cacheMessages(messages, rawtopiccommon.CodecGzip, parallelCount))
 	})
 }

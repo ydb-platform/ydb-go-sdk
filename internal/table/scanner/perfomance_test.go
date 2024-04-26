@@ -123,7 +123,7 @@ func BenchmarkTestSliceIncrement(b *testing.B) {
 	for j := 0; j < testSize; j++ {
 		slice[j] = &column{}
 	}
-	cnt := 0
+	var cnt int
 	var row column
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

@@ -3,138 +3,234 @@ package coordination
 import (
 	"context"
 	"errors"
+	"sync"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Coordination_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Coordination"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"google.golang.org/grpc"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
+	"github.com/ydb-platform/ydb-go-sdk/v3/coordination/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-//nolint:gofumpt
-//nolint:nolintlint
-var (
-	errNilClient = xerrors.Wrap(errors.New("coordination client is not initialized"))
-)
+//go:generate mockgen -destination grpc_client_mock_test.go -package coordination -write_package_comment=false github.com/ydb-platform/ydb-go-genproto/Ydb_Coordination_V1 CoordinationServiceClient,CoordinationService_SessionClient
+
+var errNilClient = xerrors.Wrap(errors.New("coordination client is not initialized"))
 
 type Client struct {
-	config  config.Config
-	service Ydb_Coordination_V1.CoordinationServiceClient
+	config config.Config
+	client Ydb_Coordination_V1.CoordinationServiceClient
+
+	mutex    sync.Mutex // guards the fields below
+	sessions map[*session]struct{}
 }
 
-func New(cc grpc.ClientConnInterface, config config.Config) *Client {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) *Client {
+	onDone := trace.CoordinationOnNew(config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.New"),
+	)
+	defer onDone()
+
 	return &Client{
-		config:  config,
-		service: Ydb_Coordination_V1.NewCoordinationServiceClient(cc),
+		config:   config,
+		client:   Ydb_Coordination_V1.NewCoordinationServiceClient(cc),
+		sessions: make(map[*session]struct{}),
 	}
 }
 
-func (c *Client) CreateNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
+func operationParams(
+	ctx context.Context,
+	config interface {
+		OperationTimeout() time.Duration
+		OperationCancelAfter() time.Duration
+	},
+	mode operation.Mode,
+) *Ydb_Operations.OperationParams {
+	return operation.Params(
+		ctx,
+		config.OperationTimeout(),
+		config.OperationCancelAfter(),
+		mode,
+	)
+}
+
+func createNodeRequest(
+	path string, config coordination.NodeConfig, operationParams *Ydb_Operations.OperationParams,
+) *Ydb_Coordination.CreateNodeRequest {
+	return &Ydb_Coordination.CreateNodeRequest{
+		Path: path,
+		Config: &Ydb_Coordination.Config{
+			Path:                     config.Path,
+			SelfCheckPeriodMillis:    config.SelfCheckPeriodMillis,
+			SessionGracePeriodMillis: config.SessionGracePeriodMillis,
+			ReadConsistencyMode:      config.ReadConsistencyMode.To(),
+			AttachConsistencyMode:    config.AttachConsistencyMode.To(),
+			RateLimiterCountersMode:  config.RatelimiterCountersMode.To(),
+		},
+		OperationParams: operationParams,
+	}
+}
+
+func createNode(
+	ctx context.Context, client Ydb_Coordination_V1.CoordinationServiceClient, request *Ydb_Coordination.CreateNodeRequest,
+) error {
+	_, err := client.CreateNode(ctx, request)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
+}
+
+func (c *Client) CreateNode(ctx context.Context, path string, config coordination.NodeConfig) (finalErr error) {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
-	call := func(ctx context.Context) error {
-		return xerrors.WithStackTrace(c.createNode(ctx, path, config))
-	}
-	if !c.config.AutoRetry() {
-		return call(ctx)
-	}
-	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
-}
 
-func (c *Client) createNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
-	_, err = c.service.CreateNode(
-		ctx,
-		&Ydb_Coordination.CreateNodeRequest{
-			Path: path,
-			Config: &Ydb_Coordination.Config{
-				Path:                     config.Path,
-				SelfCheckPeriodMillis:    config.SelfCheckPeriodMillis,
-				SessionGracePeriodMillis: config.SessionGracePeriodMillis,
-				ReadConsistencyMode:      config.ReadConsistencyMode.To(),
-				AttachConsistencyMode:    config.AttachConsistencyMode.To(),
-				RateLimiterCountersMode:  config.RatelimiterCountersMode.To(),
-			},
-			OperationParams: operation.Params(
-				ctx,
-				c.config.OperationTimeout(),
-				c.config.OperationCancelAfter(),
-				operation.ModeSync,
-			),
-		},
+	onDone := trace.CoordinationOnCreateNode(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.(*Client).CreateNode"),
+		path,
 	)
-	return xerrors.WithStackTrace(err)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	request := createNodeRequest(path, config, operationParams(ctx, &c.config, operation.ModeSync))
+
+	if !c.config.AutoRetry() {
+		return createNode(ctx, c.client, request)
+	}
+
+	return retry.Retry(ctx,
+		func(ctx context.Context) error {
+			return createNode(ctx, c.client, request)
+		},
+		retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithBudget(c.config.RetryBudget()),
+	)
 }
 
-func (c *Client) AlterNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
+func (c *Client) AlterNode(ctx context.Context, path string, config coordination.NodeConfig) (finalErr error) {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
+
+	onDone := trace.CoordinationOnAlterNode(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.(*Client).AlterNode"),
+		path,
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	request := alterNodeRequest(path, config, operationParams(ctx, &c.config, operation.ModeSync))
+
 	call := func(ctx context.Context) error {
-		return xerrors.WithStackTrace(c.alterNode(ctx, path, config))
+		return alterNode(ctx, c.client, request)
 	}
 	if !c.config.AutoRetry() {
-		return call(ctx)
+		return xerrors.WithStackTrace(call(ctx))
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
-}
 
-func (c *Client) alterNode(ctx context.Context, path string, config coordination.NodeConfig) (err error) {
-	_, err = c.service.AlterNode(
-		ctx,
-		&Ydb_Coordination.AlterNodeRequest{
-			Path: path,
-			Config: &Ydb_Coordination.Config{
-				Path:                     config.Path,
-				SelfCheckPeriodMillis:    config.SelfCheckPeriodMillis,
-				SessionGracePeriodMillis: config.SessionGracePeriodMillis,
-				ReadConsistencyMode:      config.ReadConsistencyMode.To(),
-				AttachConsistencyMode:    config.AttachConsistencyMode.To(),
-				RateLimiterCountersMode:  config.RatelimiterCountersMode.To(),
-			},
-			OperationParams: operation.Params(
-				ctx,
-				c.config.OperationTimeout(),
-				c.config.OperationCancelAfter(),
-				operation.ModeSync,
-			),
+	return retry.Retry(ctx,
+		func(ctx context.Context) (err error) {
+			return alterNode(ctx, c.client, request)
 		},
+		retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
-	return xerrors.WithStackTrace(err)
 }
 
-func (c *Client) DropNode(ctx context.Context, path string) (err error) {
+func alterNodeRequest(
+	path string, config coordination.NodeConfig, operationParams *Ydb_Operations.OperationParams,
+) *Ydb_Coordination.AlterNodeRequest {
+	return &Ydb_Coordination.AlterNodeRequest{
+		Path: path,
+		Config: &Ydb_Coordination.Config{
+			Path:                     config.Path,
+			SelfCheckPeriodMillis:    config.SelfCheckPeriodMillis,
+			SessionGracePeriodMillis: config.SessionGracePeriodMillis,
+			ReadConsistencyMode:      config.ReadConsistencyMode.To(),
+			AttachConsistencyMode:    config.AttachConsistencyMode.To(),
+			RateLimiterCountersMode:  config.RatelimiterCountersMode.To(),
+		},
+		OperationParams: operationParams,
+	}
+}
+
+func alterNode(
+	ctx context.Context, client Ydb_Coordination_V1.CoordinationServiceClient, request *Ydb_Coordination.AlterNodeRequest,
+) error {
+	_, err := client.AlterNode(ctx, request)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
+}
+
+func (c *Client) DropNode(ctx context.Context, path string) (finalErr error) {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
+
+	onDone := trace.CoordinationOnDropNode(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.(*Client).DropNode"),
+		path,
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	request := dropNodeRequest(path, operationParams(ctx, &c.config, operation.ModeSync))
+
 	call := func(ctx context.Context) error {
-		return xerrors.WithStackTrace(c.dropNode(ctx, path))
+		return dropNode(ctx, c.client, request)
 	}
 	if !c.config.AutoRetry() {
-		return call(ctx)
+		return xerrors.WithStackTrace(call(ctx))
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
+
+	return retry.Retry(ctx,
+		func(ctx context.Context) (err error) {
+			return dropNode(ctx, c.client, request)
+		},
+		retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithBudget(c.config.RetryBudget()),
+	)
 }
 
-func (c *Client) dropNode(ctx context.Context, path string) (err error) {
-	_, err = c.service.DropNode(
-		ctx,
-		&Ydb_Coordination.DropNodeRequest{
-			Path: path,
-			OperationParams: operation.Params(
-				ctx,
-				c.config.OperationTimeout(),
-				c.config.OperationCancelAfter(),
-				operation.ModeSync,
-			),
-		},
-	)
-	return xerrors.WithStackTrace(err)
+func dropNodeRequest(path string, operationParams *Ydb_Operations.OperationParams) *Ydb_Coordination.DropNodeRequest {
+	return &Ydb_Coordination.DropNodeRequest{
+		Path:            path,
+		OperationParams: operationParams,
+	}
+}
+
+func dropNode(
+	ctx context.Context, client Ydb_Coordination_V1.CoordinationServiceClient, request *Ydb_Coordination.DropNodeRequest,
+) error {
+	_, err := client.DropNode(ctx, request)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
 }
 
 func (c *Client) DescribeNode(
@@ -143,28 +239,61 @@ func (c *Client) DescribeNode(
 ) (
 	entry *scheme.Entry,
 	config *coordination.NodeConfig,
-	err error,
+	finalErr error,
 ) {
 	if c == nil {
-		err = xerrors.WithStackTrace(errNilClient)
-		return
+		return nil, nil, xerrors.WithStackTrace(errNilClient)
 	}
-	call := func(ctx context.Context) error {
-		entry, config, err = c.describeNode(ctx, path)
-		return xerrors.WithStackTrace(err)
-	}
+
+	onDone := trace.CoordinationOnDescribeNode(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.(*Client).DescribeNode"),
+		path,
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	request := describeNodeRequest(path, operationParams(ctx, &c.config, operation.ModeSync))
+
 	if !c.config.AutoRetry() {
-		err = call(ctx)
-		return
+		return describeNode(ctx, c.client, request)
 	}
-	err = retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
-	return
+
+	err := retry.Retry(ctx,
+		func(ctx context.Context) (err error) {
+			entry, config, err = describeNode(ctx, c.client, request)
+			if err != nil {
+				return xerrors.WithStackTrace(err)
+			}
+
+			return nil
+		},
+		retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithBudget(c.config.RetryBudget()),
+	)
+	if err != nil {
+		return nil, nil, xerrors.WithStackTrace(err)
+	}
+
+	return entry, config, nil
+}
+
+func describeNodeRequest(
+	path string, operationParams *Ydb_Operations.OperationParams,
+) *Ydb_Coordination.DescribeNodeRequest {
+	return &Ydb_Coordination.DescribeNodeRequest{
+		Path:            path,
+		OperationParams: operationParams,
+	}
 }
 
 // DescribeNode describes a coordination node
-func (c *Client) describeNode(
+func describeNode(
 	ctx context.Context,
-	path string,
+	client Ydb_Coordination_V1.CoordinationServiceClient,
+	request *Ydb_Coordination.DescribeNodeRequest,
 ) (
 	_ *scheme.Entry,
 	_ *coordination.NodeConfig,
@@ -174,25 +303,16 @@ func (c *Client) describeNode(
 		response *Ydb_Coordination.DescribeNodeResponse
 		result   Ydb_Coordination.DescribeNodeResult
 	)
-	response, err = c.service.DescribeNode(
-		ctx,
-		&Ydb_Coordination.DescribeNodeRequest{
-			Path: path,
-			OperationParams: operation.Params(
-				ctx,
-				c.config.OperationTimeout(),
-				c.config.OperationCancelAfter(),
-				operation.ModeSync,
-			),
-		},
-	)
+	response, err = client.DescribeNode(ctx, request)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
+
 	err = response.GetOperation().GetResult().UnmarshalTo(&result)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
+
 	return scheme.InnerConvertEntry(result.GetSelf()), &coordination.NodeConfig{
 		Path:                     result.GetConfig().GetPath(),
 		SelfCheckPeriodMillis:    result.GetConfig().GetSelfCheckPeriodMillis(),
@@ -203,14 +323,85 @@ func (c *Client) describeNode(
 	}, nil
 }
 
-func (c *Client) Close(ctx context.Context) error {
+func newCreateSessionConfig(opts ...options.SessionOption) *options.CreateSessionOptions {
+	c := defaultCreateSessionConfig()
+	for _, o := range opts {
+		if o != nil {
+			o(c)
+		}
+	}
+
+	return c
+}
+
+func (c *Client) sessionCreated(s *session) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	c.sessions[s] = struct{}{}
+}
+
+func (c *Client) sessionClosed(s *session) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	delete(c.sessions, s)
+}
+
+func (c *Client) closeSessions(ctx context.Context) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	for s := range c.sessions {
+		s.Close(ctx)
+	}
+}
+
+func defaultCreateSessionConfig() *options.CreateSessionOptions {
+	return &options.CreateSessionOptions{
+		Description:             "YDB Go SDK",
+		SessionTimeout:          time.Second * 5, //nolint:gomnd
+		SessionStartTimeout:     time.Second * 1,
+		SessionStopTimeout:      time.Second * 1,
+		SessionKeepAliveTimeout: time.Second * 10,       //nolint:gomnd
+		SessionReconnectDelay:   time.Millisecond * 500, //nolint:gomnd
+	}
+}
+
+func (c *Client) Session(
+	ctx context.Context,
+	path string,
+	opts ...options.SessionOption,
+) (_ coordination.Session, finalErr error) {
+	if c == nil {
+		return nil, xerrors.WithStackTrace(errNilClient)
+	}
+
+	onDone := trace.CoordinationOnSession(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.(*Client).Session"),
+		path,
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	return createSession(ctx, c, path, newCreateSessionConfig(opts...))
+}
+
+func (c *Client) Close(ctx context.Context) (finalErr error) {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
-	return c.close(ctx)
-}
 
-func (c *Client) close(context.Context) error {
+	onDone := trace.CoordinationOnClose(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.(*Client).Close"),
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
+	c.closeSessions(ctx)
+
 	return nil
 }
 

@@ -6,8 +6,6 @@ import (
 )
 
 // Config is an configuration of coordination client
-//
-//nolint:maligned
 type Config struct {
 	config.Common
 
@@ -22,9 +20,9 @@ func (c Config) Trace() *trace.Coordination {
 type Option func(c *Config)
 
 // WithTrace appends coordination trace to early defined traces
-func WithTrace(trace trace.Coordination, opts ...trace.CoordinationComposeOption) Option {
+func WithTrace(trace *trace.Coordination, opts ...trace.CoordinationComposeOption) Option {
 	return func(c *Config) {
-		c.trace = c.trace.Compose(&trace, opts...)
+		c.trace = c.trace.Compose(trace, opts...)
 	}
 }
 
@@ -39,10 +37,11 @@ func New(opts ...Option) Config {
 	c := Config{
 		trace: &trace.Coordination{},
 	}
-	for _, o := range opts {
-		if o != nil {
-			o(&c)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&c)
 		}
 	}
+
 	return c
 }

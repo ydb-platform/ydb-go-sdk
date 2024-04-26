@@ -9,11 +9,13 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
+//nolint:funlen, maintidx
 func TestQueryBind(t *testing.T) {
 	now := time.Now()
 	for _, tt := range []struct {
@@ -566,14 +568,14 @@ SELECT $param1, $param2`,
 		},
 	} {
 		t.Run("", func(t *testing.T) {
-			yql, params, err := tt.b.RewriteQuery(tt.sql, tt.args...)
+			yql, parameters, err := tt.b.RewriteQuery(tt.sql, tt.args...)
 			if tt.err != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.err)
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tt.yql, yql)
-				require.Equal(t, tt.params, params)
+				require.Equal(t, []*params.Parameter(*tt.params), parameters)
 			}
 		})
 	}

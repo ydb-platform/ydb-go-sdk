@@ -3,8 +3,8 @@ package bind
 import (
 	"sort"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
 type AutoDeclare struct{}
@@ -27,9 +27,9 @@ func (m AutoDeclare) RewriteQuery(query string, args ...interface{}) (
 
 	var (
 		declares = make([]string, 0, len(params))
-		buffer   = allocator.Buffers.Get()
+		buffer   = xstring.Buffer()
 	)
-	defer allocator.Buffers.Put(buffer)
+	defer buffer.Free()
 
 	buffer.WriteString("-- bind declares\n")
 

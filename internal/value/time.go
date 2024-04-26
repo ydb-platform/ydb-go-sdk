@@ -12,9 +12,11 @@ import (
 const InfiniteDuration = time.Duration(math.MaxInt64)
 
 const (
-	secondsPerMinute uint64 = 60
-	secondsPerHour          = 60 * secondsPerMinute
-	secondsPerDay           = 24 * secondsPerHour
+	secondsPerMinute          uint64 = 60
+	secondsPerHour                   = 60 * secondsPerMinute
+	secondsPerDay                    = 24 * secondsPerHour
+	microsecondsPerSecond            = 1e6
+	nanosecondsPerMicrosecond        = 1000
 )
 
 // Date format layouts described in time.Format and time.ANSIC docs.
@@ -52,14 +54,15 @@ func DatetimeToTime(n uint32) time.Time {
 // TimestampToTime converts given microseconds to time.Time
 // Up to 586524-01-19 08:01:49.000551615 +0000 UTC.
 func TimestampToTime(n uint64) time.Time {
-	sec := n / 1e6
-	nsec := (n - (sec * 1e6)) * 1000
+	sec := n / microsecondsPerSecond
+	nsec := (n - (sec * microsecondsPerSecond)) * nanosecondsPerMicrosecond
+
 	return time.Unix(int64(sec), int64(nsec))
 }
 
 func TzDateToTime(s string) (t time.Time, err error) {
 	ss := strings.Split(s, ",")
-	if len(ss) != 2 {
+	if len(ss) != 2 { //nolint:gomnd
 		return t, xerrors.WithStackTrace(fmt.Errorf("not found timezone location in '%s'", s))
 	}
 	location, err := time.LoadLocation(ss[1])
@@ -70,12 +73,13 @@ func TzDateToTime(s string) (t time.Time, err error) {
 	if err != nil {
 		return t, xerrors.WithStackTrace(fmt.Errorf("parse '%s' failed: %w", s, err))
 	}
+
 	return t, nil
 }
 
 func TzDatetimeToTime(s string) (t time.Time, err error) {
 	ss := strings.Split(s, ",")
-	if len(ss) != 2 {
+	if len(ss) != 2 { //nolint:gomnd
 		return t, xerrors.WithStackTrace(fmt.Errorf("not found timezone location in '%s'", s))
 	}
 	location, err := time.LoadLocation(ss[1])
@@ -86,12 +90,13 @@ func TzDatetimeToTime(s string) (t time.Time, err error) {
 	if err != nil {
 		return t, xerrors.WithStackTrace(fmt.Errorf("parse '%s' failed: %w", s, err))
 	}
+
 	return t, nil
 }
 
 func TzTimestampToTime(s string) (t time.Time, err error) {
 	ss := strings.Split(s, ",")
-	if len(ss) != 2 {
+	if len(ss) != 2 { //nolint:gomnd
 		return t, xerrors.WithStackTrace(fmt.Errorf("not found timezone location in '%s'", s))
 	}
 	location, err := time.LoadLocation(ss[1])
@@ -106,5 +111,6 @@ func TzTimestampToTime(s string) (t time.Time, err error) {
 	if err != nil {
 		return t, xerrors.WithStackTrace(fmt.Errorf("parse '%s' failed: %w", s, err))
 	}
+
 	return t, nil
 }

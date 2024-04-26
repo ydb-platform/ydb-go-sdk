@@ -73,6 +73,7 @@ type readExplicitMessagesCount int
 func (count readExplicitMessagesCount) Apply(options ReadMessageBatchOptions) ReadMessageBatchOptions {
 	options.MinCount = int(count)
 	options.MaxCount = int(count)
+
 	return options
 }
 
@@ -101,7 +102,6 @@ func NewReader(
 			cfg.OperationTimeout(),
 			cfg.RetrySettings,
 			cfg.Trace,
-			cfg.BaseContext,
 		),
 		defaultBatchConfig: cfg.DefaultBatchConfig,
 		tracer:             cfg.Trace,
@@ -257,9 +257,9 @@ func convertNewParamsToStreamConfig(
 		cfg.ReadSelectors[i] = readSelectors[i].Clone()
 	}
 
-	for _, f := range opts {
-		if f != nil {
-			f(&cfg)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&cfg)
 		}
 	}
 
@@ -276,5 +276,6 @@ type PublicReadSelector struct {
 // Clone create deep clone of the selector
 func (s PublicReadSelector) Clone() *PublicReadSelector { //nolint:gocritic
 	s.Partitions = clone.Int64Slice(s.Partitions)
+
 	return &s
 }

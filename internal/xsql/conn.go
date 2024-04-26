@@ -8,10 +8,12 @@ import (
 	"io"
 	"path"
 	"strings"
+	"sync/atomic"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/helpers"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
@@ -66,14 +68,16 @@ func withTrace(t *trace.DatabaseSQL) connOption {
 type beginTxFunc func(ctx context.Context, txOptions driver.TxOptions) (currentTx, error)
 
 type conn struct {
+	ctx context.Context //nolint:containedctx
+
 	connector *Connector
 	trace     *trace.DatabaseSQL
 	session   table.ClosableSession // Immutable and r/o usage.
 
 	beginTxFuncs map[QueryMode]beginTxFunc
 
-	closed           xatomic.Bool
-	lastUsage        xatomic.Int64
+	closed           atomic.Bool
+	lastUsage        atomic.Int64
 	defaultQueryMode QueryMode
 
 	defaultTxControl *table.TransactionControl
@@ -101,6 +105,7 @@ type currentTx interface {
 	driver.Tx
 	driver.ExecerContext
 	driver.QueryerContext
+	driver.ConnPrepareContext
 	table.TransactionIdentifier
 }
 
@@ -122,20 +127,22 @@ var (
 	_ driver.Result = resultNoRows{}
 )
 
-func newConn(c *Connector, s table.ClosableSession, opts ...connOption) *conn {
+func newConn(ctx context.Context, c *Connector, s table.ClosableSession, opts ...connOption) *conn {
 	cc := &conn{
+		ctx:       ctx,
 		connector: c,
 		session:   s,
 	}
 	cc.beginTxFuncs = map[QueryMode]beginTxFunc{
 		DataQueryMode: cc.beginTx,
 	}
-	for _, o := range opts {
-		if o != nil {
-			o(cc)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(cc)
 		}
 	}
 	c.attach(cc)
+
 	return cc
 }
 
@@ -143,18 +150,28 @@ func (c *conn) isReady() bool {
 	return c.session.Status() == table.SessionReady
 }
 
-func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, err error) {
-	onDone := trace.DatabaseSQLOnConnPrepare(c.trace, &ctx, query)
+func (c *conn) PrepareContext(ctx context.Context, query string) (_ driver.Stmt, finalErr error) {
+	if c.currentTx != nil {
+		return c.currentTx.PrepareContext(ctx, query)
+	}
+	onDone := trace.DatabaseSQLOnConnPrepare(c.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).PrepareContext"),
+		query,
+	)
 	defer func() {
-		onDone(err)
+		onDone(finalErr)
 	}()
+
 	if !c.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
+
 	return &stmt{
-		conn:  c,
-		query: query,
-		trace: c.trace,
+		conn:      c,
+		processor: c,
+		ctx:       ctx,
+		query:     query,
+		trace:     c.trace,
 	}, nil
 }
 
@@ -162,29 +179,42 @@ func (c *conn) sinceLastUsage() time.Duration {
 	return time.Since(time.Unix(c.lastUsage.Load(), 0))
 }
 
-func (c *conn) execContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, err error) {
-	var (
-		m      = queryModeFromContext(ctx, c.defaultQueryMode)
-		onDone = trace.DatabaseSQLOnConnExec(c.trace, &ctx, query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage())
-	)
-
+func (c *conn) execContext(ctx context.Context, query string, args []driver.NamedValue) (
+	_ driver.Result, finalErr error,
+) {
 	defer func() {
 		c.lastUsage.Store(time.Now().Unix())
-		onDone(err)
 	}()
+
+	if !c.isReady() {
+		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+	}
+
+	if c.currentTx != nil {
+		return c.currentTx.ExecContext(ctx, query, args)
+	}
+
+	var (
+		m      = queryModeFromContext(ctx, c.defaultQueryMode)
+		onDone = trace.DatabaseSQLOnConnExec(
+			c.trace, &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).execContext"),
+			query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage(),
+		)
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
 	switch m {
 	case DataQueryMode:
-		var (
-			res    result.Result
-			params *table.QueryParameters
-		)
-		query, params, err = c.normalize(query, args...)
+		normalizedQuery, parameters, err := c.normalize(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
-		_, res, err = c.session.Execute(ctx,
+		_, res, err := c.session.Execute(ctx,
 			txControl(ctx, c.defaultTxControl),
-			query, params, c.dataQueryOptions(ctx)...,
+			normalizedQuery, &parameters, c.dataQueryOptions(ctx)...,
 		)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -198,27 +228,26 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		if err = res.Err(); err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		return resultNoRows{}, nil
 	case SchemeQueryMode:
-		query, _, err = c.normalize(query)
+		normalizedQuery, _, err := c.normalize(query)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
-		err = c.session.ExecuteSchemeQuery(ctx, query)
+		err = c.session.ExecuteSchemeQuery(ctx, normalizedQuery)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		return resultNoRows{}, nil
 	case ScriptingQueryMode:
-		var (
-			res    result.StreamResult
-			params *table.QueryParameters
-		)
-		query, params, err = c.normalize(query, args...)
+		var res result.StreamResult
+		normalizedQuery, parameters, err := c.normalize(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
-		res, err = c.connector.parent.Scripting().StreamExecute(ctx, query, params)
+		res, err = c.connector.parent.Scripting().StreamExecute(ctx, normalizedQuery, &parameters)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
@@ -231,59 +260,71 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 		if err = res.Err(); err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		return resultNoRows{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported query mode '%s' for execute query", m)
 	}
 }
 
-func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, err error) {
+func (c *conn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Result, _ error) {
 	if !c.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
 	if c.currentTx != nil {
 		return c.currentTx.ExecContext(ctx, query, args)
 	}
+
 	return c.execContext(ctx, query, args)
 }
 
-func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, err error) {
+func (c *conn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, _ error) {
 	if !c.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
 	if c.currentTx != nil {
 		return c.currentTx.QueryContext(ctx, query, args)
 	}
+
 	return c.queryContext(ctx, query, args)
 }
 
-func (c *conn) queryContext(ctx context.Context, query string, args []driver.NamedValue) (_ driver.Rows, err error) {
-	m := queryModeFromContext(ctx, c.defaultQueryMode)
-	onDone := trace.DatabaseSQLOnConnQuery(
-		c.trace,
-		&ctx,
-		query,
-		m.String(),
-		xcontext.IsIdempotent(ctx),
-		c.sinceLastUsage(),
-	)
+func (c *conn) queryContext(ctx context.Context, query string, args []driver.NamedValue) (
+	_ driver.Rows, finalErr error,
+) {
 	defer func() {
 		c.lastUsage.Store(time.Now().Unix())
-		onDone(err)
 	}()
+
+	if !c.isReady() {
+		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
+	}
+
+	if c.currentTx != nil {
+		return c.currentTx.QueryContext(ctx, query, args)
+	}
+
+	var (
+		m      = queryModeFromContext(ctx, c.defaultQueryMode)
+		onDone = trace.DatabaseSQLOnConnQuery(
+			c.trace, &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).queryContext"),
+			query, m.String(), xcontext.IsIdempotent(ctx), c.sinceLastUsage(),
+		)
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+
 	switch m {
 	case DataQueryMode:
-		var (
-			res    result.Result
-			params *table.QueryParameters
-		)
-		query, params, err = c.normalize(query, args...)
+		normalizedQuery, parameters, err := c.normalize(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
-		_, res, err = c.session.Execute(ctx,
+		_, res, err := c.session.Execute(ctx,
 			txControl(ctx, c.defaultTxControl),
-			query, params, c.dataQueryOptions(ctx)...,
+			normalizedQuery, &parameters, c.dataQueryOptions(ctx)...,
 		)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -291,21 +332,18 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		if err = res.Err(); err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		return &rows{
 			conn:   c,
 			result: res,
 		}, nil
 	case ScanQueryMode:
-		var (
-			res    result.StreamResult
-			params *table.QueryParameters
-		)
-		query, params, err = c.normalize(query, args...)
+		normalizedQuery, parameters, err := c.normalize(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
-		res, err = c.session.StreamExecuteScanQuery(ctx,
-			query, params, c.scanQueryOptions(ctx)...,
+		res, err := c.session.StreamExecuteScanQuery(ctx,
+			normalizedQuery, &parameters, c.scanQueryOptions(ctx)...,
 		)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
@@ -313,20 +351,21 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 		if err = res.Err(); err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		return &rows{
 			conn:   c,
 			result: res,
 		}, nil
 	case ExplainQueryMode:
-		var exp table.DataQueryExplanation
-		query, _, err = c.normalize(query, args...)
+		normalizedQuery, _, err := c.normalize(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
-		exp, err = c.session.Explain(ctx, query)
+		exp, err := c.session.Explain(ctx, normalizedQuery)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		return &single{
 			values: []sql.NamedArg{
 				sql.Named("AST", exp.AST),
@@ -334,21 +373,18 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 			},
 		}, nil
 	case ScriptingQueryMode:
-		var (
-			res    result.StreamResult
-			params *table.QueryParameters
-		)
-		query, params, err = c.normalize(query, args...)
+		normalizedQuery, parameters, err := c.normalize(query, args...)
 		if err != nil {
 			return nil, xerrors.WithStackTrace(err)
 		}
-		res, err = c.connector.parent.Scripting().StreamExecute(ctx, query, params)
+		res, err := c.connector.parent.Scripting().StreamExecute(ctx, normalizedQuery, &parameters)
 		if err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
 		if err = res.Err(); err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		return &rows{
 			conn:   c,
 			result: res,
@@ -358,33 +394,47 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 	}
 }
 
-func (c *conn) Ping(ctx context.Context) (err error) {
-	onDone := trace.DatabaseSQLOnConnPing(c.trace, &ctx)
+func (c *conn) Ping(ctx context.Context) (finalErr error) {
+	onDone := trace.DatabaseSQLOnConnPing(c.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).Ping"),
+	)
 	defer func() {
-		onDone(err)
+		onDone(finalErr)
 	}()
 	if !c.isReady() {
 		return badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
-	if err = c.session.KeepAlive(ctx); err != nil {
+	if err := c.session.KeepAlive(ctx); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
+
 	return nil
 }
 
-func (c *conn) Close() (err error) {
+func (c *conn) Close() (finalErr error) {
 	if c.closed.CompareAndSwap(false, true) {
 		c.connector.detach(c)
-		onDone := trace.DatabaseSQLOnConnClose(c.trace)
+		var (
+			ctx    = c.ctx
+			onDone = trace.DatabaseSQLOnConnClose(
+				c.trace, &ctx,
+				stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).Close"),
+			)
+		)
 		defer func() {
-			onDone(err)
+			onDone(finalErr)
 		}()
-		err = c.session.Close(context.Background())
+		if c.currentTx != nil {
+			_ = c.currentTx.Rollback()
+		}
+		err := c.session.Close(xcontext.ValueOnly(ctx))
 		if err != nil {
 			return badconn.Map(xerrors.WithStackTrace(err))
 		}
+
 		return nil
 	}
+
 	return badconn.Map(xerrors.WithStackTrace(errConnClosedEarly))
 }
 
@@ -396,35 +446,56 @@ func (c *conn) Begin() (driver.Tx, error) {
 	return nil, errDeprecated
 }
 
-func (c *conn) normalize(q string, args ...driver.NamedValue) (query string, _ *table.QueryParameters, _ error) {
+func (c *conn) normalize(q string, args ...driver.NamedValue) (query string, _ params.Parameters, _ error) {
 	return c.connector.Bindings.RewriteQuery(q, func() (ii []interface{}) {
 		for i := range args {
 			ii = append(ii, args[i])
 		}
+
 		return ii
 	}()...)
 }
 
-func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ driver.Tx, err error) {
+func (c *conn) ID() string {
+	return c.session.ID()
+}
+
+func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ driver.Tx, finalErr error) {
 	var tx currentTx
-	onDone := trace.DatabaseSQLOnConnBegin(c.trace, &ctx)
+	onDone := trace.DatabaseSQLOnConnBegin(c.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).BeginTx"),
+	)
 	defer func() {
-		onDone(tx, err)
+		onDone(tx, finalErr)
 	}()
 
 	if c.currentTx != nil {
-		return nil, xerrors.WithStackTrace(&ErrConnAlreadyHaveTx{
-			currentTx: c.currentTx.ID(),
-		})
+		return nil, xerrors.WithStackTrace(
+			xerrors.Retryable(
+				&ConnAlreadyHaveTxError{
+					currentTx: c.currentTx.ID(),
+				},
+				xerrors.InvalidObject(),
+			),
+		)
 	}
 
 	m := queryModeFromContext(ctx, c.defaultQueryMode)
 
 	beginTx, isKnown := c.beginTxFuncs[m]
 	if !isKnown {
-		return nil, badconn.Map(xerrors.WithStackTrace(fmt.Errorf("wrong query mode: %s", m.String())))
+		return nil, badconn.Map(
+			xerrors.WithStackTrace(
+				xerrors.Retryable(
+					fmt.Errorf("wrong query mode: %s", m.String()),
+					xerrors.InvalidObject(),
+					xerrors.WithName("WRONG_QUERY_MODE"),
+				),
+			),
+		)
 	}
 
+	var err error
 	tx, err = beginTx(ctx, txOptions)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
@@ -433,24 +504,33 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 	return tx, nil
 }
 
-func (c *conn) Version(_ context.Context) (_ string, err error) {
+func (c *conn) Version(_ context.Context) (_ string, _ error) {
 	const version = "default"
+
 	return version, nil
 }
 
-func (c *conn) IsTableExists(ctx context.Context, tableName string) (tableExists bool, err error) {
+func (c *conn) IsTableExists(ctx context.Context, tableName string) (tableExists bool, finalErr error) {
 	tableName = c.normalizePath(tableName)
-	tableExists, err = helpers.IsEntryExists(ctx,
+	onDone := trace.DatabaseSQLOnConnIsTableExists(c.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).IsTableExists"),
+		tableName,
+	)
+	defer func() {
+		onDone(tableExists, finalErr)
+	}()
+	tableExists, err := helpers.IsEntryExists(ctx,
 		c.connector.parent.Scheme(), tableName,
 		scheme.EntryTable, scheme.EntryColumnTable,
 	)
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
+
 	return tableExists, nil
 }
 
-func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string) (columnExists bool, err error) {
+func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string) (columnExists bool, _ error) {
 	tableName = c.normalizePath(tableName)
 	tableExists, err := helpers.IsEntryExists(ctx,
 		c.connector.parent.Scheme(), tableName,
@@ -463,7 +543,7 @@ func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string)
 		return false, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
 
-	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+	err = c.retryIdempotent(ctx, func(ctx context.Context) (err error) {
 		desc, err := c.session.DescribeTable(ctx, tableName)
 		if err != nil {
 			return err
@@ -471,18 +551,21 @@ func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string)
 		for i := range desc.Columns {
 			if desc.Columns[i].Name == columnName {
 				columnExists = true
+
 				break
 			}
 		}
+
 		return nil
-	}, retry.WithIdempotent(true))
+	})
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
+
 	return columnExists, nil
 }
 
-func (c *conn) GetColumns(ctx context.Context, tableName string) (columns []string, err error) {
+func (c *conn) GetColumns(ctx context.Context, tableName string) (columns []string, _ error) {
 	tableName = c.normalizePath(tableName)
 	tableExists, err := helpers.IsEntryExists(ctx,
 		c.connector.parent.Scheme(), tableName,
@@ -495,7 +578,7 @@ func (c *conn) GetColumns(ctx context.Context, tableName string) (columns []stri
 		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
 
-	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+	err = c.retryIdempotent(ctx, func(ctx context.Context) (err error) {
 		desc, err := c.session.DescribeTable(ctx, tableName)
 		if err != nil {
 			return err
@@ -503,15 +586,17 @@ func (c *conn) GetColumns(ctx context.Context, tableName string) (columns []stri
 		for i := range desc.Columns {
 			columns = append(columns, desc.Columns[i].Name)
 		}
+
 		return nil
-	}, retry.WithIdempotent(true))
+	})
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	return columns, nil
 }
 
-func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) (dataType string, err error) {
+func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) (dataType string, _ error) {
 	tableName = c.normalizePath(tableName)
 	tableExists, err := helpers.IsEntryExists(ctx,
 		c.connector.parent.Scheme(), tableName,
@@ -532,7 +617,7 @@ func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) 
 		return "", xerrors.WithStackTrace(fmt.Errorf("column '%s' not exist in table '%s'", columnName, tableName))
 	}
 
-	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+	err = c.retryIdempotent(ctx, func(ctx context.Context) (err error) {
 		desc, err := c.session.DescribeTable(ctx, tableName)
 		if err != nil {
 			return err
@@ -540,18 +625,21 @@ func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) 
 		for i := range desc.Columns {
 			if desc.Columns[i].Name == columnName {
 				dataType = desc.Columns[i].Type.Yql()
+
 				break
 			}
 		}
+
 		return nil
-	}, retry.WithIdempotent(true))
+	})
 	if err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
+
 	return dataType, nil
 }
 
-func (c *conn) GetPrimaryKeys(ctx context.Context, tableName string) (pkCols []string, err error) {
+func (c *conn) GetPrimaryKeys(ctx context.Context, tableName string) (pkCols []string, _ error) {
 	tableName = c.normalizePath(tableName)
 	tableExists, err := helpers.IsEntryExists(ctx,
 		c.connector.parent.Scheme(), tableName,
@@ -564,21 +652,23 @@ func (c *conn) GetPrimaryKeys(ctx context.Context, tableName string) (pkCols []s
 		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
 
-	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+	err = c.retryIdempotent(ctx, func(ctx context.Context) (err error) {
 		desc, err := c.session.DescribeTable(ctx, tableName)
 		if err != nil {
 			return err
 		}
 		pkCols = append(pkCols, desc.PrimaryKey...)
+
 		return nil
-	}, retry.WithIdempotent(true))
+	})
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
+
 	return pkCols, nil
 }
 
-func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (ok bool, err error) {
+func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (ok bool, _ error) {
 	tableName = c.normalizePath(tableName)
 	tableExists, err := helpers.IsEntryExists(ctx,
 		c.connector.parent.Scheme(), tableName,
@@ -606,9 +696,11 @@ func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (
 	for _, pkCol := range pkCols {
 		if pkCol == columnName {
 			ok = true
+
 			break
 		}
 	}
+
 	return ok, nil
 }
 
@@ -625,21 +717,23 @@ func isSysDir(databaseName, dirAbsPath string) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
 func (c *conn) getTables(ctx context.Context, absPath string, recursive, excludeSysDirs bool) (
-	tables []string, err error,
+	tables []string, _ error,
 ) {
 	if excludeSysDirs && isSysDir(c.connector.parent.Name(), absPath) {
 		return nil, nil
 	}
 
 	var d scheme.Directory
-	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+	err := c.retryIdempotent(ctx, func(ctx context.Context) (err error) {
 		d, err = c.connector.parent.Scheme().ListDirectory(ctx, absPath)
+
 		return err
-	}, retry.WithIdempotent(true))
+	})
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -667,15 +761,16 @@ func (c *conn) getTables(ctx context.Context, absPath string, recursive, exclude
 }
 
 func (c *conn) GetTables(ctx context.Context, folder string, recursive, excludeSysDirs bool) (
-	tables []string, err error,
+	tables []string, _ error,
 ) {
 	absPath := c.normalizePath(folder)
 
 	var e scheme.Entry
-	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+	err := c.retryIdempotent(ctx, func(ctx context.Context) (err error) {
 		e, err = c.connector.parent.Scheme().DescribePath(ctx, absPath)
+
 		return err
-	}, retry.WithIdempotent(true))
+	})
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -692,6 +787,7 @@ func (c *conn) GetTables(ctx context.Context, folder string, recursive, excludeS
 		for i := range tables {
 			tables[i] = strings.TrimPrefix(tables[i], absPath+"/")
 		}
+
 		return tables, nil
 	default:
 		return nil, xerrors.WithStackTrace(
@@ -700,7 +796,7 @@ func (c *conn) GetTables(ctx context.Context, folder string, recursive, excludeS
 	}
 }
 
-func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []string, err error) {
+func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []string, _ error) {
 	tableName = c.normalizePath(tableName)
 	tableExists, err := helpers.IsEntryExists(ctx,
 		c.connector.parent.Scheme(), tableName,
@@ -713,7 +809,7 @@ func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []stri
 		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
 
-	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+	err = c.retryIdempotent(ctx, func(ctx context.Context) (err error) {
 		desc, err := c.session.DescribeTable(ctx, tableName)
 		if err != nil {
 			return err
@@ -721,8 +817,9 @@ func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []stri
 		for i := range desc.Indexes {
 			indexes = append(indexes, desc.Indexes[i].Name)
 		}
+
 		return nil
-	}, retry.WithIdempotent(true))
+	})
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -730,7 +827,20 @@ func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []stri
 	return indexes, nil
 }
 
-func (c *conn) GetIndexColumns(ctx context.Context, tableName, indexName string) (columns []string, err error) {
+func (c *conn) retryIdempotent(ctx context.Context, f func(ctx context.Context) error) error {
+	err := retry.Retry(ctx, f,
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.connector.traceRetry),
+		retry.WithBudget(c.connector.retryBudget),
+	)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
+}
+
+func (c *conn) GetIndexColumns(ctx context.Context, tableName, indexName string) (columns []string, _ error) {
 	tableName = c.normalizePath(tableName)
 	tableExists, err := helpers.IsEntryExists(ctx,
 		c.connector.parent.Scheme(), tableName,
@@ -743,7 +853,7 @@ func (c *conn) GetIndexColumns(ctx context.Context, tableName, indexName string)
 		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
 
-	err = retry.Retry(ctx, func(ctx context.Context) (err error) {
+	err = c.retryIdempotent(ctx, func(ctx context.Context) (err error) {
 		desc, err := c.session.DescribeTable(ctx, tableName)
 		if err != nil {
 			return err
@@ -751,11 +861,13 @@ func (c *conn) GetIndexColumns(ctx context.Context, tableName, indexName string)
 		for i := range desc.Indexes {
 			if desc.Indexes[i].Name == indexName {
 				columns = append(columns, desc.Indexes[i].IndexColumns...)
+
 				return nil
 			}
 		}
+
 		return xerrors.WithStackTrace(fmt.Errorf("index '%s' not found in table '%s'", indexName, tableName))
-	}, retry.WithIdempotent(true))
+	})
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

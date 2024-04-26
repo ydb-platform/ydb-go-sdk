@@ -14,11 +14,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/discovery/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func New(cc grpc.ClientConnInterface, config *config.Config) *Client {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) *Client {
 	return &Client{
 		config: config,
 		cc:     cc,
@@ -37,15 +38,18 @@ type Client struct {
 // Discover cluster endpoints
 func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
 	var (
-		onDone  = trace.DiscoveryOnDiscover(c.config.Trace(), &ctx, c.config.Endpoint(), c.config.Database())
+		onDone = trace.DiscoveryOnDiscover(
+			c.config.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/discovery.(*Client).Discover"),
+			c.config.Endpoint(), c.config.Database(),
+		)
 		request = Ydb_Discovery.ListEndpointsRequest{
 			Database: c.config.Database(),
 		}
 		response *Ydb_Discovery.ListEndpointsResponse
 		result   Ydb_Discovery.ListEndpointsResult
+		location string
 	)
-
-	var location string
 	defer func() {
 		nodes := make([]trace.EndpointInfo, 0, len(endpoints))
 		for _, e := range endpoints {
@@ -66,9 +70,7 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 
 	if response.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS {
 		return nil, xerrors.WithStackTrace(
-			xerrors.Operation(
-				xerrors.FromOperation(response.GetOperation()),
-			),
+			xerrors.FromOperation(response.GetOperation()),
 		)
 	}
 
@@ -78,9 +80,9 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 	}
 
 	location = result.GetSelfLocation()
-	endpoints = make([]endpoint.Endpoint, 0, len(result.Endpoints))
-	for _, e := range result.Endpoints {
-		if e.Ssl == c.config.Secure() {
+	endpoints = make([]endpoint.Endpoint, 0, len(result.GetEndpoints()))
+	for _, e := range result.GetEndpoints() {
+		if e.GetSsl() == c.config.Secure() {
 			endpoints = append(endpoints, endpoint.New(
 				net.JoinHostPort(e.GetAddress(), strconv.Itoa(int(e.GetPort()))),
 				endpoint.WithLocation(e.GetLocation()),
@@ -97,7 +99,9 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 
 func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err error) {
 	var (
-		onDone             = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx)
+		onDone = trace.DiscoveryOnWhoAmI(c.config.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/discovery.(*Client).WhoAmI"),
+		)
 		request            = Ydb_Discovery.WhoAmIRequest{}
 		response           *Ydb_Discovery.WhoAmIResponse
 		whoAmIResultResult Ydb_Discovery.WhoAmIResult
@@ -122,10 +126,8 @@ func (c *Client) WhoAmI(ctx context.Context) (whoAmI *discovery.WhoAmI, err erro
 
 	if response.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS {
 		return nil, xerrors.WithStackTrace(
-			xerrors.Operation(
-				xerrors.FromOperation(
-					response.GetOperation(),
-				),
+			xerrors.FromOperation(
+				response.GetOperation(),
 			),
 		)
 	}
@@ -150,5 +152,6 @@ func (c *Client) Close(context.Context) error {
 	if cc, has := c.cc.(io.Closer); has {
 		return cc.Close()
 	}
+
 	return nil
 }

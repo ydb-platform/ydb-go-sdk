@@ -53,12 +53,14 @@ func (c *SupportedCodecs) Contains(need Codec) bool {
 			return true
 		}
 	}
+
 	return false
 }
 
 func (c *SupportedCodecs) Clone() SupportedCodecs {
 	res := make(SupportedCodecs, len(*c))
 	copy(res, *c)
+
 	return res
 }
 
@@ -77,6 +79,7 @@ func (c *SupportedCodecs) IsEqualsTo(other SupportedCodecs) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -88,13 +91,14 @@ func (c *SupportedCodecs) ToProto() *Ydb_Topic.SupportedCodecs {
 	for i := range codecs {
 		proto.Codecs[i] = int32(codecs[i].ToProto().Number())
 	}
+
 	return proto
 }
 
 func (c *SupportedCodecs) MustFromProto(proto *Ydb_Topic.SupportedCodecs) {
 	res := make([]Codec, len(proto.GetCodecs()))
 	for i := range proto.GetCodecs() {
-		res[i].MustFromProto(Ydb_Topic.Codec(proto.Codecs[i]))
+		res[i].MustFromProto(Ydb_Topic.Codec(proto.GetCodecs()[i]))
 	}
 	*c = res
 }

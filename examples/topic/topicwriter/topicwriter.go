@@ -12,16 +12,19 @@ import (
 
 func ConnectSimple(ctx context.Context, db *ydb.Driver) *topicwriter.Writer {
 	writer, _ := db.Topic().StartWriter("topicName")
+
 	return writer
 }
 
 func ConnectWithSyncWrite(ctx context.Context, db *ydb.Driver) *topicwriter.Writer {
-	writer, _ := db.Topic().StartWriter("topicName", topicoptions.WithSyncWrite(true))
+	writer, _ := db.Topic().StartWriter("topicName", topicoptions.WithWriterWaitServerAck(true))
+
 	return writer
 }
 
 func ConnectSelectCodec(ctx context.Context, db *ydb.Driver) *topicwriter.Writer {
-	writer, _ := db.Topic().StartWriter("topicName", topicoptions.WithCodec(topictypes.CodecGzip))
+	writer, _ := db.Topic().StartWriter("topicName", topicoptions.WithWriterCodec(topictypes.CodecGzip))
+
 	return writer
 }
 

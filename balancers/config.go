@@ -20,8 +20,8 @@ const (
 type preferType string
 
 const (
-	preferLocalDC   = preferType("local_dc")
-	preferLocations = preferType("locations")
+	preferTypeLocalDC   = preferType("local_dc")
+	preferTypeLocations = preferType("locations")
 )
 
 type balancersConfig struct {
@@ -88,18 +88,20 @@ func CreateFromConfig(s string) (*balancerConfig.Config, error) {
 	}
 
 	switch c.Prefer {
-	case preferLocalDC:
+	case preferTypeLocalDC:
 		if c.Fallback {
 			return PreferLocalDCWithFallBack(b), nil
 		}
+
 		return PreferLocalDC(b), nil
-	case preferLocations:
+	case preferTypeLocations:
 		if len(c.Locations) == 0 {
 			return nil, xerrors.WithStackTrace(fmt.Errorf("empty locations list in balancer '%s' config", c.Type))
 		}
 		if c.Fallback {
 			return PreferLocationsWithFallback(b, c.Locations...), nil
 		}
+
 		return PreferLocations(b, c.Locations...), nil
 	default:
 		return b, nil
@@ -114,9 +116,9 @@ func FromConfig(config string, opts ...fromConfigOption) *balancerConfig.Config 
 		b   *balancerConfig.Config
 		err error
 	)
-	for _, o := range opts {
-		if o != nil {
-			o(&h)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&h)
 		}
 	}
 
@@ -125,6 +127,7 @@ func FromConfig(config string, opts ...fromConfigOption) *balancerConfig.Config 
 		if h.errorHandler != nil {
 			h.errorHandler(err)
 		}
+
 		return h.fallbackBalancer
 	}
 

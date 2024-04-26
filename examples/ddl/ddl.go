@@ -71,11 +71,13 @@ func executeQuery(ctx context.Context, c table.Client, prefix, query string) (er
 	err = c.Do(ctx,
 		func(ctx context.Context, s table.Session) error {
 			err = s.ExecuteSchemeQuery(ctx, fmt.Sprintf(query, prefix))
+
 			return err
 		},
 	)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }

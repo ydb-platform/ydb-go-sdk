@@ -21,7 +21,7 @@ var (
 	logLevel         string
 )
 
-func init() {
+func init() { //nolint:gochecknoinits
 	required := []string{"ydb"}
 	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	flagSet.Usage = func() {
@@ -93,6 +93,7 @@ func main() {
 	if err != nil {
 		fmt.Println()
 		fmt.Println("Create service failed. Re-run with flag '-log-level=warn' and see logs")
+
 		return
 	}
 	defer s.Close(ctx)

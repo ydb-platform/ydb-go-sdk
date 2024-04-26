@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestWriterWaitInit(t *testing.T) {
@@ -41,7 +41,7 @@ func TestWriterWrite(t *testing.T) {
 			w := Writer{
 				streamWriter: strm,
 			}
-			require.NoError(t, w.Write(ctx, Message{SeqNo: 1}))
+			require.NoError(t, w.Write(ctx, PublicMessage{SeqNo: 1}))
 		})
 	})
 }
@@ -56,6 +56,6 @@ func TestWriterWriteMessage(t *testing.T) {
 		w := Writer{
 			streamWriter: strm,
 		}
-		require.NoError(t, w.Write(ctx, Message{SeqNo: 1}, Message{SeqNo: 3}))
+		require.NoError(t, w.Write(ctx, PublicMessage{SeqNo: 1}, PublicMessage{SeqNo: 3}))
 	})
 }

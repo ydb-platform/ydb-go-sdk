@@ -3,14 +3,19 @@ package meta
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
+
+var pid = os.Getpid()
 
 func New(
 	database string,
@@ -19,23 +24,25 @@ func New(
 	opts ...Option,
 ) *Meta {
 	m := &Meta{
+		pid:         strconv.Itoa(pid),
 		trace:       trace,
 		credentials: credentials,
 		database:    database,
 	}
-	for _, o := range opts {
-		if o != nil {
-			o(m)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(m)
 		}
 	}
+
 	return m
 }
 
 type Option func(m *Meta)
 
-func WithUserAgentOption(userAgent string) Option {
+func WithApplicationNameOption(applicationName string) Option {
 	return func(m *Meta) {
-		m.userAgents = append(m.userAgents, userAgent)
+		m.applicationName = applicationName
 	}
 }
 
@@ -65,12 +72,13 @@ func ForbidOption(feature string) Option {
 }
 
 type Meta struct {
-	trace        *trace.Driver
-	credentials  credentials.Credentials
-	database     string
-	requestsType string
-	userAgents   []string
-	capabilities []string
+	pid             string
+	trace           *trace.Driver
+	credentials     credentials.Credentials
+	database        string
+	requestsType    string
+	applicationName string
+	capabilities    []string
 }
 
 func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
@@ -78,6 +86,8 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 	if !has {
 		md = metadata.MD{}
 	}
+
+	md.Set(HeaderClientPid, m.pid)
 
 	if len(md.Get(HeaderDatabase)) == 0 {
 		md.Set(HeaderDatabase, m.database)
@@ -93,8 +103,8 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		}
 	}
 
-	if len(m.userAgents) != 0 {
-		md.Append(HeaderUserAgent, m.userAgents...)
+	if m.applicationName != "" {
+		md.Append(HeaderApplicationName, m.applicationName)
 	}
 
 	if len(m.capabilities) > 0 {
@@ -107,7 +117,9 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 
 	var token string
 
-	done := trace.DriverOnGetCredentials(m.trace, &ctx)
+	done := trace.DriverOnGetCredentials(m.trace, &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/meta.(*Meta).meta"),
+	)
 	defer func() {
 		done(token, err)
 	}()
@@ -117,6 +129,7 @@ func (m *Meta) meta(ctx context.Context) (_ metadata.MD, err error) {
 		if stringer, ok := m.credentials.(fmt.Stringer); ok {
 			return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %s", err, stringer.String()))
 		}
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 
@@ -130,5 +143,6 @@ func (m *Meta) Context(ctx context.Context) (_ context.Context, err error) {
 	if err != nil {
 		return ctx, xerrors.WithStackTrace(err)
 	}
+
 	return metadata.NewOutgoingContext(ctx, md), nil
 }

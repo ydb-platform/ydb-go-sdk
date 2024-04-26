@@ -26,25 +26,26 @@ func (e *Entry) FromProto(proto *Ydb_Scheme.Entry) error {
 	if proto == nil {
 		return xerrors.WithStackTrace(errUnexpectedNilForSchemeEntry)
 	}
-	e.Name = proto.Name
-	e.Owner = proto.Owner
-	e.Type = EntryType(proto.Type)
+	e.Name = proto.GetName()
+	e.Owner = proto.GetOwner()
+	e.Type = EntryType(proto.GetType())
 
-	e.EffectivePermissions = make([]Permissions, len(proto.EffectivePermissions))
-	for i := range proto.EffectivePermissions {
-		if err := e.EffectivePermissions[i].FromProto(proto.EffectivePermissions[i]); err != nil {
+	e.EffectivePermissions = make([]Permissions, len(proto.GetEffectivePermissions()))
+	for i := range proto.GetEffectivePermissions() {
+		if err := e.EffectivePermissions[i].FromProto(proto.GetEffectivePermissions()[i]); err != nil {
 			return err
 		}
 	}
 
-	e.Permissions = make([]Permissions, len(proto.Permissions))
-	for i := range proto.Permissions {
-		if err := e.Permissions[i].FromProto(proto.Permissions[i]); err != nil {
+	e.Permissions = make([]Permissions, len(proto.GetPermissions()))
+	for i := range proto.GetPermissions() {
+		if err := e.Permissions[i].FromProto(proto.GetPermissions()[i]); err != nil {
 			return err
 		}
 	}
 
-	e.SizeBytes = proto.SizeBytes
+	e.SizeBytes = proto.GetSizeBytes()
+
 	return nil
 }
 
@@ -73,7 +74,8 @@ func (p *Permissions) FromProto(proto *Ydb_Scheme.Permissions) error {
 	if proto == nil {
 		return xerrors.WithStackTrace(errUnexpectedNilForSchemePermissions)
 	}
-	p.Subject = proto.Subject
-	p.PermissionNames = proto.PermissionNames
+	p.Subject = proto.GetSubject()
+	p.PermissionNames = proto.GetPermissionNames()
+
 	return nil
 }

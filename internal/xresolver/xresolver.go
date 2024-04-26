@@ -5,6 +5,7 @@ import (
 
 	"google.golang.org/grpc/resolver"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -26,23 +27,30 @@ func (c *clientConn) Endpoint() string {
 	if endpoint == "" {
 		endpoint = c.target.URL.Opaque
 	}
+
 	return strings.TrimPrefix(endpoint, "/")
 }
 
 func (c *clientConn) UpdateState(state resolver.State) (err error) {
-	onDone := trace.DriverOnResolve(c.trace, c.Endpoint(), func() (addrs []string) {
-		for i := range state.Addresses {
-			addrs = append(addrs, state.Addresses[i].Addr)
-		}
-		return
-	}())
+	onDone := trace.DriverOnResolve(c.trace,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xresolver.(*clientConn).UpdateState"),
+		c.Endpoint(), func() (addrs []string) {
+			for i := range state.Addresses {
+				addrs = append(addrs, state.Addresses[i].Addr)
+			}
+
+			return
+		}(),
+	)
 	defer func() {
 		onDone(err)
 	}()
+
 	err = c.ClientConn.UpdateState(state)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
+
 	return nil
 }
 

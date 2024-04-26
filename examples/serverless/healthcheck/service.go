@@ -14,7 +14,6 @@ import (
 	"time"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
-
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -43,6 +42,7 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 		s.db, err = ydb.Open(ctx, dsn, opts...)
 		if err != nil {
 			err = fmt.Errorf("connect error: %w", err)
+
 			return
 		}
 		err = s.createTableIfNotExists(ctx)
@@ -53,8 +53,10 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 	})
 	if err != nil {
 		once = sync.Once{}
+
 		return nil, err
 	}
+
 	return s, nil
 }
 
@@ -83,6 +85,7 @@ func (s *service) createTableIfNotExists(ctx context.Context) error {
 			AUTO_PARTITIONING_BY_LOAD = ENABLED
 		);`, path.Join(s.db.Name(), prefix),
 	)
+
 	return s.db.Table().Do(ctx,
 		func(ctx context.Context, s table.Session) error {
 			return s.ExecuteSchemeQuery(ctx, query)
@@ -90,7 +93,7 @@ func (s *service) createTableIfNotExists(ctx context.Context) error {
 	)
 }
 
-func (s *service) ping(path string) (code int32, err error) {
+func (s *service) ping(ctx context.Context, path string) (code int32, err error) {
 	uri, err := url.Parse(path)
 	if err != nil {
 		return -1, err
@@ -98,7 +101,7 @@ func (s *service) ping(path string) (code int32, err error) {
 	if uri.Scheme == "" {
 		uri.Scheme = "http"
 	}
-	request, err := http.NewRequest(http.MethodGet, uri.String(), nil) //nolint:gocritic
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, uri.String(), nil) //nolint:gocritic
 	if err != nil {
 		return -1, err
 	}
@@ -106,6 +109,10 @@ func (s *service) ping(path string) (code int32, err error) {
 	if err != nil {
 		return -1, err
 	}
+	defer func() {
+		_ = response.Body.Close()
+	}()
+
 	return int32(response.StatusCode), nil
 }
 
@@ -127,7 +134,7 @@ func (s *service) check(ctx context.Context, urls []string) error {
 			go func(idx int, u string) {
 				defer wg.Done()
 				out := " > '" + u + "' => "
-				code, err := s.ping(u)
+				code, err := s.ping(ctx, u)
 				if err != nil {
 					fmt.Println(out + err.Error())
 				} else {
@@ -157,6 +164,7 @@ func (s *service) upsertRows(ctx context.Context, rows []row) (err error) {
 				if err != nil {
 					return err.Error()
 				}
+
 				return ""
 			}(rows[i].err))),
 		)
@@ -183,12 +191,14 @@ func (s *service) upsertRows(ctx context.Context, rows []row) (err error) {
 					table.ValueParam("$rows", types.ListValue(values...)),
 				),
 			)
+
 			return err
 		},
 	)
 	if err != nil {
 		return fmt.Errorf("error on upsert rows: %w", err)
 	}
+
 	return nil
 }
 
@@ -206,5 +216,6 @@ func Serverless(ctx context.Context) error {
 		return fmt.Errorf("error on create service: %w", err)
 	}
 	defer s.Close(ctx)
+
 	return s.check(ctx, strings.Split(os.Getenv("URLS"), ","))
 }

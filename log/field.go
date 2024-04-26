@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -52,30 +51,35 @@ func (f Field) Key() string {
 // StringValue is a value getter for fields with StringType type
 func (f Field) StringValue() string {
 	f.checkType(StringType)
+
 	return f.vstr
 }
 
 // IntValue is a value getter for fields with IntType type
 func (f Field) IntValue() int {
 	f.checkType(IntType)
+
 	return int(f.vint)
 }
 
 // Int64Value is a value getter for fields with Int64Type type
 func (f Field) Int64Value() int64 {
 	f.checkType(Int64Type)
+
 	return f.vint
 }
 
 // BoolValue is a value getter for fields with BoolType type
 func (f Field) BoolValue() bool {
 	f.checkType(BoolType)
+
 	return f.vint != 0
 }
 
 // DurationValue is a value getter for fields with DurationType type
 func (f Field) DurationValue() time.Duration {
 	f.checkType(DurationType)
+
 	return time.Nanosecond * time.Duration(f.vint)
 }
 
@@ -85,6 +89,7 @@ func (f Field) StringsValue() []string {
 	if f.vany == nil {
 		return nil
 	}
+
 	return f.vany.([]string)
 }
 
@@ -94,6 +99,7 @@ func (f Field) ErrorValue() error {
 	if f.vany == nil {
 		return nil
 	}
+
 	return f.vany.(error)
 }
 
@@ -129,6 +135,7 @@ func (f Field) Stringer() fmt.Stringer {
 	if f.vany == nil {
 		return nil
 	}
+
 	return f.vany.(fmt.Stringer)
 }
 
@@ -157,6 +164,7 @@ func (f Field) String() string {
 		if f.vany == nil || f.vany.(error) == nil {
 			return "<nil>"
 		}
+
 		return f.ErrorValue().Error()
 	case AnyType:
 		if f.vany == nil {
@@ -166,8 +174,10 @@ func (f Field) String() string {
 			if v.IsNil() {
 				return nilPtr
 			}
+
 			return v.Type().String() + "(" + fmt.Sprint(v.Elem()) + ")"
 		}
+
 		return fmt.Sprint(f.vany)
 	case StringerType:
 		return f.Stringer().String()
@@ -210,6 +220,7 @@ func Bool(key string, value bool) Field {
 	} else {
 		vint = 0
 	}
+
 	return Field{
 		ftype: BoolType,
 		key:   key,
@@ -264,6 +275,7 @@ func Stringer(key string, value fmt.Stringer) Field {
 	if value == nil {
 		return Any(key, nil)
 	}
+
 	return Field{
 		ftype: StringerType,
 		key:   key,
@@ -328,6 +340,7 @@ func (ft FieldType) String() (typeName string) {
 	default:
 		panic("not implemented")
 	}
+
 	return typeName
 }
 
@@ -344,8 +357,8 @@ func versionField() Field {
 type endpoints []trace.EndpointInfo
 
 func (ee endpoints) String() string {
-	b := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(b)
+	b := xstring.Buffer()
+	defer b.Free()
 	b.WriteByte('[')
 	for i, e := range ee {
 		if i != 0 {
@@ -354,6 +367,7 @@ func (ee endpoints) String() string {
 		b.WriteString(e.String())
 	}
 	b.WriteByte(']')
+
 	return b.String()
 }
 
@@ -364,6 +378,7 @@ func (m metadata) String() string {
 	if err != nil {
 		return fmt.Sprintf("error:%s", err)
 	}
+
 	return xstring.FromBytes(b)
 }
 
@@ -371,5 +386,6 @@ func appendFieldByCondition(condition bool, ifTrueField Field, fields ...Field) 
 	if condition {
 		fields = append(fields, ifTrueField)
 	}
+
 	return fields
 }

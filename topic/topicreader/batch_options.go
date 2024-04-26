@@ -12,6 +12,7 @@ func (count WithBatchMaxCount) Apply(
 	options topicreaderinternal.ReadMessageBatchOptions,
 ) topicreaderinternal.ReadMessageBatchOptions {
 	options.MaxCount = int(count)
+
 	return options
 }
 
@@ -21,8 +22,10 @@ func (count WithBatchMaxCount) Apply(
 // count must be 1 or greater
 // it will panic if count < 1
 //
-// Deprecated: (was experimental) will be removed soon.
-// The option will be removed for simplify code internals
+// Deprecated: was experimental and not actual now.
+// The option will be removed for simplify code internals.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 type WithBatchPreferMinCount int
 
 // Apply implements ReadBatchOption interface
@@ -33,5 +36,6 @@ func (count WithBatchPreferMinCount) Apply(
 		panic("ydb: min batch size must be 1 or greater")
 	}
 	options.MinCount = int(count)
+
 	return options
 }

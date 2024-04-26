@@ -13,11 +13,13 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"google.golang.org/grpc"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/secret"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
+
+const TokenRefreshDivisor = 10
 
 var (
 	_ Credentials             = (*Static)(nil)
@@ -47,8 +49,11 @@ func NewStaticCredentials(user, password, endpoint string, opts ...StaticCredent
 		sourceInfo: stack.Record(1),
 	}
 	for _, opt := range opts {
-		opt.ApplyStaticCredentialsOption(c)
+		if opt != nil {
+			opt.ApplyStaticCredentialsOption(c)
+		}
 	}
+
 	return c
 }
 
@@ -130,7 +135,7 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 		return "", xerrors.WithStackTrace(err)
 	}
 
-	c.requestAt = time.Now().Add(time.Until(expiresAt) / 2)
+	c.requestAt = time.Now().Add(time.Until(expiresAt) / TokenRefreshDivisor)
 	c.token = result.GetToken()
 
 	return c.token, nil
@@ -141,22 +146,24 @@ func parseExpiresAt(raw string) (expiresAt time.Time, err error) {
 	if _, _, err = jwt.NewParser().ParseUnverified(raw, &claims); err != nil {
 		return expiresAt, xerrors.WithStackTrace(err)
 	}
+
 	return claims.ExpiresAt.Time, nil
 }
 
 func (c *Static) String() string {
-	buffer := allocator.Buffers.Get()
-	defer allocator.Buffers.Put(buffer)
-	buffer.WriteString("Static(user:")
+	buffer := xstring.Buffer()
+	defer buffer.Free()
+	buffer.WriteString("Static{User:")
 	fmt.Fprintf(buffer, "%q", c.user)
-	buffer.WriteString(",password:")
+	buffer.WriteString(",Password:")
 	fmt.Fprintf(buffer, "%q", secret.Password(c.password))
-	buffer.WriteString(",token:")
+	buffer.WriteString(",Token:")
 	fmt.Fprintf(buffer, "%q", secret.Token(c.token))
 	if c.sourceInfo != "" {
-		buffer.WriteString(",from:")
+		buffer.WriteString(",From:")
 		fmt.Fprintf(buffer, "%q", c.sourceInfo)
 	}
-	buffer.WriteByte(')')
+	buffer.WriteByte('}')
+
 	return buffer.String()
 }

@@ -9,14 +9,17 @@ func WithTraces(config Config) ydb.Option {
 		return nil
 	}
 	config = config.WithSystem("ydb")
+
 	return ydb.MergeOptions(
 		ydb.WithTraceDriver(driver(config)),
 		ydb.WithTraceTable(table(config)),
+		ydb.WithTraceQuery(query(config)),
 		ydb.WithTraceScripting(scripting(config)),
 		ydb.WithTraceScheme(scheme(config)),
 		ydb.WithTraceCoordination(coordination(config)),
 		ydb.WithTraceRatelimiter(ratelimiter(config)),
 		ydb.WithTraceDiscovery(discovery(config)),
 		ydb.WithTraceDatabaseSQL(databaseSQL(config)),
+		ydb.WithTraceRetry(retry(config)),
 	)
 }

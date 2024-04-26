@@ -12,9 +12,11 @@ type tableComposeOptions struct {
 }
 
 // TableOption specified Table compose option
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 type TableComposeOption func(o *tableComposeOptions)
 
 // WithTablePanicCallback specified behavior on panic
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func WithTablePanicCallback(cb func(e interface{})) TableComposeOption {
 	return func(o *tableComposeOptions) {
 		o.panicCallback = cb
@@ -22,6 +24,7 @@ func WithTablePanicCallback(cb func(e interface{})) TableComposeOption {
 }
 
 // Compose returns a new Table which has functional fields composed both from t and x.
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 	var ret Table
 	options := tableComposeOptions{}
@@ -103,7 +106,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 	{
 		h1 := t.OnDo
 		h2 := x.OnDo
-		ret.OnDo = func(t TableDoStartInfo) func(TableDoIntermediateInfo) func(TableDoDoneInfo) {
+		ret.OnDo = func(t TableDoStartInfo) func(TableDoDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -111,14 +114,14 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 					}
 				}()
 			}
-			var r, r1 func(TableDoIntermediateInfo) func(TableDoDoneInfo)
+			var r, r1 func(TableDoDoneInfo)
 			if h1 != nil {
 				r = h1(t)
 			}
 			if h2 != nil {
 				r1 = h2(t)
 			}
-			return func(info TableDoIntermediateInfo) func(TableDoDoneInfo) {
+			return func(t TableDoDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -126,27 +129,11 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 						}
 					}()
 				}
-				var r2, r3 func(TableDoDoneInfo)
 				if r != nil {
-					r2 = r(info)
+					r(t)
 				}
 				if r1 != nil {
-					r3 = r1(info)
-				}
-				return func(t TableDoDoneInfo) {
-					if options.panicCallback != nil {
-						defer func() {
-							if e := recover(); e != nil {
-								options.panicCallback(e)
-							}
-						}()
-					}
-					if r2 != nil {
-						r2(t)
-					}
-					if r3 != nil {
-						r3(t)
-					}
+					r1(t)
 				}
 			}
 		}
@@ -154,7 +141,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 	{
 		h1 := t.OnDoTx
 		h2 := x.OnDoTx
-		ret.OnDoTx = func(t TableDoTxStartInfo) func(TableDoTxIntermediateInfo) func(TableDoTxDoneInfo) {
+		ret.OnDoTx = func(t TableDoTxStartInfo) func(TableDoTxDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -162,14 +149,14 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 					}
 				}()
 			}
-			var r, r1 func(TableDoTxIntermediateInfo) func(TableDoTxDoneInfo)
+			var r, r1 func(TableDoTxDoneInfo)
 			if h1 != nil {
 				r = h1(t)
 			}
 			if h2 != nil {
 				r1 = h2(t)
 			}
-			return func(info TableDoTxIntermediateInfo) func(TableDoTxDoneInfo) {
+			return func(t TableDoTxDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -177,27 +164,11 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 						}
 					}()
 				}
-				var r2, r3 func(TableDoTxDoneInfo)
 				if r != nil {
-					r2 = r(info)
+					r(t)
 				}
 				if r1 != nil {
-					r3 = r1(info)
-				}
-				return func(t TableDoTxDoneInfo) {
-					if options.panicCallback != nil {
-						defer func() {
-							if e := recover(); e != nil {
-								options.panicCallback(e)
-							}
-						}()
-					}
-					if r2 != nil {
-						r2(t)
-					}
-					if r3 != nil {
-						r3(t)
-					}
+					r1(t)
 				}
 			}
 		}
@@ -205,7 +176,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 	{
 		h1 := t.OnCreateSession
 		h2 := x.OnCreateSession
-		ret.OnCreateSession = func(t TableCreateSessionStartInfo) func(TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
+		ret.OnCreateSession = func(t TableCreateSessionStartInfo) func(TableCreateSessionDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -213,14 +184,14 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 					}
 				}()
 			}
-			var r, r1 func(TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo)
+			var r, r1 func(TableCreateSessionDoneInfo)
 			if h1 != nil {
 				r = h1(t)
 			}
 			if h2 != nil {
 				r1 = h2(t)
 			}
-			return func(info TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
+			return func(t TableCreateSessionDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -228,27 +199,11 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 						}
 					}()
 				}
-				var r2, r3 func(TableCreateSessionDoneInfo)
 				if r != nil {
-					r2 = r(info)
+					r(t)
 				}
 				if r1 != nil {
-					r3 = r1(info)
-				}
-				return func(t TableCreateSessionDoneInfo) {
-					if options.panicCallback != nil {
-						defer func() {
-							if e := recover(); e != nil {
-								options.panicCallback(e)
-							}
-						}()
-					}
-					if r2 != nil {
-						r2(t)
-					}
-					if r3 != nil {
-						r3(t)
-					}
+					r1(t)
 				}
 			}
 		}
@@ -342,6 +297,41 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 				r1 = h2(t)
 			}
 			return func(t TableKeepAliveDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnSessionBulkUpsert
+		h2 := x.OnSessionBulkUpsert
+		ret.OnSessionBulkUpsert = func(t TableBulkUpsertStartInfo) func(TableBulkUpsertDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TableBulkUpsertDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableBulkUpsertDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -466,7 +456,7 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 	{
 		h1 := t.OnSessionQueryStreamExecute
 		h2 := x.OnSessionQueryStreamExecute
-		ret.OnSessionQueryStreamExecute = func(t TableSessionQueryStreamExecuteStartInfo) func(TableSessionQueryStreamExecuteIntermediateInfo) func(TableSessionQueryStreamExecuteDoneInfo) {
+		ret.OnSessionQueryStreamExecute = func(t TableSessionQueryStreamExecuteStartInfo) func(TableSessionQueryStreamExecuteDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -474,116 +464,14 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 					}
 				}()
 			}
-			var r, r1 func(TableSessionQueryStreamExecuteIntermediateInfo) func(TableSessionQueryStreamExecuteDoneInfo)
+			var r, r1 func(TableSessionQueryStreamExecuteDoneInfo)
 			if h1 != nil {
 				r = h1(t)
 			}
 			if h2 != nil {
 				r1 = h2(t)
 			}
-			return func(t TableSessionQueryStreamExecuteIntermediateInfo) func(TableSessionQueryStreamExecuteDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				var r2, r3 func(TableSessionQueryStreamExecuteDoneInfo)
-				if r != nil {
-					r2 = r(t)
-				}
-				if r1 != nil {
-					r3 = r1(t)
-				}
-				return func(t TableSessionQueryStreamExecuteDoneInfo) {
-					if options.panicCallback != nil {
-						defer func() {
-							if e := recover(); e != nil {
-								options.panicCallback(e)
-							}
-						}()
-					}
-					if r2 != nil {
-						r2(t)
-					}
-					if r3 != nil {
-						r3(t)
-					}
-				}
-			}
-		}
-	}
-	{
-		h1 := t.OnSessionQueryStreamRead
-		h2 := x.OnSessionQueryStreamRead
-		ret.OnSessionQueryStreamRead = func(t TableSessionQueryStreamReadStartInfo) func(TableSessionQueryStreamReadIntermediateInfo) func(TableSessionQueryStreamReadDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(TableSessionQueryStreamReadIntermediateInfo) func(TableSessionQueryStreamReadDoneInfo)
-			if h1 != nil {
-				r = h1(t)
-			}
-			if h2 != nil {
-				r1 = h2(t)
-			}
-			return func(t TableSessionQueryStreamReadIntermediateInfo) func(TableSessionQueryStreamReadDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				var r2, r3 func(TableSessionQueryStreamReadDoneInfo)
-				if r != nil {
-					r2 = r(t)
-				}
-				if r1 != nil {
-					r3 = r1(t)
-				}
-				return func(t TableSessionQueryStreamReadDoneInfo) {
-					if options.panicCallback != nil {
-						defer func() {
-							if e := recover(); e != nil {
-								options.panicCallback(e)
-							}
-						}()
-					}
-					if r2 != nil {
-						r2(t)
-					}
-					if r3 != nil {
-						r3(t)
-					}
-				}
-			}
-		}
-	}
-	{
-		h1 := t.OnSessionTransactionBegin
-		h2 := x.OnSessionTransactionBegin
-		ret.OnSessionTransactionBegin = func(t TableSessionTransactionBeginStartInfo) func(TableSessionTransactionBeginDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(TableSessionTransactionBeginDoneInfo)
-			if h1 != nil {
-				r = h1(t)
-			}
-			if h2 != nil {
-				r1 = h2(t)
-			}
-			return func(t TableSessionTransactionBeginDoneInfo) {
+			return func(t TableSessionQueryStreamExecuteDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -601,9 +489,79 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 		}
 	}
 	{
-		h1 := t.OnSessionTransactionExecute
-		h2 := x.OnSessionTransactionExecute
-		ret.OnSessionTransactionExecute = func(t TableTransactionExecuteStartInfo) func(TableTransactionExecuteDoneInfo) {
+		h1 := t.OnSessionQueryStreamRead
+		h2 := x.OnSessionQueryStreamRead
+		ret.OnSessionQueryStreamRead = func(t TableSessionQueryStreamReadStartInfo) func(TableSessionQueryStreamReadDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TableSessionQueryStreamReadDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableSessionQueryStreamReadDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnTxBegin
+		h2 := x.OnTxBegin
+		ret.OnTxBegin = func(t TableTxBeginStartInfo) func(TableTxBeginDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(TableTxBeginDoneInfo)
+			if h1 != nil {
+				r = h1(t)
+			}
+			if h2 != nil {
+				r1 = h2(t)
+			}
+			return func(t TableTxBeginDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(t)
+				}
+				if r1 != nil {
+					r1(t)
+				}
+			}
+		}
+	}
+	{
+		h1 := t.OnTxExecute
+		h2 := x.OnTxExecute
+		ret.OnTxExecute = func(t TableTransactionExecuteStartInfo) func(TableTransactionExecuteDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -636,9 +594,9 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 		}
 	}
 	{
-		h1 := t.OnSessionTransactionExecuteStatement
-		h2 := x.OnSessionTransactionExecuteStatement
-		ret.OnSessionTransactionExecuteStatement = func(t TableTransactionExecuteStatementStartInfo) func(TableTransactionExecuteStatementDoneInfo) {
+		h1 := t.OnTxExecuteStatement
+		h2 := x.OnTxExecuteStatement
+		ret.OnTxExecuteStatement = func(t TableTransactionExecuteStatementStartInfo) func(TableTransactionExecuteStatementDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -671,9 +629,9 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 		}
 	}
 	{
-		h1 := t.OnSessionTransactionCommit
-		h2 := x.OnSessionTransactionCommit
-		ret.OnSessionTransactionCommit = func(t TableSessionTransactionCommitStartInfo) func(TableSessionTransactionCommitDoneInfo) {
+		h1 := t.OnTxCommit
+		h2 := x.OnTxCommit
+		ret.OnTxCommit = func(t TableTxCommitStartInfo) func(TableTxCommitDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -681,14 +639,14 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 					}
 				}()
 			}
-			var r, r1 func(TableSessionTransactionCommitDoneInfo)
+			var r, r1 func(TableTxCommitDoneInfo)
 			if h1 != nil {
 				r = h1(t)
 			}
 			if h2 != nil {
 				r1 = h2(t)
 			}
-			return func(t TableSessionTransactionCommitDoneInfo) {
+			return func(t TableTxCommitDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -706,9 +664,9 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 		}
 	}
 	{
-		h1 := t.OnSessionTransactionRollback
-		h2 := x.OnSessionTransactionRollback
-		ret.OnSessionTransactionRollback = func(t TableSessionTransactionRollbackStartInfo) func(TableSessionTransactionRollbackDoneInfo) {
+		h1 := t.OnTxRollback
+		h2 := x.OnTxRollback
+		ret.OnTxRollback = func(t TableTxRollbackStartInfo) func(TableTxRollbackDoneInfo) {
 			if options.panicCallback != nil {
 				defer func() {
 					if e := recover(); e != nil {
@@ -716,14 +674,14 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 					}
 				}()
 			}
-			var r, r1 func(TableSessionTransactionRollbackDoneInfo)
+			var r, r1 func(TableTxRollbackDoneInfo)
 			if h1 != nil {
 				r = h1(t)
 			}
 			if h2 != nil {
 				r1 = h2(t)
 			}
-			return func(t TableSessionTransactionRollbackDoneInfo) {
+			return func(t TableTxRollbackDoneInfo) {
 				if options.panicCallback != nil {
 					defer func() {
 						if e := recover(); e != nil {
@@ -794,76 +752,6 @@ func (t *Table) Compose(x *Table, opts ...TableComposeOption) *Table {
 			}
 			if h2 != nil {
 				h2(info)
-			}
-		}
-	}
-	{
-		h1 := t.OnPoolSessionNew
-		h2 := x.OnPoolSessionNew
-		ret.OnPoolSessionNew = func(t TablePoolSessionNewStartInfo) func(TablePoolSessionNewDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(TablePoolSessionNewDoneInfo)
-			if h1 != nil {
-				r = h1(t)
-			}
-			if h2 != nil {
-				r1 = h2(t)
-			}
-			return func(t TablePoolSessionNewDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(t)
-				}
-				if r1 != nil {
-					r1(t)
-				}
-			}
-		}
-	}
-	{
-		h1 := t.OnPoolSessionClose
-		h2 := x.OnPoolSessionClose
-		ret.OnPoolSessionClose = func(t TablePoolSessionCloseStartInfo) func(TablePoolSessionCloseDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(TablePoolSessionCloseDoneInfo)
-			if h1 != nil {
-				r = h1(t)
-			}
-			if h2 != nil {
-				r1 = h2(t)
-			}
-			return func(t TablePoolSessionCloseDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(t)
-				}
-				if r1 != nil {
-					r1(t)
-				}
 			}
 		}
 	}
@@ -1004,86 +892,50 @@ func (t *Table) onClose(t1 TableCloseStartInfo) func(TableCloseDoneInfo) {
 	}
 	return res
 }
-func (t *Table) onDo(t1 TableDoStartInfo) func(info TableDoIntermediateInfo) func(TableDoDoneInfo) {
+func (t *Table) onDo(t1 TableDoStartInfo) func(TableDoDoneInfo) {
 	fn := t.OnDo
 	if fn == nil {
-		return func(TableDoIntermediateInfo) func(TableDoDoneInfo) {
-			return func(TableDoDoneInfo) {
-				return
-			}
+		return func(TableDoDoneInfo) {
+			return
 		}
 	}
 	res := fn(t1)
 	if res == nil {
-		return func(TableDoIntermediateInfo) func(TableDoDoneInfo) {
-			return func(TableDoDoneInfo) {
-				return
-			}
+		return func(TableDoDoneInfo) {
+			return
 		}
 	}
-	return func(info TableDoIntermediateInfo) func(TableDoDoneInfo) {
-		res := res(info)
-		if res == nil {
-			return func(TableDoDoneInfo) {
-				return
-			}
-		}
-		return res
-	}
+	return res
 }
-func (t *Table) onDoTx(t1 TableDoTxStartInfo) func(info TableDoTxIntermediateInfo) func(TableDoTxDoneInfo) {
+func (t *Table) onDoTx(t1 TableDoTxStartInfo) func(TableDoTxDoneInfo) {
 	fn := t.OnDoTx
 	if fn == nil {
-		return func(TableDoTxIntermediateInfo) func(TableDoTxDoneInfo) {
-			return func(TableDoTxDoneInfo) {
-				return
-			}
+		return func(TableDoTxDoneInfo) {
+			return
 		}
 	}
 	res := fn(t1)
 	if res == nil {
-		return func(TableDoTxIntermediateInfo) func(TableDoTxDoneInfo) {
-			return func(TableDoTxDoneInfo) {
-				return
-			}
+		return func(TableDoTxDoneInfo) {
+			return
 		}
 	}
-	return func(info TableDoTxIntermediateInfo) func(TableDoTxDoneInfo) {
-		res := res(info)
-		if res == nil {
-			return func(TableDoTxDoneInfo) {
-				return
-			}
-		}
-		return res
-	}
+	return res
 }
-func (t *Table) onCreateSession(t1 TableCreateSessionStartInfo) func(info TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
+func (t *Table) onCreateSession(t1 TableCreateSessionStartInfo) func(TableCreateSessionDoneInfo) {
 	fn := t.OnCreateSession
 	if fn == nil {
-		return func(TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
-			return func(TableCreateSessionDoneInfo) {
-				return
-			}
+		return func(TableCreateSessionDoneInfo) {
+			return
 		}
 	}
 	res := fn(t1)
 	if res == nil {
-		return func(TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
-			return func(TableCreateSessionDoneInfo) {
-				return
-			}
+		return func(TableCreateSessionDoneInfo) {
+			return
 		}
 	}
-	return func(info TableCreateSessionIntermediateInfo) func(TableCreateSessionDoneInfo) {
-		res := res(info)
-		if res == nil {
-			return func(TableCreateSessionDoneInfo) {
-				return
-			}
-		}
-		return res
-	}
+	return res
 }
 func (t *Table) onSessionNew(t1 TableSessionNewStartInfo) func(TableSessionNewDoneInfo) {
 	fn := t.OnSessionNew
@@ -1125,6 +977,21 @@ func (t *Table) onSessionKeepAlive(t1 TableKeepAliveStartInfo) func(TableKeepAli
 	res := fn(t1)
 	if res == nil {
 		return func(TableKeepAliveDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Table) onSessionBulkUpsert(t1 TableBulkUpsertStartInfo) func(TableBulkUpsertDoneInfo) {
+	fn := t.OnSessionBulkUpsert
+	if fn == nil {
+		return func(TableBulkUpsertDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TableBulkUpsertDoneInfo) {
 			return
 		}
 	}
@@ -1175,77 +1042,53 @@ func (t *Table) onSessionQueryExplain(t1 TableExplainQueryStartInfo) func(TableE
 	}
 	return res
 }
-func (t *Table) onSessionQueryStreamExecute(t1 TableSessionQueryStreamExecuteStartInfo) func(TableSessionQueryStreamExecuteIntermediateInfo) func(TableSessionQueryStreamExecuteDoneInfo) {
+func (t *Table) onSessionQueryStreamExecute(t1 TableSessionQueryStreamExecuteStartInfo) func(TableSessionQueryStreamExecuteDoneInfo) {
 	fn := t.OnSessionQueryStreamExecute
 	if fn == nil {
-		return func(TableSessionQueryStreamExecuteIntermediateInfo) func(TableSessionQueryStreamExecuteDoneInfo) {
-			return func(TableSessionQueryStreamExecuteDoneInfo) {
-				return
-			}
+		return func(TableSessionQueryStreamExecuteDoneInfo) {
+			return
 		}
 	}
 	res := fn(t1)
 	if res == nil {
-		return func(TableSessionQueryStreamExecuteIntermediateInfo) func(TableSessionQueryStreamExecuteDoneInfo) {
-			return func(TableSessionQueryStreamExecuteDoneInfo) {
-				return
-			}
+		return func(TableSessionQueryStreamExecuteDoneInfo) {
+			return
 		}
 	}
-	return func(t TableSessionQueryStreamExecuteIntermediateInfo) func(TableSessionQueryStreamExecuteDoneInfo) {
-		res := res(t)
-		if res == nil {
-			return func(TableSessionQueryStreamExecuteDoneInfo) {
-				return
-			}
-		}
-		return res
-	}
+	return res
 }
-func (t *Table) onSessionQueryStreamRead(t1 TableSessionQueryStreamReadStartInfo) func(TableSessionQueryStreamReadIntermediateInfo) func(TableSessionQueryStreamReadDoneInfo) {
+func (t *Table) onSessionQueryStreamRead(t1 TableSessionQueryStreamReadStartInfo) func(TableSessionQueryStreamReadDoneInfo) {
 	fn := t.OnSessionQueryStreamRead
 	if fn == nil {
-		return func(TableSessionQueryStreamReadIntermediateInfo) func(TableSessionQueryStreamReadDoneInfo) {
-			return func(TableSessionQueryStreamReadDoneInfo) {
-				return
-			}
-		}
-	}
-	res := fn(t1)
-	if res == nil {
-		return func(TableSessionQueryStreamReadIntermediateInfo) func(TableSessionQueryStreamReadDoneInfo) {
-			return func(TableSessionQueryStreamReadDoneInfo) {
-				return
-			}
-		}
-	}
-	return func(t TableSessionQueryStreamReadIntermediateInfo) func(TableSessionQueryStreamReadDoneInfo) {
-		res := res(t)
-		if res == nil {
-			return func(TableSessionQueryStreamReadDoneInfo) {
-				return
-			}
-		}
-		return res
-	}
-}
-func (t *Table) onSessionTransactionBegin(t1 TableSessionTransactionBeginStartInfo) func(TableSessionTransactionBeginDoneInfo) {
-	fn := t.OnSessionTransactionBegin
-	if fn == nil {
-		return func(TableSessionTransactionBeginDoneInfo) {
+		return func(TableSessionQueryStreamReadDoneInfo) {
 			return
 		}
 	}
 	res := fn(t1)
 	if res == nil {
-		return func(TableSessionTransactionBeginDoneInfo) {
+		return func(TableSessionQueryStreamReadDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t *Table) onSessionTransactionExecute(t1 TableTransactionExecuteStartInfo) func(TableTransactionExecuteDoneInfo) {
-	fn := t.OnSessionTransactionExecute
+func (t *Table) onTxBegin(t1 TableTxBeginStartInfo) func(TableTxBeginDoneInfo) {
+	fn := t.OnTxBegin
+	if fn == nil {
+		return func(TableTxBeginDoneInfo) {
+			return
+		}
+	}
+	res := fn(t1)
+	if res == nil {
+		return func(TableTxBeginDoneInfo) {
+			return
+		}
+	}
+	return res
+}
+func (t *Table) onTxExecute(t1 TableTransactionExecuteStartInfo) func(TableTransactionExecuteDoneInfo) {
+	fn := t.OnTxExecute
 	if fn == nil {
 		return func(TableTransactionExecuteDoneInfo) {
 			return
@@ -1259,8 +1102,8 @@ func (t *Table) onSessionTransactionExecute(t1 TableTransactionExecuteStartInfo)
 	}
 	return res
 }
-func (t *Table) onSessionTransactionExecuteStatement(t1 TableTransactionExecuteStatementStartInfo) func(TableTransactionExecuteStatementDoneInfo) {
-	fn := t.OnSessionTransactionExecuteStatement
+func (t *Table) onTxExecuteStatement(t1 TableTransactionExecuteStatementStartInfo) func(TableTransactionExecuteStatementDoneInfo) {
+	fn := t.OnTxExecuteStatement
 	if fn == nil {
 		return func(TableTransactionExecuteStatementDoneInfo) {
 			return
@@ -1274,31 +1117,31 @@ func (t *Table) onSessionTransactionExecuteStatement(t1 TableTransactionExecuteS
 	}
 	return res
 }
-func (t *Table) onSessionTransactionCommit(t1 TableSessionTransactionCommitStartInfo) func(TableSessionTransactionCommitDoneInfo) {
-	fn := t.OnSessionTransactionCommit
+func (t *Table) onTxCommit(t1 TableTxCommitStartInfo) func(TableTxCommitDoneInfo) {
+	fn := t.OnTxCommit
 	if fn == nil {
-		return func(TableSessionTransactionCommitDoneInfo) {
+		return func(TableTxCommitDoneInfo) {
 			return
 		}
 	}
 	res := fn(t1)
 	if res == nil {
-		return func(TableSessionTransactionCommitDoneInfo) {
+		return func(TableTxCommitDoneInfo) {
 			return
 		}
 	}
 	return res
 }
-func (t *Table) onSessionTransactionRollback(t1 TableSessionTransactionRollbackStartInfo) func(TableSessionTransactionRollbackDoneInfo) {
-	fn := t.OnSessionTransactionRollback
+func (t *Table) onTxRollback(t1 TableTxRollbackStartInfo) func(TableTxRollbackDoneInfo) {
+	fn := t.OnTxRollback
 	if fn == nil {
-		return func(TableSessionTransactionRollbackDoneInfo) {
+		return func(TableTxRollbackDoneInfo) {
 			return
 		}
 	}
 	res := fn(t1)
 	if res == nil {
-		return func(TableSessionTransactionRollbackDoneInfo) {
+		return func(TableTxRollbackDoneInfo) {
 			return
 		}
 	}
@@ -1324,36 +1167,6 @@ func (t *Table) onPoolSessionRemove(info TablePoolSessionRemoveInfo) {
 		return
 	}
 	fn(info)
-}
-func (t *Table) onPoolSessionNew(t1 TablePoolSessionNewStartInfo) func(TablePoolSessionNewDoneInfo) {
-	fn := t.OnPoolSessionNew
-	if fn == nil {
-		return func(TablePoolSessionNewDoneInfo) {
-			return
-		}
-	}
-	res := fn(t1)
-	if res == nil {
-		return func(TablePoolSessionNewDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t *Table) onPoolSessionClose(t1 TablePoolSessionCloseStartInfo) func(TablePoolSessionCloseDoneInfo) {
-	fn := t.OnPoolSessionClose
-	if fn == nil {
-		return func(TablePoolSessionCloseDoneInfo) {
-			return
-		}
-	}
-	res := fn(t1)
-	if res == nil {
-		return func(TablePoolSessionCloseDoneInfo) {
-			return
-		}
-	}
-	return res
 }
 func (t *Table) onPoolPut(t1 TablePoolPutStartInfo) func(TablePoolPutDoneInfo) {
 	fn := t.OnPoolPut
@@ -1400,9 +1213,11 @@ func (t *Table) onPoolWait(t1 TablePoolWaitStartInfo) func(TablePoolWaitDoneInfo
 	}
 	return res
 }
-func TableOnInit(t *Table, c *context.Context) func(limit int) {
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnInit(t *Table, c *context.Context, call call) func(limit int) {
 	var p TableInitStartInfo
 	p.Context = c
+	p.Call = call
 	res := t.onInit(p)
 	return func(limit int) {
 		var p TableInitDoneInfo
@@ -1410,9 +1225,11 @@ func TableOnInit(t *Table, c *context.Context) func(limit int) {
 		res(p)
 	}
 }
-func TableOnClose(t *Table, c *context.Context) func(error) {
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnClose(t *Table, c *context.Context, call call) func(error) {
 	var p TableCloseStartInfo
 	p.Context = c
+	p.Call = call
 	res := t.onClose(p)
 	return func(e error) {
 		var p TableCloseDoneInfo
@@ -1420,64 +1237,57 @@ func TableOnClose(t *Table, c *context.Context) func(error) {
 		res(p)
 	}
 }
-func TableOnDo(t *Table, c *context.Context, iD string, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnDo(t *Table, c *context.Context, call call, label string, idempotent bool, nestedCall bool) func(attempts int, _ error) {
 	var p TableDoStartInfo
 	p.Context = c
-	p.ID = iD
+	p.Call = call
+	p.Label = label
 	p.Idempotent = idempotent
 	p.NestedCall = nestedCall
 	res := t.onDo(p)
-	return func(e error) func(int, error) {
-		var p TableDoIntermediateInfo
+	return func(attempts int, e error) {
+		var p TableDoDoneInfo
+		p.Attempts = attempts
 		p.Error = e
-		res := res(p)
-		return func(attempts int, e error) {
-			var p TableDoDoneInfo
-			p.Attempts = attempts
-			p.Error = e
-			res(p)
-		}
+		res(p)
 	}
 }
-func TableOnDoTx(t *Table, c *context.Context, iD string, idempotent bool, nestedCall bool) func(error) func(attempts int, _ error) {
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnDoTx(t *Table, c *context.Context, call call, label string, idempotent bool, nestedCall bool) func(attempts int, _ error) {
 	var p TableDoTxStartInfo
 	p.Context = c
-	p.ID = iD
+	p.Call = call
+	p.Label = label
 	p.Idempotent = idempotent
 	p.NestedCall = nestedCall
 	res := t.onDoTx(p)
-	return func(e error) func(int, error) {
-		var p TableDoTxIntermediateInfo
+	return func(attempts int, e error) {
+		var p TableDoTxDoneInfo
+		p.Attempts = attempts
 		p.Error = e
-		res := res(p)
-		return func(attempts int, e error) {
-			var p TableDoTxDoneInfo
-			p.Attempts = attempts
-			p.Error = e
-			res(p)
-		}
+		res(p)
 	}
 }
-func TableOnCreateSession(t *Table, c *context.Context) func(error) func(session tableSessionInfo, attempts int, _ error) {
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnCreateSession(t *Table, c *context.Context, call call) func(session tableSessionInfo, attempts int, _ error) {
 	var p TableCreateSessionStartInfo
 	p.Context = c
+	p.Call = call
 	res := t.onCreateSession(p)
-	return func(e error) func(tableSessionInfo, int, error) {
-		var p TableCreateSessionIntermediateInfo
+	return func(session tableSessionInfo, attempts int, e error) {
+		var p TableCreateSessionDoneInfo
+		p.Session = session
+		p.Attempts = attempts
 		p.Error = e
-		res := res(p)
-		return func(session tableSessionInfo, attempts int, e error) {
-			var p TableCreateSessionDoneInfo
-			p.Session = session
-			p.Attempts = attempts
-			p.Error = e
-			res(p)
-		}
+		res(p)
 	}
 }
-func TableOnSessionNew(t *Table, c *context.Context) func(session tableSessionInfo, _ error) {
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnSessionNew(t *Table, c *context.Context, call call) func(session tableSessionInfo, _ error) {
 	var p TableSessionNewStartInfo
 	p.Context = c
+	p.Call = call
 	res := t.onSessionNew(p)
 	return func(session tableSessionInfo, e error) {
 		var p TableSessionNewDoneInfo
@@ -1486,9 +1296,11 @@ func TableOnSessionNew(t *Table, c *context.Context) func(session tableSessionIn
 		res(p)
 	}
 }
-func TableOnSessionDelete(t *Table, c *context.Context, session tableSessionInfo) func(error) {
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnSessionDelete(t *Table, c *context.Context, call call, session tableSessionInfo) func(error) {
 	var p TableSessionDeleteStartInfo
 	p.Context = c
+	p.Call = call
 	p.Session = session
 	res := t.onSessionDelete(p)
 	return func(e error) {
@@ -1497,9 +1309,11 @@ func TableOnSessionDelete(t *Table, c *context.Context, session tableSessionInfo
 		res(p)
 	}
 }
-func TableOnSessionKeepAlive(t *Table, c *context.Context, session tableSessionInfo) func(error) {
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnSessionKeepAlive(t *Table, c *context.Context, call call, session tableSessionInfo) func(error) {
 	var p TableKeepAliveStartInfo
 	p.Context = c
+	p.Call = call
 	p.Session = session
 	res := t.onSessionKeepAlive(p)
 	return func(e error) {
@@ -1508,9 +1322,24 @@ func TableOnSessionKeepAlive(t *Table, c *context.Context, session tableSessionI
 		res(p)
 	}
 }
-func TableOnSessionQueryPrepare(t *Table, c *context.Context, session tableSessionInfo, query string) func(result tableDataQuery, _ error) {
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnSessionBulkUpsert(t *Table, c *context.Context, call call, session tableSessionInfo) func(error) {
+	var p TableBulkUpsertStartInfo
+	p.Context = c
+	p.Call = call
+	p.Session = session
+	res := t.onSessionBulkUpsert(p)
+	return func(e error) {
+		var p TableBulkUpsertDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnSessionQueryPrepare(t *Table, c *context.Context, call call, session tableSessionInfo, query string) func(result tableDataQuery, _ error) {
 	var p TablePrepareDataQueryStartInfo
 	p.Context = c
+	p.Call = call
 	p.Session = session
 	p.Query = query
 	res := t.onSessionQueryPrepare(p)
@@ -1521,9 +1350,11 @@ func TableOnSessionQueryPrepare(t *Table, c *context.Context, session tableSessi
 		res(p)
 	}
 }
-func TableOnSessionQueryExecute(t *Table, c *context.Context, session tableSessionInfo, query tableDataQuery, parameters tableQueryParameters, keepInCache bool) func(tx tableTransactionInfo, prepared bool, result tableResult, _ error) {
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnSessionQueryExecute(t *Table, c *context.Context, call call, session tableSessionInfo, query tableDataQuery, parameters tableQueryParameters, keepInCache bool) func(tx tableTransactionInfo, prepared bool, result tableResult, _ error) {
 	var p TableExecuteDataQueryStartInfo
 	p.Context = c
+	p.Call = call
 	p.Session = session
 	p.Query = query
 	p.Parameters = parameters
@@ -1538,9 +1369,11 @@ func TableOnSessionQueryExecute(t *Table, c *context.Context, session tableSessi
 		res(p)
 	}
 }
-func TableOnSessionQueryExplain(t *Table, c *context.Context, session tableSessionInfo, query string) func(aST string, plan string, _ error) {
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnSessionQueryExplain(t *Table, c *context.Context, call call, session tableSessionInfo, query string) func(aST string, plan string, _ error) {
 	var p TableExplainQueryStartInfo
 	p.Context = c
+	p.Call = call
 	p.Session = session
 	p.Query = query
 	res := t.onSessionQueryExplain(p)
@@ -1552,60 +1385,58 @@ func TableOnSessionQueryExplain(t *Table, c *context.Context, session tableSessi
 		res(p)
 	}
 }
-func TableOnSessionQueryStreamExecute(t *Table, c *context.Context, session tableSessionInfo, query tableDataQuery, parameters tableQueryParameters) func(error) func(error) {
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnSessionQueryStreamExecute(t *Table, c *context.Context, call call, session tableSessionInfo, query tableDataQuery, parameters tableQueryParameters) func(error) {
 	var p TableSessionQueryStreamExecuteStartInfo
 	p.Context = c
+	p.Call = call
 	p.Session = session
 	p.Query = query
 	p.Parameters = parameters
 	res := t.onSessionQueryStreamExecute(p)
-	return func(e error) func(error) {
-		var p TableSessionQueryStreamExecuteIntermediateInfo
+	return func(e error) {
+		var p TableSessionQueryStreamExecuteDoneInfo
 		p.Error = e
-		res := res(p)
-		return func(e error) {
-			var p TableSessionQueryStreamExecuteDoneInfo
-			p.Error = e
-			res(p)
-		}
+		res(p)
 	}
 }
-func TableOnSessionQueryStreamRead(t *Table, c *context.Context, session tableSessionInfo) func(error) func(error) {
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnSessionQueryStreamRead(t *Table, c *context.Context, call call, session tableSessionInfo) func(error) {
 	var p TableSessionQueryStreamReadStartInfo
 	p.Context = c
+	p.Call = call
 	p.Session = session
 	res := t.onSessionQueryStreamRead(p)
-	return func(e error) func(error) {
-		var p TableSessionQueryStreamReadIntermediateInfo
+	return func(e error) {
+		var p TableSessionQueryStreamReadDoneInfo
 		p.Error = e
-		res := res(p)
-		return func(e error) {
-			var p TableSessionQueryStreamReadDoneInfo
-			p.Error = e
-			res(p)
-		}
+		res(p)
 	}
 }
-func TableOnSessionTransactionBegin(t *Table, c *context.Context, session tableSessionInfo) func(tx tableTransactionInfo, _ error) {
-	var p TableSessionTransactionBeginStartInfo
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnTxBegin(t *Table, c *context.Context, call call, session tableSessionInfo) func(tx tableTransactionInfo, _ error) {
+	var p TableTxBeginStartInfo
 	p.Context = c
+	p.Call = call
 	p.Session = session
-	res := t.onSessionTransactionBegin(p)
+	res := t.onTxBegin(p)
 	return func(tx tableTransactionInfo, e error) {
-		var p TableSessionTransactionBeginDoneInfo
+		var p TableTxBeginDoneInfo
 		p.Tx = tx
 		p.Error = e
 		res(p)
 	}
 }
-func TableOnSessionTransactionExecute(t *Table, c *context.Context, session tableSessionInfo, tx tableTransactionInfo, query tableDataQuery, parameters tableQueryParameters) func(result tableResult, _ error) {
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnTxExecute(t *Table, c *context.Context, call call, session tableSessionInfo, tx tableTransactionInfo, query tableDataQuery, parameters tableQueryParameters) func(result tableResult, _ error) {
 	var p TableTransactionExecuteStartInfo
 	p.Context = c
+	p.Call = call
 	p.Session = session
 	p.Tx = tx
 	p.Query = query
 	p.Parameters = parameters
-	res := t.onSessionTransactionExecute(p)
+	res := t.onTxExecute(p)
 	return func(result tableResult, e error) {
 		var p TableTransactionExecuteDoneInfo
 		p.Result = result
@@ -1613,14 +1444,16 @@ func TableOnSessionTransactionExecute(t *Table, c *context.Context, session tabl
 		res(p)
 	}
 }
-func TableOnSessionTransactionExecuteStatement(t *Table, c *context.Context, session tableSessionInfo, tx tableTransactionInfo, statementQuery tableDataQuery, parameters tableQueryParameters) func(result tableResult, _ error) {
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnTxExecuteStatement(t *Table, c *context.Context, call call, session tableSessionInfo, tx tableTransactionInfo, statementQuery tableDataQuery, parameters tableQueryParameters) func(result tableResult, _ error) {
 	var p TableTransactionExecuteStatementStartInfo
 	p.Context = c
+	p.Call = call
 	p.Session = session
 	p.Tx = tx
 	p.StatementQuery = statementQuery
 	p.Parameters = parameters
-	res := t.onSessionTransactionExecuteStatement(p)
+	res := t.onTxExecuteStatement(p)
 	return func(result tableResult, e error) {
 		var p TableTransactionExecuteStatementDoneInfo
 		p.Result = result
@@ -1628,70 +1461,58 @@ func TableOnSessionTransactionExecuteStatement(t *Table, c *context.Context, ses
 		res(p)
 	}
 }
-func TableOnSessionTransactionCommit(t *Table, c *context.Context, session tableSessionInfo, tx tableTransactionInfo) func(error) {
-	var p TableSessionTransactionCommitStartInfo
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnTxCommit(t *Table, c *context.Context, call call, session tableSessionInfo, tx tableTransactionInfo) func(error) {
+	var p TableTxCommitStartInfo
 	p.Context = c
+	p.Call = call
 	p.Session = session
 	p.Tx = tx
-	res := t.onSessionTransactionCommit(p)
+	res := t.onTxCommit(p)
 	return func(e error) {
-		var p TableSessionTransactionCommitDoneInfo
+		var p TableTxCommitDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
-func TableOnSessionTransactionRollback(t *Table, c *context.Context, session tableSessionInfo, tx tableTransactionInfo) func(error) {
-	var p TableSessionTransactionRollbackStartInfo
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnTxRollback(t *Table, c *context.Context, call call, session tableSessionInfo, tx tableTransactionInfo) func(error) {
+	var p TableTxRollbackStartInfo
 	p.Context = c
+	p.Call = call
 	p.Session = session
 	p.Tx = tx
-	res := t.onSessionTransactionRollback(p)
+	res := t.onTxRollback(p)
 	return func(e error) {
-		var p TableSessionTransactionRollbackDoneInfo
+		var p TableTxRollbackDoneInfo
 		p.Error = e
 		res(p)
 	}
 }
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnPoolStateChange(t *Table, size int, event string) {
 	var p TablePoolStateChangeInfo
 	p.Size = size
 	p.Event = event
 	t.onPoolStateChange(p)
 }
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnPoolSessionAdd(t *Table, session tableSessionInfo) {
 	var p TablePoolSessionAddInfo
 	p.Session = session
 	t.onPoolSessionAdd(p)
 }
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func TableOnPoolSessionRemove(t *Table, session tableSessionInfo) {
 	var p TablePoolSessionRemoveInfo
 	p.Session = session
 	t.onPoolSessionRemove(p)
 }
-func TableOnPoolSessionNew(t *Table, c *context.Context) func(session tableSessionInfo, _ error) {
-	var p TablePoolSessionNewStartInfo
-	p.Context = c
-	res := t.onPoolSessionNew(p)
-	return func(session tableSessionInfo, e error) {
-		var p TablePoolSessionNewDoneInfo
-		p.Session = session
-		p.Error = e
-		res(p)
-	}
-}
-func TableOnPoolSessionClose(t *Table, c *context.Context, session tableSessionInfo) func() {
-	var p TablePoolSessionCloseStartInfo
-	p.Context = c
-	p.Session = session
-	res := t.onPoolSessionClose(p)
-	return func() {
-		var p TablePoolSessionCloseDoneInfo
-		res(p)
-	}
-}
-func TableOnPoolPut(t *Table, c *context.Context, session tableSessionInfo) func(error) {
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnPoolPut(t *Table, c *context.Context, call call, session tableSessionInfo) func(error) {
 	var p TablePoolPutStartInfo
 	p.Context = c
+	p.Call = call
 	p.Session = session
 	res := t.onPoolPut(p)
 	return func(e error) {
@@ -1700,9 +1521,11 @@ func TableOnPoolPut(t *Table, c *context.Context, session tableSessionInfo) func
 		res(p)
 	}
 }
-func TableOnPoolGet(t *Table, c *context.Context) func(session tableSessionInfo, attempts int, _ error) {
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnPoolGet(t *Table, c *context.Context, call call) func(session tableSessionInfo, attempts int, _ error) {
 	var p TablePoolGetStartInfo
 	p.Context = c
+	p.Call = call
 	res := t.onPoolGet(p)
 	return func(session tableSessionInfo, attempts int, e error) {
 		var p TablePoolGetDoneInfo
@@ -1712,9 +1535,11 @@ func TableOnPoolGet(t *Table, c *context.Context) func(session tableSessionInfo,
 		res(p)
 	}
 }
-func TableOnPoolWait(t *Table, c *context.Context) func(session tableSessionInfo, _ error) {
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func TableOnPoolWait(t *Table, c *context.Context, call call) func(session tableSessionInfo, _ error) {
 	var p TablePoolWaitStartInfo
 	p.Context = c
+	p.Call = call
 	res := t.onPoolWait(p)
 	return func(session tableSessionInfo, e error) {
 		var p TablePoolWaitDoneInfo

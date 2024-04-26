@@ -10,9 +10,11 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/scheme/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
+	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
 //nolint:gofumpt
@@ -20,7 +22,7 @@ import (
 var errNilClient = xerrors.Wrap(errors.New("scheme client is not initialized"))
 
 type Client struct {
-	config  config.Config
+	config  *config.Config
 	service Ydb_Scheme_V1.SchemeServiceClient
 }
 
@@ -32,27 +34,38 @@ func (c *Client) Close(_ context.Context) error {
 	if c == nil {
 		return xerrors.WithStackTrace(errNilClient)
 	}
+
 	return nil
 }
 
-func New(cc grpc.ClientConnInterface, config config.Config) *Client {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) *Client {
 	return &Client{
 		config:  config,
 		service: Ydb_Scheme_V1.NewSchemeServiceClient(cc),
 	}
 }
 
-func (c *Client) MakeDirectory(ctx context.Context, path string) (err error) {
-	if c == nil {
-		return xerrors.WithStackTrace(errNilClient)
-	}
+func (c *Client) MakeDirectory(ctx context.Context, path string) (finalErr error) {
+	onDone := trace.SchemeOnMakeDirectory(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scheme.(*Client).MakeDirectory"),
+		path,
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
 	call := func(ctx context.Context) error {
 		return xerrors.WithStackTrace(c.makeDirectory(ctx, path))
 	}
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
+
+	return retry.Retry(ctx, call,
+		retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithBudget(c.config.RetryBudget()),
+	)
 }
 
 func (c *Client) makeDirectory(ctx context.Context, path string) (err error) {
@@ -68,20 +81,31 @@ func (c *Client) makeDirectory(ctx context.Context, path string) (err error) {
 			),
 		},
 	)
+
 	return xerrors.WithStackTrace(err)
 }
 
-func (c *Client) RemoveDirectory(ctx context.Context, path string) (err error) {
-	if c == nil {
-		return xerrors.WithStackTrace(errNilClient)
-	}
+func (c *Client) RemoveDirectory(ctx context.Context, path string) (finalErr error) {
+	onDone := trace.SchemeOnRemoveDirectory(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scheme.(*Client).RemoveDirectory"),
+		path,
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
 	call := func(ctx context.Context) error {
 		return xerrors.WithStackTrace(c.removeDirectory(ctx, path))
 	}
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
+
+	return retry.Retry(ctx, call,
+		retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithBudget(c.config.RetryBudget()),
+	)
 }
 
 func (c *Client) removeDirectory(ctx context.Context, path string) (err error) {
@@ -97,23 +121,35 @@ func (c *Client) removeDirectory(ctx context.Context, path string) (err error) {
 			),
 		},
 	)
+
 	return xerrors.WithStackTrace(err)
 }
 
-func (c *Client) ListDirectory(ctx context.Context, path string) (d scheme.Directory, err error) {
-	if c == nil {
-		return d, xerrors.WithStackTrace(errNilClient)
-	}
-	call := func(ctx context.Context) error {
+func (c *Client) ListDirectory(ctx context.Context, path string) (d scheme.Directory, finalErr error) {
+	onDone := trace.SchemeOnListDirectory(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scheme.(*Client).ListDirectory"),
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+	call := func(ctx context.Context) (err error) {
 		d, err = c.listDirectory(ctx, path)
+
 		return xerrors.WithStackTrace(err)
 	}
 	if !c.config.AutoRetry() {
-		err = call(ctx)
-		return
+		err := call(ctx)
+
+		return d, xerrors.WithStackTrace(err)
 	}
-	err = retry.Retry(ctx, call, retry.WithIdempotent(true), retry.WithStackTrace())
-	return
+	err := retry.Retry(ctx, call,
+		retry.WithIdempotent(true),
+		retry.WithStackTrace(),
+		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithBudget(c.config.RetryBudget()),
+	)
+
+	return d, xerrors.WithStackTrace(err)
 }
 
 func (c *Client) listDirectory(ctx context.Context, path string) (scheme.Directory, error) {
@@ -142,32 +178,42 @@ func (c *Client) listDirectory(ctx context.Context, path string) (scheme.Directo
 	if err != nil {
 		return d, xerrors.WithStackTrace(err)
 	}
-	d.From(result.Self)
-	d.Children = make([]scheme.Entry, len(result.Children))
-	putEntry(d.Children, result.Children)
+	d.From(result.GetSelf())
+	d.Children = make([]scheme.Entry, len(result.GetChildren()))
+	putEntry(d.Children, result.GetChildren())
+
 	return d, nil
 }
 
-func (c *Client) DescribePath(ctx context.Context, path string) (e scheme.Entry, err error) {
-	if c == nil {
-		return e, xerrors.WithStackTrace(errNilClient)
-	}
-	call := func(ctx context.Context) error {
+func (c *Client) DescribePath(ctx context.Context, path string) (e scheme.Entry, finalErr error) {
+	onDone := trace.SchemeOnDescribePath(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scheme.(*Client).DescribePath"),
+		path,
+	)
+	defer func() {
+		onDone(e.Type.String(), finalErr)
+	}()
+	call := func(ctx context.Context) (err error) {
 		e, err = c.describePath(ctx, path)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
+
 		return nil
 	}
 	if !c.config.AutoRetry() {
-		err = call(ctx)
-		return
+		err := call(ctx)
+
+		return e, err
 	}
-	err = retry.Retry(ctx, call, retry.WithIdempotent(true), retry.WithStackTrace())
-	if err != nil {
-		return e, xerrors.WithStackTrace(err)
-	}
-	return e, nil
+	err := retry.Retry(ctx, call,
+		retry.WithIdempotent(true),
+		retry.WithStackTrace(),
+		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithBudget(c.config.RetryBudget()),
+	)
+
+	return e, xerrors.WithStackTrace(err)
 }
 
 func (c *Client) describePath(ctx context.Context, path string) (e scheme.Entry, err error) {
@@ -194,30 +240,43 @@ func (c *Client) describePath(ctx context.Context, path string) (e scheme.Entry,
 	if err != nil {
 		return e, xerrors.WithStackTrace(err)
 	}
-	e.From(result.Self)
+	e.From(result.GetSelf())
+
 	return e, nil
 }
 
-func (c *Client) ModifyPermissions(ctx context.Context, path string, opts ...scheme.PermissionsOption) (err error) {
-	if c == nil {
-		return xerrors.WithStackTrace(errNilClient)
+func (c *Client) ModifyPermissions(
+	ctx context.Context, path string, opts ...scheme.PermissionsOption,
+) (finalErr error) {
+	onDone := trace.SchemeOnModifyPermissions(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scheme.(*Client).ModifyPermissions"),
+		path,
+	)
+	defer func() {
+		onDone(finalErr)
+	}()
+	var desc permissionsDesc
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&desc)
+		}
 	}
 	call := func(ctx context.Context) error {
-		return xerrors.WithStackTrace(c.modifyPermissions(ctx, path, opts...))
+		return xerrors.WithStackTrace(c.modifyPermissions(ctx, path, desc))
 	}
 	if !c.config.AutoRetry() {
 		return call(ctx)
 	}
-	return retry.Retry(ctx, call, retry.WithStackTrace(), retry.WithIdempotent(true))
+
+	return retry.Retry(ctx, call,
+		retry.WithStackTrace(),
+		retry.WithIdempotent(true),
+		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithBudget(c.config.RetryBudget()),
+	)
 }
 
-func (c *Client) modifyPermissions(ctx context.Context, path string, opts ...scheme.PermissionsOption) (err error) {
-	var desc permissionsDesc
-	for _, o := range opts {
-		if o != nil {
-			o(&desc)
-		}
-	}
+func (c *Client) modifyPermissions(ctx context.Context, path string, desc permissionsDesc) (err error) {
 	_, err = c.service.ModifyPermissions(
 		ctx,
 		&Ydb_Scheme.ModifyPermissionsRequest{
@@ -235,6 +294,7 @@ func (c *Client) modifyPermissions(ctx context.Context, path string, opts ...sch
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
+
 	return nil
 }
 

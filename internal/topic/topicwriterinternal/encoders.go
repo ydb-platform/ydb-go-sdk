@@ -42,6 +42,7 @@ func (e *EncoderMap) CreateLazyEncodeWriter(codec rawtopiccommon.Codec, target i
 	if encoderCreator, ok := e.m[codec]; ok {
 		return encoderCreator(target)
 	}
+
 	return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected codec '%v' for encode message", codec)))
 }
 
@@ -50,11 +51,13 @@ func (e *EncoderMap) GetSupportedCodecs() rawtopiccommon.SupportedCodecs {
 	for codec := range e.m {
 		res = append(res, codec)
 	}
+
 	return res
 }
 
 func (e *EncoderMap) IsSupported(codec rawtopiccommon.Codec) bool {
 	_, ok := e.m[codec]
+
 	return ok
 }
 
@@ -119,9 +122,10 @@ func (s *EncoderSelector) CompressMessages(messages []messageWithDataContent) (r
 			len(messages),
 			trace.TopicWriterCompressMessagesReasonCompressData,
 		)
-		err = readInParallelWithCodec(messages, codec, s.parallelCompressors)
+		err = cacheMessages(messages, codec, s.parallelCompressors)
 		onCompressDone(err)
 	}
+
 	return codec, err
 }
 
@@ -188,7 +192,7 @@ func (s *EncoderSelector) measureCodecs(messages []messageWithDataContent) (rawt
 			len(messages),
 			trace.TopicWriterCompressMessagesReasonCodecsMeasure,
 		)
-		err := readInParallelWithCodec(messages, codec, s.parallelCompressors)
+		err := cacheMessages(messages, codec, s.parallelCompressors)
 		onCompressDone(err)
 		if err != nil {
 			return codecUnknown, err
@@ -215,14 +219,13 @@ func (s *EncoderSelector) measureCodecs(messages []messageWithDataContent) (rawt
 	return s.allowedCodecs[minSizeIndex], nil
 }
 
-func readInParallelWithCodec(messages []messageWithDataContent, codec rawtopiccommon.Codec, parallel int) error {
-	workerCount := parallel
+func cacheMessages(messages []messageWithDataContent, codec rawtopiccommon.Codec, workerCount int) error {
 	if len(messages) < workerCount {
 		workerCount = len(messages)
 	}
 
 	// no need goroutines and synchronization for zero or one worker
-	if workerCount < 2 {
+	if workerCount < 2 { //nolint:gomnd
 		for i := range messages {
 			if _, err := messages[i].GetEncodedBytes(codec); err != nil {
 				return err
@@ -253,11 +256,12 @@ func readInParallelWithCodec(messages []messageWithDataContent, codec rawtopicco
 			if localErr != nil {
 				return
 			}
-			_, localErr = task.GetEncodedBytes(codec)
+			localErr = task.CacheMessageData(codec)
 			if localErr != nil {
 				resErrMutex.WithLock(func() {
 					resErr = localErr
 				})
+
 				return
 			}
 		}

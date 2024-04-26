@@ -31,12 +31,12 @@ func TestDiscovery(t *testing.T) {
 			if !has {
 				t.Fatalf("no medatada")
 			}
-			userAgents := md.Get(meta.HeaderUserAgent)
-			if len(userAgents) == 0 {
-				t.Fatalf("no user agent")
+			applicationName := md.Get(meta.HeaderApplicationName)
+			if len(applicationName) == 0 {
+				t.Fatalf("no application name")
 			}
-			if userAgents[0] != userAgent {
-				t.Fatalf("unknown user agent: %s", userAgents[0])
+			if applicationName[0] != userAgent {
+				t.Fatalf("unknown user agent: %s", applicationName[0])
 			}
 			requestTypes := md.Get(meta.HeaderRequestType)
 			if len(requestTypes) == 0 {
@@ -63,13 +63,10 @@ func TestDiscovery(t *testing.T) {
 		ydb.WithConnectionTTL(time.Second*1),
 		ydb.WithMinTLSVersion(tls.VersionTLS10),
 		ydb.WithLogger(
-			log.Default(os.Stderr,
-				log.WithMinLevel(log.WARN),
-				log.WithColoring(),
-			),
+			newLoggerWithMinLevel(t, log.WARN),
 			trace.MatchDetails(`ydb\.(driver|discovery|repeater).*`),
 		),
-		ydb.WithUserAgent(userAgent),
+		ydb.WithApplicationName(userAgent),
 		ydb.WithRequestsType(requestType),
 		ydb.With(
 			config.WithGrpcOptions(

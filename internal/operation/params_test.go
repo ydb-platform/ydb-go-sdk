@@ -14,7 +14,7 @@ import (
 
 func TestParams(t *testing.T) {
 	for _, tt := range []struct {
-		ctx                  context.Context
+		ctx                  context.Context //nolint:containedctx
 		preferContextTimeout bool
 		timeout              time.Duration
 		cancelAfter          time.Duration
@@ -224,6 +224,7 @@ func TestParams(t *testing.T) {
 					),
 					time.Second*5,
 				), time.Second*10)
+
 				return ctx
 			}(),
 			timeout:     time.Second * 2,
@@ -244,6 +245,7 @@ func TestParams(t *testing.T) {
 					),
 					time.Second*5,
 				), time.Second*1)
+
 				return ctx
 			}(),
 			timeout:     time.Second * 2,
@@ -264,6 +266,7 @@ func TestParams(t *testing.T) {
 					),
 					time.Second*5,
 				), time.Second*1)
+
 				return ctx
 			}(),
 			preferContextTimeout: true,
@@ -279,6 +282,7 @@ func TestParams(t *testing.T) {
 		{
 			ctx: func() context.Context {
 				ctx, _ := xcontext.WithTimeout(context.Background(), time.Second*1)
+
 				return ctx
 			}(),
 			preferContextTimeout: true,
@@ -306,27 +310,28 @@ func TestParams(t *testing.T) {
 						tt.exp,
 					)
 				}
+
 				return
 			}
-			if !reflect.DeepEqual(got.OperationMode, tt.exp.OperationMode) {
+			if !reflect.DeepEqual(got.GetOperationMode(), tt.exp.GetOperationMode()) {
 				t.Errorf(
 					"Params().OperationMode: %v, want: %v",
-					got.OperationMode,
-					tt.exp.OperationMode,
+					got.GetOperationMode(),
+					tt.exp.GetOperationMode(),
 				)
 			}
-			if !reflect.DeepEqual(got.CancelAfter, tt.exp.CancelAfter) {
+			if !reflect.DeepEqual(got.GetCancelAfter(), tt.exp.GetCancelAfter()) {
 				t.Errorf(
 					"Params().CancelAfter: %v, want: %v",
-					got.CancelAfter.AsDuration(),
-					tt.exp.CancelAfter.AsDuration(),
+					got.GetCancelAfter().AsDuration(),
+					tt.exp.GetCancelAfter().AsDuration(),
 				)
 			}
-			if got.OperationTimeout.AsDuration() > tt.exp.OperationTimeout.AsDuration() {
+			if got.GetOperationTimeout().AsDuration() > tt.exp.GetOperationTimeout().AsDuration() {
 				t.Errorf(
 					"Params().OperationTimeout: %v, want: <= %v",
-					got.OperationTimeout.AsDuration(),
-					tt.exp.OperationTimeout.AsDuration(),
+					got.GetOperationTimeout().AsDuration(),
+					tt.exp.GetOperationTimeout().AsDuration(),
 				)
 			}
 		})
