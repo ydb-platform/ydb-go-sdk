@@ -1,4 +1,8 @@
+
 * Added type assertion checks to enhance type safety and prevent unexpected panics in critical sections of the codebase
+
+## v3.66.1
+* Added flush messages from buffer before close topic writer
 * Added Flush method for topic writer
 
 ## v3.66.0

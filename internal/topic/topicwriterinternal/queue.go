@@ -36,12 +36,13 @@ type messageQueue struct {
 	closedErr         error
 	acksReceivedEvent xsync.EventBroadcast
 
-	m                xsync.RWMutex
-	closed           bool
-	closedChan       empty.Chan
-	lastWrittenIndex int
-	lastSentIndex    int
-	lastSeqNo        int64
+	m                         xsync.RWMutex
+	stopReceiveMessagesReason error
+	closed                    bool
+	closedChan                empty.Chan
+	lastWrittenIndex          int
+	lastSentIndex             int
+	lastSeqNo                 int64
 
 	messagesByOrder map[int]messageWithDataContent
 	seqNoToOrderID  map[int64]int
@@ -77,8 +78,10 @@ func (q *messageQueue) addMessages(messages []messageWithDataContent, needWaiter
 	q.m.Lock()
 	defer q.m.Unlock()
 
-	if q.closed {
-		return waiter, xerrors.WithStackTrace(fmt.Errorf("ydb: add message to closed message queue: %w", q.closedErr))
+	if q.stopReceiveMessagesReason != nil {
+		return waiter, xerrors.WithStackTrace(
+			fmt.Errorf("ydb: add message to closed message queue: %w", q.stopReceiveMessagesReason),
+		)
 	}
 
 	if err := q.checkNewMessagesBeforeAddNeedLock(messages); err != nil {
@@ -181,6 +184,19 @@ func (q *messageQueue) ackReceivedNeedLock(seqNo int64) error {
 	return nil
 }
 
+func (q *messageQueue) StopAddNewMessages(reason error) {
+	q.m.Lock()
+	defer q.m.Unlock()
+
+	q.stopAddNewMessagesNeedLock(reason)
+}
+
+func (q *messageQueue) stopAddNewMessagesNeedLock(reason error) {
+	if q.stopReceiveMessagesReason == nil {
+		q.stopReceiveMessagesReason = reason
+	}
+}
+
 func (q *messageQueue) Close(err error) error {
 	isFirstTimeClosed := false
 	q.m.Lock()
@@ -192,6 +208,8 @@ func (q *messageQueue) Close(err error) error {
 			q.OnAckReceived(len(q.seqNoToOrderID))
 		}
 	}()
+
+	q.stopAddNewMessagesNeedLock(err)
 
 	if q.closed {
 		return xerrors.WithStackTrace(errCloseClosedMessageQueue)
