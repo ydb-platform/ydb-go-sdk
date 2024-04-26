@@ -1,3 +1,4 @@
+* Added flush messages from buffer before close topic writer
 * Added Flush method for topic writer
 
 ## v3.66.0
