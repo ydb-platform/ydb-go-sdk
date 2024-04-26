@@ -187,10 +187,7 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 
 		messReceived := make(chan rawtopiccommon.Codec, 2)
 		e.stream.EXPECT().Send(gomock.Any()).Do(func(message rawtopicwriter.ClientMessage) {
-			writeReq, ok := message.(*rawtopicwriter.WriteRequest)
-			if !ok {
-				panic(fmt.Sprintf("unsupported type conversion from %T to *rawtopicwriter.WriteRequest", writeReq))
-			}
+			writeReq := message.(*rawtopicwriter.WriteRequest)
 			messReceived <- writeReq.Codec
 		})
 
@@ -219,10 +216,7 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 
 		messReceived := make(chan rawtopiccommon.Codec, 2)
 		e.stream.EXPECT().Send(gomock.Any()).Do(func(message rawtopicwriter.ClientMessage) {
-			writeReq, ok := message.(*rawtopicwriter.WriteRequest)
-			if !ok {
-				panic(fmt.Sprintf("unsupported type conversion from %T to *rawtopicreader.WriteRequest", writeReq))
-			}
+			writeReq := message.(*rawtopicwriter.WriteRequest)
 			messReceived <- writeReq.Codec
 		})
 
@@ -247,10 +241,7 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 
 		messReceived := make(chan rawtopiccommon.Codec, 2)
 		e.stream.EXPECT().Send(gomock.Any()).Do(func(message rawtopicwriter.ClientMessage) {
-			writeReq, ok := message.(*rawtopicwriter.WriteRequest)
-			if !ok {
-				panic(fmt.Sprintf("unsupported type conversion from %T to *rawtopicwriter.WriteRequest", writeReq))
-			}
+			writeReq := message.(*rawtopicwriter.WriteRequest)
 			messReceived <- writeReq.Codec
 		}).Times(codecMeasureIntervalBatches * 2)
 

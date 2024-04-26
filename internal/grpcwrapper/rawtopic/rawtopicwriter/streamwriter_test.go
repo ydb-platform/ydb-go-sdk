@@ -1,7 +1,6 @@
 package rawtopicwriter
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -73,14 +72,7 @@ func TestSendWriteRequest(t *testing.T) {
 		}
 
 		getWriteRequest := func(req *Ydb_Topic.StreamWriteMessage_FromClient) *Ydb_Topic.StreamWriteMessage_WriteRequest {
-			//nolint:protogetter
-			res, ok := req.ClientMessage.(*Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest)
-			if !ok {
-				panic(fmt.Sprintf(`unsupported type conversion from %T to 
-				*Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest`, res))
-			}
-
-			return res.WriteRequest
+			return req.GetClientMessage().(*Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest).WriteRequest
 		}
 
 		sendCounter := 0

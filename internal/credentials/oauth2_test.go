@@ -400,9 +400,7 @@ func TestJWTTokenSource(t *testing.T) {
 	require.NoError(t, parsedToken.Claims.Valid())
 	require.Equal(t, "test_issuer", claims.Issuer)
 	require.Equal(t, "test_audience", claims.Audience[0])
-	//nolint:forcetypeassert
 	require.Equal(t, "key_id", parsedToken.Header["kid"].(string))
-	//nolint:forcetypeassert
 	require.Equal(t, "RS256", parsedToken.Header["alg"].(string))
 }
 

@@ -2,7 +2,6 @@ package testutil
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -22,11 +21,7 @@ func TestUnwrapOptionalValue(t *testing.T) {
 	if typeID != Ydb.Type_UTF8 {
 		t.Errorf("Types are different: expected %d, actual %d", Ydb.Type_UTF8, typeID)
 	}
-	textValue, ok := val.GetValue().GetValue().(*Ydb.Value_TextValue)
-	if !ok {
-		panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Value_TextValue", textValue))
-	}
-
+	textValue := val.GetValue().GetValue().(*Ydb.Value_TextValue)
 	text := textValue.TextValue
 	if text != "a" {
 		t.Errorf("Values are different: expected %q, actual %q", "a", text)
@@ -42,10 +37,7 @@ func TestUnwrapPrimitiveValue(t *testing.T) {
 	if typeID != Ydb.Type_UTF8 {
 		t.Errorf("Types are different: expected %d, actual %d", Ydb.Type_UTF8, typeID)
 	}
-	textValue, ok := val.GetValue().GetValue().(*Ydb.Value_TextValue)
-	if !ok {
-		panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Value_TextValue", textValue))
-	}
+	textValue := val.GetValue().GetValue().(*Ydb.Value_TextValue)
 	text := textValue.TextValue
 	if text != "a" {
 		t.Errorf("Values are different: expected %q, actual %q", "a", text)
@@ -61,11 +53,7 @@ func TestUnwrapNullValue(t *testing.T) {
 	if typeID != Ydb.Type_UTF8 {
 		t.Errorf("Types are different: expected %d, actual %d", Ydb.Type_UTF8, typeID)
 	}
-
-	nullFlagValue, ok := val.GetValue().GetValue().(*Ydb.Value_NullFlagValue)
-	if !ok {
-		panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Value_NullFlagValue", nullFlagValue))
-	}
+	nullFlagValue := val.GetValue().GetValue().(*Ydb.Value_NullFlagValue)
 	if nullFlagValue.NullFlagValue != structpb.NullValue_NULL_VALUE {
 		t.Errorf("Values are different: expected %d, actual %d", structpb.NullValue_NULL_VALUE, nullFlagValue.NullFlagValue)
 	}
