@@ -196,7 +196,8 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 			Data: bytes.NewReader(messContent),
 		}}))
 
-		require.Equal(t, rawtopiccommon.CodecRaw, <-messReceived)
+		mess := <-messReceived
+		require.Equal(t, rawtopiccommon.CodecRaw, mess)
 	})
 	t.Run("ForceGzip", func(t *testing.T) {
 		var err error
