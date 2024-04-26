@@ -1,4 +1,5 @@
 * Added type assertion checks to enhance type safety and prevent unexpected panics in critical sections of the codebase
+* Added Flush method for topic writer
 
 ## v3.66.0
 * Added experimental package `retry/budget` for limit second and subsequent retry attempts 

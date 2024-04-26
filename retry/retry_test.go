@@ -209,3 +209,45 @@ func TestRetryWithBudget(t *testing.T) {
 		require.ErrorIs(t, err, errNoQuota)
 	})
 }
+
+type MockPanicCallback struct {
+	called   bool
+	received interface{}
+}
+
+func (m *MockPanicCallback) Call(e interface{}) {
+	m.called = true
+	m.received = e
+}
+
+func TestOpWithRecover_NoPanic(t *testing.T) {
+	ctx := context.Background()
+	options := &retryOptions{
+		panicCallback: nil,
+	}
+	op := func(ctx context.Context) error {
+		return nil
+	}
+
+	err := opWithRecover(ctx, options, op)
+
+	require.NoError(t, err)
+}
+
+func TestOpWithRecover_WithPanic(t *testing.T) {
+	ctx := context.Background()
+	mockCallback := new(MockPanicCallback)
+	options := &retryOptions{
+		panicCallback: mockCallback.Call,
+	}
+	op := func(ctx context.Context) error {
+		panic("test panic")
+	}
+
+	err := opWithRecover(ctx, options, op)
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "panic recovered: test panic")
+	require.True(t, mockCallback.called)
+	require.Equal(t, "test panic", mockCallback.received)
+}

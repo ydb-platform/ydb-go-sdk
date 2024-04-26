@@ -257,6 +257,8 @@ func WithPanicCallback(panicCallback func(e interface{})) panicCallbackOption {
 // Warning: if context without deadline or cancellation func was passed, Retry will work infinitely.
 //
 // If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
+//
+//nolint:funlen
 func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr error) {
 	options := &retryOptions{
 		call:        stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.Retry"),
@@ -300,26 +302,11 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 		select {
 		case <-ctx.Done():
 			return xerrors.WithStackTrace(
-				fmt.Errorf("retry failed on attempt No.%d: %w",
-					attempts, ctx.Err(),
-				),
+				fmt.Errorf("retry failed on attempt No.%d: %w", attempts, ctx.Err()),
 			)
 
 		default:
-			err := func() (err error) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-							err = xerrors.WithStackTrace(
-								fmt.Errorf("panic recovered: %v", e),
-							)
-						}
-					}()
-				}
-
-				return op(ctx)
-			}()
+			err := opWithRecover(ctx, options, op)
 
 			if err == nil {
 				return nil
@@ -336,8 +323,7 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 			if !m.MustRetry(options.idempotent) {
 				return xerrors.WithStackTrace(
 					fmt.Errorf("non-retryable error occurred on attempt No.%d (idempotent=%v): %w",
-						attempts, options.idempotent, err,
-					),
+						attempts, options.idempotent, err),
 				)
 			}
 
@@ -371,6 +357,21 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 			}
 		}
 	}
+}
+
+func opWithRecover(ctx context.Context, options *retryOptions, op retryOperation) (err error) {
+	if options.panicCallback != nil {
+		defer func() {
+			if e := recover(); e != nil {
+				options.panicCallback(e)
+				err = xerrors.WithStackTrace(
+					fmt.Errorf("panic recovered: %v", e),
+				)
+			}
+		}()
+	}
+
+	return op(ctx)
 }
 
 // Check returns retry mode for queryErr.

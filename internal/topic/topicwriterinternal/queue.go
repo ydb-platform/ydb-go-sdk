@@ -320,6 +320,16 @@ func (q *messageQueue) Wait(ctx context.Context, waiter MessageQueueAckWaiter) e
 	}
 }
 
+// WaitLastWritten waits for last written message gets ack.
+func (q *messageQueue) WaitLastWritten(ctx context.Context) error {
+	var lastIndex int
+	q.m.WithRLock(func() {
+		lastIndex = q.lastWrittenIndex
+	})
+
+	return q.Wait(ctx, MessageQueueAckWaiter{sequenseNumbers: []int{lastIndex}})
+}
+
 type MessageQueueAckWaiter struct {
 	sequenseNumbers []int
 }

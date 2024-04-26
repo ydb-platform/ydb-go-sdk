@@ -68,6 +68,7 @@ func New() (v *Allocator) {
 	return allocatorPool.Get()
 }
 
+//nolint:funlen
 func (a *Allocator) Free() {
 	a.valueAllocator.free()
 	a.typeAllocator.free()
