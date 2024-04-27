@@ -88,7 +88,7 @@ func (w *Writer) init() {
 func (w *Writer) mustDeclare(name string) {
 	s, ok := w.scope.Back().Value.(*scope)
 	if !ok {
-		panic(fmt.Sprintf("unsupported type conversion from %T to w.scope.Back()", s))
+		panic(fmt.Sprintf("unsupported type conversion from %T to *scope", s))
 	}
 	if !s.set(name) {
 		where := s.where(name)
