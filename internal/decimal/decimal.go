@@ -223,6 +223,8 @@ func handleRemainingDigits(s string, v *big.Int, precision uint32) (*big.Int, er
 
 // Format returns the string representation of x with the given precision and
 // scale.
+//
+//nolint:ifshort //Can't place variable inside if scope because it's used below
 func Format(x *big.Int, precision, scale uint32) string {
 	// Check for special values and nil pointer upfront.
 	if x == nil {
@@ -245,7 +247,7 @@ func Format(x *big.Int, precision, scale uint32) string {
 
 	v := big.NewInt(0).Set(x)
 	neg := x.Sign() < 0
-	if neg { //nolint:ifshort //Can't place variable inside if scope because it's used below
+	if neg {
 		// Convert negative to positive.
 		v.Neg(x)
 	}
@@ -336,9 +338,10 @@ func BigIntToByte(x *big.Int, precision, scale uint32) (p [16]byte) {
 	return p
 }
 
+//nolint:ifshort //Can't place variable inside if scope because it's used one more time below
 func put(x *big.Int, p []byte) {
 	neg := x.Sign() < 0
-	if neg { //nolint:ifshort //Can't place variable inside if scope because it's used one more time below
+	if neg {
 		x = complement(x)
 	}
 	i := len(p)

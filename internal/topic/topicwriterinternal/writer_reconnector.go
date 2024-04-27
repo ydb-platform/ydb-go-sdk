@@ -336,6 +336,7 @@ func (w *WriterReconnector) Close(ctx context.Context) error {
 		return flushErr
 	}
 	closeErr := w.close(ctx, reason)
+
 	return closeErr
 }
 
