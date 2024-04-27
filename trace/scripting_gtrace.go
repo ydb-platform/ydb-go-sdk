@@ -263,7 +263,6 @@ func (t *Scripting) onClose(s ScriptingCloseStartInfo) func(ScriptingCloseDoneIn
 	}
 	return res
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func ScriptingOnExecute(t *Scripting, c *context.Context, call call, query string, parameters scriptingQueryParameters) func(result scriptingResult, _ error) {
 	var p ScriptingExecuteStartInfo
@@ -279,7 +278,6 @@ func ScriptingOnExecute(t *Scripting, c *context.Context, call call, query strin
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func ScriptingOnStreamExecute(t *Scripting, c *context.Context, call call, query string, parameters scriptingQueryParameters) func(error) func(error) {
 	var p ScriptingStreamExecuteStartInfo
@@ -299,7 +297,6 @@ func ScriptingOnStreamExecute(t *Scripting, c *context.Context, call call, query
 		}
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func ScriptingOnExplain(t *Scripting, c *context.Context, call call, query string) func(plan string, _ error) {
 	var p ScriptingExplainStartInfo
@@ -314,7 +311,6 @@ func ScriptingOnExplain(t *Scripting, c *context.Context, call call, query strin
 		res(p)
 	}
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func ScriptingOnClose(t *Scripting, c *context.Context, call call) func(error) {
 	var p ScriptingCloseStartInfo

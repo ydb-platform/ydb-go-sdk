@@ -85,7 +85,6 @@ func (t *Retry) onRetry(r RetryLoopStartInfo) func(RetryLoopDoneInfo) {
 	}
 	return res
 }
-
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func RetryOnRetry(t *Retry, c *context.Context, call call, label string, idempotent bool, nestedCall bool) func(attempts int, _ error) {
 	var p RetryLoopStartInfo
