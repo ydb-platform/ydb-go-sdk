@@ -1111,7 +1111,7 @@ func (p *Pool[T]) Get() *T {
 
 	val, ok := v.(*T)
 	if !ok {
-		panic(fmt.Sprintf("assertion failed: expected type *T, got %T", v))
+		panic(fmt.Sprintf("unsupported type conversion from %T to *T", val))
 	}
 
 	return val
