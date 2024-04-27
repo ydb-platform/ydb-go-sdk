@@ -225,7 +225,6 @@ linters:
     - exhaustive
     - exhaustivestruct
     - exhaustruct
-    - forbidigo
     - forcetypeassert
     - funlen
     - gochecknoglobals
@@ -246,6 +245,8 @@ linters:
     - varnamelen
     - wrapcheck
     - wsl
+#disable:examples    - forbidigo
+#disable:slo    - forbidigo
 
 issues:
   # List of regexps of issue texts to exclude, empty list by default.

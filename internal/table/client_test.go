@@ -909,6 +909,7 @@ func (s *StubBuilder) createSession(ctx context.Context) (session *session, err 
 	return newSession(ctx, s.cc, config.New())
 }
 
+//nolint:forbidigo
 func (c *Client) debug() {
 	fmt.Print("head ")
 	for el := c.idle.Front(); el != nil; el = el.Next() {
