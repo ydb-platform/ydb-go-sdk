@@ -34,10 +34,10 @@ func Compare(l, r value.Value) (int, error) {
 }
 
 func unwrapTypedValue(v *Ydb.TypedValue) *Ydb.TypedValue {
-	typ := v.Type
-	val := v.Value
+	typ := v.GetType()
+	val := v.GetValue()
 	for opt := typ.GetOptionalType(); opt != nil; opt = typ.GetOptionalType() {
-		typ = opt.Item
+		typ = opt.GetItem()
 		if nested := val.GetNestedValue(); nested != nil {
 			val = nested
 		}
@@ -47,18 +47,18 @@ func unwrapTypedValue(v *Ydb.TypedValue) *Ydb.TypedValue {
 }
 
 func compare(lhs, rhs *Ydb.TypedValue) (int, error) {
-	lTypeID := lhs.Type.GetTypeId()
-	rTypeID := rhs.Type.GetTypeId()
+	lTypeID := lhs.GetType().GetTypeId()
+	rTypeID := rhs.GetType().GetTypeId()
 	switch {
 	case lTypeID != rTypeID:
 		return 0, notComparableError(lhs, rhs)
 	case lTypeID != Ydb.Type_PRIMITIVE_TYPE_ID_UNSPECIFIED:
-		return comparePrimitives(lTypeID, lhs.Value, rhs.Value)
-	case lhs.Type.GetTupleType() != nil && rhs.Type.GetTupleType() != nil:
+		return comparePrimitives(lTypeID, lhs.GetValue(), rhs.GetValue())
+	case lhs.GetType().GetTupleType() != nil && rhs.GetType().GetTupleType() != nil:
 		return compareTuplesOrLists(expandTuple(lhs), expandTuple(rhs))
-	case lhs.Type.GetListType() != nil && rhs.Type.GetListType() != nil:
+	case lhs.GetType().GetListType() != nil && rhs.GetType().GetListType() != nil:
 		return compareTuplesOrLists(expandList(lhs), expandList(rhs))
-	case lhs.Type.GetStructType() != nil && rhs.Type.GetStructType() != nil:
+	case lhs.GetType().GetStructType() != nil && rhs.GetType().GetStructType() != nil:
 		return compareStructs(expandStruct(lhs), expandStruct(rhs))
 	default:
 		return 0, notComparableError(lhs, rhs)
@@ -88,11 +88,11 @@ func expandStruct(v *Ydb.TypedValue) []*Ydb.TypedValue {
 }
 
 func expandTuple(v *Ydb.TypedValue) []*Ydb.TypedValue {
-	tuple := v.Type.GetTupleType()
-	size := len(tuple.Elements)
+	tuple := v.GetType().GetTupleType()
+	size := len(tuple.GetElements())
 	values := make([]*Ydb.TypedValue, 0, size)
-	for idx, typ := range tuple.Elements {
-		values = append(values, unwrapTypedValue(&Ydb.TypedValue{Type: typ, Value: v.Value.Items[idx]}))
+	for idx, typ := range tuple.GetElements() {
+		values = append(values, unwrapTypedValue(&Ydb.TypedValue{Type: typ, Value: v.GetValue().GetItems()[idx]}))
 	}
 
 	return values
@@ -103,8 +103,8 @@ func notComparableError(lhs, rhs interface{}) error {
 }
 
 func comparePrimitives(t Ydb.Type_PrimitiveTypeId, lhs, rhs *Ydb.Value) (int, error) {
-	_, lIsNull := lhs.Value.(*Ydb.Value_NullFlagValue)
-	_, rIsNull := rhs.Value.(*Ydb.Value_NullFlagValue)
+	_, lIsNull := lhs.GetValue().(*Ydb.Value_NullFlagValue)
+	_, rIsNull := rhs.GetValue().(*Ydb.Value_NullFlagValue)
 	if lIsNull {
 		if rIsNull {
 			return 0, nil
@@ -308,11 +308,11 @@ func compareBool(l, r *Ydb.Value) int {
 func compareDyNumber(l, r *Ydb.Value) (int, error) {
 	ll := l.GetTextValue()
 	rr := r.GetTextValue()
-	lf, _, err := big.ParseFloat(ll, 10, 127, big.ToNearestEven)
+	lf, _, err := big.ParseFloat(ll, 10, 127, big.ToNearestEven) //nolint:gomnd
 	if err != nil {
 		return 0, xerrors.WithStackTrace(err)
 	}
-	rf, _, err := big.ParseFloat(rr, 10, 127, big.ToNearestEven)
+	rf, _, err := big.ParseFloat(rr, 10, 127, big.ToNearestEven) //nolint:gomnd
 	if err != nil {
 		return 0, err
 	}

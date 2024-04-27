@@ -2,20 +2,18 @@ package table
 
 import (
 	"context"
-	"sort"
 	"time"
 
-	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/params"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -42,8 +40,9 @@ type Client interface {
 	// - context was canceled or deadlined
 	// - session was created
 	//
-	// Deprecated: don't use CreateSession explicitly. This method only for ORM's compatibility.
-	// Use Do for queries with session
+	// Deprecated: not for public usage. Because explicit session often leaked on server-side due to bad client-side usage.
+	// Will be removed after Oct 2024.
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	CreateSession(ctx context.Context, opts ...Option) (s ClosableSession, err error)
 
 	// Do provide the best effort for execute operation.
@@ -114,6 +113,9 @@ type Session interface {
 		opts ...options.AlterTableOption,
 	) (err error)
 
+	// Deprecated: use CopyTables method instead
+	// Will be removed after Oct 2024.
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	CopyTable(
 		ctx context.Context,
 		dst, src string,
@@ -123,6 +125,11 @@ type Session interface {
 	CopyTables(
 		ctx context.Context,
 		opts ...options.CopyTablesOption,
+	) (err error)
+
+	RenameTables(
+		ctx context.Context,
+		opts ...options.RenameTablesOption,
 	) (err error)
 
 	Explain(
@@ -144,7 +151,7 @@ type Session interface {
 		ctx context.Context,
 		tx *TransactionControl,
 		query string,
-		params *QueryParameters,
+		params *params.Parameters,
 		opts ...options.ExecuteDataQueryOption,
 	) (txr Transaction, r result.Result, err error)
 
@@ -167,21 +174,21 @@ type Session interface {
 	StreamExecuteScanQuery(
 		ctx context.Context,
 		query string,
-		params *QueryParameters,
+		params *params.Parameters,
 		opts ...options.ExecuteScanQueryOption,
 	) (_ result.StreamResult, err error)
 
 	BulkUpsert(
 		ctx context.Context,
 		table string,
-		rows types.Value,
+		rows value.Value,
 		opts ...options.BulkUpsertOption,
 	) (err error)
 
 	ReadRows(
 		ctx context.Context,
 		path string,
-		keys types.Value,
+		keys value.Value,
 		opts ...options.ReadRowsOption,
 	) (_ result.Result, err error)
 
@@ -243,13 +250,13 @@ type TransactionActor interface {
 	Execute(
 		ctx context.Context,
 		query string,
-		params *QueryParameters,
+		params *params.Parameters,
 		opts ...options.ExecuteDataQueryOption,
 	) (result.Result, error)
 	ExecuteStatement(
 		ctx context.Context,
 		stmt Statement,
-		params *QueryParameters,
+		params *params.Parameters,
 		opts ...options.ExecuteDataQueryOption,
 	) (result.Result, error)
 }
@@ -270,7 +277,7 @@ type Statement interface {
 	Execute(
 		ctx context.Context,
 		tx *TransactionControl,
-		params *QueryParameters,
+		params *params.Parameters,
 		opts ...options.ExecuteDataQueryOption,
 	) (txr Transaction, r result.Result, err error)
 	NumInput() int
@@ -455,113 +462,22 @@ func SnapshotReadOnlyTxControl() *TransactionControl {
 
 // QueryParameters
 type (
-	queryParams     map[string]types.Value
-	ParameterOption interface {
-		Name() string
-		Value() types.Value
-	}
-	parameterOption struct {
-		name  string
-		value types.Value
-	}
-	QueryParameters struct {
-		m queryParams
-	}
+	ParameterOption = params.NamedValue
+	QueryParameters = params.Parameters
 )
 
-func (p parameterOption) Name() string {
-	return p.name
-}
-
-func (p parameterOption) Value() types.Value {
-	return p.value
-}
-
-func (qp queryParams) ToYDB(a *allocator.Allocator) map[string]*Ydb.TypedValue {
-	if qp == nil {
-		return nil
-	}
-	params := make(map[string]*Ydb.TypedValue, len(qp))
-	for k, v := range qp {
-		params[k] = value.ToYDB(v, a)
-	}
-
-	return params
-}
-
-func (q *QueryParameters) Params() queryParams {
-	if q == nil {
-		return nil
-	}
-
-	return q.m
-}
-
-func (q *QueryParameters) Count() int {
-	if q == nil {
-		return 0
-	}
-
-	return len(q.m)
-}
-
-func (q *QueryParameters) Each(it func(name string, v types.Value)) {
-	if q == nil {
-		return
-	}
-	for key, v := range q.m {
-		it(key, v)
-	}
-}
-
-func (q *QueryParameters) names() []string {
-	if q == nil {
-		return nil
-	}
-	names := make([]string, 0, len(q.m))
-	for k := range q.m {
-		names = append(names, k)
-	}
-	sort.Strings(names)
-
-	return names
-}
-
-func (q *QueryParameters) String() string {
-	buffer := xstring.Buffer()
-	defer buffer.Free()
-
-	buffer.WriteByte('{')
-	for i, name := range q.names() {
-		if i != 0 {
-			buffer.WriteByte(',')
-		}
-		buffer.WriteByte('"')
-		buffer.WriteString(name)
-		buffer.WriteString("\":")
-		buffer.WriteString(q.m[name].Yql())
-	}
-	buffer.WriteByte('}')
-
-	return buffer.String()
-}
-
 func NewQueryParameters(opts ...ParameterOption) *QueryParameters {
-	q := &QueryParameters{
-		m: make(queryParams, len(opts)),
+	qp := QueryParameters(make([]*params.Parameter, len(opts)))
+	for i, opt := range opts {
+		if opt != nil {
+			qp[i] = params.Named(opt.Name(), opt.Value())
+		}
 	}
-	q.Add(opts...)
 
-	return q
+	return &qp
 }
 
-func (q *QueryParameters) Add(params ...ParameterOption) {
-	for _, param := range params {
-		q.m[param.Name()] = param.Value()
-	}
-}
-
-func ValueParam(name string, v types.Value) ParameterOption {
+func ValueParam(name string, v value.Value) ParameterOption {
 	switch len(name) {
 	case 0:
 		panic("empty name")
@@ -571,10 +487,7 @@ func ValueParam(name string, v types.Value) ParameterOption {
 		}
 	}
 
-	return &parameterOption{
-		name:  name,
-		value: v,
-	}
+	return params.Named(name, v)
 }
 
 type Options struct {
@@ -608,24 +521,23 @@ var _ Option = retryOptionsOption{}
 type retryOptionsOption []retry.Option
 
 func (retryOptions retryOptionsOption) ApplyTableOption(opts *Options) {
-	opts.RetryOptions = append(opts.RetryOptions, retry.WithIdempotent(true))
+	opts.RetryOptions = append(opts.RetryOptions, retryOptions...)
 }
 
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithRetryBudget(b budget.Budget) retryOptionsOption {
+	return []retry.Option{retry.WithBudget(b)}
+}
+
+// Deprecated: redundant option
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithRetryOptions(retryOptions []retry.Option) retryOptionsOption {
 	return retryOptions
 }
 
-var _ Option = idempotentOption{}
-
-type idempotentOption struct{}
-
-func (idempotentOption) ApplyTableOption(opts *Options) {
-	opts.Idempotent = true
-	opts.RetryOptions = append(opts.RetryOptions, retry.WithIdempotent(true))
-}
-
-func WithIdempotent() idempotentOption {
-	return idempotentOption{}
+func WithIdempotent() retryOptionsOption {
+	return []retry.Option{retry.WithIdempotent(true)}
 }
 
 var _ Option = txSettingsOption{}

@@ -44,6 +44,11 @@ const (
 	TablePoolSessionLifeCycleEvents
 	TablePoolAPIEvents
 
+	QuerySessionEvents
+	QueryResultEvents
+	QueryTransactionEvents
+	QueryPoolEvents
+
 	TopicControlPlaneEvents
 
 	TopicReaderCustomerEvents
@@ -73,9 +78,6 @@ const (
 
 	CoordinationEvents
 
-	// Deprecated: has no effect now
-	DriverClusterEvents
-
 	DriverEvents = DriverConnEvents |
 		DriverBalancerEvents |
 		DriverResolverEvents |
@@ -89,6 +91,11 @@ const (
 		TablePoolLifeCycleEvents |
 		TablePoolSessionLifeCycleEvents |
 		TablePoolAPIEvents
+
+	QueryEvents = QuerySessionEvents |
+		QueryPoolEvents |
+		QueryResultEvents |
+		QueryTransactionEvents
 
 	TablePoolEvents = TablePoolLifeCycleEvents |
 		TablePoolSessionLifeCycleEvents |
@@ -144,6 +151,12 @@ var (
 		TablePoolSessionLifeCycleEvents: "ydb.table.pool.session",
 		TablePoolAPIEvents:              "ydb.table.pool.api",
 
+		QueryEvents:            "ydb.query",
+		QueryPoolEvents:        "ydb.query.pool",
+		QuerySessionEvents:     "ydb.query.session",
+		QueryResultEvents:      "ydb.query.result",
+		QueryTransactionEvents: "ydb.query.tx",
+
 		DatabaseSQLEvents:          "ydb.database.sql",
 		DatabaseSQLConnectorEvents: "ydb.database.sql.connector",
 		DatabaseSQLConnEvents:      "ydb.database.sql.conn",
@@ -191,9 +204,9 @@ func MatchDetails(pattern string, opts ...matchDetailsOption) (d Details) {
 		err error
 	)
 
-	for _, o := range opts {
-		if o != nil {
-			o(h)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(h)
 		}
 	}
 	if h.posixMatch {

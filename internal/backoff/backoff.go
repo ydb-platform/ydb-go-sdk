@@ -22,11 +22,11 @@ const (
 var (
 	Fast = New(
 		WithSlotDuration(fastSlot),
-		WithCeiling(6),
+		WithCeiling(6), //nolint:gomnd
 	)
 	Slow = New(
 		WithSlotDuration(slowSlot),
-		WithCeiling(6),
+		WithCeiling(6), //nolint:gomnd
 	)
 )
 
@@ -86,9 +86,9 @@ func New(opts ...option) logBackoff {
 	b := logBackoff{
 		r: xrand.New(xrand.WithLock()),
 	}
-	for _, o := range opts {
-		if o != nil {
-			o(&b)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(&b)
 		}
 	}
 

@@ -12,6 +12,7 @@ import (
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -107,7 +108,9 @@ type Option func(c *Config)
 
 // WithInternalDNSResolver
 //
-// Deprecated: always used internal dns-resolver
+// Deprecated: always used internal dns-resolver.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithInternalDNSResolver() Option {
 	return func(c *Config) {}
 }
@@ -155,15 +158,34 @@ func WithTrace(t trace.Driver, opts ...trace.DriverComposeOption) Option { //nol
 	}
 }
 
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithRetryBudget(b budget.Budget) Option {
+	return func(c *Config) {
+		config.SetRetryBudget(&c.Common, b)
+	}
+}
+
 func WithTraceRetry(t *trace.Retry, opts ...trace.RetryComposeOption) Option {
 	return func(c *Config) {
 		config.SetTraceRetry(&c.Common, t, opts...)
 	}
 }
 
+// WithApplicationName add provided application name to all api requests
+func WithApplicationName(applicationName string) Option {
+	return func(c *Config) {
+		c.metaOptions = append(c.metaOptions, meta.WithApplicationNameOption(applicationName))
+	}
+}
+
+// WithUserAgent add provided user agent to all api requests
+//
+// Deprecated: use WithApplicationName instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithUserAgent(userAgent string) Option {
 	return func(c *Config) {
-		c.metaOptions = append(c.metaOptions, meta.WithUserAgentOption(userAgent))
+		c.metaOptions = append(c.metaOptions, meta.WithApplicationNameOption(userAgent))
 	}
 }
 
@@ -268,9 +290,9 @@ func ExcludeGRPCCodesForPessimization(codes ...grpcCodes.Code) Option {
 func New(opts ...Option) *Config {
 	c := defaultConfig()
 
-	for _, o := range opts {
-		if o != nil {
-			o(c)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(c)
 		}
 	}
 
@@ -281,9 +303,9 @@ func New(opts ...Option) *Config {
 
 // With makes copy of current Config with specified options
 func (c *Config) With(opts ...Option) *Config {
-	for _, o := range opts {
-		if o != nil {
-			o(c)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(c)
 		}
 	}
 	c.meta = meta.New(

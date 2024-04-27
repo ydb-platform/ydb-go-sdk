@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/big"
 	"runtime"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,7 +23,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -84,8 +84,8 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		},
 		AutoSetSeqNo:       true,
 		AutoSetCreatedTime: true,
-		MaxMessageSize:     50 * 1024 * 1024,
-		MaxQueueLen:        1000,
+		MaxMessageSize:     50 * 1024 * 1024, //nolint:gomnd
+		MaxQueueLen:        1000,             //nolint:gomnd
 		RetrySettings: topic.RetrySettings{
 			StartTimeout: topic.DefaultStartTimeout,
 		},
@@ -114,25 +114,22 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 }
 
 type WriterReconnector struct {
-	cfg           WriterReconnectorConfig
-	retrySettings topic.RetrySettings
-
-	semaphore                      *semaphore.Weighted
+	cfg                            WriterReconnectorConfig
 	queue                          messageQueue
 	background                     background.Worker
+	retrySettings                  topic.RetrySettings
 	clock                          clockwork.Clock
-	firstConnectionHandled         xatomic.Bool
-	firstInitResponseProcessedChan empty.Chan
 	writerInstanceID               string
-
-	m           xsync.RWMutex
-	sessionID   string
-	lastSeqNo   int64
-	encodersMap *EncoderMap
-
-	initDone   bool
-	initDoneCh empty.Chan
-	initInfo   InitialInfo
+	sessionID                      string
+	semaphore                      *semaphore.Weighted
+	firstInitResponseProcessedChan empty.Chan
+	lastSeqNo                      int64
+	encodersMap                    *EncoderMap
+	initDoneCh                     empty.Chan
+	initInfo                       InitialInfo
+	m                              xsync.RWMutex
+	firstConnectionHandled         atomic.Bool
+	initDone                       bool
 }
 
 func newWriterReconnector(
@@ -328,8 +325,22 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 	return res, nil
 }
 
+func (w *WriterReconnector) Flush(ctx context.Context) error {
+	return w.queue.WaitLastWritten(ctx)
+}
+
 func (w *WriterReconnector) Close(ctx context.Context) error {
-	return w.close(ctx, xerrors.WithStackTrace(errStopWriterReconnector))
+	reason := xerrors.WithStackTrace(errStopWriterReconnector)
+	w.queue.StopAddNewMessages(reason)
+
+	flushErr := w.Flush(ctx)
+	closeErr := w.close(ctx, reason)
+
+	if flushErr != nil {
+		return flushErr
+	}
+
+	return closeErr
 }
 
 func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr error) {
@@ -338,9 +349,13 @@ func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr err
 		onDone(resErr)
 	}()
 
-	resErr = w.queue.Close(reason)
+	closeErr := w.queue.Close(reason)
+	if resErr == nil && closeErr != nil {
+		resErr = closeErr
+	}
+
 	bgErr := w.background.Close(ctx, reason)
-	if resErr == nil {
+	if resErr == nil && bgErr != nil {
 		resErr = bgErr
 	}
 
@@ -353,7 +368,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 
 	createStreamContext := func() (context.Context, context.CancelFunc) {
 		// need suppress parent context cancelation for flush buffer while close writer
-		return xcontext.WithCancel(xcontext.WithoutDeadline(ctx))
+		return xcontext.WithCancel(xcontext.ValueOnly(ctx))
 	}
 
 	//nolint:ineffassign,staticcheck,wastedassign
@@ -383,16 +398,21 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		prevAttemptTime = now
 
 		if reconnectReason != nil {
-			if backoff, retry := topic.CheckRetryMode(reconnectReason, w.retrySettings, w.clock.Since(startOfRetries)); retry {
+			retryDuration := w.clock.Since(startOfRetries)
+			if backoff, retry := topic.CheckRetryMode(reconnectReason, w.retrySettings, retryDuration); retry {
 				delay := backoff.Delay(attempt)
+				delayTimer := w.clock.NewTimer(delay)
 				select {
 				case <-doneCtx:
+					delayTimer.Stop()
+
 					return
-				case <-w.clock.After(delay):
+				case <-delayTimer.Chan():
+					delayTimer.Stop() // no really need, stop for common style only
 					// pass
 				}
 			} else {
-				_ = w.close(ctx, reconnectReason)
+				_ = w.close(ctx, fmt.Errorf("%w, was retried (%v)", reconnectReason, retryDuration))
 
 				return
 			}

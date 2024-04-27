@@ -3,6 +3,7 @@ package ydb_test
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -14,12 +15,76 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 )
+
+//nolint:testableexamples, nonamedreturns
+func Example_query() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close(ctx) // cleanup resources
+
+	err = db.Query().Do( // Do retry operation on errors with best effort
+		ctx, // context manage exiting from Do
+		func(ctx context.Context, s query.Session) (err error) { // retry operation
+			_, res, err := s.Execute(ctx,
+				`SELECT $id as myId, $str as myStr`,
+				query.WithParameters(
+					ydb.ParamsBuilder().
+						Param("$id").Uint64(42).
+						Param("$str").Text("my string").
+						Build(),
+				),
+			)
+			if err != nil {
+				return err // for auto-retry with driver
+			}
+			defer func() { _ = res.Close(ctx) }() // cleanup resources
+			for {                                 // iterate over result sets
+				rs, err := res.NextResultSet(ctx)
+				if err != nil {
+					if errors.Is(err, io.EOF) {
+						break
+					}
+
+					return err
+				}
+				for { // iterate over rows
+					row, err := rs.NextRow(ctx)
+					if err != nil {
+						if errors.Is(err, io.EOF) {
+							break
+						}
+
+						return err
+					}
+					type myStruct struct {
+						id  uint64 `sql:"id"`
+						str string `sql:"myStr"`
+					}
+					var s myStruct
+					if err = row.ScanStruct(&s); err != nil {
+						return err // generally scan error not retryable, return it for driver check error
+					}
+				}
+			}
+
+			return res.Err() // return finally result error for auto-retry with driver
+		},
+		query.WithIdempotent(),
+	)
+	if err != nil {
+		log.Printf("unexpected error: %v", err)
+	}
+}
 
 //nolint:testableexamples, nonamedreturns
 func Example_table() {

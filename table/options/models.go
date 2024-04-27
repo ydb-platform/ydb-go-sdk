@@ -9,8 +9,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
 type Column struct {
@@ -22,7 +22,7 @@ type Column struct {
 func (c Column) toYDB(a *allocator.Allocator) *Ydb_Table.ColumnMeta {
 	return &Ydb_Table.ColumnMeta{
 		Name:   c.Name,
-		Type:   value.TypeToYDB(c.Type, a),
+		Type:   types.TypeToYDB(c.Type, a),
 		Family: c.Family,
 	}
 }
@@ -41,15 +41,6 @@ type IndexDescription struct {
 	DataColumns  []string
 	Status       Ydb_Table.TableIndexDescription_Status
 	Type         IndexType
-}
-
-//nolint:unused
-func (i IndexDescription) toYDB() *Ydb_Table.TableIndexDescription {
-	return &Ydb_Table.TableIndexDescription{
-		Name:         i.Name,
-		IndexColumns: i.IndexColumns,
-		Status:       i.Status,
-	}
 }
 
 type Description struct {
@@ -406,8 +397,8 @@ type (
 )
 
 type KeyRange struct {
-	From types.Value
-	To   types.Value
+	From value.Value
+	To   value.Value
 }
 
 func (kr KeyRange) String() string {
@@ -430,7 +421,8 @@ func (kr KeyRange) String() string {
 }
 
 // Deprecated: use TimeToLiveSettings instead.
-// Will be removed after Jan 2022.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 type TTLSettings struct {
 	DateTimeColumn string
 	TTLSeconds     uint32

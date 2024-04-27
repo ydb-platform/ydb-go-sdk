@@ -26,9 +26,7 @@ func TestWithTraceRetry(t *testing.T) {
 			scope       = newScope(t)
 			db          = scope.Driver(
 				ydb.WithTraceRetry(trace.Retry{
-					OnRetry: func(
-						info trace.RetryLoopStartInfo,
-					) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
 						retryCalled[info.Label] = true
 						return nil
 					},
@@ -64,9 +62,7 @@ func TestWithTraceRetry(t *testing.T) {
 			scope       = newScope(t)
 			nativeDb    = scope.Driver(
 				ydb.WithTraceRetry(trace.Retry{
-					OnRetry: func(
-						info trace.RetryLoopStartInfo,
-					) func(trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
 						retryCalled[info.Label] = true
 						return nil
 					},

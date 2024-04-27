@@ -8,6 +8,7 @@ import (
 	"path"
 	"runtime"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -20,7 +21,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
@@ -408,7 +408,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 		session *session
 	}
 	create := make(chan createReq)
-	p, err := newClient(
+	p := newClient(
 		context.Background(),
 		nil,
 		(&StubBuilder{
@@ -429,10 +429,10 @@ func TestSessionPoolRacyGet(t *testing.T) {
 			config.WithIdleThreshold(-1),
 		),
 	)
-	require.NoError(t, err)
 	var (
 		expSession *session
 		done       = make(chan struct{}, 2)
+		err        error
 	)
 	for i := 0; i < 2; i++ {
 		go func() {
@@ -678,7 +678,7 @@ func TestSessionPoolCloseIdleSessions(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		var (
 			idleThreshold = 4 * time.Second
-			closedCount   xatomic.Int64
+			closedCount   atomic.Int64
 			fakeClock     = clockwork.NewFakeClock()
 		)
 		p := newClientWithStubBuilder(
@@ -872,7 +872,7 @@ func newClientWithStubBuilder(
 	stubLimit int,
 	options ...config.Option,
 ) *Client {
-	c, err := newClient(
+	c := newClient(
 		context.Background(),
 		balancer,
 		(&StubBuilder{
@@ -882,7 +882,6 @@ func newClientWithStubBuilder(
 		}).createSession,
 		config.New(options...),
 	)
-	require.NoError(t, err)
 
 	return c
 }

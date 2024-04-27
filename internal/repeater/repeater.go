@@ -108,9 +108,9 @@ func New(
 		trace:    &trace.Driver{},
 	}
 
-	for _, o := range opts {
-		if o != nil {
-			o(r)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(r)
 		}
 	}
 
@@ -147,7 +147,7 @@ func (r *repeater) wakeUp(ctx context.Context, e Event) (err error) {
 	ctx = WithEvent(ctx, e)
 
 	onDone := trace.DriverOnRepeaterWakeUp(r.trace, &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/repeater.(*repeater).wakeUp"),
 		r.name, e,
 	)
 	defer func() {
@@ -172,8 +172,8 @@ func (r *repeater) worker(ctx context.Context, tick clockwork.Ticker) {
 
 	// force returns backoff with delays [500ms...32s]
 	force := backoff.New(
-		backoff.WithSlotDuration(500*time.Millisecond),
-		backoff.WithCeiling(6),
+		backoff.WithSlotDuration(500*time.Millisecond), //nolint:gomnd
+		backoff.WithCeiling(6),                         //nolint:gomnd
 		backoff.WithJitterLimit(1),
 	)
 

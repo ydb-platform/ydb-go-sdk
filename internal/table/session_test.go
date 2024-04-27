@@ -22,12 +22,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
-	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
@@ -133,17 +133,17 @@ func TestSessionDescribeTable(t *testing.T) {
 			Columns: []options.Column{
 				{
 					Name:   "testColumn",
-					Type:   types.Void(),
+					Type:   types.NewVoid(),
 					Family: "testFamily",
 				},
 			},
 			KeyRanges: []options.KeyRange{
 				{
 					From: nil,
-					To:   types.Int64Value(100500),
+					To:   value.Int64Value(100500),
 				},
 				{
-					From: types.Int64Value(100500),
+					From: value.Int64Value(100500),
 					To:   nil,
 				},
 			},
@@ -182,7 +182,7 @@ func TestSessionDescribeTable(t *testing.T) {
 			Columns: []*Ydb_Table.ColumnMeta{
 				{
 					Name:   expect.Columns[0].Name,
-					Type:   value.TypeToYDB(expect.Columns[0].Type, a),
+					Type:   types.TypeToYDB(expect.Columns[0].Type, a),
 					Family: "testFamily",
 				},
 			},
@@ -339,7 +339,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 			func(t *testing.T) {
 				for _, srcDst := range fromTo {
 					t.Run(srcDst.srcMode.String()+"->"+srcDst.dstMode.String(), func(t *testing.T) {
-						client, err := New(context.Background(), testutil.NewBalancer(
+						client := New(context.Background(), testutil.NewBalancer(
 							testutil.WithInvokeHandlers(
 								testutil.InvokeHandlers{
 									testutil.TableExecuteDataQuery: func(interface{}) (proto.Message, error) {
@@ -382,7 +382,6 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 								},
 							),
 						), config.New())
-						require.NoError(t, err)
 						ctx, cancel := xcontext.WithTimeout(
 							context.Background(),
 							time.Second,
@@ -397,7 +396,7 @@ func TestSessionOperationModeOnExecuteDataQuery(t *testing.T) {
 }
 
 func TestCreateTableRegression(t *testing.T) {
-	client, err := New(context.Background(), testutil.NewBalancer(
+	client := New(context.Background(), testutil.NewBalancer(
 		testutil.WithInvokeHandlers(
 			testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(request interface{}) (proto.Message, error) {
@@ -474,21 +473,19 @@ func TestCreateTableRegression(t *testing.T) {
 		),
 	), config.New())
 
-	require.NoError(t, err)
-
 	ctx, cancel := xcontext.WithTimeout(
 		context.Background(),
 		time.Second,
 	)
 	defer cancel()
 
-	err = client.Do(ctx, func(ctx context.Context, s table.Session) error {
+	err := client.Do(ctx, func(ctx context.Context, s table.Session) error {
 		return s.CreateTable(ctx, "episodes",
-			options.WithColumn("series_id", types.Optional(types.TypeUint64)),
-			options.WithColumn("season_id", types.Optional(types.TypeUint64)),
-			options.WithColumn("episode_id", types.Optional(types.TypeUint64)),
-			options.WithColumn("title", types.Optional(types.TypeText)),
-			options.WithColumn("air_date", types.Optional(types.TypeUint64)),
+			options.WithColumn("series_id", types.NewOptional(types.Uint64)),
+			options.WithColumn("season_id", types.NewOptional(types.Uint64)),
+			options.WithColumn("episode_id", types.NewOptional(types.Uint64)),
+			options.WithColumn("title", types.NewOptional(types.Text)),
+			options.WithColumn("air_date", types.NewOptional(types.Uint64)),
 			options.WithPrimaryKeyColumn("series_id", "season_id", "episode_id"),
 			options.WithAttribute("attr", "attr_value"),
 		)
@@ -498,7 +495,7 @@ func TestCreateTableRegression(t *testing.T) {
 }
 
 func TestDescribeTableRegression(t *testing.T) {
-	client, err := New(context.Background(), testutil.NewBalancer(
+	client := New(context.Background(), testutil.NewBalancer(
 		testutil.WithInvokeHandlers(
 			testutil.InvokeHandlers{
 				testutil.TableCreateSession: func(request interface{}) (proto.Message, error) {
@@ -567,8 +564,6 @@ func TestDescribeTableRegression(t *testing.T) {
 		),
 	), config.New())
 
-	require.NoError(t, err)
-
 	ctx, cancel := xcontext.WithTimeout(
 		context.Background(),
 		time.Second,
@@ -577,7 +572,7 @@ func TestDescribeTableRegression(t *testing.T) {
 
 	var act options.Description
 
-	err = client.Do(ctx, func(ctx context.Context, s table.Session) (err error) {
+	err := client.Do(ctx, func(ctx context.Context, s table.Session) (err error) {
 		act, err = s.DescribeTable(ctx, "episodes")
 
 		return err
@@ -590,23 +585,23 @@ func TestDescribeTableRegression(t *testing.T) {
 		Columns: []options.Column{
 			{
 				Name: "series_id",
-				Type: types.Optional(types.TypeUint64),
+				Type: types.NewOptional(types.Uint64),
 			},
 			{
 				Name: "season_id",
-				Type: types.Optional(types.TypeUint64),
+				Type: types.NewOptional(types.Uint64),
 			},
 			{
 				Name: "episode_id",
-				Type: types.Optional(types.TypeUint64),
+				Type: types.NewOptional(types.Uint64),
 			},
 			{
 				Name: "title",
-				Type: types.Optional(types.TypeText),
+				Type: types.NewOptional(types.Text),
 			},
 			{
 				Name: "air_date",
-				Type: types.Optional(types.TypeUint64),
+				Type: types.NewOptional(types.Uint64),
 			},
 		},
 		KeyRanges: []options.KeyRange{
@@ -644,7 +639,7 @@ func (mock *copyTablesMock) CopyTables(
 	return nil, fmt.Errorf("%w: %s, exp: %s", errUnexpectedRequest, in, mock.String())
 }
 
-func Test_copyTables(t *testing.T) {
+func TestCopyTables(t *testing.T) {
 	ctx := xtest.Context(t)
 	for _, tt := range []struct {
 		sessionID            string
@@ -755,6 +750,140 @@ func Test_copyTables(t *testing.T) {
 	} {
 		t.Run("", func(t *testing.T) {
 			err := copyTables(ctx, tt.sessionID, tt.operationTimeout, tt.operationCancelAfter, tt.service, tt.opts...)
+			if tt.err != nil {
+				require.ErrorIs(t, err, tt.err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+type renameTablesMock struct {
+	*Ydb_Table.RenameTablesRequest
+}
+
+func (mock *renameTablesMock) RenameTables(
+	_ context.Context, in *Ydb_Table.RenameTablesRequest, opts ...grpc.CallOption,
+) (*Ydb_Table.RenameTablesResponse, error) {
+	if in.String() == mock.String() {
+		return &Ydb_Table.RenameTablesResponse{}, nil
+	}
+
+	return nil, fmt.Errorf("%w: %s, exp: %s", errUnexpectedRequest, in, mock.String())
+}
+
+func TestRenameTables(t *testing.T) {
+	ctx := xtest.Context(t)
+	for _, tt := range []struct {
+		sessionID            string
+		operationTimeout     time.Duration
+		operationCancelAfter time.Duration
+		service              *renameTablesMock
+		opts                 []options.RenameTablesOption
+		err                  error
+	}{
+		{
+			sessionID:            "1",
+			operationTimeout:     time.Second,
+			operationCancelAfter: time.Second,
+			service: &renameTablesMock{
+				RenameTablesRequest: &Ydb_Table.RenameTablesRequest{
+					SessionId: "1",
+					Tables: []*Ydb_Table.RenameTableItem{
+						{
+							SourcePath:         "from",
+							DestinationPath:    "to",
+							ReplaceDestination: true,
+						},
+					},
+					OperationParams: &Ydb_Operations.OperationParams{
+						OperationMode:    Ydb_Operations.OperationParams_SYNC,
+						OperationTimeout: durationpb.New(time.Second),
+						CancelAfter:      durationpb.New(time.Second),
+					},
+				},
+			},
+			opts: []options.RenameTablesOption{
+				options.RenameTablesItem("from", "to", true),
+			},
+			err: nil,
+		},
+		{
+			sessionID:            "2",
+			operationTimeout:     2 * time.Second,
+			operationCancelAfter: 2 * time.Second,
+			service: &renameTablesMock{
+				RenameTablesRequest: &Ydb_Table.RenameTablesRequest{
+					SessionId: "2",
+					Tables: []*Ydb_Table.RenameTableItem{
+						{
+							SourcePath:         "from1",
+							DestinationPath:    "to1",
+							ReplaceDestination: true,
+						},
+						{
+							SourcePath:         "from2",
+							DestinationPath:    "to2",
+							ReplaceDestination: false,
+						},
+						{
+							SourcePath:         "from3",
+							DestinationPath:    "to3",
+							ReplaceDestination: true,
+						},
+					},
+					OperationParams: &Ydb_Operations.OperationParams{
+						OperationMode:    Ydb_Operations.OperationParams_SYNC,
+						OperationTimeout: durationpb.New(2 * time.Second),
+						CancelAfter:      durationpb.New(2 * time.Second),
+					},
+				},
+			},
+			opts: []options.RenameTablesOption{
+				options.RenameTablesItem("from1", "to1", true),
+				options.RenameTablesItem("from2", "to2", false),
+				options.RenameTablesItem("from3", "to3", true),
+			},
+			err: nil,
+		},
+		{
+			sessionID:            "3",
+			operationTimeout:     time.Second,
+			operationCancelAfter: time.Second,
+			service: &renameTablesMock{
+				RenameTablesRequest: &Ydb_Table.RenameTablesRequest{
+					SessionId: "1",
+					Tables: []*Ydb_Table.RenameTableItem{
+						{
+							SourcePath:         "from",
+							DestinationPath:    "to",
+							ReplaceDestination: true,
+						},
+					},
+					OperationParams: &Ydb_Operations.OperationParams{
+						OperationMode:    Ydb_Operations.OperationParams_SYNC,
+						OperationTimeout: durationpb.New(time.Second),
+						CancelAfter:      durationpb.New(time.Second),
+					},
+				},
+			},
+			opts: []options.RenameTablesOption{
+				options.RenameTablesItem("from1", "to1", true),
+			},
+			err: errUnexpectedRequest,
+		},
+		{
+			sessionID:            "4",
+			operationTimeout:     time.Second,
+			operationCancelAfter: time.Second,
+			service:              &renameTablesMock{},
+			opts:                 nil,
+			err:                  errParamsRequired,
+		},
+	} {
+		t.Run("", func(t *testing.T) {
+			err := renameTables(ctx, tt.sessionID, tt.operationTimeout, tt.operationCancelAfter, tt.service, tt.opts...)
 			if tt.err != nil {
 				require.ErrorIs(t, err, tt.err)
 			} else {

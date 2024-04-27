@@ -14,13 +14,7 @@ func Retry(l Logger, d trace.Detailer, opts ...Option) (t trace.Retry) {
 }
 
 func internalRetry(l Logger, d trace.Detailer) (t trace.Retry) {
-	t.OnRetry = func(
-		info trace.RetryLoopStartInfo,
-	) func(
-		trace.RetryLoopIntermediateInfo,
-	) func(
-		trace.RetryLoopDoneInfo,
-	) {
+	t.OnRetry = func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
 		if d.Details()&trace.RetryEvents == 0 {
 			return nil
 		}
@@ -33,11 +27,12 @@ func internalRetry(l Logger, d trace.Detailer) (t trace.Retry) {
 		)
 		start := time.Now()
 
-		return func(info trace.RetryLoopIntermediateInfo) func(trace.RetryLoopDoneInfo) {
+		return func(info trace.RetryLoopDoneInfo) {
 			if info.Error == nil {
-				l.Log(ctx, "attempt done",
+				l.Log(ctx, "done",
 					String("label", label),
 					latencyField(start),
+					Int("attempts", info.Attempts),
 				)
 			} else {
 				lvl := ERROR
@@ -45,41 +40,16 @@ func internalRetry(l Logger, d trace.Detailer) (t trace.Retry) {
 					lvl = DEBUG
 				}
 				m := retry.Check(info.Error)
-				l.Log(WithLevel(ctx, lvl), "attempt failed",
+				l.Log(WithLevel(ctx, lvl), "failed",
 					Error(info.Error),
 					String("label", label),
 					latencyField(start),
+					Int("attempts", info.Attempts),
 					Bool("retryable", m.MustRetry(idempotent)),
 					Int64("code", m.StatusCode()),
-					Bool("deleteSession", m.MustDeleteSession()),
+					Bool("deleteSession", m.IsRetryObjectValid()),
 					versionField(),
 				)
-			}
-
-			return func(info trace.RetryLoopDoneInfo) {
-				if info.Error == nil {
-					l.Log(ctx, "done",
-						String("label", label),
-						latencyField(start),
-						Int("attempts", info.Attempts),
-					)
-				} else {
-					lvl := ERROR
-					if !xerrors.IsYdb(info.Error) {
-						lvl = DEBUG
-					}
-					m := retry.Check(info.Error)
-					l.Log(WithLevel(ctx, lvl), "failed",
-						Error(info.Error),
-						String("label", label),
-						latencyField(start),
-						Int("attempts", info.Attempts),
-						Bool("retryable", m.MustRetry(idempotent)),
-						Int64("code", m.StatusCode()),
-						Bool("deleteSession", m.MustDeleteSession()),
-						versionField(),
-					)
-				}
 			}
 		}
 	}

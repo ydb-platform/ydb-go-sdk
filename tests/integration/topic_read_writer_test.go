@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -24,7 +25,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicsugar"
@@ -372,7 +372,7 @@ func TestUpdateToken(t *testing.T) {
 	var wg sync.WaitGroup
 
 	wg.Add(1)
-	stopTopicActivity := xatomic.Bool{}
+	stopTopicActivity := atomic.Bool{}
 	go func() {
 		defer wg.Done()
 
@@ -387,7 +387,7 @@ func TestUpdateToken(t *testing.T) {
 		}
 	}()
 
-	hasMessages := xatomic.Bool{}
+	hasMessages := atomic.Bool{}
 
 	wg.Add(1)
 	go func() {
@@ -436,6 +436,32 @@ func TestTopicWriterWithManualPartitionSelect(t *testing.T) {
 	require.NoError(t, err)
 	err = writer.Write(ctx, topicwriter.Message{Data: strings.NewReader("asd")})
 	require.NoError(t, err)
+}
+
+func TestWriterFlushMessagesBeforeClose(t *testing.T) {
+	s := newScope(t)
+	ctx := s.Ctx
+	writer, err := s.Driver().Topic().StartWriter(s.TopicPath(), topicoptions.WithWriterWaitServerAck(false))
+	require.NoError(t, err)
+
+	count := 1000
+	for i := 0; i < count; i++ {
+		require.NoError(t, writer.Write(ctx, topicwriter.Message{Data: strings.NewReader(strconv.Itoa(i))}))
+	}
+	require.NoError(t, writer.Close(ctx))
+
+	for i := 0; i < count; i++ {
+		readCtx, cancel := context.WithTimeout(ctx, time.Second)
+		mess, err := s.TopicReader().ReadMessage(readCtx)
+		cancel()
+		require.NoError(t, err)
+
+		messBody, err := io.ReadAll(mess)
+		require.NoError(t, err)
+		messBodyString := string(messBody)
+		require.Equal(t, strconv.Itoa(i), messBodyString)
+		cancel()
+	}
 }
 
 var topicCounter int

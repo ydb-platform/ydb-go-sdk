@@ -3,6 +3,7 @@ package topicreaderinternal
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
@@ -282,7 +282,7 @@ func TestBatcher_PopMinIgnored(t *testing.T) {
 			},
 		}}))
 
-		var IgnoreMinRestrictionsOnNextPopDone xatomic.Int64
+		var IgnoreMinRestrictionsOnNextPopDone atomic.Int64
 		go func() {
 			defer IgnoreMinRestrictionsOnNextPopDone.Add(1)
 
@@ -407,7 +407,7 @@ func TestBatcher_Apply(t *testing.T) {
 			Key:  session,
 			Rest: batcherMessageOrderItems{newBatcherItemBatch(batch)},
 		}
-		b.applyNeedLock(foundRes)
+		b.applyNeedLock(&foundRes)
 
 		expectedMap := batcherMessagesMap{session: batcherMessageOrderItems{newBatcherItemBatch(batch)}}
 		require.Equal(t, expectedMap, b.messages)
@@ -426,7 +426,7 @@ func TestBatcher_Apply(t *testing.T) {
 
 		b.messages = batcherMessagesMap{session: batcherMessageOrderItems{newBatcherItemBatch(batch)}}
 
-		b.applyNeedLock(foundRes)
+		b.applyNeedLock(&foundRes)
 
 		require.Empty(t, b.messages)
 	})

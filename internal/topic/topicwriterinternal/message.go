@@ -9,7 +9,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xbytes"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -59,14 +58,14 @@ type messageWithDataContent struct {
 	PublicMessage
 
 	dataWasRead         bool
-	encoders            *EncoderMap
 	hasRawContent       bool
-	rawBuf              bytes.Buffer
 	hasEncodedContent   bool
+	metadataCached      bool
 	bufCodec            rawtopiccommon.Codec
 	bufEncoded          bytes.Buffer
+	rawBuf              bytes.Buffer
+	encoders            *EncoderMap
 	BufUncompressedSize int
-	metadataCached      bool
 }
 
 func (m *messageWithDataContent) GetEncodedBytes(codec rawtopiccommon.Codec) ([]byte, error) {
@@ -86,7 +85,7 @@ func (m *messageWithDataContent) cacheMetadata() {
 	if len(m.Metadata) > 0 {
 		ownCopy := make(map[string][]byte, len(m.Metadata))
 		for key, val := range m.Metadata {
-			ownCopy[key] = xbytes.Clone(val)
+			ownCopy[key] = bytes.Clone(val)
 		}
 		m.Metadata = ownCopy
 	} else {

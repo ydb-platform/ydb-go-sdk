@@ -2,14 +2,14 @@ package ydb
 
 import (
 	"context"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var nextID xatomic.Uint64 //nolint:gochecknoglobals
+var nextID atomic.Uint64 //nolint:gochecknoglobals
 
 func (d *Driver) with(ctx context.Context, opts ...Option) (*Driver, uint64, error) {
 	id := nextID.Add(1)
@@ -49,7 +49,7 @@ func (d *Driver) With(ctx context.Context, opts ...Option) (*Driver, error) {
 
 	onDone := trace.DriverOnWith(
 		d.trace(), &ctx,
-		stack.FunctionID(""),
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/ydb.(*Driver).With"),
 		d.config.Endpoint(), d.config.Database(), d.config.Secure(),
 	)
 	defer func() {

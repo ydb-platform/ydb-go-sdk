@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	budget "github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -32,7 +33,9 @@ func (retryOptions doRetryOptionsOption) ApplyDoOption(opts *doOptions) {
 }
 
 // WithDoRetryOptions specified retry options
-// Deprecated: use implicit options instead
+// Deprecated: use explicit options instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithDoRetryOptions(opts ...Option) doRetryOptionsOption {
 	return opts
 }
@@ -42,7 +45,7 @@ func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Co
 	var (
 		options = doOptions{
 			retryOptions: []Option{
-				withCaller(stack.FunctionID("")),
+				withCaller(stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.Do")),
 			},
 		}
 		attempts = 0
@@ -102,7 +105,9 @@ func (doTxRetryOptions doTxRetryOptionsOption) ApplyDoTxOption(o *doTxOptions) {
 }
 
 // WithDoTxRetryOptions specified retry options
-// Deprecated: use implicit options instead
+// Deprecated: use explicit options instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithDoTxRetryOptions(opts ...Option) doTxRetryOptionsOption {
 	return opts
 }
@@ -129,7 +134,7 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 	var (
 		options = doTxOptions{
 			retryOptions: []Option{
-				withCaller(stack.FunctionID("")),
+				withCaller(stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.DoTx")),
 			},
 			txOptions: &sql.TxOptions{
 				Isolation: sql.LevelDefault,
@@ -138,12 +143,14 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 		}
 		attempts = 0
 	)
-	if tracer, has := db.Driver().(interface {
+	if d, has := db.Driver().(interface {
 		TraceRetry() *trace.Retry
+		RetryBudget() budget.Budget
 	}); has {
-		options.retryOptions = append(options.retryOptions, nil)
-		copy(options.retryOptions[1:], options.retryOptions)
-		options.retryOptions[0] = WithTrace(tracer.TraceRetry())
+		options.retryOptions = append(options.retryOptions, nil, nil)
+		copy(options.retryOptions[2:], options.retryOptions)
+		options.retryOptions[0] = WithTrace(d.TraceRetry())
+		options.retryOptions[1] = WithBudget(d.RetryBudget())
 	}
 	for _, opt := range opts {
 		if opt != nil {

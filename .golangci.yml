@@ -112,6 +112,10 @@ linters-settings:
     # if it's called for subdir of a project it can't find external interfaces. All text editor integrations
     # with golangci-lint call it on a directory with the changed file.
     check-exported: false
+  gomoddirectives:
+    replace-local: true
+    replace-allow-list:
+      - xorm.io/xorm
   gocritic:
     disabled-checks:
       - whyNoLint # https://github.com/go-critic/go-critic/issues/1063
@@ -214,12 +218,10 @@ linters-settings:
 linters:
   enable-all: true
   disable:
-    - containedctx
     - contextcheck
     - cyclop
     - depguard
     - dupl
-    - errname
     - exhaustive
     - exhaustivestruct
     - exhaustruct
@@ -231,16 +233,12 @@ linters:
     - godot
     - goerr113
     - golint
-    - gomnd
-    - gomoddirectives
+    - ifshort
     - interfacebloat
     - ireturn
     - maintidx
-    - maligned
     - nonamedreturns
     - paralleltest
-    - protogetter
-    - scopelint
     - structcheck
     - testableexamples
     - testpackage
@@ -294,6 +292,8 @@ issues:
         - predeclared
     - path: _test\.go
       linters:
+        - scopelint
+        - funlen
         - unused
         - unparam
         - gocritic
@@ -302,6 +302,9 @@ issues:
         - staticcheck
     - path: _test\.go
       text: "ydb.Connection is deprecated"
+    - path: examples
+      linters:
+        - gomnd
 
       # Allow underscore and capital camel case for readability
       # Examples: Type_PRIMITIVE_TYPE_ID_UNSPECIFIED, Ydb_Discovery_V1, _voidValue

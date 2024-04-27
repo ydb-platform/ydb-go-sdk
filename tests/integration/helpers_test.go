@@ -79,7 +79,7 @@ func (scope *scopeT) AuthToken() string {
 }
 
 func (scope *scopeT) Driver(opts ...ydb.Option) *ydb.Driver {
-	return scope.CacheWithCleanup("", nil, func() (res interface{}, cleanup fixenv.FixtureCleanupFunc, err error) {
+	f := func() (*fixenv.GenericResult[*ydb.Driver], error) {
 		connectionString := scope.ConnectionString()
 		scope.Logf("Connect with connection string: %v", connectionString)
 
@@ -103,10 +103,15 @@ func (scope *scopeT) Driver(opts ...ydb.Option) *ydb.Driver {
 			)...,
 		)
 		clean := func() {
-			scope.Require.NoError(driver.Close(scope.Ctx))
+			if driver != nil {
+				scope.Require.NoError(driver.Close(scope.Ctx))
+			}
 		}
-		return driver, clean, err
-	}).(*ydb.Driver)
+
+		return fixenv.NewGenericResultWithCleanup(driver, clean), err
+	}
+
+	return fixenv.CacheResult(scope.Env, f)
 }
 
 func (scope *scopeT) SQLDriver(opts ...ydb.ConnectorOption) *sql.DB {
@@ -136,7 +141,7 @@ func (scope *scopeT) SQLDriverWithFolder(opts ...ydb.ConnectorOption) *sql.DB {
 }
 
 func (scope *scopeT) Folder() string {
-	return scope.CacheWithCleanup(nil, nil, func() (res interface{}, cleanup fixenv.FixtureCleanupFunc, err error) {
+	f := func() (*fixenv.GenericResult[string], error) {
 		driver := scope.Driver()
 		folderPath := path.Join(driver.Name(), scope.T().Name())
 		scope.Require.NoError(sugar.RemoveRecursive(scope.Ctx, driver, folderPath))
@@ -148,8 +153,9 @@ func (scope *scopeT) Folder() string {
 				scope.Require.NoError(sugar.RemoveRecursive(scope.Ctx, driver, folderPath))
 			}
 		}
-		return folderPath, clean, nil
-	}).(string)
+		return fixenv.NewGenericResultWithCleanup(folderPath, clean), nil
+	}
+	return fixenv.CacheResult(scope.Env, f)
 }
 
 func (scope *scopeT) Logger() *testLogger {
@@ -169,57 +175,62 @@ func (scope *scopeT) TopicConsumerName() string {
 }
 
 func (scope *scopeT) TopicPath() string {
-	return scope.CacheWithCleanup(nil, nil, func() (res interface{}, cleanup fixenv.FixtureCleanupFunc, err error) {
+	f := func() (*fixenv.GenericResult[string], error) {
 		topicName := strings.Replace(scope.T().Name(), "/", "__", -1)
 		topicPath := path.Join(scope.Folder(), topicName)
 		client := scope.Driver().Topic()
 
-		cleanup = func() {
+		cleanup := func() {
 			if !scope.Failed() {
 				_ = client.Drop(scope.Ctx, topicPath)
 			}
 		}
 		cleanup()
 
-		err = client.Create(scope.Ctx, topicPath, topicoptions.CreateWithConsumer(
+		err := client.Create(scope.Ctx, topicPath, topicoptions.CreateWithConsumer(
 			topictypes.Consumer{
 				Name: scope.TopicConsumerName(),
 			},
 		))
 
-		return topicPath, cleanup, err
-	}).(string)
+		return fixenv.NewGenericResultWithCleanup(topicPath, cleanup), err
+	}
+	return fixenv.CacheResult(scope.Env, f)
 }
 
 func (scope *scopeT) TopicReader() *topicreader.Reader {
-	return scope.CacheWithCleanup(nil, nil, func() (res interface{}, cleanup fixenv.FixtureCleanupFunc, err error) {
+	f := func() (*fixenv.GenericResult[*topicreader.Reader], error) {
 		reader, err := scope.Driver().Topic().StartReader(
 			scope.TopicConsumerName(),
 			topicoptions.ReadTopic(scope.TopicPath()),
 		)
-		cleanup = func() {
+		cleanup := func() {
 			if reader != nil {
 				_ = reader.Close(scope.Ctx)
 			}
 		}
-		return reader, cleanup, err
-	}).(*topicreader.Reader)
+		return fixenv.NewGenericResultWithCleanup(reader, cleanup), err
+	}
+
+	return fixenv.CacheResult(scope.Env, f)
 }
 
 func (scope *scopeT) TopicWriter() *topicwriter.Writer {
-	return scope.CacheWithCleanup(nil, nil, func() (res interface{}, cleanup fixenv.FixtureCleanupFunc, err error) {
+	f := func() (*fixenv.GenericResult[*topicwriter.Writer], error) {
 		writer, err := scope.Driver().Topic().StartWriter(
 			scope.TopicPath(),
 			topicoptions.WithWriterProducerID(scope.TopicWriterProducerID()),
 			topicoptions.WithWriterWaitServerAck(true),
 		)
-		cleanup = func() {
+		cleanup := func() {
 			if writer != nil {
 				_ = writer.Close(scope.Ctx)
 			}
 		}
-		return writer, cleanup, err
-	}).(*topicwriter.Writer)
+		return fixenv.NewGenericResultWithCleanup(writer, cleanup), err
+	}
+
+	return fixenv.CacheResult(scope.Env, f)
 }
 
 func (scope *scopeT) TopicWriterProducerID() string {
@@ -266,7 +277,9 @@ func (scope *scopeT) TableName(opts ...func(t *tableNameParams)) string {
 		`,
 	}
 	for _, opt := range opts {
-		opt(&params)
+		if opt != nil {
+			opt(&params)
+		}
 	}
 	return scope.Cache(params.tableName, nil, func() (res interface{}, err error) {
 		err = scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) (err error) {

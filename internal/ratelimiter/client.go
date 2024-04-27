@@ -37,11 +37,11 @@ func (c *Client) Close(ctx context.Context) error {
 	return nil
 }
 
-func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) (*Client, error) {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config) *Client {
 	return &Client{
 		config:  config,
 		service: Ydb_RateLimiter_V1.NewRateLimiterServiceClient(cc),
-	}, nil
+	}
 }
 
 func (c *Client) CreateResource(
@@ -63,6 +63,7 @@ func (c *Client) CreateResource(
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
 }
 
@@ -112,6 +113,7 @@ func (c *Client) AlterResource(
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
 }
 
@@ -161,6 +163,7 @@ func (c *Client) DropResource(
 		retry.WithStackTrace(),
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
 }
 
@@ -206,6 +209,7 @@ func (c *Client) ListResource(
 		retry.WithIdempotent(true),
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
 
 	return list, err
@@ -265,6 +269,7 @@ func (c *Client) DescribeResource(
 		retry.WithIdempotent(true),
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
 
 	return
@@ -333,6 +338,7 @@ func (c *Client) AcquireResource(
 	return retry.Retry(ctx, call,
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
+		retry.WithBudget(c.config.RetryBudget()),
 	)
 }
 

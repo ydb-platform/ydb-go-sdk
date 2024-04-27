@@ -41,7 +41,9 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 
 	grpcMsg, err := w.Stream.Recv()
 	if err != nil {
-		err = xerrors.Transport(err)
+		if !xerrors.IsErrorFromServer(err) {
+			err = xerrors.Transport(err)
+		}
 
 		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: failed to read grpc message from writer stream: %w",
@@ -57,7 +59,7 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: bad status from topic server: %v", meta.Status))
 	}
 
-	switch v := grpcMsg.ServerMessage.(type) {
+	switch v := grpcMsg.GetServerMessage().(type) {
 	case *Ydb_Topic.StreamWriteMessage_FromServer_InitResponse:
 		var res InitResult
 		res.ServerMessageMetadata = meta
@@ -170,11 +172,12 @@ func sendWriteRequest(send sendFunc, req *Ydb_Topic.StreamWriteMessage_FromClien
 		return sendErr
 	}
 
-	grpcMessages := req.WriteRequest.Messages
+	grpcMessages := req.WriteRequest.GetMessages()
 	if grpcStatus.Code() != codes.ResourceExhausted || len(grpcMessages) < 2 {
 		return sendErr
 	}
 
+	//nolint:gomnd
 	splitIndex := len(grpcMessages) / 2
 	firstMessages, lastMessages := grpcMessages[:splitIndex], grpcMessages[splitIndex:]
 	defer func() {

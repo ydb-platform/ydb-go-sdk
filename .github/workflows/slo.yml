@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Run SLO
         uses: ydb-platform/slo-tests@js-version
@@ -43,31 +43,37 @@ jobs:
           timeBetweenPhases: 30
           shutdownTime: 30
 
-          language_id0: 'native'
+          language_id0: 'native-table'
           workload_path0: 'tests/slo'
-          language0: 'Go SDK native'
+          language0: 'Native ydb-go-sdk/v3 over table-service'
           workload_build_context0: ../..
-          workload_build_options0: -f Dockerfile --build-arg SRC_PATH=native --build-arg JOB_NAME=workload-native
+          workload_build_options0: -f Dockerfile --build-arg SRC_PATH=native/table --build-arg JOB_NAME=workload-native-table
 
-          language_id1: 'databasesql'
+          language_id1: 'native-query'
           workload_path1: 'tests/slo'
-          language1: 'Go SDK database/sql'
+          language1: 'Native ydb-go-sdk/v3 over query-service'
           workload_build_context1: ../..
-          workload_build_options1: -f Dockerfile --build-arg SRC_PATH=database/sql --build-arg JOB_NAME=workload-databasesql
+          workload_build_options1: -f Dockerfile --build-arg SRC_PATH=native/query --build-arg JOB_NAME=workload-native-query
 
-          language_id2: 'gorm'
+          language_id2: 'database-sql'
           workload_path2: 'tests/slo'
-          language2: 'Go SDK gorm'
+          language2: 'Go SDK database/sql'
           workload_build_context2: ../..
-          workload_build_options2: -f Dockerfile --build-arg SRC_PATH=gorm --build-arg JOB_NAME=workload-gorm
+          workload_build_options2: -f Dockerfile --build-arg SRC_PATH=database/sql --build-arg JOB_NAME=workload-database-sql
 
-          language_id3: 'xorm'
+          language_id3: 'gorm'
           workload_path3: 'tests/slo'
-          language3: 'Go SDK xorm'
+          language3: 'Go SDK gorm'
           workload_build_context3: ../..
-          workload_build_options3: -f Dockerfile --build-arg SRC_PATH=xorm --build-arg JOB_NAME=workload-xorm
+          workload_build_options3: -f Dockerfile --build-arg SRC_PATH=gorm --build-arg JOB_NAME=workload-gorm
 
-      - uses: actions/upload-artifact@v3
+          language_id4: 'xorm'
+          workload_path4: 'tests/slo'
+          language4: 'Go SDK xorm'
+          workload_build_context4: ../..
+          workload_build_options4: -f Dockerfile --build-arg SRC_PATH=xorm --build-arg JOB_NAME=workload-xorm
+
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: slo-logs

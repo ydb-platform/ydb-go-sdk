@@ -27,7 +27,7 @@ type Optional interface{}
 // RequiredOrOptional is a type scan destination of ydb values
 // This is a proxy type for preparing go1.18 type set constrains such as
 //
-//	type Value interface {
+//	type valueType interface {
 //	  Required | Optional
 //	}
 type RequiredOrOptional interface{}

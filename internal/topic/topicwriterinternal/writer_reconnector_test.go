@@ -20,7 +20,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
@@ -197,7 +196,8 @@ func TestWriterImpl_WriteCodecs(t *testing.T) {
 			Data: bytes.NewReader(messContent),
 		}}))
 
-		require.Equal(t, rawtopiccommon.CodecRaw, <-messReceived)
+		mess := <-messReceived
+		require.Equal(t, rawtopiccommon.CodecRaw, mess)
 	})
 	t.Run("ForceGzip", func(t *testing.T) {
 		var err error
@@ -508,7 +508,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			},
 		}
 
-		var connectionAttempt xatomic.Int64
+		var connectionAttempt atomic.Int64
 		w.cfg.Connect = func(ctx context.Context) (RawTopicWriterStream, error) {
 			attemptIndex := int(connectionAttempt.Add(1)) - 1
 			t.Logf("connect with attempt index: %v", attemptIndex)
@@ -529,6 +529,110 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 
 		xtest.WaitChannelClosedWithTimeout(t, connectionLoopStopped, 4*time.Second)
 	})
+}
+
+func TestWriterImpl_CloseWithFlush(t *testing.T) {
+	type flushMethod func(ctx context.Context, writer *WriterReconnector) error
+
+	f := func(t testing.TB, flush flushMethod) {
+		e := newTestEnv(t, nil)
+
+		messageTime := time.Date(2023, 9, 7, 11, 34, 0, 0, time.UTC)
+		messageData := []byte("123")
+
+		const seqNo = 36
+
+		writeCompleted := make(empty.Chan)
+		e.stream.EXPECT().Send(&rawtopicwriter.WriteRequest{
+			Messages: []rawtopicwriter.MessageData{
+				{
+					SeqNo:            seqNo,
+					CreatedAt:        messageTime,
+					UncompressedSize: int64(len(messageData)),
+					Partitioning:     rawtopicwriter.Partitioning{},
+					Data:             messageData,
+				},
+			},
+			Codec: rawtopiccommon.CodecRaw,
+		}).Return(nil)
+
+		flushCompleted := make(empty.Chan)
+		go func() {
+			err := e.writer.Write(e.ctx, []PublicMessage{{
+				SeqNo:     seqNo,
+				CreatedAt: messageTime,
+				Data:      bytes.NewReader(messageData),
+			}})
+			close(writeCompleted)
+			require.NoError(t, err)
+		}()
+
+		<-writeCompleted
+
+		go func() {
+			require.NoError(t, flush(e.ctx, e.writer))
+			close(flushCompleted)
+		}()
+
+		select {
+		case <-flushCompleted:
+			t.Fatal("flush and close must complete only after message is acked")
+		case <-time.After(10 * time.Millisecond):
+			// pass
+		}
+
+		e.sendFromServer(&rawtopicwriter.WriteResult{
+			Acks: []rawtopicwriter.WriteAck{
+				{
+					SeqNo: seqNo,
+					MessageWriteStatus: rawtopicwriter.MessageWriteStatus{
+						Type:          rawtopicwriter.WriteStatusTypeWritten,
+						WrittenOffset: 4,
+					},
+				},
+			},
+			PartitionID: e.partitionID,
+		})
+
+		xtest.WaitChannelClosed(t, flushCompleted)
+	}
+
+	tests := []struct {
+		name  string
+		flush flushMethod
+	}{
+		{
+			name: "close",
+			flush: func(ctx context.Context, writer *WriterReconnector) error {
+				return writer.Close(ctx)
+			},
+		},
+		{
+			name: "flush",
+			flush: func(ctx context.Context, writer *WriterReconnector) error {
+				return writer.Close(ctx)
+			},
+		},
+		{
+			name: "flush and close",
+			flush: func(ctx context.Context, writer *WriterReconnector) error {
+				err := writer.Flush(ctx)
+				if err != nil {
+					return err
+				}
+
+				return writer.Close(ctx)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			xtest.TestManyTimes(t, func(t testing.TB) {
+				f(t, test.flush)
+			})
+		})
+	}
 }
 
 func TestAllMessagesHasSameBufCodec(t *testing.T) {
@@ -822,7 +926,7 @@ func isClosed(ch <-chan struct{}) bool {
 }
 
 type testEnv struct {
-	ctx                   context.Context
+	ctx                   context.Context //nolint:containedctx
 	stream                *MockRawTopicWriterStream
 	writer                *WriterReconnector
 	sendFromServerChannel chan sendFromServerResponse
@@ -892,7 +996,7 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 	require.NoError(t, res.writer.waitFirstInitResponse(res.ctx))
 
 	t.Cleanup(func() {
-		res.writer.close(context.Background(), errors.New("stop writer test environment"))
+		_ = res.writer.close(context.Background(), errors.New("stop writer test environment"))
 		close(res.stopReadEvents)
 		<-streamClosed
 	})

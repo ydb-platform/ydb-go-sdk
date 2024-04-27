@@ -22,7 +22,7 @@ func (o *Operation) FromProto(proto *Ydb_Operations.Operation) error {
 		return err
 	}
 
-	return o.Issues.FromProto(proto.Issues)
+	return o.Issues.FromProto(proto.GetIssues())
 }
 
 func (o *Operation) OperationStatusToError() error {

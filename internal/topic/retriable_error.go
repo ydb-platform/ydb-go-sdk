@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	DefaultStartTimeout          = time.Minute
+	DefaultStartTimeout          = value.InfiniteDuration
 	connectionEstablishedTimeout = time.Minute
 )
 
@@ -41,7 +41,7 @@ type PublicCheckRetryResult struct {
 var (
 	PublicRetryDecisionDefault = PublicCheckRetryResult{val: 0}
 	PublicRetryDecisionRetry   = PublicCheckRetryResult{val: 1}
-	PublicRetryDecisionStop    = PublicCheckRetryResult{val: 2}
+	PublicRetryDecisionStop    = PublicCheckRetryResult{val: 2} //nolint:gomnd
 )
 
 func CheckResetReconnectionCounters(lastTry, now time.Time, connectionTimeout time.Duration) bool {

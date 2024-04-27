@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
@@ -24,12 +24,12 @@ type partitionSession struct {
 	readerID     int64
 	connectionID string
 
-	ctx                context.Context
+	ctx                context.Context //nolint:containedctx
 	ctxCancel          context.CancelFunc
 	partitionSessionID rawtopicreader.PartitionSessionID
 
-	lastReceivedOffsetEndVal xatomic.Int64
-	committedOffsetVal       xatomic.Int64
+	lastReceivedOffsetEndVal atomic.Int64
+	committedOffsetVal       atomic.Int64
 }
 
 func newPartitionSession(

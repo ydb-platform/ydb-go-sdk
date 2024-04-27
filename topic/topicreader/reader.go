@@ -2,9 +2,9 @@ package topicreader
 
 import (
 	"context"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xatomic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
@@ -21,8 +21,8 @@ import (
 // | Close            |      -      |         -        |   -    | -     |
 type Reader struct {
 	reader         topicreaderinternal.Reader
-	readInFlyght   xatomic.Bool
-	commitInFlyght xatomic.Bool
+	readInFlyght   atomic.Bool
+	commitInFlyght atomic.Bool
 }
 
 // NewReader
@@ -75,8 +75,11 @@ func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
 type CommitRangeGetter = topicreaderinternal.PublicCommitRangeGetter
 
 // ReadMessageBatch
-// Deprecated: (was experimental) will be removed soon.
+//
+// Deprecated: was experimental and not actual now.
 // Use ReadMessagesBatch instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func (r *Reader) ReadMessageBatch(ctx context.Context, opts ...ReadBatchOption) (*Batch, error) {
 	if err := r.inCall(&r.readInFlyght); err != nil {
 		return nil, err
@@ -124,7 +127,7 @@ func (r *Reader) Close(ctx context.Context) error {
 	return r.reader.Close(ctx)
 }
 
-func (r *Reader) inCall(inFlight *xatomic.Bool) error {
+func (r *Reader) inCall(inFlight *atomic.Bool) error {
 	if inFlight.CompareAndSwap(false, true) {
 		return nil
 	}
@@ -132,7 +135,7 @@ func (r *Reader) inCall(inFlight *xatomic.Bool) error {
 	return xerrors.WithStackTrace(ErrConcurrencyCall)
 }
 
-func (r *Reader) outCall(inFlight *xatomic.Bool) {
+func (r *Reader) outCall(inFlight *atomic.Bool) {
 	if inFlight.CompareAndSwap(true, false) {
 		return
 	}

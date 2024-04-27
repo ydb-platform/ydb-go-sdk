@@ -176,7 +176,7 @@ func (b *batcher) Pop(ctx context.Context, opts batcherGetOptions) (_ batcherMes
 
 			findRes = b.findNeedLock(opts)
 			if findRes.Ok {
-				b.applyNeedLock(findRes)
+				b.applyNeedLock(&findRes)
 
 				return
 			}
@@ -279,7 +279,7 @@ func (b *batcher) applyForceFlagToOptions(options batcherGetOptions) batcherGetO
 	return res
 }
 
-func (b *batcher) applyNeedLock(res batcherResultCandidate) {
+func (b *batcher) applyNeedLock(res *batcherResultCandidate) {
 	if res.Rest.IsEmpty() && res.WaiterIndex >= 0 {
 		delete(b.messages, res.Key)
 	} else {

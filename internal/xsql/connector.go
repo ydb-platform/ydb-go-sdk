@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -175,6 +176,20 @@ func WithTraceRetry(t *trace.Retry) ConnectorOption {
 	return traceRetryConnectorOption{t: t}
 }
 
+type retryBudgetConnectorOption struct {
+	b budget.Budget
+}
+
+func (l retryBudgetConnectorOption) Apply(c *Connector) error {
+	c.retryBudget = l.b
+
+	return nil
+}
+
+func WithretryBudget(b budget.Budget) ConnectorOption {
+	return retryBudgetConnectorOption{b: b}
+}
+
 type fakeTxConnectorOption QueryMode
 
 func (m fakeTxConnectorOption) Apply(c *Connector) error {
@@ -248,8 +263,9 @@ type Connector struct {
 	disableServerBalancer bool
 	idleThreshold         time.Duration
 
-	trace      *trace.DatabaseSQL
-	traceRetry *trace.Retry
+	trace       *trace.DatabaseSQL
+	traceRetry  *trace.Retry
+	retryBudget budget.Budget
 }
 
 var (
@@ -262,10 +278,14 @@ func (c *Connector) idleCloser() (idleStopper func()) {
 	ctx, idleStopper = xcontext.WithCancel(context.Background())
 	go func() {
 		for {
+			idleThresholdTimer := c.clock.NewTimer(c.idleThreshold)
 			select {
 			case <-ctx.Done():
+				idleThresholdTimer.Stop()
+
 				return
-			case <-c.clock.After(c.idleThreshold):
+			case <-idleThresholdTimer.Chan():
+				idleThresholdTimer.Stop() // no really need, stop for common style only
 				c.connsMtx.RLock()
 				conns := make([]*conn, 0, len(c.conns))
 				for cc := range c.conns {
@@ -313,7 +333,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 	var (
 		onDone = trace.DatabaseSQLOnConnectorConnect(
 			c.trace, &ctx,
-			stack.FunctionID(""),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*Connector).Connect"),
 		)
 		session table.ClosableSession
 	)
@@ -347,6 +367,10 @@ type driverWrapper struct {
 
 func (d *driverWrapper) TraceRetry() *trace.Retry {
 	return d.c.traceRetry
+}
+
+func (d *driverWrapper) RetryBudget() budget.Budget {
+	return d.c.retryBudget
 }
 
 func (d *driverWrapper) Open(_ string) (driver.Conn, error) {

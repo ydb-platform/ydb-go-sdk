@@ -8,10 +8,11 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
-// operationError reports about operationStatus fail.
+// operationError reports about operation fail.
 type operationError struct {
 	code    Ydb.StatusIds_StatusCode
 	issues  issues
@@ -29,18 +30,13 @@ func (e *operationError) Name() string {
 	return "operation/" + e.code.String()
 }
 
-type operationStatus interface {
-	GetStatus() Ydb.StatusIds_StatusCode
-	GetIssues() []*Ydb_Issue.IssueMessage
-}
-
 type issuesOption []*Ydb_Issue.IssueMessage
 
 func (issues issuesOption) applyToOperationError(oe *operationError) {
 	oe.issues = []*Ydb_Issue.IssueMessage(issues)
 }
 
-// WithIssues is an option for construct operationStatus error with issues list
+// WithIssues is an option for construct operation error with issues list
 // WithIssues must use as `Operation(WithIssues(issues))`
 func WithIssues(issues []*Ydb_Issue.IssueMessage) issuesOption {
 	return issues
@@ -52,7 +48,7 @@ func (code statusCodeOption) applyToOperationError(oe *operationError) {
 	oe.code = Ydb.StatusIds_StatusCode(code)
 }
 
-// WithStatusCode is an option for construct operationStatus error with reason code
+// WithStatusCode is an option for construct operation error with reason code
 // WithStatusCode must use as `Operation(WithStatusCode(reason))`
 func WithStatusCode(code Ydb.StatusIds_StatusCode) statusCodeOption {
 	return statusCodeOption(code)
@@ -72,24 +68,25 @@ func (traceID traceIDOption) applyToOperationError(oe *operationError) {
 	oe.traceID = string(traceID)
 }
 
-// WithTraceID is an option for construct operationStatus error with traceID
+// WithTraceID is an option for construct operation error with traceID
 func WithTraceID(traceID string) traceIDOption {
 	return traceIDOption(traceID)
 }
 
-type operationOption struct {
-	operationStatus
+type operationOption = operationError
+
+func (e *operationOption) applyToOperationError(oe *operationError) {
+	oe.code = e.code
+	oe.issues = e.issues
 }
 
-func (operation operationOption) applyToOperationError(oe *operationError) {
-	oe.code = operation.GetStatus()
-	oe.issues = operation.GetIssues()
-}
-
-// FromOperation is an option for construct operationStatus error from operationStatus
-// FromOperation must use as `Operation(FromOperation(operationStatus))`
-func FromOperation(operation operationStatus) operationOption {
-	return operationOption{operation}
+// FromOperation is an option for construct operation error from operation.Status
+// FromOperation must use as `Operation(FromOperation(operation.Status))`
+func FromOperation(operation operation.Status) *operationOption {
+	return &operationOption{
+		code:   operation.GetStatus(),
+		issues: operation.GetIssues(),
+	}
 }
 
 type oeOpt interface {
@@ -195,7 +192,7 @@ func (e *operationError) BackoffType() backoff.Type {
 	}
 }
 
-func (e *operationError) MustDeleteSession() bool {
+func (e *operationError) IsRetryObjectValid() bool {
 	switch e.code {
 	case
 		Ydb.StatusIds_BAD_SESSION,
