@@ -48,8 +48,7 @@ func (c *Client) Stats() *stats.Stats {
 func (c *Client) Close(ctx context.Context) error {
 	close(c.done)
 
-	err := c.pool.Close(ctx)
-	if err != nil {
+	if err := c.pool.Close(ctx); err != nil {
 		return xerrors.WithStackTrace(err)
 	}
 

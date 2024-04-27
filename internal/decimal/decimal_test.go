@@ -297,19 +297,18 @@ func oldParse(s string, precision, scale uint32) (*big.Int, error) {
 		return v, nil
 	}
 
-	neg := s[0] == '-'
-	if neg || s[0] == '+' {
+	if neg := s[0] == '-'; neg || s[0] == '+' {
 		s = s[1:]
 	}
 	if isInf(s) {
-		if neg {
+		if neg := s[0] == '-'; neg {
 			return v.Set(neginf), nil
 		}
 
 		return v.Set(inf), nil
 	}
 	if isNaN(s) {
-		if neg {
+		if neg := s[0] == '-'; neg {
 			return v.Set(negnan), nil
 		}
 
@@ -345,7 +344,7 @@ func oldParse(s string, precision, scale uint32) (*big.Int, error) {
 		v.Add(v, big.NewInt(int64(c-'0')))
 
 		if !dot && v.Cmp(zero) > 0 && integral == 0 {
-			if neg {
+			if neg := s[0] == '-'; neg {
 				return neginf, nil
 			}
 
@@ -380,7 +379,7 @@ func oldParse(s string, precision, scale uint32) (*big.Int, error) {
 		}
 	}
 	v.Mul(v, pow(ten, scale))
-	if neg {
+	if neg := s[0] == '-'; neg {
 		v.Neg(v)
 	}
 

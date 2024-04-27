@@ -87,8 +87,8 @@ func runTokenExchangeServer(
 		},
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-	err := server.ListenAndServe()
-	if err != nil {
+
+	if err := server.ListenAndServe(); err != nil {
 		fmt.Printf("Failed to run http server: %s", err.Error())
 	}
 }

@@ -89,8 +89,7 @@ func (tx *tx) Commit() (finalErr error) {
 	defer func() {
 		tx.conn.currentTx = nil
 	}()
-	_, err := tx.tx.CommitTx(tx.ctx)
-	if err != nil {
+	if _, err := tx.tx.CommitTx(tx.ctx); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))
 	}
 

@@ -22,8 +22,7 @@ func TestUnwrapOptionalValue(t *testing.T) {
 		t.Errorf("Types are different: expected %d, actual %d", Ydb.Type_UTF8, typeID)
 	}
 	textValue := val.GetValue().GetValue().(*Ydb.Value_TextValue)
-	text := textValue.TextValue
-	if text != "a" {
+	if text := textValue.TextValue; text != "a" {
 		t.Errorf("Values are different: expected %q, actual %q", "a", text)
 	}
 }
@@ -38,8 +37,7 @@ func TestUnwrapPrimitiveValue(t *testing.T) {
 		t.Errorf("Types are different: expected %d, actual %d", Ydb.Type_UTF8, typeID)
 	}
 	textValue := val.GetValue().GetValue().(*Ydb.Value_TextValue)
-	text := textValue.TextValue
-	if text != "a" {
+	if text := textValue.TextValue; text != "a" {
 		t.Errorf("Values are different: expected %q, actual %q", "a", text)
 	}
 }
@@ -349,8 +347,7 @@ func TestIncompatiblePrimitives(t *testing.T) {
 func TestIncompatibleTuples(t *testing.T) {
 	l := value.TupleValue(value.Uint64Value(1), value.TextValue("abc"))
 	r := value.TupleValue(value.Uint64Value(1), value.BytesValue([]byte("abc")))
-	_, err := Compare(l, r)
-	if err == nil {
+	if _, err := Compare(l, r); err == nil {
 		t.Error("WithStackTrace expected")
 	} else if !errors.Is(err, ErrNotComparable) {
 		t.Errorf("Unexpected error: %v", err)

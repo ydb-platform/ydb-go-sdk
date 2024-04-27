@@ -360,7 +360,7 @@ func (c *Controller) OnRecv(resp *Ydb_Coordination.SessionResponse) bool {
 		}
 	}
 
-	if notify {
+	if notify { //nolint:ifshort // fasle-positive this var is used outside if statement in switch-case up
 		c.notify()
 	}
 

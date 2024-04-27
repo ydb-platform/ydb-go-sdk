@@ -60,8 +60,7 @@ func FromBytes(bts []byte, precision, scale uint32) *big.Int {
 
 	v.SetBytes(bts)
 
-	neg := bts[0]&negMask != 0
-	if neg {
+	if neg := bts[0]&negMask != 0; neg {
 		// Given bytes contains negative value.
 		// Interpret is as two's complement.
 		not(v)
@@ -69,7 +68,7 @@ func FromBytes(bts []byte, precision, scale uint32) *big.Int {
 		v.Neg(v)
 	}
 	if v.CmpAbs(pow(ten, precision)) >= 0 {
-		if neg {
+		if neg := bts[0]&negMask != 0; neg {
 			v.Set(neginf)
 		} else {
 			v.Set(inf)
@@ -246,7 +245,7 @@ func Format(x *big.Int, precision, scale uint32) string {
 
 	v := big.NewInt(0).Set(x)
 	neg := x.Sign() < 0
-	if neg {
+	if neg { //nolint:ifshort //Can't place variable inside if scope because it's used below
 		// Convert negative to positive.
 		v.Neg(x)
 	}
@@ -339,7 +338,7 @@ func BigIntToByte(x *big.Int, precision, scale uint32) (p [16]byte) {
 
 func put(x *big.Int, p []byte) {
 	neg := x.Sign() < 0
-	if neg {
+	if neg { //nolint:ifshort //Can't place variable inside if scope because it's used one more time below
 		x = complement(x)
 	}
 	i := len(p)
