@@ -329,13 +329,17 @@ func (w *WriterReconnector) Flush(ctx context.Context) error {
 	return w.queue.WaitLastWritten(ctx)
 }
 
+//nolint:ifshort //putting flushErr into if scope may cause random fails during closing topicwriter with flush
 func (w *WriterReconnector) Close(ctx context.Context) error {
 	reason := xerrors.WithStackTrace(errStopWriterReconnector)
 	w.queue.StopAddNewMessages(reason)
-	if flushErr := w.Flush(ctx); flushErr != nil {
+
+	flushErr := w.Flush(ctx)
+	closeErr := w.close(ctx, reason)
+
+	if flushErr != nil {
 		return flushErr
 	}
-	closeErr := w.close(ctx, reason)
 
 	return closeErr
 }
