@@ -20,9 +20,8 @@ var errAlreadyClosed = xerrors.Wrap(errors.New("result closed early"))
 type baseResult struct {
 	valueScanner
 
-	nextResultSetCounter atomic.Uint64
-	statsMtx             xsync.RWMutex
-	stats                *Ydb_TableStats.QueryStats
+	statsMtx xsync.RWMutex
+	stats    *Ydb_TableStats.QueryStats
 
 	closed atomic.Bool
 }
@@ -170,11 +169,6 @@ func (r *unaryResult) NextResultSet(ctx context.Context, columns ...string) bool
 
 func (r *streamResult) nextResultSetErr(ctx context.Context, columns ...string) (err error) {
 	// skipping second recv because first call of recv is from New Stream(), second call is from user
-	if r.nextResultSetCounter.Add(1) == 2 { //nolint:gomnd
-		r.setColumnIndexes(columns)
-
-		return ctx.Err()
-	}
 	s, stats, err := r.recv(ctx)
 	if err != nil {
 		r.Reset(nil)

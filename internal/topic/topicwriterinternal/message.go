@@ -23,7 +23,6 @@ type PublicMessage struct {
 	// partitioning at level message available by protocol, but doesn't available by current server implementation
 	// the field hidden from public access for prevent runtime errors.
 	// it will be published after implementation on server side.
-	futurePartitioning PublicFuturePartitioning
 }
 
 // PublicFuturePartitioning will be published in feature, after server implementation completed.
