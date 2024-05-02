@@ -15,6 +15,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
+var (
+	errEmptyEndpointsList      = errors.New("empty endpoints list")
+	errFailCheckFastestAddress = errors.New("failed to check fastest address")
+)
+
 const (
 	maxEndpointsCheckPerLocation = 5
 )
@@ -64,7 +69,7 @@ func checkFastestAddress(ctx context.Context, addresses []string) string {
 
 func detectFastestEndpoint(ctx context.Context, endpoints []endpoint.Endpoint) (endpoint.Endpoint, error) {
 	if len(endpoints) == 0 {
-		return nil, xerrors.WithStackTrace(errors.New("empty endpoints list"))
+		return nil, xerrors.WithStackTrace(errEmptyEndpointsList)
 	}
 
 	var lastErr error
@@ -86,7 +91,7 @@ func detectFastestEndpoint(ctx context.Context, endpoints []endpoint.Endpoint) (
 			continue
 		}
 		if len(addresses) == 0 {
-			lastErr = xerrors.WithStackTrace(fmt.Errorf("no ips for fqdn: %q", host))
+			lastErr = xerrors.WithStackTrace(fmt.Errorf("no ips for fqdn: %q", host)) //nolint:goerr113
 
 			continue
 		}
@@ -106,7 +111,7 @@ func detectFastestEndpoint(ctx context.Context, endpoints []endpoint.Endpoint) (
 
 	fastestAddress := checkFastestAddress(ctx, addressesToPing)
 	if fastestAddress == "" {
-		return nil, xerrors.WithStackTrace(errors.New("failed to check fastest address"))
+		return nil, xerrors.WithStackTrace(errFailCheckFastestAddress)
 	}
 
 	return addressToEndpoint[fastestAddress], nil
