@@ -134,6 +134,6 @@ func main() {
 
 		wg.Wait()
 	default:
-		panic(fmt.Errorf("unknown mode: %v", cfg.Mode))
+		panic(fmt.Errorf("unknown mode: %v", cfg.Mode)) //nolint:goerr113
 	}
 }
