@@ -2,12 +2,17 @@ package xerrors
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
+)
+
+var (
+	errFmtErrorf      = errors.New("fmt.Errorf")
+	errFmtErrorPrintf = errors.New("fmt.Errorf Printf")
+	errErrorsNew      = errors.New("errors.New")
 )
 
 func TestStackTraceError(t *testing.T) {
@@ -16,18 +21,18 @@ func TestStackTraceError(t *testing.T) {
 		text  string
 	}{
 		{
-			error: WithStackTrace(fmt.Errorf("fmt.Errorf")),
+			error: WithStackTrace(errFmtErrorf),
 			//nolint:lll
 			text: "fmt.Errorf at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestStackTraceError(stacktrace_test.go:19)`",
 		},
 		{
-			error: WithStackTrace(fmt.Errorf("fmt.Errorf %s", "Printf")),
+			error: WithStackTrace(errFmtErrorPrintf),
 			//nolint:lll
 			text: "fmt.Errorf Printf at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestStackTraceError(stacktrace_test.go:24)`",
 		},
 		{
 			error: WithStackTrace(
-				WithStackTrace(errors.New("errors.New")),
+				WithStackTrace(errErrorsNew),
 			),
 			//nolint:lll
 			text: "errors.New at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestStackTraceError(stacktrace_test.go:30)` at `github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors.TestStackTraceError(stacktrace_test.go:29)`",

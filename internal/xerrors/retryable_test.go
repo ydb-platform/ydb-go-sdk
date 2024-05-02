@@ -1,7 +1,7 @@
 package xerrors
 
 import (
-	"fmt"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,13 +10,15 @@ import (
 	grpcStatus "google.golang.org/grpc/status"
 )
 
+var errSome = errors.New("some")
+
 func TestRetryableCode(t *testing.T) {
 	for _, tt := range []struct {
 		err  error
 		code int32
 	}{
 		{
-			err:  Retryable(fmt.Errorf("some")),
+			err:  Retryable(errSome),
 			code: -1,
 		},
 		{

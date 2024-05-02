@@ -3,12 +3,13 @@ package xerrors
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 )
+
+var errUser = errors.New("user error")
 
 func TestMustPessimizeEndpoint(t *testing.T) {
 	for _, test := range []struct {
@@ -88,7 +89,7 @@ func TestMustPessimizeEndpoint(t *testing.T) {
 			pessimize: false,
 		},
 		{
-			error:     fmt.Errorf("user error"),
+			error:     errUser,
 			pessimize: false,
 		},
 	} {

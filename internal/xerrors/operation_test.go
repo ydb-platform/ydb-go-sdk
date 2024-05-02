@@ -1,6 +1,7 @@
 package xerrors
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -8,6 +9,8 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
 )
+
+var errTest = errors.New("test")
 
 func TestIsOperationError(t *testing.T) {
 	for _, tt := range []struct {
@@ -26,9 +29,9 @@ func TestIsOperationError(t *testing.T) {
 		},
 		{
 			err: Join(
-				fmt.Errorf("test"),
+				errTest,
 				&operationError{code: Ydb.StatusIds_BAD_REQUEST},
-				Retryable(fmt.Errorf("test")),
+				Retryable(errTest),
 			),
 			match: true,
 		},
@@ -45,9 +48,9 @@ func TestIsOperationError(t *testing.T) {
 		},
 		{
 			err: Join(
-				fmt.Errorf("test"),
+				errTest,
 				&operationError{code: Ydb.StatusIds_BAD_REQUEST},
-				Retryable(fmt.Errorf("test")),
+				Retryable(errTest),
 			),
 			codes: []Ydb.StatusIds_StatusCode{Ydb.StatusIds_BAD_REQUEST},
 			match: true,
@@ -65,9 +68,9 @@ func TestIsOperationError(t *testing.T) {
 		},
 		{
 			err: Join(
-				fmt.Errorf("test"),
+				errTest,
 				&operationError{code: Ydb.StatusIds_BAD_REQUEST},
-				Retryable(fmt.Errorf("test")),
+				Retryable(errTest),
 			),
 			codes: []Ydb.StatusIds_StatusCode{Ydb.StatusIds_ABORTED},
 			match: false,

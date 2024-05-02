@@ -2,12 +2,17 @@ package xerrors
 
 import (
 	"errors"
-	"fmt"
 	"testing"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
+)
+
+var (
+	errEmpty           = errors.New("")
+	errTestError       = errors.New("TestError")
+	errTestErrorPrintf = errors.New("TestErrorPrintf")
 )
 
 func TestIsYdb(t *testing.T) {
@@ -28,7 +33,7 @@ func TestIsYdb(t *testing.T) {
 			isYdbError: true,
 		},
 		{
-			error:      RetryableError(fmt.Errorf("")),
+			error:      RetryableError(errEmpty),
 			isYdbError: false,
 		},
 		{
@@ -40,7 +45,7 @@ func TestIsYdb(t *testing.T) {
 			isYdbError: true,
 		},
 		{
-			error:      WithStackTrace(RetryableError(fmt.Errorf(""))),
+			error:      WithStackTrace(RetryableError(errEmpty)),
 			isYdbError: false,
 		},
 		{
@@ -52,23 +57,23 @@ func TestIsYdb(t *testing.T) {
 			isYdbError: true,
 		},
 		{
-			error:      WithStackTrace(WithStackTrace(RetryableError(fmt.Errorf("")))),
+			error:      WithStackTrace(WithStackTrace(RetryableError(errEmpty))),
 			isYdbError: false,
 		},
 		{
-			error:      fmt.Errorf("TestError%s", "Printf"),
+			error:      errTestErrorPrintf,
 			isYdbError: false,
 		},
 		{
-			error:      errors.New("TestError"),
+			error:      errTestError,
 			isYdbError: false,
 		},
 		{
-			error:      Wrap(fmt.Errorf("TestError%s", "Printf")),
+			error:      Wrap(errTestErrorPrintf),
 			isYdbError: true,
 		},
 		{
-			error:      Wrap(errors.New("TestError")),
+			error:      Wrap(errTestError),
 			isYdbError: true,
 		},
 	} {
