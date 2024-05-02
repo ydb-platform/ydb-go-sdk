@@ -14,5 +14,5 @@ func Stats(client Client) (*stats.Stats, error) {
 		return c.Stats(), nil
 	}
 
-	return nil, xerrors.WithStackTrace(fmt.Errorf("client %T not supported stats", client))
+	return nil, xerrors.WithStackTrace(fmt.Errorf("client %T not supported stats", client)) //nolint:goerr113
 }
