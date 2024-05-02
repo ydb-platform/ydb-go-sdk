@@ -2,13 +2,15 @@ package repeater
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"runtime"
 	"testing"
 	"time"
 
 	"github.com/jonboulle/clockwork"
 )
+
+var errForceWithLogBackoff = errors.New("special error for force with log backoff")
 
 func TestRepeaterNoWakeUpsAfterStop(t *testing.T) {
 	var (
@@ -85,7 +87,7 @@ func TestRepeaterForceLogBackoff(t *testing.T) {
 		lastWakeUp = fakeClock.Now()
 		wakeUps++
 
-		return fmt.Errorf("special error for force with log backoff")
+		return errForceWithLogBackoff
 	}, WithClock(fakeClock))
 	defer r.Stop()
 
