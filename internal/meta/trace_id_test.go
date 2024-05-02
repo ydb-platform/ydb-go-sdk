@@ -10,6 +10,8 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+var errEmpty = errors.New("")
+
 func TestTraceID(t *testing.T) {
 	t.Run("TraceID from rand", func(t *testing.T) {
 		ctx, id, err := TraceID(
@@ -32,7 +34,7 @@ func TestTraceID(t *testing.T) {
 			context.Background(),
 			func(opts *newTraceIDOpts) {
 				opts.newRandom = func() (uuid.UUID, error) {
-					return uuid.UUID{}, errors.New("")
+					return uuid.UUID{}, errEmpty
 				}
 			},
 		)
@@ -43,7 +45,7 @@ func TestTraceID(t *testing.T) {
 			WithTraceID(context.Background(), "{test}"),
 			func(opts *newTraceIDOpts) {
 				opts.newRandom = func() (uuid.UUID, error) {
-					return uuid.UUID{}, errors.New("")
+					return uuid.UUID{}, errEmpty
 				}
 			},
 		)
