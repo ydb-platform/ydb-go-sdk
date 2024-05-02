@@ -22,6 +22,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+var errEmpty = errors.New("")
+
 func TestCreateSession(t *testing.T) {
 	t.Run("HappyWay", func(t *testing.T) {
 		xtest.TestManyTimes(t, func(t testing.TB) {
@@ -198,7 +200,7 @@ func TestDo(t *testing.T) {
 		}), func(ctx context.Context, s query.Session) error {
 			counter++
 			if counter < 10 {
-				return xerrors.Retryable(errors.New(""))
+				return xerrors.Retryable(errEmpty)
 			}
 
 			return nil
@@ -246,7 +248,7 @@ func TestDoTx(t *testing.T) {
 		}), func(ctx context.Context, tx query.TxActor) error {
 			counter++
 			if counter < 10 {
-				return xerrors.Retryable(errors.New(""))
+				return xerrors.Retryable(errEmpty)
 			}
 
 			return nil
