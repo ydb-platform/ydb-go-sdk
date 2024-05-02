@@ -379,7 +379,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		e.reader.cfg.Trace.OnReaderPartitionReadStopResponse = func(info trace.TopicReaderPartitionReadStopResponseStartInfo) func(doneInfo trace.TopicReaderPartitionReadStopResponseDoneInfo) { //nolint:lll
 			expected := trace.TopicReaderPartitionReadStopResponseStartInfo{
 				ReaderConnectionID: e.reader.readConnectionID,
-				PartitionContext:   e.partitionSession.ctx,
+				PartitionContext:   &e.partitionSession.ctx,
 				Topic:              e.partitionSession.Topic,
 				PartitionID:        e.partitionSession.PartitionID,
 				PartitionSessionID: e.partitionSession.partitionSessionID.ToInt64(),
@@ -388,7 +388,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 			}
 			require.Equal(t, expected, info)
 
-			require.NoError(t, info.PartitionContext.Err())
+			require.NoError(t, (*info.PartitionContext).Err())
 
 			readMessagesCtxCancel()
 
@@ -424,7 +424,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 		e.reader.cfg.Trace.OnReaderPartitionReadStopResponse = func(info trace.TopicReaderPartitionReadStopResponseStartInfo) func(doneInfo trace.TopicReaderPartitionReadStopResponseDoneInfo) { //nolint:lll
 			expected := trace.TopicReaderPartitionReadStopResponseStartInfo{
 				ReaderConnectionID: e.reader.readConnectionID,
-				PartitionContext:   e.partitionSession.ctx,
+				PartitionContext:   &e.partitionSession.ctx,
 				Topic:              e.partitionSession.Topic,
 				PartitionID:        e.partitionSession.PartitionID,
 				PartitionSessionID: e.partitionSession.partitionSessionID.ToInt64(),
@@ -432,7 +432,7 @@ func TestStreamReaderImpl_OnPartitionCloseHandle(t *testing.T) {
 				Graceful:           false,
 			}
 			require.Equal(t, expected, info)
-			require.Error(t, info.PartitionContext.Err())
+			require.Error(t, (*info.PartitionContext).Err())
 
 			readMessagesCtxCancel()
 
@@ -954,7 +954,7 @@ func TestTopicStreamReadImpl_CommitWithBadSession(t *testing.T) {
 }
 
 type streamEnv struct {
-	ctx                    context.Context
+	ctx                    context.Context //nolint:containedctx
 	t                      testing.TB
 	reader                 *topicStreamReaderImpl
 	stopReadEvents         empty.Chan

@@ -294,6 +294,17 @@ var errsToCheck = []struct {
 	},
 	{
 		err: xerrors.Operation(
+			xerrors.WithStatusCode(Ydb.StatusIds_EXTERNAL_ERROR),
+		),
+		backoff:       backoff.TypeNoBackoff,
+		deleteSession: false,
+		canRetry: map[idempotency]bool{
+			idempotent:    false,
+			nonIdempotent: false,
+		},
+	},
+	{
+		err: xerrors.Operation(
 			xerrors.WithStatusCode(Ydb.StatusIds_ABORTED),
 		),
 		backoff:       backoff.TypeFast,

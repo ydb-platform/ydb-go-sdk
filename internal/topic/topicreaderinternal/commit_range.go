@@ -158,9 +158,7 @@ func (r *CommitRanges) toRawPartitionCommitOffset() []rawtopicreader.PartitionCo
 
 // PublicCommitRange contains data for commit messages range
 //
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 type PublicCommitRange struct {
 	priv commitRange
 }

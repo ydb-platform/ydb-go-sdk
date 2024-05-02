@@ -23,7 +23,7 @@ type (
 		// Execute executes query.
 		//
 		// Execute used by default:
-		// - DefaultTxControl
+		// - DefaultTxControl (NoTx)
 		// - flag WithKeepInCache(true) if params is not empty.
 		Execute(ctx context.Context, query string, opts ...options.ExecuteOption) (tx Transaction, r Result, err error)
 

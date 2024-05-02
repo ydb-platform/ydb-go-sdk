@@ -21,7 +21,7 @@ var (
 	errMultipleQueryParameters = errors.New("only one query arg *table.QueryParameters allowed")
 )
 
-//nolint:gocyclo
+//nolint:gocyclo,funlen
 func toValue(v interface{}) (_ types.Value, err error) {
 	if valuer, ok := v.(driver.Valuer); ok {
 		v, err = valuer.Value()
@@ -174,62 +174,70 @@ func toYdbParam(name string, value interface{}) (*params.Parameter, error) {
 	return params.Named(name, v), nil
 }
 
-func Params(args ...interface{}) (parameters []*params.Parameter, _ error) {
-	parameters = make([]*params.Parameter, 0, len(args))
+func Params(args ...interface{}) ([]*params.Parameter, error) {
+	parameters := make([]*params.Parameter, 0, len(args))
 	for i, arg := range args {
+		var newParam *params.Parameter
+		var newParams []*params.Parameter
+		var err error
 		switch x := arg.(type) {
 		case driver.NamedValue:
-			if x.Name == "" {
-				switch xx := x.Value.(type) {
-				case *params.Parameters:
-					if len(args) > 1 {
-						return nil, xerrors.WithStackTrace(errMultipleQueryParameters)
-					}
-					parameters = *xx
-				case *params.Parameter:
-					parameters = append(parameters, xx)
-				default:
-					x.Name = fmt.Sprintf("$p%d", i)
-					param, err := toYdbParam(x.Name, x.Value)
-					if err != nil {
-						return nil, xerrors.WithStackTrace(err)
-					}
-					parameters = append(parameters, param)
-				}
-			} else {
-				param, err := toYdbParam(x.Name, x.Value)
-				if err != nil {
-					return nil, xerrors.WithStackTrace(err)
-				}
-				parameters = append(parameters, param)
-			}
+			newParams, err = paramHandleNamedValue(x, i, len(args))
 		case sql.NamedArg:
 			if x.Name == "" {
 				return nil, xerrors.WithStackTrace(errUnnamedParam)
 			}
-			param, err := toYdbParam(x.Name, x.Value)
-			if err != nil {
-				return nil, xerrors.WithStackTrace(err)
-			}
-			parameters = append(parameters, param)
+			newParam, err = toYdbParam(x.Name, x.Value)
+			newParams = append(newParams, newParam)
 		case *params.Parameters:
 			if len(args) > 1 {
 				return nil, xerrors.WithStackTrace(errMultipleQueryParameters)
 			}
 			parameters = *x
 		case *params.Parameter:
-			parameters = append(parameters, x)
+			newParams = append(newParams, x)
 		default:
-			param, err := toYdbParam(fmt.Sprintf("$p%d", i), x)
-			if err != nil {
-				return nil, xerrors.WithStackTrace(err)
-			}
-			parameters = append(parameters, param)
+			newParam, err = toYdbParam(fmt.Sprintf("$p%d", i), x)
+			newParams = append(newParams, newParam)
 		}
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+		parameters = append(parameters, newParams...)
 	}
 	sort.Slice(parameters, func(i, j int) bool {
 		return parameters[i].Name() < parameters[j].Name()
 	})
 
 	return parameters, nil
+}
+
+func paramHandleNamedValue(arg driver.NamedValue, paramNumber, argsLen int) ([]*params.Parameter, error) {
+	if arg.Name == "" {
+		switch x := arg.Value.(type) {
+		case *params.Parameters:
+			if argsLen > 1 {
+				return nil, xerrors.WithStackTrace(errMultipleQueryParameters)
+			}
+
+			return *x, nil
+		case *params.Parameter:
+			return []*params.Parameter{x}, nil
+		default:
+			arg.Name = fmt.Sprintf("$p%d", paramNumber)
+			param, err := toYdbParam(arg.Name, arg.Value)
+			if err != nil {
+				return nil, xerrors.WithStackTrace(err)
+			}
+
+			return []*params.Parameter{param}, nil
+		}
+	} else {
+		param, err := toYdbParam(arg.Name, arg.Value)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		return []*params.Parameter{param}, nil
+	}
 }

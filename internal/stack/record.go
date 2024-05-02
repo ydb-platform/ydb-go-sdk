@@ -2,6 +2,7 @@ package stack
 
 import (
 	"fmt"
+	"path"
 	"runtime"
 	"strings"
 
@@ -16,6 +17,14 @@ type recordOptions struct {
 	fileName     bool
 	line         bool
 	lambdas      bool
+}
+
+type functionDetails struct {
+	pkgPath    string
+	pkgName    string
+	structName string
+	funcName   string
+	lambdas    []string
 }
 
 type recordOption func(opts *recordOptions)
@@ -91,67 +100,81 @@ func (c call) Record(opts ...recordOption) string {
 			opt(&optionsHolder)
 		}
 	}
-	name := runtime.FuncForPC(c.function).Name()
-	var (
-		pkgPath    string
-		pkgName    string
-		structName string
-		funcName   string
-		file       = c.file
-	)
-	if i := strings.LastIndex(file, "/"); i > -1 {
-		file = file[i+1:]
-	}
-	if i := strings.LastIndex(name, "/"); i > -1 {
-		pkgPath, name = name[:i], name[i+1:]
-	}
+
+	name, file := extractName(c.function, c.file)
+	fnDetails := parseFunctionName(name)
+
+	return buildRecordString(optionsHolder, &fnDetails, file, c.line)
+}
+
+func extractName(function uintptr, file string) (name, fileName string) {
+	name = runtime.FuncForPC(function).Name()
+	_, fileName = path.Split(file)
 	name = strings.ReplaceAll(name, "[...]", "")
+
+	return name, fileName
+}
+
+func parseFunctionName(name string) functionDetails {
+	var details functionDetails
+	if i := strings.LastIndex(name, "/"); i > -1 {
+		details.pkgPath, name = name[:i], name[i+1:]
+	}
 	split := strings.Split(name, ".")
-	lambdas := make([]string, 0, len(split))
+	details.lambdas = make([]string, 0, len(split))
 	for i := range split {
 		elem := split[len(split)-i-1]
 		if !strings.HasPrefix(elem, "func") {
 			break
 		}
-		lambdas = append(lambdas, elem)
+		details.lambdas = append(details.lambdas, elem)
 	}
-	split = split[:len(split)-len(lambdas)]
+	split = split[:len(split)-len(details.lambdas)]
 	if len(split) > 0 {
-		pkgName = split[0]
+		details.pkgName = split[0]
 	}
 	if len(split) > 1 {
-		funcName = split[len(split)-1]
+		details.funcName = split[len(split)-1]
 	}
-	if len(split) > 2 {
-		structName = split[1]
+	if len(split) > 2 { //nolint:gomnd
+		details.structName = split[1]
 	}
 
+	return details
+}
+
+func buildRecordString(
+	optionsHolder recordOptions,
+	fnDetails *functionDetails,
+	file string,
+	line int,
+) string {
 	buffer := xstring.Buffer()
 	defer buffer.Free()
 	if optionsHolder.packagePath {
-		buffer.WriteString(pkgPath)
+		buffer.WriteString(fnDetails.pkgPath)
 	}
 	if optionsHolder.packageName {
 		if buffer.Len() > 0 {
 			buffer.WriteByte('/')
 		}
-		buffer.WriteString(pkgName)
+		buffer.WriteString(fnDetails.pkgName)
 	}
-	if optionsHolder.structName && len(structName) > 0 {
+	if optionsHolder.structName && len(fnDetails.structName) > 0 {
 		if buffer.Len() > 0 {
 			buffer.WriteByte('.')
 		}
-		buffer.WriteString(structName)
+		buffer.WriteString(fnDetails.structName)
 	}
 	if optionsHolder.functionName {
 		if buffer.Len() > 0 {
 			buffer.WriteByte('.')
 		}
-		buffer.WriteString(funcName)
+		buffer.WriteString(fnDetails.funcName)
 		if optionsHolder.lambdas {
-			for i := range lambdas {
+			for i := range fnDetails.lambdas {
 				buffer.WriteByte('.')
-				buffer.WriteString(lambdas[len(lambdas)-i-1])
+				buffer.WriteString(fnDetails.lambdas[len(fnDetails.lambdas)-i-1])
 			}
 		}
 	}
@@ -164,7 +187,7 @@ func (c call) Record(opts ...recordOption) string {
 		buffer.WriteString(file)
 		if optionsHolder.line {
 			buffer.WriteByte(':')
-			fmt.Fprintf(buffer, "%d", c.line)
+			fmt.Fprintf(buffer, "%d", line)
 		}
 		if closeBrace {
 			buffer.WriteByte(')')

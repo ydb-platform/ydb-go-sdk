@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Run SLO
         uses: ydb-platform/slo-tests@js-version
@@ -73,7 +73,7 @@ jobs:
           workload_build_context4: ../..
           workload_build_options4: -f Dockerfile --build-arg SRC_PATH=xorm --build-arg JOB_NAME=workload-xorm
 
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: slo-logs

@@ -50,6 +50,20 @@ func (mr *MockStreamWriterMockRecorder) Close(ctx any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockStreamWriter)(nil).Close), ctx)
 }
 
+// Flush mocks base method.
+func (m *MockStreamWriter) Flush(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Flush", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Flush indicates an expected call of Flush.
+func (mr *MockStreamWriterMockRecorder) Flush(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Flush", reflect.TypeOf((*MockStreamWriter)(nil).Flush), ctx)
+}
+
 // WaitInit mocks base method.
 func (m *MockStreamWriter) WaitInit(ctx context.Context) (InitialInfo, error) {
 	m.ctrl.T.Helper()

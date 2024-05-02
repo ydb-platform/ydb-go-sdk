@@ -16,7 +16,7 @@ type Client interface {
 	DropNode(ctx context.Context, path string) (err error)
 	DescribeNode(ctx context.Context, path string) (_ *scheme.Entry, _ *NodeConfig, err error)
 
-	// CreateSession starts a new session. This method blocks until the server session is created. The context provided
+	// Session starts a new session. This method blocks until the server session is created. The context provided
 	// may be used to cancel the invocation. If the method completes successfully, the session remains alive even if
 	// the context is canceled.
 	//
@@ -26,10 +26,8 @@ type Client interface {
 	// - close the Client which the session was created with,
 	// - call any method of the Session until the ErrSessionClosed is returned.
 	//
-	// # Experimental
-	//
-	// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
-	CreateSession(ctx context.Context, path string, opts ...options.CreateSessionOption) (Session, error)
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+	Session(ctx context.Context, path string, opts ...options.SessionOption) (Session, error)
 }
 
 const (

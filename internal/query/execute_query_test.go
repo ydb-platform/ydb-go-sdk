@@ -19,6 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
+	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
 func TestExecute(t *testing.T) {
@@ -768,6 +769,24 @@ func TestExecuteQueryRequest(t *testing.T) {
 			request: &Ydb_Query.ExecuteQueryRequest{
 				SessionId: "WithoutOptions",
 				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_EXECUTE,
+				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
+					QueryContent: &Ydb_Query.QueryContent{
+						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
+						Text:   "WithoutOptions",
+					},
+				},
+				StatsMode:            Ydb_Query.StatsMode_STATS_MODE_NONE,
+				ConcurrentResultSets: false,
+			},
+		},
+		{
+			name: "WithTxControl",
+			opts: []options.ExecuteOption{
+				options.WithTxControl(query.SerializableReadWriteTxControl(query.CommitTx())),
+			},
+			request: &Ydb_Query.ExecuteQueryRequest{
+				SessionId: "WithTxControl",
+				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_EXECUTE,
 				TxControl: &Ydb_Query.TransactionControl{
 					TxSelector: &Ydb_Query.TransactionControl_BeginTx{
 						BeginTx: &Ydb_Query.TransactionSettings{
@@ -781,7 +800,7 @@ func TestExecuteQueryRequest(t *testing.T) {
 				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
 					QueryContent: &Ydb_Query.QueryContent{
 						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
-						Text:   "WithoutOptions",
+						Text:   "WithTxControl",
 					},
 				},
 				StatsMode:            Ydb_Query.StatsMode_STATS_MODE_NONE,
@@ -802,16 +821,6 @@ func TestExecuteQueryRequest(t *testing.T) {
 			request: &Ydb_Query.ExecuteQueryRequest{
 				SessionId: "WithParams",
 				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_EXECUTE,
-				TxControl: &Ydb_Query.TransactionControl{
-					TxSelector: &Ydb_Query.TransactionControl_BeginTx{
-						BeginTx: &Ydb_Query.TransactionSettings{
-							TxMode: &Ydb_Query.TransactionSettings_SerializableReadWrite{
-								SerializableReadWrite: &Ydb_Query.SerializableModeSettings{},
-							},
-						},
-					},
-					CommitTx: true,
-				},
 				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
 					QueryContent: &Ydb_Query.QueryContent{
 						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
@@ -868,16 +877,6 @@ func TestExecuteQueryRequest(t *testing.T) {
 			request: &Ydb_Query.ExecuteQueryRequest{
 				SessionId: "WithExplain",
 				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_EXPLAIN,
-				TxControl: &Ydb_Query.TransactionControl{
-					TxSelector: &Ydb_Query.TransactionControl_BeginTx{
-						BeginTx: &Ydb_Query.TransactionSettings{
-							TxMode: &Ydb_Query.TransactionSettings_SerializableReadWrite{
-								SerializableReadWrite: &Ydb_Query.SerializableModeSettings{},
-							},
-						},
-					},
-					CommitTx: true,
-				},
 				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
 					QueryContent: &Ydb_Query.QueryContent{
 						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
@@ -896,16 +895,6 @@ func TestExecuteQueryRequest(t *testing.T) {
 			request: &Ydb_Query.ExecuteQueryRequest{
 				SessionId: "WithValidate",
 				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_VALIDATE,
-				TxControl: &Ydb_Query.TransactionControl{
-					TxSelector: &Ydb_Query.TransactionControl_BeginTx{
-						BeginTx: &Ydb_Query.TransactionSettings{
-							TxMode: &Ydb_Query.TransactionSettings_SerializableReadWrite{
-								SerializableReadWrite: &Ydb_Query.SerializableModeSettings{},
-							},
-						},
-					},
-					CommitTx: true,
-				},
 				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
 					QueryContent: &Ydb_Query.QueryContent{
 						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
@@ -924,16 +913,6 @@ func TestExecuteQueryRequest(t *testing.T) {
 			request: &Ydb_Query.ExecuteQueryRequest{
 				SessionId: "WithValidate",
 				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_PARSE,
-				TxControl: &Ydb_Query.TransactionControl{
-					TxSelector: &Ydb_Query.TransactionControl_BeginTx{
-						BeginTx: &Ydb_Query.TransactionSettings{
-							TxMode: &Ydb_Query.TransactionSettings_SerializableReadWrite{
-								SerializableReadWrite: &Ydb_Query.SerializableModeSettings{},
-							},
-						},
-					},
-					CommitTx: true,
-				},
 				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
 					QueryContent: &Ydb_Query.QueryContent{
 						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
@@ -952,16 +931,6 @@ func TestExecuteQueryRequest(t *testing.T) {
 			request: &Ydb_Query.ExecuteQueryRequest{
 				SessionId: "WithStatsFull",
 				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_EXECUTE,
-				TxControl: &Ydb_Query.TransactionControl{
-					TxSelector: &Ydb_Query.TransactionControl_BeginTx{
-						BeginTx: &Ydb_Query.TransactionSettings{
-							TxMode: &Ydb_Query.TransactionSettings_SerializableReadWrite{
-								SerializableReadWrite: &Ydb_Query.SerializableModeSettings{},
-							},
-						},
-					},
-					CommitTx: true,
-				},
 				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
 					QueryContent: &Ydb_Query.QueryContent{
 						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
@@ -980,16 +949,6 @@ func TestExecuteQueryRequest(t *testing.T) {
 			request: &Ydb_Query.ExecuteQueryRequest{
 				SessionId: "WithStatsBasic",
 				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_EXECUTE,
-				TxControl: &Ydb_Query.TransactionControl{
-					TxSelector: &Ydb_Query.TransactionControl_BeginTx{
-						BeginTx: &Ydb_Query.TransactionSettings{
-							TxMode: &Ydb_Query.TransactionSettings_SerializableReadWrite{
-								SerializableReadWrite: &Ydb_Query.SerializableModeSettings{},
-							},
-						},
-					},
-					CommitTx: true,
-				},
 				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
 					QueryContent: &Ydb_Query.QueryContent{
 						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
@@ -1008,16 +967,6 @@ func TestExecuteQueryRequest(t *testing.T) {
 			request: &Ydb_Query.ExecuteQueryRequest{
 				SessionId: "WithStatsProfile",
 				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_EXECUTE,
-				TxControl: &Ydb_Query.TransactionControl{
-					TxSelector: &Ydb_Query.TransactionControl_BeginTx{
-						BeginTx: &Ydb_Query.TransactionSettings{
-							TxMode: &Ydb_Query.TransactionSettings_SerializableReadWrite{
-								SerializableReadWrite: &Ydb_Query.SerializableModeSettings{},
-							},
-						},
-					},
-					CommitTx: true,
-				},
 				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
 					QueryContent: &Ydb_Query.QueryContent{
 						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,
@@ -1038,16 +987,6 @@ func TestExecuteQueryRequest(t *testing.T) {
 			request: &Ydb_Query.ExecuteQueryRequest{
 				SessionId: "WithGrpcCallOptions",
 				ExecMode:  Ydb_Query.ExecMode_EXEC_MODE_EXECUTE,
-				TxControl: &Ydb_Query.TransactionControl{
-					TxSelector: &Ydb_Query.TransactionControl_BeginTx{
-						BeginTx: &Ydb_Query.TransactionSettings{
-							TxMode: &Ydb_Query.TransactionSettings_SerializableReadWrite{
-								SerializableReadWrite: &Ydb_Query.SerializableModeSettings{},
-							},
-						},
-					},
-					CommitTx: true,
-				},
 				Query: &Ydb_Query.ExecuteQueryRequest_QueryContent{
 					QueryContent: &Ydb_Query.QueryContent{
 						Syntax: Ydb_Query.Syntax_SYNTAX_YQL_V1,

@@ -67,6 +67,7 @@ func New() (v *Allocator) {
 	return allocatorPool.Get()
 }
 
+//nolint:funlen
 func (a *Allocator) Free() {
 	a.valueAllocator.free()
 	a.typeAllocator.free()
@@ -395,7 +396,7 @@ type structAllocator struct {
 func (a *structAllocator) Struct() (v *Ydb.StructType) {
 	v = structPool.Get()
 	if cap(v.GetMembers()) <= 0 {
-		v.Members = make([]*Ydb.StructMember, 0, 10)
+		v.Members = make([]*Ydb.StructMember, 0, 10) //nolint:gomnd
 	}
 	a.allocations = append(a.allocations, v)
 

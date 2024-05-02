@@ -16,11 +16,11 @@ jobs:
       contents: read
     steps:
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: "1.21"
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install gorelease
         run: test -e ~/go/bin/gorelease || go install golang.org/x/exp/cmd/gorelease@latest
       - name: Check broken API changes

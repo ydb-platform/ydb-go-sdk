@@ -9,6 +9,7 @@ type StreamWriter interface {
 	Write(ctx context.Context, messages []PublicMessage) error
 	WaitInit(ctx context.Context) (info InitialInfo, err error)
 	Close(ctx context.Context) error
+	Flush(ctx context.Context) error
 }
 
 type InitialInfo struct {

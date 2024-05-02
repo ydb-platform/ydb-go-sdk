@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/coordination/conversation"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -22,7 +23,7 @@ type session struct {
 	options *options.CreateSessionOptions
 	client  *Client
 
-	ctx               context.Context
+	ctx               context.Context //nolint:containedctx
 	cancel            context.CancelFunc
 	sessionClosedChan chan struct{}
 	controller        *conversation.Controller
@@ -36,7 +37,7 @@ type session struct {
 type lease struct {
 	session *session
 	name    string
-	ctx     context.Context
+	ctx     context.Context //nolint:containedctx
 	cancel  context.CancelFunc
 }
 
@@ -46,7 +47,7 @@ func createSession(
 	path string,
 	opts *options.CreateSessionOptions,
 ) (*session, error) {
-	sessionCtx, cancel := context.WithCancel(context.Background())
+	sessionCtx, cancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 	s := session{
 		options:           opts,
 		client:            client,
@@ -72,7 +73,7 @@ func createSession(
 }
 
 func newProtectionKey() []byte {
-	key := make([]byte, 8)
+	key := make([]byte, 8)                            //nolint:gomnd
 	binary.LittleEndian.PutUint64(key, rand.Uint64()) //nolint:gosec
 
 	return key
@@ -119,7 +120,7 @@ func (s *session) newStream(
 		deadline = s.getLastGoodResponseTime().Add(s.options.SessionTimeout)
 	} else {
 		// Large enough to make the loop infinite, small enough to allow the maximum duration value (~290 years).
-		deadline = time.Now().Add(time.Hour * 24 * 365 * 100)
+		deadline = time.Now().Add(time.Hour * 24 * 365 * 100) //nolint:gomnd
 	}
 
 	lastChance := false
@@ -138,10 +139,12 @@ func (s *session) newStream(
 
 		var client Ydb_Coordination_V1.CoordinationService_SessionClient
 		if lastChance {
+			timer := time.NewTimer(s.options.SessionKeepAliveTimeout)
 			select {
-			case <-time.After(s.options.SessionKeepAliveTimeout):
+			case <-timer.C:
 			case client = <-result:
 			}
+			timer.Stop()
 
 			if client != nil {
 				return client, nil
@@ -174,10 +177,12 @@ func (s *session) newStream(
 		}
 
 		// Waiting for some time before trying to reconnect.
+		sessionReconnectDelay := time.NewTimer(s.options.SessionReconnectDelay)
 		select {
-		case <-time.After(s.options.SessionReconnectDelay):
+		case <-sessionReconnectDelay.C:
 		case <-s.ctx.Done():
 		}
+		sessionReconnectDelay.Stop()
 
 		if s.ctx.Err() != nil {
 			// Give this session the last chance to stop gracefully if the session is canceled in the reconnect cycle.
@@ -225,7 +230,7 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 
 		// Start the loops.
 		wg := sync.WaitGroup{}
-		wg.Add(2)
+		wg.Add(2) //nolint:gomnd
 		sessionStarted := make(chan *Ydb_Coordination.SessionResponse_SessionStarted, 1)
 		sessionStopped := make(chan *Ydb_Coordination.SessionResponse_SessionStopped, 1)
 		startSending := make(chan struct{})
@@ -246,6 +251,7 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 
 		// Wait for the session started response unless the stream context is done. We intentionally do not take into
 		// account stream context cancellation in order to proceed with the graceful shutdown if it requires reconnect.
+		sessionStartTimer := time.NewTimer(s.options.SessionStartTimeout)
 		select {
 		case start := <-sessionStarted:
 			trace.CoordinationOnSessionStarted(s.client.config.Trace(), start.GetSessionId(), s.sessionID)
@@ -257,13 +263,14 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 				cancelStream()
 			}
 			close(startSending)
-		case <-time.After(s.options.SessionStartTimeout):
+		case <-sessionStartTimer.C:
 			// Reconnect if no response was received before the timeout occurred.
 			trace.CoordinationOnSessionStartTimeout(s.client.config.Trace(), s.options.SessionStartTimeout)
 			cancelStream()
 		case <-streamCtx.Done():
 		case <-s.ctx.Done():
 		}
+		sessionStartTimer.Stop()
 
 		for {
 			// Respect the failure reason priority: if the session context is done, we must stop the session, even
@@ -279,8 +286,9 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 			}
 
 			keepAliveTime := time.Until(s.getLastGoodResponseTime().Add(s.options.SessionKeepAliveTimeout))
+			keepAliveTimeTimer := time.NewTimer(keepAliveTime)
 			select {
-			case <-time.After(keepAliveTime):
+			case <-keepAliveTimeTimer.C:
 				last := s.getLastGoodResponseTime()
 				if time.Since(last) > s.options.SessionKeepAliveTimeout {
 					// Reconnect if the underlying stream is likely to be dead.
@@ -294,6 +302,7 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 			case <-streamCtx.Done():
 			case <-s.ctx.Done():
 			}
+			keepAliveTimeTimer.Stop()
 		}
 
 		if closing {
@@ -317,8 +326,10 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 			)
 
 			// Wait for the session stopped response unless the stream context is done.
+			sessionStopTimeout := time.NewTimer(s.options.SessionStopTimeout)
 			select {
 			case stop := <-sessionStopped:
+				sessionStopTimeout.Stop()
 				trace.CoordinationOnSessionStopped(s.client.config.Trace(), stop.GetSessionId(), s.sessionID)
 				if stop.GetSessionId() == s.sessionID {
 					cancelStream()
@@ -328,15 +339,19 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 
 				// Reconnect if the server response is invalid.
 				cancelStream()
-			case <-time.After(s.options.SessionStopTimeout):
+			case <-sessionStopTimeout.C:
+				sessionStopTimeout.Stop() // no really need, call stop for common style only
+
 				// Reconnect if no response was received before the timeout occurred.
 				trace.CoordinationOnSessionStopTimeout(s.client.config.Trace(), s.options.SessionStopTimeout)
 				cancelStream()
 			case <-s.ctx.Done():
+				sessionStopTimeout.Stop()
 				cancelStream()
 
 				return
 			case <-streamCtx.Done():
+				sessionStopTimeout.Stop()
 			}
 		}
 
