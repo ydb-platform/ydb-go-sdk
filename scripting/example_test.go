@@ -2,12 +2,19 @@ package scripting_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
+)
+
+var (
+	errNoResultSets             = errors.New("no result sets")
+	errNoRows                   = errors.New("no rows")
+	errUnexpectedParameterTypes = errors.New("unexpected parameter types")
 )
 
 func Example_execute() {
@@ -31,13 +38,13 @@ func Example_execute() {
 		defer res.Close() // cleanup resources
 		if !res.NextResultSet(ctx) {
 			return retry.RetryableError(
-				fmt.Errorf("no result sets"),
+				errNoResultSets,
 				retry.WithBackoff(retry.TypeNoBackoff),
 			)
 		}
 		if !res.NextRow() {
 			return retry.RetryableError(
-				fmt.Errorf("no rows"),
+				errNoRows,
 				retry.WithBackoff(retry.TypeSlowBackoff),
 			)
 		}
@@ -46,7 +53,7 @@ func Example_execute() {
 			return fmt.Errorf("scan failed: %w", err)
 		}
 		if sum != 2 {
-			return fmt.Errorf("unexpected sum: %v", sum)
+			return fmt.Errorf("unexpected sum: %v", sum) //nolint:goerr113
 		}
 
 		return res.Err()
@@ -76,14 +83,14 @@ func Example_streamExecute() {
 		defer res.Close() // cleanup resources
 		if !res.NextResultSet(ctx) {
 			return retry.RetryableError(
-				fmt.Errorf("no result sets"),
+				errNoResultSets,
 				retry.WithBackoff(retry.TypeNoBackoff),
 				retry.WithDeleteSession(),
 			)
 		}
 		if !res.NextRow() {
 			return retry.RetryableError(
-				fmt.Errorf("no rows"),
+				errNoRows,
 				retry.WithBackoff(retry.TypeFastBackoff),
 			)
 		}
@@ -92,7 +99,7 @@ func Example_streamExecute() {
 			return fmt.Errorf("scan failed: %w", err)
 		}
 		if sum != 2 {
-			return fmt.Errorf("unexpected sum: %v", sum)
+			return fmt.Errorf("unexpected sum: %v", sum) //nolint:goerr113
 		}
 
 		return res.Err()
@@ -147,7 +154,7 @@ func Example_explainValidate() {
 			return err
 		}
 		if len(res.ParameterTypes) > 0 {
-			return retry.RetryableError(fmt.Errorf("unexpected parameter types"))
+			return retry.RetryableError(errUnexpectedParameterTypes)
 		}
 
 		return nil
