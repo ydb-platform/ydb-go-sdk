@@ -41,6 +41,7 @@ func ToDecimal(v Value) (*Decimal, error) {
 		}, nil
 	}
 
+	//nolint:goerr113
 	return nil, xerrors.WithStackTrace(fmt.Errorf("value type '%s' is not decimal type", v.Type().Yql()))
 }
 
@@ -52,6 +53,7 @@ func ListItems(v Value) ([]Value, error) {
 		return vv.ListItems(), nil
 	}
 
+	//nolint:goerr113
 	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get list items from '%s'", v.Type().Yql()))
 }
 
@@ -63,6 +65,7 @@ func TupleItems(v Value) ([]Value, error) {
 		return vv.TupleItems(), nil
 	}
 
+	//nolint:goerr113
 	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get tuple items from '%s'", v.Type().Yql()))
 }
 
@@ -74,6 +77,7 @@ func StructFields(v Value) (map[string]Value, error) {
 		return vv.StructFields(), nil
 	}
 
+	//nolint:goerr113
 	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get struct fields from '%s'", v.Type().Yql()))
 }
 
@@ -88,6 +92,7 @@ func VariantValue(v Value) (name string, idx uint32, _ Value, _ error) {
 		return name, idx, vv.Value(), nil
 	}
 
+	//nolint:goerr113
 	return "", 0, nil, xerrors.WithStackTrace(fmt.Errorf("cannot get variant value from '%s'", v.Type().Yql()))
 }
 
@@ -108,5 +113,6 @@ func DictValues(v Value) (map[Value]Value, error) {
 		return vv.DictValues(), nil
 	}
 
+	//nolint:goerr113
 	return nil, xerrors.WithStackTrace(fmt.Errorf("cannot get dict values from '%s'", v.Type().Yql()))
 }

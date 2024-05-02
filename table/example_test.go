@@ -2,6 +2,7 @@ package table_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
 	"time"
@@ -15,6 +16,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/named"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
+)
+
+var (
+	errNoResultSets = errors.New("no result sets")
+	errNoRows       = errors.New("no rows")
 )
 
 func Example_select() {
@@ -213,10 +219,10 @@ func Example_lazyTransaction() {
 				_ = result.Close()
 			}()
 			if !result.NextResultSet(ctx) {
-				return retry.RetryableError(fmt.Errorf("no result sets"))
+				return retry.RetryableError(errNoResultSets)
 			}
 			if !result.NextRow() {
-				return retry.RetryableError(fmt.Errorf("no rows"))
+				return retry.RetryableError(errNoRows)
 			}
 			var (
 				id          uint64
