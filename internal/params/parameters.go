@@ -141,6 +141,13 @@ func (p *Parameter) BeginStruct() *structure {
 	}
 }
 
+func (p *Parameter) BeginVariant() *variant {
+	return &variant{
+		parent: p.parent,
+		name:   p.name,
+	}
+}
+
 func (p *Parameter) Text(v string) Builder {
 	p.value = value.TextValue(v)
 	p.parent.params = append(p.parent.params, p)

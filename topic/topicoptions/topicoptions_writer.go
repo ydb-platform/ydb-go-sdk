@@ -45,9 +45,7 @@ func WithWriterCompressorCount(num int) WriterOption {
 
 // WithWriterMaxQueueLen set max len of queue for wait ack
 //
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func WithWriterMaxQueueLen(num int) WriterOption {
 	return topicwriterinternal.WithMaxQueueLen(num)
 }
@@ -61,8 +59,11 @@ func WithWriterMessageMaxBytesSize(size int) WriterOption {
 }
 
 // WithWriteSessionMeta
-// Deprecated: (was experimental) will be removed soon.
-// Use WithWriterSessionMeta instead
+//
+// Deprecated: was experimental and not actual now.
+// Use WithWriterSessionMeta instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithWriteSessionMeta(meta map[string]string) WriterOption {
 	return WithWriterSessionMeta(meta)
 }
@@ -73,8 +74,11 @@ func WithWriterSessionMeta(meta map[string]string) WriterOption {
 }
 
 // WithProducerID
-// Deprecated: (was experimental) will be removed soon.
-// Use WithWriterProducerID instead
+//
+// Deprecated: was experimental and not actual now.
+// Use WithWriterProducerID instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithProducerID(producerID string) WriterOption {
 	return WithWriterProducerID(producerID)
 }
@@ -85,8 +89,11 @@ func WithWriterProducerID(producerID string) WriterOption {
 }
 
 // WithPartitionID
-// Deprecated: (was experimental) will be removed soon
-// Use WithWriterPartitionID instead
+//
+// Deprecated: was experimental and not actual now.
+// Use WithWriterPartitionID instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithPartitionID(partitionID int64) WriterOption {
 	return WithWriterPartitionID(partitionID)
 }
@@ -97,7 +104,11 @@ func WithWriterPartitionID(partitionID int64) WriterOption {
 }
 
 // WithSyncWrite
-// Deprecated: (was experimental) use WithWriterWaitServerAck instead
+//
+// Deprecated: was experimental and not actual now.
+// Use WithWriterWaitServerAck instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithSyncWrite(sync bool) WriterOption {
 	return WithWriterWaitServerAck(sync)
 }
@@ -110,17 +121,26 @@ func WithWriterWaitServerAck(wait bool) WriterOption {
 
 type (
 	// WithOnWriterConnectedInfo present information, received from server
-	// Deprecated: (was experimental) will be removed soon
+	//
+	// Deprecated: was experimental and not actual now.
+	// Will be removed after Oct 2024.
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	WithOnWriterConnectedInfo = topicwriterinternal.PublicWithOnWriterConnectedInfo
 
 	// OnWriterInitResponseCallback
-	// Deprecated: (was experimental) will be removed soon.
+	//
+	// Deprecated: was experimental and not actual now.
+	// Will be removed after Oct 2024.
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 	OnWriterInitResponseCallback = topicwriterinternal.PublicOnWriterInitResponseCallback
 )
 
 // WithOnWriterFirstConnected set callback f, which will called once - after first successfully init topic writer stream
-// Deprecated: (was experimental) will be removed soon.
-// Use Writer.WaitInit function instead
+//
+// Deprecated: was experimental and not actual now.
+// Use Writer.WaitInit function instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithOnWriterFirstConnected(f OnWriterInitResponseCallback) WriterOption {
 	return func(cfg *topicwriterinternal.WriterReconnectorConfig) {
 		cfg.OnWriterInitResponseCallback = f
@@ -128,8 +148,11 @@ func WithOnWriterFirstConnected(f OnWriterInitResponseCallback) WriterOption {
 }
 
 // WithCodec
-// Deprecated: (was experimental) will be removed soon.
-// Use WithWriterCodec instead
+//
+// Deprecated: was experimental and not actual now.
+// Use WithWriterCodec instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithCodec(codec topictypes.Codec) WriterOption {
 	return WithWriterCodec(codec)
 }
@@ -140,8 +163,11 @@ func WithWriterCodec(codec topictypes.Codec) WriterOption {
 }
 
 // WithCodecAutoSelect
-// Deprecated: (was experimental) will be removed soon.
+//
+// Deprecated: was experimental and not actual now.
 // Use WithWriterCodecAutoSelect instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithCodecAutoSelect() WriterOption {
 	return topicwriterinternal.WithAutoCodec()
 }

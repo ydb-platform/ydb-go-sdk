@@ -31,7 +31,6 @@ type readerConnectFunc func(ctx context.Context) (batchedStreamReader, error)
 type readerReconnector struct {
 	background                 background.Worker
 	clock                      clockwork.Clock
-	baseContext                context.Context
 	retrySettings              topic.RetrySettings
 	streamVal                  batchedStreamReader
 	streamErr                  error
@@ -49,14 +48,12 @@ type readerReconnector struct {
 	initDone                   bool
 }
 
-//nolint:revive
 func newReaderReconnector(
 	readerID int64,
 	connector readerConnectFunc,
 	connectTimeout time.Duration,
 	retrySettings topic.RetrySettings,
 	tracer *trace.Topic,
-	baseContext context.Context,
 ) *readerReconnector {
 	res := &readerReconnector{
 		readerID:       readerID,
@@ -65,7 +62,6 @@ func newReaderReconnector(
 		streamErr:      errUnconnected,
 		connectTimeout: connectTimeout,
 		tracer:         tracer,
-		baseContext:    baseContext,
 		retrySettings:  retrySettings,
 	}
 
@@ -328,9 +324,12 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 		result <- connectResult{stream: stream, err: err}
 	}()
 
+	connectionTimoutTimer := r.clock.NewTimer(r.connectTimeout)
+	defer connectionTimoutTimer.Stop()
+
 	var res connectResult
 	select {
-	case <-r.clock.After(r.connectTimeout):
+	case <-connectionTimoutTimer.Chan():
 		// cancel connection context only if timeout exceed while connection
 		// because if cancel context after connect - it will break
 		cancel()

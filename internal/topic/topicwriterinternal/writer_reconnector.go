@@ -84,8 +84,8 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		},
 		AutoSetSeqNo:       true,
 		AutoSetCreatedTime: true,
-		MaxMessageSize:     50 * 1024 * 1024,
-		MaxQueueLen:        1000,
+		MaxMessageSize:     50 * 1024 * 1024, //nolint:gomnd
+		MaxQueueLen:        1000,             //nolint:gomnd
 		RetrySettings: topic.RetrySettings{
 			StartTimeout: topic.DefaultStartTimeout,
 		},
@@ -325,8 +325,22 @@ func (w *WriterReconnector) createMessagesWithContent(messages []PublicMessage) 
 	return res, nil
 }
 
+func (w *WriterReconnector) Flush(ctx context.Context) error {
+	return w.queue.WaitLastWritten(ctx)
+}
+
 func (w *WriterReconnector) Close(ctx context.Context) error {
-	return w.close(ctx, xerrors.WithStackTrace(errStopWriterReconnector))
+	reason := xerrors.WithStackTrace(errStopWriterReconnector)
+	w.queue.StopAddNewMessages(reason)
+
+	flushErr := w.Flush(ctx)
+	closeErr := w.close(ctx, reason)
+
+	if flushErr != nil {
+		return flushErr
+	}
+
+	return closeErr
 }
 
 func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr error) {
@@ -335,9 +349,13 @@ func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr err
 		onDone(resErr)
 	}()
 
-	resErr = w.queue.Close(reason)
+	closeErr := w.queue.Close(reason)
+	if resErr == nil && closeErr != nil {
+		resErr = closeErr
+	}
+
 	bgErr := w.background.Close(ctx, reason)
-	if resErr == nil {
+	if resErr == nil && bgErr != nil {
 		resErr = bgErr
 	}
 
@@ -380,16 +398,21 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		prevAttemptTime = now
 
 		if reconnectReason != nil {
-			if backoff, retry := topic.CheckRetryMode(reconnectReason, w.retrySettings, w.clock.Since(startOfRetries)); retry {
+			retryDuration := w.clock.Since(startOfRetries)
+			if backoff, retry := topic.CheckRetryMode(reconnectReason, w.retrySettings, retryDuration); retry {
 				delay := backoff.Delay(attempt)
+				delayTimer := w.clock.NewTimer(delay)
 				select {
 				case <-doneCtx:
+					delayTimer.Stop()
+
 					return
-				case <-w.clock.After(delay):
+				case <-delayTimer.Chan():
+					delayTimer.Stop() // no really need, stop for common style only
 					// pass
 				}
 			} else {
-				_ = w.close(ctx, reconnectReason)
+				_ = w.close(ctx, fmt.Errorf("%w, was retried (%v)", reconnectReason, retryDuration))
 
 				return
 			}

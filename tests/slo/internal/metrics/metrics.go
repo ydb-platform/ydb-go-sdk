@@ -63,7 +63,7 @@ func New(url, label, jobName string) (*Metrics, error) {
 				0.99: 0,
 				1.0:  0,
 			},
-			MaxAge: 15 * time.Second,
+			MaxAge: 15 * time.Second, //nolint:gomnd
 		},
 		[]string{"status", "jobName"},
 	)
@@ -71,7 +71,7 @@ func New(url, label, jobName string) (*Metrics, error) {
 		prometheus.HistogramOpts{
 			Name:    "attempts",
 			Help:    "summary of amount for request",
-			Buckets: prometheus.LinearBuckets(1, 1, 10),
+			Buckets: prometheus.LinearBuckets(1, 1, 10), //nolint:gomnd
 		},
 		[]string{"status", "jobName"},
 	)

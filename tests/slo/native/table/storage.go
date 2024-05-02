@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -62,16 +63,24 @@ type Storage struct {
 	prefix      string
 	upsertQuery string
 	selectQuery string
+	retryBudget interface {
+		budget.Budget
+
+		Stop()
+	}
 }
 
 func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage, error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:gomnd
 	defer cancel()
+
+	retryBudget := budget.Limited(int(float64(poolSize) * 0.1)) //nolint:gomnd
 
 	db, err := ydb.Open(
 		ctx,
 		cfg.Endpoint+cfg.DB,
 		ydb.WithSessionPoolSizeLimit(poolSize),
+		ydb.WithRetryBudget(retryBudget),
 	)
 	if err != nil {
 		return nil, err
@@ -85,6 +94,7 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage
 		prefix:      prefix,
 		upsertQuery: fmt.Sprintf(upsertTemplate, prefix, cfg.Table),
 		selectQuery: fmt.Sprintf(selectTemplate, prefix, cfg.Table),
+		retryBudget: retryBudget,
 	}
 
 	return s, nil
@@ -245,6 +255,8 @@ func (s *Storage) dropTable(ctx context.Context) error {
 }
 
 func (s *Storage) close(ctx context.Context) error {
+	s.retryBudget.Stop()
+
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.ShutdownTime)*time.Second)
 	defer cancel()
 

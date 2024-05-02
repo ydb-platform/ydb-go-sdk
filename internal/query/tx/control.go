@@ -125,10 +125,7 @@ func NoTx() *Control {
 
 // DefaultTxControl returns default transaction control with serializable read-write isolation mode and auto-commit
 func DefaultTxControl() *Control {
-	return NewControl(
-		BeginTx(WithSerializableReadWrite()),
-		CommitTx(),
-	)
+	return NoTx()
 }
 
 // SerializableReadWriteTxControl returns transaction control with serializable read-write isolation mode

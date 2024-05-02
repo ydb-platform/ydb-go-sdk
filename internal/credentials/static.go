@@ -19,6 +19,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
+const TokenRefreshDivisor = 10
+
 var (
 	_ Credentials             = (*Static)(nil)
 	_ fmt.Stringer            = (*Static)(nil)
@@ -133,7 +135,7 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 		return "", xerrors.WithStackTrace(err)
 	}
 
-	c.requestAt = time.Now().Add(time.Until(expiresAt) / 10)
+	c.requestAt = time.Now().Add(time.Until(expiresAt) / TokenRefreshDivisor)
 	c.token = result.GetToken()
 
 	return c.token, nil

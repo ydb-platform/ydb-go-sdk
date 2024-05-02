@@ -19,6 +19,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
+const (
+	decimalPrecision uint32 = 22
+	decimalScale     uint32 = 9
+)
+
 type Value interface {
 	Type() types.Type
 	Yql() string
@@ -1037,6 +1042,7 @@ func (v intervalValue) Yql() string {
 		d = -d
 	}
 	buffer.WriteByte('P')
+	//nolint:gomnd
 	if days := d / time.Hour / 24; days > 0 {
 		d -= days * time.Hour * 24 //nolint:durationcheck
 		buffer.WriteString(strconv.FormatInt(int64(days), 10))
@@ -2420,7 +2426,7 @@ func ZeroValue(t types.Type) Value {
 			return values
 		}()...)
 	case *types.Decimal:
-		return DecimalValue([16]byte{}, 22, 9)
+		return DecimalValue([16]byte{}, decimalPrecision, decimalScale)
 
 	default:
 		panic(fmt.Sprintf("type '%T' have not a zero value", t))

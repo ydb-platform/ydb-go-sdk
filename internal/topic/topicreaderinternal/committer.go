@@ -126,7 +126,7 @@ func (c *committer) pushCommitsLoop(ctx context.Context) {
 		var commits CommitRanges
 		c.m.WithLock(func() {
 			commits = c.commits
-			c.commits = NewCommitRangesWithCapacity(commits.len() * 2)
+			c.commits = NewCommitRangesWithCapacity(commits.len() * 2) //nolint:gomnd
 		})
 
 		if commits.len() == 0 && c.backgroundWorker.Context().Err() != nil {
@@ -166,7 +166,10 @@ func (c *committer) waitSendTrigger(ctx context.Context) {
 		return
 	}
 
-	finish := c.clock.After(c.BufferTimeLagTrigger)
+	bufferTimeLagTriggerTimer := c.clock.NewTimer(c.BufferTimeLagTrigger)
+	defer bufferTimeLagTriggerTimer.Stop()
+
+	finish := bufferTimeLagTriggerTimer.Chan()
 	if c.BufferCountTrigger == 0 {
 		select {
 		case <-ctxDone:

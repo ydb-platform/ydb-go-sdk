@@ -40,7 +40,7 @@ func ExplicitPartitionStartStopHandler(ctx context.Context, db *ydb.Driver) {
 				) func(
 					trace.TopicReaderPartitionReadStartResponseDoneInfo,
 				) {
-					err := externalSystemLock(info.PartitionContext, info.Topic, info.PartitionID)
+					err := externalSystemLock(*info.PartitionContext, info.Topic, info.PartitionID)
 					if err != nil {
 						stopReader()
 					}
@@ -71,7 +71,7 @@ func ExplicitPartitionStartStopHandler(ctx context.Context, db *ydb.Driver) {
 	}()
 
 	for {
-		batch, _ := reader.ReadMessageBatch(readContext)
+		batch, _ := reader.ReadMessagesBatch(readContext)
 
 		processBatch(batch.Context(), batch)
 		_ = externalSystemCommit(
@@ -105,7 +105,7 @@ func PartitionStartStopHandlerAndOwnReadProgressStorage(ctx context.Context, db 
 	) func(
 		trace.TopicReaderPartitionReadStartResponseDoneInfo,
 	) {
-		err := externalSystemLock(info.PartitionContext, info.Topic, info.PartitionID)
+		err := externalSystemLock(*info.PartitionContext, info.Topic, info.PartitionID)
 		if err != nil {
 			stopReader()
 		}
@@ -129,8 +129,7 @@ func PartitionStartStopHandlerAndOwnReadProgressStorage(ctx context.Context, db 
 	}
 
 	r, _ := db.Topic().StartReader("consumer", topicoptions.ReadTopic("asd"),
-
-		topicoptions.WithGetPartitionStartOffset(readStartPosition),
+		topicoptions.WithReaderGetPartitionStartOffset(readStartPosition),
 		topicoptions.WithReaderTrace(
 			trace.Topic{
 				OnReaderPartitionReadStartResponse: onPartitionStart,
@@ -144,7 +143,7 @@ func PartitionStartStopHandlerAndOwnReadProgressStorage(ctx context.Context, db 
 	}()
 
 	for {
-		batch, _ := r.ReadMessageBatch(readContext)
+		batch, _ := r.ReadMessagesBatch(readContext)
 
 		processBatch(batch.Context(), batch)
 		_ = externalSystemCommit(batch.Context(), batch.Topic(), batch.PartitionID(), getEndOffset(batch))

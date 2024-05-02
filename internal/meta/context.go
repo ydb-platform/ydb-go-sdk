@@ -41,7 +41,7 @@ func WithRequestType(ctx context.Context, requestType string) context.Context {
 
 // WithAllowFeatures returns a copy of parent context with allowed client feature
 func WithAllowFeatures(ctx context.Context, features ...string) context.Context {
-	kv := make([]string, 0, len(features)*2)
+	kv := make([]string, 0, len(features)*2) //nolint:gomnd
 	for _, feature := range features {
 		kv = append(kv, HeaderClientCapabilities, feature)
 	}

@@ -7,70 +7,70 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Coordination"
 )
 
-// WithDescription returns an CreateSessionOption that specifies a user-defined description that may be used to describe
+// WithDescription returns an SessionOption that specifies a user-defined description that may be used to describe
 // the client.
-func WithDescription(description string) CreateSessionOption {
+func WithDescription(description string) SessionOption {
 	return func(c *CreateSessionOptions) {
 		c.Description = description
 	}
 }
 
-// WithSessionTimeout returns an CreateSessionOption that specifies the timeout during which client may restore a
+// WithSessionTimeout returns an SessionOption that specifies the timeout during which client may restore a
 // detached session. The client is forced to terminate the session if the last successful session request occurred
 // earlier than this time.
 //
 // If this is not set, the client uses the default 5 seconds.
-func WithSessionTimeout(timeout time.Duration) CreateSessionOption {
+func WithSessionTimeout(timeout time.Duration) SessionOption {
 	return func(c *CreateSessionOptions) {
 		c.SessionTimeout = timeout
 	}
 }
 
-// WithSessionStartTimeout returns an CreateSessionOption that specifies the time that the client should wait for a
+// WithSessionStartTimeout returns an SessionOption that specifies the time that the client should wait for a
 // response to the StartSession request from the server before it terminates the gRPC stream and tries to reconnect.
 //
 // If this is not set, the client uses the default time 1 second.
-func WithSessionStartTimeout(timeout time.Duration) CreateSessionOption {
+func WithSessionStartTimeout(timeout time.Duration) SessionOption {
 	return func(c *CreateSessionOptions) {
 		c.SessionStartTimeout = timeout
 	}
 }
 
-// WithSessionStopTimeout returns an CreateSessionOption that specifies the time that the client should wait for a
+// WithSessionStopTimeout returns an SessionOption that specifies the time that the client should wait for a
 // response to the StopSession request from the server before it terminates the gRPC stream and tries to reconnect.
 //
 // If this is not set, the client uses the default time 1 second.
-func WithSessionStopTimeout(timeout time.Duration) CreateSessionOption {
+func WithSessionStopTimeout(timeout time.Duration) SessionOption {
 	return func(c *CreateSessionOptions) {
 		c.SessionStartTimeout = timeout
 	}
 }
 
-// WithSessionKeepAliveTimeout returns an CreateSessionOption that specifies the time that the client will wait before
+// WithSessionKeepAliveTimeout returns an SessionOption that specifies the time that the client will wait before
 // it terminates the gRPC stream and tries to reconnect if no successful responses have been received from the server.
 //
 // If this is not set, the client uses the default time 10 seconds.
-func WithSessionKeepAliveTimeout(timeout time.Duration) CreateSessionOption {
+func WithSessionKeepAliveTimeout(timeout time.Duration) SessionOption {
 	return func(c *CreateSessionOptions) {
 		c.SessionKeepAliveTimeout = timeout
 	}
 }
 
-// WithSessionReconnectDelay returns an CreateSessionOption that specifies the time that the client will wait before it
+// WithSessionReconnectDelay returns an SessionOption that specifies the time that the client will wait before it
 // tries to reconnect the underlying gRPC stream in case of error.
 //
 // If this is not set, the client uses the default time 500 milliseconds.
-func WithSessionReconnectDelay(delay time.Duration) CreateSessionOption {
+func WithSessionReconnectDelay(delay time.Duration) SessionOption {
 	return func(c *CreateSessionOptions) {
 		c.SessionReconnectDelay = delay
 	}
 }
 
-// CreateSessionOption configures how we create a new session.
-type CreateSessionOption func(c *CreateSessionOptions)
+// SessionOption configures how we create a new session.
+type SessionOption func(c *CreateSessionOptions)
 
-// CreateSessionOptions configure an CreateSession call. CreateSessionOptions are set by the CreateSessionOption values
-// passed to the CreateSession function.
+// CreateSessionOptions configure an Session call. CreateSessionOptions are set by the SessionOption values
+// passed to the Session function.
 type CreateSessionOptions struct {
 	Description             string
 	SessionTimeout          time.Duration

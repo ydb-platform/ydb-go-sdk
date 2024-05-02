@@ -438,6 +438,32 @@ func TestTopicWriterWithManualPartitionSelect(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestWriterFlushMessagesBeforeClose(t *testing.T) {
+	s := newScope(t)
+	ctx := s.Ctx
+	writer, err := s.Driver().Topic().StartWriter(s.TopicPath(), topicoptions.WithWriterWaitServerAck(false))
+	require.NoError(t, err)
+
+	count := 1000
+	for i := 0; i < count; i++ {
+		require.NoError(t, writer.Write(ctx, topicwriter.Message{Data: strings.NewReader(strconv.Itoa(i))}))
+	}
+	require.NoError(t, writer.Close(ctx))
+
+	for i := 0; i < count; i++ {
+		readCtx, cancel := context.WithTimeout(ctx, time.Second)
+		mess, err := s.TopicReader().ReadMessage(readCtx)
+		cancel()
+		require.NoError(t, err)
+
+		messBody, err := io.ReadAll(mess)
+		require.NoError(t, err)
+		messBodyString := string(messBody)
+		require.Equal(t, strconv.Itoa(i), messBodyString)
+		cancel()
+	}
+}
+
 var topicCounter int
 
 func createTopic(ctx context.Context, t testing.TB, db *ydb.Driver) (topicPath string) {
