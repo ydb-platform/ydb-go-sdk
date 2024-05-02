@@ -16,7 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var errConcurencyReadDenied = xerrors.Wrap(errors.New("ydb: read from rawtopicwriter in parallel"))
+var errConcurencyReadDenied = xerrors.Wrap(errors.New("ydb: read from rawtopicwriter in parallel")) //nolint:goerr113
 
 type GrpcStream interface {
 	Send(messageNew *Ydb_Topic.StreamWriteMessage_FromClient) error
@@ -56,7 +56,7 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 		return nil, err
 	}
 	if !meta.Status.IsSuccess() {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: bad status from topic server: %v", meta.Status))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: bad status from topic server: %v", meta.Status)) //nolint:lll,goerr113
 	}
 
 	switch v := grpcMsg.GetServerMessage().(type) {
@@ -81,6 +81,7 @@ func (w *StreamWriter) Recv() (ServerMessage, error) {
 
 		return &res, nil
 	default:
+		//nolint:goerr113
 		return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: unexpected message type received from raw writer stream: '%v'",
 			reflect.TypeOf(grpcMsg),
@@ -117,6 +118,7 @@ func (w *StreamWriter) Send(rawMsg ClientMessage) (err error) {
 			UpdateTokenRequest: v.ToProto(),
 		}
 	default:
+		//nolint:goerr113
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: unexpected message type for send to raw writer stream: '%v'",
 			reflect.TypeOf(rawMsg),

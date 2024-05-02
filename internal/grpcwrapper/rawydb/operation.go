@@ -27,7 +27,7 @@ func (o *Operation) FromProto(proto *Ydb_Operations.Operation) error {
 
 func (o *Operation) OperationStatusToError() error {
 	if !o.Status.IsSuccess() {
-		return xerrors.WithStackTrace(fmt.Errorf("ydb: create topic error [%v]: %v", o.Status, o.Issues))
+		return xerrors.WithStackTrace(fmt.Errorf("ydb: create topic error [%v]: %v", o.Status, o.Issues)) //nolint:lll,goerr113
 	}
 
 	return nil

@@ -10,6 +10,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
+var errNilIssueMsgPointerFromProtobuf = xerrors.Wrap(errors.New("receive nil issue message pointer from protobuf")) //nolint:lll,goerr113
+
 type Issues []Issue
 
 func (issuesPointer *Issues) FromProto(p []*Ydb_Issue.IssueMessage) error {
@@ -42,7 +44,7 @@ type Issue struct {
 
 func (issue *Issue) FromProto(p *Ydb_Issue.IssueMessage) error {
 	if p == nil {
-		return xerrors.WithStackTrace(errors.New("receive nil issue message pointer from protobuf"))
+		return xerrors.WithStackTrace(errNilIssueMsgPointerFromProtobuf)
 	}
 	issue.Code = p.GetIssueCode()
 	issue.Message = p.GetMessage()

@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	errUnexpectedNilForSchemePermissions = xerrors.Wrap(errors.New("ydb: unexpected nil for scheme permissions"))
-	errUnexpectedNilForSchemeEntry       = xerrors.Wrap(errors.New("ydb: unexpected nil for scheme entry"))
+	errUnexpectedNilForSchemePermissions = xerrors.Wrap(errors.New("ydb: unexpected nil for scheme permissions")) //nolint:lll,goerr113
+	errUnexpectedNilForSchemeEntry       = xerrors.Wrap(errors.New("ydb: unexpected nil for scheme entry"))       //nolint:lll,goerr113
 )
 
 type Entry struct {
