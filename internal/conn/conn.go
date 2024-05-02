@@ -158,7 +158,7 @@ func (c *conn) setState(ctx context.Context, s State) State {
 	return s
 }
 
-//nolint:ifshort //here a pointer is intentionally saved under the lock,
+//nolint:ifshort //here a pointer is intentionally saved under the lock
 func (c *conn) Unban(ctx context.Context) State {
 	var newState State
 	c.mtx.RLock()
