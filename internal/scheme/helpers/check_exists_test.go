@@ -48,7 +48,7 @@ func (c isDirectoryExistsSchemeClient) ListDirectory(ctx context.Context, path s
 		}, nil
 	}
 
-	return d, fmt.Errorf("path '%s' not found in '%s'", path, c)
+	return d, fmt.Errorf("path '%s' not found in '%s'", path, c) //nolint:goerr113
 }
 
 func TestIsDirectoryExists(t *testing.T) {
@@ -176,7 +176,7 @@ func (c isTableExistsSchemeClient) ListDirectory(ctx context.Context, path strin
 		}
 	}
 
-	return d, fmt.Errorf("path '%s' not found in '%s'", path, c)
+	return d, fmt.Errorf("path '%s' not found in '%s'", path, c) //nolint:goerr113
 }
 
 func TestIsTableExists(t *testing.T) {
