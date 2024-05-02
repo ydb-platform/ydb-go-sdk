@@ -25,13 +25,13 @@ import (
 
 var (
 	// errOperationNotReady specified error when operation is not ready
-	errOperationNotReady = xerrors.Wrap(fmt.Errorf("operation is not ready yet"))
+	errOperationNotReady = xerrors.Wrap(fmt.Errorf("operation is not ready yet")) //nolint:goerr113
 
 	// errClosedConnection specified error when connection are closed early
-	errClosedConnection = xerrors.Wrap(fmt.Errorf("connection closed early"))
+	errClosedConnection = xerrors.Wrap(fmt.Errorf("connection closed early")) //nolint:goerr113
 
 	// errUnavailableConnection specified error when connection are closed early
-	errUnavailableConnection = xerrors.Wrap(fmt.Errorf("connection unavailable"))
+	errUnavailableConnection = xerrors.Wrap(fmt.Errorf("connection unavailable")) //nolint:goerr113
 )
 
 type Conn interface {
