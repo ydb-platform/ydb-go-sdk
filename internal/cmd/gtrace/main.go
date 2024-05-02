@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"go/ast"
@@ -19,6 +20,8 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
+
+var errUnsupportedNumberOfFuncResults = errors.New("unsupported number of function results")
 
 //nolint:gocyclo
 func main() {
@@ -276,9 +279,7 @@ func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (re
 		return ret, nil
 	}
 	if len(fn.Results.List) > 1 {
-		return nil, fmt.Errorf(
-			"unsupported number of function results",
-		)
+		return nil, errUnsupportedNumberOfFuncResults
 	}
 
 	r := fn.Results.List[0]
@@ -302,6 +303,7 @@ func buildFunc(info *types.Info, traces map[string]*Trace, fn *ast.FuncType) (re
 		}
 	}
 
+	//nolint:goerr113
 	return nil, fmt.Errorf(
 		"unsupported function result type %s",
 		info.TypeOf(r.Type),

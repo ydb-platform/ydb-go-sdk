@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -11,6 +12,11 @@ import (
 	"path/filepath"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
+)
+
+var (
+	errGettingIdentFromExpr = errors.New("error during getting ident from expr")
+	errGetPackageName       = errors.New("error during get package name function")
 )
 
 type FunctionIDArg struct {
@@ -32,8 +38,10 @@ func ReadFile(filename string, info fs.FileInfo) ([]byte, error) {
 		return nil, err
 	}
 	if n < size {
+		//nolint:goerr113
 		return nil, fmt.Errorf("error: size of %q changed during reading (from %d to %d bytes)", filename, size, n)
 	} else if n > size {
+		//nolint:goerr113
 		return nil, fmt.Errorf("error: size of %q changed during reading (from %d to >=%d bytes)", filename, size, len(src))
 	}
 
@@ -120,7 +128,7 @@ func getIdentNameFromExpr(expr ast.Expr) (string, error) {
 	case *ast.IndexListExpr:
 		return getIdentNameFromExpr(expr.X)
 	default:
-		return "", fmt.Errorf("error during getting ident from expr")
+		return "", errGettingIdentFromExpr
 	}
 }
 
@@ -128,7 +136,7 @@ func getPackageName(fset *token.FileSet, arg FunctionIDArg) (string, error) {
 	file := fset.File(arg.ArgPos)
 	parsedFile, err := parser.ParseFile(fset, file.Name(), nil, parser.PackageClauseOnly)
 	if err != nil {
-		return "", fmt.Errorf("error during get package name function")
+		return "", errGetPackageName
 	}
 
 	return parsedFile.Name.Name, nil
