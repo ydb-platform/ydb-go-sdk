@@ -26,6 +26,7 @@ func ToYDB(opts driver.TxOptions) (txcControl table.TxOption, err error) {
 		}
 	}
 
+	//nolint:goerr113
 	return nil, xerrors.WithStackTrace(fmt.Errorf(
 		"unsupported transaction options: %+v", opts,
 	))

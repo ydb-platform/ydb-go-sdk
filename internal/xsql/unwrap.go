@@ -16,7 +16,7 @@ func Unwrap[T *sql.DB | *sql.Conn](v T) (connector *Connector, err error) {
 			return dw.c, nil
 		}
 
-		return nil, xerrors.WithStackTrace(fmt.Errorf("%T is not a *driverWrapper", d))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("%T is not a *driverWrapper", d)) //nolint:goerr113
 	case *sql.Conn:
 		if err = vv.Raw(func(driverConn interface{}) error {
 			if cc, ok := driverConn.(*conn); ok {
@@ -25,13 +25,13 @@ func Unwrap[T *sql.DB | *sql.Conn](v T) (connector *Connector, err error) {
 				return nil
 			}
 
-			return xerrors.WithStackTrace(fmt.Errorf("%T is not a *conn", driverConn))
+			return xerrors.WithStackTrace(fmt.Errorf("%T is not a *conn", driverConn)) //nolint:goerr113
 		}); err != nil {
 			return nil, badconn.Map(xerrors.WithStackTrace(err))
 		}
 
 		return connector, nil
 	default:
-		return nil, xerrors.WithStackTrace(fmt.Errorf("unknown type %T for Unwrap", vv))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("unknown type %T for Unwrap", vv)) //nolint:goerr113
 	}
 }

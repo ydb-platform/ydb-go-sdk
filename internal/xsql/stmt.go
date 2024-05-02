@@ -44,7 +44,7 @@ func (stmt *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_
 	case DataQueryMode:
 		return stmt.processor.QueryContext(stmt.conn.withKeepInCache(ctx), stmt.query, args)
 	default:
-		return nil, fmt.Errorf("unsupported query mode '%s' for execute query on prepared statement", m)
+		return nil, fmt.Errorf("unsupported query mode '%s' for execute query on prepared statement", m) //nolint:goerr113
 	}
 }
 
@@ -63,7 +63,7 @@ func (stmt *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ 
 	case DataQueryMode:
 		return stmt.processor.ExecContext(stmt.conn.withKeepInCache(ctx), stmt.query, args)
 	default:
-		return nil, fmt.Errorf("unsupported query mode '%s' for execute query on prepared statement", m)
+		return nil, fmt.Errorf("unsupported query mode '%s' for execute query on prepared statement", m) //nolint:goerr113
 	}
 }
 

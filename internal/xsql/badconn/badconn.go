@@ -2,6 +2,7 @@ package badconn
 
 import (
 	"database/sql/driver"
+	"errors"
 	"io"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -21,7 +22,7 @@ func (e Error) Error() string {
 
 func (e Error) Is(err error) bool {
 	//nolint:nolintlint
-	if err == driver.ErrBadConn { //nolint:errorlint
+	if errors.Is(err, driver.ErrBadConn) {
 		return true
 	}
 

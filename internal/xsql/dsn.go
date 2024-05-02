@@ -33,12 +33,14 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 	if queryMode := info.Params.Get("go_query_mode"); queryMode != "" {
 		mode := QueryModeFromString(queryMode)
 		if mode == UnknownQueryMode {
+			//nolint:goerr113
 			return nil, nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
 		}
 		connectorOpts = append(connectorOpts, WithDefaultQueryMode(mode))
 	} else if queryMode := info.Params.Get("query_mode"); queryMode != "" {
 		mode := QueryModeFromString(queryMode)
 		if mode == UnknownQueryMode {
+			//nolint:goerr113
 			return nil, nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
 		}
 		connectorOpts = append(connectorOpts, WithDefaultQueryMode(mode))
@@ -47,6 +49,7 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 		for _, queryMode := range strings.Split(fakeTx, ",") {
 			mode := QueryModeFromString(queryMode)
 			if mode == UnknownQueryMode {
+				//nolint:goerr113
 				return nil, nil, xerrors.WithStackTrace(fmt.Errorf("unknown query mode: %s", queryMode))
 			}
 			connectorOpts = append(connectorOpts, WithFakeTx(mode))
@@ -71,6 +74,7 @@ func Parse(dataSourceName string) (opts []config.Option, connectorOpts []Connect
 					}
 					binders = append(binders, WithTablePathPrefix(prefix))
 				} else {
+					//nolint:goerr113
 					return nil, nil, xerrors.WithStackTrace(
 						fmt.Errorf("unknown query rewriter: %s", transformer),
 					)

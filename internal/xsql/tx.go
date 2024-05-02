@@ -30,7 +30,7 @@ func (c *conn) beginTx(ctx context.Context, txOptions driver.TxOptions) (current
 	if c.currentTx != nil {
 		return nil, badconn.Map(
 			xerrors.WithStackTrace(
-				fmt.Errorf("broken conn state: conn=%q already have current tx=%q",
+				fmt.Errorf("broken conn state: conn=%q already have current tx=%q", //nolint:goerr113
 					c.ID(), c.currentTx.ID(),
 				),
 			),
@@ -62,12 +62,12 @@ func (tx *tx) checkTxState() error {
 		return nil
 	}
 	if tx.conn.currentTx == nil {
-		return fmt.Errorf("broken conn state: tx=%q not related to conn=%q",
+		return fmt.Errorf("broken conn state: tx=%q not related to conn=%q", //nolint:goerr113
 			tx.ID(), tx.conn.ID(),
 		)
 	}
 
-	return fmt.Errorf("broken conn state: tx=%s not related to conn=%q (conn have current tx=%q)",
+	return fmt.Errorf("broken conn state: tx=%s not related to conn=%q (conn have current tx=%q)", //nolint:goerr113
 		tx.conn.currentTx.ID(), tx.conn.ID(), tx.ID(),
 	)
 }
@@ -137,7 +137,7 @@ func (tx *tx) QueryContext(ctx context.Context, query string, args []driver.Name
 		return nil, badconn.Map(
 			xerrors.WithStackTrace(
 				xerrors.Retryable(
-					fmt.Errorf("wrong query mode: %s", m.String()),
+					fmt.Errorf("wrong query mode: %s", m.String()), //nolint:goerr113
 					xerrors.InvalidObject(),
 					xerrors.WithName("WRONG_QUERY_MODE"),
 				),
@@ -179,7 +179,7 @@ func (tx *tx) ExecContext(ctx context.Context, query string, args []driver.Named
 		return nil, badconn.Map(
 			xerrors.WithStackTrace(
 				xerrors.Retryable(
-					fmt.Errorf("wrong query mode: %s", m.String()),
+					fmt.Errorf("wrong query mode: %s", m.String()), //nolint:goerr113
 					xerrors.InvalidObject(),
 					xerrors.WithName("WRONG_QUERY_MODE"),
 				),

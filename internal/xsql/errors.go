@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
+//nolint:goerr113
 var (
 	ErrUnsupported     = driver.ErrSkip
 	errDeprecated      = driver.ErrSkip
