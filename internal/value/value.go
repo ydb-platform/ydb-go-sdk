@@ -135,7 +135,7 @@ func primitiveValueFromYDB(t types.Primitive, v *Ydb.Value) (Value, error) {
 		case *Ydb.Value_BytesValue:
 			return YSONValue(vv.BytesValue), nil
 		default:
-			return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered YSON internal type: %T", vv))
+			return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered YSON internal type: %T", vv)) //nolint:goerr113
 		}
 
 	case types.JSON:
@@ -163,7 +163,7 @@ func primitiveValueFromYDB(t types.Primitive, v *Ydb.Value) (Value, error) {
 		return UUIDValue(BigEndianUint128(v.GetHigh_128(), v.GetLow_128())), nil
 
 	default:
-		return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered primitive type: %T", t))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered primitive type: %T", t)) //nolint:goerr113
 	}
 }
 
@@ -296,7 +296,7 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		}, nil
 
 	default:
-		return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered type: %T", ttt))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("uncovered type: %T", ttt)) //nolint:goerr113
 	}
 }
 
