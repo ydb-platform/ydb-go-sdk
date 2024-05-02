@@ -5,10 +5,12 @@ import (
 	"sync"
 )
 
-type CancelsGuard struct {
-	mu      sync.Mutex
-	cancels map[*context.CancelFunc]struct{}
-}
+type (
+	CancelsGuard struct {
+		mu      sync.Mutex
+		cancels map[*context.CancelFunc]struct{}
+	}
+)
 
 func NewCancelsGuard() *CancelsGuard {
 	return &CancelsGuard{
@@ -16,16 +18,18 @@ func NewCancelsGuard() *CancelsGuard {
 	}
 }
 
-func (g *CancelsGuard) Remember(cancel *context.CancelFunc) {
+func (g *CancelsGuard) WithCancel(ctx context.Context) (context.Context, context.CancelFunc) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	g.cancels[cancel] = struct{}{}
-}
+	ctx, cancel := WithCancel(ctx)
+	g.cancels[&cancel] = struct{}{}
 
-func (g *CancelsGuard) Forget(cancel *context.CancelFunc) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	delete(g.cancels, cancel)
+	return ctx, func() {
+		cancel()
+		g.mu.Lock()
+		defer g.mu.Unlock()
+		delete(g.cancels, &cancel)
+	}
 }
 
 func (g *CancelsGuard) Cancel() {
