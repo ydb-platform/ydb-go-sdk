@@ -19,6 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+//nolint:goerr113
 var (
 	errTxAlreadyCommitted = xerrors.Wrap(fmt.Errorf("transaction already committed"))
 	errTxRollbackedEarly  = xerrors.Wrap(fmt.Errorf("transaction rollbacked early"))

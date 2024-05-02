@@ -26,7 +26,7 @@ type intIncScanner int64
 func (s *intIncScanner) Scan(src interface{}) error {
 	v, ok := src.(int64)
 	if !ok {
-		return fmt.Errorf("wrong type: %T, exp: int64", src)
+		return fmt.Errorf("wrong type: %T, exp: int64", src) //nolint:goerr113
 	}
 	*s = intIncScanner(v + 10)
 
@@ -38,7 +38,7 @@ type dateScanner time.Time
 func (s *dateScanner) Scan(src interface{}) error {
 	v, ok := src.(time.Time)
 	if !ok {
-		return fmt.Errorf("wrong type: %T, exp: time.Time", src)
+		return fmt.Errorf("wrong type: %T, exp: time.Time", src) //nolint:goerr113
 	}
 	*s = dateScanner(v)
 

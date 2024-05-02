@@ -2,6 +2,7 @@ package table
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"testing"
@@ -18,6 +19,15 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
+)
+
+var (
+	errWhoa              = errors.New("whoa")
+	errTest              = errors.New("test error")
+	errCustom            = errors.New("custom error")
+	errNoSession         = xerrors.Wrap(fmt.Errorf("no session"))         //nolint:goerr113
+	errUnexpectedSession = xerrors.Wrap(fmt.Errorf("unexpected session")) //nolint:goerr113
+	errSessionOverflow   = xerrors.Wrap(fmt.Errorf("session overflow"))   //nolint:goerr113
 )
 
 func TestRetryerBackoffRetryCancelation(t *testing.T) {
@@ -197,7 +207,7 @@ func TestRetryerImmediateReturn(t *testing.T) {
 		fmt.Errorf("wrap transport error: %w", xerrors.Transport(
 			grpcStatus.Error(grpcCodes.PermissionDenied, ""),
 		)),
-		fmt.Errorf("whoa"),
+		errWhoa,
 	} {
 		t.Run("", func(t *testing.T) {
 			defer func() {
@@ -258,7 +268,7 @@ func TestRetryContextDeadline(t *testing.T) {
 	errs := []error{
 		io.EOF,
 		context.DeadlineExceeded,
-		fmt.Errorf("test error"),
+		errTest,
 		xerrors.Transport(
 			grpcStatus.Error(grpcCodes.Canceled, ""),
 		),
@@ -390,7 +400,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 		{
 			error: &CustomError{
 				Err: retry.RetryableError(
-					fmt.Errorf("custom error"),
+					errCustom,
 					retry.WithDeleteSession(),
 				),
 			},
@@ -538,9 +548,3 @@ func (s *singleSession) Put(_ context.Context, x *session) error {
 
 	return nil
 }
-
-var (
-	errNoSession         = xerrors.Wrap(fmt.Errorf("no session"))
-	errUnexpectedSession = xerrors.Wrap(fmt.Errorf("unexpected session"))
-	errSessionOverflow   = xerrors.Wrap(fmt.Errorf("session overflow"))
-)

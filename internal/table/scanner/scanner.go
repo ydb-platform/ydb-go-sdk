@@ -1167,7 +1167,7 @@ func (s *valueScanner) errorf(depth int, f string, args ...interface{}) error {
 	if s.err != nil {
 		return s.err
 	}
-	s.err = xerrors.WithStackTrace(fmt.Errorf(f, args...), xerrors.WithSkipDepth(depth+1))
+	s.err = xerrors.WithStackTrace(fmt.Errorf(f, args...), xerrors.WithSkipDepth(depth+1)) //nolint:goerr113
 
 	return s.err
 }
