@@ -16,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+//nolint:goerr113
 var errSingleStreamWriterDoubleClose = xerrors.Wrap(errors.New("ydb: single stream writer impl double closed"))
 
 type SingleStreamWriterConfig struct {
@@ -135,7 +136,7 @@ func (w *SingleStreamWriter) initStream() (err error) {
 	result, ok := recvMessage.(*rawtopicwriter.InitResult)
 	if !ok {
 		return xerrors.WithStackTrace(
-			fmt.Errorf("ydb: failed init response message type: %v", reflect.TypeOf(recvMessage)),
+			fmt.Errorf("ydb: failed init response message type: %v", reflect.TypeOf(recvMessage)), //nolint:goerr113
 		)
 	}
 
@@ -203,10 +204,10 @@ func (w *SingleStreamWriter) receiveMessagesLoop(ctx context.Context) {
 				w.cfg.tracer,
 				w.cfg.reconnectorInstanceID,
 				w.SessionID,
-				xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
-					"ydb: unexpected message type in stream reader: %v",
-					reflect.TypeOf(m),
-				))),
+				xerrors.WithStackTrace(xerrors.Wrap(
+					fmt.Errorf("ydb: unexpected message type in stream reader: %v", //nolint:goerr113
+						reflect.TypeOf(m),
+					))),
 			)
 		}
 	}

@@ -15,6 +15,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
+var errSecondClose = errors.New("second close")
+
 func TestBatcher_PushBatch(t *testing.T) {
 	session1 := &partitionSession{}
 	session2 := &partitionSession{}
@@ -223,7 +225,6 @@ func TestBatcher_Pop(t *testing.T) {
 
 	xtest.TestManyTimesWithName(t, "CloseBatcherWhilePopWait", func(t testing.TB) {
 		ctx := xtest.Context(t)
-		testErr := errors.New("test")
 
 		b := newBatcher()
 		b.notifyAboutNewMessages()
@@ -236,7 +237,7 @@ func TestBatcher_Pop(t *testing.T) {
 			close(popGoroutineStarted)
 
 			_, popErr := b.Pop(ctx, batcherGetOptions{MinCount: 1})
-			require.ErrorIs(t, popErr, testErr)
+			require.ErrorIs(t, popErr, errTest)
 			close(popFinished)
 		}()
 
@@ -247,8 +248,8 @@ func TestBatcher_Pop(t *testing.T) {
 			return len(b.hasNewMessages) == 0
 		})
 
-		require.NoError(t, b.Close(testErr))
-		require.Error(t, b.Close(errors.New("second close")))
+		require.NoError(t, b.Close(errTest))
+		require.Error(t, b.Close(errSecondClose))
 
 		xtest.WaitChannelClosed(t, popFinished)
 	})

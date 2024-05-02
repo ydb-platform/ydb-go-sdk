@@ -25,7 +25,15 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
-var testCommonEncoders = NewEncoderMap()
+var (
+	testCommonEncoders   = NewEncoderMap()
+	errTestStreamClosed  = errors.New("test stream closed")
+	errRetriableOnStrm2  = errors.New("retriable on strm2")
+	errStrm3             = errors.New("strm3")
+	errTest1             = errors.New("test-1")
+	errStopWriterTestEnv = errors.New("stop writer test environment")
+	errStopTestEnv       = errors.New("test: stop test environment")
+)
 
 func TestWriterImpl_AutoSeq(t *testing.T) {
 	t.Run("OK", func(t *testing.T) {
@@ -399,7 +407,6 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		w := newTestWriterStopped()
 
 		ctx := xtest.Context(t)
-		testErr := errors.New("test")
 
 		connectCalled := false
 		connectCalledChan := make(empty.Chan)
@@ -414,13 +421,13 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 
 		initRequest := testCreateInitRequest(w)
 		strm.EXPECT().Send(&initRequest)
-		strm.EXPECT().Recv().Return(nil, testErr)
+		strm.EXPECT().Recv().Return(nil, errTest)
 		strm.EXPECT().CloseSend()
 
 		w.connectionLoop(ctx)
 
 		require.True(t, connectCalled)
-		require.ErrorIs(t, w.background.CloseReason(), testErr)
+		require.ErrorIs(t, w.background.CloseReason(), errTest)
 	})
 
 	xtest.TestManyTimesWithName(t, "ReconnectOnErrors", func(t testing.TB) {
@@ -467,7 +474,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 				t.Logf("waiting close channel: %v", name)
 				xtest.WaitChannelClosed(t, streamClosed)
 				t.Logf("channel closed: %v", name)
-			}).Return(nil, errors.New("test stream closed")).MaxTimes(1)
+			}).Return(nil, errTestStreamClosed).MaxTimes(1)
 
 			return strm
 		}
@@ -480,7 +487,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			Codec: rawtopiccommon.CodecRaw,
 		}).Do(func(_ *rawtopicwriter.WriteRequest) {
 			t.Logf("strm2 sent message and return retriable error")
-		}).Return(xerrors.Retryable(errors.New("retriable on strm2")))
+		}).Return(xerrors.Retryable(errRetriableOnStrm2))
 
 		strm3 := newStream("strm3")
 		strm3.EXPECT().Send(&rawtopicwriter.WriteRequest{
@@ -490,13 +497,13 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			Codec: rawtopiccommon.CodecRaw,
 		}).Do(func(_ *rawtopicwriter.WriteRequest) {
 			t.Logf("strm3 sent message and return unretriable error")
-		}).Return(errors.New("strm3"))
+		}).Return(errStrm3)
 
 		connectsResult := []connectionAttemptContext{
 			{
 				name:            "step-1 connection error",
 				stream:          nil,
-				connectionError: xerrors.Retryable(errors.New("test-1")),
+				connectionError: xerrors.Retryable(errTest1),
 			},
 			{
 				name:   "step-2 connect and return retryable error on write",
@@ -773,7 +780,7 @@ func TestCalculateAllowedCodecs(t *testing.T) {
 	customCodecUnsupported := rawtopiccommon.Codec(rawtopiccommon.CodecCustomerFirst + 1)
 	encoders := NewEncoderMap()
 	encoders.AddEncoder(customCodecSupported, func(writer io.Writer) (io.WriteCloser, error) {
-		return nil, errors.New("test")
+		return nil, errTest
 	})
 
 	table := []struct {
@@ -996,7 +1003,7 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 	require.NoError(t, res.writer.waitFirstInitResponse(res.ctx))
 
 	t.Cleanup(func() {
-		_ = res.writer.close(context.Background(), errors.New("stop writer test environment"))
+		_ = res.writer.close(context.Background(), errStopWriterTestEnv)
 		close(res.stopReadEvents)
 		<-streamClosed
 	})
@@ -1015,7 +1022,7 @@ func (e *testEnv) sendFromServer(msg rawtopicwriter.ServerMessage) {
 func (e *testEnv) receiveMessageHandler() (rawtopicwriter.ServerMessage, error) {
 	select {
 	case <-e.stopReadEvents:
-		return nil, fmt.Errorf("test: stop test environment")
+		return nil, errStopTestEnv
 	case res := <-e.sendFromServerChannel:
 		return res.msg, res.err
 	}

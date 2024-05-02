@@ -16,6 +16,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+//nolint:goerr113
 var (
 	ErrCommitDisabled             = xerrors.Wrap(errors.New("ydb: commits disabled"))
 	ErrWrongCommitOrderInSyncMode = xerrors.Wrap(errors.New("ydb: wrong commit order in sync mode"))

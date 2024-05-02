@@ -17,6 +17,11 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 )
 
+var (
+	errTest   = errors.New("test")
+	errSecond = errors.New("second")
+)
+
 func TestMessageQueue_AddMessages(t *testing.T) {
 	t.Run("Empty", func(t *testing.T) {
 		q := newMessageQueue()
@@ -38,7 +43,7 @@ func TestMessageQueue_AddMessages(t *testing.T) {
 	})
 	t.Run("Closed", func(t *testing.T) {
 		q := newMessageQueue()
-		_ = q.Close(errors.New("err"))
+		_ = q.Close(errTest)
 		require.Error(t, q.AddMessages(newTestMessagesWithContent(1, 3, 5)))
 	})
 	t.Run("OverflowIndex", func(t *testing.T) {
@@ -78,10 +83,9 @@ func TestMessageQueue_CheckMessages(t *testing.T) {
 
 func TestMessageQueue_Close(t *testing.T) {
 	q := newMessageQueue()
-	testErr := errors.New("test")
-	require.NoError(t, q.Close(testErr))
-	require.Error(t, q.Close(errors.New("second")))
-	require.Equal(t, testErr, q.closedErr)
+	require.NoError(t, q.Close(errTest))
+	require.Error(t, q.Close(errSecond))
+	require.Equal(t, errTest, q.closedErr)
 	require.True(t, q.closed)
 	<-q.closedChan
 }
@@ -207,7 +211,7 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 
 	t.Run("CallOnClosedQueue", func(t *testing.T) {
 		q := newMessageQueue()
-		_ = q.Close(errors.New("test"))
+		_ = q.Close(errTest)
 		_, err := q.GetMessagesForSend(ctx)
 		require.Error(t, err)
 	})
@@ -225,11 +229,10 @@ func TestMessageQueue_GetMessages(t *testing.T) {
 
 		waitGetMessageStarted(&q)
 
-		testErr := errors.New("test")
-		require.NoError(t, q.Close(testErr))
+		require.NoError(t, q.Close(errTest))
 
 		<-gotErr
-		require.ErrorIs(t, err, testErr)
+		require.ErrorIs(t, err, errTest)
 	})
 }
 
@@ -417,7 +420,7 @@ func TestRegressionIssue1038_ReceiveAckAfterCloseQueue(t *testing.T) {
 	require.NoError(t, q.AddMessages(newTestMessagesWithContent(1)))
 	counter++
 
-	require.NoError(t, q.Close(errors.New("test err")))
+	require.NoError(t, q.Close(errTest))
 	require.ErrorIs(t, q.AcksReceived([]rawtopicwriter.WriteAck{
 		{
 			SeqNo:              1,

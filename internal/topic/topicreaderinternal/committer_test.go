@@ -17,6 +17,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+var errTestCommitterClosed = errors.New("test committer closed")
+
 func TestCommitterCommit(t *testing.T) {
 	t.Run("CommitWithCancelledContext", func(t *testing.T) {
 		ctx := xtest.Context(t)
@@ -381,7 +383,7 @@ func newTestCommitter(ctx context.Context, t testing.TB) *committer {
 		return nil
 	})
 	t.Cleanup(func() {
-		if err := res.Close(ctx, errors.New("test comitter closed")); err != nil {
+		if err := res.Close(ctx, errTestCommitterClosed); err != nil {
 			require.ErrorIs(t, err, background.ErrAlreadyClosed)
 		}
 	})

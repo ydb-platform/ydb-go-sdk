@@ -12,7 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var errNoRawContent = xerrors.Wrap(errors.New("ydb: internal state error - no raw message content"))
+var errNoRawContent = xerrors.Wrap(errors.New("ydb: internal state error - no raw message content")) //nolint:lll,goerr113
 
 type PublicMessage struct {
 	SeqNo     int64

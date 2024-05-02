@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
+//nolint:goerr113
 var errBatcherPopConcurency = xerrors.Wrap(errors.New("ydb: batch pop concurency, internal state error"))
 
 type batcher struct {

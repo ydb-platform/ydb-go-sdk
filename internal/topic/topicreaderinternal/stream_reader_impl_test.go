@@ -23,6 +23,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+var (
+	errTestFinished     = errors.New("test finished")
+	errTestReaderClosed = errors.New("test reader closed")
+	errMockReaderClosed = errors.New("mock reader closed")
+)
+
 func TestTopicStreamReaderImpl_BufferCounterOnStopPartition(t *testing.T) {
 	table := []struct {
 		name     string
@@ -1039,7 +1045,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 		defer cancel()
 
 		close(env.stopReadEvents)
-		_ = env.reader.CloseWithError(ctx, errors.New("test finished"))
+		_ = env.reader.CloseWithError(ctx, errTestFinished)
 		require.NoError(t, cleanupTimeout.Err())
 		xtest.WaitChannelClosed(t, streamClosed)
 	})
@@ -1067,7 +1073,7 @@ func (e *streamEnv) readerReceiveWaitClose(callback func()) {
 			callback()
 		}
 		<-e.ctx.Done()
-	}).Return(nil, errors.New("test reader closed"))
+	}).Return(nil, errTestReaderClosed)
 }
 
 func (e *streamEnv) SendFromServer(msg rawtopicreader.ServerMessage) {
@@ -1106,7 +1112,7 @@ readMessages:
 		case <-e.ctx.Done():
 			return nil, e.ctx.Err()
 		case <-e.stopReadEvents:
-			return nil, xerrors.Wrap(errors.New("mock reader closed"))
+			return nil, xerrors.Wrap(errMockReaderClosed)
 		case res := <-e.messagesFromServerToClient:
 			if res.waitOnly {
 				continue readMessages

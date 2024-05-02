@@ -10,8 +10,10 @@ import (
 )
 
 var (
-	errBadSessionWhileMessageBatchCreate       = xerrors.Wrap(errors.New("ydb: bad session while messages batch create"))        //nolint:lll
-	errBadMessageOffsetWhileMessageBatchCreate = xerrors.Wrap(errors.New("ydb: bad message offset while messages batch create")) //nolint:lll
+	errBadSessionWhileMessageBatchCreate       = xerrors.Wrap(errors.New("ydb: bad session while messages batch create"))        //nolint:lll,goerr113
+	errBadMessageOffsetWhileMessageBatchCreate = xerrors.Wrap(errors.New("ydb: bad message offset while messages batch create")) //nolint:lll,goerr113
+	errBadPartitionSessionForMerge             = xerrors.Wrap(errors.New("ydb: bad partition session for merge"))                //nolint:lll,goerr113
+	errBadOffsetIntervalForMerge               = xerrors.Wrap(errors.New("ydb: bad offset interval for merge"))                  //nolint:lll,goerr113
 )
 
 // PublicBatch is ordered group of message from one partition
@@ -134,11 +136,11 @@ func (m *PublicBatch) append(b *PublicBatch) (*PublicBatch, error) {
 	}
 
 	if res.commitRange.partitionSession != b.commitRange.partitionSession {
-		return nil, xerrors.WithStackTrace(errors.New("ydb: bad partition session for merge"))
+		return nil, xerrors.WithStackTrace(errBadPartitionSessionForMerge)
 	}
 
 	if res.commitRange.commitOffsetEnd != b.commitRange.commitOffsetStart {
-		return nil, xerrors.WithStackTrace(errors.New("ydb: bad offset interval for merge"))
+		return nil, xerrors.WithStackTrace(errBadOffsetIntervalForMerge)
 	}
 
 	res.Messages = append(res.Messages, b.Messages...)

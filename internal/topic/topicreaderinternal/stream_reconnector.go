@@ -21,6 +21,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+//nolint:goerr113
 var (
 	errReconnectRequestOutdated = xerrors.Wrap(errors.New("ydb: reconnect request outdated"))
 	errReconnect                = xerrors.Wrap(errors.New("ydb: reconnect to topic grpc stream"))
@@ -413,7 +414,7 @@ func (r *readerReconnector) handlePanic() {
 	p := recover()
 
 	if p != nil {
-		_ = r.CloseWithError(context.Background(), xerrors.WithStackTrace(fmt.Errorf("handled panic: %v", p)))
+		_ = r.CloseWithError(context.Background(), xerrors.WithStackTrace(fmt.Errorf("handled panic: %v", p))) //nolint:lll,goerr113
 	}
 }
 

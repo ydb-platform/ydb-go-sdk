@@ -2,7 +2,6 @@ package topicreaderinternal
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"testing"
 	"testing/iotest"
@@ -47,11 +46,10 @@ func TestOneTimeReader(t *testing.T) {
 		require.NoError(t, r.err)
 	})
 	t.Run("ReadAfterError", func(t *testing.T) {
-		testErr := errors.New("err")
-		r := &oneTimeReader{err: testErr}
+		r := &oneTimeReader{err: errTest}
 		dstBuf := make([]byte, 2)
 		n, err := r.Read(dstBuf)
-		require.Equal(t, testErr, err)
+		require.Equal(t, errTest, err)
 		require.Equal(t, 0, n)
 	})
 	t.Run("InnerErr", func(t *testing.T) {

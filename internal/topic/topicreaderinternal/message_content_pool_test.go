@@ -2,7 +2,6 @@ package topicreaderinternal
 
 import (
 	"bytes"
-	"errors"
 	"io"
 	"testing"
 
@@ -132,22 +131,20 @@ func TestCallbackOnReaderContent(t *testing.T) {
 		require.True(t, called)
 	})
 	t.Run("ReturnErrorFromReader", func(t *testing.T) {
-		testErr := errors.New("test")
-		err := callbackOnReaderContent(globalReadMessagePool, ErrReader(testErr), 0, nil)
-		require.ErrorIs(t, err, testErr)
+		err := callbackOnReaderContent(globalReadMessagePool, ErrReader(errTest), 0, nil)
+		require.ErrorIs(t, err, errTest)
 		require.False(t, xerrors.IsYdb(err))
 	})
 	t.Run("ReturnErrorFromUnmarshal", func(t *testing.T) {
-		testErr := errors.New("test")
 		err := callbackOnReaderContent(
 			globalReadMessagePool,
 			ErrReader(io.EOF),
 			0,
 			testFuncConsumer(func(data []byte) error {
-				return testErr
+				return errTest
 			}),
 		)
-		require.ErrorIs(t, err, testErr)
+		require.ErrorIs(t, err, errTest)
 		require.False(t, xerrors.IsYdb(err))
 	})
 }
