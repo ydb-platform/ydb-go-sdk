@@ -20,8 +20,8 @@ import (
 )
 
 var (
-	errUnknownAcquireType = xerrors.Wrap(errors.New("unknown acquire type"))
-	errNilClient          = xerrors.Wrap(errors.New("ratelimiter client is not initialized"))
+	errUnknownAcquireType = xerrors.Wrap(errors.New("unknown acquire type"))                  //nolint:goerr113
+	errNilClient          = xerrors.Wrap(errors.New("ratelimiter client is not initialized")) //nolint:goerr113
 )
 
 type Client struct {
