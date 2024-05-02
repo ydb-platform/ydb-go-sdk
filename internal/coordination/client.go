@@ -24,6 +24,7 @@ import (
 
 //go:generate mockgen -destination grpc_client_mock_test.go -package coordination -write_package_comment=false github.com/ydb-platform/ydb-go-genproto/Ydb_Coordination_V1 CoordinationServiceClient,CoordinationService_SessionClient
 
+//nolint:goerr113
 var errNilClient = xerrors.Wrap(errors.New("coordination client is not initialized"))
 
 type Client struct {
