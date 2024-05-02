@@ -1,5 +1,5 @@
 * Refactored internal packages by `ifshort` linter issues
-
+ 
 ## v3.66.1
 * Added flush messages from buffer before close topic writer
 * Added Flush method for topic writer
