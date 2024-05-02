@@ -10,7 +10,7 @@ import (
 	"time"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
@@ -49,7 +49,7 @@ func main() {
 
 	go fillTable(ctx, db.Table(), prefix, tableName)
 	go func() {
-		time.Sleep(interval / 2)
+		time.Sleep(interval / 2) //nolint:gomnd
 		removeFromTable(ctx, db.Table(), prefix, tableName)
 	}()
 

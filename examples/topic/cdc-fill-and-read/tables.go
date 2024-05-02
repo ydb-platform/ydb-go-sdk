@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
@@ -86,7 +86,7 @@ VALUES
 `, prefix, tableName)
 	for {
 		id := uint64(rand.Intn(maxID))              //nolint:gosec
-		val := "val-" + strconv.Itoa(rand.Intn(10)) //nolint:gosec
+		val := "val-" + strconv.Itoa(rand.Intn(10)) //nolint:gosec,gomnd
 		params := table.NewQueryParameters(
 			table.ValueParam("$id", types.Uint64Value(id)),
 			table.ValueParam("$value", types.UTF8Value(val)),

@@ -8,7 +8,7 @@ import (
 	"path"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 )
 
@@ -52,6 +52,7 @@ func init() { //nolint:gochecknoinits
 	}
 }
 
+//nolint:gomnd
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

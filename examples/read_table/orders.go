@@ -85,6 +85,7 @@ type templateConfig struct {
 	TablePathPrefix string
 }
 
+//nolint:gomnd
 func fillTable(ctx context.Context, c table.Client, prefix string) (err error) {
 	return c.Do(ctx,
 		func(ctx context.Context, s table.Session) (err error) {
@@ -151,7 +152,7 @@ func readTable(ctx context.Context, c table.Client, path string, opts ...options
 			r := row{}
 			for res.NextResultSet(ctx) {
 				for res.NextRow() {
-					if res.CurrentResultSet().ColumnCount() == 4 {
+					if res.CurrentResultSet().ColumnCount() == 4 { //nolint:gomnd
 						err = res.ScanNamed(
 							named.OptionalWithDefault("customer_id", &r.id),
 							named.OptionalWithDefault("order_id", &r.orderID),

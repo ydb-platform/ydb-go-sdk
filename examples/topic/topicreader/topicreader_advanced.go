@@ -10,6 +10,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicreader"
 )
 
+var errBadDataLen = errors.New("bad data len")
+
 // ReadMessagesWithCustomBatching example of custom of readed message batch
 func ReadMessagesWithCustomBatching(ctx context.Context, db *ydb.Driver) {
 	reader, _ := db.Topic().StartReader("consumer", nil)
@@ -30,8 +32,9 @@ type MyMessage struct {
 
 // UnmarshalYDBTopicMessage implements topicreader.MessageContentUnmarshaler interface
 func (m *MyMessage) UnmarshalYDBTopicMessage(data []byte) error {
+	//nolint:gomnd
 	if len(data) != 6 {
-		return errors.New("bad data len")
+		return errBadDataLen
 	}
 	m.ID = data[0]
 	m.ChangeType = data[1]
