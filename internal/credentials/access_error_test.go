@@ -14,7 +14,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var _ Credentials = customCredentials{}
+var (
+	_ Credentials = customCredentials{}
+
+	errTest = errors.New("test")
+	errSome = errors.New("some error")
+)
 
 type customCredentials struct {
 	token string
@@ -32,7 +37,7 @@ func TestAccessError(t *testing.T) {
 		{
 			err: AccessError(
 				"something went wrong",
-				errors.New("test"),
+				errTest,
 				WithEndpoint("grps://localhost:2135"),
 				WithDatabase("/local"),
 				WithCredentials(NewAnonymousCredentials(WithSourceInfo(""))),
@@ -47,7 +52,7 @@ func TestAccessError(t *testing.T) {
 		{
 			err: AccessError(
 				"something went wrong",
-				errors.New("test"),
+				errTest,
 				WithEndpoint("grps://localhost:2135"),
 				WithDatabase("/local"),
 				WithCredentials(NewAnonymousCredentials(WithSourceInfo(t.Name()))),
@@ -62,7 +67,7 @@ func TestAccessError(t *testing.T) {
 		{
 			err: AccessError(
 				"something went wrong",
-				errors.New("test"),
+				errTest,
 				WithEndpoint("grps://localhost:2135"),
 				WithDatabase("/local"),
 				WithCredentials(NewAccessTokenCredentials("SECRET_TOKEN", WithSourceInfo(""))),
@@ -77,7 +82,7 @@ func TestAccessError(t *testing.T) {
 		{
 			err: AccessError(
 				"something went wrong",
-				errors.New("test"),
+				errTest,
 				WithEndpoint("grps://localhost:2135"),
 				WithDatabase("/local"),
 				WithCredentials(NewAccessTokenCredentials("SECRET_TOKEN", WithSourceInfo(t.Name()))),
@@ -92,7 +97,7 @@ func TestAccessError(t *testing.T) {
 		{
 			err: AccessError(
 				"something went wrong",
-				errors.New("test"),
+				errTest,
 				WithEndpoint("grps://localhost:2135"),
 				WithDatabase("/local"),
 				WithCredentials(
@@ -111,7 +116,7 @@ func TestAccessError(t *testing.T) {
 		{
 			err: AccessError(
 				"something went wrong",
-				errors.New("test"),
+				errTest,
 				WithEndpoint("grps://localhost:2135"),
 				WithDatabase("/local"),
 				WithCredentials(
@@ -130,7 +135,7 @@ func TestAccessError(t *testing.T) {
 		{
 			err: AccessError(
 				"something went wrong",
-				errors.New("test"),
+				errTest,
 				WithEndpoint("grps://localhost:2135"),
 				WithDatabase("/local"),
 				WithCredentials(customCredentials{token: "SECRET_TOKEN"}),
@@ -145,7 +150,7 @@ func TestAccessError(t *testing.T) {
 		{
 			err: AccessError(
 				"something went wrong",
-				errors.New("test"),
+				errTest,
 				WithEndpoint("grps://localhost:2135"),
 				WithDatabase("/local"),
 				WithCredentials(NewAnonymousCredentials(WithSourceInfo(""))),
@@ -194,7 +199,7 @@ func TestIsAccessError(t *testing.T) {
 			is:    true,
 		},
 		{
-			error: errors.New("some error"),
+			error: errSome,
 			is:    false,
 		},
 	} {

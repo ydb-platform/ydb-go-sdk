@@ -103,7 +103,7 @@ func AccessError(msg string, err error, opts ...authErrorOption) error {
 	}
 	buffer.WriteString("): %w")
 
-	return xerrors.WithStackTrace(fmt.Errorf(buffer.String(), err), xerrors.WithSkipDepth(1))
+	return xerrors.WithStackTrace(fmt.Errorf(buffer.String(), err), xerrors.WithSkipDepth(1)) //nolint:goerr113
 }
 
 func IsAccessError(err error) bool {
