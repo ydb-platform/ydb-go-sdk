@@ -29,7 +29,7 @@ import (
 //nolint:gofumpt
 //nolint:nolintlint
 var (
-	errNilClient = xerrors.Wrap(errors.New("scripting client is not initialized"))
+	errNilClient = xerrors.Wrap(errors.New("scripting client is not initialized")) //nolint:goerr113
 )
 
 type (
