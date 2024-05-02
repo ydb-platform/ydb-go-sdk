@@ -216,7 +216,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
 		) func(
 			trace.DriverConnNewStreamDoneInfo,
 		) {
-			if d.Details()&trace.DriverConnEvents == 0 {
+			if d.Details()&trace.DriverConnStreamEvents == 0 {
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "stream", "New")
@@ -249,7 +249,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
 		OnConnStreamCloseSend: func(info trace.DriverConnStreamCloseSendStartInfo) func(
 			trace.DriverConnStreamCloseSendDoneInfo,
 		) {
-			if d.Details()&trace.DriverConnEvents == 0 {
+			if d.Details()&trace.DriverConnStreamEvents == 0 {
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "stream", "CloseSend")
@@ -271,7 +271,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
 			}
 		},
 		OnConnStreamSendMsg: func(info trace.DriverConnStreamSendMsgStartInfo) func(trace.DriverConnStreamSendMsgDoneInfo) {
-			if d.Details()&trace.DriverConnEvents == 0 {
+			if d.Details()&trace.DriverConnStreamEvents == 0 {
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "stream", "SendMsg")
@@ -293,7 +293,7 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
 			}
 		},
 		OnConnStreamRecvMsg: func(info trace.DriverConnStreamRecvMsgStartInfo) func(trace.DriverConnStreamRecvMsgDoneInfo) {
-			if d.Details()&trace.DriverConnEvents == 0 {
+			if d.Details()&trace.DriverConnStreamEvents == 0 {
 				return nil
 			}
 			ctx := with(*info.Context, TRACE, "ydb", "driver", "conn", "stream", "RecvMsg")
