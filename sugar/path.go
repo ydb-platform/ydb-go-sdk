@@ -50,6 +50,7 @@ type dbFoRemoveRecursive interface {
 // where `~` - is a root of database
 func MakeRecursive(ctx context.Context, db dbForMakeRecursive, pathToCreate string) error {
 	if strings.HasPrefix(pathToCreate, sysDirectory+"/") {
+		//nolint:goerr113
 		return xerrors.WithStackTrace(
 			fmt.Errorf("making directory %q inside system path %q not supported", pathToCreate, sysDirectory),
 		)
@@ -77,6 +78,7 @@ func MakeRecursive(ctx context.Context, db dbForMakeRecursive, pathToCreate stri
 		scheme.EntryDirectory:
 		return nil
 	default:
+		//nolint:goerr113
 		return xerrors.WithStackTrace(
 			fmt.Errorf("entry %q exists but it is not a directory: %s", absPath, info.Type),
 		)
@@ -151,6 +153,7 @@ func RemoveRecursive(ctx context.Context, db dbFoRemoveRecursive, pathToRemove s
 				}
 
 			default:
+				//nolint:goerr113
 				return xerrors.WithStackTrace(
 					fmt.Errorf("unknown entry type: %s", t.String()),
 				)
