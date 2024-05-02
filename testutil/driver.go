@@ -2,6 +2,7 @@ package testutil
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -16,7 +17,13 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var ErrNotImplemented = xerrors.Wrap(fmt.Errorf("testutil: not implemented"))
+//nolint:goerr113
+var (
+	ErrNotImplemented = xerrors.Wrap(errors.New("testutil: not implemented"))
+
+	errOnInvokeNotDefined    = errors.New("database.onInvoke() not defined")
+	errOnNewStreamNotDefined = errors.New("database.onNewStream() not defined")
+)
 
 type MethodCode uint
 
@@ -150,7 +157,7 @@ func (b *balancerStub) Invoke(
 	opts ...grpc.CallOption,
 ) (err error) {
 	if b.onInvoke == nil {
-		return fmt.Errorf("database.onInvoke() not defined")
+		return errOnInvokeNotDefined
 	}
 
 	return b.onInvoke(ctx, method, args, reply, opts...)
@@ -163,7 +170,7 @@ func (b *balancerStub) NewStream(
 	opts ...grpc.CallOption,
 ) (_ grpc.ClientStream, err error) {
 	if b.onNewStream == nil {
-		return nil, fmt.Errorf("database.onNewStream() not defined")
+		return nil, errOnNewStreamNotDefined
 	}
 
 	return b.onNewStream(ctx, desc, method, opts...)
@@ -224,7 +231,7 @@ func WithInvokeHandlers(invokeHandlers InvokeHandlers) balancerOption {
 				return nil
 			}
 
-			return fmt.Errorf("method '%s' not implemented", method)
+			return fmt.Errorf("method '%s' not implemented", method) //nolint:goerr113
 		}
 	}
 }
@@ -241,7 +248,7 @@ func WithNewStreamHandlers(newStreamHandlers NewStreamHandlers) balancerOption {
 				return handler(desc)
 			}
 
-			return nil, fmt.Errorf("method '%s' not implemented", method)
+			return nil, fmt.Errorf("method '%s' not implemented", method) //nolint:goerr113
 		}
 	}
 }
@@ -293,6 +300,7 @@ func (c *clientConn) Invoke(
 	opts ...grpc.CallOption,
 ) error {
 	if c.onInvoke == nil {
+		//nolint:goerr113
 		return fmt.Errorf("onInvoke not implemented (method: %s, request: %v, response: %v)", method, args, reply)
 	}
 
@@ -306,6 +314,7 @@ func (c *clientConn) NewStream(
 	opts ...grpc.CallOption,
 ) (grpc.ClientStream, error) {
 	if c.onNewStream == nil {
+		//nolint:goerr113
 		return nil, fmt.Errorf("onNewStream not implemented (method: %s, desc: %v)", method, desc)
 	}
 
