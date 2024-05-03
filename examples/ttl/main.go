@@ -52,7 +52,6 @@ func init() { //nolint:gochecknoinits
 	}
 }
 
-//nolint:gomnd
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

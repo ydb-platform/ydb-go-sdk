@@ -49,11 +49,11 @@ func init() {
 		"semaphore prefix",
 	)
 	flagSet.IntVar(&taskCount,
-		"tasks", 10, //nolint:gomnd
+		"tasks", 10,
 		"the number of tasks",
 	)
 	flagSet.IntVar(&capacity,
-		"capacity", 4, //nolint:gomnd
+		"capacity", 4,
 		"the maximum number of tasks a worker can run",
 	)
 	if err := flagSet.Parse(os.Args[1:]); err != nil {
@@ -88,8 +88,8 @@ func main() {
 
 	err = db.Coordination().CreateNode(ctx, path, coordination.NodeConfig{
 		Path:                     "",
-		SelfCheckPeriodMillis:    1000, //nolint:gomnd
-		SessionGracePeriodMillis: 1000, //nolint:gomnd
+		SelfCheckPeriodMillis:    1000,
+		SessionGracePeriodMillis: 1000,
 		ReadConsistencyMode:      coordination.ConsistencyModeStrict,
 		AttachConsistencyMode:    coordination.ConsistencyModeStrict,
 		RatelimiterCountersMode:  coordination.RatelimiterCountersModeDetailed,

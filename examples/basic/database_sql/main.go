@@ -13,7 +13,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 )
 
-//nolint:gomnd
 func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

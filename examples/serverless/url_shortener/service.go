@@ -83,7 +83,6 @@ type service struct {
 
 var once sync.Once
 
-//nolint:gomnd
 func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service, err error) {
 	once.Do(func() {
 		var (

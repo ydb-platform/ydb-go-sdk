@@ -86,7 +86,7 @@ VALUES
 `, prefix, tableName)
 	for {
 		id := uint64(rand.Intn(maxID))              //nolint:gosec
-		val := "val-" + strconv.Itoa(rand.Intn(10)) //nolint:gosec,gomnd
+		val := "val-" + strconv.Itoa(rand.Intn(10)) //nolint:gosec
 		params := table.NewQueryParameters(
 			table.ValueParam("$id", types.Uint64Value(id)),
 			table.ValueParam("$value", types.UTF8Value(val)),

@@ -49,7 +49,7 @@ func main() {
 
 	go fillTable(ctx, db.Table(), prefix, tableName)
 	go func() {
-		time.Sleep(interval / 2) //nolint:gomnd
+		time.Sleep(interval / 2)
 		removeFromTable(ctx, db.Table(), prefix, tableName)
 	}()
 

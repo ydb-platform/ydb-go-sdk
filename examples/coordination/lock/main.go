@@ -76,8 +76,8 @@ func main() {
 
 	err = db.Coordination().CreateNode(ctx, path, coordination.NodeConfig{
 		Path:                     "",
-		SelfCheckPeriodMillis:    1000, //nolint:gomnd
-		SessionGracePeriodMillis: 1000, //nolint:gomnd
+		SelfCheckPeriodMillis:    1000,
+		SessionGracePeriodMillis: 1000,
 		ReadConsistencyMode:      coordination.ConsistencyModeStrict,
 		AttachConsistencyMode:    coordination.ConsistencyModeStrict,
 		RatelimiterCountersMode:  coordination.RatelimiterCountersModeDetailed,

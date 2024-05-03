@@ -21,7 +21,6 @@ var (
 	logLevel         string
 )
 
-//nolint:gomnd
 func init() { //nolint:gochecknoinits
 	required := []string{"ydb"}
 	flagSet := flag.NewFlagSet(os.Args[0], flag.ExitOnError)

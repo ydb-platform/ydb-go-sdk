@@ -285,7 +285,7 @@ func scanQuerySelect(ctx context.Context, c table.Client, prefix string) error {
 					table.ValueParam("$series",
 						types.ListValue(
 							types.Uint64Value(1),
-							types.Uint64Value(10), //nolint:gomnd
+							types.Uint64Value(10),
 						),
 					),
 				),

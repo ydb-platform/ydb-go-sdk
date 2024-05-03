@@ -12,7 +12,6 @@ import (
 
 const defaultConnectionString = "grpc://localhost:2136/local"
 
-//nolint:gomnd
 var (
 	host                = flag.String("listen-host", "localhost", "host/ip for start listener")
 	port                = flag.Int("port", 3619, "port to listen")

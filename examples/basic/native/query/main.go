@@ -47,7 +47,7 @@ func main() {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) //nolint:gomnd
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	dsn, exists := os.LookupEnv("YDB_CONNECTION_STRING")

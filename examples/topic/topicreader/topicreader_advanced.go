@@ -32,7 +32,6 @@ type MyMessage struct {
 
 // UnmarshalYDBTopicMessage implements topicreader.MessageContentUnmarshaler interface
 func (m *MyMessage) UnmarshalYDBTopicMessage(data []byte) error {
-	//nolint:gomnd
 	if len(data) != 6 {
 		return errBadDataLen
 	}
