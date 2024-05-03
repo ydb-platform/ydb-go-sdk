@@ -1,3 +1,4 @@
+## v3.66.3
 * Fixed the OAuth2 test
 
 ## v3.66.2
