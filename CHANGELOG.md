@@ -1,3 +1,5 @@
+* Fixed the OAuth2 test
+
 ## v3.66.2
 * Added `trace.DriverConnStreamEvents` details bit
 * Added `trace.Driver.OnConnStreamFinish` event
