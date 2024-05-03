@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/user"
-	"path/filepath"
 	"reflect"
 	"strconv"
 	"testing"
@@ -430,23 +428,16 @@ func TestJWTTokenBadParams(t *testing.T) {
 }
 
 func TestJWTTokenSourceReadPrivateKeyFromFile(t *testing.T) {
-	const perm = 0o600
-	usr, err := user.Current()
+	f, err := os.CreateTemp("", "tmpfile-")
 	require.NoError(t, err)
-	fileName := strconv.Itoa(time.Now().Second())
-	filePath := filepath.Join(usr.HomeDir, fileName)
-	beautifulFilePath := filepath.Join("~", fileName)
-	err = os.WriteFile(
-		filePath,
-		[]byte(testPrivateKeyContent),
-		perm,
-	)
+	defer os.Remove(f.Name())
+	_, err = f.WriteString(testPrivateKeyContent)
 	require.NoError(t, err)
-	defer os.Remove(filePath)
+	f.Close()
 
 	var src TokenSource
 	src, err = NewJWTTokenSource(
-		WithRSAPrivateKeyPEMFile(beautifulFilePath),
+		WithRSAPrivateKeyPEMFile(f.Name()),
 		WithKeyID("key_id"),
 		WithSigningMethod(jwt.SigningMethodRS256),
 		WithIssuer("test_issuer"),
