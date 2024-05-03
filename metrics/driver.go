@@ -55,7 +55,7 @@ func driver(config Config) (t trace.Driver) {
 		)
 
 		return func(info trace.DriverConnNewStreamDoneInfo) {
-			if config.Details()&trace.DriverConnEvents != 0 {
+			if config.Details()&trace.DriverConnStreamEvents != 0 {
 				requests.With(map[string]string{
 					"status":   errorBrief(info.Error),
 					"method":   string(method),

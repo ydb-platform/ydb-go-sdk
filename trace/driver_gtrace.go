@@ -454,6 +454,25 @@ func (t *Driver) Compose(x *Driver, opts ...DriverComposeOption) *Driver {
 		}
 	}
 	{
+		h1 := t.OnConnStreamFinish
+		h2 := x.OnConnStreamFinish
+		ret.OnConnStreamFinish = func(info DriverConnStreamFinishInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			if h1 != nil {
+				h1(info)
+			}
+			if h2 != nil {
+				h2(info)
+			}
+		}
+	}
+	{
 		h1 := t.OnConnDial
 		h2 := x.OnConnDial
 		ret.OnConnDial = func(d DriverConnDialStartInfo) func(DriverConnDialDoneInfo) {
@@ -1055,6 +1074,13 @@ func (t *Driver) onConnStreamCloseSend(d DriverConnStreamCloseSendStartInfo) fun
 	}
 	return res
 }
+func (t *Driver) onConnStreamFinish(info DriverConnStreamFinishInfo) {
+	fn := t.OnConnStreamFinish
+	if fn == nil {
+		return
+	}
+	fn(info)
+}
 func (t *Driver) onConnDial(d DriverConnDialStartInfo) func(DriverConnDialDoneInfo) {
 	fn := t.OnConnDial
 	if fn == nil {
@@ -1395,6 +1421,14 @@ func DriverOnConnStreamCloseSend(t *Driver, c *context.Context, call call) func(
 		p.Error = e
 		res(p)
 	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func DriverOnConnStreamFinish(t *Driver, c context.Context, call call, e error) {
+	var p DriverConnStreamFinishInfo
+	p.Context = c
+	p.Call = call
+	p.Error = e
+	t.onConnStreamFinish(p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 func DriverOnConnDial(t *Driver, c *context.Context, call call, endpoint EndpointInfo) func(error) {
