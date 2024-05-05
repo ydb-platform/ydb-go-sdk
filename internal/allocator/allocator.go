@@ -3,8 +3,6 @@ package allocator
 import (
 	"sync"
 
-	"google.golang.org/protobuf/types/known/structpb"
-
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
@@ -347,7 +345,7 @@ func (a *nullFlagAllocator) NullFlag() (v *Ydb.Value_NullFlagValue) {
 
 func (a *nullFlagAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Value_NullFlagValue{NullFlagValue: structpb.NullValue_NULL_VALUE}
+		*v = Ydb.Value_NullFlagValue{NullFlagValue: 0}
 		nullFlagPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -534,7 +532,7 @@ func (a *typeEmptyListAllocator) TypeEmptyList() (v *Ydb.Type_EmptyListType) {
 
 func (a *typeEmptyListAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Type_EmptyListType{EmptyListType: structpb.NullValue_NULL_VALUE}
+		*v = Ydb.Type_EmptyListType{EmptyListType: 0}
 		typeEmptyListPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -553,7 +551,7 @@ func (a *typeEmptyDictAllocator) TypeEmptyDict() (v *Ydb.Type_EmptyDictType) {
 
 func (a *typeEmptyDictAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Type_EmptyDictType{EmptyDictType: structpb.NullValue_NULL_VALUE}
+		*v = Ydb.Type_EmptyDictType{EmptyDictType: 0}
 		typeEmptyDictPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
