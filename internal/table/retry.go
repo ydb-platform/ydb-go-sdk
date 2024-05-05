@@ -102,6 +102,7 @@ func (c *Client) retryOptions(opts ...table.Option) *table.Options {
 		TxCommitOptions: nil,
 		RetryOptions: []retry.Option{
 			retry.WithTrace(c.config.TraceRetry()),
+			retry.WithBudget(c.config.RetryBudget()),
 		},
 	}
 	for _, opt := range opts {

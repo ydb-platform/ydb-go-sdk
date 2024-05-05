@@ -9,10 +9,15 @@ import (
 type Info interface {
 	NodeID() uint32
 	Address() string
-	LocalDC() bool
 	Location() string
 	LastUpdated() time.Time
 	LoadFactor() float32
+
+	// Deprecated: LocalDC check "local" by compare endpoint location with discovery "selflocation" field.
+	// It work good only if connection url always point to local dc.
+	// Will be removed after Oct 2024.
+	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+	LocalDC() bool
 }
 
 type Endpoint interface {
@@ -23,17 +28,17 @@ type Endpoint interface {
 	Touch(opts ...Option)
 }
 
-type endpoint struct {
+type endpoint struct { //nolint:maligned
 	mu       sync.RWMutex
 	id       uint32
 	address  string
 	location string
 	services []string
 
-	loadFactor float32
-	local      bool
-
+	loadFactor  float32
 	lastUpdated time.Time
+
+	local bool
 }
 
 func (e *endpoint) Copy() Endpoint {
@@ -87,6 +92,10 @@ func (e *endpoint) Location() string {
 	return e.location
 }
 
+// Deprecated: LocalDC check "local" by compare endpoint location with discovery "selflocation" field.
+// It work good only if connection url always point to local dc.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func (e *endpoint) LocalDC() bool {
 	e.mu.RLock()
 	defer e.mu.RUnlock()

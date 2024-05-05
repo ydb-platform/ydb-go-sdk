@@ -526,7 +526,9 @@ func WithPartitioningPolicyMode(mode PartitioningMode) PartitioningPolicyOption 
 	}
 }
 
-// Deprecated: use WithUniformPartitions instead
+// Deprecated: use WithUniformPartitions instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithPartitioningPolicyUniformPartitions(n uint64) PartitioningPolicyOption {
 	return func(p *partitioningPolicy, a *allocator.Allocator) {
 		p.Partitions = &Ydb_Table.PartitioningPolicy_UniformPartitions{
@@ -535,7 +537,9 @@ func WithPartitioningPolicyUniformPartitions(n uint64) PartitioningPolicyOption 
 	}
 }
 
-// Deprecated: use WithExplicitPartitions instead
+// Deprecated: use WithExplicitPartitions instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithPartitioningPolicyExplicitPartitions(splitPoints ...value.Value) PartitioningPolicyOption {
 	return func(p *partitioningPolicy, a *allocator.Allocator) {
 		values := make([]*Ydb.TypedValue, len(splitPoints))
@@ -816,6 +820,21 @@ func CopyTablesItem(src, dst string, omitIndexes bool) CopyTablesOption {
 }
 
 type (
+	RenameTablesDesc   Ydb_Table.RenameTablesRequest
+	RenameTablesOption func(desc *RenameTablesDesc)
+)
+
+func RenameTablesItem(src, dst string, replaceDestination bool) RenameTablesOption {
+	return func(desc *RenameTablesDesc) {
+		desc.Tables = append(desc.Tables, &Ydb_Table.RenameTableItem{
+			SourcePath:         src,
+			DestinationPath:    dst,
+			ReplaceDestination: replaceDestination,
+		})
+	}
+}
+
+type (
 	ExecuteSchemeQueryDesc   Ydb_Table.ExecuteSchemeQueryRequest
 	ExecuteSchemeQueryOption func(*ExecuteSchemeQueryDesc)
 )
@@ -901,7 +920,8 @@ func WithIgnoreTruncated() ExecuteDataQueryOption {
 // WithQueryCachePolicyKeepInCache manages keep-in-cache policy
 //
 // Deprecated: data queries always executes with enabled keep-in-cache policy.
-// Use WithKeepInCache for disabling keep-in-cache policy
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithQueryCachePolicyKeepInCache() QueryCachePolicyOption {
 	return withQueryCachePolicyKeepInCache(true)
 }
@@ -914,7 +934,9 @@ func withQueryCachePolicyKeepInCache(keepInCache bool) QueryCachePolicyOption {
 
 // WithQueryCachePolicy manages query cache policy
 //
-// Deprecated: use WithKeepInCache for disabling keep-in-cache policy
+// Deprecated: use WithKeepInCache for disabling keep-in-cache policy.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithQueryCachePolicy(opts ...QueryCachePolicyOption) ExecuteDataQueryOption {
 	return withQueryCachePolicy(opts...)
 }

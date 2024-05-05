@@ -19,6 +19,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -50,12 +51,13 @@ type Conn interface {
 type conn struct {
 	mtx               sync.RWMutex
 	config            Config // ro access
-	cc                *grpc.ClientConn
+	grpcConn          *grpc.ClientConn
 	done              chan struct{}
 	endpoint          endpoint.Endpoint // ro access
 	closed            bool
 	state             atomic.Uint32
-	lastUsage         *lastUsage
+	childStreams      *xcontext.CancelsGuard
+	lastUsage         xsync.LastUsage
 	onClose           []func(*conn)
 	onTransportErrors []func(ctx context.Context, cc Conn, cause error)
 }
@@ -119,7 +121,7 @@ func (c *conn) park(ctx context.Context) (err error) {
 		return nil
 	}
 
-	if c.cc == nil {
+	if c.grpcConn == nil {
 		return nil
 	}
 
@@ -159,7 +161,7 @@ func (c *conn) setState(ctx context.Context, s State) State {
 func (c *conn) Unban(ctx context.Context) State {
 	var newState State
 	c.mtx.RLock()
-	cc := c.cc
+	cc := c.grpcConn
 	c.mtx.RUnlock()
 	if isAvailable(cc) {
 		newState = Online
@@ -184,8 +186,8 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
 
-	if c.cc != nil {
-		return c.cc, nil
+	if c.grpcConn != nil {
+		return c.grpcConn, nil
 	}
 
 	if dialTimeout := c.config.DialTimeout(); dialTimeout > 0 {
@@ -232,10 +234,10 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 		)
 	}
 
-	c.cc = cc
+	c.grpcConn = cc
 	c.setState(ctx, Online)
 
-	return c.cc, nil
+	return c.grpcConn, nil
 }
 
 func (c *conn) onTransportError(ctx context.Context, cause error) {
@@ -250,11 +252,11 @@ func isAvailable(raw *grpc.ClientConn) bool {
 
 // conn must be locked
 func (c *conn) close(ctx context.Context) (err error) {
-	if c.cc == nil {
+	if c.grpcConn == nil {
 		return nil
 	}
-	err = c.cc.Close()
-	c.cc = nil
+	err = c.grpcConn.Close()
+	c.grpcConn = nil
 	c.setState(ctx, Offline)
 
 	return c.wrapError(err)
@@ -392,7 +394,7 @@ func (c *conn) NewStream(
 	desc *grpc.StreamDesc,
 	method string,
 	opts ...grpc.CallOption,
-) (_ grpc.ClientStream, err error) {
+) (_ grpc.ClientStream, finalErr error) {
 	var (
 		onDone = trace.DriverOnConnNewStream(
 			c.config.Trace(), &ctx,
@@ -400,15 +402,13 @@ func (c *conn) NewStream(
 			c.endpoint.Copy(), trace.Method(method),
 		)
 		useWrapping = UseWrapping(ctx)
-		cc          *grpc.ClientConn
-		s           grpc.ClientStream
 	)
 
 	defer func() {
-		onDone(err, c.GetState())
+		onDone(finalErr, c.GetState())
 	}()
 
-	cc, err = c.realConn(ctx)
+	cc, err := c.realConn(ctx)
 	if err != nil {
 		return nil, c.wrapError(err)
 	}
@@ -423,7 +423,23 @@ func (c *conn) NewStream(
 
 	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID))
 
-	s, err = cc.NewStream(ctx, desc, method, opts...)
+	ctx, cancel := c.childStreams.WithCancel(ctx)
+	defer func() {
+		if finalErr != nil {
+			cancel()
+		}
+	}()
+
+	s := &grpcClientStream{
+		parentConn:   c,
+		streamCtx:    ctx,
+		streamCancel: cancel,
+		wrapping:     useWrapping,
+		traceID:      traceID,
+		sentMark:     sentMark,
+	}
+
+	s.stream, err = cc.NewStream(ctx, desc, method, append(opts, grpc.OnFinish(s.finish))...)
 	if err != nil {
 		if xerrors.IsContextError(err) {
 			return nil, xerrors.WithStackTrace(err)
@@ -439,26 +455,16 @@ func (c *conn) NewStream(
 				xerrors.WithTraceID(traceID),
 			)
 			if sentMark.canRetry() {
-				return s, c.wrapError(xerrors.Retryable(err, xerrors.WithName("NewStream")))
+				return nil, c.wrapError(xerrors.Retryable(err, xerrors.WithName("NewStream")))
 			}
 
-			return s, c.wrapError(err)
+			return nil, c.wrapError(err)
 		}
 
-		return s, err
+		return nil, err
 	}
 
-	return &grpcClientStream{
-		ClientStream: s,
-		ctx:          ctx,
-		c:            c,
-		wrapping:     useWrapping,
-		traceID:      traceID,
-		sentMark:     sentMark,
-		onDone: func(ctx context.Context, md metadata.MD) {
-			meta.CallTrailerCallback(ctx, md)
-		},
-	}, nil
+	return s, nil
 }
 
 func (c *conn) wrapError(err error) error {
@@ -490,15 +496,20 @@ func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, ca
 
 func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	c := &conn{
-		endpoint:          e,
-		config:            config,
-		done:              make(chan struct{}),
-		lastUsage:         newLastUsage(nil),
-		mtx:               sync.RWMutex{},
-		cc:                nil,
-		closed:            false,
-		state:             atomic.Uint32{},
-		onClose:           nil,
+		mtx:          sync.RWMutex{},
+		config:       config,
+		grpcConn:     nil,
+		done:         make(chan struct{}),
+		endpoint:     e,
+		closed:       false,
+		state:        atomic.Uint32{},
+		childStreams: xcontext.NewCancelsGuard(),
+		lastUsage:    xsync.NewLastUsage(),
+		onClose: []func(*conn){
+			func(c *conn) {
+				c.childStreams.Cancel()
+			},
+		},
 		onTransportErrors: nil,
 	}
 	c.state.Store(uint32(Created))

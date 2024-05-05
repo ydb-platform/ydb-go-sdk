@@ -35,6 +35,7 @@ type Config struct {
 	ShutdownTime int
 }
 
+//nolint:gomnd
 func New() (*Config, error) {
 	cfg := new(Config)
 

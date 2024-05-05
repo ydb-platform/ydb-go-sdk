@@ -24,7 +24,7 @@ func PrintMessageContent(ctx context.Context, reader *topicreader.Reader) {
 // ReadMessagesByBatch it is recommended way for process messages
 func ReadMessagesByBatch(ctx context.Context, reader *topicreader.Reader) {
 	for {
-		batch, _ := reader.ReadMessageBatch(ctx)
+		batch, _ := reader.ReadMessagesBatch(ctx)
 		processBatch(batch.Context(), batch)
 		_ = reader.Commit(batch.Context(), batch)
 	}

@@ -644,6 +644,56 @@ func (s *session) CopyTables(
 	return nil
 }
 
+func renameTables(
+	ctx context.Context,
+	sessionID string,
+	operationTimeout time.Duration,
+	operationCancelAfter time.Duration,
+	service interface {
+		RenameTables(
+			ctx context.Context, in *Ydb_Table.RenameTablesRequest, opts ...grpc.CallOption,
+		) (*Ydb_Table.RenameTablesResponse, error)
+	},
+	opts ...options.RenameTablesOption,
+) (err error) {
+	request := Ydb_Table.RenameTablesRequest{
+		SessionId: sessionID,
+		OperationParams: operation.Params(
+			ctx,
+			operationTimeout,
+			operationCancelAfter,
+			operation.ModeSync,
+		),
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt((*options.RenameTablesDesc)(&request))
+		}
+	}
+	if len(request.GetTables()) == 0 {
+		return xerrors.WithStackTrace(fmt.Errorf("no RenameTablesItem: %w", errParamsRequired))
+	}
+	_, err = service.RenameTables(ctx, &request)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
+}
+
+// RenameTables renames tables.
+func (s *session) RenameTables(
+	ctx context.Context,
+	opts ...options.RenameTablesOption,
+) (err error) {
+	err = renameTables(ctx, s.id, s.config.OperationTimeout(), s.config.OperationCancelAfter(), s.tableService, opts...)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
+}
+
 // Explain explains data query represented by text.
 func (s *session) Explain(
 	ctx context.Context,

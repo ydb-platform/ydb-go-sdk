@@ -25,6 +25,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -54,6 +55,19 @@ func WithAccessTokenCredentials(accessToken string) Option {
 	)
 }
 
+// WithOauth2TokenExchangeCredentials adds credentials that exchange token using
+// OAuth 2.0 token exchange protocol:
+// https://www.rfc-editor.org/rfc/rfc8693
+func WithOauth2TokenExchangeCredentials(
+	opts ...credentials.Oauth2TokenExchangeCredentialsOption,
+) Option {
+	opts = append(opts, credentials.WithSourceInfo("ydb.WithOauth2TokenExchangeCredentials(opts)"))
+
+	return WithCreateCredentialsFunc(func(context.Context) (credentials.Credentials, error) {
+		return credentials.NewOauth2TokenExchangeCredentials(opts...)
+	})
+}
+
 // WithApplicationName add provided application name to all api requests
 func WithApplicationName(applicationName string) Option {
 	return func(ctx context.Context, c *Driver) error {
@@ -65,7 +79,9 @@ func WithApplicationName(applicationName string) Option {
 
 // WithUserAgent add provided user agent value to all api requests
 //
-// Deprecated: use WithApplicationName instead
+// Deprecated: use WithApplicationName instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithUserAgent(userAgent string) Option {
 	return func(ctx context.Context, c *Driver) error {
 		c.options = append(c.options, config.WithApplicationName(userAgent))
@@ -279,6 +295,17 @@ func WithDiscoveryInterval(discoveryInterval time.Duration) Option {
 	}
 }
 
+// WithRetryBudget sets retry budget for all calls of all retryers.
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithRetryBudget(b budget.Budget) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.options = append(c.options, config.WithRetryBudget(b))
+
+		return nil
+	}
+}
+
 // WithTraceDriver appends trace.Driver into driver traces
 func WithTraceDriver(t trace.Driver, opts ...trace.DriverComposeOption) Option { //nolint:gocritic
 	return func(ctx context.Context, c *Driver) error {
@@ -434,14 +461,18 @@ func WithSessionPoolDeleteTimeout(deleteTimeout time.Duration) Option {
 
 // WithSessionPoolKeepAliveMinSize set minimum sessions should be keeped alive in table.Client
 //
-// Deprecated: table client do not support background session keep-aliving now
+// Deprecated: use WithApplicationName instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithSessionPoolKeepAliveMinSize(keepAliveMinSize int) Option {
 	return func(ctx context.Context, c *Driver) error { return nil }
 }
 
 // WithSessionPoolKeepAliveTimeout set timeout of keep alive requests for session in table.Client
 //
-// Deprecated: table client do not support background session keep-aliving now
+// Deprecated: use WithApplicationName instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithSessionPoolKeepAliveTimeout(keepAliveTimeout time.Duration) Option {
 	return func(ctx context.Context, c *Driver) error { return nil }
 }

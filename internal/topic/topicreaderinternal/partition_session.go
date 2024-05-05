@@ -24,7 +24,7 @@ type partitionSession struct {
 	readerID     int64
 	connectionID string
 
-	ctx                context.Context
+	ctx                context.Context //nolint:containedctx
 	ctxCancel          context.CancelFunc
 	partitionSessionID rawtopicreader.PartitionSessionID
 

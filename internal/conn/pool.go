@@ -247,7 +247,7 @@ func NewPool(ctx context.Context, config Config) *Pool {
 	}
 
 	if ttl := config.ConnectionTTL(); ttl > 0 {
-		go p.connParker(xcontext.ValueOnly(ctx), ttl, ttl/2)
+		go p.connParker(xcontext.ValueOnly(ctx), ttl, ttl/2) //nolint:gomnd
 	}
 
 	return p

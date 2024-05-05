@@ -422,7 +422,8 @@ func (kr KeyRange) String() string {
 }
 
 // Deprecated: use TimeToLiveSettings instead.
-// Will be removed after Jan 2022.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 type TTLSettings struct {
 	DateTimeColumn string
 	TTLSeconds     uint32

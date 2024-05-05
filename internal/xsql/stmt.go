@@ -17,63 +17,66 @@ type stmt struct {
 		driver.ExecerContext
 		driver.QueryerContext
 	}
-	query   string
-	stmtCtx context.Context
+	query string
+	ctx   context.Context //nolint:containedctx
 
 	trace *trace.DatabaseSQL
 }
 
 var (
-	_ driver.Stmt             = &stmt{conn: nil, processor: nil, query: "", stmtCtx: nil, trace: nil}
-	_ driver.StmtQueryContext = &stmt{conn: nil, processor: nil, query: "", stmtCtx: nil, trace: nil}
-	_ driver.StmtExecContext  = &stmt{conn: nil, processor: nil, query: "", stmtCtx: nil, trace: nil}
+	_ driver.Stmt             = &stmt{conn: nil, processor: nil, query: "", ctx: nil, trace: nil}
+	_ driver.StmtQueryContext = &stmt{conn: nil, processor: nil, query: "", ctx: nil, trace: nil}
+	_ driver.StmtExecContext  = &stmt{conn: nil, processor: nil, query: "", ctx: nil, trace: nil}
 )
 
-func (s *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ driver.Rows, finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtQuery(s.trace, &ctx,
+func (stmt *stmt) QueryContext(ctx context.Context, args []driver.NamedValue) (_ driver.Rows, finalErr error) {
+	onDone := trace.DatabaseSQLOnStmtQuery(stmt.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*stmt).QueryContext"),
-		s.stmtCtx, s.query,
+		stmt.ctx, stmt.query,
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
-	if !s.conn.isReady() {
+	if !stmt.conn.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
-	switch m := queryModeFromContext(ctx, s.conn.defaultQueryMode); m {
+	switch m := queryModeFromContext(ctx, stmt.conn.defaultQueryMode); m {
 	case DataQueryMode:
-		return s.processor.QueryContext(s.conn.withKeepInCache(ctx), s.query, args)
+		return stmt.processor.QueryContext(stmt.conn.withKeepInCache(ctx), stmt.query, args)
 	default:
 		return nil, fmt.Errorf("unsupported query mode '%s' for execute query on prepared statement", m)
 	}
 }
 
-func (s *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ driver.Result, finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtExec(s.trace, &ctx,
+func (stmt *stmt) ExecContext(ctx context.Context, args []driver.NamedValue) (_ driver.Result, finalErr error) {
+	onDone := trace.DatabaseSQLOnStmtExec(stmt.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*stmt).ExecContext"),
-		s.stmtCtx, s.query,
+		stmt.ctx, stmt.query,
 	)
 	defer func() {
 		onDone(finalErr)
 	}()
-	if !s.conn.isReady() {
+	if !stmt.conn.isReady() {
 		return nil, badconn.Map(xerrors.WithStackTrace(errNotReadyConn))
 	}
-	switch m := queryModeFromContext(ctx, s.conn.defaultQueryMode); m {
+	switch m := queryModeFromContext(ctx, stmt.conn.defaultQueryMode); m {
 	case DataQueryMode:
-		return s.processor.ExecContext(s.conn.withKeepInCache(ctx), s.query, args)
+		return stmt.processor.ExecContext(stmt.conn.withKeepInCache(ctx), stmt.query, args)
 	default:
 		return nil, fmt.Errorf("unsupported query mode '%s' for execute query on prepared statement", m)
 	}
 }
 
-func (s *stmt) NumInput() int {
+func (stmt *stmt) NumInput() int {
 	return -1
 }
 
-func (s *stmt) Close() (finalErr error) {
-	onDone := trace.DatabaseSQLOnStmtClose(s.trace, &s.stmtCtx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*stmt).Close"),
+func (stmt *stmt) Close() (finalErr error) {
+	var (
+		ctx    = stmt.ctx
+		onDone = trace.DatabaseSQLOnStmtClose(stmt.trace, &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*stmt).Close"),
+		)
 	)
 	defer func() {
 		onDone(finalErr)
@@ -82,10 +85,10 @@ func (s *stmt) Close() (finalErr error) {
 	return nil
 }
 
-func (s *stmt) Exec([]driver.Value) (driver.Result, error) {
+func (stmt *stmt) Exec([]driver.Value) (driver.Result, error) {
 	return nil, errDeprecated
 }
 
-func (s *stmt) Query([]driver.Value) (driver.Rows, error) {
+func (stmt *stmt) Query([]driver.Value) (driver.Rows, error) {
 	return nil, errDeprecated
 }

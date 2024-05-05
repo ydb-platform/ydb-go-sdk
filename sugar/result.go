@@ -73,9 +73,7 @@ func (r *result) Close() error {
 
 // Result converts query.Result to iterable result for compatibility with table/result.Result usage
 //
-// # Experimental
-//
-// Notice: This API is EXPERIMENTAL and may be changed or removed in a later release.
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func Result(r query.Result) *result {
 	return &result{
 		r:   r,

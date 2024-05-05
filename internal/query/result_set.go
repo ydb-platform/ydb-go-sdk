@@ -48,39 +48,43 @@ func newResultSet(
 
 func (rs *resultSet) nextRow(ctx context.Context) (*row, error) {
 	rs.rowIndex++
-	select {
-	case <-rs.done:
-		return nil, io.EOF
-	case <-ctx.Done():
-		return nil, xerrors.WithStackTrace(ctx.Err())
-	default:
-		if rs.rowIndex == len(rs.currentPart.GetResultSet().GetRows()) {
-			part, err := rs.recv()
-			if err != nil {
-				if xerrors.Is(err, io.EOF) {
-					close(rs.done)
-				}
+	for {
+		select {
+		case <-rs.done:
+			return nil, io.EOF
+		case <-ctx.Done():
+			return nil, xerrors.WithStackTrace(ctx.Err())
+		default:
+			if rs.rowIndex == len(rs.currentPart.GetResultSet().GetRows()) {
+				part, err := rs.recv()
+				if err != nil {
+					if xerrors.Is(err, io.EOF) {
+						close(rs.done)
+					}
 
-				return nil, xerrors.WithStackTrace(err)
+					return nil, xerrors.WithStackTrace(err)
+				}
+				rs.rowIndex = 0
+				rs.currentPart = part
+				if part == nil {
+					close(rs.done)
+
+					return nil, xerrors.WithStackTrace(io.EOF)
+				}
 			}
-			rs.rowIndex = 0
-			rs.currentPart = part
-			if part == nil {
+			if rs.index != rs.currentPart.GetResultSetIndex() {
 				close(rs.done)
 
-				return nil, xerrors.WithStackTrace(io.EOF)
+				return nil, xerrors.WithStackTrace(fmt.Errorf(
+					"received part with result set index = %d, current result set index = %d: %w",
+					rs.index, rs.currentPart.GetResultSetIndex(), errWrongResultSetIndex,
+				))
+			}
+
+			if rs.rowIndex < len(rs.currentPart.GetResultSet().GetRows()) {
+				return newRow(ctx, rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex], rs.trace)
 			}
 		}
-		if rs.index != rs.currentPart.GetResultSetIndex() {
-			close(rs.done)
-
-			return nil, xerrors.WithStackTrace(fmt.Errorf(
-				"received part with result set index = %d, current result set index = %d: %w",
-				rs.index, rs.currentPart.GetResultSetIndex(), errWrongResultSetIndex,
-			))
-		}
-
-		return newRow(ctx, rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex], rs.trace)
 	}
 }
 

@@ -83,6 +83,7 @@ func TypeFromYDB(x *Ydb.Type) Type {
 	}
 }
 
+//nolint:funlen
 func primitiveTypeFromYDB(t Ydb.Type_PrimitiveTypeId) Type {
 	switch t {
 	case Ydb.Type_BOOL:

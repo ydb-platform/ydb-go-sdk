@@ -71,30 +71,30 @@ func New(url, label, jobName string) (*Metrics, error) {
 	)
 	m.latencies = prometheus.NewSummaryVec(
 		prometheus.SummaryOpts{
-			Name: "latency",
-			Help: "summary of latencies in ms",
+			Namespace:   "",
+			Subsystem:   "",
+			Name:        "latency",
+			Help:        "summary of latencies in ms",
+			ConstLabels: nil,
 			Objectives: map[float64]float64{
 				0.5:  0,
 				0.99: 0,
 				1.0:  0,
 			},
-			MaxAge:      15 * time.Second,
-			Namespace:   "",
-			Subsystem:   "",
-			ConstLabels: nil,
-			AgeBuckets:  0,
-			BufCap:      0,
+			MaxAge:     15 * time.Second, //nolint:gomnd
+			AgeBuckets: 0,
+			BufCap:     0,
 		},
 		[]string{"status", "jobName"},
 	)
 	m.attempts = prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
-			Name:                            "attempts",
-			Help:                            "summary of amount for request",
-			Buckets:                         prometheus.LinearBuckets(1, 1, 10),
 			Namespace:                       "",
 			Subsystem:                       "",
+			Name:                            "attempts",
+			Help:                            "summary of amount for request",
 			ConstLabels:                     nil,
+			Buckets:                         prometheus.LinearBuckets(1, 1, 10), //nolint:gomnd
 			NativeHistogramBucketFactor:     0,
 			NativeHistogramZeroThreshold:    0,
 			NativeHistogramMaxBucketNumber:  0,

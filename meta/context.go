@@ -15,7 +15,9 @@ func WithTraceID(ctx context.Context, traceID string) context.Context {
 
 // WithUserAgent returns a copy of parent context with custom user-agent info
 //
-// Deprecated: use WithApplicationName instead
+// Deprecated: use WithApplicationName instead.
+// Will be removed after Oct 2024.
+// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func WithUserAgent(ctx context.Context, _ string) context.Context {
 	return ctx
 }

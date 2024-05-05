@@ -3,12 +3,13 @@ package retry
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wait"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
@@ -25,6 +26,7 @@ type retryOptions struct {
 	stackTrace  bool
 	fastBackoff backoff.Backoff
 	slowBackoff backoff.Backoff
+	budget      budget.Budget
 
 	panicCallback func(e interface{})
 }
@@ -122,6 +124,31 @@ func (t traceOption) ApplyDoTxOption(opts *doTxOptions) {
 // WithTrace returns trace option
 func WithTrace(t *trace.Retry) traceOption {
 	return traceOption{t: t}
+}
+
+var _ Option = budgetOption{}
+
+type budgetOption struct {
+	b budget.Budget
+}
+
+func (b budgetOption) ApplyRetryOption(opts *retryOptions) {
+	opts.budget = b.b
+}
+
+func (b budgetOption) ApplyDoOption(opts *doOptions) {
+	opts.retryOptions = append(opts.retryOptions, WithBudget(b.b))
+}
+
+func (b budgetOption) ApplyDoTxOption(opts *doTxOptions) {
+	opts.retryOptions = append(opts.retryOptions, WithBudget(b.b))
+}
+
+//	WithBudget returns budget option
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithBudget(b budget.Budget) budgetOption {
+	return budgetOption{b: b}
 }
 
 var _ Option = idempotentOption(false)
@@ -227,18 +254,21 @@ func WithPanicCallback(panicCallback func(e interface{})) panicCallbackOption {
 //
 // - retry operation returned nil as error
 //
-// Warning: if deadline without deadline or cancellation func Retry will be worked infinite
+// Warning: if context without deadline or cancellation func was passed, Retry will work infinitely.
 //
 // If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
+//
+//nolint:funlen
 func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr error) {
 	options := &retryOptions{
+		label:         "",
 		call:          stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.Retry"),
 		trace:         new(trace.Retry),
-		fastBackoff:   backoff.Fast,
-		slowBackoff:   backoff.Slow,
-		label:         "",
 		idempotent:    false,
 		stackTrace:    false,
+		fastBackoff:   backoff.Fast,
+		slowBackoff:   backoff.Slow,
+		budget:        budget.Limited(-1),
 		panicCallback: nil,
 	}
 	for _, opt := range opts {
@@ -249,8 +279,10 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 	if options.idempotent {
 		ctx = xcontext.WithIdempotent(ctx, options.idempotent)
 	}
+
 	defer func() {
 		if finalErr != nil && options.stackTrace {
+			//nolint:gomnd
 			finalErr = xerrors.WithStackTrace(finalErr,
 				xerrors.WithSkipDepth(2), // 1 - exit from defer, 1 - exit from Retry call
 			)
@@ -274,38 +306,14 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 		select {
 		case <-ctx.Done():
 			return xerrors.WithStackTrace(
-				fmt.Errorf("retry failed on attempt No.%d: %w",
-					attempts, ctx.Err(),
-				),
+				fmt.Errorf("retry failed on attempt No.%d: %w", attempts, ctx.Err()),
 			)
 
 		default:
-			err := func() (err error) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-							err = xerrors.WithStackTrace(
-								fmt.Errorf("panic recovered: %v", e),
-							)
-						}
-					}()
-				}
-
-				return op(ctx)
-			}()
+			err := opWithRecover(ctx, options, op)
 
 			if err == nil {
 				return nil
-			}
-
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				return xerrors.WithStackTrace(
-					xerrors.Join(
-						fmt.Errorf("context error occurred on attempt No.%d", attempts),
-						ctxErr, err,
-					),
-				)
 			}
 
 			m := Check(err)
@@ -314,27 +322,60 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 				i = 0
 			}
 
+			code = m.StatusCode()
+
 			if !m.MustRetry(options.idempotent) {
 				return xerrors.WithStackTrace(
 					fmt.Errorf("non-retryable error occurred on attempt No.%d (idempotent=%v): %w",
-						attempts, options.idempotent, err,
-					),
+						attempts, options.idempotent, err),
 				)
 			}
 
-			if e := wait.Wait(ctx, options.fastBackoff, options.slowBackoff, m.BackoffType(), i); e != nil {
+			t := time.NewTimer(backoff.Delay(m.BackoffType(), i,
+				backoff.WithFastBackoff(options.fastBackoff),
+				backoff.WithSlowBackoff(options.slowBackoff),
+			))
+
+			select {
+			case <-ctx.Done():
+				t.Stop()
+
 				return xerrors.WithStackTrace(
 					xerrors.Join(
-						fmt.Errorf("wait exit on attempt No.%d",
-							attempts,
-						), e, err,
+						fmt.Errorf("attempt No.%d: %w", attempts, ctx.Err()),
+						err,
 					),
 				)
-			}
+			case <-t.C:
+				t.Stop()
 
-			code = m.StatusCode()
+				if acquireErr := options.budget.Acquire(ctx); acquireErr != nil {
+					return xerrors.WithStackTrace(
+						xerrors.Join(
+							fmt.Errorf("attempt No.%d: %w", attempts, budget.ErrNoQuota),
+							acquireErr,
+							err,
+						),
+					)
+				}
+			}
 		}
 	}
+}
+
+func opWithRecover(ctx context.Context, options *retryOptions, op retryOperation) (err error) {
+	if options.panicCallback != nil {
+		defer func() {
+			if e := recover(); e != nil {
+				options.panicCallback(e)
+				err = xerrors.WithStackTrace(
+					fmt.Errorf("panic recovered: %v", e),
+				)
+			}
+		}()
+	}
+
+	return op(ctx)
 }
 
 // Check returns retry mode for queryErr.

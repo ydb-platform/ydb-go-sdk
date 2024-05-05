@@ -19,7 +19,7 @@ var (
 
 // A Worker must not be copied after first use
 type Worker struct {
-	ctx            context.Context
+	ctx            context.Context //nolint:containedctx
 	workers        sync.WaitGroup
 	closeReason    error
 	tasksCompleted empty.Chan

@@ -55,3 +55,7 @@ func (w *Writer) WaitInit(ctx context.Context) (info InitialInfo, err error) {
 func (w *Writer) Close(ctx context.Context) error {
 	return w.streamWriter.Close(ctx)
 }
+
+func (w *Writer) Flush(ctx context.Context) error {
+	return w.streamWriter.Flush(ctx)
+}

@@ -9,6 +9,7 @@ import (
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
+	"github.com/ydb-platform/ydb-go-sdk/v3/retry/budget"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 
@@ -74,27 +75,36 @@ type Storage struct {
 	dropQuery   string
 	upsertQuery string
 	selectQuery string
+	retryBudget interface {
+		budget.Budget
+
+		Stop()
+	}
 }
 
 func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Storage, err error) {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute*5)
+	ctx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:gomnd
 	defer cancel()
 
+	retryBudget := budget.Limited(int(float64(poolSize) * 0.1)) //nolint:gomnd
+
 	s = &Storage{
+		cc:  nil,
+		c:   nil,
+		db:  nil,
 		cfg: cfg,
 		createQuery: fmt.Sprintf(createTemplate, cfg.Table,
 			cfg.PartitionSize, cfg.MinPartitionsCount, cfg.MaxPartitionsCount, cfg.MinPartitionsCount),
 		dropQuery:   fmt.Sprintf(dropTemplate, cfg.Table),
 		upsertQuery: fmt.Sprintf(upsertTemplate, cfg.Table),
 		selectQuery: fmt.Sprintf(selectTemplate, cfg.Table),
-		cc:          nil,
-		c:           nil,
-		db:          nil,
+		retryBudget: retryBudget,
 	}
 
 	s.cc, err = ydb.Open(
 		ctx,
 		s.cfg.Endpoint+s.cfg.DB,
+		ydb.WithRetryBudget(retryBudget),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("ydb.Open error: %w", err)
@@ -227,6 +237,8 @@ func (s *Storage) dropTable(ctx context.Context) error {
 }
 
 func (s *Storage) close(ctx context.Context) error {
+	s.retryBudget.Stop()
+
 	if err := ctx.Err(); err != nil {
 		return err
 	}

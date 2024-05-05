@@ -31,7 +31,6 @@ type readerConnectFunc func(ctx context.Context) (batchedStreamReader, error)
 type readerReconnector struct {
 	background                 background.Worker
 	clock                      clockwork.Clock
-	baseContext                context.Context
 	retrySettings              topic.RetrySettings
 	streamVal                  batchedStreamReader
 	streamErr                  error
@@ -49,29 +48,26 @@ type readerReconnector struct {
 	initDone                   bool
 }
 
-//nolint:revive
 func newReaderReconnector(
 	readerID int64,
 	connector readerConnectFunc,
 	connectTimeout time.Duration,
 	retrySettings topic.RetrySettings,
 	tracer *trace.Topic,
-	baseContext context.Context,
 ) *readerReconnector {
 	res := &readerReconnector{
-		readerID:                   readerID,
-		clock:                      clockwork.NewRealClock(),
-		readerConnect:              connector,
-		streamErr:                  errUnconnected,
-		connectTimeout:             connectTimeout,
-		tracer:                     tracer,
-		baseContext:                baseContext,
-		retrySettings:              retrySettings,
 		background:                 background.Worker{},
+		clock:                      clockwork.NewRealClock(),
+		retrySettings:              retrySettings,
 		streamVal:                  nil,
+		streamErr:                  errUnconnected,
 		closedErr:                  nil,
 		initErr:                    nil,
+		tracer:                     tracer,
+		readerConnect:              connector,
 		reconnectFromBadStream:     nil,
+		connectTimeout:             connectTimeout,
+		readerID:                   readerID,
 		streamConnectionInProgress: nil,
 		initDoneCh:                 nil,
 		m:                          xsync.RWMutex{RWMutex: sync.RWMutex{}},

@@ -5,6 +5,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
@@ -473,20 +475,16 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	errs := make([]error, 0, len(p.index))
-
+	var g errgroup.Group
 	for item := range p.index {
-		if err := item.Close(ctx); err != nil {
-			errs = append(errs, err)
-		}
+		item := item
+		g.Go(func() error {
+			return item.Close(ctx)
+		})
+	}
+	if err := g.Wait(); err != nil {
+		return xerrors.WithStackTrace(err)
 	}
 
-	switch len(errs) {
-	case 0:
-		return nil
-	case 1:
-		return errs[0]
-	default:
-		return xerrors.Join(errs...)
-	}
+	return nil
 }
