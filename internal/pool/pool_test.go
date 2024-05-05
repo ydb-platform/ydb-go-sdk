@@ -19,8 +19,6 @@ import (
 )
 
 type testItem struct {
-	v uint32
-
 	onClose   func() error
 	onIsAlive func() bool
 }

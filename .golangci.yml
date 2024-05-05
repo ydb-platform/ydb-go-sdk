@@ -239,7 +239,6 @@ linters:
     - maintidx
     - nonamedreturns
     - paralleltest
-    - structcheck
     - testableexamples
     - testpackage
     - thelper
