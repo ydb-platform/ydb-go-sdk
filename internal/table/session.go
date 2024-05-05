@@ -664,6 +664,7 @@ func renameTables(
 			operationCancelAfter,
 			operation.ModeSync,
 		),
+		Tables: nil,
 	}
 	for _, opt := range opts {
 		if opt != nil {

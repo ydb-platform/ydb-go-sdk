@@ -14,6 +14,7 @@ type (
 
 func NewCancelsGuard() *CancelsGuard {
 	return &CancelsGuard{
+		mu:      sync.Mutex{},
 		cancels: make(map[*context.CancelFunc]struct{}),
 	}
 }

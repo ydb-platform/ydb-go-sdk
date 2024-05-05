@@ -229,6 +229,7 @@ func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
 		pathNormalizer:        bind.TablePathPrefix(parent.Name()),
 		trace:                 nil,
 		traceRetry:            nil,
+		retryBudget:           nil,
 	}
 	for _, opt := range opts {
 		if opt != nil {

@@ -126,7 +126,7 @@ func WithTrace(t *trace.Retry) traceOption {
 	return traceOption{t: t}
 }
 
-var _ Option = budgetOption{}
+var _ Option = budgetOption{b: nil}
 
 type budgetOption struct {
 	b budget.Budget

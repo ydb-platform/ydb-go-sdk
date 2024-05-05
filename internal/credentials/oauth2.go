@@ -179,12 +179,14 @@ func (tokenSource *tokenSourceOption) ApplyOauth2CredentialsOption(c *oauth2Toke
 func WithSubjectToken(subjectToken TokenSource) *tokenSourceOption {
 	return &tokenSourceOption{
 		source:          subjectToken,
+		createFunc:      nil,
 		tokenSourceType: SubjectTokenSourceType,
 	}
 }
 
 func WithFixedSubjectToken(token, tokenType string) *tokenSourceOption {
 	return &tokenSourceOption{
+		source: nil,
 		createFunc: func() (TokenSource, error) {
 			return NewFixedTokenSource(token, tokenType), nil
 		},
@@ -194,6 +196,7 @@ func WithFixedSubjectToken(token, tokenType string) *tokenSourceOption {
 
 func WithJWTSubjectToken(opts ...JWTTokenSourceOption) *tokenSourceOption {
 	return &tokenSourceOption{
+		source: nil,
 		createFunc: func() (TokenSource, error) {
 			return NewJWTTokenSource(opts...)
 		},
@@ -205,12 +208,14 @@ func WithJWTSubjectToken(opts ...JWTTokenSourceOption) *tokenSourceOption {
 func WithActorToken(actorToken TokenSource) *tokenSourceOption {
 	return &tokenSourceOption{
 		source:          actorToken,
+		createFunc:      nil,
 		tokenSourceType: ActorTokenSourceType,
 	}
 }
 
 func WithFixedActorToken(token, tokenType string) *tokenSourceOption {
 	return &tokenSourceOption{
+		source: nil,
 		createFunc: func() (TokenSource, error) {
 			return NewFixedTokenSource(token, tokenType), nil
 		},
@@ -220,6 +225,7 @@ func WithFixedActorToken(token, tokenType string) *tokenSourceOption {
 
 func WithJWTActorToken(opts ...JWTTokenSourceOption) *tokenSourceOption {
 	return &tokenSourceOption{
+		source: nil,
 		createFunc: func() (TokenSource, error) {
 			return NewJWTTokenSource(opts...)
 		},
@@ -265,10 +271,21 @@ func NewOauth2TokenExchangeCredentials(
 	opts ...Oauth2TokenExchangeCredentialsOption,
 ) (*oauth2TokenExchange, error) {
 	c := &oauth2TokenExchange{
-		grantType:          "urn:ietf:params:oauth:grant-type:token-exchange",
-		requestedTokenType: "urn:ietf:params:oauth:token-type:access_token",
-		requestTimeout:     defaultRequestTimeout,
-		sourceInfo:         stack.Record(1),
+		tokenEndpoint:           "",
+		grantType:               "urn:ietf:params:oauth:grant-type:token-exchange",
+		resource:                "",
+		audience:                nil,
+		scope:                   nil,
+		requestedTokenType:      "urn:ietf:params:oauth:token-type:access_token",
+		subjectTokenSource:      nil,
+		actorTokenSource:        nil,
+		requestTimeout:          defaultRequestTimeout,
+		receivedToken:           "",
+		updateTokenTime:         time.Time{},
+		receivedTokenExpireTime: time.Time{},
+		mutex:                   sync.RWMutex{},
+		updating:                atomic.Bool{},
+		sourceInfo:              stack.Record(1),
 	}
 
 	var err error
@@ -452,8 +469,10 @@ func (provider *oauth2TokenExchange) exchangeToken(ctx context.Context, now time
 	req.Close = true
 
 	client := http.Client{
-		Transport: http.DefaultTransport,
-		Timeout:   provider.requestTimeout,
+		Transport:     http.DefaultTransport,
+		CheckRedirect: nil,
+		Jar:           nil,
+		Timeout:       provider.requestTimeout,
 	}
 
 	result, err := client.Do(req)
@@ -756,7 +775,14 @@ func WithRSAPrivateKeyPEMFile(path string) *rsaPrivateKeyPemFileOption {
 
 func NewJWTTokenSource(opts ...JWTTokenSourceOption) (*jwtTokenSource, error) {
 	s := &jwtTokenSource{
-		tokenTTL: defaultJWTTokenTTL,
+		signingMethod: nil,
+		keyID:         "",
+		privateKey:    nil,
+		issuer:        "",
+		subject:       "",
+		audience:      nil,
+		id:            "",
+		tokenTTL:      defaultJWTTokenTTL,
 	}
 
 	var err error
@@ -801,6 +827,8 @@ func (s *jwtTokenSource) Token() (Token, error) {
 		err    error
 	)
 	t := jwt.Token{
+		Raw:    "",
+		Method: s.signingMethod,
 		Header: map[string]interface{}{
 			"typ": "JWT",
 			"alg": s.signingMethod.Alg(),
@@ -812,9 +840,11 @@ func (s *jwtTokenSource) Token() (Token, error) {
 			IssuedAt:  issued,
 			Audience:  s.audience,
 			ExpiresAt: expire,
+			NotBefore: nil,
 			ID:        s.id,
 		},
-		Method: s.signingMethod,
+		Signature: "",
+		Valid:     false,
 	}
 
 	var token Token

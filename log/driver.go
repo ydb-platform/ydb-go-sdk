@@ -503,5 +503,6 @@ func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
 		OnPoolRelease:                     nil,
 		OnConnPark:                        nil,
 		OnBalancerClusterDiscoveryAttempt: nil,
+		OnConnStreamFinish:                nil,
 	}
 }

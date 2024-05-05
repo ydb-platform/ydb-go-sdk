@@ -39,8 +39,10 @@ func withFixedBudgetClock(clock clockwork.Clock) fixedBudgetOption {
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func Limited(attemptsPerSecond int, opts ...fixedBudgetOption) *fixedBudget {
 	q := &fixedBudget{
-		clock: clockwork.NewRealClock(),
-		done:  make(chan struct{}),
+		clock:  clockwork.NewRealClock(),
+		ticker: nil,
+		quota:  nil,
+		done:   make(chan struct{}),
 	}
 	for _, opt := range opts {
 		opt(q)

@@ -432,6 +432,7 @@ func (c *conn) NewStream(
 
 	s := &grpcClientStream{
 		parentConn:   c,
+		stream:       nil,
 		streamCtx:    ctx,
 		streamCancel: cancel,
 		wrapping:     useWrapping,

@@ -51,18 +51,19 @@ type messageQueue struct {
 
 func newMessageQueue() messageQueue {
 	return messageQueue{
-		messagesByOrder:   make(map[int]messageWithDataContent),
-		seqNoToOrderID:    make(map[int64]int),
-		hasNewMessages:    make(empty.Chan, 1),
-		closedChan:        make(empty.Chan),
-		lastSeqNo:         -1,
-		OnAckReceived:     nil,
-		closedErr:         nil,
-		acksReceivedEvent: xsync.EventBroadcast{},
-		m:                 xsync.RWMutex{RWMutex: sync.RWMutex{}},
-		closed:            false,
-		lastWrittenIndex:  0,
-		lastSentIndex:     0,
+		messagesByOrder:           make(map[int]messageWithDataContent),
+		seqNoToOrderID:            make(map[int64]int),
+		hasNewMessages:            make(empty.Chan, 1),
+		closedChan:                make(empty.Chan),
+		lastSeqNo:                 -1,
+		OnAckReceived:             nil,
+		closedErr:                 nil,
+		acksReceivedEvent:         xsync.EventBroadcast{},
+		m:                         xsync.RWMutex{RWMutex: sync.RWMutex{}},
+		stopReceiveMessagesReason: nil,
+		closed:                    false,
+		lastWrittenIndex:          0,
+		lastSentIndex:             0,
 	}
 }
 
