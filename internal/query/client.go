@@ -108,15 +108,12 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 	//	return err
 	//}
 
+	ctx, cancel := xcontext.WithDone(ctx, c.done)
+	defer cancel()
+
 	doOpts := options.ParseDoOpts(c.config.Trace(), opts...)
 
 	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		select {
-		case <-c.done:
-			return xerrors.WithStackTrace(errClosedClient)
-		default:
-
-		}
 		var (
 			createCtx    context.Context
 			cancelCreate context.CancelFunc
@@ -201,16 +198,13 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 	//	return err
 	//}
 
+	ctx, cancel := xcontext.WithDone(ctx, c.done)
+	defer cancel()
+
 	doTxOpts := options.ParseDoTxOpts(c.config.Trace(), opts...)
 	doOpts := options.ParseDoOpts(c.config.Trace(), doTxOpts.DoOpts()...)
 
 	return retry.Retry(ctx, func(ctx context.Context) (err error) {
-		select {
-		case <-c.done:
-			return xerrors.WithStackTrace(errClosedClient)
-		default:
-
-		}
 		var (
 			createCtx    context.Context
 			cancelCreate context.CancelFunc
