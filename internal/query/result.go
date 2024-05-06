@@ -130,40 +130,10 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 		case <-ctx.Done():
 			return nil, xerrors.WithStackTrace(ctx.Err())
 		default:
-			if resultSetIndex := r.lastPart.GetResultSetIndex(); resultSetIndex >= nextResultSetIndex { //nolint:nestif
+			if resultSetIndex := r.lastPart.GetResultSetIndex(); resultSetIndex >= nextResultSetIndex {
 				r.resultSetIndex = resultSetIndex
 
-				return newResultSet(func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
-					defer func() {
-						if err != nil && !xerrors.Is(err,
-							io.EOF, context.Canceled,
-						) {
-							r.errs = append(r.errs, err)
-						}
-					}()
-					select {
-					case <-r.closed:
-						return nil, errClosedResult
-					default:
-						part, err := nextPart(ctx, r.stream, r.trace)
-						if err != nil {
-							if xerrors.Is(err, io.EOF) {
-								_ = r.closeOnce(ctx)
-							}
-
-							return nil, xerrors.WithStackTrace(err)
-						}
-						r.lastPart = part
-						if part.GetResultSetIndex() > nextResultSetIndex {
-							return nil, xerrors.WithStackTrace(fmt.Errorf(
-								"result set (index=%d) receive part (index=%d) for next result set: %w",
-								nextResultSetIndex, part.GetResultSetIndex(), io.EOF,
-							))
-						}
-
-						return part, nil
-					}
-				}, r.lastPart, r.trace), nil
+				return newResultSet(r.getNextResultSetPart(ctx, nextResultSetIndex), r.lastPart, r.trace), nil
 			}
 			part, err := nextPart(ctx, r.stream, r.trace)
 			if err != nil {
@@ -177,6 +147,43 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 			}
 			r.lastPart = part
 			r.resultSetIndex = part.GetResultSetIndex()
+		}
+	}
+}
+
+func (r *result) getNextResultSetPart(
+	ctx context.Context,
+	nextResultSetIndex int64,
+) func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
+	return func() (_ *Ydb_Query.ExecuteQueryResponsePart, err error) {
+		defer func() {
+			if err != nil && !xerrors.Is(err,
+				io.EOF, context.Canceled,
+			) {
+				r.errs = append(r.errs, err)
+			}
+		}()
+		select {
+		case <-r.closed:
+			return nil, errClosedResult
+		default:
+			part, err := nextPart(ctx, r.stream, r.trace)
+			if err != nil {
+				if xerrors.Is(err, io.EOF) {
+					_ = r.closeOnce(ctx)
+				}
+
+				return nil, xerrors.WithStackTrace(err)
+			}
+			r.lastPart = part
+			if part.GetResultSetIndex() > nextResultSetIndex {
+				return nil, xerrors.WithStackTrace(fmt.Errorf(
+					"result set (index=%d) receive part (index=%d) for next result set: %w",
+					nextResultSetIndex, part.GetResultSetIndex(), io.EOF,
+				))
+			}
+
+			return part, nil
 		}
 	}
 }
