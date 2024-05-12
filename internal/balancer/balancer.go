@@ -24,7 +24,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var ErrNoEndpoints = xerrors.Wrap(fmt.Errorf("no endpoints"))
+var ErrNoEndpoints = xerrors.Wrap(fmt.Errorf("no endpoints")) //nolint:goerr113
 
 type discoveryClient interface {
 	closer.Closer

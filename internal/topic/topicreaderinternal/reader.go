@@ -17,6 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+//nolint:goerr113
 var (
 	errUnconnected = xerrors.Retryable(xerrors.Wrap(
 		errors.New("ydb: first connection attempt not finished"),

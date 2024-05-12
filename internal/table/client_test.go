@@ -31,6 +31,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+var errLimitOverflow = errors.New("stub session: limit overflow")
+
 func TestSessionPoolCreateAbnormalResult(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		limit := 100
@@ -446,7 +448,7 @@ func TestSessionPoolRacyGet(t *testing.T) {
 				return
 			}
 			if s != expSession {
-				err = fmt.Errorf("unexpected session: %v; want %v", s, expSession)
+				err = fmt.Errorf("unexpected session: %v; want %v", s, expSession) //nolint:goerr113
 
 				return
 			}
@@ -895,7 +897,7 @@ func (s *StubBuilder) createSession(ctx context.Context) (session *session, err 
 
 	s.mu.WithLock(func() {
 		if s.Limit > 0 && s.actual == s.Limit {
-			err = fmt.Errorf("stub session: limit overflow")
+			err = errLimitOverflow
 		}
 	})
 	if err != nil {

@@ -42,9 +42,9 @@ func TestIsTransportError(t *testing.T) {
 		{
 			name: xtest.CurrentFileLine(),
 			err: Join(
-				fmt.Errorf("test"),
+				errTest,
 				grpcStatus.Error(grpcCodes.Canceled, ""),
-				Retryable(fmt.Errorf("test")),
+				Retryable(errTest),
 			),
 			match: true,
 		},
@@ -76,9 +76,9 @@ func TestIsTransportError(t *testing.T) {
 		{
 			name: xtest.CurrentFileLine(),
 			err: Join(
-				fmt.Errorf("test"),
+				errTest,
 				grpcStatus.Error(grpcCodes.Canceled, ""),
-				Retryable(fmt.Errorf("test")),
+				Retryable(errTest),
 			),
 			codes: []grpcCodes.Code{grpcCodes.Canceled},
 			match: true,
@@ -111,9 +111,9 @@ func TestIsTransportError(t *testing.T) {
 		{
 			name: xtest.CurrentFileLine(),
 			err: Join(
-				fmt.Errorf("test"),
+				errTest,
 				grpcStatus.Error(grpcCodes.Canceled, ""),
-				Retryable(fmt.Errorf("test")),
+				Retryable(errTest),
 			),
 			codes: []grpcCodes.Code{grpcCodes.Aborted},
 			match: false,

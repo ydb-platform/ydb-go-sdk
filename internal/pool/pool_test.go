@@ -18,6 +18,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
+var errExpected = errors.New("expected error")
+
 type testItem struct {
 	v uint32
 
@@ -227,7 +229,7 @@ func TestPool(t *testing.T) {
 				var (
 					newItems    int64
 					deleteItems int64
-					expErr      = xerrors.Retryable(errors.New("expected error"), xerrors.InvalidObject())
+					expErr      = xerrors.Retryable(errExpected, xerrors.InvalidObject())
 				)
 				p := New(rootCtx,
 					WithLimit[*testItem, testItem](1),

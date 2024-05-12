@@ -12,14 +12,15 @@ import (
 )
 
 var (
-	errUnexpectedNilStreamReadMessageReadResponse     = xerrors.Wrap(errors.New("ydb: unexpected nil Ydb_Topic.StreamReadMessage_ReadResponse")) //nolint:lll
-	errNilPartitionData                               = xerrors.Wrap(errors.New("ydb: unexpected nil partition data"))
-	errUnexpectedNilBatchInPartitionData              = xerrors.Wrap(errors.New("ydb: unexpected nil batch in partition data"))   //nolint:lll
-	errUnexpectedMessageNilInPartitionData            = xerrors.Wrap(errors.New("ydb: unexpected message nil in partition data")) //nolint:lll
-	errUnexpectedProtobufInOffsets                    = xerrors.Wrap(errors.New("ydb: unexpected protobuf nil offsets"))
-	errUnexpectedProtoNilStartPartitionSessionRequest = xerrors.Wrap(errors.New("ydb: unexpected proto nil start partition session request"))                      //nolint:lll
-	errUnexpectedNilPartitionSession                  = xerrors.Wrap(errors.New("ydb: unexpected proto nil partition session in start partition session request")) //nolint:lll
-	errUnexpectedGrpcNilStopPartitionSessionRequest   = xerrors.Wrap(errors.New("ydb: unexpected grpc nil stop partition session request"))                        //nolint:lll
+	errUnexpectedNilStreamReadMessageReadResponse     = xerrors.Wrap(errors.New("ydb: unexpected nil Ydb_Topic.StreamReadMessage_ReadResponse"))                   //nolint:lll,goerr113
+	errNilPartitionData                               = xerrors.Wrap(errors.New("ydb: unexpected nil partition data"))                                             //nolint:goerr113
+	errUnexpectedNilBatchInPartitionData              = xerrors.Wrap(errors.New("ydb: unexpected nil batch in partition data"))                                    //nolint:lll,goerr113
+	errUnexpectedMessageNilInPartitionData            = xerrors.Wrap(errors.New("ydb: unexpected message nil in partition data"))                                  //nolint:lll,goerr113
+	errUnexpectedProtobufInOffsets                    = xerrors.Wrap(errors.New("ydb: unexpected protobuf nil offsets"))                                           //nolint:goerr113
+	errUnexpectedProtoNilStartPartitionSessionRequest = xerrors.Wrap(errors.New("ydb: unexpected proto nil start partition session request"))                      //nolint:lll,goerr113
+	errUnexpectedNilPartitionSession                  = xerrors.Wrap(errors.New("ydb: unexpected proto nil partition session in start partition session request")) //nolint:lll,goerr113
+	errUnexpectedGrpcNilStopPartitionSessionRequest   = xerrors.Wrap(errors.New("ydb: unexpected grpc nil stop partition session request"))                        //nolint:lll,goerr113
+	errUnexpectedNilWhileParseCommitOffsetResponse    = xerrors.Wrap(errors.New("unexpected nil while parse commit offset response"))                              //nolint:lll,goerr113
 )
 
 type PartitionSessionID int64
@@ -364,7 +365,7 @@ func (r *CommitOffsetResponse) fromProto(proto *Ydb_Topic.StreamReadMessage_Comm
 	for i := range r.PartitionsCommittedOffsets {
 		srcCommitted := proto.GetPartitionsCommittedOffsets()[i]
 		if srcCommitted == nil {
-			return xerrors.WithStackTrace(errors.New("unexpected nil while parse commit offset response"))
+			return xerrors.WithStackTrace(errUnexpectedNilWhileParseCommitOffsetResponse)
 		}
 		dstCommitted := &r.PartitionsCommittedOffsets[i]
 

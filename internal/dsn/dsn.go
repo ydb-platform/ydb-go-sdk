@@ -30,6 +30,7 @@ func Parse(dsn string) (info parsedInfo, err error) {
 		return info, xerrors.WithStackTrace(err)
 	}
 	if port := uri.Port(); port == "" {
+		//nolint:goerr113
 		return info, xerrors.WithStackTrace(fmt.Errorf("bad connection string '%s': port required", dsn))
 	}
 	info.Options = append(info.Options,

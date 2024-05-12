@@ -33,7 +33,7 @@ func GenerateDeclareSection[T constraint](parameters T) (string, error) {
 	case []sql.NamedArg:
 		return namedArgsToDeclares(v)
 	default:
-		return "", xerrors.WithStackTrace(fmt.Errorf("unsupported type: %T", v))
+		return "", xerrors.WithStackTrace(fmt.Errorf("unsupported type: %T", v)) //nolint:goerr113
 	}
 }
 
@@ -46,6 +46,7 @@ func ToYdbParam(param sql.NamedArg) (*params.Parameter, error) {
 		return nil, xerrors.WithStackTrace(err)
 	}
 	if len(params) != 1 {
+		//nolint:goerr113
 		return nil, xerrors.WithStackTrace(fmt.Errorf("internal error: wrong parameters count: %v", params))
 	}
 

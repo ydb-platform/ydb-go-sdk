@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
+//nolint:goerr113
 var (
 	ErrAlreadyClosed       = xerrors.Wrap(errors.New("ydb: background worker already closed"))
 	errClosedWithNilReason = xerrors.Wrap(errors.New("ydb: background worker closed with nil reason"))

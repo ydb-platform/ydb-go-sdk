@@ -13,6 +13,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
+//nolint:goerr113
 var ErrNotComparable = xerrors.Wrap(fmt.Errorf("not comparable"))
 
 // Compare compares its operands.

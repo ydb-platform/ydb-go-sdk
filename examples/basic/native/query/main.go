@@ -9,7 +9,7 @@ import (
 	"time"
 
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
 )
 
@@ -19,6 +19,7 @@ func isYdbVersionHaveQueryService() error {
 	for i, component := range ydbVersion {
 		if i < len(minYdbVersion) {
 			if r := strings.Compare(component, minYdbVersion[i]); r < 0 {
+				//nolint:goerr113
 				return fmt.Errorf("example '%s' run on minimal YDB version '%v', but current version is '%s'",
 					os.Args[0],
 					strings.Join(minYdbVersion, "."),

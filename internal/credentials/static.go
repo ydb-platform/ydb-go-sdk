@@ -111,7 +111,7 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 	switch {
 	case !response.GetOperation().GetReady():
 		return "", xerrors.WithStackTrace(
-			fmt.Errorf("operation '%s' not ready: %v",
+			fmt.Errorf("operation '%s' not ready: %v", //nolint:goerr113
 				response.GetOperation().GetId(),
 				response.GetOperation().GetIssues(),
 			),

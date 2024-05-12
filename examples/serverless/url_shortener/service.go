@@ -22,7 +22,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydbMetrics "github.com/ydb-platform/ydb-go-sdk-prometheus/v2"
-	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
+	"github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/options"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
@@ -306,7 +306,7 @@ func (s *service) selectLong(ctx context.Context, hash string) (url string, err 
 		}
 	}
 
-	return "", fmt.Errorf("hash '%s' is not found", hash)
+	return "", fmt.Errorf("hash '%s' is not found", hash) //nolint:goerr113
 }
 
 func writeResponse(w http.ResponseWriter, statusCode int, body string) {
@@ -390,7 +390,7 @@ func (s *service) handleShorten(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !isLongCorrect(string(url)) {
-		err = fmt.Errorf("'%s' is not a valid URL", url)
+		err = fmt.Errorf("'%s' is not a valid URL", url) //nolint:goerr113
 		writeResponse(w, http.StatusBadRequest, err.Error())
 
 		return
@@ -428,7 +428,7 @@ func (s *service) handleLonger(w http.ResponseWriter, r *http.Request) {
 	}()
 	path := strings.Split(r.URL.Path, "/")
 	if !isShortCorrect(path[len(path)-1]) {
-		err = fmt.Errorf("'%s' is not a valid short path", path[len(path)-1])
+		err = fmt.Errorf("'%s' is not a valid short path", path[len(path)-1]) //nolint:goerr113
 		writeResponse(w, http.StatusBadRequest, err.Error())
 
 		return

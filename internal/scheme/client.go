@@ -17,8 +17,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-//nolint:gofumpt
-//nolint:nolintlint
+//nolint:gofumpt,nolintlint,goerr113
 var errNilClient = xerrors.Wrap(errors.New("scheme client is not initialized"))
 
 type Client struct {

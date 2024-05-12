@@ -112,7 +112,7 @@ func (c *partitionSessionStorage) Add(session *partitionSession) error {
 	defer c.m.Unlock()
 
 	if _, ok := c.sessions[session.partitionSessionID]; ok {
-		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.partitionSessionID))
+		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.partitionSessionID)) //nolint:lll,goerr113
 	}
 	c.sessions[session.partitionSessionID] = &sessionInfo{Session: session}
 
@@ -125,7 +125,7 @@ func (c *partitionSessionStorage) Get(id partitionSessionID) (*partitionSession,
 
 	partitionInfo, has := c.sessions[id]
 	if !has || partitionInfo.Session == nil {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: read undefined partition session with id: %v", id))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: read undefined partition session with id: %v", id)) //nolint:lll,goerr113
 	}
 
 	return partitionInfo.Session, nil
@@ -145,7 +145,7 @@ func (c *partitionSessionStorage) Remove(id partitionSessionID) (*partitionSessi
 
 	c.compactionNeedLock(now)
 
-	return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: delete undefined partition session with id: %v", id))
+	return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: delete undefined partition session with id: %v", id)) //nolint:lll,goerr113
 }
 
 func (c *partitionSessionStorage) compactionNeedLock(now time.Time) {

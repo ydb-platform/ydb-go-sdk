@@ -365,7 +365,7 @@ func opWithRecover(ctx context.Context, options *retryOptions, op retryOperation
 			if e := recover(); e != nil {
 				options.panicCallback(e)
 				err = xerrors.WithStackTrace(
-					fmt.Errorf("panic recovered: %v", e),
+					fmt.Errorf("panic recovered: %v", e), //nolint:goerr113
 				)
 			}
 		}()

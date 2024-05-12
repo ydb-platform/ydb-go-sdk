@@ -30,6 +30,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+//nolint:goerr113
 var (
 	errConnTimeout           = xerrors.Wrap(errors.New("ydb: connection timeout"))
 	errStopWriterReconnector = xerrors.Wrap(errors.New("ydb: stop writer reconnector"))
@@ -475,7 +476,9 @@ func (w *WriterReconnector) connectWithTimeout(streamLifetimeContext context.Con
 			if p != nil {
 				resCh <- resT{
 					stream: nil,
-					err:    xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: panic while connect to topic writer: %+v", p))),
+					err: xerrors.WithStackTrace(xerrors.Wrap(
+						fmt.Errorf("ydb: panic while connect to topic writer: %+v", p), //nolint:goerr113
+					)),
 				}
 			}
 		}()

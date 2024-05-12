@@ -11,6 +11,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
+var errEmpty = errors.New("")
+
 func TestOnceFunc(t *testing.T) {
 	var (
 		ctx = xtest.Context(t)
@@ -62,27 +64,25 @@ func TestOnceValue(t *testing.T) {
 		wg.Wait()
 	})
 	t.Run("GetBeforeClose", func(t *testing.T) {
-		constCloseErr := errors.New("")
 		once := OnceValue(func() *testCloser {
 			return &testCloser{
 				inited:   true,
-				closeErr: constCloseErr,
+				closeErr: errEmpty,
 			}
 		})
 		v := once.Get()
 		require.True(t, v.inited)
 		require.False(t, v.closed)
 		err := once.Close(ctx)
-		require.ErrorIs(t, err, constCloseErr)
+		require.ErrorIs(t, err, errEmpty)
 		require.True(t, v.inited)
 		require.True(t, v.closed)
 	})
 	t.Run("CloseBeforeGet", func(t *testing.T) {
-		constCloseErr := errors.New("")
 		once := OnceValue(func() *testCloser {
 			return &testCloser{
 				inited:   true,
-				closeErr: constCloseErr,
+				closeErr: errEmpty,
 			}
 		})
 		err := once.Close(ctx)

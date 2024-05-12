@@ -6,6 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
+//nolint:goerr113
 var errSyntax = xerrors.Wrap(fmt.Errorf("invalid syntax"))
 
 type ParseError struct {
@@ -32,7 +33,7 @@ func syntaxError(s string) *ParseError {
 
 func precisionError(s string, precision, scale uint32) *ParseError {
 	return &ParseError{
-		Err:   fmt.Errorf("invalid precision/scale: %d/%d", precision, scale),
+		Err:   fmt.Errorf("invalid precision/scale: %d/%d", precision, scale), //nolint:goerr113
 		Input: s,
 	}
 }

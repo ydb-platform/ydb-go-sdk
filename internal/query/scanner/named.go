@@ -25,7 +25,7 @@ func NamedRef(columnName string, destinationValueReference interface{}) (dst Nam
 	dst.name = columnName
 	v := reflect.TypeOf(destinationValueReference)
 	if v.Kind() != reflect.Ptr {
-		panic(fmt.Errorf("%T is not reference type", destinationValueReference))
+		panic(fmt.Errorf("%T is not reference type", destinationValueReference)) //nolint:goerr113
 	}
 	dst.ref = destinationValueReference
 

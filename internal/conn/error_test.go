@@ -7,29 +7,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var (
+	errTest  = errors.New("test")
+	errTest2 = errors.New("test2")
+)
+
 func TestNodeErrorError(t *testing.T) {
-	testErr := errors.New("test")
-	nodeErr := newConnError(1, "localhost:1234", testErr)
+	nodeErr := newConnError(1, "localhost:1234", errTest)
 	message := nodeErr.Error()
 
 	require.Equal(t, "connError{node_id:1,address:'localhost:1234'}: test", message)
 }
 
 func TestNodeErrorUnwrap(t *testing.T) {
-	testErr := errors.New("test")
-	nodeErr := newConnError(1, "asd", testErr)
+	nodeErr := newConnError(1, "asd", errTest)
 
 	unwrapped := errors.Unwrap(nodeErr)
-	require.Equal(t, testErr, unwrapped)
+	require.Equal(t, errTest, unwrapped)
 }
 
 func TestNodeErrorIs(t *testing.T) {
-	testErr := errors.New("test")
-	testErr2 := errors.New("test2")
-	nodeErr := newConnError(1, "localhost:1234", testErr)
+	nodeErr := newConnError(1, "localhost:1234", errTest)
 
-	require.ErrorIs(t, nodeErr, testErr)
-	require.NotErrorIs(t, nodeErr, testErr2)
+	require.ErrorIs(t, nodeErr, errTest)
+	require.NotErrorIs(t, nodeErr, errTest2)
 }
 
 type testType1Error struct {

@@ -24,10 +24,13 @@ import (
 
 const defaultBufferSize = 1024 * 1024
 
+//nolint:goerr113
 var (
 	PublicErrCommitSessionToExpiredSession = xerrors.Wrap(errors.New("ydb: commit to expired session"))
 
 	errCommitWithNilPartitionSession = xerrors.Wrap(errors.New("ydb: commit with nil partition session"))
+	errNotStarted                    = xerrors.Wrap(errors.New("not started: can be started only after initialize from constructor")) //nolint:lll
+	errAlreadyStarted                = xerrors.Wrap(errors.New("already started"))
 )
 
 type partitionSessionID = rawtopicreader.PartitionSessionID
@@ -167,7 +170,7 @@ func newTopicStreamReaderStopped(
 
 func (r *topicStreamReaderImpl) WaitInit(_ context.Context) error {
 	if !r.started {
-		return errors.New("not started: can be started only after initialize from constructor")
+		return errNotStarted
 	}
 
 	return nil
@@ -230,7 +233,7 @@ func (r *topicStreamReaderImpl) consumeMessagesUntilBatch(
 		case item.IsRawMessage():
 			r.sendRawMessageToChannelUnblocked(item.RawMessage)
 		default:
-			return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: unexpected item type from batcher: %#v", item))
+			return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: unexpected item type from batcher: %#v", item)) //nolint:lll,goerr113
 		}
 	}
 }
@@ -281,7 +284,7 @@ func (r *topicStreamReaderImpl) consumeRawMessageFromBuffer(ctx context.Context)
 			r.onPartitionSessionStatusResponseFromBuffer(ctx, m)
 		default:
 			_ = r.CloseWithError(ctx, xerrors.WithStackTrace(
-				fmt.Errorf("ydb: unexpected server message from buffer: %v", reflect.TypeOf(msg))),
+				fmt.Errorf("ydb: unexpected server message from buffer: %v", reflect.TypeOf(msg))), //nolint:goerr113
 			)
 		}
 	}
@@ -432,7 +435,7 @@ func (r *topicStreamReaderImpl) setStarted() error {
 	defer r.m.Unlock()
 
 	if r.started {
-		return xerrors.WithStackTrace(errors.New("already started"))
+		return xerrors.WithStackTrace(errAlreadyStarted)
 	}
 
 	r.started = true
@@ -458,12 +461,12 @@ func (r *topicStreamReaderImpl) initSession() (err error) {
 	}
 
 	if status := resp.StatusData(); !status.Status.IsSuccess() {
-		return xerrors.WithStackTrace(fmt.Errorf("bad status on initial error: %v (%v)", status.Status, status.Issues))
+		return xerrors.WithStackTrace(fmt.Errorf("bad status on initial error: %v (%v)", status.Status, status.Issues)) //nolint:lll,goerr113
 	}
 
 	initResp, ok := resp.(*rawtopicreader.InitResponse)
 	if !ok {
-		return xerrors.WithStackTrace(fmt.Errorf("bad message type on session init: %v (%v)", resp, reflect.TypeOf(resp)))
+		return xerrors.WithStackTrace(fmt.Errorf("bad message type on session init: %v (%v)", resp, reflect.TypeOf(resp))) //nolint:lll,goerr113
 	}
 
 	r.readConnectionID = initResp.SessionID
@@ -507,7 +510,7 @@ func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
 		if !status.Status.IsSuccess() {
 			_ = r.CloseWithError(ctx,
 				xerrors.WithStackTrace(
-					fmt.Errorf("ydb: bad status from pq grpc stream: %v, %v", status.Status, status.Issues.String()),
+					fmt.Errorf("ydb: bad status from pq grpc stream: %v, %v", status.Status, status.Issues.String()), //nolint:lll,goerr113
 				),
 			)
 		}
@@ -542,10 +545,10 @@ func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
 			trace.TopicOnReaderUnknownGrpcMessage(
 				r.cfg.Trace,
 				r.readConnectionID,
-				xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
-					"ydb: unexpected message type in stream reader: %v",
-					reflect.TypeOf(serverMessage),
-				))),
+				xerrors.WithStackTrace(xerrors.Wrap(
+					fmt.Errorf("ydb: unexpected message type in stream reader: %v", //nolint:goerr113
+						reflect.TypeOf(serverMessage),
+					))),
 			)
 		}
 	}

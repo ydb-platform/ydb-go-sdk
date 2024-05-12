@@ -14,7 +14,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-var _ Credentials = customCredentials{}
+var (
+	_ Credentials = customCredentials{}
+
+	errTest = errors.New("test")
+	errSome = errors.New("some error")
+)
 
 type customCredentials struct {
 	token string
@@ -32,7 +37,7 @@ func TestAccessError(t *testing.T) {
 		{
 			err: AccessError(
 				"something went wrong",
-				errors.New("test"),
+				errTest,
 				WithEndpoint("grps://localhost:2135"),
 				WithDatabase("/local"),
 				WithCredentials(NewAnonymousCredentials(WithSourceInfo(""))),
@@ -42,12 +47,12 @@ func TestAccessError(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"Anonymous{}\"" +
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessError(access_error_test.go:33)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessError(access_error_test.go:38)`", //nolint:lll
 		},
 		{
 			err: AccessError(
 				"something went wrong",
-				errors.New("test"),
+				errTest,
 				WithEndpoint("grps://localhost:2135"),
 				WithDatabase("/local"),
 				WithCredentials(NewAnonymousCredentials(WithSourceInfo(t.Name()))),
@@ -57,12 +62,12 @@ func TestAccessError(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"Anonymous{From:\\\"TestAccessError\\\"}\"" +
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessError(access_error_test.go:48)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessError(access_error_test.go:53)`", //nolint:lll
 		},
 		{
 			err: AccessError(
 				"something went wrong",
-				errors.New("test"),
+				errTest,
 				WithEndpoint("grps://localhost:2135"),
 				WithDatabase("/local"),
 				WithCredentials(NewAccessTokenCredentials("SECRET_TOKEN", WithSourceInfo(""))),
@@ -72,12 +77,12 @@ func TestAccessError(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"AccessToken{Token:\\\"****(CRC-32c: 9B7801F4)\\\"}\"" +
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessError(access_error_test.go:63)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessError(access_error_test.go:68)`", //nolint:lll
 		},
 		{
 			err: AccessError(
 				"something went wrong",
-				errors.New("test"),
+				errTest,
 				WithEndpoint("grps://localhost:2135"),
 				WithDatabase("/local"),
 				WithCredentials(NewAccessTokenCredentials("SECRET_TOKEN", WithSourceInfo(t.Name()))),
@@ -87,12 +92,12 @@ func TestAccessError(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"AccessToken{Token:\\\"****(CRC-32c: 9B7801F4)\\\",From:\\\"TestAccessError\\\"}\"" +
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessError(access_error_test.go:78)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessError(access_error_test.go:83)`", //nolint:lll
 		},
 		{
 			err: AccessError(
 				"something went wrong",
-				errors.New("test"),
+				errTest,
 				WithEndpoint("grps://localhost:2135"),
 				WithDatabase("/local"),
 				WithCredentials(
@@ -106,12 +111,12 @@ func TestAccessError(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"Static{User:\\\"USER\\\",Password:\\\"SEC**********RD\\\",Token:\\\"****(CRC-32c: 00000000)\\\"}\"" + //nolint:lll
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessError(access_error_test.go:93)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessError(access_error_test.go:98)`", //nolint:lll
 		},
 		{
 			err: AccessError(
 				"something went wrong",
-				errors.New("test"),
+				errTest,
 				WithEndpoint("grps://localhost:2135"),
 				WithDatabase("/local"),
 				WithCredentials(
@@ -125,12 +130,12 @@ func TestAccessError(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"Static{User:\\\"USER\\\",Password:\\\"SEC**********RD\\\",Token:\\\"****(CRC-32c: 00000000)\\\",From:\\\"TestAccessError\\\"}\"" + //nolint:lll
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessError(access_error_test.go:112)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessError(access_error_test.go:117)`", //nolint:lll
 		},
 		{
 			err: AccessError(
 				"something went wrong",
-				errors.New("test"),
+				errTest,
 				WithEndpoint("grps://localhost:2135"),
 				WithDatabase("/local"),
 				WithCredentials(customCredentials{token: "SECRET_TOKEN"}),
@@ -140,12 +145,12 @@ func TestAccessError(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.customCredentials\"" +
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessError(access_error_test.go:131)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessError(access_error_test.go:136)`", //nolint:lll
 		},
 		{
 			err: AccessError(
 				"something went wrong",
-				errors.New("test"),
+				errTest,
 				WithEndpoint("grps://localhost:2135"),
 				WithDatabase("/local"),
 				WithCredentials(NewAnonymousCredentials(WithSourceInfo(""))),
@@ -155,7 +160,7 @@ func TestAccessError(t *testing.T) {
 				"database:\"/local\"," +
 				"credentials:\"Anonymous{}\"" +
 				"): test " +
-				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessError(access_error_test.go:146)`", //nolint:lll
+				"at `github.com/ydb-platform/ydb-go-sdk/v3/internal/credentials.TestAccessError(access_error_test.go:151)`", //nolint:lll
 		},
 	} {
 		t.Run("", func(t *testing.T) {
@@ -194,7 +199,7 @@ func TestIsAccessError(t *testing.T) {
 			is:    true,
 		},
 		{
-			error: errors.New("some error"),
+			error: errSome,
 			is:    false,
 		},
 	} {

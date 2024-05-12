@@ -43,7 +43,7 @@ func (e *EncoderMap) CreateLazyEncodeWriter(codec rawtopiccommon.Codec, target i
 		return encoderCreator(target)
 	}
 
-	return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected codec '%v' for encode message", codec)))
+	return nil, xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected codec '%v' for encode message", codec))) //nolint:lll,goerr113
 }
 
 func (e *EncoderMap) GetSupportedCodecs() rawtopiccommon.SupportedCodecs {

@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
+//nolint:goerr113
 var errMessageWasReadEarly = xerrors.Wrap(errors.New("ydb: message was read early"))
 
 // ErrPublicUnexpectedCodec return when try to read message content with unknown codec

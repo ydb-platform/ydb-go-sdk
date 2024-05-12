@@ -19,6 +19,7 @@ func IsDirectoryExists(ctx context.Context, c schemeClient, directory string) (
 	exists bool, _ error,
 ) {
 	if !strings.HasPrefix(directory, c.Database()) {
+		//nolint:goerr113
 		return false, xerrors.WithStackTrace(fmt.Errorf(
 			"path '%s' must be inside database '%s'",
 			directory, c.Database(),
@@ -45,6 +46,7 @@ func IsDirectoryExists(ctx context.Context, c schemeClient, directory string) (
 			continue
 		}
 		if t := d.Children[i].Type; t != scheme.EntryDirectory {
+			//nolint:goerr113
 			return false, xerrors.WithStackTrace(fmt.Errorf(
 				"entry '%s' in path '%s' is not a directory: %s",
 				childDirectory, parentDirectory, t.String(),
@@ -61,11 +63,13 @@ func IsEntryExists(ctx context.Context, c schemeClient, absPath string, entryTyp
 	exists bool, _ error,
 ) {
 	if !strings.HasPrefix(absPath, c.Database()) {
+		//nolint:goerr113
 		return false, xerrors.WithStackTrace(fmt.Errorf(
 			"entry path '%s' must be inside database '%s'",
 			absPath, c.Database(),
 		))
 	} else if absPath == c.Database() {
+		//nolint:goerr113
 		return false, xerrors.WithStackTrace(fmt.Errorf(
 			"entry path '%s' cannot be equals database name '%s'",
 			absPath, c.Database(),
@@ -95,6 +99,7 @@ func IsEntryExists(ctx context.Context, c schemeClient, absPath string, entryTyp
 			}
 		}
 
+		//nolint:goerr113
 		return false, xerrors.WithStackTrace(fmt.Errorf(
 			"entry type of '%s' (%s) in path '%s' is not corresponds to %v",
 			entryName, childrenType, directory, entryTypes,

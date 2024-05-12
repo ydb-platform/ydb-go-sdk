@@ -47,7 +47,7 @@ func (s StreamReader) Recv() (ServerMessage, error) {
 		return nil, err
 	}
 	if !meta.Status.IsSuccess() {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: bad status from topic server: %v", meta.Status))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("ydb: bad status from topic server: %v", meta.Status)) //nolint:lll,goerr113
 	}
 
 	switch m := grpcMess.GetServerMessage().(type) {
@@ -170,7 +170,7 @@ func (s StreamReader) Send(msg ClientMessage) (err error) {
 
 		return s.Stream.Send(grpcMess)
 	default:
-		return xerrors.WithStackTrace(fmt.Errorf("ydb: send unexpected message type: %v", reflect.TypeOf(msg)))
+		return xerrors.WithStackTrace(fmt.Errorf("ydb: send unexpected message type: %v", reflect.TypeOf(msg))) //nolint:lll,goerr113
 	}
 }
 

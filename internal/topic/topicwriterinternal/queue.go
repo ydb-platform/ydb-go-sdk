@@ -12,6 +12,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 )
 
+//nolint:goerr113
 var (
 	errCloseClosedMessageQueue   = xerrors.Wrap(errors.New("ydb: close closed message queue"))
 	errAckOnClosedMessageQueue   = xerrors.Wrap(errors.New("ydb: ack on closed message queue"))
@@ -136,7 +137,7 @@ func (q *messageQueue) addMessageNeedLock(
 	}
 
 	if _, ok := q.messagesByOrder[messageIndex]; ok {
-		panic(fmt.Errorf("ydb: bad internal state os message queue - already exists with index: %v", messageIndex))
+		panic(fmt.Errorf("ydb: bad internal state os message queue - already exists with index: %v", messageIndex)) //nolint:lll,goerr113
 	}
 
 	q.messagesByOrder[messageIndex] = mess

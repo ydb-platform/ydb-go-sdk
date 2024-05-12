@@ -14,9 +14,9 @@ import (
 )
 
 var (
-	errWriteResultProtoIsNil             = xerrors.Wrap(errors.New("ydb: write result proto is nil"))
-	errWriteResultResponseWriteAckIsNil  = xerrors.Wrap(errors.New("ydb: write result response write ack is nil"))
-	errWriteResultResponseStatisticIsNil = xerrors.Wrap(errors.New("ydb: write result response statistic is nil"))
+	errWriteResultProtoIsNil             = xerrors.Wrap(errors.New("ydb: write result proto is nil"))              //nolint:lll,goerr113
+	errWriteResultResponseWriteAckIsNil  = xerrors.Wrap(errors.New("ydb: write result response write ack is nil")) //nolint:lll,goerr113
+	errWriteResultResponseStatisticIsNil = xerrors.Wrap(errors.New("ydb: write result response statistic is nil")) //nolint:lll,goerr113
 )
 
 type InitRequest struct {
@@ -83,6 +83,7 @@ func (p *Partitioning) setToProtoInitRequest(r *Ydb_Topic.StreamWriteMessage_Ini
 			PartitionId: p.PartitionID,
 		}
 	default:
+		//nolint:goerr113
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: unexpected partition type while set to init request: %v",
 			p.Type,
@@ -105,6 +106,7 @@ func (p *Partitioning) setToProtoMessage(m *Ydb_Topic.StreamWriteMessage_WriteRe
 			PartitionId: p.PartitionID,
 		}
 	default:
+		//nolint:goerr113
 		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf(
 			"ydb: unexpected partition type while set to message proto: %v",
 			p.Type,
@@ -257,7 +259,7 @@ func (s *MessageWriteStatus) fromProto(status interface{}) error {
 
 		return nil
 	default:
-		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected write status type: %v", reflect.TypeOf(v))))
+		return xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: unexpected write status type: %v", reflect.TypeOf(v)))) //nolint:lll,goerr113
 	}
 }
 

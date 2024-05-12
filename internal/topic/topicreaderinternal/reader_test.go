@@ -2,7 +2,6 @@ package topicreaderinternal
 
 import (
 	"context"
-	"errors"
 	"runtime"
 	"testing"
 
@@ -19,21 +18,20 @@ func TestReader_Close(t *testing.T) {
 		mc := gomock.NewController(t)
 		defer mc.Finish()
 
-		testErr := errors.New("test error")
 		readerContext, readerCancel := xcontext.WithCancel(context.Background())
 		baseReader := NewMockbatchedStreamReader(mc)
 		baseReader.EXPECT().ReadMessageBatch(gomock.Any(), ReadMessageBatchOptions{}).Do(func(_, _ interface{}) {
 			<-readerContext.Done()
-		}).Return(nil, testErr)
+		}).Return(nil, errTest)
 		baseReader.EXPECT().ReadMessageBatch(
 			gomock.Any(),
 			ReadMessageBatchOptions{batcherGetOptions: batcherGetOptions{MaxCount: 1, MinCount: 1}},
 		).Do(func(_, _ interface{}) {
 			<-readerContext.Done()
-		}).Return(nil, testErr)
+		}).Return(nil, errTest)
 		baseReader.EXPECT().Commit(gomock.Any(), gomock.Any()).Do(func(_, _ interface{}) {
 			<-readerContext.Done()
-		}).Return(testErr)
+		}).Return(errTest)
 		baseReader.EXPECT().CloseWithError(gomock.Any(), gomock.Any()).Do(func(_, _ interface{}) {
 			readerCancel()
 		})
@@ -137,9 +135,8 @@ func TestReader_Commit(t *testing.T) {
 			},
 		}
 
-		testErr := errors.New("test err")
-		baseReader.EXPECT().Commit(gomock.Any(), expectedRangeErr).Return(testErr)
-		require.ErrorIs(t, reader.Commit(context.Background(), &PublicMessage{commitRange: expectedRangeErr}), testErr)
+		baseReader.EXPECT().Commit(gomock.Any(), expectedRangeErr).Return(errTest)
+		require.ErrorIs(t, reader.Commit(context.Background(), &PublicMessage{commitRange: expectedRangeErr}), errTest)
 	})
 
 	t.Run("CommitFromOtherReader", func(t *testing.T) {

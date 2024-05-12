@@ -20,6 +20,12 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
+var (
+	errFirstMessage        = errors.New("first message must be init message")
+	errFailReadMsgBlock    = errors.New("failed to read messages block")
+	errReceiveZeroMsgBlock = errors.New("received zero messages block")
+)
+
 func TestRegressionOperationUnavailableIssue1007(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		e := fixenv.New(t)
@@ -58,7 +64,7 @@ func (t *topicWriterOperationUnavailable) StreamWrite(server Ydb_Topic_V1.TopicS
 	}
 
 	if initMsg.GetInitRequest() == nil {
-		return errors.New("first message must be init message")
+		return errFirstMessage
 	}
 
 	err = server.Send(&Ydb_Topic.StreamWriteMessage_FromServer{
@@ -98,12 +104,12 @@ func (t *topicWriterOperationUnavailable) StreamWrite(server Ydb_Topic_V1.TopicS
 	// wait message block
 	messagesMsg, err := server.Recv()
 	if err != nil {
-		return errors.New("failed to read messages block")
+		return errFailReadMsgBlock
 	}
 
 	if len(messagesMsg.GetClientMessage().(*Ydb_Topic.StreamWriteMessage_FromClient_WriteRequest).
 		WriteRequest.GetMessages()) == 0 {
-		return errors.New("received zero messages block")
+		return errReceiveZeroMsgBlock
 	}
 
 	err = server.Send(&Ydb_Topic.StreamWriteMessage_FromServer{

@@ -32,6 +32,8 @@ var (
 	writeTx = table.SerializableReadWriteTxControl(
 		table.CommitTx(),
 	)
+
+	errEntryNotFound = errors.New("get entry: entry not found")
 )
 
 type mapper struct {
@@ -133,7 +135,7 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (row generator.R
 				return fmt.Errorf("get entry error: %w", err)
 			}
 			if !has {
-				return errors.New("get entry: entry not found")
+				return errEntryNotFound
 			}
 
 			return nil

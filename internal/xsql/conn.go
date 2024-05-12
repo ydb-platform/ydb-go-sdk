@@ -263,7 +263,7 @@ func (c *conn) execContext(ctx context.Context, query string, args []driver.Name
 
 		return resultNoRows{}, nil
 	default:
-		return nil, fmt.Errorf("unsupported query mode '%s' for execute query", m)
+		return nil, fmt.Errorf("unsupported query mode '%s' for execute query", m) //nolint:goerr113
 	}
 }
 
@@ -390,7 +390,7 @@ func (c *conn) queryContext(ctx context.Context, query string, args []driver.Nam
 			result: res,
 		}, nil
 	default:
-		return nil, fmt.Errorf("unsupported query mode '%s' on conn query", m)
+		return nil, fmt.Errorf("unsupported query mode '%s' on conn query", m) //nolint:goerr113
 	}
 }
 
@@ -487,7 +487,7 @@ func (c *conn) BeginTx(ctx context.Context, txOptions driver.TxOptions) (_ drive
 		return nil, badconn.Map(
 			xerrors.WithStackTrace(
 				xerrors.Retryable(
-					fmt.Errorf("wrong query mode: %s", m.String()),
+					fmt.Errorf("wrong query mode: %s", m.String()), //nolint:goerr113
 					xerrors.InvalidObject(),
 					xerrors.WithName("WRONG_QUERY_MODE"),
 				),
@@ -540,7 +540,7 @@ func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string)
 		return false, xerrors.WithStackTrace(err)
 	}
 	if !tableExists {
-		return false, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
+		return false, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName)) //nolint:goerr113
 	}
 
 	err = c.retryIdempotent(ctx, func(ctx context.Context) (err error) {
@@ -575,7 +575,7 @@ func (c *conn) GetColumns(ctx context.Context, tableName string) (columns []stri
 		return nil, xerrors.WithStackTrace(err)
 	}
 	if !tableExists {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName)) //nolint:goerr113
 	}
 
 	err = c.retryIdempotent(ctx, func(ctx context.Context) (err error) {
@@ -606,7 +606,7 @@ func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) 
 		return "", xerrors.WithStackTrace(err)
 	}
 	if !tableExists {
-		return "", xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
+		return "", xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName)) //nolint:goerr113
 	}
 
 	columnExist, err := c.IsColumnExists(ctx, tableName, columnName)
@@ -614,6 +614,7 @@ func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) 
 		return "", xerrors.WithStackTrace(err)
 	}
 	if !columnExist {
+		//nolint:goerr113
 		return "", xerrors.WithStackTrace(fmt.Errorf("column '%s' not exist in table '%s'", columnName, tableName))
 	}
 
@@ -649,7 +650,7 @@ func (c *conn) GetPrimaryKeys(ctx context.Context, tableName string) (pkCols []s
 		return nil, xerrors.WithStackTrace(err)
 	}
 	if !tableExists {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName)) //nolint:goerr113
 	}
 
 	err = c.retryIdempotent(ctx, func(ctx context.Context) (err error) {
@@ -678,7 +679,7 @@ func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (
 		return false, xerrors.WithStackTrace(err)
 	}
 	if !tableExists {
-		return false, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
+		return false, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName)) //nolint:goerr113
 	}
 
 	columnExist, err := c.IsColumnExists(ctx, tableName, columnName)
@@ -686,6 +687,7 @@ func (c *conn) IsPrimaryKey(ctx context.Context, tableName, columnName string) (
 		return false, xerrors.WithStackTrace(err)
 	}
 	if !columnExist {
+		//nolint:goerr113
 		return false, xerrors.WithStackTrace(fmt.Errorf("column '%s' not exist in table '%s'", columnName, tableName))
 	}
 
@@ -739,7 +741,7 @@ func (c *conn) getTables(ctx context.Context, absPath string, recursive, exclude
 	}
 
 	if !d.IsDirectory() && !d.IsDatabase() {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("'%s' is not a folder", absPath))
+		return nil, xerrors.WithStackTrace(fmt.Errorf("'%s' is not a folder", absPath)) //nolint:goerr113
 	}
 
 	for i := range d.Children {
@@ -791,7 +793,7 @@ func (c *conn) GetTables(ctx context.Context, folder string, recursive, excludeS
 		return tables, nil
 	default:
 		return nil, xerrors.WithStackTrace(
-			fmt.Errorf("'%s' is not a table or directory (%s)", folder, e.Type.String()),
+			fmt.Errorf("'%s' is not a table or directory (%s)", folder, e.Type.String()), //nolint:goerr113
 		)
 	}
 }
@@ -806,6 +808,7 @@ func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []stri
 		return nil, xerrors.WithStackTrace(err)
 	}
 	if !tableExists {
+		//nolint:goerr113
 		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
 
@@ -850,6 +853,7 @@ func (c *conn) GetIndexColumns(ctx context.Context, tableName, indexName string)
 		return nil, xerrors.WithStackTrace(err)
 	}
 	if !tableExists {
+		//nolint:goerr113
 		return nil, xerrors.WithStackTrace(fmt.Errorf("table '%s' not exist", tableName))
 	}
 
@@ -866,6 +870,7 @@ func (c *conn) GetIndexColumns(ctx context.Context, tableName, indexName string)
 			}
 		}
 
+		//nolint:goerr113
 		return xerrors.WithStackTrace(fmt.Errorf("index '%s' not found in table '%s'", indexName, tableName))
 	})
 	if err != nil {

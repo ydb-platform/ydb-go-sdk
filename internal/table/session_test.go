@@ -31,6 +31,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/testutil"
 )
 
+var errAny = errors.New("any error")
+
 func TestSessionKeepAlive(t *testing.T) {
 	ctx, cancel := xcontext.WithCancel(context.Background())
 	defer cancel()
@@ -60,7 +62,7 @@ func TestSessionKeepAlive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	e = fmt.Errorf("any error")
+	e = errAny
 	err = s.KeepAlive(ctx)
 	if err == nil {
 		t.Fatal(err)
@@ -119,7 +121,7 @@ func TestSessionDescribeTable(t *testing.T) {
 	}
 
 	{
-		e = fmt.Errorf("any error")
+		e = errAny
 		_, err = s.DescribeTable(ctx, "")
 		if err == nil {
 			t.Fatal(err)
@@ -463,7 +465,7 @@ func TestCreateTableRegression(t *testing.T) {
 						},
 					}
 					if !proto.Equal(exp, act.(proto.Message)) {
-						//nolint:revive
+						//nolint:revive,goerr113
 						return nil, fmt.Errorf("proto's not equal: \n\nact: %v\n\nexp: %s\n\n", act, exp)
 					}
 

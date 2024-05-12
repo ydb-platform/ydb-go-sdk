@@ -2,7 +2,7 @@ package metrics
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"net"
 	"testing"
@@ -15,6 +15,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
+
+var errTest = errors.New("test")
 
 func TestErrorBrief(t *testing.T) {
 	for _, tt := range []struct {
@@ -49,7 +51,7 @@ func TestErrorBrief(t *testing.T) {
 		},
 		{
 			name:  xtest.CurrentFileLine(),
-			err:   fmt.Errorf("test"),
+			err:   errTest,
 			brief: "unknown",
 		},
 		{
@@ -71,23 +73,23 @@ func TestErrorBrief(t *testing.T) {
 		},
 		{
 			name:  xtest.CurrentFileLine(),
-			err:   xerrors.Retryable(fmt.Errorf("test")),
+			err:   xerrors.Retryable(errTest),
 			brief: "retryable/CUSTOM",
 		},
 		{
 			name:  xtest.CurrentFileLine(),
-			err:   xerrors.Retryable(fmt.Errorf("test"), xerrors.WithName("SomeName")),
+			err:   xerrors.Retryable(errTest, xerrors.WithName("SomeName")),
 			brief: "retryable/SomeName",
 		},
 		{
 			name:  xtest.CurrentFileLine(),
-			err:   xerrors.WithStackTrace(xerrors.Retryable(fmt.Errorf("test"))),
+			err:   xerrors.WithStackTrace(xerrors.Retryable(errTest)),
 			brief: "retryable/CUSTOM",
 		},
 		{
 			name: xtest.CurrentFileLine(),
 			err: xerrors.WithStackTrace(
-				xerrors.Retryable(fmt.Errorf("test"), xerrors.WithName("SomeName")),
+				xerrors.Retryable(errTest, xerrors.WithName("SomeName")),
 			),
 			brief: "retryable/SomeName",
 		},
@@ -125,7 +127,7 @@ func TestErrorBrief(t *testing.T) {
 		// errors with stack trace
 		{
 			name:  xtest.CurrentFileLine(),
-			err:   xerrors.WithStackTrace(fmt.Errorf("test")),
+			err:   xerrors.WithStackTrace(errTest),
 			brief: "unknown",
 		},
 		{
@@ -157,30 +159,30 @@ func TestErrorBrief(t *testing.T) {
 		// joined errors
 		{
 			name:  xtest.CurrentFileLine(),
-			err:   xerrors.Join(fmt.Errorf("test")),
+			err:   xerrors.Join(errTest),
 			brief: "unknown",
 		},
 		{
 			name: xtest.CurrentFileLine(),
 			err: xerrors.Join(
-				fmt.Errorf("test"),
-				xerrors.Retryable(fmt.Errorf("test")),
+				errTest,
+				xerrors.Retryable(errTest),
 			),
 			brief: "retryable/CUSTOM",
 		},
 		{
 			name: xtest.CurrentFileLine(),
 			err: xerrors.Join(
-				fmt.Errorf("test"),
-				xerrors.Retryable(fmt.Errorf("test"), xerrors.WithName("SomeName")),
+				errTest,
+				xerrors.Retryable(errTest, xerrors.WithName("SomeName")),
 			),
 			brief: "retryable/SomeName",
 		},
 		{
 			name: xtest.CurrentFileLine(),
 			err: xerrors.Join(
-				fmt.Errorf("test"),
-				xerrors.Retryable(fmt.Errorf("test"), xerrors.WithName("SomeName")),
+				errTest,
+				xerrors.Retryable(errTest, xerrors.WithName("SomeName")),
 				grpcStatus.Error(grpcCodes.Unavailable, "test"),
 			),
 			brief: "transport/Unavailable",
@@ -214,7 +216,7 @@ func TestErrorBrief(t *testing.T) {
 		// joined errors with stack trace
 		{
 			name:  xtest.CurrentFileLine(),
-			err:   xerrors.Join(xerrors.WithStackTrace(fmt.Errorf("test"))),
+			err:   xerrors.Join(xerrors.WithStackTrace(errTest)),
 			brief: "unknown",
 		},
 		{
@@ -240,7 +242,7 @@ func TestErrorBrief(t *testing.T) {
 		{
 			name: xtest.CurrentFileLine(),
 			err: xerrors.Join(
-				xerrors.WithStackTrace(fmt.Errorf("test")),
+				xerrors.WithStackTrace(errTest),
 				xerrors.WithStackTrace(io.EOF),
 			),
 			brief: "io/EOF",
@@ -248,7 +250,7 @@ func TestErrorBrief(t *testing.T) {
 		{
 			name: xtest.CurrentFileLine(),
 			err: xerrors.WithStackTrace(xerrors.Join(
-				xerrors.WithStackTrace(fmt.Errorf("test")),
+				xerrors.WithStackTrace(errTest),
 				xerrors.WithStackTrace(io.EOF),
 			)),
 			brief: "io/EOF",

@@ -84,7 +84,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 		{
 			error: &CustomError{
 				Err: RetryableError(
-					fmt.Errorf("custom error"),
+					errCustom,
 					WithDeleteSession(),
 				),
 			},
@@ -204,7 +204,7 @@ func TestRetryWithBudget(t *testing.T) {
 		ctx, cancel := context.WithCancel(xtest.Context(t))
 		defer cancel()
 		err := Retry(ctx, func(ctx context.Context) (err error) {
-			return RetryableError(errors.New("custom error"))
+			return RetryableError(errCustom)
 		}, WithBudget(quota))
 		require.ErrorIs(t, err, errNoQuota)
 	})

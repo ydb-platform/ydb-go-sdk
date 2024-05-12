@@ -15,7 +15,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/types"
 )
 
-var errNotEnthoughtFreeSeats = errors.New("not enough free seats")
+var (
+	errNotEnthoughtFreeSeats = errors.New("not enough free seats")
+	errNotFound              = errors.New("not found")
+)
 
 type server struct {
 	cache     *Cache
@@ -133,7 +136,7 @@ SELECT freeSeats FROM bus WHERE id=$id;
 	if !res.NextRow() {
 		freeSeats = 0
 
-		return 0, errors.New("not found")
+		return 0, errNotFound
 	}
 
 	err = res.ScanWithDefaults(&freeSeats)

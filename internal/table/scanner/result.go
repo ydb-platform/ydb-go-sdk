@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/stats"
 )
 
+//nolint:goerr113
 var errAlreadyClosed = xerrors.Wrap(errors.New("result closed early"))
 
 type baseResult struct {

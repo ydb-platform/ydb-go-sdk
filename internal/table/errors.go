@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
+//nolint:goerr113
 var (
 	errNilClient = xerrors.Wrap(errors.New("table client is not initialized"))
 

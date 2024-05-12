@@ -135,7 +135,7 @@ func (s *Storage) Read(ctx context.Context, entryID generator.RowID) (_ generato
 			}
 
 			if !res.NextRow() {
-				return fmt.Errorf("entry not found, id = %v", entryID)
+				return fmt.Errorf("entry not found, id = %v", entryID) //nolint:goerr113
 			}
 
 			err = res.ScanNamed(

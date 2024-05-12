@@ -630,6 +630,7 @@ func TestResultSetNext(t *testing.T) {
 				return nil, xerrors.WithStackTrace(err)
 			}
 			if resultSetIndex := part.GetResultSetIndex(); resultSetIndex != 0 {
+				//nolint:goerr113
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
 					"critical violation of the logic: wrong result set index: %d != %d",
 					resultSetIndex, 0,
@@ -731,6 +732,7 @@ func TestResultSetNext(t *testing.T) {
 				return nil, xerrors.WithStackTrace(err)
 			}
 			if resultSetIndex := part.GetResultSetIndex(); resultSetIndex != 0 {
+				//nolint:goerr113
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
 					"critical violation of the logic: wrong result set index: %d != %d",
 					resultSetIndex, 0,

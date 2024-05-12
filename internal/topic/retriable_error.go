@@ -86,7 +86,7 @@ func CheckRetryMode(err error, settings RetrySettings, retriesDuration time.Dura
 	case PublicRetryDecisionStop:
 		isRetriable = false
 	default:
-		panic(fmt.Errorf("unexpected retry decision: %v", decision))
+		panic(fmt.Errorf("unexpected retry decision: %v", decision)) //nolint:goerr113
 	}
 
 	if !isRetriable {
