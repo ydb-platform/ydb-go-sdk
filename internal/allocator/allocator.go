@@ -1,6 +1,7 @@
 package allocator
 
 import (
+	"fmt"
 	"sync"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -1108,7 +1109,12 @@ func (p *Pool[T]) Get() *T {
 		v = &zero
 	}
 
-	return v.(*T)
+	val, ok := v.(*T)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to *T", val))
+	}
+
+	return val
 }
 
 func (p *Pool[T]) Put(t *T) {

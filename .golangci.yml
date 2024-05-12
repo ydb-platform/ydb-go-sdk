@@ -226,7 +226,6 @@ linters:
     - exhaustivestruct
     - exhaustruct
     - forbidigo
-    - forcetypeassert
     - funlen
     - gochecknoglobals
     - gocognit
@@ -297,6 +296,7 @@ issues:
         - unused
         - unparam
         - gocritic
+        - forcetypeassert
     - path: topic/topicreader/reader_example_test.go
       linters:
         - staticcheck
