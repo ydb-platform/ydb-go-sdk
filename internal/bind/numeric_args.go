@@ -60,7 +60,11 @@ func (m NumericArgs) RewriteQuery(sql string, args ...interface{}) (yql string, 
 				)
 			}
 			paramIndex := int(p - 1)
-			buffer.WriteString(newArgs[paramIndex].(table.ParameterOption).Name())
+			val, ok := newArgs[paramIndex].(table.ParameterOption)
+			if !ok {
+				panic(fmt.Sprintf("unsupported type conversion from %T to table.ParameterOption", val))
+			}
+			buffer.WriteString(val.Name())
 		}
 	}
 

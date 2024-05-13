@@ -2,6 +2,7 @@ package xstring
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 )
 
@@ -19,5 +20,10 @@ func (b *buffer) Free() {
 }
 
 func Buffer() *buffer {
-	return buffersPool.Get().(*buffer)
+	val, ok := buffersPool.Get().(*buffer)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to *buffer", val))
+	}
+
+	return val
 }

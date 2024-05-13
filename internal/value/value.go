@@ -188,7 +188,11 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		return DecimalValue(BigEndianUint128(v.GetHigh_128(), v.GetLow_128()), ttt.Precision(), ttt.Scale()), nil
 
 	case types.Optional:
-		t = t.GetType().(*Ydb.Type_OptionalType).OptionalType.GetItem()
+		tt, ok := t.GetType().(*Ydb.Type_OptionalType)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Type_OptionalType", tt))
+		}
+		t = tt.OptionalType.GetItem()
 		if nestedValue, ok := v.GetValue().(*Ydb.Value_NestedValue); ok {
 			return OptionalValue(FromYDB(t, nestedValue.NestedValue)), nil
 		}
@@ -265,10 +269,15 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		a := allocator.New()
 		defer a.Free()
 
+		val, ok := v.GetValue().(*Ydb.Value_NestedValue)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Value_NestedValue", val))
+		}
+
 		return VariantValueStruct(
 			FromYDB(
 				ttt.Struct.Field(int(v.GetVariantIndex())).T.ToYDB(a),
-				v.GetValue().(*Ydb.Value_NestedValue).NestedValue,
+				val.NestedValue,
 			),
 			ttt.Struct.Field(int(v.GetVariantIndex())).Name,
 			ttt.Struct,
@@ -278,10 +287,15 @@ func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 		a := allocator.New()
 		defer a.Free()
 
+		val, ok := v.GetValue().(*Ydb.Value_NestedValue)
+		if !ok {
+			panic(fmt.Sprintf("unsupported type conversion from %T to *Ydb.Value_NestedValue", val))
+		}
+
 		return VariantValueTuple(
 			FromYDB(
 				ttt.Tuple.ItemType(int(v.GetVariantIndex())).ToYDB(a),
-				v.GetValue().(*Ydb.Value_NestedValue).NestedValue,
+				val.NestedValue,
 			),
 			v.GetVariantIndex(),
 			ttt.Tuple,

@@ -569,7 +569,12 @@ func getContextMark(ctx context.Context) *modificationMark {
 		}
 	}
 
-	return v.(*modificationMark)
+	val, ok := v.(*modificationMark)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to *modificationMark", val))
+	}
+
+	return val
 }
 
 type modificationMark struct {

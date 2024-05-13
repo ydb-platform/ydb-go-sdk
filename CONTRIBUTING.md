@@ -14,12 +14,6 @@ Thank you!
         - [Only unit tests](#only-unit-tests)
         - [All tests (include integration tests)](#all-tests)
 
-## Legal Info
-
-In order for us (YANDEX LLC) to accept patches and other contributions from you, you will have to adopt our Yandex Contributor License Agreement (the “**CLA**”). The current version of the CLA you may find here:
-1) https://yandex.ru/legal/cla/?lang=en (in English) and
-2) https://yandex.ru/legal/cla/?lang=ru (in Russian).
-
 ## Technical Info
 
 1. Check for open issues or open a fresh issue to start a discussion around a feature idea or a bug.

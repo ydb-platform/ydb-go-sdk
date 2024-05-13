@@ -98,10 +98,15 @@ func (tx *transaction) ExecuteStatement(
 	a := allocator.New()
 	defer a.Free()
 
+	val, ok := stmt.(*statement)
+	if !ok {
+		panic(fmt.Sprintf("unsupported type conversion from %T to *statement", val))
+	}
+
 	onDone := trace.TableOnTxExecuteStatement(
 		tx.s.config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*transaction).ExecuteStatement"),
-		tx.s, tx, stmt.(*statement).query, parameters,
+		tx.s, tx, val.query, parameters,
 	)
 	defer func() {
 		onDone(r, err)

@@ -125,26 +125,7 @@ func (s *Session) attach(ctx context.Context) (finalErr error) {
 		return xerrors.WithStackTrace(err)
 	}
 
-	s.closeOnce = xsync.OnceFunc(func(ctx context.Context) (err error) {
-		defer cancelAttach()
-
-		s.setStatus(statusClosing)
-		defer s.setStatus(statusClosed)
-
-		var cancel context.CancelFunc
-		if d := s.cfg.SessionDeleteTimeout(); d > 0 {
-			ctx, cancel = xcontext.WithTimeout(ctx, d)
-		} else {
-			ctx, cancel = xcontext.WithCancel(ctx)
-		}
-		defer cancel()
-
-		if err = deleteSession(ctx, s.grpcClient, s.id); err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-
-		return nil
-	})
+	s.closeOnce = xsync.OnceFunc(s.closeAndDeleteSession(cancelAttach))
 
 	go func() {
 		defer func() {
@@ -169,6 +150,29 @@ func (s *Session) attach(ctx context.Context) (finalErr error) {
 	}()
 
 	return nil
+}
+
+func (s *Session) closeAndDeleteSession(cancelAttach context.CancelFunc) func(ctx context.Context) (err error) {
+	return func(ctx context.Context) (err error) {
+		defer cancelAttach()
+
+		s.setStatus(statusClosing)
+		defer s.setStatus(statusClosed)
+
+		var cancel context.CancelFunc
+		if d := s.cfg.SessionDeleteTimeout(); d > 0 {
+			ctx, cancel = xcontext.WithTimeout(ctx, d)
+		} else {
+			ctx, cancel = xcontext.WithCancel(ctx)
+		}
+		defer cancel()
+
+		if err = deleteSession(ctx, s.grpcClient, s.id); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		return nil
+	}
 }
 
 func deleteSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, sessionID string) error {
