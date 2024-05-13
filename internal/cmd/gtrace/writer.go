@@ -385,57 +385,70 @@ func (w *Writer) composeHookCall(fn *Func, h1, h2 string) {
 			w.funcResults(fn)
 			w.line(` {`)
 			w.line(`if options.panicCallback != nil {`)
+			w.addPanicCallback()
+			w.line("}")
+			if fn.HasResult() {
+				rs := w.declareResults(fn)
+				w.addHookCalls(fn, h1, h2, args, rs)
+				w.addReturnStatement(fn, rs)
+			} else {
+				w.addHookCalls(fn, h1, h2, args, nil)
+			}
+			w.line(`}`)
+		})
+	})
+}
+
+func (w *Writer) addPanicCallback() {
+	w.block(func() {
+		w.line("defer func() {")
+		w.block(func() {
+			w.line("if e := recover(); e != nil {")
 			w.block(func() {
-				w.line("defer func() {")
-				w.block(func() {
-					w.line("if e := recover(); e != nil {")
-					w.block(func() {
-						w.line(`options.panicCallback(e)`)
-					})
-					w.line("}")
-				})
-				w.line("}()")
+				w.line(`options.panicCallback(e)`)
 			})
 			w.line("}")
-			var (
-				r1 string
-				r2 string
-				rs []string
-			)
-			if fn.HasResult() {
-				r1 = w.declare("r")
-				r2 = w.declare("r")
-				rs = []string{r1, r2}
-				w.code("var " + r1 + ", " + r2 + " ")
-				w.funcResults(fn)
-				_ = w.bw.WriteByte('\n')
-				w.atEOL = true
-			}
-			for i, h := range []string{h1, h2} {
-				w.line("if " + h + " != nil {")
-				w.block(func() {
-					if fn.HasResult() {
-						w.code(rs[i], ` = `) //nolint:scopelint
-					}
-					w.code(h) //nolint:scopelint
-					w.call(args)
-				})
-				w.line("}")
-			}
-			if fn.HasResult() {
-				w.code(`return `)
-				switch x := fn.Result[0].(type) {
-				case *Func:
-					w.composeHookCall(x, r1, r2)
-				case *Trace:
-					w.line(r1, `.Compose(`, r2, `)`)
-				default:
-					panic("unknown result type")
-				}
-			}
 		})
-		w.line(`}`)
+		w.line("}()")
 	})
+}
+
+func (w *Writer) declareResults(fn *Func) []string {
+	r1 := w.declare("r")
+	r2 := w.declare("r")
+	rs := []string{r1, r2}
+	w.code("var " + r1 + ", " + r2 + " ")
+	w.funcResults(fn)
+	_ = w.bw.WriteByte('\n')
+	w.atEOL = true
+
+	return rs
+}
+
+func (w *Writer) addHookCalls(fn *Func, h1, h2 string, args, rs []string) {
+	for i, h := range []string{h1, h2} {
+		w.line("if " + h + " != nil {")
+		w.block(func() {
+			if fn.HasResult() {
+				w.code(rs[i], ` = `) //nolint:scopelint
+			}
+			w.code(h) //nolint:scopelint
+			w.call(args)
+		})
+		w.line("}")
+	}
+}
+
+func (w *Writer) addReturnStatement(fn *Func, rs []string) {
+	w.code(`return `)
+	switch x := fn.Result[0].(type) {
+	case *Func:
+		w.composeHookCall(x, rs[0], rs[1])
+	case *Trace:
+		w.line(rs[0], `.Compose(`, rs[1], `)`)
+	default:
+		panic("unknown result type")
+	}
 }
 
 func (w *Writer) options(trace *Trace) {

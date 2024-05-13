@@ -20,7 +20,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
-//nolint:gocyclo
+//nolint:gocyclo,funlen
 func main() {
 	var (
 		// Reports whether we were called from go:generate.

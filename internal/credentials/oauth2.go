@@ -349,62 +349,89 @@ func (provider *oauth2TokenExchange) getRequestParams() (string, error) {
 }
 
 func (provider *oauth2TokenExchange) processTokenExchangeResponse(result *http.Response, now time.Time) error {
-	var (
-		data []byte
-		err  error
-	)
-	if result.Body != nil {
-		data, err = io.ReadAll(result.Body)
-		if err != nil {
-			return xerrors.WithStackTrace(err)
-		}
-	} else {
-		data = make([]byte, 0)
+	data, err := readResponseBody(result)
+	if err != nil {
+		return err
 	}
 
 	if result.StatusCode != http.StatusOK {
-		description := result.Status
+		return provider.handleErrorResponse(result.Status, data)
+	}
 
-		//nolint:tagliatelle
-		type errorResponse struct {
-			ErrorName        string `json:"error"`
-			ErrorDescription string `json:"error_description"`
-			ErrorURI         string `json:"error_uri"`
-		}
-		var parsedErrorResponse errorResponse
-		if err := json.Unmarshal(data, &parsedErrorResponse); err != nil {
-			description += ", could not parse response: " + err.Error()
+	parsedResponse, err := parseTokenResponse(data)
+	if err != nil {
+		return err
+	}
 
-			return xerrors.WithStackTrace(fmt.Errorf("%w: %s", errCouldNotExchangeToken, description))
+	if err := validateTokenResponse(parsedResponse, provider); err != nil {
+		return err
+	}
+
+	provider.updateToken(parsedResponse, now)
+
+	return nil
+}
+
+func readResponseBody(result *http.Response) ([]byte, error) {
+	if result.Body != nil {
+		data, err := io.ReadAll(result.Body)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
 		}
 
-		if parsedErrorResponse.ErrorName != "" {
-			description += ", error: " + parsedErrorResponse.ErrorName
-		}
+		return data, nil
+	}
 
-		if parsedErrorResponse.ErrorDescription != "" {
-			description += fmt.Sprintf(", description: %q", parsedErrorResponse.ErrorDescription)
-		}
+	return make([]byte, 0), nil
+}
 
-		if parsedErrorResponse.ErrorURI != "" {
-			description += ", error_uri: " + parsedErrorResponse.ErrorURI
-		}
+func (provider *oauth2TokenExchange) handleErrorResponse(status string, data []byte) error {
+	description := status
+
+	//nolint:tagliatelle
+	type errorResponse struct {
+		ErrorName        string `json:"error"`
+		ErrorDescription string `json:"error_description"`
+		ErrorURI         string `json:"error_uri"`
+	}
+	var parsedErrorResponse errorResponse
+	if err := json.Unmarshal(data, &parsedErrorResponse); err != nil {
+		description += ", could not parse response: " + err.Error()
 
 		return xerrors.WithStackTrace(fmt.Errorf("%w: %s", errCouldNotExchangeToken, description))
 	}
 
-	//nolint:tagliatelle
-	type response struct {
-		AccessToken string `json:"access_token"`
-		TokenType   string `json:"token_type"`
-		ExpiresIn   int64  `json:"expires_in"`
-		Scope       string `json:"scope"`
+	if parsedErrorResponse.ErrorName != "" {
+		description += ", error: " + parsedErrorResponse.ErrorName
 	}
-	var parsedResponse response
-	if err := json.Unmarshal(data, &parsedResponse); err != nil {
-		return xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotParseResponse, err))
+	if parsedErrorResponse.ErrorDescription != "" {
+		description += fmt.Sprintf(", description: %q", parsedErrorResponse.ErrorDescription)
+	}
+	if parsedErrorResponse.ErrorURI != "" {
+		description += ", error_uri: " + parsedErrorResponse.ErrorURI
 	}
 
+	return xerrors.WithStackTrace(fmt.Errorf("%w: %s", errCouldNotExchangeToken, description))
+}
+
+//nolint:tagliatelle
+type tokenResponse struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	ExpiresIn   int64  `json:"expires_in"`
+	Scope       string `json:"scope"`
+}
+
+func parseTokenResponse(data []byte) (*tokenResponse, error) {
+	var parsedResponse tokenResponse
+	if err := json.Unmarshal(data, &parsedResponse); err != nil {
+		return nil, xerrors.WithStackTrace(fmt.Errorf("%w: %w", errCouldNotParseResponse, err))
+	}
+
+	return &parsedResponse, nil
+}
+
+func validateTokenResponse(parsedResponse *tokenResponse, provider *oauth2TokenExchange) error {
 	if !strings.EqualFold(parsedResponse.TokenType, "bearer") {
 		return xerrors.WithStackTrace(
 			fmt.Errorf("%w: %q", errUnsupportedTokenType, parsedResponse.TokenType))
@@ -423,18 +450,17 @@ func (provider *oauth2TokenExchange) processTokenExchangeResponse(result *http.R
 		}
 	}
 
+	return nil
+}
+
+func (provider *oauth2TokenExchange) updateToken(parsedResponse *tokenResponse, now time.Time) {
 	provider.receivedToken = "Bearer " + parsedResponse.AccessToken
 
-	// Expire time
-	expireDelta := time.Duration(parsedResponse.ExpiresIn)
-	expireDelta *= time.Second
+	expireDelta := time.Duration(parsedResponse.ExpiresIn) * time.Second
 	provider.receivedTokenExpireTime = now.Add(expireDelta)
 
-	updateDelta := time.Duration(parsedResponse.ExpiresIn / updateTimeDivider)
-	updateDelta *= time.Second
+	updateDelta := time.Duration(parsedResponse.ExpiresIn/updateTimeDivider) * time.Second
 	provider.updateTokenTime = now.Add(updateDelta)
-
-	return nil
 }
 
 func (provider *oauth2TokenExchange) exchangeToken(ctx context.Context, now time.Time) error {
