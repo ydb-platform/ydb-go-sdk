@@ -1,12 +1,13 @@
 * Refactored internal packages by `ifshort` linter issues
-  
-* ## v3.66.3
+* Added type assertion checks to enhance type safety and prevent unexpected panics in critical sections of the codebase
+
+## v3.66.3
 * Fixed the OAuth2 test
 
 ## v3.66.2
 * Added `trace.DriverConnStreamEvents` details bit
 * Added `trace.Driver.OnConnStreamFinish` event
-  
+
 ## v3.66.1
 * Added flush messages from buffer before close topic writer
 * Added Flush method for topic writer
