@@ -130,6 +130,8 @@ func WithTxOptions(txOptions *sql.TxOptions) txOptionsOption {
 }
 
 // DoTx is a retryer of database/sql transactions with fallbacks on errors
+//
+//nolint:funlen
 func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) error, opts ...doTxOption) error {
 	var (
 		options = doTxOptions{
