@@ -3,6 +3,7 @@ package table
 import (
 	"context"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -87,7 +88,11 @@ func retryBackoff(
 
 			return nil
 		},
-		opts...,
+		append(opts,
+			retry.WithLabel(
+				stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.retryBackoff").FunctionID(),
+			),
+		)...,
 	)
 }
 

@@ -14,6 +14,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/config"
 	ratelimiterErrors "github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/errors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/ratelimiter/options"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
@@ -64,6 +65,9 @@ func (c *Client) CreateResource(
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
 		retry.WithBudget(c.config.RetryBudget()),
+		retry.WithLabel(
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/ratelimiter.(*Client).CreateResource").FunctionID(),
+		),
 	)
 }
 
@@ -114,6 +118,9 @@ func (c *Client) AlterResource(
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
 		retry.WithBudget(c.config.RetryBudget()),
+		retry.WithLabel(
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/ratelimiter.(*Client).AlterResource").FunctionID(),
+		),
 	)
 }
 
@@ -164,6 +171,9 @@ func (c *Client) DropResource(
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
 		retry.WithBudget(c.config.RetryBudget()),
+		retry.WithLabel(
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/ratelimiter.(*Client).DropResource").FunctionID(),
+		),
 	)
 }
 
@@ -210,6 +220,9 @@ func (c *Client) ListResource(
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
 		retry.WithBudget(c.config.RetryBudget()),
+		retry.WithLabel(
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/ratelimiter.(*Client).ListResource").FunctionID(),
+		),
 	)
 
 	return list, err
@@ -262,17 +275,28 @@ func (c *Client) DescribeResource(
 	}
 	if !c.config.AutoRetry() {
 		err = call(ctx)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
 
-		return
+		return resource, nil
 	}
 	err = retry.Retry(ctx, call,
 		retry.WithIdempotent(true),
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
 		retry.WithBudget(c.config.RetryBudget()),
+		retry.WithLabel(
+			stack.FunctionID(
+				"github.com/ydb-platform/ydb-go-sdk/3/internal/ratelimiter.(*Client).DescribeResource",
+			).FunctionID(),
+		),
 	)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
 
-	return
+	return resource, nil
 }
 
 func (c *Client) describeResource(
@@ -339,6 +363,9 @@ func (c *Client) AcquireResource(
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
 		retry.WithBudget(c.config.RetryBudget()),
+		retry.WithLabel(
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/ratelimiter.(*Client).AcquireResource").FunctionID(),
+		),
 	)
 }
 

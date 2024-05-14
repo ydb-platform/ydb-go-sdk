@@ -437,13 +437,18 @@ func (p *Pool[PT, T]) With(
 		}
 
 		return nil
-	}, append(opts, retry.WithTrace(&trace.Retry{
-		OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
-			return func(info trace.RetryLoopDoneInfo) {
-				attempts = info.Attempts
-			}
-		},
-	}))...)
+	}, append(opts,
+		retry.WithTrace(&trace.Retry{
+			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+				return func(info trace.RetryLoopDoneInfo) {
+					attempts = info.Attempts
+				}
+			},
+		}),
+		retry.WithLabel(
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/pool.(*Pool).With").FunctionID(),
+		),
+	)...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}

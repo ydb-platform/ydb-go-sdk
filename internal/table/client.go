@@ -259,21 +259,22 @@ func (c *Client) CreateSession(ctx context.Context, opts ...table.Option) (_ tab
 
 			return nil
 		},
-		append(
-			[]retry.Option{
-				retry.WithIdempotent(true),
-				retry.WithTrace(&trace.Retry{
-					OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
-						onDone := trace.TableOnCreateSession(c.config.Trace(), info.Context,
-							stack.FunctionID(
-								"github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).CreateSession"))
+		append(c.retryOptions(opts...).RetryOptions,
+			retry.WithIdempotent(true),
+			retry.WithTrace(&trace.Retry{
+				OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
+					onDone := trace.TableOnCreateSession(c.config.Trace(), info.Context,
+						stack.FunctionID(
+							"github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).CreateSession"))
 
-						return func(info trace.RetryLoopDoneInfo) {
-							onDone(s, info.Attempts, info.Error)
-						}
-					},
-				}),
-			}, c.retryOptions(opts...).RetryOptions...,
+					return func(info trace.RetryLoopDoneInfo) {
+						onDone(s, info.Attempts, info.Error)
+					}
+				},
+			}),
+			retry.WithLabel(
+				stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).CreateSession").FunctionID(),
+			),
 		)...,
 	)
 
@@ -656,7 +657,9 @@ func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 		return xerrors.WithStackTrace(errClosedClient)
 	}
 
-	config := c.retryOptions(opts...)
+	config := c.retryOptions(append(opts,
+		table.WithLabel(stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).Do").FunctionID()),
+	)...)
 
 	attempts, onDone := 0, trace.TableOnDo(config.Trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).Do"),
@@ -685,7 +688,9 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 		return xerrors.WithStackTrace(errClosedClient)
 	}
 
-	config := c.retryOptions(opts...)
+	config := c.retryOptions(append(opts,
+		table.WithLabel(stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).DoTx").FunctionID()),
+	)...)
 
 	attempts, onDone := 0, trace.TableOnDoTx(config.Trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.(*Client).DoTx"),

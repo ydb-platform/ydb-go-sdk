@@ -61,6 +61,9 @@ func (c *Client) Execute(
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
 		retry.WithBudget(c.config.RetryBudget()),
+		retry.WithLabel(
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scripting.(*Client).Execute").FunctionID(),
+		),
 	)
 
 	return r, xerrors.WithStackTrace(err)
@@ -141,6 +144,9 @@ func (c *Client) Explain(
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
 		retry.WithBudget(c.config.RetryBudget()),
+		retry.WithLabel(
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scripting.(*Client).Explain").FunctionID(),
+		),
 	)
 
 	return e, xerrors.WithStackTrace(err)
@@ -216,6 +222,9 @@ func (c *Client) StreamExecute(
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
 		retry.WithBudget(c.config.RetryBudget()),
+		retry.WithLabel(
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scripting.(*Client).StreamExecute").FunctionID(),
+		),
 	)
 
 	return r, xerrors.WithStackTrace(err)

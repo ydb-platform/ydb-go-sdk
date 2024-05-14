@@ -65,6 +65,9 @@ func (c *Client) MakeDirectory(ctx context.Context, path string) (finalErr error
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
 		retry.WithBudget(c.config.RetryBudget()),
+		retry.WithLabel(
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scheme.(*Client).MakeDirectory").FunctionID(),
+		),
 	)
 }
 
@@ -105,6 +108,9 @@ func (c *Client) RemoveDirectory(ctx context.Context, path string) (finalErr err
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
 		retry.WithBudget(c.config.RetryBudget()),
+		retry.WithLabel(
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scheme.(*Client).RemoveDirectory").FunctionID(),
+		),
 	)
 }
 
@@ -147,6 +153,9 @@ func (c *Client) ListDirectory(ctx context.Context, path string) (d scheme.Direc
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
 		retry.WithBudget(c.config.RetryBudget()),
+		retry.WithLabel(
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scheme.(*Client).ListDirectory").FunctionID(),
+		),
 	)
 
 	return d, xerrors.WithStackTrace(err)
@@ -211,6 +220,9 @@ func (c *Client) DescribePath(ctx context.Context, path string) (e scheme.Entry,
 		retry.WithStackTrace(),
 		retry.WithTrace(c.config.TraceRetry()),
 		retry.WithBudget(c.config.RetryBudget()),
+		retry.WithLabel(
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scheme.(*Client).DescribePath").FunctionID(),
+		),
 	)
 
 	return e, xerrors.WithStackTrace(err)
@@ -273,6 +285,9 @@ func (c *Client) ModifyPermissions(
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
 		retry.WithBudget(c.config.RetryBudget()),
+		retry.WithLabel(
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/scheme.(*Client).ModifyPermissions").FunctionID(),
+		),
 	)
 }
 

@@ -118,6 +118,9 @@ func (c *Client) CreateNode(ctx context.Context, path string, config coordinatio
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
 		retry.WithBudget(c.config.RetryBudget()),
+		retry.WithLabel(
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.(*Client).CreateNode").FunctionID(),
+		),
 	)
 }
 
@@ -151,6 +154,9 @@ func (c *Client) AlterNode(ctx context.Context, path string, config coordination
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
 		retry.WithBudget(c.config.RetryBudget()),
+		retry.WithLabel(
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.(*Client).AlterNode").FunctionID(),
+		),
 	)
 }
 
@@ -212,6 +218,9 @@ func (c *Client) DropNode(ctx context.Context, path string) (finalErr error) {
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
 		retry.WithBudget(c.config.RetryBudget()),
+		retry.WithLabel(
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.(*Client).DropNode").FunctionID(),
+		),
 	)
 }
 
@@ -272,6 +281,9 @@ func (c *Client) DescribeNode(
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.config.TraceRetry()),
 		retry.WithBudget(c.config.RetryBudget()),
+		retry.WithLabel(
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/coordination.(*Client).DescribeNode").FunctionID(),
+		),
 	)
 	if err != nil {
 		return nil, nil, xerrors.WithStackTrace(err)

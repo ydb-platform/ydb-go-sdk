@@ -90,6 +90,9 @@ func (b *Balancer) clusterDiscovery(ctx context.Context) (err error) {
 		retry.WithIdempotent(true),
 		retry.WithTrace(b.driverConfig.TraceRetry()),
 		retry.WithBudget(b.driverConfig.RetryBudget()),
+		retry.WithLabel(
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/balancer.(*Balancer).clusterDiscovery").FunctionID(),
+		),
 	)
 }
 

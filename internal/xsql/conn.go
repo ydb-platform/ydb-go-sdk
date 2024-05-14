@@ -557,7 +557,9 @@ func (c *conn) IsColumnExists(ctx context.Context, tableName, columnName string)
 		}
 
 		return nil
-	})
+	}, retry.WithLabel(
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).IsColumnExists").FunctionID(),
+	))
 	if err != nil {
 		return false, xerrors.WithStackTrace(err)
 	}
@@ -588,7 +590,9 @@ func (c *conn) GetColumns(ctx context.Context, tableName string) (columns []stri
 		}
 
 		return nil
-	})
+	}, retry.WithLabel(
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).GetColumns").FunctionID(),
+	))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -631,7 +635,9 @@ func (c *conn) GetColumnType(ctx context.Context, tableName, columnName string) 
 		}
 
 		return nil
-	})
+	}, retry.WithLabel(
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).GetColumnType").FunctionID(),
+	))
 	if err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
@@ -660,7 +666,9 @@ func (c *conn) GetPrimaryKeys(ctx context.Context, tableName string) (pkCols []s
 		pkCols = append(pkCols, desc.PrimaryKey...)
 
 		return nil
-	})
+	}, retry.WithLabel(
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).GetPrimaryKeys").FunctionID(),
+	))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -733,7 +741,9 @@ func (c *conn) getTables(ctx context.Context, absPath string, recursive, exclude
 		d, err = c.connector.parent.Scheme().ListDirectory(ctx, absPath)
 
 		return err
-	})
+	}, retry.WithLabel(
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).getTables").FunctionID(),
+	))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -770,7 +780,9 @@ func (c *conn) GetTables(ctx context.Context, folder string, recursive, excludeS
 		e, err = c.connector.parent.Scheme().DescribePath(ctx, absPath)
 
 		return err
-	})
+	}, retry.WithLabel(
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).GetTables").FunctionID(),
+	))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -819,7 +831,9 @@ func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []stri
 		}
 
 		return nil
-	})
+	}, retry.WithLabel(
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).GetIndexes").FunctionID(),
+	))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
@@ -827,12 +841,12 @@ func (c *conn) GetIndexes(ctx context.Context, tableName string) (indexes []stri
 	return indexes, nil
 }
 
-func (c *conn) retryIdempotent(ctx context.Context, f func(ctx context.Context) error) error {
-	err := retry.Retry(ctx, f,
+func (c *conn) retryIdempotent(ctx context.Context, f func(ctx context.Context) error, opts ...retry.Option) error {
+	err := retry.Retry(ctx, f, append(opts,
 		retry.WithIdempotent(true),
 		retry.WithTrace(c.connector.traceRetry),
 		retry.WithBudget(c.connector.retryBudget),
-	)
+	)...)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -867,7 +881,9 @@ func (c *conn) GetIndexColumns(ctx context.Context, tableName, indexName string)
 		}
 
 		return xerrors.WithStackTrace(fmt.Errorf("index '%s' not found in table '%s'", indexName, tableName))
-	})
+	}, retry.WithLabel(
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*conn).GetIndexColumns").FunctionID(),
+	))
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

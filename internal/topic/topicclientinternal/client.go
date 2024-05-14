@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawydb"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicreaderinternal"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic/topicwriterinternal"
@@ -88,6 +89,11 @@ func (c *Client) Alter(ctx context.Context, path string, opts ...topicoptions.Al
 			retry.WithIdempotent(true),
 			retry.WithTrace(c.cfg.TraceRetry()),
 			retry.WithBudget(c.cfg.RetryBudget()),
+			retry.WithLabel(
+				stack.FunctionID(
+					"github.com/ydb-platform/ydb-go-sdk/3/internal/topic/topicclientinternal.(*Client).Alter",
+				).FunctionID(),
+			),
 		)
 	}
 
@@ -121,6 +127,11 @@ func (c *Client) Create(
 			retry.WithIdempotent(true),
 			retry.WithTrace(c.cfg.TraceRetry()),
 			retry.WithBudget(c.cfg.RetryBudget()),
+			retry.WithLabel(
+				stack.FunctionID(
+					"github.com/ydb-platform/ydb-go-sdk/3/internal/topic/topicclientinternal.(*Client).Create",
+				).FunctionID(),
+			),
 		)
 	}
 
@@ -159,6 +170,11 @@ func (c *Client) Describe(
 			retry.WithIdempotent(true),
 			retry.WithTrace(c.cfg.TraceRetry()),
 			retry.WithBudget(c.cfg.RetryBudget()),
+			retry.WithLabel(
+				stack.FunctionID(
+					"github.com/ydb-platform/ydb-go-sdk/3/internal/topic/topicclientinternal.(*Client).Describe",
+				).FunctionID(),
+			),
 		)
 	} else {
 		err = call(ctx)
@@ -196,6 +212,11 @@ func (c *Client) Drop(ctx context.Context, path string, opts ...topicoptions.Dro
 			retry.WithIdempotent(true),
 			retry.WithTrace(c.cfg.TraceRetry()),
 			retry.WithBudget(c.cfg.RetryBudget()),
+			retry.WithLabel(
+				stack.FunctionID(
+					"github.com/ydb-platform/ydb-go-sdk/3/internal/topic/topicclientinternal.(*Client).Drop",
+				).FunctionID(),
+			),
 		)
 	}
 
