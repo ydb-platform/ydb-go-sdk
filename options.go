@@ -44,6 +44,17 @@ func WithStaticCredentials(user, password string) Option {
 	}
 }
 
+// WithNodeAddressMutator applies mutator for node addresses from discovery.ListEndpoints response
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithNodeAddressMutator(mutator func(address string) string) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.discoveryOptions = append(c.discoveryOptions, discoveryConfig.WithAddressMutator(mutator))
+
+		return nil
+	}
+}
+
 func WithAccessTokenCredentials(accessToken string) Option {
 	return WithCredentials(
 		credentials.NewAccessTokenCredentials(

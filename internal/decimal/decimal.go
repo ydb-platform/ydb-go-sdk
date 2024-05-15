@@ -224,6 +224,8 @@ func handleRemainingDigits(s string, v *big.Int, precision uint32) (*big.Int, er
 
 // Format returns the string representation of x with the given precision and
 // scale.
+//
+//nolint:funlen
 func Format(x *big.Int, precision, scale uint32) string {
 	// Check for special values and nil pointer upfront.
 	if x == nil {

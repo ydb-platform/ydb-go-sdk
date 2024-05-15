@@ -372,6 +372,7 @@ func (w *Writer) composeHook(hook Hook, t1, t2, dst string) {
 	w.line(`}`)
 }
 
+//nolint:funlen
 func (w *Writer) composeHookCall(fn *Func, h1, h2 string) {
 	w.newScope(func() {
 		w.capture(h1, h2)

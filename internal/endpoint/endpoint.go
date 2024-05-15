@@ -119,7 +119,7 @@ func (e *endpoint) LastUpdated() time.Time {
 func (e *endpoint) Touch(opts ...Option) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
-	for _, opt := range append([]Option{withLastUpdated(time.Now())}, opts...) {
+	for _, opt := range append([]Option{WithLastUpdated(time.Now())}, opts...) {
 		if opt != nil {
 			opt(e)
 		}
@@ -158,7 +158,7 @@ func WithServices(services []string) Option {
 	}
 }
 
-func withLastUpdated(ts time.Time) Option {
+func WithLastUpdated(ts time.Time) Option {
 	return func(e *endpoint) {
 		e.lastUpdated = ts
 	}
