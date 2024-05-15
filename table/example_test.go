@@ -70,7 +70,7 @@ func Example_explainQuery() {
 
 		return
 	}
-	defer db.Close(ctx) // cleanup resources
+	defer db.Close(ctx)  // cleanup resources
 	err = db.Table().Do( // Do retry operation on errors with best effort
 		ctx, // context manage exiting from Do
 		func(ctx context.Context, s table.Session) (err error) { // retry operation
