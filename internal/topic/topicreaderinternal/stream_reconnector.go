@@ -15,7 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -24,6 +23,8 @@ import (
 var (
 	errReconnectRequestOutdated = xerrors.Wrap(errors.New("ydb: reconnect request outdated"))
 	errReconnect                = xerrors.Wrap(errors.New("ydb: reconnect to topic grpc stream"))
+	errStreamClosed             = xerrors.Wrap(errors.New("ydb: topic reader stream closed"))
+	errConnectionTimeout        = xerrors.Wrap(errors.New("ydb: topic reader connection timeout for stream"))
 )
 
 type readerConnectFunc func(ctx context.Context) (batchedStreamReader, error)
@@ -311,7 +312,7 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 		return nil, err
 	}
 
-	connectionContext, cancel := xcontext.WithCancel(context.Background())
+	connectionContext, cancel := context.WithCancelCause(context.WithoutCancel(bgContext))
 
 	type connectResult struct {
 		stream batchedStreamReader
@@ -332,14 +333,18 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 	case <-connectionTimoutTimer.Chan():
 		// cancel connection context only if timeout exceed while connection
 		// because if cancel context after connect - it will break
-		cancel()
+		cancel(xerrors.WithStackTrace(errConnectionTimeout))
 		res = <-result
 	case res = <-result:
 		// pass
 	}
 
 	if res.err == nil {
-		return res.stream, nil
+		stream := batchedStreamReaderHook{
+			batchedStreamReader: res.stream,
+			contextCancel:       cancel,
+		}
+		return stream, nil
 	}
 
 	return nil, res.err
@@ -415,6 +420,17 @@ func (r *readerReconnector) handlePanic() {
 	if p != nil {
 		_ = r.CloseWithError(context.Background(), xerrors.WithStackTrace(fmt.Errorf("handled panic: %v", p)))
 	}
+}
+
+type batchedStreamReaderHook struct {
+	batchedStreamReader
+	contextCancel context.CancelCauseFunc
+}
+
+func (b batchedStreamReaderHook) CloseWithError(ctx context.Context, err error) error {
+	defer b.contextCancel(xerrors.WithStackTrace(errStreamClosed))
+
+	return b.batchedStreamReader.CloseWithError(ctx, err)
 }
 
 type reconnectRequest struct {
