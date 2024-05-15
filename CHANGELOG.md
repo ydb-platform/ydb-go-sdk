@@ -1,3 +1,4 @@
+* Fixed goroutines leak within topic reader on network problems
 * Added type assertion checks to enhance type safety and prevent unexpected panics in critical sections of the codebase
 
 ## v3.66.3
