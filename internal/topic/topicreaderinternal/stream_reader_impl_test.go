@@ -1055,7 +1055,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 }
 
 func (e *streamEnv) Start() {
-	require.NoError(e.t, e.reader.startLoops())
+	require.NoError(e.t, e.reader.startBackgroundWorkers())
 	xtest.SpinWaitCondition(e.t, nil, func() bool {
 		return e.reader.restBufferSizeBytes.Load() == e.initialBufferSizeBytes
 	})

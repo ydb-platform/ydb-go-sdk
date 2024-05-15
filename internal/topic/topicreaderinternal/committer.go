@@ -3,6 +3,7 @@ package topicreaderinternal
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"time"
 
@@ -52,16 +53,15 @@ type committer struct {
 	commits CommitRanges
 }
 
-func newCommitter(tracer *trace.Topic, lifeContext context.Context, mode PublicCommitMode, send sendMessageToServerFunc) *committer { //nolint:lll,revive
+func newCommitterStopped(tracer *trace.Topic, lifeContext context.Context, mode PublicCommitMode, send sendMessageToServerFunc, readerID int64) *committer { //nolint:lll,revive
 	res := &committer{
 		mode:             mode,
 		clock:            clockwork.NewRealClock(),
 		send:             send,
-		backgroundWorker: *background.NewWorker(lifeContext),
+		backgroundWorker: *background.NewWorker(lifeContext, fmt.Sprintf("ydb-topic-reader-committer: %v", readerID)),
 		tracer:           tracer,
 	}
 	res.initChannels()
-	res.start()
 
 	return res
 }
@@ -70,7 +70,7 @@ func (c *committer) initChannels() {
 	c.commitLoopSignal = make(empty.Chan, 1)
 }
 
-func (c *committer) start() {
+func (c *committer) Start() {
 	c.backgroundWorker.Start("commit pusher", c.pushCommitsLoop)
 }
 
