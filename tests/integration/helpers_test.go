@@ -369,6 +369,7 @@ func (t *testLogger) Log(ctx context.Context, msg string, fields ...log.Field) {
 
 func (t *testLogger) flush() {
 	t.m.WithLock(func() {
+		t.test.Helper()
 		t.closed = true
 		message := "\n" + strings.Join(t.messages, "\n")
 		t.test.Log(message)
