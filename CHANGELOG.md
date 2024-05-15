@@ -1,3 +1,4 @@
+## v3.67.0
 * Added `ydb.WithNodeAddressMutator` experimental option for mutate node addresses from `discovery.ListEndpoints` response
 * Added type assertion checks to enhance type safety and prevent unexpected panics in critical sections of the codebase
 
