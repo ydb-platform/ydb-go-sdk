@@ -632,7 +632,7 @@ func TestWriterImpl_CloseWithFlush(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
 				f(t, test.flush)
-			}, xtest.StopAfter(time.Minute))
+			})
 		})
 	}
 }
