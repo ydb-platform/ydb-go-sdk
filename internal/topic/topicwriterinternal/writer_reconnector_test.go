@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
@@ -428,19 +427,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "ReconnectOnErrors", func(t testing.TB) {
 		ctx := xtest.Context(t)
 
-		clock := clockwork.NewFakeClock()
-
-		go func() {
-			for {
-				if ctx.Err() != nil {
-					return
-				}
-				clock.Advance(time.Second)
-				time.Sleep(time.Microsecond)
-			}
-		}()
-
-		w := newTestWriterStopped(WithClock(clock), WithTokenUpdateInterval(time.Duration(math.MaxInt64)))
+		w := newTestWriterStopped(WithClock(xtest.FastClock(t)), WithTokenUpdateInterval(time.Duration(math.MaxInt64)))
 
 		mc := gomock.NewController(t)
 
