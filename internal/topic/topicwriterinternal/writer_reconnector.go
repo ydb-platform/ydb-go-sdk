@@ -347,14 +347,15 @@ func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr err
 		onDone(resErr)
 	}()
 
-	closeErr := w.queue.Close(reason)
-	if resErr == nil && closeErr != nil {
-		resErr = closeErr
-	}
-
+	// stop background work and single stream writer
 	bgErr := w.background.Close(ctx, reason)
 	if resErr == nil && bgErr != nil {
 		resErr = bgErr
+	}
+
+	closeErr := w.queue.Close(reason)
+	if resErr == nil && closeErr != nil {
+		resErr = closeErr
 	}
 
 	return resErr

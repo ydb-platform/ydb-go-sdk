@@ -1,3 +1,4 @@
+* Fixed race of stop internal processes on close topic writer
 * Fixed goroutines leak within topic reader on network problems
 
 ## v3.67.0
