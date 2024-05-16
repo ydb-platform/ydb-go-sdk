@@ -1,6 +1,7 @@
 ## v3.67.1
 * Fixed race of stop internal processes on close topic writer
 * Fixed goroutines leak within topic reader on network problems
+* Skipped explicit `Rollback` of transaction on errors (server-side automatically rolled back transactions on errors)
 
 ## v3.67.0
 * Added `ydb.WithNodeAddressMutator` experimental option for mutate node addresses from `discovery.ListEndpoints` response

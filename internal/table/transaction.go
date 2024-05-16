@@ -22,6 +22,7 @@ import (
 var (
 	errTxAlreadyCommitted = xerrors.Wrap(fmt.Errorf("transaction already committed"))
 	errTxRollbackedEarly  = xerrors.Wrap(fmt.Errorf("transaction rollbacked early"))
+	errTxFailedEarly      = xerrors.Wrap(fmt.Errorf("transaction failed early"))
 )
 
 type txState struct {
@@ -42,6 +43,7 @@ const (
 	txStateInitialized txStateEnum = iota
 	txStateCommitted
 	txStateRollbacked
+	txStateFailed
 )
 
 type transaction struct {
@@ -73,11 +75,15 @@ func (tx *transaction) Execute(
 	switch tx.state.Load() {
 	case txStateCommitted:
 		return nil, xerrors.WithStackTrace(errTxAlreadyCommitted)
+	case txStateFailed:
+		return nil, xerrors.WithStackTrace(errTxFailedEarly)
 	case txStateRollbacked:
 		return nil, xerrors.WithStackTrace(errTxRollbackedEarly)
 	default:
 		_, r, err = tx.s.Execute(ctx, tx.control, query, parameters, opts...)
 		if err != nil {
+			tx.state.Store(txStateFailed)
+
 			return nil, xerrors.WithStackTrace(err)
 		}
 
@@ -115,11 +121,15 @@ func (tx *transaction) ExecuteStatement(
 	switch tx.state.Load() {
 	case txStateCommitted:
 		return nil, xerrors.WithStackTrace(errTxAlreadyCommitted)
+	case txStateFailed:
+		return nil, xerrors.WithStackTrace(errTxFailedEarly)
 	case txStateRollbacked:
 		return nil, xerrors.WithStackTrace(errTxRollbackedEarly)
 	default:
 		_, r, err = stmt.Execute(ctx, tx.control, parameters, opts...)
 		if err != nil {
+			tx.state.Store(txStateFailed)
+
 			return nil, xerrors.WithStackTrace(err)
 		}
 
@@ -148,6 +158,8 @@ func (tx *transaction) CommitTx(
 	switch tx.state.Load() {
 	case txStateCommitted:
 		return nil, xerrors.WithStackTrace(errTxAlreadyCommitted)
+	case txStateFailed:
+		return nil, xerrors.WithStackTrace(errTxFailedEarly)
 	case txStateRollbacked:
 		return nil, xerrors.WithStackTrace(errTxRollbackedEarly)
 	default:
@@ -174,6 +186,8 @@ func (tx *transaction) CommitTx(
 
 		response, err = tx.s.tableService.CommitTransaction(ctx, request)
 		if err != nil {
+			tx.state.Store(txStateFailed)
+
 			return nil, xerrors.WithStackTrace(err)
 		}
 
@@ -206,6 +220,8 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 	switch tx.state.Load() {
 	case txStateCommitted:
 		return nil // nop for committed tx
+	case txStateFailed:
+		return xerrors.WithStackTrace(errTxFailedEarly)
 	case txStateRollbacked:
 		return xerrors.WithStackTrace(errTxRollbackedEarly)
 	default:
@@ -222,6 +238,8 @@ func (tx *transaction) Rollback(ctx context.Context) (err error) {
 			},
 		)
 		if err != nil {
+			tx.state.Store(txStateFailed)
+
 			return xerrors.WithStackTrace(err)
 		}
 

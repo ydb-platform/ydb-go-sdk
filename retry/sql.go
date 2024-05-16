@@ -161,26 +161,16 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 	}
 	err := Retry(ctx, func(ctx context.Context) (finalErr error) {
 		attempts++
+
 		tx, err := db.BeginTx(ctx, options.txOptions)
 		if err != nil {
 			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
-		defer func() {
-			if finalErr == nil {
-				return
-			}
-			errRollback := tx.Rollback()
-			if errRollback == nil {
-				return
-			}
-			finalErr = xerrors.NewWithIssues("",
-				xerrors.WithStackTrace(finalErr),
-				xerrors.WithStackTrace(fmt.Errorf("rollback failed: %w", errRollback)),
-			)
-		}()
+
 		if err = op(xcontext.MarkRetryCall(ctx), tx); err != nil {
 			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
+
 		if err = tx.Commit(); err != nil {
 			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}

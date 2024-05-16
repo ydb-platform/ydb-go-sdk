@@ -704,20 +704,6 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 				return xerrors.WithStackTrace(err)
 			}
 
-			defer func() {
-				if err != nil {
-					errRollback := tx.Rollback(ctx)
-					if errRollback != nil {
-						err = xerrors.NewWithIssues("",
-							xerrors.WithStackTrace(err),
-							xerrors.WithStackTrace(errRollback),
-						)
-					} else {
-						err = xerrors.WithStackTrace(err)
-					}
-				}
-			}()
-
 			err = func() error {
 				if panicCallback := c.config.PanicCallback(); panicCallback != nil {
 					defer func() {
