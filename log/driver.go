@@ -13,7 +13,8 @@ func Driver(l Logger, d trace.Detailer, opts ...Option) (t trace.Driver) {
 	return internalDriver(wrapLogger(l, opts...), d)
 }
 
-func internalDriver(l Logger, d trace.Detailer) trace.Driver { //nolint:gocyclo
+//nolint:gocyclo,funlen
+func internalDriver(l Logger, d trace.Detailer) trace.Driver {
 	return trace.Driver{
 		OnResolve: func(
 			info trace.DriverResolveStartInfo,

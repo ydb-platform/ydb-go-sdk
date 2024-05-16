@@ -88,9 +88,7 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 		)
 	}
 	defer cc.Close()
-
 	client := Ydb_Auth_V1.NewAuthServiceClient(cc)
-
 	response, err := client.Login(ctx, &Ydb_Auth.LoginRequest{
 		OperationParams: &Ydb_Operations.OperationParams{
 			OperationMode:    0,
@@ -105,7 +103,6 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 	if err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
-
 	switch {
 	case !response.GetOperation().GetReady():
 		return "", xerrors.WithStackTrace(
@@ -114,7 +111,6 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 				response.GetOperation().GetIssues(),
 			),
 		)
-
 	case response.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
 		return "", xerrors.WithStackTrace(
 			xerrors.Operation(
@@ -127,12 +123,10 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 	if err = response.GetOperation().GetResult().UnmarshalTo(&result); err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
-
 	expiresAt, err := parseExpiresAt(result.GetToken())
 	if err != nil {
 		return "", xerrors.WithStackTrace(err)
 	}
-
 	c.requestAt = time.Now().Add(time.Until(expiresAt) / TokenRefreshDivisor)
 	c.token = result.GetToken()
 

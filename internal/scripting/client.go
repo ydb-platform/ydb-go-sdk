@@ -221,6 +221,7 @@ func (c *Client) StreamExecute(
 	return r, xerrors.WithStackTrace(err)
 }
 
+//nolint:funlen
 func (c *Client) streamExecute(
 	ctx context.Context,
 	query string,
