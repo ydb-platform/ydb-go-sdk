@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	"time"
 
 	ydb "github.com/ydb-platform/gorm-driver"
@@ -62,6 +63,9 @@ func NewStorage(cfg *config.Config, poolSize int) (*Storage, error) {
 			ydb.WithMaxOpenConns(poolSize),
 			ydb.WithMaxIdleConns(poolSize),
 			ydb.WithTablePathPrefix(label),
+			ydb.With(
+				environ.WithEnvironCredentials(),
+			),
 		),
 		&gorm.Config{
 			Logger: gormLogger.Default.LogMode(gormLogger.Warn),
