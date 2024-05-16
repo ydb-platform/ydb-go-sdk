@@ -15,7 +15,6 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -24,6 +23,7 @@ import (
 var (
 	errReconnectRequestOutdated = xerrors.Wrap(errors.New("ydb: reconnect request outdated"))
 	errReconnect                = xerrors.Wrap(errors.New("ydb: reconnect to topic grpc stream"))
+	errConnectionTimeout        = xerrors.Wrap(errors.New("ydb: topic reader connection timeout for stream"))
 )
 
 type readerConnectFunc func(ctx context.Context) (batchedStreamReader, error)
@@ -33,6 +33,7 @@ type readerReconnector struct {
 	clock                      clockwork.Clock
 	retrySettings              topic.RetrySettings
 	streamVal                  batchedStreamReader
+	streamContextCancel        context.CancelCauseFunc
 	streamErr                  error
 	closedErr                  error
 	initErr                    error
@@ -148,6 +149,7 @@ func (r *readerReconnector) CloseWithError(ctx context.Context, err error) error
 
 		if r.streamVal != nil {
 			streamCloseErr := r.streamVal.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
+			r.streamContextCancel(errReaderClosed)
 			if closeErr == nil {
 				closeErr = streamCloseErr
 			}
@@ -267,7 +269,7 @@ func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldRead
 		_ = oldReader.CloseWithError(ctx, xerrors.WithStackTrace(errReconnect))
 	}
 
-	newStream, err := r.connectWithTimeout()
+	newStream, newStreamClose, err := r.connectWithTimeout()
 
 	if r.isRetriableError(err) {
 		go func(reason error) {
@@ -281,6 +283,7 @@ func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldRead
 		r.streamErr = err
 		if err == nil {
 			r.streamVal = newStream
+			r.streamContextCancel = newStreamClose
 			if !r.initDone {
 				r.initDone = true
 				close(r.initDoneCh)
@@ -304,14 +307,14 @@ func (r *readerReconnector) checkErrRetryMode(err error, retriesDuration time.Du
 	return topic.CheckRetryMode(err, r.retrySettings, retriesDuration)
 }
 
-func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err error) {
+func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, _ context.CancelCauseFunc, err error) {
 	bgContext := r.background.Context()
 
 	if err = bgContext.Err(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	connectionContext, cancel := xcontext.WithCancel(context.Background())
+	connectionContext, cancel := context.WithCancelCause(context.WithoutCancel(bgContext))
 
 	type connectResult struct {
 		stream batchedStreamReader
@@ -332,17 +335,17 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, err err
 	case <-connectionTimoutTimer.Chan():
 		// cancel connection context only if timeout exceed while connection
 		// because if cancel context after connect - it will break
-		cancel()
+		cancel(xerrors.WithStackTrace(errConnectionTimeout))
 		res = <-result
 	case res = <-result:
 		// pass
 	}
 
 	if res.err == nil {
-		return res.stream, nil
+		return res.stream, cancel, nil
 	}
 
-	return nil, res.err
+	return nil, nil, res.err
 }
 
 func (r *readerReconnector) WaitInit(ctx context.Context) error {

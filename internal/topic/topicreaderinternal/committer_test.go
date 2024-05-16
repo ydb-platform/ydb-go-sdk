@@ -377,11 +377,12 @@ func TestCommitterBuffer(t *testing.T) {
 }
 
 func newTestCommitter(ctx context.Context, t testing.TB) *committer {
-	res := newCommitter(&trace.Topic{}, ctx, CommitModeAsync, func(msg rawtopicreader.ClientMessage) error {
+	res := newCommitterStopped(&trace.Topic{}, ctx, CommitModeAsync, func(msg rawtopicreader.ClientMessage) error {
 		return nil
-	})
+	}, -1)
+	res.Start()
 	t.Cleanup(func() {
-		if err := res.Close(ctx, errors.New("test comitter closed")); err != nil {
+		if err := res.Close(ctx, errors.New("test committer closed")); err != nil {
 			require.ErrorIs(t, err, background.ErrAlreadyClosed)
 		}
 	})

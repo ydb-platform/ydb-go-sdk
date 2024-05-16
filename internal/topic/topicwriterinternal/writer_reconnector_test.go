@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -426,7 +427,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "ReconnectOnErrors", func(t testing.TB) {
 		ctx := xtest.Context(t)
 
-		w := newTestWriterStopped()
+		w := newTestWriterStopped(WithClock(xtest.FastClock(t)), WithTokenUpdateInterval(time.Duration(math.MaxInt64)))
 
 		mc := gomock.NewController(t)
 
