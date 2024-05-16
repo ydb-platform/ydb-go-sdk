@@ -76,6 +76,8 @@ func (b *Worker) Close(ctx context.Context, err error) error {
 	var resErr error
 	b.m.WithLock(func() {
 		if b.closed {
+			// The error of Close is second close, close reason added for describe previous close only, for better debug
+			//nolint:errorlint
 			resErr = xerrors.WithStackTrace(fmt.Errorf("%w with reason: %+v", ErrAlreadyClosed, b.closeReason))
 
 			return
