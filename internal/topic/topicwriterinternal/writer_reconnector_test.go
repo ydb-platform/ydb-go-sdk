@@ -555,6 +555,8 @@ func TestWriterImpl_CloseWithFlush(t *testing.T) {
 				},
 			},
 			Codec: rawtopiccommon.CodecRaw,
+		}).Do(func(_ *rawtopicwriter.WriteRequest) {
+			close(writeCompleted)
 		}).Return(nil)
 
 		flushCompleted := make(empty.Chan)
@@ -564,7 +566,6 @@ func TestWriterImpl_CloseWithFlush(t *testing.T) {
 				CreatedAt: messageTime,
 				Data:      bytes.NewReader(messageData),
 			}})
-			close(writeCompleted)
 			require.NoError(t, err)
 		}()
 
@@ -611,11 +612,11 @@ func TestWriterImpl_CloseWithFlush(t *testing.T) {
 		{
 			name: "flush",
 			flush: func(ctx context.Context, writer *WriterReconnector) error {
-				return writer.Close(ctx)
+				return writer.Flush(ctx)
 			},
 		},
 		{
-			name: "flush and close",
+			name: "flush_and_close",
 			flush: func(ctx context.Context, writer *WriterReconnector) error {
 				err := writer.Flush(ctx)
 				if err != nil {
@@ -631,7 +632,7 @@ func TestWriterImpl_CloseWithFlush(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
 				f(t, test.flush)
-			})
+			}, xtest.StopAfter(time.Minute))
 		})
 	}
 }
