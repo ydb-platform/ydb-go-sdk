@@ -1,3 +1,4 @@
+## v3.67.2
 * Fixed incorrect formatting of decimal. Implementation of decimal has been reverted to latest working version
 
 ## v3.67.1
