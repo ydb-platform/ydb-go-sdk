@@ -7,6 +7,7 @@ import (
 	"time"
 
 	ydb "github.com/ydb-platform/gorm-driver"
+	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydbSDK "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -62,6 +63,9 @@ func NewStorage(cfg *config.Config, poolSize int) (*Storage, error) {
 			ydb.WithMaxOpenConns(poolSize),
 			ydb.WithMaxIdleConns(poolSize),
 			ydb.WithTablePathPrefix(label),
+			ydb.With(
+				environ.WithEnvironCredentials(),
+			),
 		),
 		&gorm.Config{
 			Logger: gormLogger.Default.LogMode(gormLogger.Warn),
