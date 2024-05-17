@@ -4,10 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	"time"
 
 	ydb "github.com/ydb-platform/gorm-driver"
+	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
 	ydbSDK "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
