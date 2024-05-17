@@ -166,6 +166,11 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 		if err != nil {
 			return unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
+		defer func() {
+			if finalErr != nil {
+				_ = tx.Rollback()
+			}
+		}()
 
 		if err = op(xcontext.MarkRetryCall(ctx), tx); err != nil {
 			return unwrapErrBadConn(xerrors.WithStackTrace(err))

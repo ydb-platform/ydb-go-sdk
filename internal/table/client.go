@@ -666,9 +666,30 @@ func (c *Client) Do(ctx context.Context, op table.Operation, opts ...table.Optio
 		onDone(attempts, finalErr)
 	}()
 
-	err := do(ctx, c, c.config, op, func(err error) {
-		attempts++
-	}, config.RetryOptions...)
+	err := retryBackoff(ctx, c,
+		func(ctx context.Context, s table.Session) (err error) {
+			attempts++
+
+			err = func() error {
+				if panicCallback := c.config.PanicCallback(); panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							panicCallback(e)
+						}
+					}()
+				}
+
+				return op(xcontext.MarkRetryCall(ctx), s)
+			}()
+
+			if err != nil {
+				return xerrors.WithStackTrace(err)
+			}
+
+			return nil
+		},
+		config.RetryOptions...,
+	)
 	if err != nil {
 		return xerrors.WithStackTrace(err)
 	}
@@ -695,14 +716,19 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 		onDone(attempts, finalErr)
 	}()
 
-	return retryBackoff(ctx, c,
-		func(ctx context.Context, s table.Session) (err error) {
+	err := retryBackoff(ctx, c,
+		func(ctx context.Context, s table.Session) (finalErr error) {
 			attempts++
 
 			tx, err := s.BeginTransaction(ctx, config.TxSettings)
 			if err != nil {
 				return xerrors.WithStackTrace(err)
 			}
+			defer func() {
+				if finalErr != nil {
+					_ = tx.Rollback(ctx)
+				}
+			}()
 
 			err = func() error {
 				if panicCallback := c.config.PanicCallback(); panicCallback != nil {
@@ -729,6 +755,11 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 		},
 		config.RetryOptions...,
 	)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
 }
 
 func (c *Client) internalPoolGCTick(ctx context.Context, idleThreshold time.Duration) {
