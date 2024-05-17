@@ -1,3 +1,5 @@
+* Fixed incorrect formatting of decimal. Implementation of decimal has been reverted to latest working version
+
 ## v3.67.1
 * Fixed race of stop internal processes on close topic writer
 * Fixed goroutines leak within topic reader on network problems
