@@ -1,3 +1,5 @@
+* Skipped explicit `Rollback` of transaction on errors (server-side automatically rolled back transactions on errors)
+
 ## v3.67.1
 * Fixed race of stop internal processes on close topic writer
 * Fixed goroutines leak within topic reader on network problems

@@ -3,8 +3,6 @@ package table
 import (
 	"context"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/retry"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
@@ -20,44 +18,6 @@ type SessionProvider interface {
 	// on implementation.
 	// Put must be fast, if necessary must be async
 	Put(ctx context.Context, s *session) (err error)
-}
-
-func do(
-	ctx context.Context,
-	c SessionProvider,
-	config *config.Config,
-	op table.Operation,
-	onAttempt func(err error),
-	opts ...retry.Option,
-) (err error) {
-	return retryBackoff(ctx, c,
-		func(ctx context.Context, s table.Session) (err error) {
-			defer func() {
-				if onAttempt != nil {
-					onAttempt(err)
-				}
-			}()
-
-			err = func() error {
-				if panicCallback := config.PanicCallback(); panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							panicCallback(e)
-						}
-					}()
-				}
-
-				return op(xcontext.MarkRetryCall(ctx), s)
-			}()
-
-			if err != nil {
-				return xerrors.WithStackTrace(err)
-			}
-
-			return nil
-		},
-		opts...,
-	)
 }
 
 func retryBackoff(

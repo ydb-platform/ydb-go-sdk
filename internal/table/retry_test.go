@@ -11,7 +11,6 @@ import (
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xrand"
@@ -41,12 +40,10 @@ func TestRetryerBackoffRetryCancelation(t *testing.T) {
 			ctx, cancel := xcontext.WithCancel(context.Background())
 			results := make(chan error)
 			go func() {
-				err := do(ctx, p,
-					config.New(),
+				err := retryBackoff(ctx, p,
 					func(ctx context.Context, _ table.Session) error {
 						return testErr
 					},
-					nil,
 					retry.WithFastBackoff(
 						testutil.BackoffFunc(func(n int) <-chan time.Time {
 							ch := make(chan time.Time)
@@ -103,7 +100,7 @@ func TestRetryerBadSession(t *testing.T) {
 		sessions   []table.Session
 	)
 	ctx, cancel := xcontext.WithCancel(context.Background())
-	err := do(ctx, p, config.New(),
+	err := retryBackoff(ctx, p,
 		func(ctx context.Context, s table.Session) error {
 			sessions = append(sessions, s)
 			i++
@@ -115,7 +112,6 @@ func TestRetryerBadSession(t *testing.T) {
 				xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
 			)
 		},
-		func(err error) {},
 	)
 	if !xerrors.Is(err, context.Canceled) {
 		t.Errorf("unexpected error: %v", err)
@@ -154,17 +150,13 @@ func TestRetryerSessionClosing(t *testing.T) {
 	}
 	var sessions []table.Session
 	for i := 0; i < 1000; i++ {
-		err := do(
-			context.Background(),
-			p,
-			config.New(),
+		err := retryBackoff(context.Background(), p,
 			func(ctx context.Context, s table.Session) error {
 				sessions = append(sessions, s)
 				s.(*session).SetStatus(table.SessionClosing)
 
 				return nil
 			},
-			nil,
 		)
 		if err != nil {
 			t.Errorf("unexpected error: %v", err)
@@ -208,14 +200,10 @@ func TestRetryerImmediateReturn(t *testing.T) {
 			p := SingleSession(
 				simpleSession(t),
 			)
-			err := do(
-				context.Background(),
-				p,
-				config.New(),
+			err := retryBackoff(context.Background(), p,
 				func(ctx context.Context, _ table.Session) error {
 					return testErr
 				},
-				nil,
 				retry.WithFastBackoff(
 					testutil.BackoffFunc(func(n int) <-chan time.Time {
 						panic("this code will not be called")
@@ -341,10 +329,7 @@ func TestRetryContextDeadline(t *testing.T) {
 			t.Run(fmt.Sprintf("Timeout=%v,Sleep=%v", timeout, sleep), func(t *testing.T) {
 				ctx, cancel := xcontext.WithTimeout(context.Background(), timeout)
 				defer cancel()
-				_ = do(
-					ctx,
-					p,
-					config.New(),
+				_ = retryBackoff(ctx, p,
 					func(ctx context.Context, _ table.Session) error {
 						select {
 						case <-ctx.Done():
@@ -353,7 +338,6 @@ func TestRetryContextDeadline(t *testing.T) {
 							return errs[r.Int(len(errs))]
 						}
 					},
-					nil,
 				)
 			})
 		}
@@ -442,10 +426,7 @@ func TestRetryWithCustomErrors(t *testing.T) {
 				i        = 0
 				sessions = make(map[table.Session]int)
 			)
-			err := do(
-				ctx,
-				p,
-				config.New(),
+			err := retryBackoff(ctx, p,
 				func(ctx context.Context, s table.Session) (err error) {
 					sessions[s]++
 					i++
@@ -455,7 +436,6 @@ func TestRetryWithCustomErrors(t *testing.T) {
 
 					return nil
 				},
-				nil,
 			)
 			//nolint:nestif
 			if test.retriable {
