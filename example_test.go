@@ -67,8 +67,8 @@ func Example_query() {
 						return err
 					}
 					type myStruct struct {
-						id  uint64 `sql:"id"`
-						str string `sql:"myStr"`
+						Id  uint64 `sql:"id"`
+						Str string `sql:"myStr"`
 					}
 					var s myStruct
 					if err = row.ScanStruct(&s); err != nil {
