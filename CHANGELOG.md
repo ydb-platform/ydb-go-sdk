@@ -1,3 +1,4 @@
+* Simple implement option WithReaderWithoutConsumer
 * Fixed bug: topic didn't send specified partition number to a server 
 
 ## v3.67.2

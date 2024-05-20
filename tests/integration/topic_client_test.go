@@ -5,8 +5,10 @@ package integration
 
 import (
 	"context"
+	"io"
 	"os"
 	"path"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +20,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
+	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
 const defaultConnectionString = "grpc://localhost:2136/local"
@@ -153,6 +156,75 @@ func TestSchemeList(t *testing.T) {
 		}
 	}
 	require.True(t, hasTopic)
+}
+
+func TestReaderWithoutConsumer(t *testing.T) {
+	t.Run("OK", func(t *testing.T) {
+		scope := newScope(t)
+		ctx := scope.Ctx
+
+		reader1, err := scope.Driver().Topic().StartReader(
+			"",
+			topicoptions.ReadSelectors{
+				{
+					Path:       scope.TopicPath(),
+					Partitions: []int64{0},
+				},
+			},
+			topicoptions.WithReaderWithoutConsumer(false),
+		)
+		require.NoError(t, err)
+
+		reader2, err := scope.Driver().Topic().StartReader(
+			"",
+			topicoptions.ReadSelectors{
+				{
+					Path:       scope.TopicPath(),
+					Partitions: []int64{0},
+				},
+			},
+			topicoptions.WithReaderWithoutConsumer(false),
+		)
+		require.NoError(t, err)
+
+		err = scope.TopicWriter().Write(ctx, topicwriter.Message{Data: strings.NewReader("123")})
+		require.NoError(t, err)
+
+		msg1, err := reader1.ReadMessage(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(1), msg1.SeqNo)
+
+		msg1data, err := io.ReadAll(msg1)
+		require.NoError(t, err)
+		require.Equal(t, "123", string(msg1data))
+
+		msg2, err := reader2.ReadMessage(ctx)
+		require.NoError(t, err)
+		require.Equal(t, int64(1), msg2.SeqNo)
+
+		msg2data, err := io.ReadAll(msg2)
+		require.NoError(t, err)
+		require.Equal(t, "123", string(msg2data))
+
+		_ = reader1.Close(ctx)
+		_ = reader2.Close(ctx)
+	})
+	t.Run("NoNameNoOptionErr", func(t *testing.T) {
+		scope := newScope(t)
+		topicReader, err := scope.Driver().Topic().StartReader("", topicoptions.ReadTopic(scope.TopicPath()))
+		require.Error(t, err)
+		require.Nil(t, topicReader)
+	})
+	t.Run("NameAndOption", func(t *testing.T) {
+		scope := newScope(t)
+		topicReader, err := scope.Driver().Topic().StartReader(
+			scope.TopicConsumerName(),
+			topicoptions.ReadTopic(scope.TopicPath()),
+			topicoptions.WithReaderWithoutConsumer(false),
+		)
+		require.Error(t, err)
+		require.Nil(t, topicReader)
+	})
 }
 
 func connect(t testing.TB, opts ...ydb.Option) *ydb.Driver {
