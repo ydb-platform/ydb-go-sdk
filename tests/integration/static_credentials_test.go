@@ -64,8 +64,7 @@ func TestStaticCredentials(t *testing.T) {
 	t.Logf("token: %s\n", token)
 
 	db, err := ydb.Open(ctx,
-		"", // corner case for check replacement of endpoint+database+secure
-		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
+		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithCredentials(staticCredentials),
 	)
 	if err != nil {

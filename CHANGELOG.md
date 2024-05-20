@@ -1,3 +1,4 @@
+* Added experimental `ydb.{Register,Unregister}DsnParser` global funcs for register/unregister external custom DSN parser for `ydb.Open` and `sql.Open` driver constructor
 * Simple implement option WithReaderWithoutConsumer
 * Fixed bug: topic didn't send specified partition number to a server 
 
