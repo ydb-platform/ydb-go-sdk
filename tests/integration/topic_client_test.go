@@ -17,6 +17,7 @@ import (
 
 	ydb "github.com/ydb-platform/ydb-go-sdk/v3"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/version"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicoptions"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
@@ -160,6 +161,9 @@ func TestSchemeList(t *testing.T) {
 
 func TestReaderWithoutConsumer(t *testing.T) {
 	t.Run("OK", func(t *testing.T) {
+		if version.Lt(os.Getenv("YDB_VERSION"), "24.1") {
+			t.Skip("Read topic without consumer implemented since YDB 24.1, test ran for '" + os.Getenv("YDB_VERSION") + "'")
+		}
 		scope := newScope(t)
 		ctx := scope.Ctx
 
