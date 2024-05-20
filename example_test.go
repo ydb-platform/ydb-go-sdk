@@ -67,7 +67,7 @@ func Example_query() {
 						return err
 					}
 					type myStruct struct {
-						Id  uint64 `sql:"id"`
+						ID  uint64 `sql:"id"`
 						Str string `sql:"myStr"`
 					}
 					var s myStruct
