@@ -124,8 +124,10 @@ func (r *InitRequest) toProto() *Ydb_Topic.StreamReadMessage_InitRequest {
 		dstTopicSettings.MaxLag = srcTopicSettings.MaxLag.ToProto()
 		dstTopicSettings.ReadFrom = srcTopicSettings.ReadFrom.ToProto()
 
-		dstTopicSettings.PartitionIds = make([]int64, len(srcTopicSettings.PartitionsID))
-		copy(dstTopicSettings.PartitionIds, srcTopicSettings.PartitionsID)
+		partitionsIDs := make([]int64, len(srcTopicSettings.PartitionsID))
+		copy(partitionsIDs, srcTopicSettings.PartitionsID)
+
+		dstTopicSettings.PartitionIds = partitionsIDs
 	}
 
 	return p

@@ -234,7 +234,7 @@ type ReaderConfig struct {
 	topicStreamReaderConfig
 }
 
-func (c ReaderConfig) Validate() error {
+func (c *ReaderConfig) Validate() error {
 	if c.Consumer != "" && c.ReadWithoutConsumer {
 		return xerrors.WithStackTrace(errSetConsumerAndNoConsumer)
 	}
@@ -244,6 +244,7 @@ func (c ReaderConfig) Validate() error {
 	if c.ReadWithoutConsumer && c.CommitMode != CommitModeNone {
 		return xerrors.WithStackTrace(errCantCommitWithoutConsumer)
 	}
+
 	return nil
 }
 

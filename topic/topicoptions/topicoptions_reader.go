@@ -274,6 +274,7 @@ func WithReaderWithoutConsumer(saveStateOnReconnection bool) ReaderOption {
 	if saveStateOnReconnection {
 		panic("ydb: saveStateOnReconnection mode doesn't implemented yet")
 	}
+
 	return func(cfg *topicreaderinternal.ReaderConfig) {
 		cfg.ReadWithoutConsumer = true
 		cfg.CommitMode = CommitModeNone
