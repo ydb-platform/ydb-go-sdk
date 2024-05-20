@@ -257,3 +257,11 @@ func WithReaderUpdateTokenInterval(interval time.Duration) ReaderOption {
 		cfg.CredUpdateInterval = interval
 	}
 }
+
+// WithReaderWithoutConsumer allow read topic without consumer.
+// Read without consumer is special read mode on a server. In the mode every reader without consumer receive all
+// messages from a topic and can't commit them.
+// The mode work good if every reader process need all messages (for example for cache invalidation) and no need
+// scale process messages by readers count.
+func WithReaderWithoutConsumer() ReaderOption {
+}
