@@ -1,3 +1,6 @@
+* Simple implement option WithReaderWithoutConsumer
+* Fixed bug: topic didn't send specified partition number to a server 
+
 ## v3.67.2
 * Fixed incorrect formatting of decimal. Implementation of decimal has been reverted to latest working version
 

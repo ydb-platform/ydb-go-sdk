@@ -65,6 +65,7 @@ type topicStreamReaderConfig struct {
 	Cred                            credentials.Credentials
 	CredUpdateInterval              time.Duration
 	Consumer                        string
+	ReadWithoutConsumer             bool
 	ReadSelectors                   []*PublicReadSelector
 	Trace                           *trace.Topic
 	GetPartitionStartOffsetCallback PublicGetPartitionStartOffsetFunc

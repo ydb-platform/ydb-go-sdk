@@ -106,6 +106,7 @@ type (
 	TopicReaderStartInfo struct {
 		ReaderID int64
 		Consumer string
+		Error    error
 	}
 
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals

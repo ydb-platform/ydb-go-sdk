@@ -996,10 +996,11 @@ func (t *Topic) onWriterReadUnknownGrpcMessage(t1 TopicOnWriterReadUnknownGrpcMe
 	fn(t1)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func TopicOnReaderStart(t *Topic, readerID int64, consumer string) {
+func TopicOnReaderStart(t *Topic, readerID int64, consumer string, e error) {
 	var p TopicReaderStartInfo
 	p.ReaderID = readerID
 	p.Consumer = consumer
+	p.Error = e
 	t.onReaderStart(p)
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
