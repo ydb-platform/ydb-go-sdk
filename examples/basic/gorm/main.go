@@ -1,10 +1,8 @@
 package main
 
 import (
-	"context"
 	"log"
 	"os"
-	"time"
 
 	ydb "github.com/ydb-platform/gorm-driver"
 	environ "github.com/ydb-platform/ydb-go-sdk-auth-environ"
@@ -23,9 +21,6 @@ SQLITE_CONNECTION_STRING
 YDB_CONNECTION_STRING`
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
 	cfg := &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Error),
 	}
@@ -43,7 +38,7 @@ func main() {
 				dsn,
 				ydb.WithTablePathPrefix("gorm"),
 				ydb.With(
-					environ.WithEnvironCredentials(ctx),
+					environ.WithEnvironCredentials(),
 				),
 			),
 			cfg,

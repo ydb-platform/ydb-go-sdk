@@ -118,7 +118,6 @@ type WriterReconnector struct {
 	queue                          messageQueue
 	background                     background.Worker
 	retrySettings                  topic.RetrySettings
-	clock                          clockwork.Clock
 	writerInstanceID               string
 	sessionID                      string
 	semaphore                      *semaphore.Weighted
@@ -149,7 +148,6 @@ func newWriterReconnectorStopped(
 		cfg:                            cfg,
 		semaphore:                      semaphore.NewWeighted(int64(cfg.MaxQueueLen)),
 		queue:                          newMessageQueue(),
-		clock:                          clockwork.NewRealClock(),
 		lastSeqNo:                      -1,
 		firstInitResponseProcessedChan: make(empty.Chan),
 		encodersMap:                    NewEncoderMap(),
@@ -189,7 +187,7 @@ func (w *WriterReconnector) fillFields(messages []messageWithDataContent) error 
 		if w.cfg.AutoSetCreatedTime {
 			if msg.CreatedAt.IsZero() {
 				if now.IsZero() {
-					now = w.clock.Now()
+					now = w.cfg.clock.Now()
 				}
 				msg.CreatedAt = now
 			} else {
@@ -350,14 +348,15 @@ func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr err
 		onDone(resErr)
 	}()
 
-	closeErr := w.queue.Close(reason)
-	if resErr == nil && closeErr != nil {
-		resErr = closeErr
-	}
-
+	// stop background work and single stream writer
 	bgErr := w.background.Close(ctx, reason)
 	if resErr == nil && bgErr != nil {
 		resErr = bgErr
+	}
+
+	closeErr := w.queue.Close(reason)
+	if resErr == nil && closeErr != nil {
+		resErr = closeErr
 	}
 
 	return resErr
@@ -392,17 +391,17 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		now := time.Now()
 		if startOfRetries.IsZero() || topic.CheckResetReconnectionCounters(prevAttemptTime, now, w.cfg.connectTimeout) {
 			attempt = 0
-			startOfRetries = w.clock.Now()
+			startOfRetries = w.cfg.clock.Now()
 		} else {
 			attempt++
 		}
 		prevAttemptTime = now
 
 		if reconnectReason != nil {
-			retryDuration := w.clock.Since(startOfRetries)
+			retryDuration := w.cfg.clock.Since(startOfRetries)
 			if backoff, retry := topic.CheckRetryMode(reconnectReason, w.retrySettings, retryDuration); retry {
 				delay := backoff.Delay(attempt)
-				delayTimer := w.clock.NewTimer(delay)
+				delayTimer := w.cfg.clock.NewTimer(delay)
 				select {
 				case <-doneCtx:
 					delayTimer.Stop()

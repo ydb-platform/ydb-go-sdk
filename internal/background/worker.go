@@ -3,6 +3,7 @@ package background
 import (
 	"context"
 	"errors"
+	"fmt"
 	"runtime/pprof"
 	"sync"
 
@@ -20,6 +21,7 @@ var (
 // A Worker must not be copied after first use
 type Worker struct {
 	ctx            context.Context //nolint:containedctx
+	name           string
 	workers        sync.WaitGroup
 	closeReason    error
 	tasksCompleted empty.Chan
@@ -32,8 +34,10 @@ type Worker struct {
 
 type CallbackFunc func(ctx context.Context)
 
-func NewWorker(parent context.Context) *Worker {
-	w := Worker{}
+func NewWorker(parent context.Context, name string) *Worker {
+	w := Worker{
+		name: name,
+	}
 	w.ctx, w.stop = xcontext.WithCancel(parent)
 
 	return &w
@@ -72,7 +76,9 @@ func (b *Worker) Close(ctx context.Context, err error) error {
 	var resErr error
 	b.m.WithLock(func() {
 		if b.closed {
-			resErr = xerrors.WithStackTrace(ErrAlreadyClosed)
+			// The error of Close is second close, close reason added for describe previous close only, for better debug
+			//nolint:errorlint
+			resErr = xerrors.WithStackTrace(fmt.Errorf("%w with reason: %+v", ErrAlreadyClosed, b.closeReason))
 
 			return
 		}
@@ -122,11 +128,14 @@ func (b *Worker) init() {
 		}
 		b.tasks = make(chan backgroundTask)
 		b.tasksCompleted = make(empty.Chan)
-		go b.starterLoop()
+
+		pprof.Do(b.ctx, pprof.Labels("worker-name", b.name), func(ctx context.Context) {
+			go b.starterLoop(ctx)
+		})
 	})
 }
 
-func (b *Worker) starterLoop() {
+func (b *Worker) starterLoop(ctx context.Context) {
 	defer close(b.tasksCompleted)
 
 	for bgTask := range b.tasks {
@@ -135,7 +144,7 @@ func (b *Worker) starterLoop() {
 		go func(task backgroundTask) {
 			defer b.workers.Done()
 
-			pprof.Do(b.ctx, pprof.Labels("background", task.name), task.callback)
+			pprof.Do(ctx, pprof.Labels("background", task.name), task.callback)
 		}(bgTask)
 	}
 }

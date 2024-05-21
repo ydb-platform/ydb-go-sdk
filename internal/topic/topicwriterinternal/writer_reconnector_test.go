@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -426,7 +427,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 	xtest.TestManyTimesWithName(t, "ReconnectOnErrors", func(t testing.TB) {
 		ctx := xtest.Context(t)
 
-		w := newTestWriterStopped()
+		w := newTestWriterStopped(WithClock(xtest.FastClock(t)), WithTokenUpdateInterval(time.Duration(math.MaxInt64)))
 
 		mc := gomock.NewController(t)
 
@@ -554,6 +555,8 @@ func TestWriterImpl_CloseWithFlush(t *testing.T) {
 				},
 			},
 			Codec: rawtopiccommon.CodecRaw,
+		}).Do(func(_ *rawtopicwriter.WriteRequest) {
+			close(writeCompleted)
 		}).Return(nil)
 
 		flushCompleted := make(empty.Chan)
@@ -563,7 +566,6 @@ func TestWriterImpl_CloseWithFlush(t *testing.T) {
 				CreatedAt: messageTime,
 				Data:      bytes.NewReader(messageData),
 			}})
-			close(writeCompleted)
 			require.NoError(t, err)
 		}()
 
@@ -610,11 +612,11 @@ func TestWriterImpl_CloseWithFlush(t *testing.T) {
 		{
 			name: "flush",
 			flush: func(ctx context.Context, writer *WriterReconnector) error {
-				return writer.Close(ctx)
+				return writer.Flush(ctx)
 			},
 		},
 		{
-			name: "flush and close",
+			name: "flush_and_close",
 			flush: func(ctx context.Context, writer *WriterReconnector) error {
 				err := writer.Flush(ctx)
 				if err != nil {

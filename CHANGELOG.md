@@ -1,4 +1,16 @@
 * Refactored internal packages by `ifshort` linter issues
+* Simple implement option WithReaderWithoutConsumer
+* Fixed bug: topic didn't send specified partition number to a server 
+
+## v3.67.2
+* Fixed incorrect formatting of decimal. Implementation of decimal has been reverted to latest working version
+
+## v3.67.1 (retracted)
+* Fixed race of stop internal processes on close topic writer
+* Fixed goroutines leak within topic reader on network problems
+
+## v3.67.0
+* Added `ydb.WithNodeAddressMutator` experimental option for mutate node addresses from `discovery.ListEndpoints` response
 * Added type assertion checks to enhance type safety and prevent unexpected panics in critical sections of the codebase
 
 ## v3.66.3

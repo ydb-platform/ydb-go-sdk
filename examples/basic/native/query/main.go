@@ -56,7 +56,7 @@ func main() {
 
 	db, err := ydb.Open(ctx,
 		dsn,
-		environ.WithEnvironCredentials(ctx),
+		environ.WithEnvironCredentials(),
 	)
 	if err != nil {
 		panic(fmt.Errorf("connect error: %w", err))

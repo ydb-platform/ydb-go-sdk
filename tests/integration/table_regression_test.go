@@ -11,7 +11,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result"
 	"github.com/ydb-platform/ydb-go-sdk/v3/table/result/indexed"
@@ -92,4 +94,22 @@ func TestIssueWideResultWithUnwrap(t *testing.T) {
 			require.Equal(t, int64(i), val.val)
 		}
 	})
+}
+
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1227
+func TestRegressionIssue1227RetryBadSession(t *testing.T) {
+	var (
+		scope = newScope(t)
+		cnt   = 0
+	)
+	err := scope.Driver().Table().Do(scope.Ctx, func(ctx context.Context, s table.Session) error {
+		cnt++
+		if cnt < 100 {
+			return xerrors.WithStackTrace(xerrors.Operation(xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION)))
+		}
+
+		return nil
+	})
+	require.NoError(t, err)
+	require.EqualValues(t, 100, cnt)
 }

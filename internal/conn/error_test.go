@@ -5,6 +5,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/backoff"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
 
 func TestNodeErrorError(t *testing.T) {
@@ -58,4 +62,18 @@ func TestNodeErrorAs(t *testing.T) {
 
 	target2 := testType2Error{}
 	require.False(t, errors.As(nodeErr, &target2))
+}
+
+// https://github.com/ydb-platform/ydb-go-sdk/issues/1227
+func TestIssue1227NodeErrorUnwrapBadSession(t *testing.T) {
+	nodeErr := xerrors.WithStackTrace(newConnError(1, "localhost:1234", xerrors.Operation(
+		xerrors.WithStatusCode(Ydb.StatusIds_BAD_SESSION),
+	)))
+
+	code, errType, backoffType, invalidObject := xerrors.Check(nodeErr)
+
+	require.EqualValues(t, Ydb.StatusIds_BAD_SESSION, code)
+	require.EqualValues(t, xerrors.TypeRetryable, errType)
+	require.EqualValues(t, backoff.TypeNoBackoff, backoffType)
+	require.True(t, invalidObject)
 }

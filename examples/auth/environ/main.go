@@ -14,7 +14,7 @@ func main() {
 	defer cancel()
 	db, err := ydb.Open(ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
-		environ.WithEnvironCredentials(ctx),
+		environ.WithEnvironCredentials(),
 	)
 	if err != nil {
 		panic(err)

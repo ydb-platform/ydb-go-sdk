@@ -22,6 +22,9 @@ var (
 		errors.New("ydb: first connection attempt not finished"),
 	))
 	errReaderClosed                 = xerrors.Wrap(errors.New("ydb: reader closed"))
+	errUnexpectedEmptyConsumername  = xerrors.Wrap(errors.New("ydb: create ydb reader with empty consumer name. Set one of: consumer name or option WithReaderWithoutConsumer")) //nolint:lll
+	errSetConsumerAndNoConsumer     = xerrors.Wrap(errors.New("ydb: reader has non empty consumer name and set option WithReaderWithoutConsumer. Only one of them must be set")) //nolint:lll
+	errCantCommitWithoutConsumer    = xerrors.Wrap(errors.New("ydb: reader can't commit messages without consumer"))
 	errCommitSessionFromOtherReader = xerrors.Wrap(errors.New("ydb: commit with session from other reader"))
 )
 
@@ -82,8 +85,13 @@ func NewReader(
 	consumer string,
 	readSelectors []PublicReadSelector,
 	opts ...PublicReaderOption,
-) Reader {
+) (Reader, error) {
 	cfg := convertNewParamsToStreamConfig(consumer, readSelectors, opts...)
+
+	if err := cfg.Validate(); err != nil {
+		return Reader{}, err
+	}
+
 	readerID := nextReaderID()
 
 	readerConnector := func(ctx context.Context) (batchedStreamReader, error) {
@@ -108,7 +116,7 @@ func NewReader(
 		readerID:           readerID,
 	}
 
-	return res
+	return res, nil
 }
 
 func (r *Reader) WaitInit(ctx context.Context) error {
@@ -224,6 +232,20 @@ type ReaderConfig struct {
 	RetrySettings      topic.RetrySettings
 	DefaultBatchConfig ReadMessageBatchOptions
 	topicStreamReaderConfig
+}
+
+func (c *ReaderConfig) Validate() error {
+	if c.Consumer != "" && c.ReadWithoutConsumer {
+		return xerrors.WithStackTrace(errSetConsumerAndNoConsumer)
+	}
+	if c.Consumer == "" && !c.ReadWithoutConsumer {
+		return xerrors.WithStackTrace(errUnexpectedEmptyConsumername)
+	}
+	if c.ReadWithoutConsumer && c.CommitMode != CommitModeNone {
+		return xerrors.WithStackTrace(errCantCommitWithoutConsumer)
+	}
+
+	return nil
 }
 
 type PublicReaderOption func(cfg *ReaderConfig)

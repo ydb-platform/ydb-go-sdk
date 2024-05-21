@@ -88,7 +88,7 @@ func main() {
 	s, err := getService(
 		ctx,
 		dsn,
-		environ.WithEnvironCredentials(ctx),
+		environ.WithEnvironCredentials(),
 	)
 	if err != nil {
 		fmt.Println()
