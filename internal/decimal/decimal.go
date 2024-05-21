@@ -88,6 +88,8 @@ func FromInt128(p [16]byte, precision, scale uint32) *big.Int {
 
 // Parse interprets a string s with the given precision and scale and returns
 // the corresponding big integer.
+//
+//nolint:ifshort
 func Parse(s string, precision, scale uint32) (*big.Int, error) {
 	if scale > precision {
 		return nil, precisionError(s, precision, scale)
