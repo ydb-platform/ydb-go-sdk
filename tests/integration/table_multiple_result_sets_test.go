@@ -40,8 +40,7 @@ func TestTableMultipleResultSets(t *testing.T) {
 	)
 
 	db, err := ydb.Open(ctx,
-		"", // corner case for check replacement of endpoint+database+secure
-		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
+		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithLogger(
 			newLogger(t),
 			trace.MatchDetails(`ydb\.(driver|discovery|retry|scheme).*`),

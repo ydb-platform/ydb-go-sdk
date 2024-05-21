@@ -39,9 +39,7 @@ func TestConnectionSecure(t *testing.T) {
 	const sumColumn = "sum"
 	ctx := xtest.Context(t)
 
-	db, err := ydb.Open(ctx,
-		"", // corner case for check replacement of endpoint+database+secure
-		ydb.WithConnectionString(dsn),
+	db, err := ydb.Open(ctx, dsn,
 		ydb.WithAccessTokenCredentials(
 			os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
 		),

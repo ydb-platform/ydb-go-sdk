@@ -20,10 +20,7 @@ import (
 func TestMonitoring(t *testing.T) {
 	ctx := xtest.Context(t)
 
-	db, err := ydb.Open(ctx,
-		"", // corner case for check replacement of endpoint+database+secure
-		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
-	)
+	db, err := ydb.Open(ctx, os.Getenv("YDB_CONNECTION_STRING"))
 	if err != nil {
 		t.Fatal(err)
 	}

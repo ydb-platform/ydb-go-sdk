@@ -31,7 +31,7 @@ import (
 )
 
 // Option contains configuration values for Driver
-type Option func(ctx context.Context, c *Driver) error
+type Option func(ctx context.Context, d *Driver) error
 
 func WithStaticCredentials(user, password string) Option {
 	return func(ctx context.Context, c *Driver) error {
