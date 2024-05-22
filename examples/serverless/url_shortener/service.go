@@ -464,7 +464,7 @@ func Serverless(w http.ResponseWriter, r *http.Request) {
 	s, err := getService(
 		r.Context(),
 		os.Getenv("YDB"),
-		environ.WithEnvironCredentials(r.Context()),
+		environ.WithEnvironCredentials(),
 	)
 	if err != nil {
 		writeResponse(w, http.StatusInternalServerError, err.Error())

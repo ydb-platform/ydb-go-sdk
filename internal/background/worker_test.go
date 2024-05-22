@@ -25,7 +25,7 @@ func TestWorkerContext(t *testing.T) {
 	t.Run("Dedicated", func(t *testing.T) {
 		type ctxkey struct{}
 		ctx := context.WithValue(context.Background(), ctxkey{}, "2")
-		w := NewWorker(ctx)
+		w := NewWorker(ctx, "test-worker, "+t.Name())
 		require.Equal(t, "2", w.Context().Value(ctxkey{}))
 	})
 
@@ -41,7 +41,7 @@ func TestWorkerContext(t *testing.T) {
 
 func TestWorkerStart(t *testing.T) {
 	t.Run("Started", func(t *testing.T) {
-		w := NewWorker(xtest.Context(t))
+		w := NewWorker(xtest.Context(t), "test-worker, "+t.Name())
 		started := make(empty.Chan)
 		w.Start("test", func(ctx context.Context) {
 			close(started)
@@ -50,7 +50,7 @@ func TestWorkerStart(t *testing.T) {
 	})
 	t.Run("Stopped", func(t *testing.T) {
 		ctx := xtest.Context(t)
-		w := NewWorker(ctx)
+		w := NewWorker(ctx, "test-worker, "+t.Name())
 		_ = w.Close(ctx, nil)
 
 		started := make(empty.Chan)
@@ -72,7 +72,7 @@ func TestWorkerStart(t *testing.T) {
 func TestWorkerClose(t *testing.T) {
 	t.Run("StopBackground", func(t *testing.T) {
 		ctx := xtest.Context(t)
-		w := NewWorker(ctx)
+		w := NewWorker(ctx, "test-worker, "+t.Name())
 
 		started := make(empty.Chan)
 		stopped := atomic.Bool{}
@@ -89,7 +89,7 @@ func TestWorkerClose(t *testing.T) {
 
 	t.Run("DoubleClose", func(t *testing.T) {
 		ctx := xtest.Context(t)
-		w := NewWorker(ctx)
+		w := NewWorker(ctx, "test-worker, "+t.Name())
 		require.NoError(t, w.Close(ctx, nil))
 		require.Error(t, w.Close(ctx, nil))
 	})
@@ -104,7 +104,7 @@ func TestWorkerConcurrentStartAndClose(t *testing.T) {
 		var counter atomic.Int64
 
 		ctx := xtest.Context(t)
-		w := NewWorker(ctx)
+		w := NewWorker(ctx, "test-worker, "+t.Name())
 
 		stopNewStarts := atomic.Bool{}
 		var wgStarters sync.WaitGroup
@@ -144,7 +144,7 @@ func TestWorkerConcurrentStartAndClose(t *testing.T) {
 func TestWorkerStartCompletedWhileLongWait(t *testing.T) {
 	xtest.TestManyTimes(t, func(t testing.TB) {
 		ctx := xtest.Context(t)
-		w := NewWorker(ctx)
+		w := NewWorker(ctx, "test-worker, "+t.Name())
 
 		allowStop := make(empty.Chan)
 		closeStarted := make(empty.Chan)

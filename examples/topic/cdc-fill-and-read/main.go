@@ -27,7 +27,7 @@ func main() {
 
 	var opts []ydb.Option
 	if useEnvCredentials {
-		opts = append(opts, environ.WithEnvironCredentials(ctx))
+		opts = append(opts, environ.WithEnvironCredentials())
 	}
 
 	db, err := ydb.Open(

@@ -78,6 +78,7 @@ func nullValueFromYDB(x *Ydb.Value, t types.Type) (_ Value, ok bool) {
 	}
 }
 
+//nolint:funlen
 func primitiveValueFromYDB(t types.Primitive, v *Ydb.Value) (Value, error) {
 	switch t {
 	case types.Bool:
@@ -167,6 +168,7 @@ func primitiveValueFromYDB(t types.Primitive, v *Ydb.Value) (Value, error) {
 	}
 }
 
+//nolint:funlen
 func fromYDB(t *Ydb.Type, v *Ydb.Value) (Value, error) {
 	tt := types.TypeFromYDB(t)
 
@@ -2315,6 +2317,7 @@ func YSONValue(v []byte) ysonValue {
 	return v
 }
 
+//nolint:funlen
 func zeroPrimitiveValue(t types.Primitive) Value {
 	switch t {
 	case types.Bool:

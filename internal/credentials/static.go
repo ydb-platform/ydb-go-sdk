@@ -91,9 +91,7 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 			fmt.Errorf("dial failed: %w", err),
 		)
 	}
-	defer func() {
-		_ = cc.Close()
-	}()
+	defer cc.Close()
 
 	client := Ydb_Auth_V1.NewAuthServiceClient(cc)
 

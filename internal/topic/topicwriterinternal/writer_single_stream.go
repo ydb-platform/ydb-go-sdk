@@ -82,8 +82,11 @@ func newSingleStreamWriterStopped(
 	cfg SingleStreamWriterConfig, //nolint:gocritic
 ) *SingleStreamWriter {
 	return &SingleStreamWriter{
-		cfg:            cfg,
-		background:     *background.NewWorker(xcontext.ValueOnly(ctxForPProfLabelsOnly)),
+		cfg: cfg,
+		background: *background.NewWorker(xcontext.ValueOnly(ctxForPProfLabelsOnly), fmt.Sprintf(
+			"ydb-topic-stream-writer-background: %v",
+			cfg.reconnectorInstanceID,
+		)),
 		closeCompleted: make(empty.Chan),
 		Encoder: EncoderSelector{
 			m:                      nil,

@@ -66,6 +66,7 @@ type topicStreamReaderConfig struct {
 	Cred                            credentials.Credentials
 	CredUpdateInterval              time.Duration
 	Consumer                        string
+	ReadWithoutConsumer             bool
 	ReadSelectors                   []*PublicReadSelector
 	Trace                           *trace.Topic
 	GetPartitionStartOffsetCallback PublicGetPartitionStartOffsetFunc
@@ -82,6 +83,7 @@ func newTopicStreamReaderConfig() topicStreamReaderConfig {
 		Cred:                            credentials.NewAnonymousCredentials(),
 		CredUpdateInterval:              time.Hour,
 		Consumer:                        "",
+		ReadWithoutConsumer:             false,
 		ReadSelectors:                   nil,
 		Trace:                           new(trace.Topic),
 		GetPartitionStartOffsetCallback: nil,
@@ -129,7 +131,7 @@ func newTopicStreamReader(
 	if err = reader.initSession(); err != nil {
 		return nil, err
 	}
-	if err = reader.startLoops(); err != nil {
+	if err = reader.startBackgroundWorkers(); err != nil {
 		return nil, err
 	}
 
@@ -156,7 +158,6 @@ func newTopicStreamReaderStopped(
 		stream:                &syncedStream{m: sync.Mutex{}, stream: stream},
 		cancel:                cancel,
 		batcher:               newBatcher(),
-		backgroundWorkers:     *background.NewWorker(stopPump),
 		readConnectionID:      "preinitID-" + readerConnectionID.String(),
 		readerID:              readerID,
 		rawMessagesFromBuffer: make(chan rawtopicreader.ServerMessage, 1),
@@ -168,6 +169,10 @@ func newTopicStreamReaderStopped(
 			lastCompactedTime:        time.Time{},
 			lastCompactedRemoveIndex: 0,
 		},
+		backgroundWorkers: *background.NewWorker(stopPump, fmt.Sprintf(
+			"topic-reader-stream-background: %v",
+			readerID,
+		)),
 		committer: nil,
 		m:         xsync.RWMutex{RWMutex: sync.RWMutex{}},
 		err:       nil,
@@ -175,7 +180,7 @@ func newTopicStreamReaderStopped(
 		closed:    false,
 	}
 
-	res.committer = newCommitter(cfg.Trace, labeledContext, cfg.CommitMode, res.send)
+	res.committer = newCommitterStopped(cfg.Trace, labeledContext, cfg.CommitMode, res.send, res.readerID)
 	res.committer.BufferTimeLagTrigger = cfg.CommitterBatchTimeLag
 	res.committer.BufferCountTrigger = cfg.CommitterBatchCounterTrigger
 	res.sessionController.init()
@@ -432,10 +437,12 @@ func (r *topicStreamReaderImpl) send(msg rawtopicreader.ClientMessage) error {
 	return err
 }
 
-func (r *topicStreamReaderImpl) startLoops() error {
+func (r *topicStreamReaderImpl) startBackgroundWorkers() error {
 	if err := r.setStarted(); err != nil {
 		return err
 	}
+
+	r.committer.Start()
 
 	r.backgroundWorkers.Start("readMessagesLoop", r.readMessagesLoop)
 	r.backgroundWorkers.Start("dataRequestLoop", r.dataRequestLoop)

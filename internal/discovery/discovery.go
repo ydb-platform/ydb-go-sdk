@@ -19,6 +19,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+//go:generate mockgen -destination grpc_client_mock_test.go -package discovery -write_package_comment=false github.com/ydb-platform/ydb-go-genproto/Ydb_Discovery_V1 DiscoveryServiceClient
+
 func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) *Client {
 	return &Client{
 		config: config,
@@ -35,20 +37,66 @@ type Client struct {
 	client Ydb_Discovery_V1.DiscoveryServiceClient
 }
 
+func discover(
+	ctx context.Context,
+	client Ydb_Discovery_V1.DiscoveryServiceClient,
+	config *config.Config,
+) (endpoints []endpoint.Endpoint, location string, err error) {
+	var (
+		request = Ydb_Discovery.ListEndpointsRequest{
+			Database: config.Database(),
+			Service:  nil,
+		}
+		response *Ydb_Discovery.ListEndpointsResponse
+		result   Ydb_Discovery.ListEndpointsResult
+	)
+
+	response, err = client.ListEndpoints(ctx, &request)
+	if err != nil {
+		return nil, location, xerrors.WithStackTrace(err)
+	}
+
+	if response.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS {
+		return nil, location, xerrors.WithStackTrace(
+			xerrors.FromOperation(response.GetOperation()),
+		)
+	}
+
+	err = response.GetOperation().GetResult().UnmarshalTo(&result)
+	if err != nil {
+		return nil, location, xerrors.WithStackTrace(err)
+	}
+
+	location = result.GetSelfLocation()
+	endpoints = make([]endpoint.Endpoint, 0, len(result.GetEndpoints()))
+	for _, e := range result.GetEndpoints() {
+		if e.GetSsl() == config.Secure() {
+			endpoints = append(endpoints, endpoint.New(
+				net.JoinHostPort(
+					config.MutateAddress(e.GetAddress()),
+					strconv.Itoa(int(e.GetPort())),
+				),
+				endpoint.WithLocation(e.GetLocation()),
+				endpoint.WithID(e.GetNodeId()),
+				endpoint.WithLoadFactor(e.GetLoadFactor()),
+				endpoint.WithLocalDC(e.GetLocation() == location),
+				endpoint.WithServices(e.GetService()),
+				endpoint.WithLastUpdated(config.Clock().Now()),
+			))
+		}
+	}
+
+	return endpoints, result.GetSelfLocation(), nil
+}
+
 // Discover cluster endpoints
-func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, err error) {
+func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, finalErr error) {
 	var (
 		onDone = trace.DiscoveryOnDiscover(
 			c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/discovery.(*Client).Discover"),
 			c.config.Endpoint(), c.config.Database(),
 		)
-		request = Ydb_Discovery.ListEndpointsRequest{
-			Database: c.config.Database(),
-			Service:  nil,
-		}
-		response *Ydb_Discovery.ListEndpointsResponse
-		result   Ydb_Discovery.ListEndpointsResult
 		location string
 	)
 	defer func() {
@@ -56,43 +104,17 @@ func (c *Client) Discover(ctx context.Context) (endpoints []endpoint.Endpoint, e
 		for _, e := range endpoints {
 			nodes = append(nodes, e.Copy())
 		}
-		onDone(location, nodes, err)
+		onDone(location, nodes, finalErr)
 	}()
 
-	ctx, err = c.config.Meta().Context(ctx)
+	ctx, err := c.config.Meta().Context(ctx)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	response, err = c.client.ListEndpoints(ctx, &request)
+	endpoints, location, err = discover(ctx, c.client, c.config)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
-	}
-
-	if response.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS {
-		return nil, xerrors.WithStackTrace(
-			xerrors.FromOperation(response.GetOperation()),
-		)
-	}
-
-	err = response.GetOperation().GetResult().UnmarshalTo(&result)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(err)
-	}
-
-	location = result.GetSelfLocation()
-	endpoints = make([]endpoint.Endpoint, 0, len(result.GetEndpoints()))
-	for _, e := range result.GetEndpoints() {
-		if e.GetSsl() == c.config.Secure() {
-			endpoints = append(endpoints, endpoint.New(
-				net.JoinHostPort(e.GetAddress(), strconv.Itoa(int(e.GetPort()))),
-				endpoint.WithLocation(e.GetLocation()),
-				endpoint.WithID(e.GetNodeId()),
-				endpoint.WithLoadFactor(e.GetLoadFactor()),
-				endpoint.WithLocalDC(e.GetLocation() == location),
-				endpoint.WithServices(e.GetService()),
-			))
-		}
 	}
 
 	return endpoints, nil

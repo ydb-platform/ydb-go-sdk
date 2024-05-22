@@ -212,7 +212,7 @@ func Serverless(ctx context.Context) error {
 	s, err := getService(
 		ctx,
 		os.Getenv("YDB"),
-		environ.WithEnvironCredentials(ctx),
+		environ.WithEnvironCredentials(),
 		ydb.WithDialTimeout(time.Second),
 	)
 	if err != nil {

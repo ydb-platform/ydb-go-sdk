@@ -3,6 +3,8 @@ package config
 import (
 	"time"
 
+	"github.com/jonboulle/clockwork"
+
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -15,10 +17,12 @@ const (
 type Config struct {
 	config.Common
 
-	endpoint string
-	database string
-	secure   bool
-	meta     *meta.Meta
+	endpoint       string
+	database       string
+	secure         bool
+	meta           *meta.Meta
+	addressMutator func(address string) string
+	clock          clockwork.Clock
 
 	interval time.Duration
 	trace    *trace.Discovery
@@ -26,13 +30,17 @@ type Config struct {
 
 func New(opts ...Option) *Config {
 	c := &Config{
-		interval: DefaultInterval,
-		trace:    new(trace.Discovery),
 		Common:   config.Common{},
 		endpoint: "",
 		database: "",
 		secure:   false,
 		meta:     nil,
+		addressMutator: func(address string) string {
+			return address
+		},
+		clock:    clockwork.NewRealClock(),
+		interval: DefaultInterval,
+		trace:    new(trace.Discovery),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -43,8 +51,16 @@ func New(opts ...Option) *Config {
 	return c
 }
 
+func (c *Config) MutateAddress(fqdn string) string {
+	return c.addressMutator(fqdn)
+}
+
 func (c *Config) Meta() *meta.Meta {
 	return c.meta
+}
+
+func (c *Config) Clock() clockwork.Clock {
+	return c.clock
 }
 
 func (c *Config) Interval() time.Duration {
@@ -87,6 +103,18 @@ func WithEndpoint(endpoint string) Option {
 func WithDatabase(database string) Option {
 	return func(c *Config) {
 		c.database = database
+	}
+}
+
+func WithClock(clock clockwork.Clock) Option {
+	return func(c *Config) {
+		c.clock = clock
+	}
+}
+
+func WithAddressMutator(addressMutator func(address string) string) Option {
+	return func(c *Config) {
+		c.addressMutator = addressMutator
 	}
 }
 

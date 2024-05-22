@@ -31,7 +31,7 @@ import (
 )
 
 // Option contains configuration values for Driver
-type Option func(ctx context.Context, c *Driver) error
+type Option func(ctx context.Context, d *Driver) error
 
 func WithStaticCredentials(user, password string) Option {
 	return func(ctx context.Context, c *Driver) error {
@@ -39,6 +39,17 @@ func WithStaticCredentials(user, password string) Option {
 			User:     user,
 			Password: password,
 		}
+
+		return nil
+	}
+}
+
+// WithNodeAddressMutator applies mutator for node addresses from discovery.ListEndpoints response
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func WithNodeAddressMutator(mutator func(address string) string) Option {
+	return func(ctx context.Context, c *Driver) error {
+		c.discoveryOptions = append(c.discoveryOptions, discoveryConfig.WithAddressMutator(mutator))
 
 		return nil
 	}

@@ -86,7 +86,7 @@ func init() { //nolint:gochecknoinits
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	s, err := getService(ctx, dsn, environ.WithEnvironCredentials(ctx))
+	s, err := getService(ctx, dsn, environ.WithEnvironCredentials())
 	if err != nil {
 		panic(fmt.Errorf("error on create service: %w", err))
 	}

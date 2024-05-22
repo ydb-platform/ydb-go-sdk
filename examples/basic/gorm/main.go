@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"os"
 	"time"
@@ -23,9 +22,6 @@ SQLITE_CONNECTION_STRING
 YDB_CONNECTION_STRING`
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
 	cfg := new(gorm.Config)
 	cfg.Logger = logger.Default.LogMode(logger.Error)
 
@@ -42,7 +38,7 @@ func main() {
 				dsn,
 				ydb.WithTablePathPrefix("gorm"),
 				ydb.With(
-					environ.WithEnvironCredentials(ctx),
+					environ.WithEnvironCredentials(),
 				),
 			),
 			cfg,

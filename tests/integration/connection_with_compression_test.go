@@ -64,8 +64,7 @@ func TestConnectionWithCompression(t *testing.T) {
 	)
 
 	db, err := ydb.Open(ctx,
-		"", // corner case for check replacement of endpoint+database+secure
-		ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
+		os.Getenv("YDB_CONNECTION_STRING"), // corner case for check replacement of endpoint+database+secure
 		ydb.WithAccessTokenCredentials(
 			os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS"),
 		),

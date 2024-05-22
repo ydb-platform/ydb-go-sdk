@@ -3,6 +3,7 @@ package ydb
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"sync"
 
@@ -234,13 +235,20 @@ func (d *Driver) Topic() topic.Client {
 // See sugar.DSN helper for make dsn from endpoint and database
 //
 //nolint:nonamedreturns
-func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, err error) {
-	d, err := newConnectionFromOptions(ctx, append(
-		[]Option{
-			WithConnectionString(dsn),
-		},
-		opts...,
-	)...)
+func Open(ctx context.Context, dsn string, opts ...Option) (_ *Driver, _ error) {
+	opts = append(append(make([]Option, 0, len(opts)+1), WithConnectionString(dsn)), opts...)
+
+	for parserIdx := range dsnParsers {
+		if parser := dsnParsers[parserIdx]; parser != nil {
+			optsFromParser, err := parser(dsn)
+			if err != nil {
+				return nil, xerrors.WithStackTrace(fmt.Errorf("data source name '%s' wrong: %w", dsn, err))
+			}
+			opts = append(opts, optsFromParser...)
+		}
+	}
+
+	d, err := newConnectionFromOptions(ctx, opts...)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(err)
 	}

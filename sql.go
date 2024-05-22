@@ -26,6 +26,14 @@ func init() { //nolint:gochecknoinits
 	sql.Register("ydb/v3", d)
 }
 
+func withConnectorOptions(opts ...ConnectorOption) Option {
+	return func(ctx context.Context, d *Driver) error {
+		d.databaseSQLOptions = append(d.databaseSQLOptions, opts...)
+
+		return nil
+	}
+}
+
 type sqlDriver struct {
 	connectors    map[*xsql.Connector]*Driver
 	connectorsMtx xsync.RWMutex
@@ -60,16 +68,12 @@ func (d *sqlDriver) Open(string) (driver.Conn, error) {
 }
 
 func (d *sqlDriver) OpenConnector(dataSourceName string) (driver.Connector, error) {
-	opts, connectorOpts, err := xsql.Parse(dataSourceName)
-	if err != nil {
-		return nil, xerrors.WithStackTrace(fmt.Errorf("data source name '%s' wrong: %w", dataSourceName, err))
-	}
-	db, err := Open(context.Background(), "", With(opts...))
+	db, err := Open(context.Background(), dataSourceName)
 	if err != nil {
 		return nil, xerrors.WithStackTrace(fmt.Errorf("failed to connect by data source name '%s': %w", dataSourceName, err))
 	}
 
-	return Connector(db, connectorOpts...)
+	return Connector(db, db.databaseSQLOptions...)
 }
 
 func (d *sqlDriver) attach(c *xsql.Connector, parent *Driver) {
