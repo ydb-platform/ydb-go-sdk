@@ -54,7 +54,7 @@ func Err() *big.Int { return big.NewInt(0).Set(err) }
 //
 // If given bytes contains value that is greater than given precision it
 // returns infinity or negative infinity value accordingly the bytes sign.
-func FromBytes(bts []byte, precision, scale uint32) *big.Int { //nolint:ifshort
+func FromBytes(bts []byte, precision, scale uint32) *big.Int {
 	v := big.NewInt(0)
 	if len(bts) == 0 {
 		return v
@@ -88,7 +88,7 @@ func FromInt128(p [16]byte, precision, scale uint32) *big.Int {
 
 // Parse interprets a string s with the given precision and scale and returns
 // the corresponding big integer.
-func Parse(s string, precision, scale uint32) (*big.Int, error) { //nolint:ifshort
+func Parse(s string, precision, scale uint32) (*big.Int, error) {
 	if scale > precision {
 		return nil, precisionError(s, precision, scale)
 	}
