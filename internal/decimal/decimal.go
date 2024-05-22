@@ -62,7 +62,8 @@ func FromBytes(bts []byte, precision, scale uint32) *big.Int {
 
 	v.SetBytes(bts)
 
-	if neg := bts[0]&negMask != 0; neg {
+	neg := bts[0]&negMask != 0
+	if neg { //nolint:ifshort
 		// Given bytes contains negative value.
 		// Interpret is as two's complement.
 		not(v)
@@ -70,7 +71,7 @@ func FromBytes(bts []byte, precision, scale uint32) *big.Int {
 		v.Neg(v)
 	}
 	if v.CmpAbs(pow(ten, precision)) >= 0 {
-		if neg := bts[0]&negMask != 0; neg {
+		if neg { //nolint:ifshort
 			v.Set(neginf)
 		} else {
 			v.Set(inf)
@@ -88,9 +89,7 @@ func FromInt128(p [16]byte, precision, scale uint32) *big.Int {
 
 // Parse interprets a string s with the given precision and scale and returns
 // the corresponding big integer.
-//
-//nolint:ifshort
-func Parse(s string, precision, scale uint32) (*big.Int, error) {
+func Parse(s string, precision, scale uint32) (*big.Int, error) { //nolint:ifshort
 	if scale > precision {
 		return nil, precisionError(s, precision, scale)
 	}
@@ -192,9 +191,7 @@ func Parse(s string, precision, scale uint32) (*big.Int, error) {
 
 // Format returns the string representation of x with the given precision and
 // scale.
-//
-//nolint:ifshort //Can't place variable inside if scope because it's used below
-func Format(x *big.Int, precision, scale uint32) string {
+func Format(x *big.Int, precision, scale uint32) string { //nolint:ifshort
 	switch {
 	case x.CmpAbs(inf) == 0:
 		if x.Sign() < 0 {
@@ -290,8 +287,7 @@ func BigIntToByte(x *big.Int, precision, scale uint32) (p [16]byte) {
 	return p
 }
 
-//nolint:ifshort //Can't place variable inside if scope because it's used one more time below
-func put(x *big.Int, p []byte) {
+func put(x *big.Int, p []byte) { //nolint:ifshort
 	neg := x.Sign() < 0
 	if neg {
 		x = complement(x)
