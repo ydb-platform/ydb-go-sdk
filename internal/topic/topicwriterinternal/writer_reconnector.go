@@ -327,8 +327,7 @@ func (w *WriterReconnector) Flush(ctx context.Context) error {
 	return w.queue.WaitLastWritten(ctx)
 }
 
-//nolint:ifshort //putting flushErr into if scope may cause random fails during closing topicwriter with flush
-func (w *WriterReconnector) Close(ctx context.Context) error {
+func (w *WriterReconnector) Close(ctx context.Context) error { //nolint:ifshort
 	reason := xerrors.WithStackTrace(errStopWriterReconnector)
 	w.queue.StopAddNewMessages(reason)
 
