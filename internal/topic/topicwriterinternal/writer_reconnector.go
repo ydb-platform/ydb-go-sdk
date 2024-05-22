@@ -331,10 +331,10 @@ func (w *WriterReconnector) Close(ctx context.Context) error {
 	reason := xerrors.WithStackTrace(errStopWriterReconnector)
 	w.queue.StopAddNewMessages(reason)
 
-	flushErr := w.Flush(ctx)
+	flushErr := w.Flush(ctx) //nolint:ifshort
 	closeErr := w.close(ctx, reason)
 
-	if flushErr != nil { //nolint:ifshort
+	if flushErr != nil {
 		return flushErr
 	}
 
