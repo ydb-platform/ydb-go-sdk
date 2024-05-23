@@ -188,8 +188,7 @@ func (m *messageWithDataContent) getRawBytes() ([]byte, error) {
 		return nil, xerrors.WithStackTrace(errNoRawContent)
 	}
 
-	err := m.readDataToRawBuf()
-	if err != nil {
+	if err := m.readDataToRawBuf(); err != nil {
 		return nil, err
 	}
 

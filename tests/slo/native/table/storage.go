@@ -238,8 +238,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 }
 
 func (s *Storage) dropTable(ctx context.Context) error {
-	err := ctx.Err()
-	if err != nil {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 

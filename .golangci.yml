@@ -232,7 +232,6 @@ linters:
     - godot
     - goerr113
     - golint
-    - ifshort
     - interfacebloat
     - ireturn
     - maintidx

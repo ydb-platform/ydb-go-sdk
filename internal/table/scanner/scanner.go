@@ -527,9 +527,8 @@ func (s *valueScanner) unwrapDecimal() decimal.Decimal {
 }
 
 func (s *valueScanner) assertTypeDecimal(typ *Ydb.Type) (t *Ydb.Type_DecimalType) {
-	x := typ.GetType()
-	if t, _ = x.(*Ydb.Type_DecimalType); t == nil {
-		s.typeError(x, t)
+	if t, _ = typ.GetType().(*Ydb.Type_DecimalType); t == nil {
+		s.typeError(typ.GetType(), t)
 	}
 
 	return

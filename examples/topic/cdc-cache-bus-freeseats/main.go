@@ -27,11 +27,10 @@ var (
 func main() {
 	flag.Parse()
 
-	ctx := context.Background()
 	db := connect()
 
 	if !*skipCreateTable {
-		createTableAndCDC(ctx, db, *backendCount)
+		createTableAndCDC(context.Background(), db, *backendCount)
 	}
 
 	servers := make([]http.Handler, *backendCount)
