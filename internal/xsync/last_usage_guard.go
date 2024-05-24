@@ -1,7 +1,6 @@
 package xsync
 
 import (
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -42,21 +41,10 @@ func NewLastUsage(opts ...lastUsageOption) *lastUsage {
 	return lastUsage
 }
 
-func (g *lastUsage) Get() time.Time {
-	if g.locks.Load() == 0 {
-		return *g.t.Load()
+func (guard *lastUsage) Get() time.Time {
+	if guard.locks.Load() == 0 {
+		return *guard.t.Load()
 	}
 
-	return g.clock.Now()
-}
-
-func (g *lastUsage) Start() (stop func()) {
-	g.locks.Add(1)
-
-	return sync.OnceFunc(func() {
-		if g.locks.Add(-1) == 0 {
-			now := g.clock.Now()
-			g.t.Store(&now)
-		}
-	})
+	return guard.clock.Now()
 }
