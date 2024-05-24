@@ -1,3 +1,4 @@
+* Downgraded minimal version of Go to 1.20
 * Refactored internal packages by `ifshort` linter issues
 
 # v3.68.0

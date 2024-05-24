@@ -15,6 +15,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/topic"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/value"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -313,7 +314,7 @@ func (r *readerReconnector) connectWithTimeout() (_ batchedStreamReader, _ conte
 		return nil, nil, err
 	}
 
-	connectionContext, cancel := context.WithCancelCause(context.WithoutCancel(bgContext))
+	connectionContext, cancel := context.WithCancelCause(xcontext.ValueOnly(bgContext))
 
 	type connectResult struct {
 		stream batchedStreamReader
