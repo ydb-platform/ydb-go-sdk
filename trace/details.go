@@ -202,6 +202,7 @@ func MatchDetails(pattern string, opts ...matchDetailsOption) (d Details) {
 	var (
 		h = &matchDetailsOptionsHolder{
 			defaultDetails: defaultDetails,
+			posixMatch:     false,
 		}
 		re  *regexp.Regexp
 		err error

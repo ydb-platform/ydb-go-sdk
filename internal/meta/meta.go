@@ -24,10 +24,13 @@ func New(
 	opts ...Option,
 ) *Meta {
 	m := &Meta{
-		pid:         strconv.Itoa(pid),
-		trace:       trace,
-		credentials: credentials,
-		database:    database,
+		pid:             strconv.Itoa(pid),
+		trace:           trace,
+		credentials:     credentials,
+		database:        database,
+		requestsType:    "",
+		applicationName: "",
+		capabilities:    nil,
 	}
 	for _, opt := range opts {
 		if opt != nil {

@@ -49,12 +49,16 @@ func createSession(
 ) (*session, error) {
 	sessionCtx, cancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 	s := session{
-		options:           opts,
-		client:            client,
-		ctx:               sessionCtx,
-		cancel:            cancel,
-		sessionClosedChan: make(chan struct{}),
-		controller:        conversation.NewController(),
+		options:              opts,
+		client:               client,
+		ctx:                  sessionCtx,
+		cancel:               cancel,
+		sessionClosedChan:    make(chan struct{}),
+		controller:           conversation.NewController(),
+		sessionID:            0,
+		mutex:                sync.Mutex{},
+		lastGoodResponseTime: time.Time{},
+		cancelStream:         nil,
 	}
 	client.sessionCreated(&s)
 
@@ -548,6 +552,7 @@ func (s *session) CreateSemaphore(
 				ReqId: newReqID(),
 				Name:  name,
 				Limit: limit,
+				Data:  nil,
 			}
 			for _, o := range opts {
 				if o != nil {
@@ -590,6 +595,7 @@ func (s *session) UpdateSemaphore(
 			updateSemaphore := Ydb_Coordination.SessionRequest_UpdateSemaphore{
 				ReqId: newReqID(),
 				Name:  name,
+				Data:  nil,
 			}
 			for _, o := range opts {
 				if o != nil {
@@ -634,6 +640,7 @@ func (s *session) DeleteSemaphore(
 			deleteSemaphore := Ydb_Coordination.SessionRequest_DeleteSemaphore{
 				ReqId: newReqID(),
 				Name:  name,
+				Force: false,
 			}
 			for _, o := range opts {
 				if o != nil {
@@ -675,8 +682,12 @@ func (s *session) DescribeSemaphore(
 	req := conversation.NewConversation(
 		func() *Ydb_Coordination.SessionRequest {
 			describeSemaphore := Ydb_Coordination.SessionRequest_DescribeSemaphore{
-				ReqId: newReqID(),
-				Name:  name,
+				ReqId:          newReqID(),
+				Name:           name,
+				IncludeOwners:  false,
+				IncludeWaiters: false,
+				WatchData:      false,
+				WatchOwners:    false,
 			}
 			for _, o := range opts {
 				if o != nil {
@@ -778,6 +789,8 @@ func (s *session) AcquireSemaphore(
 				Name:          name,
 				Count:         count,
 				TimeoutMillis: math.MaxUint64,
+				Data:          nil,
+				Ephemeral:     false,
 			}
 			for _, o := range opts {
 				if o != nil {

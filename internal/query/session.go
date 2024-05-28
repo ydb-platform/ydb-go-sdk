@@ -45,8 +45,11 @@ func createSession(
 ) (s *Session, finalErr error) {
 	s = &Session{
 		cfg:        cfg,
+		id:         "",
+		nodeID:     0,
 		grpcClient: client,
 		statusCode: statusUnknown,
+		closeOnce:  nil,
 		checks: []func(*Session) bool{
 			func(s *Session) bool {
 				switch s.status() {

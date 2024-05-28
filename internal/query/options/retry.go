@@ -9,11 +9,11 @@ import (
 
 var (
 	_ DoOption = retryOptionsOption(nil)
-	_ DoOption = traceOption{}
+	_ DoOption = traceOption{t: nil}
 
 	_ DoTxOption = retryOptionsOption(nil)
-	_ DoTxOption = traceOption{}
-	_ DoTxOption = doTxSettingsOption{}
+	_ DoTxOption = traceOption{t: nil}
+	_ DoTxOption = doTxSettingsOption{txSettings: nil}
 )
 
 type (
@@ -102,7 +102,8 @@ func WithRetryBudget(b budget.Budget) retryOptionsOption {
 
 func ParseDoOpts(t *trace.Query, opts ...DoOption) (s *doSettings) {
 	s = &doSettings{
-		trace: t,
+		retryOpts: nil,
+		trace:     t,
 	}
 
 	for _, opt := range opts {

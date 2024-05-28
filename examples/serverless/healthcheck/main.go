@@ -16,7 +16,7 @@ var (
 	prefix   string
 	count    int
 	interval time.Duration
-	urls     = URLs{}
+	urls     = URLs{urls: nil}
 )
 
 // URLs is a flag.Value implementation which holds URL's as string slice

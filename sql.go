@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"fmt"
+	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -15,7 +16,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var d = &sqlDriver{connectors: make(map[*xsql.Connector]*Driver)} //nolint:gochecknoglobals
+var d = &sqlDriver{
+	connectors:    make(map[*xsql.Connector]*Driver),
+	connectorsMtx: xsync.RWMutex{RWMutex: sync.RWMutex{}},
+} //nolint:gochecknoglobals
 
 func init() { //nolint:gochecknoinits
 	sql.Register("ydb", d)
@@ -36,8 +40,8 @@ type sqlDriver struct {
 }
 
 var (
-	_ driver.Driver        = &sqlDriver{}
-	_ driver.DriverContext = &sqlDriver{}
+	_ driver.Driver        = &sqlDriver{connectors: nil, connectorsMtx: xsync.RWMutex{RWMutex: sync.RWMutex{}}}
+	_ driver.DriverContext = &sqlDriver{connectors: nil, connectorsMtx: xsync.RWMutex{RWMutex: sync.RWMutex{}}}
 )
 
 func (d *sqlDriver) Close() error {

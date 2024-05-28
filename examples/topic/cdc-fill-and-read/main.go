@@ -103,7 +103,11 @@ func prepareTableWithCDC(ctx context.Context, db *ydb.Driver, prefix, tableName,
 
 	log.Println("Create consumer")
 	err = db.Topic().Alter(ctx, topicPath, topicoptions.AlterWithAddConsumers(topictypes.Consumer{
-		Name: consumerName,
+		Name:            consumerName,
+		Important:       false,
+		SupportedCodecs: nil,
+		ReadFrom:        time.Time{},
+		Attributes:      nil,
 	}))
 	if err != nil {
 		panic(fmt.Errorf("failed to create feed consumer: %w", err))

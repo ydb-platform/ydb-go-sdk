@@ -70,12 +70,20 @@ func main() {
 }
 
 func prepareScheme(db *xorm.Engine) error {
-	err := db.DropTables(&Series{}, &Seasons{}, &Episodes{})
+	err := db.DropTables(
+		&Series{ID: "", Title: "", Info: "", Comment: "", ReleaseDate: time.Time{}},
+		&Seasons{ID: "", SeriesID: "", Title: "", FirstAired: time.Time{}, LastAired: time.Time{}},
+		&Episodes{ID: "", SeasonID: "", Title: "", AirDate: time.Time{}, Views: 0},
+	)
 	if err != nil {
 		return err
 	}
 
-	err = db.CreateTables(&Series{}, &Seasons{}, &Episodes{})
+	err = db.CreateTables(
+		&Series{ID: "", Title: "", Info: "", Comment: "", ReleaseDate: time.Time{}},
+		&Seasons{ID: "", SeriesID: "", Title: "", FirstAired: time.Time{}, LastAired: time.Time{}},
+		&Episodes{ID: "", SeasonID: "", Title: "", AirDate: time.Time{}, Views: 0},
+	)
 
 	return err
 }
@@ -154,14 +162,22 @@ func findEpisodesByTitle(db *xorm.Engine, fragment string) error {
 	log.Println("all episodes with title with word 'bad':")
 	for _, e := range episodes {
 		ss := Seasons{
-			ID: e.SeasonID,
+			ID:         e.SeasonID,
+			SeriesID:   "",
+			Title:      "",
+			FirstAired: time.Time{},
+			LastAired:  time.Time{},
 		}
 		if _, err := session.Get(&ss); err != nil {
 			return err
 		}
 
 		s := Series{
-			ID: ss.SeriesID,
+			ID:          ss.SeriesID,
+			Title:       "",
+			Info:        "",
+			Comment:     "",
+			ReleaseDate: time.Time{},
 		}
 		if _, err := session.Get(&s); err != nil {
 			return err

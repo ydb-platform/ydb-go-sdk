@@ -62,7 +62,7 @@ func (o ReadMessageBatchOptions) clone() ReadMessageBatchOptions {
 }
 
 func newReadMessageBatchOptions() ReadMessageBatchOptions {
-	return ReadMessageBatchOptions{}
+	return ReadMessageBatchOptions{batcherGetOptions: batcherGetOptions{MinCount: 0, MaxCount: 0, rawMessagesOnly: false}}
 }
 
 // PublicReadBatchOption для различных пожеланий к батчу вроде WithMaxMessages(int)

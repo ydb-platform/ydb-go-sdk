@@ -9,6 +9,10 @@ import (
 func WithCancel(ctx context.Context) (context.Context, context.CancelFunc) {
 	childCtx := &cancelCtx{
 		parentCtx: ctx,
+		ctx:       nil,
+		ctxCancel: nil,
+		m:         sync.Mutex{},
+		err:       nil,
 	}
 	childCtx.ctx, childCtx.ctxCancel = context.WithCancel(ctx)
 

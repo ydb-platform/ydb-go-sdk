@@ -84,8 +84,10 @@ func (e *operationOption) applyToOperationError(oe *operationError) {
 // FromOperation must use as `Operation(FromOperation(operation.Status))`
 func FromOperation(operation operation.Status) *operationOption {
 	return &operationOption{
-		code:   operation.GetStatus(),
-		issues: operation.GetIssues(),
+		code:    operation.GetStatus(),
+		issues:  operation.GetIssues(),
+		address: "",
+		traceID: "",
 	}
 }
 
@@ -95,7 +97,10 @@ type oeOpt interface {
 
 func Operation(opts ...oeOpt) error {
 	oe := &operationError{
-		code: Ydb.StatusIds_STATUS_CODE_UNSPECIFIED,
+		code:    Ydb.StatusIds_STATUS_CODE_UNSPECIFIED,
+		issues:  nil,
+		address: "",
+		traceID: "",
 	}
 	for _, opt := range opts {
 		if opt != nil {

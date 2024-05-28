@@ -54,6 +54,7 @@ func NewStorage(cfg *config.Config, poolSize int) (*Storage, error) {
 		cfg: cfg,
 		tableOptions: fmt.Sprintf(optionsTemplate,
 			cfg.PartitionSize, cfg.MinPartitionsCount, cfg.MaxPartitionsCount, cfg.MinPartitionsCount),
+		db: nil,
 	}
 
 	var err error
@@ -68,7 +69,25 @@ func NewStorage(cfg *config.Config, poolSize int) (*Storage, error) {
 			),
 		),
 		&gorm.Config{
-			Logger: gormLogger.Default.LogMode(gormLogger.Warn),
+			Logger:                                   gormLogger.Default.LogMode(gormLogger.Warn),
+			SkipDefaultTransaction:                   false,
+			NamingStrategy:                           nil,
+			FullSaveAssociations:                     false,
+			NowFunc:                                  nil,
+			DryRun:                                   false,
+			PrepareStmt:                              false,
+			DisableAutomaticPing:                     false,
+			DisableForeignKeyConstraintWhenMigrating: false,
+			IgnoreRelationshipsWhenMigrating:         false,
+			DisableNestedTransaction:                 false,
+			AllowGlobalUpdate:                        false,
+			QueryFields:                              false,
+			CreateBatchSize:                          0,
+			TranslateError:                           false,
+			ClauseBuilders:                           nil,
+			ConnPool:                                 nil,
+			Dialector:                                nil,
+			Plugins:                                  nil,
 		},
 	)
 	if err != nil {
@@ -97,11 +116,12 @@ func (s *Storage) Read(ctx context.Context, id generator.RowID) (r generator.Row
 				return err
 			}
 
-			err = s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).Model(&generator.Row{}).
+			err = s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).Model(new(generator.Row)).
 				First(&r, "hash = ? AND id = ?",
 					clause.Expr{
-						SQL:  "Digest::NumericHash(?)",
-						Vars: []interface{}{id},
+						SQL:                "Digest::NumericHash(?)",
+						Vars:               []interface{}{id},
+						WithoutParentheses: false,
 					},
 					id,
 				).Error
@@ -145,11 +165,12 @@ func (s *Storage) Write(ctx context.Context, row generator.Row) (attempts int, e
 				return err
 			}
 
-			return s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).Model(&generator.Row{}).
+			return s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).Model(new(generator.Row)).
 				Create(map[string]interface{}{
 					"Hash": clause.Expr{
-						SQL:  "Digest::NumericHash(?)",
-						Vars: []interface{}{row.ID},
+						SQL:                "Digest::NumericHash(?)",
+						Vars:               []interface{}{row.ID},
+						WithoutParentheses: false,
 					},
 					"ID":               row.ID,
 					"PayloadStr":       row.PayloadStr,
@@ -181,7 +202,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 	defer cancel()
 
 	return s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).
-		Set("gorm:table_options", s.tableOptions).AutoMigrate(&generator.Row{})
+		Set("gorm:table_options", s.tableOptions).AutoMigrate(new(generator.Row))
 }
 
 func (s *Storage) dropTable(ctx context.Context) error {
@@ -192,7 +213,7 @@ func (s *Storage) dropTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
-	return s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).Migrator().DropTable(&generator.Row{})
+	return s.db.WithContext(ctx).Scopes(addTableToScope(s.cfg.Table)).Migrator().DropTable(new(generator.Row))
 }
 
 func (s *Storage) close(ctx context.Context) error {

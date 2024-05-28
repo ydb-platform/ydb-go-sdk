@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
@@ -488,7 +489,9 @@ func (v PgType) ToYDB(a *allocator.Allocator) *Ydb.Type {
 	// TODO: make allocator
 	return &Ydb.Type{Type: &Ydb.Type_PgType{
 		PgType: &Ydb.PgType{
-			Oid: v.OID,
+			Oid:    v.OID,
+			Typlen: 0,
+			Typmod: 0,
 		},
 	}}
 }
@@ -913,7 +916,9 @@ func (v Void) Yql() string {
 }
 
 var _voidType = &Ydb.Type{
-	Type: &Ydb.Type_VoidType{},
+	Type: &Ydb.Type_VoidType{
+		VoidType: structpb.NullValue_NULL_VALUE,
+	},
 }
 
 func (v Void) equalsTo(rhs Type) bool {
@@ -941,7 +946,9 @@ func (v Null) Yql() string {
 }
 
 var _nullType = &Ydb.Type{
-	Type: &Ydb.Type_NullType{},
+	Type: &Ydb.Type_NullType{
+		NullType: structpb.NullValue_NULL_VALUE,
+	},
 }
 
 func (v Null) equalsTo(rhs Type) bool {

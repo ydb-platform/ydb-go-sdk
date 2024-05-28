@@ -212,13 +212,24 @@ type ydbDriver interface {
 
 func Open(parent ydbDriver, opts ...ConnectorOption) (_ *Connector, err error) {
 	c := &Connector{
-		parent:           parent,
-		clock:            clockwork.NewRealClock(),
-		conns:            make(map[*conn]struct{}),
-		defaultTxControl: table.DefaultTxControl(),
-		defaultQueryMode: DefaultQueryMode,
-		pathNormalizer:   bind.TablePathPrefix(parent.Name()),
-		trace:            &trace.DatabaseSQL{},
+		parent:                parent,
+		clock:                 clockwork.NewRealClock(),
+		Bindings:              bind.Bindings{},
+		fakeTxModes:           nil,
+		onClose:               nil,
+		conns:                 make(map[*conn]struct{}),
+		connsMtx:              sync.RWMutex{},
+		idleStopper:           nil,
+		defaultTxControl:      table.DefaultTxControl(),
+		defaultQueryMode:      DefaultQueryMode,
+		defaultDataQueryOpts:  nil,
+		defaultScanQueryOpts:  nil,
+		disableServerBalancer: false,
+		idleThreshold:         time.Duration(0),
+		pathNormalizer:        bind.TablePathPrefix(parent.Name()),
+		trace:                 nil,
+		traceRetry:            nil,
+		retryBudget:           nil,
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -269,8 +280,8 @@ type Connector struct {
 }
 
 var (
-	_ driver.Connector = &Connector{}
-	_ io.Closer        = &Connector{}
+	_ driver.Connector = nil
+	_ io.Closer        = nil
 )
 
 func (c *Connector) idleCloser() (idleStopper func()) {

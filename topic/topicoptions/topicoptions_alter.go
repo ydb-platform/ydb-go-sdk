@@ -4,7 +4,9 @@ import (
 	"sort"
 	"time"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawoptional"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topictypes"
 )
 
@@ -126,7 +128,13 @@ func ensureAlterConsumer(
 			return consumers, i
 		}
 	}
-	consumers = append(consumers, rawtopic.AlterConsumer{Name: name})
+	consumers = append(consumers, rawtopic.AlterConsumer{
+		Name:               name,
+		SetImportant:       rawoptional.Bool{Value: false, HasValue: false},
+		SetReadFrom:        rawoptional.Time{Value: time.Time{}, HasValue: false},
+		SetSupportedCodecs: rawtopiccommon.SupportedCodecs{},
+		AlterAttributes:    nil,
+	})
 
 	return consumers, len(consumers) - 1
 }

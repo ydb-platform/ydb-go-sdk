@@ -145,14 +145,7 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	s = &session{
-		id:     result.GetSessionId(),
-		config: config,
-		status: table.SessionReady,
-	}
-	s.lastUsage.Store(time.Now().Unix())
-
-	s.tableService = Ydb_Table_V1.NewTableServiceClient(
+	tableService := Ydb_Table_V1.NewTableServiceClient(
 		conn.WithBeforeFunc(
 			conn.WithContextModifier(cc, func(ctx context.Context) context.Context {
 				return meta.WithTrailerCallback(balancerContext.WithEndpoint(ctx, s), s.checkCloseHint)
@@ -162,6 +155,19 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config
 			},
 		),
 	)
+
+	s = &session{
+		onClose:      nil,
+		id:           result.GetSessionId(),
+		tableService: tableService,
+		config:       config,
+		status:       table.SessionReady,
+		lastUsage:    atomic.Int64{},
+		statusMtx:    sync.RWMutex{},
+		closeOnce:    sync.Once{},
+		nodeID:       atomic.Uint32{},
+	}
+	s.lastUsage.Store(time.Now().Unix())
 
 	return s, nil
 }
@@ -279,14 +285,28 @@ func (s *session) CreateTable(
 ) (err error) {
 	var (
 		request = Ydb_Table.CreateTableRequest{
-			SessionId: s.id,
-			Path:      path,
+			SessionId:  s.id,
+			Path:       path,
+			Columns:    nil,
+			PrimaryKey: nil,
+			Profile:    nil,
 			OperationParams: operation.Params(
 				ctx,
 				s.config.OperationTimeout(),
 				s.config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
+			Indexes:              nil,
+			TtlSettings:          nil,
+			StorageSettings:      nil,
+			ColumnFamilies:       nil,
+			Attributes:           nil,
+			CompactionPolicy:     "",
+			Partitions:           nil,
+			PartitioningSettings: nil,
+			KeyBloomFilter:       Ydb.FeatureFlag_STATUS_UNSPECIFIED,
+			ReadReplicasSettings: nil,
+			Tiering:              "",
 		}
 		a = allocator.New()
 	)
@@ -323,6 +343,9 @@ func (s *session) DescribeTable(
 			s.config.OperationCancelAfter(),
 			operation.ModeSync,
 		),
+		IncludeShardKeyBounds: false,
+		IncludeTableStats:     false,
+		IncludePartitionStats: false,
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -500,14 +523,32 @@ func (s *session) AlterTable(
 ) (err error) {
 	var (
 		request = Ydb_Table.AlterTableRequest{
-			SessionId: s.id,
-			Path:      path,
+			SessionId:   s.id,
+			Path:        path,
+			AddColumns:  nil,
+			DropColumns: nil,
 			OperationParams: operation.Params(
 				ctx,
 				s.config.OperationTimeout(),
 				s.config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
+			AlterColumns:              nil,
+			TtlAction:                 nil,
+			AddIndexes:                nil,
+			DropIndexes:               nil,
+			AlterStorageSettings:      nil,
+			AddColumnFamilies:         nil,
+			AlterColumnFamilies:       nil,
+			AlterAttributes:           nil,
+			SetCompactionPolicy:       "",
+			AlterPartitioningSettings: nil,
+			SetKeyBloomFilter:         Ydb.FeatureFlag_STATUS_UNSPECIFIED,
+			SetReadReplicasSettings:   nil,
+			AddChangefeeds:            nil,
+			DropChangefeeds:           nil,
+			RenameIndexes:             nil,
+			TieringAction:             nil,
 		}
 		a = allocator.New()
 	)
@@ -572,6 +613,7 @@ func copyTables(
 			operationCancelAfter,
 			operation.ModeSync,
 		),
+		Tables: nil,
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -622,6 +664,7 @@ func renameTables(
 			operationCancelAfter,
 			operation.ModeSync,
 		),
+		Tables: nil,
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -823,8 +866,10 @@ func (s *session) executeQueryResult(
 	table.Transaction, result.Result, error,
 ) {
 	tx := &transaction{
-		id: res.GetTxMeta().GetId(),
-		s:  s,
+		id:      res.GetTxMeta().GetId(),
+		s:       s,
+		control: nil,
+		state:   txState{rawVal: atomic.Uint32{}},
 	}
 	if txControl.GetCommitTx() {
 		tx.state.Store(txStateCommitted)
@@ -1041,8 +1086,15 @@ func (s *session) StreamReadTable(
 			s,
 		)
 		request = Ydb_Table.ReadTableRequest{
-			SessionId: s.id,
-			Path:      path,
+			SessionId:       s.id,
+			Path:            path,
+			KeyRange:        nil,
+			Columns:         nil,
+			Ordered:         false,
+			RowLimit:        0,
+			UseSnapshot:     Ydb.FeatureFlag_STATUS_UNSPECIFIED,
+			BatchLimitBytes: 0,
+			BatchLimitRows:  0,
 		}
 		stream Ydb_Table_V1.TableService_StreamReadTableClient
 		a      = allocator.New()
@@ -1109,6 +1161,7 @@ func (s *session) ReadRows(
 			SessionId: s.id,
 			Path:      path,
 			Keys:      value.ToYDB(keys, a),
+			Columns:   nil,
 		}
 		response *Ydb_Table.ReadRowsResponse
 	)
@@ -1160,9 +1213,10 @@ func (s *session) StreamExecuteScanQuery(
 			s, q, parameters,
 		)
 		request = Ydb_Table.ExecuteScanQueryRequest{
-			Query:      q.toYDB(a),
-			Parameters: parameters.ToYDB(a),
-			Mode:       Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC, // set default
+			Query:        q.toYDB(a),
+			Parameters:   parameters.ToYDB(a),
+			Mode:         Ydb_Table.ExecuteScanQueryRequest_MODE_EXEC, // set default
+			CollectStats: Ydb_Table.QueryStatsCollection_STATS_COLLECTION_UNSPECIFIED,
 		}
 		stream      Ydb_Table_V1.TableService_StreamExecuteScanQueryClient
 		callOptions []grpc.CallOption
@@ -1252,6 +1306,8 @@ func (s *session) BulkUpsert(ctx context.Context, table string, rows value.Value
 				s.config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
+			DataFormat: nil,
+			Data:       nil,
 		},
 		callOptions...,
 	)
@@ -1304,6 +1360,7 @@ func (s *session) BeginTransaction(
 		id:      result.GetTxMeta().GetId(),
 		s:       s,
 		control: table.TxControl(table.WithTxID(result.GetTxMeta().GetId())),
+		state:   txState{rawVal: atomic.Uint32{}},
 	}
 	tx.state.Store(txStateInitialized)
 

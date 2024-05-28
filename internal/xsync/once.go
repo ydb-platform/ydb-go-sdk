@@ -27,7 +27,7 @@ type Once[T closer.Closer] struct {
 }
 
 func OnceValue[T closer.Closer](f func() T) *Once[T] {
-	return &Once[T]{f: f}
+	return &Once[T]{f: f, t: f(), once: sync.Once{}, mutex: sync.RWMutex{}}
 }
 
 func (v *Once[T]) Close(ctx context.Context) (err error) {

@@ -13,16 +13,29 @@ import (
 // Will be removed after Oct 2024.
 // Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
 func RoundRobin() *balancerConfig.Config {
-	return &balancerConfig.Config{}
+	return &balancerConfig.Config{
+		Filter:        nil,
+		AllowFallback: false,
+		SingleConn:    false,
+		DetectLocalDC: false,
+	}
 }
 
 func RandomChoice() *balancerConfig.Config {
-	return &balancerConfig.Config{}
+	return &balancerConfig.Config{
+		Filter:        nil,
+		AllowFallback: false,
+		SingleConn:    false,
+		DetectLocalDC: false,
+	}
 }
 
 func SingleConn() *balancerConfig.Config {
 	return &balancerConfig.Config{
-		SingleConn: true,
+		Filter:        nil,
+		AllowFallback: false,
+		SingleConn:    true,
+		DetectLocalDC: false,
 	}
 }
 

@@ -23,7 +23,8 @@ type (
 
 func (d *dict) Add() *dictPair {
 	return &dictPair{
-		parent: d,
+		parent:   d,
+		keyValue: nil,
 	}
 }
 

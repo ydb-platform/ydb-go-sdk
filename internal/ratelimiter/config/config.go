@@ -35,7 +35,8 @@ func With(config config.Common) Option {
 
 func New(opts ...Option) Config {
 	c := Config{
-		trace: &trace.Ratelimiter{},
+		Common: config.Common{},
+		trace:  &trace.Ratelimiter{},
 	}
 	for _, opt := range opts {
 		if opt != nil {

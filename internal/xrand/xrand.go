@@ -33,6 +33,7 @@ func WithSeed(seed int64) option {
 
 func New(opts ...option) Rand {
 	r := &r{
+		m: &sync.Mutex{},
 		r: rand.New(rand.NewSource(time.Now().Unix())), //nolint:gosec
 	}
 	for _, opt := range opts {

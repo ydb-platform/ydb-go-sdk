@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 )
@@ -82,11 +83,25 @@ func main() {
 		writers = append(writers, &Writer{
 			Context: buildCtx,
 			Output:  f,
+			once:    sync.Once{},
+			bw:      nil,
+			atEOL:   false,
+			depth:   0,
+			scope:   nil,
+			pkg:     nil,
+			std:     make(map[string]bool),
 		})
 	} else {
 		writers = append(writers, &Writer{
 			Context: buildCtx,
 			Output:  os.Stdout,
+			once:    sync.Once{},
+			bw:      nil,
+			atEOL:   false,
+			depth:   0,
+			scope:   nil,
+			pkg:     nil,
+			std:     make(map[string]bool),
 		})
 	}
 
@@ -129,14 +144,25 @@ func main() {
 		}
 	}
 	info := &types.Info{
-		Types: make(map[ast.Expr]types.TypeAndValue),
-		Defs:  make(map[*ast.Ident]types.Object),
-		Uses:  make(map[*ast.Ident]types.Object),
+		Types:        make(map[ast.Expr]types.TypeAndValue),
+		Defs:         make(map[*ast.Ident]types.Object),
+		Uses:         make(map[*ast.Ident]types.Object),
+		Instances:    make(map[*ast.Ident]types.Instance),
+		Implicits:    make(map[ast.Node]types.Object),
+		Selections:   make(map[*ast.SelectorExpr]*types.Selection),
+		Scopes:       make(map[ast.Node]*types.Scope),
+		InitOrder:    nil,
+		FileVersions: make(map[*ast.File]string),
 	}
 	conf := types.Config{
 		IgnoreFuncBodies:         true,
 		DisableUnusedImportCheck: true,
 		Importer:                 importer.ForCompiler(fset, "source", nil),
+		Context:                  nil,
+		GoVersion:                "",
+		FakeImportC:              false,
+		Error:                    nil,
+		Sizes:                    nil,
 	}
 	pkg, err := conf.Check(".", fset, astFiles, info)
 	if err != nil {
@@ -179,7 +205,7 @@ func main() {
 				for _, c := range v.List {
 					if strings.Contains(strings.TrimPrefix(c.Text, "//"), "gtrace:gen") {
 						if item == nil {
-							item = &GenItem{}
+							item = &GenItem{Ident: nil, StructType: nil}
 						}
 					}
 				}
@@ -202,11 +228,14 @@ func main() {
 	p := Package{
 		Package:          pkg,
 		BuildConstraints: buildConstraints,
+		Traces:           nil,
 	}
 	traces := make(map[string]*Trace)
 	for _, item := range items {
 		t := &Trace{
-			Name: item.Ident.Name,
+			Name:   item.Ident.Name,
+			Hooks:  nil,
+			Nested: false,
 		}
 		p.Traces = append(p.Traces, t)
 		traces[item.Ident.Name] = t

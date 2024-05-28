@@ -432,6 +432,7 @@ func (c *conn) NewStream(
 
 	s := &grpcClientStream{
 		parentConn:   c,
+		stream:       nil,
 		streamCtx:    ctx,
 		streamCancel: cancel,
 		wrapping:     useWrapping,
@@ -496,16 +497,21 @@ func withOnTransportError(onTransportError func(ctx context.Context, cc Conn, ca
 
 func newConn(e endpoint.Endpoint, config Config, opts ...option) *conn {
 	c := &conn{
-		endpoint:     e,
+		mtx:          sync.RWMutex{},
 		config:       config,
+		grpcConn:     nil,
 		done:         make(chan struct{}),
-		lastUsage:    xsync.NewLastUsage(),
+		endpoint:     e,
+		closed:       false,
+		state:        atomic.Uint32{},
 		childStreams: xcontext.NewCancelsGuard(),
+		lastUsage:    xsync.NewLastUsage(),
 		onClose: []func(*conn){
 			func(c *conn) {
 				c.childStreams.Cancel()
 			},
 		},
+		onTransportErrors: nil,
 	}
 	c.state.Store(uint32(Created))
 	for _, opt := range opts {
@@ -548,7 +554,9 @@ type ctxHandleRPCKey struct{}
 var rpcKey = ctxHandleRPCKey{}
 
 func markContext(ctx context.Context) (context.Context, *modificationMark) {
-	mark := &modificationMark{}
+	mark := &modificationMark{
+		dirty: atomic.Bool{},
+	}
 
 	return context.WithValue(ctx, rpcKey, mark), mark
 }
@@ -556,7 +564,9 @@ func markContext(ctx context.Context) (context.Context, *modificationMark) {
 func getContextMark(ctx context.Context) *modificationMark {
 	v := ctx.Value(rpcKey)
 	if v == nil {
-		return &modificationMark{}
+		return &modificationMark{
+			dirty: atomic.Bool{},
+		}
 	}
 
 	val, ok := v.(*modificationMark)

@@ -44,6 +44,7 @@ func New(ctx context.Context, cc grpc.ClientConnInterface, config config.Config)
 		config:   config,
 		client:   Ydb_Coordination_V1.NewCoordinationServiceClient(cc),
 		sessions: make(map[*session]struct{}),
+		mutex:    sync.Mutex{},
 	}
 }
 

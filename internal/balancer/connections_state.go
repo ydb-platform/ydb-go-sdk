@@ -27,6 +27,9 @@ func newConnectionsState(
 	res := &connectionsState{
 		connByNodeID: connsToNodeIDMap(conns),
 		rand:         xrand.New(xrand.WithLock()),
+		prefer:       nil,
+		fallback:     nil,
+		all:          nil,
 	}
 
 	res.prefer, res.fallback = sortPreferConnections(conns, filter, info, allowFallback)

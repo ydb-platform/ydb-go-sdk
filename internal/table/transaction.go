@@ -161,6 +161,7 @@ func (tx *transaction) CommitTx(
 					tx.s.config.OperationCancelAfter(),
 					operation.ModeSync,
 				),
+				CollectStats: Ydb_Table.QueryStatsCollection_STATS_COLLECTION_UNSPECIFIED,
 			}
 			response *Ydb_Table.CommitTransactionResponse
 			result   = new(Ydb_Table.CommitTransactionResult)

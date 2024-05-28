@@ -59,6 +59,7 @@ func (ii issues) String() string {
 func NewWithIssues(text string, issues ...error) error {
 	err := &withIssuesError{
 		reason: text,
+		issues: nil,
 	}
 	for i := range issues {
 		if issues[i] != nil {

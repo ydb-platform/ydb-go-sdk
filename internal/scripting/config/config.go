@@ -34,7 +34,8 @@ func With(config config.Common) Option {
 
 func New(opts ...Option) Config {
 	c := Config{
-		trace: &trace.Scripting{},
+		Common: config.Common{},
+		trace:  new(trace.Scripting),
 	}
 	for _, opt := range opts {
 		if opt != nil {

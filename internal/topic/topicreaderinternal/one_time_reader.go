@@ -11,6 +11,7 @@ type oneTimeReader struct {
 
 func newOneTimeReader(reader io.Reader) oneTimeReader {
 	return oneTimeReader{
+		err:    nil,
 		reader: reader,
 	}
 }

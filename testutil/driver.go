@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Operations"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
@@ -173,6 +174,7 @@ func (b *balancerStub) Get(context.Context) (conn grpc.ClientConnInterface, err 
 	cc := &clientConn{
 		onInvoke:    b.onInvoke,
 		onNewStream: b.onNewStream,
+		onAddress:   nil,
 	}
 
 	return cc, nil
@@ -217,7 +219,13 @@ func WithInvokeHandlers(invokeHandlers InvokeHandlers) balancerOption {
 					"Operation",
 					reply,
 					&Ydb_Operations.Operation{
-						Result: anyResult,
+						Result:   anyResult,
+						Id:       "",
+						Ready:    false,
+						Status:   Ydb.StatusIds_STATUS_CODE_UNSPECIFIED,
+						Issues:   nil,
+						Metadata: nil,
+						CostInfo: nil,
 					},
 				)
 
@@ -247,7 +255,7 @@ func WithNewStreamHandlers(newStreamHandlers NewStreamHandlers) balancerOption {
 }
 
 func NewBalancer(opts ...balancerOption) *balancerStub {
-	c := &balancerStub{}
+	c := &balancerStub{onInvoke: nil, onNewStream: nil}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(c)

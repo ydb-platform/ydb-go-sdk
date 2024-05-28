@@ -16,6 +16,7 @@ func NewTimeToLiveSettings(settings *Ydb_Table.TtlSettings) *options.TimeToLiveS
 			ColumnName:         mode.DateTypeColumn.GetColumnName(),
 			ExpireAfterSeconds: mode.DateTypeColumn.GetExpireAfterSeconds(),
 			Mode:               options.TimeToLiveModeDateType,
+			ColumnUnit:         nil,
 		}
 
 	case *Ydb_Table.TtlSettings_ValueSinceUnixEpoch:

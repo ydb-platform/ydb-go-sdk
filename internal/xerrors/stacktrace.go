@@ -23,7 +23,7 @@ func WithStackTrace(err error, opts ...withStackTraceOption) error {
 	if err == nil {
 		return nil
 	}
-	options := withStackTraceOptions{}
+	options := withStackTraceOptions{skipDepth: 0}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(&options)

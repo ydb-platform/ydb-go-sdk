@@ -18,13 +18,13 @@ import (
 )
 
 var (
-	_ driver.Rows                           = &rows{}
-	_ driver.RowsNextResultSet              = &rows{}
-	_ driver.RowsColumnTypeDatabaseTypeName = &rows{}
-	_ driver.RowsColumnTypeNullable         = &rows{}
-	_ driver.Rows                           = &single{}
+	_ driver.Rows                           = &rows{conn: nil, result: nil, nextSet: sync.Once{}}
+	_ driver.RowsNextResultSet              = &rows{conn: nil, result: nil, nextSet: sync.Once{}}
+	_ driver.RowsColumnTypeDatabaseTypeName = &rows{conn: nil, result: nil, nextSet: sync.Once{}}
+	_ driver.RowsColumnTypeNullable         = &rows{conn: nil, result: nil, nextSet: sync.Once{}}
+	_ driver.Rows                           = &single{values: nil, readAll: false}
 
-	_ scanner.Scanner = &valuer{}
+	_ scanner.Scanner = &valuer{v: nil}
 
 	ignoreColumnPrefixName = "__discard_column_"
 )
@@ -123,7 +123,7 @@ func (r *rows) Next(dst []driver.Value) error {
 	}
 	values := make([]indexed.RequiredOrOptional, len(dst))
 	for i := range dst {
-		values[i] = &valuer{}
+		values[i] = &valuer{v: nil}
 	}
 	if err = r.result.Scan(values...); err != nil {
 		return badconn.Map(xerrors.WithStackTrace(err))

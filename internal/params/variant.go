@@ -27,11 +27,17 @@ func (vb *variantBuilder) EndVariant() Builder {
 func (v *variant) BeginTuple() *variantTuple {
 	return &variantTuple{
 		parent: v,
+		types:  nil,
+		index:  0,
+		value:  v.value,
 	}
 }
 
 func (v *variant) BeginStruct() *variantStruct {
 	return &variantStruct{
 		parent: v,
+		fields: nil,
+		name:   "",
+		value:  v.value,
 	}
 }

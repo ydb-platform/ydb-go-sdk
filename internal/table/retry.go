@@ -93,10 +93,13 @@ func retryBackoff(
 
 func (c *Client) retryOptions(opts ...table.Option) *table.Options {
 	options := &table.Options{
-		Trace: c.config.Trace(),
+		Label:      "",
+		Idempotent: false,
+		Trace:      c.config.Trace(),
 		TxSettings: table.TxSettings(
 			table.WithSerializableReadWrite(),
 		),
+		TxCommitOptions: nil,
 		RetryOptions: []retry.Option{
 			retry.WithTrace(c.config.TraceRetry()),
 			retry.WithBudget(c.config.RetryBudget()),
@@ -108,7 +111,7 @@ func (c *Client) retryOptions(opts ...table.Option) *table.Options {
 		}
 	}
 	if options.Trace == nil {
-		options.Trace = &trace.Table{}
+		options.Trace = new(trace.Table)
 	}
 
 	return options

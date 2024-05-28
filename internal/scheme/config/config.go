@@ -48,7 +48,9 @@ func With(config config.Common) Option {
 
 func New(opts ...Option) *Config {
 	c := &Config{
-		trace: &trace.Scheme{},
+		Common:       config.Common{},
+		databaseName: "",
+		trace:        new(trace.Scheme),
 	}
 	for _, opt := range opts {
 		if opt != nil {

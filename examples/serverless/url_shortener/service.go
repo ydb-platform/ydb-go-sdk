@@ -86,9 +86,11 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 		var (
 			registry = prometheus.NewRegistry()
 			calls    = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-				Namespace: "app",
-				Name:      "calls",
-				Help:      "application calls counter",
+				Namespace:   "app",
+				Name:        "calls",
+				Help:        "application calls counter",
+				Subsystem:   "",
+				ConstLabels: nil,
 			}, []string{
 				"method",
 				"success",
@@ -108,14 +110,18 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 					(5000 * time.Millisecond).Seconds(),
 					(10000 * time.Millisecond).Seconds(),
 				},
+				Subsystem:   "",
+				ConstLabels: nil,
 			}, []string{
 				"success",
 				"method",
 			})
 			callsErrors = prometheus.NewGaugeVec(prometheus.GaugeOpts{
-				Namespace: "app",
-				Name:      "errors",
-				Help:      "application errors counter",
+				Namespace:   "app",
+				Name:        "errors",
+				Help:        "application errors counter",
+				Subsystem:   "",
+				ConstLabels: nil,
 			}, []string{
 				"method",
 			})
@@ -137,6 +143,7 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 		)
 
 		s = &service{
+			db:       nil,
 			registry: registry,
 			router:   mux.NewRouter(),
 
@@ -153,7 +160,15 @@ func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service
 		}
 
 		s.router.Handle("/metrics", promhttp.InstrumentMetricHandler(
-			registry, promhttp.HandlerFor(registry, promhttp.HandlerOpts{}),
+			registry, promhttp.HandlerFor(registry, promhttp.HandlerOpts{
+				ErrorLog:            nil,
+				ErrorHandling:       0,
+				Registry:            nil,
+				DisableCompression:  false,
+				MaxRequestsInFlight: 0,
+				Timeout:             time.Duration(0),
+				EnableOpenMetrics:   false,
+			}),
 		))
 		s.router.HandleFunc("/", s.handleIndex).Methods(http.MethodGet)
 		s.router.HandleFunc("/shorten", s.handleShorten).Methods(http.MethodPost)

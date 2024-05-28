@@ -30,12 +30,17 @@ type Config struct {
 
 func New(opts ...Option) *Config {
 	c := &Config{
-		interval: DefaultInterval,
-		trace:    &trace.Discovery{},
+		Common:   config.Common{},
+		endpoint: "",
+		database: "",
+		secure:   false,
+		meta:     nil,
 		addressMutator: func(address string) string {
 			return address
 		},
-		clock: clockwork.NewRealClock(),
+		clock:    clockwork.NewRealClock(),
+		interval: DefaultInterval,
+		trace:    new(trace.Discovery),
 	}
 	for _, opt := range opts {
 		if opt != nil {

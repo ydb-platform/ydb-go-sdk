@@ -145,13 +145,17 @@ func Transport(err error, opts ...teOpt) error {
 	}
 	if s, ok := grpcStatus.FromError(err); ok {
 		te = &transportError{
-			status: s,
-			err:    err,
+			status:  s,
+			err:     err,
+			address: "",
+			traceID: "",
 		}
 	} else {
 		te = &transportError{
-			status: grpcStatus.New(grpcCodes.Unknown, stack.Record(1)),
-			err:    err,
+			status:  grpcStatus.New(grpcCodes.Unknown, stack.Record(1)),
+			err:     err,
+			address: "",
+			traceID: "",
 		}
 	}
 	for _, opt := range opts {
@@ -194,8 +198,10 @@ func TransportError(err error) Error {
 	}
 	if s, ok := grpcStatus.FromError(err); ok {
 		return &transportError{
-			status: s,
-			err:    err,
+			status:  s,
+			err:     err,
+			address: "",
+			traceID: "",
 		}
 	}
 

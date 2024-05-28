@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
@@ -50,11 +51,19 @@ type messageQueue struct {
 
 func newMessageQueue() messageQueue {
 	return messageQueue{
-		messagesByOrder: make(map[int]messageWithDataContent),
-		seqNoToOrderID:  make(map[int64]int),
-		hasNewMessages:  make(empty.Chan, 1),
-		closedChan:      make(empty.Chan),
-		lastSeqNo:       -1,
+		messagesByOrder:           make(map[int]messageWithDataContent),
+		seqNoToOrderID:            make(map[int64]int),
+		hasNewMessages:            make(empty.Chan, 1),
+		closedChan:                make(empty.Chan),
+		lastSeqNo:                 -1,
+		OnAckReceived:             nil,
+		closedErr:                 nil,
+		acksReceivedEvent:         xsync.EventBroadcast{},
+		m:                         xsync.RWMutex{RWMutex: sync.RWMutex{}},
+		stopReceiveMessagesReason: nil,
+		closed:                    false,
+		lastWrittenIndex:          0,
+		lastSentIndex:             0,
 	}
 }
 

@@ -21,6 +21,7 @@ type Generator struct {
 func New(id RowID) *Generator {
 	return &Generator{
 		currentID: id,
+		mu:        sync.Mutex{},
 	}
 }
 
@@ -33,6 +34,9 @@ func (g *Generator) Generate() (Row, error) {
 		ID:               id,
 		PayloadDouble:    func(a float64) *float64 { return &a }(rand.Float64()), //nolint:gosec // speed more important
 		PayloadTimestamp: func(a time.Time) *time.Time { return &a }(time.Now()),
+		Hash:             0,
+		PayloadStr:       nil,
+		PayloadHash:      0,
 	}
 
 	var err error

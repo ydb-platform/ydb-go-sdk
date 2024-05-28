@@ -7,6 +7,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Scripting_V1"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Scripting"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Table"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 	"google.golang.org/grpc"
 
@@ -86,8 +87,12 @@ func (c *Client) execute(
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
+			CollectStats: Ydb_Table.QueryStatsCollection_STATS_COLLECTION_UNSPECIFIED,
 		}
-		result   = Ydb_Scripting.ExecuteYqlResult{}
+		result = Ydb_Scripting.ExecuteYqlResult{
+			ResultSets: nil,
+			QueryStats: nil,
+		}
 		response *Ydb_Scripting.ExecuteYqlResponse
 	)
 	defer func() {
@@ -167,7 +172,10 @@ func (c *Client) explain(
 			),
 		}
 		response *Ydb_Scripting.ExplainYqlResponse
-		result   = Ydb_Scripting.ExplainYqlResult{}
+		result   = Ydb_Scripting.ExplainYqlResult{
+			ParametersTypes: nil,
+			Plan:            "",
+		}
 	)
 	defer func() {
 		onDone(e.Explanation.Plan, err)
@@ -241,6 +249,7 @@ func (c *Client) streamExecute(
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
+			CollectStats: Ydb_Table.QueryStatsCollection_STATS_COLLECTION_UNSPECIFIED,
 		}
 	)
 	defer func() {

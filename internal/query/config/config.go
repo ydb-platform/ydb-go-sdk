@@ -38,10 +38,11 @@ func New(opts ...Option) *Config {
 
 func defaults() *Config {
 	return &Config{
+		Common:               config.Common{},
 		poolLimit:            DefaultPoolMaxSize,
 		sessionCreateTimeout: DefaultSessionCreateTimeout,
 		sessionDeleteTimeout: DefaultSessionDeleteTimeout,
-		trace:                &trace.Query{},
+		trace:                new(trace.Query),
 	}
 }
 

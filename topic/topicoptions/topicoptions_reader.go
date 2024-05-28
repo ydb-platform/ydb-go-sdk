@@ -18,7 +18,7 @@ type ReadSelectors []ReadSelector
 
 // ReadTopic create simple selector for read topics, if no need special settings.
 func ReadTopic(path string) ReadSelectors {
-	return ReadSelectors{{Path: path}}
+	return ReadSelectors{{Path: path, Partitions: nil, ReadFrom: time.Time{}, MaxTimeLag: time.Duration(0)}}
 }
 
 // ReaderOption options for topic reader

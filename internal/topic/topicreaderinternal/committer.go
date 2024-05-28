@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -55,11 +56,17 @@ type committer struct {
 
 func newCommitterStopped(tracer *trace.Topic, lifeContext context.Context, mode PublicCommitMode, send sendMessageToServerFunc, readerID int64) *committer { //nolint:lll,revive
 	res := &committer{
-		mode:             mode,
-		clock:            clockwork.NewRealClock(),
-		send:             send,
-		backgroundWorker: *background.NewWorker(lifeContext, fmt.Sprintf("ydb-topic-reader-committer: %v", readerID)),
-		tracer:           tracer,
+		BufferTimeLagTrigger: time.Duration(0),
+		BufferCountTrigger:   0,
+		send:                 send,
+		mode:                 mode,
+		clock:                clockwork.NewRealClock(),
+		commitLoopSignal:     nil,
+		backgroundWorker:     *background.NewWorker(lifeContext, fmt.Sprintf("ydb-topic-reader-committer: %v", readerID)),
+		tracer:               tracer,
+		m:                    xsync.Mutex{Mutex: sync.Mutex{}},
+		waiters:              nil,
+		commits:              CommitRanges{ranges: nil},
 	}
 	res.initChannels()
 

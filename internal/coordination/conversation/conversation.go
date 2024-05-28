@@ -137,6 +137,9 @@ func NewController() *Controller {
 	return &Controller{
 		notifyChan: make(chan struct{}, 1),
 		conflicts:  make(map[string]struct{}),
+		mutex:      sync.Mutex{},
+		queue:      nil,
+		closed:     false,
 	}
 }
 
@@ -195,7 +198,13 @@ type Option func(c *Conversation)
 
 // NewConversation creates a new conversation that starts with a specified message.
 func NewConversation(request func() *Ydb_Coordination.SessionRequest, opts ...Option) *Conversation {
-	conversation := Conversation{message: request}
+	conversation := Conversation{
+		message: request, responseFilter: nil, acknowledgeFilter: nil,
+		cancelMessage: nil, cancelFilter: nil,
+		conflictKey: "", responseErr: nil, done: nil,
+		requestSent: nil, cancelRequestSent: nil, response: nil,
+		idempotent: false, canceled: false,
+	}
 	for _, o := range opts {
 		if o != nil {
 			o(&conversation)

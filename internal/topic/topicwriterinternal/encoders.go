@@ -104,6 +104,9 @@ func NewEncoderSelector(
 		tracer:                 tracer,
 		writerReconnectorID:    writerReconnectorID,
 		sessionID:              sessionID,
+		allowedCodecs:          rawtopiccommon.SupportedCodecs{},
+		lastSelectedCodec:      0,
+		batchCounter:           0,
 	}
 	res.ResetAllowedCodecs(allowedCodecs)
 

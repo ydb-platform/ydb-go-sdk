@@ -112,6 +112,7 @@ func FromConfig(config string, opts ...fromConfigOption) *balancerConfig.Config 
 	var (
 		h = fromConfigOptionsHolder{
 			fallbackBalancer: Default(),
+			errorHandler:     nil,
 		}
 		b   *balancerConfig.Config
 		err error

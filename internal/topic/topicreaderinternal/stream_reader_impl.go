@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"reflect"
 	"runtime/pprof"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -75,20 +76,26 @@ type topicStreamReaderConfig struct {
 
 func newTopicStreamReaderConfig() topicStreamReaderConfig {
 	return topicStreamReaderConfig{
-		BaseContext:           context.Background(),
-		BufferSizeProtoBytes:  defaultBufferSize,
-		Cred:                  credentials.NewAnonymousCredentials(),
-		CredUpdateInterval:    time.Hour,
-		CommitMode:            CommitModeAsync,
-		CommitterBatchTimeLag: time.Second,
-		Decoders:              newDecoderMap(),
-		Trace:                 &trace.Topic{},
+		CommitterBatchTimeLag:           time.Second,
+		CommitterBatchCounterTrigger:    0,
+		BaseContext:                     context.Background(),
+		BufferSizeProtoBytes:            defaultBufferSize,
+		Cred:                            credentials.NewAnonymousCredentials(),
+		CredUpdateInterval:              time.Hour,
+		Consumer:                        "",
+		ReadWithoutConsumer:             false,
+		ReadSelectors:                   nil,
+		Trace:                           new(trace.Topic),
+		GetPartitionStartOffsetCallback: nil,
+		CommitMode:                      CommitModeAsync,
+		Decoders:                        newDecoderMap(),
 	}
 }
 
 func (cfg *topicStreamReaderConfig) initMessage() *rawtopicreader.InitRequest {
 	res := &rawtopicreader.InitRequest{
-		Consumer: cfg.Consumer,
+		Consumer:           cfg.Consumer,
+		TopicsReadSettings: nil,
 	}
 
 	res.TopicsReadSettings = make([]rawtopicreader.TopicReadSettings, len(cfg.ReadSelectors))
@@ -148,18 +155,30 @@ func newTopicStreamReaderStopped(
 		cfg:                   cfg,
 		ctx:                   stopPump,
 		freeBytes:             make(chan int, 1),
-		stream:                &syncedStream{stream: stream},
+		stream:                &syncedStream{m: sync.Mutex{}, stream: stream},
 		cancel:                cancel,
 		batcher:               newBatcher(),
 		readConnectionID:      "preinitID-" + readerConnectionID.String(),
 		readerID:              readerID,
 		rawMessagesFromBuffer: make(chan rawtopicreader.ServerMessage, 1),
+		restBufferSizeBytes:   atomic.Int64{},
+		sessionController: partitionSessionStorage{
+			m:                        sync.RWMutex{},
+			sessions:                 nil,
+			removeIndex:              0,
+			lastCompactedTime:        time.Time{},
+			lastCompactedRemoveIndex: 0,
+		},
+		backgroundWorkers: *background.NewWorker(stopPump, fmt.Sprintf(
+			"topic-reader-stream-background: %v",
+			readerID,
+		)),
+		committer: nil,
+		m:         xsync.RWMutex{RWMutex: sync.RWMutex{}},
+		err:       nil,
+		started:   false,
+		closed:    false,
 	}
-
-	res.backgroundWorkers = *background.NewWorker(stopPump, fmt.Sprintf(
-		"topic-reader-stream-background: %v",
-		res.readerID,
-	))
 
 	res.committer = newCommitterStopped(cfg.Trace, labeledContext, cfg.CommitMode, res.send, res.readerID)
 	res.committer.BufferTimeLagTrigger = cfg.CommitterBatchTimeLag
@@ -792,6 +811,8 @@ func (r *topicStreamReaderImpl) onStartPartitionSessionRequestFromBuffer(
 
 	respMessage := &rawtopicreader.StartPartitionSessionResponse{
 		PartitionSessionID: session.partitionSessionID,
+		ReadOffset:         rawtopicreader.OptionalOffset{Offset: rawtopicreader.Offset(0), HasValue: false},
+		CommitOffset:       rawtopicreader.OptionalOffset{Offset: rawtopicreader.Offset(0), HasValue: false},
 	}
 
 	var forceOffset *int64

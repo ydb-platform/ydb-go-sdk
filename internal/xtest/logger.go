@@ -7,6 +7,7 @@ import (
 
 func MakeSyncedTest(t testing.TB) *SyncedTest {
 	return &SyncedTest{
+		m:  sync.Mutex{},
 		TB: t,
 	}
 }

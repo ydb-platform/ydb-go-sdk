@@ -15,8 +15,10 @@ type Cache struct {
 
 func NewCache(timeout time.Duration) *Cache {
 	return &Cache{
-		timeout: timeout,
-		values:  make(map[string]CacheItem),
+		timeout:    timeout,
+		values:     make(map[string]CacheItem),
+		m:          sync.Mutex{},
+		setCounter: 0,
 	}
 }
 

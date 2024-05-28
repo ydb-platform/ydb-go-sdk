@@ -289,6 +289,7 @@ func (c *Client) modifyPermissions(ctx context.Context, path string, desc permis
 				c.config.OperationCancelAfter(),
 				operation.ModeSync,
 			),
+			Inheritance: nil,
 		},
 	)
 	if err != nil {

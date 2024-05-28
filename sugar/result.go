@@ -76,6 +76,8 @@ func (r *result) Close() error {
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func Result(r query.Result) *result {
 	return &result{
-		r: r,
+		r:   r,
+		rs:  nil,
+		row: nil,
 	}
 }

@@ -41,7 +41,7 @@ func NewCommitRangesWithCapacity(capacity int) CommitRanges {
 }
 
 func NewCommitRangesFromPublicCommits(ranges []PublicCommitRange) CommitRanges {
-	res := CommitRanges{}
+	res := CommitRanges{ranges: nil}
 	res.ranges = make([]commitRange, len(ranges))
 	for i := 0; i < len(res.ranges); i++ {
 		res.ranges[i] = ranges[i].priv
@@ -133,6 +133,7 @@ func (r *CommitRanges) toRawPartitionCommitOffset() []rawtopicreader.PartitionCo
 	newPartition := func(id rawtopicreader.PartitionSessionID) rawtopicreader.PartitionCommitOffset {
 		return rawtopicreader.PartitionCommitOffset{
 			PartitionSessionID: id,
+			Offsets:            nil,
 		}
 	}
 

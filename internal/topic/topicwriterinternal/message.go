@@ -44,11 +44,14 @@ func (p PublicFuturePartitioning) ToRaw() rawtopicwriter.Partitioning {
 func NewPartitioningWithMessageGroupID(id string) PublicFuturePartitioning {
 	return PublicFuturePartitioning{
 		messageGroupID: id,
+		partitionID:    0,
+		hasPartitionID: false,
 	}
 }
 
 func NewPartitioningWithPartitionID(id int64) PublicFuturePartitioning {
 	return PublicFuturePartitioning{
+		messageGroupID: "",
 		partitionID:    id,
 		hasPartitionID: true,
 	}
@@ -218,7 +221,15 @@ func newMessageDataWithContent(
 	encoders *EncoderMap,
 ) messageWithDataContent {
 	return messageWithDataContent{
-		PublicMessage: message,
-		encoders:      encoders,
+		PublicMessage:       message,
+		encoders:            encoders,
+		dataWasRead:         false,
+		hasRawContent:       false,
+		hasEncodedContent:   false,
+		metadataCached:      false,
+		bufCodec:            0,
+		bufEncoded:          bytes.Buffer{},
+		rawBuf:              bytes.Buffer{},
+		BufUncompressedSize: 0,
 	}
 }

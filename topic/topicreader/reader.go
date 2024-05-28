@@ -28,7 +28,7 @@ type Reader struct {
 // NewReader
 // create new reader, used internally only.
 func NewReader(internalReader topicreaderinternal.Reader) *Reader {
-	return &Reader{reader: internalReader}
+	return &Reader{reader: internalReader, readInFlyght: atomic.Bool{}, commitInFlyght: atomic.Bool{}}
 }
 
 // WaitInit waits until the reader is initialized

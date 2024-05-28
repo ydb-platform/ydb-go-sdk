@@ -44,13 +44,15 @@ func newPartitionSession(
 	partitionContext, cancel := xcontext.WithCancel(partitionContext)
 
 	res := &partitionSession{
-		Topic:              topic,
-		PartitionID:        partitionID,
-		readerID:           readerID,
-		connectionID:       connectionID,
-		ctx:                partitionContext,
-		ctxCancel:          cancel,
-		partitionSessionID: partitionSessionID,
+		Topic:                    topic,
+		PartitionID:              partitionID,
+		readerID:                 readerID,
+		connectionID:             connectionID,
+		ctx:                      partitionContext,
+		ctxCancel:                cancel,
+		partitionSessionID:       partitionSessionID,
+		lastReceivedOffsetEndVal: atomic.Int64{},
+		committedOffsetVal:       atomic.Int64{},
 	}
 	res.committedOffsetVal.Store(committedOffset.ToInt64())
 	res.lastReceivedOffsetEndVal.Store(committedOffset.ToInt64() - 1)
@@ -114,7 +116,7 @@ func (c *partitionSessionStorage) Add(session *partitionSession) error {
 	if _, ok := c.sessions[session.partitionSessionID]; ok {
 		return xerrors.WithStackTrace(fmt.Errorf("session id already existed: %v", session.partitionSessionID))
 	}
-	c.sessions[session.partitionSessionID] = &sessionInfo{Session: session}
+	c.sessions[session.partitionSessionID] = &sessionInfo{Session: session, RemovedIndex: 0, RemoveTime: time.Time{}}
 
 	return nil
 }

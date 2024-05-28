@@ -27,9 +27,11 @@ type server struct {
 
 func newServer(id int, db *ydb.Driver, cacheTimeout time.Duration, useCDC bool) *server {
 	res := &server{
-		cache: NewCache(cacheTimeout),
-		db:    db,
-		id:    id,
+		cache:     NewCache(cacheTimeout),
+		db:        db,
+		id:        id,
+		mux:       http.ServeMux{},
+		dbCounter: 0,
 	}
 
 	res.mux.HandleFunc("/", res.IndexPageHandler)

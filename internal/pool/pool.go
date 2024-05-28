@@ -2,6 +2,7 @@ package pool
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -147,14 +148,20 @@ func New[PT Item[T], T any](
 	opts ...option[PT, T],
 ) *Pool[PT, T] {
 	p := &Pool[PT, T]{
-		trace: defaultTrace,
-		limit: DefaultLimit,
+		trace:         defaultTrace,
+		limit:         DefaultLimit,
+		createTimeout: time.Duration(0),
+		closeTimeout:  time.Duration(0),
+		mu:            xsync.Mutex{Mutex: sync.Mutex{}},
+		idle:          nil,
+		index:         nil,
 		createItem: func(ctx context.Context) (PT, error) {
 			var item T
 
 			return &item, nil
 		},
-		done: make(chan struct{}),
+		done:  make(chan struct{}),
+		stats: nil,
 	}
 
 	for _, opt := range opts {
@@ -252,7 +259,8 @@ func New[PT Item[T], T any](
 	p.idle = make([]PT, 0, p.limit)
 	p.index = make(map[PT]struct{}, p.limit)
 	p.stats = &safeStats{
-		v:        stats.Stats{Limit: p.limit},
+		mu:       xsync.RWMutex{RWMutex: sync.RWMutex{}},
+		v:        stats.Stats{Limit: p.limit, Index: 0, Idle: 0, InUse: 0},
 		onChange: p.trace.OnChange,
 	}
 

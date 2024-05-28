@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/big"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -80,7 +81,16 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 			credUpdateInterval: time.Hour,
 			clock:              clockwork.NewRealClock(),
 			compressorCount:    runtime.NumCPU(),
-			tracer:             &trace.Topic{},
+			tracer:             new(trace.Topic),
+			producerID:         "",
+			topic:              "",
+			writerMeta:         nil,
+			defaultPartitioning: rawtopicwriter.Partitioning{
+				Type:           rawtopicwriter.PartitioningUndefined,
+				MessageGroupID: "",
+				PartitionID:    0,
+			},
+			forceCodec: rawtopiccommon.CodecUNSPECIFIED,
 		},
 		AutoSetSeqNo:       true,
 		AutoSetCreatedTime: true,
@@ -88,7 +98,14 @@ func newWriterReconnectorConfig(options ...PublicWriterOption) WriterReconnector
 		MaxQueueLen:        1000,             //nolint:gomnd
 		RetrySettings: topic.RetrySettings{
 			StartTimeout: topic.DefaultStartTimeout,
+			CheckError:   nil,
 		},
+		Common:                       config.Common{},
+		AdditionalEncoders:           nil,
+		Connect:                      nil,
+		WaitServerAck:                false,
+		OnWriterInitResponseCallback: nil,
+		connectTimeout:               time.Duration(0),
 	}
 	if cfg.compressorCount == 0 {
 		cfg.compressorCount = 1
@@ -153,6 +170,13 @@ func newWriterReconnectorStopped(
 		encodersMap:                    NewEncoderMap(),
 		writerInstanceID:               writerInstanceID.String(),
 		retrySettings:                  cfg.RetrySettings,
+		background:                     background.Worker{},
+		sessionID:                      "",
+		initDoneCh:                     nil,
+		initInfo:                       InitialInfo{LastSeqNum: 0},
+		m:                              xsync.RWMutex{RWMutex: sync.RWMutex{}},
+		firstConnectionHandled:         atomic.Bool{},
+		initDone:                       false,
 	}
 
 	res.queue.OnAckReceived = res.onAckReceived
@@ -555,6 +579,7 @@ func (w *WriterReconnector) onWriterInitCallbackHandler(writerStream *SingleStre
 			SessionID:        w.sessionID,
 			PartitionID:      writerStream.PartitionID,
 			CodecsFromServer: createPublicCodecsFromRaw(writerStream.CodecsFromServer),
+			AllowedCodecs:    nil,
 		}
 
 		if err := w.cfg.OnWriterInitResponseCallback(info); err != nil {

@@ -116,7 +116,10 @@ func (q *queryPhase) IsLiteralPhase() bool {
 
 func initOperationStats(x *Ydb_TableStats.OperationStats) stats.OperationStats {
 	if x == nil {
-		return stats.OperationStats{}
+		return stats.OperationStats{
+			Rows:  0,
+			Bytes: 0,
+		}
 	}
 
 	return stats.OperationStats{

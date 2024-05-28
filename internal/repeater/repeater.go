@@ -100,12 +100,13 @@ func New(
 
 	r := &repeater{
 		interval: interval,
+		name:     "",
+		trace:    new(trace.Driver),
 		task:     task,
 		cancel:   cancel,
 		stopped:  make(chan struct{}),
 		force:    make(chan struct{}, 1),
 		clock:    clockwork.NewRealClock(),
-		trace:    &trace.Driver{},
 	}
 
 	for _, opt := range opts {

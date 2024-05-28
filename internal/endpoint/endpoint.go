@@ -46,6 +46,7 @@ func (e *endpoint) Copy() Endpoint {
 	defer e.mu.RUnlock()
 
 	return &endpoint{
+		mu:          sync.RWMutex{},
 		id:          e.id,
 		address:     e.address,
 		location:    e.location,
@@ -166,7 +167,13 @@ func WithLastUpdated(ts time.Time) Option {
 
 func New(address string, opts ...Option) *endpoint {
 	e := &endpoint{
+		mu:          sync.RWMutex{},
+		id:          0,
 		address:     address,
+		location:    "",
+		services:    []string{},
+		loadFactor:  0,
+		local:       false,
 		lastUpdated: time.Now(),
 	}
 	for _, opt := range opts {

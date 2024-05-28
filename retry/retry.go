@@ -103,7 +103,7 @@ func WithStackTrace() stackTraceOption {
 	return stackTraceOption{}
 }
 
-var _ Option = traceOption{}
+var _ Option = traceOption{t: nil}
 
 type traceOption struct {
 	t *trace.Retry
@@ -126,7 +126,7 @@ func WithTrace(t *trace.Retry) traceOption {
 	return traceOption{t: t}
 }
 
-var _ Option = budgetOption{}
+var _ Option = budgetOption{b: nil}
 
 type budgetOption struct {
 	b budget.Budget
@@ -172,7 +172,7 @@ func WithIdempotent(idempotent bool) idempotentOption {
 	return idempotentOption(idempotent)
 }
 
-var _ Option = fastBackoffOption{}
+var _ Option = fastBackoffOption{backoff: nil}
 
 type fastBackoffOption struct {
 	backoff backoff.Backoff
@@ -197,7 +197,7 @@ func WithFastBackoff(b backoff.Backoff) fastBackoffOption {
 	return fastBackoffOption{backoff: b}
 }
 
-var _ Option = slowBackoffOption{}
+var _ Option = slowBackoffOption{backoff: nil}
 
 type slowBackoffOption struct {
 	backoff backoff.Backoff
@@ -222,7 +222,7 @@ func WithSlowBackoff(b backoff.Backoff) slowBackoffOption {
 	return slowBackoffOption{backoff: b}
 }
 
-var _ Option = panicCallbackOption{}
+var _ Option = panicCallbackOption{callback: nil}
 
 type panicCallbackOption struct {
 	callback func(e interface{})
@@ -261,11 +261,15 @@ func WithPanicCallback(panicCallback func(e interface{})) panicCallbackOption {
 //nolint:funlen
 func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr error) {
 	options := &retryOptions{
-		call:        stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.Retry"),
-		trace:       &trace.Retry{},
-		budget:      budget.Limited(-1),
-		fastBackoff: backoff.Fast,
-		slowBackoff: backoff.Slow,
+		label:         "",
+		call:          stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.Retry"),
+		trace:         new(trace.Retry),
+		idempotent:    false,
+		stackTrace:    false,
+		fastBackoff:   backoff.Fast,
+		slowBackoff:   backoff.Slow,
+		budget:        budget.Limited(-1),
+		panicCallback: nil,
 	}
 	for _, opt := range opts {
 		if opt != nil {

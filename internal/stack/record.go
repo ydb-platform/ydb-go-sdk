@@ -71,7 +71,7 @@ func PackagePath(b bool) recordOption {
 	}
 }
 
-var _ Caller = call{}
+var _ Caller = call{function: 0, file: "", line: 0}
 
 type call struct {
 	function uintptr

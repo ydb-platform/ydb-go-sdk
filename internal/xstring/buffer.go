@@ -11,7 +11,7 @@ type buffer struct {
 }
 
 var buffersPool = sync.Pool{New: func() interface{} {
-	return &buffer{}
+	return &buffer{Buffer: bytes.Buffer{}}
 }}
 
 func (b *buffer) Free() {

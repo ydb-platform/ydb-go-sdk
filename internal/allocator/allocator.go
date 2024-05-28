@@ -137,7 +137,7 @@ func (a *boolAllocator) Bool() (v *Ydb.Value_BoolValue) {
 
 func (a *boolAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Value_BoolValue{}
+		*v = Ydb.Value_BoolValue{BoolValue: false}
 		boolPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -156,7 +156,7 @@ func (a *bytesAllocator) Bytes() (v *Ydb.Value_BytesValue) {
 
 func (a *bytesAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Value_BytesValue{}
+		*v = Ydb.Value_BytesValue{BytesValue: []byte{}}
 		bytesPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -213,7 +213,7 @@ func (a *doubleAllocator) Double() (v *Ydb.Value_DoubleValue) {
 
 func (a *doubleAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Value_DoubleValue{}
+		*v = Ydb.Value_DoubleValue{DoubleValue: 0}
 		doublePool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -232,7 +232,7 @@ func (a *floatAllocator) Float() (v *Ydb.Value_FloatValue) {
 
 func (a *floatAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Value_FloatValue{}
+		*v = Ydb.Value_FloatValue{FloatValue: 0}
 		floatPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -251,7 +251,7 @@ func (a *int32Allocator) Int32() (v *Ydb.Value_Int32Value) {
 
 func (a *int32Allocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Value_Int32Value{}
+		*v = Ydb.Value_Int32Value{Int32Value: 0}
 		int32Pool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -270,7 +270,7 @@ func (a *int64Allocator) Int64() (v *Ydb.Value_Int64Value) {
 
 func (a *int64Allocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Value_Int64Value{}
+		*v = Ydb.Value_Int64Value{Int64Value: 0}
 		int64Pool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -308,7 +308,7 @@ func (a *low128Allocator) Low128() (v *Ydb.Value_Low_128) {
 
 func (a *low128Allocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Value_Low_128{}
+		*v = Ydb.Value_Low_128{Low_128: 0}
 		low128Pool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -327,7 +327,7 @@ func (a *nestedAllocator) Nested() (v *Ydb.Value_NestedValue) {
 
 func (a *nestedAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Value_NestedValue{}
+		*v = Ydb.Value_NestedValue{NestedValue: new(Ydb.Value)}
 		nestedPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -346,7 +346,7 @@ func (a *nullFlagAllocator) NullFlag() (v *Ydb.Value_NullFlagValue) {
 
 func (a *nullFlagAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Value_NullFlagValue{}
+		*v = Ydb.Value_NullFlagValue{NullFlagValue: 0}
 		nullFlagPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -384,7 +384,10 @@ func (a *pairAllocator) Pair() (v *Ydb.ValuePair) {
 
 func (a *pairAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.ValuePair{}
+		*v = Ydb.ValuePair{
+			Key:     new(Ydb.Value),
+			Payload: new(Ydb.Value),
+		}
 		pairPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -449,7 +452,7 @@ func (a *textAllocator) Text() (v *Ydb.Value_TextValue) {
 
 func (a *textAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Value_TextValue{}
+		*v = Ydb.Value_TextValue{TextValue: ""}
 		textPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -492,7 +495,7 @@ func (a *typeDecimalAllocator) TypeDecimal() (v *Ydb.Type_DecimalType) {
 
 func (a *typeDecimalAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Type_DecimalType{}
+		*v = Ydb.Type_DecimalType{DecimalType: new(Ydb.DecimalType)}
 		typeDecimalPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -511,7 +514,7 @@ func (a *typeDictAllocator) TypeDict() (v *Ydb.Type_DictType) {
 
 func (a *typeDictAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Type_DictType{}
+		*v = Ydb.Type_DictType{DictType: new(Ydb.DictType)}
 		typeDictPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -530,7 +533,7 @@ func (a *typeEmptyListAllocator) TypeEmptyList() (v *Ydb.Type_EmptyListType) {
 
 func (a *typeEmptyListAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Type_EmptyListType{}
+		*v = Ydb.Type_EmptyListType{EmptyListType: 0}
 		typeEmptyListPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -549,7 +552,7 @@ func (a *typeEmptyDictAllocator) TypeEmptyDict() (v *Ydb.Type_EmptyDictType) {
 
 func (a *typeEmptyDictAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Type_EmptyDictType{}
+		*v = Ydb.Type_EmptyDictType{EmptyDictType: 0}
 		typeEmptyDictPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -587,7 +590,7 @@ func (a *typeListAllocator) TypeList() (v *Ydb.Type_ListType) {
 
 func (a *typeListAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Type_ListType{}
+		*v = Ydb.Type_ListType{ListType: new(Ydb.ListType)}
 		typeListPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -606,7 +609,7 @@ func (a *typeOptionalAllocator) TypeOptional() (v *Ydb.Type_OptionalType) {
 
 func (a *typeOptionalAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Type_OptionalType{}
+		*v = Ydb.Type_OptionalType{OptionalType: new(Ydb.OptionalType)}
 		typeOptionalPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -625,7 +628,7 @@ func (a *typeStructAllocator) TypeStruct() (v *Ydb.Type_StructType) {
 
 func (a *typeStructAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Type_StructType{}
+		*v = Ydb.Type_StructType{StructType: new(Ydb.StructType)}
 		typeStructPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -644,7 +647,7 @@ func (a *typeTupleAllocator) TypeTuple() (v *Ydb.Type_TupleType) {
 
 func (a *typeTupleAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Type_TupleType{}
+		*v = Ydb.Type_TupleType{TupleType: new(Ydb.TupleType)}
 		typeTuplePool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -663,7 +666,7 @@ func (a *typeVariantAllocator) TypeVariant() (v *Ydb.Type_VariantType) {
 
 func (a *typeVariantAllocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Type_VariantType{}
+		*v = Ydb.Type_VariantType{VariantType: new(Ydb.VariantType)}
 		typeVariantPool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -701,7 +704,7 @@ func (a *uint32Allocator) Uint32() (v *Ydb.Value_Uint32Value) {
 
 func (a *uint32Allocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Value_Uint32Value{}
+		*v = Ydb.Value_Uint32Value{Uint32Value: 0}
 		uint32Pool.Put(v)
 	}
 	a.allocations = a.allocations[:0]
@@ -720,7 +723,7 @@ func (a *uint64Allocator) Uint64() (v *Ydb.Value_Uint64Value) {
 
 func (a *uint64Allocator) free() {
 	for _, v := range a.allocations {
-		*v = Ydb.Value_Uint64Value{}
+		*v = Ydb.Value_Uint64Value{Uint64Value: 0}
 		uint64Pool.Put(v)
 	}
 	a.allocations = a.allocations[:0]

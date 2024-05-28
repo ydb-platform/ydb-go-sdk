@@ -54,15 +54,17 @@ func newClient(
 	config *config.Config,
 ) *Client {
 	c := &Client{
-		clock:       config.Clock(),
-		config:      config,
-		cc:          balancer,
-		nodeChecker: balancer,
-		build:       builder,
-		index:       make(map[*session]sessionInfo),
-		idle:        list.New(),
-		waitQ:       list.New(),
-		limit:       config.SizeLimit(),
+		clock:            config.Clock(),
+		config:           config,
+		cc:               balancer,
+		nodeChecker:      balancer,
+		build:            builder,
+		mu:               xsync.Mutex{Mutex: sync.Mutex{}},
+		index:            make(map[*session]sessionInfo),
+		createInProgress: 0,
+		idle:             list.New(),
+		waitQ:            list.New(),
+		limit:            config.SizeLimit(),
 		waitChPool: sync.Pool{
 			New: func() interface{} {
 				ch := make(chan *session)
@@ -70,7 +72,9 @@ func newClient(
 				return &ch
 			},
 		},
-		done: make(chan struct{}),
+		testHookGetWaitCh: nil,
+		wg:                sync.WaitGroup{},
+		done:              make(chan struct{}),
 	}
 	if idleThreshold := config.IdleThreshold(); idleThreshold > 0 {
 		c.wg.Add(1)
@@ -123,7 +127,7 @@ func withCreateSessionOnClose(onClose func(s *session)) createSessionOption {
 }
 
 func (c *Client) createSession(ctx context.Context, opts ...createSessionOption) (s *session, err error) {
-	options := createSessionOptions{}
+	options := createSessionOptions{onCreate: nil, onClose: nil}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(&options)
@@ -320,6 +324,7 @@ func (c *Client) internalPoolCreateSession(ctx context.Context) (s *session, err
 		withCreateSessionOnCreate(func(s *session) {
 			c.mu.WithLock(func() {
 				c.index[s] = sessionInfo{
+					idle:    nil,
 					touched: c.clock.Now(),
 				}
 				trace.TableOnPoolSessionAdd(c.config.Trace(), s)

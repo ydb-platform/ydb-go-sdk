@@ -45,7 +45,9 @@ func newBatch(session *partitionSession, messages []*PublicMessage) (*PublicBatc
 	}
 
 	offset := commitRange{
-		partitionSession: session,
+		commitOffsetStart: rawtopicreader.Offset(0),
+		commitOffsetEnd:   rawtopicreader.Offset(0),
+		partitionSession:  session,
 	}
 	if len(messages) > 0 {
 		offset.commitOffsetStart = messages[0].commitRange.commitOffsetStart
@@ -55,6 +57,7 @@ func newBatch(session *partitionSession, messages []*PublicMessage) (*PublicBatc
 	return &PublicBatch{
 		Messages:    messages,
 		commitRange: offset,
+		DoNotCopy:   empty.DoNotCopy{},
 	}, nil
 }
 
@@ -68,7 +71,7 @@ func newBatchFromStream(
 	for i := range sb.MessageData {
 		sMess := &sb.MessageData[i]
 
-		dstMess := &PublicMessage{}
+		dstMess := new(PublicMessage)
 		messages[i] = dstMess
 		dstMess.CreatedAt = sMess.CreatedAt
 		dstMess.MessageGroupID = sMess.MessageGroupID
@@ -128,7 +131,7 @@ func (m *PublicBatch) getCommitRange() PublicCommitRange {
 func (m *PublicBatch) append(b *PublicBatch) (*PublicBatch, error) {
 	var res *PublicBatch
 	if m == nil {
-		res = &PublicBatch{}
+		res = new(PublicBatch)
 	} else {
 		res = m
 	}

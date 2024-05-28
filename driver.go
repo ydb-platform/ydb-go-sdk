@@ -108,7 +108,7 @@ func (d *Driver) trace() *trace.Driver {
 		return d.config.Trace()
 	}
 
-	return &trace.Driver{}
+	return new(trace.Driver)
 }
 
 // Close closes Driver and clear resources
@@ -316,10 +316,9 @@ func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, e
 		}
 	}()
 
-	d := &Driver{
-		children:  make(map[uint64]*Driver),
-		ctxCancel: driverCtxCancel,
-	}
+	d := new(Driver)
+	d.children = make(map[uint64]*Driver)
+	d.ctxCancel = driverCtxCancel
 
 	if caFile, has := os.LookupEnv("YDB_SSL_ROOT_CERTIFICATES_FILE"); has {
 		d.opts = append(d.opts,

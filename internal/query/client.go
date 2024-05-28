@@ -174,6 +174,7 @@ func New(ctx context.Context, balancer balancer, cfg *config.Config) *Client {
 	client := &Client{
 		config:     cfg,
 		grpcClient: Ydb_Query_V1.NewQueryServiceClient(balancer),
+		pool:       nil,
 		done:       make(chan struct{}),
 	}
 

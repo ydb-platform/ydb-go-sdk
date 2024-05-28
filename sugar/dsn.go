@@ -13,10 +13,17 @@ func DSN(endpoint, database string, secure bool) (s string) {
 	qp := url.Values{}
 
 	dsn := url.URL{
-		Scheme:   "grpc",
-		Host:     endpoint,
-		Path:     database,
-		RawQuery: qp.Encode(),
+		Scheme:      "grpc",
+		Host:        endpoint,
+		Path:        database,
+		RawQuery:    qp.Encode(),
+		Opaque:      "",
+		User:        nil,
+		RawPath:     "",
+		OmitHost:    false,
+		ForceQuery:  false,
+		Fragment:    "",
+		RawFragment: "",
 	}
 
 	if secure {

@@ -35,7 +35,8 @@ func With(config config.Common) Option {
 
 func New(opts ...Option) Config {
 	c := Config{
-		trace: &trace.Coordination{},
+		Common: config.Common{},
+		trace:  new(trace.Coordination),
 	}
 	for _, opt := range opts {
 		if opt != nil {

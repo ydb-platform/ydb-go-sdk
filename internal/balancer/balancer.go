@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync"
 
 	"google.golang.org/grpc"
 
@@ -259,6 +260,17 @@ func New(
 		driverConfig:    driverConfig,
 		pool:            pool,
 		localDCDetector: detectLocalDC,
+		config: balancerConfig.Config{
+			Filter:        nil,
+			AllowFallback: false,
+			SingleConn:    false,
+			DetectLocalDC: false,
+		},
+		discoveryClient:            nil,
+		discoveryRepeater:          nil,
+		mu:                         xsync.RWMutex{RWMutex: sync.RWMutex{}},
+		connectionsState:           nil,
+		onApplyDiscoveredEndpoints: nil,
 	}
 	d := internalDiscovery.New(ctx, pool.Get(
 		endpoint.New(driverConfig.Endpoint()),
@@ -267,7 +279,12 @@ func New(
 	b.discoveryClient = d
 
 	if config := driverConfig.Balancer(); config == nil {
-		b.config = balancerConfig.Config{}
+		b.config = balancerConfig.Config{
+			Filter:        nil,
+			AllowFallback: false,
+			SingleConn:    false,
+			DetectLocalDC: false,
+		}
 	} else {
 		b.config = *config
 	}

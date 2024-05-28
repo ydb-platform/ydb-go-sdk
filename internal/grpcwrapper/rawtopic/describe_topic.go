@@ -22,6 +22,7 @@ func (req *DescribeTopicRequest) ToProto() *Ydb_Topic.DescribeTopicRequest {
 	return &Ydb_Topic.DescribeTopicRequest{
 		OperationParams: req.OperationParams.ToProto(),
 		Path:            req.Path,
+		IncludeStats:    false,
 	}
 }
 
@@ -46,7 +47,7 @@ func (res *DescribeTopicResult) FromProto(protoResponse *Ydb_Topic.DescribeTopic
 		return err
 	}
 
-	protoResult := &Ydb_Topic.DescribeTopicResult{}
+	protoResult := new(Ydb_Topic.DescribeTopicResult)
 	if err := protoResponse.GetOperation().GetResult().UnmarshalTo(protoResult); err != nil {
 		return xerrors.WithStackTrace(fmt.Errorf("ydb: describe topic result failed on unmarshal grpc result: %w", err))
 	}

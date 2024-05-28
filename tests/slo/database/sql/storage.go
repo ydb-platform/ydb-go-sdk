@@ -89,6 +89,9 @@ func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (s *Stora
 	retryBudget := budget.Limited(int(float64(poolSize) * 0.1)) //nolint:gomnd
 
 	s = &Storage{
+		cc:  nil,
+		c:   nil,
+		db:  nil,
 		cfg: cfg,
 		createQuery: fmt.Sprintf(createTemplate, cfg.Table,
 			cfg.PartitionSize, cfg.MinPartitionsCount, cfg.MaxPartitionsCount, cfg.MinPartitionsCount),

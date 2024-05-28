@@ -28,6 +28,8 @@ func WithClock(clock clockwork.Clock) lastUsageOption {
 
 func NewLastUsage(opts ...lastUsageOption) *lastUsage {
 	lastUsage := &lastUsage{
+		locks: atomic.Int64{},
+		t:     atomic.Pointer[time.Time]{},
 		clock: clockwork.NewRealClock(),
 	}
 	for _, opt := range opts {

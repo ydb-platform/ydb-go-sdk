@@ -13,6 +13,7 @@ type balancer struct {
 func newBalancer(handlers ...http.Handler) *balancer {
 	return &balancer{
 		handlers: handlers,
+		counter:  0,
 	}
 }
 

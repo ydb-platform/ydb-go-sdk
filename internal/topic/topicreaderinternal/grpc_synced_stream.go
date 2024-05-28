@@ -6,7 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 )
 
-var _ RawTopicReaderStream = &syncedStream{}
+var _ RawTopicReaderStream = &syncedStream{m: sync.Mutex{}, stream: nil}
 
 type syncedStream struct {
 	m      sync.Mutex

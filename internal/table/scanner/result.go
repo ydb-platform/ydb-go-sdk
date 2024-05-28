@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
@@ -111,6 +112,25 @@ func NewStream(
 	opts ...option,
 ) (StreamResult, error) {
 	r := &streamResult{
+		baseResult: baseResult{
+			valueScanner: valueScanner{
+				set:                      nil,
+				row:                      nil,
+				converter:                nil,
+				stack:                    scanStack{v: nil, p: 0, scanItem: item{name: "", i: 0, t: nil, v: nil}},
+				nextRow:                  0,
+				nextItem:                 0,
+				ignoreTruncated:          false,
+				markTruncatedAsRetryable: false,
+				columnIndexes:            nil,
+				errMtx:                   xsync.RWMutex{RWMutex: sync.RWMutex{}},
+				err:                      nil,
+			},
+			nextResultSetCounter: atomic.Uint64{},
+			statsMtx:             xsync.RWMutex{RWMutex: sync.RWMutex{}},
+			stats:                nil,
+			closed:               atomic.Bool{},
+		},
 		recv:  recv,
 		close: onClose,
 	}
@@ -129,9 +149,26 @@ func NewStream(
 func NewUnary(sets []*Ydb.ResultSet, stats *Ydb_TableStats.QueryStats, opts ...option) UnaryResult {
 	r := &unaryResult{
 		baseResult: baseResult{
-			stats: stats,
+			valueScanner: valueScanner{
+				set:                      nil,
+				row:                      nil,
+				converter:                nil,
+				stack:                    scanStack{v: nil, p: 0, scanItem: item{name: "", i: 0, t: nil, v: nil}},
+				nextRow:                  0,
+				nextItem:                 0,
+				ignoreTruncated:          false,
+				markTruncatedAsRetryable: false,
+				columnIndexes:            nil,
+				errMtx:                   xsync.RWMutex{RWMutex: sync.RWMutex{}},
+				err:                      nil,
+			},
+			nextResultSetCounter: atomic.Uint64{},
+			statsMtx:             xsync.RWMutex{RWMutex: sync.RWMutex{}},
+			stats:                stats,
+			closed:               atomic.Bool{},
 		},
-		sets: sets,
+		sets:    sets,
+		nextSet: 0,
 	}
 	for _, opt := range opts {
 		if opt != nil {

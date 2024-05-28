@@ -29,14 +29,17 @@ var once sync.Once
 
 func getService(ctx context.Context, dsn string, opts ...ydb.Option) (s *service, err error) {
 	once.Do(func() {
+		transport := new(http.Transport)
+		transport.TLSClientConfig = new(tls.Config)
+		transport.TLSClientConfig.InsecureSkipVerify = true
+
 		s = &service{
+			db: nil,
 			client: &http.Client{
-				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{
-						InsecureSkipVerify: true, //nolint:gosec
-					},
-				},
-				Timeout: time.Second * 10,
+				Transport:     transport,
+				CheckRedirect: nil,
+				Jar:           nil,
+				Timeout:       time.Second * 10,
 			},
 		}
 		s.db, err = ydb.Open(ctx, dsn, opts...)
