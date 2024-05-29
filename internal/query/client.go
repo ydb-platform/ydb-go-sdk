@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"io"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"google.golang.org/grpc"
@@ -94,18 +95,16 @@ func do(
 }
 
 func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) error {
-	select {
-	case <-c.done:
-		return xerrors.WithStackTrace(errClosedClient)
-	default:
-		onDone := trace.QueryOnDo(c.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).Do"),
-		)
-		attempts, err := do(ctx, c.pool, op, c.config.Trace(), opts...)
-		onDone(attempts, err)
+	ctx, cancel := xcontext.WithDone(ctx, c.done)
+	defer cancel()
 
-		return err
-	}
+	onDone := trace.QueryOnDo(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).Do"),
+	)
+	attempts, err := do(ctx, c.pool, op, c.config.Trace(), opts...)
+	onDone(attempts, err)
+
+	return err
 }
 
 func doTx(
@@ -150,19 +149,78 @@ func doTx(
 	return attempts, nil
 }
 
-func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) (err error) {
-	select {
-	case <-c.done:
-		return xerrors.WithStackTrace(errClosedClient)
-	default:
-		onDone := trace.QueryOnDoTx(c.config.Trace(), &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).DoTx"),
-		)
-		attempts, err := doTx(ctx, c.pool, op, c.config.Trace(), opts...)
-		onDone(attempts, err)
+func readRow(ctx context.Context,
+	pool *pool.Pool[*Session, Session],
+	q string,
+	t *trace.Query,
+	opts ...options.ExecuteOption,
+) (row query.Row, err error) {
+	_, err = do(ctx, pool, func(ctx context.Context, s query.Session) (err error) {
+		_, r, err := s.Execute(ctx, q, opts...)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+		defer func() {
+			_ = r.Close(ctx)
+		}()
+		rs, err := r.NextResultSet(ctx)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+		row, err = rs.NextRow(ctx)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
 
-		return err
+		if _, err = rs.NextRow(ctx); err == nil || !xerrors.Is(err, io.EOF) {
+			return xerrors.WithStackTrace(errMoreThanOneRow)
+		}
+
+		if _, err = r.NextResultSet(ctx); err == nil || !xerrors.Is(err, io.EOF) {
+			return xerrors.WithStackTrace(errMoreThanOneResultSet)
+		}
+
+		return r.Err()
+	}, t)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
 	}
+
+	return row, nil
+}
+
+// ReadRow is a helper which read only one row from first result set in result
+func (c *Client) ReadRow(ctx context.Context, q string, opts ...options.ExecuteOption) (row query.Row, err error) {
+	ctx, cancel := xcontext.WithDone(ctx, c.done)
+	defer cancel()
+
+	onDone := trace.QueryOnReadRow(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).ReadRow"),
+		q,
+	)
+	defer func() {
+		onDone(err)
+	}()
+
+	row, err = readRow(ctx, c.pool, q, c.config.Trace(), opts...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return row, nil
+}
+
+func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) (err error) {
+	ctx, cancel := xcontext.WithDone(ctx, c.done)
+	defer cancel()
+
+	onDone := trace.QueryOnDoTx(c.config.Trace(), &ctx,
+		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).DoTx"),
+	)
+	attempts, err := doTx(ctx, c.pool, op, c.config.Trace(), opts...)
+	onDone(attempts, err)
+
+	return err
 }
 
 func New(ctx context.Context, balancer balancer, cfg *config.Config) *Client {

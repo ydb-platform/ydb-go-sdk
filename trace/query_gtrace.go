@@ -403,6 +403,41 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 		}
 	}
 	{
+		h1 := t.OnReadRow
+		h2 := x.OnReadRow
+		ret.OnReadRow = func(q QueryReadRowStartInfo) func(QueryReadRowDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryReadRowDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(q QueryReadRowDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(q)
+				}
+				if r1 != nil {
+					r1(q)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnSessionCreate
 		h2 := x.OnSessionCreate
 		ret.OnSessionCreate = func(q QuerySessionCreateStartInfo) func(QuerySessionCreateDoneInfo) {
@@ -1051,6 +1086,21 @@ func (t *Query) onDoTx(q QueryDoTxStartInfo) func(QueryDoTxDoneInfo) {
 	}
 	return res
 }
+func (t *Query) onReadRow(q QueryReadRowStartInfo) func(QueryReadRowDoneInfo) {
+	fn := t.OnReadRow
+	if fn == nil {
+		return func(QueryReadRowDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryReadRowDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Query) onSessionCreate(q QuerySessionCreateStartInfo) func(info QuerySessionCreateDoneInfo) {
 	fn := t.OnSessionCreate
 	if fn == nil {
@@ -1388,6 +1438,19 @@ func QueryOnDoTx(t *Query, c *context.Context, call call) func(attempts int, _ e
 	return func(attempts int, e error) {
 		var p QueryDoTxDoneInfo
 		p.Attempts = attempts
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func QueryOnReadRow(t *Query, c *context.Context, call call, query string) func(error) {
+	var p QueryReadRowStartInfo
+	p.Context = c
+	p.Call = call
+	p.Query = query
+	res := t.onReadRow(p)
+	return func(e error) {
+		var p QueryReadRowDoneInfo
 		p.Error = e
 		res(p)
 	}

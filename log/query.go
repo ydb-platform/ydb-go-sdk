@@ -261,6 +261,32 @@ func internalQuery(
 				}
 			}
 		},
+		OnReadRow: func(info trace.QueryReadRowStartInfo) func(trace.QueryReadRowDoneInfo) {
+			if d.Details()&trace.QueryEvents == 0 {
+				return nil
+			}
+			ctx := with(*info.Context, TRACE, "ydb", "query", "do", "tx")
+			l.Log(ctx, "start")
+			start := time.Now()
+
+			return func(info trace.QueryReadRowDoneInfo) {
+				if info.Error == nil {
+					l.Log(ctx, "done",
+						latencyField(start),
+					)
+				} else {
+					lvl := ERROR
+					if !xerrors.IsYdb(info.Error) {
+						lvl = DEBUG
+					}
+					l.Log(WithLevel(ctx, lvl), "failed",
+						latencyField(start),
+						Error(info.Error),
+						versionField(),
+					)
+				}
+			}
+		},
 		OnSessionCreate: func(info trace.QuerySessionCreateStartInfo) func(info trace.QuerySessionCreateDoneInfo) {
 			if d.Details()&trace.QuerySessionEvents == 0 {
 				return nil

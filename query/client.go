@@ -32,6 +32,11 @@ type Client interface {
 	// If op TxOperation return non nil - transaction will be rollback
 	// Warning: if context without deadline or cancellation func than DoTx can run indefinitely
 	DoTx(ctx context.Context, op TxOperation, opts ...options.DoTxOption) error
+
+	// ReadRow is a helper which read only one row from first result set in result
+	//
+	// ReadRow returns error if result contains more than one result set or more than one row
+	ReadRow(ctx context.Context, query string, opts ...options.ExecuteOption) (Row, error)
 }
 
 type (
