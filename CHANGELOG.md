@@ -1,3 +1,5 @@
+* Added `query.ReadRow` method for execute query and read only one row from result
+
 ## v3.68.1
 * Downgraded minimal version of Go to 1.20
 * Refactored internal packages by `ifshort` linter issues

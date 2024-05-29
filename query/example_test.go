@@ -11,6 +11,36 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 )
 
+func Example_readRow() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close(ctx) // cleanup resources
+	var (
+		id    int32  // required value
+		myStr string // optional value
+	)
+	// Do retry operation on errors with best effort
+	row, err := db.Query().ReadRow(ctx, // context manage exiting from Do
+		`SELECT 42 as id, "my string" as myStr`,
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	err = row.ScanNamed(
+		query.Named("id", &id),
+		query.Named("myStr", &myStr),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
+}
+
 func Example_selectWithoutParameters() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")

@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
@@ -135,8 +136,15 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 
 				return newResultSet(r.getNextResultSetPart(ctx, nextResultSetIndex), r.lastPart, r.trace), nil
 			}
+			if r.stream == nil {
+				return nil, xerrors.WithStackTrace(io.EOF)
+			}
 			part, err := nextPart(ctx, r.stream, r.trace)
 			if err != nil {
+				if xerrors.Is(err, io.EOF) {
+					r.stream = nil
+				}
+
 				return nil, xerrors.WithStackTrace(err)
 			}
 			if part.GetResultSetIndex() < r.resultSetIndex {
@@ -167,10 +175,13 @@ func (r *result) getNextResultSetPart(
 		case <-r.closed:
 			return nil, errClosedResult
 		default:
+			if r.stream == nil {
+				return nil, xerrors.WithStackTrace(io.EOF)
+			}
 			part, err := nextPart(ctx, r.stream, r.trace)
 			if err != nil {
 				if xerrors.Is(err, io.EOF) {
-					_ = r.closeOnce(ctx)
+					r.stream = nil
 				}
 
 				return nil, xerrors.WithStackTrace(err)
@@ -189,6 +200,9 @@ func (r *result) getNextResultSetPart(
 }
 
 func (r *result) NextResultSet(ctx context.Context) (_ query.ResultSet, err error) {
+	ctx, cancel := xcontext.WithDone(ctx, r.closed)
+	defer cancel()
+
 	onDone := trace.QueryOnResultNextResultSet(r.trace, &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*result).NextResultSet"),
 	)
