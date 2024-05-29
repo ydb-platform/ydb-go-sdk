@@ -13,6 +13,7 @@ func DatabaseSQL(l Logger, d trace.Detailer, opts ...Option) (t trace.DatabaseSQ
 	return internalDatabaseSQL(wrapLogger(l, opts...), d)
 }
 
+//nolint:funlen
 func internalDatabaseSQL(l *wrapper, d trace.Detailer) (t trace.DatabaseSQL) {
 	t.OnConnectorConnect = func(
 		info trace.DatabaseSQLConnectorConnectStartInfo,

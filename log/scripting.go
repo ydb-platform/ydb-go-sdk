@@ -11,6 +11,7 @@ func Scripting(l Logger, d trace.Detailer, opts ...Option) (t trace.Scripting) {
 	return internalScripting(wrapLogger(l, opts...), d)
 }
 
+//nolint:funlen
 func internalScripting(l *wrapper, d trace.Detailer) (t trace.Scripting) {
 	t.OnExecute = func(info trace.ScriptingExecuteStartInfo) func(trace.ScriptingExecuteDoneInfo) {
 		if d.Details()&trace.ScriptingEvents == 0 {

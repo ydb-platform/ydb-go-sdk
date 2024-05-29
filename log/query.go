@@ -12,7 +12,7 @@ func Query(l Logger, d trace.Detailer, opts ...Option) (t trace.Query) {
 	return internalQuery(wrapLogger(l, opts...), d)
 }
 
-//nolint:gocyclo
+//nolint:gocyclo,funlen
 func internalQuery(
 	l *wrapper, //nolint:interfacer
 	d trace.Detailer,
