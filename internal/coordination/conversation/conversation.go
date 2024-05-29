@@ -316,7 +316,7 @@ func (c *Controller) OnSend(ctx context.Context) (*Ydb_Coordination.SessionReque
 // returned value indicates if any conversation considers the incoming message part of it or the controller is closed.
 // You should call this method in the goroutine that handles gRPC stream Recv method.
 //
-//nolint:ifshort // false-positive this var is used outside if statement in switch-case up
+// false-positive this var is used outside if statement in switch-case up
 func (c *Controller) OnRecv(resp *Ydb_Coordination.SessionResponse) bool {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
