@@ -36,6 +36,8 @@ type Client interface {
 	// ReadRow is a helper which read only one row from first result set in result
 	//
 	// ReadRow returns error if result contains more than one result set or more than one row
+	//
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	ReadRow(ctx context.Context, query string, opts ...options.ExecuteOption) (Row, error)
 }
 
