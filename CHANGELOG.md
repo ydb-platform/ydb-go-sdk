@@ -1,4 +1,12 @@
-* Added experimental `query.ReadRow` method for execute query and read only one row from result
+* Added experimental method for execute query and read only one row from result:
+  * `query/Client.ReadRow`
+  * `query/Session.ReadRow`
+  * `query/Transaction.ReadRow`
+* Added experimental method for execute query and read only one result set from result:
+  * `query/Client.ReadResultSet`
+  * `query/Session.ReadResultSet`
+  * `query/Transaction.ReadResultSet`
+* Added experimental `sugar.UnmarshallRow[T]` and `sugar.UnmarshallResultSet[T]` helpers for converts YDB rows to typed objects
 
 ## v3.68.1
 * Downgraded minimal version of Go to 1.20

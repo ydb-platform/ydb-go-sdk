@@ -69,7 +69,7 @@ func (s StructScanner) ScanStruct(dst interface{}, opts ...ScanStructOption) (er
 
 	if !settings.AllowMissingColumnsFromSelect && len(missingColumns) > 0 {
 		return xerrors.WithStackTrace(
-			fmt.Errorf("%w: '%v'", errColumnsNotFoundInRow, strings.Join(missingColumns, "','")),
+			fmt.Errorf("%w: '%v'", ErrColumnsNotFoundInRow, strings.Join(missingColumns, "','")),
 		)
 	}
 
@@ -82,7 +82,7 @@ func (s StructScanner) ScanStruct(dst interface{}, opts ...ScanStructOption) (er
 		}
 		if len(missingFields) > 0 {
 			return xerrors.WithStackTrace(
-				fmt.Errorf("%w: '%v'", errFieldsNotFoundInStruct, strings.Join(missingFields, "','")),
+				fmt.Errorf("%w: '%v'", ErrFieldsNotFoundInStruct, strings.Join(missingFields, "','")),
 			)
 		}
 	}

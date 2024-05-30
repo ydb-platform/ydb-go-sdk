@@ -22,7 +22,7 @@ type row struct {
 	structScanner  scanner.StructScanner
 }
 
-func newRow(ctx context.Context, columns []*Ydb.Column, v *Ydb.Value, t *trace.Query) (*row, error) {
+func NewRow(ctx context.Context, columns []*Ydb.Column, v *Ydb.Value, t *trace.Query) (*row, error) {
 	data := scanner.Data(columns, v.GetItems())
 
 	return &row{

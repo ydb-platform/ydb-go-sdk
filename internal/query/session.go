@@ -34,6 +34,46 @@ type (
 	sessionOption func(session *Session)
 )
 
+func (s *Session) ReadRow(ctx context.Context, q string, opts ...options.ExecuteOption) (row query.Row, _ error) {
+	_, r, err := s.Execute(ctx, q, opts...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	defer func() {
+		_ = r.Close(ctx)
+	}()
+	row, err = exactlyOneRowFromResult(ctx, r)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	if err = r.Err(); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return row, nil
+}
+
+func (s *Session) ReadResultSet(ctx context.Context, q string, opts ...options.ExecuteOption) (
+	rs query.ResultSet, _ error,
+) {
+	_, r, err := s.Execute(ctx, q, opts...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	defer func() {
+		_ = r.Close(ctx)
+	}()
+	rs, err = exactlyOneResultSetFromResult(ctx, r)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	if err = r.Err(); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return rs, nil
+}
+
 func withSessionCheck(f func(*Session) bool) sessionOption {
 	return func(s *Session) {
 		s.checks = append(s.checks, f)

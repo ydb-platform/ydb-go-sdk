@@ -20,6 +20,46 @@ type transaction struct {
 	s  *Session
 }
 
+func (tx transaction) ReadRow(ctx context.Context, q string, opts ...options.TxExecuteOption) (row query.Row, _ error) {
+	r, err := tx.Execute(ctx, q, opts...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	defer func() {
+		_ = r.Close(ctx)
+	}()
+	row, err = exactlyOneRowFromResult(ctx, r)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	if err = r.Err(); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return row, nil
+}
+
+func (tx transaction) ReadResultSet(ctx context.Context, q string, opts ...options.TxExecuteOption) (
+	rs query.ResultSet, _ error,
+) {
+	r, err := tx.Execute(ctx, q, opts...)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	defer func() {
+		_ = r.Close(ctx)
+	}()
+	rs, err = exactlyOneResultSetFromResult(ctx, r)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	if err = r.Err(); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return rs, nil
+}
+
 func newTransaction(id string, s *Session) *transaction {
 	return &transaction{
 		id: id,

@@ -45,9 +45,7 @@ func Example_selectWithoutParameters() {
 	ctx := context.TODO()
 	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
 	if err != nil {
-		fmt.Printf("failed connect: %v", err)
-
-		return
+		panic(err)
 	}
 	defer db.Close(ctx) // cleanup resources
 	var (
@@ -93,9 +91,10 @@ func Example_selectWithoutParameters() {
 		query.WithIdempotent(),
 	)
 	if err != nil {
-		fmt.Printf("unexpected error: %v", err)
+		panic(err)
 	}
 	fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
+	// id=42, myStr='my string'
 }
 
 func Example_selectWithParameters() {

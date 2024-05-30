@@ -11,4 +11,5 @@ var (
 	errWrongResultSetIndex     = errors.New("critical violation of the logic - wrong result set index")
 	errMoreThanOneRow          = errors.New("unexpected more than one row in result set")
 	errMoreThanOneResultSet    = errors.New("unexpected more than one result set")
+	errNoResultSets            = errors.New("no result sets")
 )

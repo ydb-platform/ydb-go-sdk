@@ -893,3 +893,392 @@ func TestResultNextResultSet(t *testing.T) {
 		}, xtest.StopAfter(time.Second))
 	})
 }
+
+func Test_exactlyOneRowFromResult(t *testing.T) {
+	ctx := xtest.Context(t)
+	t.Run("HappyWay", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status: Ydb.StatusIds_SUCCESS,
+			TxMeta: &Ydb_Query.TransactionMeta{
+				Id: "456",
+			},
+			ResultSetIndex: 0,
+			ResultSet: &Ydb.ResultSet{
+				Columns: []*Ydb.Column{
+					{
+						Name: "a",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UINT64,
+							},
+						},
+					},
+					{
+						Name: "b",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UTF8,
+							},
+						},
+					},
+				},
+				Rows: []*Ydb.Value{
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 1,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "1",
+							},
+						}},
+					},
+				},
+			},
+		}, nil)
+		stream.EXPECT().Recv().Return(nil, io.EOF)
+		r, _, err := newResult(ctx, stream, nil, nil)
+		require.NoError(t, err)
+
+		row, err := exactlyOneRowFromResult(ctx, r)
+		require.NoError(t, err)
+		var (
+			a uint64
+			b string
+		)
+		err = row.Scan(&a, &b)
+		require.NoError(t, err)
+		require.EqualValues(t, 1, a)
+		require.EqualValues(t, "1", b)
+	})
+	t.Run("MoreThanOneRow", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status: Ydb.StatusIds_SUCCESS,
+			TxMeta: &Ydb_Query.TransactionMeta{
+				Id: "456",
+			},
+			ResultSetIndex: 0,
+			ResultSet: &Ydb.ResultSet{
+				Columns: []*Ydb.Column{
+					{
+						Name: "a",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UINT64,
+							},
+						},
+					},
+					{
+						Name: "b",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UTF8,
+							},
+						},
+					},
+				},
+				Rows: []*Ydb.Value{
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 1,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "1",
+							},
+						}},
+					},
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 2,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "2",
+							},
+						}},
+					},
+				},
+			},
+		}, nil)
+		r, _, err := newResult(ctx, stream, nil, nil)
+		require.NoError(t, err)
+
+		row, err := exactlyOneRowFromResult(ctx, r)
+		require.ErrorIs(t, err, errMoreThanOneRow)
+		require.Nil(t, row)
+	})
+	t.Run("MoreThanOneResultSet", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status: Ydb.StatusIds_SUCCESS,
+			TxMeta: &Ydb_Query.TransactionMeta{
+				Id: "456",
+			},
+			ResultSetIndex: 0,
+			ResultSet: &Ydb.ResultSet{
+				Columns: []*Ydb.Column{
+					{
+						Name: "a",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UINT64,
+							},
+						},
+					},
+					{
+						Name: "b",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UTF8,
+							},
+						},
+					},
+				},
+				Rows: []*Ydb.Value{
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 1,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "1",
+							},
+						}},
+					},
+				},
+			},
+		}, nil)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status: Ydb.StatusIds_SUCCESS,
+			TxMeta: &Ydb_Query.TransactionMeta{
+				Id: "456",
+			},
+			ResultSetIndex: 1,
+			ResultSet: &Ydb.ResultSet{
+				Columns: []*Ydb.Column{
+					{
+						Name: "a",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UINT64,
+							},
+						},
+					},
+					{
+						Name: "b",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UTF8,
+							},
+						},
+					},
+				},
+				Rows: []*Ydb.Value{
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 1,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "1",
+							},
+						}},
+					},
+				},
+			},
+		}, nil)
+		r, _, err := newResult(ctx, stream, nil, nil)
+		require.NoError(t, err)
+
+		row, err := exactlyOneRowFromResult(ctx, r)
+		require.ErrorIs(t, err, errMoreThanOneResultSet)
+		require.Nil(t, row)
+	})
+}
+
+func Test_exactlyOneResultSetFromResult(t *testing.T) {
+	ctx := xtest.Context(t)
+	t.Run("HappyWay", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status: Ydb.StatusIds_SUCCESS,
+			TxMeta: &Ydb_Query.TransactionMeta{
+				Id: "456",
+			},
+			ResultSetIndex: 0,
+			ResultSet: &Ydb.ResultSet{
+				Columns: []*Ydb.Column{
+					{
+						Name: "a",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UINT64,
+							},
+						},
+					},
+					{
+						Name: "b",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UTF8,
+							},
+						},
+					},
+				},
+				Rows: []*Ydb.Value{
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 1,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "1",
+							},
+						}},
+					},
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 2,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "2",
+							},
+						}},
+					},
+				},
+			},
+		}, nil)
+		stream.EXPECT().Recv().Return(nil, io.EOF)
+		r, _, err := newResult(ctx, stream, nil, nil)
+		require.NoError(t, err)
+
+		rs, err := exactlyOneResultSetFromResult(ctx, r)
+		require.NoError(t, err)
+		var (
+			a uint64
+			b string
+		)
+		r1, err1 := rs.NextRow(ctx)
+		require.NoError(t, err1)
+		require.NotNil(t, r1)
+		scanErr1 := r1.Scan(&a, &b)
+		require.NoError(t, scanErr1)
+		require.EqualValues(t, 1, a)
+		require.EqualValues(t, "1", b)
+		r2, err2 := rs.NextRow(ctx)
+		require.NoError(t, err2)
+		require.NotNil(t, r2)
+		scanErr2 := r2.Scan(&a, &b)
+		require.NoError(t, scanErr2)
+		require.EqualValues(t, 2, a)
+		require.EqualValues(t, "2", b)
+		r3, err3 := rs.NextRow(ctx)
+		require.ErrorIs(t, err3, io.EOF)
+		require.Nil(t, r3)
+	})
+	t.Run("MoreThanOneResultSet", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		stream := NewMockQueryService_ExecuteQueryClient(ctrl)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status: Ydb.StatusIds_SUCCESS,
+			TxMeta: &Ydb_Query.TransactionMeta{
+				Id: "456",
+			},
+			ResultSetIndex: 0,
+			ResultSet: &Ydb.ResultSet{
+				Columns: []*Ydb.Column{
+					{
+						Name: "a",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UINT64,
+							},
+						},
+					},
+					{
+						Name: "b",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UTF8,
+							},
+						},
+					},
+				},
+				Rows: []*Ydb.Value{
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 1,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "1",
+							},
+						}},
+					},
+				},
+			},
+		}, nil)
+		stream.EXPECT().Recv().Return(&Ydb_Query.ExecuteQueryResponsePart{
+			Status: Ydb.StatusIds_SUCCESS,
+			TxMeta: &Ydb_Query.TransactionMeta{
+				Id: "456",
+			},
+			ResultSetIndex: 1,
+			ResultSet: &Ydb.ResultSet{
+				Columns: []*Ydb.Column{
+					{
+						Name: "a",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UINT64,
+							},
+						},
+					},
+					{
+						Name: "b",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UTF8,
+							},
+						},
+					},
+				},
+				Rows: []*Ydb.Value{
+					{
+						Items: []*Ydb.Value{{
+							Value: &Ydb.Value_Uint64Value{
+								Uint64Value: 1,
+							},
+						}, {
+							Value: &Ydb.Value_TextValue{
+								TextValue: "1",
+							},
+						}},
+					},
+				},
+			},
+		}, nil)
+		r, _, err := newResult(ctx, stream, nil, nil)
+		require.NoError(t, err)
+
+		rs, err := exactlyOneResultSetFromResult(ctx, r)
+		require.ErrorIs(t, err, errMoreThanOneResultSet)
+		require.Nil(t, rs)
+	})
+}

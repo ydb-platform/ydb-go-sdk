@@ -28,6 +28,20 @@ type (
 		Execute(ctx context.Context, query string, opts ...options.ExecuteOption) (tx Transaction, r Result, err error)
 
 		Begin(ctx context.Context, txSettings TransactionSettings) (Transaction, error)
+
+		// ReadRow is a helper which read only one row from first result set in result
+		//
+		// ReadRow returns error if result contains more than one result set or more than one row
+		//
+		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+		ReadRow(ctx context.Context, query string, opts ...options.ExecuteOption) (Row, error)
+
+		// ReadResultSet is a helper which read all rows from first result set in result
+		//
+		// ReadRow returns error if result contains more than one result set
+		//
+		// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+		ReadResultSet(ctx context.Context, query string, opts ...options.ExecuteOption) (ResultSet, error)
 	}
 )
 

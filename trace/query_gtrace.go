@@ -438,6 +438,41 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 		}
 	}
 	{
+		h1 := t.OnReadResultSet
+		h2 := x.OnReadResultSet
+		ret.OnReadResultSet = func(q QueryReadResultSetStartInfo) func(QueryReadResultSetDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryReadResultSetDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(q QueryReadResultSetDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(q)
+				}
+				if r1 != nil {
+					r1(q)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnSessionCreate
 		h2 := x.OnSessionCreate
 		ret.OnSessionCreate = func(q QuerySessionCreateStartInfo) func(QuerySessionCreateDoneInfo) {
@@ -1101,6 +1136,21 @@ func (t *Query) onReadRow(q QueryReadRowStartInfo) func(QueryReadRowDoneInfo) {
 	}
 	return res
 }
+func (t *Query) onReadResultSet(q QueryReadResultSetStartInfo) func(QueryReadResultSetDoneInfo) {
+	fn := t.OnReadResultSet
+	if fn == nil {
+		return func(QueryReadResultSetDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryReadResultSetDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Query) onSessionCreate(q QuerySessionCreateStartInfo) func(info QuerySessionCreateDoneInfo) {
 	fn := t.OnSessionCreate
 	if fn == nil {
@@ -1451,6 +1501,19 @@ func QueryOnReadRow(t *Query, c *context.Context, call call, query string) func(
 	res := t.onReadRow(p)
 	return func(e error) {
 		var p QueryReadRowDoneInfo
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func QueryOnReadResultSet(t *Query, c *context.Context, call call, query string) func(error) {
+	var p QueryReadResultSetStartInfo
+	p.Context = c
+	p.Call = call
+	p.Query = query
+	res := t.onReadResultSet(p)
+	return func(e error) {
+		var p QueryReadResultSetDoneInfo
 		p.Error = e
 		res(p)
 	}

@@ -547,7 +547,7 @@ func TestScannerNamedNotFoundByName(t *testing.T) {
 	))
 	var s string
 	err := scanner.ScanNamed(NamedRef("b", &s))
-	require.ErrorIs(t, err, errColumnsNotFoundInRow)
+	require.ErrorIs(t, err, ErrColumnsNotFoundInRow)
 }
 
 func TestScannerNamedOrdering(t *testing.T) {
