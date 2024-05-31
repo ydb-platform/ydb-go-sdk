@@ -249,7 +249,26 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 		return err
 	}
 
-	var waiter MessageQueueAckWaiter
+	waiter, err := w.processMessagesWithLock(messagesSlice, &semaphoreWeight)
+	if err != nil {
+		return err
+	}
+
+	if !w.cfg.WaitServerAck {
+		return nil
+	}
+
+	return w.queue.Wait(ctx, waiter)
+}
+
+func (w *WriterReconnector) processMessagesWithLock(
+	messagesSlice []messageWithDataContent,
+	semaphoreWeight *int64,
+) (MessageQueueAckWaiter, error) {
+	var (
+		waiter MessageQueueAckWaiter
+		err    error
+	)
 	w.m.WithLock(func() {
 		// need set numbers and add to queue atomically
 		err = w.fillFields(messagesSlice)
@@ -264,18 +283,11 @@ func (w *WriterReconnector) Write(ctx context.Context, messages []PublicMessage)
 		}
 		if err == nil {
 			// move semaphore weight to queue
-			semaphoreWeight = 0
+			*semaphoreWeight = 0
 		}
 	})
-	if err != nil {
-		return err
-	}
 
-	if !w.cfg.WaitServerAck {
-		return nil
-	}
-
-	return w.queue.Wait(ctx, waiter)
+	return waiter, err
 }
 
 func (w *WriterReconnector) checkMessages(messages []messageWithDataContent) error {

@@ -363,10 +363,25 @@ func (c *conn) Invoke(
 		return err
 	}
 
+	err = c.handleResponse(res, &opID, &issues, traceID, useWrapping)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+func (c *conn) handleResponse(
+	res interface{},
+	opID *string,
+	issues *[]trace.Issue,
+	traceID string,
+	useWrapping bool,
+) error {
 	if o, ok := res.(response.Response); ok {
-		opID = o.GetOperation().GetId()
+		*opID = o.GetOperation().GetId()
 		for _, issue := range o.GetOperation().GetIssues() {
-			issues = append(issues, issue)
+			*issues = append(*issues, issue)
 		}
 		if useWrapping {
 			switch {
@@ -385,7 +400,7 @@ func (c *conn) Invoke(
 		}
 	}
 
-	return err
+	return nil
 }
 
 //nolint:funlen

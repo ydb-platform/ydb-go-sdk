@@ -491,6 +491,7 @@ func (r *topicStreamReaderImpl) getRestBufferBytes() int {
 	return int(r.restBufferSizeBytes.Load())
 }
 
+//nolint:funlen
 func (r *topicStreamReaderImpl) readMessagesLoop(ctx context.Context) {
 	ctx, cancel := xcontext.WithCancel(ctx)
 	defer cancel()
