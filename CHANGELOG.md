@@ -1,3 +1,4 @@
+## v3.69.0
 * Added experimental method for execute query and read only one row from result:
   * `query/Client.ReadRow`
   * `query/Session.ReadRow`
