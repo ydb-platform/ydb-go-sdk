@@ -57,12 +57,10 @@ func newResult(
 			return nil, txID, xerrors.WithStackTrace(err)
 		}
 		var (
-			interrupted = make(chan struct{})
-			closed      = make(chan struct{})
-			closeOnce   = xsync.OnceFunc(func(ctx context.Context) error {
+			closed    = make(chan struct{})
+			closeOnce = xsync.OnceFunc(func(ctx context.Context) error {
 				closeResult()
 
-				close(interrupted)
 				close(closed)
 
 				return nil
@@ -173,7 +171,7 @@ func (r *result) getNextResultSetPart(
 		}()
 		select {
 		case <-r.closed:
-			return nil, errClosedResult
+			return nil, xerrors.WithStackTrace(errClosedResult)
 		default:
 			if r.stream == nil {
 				return nil, xerrors.WithStackTrace(io.EOF)
@@ -222,4 +220,65 @@ func (r *result) Err() error {
 	default:
 		return xerrors.WithStackTrace(xerrors.Join(r.errs...))
 	}
+}
+
+func exactlyOneRowFromResult(ctx context.Context, r query.Result) (row query.Row, err error) {
+	rs, err := r.NextResultSet(ctx)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+	row, err = rs.NextRow(ctx)
+	if err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	if _, err = rs.NextRow(ctx); err == nil || !xerrors.Is(err, io.EOF) {
+		return nil, xerrors.WithStackTrace(errMoreThanOneRow)
+	}
+
+	if _, err = r.NextResultSet(ctx); err == nil || !xerrors.Is(err, io.EOF) {
+		return nil, xerrors.WithStackTrace(errMoreThanOneResultSet)
+	}
+
+	if err = r.Err(); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return row, nil
+}
+
+func exactlyOneResultSetFromResult(ctx context.Context, r query.Result) (rs query.ResultSet, err error) {
+	var rows []query.Row
+	rs, err = r.NextResultSet(ctx)
+	if err != nil {
+		if xerrors.Is(err, io.EOF) {
+			return nil, xerrors.WithStackTrace(errNoResultSets)
+		}
+
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	var row query.Row
+	for {
+		row, err = rs.NextRow(ctx)
+		if err != nil {
+			if xerrors.Is(err, io.EOF) {
+				break
+			}
+
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		rows = append(rows, row)
+	}
+
+	if _, err = r.NextResultSet(ctx); err == nil || !xerrors.Is(err, io.EOF) {
+		return nil, xerrors.WithStackTrace(errMoreThanOneResultSet)
+	}
+
+	if err = r.Err(); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return NewMaterializedResultSet(rows), nil
 }

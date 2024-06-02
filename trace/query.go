@@ -48,6 +48,8 @@ type (
 		OnDoTx func(QueryDoTxStartInfo) func(QueryDoTxDoneInfo)
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnReadRow func(QueryReadRowStartInfo) func(QueryReadRowDoneInfo)
+		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+		OnReadResultSet func(QueryReadResultSetStartInfo) func(QueryReadResultSetDoneInfo)
 
 		// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 		OnSessionCreate func(QuerySessionCreateStartInfo) func(info QuerySessionCreateDoneInfo)
@@ -111,6 +113,21 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryReadRowDoneInfo struct {
+		Error error
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	QueryReadResultSetStartInfo struct {
+		// Context make available context in trace callback function.
+		// Pointer to context provide replacement of context in trace callback function.
+		// Warning: concurrent access to pointer on client side must be excluded.
+		// Safe replacement of context are provided only inside callback function
+		Context *context.Context
+		Call    call
+
+		Query string
+	}
+	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+	QueryReadResultSetDoneInfo struct {
 		Error error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals

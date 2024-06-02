@@ -588,7 +588,7 @@ func TestStructNotFoundColumns(t *testing.T) {
 		C string
 	}
 	err := scanner.ScanStruct(&row)
-	require.ErrorIs(t, err, errColumnsNotFoundInRow)
+	require.ErrorIs(t, err, ErrColumnsNotFoundInRow)
 }
 
 func TestStructWithAllowMissingColumnsFromSelect(t *testing.T) {
@@ -675,7 +675,7 @@ func TestStructNotFoundFields(t *testing.T) {
 		A string
 	}
 	err := scanner.ScanStruct(&row)
-	require.ErrorIs(t, err, errFieldsNotFoundInStruct)
+	require.ErrorIs(t, err, ErrFieldsNotFoundInStruct)
 }
 
 func TestStructWithAllowMissingFieldsInStruct(t *testing.T) {

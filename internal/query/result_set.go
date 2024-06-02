@@ -16,14 +16,38 @@ import (
 
 var _ query.ResultSet = (*resultSet)(nil)
 
-type resultSet struct {
-	index       int64
-	recv        func() (*Ydb_Query.ExecuteQueryResponsePart, error)
-	columns     []*Ydb.Column
-	currentPart *Ydb_Query.ExecuteQueryResponsePart
-	rowIndex    int
-	trace       *trace.Query
-	done        chan struct{}
+type (
+	materializedResultSet struct {
+		rows []query.Row
+		idx  int
+	}
+	resultSet struct {
+		index       int64
+		recv        func() (*Ydb_Query.ExecuteQueryResponsePart, error)
+		columns     []*Ydb.Column
+		currentPart *Ydb_Query.ExecuteQueryResponsePart
+		rowIndex    int
+		trace       *trace.Query
+		done        chan struct{}
+	}
+)
+
+func (rs *materializedResultSet) NextRow(ctx context.Context) (query.Row, error) {
+	if rs.idx == len(rs.rows) {
+		return nil, xerrors.WithStackTrace(io.EOF)
+	}
+
+	defer func() {
+		rs.idx++
+	}()
+
+	return rs.rows[rs.idx], nil
+}
+
+func NewMaterializedResultSet(rows []query.Row) *materializedResultSet {
+	return &materializedResultSet{
+		rows: rows,
+	}
 }
 
 func newResultSet(
@@ -82,7 +106,7 @@ func (rs *resultSet) nextRow(ctx context.Context) (*row, error) {
 			}
 
 			if rs.rowIndex < len(rs.currentPart.GetResultSet().GetRows()) {
-				return newRow(ctx, rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex], rs.trace)
+				return NewRow(ctx, rs.columns, rs.currentPart.GetResultSet().GetRows()[rs.rowIndex], rs.trace)
 			}
 		}
 	}

@@ -28,7 +28,7 @@ func (s data) seekByName(name string) (value.Value, error) {
 		}
 	}
 
-	return nil, xerrors.WithStackTrace(fmt.Errorf("'%s': %w", name, errColumnsNotFoundInRow))
+	return nil, xerrors.WithStackTrace(fmt.Errorf("'%s': %w", name, ErrColumnsNotFoundInRow))
 }
 
 func (s data) seekByIndex(idx int) value.Value {
