@@ -299,6 +299,7 @@ func (c *conn) Close(ctx context.Context) (err error) {
 	return c.wrapError(err)
 }
 
+//nolint:funlen
 func (c *conn) Invoke(
 	ctx context.Context,
 	method string,

@@ -374,7 +374,6 @@ func (w *WriterReconnector) close(ctx context.Context, reason error) (resErr err
 }
 
 func (w *WriterReconnector) connectionLoop(ctx context.Context) {
-	doneCtx := ctx.Done()
 	attempt := 0
 
 	createStreamContext := func() (context.Context, context.CancelFunc) {
@@ -409,22 +408,7 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 		prevAttemptTime = now
 
 		if reconnectReason != nil {
-			retryDuration := w.cfg.clock.Since(startOfRetries)
-			if backoff, retry := topic.CheckRetryMode(reconnectReason, w.retrySettings, retryDuration); retry {
-				delay := backoff.Delay(attempt)
-				delayTimer := w.cfg.clock.NewTimer(delay)
-				select {
-				case <-doneCtx:
-					delayTimer.Stop()
-
-					return
-				case <-delayTimer.Chan():
-					delayTimer.Stop() // no really need, stop for common style only
-					// pass
-				}
-			} else {
-				_ = w.close(ctx, fmt.Errorf("%w, was retried (%v)", reconnectReason, retryDuration))
-
+			if w.handleReconnectRetry(ctx, reconnectReason, attempt, startOfRetries) {
 				return
 			}
 		}
@@ -438,6 +422,34 @@ func (w *WriterReconnector) connectionLoop(ctx context.Context) {
 			reconnectReason = err
 		}
 	}
+}
+
+func (w *WriterReconnector) handleReconnectRetry(
+	ctx context.Context,
+	reconnectReason error,
+	attempt int,
+	startOfRetries time.Time,
+) bool {
+	retryDuration := w.cfg.clock.Since(startOfRetries)
+	if backoff, retry := topic.CheckRetryMode(reconnectReason, w.retrySettings, retryDuration); retry {
+		delay := backoff.Delay(attempt)
+		delayTimer := w.cfg.clock.NewTimer(delay)
+		select {
+		case <-ctx.Done():
+			delayTimer.Stop()
+
+			return true
+		case <-delayTimer.Chan():
+			delayTimer.Stop() // no really need, stop for common style only
+			// pass
+		}
+	} else {
+		_ = w.close(ctx, fmt.Errorf("%w, was retried (%v)", reconnectReason, retryDuration))
+
+		return true
+	}
+
+	return false
 }
 
 func (w *WriterReconnector) startWriteStream(ctx, streamCtx context.Context, attempt int) (
