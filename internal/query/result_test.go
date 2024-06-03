@@ -894,7 +894,7 @@ func TestResultNextResultSet(t *testing.T) {
 	})
 }
 
-func Test_exactlyOneRowFromResult(t *testing.T) {
+func TestExactlyOneRowFromResult(t *testing.T) {
 	ctx := xtest.Context(t)
 	t.Run("HappyWay", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
@@ -1107,7 +1107,7 @@ func Test_exactlyOneRowFromResult(t *testing.T) {
 	})
 }
 
-func Test_exactlyOneResultSetFromResult(t *testing.T) {
+func TestExactlyOneResultSetFromResult(t *testing.T) {
 	ctx := xtest.Context(t)
 	t.Run("HappyWay", func(t *testing.T) {
 		ctrl := gomock.NewController(t)

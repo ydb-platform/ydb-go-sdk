@@ -1,3 +1,5 @@
+* Added experimental method `query/Client.Execute` for execute query and read materialized result
+
 ## v3.69.0
 * Added experimental method for execute query and read only one row from result:
   * `query/Client.ReadRow`

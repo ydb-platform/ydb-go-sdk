@@ -33,12 +33,14 @@ type Client interface {
 	// Warning: if context without deadline or cancellation func than DoTx can run indefinitely
 	DoTx(ctx context.Context, op TxOperation, opts ...options.DoTxOption) error
 
-	// ReadRow is a helper which read only one row from first result set in result
+	// Execute is a simple executor with retries
 	//
-	// ReadRow returns error if result contains more than one result set or more than one row
+	// Execute returns materialized result
+	//
+	// Warning: large result can lead to "OOM Killed" problem
 	//
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-	ReadRow(ctx context.Context, query string, opts ...options.ExecuteOption) (Row, error)
+	Execute(ctx context.Context, query string, opts ...options.ExecuteOption) (Result, error)
 
 	// ReadResultSet is a helper which read all rows from first result set in result
 	//
@@ -46,6 +48,13 @@ type Client interface {
 	//
 	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 	ReadResultSet(ctx context.Context, query string, opts ...options.ExecuteOption) (ResultSet, error)
+
+	// ReadRow is a helper which read only one row from first result set in result
+	//
+	// ReadRow returns error if result contains more than one result set or more than one row
+	//
+	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+	ReadRow(ctx context.Context, query string, opts ...options.ExecuteOption) (Row, error)
 }
 
 type (

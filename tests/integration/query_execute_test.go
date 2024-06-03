@@ -44,6 +44,39 @@ func TestQueryExecute(t *testing.T) {
 		),
 	)
 	require.NoError(t, err)
+	t.Run("Execute", func(t *testing.T) {
+		var (
+			p1 string
+			p2 uint64
+			p3 time.Duration
+		)
+		res, err := db.Query().Execute(ctx, `
+				DECLARE $p1 AS Text;
+				DECLARE $p2 AS Uint64;
+				DECLARE $p3 AS Interval;
+				SELECT $p1, $p2, $p3;
+				`,
+			query.WithParameters(
+				ydb.ParamsBuilder().
+					Param("$p1").Text("test").
+					Param("$p2").Uint64(100500000000).
+					Param("$p3").Interval(time.Duration(100500000000)).
+					Build(),
+			),
+			query.WithSyntax(query.SyntaxYQL),
+		)
+		require.NoError(t, err)
+		rs, err := res.NextResultSet(ctx)
+		require.NoError(t, err)
+		row, err := rs.NextRow(ctx)
+		require.NoError(t, err)
+		err = row.Scan(&p1, &p2, &p3)
+		require.NoError(t, err)
+		require.NoError(t, res.Err())
+		require.EqualValues(t, "test", p1)
+		require.EqualValues(t, 100500000000, p2)
+		require.EqualValues(t, time.Duration(100500000000), p3)
+	})
 	t.Run("Stats", func(t *testing.T) {
 		s, err := query.Stats(db.Query())
 		require.NoError(t, err)

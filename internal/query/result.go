@@ -16,16 +16,51 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var _ query.Result = (*result)(nil)
+var (
+	_ query.Result = (*result)(nil)
+	_ query.Result = (*materializedResult)(nil)
+)
 
-type result struct {
-	stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
-	closeOnce      func(ctx context.Context) error
-	lastPart       *Ydb_Query.ExecuteQueryResponsePart
-	resultSetIndex int64
-	errs           []error
-	closed         chan struct{}
-	trace          *trace.Query
+type (
+	materializedResult struct {
+		resultSets []query.ResultSet
+		idx        int
+	}
+	result struct {
+		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
+		closeOnce      func(ctx context.Context) error
+		lastPart       *Ydb_Query.ExecuteQueryResponsePart
+		resultSetIndex int64
+		errs           []error
+		closed         chan struct{}
+		trace          *trace.Query
+	}
+)
+
+func (r *materializedResult) Close(ctx context.Context) error {
+	return nil
+}
+
+func (r *materializedResult) NextResultSet(ctx context.Context) (query.ResultSet, error) {
+	if r.idx == len(r.resultSets) {
+		return nil, xerrors.WithStackTrace(io.EOF)
+	}
+
+	defer func() {
+		r.idx++
+	}()
+
+	return r.resultSets[r.idx], nil
+}
+
+func (r *materializedResult) Err() error {
+	return nil
+}
+
+func newMaterializedResult(resultSets []query.ResultSet) *materializedResult {
+	return &materializedResult{
+		resultSets: resultSets,
+	}
 }
 
 func newResult(
@@ -281,4 +316,37 @@ func exactlyOneResultSetFromResult(ctx context.Context, r query.Result) (rs quer
 	}
 
 	return NewMaterializedResultSet(rows), nil
+}
+
+func resultToMaterializedResult(ctx context.Context, r query.Result) (query.Result, error) {
+	var resultSets []query.ResultSet
+
+	for {
+		rs, err := r.NextResultSet(ctx)
+		if err != nil {
+			if xerrors.Is(err, io.EOF) {
+				break
+			}
+
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		var rows []query.Row
+		for {
+			row, err := rs.NextRow(ctx)
+			if err != nil {
+				if xerrors.Is(err, io.EOF) {
+					break
+				}
+
+				return nil, xerrors.WithStackTrace(err)
+			}
+
+			rows = append(rows, row)
+		}
+
+		resultSets = append(resultSets, NewMaterializedResultSet(rows))
+	}
+
+	return newMaterializedResult(resultSets), nil
 }
