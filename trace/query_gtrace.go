@@ -403,6 +403,41 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 		}
 	}
 	{
+		h1 := t.OnExecute
+		h2 := x.OnExecute
+		ret.OnExecute = func(q QueryExecuteStartInfo) func(QueryExecuteDoneInfo) {
+			if options.panicCallback != nil {
+				defer func() {
+					if e := recover(); e != nil {
+						options.panicCallback(e)
+					}
+				}()
+			}
+			var r, r1 func(QueryExecuteDoneInfo)
+			if h1 != nil {
+				r = h1(q)
+			}
+			if h2 != nil {
+				r1 = h2(q)
+			}
+			return func(q QueryExecuteDoneInfo) {
+				if options.panicCallback != nil {
+					defer func() {
+						if e := recover(); e != nil {
+							options.panicCallback(e)
+						}
+					}()
+				}
+				if r != nil {
+					r(q)
+				}
+				if r1 != nil {
+					r1(q)
+				}
+			}
+		}
+	}
+	{
 		h1 := t.OnReadRow
 		h2 := x.OnReadRow
 		ret.OnReadRow = func(q QueryReadRowStartInfo) func(QueryReadRowDoneInfo) {
@@ -1121,6 +1156,21 @@ func (t *Query) onDoTx(q QueryDoTxStartInfo) func(QueryDoTxDoneInfo) {
 	}
 	return res
 }
+func (t *Query) onExecute(q QueryExecuteStartInfo) func(QueryExecuteDoneInfo) {
+	fn := t.OnExecute
+	if fn == nil {
+		return func(QueryExecuteDoneInfo) {
+			return
+		}
+	}
+	res := fn(q)
+	if res == nil {
+		return func(QueryExecuteDoneInfo) {
+			return
+		}
+	}
+	return res
+}
 func (t *Query) onReadRow(q QueryReadRowStartInfo) func(QueryReadRowDoneInfo) {
 	fn := t.OnReadRow
 	if fn == nil {
@@ -1488,6 +1538,19 @@ func QueryOnDoTx(t *Query, c *context.Context, call call) func(attempts int, _ e
 	return func(attempts int, e error) {
 		var p QueryDoTxDoneInfo
 		p.Attempts = attempts
+		p.Error = e
+		res(p)
+	}
+}
+// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
+func QueryOnExecute(t *Query, c *context.Context, call call, query string) func(error) {
+	var p QueryExecuteStartInfo
+	p.Context = c
+	p.Call = call
+	p.Query = query
+	res := t.onExecute(p)
+	return func(e error) {
+		var p QueryExecuteDoneInfo
 		p.Error = e
 		res(p)
 	}

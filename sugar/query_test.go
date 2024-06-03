@@ -24,11 +24,21 @@ type mockReadResultSetClient struct {
 	rs query.ResultSet
 }
 
-func (c *mockReadResultSetClient) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) error {
+func (c *mockReadResultSetClient) Execute(
+	ctx context.Context, query string, opts ...options.ExecuteOption,
+) (query.Result, error) {
 	panic("unexpected call")
 }
 
-func (c *mockReadResultSetClient) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) error {
+func (c *mockReadResultSetClient) Do(
+	ctx context.Context, op query.Operation, opts ...options.DoOption,
+) error {
+	panic("unexpected call")
+}
+
+func (c *mockReadResultSetClient) DoTx(
+	ctx context.Context, op query.TxOperation, opts ...options.DoTxOption,
+) error {
 	panic("unexpected call")
 }
 
@@ -48,11 +58,21 @@ type mockReadRowClient struct {
 	row query.Row
 }
 
-func (c *mockReadRowClient) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) error {
+func (c *mockReadRowClient) Execute(
+	ctx context.Context, query string, opts ...options.ExecuteOption,
+) (query.Result, error) {
 	panic("unexpected call")
 }
 
-func (c *mockReadRowClient) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) error {
+func (c *mockReadRowClient) Do(
+	ctx context.Context, op query.Operation, opts ...options.DoOption,
+) error {
+	panic("unexpected call")
+}
+
+func (c *mockReadRowClient) DoTx(
+	ctx context.Context, op query.TxOperation, opts ...options.DoTxOption,
+) error {
 	panic("unexpected call")
 }
 
