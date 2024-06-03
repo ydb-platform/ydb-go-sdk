@@ -291,7 +291,7 @@ func internalQuery(
 			if d.Details()&trace.QueryEvents == 0 {
 				return nil
 			}
-			ctx := with(*info.Context, TRACE, "ydb", "query", "read", "rows")
+			ctx := with(*info.Context, TRACE, "ydb", "query", "read", "result", "set")
 			l.Log(ctx, "start")
 			start := time.Now()
 
