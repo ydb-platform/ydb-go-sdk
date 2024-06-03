@@ -109,6 +109,8 @@ func (s *session) updateCancelStream(cancel context.CancelFunc) {
 }
 
 // Create a new gRPC stream using an independent context.
+//
+//nolint:funlen
 func (s *session) newStream(
 	streamCtx context.Context,
 	cancelStream context.CancelFunc,
@@ -197,6 +199,7 @@ func (s *session) newStream(
 	}
 }
 
+//nolint:funlen
 func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 	defer s.client.sessionClosed(s)
 	defer close(s.sessionClosedChan)
@@ -363,6 +366,7 @@ func (s *session) mainLoop(path string, sessionStartedChan chan struct{}) {
 	}
 }
 
+//nolint:funlen
 func (s *session) receiveLoop(
 	wg *sync.WaitGroup,
 	sessionClient Ydb_Coordination_V1.CoordinationService_SessionClient,
@@ -441,7 +445,7 @@ func (s *session) receiveLoop(
 	}
 }
 
-//nolint:revive
+//nolint:revive,funlen
 func (s *session) sendLoop(
 	wg *sync.WaitGroup,
 	sessionClient Ydb_Coordination_V1.CoordinationService_SessionClient,
@@ -765,6 +769,7 @@ func convertSemaphoreSession(
 	return &result
 }
 
+//nolint:funlen
 func (s *session) AcquireSemaphore(
 	ctx context.Context,
 	name string,
