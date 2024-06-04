@@ -108,6 +108,11 @@ type createSessionOptions struct {
 	onClose  []func(s *session)
 }
 
+type sessionResult struct {
+	s   *session
+	err error
+}
+
 type createSessionOption func(o *createSessionOptions)
 
 func withCreateSessionOnCreate(onCreate func(s *session)) createSessionOption {
@@ -123,6 +128,23 @@ func withCreateSessionOnClose(onClose func(s *session)) createSessionOption {
 }
 
 func (c *Client) createSession(ctx context.Context, opts ...createSessionOption) (s *session, err error) {
+	options := gatherOptions(opts)
+
+	defer func() {
+		if s != nil {
+			applyOptions(s, options)
+		}
+	}()
+
+	resultCh := make(chan sessionResult)
+	if err := c.initiateSessionCreation(ctx, resultCh); err != nil {
+		return nil, xerrors.WithStackTrace(err)
+	}
+
+	return c.waitForSessionCreation(ctx, resultCh)
+}
+
+func gatherOptions(opts []createSessionOption) createSessionOptions {
 	options := createSessionOptions{}
 	for _, opt := range opts {
 		if opt != nil {
@@ -130,29 +152,23 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 		}
 	}
 
-	defer func() {
-		if s == nil {
-			return
-		}
-		for _, onCreate := range options.onCreate {
-			onCreate(s)
-		}
-		s.onClose = append(s.onClose, options.onClose...)
-	}()
+	return options
+}
 
-	type result struct {
-		s   *session
-		err error
+func applyOptions(s *session, options createSessionOptions) {
+	for _, onCreate := range options.onCreate {
+		onCreate(s)
 	}
+	s.onClose = append(s.onClose, options.onClose...)
+}
 
-	ch := make(chan result)
-
+func (c *Client) initiateSessionCreation(ctx context.Context, resultCh chan<- sessionResult) error {
 	select {
 	case <-c.done:
-		return nil, xerrors.WithStackTrace(errClosedClient)
+		return errClosedClient
 
 	case <-ctx.Done():
-		return nil, xerrors.WithStackTrace(ctx.Err())
+		return ctx.Err()
 
 	default:
 		c.mu.WithLock(func() {
@@ -160,56 +176,50 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 				return
 			}
 			c.wg.Add(1)
-			go func() {
-				defer c.wg.Done()
-
-				var (
-					s   *session
-					err error
-				)
-
-				createSessionCtx := xcontext.ValueOnly(ctx)
-
-				if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
-					var cancel context.CancelFunc
-					createSessionCtx, cancel = xcontext.WithTimeout(createSessionCtx, timeout)
-					defer cancel()
-				}
-
-				closeSession := func(s *session) {
-					if s == nil {
-						return
-					}
-
-					closeSessionCtx := xcontext.ValueOnly(ctx)
-
-					if timeout := c.config.DeleteTimeout(); timeout > 0 {
-						var cancel context.CancelFunc
-						createSessionCtx, cancel = xcontext.WithTimeout(closeSessionCtx, timeout)
-						defer cancel()
-					}
-
-					_ = s.Close(closeSessionCtx)
-				}
-
-				s, err = c.build(createSessionCtx)
-
-				select {
-				case ch <- result{
-					s:   s,
-					err: err,
-				}: // nop
-
-				case <-c.done:
-					closeSession(s)
-
-				case <-ctx.Done():
-					closeSession(s)
-				}
-			}()
+			go c.createSessionWorker(ctx, resultCh)
 		})
+
+		return nil
+	}
+}
+
+func (c *Client) createSessionWorker(ctx context.Context, resultCh chan<- sessionResult) {
+	defer c.wg.Done()
+
+	createSessionCtx := xcontext.ValueOnly(ctx)
+	if timeout := c.config.CreateSessionTimeout(); timeout > 0 {
+		var cancel context.CancelFunc
+		createSessionCtx, cancel = xcontext.WithTimeout(createSessionCtx, timeout)
+		defer cancel()
 	}
 
+	s, err := c.build(createSessionCtx)
+
+	select {
+	case resultCh <- sessionResult{s: s, err: err}:
+	case <-c.done:
+		c.closeSession(ctx, s)
+	case <-ctx.Done():
+		c.closeSession(ctx, s)
+	}
+}
+
+func (c *Client) closeSession(ctx context.Context, s *session) {
+	if s == nil {
+		return
+	}
+
+	closeSessionCtx := xcontext.ValueOnly(ctx)
+	if timeout := c.config.DeleteTimeout(); timeout > 0 {
+		var cancel context.CancelFunc
+		closeSessionCtx, cancel = xcontext.WithTimeout(closeSessionCtx, timeout)
+		defer cancel()
+	}
+
+	_ = s.Close(closeSessionCtx)
+}
+
+func (c *Client) waitForSessionCreation(ctx context.Context, resultCh <-chan sessionResult) (*session, error) {
 	select {
 	case <-c.done:
 		return nil, xerrors.WithStackTrace(errClosedClient)
@@ -217,7 +227,7 @@ func (c *Client) createSession(ctx context.Context, opts ...createSessionOption)
 	case <-ctx.Done():
 		return nil, xerrors.WithStackTrace(ctx.Err())
 
-	case r := <-ch:
+	case r := <-resultCh:
 		if r.err != nil {
 			return nil, xerrors.WithStackTrace(r.err)
 		}
