@@ -35,8 +35,10 @@ func Parse(dsn string) (info parsedInfo, err error) {
 	info.Options = append(info.Options,
 		config.WithSecure(uri.Scheme != insecureSchema),
 		config.WithEndpoint(uri.Host),
-		config.WithDatabase(uri.Path),
 	)
+	if uri.Path != "" {
+		info.Options = append(info.Options, config.WithDatabase(uri.Path))
+	}
 	if uri.User != nil {
 		password, _ := uri.User.Password()
 		info.UserInfo = &UserInfo{
