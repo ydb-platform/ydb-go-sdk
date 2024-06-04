@@ -1,3 +1,4 @@
+## v3.70.0
 * Fixed `config.WithDatabase` behaviour with empty database in DSN string
 * Added experimental method `query/Client.Execute` for execute query and read materialized result
 
