@@ -9,6 +9,7 @@ import (
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -21,8 +22,10 @@ var (
 
 type (
 	materializedResultSet struct {
-		rows []query.Row
-		idx  int
+		columnNames []string
+		columnTypes []types.Type
+		rows        []query.Row
+		idx         int
 	}
 	resultSet struct {
 		index       int64
@@ -34,6 +37,32 @@ type (
 		done        chan struct{}
 	}
 )
+
+func (rs *materializedResultSet) Columns() (columnNames []string) {
+	return rs.columnNames
+}
+
+func (rs *materializedResultSet) ColumnTypes() []types.Type {
+	return rs.columnTypes
+}
+
+func (rs *resultSet) ColumnTypes() (columnTypes []types.Type) {
+	columnTypes = make([]types.Type, len(rs.columns))
+	for i := range rs.columns {
+		columnTypes[i] = types.TypeFromYDB(rs.columns[i].GetType())
+	}
+
+	return columnTypes
+}
+
+func (rs *resultSet) Columns() (columnNames []string) {
+	columnNames = make([]string, len(rs.columns))
+	for i := range rs.columns {
+		columnNames[i] = rs.columns[i].GetName()
+	}
+
+	return columnNames
+}
 
 func (rs *materializedResultSet) NextRow(ctx context.Context) (query.Row, error) {
 	if rs.idx == len(rs.rows) {
@@ -47,9 +76,15 @@ func (rs *materializedResultSet) NextRow(ctx context.Context) (query.Row, error)
 	return rs.rows[rs.idx], nil
 }
 
-func NewMaterializedResultSet(rows []query.Row) *materializedResultSet {
+func NewMaterializedResultSet(
+	columnNames []string,
+	columnTypes []types.Type,
+	rows []query.Row,
+) *materializedResultSet {
 	return &materializedResultSet{
-		rows: rows,
+		columnNames: columnNames,
+		columnTypes: columnTypes,
+		rows:        rows,
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/scanner"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 )
 
 type (
@@ -15,6 +16,8 @@ type (
 		Err() error
 	}
 	ResultSet interface {
+		Columns() []string
+		ColumnTypes() []types.Type
 		NextRow(ctx context.Context) (Row, error)
 	}
 	Row interface {

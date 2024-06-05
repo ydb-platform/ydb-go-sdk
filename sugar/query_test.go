@@ -140,78 +140,82 @@ func TestUnmarshallResultSet(t *testing.T) {
 		ID  uint64 `sql:"id"`
 		Str string `sql:"myStr"`
 	}
-	v, err := sugar.UnmarshallResultSet[myStruct](internalQuery.NewMaterializedResultSet([]query.Row{
-		func() query.Row {
-			row, err := internalQuery.NewRow(ctx, []*Ydb.Column{
-				{
-					Name: "id",
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_UINT64,
+	v, err := sugar.UnmarshallResultSet[myStruct](internalQuery.NewMaterializedResultSet(
+		nil,
+		nil,
+		[]query.Row{
+			func() query.Row {
+				row, err := internalQuery.NewRow(ctx, []*Ydb.Column{
+					{
+						Name: "id",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UINT64,
+							},
 						},
 					},
-				},
-				{
-					Name: "myStr",
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_UTF8,
+					{
+						Name: "myStr",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UTF8,
+							},
 						},
 					},
-				},
-			}, &Ydb.Value{
-				Items: []*Ydb.Value{{
-					Value: &Ydb.Value_Uint64Value{
-						Uint64Value: 123,
-					},
-				}, {
-					Value: &Ydb.Value_TextValue{
-						TextValue: "my string 1",
-					},
-				}},
-			}, &trace.Query{})
-			if err != nil {
-				panic(err)
-			}
+				}, &Ydb.Value{
+					Items: []*Ydb.Value{{
+						Value: &Ydb.Value_Uint64Value{
+							Uint64Value: 123,
+						},
+					}, {
+						Value: &Ydb.Value_TextValue{
+							TextValue: "my string 1",
+						},
+					}},
+				}, &trace.Query{})
+				if err != nil {
+					panic(err)
+				}
 
-			return row
-		}(),
-		func() query.Row {
-			row, err := internalQuery.NewRow(ctx, []*Ydb.Column{
-				{
-					Name: "id",
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_UINT64,
+				return row
+			}(),
+			func() query.Row {
+				row, err := internalQuery.NewRow(ctx, []*Ydb.Column{
+					{
+						Name: "id",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UINT64,
+							},
 						},
 					},
-				},
-				{
-					Name: "myStr",
-					Type: &Ydb.Type{
-						Type: &Ydb.Type_TypeId{
-							TypeId: Ydb.Type_UTF8,
+					{
+						Name: "myStr",
+						Type: &Ydb.Type{
+							Type: &Ydb.Type_TypeId{
+								TypeId: Ydb.Type_UTF8,
+							},
 						},
 					},
-				},
-			}, &Ydb.Value{
-				Items: []*Ydb.Value{{
-					Value: &Ydb.Value_Uint64Value{
-						Uint64Value: 456,
-					},
-				}, {
-					Value: &Ydb.Value_TextValue{
-						TextValue: "my string 2",
-					},
-				}},
-			}, &trace.Query{})
-			if err != nil {
-				panic(err)
-			}
+				}, &Ydb.Value{
+					Items: []*Ydb.Value{{
+						Value: &Ydb.Value_Uint64Value{
+							Uint64Value: 456,
+						},
+					}, {
+						Value: &Ydb.Value_TextValue{
+							TextValue: "my string 2",
+						},
+					}},
+				}, &trace.Query{})
+				if err != nil {
+					panic(err)
+				}
 
-			return row
-		}(),
-	}))
+				return row
+			}(),
+		},
+	))
 	require.NoError(t, err)
 	require.Len(t, v, 2)
 	require.EqualValues(t, 123, v[0].ID)
