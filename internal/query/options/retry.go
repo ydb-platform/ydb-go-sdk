@@ -31,7 +31,7 @@ type (
 	}
 
 	doTxSettings struct {
-		doOpts     []DoOption
+		doSettings
 		txSettings tx.Settings
 	}
 
@@ -52,10 +52,6 @@ func (s *doSettings) RetryOpts() []retry.Option {
 	return s.retryOpts
 }
 
-func (s *doTxSettings) DoOpts() []DoOption {
-	return s.doOpts
-}
-
 func (s *doTxSettings) TxSettings() tx.Settings {
 	return s.txSettings
 }
@@ -65,7 +61,7 @@ func (opt traceOption) applyDoOption(s *doSettings) {
 }
 
 func (opt traceOption) applyDoTxOption(s *doTxSettings) {
-	s.doOpts = append(s.doOpts, opt)
+	opt.applyDoOption(&s.doSettings)
 }
 
 func (opts retryOptionsOption) applyDoOption(s *doSettings) {
@@ -73,7 +69,7 @@ func (opts retryOptionsOption) applyDoOption(s *doSettings) {
 }
 
 func (opts retryOptionsOption) applyDoTxOption(s *doTxSettings) {
-	s.doOpts = append(s.doOpts, opts)
+	opts.applyDoOption(&s.doSettings)
 }
 
 func (opt doTxSettingsOption) applyDoTxOption(opts *doTxSettings) {
@@ -117,8 +113,8 @@ func ParseDoOpts(t *trace.Query, opts ...DoOption) (s *doSettings) {
 func ParseDoTxOpts(t *trace.Query, opts ...DoTxOption) (s *doTxSettings) {
 	s = &doTxSettings{
 		txSettings: tx.NewSettings(tx.WithDefaultTxMode()),
-		doOpts: []DoOption{
-			WithTrace(t),
+		doSettings: doSettings{
+			trace: t,
 		},
 	}
 

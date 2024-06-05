@@ -84,54 +84,39 @@ func do(
 	return nil
 }
 
-func doWithAttempts(
-	ctx context.Context,
-	pool *pool.Pool[*Session, Session],
-	op query.Operation,
-	t *trace.Query,
-	opts ...options.DoOption,
-) (attempts int, finalErr error) {
-	doOpts := options.ParseDoOpts(t, opts...)
-
-	err := do(ctx, pool, op,
-		append(doOpts.RetryOpts(), retry.WithTrace(&trace.Retry{
-			OnRetry: func(info trace.RetryLoopStartInfo) func(trace.RetryLoopDoneInfo) {
-				return func(info trace.RetryLoopDoneInfo) {
-					attempts = info.Attempts
-				}
-			},
-		}))...,
-	)
-	if err != nil {
-		return attempts, xerrors.WithStackTrace(err)
-	}
-
-	return attempts, nil
-}
-
-func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) error {
+func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoOption) (finalErr error) {
 	ctx, cancel := xcontext.WithDone(ctx, c.done)
 	defer cancel()
 
-	onDone := trace.QueryOnDo(c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).Do"),
+	var (
+		onDone = trace.QueryOnDo(c.config.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).Do"),
+		)
+		attempts = 0
 	)
-	attempts, err := doWithAttempts(ctx, c.pool, op, c.config.Trace(), opts...)
-	onDone(attempts, err)
+	defer func() {
+		onDone(attempts, finalErr)
+	}()
+
+	err := do(ctx, c.pool, func(ctx context.Context, s query.Session) error {
+		attempts++
+
+		return op(ctx, s)
+	}, options.ParseDoOpts(c.config.Trace(), opts...).RetryOpts()...)
 
 	return err
 }
 
-func doTxWithAttempts(
+func doTx(
 	ctx context.Context,
 	pool *pool.Pool[*Session, Session],
 	op query.TxOperation,
 	t *trace.Query,
 	opts ...options.DoTxOption,
-) (attempts int, err error) {
+) (finalErr error) {
 	doTxOpts := options.ParseDoTxOpts(t, opts...)
 
-	attempts, err = doWithAttempts(ctx, pool, func(ctx context.Context, s query.Session) (err error) {
+	err := do(ctx, pool, func(ctx context.Context, s query.Session) (err error) {
 		tx, err := s.Begin(ctx, doTxOpts.TxSettings())
 		if err != nil {
 			return xerrors.WithStackTrace(err)
@@ -156,12 +141,12 @@ func doTxWithAttempts(
 		}
 
 		return nil
-	}, t, doTxOpts.DoOpts()...)
+	}, doTxOpts.RetryOpts()...)
 	if err != nil {
-		return attempts, xerrors.WithStackTrace(err)
+		return xerrors.WithStackTrace(err)
 	}
 
-	return attempts, nil
+	return nil
 }
 
 // ReadRow is a helper which read only one row from first result set in result
@@ -273,17 +258,30 @@ func (c *Client) ReadResultSet(
 	return rs, nil
 }
 
-func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) (err error) {
+func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options.DoTxOption) (finalErr error) {
 	ctx, cancel := xcontext.WithDone(ctx, c.done)
 	defer cancel()
 
-	onDone := trace.QueryOnDoTx(c.config.Trace(), &ctx,
-		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).DoTx"),
+	var (
+		onDone = trace.QueryOnDoTx(c.config.Trace(), &ctx,
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.(*Client).DoTx"),
+		)
+		attempts = 0
 	)
-	attempts, err := doTxWithAttempts(ctx, c.pool, op, c.config.Trace(), opts...)
-	onDone(attempts, err)
+	defer func() {
+		onDone(attempts, finalErr)
+	}()
 
-	return err
+	err := doTx(ctx, c.pool, func(ctx context.Context, tx query.TxActor) error {
+		attempts++
+
+		return op(ctx, tx)
+	}, c.config.Trace(), opts...)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
 }
 
 func New(ctx context.Context, balancer balancer, cfg *config.Config) *Client {
