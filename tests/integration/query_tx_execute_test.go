@@ -40,6 +40,10 @@ func TestQueryTxExecute(t *testing.T) {
 		),
 	)
 	require.NoError(t, err)
+	var (
+		columnNames []string
+		columnTypes []string
+	)
 	err = db.Query().DoTx(ctx, func(ctx context.Context, tx query.TxActor) (err error) {
 		res, err := tx.Execute(ctx, "SELECT 1 AS col1")
 		if err != nil {
@@ -48,6 +52,10 @@ func TestQueryTxExecute(t *testing.T) {
 		rs, err := res.NextResultSet(ctx)
 		if err != nil {
 			return err
+		}
+		columnNames = rs.Columns()
+		for _, t := range rs.ColumnTypes() {
+			columnTypes = append(columnTypes, t.Yql())
 		}
 		row, err := rs.NextRow(ctx)
 		if err != nil {
@@ -61,4 +69,6 @@ func TestQueryTxExecute(t *testing.T) {
 		return res.Err()
 	}, query.WithIdempotent(), query.WithTxSettings(query.TxSettings(query.WithSerializableReadWrite())))
 	require.NoError(t, err)
+	require.Equal(t, []string{"col1"}, columnNames)
+	require.Equal(t, []string{"Int32"}, columnTypes)
 }
