@@ -14,7 +14,10 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-var _ query.ResultSet = (*resultSet)(nil)
+var (
+	_ query.ResultSet = (*resultSet)(nil)
+	_ query.ResultSet = (*materializedResultSet)(nil)
+)
 
 type (
 	materializedResultSet struct {

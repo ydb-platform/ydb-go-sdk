@@ -151,17 +151,20 @@ func TestClient(t *testing.T) {
 	})
 	t.Run("Do", func(t *testing.T) {
 		t.Run("HappyWay", func(t *testing.T) {
-			attempts, err := doWithAttempts(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+			var visited bool
+			err := do(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
 				return newTestSession("123"), nil
 			}), func(ctx context.Context, s query.Session) error {
+				visited = true
+
 				return nil
-			}, &trace.Query{})
+			})
 			require.NoError(t, err)
-			require.EqualValues(t, 1, attempts)
+			require.True(t, visited)
 		})
 		t.Run("RetryableError", func(t *testing.T) {
 			counter := 0
-			attempts, err := doWithAttempts(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+			err := do(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
 				return newTestSession("123"), nil
 			}), func(ctx context.Context, s query.Session) error {
 				counter++
@@ -170,9 +173,8 @@ func TestClient(t *testing.T) {
 				}
 
 				return nil
-			}, &trace.Query{})
+			})
 			require.NoError(t, err)
-			require.EqualValues(t, 10, attempts)
 			require.Equal(t, 10, counter)
 		})
 	})
@@ -186,13 +188,12 @@ func TestClient(t *testing.T) {
 			client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil)
-			attempts, err := doTxWithAttempts(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+			err := doTx(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client), nil
 			}), func(ctx context.Context, tx query.TxActor) error {
 				return nil
 			}, &trace.Query{})
 			require.NoError(t, err)
-			require.EqualValues(t, 1, attempts)
 		})
 		t.Run("RetryableError", func(t *testing.T) {
 			counter := 0
@@ -207,7 +208,7 @@ func TestClient(t *testing.T) {
 			client.EXPECT().CommitTransaction(gomock.Any(), gomock.Any()).Return(&Ydb_Query.CommitTransactionResponse{
 				Status: Ydb.StatusIds_SUCCESS,
 			}, nil).AnyTimes()
-			attempts, err := doTxWithAttempts(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
+			err := doTx(ctx, testPool(ctx, func(ctx context.Context) (*Session, error) {
 				return newTestSessionWithClient("123", client), nil
 			}), func(ctx context.Context, tx query.TxActor) error {
 				counter++
@@ -218,7 +219,6 @@ func TestClient(t *testing.T) {
 				return nil
 			}, &trace.Query{})
 			require.NoError(t, err)
-			require.EqualValues(t, 10, attempts)
 			require.Equal(t, 10, counter)
 		})
 	})
