@@ -5,7 +5,6 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/coordination"
 	"github.com/ydb-platform/ydb-go-sdk/v3/discovery"
-	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/ratelimiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scheme"
 	"github.com/ydb-platform/ydb-go-sdk/v3/scripting"
@@ -34,11 +33,6 @@ type Connection interface { //nolint:interfacebloat
 
 	// Table returns table client
 	Table() table.Client
-
-	// Query returns query client
-	//
-	// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-	Query() query.Client
 
 	// Scheme returns scheme client
 	Scheme() scheme.Client

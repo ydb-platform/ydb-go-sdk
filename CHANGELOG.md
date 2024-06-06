@@ -1,3 +1,5 @@
+* Excluded `Query()` method from interface `ydb.Connection`. Method `Query()` remains accessible from `ydb.Driver`
+
 ## v3.71.0
 * Added `query/ResultSet.{Columns,ColumnTypes}` methods for get column names and types from query result set
 * Added experimental `retry.RetryWithResult` helper for retry lambda and return value from lambda
