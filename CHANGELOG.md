@@ -1,3 +1,4 @@
+## v3.72.0
 * Excluded `Query()` method from interface `ydb.Connection`. Method `Query()` remains accessible from `ydb.Driver`
 
 ## v3.71.0
