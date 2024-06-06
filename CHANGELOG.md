@@ -1,3 +1,4 @@
+## v3.73.1
 * Changed `query.DefaultTxControl()` from `query.SerializableReadWrite()` with commit to `query.NoTx()`
 
 ## v3.73.0
