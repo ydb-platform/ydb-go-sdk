@@ -71,6 +71,22 @@ func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
 	return r.reader.Commit(ctx, obj)
 }
 
+type Transaction interface {
+	ID() string
+	SessionID() string
+	OnPrecommit(f func(ctx context.Context) error)
+	OnComplete(f func(ctx context.Context, commitError error))
+}
+
+// CommitWithTx attach the messages to the transaction. The messages will be committed on the server
+// only when the tx will be committed successfully.
+// If transaction will be failed - the reader will cancel all current messages.
+// The behaviour can be set by WithContinueOnFailedCommit option to start reader.
+func (r *Reader) CommitWithTx(ctx context.Context, tx Transaction, obj CommitRangeGetter) error {
+	//TODO implement me
+	panic("implement me")
+}
+
 // CommitRangeGetter interface for get commit offsets
 type CommitRangeGetter = topicreaderinternal.PublicCommitRangeGetter
 
