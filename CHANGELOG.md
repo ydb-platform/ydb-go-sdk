@@ -1,3 +1,4 @@
+## v3.73.0
 * Added experimental `retry.DoWithResult` and `retry.DoTxWithResult` helpers for retry lambda and return value from lambda
 
 ## v3.72.0
