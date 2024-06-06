@@ -1,3 +1,5 @@
+* Added experimental `retry.DoWithResult` and `retry.DoTxWithResult` helpers for retry lambda and return value from lambda
+
 ## v3.72.0
 * Excluded `Query()` method from interface `ydb.Connection`. Method `Query()` remains accessible from `ydb.Driver`
 

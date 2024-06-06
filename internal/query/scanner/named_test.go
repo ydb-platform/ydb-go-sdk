@@ -618,25 +618,25 @@ func TestNamedRef(t *testing.T) {
 		{
 			name:  "",
 			ref:   nil,
-			dst:   NamedDestination{},
+			dst:   namedDestination{},
 			panic: true,
 		},
 		{
 			name:  "nil_ref",
 			ref:   nil,
-			dst:   NamedDestination{},
+			dst:   namedDestination{},
 			panic: true,
 		},
 		{
 			name:  "not_ref",
 			ref:   123,
-			dst:   NamedDestination{},
+			dst:   namedDestination{},
 			panic: true,
 		},
 		{
 			name: "int_ptr",
 			ref:  func(v int) *int { return &v }(123),
-			dst: NamedDestination{
+			dst: namedDestination{
 				name: "int_ptr",
 				ref:  func(v int) *int { return &v }(123),
 			},
@@ -649,7 +649,7 @@ func TestNamedRef(t *testing.T) {
 
 				return &vv
 			}(123),
-			dst: NamedDestination{
+			dst: namedDestination{
 				name: "int_dbl_ptr",
 				ref: func(v int) **int {
 					vv := &v
