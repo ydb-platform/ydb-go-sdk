@@ -72,12 +72,9 @@ func NoTx() *TransactionControl {
 	return nil
 }
 
-// DefaultTxControl returns default transaction control with serializable read-write isolation mode and auto-commit
+// DefaultTxControl returns default transaction control for use default tx control on server-side
 func DefaultTxControl() *TransactionControl {
-	return TxControl(
-		BeginTx(WithSerializableReadWrite()),
-		CommitTx(),
-	)
+	return NoTx()
 }
 
 // SerializableReadWriteTxControl returns transaction control with serializable read-write isolation mode

@@ -1,3 +1,5 @@
+* Changed `query.DefaultTxControl()` from `query.SerializableReadWrite()` with commit to `query.NoTx()`
+
 ## v3.73.0
 * Added experimental `retry.DoWithResult` and `retry.DoTxWithResult` helpers for retry lambda and return value from lambda
 
