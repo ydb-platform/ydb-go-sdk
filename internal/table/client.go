@@ -380,6 +380,8 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 		return nil, xerrors.WithStackTrace(errClosedClient)
 	}
 
+	const maxAttempts = 100
+
 	var (
 		start = time.Now()
 		i     = 0
@@ -398,17 +400,12 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 		onDone(s, i, err)
 	}()
 
-	const maxAttempts = 100
 	for s == nil && err == nil && i < maxAttempts && !c.isClosed() {
 		i++
-		// First, we try to internalPoolGet session from idle
-		c.mu.WithLock(func() {
-			s = c.internalPoolRemoveFirstIdle()
-		})
-
+		s = tryGetIdleSession(c)
 		if s != nil {
-			if c.nodeChecker != nil && !c.nodeChecker.HasNode(s.NodeID()) {
-				_ = s.Close(ctx)
+			if !isValidNode(c, s) {
+				closeInvalidSession(ctx, s)
 				s = nil
 
 				continue
@@ -417,30 +414,51 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 			return s, nil
 		}
 
-		// Second, we try to create new session
-		s, err = c.internalPoolCreateSession(ctx)
-		if s == nil && err == nil {
-			if err = ctx.Err(); err != nil {
-				return nil, xerrors.WithStackTrace(err)
-			}
-			panic("both of session and err are nil")
-		}
-		// got session or err is not recoverable
+		s, err = tryCreateNewSession(ctx, c)
 		if s != nil || !isCreateSessionErrorRetriable(err) {
 			return s, xerrors.WithStackTrace(err)
 		}
 
-		// Third, we try to wait for a touched session - Client is full.
-		//
-		// This should be done only if number of currently waiting goroutines
-		// are less than maximum amount of touched session. That is, we want to
-		// be fair here and not to lock more goroutines than we could ship
-		// session to.
 		s, err = c.internalPoolWaitFromCh(ctx, o.t)
 		if err != nil {
 			err = xerrors.WithStackTrace(err)
 		}
 	}
+
+	return handleNoProgress(s, err, start, c, i)
+}
+
+func tryGetIdleSession(c *Client) *session {
+	var s *session
+	c.mu.WithLock(func() {
+		s = c.internalPoolRemoveFirstIdle()
+	})
+
+	return s
+}
+
+//nolint:interfacer
+func isValidNode(c *Client, s *session) bool {
+	return c.nodeChecker == nil || c.nodeChecker.HasNode(s.NodeID())
+}
+
+func closeInvalidSession(ctx context.Context, s *session) {
+	_ = s.Close(ctx)
+}
+
+func tryCreateNewSession(ctx context.Context, c *Client) (*session, error) {
+	s, err := c.internalPoolCreateSession(ctx)
+	if s == nil && err == nil {
+		if err = ctx.Err(); err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+		panic("both session and err are nil")
+	}
+
+	return s, err
+}
+
+func handleNoProgress(s *session, err error, start time.Time, c *Client, attempts int) (*session, error) {
 	if s == nil && err == nil {
 		if c.isClosed() {
 			err = xerrors.WithStackTrace(errClosedClient)
@@ -448,6 +466,7 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 			err = xerrors.WithStackTrace(errNoProgress)
 		}
 	}
+
 	if err != nil {
 		var (
 			index            int
@@ -460,15 +479,15 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 			createInProgress = c.createInProgress
 		})
 
-		return s, xerrors.WithStackTrace(
+		err = xerrors.WithStackTrace(
 			fmt.Errorf("failed to get session from pool ("+
-				"attempts: %d, latency: %v, pool have %d sessions (%d busy, %d idle, %d create_in_progress): %w",
-				i, time.Since(start), index, index-idle, idle, createInProgress, err,
+				"attempts: %d, latency: %v, pool has %d sessions (%d busy, %d idle, %d create_in_progress): %w",
+				attempts, time.Since(start), index, index-idle, idle, createInProgress, err,
 			),
 		)
 	}
 
-	return s, nil
+	return s, err
 }
 
 // Get returns first idle session from the Client and removes it from
@@ -477,6 +496,7 @@ func (c *Client) Get(ctx context.Context) (s *session, err error) {
 	return c.internalPoolGet(ctx)
 }
 
+//nolint:funlen
 func (c *Client) internalPoolWaitFromCh(ctx context.Context, t *trace.Table) (s *session, err error) {
 	var (
 		ch *chan *session
@@ -705,54 +725,57 @@ func (c *Client) DoTx(ctx context.Context, op table.TxOperation, opts ...table.O
 		onDone(attempts, finalErr)
 	}()
 
-	return retryBackoff(ctx, c,
-		func(ctx context.Context, s table.Session) (err error) {
-			attempts++
+	return retryBackoff(ctx, c, func(ctx context.Context, s table.Session) (err error) {
+		attempts++
 
-			tx, err := s.BeginTransaction(ctx, config.TxSettings)
-			if err != nil {
-				return xerrors.WithStackTrace(err)
+		tx, err := s.BeginTransaction(ctx, config.TxSettings)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		defer func() {
+			err = handleTransactionError(ctx, tx, err)
+		}()
+
+		if err = executeTxOperation(ctx, c, op, tx); err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		_, err = tx.CommitTx(ctx, config.TxCommitOptions...)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		return nil
+	}, config.RetryOptions...)
+}
+
+func handleTransactionError(ctx context.Context, tx table.Transaction, err error) error {
+	if err != nil {
+		errRollback := tx.Rollback(ctx)
+		if errRollback != nil {
+			return xerrors.NewWithIssues("",
+				xerrors.WithStackTrace(err),
+				xerrors.WithStackTrace(errRollback),
+			)
+		}
+
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
+}
+
+func executeTxOperation(ctx context.Context, c *Client, op table.TxOperation, tx table.Transaction) (err error) {
+	if panicCallback := c.config.PanicCallback(); panicCallback != nil {
+		defer func() {
+			if e := recover(); e != nil {
+				panicCallback(e)
 			}
+		}()
+	}
 
-			defer func() {
-				if err != nil {
-					errRollback := tx.Rollback(ctx)
-					if errRollback != nil {
-						err = xerrors.NewWithIssues("",
-							xerrors.WithStackTrace(err),
-							xerrors.WithStackTrace(errRollback),
-						)
-					} else {
-						err = xerrors.WithStackTrace(err)
-					}
-				}
-			}()
-
-			err = func() error {
-				if panicCallback := c.config.PanicCallback(); panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							panicCallback(e)
-						}
-					}()
-				}
-
-				return op(xcontext.MarkRetryCall(ctx), tx)
-			}()
-
-			if err != nil {
-				return xerrors.WithStackTrace(err)
-			}
-
-			_, err = tx.CommitTx(ctx, config.TxCommitOptions...)
-			if err != nil {
-				return xerrors.WithStackTrace(err)
-			}
-
-			return nil
-		},
-		config.RetryOptions...,
-	)
+	return op(xcontext.MarkRetryCall(ctx), tx)
 }
 
 func (c *Client) internalPoolGCTick(ctx context.Context, idleThreshold time.Duration) {

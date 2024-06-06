@@ -310,10 +310,44 @@ func (s *session) DescribeTable(
 	path string,
 	opts ...options.DescribeTableOption,
 ) (desc options.Description, err error) {
-	var (
-		response *Ydb_Table.DescribeTableResponse
-		result   Ydb_Table.DescribeTableResult
-	)
+	request := initializeRequest(ctx, s, path, opts)
+	response, err := s.tableService.DescribeTable(ctx, request)
+	if err != nil {
+		return desc, xerrors.WithStackTrace(err)
+	}
+
+	var result Ydb_Table.DescribeTableResult
+	if err = response.GetOperation().GetResult().UnmarshalTo(&result); err != nil {
+		return desc, xerrors.WithStackTrace(err)
+	}
+
+	desc = options.Description{
+		Name:                 result.GetSelf().GetName(),
+		PrimaryKey:           result.GetPrimaryKey(),
+		Columns:              processColumns(result.GetColumns()),
+		KeyRanges:            processKeyRanges(result.GetShardKeyBounds()),
+		Stats:                processTableStats(result.GetTableStats()),
+		ColumnFamilies:       processColumnFamilies(result.GetColumnFamilies()),
+		Attributes:           processAttributes(result.GetAttributes()),
+		ReadReplicaSettings:  options.NewReadReplicasSettings(result.GetReadReplicasSettings()),
+		StorageSettings:      options.NewStorageSettings(result.GetStorageSettings()),
+		KeyBloomFilter:       feature.FromYDB(result.GetKeyBloomFilter()),
+		PartitioningSettings: options.NewPartitioningSettings(result.GetPartitioningSettings()),
+		Indexes:              processIndexes(result.GetIndexes()),
+		TimeToLiveSettings:   NewTimeToLiveSettings(result.GetTtlSettings()),
+		Changefeeds:          processChangefeeds(result.GetChangefeeds()),
+		Tiering:              result.GetTiering(),
+	}
+
+	return desc, nil
+}
+
+func initializeRequest(
+	ctx context.Context,
+	s *session,
+	path string,
+	opts []options.DescribeTableOption,
+) *Ydb_Table.DescribeTableRequest {
 	request := Ydb_Table.DescribeTableRequest{
 		SessionId: s.id,
 		Path:      path,
@@ -329,20 +363,13 @@ func (s *session) DescribeTable(
 			opt((*options.DescribeTableDesc)(&request))
 		}
 	}
-	response, err = s.tableService.DescribeTable(ctx, &request)
-	if err != nil {
-		return desc, xerrors.WithStackTrace(err)
-	}
-	err = response.GetOperation().GetResult().UnmarshalTo(&result)
-	if err != nil {
-		return desc, xerrors.WithStackTrace(err)
-	}
 
-	cs := make(
-		[]options.Column,
-		len(result.GetColumns()),
-	)
-	for i, c := range result.GetColumns() {
+	return &request
+}
+
+func processColumns(columns []*Ydb_Table.ColumnMeta) []options.Column {
+	cs := make([]options.Column, len(columns))
+	for i, c := range columns {
 		cs[i] = options.Column{
 			Name:   c.GetName(),
 			Type:   types.TypeFromYDB(c.GetType()),
@@ -350,12 +377,13 @@ func (s *session) DescribeTable(
 		}
 	}
 
-	rs := make(
-		[]options.KeyRange,
-		len(result.GetShardKeyBounds())+1,
-	)
+	return cs
+}
+
+func processKeyRanges(bounds []*Ydb.TypedValue) []options.KeyRange {
+	rs := make([]options.KeyRange, len(bounds)+1)
 	var last value.Value
-	for i, b := range result.GetShardKeyBounds() {
+	for i, b := range bounds {
 		if last != nil {
 			rs[i].From = last
 		}
@@ -370,53 +398,62 @@ func (s *session) DescribeTable(
 		rs[i].From = last
 	}
 
-	var stats *options.TableStats
-	if result.GetTableStats() != nil {
-		resStats := result.GetTableStats()
-		partStats := make(
-			[]options.PartitionStats,
-			len(result.GetTableStats().GetPartitionStats()),
-		)
-		for i, v := range result.GetTableStats().GetPartitionStats() {
-			partStats[i].RowsEstimate = v.GetRowsEstimate()
-			partStats[i].StoreSize = v.GetStoreSize()
-		}
-		var creationTime, modificationTime time.Time
-		if resStats.GetCreationTime().GetSeconds() != 0 {
-			creationTime = time.Unix(
-				resStats.GetCreationTime().GetSeconds(),
-				int64(resStats.GetCreationTime().GetNanos()),
-			)
-		}
-		if resStats.GetModificationTime().GetSeconds() != 0 {
-			modificationTime = time.Unix(
-				resStats.GetModificationTime().GetSeconds(),
-				int64(resStats.GetModificationTime().GetNanos()),
-			)
-		}
+	return rs
+}
 
-		stats = &options.TableStats{
-			PartitionStats:   partStats,
-			RowsEstimate:     resStats.GetRowsEstimate(),
-			StoreSize:        resStats.GetStoreSize(),
-			Partitions:       resStats.GetPartitions(),
-			CreationTime:     creationTime,
-			ModificationTime: modificationTime,
-		}
+func processTableStats(resStats *Ydb_Table.TableStats) *options.TableStats {
+	if resStats == nil {
+		return nil
 	}
 
-	cf := make([]options.ColumnFamily, len(result.GetColumnFamilies()))
-	for i, c := range result.GetColumnFamilies() {
+	partStats := make([]options.PartitionStats, len(resStats.GetPartitionStats()))
+	for i, v := range resStats.GetPartitionStats() {
+		partStats[i].RowsEstimate = v.GetRowsEstimate()
+		partStats[i].StoreSize = v.GetStoreSize()
+	}
+
+	var creationTime, modificationTime time.Time
+	if resStats.GetCreationTime().GetSeconds() != 0 {
+		creationTime = time.Unix(resStats.GetCreationTime().GetSeconds(), int64(resStats.GetCreationTime().GetNanos()))
+	}
+	if resStats.GetModificationTime().GetSeconds() != 0 {
+		modificationTime = time.Unix(
+			resStats.GetModificationTime().GetSeconds(),
+			int64(resStats.GetModificationTime().GetNanos()),
+		)
+	}
+
+	return &options.TableStats{
+		PartitionStats:   partStats,
+		RowsEstimate:     resStats.GetRowsEstimate(),
+		StoreSize:        resStats.GetStoreSize(),
+		Partitions:       resStats.GetPartitions(),
+		CreationTime:     creationTime,
+		ModificationTime: modificationTime,
+	}
+}
+
+func processColumnFamilies(families []*Ydb_Table.ColumnFamily) []options.ColumnFamily {
+	cf := make([]options.ColumnFamily, len(families))
+	for i, c := range families {
 		cf[i] = options.NewColumnFamily(c)
 	}
 
-	attrs := make(map[string]string, len(result.GetAttributes()))
-	for k, v := range result.GetAttributes() {
-		attrs[k] = v
+	return cf
+}
+
+func processAttributes(attrs map[string]string) map[string]string {
+	attributes := make(map[string]string, len(attrs))
+	for k, v := range attrs {
+		attributes[k] = v
 	}
 
-	indexes := make([]options.IndexDescription, len(result.GetIndexes()))
-	for i, idx := range result.GetIndexes() {
+	return attributes
+}
+
+func processIndexes(indexes []*Ydb_Table.TableIndexDescription) []options.IndexDescription {
+	idxs := make([]options.IndexDescription, len(indexes))
+	for i, idx := range indexes {
 		var typ options.IndexType
 		switch idx.GetType().(type) {
 		case *Ydb_Table.TableIndexDescription_GlobalAsyncIndex:
@@ -424,7 +461,7 @@ func (s *session) DescribeTable(
 		case *Ydb_Table.TableIndexDescription_GlobalIndex:
 			typ = options.IndexTypeGlobal
 		}
-		indexes[i] = options.IndexDescription{
+		idxs[i] = options.IndexDescription{
 			Name:         idx.GetName(),
 			IndexColumns: idx.GetIndexColumns(),
 			DataColumns:  idx.GetDataColumns(),
@@ -433,28 +470,16 @@ func (s *session) DescribeTable(
 		}
 	}
 
-	changeFeeds := make([]options.ChangefeedDescription, len(result.GetChangefeeds()))
-	for i, proto := range result.GetChangefeeds() {
-		changeFeeds[i] = options.NewChangefeedDescription(proto)
+	return idxs
+}
+
+func processChangefeeds(changefeeds []*Ydb_Table.ChangefeedDescription) []options.ChangefeedDescription {
+	feeds := make([]options.ChangefeedDescription, len(changefeeds))
+	for i, proto := range changefeeds {
+		feeds[i] = options.NewChangefeedDescription(proto)
 	}
 
-	return options.Description{
-		Name:                 result.GetSelf().GetName(),
-		PrimaryKey:           result.GetPrimaryKey(),
-		Columns:              cs,
-		KeyRanges:            rs,
-		Stats:                stats,
-		ColumnFamilies:       cf,
-		Attributes:           attrs,
-		ReadReplicaSettings:  options.NewReadReplicasSettings(result.GetReadReplicasSettings()),
-		StorageSettings:      options.NewStorageSettings(result.GetStorageSettings()),
-		KeyBloomFilter:       feature.FromYDB(result.GetKeyBloomFilter()),
-		PartitioningSettings: options.NewPartitioningSettings(result.GetPartitioningSettings()),
-		Indexes:              indexes,
-		TimeToLiveSettings:   NewTimeToLiveSettings(result.GetTtlSettings()),
-		Changefeeds:          changeFeeds,
-		Tiering:              result.GetTiering(),
-	}, nil
+	return feeds
 }
 
 // DropTable drops table at given path with given options.
