@@ -257,8 +257,6 @@ func WithPanicCallback(panicCallback func(e interface{})) panicCallbackOption {
 // Warning: if context without deadline or cancellation func was passed, Retry will work infinitely.
 //
 // # If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
-//
-// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
 func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr error) {
 	_, err := RetryWithResult[*struct{}](ctx, func(ctx context.Context) (*struct{}, error) {
 		err := op(ctx)
@@ -285,10 +283,10 @@ func Retry(ctx context.Context, op retryOperation, opts ...Option) (finalErr err
 //
 // Warning: if context without deadline or cancellation func was passed, RetryWithResult will work infinitely.
 //
-// If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
+// # If you need to retry your op func on some logic errors - you must return RetryableError() from retryOperation
 //
-//nolint:funlen
-func RetryWithResult[T any](ctx context.Context, //nolint:revive
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func RetryWithResult[T any](ctx context.Context, //nolint:revive,funlen
 	op func(context.Context) (T, error), opts ...Option,
 ) (_ T, finalErr error) {
 	var (

@@ -42,10 +42,33 @@ func WithDoRetryOptions(opts ...Option) doRetryOptionsOption {
 
 // Do is a retryer of database/sql Conn with fallbacks on errors
 func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Conn) error, opts ...doOption) error {
+	_, err := DoWithResult(ctx, db, func(ctx context.Context, cc *sql.Conn) (*struct{}, error) {
+		err := op(ctx, cc)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		return nil, nil //nolint:nilnil
+	}, opts...)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
+}
+
+// DoWithResult is a retryer of database/sql Conn with fallbacks on errors
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func DoWithResult[T any](ctx context.Context, db *sql.DB,
+	op func(ctx context.Context, cc *sql.Conn) (T, error),
+	opts ...doOption,
+) (T, error) {
 	var (
-		options = doOptions{
+		zeroValue T
+		options   = doOptions{
 			retryOptions: []Option{
-				withCaller(stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.Do")),
+				withCaller(stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.DoWithResult")),
 			},
 		}
 		attempts = 0
@@ -62,28 +85,29 @@ func Do(ctx context.Context, db *sql.DB, op func(ctx context.Context, cc *sql.Co
 			opt.ApplyDoOption(&options)
 		}
 	}
-	err := Retry(ctx, func(ctx context.Context) error {
+	v, err := RetryWithResult(ctx, func(ctx context.Context) (T, error) {
 		attempts++
 		cc, err := db.Conn(ctx)
 		if err != nil {
-			return unwrapErrBadConn(xerrors.WithStackTrace(err))
+			return zeroValue, unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 		defer func() {
 			_ = cc.Close()
 		}()
-		if err = op(xcontext.MarkRetryCall(ctx), cc); err != nil {
-			return unwrapErrBadConn(xerrors.WithStackTrace(err))
+		v, err := op(xcontext.MarkRetryCall(ctx), cc)
+		if err != nil {
+			return zeroValue, unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 
-		return nil
+		return v, nil
 	}, options.retryOptions...)
 	if err != nil {
-		return xerrors.WithStackTrace(
+		return zeroValue, xerrors.WithStackTrace(
 			fmt.Errorf("operation failed with %d attempts: %w", attempts, err),
 		)
 	}
 
-	return nil
+	return v, nil
 }
 
 type doTxOptions struct {
@@ -130,13 +154,34 @@ func WithTxOptions(txOptions *sql.TxOptions) txOptionsOption {
 }
 
 // DoTx is a retryer of database/sql transactions with fallbacks on errors
-//
-//nolint:funlen
 func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) error, opts ...doTxOption) error {
+	_, err := DoTxWithResult(ctx, db, func(ctx context.Context, tx *sql.Tx) (*struct{}, error) {
+		err := op(ctx, tx)
+		if err != nil {
+			return nil, xerrors.WithStackTrace(err)
+		}
+
+		return nil, nil //nolint:nilnil
+	}, opts...)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
+}
+
+// DoTxWithResult is a retryer of database/sql transactions with fallbacks on errors
+//
+// Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
+func DoTxWithResult[T any](ctx context.Context, db *sql.DB, //nolint:funlen
+	op func(context.Context, *sql.Tx) (T, error),
+	opts ...doTxOption,
+) (T, error) {
 	var (
-		options = doTxOptions{
+		zeroValue T
+		options   = doTxOptions{
 			retryOptions: []Option{
-				withCaller(stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.DoTx")),
+				withCaller(stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/retry.DoTxWithResult")),
 			},
 			txOptions: &sql.TxOptions{
 				Isolation: sql.LevelDefault,
@@ -159,11 +204,11 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 			opt.ApplyDoTxOption(&options)
 		}
 	}
-	err := Retry(ctx, func(ctx context.Context) (finalErr error) {
+	v, err := RetryWithResult(ctx, func(ctx context.Context) (_ T, finalErr error) {
 		attempts++
 		tx, err := db.BeginTx(ctx, options.txOptions)
 		if err != nil {
-			return unwrapErrBadConn(xerrors.WithStackTrace(err))
+			return zeroValue, unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 		defer func() {
 			if finalErr == nil {
@@ -178,20 +223,21 @@ func DoTx(ctx context.Context, db *sql.DB, op func(context.Context, *sql.Tx) err
 				xerrors.WithStackTrace(fmt.Errorf("rollback failed: %w", errRollback)),
 			)
 		}()
-		if err = op(xcontext.MarkRetryCall(ctx), tx); err != nil {
-			return unwrapErrBadConn(xerrors.WithStackTrace(err))
+		v, err := op(xcontext.MarkRetryCall(ctx), tx)
+		if err != nil {
+			return zeroValue, unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 		if err = tx.Commit(); err != nil {
-			return unwrapErrBadConn(xerrors.WithStackTrace(err))
+			return zeroValue, unwrapErrBadConn(xerrors.WithStackTrace(err))
 		}
 
-		return nil
+		return v, nil
 	}, options.retryOptions...)
 	if err != nil {
-		return xerrors.WithStackTrace(
+		return zeroValue, xerrors.WithStackTrace(
 			fmt.Errorf("tx operation failed with %d attempts: %w", attempts, err),
 		)
 	}
 
-	return nil
+	return v, nil
 }
