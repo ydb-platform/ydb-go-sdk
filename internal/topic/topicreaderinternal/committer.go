@@ -52,7 +52,12 @@ type committer struct {
 	commits CommitRanges
 }
 
-func newCommitterStopped(tracer *trace.Topic, lifeContext context.Context, mode PublicCommitMode, send sendMessageToServerFunc, readerID int64) *committer { //nolint:lll,revive
+func newCommitterStopped(
+	tracer *trace.Topic,
+	lifeContext context.Context, //nolint:revive
+	mode PublicCommitMode,
+	send sendMessageToServerFunc,
+) *committer {
 	res := &committer{
 		mode:             mode,
 		clock:            clockwork.NewRealClock(),

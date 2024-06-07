@@ -158,7 +158,7 @@ func newTopicStreamReaderStopped(
 
 	res.backgroundWorkers = *background.NewWorker(stopPump, "topic-reader-stream-background")
 
-	res.committer = newCommitterStopped(cfg.Trace, labeledContext, cfg.CommitMode, res.send, res.readerID)
+	res.committer = newCommitterStopped(cfg.Trace, labeledContext, cfg.CommitMode, res.send)
 	res.committer.BufferTimeLagTrigger = cfg.CommitterBatchTimeLag
 	res.committer.BufferCountTrigger = cfg.CommitterBatchCounterTrigger
 	res.sessionController.init()
