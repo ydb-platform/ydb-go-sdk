@@ -62,7 +62,7 @@ func TestResultSetRange(t *testing.T) {
 				return part, nil
 			}, recv, nil)
 			require.EqualValues(t, 0, rs.index)
-			var count = 0
+			count := 0
 			for _, err := range rs.Range(ctx) {
 				require.NoError(t, err)
 				count++
@@ -149,7 +149,7 @@ func TestResultSetRange(t *testing.T) {
 				return part, nil
 			}, recv, nil)
 			require.EqualValues(t, 0, rs.index)
-			var count = 0
+			count := 0
 			for _, err := range rs.Range(ctx) {
 				require.NoError(t, err)
 				require.EqualValues(t, count, rs.rowIndex)
@@ -296,7 +296,7 @@ func TestResultSetRange(t *testing.T) {
 				return part, nil
 			}, recv, nil)
 			require.EqualValues(t, 0, rs.index)
-			var count = 0
+			count := 0
 			for _, err := range rs.Range(ctx) {
 				require.NoError(t, err)
 				count++
@@ -406,7 +406,7 @@ func TestResultSetRange(t *testing.T) {
 				return part, nil
 			}, recv, nil)
 			require.EqualValues(t, 0, rs.index)
-			var count = 0
+			count := 0
 			for _, err := range rs.Range(ctx) {
 				require.NoError(t, err)
 				count++
@@ -583,7 +583,7 @@ func TestResultSetRange(t *testing.T) {
 				return part, nil
 			}, recv, nil)
 			require.EqualValues(t, 0, rs.index)
-			var count = 0
+			count := 0
 			for _, err := range rs.Range(ctx) {
 				if count < 3 {
 					require.NoError(t, err)
@@ -673,7 +673,7 @@ func TestResultSetRange(t *testing.T) {
 				return part, nil
 			}, recv, nil)
 			require.EqualValues(t, 0, rs.index)
-			var count = 0
+			count := 0
 			for _, err := range rs.Range(ctx) {
 				if count < 3 {
 					require.NoError(t, err)
@@ -815,7 +815,7 @@ func TestResultSetRange(t *testing.T) {
 				return part, nil
 			}, recv, nil)
 			require.EqualValues(t, 0, rs.index)
-			var count = 0
+			count := 0
 			for _, err := range rs.Range(ctx) {
 				if count < 3 {
 					require.NoError(t, err)
