@@ -27,6 +27,7 @@ func unwrapPtr(v interface{}) interface{} {
 func loadLocation(T *testing.T, name string) *time.Location {
 	loc, err := time.LoadLocation(name)
 	require.NoError(T, err)
+
 	return loc
 }
 

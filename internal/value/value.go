@@ -1742,6 +1742,7 @@ func (v tzTimestampValue) castTo(dst interface{}) error {
 			return err
 		}
 		*vv = t
+
 		return nil
 	case *string:
 		*vv = string(v)
