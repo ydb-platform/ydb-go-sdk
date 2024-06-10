@@ -17,7 +17,7 @@ type Client interface {
 	// - retry operation returned nil as error
 	//
 	// Warning: if context without deadline or cancellation func than Do can run indefinitely.
-	Do(ctx context.Context, op Operation, opts ...options.DoOption) error
+	Do(ctx context.Context, op Operation, opts ...DoOption) error
 
 	// DoTx provide the best effort for execute transaction.
 	//
@@ -31,7 +31,7 @@ type Client interface {
 	// If op TxOperation returns nil - transaction will be committed
 	// If op TxOperation return non nil - transaction will be rollback
 	// Warning: if context without deadline or cancellation func than DoTx can run indefinitely
-	DoTx(ctx context.Context, op TxOperation, opts ...options.DoTxOption) error
+	DoTx(ctx context.Context, op TxOperation, opts ...DoTxOption) error
 
 	// Execute is a simple executor with retries
 	//
@@ -73,12 +73,12 @@ type (
 
 		Session
 	}
+	DoOption            = options.DoOption
+	DoTxOption          = options.DoTxOption
 	bothDoAndDoTxOption interface {
-		options.DoOption
-		options.DoTxOption
+		DoOption
+		DoTxOption
 	}
-	DoOption   = options.DoOption
-	DoTxOption = options.DoTxOption
 )
 
 func WithIdempotent() bothDoAndDoTxOption {

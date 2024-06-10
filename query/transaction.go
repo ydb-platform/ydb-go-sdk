@@ -47,7 +47,7 @@ type (
 )
 
 // BeginTx returns selector transaction control option
-func BeginTx(opts ...tx.Option) tx.ControlOption {
+func BeginTx(opts ...TransactionOption) tx.ControlOption {
 	return tx.BeginTx(opts...)
 }
 
@@ -112,19 +112,19 @@ func TxSettings(opts ...tx.Option) TransactionSettings {
 	return opts
 }
 
-func WithDefaultTxMode() tx.Option {
+func WithDefaultTxMode() TransactionOption {
 	return tx.WithDefaultTxMode()
 }
 
-func WithSerializableReadWrite() tx.Option {
+func WithSerializableReadWrite() TransactionOption {
 	return tx.WithSerializableReadWrite()
 }
 
-func WithSnapshotReadOnly() tx.Option {
+func WithSnapshotReadOnly() TransactionOption {
 	return tx.WithSnapshotReadOnly()
 }
 
-func WithStaleReadOnly() tx.Option {
+func WithStaleReadOnly() TransactionOption {
 	return tx.WithStaleReadOnly()
 }
 
@@ -132,6 +132,6 @@ func WithInconsistentReads() tx.OnlineReadOnlyOption {
 	return tx.WithInconsistentReads()
 }
 
-func WithOnlineReadOnly(opts ...tx.OnlineReadOnlyOption) tx.Option {
+func WithOnlineReadOnly(opts ...tx.OnlineReadOnlyOption) TransactionOption {
 	return tx.WithOnlineReadOnly(opts...)
 }
