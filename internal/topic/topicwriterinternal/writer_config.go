@@ -6,7 +6,6 @@ import (
 	"github.com/jonboulle/clockwork"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopiccommon"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicwriter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -22,5 +21,4 @@ type WritersCommonConfig struct {
 	cred               credentials.Credentials
 	credUpdateInterval time.Duration
 	clock              clockwork.Clock
-	forceCodec         rawtopiccommon.Codec
 }
