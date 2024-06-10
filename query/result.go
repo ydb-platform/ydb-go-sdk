@@ -12,10 +12,14 @@ type (
 	Result interface {
 		closer.Closer
 
+		resultSetsRanger
+
 		NextResultSet(ctx context.Context) (ResultSet, error)
 		Err() error
 	}
 	ResultSet interface {
+		rowsRanger
+
 		Columns() []string
 		ColumnTypes() []Type
 		NextRow(ctx context.Context) (Row, error)

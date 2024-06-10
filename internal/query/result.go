@@ -23,10 +23,14 @@ var (
 
 type (
 	materializedResult struct {
+		resultRange
+
 		resultSets []query.ResultSet
 		idx        int
 	}
 	result struct {
+		resultRange
+
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
 		closeOnce      func(ctx context.Context) error
 		lastPart       *Ydb_Query.ExecuteQueryResponsePart
@@ -58,9 +62,12 @@ func (r *materializedResult) Err() error {
 }
 
 func newMaterializedResult(resultSets []query.ResultSet) *materializedResult {
-	return &materializedResult{
+	r := &materializedResult{
 		resultSets: resultSets,
 	}
+	r.resultRange = resultRange{r: r}
+
+	return r
 }
 
 func newResult(
@@ -102,14 +109,17 @@ func newResult(
 			})
 		)
 
-		return &result{
+		r := &result{
 			stream:         stream,
 			resultSetIndex: -1,
 			lastPart:       part,
 			closed:         closed,
 			closeOnce:      closeOnce,
 			trace:          t,
-		}, part.GetTxMeta().GetId(), nil
+		}
+		r.resultRange = resultRange{r: r}
+
+		return r, part.GetTxMeta().GetId(), nil
 	}
 }
 

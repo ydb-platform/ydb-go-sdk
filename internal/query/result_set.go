@@ -22,12 +22,16 @@ var (
 
 type (
 	materializedResultSet struct {
+		resultSetRange
+
 		columnNames []string
 		columnTypes []types.Type
 		rows        []query.Row
 		idx         int
 	}
 	resultSet struct {
+		resultSetRange
+
 		index       int64
 		recv        func() (*Ydb_Query.ExecuteQueryResponsePart, error)
 		columns     []*Ydb.Column
@@ -81,11 +85,14 @@ func NewMaterializedResultSet(
 	columnTypes []types.Type,
 	rows []query.Row,
 ) *materializedResultSet {
-	return &materializedResultSet{
+	rs := &materializedResultSet{
 		columnNames: columnNames,
 		columnTypes: columnTypes,
 		rows:        rows,
 	}
+	rs.resultSetRange = resultSetRange{rs: rs}
+
+	return rs
 }
 
 func newResultSet(
@@ -97,7 +104,7 @@ func newResultSet(
 		t = &trace.Query{}
 	}
 
-	return &resultSet{
+	rs := &resultSet{
 		index:       part.GetResultSetIndex(),
 		recv:        recv,
 		currentPart: part,
@@ -106,6 +113,9 @@ func newResultSet(
 		trace:       t,
 		done:        make(chan struct{}),
 	}
+	rs.resultSetRange = resultSetRange{rs: rs}
+
+	return rs
 }
 
 func (rs *resultSet) nextRow(ctx context.Context) (*row, error) {
