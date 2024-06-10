@@ -43,6 +43,22 @@ func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 	return w.inner.Write(ctx, messages...)
 }
 
+type Transaction interface {
+	ID() string
+	//SessionID() string
+	//OnPrecommit(f func(ctx context.Context) error)
+	//OnComplete(f func(ctx context.Context, commitError error))
+}
+
+// WriteWithTx attach the messages to the transaction.
+// The message will be shown on the topic after commit the transaction only.
+// The message can be discarded if the transaction failed/rolled back.
+// No retries for send message after first send attempt. If the send failed - the transaction will be failed too.
+func (r *Writer) WriteWithTx(ctx context.Context, tx Transaction, messages ...Message) error {
+	//TODO implement me
+	panic("implement me")
+}
+
 // WaitInit waits until the reader is initialized
 // or an error occurs, return PublicInitialInfo and err
 func (w *Writer) WaitInit(ctx context.Context) (err error) {

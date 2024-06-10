@@ -73,9 +73,9 @@ func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
 
 type Transaction interface {
 	ID() string
-	SessionID() string
-	OnPrecommit(f func(ctx context.Context) error)
-	OnComplete(f func(ctx context.Context, commitError error))
+	//SessionID() string
+	//OnPrecommit(f func(ctx context.Context) error)
+	//OnComplete(f func(ctx context.Context, commitError error))
 }
 
 // CommitWithTx attach the messages to the transaction. The messages will be committed on the server
