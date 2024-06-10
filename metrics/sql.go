@@ -7,6 +7,8 @@ import (
 )
 
 // databaseSQL makes trace.DatabaseSQL with measuring `database/sql` events
+//
+//nolint:funlen
 func databaseSQL(config Config) (t trace.DatabaseSQL) {
 	config = config.WithSystem("database").WithSystem("sql")
 	conns := config.GaugeVec("conns")

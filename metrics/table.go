@@ -8,6 +8,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+//nolint:funlen
 func table(config Config) (t trace.Table) {
 	config = config.WithSystem("table")
 	alive := config.GaugeVec("sessions", "node_id")

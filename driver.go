@@ -306,7 +306,7 @@ func New(ctx context.Context, opts ...Option) (_ *Driver, err error) { //nolint:
 	return d, nil
 }
 
-//nolint:cyclop, nonamedreturns
+//nolint:cyclop, nonamedreturns, funlen
 func newConnectionFromOptions(ctx context.Context, opts ...Option) (_ *Driver, err error) {
 	ctx, driverCtxCancel := xcontext.WithCancel(xcontext.ValueOnly(ctx))
 	defer func() {

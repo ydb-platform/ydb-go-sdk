@@ -944,110 +944,121 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 		return desc, xerrors.WithStackTrace(err)
 	}
 
-	{
-		xs := make([]options.TableProfileDescription, len(result.GetTableProfilePresets()))
-		for i, p := range result.GetTableProfilePresets() {
-			xs[i] = options.TableProfileDescription{
-				Name:   p.GetName(),
-				Labels: p.GetLabels(),
-
-				DefaultStoragePolicy:      p.GetDefaultStoragePolicy(),
-				DefaultCompactionPolicy:   p.GetDefaultCompactionPolicy(),
-				DefaultPartitioningPolicy: p.GetDefaultPartitioningPolicy(),
-				DefaultExecutionPolicy:    p.GetDefaultExecutionPolicy(),
-				DefaultReplicationPolicy:  p.GetDefaultReplicationPolicy(),
-				DefaultCachingPolicy:      p.GetDefaultCachingPolicy(),
-
-				AllowedStoragePolicies:      p.GetAllowedStoragePolicies(),
-				AllowedCompactionPolicies:   p.GetAllowedCompactionPolicies(),
-				AllowedPartitioningPolicies: p.GetAllowedPartitioningPolicies(),
-				AllowedExecutionPolicies:    p.GetAllowedExecutionPolicies(),
-				AllowedReplicationPolicies:  p.GetAllowedReplicationPolicies(),
-				AllowedCachingPolicies:      p.GetAllowedCachingPolicies(),
-			}
-		}
-		desc.TableProfilePresets = xs
-	}
-	{
-		xs := make(
-			[]options.StoragePolicyDescription,
-			len(result.GetStoragePolicyPresets()),
-		)
-		for i, p := range result.GetStoragePolicyPresets() {
-			xs[i] = options.StoragePolicyDescription{
-				Name:   p.GetName(),
-				Labels: p.GetLabels(),
-			}
-		}
-		desc.StoragePolicyPresets = xs
-	}
-	{
-		xs := make(
-			[]options.CompactionPolicyDescription,
-			len(result.GetCompactionPolicyPresets()),
-		)
-		for i, p := range result.GetCompactionPolicyPresets() {
-			xs[i] = options.CompactionPolicyDescription{
-				Name:   p.GetName(),
-				Labels: p.GetLabels(),
-			}
-		}
-		desc.CompactionPolicyPresets = xs
-	}
-	{
-		xs := make(
-			[]options.PartitioningPolicyDescription,
-			len(result.GetPartitioningPolicyPresets()),
-		)
-		for i, p := range result.GetPartitioningPolicyPresets() {
-			xs[i] = options.PartitioningPolicyDescription{
-				Name:   p.GetName(),
-				Labels: p.GetLabels(),
-			}
-		}
-		desc.PartitioningPolicyPresets = xs
-	}
-	{
-		xs := make(
-			[]options.ExecutionPolicyDescription,
-			len(result.GetExecutionPolicyPresets()),
-		)
-		for i, p := range result.GetExecutionPolicyPresets() {
-			xs[i] = options.ExecutionPolicyDescription{
-				Name:   p.GetName(),
-				Labels: p.GetLabels(),
-			}
-		}
-		desc.ExecutionPolicyPresets = xs
-	}
-	{
-		xs := make(
-			[]options.ReplicationPolicyDescription,
-			len(result.GetReplicationPolicyPresets()),
-		)
-		for i, p := range result.GetReplicationPolicyPresets() {
-			xs[i] = options.ReplicationPolicyDescription{
-				Name:   p.GetName(),
-				Labels: p.GetLabels(),
-			}
-		}
-		desc.ReplicationPolicyPresets = xs
-	}
-	{
-		xs := make(
-			[]options.CachingPolicyDescription,
-			len(result.GetCachingPolicyPresets()),
-		)
-		for i, p := range result.GetCachingPolicyPresets() {
-			xs[i] = options.CachingPolicyDescription{
-				Name:   p.GetName(),
-				Labels: p.GetLabels(),
-			}
-		}
-		desc.CachingPolicyPresets = xs
-	}
+	desc.TableProfilePresets = processTableProfilePresets(result.GetTableProfilePresets())
+	desc.StoragePolicyPresets = processStoragePolicyPresets(result.GetStoragePolicyPresets())
+	desc.CompactionPolicyPresets = processCompactionPolicyPresets(result.GetCompactionPolicyPresets())
+	desc.PartitioningPolicyPresets = processPartitioningPolicyPresets(result.GetPartitioningPolicyPresets())
+	desc.ExecutionPolicyPresets = processExecutionPolicyPresets(result.GetExecutionPolicyPresets())
+	desc.ReplicationPolicyPresets = processReplicationPolicyPresets(result.GetReplicationPolicyPresets())
+	desc.CachingPolicyPresets = processCachingPolicyPresets(result.GetCachingPolicyPresets())
 
 	return desc, nil
+}
+
+func processTableProfilePresets(presets []*Ydb_Table.TableProfileDescription) []options.TableProfileDescription {
+	xs := make([]options.TableProfileDescription, len(presets))
+	for i, p := range presets {
+		xs[i] = options.TableProfileDescription{
+			Name:                        p.GetName(),
+			Labels:                      p.GetLabels(),
+			DefaultStoragePolicy:        p.GetDefaultStoragePolicy(),
+			DefaultCompactionPolicy:     p.GetDefaultCompactionPolicy(),
+			DefaultPartitioningPolicy:   p.GetDefaultPartitioningPolicy(),
+			DefaultExecutionPolicy:      p.GetDefaultExecutionPolicy(),
+			DefaultReplicationPolicy:    p.GetDefaultReplicationPolicy(),
+			DefaultCachingPolicy:        p.GetDefaultCachingPolicy(),
+			AllowedStoragePolicies:      p.GetAllowedStoragePolicies(),
+			AllowedCompactionPolicies:   p.GetAllowedCompactionPolicies(),
+			AllowedPartitioningPolicies: p.GetAllowedPartitioningPolicies(),
+			AllowedExecutionPolicies:    p.GetAllowedExecutionPolicies(),
+			AllowedReplicationPolicies:  p.GetAllowedReplicationPolicies(),
+			AllowedCachingPolicies:      p.GetAllowedCachingPolicies(),
+		}
+	}
+
+	return xs
+}
+
+func processStoragePolicyPresets(presets []*Ydb_Table.StoragePolicyDescription) []options.StoragePolicyDescription {
+	xs := make([]options.StoragePolicyDescription, len(presets))
+	for i, p := range presets {
+		xs[i] = options.StoragePolicyDescription{
+			Name:   p.GetName(),
+			Labels: p.GetLabels(),
+		}
+	}
+
+	return xs
+}
+
+func processCompactionPolicyPresets(
+	presets []*Ydb_Table.CompactionPolicyDescription,
+) []options.CompactionPolicyDescription {
+	xs := make([]options.CompactionPolicyDescription, len(presets))
+	for i, p := range presets {
+		xs[i] = options.CompactionPolicyDescription{
+			Name:   p.GetName(),
+			Labels: p.GetLabels(),
+		}
+	}
+
+	return xs
+}
+
+func processPartitioningPolicyPresets(
+	presets []*Ydb_Table.PartitioningPolicyDescription,
+) []options.PartitioningPolicyDescription {
+	xs := make([]options.PartitioningPolicyDescription, len(presets))
+	for i, p := range presets {
+		xs[i] = options.PartitioningPolicyDescription{
+			Name:   p.GetName(),
+			Labels: p.GetLabels(),
+		}
+	}
+
+	return xs
+}
+
+func processExecutionPolicyPresets(
+	presets []*Ydb_Table.ExecutionPolicyDescription,
+) []options.ExecutionPolicyDescription {
+	xs := make([]options.ExecutionPolicyDescription, len(presets))
+	for i, p := range presets {
+		xs[i] = options.ExecutionPolicyDescription{
+			Name:   p.GetName(),
+			Labels: p.GetLabels(),
+		}
+	}
+
+	return xs
+}
+
+func processReplicationPolicyPresets(
+	presets []*Ydb_Table.ReplicationPolicyDescription,
+) []options.ReplicationPolicyDescription {
+	xs := make([]options.ReplicationPolicyDescription, len(presets))
+	for i, p := range presets {
+		xs[i] = options.ReplicationPolicyDescription{
+			Name:   p.GetName(),
+			Labels: p.GetLabels(),
+		}
+	}
+
+	return xs
+}
+
+func processCachingPolicyPresets(
+	presets []*Ydb_Table.CachingPolicyDescription,
+) []options.CachingPolicyDescription {
+	xs := make([]options.CachingPolicyDescription, len(presets))
+	for i, p := range presets {
+		xs[i] = options.CachingPolicyDescription{
+			Name:   p.GetName(),
+			Labels: p.GetLabels(),
+		}
+	}
+
+	return xs
 }
 
 // StreamReadTable reads table at given path with given options.
@@ -1055,6 +1066,8 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 // Note that given ctx controls the lifetime of the whole read, not only this
 // StreamReadTable() call; that is, the time until returned result is closed
 // via Close() call or fully drained by sequential NextResultSet() calls.
+//
+//nolint:funlen
 func (s *session) StreamReadTable(
 	ctx context.Context,
 	path string,
@@ -1170,6 +1183,8 @@ func (s *session) ReadRows(
 // Note that given ctx controls the lifetime of the whole read, not only this
 // StreamExecuteScanQuery() call; that is, the time until returned result is closed
 // via Close() call or fully drained by sequential NextResultSet() calls.
+//
+//nolint:funlen
 func (s *session) StreamExecuteScanQuery(
 	ctx context.Context,
 	query string,

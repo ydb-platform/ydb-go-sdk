@@ -226,7 +226,6 @@ linters:
     - exhaustivestruct
     - exhaustruct
     - forbidigo
-    - funlen
     - gochecknoglobals
     - gocognit
     - godot
