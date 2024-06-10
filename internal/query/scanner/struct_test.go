@@ -477,7 +477,7 @@ func TestStruct(t *testing.T) {
 		Int8Int32:     123,
 		Int8Int16:     123,
 		BoolBool:      true,
-		DateTime:      time.Unix(8683200000, 0),
+		DateTime:      time.Unix(8683200000, 0).UTC(),
 		DatetimeTime:  time.Unix(100500, 0),
 		TimestampTime: time.Unix(12345678987, 654321000),
 	}, dst)

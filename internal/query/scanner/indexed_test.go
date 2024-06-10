@@ -399,7 +399,7 @@ func TestIndexed(t *testing.T) {
 				{func(v uint64) *uint64 { return &v }(100500)},
 				{func(v int64) *int64 { return &v }(100500)},
 				{func(v int32) *int32 { return &v }(100500)},
-				{func(v time.Time) *time.Time { return &v }(time.Unix(8683200000, 0))},
+				{func(v time.Time) *time.Time { return &v }(time.Unix(8683200000, 0).UTC())},
 			},
 		},
 		{
