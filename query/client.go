@@ -77,6 +77,8 @@ type (
 		options.DoOption
 		options.DoTxOption
 	}
+	DoOption   = options.DoOption
+	DoTxOption = options.DoTxOption
 )
 
 func WithIdempotent() bothDoAndDoTxOption {

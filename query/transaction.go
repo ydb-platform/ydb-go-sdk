@@ -43,6 +43,7 @@ type (
 	}
 	TransactionControl  = tx.Control
 	TransactionSettings = tx.Settings
+	TransactionOption   = tx.Option
 )
 
 // BeginTx returns selector transaction control option
