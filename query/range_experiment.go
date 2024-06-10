@@ -4,7 +4,6 @@ package query
 
 import (
 	"context"
-
 	"iter"
 )
 

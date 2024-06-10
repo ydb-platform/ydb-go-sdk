@@ -5,7 +5,6 @@ package query
 import (
 	"context"
 	"io"
-
 	"iter"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
