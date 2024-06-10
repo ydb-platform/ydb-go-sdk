@@ -1,3 +1,5 @@
+* Added public types for `tx.Option`, `options.DoOption` and `options.DoTxOption`
+
 ## v3.73.1
 * Changed `query.DefaultTxControl()` from `query.SerializableReadWrite()` with commit to `query.NoTx()`
 
