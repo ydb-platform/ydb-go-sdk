@@ -78,7 +78,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache: true
       - name: Integration test
-        run: go test -race -tags integration -coverpkg=./... -coverprofile integration-secure.txt -covermode atomic ./tests/integration
+        run: GOEXPERIMENT=rangefunc go test -race -tags integration -coverpkg=./... -coverprofile integration-secure.txt -covermode atomic ./tests/integration
       - name: Upload Test secure connection coverage report to Codecov
         uses: codecov/codecov-action@v4
         with:
