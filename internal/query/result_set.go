@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -22,16 +23,12 @@ var (
 
 type (
 	materializedResultSet struct {
-		resultSetRange
-
 		columnNames []string
 		columnTypes []types.Type
 		rows        []query.Row
 		idx         int
 	}
 	resultSet struct {
-		resultSetRange
-
 		index       int64
 		recv        func() (*Ydb_Query.ExecuteQueryResponsePart, error)
 		columns     []*Ydb.Column
@@ -41,6 +38,14 @@ type (
 		done        chan struct{}
 	}
 )
+
+func (rs *materializedResultSet) Range(ctx context.Context) xiter.Seq2[query.Row, error] {
+	return rangeRows(ctx, rs)
+}
+
+func (rs *resultSet) Range(ctx context.Context) xiter.Seq2[query.Row, error] {
+	return rangeRows(ctx, rs)
+}
 
 func (rs *materializedResultSet) Columns() (columnNames []string) {
 	return rs.columnNames
@@ -85,14 +90,11 @@ func NewMaterializedResultSet(
 	columnTypes []types.Type,
 	rows []query.Row,
 ) *materializedResultSet {
-	rs := &materializedResultSet{
+	return &materializedResultSet{
 		columnNames: columnNames,
 		columnTypes: columnTypes,
 		rows:        rows,
 	}
-	rs.resultSetRange = resultSetRange{rs: rs}
-
-	return rs
 }
 
 func newResultSet(
@@ -104,7 +106,7 @@ func newResultSet(
 		t = &trace.Query{}
 	}
 
-	rs := &resultSet{
+	return &resultSet{
 		index:       part.GetResultSetIndex(),
 		recv:        recv,
 		currentPart: part,
@@ -113,9 +115,6 @@ func newResultSet(
 		trace:       t,
 		done:        make(chan struct{}),
 	}
-	rs.resultSetRange = resultSetRange{rs: rs}
-
-	return rs
 }
 
 func (rs *resultSet) nextRow(ctx context.Context) (*row, error) {

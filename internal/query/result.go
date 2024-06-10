@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -23,14 +24,10 @@ var (
 
 type (
 	materializedResult struct {
-		resultRange
-
 		resultSets []query.ResultSet
 		idx        int
 	}
 	result struct {
-		resultRange
-
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
 		closeOnce      func(ctx context.Context) error
 		lastPart       *Ydb_Query.ExecuteQueryResponsePart
@@ -40,6 +37,14 @@ type (
 		trace          *trace.Query
 	}
 )
+
+func (r *materializedResult) Range(ctx context.Context) xiter.Seq2[query.ResultSet, error] {
+	return rangeResultSets(ctx, r)
+}
+
+func (r *result) Range(ctx context.Context) xiter.Seq2[query.ResultSet, error] {
+	return rangeResultSets(ctx, r)
+}
 
 func (r *materializedResult) Close(ctx context.Context) error {
 	return nil
@@ -62,12 +67,9 @@ func (r *materializedResult) Err() error {
 }
 
 func newMaterializedResult(resultSets []query.ResultSet) *materializedResult {
-	r := &materializedResult{
+	return &materializedResult{
 		resultSets: resultSets,
 	}
-	r.resultRange = resultRange{r: r}
-
-	return r
 }
 
 func newResult(
@@ -109,17 +111,14 @@ func newResult(
 			})
 		)
 
-		r := &result{
+		return &result{
 			stream:         stream,
 			resultSetIndex: -1,
 			lastPart:       part,
 			closed:         closed,
 			closeOnce:      closeOnce,
 			trace:          t,
-		}
-		r.resultRange = resultRange{r: r}
-
-		return r, part.GetTxMeta().GetId(), nil
+		}, part.GetTxMeta().GetId(), nil
 	}
 }
 
