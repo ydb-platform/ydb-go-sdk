@@ -84,10 +84,10 @@ func newSingleStreamWriterStopped(
 ) *SingleStreamWriter {
 	return &SingleStreamWriter{
 		cfg: cfg,
-		background: *background.NewWorker(xcontext.ValueOnly(ctxForPProfLabelsOnly), fmt.Sprintf(
-			"ydb-topic-stream-writer-background: %v",
-			cfg.reconnectorInstanceID,
-		)),
+		background: *background.NewWorker(
+			xcontext.ValueOnly(ctxForPProfLabelsOnly),
+			"ydb-topic-stream-writer-background",
+		),
 		closeCompleted: make(empty.Chan),
 	}
 }

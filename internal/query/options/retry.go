@@ -8,11 +8,11 @@ import (
 )
 
 var (
-	_ DoOption = retryOptionsOption(nil)
-	_ DoOption = traceOption{}
+	_ DoOption = RetryOptionsOption(nil)
+	_ DoOption = TraceOption{}
 
-	_ DoTxOption = retryOptionsOption(nil)
-	_ DoTxOption = traceOption{}
+	_ DoTxOption = RetryOptionsOption(nil)
+	_ DoTxOption = TraceOption{}
 	_ DoTxOption = doTxSettingsOption{}
 )
 
@@ -35,8 +35,8 @@ type (
 		txSettings tx.Settings
 	}
 
-	retryOptionsOption []retry.Option
-	traceOption        struct {
+	RetryOptionsOption []retry.Option
+	TraceOption        struct {
 		t *trace.Query
 	}
 	doTxSettingsOption struct {
@@ -56,19 +56,19 @@ func (s *doTxSettings) TxSettings() tx.Settings {
 	return s.txSettings
 }
 
-func (opt traceOption) applyDoOption(s *doSettings) {
+func (opt TraceOption) applyDoOption(s *doSettings) {
 	s.trace = s.trace.Compose(opt.t)
 }
 
-func (opt traceOption) applyDoTxOption(s *doTxSettings) {
+func (opt TraceOption) applyDoTxOption(s *doTxSettings) {
 	opt.applyDoOption(&s.doSettings)
 }
 
-func (opts retryOptionsOption) applyDoOption(s *doSettings) {
+func (opts RetryOptionsOption) applyDoOption(s *doSettings) {
 	s.retryOpts = append(s.retryOpts, opts...)
 }
 
-func (opts retryOptionsOption) applyDoTxOption(s *doTxSettings) {
+func (opts RetryOptionsOption) applyDoTxOption(s *doTxSettings) {
 	opts.applyDoOption(&s.doSettings)
 }
 
@@ -80,19 +80,19 @@ func WithTxSettings(txSettings tx.Settings) doTxSettingsOption {
 	return doTxSettingsOption{txSettings: txSettings}
 }
 
-func WithIdempotent() retryOptionsOption {
+func WithIdempotent() RetryOptionsOption {
 	return []retry.Option{retry.WithIdempotent(true)}
 }
 
-func WithLabel(lbl string) retryOptionsOption {
+func WithLabel(lbl string) RetryOptionsOption {
 	return []retry.Option{retry.WithLabel(lbl)}
 }
 
-func WithTrace(t *trace.Query) traceOption {
-	return traceOption{t: t}
+func WithTrace(t *trace.Query) TraceOption {
+	return TraceOption{t: t}
 }
 
-func WithRetryBudget(b budget.Budget) retryOptionsOption {
+func WithRetryBudget(b budget.Budget) RetryOptionsOption {
 	return []retry.Option{retry.WithBudget(b)}
 }
 

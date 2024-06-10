@@ -364,7 +364,7 @@ type dateValue uint32
 func (v dateValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *time.Time:
-		*vv = DateToTime(uint32(v))
+		*vv = DateToTime(uint32(v)).UTC()
 
 		return nil
 	case *uint64:
@@ -1736,6 +1736,14 @@ type tzTimestampValue string
 
 func (v tzTimestampValue) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
+	case *time.Time:
+		t, err := TzTimestampToTime(string(v))
+		if err != nil {
+			return err
+		}
+		*vv = t
+
+		return nil
 	case *string:
 		*vv = string(v)
 

@@ -75,25 +75,23 @@ type (
 	}
 	DoOption            = options.DoOption
 	DoTxOption          = options.DoTxOption
-	bothDoAndDoTxOption interface {
-		DoOption
-		DoTxOption
-	}
 )
 
-func WithIdempotent() bothDoAndDoTxOption {
+func WithIdempotent() options.RetryOptionsOption {
 	return options.WithIdempotent()
 }
 
-func WithTrace(t *trace.Query) bothDoAndDoTxOption {
+func WithTrace(t *trace.Query) options.TraceOption {
 	return options.WithTrace(t)
 }
 
-func WithLabel(lbl string) bothDoAndDoTxOption {
+func WithLabel(lbl string) options.RetryOptionsOption {
 	return options.WithLabel(lbl)
 }
 
+// WithRetryBudget creates option with external budget
+//
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental
-func WithRetryBudget(b budget.Budget) bothDoAndDoTxOption {
+func WithRetryBudget(b budget.Budget) options.RetryOptionsOption {
 	return options.WithRetryBudget(b)
 }
