@@ -73,8 +73,8 @@ type (
 
 		Session
 	}
-	DoOption            = options.DoOption
-	DoTxOption          = options.DoTxOption
+	DoOption   = options.DoOption
+	DoTxOption = options.DoTxOption
 )
 
 func WithIdempotent() options.RetryOptionsOption {
