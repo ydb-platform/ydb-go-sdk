@@ -4,6 +4,7 @@ package topicreader
 
 import (
 	"context"
+
 	"iter"
 )
 
@@ -15,7 +16,8 @@ func (r *Reader) RangeMessages(ctx context.Context) iter.Seq2[*Message, error] {
 		mess, err := r.ReadMessage(ctx)
 		cont := yield(mess, err)
 		if !cont || err != nil {
-			return
+			return false
 		}
+		return true
 	}
 }
