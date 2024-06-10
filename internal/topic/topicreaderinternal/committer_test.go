@@ -379,7 +379,7 @@ func TestCommitterBuffer(t *testing.T) {
 func newTestCommitter(ctx context.Context, t testing.TB) *committer {
 	res := newCommitterStopped(&trace.Topic{}, ctx, CommitModeAsync, func(msg rawtopicreader.ClientMessage) error {
 		return nil
-	}, -1)
+	})
 	res.Start()
 	t.Cleanup(func() {
 		if err := res.Close(ctx, errors.New("test committer closed")); err != nil {
