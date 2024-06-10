@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/types"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -37,6 +38,14 @@ type (
 		done        chan struct{}
 	}
 )
+
+func (rs *materializedResultSet) Range(ctx context.Context) xiter.Seq2[query.Row, error] {
+	return rangeRows(ctx, rs)
+}
+
+func (rs *resultSet) Range(ctx context.Context) xiter.Seq2[query.Row, error] {
+	return rangeRows(ctx, rs)
+}
 
 func (rs *materializedResultSet) Columns() (columnNames []string) {
 	return rs.columnNames

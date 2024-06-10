@@ -11,6 +11,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xiter"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
 	"github.com/ydb-platform/ydb-go-sdk/v3/query"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
@@ -36,6 +37,14 @@ type (
 		trace          *trace.Query
 	}
 )
+
+func (r *materializedResult) Range(ctx context.Context) xiter.Seq2[query.ResultSet, error] {
+	return rangeResultSets(ctx, r)
+}
+
+func (r *result) Range(ctx context.Context) xiter.Seq2[query.ResultSet, error] {
+	return rangeResultSets(ctx, r)
+}
 
 func (r *materializedResult) Close(ctx context.Context) error {
 	return nil
