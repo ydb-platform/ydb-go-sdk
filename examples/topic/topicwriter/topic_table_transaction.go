@@ -30,5 +30,6 @@ func SendMessageWithinTransaction(ctx context.Context, db *ydb.Driver, writer *t
 		if err != nil {
 			return err
 		}
+		return nil
 	})
 }
