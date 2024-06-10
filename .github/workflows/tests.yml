@@ -29,7 +29,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache: true
       - name: Test
-        run: if [ "$GO" == "1.22" ]; then GOEXPERIMENT=rangefunc; fi; go test -race -coverprofile unit.txt -covermode atomic -v ./...
+        run: if ( "$GO" -eq "1.22" ); then export GOEXPERIMENT=rangefunc; fi; go test -race -coverprofile unit.txt -covermode atomic -v ./...
       - name: Upload coverage report to Codecov
         uses: codecov/codecov-action@v4
         with:
@@ -78,7 +78,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache: true
       - name: Integration test
-        run: if [ "$GO" == "1.22" ]; then GOEXPERIMENT=rangefunc; fi; go test -race -tags integration -coverpkg=./... -coverprofile integration-secure.txt -covermode atomic ./tests/integration
+        run: if ( "$GO" -eq "1.22" ); then export GOEXPERIMENT=rangefunc; fi; go test -race -tags integration -coverpkg=./... -coverprofile integration-secure.txt -covermode atomic ./tests/integration
       - name: Upload Test secure connection coverage report to Codecov
         uses: codecov/codecov-action@v4
         with:
