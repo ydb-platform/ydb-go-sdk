@@ -1,7 +1,7 @@
 ## v3.74.1
 * Allowed the use of DSN without specifying the protocol/scheme
 * Allowed casts from signed YDB types to unsigned destination types if source value is not negative
-* Removed public `query.Identifier` interface for exclude any external implementations for use with YDB
+* Removed public `query.TxIdentifier` interface for exclude any external implementations for use with YDB
 
 ## v3.74.0
 * Added experimental range functions to the `query.Result` and `query.ResultSet` types, available as for-range loops starting with Go version 1.22. These features can be enabled by setting the environment variable `GOEXPERIMENT=rangefunc`.
