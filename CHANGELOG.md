@@ -1,3 +1,5 @@
+* Removed public `query.Identifier` interface for exclude any external implementations for use with YDB
+
 ## v3.74.0
 * Added experimental range functions to the `query.Result` and `query.ResultSet` types, available as for-range loops starting with Go version 1.22. These features can be enabled by setting the environment variable `GOEXPERIMENT=rangefunc`.
 * Added public types for `tx.Option`, `options.DoOption` and `options.DoTxOption`
