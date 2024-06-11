@@ -1,3 +1,4 @@
+* Allowed the use of DSN without specifying the protocol/scheme
 * Removed public `query.Identifier` interface for exclude any external implementations for use with YDB
 
 ## v3.74.0
