@@ -6,6 +6,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
+//nolint:funlen
 func query(config Config) (t trace.Query) {
 	queryConfig := config.WithSystem("query")
 	{
