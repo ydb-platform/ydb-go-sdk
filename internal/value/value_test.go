@@ -951,7 +951,7 @@ func TestCastNumbers(t *testing.T) {
 			len:    8,
 		},
 		{
-			value:  Int64Value(2),
+			value:  Int64Value(-2),
 			signed: true,
 			len:    8,
 		},
@@ -961,7 +961,7 @@ func TestCastNumbers(t *testing.T) {
 			len:    4,
 		},
 		{
-			value:  Int32Value(4),
+			value:  Int32Value(-4),
 			signed: true,
 			len:    4,
 		},
@@ -971,7 +971,7 @@ func TestCastNumbers(t *testing.T) {
 			len:    2,
 		},
 		{
-			value:  Int16Value(6),
+			value:  Int16Value(-6),
 			signed: true,
 			len:    2,
 		},
@@ -981,7 +981,7 @@ func TestCastNumbers(t *testing.T) {
 			len:    1,
 		},
 		{
-			value:  Int8Value(8),
+			value:  Int8Value(-8),
 			signed: true,
 			len:    1,
 		},
@@ -1044,8 +1044,8 @@ func TestCastNumbers(t *testing.T) {
 	}
 	for _, dst := range numberDestinations {
 		for _, src := range numberValues {
-			t.Run(fmt.Sprintf("%s→%s",
-				src.value.Yql(), reflect.ValueOf(dst.destination).Type().Elem().String(),
+			t.Run(fmt.Sprintf("%s(%s)→%s",
+				src.value.Type().Yql(), src.value.Yql(), reflect.ValueOf(dst.destination).Type().Elem().String(),
 			), func(t *testing.T) {
 				mustErr := false
 				switch {
@@ -1061,8 +1061,8 @@ func TestCastNumbers(t *testing.T) {
 					require.NoError(t, err)
 				}
 			})
-			t.Run(fmt.Sprintf("Optional(%s)→%s",
-				src.value.Yql(), reflect.ValueOf(dst.destination).Type().Elem().String(),
+			t.Run(fmt.Sprintf("Optional(%s(%s))→%s",
+				src.value.Type().Yql(), src.value.Yql(), reflect.ValueOf(dst.destination).Type().Elem().String(),
 			), func(t *testing.T) {
 				mustErr := false
 				switch {
@@ -1079,6 +1079,181 @@ func TestCastNumbers(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestCastNegativeNumbers(t *testing.T) {
+	for _, tt := range []struct {
+		value Value
+		dst   interface{}
+		err   error
+	}{
+		{
+			value: Int64Value(1),
+			dst:   ptr[uint64](),
+		},
+		{
+			value: Int64Value(-2),
+			dst:   ptr[uint64](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int64Value(1),
+			dst:   ptr[uint32](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int64Value(-2),
+			dst:   ptr[uint32](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int64Value(1),
+			dst:   ptr[uint16](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int64Value(-2),
+			dst:   ptr[uint16](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int64Value(1),
+			dst:   ptr[uint8](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int64Value(-2),
+			dst:   ptr[uint8](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int32Value(1),
+			dst:   ptr[uint64](),
+		},
+		{
+			value: Int32Value(-2),
+			dst:   ptr[uint64](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int32Value(1),
+			dst:   ptr[uint32](),
+		},
+		{
+			value: Int32Value(-2),
+			dst:   ptr[uint32](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int32Value(1),
+			dst:   ptr[uint16](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int32Value(-2),
+			dst:   ptr[uint16](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int32Value(1),
+			dst:   ptr[uint8](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int32Value(-2),
+			dst:   ptr[uint8](),
+			err:   ErrCannotCast,
+		},
+
+		{
+			value: Int16Value(1),
+			dst:   ptr[uint64](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int16Value(-2),
+			dst:   ptr[uint64](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int16Value(1),
+			dst:   ptr[uint32](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int16Value(-2),
+			dst:   ptr[uint32](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int16Value(1),
+			dst:   ptr[uint16](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int16Value(-2),
+			dst:   ptr[uint16](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int16Value(1),
+			dst:   ptr[uint8](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int32Value(-2),
+			dst:   ptr[uint8](),
+			err:   ErrCannotCast,
+		},
+
+		{
+			value: Int8Value(1),
+			dst:   ptr[uint64](),
+		},
+		{
+			value: Int8Value(-2),
+			dst:   ptr[uint64](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int8Value(1),
+			dst:   ptr[uint32](),
+		},
+		{
+			value: Int8Value(-2),
+			dst:   ptr[uint32](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int8Value(1),
+			dst:   ptr[uint16](),
+		},
+		{
+			value: Int8Value(-2),
+			dst:   ptr[uint16](),
+			err:   ErrCannotCast,
+		},
+		{
+			value: Int8Value(1),
+			dst:   ptr[uint8](),
+		},
+		{
+			value: Int8Value(-2),
+			dst:   ptr[uint8](),
+			err:   ErrCannotCast,
+		},
+	} {
+		t.Run(fmt.Sprintf("%s(%s)→%s",
+			tt.value.Type().Yql(), tt.value.Yql(), reflect.ValueOf(tt.dst).Type().Elem().String(),
+		), func(t *testing.T) {
+			err := CastTo(tt.value, tt.dst)
+			if tt.err != nil {
+				require.ErrorIs(t, err, tt.err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
 	}
 }
 
