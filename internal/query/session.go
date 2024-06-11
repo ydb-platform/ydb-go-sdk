@@ -87,16 +87,6 @@ func createSession(
 		cfg:        cfg,
 		grpcClient: client,
 		statusCode: statusUnknown,
-		checks: []func(*Session) bool{
-			func(s *Session) bool {
-				switch s.status() {
-				case statusIdle, statusInUse:
-					return true
-				default:
-					return false
-				}
-			},
-		},
 	}
 	defer func() {
 		if finalErr != nil && s != nil {
