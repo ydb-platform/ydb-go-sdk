@@ -226,7 +226,6 @@ linters:
     - exhaustivestruct
     - exhaustruct
     - forbidigo
-    - funlen
     - gochecknoglobals
     - gocognit
     - godot
@@ -304,7 +303,10 @@ issues:
     - path: examples
       linters:
         - gomnd
-
+        - funlen
+    - path: tests
+      linters:
+        - funlen
       # Allow underscore and capital camel case for readability
       # Examples: Type_PRIMITIVE_TYPE_ID_UNSPECIFIED, Ydb_Discovery_V1, _voidValue
     - linters:

@@ -918,6 +918,8 @@ func (s *session) ExecuteSchemeQuery(
 }
 
 // DescribeTableOptions describes supported table options.
+//
+//nolint:funlen
 func (s *session) DescribeTableOptions(ctx context.Context) (
 	desc options.TableOptionsDescription,
 	err error,
@@ -1055,6 +1057,8 @@ func (s *session) DescribeTableOptions(ctx context.Context) (
 // Note that given ctx controls the lifetime of the whole read, not only this
 // StreamReadTable() call; that is, the time until returned result is closed
 // via Close() call or fully drained by sequential NextResultSet() calls.
+//
+//nolint:funlen
 func (s *session) StreamReadTable(
 	ctx context.Context,
 	path string,
@@ -1170,6 +1174,8 @@ func (s *session) ReadRows(
 // Note that given ctx controls the lifetime of the whole read, not only this
 // StreamExecuteScanQuery() call; that is, the time until returned result is closed
 // via Close() call or fully drained by sequential NextResultSet() calls.
+//
+//nolint:funlen
 func (s *session) StreamExecuteScanQuery(
 	ctx context.Context,
 	query string,
