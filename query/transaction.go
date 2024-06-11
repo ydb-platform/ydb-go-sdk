@@ -8,11 +8,8 @@ import (
 )
 
 type (
-	TxIdentifier interface {
-		ID() string
-	}
 	TxActor interface {
-		TxIdentifier
+		tx.Identifier
 
 		// Execute executes query.
 		//
