@@ -359,7 +359,7 @@ func TestExecute(t *testing.T) {
 		tx, r, err := execute(ctx, newTestSession("123"), client, "", options.ExecuteSettings())
 		require.NoError(t, err)
 		defer r.Close(ctx)
-		require.EqualValues(t, "456", tx.id)
+		require.EqualValues(t, "456", tx.ID())
 		require.EqualValues(t, "123", tx.s.id)
 		require.EqualValues(t, -1, r.resultSetIndex)
 		{
@@ -576,7 +576,7 @@ func TestExecute(t *testing.T) {
 			tx, r, err := execute(ctx, newTestSession("123"), client, "", options.ExecuteSettings())
 			require.NoError(t, err)
 			defer r.Close(ctx)
-			require.EqualValues(t, "456", tx.id)
+			require.EqualValues(t, "456", tx.ID())
 			require.EqualValues(t, "123", tx.s.id)
 			require.EqualValues(t, -1, r.resultSetIndex)
 			{
@@ -716,7 +716,7 @@ func TestExecute(t *testing.T) {
 			tx, r, err := execute(ctx, newTestSession("123"), client, "", options.ExecuteSettings())
 			require.NoError(t, err)
 			defer r.Close(ctx)
-			require.EqualValues(t, "456", tx.id)
+			require.EqualValues(t, "456", tx.ID())
 			require.EqualValues(t, "123", tx.s.id)
 			require.EqualValues(t, -1, r.resultSetIndex)
 			{

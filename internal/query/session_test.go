@@ -29,7 +29,7 @@ func TestBegin(t *testing.T) {
 		t.Log("begin")
 		tx, err := begin(ctx, service, &Session{id: "123"}, query.TxSettings())
 		require.NoError(t, err)
-		require.Equal(t, "123", tx.id)
+		require.Equal(t, "123", tx.ID())
 	})
 	t.Run("TransportError", func(t *testing.T) {
 		ctx := xtest.Context(t)
