@@ -699,3 +699,28 @@ func TestNamedCastFailed(t *testing.T) {
 	err := scanner.ScanNamed(NamedRef("a", &A))
 	require.ErrorIs(t, err, value.ErrCannotCast)
 }
+
+func TestNamedCastFailedErrMsg(t *testing.T) {
+	scanner := Named(Data(
+		[]*Ydb.Column{
+			{
+				Name: "a",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_UTF8,
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Value: &Ydb.Value_TextValue{
+					TextValue: "test",
+				},
+			},
+		},
+	))
+	var A uint64
+	err := scanner.ScanNamed(NamedRef("a", &A))
+	require.ErrorContains(t, err, "scan error on column name 'a': cast failed")
+}

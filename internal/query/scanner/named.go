@@ -57,7 +57,7 @@ func (s NamedScanner) ScanNamed(dst ...NamedDestination) (err error) {
 			return xerrors.WithStackTrace(err)
 		}
 		if err = value.CastTo(v, dst[i].Ref()); err != nil {
-			return xerrors.WithStackTrace(err)
+			return xerrors.WithStackTrace(fmt.Errorf("scan error on column name '%s': %w", dst[i].Name(), err))
 		}
 	}
 

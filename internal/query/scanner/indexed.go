@@ -29,7 +29,7 @@ func (s IndexedScanner) Scan(dst ...interface{}) (err error) {
 	for i := range dst {
 		v := s.data.seekByIndex(i)
 		if err := value.CastTo(v, dst[i]); err != nil {
-			return xerrors.WithStackTrace(err)
+			return xerrors.WithStackTrace(fmt.Errorf("scan error on column index %d: %w", i, err))
 		}
 	}
 

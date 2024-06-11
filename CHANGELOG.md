@@ -1,3 +1,5 @@
+* Added description to scan errors with use query service client scanner
+
 ## v3.74.1
 * Allowed the use of DSN without specifying the protocol/scheme
 * Allowed casts from signed YDB types to unsigned destination types if source value is not negative
