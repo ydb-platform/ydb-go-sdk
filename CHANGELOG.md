@@ -1,3 +1,4 @@
+## v3.74.2
 * Added description to scan errors with use query service client scanner
 
 ## v3.74.1
