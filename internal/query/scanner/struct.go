@@ -61,7 +61,7 @@ func (s StructScanner) ScanStruct(dst interface{}, opts ...ScanStructOption) (er
 			missingColumns = append(missingColumns, name)
 		} else {
 			if err = value.CastTo(v, ptr.Elem().Field(i).Addr().Interface()); err != nil {
-				return xerrors.WithStackTrace(err)
+				return xerrors.WithStackTrace(fmt.Errorf("scan error on struct field name '%s': %w", name, err))
 			}
 			existingFields[name] = struct{}{}
 		}

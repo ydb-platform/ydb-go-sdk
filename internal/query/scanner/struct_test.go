@@ -563,6 +563,33 @@ func TestStructCastFailed(t *testing.T) {
 	require.ErrorIs(t, err, value.ErrCannotCast)
 }
 
+func TestStructCastFailedErrMsg(t *testing.T) {
+	scanner := Struct(Data(
+		[]*Ydb.Column{
+			{
+				Name: "A",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_UTF8,
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Value: &Ydb.Value_TextValue{
+					TextValue: "test",
+				},
+			},
+		},
+	))
+	var row struct {
+		A uint64
+	}
+	err := scanner.ScanStruct(&row)
+	require.ErrorContains(t, err, "scan error on struct field name 'A': cast failed")
+}
+
 func TestStructNotFoundColumns(t *testing.T) {
 	scanner := Struct(Data(
 		[]*Ydb.Column{
