@@ -1,4 +1,4 @@
-* Diabled check the node is available for query service session 
+* Removed check the node is available for query and table service sessions 
 
 ## v3.74.2
 * Added description to scan errors with use query service client scanner
