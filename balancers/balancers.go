@@ -6,6 +6,7 @@ import (
 
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xslices"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xstring"
 )
 
@@ -91,6 +92,10 @@ func PreferLocations(balancer *balancerConfig.Config, locations ...string) *bala
 	if len(locations) == 0 {
 		panic("empty list of locations")
 	}
+
+	// Prevent modify source locations
+	locations = xslices.Clone(locations)
+
 	for i := range locations {
 		locations[i] = strings.ToUpper(locations[i])
 	}
