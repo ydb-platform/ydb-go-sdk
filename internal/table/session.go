@@ -17,8 +17,8 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
-	balancerContext "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	balancerContext "github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/feature"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
@@ -159,7 +159,7 @@ func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config
 	s.tableService = Ydb_Table_V1.NewTableServiceClient(
 		conn.WithBeforeFunc(
 			conn.WithContextModifier(cc, func(ctx context.Context) context.Context {
-				return meta.WithTrailerCallback(balancerContext.WithEndpoint(ctx, s), s.checkCloseHint)
+				return meta.WithTrailerCallback(balancerContext.WithNodeID(ctx, s.NodeID()), s.checkCloseHint)
 			}),
 			func() {
 				s.lastUsage.Store(time.Now().Unix())

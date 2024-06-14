@@ -9,6 +9,7 @@ import (
 
 	balancerConfig "github.com/ydb-platform/ydb-go-sdk/v3/internal/balancer/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/mock"
 )
 
@@ -447,7 +448,7 @@ func TestConnection(t *testing.T) {
 			&mock.Conn{AddrField: "1", State: conn.Online, NodeIDField: 1},
 			&mock.Conn{AddrField: "2", State: conn.Online, NodeIDField: 2},
 		}, nil, balancerConfig.Info{}, false)
-		c, failed := s.GetConnection(WithEndpoint(context.Background(), &mock.Endpoint{AddrField: "2", NodeIDField: 2}))
+		c, failed := s.GetConnection(endpoint.WithNodeID(context.Background(), 2))
 		require.Equal(t, &mock.Conn{AddrField: "2", State: conn.Online, NodeIDField: 2}, c)
 		require.Equal(t, 0, failed)
 	})
@@ -456,7 +457,7 @@ func TestConnection(t *testing.T) {
 			&mock.Conn{AddrField: "1", State: conn.Online, NodeIDField: 1},
 			&mock.Conn{AddrField: "2", State: conn.Unknown, NodeIDField: 2},
 		}, nil, balancerConfig.Info{}, false)
-		c, failed := s.GetConnection(WithEndpoint(context.Background(), &mock.Endpoint{AddrField: "2", NodeIDField: 2}))
+		c, failed := s.GetConnection(endpoint.WithNodeID(context.Background(), 2))
 		require.Equal(t, &mock.Conn{AddrField: "1", State: conn.Online, NodeIDField: 1}, c)
 		require.Equal(t, 0, failed)
 	})
