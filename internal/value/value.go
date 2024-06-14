@@ -804,65 +804,21 @@ func (v int8Value) castTo(dst interface{}) error {
 
 		return nil
 
-	case *uint64:
-		if v < 0 {
-			return xerrors.WithStackTrace(fmt.Errorf(
-				"%w '%s(%+v)' to '%T' destination",
-				ErrCannotCast, v.Type().Yql(), v, vv,
-			))
-		}
-
-		*vv = uint64(v)
-
-		return nil
 	case *int32:
 		*vv = int32(v)
 
 		return nil
 
-	case *uint32:
-		if v < 0 {
-			return xerrors.WithStackTrace(fmt.Errorf(
-				"%w '%s(%+v)' to '%T' destination",
-				ErrCannotCast, v.Type().Yql(), v, vv,
-			))
-		}
-
-		*vv = uint32(v)
-
-		return nil
 	case *int16:
 		*vv = int16(v)
 
 		return nil
 
-	case *uint16:
-		if v < 0 {
-			return xerrors.WithStackTrace(fmt.Errorf(
-				"%w '%s(%+v)' to '%T' destination",
-				ErrCannotCast, v.Type().Yql(), v, vv,
-			))
-		}
-
-		*vv = uint16(v)
-
-		return nil
 	case *int8:
 		*vv = int8(v)
 
 		return nil
 
-	case *uint8:
-		if v < 0 {
-			return xerrors.WithStackTrace(fmt.Errorf(
-				"%w '%s(%+v)' to '%T' destination",
-				ErrCannotCast, v.Type().Yql(), v, vv,
-			))
-		}
-
-		*vv = uint8(v)
-
-		return nil
 	case *float64:
 		*vv = float64(v)
 
@@ -981,49 +937,16 @@ func (v int32Value) castTo(dst interface{}) error {
 
 		return nil
 
-	case *uint64:
-		if v < 0 {
-			return xerrors.WithStackTrace(fmt.Errorf(
-				"%w '%s(%+v)' to '%T' destination",
-				ErrCannotCast, v.Type().Yql(), v, vv,
-			))
-		}
-
-		*vv = uint64(v)
-
-		return nil
 	case *int:
 		*vv = int(v)
 
 		return nil
 
-	case *uint:
-		if v < 0 {
-			return xerrors.WithStackTrace(fmt.Errorf(
-				"%w '%s(%+v)' to '%T' destination",
-				ErrCannotCast, v.Type().Yql(), v, vv,
-			))
-		}
-
-		*vv = uint(v)
-
-		return nil
 	case *int32:
 		*vv = int32(v)
 
 		return nil
 
-	case *uint32:
-		if v < 0 {
-			return xerrors.WithStackTrace(fmt.Errorf(
-				"%w '%s(%+v)' to '%T' destination",
-				ErrCannotCast, v.Type().Yql(), v, vv,
-			))
-		}
-
-		*vv = uint32(v)
-
-		return nil
 	case *float64:
 		*vv = float64(v)
 
@@ -1079,17 +1002,6 @@ func (v int64Value) castTo(dst interface{}) error {
 
 		return nil
 
-	case *uint64:
-		if v < 0 {
-			return xerrors.WithStackTrace(fmt.Errorf(
-				"%w '%s(%+v)' to '%T' destination",
-				ErrCannotCast, v.Type().Yql(), v, vv,
-			))
-		}
-
-		*vv = uint64(v)
-
-		return nil
 	case *float64:
 		*vv = float64(v)
 
