@@ -431,7 +431,11 @@ func (w *WriterReconnector) handleReconnectRetry(
 	startOfRetries time.Time,
 ) bool {
 	retryDuration := w.cfg.clock.Since(startOfRetries)
-	if backoff, stopRetryReason := topic.RetryDecision(reconnectReason, w.retrySettings, retryDuration); stopRetryReason == nil {
+	if backoff, stopRetryReason := topic.RetryDecision(
+		reconnectReason,
+		w.retrySettings,
+		retryDuration,
+	); stopRetryReason == nil {
 		delay := backoff.Delay(attempt)
 		delayTimer := w.cfg.clock.NewTimer(delay)
 		select {

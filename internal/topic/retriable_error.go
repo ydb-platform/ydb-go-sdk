@@ -17,9 +17,7 @@ const (
 	connectionEstablishedTimeout = time.Minute
 )
 
-var (
-	errNil = xerrors.Wrap(errors.New("nil error is not retrieable"))
-)
+var errNil = xerrors.Wrap(errors.New("nil error is not retrieable"))
 
 type RetrySettings struct {
 	StartTimeout time.Duration // Full retry timeout
@@ -59,7 +57,8 @@ func CheckResetReconnectionCounters(lastTry, now time.Time, connectionTimeout ti
 
 // RetryDecision check if err is retriable.
 // if return nil stopRetryReason - err can be retried
-// if return non nil stopRetryReason - err is not retriable and stopRetryReason contains reason, which should be used instead of err
+// if return non nil stopRetryReason - err is not retriable and stopRetryReason contains reason,
+// which should be used instead of err
 func RetryDecision(checkErr error, settings RetrySettings, retriesDuration time.Duration) (
 	_ backoff.Backoff,
 	stopRetryReason error,
@@ -94,7 +93,10 @@ func RetryDecision(checkErr error, settings RetrySettings, retriesDuration time.
 	case PublicRetryDecisionRetry:
 		// pass
 	case PublicRetryDecisionStop:
-		return nil, fmt.Errorf("ydb: topic reader unretriable error by check error callback: %w", xerrors.Nonretryable(checkErr))
+		return nil, fmt.Errorf(
+			"ydb: topic reader unretriable error by check error callback: %w",
+			xerrors.Nonretryable(checkErr),
+		)
 	default:
 		panic(fmt.Errorf("unexpected retry decision: %v", decision))
 	}

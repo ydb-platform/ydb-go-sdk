@@ -234,6 +234,7 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 			} else {
 				_ = r.CloseWithError(ctx, stopRetryReason)
 				onReconnectionDone(stopRetryReason)
+
 				return
 			}
 		}
