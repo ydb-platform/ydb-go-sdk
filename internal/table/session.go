@@ -113,6 +113,10 @@ func (s *session) isClosing() bool {
 	return s.Status() == table.SessionClosing
 }
 
+func (s *session) isReady() bool {
+	return s.Status() == table.SessionReady
+}
+
 func newSession(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) (
 	s *session, err error,
 ) {

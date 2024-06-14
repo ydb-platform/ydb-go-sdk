@@ -25,16 +25,7 @@ import (
 // sessionBuilder is the interface that holds logic of creating sessions.
 type sessionBuilder func(ctx context.Context) (*session, error)
 
-type nodeChecker interface {
-	HasNode(id uint32) bool
-}
-
-type balancer interface {
-	grpc.ClientConnInterface
-	nodeChecker
-}
-
-func New(ctx context.Context, balancer balancer, config *config.Config) *Client {
+func New(ctx context.Context, cc grpc.ClientConnInterface, config *config.Config) *Client {
 	onDone := trace.TableOnInit(config.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table.New"),
 	)
@@ -42,27 +33,26 @@ func New(ctx context.Context, balancer balancer, config *config.Config) *Client 
 		onDone(config.SizeLimit())
 	}()
 
-	return newClient(ctx, balancer, func(ctx context.Context) (s *session, err error) {
-		return newSession(ctx, balancer, config)
+	return newClient(ctx, cc, func(ctx context.Context) (s *session, err error) {
+		return newSession(ctx, cc, config)
 	}, config)
 }
 
 func newClient(
 	ctx context.Context,
-	balancer balancer,
+	cc grpc.ClientConnInterface,
 	builder sessionBuilder,
 	config *config.Config,
 ) *Client {
 	c := &Client{
-		clock:       config.Clock(),
-		config:      config,
-		cc:          balancer,
-		nodeChecker: balancer,
-		build:       builder,
-		index:       make(map[*session]sessionInfo),
-		idle:        list.New(),
-		waitQ:       list.New(),
-		limit:       config.SizeLimit(),
+		clock:  config.Clock(),
+		config: config,
+		cc:     cc,
+		build:  builder,
+		index:  make(map[*session]sessionInfo),
+		idle:   list.New(),
+		waitQ:  list.New(),
+		limit:  config.SizeLimit(),
 		waitChPool: sync.Pool{
 			New: func() interface{} {
 				ch := make(chan *session)
@@ -84,11 +74,10 @@ func newClient(
 // A Client is safe for use by multiple goroutines simultaneously.
 type Client struct {
 	// read-only fields
-	config      *config.Config
-	build       sessionBuilder
-	cc          grpc.ClientConnInterface
-	nodeChecker nodeChecker
-	clock       clockwork.Clock
+	config *config.Config
+	build  sessionBuilder
+	cc     grpc.ClientConnInterface
+	clock  clockwork.Clock
 
 	// read-write fields
 	mu                xsync.Mutex
@@ -404,7 +393,7 @@ func (c *Client) internalPoolGet(ctx context.Context, opts ...getOption) (s *ses
 		i++
 		s = tryGetIdleSession(c)
 		if s != nil {
-			if !isValidNode(c, s) {
+			if !s.isReady() {
 				closeInvalidSession(ctx, s)
 				s = nil
 
@@ -435,11 +424,6 @@ func tryGetIdleSession(c *Client) *session {
 	})
 
 	return s
-}
-
-//nolint:interfacer
-func isValidNode(c *Client, s *session) bool {
-	return c.nodeChecker == nil || c.nodeChecker.HasNode(s.NodeID())
 }
 
 func closeInvalidSession(ctx context.Context, s *session) {
@@ -598,9 +582,6 @@ func (c *Client) Put(ctx context.Context, s *session) (err error) {
 
 	case s.isClosed():
 		return xerrors.WithStackTrace(errSessionClosed)
-
-	case c.nodeChecker != nil && !c.nodeChecker.HasNode(s.NodeID()):
-		return xerrors.WithStackTrace(errNodeIsNotObservable)
 
 	default:
 		c.mu.Lock()

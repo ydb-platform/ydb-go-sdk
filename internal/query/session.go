@@ -21,18 +21,15 @@ import (
 
 var _ query.Session = (*Session)(nil)
 
-type (
-	Session struct {
-		cfg        *config.Config
-		id         string
-		nodeID     int64
-		grpcClient Ydb_Query_V1.QueryServiceClient
-		statusCode statusCode
-		closeOnce  func(ctx context.Context) error
-		checks     []func(s *Session) bool
-	}
-	sessionOption func(session *Session)
-)
+type Session struct {
+	cfg        *config.Config
+	id         string
+	nodeID     int64
+	grpcClient Ydb_Query_V1.QueryServiceClient
+	statusCode statusCode
+	closeOnce  func(ctx context.Context) error
+	checks     []func(s *Session) bool
+}
 
 func (s *Session) ReadRow(ctx context.Context, q string, opts ...options.ExecuteOption) (row query.Row, _ error) {
 	_, r, err := s.Execute(ctx, q, opts...)
@@ -74,39 +71,19 @@ func (s *Session) ReadResultSet(ctx context.Context, q string, opts ...options.E
 	return rs, nil
 }
 
-func withSessionCheck(f func(*Session) bool) sessionOption {
-	return func(s *Session) {
-		s.checks = append(s.checks, f)
-	}
-}
-
-func createSession(
-	ctx context.Context, client Ydb_Query_V1.QueryServiceClient, cfg *config.Config, opts ...sessionOption,
-) (s *Session, finalErr error) {
+func createSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, cfg *config.Config) (
+	s *Session, finalErr error,
+) {
 	s = &Session{
 		cfg:        cfg,
 		grpcClient: client,
 		statusCode: statusUnknown,
-		checks: []func(*Session) bool{
-			func(s *Session) bool {
-				switch s.status() {
-				case statusIdle, statusInUse:
-					return true
-				default:
-					return false
-				}
-			},
-		},
 	}
 	defer func() {
 		if finalErr != nil && s != nil {
 			s.setStatus(statusError)
 		}
 	}()
-
-	for _, opt := range opts {
-		opt(s)
-	}
 
 	onDone := trace.QueryOnSessionCreate(s.cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.createSession"),

@@ -20,15 +20,6 @@ import (
 
 //go:generate mockgen -destination grpc_client_mock_test.go -package query -write_package_comment=false github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1 QueryServiceClient,QueryService_AttachSessionClient,QueryService_ExecuteQueryClient
 
-type nodeChecker interface {
-	HasNode(id uint32) bool
-}
-
-type balancer interface {
-	grpc.ClientConnInterface
-	nodeChecker
-}
-
 var _ query.Client = (*Client)(nil)
 
 type Client struct {
@@ -284,7 +275,7 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 	return nil
 }
 
-func New(ctx context.Context, balancer balancer, cfg *config.Config) *Client {
+func New(ctx context.Context, balancer grpc.ClientConnInterface, cfg *config.Config) *Client {
 	onDone := trace.QueryOnNew(cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.New"),
 	)
@@ -313,11 +304,7 @@ func New(ctx context.Context, balancer balancer, cfg *config.Config) *Client {
 			}
 			defer cancelCreate()
 
-			s, err := createSession(createCtx, client.grpcClient, cfg,
-				withSessionCheck(func(s *Session) bool {
-					return balancer.HasNode(uint32(s.nodeID))
-				}),
-			)
+			s, err := createSession(createCtx, client.grpcClient, cfg)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
