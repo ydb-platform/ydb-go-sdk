@@ -304,11 +304,7 @@ func New(ctx context.Context, balancer grpc.ClientConnInterface, cfg *config.Con
 			}
 			defer cancelCreate()
 
-			s, err := createSession(createCtx, client.grpcClient, cfg,
-				withSessionCheck(func(s *Session) bool {
-					return true
-				}),
-			)
+			s, err := createSession(createCtx, client.grpcClient, cfg)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
