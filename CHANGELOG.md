@@ -1,5 +1,5 @@
 * Removed check the node is available for query and table service sessions 
-* Refactored the `balancers.PreferLocations()' function - it is a clean/pure function
+* Refactored the `balancers.PreferLocations()` function - it is a clean/pure function
 
 ## v3.74.2
 * Added description to scan errors with use query service client scanner
