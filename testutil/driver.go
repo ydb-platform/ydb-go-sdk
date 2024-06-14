@@ -138,10 +138,6 @@ type balancerStub struct {
 	) (grpc.ClientStream, error)
 }
 
-func (b *balancerStub) HasNode(id uint32) bool {
-	return true
-}
-
 func (b *balancerStub) Invoke(
 	ctx context.Context,
 	method string,

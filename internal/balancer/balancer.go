@@ -46,19 +46,6 @@ type Balancer struct {
 	onApplyDiscoveredEndpoints []func(ctx context.Context, endpoints []endpoint.Info)
 }
 
-func (b *Balancer) HasNode(id uint32) bool {
-	if b.config.SingleConn {
-		return true
-	}
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-	if _, has := b.connectionsState.connByNodeID[id]; has {
-		return true
-	}
-
-	return false
-}
-
 func (b *Balancer) OnUpdate(onApplyDiscoveredEndpoints func(ctx context.Context, endpoints []endpoint.Info)) {
 	b.mu.WithLock(func() {
 		b.onApplyDiscoveredEndpoints = append(b.onApplyDiscoveredEndpoints, onApplyDiscoveredEndpoints)
