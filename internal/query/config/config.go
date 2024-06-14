@@ -19,6 +19,7 @@ type Config struct {
 
 	poolLimit int
 
+	useSessionPool       bool
 	sessionCreateTimeout time.Duration
 	sessionDeleteTimeout time.Duration
 
@@ -67,4 +68,8 @@ func (c *Config) SessionCreateTimeout() time.Duration {
 // If SessionDeleteTimeout is less than or equal to zero then the DefaultSessionDeleteTimeout is used.
 func (c *Config) SessionDeleteTimeout() time.Duration {
 	return c.sessionDeleteTimeout
+}
+
+func (c *Config) UseSessionPool() bool {
+	return c.useSessionPool
 }

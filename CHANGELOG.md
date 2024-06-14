@@ -2,6 +2,7 @@
 * Refactored the `balancers.PreferLocations()` function - it is a clean/pure function
 * Added experimental `balancers.WithNodeID()` context modifier for define per request the YDB endpoint by NodeID
 * Reverted the allowing the casts from signed YDB types to unsigned destination types if source value is not negative
+* Replaced internal query session pool by default to stub for exclude impact from internal/pool 
 
 ## v3.74.2
 * Added description to scan errors with use query service client scanner

@@ -31,7 +31,6 @@ func TestQueryExecute(t *testing.T) {
 	db, err := ydb.Open(ctx,
 		os.Getenv("YDB_CONNECTION_STRING"),
 		ydb.WithAccessTokenCredentials(os.Getenv("YDB_ACCESS_TOKEN_CREDENTIALS")),
-		ydb.WithSessionPoolSizeLimit(10),
 		ydb.WithTraceQuery(
 			log.Query(
 				log.Default(os.Stdout,
@@ -80,7 +79,7 @@ func TestQueryExecute(t *testing.T) {
 	t.Run("Stats", func(t *testing.T) {
 		s, err := query.Stats(db.Query())
 		require.NoError(t, err)
-		require.EqualValues(t, 10, s.Limit)
+		require.EqualValues(t, -1, s.Limit)
 	})
 	t.Run("Scan", func(t *testing.T) {
 		var (
