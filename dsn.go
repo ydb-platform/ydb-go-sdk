@@ -43,6 +43,7 @@ func UnregisterDsnParser(registrationID int) {
 	dsnParsers[registrationID] = nil
 }
 
+//nolint:funlen
 func parseConnectionString(dataSourceName string) (opts []Option, _ error) {
 	info, err := dsn.Parse(dataSourceName)
 	if err != nil {

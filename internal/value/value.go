@@ -788,6 +788,7 @@ func FloatValue(v float32) *floatValue {
 
 type int8Value int8
 
+//nolint:funlen
 func (v int8Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
@@ -964,6 +965,7 @@ func Int16Value(v int16) int16Value {
 
 type int32Value int32
 
+//nolint:funlen
 func (v int32Value) castTo(dst interface{}) error {
 	switch vv := dst.(type) {
 	case *string:
