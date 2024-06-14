@@ -1,6 +1,7 @@
 package xerrors
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 
@@ -50,4 +51,17 @@ func TestRetryableCode(t *testing.T) {
 			require.Equal(t, tt.code, err.Code())
 		})
 	}
+}
+
+func TestRetriableError(t *testing.T) {
+	t.Run("retryable", func(t *testing.T) {
+		retriable := Retryable(errors.New("test"))
+		wrapped := fmt.Errorf("wrap: %w", retriable)
+		require.Equal(t, retriable, RetryableError(retriable))
+		require.Equal(t, retriable, RetryableError(wrapped))
+	})
+	t.Run("unretryable", func(t *testing.T) {
+		require.Nil(t, RetryableError(errors.New("test")))
+		require.Nil(t, RetryableError(Nonretryable(Retryable(errors.New("test")))))
+	})
 }

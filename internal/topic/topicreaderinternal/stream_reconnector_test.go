@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/background"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
@@ -424,7 +426,8 @@ func TestTopicReaderReconnectorFireReconnectOnRetryableError(t *testing.T) {
 		}
 
 		testErr := errors.New("test")
-		reconnector.fireReconnectOnRetryableError(stream, xerrors.Retryable(testErr))
+		//reconnector.fireReconnectOnRetryableError(stream, xerrors.Retryable(testErr))
+		reconnector.fireReconnectOnRetryableError(stream, xerrors.TransportError(status.Error(codes.Unavailable, "test err")))
 		res := <-reconnector.reconnectFromBadStream
 		require.Equal(t, stream, res.oldReader)
 		require.ErrorIs(t, res.reason, testErr)
@@ -469,7 +472,7 @@ func TestTopicReaderReconnectorReconnectWithError(t *testing.T) {
 		tracer:    &trace.Topic{},
 	}
 	reconnector.initChannelsAndClock()
-	err := reconnector.reconnect(ctx, nil, nil)
+	err := reconnector.reconnect(ctx, nil)
 	require.ErrorIs(t, err, testErr)
 	require.ErrorIs(t, reconnector.streamErr, testErr)
 }
