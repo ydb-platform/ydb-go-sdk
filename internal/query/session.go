@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Query"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/allocator"
@@ -78,6 +79,16 @@ func createSession(ctx context.Context, client Ydb_Query_V1.QueryServiceClient, 
 		cfg:        cfg,
 		grpcClient: client,
 		statusCode: statusUnknown,
+		checks: []func(s *Session) bool{
+			func(s *Session) bool {
+				switch s.status() {
+				case statusClosed, statusClosing, statusError:
+					return false
+				default:
+					return true
+				}
+			},
+		},
 	}
 	defer func() {
 		if finalErr != nil && s != nil {
@@ -263,6 +274,10 @@ func (s *Session) Begin(
 
 	tx, err = begin(ctx, s.grpcClient, s, txSettings)
 	if err != nil {
+		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
+			s.setStatus(statusClosed)
+		}
+
 		return nil, xerrors.WithStackTrace(err)
 	}
 	tx.s = s
@@ -301,6 +316,10 @@ func (s *Session) Execute(
 
 	tx, r, err := execute(ctx, s, s.grpcClient, q, options.ExecuteSettings(opts...))
 	if err != nil {
+		if xerrors.IsOperationError(err, Ydb.StatusIds_BAD_SESSION) {
+			s.setStatus(statusClosed)
+		}
+
 		return nil, nil, xerrors.WithStackTrace(err)
 	}
 
