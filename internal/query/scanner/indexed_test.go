@@ -399,7 +399,7 @@ func TestIndexed(t *testing.T) {
 				{func(v uint64) *uint64 { return &v }(100500)},
 				{func(v int64) *int64 { return &v }(100500)},
 				{func(v int32) *int32 { return &v }(100500)},
-				{func(v time.Time) *time.Time { return &v }(time.Unix(8683200000, 0))},
+				{func(v time.Time) *time.Time { return &v }(time.Unix(8683200000, 0).UTC())},
 			},
 		},
 		{
@@ -555,4 +555,29 @@ func TestIndexedCastFailed(t *testing.T) {
 	var A uint64
 	err := scanner.Scan(&A)
 	require.ErrorIs(t, err, value.ErrCannotCast)
+}
+
+func TestIndexedCastFailedErrMsg(t *testing.T) {
+	scanner := Indexed(Data(
+		[]*Ydb.Column{
+			{
+				Name: "a",
+				Type: &Ydb.Type{
+					Type: &Ydb.Type_TypeId{
+						TypeId: Ydb.Type_UTF8,
+					},
+				},
+			},
+		},
+		[]*Ydb.Value{
+			{
+				Value: &Ydb.Value_TextValue{
+					TextValue: "test",
+				},
+			},
+		},
+	))
+	var A uint64
+	err := scanner.Scan(&A)
+	require.ErrorContains(t, err, "scan error on column index 0: cast failed")
 }

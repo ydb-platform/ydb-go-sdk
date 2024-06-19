@@ -6,27 +6,31 @@ import (
 	"time"
 )
 
-type Info interface {
-	NodeID() uint32
-	Address() string
-	Location() string
-	LastUpdated() time.Time
-	LoadFactor() float32
+type (
+	NodeID interface {
+		NodeID() uint32
+	}
+	Info interface {
+		NodeID
+		Address() string
+		Location() string
+		LastUpdated() time.Time
+		LoadFactor() float32
 
-	// Deprecated: LocalDC check "local" by compare endpoint location with discovery "selflocation" field.
-	// It work good only if connection url always point to local dc.
-	// Will be removed after Oct 2024.
-	// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
-	LocalDC() bool
-}
+		// Deprecated: LocalDC check "local" by compare endpoint location with discovery "selflocation" field.
+		// It work good only if connection url always point to local dc.
+		// Will be removed after Oct 2024.
+		// Read about versioning policy: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#deprecated
+		LocalDC() bool
+	}
+	Endpoint interface {
+		Info
 
-type Endpoint interface {
-	Info
-
-	String() string
-	Copy() Endpoint
-	Touch(opts ...Option)
-}
+		String() string
+		Copy() Endpoint
+		Touch(opts ...Option)
+	}
+)
 
 type endpoint struct { //nolint:maligned
 	mu       sync.RWMutex

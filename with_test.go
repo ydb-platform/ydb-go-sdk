@@ -21,7 +21,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/conn"
 )
 
-func TestWithCertificatesCached(t *testing.T) { //nolint:funlen
+func TestWithCertificatesCached(t *testing.T) {
 	ca := &x509.Certificate{
 		SerialNumber: big.NewInt(2019),
 		Subject: pkix.Name{

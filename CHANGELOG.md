@@ -1,3 +1,27 @@
+* Removed check the node is available for query and table service sessions 
+* Refactored the `balancers.PreferLocations()` function - it is a clean/pure function
+* Added experimental `balancers.WithNodeID()` context modifier for define per request the YDB endpoint by NodeID
+* Reverted the allowing the casts from signed YDB types to unsigned destination types if source value is not negative
+
+## v3.74.2
+* Added description to scan errors with use query service client scanner
+
+## v3.74.1
+* Allowed the use of DSN without specifying the protocol/scheme
+* Allowed casts from signed YDB types to unsigned destination types if source value is not negative
+* Removed public `query.TxIdentifier` interface for exclude any external implementations for use with YDB
+
+## v3.74.0
+* Added experimental range functions to the `query.Result` and `query.ResultSet` types, available as for-range loops starting with Go version 1.22. These features can be enabled by setting the environment variable `GOEXPERIMENT=rangefunc`.
+* Added public types for `tx.Option`, `options.DoOption` and `options.DoTxOption`
+
+## v3.73.1
+* Changed `query.DefaultTxControl()` from `query.SerializableReadWrite()` with commit to `query.NoTx()`
+
+## v3.73.0
+* Added experimental `retry.DoWithResult` and `retry.DoTxWithResult` helpers for retry lambda and return value from lambda
+
+## v3.72.0
 * Excluded `Query()` method from interface `ydb.Connection`. Method `Query()` remains accessible from `ydb.Driver`
 
 ## v3.71.0
@@ -23,7 +47,7 @@
 * Downgraded minimal version of Go to 1.20
 * Refactored internal packages by `ifshort` linter issues
 
-# v3.68.0
+## v3.68.0
 * Added experimental `ydb.{Register,Unregister}DsnParser` global funcs for register/unregister external custom DSN parser for `ydb.Open` and `sql.Open` driver constructor
 * Simple implement option WithReaderWithoutConsumer
 * Fixed bug: topic didn't send specified partition number to a server 

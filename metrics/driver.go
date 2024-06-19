@@ -9,6 +9,8 @@ import (
 )
 
 // driver makes driver with New publishing
+//
+//nolint:funlen
 func driver(config Config) (t trace.Driver) {
 	config = config.WithSystem("driver")
 	endpoints := config.WithSystem("balancer").GaugeVec("endpoints", "az")

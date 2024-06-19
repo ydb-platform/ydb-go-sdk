@@ -26,6 +26,7 @@ type (
 	}
 	Identifier interface {
 		ID() string
+		isYdbTx()
 	}
 )
 

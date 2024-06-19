@@ -3,6 +3,7 @@ package dsn
 import (
 	"fmt"
 	"net/url"
+	"regexp"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -10,6 +11,8 @@ import (
 
 var (
 	insecureSchema = "grpc"
+	secureSchema   = "grpcs"
+	reScheme       = regexp.MustCompile(`^\w+://`)
 	databaseParam  = "database"
 )
 
@@ -25,7 +28,13 @@ type parsedInfo struct {
 }
 
 func Parse(dsn string) (info parsedInfo, err error) {
-	uri, err := url.Parse(dsn)
+	uri, err := url.ParseRequestURI(func() string {
+		if reScheme.MatchString(dsn) {
+			return dsn
+		}
+
+		return secureSchema + "://" + dsn
+	}())
 	if err != nil {
 		return info, xerrors.WithStackTrace(err)
 	}

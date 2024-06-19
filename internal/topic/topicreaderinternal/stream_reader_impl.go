@@ -156,12 +156,9 @@ func newTopicStreamReaderStopped(
 		rawMessagesFromBuffer: make(chan rawtopicreader.ServerMessage, 1),
 	}
 
-	res.backgroundWorkers = *background.NewWorker(stopPump, fmt.Sprintf(
-		"topic-reader-stream-background: %v",
-		res.readerID,
-	))
+	res.backgroundWorkers = *background.NewWorker(stopPump, "topic-reader-stream-background")
 
-	res.committer = newCommitterStopped(cfg.Trace, labeledContext, cfg.CommitMode, res.send, res.readerID)
+	res.committer = newCommitterStopped(cfg.Trace, labeledContext, cfg.CommitMode, res.send)
 	res.committer.BufferTimeLagTrigger = cfg.CommitterBatchTimeLag
 	res.committer.BufferCountTrigger = cfg.CommitterBatchCounterTrigger
 	res.sessionController.init()

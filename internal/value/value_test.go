@@ -951,7 +951,7 @@ func TestCastNumbers(t *testing.T) {
 			len:    8,
 		},
 		{
-			value:  Int64Value(2),
+			value:  Int64Value(-2),
 			signed: true,
 			len:    8,
 		},
@@ -961,7 +961,7 @@ func TestCastNumbers(t *testing.T) {
 			len:    4,
 		},
 		{
-			value:  Int32Value(4),
+			value:  Int32Value(-4),
 			signed: true,
 			len:    4,
 		},
@@ -971,7 +971,7 @@ func TestCastNumbers(t *testing.T) {
 			len:    2,
 		},
 		{
-			value:  Int16Value(6),
+			value:  Int16Value(-6),
 			signed: true,
 			len:    2,
 		},
@@ -981,7 +981,7 @@ func TestCastNumbers(t *testing.T) {
 			len:    1,
 		},
 		{
-			value:  Int8Value(8),
+			value:  Int8Value(-8),
 			signed: true,
 			len:    1,
 		},
@@ -1044,8 +1044,8 @@ func TestCastNumbers(t *testing.T) {
 	}
 	for _, dst := range numberDestinations {
 		for _, src := range numberValues {
-			t.Run(fmt.Sprintf("%s→%s",
-				src.value.Yql(), reflect.ValueOf(dst.destination).Type().Elem().String(),
+			t.Run(fmt.Sprintf("%s(%s)→%s",
+				src.value.Type().Yql(), src.value.Yql(), reflect.ValueOf(dst.destination).Type().Elem().String(),
 			), func(t *testing.T) {
 				mustErr := false
 				switch {
@@ -1061,8 +1061,8 @@ func TestCastNumbers(t *testing.T) {
 					require.NoError(t, err)
 				}
 			})
-			t.Run(fmt.Sprintf("Optional(%s)→%s",
-				src.value.Yql(), reflect.ValueOf(dst.destination).Type().Elem().String(),
+			t.Run(fmt.Sprintf("Optional(%s(%s))→%s",
+				src.value.Type().Yql(), src.value.Yql(), reflect.ValueOf(dst.destination).Type().Elem().String(),
 			), func(t *testing.T) {
 				mustErr := false
 				switch {

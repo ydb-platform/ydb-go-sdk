@@ -1,3 +1,5 @@
+//go:build go1.22 && goexperiment.rangefunc
+
 package query_test
 
 import (
@@ -39,6 +41,84 @@ func Example_readRow() {
 	}
 
 	fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
+}
+
+func Example_rangeWithLegacyGo() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close(ctx) // cleanup resources
+	var (
+		id    int32  // required value
+		myStr string // optional value
+	)
+	r, err := db.Query().Execute(ctx, `SELECT 42 as id, "my string" as myStr`)
+	if err != nil {
+		panic(err)
+	}
+	r.Range(ctx)(func(rs query.ResultSet, err error) bool {
+		if err != nil {
+			return false
+		}
+		rs.Range(ctx)(func(row query.Row, err error) bool {
+			if err != nil {
+				return false
+			}
+			err = row.ScanNamed(
+				query.Named("id", &id),
+				query.Named("myStr", &myStr),
+			)
+			if err != nil {
+				return false
+			}
+
+			fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
+
+			return true
+		})
+
+		return true
+	})
+}
+
+func Example_rangeExperiment() {
+	ctx := context.TODO()
+	db, err := ydb.Open(ctx, "grpc://localhost:2136/local")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close(ctx) // cleanup resources
+	var (
+		id    int32  // required value
+		myStr string // optional value
+	)
+	r, err := db.Query().Execute(ctx, `SELECT 42 as id, "my string" as myStr`)
+	if err != nil {
+		panic(err)
+	}
+	// for loop with Range available with Go version 1.22+ and flag `GOEXPERIMENT=rangefunc`.
+	for rs, err := range r.Range(ctx) {
+		if err != nil {
+			panic(err)
+		}
+		// for loop with Range available with Go version 1.22+ and flag `GOEXPERIMENT=rangefunc`.
+		for row, err := range rs.Range(ctx) {
+			if err != nil {
+				panic(err)
+			}
+			err = row.ScanNamed(
+				query.Named("id", &id),
+				query.Named("myStr", &myStr),
+			)
+			if err != nil {
+				panic(err)
+			}
+
+			fmt.Printf("id=%v, myStr='%s'\n", id, myStr)
+		}
+	}
 }
 
 func Example_selectWithoutParameters() {

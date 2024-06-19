@@ -8,11 +8,8 @@ import (
 )
 
 type (
-	TxIdentifier interface {
-		ID() string
-	}
 	TxActor interface {
-		TxIdentifier
+		tx.Identifier
 
 		// Execute executes query.
 		//
@@ -43,10 +40,11 @@ type (
 	}
 	TransactionControl  = tx.Control
 	TransactionSettings = tx.Settings
+	TransactionOption   = tx.Option
 )
 
 // BeginTx returns selector transaction control option
-func BeginTx(opts ...tx.Option) tx.ControlOption {
+func BeginTx(opts ...TransactionOption) tx.ControlOption {
 	return tx.BeginTx(opts...)
 }
 
@@ -72,12 +70,9 @@ func NoTx() *TransactionControl {
 	return nil
 }
 
-// DefaultTxControl returns default transaction control with serializable read-write isolation mode and auto-commit
+// DefaultTxControl returns default transaction control for use default tx control on server-side
 func DefaultTxControl() *TransactionControl {
-	return TxControl(
-		BeginTx(WithSerializableReadWrite()),
-		CommitTx(),
-	)
+	return NoTx()
 }
 
 // SerializableReadWriteTxControl returns transaction control with serializable read-write isolation mode
@@ -114,19 +109,19 @@ func TxSettings(opts ...tx.Option) TransactionSettings {
 	return opts
 }
 
-func WithDefaultTxMode() tx.Option {
+func WithDefaultTxMode() TransactionOption {
 	return tx.WithDefaultTxMode()
 }
 
-func WithSerializableReadWrite() tx.Option {
+func WithSerializableReadWrite() TransactionOption {
 	return tx.WithSerializableReadWrite()
 }
 
-func WithSnapshotReadOnly() tx.Option {
+func WithSnapshotReadOnly() TransactionOption {
 	return tx.WithSnapshotReadOnly()
 }
 
-func WithStaleReadOnly() tx.Option {
+func WithStaleReadOnly() TransactionOption {
 	return tx.WithStaleReadOnly()
 }
 
@@ -134,6 +129,6 @@ func WithInconsistentReads() tx.OnlineReadOnlyOption {
 	return tx.WithInconsistentReads()
 }
 
-func WithOnlineReadOnly(opts ...tx.OnlineReadOnlyOption) tx.Option {
+func WithOnlineReadOnly(opts ...tx.OnlineReadOnlyOption) TransactionOption {
 	return tx.WithOnlineReadOnly(opts...)
 }
