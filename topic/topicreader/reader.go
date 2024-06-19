@@ -73,9 +73,9 @@ func (r *Reader) Commit(ctx context.Context, obj CommitRangeGetter) error {
 
 type Transaction interface {
 	ID() string
-	//SessionID() string
-	//OnPrecommit(f func(ctx context.Context) error)
-	//OnComplete(f func(ctx context.Context, commitError error))
+	// SessionID() string
+	// OnPrecommit(f func(ctx context.Context) error)
+	// OnComplete(f func(ctx context.Context, commitError error))
 }
 
 // CommitMessagesInTx attach the messages to the transaction. The messages will be committed on the server
@@ -83,7 +83,7 @@ type Transaction interface {
 // If transaction will be failed - the reader will cancel all current messages.
 // The behaviour can be set by WithContinueOnFailedCommit option to start reader.
 func (r *Reader) CommitMessagesInTx(ctx context.Context, tx Transaction, obj CommitRangeGetter) error {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
@@ -93,7 +93,7 @@ func (r *Reader) CommitMessagesInTx(ctx context.Context, tx Transaction, obj Com
 // Now it means reconnect to the server and re-read messages from the server to the readers buffer.
 // The reconnect is implementation detail and may be changed in the future.
 func (r *Reader) PopBatchTx(ctx context.Context, tx Transaction) (*Batch, error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
