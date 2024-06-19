@@ -36,7 +36,8 @@ import (
 )
 
 //nolint:gocyclo
-func TestConnection(t *testing.T) {
+func TestConnection(sourceTest *testing.T) {
+	t := xtest.MakeSyncedTest(sourceTest)
 	const sumColumn = "sum"
 	var (
 		userAgent     = "connection user agent"
@@ -71,7 +72,7 @@ func TestConnection(t *testing.T) {
 		ctx = xtest.Context(t)
 	)
 
-	t.Run("ydb.New", func(t *testing.T) {
+	t.RunSynced("ydb.New", func(t *xtest.SyncedTest) {
 		db, err := ydb.New(ctx, //nolint:gocritic
 			ydb.WithConnectionString(os.Getenv("YDB_CONNECTION_STRING")),
 			ydb.WithAccessTokenCredentials(
@@ -98,7 +99,7 @@ func TestConnection(t *testing.T) {
 			}
 		}()
 	})
-	t.Run("ydb.Open", func(t *testing.T) {
+	t.RunSynced("ydb.Open", func(t *xtest.SyncedTest) {
 		db, err := ydb.Open(ctx,
 			os.Getenv("YDB_CONNECTION_STRING"),
 			ydb.WithAccessTokenCredentials(
