@@ -22,7 +22,7 @@ func externalSystemUnlock(ctx context.Context, topic string, partition int64) er
 	panic("example stub")
 }
 
-func processBatch(ctx context.Context, batch *topicreader.Batch) {
+func processBatch(ctx context.Context, batch *topicreader.Batch) (result int, err error) {
 	// recommend derive ctx from batch.Context() for handle signal about stop message processing
 	panic("example stub")
 }
