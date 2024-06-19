@@ -11,8 +11,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/topic/topicwriter"
 )
 
-func SendMessageWithinTransaction(ctx context.Context, db *ydb.Driver, writer *topicwriter.Writer, id int64) {
-	db.Query().DoTx(ctx, func(ctx context.Context, t query.TxActor) error {
+func SendMessageWithinTransaction(ctx context.Context, db *ydb.Driver, writer *topicwriter.Writer, id int64) error {
+	return db.Query().DoTx(ctx, func(ctx context.Context, t query.TxActor) error {
 		row, err := t.ReadRow(ctx, "SELECT val FROM table WHERE id=$id", query.WithParameters(
 			ydb.ParamsBuilder().
 				Param("$id").Int64(id).

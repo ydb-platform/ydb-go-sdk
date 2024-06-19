@@ -45,9 +45,9 @@ func (w *Writer) Write(ctx context.Context, messages ...Message) error {
 
 type Transaction interface {
 	ID() string
-	//SessionID() string
-	//OnPrecommit(f func(ctx context.Context) error)
-	//OnComplete(f func(ctx context.Context, commitError error))
+	// SessionID() string
+	// OnPrecommit(f func(ctx context.Context) error)
+	// OnComplete(f func(ctx context.Context, commitError error))
 }
 
 // WriteWithTx attach the messages to the transaction.
@@ -55,7 +55,7 @@ type Transaction interface {
 // The message can be discarded if the transaction failed/rolled back.
 // No retries for send message after first send attempt. If the send failed - the transaction will be failed too.
 func (r *Writer) WriteWithTx(ctx context.Context, tx Transaction, messages ...Message) error {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
