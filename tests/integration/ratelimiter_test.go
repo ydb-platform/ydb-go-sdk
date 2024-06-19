@@ -18,7 +18,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-func TestRatelimiter(t *testing.T) {
+func TestRatelimiter(sourceTest *testing.T) {
+	t := xtest.MakeSyncedTest(sourceTest)
 	const (
 		testCoordinationNodePath = "/local/ratelimiter_test"
 		testResource             = "test_resource"
