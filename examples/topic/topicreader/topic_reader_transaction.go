@@ -44,7 +44,7 @@ UPSERT INTO t (id, val) VALUES($id, COALESCE($last, 0) + $value)
 	}
 }
 
-func PopWithTransactino(ctx context.Context, db *ydb.Driver, reader *topicreader.Reader) error {
+func PopWithTransaction(ctx context.Context, db *ydb.Driver, reader *topicreader.Reader) error {
 	for { // loop
 		if ctx.Err() != nil {
 			return ctx.Err()
