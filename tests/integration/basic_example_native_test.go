@@ -26,6 +26,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/balancers"
 	"github.com/ydb-platform/ydb-go-sdk/v3/config"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 	"github.com/ydb-platform/ydb-go-sdk/v3/log"
 	"github.com/ydb-platform/ydb-go-sdk/v3/meta"
 	"github.com/ydb-platform/ydb-go-sdk/v3/sugar"
@@ -154,7 +155,8 @@ func (s *stats) removeFromInFlight(t testing.TB, id string) {
 	delete(s.inFlightSessions, id)
 }
 
-func TestBasicExampleNative(t *testing.T) { //nolint:gocyclo
+func TestBasicExampleNative(sourceTest *testing.T) { //nolint:gocyclo
+	t := xtest.MakeSyncedTest(sourceTest)
 	folder := t.Name()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 42*time.Second)

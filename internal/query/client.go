@@ -2,10 +2,12 @@ package query
 
 import (
 	"context"
+	"sync/atomic"
 
 	"github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1"
 	"google.golang.org/grpc"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/closer"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/pool/stats"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/query/config"
@@ -20,14 +22,74 @@ import (
 
 //go:generate mockgen -destination grpc_client_mock_test.go -package query -write_package_comment=false github.com/ydb-platform/ydb-go-genproto/Ydb_Query_V1 QueryServiceClient,QueryService_AttachSessionClient,QueryService_ExecuteQueryClient
 
-var _ query.Client = (*Client)(nil)
+var (
+	_ query.Client = (*Client)(nil)
+	_ sessionPool  = (*poolStub)(nil)
+	_ sessionPool  = (*pool.Pool[*Session, Session])(nil)
+)
 
-type Client struct {
-	config     *config.Config
-	grpcClient Ydb_Query_V1.QueryServiceClient
-	pool       *pool.Pool[*Session, Session]
+type (
+	sessionPool interface {
+		closer.Closer
 
-	done chan struct{}
+		Stats() stats.Stats
+		With(ctx context.Context, f func(ctx context.Context, s *Session) error, opts ...retry.Option) error
+	}
+	poolStub struct {
+		createSession func(ctx context.Context) (*Session, error)
+		InUse         atomic.Int32
+	}
+	Client struct {
+		config *config.Config
+		client Ydb_Query_V1.QueryServiceClient
+		pool   sessionPool
+
+		done chan struct{}
+	}
+)
+
+func (pool *poolStub) Close(ctx context.Context) error {
+	return nil
+}
+
+func (pool *poolStub) Stats() stats.Stats {
+	return stats.Stats{
+		Limit: -1,
+		Index: 0,
+		Idle:  0,
+		InUse: int(pool.InUse.Load()),
+	}
+}
+
+func (pool *poolStub) With(
+	ctx context.Context, f func(ctx context.Context, s *Session) error, opts ...retry.Option,
+) error {
+	pool.InUse.Add(1)
+	defer func() {
+		pool.InUse.Add(-1)
+	}()
+
+	err := retry.Retry(ctx, func(ctx context.Context) (err error) {
+		s, err := pool.createSession(ctx)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+		defer func() {
+			_ = s.Close(ctx)
+		}()
+
+		err = f(ctx, s)
+		if err != nil {
+			return xerrors.WithStackTrace(err)
+		}
+
+		return nil
+	}, opts...)
+	if err != nil {
+		return xerrors.WithStackTrace(err)
+	}
+
+	return nil
 }
 
 func (c *Client) Stats() *stats.Stats {
@@ -48,7 +110,7 @@ func (c *Client) Close(ctx context.Context) error {
 
 func do(
 	ctx context.Context,
-	pool *pool.Pool[*Session, Session],
+	pool sessionPool,
 	op query.Operation,
 	opts ...retry.Option,
 ) (finalErr error) {
@@ -100,7 +162,7 @@ func (c *Client) Do(ctx context.Context, op query.Operation, opts ...options.DoO
 
 func doTx(
 	ctx context.Context,
-	pool *pool.Pool[*Session, Session],
+	pool sessionPool,
 	op query.TxOperation,
 	t *trace.Query,
 	opts ...options.DoTxOption,
@@ -169,7 +231,7 @@ func (c *Client) ReadRow(ctx context.Context, q string, opts ...options.ExecuteO
 }
 
 func clientExecute(ctx context.Context,
-	pool *pool.Pool[*Session, Session],
+	pool sessionPool,
 	q string, opts ...options.ExecuteOption,
 ) (r query.Result, err error) {
 	err = do(ctx, pool, func(ctx context.Context, s query.Session) (err error) {
@@ -275,24 +337,37 @@ func (c *Client) DoTx(ctx context.Context, op query.TxOperation, opts ...options
 	return nil
 }
 
+func newPool(
+	ctx context.Context, cfg *config.Config, createSession func(ctx context.Context) (*Session, error),
+) sessionPool {
+	if cfg.UseSessionPool() {
+		return pool.New(ctx,
+			pool.WithLimit[*Session, Session](cfg.PoolLimit()),
+			pool.WithTrace[*Session, Session](poolTrace(cfg.Trace())),
+			pool.WithCreateItemTimeout[*Session, Session](cfg.SessionCreateTimeout()),
+			pool.WithCloseItemTimeout[*Session, Session](cfg.SessionDeleteTimeout()),
+			pool.WithCreateFunc(createSession),
+		)
+	}
+
+	return &poolStub{
+		createSession: createSession,
+	}
+}
+
 func New(ctx context.Context, balancer grpc.ClientConnInterface, cfg *config.Config) *Client {
 	onDone := trace.QueryOnNew(cfg.Trace(), &ctx,
 		stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/query.New"),
 	)
 	defer onDone()
 
-	client := &Client{
-		config:     cfg,
-		grpcClient: Ydb_Query_V1.NewQueryServiceClient(balancer),
-		done:       make(chan struct{}),
-	}
+	grpcClient := Ydb_Query_V1.NewQueryServiceClient(balancer)
 
-	client.pool = pool.New(ctx,
-		pool.WithLimit[*Session, Session](cfg.PoolLimit()),
-		pool.WithTrace[*Session, Session](poolTrace(cfg.Trace())),
-		pool.WithCreateItemTimeout[*Session, Session](cfg.SessionCreateTimeout()),
-		pool.WithCloseItemTimeout[*Session, Session](cfg.SessionDeleteTimeout()),
-		pool.WithCreateFunc(func(ctx context.Context) (_ *Session, err error) {
+	client := &Client{
+		config: cfg,
+		client: grpcClient,
+		done:   make(chan struct{}),
+		pool: newPool(ctx, cfg, func(ctx context.Context) (_ *Session, err error) {
 			var (
 				createCtx    context.Context
 				cancelCreate context.CancelFunc
@@ -304,14 +379,14 @@ func New(ctx context.Context, balancer grpc.ClientConnInterface, cfg *config.Con
 			}
 			defer cancelCreate()
 
-			s, err := createSession(createCtx, client.grpcClient, cfg)
+			s, err := createSession(createCtx, grpcClient, cfg)
 			if err != nil {
 				return nil, xerrors.WithStackTrace(err)
 			}
 
 			return s, nil
 		}),
-	)
+	}
 
 	return client
 }

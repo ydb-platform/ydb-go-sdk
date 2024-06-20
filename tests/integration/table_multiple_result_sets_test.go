@@ -28,7 +28,8 @@ type scopeTableStreamExecuteScanQuery struct {
 	sum uint64
 }
 
-func TestTableMultipleResultSets(t *testing.T) {
+func TestTableMultipleResultSets(sourceTest *testing.T) {
+	t := xtest.MakeSyncedTest(sourceTest)
 	var (
 		scope = &scopeTableStreamExecuteScanQuery{
 			folder:          t.Name(),

@@ -6,6 +6,10 @@ on:
       - release-*
   pull_request:
   workflow_dispatch:
+  # For detect flaky tests
+  schedule:
+    - cron: "45 * * * *"
+
 jobs:
   unit:
     concurrency:

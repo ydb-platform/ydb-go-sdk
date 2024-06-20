@@ -5,110 +5,129 @@ import (
 	"testing"
 )
 
-func MakeSyncedTest(t testing.TB) *SyncedTest {
+func MakeSyncedTest(t *testing.T) *SyncedTest {
 	return &SyncedTest{
-		TB: t,
+		T: t,
 	}
 }
 
 type SyncedTest struct {
 	m sync.Mutex
-	testing.TB
+	*testing.T
 }
 
 func (s *SyncedTest) Cleanup(f func()) {
 	s.m.Lock()
 	defer s.m.Unlock()
-	s.TB.Helper()
+	s.T.Helper()
 
-	s.TB.Cleanup(f)
+	s.T.Cleanup(f)
 }
 
 func (s *SyncedTest) Error(args ...interface{}) {
 	s.m.Lock()
 	defer s.m.Unlock()
-	s.TB.Helper()
+	s.T.Helper()
 
-	s.TB.Error(args...)
+	s.T.Error(args...)
 }
 
 func (s *SyncedTest) Errorf(format string, args ...interface{}) {
 	s.m.Lock()
 	defer s.m.Unlock()
-	s.TB.Helper()
+	s.T.Helper()
 
-	s.TB.Errorf(format, args...)
+	s.T.Errorf(format, args...)
 }
 
 func (s *SyncedTest) Fail() {
 	s.m.Lock()
 	defer s.m.Unlock()
-	s.TB.Helper()
+	s.T.Helper()
 
-	s.TB.Fail()
+	s.T.Fail()
 }
 
 func (s *SyncedTest) FailNow() {
 	s.m.Lock()
 	defer s.m.Unlock()
-	s.TB.Helper()
+	s.T.Helper()
 
-	s.TB.FailNow()
+	s.T.FailNow()
 }
 
 func (s *SyncedTest) Failed() bool {
 	s.m.Lock()
 	defer s.m.Unlock()
-	s.TB.Helper()
+	s.T.Helper()
 
-	return s.TB.Failed()
+	return s.T.Failed()
 }
 
 func (s *SyncedTest) Fatal(args ...interface{}) {
 	s.m.Lock()
 	defer s.m.Unlock()
-	s.TB.Helper()
+	s.T.Helper()
 
-	s.TB.Fatal(args...)
+	s.T.Fatal(args...)
 }
 
 func (s *SyncedTest) Fatalf(format string, args ...interface{}) {
 	s.m.Lock()
 	defer s.m.Unlock()
-	s.TB.Helper()
+	s.T.Helper()
 
-	s.TB.Fatalf(format, args...)
+	s.T.Fatalf(format, args...)
 }
 
 // must direct called
 // func (s *SyncedTest) Helper() {
 //	s.m.Lock()
 //	defer s.m.Unlock()
-//	s.TB.Helper()
+//	s.T.Helper()
 //}
 
 func (s *SyncedTest) Log(args ...interface{}) {
 	s.m.Lock()
 	defer s.m.Unlock()
-	s.TB.Helper()
+	s.T.Helper()
 
-	s.TB.Log(args...)
+	s.T.Log(args...)
 }
 
 func (s *SyncedTest) Logf(format string, args ...interface{}) {
 	s.m.Lock()
 	defer s.m.Unlock()
-	s.TB.Helper()
+	s.T.Helper()
 
-	s.TB.Logf(format, args...)
+	s.T.Logf(format, args...)
 }
 
 func (s *SyncedTest) Name() string {
 	s.m.Lock()
 	defer s.m.Unlock()
-	s.TB.Helper()
+	s.T.Helper()
 
-	return s.TB.Name()
+	return s.T.Name()
+}
+
+func (s *SyncedTest) Run(name string, f func(t *testing.T)) bool {
+	s.m.Lock()
+	defer s.m.Unlock()
+	s.T.Helper()
+
+	return s.T.Run(name, f)
+}
+
+func (s *SyncedTest) RunSynced(name string, f func(t *SyncedTest)) bool {
+	s.m.Lock()
+	defer s.m.Unlock()
+	s.T.Helper()
+
+	return s.T.Run(name, func(t *testing.T) {
+		syncedTest := MakeSyncedTest(t)
+		f(syncedTest)
+	})
 }
 
 func (s *SyncedTest) Setenv(key, value string) {
@@ -118,38 +137,38 @@ func (s *SyncedTest) Setenv(key, value string) {
 func (s *SyncedTest) Skip(args ...interface{}) {
 	s.m.Lock()
 	defer s.m.Unlock()
-	s.TB.Helper()
+	s.T.Helper()
 
-	s.TB.Skip(args...)
+	s.T.Skip(args...)
 }
 
 func (s *SyncedTest) SkipNow() {
 	s.m.Lock()
 	defer s.m.Unlock()
-	s.TB.Helper()
+	s.T.Helper()
 
-	s.TB.SkipNow()
+	s.T.SkipNow()
 }
 
 func (s *SyncedTest) Skipf(format string, args ...interface{}) {
 	s.m.Lock()
 	defer s.m.Unlock()
-	s.TB.Helper()
-	s.TB.Skipf(format, args...)
+	s.T.Helper()
+	s.T.Skipf(format, args...)
 }
 
 func (s *SyncedTest) Skipped() bool {
 	s.m.Lock()
 	defer s.m.Unlock()
-	s.TB.Helper()
+	s.T.Helper()
 
-	return s.TB.Skipped()
+	return s.T.Skipped()
 }
 
 func (s *SyncedTest) TempDir() string {
 	s.m.Lock()
 	defer s.m.Unlock()
-	s.TB.Helper()
+	s.T.Helper()
 
-	return s.TB.TempDir()
+	return s.T.TempDir()
 }

@@ -30,7 +30,8 @@ import (
 )
 
 //nolint:gocyclo
-func TestConnectionSecure(t *testing.T) {
+func TestConnectionSecure(sourceTest *testing.T) {
+	t := xtest.MakeSyncedTest(sourceTest)
 	dsn, has := os.LookupEnv("YDB_CONNECTION_STRING_SECURE")
 	if !has {
 		t.Skipf("require YDB_CONNECTION_STRING_SECURE env")

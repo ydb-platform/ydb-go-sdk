@@ -430,7 +430,7 @@ func (registry *registryConfig) Details() trace.Details {
 	return registry.details
 }
 
-func withMetrics(t *testing.T, details trace.Details, interval time.Duration) ydb.Option {
+func withMetrics(t testing.TB, details trace.Details, interval time.Duration) ydb.Option {
 	registry := &registryConfig{
 		details:    details,
 		gauges:     newVec[gaugeVec](),

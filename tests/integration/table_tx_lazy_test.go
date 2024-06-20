@@ -28,6 +28,8 @@ func TestTableTxLazy(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	require.NotNil(t, db)
+
 	t.Run("tx", func(t *testing.T) {
 		t.Run("lazy", func(t *testing.T) {
 			err := db.Table().Do(ctx,

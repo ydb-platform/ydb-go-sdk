@@ -465,9 +465,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 			}, nil)
 
 			strm.EXPECT().Recv().Do(func() {
-				t.Logf("waiting close channel: %v", name)
 				xtest.WaitChannelClosed(t, streamClosed)
-				t.Logf("channel closed: %v", name)
 			}).Return(nil, errors.New("test stream closed")).MaxTimes(1)
 
 			return strm
