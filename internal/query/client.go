@@ -119,10 +119,6 @@ func do(
 
 		err := op(ctx, s)
 		if err != nil {
-			if !xerrors.IsRetryObjectValid(err) {
-				s.setStatus(statusError)
-			}
-
 			return xerrors.WithStackTrace(err)
 		}
 

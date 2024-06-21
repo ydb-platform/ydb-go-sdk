@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"context"
@@ -69,7 +69,7 @@ const dropTableQuery = `
 DROP TABLE %s
 `
 
-func NewStorage(ctx context.Context, cfg *config.Config, poolSize int) (*Storage, error) {
+func NewStorage(ctx context.Context, cfg *config.Config, poolSize int, label string) (*Storage, error) {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute*5) //nolint:gomnd
 	defer cancel()
 
@@ -219,7 +219,7 @@ func (s *Storage) Write(ctx context.Context, e generator.Row) (attempts int, fin
 	return attempts, err
 }
 
-func (s *Storage) createTable(ctx context.Context) error {
+func (s *Storage) CreateTable(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(s.cfg.WriteTimeout)*time.Millisecond)
 	defer cancel()
 
@@ -237,7 +237,7 @@ func (s *Storage) createTable(ctx context.Context) error {
 	)
 }
 
-func (s *Storage) dropTable(ctx context.Context) error {
+func (s *Storage) DropTable(ctx context.Context) error {
 	err := ctx.Err()
 	if err != nil {
 		return err
@@ -260,7 +260,7 @@ func (s *Storage) dropTable(ctx context.Context) error {
 	)
 }
 
-func (s *Storage) close(ctx context.Context) error {
+func (s *Storage) Close(ctx context.Context) error {
 	s.retryBudget.Stop()
 
 	var (
