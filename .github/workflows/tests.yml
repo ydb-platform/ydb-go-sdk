@@ -32,14 +32,16 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           cache: true
-      - name: Test
+      - name: Run tests
         run: go test -race -coverprofile unit.txt -covermode atomic -v ./...
-      - name: Upload coverage report to Codecov
+      - name: Upload unit-tests coverage report to Codecov
         uses: codecov/codecov-action@v4
         with:
           file: ./unit.txt
           flags: unit,${{ matrix.os }},go-${{ matrix.go-version }}
           name: unit
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
   integration:
     concurrency:
       group: integration-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
@@ -81,14 +83,16 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           cache: true
-      - name: Integration test
+      - name: Run tests
         run: go test -race -tags integration -coverpkg=./... -coverprofile integration.txt -covermode atomic ./tests/integration
-      - name: Upload Test secure connection coverage report to Codecov
+      - name: Upload integration-tests coverage report to Codecov
         uses: codecov/codecov-action@v4
         with:
           file: ./integration.txt
           flags: integration,${{ matrix.os }},go-${{ matrix.go-version }},ydb-${{ matrix.ydb-version }}
           name: integration
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
   experiment:
     concurrency:
       group: experiment-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
@@ -131,11 +135,13 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           cache: true
-      - name: Integration test
+      - name: Run tests
         run: go test -race -tags integration -coverpkg=./... -coverprofile experiment.txt -covermode atomic ./...
-      - name: Upload Test secure connection coverage report to Codecov
+      - name: Upload experimental-tests coverage report to Codecov
         uses: codecov/codecov-action@v4
         with:
-          file: ./integration-secure.txt
+          file: ./experiment.txt
           flags: experiment,${{ matrix.os }},go-${{ matrix.go-version }},ydb-${{ matrix.ydb-version }}
           name: experiment
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
