@@ -9,8 +9,8 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/wrap"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
@@ -173,7 +173,7 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) {
 	}
 
 	if s.wrapping {
-		if operation, ok := m.(wrap.StreamOperationResponse); ok {
+		if operation, ok := m.(operation.Status); ok {
 			if status := operation.GetStatus(); status != Ydb.StatusIds_SUCCESS {
 				return s.wrapError(
 					xerrors.Operation(

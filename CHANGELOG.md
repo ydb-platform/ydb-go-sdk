@@ -1,5 +1,8 @@
 * Fixed handle reconnection timeout error 
 
+## v3.74.4
+* Fixed bug with fail cast of grpc response to `operation.{Response,Status}`
+
 ## v3.74.3
 * Removed check the node is available for query and table service sessions 
 * Refactored the `balancers.PreferLocations()` function - it is a clean/pure function
