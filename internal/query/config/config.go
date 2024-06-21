@@ -43,7 +43,7 @@ func defaults() *Config {
 		sessionCreateTimeout: DefaultSessionCreateTimeout,
 		sessionDeleteTimeout: DefaultSessionDeleteTimeout,
 		trace:                &trace.Query{},
-		useSessionPool:       false,
+		useSessionPool:       true,
 	}
 }
 
