@@ -10,8 +10,8 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/credentials"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/bind"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/dsn"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/xsql"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql"
 )
 
 const tablePathPrefixTransformer = "table_path_prefix"

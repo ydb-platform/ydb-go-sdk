@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/table/xsql/badconn"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsql/badconn"
 )
 
 func Unwrap[T *sql.DB | *sql.Conn](v T) (connector *Connector, err error) {

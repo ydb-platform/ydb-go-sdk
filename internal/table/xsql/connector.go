@@ -333,7 +333,7 @@ func (c *Connector) Connect(ctx context.Context) (_ driver.Conn, err error) {
 	var (
 		onDone = trace.DatabaseSQLOnConnectorConnect(
 			c.trace, &ctx,
-			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/xsql.(*Connector).Connect"),
+			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/table/xsql.(*Connector).Connect"),
 		)
 		session table.ClosableSession
 	)
