@@ -299,7 +299,107 @@ func (c *conn) Close(ctx context.Context) (err error) {
 	return c.wrapError(err)
 }
 
+var (
+	onTransportErrorStub = func(ctx context.Context, err error) {}
+	wrapErrorStub        = func(err error) error { return err }
+)
+
 //nolint:funlen
+func invoke(
+	ctx context.Context,
+	method string,
+	req, reply any,
+	cc grpc.ClientConnInterface,
+	onTransportError func(context.Context, error),
+	address string,
+	wrapError func(err error) error,
+	opts ...grpc.CallOption,
+) (
+	opID string,
+	issues []trace.Issue,
+	_ error,
+) {
+	useWrapping := UseWrapping(ctx)
+
+	ctx, traceID, err := meta.TraceID(ctx)
+	if err != nil {
+		return opID, issues, xerrors.WithStackTrace(err)
+	}
+
+	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID))
+
+	if onTransportError == nil {
+		onTransportError = onTransportErrorStub
+	}
+
+	if wrapError == nil {
+		wrapError = wrapErrorStub
+	}
+
+	err = cc.Invoke(ctx, method, req, reply, opts...)
+	if err != nil {
+		if xerrors.IsContextError(err) {
+			return opID, issues, xerrors.WithStackTrace(err)
+		}
+
+		defer onTransportError(ctx, err)
+
+		if useWrapping {
+			err = xerrors.Transport(err,
+				xerrors.WithAddress(address),
+				xerrors.WithTraceID(traceID),
+			)
+			if sentMark.canRetry() {
+				return opID, issues, wrapError(xerrors.Retryable(err, xerrors.WithName("Invoke")))
+			}
+
+			return opID, issues, wrapError(err)
+		}
+
+		return opID, issues, err
+	}
+
+	switch t := reply.(type) {
+	case operation.Response:
+		opID = t.GetOperation().GetId()
+		for _, issue := range t.GetOperation().GetIssues() {
+			issues = append(issues, issue)
+		}
+		if useWrapping {
+			switch {
+			case !t.GetOperation().GetReady():
+				return opID, issues, wrapError(errOperationNotReady)
+
+			case t.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
+				return opID, issues, wrapError(
+					xerrors.Operation(
+						xerrors.FromOperation(t.GetOperation()),
+						xerrors.WithAddress(address),
+						xerrors.WithTraceID(traceID),
+					),
+				)
+			}
+		}
+	case operation.Status:
+		for _, issue := range t.GetIssues() {
+			issues = append(issues, issue)
+		}
+		if useWrapping {
+			if t.GetStatus() != Ydb.StatusIds_SUCCESS {
+				return opID, issues, wrapError(
+					xerrors.Operation(
+						xerrors.FromOperation(t),
+						xerrors.WithAddress(address),
+						xerrors.WithTraceID(traceID),
+					),
+				)
+			}
+		}
+	}
+
+	return opID, issues, nil
+}
+
 func (c *conn) Invoke(
 	ctx context.Context,
 	method string,
@@ -308,10 +408,9 @@ func (c *conn) Invoke(
 	opts ...grpc.CallOption,
 ) (err error) {
 	var (
-		opID        string
-		issues      []trace.Issue
-		useWrapping = UseWrapping(ctx)
-		onDone      = trace.DriverOnConnInvoke(
+		opID   string
+		issues []trace.Issue
+		onDone = trace.DriverOnConnInvoke(
 			c.config.Trace(), &ctx,
 			stack.FunctionID("github.com/ydb-platform/ydb-go-sdk/3/internal/conn.(*conn).Invoke"),
 			c.endpoint, trace.Method(method),
@@ -332,77 +431,19 @@ func (c *conn) Invoke(
 	stop := c.lastUsage.Start()
 	defer stop()
 
-	ctx, traceID, err := meta.TraceID(ctx)
-	if err != nil {
-		return xerrors.WithStackTrace(err)
-	}
+	opID, issues, err = invoke(
+		ctx,
+		method,
+		req,
+		res,
+		cc,
+		c.onTransportError,
+		c.Address(),
+		c.wrapError,
+		append(opts, grpc.Trailer(&md))...,
+	)
 
-	ctx, sentMark := markContext(meta.WithTraceID(ctx, traceID))
-
-	err = cc.Invoke(ctx, method, req, res, append(opts, grpc.Trailer(&md))...)
-	if err != nil {
-		if xerrors.IsContextError(err) {
-			return xerrors.WithStackTrace(err)
-		}
-
-		defer func() {
-			c.onTransportError(ctx, err)
-		}()
-
-		if useWrapping {
-			err = xerrors.Transport(err,
-				xerrors.WithAddress(c.Address()),
-				xerrors.WithTraceID(traceID),
-			)
-			if sentMark.canRetry() {
-				return c.wrapError(xerrors.Retryable(err, xerrors.WithName("Invoke")))
-			}
-
-			return c.wrapError(err)
-		}
-
-		return err
-	}
-
-	switch t := res.(type) {
-	case operation.Response:
-		opID = t.GetOperation().GetId()
-		for _, issue := range t.GetOperation().GetIssues() {
-			issues = append(issues, issue)
-		}
-		if useWrapping {
-			switch {
-			case !t.GetOperation().GetReady():
-				return c.wrapError(errOperationNotReady)
-
-			case t.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
-				return c.wrapError(
-					xerrors.Operation(
-						xerrors.FromOperation(t.GetOperation()),
-						xerrors.WithAddress(c.Address()),
-						xerrors.WithTraceID(traceID),
-					),
-				)
-			}
-		}
-	case operation.Status:
-		for _, issue := range t.GetIssues() {
-			issues = append(issues, issue)
-		}
-		if useWrapping {
-			if t.GetStatus() != Ydb.StatusIds_SUCCESS {
-				return c.wrapError(
-					xerrors.Operation(
-						xerrors.FromOperation(t),
-						xerrors.WithAddress(c.Address()),
-						xerrors.WithTraceID(traceID),
-					),
-				)
-			}
-		}
-	}
-
-	return nil
+	return err
 }
 
 //nolint:funlen
