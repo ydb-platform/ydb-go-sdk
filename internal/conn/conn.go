@@ -15,7 +15,7 @@ import (
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/endpoint"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/meta"
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/response"
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/operation"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stack"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xcontext"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
@@ -364,35 +364,36 @@ func (c *conn) Invoke(
 		return err
 	}
 
-	err = c.handleResponse(res, &opID, &issues, traceID, useWrapping)
-	if err != nil {
-		return err
-	}
-
-	return err
-}
-
-func (c *conn) handleResponse(
-	res interface{},
-	opID *string,
-	issues *[]trace.Issue,
-	traceID string,
-	useWrapping bool,
-) error {
-	if o, ok := res.(response.Response); ok {
-		*opID = o.GetOperation().GetId()
-		for _, issue := range o.GetOperation().GetIssues() {
-			*issues = append(*issues, issue)
+	switch t := res.(type) {
+	case operation.Response:
+		opID = t.GetOperation().GetId()
+		for _, issue := range t.GetOperation().GetIssues() {
+			issues = append(issues, issue)
 		}
 		if useWrapping {
 			switch {
-			case !o.GetOperation().GetReady():
+			case !t.GetOperation().GetReady():
 				return c.wrapError(errOperationNotReady)
 
-			case o.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
+			case t.GetOperation().GetStatus() != Ydb.StatusIds_SUCCESS:
 				return c.wrapError(
 					xerrors.Operation(
-						xerrors.FromOperation(o.GetOperation()),
+						xerrors.FromOperation(t.GetOperation()),
+						xerrors.WithAddress(c.Address()),
+						xerrors.WithTraceID(traceID),
+					),
+				)
+			}
+		}
+	case operation.Status:
+		for _, issue := range t.GetIssues() {
+			issues = append(issues, issue)
+		}
+		if useWrapping {
+			if t.GetStatus() != Ydb.StatusIds_SUCCESS {
+				return c.wrapError(
+					xerrors.Operation(
+						xerrors.FromOperation(t),
 						xerrors.WithAddress(c.Address()),
 						xerrors.WithTraceID(traceID),
 					),
