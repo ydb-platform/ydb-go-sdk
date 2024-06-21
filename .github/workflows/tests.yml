@@ -40,6 +40,8 @@ jobs:
           file: ./unit.txt
           flags: unit,${{ matrix.os }},go-${{ matrix.go-version }}
           name: unit
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
   integration:
     concurrency:
       group: integration-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
@@ -89,6 +91,8 @@ jobs:
           file: ./integration.txt
           flags: integration,${{ matrix.os }},go-${{ matrix.go-version }},ydb-${{ matrix.ydb-version }}
           name: integration
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
   experiment:
     concurrency:
       group: experiment-${{ github.ref }}-${{ matrix.os }}-${{ matrix.go-version }}-${{ matrix.ydb-version }}
@@ -139,3 +143,5 @@ jobs:
           file: ./integration-secure.txt
           flags: experiment,${{ matrix.os }},go-${{ matrix.go-version }},ydb-${{ matrix.ydb-version }}
           name: experiment
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
