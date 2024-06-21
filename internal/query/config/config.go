@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"time"
 
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/config"
@@ -43,7 +44,7 @@ func defaults() *Config {
 		sessionCreateTimeout: DefaultSessionCreateTimeout,
 		sessionDeleteTimeout: DefaultSessionDeleteTimeout,
 		trace:                &trace.Query{},
-		useSessionPool:       false,
+		useSessionPool:       os.Getenv("YDB_GO_SDK_QUERY_SERVICE_USE_SESSION_POOL") != "",
 	}
 }
 
