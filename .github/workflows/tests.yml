@@ -32,7 +32,7 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           cache: true
-      - name: Test
+      - name: Run tests
         run: go test -race -coverprofile unit.txt -covermode atomic -v ./...
       - name: Upload unit-tests coverage report to Codecov
         uses: codecov/codecov-action@v4
@@ -83,7 +83,7 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           cache: true
-      - name: Integration test
+      - name: Run tests
         run: go test -race -tags integration -coverpkg=./... -coverprofile integration.txt -covermode atomic ./tests/integration
       - name: Upload integration-tests coverage report to Codecov
         uses: codecov/codecov-action@v4
@@ -135,7 +135,7 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           cache: true
-      - name: Integration test
+      - name: Run tests
         run: go test -race -tags integration -coverpkg=./... -coverprofile experiment.txt -covermode atomic ./...
       - name: Upload experimental-tests coverage report to Codecov
         uses: codecov/codecov-action@v4
