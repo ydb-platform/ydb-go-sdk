@@ -2,6 +2,7 @@ package pool
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -60,6 +61,10 @@ type (
 		done chan struct{}
 
 		stats *safeStats
+
+		spawnCancel context.CancelFunc
+
+		wg *sync.WaitGroup
 	}
 	option[PT Item[T], T any] func(p *Pool[PT, T])
 )
@@ -202,9 +207,11 @@ func New[PT Item[T], T any](
 		onChange: p.trace.OnChange,
 	}
 
-	for i := 0; i < defaultSpawnGoroutinesNumber; i++ {
-		go p.spawnItems(ctx)
-	}
+	var spawnCtx context.Context
+	p.wg = &sync.WaitGroup{}
+	spawnCtx, p.spawnCancel = xcontext.WithCancel(xcontext.ValueOnly(ctx))
+	p.wg.Add(1)
+	go p.spawnItems(spawnCtx)
 
 	return p
 }
@@ -213,43 +220,53 @@ func New[PT Item[T], T any](
 // It ensures that pool would always have amount of connections equal to configured limit.
 // If item creation ended with error it will be retried infinity with configured interval until success.
 func (p *Pool[PT, T]) spawnItems(ctx context.Context) {
-spawnLoop:
+	defer p.wg.Done()
 	for {
 		select {
 		case <-ctx.Done():
-			break spawnLoop
+			return
 		case <-p.done:
-			break spawnLoop
+			return
 		case <-p.itemTokens:
 			// got token, must create item
+		createLoop:
 			for {
-				item, err := p.createItem(ctx)
-				if err != nil {
-					select {
-					case <-ctx.Done():
-						break spawnLoop
-					case <-p.done:
-						break spawnLoop
-					case <-time.After(defaultCreateRetryDelay):
-						// try again.
-						// token must always result in new item and not be lost.
+				select {
+				case <-ctx.Done():
+					return
+				case <-p.done:
+					return
+				default:
+					p.wg.Add(1)
+					err := p.trySpawn(ctx)
+					if err == nil {
+						break createLoop
 					}
-				} else {
-					// item is created successfully, put it in queue
-					select {
-					case <-ctx.Done():
-						break spawnLoop
-					case <-p.done:
-						break spawnLoop
-					case p.queue <- item:
-						p.stats.Idle().Inc()
-					}
-
-					continue spawnLoop
 				}
+				// spawn was unsuccessful, need to try again.
+				// token must always result in new item and not be lost.
 			}
 		}
 	}
+}
+
+func (p *Pool[PT, T]) trySpawn(ctx context.Context) error {
+	defer p.wg.Done()
+	item, err := p.createItem(ctx)
+	if err != nil {
+		return err
+	}
+	// item was created successfully, put it in queue
+	select {
+	case <-ctx.Done():
+		return nil
+	case <-p.done:
+		return nil
+	case p.queue <- item:
+		p.stats.Idle().Inc()
+	}
+
+	return nil
 }
 
 // defaultCreateItem returns a new item
@@ -365,7 +382,6 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (_ PT, finalErr error) {
 			if item != nil {
 				if item.IsAlive() {
 					// item is alive, return it
-					p.stats.InUse().Inc()
 
 					return item, nil
 				}
@@ -373,7 +389,6 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (_ PT, finalErr error) {
 				_ = p.closeItem(ctx, item) // clean up dead item
 			}
 			p.itemTokens <- struct{}{} // signal spawn goroutine to create a new item
-
 			// and try again
 		}
 	}
@@ -400,7 +415,6 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, item PT) (finalErr error) {
 	case <-ctx.Done():
 		return xerrors.WithStackTrace(ctx.Err())
 	default:
-		p.stats.InUse().Dec()
 		if item.IsAlive() {
 			// put back in the queue
 			select {
@@ -455,9 +469,11 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 
 		return xerrors.WithStackTrace(err)
 	}
+	p.stats.InUse().Inc()
 
 	defer func() {
 		_ = p.putItem(ctx, item)
+		p.stats.InUse().Dec()
 	}()
 
 	err = f(ctx, item)
@@ -519,10 +535,16 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 		})
 	}()
 
+	// canceling spawner (and any underlying createItem calls)
+	p.spawnCancel()
+
 	// Only closing done channel.
 	// Due to multiple senders queue is not closed here,
 	// we're just making sure to drain it fully to close any existing item.
 	close(p.done)
+
+	p.wg.Wait()
+
 	var g errgroup.Group
 shutdownLoop:
 	for {
