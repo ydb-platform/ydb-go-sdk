@@ -3,7 +3,6 @@ package pool
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -339,7 +338,6 @@ func TestPool(t *testing.T) {
 					atomic.AddInt64(&newItems, 1)
 					v := &testItem{
 						onClose: func() error {
-							fmt.Println("close call")
 							atomic.AddInt64(&deleteItems, 1)
 
 							return nil
