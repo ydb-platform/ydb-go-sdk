@@ -5,6 +5,5 @@ import (
 )
 
 var (
-	errClosedPool     = errors.New("closed pool")
-	errItemIsNotAlive = errors.New("item is not alive")
+	errClosedPool = errors.New("closed pool")
 )
