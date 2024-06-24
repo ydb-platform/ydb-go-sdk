@@ -3,6 +3,7 @@ package pool
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"sync"
 	"sync/atomic"
@@ -43,6 +44,32 @@ func (t testItem) Close(context.Context) error {
 	}
 
 	return nil
+}
+
+type testItemV2 struct {
+	v uint32
+
+	closeCalls int32
+	dead       int32
+}
+
+func (t *testItemV2) IsAlive() bool {
+	return atomic.LoadInt32(&t.dead) == 0
+}
+
+func (t *testItemV2) ID() string {
+	return ""
+}
+
+func (t *testItemV2) Close(context.Context) error {
+	atomic.AddInt32(&t.closeCalls, 1)
+
+	return nil
+}
+
+func (t *testItemV2) failAfter(d time.Duration) {
+	<-time.After(d)
+	atomic.CompareAndSwapInt32(&t.dead, 0, 1)
 }
 
 func TestPool(t *testing.T) {
@@ -222,6 +249,7 @@ func TestPool(t *testing.T) {
 				require.EqualValues(t, atomic.LoadInt64(&createCounter), atomic.LoadInt64(&closeCounter))
 			}, xtest.StopAfter(time.Second))
 		})
+
 		t.Run("IsAlive", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
 				var (
@@ -288,6 +316,148 @@ func TestPool(t *testing.T) {
 			}()
 			wg.Wait()
 		}, xtest.StopAfter(42*time.Second))
+	})
+
+	t.Run("Chaos", func(t *testing.T) {
+		// FrozenCalls makes sure that poolSize is fully utilized,
+		// but not above configured limit. It freezes pool items
+		// and checks that pool is still operational if at least
+		// one item remains available.
+		t.Run("FrozenCalls", func(t *testing.T) {
+			const (
+				poolSize         = 11
+				callsAmount      = 100
+				callFreezeFactor = 10 // every 'callFreezeFactor' call will freeze
+			)
+			var (
+				newItems    int64
+				deleteItems int64
+			)
+			p := New(rootCtx,
+				WithLimit[*testItem, testItem](poolSize),
+				WithCreateFunc(func(context.Context) (*testItem, error) {
+					atomic.AddInt64(&newItems, 1)
+					v := &testItem{
+						onClose: func() error {
+							fmt.Println("close call")
+							atomic.AddInt64(&deleteItems, 1)
+
+							return nil
+						},
+					}
+
+					return v, nil
+				}),
+			)
+
+			var (
+				freezeCh = make(chan struct{})
+				wg       = &sync.WaitGroup{}
+			)
+			wg.Add(callsAmount - callsAmount/callFreezeFactor + 1)
+			go func() {
+				for i := 1; i <= callsAmount; i++ {
+					go func(ctr int) {
+						err := p.With(rootCtx, func(ctx context.Context, testItem *testItem) error {
+							if ctr%callFreezeFactor == 0 {
+								<-freezeCh
+							}
+
+							return nil
+						})
+						if err != nil && !xerrors.Is(err, errClosedPool, context.Canceled) {
+							t.Failed()
+						}
+						wg.Done()
+					}(i)
+				}
+				wg.Done()
+			}()
+			// everything not frozen should complete
+			wg.Wait()
+
+			time.Sleep(time.Second) // ensuring item will be put back in the queue
+			require.Equal(t, poolSize-callsAmount/callFreezeFactor, p.stats.Get().Idle)
+			require.Equal(t, callsAmount/callFreezeFactor, p.stats.Get().InUse)
+			require.GreaterOrEqual(t, atomic.LoadInt64(&newItems), int64(poolSize))
+
+			// unfreeze
+			wg.Add(callsAmount / callFreezeFactor)
+			for i := 0; i < callsAmount/callFreezeFactor; i++ {
+				freezeCh <- struct{}{}
+			}
+			wg.Wait()
+			err := p.Close(rootCtx)
+			require.NoError(t, err)
+			// time.Sleep(5 * time.Second)
+			require.EqualValues(t, atomic.LoadInt64(&newItems), atomic.LoadInt64(&deleteItems))
+		})
+
+		// FailingItems checks proper item recycling. Created items will fail
+		// at random time, and it should not affect call results.
+		t.Run("FailingItems", func(t *testing.T) {
+			const (
+				poolSize = 11
+				runTime  = 20 // test will run for 'runTime' seconds
+				lifetime = 2  // item will die in [1;3) seconds
+				callFreq = 5  // new call will be made with 'callFreq' milliseconds interval
+				callTake = 4  // each call will take 'callTake' milliseconds
+			)
+			var (
+				callsCtr int64
+				items    = make([]*testItemV2, 0, 1000)
+				mx       = &sync.Mutex{}
+			)
+			p := New(rootCtx,
+				WithLimit[*testItemV2, testItemV2](poolSize),
+				WithCreateFunc(func(context.Context) (*testItemV2, error) {
+					v := &testItemV2{}
+					mx.Lock()
+					items = append(items, v)
+					mx.Unlock()
+					go v.failAfter(time.Duration(rand.Intn(lifetime)+1) * time.Second) //nolint:gosec
+
+					return v, nil
+				}),
+			)
+
+			tickDone := time.After(runTime * time.Second)
+			tickCall := time.Tick(callFreq * time.Millisecond)
+			wg := sync.WaitGroup{}
+			wg.Add(1)
+			go func() {
+				for {
+					select {
+					case <-tickDone:
+						wg.Done()
+
+						return
+					case <-tickCall:
+						wg.Add(1)
+						go func() {
+							err := p.With(rootCtx, func(ctx context.Context, _ *testItemV2) error {
+								atomic.AddInt64(&callsCtr, 1)
+								time.Sleep(callTake * time.Millisecond)
+
+								return nil
+							})
+							if err != nil && !xerrors.Is(err, errClosedPool, context.Canceled) {
+								t.Failed()
+							}
+							wg.Done()
+						}()
+					}
+				}
+			}()
+			wg.Wait()
+			err := p.Close(rootCtx)
+			require.NoError(t, err)
+			t.Log("created items", len(items), "calls made:", callsCtr)
+			// ensure each item was closed, and only once
+			for _, item := range items {
+				require.Equal(t, int32(1), item.closeCalls)
+			}
+		})
 	})
 }
 
