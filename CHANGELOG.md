@@ -1,3 +1,5 @@
+* Added warm-up and asynchronous item handling in internal/pool
+
 ## v3.74.4
 * Fixed bug with fail cast of grpc response to `operation.{Response,Status}`
 
