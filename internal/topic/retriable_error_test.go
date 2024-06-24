@@ -227,9 +227,9 @@ func TestCheckRetryMode(t *testing.T) {
 
 	for _, test := range table {
 		t.Run(test.name, func(t *testing.T) {
-			resBackoff, retriable := CheckRetryMode(test.err, test.settings, test.duration)
+			resBackoff, stopReason := RetryDecision(test.err, test.settings, test.duration)
 			require.Equal(t, test.resBackoff, resBackoff)
-			require.Equal(t, test.resRetriable, retriable)
+			require.Equal(t, test.resRetriable, stopReason == nil)
 		})
 	}
 }
