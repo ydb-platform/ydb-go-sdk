@@ -143,7 +143,7 @@ func (rs *resultSet) nextRow(ctx context.Context) (*row, error) {
 					return nil, xerrors.WithStackTrace(io.EOF)
 				}
 			}
-			if rs.index != rs.currentPart.GetResultSetIndex() {
+			if rs.currentPart.GetResultSet() != nil && rs.index != rs.currentPart.GetResultSetIndex() {
 				close(rs.done)
 
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
