@@ -231,15 +231,15 @@ func clientExecute(ctx context.Context,
 	q string, opts ...options.ExecuteOption,
 ) (r query.Result, err error) {
 	err = do(ctx, pool, func(ctx context.Context, s query.Session) (err error) {
-		_, r, err = s.Execute(ctx, q, opts...)
+		_, streamResult, err := s.Execute(ctx, q, opts...)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
 		defer func() {
-			_ = r.Close(ctx)
+			_ = streamResult.Close(ctx)
 		}()
 
-		r, err = resultToMaterializedResult(ctx, r)
+		r, err = resultToMaterializedResult(ctx, streamResult)
 		if err != nil {
 			return xerrors.WithStackTrace(err)
 		}
