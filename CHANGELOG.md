@@ -1,3 +1,4 @@
+## v3.74.5
 * Fixed bug with reading empty result set parts.
 * Fixed nil pointer dereference when closing result set
 
