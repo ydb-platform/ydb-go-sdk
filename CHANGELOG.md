@@ -1,3 +1,5 @@
+* Fixed nil pointer dereference when closing result set
+
 ## v3.74.4
 * Fixed bug with fail cast of grpc response to `operation.{Response,Status}`
 
