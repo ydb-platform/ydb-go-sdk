@@ -23,10 +23,11 @@ var (
 
 type (
 	materializedResultSet struct {
+		index       int
 		columnNames []string
 		columnTypes []types.Type
 		rows        []query.Row
-		idx         int
+		rowIndex    int
 	}
 	resultSet struct {
 		index       int64
@@ -74,27 +75,29 @@ func (rs *resultSet) Columns() (columnNames []string) {
 }
 
 func (rs *materializedResultSet) NextRow(ctx context.Context) (query.Row, error) {
-	if rs.idx == len(rs.rows) {
+	if rs.rowIndex == len(rs.rows) {
 		return nil, xerrors.WithStackTrace(io.EOF)
 	}
 
 	defer func() {
-		rs.idx++
+		rs.rowIndex++
 	}()
 
-	return rs.rows[rs.idx], nil
+	return rs.rows[rs.rowIndex], nil
 }
 
 func (rs *materializedResultSet) Index() int {
-	return rs.idx
+	return rs.index
 }
 
 func NewMaterializedResultSet(
+	index int,
 	columnNames []string,
 	columnTypes []types.Type,
 	rows []query.Row,
 ) *materializedResultSet {
 	return &materializedResultSet{
+		index:       index,
 		columnNames: columnNames,
 		columnTypes: columnTypes,
 		rows:        rows,
@@ -151,7 +154,7 @@ func (rs *resultSet) nextRow(ctx context.Context) (*row, error) {
 				close(rs.done)
 
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
-					"received part with result set index = %d, current result set index = %d: %w",
+					"received part with result set rowIndex = %d, current result set rowIndex = %d: %w",
 					rs.index, rs.currentPart.GetResultSetIndex(), errWrongResultSetIndex,
 				))
 			}
@@ -175,5 +178,5 @@ func (rs *resultSet) NextRow(ctx context.Context) (_ query.Row, err error) {
 }
 
 func (rs *resultSet) Index() int {
-	return rs.idx
+	return int(rs.index)
 }
