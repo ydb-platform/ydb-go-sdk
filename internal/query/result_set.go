@@ -85,6 +85,10 @@ func (rs *materializedResultSet) NextRow(ctx context.Context) (query.Row, error)
 	return rs.rows[rs.idx], nil
 }
 
+func (rs *materializedResultSet) Index() int {
+	return rs.idx
+}
+
 func NewMaterializedResultSet(
 	columnNames []string,
 	columnTypes []types.Type,
@@ -168,4 +172,8 @@ func (rs *resultSet) NextRow(ctx context.Context) (_ query.Row, err error) {
 	}()
 
 	return rs.nextRow(ctx)
+}
+
+func (rs *resultSet) Index() int {
+	return int(rs.index)
 }

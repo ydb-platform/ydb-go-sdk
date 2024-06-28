@@ -352,7 +352,7 @@ func TestResultNextResultSet(t *testing.T) {
 				t.Log("nextResultSet")
 				rs, err := r.nextResultSet(ctx)
 				require.NoError(t, err)
-				require.EqualValues(t, 0, rs.index)
+				require.EqualValues(t, 0, rs.Index())
 				{
 					t.Log("next (row=1)")
 					_, err := rs.nextRow(ctx)
@@ -393,13 +393,13 @@ func TestResultNextResultSet(t *testing.T) {
 				t.Log("nextResultSet")
 				rs, err := r.nextResultSet(ctx)
 				require.NoError(t, err)
-				require.EqualValues(t, 1, rs.index)
+				require.EqualValues(t, 1, rs.Index())
 			}
 			{
 				t.Log("nextResultSet")
 				rs, err := r.nextResultSet(ctx)
 				require.NoError(t, err)
-				require.EqualValues(t, 2, rs.index)
+				require.EqualValues(t, 2, rs.Index())
 				{
 					t.Log("next (row=1)")
 					_, err := rs.nextRow(ctx)
@@ -521,7 +521,7 @@ func TestResultNextResultSet(t *testing.T) {
 				t.Log("nextResultSet")
 				rs, err := r.nextResultSet(ctx)
 				require.NoError(t, err)
-				require.EqualValues(t, 0, rs.index)
+				require.EqualValues(t, 0, rs.Index())
 				{
 					t.Log("next (row=1)")
 					_, err := rs.nextRow(ctx)
@@ -840,7 +840,7 @@ func TestResultNextResultSet(t *testing.T) {
 				t.Log("nextResultSet")
 				rs, err := r.nextResultSet(ctx)
 				require.NoError(t, err)
-				require.EqualValues(t, 0, rs.index)
+				require.EqualValues(t, 0, rs.Index())
 				{
 					t.Log("next (row=1)")
 					_, err := rs.nextRow(ctx)
@@ -881,7 +881,7 @@ func TestResultNextResultSet(t *testing.T) {
 				t.Log("nextResultSet")
 				rs, err := r.nextResultSet(ctx)
 				require.NoError(t, err)
-				require.EqualValues(t, 2, rs.index)
+				require.EqualValues(t, 2, rs.Index())
 			}
 			{
 				t.Log("nextResultSet")

@@ -25,7 +25,7 @@ var (
 type (
 	materializedResult struct {
 		resultSets []query.ResultSet
-		idx        int
+		idx        int64
 	}
 	result struct {
 		stream         Ydb_Query_V1.QueryService_ExecuteQueryClient
@@ -51,7 +51,7 @@ func (r *materializedResult) Close(ctx context.Context) error {
 }
 
 func (r *materializedResult) NextResultSet(ctx context.Context) (query.ResultSet, error) {
-	if r.idx == len(r.resultSets) {
+	if r.idx == int64(len(r.resultSets)) {
 		return nil, xerrors.WithStackTrace(io.EOF)
 	}
 
