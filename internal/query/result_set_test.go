@@ -59,7 +59,7 @@ func TestResultSetNext(t *testing.T) {
 
 				return part, nil
 			}, recv, nil)
-			require.EqualValues(t, 0, rs.index)
+			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
 				require.ErrorIs(t, err, io.EOF)
@@ -144,7 +144,7 @@ func TestResultSetNext(t *testing.T) {
 
 				return part, nil
 			}, recv, nil)
-			require.EqualValues(t, 0, rs.index)
+			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
 				require.NoError(t, err)
@@ -303,7 +303,7 @@ func TestResultSetNext(t *testing.T) {
 
 				return part, nil
 			}, recv, nil)
-			require.EqualValues(t, 0, rs.index)
+			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
 				require.NoError(t, err)
@@ -441,7 +441,7 @@ func TestResultSetNext(t *testing.T) {
 
 				return part, nil
 			}, recv, nil)
-			require.EqualValues(t, 0, rs.index)
+			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
 				require.NoError(t, err)
@@ -544,7 +544,7 @@ func TestResultSetNext(t *testing.T) {
 
 				return part, nil
 			}, recv, nil)
-			require.EqualValues(t, 0, rs.index)
+			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(childCtx)
 				require.NoError(t, err)
@@ -636,7 +636,7 @@ func TestResultSetNext(t *testing.T) {
 
 				return part, nil
 			}, recv, nil)
-			require.EqualValues(t, 0, rs.index)
+			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
 				require.NoError(t, err)
@@ -735,7 +735,7 @@ func TestResultSetNext(t *testing.T) {
 
 				return part, nil
 			}, recv, nil)
-			require.EqualValues(t, 0, rs.index)
+			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
 				require.NoError(t, err)
@@ -886,7 +886,7 @@ func TestResultSetNext(t *testing.T) {
 
 				return part, nil
 			}, recv, nil)
-			require.EqualValues(t, 0, rs.index)
+			require.EqualValues(t, 0, rs.Index())
 			{
 				_, err := rs.nextRow(ctx)
 				require.NoError(t, err)
@@ -948,7 +948,7 @@ func TestResultSetNext(t *testing.T) {
 
 		return part, nil
 	}, recv, nil)
-	require.EqualValues(t, 0, rs.index)
+	require.EqualValues(t, 0, rs.Index())
 	t.Run("Columns", func(t *testing.T) {
 		require.EqualValues(t, []string{"a", "b"}, rs.Columns())
 	})
