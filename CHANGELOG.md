@@ -1,4 +1,4 @@
-* Added `ResultSet.Index()` method
+* Added `query.ResultSet.Index()` method
 
 ## v3.74.5
 * Fixed bug with reading empty result set parts.

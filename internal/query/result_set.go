@@ -175,5 +175,5 @@ func (rs *resultSet) NextRow(ctx context.Context) (_ query.Row, err error) {
 }
 
 func (rs *resultSet) Index() int {
-	return int(rs.index)
+	return rs.idx
 }
