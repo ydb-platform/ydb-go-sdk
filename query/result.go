@@ -20,10 +20,10 @@ type (
 		Range(ctx context.Context) xiter.Seq2[ResultSet, error]
 	}
 	ResultSet interface {
+		Index() int
 		Columns() []string
 		ColumnTypes() []Type
 		NextRow(ctx context.Context) (Row, error)
-		Index() int
 
 		// Range is experimental API for range iterators available with Go version 1.22+ and flag `GOEXPERIMENT=rangefunc`.
 		Range(ctx context.Context) xiter.Seq2[Row, error]
