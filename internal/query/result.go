@@ -191,7 +191,7 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 			}
 			if part.GetResultSetIndex() < r.resultSetIndex {
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
-					"next result set rowIndex %d less than last result set rowIndex %d: %w",
+					"next result set rowIndex %d less than last result set index %d: %w",
 					part.GetResultSetIndex(), r.resultSetIndex, errWrongNextResultSetIndex,
 				))
 			}
@@ -231,7 +231,7 @@ func (r *result) getNextResultSetPart(
 			r.lastPart = part
 			if part.GetResultSetIndex() > nextResultSetIndex {
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
-					"result set (rowIndex=%d) receive part (rowIndex=%d) for next result set: %w",
+					"result set (index=%d) receive part (index=%d) for next result set: %w",
 					nextResultSetIndex, part.GetResultSetIndex(), io.EOF,
 				))
 			}
