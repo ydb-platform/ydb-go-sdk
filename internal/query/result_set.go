@@ -23,10 +23,11 @@ var (
 
 type (
 	materializedResultSet struct {
+		index       int
 		columnNames []string
 		columnTypes []types.Type
 		rows        []query.Row
-		idx         int
+		rowIndex    int
 	}
 	resultSet struct {
 		index       int64
@@ -74,23 +75,33 @@ func (rs *resultSet) Columns() (columnNames []string) {
 }
 
 func (rs *materializedResultSet) NextRow(ctx context.Context) (query.Row, error) {
-	if rs.idx == len(rs.rows) {
+	if rs.rowIndex == len(rs.rows) {
 		return nil, xerrors.WithStackTrace(io.EOF)
 	}
 
 	defer func() {
-		rs.idx++
+		rs.rowIndex++
 	}()
 
-	return rs.rows[rs.idx], nil
+	return rs.rows[rs.rowIndex], nil
+}
+
+func (rs *materializedResultSet) Index() int {
+	if rs == nil {
+		return -1
+	}
+
+	return rs.index
 }
 
 func NewMaterializedResultSet(
+	index int,
 	columnNames []string,
 	columnTypes []types.Type,
 	rows []query.Row,
 ) *materializedResultSet {
 	return &materializedResultSet{
+		index:       index,
 		columnNames: columnNames,
 		columnTypes: columnTypes,
 		rows:        rows,
@@ -168,4 +179,12 @@ func (rs *resultSet) NextRow(ctx context.Context) (_ query.Row, err error) {
 	}()
 
 	return rs.nextRow(ctx)
+}
+
+func (rs *resultSet) Index() int {
+	if rs == nil {
+		return -1
+	}
+
+	return int(rs.index)
 }

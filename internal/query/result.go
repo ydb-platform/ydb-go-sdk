@@ -191,7 +191,7 @@ func (r *result) nextResultSet(ctx context.Context) (_ *resultSet, err error) {
 			}
 			if part.GetResultSetIndex() < r.resultSetIndex {
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
-					"next result set index %d less than last result set index %d: %w",
+					"next result set rowIndex %d less than last result set index %d: %w",
 					part.GetResultSetIndex(), r.resultSetIndex, errWrongNextResultSetIndex,
 				))
 			}
@@ -324,7 +324,7 @@ func exactlyOneResultSetFromResult(ctx context.Context, r query.Result) (rs quer
 		return nil, xerrors.WithStackTrace(err)
 	}
 
-	return NewMaterializedResultSet(rs.Columns(), rs.ColumnTypes(), rows), nil
+	return NewMaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows), nil
 }
 
 func resultToMaterializedResult(ctx context.Context, r query.Result) (query.Result, error) {
@@ -354,7 +354,7 @@ func resultToMaterializedResult(ctx context.Context, r query.Result) (query.Resu
 			rows = append(rows, row)
 		}
 
-		resultSets = append(resultSets, NewMaterializedResultSet(rs.Columns(), rs.ColumnTypes(), rows))
+		resultSets = append(resultSets, NewMaterializedResultSet(rs.Index(), rs.Columns(), rs.ColumnTypes(), rows))
 	}
 
 	return newMaterializedResult(resultSets), nil

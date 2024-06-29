@@ -20,6 +20,7 @@ type (
 		Range(ctx context.Context) xiter.Seq2[ResultSet, error]
 	}
 	ResultSet interface {
+		Index() int
 		Columns() []string
 		ColumnTypes() []Type
 		NextRow(ctx context.Context) (Row, error)
