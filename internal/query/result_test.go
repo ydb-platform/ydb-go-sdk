@@ -442,8 +442,10 @@ func TestResultNextResultSet(t *testing.T) {
 			}
 			{
 				t.Log("nextResultSet")
-				_, err := r.nextResultSet(context.Background())
+				rs, err := r.nextResultSet(context.Background())
 				require.ErrorIs(t, err, errClosedResult)
+				require.Nil(t, rs)
+				require.Equal(t, -1, rs.Index())
 			}
 			t.Log("check final error")
 			require.NoError(t, r.Err())

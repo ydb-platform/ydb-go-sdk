@@ -87,6 +87,10 @@ func (rs *materializedResultSet) NextRow(ctx context.Context) (query.Row, error)
 }
 
 func (rs *materializedResultSet) Index() int {
+	if rs == nil {
+		return -1
+	}
+
 	return rs.index
 }
 
@@ -154,7 +158,7 @@ func (rs *resultSet) nextRow(ctx context.Context) (*row, error) {
 				close(rs.done)
 
 				return nil, xerrors.WithStackTrace(fmt.Errorf(
-					"received part with result set rowIndex = %d, current result set rowIndex = %d: %w",
+					"received part with result set index = %d, current result set index = %d: %w",
 					rs.index, rs.currentPart.GetResultSetIndex(), errWrongResultSetIndex,
 				))
 			}
@@ -178,5 +182,9 @@ func (rs *resultSet) NextRow(ctx context.Context) (_ query.Row, err error) {
 }
 
 func (rs *resultSet) Index() int {
+	if rs == nil {
+		return -1
+	}
+
 	return int(rs.index)
 }
