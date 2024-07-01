@@ -526,6 +526,7 @@ func internalQuery(
 			return func(info trace.QueryResultNextPartDoneInfo) {
 				if info.Error == nil {
 					l.Log(ctx, "done",
+						Stringer("stats", info.Stats),
 						latencyField(start),
 					)
 				} else {
