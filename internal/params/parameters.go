@@ -303,7 +303,7 @@ func (p *Parameter) UUID(v [16]byte) Builder {
 	return p.parent
 }
 
-func (p *Parameter) TypesValue(v types.Value) Builder {
+func (p *Parameter) Value(v types.Value) Builder {
 	p.value = v
 	p.parent.params = append(p.parent.params, p)
 
