@@ -1,3 +1,4 @@
+* Added method `ydb.ParamsBuilder().Param(name).Any(value)` to add custom `types.Value`
 * Added `query.ResultSet.Index()` method
 
 ## v3.74.5
