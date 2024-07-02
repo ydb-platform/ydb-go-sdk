@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sync/atomic"
 
-	"github.com/ydb-platform/ydb-go-sdk/v3/internal/empty"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/grpcwrapper/rawtopic/rawtopicreader"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xerrors"
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xsync"
@@ -16,22 +15,24 @@ var errBatcherPopConcurency = xerrors.Wrap(errors.New("ydb: batch pop concurency
 
 type batcher struct {
 	popInFlight    int64
-	closeErr       error
-	hasNewMessages empty.Chan
+	hasNewMessages xsync.SingleReceiverNotifier
+
+	lifetimeCtx       context.Context
+	lifetimeCtxCancel context.CancelCauseFunc
 
 	m xsync.Mutex
 
 	forceIgnoreMinRestrictionsOnNextMessagesBatch bool
-	closed                                        bool
-	closeChan                                     empty.Chan
 	messages                                      batcherMessagesMap
 }
 
 func newBatcher() *batcher {
+	ctx, cancel := context.WithCancelCause(context.Background())
 	return &batcher{
-		messages:       make(batcherMessagesMap),
-		closeChan:      make(empty.Chan),
-		hasNewMessages: make(empty.Chan, 1),
+		messages:          make(batcherMessagesMap),
+		lifetimeCtx:       ctx,
+		lifetimeCtxCancel: cancel,
+		hasNewMessages:    xsync.NewSingleReceiverNotifier(),
 	}
 }
 
@@ -39,22 +40,26 @@ func (b *batcher) Close(err error) error {
 	b.m.Lock()
 	defer b.m.Unlock()
 
-	if b.closed {
-		return xerrors.WithStackTrace(fmt.Errorf("ydb: batch closed already: %w", err))
+	if reason := b.closeReason(); reason != nil {
+		return xerrors.WithStackTrace(fmt.Errorf("ydb: batch closed already: %w", reason))
 	}
 
-	b.closed = true
-	b.closeErr = err
-	close(b.closeChan)
+	reason := fmt.Errorf("ydb: topic reader batcher closed: %w", err)
+	b.lifetimeCtxCancel(reason)
+	_ = b.hasNewMessages.Close(reason)
 
 	return nil
+}
+
+func (b *batcher) closeReason() error {
+	return context.Cause(b.lifetimeCtx)
 }
 
 func (b *batcher) PushBatches(batches ...*PublicBatch) error {
 	b.m.Lock()
 	defer b.m.Unlock()
-	if b.closed {
-		return xerrors.WithStackTrace(fmt.Errorf("ydb: push batch to closed batcher :%w", b.closeErr))
+	if reason := b.closeReason(); reason != nil {
+		return xerrors.WithStackTrace(fmt.Errorf("ydb: push batch to closed batcher :%w", reason))
 	}
 
 	for _, batch := range batches {
@@ -70,8 +75,8 @@ func (b *batcher) PushRawMessage(session *partitionSession, m rawtopicreader.Ser
 	b.m.Lock()
 	defer b.m.Unlock()
 
-	if b.closed {
-		return xerrors.WithStackTrace(fmt.Errorf("ydb: push raw message to closed batcher: %w", b.closeErr))
+	if reason := b.closeReason(); reason != nil {
+		return xerrors.WithStackTrace(fmt.Errorf("ydb: push raw message to closed batcher: %w", reason))
 	}
 
 	return b.addNeedLock(session, newBatcherItemRawMessage(m))
@@ -169,7 +174,7 @@ func (b *batcher) Pop(ctx context.Context, opts batcherGetOptions) (_ batcherMes
 		var closed bool
 
 		b.m.WithLock(func() {
-			closed = b.closed
+			closed = b.closeReason() != nil
 			if closed {
 				return
 			}
@@ -183,37 +188,22 @@ func (b *batcher) Pop(ctx context.Context, opts batcherGetOptions) (_ batcherMes
 		})
 		if closed {
 			return batcherMessageOrderItem{},
-				xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: try pop messages from closed batcher: %w", b.closeErr)))
+				xerrors.WithStackTrace(xerrors.Wrap(fmt.Errorf("ydb: try pop messages from closed batcher: %w", b.closeReason())))
 		}
 		if findRes.Ok {
 			return findRes.Result, nil
 		}
 
 		// wait new messages for next iteration
-		select {
-		case <-b.hasNewMessages:
-			// new iteration
-		case <-b.closeChan:
-			return batcherMessageOrderItem{},
-				xerrors.WithStackTrace(
-					fmt.Errorf(
-						"ydb: batcher close while pop wait new messages: %w",
-						b.closeErr,
-					),
-				)
-		case <-ctx.Done():
-			return batcherMessageOrderItem{}, ctx.Err()
+		err = b.hasNewMessages.Wait(ctx)
+		if err != nil {
+			return batcherMessageOrderItem{}, err
 		}
 	}
 }
 
 func (b *batcher) notifyAboutNewMessages() {
-	select {
-	case b.hasNewMessages <- empty.Struct{}:
-		// sent signal
-	default:
-		// signal already in progress
-	}
+	b.hasNewMessages.Notify()
 }
 
 type batcherResultCandidate struct {
