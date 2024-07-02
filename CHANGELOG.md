@@ -1,4 +1,6 @@
 * Added `query.ResultSet.Index()` method
+* Added `query.Client.Stats()` method
+* Added `query.Result.Stats()` method
 
 ## v3.74.5
 * Fixed bug with reading empty result set parts.

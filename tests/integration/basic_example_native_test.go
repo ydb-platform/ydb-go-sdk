@@ -38,7 +38,7 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/trace"
 )
 
-type stats struct {
+type poolStats struct {
 	xsync.Mutex
 
 	inFlightSessions map[string]struct{}
@@ -47,17 +47,17 @@ type stats struct {
 	limit            int
 }
 
-func (s *stats) print(t testing.TB) {
+func (s *poolStats) print(t testing.TB) {
 	s.Lock()
 	defer s.Unlock()
-	t.Log("stats:")
+	t.Log("poolStats:")
 	t.Log(" - limit            :", s.limit)
 	t.Log(" - open             :", len(s.openSessions))
 	t.Log(" - in-pool          :", len(s.inPoolSessions))
 	t.Log(" - in-flight        :", len(s.inFlightSessions))
 }
 
-func (s *stats) check(t testing.TB) {
+func (s *poolStats) check(t testing.TB) {
 	s.Lock()
 	defer s.Unlock()
 	if s.limit < 0 {
@@ -71,13 +71,13 @@ func (s *stats) check(t testing.TB) {
 	}
 }
 
-func (s *stats) max() int {
+func (s *poolStats) max() int {
 	s.Lock()
 	defer s.Unlock()
 	return s.limit
 }
 
-func (s *stats) addToOpen(t testing.TB, id string) {
+func (s *poolStats) addToOpen(t testing.TB, id string) {
 	defer s.check(t)
 
 	s.Lock()
@@ -90,7 +90,7 @@ func (s *stats) addToOpen(t testing.TB, id string) {
 	s.openSessions[id] = struct{}{}
 }
 
-func (s *stats) removeFromOpen(t testing.TB, id string) {
+func (s *poolStats) removeFromOpen(t testing.TB, id string) {
 	defer s.check(t)
 
 	s.Lock()
@@ -103,7 +103,7 @@ func (s *stats) removeFromOpen(t testing.TB, id string) {
 	delete(s.openSessions, id)
 }
 
-func (s *stats) addToPool(t testing.TB, id string) {
+func (s *poolStats) addToPool(t testing.TB, id string) {
 	defer s.check(t)
 
 	s.Lock()
@@ -116,7 +116,7 @@ func (s *stats) addToPool(t testing.TB, id string) {
 	s.inPoolSessions[id] = struct{}{}
 }
 
-func (s *stats) removeFromPool(t testing.TB, id string) {
+func (s *poolStats) removeFromPool(t testing.TB, id string) {
 	defer s.check(t)
 
 	s.Lock()
@@ -129,7 +129,7 @@ func (s *stats) removeFromPool(t testing.TB, id string) {
 	delete(s.inPoolSessions, id)
 }
 
-func (s *stats) addToInFlight(t testing.TB, id string) {
+func (s *poolStats) addToInFlight(t testing.TB, id string) {
 	defer s.check(t)
 
 	s.Lock()
@@ -142,7 +142,7 @@ func (s *stats) addToInFlight(t testing.TB, id string) {
 	s.inFlightSessions[id] = struct{}{}
 }
 
-func (s *stats) removeFromInFlight(t testing.TB, id string) {
+func (s *poolStats) removeFromInFlight(t testing.TB, id string) {
 	defer s.check(t)
 
 	s.Lock()
@@ -171,7 +171,7 @@ func TestBasicExampleNative(sourceTest *testing.T) { //nolint:gocyclo
 		totalConsumedUnits.Add(meta.ConsumedUnits(md))
 	})
 
-	s := &stats{
+	s := &poolStats{
 		limit:            math.MaxInt32,
 		openSessions:     make(map[string]struct{}),
 		inPoolSessions:   make(map[string]struct{}),
