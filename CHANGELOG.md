@@ -1,5 +1,4 @@
-* Added method `ydb.ParamsBuilder().Param(name).Value(value)` to add custom `types.Value`
-* Added `TypesValue` to `ydb.ParamsBuilder().Name()`, allow to add custom `types.Value`
+* Added method `ydb.ParamsBuilder().Param(name).Any(value)` to add custom `types.Value`
 * Fixed goroutine leak on close reader
 * Fixed topic reader and writer WaitInit hunging on unretriable connection error
 * Added `query.Client.Stats()` method
