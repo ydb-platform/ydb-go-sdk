@@ -202,10 +202,7 @@ func New[PT Item[T], T any](
 		onChange: p.trace.OnChange,
 	}
 
-	createCtx := xcontext.ValueOnly(ctx)
-	for i := 0; i < defaultSpawnGoroutinesNumber; i++ {
-		go p.spawnItems(createCtx)
-	}
+	go p.spawnItems(xcontext.ValueOnly(ctx))
 
 	return p
 }
@@ -227,15 +224,6 @@ func (p *Pool[PT, T]) spawnItems(ctx context.Context) {
 				}
 				// spawn was unsuccessful, need to try again.
 				// token must always result in new item and not be lost.
-				timer := time.NewTimer(defaultCreateRetryDelay)
-				select {
-				case <-p.done:
-					timer.Stop()
-
-					return
-				case <-timer.C:
-				}
-				timer.Stop()
 			}
 		}
 	}
@@ -370,7 +358,6 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (_ PT, finalErr error) {
 			if item != nil {
 				if item.IsAlive() {
 					// item is alive, return it
-					p.stats.InUse().Inc()
 
 					return item, nil
 				}
@@ -405,7 +392,6 @@ func (p *Pool[PT, T]) putItem(ctx context.Context, item PT) (finalErr error) {
 	case <-ctx.Done():
 		return xerrors.WithStackTrace(ctx.Err())
 	default:
-		p.stats.InUse().Dec()
 		if item.IsAlive() {
 			// put back in the queue
 			select {
@@ -460,9 +446,11 @@ func (p *Pool[PT, T]) try(ctx context.Context, f func(ctx context.Context, item 
 
 		return xerrors.WithStackTrace(err)
 	}
+	p.stats.InUse().Inc()
 
 	defer func() {
 		_ = p.putItem(ctx, item)
+		p.stats.InUse().Dec()
 	}()
 
 	err = f(ctx, item)
