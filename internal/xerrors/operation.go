@@ -3,6 +3,7 @@ package xerrors
 import (
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb"
 	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_Issue"
@@ -17,6 +18,7 @@ type operationError struct {
 	code    Ydb.StatusIds_StatusCode
 	issues  issues
 	address string
+	nodeID  uint32
 	traceID string
 }
 
@@ -118,6 +120,10 @@ func (e *operationError) Error() string {
 	if len(e.address) > 0 {
 		b.WriteString(", address = ")
 		b.WriteString(e.address)
+	}
+	if e.nodeID > 0 {
+		b.WriteString(", nodeID = ")
+		b.WriteString(strconv.FormatUint(uint64(e.nodeID), 10))
 	}
 	if len(e.issues) > 0 {
 		b.WriteString(", issues = ")

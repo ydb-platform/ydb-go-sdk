@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strconv"
 
 	grpcCodes "google.golang.org/grpc/codes"
 	grpcStatus "google.golang.org/grpc/status"
@@ -16,6 +17,7 @@ type transportError struct {
 	status  *grpcStatus.Status
 	err     error
 	address string
+	nodeID  uint32
 	traceID string
 }
 
@@ -47,12 +49,30 @@ func WithAddress(address string) addressOption {
 	return addressOption(address)
 }
 
+type nodeIDOption uint32
+
+func (nodeID nodeIDOption) applyToTransportError(te *transportError) {
+	te.nodeID = uint32(nodeID)
+}
+
+func (nodeID nodeIDOption) applyToOperationError(oe *operationError) {
+	oe.nodeID = uint32(nodeID)
+}
+
+func WithNodeID(nodeID uint32) nodeIDOption {
+	return nodeIDOption(nodeID)
+}
+
 func (e *transportError) Error() string {
 	var b bytes.Buffer
 	b.WriteString(e.Name())
 	b.WriteString(fmt.Sprintf(" (code = %d, source error = %q", e.status.Code(), e.err.Error()))
 	if len(e.address) > 0 {
 		b.WriteString(fmt.Sprintf(", address: %q", e.address))
+	}
+	if e.nodeID > 0 {
+		b.WriteString(", nodeID = ")
+		b.WriteString(strconv.FormatUint(uint64(e.nodeID), 10))
 	}
 	if len(e.traceID) > 0 {
 		b.WriteString(fmt.Sprintf(", traceID: %q", e.traceID))

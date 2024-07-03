@@ -20,13 +20,14 @@ func OnceFunc(f func(ctx context.Context) error) func(ctx context.Context) error
 }
 
 type Once[T closer.Closer] struct {
-	f     func() T
+	f     func() (T, error)
 	once  sync.Once
 	mutex sync.RWMutex
 	t     T
+	err   error
 }
 
-func OnceValue[T closer.Closer](f func() T) *Once[T] {
+func OnceValue[T closer.Closer](f func() (T, error)) *Once[T] {
 	return &Once[T]{f: f}
 }
 
@@ -46,16 +47,25 @@ func (v *Once[T]) Close(ctx context.Context) (err error) {
 	return nil
 }
 
-func (v *Once[T]) Get() T {
+func (v *Once[T]) Get() (T, error) {
 	v.once.Do(func() {
 		v.mutex.Lock()
 		defer v.mutex.Unlock()
 
-		v.t = v.f()
+		v.t, v.err = v.f()
 	})
 
 	v.mutex.RLock()
 	defer v.mutex.RUnlock()
 
-	return v.t
+	return v.t, v.err
+}
+
+func (v *Once[T]) Must() T {
+	t, err := v.Get()
+	if err != nil {
+		panic(err)
+	}
+
+	return t
 }

@@ -189,6 +189,52 @@ func TestPool(t *testing.T) {
 			})
 		})
 	})
+	t.Run("Close", func(t *testing.T) {
+		t.Run("WithoutDeadline", func(t *testing.T) {
+			xtest.TestManyTimes(t, func(t testing.TB) {
+				require.NotPanics(t, func() {
+					p := New(rootCtx,
+						WithLimit[*testItem, testItem](10),
+					)
+					wg := sync.WaitGroup{}
+					for range make([]struct{}, 1000) {
+						wg.Add(1)
+						go func() {
+							defer wg.Done()
+							_ = p.try(rootCtx, func(ctx context.Context, item *testItem) error {
+								return nil
+							})
+						}()
+					}
+					p.Close(rootCtx)
+					require.Empty(t, p.items)
+				})
+			}, xtest.StopAfter(3*time.Second))
+		})
+		t.Run("WithDeadline", func(t *testing.T) {
+			xtest.TestManyTimes(t, func(t testing.TB) {
+				require.NotPanics(t, func() {
+					p := New(rootCtx,
+						WithLimit[*testItem, testItem](10),
+					)
+					wg := sync.WaitGroup{}
+					for range make([]struct{}, 1000) {
+						wg.Add(1)
+						go func() {
+							defer wg.Done()
+							_ = p.try(rootCtx, func(ctx context.Context, item *testItem) error {
+								return nil
+							})
+						}()
+					}
+					ctx, cancel := context.WithTimeout(rootCtx, time.Second)
+					defer cancel()
+					p.Close(ctx)
+					require.Empty(t, p.items)
+				})
+			}, xtest.StopAfter(3*time.Second))
+		})
+	})
 	t.Run("Item", func(t *testing.T) {
 		t.Run("Close", func(t *testing.T) {
 			xtest.TestManyTimes(t, func(t testing.TB) {
@@ -302,12 +348,10 @@ func TestSafeStatsRace(t *testing.T) {
 			go func() {
 				defer wg.Done()
 				require.NotPanics(t, func() {
-					switch rand.Int31n(4) { //nolint:gosec
+					switch rand.Int31n(3) { //nolint:gosec
 					case 0:
-						s.Index().Inc()
-					case 1:
 						s.InUse().Inc()
-					case 2:
+					case 1:
 						s.Idle().Inc()
 					default:
 						s.Get()
@@ -317,4 +361,23 @@ func TestSafeStatsRace(t *testing.T) {
 		}
 		wg.Wait()
 	}, xtest.StopAfter(5*time.Second))
+}
+
+func BenchmarkPoolTry(b *testing.B) {
+	b.ReportAllocs()
+	ctx := xtest.Context(b)
+	p := New(ctx,
+		WithLimit[*testItem, testItem](100),
+	)
+	defer func() {
+		_ = p.Close(ctx)
+		require.Empty(b, p.items)
+	}()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			_ = p.try(ctx, func(ctx context.Context, item *testItem) error {
+				return nil
+			})
+		}
+	})
 }

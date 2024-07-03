@@ -58,17 +58,17 @@ func (s *grpcClientStream) CloseSend() (err error) {
 			return xerrors.WithStackTrace(err)
 		}
 
-		if s.wrapping {
-			return s.wrapError(
-				xerrors.Transport(
-					err,
-					xerrors.WithAddress(s.parentConn.Address()),
-					xerrors.WithTraceID(s.traceID),
-				),
-			)
+		if !s.wrapping {
+			return err
 		}
 
-		return s.wrapError(err)
+		return xerrors.WithStackTrace(
+			xerrors.Transport(err,
+				xerrors.WithAddress(s.parentConn.Address()),
+				xerrors.WithNodeID(s.parentConn.NodeID()),
+				xerrors.WithTraceID(s.traceID),
+			),
+		)
 	}
 
 	return nil
@@ -100,17 +100,22 @@ func (s *grpcClientStream) SendMsg(m interface{}) (err error) {
 		}()
 
 		if s.wrapping {
-			err = xerrors.Transport(err,
-				xerrors.WithAddress(s.parentConn.Address()),
-				xerrors.WithTraceID(s.traceID),
-			)
 			if s.sentMark.canRetry() {
-				return s.wrapError(xerrors.Retryable(err,
+				return xerrors.WithStackTrace(xerrors.Retryable(
+					xerrors.Transport(err,
+						xerrors.WithAddress(s.parentConn.Address()),
+						xerrors.WithNodeID(s.parentConn.NodeID()),
+						xerrors.WithTraceID(s.traceID),
+					),
 					xerrors.WithName("SendMsg"),
 				))
 			}
 
-			return s.wrapError(err)
+			return xerrors.WithStackTrace(xerrors.Transport(err,
+				xerrors.WithAddress(s.parentConn.Address()),
+				xerrors.WithNodeID(s.parentConn.NodeID()),
+				xerrors.WithTraceID(s.traceID),
+			))
 		}
 
 		return err
@@ -150,53 +155,49 @@ func (s *grpcClientStream) RecvMsg(m interface{}) (err error) { //nolint:funlen
 			return io.EOF
 		}
 
-		if xerrors.IsContextError(err) {
-			return xerrors.WithStackTrace(err)
-		}
-
 		defer func() {
 			s.parentConn.onTransportError(ctx, err)
 		}()
 
-		if s.wrapping {
-			err = xerrors.Transport(err,
-				xerrors.WithAddress(s.parentConn.Address()),
-			)
-			if s.sentMark.canRetry() {
-				return s.wrapError(xerrors.Retryable(err,
-					xerrors.WithName("RecvMsg"),
-				))
-			}
-
-			return s.wrapError(err)
+		if !s.wrapping {
+			return err
 		}
 
-		return err
+		if xerrors.IsContextError(err) {
+			return xerrors.WithStackTrace(err)
+		}
+
+		if s.sentMark.canRetry() {
+			return xerrors.WithStackTrace(xerrors.Retryable(
+				xerrors.Transport(err,
+					xerrors.WithAddress(s.parentConn.Address()),
+					xerrors.WithNodeID(s.parentConn.NodeID()),
+				),
+				xerrors.WithName("RecvMsg"),
+			))
+		}
+
+		return xerrors.WithStackTrace(xerrors.Transport(err,
+			xerrors.WithAddress(s.parentConn.Address()),
+			xerrors.WithNodeID(s.parentConn.NodeID()),
+		))
 	}
 
-	if s.wrapping {
-		if operation, ok := m.(operation.Status); ok {
-			if status := operation.GetStatus(); status != Ydb.StatusIds_SUCCESS {
-				return s.wrapError(
-					xerrors.Operation(
-						xerrors.FromOperation(operation),
-						xerrors.WithAddress(s.parentConn.Address()),
-					),
-				)
-			}
+	if !s.wrapping {
+		return nil
+	}
+
+	if operation, ok := m.(operation.Status); ok {
+		if status := operation.GetStatus(); status != Ydb.StatusIds_SUCCESS {
+			return xerrors.WithStackTrace(
+				xerrors.Operation(
+					xerrors.FromOperation(operation),
+					xerrors.WithAddress(s.parentConn.Address()),
+					xerrors.WithNodeID(s.parentConn.NodeID()),
+				),
+			)
 		}
 	}
 
 	return nil
-}
-
-func (s *grpcClientStream) wrapError(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	return xerrors.WithStackTrace(
-		newConnError(s.parentConn.endpoint.NodeID(), s.parentConn.endpoint.Address(), err),
-		xerrors.WithSkipDepth(1),
-	)
 }

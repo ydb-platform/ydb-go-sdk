@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"google.golang.org/grpc/connectivity"
 )
 
 type (
@@ -130,14 +132,6 @@ func (m Method) Split() (service, method string) {
 }
 
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-type ConnState interface {
-	fmt.Stringer
-
-	IsValid() bool
-	Code() int
-}
-
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 type EndpointInfo interface {
 	fmt.Stringer
 
@@ -164,11 +158,11 @@ type (
 		Context  *context.Context
 		Call     call
 		Endpoint EndpointInfo
-		State    ConnState
+		State    connectivity.State
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnStateChangeDoneInfo struct {
-		State ConnState
+		State connectivity.State
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverResolveStartInfo struct {
@@ -321,12 +315,12 @@ type (
 		Context  *context.Context
 		Call     call
 		Endpoint EndpointInfo
-		State    ConnState
+		State    connectivity.State
 		Cause    error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnBanDoneInfo struct {
-		State ConnState
+		State connectivity.State
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnAllowStartInfo struct {
@@ -337,11 +331,11 @@ type (
 		Context  *context.Context
 		Call     call
 		Endpoint EndpointInfo
-		State    ConnState
+		State    connectivity.State
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnAllowDoneInfo struct {
-		State ConnState
+		State connectivity.State
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnInvokeStartInfo struct {
@@ -359,7 +353,7 @@ type (
 		Error    error
 		Issues   []Issue
 		OpID     string
-		State    ConnState
+		State    connectivity.State
 		Metadata map[string][]string
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
@@ -376,7 +370,7 @@ type (
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnNewStreamDoneInfo struct {
 		Error error
-		State ConnState
+		State connectivity.State
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	DriverConnStreamRecvMsgStartInfo struct {

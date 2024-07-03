@@ -246,76 +246,6 @@ func (t *Query) Compose(x *Query, opts ...QueryComposeOption) *Query {
 		}
 	}
 	{
-		h1 := t.OnPoolPut
-		h2 := x.OnPoolPut
-		ret.OnPoolPut = func(q QueryPoolPutStartInfo) func(QueryPoolPutDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(QueryPoolPutDoneInfo)
-			if h1 != nil {
-				r = h1(q)
-			}
-			if h2 != nil {
-				r1 = h2(q)
-			}
-			return func(q QueryPoolPutDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(q)
-				}
-				if r1 != nil {
-					r1(q)
-				}
-			}
-		}
-	}
-	{
-		h1 := t.OnPoolGet
-		h2 := x.OnPoolGet
-		ret.OnPoolGet = func(q QueryPoolGetStartInfo) func(QueryPoolGetDoneInfo) {
-			if options.panicCallback != nil {
-				defer func() {
-					if e := recover(); e != nil {
-						options.panicCallback(e)
-					}
-				}()
-			}
-			var r, r1 func(QueryPoolGetDoneInfo)
-			if h1 != nil {
-				r = h1(q)
-			}
-			if h2 != nil {
-				r1 = h2(q)
-			}
-			return func(q QueryPoolGetDoneInfo) {
-				if options.panicCallback != nil {
-					defer func() {
-						if e := recover(); e != nil {
-							options.panicCallback(e)
-						}
-					}()
-				}
-				if r != nil {
-					r(q)
-				}
-				if r1 != nil {
-					r1(q)
-				}
-			}
-		}
-	}
-	{
 		h1 := t.OnPoolChange
 		h2 := x.OnPoolChange
 		ret.OnPoolChange = func(q QueryPoolChange) {
@@ -1091,36 +1021,6 @@ func (t *Query) onPoolWith(q QueryPoolWithStartInfo) func(QueryPoolWithDoneInfo)
 	}
 	return res
 }
-func (t *Query) onPoolPut(q QueryPoolPutStartInfo) func(QueryPoolPutDoneInfo) {
-	fn := t.OnPoolPut
-	if fn == nil {
-		return func(QueryPoolPutDoneInfo) {
-			return
-		}
-	}
-	res := fn(q)
-	if res == nil {
-		return func(QueryPoolPutDoneInfo) {
-			return
-		}
-	}
-	return res
-}
-func (t *Query) onPoolGet(q QueryPoolGetStartInfo) func(QueryPoolGetDoneInfo) {
-	fn := t.OnPoolGet
-	if fn == nil {
-		return func(QueryPoolGetDoneInfo) {
-			return
-		}
-	}
-	res := fn(q)
-	if res == nil {
-		return func(QueryPoolGetDoneInfo) {
-			return
-		}
-	}
-	return res
-}
 func (t *Query) onPoolChange(q QueryPoolChange) {
 	fn := t.OnPoolChange
 	if fn == nil {
@@ -1486,34 +1386,9 @@ func QueryOnPoolWith(t *Query, c *context.Context, call call) func(_ error, atte
 	}
 }
 // Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnPoolPut(t *Query, c *context.Context, call call) func(error) {
-	var p QueryPoolPutStartInfo
-	p.Context = c
-	p.Call = call
-	res := t.onPoolPut(p)
-	return func(e error) {
-		var p QueryPoolPutDoneInfo
-		p.Error = e
-		res(p)
-	}
-}
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnPoolGet(t *Query, c *context.Context, call call) func(error) {
-	var p QueryPoolGetStartInfo
-	p.Context = c
-	p.Call = call
-	res := t.onPoolGet(p)
-	return func(e error) {
-		var p QueryPoolGetDoneInfo
-		p.Error = e
-		res(p)
-	}
-}
-// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
-func QueryOnPoolChange(t *Query, limit int, index int, idle int, inUse int) {
+func QueryOnPoolChange(t *Query, limit int, idle int, inUse int) {
 	var p QueryPoolChange
 	p.Limit = limit
-	p.Index = index
 	p.Idle = idle
 	p.InUse = inUse
 	t.onPoolChange(p)

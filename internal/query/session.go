@@ -183,7 +183,9 @@ func (s *Session) closeAndDeleteSession(cancelAttach context.CancelFunc) func(ct
 		} else {
 			ctx, cancel = xcontext.WithCancel(ctx)
 		}
-		defer cancel()
+		defer func() {
+			cancel()
+		}()
 
 		if err = deleteSession(ctx, s.grpcClient, s.id); err != nil {
 			return xerrors.WithStackTrace(err)
