@@ -60,6 +60,8 @@ type (
 		done chan struct{}
 
 		stats *safeStats
+
+		spawnCancel context.CancelFunc
 	}
 	option[PT Item[T], T any] func(p *Pool[PT, T])
 )
@@ -202,7 +204,9 @@ func New[PT Item[T], T any](
 		onChange: p.trace.OnChange,
 	}
 
-	go p.spawnItems(xcontext.ValueOnly(ctx))
+	var spawnCtx context.Context
+	spawnCtx, p.spawnCancel = xcontext.WithCancel(xcontext.ValueOnly(ctx))
+	go p.spawnItems(spawnCtx)
 
 	return p
 }
@@ -511,6 +515,9 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 			Error: finalErr,
 		})
 	}()
+
+	// canceling spawner (and any underlying createItem calls)
+	p.spawnCancel()
 
 	// Only closing done channel.
 	// Due to multiple senders queue is not closed here,
