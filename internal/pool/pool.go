@@ -202,8 +202,9 @@ func New[PT Item[T], T any](
 		onChange: p.trace.OnChange,
 	}
 
+	createCtx := xcontext.ValueOnly(ctx)
 	for i := 0; i < defaultSpawnGoroutinesNumber; i++ {
-		go p.spawnItems(ctx)
+		go p.spawnItems(createCtx)
 	}
 
 	return p
@@ -213,43 +214,45 @@ func New[PT Item[T], T any](
 // It ensures that pool would always have amount of connections equal to configured limit.
 // If item creation ended with error it will be retried infinity with configured interval until success.
 func (p *Pool[PT, T]) spawnItems(ctx context.Context) {
-spawnLoop:
 	for {
 		select {
-		case <-ctx.Done():
-			break spawnLoop
 		case <-p.done:
-			break spawnLoop
+			return
 		case <-p.itemTokens:
 			// got token, must create item
 			for {
-				item, err := p.createItem(ctx)
-				if err != nil {
-					select {
-					case <-ctx.Done():
-						break spawnLoop
-					case <-p.done:
-						break spawnLoop
-					case <-time.After(defaultCreateRetryDelay):
-						// try again.
-						// token must always result in new item and not be lost.
-					}
-				} else {
-					// item is created successfully, put it in queue
-					select {
-					case <-ctx.Done():
-						break spawnLoop
-					case <-p.done:
-						break spawnLoop
-					case p.queue <- item:
-						p.stats.Idle().Inc()
-					}
-
-					continue spawnLoop
+				err := p.trySpawn(ctx)
+				if err == nil {
+					break
 				}
+				// spawn was unsuccessful, need to try again.
+				// token must always result in new item and not be lost.
+				timer := time.NewTimer(defaultCreateRetryDelay)
+				select {
+				case <-p.done:
+					timer.Stop()
+					return
+				case <-timer.C:
+				}
+				timer.Stop()
 			}
 		}
 	}
+}
+
+func (p *Pool[PT, T]) trySpawn(ctx context.Context) error {
+	item, err := p.createItem(ctx)
+	if err != nil {
+		return err
+	}
+	// item was created successfully, put it in queue
+	select {
+	case <-p.done:
+		return nil
+	case p.queue <- item:
+		p.stats.Idle().Inc()
+	}
+	return nil
 }
 
 // defaultCreateItem returns a new item

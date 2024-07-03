@@ -67,8 +67,10 @@ func (t *testItemV2) Close(context.Context) error {
 }
 
 func (t *testItemV2) failAfter(d time.Duration) {
-	<-time.After(d)
+	timer := time.NewTimer(d)
+	<-timer.C
 	atomic.CompareAndSwapInt32(&t.dead, 0, 1)
+	timer.Stop()
 }
 
 func TestPool(t *testing.T) {
