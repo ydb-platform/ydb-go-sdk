@@ -2,6 +2,7 @@ package pool
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"golang.org/x/sync/errgroup"
@@ -62,6 +63,8 @@ type (
 		stats *safeStats
 
 		spawnCancel context.CancelFunc
+
+		wg *sync.WaitGroup
 	}
 	option[PT Item[T], T any] func(p *Pool[PT, T])
 )
@@ -205,7 +208,9 @@ func New[PT Item[T], T any](
 	}
 
 	var spawnCtx context.Context
+	p.wg = &sync.WaitGroup{}
 	spawnCtx, p.spawnCancel = xcontext.WithCancel(xcontext.ValueOnly(ctx))
+	p.wg.Add(1)
 	go p.spawnItems(spawnCtx)
 
 	return p
@@ -215,13 +220,17 @@ func New[PT Item[T], T any](
 // It ensures that pool would always have amount of connections equal to configured limit.
 // If item creation ended with error it will be retried infinity with configured interval until success.
 func (p *Pool[PT, T]) spawnItems(ctx context.Context) {
+	defer p.wg.Done()
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-p.done:
 			return
 		case <-p.itemTokens:
 			// got token, must create item
 			for {
+				p.wg.Add(1)
 				err := p.trySpawn(ctx)
 				if err == nil {
 					break
@@ -234,12 +243,15 @@ func (p *Pool[PT, T]) spawnItems(ctx context.Context) {
 }
 
 func (p *Pool[PT, T]) trySpawn(ctx context.Context) error {
+	defer p.wg.Done()
 	item, err := p.createItem(ctx)
 	if err != nil {
 		return err
 	}
 	// item was created successfully, put it in queue
 	select {
+	case <-ctx.Done():
+		return ctx.Err()
 	case <-p.done:
 		return nil
 	case p.queue <- item:
@@ -523,6 +535,9 @@ func (p *Pool[PT, T]) Close(ctx context.Context) (finalErr error) {
 	// Due to multiple senders queue is not closed here,
 	// we're just making sure to drain it fully to close any existing item.
 	close(p.done)
+
+	p.wg.Wait()
+
 	var g errgroup.Group
 shutdownLoop:
 	for {
