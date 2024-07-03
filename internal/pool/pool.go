@@ -231,6 +231,7 @@ func (p *Pool[PT, T]) spawnItems(ctx context.Context) {
 				select {
 				case <-p.done:
 					timer.Stop()
+
 					return
 				case <-timer.C:
 				}
@@ -252,6 +253,7 @@ func (p *Pool[PT, T]) trySpawn(ctx context.Context) error {
 	case p.queue <- item:
 		p.stats.Idle().Inc()
 	}
+
 	return nil
 }
 
