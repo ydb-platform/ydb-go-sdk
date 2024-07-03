@@ -229,11 +229,19 @@ func (p *Pool[PT, T]) spawnItems(ctx context.Context) {
 			return
 		case <-p.itemTokens:
 			// got token, must create item
+		createLoop:
 			for {
-				p.wg.Add(1)
-				err := p.trySpawn(ctx)
-				if err == nil {
-					break
+				select {
+				case <-ctx.Done():
+					return
+				case <-p.done:
+					return
+				default:
+					p.wg.Add(1)
+					err := p.trySpawn(ctx)
+					if err == nil {
+						break createLoop
+					}
 				}
 				// spawn was unsuccessful, need to try again.
 				// token must always result in new item and not be lost.
@@ -251,7 +259,7 @@ func (p *Pool[PT, T]) trySpawn(ctx context.Context) error {
 	// item was created successfully, put it in queue
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return nil
 	case <-p.done:
 		return nil
 	case p.queue <- item:
@@ -381,7 +389,6 @@ func (p *Pool[PT, T]) getItem(ctx context.Context) (_ PT, finalErr error) {
 				_ = p.closeItem(ctx, item) // clean up dead item
 			}
 			p.itemTokens <- struct{}{} // signal spawn goroutine to create a new item
-
 			// and try again
 		}
 	}
