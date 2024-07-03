@@ -24,6 +24,9 @@ func ReadTopic(path string) ReadSelectors {
 // ReaderOption options for topic reader
 type ReaderOption = topicreaderinternal.PublicReaderOption
 
+// CallbackReaderOption options for topic callback reader
+type CallbackReaderOption = topicreaderinternal.PublicCallbackReaderOption
+
 // WithReaderOperationTimeout
 //
 // Experimental: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#experimental

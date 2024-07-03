@@ -32,6 +32,14 @@ type Client interface {
 		opts ...topicoptions.ReaderOption,
 	) (*topicreader.Reader, error)
 
+	// StartCallbackReader start read messages from topic, callback based interface
+	StartCallbackReader(
+		consumer string,
+		eventsHandler topicreader.EventHandler,
+		readSelectors topicoptions.ReadSelectors,
+		opts ...topicoptions.CallbackReaderOption,
+	) (*topicreader.CallbackReader, error)
+
 	// StartWriter start write session to topic
 	// it is fast non block call, connection starts in background
 	StartWriter(topicPath string, opts ...topicoptions.WriterOption) (*topicwriter.Writer, error)
