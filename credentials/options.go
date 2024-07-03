@@ -115,14 +115,19 @@ func WithTokenTTL(ttl time.Duration) credentials.JWTTokenSourceOption {
 	return credentials.WithTokenTTL(ttl)
 }
 
+// KeyID
+func WithKeyID(id string) credentials.JWTTokenSourceOption {
+	return credentials.WithKeyID(id)
+}
+
 // SigningMethod
 func WithSigningMethod(method jwt.SigningMethod) credentials.JWTTokenSourceOption {
 	return credentials.WithSigningMethod(method)
 }
 
-// KeyID
-func WithKeyID(id string) credentials.JWTTokenSourceOption {
-	return credentials.WithKeyID(id)
+// SigningMethod
+func WithSigningMethodName(method string) credentials.JWTTokenSourceOption {
+	return credentials.WithSigningMethodName(method)
 }
 
 // PrivateKey
@@ -131,11 +136,49 @@ func WithPrivateKey(key interface{}) credentials.JWTTokenSourceOption {
 }
 
 // PrivateKey
+// For RSA signing methods: RS256, RS384, RS512, PS256, PS384, PS512
 func WithRSAPrivateKeyPEMContent(key []byte) credentials.JWTTokenSourceOption {
 	return credentials.WithRSAPrivateKeyPEMContent(key)
 }
 
 // PrivateKey
+// For RSA signing methods: RS256, RS384, RS512, PS256, PS384, PS512
 func WithRSAPrivateKeyPEMFile(path string) credentials.JWTTokenSourceOption {
 	return credentials.WithRSAPrivateKeyPEMFile(path)
+}
+
+// PrivateKey
+// For EC signing methods: ES256, ES384, ES512
+func WithECPrivateKeyPEMContent(key []byte) credentials.JWTTokenSourceOption {
+	return credentials.WithECPrivateKeyPEMContent(key)
+}
+
+// PrivateKey
+// For EC signing methods: ES256, ES384, ES512
+func WithECPrivateKeyPEMFile(path string) credentials.JWTTokenSourceOption {
+	return credentials.WithECPrivateKeyPEMFile(path)
+}
+
+// Key
+// For HMAC signing methods: HS256, HS384, HS512
+func WithHMACSecretKey(key []byte) credentials.JWTTokenSourceOption {
+	return credentials.WithHMACSecretKey(key)
+}
+
+// Key
+// For HMAC signing methods: HS256, HS384, HS512
+func WithHMACSecretKeyBase64Content(base64KeyContent string) credentials.JWTTokenSourceOption {
+	return credentials.WithHMACSecretKeyBase64Content(base64KeyContent)
+}
+
+// Key
+// For HMAC signing methods: HS256, HS384, HS512
+func WithHMACSecretKeyFile(path string) credentials.JWTTokenSourceOption {
+	return credentials.WithHMACSecretKeyFile(path)
+}
+
+// Key
+// For HMAC signing methods: HS256, HS384, HS512
+func WithHMACSecretKeyBase64File(path string) credentials.JWTTokenSourceOption {
+	return credentials.WithHMACSecretKeyBase64File(path)
 }
