@@ -2,21 +2,20 @@ package topicreader
 
 import "context"
 
-type CallbackReader struct {
-}
+type CallbackReader struct{}
 
 func (cr *CallbackReader) WaitInit() error {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (cr *CallbackReader) Commit(ctx context.Context, batch CommitRangeGetter) error {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func (cr *CallbackReader) Close(ctx context.Context) error {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
@@ -52,21 +51,18 @@ type StopPartitionSessionRequest struct {
 	CommittedOffset    int64
 }
 
-type StopPartitionSessionResponse struct {
-}
+type StopPartitionSessionResponse struct{}
 
 type ReadMessages struct {
 	PartitionSessionID int64
 	Batch              *Batch
 }
 
-type BaseHandler struct {
-}
+type BaseHandler struct{}
 
 func (b BaseHandler) topicReaderHandler() {}
 
 func (b BaseHandler) OnReaderCreated(ctx context.Context, req ReaderReady) error {
-
 }
 
 func (b BaseHandler) OnStartPartitionSessionRequest(

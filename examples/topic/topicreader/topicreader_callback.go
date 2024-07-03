@@ -80,11 +80,11 @@ func (h *TopicEventsHandler) OnStopPartitionSessionRequest(
 }
 
 func lockPartition(ctx context.Context, topic string, partitionID int64) (lockID, offset int64, err error) {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
 
 func unlockPartition(ctx context.Context, lockID int64) error {
-	//TODO implement me
+	// TODO implement me
 	panic("implement me")
 }
