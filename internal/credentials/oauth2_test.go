@@ -2,6 +2,7 @@ package credentials
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -20,9 +21,15 @@ import (
 	"github.com/ydb-platform/ydb-go-sdk/v3/internal/xtest"
 )
 
+// #nosec G101
 var (
-	testPrivateKeyContent = "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC75/JS3rMcLJxv\nFgpOzF5+2gH+Yig3RE2MTl9uwC0BZKAv6foYr7xywQyWIK+W1cBhz8R4LfFmZo2j\nM0aCvdRmNBdW0EDSTnHLxCsFhoQWLVq+bI5f5jzkcoiioUtaEpADPqwgVULVtN/n\nnPJiZ6/dU30C3jmR6+LUgEntUtWt3eq3xQIn5lG3zC1klBY/HxtfH5Hu8xBvwRQT\nJnh3UpPLj8XwSmriDgdrhR7o6umWyVuGrMKlLHmeivlfzjYtfzO1MOIMG8t2/zxG\nR+xb4Vwks73sH1KruH/0/JMXU97npwpe+Um+uXhpldPygGErEia7abyZB2gMpXqr\nWYKMo02NAgMBAAECggEAO0BpC5OYw/4XN/optu4/r91bupTGHKNHlsIR2rDzoBhU\nYLd1evpTQJY6O07EP5pYZx9mUwUdtU4KRJeDGO/1/WJYp7HUdtxwirHpZP0lQn77\nuccuX/QQaHLrPekBgz4ONk+5ZBqukAfQgM7fKYOLk41jgpeDbM2Ggb6QUSsJISEp\nzrwpI/nNT/wn+Hvx4DxrzWU6wF+P8kl77UwPYlTA7GsT+T7eKGVH8xsxmK8pt6lg\nsvlBA5XosWBWUCGLgcBkAY5e4ZWbkdd183o+oMo78id6C+PQPE66PLDtHWfpRRmN\nm6XC03x6NVhnfvfozoWnmS4+e4qj4F/emCHvn0GMywKBgQDLXlj7YPFVXxZpUvg/\nrheVcCTGbNmQJ+4cZXx87huqwqKgkmtOyeWsRc7zYInYgraDrtCuDBCfP//ZzOh0\nLxepYLTPk5eNn/GT+VVrqsy35Ccr60g7Lp/bzb1WxyhcLbo0KX7/6jl0lP+VKtdv\nmto+4mbSBXSM1Y5BVVoVgJ3T/wKBgQDsiSvPRzVi5TTj13x67PFymTMx3HCe2WzH\nJUyepCmVhTm482zW95pv6raDr5CTO6OYpHtc5sTTRhVYEZoEYFTM9Vw8faBtluWG\nBjkRh4cIpoIARMn74YZKj0C/0vdX7SHdyBOU3bgRPHg08Hwu3xReqT1kEPSI/B2V\n4pe5fVrucwKBgQCNFgUxUA3dJjyMES18MDDYUZaRug4tfiYouRdmLGIxUxozv6CG\nZnbZzwxFt+GpvPUV4f+P33rgoCvFU+yoPctyjE6j+0aW0DFucPmb2kBwCu5J/856\nkFwCx3blbwFHAco+SdN7g2kcwgmV2MTg/lMOcU7XwUUcN0Obe7UlWbckzQKBgQDQ\nnXaXHL24GGFaZe4y2JFmujmNy1dEsoye44W9ERpf9h1fwsoGmmCKPp90az5+rIXw\nFXl8CUgk8lXW08db/r4r+ma8Lyx0GzcZyplAnaB5/6j+pazjSxfO4KOBy4Y89Tb+\nTP0AOcCi6ws13bgY+sUTa/5qKA4UVw+c5zlb7nRpgwKBgGXAXhenFw1666482iiN\ncHSgwc4ZHa1oL6aNJR1XWH+aboBSwR+feKHUPeT4jHgzRGo/aCNHD2FE5I8eBv33\nof1kWYjAO0YdzeKrW0rTwfvt9gGg+CS397aWu4cy+mTI+MNfBgeDAIVBeJOJXLlX\nhL8bFAuNNVrCOp79TNnNIsh7\n-----END PRIVATE KEY-----\n" //nolint:lll
-	testPublicKeyContent  = "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu+fyUt6zHCycbxYKTsxe\nftoB/mIoN0RNjE5fbsAtAWSgL+n6GK+8csEMliCvltXAYc/EeC3xZmaNozNGgr3U\nZjQXVtBA0k5xy8QrBYaEFi1avmyOX+Y85HKIoqFLWhKQAz6sIFVC1bTf55zyYmev\n3VN9At45kevi1IBJ7VLVrd3qt8UCJ+ZRt8wtZJQWPx8bXx+R7vMQb8EUEyZ4d1KT\ny4/F8Epq4g4Ha4Ue6OrplslbhqzCpSx5nor5X842LX8ztTDiDBvLdv88RkfsW+Fc\nJLO97B9Sq7h/9PyTF1Pe56cKXvlJvrl4aZXT8oBhKxImu2m8mQdoDKV6q1mCjKNN\njQIDAQAB\n-----END PUBLIC KEY-----\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         //nolint:lll
+	testRSAPrivateKeyContent       = "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC75/JS3rMcLJxv\nFgpOzF5+2gH+Yig3RE2MTl9uwC0BZKAv6foYr7xywQyWIK+W1cBhz8R4LfFmZo2j\nM0aCvdRmNBdW0EDSTnHLxCsFhoQWLVq+bI5f5jzkcoiioUtaEpADPqwgVULVtN/n\nnPJiZ6/dU30C3jmR6+LUgEntUtWt3eq3xQIn5lG3zC1klBY/HxtfH5Hu8xBvwRQT\nJnh3UpPLj8XwSmriDgdrhR7o6umWyVuGrMKlLHmeivlfzjYtfzO1MOIMG8t2/zxG\nR+xb4Vwks73sH1KruH/0/JMXU97npwpe+Um+uXhpldPygGErEia7abyZB2gMpXqr\nWYKMo02NAgMBAAECggEAO0BpC5OYw/4XN/optu4/r91bupTGHKNHlsIR2rDzoBhU\nYLd1evpTQJY6O07EP5pYZx9mUwUdtU4KRJeDGO/1/WJYp7HUdtxwirHpZP0lQn77\nuccuX/QQaHLrPekBgz4ONk+5ZBqukAfQgM7fKYOLk41jgpeDbM2Ggb6QUSsJISEp\nzrwpI/nNT/wn+Hvx4DxrzWU6wF+P8kl77UwPYlTA7GsT+T7eKGVH8xsxmK8pt6lg\nsvlBA5XosWBWUCGLgcBkAY5e4ZWbkdd183o+oMo78id6C+PQPE66PLDtHWfpRRmN\nm6XC03x6NVhnfvfozoWnmS4+e4qj4F/emCHvn0GMywKBgQDLXlj7YPFVXxZpUvg/\nrheVcCTGbNmQJ+4cZXx87huqwqKgkmtOyeWsRc7zYInYgraDrtCuDBCfP//ZzOh0\nLxepYLTPk5eNn/GT+VVrqsy35Ccr60g7Lp/bzb1WxyhcLbo0KX7/6jl0lP+VKtdv\nmto+4mbSBXSM1Y5BVVoVgJ3T/wKBgQDsiSvPRzVi5TTj13x67PFymTMx3HCe2WzH\nJUyepCmVhTm482zW95pv6raDr5CTO6OYpHtc5sTTRhVYEZoEYFTM9Vw8faBtluWG\nBjkRh4cIpoIARMn74YZKj0C/0vdX7SHdyBOU3bgRPHg08Hwu3xReqT1kEPSI/B2V\n4pe5fVrucwKBgQCNFgUxUA3dJjyMES18MDDYUZaRug4tfiYouRdmLGIxUxozv6CG\nZnbZzwxFt+GpvPUV4f+P33rgoCvFU+yoPctyjE6j+0aW0DFucPmb2kBwCu5J/856\nkFwCx3blbwFHAco+SdN7g2kcwgmV2MTg/lMOcU7XwUUcN0Obe7UlWbckzQKBgQDQ\nnXaXHL24GGFaZe4y2JFmujmNy1dEsoye44W9ERpf9h1fwsoGmmCKPp90az5+rIXw\nFXl8CUgk8lXW08db/r4r+ma8Lyx0GzcZyplAnaB5/6j+pazjSxfO4KOBy4Y89Tb+\nTP0AOcCi6ws13bgY+sUTa/5qKA4UVw+c5zlb7nRpgwKBgGXAXhenFw1666482iiN\ncHSgwc4ZHa1oL6aNJR1XWH+aboBSwR+feKHUPeT4jHgzRGo/aCNHD2FE5I8eBv33\nof1kWYjAO0YdzeKrW0rTwfvt9gGg+CS397aWu4cy+mTI+MNfBgeDAIVBeJOJXLlX\nhL8bFAuNNVrCOp79TNnNIsh7\n-----END PRIVATE KEY-----\n"                             //nolint:lll
+	testRSAPrivateKeyJSONContent   = "-----BEGIN PRIVATE KEY-----\\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC75/JS3rMcLJxv\\nFgpOzF5+2gH+Yig3RE2MTl9uwC0BZKAv6foYr7xywQyWIK+W1cBhz8R4LfFmZo2j\\nM0aCvdRmNBdW0EDSTnHLxCsFhoQWLVq+bI5f5jzkcoiioUtaEpADPqwgVULVtN/n\\nnPJiZ6/dU30C3jmR6+LUgEntUtWt3eq3xQIn5lG3zC1klBY/HxtfH5Hu8xBvwRQT\\nJnh3UpPLj8XwSmriDgdrhR7o6umWyVuGrMKlLHmeivlfzjYtfzO1MOIMG8t2/zxG\\nR+xb4Vwks73sH1KruH/0/JMXU97npwpe+Um+uXhpldPygGErEia7abyZB2gMpXqr\\nWYKMo02NAgMBAAECggEAO0BpC5OYw/4XN/optu4/r91bupTGHKNHlsIR2rDzoBhU\\nYLd1evpTQJY6O07EP5pYZx9mUwUdtU4KRJeDGO/1/WJYp7HUdtxwirHpZP0lQn77\\nuccuX/QQaHLrPekBgz4ONk+5ZBqukAfQgM7fKYOLk41jgpeDbM2Ggb6QUSsJISEp\\nzrwpI/nNT/wn+Hvx4DxrzWU6wF+P8kl77UwPYlTA7GsT+T7eKGVH8xsxmK8pt6lg\\nsvlBA5XosWBWUCGLgcBkAY5e4ZWbkdd183o+oMo78id6C+PQPE66PLDtHWfpRRmN\\nm6XC03x6NVhnfvfozoWnmS4+e4qj4F/emCHvn0GMywKBgQDLXlj7YPFVXxZpUvg/\\nrheVcCTGbNmQJ+4cZXx87huqwqKgkmtOyeWsRc7zYInYgraDrtCuDBCfP//ZzOh0\\nLxepYLTPk5eNn/GT+VVrqsy35Ccr60g7Lp/bzb1WxyhcLbo0KX7/6jl0lP+VKtdv\\nmto+4mbSBXSM1Y5BVVoVgJ3T/wKBgQDsiSvPRzVi5TTj13x67PFymTMx3HCe2WzH\\nJUyepCmVhTm482zW95pv6raDr5CTO6OYpHtc5sTTRhVYEZoEYFTM9Vw8faBtluWG\\nBjkRh4cIpoIARMn74YZKj0C/0vdX7SHdyBOU3bgRPHg08Hwu3xReqT1kEPSI/B2V\\n4pe5fVrucwKBgQCNFgUxUA3dJjyMES18MDDYUZaRug4tfiYouRdmLGIxUxozv6CG\\nZnbZzwxFt+GpvPUV4f+P33rgoCvFU+yoPctyjE6j+0aW0DFucPmb2kBwCu5J/856\\nkFwCx3blbwFHAco+SdN7g2kcwgmV2MTg/lMOcU7XwUUcN0Obe7UlWbckzQKBgQDQ\\nnXaXHL24GGFaZe4y2JFmujmNy1dEsoye44W9ERpf9h1fwsoGmmCKPp90az5+rIXw\\nFXl8CUgk8lXW08db/r4r+ma8Lyx0GzcZyplAnaB5/6j+pazjSxfO4KOBy4Y89Tb+\\nTP0AOcCi6ws13bgY+sUTa/5qKA4UVw+c5zlb7nRpgwKBgGXAXhenFw1666482iiN\\ncHSgwc4ZHa1oL6aNJR1XWH+aboBSwR+feKHUPeT4jHgzRGo/aCNHD2FE5I8eBv33\\nof1kWYjAO0YdzeKrW0rTwfvt9gGg+CS397aWu4cy+mTI+MNfBgeDAIVBeJOJXLlX\\nhL8bFAuNNVrCOp79TNnNIsh7\\n-----END PRIVATE KEY-----\\n" //nolint:lll
+	testRSAPublicKeyContent        = "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu+fyUt6zHCycbxYKTsxe\nftoB/mIoN0RNjE5fbsAtAWSgL+n6GK+8csEMliCvltXAYc/EeC3xZmaNozNGgr3U\nZjQXVtBA0k5xy8QrBYaEFi1avmyOX+Y85HKIoqFLWhKQAz6sIFVC1bTf55zyYmev\n3VN9At45kevi1IBJ7VLVrd3qt8UCJ+ZRt8wtZJQWPx8bXx+R7vMQb8EUEyZ4d1KT\ny4/F8Epq4g4Ha4Ue6OrplslbhqzCpSx5nor5X842LX8ztTDiDBvLdv88RkfsW+Fc\nJLO97B9Sq7h/9PyTF1Pe56cKXvlJvrl4aZXT8oBhKxImu2m8mQdoDKV6q1mCjKNN\njQIDAQAB\n-----END PUBLIC KEY-----\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     //nolint:lll
+	testECPrivateKeyContent        = "-----BEGIN EC PRIVATE KEY-----\nMHcCAQEEIB6fv25gf7P/7fkjW/2kcKICUhHeOygkFeUJ/ylyU3hloAoGCCqGSM49\nAwEHoUQDQgAEvkKy92hpLiT0GEpzFkYBEWWnkAGTTA6141H0oInA9X30eS0RObAa\nmVY8yD39NI7Nj03hBxEa4Z0tOhrq9cW8eg==\n-----END EC PRIVATE KEY-----\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         //nolint:lll
+	testECPrivateKeyJSONContent    = "-----BEGIN EC PRIVATE KEY-----\\nMHcCAQEEIB6fv25gf7P/7fkjW/2kcKICUhHeOygkFeUJ/ylyU3hloAoGCCqGSM49\\nAwEHoUQDQgAEvkKy92hpLiT0GEpzFkYBEWWnkAGTTA6141H0oInA9X30eS0RObAa\\nmVY8yD39NI7Nj03hBxEa4Z0tOhrq9cW8eg==\\n-----END EC PRIVATE KEY-----\\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    //nolint:lll
+	testECPublicKeyContent         = "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEvkKy92hpLiT0GEpzFkYBEWWnkAGT\nTA6141H0oInA9X30eS0RObAamVY8yD39NI7Nj03hBxEa4Z0tOhrq9cW8eg==\n-----END PUBLIC KEY-----\n"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           //nolint:lll
+	testHMACSecretKeyBase64Content = "VGhlIHdvcmxkIGhhcyBjaGFuZ2VkLgpJIHNlZSBpdCBpbiB0aGUgd2F0ZXIuCkkgZmVlbCBpdCBpbiB0aGUgRWFydGguCkkgc21lbGwgaXQgaW4gdGhlIGFpci4KTXVjaCB0aGF0IG9uY2Ugd2FzIGlzIGxvc3QsCkZvciBub25lIG5vdyBsaXZlIHdobyByZW1lbWJlciBpdC4K"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 //nolint:lll
 )
 
 func WriteErr(w http.ResponseWriter, err error) {
@@ -286,6 +293,42 @@ func TestErrorInSourceToken(t *testing.T) {
 	)
 	require.ErrorIs(t, err, errCouldNotCreateTokenSource)
 
+	_, err = NewOauth2TokenExchangeCredentials(
+		WithTokenEndpoint("http:trololo"),
+		WithJWTSubjectToken(
+			WithECPrivateKeyPEMContent([]byte("invalid")),
+			WithKeyID("key_id"),
+			WithSigningMethod(jwt.SigningMethodES512),
+			WithIssuer("test_issuer"),
+			WithAudience("test_audience"),
+		),
+	)
+	require.ErrorIs(t, err, errCouldNotCreateTokenSource)
+
+	_, err = NewOauth2TokenExchangeCredentials(
+		WithTokenEndpoint("http:trololo"),
+		WithJWTSubjectToken(
+			WithHMACSecretKeyBase64Content("<not base64>"),
+			WithKeyID("key_id"),
+			WithSigningMethod(jwt.SigningMethodHS384),
+			WithIssuer("test_issuer"),
+			WithAudience("test_audience"),
+		),
+	)
+	require.ErrorIs(t, err, errCouldNotCreateTokenSource)
+
+	_, err = NewOauth2TokenExchangeCredentials(
+		WithTokenEndpoint("http:trololo"),
+		WithJWTSubjectToken(
+			WithHMACSecretKeyBase64Content(testHMACSecretKeyBase64Content),
+			WithKeyID("key_id"),
+			WithSigningMethodName("unknown"),
+			WithIssuer("test_issuer"),
+			WithAudience("test_audience"),
+		),
+	)
+	require.ErrorIs(t, err, errUnsupportedSigningMethod)
+
 	// Use
 	client, err := NewOauth2TokenExchangeCredentials(
 		WithTokenEndpoint("http:trololo"),
@@ -324,14 +367,14 @@ func TestErrorInHTTPRequest(t *testing.T) {
 	client, err := NewOauth2TokenExchangeCredentials(
 		WithTokenEndpoint("http://invalid_host:42/exchange"),
 		WithJWTSubjectToken(
-			WithRSAPrivateKeyPEMContent([]byte(testPrivateKeyContent)),
+			WithRSAPrivateKeyPEMContent([]byte(testRSAPrivateKeyContent)),
 			WithKeyID("key_id"),
 			WithSigningMethod(jwt.SigningMethodRS256),
 			WithIssuer("test_issuer"),
 			WithAudience("test_audience"),
 		),
 		WithJWTActorToken(
-			WithRSAPrivateKeyPEMContent([]byte(testPrivateKeyContent)),
+			WithRSAPrivateKeyPEMContent([]byte(testRSAPrivateKeyContent)),
 			WithKeyID("key_id"),
 			WithSigningMethod(jwt.SigningMethodRS256),
 			WithIssuer("test_issuer"),
@@ -351,43 +394,105 @@ func TestErrorInHTTPRequest(t *testing.T) {
 }
 
 func TestJWTTokenSource(t *testing.T) {
-	publicKey, err := jwt.ParseRSAPublicKeyFromPEM([]byte(testPublicKeyContent))
-	require.NoError(t, err)
-	getPublicKey := func(*jwt.Token) (interface{}, error) {
-		return publicKey, nil
+	methods := []string{
+		"RS384",
+		"ES256",
+		"HS512",
+		"PS512",
+	}
+	binaryOpts := []bool{
+		false,
+		true,
 	}
 
-	var src TokenSource
-	src, err = NewJWTTokenSource(
-		WithRSAPrivateKeyPEMContent([]byte(testPrivateKeyContent)),
-		WithKeyID("key_id"),
-		WithSigningMethod(jwt.SigningMethodRS256),
-		WithIssuer("test_issuer"),
-		WithAudience("test_audience"),
-	)
-	require.NoError(t, err)
+	for _, method := range methods {
+		for _, binary := range binaryOpts {
+			var publicKey interface{}
+			var src TokenSource
+			var err error
 
-	token, err := src.Token()
-	require.NoError(t, err)
-	require.Equal(t, "urn:ietf:params:oauth:token-type:jwt", token.TokenType)
+			//nolint:nestif
+			if method[0:2] == "HS" {
+				publicKey, err = base64.StdEncoding.DecodeString(testHMACSecretKeyBase64Content)
+				require.NoError(t, err)
 
-	claims := jwt.RegisteredClaims{}
-	parsedToken, err := jwt.ParseWithClaims(token.Token, &claims, getPublicKey)
-	require.NoError(t, err)
+				if binary {
+					src, err = NewJWTTokenSource(
+						WithHMACSecretKey(publicKey.([]byte)),
+						WithKeyID("key_id"),
+						WithSigningMethodName(method),
+						WithIssuer("test_issuer"),
+						WithAudience("test_audience"),
+					)
+					require.NoError(t, err)
+				} else {
+					src, err = NewJWTTokenSource(
+						WithHMACSecretKeyBase64Content(testHMACSecretKeyBase64Content),
+						WithKeyID("key_id"),
+						WithSigningMethodName(method),
+						WithIssuer("test_issuer"),
+						WithAudience("test_audience"),
+					)
+					require.NoError(t, err)
+				}
+			} else if method[0:2] == "ES" {
+				if binary {
+					continue
+				}
 
-	require.True(t, parsedToken.Valid)
-	require.NoError(t, parsedToken.Claims.Valid())
-	require.Equal(t, "test_issuer", claims.Issuer)
-	require.Equal(t, "test_audience", claims.Audience[0])
-	require.Equal(t, "key_id", parsedToken.Header["kid"].(string))
-	require.Equal(t, "RS256", parsedToken.Header["alg"].(string))
+				publicKey, err = jwt.ParseECPublicKeyFromPEM([]byte(testECPublicKeyContent))
+				require.NoError(t, err)
+
+				src, err = NewJWTTokenSource(
+					WithECPrivateKeyPEMContent([]byte(testECPrivateKeyContent)),
+					WithKeyID("key_id"),
+					WithSigningMethodName(method),
+					WithIssuer("test_issuer"),
+					WithAudience("test_audience"),
+				)
+				require.NoError(t, err)
+			} else {
+				if binary {
+					continue
+				}
+
+				publicKey, err = jwt.ParseRSAPublicKeyFromPEM([]byte(testRSAPublicKeyContent))
+				require.NoError(t, err)
+
+				src, err = NewJWTTokenSource(
+					WithRSAPrivateKeyPEMContent([]byte(testRSAPrivateKeyContent)),
+					WithKeyID("key_id"),
+					WithSigningMethodName(method),
+					WithIssuer("test_issuer"),
+					WithAudience("test_audience"),
+				)
+				require.NoError(t, err)
+			}
+
+			getPublicKey := func(*jwt.Token) (interface{}, error) {
+				return publicKey, nil
+			}
+
+			token, err := src.Token()
+			require.NoError(t, err)
+			require.Equal(t, "urn:ietf:params:oauth:token-type:jwt", token.TokenType)
+
+			claims := jwt.RegisteredClaims{}
+			parsedToken, err := jwt.ParseWithClaims(token.Token, &claims, getPublicKey)
+			require.NoError(t, err)
+
+			require.True(t, parsedToken.Valid)
+			require.NoError(t, parsedToken.Claims.Valid())
+			require.Equal(t, "test_issuer", claims.Issuer)
+			require.Equal(t, "test_audience", claims.Audience[0])
+			require.Equal(t, "key_id", parsedToken.Header["kid"].(string))
+			require.Equal(t, method, parsedToken.Header["alg"].(string))
+		}
+	}
 }
 
 func TestJWTTokenBadParams(t *testing.T) {
-	privateKey, err := jwt.ParseRSAPrivateKeyFromPEM([]byte(testPrivateKeyContent))
-	require.NoError(t, err)
-
-	_, err = NewJWTTokenSource(
+	_, err := NewJWTTokenSource(
 		// no private key
 		WithKeyID("key_id"),
 		WithSigningMethod(jwt.SigningMethodRS256),
@@ -398,7 +503,7 @@ func TestJWTTokenBadParams(t *testing.T) {
 	require.ErrorIs(t, err, errNoPrivateKeyError)
 
 	_, err = NewJWTTokenSource(
-		WithPrivateKey(privateKey),
+		WithPrivateKey([]byte{1, 2, 3}),
 		WithKeyID("key_id"),
 		// no signing method
 		WithSubject("s"),
@@ -409,34 +514,436 @@ func TestJWTTokenBadParams(t *testing.T) {
 }
 
 func TestJWTTokenSourceReadPrivateKeyFromFile(t *testing.T) {
-	f, err := os.CreateTemp("", "tmpfile-")
-	require.NoError(t, err)
-	defer os.Remove(f.Name())
-	_, err = f.WriteString(testPrivateKeyContent)
-	require.NoError(t, err)
-	f.Close()
-
-	var src TokenSource
-	src, err = NewJWTTokenSource(
-		WithRSAPrivateKeyPEMFile(f.Name()),
-		WithKeyID("key_id"),
-		WithSigningMethod(jwt.SigningMethodRS256),
-		WithIssuer("test_issuer"),
-		WithAudience("test_audience"),
-	)
-	require.NoError(t, err)
-
-	token, err := src.Token()
-	require.NoError(t, err)
-
-	// parse token
-	publicKey, err := jwt.ParseRSAPublicKeyFromPEM([]byte(testPublicKeyContent))
-	require.NoError(t, err)
-	getPublicKey := func(*jwt.Token) (interface{}, error) {
-		return publicKey, nil
+	methods := []string{
+		"ES256",
+		"PS512",
+		"RS384",
+		"HS256",
+	}
+	binaryOpts := []bool{
+		false,
+		true,
 	}
 
-	claims := jwt.RegisteredClaims{}
-	_, err = jwt.ParseWithClaims(token.Token, &claims, getPublicKey)
-	require.NoError(t, err)
+	for _, method := range methods {
+		for _, binary := range binaryOpts {
+			f, err := os.CreateTemp("", "tmpfile-")
+			require.NoError(t, err)
+			defer os.Remove(f.Name())
+
+			var publicKey interface{}
+			var src TokenSource
+
+			//nolint:nestif
+			if method[0:2] == "HS" {
+				publicKey, err = base64.StdEncoding.DecodeString(testHMACSecretKeyBase64Content)
+				require.NoError(t, err)
+
+				if binary {
+					_, err = f.Write(publicKey.([]byte))
+					require.NoError(t, err)
+					f.Close()
+
+					_, err = NewJWTTokenSource(
+						WithHMACSecretKeyFile("~/unknown_file"),
+						WithKeyID("key_id"),
+						WithSigningMethodName(method),
+						WithIssuer("test_issuer"),
+						WithAudience("test_audience"),
+					)
+					require.ErrorIs(t, err, errCouldNotReadPrivateKeyFile)
+
+					src, err = NewJWTTokenSource(
+						WithHMACSecretKeyFile(f.Name()),
+						WithKeyID("key_id"),
+						WithSigningMethodName(method),
+						WithIssuer("test_issuer"),
+						WithAudience("test_audience"),
+					)
+					require.NoError(t, err)
+				} else {
+					_, err = f.WriteString(testHMACSecretKeyBase64Content)
+					require.NoError(t, err)
+					f.Close()
+
+					_, err = NewJWTTokenSource(
+						WithHMACSecretKeyBase64File("~/unknown_file"),
+						WithKeyID("key_id"),
+						WithSigningMethodName(method),
+						WithIssuer("test_issuer"),
+						WithAudience("test_audience"),
+					)
+					require.ErrorIs(t, err, errCouldNotReadPrivateKeyFile)
+
+					src, err = NewJWTTokenSource(
+						WithHMACSecretKeyBase64File(f.Name()),
+						WithKeyID("key_id"),
+						WithSigningMethodName(method),
+						WithIssuer("test_issuer"),
+						WithAudience("test_audience"),
+					)
+					require.NoError(t, err)
+				}
+			} else if method[0:2] == "ES" {
+				if binary {
+					continue
+				}
+
+				publicKey, err = jwt.ParseECPublicKeyFromPEM([]byte(testECPublicKeyContent))
+				require.NoError(t, err)
+
+				_, err = f.WriteString(testECPrivateKeyContent)
+				require.NoError(t, err)
+				f.Close()
+
+				_, err = NewJWTTokenSource(
+					WithECPrivateKeyPEMFile("~/unknown_file"),
+					WithKeyID("key_id"),
+					WithSigningMethodName(method),
+					WithIssuer("test_issuer"),
+					WithAudience("test_audience"),
+				)
+				require.ErrorIs(t, err, errCouldNotReadPrivateKeyFile)
+
+				src, err = NewJWTTokenSource(
+					WithECPrivateKeyPEMFile(f.Name()),
+					WithKeyID("key_id"),
+					WithSigningMethodName(method),
+					WithIssuer("test_issuer"),
+					WithAudience("test_audience"),
+				)
+				require.NoError(t, err)
+			} else {
+				if binary {
+					continue
+				}
+
+				publicKey, err = jwt.ParseRSAPublicKeyFromPEM([]byte(testRSAPublicKeyContent))
+				require.NoError(t, err)
+
+				_, err = f.WriteString(testRSAPrivateKeyContent)
+				require.NoError(t, err)
+				f.Close()
+
+				_, err = NewJWTTokenSource(
+					WithRSAPrivateKeyPEMFile("~/unknown_file"),
+					WithKeyID("key_id"),
+					WithSigningMethodName(method),
+					WithIssuer("test_issuer"),
+					WithAudience("test_audience"),
+				)
+				require.ErrorIs(t, err, errCouldNotReadPrivateKeyFile)
+
+				src, err = NewJWTTokenSource(
+					WithRSAPrivateKeyPEMFile(f.Name()),
+					WithKeyID("key_id"),
+					WithSigningMethodName(method),
+					WithIssuer("test_issuer"),
+					WithAudience("test_audience"),
+				)
+				require.NoError(t, err)
+			}
+
+			token, err := src.Token()
+			require.NoError(t, err)
+
+			// parse token
+			getPublicKey := func(*jwt.Token) (interface{}, error) {
+				return publicKey, nil
+			}
+
+			claims := jwt.RegisteredClaims{}
+			parsedToken, err := jwt.ParseWithClaims(token.Token, &claims, getPublicKey)
+			require.NoError(t, err)
+
+			require.True(t, parsedToken.Valid)
+			require.NoError(t, parsedToken.Claims.Valid())
+			require.Equal(t, "test_issuer", claims.Issuer)
+			require.Equal(t, "test_audience", claims.Audience[0])
+			require.Equal(t, "key_id", parsedToken.Header["kid"].(string))
+			require.Equal(t, method, parsedToken.Header["alg"].(string))
+		}
+	}
+}
+
+type parseSettingsFromFileTestParams struct {
+	Cfg                          string
+	CfgFile                      string
+	ExpectedError                error
+	ExpectedFormattedCredentials string
+}
+
+func TestParseSettingsFromFile(t *testing.T) {
+	testsParams := []parseSettingsFromFileTestParams{
+		{
+			Cfg: `{
+				"token-endpoint": "http://localhost:123",
+				"res": "tEst",
+				"grant-type": "grant",
+				"subject-credentials": {
+					"type": "fixed",
+					"token": "test-token",
+					"token-type": "test-token-type"
+				}
+			}`,
+			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:grant,Resource:tEst,Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:FixedTokenSource{Token:"****(CRC-32c: 1203ABFA)",Type:test-token-type},From:"TestParseSettingsFromFile"}`, //nolint:lll
+		},
+		{
+			Cfg: `{
+				"token-endpoint": "http://localhost:123",
+				"aud": "test-aud",
+				"scope": [
+					"s1",
+					"s2"
+				],
+				"unknown-field": [123],
+				"actor-credentials": {
+					"type": "fixed",
+					"token": "test-token",
+					"token-type": "test-token-type"
+				}
+			}`,
+			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:,Audience:[test-aud],Scope:[s1 s2],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,ActorToken:FixedTokenSource{Token:"****(CRC-32c: 1203ABFA)",Type:test-token-type},From:"TestParseSettingsFromFile"}`, //nolint:lll
+		},
+		{
+			Cfg: `{
+				"token-endpoint": "http://localhost:123",
+				"requested-token-type": "access_token",
+				"subject-credentials": {
+					"type": "JWT",
+					"alg": "ps256",
+					"private-key": "` + testRSAPrivateKeyJSONContent + `",
+					"aud": ["a1", "a2"],
+					"jti": "123",
+					"sub": "test_subject",
+					"iss": "test_issuer",
+					"kid": "test_key_id",
+					"ttl": "24h",
+					"unknown_field": [123]
+				}
+			}`,
+			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:,Audience:[],Scope:[],RequestedTokenType:access_token,SubjectToken:JWTTokenSource{Method:PS256,KeyID:test_key_id,Issuer:"test_issuer",Subject:"test_subject",Audience:[a1 a2],ID:123,TokenTTL:24h0m0s},From:"TestParseSettingsFromFile"}`, //nolint:lll
+		},
+		{
+			Cfg: `{
+				"token-endpoint": "http://localhost:123",
+				"subject-credentials": {
+					"type": "JWT",
+					"alg": "es256",
+					"private-key": "` + testECPrivateKeyJSONContent + `",
+					"ttl": "3m"
+				}
+			}`,
+			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:,Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:JWTTokenSource{Method:ES256,KeyID:,Issuer:"",Subject:"",Audience:[],ID:,TokenTTL:3m0s},From:"TestParseSettingsFromFile"}`, //nolint:lll
+		},
+		{
+			Cfg: `{
+				"token-endpoint": "http://localhost:123",
+				"subject-credentials": {
+					"type": "JWT",
+					"alg": "hs512",
+					"private-key": "` + testHMACSecretKeyBase64Content + `"
+				}
+			}`,
+			ExpectedFormattedCredentials: `OAuth2TokenExchange{Endpoint:"http://localhost:123",GrantType:urn:ietf:params:oauth:grant-type:token-exchange,Resource:,Audience:[],Scope:[],RequestedTokenType:urn:ietf:params:oauth:token-type:access_token,SubjectToken:JWTTokenSource{Method:HS512,KeyID:,Issuer:"",Subject:"",Audience:[],ID:,TokenTTL:1h0m0s},From:"TestParseSettingsFromFile"}`, //nolint:lll
+		},
+		{
+			Cfg: `{
+				"token-endpoint": "http://localhost:123",
+				"subject-credentials": {
+					"type": "JWT",
+					"alg": "rs512",
+					"private-key": "` + testHMACSecretKeyBase64Content + `"
+				}
+			}`,
+			ExpectedError: errCouldNotparsePrivateKey, // wrong private key format
+		},
+		{
+			Cfg: `{
+				"token-endpoint": "http://localhost:123",
+				"subject-credentials": {
+					"type": "JWT",
+					"alg": "es512",
+					"private-key": "` + testHMACSecretKeyBase64Content + `"
+				}
+			}`,
+			ExpectedError: errCouldNotparsePrivateKey, // wrong private key format
+		},
+		{
+			Cfg: `{
+				"token-endpoint": "http://localhost:123",
+				"subject-credentials": {
+					"type": "JWT",
+					"alg": "es512",
+					"private-key": "` + testRSAPrivateKeyJSONContent + `"
+				}
+			}`,
+			ExpectedError: errCouldNotparsePrivateKey, // wrong private key format
+		},
+		{
+			Cfg: `{
+				"token-endpoint": "http://localhost:123",
+				"subject-credentials": {
+					"type": "JWT",
+					"alg": "hs512",
+					"private-key": "<not base64>"
+				}
+			}`,
+			ExpectedError: errCouldNotParseBase64Secret, // wrong private key format
+		},
+		{
+			CfgFile:       "~/unknown-file.cfg",
+			ExpectedError: errCouldNotReadConfigFile,
+		},
+		{
+			Cfg:           "{not json",
+			ExpectedError: errCouldNotUnmarshalJSON,
+		},
+		{
+			Cfg: `{
+				"actor-credentials": ""
+			}`,
+			ExpectedError: errCouldNotUnmarshalJSON,
+		},
+		{
+			Cfg: `{
+				"subject-credentials": {
+					"type": "JWT",
+					"ttl": 123
+				}
+			}`,
+			ExpectedError: errCouldNotUnmarshalJSON,
+		},
+		{
+			Cfg: `{
+				"subject-credentials": {
+					"type": "JWT",
+					"ttl": "123"
+				}
+			}`,
+			ExpectedError: errCouldNotUnmarshalJSON,
+		},
+		{
+			Cfg: `{
+				"subject-credentials": {
+					"type": "JWT",
+					"ttl": "-3h"
+				}
+			}`,
+			ExpectedError: errTTLMustBePositive,
+		},
+		{
+			Cfg: `{
+				"actor-credentials": {
+					"type": "JWT",
+					"alg": "HS384"
+				}
+			}`,
+			ExpectedError: errAlgAndKeyRequired,
+		},
+		{
+			Cfg: `{
+				"actor-credentials": {
+					"type": "JWT",
+					"private-key": "1234"
+				}
+			}`,
+			ExpectedError: errAlgAndKeyRequired,
+		},
+		{
+			Cfg: `{
+				"actor-credentials": {
+					"type": "JWT",
+					"alg": "unknown",
+					"private-key": "1234"
+				}
+			}`,
+			ExpectedError: errUnsupportedSigningMethod,
+		},
+		{
+			Cfg: `{
+				"actor-credentials": {
+					"type": "JWT",
+					"ttl": "3h"
+				}
+			}`,
+			ExpectedError: errAlgAndKeyRequired,
+		},
+		{
+			Cfg: `{
+				"aud": {
+					"value": "wrong_format of aud: not string and not list"
+				},
+				"actor-credentials": {
+					"type": "fixed",
+					"token": "test-token",
+					"token-type": "test-token-type"
+				}
+			}`,
+			ExpectedError: errCouldNotUnmarshalJSON,
+		},
+		{
+			Cfg: `{
+				"actor-credentials": {
+					"type": "unknown"
+				}
+			}`,
+			ExpectedError: errUnknownTokenSourceType,
+		},
+		{
+			Cfg: `{
+				"subject-credentials": {
+					"token": "123"
+				}
+			}`,
+			ExpectedError: errUnknownTokenSourceType,
+		},
+		{
+			Cfg: `{
+				"subject-credentials": {
+					"type": "FIXED",
+					"token": "123"
+				}
+			}`,
+			ExpectedError: errTokenAndTokenTypeRequired,
+		},
+		{
+			Cfg: `{
+				"actor-credentials": {
+					"type": "Fixed",
+					"token-type": "t"
+				}
+			}`,
+			ExpectedError: errTokenAndTokenTypeRequired,
+		},
+	}
+	xtest.TestManyTimes(t, func(t testing.TB) {
+		for _, params := range testsParams {
+			var fileName string
+			if params.Cfg != "" {
+				f, err := os.CreateTemp("", "cfg-")
+				require.NoError(t, err)
+				defer os.Remove(f.Name())
+				_, err = f.WriteString(params.Cfg)
+				require.NoError(t, err)
+				f.Close()
+				fileName = f.Name()
+			} else {
+				fileName = params.CfgFile
+			}
+
+			client, err := NewOauth2TokenExchangeCredentialsFile(
+				fileName,
+				WithSourceInfo("TestParseSettingsFromFile"),
+			)
+			fmt.Printf("Cfg:\n%s\n", params.Cfg)
+			if params.ExpectedError != nil {
+				require.ErrorIs(t, err, params.ExpectedError)
+			} else {
+				require.NoError(t, err)
+				formatted := fmt.Sprint(client)
+				require.Equal(t, params.ExpectedFormattedCredentials, formatted)
+			}
+		}
+	})
 }
