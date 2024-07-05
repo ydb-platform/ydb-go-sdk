@@ -231,6 +231,7 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 	}
 }
 
+//nolint:funlen
 func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldReader batchedStreamReader) (err error) {
 	onDone := trace.TopicOnReaderReconnect(r.tracer, reason)
 	defer func() { onDone(err) }()
@@ -268,11 +269,15 @@ func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldRead
 	case err == nil:
 		// pass
 	case r.isRetriableError(err):
-		go func(reason error) {
-			// guarantee write reconnect signal to channel
-			r.reconnectFromBadStream <- newReconnectRequest(oldReader, reason)
-			trace.TopicOnReaderReconnectRequest(r.tracer, err, true)
-		}(err)
+		sendReason := err
+		r.background.Start("ydb topic reader send reconnect message", func(ctx context.Context) {
+			select {
+			case r.reconnectFromBadStream <- newReconnectRequest(oldReader, sendReason):
+				trace.TopicOnReaderReconnectRequest(r.tracer, err, true)
+			case <-ctx.Done():
+				trace.TopicOnReaderReconnectRequest(r.tracer, ctx.Err(), false)
+			}
+		})
 	default:
 		// unretriable error
 		_ = r.CloseWithError(ctx, err)

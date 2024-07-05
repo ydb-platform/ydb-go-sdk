@@ -82,7 +82,7 @@ func (c *Static) Token(ctx context.Context) (token string, err error) {
 	if time.Until(c.requestAt) > 0 {
 		return c.token, nil
 	}
-	cc, err := grpc.DialContext(ctx, c.endpoint, c.opts...) //nolint:staticcheck
+	cc, err := grpc.DialContext(ctx, c.endpoint, c.opts...) //nolint:staticcheck,nolintlint
 	if err != nil {
 		return "", xerrors.WithStackTrace(
 			fmt.Errorf("dial failed: %w", err),

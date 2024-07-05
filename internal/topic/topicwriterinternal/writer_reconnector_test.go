@@ -879,6 +879,70 @@ func TestCalculateAllowedCodecs(t *testing.T) {
 	}
 }
 
+func TestWriterReconnector_WaitInit(t *testing.T) {
+	t.Run("SuccessInit", func(t *testing.T) {
+		xtest.TestManyTimes(t, func(t testing.TB) {
+			initRequestReceived := make(empty.Chan)
+			env := newTestEnv(t, &testEnvOptions{
+				skipWaitInitResponse: true,
+				customInitRequestHandler: func(env *testEnv, req *rawtopicwriter.InitRequest) {
+					close(initRequestReceived)
+				},
+			})
+			<-initRequestReceived
+			go func() {
+				time.Sleep(time.Millisecond)
+				env.sendFromServer(&rawtopicwriter.InitResult{
+					ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{},
+					LastSeqNo:             0,
+					SessionID:             "session-" + t.Name(),
+					PartitionID:           env.partitionID,
+					SupportedCodecs:       rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw},
+				})
+			}()
+			_, err := env.writer.WaitInit(env.ctx)
+			require.NoError(t, err)
+		})
+	})
+	t.Run("Close", func(t *testing.T) {
+		xtest.TestManyTimes(t, func(t testing.TB) {
+			testErr := errors.New("test err")
+			initRequestReceived := make(empty.Chan)
+			env := newTestEnv(t, &testEnvOptions{
+				skipWaitInitResponse: true,
+				customInitRequestHandler: func(env *testEnv, req *rawtopicwriter.InitRequest) {
+					close(initRequestReceived)
+				},
+			})
+			<-initRequestReceived
+			go func() {
+				time.Sleep(time.Millisecond)
+				_ = env.writer.close(env.ctx, testErr)
+			}()
+			_, err := env.writer.WaitInit(env.ctx)
+			require.ErrorIs(t, err, testErr)
+		})
+	})
+	t.Run("InitContext", func(t *testing.T) {
+		xtest.TestManyTimes(t, func(t testing.TB) {
+			initRequestReceived := make(empty.Chan)
+			env := newTestEnv(t, &testEnvOptions{
+				skipWaitInitResponse: true,
+				customInitRequestHandler: func(env *testEnv, req *rawtopicwriter.InitRequest) {
+					close(initRequestReceived)
+				},
+			})
+			<-initRequestReceived
+
+			ctx, cancel := context.WithTimeout(env.ctx, time.Millisecond)
+			defer cancel()
+
+			_, err := env.writer.WaitInit(ctx)
+			require.ErrorIs(t, err, context.DeadlineExceeded)
+		})
+	})
+}
+
 func newTestMessageWithDataContent(num int) messageWithDataContent {
 	res := newMessageDataWithContent(PublicMessage{SeqNo: int64(num)}, testCommonEncoders)
 
@@ -952,9 +1016,11 @@ type testEnv struct {
 }
 
 type testEnvOptions struct {
-	writerOptions []PublicWriterOption
-	lastSeqNo     int64
-	topicCodecs   rawtopiccommon.SupportedCodecs
+	writerOptions            []PublicWriterOption
+	lastSeqNo                int64
+	topicCodecs              rawtopiccommon.SupportedCodecs
+	customInitRequestHandler func(env *testEnv, req *rawtopicwriter.InitRequest)
+	skipWaitInitResponse     bool
 }
 
 func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
@@ -989,19 +1055,25 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 
 	req := testCreateInitRequest(res.writer)
 
-	res.stream.EXPECT().Send(&req).Do(func(_ interface{}) {
-		supportedCodecs := rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw}
-		if options.topicCodecs != nil {
-			supportedCodecs = options.topicCodecs
-		}
-		res.sendFromServer(&rawtopicwriter.InitResult{
-			ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{},
-			LastSeqNo:             options.lastSeqNo,
-			SessionID:             "session-" + t.Name(),
-			PartitionID:           res.partitionID,
-			SupportedCodecs:       supportedCodecs,
+	if options.customInitRequestHandler == nil {
+		res.stream.EXPECT().Send(&req).Do(func(_ interface{}) {
+			supportedCodecs := rawtopiccommon.SupportedCodecs{rawtopiccommon.CodecRaw}
+			if options.topicCodecs != nil {
+				supportedCodecs = options.topicCodecs
+			}
+			res.sendFromServer(&rawtopicwriter.InitResult{
+				ServerMessageMetadata: rawtopiccommon.ServerMessageMetadata{},
+				LastSeqNo:             options.lastSeqNo,
+				SessionID:             "session-" + t.Name(),
+				PartitionID:           res.partitionID,
+				SupportedCodecs:       supportedCodecs,
+			})
+		}).Return(nil)
+	} else {
+		res.stream.EXPECT().Send(&req).Do(func(receivedRequest *rawtopicwriter.InitRequest) {
+			options.customInitRequestHandler(res, receivedRequest)
 		})
-	}).Return(nil)
+	}
 
 	streamClosed := make(empty.Chan)
 	res.stream.EXPECT().CloseSend().Do(func() {
@@ -1009,11 +1081,13 @@ func newTestEnv(t testing.TB, options *testEnvOptions) *testEnv {
 	})
 
 	res.writer.start()
-	require.NoError(t, res.writer.waitFirstInitResponse(res.ctx))
+	if !options.skipWaitInitResponse {
+		require.NoError(t, res.writer.waitFirstInitResponse(res.ctx))
+	}
 
 	t.Cleanup(func() {
-		_ = res.writer.close(context.Background(), errors.New("stop writer test environment"))
 		close(res.stopReadEvents)
+		_ = res.writer.close(context.Background(), errors.New("stop writer test environment"))
 		<-streamClosed
 	})
 
