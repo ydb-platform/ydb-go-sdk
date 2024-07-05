@@ -1,5 +1,7 @@
 * Fixed goroutine leak on close reader
-* Fixed hangup on writer WaitInit on error
+* Fixed topic reader and writer WaitInit hunging on unretriable connection error
+* Added `query.Client.Stats()` method
+* Added `query.Result.Stats()` method
 * Added `query.ResultSet.Index()` method
 * Support loading OAuth 2.0 token exchange credentials provider from config file
 * Added options for JWT tokens for loading EC private keys and HMAC secrets
@@ -12,11 +14,11 @@
 * Fixed bug with fail cast of grpc response to `operation.{Response,Status}`
 
 ## v3.74.3
-* Removed check the node is available for query and table service sessions
+* Removed check the node is available for query and table service sessions 
 * Refactored the `balancers.PreferLocations()` function - it is a clean/pure function
 * Added experimental `balancers.WithNodeID()` context modifier for define per request the YDB endpoint by NodeID
 * Reverted the allowing the casts from signed YDB types to unsigned destination types if source value is not negative
-* Replaced internal query session pool by default to stub for exclude impact from internal/pool
+* Replaced internal query session pool by default to stub for exclude impact from internal/pool 
 
 ## v3.74.2
 * Added description to scan errors with use query service client scanner
@@ -65,7 +67,7 @@
 ## v3.68.0
 * Added experimental `ydb.{Register,Unregister}DsnParser` global funcs for register/unregister external custom DSN parser for `ydb.Open` and `sql.Open` driver constructor
 * Simple implement option WithReaderWithoutConsumer
-* Fixed bug: topic didn't send specified partition number to a server
+* Fixed bug: topic didn't send specified partition number to a server 
 
 ## v3.67.2
 * Fixed incorrect formatting of decimal. Implementation of decimal has been reverted to latest working version
@@ -90,12 +92,12 @@
 * Added Flush method for topic writer
 
 ## v3.66.0
-* Added experimental package `retry/budget` for limit second and subsequent retry attempts
+* Added experimental package `retry/budget` for limit second and subsequent retry attempts 
 * Refactored internals for enabling `containedctx` linter
 * Fixed the hanging semaphore issue on coordination session reconnect
 
 ## v3.65.3
-* Fixed data race in `internal/conn.grpcClientStream`
+* Fixed data race in `internal/conn.grpcClientStream` 
 
 ## v3.65.2
 * Fixed data race using `log.WithNames`

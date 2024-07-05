@@ -1,48 +1,19 @@
 package stats
 
-import "time"
+import (
+	"github.com/ydb-platform/ydb-go-sdk/v3/internal/stats"
+)
 
 // QueryPhase holds query execution phase statistics.
-type QueryPhase interface {
-	// NextTableAccess returns next accessed table within query execution phase.
-	// If ok flag is false, then there are no more accessed tables and t is invalid.
-	NextTableAccess() (t *TableAccess, ok bool)
-	Duration() time.Duration
-	CPUTime() time.Duration
-	AffectedShards() uint64
-	IsLiteralPhase() bool
-}
+type QueryPhase = stats.QueryPhase
 
 // QueryStats holds query execution statistics.
-type QueryStats interface {
-	ProcessCPUTime() time.Duration
-	Compilation() (c *CompilationStats)
-	QueryPlan() string
-	QueryAST() string
-	TotalCPUTime() time.Duration
-	TotalDuration() time.Duration
-
-	// NextPhase returns next execution phase within query.
-	// If ok flag is false, then there are no more phases and p is invalid.
-	NextPhase() (p QueryPhase, ok bool)
-}
+type QueryStats = stats.QueryStats
 
 // CompilationStats holds query compilation statistics.
-type CompilationStats struct {
-	FromCache bool
-	Duration  time.Duration
-	CPUTime   time.Duration
-}
+type CompilationStats = stats.CompilationStats
 
 // TableAccess contains query execution phase's table access statistics.
-type TableAccess struct {
-	Name    string
-	Reads   OperationStats
-	Updates OperationStats
-	Deletes OperationStats
-}
+type TableAccess = stats.TableAccess
 
-type OperationStats struct {
-	Rows  uint64
-	Bytes uint64
-}
+type OperationStats = stats.OperationStats

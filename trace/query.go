@@ -2,6 +2,8 @@ package trace
 
 import (
 	"context"
+
+	"github.com/ydb-platform/ydb-go-genproto/protos/Ydb_TableStats"
 )
 
 // tool gtrace used from ./internal/cmd/gtrace
@@ -260,6 +262,7 @@ type (
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
 	QueryResultNextPartDoneInfo struct {
+		Stats *Ydb_TableStats.QueryStats
 		Error error
 	}
 	// Internals: https://github.com/ydb-platform/ydb-go-sdk/blob/master/VERSIONING.md#internals
