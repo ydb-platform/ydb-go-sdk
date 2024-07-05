@@ -33,3 +33,10 @@ func TestRegressionIssue1011_WriteInitInfoLastSeqNum(t *testing.T) {
 	info, err := w2.WaitInitInfo(scope.Ctx)
 	require.Equal(t, int64(1), info.LastSeqNum)
 }
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}

@@ -1,3 +1,5 @@
+* Fixed goroutine leak on close reader
+* Fixed hangup on writer WaitInit on error
 * Added `query.ResultSet.Index()` method
 * Support loading OAuth 2.0 token exchange credentials provider from config file
 * Added options for JWT tokens for loading EC private keys and HMAC secrets

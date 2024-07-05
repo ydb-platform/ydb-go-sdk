@@ -272,11 +272,15 @@ func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldRead
 	newStream, newStreamClose, err := r.connectWithTimeout()
 
 	if r.isRetriableError(err) {
-		go func(reason error) {
-			// guarantee write reconnect signal to channel
-			r.reconnectFromBadStream <- newReconnectRequest(oldReader, reason)
-			trace.TopicOnReaderReconnectRequest(r.tracer, err, true)
-		}(err)
+		sendReason := err
+		r.background.Start("ydb topic reader send reconnect message", func(ctx context.Context) {
+			select {
+			case r.reconnectFromBadStream <- newReconnectRequest(oldReader, sendReason):
+				trace.TopicOnReaderReconnectRequest(r.tracer, err, true)
+			case <-ctx.Done():
+				trace.TopicOnReaderReconnectRequest(r.tracer, ctx.Err(), false)
+			}
+		})
 	}
 
 	r.m.WithLock(func() {
