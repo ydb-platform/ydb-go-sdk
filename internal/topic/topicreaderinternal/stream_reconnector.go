@@ -231,6 +231,7 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 	}
 }
 
+//nolint:funlen
 func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldReader batchedStreamReader) (err error) {
 	onDone := trace.TopicOnReaderReconnect(r.tracer, reason)
 	defer func() { onDone(err) }()
