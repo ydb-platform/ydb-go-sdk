@@ -233,9 +233,7 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 
 func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldReader batchedStreamReader) (err error) {
 	onDone := trace.TopicOnReaderReconnect(r.tracer, reason)
-	defer func() {
-		onDone(err)
-	}()
+	defer func() { onDone(err) }()
 
 	if err = ctx.Err(); err != nil {
 		return err
