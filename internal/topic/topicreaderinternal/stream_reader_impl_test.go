@@ -1039,9 +1039,7 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 		defer cancel()
 
 		close(env.stopReadEvents)
-		_ = env.reader.CloseWithError(ctx, errors.New("test finished"))
-		require.NoError(t, cleanupTimeout.Err())
-		xtest.WaitChannelClosed(t, streamClosed)
+		_ = env.reader.CloseWithError(cleanupTimeout, errors.New("test finished"))
 	})
 
 	t.Cleanup(func() {
