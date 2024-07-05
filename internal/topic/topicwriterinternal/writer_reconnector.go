@@ -571,8 +571,6 @@ func (w *WriterReconnector) WaitInit(ctx context.Context) (info InitialInfo, err
 		return InitialInfo{}, w.background.CloseReason()
 	case <-w.initDoneCh:
 		return w.initInfo, nil
-	case <-w.background.Done():
-		return InitialInfo{}, w.background.CloseReason()
 	}
 }
 
