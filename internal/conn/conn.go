@@ -209,7 +209,7 @@ func (c *conn) realConn(ctx context.Context) (cc *grpc.ClientConn, err error) {
 	// three slashes in "ydb:///" is ok. It needs for good parse scheme in grpc resolver.
 	address := "ydb:///" + c.endpoint.Address()
 
-	cc, err = grpc.DialContext(ctx, address, append( //nolint:staticcheck
+	cc, err = grpc.DialContext(ctx, address, append( //nolint:staticcheck,nolintlint
 		[]grpc.DialOption{
 			grpc.WithStatsHandler(statsHandler{}),
 		}, c.config.GrpcDialOptions()...,
