@@ -1,3 +1,4 @@
+* Fixed topic reader and writer WaitInit hunging on unretriable connection error
 * Added `query.Client.Stats()` method
 * Added `query.Result.Stats()` method
 * Added `query.ResultSet.Index()` method

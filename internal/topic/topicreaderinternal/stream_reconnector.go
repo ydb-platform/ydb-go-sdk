@@ -36,7 +36,6 @@ type readerReconnector struct {
 	streamVal                  batchedStreamReader
 	streamContextCancel        context.CancelCauseFunc
 	streamErr                  error
-	closedErr                  error
 	initErr                    error
 	tracer                     *trace.Topic
 	readerConnect              readerConnectFunc
@@ -139,14 +138,10 @@ func (r *readerReconnector) Commit(ctx context.Context, commitRange commitRange)
 	return err
 }
 
-func (r *readerReconnector) CloseWithError(ctx context.Context, err error) error {
+func (r *readerReconnector) CloseWithError(ctx context.Context, reason error) error {
 	var closeErr error
 	r.closeOnce.Do(func() {
-		r.m.WithLock(func() {
-			r.closedErr = err
-		})
-
-		closeErr = r.background.Close(ctx, err)
+		closeErr = r.background.Close(ctx, reason)
 
 		if r.streamVal != nil {
 			streamCloseErr := r.streamVal.CloseWithError(ctx, xerrors.WithStackTrace(errReaderClosed))
@@ -158,7 +153,7 @@ func (r *readerReconnector) CloseWithError(ctx context.Context, err error) error
 
 		r.m.WithLock(func() {
 			if !r.initDone {
-				r.initErr = closeErr
+				r.initErr = reason
 				close(r.initDoneCh)
 			}
 		})
@@ -238,9 +233,7 @@ func (r *readerReconnector) reconnectionLoop(ctx context.Context) {
 
 func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldReader batchedStreamReader) (err error) {
 	onDone := trace.TopicOnReaderReconnect(r.tracer, reason)
-	defer func() {
-		onDone(err)
-	}()
+	defer func() { onDone(err) }()
 
 	if err = ctx.Err(); err != nil {
 		return err
@@ -248,7 +241,7 @@ func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldRead
 
 	var closedErr error
 	r.m.WithRLock(func() {
-		closedErr = r.closedErr
+		closedErr = r.background.CloseReason()
 	})
 	if closedErr != nil {
 		return err
@@ -271,12 +264,18 @@ func (r *readerReconnector) reconnect(ctx context.Context, reason error, oldRead
 
 	newStream, newStreamClose, err := r.connectWithTimeout()
 
-	if r.isRetriableError(err) {
+	switch {
+	case err == nil:
+		// pass
+	case r.isRetriableError(err):
 		go func(reason error) {
 			// guarantee write reconnect signal to channel
 			r.reconnectFromBadStream <- newReconnectRequest(oldReader, reason)
 			trace.TopicOnReaderReconnectRequest(r.tracer, err, true)
 		}(err)
+	default:
+		// unretriable error
+		_ = r.CloseWithError(ctx, err)
 	}
 
 	r.m.WithLock(func() {
@@ -358,6 +357,8 @@ func (r *readerReconnector) WaitInit(ctx context.Context) error {
 		return ctx.Err()
 	case <-r.initDoneCh:
 		return r.initErr
+	case <-r.background.Done():
+		return r.background.CloseReason()
 	}
 }
 
@@ -385,11 +386,7 @@ func (r *readerReconnector) stream(ctx context.Context) (batchedStreamReader, er
 	var connectionChan empty.Chan
 	r.m.WithRLock(func() {
 		connectionChan = r.streamConnectionInProgress
-		if r.closedErr != nil {
-			err = r.closedErr
-
-			return
-		}
+		err = r.background.CloseReason()
 	})
 	if err != nil {
 		return nil, err
@@ -399,7 +396,7 @@ func (r *readerReconnector) stream(ctx context.Context) (batchedStreamReader, er
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case <-r.background.Done():
-		return nil, r.closedErr
+		return nil, r.background.CloseReason()
 	case <-connectionChan:
 		var reader batchedStreamReader
 		r.m.WithRLock(func() {
