@@ -215,7 +215,7 @@ func Format(x *big.Int, precision, scale uint32) string {
 	}
 
 	v := big.NewInt(0).Set(x)
-	neg := x.Sign() < 0
+	neg := x.Sign() < 0 //nolint:ifshort,nolintlint
 	if neg {
 		// Convert negative to positive.
 		v.Neg(x)
