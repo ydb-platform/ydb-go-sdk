@@ -1035,11 +1035,8 @@ func newTopicReaderTestEnv(t testing.TB) streamEnv {
 	})
 
 	t.Cleanup(func() {
-		cleanupTimeout, cancel := xcontext.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-
 		close(env.stopReadEvents)
-		_ = env.reader.CloseWithError(cleanupTimeout, errors.New("test finished"))
+		_ = env.reader.CloseWithError(ctx, errors.New("test finished"))
 	})
 
 	t.Cleanup(func() {
