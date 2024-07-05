@@ -482,6 +482,7 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 
 			strm.EXPECT().Recv().Do(func() {
 				xtest.WaitChannelClosed(t, streamClosed)
+				t.Logf("channel closed: %v", name)
 			}).Return(nil, errors.New("test stream closed")).MaxTimes(1)
 
 			return strm
@@ -542,7 +543,9 @@ func TestWriterImpl_Reconnect(t *testing.T) {
 		err := w.Write(ctx, newTestMessages(1))
 		require.NoError(t, err)
 
+		t.Log("Waiting to connection loop stopped...")
 		xtest.WaitChannelClosedWithTimeout(t, connectionLoopStopped, 4*time.Second)
+		t.Log("Connection loop stopped")
 	})
 }
 
